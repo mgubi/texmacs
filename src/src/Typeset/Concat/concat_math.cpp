@@ -20,7 +20,7 @@
 void
 concater_rep::typeset_large (tree t, path ip, int tp, int otp, string prefix) {
   font old_fn= env->fn;
-  if (hand_tuned_math_fonts && starts (locase_all (old_fn->res_name), "stix-"))
+  if (hand_tuned_math_fonts && starts (old_fn->res_name, "stix-"))
     //if (old_fn->type == FONT_TYPE_UNICODE)
     env->fn= rubber_font (old_fn);
   
@@ -448,21 +448,34 @@ concater_rep::typeset_sqrt (tree t, path ip) {
   }
   SI sep= env->fn->sep;
   font lfn= env->fn;
-  bool stix= hand_tuned_math_fonts &&
-             starts (locase_all (lfn->res_name), "stix-");
+  bool stix= hand_tuned_math_fonts && starts (lfn->res_name, "stix-");
   if (stix) lfn= rubber_font (lfn);
   SI   gap= (3 * sep >> 1);
+  SI   clr= 0, thick= 0;
   bool use_opentype=
-      lfn->ot_math && (lfn->sqrt_ver_gap > 0);
+      lfn->math_type == MATH_TYPE_OPENTYPE && lfn->ot_math &&
+      (lfn->sqrt_ver_gap > 0);
   if (use_opentype) {
-    gap=
-        (disp ? lfn->sqrt_ver_disp_gap : lfn->sqrt_ver_gap) + (lfn->wline >> 1);
+    // the sign reaches from the bottom of the radicand to the top of the
+    // rule, which lies above the gap
+    clr  = disp ? lfn->sqrt_ver_disp_gap : lfn->sqrt_ver_gap;
+    thick= lfn->sqrt_rule_thickness;
+    gap  = clr + thick;
   }
   box sqrtb= delimiter_box (decorate_left (ip), "<large-sqrt>",
                             lfn, env->pen, b->y1, b->y2 + gap);
   if (stix) sqrtb= shift_box (decorate_left (ip), sqrtb,
                               -env->fn->wline/2, -env->fn->wline/3,
                               false, true);
+  if (use_opentype) {
+    // a sign which is taller than needed leaves half of the excess above
+    // the radicand and half of it below, as in TeX
+    SI excess= max (sqrtb->h () - (b->h () + gap), 0);
+    SI top   = b->y2 + gap + (excess >> 1);
+    if (top != sqrtb->y2)
+      sqrtb= shift_box (decorate_left (ip), sqrtb, 0, top - sqrtb->y2,
+                        false, true);
+  }
   print (sqrt_box (ip, b, ind, sqrtb, env->fn, env->pen));
 }
 
@@ -471,12 +484,15 @@ concater_rep::typeset_wide (tree t, path ip, bool above) {
   if (N(t) != 2) { typeset_error (t, ip); return; }
   tree body= t[0];
   // dotless i and j under accents, from the font (GSUB feature dtls)
-  if (above && env->fn->ot_math && is_atomic (body) &&
+  if (above && env->fn->math_type == MATH_TYPE_OPENTYPE &&
+      env->fn->ot_math && is_atomic (body) &&
       (body == "i" || body == "j")) {
     string r;
     if (env->fn->get_feature_variant (body->label, "dtls", 0, r)) body= r;
   }
   box b= typeset_as_concat (env, body, descend (ip, 0));
+  // the positions in the substituted glyph are those of the letter
+  if (body != t[0]) b= symbol_box (descend (ip, 0), b, N(t[0]->label));
   string s= env->exec_string (t[1]);
   if (s == "^") s= "<hat>";
   if (s == "~") s= "<tilde>";
@@ -529,8 +545,11 @@ concater_rep::typeset_neg (tree t, path ip) {
     hashmap<string,string>& neg= negated_symbols ();
     string s= t[0]->label;
     if (neg->contains (s) && env->fn->supports (neg[s])) {
+      // the positions in the negated symbol are those of the relation,
+      // inside a box for the negation itself
       box b= typeset_as_concat (env, tree (neg[s]), descend (ip, 0));
-      print_semantic (b, t[0]);
+      b= symbol_box (descend (ip, 0), b, N(s));
+      print_semantic (move_box (ip, b, 0, 0, true, true), t[0]);
       return;
     }
   }
@@ -607,8 +626,7 @@ concater_rep::typeset_around (tree t, path ip, bool colored) {
         SI adjust= env->fn->double_bracket_correct;
         font old_fn= env->fn;
         font new_fn= env->fn;
-        if (hand_tuned_math_fonts &&
-            starts (locase_all (new_fn->res_name), "stix-"))
+        if (hand_tuned_math_fonts && starts (new_fn->res_name, "stix-"))
           //if (new_fn->type == FONT_TYPE_UNICODE)
           new_fn= rubber_font (new_fn);
         env->fn= new_fn;

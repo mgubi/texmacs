@@ -85,7 +85,7 @@ tt_face_rep::tt_face_rep (string name): rep<tt_face> (name) {
 
   // the font file may contain an OpenType MATH table;
   // parse it from the buffer that we already hold in memory
-  math_table= parse_mathtable (string ((const char*) buffer, (int) fsize));
+  math_table= parse_mathtable ((const char*) buffer, (int) fsize);
   if (!is_nil (math_table) && DEBUG_VERBOSE) {
     debug_fonts << "Found MATH table for font " << name << "\n";
     dump_mathtable (debug_fonts, math_table);
@@ -97,7 +97,7 @@ tt_face_rep::gsub_feature (string tag) {
   if (!gsub_features->contains (tag)) {
     ot_gsub_map m;
     if (buffer != nullptr)
-      m= parse_gsub_feature (string ((const char*) buffer, buffer_size), tag);
+      m= parse_gsub_feature ((const char*) buffer, buffer_size, tag);
     gsub_features (tag)= m;
   }
   return gsub_features (tag);
@@ -108,7 +108,7 @@ tt_face_rep::gsub_tags () {
   if (!gsub_tags_ready) {
     if (buffer != nullptr)
       gsub_tag_list=
-        parse_gsub_tags (string ((const char*) buffer, buffer_size));
+        parse_gsub_tags ((const char*) buffer, buffer_size);
     gsub_tags_ready= true;
   }
   return gsub_tag_list;
@@ -119,7 +119,7 @@ tt_face_rep::gpos_kern () {
   if (!gpos_kern_ready) {
     if (buffer != nullptr)
       gpos_kern_table=
-        parse_gpos_kern (string ((const char*) buffer, buffer_size));
+        parse_gpos_kern ((const char*) buffer, buffer_size);
     gpos_kern_ready= true;
   }
   return gpos_kern_table;

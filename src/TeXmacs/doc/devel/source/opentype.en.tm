@@ -136,7 +136,7 @@
   introduced the support, and are more detailed on its history and status:
 
   <\description-paragraphs>
-    <item*|<source-link|src/src/OPENTYPEMATH.md|src/OPENTYPEMATH.md>>A summary of what is
+    <item*|<source-link|src/doc/OPENTYPEMATH.md|doc/OPENTYPEMATH.md>>A summary of what is
     implemented, the build and test instructions, and a specimen of every
     profiled font.
 

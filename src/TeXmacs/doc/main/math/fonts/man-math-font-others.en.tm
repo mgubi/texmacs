@@ -82,7 +82,7 @@
   installation and of your <TeXmacs> home directory (<verbatim|~/.TeXmacs>,
   or the folder <verbatim|TeXmacs> of the application data on <name|Windows>),
   in the font directories of your system, in the <TeX> Live installations it
-  finds (of any year on <name|macOS>, of 2020 to 2022 on <name|Linux>), and
+  finds (of any year, on <name|macOS> and <name|Linux>), and
   in the directories listed in the environment variable
   <verbatim|TEXMACS_FONT_PATH>, which is the way to point it at another
   <TeX> Live. To add a font:

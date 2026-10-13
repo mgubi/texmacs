@@ -110,7 +110,7 @@ struct MathValueRecord {
   int         value;
   bool        hasDevice;
   DeviceTable deviceTable;
-  MathValueRecord () : hasDevice (false) {}
+  MathValueRecord () : value (0), hasDevice (false) {}
 
   // cast to int
 //  operator int () const { return value; }
@@ -125,7 +125,10 @@ struct MathConstantsTable {
   int                    radicalDegreeBottomRaisePercent;
 
   MathConstantsTable ()
-      : records (MathConstantRecordEnum::otmathConstantsRecordsEnd){};
+      : records (MathConstantRecordEnum::otmathConstantsRecordsEnd),
+        scriptPercentScaleDown (0), scriptScriptPercentScaleDown (0),
+        delimitedSubFormulaMinHeight (0), displayOperatorMinHeight (0),
+        radicalDegreeBottomRaisePercent (0) {};
 
   int operator[] (int i) {
     if (i >= 0 && i < MathConstantRecordEnum::otmathConstantsRecordsEnd)
@@ -151,7 +154,7 @@ struct MathKernTable {
   unsigned int           heightCount;
   array<MathValueRecord> correctionHeight;
   array<MathValueRecord> kernValues;
-  MathKernTable ()= default;
+  MathKernTable () : heightCount (0) {}
   MathKernTable (unsigned int h)
       : heightCount (h), correctionHeight (h), kernValues (h + 1) {}
 };
@@ -185,6 +188,7 @@ struct GlyphAssembly {
   MathValueRecord        italicsCorrection;
   array<GlyphPartRecord> partRecords;
   int                    partCount;
+  GlyphAssembly () : partCount (0) {}
 
 //  const GlyphPartRecord& operator[] (int i) { return partRecords[i]; }
 };
@@ -219,16 +223,21 @@ struct ot_mathtable {
 };
 CONCRETE_NULL_CODE (ot_mathtable);
 
+// the file is given as a string, or as the buffer which holds it
 ot_mathtable parse_mathtable (const string& buf);
+ot_mathtable parse_mathtable (const char* buf, int n);
 
 /******************************************************************************
  * OpenType GSUB: single and alternate substitutions of one feature
  ******************************************************************************/
 // glyph -> substitutes (one for single substitutions, the alternates in
-// order for alternate substitutions), for all lookups of the feature tag
+// order for alternate substitutions), for the lookups which the feature tag
+// has in the default language system of each script
 typedef hashmap<unsigned int, array<unsigned int> > ot_gsub_map;
 ot_gsub_map parse_gsub_feature (const string& buf, string feature);
+ot_gsub_map parse_gsub_feature (const char* buf, int n, string feature);
 array<string> parse_gsub_tags (const string& buf);
+array<string> parse_gsub_tags (const char* buf, int n);
 
 /******************************************************************************
  * OpenType GPOS: pair kerning
@@ -238,19 +247,25 @@ array<string> parse_gsub_tags (const string& buf);
 // adjustments of the 'kern' feature: the explicit pairs of a format 1
 // subtable and the class matrices of a format 2 one.
 
-struct ot_kern_classes {
-  hashset<unsigned int>      coverage;
+// one pair adjustment subtable: explicit pairs, or two classifications of
+// the glyphs and a matrix
+struct ot_kern_subtable {
+  hashset<unsigned int>      coverage; // the left glyphs it applies to
+  bool                       by_class;
+  hashmap<unsigned int, int> pairs;    // (left << 16) | right -> x advance
   hashmap<unsigned int, int> class1, class2;
-  array<int>                 values; // class1_count x class2_count
+  array<int>                 values;   // class1_count x class2_count
   int                        class1_count, class2_count;
-  ot_kern_classes ()
-      : class1 (0), class2 (0), class1_count (0), class2_count (0) {}
+  ot_kern_subtable ()
+      : by_class (false), pairs (0), class1 (0), class2 (0),
+        class1_count (0), class2_count (0) {}
 };
 
 struct ot_gpos_kern_rep : concrete_struct {
-  hashmap<unsigned int, int> pairs; // (left << 16) | right -> x advance
-  array<ot_kern_classes>     classes;
-  ot_gpos_kern_rep () : pairs (0) {}
+  // the subtables of each lookup of the feature, in the order of the font
+  array<array<ot_kern_subtable> > lookups;
+  hashmap<unsigned int, int>      cache; // the pairs already asked for
+  ot_gpos_kern_rep () : cache (0) {}
   bool empty ();
   // horizontal adjustment in design units, zero when the pair is not kerned
   int  get (unsigned int left, unsigned int right);
@@ -263,6 +278,7 @@ struct ot_gpos_kern {
 CONCRETE_NULL_CODE (ot_gpos_kern);
 
 ot_gpos_kern parse_gpos_kern (const string& buf);
+ot_gpos_kern parse_gpos_kern (const char* buf, int n);
 ot_mathtable parse_mathtable (url u);
 void dump_mathtable (tm_ostream& str, ot_mathtable table);
 

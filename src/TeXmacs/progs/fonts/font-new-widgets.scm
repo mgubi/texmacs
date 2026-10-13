@@ -438,8 +438,10 @@
   ;; through the logical font, which is what the sample text is set in:
   ;; a lookup by family and style alone misses the substitutions the font
   ;; selection makes, and answers nothing for a style it does not know
+  ;; (the family alone: with the rules of the customization the search
+  ;; takes the whole value for the name of one family)
   (with fn (selector-get-font specs)
-    (with l (font-logical-search (logical-font-family* specs fn)
+    (with l (font-logical-search (logical-font-family fn)
                                  (logical-font-variant fn)
                                  (logical-font-series fn)
                                  (logical-font-shape fn))

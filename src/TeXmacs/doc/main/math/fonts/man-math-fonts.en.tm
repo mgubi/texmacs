@@ -8,7 +8,7 @@
   A formula is set in a <em|mathematical font>: a font which, besides
   letters and digits, has the symbols, the delimiters in several sizes and
   the big operators which mathematics needs, and which says how they are to
-  be placed. <TeXmacs> comes with a dozen such fonts, each paired with text
+  be placed. <TeXmacs> comes with about two dozen such fonts, each paired with text
   fonts of the same design, and it uses others when they are installed on
   your system. This section explains how the mathematical fonts work, shows
   every font which comes with <TeXmacs>, and lists the ones you may add.

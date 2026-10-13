@@ -123,7 +123,7 @@
 
   <paragraph*|DejaVu>
 
-  The DejaVu fonts, wide and very legible on the screen, with a mathematical companion in the style of the <name|TeX Gyre> fonts; they have sans serif and typewriter faces of their own, and condensed ones. Text: DejaVu Serif; mathematics: TeX Gyre DejaVu Math; in <LaTeX>: <verbatim|dejavu-otf>.
+  The DejaVu fonts, wide and very legible on the screen, with a mathematical companion in the style of the <name|TeX Gyre> fonts; they have sans serif and typewriter faces of their own, and condensed ones, the entry <menu|Condensed> of the submenu <menu|DejaVu>. Text: DejaVu Serif; mathematics: TeX Gyre DejaVu Math; in <LaTeX>: <verbatim|dejavu-otf>.
 
   <\with|font|DejaVu>
     Text in <em|italic>, <strong|bold>, <samp|sans serif> and <verbatim|typewriter>: the quick brown fox jumps over the lazy dog, 0123456789.
@@ -368,7 +368,7 @@
 
   <paragraph*|IBM Plex>
 
-  IBM's corporate family, with serif, sans serif and typewriter faces and a complete mathematical font of recent design. The text is set in IBM Plex Sans; IBM Plex Serif stays in the section <menu|Text only> of the submenu <menu|Serif>. Text: IBM Plex Sans; mathematics: IBM Plex Math; in <LaTeX>: <verbatim|plex-otf>, or <verbatim|unicode-math> with IBM Plex Math.
+  IBM's corporate family, with serif, sans serif and typewriter faces and a complete mathematical font of recent design. The text is set in IBM Plex Sans; IBM Plex Serif stays in the section <menu|Text only> of the submenu <menu|Serif>. The submenu <menu|IBM Plex> also sets the document in the weights Text, Light and Medium and in the condensed width, and <menu|Format|Weight> reaches the eight weights of the family, from Thin to Bold. Text: IBM Plex Sans; mathematics: IBM Plex Math; in <LaTeX>: <verbatim|plex-otf>, or <verbatim|unicode-math> with IBM Plex Math.
 
   <\with|font|IBM Plex|font-family|ss>
     Text in <em|italic>, <strong|bold>, <samp|sans serif> and <verbatim|typewriter>: the quick brown fox jumps over the lazy dog, 0123456789.
@@ -449,7 +449,7 @@
   </big-table>
 
   <\big-table|<tabular|<tformat|<cwith|1|1|1|-1|cell-bborder|1ln>|<cwith|1|-1|1|-1|cell-lsep|0.5em>|<cwith|1|-1|1|-1|cell-rsep|0.5em>|<table|<row|<cell|<em|font>>|<cell|<em|sans serif, typewriter>>|<cell|<em|license>>>|<row|<cell|Latin Modern>|<cell|LM Sans, LM Mono>|<cell|GUST>>|<row|<cell|New Computer Modern>|<cell|NewCM Sans, NewCM Mono>|<cell|GUST>>|<row|<cell|Times>|<cell|Heros, Inconsolata>|<cell|GUST, OFL>>|<row|<cell|Palatino>|<cell|Heros, Inconsolata>|<cell|GUST, OFL>>|<row|<cell|Bookman>|<cell|Adventor, Inconsolata>|<cell|GUST, OFL>>|<row|<cell|Schoolbook>|<cell|Heros, Inconsolata>|<cell|GUST, OFL>>|<row|<cell|DejaVu>|<cell|DejaVu Sans, DejaVu Sans Mono>|<cell|GUST, Bitstream Vera>>|<row|<cell|STIX Two>|<cell|none>|<cell|OFL>>|<row|<cell|Libertinus>|<cell|Libertinus Sans, Mono>|<cell|OFL>>|<row|<cell|Kp Fonts>|<cell|KpSans, KpMono>|<cell|OFL>>|<row|<cell|Utopia>|<cell|none>|<cell|OFL>>|<row|<cell|Charter>|<cell|none>|<cell|OFL, Bitstream>>|<row|<cell|Euler>|<cell|Heros, Inconsolata>|<cell|OFL, GUST>>|<row|<cell|Concrete>|<cell|none>|<cell|OFL>>|<row|<cell|Garamond>|<cell|Inconsolata (typewriter)>|<cell|OFL>>|<row|<cell|Old Standard>|<cell|Heros, Inconsolata>|<cell|OFL, GUST>>|<row|<cell|Fira>|<cell|Fira Mono>|<cell|OFL>>|<row|<cell|Kp Sans>|<cell|KpMono>|<cell|OFL>>|<row|<cell|Computer Modern Sans>|<cell|NewCM Sans, NewCM Mono>|<cell|GUST>>|<row|<cell|Lete Sans>|<cell|none>|<cell|OFL>>|<row|<cell|Noto Sans>|<cell|Noto Sans, Noto Sans Mono>|<cell|OFL>>|<row|<cell|IBM Plex>|<cell|Plex Sans, Plex Mono>|<cell|OFL>>|<row|<cell|GFS Neohellenic>|<cell|Inconsolata (typewriter)>|<cell|OFL>>>>>>
-    The sans serif and typewriter companions which come with <TeXmacs>, and the licenses of the fonts involved: the GUST Font License or the SIL Open Font License (OFL). Old Standard Math is under the GUST Font License, the Old Standard text faces under the OFL; Inconsolata is under the OFL. The DejaVu text faces are under the license of the Bitstream Vera fonts, with the changes of DejaVu in the public domain.
+    The sans serif and typewriter companions which come with <TeXmacs>, and the licenses of the fonts involved: the GUST Font License or the SIL Open Font License (OFL). Old Standard Math is under the GUST Font License, the Old Standard text faces under the OFL; Inconsolata is under the OFL, its bold face under the Apache License 2.0. The DejaVu text faces are under the license of the Bitstream Vera fonts, with the changes of DejaVu in the public domain.
   </big-table>
 
   <tmdoc-copyright|2026|Massimiliano Gubinelli>

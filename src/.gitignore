@@ -1,6 +1,5 @@
 
-# temp , to be removed
-plugins/scilab/*
+# written by configure and by the build
 packages/android/AndroidManifest.xml
 packages/android/res/values/
 

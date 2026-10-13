@@ -64,13 +64,11 @@ Makefile still links QtTest into every binary, with the macOS
 `-framework QtTest`). `tests/Makefile` builds both kinds, and runs `moc` only
 on the sources which declare a `Q_OBJECT`.
 
-`make -C tests TM_TEST_FONT_DIR=/path/to/fonts` points to a directory,
-searched recursively, with the fonts the OpenType tests need. Latin Modern
-Math and STIX Two Math are shipped in the tree now, but the tests still look
-for them through this variable and skip themselves when it is not set:
-without it, 19 of the 143 tests of the 18 binaries skip, 18 of them in
-`opentype_font_test`. Pointing it at `TeXmacs/fonts/truetype` runs them all;
-other fonts, Asana Math for instance, are genuinely external.
+The OpenType tests use the fonts shipped in `TeXmacs/fonts/truetype`, so a
+plain `make -C tests` runs them. `make -C tests TM_TEST_FONT_DIR=/path/to/fonts`
+adds a directory, searched recursively, for the fonts which are not shipped,
+Asana Math for instance; a test which needs such a font and does not find it
+reports itself as skipped.
 `opentype_font_test` covers the MATH constants, variants and assemblies of
 the fonts it finds, the corrections and kerning hooks, and the profiles:
 `test_profile_file` reads `fonts-opentype.scm` and checks every key and
@@ -346,7 +344,7 @@ slash without variants (Fira Math) keeps being stretched.
 ## Other tools
 
 `tests/opentype/font-gallery.sh` renders one specimen per math font into a
-PNG, for the gallery of `src/OPENTYPEMATH.md`: without arguments it asks
+PNG, for the gallery of `doc/OPENTYPEMATH.md`: without arguments it asks
 TeXmacs for the installed profiled fonts (`opentype-math-font-list`) and
 puts the TeX fonts and the first STIX in front as references, and
 families can be given instead, separated by `|`. Options: `-o outdir`

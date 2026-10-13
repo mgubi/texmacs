@@ -12,8 +12,9 @@
 // These tests exercise the path from a MATH table to font parameters,
 // glyph corrections and rubber characters. They need an OpenType math font
 // that is not special-cased by name in unicode_font.cpp; we use Latin Modern
-// Math, found through TM_TEST_FONT_DIR (see tests/Makefile). Expected design
-// unit values come from fontTools.
+// Math and the other fonts which come with TeXmacs. TM_TEST_FONT_DIR (see
+// tests/Makefile) adds a directory of fonts, for the tests of fonts which
+// are not shipped. Expected design unit values come from fontTools.
 
 #include "tm_test.hpp"
 #include <stdlib.h>
@@ -42,15 +43,16 @@ static bool have_lm= false;
 static SI   du_y (int du);
 static SI   du_x (int du);
 
+extern void init_tex (); // from Plugins/Metafont/tex_init.cpp
+
 static void
 test_setup () {
+  // the search paths of the TeX fonts, which the font "roman" is made of
+  init_tex ();
   string dir= get_env ("TM_TEST_FONT_DIR");
-  have_lm= false;
-  if (dir != "") {
-    setenv ("TEXMACS_FONT_PATH", as_charp (dir), 1);
-    have_lm= tt_font_exists ("latinmodern-math");
-    if (have_lm) lm= unicode_font ("latinmodern-math", LM_SIZE, LM_DPI);
-  }
+  if (dir != "") setenv ("TEXMACS_FONT_PATH", as_charp (dir), 1);
+  have_lm= tt_font_exists ("latinmodern-math");
+  if (have_lm) lm= unicode_font ("latinmodern-math", LM_SIZE, LM_DPI);
 }
 
 static SI
@@ -65,17 +67,18 @@ du_x (int du) {
 
 static void
 test_shipped_fonts_keep_legacy_math_type () {
-  // Documents the current behaviour: the TeX Gyre math fonts and the STIX
-  // text fonts take the hand-tuned branches of unicode_font.cpp and do not
-  // use their MATH table yet. STIXMath-Regular does not match the "STIX-"
-  // prefix, so it already goes through the OpenType path.
+  // The TeX Gyre math fonts and the STIX text fonts take the hand-tuned
+  // branches of unicode_font.cpp and do not use their MATH table: they are
+  // typeset as before there was any support for it. STIXMath-Regular does
+  // not match the "STIX-" prefix, so it goes through the OpenType path.
   font pag= unicode_font ("texgyrepagella-math", LM_SIZE, LM_DPI);
   CHECK (!is_nil (pag));
   CHECK_EQ (pag->math_type, MATH_TYPE_TEX_GYRE);
-  // ... but the MATH table is loaded underneath the hand-tuned tables
-  CHECK (pag->ot_math);
-  CHECK_EQ (pag->frac_rule_thickness, (SI) tm_round (60 * LM_SIZE * pag->hpt / 1000.0));
-  CHECK (pag->is_extended_shape ("<#222B>"));
+  CHECK (!pag->ot_math);
+  CHECK_EQ (pag->frac_rule_thickness, (SI) 0);
+  CHECK (!pag->is_extended_shape ("<#222B>"));
+  // the rubber font is the one of a font without MATH table
+  CHECK (!occurs ("rubberunicode-ot", rubber_font (pag)->res_name));
   font stix= unicode_font ("STIX-Regular", LM_SIZE, LM_DPI);
   CHECK (!is_nil (stix));
   CHECK_EQ (stix->math_type, MATH_TYPE_STIX);
@@ -86,7 +89,7 @@ test_shipped_fonts_keep_legacy_math_type () {
 
 static void
 test_activation () {
-  if (!have_lm) SKIP ("set TM_TEST_FONT_DIR to a directory containing latinmodern-math.otf");
+  if (!have_lm) SKIP ("no Latin Modern Math");
   CHECK (!is_nil (lm));
   CHECK_EQ (lm->type, FONT_TYPE_UNICODE);
   CHECK_EQ (lm->math_type, MATH_TYPE_OPENTYPE);
@@ -194,8 +197,7 @@ test_big_operators () {
 static void
 test_kerning_at_height () {
   // STIX Two Math has MathKernInfo; Latin Modern Math does not.
-  if (get_env ("TM_TEST_FONT_DIR") == "" || !tt_font_exists ("STIXTwoMath-Regular"))
-    SKIP ("no STIX Two Math in TM_TEST_FONT_DIR");
+  if (!tt_font_exists ("STIXTwoMath-Regular")) SKIP ("no STIX Two Math");
   font st= unicode_font ("STIXTwoMath-Regular", LM_SIZE, LM_DPI);
   CHECK (!is_nil (st));
   CHECK_EQ (st->math_type, MATH_TYPE_OPENTYPE);
@@ -235,8 +237,8 @@ test_assembly_monotone () {
   // Asana Math parentheses have 4 variants and an assembly whose smallest
   // instance is shorter than the largest variant; braces have 4 variants
   // with two extenders; bars have 7 variants and a two-part assembly.
-  if (get_env ("TM_TEST_FONT_DIR") == "" || !tt_font_exists ("Asana-Math"))
-    SKIP ("no Asana Math in TM_TEST_FONT_DIR");
+  if (!tt_font_exists ("Asana-Math"))
+    SKIP ("no Asana Math, which is not shipped: set TM_TEST_FONT_DIR");
   font as= unicode_font ("Asana-Math", LM_SIZE, LM_DPI);
   CHECK_EQ (as->math_type, MATH_TYPE_OPENTYPE);
   font rf= rubber_font (as);
@@ -278,8 +280,15 @@ test_hand_tuned_switch () {
   set_hand_tuned_math_fonts (true);
   font pag2= unicode_font ("texgyrepagella-math", 14, LM_DPI);
   CHECK_EQ (pag2->math_type, MATH_TYPE_TEX_GYRE);
-  CHECK (pag2->ot_math);
-  CHECK (pag2->frac_rule_thickness > 0);
+  CHECK (!pag2->ot_math);
+  CHECK_EQ (pag2->frac_rule_thickness, (SI) 0);
+  // the switch takes effect for a font which was made in the other state
+  set_hand_tuned_math_fonts (false);
+  font pag3= unicode_font ("texgyrepagella-math", 14, LM_DPI);
+  CHECK_EQ (pag3->math_type, MATH_TYPE_OPENTYPE);
+  set_hand_tuned_math_fonts (true);
+  font pag4= unicode_font ("texgyrepagella-math", 14, LM_DPI);
+  CHECK_EQ (pag4->math_type, MATH_TYPE_TEX_GYRE);
 }
 
 static void
@@ -566,6 +575,20 @@ test_profile_file () {
     hashmap<string,string> val ("");
     for (int j=2; j<N(f); j++) {
       scheme_tree q= f[j];
+      if (!is_atomic (q) && N(q) >= 2 && is_atomic (q[0]) &&
+          q[0]->label == "variants") {
+        // the variants of the text companion: (label master) pairs, the
+        // plain design first
+        CHECK_MSG (N(q) >= 3,
+                  as_charp ("a single variant in the profile of " * name));
+        for (int k=1; k<N(q); k++)
+          CHECK_MSG (!is_atomic (q[k]) && N(q[k]) == 2 &&
+                     is_atomic (q[k][0]) && is_atomic (q[k][1]) &&
+                     scm_unquote (q[k][0]->label) != "" &&
+                     scm_unquote (q[k][1]->label) != "",
+                    as_charp ("malformed variant in the profile of " * name));
+        continue;
+      }
       CHECK_MSG (!is_atomic (q) && N(q) == 2,
                 as_charp ("malformed property in the profile of " * name));
       string key= scm_unquote (q[0]->label);
@@ -638,7 +661,8 @@ test_profile_file () {
     }
     font mf= unicode_font (val["file"], LM_SIZE, LM_DPI);
     CHECK (!is_nil (mf));
-    CHECK_MSG (mf->ot_math,
+    // a font which is being hand tuned is not typeset from its table
+    CHECK_MSG (mf->ot_math || mf->math_type == MATH_TYPE_TEX_GYRE,
               as_charp (val["file"] * " has no MATH table"));
   }
   CHECK_MSG (nr_profiles >= 15,
@@ -695,7 +719,7 @@ test_stretch_stack_constants () {
   CHECK_EQ (lm->stretch_stack_gap_below_min, du_y (167));
   CHECK_EQ (lm->stretch_stack_top_shift_up, lm->upper_limit_baseline_rise_min);
   CHECK_EQ (lm->stretch_stack_gap_below_min, lm->lower_limit_gap_min);
-  if (!tt_font_exists ("STIXTwoMath-Regular")) return;
+  if (!tt_font_exists ("STIXTwoMath-Regular")) SKIP ("no STIX Two Math");
   font st= unicode_font ("STIXTwoMath-Regular", LM_SIZE, LM_DPI);
   CHECK (!is_nil (st));
   CHECK_EQ (st->stretch_stack_top_shift_up, du_y (800));
@@ -737,7 +761,7 @@ test_text_font_features () {
   // an unknown tag and an empty list leave the font alone
   CHECK_EQ (apply_features (lm, "")->res_name, lm->res_name);
   CHECK_EQ (apply_features (lm, "toolong")->res_name, lm->res_name);
-  if (!tt_font_exists ("LinLibertine_R")) return;
+  if (!tt_font_exists ("LinLibertine_R")) SKIP ("Linux Libertine missing");
   font lib= unicode_font ("LinLibertine_R", LM_SIZE, LM_DPI);
   CHECK (lib->get_feature_variant ("a", "smcp", 0, sub));
   CHECK (sub != "a");
@@ -759,7 +783,6 @@ test_text_font_features () {
 // bottom of its right parenthesis, which then came out an em too tall.
 static void
 test_assembled_delimiters () {
-  if (get_env ("TM_TEST_FONT_DIR") == "") SKIP ("no TM_TEST_FONT_DIR");
   array<string> files;
   files << string ("latinmodern-math") << string ("KpMath-Regular")
         << string ("STIXTwoMath-Regular") << string ("texgyrepagella-math")
@@ -838,7 +861,7 @@ test_assembled_delimiters () {
         }
       }
   }
-  if (nr == 0) SKIP ("no math font in TM_TEST_FONT_DIR");
+  if (nr == 0) SKIP ("no math font");
   CHECK_MSG (nr_assembled >= 4, "no delimiter was assembled from parts");
 }
 
@@ -883,7 +906,6 @@ test_magnified_assembly () {
 // Libertinus Math.
 static void
 test_math_family_for_text () {
-  if (get_env ("TM_TEST_FONT_DIR") == "") SKIP ("no TM_TEST_FONT_DIR");
   // profiles are defined in Scheme at boot; here we set one by hand
   tree p (TUPLE);
   p << tuple ("file", "KpMath-Regular") << tuple ("text", "Kepler")
@@ -896,6 +918,416 @@ test_math_family_for_text () {
   // a family which belongs to no master with a profile keeps its answer
   CHECK_EQ (math_family_for_text ("Zorglub Nonesuch"), string (""));
   CHECK_EQ (math_family_for_text ("KpMath"), string (""));
+}
+
+// A glyph drawn by its number is not the letter f, whatever the number: the
+// small capital of O in XCharter is the glyph 0x466, whose low byte is the
+// code of f, and the ligatures of f used to swallow the letter after it.
+static void
+test_no_ligature_on_glyph_number () {
+  if (!tt_font_exists ("XCharter-Roman")) SKIP ("XCharter missing");
+  font xc= unicode_font ("XCharter-Roman", LM_SIZE, LM_DPI);
+  string sub;
+  CHECK (xc->get_feature_variant ("O", "c2sc", 0, sub));
+  CHECK_MSG (ends (sub, "66>"), as_charp ("the small capital O is " * sub));
+  metric eo, ef, eof;
+  xc->get_extents (sub, eo);
+  xc->get_extents ("f", ef);
+  xc->get_extents (sub * "f", eof);
+  CHECK_MSG (si_abs (eof->x2 - (eo->x2 + ef->x2)) <= ef->x2 / 4,
+            as_charp ("width of a small capital O and f: " *
+                      as_string (eof->x2 / PIXEL) * " pixels instead of " *
+                      as_string ((eo->x2 + ef->x2) / PIXEL)));
+  int pos= 0;
+  xc->advance_glyph (sub * "fi", pos, true);
+  CHECK_EQ (pos, N (sub));
+  // and through the font of the feature
+  font sc= apply_features (xc, "c2sc");
+  SI xpos[3];
+  sc->get_xpositions ("Of", xpos);
+  CHECK (xpos[1] > 0 && xpos[2] > xpos[1]);
+}
+
+// The first size of a rubber character is the glyph of the character: GFS
+// Neohellenic Math lists a single variant for the contour integral, of
+// display size, which is not the glyph itself.
+static void
+test_first_variant_is_base_glyph () {
+  if (!tt_font_exists ("GFSNeohellenicMath")) SKIP ("GFS Neohellenic Math missing");
+  font nh= unicode_font ("GFSNeohellenicMath", LM_SIZE, LM_DPI);
+  CHECK_EQ (nh->math_type, MATH_TYPE_OPENTYPE);
+  font rf= rubber_font (nh);
+  metric base, text, disp;
+  nh->get_extents ("<#222E>", base);
+  rf->get_extents ("<big-oint-1>", text);
+  rf->get_extents ("<big-oint-2>", disp);
+  CHECK_EQ (text->y2 - text->y1, base->y2 - base->y1);
+  CHECK (disp->y2 - disp->y1 > text->y2 - text->y1);
+}
+
+// Sizes do not shrink with the number: beyond the last assembly which is
+// defined, a delimiter keeps the size of that last one.
+static void
+test_sizes_beyond_the_last () {
+  if (!have_lm) SKIP ("no Latin Modern Math");
+  font rf= rubber_font (lm);
+  SI prev= 0;
+  int nrs[6]= {20, 40, 70, 71, 80, 200};
+  for (int i= 0; i < 6; i++) {
+    string s= "<left-(-" * as_string (nrs[i]) * ">";
+    CHECK_MSG (rf->supports (s), as_charp (s));
+    metric ex;
+    rf->get_extents (s, ex);
+    SI h= ex->y2 - ex->y1;
+    CHECK_MSG (h >= prev, as_charp (s * " is shorter than a smaller size"));
+    prev= h;
+  }
+  metric e1, e2;
+  rf->get_extents ("<left-(-80>", e1);
+  rf->get_extents ("<left-(-200>", e2);
+  CHECK_EQ (e1->y2 - e1->y1, e2->y2 - e2->y1);
+}
+
+// A script correction of a string of several characters is the one of its
+// last character.
+static void
+test_correction_of_a_word () {
+  if (!have_lm) SKIP ("no Latin Modern Math");
+  SI h= du_y (300);
+  // upright f has an italic correction of 79 in Latin Modern Math
+  CHECK_EQ (lm->get_rsup_correction_at ("f", h), du_x (79));
+  CHECK_EQ (lm->get_rsup_correction_at ("af", h), du_x (79));
+  CHECK_EQ (lm->get_rsub_correction_at ("af", h),
+            lm->get_rsub_correction_at ("f", h));
+  // the integral keeps its share of the correction at the end of a string
+  CHECK_EQ (lm->get_rsup_correction_at ("a<#222B>", h),
+            lm->get_rsup_correction_at ("<#222B>", h));
+  CHECK (!lm->get_top_accent ("af", h));
+  CHECK (!lm->is_extended_shape ("af"));
+}
+
+// The glyphs drawn by their number record the character they stand for,
+// which is what a PDF needs for copying and searching.
+static void
+test_glyph_unicode () {
+  if (!have_lm) SKIP ("no Latin Modern Math");
+  font_metric fnm;
+  font_glyphs fng;
+  string sub;
+  CHECK (lm->get_feature_variant ("<#1D456>", "ssty", 0, sub));
+  int c= lm->index_glyph (sub, fnm, fng);
+  CHECK (c >= 0xc000000);
+  CHECK_EQ (native_glyph_get_unicode (fng->res_name, c - 0xc000000), 0x1D456);
+  // the second script size is a substitute of the first one
+  string sub2;
+  CHECK (lm->get_feature_variant ("<#1D456>", "ssty", 1, sub2));
+  c= lm->index_glyph (sub2, fnm, fng);
+  CHECK_EQ (native_glyph_get_unicode (fng->res_name, c - 0xc000000), 0x1D456);
+  // a size variant of a delimiter and a display operator
+  font rf= rubber_font (lm);
+  c= rf->index_glyph ("<left-(-3>", fnm, fng);
+  CHECK (c >= 0xc000000);
+  CHECK_EQ (native_glyph_get_unicode (fng->res_name, c - 0xc000000), 0x28);
+  c= rf->index_glyph ("<big-sum-2>", fnm, fng);
+  CHECK (c >= 0xc000000);
+  CHECK_EQ (native_glyph_get_unicode (fng->res_name, c - 0xc000000), 0x2211);
+  // a glyph nobody told anything about
+  CHECK_EQ (native_glyph_get_unicode (fng->res_name, 0xfffe), -1);
+}
+
+// The same string as the unicode font u draws it under a feature, glyph by
+// glyph: what a font made of several fonts must give for the characters it
+// takes from u
+static string
+featured (font u, string s, string feature, int alt) {
+  string r;
+  int i= 0;
+  while (i < N(s)) {
+    int start= i;
+    tm_char_forwards (s, i);
+    string c= s (start, i), sub;
+    if (u->get_feature_variant (c, feature, alt, sub)) r << sub;
+    else r << c;
+  }
+  return r;
+}
+
+// A feature is applied in the font which draws each run, after the smart
+// font has split the string: the letters of a word stay the upright
+// letters they are, and a single letter is the italic variable it was.
+static void
+test_feature_on_smart_font () {
+  if (!have_lm) SKIP ("no Latin Modern Math");
+  bool old= get_new_fonts ();
+  set_new_fonts (true);
+  font sf= smart_font ("Latin Modern Math", "mr", "medium", "normal",
+                       "roman", "rm", "medium", "mathitalic",
+                       LM_SIZE, LM_DPI);
+  CHECK (!is_nil (sf));
+  font sc= feature_font (sf, "ssty", 0);
+  CHECK (!is_nil (sc));
+  CHECK (sc->res_name != sf->res_name);
+  CHECK_EQ (feature_font (sf, "ssty", 0)->res_name, sc->res_name);
+  metric e1, e2;
+  // a word: the upright letters, in their script variants when the font
+  // has them, never the mathematical italic ones
+  const char* words[3]= {"sin", "eff", "max"};
+  for (int i= 0; i < 3; i++) {
+    string w (words[i]);
+    sc->get_extents (w, e1);
+    lm->get_extents (featured (lm, w, "ssty", 0), e2);
+    CHECK_MSG (e1->x2 == e2->x2 && e1->y2 == e2->y2 && e1->x4 == e2->x4,
+              as_charp ("the word " * w * " is not set in upright letters"));
+  }
+  // a single letter: the script variant of the italic letter
+  string it;
+  CHECK (lm->get_feature_variant ("<#1D45B>", "ssty", 0, it));
+  sc->get_extents ("n", e1);
+  lm->get_extents (it, e2);
+  CHECK_EQ (e1->x2, e2->x2);
+  CHECK_EQ (e1->x4, e2->x4);
+  sf->get_extents ("n", e2);
+  CHECK (e1->x2 != e2->x2);
+  // the same glyph collection draws a character with and without feature
+  font_metric fnm;
+  font_glyphs fng1, fng2;
+  CHECK (sf->index_glyph ("n", fnm, fng1) >= 0);
+  CHECK (sc->index_glyph ("n", fnm, fng2) >= 0);
+  CHECK_EQ (fng1->res_name, fng2->res_name);
+  // the copy made for another resolution keeps the feature
+  font mg= sc->magnify (2.0);
+  mg->get_extents ("n", e2);
+  CHECK_MSG (si_abs (e2->x2 - 2 * e1->x2) <= du_x (20),
+            "the magnified font lost the feature");
+  set_new_fonts (old);
+}
+
+// The substitute of a glyph is a glyph of the font which draws it: a
+// character which a smart font takes from another font than its main one
+// stays in that font under a feature.
+static void
+test_feature_on_fallback_font () {
+  if (!tt_font_exists ("FiraMath-Regular")) SKIP ("Fira Math missing");
+  bool old= get_new_fonts ();
+  set_new_fonts (true);
+  font sf= smart_font ("Fira Math", "mr", "medium", "normal",
+                       "roman", "rm", "medium", "mathitalic",
+                       LM_SIZE, LM_DPI);
+  CHECK (!is_nil (sf));
+  font sc= feature_font (sf, "ssty", 0);
+  font fira= unicode_font ("FiraMath-Regular", LM_SIZE, LM_DPI);
+  // Fira Math has neither script nor fraktur letters
+  const char* cs[4]= {"<cal-A>", "<frak-A>", "<frak-g>", "<bbb-R>"};
+  int nr= 0;
+  for (int i= 0; i < 4; i++) {
+    string c (cs[i]);
+    font_metric fnm;
+    font_glyphs fng1, fng2;
+    int c1= sf->index_glyph (c, fnm, fng1);
+    int c2= sc->index_glyph (c, fnm, fng2);
+    if (c1 < 0 || c2 < 0) continue;
+    if (fng1->res_name != fira->res_name &&
+        !occurs ("FiraMath", fng1->res_name)) nr++;
+    CHECK_MSG (fng1->res_name == fng2->res_name,
+              as_charp (c * " is drawn by " * fng2->res_name *
+                        " under the feature, by " * fng1->res_name *
+                        " without it"));
+    // a number of a glyph of the other font never comes back
+    string sub;
+    if (!occurs ("FiraMath", fng1->res_name))
+      CHECK (!sf->get_feature_variant (c, "ssty", 0, sub));
+  }
+  CHECK_MSG (nr > 0, "no character came from another font");
+  set_new_fonts (old);
+}
+
+// A text font may carry a MATH table without the mathematical alphabets,
+// as the New Computer Modern text faces do: the variables of a formula in
+// such a font are its own letters.
+static void
+test_math_letters_of_text_font () {
+  if (!tt_font_exists ("NewCMSans10-Regular")) SKIP ("New Computer Modern Sans missing");
+  font u= unicode_font ("NewCMSans10-Regular", LM_SIZE, LM_DPI);
+  CHECK_EQ (u->math_type, MATH_TYPE_OPENTYPE);
+  CHECK (!u->supports ("<#1D44E>"));
+  bool old= get_new_fonts ();
+  set_new_fonts (true);
+  font sf= smart_font ("NewComputerModernSans10", "ms", "medium", "normal",
+                       "roman", "ss", "medium", "mathitalic",
+                       LM_SIZE, LM_DPI);
+  CHECK (!is_nil (sf));
+  const char* cs[3]= {"a", "h", "Z"};
+  for (int i= 0; i < 3; i++) {
+    metric ex;
+    sf->get_extents (cs[i], ex);
+    CHECK_MSG (ex->x4 > ex->x3 && ex->y4 > ex->y3,
+              as_charp ("the variable " * string (cs[i]) * " has no ink"));
+    font_metric fnm;
+    font_glyphs fng;
+    CHECK_EQ (sf->index_glyph (cs[i], fnm, fng), (int) cs[i][0]);
+  }
+  set_new_fonts (old);
+}
+
+// The accents over a single letter are those of the math font: the
+// smallest size of its combining accents, whichever font has the spacing
+// accents, and their flattened forms when the font has them.
+static void
+test_narrow_accents () {
+  if (!have_lm) SKIP ("no Latin Modern Math");
+  font rf= rubber_font (lm);
+  const char* accs[10]= {"hat", "tilde", "macron", "check", "breve", "dot",
+                         "ddot", "acute", "grave", "vect"};
+  int codes[10]= {0x302, 0x303, 0x304, 0x30C, 0x306, 0x307, 0x308, 0x301,
+                  0x300, 0x20D7};
+  for (int i= 0; i < 10; i++) {
+    string nm= "<wide-" * string (accs[i]) * ">", r;
+    CHECK_MSG (rf->get_wide_variant (nm, 0, r), as_charp (nm));
+    CHECK_EQ (r, "<wide-" * string (accs[i]) * "-0>");
+    CHECK_MSG (rf->supports (r), as_charp (r));
+    // it is the combining accent of the font
+    metric e1, e2;
+    string c= "<#" * upcase_all (as_hexadecimal (codes[i])) * ">";
+    rf->get_extents (r, e1);
+    lm->get_extents (c, e2);
+    CHECK_MSG (e1->x3 == e2->x3 && e1->x4 == e2->x4 && e1->y4 == e2->y4,
+              as_charp (r * " is not " * c));
+    CHECK_MSG (e1->x3 < e1->x4, as_charp (r * " has no ink"));
+    SI x;
+    CHECK_MSG (rf->get_top_accent (r, x), as_charp (r));
+    CHECK_MSG (x >= e1->x3 && x <= e1->x4, as_charp (r));
+  }
+  // a width asks for a larger size, and no accent of that name for none
+  string r;
+  CHECK (rf->get_wide_variant ("<wide-hat>", du_x (600), r));
+  CHECK (r != "<wide-hat-0>");
+  CHECK (!rf->get_wide_variant ("<wide-zorglub>", 0, r));
+  // Latin Modern Math has no flattened accents, STIX Two Math has them
+  CHECK (!rf->get_feature_variant ("<wide-hat-0>", "flac", 0, r));
+  if (!tt_font_exists ("STIXTwoMath-Regular")) SKIP ("no STIX Two Math");
+  font st = unicode_font ("STIXTwoMath-Regular", LM_SIZE, LM_DPI);
+  font srf= rubber_font (st);
+  CHECK (srf->get_feature_variant ("<wide-hat-0>", "flac", 0, r));
+  CHECK (starts (r, "<@"));
+  metric e1, e2;
+  srf->get_extents ("<wide-hat-0>", e1);
+  st->get_extents (r, e2);
+  CHECK (e2->y4 - e2->y3 < e1->y4 - e1->y3);
+}
+
+// The font "roman" is the master of the TeX fonts which come with TeXmacs.
+// The local database must hold them whatever program made it, this one
+// included, which does not set up the search path of TeX: without them the
+// name goes to the nearest family found on the system, CMU Serif where a
+// TeX distribution is installed.
+static void
+test_roman_is_the_tex_fonts () {
+  array<string> st= font_database_styles ("TeXmacs Computer Modern");
+  CHECK_MSG (N(st) > 0,
+            "the local database lost the TeX fonts shipped with TeXmacs");
+  array<string> v;
+  v << string ("roman");
+  array<string> r= search_font (v, 1);
+  CHECK (N(r) == 2);
+  CHECK_EQ (r[0], string ("TeXmacs Computer Modern"));
+  v << string ("bold");
+  r= search_font (v, 1);
+  CHECK_EQ (r[0], string ("TeXmacs Computer Modern"));
+}
+
+// The kind of subfont, as the smart font names it, which draws the
+// character c of a smart font
+static string
+subfont_kind (font sf, string c) {
+  metric ex;
+  sf->get_extents (c, ex);
+  tree info= smart_font_debug_info (sf, c, 0);
+  for (int i= 0; i < N(info); i++)
+    if (is_tuple (info[i], "spec", 1) && is_tuple (info[i][1]) &&
+        N(info[i][1]) > 0 && is_atomic (info[i][1][0]))
+      return info[i][1][0]->label;
+  return "";
+}
+
+// A hand-tuned font is typeset without its MATH table, but the table of
+// its file still gives the tall radicals and the big operators which would
+// otherwise be built from pieces, bitmaps in a PDF: they are glyphs, of
+// the font itself or of the nearest font which has such a table.
+static void
+test_tall_radical_is_not_a_bitmap () {
+  if (!tt_font_exists ("texgyrepagella-math")) SKIP ("TeX Gyre Pagella Math missing");
+  font pag= unicode_font ("texgyrepagella-math", LM_SIZE, LM_DPI);
+  CHECK (!pag->ot_math);
+  // the MATH table of the file, for a font which is typeset without it
+  font own= math_table_rubber_font (pag);
+  CHECK (!is_nil (own));
+  CHECK (own->supports ("<large-sqrt-3>"));
+  CHECK (own->supports ("<big-oint-2>"));
+  if (tt_font_exists ("lmroman10-regular"))
+    CHECK (is_nil (math_table_rubber_font
+                     (unicode_font ("lmroman10-regular", LM_SIZE, LM_DPI))));
+  // what the emulation builds from pieces
+  font ref= poor_rubber_font (pag);
+  CHECK (!poor_rubber_constructs (ref, "<large-sqrt-2>"));
+  CHECK (poor_rubber_constructs (ref, "<large-sqrt-7>"));
+  CHECK (!poor_rubber_constructs (pag, "<large-sqrt-7>"));
+
+  bool old= get_new_fonts ();
+  set_new_fonts (true);
+  font sf= smart_font ("TeX Gyre Pagella", "mr", "medium", "normal",
+                       "roman", "rm", "medium", "mathitalic",
+                       LM_SIZE, LM_DPI);
+  CHECK (!is_nil (sf));
+  int nr_own= 0;
+  for (int n= 0; n <= 14; n++) {
+    string s   = "<large-sqrt-" * as_string (n) * ">";
+    string kind= subfont_kind (sf, s);
+    if (kind == "rubber-own") nr_own++;
+    // a size which the emulation builds from pieces is not drawn by it:
+    // it is a glyph which the hand tuning names, or one of the table,
+    // which is then not taller than the emulation of that number
+    if (poor_rubber_constructs (ref, s))
+      CHECK_MSG (kind == "rubber-own" || kind == "main",
+                as_charp (s * " is drawn by " * kind));
+    if (kind == "rubber-own") {
+      CHECK (poor_rubber_constructs (ref, s));
+      metric e1, e2;
+      sf->get_extents (s, e1);
+      ref->get_extents (s, e2);
+      CHECK_MSG (e1->y2 - e1->y1 <= e2->y2 - e2->y1 + pag->wfn / 50,
+                as_charp (s * " is taller than the size of that number"));
+      CHECK (e1->y2 - e1->y1 > 0);
+    }
+  }
+  CHECK (nr_own > 0);
+  // the contour integral, which the emulation makes of an integral and a
+  // circle
+  CHECK (smart_font_has_math_big_operator (sf, "<big-oint-2>"));
+  CHECK_EQ (subfont_kind (sf, "<big-oint-2>"), string ("rubber-math"));
+  CHECK (!smart_font_has_math_big_operator (sf, "<left-(-2>"));
+  if (have_lm) {
+    // a font which is typeset from its table needs none of this
+    font lsf= smart_font ("Latin Modern Math", "mr", "medium", "normal",
+                          "roman", "rm", "medium", "mathitalic",
+                          LM_SIZE, LM_DPI);
+    CHECK (!smart_font_has_math_big_operator (lsf, "<big-oint-2>"));
+    CHECK (subfont_kind (lsf, "<large-sqrt-7>") != "rubber-own");
+  }
+  // the font Stix has its first sizes as glyphs and takes the next ones
+  // from STIX Math, which has the table
+  if (tt_font_exists ("STIX-Regular") && tt_font_exists ("STIXMath-Regular")) {
+    font st= smart_font ("Stix", "mr", "medium", "normal",
+                         "roman", "rm", "medium", "mathitalic",
+                         LM_SIZE, LM_DPI);
+    CHECK (!is_nil (st));
+    int nr= 0;
+    for (int n= 5; n <= 12; n++)
+      if (subfont_kind (st, "<large-sqrt-" * as_string (n) * ">") ==
+          "rubber-own") nr++;
+    CHECK_MSG (nr == 8, as_charp ("only " * as_string (nr) *
+                                  " of 8 tall radicals are glyphs"));
+  }
+  set_new_fonts (old);
 }
 
 int
@@ -925,5 +1357,16 @@ main () {
   RUN (test_profile_file);
   RUN (test_bold_math_font);
   RUN (test_stretch_stack_constants);
+  RUN (test_no_ligature_on_glyph_number);
+  RUN (test_first_variant_is_base_glyph);
+  RUN (test_sizes_beyond_the_last);
+  RUN (test_correction_of_a_word);
+  RUN (test_glyph_unicode);
+  RUN (test_feature_on_smart_font);
+  RUN (test_feature_on_fallback_font);
+  RUN (test_math_letters_of_text_font);
+  RUN (test_narrow_accents);
+  RUN (test_roman_is_the_tex_fonts);
+  RUN (test_tall_radical_is_not_a_bitmap);
   return test_report ();
 }

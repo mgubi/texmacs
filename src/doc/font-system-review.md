@@ -155,10 +155,9 @@ char index, load glyph, render glyph, get kerning.
   `tt_font_path ()` concatenates
   `$TEXMACS_FONT_PATH`, the "imported fonts" preference,
   `$TEXMACS_HOME_PATH/fonts/truetype`, `$TEXMACS_PATH/fonts/truetype`, and
-  platform system directories. On macOS `texlive_font_dirs` scans
-  `/usr/local/texlive`, `/usr/share/texlive`, `/opt/texlive` and
-  `$HOME/texlive` for any year; the Linux branch still lists 2020, 2021 and
-  2022 by hand. Located files are cached persistently in `font_cache.scm`;
+  platform system directories. On macOS and Linux `texlive_font_dirs`
+  scans `/usr/local/texlive`, `/usr/share/texlive`, `/opt/texlive` and
+  `$HOME/texlive` for any year, the newest first, once per run. Located files are cached persistently in `font_cache.scm`;
   the `tt_fonts` hash map caches only the existence flag.
 - `tt_face.cpp`: `tt_face` reads the whole file into memory and creates an
   `FT_Face`. `tt_font_metric_rep` and `tt_font_glyphs_rep` render each glyph
