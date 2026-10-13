@@ -284,6 +284,9 @@ bridge_document_rep::replay_tail (doc_run& run, int s, int e) {
     if (run.brs[k-s].operator-> () != br || run.vers[k-s] != br->version ||
         br->status != PROCESSED + WANTED_PARAGRAPH)
       return false;
+    // the changes of the paragraphs removed before this one are compared
+    // with the environment when it is typeset (bridge_rep::typeset)
+    if (N(br->removed) != 0) return false;
   }
   int idx= last_line_item (ttt->l);
   if (idx < 0 || N(ttt->l) - idx != run.head_back) return false;
@@ -299,6 +302,10 @@ bridge_document_rep::replay_tail (doc_run& run, int s, int e) {
   sb->vspc_after= run.vspc_after;
   sb->nobr_after= run.nobr_after;
   env->monitored_patch_env (run.patch);
+  // the bridges of the tail are not visited, and their reads are not
+  // added to the record of the bridge which is being typeset (see "What
+  // is typeset again" in bridge.cpp): it is not all that was read
+  if (env->read_recorder () != NULL) env->read_unknown= true;
   return true;
 }
 
