@@ -302,7 +302,7 @@ typesetter_rep::typeset () {
   }
 
   // Typeset
-  shove_cache_new_pass ();
+  shove_cache_new_pass (shoves);
   last_body= box ();
   if (env->complete) {
     env->local_aux= hashmap<string,tree> (UNINIT);
@@ -313,7 +313,7 @@ typesetter_rep::typeset () {
   double t0= edit_profile.on ? edit_profile_now () : 0;
   br->typeset (PROCESSED+ WANTED_PARAGRAPH);
   double t1= edit_profile.on ? edit_profile_now () : 0;
-  shove_cache_end_pass ();
+  shove_cache_end_pass (shoves);
   pager ppp= tm_new<pager_rep> (br->ip, env, l);
   ppp->memo= kept_pages;
   if (!paper) ppp->snap= snap_pixel;
