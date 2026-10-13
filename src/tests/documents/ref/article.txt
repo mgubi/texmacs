@@ -34,10 +34,10 @@ A first item, short.
 A second item which is long enough to wrap onto a second line of the page, so that the
 indentation of continuation lines is checked.
 
-◦
+∘
 A nested item.
 
-◦
+∘
 Another nested item.
 
 1. One.
