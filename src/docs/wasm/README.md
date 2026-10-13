@@ -801,7 +801,12 @@ in every state) against the desktop Vue port and, on the upstream sources,
 the Qt port; `client.mjs`; from the page (Firefox) the login, the home
 directory and a new remote file over `ws`, and the login over `wss` to
 the address of the machine on the network and to `localhost` with
-`?websocket=wss`. In maxs_texmacs the Qt port was only compiled.
+`?websocket=wss`; the login with `?websocket-port=` to a server whose
+preference gives another port; the message of a login when nothing
+answers at the port; and the bridge (`ws-bridge.mjs` in front of the port
+of the test server, with `NODE_TLS_REJECT_UNAUTHORIZED=0` for its
+self-signed certificate), from `client.mjs` and from the page. In
+maxs_texmacs the Qt port was only compiled.
 
 The remote tools as a whole (2026-10-08): `remote-check.scm`, loaded by a
 desktop client (`-tls-no-verify -x`) or by the page (written to its file
