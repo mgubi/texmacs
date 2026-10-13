@@ -197,6 +197,14 @@ public:
   box    adjust_kerning (int mode, double factor);
   box    expand_glyphs (int mode, double factor);
   path   find_box_path (SI x, SI y, SI delta, bool force, bool& found);
+  path   find_rip ();
+  path   find_right_box_path ();
+  path   find_box_path (path p, bool& found);
+  cursor find_cursor (path bp);
+  selection find_selection (path lbp, path rbp);
+private:
+  path   outer (path p);
+  path   inner (path bp);
 };
 
 symbol_box_rep::symbol_box_rep (path ip, box b2, int n2):
@@ -227,6 +235,58 @@ symbol_box_rep::find_box_path (SI x, SI y, SI delta, bool force, bool& found) {
     else return path_up (p) * n;
   }
   else return p;
+}
+
+// The string of the leaf differs from the string in the tree, which has
+// length n: the box paths of a symbol box end with 0 or with n, for the left
+// and the right side of the symbol, and correspond to the positions in the
+// tree. 'outer' converts a box path of the contents, 'inner' gives the box
+// path which the contents understand.
+
+path
+symbol_box_rep::outer (path p) {
+  box leaf= ::subbox (box (this), path_up (p));
+  if (leaf->get_type () != TEXT_BOX || !is_accessible (leaf->ip)) return p;
+  if (last_item (p) == 0) return p;
+  return path_up (p) * n;
+}
+
+path
+symbol_box_rep::inner (path bp) {
+  box leaf= ::subbox (box (this), path_up (bp));
+  if (leaf->get_type () != TEXT_BOX || !is_accessible (leaf->ip))
+    return bp->next;
+  if (last_item (bp) == 0) return bp->next;
+  return path_up (bp->next) * last_item (leaf->find_right_box_path ());
+}
+
+path
+symbol_box_rep::find_rip () {
+  path p= b->find_rip ();
+  if (is_nil (p) || !is_accessible (p)) return p;
+  return path (n, p->next);
+}
+
+path
+symbol_box_rep::find_right_box_path () {
+  return outer (modifier_box_rep::find_right_box_path ());
+}
+
+path
+symbol_box_rep::find_box_path (path p, bool& found) {
+  return outer (modifier_box_rep::find_box_path (p, found));
+}
+
+cursor
+symbol_box_rep::find_cursor (path bp) {
+  return b->find_cursor (inner (bp));
+}
+
+selection
+symbol_box_rep::find_selection (path lbp, path rbp) {
+  selection sel= b->find_selection (inner (lbp), inner (rbp));
+  return selection (sel->rs, find_tree_path (lbp), find_tree_path (rbp),
+                    sel->valid);
 }
 
 /******************************************************************************

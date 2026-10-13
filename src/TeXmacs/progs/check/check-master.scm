@@ -36,6 +36,7 @@
         (check formats-test)
         (check editing-test)
         (check typeset-test)
+        (check opentype-typeset-test)
         (check bibtex-test)
         (check database-test)
         (check math-edit-test)
@@ -145,6 +146,7 @@
     ;; opens buffers and edits them
     ("editing" editing-test-failures count)
     ("typeset" typeset-test-failures count)
+    ("opentype-typeset" opentype-typeset-test-failures count)
     ("math-edit" math-edit-test-failures count)
     ("table" table-test-failures count)
     ("text-structure" text-structure-test-failures count)
