@@ -66,14 +66,14 @@
   function, so <verbatim|procedure-source>, <verbatim|procedure-name> and
   <verbatim|procedure-arity> are right for a function which was never called.
   (All this relies on <verbatim|*keep-source*>, which
-  <verbatim|r5rs-femtolisp.scm> turns on: the compiler then keeps the source
+  <source-link|r5rs-femtolisp.scm|TeXmacs/progs/kernel/boot/r5rs-femtolisp.scm> turns on: the compiler then keeps the source
   of each function as its last constant.)
 
   <section|The first call>
 
   <verbatim|%lazy-force!> expands and compiles the lambda, with
   <verbatim|*current-module*> bound to the module where it was loaded, then
-  calls <verbatim|%function-become!> (in <verbatim|fl_core.c>): the stub takes
+  calls <verbatim|%function-become!> (in <source-link|fl_core.c|src/Scheme/Femtolisp/fl_core.c>): the stub takes
   the code, the constants, the environment and the name of the compiled
   function. The stub <em|is> now the compiled function: whatever kept it (a
   hook, a menu, the former definitions of <verbatim|tm-define>, a table) calls
@@ -139,7 +139,7 @@
   one of the home.
 
   A fingerprint is 128 bits of hash of the structure of a value, as 32
-  hexadecimal digits (<verbatim|%fingerprint>, in <verbatim|fl_core.c>). It is
+  hexadecimal digits (<verbatim|%fingerprint>, in <source-link|fl_core.c|src/Scheme/Femtolisp/fl_core.c>). It is
   <verbatim|#f> when the value holds a closure, an uninterned symbol, a table
   or an object of <TeXmacs>, or is very large: the form is then compiled at
   each load. So is a form whose compiled code holds an uninterned symbol, a
@@ -148,7 +148,7 @@
   written again at each load.
 
   <em|When to change the format.> The key does not see a change of
-  <verbatim|boot-femtolisp.scm>. After a change which makes the same expansion
+  <source-link|boot-femtolisp.scm|TeXmacs/progs/kernel/boot/boot-femtolisp.scm>. After a change which makes the same expansion
   compile to other code (the arguments of <verbatim|%make-lazy>, the late
   calls...), increase <verbatim|%cache-format> (it has two numbers, one with
   lazy bodies and one for <verbatim|TEXMACS_FL_EAGER>): the old caches are

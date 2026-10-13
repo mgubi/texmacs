@@ -7,12 +7,12 @@
 
   <section|What is loaded at the start>
 
-  <verbatim|init-femtolisp.scm> is loaded with the <verbatim|load> of
-  femtolisp. It loads <verbatim|r5rs-femtolisp.scm>, then
-  <verbatim|boot-femtolisp.scm>, both as plain global definitions; from there
-  on <verbatim|load> is the one of <verbatim|boot-femtolisp.scm>. It then
+  <source-link|init-femtolisp.scm|TeXmacs/progs/init-femtolisp.scm> is loaded with the <verbatim|load> of
+  femtolisp. It loads <source-link|r5rs-femtolisp.scm|TeXmacs/progs/kernel/boot/r5rs-femtolisp.scm>, then
+  <source-link|boot-femtolisp.scm|TeXmacs/progs/kernel/boot/boot-femtolisp.scm>, both as plain global definitions; from there
+  on <verbatim|load> is the one of <source-link|boot-femtolisp.scm|TeXmacs/progs/kernel/boot/boot-femtolisp.scm>. It then
   loads the module <verbatim|(kernel boot compat-femtolisp)>, and the
-  <verbatim|init-kernel.scm> and <verbatim|init-texmacs.scm> which all the
+  <source-link|init-kernel.scm|TeXmacs/progs/init-kernel.scm> and <source-link|init-texmacs.scm|TeXmacs/progs/init-texmacs.scm> which all the
   interpreters share.
 
   <section|A module is a set of renamed global names>
@@ -34,7 +34,7 @@
     <item>Each form is then expanded and compiled with
     <verbatim|*current-module*> bound to the module. The expander and the
     compiler of femtolisp call the hook <verbatim|resolve-global> on every
-    global name (patch 0003); <verbatim|boot-femtolisp.scm> defines it to map
+    global name (patch 0003); <source-link|boot-femtolisp.scm|TeXmacs/progs/kernel/boot/boot-femtolisp.scm> defines it to map
     the private names of the current module to their global names. This covers
     the variables, the functions, <verbatim|set!> and the macros.
   </itemize>
@@ -77,7 +77,7 @@
 
   <section|<verbatim|tm-define>>
 
-  <verbatim|kernel/texmacs/tm-define.scm> has branches for femtolisp, close to
+  <source-link|kernel/texmacs/tm-define.scm|TeXmacs/progs/kernel/texmacs/tm-define.scm> has branches for femtolisp, close to
   those for S7:
 
   <\itemize>
@@ -103,7 +103,7 @@
 
   <\itemize>
     <item><em|A function uses a macro defined later>, in a module loaded later
-    (<verbatim|delayed>, in <verbatim|tm-plugins.scm>).
+    (<verbatim|delayed>, in <source-link|tm-plugins.scm|TeXmacs/progs/kernel/texmacs/tm-plugins.scm>).
 
     <item><em|Code which never runs is never expanded>: a call of a macro
     which fails to expand, in a widget which a configuration never shows, is

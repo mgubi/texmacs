@@ -10,7 +10,7 @@
   which know UTF-8, and a small library. Two files give <TeXmacs> the R5RS and
   the Guile 1.8 which its code is written for.
 
-  <section|<verbatim|r5rs-femtolisp.scm>: the language>
+  <section|<source-link|r5rs-femtolisp.scm|TeXmacs/progs/kernel/boot/r5rs-femtolisp.scm>: the language>
 
   Global definitions, loaded before the modules exist.
 
@@ -55,7 +55,7 @@
     <verbatim|string-ref>, <verbatim|substring>, <verbatim|string-set!>,
     <verbatim|make-string>, <verbatim|list-\<gtr\>string>,
     <verbatim|string-\<gtr\>list>, the search and the comparison) are C
-    builtins of <verbatim|fl_core.c>; the others are written in Scheme on
+    builtins of <source-link|fl_core.c|src/Scheme/Femtolisp/fl_core.c>; the others are written in Scheme on
     them. femtolisp reads the octal characters of Guile wrongly
     (<verbatim|#\\04> is read as the character <verbatim|0> followed by
     <verbatim|4>): write <verbatim|(integer-\<gtr\>char 4)>.
@@ -81,13 +81,13 @@
     0018); the bytes from 128 of a string are written as they are (patch
     0006). <verbatim|display> and <verbatim|write> without a port write to the
     output of <TeXmacs> (<verbatim|tm-output>), as with Guile; this is done in
-    <verbatim|boot-femtolisp.scm>.
+    <source-link|boot-femtolisp.scm|TeXmacs/progs/kernel/boot/boot-femtolisp.scm>.
   </description-long>
 
-  <section|<verbatim|compat-femtolisp.scm>: the library>
+  <section|<source-link|compat-femtolisp.scm|TeXmacs/progs/kernel/boot/compat-femtolisp.scm>: the library>
 
   The module <verbatim|(kernel boot compat-femtolisp)>, modelled on
-  <verbatim|compat-s7.scm>: the hash tables of Guile on the tables of
+  <source-link|compat-s7.scm|TeXmacs/progs/kernel/boot/compat-s7.scm>: the hash tables of Guile on the tables of
   femtolisp, the association lists, SRFI-1 (<verbatim|fold>,
   <verbatim|filter-map>, <verbatim|partition>...) and the sorts, the string
   functions of SRFI-13, the character sets (a tagged vector which holds 256
@@ -122,7 +122,7 @@
     <item>A macro whose expansion contains a call of itself expands without
     end, until an out of memory error: when the file is loaded if the call is
     at its top level, at the first call of the function if it is in a body
-    (<verbatim|concat-isolate!> in <verbatim|math-edit.scm> was made a
+    (<verbatim|concat-isolate!> in <source-link|math-edit.scm|TeXmacs/progs/math/math-edit.scm> was made a
     function).
 
     <item>The forms at the top level of a file are expanded when it is loaded,
@@ -141,22 +141,22 @@
   except in a few files which have a branch for it:
 
   <\description-long>
-    <item*|<verbatim|kernel/boot/prologue.scm>>The modules are loaded by
-    <verbatim|boot-femtolisp.scm>, as for S7.
+    <item*|<source-link|kernel/boot/prologue.scm|TeXmacs/progs/kernel/boot/prologue.scm>>The modules are loaded by
+    <source-link|boot-femtolisp.scm|TeXmacs/progs/kernel/boot/boot-femtolisp.scm>, as for S7.
 
-    <item*|<verbatim|kernel/boot/ahash-table.scm>>The <verbatim|ahash->
+    <item*|<source-link|kernel/boot/ahash-table.scm|TeXmacs/progs/kernel/boot/ahash-table.scm>>The <verbatim|ahash->
     functions are directly on the tables of femtolisp.
 
-    <item*|<verbatim|kernel/regexp/regexp-select.scm>><verbatim|select> as on
+    <item*|<source-link|kernel/regexp/regexp-select.scm|TeXmacs/progs/kernel/regexp/regexp-select.scm>><verbatim|select> as on
     MinGW, without the <verbatim|select> of Guile.
 
-    <item*|<verbatim|kernel/texmacs/tm-define.scm>>Global definitions, see
+    <item*|<source-link|kernel/texmacs/tm-define.scm|TeXmacs/progs/kernel/texmacs/tm-define.scm>>Global definitions, see
     <hlink|the modules|femtolisp-modules.en.tm>.
 
-    <item*|<verbatim|prog/scheme-autocomplete.scm>>The symbols come from the
+    <item*|<source-link|prog/scheme-autocomplete.scm|TeXmacs/progs/prog/scheme-autocomplete.scm>>The symbols come from the
     environment of femtolisp.
 
-    <item*|<verbatim|check/define-test.scm>, <verbatim|check/macro-drd-test.scm>>Two
+    <item*|<source-link|check/define-test.scm|TeXmacs/progs/check/define-test.scm>, <source-link|check/macro-drd-test.scm|TeXmacs/progs/check/macro-drd-test.scm>>Two
     tests skip checks, as they do for S7: that <verbatim|:use> restricts the
     names, and dates computed with the functions of Guile.
   </description-long>

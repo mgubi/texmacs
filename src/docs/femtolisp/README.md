@@ -21,11 +21,10 @@ how it works, what differs from Guile, how it performs, and what is left.
 | [bench/](bench) | The script which runs the benchmarks of `docs/s7/bench` on several builds, and the workloads of 10 and 11 |
 
 The documentation for the developers who maintain the interpreter is with
-the documentation of TeXmacs: `TeXmacs/doc/devel/source/femtolisp.en.tm` and
-the pages it links, a chapter of "About the source code"
-(`doc/devel/source/source.en.tm`; open the file in TeXmacs, the Help menu of
-this branch has no entry for it). These notes keep the measurements and the
-history of the decisions.
+the developer documentation of TeXmacs:
+`TeXmacs/doc/devel/source/femtolisp.en.tm` and the pages it links, among the
+foundations of "About the source code". These notes keep the measurements
+and the history of the decisions.
 
 ## Summary
 

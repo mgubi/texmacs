@@ -8,21 +8,21 @@
   <section|The layers>
 
   The rest of <TeXmacs> knows the Scheme interpreter through
-  <verbatim|scheme.hpp> (the class <verbatim|object>, <verbatim|call>,
-  <verbatim|eval>...). Below it, <verbatim|Scheme/Scheme/object.cpp>,
-  <verbatim|glue.cpp> and the generated <verbatim|Scheme/Glue/glue_*.cpp> use
+  <source-link|scheme.hpp|src/Scheme/scheme.hpp> (the class <verbatim|object>, <verbatim|call>,
+  <verbatim|eval>...). Below it, <source-link|Scheme/Scheme/object.cpp|src/Scheme/Scheme/object.cpp>,
+  <source-link|glue.cpp|src/Scheme/Scheme/glue.cpp> and the generated <verbatim|Scheme/Glue/glue_*.cpp> use
   only the type <verbatim|tmscm> and the functions and macros around it
   (<verbatim|tmscm_cons>, <verbatim|string_to_tmscm>,
   <verbatim|TMSCM_ASSERT>...). Each interpreter implements these: for
-  femtolisp, <verbatim|femtolisp_tm.hpp> and <verbatim|femtolisp_tm.cpp>,
-  which <verbatim|object.hpp> includes when <verbatim|USE_FEMTOLISP> is
+  femtolisp, <source-link|femtolisp_tm.hpp|src/Scheme/Femtolisp/femtolisp_tm.hpp> and <source-link|femtolisp_tm.cpp|src/Scheme/Femtolisp/femtolisp_tm.cpp>,
+  which <source-link|object.hpp|src/Scheme/Scheme/object.hpp> includes when <verbatim|USE_FEMTOLISP> is
   defined.
 
   The C++ code never includes the headers of femtolisp: their macros and
   functions (<verbatim|car>, <verbatim|cdr>, <verbatim|ptr>, <verbatim|tag>,
   <verbatim|symbol>...) clash with names of <TeXmacs>. It uses
-  <verbatim|fl_tm.h>, a small C interface whose functions start with
-  <verbatim|fltm_>. <verbatim|fl_core.c> implements it; that file also
+  <source-link|fl_tm.h|src/Scheme/Femtolisp/fl_tm.h>, a small C interface whose functions start with
+  <verbatim|fltm_>. <source-link|fl_core.c|src/Scheme/Femtolisp/fl_core.c> implements it; that file also
   includes the sources of femtolisp, as one compilation unit, so the interface
   can use the insides of the interpreter (its stack, its types).
 
@@ -54,9 +54,9 @@
     protected objects of the Guile and S7 interfaces is not needed.
 
     <item>A raw <verbatim|fltm_value> must not be kept across a call which
-    allocates. The functions of <verbatim|fl_tm.h> marked <em|allocates>
+    allocates. The functions of <source-link|fl_tm.h|src/Scheme/Femtolisp/fl_tm.h> marked <em|allocates>
     protect their own arguments, not the other values of their caller. In C++,
-    keep a <verbatim|tmscm>; in <verbatim|fl_core.c>, push the value on the
+    keep a <verbatim|tmscm>; in <source-link|fl_core.c|src/Scheme/Femtolisp/fl_core.c>, push the value on the
     stack of femtolisp.
 
     <item>A <verbatim|tmscm> costs a little more than a pointer: a call of the
@@ -138,24 +138,27 @@
   small S7 interpreter <verbatim|s7-run>, as the S7 build does.
 
   A few builtins which <TeXmacs> needs and femtolisp lacks are written in C in
-  <verbatim|fl_core.c> (the table <verbatim|fltm_builtin_info>): the functions
+  <source-link|fl_core.c|src/Scheme/Femtolisp/fl_core.c> (the table <verbatim|fltm_builtin_info>): the functions
   on strings of bytes (<verbatim|string-length>, <verbatim|string-ref>,
   <verbatim|substring>, <verbatim|list-\<gtr\>string>...),
   <verbatim|%keyword?>, <verbatim|%symbol?>, <verbatim|%table-ref>,
   <verbatim|%fingerprint>, <verbatim|%function-become!>, <verbatim|system>.
   Their names starting with <verbatim|%> are for the Scheme files of the
-  interface only.
+  interface only. The functions of Scheme which only the browser version has
+  (<verbatim|web-javascript>, <verbatim|web-files>...) are defined in
+  <source-link|src/Plugins/Vue/vue_gui.cpp|src/Plugins/Vue/vue_gui.cpp> with
+  <verbatim|tmscm_install_procedure>, for S7 and femtolisp alike.
 
   <section|Starting>
 
   <verbatim|start_scheme> calls <verbatim|fltm_init> with the size of the heap
-  and the boot image, which is in the program (<verbatim|fl_boot.h>): nothing
+  and the boot image, which is in the program (<source-link|fl_boot.h|src/Scheme/Femtolisp/fl_boot.h>): nothing
   is read from the disk to start femtolisp. It then gives
   <verbatim|tmscm_relocate_roots> to the collector.
   <verbatim|initialize_scheme> defines the builtins of the glue and the type
   of the objects of <TeXmacs>, and <TeXmacs> loads
   <verbatim|scheme_init_file ()>, which is
-  <verbatim|progs/init-femtolisp.scm>.
+  <source-link|progs/init-femtolisp.scm|TeXmacs/progs/init-femtolisp.scm>.
 
   The heap has two halves of the same size, which the collector copies one
   into the other; a half is doubled when more than 80% of it is still in use

@@ -107,13 +107,23 @@
   <section|Testing>
 
   <\shell-code>
-    QT_QPA_PLATFORM=offscreen TM_TEST_HOME=\<less\>a scratch directory\<gtr\> \\
+    TEXMACS_PATH=$PWD/TeXmacs TEXMACS_HOME_PATH=\<less\>a scratch directory\<gtr\> \\
 
-    \ \ sh tests/scheme/check.sh all
+    \ \ TeXmacs/bin/texmacs.bin -headless -x '(exit (catch #t
+
+    \ \ \ \ (lambda () (min 1 (run-all-tests)))
+
+    \ \ \ \ (lambda args (display* "error: " args "\\n") 2)))' -q
   </shell-code>
 
-  runs the regression suites of <verbatim|progs/check>. With femtolisp, three
-  suites have failing checks (four in all, two of them in
+  runs the regression suites of <source-link|progs/check|TeXmacs/progs/check> with the Vue interface,
+  which needs <verbatim|-headless> to run without a window
+  (<source-link|tests/scheme/check.sh|tests/scheme/check.sh> does not pass it; with a Qt build, use
+  that script with <verbatim|QT_QPA_PLATFORM=offscreen>). The option
+  <verbatim|-q> must come after <verbatim|-x>: the options are run in their
+  order, and <verbatim|-q> first would quit before the tests.
+  <verbatim|(run-regression-suite "name")> runs one suite. With femtolisp, two
+  suites have failing checks (three in all, two of them in
   <verbatim|graphics-edit>), which are not bugs of the interface:
 
   <\itemize>
@@ -121,21 +131,18 @@
     Guile gives <verbatim|1/2par> (no exact rationals);
 
     <item><verbatim|graphics-edit>: the order of the attributes of a
-    <verbatim|with> comes from the order of a hash table;
-
-    <item><verbatim|formats>: an export to ISO-8859-1 whose expected result no
-    longer matches the C++ code, with every interpreter.
+    <verbatim|with> comes from the order of a hash table.
   </itemize>
 
   Run the suites twice with the same scratch directory: the first run fills
   the caches of compiled code, the second one uses them. A change of
-  <verbatim|boot-femtolisp.scm> should be tested both ways, and with
-  <verbatim|TEXMACS_FL_EAGER=1>. <verbatim|check.sh \<less\>name\<gtr\>> runs
-  one suite.
+  <source-link|boot-femtolisp.scm|TeXmacs/progs/kernel/boot/boot-femtolisp.scm> should be tested both ways, and with
+  <verbatim|TEXMACS_FL_EAGER=1>. The two suites <verbatim|boot-s7> and
+  <verbatim|compat-s7> are for S7 and do not run with femtolisp.
 
-  The benchmarks are the scripts of <verbatim|docs/s7/bench> and
-  <verbatim|docs/femtolisp/bench/ui.scm>, run on several builds by
-  <verbatim|docs/femtolisp/bench/run.sh>. Compare builds by alternating them
+  The benchmarks are the scripts of <source-link|docs/s7/bench|docs/s7/bench> and
+  <source-link|docs/femtolisp/bench/ui.scm|docs/femtolisp/bench/ui.scm>, run on several builds by
+  <source-link|docs/femtolisp/bench/run.sh|docs/femtolisp/bench/run.sh>. Compare builds by alternating them
   on the same machine, and take the times without a profiler: sampling slows
   femtolisp more than S7.
 
@@ -143,14 +150,14 @@
 
   <\description-long>
     <item*|Adding a function of Guile which is missing>Define it in
-    <verbatim|compat-femtolisp.scm> with <verbatim|define-public>, after
+    <source-link|compat-femtolisp.scm|TeXmacs/progs/kernel/boot/compat-femtolisp.scm> with <verbatim|define-public>, after
     checking that the glue does not define it. If the name is a builtin of
     femtolisp with another meaning, use <verbatim|define-override> in
-    <verbatim|r5rs-femtolisp.scm>.
+    <source-link|r5rs-femtolisp.scm|TeXmacs/progs/kernel/boot/r5rs-femtolisp.scm>.
 
     <item*|Adding a primitive in C>For a function of <TeXmacs>, add it to the
     glue, as for the other interpreters. For a function which only femtolisp
-    needs, write it in <verbatim|fl_core.c> with the signature of the builtins
+    needs, write it in <source-link|fl_core.c|src/Scheme/Femtolisp/fl_core.c> with the signature of the builtins
     of femtolisp and add it to <verbatim|fltm_builtin_info>; there, an error
     is raised with the functions of femtolisp (<verbatim|type_error>,
     <verbatim|bounds_error>, <verbatim|argcount>; <verbatim|lerrorf> for the
@@ -164,7 +171,7 @@
     itself with the same arguments.
 
     <item*|Changing how files are loaded or compiled>The code is in
-    <verbatim|boot-femtolisp.scm>. Increase <verbatim|%cache-format> if the
+    <source-link|boot-femtolisp.scm|TeXmacs/progs/kernel/boot/boot-femtolisp.scm>. Increase <verbatim|%cache-format> if the
     same expansion now compiles to other code, test with and without the
     caches, and measure a boot with <verbatim|TEXMACS_FL_PROFILE=1>.
 

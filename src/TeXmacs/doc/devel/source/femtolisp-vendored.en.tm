@@ -7,26 +7,26 @@
 
   <section|What is in the tree>
 
-  <verbatim|src/Scheme/Femtolisp/femtolisp/> holds femtolisp at its commit
+  <source-link|src/Scheme/Femtolisp/femtolisp/|src/Scheme/Femtolisp/femtolisp> holds femtolisp at its commit
   <verbatim|ec76010>, under its BSD license, with the local patches applied.
   Only the sources, the boot files and its two main test files are kept (the
   tests run in a clone, see below).
 
   <\description-long>
-    <item*|The C core><verbatim|flisp.c> (the values, the collector, the
+    <item*|The C core><source-link|flisp.c|src/Scheme/Femtolisp/femtolisp/flisp.c> (the values, the collector, the
     bytecode interpreter <verbatim|apply_cl>; it includes
-    <verbatim|cvalues.c>, which includes <verbatim|operators.c>,
-    <verbatim|types.c>, <verbatim|print.c>, <verbatim|read.c> and
-    <verbatim|equal.c>), <verbatim|builtins.c>, <verbatim|string.c>,
-    <verbatim|table.c>, <verbatim|equalhash.c>, <verbatim|iostream.c>. About
+    <source-link|cvalues.c|src/Scheme/Femtolisp/femtolisp/cvalues.c>, which includes <source-link|operators.c|src/Scheme/Femtolisp/femtolisp/operators.c>,
+    <source-link|types.c|src/Scheme/Femtolisp/femtolisp/types.c>, <source-link|print.c|src/Scheme/Femtolisp/femtolisp/print.c>, <source-link|read.c|src/Scheme/Femtolisp/femtolisp/read.c> and
+    <source-link|equal.c|src/Scheme/Femtolisp/femtolisp/equal.c>), <source-link|builtins.c|src/Scheme/Femtolisp/femtolisp/builtins.c>, <source-link|string.c|src/Scheme/Femtolisp/femtolisp/string.c>,
+    <source-link|table.c|src/Scheme/Femtolisp/femtolisp/table.c>, <source-link|equalhash.c|src/Scheme/Femtolisp/femtolisp/equalhash.c>, <source-link|iostream.c|src/Scheme/Femtolisp/femtolisp/iostream.c>. About
     8800 lines with the headers.
 
     <item*|The library <verbatim|llt>>By the same author, with three files of
-    others (<verbatim|lookup3.c>, <verbatim|mt19937ar.c>,
-    <verbatim|wcwidth.c>): the streams (<verbatim|ios>), UTF-8, hash tables
+    others (<source-link|lookup3.c|src/Scheme/Femtolisp/femtolisp/llt/lookup3.c>, <source-link|mt19937ar.c|src/Scheme/Femtolisp/femtolisp/llt/mt19937ar.c>,
+    <source-link|wcwidth.c|src/Scheme/Femtolisp/femtolisp/llt/wcwidth.c>): the streams (<verbatim|ios>), UTF-8, hash tables
     keyed by pointers, the hash functions, bit vectors, random numbers, time,
-    paths. About 5800 lines. <verbatim|socket.c> and
-    <verbatim|bitvector-ops.c> are compiled and not used.
+    paths. About 5800 lines. <source-link|socket.c|src/Scheme/Femtolisp/femtolisp/llt/socket.c> and
+    <source-link|bitvector-ops.c|src/Scheme/Femtolisp/femtolisp/llt/bitvector-ops.c> are compiled and not used.
 
     <item*|The Lisp part><verbatim|system.lsp> (the standard library and the
     macro expander) and <verbatim|compiler.lsp> (the compiler to bytecode),
@@ -34,10 +34,10 @@
     <verbatim|flisp.boot>: their compiled code, as text.
   </description-long>
 
-  <verbatim|fl_core.c> and <verbatim|fl_llt.c> include these sources, as two
+  <source-link|fl_core.c|src/Scheme/Femtolisp/fl_core.c> and <source-link|fl_llt.c|src/Scheme/Femtolisp/fl_llt.c> include these sources, as two
   compilation units. They are compiled with the directory of <verbatim|llt> on
   the include path of these two files only: <verbatim|llt> has headers with
-  common names (<verbatim|utils.h>...).
+  common names (<source-link|utils.h|src/Scheme/Femtolisp/femtolisp/llt/utils.h>...).
 
   <section|The patches>
 
@@ -121,8 +121,8 @@
 
   Here <verbatim|\<less\>tree\<gtr\>> is the directory <verbatim|src> of
   <TeXmacs>, which holds <verbatim|configure>. <verbatim|mkboot1.lsp> is run
-  twice to reach a fixed point. <verbatim|make-boot-header.sh> writes
-  <verbatim|fl_boot.h>, the image as a C array. When <TeXmacs> starts,
+  twice to reach a fixed point. <source-link|make-boot-header.sh|src/Scheme/Femtolisp/make-boot-header.sh> writes
+  <source-link|fl_boot.h|src/Scheme/Femtolisp/fl_boot.h>, the image as a C array. When <TeXmacs> starts,
   <verbatim|initialize_scheme> computes a checksum of the image and defines it
   as <verbatim|*fl-boot-id*>, which is part of the key of the caches of
   compiled code: a new compiler makes them invalid by itself.
@@ -130,7 +130,7 @@
   <em|A new version of femtolisp>: apply the patches to it, in order, fix what
   no longer applies, copy the sources, make the boot image as above. Then
   check the two places which depend on the insides of femtolisp:
-  <verbatim|fl_core.c>, which uses its stack and its types, and the lazy
+  <source-link|fl_core.c|src/Scheme/Femtolisp/fl_core.c>, which uses its stack and its types, and the lazy
   function bodies (<verbatim|%expand-top> follows <verbatim|expand>, and the
   stubs depend on the code which the compiler makes for them, see
   <hlink|the lazy bodies|femtolisp-lazy.en.tm>).

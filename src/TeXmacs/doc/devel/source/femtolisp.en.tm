@@ -25,53 +25,55 @@
   </shell-code>
 
   With CMake the option is <verbatim|-DSCHEME_IMPL=femtolisp> (not tested
-  yet). The choice defines <verbatim|USE_FEMTOLISP> and compiles the directory
-  <verbatim|src/Scheme/Femtolisp>. In Scheme, <verbatim|(femtolisp-scheme?)>
+  yet); for the browser version, see
+  <hlink|femtolisp in the browser|femtolisp-browser.en.tm>. The choice defines
+  <verbatim|USE_FEMTOLISP> and compiles the directory
+  <source-link|src/Scheme/Femtolisp|src/Scheme/Femtolisp>. In Scheme, <verbatim|(femtolisp-scheme?)>
   tells that the interpreter is femtolisp, as <verbatim|(s7-scheme?)> does for
   S7.
 
   <section|Where things are>
 
   <\description-long>
-    <item*|<verbatim|src/Scheme/Femtolisp/femtolisp/>>femtolisp itself, with
+    <item*|<source-link|src/Scheme/Femtolisp/femtolisp/|src/Scheme/Femtolisp/femtolisp>>femtolisp itself, with
     the local patches applied: its C sources, its library <verbatim|llt>, its
     compiler and standard library (<verbatim|system.lsp>,
     <verbatim|compiler.lsp>) and the boot image made from them
     (<verbatim|flisp.boot>).
 
-    <item*|<verbatim|src/Scheme/Femtolisp/patches/>>The local patches, in
+    <item*|<source-link|src/Scheme/Femtolisp/patches/|src/Scheme/Femtolisp/patches>>The local patches, in
     order, as <verbatim|git format-patch> writes them.
 
-    <item*|<verbatim|src/Scheme/Femtolisp/fl_core.c>, <verbatim|fl_llt.c>>The
+    <item*|<source-link|src/Scheme/Femtolisp/fl_core.c|src/Scheme/Femtolisp/fl_core.c>, <source-link|fl_llt.c|src/Scheme/Femtolisp/fl_llt.c>>The
     two compilation units: femtolisp and its C interface for <TeXmacs>, and
     the library <verbatim|llt>.
 
-    <item*|<verbatim|src/Scheme/Femtolisp/fl_tm.h>>The C interface, the only
+    <item*|<source-link|src/Scheme/Femtolisp/fl_tm.h|src/Scheme/Femtolisp/fl_tm.h>>The C interface, the only
     header of femtolisp which the C++ code includes.
 
-    <item*|<verbatim|src/Scheme/Femtolisp/femtolisp_tm.hpp>, <verbatim|femtolisp_tm.cpp>>The
+    <item*|<source-link|src/Scheme/Femtolisp/femtolisp_tm.hpp|src/Scheme/Femtolisp/femtolisp_tm.hpp>, <source-link|femtolisp_tm.cpp|src/Scheme/Femtolisp/femtolisp_tm.cpp>>The
     interface of the Scheme interpreters of <TeXmacs> (<verbatim|tmscm>) on
     femtolisp, as <verbatim|S7/s7_tm.*> and <verbatim|Guile/guile_tm.*>.
 
-    <item*|<verbatim|src/Scheme/Femtolisp/fl_boot.h>>The boot image as a C
-    array, made by <verbatim|make-boot-header.sh>.
+    <item*|<source-link|src/Scheme/Femtolisp/fl_boot.h|src/Scheme/Femtolisp/fl_boot.h>>The boot image as a C
+    array, made by <source-link|make-boot-header.sh|src/Scheme/Femtolisp/make-boot-header.sh>.
 
-    <item*|<verbatim|TeXmacs/progs/init-femtolisp.scm>>The first Scheme file
+    <item*|<source-link|TeXmacs/progs/init-femtolisp.scm|TeXmacs/progs/init-femtolisp.scm>>The first Scheme file
     loaded. It loads the two files below and the module of the third, then the
-    <verbatim|init-kernel.scm> and <verbatim|init-texmacs.scm> of all the
+    <source-link|init-kernel.scm|TeXmacs/progs/init-kernel.scm> and <source-link|init-texmacs.scm|TeXmacs/progs/init-texmacs.scm> of all the
     interpreters.
 
-    <item*|<verbatim|TeXmacs/progs/kernel/boot/r5rs-femtolisp.scm>>R5RS and
+    <item*|<source-link|TeXmacs/progs/kernel/boot/r5rs-femtolisp.scm|TeXmacs/progs/kernel/boot/r5rs-femtolisp.scm>>R5RS and
     the basic functions of Guile, defined on femtolisp.
 
-    <item*|<verbatim|TeXmacs/progs/kernel/boot/boot-femtolisp.scm>>The
+    <item*|<source-link|TeXmacs/progs/kernel/boot/boot-femtolisp.scm|TeXmacs/progs/kernel/boot/boot-femtolisp.scm>>The
     modules, the loading of files, the lazy function bodies and the caches of
     compiled code.
 
-    <item*|<verbatim|TeXmacs/progs/kernel/boot/compat-femtolisp.scm>>The
+    <item*|<source-link|TeXmacs/progs/kernel/boot/compat-femtolisp.scm|TeXmacs/progs/kernel/boot/compat-femtolisp.scm>>The
     library functions of Guile (hash tables, lists, strings...), as a module.
 
-    <item*|<verbatim|docs/femtolisp/>>The working notes: the measurements, the
+    <item*|<source-link|docs/femtolisp/|docs/femtolisp>>The working notes: the measurements, the
     history of the decisions.
   </description-long>
 
@@ -109,6 +111,8 @@
     <branch|Scheme and Guile on femtolisp|femtolisp-compat.en.tm>
 
     <branch|The sources of femtolisp and their patches|femtolisp-vendored.en.tm>
+
+    <branch|femtolisp in the browser|femtolisp-browser.en.tm>
 
     <branch|Debugging, testing and common tasks|femtolisp-howto.en.tm>
   </traverse>
