@@ -4607,7 +4607,12 @@ void
 vue_input_text_widget_rep::copy_selection (bool cut) {
   int b, e;
   if (!selection (b, e)) return;
+#ifdef TAU_SHELL
+  // (the clipboard of the machine, in UTF-8: no Scheme converts it here)
+  string t= cork_to_utf8 (s (b, e));
+#else
   string t= tm_decode (s (b, e));
+#endif
   // "primary" is the system clipboard of the Vue GUI (see vue_gui.cpp)
   set_selection ("primary", tuple ("extern", t), t, t, "", "verbatim");
   if (cut) delete_selection ();
@@ -4618,8 +4623,13 @@ vue_input_text_widget_rep::paste () {
   tree t; string str;
   (void) get_selection ("primary", t, str, "verbatim");
   string ins;
+#ifdef TAU_SHELL
+  if (is_tuple (t, "extern", 1)) ins= utf8_to_cork (as_string (t[1]));
+  else if (N(str) > 0) ins= utf8_to_cork (str);
+#else
   if (is_tuple (t, "extern", 1)) ins= tm_encode (as_string (t[1]));
   else if (N(str) > 0) ins= tm_encode (str);
+#endif
   if (N(ins) == 0) return;
   // a single line: the newlines of the clipboard become spaces
   ins= replace (ins, "\n", " ");

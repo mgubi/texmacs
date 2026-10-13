@@ -1668,6 +1668,10 @@ tau_shell_main (int argc, char** argv) {
   // which Scheme sets up in TeXmacs
   void set_new_fonts (bool new_fonts);
   set_new_fonts (true);
+  // the clipboard of the machine is UTF-8, for the fields of the dialogs
+  // (the encodings are preferences of the core, which are not here)
+  set_user_preference ("verbatim->texmacs:encoding", "utf-8");
+  set_user_preference ("texmacs->verbatim:encoding", "utf-8");
   gui_open (argc, argv);
 
   // the core, next to this program unless TAU_CORE says where
