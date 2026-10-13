@@ -5,6 +5,8 @@
 <\body>
   <tmdoc-title|About Tau>
 
+  <center|<image|$TEXMACS_PATH/misc/images/tau-256.png|3cm|||>>
+
   <name|Tau> (<math|<around*|\<langle\>|\<tau\>|\<rangle\>>>) is an
   experimental form of <TeXmacs> in which the editor and its interface are
   two programs. The <em|core> is <TeXmacs> without windows: the documents,

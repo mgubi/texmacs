@@ -12,6 +12,10 @@ The web app uses `../web/icon.png` (256 pixels), `icon-192.png` for the browser
 fallback, and `icon-180.png` for the Apple touch icon. The app button and loading
 panel use the same artwork.
 
+The desktop program (`tau_shell`) shows `TeXmacs/misc/images/tau-256.png`, a
+copy of `../web/icon.png`, as the icon of its window and in the Dock, and the
+page about Tau of the documentation (Help → About Tau) shows it too.
+
 `../../../packages/macos/Tau.icns` contains the standard macOS icon sizes
 16, 32, 128, 256, and 512 points, each at 1x and 2x, up to 1024 pixels. It is a
 Tau-specific asset for macOS app bundles; the current native Tau trial builds

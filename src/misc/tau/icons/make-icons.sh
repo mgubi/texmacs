@@ -30,4 +30,7 @@ for size in 256 192 180; do
   sips -z "$size" "$size" "$here/tau.png" \
     --out "$here/../web/$name" >/dev/null
 done
+# The window and the Dock of the desktop program (tau_shell), and the page
+# about Tau in the documentation.
+cp "$here/../web/icon.png" "$src/TeXmacs/misc/images/tau-256.png"
 printf 'Tau icons exported to %s\n' "$out"

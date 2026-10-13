@@ -321,7 +321,12 @@ vue_logo_surface () {
   static bool tried= false;
   if (tried) return icon;
   tried= true;
+#ifdef TAU_SHELL
+  // (the icon of Tau: misc/tau/icons)
+  url u= resolve (url ("$TEXMACS_PATH") * url ("misc/images/tau-256.png"));
+#else
   url u= resolve (url ("$TEXMACS_PATH") * url ("misc/images/texmacs-vue-256.png"));
+#endif
   if (is_none (u)) return NULL;
   fz_image* im= mupdf_load_image (u);
   fz_pixmap* pix= mupdf_pixmap_from_image (im);
