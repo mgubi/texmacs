@@ -801,7 +801,7 @@ public:
 
 // where a node is: in a menu or a bar, or in a dialog (or a tool), where
 // it is laid out; in a row or in a column
-struct context { bool dialog; bool row; };
+struct context { bool dialog; bool row; bool sized= false; };
 
 // the first input of what is being made: it takes the keyboard
 static widget first_input;
@@ -900,7 +900,7 @@ build (const json& node, int style, context c) {
   std::string kind= node["kind"].str ();
   bool enabled= !node.has ("enabled") || node["enabled"].truth ();
   int st= style | (enabled? 0: WIDGET_STYLE_INERT | WIDGET_STYLE_GREY);
-  context row= { c.dialog, true }, column= { c.dialog, false };
+  context row= { c.dialog, true, c.sized }, column= { c.dialog, false, c.sized };
   string width= node["width"].text ();
   widget w;
   if (kind == "horizontal" || kind == "hlist" || kind == "class")
@@ -968,7 +968,9 @@ build (const json& node, int style, context c) {
       w= user_canvas_widget (pack (build_items (in, style, column), column), 0);
   }
   else if (kind == "resize") {
-    widget inner= pack (build_items (node["items"], style, column), column);
+    context inside= column;
+    inside.sized= true;
+    widget inner= pack (build_items (node["items"], style, inside), inside);
     string h= node["height"].text ();
     w= resize_widget (inner, 0, width, h, width, h, width, h, "", "");
   }
@@ -1004,6 +1006,15 @@ build (const json& node, int style, context c) {
                                      !node.has ("input") || node["input"].truth (),
                                      node["width"].num () * PIXEL,
                                      node["height"].num () * PIXEL));
+    // A view fills the room it is given, and where nothing gives it any
+    // (a page of tabs in a window which takes the size of its contents:
+    // the consoles) it had none. It gets the size which the core says,
+    // unless something around it already sets one (a resize).
+    if (!c.sized && node["width"].num () > 0 && node["height"].num () > 0) {
+      string vw= as_string (node["width"].num ()) * "px";
+      string vh= as_string (node["height"].num ()) * "px";
+      w= resize_widget (w, 0, vw, vh, vw, vh, vw, vh, "", "");
+    }
   }
   else if (kind == "input") {
     command cmd= tm_new<answer_command_rep> (node["answer"].num ());

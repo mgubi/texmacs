@@ -1175,6 +1175,24 @@ test("a displayed formula from the keyboard", async p => {
 	check("no error of the core", (await p.errors()).length === 0, await p.errors());
 });
 
+test("the debugging console", async p => {
+	await p.open();
+	// a window with tabs, each a view of the messages of the core
+	await p.scheme("(open-debug-console)");
+	await p.until("the console, with a view", async () => (await p.count(".tau-dialog canvas")) >= 1, 20000);
+	const view = await p.box(".tau-dialog canvas");
+	check("its view has room", view.w > 200 && view.h > 40, view);
+	await p.until("and is drawn", () => p.page.evaluate(() => {
+		const c = document.querySelector(".tau-dialog canvas");
+		if (!c || c.width < 10) return false;
+		const data = c.getContext("2d").getImageData(0, 0, c.width, c.height).data;
+		let dark = 0;
+		for (let i = 0; i < data.length; i += 4) if (data[i + 3] > 200 && data[i] < 100) dark++;
+		return dark > 50;
+	}));
+	check("no error of the core", (await p.errors()).length === 0, await p.errors());
+});
+
 test("stopped", async p => {
 	await p.open();
 	await p.newDocument();
