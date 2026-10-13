@@ -137,6 +137,30 @@
       (buffer-close u)
       (when (buffer-exists? old) (switch-to-buffer old)))))
 
+;; A position of the cursor history whose buffer was closed is forgotten,
+;; not read
+(define (test-cursor-history)
+  (check-group "cursor history")
+  (with-buffer-doc '(document "one" "two") '("generic")
+    (lambda ()
+      (go-end)
+      (cursor-history-add (cursor-path))))
+  (with-buffer-doc '(document "three" "four") '("generic")
+    (lambda ()
+      (with start (cursor-path)
+        (cursor-history-add start)
+        (check-true (cursor-has-history?))
+        (go-end)
+        (with end (cursor-path)
+          (cursor-history-add end)
+          (cursor-history-backward)
+          (check= (cursor-path) start)
+          (cursor-history-backward)
+          (check= (cursor-path) start)
+          (check-false (cursor-has-history?))
+          (cursor-history-forward)
+          (check= (cursor-path) end))))))
+
 (define (run-group thunk)
   ;; an error in a group counts as one failure
   (with r (check-run thunk)
@@ -1535,6 +1559,7 @@
   (for-each run-group
             (list test-help-files test-doc-parse test-tmdoc-expand
                   test-tmdoc-rewrite test-doc-search test-tmdoc-edit
+                  test-cursor-history
                   test-font-database test-logical-fonts
                   test-font-typesetting test-init-font
                   test-language-names test-translations test-hyphenation

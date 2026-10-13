@@ -181,23 +181,42 @@
 (define (future-get) (ahash-ref* cursor-future (window-get-serial) '()))
 (define (future-set l) (ahash-set! cursor-future (window-get-serial) l))
 
+;; An entry of the history is a position with the body of its buffer. A
+;; position points into the tree of its buffer and must not be read once
+;; that tree is gone: the body, which the entry keeps alive, tells whether
+;; the buffer is still part of the document.
+(define (entry-new p)
+  (with pos (position-new)
+    (position-set pos p)
+    (cons pos (buffer-tree))))
+
+(define (entry-alive? e)
+  (tree-active? (cdr e)))
+
+(define (entry-path e)
+  (and (entry-alive? e) (position-get (car e))))
+
+(define (entry-valid? e)
+  (and-with p (entry-path e)
+    (and (nnull? p)
+         (and-with t (path->tree (cDr p))
+           (not (tm-func? t 'uninit))))))
+
+(define (entry-delete e)
+  (when (entry-alive? e)
+    (position-delete (car e))))
+
 (define (cursor-same? l p)
-  (and (nnull? l) (== (position-get (car l)) p)))
+  (and (nnull? l) (== (entry-path (car l)) p)))
 
 (tm-define (cursor-history-add p)
   (:synopsis "Add current cursor position into the history")
   (if (cursor-same? (future-get) p)
-      (with pos (car (future-get))
+      (with e (car (future-get))
         (future-set (cdr (future-get)))
-        (history-set (cons pos (history-get))))
+        (history-set (cons e (history-get))))
       (when (not (cursor-same? (history-get) p))
-        (with pos (position-new)
-          (position-set pos p)
-          (history-set (cons pos (history-get)))))))
-
-(define (position-valid? pos)
-  (and-with t (path->tree (cDr (position-get pos)))
-    (not (tm-func? t 'uninit))))
+        (history-set (cons (entry-new p) (history-get))))))
 
 (tm-define (cursor-has-history?)
   (:synopsis "Does there exist a previous position in history?")
@@ -206,18 +225,18 @@
 (tm-define (cursor-history-backward)
   (:synopsis "Go to previous position in history")
   (when (nnull? (history-get))
-    (with pos (car (history-get))
+    (with e (car (history-get))
       (history-set (cdr (history-get)))
-      (if (position-valid? pos)
+      (if (entry-valid? e)
           (begin
-            (future-set (cons pos (future-get)))
-            (if (== (cursor-path) (position-get pos))
+            (future-set (cons e (future-get)))
+            (if (== (cursor-path) (entry-path e))
                 (cursor-history-backward)
                 (begin
-                  (go-to (position-get pos))
+                  (go-to (entry-path e))
                   (cursor-show-if-hidden))))
           (begin
-            (position-delete pos)
+            (entry-delete e)
             (cursor-history-backward))))))
 
 (tm-define (cursor-has-future?)
@@ -227,19 +246,19 @@
 (tm-define (cursor-history-forward)
   (:synopsis "Go to next position in history")
   (when (nnull? (future-get))
-    (with pos (car (future-get))
+    (with e (car (future-get))
       (future-set (cdr (future-get)))
-      (if (position-valid? pos)
+      (if (entry-valid? e)
           (begin
-            (history-set (cons pos (history-get)))
-            (if (== (cursor-path) (position-get pos))
+            (history-set (cons e (history-get)))
+            (if (== (cursor-path) (entry-path e))
                 (cursor-history-forward)
                 (begin
-                  (go-to (position-get pos))
+                  (go-to (entry-path e))
                   (cursor-show-if-hidden))))
           (begin
-            (position-delete pos)
-            (cursor-future-backward))))))
+            (entry-delete e)
+            (cursor-history-forward))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Changing buffers
