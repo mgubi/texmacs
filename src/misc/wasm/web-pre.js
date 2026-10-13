@@ -90,6 +90,32 @@ Module['preRun'].push(function () {
     ENV['TEXMACS_VUE_SCALE'] = tmAddress.get ('scale');
   // ?gpusync=1: the profile waits for the GPU (vue_gpu.cpp, gpu_finish)
   if (tmAddress.get ('gpusync') === '1') ENV['TEXMACS_VUE_GPU_SYNC'] = '1';
+  // ?editprofile=1: the cost of each edit in the console
+  // (TEXMACS_EDIT_PROFILE, see typesetter.cpp); ?typeset=old: the
+  // typesetter without what it keeps from one edit to the next, and
+  // ?typeset=check: with all of it checked against the old way (the
+  // variables are described with bridge_rep::typeset, new_breaker.cpp,
+  // make_pages.cpp and exec_auto_id); both for measurements and tests
+  if (tmAddress.get ('editprofile') === '1') ENV['TEXMACS_EDIT_PROFILE'] = '1';
+  if (tmAddress.get ('typeset') === 'old') {
+    ENV['TEXMACS_TYPESET_READS'] = 'off';
+    ENV['TEXMACS_PAGE_BREAK_CACHE'] = 'off';
+    ENV['TEXMACS_PAGE_BREAK_FAST'] = '0';
+    ENV['TEXMACS_STABLE_LABELS'] = 'off';
+    ENV['TEXMACS_PAGE_REUSE'] = 'off';
+  }
+  if (tmAddress.get ('typeset') === 'check') {
+    ENV['TEXMACS_TYPESET_READS'] = 'check';
+    ENV['TEXMACS_PAGE_BREAK_CACHE'] = 'check';
+    ENV['TEXMACS_PAGE_BREAK_FAST'] = 'check';
+    ENV['TEXMACS_PAGE_REUSE'] = 'check';
+  }
+  // ?env=TEXMACS_NAME:value (several may be given): an environment
+  // variable of TeXmacs, for tests
+  tmAddress.getAll ('env').forEach (function (e) {
+    var m = /^(TEXMACS_[A-Z0-9_]+):(.*)$/.exec (e);
+    if (m) ENV[m[1]] = m[2];
+  });
   FS.mkdirTree ('/home/web');
   FS.mount (IDBFS, { autoPersist: false }, '/home/web');
   addRunDependency ('home');

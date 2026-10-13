@@ -242,6 +242,28 @@
     the same computer it stays in clear, without any certificate. Such a
     server serves the browsers of other computers when its preference
     <verbatim|server websocket> is <verbatim|on>.
+
+    <item>Editing a long document is faster. A new section, a numbered
+    equation or the join of two paragraphs used to typeset everything
+    after it again, since the numbers changed: now only what shows one of
+    these numbers is. The page breaks are searched faster, and not at all
+    when no line changed its height; the pages which did not change, with
+    their headers and footers, are no longer put together again at every
+    key. In the user manual opened as a book, some 380 pages, a letter
+    takes about 50<nbsp>ms in this page instead of 730, the join of two
+    paragraphs 50 instead of 2100 and a new section 200 instead
+    of 3200 (the typesetting alone, on a recent laptop; the pages are
+    the same as before).
+
+    <item>The entries of a table of contents and of an index keep pointing
+    to their places when sections or index entries are added before them:
+    they no longer wait for <menu|Document|Update|All> to be right again.
+
+    <item>A long document sometimes lost what comes at its end when it was
+    made by a program: the user manual, opened as a book from the
+    <menu|Help> menu, was now and then shown as one endless page instead of
+    its pages. The memory of such a document could be reused while it was
+    still being built.
   </itemize>
 
   <paragraph|9 October 2026>
