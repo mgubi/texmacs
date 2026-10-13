@@ -48,6 +48,7 @@
 #include "url.hpp"
 #include "file.hpp"
 #include "analyze.hpp"
+#include "font.hpp"
 #include "iterator.hpp"
 #include <SDL3/SDL.h>
 #include <mupdf/fitz.h>
@@ -335,6 +336,7 @@ json_parse (const char* data, size_t n) {
 class tau_view_rep;
 static hashmap<int,pointer> views (NULL); // number of a view -> its canvas
 static std::string clipboard_text ();
+widget box_widget (scheme_tree p, string s, color col, bool trans, bool ink); // tm_button.cpp
 static bool close_context_menu ();
 
 class tau_view_rep: public vue_simple_widget_rep {
@@ -355,11 +357,24 @@ public:
   SI      ax, ay;
   bool    asked;       // the core was asked to scroll, and has not yet
   SI      asked_x, asked_y;
+  // The wheel and the moves of the pointer come faster than the core
+  // answers (a step of the wheel is a whole view to draw and to send): one
+  // of each is with the core at a time, which says when it is done with it
+  // (a ping after it comes back); what comes meanwhile is added up (the
+  // wheel) or replaces what waited (the pointer). Without this the steps
+  // waited in the pipe and were done long after the fingers had stopped.
+  double  wheel_x, wheel_y;  // what the wheel asked and was not sent yet
+  int     wheel_px, wheel_py;
+  bool    wheel_sent;        // a step is with the core
+  std::string move_held;     // the last move, which waits
+  bool    move_sent;
 
   tau_view_rep (int v= 0, bool emb= false, bool inp= true, SI hw= 0, SI hh= 0):
     view (0), place (0), pw (0), ph (0), fw (0), fh (0),
     embedded (emb), input (inp), hint_w (hw), hint_h (hh),
-    ax (0), ay (0), asked (false), asked_x (0), asked_y (0) { set_view (v); }
+    ax (0), ay (0), asked (false), asked_x (0), asked_y (0),
+    wheel_x (0), wheel_y (0), wheel_px (0), wheel_py (0), wheel_sent (false),
+    move_sent (false) { set_view (v); }
   ~tau_view_rep () {
     if (view && views [view] == (pointer) this) views->reset (view); }
   bool is_editor_widget () { return true; }
@@ -441,15 +456,46 @@ public:
       // (the displacement in points, y up: for the core pixels, y down)
       if (N(data) != 2) return;
       double d= density ();
-      core_say ("scroll " + std::to_string (view) + " " +
-                std::to_string ((int) (-data[0] * d)) + " " +
-                std::to_string ((int) (-data[1] * d)) + " " +
-                std::to_string (px) + " " + std::to_string (py));
+      wheel_x -= data[0] * d; wheel_y -= data[1] * d;
+      wheel_px= px; wheel_py= py;
+      if (!wheel_sent) send_wheel ();
       return;
     }
-    core_say ("mouse " + std::to_string (view) + " " + std_of (kind) + " " +
-              std::to_string (px) + " " + std::to_string (py) + " " +
-              std::to_string (mods) + " 0");
+    std::string line= "mouse " + std::to_string (view) + " " + std_of (kind) + " " +
+      std::to_string (px) + " " + std::to_string (py) + " " + std::to_string (mods) + " 0";
+    if (kind == "move") {
+      if (move_sent) { move_held= line; return; }
+      move_sent= true;
+      core_say (line);
+      core_say ("ping move " + std::to_string (view));
+      return;
+    }
+    // (a press or a release: after the move which waits, not before it)
+    if (move_held != "") { core_say (move_held); move_held= ""; }
+    core_say (line);
+  }
+  void send_wheel () {
+    int dx= (int) wheel_x, dy= (int) wheel_y;
+    if (dx == 0 && dy == 0) return;
+    wheel_x -= dx; wheel_y -= dy;
+    wheel_sent= true;
+    core_say ("scroll " + std::to_string (view) + " " + std::to_string (dx) + " " +
+              std::to_string (dy) + " " + std::to_string (wheel_px) + " " +
+              std::to_string (wheel_py));
+    core_say ("ping wheel " + std::to_string (view));
+  }
+  // the core is done with a step of the wheel, or with a move
+  void done (std::string what) {
+    if (what == "wheel") { wheel_sent= false; send_wheel (); }
+    else if (what == "move") {
+      move_sent= false;
+      if (move_held != "") {
+        move_sent= true;
+        core_say (move_held);
+        move_held= "";
+        core_say ("ping move " + std::to_string (view));
+      }
+    }
   }
   void handle_repaint (renderer win, SI x1, SI y1, SI x2, SI y2) {
     win->set_background (white);
@@ -496,6 +542,10 @@ public:
       extents= rectangle (0, -(SI) max (n[9], h) * px, (SI) max (n[8], w) * px, 0);
       ax= nx; ay= ny;
       if (asked && !moved) asked= false; // (it could not go there)
+      // where the cursor is, for the input methods of the system, which
+      // put their candidates there (update_text_input_area)
+      cursor_pos= coord2 (ax + (SI) n[12] * px, ay - (SI) n[13] * px);
+      cursor_moved= true;
       if (!asked && (backing_pos.x1 != ax || backing_pos.x2 != ay)) {
         // the core scrolled: the canvas goes where the frame is
         scroll_pos= coord2 (ax, ay);
@@ -538,6 +588,9 @@ expand (int number) {
         const char* fpart= kind + strlen (kind) + 1;
         if (!strcmp (kind, "contents") && part == fpart) {
           const char* js= fpart + strlen (fpart) + 1;
+          if (getenv ("TAU_SHELL_DEBUG") != NULL)
+            fprintf (stderr, "tau_shell] contents %s %.*s\n", fpart,
+                     (int) std::min ((size_t) 1800, f.body.size () - (size_t) (js - kind)), js);
           return json_parse (js, f.body.size () - (size_t) (js - kind));
         }
       }
@@ -662,6 +715,30 @@ build_label (const json& node, int style) {
     // (the file which the core found is drawn at its own size: a flag
     // filled the window)
     return xpm_widget (url (node["icon"].text ()));
+  if (node.has ("color")) {
+    // a color of a palette: a patch of it ("rgba(r,g,b,a)" for the page)
+    int r= 0, g= 0, b= 0;
+    sscanf (node["color"].str ().c_str (), "rgba(%d,%d,%d", &r, &g, &b);
+    char hex[8];
+    snprintf (hex, sizeof (hex), "#%02x%02x%02x", r & 255, g & 255, b & 255);
+    int w= node.has ("width")? node["width"].num (): 24;
+    int h= node.has ("height")? node["height"].num (): 18;
+    return glue_widget (tree (hex), false, false, w * PIXEL, h * PIXEL);
+  }
+  if (node["symbol"].truth ())
+    // a symbol of a palette of mathematics: typeset as in a document
+    // (the font of the interface has no such glyphs), as the menus of
+    // TeXmacs do
+  {
+    // (a symbol which Unicode has not comes under its name of TeXmacs,
+    // "<big-int-2>": not to be read as the three characters it is made of)
+    std::string l= node["label"].str ();
+    string sym= (l.size () > 2 && l[0] == '<' && l[l.size () - 1] == '>')
+                ? string (l.c_str ()): node["label"].text ();
+    // (not transparent: on the grey of the menus, a canvas of Vue which
+    // paints nothing behind it stays white)
+    return box_widget (tree (TUPLE), sym, black, false, false);
+  }
   return text_widget (node["label"].text (), style, black, false);
 }
 
@@ -714,8 +791,10 @@ build (const json& node, int style, context c) {
     command cmd= tm_new<invoke_command_rep> (node["action"].num ());
     if (node["button"].truth () && c.dialog) st |= WIDGET_STYLE_BUTTON;
     if (c.dialog && node["check"].str () != "") st |= WIDGET_STYLE_PRESSED;
+    // (a symbol or a color of a palette: the patch alone)
+    bool patch= node["symbol"].truth () || node.has ("color");
     w= menu_button (build_label (node, st), cmd, node["check"].text (),
-                    node["shortcut"].text (), st);
+                    patch? string (""): node["shortcut"].text (), st);
   }
   else if (kind == "submenu") {
     promise<widget> pw= tm_new<contents_promise_rep> (node["contents"].num ());
@@ -1201,6 +1280,14 @@ handle_frame (core_frame& f) {
         core_say ("scheme " + escaped (getenv ("TAU_SHELL_EVAL")));
     }
   }
+  else if (!strcmp (f.tag, "PONG")) {
+    // ("wheel <view>" or "move <view>": see tau_view_rep)
+    char what[16]; int view= 0;
+    if (sscanf (std::string (f.body.begin (), f.body.end ()).c_str (), "%15s %d", what, &view) == 2) {
+      tau_view_rep* v= (tau_view_rep*) views [view];
+      if (v != NULL) v->done (what);
+    }
+  }
   else if (!strcmp (f.tag, "JSON")) {
     const char* kind= (const char*) f.body.data ();
     const char* part= kind + strlen (kind) + 1;
@@ -1290,6 +1377,11 @@ tau_shell_main (int argc, char** argv) {
         " (define (format-get-suffixes* x) (list))"
         " (define (safely-quit-TeXmacs) (quit))"
         " (define (open-window) #t))");
+  // the fonts as the documents have them (found among the files, with
+  // those of mathematics: the symbols of the palettes), not by the rules
+  // which Scheme sets up in TeXmacs
+  void set_new_fonts (bool new_fonts);
+  set_new_fonts (true);
   gui_open (argc, argv);
 
   // the core, next to this program unless TAU_CORE says where
