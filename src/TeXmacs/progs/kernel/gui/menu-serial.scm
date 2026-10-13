@@ -330,6 +330,9 @@
       `((kind . entry)
         (label . ,(serial-text symstring))
         (symbol . #t)
+        ;; (as TeXmacs names it, for an interface which typesets it itself:
+        ;; the desktop; Unicode does not say which glyph of mathematics)
+        ,@(if (in-desktop?) `((tm . ,symstring)) '())
         (shortcut . ,sh)
         (check . "")
         (enabled . ,(active? style))

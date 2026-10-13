@@ -863,9 +863,14 @@ build_label (const json& node, int style) {
   {
     // (a symbol which Unicode has not comes under its name of TeXmacs,
     // "<big-int-2>": not to be read as the three characters it is made of)
+    // The core also says the symbol as TeXmacs names it ("<jmath>"),
+    // which is what is typeset: back from Unicode it would be a character
+    // by its number, which the fonts of mathematics may not have.
     std::string l= node["label"].str ();
     string sym= (l.size () > 2 && l[0] == '<' && l[l.size () - 1] == '>')
                 ? string (l.c_str ()): node["label"].text ();
+    if (node.has ("tm") && node["tm"].str () != "")
+      sym= string (node["tm"].str ().c_str ());
     // (not transparent: on the grey of the menus, a canvas of Vue which
     // paints nothing behind it stays white)
     return box_widget (tree (TUPLE), sym, black, false, false);

@@ -1097,6 +1097,34 @@ test("a balloon of the document", async p => {
 	check("no error of the core", (await p.errors()).length === 0, await p.errors());
 });
 
+test("the preview of a reference", async p => {
+	await p.open();
+	await p.newDocument();
+	// a formula with a label and a line of references to it: the pointer
+	// over one of them shows the formula in a balloon
+	await p.scheme('(begin (add-style-package "preview-ref")' +
+		' (insert (quote (equation (document (concat "a=b" (label "eq1"))))))' +
+		' (go-end) (insert-return)' +
+		' (do ((i 0 (+ i 1))) ((= i 40)) (insert (quote (reference "eq1"))))' +
+		' (update-document "all"))');
+	await sleep(1500);
+	const view = await p.box(".tau-pane .tau-canvas");
+	let shown = false;
+	let at = 0;
+	for (let y = 20; y < 320 && !shown; y += 5) {
+		// (as a hand does: many small moves along the line, without a rest)
+		for (let i = 0; i < 12; i++) {
+			await p.page.mouse.move(view.x + view.w / 2 - 90 + 5 * i, view.y + y);
+			await sleep(16);
+		}
+		await sleep(300);
+		shown = (await p.count(".tau-tooltip canvas")) > 0;
+		at = y;
+	}
+	check("the preview is shown under a pointer which moves", shown, [(await p.sent("mouse")).length, await p.errors()]);
+	check("no error of the core", (await p.errors()).length === 0, await p.errors());
+});
+
 test("stopped", async p => {
 	await p.open();
 	await p.newDocument();
