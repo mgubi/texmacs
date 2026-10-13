@@ -44,6 +44,21 @@ inline bool tmscm_is_double (tmscm obj) { return s7_is_real (obj); }
 inline bool tmscm_is_string (tmscm obj) { return s7_is_string (obj); }
 inline bool tmscm_is_symbol (tmscm obj) { return s7_is_symbol (obj); }
 
+// While C++ code builds a list, the part which is built is only known to
+// C++: the collector of S7 does not look at the variables of C++, and it
+// only spares the last few hundreds of cells which were made. A list
+// whose other elements took more than that to make lost its end (the
+// initial environment of the user manual, built before its body). The
+// collector is therefore off while an object of this class exists; the
+// heap grows instead.
+extern int tmscm_builders;
+struct tmscm_builder {
+  inline tmscm_builder () {
+    if (tmscm_builders++ == 0) s7_gc_on (tm_s7, false); }
+  inline ~tmscm_builder () {
+    if (--tmscm_builders == 0) s7_gc_on (tm_s7, true); }
+};
+
 inline tmscm tmscm_cons (tmscm obj1, tmscm obj2) { return s7_cons (tm_s7, obj1, obj2); }
 inline tmscm tmscm_car (tmscm obj) { return s7_car (obj); }
 inline tmscm tmscm_cdr (tmscm obj) { return s7_cdr (obj); }

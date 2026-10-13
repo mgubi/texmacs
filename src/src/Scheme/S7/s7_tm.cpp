@@ -22,6 +22,7 @@
  ******************************************************************************/
 
 s7_scheme *tm_s7;
+int tmscm_builders= 0;
 s7_pointer user_env;
 static s7_pointer catch_call;
 
