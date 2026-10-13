@@ -415,8 +415,9 @@
                     (resolve-module '(check define-test)))
                    'define-test-pub)))
   ;; S7 modules see everything in the rootlet, where the public names are
-  ;; published, and :use is not enforced (see src/docs/s7)
-  (when (not (s7-scheme?))
+  ;; published, and :use is not enforced (see src/docs/s7); the same for
+  ;; femtolisp, which has one global environment
+  (when (not (or (s7-scheme?) (femtolisp-scheme?)))
     (test-texmacs-module)))
 
 (define (test-texmacs-module)

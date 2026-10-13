@@ -20,9 +20,16 @@
 
 (define lazy-format-todo '())
 
+(define-public (lazy-format-add! module)
+  (set! lazy-format-todo (cons module lazy-format-todo)))
+
 (define-public-macro (lazy-format module . ignored)
-  (set! lazy-format-todo (cons module lazy-format-todo))
-  `(delayed (:idle 2000) (import-from ,module)))
+  ;; the module is recorded when the form is evaluated, not when it is
+  ;; expanded: a Scheme may expand a form which is not evaluated (femtolisp
+  ;; expands (when #f (lazy-format ...)) when it compiles it)
+  `(begin
+     (lazy-format-add! ',module)
+     (delayed (:idle 2000) (import-from ,module))))
 
 (define (lazy-format-force)
   (if (nnull? lazy-format-todo)

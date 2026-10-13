@@ -1,0 +1,47 @@
+From 0a831848fc938d629240ab6851515088a4271a4a Mon Sep 17 00:00:00 2001
+From: tm <tm@x>
+Date: Tue, 6 Oct 2026 22:56:17 +0100
+Subject: [PATCH 21/21] Reader: a vector without a label is made once its
+ elements are read (growing it called the garbage collector at each step)
+
+---
+ read.c | 23 +++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
+
+diff --git a/read.c b/read.c
+index ad68535..0809a14 100644
+--- a/read.c
++++ b/read.c
+@@ -428,6 +428,29 @@ static value_t read_vector(value_t label, u_int32_t closer)
+ {
+     value_t v=the_empty_vector, elt;
+     u_int32_t i=0;
++    if (label == UNBOUND) {
++        // TeXmacs: without a label, nothing refers to the vector while it is
++        // read: its elements are kept on the stack and the vector made at
++        // the end (growing it calls the garbage collector, which is slow
++        // with a large heap)
++        uint32_t base = SP;
++        while (peek() != closer) {
++            if (ios_eof(F))
++                lerror(ParseError, "read: unexpected end of input");
++            elt = do_read_sexpr(UNBOUND);
++            if (SP >= N_STACK)
++                grow_stack();
++            PUSH(elt);
++            i++;
++        }
++        take();
++        if (i == 0)
++            return the_empty_vector;
++        v = alloc_vector(i, 0);
++        memcpy(&vector_elt(v,0), &Stack[base], i*sizeof(value_t));
++        POPN(i);
++        return v;
++    }
+     PUSH(v);
+     if (label != UNBOUND)
+         ptrhash_put(&readstate->backrefs, (void*)label, (void*)v);
+-- 
+2.50.1 (Apple Git-155)
+

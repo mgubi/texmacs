@@ -68,6 +68,22 @@
   ;; the graphics of the buffer, (document (with ... (graphics ...)))
   (tree->stree (tree-ref (buffer-tree) 0 :last)))
 
+(define (attribute-pairs l)
+  ;; the pairs (name value) of the arguments @l of a with, without its body
+  (if (or (null? l) (null? (cdr l))) '()
+      (cons (list (car l) (cadr l)) (attribute-pairs (cddr l)))))
+
+(define (sort-attributes t)
+  ;; @t with the attributes of each with sorted by their names: they come
+  ;; from a hash table, whose order depends on the Scheme interpreter
+  (cond ((npair? t) t)
+        ((and (== (car t) 'with) (odd? (length (cdr t))))
+         (with l (sort (attribute-pairs (cdr t))
+                       (lambda (a b) (string<? (car a) (car b))))
+           `(with ,@(append-map identity l)
+                  ,(sort-attributes (cAr t)))))
+        (else (map sort-attributes t))))
+
 (define (attrs)
   ;; the attributes of the with around the graphics
   (cDr (cdr (tree->stree (tree-ref (buffer-tree) 0)))))
@@ -786,7 +802,7 @@
       (edit_left-button 'edit "1" "2")
       (check-true sticky-point)
       (check= current-point-no 1)
-      (check= (sketch-get)
+      (check= (sort-attributes (sketch-get))
               '((with "color" "red" "line-width" "2ln"
                       (line (point "1" "2") (point "1" "2")))))
       ;; the graphics does not have it yet
@@ -796,7 +812,8 @@
       (check-false sticky-point)
       (check= (rel current-path) '(0 6 1))
       (check= current-obj '(line (point "1" "2") (point "1" "2")))
-      (check= (gr) '(graphics "" (with "color" "red" "line-width" "2ln"
+      (check= (sort-attributes (gr))
+              '(graphics "" (with "color" "red" "line-width" "2ln"
                                        (line (point "1" "2")
                                              (point "1" "2")))))
       (check-false (graphics-busy?))))

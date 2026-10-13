@@ -150,6 +150,10 @@
 /texmacs/progs/init-s7.scm
 /texmacs/progs/kernel/boot/boot-s7.scm
 /texmacs/progs/kernel/boot/compat-s7.scm
+/texmacs/progs/init-femtolisp.scm
+/texmacs/progs/kernel/boot/r5rs-femtolisp.scm
+/texmacs/progs/kernel/boot/boot-femtolisp.scm
+/texmacs/progs/kernel/boot/compat-femtolisp.scm
 /texmacs/progs/init-kernel.scm
 /texmacs/progs/kernel/boot/abbrevs.scm
 /texmacs/progs/kernel/boot/debug.scm

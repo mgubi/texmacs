@@ -45,7 +45,10 @@
 #define USE_FREETYPE 3
 #define USE_ICONV 1
 #define USE_MUPDF 1
+// the Scheme interpreter: S7, or femtolisp with SCHEME=femtolisp (Makefile)
+#ifndef USE_FEMTOLISP
 #define USE_S7 1
+#endif
 #define USE_SDL3 1
 // the spell checker in the program (src/Plugins/Ispell/ispell_hunspell.cpp)
 #define USE_HUNSPELL 1
