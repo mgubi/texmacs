@@ -28,6 +28,7 @@
 #include <unistd.h>
 #include <signal.h>
 #include <sys/wait.h>
+#include <errno.h>
 #define TM_FD_SET(fd, set) FD_SET(fd, set)
 #else
 namespace wsoc {
@@ -86,6 +87,7 @@ public:
   void    stop ();
 
   void    feed (int channel);
+  void    close_fds ();
 };
 
 cmdline_link_rep::cmdline_link_rep (string name2): name (name2) {
@@ -96,6 +98,7 @@ cmdline_link_rep::cmdline_link_rep (string name2): name (name2) {
   outbuf = "";
   errbuf = "";
   alive  = false;
+  pid    = -1;  // no process yet: terminate_child does nothing
 }
 
 cmdline_link_rep::~cmdline_link_rep () {
@@ -108,6 +111,46 @@ make_cmdline_link (string name) {
   return tm_new<cmdline_link_rep> (name);
 }
 
+#ifndef OS_MINGW
+// NOTE: the same as in pipe_link.cpp, which is not compiled with Qt pipes
+static void
+terminate_child (int pid) {
+  // no process (fork failed, or none was made): killpg (-1, ...) fails, and
+  // kill (-1, SIGKILL) below would kill every process of the user
+  if (pid <= 0) return;
+  // Ask the process group of the child to terminate, give it up to 2 s to
+  // do so, kill what is left of it otherwise, and reap the child. The whole
+  // group is waited for, not only the child: a wrapper script often runs
+  // the program as a child of its own (without exec), and stops at once on
+  // SIGTERM while the program still cleans up
+  if (-1 != killpg (pid, SIGTERM)) {
+    bool reaped= false;
+    for (int i=0; i<200; i++) {
+      if (!reaped && waitpid (pid, NULL, WNOHANG) != 0) reaped= true;
+      if (reaped && killpg (pid, 0) == -1) return;  // the group is gone
+      usleep (10000);
+    }
+    // (the group may have ended during the last pause: its number may then
+    // be another group's; EPERM: a member which we may not signal)
+    if (killpg (pid, 0) == 0 || errno == EPERM) killpg (pid, SIGKILL);
+    if (!reaped) waitpid (pid, NULL, 0);
+  }
+  else {
+    kill (pid, SIGKILL);
+    waitpid (pid, NULL, 0);
+  }
+}
+#endif
+
+void
+cmdline_link_rep::close_fds () {
+#ifndef OS_MINGW
+  if (in  != -1) { close (in ); in = -1; }
+  if (out != -1) { close (out); out= -1; }
+  if (err != -1) { close (err); err= -1; }
+#endif
+}
+
 void
 close_all_cmdlines () {
 #ifndef OS_MINGW
@@ -115,11 +158,11 @@ close_all_cmdlines () {
   while (it->busy()) {
     cmdline_link_rep* con= (cmdline_link_rep*) it->next();
     if (con->alive) {
-      if (-1 != killpg(con->pid,SIGTERM)) {
-sleep(2);
-        killpg(con->pid,SIGKILL);
-      }
+      terminate_child (con->pid);
       con->alive= false;
+      remove_notifier (con->snout);
+      remove_notifier (con->snerr);
+      con->close_fds ();
       //cout << "Alive = false, close all\n";
     }
   }
@@ -197,6 +240,14 @@ cmdline_link_rep::write (string s, int channel) {
   int e2= pipe (pp_out); (void) e2;
   int e3= pipe (pp_err); (void) e3;
   pid= fork ();
+  if (pid < 0) { // no process: not a live program
+    int* fds[3]= { pp_in, pp_out, pp_err };
+    for (int i= 0; i < 3; i++)
+      for (int j= 0; j < 2; j++)
+        if (fds[i][j] >= 0) { close (fds[i][j]); fds[i][j]= -1; }
+    errbuf << "Error: cannot start '" << cmd << "'\n";
+    return;
+  }
   if (pid==0) { // the child
     setsid();
     close (pp_in  [CMDOUT]);
@@ -242,21 +293,19 @@ cmdline_link_rep::feed (int channel) {
   char tempout[1024];
   if (channel == LINK_OUT) r = ::read (out, tempout, 1024);
   else r = ::read (err, tempout, 1024);
-  if (r == -1) {
-    io_error << "Read failed for '" << name << "'\n";
-    wait (NULL);
-  }
-  else if (r == 0) {
-    if (channel != LINK_OUT) return;
-    if (-1 != killpg(pid,SIGTERM)) {
-      sleep(2);
-      killpg(pid,SIGKILL);
-    }
-
+  // NOTE: an interrupted read is tried again later; after any other
+  // failure, the pipe is closed as at its end, since it would otherwise
+  // be reported readable again and again
+  if (r == -1 && (errno == EINTR || errno == EAGAIN)) return;
+  if (r == -1) io_error << "Read failed for '" << name << "'\n";
+  if (r <= 0) {
+    if (r == 0 && channel != LINK_OUT) return;
+    terminate_child (pid);
     alive= false;
     //cout << "Alive = false, feed\n";
     remove_notifier (snout);      
     remove_notifier (snerr);
+    close_fds ();
   }
   else {
     if (DEBUG_IO) debug_io << debug_io_string (string (tempout, r));
@@ -334,17 +383,13 @@ cmdline_link_rep::stop () {
   //cout << "Stop\n";
 #ifndef OS_MINGW
   if (!alive) return;
-  if (-1 != killpg(pid,SIGTERM)) {
-    sleep(2);
-    killpg(pid,SIGKILL);
-  }
+  terminate_child (pid);
   alive= false;    
   //cout << "Alive = false, stop\n";
-  close (in);
-  wait (NULL);
 
   remove_notifier (snout);
   remove_notifier (snerr);
+  close_fds ();
 #endif
 }
 
