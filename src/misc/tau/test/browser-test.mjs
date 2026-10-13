@@ -1056,6 +1056,47 @@ test("preview, full screen, tooltip", async p => {
 	check("no error of the core", (await p.errors()).length === 0, await p.errors());
 });
 
+test("a balloon of the document", async p => {
+	await p.open();
+	await p.newDocument();
+	// a text with a balloon, which the pointer over it shows
+	await p.scheme('(begin (insert (quote (hover-balloon "MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM" "The tip." "left" "Bottom"))) (insert-return) (insert "after"))');
+	await sleep(500);
+	const view = await p.box(".tau-pane .tau-canvas");
+	// (the text is on the first line of the page: the pointer is moved down
+	// through the top of the page, at the left of its middle, until the
+	// balloon comes)
+	let shown = false;
+	for (let y = 20; y < 260 && !shown; y += 6) {
+		await p.page.mouse.move(view.x + view.w / 2 - 60, view.y + y);
+		await sleep(150);
+		await p.page.mouse.move(view.x + view.w / 2 - 58, view.y + y);
+		await sleep(250);
+		shown = (await p.count(".tau-tooltip canvas")) > 0;
+	}
+	check("the balloon is shown under the pointer", shown, [(await p.sent("mouse")).length, await p.got("batch")]);
+	// and in a view which is scrolled: where the text is, not where it
+	// would be at the top of the document
+	await p.page.mouse.move(view.x + 5, view.y + view.h - 5);
+	await p.until("the balloon goes", async () => (await p.count(".tau-tooltip")) === 0);
+	await p.scheme('(begin (go-start) (do ((i 0 (+ i 1))) ((= i 70)) (insert-return)) (go-end))');
+	await sleep(800);
+	shown = false;
+	for (let y = 20; y < view.h - 10 && !shown; y += 6) {
+		await p.page.mouse.move(view.x + view.w / 2 - 60, view.y + y);
+		await sleep(150);
+		await p.page.mouse.move(view.x + view.w / 2 - 58, view.y + y);
+		await sleep(250);
+		shown = (await p.count(".tau-tooltip canvas")) > 0;
+	}
+	check("the balloon is shown in a scrolled view", shown, [(await p.sent("mouse")).length]);
+	if (shown) {
+		const tip = await p.box(".tau-tooltip");
+		check("and it is in the view", tip.x >= view.x - 2 && tip.y >= view.y - 2 && tip.x + tip.w <= view.x + view.w + 2 && tip.y + tip.h <= view.y + view.h + 2, [tip, view]);
+	}
+	check("no error of the core", (await p.errors()).length === 0, await p.errors());
+});
+
 test("stopped", async p => {
 	await p.open();
 	await p.newDocument();
