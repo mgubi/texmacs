@@ -1156,6 +1156,23 @@ test("the symbols of a palette", async p => {
 	check("no error of the core", (await p.errors()).length === 0, await p.errors());
 });
 
+test("a displayed formula from the keyboard", async p => {
+	await p.open();
+	await p.newDocument();
+	// Control with $ (Shift and 4 on most keyboards), as TeXmacs binds it on
+	// a Mac: the key reaches the core under its name
+	await p.forget();
+	await p.key("Digit4", "Control", "Shift");
+	await sleep(500);
+	const keys = (await p.sent("key")).map(m => m.key);
+	if (mac) check("the key is C-$", keys.includes("C-$"), keys);
+	await p.scheme('(set-message (if (inside? (quote equation*)) "in a displayed formula" "not in one") "")');
+	await sleep(300);
+	const where = await p.page.$eval("#tau-footer-left", e => e.textContent);
+	if (mac) check("and makes a displayed formula", where.includes("in a displayed formula"), where);
+	check("no error of the core", (await p.errors()).length === 0, await p.errors());
+});
+
 test("stopped", async p => {
 	await p.open();
 	await p.newDocument();
