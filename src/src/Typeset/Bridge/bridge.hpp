@@ -46,6 +46,8 @@ public:
   array<tree>          seen_values; // looked up, with the values found
   hashmap<string,tree> removed;  // changes of the bridges removed before
                                  // this one since the last pass
+  tree                 bound;    // what the bridge bound for the bridges
+                                 // below it in the previous pass
 
   array<page_item>     l;        // the typesetted lines of st
   stack_border         sb;       // border properties of l
@@ -69,6 +71,8 @@ public:
   virtual void my_typeset (int desired_status);
   virtual void exec_until (path p, bool skip_flag= false);
   void typeset (int desired_status);
+  tree bind_start (tree now);
+  void bind_end (tree outer);
 };
 
 bool bridge_reads_on (); // see "What is typeset again" in bridge.cpp

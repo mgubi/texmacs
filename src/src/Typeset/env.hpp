@@ -421,7 +421,7 @@ private:
   tree exec_has_binding (tree t);
   tree exec_get_attachment (tree t);
   tree exec_auto_id (tree t);
-  bool auto_label_tag (tree& tag, tree& root);
+  bool auto_label_tag (tree& tag, tree& root, path& where);
 
   tree exec_pattern (tree t);
 

@@ -2097,6 +2097,13 @@ edit_env_rep::exec_has_binding (tree t) {
 * auto-n.k. The variable auto-last holds the last name which was given,
 * so that the tag which makes a label is typeset again when the label
 * before it is another one (the next one after a new section is, once).
+* The variable auto-open holds the last names given by the tag and by the
+* tags around it in the document, which may make other labels after one
+* of a tag inside them (an entry of the index before and after the body
+* of a tag, with one in the body): k is one more than in the name which
+* the tag has there. It is a variable, and not a count kept with the
+* tag, because the labels of a tag may be made by several bridges, of
+* which some are not typeset again.
 * A label which no tag of the document makes (in an included file...) is
 * auto-xk, where k is the old counter, auto-nr.
 *
@@ -2139,7 +2146,7 @@ auto_labels_numbered (tree root) {
 }
 
 bool
-edit_env_rep::auto_label_tag (tree& tag, tree& root) {
+edit_env_rep::auto_label_tag (tree& tag, tree& root, path& where) {
   list<hashmap<string,path> > l= macro_src;
   for (; !is_nil (l); l= l->next) {
     iterator<string> it= iterate (l->item);
@@ -2165,6 +2172,7 @@ edit_env_rep::auto_label_tag (tree& tag, tree& root) {
     if (!has_subtree (the_et, q)) continue;
     tag = subtree (the_et, q);
     root= the_et[q->item];
+    where= q;
     if (is_compound (tag)) return true;
   }
   return false;
@@ -2186,7 +2194,8 @@ edit_env_rep::exec_auto_id (tree t) {
   }
   string name;
   tree tag, root;
-  if (auto_label_tag (tag, root)) {
+  path where;
+  if (auto_label_tag (tag, root, where)) {
     array<int> r, a;
     if (!auto_label_data (root, r)) {
       r= array<int> ();
@@ -2203,10 +2212,27 @@ edit_env_rep::exec_auto_id (tree t) {
     bool given= (a[0] != r[0]);
     if (given) { a[0]= r[0]; a[1]= r[1]++; }
     string nr= as_string (a[1]);
+    // the tags around this one which have a number
+    array<string> around;
+    // (below the tree of the buffer, which holds the numbers to come)
+    tree up= root;
+    for (path q= where->next; !is_nil (q) && !is_nil (q->next); q= q->next) {
+      up= up[q->item];
+      array<int> b;
+      if (auto_label_data (up, b) && b[0] == r[0]) around << as_string (b[1]);
+    }
+    // the names which they gave last, and the one of this tag
+    tree open (TUPLE), now (TUPLE);
+    if (provides ("auto-open")) open= read ("auto-open");
     int k= 1;
-    if (last == nr) k= 2;
-    else if (starts (last, nr * "."))
-      k= as_int (last (N(nr) + 1, N(last))) + 1;
+    for (int i=0; i<N(open); i++) {
+      if (!is_atomic (open[i])) continue;
+      string s= open[i]->label, base= s;
+      int dot= search_forwards (".", s);
+      if (dot >= 0) base= s (0, dot);
+      if (base == nr) k= (dot < 0 ? 1 : as_int (s (dot + 1, N(s)))) + 1;
+      else if (contains (base, around)) now << open[i];
+    }
     if (k == 1) {
       // numbered in the order of the document?
       auto_seen++;
@@ -2214,6 +2240,8 @@ edit_env_rep::exec_auto_id (tree t) {
       name= nr;
     }
     else name= nr * "." * as_string (k);
+    now << tree (name);
+    if (now != open) monitored_write ("auto-open", now);
   }
   else {
     int n= 1;

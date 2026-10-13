@@ -404,6 +404,90 @@
        (check= (nr "auto-4") "3")
        (check= (nr "auto-6") "4")))))
 
+;; A tag makes its k-th label from the names which it and the tags around
+;; it gave last: a tag inside it which makes a label of its own does not
+;; make it start again.
+(define (test-labels-of-nested-tags)
+  (check-group "labels of nested tags")
+  (with-typeset-body
+   '(document (assign "wrap" (macro "body" (concat (index "start") (arg "body")
+                                                   (index "end"))))
+              (concat "a " (wrap (concat "x" (index "mid") "y")) " b")
+              (concat "c " (wrap "z") " d"))
+   (lambda ()
+     (let* ((autos (list-filter (list-references)
+                                (lambda (l) (string-starts? l "auto-")))))
+       (check= (length autos) 5)
+       (check= (length (list-remove-duplicates autos)) 5)))))
+
+;; A paragraph is not typeset again when the variables which changed are
+;; not among those it read (Typeset/Bridge/bridge.cpp). Below a tag which
+;; binds a variable to a value computed from one which changed, the
+;; paragraphs read the bound variable only, and are typeset again.
+(define (test-reuse-below-bindings)
+  (check-group "reuse below bindings")
+  (let ((lefts (lambda (n)
+                 (map (lambda (i)
+                        (car (tree-bounding-rectangle
+                              (tree-ref (buffer-tree) 1 0 i))))
+                      (.. 0 n)))))
+    (with-typeset-body
+     '(document (assign "quote-left-indentation" "2tab")
+                (quote-env (document "aaa" "bbb" "ccc" "ddd" "eee"))
+                "tail")
+     (lambda ()
+       (with before (lefts 5)
+         (check= (length (list-remove-duplicates before)) 1)
+         (tree-set (tree-ref (buffer-tree) 0 1) "8tab")
+         (update-forced)
+         (with after (lefts 5)
+           (check= (length (list-remove-duplicates after)) 1)
+           (check-true (> (car after) (car before)))))))
+    (with-typeset-body
+     '(document (assign "ornament-hpadding" "1spc")
+                (ornament (document "aaa" "bbb" "ccc"))
+                "tail")
+     (lambda ()
+       (with before (lefts 3)
+         (check= (length (list-remove-duplicates before)) 1)
+         (tree-set (tree-ref (buffer-tree) 0 1) "3cm")
+         (update-forced)
+         (with after (lefts 3)
+           (check= (length (list-remove-duplicates after)) 1)
+           (check-true (> (car after) (car before)))))))))
+
+;; The page breaks which were found are used again when the page items
+;; keep their sizes (Typeset/Page/new_breaker.cpp). The breaker moves a
+;; footnote on two columns of a title on one column to the next item on
+;; two columns: the pager needs this done when the search is skipped too.
+(define (test-page-breaks-kept)
+  (check-group "page breaks kept")
+  (with-typeset-body
+   '(document (with "par-columns" "1"
+                (document (concat "Title"
+                            (footnote (with "par-columns" "2"
+                                        (document "the note"))))))
+              "body one body one body one body one body one"
+              "body two")
+   (lambda ()
+     (init-env "page-medium" "paper")
+     (init-env "par-columns" "2")
+     ;; (the initial environment is in use after an update of the buffer)
+     (update-current-buffer)
+     (update-forced)
+     (with top (lambda () (cadddr (tree-bounding-rectangle
+                                   (tree-ref (buffer-tree) 2))))
+       (with before (top)
+         ;; edits which keep the heights of the lines
+         (tree-set (tree-ref (buffer-tree) 2) "body 2wo")
+         (update-forced)
+         (check= (tree->stree (tree-ref (buffer-tree) 2)) "body 2wo")
+         (check= (top) before)
+         (tree-set (tree-ref (buffer-tree) 2) "body tvo")
+         (update-forced)
+         (check= (tree->stree (tree-ref (buffer-tree) 2)) "body tvo")
+         (check= (top) before))))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Boxes
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -659,6 +743,9 @@
   (test-numbering)
   (test-renumbering)
   (test-automatic-labels)
+  (test-labels-of-nested-tags)
+  (test-reuse-below-bindings)
+  (test-page-breaks-kept)
   (test-tables)
   (test-paragraphs)
   (test-pages)

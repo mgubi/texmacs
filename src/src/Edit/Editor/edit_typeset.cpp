@@ -1087,7 +1087,8 @@ edit_typeset_rep::typeset_invalidate_all () {
 // the labels. All the views of the buffer have the same labels.
 void
 edit_typeset_rep::typeset_renumber_labels () {
-  tree root= subtree (et, rp);
+  // (the tree which holds the numbers to come: see auto_label_tag)
+  tree root= is_nil (rp) ? et : et[rp->item];
   if (!auto_labels_renumber (root)) return;
   for (int i=0; i<N(buf->vws); i++)
     ((tm_view) buf->vws[i])->ed->typeset_invalidate_all ();
