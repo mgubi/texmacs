@@ -107,8 +107,6 @@
 	     (load-help-article "devel/format/regular/regular"))
 	    ("Stylesheet language"
 	     (load-help-article "devel/format/stylesheet/stylesheet"))
-	    ("Fonts, from selection to glyph"
-	     (load-help-article "devel/fonts/font-guide"))
 	    ("Standard TeXmacs styles"
 	     (load-help-article "main/styles/styles"))
 	    ("Compatibility with other formats"
@@ -128,9 +126,7 @@
 	    ("The plug-in system"
 	     (load-help-article "devel/plugin/plugins"))
 	    ("Interfacing with other programs"
-	     (load-help-article "devel/interface/interface"))
-	    ("Fonts, from selection to glyph"
-	     (load-help-article "devel/fonts/font-guide"))))
+	     (load-help-article "devel/interface/interface"))))
   (-> "Plug-ins"
       (link help-plugins-menu))
   (when (url-exists-in-help? "about/about.en.tm")

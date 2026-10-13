@@ -5,6 +5,11 @@ menu of the fonts, `TeXmacs/progs/fonts/font-design.scm`): one for each
 font of each tab of that page which comes with TeXmacs, named by the tab
 (the part of a document) and the name of its entry. They are pictures so that the page does not load the fonts.
 
+A font with variants (the weights of IBM Plex, the condensed width of
+DejaVu) has one more picture for each variant, named by the tab, the name
+of the entry and the label of the variant: `text-ibm-plex-light.pdf`,
+`typewriter-latin-modern-proportional.pdf`.
+
 They are made by TeXmacs itself and have to be made again when a font
 is added, removed or updated, or when the sample changes:
 

@@ -144,6 +144,8 @@
 ;;   math    the family of the mathematical font, or #f
 ;;   family  ss when the text is the sans serif of its master
 ;;   id      the name of the picture of the sample, unique in the tab
+;;   label   what the page calls the font, when it is not its name: in the
+;;           tab of the typewriter fonts the master "PT" is no "PT Serif"
 
 (tm-define font-design-tabs
   '("text" "math" "sansserif" "typewriter" "bbb" "cal" "frak"))
@@ -167,10 +169,14 @@
                      (else #\-)))
     (list->string (map safe (string->list s)))))
 
-(define (make-entry tab name text math family)
+(define (make-entry tab name text math family . opt)
   `((tab . ,tab) (name . ,name) (text . ,text) (math . ,math)
     (family . ,family)
-    (id . ,(string-append tab "-" (font-design-slug name)))))
+    (id . ,(string-append tab "-" (font-design-slug name)))
+    (label . ,(if (null? opt) name (car opt)))))
+
+(define (entry-label e)
+  (or (entry-ref e 'label) (entry-ref e 'name)))
 
 ;; the value which names the font of an entry for its part
 (define (entry-value e)
@@ -195,14 +201,15 @@
 ;; the text fonts of the menus, as (name text #f family); a font with the
 ;; name of a pair says what it is: the serif faces of IBM Plex next to the
 ;; pair IBM Plex, which is sans serif; the Palatino of macOS next to the
-;; pair Palatino, which is TeX Gyre Pagella
+;; pair Palatino, which is TeX Gyre Pagella. A typewriter face is alone in
+;; its tab and keeps its name.
 (define (pair-names)
   (map car (append (serif-pairs) (pairs "Sans serif") (pairs "Other"))))
 
 (define (texts kind)
   (with taken (pair-names)
     (map (lambda (p)
-           (list (cond ((nin? (car p) taken) (car p))
+           (list (cond ((or (== kind 'mono) (nin? (car p) taken)) (car p))
                        ;; the serif of a master whose pair is sans serif
                        ((master-shipped? (cadr p))
                         (string-append (car p) " Serif"))
@@ -258,15 +265,26 @@
   ;; first: IBM Plex stands for its master rather than IBM Plex Serif
   (unique (append (cdr (cadr (text-fonts))) (cdr (car (text-fonts)))) cadr))
 
+(define (face-label name kind)
+  ;; a master is listed under the name of another of its faces: the
+  ;; typewriter face of "PT Serif" or of "Noto Sans" is called by the
+  ;; name of the family
+  (cond ((string-ends? name " Serif") (string-drop-right name 6))
+        ((and (== kind 'mono) (string-ends? name " Sans"))
+         (string-drop-right name 5))
+        (else name)))
+
 (define (variant-fonts feature kind)
   ;; the masters with a sans serif or a typewriter face
   (by-name
    (unique (append (texts kind)
-                   (list-filter (all-text-fonts)
-                                (lambda (x)
-                                  (and (!= (cadr x) "roman")
-                                       (master-has-feature? (cadr x)
-                                                            feature)))))
+                   (map (lambda (x)
+                          (rcons x (face-label (car x) kind)))
+                        (list-filter (all-text-fonts)
+                                     (lambda (x)
+                                       (and (!= (cadr x) "roman")
+                                            (master-has-feature?
+                                             (cadr x) feature))))))
            cadr)))
 
 (define (sections tab l)
@@ -292,13 +310,107 @@
   (append-map cdr (font-design-sections tab)))
 
 (tm-define (font-design-find-entry tab id)
-  (list-find (font-design-entries tab) (lambda (e) (== (entry-ref e 'id) id))))
+  (:synopsis "The entry of the tab @tab, or of one of its variants, named @id")
+  (list-find (append-map entry-and-variants (font-design-entries tab))
+             (lambda (e) (== (entry-ref e 'id) id))))
 
-;; the name of the menus for the value of a part
+;; The variants of the font of an entry (fonts-opentype.scm) which have the
+;; face of its tab: IBM Plex Condensed is a sans serif face only, and
+;; DejaVu Condensed has no typewriter face. The roman face of a
+;; master without a serif family is its sans serif one (Fira, Iwona).
+(define (families-by-face master)
+  ;; the typewriter, the sans serif and the serif families of @master
+  (let* ((fams (font-master->families master))
+         (has? (lambda (fam feature)
+                 (in? feature (font-family-features fam))))
+         (mono (list-filter fams (lambda (fam) (or (has? fam "mono")
+                                                   (has? fam "typewriter")))))
+         (text (list-difference fams mono))
+         (sans (list-filter text (lambda (fam) (has? fam "sansserif")))))
+    (list mono sans (list-difference text sans))))
+
+(define (roman-face master)
+  (if (null? (caddr (families-by-face master))) "sansserif" "serif"))
+
+;; The menus set a document in Iwona with the roman font family and the
+;; page with the sans serif one: the same text
+(define (same-family? master fam1 fam2)
+  (or (== fam1 fam2)
+      (and (in? fam1 '("rm" "ss")) (in? fam2 '("rm" "ss"))
+           (== (roman-face master) "sansserif"))))
+
+(define (face-families master face)
+  ;; the families of @master with the face mono, sansserif or serif
+  (with l (families-by-face master)
+    (cond ((== face "mono") (car l))
+          ((== face "sansserif") (cadr l))
+          ((nnull? (caddr l)) (caddr l))
+          (else (cadr l)))))
+
+(define (master-has-face? master face)
+  (and (or (!= face "serif") (== (roman-face master) "serif"))
+       (list-or (map (lambda (fam) (nnull? (font-database-styles fam)))
+                     (face-families master face)))))
+
+(define (entry-face e)
+  (cond ((== (entry-ref e 'tab) "typewriter") "mono")
+        ((== (entry-ref e 'tab) "sansserif") "sansserif")
+        ((== (entry-ref e 'family) "ss") "sansserif")
+        (else "serif")))
+
+(tm-define (font-design-variants e)
+  (:synopsis "The variants of the font of the entry @e, as (label master)")
+  ;; the font itself comes first, as in the menus; () without variants
+  (if (in? (entry-ref e 'tab) '("text" "sansserif" "typewriter"))
+      (let* ((base (entry-ref e 'text))
+             (face (if (== (entry-face e) "serif") (roman-face base)
+                       (entry-face e)))
+             (l (list-filter (font-variants-of base)
+                             (lambda (m) (master-has-face? m face)))))
+        (if (null? l) l
+            (cons (list "Regular" base)
+                  (map (lambda (m) (list (font-variant-label m) m)) l))))
+      (list)))
+
+;; The entry of a variant: the entry of its font with the master of the
+;; variant for text font, and a picture and a label of its own
+(tm-define (font-design-variant-entry e v)
+  (:synopsis "The entry @e of the catalogue, in its variant @v")
+  (if (== (cadr v) (entry-ref e 'text)) e
+      (map (lambda (p)
+             (cond ((== (car p) 'text) (cons 'text (cadr v)))
+                   ((== (car p) 'id)
+                    (cons 'id (string-append (cdr p) "-"
+                                             (font-design-slug (car v)))))
+                   ((== (car p) 'label)
+                    (cons 'label (string-append (cdr p) " (" (car v) ")")))
+                   (else p)))
+           e)))
+
+(define (entry-and-variants e)
+  (with vs (font-design-variants e)
+    (if (null? vs) (list e)
+        (map (cut font-design-variant-entry e <>) vs))))
+
+;; The text fonts which a package of the menus sets are named in the
+;; document by the old name of their family
+(define (text-master val)
+  (cond ((== val "pagella") "TeX Gyre Pagella")
+        ((== val "termes") "TeX Gyre Termes")
+        ((== val "bonum") "TeX Gyre Bonum")
+        ((== val "schola") "TeX Gyre Schola")
+        (else val)))
+
+;; the name of the menus for the value of a part, with the variant
 (define (font-design-value-name part val)
-  (with e (list-find (font-design-entries part)
-                     (lambda (e) (== (entry-value e) val)))
-    (if e (entry-ref e 'name) val)))
+  (let* ((val* (if (== part "text") (text-master val) val))
+         (base (font-variant-base val*))
+         (e (list-find (font-design-entries part)
+                       (lambda (e) (== (entry-value e) base)))))
+    (cond ((not e) val)
+          ((== base val*) (entry-label e))
+          (else (string-append (entry-label e) " ("
+                               (font-variant-label val*) ")")))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The choice: the fonts of the parts, and the value of `font' for them
@@ -306,7 +418,11 @@
 
 ;; A choice is an association list from the parts "text", "math",
 ;; "sansserif", "typewriter", "bbb", "cal" and "frak" to their fonts, and
-;; from "family" to rm or ss; a part which is not there follows the text.
+;; from "family" to the font family of the text; a part which is not there
+;; follows the text. What the page does not show is kept as it is: "rules"
+;; holds the other items of the value of `font' ("greek=Stix Two Math",
+;; as the font selector writes them) and "math-font" the mathematical font
+;; of a document which names it apart, with the math-font variable.
 
 (define extra-parts '("frak" "cal" "bbb" "math" "typewriter" "sansserif"))
 
@@ -317,17 +433,24 @@
   (with r (list-filter c (lambda (p) (!= (car p) part)))
     (if val (rcons r (cons part val)) r)))
 
-(tm-define (font-design-parse font family)
+(tm-define (font-design-parse font family . opt)
   (:synopsis "The choice which the values @font and @family of a document are")
-  (let* ((items (map (lambda (s) (string-tokenize-by-char s #\=))
-                     (string-tokenize-by-char font #\,)))
-         (c (list (cons "family" (if (== family "ss") "ss" "rm")))))
-    (for (it items)
-      (cond ((and (list-2? it) (in? (car it) extra-parts))
-             (set! c (choice-set c (car it) (cadr it))))
-            ((list-1? it)
-             (set! c (choice-set c "text" (car it))))))
-    (if (choice-ref c "text") c (choice-set c "text" "roman"))))
+  ;; the optional argument is the value of math-font
+  (let* ((items (string-tokenize-by-char font #\,))
+         (plain (list-filter items (lambda (s) (not (string-occurs? "=" s)))))
+         (text (if (null? plain) "roman" (cAr plain)))
+         (math-font (if (null? opt) "roman" (car opt)))
+         (rules (list))
+         (c (list (cons "family" (if (== family "") "rm" family))
+                  (cons "text" text))))
+    (for (s items)
+      (with it (string-tokenize-by-char s #\=)
+        (cond ((and (list-2? it) (in? (car it) extra-parts))
+               (set! c (choice-set c (car it) (cadr it))))
+              ((!= s text) (set! rules (rcons rules s))))))
+    (when (nnull? rules)
+      (set! c (choice-set c "rules" (string-recompose rules ","))))
+    (if (== math-font "roman") c (choice-set c "math-font" math-font))))
 
 (tm-define (font-design-font c)
   (:synopsis "The value of the font variable for the choice @c")
@@ -341,17 +464,21 @@
       (with val (if (== part "math") math* (choice-ref c part))
         (when val
           (set! r (string-append part "=" val "," r)))))
-    r))
+    (with rules (choice-ref c "rules")
+      (if rules (string-append rules "," r) r))))
 
 (define (choice-pair c)
   ;; the pair of the menus which the choice is, when no other part is set
   (let* ((text (or (choice-ref c "text") "roman"))
          (fam (or (choice-ref c "family") "rm"))
          (math (or (choice-ref c "math") (math-family-for-text text))))
+    ;; (the pair of its design, for the text in a variant)
     (and (not (list-or (map (cut choice-ref c <>)
-                            '("frak" "cal" "bbb" "typewriter" "sansserif"))))
+                            '("frak" "cal" "bbb" "typewriter" "sansserif"
+                              "rules"))))
          (list-find (font-design-entries "all")
-                    (lambda (e) (and (== (entry-ref e 'text) text)
+                    (lambda (e) (and (== (entry-ref e 'text)
+                                         (font-variant-base text))
                                      (== (entry-ref e 'math) math)
                                      (== (entry-ref e 'family) fam)))))))
 
@@ -359,51 +486,119 @@
   ;; a text font of the menus, without parts of its own
   (== (font-design-font c) (or (choice-ref c "text") "roman")))
 
-;; the choices in the making, by document
+;; The mathematical font which the document names apart shows through when
+;; the text font is roman: another text font brings its own along
+(define (choice-math c)
+  (or (choice-ref c "math")
+      (and (== (or (choice-ref c "text") "roman") "roman")
+           (choice-ref c "math-font"))))
+
+(define (choice-same? c1 c2 part)
+  (== (choice-ref c1 part) (choice-ref c2 part)))
+
+;; the choices in the making and the fonts the documents have, by document
 (define font-design-choices (make-ahash-table))
+(define font-design-origins (make-ahash-table))
+
+(define (read-document-choice u)
+  ;; the fonts of a document which is not loaded are not known
+  (or (with-buffer u
+        (font-design-parse (get-init "font") (get-init "font-family")
+                           (get-init "math-font")))
+      (font-design-parse "roman" "rm")))
 
 (define (document-choice u)
   (or (ahash-ref font-design-choices (url->system u))
-      (with c (with-buffer u
-                (font-design-parse (get-init "font") (get-init "font-family")))
+      (with c (read-document-choice u)
         (ahash-set! font-design-choices (url->system u) c)
+        (ahash-set! font-design-origins (url->system u) c)
         c)))
+
+(define (document-origin u)
+  (document-choice u)
+  (ahash-ref font-design-origins (url->system u)))
 
 (define (set-document-choice u c)
   (ahash-set! font-design-choices (url->system u) c))
 
+(define (forget-document-choice u)
+  (ahash-remove! font-design-choices (url->system u))
+  (ahash-remove! font-design-origins (url->system u)))
+
+;; The mathematics of a text font follows it, and a variant is a master
+;; without mathematics: the choice of a variant names the mathematics of
+;; its design, unless the choice has other ones, and this mathematics
+;; leaves with the variant.
+(define (design-math text)
+  (with base (font-variant-base text)
+    (and (!= base text) (!= (math-family-for-text base) "")
+         (math-family-for-text base))))
+
+(define (choose-text c text fam)
+  (let* ((old (or (choice-ref c "text") "roman"))
+         (old-fam (or (choice-ref c "family") "rm"))
+         (c1 (if (and (design-math old)
+                      (== (choice-ref c "math") (design-math old)))
+                 (choice-set c "math" #f)
+                 c))
+         ;; another variant of the font of the choice keeps its font family
+         (fam* (if (and (== (font-variant-base text)
+                            (font-variant-base (text-master old)))
+                        (same-family? text fam old-fam))
+                   old-fam fam))
+         (c2 (choice-set (choice-set c1 "text" text) "family" fam*)))
+    (if (and (design-math text) (not (choice-math c2)))
+        (choice-set c2 "math" (design-math text))
+        c2)))
+
 (tm-define (font-design-choose c e)
   (:synopsis "The choice @c with the entry @e for the part of its tab")
+  ;; the entry of a variant (font-design-variant-entry) chooses the variant
   (let* ((tab (entry-ref e 'tab))
          (fam (or (entry-ref e 'family) "rm")))
     (cond ((== tab "all")
            ;; a pair, as its entry of the menus: the other parts follow it
            (list (cons "family" fam) (cons "text" (entry-ref e 'text))
                  (cons "math" (entry-ref e 'math))))
-          ((== tab "text")
-           (choice-set (choice-set c "text" (entry-ref e 'text))
-                       "family" fam))
+          ((== tab "text") (choose-text c (entry-ref e 'text) fam))
+          ((== tab "math")
+           (choice-set (choice-set c "math" (entry-value e)) "math-font" #f))
           (else (choice-set c tab (entry-value e))))))
 
-(tm-define (font-design-apply c)
+(define (init-font-family fam)
+  (if (== fam "rm") (init-default "font-family")
+      (init-env "font-family" fam)))
+
+(tm-define (font-design-apply c . opt)
   (:synopsis "Give the current document the fonts of the choice @c")
-  (let* ((text (or (choice-ref c "text") "roman"))
+  ;; The optional argument is the choice which the document has: only what
+  ;; differs is given to the document, and a document whose text and
+  ;; mathematics stay keeps its packages and its math-font variable.
+  (let* ((c0 (and (nnull? opt) (car opt)))
+         (same? (lambda (part) (and c0 (choice-same? c c0 part))))
+         (text (or (choice-ref c "text") "roman"))
          (fam (or (choice-ref c "family") "rm"))
          (pair (choice-pair c)))
-    (cond ((and pair (== text "roman"))
+    (cond ((and (list-and (map same? '("text" "family" "math" "math-font")))
+                (list-and (map same? (cons "rules" extra-parts))))
+           (noop))
+          ((list-and (map same? '("text" "family" "math" "math-font")))
+           (init-env "font" (font-design-font c)))
+          ((and pair (== text "roman"))
            (init-font "roman" "roman"))
           ;; as the entry of the menus of the pair does
-          (pair (init-opentype-font (entry-ref pair 'math)))
+          ((and pair (== text (entry-ref pair 'text)))
+           (init-opentype-font (entry-ref pair 'math)))
+          (pair (init-opentype-font (entry-ref pair 'math) text))
           ((choice-plain? c)
            (init-font text)
-           (if (== fam "ss") (init-env "font-family" "ss")
-               (init-default "font-family")))
+           (init-font-family fam))
           (else
             (remove-font-packages)
-            (init-default "math-font")
+            (when (or (choice-ref c "math") (not (choice-ref c "math-font")))
+              (init-default "math-font"))
             (init-env "font" (font-design-font c))
-            (if (== fam "ss") (init-env "font-family" "ss")
-                (init-default "font-family"))))))
+            (init-font-family fam)))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -561,10 +756,17 @@
   (or (== master "roman")
       (list-or (map family-shipped? (font-master->families master)))))
 
+;; The face of a master which a tab shows: of the master Noto, TeXmacs has
+;; the sans serif and the typewriter faces and not Noto Serif.
+(define (face-shipped? master face)
+  (or (== master "roman")
+      (list-or (map family-shipped? (face-families master face)))))
+
 (define (math-shipped? math)
   (or (== math "roman")
-      (shipped-file?
-       (string-append (math-font-profile-attr math "file") ".otf"))))
+      (with file (math-font-profile-attr math "file")
+        (or (shipped-file? (string-append file ".otf"))
+            (shipped-file? (string-append file ".ttf"))))))
 
 (define (entry-shipped? e)
   (let* ((tab (entry-ref e 'tab))
@@ -572,7 +774,10 @@
          (math (entry-ref e 'math)))
     (cond ((== tab "all") (and (master-shipped? text) (math-shipped? math)))
           ((in? tab '("math" "bbb" "cal" "frak")) (math-shipped? math))
-          (else (master-shipped? text)))))
+          ((== tab "sansserif") (face-shipped? text "sansserif"))
+          ((== tab "typewriter") (face-shipped? text "mono"))
+          ((== (entry-ref e 'family) "ss") (face-shipped? text "sansserif"))
+          (else (face-shipped? text "serif")))))
 
 (tm-define (font-design-make-samples dir)
   (:synopsis "Make in @dir the samples of the fonts which come with TeXmacs")
@@ -580,7 +785,7 @@
   ;; made with (font-design-make-samples "$TEXMACS_PATH/misc/font-samples")
   (with dir* (if (string? dir) (system->url dir) dir)
     (for (tab font-design-tabs)
-      (for (e (font-design-entries tab))
+      (for (e (append-map entry-and-variants (font-design-entries tab)))
         (when (entry-shipped? e)
           (display* "font sample: " (entry-ref e 'id)
                     (if (font-design-make-sample e dir*) "" " FAILED")
@@ -610,22 +815,25 @@
 
 (define (design-action text cmd . args)
   `(action (font-design-button ,text)
-           ,(string-append "(" cmd " "
-                           (string-recompose (map object->string args) " ")
-                           ")")))
+           ,(string-append
+             "(" (string-recompose (cons cmd (map object->string args)) " ")
+             ")")))
+
+;; The actions of the page name no document: the document is the one of
+;; the page they are run from (page-context), and its path, with the
+;; backslashes it has on some systems, stays out of the commands.
 
 ;; A row of the choice: the name of the part is the button which shows
 ;; the fonts for it in the list (pressed for the part which is shown)
 (define (choice-row doc c part)
-  (let* ((d (url->system doc))
-         (val (and-with v (choice-ref c part)
+  (let* ((val (and-with v (if (== part "math") (choice-math c)
+                              (choice-ref c part))
                 (font-design-value-name part v)))
          (name (or val "as the text font")))
     `(row (cell ,(if (== part (document-tab doc))
                      `(font-design-tab-on ,(tab-name part))
                      `(action (font-design-tab-off ,(tab-name part))
                               ,(string-append "(font-design-page-tab "
-                                              (object->string d) " "
                                               (object->string part) ")"))))
           (cell ,(if val `(strong ,name) `(font-design-muted ,name))))))
 
@@ -643,36 +851,35 @@
 
 (define (choice-block doc c)
   ;; the parts and the buttons on the left, the sample on the right
-  (with d (url->system doc)
-    `(tabular
-      (tformat
-       (twith "table-width" "1par") (twith "table-hmode" "exact")
-       (cwith "1" "1" "1" "-1" "cell-hyphen" "t")
-       (cwith "1" "1" "1" "-1" "cell-valign" "t")
-       ;; a height of its own, whatever the sample takes in a narrow
-       ;; window: the list has the rest of the window (font-design.ts)
-       (cwith "1" "1" "1" "-1" "cell-vmode" "exact")
-       (cwith "1" "1" "1" "-1" "cell-height" "134pt")
-       (cwith "1" "1" "1" "1" "cell-width" "0.42par")
-       (cwith "1" "1" "1" "1" "cell-hmode" "exact")
-       (cwith "1" "1" "1" "-1" "cell-lsep" "0spc")
-       (table
-        (row
-         (cell
-          (document
-            (tabular
-             (tformat (cwith "1" "-1" "1" "-1" "cell-lsep" "0spc")
-                      (cwith "1" "-1" "1" "2" "cell-rsep" "1em")
-                      (table ,@(map (cut choice-row doc c <>)
-                                    font-design-tabs))))
-            (concat ,(design-action "Use for the document"
-                                    "font-design-page-apply" d)
-                    " "
-                    ,(design-action "Save as" "font-design-page-save" d)
-                    " "
-                    ,(design-action "Start again"
-                                    "font-design-page-restart" d))))
-         (cell ,(choice-preview c))))))))
+  `(tabular
+    (tformat
+     (twith "table-width" "1par") (twith "table-hmode" "exact")
+     (cwith "1" "1" "1" "-1" "cell-hyphen" "t")
+     (cwith "1" "1" "1" "-1" "cell-valign" "t")
+     ;; a height of its own, whatever the sample takes in a narrow
+     ;; window: the list has the rest of the window (font-design.ts)
+     (cwith "1" "1" "1" "-1" "cell-vmode" "exact")
+     (cwith "1" "1" "1" "-1" "cell-height" "134pt")
+     (cwith "1" "1" "1" "1" "cell-width" "0.42par")
+     (cwith "1" "1" "1" "1" "cell-hmode" "exact")
+     (cwith "1" "1" "1" "-1" "cell-lsep" "0spc")
+     (table
+      (row
+       (cell
+        (document
+          (tabular
+           (tformat (cwith "1" "-1" "1" "-1" "cell-lsep" "0spc")
+                    (cwith "1" "-1" "1" "2" "cell-rsep" "1em")
+                    (table ,@(map (cut choice-row doc c <>)
+                                  font-design-tabs))))
+          (concat ,(design-action "Use for the document"
+                                  "font-design-page-apply")
+                  " "
+                  ,(design-action "Save as" "font-design-page-save")
+                  " "
+                  ,(design-action "Start again"
+                                  "font-design-page-restart"))))
+       (cell ,(choice-preview c)))))))
 
 ;; is the entry what the choice has for its part?
 (define (entry-chosen? c e)
@@ -682,33 +889,72 @@
     (cond ((== tab "all")
            (with pair (choice-pair c)
              (and pair (== (entry-ref pair 'id) (entry-ref e 'id)))))
+          ;; (an entry is chosen in any of its variants)
           ((== tab "text")
-           (and (== text (entry-ref e 'text))
-                (== (or (choice-ref c "family") "rm") fam)))
+           (and (== (font-variant-base (text-master text))
+                    (entry-ref e 'text))
+                (same-family? (entry-ref e 'text)
+                              (or (choice-ref c "family") "rm") fam)))
+          ((== tab "math") (== (choice-math c) (entry-value e)))
+          ((in? tab '("sansserif" "typewriter"))
+           (and-with val (choice-ref c tab)
+             (== (font-variant-base val) (entry-value e))))
           (else (== (choice-ref c tab) (entry-value e))))))
 
+(define (variant-chosen? c e v)
+  ;; is the variant @v of the chosen entry @e the one of the choice?
+  (== (cadr v) (if (== (entry-ref e 'tab) "text")
+                   (text-master (or (choice-ref c "text") "roman"))
+                   (choice-ref c (entry-ref e 'tab)))))
+
+(define (sample-block e)
+  (with pic (font-design-sample e)
+    (if pic
+        `(font-design-sample (image ,(url->system pic) "" "" "" ""))
+        (design-action "Show a sample" "font-design-page-sample"
+                       (entry-ref e 'tab) (entry-ref e 'id)))))
+
+;; The variants of the chosen font are a second choice under it: a row of
+;; buttons, then the sample of each variant under its name
+(define (variants-row c e vs)
+  `(concat (font-design-muted "Variants")
+           ,@(append-map
+              (lambda (v)
+                (list '(space "0.6em")
+                      (if (variant-chosen? c e v)
+                          `(font-design-chosen ,(car v))
+                          (design-action
+                           (car v) "font-design-page-choose"
+                           (entry-ref e 'tab)
+                           (entry-ref (font-design-variant-entry e v) 'id)))))
+              vs)))
+
+(define (variant-samples e vs)
+  (append-map (lambda (v)
+                (list `(font-design-muted ,(car v))
+                      (sample-block (font-design-variant-entry e v))))
+              vs))
+
 (define (entry-block doc c e)
-  (let* ((d (url->system doc))
-         (tab (entry-ref e 'tab))
+  (let* ((tab (entry-ref e 'tab))
          (id (entry-ref e 'id))
-         (pic (font-design-sample e))
-         (descr (font-design-description (entry-ref e 'name))))
-    `((concat ,(if (entry-chosen? c e)
+         (chosen? (entry-chosen? c e))
+         (vs (if chosen? (font-design-variants e) (list)))
+         (descr (font-design-description (entry-label e))))
+    `((concat ,(if chosen?
                    '(font-design-chosen "Chosen")
-                   (design-action "Choose" "font-design-page-choose" d tab id))
-              (space "1em") (strong ,(entry-ref e 'name))
+                   (design-action "Choose" "font-design-page-choose" tab id))
+              (space "1em") (strong ,(entry-label e))
               ,@(if (== descr "") (list)
                     (list '(space "1em") `(font-design-muted ,descr))))
-      ,(if pic
-           `(font-design-sample (image ,(url->system pic) "" "" "" ""))
-           (design-action "Show a sample" "font-design-page-sample"
-                          d tab id)))))
+      ,@(if (null? vs) (list (sample-block e))
+            (cons (variants-row c e vs) (variant-samples e vs))))))
 
 (define (default-block doc c tab)
   ;; the parts which follow the text font unless they have one of their own
-  (with d (url->system doc)
-    `((concat ,(if (choice-ref c tab)
-                   (design-action "Choose" "font-design-page-reset" d tab)
+  (with val (if (== tab "math") (choice-math c) (choice-ref c tab))
+    `((concat ,(if val
+                   (design-action "Choose" "font-design-page-reset" tab)
                    '(font-design-chosen "Chosen"))
               (space "1em") (strong "As the text font")
               (space "1em")
@@ -776,31 +1022,38 @@
           (tree-set (tree-ref t 2) (stree->tree (list-block doc c scroll))))
         (revert-buffer-revert (tmfs-url-font-design doc)))))
 
-(define (page-context? d)
-  ;; the actions only work from the page of the document they name
-  (with ok? (== (url->system (current-buffer))
-                (url->system (string->url (tmfs-url-font-design
-                                           (system->url d)))))
-    (when (not ok?)
-      (set-message "This only works from the page of the fonts" "Font design"))
-    ok?))
+(define (font-design-page?)
+  (string-starts? (url->system (current-buffer)) "tmfs://font-design/"))
+
+(define (page-context)
+  ;; the document of the page the action is run from: the actions only
+  ;; work from a page of the fonts
+  (if (font-design-page?)
+      (page-document
+       (string-drop (url->system (current-buffer))
+                    (string-length "tmfs://font-design/")))
+      (begin
+        (set-message "This only works from the page of the fonts"
+                     "Font design")
+        #f)))
 
 ;; The wheel scrolls the list of the fonts, wherever the pointer is: the
 ;; page itself fits the window (font-design.ts) and has nothing to scroll.
 ;; The ports hand the wheel to an editor which captures it (wheel-capture?,
 ;; as the graphics do), with the displacement in points.
-(define (font-design-page?)
-  (string-starts? (url->system (current-buffer)) "tmfs://font-design/"))
 
 ;; The position of the list is a percentage (100% at the top), which the
 ;; canvas turns into a displacement and keeps within the list. Points are
 ;; turned into a percentage with an estimate of the height of the list: the
 ;; extents of what a canvas holds are not known here, and an estimate
 ;; which is off by a fifth only makes the wheel that much faster or slower.
-(define (list-height-estimate tab)
+(define (list-height-estimate tab c)
   (with entry-height
       (lambda (e)
-        (cond ((not (font-design-sample e)) 55)
+        (cond ((and (entry-chosen? c e) (nnull? (font-design-variants e)))
+               ;; the row of the variants and their samples
+               (+ 45 (* 90 (length (font-design-variants e)))))
+              ((not (font-design-sample e)) 55)
               ((== tab "all") 135)
               ((== tab "math") 110)
               (else 75)))
@@ -810,10 +1063,10 @@
 (tm-define (font-design-scroll dy)
   (:synopsis "Scroll the list of the fonts by @dy points")
   (and-with l (page-list)
-    (let* ((doc (page-document
-                 (string-drop (url->system (current-buffer))
-                              (string-length "tmfs://font-design/"))))
-           (h (max 200 (- (list-height-estimate (document-tab doc)) 300)))
+    (let* ((doc (page-context))
+           (h (max 200 (- (list-height-estimate (document-tab doc)
+                                                (document-choice doc))
+                          300)))
            (s (tree->string (tree-ref l 0)))
            (old (or (and (string-ends? s "%")
                          (string->number (string-drop-right s 1)))
@@ -830,71 +1083,74 @@
   (:require (font-design-page?))
   (font-design-scroll dy))
 
-(tm-define (font-design-page-tab d tab)
+(tm-define (font-design-page-tab tab)
   (:secure #t)
-  (when (and (page-context? d) (in? tab font-design-tabs))
-    (ahash-set! font-design-page-tabs d tab)
-    (page-update (system->url d) #t)))
+  (and-with doc (page-context)
+    (when (in? tab font-design-tabs)
+      (ahash-set! font-design-page-tabs (url->system doc) tab)
+      (page-update doc #t))))
 
-(tm-define (font-design-page-choose d tab id)
+(tm-define (font-design-page-choose tab id)
   (:secure #t)
-  (when (page-context? d)
-    (let* ((doc (system->url d))
-           (e (font-design-find-entry tab id)))
-      (when e
-        (set-document-choice doc (font-design-choose (document-choice doc) e))
-        (page-update doc #f)
-        (set-message (string-append (tab-name tab) ": " (entry-ref e 'name))
-                     "Font design")))))
+  (and-with doc (page-context)
+    (and-with e (font-design-find-entry tab id)
+      (set-document-choice doc (font-design-choose (document-choice doc) e))
+      (page-update doc #f)
+      (set-message (string-append (tab-name tab) ": " (entry-label e))
+                   "Font design"))))
 
-(tm-define (font-design-page-reset d part)
+(tm-define (font-design-page-reset part)
   (:secure #t)
-  (when (page-context? d)
-    (with doc (system->url d)
-      (set-document-choice doc (choice-set (document-choice doc) part #f))
+  (and-with doc (page-context)
+    (with c (choice-set (document-choice doc) part #f)
+      (set-document-choice doc (if (== part "math")
+                                   (choice-set c "math-font" #f)
+                                   c))
       (page-update doc #f))))
 
-(tm-define (font-design-page-restart d)
+(tm-define (font-design-page-restart)
   (:secure #t)
-  (when (page-context? d)
-    (with doc (system->url d)
-      (ahash-remove! font-design-choices d)
-      (page-update doc #f))))
+  (and-with doc (page-context)
+    (forget-document-choice doc)
+    (page-update doc #f)))
 
-(tm-define (font-design-page-sample d tab id)
+(tm-define (font-design-page-sample tab id)
   (:secure #t)
-  (when (page-context? d)
+  (and-with doc (page-context)
     (and-with e (font-design-find-entry tab id)
       (font-design-make-sample e (cached-samples))
-      (page-update (system->url d) #f))))
+      (page-update doc #f))))
 
-(tm-define (font-design-page-save d)
+(tm-define (font-design-page-save)
   (:secure #t)
   ;; the choice under a name, for the menu of the fonts of every document
-  (when (page-context? d)
-    (with c (document-choice (system->url d))
+  (and-with doc (page-context)
+    (with c (document-choice doc)
       (interactive
           (lambda (name)
-            (when (!= name "")
-              (font-design-store name (font-design-font c)
-                                 (or (choice-ref c "family") "rm"))
+            (when (font-design-store name (font-design-font c)
+                                     (or (choice-ref c "family") "rm"))
               (set-message (string-append "The fonts are saved as " name)
                            "Font design")))
         (list "Name of these fonts" "string" '())))))
 
-(tm-define (font-design-page-apply d)
+(tm-define (font-design-page-apply)
   (:secure #t)
-  (when (page-context? d)
-    (let* ((doc (system->url d))
-           (c (document-choice doc)))
+  (and-with doc (page-context)
+    (let* ((c (document-choice doc))
+           (c0 (document-origin doc)))
       (switch-to-buffer doc)
-      (font-design-apply c)
+      (font-design-apply c c0)
+      ;; the document now has the fonts of the choice
+      (ahash-set! font-design-origins (url->system doc) c)
       (set-message "The document has the fonts of the choice" "Font design"))))
 
 (tm-define (open-font-design)
   (:synopsis "Open the page of the design of the fonts of the document")
-  (with doc (current-buffer)
-    (ahash-remove! font-design-choices (url->system doc))
-    (document-choice doc)
-    (cursor-history-add (cursor-path))
-    (load-document (tmfs-url-font-design doc))))
+  ;; (the page of the fonts has no fonts to design)
+  (when (not (font-design-page?))
+    (with doc (current-buffer)
+      (forget-document-choice doc)
+      (document-choice doc)
+      (cursor-history-add (cursor-path))
+      (load-document (tmfs-url-font-design doc)))))

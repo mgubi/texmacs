@@ -31,24 +31,50 @@
   (and (list? d) (== (length d) 3)
        (string? (car d)) (string? (cadr d)) (string? (caddr d))))
 
-(tm-define (font-designs)
-  (:synopsis "The saved choices of fonts, as a list of (name font family)")
+(define (read-font-designs)
+  ;; the list of the preference, or #f when it cannot be read
   (with s (get-preference "font designs")
     (if (or (not (string? s)) (== s "") (== s "default")) (list)
-        (with l (catch #t (lambda () (string->object s)) (lambda args (list)))
-          (if (list? l) (list-filter l valid-design?) (list))))))
+        (with l (catch #t (lambda () (string->object s)) (lambda args #f))
+          (and (list? l) l)))))
 
+(tm-define (font-designs)
+  (:synopsis "The saved choices of fonts, as a list of (name font family)")
+  (list-filter (or (read-font-designs) (list)) valid-design?))
+
+;; A preference which cannot be read is not written over: its value is put
+;; aside, in the preference "font designs unreadable", where it can be
+;; repaired by hand
 (define (set-font-designs l)
+  (when (not (read-font-designs))
+    (set-preference "font designs unreadable"
+                    (get-preference "font designs")))
   (set-preference "font designs" (object->string l)))
 
 (define (design<=? a b)
   (string<=? (locase-all (car a)) (locase-all (car b))))
 
+;; The preferences are read back with the double quotes and the backslashes
+;; of a value unescaped once more than they were written: a name with one
+;; of them would make the list unreadable at the next start
+(tm-define (font-design-name? name)
+  (:synopsis "May the saved fonts have the name @name?")
+  (and (string? name) (!= name "")
+       (not (string-occurs? "\"" name)) (not (string-occurs? "\\" name))))
+
 (tm-define (font-design-store name font family)
   (:synopsis "Save the fonts @font, with the family @family, as @name")
-  (with l (list-filter (font-designs) (lambda (d) (!= (car d) name)))
-    (set-font-designs (list-sort (cons (list name font family) l)
-                                 design<=?))))
+  ;; #f, with a message, for a name which cannot be kept
+  (if (font-design-name? name)
+      (with l (list-filter (font-designs) (lambda (d) (!= (car d) name)))
+        (set-font-designs (list-sort (cons (list name font family) l)
+                                     design<=?))
+        #t)
+      (begin
+        (when (and (string? name) (!= name ""))
+          (set-message "A name of fonts cannot have \" or \\ in it"
+                       "Fonts"))
+        #f)))
 
 (tm-define (font-design-forget name)
   (:synopsis "Forget the saved fonts @name")
@@ -60,25 +86,14 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define (document-family)
-  (if (== (get-init "font-family") "ss") "ss" "rm"))
+  (get-init "font-family"))
 
 (tm-define (font-design-custom?)
   (:synopsis "Does the document have fonts of its own for some of its parts?")
   ;; "math=Euler Math,TeX Gyre Pagella" is the entry Euler of the menus
   (with font (get-init "font")
     (and (string-occurs? "=" font)
-         (not (list-or (map (lambda (p)
-                              (and (== (get-init "font") (opentype-font-value* p))
-                                   #t))
-                            (opentype-math-font-list)))))))
-
-;; the value of `font' of a pair of the menus (opentype-font-value in
-;; fonts-opentype.scm, which is private)
-(define (opentype-font-value* p)
-  (let* ((math (cadr p))
-         (text (caddr p)))
-    (if (== (math-family-for-text text) math) text
-        (string-append "math=" math "," text))))
+         (nin? font (opentype-font-values)))))
 
 (tm-define (font-design-current)
   (:synopsis "The saved fonts which the document has, or #f")
@@ -93,16 +108,42 @@
         ((font-design-custom?) "Custom")
         (else (upcase-first (font-family-main (get-init "font"))))))
 
+;; The fonts of a value of `font' which the font database does not know.
+;; The fonts of TeX (roman, stix, pagella), in lower case, are not in it.
+(define (font-missing? name)
+  ;; (the master of an unknown name is the name, with itself for family)
+  (and (!= name "") (!= name (locase-all name))
+       (not (list-or (map (lambda (fam) (nnull? (font-database-styles fam)))
+                          (font-master->families name))))))
+
+(tm-define (font-design-missing font)
+  (:synopsis "The fonts of the value @font which are not installed")
+  (list-remove-duplicates
+   (list-filter (map (lambda (s) (cAr (string-tokenize-by-char s #\=)))
+                     (string-tokenize-by-char font #\,))
+                font-missing?)))
+
+(tm-define (font-design-menu-label)
+  (:synopsis "The label of a menu for the name of the fonts of the document")
+  ;; the name of saved fonts is shown as it is, not translated nor read
+  ;; as markup
+  (if (font-design-current) `(verbatim ,(font-design-label))
+      (font-design-label)))
+
 (tm-define (font-design-use name)
   (:synopsis "Give the document the saved fonts @name")
   (and-with d (list-find (font-designs) (lambda (d) (== (car d) name)))
-    (font-design-apply (font-design-parse (cadr d) (caddr d)))))
+    (font-design-apply (font-design-parse (cadr d) (caddr d)))
+    (with l (font-design-missing (cadr d))
+      (when (nnull? l)
+        (set-message (string-append "Not installed: "
+                                    (string-recompose l ", "))
+                     "Fonts")))))
 
 (tm-define (font-design-save name)
   (:synopsis "Save the fonts of the document under @name")
   (:argument name "Name of these fonts")
-  (when (and (string? name) (!= name ""))
-    (font-design-store name (get-init "font") (document-family))
+  (when (font-design-store name (get-init "font") (document-family))
     (set-message (string-append "The fonts are saved as " name) "Fonts")))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -114,13 +155,13 @@
 
 (tm-menu (font-design-forget-menu)
   (for (d (font-designs))
-    ((eval (car d)) (font-design-forget (car d)))))
+    ((eval `(verbatim ,(car d))) (font-design-forget (car d)))))
 
 (tm-menu (document-custom-font-menu)
   (assuming (nnull? (font-designs))
     (group "Saved fonts")
     (for (d (font-designs))
-      ((check (eval (car d)) "*" (design-current? (car d)))
+      ((check (eval `(verbatim ,(car d))) "*" (design-current? (car d)))
        (font-design-use (car d)))))
   (assuming (and (font-design-custom?) (not (font-design-current)))
     ((check "Custom" "*" #t) (open-font-design))

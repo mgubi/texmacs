@@ -65,6 +65,17 @@
   which are installed. The second section of a submenu, <menu|Text only>,
   changes the text font alone.
 
+  A design which comes in several weights or widths is a submenu of its
+  own, whose name says which variant the document has: <menu|IBM Plex>
+  offers <menu|Regular>, <menu|Text>, <menu|Light>, <menu|Medium> and
+  <menu|Condensed>, <menu|DejaVu> a condensed width, Iwona, Kurier and the
+  two Antykwa fonts light and condensed variants, and <menu|Latin Modern>,
+  among the typewriter fonts, its typewriter of variable width. A variant
+  sets the whole document and has its own italic and its own bold. A
+  weight which has no bold of its own is paired with a heavier weight of
+  the design: the bold of IBM Plex Light is the semibold, the bold of
+  Iwona Light the bold of Iwona. The mathematics stay those of the design.
+
   The menus only name the fonts. <menu|Font design>, at the end of the same
   menu, opens a page which shows them. Its top lists the parts of a
   document with the font of each: the text, the mathematics, the sans
@@ -80,7 +91,9 @@
   changes before. The samples of the fonts which come with <TeXmacs> are
   pictures, so that the page does not load any font but those of the
   choice; for a font of your system, <menu|Show a sample> makes the
-  picture.
+  picture. When the font chosen for a part has variants, they are listed
+  under it, each with its sample: a second choice, which changes that part
+  only.
 
   A document whose parts have fonts of their own has no font of the menus:
   the font button then says <menu|Custom>, and so does an entry of its
@@ -90,6 +103,15 @@
   the top of the menu offers it for every document, also the next time
   <TeXmacs> runs. <menu|Forget saved fonts> removes a name; the documents
   which use those fonts keep them.
+
+  Inside a document, <menu|Format|Weight> changes the weight of the
+  selection, or of the text to come. It lists the weights which the font at
+  the cursor really has, from the lightest to the heaviest, and marks the
+  current one: eight for IBM Plex, from <menu|Thin> to <menu|Bold>, four
+  for Iwona, <menu|Light>, <menu|Regular>, <menu|Bold> and <menu|Heavy>. In
+  a document set in a variant, the weights are those of the design in the
+  width of the variant, and <menu|Bold> is the bold which goes with the
+  variant.
 
   <menu|Document|Font|Mathematical font> changes the mathematical font alone,
   and keeps the text font. Its entries are the traditional <TeXmacs> math
@@ -114,7 +136,9 @@
     <inactive*|<assign|font|math=Euler Math,TeX Gyre Pagella>>
   </tm-fragment>
 
-  and the part before the comma applies to mathematics only. The variable
+  and the part before the comma applies to mathematics only. A variant of
+  a design is a family of its own, which keeps the mathematics of the
+  design in the same way: <verbatim|math=IBM Plex Math,IBM Plex Light>. The variable
   <src-var|font-family> says whether the text is set in roman (<verbatim|rm>),
   sans serif (<verbatim|ss>) or typewriter (<verbatim|tt>) letters; a sans
   serif pair such as Kp Sans sets it to <verbatim|ss>. A formula, or any part

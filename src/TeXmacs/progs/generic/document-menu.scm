@@ -983,7 +983,7 @@
       (-> "Encryption" (link document-encryption-menu)))
   (-> (eval (upcase-first (get-init "language")))
       (link document-language-menu))
-  (-> (eval (font-design-label))
+  (-> (eval (font-design-menu-label))
       (link document-short-font-menu)))
 
 (tm-menu (standard-focus-menu t)
