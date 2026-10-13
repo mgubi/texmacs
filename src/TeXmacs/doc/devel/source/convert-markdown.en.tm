@@ -112,6 +112,21 @@
   tells the escaped brackets which other programs write
   (<verbatim|\\[2\\]>) from a formula.
 
+  A file may be made to take a time which grows as the square of its
+  length, or faster, and a file of a few kilobytes then hangs the editor.
+  What is looked for and not found is therefore looked for once: the
+  strings which do not occur any more in the text which is cut into
+  tokens, the runs of backquotes of each length (<scm|md-code-runs>) and
+  the brackets with their ends (<scm|md-none>); a formula which does not
+  end before a blank line (<scm|md-no-math-end>) and a comment of
+  <name|HTML> which does not end (<scm|md-no-comment-end?>). The quotations
+  and the lists inside each other are read down to <scm|md-max-depth>
+  levels, each level being a call inside the previous one, and the lists
+  of nodes are walked by loops and not by calls, for the paragraphs of
+  thousands of nodes. On the import a footnote inside a footnote is left
+  as its mark (<scm|mdtm-footnote>): definitions which refer to each other
+  twice would make a document whose size doubles with each of them.
+
   <section|The import>
 
   <scm|markdown-\<gtr\>texmacs> maps the blocks and the text to the tags of

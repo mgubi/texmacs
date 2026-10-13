@@ -19,9 +19,9 @@
 ;;   - markdowntm.scm: the import, from a Markdown tree to a TeXmacs tree;
 ;;   - tmmarkdown.scm: the export, from a TeXmacs tree to a Markdown tree;
 ;;
-;; and the round trips in both directions. The trees are not expanded here:
-;; the export of a buffer, which runs the macros of its style first
-;; (tmmarkdown-expand.scm), is left to the tests with an editor.
+;; and the round trips in both directions. The trees are not expanded
+;; there: the export of a buffer, which runs the macros of its style first
+;; (tmmarkdown-expand.scm), is tested with one document at the end.
 
 (texmacs-module (check markdown-test)
   (:use (check check-lib)))
@@ -93,7 +93,22 @@
     (check= (len (rep "AT&T " 20000)) 2)
     (check= (len (rep "\\(a " 20000)) 2)
     (check= (len (rep "word word\n" 40000)) 2)
-    (check= (len (rep "<!-- x\n\n" 5000)) 5001)))
+    (check= (len (rep "<!-- x\n\n" 5000)) 5001)
+    ;; formulas which do not end, blank lines after indented code, runs of
+    ;; backquotes which nothing closes, footnote marks inside each other
+    (check= (len (rep "\\[=\n" 4000)) 4001)
+    (check= (len (string-append "    a\n" (rep "\n" 8000) "    b\n")) 2)
+    (check= (len (string-append "    a\n" (rep "\n" 8000) "b\n")) 3)
+    (check= (len (apply string-append
+                        (map (lambda (i) (string-append (make-string i #\`) "a "))
+                             (.. 1 300)))) 2)
+    (check= (len (string-append (rep "[^" 3000) " x" (rep "]" 3000))) 2)
+    ;; quotes and lists inside each other: beyond a hundred levels their
+    ;; marks are text
+    (check= (parse "> > > x")
+            '(markdown (blockquote (blockquote (blockquote (p "x"))))))
+    (check= (len (string-append (rep ">" 3000) " x")) 2)
+    (check= (len (string-append (rep "- " 3000) "x")) 2)))
 
 ;; The formulas are kept as LaTeX. A dollar opens a formula as for Pandoc:
 ;; not before a space, and the one which closes is not after a space nor
@@ -313,6 +328,18 @@
   (check= (import "![](i.png)") '(image "i.png" "" "" "" "")))
 
 ;; The first level of headings of a text is the sections.
+;; The sizes of an image are numbers with a unit of length, or nothing.
+(define (test-import-image-sizes)
+  (check-group "import image sizes")
+  (check= (import "x ![a](i.png){width=50% height=2cm}")
+          '(concat "x " (image "i.png" "0.5par" "2cm" "" "")))
+  (check= (import "x ![a](i.png){width=120 height=1.5em}")
+          '(concat "x " (image "i.png" "120px" "1.5em" "" "")))
+  (check= (import "x ![a](i.png){width=1/2 height=foo}")
+          '(concat "x " (image "i.png" "" "" "" "")))
+  (check= (import "x ![a](i.png){width=1e3 height=-2cm}")
+          '(concat "x " (image "i.png" "" "" "" ""))))
+
 (define (test-import-blocks)
   (check-group "import blocks")
   (check= (import "a\n\nb") '(document "a" "b"))
@@ -658,8 +685,50 @@
     (block (tformat (table (row (cell (strong "a")) (cell (strong "b")))
                            (row (cell (verbatim "x\\")) (cell "y")))))))
 
+;; Long paragraphs, in both directions, and footnotes which refer to each
+;; other: a footnote inside a footnote is its mark.
+(define (test-long)
+  (check-group "long")
+  (let* ((rep (lambda (s n) (apply string-append (make-list n s))))
+         (count (lambda (t) (if (func? t 'concat) (length (cdr t)) 1)))
+         (ems (lambda (n)
+                (let loop ((i 0) (acc '()))
+                  (if (>= i n) (cons 'concat acc)
+                      (loop (+ i 1) (cons '(em "a") (cons " b " acc)))))))
+         (notes (lambda (n)
+                  (apply string-append
+                         (cons "x[^1]\n\n"
+                               (map (lambda (i)
+                                      (with next (number->string (+ i 1))
+                                        (string-append
+                                          "[^" (number->string i) "]: a [^" next
+                                          "] [^" next "]\n\n")))
+                                    (.. 1 31)))))))
+    (check= (count (import (rep "*a* " 20000))) 40000)
+    (check= (count (import (rep "a `b` " 10000))) 20001)
+    (check= (string-length (export (ems 20000))) 119999)
+    (check= (string-length (export (rep "a... " 20000))) 99999)
+    (check= (import (string-append "``` \n" (make-string 20000 #\`) "x\n```"))
+            `(verbatim-code (document ,(string-append (make-string 20000 #\`)
+                                                      "x"))))
+    (check= (import (notes 30)) '(concat "x" (footnote "a [^2] [^2]")))
+    (check= (import "a[^1] b[^2]\n\n[^1]: one [^2]\n\n[^2]: two [^2]\n")
+            '(concat "a" (footnote "one [^2]") " b" (footnote "two [^2]")))))
+
 (define (test-round-trips)
   (check-group "round trips")
+  ;; what looks like the definition of a link or of a footnote is text
+  (for-each (lambda (t) (check= (import (export t)) t))
+            '((document "[1]: Knuth" "text")
+              (document "[^1]: y" "text")
+              (hlink "x" "a b<gtr>c")
+              (hlink "x" "a (b) <less>c<gtr>")
+              (hlink* "x" "u" "t\\")
+              (hlink* "x" "u" "say \"hi\"")))
+  (check= (export '(document "[1]: Knuth")) "[1\\]: Knuth\n")
+  (check= (import "[a][1]\n\n[1]: http://x.y\n") '(hlink "a" "http://x.y"))
+  (check= (import "[x](<a b> \"t\") [y](<a\\>b>)")
+          '(concat (hlink* "x" "a b" "t") " " (hlink "y" "a<gtr>b")))
   (for-each (lambda (s) (check= (export (import s)) s)) md-same)
   (for-each (lambda (t) (check= (import (export t)) t)) tm-same)
   ;; a figure alone is a paragraph, which ends its line
@@ -673,6 +742,53 @@
               "> q\n>\n> - l" "<div>\nhtml\n</div>" "    code\n    more"
               "[t](u \"T\") ![alt](i.png)"
               "<img src=\"i.png\" alt=\"a\" width=\"36\">")))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; The export of a buffer
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; A buffer is exported with the macros of its style expanded: the numbers
+;; of the sections, of the theorems and of the equations, the references,
+;; the title as a header, the footnotes at the end.
+(define (test-export-buffer)
+  (check-group "export buffer")
+  (let* ((old (current-buffer))
+         (u (new-buffer))
+         (dir (url-append (url-temp-dir) "markdown-test"))
+         (to (url-append dir "out.md")))
+    (switch-to-buffer* u)
+    (buffer-set-body u (stree->tree
+      '(document
+         (doc-data (doc-title "The title")
+                   (doc-author (author-data (author-name "An Author"))))
+         (section "First")
+         (concat "Some text" (footnote "a note") " and " (reference "eq"))
+         (theorem (document "A statement."))
+         (equation (concat "a=b" (label "eq")))
+         (subsection "Sub")
+         (itemize (document (concat (item) "one") (concat (item) "two"))))))
+    (set-main-style "article")
+    (update-current-buffer)
+    (update-forced)
+    (system-mkdir dir)
+    (with r (check-run
+              (lambda ()
+                (export-buffer-main u to "markdown" (list :overwrite))
+                (check= (string-load to)
+                        (string-append
+                          "---\ntitle: The title\nauthor: An Author\n---\n\n"
+                          "# 1 First\n\n"
+                          "Some text[^1] and 1\n\n"
+                          "**Theorem 1.** A statement.\n\n"
+                          "$$\na = b \\tag{1}\n$$\n\n"
+                          "## 1.1 Sub\n\n"
+                          "- one\n- two\n\n"
+                          "[^1]: a note\n"))))
+      (when (and (pair? r) (== (car r) 'error))
+        (check-report #f "the group" (object->string r))))
+    (if (url-exists? to) (system-remove to))
+    (buffer-close u)
+    (when (buffer-exists? old) (switch-to-buffer old))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The format
@@ -712,6 +828,7 @@
   (test-serialize-escapes)
   (test-import-inline)
   (test-import-figures)
+  (test-import-image-sizes)
   (test-import-blocks)
   (test-import-document)
   (test-export-inline)
@@ -723,6 +840,8 @@
   (test-export-headings)
   (test-export-tables)
   (test-export-document)
+  (test-long)
   (test-round-trips)
+  (test-export-buffer)
   (test-format)
   (check-end))
