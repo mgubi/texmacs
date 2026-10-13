@@ -131,8 +131,9 @@ Display some informative messages.
 Execute the scheme command [cmd] just after startup.
 If you specify several -x options, then the corresponding
 scheme commands are executed in the same order.
-The commands are executed before the files of the command line are
-loaded, also when the files come first on the command line.
+The commands are executed and the files of the command line are loaded
+in the order of the command line: a command which follows a file is
+executed with this file as the current document.
 .PP
 .SH AUTHOR
 Written by Joris van der Hoeven

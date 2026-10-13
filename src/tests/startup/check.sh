@@ -1,6 +1,7 @@
 #!/bin/sh
 # Check the order in which TeXmacs processes its command line: the commands
-# of -x, the files, -q and the automatic quit of the headless mode.
+# of -x and the files in their order, -q and the automatic quit of the
+# headless mode after them.
 #
 # usage: tests/startup/check.sh
 #
@@ -73,6 +74,19 @@ quit ()" \
 check "-q quits after the files, wherever it is" \
       "quit (startup-b.tm startup-a.tm)" \
       -q -x "$atquit" startup-a.tm startup-b.tm
+
+check "the commands and the files in the order of the command line" \
+      "one ()
+two (startup-a.tm)
+three (startup-b.tm startup-a.tm)
+quit (startup-b.tm startup-a.tm)" \
+      -headless -x "$atquit" -x "$(show one)" startup-a.tm -x "$(show two)" \
+      startup-b.tm -x "$(show three)"
+
+check "a command after a file has it as the current buffer" \
+      "current startup-a.tm" \
+      -headless startup-a.tm \
+      -x '(display* "CHECK current " (url->string (url-tail (current-buffer))) "\n")'
 
 check "headless: -X does not quit" \
       "one ()

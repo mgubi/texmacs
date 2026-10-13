@@ -497,7 +497,8 @@ set_global_options  (int argc, char** argv)  {
       string b= scm_quote (as_string (u));
       string cmd= "(load-buffer " * b * " " * where * ")";
       where= " :new-window";
-      extra_init_cmd << cmd;
+      // with the commands of -x and -c, in the order of the command line
+      my_init_cmds= my_init_cmds * " " * cmd;
     }
   } // for (int i...)
   if (flag) debug (DEBUG_FLAG_AUTO, true);
