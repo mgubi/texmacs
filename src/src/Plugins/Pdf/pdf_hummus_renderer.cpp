@@ -21,6 +21,7 @@
 #include "sys_utils.hpp"
 #include "convert.hpp"
 #include "converter.hpp"
+#include "font.hpp"
 #include "ntuple.hpp"
 #include "link.hpp"
 #include "frame.hpp"
@@ -1540,6 +1541,11 @@ pdf_hummus_renderer_rep::draw (int ch, font_glyphs fn, SI x, SI y) {
     gl_index= t3font_get_local_glyph
       (ch, t3font_list(cfn)->font_chunk,
        t3font_list(cfn)->fn->res_name);
+  // a glyph drawn by its number stands for the character the font
+  // recorded for it, or for none (the further pieces of an assembly)
+  bool by_number= (ch >= 0xc000000);
+  int  code= by_number?
+    native_glyph_get_unicode (fn->res_name, ch - 0xc000000): ch;
   static const std::string ligature_ff= "/Span << /ActualText (ff) >> BDC ";
   static const std::string ligature_fi= "/Span << /ActualText (fi) >> BDC ";
   static const std::string ligature_fl= "/Span << /ActualText (fl) >> BDC ";
@@ -1563,7 +1569,10 @@ pdf_hummus_renderer_rep::draw (int ch, font_glyphs fn, SI x, SI y) {
   }
   else {
     if (cfid != NULL) {
-      glyphs.push_back (GlyphUnicodeMapping (gl_index, ch));
+      if (by_number && code <= 0)
+        glyphs.push_back (GlyphUnicodeMapping (gl_index, ULongVector ()));
+      else
+        glyphs.push_back (GlyphUnicodeMapping (gl_index, code));
       contentContext->Tj(glyphs);
     }
     else {

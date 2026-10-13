@@ -98,8 +98,8 @@ struct font_rep: rep<font> {
 
   // math measurements for opentype fonts (zero when unknown); ot_math tells
   // whether they were loaded from a MATH table. Fonts with hand-tuned
-  // customizations keep their own math_type (TeX Gyre, STIX): the tuned
-  // tables take precedence, the MATH data fills what they do not cover.
+  // customizations keep their own math_type (TeX Gyre, STIX) and are
+  // typeset from the tuned tables only: their MATH table is not loaded.
   bool ot_math= false;
   SI  upper_limit_gap_min= 0;
   SI  upper_limit_baseline_rise_min= 0;
@@ -166,6 +166,10 @@ struct font_rep: rep<font> {
   // for script size alternates), as a native glyph name; false when none
   virtual bool get_feature_variant (string s, string feature, int alt,
                                     string& r);
+  // tell the font that its glyph s, a native glyph name, stands for the
+  // character of the given Unicode value, or for no character when the
+  // value is zero; a PDF records this for copying and searching
+  virtual void set_glyph_unicode (string s, int code);
 
   virtual bool   supports (string c) = 0;
   virtual void   get_extents (string s, metric& ex) = 0;
@@ -232,16 +236,21 @@ string default_korean_font_name ();
 
 font error_font (font fn);
 font virtual_font (font base, string fam, int sz, int hdpi, int vdpi, bool ext);
+font virtual_font (font base, string fam, int sz, int hdpi, int vdpi, bool ext,
+                   int room);
 font virtual_enhance_font (font base, string virt);
 font tt_font (string family, int size, int dpi);
 font unicode_font (string family, int size, int dpi);
 font unicode_math_font (font up, font it, font bup, font bit, font fb);
 font rubber_unicode_font (font base);
+font math_table_rubber_font (font base);
 font rubber_stix_font (font base);
 font rubber_assemble_font (font base);
 font rubber_font (font base);
 bool use_poor_rubber (font fn);
 font poor_rubber_font (font base);
+bool poor_rubber_constructs (font fn, string s);
+bool smart_font_has_math_big_operator (font fn, string s);
 font poor_smallcaps_font (font base);
 font poor_italic_font (font base, double slant);
 font poor_stretched_font (font base, double zoomx, double zoomy);
@@ -256,6 +265,7 @@ font poor_distorted_font (font base, tree kind);
 font poor_effected_font (font base, tree kind);
 font recolored_font (font base, tree kind);
 font feature_font (font base, string feature, int alt);
+font smart_feature_font (font base, string feature, int alt);
 font apply_features (font fn, string features);
 array<string> ot_font_features (string name);
 font superposed_font (array<font> fns, int ref);
@@ -332,6 +342,13 @@ bool get_new_fonts ();
 extern bool hand_tuned_math_fonts;
 void set_hand_tuned_math_fonts (bool val);
 bool get_hand_tuned_math_fonts ();
+// the part of the name of a font which records that switch, so that the
+// fonts made in one state are not taken for those of the other
+string hand_tuned_suffix ();
+// The Unicode value recorded for a glyph number of a collection of glyphs:
+// -1 when nothing was recorded, 0 when the glyph stands for no character
+void native_glyph_set_unicode (string glyphs_name, int glyph, int code);
+int  native_glyph_get_unicode (string glyphs_name, int glyph);
 void font_database_build (url u);
 void font_database_build_local ();
 void font_database_extend_local (url u);

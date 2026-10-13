@@ -27,6 +27,8 @@ struct poor_rubber_font_rep: font_rep {
   poor_rubber_font_rep (string name, font base);
   font   get_font (int nr);
   int    search_font (string s, string& r);
+  bool   math_big (string s);
+  hashmap<string,int> math_big_cache;
 
   bool   supports (string c);
   void   get_extents (string s, metric& ex);
@@ -144,6 +146,15 @@ is_thin (string s) {
   return thin_delims->contains (s);
 }
 
+// A big operator which would be built from pieces, a bitmap in a PDF, is
+// left to the base font when that font has it as glyphs of a MATH table
+bool
+poor_rubber_font_rep::math_big (string s) {
+  if (!math_big_cache->contains (s))
+    math_big_cache (s)= smart_font_has_math_big_operator (base, s)? 1: 0;
+  return math_big_cache [s] != 0;
+}
+
 int
 poor_rubber_font_rep::search_font (string s, string& r) {
   if (starts (s, "<big-") && (ends (s, "-1>") || ends (s, "-2>"))) {
@@ -155,11 +166,11 @@ poor_rubber_font_rep::search_font (string s, string& r) {
 	starts (s, "<big-upiiiint") || starts (s, "<big-upoint") ||
         starts (s, "<big-upoiint") || starts (s, "<big-upoiiint") ||
 	starts (s, "<big-amalg") || starts (s, "<big-pluscup"))
-      if (!big_flag) return 2*MAGNIFIED_NUMBER + 5;
+      if (!big_flag) return math_big (s)? 0: 2*MAGNIFIED_NUMBER + 5;
     if (starts (s, "<big-idotsint") || starts (s, "<big-upidotsint") ||
         starts (s, "<big-triangleup") || starts (s, "<big-box") ||
         starts (s, "<big-parallel") || starts (s, "<big-interleave"))
-      return 2*MAGNIFIED_NUMBER + 5;
+      return math_big (s)? 0: 2*MAGNIFIED_NUMBER + 5;
     if (big_flag && ends (s, "-1>") && base->supports (s)) return 0;
     return 2*MAGNIFIED_NUMBER + 4;
   }
@@ -265,6 +276,18 @@ poor_rubber_font_rep::search_font (string s, string& r) {
   }
   r= s;
   return 0;
+}
+
+// Whether a poor rubber font builds the rubber character s from pieces, as
+// it does for a tall radical, rather than taking a glyph and stretching it;
+// a PDF holds such a construction as a bitmap
+bool
+poor_rubber_constructs (font fn, string s) {
+  poor_rubber_font_rep* p= dynamic_cast<poor_rubber_font_rep*> (fn.rep);
+  if (p == NULL) return false;
+  string r;
+  int nr= p->search_font (s, r);
+  return nr >= 2*MAGNIFIED_NUMBER + 2 && nr < SLASH_BASE;
 }
 
 /******************************************************************************

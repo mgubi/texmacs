@@ -125,8 +125,12 @@ feature_font_rep::get_xpositions (string s, SI* xpos) {
 
 void
 feature_font_rep::get_xpositions (string s, SI* xpos, bool lig) {
-  (void) lig;
-  get_xpositions (s, xpos);
+  array<int> map;
+  string r= rewrite (s, map);
+  SI* rpos= tm_new_array<SI> (N(r) + 1);
+  base->get_xpositions (r, rpos, lig);
+  for (int i= 0; i <= N(s); i++) xpos[i]= rpos[map[i]];
+  tm_delete_array (rpos);
 }
 
 void
@@ -161,8 +165,16 @@ feature_font_rep::magnify (double zoomx, double zoomy) {
 
 void
 feature_font_rep::advance_glyph (string s, int& pos, bool ligf) {
-  (void) ligf;
-  tm_char_forwards (s, pos);
+  // the base font advances in the rewritten string, over a ligature of
+  // the characters which were not replaced for instance
+  if (pos >= N(s)) return;
+  array<int> map;
+  string r= rewrite (s, map);
+  int rpos= map[pos];
+  base->advance_glyph (r, rpos, ligf);
+  int old= pos;
+  while (pos < N(s) && map[pos] < rpos) pos++;
+  if (pos == old) tm_char_forwards (s, pos);
 }
 
 glyph
@@ -224,6 +236,10 @@ bool feature_font_rep::get_feature_variant (string s, string f, int a, string& r
 
 font
 feature_font (font base, string feature, int alt) {
+  // a font made of several fonts applies the feature in each of them: the
+  // substitute of a glyph is a glyph of the font which draws it
+  font sfn= smart_feature_font (base, feature, alt);
+  if (!is_nil (sfn)) return sfn;
   string name= base->res_name * "#" * feature * as_string (alt);
   return make (font, name,
                tm_new<feature_font_rep> (name, base, feature, alt));

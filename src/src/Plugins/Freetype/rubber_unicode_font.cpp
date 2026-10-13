@@ -43,6 +43,7 @@ struct rubber_unicode_font_rep: font_rep {
   // for opentype math font
   translator virt;
   tt_face    math_face;
+  int        virt_room; // number of glyphs the virtual font has room for
 
   hashmap<string,int> mapper;
   hashmap<string,string> rewriter;
@@ -51,15 +52,20 @@ struct rubber_unicode_font_rep: font_rep {
   font   get_font (int nr);
   array<GlyphPartRecord> part_records (GlyphAssembly gass, bool ver,
                                        double du, int min_overlap,
-                                       array<SI>& ink);
+                                       array<SI>& ink, int code);
+  void   get_variants (unsigned int glyphID, bool ver,
+                       array<unsigned int>& gv, array<unsigned int>& adv);
   int    search_font_sub (string s, string& rew);
   int    search_font_sub_opentype (string s, string& rew);
   bool   get_rubber_variant (string s, SI height, string& r);
   bool   make_measured (string s);
   bool   get_wide_variant (string s, SI width, string& r);
   bool   get_top_accent (string s, SI& x);
+  bool   get_feature_variant (string s, string feature, int alt, string& r);
   bool   is_extended_shape (string s);
   bool   variant_glyph (string head, string root, unsigned int& glyphID);
+  bool   variant_glyph (string head, string root, unsigned int& glyphID,
+                        int& code);
   void   add_virtual_glyph (string name, string def);
   int    search_font_cached (string s, string& rew);
   font   search_font (string& s);
@@ -97,7 +103,7 @@ rubber_unicode_font_rep::rubber_unicode_font_rep (string name, font base2,
                                                   tt_face face):
   font_rep (name, base2), base (base2),
   big_flag (supports_big_operators (base2->res_name)),
-  math_face (face)
+  math_face (face), virt_room (0)
 {
   this->copy_math_pars (base);
   big_sums= false;
@@ -114,10 +120,13 @@ rubber_unicode_font_rep::rubber_unicode_font_rep (string name, font base2,
     initialized << false;
     subfn << base;
   }
-  if (base->ot_math) {
+  if (!is_nil (math_face) && !is_nil (math_face->math_table)) {
     big_flag    = true;
     big_sums    = true;
+    // the glyphs defined for this font are its own: another font made
+    // later for the same base starts with a virtual font of its own
     string vname= "opentype_virtual[" * base->res_name * "]";
+    while (translator::instances->contains (vname)) vname << "+";
     virt        = tm_new<translator_rep> (vname);
     // virt->virt_def= array<tree> ();
     // virt->virt_def << tree (); // fill out the 0 glyph
@@ -152,8 +161,10 @@ rubber_unicode_font_rep::get_font (int nr) {
   case 6:
     int hdpi= (72 * base->wpt + (PIXEL / 2)) / PIXEL;
     int vdpi= (72 * base->hpt + (PIXEL / 2)) / PIXEL;
-    subfn[nr]=
-        virtual_font (base, virt->res_name, base->size, hdpi, vdpi, false);
+    // with room for the glyphs which are still to be defined
+    virt_room= max (256, 2 * N (virt->virt_def));
+    subfn[nr]= virtual_font (base, virt->res_name, base->size, hdpi, vdpi,
+                             false, virt_room);
     break;
   }
   return subfn[nr];
@@ -174,6 +185,7 @@ wide_code_point (string root) {
     t ("hat")= 0x302;          t ("^")= 0x302;
     t ("tilde")= 0x303;        t ("~")= 0x303;
     t ("bar")= 0x305;          t ("overline")= 0x305;
+    t ("macron")= 0x304;
     t ("underline")= 0x332;    t ("underbar")= 0x332;
     t ("vect")= 0x20D7;        t ("check")= 0x30C;
     t ("breve")= 0x306;        t ("invbreve")= 0x311;
@@ -194,6 +206,8 @@ wide_code_point (string root) {
   }
   if (t->contains (root)) return (uint32_t) t[root];
   string uu= N (root) > 1 ? strict_cork_to_utf8 ("<" * root * ">") : root;
+  // a name which is not the name of a character
+  if (N (root) > 1 && uu == "<" * root * ">") return 0;
   int j= 0;
   return decode_from_utf8 (uu, j);
 }
@@ -322,7 +336,8 @@ rubber_unicode_font_rep::search_font_sub_opentype (string s, string& rew) {
   if (root == "") return search_font_sub (s, rew);
 
   unsigned int glyphID= 0;
-  (void) variant_glyph (head, root, glyphID);
+  int          code   = 0;
+  (void) variant_glyph (head, root, glyphID, code);
 
   // cout << "unicode " << uu << " -> " << lolly::data::to_hex (u) << LF;
   // cout << "search_font_sub_opentype for " << s << " -> " << glyphID << LF;
@@ -331,8 +346,11 @@ rubber_unicode_font_rep::search_font_sub_opentype (string s, string& rew) {
   bool         has_assembly= false;
   ot_mathtable math_table  = math_face->math_table;
 
-  // a glyph can not be both vertical and horizontal
-  if (math_table->ver_glyph_variants->contains (glyphID)) {
+  // a glyph is stretched in one direction: horizontally for an accent or
+  // an arrow over a formula, even when the font can stretch it both ways
+  bool hor_first= (head == "wide" || head == "rubber") &&
+                  math_table->hor_glyph_variants->contains (glyphID);
+  if (!hor_first && math_table->ver_glyph_variants->contains (glyphID)) {
     using_vertical= true;
     has_variants  = true;
     // if a glyph has assembly, it must be contained in the variants table
@@ -359,18 +377,18 @@ rubber_unicode_font_rep::search_font_sub_opentype (string s, string& rew) {
   // turn a number to a 4-digit hexadecimal string "@XXXX"
   auto hex4= [] (int x) { return "@" * as_hexadecimal (x, 4); };
 
+  array<unsigned int> gv, adv;
   if (has_variants) {
-    auto& gv= glyph_variants (glyphID);
+    get_variants (glyphID, using_vertical, gv, adv);
     // display style big operators: the smallest variant which is at least
     // displayOperatorMinHeight tall (or the largest one)
     if (starts (s, "<big-") && var == 1 && using_vertical) {
-      auto& adv= math_table->ver_glyph_variants_adv (glyphID);
       int   min_h= math_table->constants_table[displayOperatorMinHeight];
       double upem= (double) math_face->ft_face->units_per_EM;
       if (upem <= 0.0) upem= 1000.0;
       min_h= min (min_h, (int) (DISPLAY_OPERATOR_MAX_EM * upem));
       int   i= N (gv) - 1;
-      for (int j= 1; j < N (gv); j++)
+      for (int j= 1; j < N (gv) && j < N (adv); j++)
         if ((int) adv[j] >= min_h) { i= j; break; }
       var= max (i, 1);
     }
@@ -378,9 +396,18 @@ rubber_unicode_font_rep::search_font_sub_opentype (string s, string& rew) {
       int res= gv[var];
       // use <@XXXX> for native glyph id
       rew= "<" * hex4 (res) * ">";
+      base->set_glyph_unicode (rew, code);
       // the unicode font itself has the variant glyph
       return 0;
     }
+  }
+
+  // an accent of which the font has a single size is that glyph
+  if (!has_variants && !has_assembly && glyphID != 0 && var == 0 &&
+      head == "wide" && ends (s, "-0>")) {
+    rew= "<" * hex4 (glyphID) * ">";
+    base->set_glyph_unicode (rew, code);
+    return 0;
   }
 
   if (has_assembly) {
@@ -388,40 +415,41 @@ rubber_unicode_font_rep::search_font_sub_opentype (string s, string& rew) {
     // parts; number nvar + k - 1 repeats every extender k times. We define
     // all the sizes of a glyph at once, so that the virtual font holding
     // them has to be rebuilt only once per glyph.
-    int nvar= has_variants? N (glyph_variants (glyphID)): 0;
-    if (var < nvar + MAX_ASSEMBLY_REPS) {
-      if (!virt->dict->contains (s)) {
-        GlyphAssembly gass= glyph_assembly (glyphID);
-        int    min_overlap= (int) math_table->minConnectorOverlap;
-        double upem= (double) math_face->ft_face->units_per_EM;
-        if (upem <= 0.0) upem= 1000.0;
-        string prefix= "<" * head * "-" * root * "-";
-        int    shift = starts (s, "<big-")? 1: 0; // there is no <big-x-0>
-        // sizes must grow with the variant number: start with the smallest
-        // number of repetitions which exceeds the largest pre-drawn variant
-        double pt= using_vertical? (double) base->hpt: (double) base->wpt;
-        double du= ((double) base->size * pt) / upem;
-        double em= (double) base->size * pt;
-        array<SI> ink;
-        array<GlyphPartRecord> prs=
-          part_records (gass, using_vertical, du, min_overlap, ink);
-        int k0= 1;
-        if (nvar > 0) {
-          auto& adv= using_vertical? math_table->ver_glyph_variants_adv (glyphID)
-                                   : math_table->hor_glyph_variants_adv (glyphID);
-          int largest= (N (adv) == nvar)? (int) adv[nvar - 1]: 0;
-          while (k0 < MAX_ASSEMBLY_REPS &&
-                 assembled_length (prs, k0, min_overlap) <= largest) k0++;
-        }
-        for (int k= k0; k < k0 + MAX_ASSEMBLY_REPS; k++) {
-          string name= prefix * as_string (nvar + k - k0 + shift) * ">";
-          if (virt->dict->contains (name)) continue;
-          add_virtual_glyph (name, assemble (prs, ink, k, min_overlap, 0,
-                                             du, em, using_vertical));
-        }
+    int nvar= N (gv);
+    string prefix= "<" * head * "-" * root * "-";
+    int    shift = starts (s, "<big-")? 1: 0; // there is no <big-x-0>
+    // the sizes beyond the last one which is defined are that last one
+    string name= s;
+    if (var >= nvar + MAX_ASSEMBLY_REPS)
+      name= prefix * as_string (nvar + MAX_ASSEMBLY_REPS - 1 + shift) * ">";
+    if (!virt->dict->contains (name)) {
+      GlyphAssembly gass= glyph_assembly (glyphID);
+      int    min_overlap= (int) math_table->minConnectorOverlap;
+      double upem= (double) math_face->ft_face->units_per_EM;
+      if (upem <= 0.0) upem= 1000.0;
+      // sizes must grow with the variant number: start with the smallest
+      // number of repetitions which exceeds the largest pre-drawn variant
+      double pt= using_vertical? (double) base->hpt: (double) base->wpt;
+      double du= ((double) base->size * pt) / upem;
+      double em= (double) base->size * pt;
+      array<SI> ink;
+      array<GlyphPartRecord> prs=
+        part_records (gass, using_vertical, du, min_overlap, ink, code);
+      int k0= 1;
+      if (nvar > 0) {
+        int largest= (N (adv) == nvar)? (int) adv[nvar - 1]: 0;
+        while (k0 < MAX_ASSEMBLY_REPS &&
+               assembled_length (prs, k0, min_overlap) <= largest) k0++;
       }
-      return 6;
+      for (int k= k0; k < k0 + MAX_ASSEMBLY_REPS; k++) {
+        string nm= prefix * as_string (nvar + k - k0 + shift) * ">";
+        if (virt->dict->contains (nm)) continue;
+        add_virtual_glyph (nm, assemble (prs, ink, k, min_overlap, 0,
+                                         du, em, using_vertical));
+      }
     }
+    rew= name;
+    return 6;
   }
   // cout << "No opentype variant for " << uu << " -> " << glyphID << LF;
 
@@ -444,6 +472,13 @@ rubber_unicode_font_rep::search_font_sub_opentype (string s, string& rew) {
 bool
 rubber_unicode_font_rep::variant_glyph (string head, string root,
                                         unsigned int& glyphID) {
+  int code;
+  return variant_glyph (head, root, glyphID, code);
+}
+
+bool
+rubber_unicode_font_rep::variant_glyph (string head, string root,
+                                        unsigned int& glyphID, int& code) {
   if (is_nil (math_face) || root == "" || root == ".") return false;
   uint32_t u;
   if (head == "wide" || head == "rubber") u= wide_code_point (root);
@@ -453,7 +488,38 @@ rubber_unicode_font_rep::variant_glyph (string head, string root,
     u= decode_from_utf8 (uu, j);
   }
   glyphID= ft_get_char_index (math_face->ft_face, u);
+  code   = (int) u;
   return glyphID != 0;
+}
+
+// The size variants of a glyph and their advances, starting with the glyph
+// itself: a font need not list it as its first variant (GFS Neohellenic
+// Math gives the contour integral a single variant, of display size)
+void
+rubber_unicode_font_rep::get_variants (unsigned int glyphID, bool ver,
+                                       array<unsigned int>& gv,
+                                       array<unsigned int>& adv) {
+  ot_mathtable mt= math_face->math_table;
+  gv = copy (ver? mt->ver_glyph_variants (glyphID)
+                : mt->hor_glyph_variants (glyphID));
+  adv= copy (ver? mt->ver_glyph_variants_adv (glyphID)
+                : mt->hor_glyph_variants_adv (glyphID));
+  if (N(gv) == 0 || gv[0] == glyphID || N(adv) != N(gv)) return;
+  double upem= (double) math_face->ft_face->units_per_EM;
+  if (upem <= 0.0) upem= 1000.0;
+  double pt= ver? (double) base->hpt: (double) base->wpt;
+  double du= ((double) base->size * pt) / upem;
+  metric ex;
+  base->get_extents ("<@" * as_hexadecimal (glyphID, 4) * ">", ex);
+  SI len= ver? (ex->y2 - ex->y1): (ex->x2 - ex->x1);
+  unsigned int a= (du > 0.0)? (unsigned int) max (0.0, tm_round (len / du)): 0;
+  // the variants are sorted by size
+  if (a > adv[0]) a= adv[0];
+  array<unsigned int> gv2, adv2;
+  gv2 << glyphID << gv;
+  adv2 << a << adv;
+  gv = gv2;
+  adv= adv2;
 }
 
 // Answer the width search of the typesetter for wide accents, braces and
@@ -470,28 +536,39 @@ rubber_unicode_font_rep::get_wide_variant (string s, SI width, string& r) {
   unsigned int glyphID;
   if (!variant_glyph (head, root, glyphID)) return false;
   ot_mathtable mt= math_face->math_table;
-  if (!mt->hor_glyph_variants->contains (glyphID)) return false;
+  string prefix= "<" * head * "-" * root * "-";
+  if (!mt->hor_glyph_variants->contains (glyphID)) {
+    // the smallest size of an accent is the accent of the font, also when
+    // the font has no other size of it
+    if (width > 0 || head != "wide") return false;
+    r= prefix * "0>";
+    return true;
+  }
 
   double upem= (double) math_face->ft_face->units_per_EM;
   if (upem <= 0.0) upem= 1000.0;
   double du= ((double) base->size * (double) base->wpt) / upem;
   int target= (int) ceil (width / du);
-  string prefix= "<" * head * "-" * root * "-";
 
-  array<unsigned int> gv = mt->hor_glyph_variants (glyphID);
-  array<unsigned int> adv= mt->hor_glyph_variants_adv (glyphID);
-  for (int i= 0; i < N(gv) && i < N(adv); i++)
+  array<unsigned int> gv, adv;
+  get_variants (glyphID, false, gv, adv);
+  // the variants which can be drawn: a font may have accents of ten ems
+  // and more (Lete Sans Math), too wide for a bitmap at a high resolution
+  int nv= min (N(gv), N(adv));
+  while (nv > 0 &&
+         !base->supports ("<@" * as_hexadecimal (gv[nv-1], 4) * ">")) nv--;
+  for (int i= 0; i < nv; i++)
     if ((int) adv[i] >= target) {
       r= prefix * as_string (i) * ">";
       return true;
     }
-  if (!mt->hor_glyph_assembly->contains (glyphID)) {
+  if (!mt->hor_glyph_assembly->contains (glyphID) || nv < N(gv)) {
     // without an assembly the largest variant is all the font has; when
     // it covers much less than the width (a wide check or breve over a
     // long formula), the typesetter draws a stretched accent of its own
-    if (N(gv) == 0 || N(adv) == 0) return false;
-    if (4 * (int) adv[N(adv) - 1] < 3 * target) return false;
-    r= prefix * as_string (N(gv) - 1) * ">";
+    if (nv == 0) return false;
+    if (4 * (int) adv[nv - 1] < 3 * target) return false;
+    r= prefix * as_string (nv - 1) * ">";
     return true;
   }
   double em= (double) base->size * (double) base->wpt;
@@ -505,6 +582,17 @@ rubber_unicode_font_rep::get_top_accent (string s, SI& x) {
   int nr= search_font_cached (s, rew);
   if (nr == 6) return false;
   return get_font (nr)->get_top_accent (rew, x);
+}
+
+// The substitute of a size of a rubber character under a feature, as the
+// flattened form (flac) of the smallest size of an accent
+bool
+rubber_unicode_font_rep::get_feature_variant (string s, string feature,
+                                              int alt, string& r) {
+  string rew;
+  int nr= search_font_cached (s, rew);
+  if (nr != 0 || !starts (rew, "<@")) return false;
+  return base->get_feature_variant (rew, feature, alt, r);
 }
 
 bool
@@ -528,7 +616,8 @@ rubber_unicode_font_rep::is_extended_shape (string s) {
 // detached foot.
 array<GlyphPartRecord>
 rubber_unicode_font_rep::part_records (GlyphAssembly gass, bool ver, double du,
-                                       int min_overlap, array<SI>& ink) {
+                                       int min_overlap, array<SI>& ink,
+                                       int code) {
   // the connector to lend to a part which declares none: the shortest one
   // of the parts which are properly declared
   int conn= 0;
@@ -544,7 +633,10 @@ rubber_unicode_font_rep::part_records (GlyphAssembly gass, bool ver, double du,
   for (int i= 0; i < N (gass.partRecords); i++) {
     GlyphPartRecord pr= gass.partRecords[i];
     metric ex;
-    base->get_extents ("<@" * as_hexadecimal (pr.glyphID, 4) * ">", ex);
+    string part= "<@" * as_hexadecimal (pr.glyphID, 4) * ">";
+    base->get_extents (part, ex);
+    // the first part stands for the character, the other ones for nothing
+    base->set_glyph_unicode (part, i == 0? code: 0);
     ink << (ver? ex->y1: ex->x1);
     if (pr.fullAdvance == 0 && du > 0.0) {
       SI len= ver? (ex->y2 - ex->y1): (ex->x2 - ex->x1);
@@ -560,14 +652,15 @@ rubber_unicode_font_rep::part_records (GlyphAssembly gass, bool ver, double du,
 }
 
 // Add a glyph definition to the virtual font of the assembled glyphs.
-// subfn[6] caches the definitions, so it must be recreated when new ones
-// are added; its metric and glyph caches are resources with the same name
-// and are sized after the number of definitions, so reset them as well.
+// subfn[6] has room for a number of glyphs and compiles them on demand;
+// when the room is used up it must be recreated: its metric and glyph
+// caches are resources with the same name and of that size, so reset them
+// as well.
 void
 rubber_unicode_font_rep::add_virtual_glyph (string name, string def) {
   virt->dict (name)= N (virt->virt_def);
   virt->virt_def << string_to_scheme_tree (def);
-  if (initialized[6]) {
+  if (initialized[6] && N (virt->virt_def) > virt_room) {
     string vname= subfn[6]->res_name;
     font::instances->reset (vname);
     font_metric::instances->reset (vname);
@@ -604,8 +697,8 @@ rubber_unicode_font_rep::get_rubber_variant (string s, SI height, string& r) {
   int target= (int) ceil (height / du);
   string prefix= "<" * head * "-" * root * "-";
 
-  array<unsigned int> gv = mt->ver_glyph_variants (glyphID);
-  array<unsigned int> adv= mt->ver_glyph_variants_adv (glyphID);
+  array<unsigned int> gv, adv;
+  get_variants (glyphID, true, gv, adv);
   for (int i= 0; i < N(gv) && i < N(adv); i++)
     if ((int) adv[i] >= target) {
       r= prefix * as_string (i) * ">";
@@ -644,7 +737,8 @@ rubber_unicode_font_rep::make_measured (string s) {
   string head= v[0];
   string root= recompose (range (v, 1, N(v) - 1), "-");
   unsigned int glyphID;
-  if (!variant_glyph (head, root, glyphID)) return false;
+  int          code;
+  if (!variant_glyph (head, root, glyphID, code)) return false;
   ot_mathtable mt= math_face->math_table;
   if (ver? !mt->ver_glyph_assembly->contains (glyphID)
          : !mt->hor_glyph_assembly->contains (glyphID)) return false;
@@ -659,7 +753,8 @@ rubber_unicode_font_rep::make_measured (string s) {
                          : mt->hor_glyph_assembly (glyphID);
   int min_overlap= (int) mt->minConnectorOverlap;
   array<SI> ink;
-  array<GlyphPartRecord> prs= part_records (gass, ver, du, min_overlap, ink);
+  array<GlyphPartRecord> prs=
+    part_records (gass, ver, du, min_overlap, ink, code);
   int k= 1;
   while (k < MAX_ASSEMBLY_REPS &&
          assembled_length (prs, k, min_overlap) < target) k++;

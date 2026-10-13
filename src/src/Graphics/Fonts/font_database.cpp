@@ -235,7 +235,9 @@ font_database_load_substitutions (url u) {
 // which merges. A home directory shared by several installations, as a
 // developer has, would otherwise keep the fonts of whichever ran last and
 // hide the rest for good, the stamp saying that the merge had been done:
-// the installation is therefore part of the stamp.
+// the installation is therefore part of the stamp, and the file keeps one
+// stamp for each installation, so that two of them which ship the same
+// fonts do not merge again at every start of the other one.
 
 static string
 shipped_fonts_stamp () {
@@ -249,10 +251,10 @@ shipped_fonts_stamp () {
     get_env ("TEXMACS_PATH");
 }
 
-// The two lines of the stamp: what was merged, and how large the database
-// was when this installation left it
+// The lines of the stamp file, one for each installation: the size of the
+// database when that installation left it, then its stamp
 static array<string>
-shipped_fonts_mark () {
+shipped_fonts_marks () {
   string s;
   array<string> r;
   if (!exists (url (SHIPPED_STAMP))) return r;
@@ -260,12 +262,21 @@ shipped_fonts_mark () {
   return tokenize (trim_spaces (s), "\n");
 }
 
+// The line of this installation, or "" when it never merged its database,
+// or merged another version of it
+static string
+shipped_fonts_mark () {
+  string stamp= " " * shipped_fonts_stamp ();
+  array<string> marks= shipped_fonts_marks ();
+  for (int i=0; i<N(marks); i++)
+    if (ends (marks[i], stamp)) return marks[i];
+  return "";
+}
+
 static bool
 shipped_fonts_changed () {
   if (!exists (url (GLOBAL_DATABASE))) return false;
-  array<string> mark= shipped_fonts_mark ();
-  if (N (mark) < 2) return true;
-  return trim_spaces (mark[0]) != shipped_fonts_stamp ();
+  return shipped_fonts_mark () == "";
 }
 
 // Another installation which rebuilds the database of this home directory
@@ -273,10 +284,32 @@ shipped_fonts_changed () {
 // stamp behind: merge again when the database has lost entries.
 static bool
 shipped_fonts_shrunk (int nr) {
-  array<string> mark= shipped_fonts_mark ();
-  if (N (mark) < 2) return false;
-  string n= trim_spaces (mark[1]);
+  string mark= shipped_fonts_mark ();
+  int    pos = search_forwards (" ", mark);
+  if (pos < 0) return false;
+  string n= mark (0, pos);
   return is_int (n) && nr < as_int (n);
+}
+
+// The font "roman" and the other TeX fonts are the families of the TeX
+// fonts which come with TeXmacs: a database without them, which would send
+// these names to the nearest font found on the system, is merged again
+static bool
+shipped_tex_fonts_lost () {
+  return N (font_table) != 0 &&
+         N (font_database_styles ("TeXmacs Computer Modern", font_table)) == 0;
+}
+
+// Replace the line of this installation and keep those of the others
+static void
+shipped_fonts_save_mark (int nr) {
+  string suffix= " " * get_env ("TEXMACS_PATH");
+  string s= as_string (nr) * " " * shipped_fonts_stamp () * "\n";
+  array<string> marks= shipped_fonts_marks ();
+  for (int i=0; i<N(marks); i++)
+    if (!ends (marks[i], suffix) && occurs (" ", marks[i]))
+      s << marks[i] << "\n";
+  save_string (SHIPPED_STAMP, s);
 }
 
 void
@@ -286,7 +319,8 @@ font_database_load () {
   font_database_load_database (LOCAL_DATABASE);
   if (renew && N (font_table) != 0)
     cout << "TeXmacs] the shipped font database changed, merging it\n";
-  else if (!renew && shipped_fonts_shrunk (N (font_table))) {
+  else if (!renew && (shipped_fonts_shrunk (N (font_table)) ||
+                      shipped_tex_fonts_lost ())) {
     cout << "TeXmacs] the local font database lost entries, merging again\n";
     renew= true;
   }
@@ -308,9 +342,7 @@ font_database_load () {
     font_database_save_characteristics (LOCAL_CHARACTERISTICS);
   }
   font_database_load_substitutions (GLOBAL_SUBSTITUTIONS);
-  if (renew)
-    save_string (SHIPPED_STAMP,
-                 shipped_fonts_stamp () * "\n" * as_string (N (font_table)));
+  if (renew) shipped_fonts_save_mark (N (font_table));
   fonts_loaded= true;
 }
 
@@ -582,7 +614,8 @@ find_best_approximation (tree ff) {
       }
     }
   }
-  cout << "TeXmacs] approximating font " << ff << " ~> " << best << "\n";
+  if (DEBUG_VERBOSE)
+    debug_fonts << "Approximating font " << ff << " ~> " << best << "\n";
   if (N(best) >= 2) return best;
   return ff (0, 2);
 }
@@ -637,6 +670,10 @@ font_database_filter () {
   build_back_table ();
   font_database_collect (tt_font_path ());
   font_database_collect (tfm_font_path ());
+  // the TeX fonts which come with TeXmacs are in its own tree, also for a
+  // program which did not set up the search path of TeX
+  if (is_none (tfm_font_path ()))
+    font_database_collect (search_sub_dirs ("$TEXMACS_PATH/fonts/tfm"));
   font_table= new_font_table;
   new_font_table = hashmap<tree,tree> (UNINIT);
   back_font_table= hashmap<tree,tree> (UNINIT);
@@ -810,14 +847,12 @@ font_database_search (string fam, string var, string series, string shape) {
 // "KpMath"), or "" when the features database does not know the family. The
 // font selection is driven by masters, so a name that comes from elsewhere
 // has to be translated before it is used as a font. Unlike family_to_master,
-// this says so instead of guessing, and it prints nothing.
+// this says so instead of guessing, it prints nothing, and it does not load
+// the global database for a name which is not a family, as "roman" is.
 string
 font_database_master (string family) {
   font_database_load ();
-  if (!font_features->contains (tree (family))) {
-    font_database_global_load ();
-    if (!font_features->contains (tree (family))) return "";
-  }
+  if (!font_features->contains (tree (family))) return "";
   tree t= font_features [tree (family)];
   if (is_func (t, TUPLE) && N(t) >= 1 && is_atomic (t[0])) return t[0]->label;
   return "";

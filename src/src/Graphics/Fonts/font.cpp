@@ -588,8 +588,37 @@ static hashmap<string,font> larger_font_table;
 bool has_poor_rubber= true;
 bool hand_tuned_math_fonts= true;
 
-void set_hand_tuned_math_fonts (bool val) { hand_tuned_math_fonts= val; }
+// The fonts made so far were made for the other state of the switch: they
+// stay with the documents typeset with them, and every font asked for from
+// now on is made again
+void
+set_hand_tuned_math_fonts (bool val) {
+  if (val == hand_tuned_math_fonts) return;
+  hand_tuned_math_fonts= val;
+  font::instances= hashmap<string,pointer> (NULL);
+  larger_font_table= hashmap<string,font> ();
+}
+
 bool get_hand_tuned_math_fonts () { return hand_tuned_math_fonts; }
+
+string
+hand_tuned_suffix () {
+  return hand_tuned_math_fonts? string (""): string ("-untuned");
+}
+
+static hashmap<string,int> native_unicode (-1);
+
+void
+native_glyph_set_unicode (string glyphs_name, int glyph, int code) {
+  string key= glyphs_name * "#" * as_string (glyph);
+  // a character is never replaced, and replaces the absence of one
+  if (native_unicode [key] <= 0) native_unicode (key)= code;
+}
+
+int
+native_glyph_get_unicode (string glyphs_name, int glyph) {
+  return native_unicode [glyphs_name * "#" * as_string (glyph)];
+}
 
 bool
 use_poor_rubber (font fn) {
@@ -646,6 +675,11 @@ bool
 font_rep::get_feature_variant (string s, string feature, int alt, string& r) {
   (void) s; (void) feature; (void) alt; (void) r;
   return false;
+}
+
+void
+font_rep::set_glyph_unicode (string s, int code) {
+  (void) s; (void) code;
 }
 
 font
