@@ -35,6 +35,7 @@
 #include "tree.hpp"
 #include "Vue/vue_widget.hpp"
 #include "Vue/vue_gui.hpp"
+#include "boot.hpp"
 #include "MuPDF/mupdf_picture.hpp"
 #include "widget.hpp"
 #include "message.hpp"
@@ -1482,6 +1483,17 @@ handle_message (std::string kind, std::string part, const json& desc) {
   else if (kind == "refresh") refresh_part (desc);
   else if (kind == "popup") show_context_menu (desc);
   else if (kind == "tooltip") show_tooltip (desc);
+  else if (kind == "preference") {
+    // a preference which Vue reads (the place of the icon bars, the
+    // theme, the icons): they are the core's, which says them
+    string name= desc["name"].text (), value= desc["value"].text ();
+    if (get_user_preference (name, "") != value) {
+      set_user_preference (name, value);
+      if (name == "gui theme") set_vue_theme (value);
+      gui_needs_relayout= true;
+      needs_update ();
+    }
+  }
   else if (kind == "clipboard") SDL_SetClipboardText (desc["text"].str ().c_str ());
   else if (kind == "paste-request") {
     if (the_view != NULL && the_view->view)
@@ -1528,6 +1540,8 @@ handle_frame (core_frame& f) {
     static bool evaluated= false;
     if (!evaluated) {
       evaluated= true;
+      // (the preferences which Vue reads are the core's: tau-files.scm)
+      core_say ("scheme (tau-say-preferences)");
       if (getenv ("TAU_SHELL_EVAL") != NULL)
         core_say ("scheme " + escaped (getenv ("TAU_SHELL_EVAL")));
     }

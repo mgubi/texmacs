@@ -133,8 +133,8 @@
   ("gui theme" "default" notify-gui-theme)
   ("icon set" "neo-classical" notify-icon-set)
   ;; the Vue interface reads it at each layout; at the left by default in
-  ;; a web browser
-  ("icon bars" "left" noop)
+  ;; a web browser, above the document on the desktop
+  ("icon bars" (if (in-desktop?) "top" "left") noop)
   ("window tabs" "left" notify-window-tabs)
   ("gui density" (get-default-gui-density) noop)
   ("gui scaling" "default" notify-gui-scaling)

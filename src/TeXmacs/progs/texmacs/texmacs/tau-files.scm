@@ -199,3 +199,25 @@
         (lambda (answ)
           (when answ (buffer-close name))))
       (buffer-close name)))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; The preferences of the interface, on the desktop
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; The program which has the windows (tau_shell.cpp) is another process:
+;; the preferences are here, and those which it reads are said to it, all
+;; when it asks (tau-say-preferences) and each when it changes.
+
+(define tau-shell-preferences
+  '("icon bars" "gui theme" "icon set" "smooth zoom"))
+
+(define (tau-say-preference which)
+  (tau-post "preference" ""
+            `((name . ,which) (value . ,(get-preference which)))))
+
+(tm-define (tau-say-preferences)
+  (for-each tau-say-preference tau-shell-preferences))
+
+(tm-define (notify-preference which)
+  (:require (and (in-desktop?) (in? which tau-shell-preferences)))
+  (former which)
+  (tau-say-preference which))
