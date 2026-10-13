@@ -104,7 +104,9 @@ High quality displaying of anti-aliased fonts (default).
 Echo the TeXmacs path.
 .TP
 \fB\-q\fR, \fB\-\-quit\fR
-Shortcut for the option -x "(quit-TeXmacs)".
+Quit TeXmacs after the commands of the -x and -c options were executed
+and the files of the command line were loaded, wherever the option is
+on the command line.
 .TP
 \fB\-r\fR, \fB\-\-reverse\fR
 Reverse video mode. This mode inverts and weakens the intensity of all colors.
@@ -129,6 +131,8 @@ Display some informative messages.
 Execute the scheme command [cmd] just after startup.
 If you specify several -x options, then the corresponding
 scheme commands are executed in the same order.
+The commands are executed before the files of the command line are
+loaded, also when the files come first on the command line.
 .PP
 .SH AUTHOR
 Written by Joris van der Hoeven
