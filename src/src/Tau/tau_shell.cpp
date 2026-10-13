@@ -356,7 +356,8 @@ public:
   // dragged, Vue moves the canvas and the core is asked to follow.
   SI      ax, ay;
   bool    asked;       // the core was asked to scroll, and has not yet
-  SI      asked_x, asked_y;
+  bool    wanted;      // a place which a scroll bar asked for waits
+  SI      want_x, want_y;
   // The wheel and the moves of the pointer come faster than the core
   // answers (a step of the wheel is a whole view to draw and to send): one
   // of each is with the core at a time, which says when it is done with it
@@ -372,7 +373,7 @@ public:
   tau_view_rep (int v= 0, bool emb= false, bool inp= true, SI hw= 0, SI hh= 0):
     view (0), place (0), pw (0), ph (0), fw (0), fh (0),
     embedded (emb), input (inp), hint_w (hw), hint_h (hh),
-    ax (0), ay (0), asked (false), asked_x (0), asked_y (0),
+    ax (0), ay (0), asked (false), wanted (false), want_x (0), want_y (0),
     wheel_x (0), wheel_y (0), wheel_px (0), wheel_py (0), wheel_sent (false),
     move_sent (false) { set_view (v); }
   ~tau_view_rep () {
@@ -487,6 +488,7 @@ public:
   // the core is done with a step of the wheel, or with a move
   void done (std::string what) {
     if (what == "wheel") { wheel_sent= false; send_wheel (); }
+    else if (what == "bar") { asked= false; send_bar (); }
     else if (what == "move") {
       move_sent= false;
       if (move_held != "") {
@@ -502,18 +504,32 @@ public:
     win->clear (x1, y1, x2, y2);
     if (is_nil (frame)) return;
     win->draw_picture (frame, ax, ay - fh * win->pixel);
-    follow ();
   }
-  // the canvas is not where the frame is (a scroll bar of Vue was
-  // dragged): the core is asked for the difference
-  void follow () {
-    if (!view || ren == NULL || embedded) return;
-    if (backing_pos.x1 == ax && backing_pos.x2 == ay) { asked= false; return; }
-    if (asked && asked_x == backing_pos.x1 && asked_y == backing_pos.x2) return;
-    asked= true; asked_x= backing_pos.x1; asked_y= backing_pos.x2;
-    core_say ("scroll " + std::to_string (view) + " " +
-              std::to_string ((int) ((backing_pos.x1 - ax) / ren->pixel)) + " " +
-              std::to_string ((int) ((ay - backing_pos.x2) / ren->pixel)) + " 0 0");
+  // A scroll bar of Vue is dragged: Vue asks the canvas to go elsewhere.
+  // The canvas stays where the frame is (it has no other pixels to show:
+  // moved at once, it showed white where the document had not come yet),
+  // and the core is asked to scroll there; the canvas follows with the
+  // paint which answers. One request at a time, as for the wheel.
+  void do_layout () {
+    vue_simple_widget_rep::do_layout ();
+    if (embedded || !view || ren == NULL) return;
+    if (scroll_pending && !absolute_scroll &&
+        (scroll_pos.x1 != ax || scroll_pos.x2 != ay)) {
+      want_x= scroll_pos.x1; want_y= scroll_pos.x2;
+      wanted= true;
+      scroll_pos= coord2 (ax, ay);
+      send_bar ();
+    }
+  }
+  void send_bar () {
+    if (asked || !wanted) return;
+    wanted= false;
+    int dx= (int) ((want_x - ax) / ren->pixel), dy= (int) ((ay - want_y) / ren->pixel);
+    if (dx == 0 && dy == 0) return;
+    asked= true;
+    core_say ("scroll " + std::to_string (view) + " " + std::to_string (dx) + " " +
+              std::to_string (dy) + " 0 0");
+    core_say ("ping bar " + std::to_string (view));
   }
 
   // a paint of the core: the rectangle which changed
@@ -538,15 +554,13 @@ public:
       // the extents of the document and where the view is in it
       SI px= ren->pixel;
       SI nx= (SI) n[10] * px, ny= -(SI) n[11] * px;
-      bool moved= (nx != ax || ny != ay);
       extents= rectangle (0, -(SI) max (n[9], h) * px, (SI) max (n[8], w) * px, 0);
       ax= nx; ay= ny;
-      if (asked && !moved) asked= false; // (it could not go there)
       // where the cursor is, for the input methods of the system, which
       // put their candidates there (update_text_input_area)
       cursor_pos= coord2 (ax + (SI) n[12] * px, ay - (SI) n[13] * px);
       cursor_moved= true;
-      if (!asked && (backing_pos.x1 != ax || backing_pos.x2 != ay)) {
+      if (backing_pos.x1 != ax || backing_pos.x2 != ay) {
         // the core scrolled: the canvas goes where the frame is
         scroll_pos= coord2 (ax, ay);
         absolute_scroll= false;
