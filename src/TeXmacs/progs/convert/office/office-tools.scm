@@ -17,13 +17,23 @@
 ;;
 ;;   (office block...)
 ;;   blocks:  (meta (key "value")...)
+;;            (setup)  the page and the usual paragraph of the document, with
+;;              the attributes page-width, page-height, margin-top,
+;;              margin-bottom, margin-left, margin-right (lengths of
+;;              TeXmacs), landscape ("true"), font-size (in points), font
+;;              ("sans" or "mono"), first-indent, space-before,
+;;              space-after (in points), line-spacing (a factor of the
+;;              single one) and align
 ;;            (p inline...)  with the attributes role (title, subtitle,
 ;;              author, date, abstract, heading, quote, code, caption,
 ;;              figure, term, definition, theorem, remark, proof, bibitem,
 ;;              toc), level (of a heading), number (of a heading which
-;;              has one), labels (the bookmarks of a heading) and align
-;;            (list (item block...)...)  with the attribute kind (bullet,
-;;              number)
+;;              has one), numbered ("no" for a heading without number),
+;;              labels (the bookmarks of a heading) and align (left,
+;;              center, right, justify)
+;;            (list (item block...)...)  with the attributes kind (bullet,
+;;              number), format (1, a, A, i, I) and start (the number of
+;;              its first item)
 ;;            (table (row (cell block...)...)...)  with the attributes
 ;;              align, width (a part of the paragraph: 0.5par) and columns
 ;;              (the parts of the columns in the table: "0.25 0.75"); the
@@ -550,6 +560,35 @@
                        (+ #x80 (modulo (quotient n 4096) 64))
                        (+ #x80 (modulo (quotient n 64) 64))
                        (+ #x80 (modulo n 64))))))))
+
+(tm-define (office-points s)
+  (:synopsis "The length @s (2cm, 1in, 10mm, 12pt) in points, or #f")
+  ;; (a length of 0 is one, and a negative one too)
+  (and (string? s) (!= s "")
+       (let* ((neg? (string-starts? s "-"))
+              (s (if neg? (substring s 1 (string-length s)) s))
+              (n (string-length s))
+              (i (let loop ((i 0))
+                   (if (and (< i n) (or (char-numeric? (string-ref s i))
+                                        (char=? (string-ref s i) #\.)))
+                       (loop (+ i 1)) i)))
+              (v (office-number (substring s 0 i)))
+              (scale (assoc-ref '(("cm" . 28.3465) ("mm" . 2.83465)
+                                  ("in" . 72.0) ("pt" . 1.0) ("pc" . 12.0)
+                                  ("px" . 0.75))
+                                (substring s i n))))
+         (and v scale (* (if neg? -1 1) v scale)))))
+
+(tm-define (office-sans? font)
+  (:synopsis "Whether the font @font is one without serifs")
+  (and (string? font) (not (office-monospace? font))
+       (with f (locase-all font)
+         (list-or (map (lambda (x) (>= (string-search-forwards x 0 f) 0))
+                       '("sans" "arial" "helvetica" "calibri" "aptos" "carlito"
+                         "verdana" "tahoma" "segoe" "trebuchet" "gothic"
+                         "gill" "futura" "roboto" "lato" "franklin" "myriad"
+                         "avenir" "frutiger" "univers" "montserrat"
+                         "candara" "corbel" "geneva" "ubuntu" "cantarell"))))))
 
 (tm-define (office-length->cm s)
   (:synopsis "The length @s (2cm, 1in, 10mm, 12pt, 96px) in centimeters, or #f")

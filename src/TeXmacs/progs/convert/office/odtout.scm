@@ -41,6 +41,8 @@
   (set! ot-id (+ ot-id 1))
   ot-id)
 
+(define ot-setup '(setup))  ; the page and the font of the document
+
 (define (ot-style key prefix make)
   ;; the name of the automatic style of this key; (make name) is its
   ;; element when it is new
@@ -469,10 +471,10 @@
         (list `(text:p (@ (text:style-name ,style)) ,@l)))))
 
 (define (ot-list-style kind)
-  ;; The name of the style of a list of this kind, "n" for numbers or "b"
-  ;; for bullets. A list inside another one has its own style, of its own
-  ;; kind, of which it takes the level of its depth: so the style has all
-  ;; the levels.
+  ;; The name of the style of a list of this kind, "b" for bullets, or the
+  ;; way of numbering ("1", "a", "A", "i", "I"). A list inside another one
+  ;; has its own style, of its own kind, of which it takes the level of its
+  ;; depth: so the style has all the levels.
   (ot-style
     (list 'list kind) "L"
     (lambda (name)
@@ -486,10 +488,11 @@
                                       (@ (text:label-followed-by "listtab")
                                          (fo:text-indent "-0.635cm")
                                          (fo:margin-left ,(ot-cm (* 1.27 (+ i 1)))))))))
-                    (if (== kind "n")
+                    (if (!= kind "b")
                         `(text:list-level-style-number
                            (@ (text:level ,(number->string (+ i 1)))
-                              (style:num-suffix ".") (style:num-format "1"))
+                              (style:num-suffix ,(if (in? kind '("a" "A")) ")" "."))
+                              (style:num-format ,kind))
                            ,props)
                         `(text:list-level-style-bullet
                            (@ (text:level ,(number->string (+ i 1)))
@@ -520,7 +523,11 @@
 (define (ot-list x)
   ;; the elements of a list: the list, or its pieces with the tables of
   ;; its items between them
-  (let* ((style (ot-list-style (if (== (ox-attr x 'kind) "number") "n" "b")))
+  (let* ((style (ot-list-style (if (== (ox-attr x 'kind) "number")
+                                   (with f (ox-attr x 'format)
+                                     (if (in? f '("a" "A" "i" "I")) f "1"))
+                                   "b")))
+         (start (office-integer (ox-attr x 'start) 1 0 100000))
          ;; the piece with these items, reversed, after the elements out
          (close (lambda (rows out)
                   (if (null? rows) out
@@ -540,7 +547,13 @@
                             '((text:p (@ (text:style-name "Text_20_body"))))
                             (car parts))))
             (let sub ((l (cdr parts))
-                      (rows (cons `(text:list-item ,@first) rows))
+                      (rows (cons (if (and (null? rows) (null? out) (!= start 1))
+                                      ;; (a list which starts at another number)
+                                      `(text:list-item
+                                         (@ (text:start-value ,(number->string start)))
+                                         ,@first)
+                                      `(text:list-item ,@first))
+                                  rows))
                       (out out))
               (if (null? l)
                   (loop (cdr items) rows out)
@@ -760,14 +773,48 @@
         ,@(if (>= n 4) '((fo:font-style "italic")) '()))
       s)))
 
+(define (ot-default-font)
+  ;; the font of the text: a font with serifs as those of TeXmacs, unless
+  ;; the document says otherwise
+  (cond ((== (ox-attr ot-setup 'font) "sans") "Arial")
+        ((== (ox-attr ot-setup 'font) "mono") "Courier New")
+        (else "Times New Roman")))
+
+(define (ot-font-decls)
+  ;; the fonts which the styles name
+  `(office:font-face-decls
+     ,@(cdr ot-fonts)
+     ,@(if (== (ot-default-font) "Courier New") '()
+           `((style:font-face (@ (style:name ,(ot-default-font))
+                                 (svg:font-family ,(string-append "'" (ot-default-font) "'"))
+                                 (style:font-family-generic
+                                   ,(if (== (ot-default-font) "Arial") "swiss" "roman"))
+                                 (style:font-pitch "variable")))))))
+
+(define (ot-setup-length key default)
+  (with cm (office-length->cm (ox-attr ot-setup key))
+    (if cm (ot-cm cm) default)))
+
 (define (ot-styles-file)
   `(office:document-styles
      (@ ,@ot-namespaces)
-     ,ot-fonts
+     ,(ot-font-decls)
      (office:styles
        (style:default-style
          (@ (style:family "paragraph"))
-         (style:text-properties (@ (fo:font-size "11pt"))))
+         (style:paragraph-properties
+           (@ (fo:text-align ,(with a (ox-attr ot-setup 'align)
+                                (cond ((== a "center") "center")
+                                      ((== a "right") "end")
+                                      ((== a "justify") "justify")
+                                      (else "start"))))))
+         (style:text-properties
+           (@ (style:font-name ,(ot-default-font))
+              (fo:font-size
+                ,(with n (office-number (ox-attr ot-setup 'font-size))
+                   (if (and n (>= n 5) (<= n 50))
+                       (string-append (office-decimal n) "pt")
+                       "11pt"))))))
        ,(ot-paragraph-style-element "Standard" #f #f '() '())
        ,(ot-paragraph-style-element
           "Text_20_body" "Text body" "Standard"
@@ -867,7 +914,22 @@
                         (iota 9))))
              '())
        (style:style (@ (style:name "Graphics") (style:family "graphic")))
-       (style:style (@ (style:name "Formula") (style:family "graphic"))))))
+       (style:style (@ (style:name "Formula") (style:family "graphic"))))
+     ;; the page
+     (office:automatic-styles
+       (style:page-layout
+         (@ (style:name "pm1"))
+         (style:page-layout-properties
+           (@ (fo:page-width ,(ot-setup-length 'page-width "21cm"))
+              (fo:page-height ,(ot-setup-length 'page-height "29.7cm"))
+              (style:print-orientation
+                ,(if (== (ox-attr ot-setup 'landscape) "true") "landscape" "portrait"))
+              (fo:margin-top ,(ot-setup-length 'margin-top "2cm"))
+              (fo:margin-bottom ,(ot-setup-length 'margin-bottom "2cm"))
+              (fo:margin-left ,(ot-setup-length 'margin-left "2cm"))
+              (fo:margin-right ,(ot-setup-length 'margin-right "2cm"))))))
+     (office:master-styles
+       (style:master-page (@ (style:name "Standard") (style:page-layout-name "pm1"))))))
 
 (define (ot-content blocks)
   `(office:document-content
@@ -928,6 +990,9 @@
   (set! ot-id 0)
   (set! ot-cell-align #f)
   (set! ot-numbered? (office-numbered-headings? x))
+  (set! ot-setup (or (and (func? x 'office)
+                          (list-find (cdr x) (lambda (y) (func? y 'setup))))
+                     '(setup)))
   (set! ot-sequences '())
   (let* ((blocks (ot-blocks-with (if (func? x 'office) (cdr x) (list x))
                                  "Text_20_body"))
