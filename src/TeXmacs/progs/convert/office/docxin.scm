@@ -93,8 +93,15 @@
                 (else '())))
         (with c (office-color (docx-child-val x 'w:color))
           (if (ox-child x 'w:color) (list (cons 'color c)) '()))
+        ;; highlighted text, with the color of its highlighting or of its
+        ;; shading
         (with h (docx-child-val x 'w:highlight)
-          (if h (list (cons 'mark (!= h "none"))) '()))
+          (cond ((not h) '())
+                ((== h "none") '((mark . #f)))
+                ((== h "yellow") '((mark . #t)))
+                (else (list (cons 'mark (or (office-highlight-color h) #t))))))
+        (with c (docx-fill x)
+          (if c (list (cons 'shade c)) '()))
         (with f (ox-child x 'w:rFonts)
           (if (and f (ox-attr f 'w:ascii))
               (list (cons 'code (office-monospace? (ox-attr f 'w:ascii))))
@@ -167,6 +174,10 @@
           (with v (and ind (docx-twips->points (or (ox-attr ind 'w:left)
                                                    (ox-attr ind 'w:start))))
             (if v (list (cons 'indent-left v)) '())))
+        (with ind (ox-child x 'w:ind)
+          (with v (and ind (docx-twips->points (or (ox-attr ind 'w:right)
+                                                   (ox-attr ind 'w:end))))
+            (if v (list (cons 'indent-right v)) '())))
         ;; a large first letter, in a frame of its own
         (with f (ox-child x 'w:framePr)
           (if (and f (in? (ox-attr f 'w:dropCap) '("drop" "margin")))
@@ -516,6 +527,12 @@
                         (append own (docx-style id))
                         own)
                     own))
+         (mark (with m (or (docx-get props 'mark) (docx-get own 'shade))
+                 ;; (yellow is the color of highlighting of TeXmacs)
+                 (if (and (string? m) (== (locase-all m) "#ffff00")) #t m)))
+         (size (docx-get own 'size))
+         (font (with f (docx-get own 'font)
+                 (and f (not (office-monospace? f)) f)))
          (code? (or (docx-get props 'code)
                     (list-or (map (lambda (n)
                                     (in? n '("verbatim char" "html code"
@@ -528,7 +545,12 @@
                  'hidden)
             (and code? 'code)
             (and (docx-get props 'color) (list 'color (docx-get props 'color)))
-            (and (docx-get props 'mark) 'mark)
+            (cond ((string? mark) (list 'mark mark))
+                  (mark 'mark)
+                  (else #f))
+            ;; the size and the font of the run, by hand
+            (and size (list 'size (office-decimal size)))
+            (and font (list 'font font))
             (and (docx-get props 'sub) 'sub)
             (and (docx-get props 'sup) 'sup)
             (and (docx-get props 'smallcaps) 'smallcaps)
@@ -1030,6 +1052,16 @@
                   (list-id ,(and item? (docx-list-group id)))
                   (list-level ,(and item? level))
                   (list-kind ,(and item? kind))
+                  ;; the formatting of a plain paragraph by hand
+                  ,@(if (or (car role) id) '()
+                        (map (lambda (k)
+                               (with v (and (not (and (eq? k 'indent-left) more?))
+                                            (docx-get own k))
+                                 (list k (cond ((number? v) (office-decimal v))
+                                               ((eq? v #t) "true")
+                                               (else v)))))
+                             '(indent-left indent-right first-indent space-before
+                               space-after line-spacing background border)))
                   (list-num ,(and item? id))
                   (list-format ,(and item? format (car format)))
                   (list-start ,(and item? format (cadr format))))))
@@ -1464,6 +1496,18 @@
 ;; Lists: from the paragraphs which are items
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(define (docx-item-paragraph p)
+  ;; a paragraph in an item: without the attributes of its list, nor its
+  ;; indentation, which is the one of the item
+  (apply office-node
+         (cons* 'p
+                (list-filter (ox-attrs p)
+                             (lambda (a) (not (in? (car a) '(list-id list-level list-kind
+                                                             list-more list-format
+                                                             list-start list-num
+                                                             indent-left first-indent)))))
+                (ox-children p))))
+
 (define (docx-plain-paragraph p)
   ;; without the attributes of its list
   (apply office-node
@@ -1496,7 +1540,7 @@
                ;; one more paragraph of the last item
                (loop (cdr l)
                      (cons (append (car items)
-                                   (list (docx-plain-paragraph (car l))))
+                                   (list (docx-item-paragraph (car l))))
                            (cdr items))))
               ((or (not n) (< n level)
                    (and (== n level)
@@ -1517,7 +1561,7 @@
                      l))
               ((== n level)
                (loop (cdr l)
-                     (cons (list 'item (docx-plain-paragraph (car l))) items)))
+                     (cons (list 'item (docx-item-paragraph (car l))) items)))
               (else
                 ;; a deeper level: a list inside the last item
                 (with sub (docx-list l n)

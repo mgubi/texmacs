@@ -82,8 +82,11 @@
                           (else '((sub . #f) (sup . #f))))))))
         (with v (ox-attr x 'fo:color)
           (if v (list (cons 'color (office-color v))) '()))
+        ;; highlighted text, with its color
         (with v (ox-attr x 'fo:background-color)
-          (if v (list (cons 'mark (and (office-color v) (!= (locase-all v) "#ffffff"))))
+          (if v (list (cons 'mark (and (office-color v) (!= (locase-all v) "#ffffff")
+                                       (if (== (locase-all v) "#ffff00") #t
+                                           (office-color v)))))
               '()))
         (with v (ox-attr x 'fo:font-variant)
           (if v (list (cons 'smallcaps (== v "small-caps"))) '()))
@@ -111,6 +114,8 @@
           (if v (list (cons 'first-indent v)) '()))
         (with v (office-points (ox-attr x 'fo:margin-left))
           (if v (list (cons 'indent-left v)) '()))
+        (with v (office-points (ox-attr x 'fo:margin-right))
+          (if v (list (cons 'indent-right v)) '()))
         (with v (ox-attr x 'fo:background-color)
           (if (and v (string-starts? v "#") (!= (locase-all v) "#ffffff"))
               (list (cons 'background (locase-all v))) '()))
@@ -475,7 +480,12 @@
     (list-filter
       (list (and code? 'code)
             (and (odt-get props 'color) (list 'color (odt-get props 'color)))
-            (and (odt-get props 'mark) 'mark)
+            (with m (odt-get props 'mark)
+              (cond ((string? m) (list 'mark m)) (m 'mark) (else #f)))
+            ;; the size and the font of the text, by hand
+            (with v (odt-get props 'size) (and v (list 'size (office-decimal v))))
+            (with f (odt-get props 'font)
+              (and f (not (office-monospace? f)) (list 'font f)))
             (and (odt-get props 'sub) 'sub)
             (and (odt-get props 'sup) 'sup)
             (and (odt-get props 'smallcaps) 'smallcaps)
@@ -781,6 +791,10 @@
                                                                           (cadr role) 1 1 10))))
                                                     "no"))
                                     (align ,(odt-align align))
+                                    ;; the formatting by hand of a plain
+                                    ;; paragraph: its automatic style
+                                    ,@(odt-direct-attrs name (or (car role)
+                                                                 (> odt-list-depth 0)))
                                     ;; the named style of a plain paragraph
                                     (style ,(and named
                                                  (begin
@@ -796,6 +810,19 @@
   (let* ((f (if (pair? family) (car family) "paragraph"))
          (own (and name (ahash-ref odt-styles (cons f name)))))
     (if (and own (odt-get own 'automatic)) (odt-get own 'parent) name)))
+
+(define (odt-direct-attrs name skip?)
+  ;; the attributes of the formatting by hand of a paragraph, from its
+  ;; automatic style
+  (with own (and (not skip?) name (ahash-ref odt-styles (cons "paragraph" name)))
+    (if (not (and own (odt-get own 'automatic))) '()
+        (map (lambda (k)
+               (with v (odt-get own k)
+                 (list k (cond ((number? v) (office-decimal v))
+                               ((eq? v #t) "true")
+                               (else v)))))
+             '(indent-left indent-right first-indent space-before space-after
+               line-spacing background border)))))
 
 (define (odt-align a)
   (cond ((== a "center") "center")

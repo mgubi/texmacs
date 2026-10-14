@@ -42,15 +42,15 @@
     </src-comment>
   </active*>
 
-  <assign|office-par|<\macro|name|body>
-    <\if|<provides|<merge|office-par-|<arg|name>>>>
-      <compound|<merge|office-par-|<arg|name>>|<arg|body>>
-    <|if>
-      <arg|body>
-    </if>
+  <assign|office-plain|<\macro|body>
+    <arg|body>
   </macro>>
 
-  <assign|office-span|<macro|name|body|<if|<provides|<merge|office-span-|<arg|name>>>|<compound|<merge|office-span-|<arg|name>>|<arg|body>>|<arg|body>>>>
+  <assign|office-par|<\macro|name|body>
+    <compound|<if|<provides|<merge|office-par-|<arg|name>>>|<merge|office-par-|<arg|name>>|office-plain>|<arg|body>>
+  </macro>>
+
+  <assign|office-span|<macro|name|body|<compound|<if|<provides|<merge|office-span-|<arg|name>>>|<merge|office-span-|<arg|name>>|office-plain>|<arg|body>>>>
 
   <drd-props|office-par|arity|2|accessible|1>
 

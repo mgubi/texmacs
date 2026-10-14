@@ -305,7 +305,8 @@
         (cons* tag (cons '@ l) children))))
 
 (define office-wrappers
-  '(em strong underline strike sub sup code smallcaps mark color span ins del))
+  '(em strong underline strike sub sup code smallcaps mark color span ins del
+    size font))
 
 (define (office-same-wrapper? x y)
   ;; two nodes which wrap text in the same way
@@ -454,6 +455,24 @@
          (office-wrap (list `(,(caar props) (@ (value ,(cadar props))) ,@l))
                       (cdr props)))
         (else (office-wrap (list (cons (car props) l)) (cdr props)))))
+
+(define office-highlights
+  ;; the colors of the highlighting of Word
+  '(("yellow" . "#ffff00") ("green" . "#00ff00") ("cyan" . "#00ffff")
+    ("magenta" . "#ff00ff") ("blue" . "#0000ff") ("red" . "#ff0000")
+    ("darkBlue" . "#000080") ("darkCyan" . "#008080") ("darkGreen" . "#008000")
+    ("darkMagenta" . "#800080") ("darkRed" . "#800000")
+    ("darkYellow" . "#808000") ("darkGray" . "#808080")
+    ("lightGray" . "#c0c0c0") ("black" . "#000000") ("white" . "#ffffff")))
+
+(tm-define (office-highlight-color name)
+  (:synopsis "The color #rrggbb of the highlighting @name of Word, or #f")
+  (assoc-ref office-highlights name))
+
+(tm-define (office-highlight-name color)
+  (:synopsis "The highlighting of Word of the color @color, or #f")
+  (with p (list-find office-highlights (lambda (p) (== (cdr p) (locase-all color))))
+    (and p (car p))))
 
 (tm-define (office-color s)
   (:synopsis "The color @s of a text as #rrggbb, or #f for none or black")

@@ -98,9 +98,12 @@
                             (lambda (t) (in? t props))))
          (color (with c (assq 'color (list-filter props pair?)) (and c (cadr c))))
          (parent (with c (assq 'rstyle (list-filter props pair?)) (and c (cadr c))))
-         (key (cons 'text (cons parent (cons color tags)))))
-    (cond ((and parent (null? tags) (not color)) parent)
-          ((not (or (pair? tags) color)) #f)
+         (size (with c (assq 'size (list-filter props pair?)) (and c (cadr c))))
+         (font (with c (assq 'font (list-filter props pair?)) (and c (cadr c))))
+         (shade (with c (assq 'shade (list-filter props pair?)) (and c (cadr c))))
+         (key (cons 'text (cons* parent size font shade (cons color tags)))))
+    (cond ((and parent (null? tags) (not (or color size font shade))) parent)
+          ((not (or (pair? tags) color size font shade)) #f)
           (else
          (ot-style
            key "T"
@@ -137,6 +140,15 @@
                              (style:font-pitch "fixed"))
                            '())
                      ,@(if (in? 'mark tags) '((fo:background-color "#ffff00")) '())
+                     ,@(if shade `((fo:background-color ,shade)) '())
+                     ,@(if size `((fo:font-size ,(string-append size "pt"))) '())
+                     ,@(if font
+                           (with f (cond ((== font "sans") "Arial")
+                                         ((== font "serif") "Times New Roman")
+                                         ((== font "mono") "Courier New")
+                                         (else font))
+                             `((fo:font-family ,(string-append "'" f "'"))))
+                           '())
                      ,@(if color `((fo:color ,color)) '()))))))))))
 
 (define (ot-span props l)
@@ -387,8 +399,17 @@
         (else
           (let ((l (ox-children x)))
             (case (car x)
-              ((em strong underline strike sub sup code smallcaps mark)
+              ((em strong underline strike sub sup code smallcaps)
                (ot-inlines l (cons (car x) props)))
+              ;; highlighted text, of a color; the size and the font of a text
+              ((mark)
+               (with c (office-color (ox-attr x 'value))
+                 (ot-inlines l (if (and c (!= c "#ffff00")) (cons (list 'shade c) props)
+                                   (cons 'mark props)))))
+              ((size font)
+               (ot-inlines l (if (ox-attr x 'value)
+                                 (cons (list (car x) (ox-attr x 'value)) props)
+                                 props)))
               ;; a named style of text
               ((span) (ot-inlines l (cons (list 'rstyle (or (ox-attr x 'style) "")) props)))
               ;; a field of OpenDocument, with its result; the result only of
@@ -476,12 +497,32 @@
     ("theorem" . "Theorem") ("remark" . "Remark") ("proof" . "Proof")
     ("bibitem" . "Bibliography")))
 
-(define (ot-paragraph-style base align break? rule?)
+(define (ot-direct-properties x)
+  ;; the properties of paragraphs for the formatting by hand of the node x
+  (let ((pt (lambda (k) (with v (office-number (ox-attr x k))
+                          (and v (string-append (office-decimal v) "pt"))))))
+    (append
+      (if (pt 'indent-left) `((fo:margin-left ,(pt 'indent-left))) '())
+      (if (pt 'indent-right) `((fo:margin-right ,(pt 'indent-right))) '())
+      (if (pt 'first-indent) `((fo:text-indent ,(pt 'first-indent))) '())
+      (if (pt 'space-before) `((fo:margin-top ,(pt 'space-before))) '())
+      (if (pt 'space-after) `((fo:margin-bottom ,(pt 'space-after))) '())
+      (with v (office-number (ox-attr x 'line-spacing))
+        (if (and v (> v 0))
+            `((fo:line-height ,(string-append (number->string (inexact->exact (round (* 100 v))))
+                                              "%")))
+            '()))
+      (with c (office-color (ox-attr x 'background))
+        (if c `((fo:background-color ,c)) '()))
+      (if (ox-attr x 'border) '((fo:border "0.5pt solid #000000") (fo:padding "0.1cm")) '()))))
+
+(define (ot-paragraph-style base align break? rule? . direct)
   ;; the name of the style of a paragraph: the style base, or one which
-  ;; is made of it with an alignment, a page break before, a line under
-  (if (not (or align break? rule?)) base
+  ;; is made of it with an alignment, a page break before, a line under,
+  ;; and the properties direct of its formatting by hand
+  (if (not (or align break? rule? (and (pair? direct) (pair? (car direct))))) base
       (ot-style
-        (list 'paragraph base align break? rule?) "P"
+        (list 'paragraph base align break? rule? (if (pair? direct) (car direct) '())) "P"
         (lambda (name)
           `(style:style
              (@ (style:name ,name) (style:family "paragraph")
@@ -496,7 +537,8 @@
                   ,@(if rule?
                         '((fo:border-bottom "0.5pt solid #000000")
                           (fo:padding "0.05cm"))
-                        '()))))))))
+                        '())
+                  ,@(if (pair? direct) (car direct) '()))))))))
 
 (define (ot-paragraph x default)
   (let* ((role (ox-attr x 'role))
@@ -517,7 +559,7 @@
          (style (ot-paragraph-style
                   base
                   (or (ox-attr x 'align) ot-cell-align (and formula? "center"))
-                  #f #f))
+                  #f #f (ot-direct-properties x)))
          (l (append
               ;; the bookmarks of the labels of a heading
               (map (lambda (name) `(text:bookmark (@ (text:name ,name))))
