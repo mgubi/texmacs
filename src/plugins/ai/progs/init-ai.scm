@@ -62,6 +62,7 @@
   ("ai raw answer" "on" noop)
   ("ai show reasoning" "on" noop)
   ("ai show usage" "on" noop)
+  ("ai tikz compile" "ask" noop)
   ("chatgpt model" "gpt-5-mini" noop)
   ("gemini model" "gemini-2.5-flash" noop)
   ("open-mistral-7b model" "mistral-small-latest" noop)
@@ -821,7 +822,15 @@
 		(get-boolean-preference "ai show reasoning")))
       (meti (hlist // (text "Show the tokens and the cost"))
 	(toggle (set-boolean-preference "ai show usage" answer)
-		(get-boolean-preference "ai show usage"))))))
+		(get-boolean-preference "ai show usage")))))
+  ;; (the code of a picture comes from the model: ai-tikz-policy)
+  (assuming (not (defined? 'web-javascript))
+    ===
+    (aligned
+      (item (text "Compile the TikZ pictures")
+        (enum (set-preference "ai tikz compile" answer)
+              '("ask" "always" "never")
+              (get-preference "ai tikz compile") "8em")))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; ChatGPT

@@ -64,12 +64,23 @@
 
   The pictures of an answer are shown: a <name|TikZ> picture
   (<verbatim|tikzpicture>, <verbatim|tikzcd>, <verbatim|circuitikz>)
-  becomes an executable fold of the <name|TikZ> plug-in, made at once, with
-  the libraries and packages which the answer asks for (on the desktop, it
-  is made by <LaTeX>, which must be installed; in a web browser, by
-  <name|TikZJax>, as soon as the picture is complete); an <name|SVG>
-  picture becomes an image. An answer cut in the middle of a picture says
-  so.
+  becomes an executable fold of the <name|TikZ> plug-in, with the libraries
+  and packages which the answer asks for; an <name|SVG> picture becomes an
+  image. An answer cut in the middle of a picture says so.
+
+  On the desktop, a <name|TikZ> picture is made by <LaTeX>, which must be
+  installed. Its code is written by the model, and <TeX> can read your
+  files (with <verbatim|\\input>, for instance) and show them in the
+  picture: by default, <TeXmacs> asks you, once the answer is there, whether
+  to compile its pictures. If you answer no, the folds stay uncompiled; you
+  can read their code, and compile one later by evaluating it, as any fold.
+  <with|font-series|bold|Compile the TikZ pictures> in the preferences of
+  the chatbots changes this: <with|font-series|bold|ask> (the default),
+  <with|font-series|bold|always> (at once, while the answer comes, without
+  asking), <with|font-series|bold|never> (the folds are left uncompiled,
+  without asking). In a web browser, the pictures are made by
+  <name|TikZJax> in the page, which reads no files, as soon as they are
+  complete.
 
   Images in <name|PNG> or <name|JPEG> (a painting, an artistic rendition
   of an idea) come from the models which draw: those of <name|Gemini> whose
