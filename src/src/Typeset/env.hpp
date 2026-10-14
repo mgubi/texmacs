@@ -136,6 +136,7 @@
 // variables are recorded by number (env_var_id): the sets of the bridges
 // are arrays of integers.
 int env_var_id (string var);
+tree env_uninit_marker (); // see edit_env_rep::rec_uninit
 // The variables which the environment read while it derived a state from
 // its variables (edit_env_rep::update): a length in a unit made by a user
 // macro, the colour of a pattern... Such a variable is not "plain": when
@@ -526,6 +527,18 @@ public:
   // lookup_value finds again
   array<string>* rec_keys;
   array<tree>*   rec_values;
+  // A with puts back the values which it read, which is UNINIT for a
+  // variable which was not there: after the with, the variable is there,
+  // with the value UNINIT, which the changes do not tell apart from not
+  // being there (while 'provides' does). Such variables are recorded too
+  // (rec_uninit): a bridge which is used again puts them there again
+  // (leave_uninit), and when it goes, those which are not there any more
+  // are among the variables which changed (see compare_changes)
+  array<string>* rec_uninit;
+  inline void note_uninit (string s, tree t) {
+    if (rec_uninit != NULL && L(t) == UNINIT && !contains (s, *rec_uninit))
+      (*rec_uninit) << s; }
+  void leave_uninit (string s);
   // The tree of the buffer which is being typeset, whose automatic labels
   // are numbered (exec_auto_id in env_exec.cpp), or a tree which is not
   // compound when there is none
@@ -551,13 +564,17 @@ public:
     bool outer_all, outer_unknown, stopped;
     array<string>* outer_keys;
     array<tree>* outer_values;
+    array<string>* outer_uninit;
     inline read_record (edit_env_rep* e, hashmap<int,bool>* rec,
-                        array<string>* keys, array<tree>* values):
+                        array<string>* keys, array<tree>* values,
+                        array<string>* uninit= NULL):
       env (e), outer_rec (e->env.rec), outer_all (e->env.all),
       outer_unknown (e->read_unknown), stopped (false),
-      outer_keys (e->rec_keys), outer_values (e->rec_values) {
+      outer_keys (e->rec_keys), outer_values (e->rec_values),
+      outer_uninit (e->rec_uninit) {
         env->record_reads (rec, false);
         env->record_lookups (keys, values);
+        env->rec_uninit= uninit;
         env->read_unknown= false; }
     // nothing was read but what the record holds
     inline bool complete () { return !env->read_all () && !env->read_unknown; }
@@ -565,6 +582,7 @@ public:
       if (stopped) return;
       env->record_reads (outer_rec, outer_all);
       env->record_lookups (outer_keys, outer_values);
+      env->rec_uninit= outer_uninit;
       env->read_unknown= outer_unknown;
       stopped= true; }
     inline ~read_record () { stop (); }
@@ -589,16 +607,18 @@ public:
   int typesetting;
   // the variables of 'change' had these values at this point of the
   // previous pass: those which have another one now are in the patch
-  inline void compare_changes (hashmap<string,tree>& patch,
-                               hashmap<string,tree> change) {
-    patch->post_patch (change, env.h); }
+  // (the entries env_uninit_marker () of 'change' are variables which
+  // were there with the value UNINIT: see rec_uninit)
+  void compare_changes (hashmap<string,tree>& patch,
+                        hashmap<string,tree> change);
 
   inline void monitored_write (string s, tree t) {
     back->write_back (s, env.h); env (s)= t; }
   inline void monitored_write_update (string s, tree t) {
-    back->write_back (s, env.h); env (s)= t; update (s); }
+    note_uninit (s, t); back->write_back (s, env.h); env (s)= t; update (s); }
   inline void write (string s, tree t) { env (s)= t; }
-  inline void write_update (string s, tree t) { env (s)= t; update (s); }
+  inline void write_update (string s, tree t) {
+    note_uninit (s, t); env (s)= t; update (s); }
   inline tree local_begin (string s, tree t) {
     // tree r (env [s]); monitored_write_update (s, t); return r;
     tree& val= env (s); tree r (val); val= t; update (s); return r; }

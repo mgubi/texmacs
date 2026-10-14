@@ -862,6 +862,64 @@
      ;; and nothing to do the next time
      (check-false (renumber-auto-labels)))))
 
+;; A binding which is the same as in the previous pass: below it, the
+;; variable has the value of the previous pass, whatever it had outside;
+;; a variable which a with binds and which was not there before is there
+;; after it (with no value), and is not there any more when the with goes.
+;; After each edit the places of the paragraphs are those of a typesetting
+;; from scratch.
+(define (same-as-scratch?)
+  (let* ((n (tree-arity (buffer-tree)))
+         (inc (map (lambda (i) (rect i)) (iota n))))
+    (== inc (scratch-places (buffer-tree) n))))
+
+(define (test-bindings-against-scratch)
+  (check-group "bindings against scratch")
+  (with-typeset-body
+   '(document (assign "x" "short")
+              (assign "y" "1")
+              (with "x" "BOUND-BOUND-BOUND-BOUND"
+                (document "hello" (concat "val: " (value "x")) "tail"))
+              "end")
+   (lambda ()
+     (tree-set (tree-ref (buffer-tree) 0 1) "a-very-very-very-long-value")
+     (tree-set (tree-ref (buffer-tree) 1 1) "2")
+     (tree-set (tree-ref (buffer-tree) 2 2 0) '(assign "x" "short"))
+     (update-forced)
+     (check-true (same-as-scratch?))))
+  (for (replace? '(#t #f))
+    (with-typeset-body
+     '(document (assign "xb" "a-much-longer-value")
+                (with "xc" "mid-val"
+                  (document "t" (assign "xc" "q") (assign "xb" "q")))
+                "plain"
+                (concat "v: " (value "xc") "."))
+     (lambda ()
+       (if replace?
+           (tree-set (tree-ref (buffer-tree) 1) "replaced")
+           (tree-remove (buffer-tree) 1 1))
+       (update-forced)
+       (check-true (same-as-scratch?))))))
+
+;; The labels of the parts of a document are named after the part, and
+;; numbered from 1 in each part, as the counter does (set-part).
+(define (test-labels-of-parts)
+  (check-group "labels of parts")
+  (with-typeset-body
+   '(document (table-of-contents "toc" (document ""))
+              (show-part "p1" (document (section "A") "a" (section "B") "b")
+                         "")
+              (show-part "p2" (document (section "C") "c" (section "D") "d")
+                         ""))
+   (lambda ()
+     (renumber-auto-labels)
+     (generate-all-aux)
+     (update-forced)
+     (check= (sort (list-filter (list-references)
+                                (lambda (l) (string-starts? l "auto.")))
+                   string<?)
+             '("auto.p1-1" "auto.p1-2" "auto.p2-1" "auto.p2-2")))))
+
 ;; Random edits of a document, each followed by a typesetting which uses
 ;; again what it can, against a typesetting from scratch in a buffer of its
 ;; own: the places of all the paragraphs must be the same. The document
@@ -986,5 +1044,7 @@
   (test-derived-state)
   (test-renumbering-labels)
   (test-label-names)
+  (test-bindings-against-scratch)
+  (test-labels-of-parts)
   (test-incremental-against-scratch)
   (check-end))

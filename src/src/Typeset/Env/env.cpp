@@ -40,7 +40,7 @@ edit_env_rep::edit_env_rep (drd_info& drd2,
   local_aux (local_aux2), global_aux (global_aux2),
   local_att (local_att2), global_att (global_att2),
   missing (UNINIT), redefined (), touched (false),
-  read_unknown (false), rec_keys (NULL), rec_values (NULL),
+  read_unknown (false), rec_keys (NULL), rec_values (NULL), rec_uninit (NULL),
   auto_buffer (""), typesetting (0)
 {
   initialize_default_env ();
@@ -269,6 +269,41 @@ edit_env_rep::patch_env (hashmap<string,tree> patch) {
 void
 edit_env_rep::read_env (hashmap<string,tree>& ret) {
   ret= copy ((hashmap<string,tree>) env); // (all of it: see env_table)
+}
+
+tree
+env_uninit_marker () {
+  static tree marker (TUPLE, "uninit-marker");
+  return marker;
+}
+
+void
+edit_env_rep::leave_uninit (string s) {
+  // (as a with leaves it: see rec_uninit)
+  if (!env.h->contains (s)) { env.h (s)= tree (UNINIT); update (s); }
+  note_uninit (s, tree (UNINIT));
+}
+
+void
+edit_env_rep::compare_changes (hashmap<string,tree>& patch,
+                               hashmap<string,tree> change) {
+  hashmap<string,tree> plain (UNINIT);
+  bool markers= false;
+  for (iterator<string> it= iterate (change); it->busy (); ) {
+    string var= it->next ();
+    if (!strong_equal (change [var], env_uninit_marker ())) continue;
+    markers= true;
+    // the variable was there with the value UNINIT in the previous pass
+    if (!env.h->contains (var) || L(env.h [var]) != UNINIT)
+      patch (var)= tree (UNINIT);
+  }
+  if (!markers) { patch->post_patch (change, env.h); return; }
+  for (iterator<string> it= iterate (change); it->busy (); ) {
+    string var= it->next ();
+    if (!strong_equal (change [var], env_uninit_marker ()))
+      plain (var)= change [var];
+  }
+  patch->post_patch (plain, env.h);
 }
 
 void

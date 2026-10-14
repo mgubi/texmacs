@@ -141,6 +141,10 @@ bridge_document_rep::notify_remove (path p, int nr) {
       for (i=pos; i<pos+nr; i++) {
         gone->join (brs[i]->removed);
         gone->join (brs[i]->changes);
+        // (and the variables which it left with the value UNINIT, which
+        // its changes do not tell apart from those which are not there)
+        for (int k=0; k<N(brs[i]->uninit); k++)
+          gone (brs[i]->uninit[k])= env_uninit_marker ();
       }
       if (N(gone) != 0) {
         hashmap<string,tree>& next=

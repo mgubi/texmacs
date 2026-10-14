@@ -2091,6 +2091,13 @@ edit_env_rep::exec_has_binding (tree t) {
 * makes (in an included file...) takes the next number each time. The
 * name is auto-n, as with the counter: when the labels were numbered in
 * the order in which they are made, the names are those of the counter.
+* The parts of a document (show-part, hide-part: set-part in
+* std-automatic.ts) start the counter again, and the labels of a part
+* are named after it: each part has a sequence of its own, with its own
+* epoch, so that a tag which goes to another part takes new numbers there.
+* The addendum of the buffer holds the epoch and the next number of the
+* labels outside of the parts, then for each part its number (auto_part),
+* its epoch and its next number.
 * This is what a document gets when it is loaded, and again when it is
 * updated (typeset_renumber_labels in edit_typeset.cpp): the epoch of the
 * buffer changes, the numbers of another epoch are not used, and a
@@ -2126,25 +2133,36 @@ auto_label_data (tree t, array<int>& a) {
   return true;
 }
 
+static int
+auto_part (string part) {
+  // (the number of a part, from 1, for the addendum of the buffer)
+  static hashmap<string,int> parts (0);
+  if (!parts->contains (part)) parts (part)= N(parts) + 1;
+  return parts [part];
+}
+
 static void
-auto_labels_numbers (tree t, int epoch, array<int>& r) {
+auto_labels_numbers (tree t, array<int>& epochs, array<int>& r) {
   array<int> a;
-  if (auto_label_data (t, a) && N(a) >= 1 && a[0] == epoch) {
+  if (auto_label_data (t, a) && N(a) >= 1 && contains (a[0], epochs)) {
     r << -1;
     for (int i=1; i<N(a); i++) r << a[i];
   }
   if (is_compound (t))
-    for (int i=0; i<N(t); i++) auto_labels_numbers (t[i], epoch, r);
+    for (int i=0; i<N(t); i++) auto_labels_numbers (t[i], epochs, r);
 }
 
 array<int>
 auto_labels_numbers (tree root) {
   // the numbers of the labels of the tags, in the order of the document,
   // and the next number
-  array<int> b, r;
+  array<int> b, r, epochs;
   if (!auto_label_data (root, b) || N(b) < 2) return r;
-  auto_labels_numbers (root, b[0], r);
+  epochs << b[0];
+  for (int j=2; j+2<N(b); j+=3) epochs << b[j+1];
+  auto_labels_numbers (root, epochs, r);
   r << b[1];
+  for (int j=2; j+2<N(b); j+=3) r << b[j] << b[j+2];
   return r;
 }
 
@@ -2154,6 +2172,7 @@ auto_labels_renumber (tree root) {
   if (!auto_label_data (root, r) || N(r) < 2) return false;
   r[0]= ++auto_epoch;
   r[1]= 1;
+  for (int j=2; j+2<N(r); j+=3) { r[j+1]= ++auto_epoch; r[j+2]= 1; }
   return true;
 }
 
@@ -2213,6 +2232,16 @@ edit_env_rep::exec_auto_id (tree t) {
     (void) tree_addendum_new (auto_buffer, ADDENDUM_AUTO_ID,
                               close_box<array<int> > (r), false);
   }
+  // the sequence of the part: its epoch is r[e] and its next number r[e+1]
+  int e= 0;
+  string part= "";
+  if (provides ("current-part")) part= as_string (read ("current-part"));
+  if (N(part) != 0) {
+    int id= auto_part (part);
+    for (int j=2; j+2<N(r) && e == 0; j+=3)
+      if (r[j] == id) e= j+1;
+    if (e == 0) { e= N(r) + 1; r << id << (++auto_epoch) << 1; }
+  }
   int number;
   tree tag, root;
   path where;
@@ -2225,8 +2254,8 @@ edit_env_rep::exec_auto_id (tree t) {
       (void) tree_addendum_new (tag, ADDENDUM_AUTO_ID,
                                 close_box<array<int> > (a), false);
     }
-    if (a[0] != r[0]) { a->resize (1); a[0]= r[0]; }
-    if (N(a) == 1) a << r[1]++;
+    if (a[0] != r[e]) { a->resize (1); a[0]= r[e]; }
+    if (N(a) == 1) a << r[e+1]++;
     string key= as_string (a[1]);
     // the tags around this one which have labels
     array<string> around;
@@ -2234,7 +2263,7 @@ edit_env_rep::exec_auto_id (tree t) {
     for (path q= where->next; !is_nil (q) && !is_nil (q->next); q= q->next) {
       up= up[q->item];
       array<int> b;
-      if (auto_label_data (up, b) && N(b) >= 2 && b[0] == r[0])
+      if (auto_label_data (up, b) && N(b) >= 2 && b[0] == r[e])
         around << as_string (b[1]);
     }
     // which of their labels each of them made last, and this tag
@@ -2249,12 +2278,12 @@ edit_env_rep::exec_auto_id (tree t) {
       if (base == key) k= (dot < 0 ? 1 : as_int (s (dot + 1, N(s)))) + 1;
       else if (contains (base, around)) now << open[i];
     }
-    if (N(a) - 1 < k) a << r[1]++;
+    if (N(a) - 1 < k) a << r[e+1]++;
     number= a[k];
     now << tree (key * "." * as_string (k));
     if (now != open) monitored_write ("auto-open", now);
   }
-  else number= r[1]++;
+  else number= r[e+1]++;
   string name= as_string (number);
   if (name != last) monitored_write ("auto-last", name);
   return "";

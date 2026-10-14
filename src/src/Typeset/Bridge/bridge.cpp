@@ -144,6 +144,9 @@ replace_bridge (bridge& br, tree st, path ip) {
   bridge new_br= make_bridge (br->ttt, st, ip);
   new_br->changes= br->changes;
   new_br->removed= br->removed;
+  // (the variables which the old bridge left with the value UNINIT: the
+  // new one compares them with those which it leaves, see typeset)
+  new_br->uninit= br->uninit;
   br= new_br;
 }
 
@@ -441,16 +444,32 @@ lines_signature (array<page_item> l) {
   return r;
 }
 
+// and the border of the stack (vertical spaces, page breaks...)
+static array<SI>
+border_signature (stack_border sb) {
+  array<SI> r;
+  r << sb->height << sb->sep << sb->hor_sep << sb->ver_sep
+    << sb->bot << sb->top << sb->height_before << sb->sep_before
+    << sb->hor_sep_before << sb->ver_sep_before
+    << sb->vspc_before->min << sb->vspc_before->def << sb->vspc_before->max
+    << sb->vspc_after->min << sb->vspc_after->def << sb->vspc_after->max
+    << (SI) sb->nobr_before << (SI) sb->nobr_after;
+  return r;
+}
+
 // 'now' is a tuple of the variables which the bridge binds and of their
 // values. The result is what bind_end needs to put old_patch back, when
 // the bridges below are typeset
 tree
 bridge_rep::bind_start (tree now) {
   tree outer (TUPLE);
-  if (now == bound) return outer;
   for (int i=0; i+1<N(now); i+=2) {
     if (!is_atomic (now[i])) continue;
     string var= now[i]->label;
+    bool later= false; // (bound again further on)
+    for (int j=i+2; j+1<N(now); j+=2)
+      if (now[j] == now[i]) later= true;
+    if (later) continue;
     // (the value bound in the previous pass, which is the last one of
     // the variable in 'bound')
     tree prev (UNINIT);
@@ -458,15 +477,16 @@ bridge_rep::bind_start (tree now) {
     if (is_func (bound, TUPLE))
       for (int j=0; j+1<N(bound); j+=2)
         if (bound[j] == now[i]) { prev= bound[j+1]; same= (prev == now[i+1]); }
-    for (int j=i+2; j+1<N(now); j+=2)
-      if (now[j] == now[i]) same= true; // (bound again further on)
-    if (same) continue;
+    // below, the variable has the value of the previous pass when the
+    // binding is the same, whatever it had outside
+    if (same && !ttt->old_patch->contains (var)) continue;
     if (ttt->old_patch->contains (var))
       outer << tree (var) << tree ("1") << ttt->old_patch [var];
     else outer << tree (var) << tree ("0") << tree (UNINIT);
-    ttt->old_patch (var)= prev;
+    if (same) ttt->old_patch->reset (var);
+    else ttt->old_patch (var)= prev;
   }
-  bound= copy (now);
+  if (now != bound) bound= copy (now);
   return outer;
 }
 
@@ -512,14 +532,19 @@ bridge_rep::typeset (int desired_status) {
   // removed before it, the bindings above it)
   bool cached= (status==desired_status) && (N(ttt->old_patch)==0);
   // the check mode typesets again both kinds of bridges used again, when
-  // what they read is known, and compares
-  bool check= reads_mode () == 2 &&
-              (unread || (cached && reads_known && alone));
-  array<SI> old_lines;
+  // what they read is known (also those which got line items from the
+  // bridges around them, as below a binding), and compares their lines,
+  // their changes and the border of their stack. (A bridge whose reads
+  // are not known may have read more than variables, and typesetting it
+  // again is not always without effect: the labels which no tag makes
+  // take new numbers)
+  bool check= reads_mode () == 2 && (unread || (cached && reads_known));
+  array<SI> old_lines, old_border;
   array<tree> old_contents;
   hashmap<string,tree> old_changes (UNINIT);
   if (check) {
     old_lines= lines_signature (l);
+    old_border= border_signature (sb);
     old_contents= lines_contents (l);
     old_changes= changes;
   }
@@ -528,6 +553,7 @@ bridge_rep::typeset (int desired_status) {
     if (edit_profile.on) edit_profile.cached++;
     add_reads (env, reads_known, reads, seen_keys, seen_values);
     env->monitored_patch_env (changes);
+    for (int i=0; i<N(uninit); i++) env->leave_uninit (uninit[i]);
     // cout << "changes       = " << changes << LF;
   }
   else if (unread && !check) {
@@ -535,6 +561,7 @@ bridge_rep::typeset (int desired_status) {
     if (edit_profile.on) { edit_profile.cached++; edit_profile.unread++; }
     add_reads (env, reads_known, reads, seen_keys, seen_values);
     env->monitored_patch_env (changes);
+    for (int i=0; i<N(uninit); i++) env->leave_uninit (uninit[i]);
     env->compare_changes (ttt->old_patch, changes);
   }
   else {
@@ -552,8 +579,9 @@ bridge_rep::typeset (int desired_status) {
     hashmap<int,bool> my_reads (false);
     array<string> my_keys;
     array<tree> my_values;
+    array<string> my_uninit;
     edit_env_rep::read_record record (env.operator-> (), &my_reads,
-                                      &my_keys, &my_values);
+                                      &my_keys, &my_values, &my_uninit);
     my_typeset (desired_status);
     bool recorded= record.complete () &&
                    N(my_reads) <= READS_MAX && N(my_keys) <= LOOKUPS_MAX;
@@ -570,12 +598,25 @@ bridge_rep::typeset (int desired_status) {
     }
     record.stop ();
     add_reads (env, recorded, reads, seen_keys, seen_values);
+    for (int i=0; i<N(my_uninit); i++)
+      env->note_uninit (my_uninit[i], tree (UNINIT));
     env->local_update (ttt->old_patch, changes);
+    // a variable which the bridge leaves with the value UNINIT now and not
+    // in the previous pass, or the other way round, changed (the changes
+    // do not tell, see rec_uninit)
+    for (int i=0; i<N(my_uninit); i++)
+      if (!contains (my_uninit[i], uninit))
+        ttt->old_patch (my_uninit[i])= tree (UNINIT);
+    for (int i=0; i<N(uninit); i++)
+      if (!contains (uninit[i], my_uninit))
+        ttt->old_patch (uninit[i])= tree (UNINIT);
+    uninit= my_uninit;
     env->local_end (prev_back);
     ttt->local_end (l, sb);
     if (check) {
       if (edit_profile.on) edit_profile.unread++;
       if (lines_signature (l) != old_lines || changes != old_changes ||
+          border_signature (sb) != old_border ||
           lines_contents (l) != old_contents) {
         typeset_check_mismatches++;
         failed_error << "A bridge which read none of the variables which "

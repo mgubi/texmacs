@@ -44,6 +44,8 @@ public:
   bool                 reads_known; // (sorted env_var_id; when all recorded)
   array<string>        seen_keys;   // the references and attachments it
   array<tree>          seen_values; // looked up, with the values found
+  array<string>        uninit;   // the variables which it leaves there
+                                 // with the value UNINIT (see rec_uninit)
   hashmap<string,tree> removed;  // changes of the bridges removed before
                                  // this one since the last pass
   tree                 bound;    // what the bridge bound for the bridges
