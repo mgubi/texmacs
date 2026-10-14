@@ -17,6 +17,7 @@
   ""
   "initialize_glue_basic"
 
+  (typeset-check-mismatches get_typeset_check_mismatches (int))
   (texmacs-version-release texmacs_version (string string))
   (version-before? version_inf (bool string string))
   (updater-supported? updater_supported (bool))

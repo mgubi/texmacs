@@ -631,48 +631,56 @@
   <TeXmacs> without the primitive calls instead, and which numbers the
   labels with the counter as before: the same package works in both.
 
-  The number is that of the tag of the document which makes the label, the
-  section, the index entry or the figure, and it is kept with the tree of
-  that tag, in an addendum (<cpp|ADDENDUM_AUTO_ID>, an observer like the
-  one which holds the player of an animation). The tag is found from the
-  arguments of the macros which are being expanded
-  (<cpp|edit_env_rep::auto_label_tag>): the innermost argument which has
-  a place in the document is one of its arguments. The number is given
-  when the tag first makes a label and not before, so that nothing is
-  attached to the other trees, and it stays as long as the tree does. A
-  tag which is typeset again makes the same label, and it does so in every
-  window on the document, since the windows share the tree: the numbers do
-  not belong to a typesetter. A new tag gets the next number which no tag
-  had, which is kept in the same way with the tree of the buffer. A tag
-  which makes several labels names them <verbatim|auto-><math|n>,
-  <verbatim|auto-><math|n><verbatim|.2> and so on, and a label which no
-  tag of the document makes, in an included file for instance, is
-  <verbatim|auto-x><math|k>, numbered by the old counter. The variable
-  <src-var|auto-last> holds the last name which was given: the next tag
-  which makes a label after a new one reads another value and is typeset
-  again, once. The variable <src-var|auto-open> holds the last names
-  given by the tag and by the tags around it in the document, from which
-  a tag knows how many labels it made when a tag inside it made one in
-  between; it is a variable and not a count kept with the tag, since the
-  labels of one tag may be made by several bridges, of which some are
-  used again.
+  The labels of a buffer are numbered from one sequence, kept with the
+  tree of the buffer in an addendum (<cpp|ADDENDUM_AUTO_ID>, an observer
+  like the one which holds the player of an animation): an epoch and the
+  next number. A label made by a tag of the document (the section, the
+  index entry, the figure) keeps its number: the tag holds the numbers of
+  its labels in an addendum of its own, its <math|k>-th label has the
+  <math|k>-th of them, and a label which it did not make before takes the
+  next number of the sequence. The tag is found from the arguments of the
+  macros which are being expanded (<cpp|edit_env_rep::auto_label_tag>):
+  the innermost argument which has a place in the document is one of its
+  arguments. A label which no tag of the buffer makes, in an included file
+  for instance, takes the next number each time it is made. A tag which is
+  typeset again makes the same labels, in every window on the document,
+  since the windows share the tree: the numbers do not belong to a
+  typesetter. The variable <src-var|auto-last> holds the last name which
+  was given: the next tag which makes a label after a new one reads another
+  value and is typeset again, once. The variable <src-var|auto-open> holds,
+  for the tag and the tags around it, which of their labels was made last,
+  from which a tag knows how many labels it made when a tag inside it made
+  one in between; it is a variable and not a count kept with the tag,
+  since the labels of one tag may be made by several bridges, of which
+  some are used again.
 
-  The numbers follow the order in which the tags first made a label. When
-  the document is updated they are given again, from 1 and in the order of
-  the document, as they are when it is loaded
+  The name of a label is <verbatim|auto-><math|n>, as with the counter.
+  When the labels were numbered in the order in which they are made, the
+  names are exactly those of the counter, which is what a document gets
+  when it is loaded, and again when it is updated
   (<scm|renumber-auto-labels>, which <scm|update-document> calls before it
-  makes the tables, since these hold the names): the buffer has an epoch,
-  the numbers of another epoch are not used, and all the views are typeset
-  again. This is one more pass, made only when a tag was numbered out of
-  order since the last time. A document which is opened or updated has
-  the names the counter gave, and the saved document is the same, byte for
-  byte. Between two updates the names differ, for the better: after a new
-  section, a line of the table of contents which was not made again still
-  refers to the label of its own section, where with the counter it
-  referred to the label of whatever had taken its number. The new section
-  in the manual takes 175<nbsp>ms instead of 815, with 600 bridges typeset
-  again instead of 10650. <verbatim|TEXMACS_STABLE_LABELS=off> uses the
-  counter as before.
+  makes the tables, since these hold the names): the epoch of the buffer
+  changes, the numbers of another epoch are not used, and the document is
+  typeset again as a whole, which is one more pass at each update. The
+  function tells whether a name changed, from the numbers of the labels in
+  the order of the document before and after: an update of one table makes
+  all of them when one did. Outside of a typesetting pass (a converter
+  which expands the macros of a copy of the document, whose tags are not
+  in the document) the counter names the labels, which gives the same
+  names in a document which was updated.
+
+  An earlier version numbered the tags rather than the labels, named the
+  other labels of a tag <verbatim|auto-><math|n><verbatim|.2>..., gave the
+  labels without a tag names of their own, and numbered again only when a
+  flag said that a number had been given out of order: a section removed
+  was not seen, and the names were not those of the counter for these
+  labels. Between two updates the names differ from those of the counter,
+  for the better: after a new section, a line of the table of contents
+  which was not made again still refers to the label of its own section,
+  where with the counter it referred to the label of whatever had taken
+  its number. The new section in the manual takes 175<nbsp>ms instead of
+  815, with 600 bridges typeset again instead of 10650.
+  <verbatim|TEXMACS_STABLE_LABELS=off> uses the counter as before.
 
   The entries of the index itself, 1350 of them with their page numbers,
   and the paragraphs with references are used again since the references
@@ -721,6 +729,30 @@
   13<nbsp>ms. <verbatim|TEXMACS_PAGE_REUSE=off> makes every page again,
   and <verbatim|=check> makes them again too and compares them with what
   is kept. On papyrus there is one page and nothing of this applies.
+
+  <paragraph|Checking what is used again>
+
+  Each of these mechanisms has a mode in which it does the work anyway and
+  compares (<verbatim|TEXMACS_TYPESET_READS>,
+  <verbatim|TEXMACS_PAGE_BREAK_CACHE>, <verbatim|TEXMACS_PAGE_BREAK_FAST>
+  and <verbatim|TEXMACS_PAGE_REUSE> set to <verbatim|check>). For the
+  bridges this covers both ways of using one again: because none of the
+  variables which changed was read, and as in the classic cache, when
+  nothing changed around it as far as the bookkeeping of the changes says
+  (the paragraphs removed before it, the bindings above it): a mistake in
+  that bookkeeping shows as a bridge which is typeset otherwise. The
+  differences found are counted, and <scm|(typeset-check-mismatches)>
+  gives their number. The group <em|incremental against scratch> of the
+  <verbatim|typeset> suite makes random edits of a document which holds
+  what the reuse has to see (counters, references, index entries,
+  footnotes, hidden paragraphs, a unit made by a macro), compares the
+  places of all the paragraphs after each one with a typesetting from
+  scratch, and fails when the check modes counted a difference; with the
+  derived inputs left out of <cpp|plain_variable> it finds 36 bad edits
+  out of 40. The record of what a bridge or a header reads is held by a
+  scoped object (<cpp|edit_env_rep::read_record>), so that an exception
+  during the typesetting leaves no record pointing to a table which is
+  gone.
 
   <subsection|Complete typesetting and references>
 

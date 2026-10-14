@@ -53,6 +53,11 @@ struct edit_profile_data {
   int    texts_kept, parts_kept;   // their texts, headers and footers kept
 };
 extern edit_profile_data edit_profile;
+// the differences found by the check modes (TEXMACS_TYPESET_READS,
+// TEXMACS_PAGE_BREAK_CACHE, TEXMACS_PAGE_BREAK_FAST, TEXMACS_PAGE_REUSE
+// set to "check") since the start: a test fails when there are any
+extern int typeset_check_mismatches;
+int get_typeset_check_mismatches ();
 double edit_profile_now ();        // ms, from an arbitrary origin
 
 box        typeset_as_concat (edit_env env, tree t, path ip);

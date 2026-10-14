@@ -608,7 +608,8 @@
         (:idle 1)
         (cursor-after
          ;; the automatic labels are first numbered in the order of the
-         ;; document: the tables which are made hold their names
+         ;; document: the tables which are made hold their names (a
+         ;; table made alone makes the others too when a name changed)
          (cond ((== what "all") 
                 (renumber-auto-labels)
                 (generate-all-aux) (inclusions-gc) (picture-gc) (wait-update-current-buffer))

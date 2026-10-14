@@ -287,23 +287,17 @@ pager_rep::make_part (array<page_part>* parts, tree what) {
     return old.b;
   }
   // typeset, with a record of what is read
-  hashmap<int,bool>* outer_rec= env->read_recorder ();
-  bool outer_all= env->read_all (), outer_unknown= env->read_unknown;
-  array<string>* outer_keys= env->rec_keys;
-  array<tree>* outer_values= env->rec_values;
   hashmap<int,bool> reads (false);
   page_part now;
   hashmap<string,tree> before= env->all_values ();
-  env->record_reads (&reads, false);
-  env->record_lookups (&now.keys, &now.looked);
-  env->read_unknown= false;
+  edit_env_rep::read_record record (env.operator-> (), &reads,
+                                    &now.keys, &now.looked);
   box b= typeset_as_concat (env, attach_here (tree (PARA, what),
                                                decorate ()));
-  now.ok= !env->read_all () && !env->read_unknown &&
+  now.ok= record.complete () &&
           N(reads) <= PART_READS_MAX && N(now.keys) <= PART_LOOKUPS_MAX;
-  env->record_reads (outer_rec, outer_all);
-  env->record_lookups (outer_keys, outer_values);
-  env->read_unknown= outer_unknown;
+  record.stop ();
+  if (same && !same_box (b, old.b)) typeset_check_mismatches++;
   if (same && !same_box (b, old.b))
     cout << "TeXmacs] page " << (nr + 1)
          << ": the header or footer kept differs from the one made" << LF;
@@ -418,6 +412,7 @@ pager_rep::pages_make_page (pagelet pg) {
     }
     else {
       sb= pages_format (pg);
+      if (same && !same_box (sb, old_text.b)) typeset_check_mismatches++;
       if (same && !same_box (sb, old_text.b))
         cout << "TeXmacs] page " << (nr_page + 1)
              << ": the text kept differs from the one made" << LF;

@@ -19,6 +19,14 @@ source code.
 \;
 
   <\explain>
+    <scm|(typeset-check-mismatches)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|get_typeset_check_mismatches> which returns
+    <scm|int>.
+  </explain>
+
+  <\explain>
     <scm|(texmacs-version-release <scm-arg|string>)>
 <explain-synopsis|no synopsis>
   <|explain>
