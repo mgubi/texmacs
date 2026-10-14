@@ -156,6 +156,7 @@ int ai_retry_delay (string s, string model, int attempt, string& why);
 tree ai_latex_body_to_tree (string r);
 tree ai_latex_partial (string r);
 tree ai_latex_output (string s, string model, string chat= "");
+void ai_set_prices (string json);
 string ai_chat (string s, string model, string agent, string chat= "");
 tree ai_translate (tree t, string from, string into, string m, string c= "");
 tree ai_correct (tree t, string lan, string model, string chat= "");

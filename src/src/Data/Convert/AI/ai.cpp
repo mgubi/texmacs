@@ -1063,20 +1063,38 @@ static string       ai_last_reasoning;
 static ai_usage_rep ai_last_usage;
 
 // The cost of an answer of an engine which does not give it: from the
-// prices of its model in the list of the models of OpenRouter (public,
-// fetched once), where the models of OpenAI, Anthropic, Google and Mistral
-// have the prices which they ask directly; an estimate (the writes to the
-// cache of Claude cost more, for instance). Ollama and Albert: none.
-static bool ai_prices_fetched= false;
+// prices of its model in the list of the models of OpenRouter, where the
+// models of OpenAI, Anthropic, Google and Mistral have the prices which
+// they ask directly; an estimate (the writes to the cache of Claude cost
+// more, for instance). Ollama and Albert: none. The list is never fetched
+// here: the plug-in keeps it in the home when the list of the models of
+// OpenRouter is updated (ai-update-models, in its preferences), so that
+// only the users of OpenRouter ask it, and only when they choose to; without
+// it, no cost is shown. OpenRouter gives the cost of its own answers.
+static bool ai_prices_loaded= false;
 static tree ai_prices= "";
+
+static url
+ai_prices_file () {
+  return url ("$TEXMACS_HOME_PATH/system/ai/openrouter-models.json");
+}
+
+// the list of the models of OpenRouter (its JSON); "": read again from the
+// home when it is needed
+void
+ai_set_prices (string json) {
+  ai_prices_loaded= (json != "");
+  ai_prices= json == ""? tree (""): json_get (http_from_json (json), "data");
+}
 
 static tree
 ai_price_list () {
-  if (!ai_prices_fetched) {
-    ai_prices_fetched= true;
-    string r= http_get ("https://openrouter.ai/api/v1/models",
-                        array<string> ());
-    ai_prices= json_get (http_from_json (r), "data");
+  if (!ai_prices_loaded) {
+    ai_prices_loaded= true;
+    string s;
+    url u= ai_prices_file ();
+    if (exists (u) && !load_string (u, s, false))
+      ai_prices= json_get (http_from_json (s), "data");
   }
   return ai_prices;
 }

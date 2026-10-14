@@ -140,6 +140,25 @@
                      (with "mode" "text" "Ok.")
                      ,(usage-line "103 7 100 0 -1"
                                   "103 tokens in (100 cached), 7 out")))
+  ;; the cost of Claude, estimated from the prices of OpenRouter, once they
+  ;; are known (they are never fetched by the conversion: the list of the
+  ;; suite is set here)
+  (cpp-ai-set-prices
+   (string-append "{\"data\": [{\"id\": \"anthropic/claude-x\", "
+                  "\"pricing\": {\"prompt\": \"0.01\", "
+                  "\"completion\": \"0.1\", "
+                  "\"input_cache_read\": \"0.001\"}}]}"))
+  (check= (answer (string-append
+                   "data: {\"type\": \"message_start\", \"message\": "
+                   "{\"model\": \"claude-x\", \"usage\": {\"input_tokens\": 3, "
+                   "\"cache_read_input_tokens\": 100, \"output_tokens\": 7}}}\n\n"
+                   "data: {\"type\": \"content_block_delta\", \"delta\": "
+                   "{\"type\": \"text_delta\", \"text\": \"Ok.\"}}\n\n")
+                  "claude")
+          `(document (with "mode" "text" "Ok.")
+                     ,(usage-line "103 7 100 0 0.83 estimated"
+                                  "103 tokens in (100 cached), 7 out, about $0.8300")))
+  (cpp-ai-set-prices "{\"data\": []}")
   ;; a model which thinks in its text (<think>, with Ollama)
   (check= (answer (openai "<think>Hmm.</think>\n\nAnswer.") "ollama")
           `(document ,(reasoning-fold "Hmm.") (with "mode" "text" "Answer.")))
@@ -184,6 +203,9 @@
 
 (tm-define (ai-test-failures)
   (check-suite "ai")
+  ;; no prices: the conversion reads none from the home, and never asks the
+  ;; network for them (ai_price_list)
+  (cpp-ai-set-prices "{\"data\": []}")
   (with old (get-preference "ai raw answer")
     (set-preference "ai raw answer" "off")
     (test-engines)
@@ -193,4 +215,6 @@
     (test-reasoning)
     (set-preference "ai raw answer" old))
   (test-raw-fold)
+  ;; the prices are read again from the home when they are needed
+  (cpp-ai-set-prices "")
   (check-end))

@@ -7035,6 +7035,19 @@ tmg_cpp_ai_latex_output (tmscm arg1, tmscm arg2, tmscm arg3) {
 }
 
 tmscm
+tmg_cpp_ai_set_prices (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "cpp-ai-set-prices");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  ai_set_prices (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
 tmg_cpp_ai_chat (tmscm arg1, tmscm arg2, tmscm arg3) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "cpp-ai-chat");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "cpp-ai-chat");
@@ -11811,6 +11824,7 @@ initialize_glue_basic () {
   tmscm_install_procedure ("cpp-ai-latex-command",  tmg_cpp_ai_latex_command, 3, 0, 0);
   tmscm_install_procedure ("cpp-ai-latex-request",  tmg_cpp_ai_latex_request, 3, 0, 0);
   tmscm_install_procedure ("cpp-ai-latex-output",  tmg_cpp_ai_latex_output, 3, 0, 0);
+  tmscm_install_procedure ("cpp-ai-set-prices",  tmg_cpp_ai_set_prices, 1, 0, 0);
   tmscm_install_procedure ("cpp-ai-chat",  tmg_cpp_ai_chat, 3, 0, 0);
   tmscm_install_procedure ("cpp-ai-correct",  tmg_cpp_ai_correct, 3, 0, 0);
   tmscm_install_procedure ("cpp-ai-translate",  tmg_cpp_ai_translate, 4, 0, 0);
