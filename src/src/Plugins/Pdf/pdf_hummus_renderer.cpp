@@ -119,6 +119,11 @@ class pdf_hummus_renderer_rep : public renderer_rep {
   
   // link annotation support
   hashmap<ObjectIDType,string> annot_list;
+
+  // embedded videos: file object of each video, and the files to embed
+  hashmap<string,ObjectIDType> video_file_id;
+  hashmap<ObjectIDType,url> video_files;
+  hashmap<ObjectIDType,int> video_annot_page; // /P is only known at the end
   list<dest_data> dests;
   ObjectIDType destId;
   hashmap<string,int> label_id;
@@ -259,6 +264,8 @@ public:
   
   void anchor (string label, SI x1, SI y1, SI x2, SI y2);
   void href (string label, SI x1, SI y1, SI x2, SI y2);
+  void embed_video (url u, int ms, bool repeat, SI x1, SI y1, SI x2, SI y2);
+  void flush_videos ();
   void toc_entry (string kind, string title, SI x, SI y);
   void set_metadata (string kind, string val);
   void flush_metadata ();
@@ -300,6 +307,7 @@ pdf_hummus_renderer_rep::pdf_hummus_renderer_rep (
     cfn (""), cfid (NULL),
     native_fonts (NULL),
     t3font_registry_id(-1),
+    video_file_id (0), video_files (url_none ()), video_annot_page (0),
     destId(0),
     label_count(0),
     outlineId(0)
@@ -401,10 +409,16 @@ pdf_hummus_renderer_rep::~pdf_hummus_renderer_rep () {
     ObjectsContext& objectsContext = pdfWriter.GetObjectsContext();
     while (it->busy()) {
       ObjectIDType id = it->next();
-      write_indirect_obj(objectsContext, id, annot_list(id));
+      string dict= annot_list (id);
+      if (video_annot_page->contains (id))
+        dict= replace (dict, "@PAGE@",
+                       as_string (page_id (video_annot_page [id])) * " 0 R");
+      write_indirect_obj(objectsContext, id, dict);
     }
   }
   
+  flush_videos ();
+
   EStatusCode status = pdfWriter.EndPDF();
   if (status != PDFHummus::eSuccess) {
     convert_error << "Failed in end PDF\n";
@@ -2323,7 +2337,6 @@ pdf_hummus_renderer_rep::on_catalog_write (CatalogInformation* inCatalogInformat
                                          PDFHummus::DocumentContext* inDocumentContext)
 {
   (void) inCatalogInformation;
-  (void) inPDFWriterObjectContext;
   (void) inDocumentContext;
   if (destId) {
     inCatalogDictionaryContext->WriteKey("Dests");
@@ -2332,6 +2345,23 @@ pdf_hummus_renderer_rep::on_catalog_write (CatalogInformation* inCatalogInformat
   if (outlineId) {
     inCatalogDictionaryContext->WriteKey("Outlines");
     inCatalogDictionaryContext->WriteNewObjectReferenceValue(outlineId);
+  }
+  if (N (video_files) > 0) {
+    // embedded videos are RichMedia annotations: PDF 1.7, Adobe extension
+    // level 3 (the catalog may raise the version of the header)
+    ObjectsContext* oc= inPDFWriterObjectContext;
+    inCatalogDictionaryContext->WriteKey ("Version");
+    inCatalogDictionaryContext->WriteNameValue ("1.7");
+    inCatalogDictionaryContext->WriteKey ("Extensions");
+    DictionaryContext* ext= oc->StartDictionary ();
+    ext->WriteKey ("ADBE");
+    DictionaryContext* adbe= oc->StartDictionary ();
+    adbe->WriteKey ("BaseVersion");
+    adbe->WriteNameValue ("1.7");
+    adbe->WriteKey ("ExtensionLevel");
+    adbe->WriteIntegerValue (3);
+    oc->EndDictionary (adbe);
+    oc->EndDictionary (ext);
   }
   return PDFHummus::eSuccess;
 }
@@ -2380,6 +2410,132 @@ pdf_hummus_renderer_rep::href (string label, SI x1, SI y1, SI x2, SI y2)
   annot_list (annotId) = dict;
 }
 
+
+/******************************************************************************
+* Embedded videos
+*
+* A video (e.g. an animated gif inserted with <video>) becomes a RichMedia
+* annotation (as made by the media9 LaTeX package) over the picture of its
+* current frame, whose video asset is an MP4 file embedded in the PDF, made
+* from the frames of the image exactly as TeXmacs shows them.  In Okular it
+* starts when the page becomes visible, loops when the animation does, and
+* a click pauses it; viewers which cannot play videos show the picture.
+******************************************************************************/
+
+static url
+video_for_pdf (url u, int ms, array<url>& temps) {
+  // An MP4 video with the frames of the animated image u as TeXmacs shows
+  // them: coalesced by ImageMagick (see decompose_gif), on a white
+  // background, each during ms milliseconds.  PDF viewers do not play
+  // animated gifs, and gif delays are multiples of 10 ms.
+  if (ms <= 0 || !has_image_magick () || !exists_in_path ("ffmpeg"))
+    return url_none ();
+  url dir= url_temp ("");
+  mkdir (dir);
+  string frames= sys_concretize (dir * "f_%05d.png");
+  url out= url_temp (".mp4");
+  if (system (imagemagick_cmd () * " " * sys_concretize (u) *
+              " -coalesce -background white -alpha remove -alpha off"
+              " +adjoin " * frames) == 0) {
+    string rate= "1000/" * as_string (ms);
+    string cmd= "ffmpeg -nostdin -loglevel error -y -framerate " * rate *
+      " -i " * frames * " -r " * rate *
+      " -vf 'scale=trunc(iw/2)*2:trunc(ih/2)*2' -pix_fmt yuv420p"
+      " -map_metadata -1 -fflags +bitexact -flags:v +bitexact"
+      " -movflags +faststart ";
+    // a failed run may leave a partial file: drop it, so that the mpeg4
+    // fallback (ffmpeg built without libx264) or no video is used
+    if (system (cmd * "-c:v libx264 -crf 18 " * sys_concretize (out)) != 0)
+      remove (out);
+    if (!exists (out) &&
+        system (cmd * "-c:v mpeg4 -q:v 2 " * sys_concretize (out)) != 0)
+      remove (out);
+  }
+  rmdir_recursive (dir);
+  if (!exists (out)) return url_none ();
+  temps << out;
+  return out;
+}
+
+void
+pdf_hummus_renderer_rep::embed_video (url u, int ms, bool repeat,
+                                      SI x1, SI y1, SI x2, SI y2) {
+  string key= as_string (u) * "|" * as_string (ms);
+  ObjectIDType fileId= video_file_id [key];
+  if (fileId == 0) {
+    url v= video_for_pdf (u, ms, temp_images);
+    if (is_none (v)) {
+      convert_warning << "Cannot embed video " << u << " in PDF\n";
+      return;
+    }
+    fileId= pdfWriter.GetObjectsContext().GetInDirectObjectsRegistry()
+                                         .AllocateNewObjectID();
+    video_file_id (key)= fileId;
+    video_files (fileId)= v;
+  }
+  ObjectsContext& oc= pdfWriter.GetObjectsContext();
+  ObjectIDType annotId= oc.GetInDirectObjectsRegistry().AllocateNewObjectID();
+  pdfWriter.GetDocumentContext().RegisterAnnotationReferenceForNextPageWrite
+    (annotId);
+  string name= prepare_text (as_string (tail (u)));
+  string fname= "video-" * as_string (fileId) * ".mp4";
+  double f= ((double) default_dpi) / dpi;
+  string filespec;
+  filespec << "<< /Type /Filespec /F (" << fname << ") /UF (" << fname
+           << ") /EF << /F " << as_string (fileId) << " 0 R >> >>";
+  string dict;
+  dict << "<<\r\n\t/Type /Annot\r\n\t/Subtype /RichMedia\r\n\t/F 4\r\n";
+  dict << "\t/Rect [" << as_string (f * to_x (x1)) << " "
+       << as_string (f * to_y (y1)) << " " << as_string (f * to_x (x2))
+       << " " << as_string (f * to_y (y2)) << "]\r\n";
+  dict << "\t/NM (" << name << ")\r\n\t/Contents (" << name << ")\r\n";
+  dict << "\t/P @PAGE@\r\n";
+  video_annot_page (annotId)= page_num;
+  dict << "\t/RichMediaSettings << /Type /RichMediaSettings\r\n"
+       << "\t\t/Activation << /Type /RichMediaActivation /Condition /PV"
+       << " /Presentation << /Type /RichMediaPresentation /Style /Embedded"
+       << " >> >>\r\n"
+       << "\t\t/Deactivation << /Type /RichMediaDeactivation /Condition /PI"
+       << " >> >>\r\n";
+  dict << "\t/RichMediaContent << /Type /RichMediaContent\r\n"
+       << "\t\t/Assets << /Names [ (" << fname << ") " << filespec
+       << " ] >>\r\n"
+       << "\t\t/Configurations [ << /Type /RichMediaConfiguration"
+       << " /Subtype /Video /Instances [ << /Type /RichMediaInstance"
+       << " /Subtype /Video /Params << /Type /RichMediaParams /FlashVars ("
+       << "source=" << fname << "&loop=" << (repeat? "true": "false")
+       << ") >> >> ] >> ] >>\r\n";
+  dict << ">>\r\n";
+  annot_list (annotId)= dict;
+}
+
+void
+pdf_hummus_renderer_rep::flush_videos () {
+  ObjectsContext& oc= pdfWriter.GetObjectsContext();
+  iterator<ObjectIDType> it= iterate (video_files);
+  while (it->busy ()) {
+    ObjectIDType id= it->next ();
+    url v= video_files [id];
+    string data;
+    if (load_string (v, data, false)) {
+      convert_error << "Cannot read video " << v << "\n";
+      data= "";
+    }
+    string pre;
+    pre << "<< /Type /EmbeddedFile /Subtype /video#2Fmp4"
+        << " /Params << /Size " << as_string (N(data)) << " >>"
+        << " /Length " << as_string (N(data)) << " >>\r\nstream\r\n";
+    string post= "\r\nendstream\r\n";
+    // write the (possibly large) video data without copying it
+    oc.StartNewIndirectObject (id);
+    IByteWriter* w= oc.StartFreeContext ();
+    w->Write ((unsigned char*) &(pre[0]), N(pre));
+    if (N(data) > 0) w->Write ((unsigned char*) &(data[0]), N(data));
+    w->Write ((unsigned char*) &(post[0]), N(post));
+    oc.EndFreeContext ();
+    oc.EndIndirectObject ();
+  }
+}
 
 void
 pdf_hummus_renderer_rep::flush_dests()
