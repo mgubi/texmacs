@@ -14,45 +14,49 @@
 #include <stdint.h>
 
 /******************************************************************************
-* Replay cache for runs of unchanged paragraphs
+* Blocks of paragraphs
 *
 * At every typesetting pass, all paragraphs of the document are visited:
 * unchanged ones only patch the environment with their cached changes and
 * merge their cached lines into the global stack.  For long documents this
 * per-paragraph work dominates the cost of a keystroke.  The paragraphs are
-* therefore grouped in blocks; the first paragraph of each block (the head)
-* is handled as usual, and the effect of the remaining ones (the tail) is
-* recorded once and replayed as a whole when all of them are unchanged.
+* therefore grouped in blocks, which are bridges (bridge_block_rep): what a
+* bridge records, its changes of the environment, the variables it read
+* and what it looked up (see "What is typeset again" in bridge.cpp), holds
+* for a block as a whole, so that a block whose paragraphs did not change
+* is used again as one bridge, also when the environment changed and the
+* block read none of what changed.
 *
-* Replaying is exact: after the head has been merged, the last line item of
-* the stack comes from the head itself, so the merging of the tail does not
-* depend on what precedes the block.  Its effect consists of a modified copy
-* of that line item, the appended items, the "after" fields of the stack
-* border and the composition of the environment patches of the tail.
+* A block does not stack its paragraphs in a stack of its own, which would
+* then be merged with the lines before it: the vertical space after a
+* paragraph without lines at the start of the block would be lost (see
+* merge_stack).  Its paragraphs are stacked where they go, and the block
+* keeps what this did to the stack: the last line before the block, shoved
+* against the first line of the block (repl), the line items it appended
+* (app) and the border of the stack after it.  Using the block again does
+* the same, provided that the stack is as it was when the block was made:
+* the same last line, at the same place, and the same border.  Otherwise,
+* or when one of its paragraphs changed, the block is typeset again, which
+* visits its paragraphs (most of them are used again).
 *
-* Block boundaries only depend on the paragraph bridges themselves (on the
-* number of the bridge, bridge_rep::serial, which follows the order in
-* which they were made, and not on where they are in memory: the blocks are
-* the same from one session to the next), and blocks are cached by the
-* number of their head bridge, which is never the one of another bridge:
-* inserting or removing paragraphs, e.g. when pressing Return, only
-* disturbs the block where it happens instead of shifting all the blocks
-* which follow.
+* The first and the last paragraph of the document are not in a block
+* (they get the line items of the bridges around the document, ttt->a and
+* ttt->b).  Block boundaries only depend on the paragraphs (on the number
+* of a paragraph bridge, bridge_rep::serial, which follows the order in
+* which they were made, and not on where they are in memory), and blocks
+* are kept by the number of their first paragraph: inserting or removing
+* paragraphs, e.g. when pressing Return, only disturbs the block where it
+* happens instead of shifting all the blocks which follow.
 *
-* For the record of the bridge above (see "What is typeset again" in
-* bridge.cpp), a replayed tail has read what its bridges read when they
-* were typeset: their reads and lookups are kept with the block, and given
-* to add_reads as those of a bridge which is used again.
-*
-* TEXMACS_TYPESET_CACHES may be "off" (no block is replayed) or "check"
-* (the tail is typeset all the same, and what it made is compared with
-* the block).
+* TEXMACS_TYPESET_CACHES may be "off" (no blocks) or "check" (a block which
+* would be used again is typeset again, and what it makes is compared, as
+* in the check mode of TEXMACS_TYPESET_READS).
 ******************************************************************************/
 
-#define DOC_RUN_MAX 64
+#define BLOCK_MAX 64
 
 static inline bool
-doc_run_boundary (bridge& br) {
+block_boundary (bridge& br) {
   // about one paragraph in 32 starts a new block
   uint64_t h= (uint64_t) (uint32_t) br->serial;
   h= (h + 1) * 0x9E3779B97F4A7C15ULL;
@@ -60,39 +64,157 @@ doc_run_boundary (bridge& br) {
   return (h >> 59) == 0;
 }
 
-struct doc_run {
-  bool                 ok;
-  bridge               head;      // the head bridge
-  array<bridge>        brs;       // the tail bridges
-  array<int>           vers;      // and their versions when recorded
-  page_item            head_item; // last line item after merging the head
-  int                  head_back; // its position, counted from the end
-  page_item            repl;      // the same item after merging the tail
-  array<page_item>     app;       // items appended by the tail
-  SI                   height, sep, hor_sep, ver_sep, bot;
-  space                vspc_after;
-  bool                 nobr_after;
-  // the border of the stack before the tail: the tail was shoved against
-  // it, and a head without a line only changes this
-  SI                   in_height, in_sep, in_hor_sep, in_ver_sep, in_bot;
-  space                in_vspc_after;
-  bool                 in_nobr_after;
-  hashmap<string,tree> patch;     // composed environment changes
-  bool                 known;     // the reads of the tail: all known,
-  array<int>           reads;     // the variables (sorted env_var_id)
-  array<string>        keys;      // and the lookups, with the values
-  array<tree>          values;    // found
-  doc_run (): ok (false), head_back (0), vspc_after (0), nobr_after (false),
-              in_height (0), in_sep (0), in_hor_sep (0), in_ver_sep (0),
-              in_bot (0), in_vspc_after (0), in_nobr_after (false),
-              patch (UNINIT), known (false) {}
-};
-
 static int
 last_line_item (array<page_item>& l) {
   int i= N(l) - 1;
   while (i >= 0 && l[i]->type != PAGE_LINE_ITEM) i--;
   return i;
+}
+
+// the fields of a border which merging a block changes, when there is a
+// line before it
+static void
+copy_after (stack_border dest, stack_border src) {
+  dest->height    = src->height;
+  dest->sep       = src->sep;
+  dest->hor_sep   = src->hor_sep;
+  dest->ver_sep   = src->ver_sep;
+  dest->bot       = src->bot;
+  dest->vspc_after= src->vspc_after;
+  dest->nobr_after= src->nobr_after;
+}
+
+static bool
+same_after (stack_border sb1, stack_border sb2) {
+  return sb1->height == sb2->height && sb1->sep == sb2->sep &&
+         sb1->hor_sep == sb2->hor_sep && sb1->ver_sep == sb2->ver_sep &&
+         sb1->bot == sb2->bot && sb1->vspc_after == sb2->vspc_after &&
+         sb1->nobr_after == sb2->nobr_after;
+}
+
+class bridge_block_rep: public bridge_rep {
+public:
+  array<bridge>    brs;       // the paragraphs
+  array<int>       vers;      // and their versions when the block was made
+  bool             ok;        // what the block did to the stack is known:
+  page_item        head_item; // the last line before it,
+  int              head_back; // its position, counted from the end,
+  stack_border     in;        // the border of the stack before it,
+  page_item        repl;      // the same line, shoved against the block,
+  array<page_item> app;       // the line items it appended,
+  stack_border     out;       // the border of the stack after it
+  int              start_n, start_i; // while it is typeset: the stack
+  page_item        start_item;       // before it
+
+public:
+  bridge_block_rep (typesetter ttt, path ip);
+  void set_paragraphs (array<bridge> brs2);
+
+  // (the notifications go to the paragraphs, through bridge_document)
+  void notify_assign (path p, tree u) {
+    (void) p; (void) u; status= CORRUPTED; }
+  bool notify_macro (int tp, string var, int l, path p, tree u) {
+    (void) tp; (void) var; (void) l; (void) p; (void) u; return false; }
+  void notify_change () { status= CORRUPTED; }
+
+  void my_resync () {}
+  bool my_reusable ();
+  bool my_check_cache () { return typeset_caches_mode () == 2; }
+  void my_stack_start ();
+  void my_stack_end ();
+  void my_insert (bool made);
+  void my_typeset (int desired_status);
+};
+
+bridge_block_rep::bridge_block_rep (typesetter ttt, path ip):
+  bridge_rep (ttt, tree (DOCUMENT), ip), ok (false), head_back (0),
+  start_n (0), start_i (-1) {}
+
+void
+bridge_block_rep::set_paragraphs (array<bridge> brs2) {
+  bool same= (N(brs2) == N(brs));
+  for (int k=0; same && k<N(brs); k++)
+    same= (brs2[k].operator-> () == brs[k].operator-> ());
+  if (same) return;
+  brs= brs2;
+  status= CORRUPTED;
+}
+
+bool
+bridge_block_rep::my_reusable () {
+  if (!ok || N(vers) != N(brs)) return false;
+  for (int k=0; k<N(brs); k++) {
+    bridge_rep* br= brs[k].operator-> ();
+    if (br->version != vers[k] || br->status != PROCESSED + WANTED_PARAGRAPH)
+      return false;
+    // the changes of the paragraphs removed before this one are compared
+    // with the environment when it is typeset (bridge_rep::typeset)
+    if (N(br->removed) != 0) return false;
+  }
+  int i= last_line_item (ttt->l);
+  return i >= 0 && N(ttt->l) - i == head_back &&
+         ttt->l[i].operator-> () == head_item.operator-> () &&
+         same_after (ttt->sb, in);
+}
+
+void
+bridge_block_rep::my_stack_start () {
+  // (the block is not a paragraph which is typeset again: those are
+  // counted when its paragraphs are)
+  if (edit_profile.on) edit_profile.redone--;
+  // nothing of what the block made is kept: it holds lines, which log the
+  // place they leave when they go (see phrase_box_rep)
+  ok= false;
+  repl= page_item ();
+  app= array<page_item> ();
+  start_n= N(ttt->l);
+  start_i= last_line_item (ttt->l);
+  start_item= (start_i >= 0? ttt->l[start_i]: page_item ());
+  in= stack_border ();
+  copy_after (in, ttt->sb);
+}
+
+void
+bridge_block_rep::my_typeset (int desired_status) {
+  (void) desired_status;
+  for (int k=0; k<N(brs); k++) {
+    ttt->a= array<line_item> ();
+    ttt->b= array<line_item> ();
+    brs[k]->typeset (PROCESSED + WANTED_PARAGRAPH);
+  }
+}
+
+void
+bridge_block_rep::my_stack_end () {
+  vers= array<int> ();
+  for (int k=0; k<N(brs); k++) vers << brs[k]->version;
+  l= array<page_item> ();
+  if (start_i < 0) return;
+  head_item= start_item;
+  head_back= start_n - start_i;
+  repl= ttt->l[start_i];
+  app= range (ttt->l, start_n, N(ttt->l));
+  out= stack_border ();
+  copy_after (out, ttt->sb);
+  start_item= page_item ();
+  ok= true;
+  // (what the check mode compares)
+  l << repl << app;
+}
+
+void
+bridge_block_rep::my_insert (bool made) {
+  // the paragraphs of a block which was typeset are in the stack already
+  if (made) return;
+  ttt->l[last_line_item (ttt->l)]= repl;
+  ttt->l << app;
+  copy_after (ttt->sb, out);
+  if (edit_profile.on) edit_profile.cached += N(brs) - 1;
+}
+
+static bridge
+bridge_block (typesetter ttt, path ip) {
+  return tm_new<bridge_block_rep> (ttt, ip);
 }
 
 bridge bridge_docrange (typesetter ttt, tree st, path ip, array<bridge>& brs,
@@ -104,14 +226,8 @@ protected:
   bridge acc; // binary splitting acceleration for long documents
   hashmap<string,tree> removed_last; // as bridge_rep::removed, for the
                                      // paragraphs removed at the end
-  hashmap<int,doc_run> runs, old_runs; // blocks, by their head bridge
+  hashmap<int,bridge> blocks; // by the number of their first paragraph
   void typeset_one (int i, int n, int desired_status,
-                    array<line_item>& a, array<line_item>& b);
-  bool may_replay (doc_run& run, int s, int e);
-  void replay_tail (doc_run& run);
-  void tail_reads (doc_run& run, int s, int e);
-  void check_tail (doc_run& old, doc_run& run, doc_run& now);
-  void record_tail (doc_run& run, int s, int e, int desired_status,
                     array<line_item>& a, array<line_item>& b);
 
 public:
@@ -323,170 +439,6 @@ bridge_document_rep::typeset_one (int i, int n, int desired_status,
   brs[i]->typeset (PROCESSED+ wanted);
 }
 
-bool
-bridge_document_rep::may_replay (doc_run& run, int s, int e) {
-  // tail = paragraphs s..e-1, none of which is the first or the last one
-  if (!run.ok || N(ttt->old_patch) != 0) return false;
-  if (run.head != brs[s-1] || N(run.brs) != e - s) return false;
-  for (int k= s; k < e; k++) {
-    bridge_rep* br= brs[k].operator-> ();
-    if (run.brs[k-s].operator-> () != br || run.vers[k-s] != br->version ||
-        br->status != PROCESSED + WANTED_PARAGRAPH)
-      return false;
-    // the changes of the paragraphs removed before this one are compared
-    // with the environment when it is typeset (bridge_rep::typeset)
-    if (N(br->removed) != 0) return false;
-  }
-  int idx= last_line_item (ttt->l);
-  if (idx < 0 || N(ttt->l) - idx != run.head_back) return false;
-  if (ttt->l[idx].operator-> () != run.head_item.operator-> ()) return false;
-  // the last line may be one of an earlier paragraph, when the head (or
-  // what is between) has no line: the border must be the one the tail
-  // was typeset against
-  stack_border sb= ttt->sb;
-  if (sb->height != run.in_height || sb->sep != run.in_sep ||
-      sb->hor_sep != run.in_hor_sep || sb->ver_sep != run.in_ver_sep ||
-      sb->bot != run.in_bot || sb->vspc_after != run.in_vspc_after ||
-      sb->nobr_after != run.in_nobr_after)
-    return false;
-  return true;
-}
-
-void
-bridge_document_rep::replay_tail (doc_run& run) {
-  // (the bridges of the tail are where they were: their paths are shared
-  // with the boxes they made, and changed in place by notify_insert and
-  // notify_remove)
-  int idx= last_line_item (ttt->l);
-  stack_border sb= ttt->sb;
-  ttt->l[idx]= run.repl;
-  ttt->l << run.app;
-  sb->height    = run.height;
-  sb->sep       = run.sep;
-  sb->hor_sep   = run.hor_sep;
-  sb->ver_sep   = run.ver_sep;
-  sb->bot       = run.bot;
-  sb->vspc_after= run.vspc_after;
-  sb->nobr_after= run.nobr_after;
-  env->monitored_patch_env (run.patch);
-  add_reads (env, run.known, run.reads, run.keys, run.values);
-  if (edit_profile.on) edit_profile.cached += N(run.brs);
-}
-
-void
-bridge_document_rep::check_tail (doc_run& old, doc_run& run, doc_run& now) {
-  // the check mode: the block which would have been replayed, and the
-  // one which the tail made when it was typeset again; its reads are
-  // those which its bridges, used again, would have given (now), since
-  // what a bridge reads when it is typeset again may differ
-  array<page_item> l1, l2;
-  l1 << old.repl << old.app;
-  l2 << run.repl << run.app;
-  string what;
-  if (!run.ok) what << " (not recorded)";
-  if (!same_page_items (l1, l2)) what << " (lines)";
-  if (old.height != run.height || old.sep != run.sep ||
-      old.hor_sep != run.hor_sep || old.ver_sep != run.ver_sep ||
-      old.bot != run.bot || old.vspc_after != run.vspc_after ||
-      old.nobr_after != run.nobr_after) what << " (border)";
-  if (old.patch != run.patch) what << " (environment)";
-  if (old.known != now.known || old.reads != now.reads) what << " (reads)";
-  if (old.keys != now.keys || old.values != now.values) what << " (lookups)";
-  if (N(what) != 0)
-    typeset_cache_mismatch ("block of paragraphs replayed" * what);
-}
-
-static array<int>
-union_reads (array<int> r1, array<int> r2) {
-  // (both sorted)
-  array<int> r;
-  int i= 0, j= 0;
-  while (i < N(r1) || j < N(r2))
-    if (j == N(r2) || (i < N(r1) && r1[i] < r2[j])) r << r1[i++];
-    else if (i == N(r1) || r2[j] < r1[i]) r << r2[j++];
-    else { r << r1[i++]; j++; }
-  return r;
-}
-
-void
-bridge_document_rep::tail_reads (doc_run& run, int s, int e) {
-  // the reads of the bridges s..e-1, which are added to the record of the
-  // bridge above when they are used again
-  run.known= true;
-  for (int k= s; k < e && run.known; k++) {
-    bridge_rep* br= brs[k].operator-> ();
-    run.known= br->reads_known;
-    run.reads = union_reads (run.reads, br->reads);
-    run.keys  << br->seen_keys;
-    run.values<< br->seen_values;
-  }
-  if (!run.known) {
-    run.reads = array<int> ();
-    run.keys  = array<string> ();
-    run.values= array<tree> ();
-  }
-}
-
-void
-bridge_document_rep::record_tail (doc_run& run, int s, int e,
-                                  int desired_status,
-                                  array<line_item>& a, array<line_item>& b) {
-  int n= N(st);
-  int idx= last_line_item (ttt->l);
-  page_item head_item= (idx >= 0? ttt->l[idx]: page_item ());
-  int n0= N(ttt->l);
-  stack_border sb0= ttt->sb;
-  SI in_height= sb0->height, in_sep= sb0->sep, in_hor_sep= sb0->hor_sep;
-  SI in_ver_sep= sb0->ver_sep, in_bot= sb0->bot;
-  space in_vspc_after= sb0->vspc_after;
-  bool in_nobr_after= sb0->nobr_after;
-  for (int k= s; k < e; k++)
-    typeset_one (k, n, desired_status, a, b);
-  // nothing of the previous record is kept: it holds lines, which log
-  // the place they leave when they go (see phrase_box_rep)
-  run= doc_run ();
-  if (idx < 0) return;
-  hashmap<string,tree> patch (UNINIT);
-  for (int k= s; k < e; k++) {
-    bridge_rep* br= brs[k].operator-> ();
-    if (br->status != PROCESSED + WANTED_PARAGRAPH) {
-      run= doc_run ();
-      return;
-    }
-    run.brs  << brs[k];
-    run.vers << br->version;
-    hashmap<string,tree> ch= br->changes;
-    iterator<string> it= iterate (ch);
-    while (it->busy ()) {
-      string key= it->next ();
-      patch (key)= ch [key];
-    }
-  }
-  run.head_item = head_item;
-  run.head_back = n0 - idx;
-  run.repl      = ttt->l[idx];
-  run.app       = range (ttt->l, n0, N(ttt->l));
-  stack_border sb= ttt->sb;
-  run.height    = sb->height;
-  run.sep       = sb->sep;
-  run.hor_sep   = sb->hor_sep;
-  run.ver_sep   = sb->ver_sep;
-  run.bot       = sb->bot;
-  run.vspc_after= sb->vspc_after;
-  run.nobr_after= sb->nobr_after;
-  run.in_height    = in_height;
-  run.in_sep       = in_sep;
-  run.in_hor_sep   = in_hor_sep;
-  run.in_ver_sep   = in_ver_sep;
-  run.in_bot       = in_bot;
-  run.in_vspc_after= in_vspc_after;
-  run.in_nobr_after= in_nobr_after;
-  tail_reads (run, s, e);
-  run.head      = brs[s-1];
-  run.patch     = patch;
-  run.ok        = true;
-}
-
 void
 bridge_document_rep::my_typeset (int desired_status) {
   //cout << INDENT;
@@ -494,35 +446,35 @@ bridge_document_rep::my_typeset (int desired_status) {
     int i, n= N(st);
     array<line_item> a= ttt->a;
     array<line_item> b= ttt->b;
-    old_runs= runs;
-    runs= hashmap<int,doc_run> ();
-    int mode= typeset_caches_mode ();
+    hashmap<int,bridge> old_blocks= blocks;
+    blocks= hashmap<int,bridge> ();
+    bool use_blocks= (typeset_caches_mode () != 0);
     for (int s= 0, e; s < n; s= e) {
-      // block s..e-1; the last paragraph always forms a block of its own
+      // block s..e-1, without the first and the last paragraph
       e= s + 1;
-      while (e < n-1 && e - s < DOC_RUN_MAX && !doc_run_boundary (brs[e])) e++;
-      typeset_one (s, n, desired_status, a, b);       // head
-      if (mode != 0 && e - (s+1) >= 2) {
-        int key= brs[s]->serial;
-        if (old_runs->contains (key)) runs (key)= old_runs (key);
-        doc_run& run= runs (key);
-        if (!may_replay (run, s+1, e))
-          record_tail (run, s+1, e, desired_status, a, b);
-        else if (mode == 1) replay_tail (run);
-        else {
-          doc_run old= run, now;
-          tail_reads (now, s+1, e);
-          record_tail (run, s+1, e, desired_status, a, b);
-          check_tail (old, run, now);
-        }
+      if (s == 0 || !use_blocks) {
+        typeset_one (s, n, desired_status, a, b);
+        continue;
       }
-      else for (i= s+1; i < e; i++) typeset_one (i, n, desired_status, a, b);
+      while (e < n-1 && e - s < BLOCK_MAX && !block_boundary (brs[e])) e++;
+      if (e - s < 3) {
+        for (i= s; i < e; i++) typeset_one (i, n, desired_status, a, b);
+        continue;
+      }
+      int key= brs[s]->serial;
+      bridge blk= (old_blocks->contains (key)? old_blocks [key]:
+                   bridge_block (ttt, ip));
+      blocks (key)= blk;
+      bridge_block_rep* br= (bridge_block_rep*) blk.operator-> ();
+      br->set_paragraphs (range (brs, s, e));
+      ttt->a= array<line_item> ();
+      ttt->b= array<line_item> ();
+      blk->typeset (PROCESSED + WANTED_PARAGRAPH);
     }
     if (N(removed_last) != 0) {
       env->compare_changes (ttt->old_patch, removed_last);
       removed_last= hashmap<string,tree> (UNINIT);
     }
-    old_runs= hashmap<int,doc_run> ();
   }
   else acc->my_typeset (desired_status);
   //cout << UNINDENT;

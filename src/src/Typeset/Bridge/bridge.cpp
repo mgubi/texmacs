@@ -700,7 +700,7 @@ bridge_rep::bind_end (tree outer) {
 }
 
 void
-bridge_rep::typeset (int desired_status) {
+bridge_rep::my_resync () {
   // FIXME: this dirty hack ensures a perfect coherence between
   // the bridge and the edit tree at the typesetting stage.
   // This should not be necessary, but we use because the ip_observers
@@ -712,6 +712,16 @@ bridge_rep::typeset (int desired_status) {
     if (ip2 != path (DETACHED))
       ip= ip2;
   }
+}
+
+bool bridge_rep::my_reusable () { return true; }
+bool bridge_rep::my_check_cache () { return false; }
+void bridge_rep::my_stack_start () { ttt->local_start (l, sb); }
+void bridge_rep::my_stack_end () { ttt->local_end (l, sb); }
+
+void
+bridge_rep::typeset (int desired_status) {
+  my_resync ();
 
   //cout << "Typesetting " << st << ", " << desired_status << LF << INDENT;
   if (N(removed) != 0) {
@@ -723,22 +733,18 @@ bridge_rep::typeset (int desired_status) {
   // around it left for its first and last lines, ttt->a and ttt->b: the
   // number of an equation ends up in the lines of its body)
   bool alone= (N(ttt->a) == 0) && (N(ttt->b) == 0);
-  bool unread= (status==desired_status) && (N(ttt->old_patch)!=0) &&
+  bool reusable= (status==desired_status) && my_reusable ();
+  bool unread= reusable && (N(ttt->old_patch)!=0) &&
                reads_known && alone && reads_mode () != 0 &&
                patch_unread (ttt->old_patch, reads, env) &&
                same_lookups (env, seen_keys, seen_values);
   // a bridge used again as in the classic cache (nothing changed around
   // it, as far as the bookkeeping of the changes says: the paragraphs
   // removed before it, the bindings above it)
-  bool cached= (status==desired_status) && (N(ttt->old_patch)==0);
+  bool cached= reusable && (N(ttt->old_patch)==0);
   // the check mode typesets again both kinds of bridges used again, when
-  // what they read is known, and compares their lines, their changes and
-  // the border of their stack. Not the bridges whose reads are not known,
-  // nor those which got line items from the bridges around them (the first
-  // and the last one below a binding): typesetting them again is not
-  // without effect on what comes after them (the labels which no tag
-  // makes take new numbers...), and the bridges after them would differ
-  bool check= reads_mode () == 2 && (unread || (cached && reads_known));
+  bool check= (reads_mode () == 2 && (unread || (cached && reads_known))) ||
+              ((unread || cached) && my_check_cache ());
   array<SI> old_lines, old_border;
   array<tree> old_contents;
   hashmap<string,tree> old_changes (UNINIT);
@@ -748,6 +754,7 @@ bridge_rep::typeset (int desired_status) {
     old_contents= lines_contents (l);
     old_changes= changes;
   }
+  bool made= false;
   if (cached && !check) {
     //cout << "cached" << LF;
     if (edit_profile.on) edit_profile.cached++;
@@ -772,7 +779,7 @@ bridge_rep::typeset (int desired_status) {
     my_clean_links ();
     link_repository old_link_env= env->link_env;
     env->link_env= link_env;
-    ttt->local_start (l, sb);
+    my_stack_start ();
     env->local_start (prev_back);
     if (env->hl_lan != 0) env->lan->highlight (st);
     // the variables read by the typesetting of the subtree
@@ -823,7 +830,7 @@ bridge_rep::typeset (int desired_status) {
         ttt->old_patch (uninit[i])= tree (UNINIT);
     uninit= my_uninit;
     env->local_end (prev_back);
-    ttt->local_end (l, sb);
+    my_stack_end ();
     if (check) {
       if (edit_profile.on) edit_profile.unread++;
       if (lines_signature (l) != old_lines || changes != old_changes ||
@@ -845,9 +852,15 @@ bridge_rep::typeset (int desired_status) {
     // cout << "old_patch     = " << ttt->old_patch << LF;
     // cout << "changes       = " << changes << LF;
     // cout << UNINDENT << "Typesetted " << st << ", " << desired_status << LF;
+    made= true;
   }
+  my_insert (made);
   //cout << UNINDENT << "Typesetted " << st << ", " << desired_status << LF;
+}
 
+void
+bridge_rep::my_insert (bool made) {
+  (void) made;
   // ttt->insert_stack (l, sb);
   //if (N(l) == 0); else
   int mode= typeset_caches_mode ();
