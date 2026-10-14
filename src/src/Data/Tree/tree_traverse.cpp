@@ -279,9 +279,10 @@ move_valid_sub (tree t, path p, bool forward) {
 
 static path
 move_valid_bis (tree t, path p, bool forward) {
-  bool inside= the_drd->is_accessible_path (t, p);
+  // NOTE: the last item of a cursor path is a position, not a child
+  bool inside= is_nil (p) || the_drd->is_accessible_path (t, path_up (p));
   if (inside) return move_valid_sub (t, p, forward);
-  bool old_mode= set_access_mode (DRD_ACCESS_SOURCE);
+  int old_mode= set_access_mode (DRD_ACCESS_SOURCE);
   path r= move_valid_sub (t, p, forward);
   set_access_mode (old_mode);
   return r;
