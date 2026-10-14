@@ -25,6 +25,19 @@
 
 (define (st x) (if (tree? x) (tree->stree x) x))
 
+;; a preference with a value during thunk, in memory only: it is not saved
+;; (set-preference would save the preferences at once), and comes back to
+;; what it was also when thunk fails
+(define (with-preference which val thunk)
+  (let ((had? (cpp-has-preference? which))
+        (old (cpp-get-preference which "default")))
+    (dynamic-wind
+      (lambda () (cpp-set-preference which val))
+      thunk
+      (lambda ()
+        (if had? (cpp-set-preference which old)
+            (cpp-reset-preference which))))))
+
 (define (answer s engine)
   (st (cpp-ai-latex-output s engine "check")))
 
@@ -192,16 +205,15 @@
 
 (define (test-raw-fold)
   (check-group "the answer as it came")
-  (with old (get-preference "ai raw answer")
-    (set-preference "ai raw answer" "on")
-    (check= (answer (openai "Hi.") "openrouter")
-            '(document
-               (with "mode" "text" "Hi.")
-               (with "ai-raw" "true"
-                 (folded (with "font-shape" "italic"
-                           "The answer of gpt-x as it came")
-                         (verbatim-code (document "Hi."))))))
-    (set-preference "ai raw answer" old)))
+  (with-preference "ai raw answer" "on"
+    (lambda ()
+      (check= (answer (openai "Hi.") "openrouter")
+              '(document
+                 (with "mode" "text" "Hi.")
+                 (with "ai-raw" "true"
+                   (folded (with "font-shape" "italic"
+                             "The answer of gpt-x as it came")
+                           (verbatim-code (document "Hi.")))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The files attached to the questions (tools/ai/ai-attachments.scm)
@@ -308,14 +320,13 @@
   ;; no prices: the conversion reads none from the home, and never asks the
   ;; network for them (ai_price_list)
   (cpp-ai-set-prices "{\"data\": []}")
-  (with old (get-preference "ai raw answer")
-    (set-preference "ai raw answer" "off")
-    (test-engines)
-    (test-stream)
-    (test-errors)
-    (test-pictures)
-    (test-reasoning)
-    (set-preference "ai raw answer" old))
+  (with-preference "ai raw answer" "off"
+    (lambda ()
+      (test-engines)
+      (test-stream)
+      (test-errors)
+      (test-pictures)
+      (test-reasoning)))
   (test-raw-fold)
   (test-attachments)
   ;; the prices are read again from the home when they are needed
