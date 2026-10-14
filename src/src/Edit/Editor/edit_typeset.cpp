@@ -991,6 +991,11 @@ edit_typeset_rep::typeset_sub (SI& x1, SI& y1, SI& x2, SI& y2) {
   catch (string msg) {
     the_exception= msg;
     std_error << "Typesetting failure, resetting to empty document\n";
+    // the bridges which were being typeset when the exception came did not
+    // stop recording what they read: their records are gone with them
+    env->record_reads (NULL, false);
+    env->record_lookups (NULL, NULL);
+    env->read_unknown= false;
     assign (rp, tree (DOCUMENT, ""));
     ::notify_assign (ttt, path(), subtree (et, rp));
     eb= ::typeset (ttt, x1, y1, x2, y2);    
