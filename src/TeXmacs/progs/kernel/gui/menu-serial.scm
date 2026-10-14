@@ -104,6 +104,7 @@
 (define serial-children (make-ahash-table)) ;; part -> list of parts
 (define serial-refresh (make-ahash-table))  ;; number -> (kind . part)
 (define serial-contents (make-ahash-table)) ;; numbers of contents -> #t
+(define serial-answers (make-ahash-table))  ;; numbers of inputs -> #t
 
 (define (serial-keep-contents make)
   "Keep the closure @make, which gives the contents of a submenu (tau-expand)."
@@ -119,6 +120,7 @@
   (for (n (or (ahash-ref serial-parts part) '()))
     (ahash-remove! serial-table n)
     (ahash-remove! serial-contents n)
+    (ahash-remove! serial-answers n)
     (ahash-remove! serial-refresh n))
   (ahash-remove! serial-parts part))
 
@@ -138,7 +140,9 @@
 
 (define (serial-keep-answer cmd)
   "Keep the command @cmd, which the page calls with the value of an input."
-  (serial-keep (lambda args (apply cmd (map from-page args)))))
+  (with n (serial-keep (lambda args (apply cmd (map from-page args))))
+    (ahash-set! serial-answers n #t)
+    n))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; What the core says by itself
@@ -744,7 +748,9 @@
 
 (tm-define (tau-answer n . args)
   (:synopsis "Give the value @args of the input kept under the number @n")
-  (and-with x (ahash-ref serial-table n)
+  ;; (only the number of an input: an action of a menu, or the contents of
+  ;; a submenu, is not given values from outside)
+  (and-with x (and (ahash-ref serial-answers n) (ahash-ref serial-table n))
     (with cmd (cdr x)
       (exec-delayed
         (lambda () (protected-call (lambda () (apply cmd args))))))))

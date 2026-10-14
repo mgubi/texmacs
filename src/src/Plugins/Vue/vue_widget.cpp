@@ -4434,6 +4434,7 @@ static hashset<pointer> live_inputs;
 class vue_input_text_widget_rep : public vue_widget_rep {
 public:
   string  s;           // the string being entered
+  string  committed;   // what was given to the call back last (or at first)
   string  type;        // expected type of string
   string  name;        // optional name of the input field
   string  serial;      // optional serial number of the input field
@@ -4507,6 +4508,7 @@ vue_input_text_widget_rep::vue_input_text_widget_rep (command _call_back,
     s= copy (def[0]);
     pos= N(s); // the cursor starts at the end of the default input
   }
+  committed= copy (s);
   live_inputs->insert ((pointer) this);
 }
 
@@ -4538,6 +4540,26 @@ vue_input_text_widget_rep::continuous () {
     starts (type, "spell") ||
     starts (serial, "form-");
 }
+
+#ifdef TAU_SHELL
+// Tau: the fields whose text was changed and not given (by return) give it
+// now, before what a button does: the page gives the value of a field when
+// it is left, which a click on a button does, and "Ok" in a dialog which
+// asks for a value had the value before it was typed
+void
+vue_commit_inputs () {
+  array<vue_input_text_widget_rep*> l;
+  iterator<pointer> it= iterate (live_inputs);
+  while (it->busy ()) l << (vue_input_text_widget_rep*) it->next ();
+  for (int i= 0; i < N(l); i++) {
+    vue_input_text_widget_rep* w= l[i];
+    if (!live_inputs->contains ((pointer) w)) continue;
+    if (w->continuous () || w->greyed || w->s == w->committed) continue;
+    w->committed= copy (w->s);
+    w->call_back (list_object (object (w->s)));
+  }
+}
+#endif
 
 // the string as displayed (passwords are hidden)
 string
@@ -4854,6 +4876,7 @@ vue_input_text_widget_rep::process_key (string key) {
     if (!continuous ()) {
       ok= true;
       done= true;
+      committed= copy (s);
       command cmd= tm_new<applied_command_rep>(call_back,
                     list_object (object (s)));
       cmd_list= list(cmd, cmd_list);

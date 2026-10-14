@@ -713,12 +713,100 @@ tau_invoke (int n) {
   tau_turn ();
 }
 
-// the value of an input: args are the arguments of its command, written
-// in Scheme by the worker
+// The value of an input: args are the arguments of its command, written
+// as Scheme writes data by the worker or the shell (strings, numbers, #t
+// and #f, lists of them: "(list ...)" or "(...)"). They are read as data
+// here, never evaluated: what is not data makes the answer none.
+static void
+answer_space (const char*& p) {
+  while (*p == ' ' || *p == '\t' || *p == '\n' || *p == '\r') p++;
+}
+
+static bool answer_value (const char*& p, object& v, int depth);
+
+static bool
+answer_list (const char*& p, object& v, int depth) {
+  // after the "(": the values up to the ")", the first of which may be the
+  // name list, as (list "a" "b") is written
+  array<object> a;
+  answer_space (p);
+  if (!strncmp (p, "list", 4) && (p[4] == ' ' || p[4] == ')')) p += 4;
+  while (true) {
+    answer_space (p);
+    if (*p == ')') { p++; break; }
+    if (*p == 0) return false;
+    object x;
+    if (!answer_value (p, x, depth + 1)) return false;
+    a << x;
+  }
+  v= as_list_object (a);
+  return true;
+}
+
+static bool
+answer_value (const char*& p, object& v, int depth) {
+  if (depth > 64) return false;
+  answer_space (p);
+  if (*p == '(') { p++; return answer_list (p, v, depth); }
+  if (*p == '"') {
+    string r;
+    for (p++; *p != '"'; p++) {
+      if (*p == 0) return false;
+      if (*p == '\\') {
+        p++;
+        if (*p == 0) return false;
+        r << (*p == 'n'? '\n': *p == 't'? '\t': *p);
+      }
+      else r << *p;
+    }
+    p++;
+    v= object (r);
+    return true;
+  }
+  if (*p == '#') {
+    const char* words[]= { "#true", "#false", "#t", "#f" };
+    for (int i= 0; i < 4; i++) {
+      int k= strlen (words[i]);
+      if (!strncmp (p, words[i], k) &&
+          (p[k] == 0 || p[k] == ' ' || p[k] == ')' || p[k] == '\t' || p[k] == '\n')) {
+        p += k;
+        v= object (i == 0 || i == 2);
+        return true;
+      }
+    }
+    return false;
+  }
+  // a number, and nothing else after it
+  char* end= NULL;
+  double x= strtod (p, &end);
+  if (end == p || x != x || x > 1e300 || x < -1e300) return false;
+  if (*end != 0 && *end != ' ' && *end != ')' && *end != '\t' && *end != '\n')
+    return false;
+  bool whole= true;
+  for (const char* q= p; q < end; q++)
+    if (*q == '.' || *q == 'e' || *q == 'E') whole= false;
+  v= (whole && x >= -2147483647.0 && x <= 2147483647.0)? object ((int) x): object (x);
+  p= end;
+  return true;
+}
+
 EMSCRIPTEN_KEEPALIVE
 void
 tau_answer (int n, const char* args) {
-  eval ("(tau-answer " * as_string (n) * " " * string (args) * ")");
+  array<object> a;
+  a << object (n);
+  const char* p= (args == NULL? "": args);
+  while (true) {
+    answer_space (p);
+    if (*p == 0) break;
+    object v;
+    if (!answer_value (p, v, 0)) {
+      cerr << "tau: an answer which is not data: " << args << "\n";
+      return;
+    }
+    a << v;
+  }
+  call ("tau-answer", a);
   tau_turn ();
 }
 

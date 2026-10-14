@@ -71,12 +71,13 @@ function giveUp() {
 		if (m.t === "fs") postMessage({ t: "fs", id: m.id, error: "the program of Tau did not start" });
 }
 
-// A value of the page as Scheme reads it: the arguments of the command of
-// an input are strings, booleans and lists of them
+// A value of the page as data which the core reads (tau_answer: it is
+// read, never evaluated): the arguments of the command of an input are
+// strings, numbers, booleans and lists of them
 function scheme(value) {
 	if (typeof value === "string") return '"' + value.replace(/[\\"]/g, "\\$&") + '"';
-	if (typeof value === "number") return String(value);
-	if (Array.isArray(value)) return "(list " + value.map(scheme).join(" ") + ")";
+	if (typeof value === "number") return Number.isFinite(value) ? String(value) : "0";
+	if (Array.isArray(value)) return "(" + value.map(scheme).join(" ") + ")";
 	return value ? "#t" : "#f";
 }
 

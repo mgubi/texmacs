@@ -933,16 +933,21 @@ expand (int number) {
   }
 }
 
+void vue_commit_inputs (); // vue_widget.cpp
+
 class invoke_command_rep: public command_rep {
   int number;
 public:
   invoke_command_rep (int n): number (n) {}
-  void apply () { core_say ("invoke " + std::to_string (number)); }
+  void apply () {
+    // (what was typed in a field and not given yet goes first: "Ok")
+    vue_commit_inputs ();
+    core_say ("invoke " + std::to_string (number)); }
   void apply (object args) { (void) args; apply (); }
   tm_ostream& print (tm_ostream& out) { return out << "invoke " << number; }
 };
 
-// a value which a widget gives its command, as Scheme reads it in the core
+// a value which a widget gives its command, as data which the core reads
 static std::string
 scheme_of (object x) {
   if (is_string (x)) return std_of (scm_quote (cork_to_utf8 (as_string (x))));
@@ -955,11 +960,12 @@ scheme_of (object x) {
     for (char* q= buf; *q; q++) if (*q == ',') *q= '.';
     return buf;
   }
-  if (is_null (x)) return "(list)";
+  // (a list as data: the core reads the values, it does not evaluate them)
+  if (is_null (x)) return "()";
   if (is_list (x)) {
-    std::string r= "(list";
-    for (; !is_null (x); x= cdr (x)) r += " " + scheme_of (car (x));
-    return r + ")";
+    std::string r;
+    for (; !is_null (x); x= cdr (x)) r += (r == ""? "": " ") + scheme_of (car (x));
+    return "(" + r + ")";
   }
   return "#f";
 }
