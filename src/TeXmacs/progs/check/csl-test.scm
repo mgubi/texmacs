@@ -197,7 +197,9 @@
   ;; equal elements stay in order
   (check= (csl-sort '((1 . a) (0 . b) (1 . c) (0 . d))
                     (lambda (x y) (< (car x) (car y))))
-          '((0 . b) (0 . d) (1 . a) (1 . c))))
+          '((0 . b) (0 . d) (1 . a) (1 . c)))
+  ;; a range as TeXmacs writes it
+  (check= (csl-number-tokens "12--15") '("12" "-" "15")))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Items
@@ -794,16 +796,20 @@
       (for (f (url-read-directory d "*")) (system-remove f))
       (system-remove d))))
 
-(define (doc-tm body)
-  (string-append "<TeXmacs|2.1>\n\n<style|generic>\n\n<\\body>\n" body
-                 "</body>\n"))
+(define (doc-tm body . style)
+  (string-append "<TeXmacs|2.1>\n\n<style|"
+                 (if (null? style) "generic" (car style))
+                 ">\n\n<\\body>\n" body "</body>\n"))
 
-(define (generated-body name text)
+(define (generated-body name text . opt)
   ;; the body after two rounds of Document > Update > All: the citations
-  ;; are known to the bibliography from the second round on
+  ;; are known to the bibliography from the second round on. With the
+  ;; optional arguments style and markup, the markup as it is evaluated in
+  ;; the document is returned instead.
   (let* ((f (tmp-file name))
          (old (current-buffer)))
-    (string-save (doc-tm text) f)
+    (string-save (apply doc-tm (cons text (if (null? opt) '() (list (car opt)))))
+                 f)
     (load-buffer f)
     (switch-to-buffer* f)
     (update-forced)
@@ -813,7 +819,8 @@
     (generate-all-aux)
     (update-current-buffer)
     (update-forced)
-    (with r (tree->stree (buffer-get-body f))
+    (with r (if (null? opt) (tree->stree (buffer-get-body f))
+                (tree->stree (texmacs-exec (cadr opt))))
       (buffer-pretend-saved f)
       (buffer-close f)
       (when (buffer-exists? old) (switch-to-buffer old))
@@ -850,7 +857,8 @@
             (string-append
              "  See <cite|knuth86b>, <cite|knuth84|knuth86>,"
              " <cite-detail|knuth84|pp. 99-101>, <cite-textual|knuth86b>,"
-             " <cite-author|knuth84> in <cite-year|knuth84>"
+             " <cite-author|knuth84> in <cite-year|knuth84>,"
+             " <cite-detail|knuth84|pp. 99--101>, <cite-detail|knuth86|12--15>"
              " and <cite-detail|knuth86|for example>.\n\n"
              "  <\\bibliography|bib|csl-apa|refs>\n  </bibliography>\n")))
     (check= (assoc-ref l "bib-csl") "true")
@@ -864,6 +872,11 @@
             "Knuth & van der Hoeven (1986)")
     (check= (assoc-ref l "bib-cite-a:knuth84,") "Knuth")
     (check= (assoc-ref l "bib-cite-y:knuth84,") "1984")
+    ;; the names of the bindings keep the "--" of the details
+    (check= (assoc-ref l "bib-cite-p:knuth84{pp. 99--101,")
+            (u "(Knuth, 1984, pp. 99–101)"))
+    (check= (assoc-ref l "bib-cite-p:knuth86{12--15,")
+            (u "(Knuth, 1986, pp. 12–15)"))
     ;; details which are no locator follow the cite
     (check= (assoc-ref l "bib-cite-p:knuth86{for example,")
             "(Knuth, 1986, for example)"))
@@ -946,7 +959,17 @@
     (check= (assoc-ref l "b2-cite-p:knuth86,#3") "Knuth, The TeXbook.")
     (check= (assoc-ref l "bib-cite-p:knuth84,#4")
             (u "Knuth, “Literate Programming.”"))
-    (check= (assoc-ref l "bib-cite-p:knuth84,#3") #f)))
+    (check= (assoc-ref l "bib-cite-p:knuth84,#3") #f))
+  ;; the package cite-author-year finds the citations with details
+  (with x (generated-body
+           "author-year.tm"
+           (string-append
+            "  See <cite-detail|knuth84|pp. 99-101>.\n\n"
+            "  <\\bibliography|bib|csl-apa|refs>\n  </bibliography>\n")
+           "<tuple|generic|cite-author-year>"
+           '(cite-detail "knuth84" "pp. 99-101"))
+    (check= (flat* (if (func? x 'concat) (cAr x) x))
+            (u "(Knuth, 1984, pp. 99–101)"))))
 
 (define (test-document)
   (check-group "document bibliography")

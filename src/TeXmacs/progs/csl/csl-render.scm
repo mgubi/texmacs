@@ -129,7 +129,10 @@
                   toks)))
           ((== (car l) " ") (loop (cdr l) '() (flush)))
           ((in? (car l) (list "-" en-dash))
-           (loop (cdr l) '() (cons "-" (flush))))
+           ;; "12--15" is a range as TeXmacs writes it
+           (loop (if (and (== (car l) "-") (pair? (cdr l)) (== (cadr l) "-"))
+                     (cddr l) (cdr l))
+                 '() (cons "-" (flush))))
           ((in? (car l) '("," "&")) (loop (cdr l) '() (cons (car l) (flush))))
           (else (loop (cdr l) (cons (car l) word) r)))))
 

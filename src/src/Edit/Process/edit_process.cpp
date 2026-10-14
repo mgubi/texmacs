@@ -111,7 +111,9 @@ arrange_bib (tree t) {
     int i, n= N(t);
     tree r (t, n);
     for (i=0; i<n; i++)
-      r[i]= arrange_bib (t[i]);
+      // the name of a binding is looked up as the citation writes it
+      if (i == 0 && is_func (t, SET_BINDING)) r[i]= t[i];
+      else r[i]= arrange_bib (t[i]);
     return r;
   }
 }
