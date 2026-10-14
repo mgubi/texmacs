@@ -1025,6 +1025,52 @@
      (update-forced)
      (check= (auto-names) '("auto-1" "auto-2" "auto-3")))))
 
+;; Paragraphs removed one after the other in a document with numbered
+;; equations: the paragraphs are kept in blocks (bridge_document.cpp), and
+;; the removal of the first paragraph of a block changes the range of the
+;; block before it. The numbers which the later references find must be
+;; those of a typesetting from scratch (not their pages, which are only
+;; found again by a complete typesetting: determine_page_references).
+(define (equation-label i) (string-append "eq" (number->string i)))
+
+(define (equation-references labels)
+  (map (lambda (lab) (cadr (tree->stree (get-reference lab)))) labels))
+
+(define (test-references-after-removals)
+  (check-group "references after removals")
+  (let* ((n 150)
+         (par (lambda (i)
+                (if (and (> i 0) (< i (- n 1)) (== (modulo i 3) 1))
+                    `(equation (document (concat "x" (label ,(equation-label i)))))
+                    (string-append "paragraph " (number->string i)))))
+         (labels (map equation-label
+                      (list-filter (.. 100 (- n 1))
+                                   (lambda (i) (== (modulo i 3) 1))))))
+    (with-typeset-body
+     `(document ,@(map par (.. 0 n)))
+     (lambda ()
+       (update-forced)
+       (let ((bad 0))
+         (for (k (.. 0 30))
+           ;; the paragraph of text after the 20th one: those before it
+           ;; are removed one by one
+           (tree-remove (buffer-tree) 20 1)
+           (update-forced)
+           (update-forced)
+           (let* ((inc (equation-references labels))
+                  (body (tree-copy (buffer-tree)))
+                  (old (current-buffer))
+                  (u (new-buffer)))
+             (switch-to-buffer* u)
+             (buffer-set-body u body)
+             (update-forced)
+             (update-forced)
+             (with scr (equation-references labels)
+               (buffer-close u)
+               (switch-to-buffer* old)
+               (when (!= inc scr) (set! bad (+ bad 1))))))
+         (check= bad 0))))))
+
 ;; Random edits of a document, each followed by a typesetting which uses
 ;; again what it can, against a typesetting from scratch in a buffer of its
 ;; own: the places of all the paragraphs must be the same. The document
@@ -1154,4 +1200,5 @@
   (test-labels-after-undo)
   (test-incremental-against-scratch)
   (test-block-replay)
+  (test-references-after-removals)
   (check-end))

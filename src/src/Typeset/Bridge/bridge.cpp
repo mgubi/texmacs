@@ -715,6 +715,7 @@ bridge_rep::my_resync () {
 
 bool bridge_rep::my_reusable () { return true; }
 bool bridge_rep::my_check_cache () { return false; }
+bool bridge_rep::my_patches_old () { return true; }
 void bridge_rep::my_stack_start () { ttt->local_start (l, sb); }
 void bridge_rep::my_stack_end () { ttt->local_end (l, sb); }
 
@@ -817,16 +818,19 @@ bridge_rep::typeset (int desired_status) {
     add_reads (env, recorded, reads, seen_keys, seen_values);
     for (int i=0; i<N(my_uninit); i++)
       env->note_uninit (my_uninit[i]);
-    env->local_update (ttt->old_patch, changes);
-    // a variable which the bridge leaves with the value UNINIT now and not
-    // in the previous pass, or the other way round, changed (the changes
-    // do not tell, see rec_uninit)
-    for (int i=0; i<N(my_uninit); i++)
-      if (!contains (my_uninit[i], uninit))
-        ttt->old_patch (my_uninit[i])= tree (UNINIT);
-    for (int i=0; i<N(uninit); i++)
-      if (!contains (uninit[i], my_uninit))
-        ttt->old_patch (uninit[i])= tree (UNINIT);
+    if (my_patches_old ()) {
+      env->local_update (ttt->old_patch, changes);
+      // a variable which the bridge leaves with the value UNINIT now and
+      // not in the previous pass, or the other way round, changed (the
+      // changes do not tell, see rec_uninit)
+      for (int i=0; i<N(my_uninit); i++)
+        if (!contains (my_uninit[i], uninit))
+          ttt->old_patch (my_uninit[i])= tree (UNINIT);
+      for (int i=0; i<N(uninit); i++)
+        if (!contains (uninit[i], my_uninit))
+          ttt->old_patch (uninit[i])= tree (UNINIT);
+    }
+    else env->local_changes (changes);
     uninit= my_uninit;
     env->local_end (prev_back);
     my_stack_end ();

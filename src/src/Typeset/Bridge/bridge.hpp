@@ -92,6 +92,7 @@ public:
   virtual void my_stack_start ();     // before typesetting the subtree
   virtual void my_stack_end ();       // after typesetting it
   virtual void my_insert (bool made); // into the stack of the typesetter
+  virtual bool my_patches_old ();     // does it keep old_patch up to date?
   void typeset (int desired_status);
   tree bind_start (tree now);
   void bind_end (tree outer);

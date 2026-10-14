@@ -326,6 +326,12 @@ edit_env_rep::local_start (hashmap<string,tree>& prev_back) {
 }
 
 void
+edit_env_rep::local_changes (hashmap<string,tree>& change) {
+  // (the changes only, without old_patch: see bridge_block_rep)
+  change= invert (back, env.h);
+}
+
+void
 edit_env_rep::local_update (hashmap<string,tree>& old_patch,
 			    hashmap<string,tree>& change)
 {

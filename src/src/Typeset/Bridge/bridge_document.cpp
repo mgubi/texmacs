@@ -123,6 +123,10 @@ public:
   void my_stack_start ();
   void my_stack_end ();
   void my_insert (bool made);
+  // (its paragraphs keep old_patch up to date, as they are typeset: its
+  // changes, which are those of the previous pass, are not those of the
+  // paragraphs it holds now when they changed)
+  bool my_patches_old () { return false; }
   void my_typeset (int desired_status);
 };
 
@@ -188,6 +192,9 @@ bridge_block_rep::my_stack_end () {
   vers= array<int> ();
   for (int k=0; k<N(brs); k++) vers << brs[k]->version;
   l= array<page_item> ();
+  // (what the check mode compares: the lines and the border after it)
+  sb= stack_border ();
+  copy_after (sb, ttt->sb);
   if (start_i < 0) return;
   head_item= start_item;
   head_back= start_n - start_i;
@@ -197,7 +204,6 @@ bridge_block_rep::my_stack_end () {
   copy_after (out, ttt->sb);
   start_item= page_item ();
   ok= true;
-  // (what the check mode compares)
   l << repl << app;
 }
 
