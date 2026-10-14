@@ -976,7 +976,8 @@ http_async_cancel (string* outbuf) {
 #else
 
 void http_async_pending () {}
-void http_async_cancel (string* outbuf) { (void) outbuf; }
+// (the requests are made by the curl program: async_eval_system)
+void http_async_cancel (string* outbuf) { async_eval_cancel (outbuf); }
 
 #endif // USE_LIBCURL
 
@@ -1149,5 +1150,5 @@ async_http_post_json (string url, array<string> headers_attr, tree data,
 #if defined(QTTEXMACS) && AC_QT_MAJOR_VERSION >= 6
 // (Qt makes the requests: QNetworkAccessManager, qt_http.cpp)
 void http_async_pending () {}
-void http_async_cancel (string* outbuf) { (void) outbuf; }
+void http_async_cancel (string* outbuf) { qt_http_async_cancel (outbuf); }
 #endif

@@ -51,6 +51,7 @@ bool qt_async_http_post (string url, array<string> headers_attr,
 bool qt_async_http_post (string url, array<string> headers_attr, tree data,
 			 int& status, string& outbuf, string& errbuf,
 			 bool& kill);
+void qt_http_async_cancel (string* outbuf);
 
 inline tree
 http_from_json (string s) {

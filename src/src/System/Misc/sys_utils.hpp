@@ -60,6 +60,7 @@ bool async_eval_system (string cmd, int& status, string& outbuf,
 int  async_evaluate_system (array<string> arg, string in, object call_back);
 void async_evaluate_cancel (int id);
 void async_eval_pending ();
+void async_eval_cancel (string* outbuf);
 
 // driving the graphical interface from scripts, for testing
 int gui_test_snapshot (string dir);
