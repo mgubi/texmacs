@@ -11,6 +11,7 @@
 
 #include "Interface/edit_interface.hpp"
 #include "message.hpp"
+#include "analyze.hpp"
 #include "gui.hpp" // for gui_interrupted
 
 extern int nr_painted;
@@ -206,6 +207,10 @@ edit_interface_rep::draw_user_cursors (renderer ren) {
     ren->line (x1, y1, x2, y2);
     string name= user_cursor_names[i];
     if (N(name) == 0) continue;
+    // a long name would cover the text: its first characters only
+    int pos= 0, nr= 0;
+    while (pos < N(name) && nr < 24) { tm_char_forwards (name, pos); nr++; }
+    if (pos < N(name)) name= name (0, pos) * "...";
     // the name of the user, in a flag of the colour above the bar
     if (is_nil (fn)) {
       tree t= use_macos_fonts () ? tuple ("apple-lucida", "ss", "medium", "right")
