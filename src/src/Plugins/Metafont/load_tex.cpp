@@ -73,6 +73,7 @@ try_tfm (string family, int size, int osize, tex_font_metric& tfm, bool make) {
   }
   // cout << "Tfm " << family << osize << " -> " << family << size << "\n";
   tfm= load_tfm (u, family, osize);
+  if (is_nil (tfm)) return false;
   if (size != osize)
     cache_set ("font_cache.scm",
 	       "tfm:" * family * as_string (osize), as_string (size));

@@ -128,7 +128,7 @@ tex_font_rep::tex_font_rep (string name, int status2,
   spc->max     = spc->def + conv (tfm->spc_stretch ());
   extra        = conv (tfm->spc_extra ());
   extra->min   = extra->min >> 1;
-  extra->max   = extra->min << 1;
+  extra->max   = extra->def << 1;
   mspc         = spc;
   sep          = ((((dpi*PIXEL)/72)*design_size) >> 8) / 10;
   exec         = !ends (family, "tt");
@@ -1084,10 +1084,16 @@ struct tfm_font_metric_rep: public font_metric_rep {
       r->y1= -conv (tfm->d(c));
       r->y2=  conv (tfm->h(c));
       glyph gl= pk->get (c);
-      r->x3= -((int) gl->xoff) * PIXEL;
-      r->x4=  ((int) (gl->width- gl->xoff)) * PIXEL;
-      r->y3=  ((int) (gl->yoff- gl->height)) * PIXEL;
-      r->y4=  ((int) gl->yoff) * PIXEL;
+      if (is_nil (gl)) {
+        r->x3= r->x1; r->x4= r->x2;
+        r->y3= r->y1; r->y4= r->y2;
+      }
+      else {
+        r->x3= -((int) gl->xoff) * PIXEL;
+        r->x4=  ((int) (gl->width- gl->xoff)) * PIXEL;
+        r->y3=  ((int) (gl->yoff- gl->height)) * PIXEL;
+        r->y4=  ((int) gl->yoff) * PIXEL;
+      }
     }
     return *((metric*) ((void*) ms[c])); }
 };
@@ -1107,42 +1113,48 @@ tfm_font_metric (tex_font_metric tfm, font_glyphs pk, double unit) {
 
 font
 tex_font (string family, int size, int dpi, int dsize) {
-  string name= "tex:" * family * as_string (size) * "@" * as_string(dpi);
+  string name= "tex:" * family * as_string (size) * "@" * as_string(dpi) *
+    ":" * as_string (dsize);
   return make (font, name,
     tm_new<tex_font_rep> (name, TEX_ANY, family, size, dpi, dsize));
 }
 
 font
 tex_cm_font (string family, int size, int dpi, int dsize) {
-  string name= "cm:" * family * as_string (size) * "@" * as_string(dpi);
+  string name= "cm:" * family * as_string (size) * "@" * as_string(dpi) *
+    ":" * as_string (dsize);
   return make (font, name,
     tm_new<tex_font_rep> (name, TEX_CM, family, size, dpi, dsize));
 }
 
 font
 tex_ec_font (string family, int size, int dpi, int dsize) {
-  string name= "ec:" * family * as_string (size) * "@" * as_string(dpi);
+  string name= "ec:" * family * as_string (size) * "@" * as_string(dpi) *
+    ":" * as_string (dsize);
   return make (font, name,
     tm_new<tex_font_rep> (name, TEX_EC, family, size, dpi, dsize));
 }
 
 font
 tex_la_font (string family, int size, int dpi, int dsize) {
-  string name= "la:" * family * as_string (size) * "@" * as_string(dpi);
+  string name= "la:" * family * as_string (size) * "@" * as_string(dpi) *
+    ":" * as_string (dsize);
   return make (font, name,
     tm_new<tex_font_rep> (name, TEX_LA, family, size, dpi, dsize));
 }
 
 font
 tex_gr_font (string family, int size, int dpi, int dsize) {
-  string name= "gr:" * family * as_string (size) * "@" * as_string(dpi);
+  string name= "gr:" * family * as_string (size) * "@" * as_string(dpi) *
+    ":" * as_string (dsize);
   return make (font, name,
     tm_new<tex_font_rep> (name, TEX_GR, family, size, dpi, dsize));
 }
 
 font
 tex_adobe_font (string family, int size, int dpi, int dsize) {
-  string name= "adobe:" * family * as_string (size) * "@" * as_string(dpi);
+  string name= "adobe:" * family * as_string (size) * "@" * as_string(dpi) *
+    ":" * as_string (dsize);
   return make (font, name,
     tm_new<tex_font_rep> (name, TEX_ADOBE, family, size, dpi, dsize));
 }
