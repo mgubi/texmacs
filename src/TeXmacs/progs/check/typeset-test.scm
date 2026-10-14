@@ -765,6 +765,23 @@
            (check= (rect 50) r2)
            (check= (get-page-count) n)))))))
 
+;; A document whose typesetting fails is replaced by an empty one, and the
+;; typesetting goes on, in it and in the other buffers (the bridges which
+;; were recording what they read when it failed do not record any more).
+(define (test-typesetting-failure)
+  (check-group "typesetting failure")
+  (with-typeset-body
+   '(document "first" "second" (anim-compose) "third")
+   (lambda ()
+     (check= (tree->stree (buffer-tree)) '(document ""))))
+  (with-typeset-body
+   '(document "one" "two" "three")
+   (lambda ()
+     (tree-set (tree-ref (buffer-tree) 1) "two again")
+     (update-forced)
+     (check= (tree->stree (buffer-tree)) '(document "one" "two again" "three"))
+     (check-true (> (rect-x2 (rect 1)) (rect-x1 (rect 1)))))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The suite
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -797,4 +814,5 @@
   (test-paragraphs)
   (test-pages)
   (test-pages-kept)
+  (test-typesetting-failure)
   (check-end))
