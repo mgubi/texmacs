@@ -1095,11 +1095,11 @@ edit_typeset_rep::typeset_invalidate_all () {
 // (exec_auto_id in env_exec.cpp), which is to be done before the tables
 // of contents and the indexes are made again: these hold the names of
 // the labels. All the views of the buffer have the same labels.
-void
+bool
 edit_typeset_rep::typeset_renumber_labels () {
   // (the tree which holds the numbers to come: see auto_label_tag)
   tree root= is_nil (rp) ? et : et[rp->item];
-  if (!auto_labels_renumber (root)) return;
+  if (!auto_labels_renumber (root)) return false;
   for (int i=0; i<N(buf->vws); i++)
     ((tm_view) buf->vws[i])->ed->typeset_invalidate_all ();
   // one pass, for the names: the references are not yet those of the
@@ -1111,6 +1111,7 @@ edit_typeset_rep::typeset_renumber_labels () {
     clean_unused (env->local_ref, env->touched);
   }
   auto_labels_numbered (root);
+  return true;
 }
 
 void

@@ -136,6 +136,14 @@
 // variables are recorded by number (env_var_id): the sets of the bridges
 // are arrays of integers.
 int env_var_id (string var);
+// The variables which the environment read while it derived a state from
+// its variables (edit_env_rep::update): a length in a unit made by a user
+// macro, the colour of a pattern... Such a variable is not "plain": when
+// it changes, what was derived from it may change too (plain_variable)
+extern int env_deriving;
+hashmap<int,bool>& env_derived_inputs ();
+inline void env_note_read (int id) {
+  if (env_deriving > 0) env_derived_inputs () (id)= true; }
 string env_var_name (int id);
 class env_table {
 public:
@@ -145,12 +153,15 @@ public:
   inline env_table (tree init): h (init), rec (NULL), all (false) {}
   inline tree operator [] (string s) {
     if (rec != NULL) rec->operator () (env_var_id (s))= true;
+    if (env_deriving > 0) env_note_read (env_var_id (s));
     return h [s]; }
   inline tree& operator () (string s) {
     if (rec != NULL) rec->operator () (env_var_id (s))= true;
+    if (env_deriving > 0) env_note_read (env_var_id (s));
     return h (s); }
   inline bool contains (string s) {
     if (rec != NULL) rec->operator () (env_var_id (s))= true;
+    if (env_deriving > 0) env_note_read (env_var_id (s));
     return h->contains (s); }
   inline env_table& operator = (hashmap<string,tree> h2) { h= h2; return *this; }
   inline operator hashmap<string,tree> () {
@@ -518,6 +529,11 @@ public:
   // The tags which made an automatic label in this pass (exec_auto_id in
   // env_exec.cpp)
   int auto_seen;
+  struct typesetting_pass {
+    edit_env_rep* env;
+    inline typesetting_pass (edit_env_rep* e): env (e) { env->typesetting++; }
+    inline ~typesetting_pass () { env->typesetting--; }
+  };
   inline void record_lookups (array<string>* keys, array<tree>* values) {
     rec_keys= keys; rec_values= values; }
   tree lookup_value (string name);
@@ -531,8 +547,12 @@ public:
   inline hashmap<string,tree> all_values () { return copy (env.h); }
   inline bool plain_variable (string s) {
     int type= var_type [s];
-    return type == Env_User || type == Env_Fixed ||
-           type == Env_Paragraph || type == Env_Page; }
+    return (type == Env_User || type == Env_Fixed ||
+            type == Env_Paragraph || type == Env_Page) &&
+           !env_derived_inputs ()->contains (env_var_id (s)); }
+  // whether the environment is in the course of a typesetting pass (the
+  // automatic labels: exec_auto_id), and the guard which says so
+  int typesetting;
   // the variables of 'change' had these values at this point of the
   // previous pass: those which have another one now are in the patch
   inline void compare_changes (hashmap<string,tree>& patch,

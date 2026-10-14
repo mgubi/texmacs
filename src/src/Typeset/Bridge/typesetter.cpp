@@ -163,6 +163,7 @@ typesetter_rep::determine_page_references (box b) {
 
 box
 typesetter_rep::typeset () {
+  edit_env_rep::typesetting_pass pass (env.operator-> ());
   old_patch= hashmap<string,tree> (UNINIT);
   l        = array<page_item> ();
   sb       = stack_border ();

@@ -2182,7 +2182,10 @@ tree
 edit_env_rep::exec_auto_id (tree t) {
   static bool stable= (get_env ("TEXMACS_STABLE_LABELS") != "off");
   bool fresh= (N(t) >= 1 && exec_string (t[0]) == "new");
-  if (!stable) {
+  // outside of a typesetting pass (a converter which expands the macros of
+  // a copy of the document, whose tags are not in the document), the
+  // counter: these are the names of a document which was updated
+  if (!stable || typesetting == 0) {
     if (fresh) { (void) exec (compound ("inc-auto")); return ""; }
     return exec (tree (VALUE, "auto-nr"));
   }
