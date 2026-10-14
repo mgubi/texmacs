@@ -86,6 +86,10 @@
       document.
 
       <item>A remote connection tool (which currently does not work anymore).
+
+      <item>A database tool, which keeps bibliographic references (and other
+      data) in databases of <TeXmacs> (see <hlink|The bibliographic
+      database|../links/man-bib-database.en.tm>).
     </itemize>
 
     <item*|<menu|Autosave>>This preference specifies how often documents will
@@ -95,9 +99,17 @@
     power problem.
 
     <item*|<menu|Bibtex command>>The user may specify an alternative to
-    <verbatim|bibtex> for the compilation of bibliographies using <BibTeX>.
-    Notice that recent versions of <TeXmacs> integrate a<nbsp>native
-    alternative tool for the compilation of bibliographies.
+    <verbatim|bibtex> for the compilation of bibliographies using <BibTeX>
+    (<verbatim|biber>, <verbatim|biblatex>, <verbatim|rubibtex> or another
+    command; in the preferences window, <menu|Convert|BibTeX|BibTeX
+    command>). It is only used for the styles of <BibTeX>: the styles whose
+    names start with <verbatim|tm-> are implemented by <TeXmacs> itself (see
+    <hlink|Compiling a bibliography|../links/man-bibliography.en.tm>).
+
+    <item*|<menu|New bibliography dialogue>>Among the experimental features
+    (<menu|Edit|Preferences|Other>): <menu|Insert|Automatic|Bibliography>
+    opens a dialogue which asks for the file and the style of the
+    bibliography, with a preview.
   </description>
 
   <tmdoc-copyright|1998--2010|Joris van der Hoeven>

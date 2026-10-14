@@ -197,3 +197,28 @@
 	     (e (number->string (string-length s))))
 	(if (< i 0) t
 	    `(concat (range ,t "0" ,m) (name (range ,t ,m ,e)))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Zotero (see bibtex/zotero.scm)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; Zotero costs nothing to those who don't use it: the hooks of the
+;; bibliographies (generation, Document -> Update, completion, the search
+;; window of the database, the focus of citations) neither load the modules
+;; of Zotero nor ask Zotero, until it was used on this computer: until it
+;; answered TeXmacs once (after a command of Zotero, or the test of its
+;; settings), a key of zotero.org was given, or the database was synced
+;; with Zotero. Explicit commands of Zotero always ask it
+(define-preferences
+  ("zotero used" "off" noop))
+
+(define (zotero-value? s)
+  (and (string? s) (nin? s '("" "default"))))
+
+(tm-define (zotero-used?)
+  (:synopsis "Has Zotero been used on this computer?")
+  ;; NOTE: the other preferences are defined by the modules of Zotero, and
+  ;; are "default" while these are not loaded and the preference not set
+  (or (== (get-preference "zotero used") "on")
+      (zotero-value? (get-preference "zotero sync version"))
+      (zotero-value? (get-preference "zotero api key"))))

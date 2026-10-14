@@ -18,7 +18,11 @@
   one file <verbatim|book.tm> for the whole book, in which the files
   <verbatim|c1.tm>, <verbatim|c2.tm> until <verbatim|cn.tm> are included
   using the above mechanism. The table of contents, bibliography, etc. are
-  usually put into <verbatim|book.tm>.
+  usually put into <verbatim|book.tm>. The bibliography of
+  <verbatim|book.tm> then holds the references cited in all the chapters;
+  with Zotero, its <BibTeX> file receives them, and
+  <menu|Document|Bibliography|Update the citations> acts on all the files
+  of the book (see <hlink|Citations from Zotero|man-zotero.en.tm>).
 
   In order to see cross references to other chapters when editing a
   particular chapter <verbatim|ci.tm>, one may specify <verbatim|book.tm> as

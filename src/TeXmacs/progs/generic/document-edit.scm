@@ -583,15 +583,31 @@
   (system-wait "Updating current buffer, " "please wait")
   (update-current-buffer))
 
+(define (zotero-update what)
+  ;; Zotero, when it is used, refreshes the references first (see
+  ;; bibtex/zotero.scm); 'wait when the update waits for zotero.org. An
+  ;; error there is reported, and does not stop the update
+  (if (not (zotero-used?)) 'done
+      (catch #t
+        (lambda () (zotero-before-update what))
+        (lambda err
+          (set-message (string-append "Zotero: " (object->string err))
+                       "Update")
+          'done))))
+
 (tm-define (update-document what)
-  (for (.. 0 doc-update-times)       
-    (delayed    ; allow typesetting/magic to happen before next update
-      (:idle 1)
-      (cursor-after
-       (cond ((== what "all") 
-              (generate-all-aux) (inclusions-gc) (picture-gc) (wait-update-current-buffer))
-             ((== what "bibliography")
-              (generate-all-aux) (wait-update-current-buffer))
-             ((== what "buffer") 
-              (wait-update-current-buffer))
-             (else (generate-aux what)))))))
+  ;; a bibliography file managed by Zotero is refreshed first; in a web
+  ;; browser, the update may wait for the answers of zotero.org, and is
+  ;; then made again when they come
+  (when (!= (zotero-update what) 'wait)
+    (for (.. 0 doc-update-times)       
+      (delayed    ; allow typesetting/magic to happen before next update
+        (:idle 1)
+        (cursor-after
+         (cond ((== what "all") 
+                (generate-all-aux) (inclusions-gc) (picture-gc) (wait-update-current-buffer))
+               ((== what "bibliography")
+                (generate-all-aux) (wait-update-current-buffer))
+               ((== what "buffer") 
+                (wait-update-current-buffer))
+               (else (generate-aux what))))))))

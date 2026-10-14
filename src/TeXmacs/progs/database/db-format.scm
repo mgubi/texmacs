@@ -46,7 +46,11 @@
   (list "type" "location" "dir" "date" "pseudo" "id"))
 
 (tm-define (db-meta-attributes)
-  (list "date" "contributor" "modus" "origin" "newer"))
+  ;; NOTE: the zotero-* attributes mark the entries which come from Zotero
+  ;; (see bibtex/zotero-db.scm)
+  (list "date" "contributor" "modus" "origin" "newer"
+        "zotero-item" "zotero-library" "zotero-version" "zotero-key"
+        "zotero-synced" "zotero-deleted"))
 
 (smart-table db-encoding-table
   ;; For each entry+field type, specify the encoding being used for
