@@ -255,11 +255,11 @@ public:
   virtual double     anim_delay ();
   virtual double     anim_duration ();
   virtual void       anim_position (double delay);
-  virtual double     anim_next ();
-  virtual rectangles anim_invalid ();
+  // the animations which intersect vis (in the coordinates of the box):
+  // the time of their next change, the areas to repaint
   virtual double     anim_next (rectangle vis);
-  bool               anim_visible (rectangle vis);
   virtual rectangles anim_invalid (rectangle vis);
+  bool               anim_visible (rectangle vis);
 
   /********************************* obsolete ********************************/
 
@@ -273,6 +273,8 @@ public:
   friend void make_raster_image (url dest, box b, double zoom);
 };
 ABSTRACT_NULL_CODE(box);
+
+rectangle anim_everywhere (); // for anim_next and anim_invalid: no culling
 
 extern int box_count;
 inline box_rep::box_rep (path ip2):
