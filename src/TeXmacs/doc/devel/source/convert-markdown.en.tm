@@ -56,8 +56,10 @@
     <scm|(blockquote <scm-arg|block> ...)>, <scm|(hr)>,
     <scm|(ul (li <scm-arg|block> ...) ...)>, <scm|(ol ...)>,
     <scm|(pre "code")>, <scm|(table (tr (th ...) ...) (tr (td ...) ...) ...)>,
-    <scm|(displaymath "latex")>, <scm|(html "text")> and
-    <scm|(footnote-def "label" <scm-arg|block> ...)>.
+    <scm|(displaymath "latex")>, <scm|(html "text")>,
+    <scm|(footnote-def "label" <scm-arg|block> ...)> and
+    <scm|(ref-def "text")> for the line of a definition of a link to
+    which nothing refers (the others are inlined in the links).
 
     <item*|Text>Strings, <scm|(em ...)>, <scm|(strong ...)>,
     <scm|(del ...)>, <scm|(code "text")>, <scm|(a ...)>, <scm|(img)>,
@@ -245,6 +247,15 @@
     get their arguments as they are and leave <markup|md-kept> with the
     text, or the body. A text which is kept becomes a node with the
     attribute <verbatim|source>, which the serializer writes as it is.
+    Kept so as well: text with a tab or another control character (shown
+    as a space, kept as <verbatim|\<less\>#9\<gtr\>>, since the codes
+    below 32 are accents in the encoding of <TeXmacs>), the unused
+    definitions of links and of footnotes, and the marks of a footnote
+    after its first one (<scm|mdtm-footnote>).
+
+    <item*|Other formats>The <LaTeX> export knows the macros
+    (<scm|tmtex-md-body> and the others in <source-link|tmtex.scm|TeXmacs/progs/convert/latex/tmtex.scm>):
+    it writes what they display, and not what they keep.
   </description>
 
   The property which the tests check: for a file <math|x>, the file

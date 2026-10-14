@@ -227,6 +227,16 @@
 
   The additions to <TeXmacs> <name|Vue>, the newest first.
 
+  <paragraph|14 October 2026>
+
+  <\itemize>
+    <item>A <name|Markdown> file keeps more of itself when it is saved:
+    its tabs, the definitions of links to which nothing refers (and the
+    comments <verbatim|[//]: # (text)>), footnotes defined in quotations
+    or lists, marked several times or not defined, and a <name|YAML>
+    header with any keys. Its export to <LaTeX> compiles.
+  </itemize>
+
   <paragraph|13 October 2026>
 
   <\itemize>
