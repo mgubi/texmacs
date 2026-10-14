@@ -772,10 +772,20 @@
           (check= (bounding-box (image->psdoc gif)) '(0 0 40 10))
           (check= (bounding-box (image->psdoc jpg)) '(0 0 16 24))
           (check= (bounding-box (image->psdoc pnm)) '(0 0 3 2))
-          ;; FIXME (#297): the size of an SVG depends on the converter
-          ;; (67 x 34 with the ImageMagick 6 of Ubuntu, which renders it at
-          ;; 96 dpi through rsvg-convert)
-          (display "  SKIP size of an SVG: depends on the converter (#297)\n")
+          ;; an SVG has the size it declares, whatever the resolution at
+          ;; which ImageMagick renders it (72 dpi for its own renderer, 96
+          ;; dpi through rsvg-convert): 50 x 25 pt, and 100 x 40 px, which
+          ;; are 75 x 30 pt
+          (check= (bounding-box (image->psdoc svg)) '(0 0 50 25))
+          (with svg-px (url-append dir "b.svg")
+            (string-save (string-append
+                          "<?xml version=\"1.0\"?>\n<svg "
+                          "xmlns=\"http://www.w3.org/2000/svg\" "
+                          "width=\"100px\" height=\"40px\">"
+                          "<rect width=\"100\" height=\"40\" fill=\"red\"/>"
+                          "</svg>\n")
+                         svg-px)
+            (check= (bounding-box (image->psdoc svg-px)) '(0 0 75 30)))
           ;; image->postscript goes through the converters of the format
           (check= (bounding-box (image->postscript png)) '(0 0 30 20))))
     (check= (bounding-box (image->postscript eps)) '(10 20 110 70))
