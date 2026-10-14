@@ -724,6 +724,7 @@ bridge_rep::my_resync () {
 
 bool bridge_rep::my_reusable () { return true; }
 bool bridge_rep::my_check_cache () { return false; }
+bool bridge_rep::my_patches_old () { return true; }
 void bridge_rep::my_stack_start () { ttt->local_start (l, sb); }
 void bridge_rep::my_stack_end () { ttt->local_end (l, sb); }
 
@@ -779,7 +780,48 @@ bridge_rep::typeset (int desired_status) {
     env->local_start (prev_back);
     if (env->hl_lan != 0) env->lan->highlight (st);
     my_typeset (desired_status);
-    env->local_update (ttt->old_patch, changes);
+    bool recorded= record.complete () &&
+                   N(my_reads) <= READS_MAX && N(my_keys) <= LOOKUPS_MAX;
+    reads_known= recorded && alone;
+    // the variables which it leaves with the value UNINIT: among those
+    // which it read or wrote (every write goes through env_table, which
+    // records it), and those of the bridges below it
+    for (iterator<int> it= iterate (my_reads); it->busy (); ) {
+      string var= env_var_name (it->next ());
+      if (!contains (var, my_uninit)) my_uninit << var;
+    }
+    array<string> left;
+    for (int i=0; i<N(my_uninit); i++)
+      if (env->is_uninit (my_uninit[i])) left << my_uninit[i];
+    my_uninit= left;
+    reads= array<int> ();
+    seen_keys= array<string> ();
+    seen_values= array<tree> ();
+    if (recorded) {
+      for (iterator<int> it= iterate (my_reads); it->busy (); )
+        reads << it->next ();
+      merge_sort (reads);
+      seen_keys= my_keys;
+      seen_values= my_values;
+    }
+    record.stop ();
+    add_reads (env, recorded, reads, seen_keys, seen_values);
+    for (int i=0; i<N(my_uninit); i++)
+      env->note_uninit (my_uninit[i]);
+    if (my_patches_old ()) {
+      env->local_update (ttt->old_patch, changes);
+      // a variable which the bridge leaves with the value UNINIT now and
+      // not in the previous pass, or the other way round, changed (the
+      // changes do not tell, see rec_uninit)
+      for (int i=0; i<N(my_uninit); i++)
+        if (!contains (my_uninit[i], uninit))
+          ttt->old_patch (my_uninit[i])= tree (UNINIT);
+      for (int i=0; i<N(uninit); i++)
+        if (!contains (uninit[i], my_uninit))
+          ttt->old_patch (uninit[i])= tree (UNINIT);
+    }
+    else env->local_changes (changes);
+    uninit= my_uninit;
     env->local_end (prev_back);
     my_stack_end ();
     if (check) {
