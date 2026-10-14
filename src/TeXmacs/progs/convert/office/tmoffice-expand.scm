@@ -36,9 +36,10 @@
 (tm-define (tmoffice-env-patch)
   `(collection
     ,@(map tmoffice-env-macro
-           '(TeXmacs TeX LaTeX hrule item
+           '(TeXmacs TeX LaTeX hrule item nbsp
              ;; the titles of the sections, with their numbers
-             part-title chapter-title section-title subsection-title
+             part-title part-numbered-title chapter-title section-title
+             subsection-title
              subsubsection-title paragraph-title subparagraph-title
              appendix-title
              ;; the table of contents: its title, and the entries which

@@ -188,6 +188,259 @@
   (check= (zip-unpack (zip-one (bytes 5 0 146 4) 8 1 0)) '())
   (check= (zip-unpack (zip-one (bytes 3 2 0) 8 3 0)) '()))
 
+;; What the files say of their page, of their usual paragraph, of their
+;; lists and of their headings, and the bugs which the audit of the
+;; fidelity found.
+
+(define (archive-entry z name)
+  (let loop ((l (zip-unpack z)))
+    (cond ((or (null? l) (null? (cdr l))) #f)
+          ((== (car l) name) (cadr l))
+          (else (loop (cddr l))))))
+
+(define (docx-file body styles numbering)
+  ;; a Word document with this body (with its sectPr), styles and lists
+  (zip-pack
+    '("[Content_Types].xml" "word/document.xml" "word/styles.xml"
+      "word/numbering.xml" "word/_rels/document.xml.rels" "word/footnotes.xml")
+    (list "<Types/>"
+          (string-append "<?xml version='1.0'?><w:document" docx-ns "><w:body>"
+                         body "</w:body></w:document>")
+          (string-append "<w:styles" docx-ns ">" styles "</w:styles>")
+          (string-append "<w:numbering" docx-ns ">" numbering "</w:numbering>")
+          docx-rels docx-footnotes)))
+
+(define (docx-blocks-of body styles numbering)
+  (cdr (parse-docx-document (docx-file body styles numbering))))
+
+(define (odt-file body styles automatic)
+  ;; an OpenDocument text with this body, these styles of styles.xml and
+  ;; these automatic styles of content.xml
+  (zip-pack
+    '("mimetype" "content.xml" "styles.xml")
+    (list "application/vnd.oasis.opendocument.text"
+          (string-append "<?xml version='1.0'?><office:document-content" odt-ns ">"
+                         "<office:automatic-styles>" automatic
+                         "</office:automatic-styles><office:body><office:text>" body
+                         "</office:text></office:body></office:document-content>")
+          (string-append "<office:document-styles" odt-ns ">" styles
+                         "</office:document-styles>"))))
+
+(define (odt-blocks-of body styles automatic)
+  (cdr (parse-odt-document (odt-file body styles automatic))))
+
+(define (test-office-fidelity)
+  (check-group "fidelity")
+  (let* ((heading (string-append
+                    "<w:style w:type='paragraph' w:styleId='H1'><w:name w:val='heading 1'/>"
+                    "</w:style>"))
+         (lists (string-append
+                  "<w:abstractNum w:abstractNumId='0'>"
+                  "<w:lvl w:ilvl='0'><w:start w:val='1'/><w:numFmt w:val='decimal'/></w:lvl>"
+                  "</w:abstractNum>"
+                  "<w:abstractNum w:abstractNumId='1'>"
+                  "<w:lvl w:ilvl='0'><w:start w:val='3'/><w:numFmt w:val='lowerRoman'/></w:lvl>"
+                  "</w:abstractNum>"
+                  "<w:num w:numId='3'><w:abstractNumId w:val='0'/></w:num>"
+                  "<w:num w:numId='4'><w:abstractNumId w:val='1'/></w:num>"))
+         (item (lambda (id text)
+                 (wp "<w:pPr><w:numPr><w:ilvl w:val='0'/><w:numId w:val='" id
+                     "'/></w:numPr></w:pPr>" (wr text)))))
+    ;; a heading has a number when its list numbers it, and none else (as
+    ;; the headings of Word and of LibreOffice by default)
+    (check= (docx-blocks-of (wp "<w:pPr><w:pStyle w:val='H1'/><w:numPr><w:ilvl w:val='0'/>"
+                                "<w:numId w:val='3'/></w:numPr></w:pPr>" (wr "N"))
+                            heading lists)
+            '((p (@ (role "heading") (level "1")) "N")))
+    (check= (docx-blocks-of (wp (wstyle "H1") (wr "U")) heading lists)
+            '((p (@ (role "heading") (level "1") (numbered "no")) "U")))
+    ;; the way of numbering of a list and its first number
+    (check= (docx-blocks-of (string-append (item "4" "a") (item "4" "b")) heading lists)
+            '((list (@ (kind "number") (format "i") (start "3"))
+                    (item (p "a")) (item (p "b")))))
+    ;; a list of Word which goes on after a paragraph keeps its numbers
+    (check= (docx-blocks-of (string-append (item "3" "a") (wp (wr "x")) (item "3" "b"))
+                            heading lists)
+            '((list (@ (kind "number")) (item (p "a"))) (p "x")
+              (list (@ (kind "number") (start "2")) (item (p "b")))))
+    ;; a break of page in a paragraph cuts it in two
+    (check= (docx (wp "<w:r><w:t>a</w:t><w:br w:type='page'/><w:t>b</w:t></w:r>"))
+            '((p "a") (pagebreak) (p "b")))
+    (check= (docx (string-append
+                    (wp "<w:r><w:t>a</w:t><w:br w:type='page'/></w:r>")
+                    (wp "<w:pPr><w:pageBreakBefore/></w:pPr>" (wr "b"))))
+            '((p "a") (pagebreak) (p "b")))
+    ;; the paragraphs of a box of text come after the paragraph of the box
+    (check= (docx (wp (wr "a") "<w:r><w:drawing><wp:anchor><wps:txbx><w:txbxContent>"
+                      (wp (wr "in the box")) "</w:txbxContent></wps:txbx></wp:anchor>"
+                      "</w:drawing></w:r>" (wr " b")))
+            '((p "a b") (p "in the box")))
+    ;; the mark which a note writes itself is not text
+    (check= (docx (wp (wr "a") "<w:r><w:footnoteReference w:customMarkFollows='1' w:id='2'/>"
+                      "<w:t>*</w:t></w:r>"))
+            '((p "a" (note (p "The note.")))))
+    ;; a reference whose number Word did not write is one of TeXmacs
+    (check= (docx (wp "<w:r><w:fldChar w:fldCharType='begin'/></w:r>"
+                      "<w:r><w:instrText> REF fig1 \\h </w:instrText></w:r>"
+                      "<w:r><w:fldChar w:fldCharType='end'/></w:r>"))
+            '((p (ref (@ (name "fig1"))))))
+    (check= (tm '(p "see " (ref (@ (name "fig1")))))
+            '((concat "see " (reference "fig1"))))
+    ;; the page and the usual paragraph
+    (let* ((styles (string-append
+                     "<w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii='Arial'/>"
+                     "<w:sz w:val='24'/></w:rPr></w:rPrDefault>"
+                     "<w:pPrDefault><w:pPr><w:spacing w:after='160' w:line='360'"
+                     " w:lineRule='auto'/></w:pPr></w:pPrDefault></w:docDefaults>"
+                     "<w:style w:type='paragraph' w:default='1' w:styleId='Normal'>"
+                     "<w:name w:val='Normal'/><w:pPr><w:ind w:firstLine='567'/>"
+                     "<w:jc w:val='both'/></w:pPr></w:style>"))
+           (body (string-append (wp (wr "x")) "<w:sectPr><w:pgSz w:w='8391' w:h='11906'/>"
+                                "<w:pgMar w:top='1134' w:bottom='1134' w:left='1701'"
+                                " w:right='1134'/></w:sectPr>"))
+           (setup (car (docx-blocks-of body styles ""))))
+      (check= setup
+              '(setup (@ (page-width "14.799cm") (page-height "20.998cm")
+                         (margin-top "2cm") (margin-bottom "2cm") (margin-left "3cm")
+                         (margin-right "2cm") (font-size "12") (font "sans")
+                         (first-indent "28.35") (space-after "8") (line-spacing "1.5")
+                         (align "justify"))))
+      (check= (cAr (convert (docx-file body styles "") "docx-document" "texmacs-stree"))
+              '(initial (collection (associate "page-type" "a5")
+                                    (associate "page-orientation" "portrait")
+                                    (associate "page-odd" "3cm") (associate "page-even" "3cm")
+                                    (associate "page-right" "2cm") (associate "page-top" "2cm")
+                                    (associate "page-bot" "2cm")
+                                    (associate "font-base-size" "12")
+                                    (associate "font-family" "ss")
+                                    (associate "par-first" "28.35pt")
+                                    (associate "par-par-sep" "8pt")
+                                    (associate "par-sep" "0.8fn")))))
+    ;; a paragraph which is not aligned as the usual ones says so
+    (check= (tm '(setup (@ (align "left"))) '(p (@ (align "justify")) "j") '(p "l"))
+            '((with "par-mode" "justify" "j") "l")))
+  ;; OpenDocument: the numbers of the headings, hidden text, the labels of
+  ;; the numbers, the marks of the citations, the lists, the page
+  (let* ((outline (lambda (format)
+                    (string-append
+                      "<office:styles><text:outline-style style:name='Outline'>"
+                      "<text:outline-level-style text:level='1' style:num-format='"
+                      format "'/></text:outline-style>"
+                      "<style:style style:name='Heading_20_1' style:display-name='Heading 1'"
+                      " style:family='paragraph'/>"
+                      "<text:list-style style:name='LA'>"
+                      "<text:list-level-style-number text:level='1' style:num-format='a'"
+                      " text:start-value='2'/></text:list-style>"
+                      "</office:styles>"))))
+    (check= (odt-blocks-of "<text:h text:outline-level='1'>N</text:h>" (outline "1") "")
+            '((p (@ (role "heading") (level "1")) "N")))
+    (check= (odt-blocks-of "<text:h text:outline-level='1'>U</text:h>" (outline "") "")
+            '((p (@ (role "heading") (level "1") (numbered "no")) "U")))
+    ;; (a paragraph of a style of headings is no heading of the outline)
+    (check= (odt-blocks-of "<text:p text:style-name='Heading_20_1'>P</text:p>" (outline "1") "")
+            '((p (@ (role "heading") (level "1") (numbered "no")) "P")))
+    (check= (odt-blocks-of (string-append
+                             "<text:p>a<text:span text:style-name='Hid'>hidden</text:span>b</text:p>"
+                             "<text:p>c<text:hidden-paragraph text:is-hidden='true'/></text:p>")
+                           (outline "")
+                           (string-append "<style:style style:name='Hid' style:family='text'>"
+                                          "<style:text-properties text:display='none'/>"
+                                          "</style:style>"))
+            '((p "ab")))
+    (check= (odt-blocks-of (string-append
+                             "<text:p>Figure <text:sequence text:name='Figure'"
+                             " text:ref-name='refFigure0'>1</text:sequence>"
+                             "<text:reference-mark-start text:name='ZOTERO_ITEM {&quot;x&quot;:1}'/>"
+                             "</text:p>")
+                           (outline "") "")
+            '((p "Figure " (bookmark (@ (name "refFigure0")))
+                 (seq (@ (name "Figure")) "1"))))
+    (check= (odt-blocks-of (string-append
+                             "<text:list text:style-name='LA'><text:list-item>"
+                             "<text:p>x</text:p></text:list-item></text:list>")
+                           (outline "") "")
+            '((list (@ (kind "number") (format "a") (start "2")) (item (p "x")))))
+    (check= (car (odt-blocks-of
+                   "<text:p>x</text:p>"
+                   (string-append
+                     "<office:automatic-styles><style:page-layout style:name='pm1'>"
+                     "<style:page-layout-properties fo:page-width='29.7cm'"
+                     " fo:page-height='21cm' style:print-orientation='landscape'"
+                     " fo:margin-top='1cm' fo:margin-bottom='1cm' fo:margin-left='1cm'"
+                     " fo:margin-right='1cm'/></style:page-layout></office:automatic-styles>"
+                     "<office:master-styles><style:master-page style:name='Standard'"
+                     " style:page-layout-name='pm1'/></office:master-styles>")
+                   ""))
+            '(setup (@ (page-width "29.7cm") (page-height "21cm") (landscape "true")
+                       (margin-top "1cm") (margin-bottom "1cm") (margin-left "1cm")
+                       (margin-right "1cm") (align "left")))))
+  ;; a brace of Word without the closing one does not take what follows
+  (with t (convert (docx-archive
+                     (wp "<m:oMath><m:d><m:dPr><m:begChr m:val='{'/><m:endChr m:val=''/>"
+                         "</m:dPr><m:e><m:r><m:t>x</m:t></m:r></m:e></m:d>"
+                         "<m:r><m:t>+y</m:t></m:r></m:oMath>"))
+                   "docx-document" "texmacs-stree")
+    (check= (cadr (cadr t))
+            '(document (equation* (document (concat (around* "{" "x" "<nobracket>")
+                                                    "+y"))))))
+  ;; a caption which holds its image, as LibreOffice writes it in a frame
+  (check= (tm '(p (@ (role "caption")) (image (@ (name "p.png") (data "PNGDATA")))
+                  "Figure " (seq (@ (name "Figure")) "1") ": A picture"))
+          '((big-figure (image (tuple (raw-data "PNGDATA") "p.png") "" "" "" "")
+                        "A picture")))
+  ;; the export: a space which does not break, what the expansion could not
+  ;; do, the ways of numbering of the lists, the numbers of the headings of
+  ;; a document which was not expanded, the page and the font
+  (check-true (in? '(associate "nbsp" (xmacro "x" (eval-args "x")))
+                   (cdr (tmoffice-env-patch))))
+  (check= (of '(document (error "bad assign") "x")) '((p "x")))
+  (check= (of '(enumerate-roman (document (concat (item) "a"))))
+          '((list (@ (kind "number") (format "i")) (item (p "a")))))
+  (check= (of '(document (TeXmacs "2.1") (style "book")
+                         (body (document (chapter "C") (section "S") (subsection "T")
+                                         (chapter "D") (section "S")))))
+          '((p (@ (role "heading") (level "1") (number "1") (id "heading1")) "C")
+            (p (@ (role "heading") (level "2") (number "1.1") (id "heading2")) "S")
+            (p (@ (role "heading") (level "3") (number "1.1.1") (id "heading3")) "T")
+            (pagebreak)
+            (p (@ (role "heading") (level "1") (number "2") (id "heading4")) "D")
+            (p (@ (role "heading") (level "2") (number "2.1") (id "heading5")) "S")))
+  (check= (of '(chapter-title (concat "Chapter 2" (vspace "1fn") (new-line) "Endings")))
+          '((p (@ (role "heading") (level "1") (number "2") (id "heading1")) "Endings")))
+  (let* ((doc '(document (TeXmacs "2.1") (style "generic")
+                         (body (document "x"
+                                         (enumerate-alpha (document (concat (item) "a")))))
+                         (initial (collection (associate "page-type" "a5")
+                                              (associate "page-orientation" "landscape")
+                                              (associate "page-odd" "3cm")
+                                              (associate "font-base-size" "12")
+                                              (associate "font-family" "ss")))))
+         (docx (convert doc "texmacs-stree" "docx-document"))
+         (odt (convert doc "texmacs-stree" "odt-document"))
+         (text (archive-entry docx "word/document.xml"))
+         (styles (archive-entry docx "word/styles.xml"))
+         (numbering (archive-entry docx "word/numbering.xml"))
+         (ostyles (archive-entry odt "styles.xml"))
+         (content (archive-entry odt "content.xml")))
+    (check-true (export-has? text "<w:pgSz w:w=\"11906\" w:h=\"8391\" w:orient=\"landscape\"/>"))
+    (check-true (export-has? text "w:left=\"1701\""))
+    (check-true (export-has? styles "<w:rFonts w:ascii=\"Arial\""))
+    (check-true (export-has? styles "<w:sz w:val=\"24\"/>"))
+    (check-true (export-has? numbering "<w:numFmt w:val=\"lowerLetter\"/>"))
+    (check-true (export-has? ostyles "fo:page-width=\"21cm\" fo:page-height=\"14.8cm\""))
+    (check-true (export-has? ostyles "style:print-orientation=\"landscape\""))
+    (check-true (export-has? ostyles "fo:margin-left=\"3cm\""))
+    (check-true (export-has? ostyles "style:font-name=\"Arial\" fo:font-size=\"12pt\""))
+    (check-true (export-has? content "style:num-format=\"a\""))
+    ;; and both are read back so
+    (for (fm '("docx-document" "odt-document"))
+      (let* ((back (convert (convert doc "texmacs-stree" fm) fm "texmacs-stree"))
+             (init (cdr (cadr (cAr back)))))
+        (check-true (in? '(associate "page-type" "a5") init))
+        (check-true (in? '(associate "page-orientation" "landscape") init))
+        (check-true (in? '(associate "font-base-size" "12") init))
+        (check-true (in? '(associate "font-family" "ss") init))))))
+
 ;; The parser of XML, which the office formats share with HTML: elements
 ;; inside each other and entities which expand to entities have limits.
 (define (test-xml-limits)
@@ -405,11 +658,11 @@
   ;; what a paragraph is comes from the name of its style, or of the style
   ;; this one is based on, or from its level in the outline
   (check= (docx (wp (wstyle "Titre1") (wr "Intro")))
-          '((p (@ (role "heading") (level "1")) "Intro")))
+          '((p (@ (role "heading") (level "1") (numbered "no")) "Intro")))
   (check= (docx (wp (wstyle "Sous") (wr "Sub")))
-          '((p (@ (role "heading") (level "1")) "Sub")))
+          '((p (@ (role "heading") (level "1") (numbered "no")) "Sub")))
   (check= (docx (wp "<w:pPr><w:outlineLvl w:val='2'/></w:pPr>" (wr "Deep")))
-          '((p (@ (role "heading") (level "3")) "Deep")))
+          '((p (@ (role "heading") (level "3") (numbered "no")) "Deep")))
   (check= (docx (wp (wstyle "Titre") (wr "T")))
           '((p (@ (role "title") (align "center")) "T")))
   (check= (docx (wp (wstyle "Citation") (wr "q"))) '((p (@ (role "quote")) "q")))
@@ -469,7 +722,7 @@
               (list (@ (kind "bullet")) (item (p "b")))))
     (check= (docx (wp "<w:pPr><w:pStyle w:val='Titre1'/><w:numPr><w:ilvl w:val='0'/>"
                       "<w:numId w:val='1'/></w:numPr></w:pPr>" (wr "H")))
-            '((p (@ (role "heading") (level "1")) "H")))))
+            '((p (@ (role "heading") (level "1") (numbered "no")) "H")))))
 
 (define (test-docx-tables)
   (check-group "docx tables")
@@ -569,7 +822,8 @@
                            (m:mi "y") (m:mo (@ (fence "true")) ")"))))
   (check= (omml (string-append "<m:d><m:dPr><m:begChr m:val='['/><m:endChr m:val=''/>"
                                "</m:dPr><m:e>" (mr "x") "</m:e></m:d>"))
-          '(m:math (m:mrow (m:mo (@ (fence "true")) "[") (m:mi "x"))))
+          '(m:math (m:mstyle (@ (scriptlevel "0"))
+                     (m:mrow (m:mo (@ (fence "true")) "[") (m:mi "x")))))
   (check= (omml (string-append "<m:m><m:mr><m:e>" (mr "a") "</m:e><m:e>" (mr "b")
                                "</m:e></m:mr></m:m>"))
           '(m:math (m:mtable (m:mtr (m:mtd (m:mi "a")) (m:mtd (m:mi "b"))))))
@@ -689,7 +943,7 @@
 (define (test-odt-blocks)
   (check-group "odt blocks")
   (check= (odt "<text:h text:outline-level='2'>Sub</text:h>")
-          '((p (@ (role "heading") (level "2")) "Sub")))
+          '((p (@ (role "heading") (level "2") (numbered "no")) "Sub")))
   (check= (odt "<text:p text:style-name='Title'>T</text:p>")
           '((p (@ (role "title") (align "center")) "T")))
   ;; an automatic style is what its parent is
@@ -963,7 +1217,7 @@
                                  (tc "" "x") "</w:tr></w:tbl>"))
             `((table (row ,(plain "x"))))))
   (check= (docx (wp "<w:pPr><w:outlineLvl w:val='1.4'/></w:pPr>" (wr "H")))
-          '((p (@ (role "heading") (level "2")) "H")))
+          '((p (@ (role "heading") (level "2") (numbered "no")) "H")))
   (check= (docx (wp "<w:pPr><w:ind w:left='720.5'/></w:pPr>" (wr "x")))
           '((p "x"))))
 
@@ -1005,7 +1259,7 @@
                  "</table:table-cell></table:table-row></table:table>"))
           '((table (row (cell (@ (borders "none")) (p "c"))))))
   (check= (odt "<text:h text:outline-level='2.4'>H</text:h>")
-          '((p (@ (role "heading") (level "2")) "H")))
+          '((p (@ (role "heading") (level "2") (numbered "no")) "H")))
   ;; the list around a table is not the one of its cells
   (check= (odt (string-append
                  "<text:list text:style-name='L1'><text:list-item><table:table>"
@@ -1035,7 +1289,7 @@
                    "<table:table-cell>" (tp "in") "</table:table-cell>"
                    "</table:table-row></table:table>" (tp "b")
                    "</draw:text-box></draw:frame>"))
-          '((p "ab") (table (row (cell (@ (borders "none")) (p "in"))))))
+          '((p "a") (table (row (cell (@ (borders "none")) (p "in")))) (p "b")))
   ;; an image which is not in the archive is not one to fetch: a link to
   ;; its address on the web, the text of another address
   (check= (odt (tp "<draw:frame><draw:image xlink:href='http://a.b/p.png'/>"
@@ -1346,8 +1600,10 @@
             (abstract-data (abstract (document "Short.")))
             "x"))
   ;; the title of the properties of the file, when the text has none
+  ;; (the title of the properties of the file is not shown: it is often
+  ;; the one of a template)
   (check= (tm '(meta (title "From the file") (author "Someone")) '(p "x"))
-          '((doc-data (doc-title "From the file")) "x"))
+          '("x"))
   (check= (tm '(meta (title "From the file")) '(p (@ (role "title")) "T"))
           '((doc-data (doc-title "T")))))
 
@@ -1355,9 +1611,13 @@
 ;; TeXmacs trees as office trees
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(define (no-setup l)
+  ;; the blocks l without the page and the font of their document
+  (list-filter l (lambda (b) (not (func? b 'setup)))))
+
 (define (of t)
   ;; the blocks of the office tree of a TeXmacs tree
-  (cdr (texmacs->office t '())))
+  (no-setup (cdr (texmacs->office t '()))))
 
 (define (test-tmoffice-text)
   (check-group "tmoffice text")
@@ -1389,7 +1649,7 @@
 (define (test-tmoffice-blocks)
   (check-group "tmoffice blocks")
   ;; the first level of headings which is used is the level 1
-  (check= (of '(document (subsection "S") "text" (subsubsection "T")))
+  (check= (of '(document (subsection* "S") "text" (subsubsection* "T")))
           '((p (@ (role "heading") (level "1")) "S") (p "text")
             (p (@ (role "heading") (level "2")) "T")))
   (check= (of '(itemize (document (concat (item) "a") (concat (item) "b")
@@ -1422,7 +1682,7 @@
                                    (doc-author (author-data (author-name "A")))
                                    (doc-date "2026"))
                          (abstract-data (abstract (document "Abs.")))
-                         (section "S") "x"))))
+                         (section* "S") "x"))))
           '((p (@ (role "title")) "T") (p (@ (role "author")) "A")
             (p (@ (role "date")) "2026") (p (@ (role "abstract")) "Abs.")
             (p (@ (role "heading") (level "1")) "S") (p "x"))))
@@ -1613,12 +1873,12 @@
               "Pictures/image2.png" "Formula-3/content.xml"))
     (check= (cadr (zip-unpack odt)) "application/vnd.oasis.opendocument.text")
     ;; what is written is read back the same
-    (check= (cdr (parse-docx-document docx))
+    (check= (no-setup (cdr (parse-docx-document docx)))
             '((p "a " (em "b") (note (p "n")))
               (p (image (@ (name "image1.png") (data "PNGDATA") (width "2cm")
                            (height "1cm"))))
               (p (math (@ (form "sxml")) (m:math (m:mi "x"))))))
-    (check= (list-head (cdr (parse-odt-document odt)) 2)
+    (check= (list-head (no-setup (cdr (parse-odt-document odt))) 2)
             '((p "a " (em "b") (note (p "n")))
               (p (image (@ (name "image2.png") (data "PNGDATA") (width "2cm")
                            (height "1cm")))))))
@@ -1630,19 +1890,21 @@
          (odt (serialize-odt-document tree)))
     (check-true (in? "word/media/image1.svg" (archive-names docx)))
     (check-true (in? "Pictures/image1.svg" (archive-names odt)))
-    (check= (cdr (parse-docx-document docx))
+    (check= (no-setup (cdr (parse-docx-document docx)))
             '((p (image (@ (name "image1.png") (data "PNGDATA") (width "2cm")
                            (height "1cm"))))))
-    (check= (cdr (parse-odt-document odt))
+    (check= (no-setup (cdr (parse-odt-document odt)))
             '((p (image (@ (name "image1.png") (data "PNGDATA") (width "2cm")
                            (height "1cm")))))))
   ;; the text of XML: its characters are escaped, the control ones removed
   (check= (ox-serialize-element '(a (@ (x "1 & \"2\"")) "t < u" (b)))
           "<a x=\"1 &amp; &quot;2&quot;\">t &lt; u<b/></a>")
   ;; an empty document is a document
-  (check= (convert (serialize-docx-document '(office)) "docx-document" "texmacs-stree")
+  (check= (list-head (convert (serialize-docx-document '(office))
+                              "docx-document" "texmacs-stree") 3)
           '(document (body (document "")) (style "generic")))
-  (check= (convert (serialize-odt-document '(office)) "odt-document" "texmacs-stree")
+  (check= (list-head (convert (serialize-odt-document '(office))
+                              "odt-document" "texmacs-stree") 3)
           '(document (body (document "")) (style "generic"))))
 
 ;; These trees come back as they are from both formats.
@@ -1793,7 +2055,7 @@
 (define (test-export-blocks)
   (check-group "export blocks")
   ;; an appendix is a heading of the first level which is in use
-  (check= (of '(document (section "S") (subsection "T") (appendix "A")))
+  (check= (of '(document (section* "S") (subsection* "T") (appendix "A")))
           '((p (@ (role "heading") (level "1")) "S")
             (p (@ (role "heading") (level "2")) "T")
             (p (@ (role "heading") (level "1")) "A")))
@@ -1933,12 +2195,12 @@
   (check= (convert (docx-archive (string-append (wp (wstyle "Titre1") (wr "Intro"))
                                                 (wp (wr "a ") (wr "b" "<w:i/>"))))
                    "docx-document" "texmacs-stree")
-          '(document (body (document (section "Intro") (concat "a " (em "b"))))
+          '(document (body (document (section* "Intro") (concat "a " (em "b"))))
                      (style "generic")))
   (check= (convert (odt-archive (string-append "<text:h text:outline-level='1'>Intro</text:h>"
                                                (tp "a " (tspan "Emphasis" "b"))))
                    "odt-document" "texmacs-stree")
-          '(document (body (document (section "Intro") (concat "a " (em "b"))))
+          '(document (body (document (section* "Intro") (concat "a " (em "b"))))
                      (style "generic")))
   ;; a file which is no archive is a document which says so
   (check= (convert "not an archive" "odt-document" "texmacs-stree")
@@ -1958,6 +2220,7 @@
   (test-xml-limits)
   (test-office-long)
   (test-office-odd-values)
+  (test-office-fidelity)
   (test-lengths)
   (test-docx-text)
   (test-docx-links)

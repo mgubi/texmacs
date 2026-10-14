@@ -36,6 +36,12 @@
 (define docx-notes (make-ahash-table))    ; (kind . id) -> element
 (define docx-open-notes '())              ; the notes which are being read
 (define docx-fields '())                  ; the fields which are open
+(define docx-list-formats (make-ahash-table)) ; (list id . level) -> (format start)
+(define docx-defaults '())                ; the properties of docDefaults
+(define docx-default-style #f)            ; the style of the usual paragraphs
+(define docx-body-styles (make-ahash-table)) ; style id -> plain paragraphs
+(define docx-floats '())                  ; blocks found inside a paragraph
+(define docx-theme-fonts '())             ; ("minor" . font) ("major" . font)
 
 (define (docx-val x)
   ;; the value of an element such as <w:jc w:val="center"/>
@@ -88,13 +94,50 @@
           (if (and f (ox-attr f 'w:ascii))
               (list (cons 'code (office-monospace? (ox-attr f 'w:ascii))))
               '()))
+        (with f (docx-font (ox-child x 'w:rFonts))
+          (if f (list (cons 'font f)) '()))
+        (with v (office-number (docx-child-val x 'w:sz))
+          (if (and v (> v 0)) (list (cons 'size (/ v 2.0))) '()))
         (with s (docx-child-val x 'w:rStyle)
           (if s (list (cons 'style s)) '())))))
+
+(define (docx-font f)
+  ;; the font of an element w:rFonts: its own, or the one of the theme
+  (and f (or (ox-attr f 'w:ascii) (ox-attr f 'w:hAnsi)
+             (with th (or (ox-attr f 'w:asciiTheme) (ox-attr f 'w:hAnsiTheme))
+               (and th (assoc-ref docx-theme-fonts
+                                  (if (string-starts? th "major") "major" "minor")))))))
+
+(define (docx-twips->points v)
+  (with n (office-number v)
+    (and n (/ n 20.0))))
+
+(define (docx-spacing-properties x)
+  ;; the spaces around a paragraph and between its lines, its indentation
+  ;; of the first line
+  (let ((sp (ox-child x 'w:spacing))
+        (ind (ox-child x 'w:ind)))
+    (append
+      (with v (and sp (docx-twips->points (ox-attr sp 'w:before)))
+        (if v (list (cons 'space-before v)) '()))
+      (with v (and sp (docx-twips->points (ox-attr sp 'w:after)))
+        (if v (list (cons 'space-after v)) '()))
+      ;; lines of 240 are single ones, when their rule is auto
+      (with v (and sp (office-number (ox-attr sp 'w:line)))
+        (if (and v (> v 0) (in? (ox-attr sp 'w:lineRule) '(#f "auto")))
+            (list (cons 'line-spacing (/ v 240.0)))
+            '()))
+      (cond ((and ind (docx-twips->points (ox-attr ind 'w:firstLine)))
+             => (lambda (v) (list (cons 'first-indent v))))
+            ((and ind (docx-twips->points (ox-attr ind 'w:hanging)))
+             => (lambda (v) (list (cons 'first-indent (- v)))))
+            (else '())))))
 
 (define (docx-paragraph-properties x)
   ;; the properties of an element w:pPr
   (if (not x) '()
       (append
+        (docx-spacing-properties x)
         (with v (docx-child-val x 'w:jc)
           (if v (list (cons 'align v)) '()))
         (with v (office-integer (docx-child-val x 'w:outlineLvl) #f -1 9)
@@ -125,8 +168,15 @@
   (set! docx-style-memo (make-ahash-table))
   (with root (office-xml docx-archive "word/styles.xml")
     (when root
+      (with d (ox-child root 'w:docDefaults)
+        (set! docx-defaults
+              (append (docx-paragraph-properties (ox-path d 'w:pPrDefault 'w:pPr))
+                      (docx-text-properties (ox-path d 'w:rPrDefault 'w:rPr)))))
       (for (x (ox-childs root 'w:style))
         (with id (ox-attr x 'w:styleId)
+          (when (and id (== (ox-attr x 'w:type) "paragraph")
+                     (in? (ox-attr x 'w:default) '("1" "true" "on")))
+            (set! docx-default-style id))
           (when id
             (ahash-set!
               docx-styles id
@@ -138,10 +188,21 @@
                 ;; are not those of a style of runs: they are told apart
                 ;; (a style of lists says in them which list it is)
                 (cond ((in? (ox-attr x 'w:type) '("paragraph" "numbering"))
-                       (docx-paragraph-properties (ox-child x 'w:pPr)))
+                       (append (docx-paragraph-properties (ox-child x 'w:pPr))
+                               (docx-text-properties (ox-child x 'w:rPr))))
                       ((== (ox-attr x 'w:type) "table")
                        (docx-table-style-properties x))
                       (else (docx-run-properties (ox-child x 'w:rPr))))))))))))
+
+(define (docx-text-properties x)
+  ;; the size and the font of the text of a style of paragraphs, apart
+  ;; from those of its runs
+  (if (not x) '()
+      (append
+        (with v (office-number (docx-child-val x 'w:sz))
+          (if (and v (> v 0)) (list (cons 'text-size (/ v 2.0))) '()))
+        (with f (docx-font (ox-child x 'w:rFonts))
+          (if f (list (cons 'text-font f)) '())))))
 
 (define (docx-get props key)
   (with p (assoc key props) (and p (cdr p))))
@@ -283,12 +344,35 @@
               (ahash-set! docx-lists (cons id 'group) aid)
               (for (lvl (ox-childs (docx-linked-list a abstract nums) 'w:lvl))
                 (ahash-set! docx-lists (cons id (ox-attr lvl 'w:ilvl))
-                            (docx-list-format lvl)))
+                            (docx-list-format lvl))
+                (docx-set-format id lvl #f))
               (for (o (ox-childs x 'w:lvlOverride))
                 (with lvl (ox-child o 'w:lvl)
                   (when (and lvl (ox-child lvl 'w:numFmt))
                     (ahash-set! docx-lists (cons id (ox-attr o 'w:ilvl))
-                                (docx-list-format lvl))))))))))))
+                                (docx-list-format lvl))
+                    (docx-set-format id lvl #f)))
+                ;; a list which starts at another number
+                (with v (docx-child-val o 'w:startOverride)
+                  (with f (ahash-ref docx-list-formats (cons id (ox-attr o 'w:ilvl)))
+                    (when v
+                      (ahash-set! docx-list-formats (cons id (ox-attr o 'w:ilvl))
+                                  (list (if f (car f) "1") v)))))))))))))
+
+(define (docx-number-format lvl)
+  ;; the way of numbering of a level: 1, a, A, i or I
+  (with f (docx-child-val lvl 'w:numFmt)
+    (cond ((== f "lowerLetter") "a")
+          ((== f "upperLetter") "A")
+          ((== f "lowerRoman") "i")
+          ((== f "upperRoman") "I")
+          (else "1"))))
+
+(define (docx-set-format id lvl start)
+  ;; the format and the start of the level lvl of the list id
+  (ahash-set! docx-list-formats (cons id (ox-attr lvl 'w:ilvl))
+              (list (docx-number-format lvl)
+                    (or start (docx-child-val lvl 'w:start)))))
 
 (define (docx-list-kind id level)
   (or (ahash-ref docx-lists (cons id level)) "bullet"))
@@ -330,9 +414,22 @@
         ((func? x tag) (list x))
         (else (append-map (lambda (y) (docx-find-all y tag)) (ox-children x)))))
 
+(define (docx-text-boxes x)
+  ;; the paragraphs of the boxes of text inside x: they come after the
+  ;; paragraph which the box is in, as its text would not fit in a line
+  (for (box (docx-find-all x 'w:txbxContent))
+    (let ((old-fields docx-fields)
+          (old-floats docx-floats))
+      (set! docx-fields '())
+      (set! docx-floats '())
+      (with l (docx-blocks (ox-children box))
+        (set! docx-fields old-fields)
+        (set! docx-floats (append old-floats l docx-floats))))))
+
 (define (docx-drawing x)
   ;; a picture of DrawingML: its file is the relation of a:blip; a group
   ;; has several pictures, and its size is not the one of each of them
+  (docx-text-boxes x)
   (let* ((blips (docx-find-all x 'a:blip))
          (one? (list-1? blips))
          (extent (and one? (ox-find x 'wp:extent)))
@@ -348,6 +445,7 @@
 
 (define (docx-picture x)
   ;; a picture of VML, in older documents
+  (docx-text-boxes x)
   (with data (ox-find x 'v:imagedata)
     (if (not data) '()
         (docx-image-node (ox-attr data 'r:id) "" ""
@@ -546,11 +644,13 @@
         ((func? x 'mc:AlternateContent)
          ;; the first of the choices and of the fallback which gives
          ;; something: a choice may be a drawing which is not read
+         ;; (or a box of text, whose paragraphs come after the paragraph)
          (let loop ((l (append (ox-childs x 'mc:Choice)
                                (ox-childs x 'mc:Fallback))))
            (if (null? l) '()
-               (with r (append-map docx-run-item (ox-children (car l)))
-                 (if (null? r) (loop (cdr l)) r)))))
+               (let* ((floats docx-floats)
+                      (r (append-map docx-run-item (ox-children (car l)))))
+                 (if (and (null? r) (eq? floats docx-floats)) (loop (cdr l)) r)))))
         ((func? x 'w:footnoteReference) (docx-note 'foot (ox-attr x 'w:id)))
         ((func? x 'w:endnoteReference) (docx-note 'end (ox-attr x 'w:id)))
         (else '())))
@@ -562,7 +662,19 @@
     (if (and (pair? w) (== (car w) 'hidden)) '()
         (append-map (lambda (x)
                       (if (string? x) (office-wrap (list x) w) (list x)))
-                    (append-map docx-run-item (ox-children r))))))
+                    (append-map docx-run-item (docx-run-children r))))))
+
+(define (docx-run-children r)
+  ;; the children of a run; the mark of a note which the run writes after
+  ;; it (a star) is left out: the note has its own
+  (with l (ox-children r)
+    (if (list-or (map (lambda (x)
+                        (and (pair? x)
+                             (in? (car x) '(w:footnoteReference w:endnoteReference))
+                             (in? (ox-attr x 'w:customMarkFollows) '("1" "true" "on"))))
+                      l))
+        (list-filter l (lambda (x) (not (func? x 'w:t))))
+        l)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The text of a paragraph, with its links and its fields
@@ -619,7 +731,10 @@
   (let* ((f (docx-field-parse instr))
          (name (car f))
          (arg (if (null? (cadr f)) "" (caadr f))))
-    (cond ((null? l) l)
+    (cond ((and (null? l) (in? name '("ref" "pageref")) (!= arg ""))
+           ;; (a reference whose result was not computed: TeXmacs does it)
+           (list `(ref (@ (name ,arg) ,@(if (== name "pageref") '((kind "page")) '())))))
+          ((null? l) l)
           ((== name "hyperlink")
            ;; an address, a bookmark in it (the switch \l), or both
            (let* ((mark (assoc-ref (caddr f) "\\l"))
@@ -739,49 +854,89 @@
 
 (define (docx-paragraph x)
   ;; the paragraph, with the list it is an item of as attributes list-id,
-  ;; list-level and list-kind, for docx-group-lists
+  ;; list-level and list-kind, for docx-group-lists; the boxes of text in
+  ;; it come after it, and a break of page in it cuts it in two
   (let* ((own (docx-paragraph-properties (ox-child x 'w:pPr)))
-         (props (append own (docx-style (docx-get own 'style))))
+         (style (docx-get own 'style))
+         (props (append own (docx-style style)))
          (role (docx-role props))
-         (align (docx-get props 'align))
+         ;; (the alignment of its style, when it is not the usual one)
+         (align (or (docx-get own 'align)
+                    (with a (docx-get props 'align)
+                      (and (!= a (docx-get (append (docx-style docx-default-style)
+                                                   docx-defaults)
+                                           'align))
+                           a))))
          (id (docx-get props 'list-id))
          (level (or (docx-get props 'list-level) "0"))
          (kind (and id (docx-list-kind id level)))
+         (format (and id (ahash-ref docx-list-formats (cons id level))))
          ;; a level without a mark is no item
          (more? (and id (!= id "0") (not (car role)) (== kind "none")))
          (item? (and id (!= id "0") (not (car role)) (not more?)))
-         (l (with r (docx-inlines-sub (ox-children x) docx-fields)
-              (set! docx-fields (cdr r))
-              (office-merge (car r)))))
+         (old-floats docx-floats)
+         (l (begin
+              (set! docx-floats '())
+              (with r (docx-inlines-sub (ox-children x) docx-fields)
+                (set! docx-fields (cdr r))
+                (office-merge (car r)))))
+         (floats (with f docx-floats (set! docx-floats old-floats) f))
+         (attrs `((role ,(car role)) (level ,(cadr role))
+                  (align ,(cond ((== align "center") "center")
+                                ((in? align '("right" "end")) "right")
+                                ((in? align '("both" "distribute")) "justify")
+                                ((in? align '("left" "start")) "left")
+                                (else #f)))
+                  ;; a heading has a number when its list numbers it
+                  (numbered ,(and (== (car role) "heading")
+                                  (not (and id (!= id "0") (== kind "number")))
+                                  "no"))
+                  (dropcap ,(and (docx-get own 'dropcap) "true"))
+                  ;; a plain paragraph which is indented, as one more
+                  ;; paragraph of an item is
+                  (list-more ,(with ind (docx-get own 'indent)
+                                (cond (more?
+                                       (number->string
+                                         (+ (office-integer level 0 0 8) 1)))
+                                      ((and ind (>= ind 600) (not item?)
+                                            (not (car role)))
+                                       (number->string
+                                         (quotient (+ ind 120) 720)))
+                                      (else #f))))
+                  (list-id ,(and item? (docx-list-group id)))
+                  (list-level ,(and item? level))
+                  (list-kind ,(and item? kind))
+                  (list-num ,(and item? id))
+                  (list-format ,(and item? format (car format)))
+                  (list-start ,(and item? format (cadr format))))))
+    ;; (the style of the usual paragraphs is the one of most of them)
+    (when (and (not (car role)) (not id) (null? docx-open-notes))
+      (with k (or style "")
+        (ahash-set! docx-body-styles k (+ 1 (or (ahash-ref docx-body-styles k) 0)))))
     (append
       (if (docx-get own 'page-break) '((pagebreak)) '())
       (if (and (null? l) (not item?)) '()
-          (list (apply office-node
-                       (cons* 'p
-                              `((role ,(car role)) (level ,(cadr role))
-                                (align ,(cond ((== align "center") "center")
-                                              ((in? align '("right" "end")) "right")
-                                              (else #f)))
-                                ;; a heading which says that it has no
-                                ;; number, where the others have one
-                                (numbered ,(and (== (car role) "heading")
-                                                (== id "0") "no"))
-                                (dropcap ,(and (docx-get own 'dropcap) "true"))
-                                ;; a plain paragraph which is indented, as
-                                ;; one more paragraph of an item is
-                                (list-more ,(with ind (docx-get own 'indent)
-                                              (cond (more?
-                                                     (number->string
-                                                       (+ (office-integer level 0 0 8) 1)))
-                                                    ((and ind (>= ind 600) (not item?)
-                                                          (not (car role)))
-                                                     (number->string
-                                                       (quotient (+ ind 120) 720)))
-                                                    (else #f))))
-                                (list-id ,(and item? (docx-list-group id)))
-                                (list-level ,(and item? level))
-                                (list-kind ,(and item? kind)))
-                              l)))))))
+          (docx-cut-pages l attrs))
+      floats)))
+
+(define (docx-cut-pages l attrs)
+  ;; the paragraph of the nodes l, or several when a break of page is in
+  ;; it: the paragraphs after the first are plain ones
+  (let loop ((l l) (part '()) (acc '()) (first? #t))
+    (let ((flush (lambda ()
+                   (if (and (null? part)
+                            (not (and first? (cadr (assoc 'list-id attrs)))))
+                       acc
+                       (cons (apply office-node
+                                    (cons* 'p (if first? attrs
+                                                  (list-filter attrs
+                                                    (lambda (a) (== (car a) 'align))))
+                                           (reverse part)))
+                             acc)))))
+      (cond ((null? l) (reverse (flush)))
+            ((func? (car l) 'pagebreak)
+             (loop (cdr l) '() (cons '(pagebreak) (flush)) #f))
+            (else (loop (cdr l) (cons (car l) part) acc first?))))))
 
 ;; The borders of a table are those of its style, of the table itself and
 ;; of each cell, in this order. A style has borders for the whole table
@@ -1149,7 +1304,10 @@
          (cons* 'p
                 (list-filter (ox-attrs p)
                              (lambda (a) (not (in? (car a) '(list-id list-level
-                                                             list-kind list-more)))))
+                                                             list-kind list-more
+                                                             list-format
+                                                             list-start
+                                                             list-num)))))
                 (ox-children p))))
 
 (define (docx-item-level x)
@@ -1160,7 +1318,9 @@
   ;; (list . rest): the list of the items at the start of l which are at
   ;; this level or deeper, the deeper ones as lists inside the items
   (let* ((id (ox-attr (car l) 'list-id))
-         (kind (ox-attr (car l) 'list-kind)))
+         (kind (ox-attr (car l) 'list-kind))
+         (format (and (== kind "number") (ox-attr (car l) 'list-format)))
+         (start (and (== kind "number") (ox-attr (car l) 'list-start))))
     (let loop ((l l) (items '()))
       (with n (and (pair? l) (docx-item-level (car l)))
         (cond ((and (pair? l) (pair? items) (func? (car l) 'p)
@@ -1175,7 +1335,13 @@
                    (and (== n level)
                         (or (!= (ox-attr (car l) 'list-id) id)
                             (!= (ox-attr (car l) 'list-kind) kind))))
-               (cons `(list (@ (kind ,kind)) ,@(reverse items)) l))
+               (cons (apply office-node
+                            (cons* 'list
+                                   `((kind ,kind)
+                                     (format ,(and (!= format "1") format))
+                                     (start ,(and (!= start "1") start)))
+                                   (reverse items)))
+                     l))
               ((== n level)
                (loop (cdr l)
                      (cons (list 'item (docx-plain-paragraph (car l))) items)))
@@ -1188,16 +1354,33 @@
                             (cons (append (car items) (list (car sub)))
                                   (cdr items)))))))))))
 
+(define (docx-continued x key counts)
+  ;; the list x, which goes on with the numbers of the list key before it:
+  ;; the items of one list of Word may be apart, with text between them
+  (let* ((n (length (list-filter (ox-children x) (lambda (y) (func? y 'item)))))
+         (before (ahash-ref counts key)))
+    (ahash-set! counts key (+ n (or before 0)))
+    (if (or (not before) (!= (ox-attr x 'kind) "number")) x
+        (apply office-node
+               (cons* 'list
+                      (append (list-filter (ox-attrs x)
+                                           (lambda (a) (!= (car a) 'start)))
+                              `((start ,(number->string
+                                          (+ before (office-integer (ox-attr x 'start)
+                                                                    1 0 100000))))))
+                      (ox-children x))))))
+
 (define (docx-group-lists l)
   ;; (loops, here and below: a document may have many thousands of blocks)
-  (let loop ((l l) (acc '()))
+  (let loop ((l l) (acc '()) (counts (make-ahash-table)))
     (cond ((null? l) (reverse acc))
           ((docx-item-level (car l))
-           (with r (docx-list l (docx-item-level (car l)))
-             (loop (cdr r) (cons (car r) acc))))
+           (let* ((key (cons (ox-attr (car l) 'list-num) (ox-attr (car l) 'list-level)))
+                  (r (docx-list l (docx-item-level (car l)))))
+             (loop (cdr r) (cons (docx-continued (car r) key counts) acc) counts)))
           ((and (func? (car l) 'p) (ox-attr (car l) 'list-more))
-           (loop (cdr l) (cons (docx-plain-paragraph (car l)) acc)))
-          (else (loop (cdr l) (cons (car l) acc))))))
+           (loop (cdr l) (cons (docx-plain-paragraph (car l)) acc) counts))
+          (else (loop (cdr l) (cons (car l) acc) counts)))))
 
 (define (docx-drop-caps l)
   ;; a large first letter is a paragraph of its own: it is the start of
@@ -1215,8 +1398,17 @@
                  acc))
           (else (loop (cdr l) (cons (car l) acc))))))
 
+(define (docx-single-breaks l)
+  ;; a break of page at the end of a paragraph and another one before the
+  ;; next are one
+  (let loop ((l l) (acc '()))
+    (cond ((null? l) (reverse acc))
+          ((and (func? (car l) 'pagebreak) (pair? acc) (func? (car acc) 'pagebreak))
+           (loop (cdr l) acc))
+          (else (loop (cdr l) (cons (car l) acc))))))
+
 (define (docx-blocks l)
-  (docx-group-lists (docx-drop-caps (docx-blocks-sub l))))
+  (docx-group-lists (docx-drop-caps (docx-single-breaks (docx-blocks-sub l)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Interface
@@ -1233,6 +1425,66 @@
                             '()))))
                (l (append (get 'dc:title 'title) (get 'dc:creator 'author))))
           (if (null? l) '() (list (cons 'meta l)))))))
+
+(define (docx-read-theme)
+  ;; the fonts of the theme, which the styles may name
+  (set! docx-theme-fonts '())
+  (let* ((root (office-xml docx-archive "word/theme/theme1.xml"))
+         (scheme (and root (ox-find root 'a:fontScheme)))
+         (font (lambda (tag)
+                 (with x (and scheme (ox-path scheme tag 'a:latin))
+                   (and x (ox-attr x 'typeface))))))
+    (when (font 'a:minorFont)
+      (set! docx-theme-fonts (cons (cons "minor" (font 'a:minorFont)) docx-theme-fonts)))
+    (when (font 'a:majorFont)
+      (set! docx-theme-fonts (cons (cons "major" (font 'a:majorFont)) docx-theme-fonts)))))
+
+(define (docx-body-style)
+  ;; the style of most of the plain paragraphs, or the usual one
+  (let ((best #f) (n 0))
+    (for (kv (ahash-table->list docx-body-styles))
+      (when (> (cdr kv) n) (set! best (car kv)) (set! n (cdr kv))))
+    (if (and best (!= best "")) best docx-default-style)))
+
+(define (docx-twips->length v)
+  (with n (office-number v)
+    (and n (>= n 0) (string-append (office-decimal (/ n 567.0)) "cm"))))
+
+(define (docx-setup body)
+  ;; the page of the last section, and the usual paragraph
+  (let* ((sect (and body (list-find (reverse (ox-children body))
+                                    (lambda (x) (func? x 'w:sectPr)))))
+         (size (and sect (ox-child sect 'w:pgSz)))
+         (mar (and sect (ox-child sect 'w:pgMar)))
+         (props (append (docx-style (docx-body-style)) docx-defaults))
+         (num (lambda (key) (with v (docx-get props key)
+                              (and v (office-decimal v)))))
+         (font (docx-get props 'text-font))
+         (align (docx-get props 'align))
+         (attrs `((page-width ,(and size (docx-twips->length (ox-attr size 'w:w))))
+                  (page-height ,(and size (docx-twips->length (ox-attr size 'w:h))))
+                  (landscape ,(and size (== (ox-attr size 'w:orient) "landscape")
+                                   "true"))
+                  (margin-top ,(and mar (docx-twips->length (ox-attr mar 'w:top))))
+                  (margin-bottom ,(and mar (docx-twips->length (ox-attr mar 'w:bottom))))
+                  (margin-left ,(and mar (docx-twips->length (ox-attr mar 'w:left))))
+                  (margin-right ,(and mar (docx-twips->length (ox-attr mar 'w:right))))
+                  (font-size ,(num 'text-size))
+                  (font ,(cond ((not font) #f)
+                               ((office-monospace? font) "mono")
+                               ((office-sans? font) "sans")
+                               (else #f)))
+                  (first-indent ,(num 'first-indent))
+                  (space-before ,(num 'space-before))
+                  (space-after ,(num 'space-after))
+                  (line-spacing ,(num 'line-spacing))
+                  ;; (left when the file says nothing, as Word does)
+                  (align ,(cond ((in? align '("both" "distribute")) "justify")
+                                ((== align "center") "center")
+                                ((in? align '("right" "end")) "right")
+                                ((or align size) "left")
+                                (else #f))))))
+    (if (list-or (map cadr attrs)) (list (office-node 'setup attrs)) '())))
 
 (define (docx-main-part)
   ;; the entry of the text: the one which _rels/.rels names, or the usual
@@ -1270,6 +1522,12 @@
     (set! docx-notes (make-ahash-table))
     (set! docx-open-notes '())
     (set! docx-fields '())
+    (set! docx-list-formats (make-ahash-table))
+    (set! docx-defaults '())
+    (set! docx-default-style #f)
+    (set! docx-body-styles (make-ahash-table))
+    (set! docx-floats '())
+    (set! docx-theme-fonts '())
     r))
 
 (define (docx-parse s)
@@ -1281,7 +1539,15 @@
         (set! docx-notes (make-ahash-table))
         (set! docx-open-notes '())
         (set! docx-fields '())
+        (set! docx-list-formats (make-ahash-table))
+        (set! docx-defaults '())
+        (set! docx-default-style #f)
+        (set! docx-body-styles (make-ahash-table))
+        (set! docx-floats '())
+        (docx-read-theme)
         (docx-read-styles)
+        (when (and (not docx-default-style) (ahash-ref docx-styles "Normal"))
+          (set! docx-default-style "Normal"))
         (docx-read-lists)
         (for (part (list docx-part "word/footnotes.xml" "word/endnotes.xml"))
           (docx-read-rels part))
@@ -1289,7 +1555,8 @@
         (docx-read-notes "word/endnotes.xml" 'w:endnote 'end)
         (let* ((root (office-xml docx-archive docx-part))
                (body (and root (ox-child root 'w:body)))
+               (blocks (and body (docx-blocks (ox-children body))))
                (r (if body
-                      `(office ,@(docx-meta) ,@(docx-blocks (ox-children body)))
+                      `(office ,@(docx-meta) ,@(docx-setup body) ,@blocks)
                       (docx-error "This Word document has no text"))))
           r))))

@@ -42,6 +42,9 @@
 
 (define (tmof-initialize opts)
   (set! tmof-flat? #f)
+  (set! tmof-heading-counts (make-list 7 0))
+  (set! tmof-heading-first 7)
+  (set! tmof-part-nr 0)
   (set! tmof-seqs (make-ahash-table))
   (set! tmof-seq-nr 0))
 
@@ -764,7 +767,8 @@
 (define (tmof-specific l)
   ;; what is for another medium only is left out
   (cond ((< (length l) 2) '())
-        ((in? (car l) '("texmacs" "screen" "printer" "image")) (tmof (cadr l)))
+        ;; (not what is drawn on the screen only: a mark of a space)
+        ((in? (car l) '("texmacs" "printer" "image")) (tmof (cadr l)))
         (else '())))
 
 (define (tmof-reference l)
@@ -902,10 +906,55 @@
                       ((tmof-numbered-title (car l)) => identity)
                       (else (loop (cdr l))))))))
 
+(define (tmof-named-title x)
+  ;; (number . title) when the tree x of a title is "Chapter 1", a line
+  ;; and the title, as the styles make the title of a chapter; else #f
+  (and (func? x 'concat) (pair? (cdr x)) (string? (cadr x))
+       (let* ((words (string-tokenize-by-char (cadr x) #\space))
+              (n (and (== (length words) 2) (cadr words)))
+              (rest (let loop ((r (cddr x)))
+                      (cond ((null? r) #f)
+                            ((func? (car r) 'new-line) (cdr r))
+                            ((and (pair? (car r)) (in? (caar r) '(vspace vspace*)))
+                             (loop (cdr r)))
+                            (else #f)))))
+         (and n rest (pair? rest)
+              (or (tmof-number? n)
+                  (list-and (map (lambda (c) (in? c '(#\I #\V #\X #\L #\C)))
+                                 (string->list n))))
+              (cons n (if (list-1? rest) (car rest) (cons 'concat rest)))))))
+
 (define (tmof-heading level l)
   ;; a heading; its number, when it has one, is kept apart: the office
-  ;; programs number the headings themselves
-  (let* ((parts (and (list-1? l) (tmof-numbered-title (car l))))
+  ;; programs number the headings themselves. A part or a chapter starts
+  ;; a page.
+  (append
+    (if (in? level '(0 1)) '((!pagebreak)) '())
+    (if (in? level '(top 1)) (tmof-heading* level (tmof-appendix-title l))
+        (tmof-heading* level l))))
+
+(define (tmof-appendix-title l)
+  ;; "Appendix A", a line and the title are "Appendix A. The title": the
+  ;; office programs number the appendices as the chapters
+  (or (and (list-1? l) (func? (car l) 'concat) (pair? (cdar l)) (string? (cadar l))
+           ;; (not "Chapter 1": a chapter has its number)
+           (with w (string-tokenize-by-char (cadar l) #\space)
+             (not (and (== (length w) 2) (tmof-number? (cadr w)))))
+           (let* ((x (car l))
+                  (rest (let loop ((r (cddr x)))
+                          (cond ((null? r) #f)
+                                ((func? (car r) 'new-line) (cdr r))
+                                ((and (pair? (car r)) (in? (caar r) '(vspace vspace*)))
+                                 (loop (cdr r)))
+                                (else #f)))))
+             (and rest (pair? rest)
+                  (list `(concat ,(cadr x) ". " ,@rest)))))
+      l))
+
+(define (tmof-heading* level l)
+  (let* ((parts (and (list-1? l)
+                     (or (tmof-numbered-title (car l))
+                         (and (in? level '(0 1)) (tmof-named-title (car l))))))
          ;; (the number is the text of its cell, without the space after it)
          (number (and parts
                       (with c (car parts)
@@ -924,6 +973,64 @@
       (cond ((null? t) '())
             (number `((!h ,level (!number ,number) ,@t)))
             (else `((!h ,level ,@t)))))))
+
+;; The numbers of the headings of a document which was not expanded, as
+;; TeXmacs makes them: the counters of the levels from the first one which
+;; is used
+(define tmof-heading-counts (make-list 7 0))
+(define tmof-heading-first 7)
+
+(define tmof-part-nr 0)
+
+(define (tmof-roman n)
+  ;; the number n < 4000 in capital Roman numerals
+  (let loop ((n n) (l '((1000 . "M") (900 . "CM") (500 . "D") (400 . "CD")
+                        (100 . "C") (90 . "XC") (50 . "L") (40 . "XL") (10 . "X")
+                        (9 . "IX") (5 . "V") (4 . "IV") (1 . "I")))
+             (acc ""))
+    (cond ((or (<= n 0) (null? l)) acc)
+          ((>= n (caar l)) (loop (- n (caar l)) l (string-append acc (cdar l))))
+          (else (loop n (cdr l) acc)))))
+
+(define (tmof-part-heading l)
+  ;; a part: "Part I. Its title", a heading of the first level without a
+  ;; number of the office programs, which do not count the chapters by
+  ;; parts
+  (set! tmof-part-nr (+ tmof-part-nr 1))
+  (append '((!pagebreak))
+          (tmof-heading* 0 (list `(concat ,(string-append "Part " (tmof-roman tmof-part-nr)
+                                                          ". ")
+                                          ,@(if (null? l) '() (list (car l))))))))
+
+(define (tmof-part-numbered-title l) (tmof-part-heading l))
+
+(define (tmof-counted-heading level l)
+  (if (== level 0) (tmof-part-heading l)
+      (tmof-counted-heading* level l)))
+
+(define (tmof-counted-heading* level l)
+  (set! tmof-heading-first (min tmof-heading-first level))
+  (set! tmof-heading-counts
+        (map (lambda (n i) (cond ((== i level) (+ n 1)) ((> i level) 0) (else n)))
+             tmof-heading-counts (iota 7)))
+  (let* ((number (string-recompose
+                   (map number->string
+                        (list-tail (list-head tmof-heading-counts (+ level 1))
+                                   tmof-heading-first))
+                   "."))
+         (t (with old tmof-flat?
+              (set! tmof-flat? #t)
+              (with r (tmof-trim (tmof-inline (tmof-all l)))
+                (set! tmof-flat? old)
+                r))))
+    (append (if (in? level '(0 1)) '((!pagebreak)) '())
+            (if (null? t) '() `((!h ,level (!number ,number) ,@t))))))
+
+(define (tmof-part-numbered l) (tmof-counted-heading 0 l))
+(define (tmof-chapter-numbered l) (tmof-counted-heading 1 l))
+(define (tmof-section-numbered l) (tmof-counted-heading 2 l))
+(define (tmof-subsection-numbered l) (tmof-counted-heading 3 l))
+(define (tmof-subsubsection-numbered l) (tmof-counted-heading 4 l))
 
 (define (tmof-part l) (tmof-heading 0 l))
 (define (tmof-chapter l) (tmof-heading 1 l))
@@ -1047,12 +1154,14 @@
           ;; text before the first item
           (else (loop (cdr l) (list (car l) '(item)) acc)))))
 
-(define (tmof-list tag l)
+(define (tmof-list tag l . format)
+  ;; a list; a numbered one may have a way of numbering (a, A, i, I)
   (let* ((body (if (null? l) '(document) (car l)))
          (pars (if (func? body 'document) (cdr body) (list body)))
          (items (tmof-items pars)))
     (if (null? items) '()
         `((,tag
+           ,@(if (null? format) '() `((@ (format ,(car format)))))
            ,@(map (lambda (it)
                     (let* ((item (car it))
                            (check (tmof-check item))
@@ -1071,6 +1180,10 @@
 
 (define (tmof-itemize l) (tmof-list 'ul l))
 (define (tmof-enumerate l) (tmof-list 'ol l))
+(define (tmof-enumerate-alpha l) (tmof-list 'ol l "a"))
+(define (tmof-enumerate-Alpha l) (tmof-list 'ol l "A"))
+(define (tmof-enumerate-roman l) (tmof-list 'ol l "i"))
+(define (tmof-enumerate-Roman l) (tmof-list 'ol l "I"))
 
 (define (tmof-quotation l)
   (with b (tmof-blocks (tmof-all l))
@@ -1457,6 +1570,8 @@
         ((not (symbol? (car x))) '())
         ((in? (car x) '(page-break new-page page-break* new-page*))
          '((!pagebreak)))
+        ;; what the expansion of the document could not do
+        ((func? x 'error) '())
         ((tmof-drawing? x) (tmof-picture x #t))
         ((tmof-dispatch 'tmoffice-methods% x) => identity)
         ((assoc (car x) tmof-languages) (tmof-code-block (car x) (cdr x)))
@@ -1544,12 +1659,19 @@
   (equations-base tmof-equation)
 
   ;; sections and the title
-  ((:or part part* part-title) tmof-part)
-  ((:or chapter chapter* chapter-title) tmof-chapter)
+  ((:or part* part-title) tmof-part)
+  ((:or chapter* chapter-title) tmof-chapter)
   ((:or appendix appendix-title) tmof-appendix)
-  ((:or section section* section-title) tmof-section)
-  ((:or subsection subsection* subsection-title) tmof-subsection)
-  ((:or subsubsection subsubsection* subsubsection-title) tmof-subsubsection)
+  ((:or section* section-title) tmof-section)
+  ((:or subsection* subsection-title) tmof-subsection)
+  ((:or subsubsection* subsubsection-title) tmof-subsubsection)
+  ;; (in a document which was not expanded, the headings with numbers)
+  (part tmof-part-numbered)
+  (part-numbered-title tmof-part-numbered-title)
+  (chapter tmof-chapter-numbered)
+  (section tmof-section-numbered)
+  (subsection tmof-subsection-numbered)
+  (subsubsection tmof-subsubsection-numbered)
   ((:or paragraph paragraph* paragraph-title) tmof-paragraph)
   ((:or subparagraph subparagraph* subparagraph-title) tmof-subparagraph)
   ((:or doc-data office-doc-data) tmof-doc-data)
@@ -1562,9 +1684,11 @@
   ((:or description description-compact description-dash description-aligned
         description-long description-paragraphs)
    tmof-description)
-  ((:or enumerate enumerate-numeric enumerate-roman enumerate-Roman
-        enumerate-alpha enumerate-Alpha)
-   tmof-enumerate)
+  ((:or enumerate enumerate-numeric) tmof-enumerate)
+  (enumerate-alpha tmof-enumerate-alpha)
+  (enumerate-Alpha tmof-enumerate-Alpha)
+  (enumerate-roman tmof-enumerate-roman)
+  (enumerate-Roman tmof-enumerate-Roman)
   ((:or item item*) tmof-noop)
   ((:or quotation quote-env verse) tmof-quotation)
 
@@ -1692,7 +1816,9 @@
              (with items (list-filter (tmof-node-children x)
                                       (lambda (y) (func? y 'li)))
                (if (null? items) '()
-                   (list `(list (@ (kind ,(if (func? x 'ol) "number" "bullet")))
+                   (list `(list (@ (kind ,(if (func? x 'ol) "number" "bullet"))
+                                   ,@(with f (assoc 'format (tmof-node-attrs x))
+                                       (if f (list f) '())))
                                 ,@(map (lambda (item)
                                          (cons 'item
                                                (tmof-final-blocks
@@ -1826,10 +1952,72 @@
 (define (tmof-finalize l)
   ;; the blocks of the office tree: the first level of headings which is
   ;; used is the level 1
-  (with levels (list-filter (append-map tmof-heading-levels l)
-                            (lambda (n) (and (number? n) (>= n 0))))
+  ;; (the parts are headings of the first level too, without number)
+  (let* ((levels (list-filter (append-map tmof-heading-levels l)
+                              (lambda (n) (and (number? n) (>= n 0)))))
+         (levels (if (list-or (map positive? levels))
+                     (list-filter levels positive?)
+                     levels)))
     (set! tmof-top-level (if (null? levels) 0 (apply min levels)))
-    (tmof-bind (tmof-final-blocks l))))
+    (tmof-single-breaks (tmof-bind (tmof-final-blocks l)))))
+
+(define (tmof-single-breaks l)
+  ;; no break of page at the start, and none after another one
+  (let loop ((l l) (acc '()))
+    (cond ((null? l) (reverse acc))
+          ((and (func? (car l) 'pagebreak)
+                (or (null? acc) (func? (car acc) 'pagebreak)))
+           (loop (cdr l) acc))
+          (else (loop (cdr l) (cons (car l) acc))))))
+
+(define tmof-page-sizes
+  ;; the sizes of the usual pages, in centimeters
+  '(("a3" 29.7 42.0) ("a4" 21.0 29.7) ("a5" 14.8 21.0) ("b5" 17.6 25.0)
+    ("letter" 21.59 27.94) ("legal" 21.59 35.56) ("executive" 18.42 26.67)))
+
+(define (tmof-setup init)
+  ;; the block setup for the initial environment of the document: its
+  ;; page, the size and the family of its font
+  (let* ((get (lambda (var)
+                (with v (assoc-ref init var)
+                  (and (string? v) (!= v "") (!= v "auto") v))))
+         (cm (lambda (var) (with v (get var) (and v (office-length->cm v)))))
+         (len (lambda (x) (string-append (office-decimal x) "cm")))
+         (type (or (get "page-type") "a4"))
+         (size (assoc-ref tmof-page-sizes type))
+         (w (if (== type "user") (cm "page-width") (and size (car size))))
+         (h (if (== type "user") (cm "page-height") (and size (cadr size))))
+         (landscape? (== (get "page-orientation") "landscape"))
+         (w* (if (and w h landscape?) (max w h) w))
+         (h* (if (and w h landscape?) (min w h) h))
+         (family (get "font-family"))
+         (base (and (get "font-base-size") (office-number (get "font-base-size"))))
+         (attrs `((page-width ,(and w* h* (len w*)))
+                  (page-height ,(and w* h* (len h*)))
+                  (landscape ,(and landscape? "true"))
+                  (margin-left ,(and (cm "page-odd") (len (cm "page-odd"))))
+                  (margin-right ,(and (cm "page-right") (len (cm "page-right"))))
+                  (margin-top ,(and (cm "page-top") (len (cm "page-top"))))
+                  (margin-bottom ,(and (cm "page-bot") (len (cm "page-bot"))))
+                  (font-size ,(and base (office-decimal base)))
+                  (font ,(cond ((== family "ss") "sans")
+                               ((== family "tt") "mono")
+                               (else #f)))
+                  ;; (the paragraphs of TeXmacs are justified)
+                  (align ,(with m (or (get "par-mode") "justify")
+                            (if (in? m '("left" "center" "right")) m "justify"))))))
+    (if (list-or (map cadr attrs)) (list (office-node 'setup attrs)) '())))
+
+(define (tmof-initial x)
+  ;; the initial environment of the document x, as an association list
+  (with init (and tmof-document? (tmfile-extract x 'initial))
+    (if (func? init 'collection)
+        (append-map (lambda (a)
+                      (if (and (func? a 'associate 2) (string? (cadr a)))
+                          (list (cons (cadr a) (caddr a)))
+                          '()))
+                    (cdr init))
+        '())))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Interface
@@ -1843,4 +2031,5 @@
         (and (func? x 'document) (tmfile-extract x 'body)
              (or (tmfile-extract x 'TeXmacs) (tmfile-extract x 'style))))
   (with body (if tmof-document? (tmfile-extract x 'body) x)
-    `(office ,@(tmof-finalize (tmof-blocks (tmof body))))))
+    `(office ,@(if tmof-document? (tmof-setup (tmof-initial x)) '())
+             ,@(tmof-finalize (tmof-blocks (tmof body))))))

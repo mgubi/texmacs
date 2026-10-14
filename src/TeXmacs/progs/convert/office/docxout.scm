@@ -34,13 +34,14 @@
 (define dx-media '())       ; (name data) of the images, reversed
 (define dx-media-files (make-ahash-table)) ; the bytes of an image -> its files
 (define dx-notes '())       ; the elements of the notes, reversed
-(define dx-lists '())       ; (list kind level) of the lists, reversed
+(define dx-lists '())       ; (id format level start) of the lists, reversed
 (define dx-id 0)            ; the last number given to a thing
 (define dx-in-note? #f)     ; inside a note, whose relations are its own
 (define dx-item #f)         ; (list level) for the next paragraph of an item
 (define dx-indent 0)        ; the depth of the lists around a paragraph
 (define dx-cell-align #f)   ; the alignment of the cell around a paragraph
 (define dx-numbered? #f)    ; the headings are numbered by Word
+(define dx-setup '(setup))  ; the page and the font of the document
 (define dx-bookmarks (make-ahash-table)) ; a label -> its bookmark
 (define dx-bookmark-names (make-ahash-table)) ; the bookmarks which are used
 
@@ -417,12 +418,14 @@
 
 (define (dx-list x)
   ;; a list: each one is a list of its own for Word, so that its numbers
-  ;; start at 1, at the level of its depth
+  ;; start at 1 (or where it says), at the level of its depth
   (let* ((kind (if (== (ox-attr x 'kind) "number") "number" "bullet"))
+         (format (if (== kind "number") (or (ox-attr x 'format) "1") "bullet"))
+         (start (number->string (office-integer (ox-attr x 'start) 1 0 100000)))
          (level dx-indent)
          (id (+ (length dx-lists) 1))
          (old-item dx-item))
-    (set! dx-lists (cons (list id kind level) dx-lists))
+    (set! dx-lists (cons (list id format level start) dx-lists))
     (set! dx-indent (+ level 1))
     (with r (append-map
               (lambda (item)
@@ -638,7 +641,9 @@
 
 (define (dx-style type id name . l)
   ;; a style: its properties of paragraphs and of runs are in l
-  `(w:style (@ (w:type ,type) (w:styleId ,id))
+  `(w:style (@ (w:type ,type) (w:styleId ,id)
+               ;; (the style of the paragraphs which name none)
+               ,@(if (== id "Normal") '((w:default "1")) '()))
             ,(dx-val 'w:name name)
             ,@l))
 
@@ -659,13 +664,37 @@
               `(w:rPr (w:b) ,@(if (>= n 4) '((w:i)) '())
                       ,(dx-val 'w:sz size) ,(dx-val 'w:szCs size)))))
 
+(define (dx-default-fonts)
+  ;; the font of the text: a font with serifs as those of TeXmacs, unless
+  ;; the document says otherwise
+  (with f (cond ((== (ox-attr dx-setup 'font) "sans") "Arial")
+                ((== (ox-attr dx-setup 'font) "mono") "Courier New")
+                (else "Times New Roman"))
+    `(w:rFonts (@ (w:ascii ,f) (w:hAnsi ,f) (w:cs ,f) (w:eastAsia ,f)))))
+
+(define (dx-default-size)
+  ;; the size of the text, in half points
+  (with n (office-number (ox-attr dx-setup 'font-size))
+    (number->string (if (and n (>= n 5) (<= n 50)) (inexact->exact (round (* 2 n))) 22))))
+
+(define (dx-twips key default)
+  ;; the length of the attribute key of the setup, in twentieths of a point
+  (with cm (office-length->cm (ox-attr dx-setup key))
+    (number->string (if cm (inexact->exact (round (* cm 566.929))) default))))
+
 (define (dx-styles)
   `(w:styles
      (@ (xmlns:w ,dx-ns-w))
      (w:docDefaults
-       (w:rPrDefault (w:rPr ,(dx-val 'w:sz "22") ,(dx-val 'w:szCs "22")))
+       (w:rPrDefault (w:rPr ,(dx-default-fonts)
+                            ,(dx-val 'w:sz (dx-default-size))
+                            ,(dx-val 'w:szCs (dx-default-size))))
        (w:pPrDefault (w:pPr (w:spacing (@ (w:after "120"))))))
-     ,(dx-style "paragraph" "Normal" "Normal" '(w:qFormat))
+     ,(dx-style "paragraph" "Normal" "Normal" '(w:qFormat)
+                `(w:pPr ,(dx-val 'w:jc (with a (ox-attr dx-setup 'align)
+                                         (cond ((in? a '("center" "right" "left")) a)
+                                               ((== a "justify") "both")
+                                               (else "left"))))))
      ,@(map dx-heading-style (map (lambda (i) (+ i 1)) (iota 9)))
      ,(dx-style "paragraph" "Title" "Title"
                 (dx-val 'w:basedOn "Normal") (dx-val 'w:next "Normal") '(w:qFormat)
@@ -751,16 +780,24 @@
                            (+ #x80 (modulo (quotient n 64) 64))
                            (+ #x80 (modulo n 64))))))))
 
+;; the abstract lists: (format id numFmt), bullets and the ways of numbering
+(define dx-formats
+  '(("bullet" "1" "bullet") ("1" "2" "decimal") ("a" "4" "lowerLetter")
+    ("A" "5" "upperLetter") ("i" "6" "lowerRoman") ("I" "7" "upperRoman")))
+
 (define (dx-level kind i)
-  ;; the level i of a list of bullets or of numbers
+  ;; the level i of a list of bullets or of numbers of the format kind
   `(w:lvl (@ (w:ilvl ,(number->string i)))
           ,(dx-val 'w:start "1")
-          ,(dx-val 'w:numFmt (if (== kind "bullet") "bullet" "decimal"))
+          ,(dx-val 'w:numFmt (caddr (or (assoc kind dx-formats) (cadr dx-formats))))
           ,(dx-val 'w:lvlText
-                   (if (== kind "bullet")
-                       (list-ref (list (dx-utf8 #x2022) (dx-utf8 #x25e6) (dx-utf8 #x25aa))
-                                 (modulo i 3))
-                       (string-append "%" (number->string (+ i 1)) ".")))
+                   (cond ((== kind "bullet")
+                          (list-ref (list (dx-utf8 #x2022) (dx-utf8 #x25e6) (dx-utf8 #x25aa))
+                                    (modulo i 3)))
+                         ;; (letters with a bracket, as TeXmacs writes them)
+                         ((in? kind '("a" "A"))
+                          (string-append "%" (number->string (+ i 1)) ")"))
+                         (else (string-append "%" (number->string (+ i 1)) "."))))
           ,(dx-val 'w:lvlJc "left")
           (w:pPr (w:ind (@ (w:left ,(number->string (* 720 (+ i 1))))
                            (w:hanging "360"))))))
@@ -770,11 +807,11 @@
   ;; them for each list of the text, which starts at 1 at its level
   `(w:numbering
      (@ (xmlns:w ,dx-ns-w))
-     ,@(map (lambda (kind id)
-              `(w:abstractNum (@ (w:abstractNumId ,id))
+     ,@(map (lambda (f)
+              `(w:abstractNum (@ (w:abstractNumId ,(cadr f)))
                               ,(dx-val 'w:multiLevelType "hybridMultilevel")
-                              ,@(map (lambda (i) (dx-level kind i)) (iota 9))))
-            '("bullet" "number") '("1" "2"))
+                              ,@(map (lambda (i) (dx-level (car f) i)) (iota 9))))
+            dx-formats)
      ;; the numbers of the headings: 1, 1.1, 1.1.1 by their styles
      ,@(if dx-numbered?
            `((w:abstractNum
@@ -802,9 +839,10 @@
            '())
      ,@(map (lambda (l)
               `(w:num (@ (w:numId ,(number->string (car l))))
-                      ,(dx-val 'w:abstractNumId (if (== (cadr l) "bullet") "1" "2"))
+                      ,(dx-val 'w:abstractNumId
+                               (cadr (or (assoc (cadr l) dx-formats) (cadr dx-formats))))
                       (w:lvlOverride (@ (w:ilvl ,(number->string (min 8 (caddr l)))))
-                                     ,(dx-val 'w:startOverride "1"))))
+                                     ,(dx-val 'w:startOverride (cadddr l)))))
             (reverse dx-lists))))
 
 (define (dx-footnotes)
@@ -870,10 +908,15 @@
      (w:body
        ,@blocks
        (w:sectPr
-         (w:pgSz (@ (w:w "11906") (w:h "16838")))
-         (w:pgMar (@ (w:top "1440") (w:right "1440") (w:bottom "1440")
-                     (w:left "1440") (w:header "720") (w:footer "720")
-                     (w:gutter "0")))))))
+         (w:pgSz (@ (w:w ,(dx-twips 'page-width 11906))
+                    (w:h ,(dx-twips 'page-height 16838))
+                    ,@(if (== (ox-attr dx-setup 'landscape) "true")
+                          '((w:orient "landscape")) '())))
+         (w:pgMar (@ (w:top ,(dx-twips 'margin-top 1440))
+                     (w:right ,(dx-twips 'margin-right 1440))
+                     (w:bottom ,(dx-twips 'margin-bottom 1440))
+                     (w:left ,(dx-twips 'margin-left 1440))
+                     (w:header "720") (w:footer "720") (w:gutter "0")))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Interface
@@ -895,6 +938,9 @@
   (set! dx-indent 0)
   (set! dx-cell-align #f)
   (set! dx-numbered? (office-numbered-headings? x))
+  (set! dx-setup (or (and (func? x 'office)
+                          (list-find (cdr x) (lambda (y) (func? y 'setup))))
+                     '(setup)))
   (set! dx-bookmarks (make-ahash-table))
   (set! dx-bookmark-names (make-ahash-table))
   ;; the relations of the files which are always there come first

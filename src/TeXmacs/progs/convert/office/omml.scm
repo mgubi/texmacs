@@ -247,9 +247,15 @@
          (sep (get 'm:sepChr "|"))
          (args (map (lambda (e) (omml-row (omml-list (ox-children e))))
                     (ox-childs x 'm:e))))
-    (list `(m:mrow ,@(if (== open "") '() `((m:mo (@ (fence "true")) ,open)))
-                   ,@(list-intersperse args `(m:mo ,sep))
-                   ,@(if (== close "") '() `((m:mo (@ (fence "true")) ,close)))))))
+    (with r `(m:mrow ,@(if (== open "") '() `((m:mo (@ (fence "true")) ,open)))
+                     ,@(list-intersperse args `(m:mo ,sep))
+                     ,@(if (== close "") '() `((m:mo (@ (fence "true")) ,close))))
+      ;; a bracket without the other one (the brace of cases) would take
+      ;; what follows it in the formula: a style keeps it apart, which the
+      ;; import takes away (see oftm-clean-math)
+      (if (or (== open "") (== close ""))
+          (list `(m:mstyle (@ (scriptlevel "0")) ,r))
+          (list r)))))
 
 (define (omml-matrix x)
   (list `(m:mtable

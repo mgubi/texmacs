@@ -27,18 +27,29 @@
   <\description>
     <item*|Title>The paragraphs with the styles <samp|Title>,
     <samp|Subtitle>, <samp|Author>, <samp|Date> and <samp|Abstract> at the
-    start of a document are its title.
+    start of a document are its title. (The title of the properties of the
+    file is not shown: it is often the one of a template.)
+
+    <item*|Page and paragraphs>The size of the page, its orientation and
+    its margins, and the usual paragraph of the document (the size of its
+    font, a font without serifs, its alignment, the indentation of its
+    first line, the spaces between its lines and around it) are the ones
+    of the <TeXmacs> document, in both directions. A paragraph aligned
+    otherwise keeps its alignment.
 
     <item*|Headings>The levels of the headings are the sections,
-    subsections and so on. A table of contents is the one of <TeXmacs>,
-    which makes it again.
+    subsections and so on; a heading has a number when it has one in the
+    file. A table of contents is the one of <TeXmacs>, which makes it
+    again.
 
     <item*|Text>Emphasized, strong, underlined and struck through text,
     subscripts and superscripts, small capitals, code (a font with a fixed
     width), colors and highlighting, links, line and page breaks.
 
-    <item*|Lists>With bullets or numbers, nested, with several paragraphs
-    in an item; the lists of terms and definitions.
+    <item*|Lists>With bullets or numbers (1, a, A, i, I), nested, with
+    several paragraphs in an item, from their first number (a list of
+    <name|Word> which goes on after a paragraph goes on with its numbers);
+    the lists of terms and definitions.
 
     <item*|Tables>With the borders and the backgrounds of their cells, the
     cells over several columns or rows, the alignments, the width of the
@@ -63,6 +74,11 @@
 
     <item*|Notes>Footnotes and endnotes are footnotes.
 
+    <item*|Boxes of text>The text of a box or of a shape follows the
+    paragraph which the box is in; a figure in a frame of
+    <name|LibreOffice>, with its caption, is a figure. Hidden text is
+    left out.
+
     <item*|Quotations and code>From the styles <samp|Quote> and
     <samp|Source Code> (<samp|Quotations> and <samp|Preformatted Text> in
     <name|OpenDocument>).
@@ -74,7 +90,9 @@
   (<samp|Heading 1>, <samp|Title>, <samp|Caption>, <samp|Quote>,
   <samp|Theorem>, <samp|Proof>, <samp|Bibliography>...), so that its look
   can be changed at once in <name|Word> or <name|LibreOffice> by changing
-  these styles or by applying a template.
+  these styles or by applying a template. Its text has a font with serifs
+  (<name|Times New Roman>), or <name|Arial> for a document without serifs,
+  and the size of the font of the document.
 
   <paragraph|Numbers and references>
 
@@ -122,8 +140,9 @@
   <paragraph|Limitations>
 
   <\itemize>
-    <item>Fonts, sizes, indentations and spacings of the text are not
-    kept, in either direction.
+    <item>The named styles of a document, its fonts other than the usual
+    one, the sizes and the spacings of other paragraphs than the usual
+    ones, headers and footers, columns and sections are not kept.
 
     <item>A reference of an office document whose text is more than a
     number (\PTable 3\Q, the title of a section) is a link to its
@@ -131,8 +150,10 @@
     language than English stay paragraphs.
 
     <item>A drawing which was exported is a picture: it cannot be edited
-    in the office programs, and it comes back as an image. The drawings,
-    charts and text boxes of the office programs are not imported.
+    in the office programs, and it comes back as an image. The drawings and
+    charts of the office programs are not imported (but for their
+    pictures), and an image which floats beside the text is placed at the
+    start of its paragraph.
 
     <item>Comments and the history of the changes are not imported: the
     text is the one with all the changes accepted.
