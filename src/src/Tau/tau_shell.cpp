@@ -55,6 +55,9 @@
 #include <mupdf/fitz.h>
 #include <unistd.h>
 #include <signal.h>
+#include <fcntl.h>
+#include <sys/wait.h>
+#include <sys/stat.h>
 #include <string.h>
 #include <string>
 #include <vector>
@@ -103,6 +106,42 @@ static std::condition_variable frames_came;
 static std::deque<core_frame>  frames;
 static Uint32                  frame_event= 0;  // wakes the loop of Vue
 static bool                    core_gone= false;
+static std::string             core_wrong;      // why the core is not heard
+static char**                  shell_argv= NULL; // (to start again)
+
+// the version of the messages which this program speaks (tau_native.cpp)
+#define TAU_PROTOCOL 1
+
+// The frames which may come, and how long one may be: anything else is a
+// core which is wrong (another program, or a stream which lost its place),
+// and nothing more of it is read
+static bool
+frame_known (const char* tag, uint32_t len) {
+  static const char* tags[]= { "HELO", "VIEW", "JSON", "PANT", "PONG" };
+  bool known= false;
+  for (const char* t : tags) known= known || !memcmp (tag, t, 4);
+  return known && len <= ((uint32_t) 1 << 30);
+}
+
+// A whole picture of a view makes those which wait before it for the same
+// view useless: they are dropped, and the frames do not pile up when the
+// core draws faster than they are shown
+static bool
+whole_paint (const core_frame& f, int32_t& view) {
+  if (strcmp (f.tag, "PANT") || f.body.size () < 56) return false;
+  int32_t n[14];
+  memcpy (n, f.body.data (), 56);
+  view= n[0];
+  return n[4] == 0 && n[5] == 0 && n[6] == n[2] && n[7] == n[3];
+}
+
+static bool
+paint_of (const core_frame& f, int32_t view) {
+  if (strcmp (f.tag, "PANT") || f.body.size () < 56) return false;
+  int32_t v;
+  memcpy (&v, f.body.data (), 4);
+  return v == view;
+}
 
 static bool
 read_all (int fd, void* data, size_t n) {
@@ -122,12 +161,21 @@ core_reader (int fd) {
     if (!read_all (fd, head, 8)) break;
     uint32_t len;
     memcpy (&len, head + 4, 4);
+    if (!frame_known (head, len)) {
+      std::lock_guard<std::mutex> g (frames_lock);
+      core_wrong= "it said something which is not a frame of Tau";
+      break;
+    }
     core_frame f;
     memcpy (f.tag, head, 4); f.tag[4]= 0;
     f.body.resize (len);
     if (len > 0 && !read_all (fd, f.body.data (), len)) break;
     {
       std::lock_guard<std::mutex> g (frames_lock);
+      int32_t view;
+      if (whole_paint (f, view))
+        for (auto it= frames.begin (); it != frames.end (); )
+          if (paint_of (*it, view)) it= frames.erase (it); else ++it;
       frames.push_back (std::move (f));
     }
     frames_came.notify_all ();
@@ -143,6 +191,35 @@ core_reader (int fd) {
   SDL_PushEvent (&e);
 }
 
+// What the core is told goes through a thread of its own: the loop of
+// Vue never waits for a core which is busy and does not read (a long paste
+// filled the pipe and froze the window), and a line is always written
+// whole (one which was cut short was glued to the next one)
+static std::mutex              said_lock;
+static std::condition_variable said_came;
+static std::deque<std::string> said;
+static Uint64                  said_at= 0;      // when the last thing was told
+
+static void
+core_writer (int fd) {
+  while (true) {
+    std::string line;
+    {
+      std::unique_lock<std::mutex> g (said_lock);
+      said_came.wait (g, [] { return !said.empty (); });
+      line= std::move (said.front ());
+      said.pop_front ();
+    }
+    const char* p= line.data (); size_t n= line.size ();
+    while (n > 0) {
+      ssize_t r= write (fd, p, n);
+      if (r < 0 && (errno == EINTR || errno == EAGAIN)) continue;
+      if (r <= 0) return; // (the core is gone: the reader sees it too)
+      p += r; n -= (size_t) r;
+    }
+  }
+}
+
 // a line for the core (see tau_native.cpp)
 static void
 core_say (std::string line) {
@@ -151,13 +228,13 @@ core_say (std::string line) {
   static bool moves= debug && !strcmp (getenv ("TAU_SHELL_DEBUG"), "2");
   if (debug && line != "ping busy" && (moves || line.find (" move ") == std::string::npos))
     fprintf (stderr, "tau_shell] > %s\n", line.c_str ());
+  if (line != "ping busy") said_at= SDL_GetTicks ();
   line.push_back ('\n');
-  const char* p= line.data (); size_t n= line.size ();
-  while (n > 0) {
-    ssize_t r= write (core_in, p, n);
-    if (r <= 0) return;
-    p += r; n -= (size_t) r;
+  {
+    std::lock_guard<std::mutex> g (said_lock);
+    said.push_back (std::move (line));
   }
+  said_came.notify_one ();
 }
 
 static std::string
@@ -204,6 +281,7 @@ core_start (url exe, int argc, char** argv) {
   }
   if (core_pid == 0) {
     dup2 (in_pipe[0], 0);
+    if (in_pipe[0] != 0) close (in_pipe[0]);
     close (in_pipe[1]); close (out_pipe[0]);
     setenv ("TAU_FD", std::to_string (out_pipe[1]).c_str (), 1);
     setenv ("TAU_DESKTOP", "1", 1);
@@ -226,6 +304,7 @@ core_start (url exe, int argc, char** argv) {
   core_in= in_pipe[1];
   frame_event= SDL_RegisterEvents (1);
   std::thread (core_reader, out_pipe[0]).detach ();
+  std::thread (core_writer, core_in).detach ();
   return true;
 }
 
@@ -402,6 +481,7 @@ class tau_view_rep;
 static void view_has_keyboard (tau_view_rep* v);
 widget box_widget (scheme_tree p, string s, color col, bool trans, bool ink); // tm_button.cpp
 static bool close_context_menu ();
+static void pointer_pressed ();
 
 class tau_view_rep: public vue_simple_widget_rep {
 public:
@@ -505,7 +585,7 @@ public:
         return;
       }
     }
-    core_say ("key " + std::to_string (view) + " " + std_of (cork_to_utf8 (key)));
+    core_say ("key " + std::to_string (view) + " " + escaped (std_of (cork_to_utf8 (key))));
   }
   void handle_keyboard_focus (bool has_focus, time_t t) {
     (void) t;
@@ -561,6 +641,7 @@ public:
     }
     // (a press or a release: after the move which waits, not before it)
     if (move_held != "") { core_say (move_held); move_held= ""; }
+    if (kind == "press-right" || kind == "press-left") pointer_pressed ();
     core_say (line);
   }
   void send_wheel () {
@@ -723,11 +804,17 @@ static std::deque<core_frame> put_aside;
 
 // The contents of a submenu, asked from the core and waited for: Vue asks
 // for the widget of a menu when it opens it, and wants it then
+static bool core_busy ();
+
 static json
 expand (int number) {
   core_say ("expand " + std::to_string (number));
   std::string part= std::to_string (number);
-  auto until= std::chrono::steady_clock::now () + std::chrono::seconds (3);
+  // (the window waits meanwhile: not long for a core which is known to be
+  // busy, whose menu then says so; the contents which come too late are
+  // dropped, and the menu is asked again when it opens again)
+  auto until= std::chrono::steady_clock::now () +
+              std::chrono::milliseconds (core_busy ()? 300: 3000);
   while (true) {
     std::unique_lock<std::mutex> g (frames_lock);
     while (!frames.empty ()) {
@@ -753,7 +840,11 @@ expand (int number) {
     }
     if (core_gone ||
         frames_came.wait_until (g, until) == std::cv_status::timeout)
-      return json ();
+    {
+      static const std::string busy=
+        "{\"items\":[{\"kind\":\"text\",\"label\":\"(Tau is busy)\"}]}";
+      return json_parse (busy.data (), busy.size ());
+    }
   }
 }
 
@@ -1242,8 +1333,18 @@ refresh_part (const json& m) {
   gui_needs_relayout= true;
 }
 
-// the menu of a view, where the pointer is
+// The menu of a view, where the pointer was pressed for it (a busy core
+// answers late: the menu then opened wherever the pointer had gone)
 static widget context_menu;
+static float  pressed_x= 0, pressed_y= 0;
+static Uint64 pressed_at= 0;
+
+static void
+pointer_pressed () {
+  SDL_GetGlobalMouseState (&pressed_x, &pressed_y);
+  pressed_at= SDL_GetTicks ();
+}
+
 static bool
 close_context_menu () {
   if (is_nil (context_menu)) return false;
@@ -1262,12 +1363,18 @@ show_context_menu (const json& m) {
   widget menu= vertical_menu (build_items (m["items"], 0, { false, false }));
   context_menu= popup_window_widget (popup_widget (menu), "Popup menu");
   float x= 0, y= 0;
-  SDL_GetGlobalMouseState (&x, &y);
+  // (a menu which the core opens by itself, without a click: at the pointer)
+  if (pressed_at != 0 && SDL_GetTicks () - pressed_at < 10000) {
+    x= pressed_x; y= pressed_y; pressed_at= 0; }
+  else SDL_GetGlobalMouseState (&x, &y);
   set_position (context_menu, (SI) (x * PIXEL), (SI) (-y * PIXEL));
   set_visibility (context_menu, true);
 }
 
-// A tooltip of the core: a view in a small window over the main view
+// the view of the pane which has the keyboard: the current view of the core
+static tau_view_rep* current_view ();
+
+// A tooltip of the core: a view in a small window over the current view
 static hashmap<string,widget> tooltips;
 static void
 show_tooltip (const json& m) {
@@ -1278,13 +1385,14 @@ show_tooltip (const json& m) {
     set_visibility (old, false);
     destroy_window_widget (old);
   }
-  if (m["view"].num () == 0 || the_view == NULL) return;
+  tau_view_rep* over= current_view ();
+  if (m["view"].num () == 0 || over == NULL) return;
   widget v (tm_new<tau_view_rep> (m["view"].num (), true, false,
                                   m["width"].num () * PIXEL, m["height"].num () * PIXEL));
   widget win= tooltip_window_widget (v, "Tooltip");
   SI wx= 0, wy= 0, cx= 0, cy= 0;
   get_position (the_window, wx, wy);
-  get_position (widget (the_view), cx, cy);
+  get_position (widget (over), cx, cy);
   set_position (win, wx + cx + m["x"].num () * PIXEL, wy + cy - m["y"].num () * PIXEL);
   set_visibility (win, true);
   tooltips (id)= win;
@@ -1363,12 +1471,26 @@ busy_answered () {
   }
 }
 
+// the core has not answered for a while: it is at work, or stuck
+static Uint64
+busy_for () {
+  return busy_asked? SDL_GetTicks () - busy_asked_at: 0;
+}
+
+static bool
+core_busy () {
+  return busy_for () >= 500;
+}
+
 static void
 busy_check () {
   if (core_gone || is_nil (the_frame)) return;
   Uint64 now= SDL_GetTicks ();
   if (!busy_asked) {
     if (now - busy_last < 150) return;
+    // (only while something was told lately: a core which was told nothing
+    // is not woken a few times a second for nothing)
+    if (now - said_at > 5000) return;
     busy_last= now;
     busy_asked= true; busy_asked_at= now;
     core_say ("ping busy");
@@ -1426,10 +1548,16 @@ show_panes () {
 // A right click on a tag of the interactive footer (vue_widget.cpp): the
 // tag is selected by its command, which went first, and the core is asked
 // for the context menu of the view which has the keyboard
+static tau_view_rep*
+current_view () {
+  pane* p= (pane*) panes [current_place];
+  return p != NULL? p->view: the_view;
+}
+
 void
 tau_shell_footer_popup () {
-  pane* p= (pane*) panes [current_place];
-  tau_view_rep* v= (p != NULL? p->view: the_view);
+  tau_view_rep* v= current_view ();
+  pointer_pressed ();
   if (v != NULL && v->view)
     core_say ("popup " + std::to_string (v->view));
 }
@@ -1611,8 +1739,9 @@ handle_message (std::string kind, std::string part, const json& desc) {
   }
   else if (kind == "clipboard") SDL_SetClipboardText (desc["text"].str ().c_str ());
   else if (kind == "paste-request") {
-    if (the_view != NULL && the_view->view)
-      core_say ("paste " + std::to_string (the_view->view) + " " + escaped (clipboard_text ()));
+    tau_view_rep* v= current_view ();
+    if (v != NULL && v->view)
+      core_say ("paste " + std::to_string (v->view) + " " + escaped (clipboard_text ()));
   }
   else if (kind == "files") choose_file (desc);
   else if (kind == "fullscreen") set_full_screen (the_window, desc["on"].truth ());
@@ -1636,13 +1765,43 @@ handle_message (std::string kind, std::string part, const json& desc) {
     if (pid > 0) { int status= 0; waitpid (pid, &status, 0); }
   }
   else if (kind == "quit") shell_exit (0);
+  // ("contents" which come here came after expand had stopped waiting)
 }
+
+static bool hello_seen= false;
 
 static void
 handle_frame (core_frame& f) {
+  if (!strcmp (f.tag, "HELO")) {
+    // what the core is: the messages of the same version, or nothing
+    hello_seen= true;
+    int version= atoi (std::string (f.body.begin (), f.body.end ()).c_str ());
+    if (version != TAU_PROTOCOL) {
+      std::lock_guard<std::mutex> g (frames_lock);
+      core_wrong= "it speaks version " + std::to_string (version) +
+                  " of the messages, this program version " +
+                  std::to_string (TAU_PROTOCOL);
+    }
+    return;
+  }
+  if (!hello_seen) {
+    // (a core from before the versions)
+    std::lock_guard<std::mutex> g (frames_lock);
+    if (core_wrong == "") core_wrong= "it did not say which messages it speaks";
+    return;
+  }
   if (!strcmp (f.tag, "VIEW")) {
     int view= 0, window= 0;
-    sscanf (std::string (f.body.begin (), f.body.end ()).c_str (), "%d %d", &view, &window);
+    char what[16]= "shown";
+    sscanf (std::string (f.body.begin (), f.body.end ()).c_str (), "%d %d %15s",
+            &view, &window, what);
+    if (!strcmp (what, "hidden")) {
+      // (no more keys for it; the view which the place shows now follows,
+      // or came already)
+      tau_view_rep* v= (tau_view_rep*) views [view];
+      if (v != NULL && v->view == view) v->set_view (0);
+      return;
+    }
     tau_view_rep* v= view_of_place (window);
     if (v != NULL) v->set_view (view);
   }
@@ -1661,8 +1820,6 @@ handle_frame (core_frame& f) {
     static bool evaluated= false;
     if (!evaluated) {
       evaluated= true;
-      // (the preferences which Vue reads are the core's: tau-files.scm)
-      core_say ("scheme (tau-say-preferences)");
       if (getenv ("TAU_SHELL_EVAL") != NULL)
         core_say ("scheme " + escaped (getenv ("TAU_SHELL_EVAL")));
     }
@@ -1714,6 +1871,68 @@ footer_budget () {
   core_say ("scheme (footer-set-budget " + std::to_string (budget) + ")");
 }
 
+// The core ended. Quitting (with the menu, or when the window was closed)
+// it ends well, and so does this program; otherwise the user is told, and
+// may start Tau again. A core which is wrong (another version) is not used.
+static std::string shell_path; // (this program, to start it again)
+
+static void
+core_ended (int status, bool known) {
+  std::string why;
+  {
+    std::lock_guard<std::mutex> g (frames_lock);
+    why= core_wrong;
+  }
+  if (why != "") {
+    if (core_pid > 0) { kill (core_pid, SIGKILL); waitpid (core_pid, NULL, 0); }
+    std::string text= "The core of Tau (" + std::string (getenv ("TAU_CORE") == NULL?
+      "tau_core": getenv ("TAU_CORE")) + ") cannot be used: " + why + ".";
+    cerr << "tau_shell] " << text.c_str () << LF;
+    SDL_ShowSimpleMessageBox (SDL_MESSAGEBOX_ERROR, "Tau", text.c_str (), NULL);
+    shell_exit (1);
+  }
+  if (known && WIFEXITED (status) && WEXITSTATUS (status) == 0) {
+    cout << "tau_shell] the core stopped" << LF;
+    shell_exit (0);
+  }
+  std::string how= !known? std::string ("for a reason which is not known"):
+    WIFSIGNALED (status)? "on the signal " + std::to_string (WTERMSIG (status)):
+    "with the status " + std::to_string (WEXITSTATUS (status));
+  std::string text= "The core of Tau stopped unexpectedly (" + how + ").\n\n"
+    "The documents which were auto-saved are proposed when they are opened "
+    "again; what was changed since may be lost.";
+  cerr << "tau_shell] the core stopped " << how.c_str () << LF;
+  const SDL_MessageBoxButtonData buttons[]= {
+    { SDL_MESSAGEBOX_BUTTON_ESCAPEKEY_DEFAULT, 0, "Quit" },
+    { SDL_MESSAGEBOX_BUTTON_RETURNKEY_DEFAULT, 1, "Start again" } };
+  SDL_MessageBoxData box;
+  SDL_zero (box);
+  box.flags= SDL_MESSAGEBOX_ERROR;
+  box.title= "Tau";
+  box.message= text.c_str ();
+  box.numbuttons= 2;
+  box.buttons= buttons;
+  int chosen= 0;
+  if (SDL_ShowMessageBox (&box, &chosen) && chosen == 1 &&
+      shell_path != "" && shell_argv != NULL) {
+    // (the descriptors of this program are closed in the new one: its
+    // ends of the pipes are, the windows go with the program)
+    execv (shell_path.c_str (), shell_argv);
+    cerr << "tau_shell] cannot start again" << LF;
+  }
+  shell_exit (1);
+}
+
+// the core is still running, or it ended: with how
+static bool
+core_alive (int& status, bool& known) {
+  known= false;
+  if (core_pid <= 0) return false;
+  pid_t r= waitpid (core_pid, &status, WNOHANG);
+  if (r == core_pid) { known= true; core_pid= 0; return false; }
+  return r == 0;
+}
+
 static void
 shell_turn () {
   busy_check ();
@@ -1729,19 +1948,61 @@ shell_turn () {
   }
   for (core_frame& f : got) handle_frame (f);
   if (!got.empty ()) needs_update ();
-  if (gone && !is_nil (the_window)) {
-    // the core is gone: so is this program
-    cout << "tau_shell] the core stopped" << LF;
-    shell_exit (0);
+  bool wrong;
+  {
+    std::lock_guard<std::mutex> g (frames_lock);
+    wrong= (core_wrong != "");
+  }
+  if (is_nil (the_window)) return;
+  int status= 0; bool known= false;
+  // (the process is looked at too: a program which the core started may
+  // keep its pipe open after it, with an older core)
+  bool alive= core_alive (status, known);
+  if (wrong) core_ended (status, known);
+  else if (gone || !alive) {
+    if (alive) {
+      // the pipe is closed: the process ends, or is about to
+      for (int i= 0; i < 100 && core_alive (status, known); i++) usleep (10000);
+    }
+    core_ended (status, known);
   }
 }
 
 // The window is closed: the core is asked to quit, which it does after a
 // question when documents are not saved; this program ends with it
+// A core which does not answer is asked whether to wait for it: quitting
+// then ends it as it is.
 class quit_command_rep: public command_rep {
 public:
   void apply () {
     if (core_gone || core_in < 0) shell_exit (0);
+    Uint64 late= busy_for ();
+    if (late >= 3000) {
+      std::string text= "The core of Tau has not answered for " +
+        std::to_string (late / 1000) + " seconds.\n\n"
+        "Quitting now loses what was changed since the documents were last "
+        "saved or auto-saved.";
+      const SDL_MessageBoxButtonData buttons[]= {
+        { SDL_MESSAGEBOX_BUTTON_ESCAPEKEY_DEFAULT |
+          SDL_MESSAGEBOX_BUTTON_RETURNKEY_DEFAULT, 0, "Wait" },
+        { 0, 1, "Quit now" } };
+      SDL_MessageBoxData box;
+      SDL_zero (box);
+      box.flags= SDL_MESSAGEBOX_WARNING;
+      box.title= "Tau";
+      box.message= text.c_str ();
+      box.numbuttons= 2;
+      box.buttons= buttons;
+      cerr << "tau_shell] the core does not answer: wait or end it?" << LF;
+      int chosen= 0;
+      if (SDL_ShowMessageBox (&box, &chosen) && chosen == 1) {
+        if (core_pid > 0) { kill (core_pid, SIGKILL); waitpid (core_pid, NULL, 0); }
+        shell_exit (0);
+      }
+      return;
+    }
+    // (with a ping after it: a core which got stuck by itself, while
+    // nothing was told, is seen when the window is closed again)
     core_say ("scheme (safely-quit-TeXmacs)");
   }
   void apply (object args) { (void) args; apply (); }
@@ -1771,6 +2032,16 @@ tau_shell_defaults (const char* argv0) {
   if (getenv ("TAU_CORE") == NULL) {
     std::string p= first ({ dir + "/tau_core", dir + "/../build-tau-native/tau_core" });
     if (p != "") setenv ("TAU_CORE", p.c_str (), 1);
+  }
+  // Started from the desktop (the Dock, a file manager) what both programs
+  // print went nowhere, and a crash left no trace: it goes to a log in the
+  // home directory, made anew when it grows large
+  if (!isatty (2) && getenv ("TEXMACS_HOME_PATH") != NULL) {
+    std::string log= std::string (getenv ("TEXMACS_HOME_PATH")) + "/system/tau.log";
+    struct stat st;
+    bool large= stat (log.c_str (), &st) == 0 && st.st_size > (1 << 20);
+    int fd= open (log.c_str (), O_WRONLY | O_CREAT | O_APPEND | (large? O_TRUNC: 0), 0644);
+    if (fd >= 0) { dup2 (fd, 1); dup2 (fd, 2); close (fd); }
   }
 }
 
@@ -1802,7 +2073,12 @@ tau_shell_main (int argc, char** argv) {
   set_user_preference ("texmacs->verbatim:encoding", "utf-8");
   gui_open (argc, argv);
 
-  // the core, next to this program unless TAU_CORE says where
+  // The core, next to this program unless TAU_CORE says where. Both
+  // programs have the same home directory: this one has made what it
+  // writes there when it starts (TeXmacs set up, the fonts found) before
+  // the core is started, and writes nothing there afterwards (it ends with
+  // _exit, without saving its caches); the preferences are the core's.
+  // (Two instances of Tau share it as two of TeXmacs do.)
   string core= get_env ("TAU_CORE");
   if (core == "") {
     string self (argv[0]);
@@ -1826,6 +2102,14 @@ tau_shell_main (int argc, char** argv) {
     cerr << "tau_shell] cannot start " << core << LF;
     shell_exit (1);
   }
+  shell_argv= argv;
+  {
+    char* real= realpath (argv[0], NULL);
+    if (real != NULL) { shell_path= real; free (real); }
+  }
+  // the preferences which Vue reads are the core's (tau-files.scm): asked
+  // at once, so that the window does not first show those of this program
+  core_say ("scheme (tau-say-preferences)");
   SDL_AddTimer (150, busy_timer, NULL);
   gui_interpose (shell_turn);
   gui_start_loop ();

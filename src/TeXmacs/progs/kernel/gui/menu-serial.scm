@@ -702,7 +702,9 @@
   ;; part of the submenu, and forgotten when the submenu is opened again:
   ;; a menu which is opened many times does not fill the table.
   (with x (and (ahash-ref serial-contents n) (ahash-ref serial-table n))
-    (if (not x) "{\"items\":[]}"
+    (if (not x)
+        ;; (a submenu of a menu which was described again meanwhile)
+        "{\"items\":[{\"kind\":\"text\",\"label\":\"(the menu had changed)\"}]}"
         (let* ((part (car x))
                (sub (string-append part "/x" (number->string n))))
           (serial-forget sub)
@@ -718,11 +720,19 @@
                 (set! serial-part old)
                 "{\"items\":[]}")))))))
 
+;; A number which is no longer kept: the menu or the dialog was described
+;; again while the click was on its way. The user is told, rather than
+;; nothing happening. (Not for an answer: a field of a dialog may give its
+;; value as the dialog goes, after its numbers were forgotten.)
+(define (serial-stale)
+  (set-temporary-message "The menu had changed: choose again" "" 2500))
+
 (tm-define (tau-invoke n)
   (:synopsis "Run the action kept under the number @n")
-  (and-with x (ahash-ref serial-table n)
-    (with action (cdr x)
-      (exec-delayed (lambda () (protected-call action))))))
+  (with x (ahash-ref serial-table n)
+    (if (not x) (serial-stale)
+        (with action (cdr x)
+          (exec-delayed (lambda () (protected-call action)))))))
 
 (tm-define (tau-answer n . args)
   (:synopsis "Give the value @args of the input kept under the number @n")

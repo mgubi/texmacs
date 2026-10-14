@@ -11,11 +11,12 @@
 # A trial (docs/tau-design.md, "On the desktop"): the same core as the one
 # of the page, built for the machine, which talks to another process over
 # pipes (src/Tau/tau_native.cpp), and a window of SDL which is that other
-# process (tau_shell.cpp). From the top of the source tree:
+# process (tau_trial.cpp: no menus, to try and measure the transport;
+# the program of Tau is src/Tau/tau_shell.cpp, misc/tau/shell). From the top of the source tree:
 #
 #   mkdir -p build-tau-native
 #   make -C build-tau-native -f ../misc/tau/native/Makefile -j8
-#   build-tau-native/tau_shell
+#   build-tau-native/tau_trial
 #
 # MuPDF, FreeType and SDL3 are those of the system (PREFIX, Homebrew here).
 
@@ -49,12 +50,12 @@ CXXFLAGS := $(OPT) -w -std=c++17
 DEPFLAGS := -MMD -MP
 LIBS     := -L$(PREFIX)/lib -lmupdf -lmupdf-third -lfreetype -liconv -lz -lm
 
-all: tau_core tau_shell
+all: tau_core tau_trial
 
 tau_core: $(OBJECTS)
 	$(CXX) $(OPT) $(OBJECTS) $(LIBS) -o $@
 
-tau_shell: $(N)/tau_shell.cpp
+tau_trial: $(N)/tau_trial.cpp
 	$(CXX) $(OPT) -std=c++17 -I$(PREFIX)/include $< -L$(PREFIX)/lib -lSDL3 -o $@
 
 $(OBJ)/%.o: $(S)/%.cpp
@@ -66,7 +67,7 @@ $(OBJ)/%.o: $(S)/%.c
 	$(CC) $(CFLAGS) $(CPPFLAGS) $(DEPFLAGS) -c $< -o $@
 
 clean:
-	rm -rf $(OBJ) tau_core tau_shell
+	rm -rf $(OBJ) tau_core tau_trial
 
 -include $(OBJECTS:.o=.d)
 .PHONY: all clean

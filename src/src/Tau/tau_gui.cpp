@@ -198,7 +198,8 @@ void
 tau_view_shown (editor_rep* ed, int place, bool shown) {
   simple_widget_rep* v= (simple_widget_rep*) ed;
   v->shown= shown;
-  if (shown && place > 0) tau_post_view (v->id, place, "shown");
+  // (and when it is no longer shown: the other side then sends it nothing)
+  if (place > 0) tau_post_view (v->id, place, shown? "shown": "hidden");
 }
 
 void
@@ -342,6 +343,20 @@ tau_popup (string menu, int view) {
 }
 
 #ifndef __EMSCRIPTEN__
+// The other side is gone (tau_native.cpp): the documents which are not
+// saved are saved aside, as at the regular intervals of TeXmacs, and are
+// proposed at the next start
+void
+tau_native_rescue () {
+  static bool done= false;
+  if (done) return;
+  done= true;
+  try {
+    eval ("(catch #t (lambda () (autosave-all)) (lambda args #f))");
+  }
+  catch (...) {}
+}
+
 // the same when the other side asks for it: a right click on a tag of the
 // interactive footer, once the tag is selected (tau_native.cpp, "popup")
 extern "C" void
@@ -557,6 +572,16 @@ tau_place (int view, int w, int h, double density, int counter) {
   tau_turn ();
 }
 
+// A view which takes the keyboard and the pointer: an editor which is not
+// shown (its place shows another buffer) has none. What was said to it
+// before the other side learnt it is dropped.
+static simple_widget_rep*
+input_view (int view) {
+  simple_widget_rep* v= simple_widget_rep::find (view);
+  if (v != NULL && v->is_editor_widget () && !v->shown) return NULL;
+  return v;
+}
+
 // The time of an event of the pointer: when it happened in the page (age
 // milliseconds ago), not when the core comes to it, which may be much
 // later when it was busy; two clicks which waited together were a double
@@ -574,7 +599,7 @@ EMSCRIPTEN_KEEPALIVE
 void
 tau_scroll_by (int view, int dx, int dy, int x, int y) {
   // (x, y): where the pointer is, in pixels of the canvas
-  simple_widget_rep* v= simple_widget_rep::find (view);
+  simple_widget_rep* v= input_view (view);
   if (v == NULL) return;
   // The editor which has the keyboard gets the wheel when it captures it
   // (the graphics, the page of the design of the fonts), as in the other
@@ -610,7 +635,7 @@ EMSCRIPTEN_KEEPALIVE
 void
 tau_key (int view, const char* key) {
   // a key in the notation of TeXmacs ("a", "C-x", "S-left"), in UTF-8
-  simple_widget_rep* v= simple_widget_rep::find (view);
+  simple_widget_rep* v= input_view (view);
   if (v == NULL) return;
   v->handle_keypress (utf8_to_cork (string (key)), texmacs_time ());
   tau_turn ();
@@ -622,7 +647,7 @@ tau_key (int view, const char* key) {
 EMSCRIPTEN_KEEPALIVE
 void
 tau_text (int view, const char* text) {
-  simple_widget_rep* v= simple_widget_rep::find (view);
+  simple_widget_rep* v= input_view (view);
   if (v == NULL) return;
   string r= utf8_to_cork (string (text));
   int pos= 0;
@@ -821,7 +846,7 @@ tau_mouse (int view, const char* kind, int x, int y, int mods, int age) {
   // kind as in TeXmacs ("press-left", "move", "release-left"...); the
   // position in pixels of the canvas, from its top left corner; age: how
   // long ago it happened, in milliseconds
-  simple_widget_rep* v= simple_widget_rep::find (view);
+  simple_widget_rep* v= input_view (view);
   if (v == NULL) return;
   SI dx= x, dy= y;
   v->to_document (dx, dy);
@@ -868,7 +893,7 @@ EMSCRIPTEN_KEEPALIVE
 void
 tau_drop (int view, int x, int y, const char* paths) {
   static int serial= 0;
-  simple_widget_rep* v= simple_widget_rep::find (view);
+  simple_widget_rep* v= input_view (view);
   if (v == NULL) return;
   tree doc (CONCAT);
   // (the paths are of the system; in the document they are a text)

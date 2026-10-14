@@ -1,6 +1,6 @@
 
 /******************************************************************************
-* MODULE     : tau_shell.cpp
+* MODULE     : tau_trial.cpp
 * DESCRIPTION: A window for the native core of Tau, in a process of its own
 * COPYRIGHT  : (C) 2026  Massimiliano Gubinelli
 *******************************************************************************
@@ -20,7 +20,7 @@
 * of the window tells the times: from a key to the pixels which answer it,
 * and the size of what came.
 *
-*   tau_shell [--core <program>] [--texmacs <TEXMACS_PATH>] [--home <dir>]
+*   tau_trial [--core <program>] [--texmacs <TEXMACS_PATH>] [--home <dir>]
 *             [--bench] [--scheme <code>] [--wait <ms>] [arguments of TeXmacs...]
 *
 * --bench types and scrolls by itself, prints the times and quits; --scheme
@@ -266,7 +266,7 @@ main (int argc, char** argv) {
       }
       else if (e.type == SDL_EVENT_KEY_DOWN && view) {
         std::string name= key_name (e.key.key, e.key.mod);
-        if (name != "") { key_at= SDL_GetTicksNS (); say ("key " + std::to_string (view) + " " + name); }
+        if (name != "") { key_at= SDL_GetTicksNS (); say ("key " + std::to_string (view) + " " + escape (name.c_str ())); }
       }
       else if (e.type == SDL_EVENT_TEXT_INPUT && view) {
         if (SDL_GetModState () & (SDL_KMOD_CTRL | SDL_KMOD_GUI)) continue;
@@ -311,7 +311,9 @@ main (int argc, char** argv) {
     for (Frame& f : got) {
       if (!strcmp (f.tag, "VIEW")) {
         int v= 0, w= 0;
-        sscanf ((const char*) std::string (f.body.begin (), f.body.end ()).c_str (), "%d %d", &v, &w);
+        char what[16]= "shown";
+        sscanf ((const char*) std::string (f.body.begin (), f.body.end ()).c_str (), "%d %d %15s", &v, &w, what);
+        if (strcmp (what, "shown")) continue; // (no longer shown)
         view= v;
         send_place ();
         say ("focus " + std::to_string (view) + (focused ? " 1" : " 0"));
@@ -369,12 +371,12 @@ main (int argc, char** argv) {
 
   int w, h; float d;
   pixels_of_window (w, h, d);
-  printf ("tau_shell: view of %d x %d pixels (density %.1f)\n", w, h, d);
-  printf ("tau_shell: the core painted first after %.0f ms\n", first_paint ? (first_paint - start) / 1e6 : -1.0);
-  printf ("tau_shell: key to pixels    mean %.2f ms, 95%% under %.2f (%zu)\n", key_ms.mean (), key_ms.high (), key_ms.v.size ());
-  printf ("tau_shell: wheel to pixels  mean %.2f ms, 95%% under %.2f (%zu)\n", wheel_ms.mean (), wheel_ms.high (), wheel_ms.v.size ());
-  printf ("tau_shell: pixels to the texture  mean %.2f ms, 95%% under %.2f (%zu)\n", copy_ms.mean (), copy_ms.high (), copy_ms.v.size ());
-  printf ("tau_shell: %zu paints, %.1f MB; %zu descriptions, %.0f KB\n", paint_count, paint_bytes / 1048576.0, json_count, json_bytes / 1024.0);
+  printf ("tau_trial: view of %d x %d pixels (density %.1f)\n", w, h, d);
+  printf ("tau_trial: the core painted first after %.0f ms\n", first_paint ? (first_paint - start) / 1e6 : -1.0);
+  printf ("tau_trial: key to pixels    mean %.2f ms, 95%% under %.2f (%zu)\n", key_ms.mean (), key_ms.high (), key_ms.v.size ());
+  printf ("tau_trial: wheel to pixels  mean %.2f ms, 95%% under %.2f (%zu)\n", wheel_ms.mean (), wheel_ms.high (), wheel_ms.v.size ());
+  printf ("tau_trial: pixels to the texture  mean %.2f ms, 95%% under %.2f (%zu)\n", copy_ms.mean (), copy_ms.high (), copy_ms.v.size ());
+  printf ("tau_trial: %zu paints, %.1f MB; %zu descriptions, %.0f KB\n", paint_count, paint_bytes / 1048576.0, json_count, json_bytes / 1024.0);
   close (to_core);
   int status= 0;
   for (int i= 0; i < 20 && waitpid (child, &status, WNOHANG) == 0; i++) SDL_Delay (50);

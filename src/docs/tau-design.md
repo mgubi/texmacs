@@ -1233,11 +1233,11 @@ from 16 to 1024 pixels. As in the page of TeXmacs Vue
   WebAssembly had let them pass). `src/Tau/tau_native.cpp` is the
   transport: what the other side says comes on the standard input, a
   line for each message; what the core says goes to a pipe in frames
-  (`VIEW`, `JSON`, `PANT` with the pixels, `PONG`). `tau_shell.cpp` is a
+  (`VIEW`, `JSON`, `PANT` with the pixels, `PONG`). `tau_trial.cpp` is a
   window of SDL which starts the core, shows its view and sends it the
   keys, the pointer and the wheel; it links nothing of TeXmacs and has
   no menus (the descriptions arrive and are counted).
-- **Measured** (`tau_shell --bench`, a view of 2000 × 1400 pixels, an
+- **Measured** (`tau_trial --bench`, a view of 2000 × 1400 pixels, an
   Apple M-series laptop): the core paints 0.25 s after the program
   starts; from a key to its pixels in the other process 3.6 ms, from a
   step of the wheel (the whole view, 11 MB through the pipe) 4 ms, the
@@ -1334,7 +1334,28 @@ from 16 to 1024 pixels. As in the page of TeXmacs Vue
   from where it is) and the core (`../build-tau-native/tau_core`, which
   its Makefile builds too) and keeps its settings in `~/.TauTeXmacs`,
   not in those of TeXmacs; `TEXMACS_PATH`, `TAU_CORE` and
-  `TEXMACS_HOME_PATH` say otherwise.
+  `TEXMACS_HOME_PATH` say otherwise. Started from the desktop (not from
+  a terminal) both programs print to `system/tau.log` there.
+- **When a side fails** (2026-10-14, after an audit of the split). The
+  core says `HELO` with the version of the messages first, and the shell
+  uses no core of another version (nor a stream which is not frames: a
+  tag it does not know, a length over 1 GB). The shell tells the core
+  through a thread of its own (a busy core never blocks the window, a
+  line is never cut), and drops the paints of a view which wait before a
+  whole one. A core whose shell goes saves the documents aside
+  (`autosave-all`) and ends; its pipe is not given to the programs it
+  starts, so its end is seen even with a session running. A core which
+  ends otherwise than by quitting is said in a box, with "Start again";
+  closing the window of a core which has not answered for 3 s asks
+  whether to wait or to end it. A menu of a busy core says so instead of
+  waiting 3 s; a click on an entry of a menu which was described again
+  meanwhile is said in the footer. The core says when a view is no
+  longer shown, and drops the keys and the pointer which still come for
+  it. The menu of a view opens where the pointer was pressed, a tooltip
+  over the view which has the keyboard. Lines whose numbers are not
+  numbers, or messages which the core does not know, are said on its
+  standard error. Keys are escaped as the texts are. (The answers of
+  the dialogs are still Scheme which the core reads: to be thought over.)
 - **The desktop is not a browser.** The core took itself for one (the
   shell gives it `TEXMACS_WEB_PLATFORM` for the shortcuts of the system):
   the menu had "Files in this browser", the files were asked for in

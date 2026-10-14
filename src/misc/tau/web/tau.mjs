@@ -812,7 +812,10 @@ worker.onmessage = event => {
 	case "view": {
 		// the view which a window shows: tell it its place, and give it the
 		// keyboard if its pane has it
-		// (a new pane takes the keyboard)
+		// (a new pane takes the keyboard; a view which is no longer shown
+		// is followed by the one which is, and the core drops what is
+		// said to it meanwhile)
+		if (m.what !== "shown") break;
 		const fresh = !panes.has(m.window);
 		const pane = panes.get(m.window) || makePane(m.window);
 		pane.view = m.view;
