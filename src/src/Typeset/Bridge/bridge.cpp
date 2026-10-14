@@ -299,8 +299,10 @@ struct line_chunk {
 };
 
 struct chunk_cache_rep {
-  // chunks of the current and of the previous pass, by their first box
+  // chunks of the current and of the previous pass, by their first box,
+  // and the path of the bridge which made them (the path of their stacks)
   hashmap<pointer,line_chunk> cur, prev;
+  path ip;
 };
 
 bridge_rep::~bridge_rep () {
@@ -376,6 +378,11 @@ static array<page_item>
 chunk_lines (bridge_rep* br, array<page_item> l) {
   if (br->chunk_cache == NULL) br->chunk_cache= tm_new<chunk_cache_rep> ();
   chunk_cache_rep* cc= br->chunk_cache;
+  if (!strong_equal (cc->ip, br->ip)) {
+    // the bridge has another path: the chunks made with the old one go
+    cc->cur= hashmap<pointer,line_chunk> ();
+    cc->ip = br->ip;
+  }
   cc->prev= cc->cur;
   cc->cur = hashmap<pointer,line_chunk> ();
   array<page_item> out;

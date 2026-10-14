@@ -254,10 +254,20 @@ snap_stack_spacing (array<box> bs, array<SI>& spc, SI snap) {
 
 void
 shove_cache_new_pass (shove_memo& m) {
+  // a pass of the same memo which did not end (an exception during the
+  // typesetting): what was current before it is current again
+  if (shove_current == &m) shove_current= m.outer;
   m.prev = m.cur;
   m.cur  = hashmap<pointer,shove_entry> ();
   m.outer= shove_current;
   shove_current= &m;
+}
+
+void
+shove_cache_forget (shove_memo& m) {
+  // the memo goes (its typesetter does): it is not current any more
+  if (shove_current == &m) shove_current= m.outer;
+  m.outer= NULL;
 }
 
 void
