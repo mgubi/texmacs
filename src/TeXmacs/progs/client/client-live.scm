@@ -109,15 +109,18 @@
 (define live-cursor-palette
   (list "dark red" "dark blue" "dark green" "dark magenta" "dark orange"
         "dark cyan" "dark brown" "dark grey"))
-(define live-cursor-color-table (make-ahash-table))
+(define live-cursor-color-table (make-ahash-table)) ;; (server who) -> colour
+(define live-cursor-max 256) ;; the cursors kept, at most
 
-(define (live-cursor-color who)
-  (when (not (ahash-ref live-cursor-color-table who))
-    (ahash-set! live-cursor-color-table who
-                (list-ref live-cursor-palette
-                          (modulo (ahash-size live-cursor-color-table)
-                                  (length live-cursor-palette)))))
-  (ahash-ref live-cursor-color-table who))
+(define (live-cursor-color server who)
+  ;; (who is the number of a client on server: other servers have others)
+  (with key (list server who)
+    (when (not (ahash-ref live-cursor-color-table key))
+      (ahash-set! live-cursor-color-table key
+                  (list-ref live-cursor-palette
+                            (modulo (ahash-size live-cursor-color-table)
+                                    (length live-cursor-palette)))))
+    (ahash-ref live-cursor-color-table key)))
 
 (define (path-starts? p q)
   (or (null? q)
@@ -125,7 +128,8 @@
 
 (define (live-show-cursor lid who)
   ;; show, or remove, the cursor of who in the views of lid
-  (with val (ahash-ref live-cursors (list lid who))
+  (let* ((val (ahash-ref live-cursors (list lid who)))
+         (server (ahash-ref live-cursor-lids lid)))
     (for (vid (live-view-ids lid))
       (for (vt (id->trees vid))
         (and-let* ((vp (tree->path vt))
@@ -135,15 +139,34 @@
           (with-buffer buf
             (if (and val (third val))
                 (set-user-cursor id (append vp (third val))
-                                 (live-cursor-color who) (second val))
+                                 (live-cursor-color server who) (second val))
                 (cancel-user-cursor id))))))))
 
+(define (live-cursor-acceptable? server lid who pseudo name pos)
+  ;; only the server of lid tells where the others are in it
+  (and (string? lid) (== (ahash-ref live-cursor-lids lid) server)
+       (integer? who) (exact? who) (string? pseudo) (string? name)
+       (or (not pos) (live-cursor-position? pos))
+       (or (not pos) (ahash-ref live-cursors (list lid who))
+           (< (ahash-size live-cursors) live-cursor-max))))
+
+(define (live-show-cursor* lid who)
+  ;; a position which the editor refuses stops nothing else
+  (catch #t
+         (lambda () (live-show-cursor lid who))
+         (lambda args
+           (when (debug-get "remote")
+             (display* "live-show-cursor " lid ", " who ": " args "\n")))))
+
 (tm-call-back (live-cursor lid who pseudo name pos)
-  (if pos
-      (ahash-set! live-cursors (list lid who) (list pseudo name pos))
-      (ahash-remove! live-cursors (list lid who)))
-  (live-show-cursor lid who)
-  (client-return envelope #t))
+  (if (live-cursor-acceptable? (car envelope) lid who pseudo name pos)
+      (begin
+        (if pos
+            (ahash-set! live-cursors (list lid who) (list pseudo name pos))
+            (ahash-remove! live-cursors (list lid who)))
+        (live-show-cursor* lid who)
+        (client-return envelope #t))
+      (client-return envelope #f)))
 
 (tm-define (live-participants lid)
   (:synopsis "The names of the other users whose cursor is in @lid")
@@ -177,7 +200,7 @@
   ;; there, or not shown, when their position came; nothing is done for
   ;; those which are shown already)
   (for (x (ahash-table->list live-cursors))
-    (live-show-cursor (caar x) (cadar x)))
+    (live-show-cursor* (caar x) (cadar x)))
   (with cur (catch #t live-cursor-current (lambda args #f))
     (for (lid (map car (ahash-table->list live-cursor-lids)))
       (with pos (and cur (== (car cur) lid) (cdr cur))
@@ -195,7 +218,8 @@
       (:while (or (!= (ahash-size live-cursor-lids) 0)
                   (begin (set! live-cursor-polling? #f) #f)))
       (:pause 300)
-      (live-cursor-poll))))
+      ;; (a delayed job which throws is not run again)
+      (catch #t live-cursor-poll (lambda args (noop))))))
 
 (tm-define (client-remove server)
   ;; the live documents of a connection which ends: no cursors any more
@@ -207,7 +231,7 @@
         (for (y (ahash-table->list live-cursors))
           (when (== (caar y) lid)
             (ahash-remove! live-cursors (car y))
-            (live-show-cursor lid (cadar y)))))))
+            (live-show-cursor* lid (cadar y)))))))
   (ahash-remove! live-cursor-refused server)
   (former server))
 
