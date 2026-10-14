@@ -127,6 +127,7 @@ TMPL void
 hashmap_rep<T,U>::clear () {
   tm_delete_array (a);
   a= tm_new_array<list<hashentry<T,U> > > (n);
+  size= 0;
 }
 
 TMPL void

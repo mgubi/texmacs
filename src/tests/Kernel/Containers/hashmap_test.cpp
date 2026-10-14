@@ -30,6 +30,7 @@ private slots:
   void test_changes ();
   void test_invert ();
   void test_size ();
+  void test_clear ();
 };
 
 
@@ -267,6 +268,26 @@ TestHashmap::test_size () {
   auto non_empty_hm = hashmap<int, void*>();
   non_empty_hm(1) = nullptr;
   QCOMPARE (N(non_empty_hm) == 1, true);
+}
+
+/******************************************************************************
+* tests on clear
+******************************************************************************/
+void
+TestHashmap::test_clear () {
+  auto hm = hashmap<int, int>(0, 10);
+  hm(1) = 10;
+  hm(2) = 20;
+  hm->clear ();
+  QCOMPARE (N(hm), 0);
+  QCOMPARE (hm->empty (), true);
+  QCOMPARE (hm->contains (1), false);
+  auto empty_hm = hashmap<int, int>(0, 10);
+  QCOMPARE (hm == empty_hm, true);
+
+  hm(3) = 30;
+  QCOMPARE (N(hm), 1);
+  QCOMPARE (hm[3], 30);
 }
 
 QTEST_MAIN(TestHashmap)
