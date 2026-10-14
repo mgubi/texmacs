@@ -164,11 +164,95 @@ str_length (string s, bool utf8) {
   else return N(s);
 }
 
+static array<string>
+cork_characters (string s) {
+  // the characters of s, each one byte or <...>
+  array<string> a;
+  int i= 0, n= N(s);
+  while (i<n) {
+    int start= i;
+    goto_next_char (s, i, false);
+    a << s (start, i);
+  }
+  return a;
+}
+
+static array<int>
+get_cork_hyphens (string s,
+                  hashmap<string,string> patterns,
+                  hashmap<string,string> hyphenations) {
+  // Hyphenation of a word with characters written <...>. The patterns are
+  // matched on characters, as below on bytes for the other words; the
+  // result has one penalty after each byte of s but the last, and no
+  // hyphenation is allowed inside a character.
+  int i, j, k, m, len;
+  array<int> penalty (N(s)-1);
+  for (i=0; i<N(penalty); i++) penalty[i]= HYPH_INVALID;
+  string l= uni_locase_all (s);
+  array<string> c= cork_characters (l);
+  int nc= N(c);
+  if (nc < 2 || N (cork_characters (s)) != nc) return penalty;
+
+  array<int> cp (nc-1); // the penalty after each character but the last
+  for (i=0; i<nc-1; i++) cp[i]= HYPH_INVALID;
+  if (hyphenations->contains (l)) {
+    string h= hyphenations [l];
+    j= 0;
+    while (j < N(h) && h[j] == '-') j++;
+    goto_next_char (h, j, false);
+    for (i=0; i<nc-1; i++) {
+      while (j < N(h) && h[j] == '-') {
+        cp[i]= HYPH_STD;
+        j++;
+      }
+      goto_next_char (h, j, false);
+    }
+  }
+  else {
+    array<string> w;
+    w << string (".") << c << string (".");
+    array<int> T (N(w)+1);
+    for (i=0; i<N(T); i++) T[i]= 0;
+    for (len=1; len < MAX_SEARCH; len++)
+      for (i=0; i < N(w) - len; i++) {
+        string key;
+        for (j=0; j<len; j++) key << w[i+j];
+        string r= patterns [key];
+        if (!(r == "?")) {
+          for (j=0, k=0; j<=len; j++, goto_next_char (r, k, false)) {
+            if (k<N(r) && is_digit (r[k])) {
+              m= ((int) r[k])-((int) '0');
+              k++;
+            }
+            else m= 0;
+            if (m>T[i+j]) T[i+j]= m;
+          }
+        }
+      }
+    for (i=0; i<nc-1; i++)
+      cp[i]= (((T[i+2]&1)==1)? HYPH_STD: HYPH_INVALID);
+    if (N(cp)>0) cp[0] = cp[N(cp)-1] = HYPH_INVALID;
+    if (N(cp)>1) cp[1] = cp[N(cp)-2] = HYPH_INVALID;
+    if (N(cp)>2) cp[N(cp)-3] = HYPH_INVALID;
+  }
+
+  // the characters of s have the lengths of those of the word as written
+  array<string> o= cork_characters (s);
+  int pos= 0;
+  for (i=0; i<nc-1; i++) {
+    pos += N(o[i]);
+    penalty[pos-1]= cp[i];
+  }
+  return penalty;
+}
+
 array<int>
 get_hyphens (string s,
              hashmap<string,string> patterns,
              hashmap<string,string> hyphenations, bool utf8) {
   ASSERT (N(s) != 0, "hyphenation of empty string");
+  if (!utf8 && occurs ("<", s))
+    return get_cork_hyphens (s, patterns, hyphenations);
 
   if (utf8) s= cork_to_utf8 (uni_locase_all(s));
   else s= uni_locase_all(s);
