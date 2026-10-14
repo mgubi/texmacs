@@ -70,6 +70,7 @@ string open_mode_url;
 bool tls_no_verify= false;
 string extra_init_cmd;
 bool exec_exit= true;
+bool quit_at_end= false;
 void server_start ();
 
 #ifdef QTTEXMACS
@@ -354,7 +355,7 @@ set_global_options  (int argc, char** argv)  {
         exit (0);
       }
       else if ((s == "-q") || (s == "-quit"))
-        my_init_cmds= my_init_cmds * " (quit-TeXmacs)";
+        quit_at_end= true;
       else if ((s == "-r") || (s == "-reverse"))
         set_reverse_colors (true);
 #if QT_VERSION < 0x060000
@@ -442,16 +443,20 @@ set_global_options  (int argc, char** argv)  {
 	       (s == "-headless") || (s == "-H") || s == "-open");
       else if (s == "-tls-no-verify") tls_no_verify= true;
       else if (s == "-build-manual") {
+        // the manual and the test suites quit when they are done
+        if (i+1<argc) exec_exit= false;
         if ((++i)<argc)
           extra_init_cmd << "(build-manual "
                          << scm_quote (argv[i]) << " delayed-quit)";
       }
       else if (s == "-reference-suite") {
+        if (i+1<argc) exec_exit= false;
         if ((++i)<argc)
           extra_init_cmd << "(build-ref-suite "
                          << scm_quote (argv[i]) << " delayed-quit)";
       }
       else if (s == "-test-suite") {
+        if (i+1<argc) exec_exit= false;
         if ((++i)<argc)
           extra_init_cmd << "(run-test-suite "
                          << scm_quote (argv[i]) << "delayed-quit)";
@@ -469,7 +474,7 @@ set_global_options  (int argc, char** argv)  {
         cout << "  -H         Run TeXmacs in headless mode\n";
         cout << "  -i [file]  Specify scheme initialization file\n";
         cout << "  -p         Get the TeXmacs path\n";
-        cout << "  -q         Shortcut for -x \"(quit-TeXmacs)\"\n";
+        cout << "  -q         Quit after the commands and the files\n";
         cout << "  -r         Reverse video mode\n";
         cout << "  -s         Suppress information messages\n";
         cout << "  -S         Rerun TeXmacs setup program before starting\n";
@@ -492,14 +497,15 @@ set_global_options  (int argc, char** argv)  {
       string b= scm_quote (as_string (u));
       string cmd= "(load-buffer " * b * " " * where * ")";
       where= " :new-window";
-      extra_init_cmd << cmd;
+      // with the commands of -x and -c, in the order of the command line
+      my_init_cmds= my_init_cmds * " " * cmd;
     }
   } // for (int i...)
   if (flag) debug (DEBUG_FLAG_AUTO, true);
   // End parse command line options
 
   // in headless mode quit after processing of the command line
-  if (headless_mode && exec_exit && !is_server ()) my_init_cmds= my_init_cmds * " (quit-TeXmacs)";
+  if (headless_mode && exec_exit && !is_server ()) quit_at_end= true;
 
   // Further options via environment variables
 #if QT_VERSION < 0x060000
@@ -570,7 +576,8 @@ TeXmacs_main (int argc, char** argv) {
     server sv;
   
     // append commands to open standard welcome messages if needed
-    if (install_status == 1) {
+    if (quit_at_end); // no messages before quitting
+    else if (install_status == 1) {
       if (DEBUG_STD) debug_boot << "Loading welcome message...\n";
       string cmd= "(load-help-article \"about/welcome/new-welcome\")";
       // FIXME: force to load welcome message into new window
@@ -618,6 +625,8 @@ TeXmacs_main (int argc, char** argv) {
     
     // inject scheme commands 
     if (N(extra_init_cmd) > 0) exec_delayed (scheme_cmd (extra_init_cmd));
+    // quit after the commands and the files of the command line
+    if (quit_at_end) exec_delayed (scheme_cmd ("(quit-TeXmacs)"));
     gui_start_loop ();
   
     if (DEBUG_STD) debug_boot << "Stopping server...\n";
