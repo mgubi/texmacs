@@ -280,8 +280,7 @@
 (lazy-format (octave-format) octave)
 (lazy-format (scilab-format) scilab)
 (lazy-keyboard (prog prog-kbd) in-prog?)
-(lazy-menu (prog prog-menu) prog-format-menu prog-format-icons
-	   prog-menu prog-icons)
+(lazy-menu (prog prog-menu) prog-format-menu prog-format-icons prog-icons)
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
 ;(display* "memory: " (texmacs-memory) " bytes\n")
 
@@ -360,8 +359,7 @@
            graphics-overlays-menu graphics-screens-menu
            graphics-focus-overlays-menu graphics-focus-overlays-icons)
 (lazy-menu (dynamic session-menu) insert-session-menu session-help-icons)
-(lazy-menu (dynamic scripts-menu) scripts-eval-menu scripts-plot-menu
-           plugin-eval-menu plugin-eval-toggle-menu plugin-plot-menu)
+(lazy-menu (dynamic scripts-menu) scripts-eval-menu scripts-plot-menu)
 (lazy-menu (dynamic calc-menu) calc-table-menu calc-insert-menu
            calc-icourse-menu)
 (lazy-menu (dynamic animate-menu) insert-animation-menu animate-toolbar)

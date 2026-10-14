@@ -796,7 +796,6 @@
 
 (define-preference-names-and-validate "updater:interval"
   ("0" "Never")
-  ("0" "Unsupported")
   ("24" "Once a day")
   ("168" "Once a week")
   ("720" "Once a month"))
