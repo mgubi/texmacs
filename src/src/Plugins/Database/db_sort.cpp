@@ -17,21 +17,31 @@
 * Lexicographical sorting of tuples
 ******************************************************************************/
 
-static bool
-operator <= (strings a1, strings a2) {
-  int i;
-  for (i=0; i<N(a1) && i<N(a2); i++) {
-    if (a1[i] < a2[i]) return true;
-    if (a2[i] < a1[i]) return false;
+// The last component of each tuple is the identifier, which is always
+// sorted in ascending order and only serves as a final tie-break.
+// The other components are sorted according to lex_sort_dirs.
+
+static array<bool> lex_sort_dirs;
+
+struct lex_sort_leq {
+  static bool leq (strings& a1, strings& a2) {
+    int i;
+    for (i=0; i<N(a1) && i<N(a2); i++) {
+      bool up= (i >= N(lex_sort_dirs) || lex_sort_dirs[i]);
+      if (a1[i] < a2[i]) return up;
+      if (a2[i] < a1[i]) return !up;
+    }
+    if (i<N(a2)) return true;
+    if (i<N(a1)) return false;
+    return true;
   }
-  if (i<N(a2)) return true;
-  if (i<N(a1)) return false;
-  return true;
-}
+};
 
 static void
-lex_sort (array<strings>& a) {
-  merge_sort (a);
+lex_sort (array<strings>& a, array<bool> dirs) {
+  lex_sort_dirs= dirs;
+  merge_sort_leq<strings, lex_sort_leq> (a);
+  lex_sort_dirs= array<bool> ();
 }
 
 /******************************************************************************
@@ -78,13 +88,11 @@ database_rep::sort_results (db_atoms ids, tree q, db_time t) {
   if (N(attrs) == 0) return ids;
   array<strings> a= build_sort_tuples (ids, attrs, t);
   //cout << "Tuples " << a << LF;
-  lex_sort (a);
+  lex_sort (a, dirs);
   //cout << "Sorted " << a << LF;
   db_atoms r;
-  for (int i=0; i<N(a); i++) {
-    int j= (dirs[0]? i: (N(a) - 1 - i));
-    r << as_atom (a[j][N(a[j]) - 1]);
-  }
+  for (int i=0; i<N(a); i++)
+    r << as_atom (a[i][N(a[i]) - 1]);
   //cout << "Result " << r << LF;
   return r;
 }

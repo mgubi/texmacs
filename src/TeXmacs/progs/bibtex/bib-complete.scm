@@ -36,16 +36,31 @@
               (tree->stree (parse-bib (string-load u))))))))
     (ahash-ref parse-results u)))
 
-; FIXME: if the user changes the bibliography file we still retrieve from cache
+(define (find-bib-file base fname)
+  ;; Same search as find_bib_file in edit_process.cpp
+  (let* ((name (if (string-ends? fname ".bib") fname
+                   (string-append fname ".bib")))
+         (bibf (string->url name))
+         (relf (url-relative base bibf))
+         (ancf (url-expand
+                (url-relative base (url-append (url-ancestor) bibf)))))
+    (cond ((url-exists? bibf) bibf)
+          ((url-exists? relf) relf)
+          ((url-exists? ancf) (url-resolve ancf "r"))
+          (else #f))))
+
 (tm-define (current-bib-file usecache?)
   (:synopsis "Returns the (cached) name of the bibliography file")
   (with u (current-buffer-url)
-    (or (and usecache? (ahash-ref bib-files-cache u))
-        (with l (select (buffer-tree) '(:* bibliography))
-          (if (nnull? l)
-              (ahash-set! bib-files-cache u
-               (url-append (url-head u) (tm->string (tree-ref (car l) 2))))
-              (url-none))))))
+    (with l (select (buffer-tree) '(:* bibliography))
+      (if (null? l) (url-none)
+          (let* ((name (tm->string (tree-ref (car l) 2)))
+                 (key (string-append (url->system u) "\n" name)))
+            (or (and usecache? (ahash-ref bib-files-cache key))
+                (with f (find-bib-file u name)
+                  (if f
+                      (begin (ahash-set! bib-files-cache key f) f)
+                      (url-append (url-head u) name)))))))))
 
 (tm-define (current-bib-style usecache?)
   (:synopsis "Returns the (cached) style of the bibliography")
