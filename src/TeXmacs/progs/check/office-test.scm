@@ -84,7 +84,9 @@
          (z (zip-pack names names)))
     (check= (length (zip-unpack z)) 10000))
   ;; more entries than the format has room for
-  (check= (zip-pack (make-list 65536 "a") (make-list 65536 "")) ""))
+  (check= (zip-pack (make-list 65536 "a") (make-list 65536 "")) "")
+  ;; a name longer than the format has room for
+  (check= (zip-pack (list (make-string 65536 #\a) "b") '("x" "yy")) ""))
 
 ;; Archives which were damaged, or made to harm: an entry which cannot be
 ;; read is left out, and nothing else happens.
@@ -157,7 +159,22 @@
       (check= (zip-unpack (string-append (substring zip-sample 0 i) "TeXmacZ"
                                          (substring zip-sample (+ i 7)
                                                     (string-length zip-sample))))
-              only-a)))
+              only-a))
+    ;; two entries of the directory for the same data (one archive of a
+    ;; few Kb could make TeXmacs inflate it thousands of times): the data
+    ;; is read for the first one
+    (let* ((copy (lambda (s i j k)
+                   ;; s with its k bytes at j replaced by the ones at i
+                   (string-append (substring s 0 j) (substring s i (+ i k))
+                                  (substring s (+ j k) (string-length s)))))
+           (z (copy (copy zip-sample (+ a 10) (+ b 10) 18) (+ a 42) (+ b 42) 4)))
+      (check= (zip-unpack z) only-a)))
+  ;; two entries with the same name: both are read, and the importers take
+  ;; the first one
+  (let* ((z (zip-pack '("e" "e") '("first" "second")))
+         (t (office-archive z)))
+    (check= (zip-unpack z) '("e" "first" "e" "second"))
+    (check= (office-entry t "e") "first"))
   ;; deflated data which is wrong: a stored block whose two lengths do not
   ;; agree, a code with more codes than its lengths allow, a distance before
   ;; the start of the data

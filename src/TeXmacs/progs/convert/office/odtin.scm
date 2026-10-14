@@ -808,8 +808,8 @@
   (with r (catch #t
             (lambda () (odt-parse s))
             (lambda args
-              (odt-error (string-append "This OpenDocument file could not be read ("
-                                        (object->string (car args)) ")"))))
+              (odt-error (string-append "This OpenDocument file could not be read "
+                                        (office-error-text args)))))
     (set! odt-archive #f)
     (set! odt-styles (make-ahash-table))
     (set! odt-style-memo (make-ahash-table))
