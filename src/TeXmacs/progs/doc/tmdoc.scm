@@ -40,7 +40,7 @@
   '(section* subsection* subsubsection* paragraph* subparagraph*))
 
 (define tmdoc-starred
-  '(part chapter section subsection subsubsection))
+  '(part chapter section subsection subsubsection paragraph subparagraph))
 
 (define (tmdoc-sectioning? x)
   (and (pair? x) (or (in? (car x) tmdoc-sectioning)

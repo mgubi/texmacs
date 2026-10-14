@@ -417,7 +417,7 @@
     (check= (demote 'section 'section) 'subsection)
     (check= (demote 'section* 'section) 'subsection*)
     (check= (demote 'subsection 'subsection) 'paragraph)
-    (check= (demote 'subsection* 'subsection) 'paragraph)
+    (check= (demote 'subsection* 'subsection) 'paragraph*)
     (check= (demote 'section 'appendix) 'section)
     (check= (demote 'section 'tmdoc-title) 'section)
     ;; a branch whose file is missing keeps its heading, with a message
