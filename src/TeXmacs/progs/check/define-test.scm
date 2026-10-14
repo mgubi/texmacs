@@ -444,6 +444,41 @@
 ;; The suite
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Delayed commands
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; Without a window the delayed commands never run, and the change time
+;; and idle time do not advance: the test calls the command which delayed
+;; schedules itself, with its own change and idle times. The command
+;; returns the delay before it is called again, or #t when it is done.
+
+(define delayed-change 0)
+(define delayed-idle 0)
+(define delayed-runs 0)
+
+(define (delayed-command)
+  (let ((cmd #f))
+    (with-global exec-delayed-pause (lambda (c) (set! cmd c))
+      (delayed
+        (:refresh 100)
+        (set! delayed-runs (+ delayed-runs 1))))
+    cmd))
+
+(define (test-delayed)
+  (check-group "delayed :refresh")
+  (with-global change-time (lambda () delayed-change)
+    (with-global idle-time (lambda () delayed-idle)
+      (let ((cmd (delayed-command)))
+        (set! delayed-runs 0)
+        ;; the body waits until the user has been idle for 100 ms
+        (set! delayed-idle 30)
+        (check= (cmd) 70)
+        (check= delayed-runs 0)
+        (set! delayed-idle 150)
+        (check= (cmd) #t)
+        (check= delayed-runs 1)))))
+
 (tm-define (define-test-failures)
   (check-suite "tm-define")
   (test-overloading)
@@ -455,4 +490,5 @@
   (test-modes)
   (test-lazy)
   (test-modules)
+  (test-delayed)
   (check-end))
