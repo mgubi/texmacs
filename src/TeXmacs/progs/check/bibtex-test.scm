@@ -183,12 +183,29 @@
   (check= (bib-value "@misc{k, pages = {}, title = {T}}" "pages") '(bib-pages))
   (check-true (contains? (bib-out (bib-parse "@misc{k, pages = {12, 15--17}}"))
                          "{12, 15--17}"))
-  ;; the fields which BibTeX reads verbatim are not converted from LaTeX
+  ;; an en dash (a UTF-8 dash in the file) separates a range too
+  (check= (bib-value (string-append "@misc{k, pages = {12" "\x15" "34}}") "pages")
+          '(bib-pages "12" "34"))
+  ;; the rule is also the one of the database, through bib-field-pages
+  (check= (tree->stree (bib-field-pages (string-append "e1" "\x15" "e9")))
+          '(bib-pages "e1" "e9"))
+  (check= (tree->stree (bib-field-pages "S-12")) '(bib-pages "S-12"))
+  (check= (tree->stree (bib-field-pages "")) '(bib-pages))
+  ;; the fields which BibTeX reads verbatim are not converted from LaTeX,
+  ;; nor the keys of other entries
   (with s (string-append "@misc{k, doi = {10.1000/a_b%20}, eprint = {a_b}, "
-                         "url = {http://x.org/a_b}, title = {a_b}}")
+                         "url = {http://x.org/a_b}, title = {a_b}, "
+                         "crossref = {smith_2020}}")
     (check= (bib-value s "doi") "10.1000/a_b%20")
     (check= (bib-value s "eprint") "a_b")
-    (check= (bib-value s "url") '(slink "http://x.org/a_b"))))
+    (check= (bib-value s "url") '(slink "http://x.org/a_b"))
+    (check= (bib-value s "crossref") "smith_2020")
+    (check-true (contains? (bib-out (bib-parse s)) "{smith_2020}")))
+  ;; the months, as in the standard styles of BibTeX, unless redefined
+  (check= (bib-value "@misc{k, month = jan}" "month") "January")
+  (check= (bib-value "@misc{k, month = sep # { 1}}" "month") "September 1")
+  (check= (bib-value "@string{jan = {Jan.}} @misc{k, month = jan}" "month")
+          "Jan."))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Parser: @string and #

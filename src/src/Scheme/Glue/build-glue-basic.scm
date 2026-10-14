@@ -918,6 +918,7 @@
   (bib-default-upcase-first bib_default_upcase_first (scheme_tree scheme_tree))
   (bib-purify bib_purify (string scheme_tree))
   (bib-text-length bib_text_length (int scheme_tree))
+  (bib-field-pages bib_field_pages (tree string))
   (bib-prefix bib_prefix (string scheme_tree int))
   (bib-empty? bib_empty (bool scheme_tree string))
   (bib-field bib_field (scheme_tree scheme_tree string))
