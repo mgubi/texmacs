@@ -483,16 +483,17 @@
              (list :error "Error: write access denied"))
             ((!= (version-get-number fid) (version-get-current vid))
              (list :error "Error: version number mismatch"))
-            ((== (string-load fname) doc) ;; no changes need to be saved
-             (list :unchanged fid))
             (else
-              (let* ((nr (version-next vid))
-                     (doc* (server-expand-cache-refs doc))
-                     (rid (remote-create uid rname vid nr doc msg)))
-                (copy-properties fid rid inherit-property?)
-                (db-remove-entry fid)
-                ;;(display* "Versions " rname ": " (version-get-versions vid) "\n")
-                (list :created rid))))))
+              (let* ((doc* (server-expand-cache-refs doc)))
+                (if (== (string-load fname) doc*) ;; no changes need to be saved
+                    (list :unchanged fid)
+                    (let* ((nr (version-next vid))
+                           (rid (remote-create uid rname vid nr doc* msg)))
+                      (copy-properties fid rid inherit-property?)
+                      (db-remove-entry fid)
+                      ;;(display* "Versions " rname ": "
+                      ;;          (version-get-versions vid) "\n")
+                      (list :created rid))))))))
 
 (tm-service (remote-file-save rname doc msg)
   ;;(display* "remote-file-save " rname ", " doc ", " msg "\n")

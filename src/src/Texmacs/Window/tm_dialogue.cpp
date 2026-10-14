@@ -86,14 +86,16 @@ tm_frame_rep::dialogue_start (string name, widget wid) {
     dialogue_wid= wid;
     dialogue_win= plain_window_widget (dialogue_wid, name);
 
-    widget win= concrete_window () -> win;
-    SI ox, oy, dx, dy, ex= 0, ey= 0;
-    get_position (win, ox, oy);
-    get_size (win, dx, dy);
-    get_size (dialogue_win, ex, ey);
-    ox += (dx - ex) >> 1;
-    oy -= (dy - ey) >> 1;
-    set_position (dialogue_win, ox, oy);
+    if (has_current_window ()) {
+      widget win= concrete_window () -> win;
+      SI ox, oy, dx, dy, ex= 0, ey= 0;
+      get_position (win, ox, oy);
+      get_size (win, dx, dy);
+      get_size (dialogue_win, ex, ey);
+      ox += (dx - ex) >> 1;
+      oy -= (dy - ey) >> 1;
+      set_position (dialogue_win, ox, oy);
+    }
     set_visibility (dialogue_win, true);
   }
 }
@@ -148,6 +150,7 @@ tm_frame_rep::choose_file (object fun, string title, string type,
   }
   else set_directory (wid, ".");
   dialogue_start (title, wid);
+  if (dialogue_wid != wid) return;
   if (type == "directory") send_keyboard_focus (get_directory (dialogue_wid));
   else send_keyboard_focus (get_file (dialogue_wid));
 }
