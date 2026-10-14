@@ -61,8 +61,11 @@
     of <name|LibreOffice>. The conversion goes through <name|MathML>.
 
     <item*|Images>The images are kept inside the document, with their
-    sizes. A paragraph of images followed by a caption is a figure, and so
-    for a table.
+    sizes and the parts which are cut from them. A paragraph of images
+    followed by a caption is a figure, and so for a table. The pictures of
+    <name|Windows> (<name|Emf>, <name|Wmf>) which <name|Word> documents
+    often have are made images by <name|LibreOffice>, when it is installed,
+    and are a frame with their name else.
 
     <item*|Drawings>A drawing made with <TeXmacs> is exported as a
     picture: an <name|Svg> image, which stays sharp at any size, with a
@@ -84,6 +87,48 @@
     <name|OpenDocument>).
   </description>
 
+  <paragraph|The style office>
+
+  A <name|Word> or <name|OpenDocument> file which is opened is a document
+  of the style <tmstyle|office>, which keeps what the file says and the
+  standard tags of <TeXmacs> do not, so that the file which is saved again
+  is close to the one which was read:
+
+  <\description>
+    <item*|Named styles>A paragraph or a piece of text of a named style of
+    the file (<samp|Warning>, <samp|Keyword>) is <markup|office-par> or
+    <markup|office-span> with the name of the style, which is shown as the
+    file shows it (its font, size, color, alignment, indentation, spacing,
+    background and border): the style is a macro <verbatim|office-par->name
+    or <verbatim|office-span->name of the document, which can be edited.
+
+    <item*|Headers and footers>They are the headers and footers of the
+    pages of the document, with the number of the page.
+
+    <item*|Fields>A field (a page number, a date, the title of the
+    document, a citation of <name|Zotero>) is <markup|office-field>, which
+    shows its result and keeps its instruction.
+
+    <item*|Comments and changes>A comment is <markup|office-comment>,
+    after its mark, with its author; the text which was inserted and the
+    one which was deleted while the changes are tracked are
+    <markup|office-ins> and <markup|office-del>, in color.
+
+    <item*|Columns>A section in several columns is
+    <markup|office-columns>.
+
+    <item*|The file>The file itself is kept in the environment of the
+    document: when it is saved again in its format, its named styles, its
+    pages with their headers and footers, its fonts, its theme, its
+    settings and its properties are written again, and the text,
+    its notes, comments and lists are those of <TeXmacs>.
+  </description>
+
+  The option <verbatim|office-\<gtr\>texmacs:faithful> of the converter
+  (on by default) makes these documents; without it, a file is a document
+  of the style <tmstyle|generic>, with the look of the named styles of its
+  text, the results of its fields and its changes accepted.
+
   <paragraph|Exporting>
 
   The file which is written uses named styles for its paragraphs
@@ -92,7 +137,10 @@
   can be changed at once in <name|Word> or <name|LibreOffice> by changing
   these styles or by applying a template. Its text has a font with serifs
   (<name|Times New Roman>), or <name|Arial> for a document without serifs,
-  and the size of the font of the document.
+  and the size of the font of the document. Several lines of equations
+  (<markup|eqnarray>, <markup|align>) are an array of equations of
+  <name|Word>, all the screens of a presentation are written, each on a
+  page of its own, and so is what is folded.
 
   <paragraph|Numbers and references>
 
@@ -140,9 +188,9 @@
   <paragraph|Limitations>
 
   <\itemize>
-    <item>The named styles of a document, its fonts other than the usual
-    one, the sizes and the spacings of other paragraphs than the usual
-    ones, headers and footers, columns and sections are not kept.
+    <item>The formatting by hand of the text and of the paragraphs (a size,
+    a font, an indentation which no named style gives) is not kept, nor
+    is a section with another page than the first one.
 
     <item>A reference of an office document whose text is more than a
     number (\PTable 3\Q, the title of a section) is a link to its
@@ -153,14 +201,13 @@
     in the office programs, and it comes back as an image. The drawings and
     charts of the office programs are not imported (but for their
     pictures), and an image which floats beside the text is placed at the
-    start of its paragraph.
-
-    <item>Comments and the history of the changes are not imported: the
-    text is the one with all the changes accepted.
+    start of its paragraph. In <name|OpenDocument>, a picture of which
+    parts are cut is written whole.
 
     <item>The bibliography is its entries as they are displayed: the
-    data of the references (authors, years) and the citation fields of
-    the office programs or of <name|Zotero> are not exchanged.
+    data of the references (authors, years) are not exchanged; the
+    citation fields of <name|Zotero> are kept as fields in the style
+    <tmstyle|office>.
   </itemize>
 
   <tmdoc-copyright|2026|the <TeXmacs> team>

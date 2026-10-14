@@ -305,7 +305,7 @@
         (cons* tag (cons '@ l) children))))
 
 (define office-wrappers
-  '(em strong underline strike sub sup code smallcaps mark color))
+  '(em strong underline strike sub sup code smallcaps mark color span ins del))
 
 (define (office-same-wrapper? x y)
   ;; two nodes which wrap text in the same way
@@ -324,6 +324,91 @@
   (with s (object->string args)
     (if (<= (string-length s) 300) s
         (string-append (substring s 0 300) "..."))))
+
+(tm-define (office-changes l)
+  (:synopsis "The nodes @l with the marks of tracked changes made nodes ins and del")
+  ;; the nodes l, with the marks of the tracked changes made nodes ins and
+  ;; del around what they hold (a change which goes on in the next
+  ;; paragraph ends with this one)
+  (let loop ((l l) (acc '()) (stack '()))
+    (let ((close (lambda (acc stack)
+                   (with node (apply office-node
+                                     (cons* (car (car stack)) (cadr (car stack))
+                                            (reverse acc)))
+                     (if (null? (reverse acc)) (caddr (car stack))
+                         (cons node (caddr (car stack))))))))
+      (cond ((and (null? l) (null? stack)) (reverse acc))
+            ((null? l) (loop l (close acc stack) (cdr stack)))
+            ((func? (car l) '!change-start)
+             (loop (cdr l) '() (cons (list (cadr (car l)) (caddr (car l)) acc) stack)))
+            ((func? (car l) '!change-end)
+             (if (null? stack) (loop (cdr l) acc stack)
+                 (loop (cdr l) (close acc stack) (cdr stack))))
+            (else (loop (cdr l) (cons (car l) acc) stack))))))
+
+(tm-define (office-drop-style l name)
+  (:synopsis "The blocks @l without the style @name of their paragraphs")
+  ;; (the paragraphs of the usual style say none)
+  (map (lambda (b)
+         (cond ((and (func? b 'p) (== (ox-attr b 'style) name))
+                (apply office-node
+                       (cons* 'p (list-filter (ox-attrs b) (lambda (a) (!= (car a) 'style)))
+                              (ox-children b))))
+               ((func? b 'columns)
+                (cons* 'columns (cons '@ (ox-attrs b))
+                       (office-drop-style (ox-children b) name)))
+               (else b)))
+       l))
+
+;; The pictures of Windows (EMF, WMF), which Word documents often have, are
+;; read by no part of TeXmacs: LibreOffice, when it is there, makes a PNG
+;; of them, with a profile of its own in the home directory of TeXmacs.
+
+(define (office-soffice)
+  ;; the program of LibreOffice, or #f
+  (cond ((url-exists-in-path? "soffice") "soffice")
+        ((url-exists-in-path? "libreoffice") "libreoffice")
+        ((url-exists? "/Applications/LibreOffice.app/Contents/MacOS/soffice")
+         "/Applications/LibreOffice.app/Contents/MacOS/soffice")
+        (else #f)))
+
+(define (office-quote s)
+  ;; s as one word of the shell
+  (string-append "'" (string-replace s "'" "'\\''") "'"))
+
+(tm-define (office-metafile? name)
+  (:synopsis "Whether the file @name is a picture of Windows (EMF, WMF)")
+  (and (string? name)
+       (with n (locase-all name)
+         (or (string-ends? n ".emf") (string-ends? n ".wmf")))))
+
+(tm-define (office-metafile->png data name)
+  (:synopsis "The PNG of the picture @data of Windows named @name, or #f")
+  (let ((prog (office-soffice)))
+    (and prog (string? data) (> (string-length data) 0)
+         (catch #t
+           (lambda ()
+             (let* ((dir (url-temp))
+                    (suffix (if (string-ends? (locase-all name) ".wmf") ".wmf" ".emf"))
+                    (in (url-append dir (string-append "picture" suffix)))
+                    (out (url-append dir "picture.png"))
+                    (profile (url-append (url-expand "$TEXMACS_HOME_PATH")
+                                         "system/office-profile")))
+               (system-mkdir dir)
+               (string-save data in)
+               (eval-system
+                 (string-append (office-quote prog) " --headless "
+                                (office-quote (string-append "-env:UserInstallation=file://"
+                                                             (url->system profile)))
+                                " --convert-to png --outdir "
+                                (office-quote (url->system dir)) " "
+                                (office-quote (url->system in))
+                                " < /dev/null 2>&1"))
+               (with r (and (url-exists? out) (string-load out))
+                 (for (u (list in out)) (when (url-exists? u) (system-remove u)))
+                 (system-rmdir dir)
+                 (and r (> (string-length r) 8) r))))
+           (lambda args #f)))))
 
 (tm-define (office-join-strings l)
   (:synopsis "The list @l with the strings which follow each other as one")

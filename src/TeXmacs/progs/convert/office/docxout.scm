@@ -42,6 +42,12 @@
 (define dx-cell-align #f)   ; the alignment of the cell around a paragraph
 (define dx-numbered? #f)    ; the headings are numbered by Word
 (define dx-setup '(setup))  ; the page and the font of the document
+(define dx-comments '())    ; the comments, reversed
+(define dx-used-styles '()) ; (id family) of the named styles of the text
+(define dx-sections? #f)    ; whether the text has sections in columns
+(define dx-package #f)      ; the entries of the file the text was read from
+(define dx-num-offset 0)    ; the lists of this file come first
+(define dx-abstract-offset 0)
 (define dx-bookmarks (make-ahash-table)) ; a label -> its bookmark
 (define dx-bookmark-names (make-ahash-table)) ; the bookmarks which are used
 
@@ -73,7 +79,8 @@
          (old (ahash-ref dx-rel-ids key)))
     (or old
         (let* ((l (if dx-in-note? dx-note-rels dx-rels))
-               (id (string-append "rId" (number->string (+ (length l) 1))))
+               (id (string-append (if dx-package "rIdTm" "rId")
+                                  (number->string (+ (length l) 1))))
                (r (list id type target external?)))
           (if dx-in-note?
               (set! dx-note-rels (cons r dx-note-rels))
@@ -89,10 +96,12 @@
   ;; the element w:rPr for the wrappers around a text, in the order which
   ;; the format wants; props has tags and (color "#rrggbb")
   (let* ((has? (lambda (tag) (in? tag props)))
-         (color (list-find props pair?))
+         (color (assq 'color (list-filter props pair?)))
+         (rstyle (assq 'rstyle (list-filter props pair?)))
          (l (append
               (cond ((has? 'code) (list (dx-val 'w:rStyle "VerbatimChar")))
                     ((has? 'hyperlink) (list (dx-val 'w:rStyle "Hyperlink")))
+                    (rstyle (list (dx-val 'w:rStyle (cadr rstyle))))
                     (else '()))
               (if (has? 'strong) '((w:b)) '())
               (if (has? 'em) '((w:i)) '())
@@ -134,8 +143,9 @@
          (suffix (if dot (locase-all (substring name (+ dot 1) (string-length name)))
                      "png")))
     (or (ahash-ref dx-media-files key)
-        (let* ((file (string-append "image" (number->string n) "." suffix))
-               (svg-file (and svg (string-append "image" (number->string n) ".svg"))))
+        (let* ((prefix (if dx-package "tm-image" "image"))
+               (file (string-append prefix (number->string n) "." suffix))
+               (svg-file (and svg (string-append prefix (number->string n) ".svg"))))
           (set! dx-media (cons (list file data) dx-media))
           (when svg (set! dx-media (cons (list svg-file svg) dx-media)))
           (ahash-set! dx-media-files key (list file svg-file))
@@ -181,11 +191,22 @@
                                            (@ (xmlns:asvg ,dx-ns-svg)
                                               (r:embed ,svg-id))))))
                                    '()))
+                           ;; the parts of the picture which are cut
+                           ,@(dx-crop (ox-attr x 'crop))
                            (a:stretch (a:fillRect)))
                          (pic:spPr
                            (a:xfrm (a:off (@ (x "0") (y "0")))
                                    (a:ext (@ (cx ,cx) (cy ,cy))))
                            (a:prstGeom (@ (prst "rect")) (a:avLst))))))))))))))
+
+(define (dx-crop crop)
+  ;; the element a:srcRect for "l t r b", fractions of the sides
+  (with l (and crop (map office-number (string-tokenize-by-char crop #\space)))
+    (if (not (and l (== (length l) 4) (list-and l))) '()
+        (list `(a:srcRect
+                 (@ ,@(map (lambda (k v)
+                             (list k (number->string (inexact->exact (round (* v 100000))))))
+                           '(l t r b) l)))))))
 
 (define (dx-math x)
   ;; a formula: MathML as a tree or as its text, or plain text
@@ -237,10 +258,55 @@
           (list `(w:r (w:rPr ,(dx-val 'w:rStyle "FootnoteReference"))
                       (w:footnoteReference (@ (w:id ,(number->string n))))))))))
 
+(define (dx-comment x)
+  ;; the mark of a comment; its text goes to word/comments.xml
+  (if dx-in-note? '()
+      (let ((id (number->string (length dx-comments)))
+            (old-item dx-item)
+            (old-indent dx-indent))
+        (set! dx-in-note? #t)
+        (set! dx-item #f)
+        (set! dx-indent 0)
+        (let* ((blocks (dx-blocks (ox-children x)))
+               (blocks (if (null? blocks) (list '(w:p)) blocks)))
+          (set! dx-in-note? #f)
+          (set! dx-item old-item)
+          (set! dx-indent old-indent)
+          (set! dx-comments
+                (cons `(w:comment (@ (w:id ,id)
+                                     (w:author ,(or (ox-attr x 'author) "TeXmacs"))
+                                     ,@(if (ox-attr x 'date) `((w:date ,(ox-attr x 'date))) '()))
+                                  ,@blocks)
+                      dx-comments))
+          (list `(w:commentRangeStart (@ (w:id ,id)))
+                `(w:commentRangeEnd (@ (w:id ,id)))
+                `(w:r (w:commentReference (@ (w:id ,id)))))))))
+
+(define (dx-use-style id family)
+  ;; the named style id of the text, which the styles have
+  (when (not (assoc id dx-used-styles))
+    (set! dx-used-styles (cons (list id family) dx-used-styles)))
+  id)
+
+(define (dx-word-name? name)
+  ;; a name of a bookmark of Word, which is kept: letters of ASCII, digits
+  ;; and _, a letter or _ first (_Toc1, _Ref2, fig1), 40 characters at most
+  (and (> (string-length name) 0) (<= (string-length name) 40)
+       (with c (string-ref name 0)
+         (or (char=? c #\_) (and (char-alphabetic? c) (< (char->integer c) 128))))
+       (list-and (map (lambda (c) (and (< (char->integer c) 128)
+                                       (or (char-alphabetic? c) (char-numeric? c)
+                                           (char=? c #\_))))
+                      (string->list name)))))
+
 (define (dx-bookmark-name name)
   ;; The name of the bookmark of a label. Word wants letters, digits and
   ;; _ only, a letter first, 40 characters at most: thm:main is tm_thm_main.
   (or (ahash-ref dx-bookmarks name)
+      (and (dx-word-name? name) (not (ahash-ref dx-bookmark-names name))
+           (begin (ahash-set! dx-bookmark-names name #t)
+                  (ahash-set! dx-bookmarks name name)
+                  name))
       (let* ((safe (list->string
                      (map (lambda (c)
                             (if (and (< (char->integer c) 128)
@@ -324,11 +390,34 @@
 (define (dx-inline x props)
   ;; the elements of a paragraph for an inline node inside the wrappers
   ;; props
-  (cond ((string? x) (if (== x "") '() (list (dx-run props (dx-text x)))))
+  (cond ((string? x)
+         (cond ((== x "") '())
+               ;; (the text which was deleted, while the changes are tracked)
+               ((in? 'deleted props)
+                (list (dx-run props `(w:delText (@ (xml:space "preserve")) ,x))))
+               (else (list (dx-run props (dx-text x))))))
         ((not (pair? x)) '())
         (else
           (let ((l (ox-children x)))
             (case (car x)
+              ;; a named style of text
+              ((span)
+               (with id (dx-use-style (or (ox-attr x 'style) "") "character")
+                 (dx-inlines l (cons (list 'rstyle id) props))))
+              ;; the changes which are tracked
+              ((ins del)
+               (with runs (dx-inlines l (if (func? x 'del) (cons 'deleted props) props))
+                 (if (null? runs) '()
+                     (list `(,(if (func? x 'ins) 'w:ins 'w:del)
+                             (@ (w:id ,(number->string (dx-next-id)))
+                                (w:author ,(or (ox-attr x 'author) "TeXmacs"))
+                                ,@(if (ox-attr x 'date) `((w:date ,(ox-attr x 'date))) '()))
+                             ,@runs)))))
+              ;; a field, with its instruction and its result
+              ((field)
+               (with runs (dx-inlines l props)
+                 (if (ox-attr x 'code) (dx-field-runs (ox-attr x 'code) runs) runs)))
+              ((comment) (dx-comment x))
               ((em strong underline strike sub sup code smallcaps mark)
                (dx-inlines l (cons (car x) props)))
               ((color)
@@ -384,6 +473,10 @@
     (cond ((== role "heading")
            (string-append "Heading" (or (ox-attr x 'level) "1")))
           ((assoc-ref dx-role-styles role) => identity)
+          ;; a named style of the file, or the one of its usual paragraphs
+          ((ox-attr x 'style) (dx-use-style (ox-attr x 'style) "paragraph"))
+          ((and (ox-attr dx-setup 'body-style) (not dx-in-note?) (not dx-item))
+           (dx-use-style (ox-attr dx-setup 'body-style) "paragraph"))
           (else #f))))
 
 (define (dx-paragraph x)
@@ -409,6 +502,7 @@
              (cond ((== align "center") (list (dx-val 'w:jc "center")))
                    ((== align "right") (list (dx-val 'w:jc "right")))
                    ((== align "left") (list (dx-val 'w:jc "left")))
+                   ((== align "justify") (list (dx-val 'w:jc "both")))
                    (else '())))))
     (set! dx-item #f)
     (list `(w:p ,@(if (null? props) '() (list (cons 'w:pPr props)))
@@ -423,7 +517,7 @@
          (format (if (== kind "number") (or (ox-attr x 'format) "1") "bullet"))
          (start (number->string (office-integer (ox-attr x 'start) 1 0 100000)))
          (level dx-indent)
-         (id (+ (length dx-lists) 1))
+         (id (+ (length dx-lists) 1 dx-num-offset))
          (old-item dx-item))
     (set! dx-lists (cons (list id format level start) dx-lists))
     (set! dx-indent (+ level 1))
@@ -612,6 +706,12 @@
             ((list) (dx-list x))
             ((table) (list (dx-table x)))
             ((pagebreak) (list `(w:p ,(dx-run '() '(w:br (@ (w:type "page")))))))
+            ;; a section in columns, between two ends of sections
+            ((columns)
+             (set! dx-sections? #t)
+             (let ((n (number->string (office-integer (ox-attr x 'count) 2 1 10)))
+                   (l (dx-blocks (ox-children x))))
+               (append (list (dx-section-end "1")) l (list (dx-section-end n)))))
             ((rule)
              (list `(w:p (w:pPr (w:pBdr (w:bottom (@ (w:val "single") (w:sz "6")
                                                      (w:space "1") (w:color "auto"))))))))
@@ -625,6 +725,25 @@
                (list (dx-field " TOC \\o \"1-3\" \\h \\z \\u "
                                "Update this field to see the table of contents."))))
             (else '())))))
+
+(define (dx-section-properties cols)
+  ;; the page and the columns of a section, which starts on the same page
+  `(w:sectPr
+     ,@(if dx-sections? '((w:type (@ (w:val "continuous")))) '())
+     (w:pgSz (@ (w:w ,(dx-twips 'page-width 11906))
+                (w:h ,(dx-twips 'page-height 16838))
+                ,@(if (== (ox-attr dx-setup 'landscape) "true")
+                      '((w:orient "landscape")) '())))
+     (w:pgMar (@ (w:top ,(dx-twips 'margin-top 1440))
+                 (w:right ,(dx-twips 'margin-right 1440))
+                 (w:bottom ,(dx-twips 'margin-bottom 1440))
+                 (w:left ,(dx-twips 'margin-left 1440))
+                 (w:header "720") (w:footer "720") (w:gutter "0")))
+     (w:cols (@ (w:num ,cols) (w:space "720")))))
+
+(define (dx-section-end cols)
+  ;; a paragraph which ends a section
+  `(w:p (w:pPr ,(dx-section-properties cols))))
 
 (define (dx-blocks l)
   ;; the elements of the blocks l; Word makes one table of two tables
@@ -802,20 +921,23 @@
           (w:pPr (w:ind (@ (w:left ,(number->string (* 720 (+ i 1))))
                            (w:hanging "360"))))))
 
+(define (dx-abstract-id id)
+  (number->string (+ (string->number id) dx-abstract-offset)))
+
 (define (dx-numbering)
   ;; two abstract lists, of bullets and of numbers, and a list of one of
   ;; them for each list of the text, which starts at 1 at its level
   `(w:numbering
      (@ (xmlns:w ,dx-ns-w))
      ,@(map (lambda (f)
-              `(w:abstractNum (@ (w:abstractNumId ,(cadr f)))
+              `(w:abstractNum (@ (w:abstractNumId ,(dx-abstract-id (cadr f))))
                               ,(dx-val 'w:multiLevelType "hybridMultilevel")
                               ,@(map (lambda (i) (dx-level (car f) i)) (iota 9))))
             dx-formats)
      ;; the numbers of the headings: 1, 1.1, 1.1.1 by their styles
      ,@(if dx-numbered?
            `((w:abstractNum
-               (@ (w:abstractNumId "3"))
+               (@ (w:abstractNumId ,(dx-abstract-id "3")))
                ,(dx-val 'w:multiLevelType "multilevel")
                ,@(map (lambda (i)
                         `(w:lvl (@ (w:ilvl ,(number->string i)))
@@ -835,12 +957,13 @@
                       (iota 9))))
            '())
      ,@(if dx-numbered?
-           `((w:num (@ (w:numId "999")) ,(dx-val 'w:abstractNumId "3")))
+           `((w:num (@ (w:numId "999")) ,(dx-val 'w:abstractNumId (dx-abstract-id "3"))))
            '())
      ,@(map (lambda (l)
               `(w:num (@ (w:numId ,(number->string (car l))))
                       ,(dx-val 'w:abstractNumId
-                               (cadr (or (assoc (cadr l) dx-formats) (cadr dx-formats))))
+                               (dx-abstract-id
+                                 (cadr (or (assoc (cadr l) dx-formats) (cadr dx-formats)))))
                       (w:lvlOverride (@ (w:ilvl ,(number->string (min 8 (caddr l)))))
                                      ,(dx-val 'w:startOverride (cadddr l)))))
             (reverse dx-lists))))
@@ -876,7 +999,7 @@
                     ,@(if (cadddr r) '((TargetMode "External")) '()))))
             l)))
 
-(define (dx-content-types)
+(define (dx-content-types . comments?)
   (let ((default (lambda (ext type)
                    `(Default (@ (Extension ,ext) (ContentType ,type)))))
         (override (lambda (part type)
@@ -899,7 +1022,9 @@
        ,(override "/word/styles.xml" "styles")
        ,(override "/word/numbering.xml" "numbering")
        ,(override "/word/footnotes.xml" "footnotes")
-       ,(override "/word/settings.xml" "settings"))))
+       ,(override "/word/settings.xml" "settings")
+       ,@(if (and (pair? comments?) (car comments?))
+             (list (override "/word/comments.xml" "comments")) '()))))
 
 (define (dx-document blocks)
   `(w:document
@@ -907,24 +1032,149 @@
         (xmlns:wp ,dx-ns-wp))
      (w:body
        ,@blocks
-       (w:sectPr
-         (w:pgSz (@ (w:w ,(dx-twips 'page-width 11906))
-                    (w:h ,(dx-twips 'page-height 16838))
-                    ,@(if (== (ox-attr dx-setup 'landscape) "true")
-                          '((w:orient "landscape")) '())))
-         (w:pgMar (@ (w:top ,(dx-twips 'margin-top 1440))
-                     (w:right ,(dx-twips 'margin-right 1440))
-                     (w:bottom ,(dx-twips 'margin-bottom 1440))
-                     (w:left ,(dx-twips 'margin-left 1440))
-                     (w:header "720") (w:footer "720") (w:gutter "0")))))))
+       ,(dx-final-section))))
+
+(define dx-section-order
+  ;; the order of the children of w:sectPr which the format wants
+  '(w:headerReference w:footerReference w:footnotePr w:endnotePr w:type w:pgSz
+    w:pgMar w:paperSrc w:pgBorders w:lnNumType w:pgNumType w:cols w:formProt
+    w:vAlign w:noEndnote w:titlePg w:textDirection w:bidi w:rtlGutter w:docGrid
+    w:printerSettings w:sectPrChange))
+
+(define (dx-final-section)
+  ;; the properties of the last section: those of the file it was read
+  ;; from, with its headers and footers, and the page and the columns of
+  ;; the document
+  (with orig (dx-package-section)
+    (if (not orig) (dx-section-properties "1")
+        (let* ((mine (cdr (dx-section-properties "1")))
+               (mine-tags '(w:type w:pgSz w:pgMar w:cols))
+               (theirs (list-filter (ox-elements orig)
+                                    (lambda (y) (not (in? (car y) mine-tags)))))
+               (all (append theirs mine))
+               (rank (lambda (y) (or (list-find-index dx-section-order
+                                                      (lambda (t) (== t (car y))))
+                                     100))))
+          `(w:sectPr ,@(sort all (lambda (a b) (< (rank a) (rank b)))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Interface
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(define (dx-comments-part)
+  `(w:comments
+     (@ (xmlns:w ,dx-ns-w) (xmlns:r ,dx-ns-r) (xmlns:m ,dx-ns-m) (xmlns:wp ,dx-ns-wp))
+     ,@(reverse dx-comments)))
+
+;; The file the text was read from, in a document of the style office: its
+;; parts which TeXmacs does not edit (the styles, the headers and footers,
+;; the theme, the fonts, the settings, the properties) are written again,
+;; and the text, its notes, comments and lists are those of TeXmacs.
+
+(define (dx-package-xml name)
+  (with s (and dx-package (ahash-ref dx-package name))
+    (and s (ox-root (parse-xml s)))))
+
+(define (dx-package-section)
+  ;; the properties of the last section of the file
+  (let* ((root (dx-package-xml "word/document.xml"))
+         (body (and root (ox-child root 'w:body))))
+    (and body (list-find (reverse (ox-children body))
+                         (lambda (y) (func? y 'w:sectPr))))))
+
+(define (dx-max-id root tag attr)
+  ;; the largest number of the attribute attr of the elements tag
+  (apply max (cons 0 (map (lambda (x) (or (office-integer (ox-attr x attr) #f 0 100000) 0))
+                          (ox-childs root tag)))))
+
+(define dx-written-types
+  ;; the relations which TeXmacs writes itself
+  '("styles" "numbering" "footnotes" "endnotes" "comments" "settings" "image"
+    "hyperlink" "commentsExtended" "commentsIds" "commentsExtensible" "oleObject"
+    "chart" "diagramData" "diagramLayout" "diagramColors" "diagramQuickStyle"
+    "package" "officeDocument"))
+
+(define (dx-rel-type-name r)
+  ;; the last word of the type of a relation
+  (cAr (string-tokenize-by-char (or (ox-attr r 'Type) "") #\/)))
+
+(define (dx-kept-relations)
+  ;; the relations of the text of the file to the parts which are kept
+  (with root (dx-package-xml "word/_rels/document.xml.rels")
+    (if (not root) '()
+        (list-filter (ox-childs root 'Relationship)
+                     (lambda (r) (not (in? (dx-rel-type-name r) dx-written-types)))))))
+
+(define (dx-merged-styles mine)
+  ;; the styles of the file, with those of TeXmacs which it does not have
+  (with root (dx-package-xml "word/styles.xml")
+    (if (not root) mine
+        (let* ((ids (map (lambda (x) (ox-attr x 'w:styleId)) (ox-childs root 'w:style)))
+               (new (list-filter (ox-childs mine 'w:style)
+                                 (lambda (x) (not (in? (ox-attr x 'w:styleId) ids))))))
+          (append root new)))))
+
+(define (dx-merged-numbering mine)
+  ;; the lists of the file, and those of TeXmacs after them
+  (with root (dx-package-xml "word/numbering.xml")
+    (if (not root) mine
+        (let* ((tags '(w:abstractNum w:num))
+               (abstract (append (ox-childs root 'w:abstractNum) (ox-childs mine 'w:abstractNum)))
+               (nums (append (ox-childs root 'w:num) (ox-childs mine 'w:num)))
+               (other (list-filter (ox-elements root) (lambda (y) (not (in? (car y) tags))))))
+          `(w:numbering (@ ,@(ox-attrs root))
+                        ,@(list-filter other (lambda (y) (func? y 'w:numPicBullet)))
+                        ,@abstract ,@nums
+                        ,@(list-filter other (lambda (y) (not (func? y 'w:numPicBullet)))))))))
+
+(define (dx-merged-settings mine)
+  ;; the settings of the file, without the separators of its notes
+  (with root (dx-package-xml "word/settings.xml")
+    (if (not root) mine
+        `(w:settings (@ ,@(ox-attrs root))
+                     ,@(list-filter (ox-children root)
+                                    (lambda (y) (not (and (pair? y)
+                                                          (in? (car y) '(w:footnotePr
+                                                                         w:endnotePr))))))))))
+
+(define dx-replaced-parts
+  '("[Content_Types].xml" "word/document.xml" "word/_rels/document.xml.rels"
+    "word/styles.xml" "word/numbering.xml" "word/footnotes.xml" "word/endnotes.xml"
+    "word/comments.xml" "word/commentsExtended.xml" "word/commentsIds.xml"
+    "word/commentsExtensible.xml" "word/settings.xml"
+    "word/_rels/footnotes.xml.rels" "word/_rels/endnotes.xml.rels"
+    "word/_rels/comments.xml.rels"))
+
+(define (dx-merged-content-types mine names)
+  ;; the types of the parts of the archive which is written
+  (let* ((root (dx-package-xml "[Content_Types].xml"))
+         (theirs (if root (ox-elements root) '()))
+         (exts (map (lambda (x) (locase-all (or (ox-attr x 'Extension) "")))
+                    (list-filter theirs (lambda (y) (func? y 'Default)))))
+         (parts (map (lambda (x) (ox-attr x 'PartName))
+                     (list-filter theirs (lambda (y) (func? y 'Override)))))
+         (exists? (lambda (part) (and part (in? (substring part 1 (string-length part)) names)))))
+    `(Types (@ (xmlns "http://schemas.openxmlformats.org/package/2006/content-types"))
+            ,@(list-filter theirs (lambda (y) (func? y 'Default)))
+            ,@(list-filter (ox-elements mine)
+                           (lambda (y) (and (func? y 'Default)
+                                            (not (in? (locase-all (ox-attr y 'Extension)) exts)))))
+            ,@(list-filter theirs (lambda (y) (and (func? y 'Override)
+                                                   (exists? (ox-attr y 'PartName)))))
+            ,@(list-filter (ox-elements mine)
+                           (lambda (y) (and (func? y 'Override)
+                                            (not (in? (ox-attr y 'PartName) parts))
+                                            (exists? (ox-attr y 'PartName))))))))
+
 (tm-define (serialize-docx-document x)
   (:type (-> stree string))
   (:synopsis "Write the office tree @x as a Word document, a zip archive")
+  (let* ((l (if (func? x 'office) (cdr x) (list x)))
+         (pack (list-find l (lambda (y) (func? y 'package)))))
+    (set! dx-package (and pack (== (ox-attr pack 'format) "docx")
+                          (office-archive (ox-attr pack 'data))))
+    (when (and dx-package (not (ahash-ref dx-package "word/document.xml")))
+      (set! dx-package #f)))
   (set! dx-rels '())
   (set! dx-note-rels '())
   (set! dx-rel-ids (make-ahash-table))
@@ -932,6 +1182,9 @@
   (set! dx-media-files (make-ahash-table))
   (set! dx-notes '())
   (set! dx-lists '())
+  (set! dx-comments '())
+  (set! dx-used-styles '())
+  (set! dx-sections? #f)
   (set! dx-id 0)
   (set! dx-in-note? #f)
   (set! dx-item #f)
@@ -941,6 +1194,10 @@
   (set! dx-setup (or (and (func? x 'office)
                           (list-find (cdr x) (lambda (y) (func? y 'setup))))
                      '(setup)))
+  (with numbering (dx-package-xml "word/numbering.xml")
+    (set! dx-num-offset (if numbering (dx-max-id numbering 'w:num 'w:numId) 0))
+    (set! dx-abstract-offset
+          (if numbering (+ 1 (dx-max-id numbering 'w:abstractNum 'w:abstractNumId)) 0)))
   (set! dx-bookmarks (make-ahash-table))
   (set! dx-bookmark-names (make-ahash-table))
   ;; the relations of the files which are always there come first
@@ -951,30 +1208,61 @@
   (let* ((blocks (dx-blocks (if (func? x 'office) (cdr x) (list x))))
          ;; a document has a paragraph at least
          (blocks (if (null? blocks) (list '(w:p)) blocks))
+         (document (dx-document blocks))
+         (comments? (pair? dx-comments))
+         (_ (when comments? (dx-relation "comments" "comments.xml" #f)))
          (media (reverse dx-media))
          ;; the relations of the notes, when they have some
          (note-rels (reverse dx-note-rels))
+         (kept (if dx-package
+                   (list-filter (map car (ahash-table->list dx-package))
+                                (lambda (n) (and (not (in? n dx-replaced-parts))
+                                                 (not (string-ends? n "/"))
+                                                 (not (string-starts? n "word/media/tm-")))))
+                   '()))
+         (kept (sort kept string<?))
+         (names (append
+                  '("[Content_Types].xml" "_rels/.rels" "word/document.xml"
+                    "word/_rels/document.xml.rels" "word/styles.xml"
+                    "word/numbering.xml" "word/footnotes.xml" "word/settings.xml")
+                  (if comments? '("word/comments.xml") '())
+                  (if (null? note-rels) '() '("word/_rels/footnotes.xml.rels"))
+                  (if (and comments? (pair? note-rels)) '("word/_rels/comments.xml.rels") '())
+                  (map (lambda (m) (string-append "word/media/" (car m))) media)))
+         (kept (list-filter kept (lambda (n) (not (in? n names)))))
+         (relations (if dx-package
+                        `(Relationships
+                           (@ (xmlns "http://schemas.openxmlformats.org/package/2006/relationships"))
+                           ,@(dx-kept-relations)
+                           ,@(cddr (dx-relations (reverse dx-rels))))
+                        (dx-relations (reverse dx-rels))))
+         (package-rels (and dx-package (ahash-ref dx-package "_rels/.rels")))
          (r (zip-pack
+              (append names kept)
               (append
-                '("[Content_Types].xml" "_rels/.rels" "word/document.xml"
-                  "word/_rels/document.xml.rels" "word/styles.xml"
-                  "word/numbering.xml" "word/footnotes.xml" "word/settings.xml")
-                (if (null? note-rels) '() '("word/_rels/footnotes.xml.rels"))
-                (map (lambda (m) (string-append "word/media/" (car m))) media))
-              (append
-                (list (ox-serialize (dx-content-types))
-                      (ox-serialize
-                        (dx-relations
-                          '(("rId1" "officeDocument" "word/document.xml" #f))))
-                      (ox-serialize (dx-document blocks))
-                      (ox-serialize (dx-relations (reverse dx-rels)))
-                      (ox-serialize (dx-styles))
-                      (ox-serialize (dx-numbering))
+                (list (ox-serialize (if dx-package
+                                        (dx-merged-content-types (dx-content-types comments?)
+                                                                 (append names kept))
+                                        (dx-content-types comments?)))
+                      (if (and package-rels
+                               (>= (string-search-forwards "word/document.xml" 0 package-rels) 0))
+                          package-rels
+                          (ox-serialize
+                            (dx-relations
+                              '(("rId1" "officeDocument" "word/document.xml" #f)))))
+                      (ox-serialize document)
+                      (ox-serialize relations)
+                      (ox-serialize (dx-merged-styles (dx-styles)))
+                      (ox-serialize (dx-merged-numbering (dx-numbering)))
                       (ox-serialize (dx-footnotes))
-                      (ox-serialize (dx-settings)))
+                      (ox-serialize (dx-merged-settings (dx-settings))))
+                (if comments? (list (ox-serialize (dx-comments-part))) '())
                 (if (null? note-rels) '()
                     (list (ox-serialize (dx-relations note-rels))))
-                (map cadr media)))))
+                (if (and comments? (pair? note-rels))
+                    (list (ox-serialize (dx-relations note-rels))) '())
+                (map cadr media)
+                (map (lambda (n) (ahash-ref dx-package n)) kept)))))
     (set! dx-rels '())
     (set! dx-note-rels '())
     (set! dx-rel-ids (make-ahash-table))
@@ -982,4 +1270,6 @@
     (set! dx-media-files (make-ahash-table))
     (set! dx-notes '())
     (set! dx-lists '())
+    (set! dx-comments '())
+    (set! dx-package #f)
     r))
