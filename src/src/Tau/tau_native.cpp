@@ -17,7 +17,8 @@
 * - what the other side says comes on the standard input, a line for each
 *   message: its name and its arguments, the last of which may hold spaces
 *   ("key 3 C-x", "mouse 3 press-left 120 80 1 0", "place 3 800 600 2 1",
-*   "answer 12 \"a value\" #t", "chosen 4 /home/me/a.tm"). A last
+*   "answer 12 \"a value\" #t", "chosen 4 /home/me/a.tm", "bar 3 0 1200":
+*   where a scroll bar was dragged to). A last
 *   argument which is a key, a text, a path or a name has its new lines
 *   written \n and its backslashes twice: a line is one message, whatever
 *   a file is called. A message whose numbers are not numbers, or which has
@@ -37,7 +38,9 @@
 *
 * When the other side goes (its end of a pipe is closed) the documents
 * which are not saved are saved aside, as TeXmacs does at intervals (the
-* files "~" which it proposes at the next start), and the core ends.
+* files "~" which it proposes at the next start), and the core ends. So it
+* does when a signal asks it to end (SIGTERM, SIGINT, SIGHUP), with the
+* status 3, which is not that of quitting (0).
 * Without TAU_FD nothing is said, and the core only runs what it is given.
 ******************************************************************************/
 
@@ -52,6 +55,7 @@
 #include <poll.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <signal.h>
 
 // the version of the messages: the shell says nothing to a core which has
 // another one (tau_shell.cpp)
@@ -62,6 +66,7 @@
 extern "C" {
   void tau_place (int view, int w, int h, double density, int counter);
   void tau_scroll_by (int view, int dx, int dy, int x, int y);
+  void tau_bar (int view, int x, int y);
   void tau_focus (int view, int has_focus);
   void tau_key (int view, const char* key);
   void tau_text (int view, const char* text);
@@ -260,6 +265,11 @@ dispatch (const std::string& line, void (*turn) (void)) {
     int view= NUM, dx= NUM, dy= NUM, x= NUM, y= NUM;
     CHECKED (tau_scroll_by (view, dx, dy, x, y));
   }
+  else if (name == "bar") {
+    // (where a scroll bar was dragged to, in pixels of the document)
+    int view= NUM, x= NUM, y= NUM;
+    CHECKED (tau_bar (view, x, y));
+  }
   else if (name == "key") {
     int view= NUM;
     std::string key= LAST;
@@ -327,9 +337,22 @@ dispatch (const std::string& line, void (*turn) (void)) {
 
 // the end, when the other side is gone
 static void
-leave () {
+leave (int code= 0) {
   tau_native_rescue ();
-  _exit (0);
+  _exit (code);
+}
+
+// Asked to end by a signal (the session which ends, kill): the documents
+// are saved aside first, by the loop, once what the core does is done; a
+// second signal ends it at once. It ends with 3, which the shell tells
+// from quitting (0).
+static volatile sig_atomic_t stop_asked= 0;
+
+static void
+stop_on_signal (int sig) {
+  (void) sig;
+  if (stop_asked) _exit (3);
+  stop_asked= 1;
 }
 
 void
@@ -343,7 +366,11 @@ tau_native_loop (void (*turn) (void)) {
   struct pollfd pfd;
   pfd.fd= 0; pfd.events= POLLIN;
   if (out () >= 0) hello ();
+  signal (SIGTERM, stop_on_signal);
+  signal (SIGINT, stop_on_signal);
+  signal (SIGHUP, stop_on_signal);
   while (true) {
+    if (stop_asked) leave (3);
     if (peer_gone) leave ();
     int r= poll (&pfd, 1, 20);
     if (r < 0 && errno != EINTR) break;
@@ -362,6 +389,7 @@ tau_native_loop (void (*turn) (void)) {
       if (!skipping) dispatch (pending.substr (start, nl - start), turn);
       skipping= false;
       start= nl + 1;
+      if (stop_asked) leave (3);
       if (peer_gone) leave ();
     }
     pending.erase (0, start);

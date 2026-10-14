@@ -3,7 +3,7 @@
 //
 //   node misc/tau/test/keys-test.mjs
 
-import { translate, makeLayout, learn, browserKey, pasteKey } from "../web/keys.mjs";
+import { translate, makeLayout, learn, browserKey, pasteKey, commandLetter } from "../web/keys.mjs";
 
 // a key press: key, code and the modifiers as letters (s shift, c control,
 // a alt, m meta, g AltGr)
@@ -107,6 +107,13 @@ const checks = [
 	["control v on a Mac does not", pasteKey(press("v", "KeyV", "c"), true), false],
 	["shift insert pastes", pasteKey(press("Insert", "Insert", "s"), false), true],
 	["command shift v does not", pasteKey(press("V", "KeyV", "sm"), true), false],
+	// (a layout which is not Latin: the letter of the place)
+	["command v pastes in Russian", pasteKey(press("м", "KeyV", "m"), true), true],
+	["control v pastes in Greek", pasteKey(press("ω", "KeyV", "c"), false), true],
+	["command r reloads in Russian", browserKey(press("к", "KeyR", "m"), true), true],
+	["the letter of c in Russian", commandLetter(press("с", "KeyC", "m")), "c"],
+	["the letter typed in AZERTY", commandLetter(press("a", "KeyQ", "c")), "a"],
+	["a key with a name keeps it", commandLetter(press("Insert", "Insert", "s")), "insert"],
 ];
 for (const [what, got, expected] of checks)
 	if (got !== expected) { failed++; console.log(`keys: ${what}: ${got}, expected ${expected}`); }

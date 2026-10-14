@@ -3372,6 +3372,10 @@ vue_pretty_image_size (int ww, int hh, string& w, string& h) {
 static void
 vue_pretty_image_size (url image, string& w, string& h) {
   w= ""; h= "";
+#ifdef TAU_SHELL
+  // (the core of Tau loads and sizes what is dropped: tau_drop)
+  return;
+#endif
   string ext= locase_all (suffix (image));
   if (ext == "pdf" || ext == "ps" || ext == "eps") return; // sized by the box
   picture pic= load_picture (image, -1, -1, tree (""), PIXEL);

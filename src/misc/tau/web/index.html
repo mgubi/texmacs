@@ -138,7 +138,14 @@ img.tau-symbol { display: block; margin: auto; }
 #tau-panes { flex: 1; min-height: 0; display: flex; }
 .tau-tool { background: var(--popup); overflow: auto; display: flex; flex-direction: column; }
 .tau-tool[hidden], .tau-tool:empty { display: none; }
-.tau-side { width: 300px; border-left: 1px solid var(--bar-border); padding: 4px; }
+.tau-side { width: 300px; max-width: 60vw; border-left: 1px solid var(--bar-border); padding: 4px; }
+/* A narrow screen (a phone): the tools at a side take less of it, and the
+   panes may be narrower (the icon bars are rows above the views there,
+   tau.mjs) */
+@media (max-width: 480px) {
+	.tau-side { max-width: 45vw; }
+	.tau-pane { min-width: 0; }
+}
 #tau-side-1 { border-left: 0; border-right: 1px solid var(--bar-border); }
 .tau-bottom { max-height: 40%; border-top: 1px solid var(--bar-border); padding: 4px; }
 .tau-embedded { display: block; flex: none; outline: none; }
@@ -149,7 +156,9 @@ img.tau-symbol { display: block; margin: auto; }
 .tau-pane { flex: 1 1 0; min-width: 80px; display: flex; flex-direction: column; }
 .tau-pane + .tau-pane { border-left: 1px solid var(--bar-border); }
 .tau-view { flex: 1; min-height: 0; position: relative; }
-.tau-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; outline: none; cursor: text; }
+.tau-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; outline: none; cursor: text;
+	touch-action: none; }
+.tau-embedded.tau-editable { touch-action: none; }
 .tau-no-header #tau-menu, .tau-no-header #tau-icons-0, .tau-no-header #tau-icons-1,
 .tau-no-header #tau-icons-2, .tau-no-header #tau-icons-3 { display: none; }
 .tau-fullscreen .tau-doc-tabs, .tau-fullscreen .tau-scroll { display: none; }
@@ -230,7 +239,7 @@ img.tau-symbol { display: block; margin: auto; }
 .tau-toast { position: fixed; left: 50%; bottom: 48px; transform: translateX(-50%); z-index: 200001; max-width: 80vw;
 	background: #33333c; color: #fff; padding: 8px 14px; border-radius: 6px; font-size: 13px; opacity: 0.94; }
 .tau-dialog { position: fixed; transform: translateX(-50%); z-index: 20; max-width: calc(100vw - 16px);
-	max-height: calc(100vh - 16px); display: flex; flex-direction: column; background: var(--popup);
+	max-height: calc(100vh - 16px); max-height: calc(100dvh - 16px); display: flex; flex-direction: column; background: var(--popup);
 	border: 1px solid var(--bar-border); border-radius: 8px; box-shadow: 0 8px 30px rgba(0,0,0,0.3); outline: none; }
 .tau-dialog-title { display: flex; align-items: center; padding: 5px 6px 5px 12px; background: var(--bar);
 	border-bottom: 1px solid var(--bar-border); border-radius: 8px 8px 0 0; cursor: default; user-select: none; }
@@ -307,7 +316,7 @@ body.tau-busy .tau-canvas { cursor: progress; }
 </div>
 </div>
 <div id="tau-busy-bar" hidden></div>
-<div id="tau-footer"><span id="tau-working" hidden>Working…</span><span id="tau-footer-left"></span><span id="status"></span><span id="tau-footer-right"></span></div>
+<div id="tau-footer"><span id="tau-working" role="status" aria-live="polite" hidden>Working…</span><span id="tau-footer-left"></span><span id="status" role="status" aria-live="polite"></span><span id="tau-footer-right"></span></div>
 <script type="module" src="tau.mjs"></script>
 </body>
 </html>

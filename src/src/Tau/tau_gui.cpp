@@ -301,7 +301,11 @@ tau_post_view (int id, int window, const char* what) {
 EM_JS (void, tau_js_json, (const char* kind, const char* part,
                            const char* json), {
   if (!Module.tauPost) return;
-  var m= JSON.parse (UTF8ToString (json));
+  // (a description which is not JSON is said, not thrown: thrown in a
+  // turn of the loop, it stopped the loop for good)
+  var m;
+  try { m= JSON.parse (UTF8ToString (json)); }
+  catch (e) { console.error ("tau: not JSON (" + UTF8ToString (kind) + "): " + e); return; }
   m.t= UTF8ToString (kind);
   m.part= UTF8ToString (part);
   Module.tauPost (m);
@@ -475,8 +479,26 @@ tau_follow_fonts () {
   }
 }
 
+static void tau_turn_now ();
+
+// A turn which fails is said and the next one is made as usual: an error
+// which came out of it ended the loop of the worker, and the delayed
+// commands, the autosaves and the plugins then waited for the next message
 static void
 tau_turn () {
+  try {
+    tau_turn_now ();
+  }
+  catch (string msg) {
+    cerr << "tau: a turn failed: " << msg << "\n";
+  }
+  catch (...) {
+    cerr << "tau: a turn failed\n";
+  }
+}
+
+static void
+tau_turn_now () {
   // (TEXMACS_EDIT_PROFILE, ?profile in the page: where a turn spends its time)
   bool prof= edit_profile.on;
   double t0= prof ? tau_now () : 0, t1= t0, t2= t0, t3= t0;
@@ -618,6 +640,20 @@ tau_scroll_by (int view, int dx, int dy, int x, int y) {
            << (int) (tau_now () - t0) << " ms\n";
   }
   else v->scroll_by (dx, dy);
+  tau_turn ();
+}
+
+// A scroll bar was dragged to (x, y), in pixels of the document from its
+// top left corner: where the view goes, whatever it did meanwhile (a step
+// of the wheel which was on its way), and never a wheel for the editor
+EMSCRIPTEN_KEEPALIVE
+void
+tau_bar (int view, int x, int y) {
+  simple_widget_rep* v= input_view (view);
+  if (v == NULL) return;
+  int ew, eh, sx, sy;
+  v->extents_in_pixels (ew, eh, sx, sy);
+  if (x != sx || y != sy) v->scroll_by (x - sx, y - sy);
   tau_turn ();
 }
 

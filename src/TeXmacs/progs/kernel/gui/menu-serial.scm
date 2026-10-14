@@ -53,11 +53,19 @@
              (cons (car l)
                    (append-map (lambda (x) (list "," x)) (cdr l))))))
 
+;; (a number as JSON has it: Scheme also writes 1/2, +nan.0 or +inf.0,
+;; which the readers of the page and of the shell do not take)
+(define (json-number x)
+  (cond ((and (exact? x) (integer? x)) (number->string x))
+        ((and (real? x) (= x x) (< (abs x) 1e300))
+         (number->string (exact->inexact x)))
+        (else "0")))
+
 (define (json x)
   (cond ((string? x) (json-string x))
         ((== x #t) "true")
         ((== x #f) "false")
-        ((number? x) (number->string x))
+        ((number? x) (json-number x))
         ((symbol? x) (json-string (symbol->string x)))
         ((vector? x)
          (string-append "[" (json-join (map json (vector->list x))) "]"))

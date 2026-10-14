@@ -6,11 +6,14 @@
 //                { t: "answer", number, args }, { t: "close", id },
 //                { t: "buffer", what, window, name }, { t: "paste", view, text, html },
 //                { t: "open", ticket, name, bytes }
+//                { t: "forget-home" }, { t: "fs", id, op, ... }, { t: "ping", id }
 // To the page:   { t: "ready" | "view" | "paint" | "log" | "status" | "failed", ... },
 //                { t: "chrome" | "visible" | "footer" | "contents" | "file", part, ... },
 //                { t: "dialog" | "close" | "refresh", part, ... },
 //                { t: "buffers" | "clipboard" | "paste-request" | "pick" | "download", ... },
-//                { t: "quit" }, { t: "stopped", text }, { t: "progress", what, loaded, total }
+//                { t: "quit", failed }, { t: "stopped", text }, { t: "progress", what, loaded, total },
+//                { t: "storage", text }, { t: "saving", on }, { t: "storage-erased" } (tau-pre.js),
+//                { t: "forget-blocked" | "forget-failed", text }
 
 "use strict";
 
@@ -28,7 +31,10 @@ self.tmProgress = {
 };
 function instantiateWasm(imports, receive) {
 	const done = r => receive(r.instance, r.module);
-	const fail = error => postMessage({ t: "failed", text: "Cannot load the program of Tau: " + (error && error.message || error) });
+	const fail = error => {
+		postMessage({ t: "failed", text: "Cannot load the program of Tau: " + (error && error.message || error) });
+		giveUp();
+	};
 	fetch("tau.wasm", { credentials: "same-origin" }).then(response => {
 		if (!response.ok) throw new Error("tau.wasm: " + response.status);
 		// (a compressed answer does not say the size of what comes out of it)
@@ -53,6 +59,17 @@ importScripts("tau.js");
 
 let core = null;
 const waiting = [];   // the messages which came before the core was ready
+let gaveUp = false;   // the program will not come: the requests are answered so
+
+// The program could not be loaded: the requests of the panel of the files
+// which wait (a backup asked from the panel of the failure) are answered
+// with that, and so are those which come later, instead of waiting forever
+function giveUp() {
+	if (gaveUp || core) return;
+	gaveUp = true;
+	for (const m of waiting.splice(0))
+		if (m.t === "fs") postMessage({ t: "fs", id: m.id, error: "the program of Tau did not start" });
+}
 
 // A value of the page as Scheme reads it: the arguments of the command of
 // an input are strings, booleans and lists of them
@@ -103,8 +120,9 @@ function handle(m) {
 		const name = m.name.replace(/[\/\\\u0000-\u001f\u007f]/g, "_") || "file", bytes = new Uint8Array(m.bytes);
 		let path = dir + "/" + name;
 		// (another file of the user with this name is not written over: what
-		// is pasted is always "image.png")
-		if (!m.temp && fsStat(path) && !sameBytes(core.FS.readFile(path), bytes)) {
+		// is pasted is always "image.png"; nor a folder of that name)
+		const st = fsStat(path);
+		if (st && (core.FS.isDir(st.mode) || (!m.temp && !sameBytes(core.FS.readFile(path), bytes)))) {
 			const dot = name.lastIndexOf("."), stem = dot > 0 ? name.slice(0, dot) : name, ext = dot > 0 ? name.slice(dot) : "";
 			for (let k = 2; fsStat(path); k++) path = dir + "/" + stem + " " + k + ext;
 		}
@@ -227,9 +245,17 @@ function fsRemove(path) {
 }
 function fsWrite(path, bytes, time) {
 	core.FS.mkdirTree(fsParent(path));
+	// (a file which is written over gets a time after the one it had, even
+	// when what comes says an older one: the browser keeps a file again
+	// only when its time changed, and different bytes with the same time
+	// were never written)
+	const before = fsStat(path);
 	core.FS.writeFile(path, new Uint8Array(bytes));
 	// (the time the file had: the lists of TeXmacs sort and compare by it)
-	if (time > 0) try { core.FS.utime(path, time, time); } catch (error) {}
+	if (time > 0) {
+		if (before && !core.FS.isDir(before.mode)) time = Math.max(time, fsTime(before) + 1);
+		try { core.FS.utime(path, time, time); } catch (error) {}
+	}
 }
 // files with their bytes, which go to the page without a copy
 function fsBytes(files) {
@@ -346,15 +372,23 @@ async function fsRequest(m) {
 	throw new Error("unknown request: " + m.op);
 }
 
-// what is kept in the browser is deleted; the page starts again
+// What is kept in the browser is deleted; the page starts again once it
+// is. Another page of Tau which keeps it lets it go (tau-pre.js); one which
+// does not (an older one) holds the deletion until it is closed: the page
+// says so, and waits.
 function forgetHome() {
 	const names = ["/home/tau"];
-	Promise.all(names.map(name => new Promise(resolve => {
+	// (this worker lets the browser go too, without saying it was deleted)
+	self.tauForgetting = true;
+	Promise.all(names.map(name => new Promise((resolve, reject) => {
 		try {
 			const r = indexedDB.deleteDatabase(name);
-			r.onsuccess = r.onerror = r.onblocked = () => resolve();
-		} catch (error) { resolve(); }
-	}))).then(() => postMessage({ t: "quit" }));
+			r.onsuccess = () => resolve();
+			r.onerror = () => reject(r.error || new Error("the browser refused"));
+			r.onblocked = () => postMessage({ t: "forget-blocked" });
+		} catch (error) { reject(error); }
+	}))).then(() => postMessage({ t: "quit" }),
+		error => { self.tauForgetting = false; postMessage({ t: "forget-failed", text: String(error && error.message || error) }); });
 }
 
 onmessage = event => {
@@ -363,20 +397,30 @@ onmessage = event => {
 	// (what is kept in the browser is forgotten without the program, which
 	// may be what cannot start with it)
 	if (event.data.t === "forget-home") { forgetHome(); return; }
-	if (!core) { waiting.push(event.data); return; }
+	if (!core) {
+		if (!gaveUp) waiting.push(event.data);
+		else if (event.data.t === "fs") postMessage({ t: "fs", id: event.data.id, error: "the program of Tau did not start" });
+		return;
+	}
 	// (after a backup was restored the page starts again: a request for the
 	// files is answered, with that, and the rest is not listened to)
 	if (frozen && event.data.t !== "fs") return;
 	// (a program which stopped is not called again; its files are still
 	// read, for a backup of them)
 	if (dead && event.data.t !== "fs") return;
-	try { handle(event.data); }
+	dispatch(event.data);
+};
+
+// a message for the core: an error in it is said, and stops the program
+// only when it cannot go on
+function dispatch(m) {
+	try { handle(m); }
 	catch (error) {
-		postMessage({ t: "log", text: "error in " + event.data.t + ": " + (error && error.message || error) });
+		postMessage({ t: "log", text: "error in " + m.t + ": " + (error && error.message || error) });
 		console.error(error);
 		stopped(error);
 	}
-};
+}
 
 // The program stopped on an error which it cannot go on after (a trap of
 // WebAssembly, the stack of the browser which is too small...): the page
@@ -443,7 +487,10 @@ tauCore({
 	instantiateWasm,
 	preRun: [module => { tauModule = module; }],
 	// TeXmacs quits: what it wrote is kept first, then the page is told
-	tauQuit: () => tauModule.tauSaveHome(() => postMessage({ t: "quit" })),
+	// (and when it could not be: the page does not start again, which would
+	// lose it)
+	tauQuit: () => tauModule.tauSaveHome(error =>
+		postMessage({ t: "quit", failed: error ? String(error && error.message || error) : "" })),
 	print: text => postMessage({ t: "log", text }),
 	printErr: text => postMessage({ t: "log", text }),
 	setStatus: text => { if (text) postMessage({ t: "status", text }); },
@@ -452,7 +499,12 @@ tauCore({
 }).then(module => {
 	core = module;
 	postMessage({ t: "ready", homeKept: !!module.tauHomeKept, homeError: module.tauHomeError || "" });
-	for (const m of waiting.splice(0)) handle(m);
+	// (each as onmessage does it: one which fails does not make the start
+	// look failed, nor drop the others)
+	for (const m of waiting.splice(0)) {
+		if (dead && m.t !== "fs") continue;
+		dispatch(m);
+	}
 }).catch(error => {
 	postMessage({ t: "failed", text: String(error && error.message || error) });
 	// The program did not start, but its files may be there (the home kept
@@ -463,5 +515,6 @@ tauCore({
 		dead = true;
 		for (const m of waiting.splice(0)) if (m.t === "fs") { try { handle(m); } catch (e) {} }
 	}
+	else giveUp();
 	throw error;
 });

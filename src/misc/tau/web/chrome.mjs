@@ -322,6 +322,9 @@ function renderSubmenu(node, context) {
 function closePopups(depth) {
 	while (popups.length > depth) {
 		const p = popups.pop();
+		// (what watched its size goes with it)
+		const f = fitted.get(p.element);
+		if (f && f.observer) f.observer.disconnect();
 		p.element.remove();
 		p.button.classList.remove("tau-open");
 	}
@@ -339,6 +342,7 @@ async function openPopup(button, node, depth, below) {
 	const items = await expand(node.contents);
 	if (!popups.includes(entry)) return; // closed meanwhile
 	popup.replaceChildren(...renderItems(items, { bar: false, depth: depth + 1 }));
+	asMenu(popup);
 	fit(popup);
 	place(popup, button, below);
 }
@@ -349,6 +353,7 @@ function showContextMenu(items) {
 	closePopups(0);
 	const popup = el("div", "tau-popup");
 	popup.append(...renderItems(items, { bar: false, depth: 1 }));
+	asMenu(popup);
 	document.body.append(popup);
 	popups.push({ element: popup, button: el("span") });
 	popup.style.maxHeight = (window.innerHeight - 8) + "px";
@@ -356,6 +361,13 @@ function showContextMenu(items) {
 	const w = popup.offsetWidth, h = popup.offsetHeight;
 	popup.style.left = Math.max(4, Math.min(contextAt.x, window.innerWidth - 4 - w)) + "px";
 	popup.style.top = Math.max(4, Math.min(contextAt.y, window.innerHeight - 4 - h)) + "px";
+}
+
+// (for the readers of the screen: a menu and its items)
+function asMenu(popup) {
+	popup.setAttribute("role", "menu");
+	for (const b of popup.querySelectorAll(":scope > .tau-entry, :scope > .tau-refreshable > .tau-entry"))
+		b.setAttribute("role", "menuitem");
 }
 
 function keepInWindow(popup) {
@@ -644,10 +656,14 @@ function renderTabs(node, context) {
 
 function showDialog(m) {
 	let d = dialogs.get(m.id);
+	const made = !d;
 	if (!d) {
 		d = el("div", "tau-dialog");
 		d.dataset.id = m.id;
 		const bar = el("div", "tau-dialog-title"), title = el("span", "tau-dialog-name");
+		title.id = "tau-dialog-name-" + m.id;
+		d.setAttribute("role", "dialog");
+		d.setAttribute("aria-labelledby", title.id);
 		const close = el("button", "tau-dialog-close", "×");
 		close.type = "button";
 		close.title = "Close";
@@ -668,9 +684,24 @@ function showDialog(m) {
 	d.querySelector(".tau-dialog-name").textContent = m.title;
 	const body = d.querySelector(".tau-dialog-body");
 	body.replaceChildren(...renderItems(m.items, { dialog: true, row: false }));
+	keepDialogInWindow(d);
+	// (the keyboard goes to a dialog when it comes, not when it is sent
+	// again: the field which the user types in keeps it)
+	if (!made) return;
 	const first = body.querySelector("input:not([type=checkbox]):not(:disabled)");
 	if (first) { first.focus(); first.select(); }
 	else { d.tabIndex = -1; d.focus(); }
+}
+
+// A dialog is kept in the window (a short window, a phone): its buttons at
+// the bottom stay within reach
+function keepDialogInWindow(d) {
+	const r = d.getBoundingClientRect(), w = window.innerWidth, h = window.innerHeight;
+	if (r.left < 8 || r.right > w - 8) {
+		d.style.transform = "none";
+		d.style.left = Math.max(8, Math.min(r.left, w - 8 - r.width)) + "px";
+	}
+	if (r.bottom > h - 8) d.style.top = Math.max(8, h - 8 - r.height) + "px";
 }
 
 function removeDialog(id) {
@@ -769,7 +800,8 @@ export function fit(c) {
 		f = { prev: chevron(c, "prev"), next: chevron(c, "next") };
 		fitted.set(c, f);
 		c.addEventListener("scroll", () => updateFit(c), { passive: true });
-		new ResizeObserver(() => updateFit(c)).observe(c);
+		f.observer = new ResizeObserver(() => updateFit(c));
+		f.observer.observe(c);
 		// the wheel moves a row sideways
 		c.addEventListener("wheel", event => {
 			if (c.classList.contains("tau-fit-column") || !event.deltaY || event.deltaX) return;

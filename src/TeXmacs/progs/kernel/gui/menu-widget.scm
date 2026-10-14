@@ -1242,10 +1242,14 @@
 (tm-define (top-window menu-promise name . opts)
   (:interactive #t)
   (with (bufs qqq) (decode-options opts)
-    ;; Tau: a dialog of the page (menu-serial.scm)
+    ;; Tau: a dialog of the page (menu-serial.scm); it goes even when what
+    ;; is done as it closes fails (its numbers were kept otherwise)
     (let* ((win (tau-dialog-new))
            (del (make-window-deleter win bufs))
-           (qui (lambda () (qqq) (del)))
+           (qui (lambda ()
+                  (catch #t qqq
+                    (lambda err (display* "dialog quit: " err "\n")))
+                  (del)))
            (men (menu-promise)))
       (tau-dialog-show win (list 'vertical men) name qui))))
 
@@ -1254,7 +1258,10 @@
   (with (bufs qqq) (decode-options opts)
     (let* ((win (tau-dialog-new))
            (del (make-window-deleter win bufs))
-           (qui (lambda () (qqq) (del)))
+           (qui (lambda ()
+                  (catch #t qqq
+                    (lambda err (display* "dialog quit: " err "\n")))
+                  (del)))
            (lbd (lambda x (apply cmd x) (del)))
            (men (menu-promise lbd)))
       (tau-dialog-show win (list 'vertical men) name qui))))

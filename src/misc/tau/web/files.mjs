@@ -80,10 +80,25 @@ function crc32(bytes) {
 	for (let i = 0; i < bytes.length; i++) crc = crcTable[(crc ^ bytes[i]) & 0xFF] ^ (crc >>> 8);
 	return (crc ^ 0xFFFFFFFF) >>> 0;
 }
-async function transform(bytes, stream) {
-	const out = new Response(new Blob([bytes]).stream().pipeThrough(stream));
-	return new Uint8Array(await out.arrayBuffer());
+// (at most limit bytes come out: more is an error, before it fills the
+// memory of the page, as a zip which inflates without end would)
+async function transform(bytes, stream, limit) {
+	const reader = new Blob([bytes]).stream().pipeThrough(stream).getReader(), parts = [];
+	let size = 0;
+	for (;;) {
+		const r = await reader.read();
+		if (r.done) break;
+		size += r.value.length;
+		if (limit !== undefined && size > limit) { reader.cancel().catch(() => {}); throw new Error("the zip file is too large once unpacked"); }
+		parts.push(r.value);
+	}
+	const out = new Uint8Array(size);
+	let at = 0;
+	for (const q of parts) { out.set(q, at); at += q.length; }
+	return out;
 }
+// what a zip may unpack to, in all
+const UNZIP_MAX = 1 << 30;
 // the time of a file (ms) as the two 16-bit fields of a zip (local time,
 // 2 s steps), and back
 function dosTime(ms) {
@@ -159,6 +174,7 @@ export async function unzip(bytes, dirs) {
 		if (v.getUint32(i, true) === 0x06054b50) { end = i; break; }
 	if (end < 0) throw new Error("not a zip file");
 	const dec = new TextDecoder(), out = [];
+	let unpacked = 0;
 	let n = v.getUint16(end + 10, true), p = v.getUint32(end + 16, true);
 	if ((n === 0xFFFF || p === 0xFFFFFFFF) && end >= 20 && v.getUint32(end - 20, true) === 0x07064b50) {
 		// (zip64: the count and the place of the directory are in its record)
@@ -182,8 +198,10 @@ export async function unzip(bytes, dirs) {
 		}
 		const start = local + 30 + v.getUint16(local + 26, true) + v.getUint16(local + 28, true);
 		let data = bytes.subarray(start, start + csize);
-		if (method === 8) data = await transform(data, new DecompressionStream("deflate-raw"));
+		if (method === 8) data = await transform(data, new DecompressionStream("deflate-raw"), UNZIP_MAX - unpacked);
 		else if (method !== 0) continue; // another compression: skipped
+		unpacked += data.length;
+		if (unpacked > UNZIP_MAX) throw new Error("the zip file is too large once unpacked");
 		if (crc32(data) !== crc) throw new Error("the zip file is damaged (" + name + ")");
 		out.push({ rel: name, bytes: new Uint8Array(data), time });
 	}
@@ -213,6 +231,8 @@ async function downloadPath(e) {
 
 function toast(text) {
 	const t = el("div", "tau-toast", text);
+	t.setAttribute("role", "status");
+	t.setAttribute("aria-live", "polite");
 	document.body.append(t);
 	setTimeout(() => t.remove(), 4000);
 }
@@ -474,7 +494,8 @@ function panel(mode, opts, done) {
 	// not go further than here
 	function onkey(event) {
 		event.stopPropagation();
-		if (event.type !== "keydown" || event.isComposing) return;
+		// (229: a key of an input method, as its Enter which picks a word)
+		if (event.type !== "keydown" || event.isComposing || event.keyCode === 229) return;
 		if (event.key === "Escape") {
 			event.preventDefault();
 			if (asking) asking(null); else close(null);
@@ -717,8 +738,12 @@ function panel(mode, opts, done) {
 		const docs = real.filter(e => !e.rel.startsWith(".TeXmacs/")).length;
 		const size = real.reduce((n, e) => n + e.bytes.length, 0);
 		const when = String(b.note.made || "").replace("T", " ").slice(0, 16);
+		// (programs of Scheme in it run when Tau starts: a backup from someone
+		// else may bring them)
+		const programs = real.filter(e => /^\.TeXmacs\/(progs|plugins)\//.test(e.rel)).length;
 		const what = "the backup made " + when + " (" + docs + " of your files, " + (real.length - docs) +
-			" files of preferences and settings, " + humanSize(size) + ")";
+			" files of preferences and settings, " + humanSize(size) + ")" +
+			(programs ? ". It has " + programs + " files of programs (in .TeXmacs/progs or .TeXmacs/plugins), which run when Tau starts: restore it only if it is yours" : "");
 		// (a backup which lost files is not put in place of everything)
 		const answer = b.missing
 			? await ask("This backup is not whole: " + b.missing + " of the " + b.note.files + " files it was made with are not in it. Restore " +

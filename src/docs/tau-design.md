@@ -1356,6 +1356,23 @@ from 16 to 1024 pixels. As in the page of TeXmacs Vue
   numbers, or messages which the core does not know, are said on its
   standard error. Keys are escaped as the texts are. (The answers of
   the dialogs are still Scheme which the core reads: to be thought over.)
+- **A second audit** (2026-10-14, four reviewers apart). A document no
+  longer runs Scheme through `<use-module|…>`: its text is put into code
+  only when it is a list of module names or the name of a plugin (with
+  `?open=` a link could give such a document to the page). The core saves
+  the documents aside on SIGTERM, SIGINT and SIGHUP too, and ends with 3;
+  the shell starts it in a process group of its own, makes its
+  environment before `fork`, asks a core which went wrong to end before
+  killing it, takes only the last answer for a submenu, sends where a
+  scroll bar was dragged (`bar`, absolute, never a wheel for graphics),
+  gives the keyboard to the pane which has it (a new pane takes it), and
+  checks the sizes and positions which the core gives. JSON numbers are
+  decimals only. In the page: the keys of the commands by their letter on
+  any layout, a "Copy" button when the clipboard is refused, touch which
+  scrolls, `persist()`, no reload after a save which failed, "Forget
+  everything" which waits for the other pages, a warning when a page is
+  closed during a save, dialogs kept in the window, roles for the readers
+  of the screen, and a limit to what a backup unpacks.
 - **The desktop is not a browser.** The core took itself for one (the
   shell gives it `TEXMACS_WEB_PLATFORM` for the shortcuts of the system):
   the menu had "Files in this browser", the files were asked for in

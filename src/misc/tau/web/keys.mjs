@@ -134,10 +134,21 @@ export function translate(event, mac, layout) {
 	return { key: name };
 }
 
+// The letter of a key for the shortcuts of the browser and of the fields
+// (copy, paste, reload...): the Latin letter which the key types, or else
+// (Russian, Greek...: "м" for the key of V) the letter of its place, as
+// the browsers take it; a key with a name keeps it ("insert", "f5")
+export function commandLetter(event) {
+	const k = (event.key || "").toLowerCase();
+	if (/^[a-z]$/.test(k) || [...k].length !== 1) return k;
+	const m = /^Key([A-Z])$/.exec(event.code || "");
+	return m ? m[1].toLowerCase() : k;
+}
+
 // The keys which are left to the browser: those which it keeps anyway
 // (windows and tabs) and reloading
 export function browserKey(event, mac) {
-	const k = (event.key || "").toLowerCase();
+	const k = commandLetter(event);
 	const mod = mac ? event.metaKey : event.ctrlKey;
 	return mod && !event.altKey && ["r", "l", "t", "w", "n", "q"].includes(k) && !(event.shiftKey && k !== "t" && k !== "n") ||
 		k === "f5" || k === "f11" || k === "f12";
@@ -146,7 +157,7 @@ export function browserKey(event, mac) {
 // The key which pastes: left to the browser, which then gives its clipboard
 // in a "paste" event
 export function pasteKey(event, mac) {
-	const k = (event.key || "").toLowerCase();
+	const k = commandLetter(event);
 	if (k === "insert" && event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey) return true;
 	return (mac ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey) &&
 		!event.altKey && !event.shiftKey && k === "v";

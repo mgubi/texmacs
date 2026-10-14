@@ -71,16 +71,56 @@ Module['preRun'].push(function () {
       // - a write which fails (no room left in the browser) is said to
       //   the page: it said nothing, and what was saved was gone at the
       //   next visit.
+      // - the page is told while something is being written (from the
+      //   change to the end of its write): it asks before it is closed
+      //   then, which would lose the write;
+      // - another page of Tau which deletes what is kept ("Forget
+      //   everything") is let through: the browser waits for this page
+      //   to let go of the database, which it did only when it was closed,
+      //   long after, deleting what was saved meanwhile. Nothing is
+      //   written any more, and the page says so.
       var realSync = IDBFS.syncfs, reading = true, read = false, held = [];
+      var pending = 0, toldSaving = false;
+      var tellSaving = function () {
+        var mount = null;
+        try { mount = FS.lookupPath (TAU_HOME).node.mount; } catch (e) {}
+        var on = pending > 0 || !!(mount && mount.idbPersistState);
+        if (on === toldSaving) return;
+        toldSaving = on;
+        try { postMessage ({ t: 'saving', on: on }); } catch (e) {}
+      };
       IDBFS.syncfs = function (mount, populate, callback) {
         if (!populate && reading) { held.push (callback); return; }
         if (!populate && !read) { if (callback) callback (null); return; }
+        if (!populate) { pending++; tellSaving (); }
         realSync.call (IDBFS, mount, populate, function (err) {
           if (err && !populate) {
             console.error ('Tau: the home directory cannot be written to the browser: ' + err);
             try { postMessage ({ t: 'storage', text: String (err && err.message || err) }); } catch (e) {}
           }
+          if (!populate) pending--;
           if (callback) callback (err);
+          if (!populate) setTimeout (tellSaving, 0);
+        });
+      };
+      if (IDBFS.queuePersist) {
+        var realQueue = IDBFS.queuePersist;
+        IDBFS.queuePersist = function (mount) { realQueue.call (IDBFS, mount); tellSaving (); };
+      }
+      var realGetDB = IDBFS.getDB;
+      IDBFS.getDB = function (name, callback) {
+        realGetDB.call (IDBFS, name, function (err, db) {
+          if (db && !db.tauWatched) {
+            db.tauWatched = true;
+            db.onversionchange = function () {
+              db.close ();
+              delete IDBFS.dbs[name];
+              read = false;
+              Module.tauHomeKept = false;
+              if (!self.tauForgetting) try { postMessage ({ t: 'storage-erased' }); } catch (e) {}
+            };
+          }
+          callback (err, db);
         });
       };
       FS.mount (IDBFS, { autoPersist: true }, TAU_HOME);
@@ -106,13 +146,21 @@ Module['preRun'].push(function () {
       done ();
     }
   };
+  // (a browser without the locks cannot tell which page keeps the home:
+  // two of them would write over each other, so none keeps it)
+  var noLocks = function () {
+    Module.tauHomeError = 'this browser cannot keep them for one page of Tau only';
+    start (false);
+  };
+  var asked = false;
   if (typeof navigator !== 'undefined' && navigator.locks && navigator.locks.request)
     navigator.locks.request ('tau-home', { ifAvailable: true }, function (lock) {
+      asked = true;
       start (!!lock);
       // (the lock is held as long as this worker lives)
       return lock ? new Promise (function () {}) : undefined;
-    }).catch (function () { start (true); });
-  else start (true);
+    }).catch (function () { if (!asked) noLocks (); });
+  else noLocks ();
 });
 
 // what was changed is written to the browser now, then done is called,

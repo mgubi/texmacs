@@ -8,7 +8,7 @@
 import * as chrome from "./chrome.mjs";
 import * as app from "./app.mjs";
 import * as files from "./files.mjs";
-import { translate, makeLayout, learn, askLayout, browserKey, pasteKey } from "./keys.mjs";
+import { translate, makeLayout, learn, askLayout, browserKey, pasteKey, commandLetter } from "./keys.mjs";
 
 const panesElement = document.getElementById("tau-panes");
 const statusLine = document.getElementById("status");
@@ -73,6 +73,12 @@ app.initApp({
 	restore: () => files.restore()
 });
 app.progress({ what: "" });
+
+// A file dropped beside the views (on a bar, the tabs, the footer) is not
+// opened by the browser in place of Tau: only the views and the panel of
+// the files take what is dropped
+document.addEventListener("dragover", event => event.preventDefault());
+document.addEventListener("drop", event => event.preventDefault());
 
 // for tests and for the console
 const state = { started: false, paints: 0, downloads: [], get view() { return active ? active.view : 0; } };
@@ -218,6 +224,10 @@ function makeView(node) {
 		target.canvas.style.height = node.height + "px";
 	} else target.canvas.classList.add("tau-fill");
 	for (const [view, t] of embedded) if (!t.canvas.isConnected && t.seen) { t.observer.disconnect(); embedded.delete(view); }
+	// (a dialog which is shown again makes a new canvas for its view: the
+	// one it replaces, still in the page at this moment, is watched no more)
+	const before = embedded.get(node.view);
+	if (before) before.observer.disconnect();
 	embedded.set(node.view, target);
 	attachView(target);
 	return target.canvas;
@@ -264,21 +274,59 @@ function attachView(target) {
 	};
 	// (a click on the canvas would take the keyboard from its text area)
 	canvas.addEventListener("mousedown", event => event.preventDefault());
+	// One pointer at a time (a second finger is not a second mouse). A
+	// press is always released: when the browser takes the pointer away
+	// (pointercancel), the core is told the button came up. A finger which
+	// moves scrolls the view; one which does not is a click.
+	let pressed = null;   // the button which is down, for the core
+	let touch = null;     // a finger on the canvas: { x, y, moved }
+	const TAP = 8;        // (how far a finger may move and still click)
+	const release = event => {
+		if (pressed === null) return;
+		sendMouse("release-" + pressed, event);
+		pressed = null;
+	};
 	canvas.addEventListener("pointerdown", event => {
+		if (!event.isPrimary) return;
 		focusView(target);
 		canvas.setPointerCapture(event.pointerId);
-		sendMouse("press-" + (BUTTONS[event.button] || "left"), event);
 		event.preventDefault();
+		if (event.pointerType === "touch") { touch = { x: event.clientX, y: event.clientY, moved: false }; return; }
+		pressed = BUTTONS[event.button] || "left";
+		sendMouse("press-" + pressed, event);
 	});
 	canvas.addEventListener("pointerup", event => {
-		sendMouse("release-" + (BUTTONS[event.button] || "left"), event);
+		if (!event.isPrimary) return;
+		if (touch) {
+			const tap = !touch.moved;
+			touch = null;
+			if (tap) { sendMouse("press-left", event); sendMouse("release-left", event); }
+			return;
+		}
+		release(event);
 	});
+	const lost = event => { if (event.isPrimary) { touch = null; release(event); } };
+	canvas.addEventListener("pointercancel", lost);
+	canvas.addEventListener("lostpointercapture", lost);
 	// (The moves are paced by send: the last one waits while the core works,
 	// and a press or a release sends it first. They were kept for the next
 	// frame before, and a move from before a press then came after it, with
 	// no button: the core took it for the release, and the release which
 	// followed for a second click.)
-	canvas.addEventListener("pointermove", event => sendMouse("move", event));
+	canvas.addEventListener("pointermove", event => {
+		if (!event.isPrimary) return;
+		if (!touch) { sendMouse("move", event); return; }
+		if (!touch.moved && Math.hypot(event.clientX - touch.x, event.clientY - touch.y) < TAP) return;
+		touch.moved = true;
+		if (!target.view) return;
+		// (the document follows the finger: it goes up when the finger does)
+		const density = window.devicePixelRatio || 1;
+		const dx = Math.round((touch.x - event.clientX) * density), dy = Math.round((touch.y - event.clientY) * density);
+		touch.x = event.clientX; touch.y = event.clientY;
+		const rect = canvas.getBoundingClientRect();
+		if (dx || dy) send({ t: "scroll", view: target.view, dx, dy,
+			x: Math.round((event.clientX - rect.left) * density), y: Math.round((event.clientY - rect.top) * density) });
+	});
 	canvas.addEventListener("contextmenu", event => event.preventDefault());
 
 	// The wheel scrolls the view; send adds up the steps which come while
@@ -440,7 +488,7 @@ let focused = null;   // the pane or the view in a dialog which has the keyboard
 let composing = false;
 
 const area = el("textarea", "tau-keyboard");
-area.setAttribute("aria-hidden", "true");
+area.setAttribute("aria-label", "Document");
 area.setAttribute("autocomplete", "off");
 area.setAttribute("autocorrect", "off");
 area.setAttribute("autocapitalize", "off");
@@ -464,6 +512,14 @@ function placeArea() {
 function focusView(target) {
 	if (!target || target.passive) return;
 	if (focused !== target) {
+		// (what was being composed for the other view is given up: its
+		// pre-edit would stay there, and the text would come here)
+		if (composing) {
+			if (focused && focused.view) send({ t: "key", view: focused.view, key: "pre-edit:" });
+			composing = false;
+			area.value = "";
+			area.blur();
+		}
 		if (focused && focused.view && document.activeElement === area)
 			send({ t: "focus", view: focused.view, focus: false });
 		focused = target;
@@ -475,7 +531,12 @@ function focusView(target) {
 }
 
 area.addEventListener("focus", () => focused && focused.view && send({ t: "focus", view: focused.view, focus: true }));
-area.addEventListener("blur", () => focused && focused.view && send({ t: "focus", view: focused.view, focus: false }));
+area.addEventListener("blur", () => {
+	// (a composition which is left does not end: the keys are not the
+	// input method's any more)
+	composing = false;
+	if (focused && focused.view) send({ t: "focus", view: focused.view, focus: false });
+});
 
 function sendKey(key) {
 	if (focused && focused.view) send({ t: "key", view: focused.view, key });
@@ -517,10 +578,16 @@ function handleKey(event) {
 area.addEventListener("keydown", event => { handleKey(event); event.stopPropagation(); });
 
 // the text which the keyboard made
+let composed = null; // what a composition ended with, a moment ago
 area.addEventListener("input", event => {
 	if (composing || event.isComposing) return;
 	const text = area.value;
 	area.value = "";
+	// (Safari tells the end of a composition, then the text it inserts once
+	// more: it was sent with the end already)
+	const again = composed;
+	composed = null;
+	if (event.inputType === "insertFromComposition" || (again && again.text === text && performance.now() - again.at < 200)) return;
 	trace("text", JSON.stringify(text));
 	sendText(text);
 });
@@ -538,6 +605,7 @@ area.addEventListener("compositionend", event => {
 	trace("composed", JSON.stringify(text));
 	sendKey("pre-edit:");
 	sendText(text);
+	composed = text ? { text, at: performance.now() } : null;
 });
 
 // The keys which are pressed while nothing of the page has the keyboard
@@ -554,14 +622,17 @@ document.addEventListener("keydown", event => {
 	const command = e.ctrlKey || e.metaKey;
 	if (busy) {
 		// a command key which is not the input's: the browser does not get it
-		if (!command || browserKey(e, isMac) || EDITING.includes((e.key || "").toLowerCase())) return;
+		if (!command || browserKey(e, isMac) || EDITING.includes(commandLetter(e))) return;
 		const r = translate(e, isMac, layout);
 		if (!r || !r.key) return;
 		event.preventDefault();
 		if (["M-+", "M--", "M-0", "C-+", "C--", "C-0"].includes(r.key)) send({ t: "key", view: active.view, key: r.key });
 		return;
 	}
-	if (event.isComposing || browserKey(e, isMac) || pasteKey(e, isMac)) return;
+	if (event.isComposing || browserKey(e, isMac)) return;
+	// (the paste is the browser's, into the text area of the view, which
+	// takes the keyboard first: in nothing, the paste went nowhere)
+	if (pasteKey(e, isMac)) { focusView(active); return; }
 	focusView(active);
 	const r = translate(e, isMac, layout);
 	if (!r) return;
@@ -615,8 +686,10 @@ function openFromAddress() {
 // system, and waits for its answers
 let fsNext = 1;
 const fsWaiting = new Map();
+let workerGone = false; // the worker could not start: no answer comes
 function fsRequest(op, args, transfer) {
 	return new Promise((resolve, reject) => {
+		if (workerGone) { reject(new Error("the program of Tau did not start")); return; }
 		const id = fsNext++;
 		fsWaiting.set(id, { resolve, reject });
 		worker.postMessage({ t: "fs", id, op, ...(args || {}) }, transfer || []);
@@ -719,15 +792,22 @@ async function pasteFromBrowser() {
 	focusView(target);
 }
 
-let copyFailed = false;
+// What was copied goes to the clipboard of the browser. The browser may
+// refuse it (it wants a click or a key of the user just before, and the
+// core answered later): a line then offers to copy it with a click, which
+// it accepts. (The keys of the browser would not do: they are the core's.)
+let copyBar = null, copyText = "";
 function copy(text) {
-	const done = navigator.clipboard && navigator.clipboard.writeText
-		? navigator.clipboard.writeText(text) : Promise.reject(new Error("no clipboard"));
-	// (a browser which refuses is said, once: what was copied is not where
-	// the user thinks it is)
-	done.catch(error => {
+	const write = t => navigator.clipboard && navigator.clipboard.writeText
+		? navigator.clipboard.writeText(t) : Promise.reject(new Error("no clipboard"));
+	write(text).then(() => { if (copyBar) { copyBar.remove(); copyBar = null; } }, error => {
 		if (verbose) console.log("clipboard: " + error.message);
-		if (!copyFailed) { copyFailed = true; notice("The browser did not let Tau write to the clipboard: copy with the keys of the browser (" + (isMac ? "⌘C" : "Ctrl+C") + ")."); }
+		copyText = text;
+		if (copyBar && copyBar.isConnected) return;
+		copyBar = notice("The browser did not let Tau write to the clipboard.", "Copy", () => {
+			write(copyText).then(() => { copyBar.remove(); copyBar = null; },
+				() => notice("The browser does not let Tau write to its clipboard."));
+		});
 	});
 }
 
@@ -793,6 +873,11 @@ worker.onmessage = event => {
 		if (!state.started) setStatus("Tau is ready, no view yet");
 		// another page of Tau keeps the documents and the preferences
 		homeKept = !!m.homeKept;
+		// (the documents are only in the browser: it is asked not to delete
+		// them when it wants room, once)
+		if (homeKept && navigator.storage && navigator.storage.persist)
+			navigator.storage.persisted().then(yes => yes || navigator.storage.persist())
+				.then(yes => { if (verbose) console.log("storage persisted: " + yes); }, () => {});
 		// (or the browser could not give them: nothing is written over them)
 		if (!m.homeKept && m.homeError)
 			notice("The documents kept in this browser could not be read (" + m.homeError + "): what is saved here is not kept, and what the browser has is left as it is.");
@@ -801,9 +886,33 @@ worker.onmessage = event => {
 		openFromAddress();
 		break;
 	case "quit":
-		// TeXmacs was closed (it asked about what is not saved): it starts again
+		// TeXmacs was closed (it asked about what is not saved): it starts
+		// again, unless what it wrote could not be stored, which reloading
+		// would lose (the files are still in the worker: a backup of them)
+		if (m.failed) {
+			failure("TeXmacs was closed, but the browser could not store your documents (" + m.failed + "). " +
+				"Save a backup before you start Tau again: what was saved since the problem is only in this page.", "Your documents are not stored");
+			break;
+		}
 		leaving = true;
 		location.reload();
+		break;
+	case "saving":
+		// what was saved is being written to the browser (tau-pre.js)
+		saving = !!m.on;
+		break;
+	case "storage-erased":
+		// another page of Tau forgot what is kept in this browser
+		homeKept = false;
+		notice("What Tau kept in this browser was deleted from another page: what is saved here is not kept any more. Save a backup to keep it.");
+		break;
+	case "forget-blocked":
+		leaving = false;
+		notice("What Tau keeps in this browser is deleted once the other pages of Tau are closed: close them.");
+		break;
+	case "forget-failed":
+		leaving = false;
+		notice("The browser did not delete what Tau keeps (" + m.text + ").");
 		break;
 	case "stopped":
 		failure("The program of Tau stopped on an error and cannot go on: " + m.text +
@@ -827,7 +936,9 @@ worker.onmessage = event => {
 	case "buffers": {
 		// where the main and the mode icon bars are: the preference, or what
 		// the address says (?bars=top or left)
-		document.body.classList.toggle("tau-bars-left", (params.get("bars") || m.bars || "left") === "left");
+		// (a narrow screen, a phone, keeps its width for the document)
+		const narrow = window.matchMedia && window.matchMedia("(max-width: 480px)").matches;
+		document.body.classList.toggle("tau-bars-left", (params.get("bars") || (narrow ? "top" : m.bars) || "left") === "left");
 		// the tabs keep their places: the documents in the order in which
 		// the page came to know them
 		const known = buffers.map(b => b.name);
@@ -877,19 +988,40 @@ worker.onmessage = event => {
 	}
 };
 worker.onerror = event => {
-	if (!state.started) setStatus("The worker failed: " + (event.message || ""));
+	if (!state.started) {
+		// (the worker did not load: nothing will answer, the requests which
+		// wait are given up, and the panel of the loading stops)
+		const text = "The worker failed: " + (event.message || "it could not be loaded");
+		setStatus(text);
+		workerGone = true;
+		for (const w of fsWaiting.values()) w.reject(new Error("the program of Tau did not start"));
+		fsWaiting.clear();
+		app.failed("Tau could not start: " + text);
+		failure(text, "Tau could not start");
+	}
 	else if (/RuntimeError|RangeError|call stack/i.test(event.message || "")) failure("The program of Tau stopped on an error and cannot go on: " + event.message);
 };
 
 // A line over the views which the user closes
 let storageFailed = false;
 
-function notice(text) {
+function notice(text, label, action) {
 	const bar = el("div", "tau-notice"), close = el("button", "tau-doc-close", "×");
+	bar.setAttribute("role", "status");
+	bar.setAttribute("aria-live", "polite");
 	close.type = "button";
+	close.title = "Close";
 	close.addEventListener("click", () => bar.remove());
-	bar.append(el("span", "", text), close);
+	bar.append(el("span", "", text));
+	if (label) {
+		const b = el("button", "tau-button", label);
+		b.type = "button";
+		b.addEventListener("click", action);
+		bar.append(b);
+	}
+	bar.append(close);
 	panesElement.parentElement.insertBefore(bar, panesElement);
+	return bar;
 }
 
 // The program stopped: nothing which is typed reaches it any more
@@ -920,9 +1052,12 @@ function failure(text, title) {
 	again.focus();
 }
 
-// leaving the page with documents which are not saved asks first
+// Leaving the page with documents which are not saved asks first, and so
+// does leaving it while what was saved is still being written to the
+// browser (a moment after the save)
+let saving = false;
 window.addEventListener("beforeunload", event => {
-	if (leaving || failed || !buffers.some(b => b.modified)) return;
+	if (leaving || (failed && !saving) || (!saving && !buffers.some(b => b.modified))) return;
 	event.preventDefault();
 	event.returnValue = "";
 });

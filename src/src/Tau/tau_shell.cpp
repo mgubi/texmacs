@@ -58,6 +58,10 @@
 #include <fcntl.h>
 #include <sys/wait.h>
 #include <sys/stat.h>
+#include <atomic>
+#ifdef __APPLE__
+#include <mach-o/dyld.h>
+#endif
 #include <string.h>
 #include <string>
 #include <vector>
@@ -148,10 +152,28 @@ read_all (int fd, void* data, size_t n) {
   char* p= (char*) data;
   while (n > 0) {
     ssize_t r= read (fd, p, n);
+    if (r < 0 && errno == EINTR) continue;
     if (r <= 0) return false;
     p += r; n -= (size_t) r;
   }
   return true;
+}
+
+// One event wakes the loop of Vue for all the frames which came meanwhile
+// (one for each frame filled the queue of SDL when the loop was slow)
+static std::atomic<bool> frame_woken (false);
+
+static void
+wake_loop () {
+  if (frame_woken.exchange (true)) return;
+  SDL_Event e; SDL_zero (e); e.type= frame_event;
+  SDL_PushEvent (&e);
+}
+
+static bool
+core_is_gone () {
+  std::lock_guard<std::mutex> g (frames_lock);
+  return core_gone;
 }
 
 static void
@@ -162,8 +184,18 @@ core_reader (int fd) {
     uint32_t len;
     memcpy (&len, head + 4, 4);
     if (!frame_known (head, len)) {
-      std::lock_guard<std::mutex> g (frames_lock);
-      core_wrong= "it said something which is not a frame of Tau";
+      {
+        std::lock_guard<std::mutex> g (frames_lock);
+        core_wrong= "it said something which is not a frame of Tau";
+      }
+      // (what it says next is read and dropped: a core which waited to
+      // write could not save its documents as it is asked to end)
+      char sink[65536];
+      while (true) {
+        ssize_t r= read (fd, sink, sizeof (sink));
+        if (r < 0 && errno == EINTR) continue;
+        if (r <= 0) break;
+      }
       break;
     }
     core_frame f;
@@ -179,16 +211,14 @@ core_reader (int fd) {
       frames.push_back (std::move (f));
     }
     frames_came.notify_all ();
-    SDL_Event e; SDL_zero (e); e.type= frame_event;
-    SDL_PushEvent (&e);
+    wake_loop ();
   }
   {
     std::lock_guard<std::mutex> g (frames_lock);
     core_gone= true;
   }
   frames_came.notify_all ();
-  SDL_Event e; SDL_zero (e); e.type= frame_event;
-  SDL_PushEvent (&e);
+  wake_loop ();
 }
 
 // What the core is told goes through a thread of its own: the loop of
@@ -224,6 +254,8 @@ core_writer (int fd) {
 static void
 core_say (std::string line) {
   if (core_in < 0) return;
+  // (a line is one message: what would cut it is not sent)
+  for (char& c : line) if (c == '\n' || c == '\r') c= ' ';
   static bool debug= (getenv ("TAU_SHELL_DEBUG") != NULL);
   static bool moves= debug && !strcmp (getenv ("TAU_SHELL_DEBUG"), "2");
   if (debug && line != "ping busy" && (moves || line.find (" move ") == std::string::npos))
@@ -265,14 +297,38 @@ shell_exit (int code) {
 static bool
 core_start (url exe, int argc, char** argv) {
   int in_pipe[2], out_pipe[2];
-  if (pipe (in_pipe) != 0 || pipe (out_pipe) != 0) return false;
+  if (pipe (in_pipe) != 0) return false;
+  if (pipe (out_pipe) != 0) { close (in_pipe[0]); close (in_pipe[1]); return false; }
   signal (SIGPIPE, SIG_IGN);
   // (the ends which stay here are not for the programs which are started
   // later, the one which shows a PDF: with them it kept the core alive
   // after this program had gone)
   fcntl (in_pipe[1], F_SETFD, FD_CLOEXEC);
   fcntl (out_pipe[0], F_SETFD, FD_CLOEXEC);
+  // The arguments and the environment of the core, made before fork: the
+  // child of a program with threads (SDL's) may only do what is safe in a
+  // signal handler until it runs the core (no allocation, no setenv)
   std::string prog= std_of (as_string (exe));
+  std::vector<std::string> env;
+  env.push_back ("TAU_FD=" + std::to_string (out_pipe[1]));
+  env.push_back ("TAU_DESKTOP=1");
+  // the machine, for the shortcuts of the core (default_look_and_feel in
+  // basic.cpp); elsewhere the core looks at the desktop itself
+#if defined(__APPLE__)
+  if (getenv ("TEXMACS_WEB_PLATFORM") == NULL) env.push_back ("TEXMACS_WEB_PLATFORM=macos");
+#elif defined(_WIN32)
+  if (getenv ("TEXMACS_WEB_PLATFORM") == NULL) env.push_back ("TEXMACS_WEB_PLATFORM=windows");
+#endif
+  extern char** environ;
+  for (char** e= environ; *e != NULL; e++)
+    if (strncmp (*e, "TAU_FD=", 7) && strncmp (*e, "TAU_DESKTOP=", 12))
+      env.push_back (*e);
+  std::vector<char*> envp, args;
+  for (std::string& e : env) envp.push_back ((char*) e.c_str ());
+  envp.push_back (NULL);
+  args.push_back ((char*) prog.c_str ());
+  for (int i= 1; i < argc; i++) args.push_back (argv[i]);
+  args.push_back (NULL);
   core_pid= fork ();
   if (core_pid < 0) {
     close (in_pipe[0]); close (in_pipe[1]);
@@ -280,24 +336,13 @@ core_start (url exe, int argc, char** argv) {
     return false;
   }
   if (core_pid == 0) {
+    // (a group of its own: Control-C in the terminal is for this program,
+    // which asks the core to quit; the core is not killed with it)
+    setpgid (0, 0);
     dup2 (in_pipe[0], 0);
     if (in_pipe[0] != 0) close (in_pipe[0]);
     close (in_pipe[1]); close (out_pipe[0]);
-    setenv ("TAU_FD", std::to_string (out_pipe[1]).c_str (), 1);
-    setenv ("TAU_DESKTOP", "1", 1);
-    // the machine, for the shortcuts of the core (default_look_and_feel
-    // in basic.cpp); elsewhere the core looks at the desktop itself
-#if defined(__APPLE__)
-    setenv ("TEXMACS_WEB_PLATFORM", "macos", 0);
-#elif defined(_WIN32)
-    setenv ("TEXMACS_WEB_PLATFORM", "windows", 0);
-#endif
-    std::vector<char*> args;
-    args.push_back ((char*) prog.c_str ());
-    for (int i= 1; i < argc; i++) args.push_back (argv[i]);
-    args.push_back (NULL);
-    execv (prog.c_str (), args.data ());
-    perror (prog.c_str ());
+    execve (prog.c_str (), args.data (), envp.data ());
     _exit (127);
   }
   close (in_pipe[0]); close (out_pipe[1]);
@@ -357,7 +402,12 @@ struct json {
     return r;
   }
   std::string str () const { return kind == STR? s: std::string (); }
-  int num () const { return kind == NUM? (int) n: 0; }
+  // (a number which is not one, or is too large, is 0 or the largest)
+  int num () const {
+    if (kind != NUM || n != n) return 0;
+    return n > 1e9? 1000000000: n < -1e9? -1000000000: (int) n; }
+  // a size in pixels, for the widgets
+  int size () const { int v= num (); return v < 0? 0: v > 16384? 16384: v; }
   bool truth () const { return kind == BOOL? b: (kind != NUL); }
 };
 
@@ -482,6 +532,7 @@ static void view_has_keyboard (tau_view_rep* v);
 widget box_widget (scheme_tree p, string s, color col, bool trans, bool ink); // tm_button.cpp
 static bool close_context_menu ();
 static void pointer_pressed ();
+static void focus_current_pane ();
 
 class tau_view_rep: public vue_simple_widget_rep {
 public:
@@ -576,7 +627,14 @@ public:
     if (!view || !input) return;
     // (Escape with the menu of the view open closes the menu)
     if (key == "escape" && close_context_menu ()) return;
-    if (key == "M-v" || key == "C-v") {
+    // (the key which pastes, as in the page: Command-V on a Mac, Control-V
+    // elsewhere, and Shift-Insert)
+#ifdef __APPLE__
+    bool paste= (key == "M-v" || key == "S-insert");
+#else
+    bool paste= (key == "C-v" || key == "S-insert");
+#endif
+    if (paste) {
       // what the system has to paste, if it has a text: the core has its
       // own clipboard only
       std::string text= clipboard_text ();
@@ -610,7 +668,8 @@ public:
         if (is_func (doc[i], IMAGE) && is_atomic (doc[i][0]))
           images += (images == ""? "": "\n") + std_of (cork_to_utf8 (doc[i][0]->label));
         else if (is_atomic (doc[i])) {
-          url u= url_system (doc[i]->label);
+          // (the path of the system, in UTF-8 as the core takes it)
+          url u= url_system (cork_to_utf8 (doc[i]->label));
           if (is_rooted (u) && exists (u))
             core_say ("chosen 0 " + escaped (std_of (cork_to_utf8 (doc[i]->label))));
           else text += std_of (cork_to_utf8 (doc[i]->label));
@@ -714,11 +773,15 @@ public:
   void send_bar () {
     if (asked || !wanted) return;
     wanted= false;
-    int dx= (int) ((want_x - ax) / ren->pixel), dy= (int) ((ay - want_y) / ren->pixel);
-    if (dx == 0 && dy == 0) return;
+    // (where the bar was dragged to, in pixels of the document: not a
+    // displacement from the last paint, which a step of the wheel on its
+    // way made wrong; and never a wheel for the editor, as "scroll" is
+    // when the graphics take the wheel)
+    int x= (int) (want_x / ren->pixel), y= (int) (-want_y / ren->pixel);
+    if (want_x == ax && want_y == ay) return;
     asked= true;
-    core_say ("scroll " + std::to_string (view) + " " + std::to_string (dx) + " " +
-              std::to_string (dy) + " 0 0");
+    core_say ("bar " + std::to_string (view) + " " + std::to_string (x) + " " +
+              std::to_string (y));
     core_say ("ping bar " + std::to_string (view));
   }
 
@@ -738,11 +801,13 @@ public:
       fz_clear_pixmap_with_value (ctx, pix, 0xff);
       fw= fz_pixmap_width (ctx, pix); fh= fz_pixmap_height (ctx, pix);
     }
-    if (pix == NULL || x < 0 || y < 0 || x + dw > fw || y + dh > fh) return;
+    // (in 64 bits: x + dw could wrap in an int and pass)
+    if (pix == NULL || x < 0 || y < 0 ||
+        (int64_t) x + dw > fw || (int64_t) y + dh > fh) return;
     unsigned char* dst= fz_pixmap_samples (ctx, pix);
     ptrdiff_t stride= fz_pixmap_stride (ctx, pix);
     for (int row= 0; row < dh; row++)
-      memcpy (dst + (ptrdiff_t) (y + row) * stride + 4 * x,
+      memcpy (dst + (ptrdiff_t) (y + row) * stride + (ptrdiff_t) 4 * x,
               px + (size_t) 4 * row * dw, (size_t) 4 * dw);
     // A new picture on the same pixels at each paint: the renderers know a
     // picture by its number (the GPU one keeps a texture of it, and Vue
@@ -768,14 +833,16 @@ public:
     }
     if (!embedded && ren != NULL) {
       // the extents of the document and where the view is in it
+      // (the numbers of the core within what SI holds: some 2^20 pixels)
+      auto fit= [] (int32_t v) { return v < -(1 << 20)? -(1 << 20): v > (1 << 20)? (1 << 20): v; };
       SI px= ren->pixel;
-      SI nx= (SI) n[10] * px, ny= -(SI) n[11] * px;
-      extents= rectangle (0, -(SI) max (n[9], h) * px, (SI) max (n[8], w) * px, 0);
-      doc_w= n[8];
+      SI nx= (SI) fit (n[10]) * px, ny= -(SI) fit (n[11]) * px;
+      extents= rectangle (0, -(SI) max (fit (n[9]), h) * px, (SI) max (fit (n[8]), w) * px, 0);
+      doc_w= fit (n[8]);
       ax= nx; ay= ny;
       // where the cursor is, for the input methods of the system, which
       // put their candidates there (update_text_input_area)
-      cursor_pos= coord2 (ax + (SI) n[12] * px, ay - (SI) n[13] * px);
+      cursor_pos= coord2 (ax + (SI) fit (n[12]) * px, ay - (SI) fit (n[13]) * px);
       cursor_moved= true;
       if (backing_pos.x1 != ax || backing_pos.x2 != ay) {
         // the core scrolled: the canvas goes where the frame is
@@ -806,8 +873,23 @@ static std::deque<core_frame> put_aside;
 // for the widget of a menu when it opens it, and wants it then
 static bool core_busy ();
 
+// The requests for the contents of a submenu which were not answered yet:
+// the core answers each, in order, and only the last answer is the one to
+// show (an earlier one which came late has numbers which the core forgot
+// when it answered the next)
+static hashmap<int,int> expand_asked (0);
+
+static bool
+expand_answer (int number) {
+  int left= expand_asked [number] - 1;
+  if (left <= 0) expand_asked->reset (number);
+  else expand_asked (number)= left;
+  return left <= 0;
+}
+
 static json
 expand (int number) {
+  expand_asked (number)= expand_asked [number] + 1;
   core_say ("expand " + std::to_string (number));
   std::string part= std::to_string (number);
   // (the window waits meanwhile: not long for a core which is known to be
@@ -828,13 +910,16 @@ expand (int number) {
       if (!strcmp (f.tag, "JSON") && z2 != NULL) {
         const char* kind= (const char*) f.body.data ();
         const char* fpart= z1 + 1;
-        if (!strcmp (kind, "contents") && part == fpart) {
+        if (!strcmp (kind, "contents") && part == fpart &&
+            expand_answer (number)) {
           const char* js= z2 + 1;
           if (getenv ("TAU_SHELL_DEBUG") != NULL)
             fprintf (stderr, "tau_shell] contents %s %.*s\n", fpart,
                      (int) std::min ((size_t) 1800, f.body.size () - (size_t) (js - kind)), js);
           return json_parse (js, f.body.size () - (size_t) (js - kind));
         }
+        // (an earlier answer for the same submenu: dropped)
+        if (!strcmp (kind, "contents") && part == fpart) continue;
       }
       put_aside.push_back (std::move (f));
     }
@@ -863,7 +948,13 @@ scheme_of (object x) {
   if (is_string (x)) return std_of (scm_quote (cork_to_utf8 (as_string (x))));
   if (is_bool (x)) return as_bool (x)? "#t": "#f";
   if (is_int (x)) return std::to_string (as_int (x));
-  if (is_double (x)) return std::to_string (as_double (x));
+  if (is_double (x)) {
+    // (all of its digits, and a point whatever the locale says)
+    char buf[64];
+    snprintf (buf, sizeof (buf), "%.17g", as_double (x));
+    for (char* q= buf; *q; q++) if (*q == ',') *q= '.';
+    return buf;
+  }
   if (is_null (x)) return "(list)";
   if (is_list (x)) {
     std::string r= "(list";
@@ -915,7 +1006,7 @@ public:
 // (a slot goes with the widgets around it, when a menu closes or a part
 // which holds it is itself sent again: the core may still refresh it)
 class tau_slot_rep;
-struct slot_info { tau_slot_rep* slot; bool dialog; bool row; };
+struct slot_info { tau_slot_rep* slot; bool dialog; bool row; bool sized; };
 static hashmap<int,pointer> slots (NULL); // number of a refreshable -> its slot
 
 class tau_slot_rep: public vue_widget_rep {
@@ -985,8 +1076,8 @@ build_label (const json& node, int style) {
     sscanf (node["color"].str ().c_str (), "rgba(%d,%d,%d", &r, &g, &b);
     char hex[8];
     snprintf (hex, sizeof (hex), "#%02x%02x%02x", r & 255, g & 255, b & 255);
-    int w= node.has ("width")? node["width"].num (): 24;
-    int h= node.has ("height")? node["height"].num (): 18;
+    int w= node.has ("width")? node["width"].size (): 24;
+    int h= node.has ("height")? node["height"].size (): 18;
     return glue_widget (tree (hex), false, false, w * PIXEL, h * PIXEL);
   }
   if (node["symbol"].truth ())
@@ -1046,14 +1137,15 @@ build (const json& node, int style, context c) {
     w= minibar_menu (build_items (node["items"], style, row));
   else if (kind == "tile")
     w= tile_menu (build_items (node["items"], style, row),
-                  node.has ("columns")? node["columns"].num (): 8);
+                  // (at least one: with none the layout went round for ever)
+                  node.has ("columns")? max (1, node["columns"].num ()): 8);
   else if (kind == "separator")
     w= menu_separator (c.dialog? node["vertical"].truth (): c.row);
   else if (kind == "group")
     w= menu_group (node["label"].text (), style);
   else if (kind == "glue")
     w= glue_widget (node["hext"].truth (), node["vext"].truth (),
-                    node["width"].num () * PIXEL, node["height"].num () * PIXEL);
+                    node["width"].size () * PIXEL, node["height"].size () * PIXEL);
   else if (kind == "text")
     w= text_widget (node["label"].text (), style, black, false);
   else if (kind == "color") {
@@ -1081,7 +1173,7 @@ build (const json& node, int style, context c) {
     slot->content= pack (build_items (node["items"], style, c), c);
     slot_info* old= (slot_info*) slots [number];
     if (old != NULL) delete old;
-    slots (number)= (pointer) new slot_info { slot, c.dialog, c.row };
+    slots (number)= (pointer) new slot_info { slot, c.dialog, c.row, c.sized };
     w= widget (slot);
   }
   else if (kind == "hsplit" || kind == "vsplit") {
@@ -1137,15 +1229,15 @@ build (const json& node, int style, context c) {
   else if (kind == "view") {
     w= widget (tm_new<tau_view_rep> (node["view"].num (), true,
                                      !node.has ("input") || node["input"].truth (),
-                                     node["width"].num () * PIXEL,
-                                     node["height"].num () * PIXEL));
+                                     node["width"].size () * PIXEL,
+                                     node["height"].size () * PIXEL));
     // A view fills the room it is given, and where nothing gives it any
     // (a page of tabs in a window which takes the size of its contents:
     // the consoles) it had none. It gets the size which the core says,
     // unless something around it already sets one (a resize).
-    if (!c.sized && node["width"].num () > 0 && node["height"].num () > 0) {
-      string vw= as_string (node["width"].num ()) * "px";
-      string vh= as_string (node["height"].num ()) * "px";
+    if (!c.sized && node["width"].size () > 0 && node["height"].size () > 0) {
+      string vw= as_string (node["width"].size ()) * "px";
+      string vh= as_string (node["height"].size ()) * "px";
       w= resize_widget (w, 0, vw, vh, vw, vh, vw, vh, "", "");
     }
   }
@@ -1240,7 +1332,7 @@ set_part (std::string part, const json& desc) {
     }
     else if (had_input [key]) {
       had_input (key)= false;
-      send_keyboard_focus (the_frame, true);
+      focus_current_pane ();
     }
   }
   first_input= widget ();
@@ -1322,14 +1414,23 @@ static void
 refresh_part (const json& m) {
   slot_info* info= (slot_info*) slots [m["number"].num ()];
   if (info == NULL) return;
-  context c= { info->dialog, info->row };
+  int number= m["number"].num ();
+  context c= { info->dialog, info->row, info->sized };
   // (built first: a slot inside what is replaced may be this very one's
   // child, and the slot is kept while its content changes)
-  widget keep (info->slot);
+  tau_slot_rep* slot= info->slot;
+  widget keep (slot);
   widget content= pack (build_items (m["items"], 0, c), c);
-  info= (slot_info*) slots [m["number"].num ()];
-  if (info == NULL) return;
-  info->slot->content= content;
+  // (what was built may have a slot of the same number, which took its
+  // place in the table: the content goes to the slot which was refreshed,
+  // and the table names it again; given to the new one, a slot held
+  // itself, and its layout had no end)
+  slot->content= content;
+  slot_info* now= (slot_info*) slots [number];
+  if (now == NULL || now->slot != slot) {
+    if (now != NULL) delete now;
+    slots (number)= (pointer) new slot_info { slot, c.dialog, c.row, c.sized };
+  }
   gui_needs_relayout= true;
 }
 
@@ -1387,13 +1488,20 @@ show_tooltip (const json& m) {
   }
   tau_view_rep* over= current_view ();
   if (m["view"].num () == 0 || over == NULL) return;
+  int tw= m["width"].size (), th= m["height"].size ();
   widget v (tm_new<tau_view_rep> (m["view"].num (), true, false,
-                                  m["width"].num () * PIXEL, m["height"].num () * PIXEL));
+                                  tw * PIXEL, th * PIXEL));
   widget win= tooltip_window_widget (v, "Tooltip");
   SI wx= 0, wy= 0, cx= 0, cy= 0;
   get_position (the_window, wx, wy);
   get_position (widget (over), cx, cy);
-  set_position (win, wx + cx + m["x"].num () * PIXEL, wy + cy - m["y"].num () * PIXEL);
+  // (inside the window, as the page keeps it inside its own)
+  SI ww= 0, wh= 0;
+  get_size (the_window, ww, wh);
+  SI tx= cx + (SI) m["x"].size () * PIXEL, ty= -cy + (SI) m["y"].size () * PIXEL;
+  tx= max ((SI) 0, min (tx, ww - (SI) tw * PIXEL));
+  ty= max ((SI) 0, min (ty, wh - (SI) th * PIXEL));
+  set_position (win, wx + tx, wy - ty);
   set_visibility (win, true);
   tooltips (id)= win;
 }
@@ -1438,8 +1546,10 @@ choose_file (const json& m) {
   // (not "image": the chooser of Vue then asks the editor for sizes)
   widget ch= file_chooser_widget (cmd, "generic", mode == "save"? string ("Save"): string (""));
   rep->chooser= ch;
-  send<string> (ch, SLOT_DIRECTORY, m["dir"].text ());
-  if (mode == "save") send<string> (ch, SLOT_FILE, m["name"].text ());
+  // (the folder and the name as the system has them, in UTF-8: the
+  // chooser gives them to the dialog of the system as they are)
+  send<string> (ch, SLOT_DIRECTORY, string (m["dir"].str ().c_str ()));
+  if (mode == "save") send<string> (ch, SLOT_FILE, string (m["name"].str ().c_str ()));
   widget win= plain_window_widget (ch, m["title"].text ());
   set_visibility (win, true);
 }
@@ -1484,7 +1594,7 @@ core_busy () {
 
 static void
 busy_check () {
-  if (core_gone || is_nil (the_frame)) return;
+  if (core_is_gone () || is_nil (the_frame)) return;
   Uint64 now= SDL_GetTicks ();
   if (!busy_asked) {
     if (now - busy_last < 150) return;
@@ -1534,6 +1644,16 @@ static array<int> pane_order;             // the places, from left to right
 static int main_place= 0;
 static int current_place= 0;              // the one which has the keyboard
 
+// The keyboard for the view of the pane which has it, once it is laid out
+// (given to the frame, it went to the line between the panes, and the
+// keys went nowhere until a pane was clicked)
+static bool focus_pending= false;
+
+static void
+focus_current_pane () {
+  focus_pending= true;
+}
+
 static void
 show_panes () {
   widget w;
@@ -1543,6 +1663,7 @@ show_panes () {
     w= is_nil (w)? p->w: hsplit_widget (w, p->w);
   }
   if (!is_nil (w)) set_scrollable (the_frame, w);
+  focus_current_pane ();
 }
 
 // A right click on a tag of the interactive footer (vue_widget.cpp): the
@@ -1562,21 +1683,39 @@ tau_shell_footer_popup () {
     core_say ("popup " + std::to_string (v->view));
 }
 
+struct json;
+static json last_buffers;
+static void set_tabs (const json& desc);
+
 static tau_view_rep*
 view_of_place (int place) {
+  if (place <= 0) return NULL; // (not a place: a frame which is wrong)
   pane* p= (pane*) panes [place];
   if (p == NULL) {
     p= new pane ();
-    if (main_place == 0) {
-      // (the view which the window was made with)
+    bool shown= true;
+    if (main_place == 0 && the_view != NULL) {
+      // (the view which the window was made with, which it shows)
       main_place= current_place= place;
       p->view= the_view;
     }
-    else p->view= tm_new<tau_view_rep> ();
+    else {
+      p->view= tm_new<tau_view_rep> ();
+      shown= false;
+      if (main_place == 0) {
+        // (all the panes went: this one is the first again)
+        main_place= current_place= place;
+        the_view= p->view;
+      }
+    }
     p->w= widget (p->view);
     panes (place)= (pointer) p;
     pane_order << place;
-    if (N(pane_order) > 1) show_panes ();
+    // (a new pane takes the keyboard, as in the page: the core made its
+    // window the current one)
+    if (!shown) current_place= place;
+    if (N(pane_order) > 1 || !shown) show_panes ();
+    if (!shown && last_buffers.kind == json::OBJ) set_tabs (last_buffers);
   }
   return p->view;
 }
@@ -1599,6 +1738,12 @@ drop_panes (const json& desc) {
   }
   if (!changed) return;
   pane_order= kept;
+  if (N(kept) == 0) {
+    // (the places which come next start again; the window keeps showing
+    // what it showed until then)
+    main_place= current_place= 0;
+    return;
+  }
   if (N(kept) > 0) {
     pane* first= (pane*) panes [kept[0]];
     if (the_view == NULL && first != NULL) { the_view= first->view; main_place= kept[0]; }
@@ -1626,7 +1771,7 @@ public:
   tm_ostream& print (tm_ostream& out) { return out << "buffer"; }
 };
 
-static json last_buffers; // the documents and the places, as last told
+// (last_buffers: the documents and the places, as last told)
 
 static void
 set_tabs (const json& desc) {
@@ -1766,6 +1911,7 @@ handle_message (std::string kind, std::string part, const json& desc) {
   }
   else if (kind == "quit") shell_exit (0);
   // ("contents" which come here came after expand had stopped waiting)
+  else if (kind == "contents") expand_answer (atoi (part.c_str ()));
 }
 
 static bool hello_seen= false;
@@ -1884,7 +2030,16 @@ core_ended (int status, bool known) {
     why= core_wrong;
   }
   if (why != "") {
-    if (core_pid > 0) { kill (core_pid, SIGKILL); waitpid (core_pid, NULL, 0); }
+    if (core_pid > 0 && hello_seen) {
+      // A core which spoke as it should and then went wrong may have
+      // documents which are not saved: it is asked to end (it saves them
+      // aside first) and only killed if it does not
+      kill (core_pid, SIGTERM);
+      for (int i= 0; i < 1000 && waitpid (core_pid, NULL, WNOHANG) == 0; i++)
+        usleep (10000);
+    }
+    if (core_pid > 0 && waitpid (core_pid, NULL, WNOHANG) == 0) {
+      kill (core_pid, SIGKILL); waitpid (core_pid, NULL, 0); }
     std::string text= "The core of Tau (" + std::string (getenv ("TAU_CORE") == NULL?
       "tau_core": getenv ("TAU_CORE")) + ") cannot be used: " + why + ".";
     cerr << "tau_shell] " << text.c_str () << LF;
@@ -1895,10 +2050,17 @@ core_ended (int status, bool known) {
     cout << "tau_shell] the core stopped" << LF;
     shell_exit (0);
   }
+  // (3: asked to end by a signal, it saved the documents aside first)
+  bool asked= known && WIFEXITED (status) && WEXITSTATUS (status) == 3;
   std::string how= !known? std::string ("for a reason which is not known"):
+    asked? std::string ("it was asked to end"):
     WIFSIGNALED (status)? "on the signal " + std::to_string (WTERMSIG (status)):
     "with the status " + std::to_string (WEXITSTATUS (status));
-  std::string text= "The core of Tau stopped unexpectedly (" + how + ").\n\n"
+  std::string text= asked?
+    "The core of Tau was asked to end.\n\n"
+    "The documents which were not saved were saved aside, and are proposed "
+    "when they are opened again.":
+    "The core of Tau stopped unexpectedly (" + how + ").\n\n"
     "The documents which were auto-saved are proposed when they are opened "
     "again; what was changed since may be lost.";
   cerr << "tau_shell] the core stopped " << how.c_str () << LF;
@@ -1937,8 +2099,17 @@ static void
 shell_turn () {
   busy_check ();
   footer_budget ();
+  if (focus_pending) {
+    tau_view_rep* v= current_view ();
+    if (v == NULL) focus_pending= false;
+    else if (v->win != NULL) {
+      focus_pending= false;
+      send_keyboard_focus (widget (v), true);
+    }
+  }
   std::deque<core_frame> got;
   bool gone;
+  frame_woken= false;
   {
     std::lock_guard<std::mutex> g (frames_lock);
     got.swap (put_aside);
@@ -1975,7 +2146,7 @@ shell_turn () {
 class quit_command_rep: public command_rep {
 public:
   void apply () {
-    if (core_gone || core_in < 0) shell_exit (0);
+    if (core_is_gone () || core_in < 0) shell_exit (0);
     Uint64 late= busy_for ();
     if (late >= 3000) {
       std::string text= "The core of Tau has not answered for " +
@@ -2104,7 +2275,18 @@ tau_shell_main (int argc, char** argv) {
   }
   shell_argv= argv;
   {
-    char* real= realpath (argv[0], NULL);
+    // (this program as the system knows it: argv[0] may be a name which
+    // was looked up in PATH)
+    char self[4096];
+    self[0]= 0;
+#ifdef __APPLE__
+    uint32_t size= sizeof (self);
+    if (_NSGetExecutablePath (self, &size) != 0) self[0]= 0;
+#else
+    ssize_t n= readlink ("/proc/self/exe", self, sizeof (self) - 1);
+    self[n > 0? n: 0]= 0;
+#endif
+    char* real= realpath (self[0] != 0? self: argv[0], NULL);
     if (real != NULL) { shell_path= real; free (real); }
   }
   // the preferences which Vue reads are the core's (tau-files.scm): asked
