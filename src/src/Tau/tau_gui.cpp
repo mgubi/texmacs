@@ -613,12 +613,16 @@ input_view (int view) {
 }
 
 // The keys go to the current editor (the handlers of Scheme act on it), so
-// an editor which is given keys is made the current one first: a focus
-// which came late for another view made that one current, and what was
+// an editor which is given keys is made the current one first, when the
+// keyboard was last given to another view: a focus which came late for a
+// view which was no longer shown made that one current, and what was
 // typed went to a document which was not on the screen
+static int keyboard_view= 0; // the view which the keyboard was given to
+
 static void
 take_keyboard (simple_widget_rep* v) {
-  if (v == NULL || !v->is_editor_widget () || v->has_focus) return;
+  if (v == NULL || !v->is_editor_widget () || v->id == keyboard_view) return;
+  keyboard_view= v->id;
   v->has_focus= true;
   v->handle_keyboard_focus (true, texmacs_time ());
 }
@@ -679,11 +683,9 @@ tau_bar (int view, int x, int y) {
 EMSCRIPTEN_KEEPALIVE
 void
 tau_focus (int view, int has_focus) {
-  // (an editor which is not shown does not take the keyboard: it became
-  // the current one, and the keys for the view on the screen went to it)
-  simple_widget_rep* v= has_focus? input_view (view):
-                                   simple_widget_rep::find (view);
+  simple_widget_rep* v= simple_widget_rep::find (view);
   if (v == NULL) return;
+  if (has_focus) keyboard_view= view;
   v->has_focus= (has_focus != 0);
   v->handle_keyboard_focus (has_focus != 0, texmacs_time ());
   tau_turn ();

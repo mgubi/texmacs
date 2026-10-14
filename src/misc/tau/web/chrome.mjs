@@ -53,7 +53,10 @@ export function handle(m) {
 	case "chrome": {
 		const bar = document.getElementById("tau-" + m.part);
 		if (!bar) return true;
-		closePopups(0); // the numbers of the old description are forgotten
+		// the numbers of the old description are forgotten: a menu opened
+		// from this bar goes (one of another bar stays: the bar of the focus
+		// is described again when the focus goes to a menu)
+		if (popups.length && bar.contains(popups[0].button)) closePopups(0);
 		// the tools at the sides and under the views are laid out as dialogs
 		const tool = bar.classList.contains("tau-tool");
 		bar.replaceChildren(...renderItems(m.items, tool ? { dialog: true, row: false } : { bar: true }));

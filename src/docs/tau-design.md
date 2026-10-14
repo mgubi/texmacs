@@ -1401,6 +1401,22 @@ from 16 to 1024 pixels. As in the page of TeXmacs Vue
   frames is held under 256 MB (the core then waits), "Start again" gives
   the new program no descriptor of the old one, and the page paces the
   sizes of its canvases as it paces the wheel.
+- **The core and the language, audited again** (2026-10-14). A focus
+  which comes late for a view which is not shown no longer makes its
+  editor the current one (what was typed went to a document off the
+  screen): keys, text and paste make their own view current. A message
+  whose handler throws is said and the core goes on; a signal breaks a
+  write which waits for the shell; the messages come on a descriptor of
+  the core alone (the standard input is `/dev/null`, which the programs
+  it starts read). Documents without a name go to `texts/rescued` and
+  open again at the next start. A file ticket which no question waits
+  for is dropped; a place fits in one frame; returns are written `\r`
+  (protocol 2). In the language: a menu item which fails is left out,
+  not its bar; the fields which give each key are those of Vue (search,
+  replace, spell, forms); the page uses the last answer for a submenu
+  asked twice and shows the fields of a bar; return validates a dialog
+  which asks for values on the desktop too; `tau-invoke` runs actions
+  only.
 - **The desktop is not a browser.** The core took itself for one (the
   shell gives it `TEXMACS_WEB_PLATFORM` for the shortcuts of the system):
   the menu had "Files in this browser", the files were asked for in

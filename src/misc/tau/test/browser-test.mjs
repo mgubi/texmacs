@@ -1389,6 +1389,29 @@ test("a dialog in a short window", async p => {
 	check("its close button can be reached", r.close <= r.w, r);
 });
 
+test("a submenu asked twice while the core is busy", async p => {
+	await p.open();
+	await p.click(600, 500);
+	const top = await p.until("the menu Insert", () => p.find("#tau-menu .tau-entry", "Insert"));
+	await p.scheme("(with t (texmacs-time) (while (< (- (texmacs-time) t) 2500) (noop)))");
+	await sleep(400);
+	// (opened, closed, opened again: two requests wait for the core)
+	await top.click();
+	await sleep(150);
+	await p.key("Escape");
+	await sleep(150);
+	await top.click();
+	const asked = (await p.sent("expand")).map(m => m.number);
+	check("the contents were asked for twice", asked.length >= 2 && asked[0] === asked[asked.length - 1], asked);
+	await p.until("the menu opens", () => p.count(".tau-popup .tau-entry").then(n => n > 0), 15000);
+	const sub = await p.until("its submenu", () => p.find(".tau-popup .tau-entry", "Mathematics"));
+	await sub.hover();
+	await p.until("the submenu opens", () => p.count(".tau-popup").then(n => n >= 2));
+	await sleep(500);
+	const text = await p.page.$$eval(".tau-popup", l => l.map(e => e.textContent).join(" "));
+	check("its numbers are the core's (the last answer)", !text.includes("the menu had changed"), text.slice(0, 200));
+});
+
 test("a menu which changed", async p => {
 	await p.open();
 	// a click on an entry whose number the core no longer has
