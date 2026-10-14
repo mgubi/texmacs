@@ -13,6 +13,7 @@
 
 (texmacs-module (convert bibtex bibtexout)
   (:use (convert tools output))
+  (:use (convert latex init-latex))
   (:use (convert latex texout)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -64,15 +65,17 @@
       (else (bibtex-has-var (cdr x))))
     #f))
 
-(define (bibtex-arg-var x)
+(define (bibtex-arg-var x . opt)
   ;; (display* "BIBTEX ARG VAR: " x "\n")
+  ;; the strings are raw LaTeX in @string, text to escape in fields (opt #t)
   (if (not (null? x))
     (let ((head (car x))
-	  (tail (cdr x)))
+	  (tail (cdr x))
+	  (escape? (and (pair? opt) (car opt))))
       (begin
 	(cond
 	  ((bibtex-match head 'bib-var 1) (output-verbatim (cadr head)))
-	  ((string? head) (output-verbatim "{" head "}"))
+	  ((and (string? head) (not escape?)) (output-verbatim "{" head "}"))
 	  (else
 	    (begin
 	      (output-verbatim "{")
@@ -81,7 +84,7 @@
 	(if (not (null? tail))
 	    (begin
 	      (output-verbatim " # ")
-	      (bibtex-arg-var tail)))))))
+	      (bibtex-arg-var tail escape?)))))))
 
 (define (bibtex-name x)
   ;; (display* "BIBTEX NAME: " x "\n")
@@ -187,11 +190,30 @@
         ((>= (string-length s) 12) s)
         (else (bibtex-padded (string-append s " ")))))
 
+;; the fields which BibTeX and biblatex read verbatim, not as LaTeX
+(define bibtex-verbatim-fields '("doi" "eprint" "file" "pdf" "url"))
+
 (define (bibtex-field x)
   (if (and (list? x) (= 2 (length x)))
-      (begin
-	(output-verbatim "  " (bibtex-padded (car x)) " = ")
-	(bibtex-arg (cadr x)))))
+      (let ((name (car x))
+            (val (cadr x)))
+	(output-verbatim "  " (bibtex-padded name) " = ")
+	(cond
+	  ;; LaTeX which could not be converted on import, saved back as is
+	  ((and (func? val 'verbatim 1) (string? (cadr val)))
+	   (output-verbatim "{" (cadr val) "}"))
+	  ((and (in? name bibtex-verbatim-fields) (string? val))
+	   (output-verbatim "{" val "}"))
+	  ((and (in? name bibtex-verbatim-fields) (func? val 'slink 1)
+                (string? (cadr val)))
+	   (output-verbatim "{" (cadr val) "}"))
+	  ((string? val)
+	   (output-verbatim "{")
+	   (bibtex-latex val)
+	   (output-verbatim "}"))
+	  ((and (list? val) (bibtex-has-var val))
+	   (bibtex-arg-var (cdr val) #t))
+	  (else (bibtex-arg val))))))
 
 (define (bibtex-fields x)
   (if (and (list? x) (not (null? x)))

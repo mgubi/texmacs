@@ -34,23 +34,39 @@
   (set! bibwid-style answer)
   (refresh-now "bibwid-preview"))
 
+(define bibwid-preview-max 10)
+
+(define (bibwid-preview-entries t)
+  (if (and (func? t 'document) (> (length (cdr t)) bibwid-preview-max))
+      (cons 'document (sublist (cdr t) 0 bibwid-preview-max))
+      t))
+
 (define (bibwid-output-content t style)
-  (if (tree-is? t 'string) 
-      '(with "bg-color" "white"
-         (mini-paragraph "480guipx"
-           (document (concat "Please choose a valid " (BibTeX) " file"))))
-      `(with "bg-color" "#ffffff"
-         (mini-paragraph "480px"
-           ,(if (csl-style-name? style)
-                (csl-bib-process "bib" style (tree->stree t))
-                (bib-process "bib" style (tree->stree t)))))))
+  (cond ((tree-is? t 'string)
+         '(with "bg-color" "white"
+            (mini-paragraph "480guipx"
+              (document (concat "Please choose a valid " (BibTeX) " file")))))
+        ((not style)
+         '(with "bg-color" "white"
+            (mini-paragraph "480guipx"
+              (document (concat "No preview for external " (BibTeX)
+                                " styles")))))
+        (else
+         (with entries (bibwid-preview-entries (tree->stree t))
+           `(with "bg-color" "#ffffff"
+              (mini-paragraph "480px"
+                ,(if (csl-style-name? style)
+                     (csl-bib-process "bib" style entries)
+                     (bib-process "bib" style entries))))))))
 
 (define (bibwid-output)
-  (with style (if (== "tm-" (string-take bibwid-style 3))
-                  (string-drop bibwid-style 3)
-                  bibwid-style)
-    (when (not (csl-style-name? style))
-      (eval `(use-modules (bibtex ,(string->symbol style)))))
+  ;; tm-NAME and csl-NAME have a preview, the external styles none
+  (with style (cond ((string-starts? bibwid-style "tm-")
+                     (string-drop bibwid-style 3))
+                    ((csl-style-name? bibwid-style) bibwid-style)
+                    (else #f))
+    (if (and style (not (csl-style-name? style)))
+        (eval `(use-modules (bibtex ,(string->symbol style)))))
     (with u (if (and bibwid-use-relative? (not (url-rooted? bibwid-url)))
                 (url-append (url-head bibwid-buffer) bibwid-url)
                 bibwid-url)

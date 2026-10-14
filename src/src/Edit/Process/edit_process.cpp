@@ -68,7 +68,9 @@ copy_bst_file (url base, string style) {
   string bst= style * ".bst";
   url u1= url ("$TEXMACS_HOME_PATH/system/bib", bst);
   url u2= relative (base, bst);
-  if (!exists (u1) && exists (u2)) copy (u2, u1);
+  if (exists (u2) &&
+      (!exists (u1) || last_modified (u2, false) > last_modified (u1, false)))
+    copy (u2, u1);
 }
 
 url
@@ -178,6 +180,7 @@ edit_process_rep::generate_bibliography (
       if (bib_t[i] == "*") star= true;
     if (!bibtex_present () && !starts (style, "tm-") && !csl) {
       if (style == "abbrv") style= "tm-abbrv";
+      else if (style == "abstract") style= "tm-abstract";
       else if (style == "acm") style= "tm-acm";
       else if (style == "alpha") style= "tm-alpha";
       else if (style == "elsart-num") style= "tm-elsart-num";
