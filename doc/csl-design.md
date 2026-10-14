@@ -1,16 +1,17 @@
 # CSL bibliography styles in TeXmacs
 
-Branch `wip_csl` (from `maxs_texmacs`). A processor of the Citation Style
+Pull request #334 to `wip_fixes` (branch `csl-processor`); the same
+processor is in `maxs_texmacs`. A processor of the Citation Style
 Language (CSL 1.0.2) written in Scheme, so that TeXmacs can use the styles
 of <https://github.com/citation-style-language/styles> (2864 independent
 styles, 8001 journal aliases) for bibliographies and citations.
 
-## Status (2026-10-12)
+## Status (2026-10-14)
 
 Working:
 
 - A bibliography whose style is `csl-NAME` is formatted by `NAME.csl`, from
-  a `.bib` file, the database tool or Zotero, through the usual
+  a `.bib` file or the database tool, through the usual
   Document -> Update -> Bibliography. Formulas and other markup of the
   fields stay TeXmacs trees.
 - The style is sought next to the document, in
@@ -37,9 +38,13 @@ What is open is listed in "Open points" below.
 
 Conformance: `csl-run-fixtures` of `(csl csl-fixtures)` runs the official
 fixtures (`processor-tests/humans` of the CSL test-suite, not distributed
-with TeXmacs): 646 of 845 pass, 136 fail, 63 are skipped (they give a
-history of citations, abbreviations or other things which the runner does
-not feed yet). The results are the same with S7 and with Guile 1.8. The
+with TeXmacs, and no script fetches them): 646 of 845 passed on
+`maxs_texmacs` (2026-10-12), 654 later with S7; an audit of 2026-10-13
+measured 652 pass, 130 fail, 63 skipped with Guile 1.8 on the revision
+`6eefc5b` of the test-suite. The skipped ones give a history of
+citations, abbreviations or other things which the runner does not feed
+yet. The fixes of 2026-10-14 (sorting of scripts without case, ranges
+`--` in locators, errors of styles) were not run against them. The
 failures are mostly conventions of citeproc-js (markup inside fields,
 names in other scripts, superscript ordinals) and corners of names, sorting
 and text case. On eight varied references, the bibliographies of the 13
@@ -121,6 +126,15 @@ changes of case skip `nocase` and `raw`.
   inside a `with` which redefines `transform-bibitem` (the label as the
   style prints it) or `render-bibitem` (no label, hanging indentation).
   The converters and `cite` therefore work unchanged.
+- `arrange_bib` turns `--` into an en-dash in the result, but not in the
+  names of the bindings, which must stay as the macros write them.
+- A style which cannot be used (not found, invalid, without bibliography,
+  or which raises an error while it is processed, such as a dependent
+  style whose parent is dependent too) gives the text "Error: CSL style
+  NAME: ..." instead of the bibliography; the citations then show as
+  without a CSL style.
+- Styles are kept for the session and read again when their file changes;
+  a style next to the document is read at every update.
 
 ## Mapping of BibTeX entries
 
@@ -141,7 +155,7 @@ capital lose it, braces protect), as CSL styles expect.
 
 ## Open points
 
-As of 2026-10-12, with the processor merged into `maxs_texmacs`.
+As of 2026-10-14.
 
 ### What gives a wrong result today
 
@@ -175,15 +189,16 @@ As of 2026-10-12, with the processor merged into `maxs_texmacs`.
   the condition `disambiguate` is set for all the ambiguous items at once
   instead of one after the other.
 - Sorting compares unaccented lower case strings, not by the rules of the
-  locale.
+  locale; the characters of the scripts without case (CJK, Arabic,
+  Hebrew...) come after the Latin letters, by their code points.
 - The locators are recognized from a fixed list of English abbreviations
   ("p.", "chap.", "sec."...); any other detail becomes a suffix of the
   cite.
 
 ### What was not checked
 
-- **The fixtures**: 646 of 845 pass, 136 fail, 63 are skipped because the
-  runner does not feed histories of citations nor abbreviations.
+- **The fixtures**: see the status; they are not in the tree, so the
+  figures cannot be reproduced from it.
 - **Real styles**: only the 13 styles which come along were compared with
   pandoc, on bibliographies of eight references, and the differences of
   four of them were read (see the status). Citations were compared on
@@ -205,8 +220,6 @@ As of 2026-10-12, with the processor merged into `maxs_texmacs`.
   have: today everything goes through BibTeX entries.
 - A chapter in the developer documentation of TeXmacs (there is this file
   and the section of the manual).
-- A pull request to `wip_fixes`: the work is on `wip_csl` and in
-  `maxs_texmacs` only.
 
 ## Next steps
 
