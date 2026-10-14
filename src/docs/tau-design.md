@@ -1373,6 +1373,21 @@ from 16 to 1024 pixels. As in the page of TeXmacs Vue
   everything" which waits for the other pages, a warning when a page is
   closed during a save, dialogs kept in the window, roles for the readers
   of the screen, and a limit to what a backup unpacks.
+- **Answers as data, and tests of the desktop** (2026-10-14). The values
+  of the inputs which the page or the shell sends are read as data by
+  the core (strings, numbers, booleans, lists), never evaluated, and only
+  for the number of an input. On the desktop a field which was typed in
+  gives its value before a button acts ("Ok" had the old value).
+  `make shell-check` (misc/tau/shell, `misc/tau/test/shell-test.mjs`)
+  starts the shell for each test with a script of Vue and a command of
+  Scheme, and checks: quitting, typing, a new pane which takes the
+  keyboard, a dialog answered and validated, answers which are not data,
+  a document which names Scheme in `<use-module|>`, the scroll bar, the
+  core asked to end (its documents saved aside), a crash, cores of
+  another version or which say no frames, and a core which does not
+  answer when the window is closed. The page has tests of the same
+  document by `?open=`, of the keys of the commands on a Russian layout,
+  of touch, of a dialog in a short window, of a menu which changed.
 - **The desktop is not a browser.** The core took itself for one (the
   shell gives it `TEXMACS_WEB_PLATFORM` for the shortcuts of the system):
   the menu had "Files in this browser", the files were asked for in

@@ -1313,6 +1313,89 @@ const browser = await puppeteer.launch({
 	browser: /firefox/i.test(program) ? "firefox" : "chrome", headless: true, executablePath: program,
 	userDataDir: fs.mkdtempSync(path.join(os.tmpdir(), "tau-browser-"))
 });
+test("a document runs nothing", async p => {
+	// A document which a link opens (?open=) names Scheme in <use-module|>:
+	// it is a module or a plugin only when it is a name
+	const evil = "<TeXmacs|2.1.5>\n\n<style|generic>\n\n<\\body>\n" +
+		"  <use-module|x (eval (quote (define tau-pwned-plugin 1)))>\n\n" +
+		"  <use-module|(utils)) (eval (quote (define tau-pwned-module 1))) ((a)>\n\n" +
+		"  Hello\n</body>\n";
+	await p.page.setRequestInterception(true);
+	p.page.on("request", r => {
+		if (r.url().endsWith("/evil-doc.tm")) r.respond({ status: 200, contentType: "text/plain", body: evil });
+		else r.continue();
+	});
+	await p.open("open=" + encodeURIComponent(new URL("evil-doc.tm", p.base).href));
+	await p.until("the document is a tab", async () => (await p.tabs())[0].some(t => /evil-doc/.test(t.name)), 20000);
+	await sleep(1500);
+	await p.scheme('(set-message (string-append (if (defined? (quote tau-pwned-plugin)) "PLUGIN" "-") (if (defined? (quote tau-pwned-module)) "MODULE" "-") "checked") "")');
+	await p.until("the core answers", async () => (await p.page.$eval("#tau-footer-left", e => e.textContent)).includes("checked"));
+	const said = await p.page.$eval("#tau-footer-left", e => e.textContent);
+	check("the Scheme of the document was not run", said.includes("--checked"), said);
+});
+
+test("the keys of the commands on another layout", async p => {
+	await p.open();
+	await p.click(600, 500);
+	await p.forget();
+	// a Russian keyboard: the key V gives "м", C gives "с"
+	const press = (key, code) => p.page.evaluate((key, code) => {
+		const mac = /Mac/.test(navigator.platform);
+		const e = new KeyboardEvent("keydown", { key, code, metaKey: mac, ctrlKey: !mac, bubbles: true, cancelable: true });
+		document.activeElement.dispatchEvent(e);
+		return e.defaultPrevented;
+	}, key, code);
+	check("the paste key is left to the browser", (await press("м", "KeyV")) === false);
+	await sleep(300);
+	check("and not sent to the core", (await p.sent("key")).length === 0, await p.sent("key"));
+	await press("с", "KeyC");
+	await p.until("the copy key reaches the core", async () => (await p.sent("key")).length === 1);
+	const key = (await p.sent("key"))[0].key;
+	check("by its letter", key === "M-c" || key === "C-c", key);
+});
+
+test("touch", async p => {
+	await p.open();
+	await p.newDocument();
+	const finger = p.page.touchscreen;
+	await p.forget();
+	// a finger which goes up: the document follows it, and nothing is clicked
+	await finger.touchStart(600, 600);
+	for (let i = 1; i <= 10; i++) await finger.touchMove(600, 600 - 20 * i);
+	await finger.touchEnd();
+	await p.until("the view scrolls", async () => (await p.sent("scroll")).length > 0);
+	check("down the document", (await p.sent("scroll")).every(m => m.dy >= 0), await p.sent("scroll"));
+	check("without a press", (await p.sent("mouse")).filter(m => /press/.test(m.kind)).length === 0, await p.sent("mouse"));
+	// a tap is a click
+	await p.forget();
+	await finger.tap(500, 400);
+	await p.until("a tap presses and releases", async () => {
+		const kinds = (await p.sent("mouse")).map(m => m.kind).filter(k => k !== "move");
+		return kinds.join() === "press-left,release-left";
+	});
+});
+
+test("a dialog in a short window", async p => {
+	await p.open("", 520, 420);
+	await p.choose("Edit", "Preferences");
+	await p.dialog("User preferences");
+	await sleep(400);
+	const r = await p.page.evaluate(() => {
+		const d = document.querySelector(".tau-dialog").getBoundingClientRect();
+		const c = document.querySelector(".tau-dialog-close").getBoundingClientRect();
+		return { top: d.top, bottom: d.bottom, left: d.left, right: d.right, close: c.right, h: innerHeight, w: innerWidth };
+	});
+	check("it is inside the window", r.top >= 0 && r.bottom <= r.h + 1 && r.left >= 0, r);
+	check("its close button can be reached", r.close <= r.w, r);
+});
+
+test("a menu which changed", async p => {
+	await p.open();
+	// a click on an entry whose number the core no longer has
+	await p.page.evaluate(() => tau.send({ t: "invoke", number: 987654 }));
+	await p.until("the footer says so", async () => (await p.page.$eval("#tau-footer-left", e => e.textContent)).includes("menu had changed"));
+});
+
 if (shots) fs.mkdirSync(shots, { recursive: true });
 
 let failed = 0, ran = 0;

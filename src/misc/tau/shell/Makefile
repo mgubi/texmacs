@@ -64,6 +64,13 @@ core:
 tau_shell: $(OBJECTS)
 	$(CXX) $(OPT) $(OBJECTS) $(LIBS) -o $@
 
+# the shell and its core together, and when one of them fails
+# (misc/tau/test/shell-test.mjs: a window opens for each test)
+NODE ?= node
+shell-check: tau_shell core
+	$(NODE) $(W)/test/shell-test.mjs --shell tau_shell \
+	  --core ../build-tau-native/tau_core --texmacs $(TM)/TeXmacs $(if $(ONLY),--only "$(ONLY)")
+
 $(OBJ)/%.o: $(S)/%.cpp
 	@mkdir -p $(dir $@)
 	$(CXX) $(CXXFLAGS) $(CPPFLAGS) $(DEPFLAGS) -c $< -o $@
@@ -76,4 +83,4 @@ clean:
 	rm -rf $(OBJ) tau_shell
 
 -include $(OBJECTS:.o=.d)
-.PHONY: all clean core
+.PHONY: shell-check all clean core
