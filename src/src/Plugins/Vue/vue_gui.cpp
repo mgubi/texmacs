@@ -312,7 +312,7 @@ init_window_clay (vue_window_rep* w, int win_w, int win_h) {
 }
 
 #ifndef __EMSCRIPTEN__
-// The logo of TeXmacs Vue (misc/icons/vue-logo), as the icon of its windows
+// The logo of TeXmacs Vue (misc/icons/vue-logo), or of Tau, as the icon of its windows
 // (in the Dock of macOS, the task bar elsewhere): read once, with MuPDF, and
 // with its alpha no longer premultiplied, as SDL wants it
 static SDL_Surface*
@@ -321,17 +321,24 @@ vue_logo_surface () {
   static bool tried= false;
   if (tried) return icon;
   tried= true;
+  fz_context* ctx= mupdf_context ();
+  fz_pixmap* pix= NULL;
 #ifdef TAU_SHELL
-  // (the icon of Tau: misc/tau/icons)
+  // The icon of Tau (misc/tau/icons/tau-mupdf.svg, which MuPDF draws as it
+  // is: no filters nor gradients), drawn at 256 pixels; the picture which
+  // was made of the detailed one when it is not there
+  url svg= resolve (url ("$TEXMACS_PATH") * url ("misc/images/tau.svg"));
+  if (!is_none (svg)) pix= mupdf_render_svg (svg, 256, 256, 1);
   url u= resolve (url ("$TEXMACS_PATH") * url ("misc/images/tau-256.png"));
 #else
   url u= resolve (url ("$TEXMACS_PATH") * url ("misc/images/texmacs-vue-256.png"));
 #endif
-  if (is_none (u)) return NULL;
-  fz_image* im= mupdf_load_image (u);
-  fz_pixmap* pix= mupdf_pixmap_from_image (im);
-  fz_context* ctx= mupdf_context ();
-  if (im != NULL) fz_drop_image (ctx, im);
+  if (pix == NULL) {
+    if (is_none (u)) return NULL;
+    fz_image* im= mupdf_load_image (u);
+    pix= mupdf_pixmap_from_image (im);
+    if (im != NULL) fz_drop_image (ctx, im);
+  }
   if (pix == NULL) return NULL;
   int w= fz_pixmap_width (ctx, pix), h= fz_pixmap_height (ctx, pix);
   if (fz_pixmap_components (ctx, pix) == 4 && fz_pixmap_alpha (ctx, pix)) {

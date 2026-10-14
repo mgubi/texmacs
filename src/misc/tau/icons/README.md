@@ -49,9 +49,11 @@ and `icon-192.png` as fallbacks of the tab icon, `icon-180.png` for the Apple
 touch icon.
 
 The desktop program (`tau_shell`) draws with MuPDF, which has no SVG filters:
-it shows `TeXmacs/misc/images/tau-256.png`, a picture of `tau.svg` made with
-librsvg, as the icon of its window and in the Dock, and the page about Tau of
-the documentation (Help → About Tau) shows it too.
+the icon of its window and in the Dock is `TeXmacs/misc/images/tau.svg`, a
+copy of `tau-mupdf.svg`, which MuPDF draws at 256 pixels. When it is not
+there, and in the page about Tau of the documentation (Help → About Tau), it
+is `TeXmacs/misc/images/tau-256.png`, a picture of `tau.svg` made with
+librsvg. `make-icons.sh` makes both.
 
 `../../../packages/macos/Tau.icns` contains the standard macOS icon sizes
 16, 32, 128, 256, and 512 points, each at 1x and 2x, up to 1024 pixels. It is a

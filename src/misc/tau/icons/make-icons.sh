@@ -34,10 +34,13 @@ done
 # panel, the icon of the tab).
 cp "$here/tau.svg" "$here/../web/icon.svg"
 
-# The window and the Dock of the desktop program (tau_shell), and the page
-# about Tau in the documentation: MuPDF, which draws there, has no SVG
-# filters, so they get a picture of the vector icon (librsvg), or of the
-# raster master without it.
+# The window and the Dock of the desktop program (tau_shell): the variant
+# without filters nor gradients, which MuPDF draws as it is (tau-mupdf.svg).
+cp "$here/tau-mupdf.svg" "$src/TeXmacs/misc/images/tau.svg"
+
+# The page about Tau in the documentation, and the desktop program when the
+# SVG is not there: MuPDF has no SVG filters, so they get a picture of the
+# vector icon (librsvg), or of the raster master without it.
 if command -v rsvg-convert >/dev/null; then
   rsvg-convert -w 256 -h 256 "$here/tau.svg" \
     -o "$src/TeXmacs/misc/images/tau-256.png"
