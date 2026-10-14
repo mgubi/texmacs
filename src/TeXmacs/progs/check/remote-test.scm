@@ -275,8 +275,15 @@
           (for (loc (db-get-field id "location"))
             (remove-repository-file loc)))))))
 
+(define notify-log '())
+(define saved-notify-hook #f)
+
 (define (remote-setup)
   (check-group "setup")
+  ;; what the user would be told of the connections is recorded
+  (set! saved-notify-hook client-notify-hook)
+  (set! client-notify-hook
+        (lambda (event msg) (set! notify-log (cons (list event msg) notify-log))))
   (when (url-exists? remote-dir) (system-rmdir-recursive remote-dir))
   (system-mkdir remote-dir)
   (for (name '("server" "user-remote" "user-sync" "user-bib" "user-general"))
@@ -329,7 +336,86 @@
   (check-false (== (url->system (server-database))
                    (url->system (tmp "server.tmdb"))))
   (system-rmdir-recursive remote-dir)
-  (check-false (url-exists? remote-dir)))
+  (check-false (url-exists? remote-dir))
+  (set! client-notify-hook saved-notify-hook))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; The state of the connections, as the user is told
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (test-connection-state)
+  (check-group "state of the connections")
+  (let* ((heard (priv '(client client-base) 'client-heard))
+         (ping-sent (priv '(client client-base) 'client-ping-sent))
+         (beat (priv '(client client-base) 'client-beat))
+         (notify-heard (priv '(client client-base) 'client-notify-heard))
+         (events (lambda () (reverse (map car notify-log)))))
+    (set! notify-log '())
+    (check= (client-connection-state 9101) :connected)
+    (check= (client-connection-state 9999) :closed)
+    (check= (client-connection-status 9101) "Connected to loophost as rt-alice")
+    ;; a ping, and its answer
+    (check-false (client-connection-latency 9101))
+    (client-heartbeat 9101)
+    (loop-pump)
+    (check= (loop-received 'server 9101 'remote-ping) '((remote-ping)))
+    (check-true (number? (client-connection-latency 9101)))
+    (check-true (string-starts? (client-connection-status 9101)
+                                "Connected to loophost as rt-alice ("))
+    (check= (rcall 9101 '(remote-ping)) "pong")
+    (check= (events) '())
+    ;; after a freeze of TeXmacs (the computer slept): the server was not
+    ;; heard for long, but no ping waited for an answer
+    (ahash-set! heard 9101 (- (texmacs-time) 200000))
+    (ahash-set! beat 9101 (- (texmacs-time) 200000))
+    (client-heartbeat 9101)
+    (check= (client-connection-state 9101) :connected)
+    (check-true (number? (ahash-ref ping-sent 9101)))
+    (loop-pump)
+    (check-false (ahash-ref ping-sent 9101))
+    ;; a ping sent just before the freeze: its answer may wait unread, and
+    ;; the heartbeat which runs late gives it a new chance
+    (ahash-set! ping-sent 9101 (- (texmacs-time) 200000))
+    (ahash-set! beat 9101 (- (texmacs-time) 200000))
+    (client-heartbeat 9101)
+    (check= (client-connection-state 9101) :connected)
+    (check-true (< (- (texmacs-time) (ahash-ref ping-sent 9101)) 10000))
+    (check= (events) '())
+    ;; a server which does not answer a ping for a while, and then again
+    (ahash-set! ping-sent 9101 (- (texmacs-time) 40000))
+    (client-heartbeat 9101)
+    (check= (client-connection-state 9101) :silent)
+    (check-true (string-starts? (client-connection-status 9101)
+                                "No answer from loophost for 4"))
+    (client-heartbeat 9101)
+    (check= (events) '(:silent))
+    (notify-heard 9101)
+    (ahash-remove! ping-sent 9101)
+    (check= (client-connection-state 9101) :connected)
+    (check= (events) '(:silent :back))
+    ;; a server which says nothing for too long: the connection is closed,
+    ;; who waits for an answer gets an error, the user is told
+    (let ((r '(:no-answer)))
+      (client-remote-eval 9102 '(remote-logged?)
+                          (lambda (x) (set! r x))
+                          (lambda (e) (set! r (list :error e))))
+      (ahash-set! ping-sent 9102 (- (texmacs-time) 200000))
+      (check= (client-lost-connections) '())
+      (client-heartbeat 9102)
+      (check= r '(:error "no answer for 200 s"))
+      (check= (client-connection-state 9102) :closed)
+      (check-false (client-find-server-pseudo 9102))
+      (check-false (memv 9102 (client-active-servers)))
+      (check= (client-lost-connections)
+              '(("loophost" "6561" "rt-bob" "no answer for 200 s")))
+      (check= (events) '(:silent :back :lost))
+      (check-true (string-starts? (cadr (car notify-log))
+                                  "Connection with rt-bob@loophost lost: "))
+      (loop-pump)
+      (check= r '(:error "no answer for 200 s")))
+    ;; a new login forgets that the connection was lost
+    (client-forget-lost "loophost" "6561")
+    (check= (client-lost-connections) '())))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Names of remote resources
@@ -417,6 +503,27 @@
   (check-true (live-list-url? "tmfs://live-list/h"))
   (check= ((priv '(client client-chat) 'chat-room-name) "tmfs://chat/h/room")
           "room")
+
+  (check-group "titles of remote documents")
+  (check= (tmfs-title "tmfs://remote-dir/h/~u/d" '(document ""))
+          "Remote directory - d")
+  (check= (tmfs-title "tmfs://remote-dir/h/~u" '(document ""))
+          "Remote directory - ~u")
+  (check= (tmfs-title "tmfs://chat-rooms/h" '(document "")) "Chat rooms - h")
+  (check= (tmfs-title "tmfs://shared/h" '(document "")) "Shared resources - h")
+  (check= (tmfs-title "tmfs://live-list/h" '(document ""))
+          "Live documents - h")
+  (check= (tmfs-title "tmfs://chat/h/room" '(document "")) "Chat room - room")
+  (check= (tmfs-title "tmfs://live/h/doc" '(document "")) "Live - doc")
+  ;; the path shown above the listing of a directory comes from the name
+  ;; of the directory (it came from the title of its buffer, which was its
+  ;; name before it had a title: the listing then failed)
+  (with crumbs (priv '(client client-tmfs) 'build-dir-breadcrumbs)
+    (check= (map (lambda (x) (if (pair? x) (cadr x) x))
+                 (crumbs "tmfs://remote-dir/h/~u/d"))
+            (list "Home" 'color "d"))
+    (check= (crumbs "Remote directory - d") '())
+    (check= (crumbs "tmfs://chat-rooms/h") '()))
 
   (check-group "names of live documents")
   (check= (live-get-name "tmfs://live/h/doc") "doc")
@@ -947,12 +1054,18 @@
             '(:error "Error: cannot modify past")))
   (with l (ralice '(remote-get-versions "loophost/~rt-alice/s.tm"))
     (check-true (list? l))
+    ;; both versions, though the first one was replaced at once (a version
+    ;; replaced within 5 seconds was left out)
+    (check= (length l) 2)
+    (check= (map fifth l) '(#f "m"))
     (check-true (list-and (map (lambda (v) (== (third v) "~rt-alice/s.tm")) l)))
     (check-true (list-and (map (lambda (v) (== (fourth v) "rt-alice")) l))))
   (check= (ralice '(remote-get-versions "loophost/~rt-alice/none.tm"))
           '(:error "Error: file does not exist"))
   (check= (ranon '(remote-get-versions "loophost/~rt-alice/s.tm"))
           '(:error "Error: not logged in"))
+  ;; and none of them for who cannot read the file
+  (check= (rbob '(remote-get-versions "loophost/~rt-alice/s.tm")) '())
   (check= (ralice '(remote-file-remove "loophost/~rt-alice/s.tm")) "removed")
   (check= (ralice '(remote-file-load "loophost/~rt-alice/s.tm"))
           '(:error "Error: file does not exist"))
@@ -1263,6 +1376,119 @@
 (define lid "tmfs://live/srvhost/rt-live")
 
 (define (live-doc) (tm->stree (live-current-document lid)))
+
+;; The client side of the suite is one client: the tables of client-live,
+;; filled by live-cursor-watch when a live document is opened, have each
+;; document followed through one connection. Here, clid is followed
+;; through the connection of bob (9102), as if bob had opened it.
+
+(define (client-cursor server lid who pos)
+  ;; a position sent to the client by server, as the call back is called
+  (client-eval (list server -1) `(live-cursor ,lid ,who "rt-eve" "Eve E" ,pos))
+  (loop-pump))
+
+(define (test-live-cursors)
+  (check-group "cursors of the users of a live document")
+  (let* ((clid "tmfs://live/loophost/rt-cursors")
+         (lids (priv '(client client-live) 'live-cursor-lids))
+         (cursors (priv '(client client-live) 'live-cursors))
+         (table (priv '(server server-live) 'live-cursor-table))
+         (told (lambda (client)
+                 (with l (list-filter (loop-received 'client client 'live-cursor)
+                                      (lambda (c) (== (cadr c) clid)))
+                   (and (nnull? l) (cddr (cAr l)))))))
+    (set! loop-blocked '(live-modify))
+    (ahash-set! lids clid 9102)
+    (ralice `(live-open ,clid))
+    (rbob `(live-open ,clid))
+    (check= (live-participants clid) '())
+    ;; the position of alice goes to bob, with who she is, not back to her
+    (check= (ralice `(live-cursor ,clid (0 3))) #t)
+    (check= (told 9002) '(9001 "rt-alice" "Alice A" (0 3)))
+    (check-false (told 9001))
+    (check= (live-participants clid) '("Alice A"))
+    (check= (live-participants (string->url clid)) '("Alice A"))
+    ;; who opens the document later is told where the others are
+    (check-false (told 9005))
+    (rcarol `(live-open ,clid))
+    (check= (told 9005) '(9001 "rt-alice" "Alice A" (0 3)))
+    ;; a new position, and none when she leaves the document
+    (check= (ralice `(live-cursor ,clid (0 7))) #t)
+    (check= (told 9002) '(9001 "rt-alice" "Alice A" (0 7)))
+    (check= (ralice `(live-cursor ,clid #f)) #t)
+    (check= (told 9002) '(9001 "rt-alice" "Alice A" #f))
+    (check= (live-participants clid) '())
+    ;; not logged in; no such document
+    (check= (ranon `(live-cursor ,clid (0 1)))
+            '(:error "Error: read access denied"))
+    (check= (ralice `(live-cursor "tmfs://live/loophost/rt-none" (0 1)))
+            '(:error "Error: read access denied"))
+    ;; not a path which an editor accepts: (in Guile, 1.0 and 10^20 are
+    ;; integers), and nothing is relayed
+    (check-group "positions of cursors which are refused")
+    (for (pos (list "x" '(1.0) '(0 100000000000000000000) '(-1) '(a)
+                    (make-list 1001 0)))
+      (check= (ralice `(live-cursor ,clid ,pos))
+              '(:error "Error: invalid cursor position")))
+    (check= (told 9002) '(9001 "rt-alice" "Alice A" #f))
+    (check-true (live-cursor-position? '(0 999999999)))
+    (check-false (live-cursor-position? '(0 1000000000)))
+    ;; only from the clients which opened this very document: root did not
+    ;; open it, and a name with another server but the same last part is
+    ;; another document, for which no table is made
+    (check-group "cursors of the clients which opened the document only")
+    (let ((other "tmfs://live/elsewhere/rt-cursors"))
+      (check= (rroot `(live-cursor ,clid (0 1)))
+              '(:error "Error: live document not open"))
+      (check= (ralice `(live-cursor ,other (0 1)))
+              '(:error "Error: live document not open"))
+      (check-false (live-connected? other 9001))
+      (check-false (in? other (live-remote-connections 9001)))
+      (check-false (ahash-ref table (list clid 9003)))
+      (check-false (ahash-ref table (list other 9001)))
+      (check= (told 9002) '(9001 "rt-alice" "Alice A" #f)))
+    ;; a client which leaves leaves no cursor: its number is given again
+    (check-group "the cursor of a client which leaves")
+    (check= (rcarol `(live-cursor ,clid (0 2))) #t)
+    (check= (told 9002) '(9005 "rt-carol" "Carol C" (0 2)))
+    (ahash-set! table (list "tmfs://live/loophost/rt-gone" 9005)
+                (list "rt-carol" '(0)))
+    (server-remove 9005)
+    (loop-pump)
+    (with l (told 9002)
+      (check= (list (car l) (cAr l)) '(9005 #f)))
+    (check= (list-filter (map car (ahash-table->list table))
+                         (lambda (key) (== (cadr key) 9005)))
+            '())
+    (server-add 9005)
+    (server-login-uid "rt-carol" 9005 "rt-carol")
+    (check= (rcarol '(remote-logged?)) "yes")
+    ;; the client takes the cursors of a document from its server only,
+    ;; positions which are paths only, and a bounded number of them
+    (check-group "cursors which the client accepts")
+    (client-cursor 9102 clid 7001 '(0 1))
+    (check= (live-participants clid) '("Eve E"))
+    (client-cursor 9102 clid 7001 #f)
+    (check= (live-participants clid) '())
+    (client-cursor 9105 clid 7002 '(0 1))
+    (client-cursor 9102 "tmfs://live/loophost/rt-other" 7003 '(0 1))
+    (client-cursor 9102 clid 7004 '(1.0))
+    (client-cursor 9102 clid 7005 '(0 100000000000000000000))
+    (check= (live-participants clid) '())
+    (check= (ahash-size cursors) 0)
+    (for (i (.. 0 300))
+      (client-cursor 9102 clid (+ 8000 i) '(0 1)))
+    (check= (ahash-size cursors) 256)
+    (client-cursor 9102 clid 8000 '(0 2))
+    (check= (third (ahash-ref cursors (list clid 8000))) '(0 2))
+    (for (i (.. 0 300))
+      (client-cursor 9102 clid (+ 8000 i) #f))
+    (check= (ahash-size cursors) 0)
+    ;; the colours of the users of two servers are not shared
+    (with color (priv '(client client-live) 'live-cursor-color)
+      (check-false (== (color 9102 7001) (color 9105 7001))))
+    (ahash-remove! lids clid)
+    (set! loop-blocked '())))
 
 (define (test-live)
   (check-group "opening live documents")
@@ -1945,6 +2171,20 @@
                        (form-checkbox "tls-server" "true")
                        (form-text-area "other" "a" "b" "c" "x")
                        "text")))
+  ;; whether there is an rsync is answered by the server, in the form it
+  ;; sends: the client which shows the form has no has-rsync-ext?
+  (with load-prefs (priv '(server server-base) 'load-preferences-in-stree)
+    (with form (load-prefs
+                (tree->stree
+                 (stree->tree
+                  '(document (freeze (if (extern "has-rsync-ext?") "yes" "no"))
+                             (if (extern "other") "a" "b"))))
+                '())
+      (check-true (in? (cadr (cadr (cadr form))) '("true" "false")))
+      (check= (caddr form) '(if (extern "other") "a" "b"))))
+  (with form ((priv '(server server-base) 'generate-preferences-form)
+              (server-admin-preferences))
+    (check-false (string-occurs? "has-rsync-ext?" (object->string form))))
   (check= ((priv '(server server-base) 'server-mailer-instantiate)
            "u" "User" "u@test" "123"
            "To: $USER_EMAIL\n$USER_NAME ($USER_PSEUDO), code $USER_CODE")
@@ -1980,6 +2220,8 @@
         (run-group test-client-connections)
         (run-group test-client-listings)
         (run-group test-server-preferences)
+        (run-group test-live-cursors)
+        (run-group test-connection-state)
         (run-group remote-cleanup)
         (loop-uninstall!)
         (set! remote-active? #f)))

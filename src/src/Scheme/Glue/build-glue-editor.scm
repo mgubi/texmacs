@@ -257,6 +257,9 @@
   (get-alt-selection get_alt_selection (array_path string))
   (cancel-alt-selection cancel_alt_selection (void string))
   (cancel-alt-selections cancel_alt_selections (void))
+  (set-user-cursor set_user_cursor (void string path string string))
+  (cancel-user-cursor cancel_user_cursor (void string))
+  (cancel-user-cursors cancel_user_cursors (void))
 
   ;; undo and redo
   (clear-undo-history clear_undo_history (void))

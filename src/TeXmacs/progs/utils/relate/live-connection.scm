@@ -69,6 +69,20 @@
   (with t (live-connections-table lid)
     (ahash-ref t remote)))
 
+(tm-define (live-connected? lid remote)
+  ;; (without creating a table for lid)
+  (and-with t (ahash-ref live-connections lid)
+    (in? remote (map car (ahash-table->list t)))))
+
+(tm-define (live-cursor-position? pos)
+  (:synopsis "Is @pos a path which the editors of the clients accept?")
+  ;; exact non-negative integers which fit in an int, in a list of a sane
+  ;; length (in Guile, 1.0 and 10^20 are integers too, which a path is not)
+  (and (list? pos) (<= (length pos) 1000)
+       (list-and (map (lambda (i) (and (integer? i) (exact? i)
+                                       (>= i 0) (< i 1000000000)))
+                      pos))))
+
 (tm-define (live-remote-connections remote)
   (with lids (map car (ahash-table->list live-connections))
     (list-filter lids (lambda (lid) (in? remote (live-get-connections lid))))))

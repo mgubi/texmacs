@@ -132,6 +132,11 @@
 (tm-define (server-remote-eval* client cmd cont)
   (server-remote-eval client cmd cont cont))
 
+;; a sign of life, for the clients which watch their connection (any answer
+;; is one: an older server answers that it does not know the command)
+(tm-service (remote-ping)
+  (server-return envelope "pong"))
+
 (tm-service (server-remote-result msg-id ret)
   (with client (car envelope)
     (when (debug-get "remote")
@@ -629,6 +634,11 @@
         ((form-checkbox)
          (and-with pref (get-pref prefs (cadr l))
                    (list-set! l 2 (if (is-on? pref) "true" "false"))))
+        ((if)
+         ;; the rsync of the server, not of the client which shows the
+         ;; form (and which has no has-rsync-ext?: "bad if")
+         (when (and (pair? (cdr l)) (== (cadr l) '(extern "has-rsync-ext?")))
+           (list-set! l 1 (if (url-exists-in-path? "rsync") "true" "false"))))
         (else l)))
     stree))
 

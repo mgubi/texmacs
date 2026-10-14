@@ -570,7 +570,7 @@
         (loop (url-head cur) new-acc)))))
 
 (define (build-dir-breadcrumbs p)
-  (if (== (tmfs-type p) "dir")
+  (if (and p (string-starts? p "tmfs://remote-dir/"))
     (with sep `(with color white (concat " " <blacktriangleright> " "))
       (list-intersperse (path-breadcrumbs p) sep))
     '()))
@@ -578,7 +578,9 @@
 ;; actions is the same actions bar the entries carry. The header renders it
 ;; as a phantom so that the columns line up with the entries below
 (tm-define (build-dir-table title date-label content actions)
-  (let* ((breadcrumbs (build-dir-breadcrumbs (buffer-get-title (current-buffer))))
+  ;; the directory is the one of the current buffer, by its name (its title
+  ;; was used, which was its name as long as these buffers had no title)
+  (let* ((breadcrumbs (build-dir-breadcrumbs (url->string (current-buffer))))
          ;; breadcrumbs already emphasize their last element
          ;; put title as strong otherwise
          (table-name (if (null? breadcrumbs)
@@ -604,6 +606,11 @@
   (remote-file-browser-document
     `(document
        (dir-list ,(directory-table sname server entries)))))
+
+;; a title for the tabs and the windows, which showed the address
+(tmfs-title-handler (remote-dir name doc)
+  (with fname (string-append "tmfs://remote-dir/" name)
+    (string-append "Remote directory - " (url->string (url-tail fname)))))
 
 (tmfs-load-handler (remote-dir name)
   ;;(display* "Loading remote dir " name "\n")
