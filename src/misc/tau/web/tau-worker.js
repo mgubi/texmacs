@@ -69,6 +69,7 @@ function giveUp() {
 	gaveUp = true;
 	for (const m of waiting.splice(0))
 		if (m.t === "fs") postMessage({ t: "fs", id: m.id, error: "the program of Tau did not start" });
+		else if (m.t === "ping") postMessage({ t: "pong", id: m.id });
 }
 
 // A value of the page as data which the core reads (tau_answer: it is
@@ -393,11 +394,13 @@ function forgetHome() {
 }
 
 onmessage = event => {
-	// (the page asks whether the worker is there: it is, when it answers)
-	if (event.data.t === "ping") { postMessage({ t: "pong", id: event.data.id }); return; }
 	// (what is kept in the browser is forgotten without the program, which
 	// may be what cannot start with it)
 	if (event.data.t === "forget-home") { forgetHome(); return; }
+	// (the page asks whether the worker is there, and is done with what it
+	// said before: it is answered after those, as the core on the desktop
+	// does. Before the program is ready they wait, the ping with them)
+	if (event.data.t === "ping" && (core || gaveUp)) { postMessage({ t: "pong", id: event.data.id }); return; }
 	if (!core) {
 		if (!gaveUp) waiting.push(event.data);
 		else if (event.data.t === "fs") postMessage({ t: "fs", id: event.data.id, error: "the program of Tau did not start" });
@@ -503,6 +506,7 @@ tauCore({
 	// (each as onmessage does it: one which fails does not make the start
 	// look failed, nor drop the others)
 	for (const m of waiting.splice(0)) {
+		if (m.t === "ping") { postMessage({ t: "pong", id: m.id }); continue; }
 		if (dead && m.t !== "fs") continue;
 		dispatch(m);
 	}
@@ -514,7 +518,9 @@ tauCore({
 	if (tauModule && tauModule.FS) {
 		core = tauModule;
 		dead = true;
-		for (const m of waiting.splice(0)) if (m.t === "fs") { try { handle(m); } catch (e) {} }
+		for (const m of waiting.splice(0))
+			if (m.t === "fs") { try { handle(m); } catch (e) {} }
+			else if (m.t === "ping") postMessage({ t: "pong", id: m.id });
 	}
 	else giveUp();
 	throw error;

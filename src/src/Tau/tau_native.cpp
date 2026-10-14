@@ -20,7 +20,7 @@
 *   "answer 12 \"a value\" #t", "chosen 4 /home/me/a.tm", "bar 3 0 1200":
 *   where a scroll bar was dragged to). A last
 *   argument which is a key, a text, a path or a name has its new lines
-*   written \n and its backslashes twice: a line is one message, whatever
+*   written \n, its returns \r and its backslashes twice: a line is one message, whatever
 *   a file is called. A message whose numbers are not numbers, or which has
 *   no name the core knows, is said on the standard error and dropped;
 * - what the core says goes to the descriptor which the variable TAU_FD
@@ -59,7 +59,7 @@
 
 // the version of the messages: the shell says nothing to a core which has
 // another one (tau_shell.cpp)
-#define TAU_PROTOCOL 1
+#define TAU_PROTOCOL 2
 
 // the messages of the other side, as the worker of the page calls them
 // (tau_gui.cpp)
@@ -88,6 +88,13 @@ void tau_native_rescue ();
 
 static int  out_fd= -2;
 static bool peer_gone= false; // the other side no longer reads
+static int  in_fd= 0;         // what the other side says (see the loop)
+
+// Asked to end by a signal (see the loop)
+static volatile sig_atomic_t stop_asked= 0;
+
+// The largest frame: the other side takes none larger (tau_shell.cpp)
+#define TAU_FRAME_MAX ((size_t) 1 << 30)
 
 static int
 out () {
@@ -107,9 +114,12 @@ static void
 write_all (const void* data, size_t n) {
   const char* p= (const char*) data;
   while (n > 0) {
+    if (stop_asked) { peer_gone= true; return; }
     ssize_t r= write (out_fd, p, n);
     if (r < 0) {
-      if (errno == EINTR) continue;
+      // (a signal which asks the core to end, while the other side does
+      // not read: the documents are saved aside, and the core ends)
+      if (errno == EINTR && !stop_asked) continue;
       // (the other side is gone: nothing more is said, and the loop ends
       // the core once the documents are saved aside)
       peer_gone= true;
@@ -139,6 +149,11 @@ frame (const char* tag, const void* a, size_t na, const void* b,
        size_t nb) {
   if (out () < 0) return;
   hello ();
+  if (na + nb > TAU_FRAME_MAX) {
+    fprintf (stderr, "tau_core] a frame %.4s of %zu bytes: not sent\n",
+             tag, na + nb);
+    return;
+  }
   uint32_t len= (uint32_t) (na + nb);
   char head[8];
   memcpy (head, tag, 4);
@@ -223,14 +238,15 @@ real (const std::string& line, size_t& pos, bool& bad) {
   return v;
 }
 
-// (a new line in what is typed or run is written \n, a backslash twice)
+// (a new line in what is typed or run is written \n, a return \r, a
+// backslash twice)
 static std::string
 unescape (const std::string& s) {
   std::string r;
   for (size_t i= 0; i < s.size (); i++)
     if (s[i] == '\\' && i + 1 < s.size ()) {
       i++;
-      r.push_back (s[i] == 'n'? '\n': s[i]);
+      r.push_back (s[i] == 'n'? '\n': s[i] == 'r'? '\r': s[i]);
     }
     else r.push_back (s[i]);
   return r;
@@ -241,8 +257,23 @@ told (const char* what, const std::string& line) {
   fprintf (stderr, "tau_core] %s: %.200s\n", what, line.c_str ());
 }
 
+static void dispatch_now (const std::string& line, void (*turn) (void));
+
+// A message which fails is said and the next one is handled: what the
+// handlers call (Scheme, the editor) may throw, and nothing caught it here,
+// so the core ended at once, without saving the documents aside
 static void
 dispatch (const std::string& line, void (*turn) (void)) {
+  try {
+    dispatch_now (line, turn);
+  }
+  catch (...) {
+    told ("a message which failed", line);
+  }
+}
+
+static void
+dispatch_now (const std::string& line, void (*turn) (void)) {
   size_t pos= 0;
   bool bad= false;
   std::string name= word (line, pos);
@@ -345,8 +376,9 @@ leave (int code= 0) {
 // Asked to end by a signal (the session which ends, kill): the documents
 // are saved aside first, by the loop, once what the core does is done; a
 // second signal ends it at once. It ends with 3, which the shell tells
-// from quitting (0).
-static volatile sig_atomic_t stop_asked= 0;
+// from quitting (0). A write to the other side which waits is broken by
+// the signal (no SA_RESTART): the core does not wait for a reader which
+// is no longer there.
 
 static void
 stop_on_signal (int sig) {
@@ -363,19 +395,34 @@ tau_native_loop (void (*turn) (void)) {
   std::string pending;
   bool skipping= false; // (the rest of a line which was too long)
   char buf[65536];
+  // What the other side says comes on a descriptor of the core alone: the
+  // standard input is then nothing (/dev/null). The programs which the core
+  // starts (a plugin, TeX) had it, and what one of them read of it (a
+  // question of TeX) was taken from the messages
+  in_fd= fcntl (0, F_DUPFD_CLOEXEC, 3);
+  if (in_fd < 0) in_fd= 0;
+  else {
+    int null_fd= open ("/dev/null", O_RDONLY);
+    if (null_fd >= 0) { dup2 (null_fd, 0); if (null_fd != 0) close (null_fd); }
+  }
   struct pollfd pfd;
-  pfd.fd= 0; pfd.events= POLLIN;
+  pfd.fd= in_fd; pfd.events= POLLIN;
   if (out () >= 0) hello ();
-  signal (SIGTERM, stop_on_signal);
-  signal (SIGINT, stop_on_signal);
-  signal (SIGHUP, stop_on_signal);
+  struct sigaction sa;
+  memset (&sa, 0, sizeof (sa));
+  sa.sa_handler= stop_on_signal;
+  sigemptyset (&sa.sa_mask);
+  sa.sa_flags= 0;
+  sigaction (SIGTERM, &sa, NULL);
+  sigaction (SIGINT, &sa, NULL);
+  sigaction (SIGHUP, &sa, NULL);
   while (true) {
     if (stop_asked) leave (3);
     if (peer_gone) leave ();
     int r= poll (&pfd, 1, 20);
     if (r < 0 && errno != EINTR) break;
     if (r <= 0) { turn (); continue; }
-    ssize_t n= read (0, buf, sizeof (buf));
+    ssize_t n= read (in_fd, buf, sizeof (buf));
     if (n < 0) { if (errno == EINTR) continue; break; }
     if (n == 0) {
       // the other side closed: it is gone (a last message without its new

@@ -356,7 +356,7 @@ tau_native_rescue () {
   if (done) return;
   done= true;
   try {
-    eval ("(catch #t (lambda () (autosave-all)) (lambda args #f))");
+    eval ("(catch #t (lambda () (tau-rescue)) (lambda args #f))");
   }
   catch (...) {}
 }
@@ -508,8 +508,10 @@ tau_turn_now () {
   iterator<pointer> it= iterate (simple_widget_rep::all_widgets);
   while (it->busy ()) views << (simple_widget_rep*) it->next ();
   // (a view which is not shown has no window: the editor cannot be asked)
+  // (nor one which the resize of another one destroyed)
   for (int i=0; i<N(views); i++)
-    if (views[i]->shown) views[i]->notify_resize ();
+    if (simple_widget_rep::all_widgets->contains ((pointer) views[i]) &&
+        views[i]->shown) views[i]->notify_resize ();
   if (the_interpose_handler != NULL) the_interpose_handler ();
   if (prof) t1= tau_now ();
   for (int i=0; i<N(views); i++) {
@@ -562,6 +564,9 @@ gui_start_loop () {
       usleep (1000);
     }
   }
+  // (the documents without a name which were saved aside when the core
+  // last ended without the user: tau-files.scm)
+  exec_delayed (scheme_cmd ("(tau-rescued-reopen)"));
 #ifdef __EMSCRIPTEN__
   // In a worker the program gives control back: the messages of the page
   // call the functions below, and a turn is made at regular intervals for
@@ -602,6 +607,17 @@ input_view (int view) {
   simple_widget_rep* v= simple_widget_rep::find (view);
   if (v != NULL && v->is_editor_widget () && !v->shown) return NULL;
   return v;
+}
+
+// The keys go to the current editor (the handlers of Scheme act on it), so
+// an editor which is given keys is made the current one first: a focus
+// which came late for another view made that one current, and what was
+// typed went to a document which was not on the screen
+static void
+take_keyboard (simple_widget_rep* v) {
+  if (v == NULL || !v->is_editor_widget () || v->has_focus) return;
+  v->has_focus= true;
+  v->handle_keyboard_focus (true, texmacs_time ());
 }
 
 // The time of an event of the pointer: when it happened in the page (age
@@ -660,7 +676,10 @@ tau_bar (int view, int x, int y) {
 EMSCRIPTEN_KEEPALIVE
 void
 tau_focus (int view, int has_focus) {
-  simple_widget_rep* v= simple_widget_rep::find (view);
+  // (an editor which is not shown does not take the keyboard: it became
+  // the current one, and the keys for the view on the screen went to it)
+  simple_widget_rep* v= has_focus? input_view (view):
+                                   simple_widget_rep::find (view);
   if (v == NULL) return;
   v->has_focus= (has_focus != 0);
   v->handle_keyboard_focus (has_focus != 0, texmacs_time ());
@@ -673,6 +692,7 @@ tau_key (int view, const char* key) {
   // a key in the notation of TeXmacs ("a", "C-x", "S-left"), in UTF-8
   simple_widget_rep* v= input_view (view);
   if (v == NULL) return;
+  take_keyboard (v);
   v->handle_keypress (utf8_to_cork (string (key)), texmacs_time ());
   tau_turn ();
 }
@@ -685,6 +705,7 @@ void
 tau_text (int view, const char* text) {
   simple_widget_rep* v= input_view (view);
   if (v == NULL) return;
+  take_keyboard (v);
   string r= utf8_to_cork (string (text));
   int pos= 0;
   while (pos < N(r)) {
@@ -956,8 +977,9 @@ void tau_paste_text (string text, string html);
 EMSCRIPTEN_KEEPALIVE
 void
 tau_paste (int view, const char* text, const char* html) {
-  simple_widget_rep* v= simple_widget_rep::find (view);
+  simple_widget_rep* v= input_view (view);
   if (v == NULL) return;
+  take_keyboard (v);
   tau_paste_text (string (text), string (html));
   // (the view which pastes has the keyboard: it is the current one)
   eval ("(kbd-paste)");

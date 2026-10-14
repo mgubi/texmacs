@@ -1343,7 +1343,8 @@ from 16 to 1024 pixels. As in the page of TeXmacs Vue
   through a thread of its own (a busy core never blocks the window, a
   line is never cut), and drops the paints of a view which wait before a
   whole one. A core whose shell goes saves the documents aside
-  (`autosave-all`) and ends; its pipe is not given to the programs it
+  (`tau-rescue`: autosaves, and the documents without a name in
+  `texts/rescued`, opened again at the next start) and ends; its pipe is not given to the programs it
   starts, so its end is seen even with a session running. A core which
   ends otherwise than by quitting is said in a box, with "Start again";
   closing the window of a core which has not answered for 3 s asks

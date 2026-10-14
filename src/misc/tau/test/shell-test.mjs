@@ -197,7 +197,10 @@ test("a menu opened while the core is busy", async () => {
 });
 
 test("the core asked to end saves the documents", async () => {
-	const scratch = path.join(home, "texts", "scratch");
+	// (a document without a name goes to a folder of its own, and is opened
+	// again at the next start: tau-files.scm)
+	const rescued = path.join(home, "texts", "rescued");
+	const kept = () => fs.existsSync(rescued) ? fs.readdirSync(rescued) : [];
 	const s = start({ scheme: "(new-document)", lines: ["click 500 500", "text Rescue me"] });
 	try {
 		await until("the text is typed", () => s.core() && said().includes("vue script: wait"), 30000);
@@ -207,9 +210,13 @@ test("the core asked to end saves the documents", async () => {
 		process.kill(pid, "SIGTERM");
 		await until("the core ends", () => !alive(pid), 20000);
 		await until("the shell says why", () => said().includes("it was asked to end"), 10000);
-		const fresh = fs.readdirSync(scratch).filter(f => (read(path.join(scratch, f)) || "").includes("Rescue me"));
-		check("the document was saved aside", fresh.length > 0, fs.readdirSync(scratch).join(" "));
+		const fresh = kept().filter(f => (read(path.join(rescued, f)) || "").includes("Rescue me"));
+		check("the document was saved aside", fresh.length > 0, kept().join(" "));
 	} finally { s.stop(); }
+	const again = start({});
+	try {
+		await until("it is opened again at the next start", () => kept().length === 0, 30000);
+	} finally { again.stop(); }
 });
 
 test("the core which crashes is said", async () => {

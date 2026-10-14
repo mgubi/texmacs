@@ -163,10 +163,13 @@
   (:synopsis "The page gave the file @u for the question @ticket")
   ;; no file (the user gave up) is an empty path; no ticket is a document
   ;; to open (dropped on the page, or opened from the panel of the files)
+  ;; (a ticket which no question waits for, answered twice or never
+  ;; given, is dropped: its file is not a document to open, an export
+  ;; which was answered twice opened the PDF)
   (let* ((fun (ahash-ref file-waiting ticket))
          (path (url->system u)))
     (ahash-remove! file-waiting ticket)
-    (when (string-starts? path "/")
+    (when (and (string-starts? path "/") (or fun (== ticket 0)))
       (when (and fun (in-home? (url->system (url-head u))))
         (set! last-dir (url->system (url-head u))))
       (exec-delayed
@@ -221,3 +224,62 @@
   (:require (and (in-desktop?) (in? which tau-shell-preferences)))
   (former which)
   (tau-say-preference which))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; What was not saved when the core had to end
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; The core ends without the user (the shell went, a signal): what was not
+;; saved is saved aside (tau_native_rescue). A document with a name is
+;; auto-saved, its file "~" proposed when it is opened again; one in
+;; another format than TeXmacs too, in its format (an autosave skips it).
+;; A document without a name was auto-saved in place, among the files of
+;; the documents without a name, which nothing proposes: it goes to a
+;; folder of its own, and is opened again at the next start.
+(define (rescued-dir) (url-append "$TEXMACS_HOME_PATH" "texts/rescued"))
+
+(define (rescued-name)
+  (let loop ((i 1))
+    (with u (url-append (rescued-dir)
+                        (string-append "no_name_" (number->string i) ".tm"))
+      (if (url-exists? u) (loop (+ i 1)) u))))
+
+(define (tau-rescue-buffer name)
+  (let ((fm (url-format name)))
+    (cond ((not (buffer-modified? name)) (noop))
+          ((url-scratch? name)
+           (when (not (url-exists? (rescued-dir))) (system-mkdir (rescued-dir)))
+           (buffer-export name (rescued-name) "texmacs"))
+          ((nin? fm (list "texmacs" "stm"))
+           (buffer-export name (url-glue name "~") fm))
+          (else (autosave-buffer name)))))
+
+(tm-define (tau-rescue)
+  (:synopsis "Save aside what was not saved: the core ends")
+  (for-each (lambda (name)
+              (catch #t (lambda () (tau-rescue-buffer name)) (lambda args #f)))
+            (buffer-list)))
+
+(tm-define (tau-rescued-reopen)
+  (:synopsis "Open again the documents without a name which were saved aside")
+  ;; (each as a new document without a name, not saved: the file saved
+  ;; aside is then removed, the document is saved aside again if need be)
+  (when (url-exists? (rescued-dir))
+    (with l (url->list (url-expand (url-complete
+                                    (url-append (rescued-dir)
+                                                (url-wildcard "*.tm")) "fr")))
+      (for-each
+        (lambda (u)
+          (catch #t
+            (lambda ()
+              (with doc (tree-import u "texmacs")
+                (new-document)
+                (buffer-set (current-buffer) doc)
+                (buffer-pretend-modified (current-buffer))
+                (system-remove u)))
+            (lambda args
+              (display* "tau: " (url->system u) " could not be opened again\n"))))
+        l)
+      (when (nnull? l)
+        (set-message "Documents without a name which were not saved when Tau ended are open again"
+                     "")))))

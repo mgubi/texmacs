@@ -122,7 +122,7 @@ static std::string             core_wrong;      // why the core is not heard
 static char**                  shell_argv= NULL; // (to start again)
 
 // the version of the messages which this program speaks (tau_native.cpp)
-#define TAU_PROTOCOL 1
+#define TAU_PROTOCOL 2
 
 // The frames which may come, and how long one may be: anything else is a
 // core which is wrong (another program, or a stream which lost its place),
@@ -297,6 +297,7 @@ escaped (std::string s) {
   std::string r;
   for (char c : s)
     if (c == '\n') r += "\\n";
+    else if (c == '\r') r += "\\r";
     else if (c == '\\') r += "\\\\";
     else r.push_back (c);
   return r;
@@ -2155,8 +2156,9 @@ core_ended (int status, bool known) {
     "with the status " + std::to_string (WEXITSTATUS (status));
   std::string text= asked?
     "The core of Tau was asked to end.\n\n"
-    "The documents which were not saved were saved aside, and are proposed "
-    "when they are opened again.":
+    "The documents which were not saved were saved aside: those with a "
+    "name are proposed when they are opened again, those without one are "
+    "opened again at the next start.":
     "The core of Tau stopped unexpectedly (" + how + ").\n\n"
     "The documents which were auto-saved are proposed when they are opened "
     "again; what was changed since may be lost.";

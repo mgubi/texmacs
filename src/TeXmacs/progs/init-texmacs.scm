@@ -304,7 +304,8 @@
 (lazy-define (texmacs texmacs tau-files) tau-choose-file tau-file-chosen tau-files
              tau-say-preferences
              tau-download tau-download-buffer tau-saved tau-close-buffer
-             tau-paste web-open-pdf tau-tooltip-show tau-tooltip-hide)
+             tau-paste web-open-pdf tau-tooltip-show tau-tooltip-hide
+             tau-rescue tau-rescued-reopen)
 (lazy-define (doc tmdoc) tmdoc-expand-help tmdoc-expand-help-manual
              tmdoc-expand-this tmdoc-include)
 (lazy-define (doc docgrep) docgrep-in-doc docgrep-in-src

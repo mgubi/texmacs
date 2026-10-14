@@ -70,6 +70,10 @@ simple_widget_rep::set_place (int w, int h, double density2, int counter) {
   if (h < 1) h= 1;
   if (w > max_side) w= max_side;
   if (h > max_side) h= max_side;
+  // (and all its pixels in one frame which the other side takes: at most
+  // 1 << 30 bytes, with the numbers of the paint, tau_native.cpp)
+  const long max_area= (long) max_side * (max_side - 1);
+  if ((long) w * h > max_area) h= (int) (max_area / w);
   if (!(density2 > 0.0)) density2= 1.0;
   if (density2 > 8.0) density2= 8.0;
   if (w == px_w && h == px_h && density2 == density && ren != NULL) {
