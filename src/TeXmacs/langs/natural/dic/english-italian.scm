@@ -35,6 +35,7 @@
 ("abbreviated authors" "autori abbreviati")
 ("abbreviation" "abbreviazione")
 ("about" "informazioni su TeXmacs")
+("add a bibliography with a BibTeX file to %1" "Aggiungi a %1 una bibliografia con un file BibTeX")
 ("add the references of Zotero to the BibTeX file" "aggiungi i riferimenti di Zotero al file BibTeX")
 ("added %1 reference from Zotero to %2" "Aggiunto %1 riferimento da Zotero a %2")
 ("added %1 references from Zotero to %2" "Aggiunti %1 riferimenti da Zotero a %2")

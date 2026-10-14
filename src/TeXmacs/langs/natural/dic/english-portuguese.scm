@@ -29,6 +29,7 @@
 ("a read-only key is made at https://www.zotero.org/settings/keys" "Uma chave somente de leitura é criada em https://www.zotero.org/settings/keys")
 ("abbreviation" "abreviação")
 ("about" "sobre TeXmacs")
+("add a bibliography with a BibTeX file to %1" "Adicione a %1 uma bibliografia com um arquivo BibTeX")
 ("add the references of Zotero to the BibTeX file" "adicionar as referências do Zotero ao arquivo BibTeX")
 ("added %1 reference from Zotero to %2" "Adicionada %1 referência do Zotero a %2")
 ("added %1 references from Zotero to %2" "Adicionadas %1 referências do Zotero a %2")

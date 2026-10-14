@@ -266,7 +266,7 @@
 
 (define (bib-retrieve-entries-from-one names db)
   (cond ((== db :local) (bib-retrieve-attached names #t))
-        ((== db :zotero) (zotero-db-entries names))
+        ((== db :zotero) (if (null? names) '() (zotero-db-entries names)))
 	((== db :attached) (bib-retrieve-attached names #f))
 	(else (with-database db
 		(bib-retrieve-several names)))))
@@ -313,12 +313,14 @@
   ;; The sources of references, in their order of precedence: the entries
   ;; of the document, the BibTeX files of the user, the database, the files
   ;; managed by Zotero, Zotero itself and the attached entries
-  ;; (see doc/zotero-design.md)
-  (receive (managed own)
-      (list-partition bib-files
-                      (lambda (f) (and (bib-file? f) (url-exists? f)
-                                       (zotero-managed-file? f))))
-    `(:local ,@own :default ,@managed :zotero :attached)))
+  ;; (see doc/zotero-design.md); Zotero only when it is used
+  (if (not (zotero-used?))
+      `(:local ,@bib-files :default :attached)
+      (receive (managed own)
+          (list-partition bib-files
+                          (lambda (f) (and (bib-file? f) (url-exists? f)
+                                           (zotero-managed-file? f))))
+        `(:local ,@own :default ,@managed :zotero :attached))))
 
 (define (bib-warning msg)
   (debug-message "bibtex-warning" msg))
@@ -488,11 +490,12 @@
 
 (tm-define (open-bib-chooser cb)
   ;; the key of zotero.org is asked if the window needs it
-  (zotero-search-opened)
+  (when (zotero-used?) (zotero-search-opened))
   (with buf (current-buffer)
     (open-db-chooser (bib-database) "bib" "Search bibliographic reference"
                      ;; the item of a reference of Zotero is remembered
                      ;; with the document
                      (lambda (key)
                        (cb key)
-                       (when (string? key) (zotero-cited key buf))))))
+                       (when (and (string? key) (zotero-used?))
+                         (zotero-cited key buf))))))

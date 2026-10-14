@@ -142,7 +142,7 @@
   ;; The source :zotero of bib-retrieve-entries. The items are recorded
   ;; with the document; a key renamed in Zotero still gives its item,
   ;; under the old name, until the citations are updated
-  (if (not (zotero-ready?)) '()
+  (if (or (null? names) (not (zotero-ready?))) '()
       (let* ((found (zotero-resolve names))
              (missing (list-difference names (map car found)))
              (renamed (car (zotero-check-missing missing))))
@@ -464,6 +464,10 @@
   (with-database (bib-database)
     (db-set-field (cadr e) key (list val))))
 
+(define (remove-meta! e key)
+  (with-database (bib-database)
+    (db-remove-field (cadr e) key)))
+
 (define (newer? e versions)
   ;; Has the item of the entry @e a newer version in Zotero?
   (with x (assoc (entry-item e) versions)
@@ -476,7 +480,8 @@
   (:synopsis "Update the entries of the database which come from Zotero")
   ;; Returns (updated renamed deleted conflicts), lists of names, the
   ;; conflicts being (old-entry . new-entry); #f when Zotero is unavailable
-  ;; or nothing changed in Zotero since the last sync
+  ;; or failed (then nothing is changed, and the next sync does it all), or
+  ;; nothing changed in Zotero since the last sync
   (let* ((force? (and (nnull? opt-force) (car opt-force)))
          (old (if (zotero-ready?) (imported-entries) '()))
          (libs (list-remove-duplicates
@@ -499,8 +504,9 @@
                                (set! conflicts
                                      (cons (cons e new) conflicts))))))))
               ;; first what Zotero says of each library, then the changes:
-              ;; NOTE: in a web browser an awaited answer would look like
-              ;; deleted items, so that nothing is changed then
+              ;; NOTE: a failed request, or in a web browser an awaited
+              ;; answer, would look like deleted items, so that nothing is
+              ;; changed then
               (let* ((gathered
                       (map (lambda (lib)
                              (let* ((here (list-filter
@@ -509,32 +515,43 @@
                                     (versions (zotero-item-versions
                                                (map entry-item here) lib))
                                     ;; items changed in Zotero
-                                    (changed (list-filter
-                                              here (cut newer? <> versions)))
+                                    (changed (if (not versions) '()
+                                                 (list-filter
+                                                  here (cut newer? <> versions))))
                                     (zs (zotero-items-entries
                                          (map entry-item changed) lib))
                                     (new (convert-entries zs)))
                                (list here versions changed zs new)))
-                           libs)))
-                (when (zotero-asking?) (set! v #f) (set! gathered '()))
-                (for (g gathered)
-                  (with (here versions changed zs new) g
-                    ;; items no longer in Zotero
-                    (for (e here)
-                      (when (not (assoc (entry-item e) versions))
-                        (when (!= (zotero-entry-meta e "zotero-deleted") "yes")
-                          (set-meta! e "zotero-deleted" "yes"))
-                        (set! deleted (cons (entry-name e) deleted))))
-                    (for (e changed)
-                      (let* ((z (list-find zs (lambda (z)
-                                                (== (zotero-entry-item z)
-                                                    (entry-item e)))))
-                             (x (and z (assoc (zotero-entry-key z) new))))
-                        (when x
-                          (sync-entry e (cdr x) z (report e (cdr x)))))))))
-              (when v (set-preference "zotero sync version" v))
-              (list (reverse updated) (reverse renamed) (reverse deleted)
-                    (reverse conflicts)))))))
+                           libs))
+                     (failed? (or (zotero-asking?) (not (zotero-ready?))
+                                  (list-find gathered
+                                             (lambda (g) (not (cadr g)))))))
+                (if failed? #f
+                    (begin
+                      (for (g gathered)
+                        (with (here versions changed zs new) g
+                          (for (e here)
+                            (if (assoc (entry-item e) versions)
+                                ;; an item in Zotero again
+                                (when (== (zotero-entry-meta e "zotero-deleted")
+                                          "yes")
+                                  (remove-meta! e "zotero-deleted"))
+                                ;; an item no longer in Zotero
+                                (begin
+                                  (when (!= (zotero-entry-meta e "zotero-deleted")
+                                            "yes")
+                                    (set-meta! e "zotero-deleted" "yes"))
+                                  (set! deleted (cons (entry-name e) deleted)))))
+                          (for (e changed)
+                            (let* ((z (list-find zs (lambda (z)
+                                                      (== (zotero-entry-item z)
+                                                          (entry-item e)))))
+                                   (x (and z (assoc (zotero-entry-key z) new))))
+                              (when x
+                                (sync-entry e (cdr x) z (report e (cdr x))))))))
+                      (when v (set-preference "zotero sync version" v))
+                      (list (reverse updated) (reverse renamed)
+                            (reverse deleted) (reverse conflicts))))))))))
 
 (define (sync-entry e new z report)
   ;; Bring the database entry @e up to date with the entry @new from Zotero
