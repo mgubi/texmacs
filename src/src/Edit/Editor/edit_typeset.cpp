@@ -322,13 +322,18 @@ edit_typeset_rep::init_update () {
       tree parts= aux ["parts"];
       if (is_func (parts, DOCUMENT))
         for (int i=0; i<N(parts); i++)
-          if (is_tuple (parts[i]) && N(parts[i]) >= 1)
-            if (parts[i][0] == id)
+          if (is_tuple (parts[i]) && N(parts[i]) >= 1 &&
+              is_atomic (parts[i][0]))
+            if (parts[i][0] == id ||
+                relative (buf->prj->buf->name,
+                          url_unix (parts[i][0]->label)) == buf->buf->name) {
+              lab= "part:" * parts[i][0]->label;
               for (int j=1; j+1 < N(parts[i]); j+=2)
                 if (is_atomic (parts[i][j])) {
                   buf->data->init (parts[i][j]->label)= copy (parts[i][j+1]);
                   init (parts[i][j]->label)= copy (parts[i][j+1]);
-                }      
+                }
+            }
     }
     if (ref->contains (lab)) {
       tree val= ref [lab];

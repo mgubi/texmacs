@@ -20,15 +20,23 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define (inclusion-children t)
-  (cond ((tree-is? t 'with) (inclusion-children (cAr (tree-children t))))
-	((tree-is? t 'document) (tree-children t))
+  ;; NOTE: keep the 'with' holding the initial environment of the
+  ;; included file (chapter settings) around its body as one paragraph
+  (cond ((tree-is? t 'document) (tree-children t))
 	(else (list t))))
 
+(define (inclusion? t)
+  (and (tree-in? t '(include include*)) (tree-atomic? (tree-ref t 0))))
+
 (define (expand-includes-one t r)
-  (if (tree-is? t 'include)
-      (with u (url-relative r (unix->url (tree->string (tree-ref t 0))))
-	(inclusion-children (tree-load-inclusion u)))
-      (list (expand-includes t r))))
+  (cond ((inclusion? t)
+         (with u (url-relative r (unix->url (tree->string (tree-ref t 0))))
+           (inclusion-children (tree-load-inclusion u))))
+        ((and (tree-is? t 'with) (inclusion? (cAr (tree-children t))))
+         (let* ((vars (map tree-copy (cDr (tree-children t))))
+                (body (expand-includes-one (cAr (tree-children t)) r)))
+           (list `(with ,@vars (document ,@body)))))
+        (else (list (expand-includes t r)))))
 
 (define (expand-includes t r)
   (cond ((tree-atomic? t) t)
@@ -66,7 +74,7 @@
 ;; The alt-body is evaluated in the background in the case of hidden parts
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define part-mode :one)
+(define part-mode-table (make-ahash-table))
 
 (define (buffer-body-paragraphs)
   (with t (buffer-tree)
@@ -127,7 +135,7 @@
   (:synopsis "Get the mode for document part selections")
   (cond ((tree-is? (tree-ref (buffer-tree) 0) 'show-preamble) :preamble)
 	((tree-in? (car (buffer-body-paragraphs)) '(show-part hide-part))
-	 part-mode)
+	 (or (ahash-ref part-mode-table (current-buffer)) :one))
 	(else :all)))
 
 (define (buffer-test-part-mode? mode)
@@ -152,7 +160,7 @@
 	  (else
 	   (buffer-hide-preamble)
 	   (buffer-make-parts)
-	   (set! part-mode mode)
+	   (ahash-set! part-mode-table (current-buffer) mode)
 	   (with first (car (buffer-parts-list #f))
 	     (if (== mode :one)
 		 (buffer-show-part first)

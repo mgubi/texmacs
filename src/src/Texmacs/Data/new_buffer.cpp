@@ -612,6 +612,7 @@ buffer_save (url name) {
   if (fm == "generic") fm= "verbatim";
   bool r= buffer_export (name, name, fm);
   if (!r) {
+    reset_inclusion (name);
     pretend_buffer_saved (name);
     array<url> ws = buffer_to_windows (name);
     for (int i=0; i<N(ws); i++)
@@ -625,6 +626,7 @@ buffer_save (url name) {
 ******************************************************************************/
 
 static hashmap<string,tree> document_inclusions ("");
+static hashmap<string,int> inclusions_busy (0);
 
 void
 reset_inclusions () {
@@ -646,4 +648,22 @@ load_inclusion (url name) {
   tree doc= extract_document (import_tree (name, "generic"));
   if (!is_func (doc, _ERROR)) document_inclusions (name_s)= doc;
   return doc;
+}
+
+bool
+inclusion_busy (url name) {
+  // Is the inclusion of name currently being processed (cycle detection)?
+  return inclusions_busy [as_string (name)] > 0;
+}
+
+void
+inclusion_enter (url name) {
+  inclusions_busy (as_string (name)) ++;
+}
+
+void
+inclusion_leave (url name) {
+  string name_s= as_string (name);
+  if (inclusions_busy [name_s] <= 1) inclusions_busy->reset (name_s);
+  else inclusions_busy (name_s) --;
 }

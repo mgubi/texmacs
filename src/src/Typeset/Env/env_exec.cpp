@@ -39,6 +39,15 @@ edit_env_rep::exec_string (tree t) {
 * Rewriting (scheme-like macro expansion)
 ******************************************************************************/
 
+static tree
+rewrite_include (url base_file_name, url file_rel) {
+  if (file_rel == base_file_name)
+    return tree (_ERROR, "invalid self include");
+  if (inclusion_busy (file_rel))
+    return tree (_ERROR, "inclusion cycle");
+  return load_inclusion (file_rel);
+}
+
 // Hack to transmit the current environment back to C++
 // across the Scheme level, and to maintain reentrancy.
 static edit_env current_rewrite_env= edit_env ();
@@ -107,10 +116,8 @@ edit_env_rep::rewrite (tree t) {
       if (N(t) == 0) return tree (_ERROR, "invalid include");
       url file_name= url_unix (exec_string (t[0]));
       url file_rel = relative (base_file_name, file_name);
-      if (file_rel == base_file_name)
-        return tree (_ERROR, "invalid self include");
       //cout << "file_name= " << as_tree (file_name) << LF;
-      return load_inclusion (file_rel);
+      return rewrite_include (base_file_name, file_rel);
     }
   case WITH_PACKAGE:
     {
@@ -160,6 +167,16 @@ edit_env_rep::exec_rewrite (tree t) {
   return r;
   */
   return exec (rewrite (t));
+}
+
+tree
+edit_env_rep::exec_include (tree t) {
+  if (N(t) == 0) return exec_rewrite (t);
+  url file_name= url_unix (exec_string (t[0]));
+  url file_rel = relative (base_file_name, file_name);
+  tree r= rewrite_include (base_file_name, file_rel);
+  inclusion_guard guard (file_rel);
+  return exec (r);
 }
 
 bool
@@ -302,7 +319,7 @@ edit_env_rep::exec (tree t) {
   case EXTERN:
     return exec_rewrite (t);
   case VAR_INCLUDE:
-    return exec_rewrite (t);
+    return exec_include (t);
   case WITH_PACKAGE:
     return exec_rewrite (t);
   case USE_PACKAGE:
