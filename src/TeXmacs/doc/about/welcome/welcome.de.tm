@@ -18,7 +18,7 @@
     <item>Im Menü <menu|Help|Manual|Writing your own style files> sind die
     verschiedenen <TeXmacs>-Dokument-Stile erläutert.\ 
 
-    <item>Das Menü <menu|Help |Apropos> enthält weitere Informationen über
+    <item>Das Menü <menu|Help |About> enthält weitere Informationen über
     <TeXmacs>, wie beispielsweise über seine
     <hlink|Autoren|../../about/authors/authors.de.tm>, deren
     <hlink|Kontaktadressen|../../about/authors/contact.de.tm>, und
@@ -110,7 +110,7 @@
   Wenn Sie also einen Beitrag zu<TeXmacs> leisten wollen, oder wenn Sie das
   Programm speziell anpassen wollen, dann finden Sie wichtige Informationen
   im <menu|Help>-Menü. <hlink|<menu|Help|Document
-  format>|../../devel/format/format.en.tm> gibt Informationen über das
+  format>|../../devel/format/basics/basics.de.tm> gibt Informationen über das
   <TeXmacs> Dokumentenformat und unter <hlink|<menu|Help|Interfacing>|../../devel/plugin/plugin.en.tm>
   wird \ erklärt, wie<TeXmacs> mit anderen Programmen zusammenarbeiten kann.
   Ein Teil des Quellcodes ist unter <hlink|<menu|Help|Source

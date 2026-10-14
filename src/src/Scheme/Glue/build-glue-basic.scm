@@ -209,7 +209,7 @@
   (tree-atomic? is_atomic (bool tree))
   (tree-compound? is_compound (bool tree))
   (tree-label L (tree_label tree))
-  (tree-children A (array_tree tree))
+  (tree-children tree_children (array_tree tree))
   (tree-arity N (int tree))
   (tree-child-ref tree_ref (tree tree int))
   (tree-child-set! tree_set (tree tree int content))

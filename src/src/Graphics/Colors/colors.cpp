@@ -156,7 +156,7 @@ blend_colors (color fg, color bg) {
   int rR= (bR * (255 - fA) + fR * fA) / 255;
   int rG= (bG * (255 - fA) + fG * fA) / 255;
   int rB= (bB * (255 - fA) + fB * fA) / 255;
-  int rA= (bA * (255 - fA) + fA * fA) / 255;
+  int rA= (bA * (255 - fA) + 255 * fA) / 255;
   return rgb_color (rR, rG, rB, rA);
 }
 
@@ -350,14 +350,6 @@ color_from_name (string s) {
     }
   }
   
-  if ((N(s) > 4) && (s (1,4) == "gray") && (is_numeric (s (5, N(s))))) {
-    int level, i=5;
-    if (read_int(s,i,level)) {
-      level = (level*255) /100;
-      return rgb_color (level, level, level);
-    }
-  }
-	
   if (init_colors) {
     populates_colorhash_from_rgb_record  (XCColors, xc_ch);
     populates_colorhash_from_rgb_record  (X11Colors, x11_ch);

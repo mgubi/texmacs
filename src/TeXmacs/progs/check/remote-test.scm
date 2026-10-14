@@ -162,31 +162,39 @@
 (define loop-queue '())
 (define loop-log '())
 (define loop-blocked '())
-(define saved-client-write #f)
-(define saved-server-write #f)
+(define loop-active? #f)
+
+;; NOTE: the messages are intercepted where they are sent, in client-send
+;; and server-send, and not by replacing the primitives client-write and
+;; server-write: S7 calls the primitives which a function used when it was
+;; first evaluated, whatever their names are bound to later on.
+
+(define (next-serial module var)
+  ;; the serial number @var of the messages sent by @module, incremented
+  (with m (resolve-module module)
+    (with n (eval var m)
+      (eval `(set! ,var ,(+ n 1)) m)
+      n)))
+
+(tm-define (client-send server cmd)
+  (:require (and loop-active? (loop-server? server)))
+  (with n (next-serial '(client client-base) 'client-serial)
+    (set! loop-queue
+          (rcons loop-queue
+                 (list 'server server (object->string* (list n cmd)))))))
+
+(tm-define (server-send client cmd)
+  (:require (and loop-active? (loop-client? client)))
+  (with n (next-serial '(server server-base) 'server-serial)
+    (set! loop-queue
+          (rcons loop-queue
+                 (list 'client client (object->string* (list n cmd)))))))
 
 (define (loop-install!)
-  (when (not saved-client-write)
-    (set! saved-client-write client-write)
-    (set! saved-server-write server-write)
-    (set! client-write
-          (lambda (fd s)
-            (if (loop-server? fd)
-                (begin (set! loop-queue (rcons loop-queue (list 'server fd s)))
-                       0)
-                (saved-client-write fd s))))
-    (set! server-write
-          (lambda (fd s)
-            (if (loop-client? fd)
-                (set! loop-queue (rcons loop-queue (list 'client fd s)))
-                (saved-server-write fd s))))))
+  (set! loop-active? #t))
 
 (define (loop-uninstall!)
-  (when saved-client-write
-    (set! client-write saved-client-write)
-    (set! server-write saved-server-write)
-    (set! saved-client-write #f)
-    (set! saved-server-write #f)))
+  (set! loop-active? #f))
 
 (define (loop-pump)
   ;; deliver the queued messages, including those sent while delivering
@@ -354,7 +362,8 @@
           "tmfs://remote-dir/h/~u")
   (check= (url->string (remote-parent (string->url "tmfs://remote-dir/h")))
           "tmfs://remote-dir/h")
-  (check= (url->string (remote-parent (string->url "/tmp/a/b.tm"))) "/tmp/a")
+  (check= (check-unix (url->string (remote-parent (string->url (check-unix-abs "tmp/a/b.tm")))))
+          (check-abs "tmp/a"))
 
   (check-group "versions in remote names")
   (check= (remote-get-time "tmfs://remote-file/h/time=123/~u/a.tm") 123)
@@ -734,12 +743,12 @@
             '(:error "Error: write access denied"))
     (check= (with-db (server-file-save #f notes doc2 #f))
             '(:error "Error: not logged in"))
-    ;; FIXME: server-file-save does not check that the file exists before
-    ;; it reads its version list (server/server-tmfs.scm:467):
-    ;; (server-file-save "rt-alice" "loophost/~rt-alice/x.tm" doc2 #f) for
-    ;; a missing file raises wrong-type-arg, expected
-    ;; (:error "Error: file does not exist"); remote-file-save then answers
-    ;; with the message of the Scheme error.
+    ;; a missing file
+    (check= (with-db (server-file-save "rt-alice" "loophost/~rt-alice/x.tm"
+                                       doc2 #f))
+            '(:error "Error: file does not exist"))
+    (check= (ralice '(remote-file-save "loophost/~rt-alice/x.tm" "<TeXmacs|x>" #f))
+            '(:error "Error: file does not exist"))
     (with r (with-db (server-file-save "rt-alice" notes doc2 "second"))
       (check= (car r) :created)
       (with rid2 (cadr r)
@@ -747,14 +756,9 @@
         (check= (with-db (file-name->resource "~rt-alice/notes.tm")) rid2)
         (check= (with-db (db-get-entry rid)) '())
         (check= (field rid2 "version-nr") '("2"))
-        ;; FIXME: server-file-save copies the properties of the previous
-        ;; version onto the new one after remote-create has set them
-        ;; (server/server-tmfs.scm:483, copy-properties with
-        ;; inherit-property?, which keeps version-msg and version-by): after
-        ;; (server-file-save "rt-alice" notes doc2 "second"), the field
-        ;; version-msg of the new version is ("first"), expected ("second"),
-        ;; and after a save by rt-bob, version-by is ("rt-alice"), expected
-        ;; ("rt-bob").
+        ;; the message and the author are those of the new version
+        (check= (field rid2 "version-msg") '("second"))
+        (check= (field rid2 "version-by") '("rt-alice"))
         (check= (field rid2 "version-list") (list vid))
         (check= (field vid "version-current") '("2"))
         (check= (with-db (server-file-load "rt-alice" notes))
@@ -795,6 +799,8 @@
         (check= (field rid3 "writable") '("rt-bob"))
         (check= (field rid3 "owner") '("rt-alice"))
         (check= (field rid3 "version-nr") '("3"))
+        (check= (field rid3 "version-by") '("rt-bob"))
+        (check= (field rid3 "version-msg") '("by bob"))
         (with-db (server-remove-user-from-acls rid3 "rt-bob"))
         (check= (field rid3 "readable") '())
         (check= (field rid3 "writable") '())
@@ -1232,15 +1238,19 @@
             "tmfs://chat/loophost/rt-hall")
     (with-db (db-set-field crid "name" '("rt-room")))
     (chat-room-messages-reset))
-  ;; FIXME: the identifier of a shared remote file is not found, since
-  ;; remote-send looks it up with search-remote-identifier on the whole url
-  ;; (server/server-chat.scm:222), which only understands names such as
-  ;; loophost/~rt-alice/notes.tm: (remote-send "rt-alice" "mail-rt-bob"
-  ;; "share" "tmfs://remote-file/loophost/~rt-alice/notes.tm") gives a
-  ;; message without resource-id, expected the identifier of notes.tm (as
-  ;; for chat rooms and live documents), so that a shared file which is
-  ;; renamed is not found any more.
-  )
+  ;; a shared remote file is found through its identifier too, also after
+  ;; it has been renamed
+  (let* ((rid (with-db (file-name->resource "~rt-alice/notes.tm")))
+         (url (string-append "tmfs://remote-file/" notes))
+         (mid (with-db (remote-send "rt-alice" "mail-rt-bob" "share" url))))
+    (check= (with-db (search-remote-identifier url)) rid)
+    (check= (field mid "resource-id") (list rid))
+    (check= (field mid "message") (list url))
+    (with-db (db-set-field rid "name" '("notes2.tm")))
+    (check= (msg-doc (with-db (chat-message-retrieve mid)))
+            "tmfs://remote-file/loophost/~rt-alice/notes2.tm")
+    (with-db (db-set-field rid "name" '("notes.tm")))
+    (check= (msg-doc (with-db (chat-message-retrieve mid))) url)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Live documents on the server
@@ -1332,8 +1342,9 @@
 (define (status-names l)
   ;; (command tail of the local name) for each line of a status list
   (map (lambda (line)
-         (list (car line) (url->string (url-delta (url-append (tmp "sync") "x")
-                                                  (system->url (third line))))))
+         (list (car line)
+               (check-unix (url->string (url-delta (url-append (tmp "sync") "x")
+                                                   (system->url (third line)))))))
        l))
 
 (define (test-sync-status)
@@ -1354,9 +1365,12 @@
     (check= (status #f "6" "5" "s" "r") "conflict**")
     (check= (status #f #f "5" "s" "r") "conflict-*")
     (check= (status #f "6" "5" #f "r") "conflict*-")
-    (check= (get-sync-status (list #f (string->url "/l/a") "lid" "5" #f #f)
+    (with r (get-sync-status (list #f (string->url (check-unix-abs "l/a")) "lid" "5" #f #f)
                              (string->url "tmfs://remote-file/h/~u/a") #f)
-            '("upload" #f "/l/a" "lid" "tmfs://remote-file/h/~u/a" #f)))
+      (check= (list (car r) (cadr r) (check-unix (caddr r)) (cadddr r)
+                    (list-ref r 4) (list-ref r 5))
+              (list "upload" #f (check-abs "l/a") "lid"
+                    "tmfs://remote-file/h/~u/a" #f))))
   (with requalify-deleted (priv '(client client-sync) 'requalify-deleted)
     (let* ((del '("local-delete" #t "/l/d" "i1" "tmfs://remote-dir/h/d" "r1"))
            (sub '("download" #f "/l/d/f" "i2" "tmfs://remote-file/h/d/f" "r2"))
@@ -1368,13 +1382,9 @@
       (check= (requalify-deleted rdel (list rdel subdir))
               (cons "conflict-*" (cdr rdel)))
       (check= (requalify-deleted rdel (list rdel)) rdel)
-      ;; FIXME: a removed directory whose remote files changed is not a
-      ;; conflict, since conflicting-remote-delete? compares the remote
-      ;; names, tmfs://remote-file/... for the files and
-      ;; tmfs://remote-dir/... for the directory (client/client-sync.scm:158):
-      ;; (requalify-deleted rdel (list rdel sub)) gives rdel, expected
-      ;; (cons "conflict-*" (cdr rdel)), as for a local directory and its
-      ;; files.
+      ;; a removed directory whose remote files changed
+      (check= (requalify-deleted rdel (list rdel sub))
+              (cons "conflict-*" (cdr rdel)))
       (check= (requalify-deleted sub (list del sub)) sub)))
   (with t (make-ahash-table)
     (ahash-set! t "/l/a" "Local")
@@ -1415,8 +1425,9 @@
     (string-save "x" (url-append local ".hidden"))
     (with l (client-sync-list local)
       (check= (car l) (list #t local))
-      (check= (sorted (map (lambda (x) (url->string (url-delta (url-append local "x")
-                                                                (cadr x))))
+      (check= (sorted (map (lambda (x)
+                             (check-unix (url->string (url-delta (url-append local "x")
+                                                                 (cadr x)))))
                            (cdr l)))
               '("a.tm" "sub" "sub/b.tm"))
       (check= (map car l) '(#t #f #t #f)))
@@ -1758,13 +1769,21 @@
   (check= (client-accounts) '(("srv.test" "7000" "u" (tls-password))))
   (client-remove-account "srv.test" "7000" "u")
   (check= (client-accounts) '())
-  ;; FIXME: the removal of an account on the port 6561 also removes, for
-  ;; the accounts saved before the ports, the first account of the same
-  ;; server and pseudo on any port (client/client-base.scm:318): after
-  ;; (client-notify-account "srv.test" "6561" "u" '(tls-password) #f) and
-  ;; (client-notify-account "srv.test" "7000" "u" '(tls-password) #f),
-  ;; (client-remove-account "srv.test" "6561" "u") leaves (client-accounts)
-  ;; empty, expected (("srv.test" "7000" "u" (tls-password))).
+  ;; the removal of an account on the port 6561 keeps the account of the
+  ;; same server and pseudo on another port
+  (client-notify-account "srv.test" "6561" "u" '(tls-password) #f)
+  (client-notify-account "srv.test" "7000" "u" '(tls-password) #f)
+  (client-remove-account "srv.test" "6561" "u")
+  (check= (client-accounts) '(("srv.test" "7000" "u" (tls-password))))
+  ;; an account saved before the ports is an account on 6561
+  (with-database (user-database "remote")
+    (db-create-entry '(("type" "account") ("server" "srv.test")
+                       ("pseudo" "u"))))
+  (check= (length (client-accounts)) 2)
+  (client-remove-account "srv.test" "6561" "u")
+  (check= (client-accounts) '(("srv.test" "7000" "u" (tls-password))))
+  (client-remove-account "srv.test" "7000" "u")
+  (check= (client-accounts) '())
   (check= (client-merge-authentications '(tls-password) '(legacy-password tls-password))
           '(tls-password legacy-password))
   (check= (client-normalize-authentications '("tls-password" tls-password unknown))
@@ -1894,10 +1913,7 @@
   (for (i (.. 0 120))
     (add-notification 9199 (number->string i) 'many noop '()))
   (check= (notification-count 9199 'many) 120)
-  ;; FIXME: more than 99 notifications are not shown as 99+, since the
-  ;; case (> c 0) comes first (client/client-notifications.scm:28):
-  ;; (notif-count-label 9199 'many "Mail") with 120 notifications gives
-  ;; "Mail (120)", expected "Mail (99+)".
+  (check= (notif-count-label 9199 'many "Mail") "Mail (99+)")
   (clear-notifications 9199 'many)
   (clear-notifications 9199 'other))
 

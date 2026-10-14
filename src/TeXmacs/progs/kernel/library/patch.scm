@@ -96,7 +96,7 @@
         ((patch-birth? p)
          `(birth ,(patch-get-birth p) ,(patch-get-author p)))
         ((patch-author? p)
-         `(author ,(patch-get-author p) ,(patch-ref p 0)))
+         `(author ,(patch-get-author p) ,(patch->scheme (patch-ref p 0))))
         (else #f)))
 
 (define-public (scheme->patch p)
@@ -108,9 +108,10 @@
         ((func? p 'branch)
          (patch-branch (map scheme->patch (cdr p))))
         ((func? p 'birth)
-         (patch-birth (cadr p) (caddr p)))
+         ;; written (birth BIRTH? AUTHOR), the glue takes the author first
+         (patch-birth (caddr p) (cadr p)))
         ((func? p 'author)
-         (patch-birth (cadr p) (scheme->patch (caddr p))))
+         (patch-author (cadr p) (scheme->patch (caddr p))))
         (else #f)))
 
 (define-public-macro (patch-apply! t m)

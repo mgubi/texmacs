@@ -22,7 +22,7 @@
 
     <branch|Utilizzare <TeXmacs> come interfaccia|interface/man-itf.it.tm>
 
-    <branch|File di stile di <TeXmacs>|../devel/style/style.it.tm>
+    <branch|File di stile di <TeXmacs>|../devel/style/style.en.tm>
 
     <branch|Sommario dei principali tag di
     <TeXmacs>|styles/std-dtds/dtds.it.tm>

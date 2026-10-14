@@ -696,6 +696,18 @@ scm_init_scmsigs ()
  scm_c_define_gsubr (s_scm_sleep, 1, 0, 0, (SCM (*)()) scm_sleep); ;
  scm_c_define_gsubr (s_scm_usleep, 1, 0, 0, (SCM (*)()) scm_usleep); ;
  scm_c_define_gsubr (s_scm_raise, 1, 0, 0, (SCM (*)()) scm_raise); ;
+  /* registrations which the snarfing of a Windows build left out
+     (the .x files of guile-snarf, pasted in this file), under the
+     conditions of their definitions */
+#if defined(HAVE_SETITIMER)
+  scm_c_define_gsubr (s_scm_setitimer, 5, 0, 0, (SCM (*)()) scm_setitimer); ;
+#endif
+#if defined(HAVE_GETITIMER)
+  scm_c_define_gsubr (s_scm_getitimer, 1, 0, 0, (SCM (*)()) scm_getitimer); ;
+#endif
+#if defined(HAVE_PAUSE)
+  scm_c_define_gsubr (s_scm_pause, 0, 0, 0, (SCM (*)()) scm_pause); ;
+#endif
 
 }
 

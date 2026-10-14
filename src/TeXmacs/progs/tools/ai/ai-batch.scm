@@ -42,6 +42,11 @@
 ;; Automatic correction
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(define (ai-empty? t)
+  (or (tm-equal? t "")
+      (and (tm-func? t 'document)
+           (list-and (map (lambda (x) (tm-equal? x "")) (tm-children t))))))
+
 (define (open-comments c)
   (let* ((doc
 	  `(document
@@ -59,12 +64,13 @@
   (when (selection-active-any?)
     (with lan (get-env "language")
       (with t (selection-tree)
-        (clipboard-cut "primary")
         (with r (cpp-ai-correct t lan model)
-          (when (and (tree-func? r 'tuple) (>= (tree-arity r) 1))
+          (when (and (tree-func? r 'tuple) (>= (tree-arity r) 1)
+                     (not (ai-empty? (tree-ref r 0))))
             (let* ((l (tree-children r))
                    (s (car l))
                    (c (cdr l)))
+              (clipboard-cut "primary")
 	      (if (get-boolean-preference "ai-correct show differences")
 		  (with d (compare-versions (tree->stree t) (tree->stree s))
 		    (insert (stree->tree d)))
@@ -81,9 +87,10 @@
   (when (selection-active-any?)
     (with from (get-env "language")
       (with t (selection-tree)
-        (clipboard-cut "primary")
         (with r (cpp-ai-translate t from into model)
-          (insert r))))))
+          (when (not (ai-empty? r))
+            (clipboard-cut "primary")
+            (insert r)))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Copy and paste while compressing non natural language text

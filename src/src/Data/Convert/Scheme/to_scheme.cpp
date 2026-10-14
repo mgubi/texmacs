@@ -121,7 +121,7 @@ tree_to_scheme_tree (tree t) {
     tree u (TUPLE, n+1);
     string s= as_string (L(t));
     if (N(s) > 0 && is_digit (s[0]))
-      if (is_int (s)) s= "'" * s;
+      if (is_int (s) || is_double (s)) s= "'" * s;
     u[0]= copy (s);
     for (i=0; i<n; i++)
       u[i+1]= tree_to_scheme_tree (t[i]);

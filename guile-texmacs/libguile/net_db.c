@@ -470,6 +470,18 @@ scm_init_net_db ()
 #if defined (HAVE_SETSERVENT) && defined (HAVE_ENDSERVENT) || defined (__MINGW32__)
  scm_c_define_gsubr (s_scm_setserv, 0, 1, 0, (SCM (*)()) scm_setserv); ;
 #endif
+  /* registrations which the snarfing of a Windows build left out
+     (the .x files of guile-snarf, pasted in this file), under the
+     conditions of their definitions */
+#if (defined(HAVE_GETNETENT) && defined(HAVE_GETNETBYNAME) && defined(HAVE_GETNETBYADDR))
+  scm_c_define_gsubr (s_scm_getnet, 0, 1, 0, (SCM (*)()) scm_getnet); ;
+#endif
+#if (defined(HAVE_SETHOSTENT) && defined(HAVE_ENDHOSTENT))
+  scm_c_define_gsubr (s_scm_sethost, 0, 1, 0, (SCM (*)()) scm_sethost); ;
+#endif
+#if (defined(HAVE_SETNETENT) && defined(HAVE_ENDNETENT))
+  scm_c_define_gsubr (s_scm_setnet, 0, 1, 0, (SCM (*)()) scm_setnet); ;
+#endif
 
 }
 

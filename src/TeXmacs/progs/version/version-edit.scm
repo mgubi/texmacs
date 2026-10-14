@@ -81,6 +81,14 @@
          (t (path->tree (cDr p))))
     (and (== (cAr p) border) (tree-compound? t) (version-context? t) t)))
 
+(define (tree-contains-version? t)
+  (and (tree-compound? t)
+       (or (version-context? t)
+           (list-find (tree-children t) tree-contains-version?))))
+
+(tm-define (version-has-differences?)
+  (not (not (tree-contains-version? (buffer-tree)))))
+
 (tm-define (version-first-difference)
   (go-start)
   ;; path-next-tag goes past a difference at the very start of the document

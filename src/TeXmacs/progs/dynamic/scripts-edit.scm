@@ -17,7 +17,12 @@
         (utils edit selections)
 	(utils plugins plugin-cmd)
 	(convert tools tmconcat)
-	(dynamic scripts-drd)))
+	(dynamic scripts-drd)
+        ;; loaded before: the alternate-toggle of executable folds below
+        ;; overloads its generic one, which would else win when this module
+        ;; is loaded first (as by a plugin at startup) and turn the input of
+        ;; a fold into its output without evaluating it
+        (dynamic fold-edit)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Some switches

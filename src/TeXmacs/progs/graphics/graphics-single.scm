@@ -465,9 +465,11 @@
   (:state graphics-state)
   (set-texmacs-pointer 'graphics-cross)
   (edit-clean-up)
-  (object-set! `(with "point style" "disk"
-		      "point-size" ,(graphics-get-property "line-width")
-		  (point ,x ,y)) 'new))
+  (let* ((lw (graphics-get-property "gr-line-width"))
+         (sz (if (== lw "default") "1ln" lw)))
+    (object-set! `(with "point-style" "disk"
+                        "point-size" ,sz
+                    (point ,x ,y)) 'new)))
 
 (tm-define (edit_start-drag mode x y t* p*)
   (:require (== mode 'hand-edit))

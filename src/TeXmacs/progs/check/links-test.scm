@@ -984,11 +984,12 @@
       (check= (ref "a1") '(uninit))
       ;; the references to labels of the project are not broken
       (check= (search-broken-references (buffer-tree)) '())
-      ;; FIXME: texmacs-expand, which exports use, gives "?" for the
-      ;; references to the other files of the project: expand_references
-      ;; looks in the references of the buffer only (Edit/Editor/
-      ;; edit_typeset.cpp:704): in ch2.tm, (texmacs-expand '(reference
-      ;; "a1")) gives (hlink "?" "#a1"), expected (hlink "1.1" "#a1").
+      ;; texmacs-expand, which exports use, finds the references to the
+      ;; other files of the project
+      (check= (ev '(reference "a1")) '(hlink "1.1" "#a1"))
+      (check= (ev '(reference "eq1")) '(hlink "1.1" "#eq1"))
+      (check= (ev '(pageref "c1")) '(hlink "1" "#c1"))
+      (check= (ev '(reference "no-such-label")) '(hlink "?" "#no-such-label"))
       (check= (ev '(reference "c2")) '(hlink "2" "#c2")))))
 
 ;; Attaching a master by hand (Document > Project > Attach master): the

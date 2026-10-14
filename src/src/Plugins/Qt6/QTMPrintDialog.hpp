@@ -336,7 +336,7 @@ public:
     blackWhiteCheck = new QCheckBox(QTMPrintDialog);
     blackWhiteCheck->setObjectName(QString::fromUtf8("blackWhiteCheck"));
     blackWhiteCheck->setEnabled(false);
-    blackWhiteCheck->setChecked(true);
+    blackWhiteCheck->setChecked(false);
     
     verticalLayout->addWidget(blackWhiteCheck);
     

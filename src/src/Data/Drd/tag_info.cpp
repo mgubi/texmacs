@@ -116,6 +116,7 @@ parent_info::parent_info (int a, int x, int am, int cm, bool frozen) {
   block            = BLOCK_NO;
   with_like        = false;
   var_type         = VAR_MACRO;
+  freeze_type      = frozen;
   freeze_arity     = frozen;
   freeze_border    = frozen;
   freeze_block     = frozen;
@@ -175,6 +176,7 @@ parent_info::operator == (const parent_info& pi) {
     (block            == pi.block           ) &&
     (with_like        == pi.with_like       ) &&
     (var_type         == pi.var_type        ) &&
+    (freeze_type      == pi.freeze_type     ) &&
     (freeze_arity     == pi.freeze_arity    ) &&
     (freeze_border    == pi.freeze_border   ) &&
     (freeze_block     == pi.freeze_block    ) &&

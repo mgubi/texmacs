@@ -32,3 +32,6 @@ CMakeLists.txt.user
 misc/benchmark/gbench
 
 TeXmacs/progs/ice-9
+
+# moc output of the autotools build
+src/Plugins/Qt*/moc_*.cpp

@@ -196,7 +196,7 @@ get_transformation (tree t) {
 
 void
 concater_rep::typeset_gr_transform (tree t, path ip) {
-  if (N(t) != 2) typeset_error (t, ip);
+  if (N(t) != 2) { typeset_error (t, ip); return; }
   tree tr= env->exec (t[1]);
   if (!is_transformation (tr)) typeset_error (t, ip);
   else {
@@ -208,7 +208,7 @@ concater_rep::typeset_gr_transform (tree t, path ip) {
 
 void
 concater_rep::typeset_gr_effect (tree t, path ip) {
-  if (N(t) < 2) typeset_error (t, ip);
+  if (N(t) < 2) { typeset_error (t, ip); return; }
   array<box> bs (N(t)-1);
   for (int i=0; i<N(t)-1; i++)
     bs[i]= typeset_as_atomic (env, t[i], descend (ip, i));

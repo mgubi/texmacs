@@ -23,7 +23,10 @@
 (define (notif-test-setup!)
   (fixture-create-account "alice" "Alice A" "AlicePass1!" "alice@test" #f)
   (fixture-create-account "bob"   "Bob B"   "BobPass1!"   "bob@test"   #f)
-  (fixture-create-account "carol" "Carol C" "CarolPass1!" "carol@test" #f))
+  (fixture-create-account "carol" "Carol C" "CarolPass1!" "carol@test" #f)
+  ;; the accounts may exist already, with the notifications of the tests
+  ;; which ran before in the same database (the deletion plan shares files)
+  (notif-test-teardown!))
 
 (define (notif-test-teardown!)
   (fixture-clear-notifications "alice" 'all)

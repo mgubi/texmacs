@@ -58,7 +58,7 @@
     <em|export-struct> <em|options>)>>>Diese Option entspricht weitgehend
     :launch, nur wird die externe Anwendung damit dynamisch eingebunden.
     Weitere Informationen finden Sie im Abschnitt <hyper-link|Dynamisch
-    ladbare Bibliotheken|../interface/interface-dynlibs.ed.tm>.
+    ladbare Bibliotheken|../interface/interface-dynlibs.de.tm>.
 
     <item*|<verbatim|<with|font-series|medium|(:session
     <em|menu-name>)>>>Diese Option erklärt, dass das Plugin ein Anwendung

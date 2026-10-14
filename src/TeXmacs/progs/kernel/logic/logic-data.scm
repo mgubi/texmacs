@@ -157,7 +157,7 @@
 
 (define-public-macro (logic-dispatch name key . args)
   (let ((k (gensym)))
-    (if (= (length args) 1)
+    (if (null? args)
 	`(let ((,k ,key))
 	   ((logic-ref ,name (car ,k)) ,k))
 	`((logic-ref ,name ,key) ,@args))))
