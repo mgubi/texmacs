@@ -176,12 +176,10 @@ tree_to_qjson (tree t) {
     return as_bool (t[0]); }
   else if (is_compound (t, "json-number", 1) && is_atomic (t[0])) {
     return is_int (t[0]) ? as_int (t[0]) : as_double (t[0]); } 
-  if (is_atomic (t)) {
-    if (is_bool (t)) return as_bool (t);
-    if (is_int (t)) return as_int (t);
-    if (is_double (t)) return as_double (t);
-    if (is_string (t)) return utf8_to_qstring (as_string (t));
-  }
+  // a plain atom is a string, as in json.cpp (json_print): the numbers,
+  // the booleans and null of a request are marked (json-number...), and
+  // a question "42" or "true" stays a string
+  if (is_atomic (t)) return utf8_to_qstring (as_string (t));
   io_error << "tree_to_qjson, invalid json tree: " << t << LF;
   return QJsonValue ();
 }
