@@ -699,6 +699,7 @@ bib_tree_length (tree t) {
     return n;
   }
   else if (L(t) == WITH) return bib_tree_length (t[N(t)-1]);
+  else if (is_compound (t, "keepcase", 1)) return bib_tree_length (t[0]);
   else if (L(t) == CONCAT || L(t) == DOCUMENT) {
     int s= 0;
     for (int i= 0; i<N(t); i++) s += bib_tree_length (t[i]);
@@ -734,6 +735,7 @@ bib_get_prefix (tree t, string& pre, int& i) {
     }
     else {
       if (L(t) == WITH) bib_get_prefix (t[N(t)-1], pre, i);
+      else if (is_compound (t, "keepcase", 1)) bib_get_prefix (t[0], pre, i);
       else if (L(t) == CONCAT || L(t) == DOCUMENT)
         for (int j= 0; j<N(t); j++) bib_get_prefix (t[j], pre, i);
     }

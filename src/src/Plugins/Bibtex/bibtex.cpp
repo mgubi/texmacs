@@ -161,6 +161,16 @@ complete_bib_file (url& bib_file, tree bib_t) {
     }
 }
 
+static string
+bibtex_failure (string log) {
+  // the first error of bibtex, the line before its "---line n of file"
+  int pos= search_forwards ("\n---", 0, log);
+  if (pos < 0) return "see the log of bibtex";
+  int start= pos;
+  while (start > 0 && log[start-1] != '\n') start--;
+  return log (start, pos);
+}
+
 tree
 bibtex_run (string bib, string style, url bib_file, tree bib_t) {
   if (!bibtex_present ()) {
@@ -183,29 +193,40 @@ bibtex_run (string bib, string style, url bib_file, tree bib_t) {
   if ((N(bib_name) >= 4) && (bib_name (N(bib_name)-4, N(bib_name)) == ".bib"))
     bib_name= bib_name (0, N(bib_name)- 4);
   bib_s << "\\bibdata{" << bib_name << "}\n";
-  save_string ("$TEXMACS_HOME_PATH/system/bib/temp.aux", bib_s);
-  remove (url ("$TEXMACS_HOME_PATH/system/bib/temp.bbl"));
+  // each run has its own directory, so that simultaneous runs (two
+  // instances of TeXmacs) do not share their temp.* files; the .bst files
+  // copied by copy_bst_file stay in $TEXMACS_HOME_PATH/system/bib
+  url run_dir= url_temp ("-bib");
+  mkdir (run_dir);
+  string rdir= concretize (run_dir);
+  string bst_dir= concretize (url ("$TEXMACS_HOME_PATH/system/bib"));
+  save_string (run_dir * "temp.aux", bib_s);
+  bool failed= false;
+  string log;
 
 #ifdef OS_WIN32_LATER
   c_string directory (dir);
-  RunBibtex (directory, "$TEXMACS_HOME_PATH/system/bib", "temp");
+  RunBibtex (directory, rdir, "temp");
 #else
-  string cmdln= "cd \"$TEXMACS_HOME_PATH/system/bib\"; ";
+  string cmdln= "cd \"" * rdir * "\"; ";
   cmdln << "BIBINPUTS=\"" << dir << "\":$BIBINPUTS "
-	<< "BSTINPUTS=\"" << dir << "\":$BSTINPUTS "
+	<< "BSTINPUTS=\"" << dir << "\":\"" << bst_dir << "\":$BSTINPUTS "
 	<< bibtex_command
-        << " temp > \"$TEXMACS_HOME_PATH/system/bib/temp.log\"";
+        << " temp > \"" << rdir << "/temp.log\"";
   if (DEBUG_AUTO) {
     if (!(DEBUG_STD))
       debug_shell << cmdln << "\n";
   }
-  string log;
+  string out;
   int ret= system (cmdln, log);
+  // the messages of bibtex go to temp.log
+  if (!load_string (run_dir * "temp.log", out, false)) log= out * log;
   // some bibtex versions exit with status 1 when there were only warnings
   bool only_warnings= occurs ("Warning--", log) &&
                       !occurs ("error message", log) &&
                       !occurs ("fatal error", log);
-  if (ret != 0 && !only_warnings)
+  failed= (ret != 0 && !only_warnings);
+  if (failed)
     bibtex_error << log << "\n";
   else {
     int pos=0;
@@ -220,7 +241,12 @@ bibtex_run (string bib, string style, url bib_file, tree bib_t) {
   }
 #endif
 
-  return bibtex_load_bbl (bib, "$TEXMACS_HOME_PATH/system/bib/temp.bbl");
+  tree r= bibtex_load_bbl (bib, run_dir * "temp.bbl");
+  rmdir_recursive (run_dir);
+  // a failed run which gave no bibliography is reported with its error
+  if (failed && is_atomic (r) && !starts (r->label, "Error:"))
+    return "Error: bibtex failed (" * bibtex_failure (log) * ")";
+  return r;
   /*
   string result;
   if (load_string ("$TEXMACS_HOME_PATH/system/bib/temp.bbl", result, false))
