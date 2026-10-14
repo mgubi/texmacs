@@ -127,7 +127,7 @@ edit_modify_rep::post_notify (path p) {
   tp= position_get (cur_pos);
   position_delete (cur_pos);
   cur_pos= nil_observer;
-  go_to_correct (tp);
+  go_to_after_change (tp);
   /*
   cout << "et= " << et << "\n";
   cout << "tp= " << tp << "\n\n";
@@ -292,6 +292,7 @@ edit_modify_rep::archive_state () {
 void
 edit_modify_rep::start_editing () {
   //cout << "Start editing" << LF << INDENT;
+  flush_cursor_hook ();
   set_author (this_author ());
 }
 
@@ -299,6 +300,7 @@ void
 edit_modify_rep::end_editing () {
   //cout << UNINDENT << "End editing" << LF;
   global_confirm ();
+  flush_cursor_hook ();
 }
 
 void
