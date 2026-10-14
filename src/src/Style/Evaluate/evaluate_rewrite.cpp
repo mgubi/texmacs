@@ -14,6 +14,7 @@
 #include "std_environment.hpp"
 #include "vars.hpp"
 #include "scheme.hpp"
+#include "new_buffer.hpp"
 
 extern int script_status;
 
@@ -139,7 +140,7 @@ rewrite_impl (tree t) {
     }
   case WITH_PACKAGE:
     {
-      string file_name= exec_string (t[0]);
+      string file_name= evaluate_string (t[0]);
       return with_package_definitions (file_name, t[1]);
     }
   case REWRITE_INACTIVE:

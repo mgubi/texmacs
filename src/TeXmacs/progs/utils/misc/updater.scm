@@ -22,8 +22,10 @@
   (when (updater-supported?)
 	(with n (get-preference "updater:interval")
 	      (when (string-number? n)
-		    (updater-set-interval (string->number n))
-		    (updater-check-background)))))
+		    (with i (string->number n)
+		      (updater-set-interval i)
+		      (when (> i 0)
+			(updater-check-background)))))))
 
 (define-preferences
   ("updater:interval" "null" noop))

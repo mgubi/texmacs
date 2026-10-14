@@ -35,7 +35,7 @@
 
   Wenn Experiment in dem geeigneten <TeXmacs>-Wörterbuch enthalten ist, wird
   der Text \RExperiment'' automatisch übersetzt. Im Abschnitt
-  <hyper-link|Definition neuer Kontexte|../../../main/styles/std-dtds/env-base-dtd.de.tm>
+  <hyper-link|Definition neuer Kontexte|../../../main/styles/env/env-base-dtd.de.tm>
   wird u.a. beschrieben, wie man neue nummerierte Kontexte schreiben kann,
   die nicht zu den <translate|theorem|english|german>-ähnlichen,
   <translate|remark|english|german>-ähnlichen und

@@ -551,13 +551,17 @@ void
 table_rep::compute_widths (SI* Mw, SI* Lw, SI* Rw, bool large) {
   //cout << "Compute widths " << large << LF << INDENT;
   int i, j;
-  for (j=0; j<nr_cols; j++)
+  STACK_NEW_ARRAY (exact, bool, nr_cols);
+  for (j=0; j<nr_cols; j++) {
     Mw[j]= Lw[j]= Rw[j]= 0;
+    exact[j]= false;
+  }
 
   for (j=0; j<nr_cols; j++)
     for (i=0; i<nr_rows; i++) {
       cell C= T[i][j];
       if ((!is_nil (C)) && (C->col_span == 1)) {
+        if (C->hmode == "exact") exact[j]= true;
         SI cmw, clw, crw;
         C->compute_width (cmw, clw, crw, large);
         //cout << i << ", " << j << ": "
@@ -576,9 +580,17 @@ table_rep::compute_widths (SI* Mw, SI* Lw, SI* Rw, bool large) {
         SI cmw, clw, crw;
         C->compute_width (cmw, clw, crw, large);
         SI tot= sum (Mw+j, C->col_span);
-        if (cmw > tot) Mw[j] += cmw - tot;
+        if (cmw > tot) {
+          // give the extra width to the first spanned column
+          // whose width is not fixed by one of its cells
+          int k= j;
+          while (k < j + C->col_span && exact[k]) k++;
+          if (k == j + C->col_span) k= j;
+          Mw[k] += cmw - tot;
+        }
       }
     }
+  STACK_DELETE_ARRAY (exact);
   //cout << UNINDENT << "Computed widths" << LF;
 }
 

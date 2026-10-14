@@ -71,14 +71,24 @@ time_t tm_sparkle::lastCheck() const
 
 bool tm_sparkle::setCheckInterval (int hours)
 {
-  if (interval == hours)
+  if (hours <= 0) {
+    // "Never": disable automatic checks instead of clamping to 24 hours
+    if (DEBUG_STD)
+      debug_updater << "Disabling automatic update checks.\n";
+    interval = 0;
+    [updater->p setAutomaticallyChecksForUpdates: NO];
     return true;
+  }
 
+  int old_interval = interval;
   interval = max (MinimumCheckInterval, min (MaximumCheckInterval, hours));
+  [updater->p setAutomaticallyChecksForUpdates: YES];
+  if (interval == old_interval)
+    return true;
 
   if (DEBUG_STD)
     debug_updater << "Changing interval from "
-                  << interval << " to " << hours << " hour(s).\n";
+                  << old_interval << " to " << interval << " hour(s).\n";
 
   [updater->p setUpdateCheckInterval: interval*3600];
   [updater->p resetUpdateCycle];

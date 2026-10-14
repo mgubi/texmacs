@@ -1835,6 +1835,27 @@ scm_init_socket ()
  scm_c_define_gsubr (s_scm_send, 2, 1, 0, (SCM (*)()) scm_send); ;
  scm_c_define_gsubr (s_scm_recvfrom, 2, 3, 0, (SCM (*)()) scm_recvfrom); ;
  scm_c_define_gsubr (s_scm_sendto, 3, 1, 1, (SCM (*)()) scm_sendto); ;
+  /* registrations which the snarfing of a Windows build left out
+     (the .x files of guile-snarf, pasted in this file), under the
+     conditions of their definitions */
+#if defined(HAVE_INET_NETOF)
+  scm_c_define_gsubr (s_scm_inet_netof, 1, 0, 0, (SCM (*)()) scm_inet_netof); ;
+#endif
+#if defined(HAVE_INET_LNAOF)
+  scm_c_define_gsubr (s_scm_lnaof, 1, 0, 0, (SCM (*)()) scm_lnaof); ;
+#endif
+#if defined(HAVE_INET_MAKEADDR)
+  scm_c_define_gsubr (s_scm_inet_makeaddr, 2, 0, 0, (SCM (*)()) scm_inet_makeaddr); ;
+#endif
+#if defined(HAVE_IPV6) && defined(HAVE_INET_PTON)
+  scm_c_define_gsubr (s_scm_inet_pton, 2, 0, 0, (SCM (*)()) scm_inet_pton); ;
+#endif
+#if defined(HAVE_IPV6) && defined(HAVE_INET_NTOP)
+  scm_c_define_gsubr (s_scm_inet_ntop, 2, 0, 0, (SCM (*)()) scm_inet_ntop); ;
+#endif
+#if defined(HAVE_SOCKETPAIR)
+  scm_c_define_gsubr (s_scm_socketpair, 3, 0, 0, (SCM (*)()) scm_socketpair); ;
+#endif
 
 }
 

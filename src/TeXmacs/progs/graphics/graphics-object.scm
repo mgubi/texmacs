@@ -621,13 +621,20 @@
   (define group-mode? (graphics-group-mode? (graphics-mode)))
   (if (not sticky-point)
       (graphics-error "(sketch-commit)"))
-  (with sketch0 (list-copy (sketch-get))
+  (let* ((sketch0 (list-copy (sketch-get)))
+         (layers layer-of-last-removed-object)
+         ;; sketch-checkout memoizes the places of the objects it removes
+         ;; from the last one to the first one: they go back in this order
+         (lifo? (and (pair? layers) (== (length layers) (length sketch0)))))
     (sketch-reset)
-    (for (o sketch0)
+    (for (o (if lifo? (reverse sketch0) sketch0))
       (with layer layer-of-last-removed-object
         (sketch-toggle (path->tree (graphics-group-insert-bis o group-mode?)))
+        ;; several objects at the place of one (ungroup): one after another
         (if (not (list? layer))
-            (set! layer-of-last-removed-object layer))))
+            (set! layer-of-last-removed-object
+                  (if (integer? layer) (+ layer 1) layer)))))
+    (if lifo? (set! the-sketch (reverse the-sketch)))
     (set! layer-of-last-removed-object #f)
     (set! current-obj
           (if group-mode?

@@ -389,6 +389,7 @@ spline_rep::spline_rep (
   U = array<double> (n+6);
   if (close) {
     int i;
+    a= copy (a);
     a->resize(N(a)+2);
     for (i=0;i<=1;i++)
       a[n+1+i]=a[i];
@@ -689,6 +690,7 @@ struct bezier_rep: public curve_rep {
 };
 
 bezier_rep::bezier_rep (array<point> a2): a (a2) {
+  ASSERT (N(a) == 4, "cubic bezier curve needs four points");
   P << a[0];
   P << (-3.0*a[0] + 3.0*a[1]);
   P << (3.0*a[0] - 6.0*a[1] + 3.0*a[2]);
@@ -734,7 +736,7 @@ bezier_rep::bound (double t, double eps) {
 point
 bezier_rep::grad (double t, bool& error) {
   error= false;
-  return ((3.0*P[3]*t) + 2.0*P[2]) + P[1];
+  return ((3.0*P[3]*t) + 2.0*P[2])*t + P[1];
 }
 
 double
@@ -1111,7 +1113,8 @@ struct inverted_curve_rep: public curve_rep {
   void rectify_cumul (array<point>& a, double eps) {
     array<point> b= c->rectify (eps);
     int i, k= N(b);
-    for (i=k-1; i>=0; i--) a << b[i];
+    // b ends with the starting point of the inverted curve, left out
+    for (i=k-2; i>=0; i--) a << b[i];
   }
   double bound (double t, double eps) {
     return curve_rep::bound (t, eps);
@@ -1175,7 +1178,8 @@ transformed_curve_rep::rectify_cumul (array<point>& a, double eps) {
     double delta= f->direct_bound (c(0.0), eps);
     array<point> b= c->rectify (delta);
     int i, k= N(b);
-    for (i=0; i<k; i++) a << f(b[i]);
+    // b starts with the starting point of the curve, left out
+    for (i=1; i<k; i++) a << f(b[i]);
   }
   else FAILED ("not yet implemented");
 }

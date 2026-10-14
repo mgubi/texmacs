@@ -52,7 +52,7 @@
 
   Il plugin <verbatim|minimal> è un esempio di interfaccia minimale tra
   <TeXmacs> e un programma esterno; il programma esterno
-  <verbatim|minimal.cpp> viene <apply|hyper-link|spiegato|../interface/interface-pipes.it.tm>
+  <verbatim|minimal.cpp> viene <apply|hyper-link|spiegato|../interface/interface-pipes.en.tm>
   in dettaglio nel capitolo relativo alla scrittura di interfacce. Il file di
   inizializzazione <verbatim|init-minimal.scm> contiene essenzialmente il
   seguente codice:

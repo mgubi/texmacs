@@ -39,7 +39,7 @@
   </description>
 
   Lembramos que as teclas modificadoras usadas para a obtenção dos prefixos
-  <prefix|M-> e <prefix|M-A-> podem ser <apply|hyper-link|configuradas|../../config/man-config-kbd-modkeys.pt.tm>
+  <prefix|M-> e <prefix|M-A-> podem ser <apply|hyper-link|configuradas|../../config/man-config-keyboard.en.tm>
   em <apply|menu|Edit|Preferences>.
 
   <apply|tmdoc-copyright|1998--2003|Joris van der Hoeven|Ramiro Brito

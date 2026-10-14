@@ -37,8 +37,7 @@
 (define-format html
   (:name "Html")
   (:suffix "html" "xhtml" "htm")
-  (:recognize html-recognizes?)
-  (:option "mathml->texmacs:latex-annotations" "off"))
+  (:recognize html-recognizes?))
 
 (lazy-define (convert html htmltm) parse-html-snippet)
 (lazy-define (convert html htmltm) parse-html-document)
@@ -59,7 +58,8 @@
   (:function serialize-html))
 
 (converter html-stree texmacs-stree
-  (:function html->texmacs))
+  (:function html->texmacs)
+  (:option "mathml->texmacs:latex-annotations" "off"))
 
 (converter texmacs-stree html-stree
   (:function-with-options texmacs->html)

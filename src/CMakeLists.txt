@@ -153,6 +153,7 @@ include (CheckFunctionExists)
 include (CheckLibraryExists)
 include (CheckIncludeFile)
 include (CheckTypeSize)
+include (CheckSymbolExists)
 include (FindPkgConfig)
 
 ### --------------------------------------------------------------------
@@ -213,6 +214,15 @@ check_include_file (pty.h HAVE_PTY_H)
 check_include_file (util.h HAVE_UTIL_H)
 check_function_exists (gettimeofday HAVE_GETTIMEOFDAY)
 check_function_exists (snprintf HAVE_SNPRINTF)
+
+if (NOT WIN32)
+  set (CMAKE_REQUIRED_LIBRARIES ${CMAKE_DL_LIBS})
+  check_symbol_exists (dlopen dlfcn.h HAVE_DLOPEN)
+  unset (CMAKE_REQUIRED_LIBRARIES)
+  if (HAVE_DLOPEN)
+    set (TM_DYNAMIC_LINKING dlopen)
+  endif ()
+endif ()
 
 set (STDC_HEADERS 1)
 set (DEBUG_ASSERT 1)
@@ -285,7 +295,6 @@ if (TEXMACS_GUI MATCHES "Qt.*")
   endif ()
 
   set (QTTEXMACS 1)
-  set (USE_QTSVG 1)
   set (CONFIG_GUI "QT")
   set (CONFIG_QT "Qt")
   set (QT_PLUGIN_DIR "Qt")
@@ -370,7 +379,7 @@ find_package (PNG REQUIRED)
 find_package (ZLIB REQUIRED)
 
 find_package (Iconv)
-if (Iconv_FOUND)
+if (Iconv_FOUND OR ICONV_FOUND)
   set (USE_ICONV 1)
 endif ()
 
@@ -394,7 +403,12 @@ option (USE_SQLITE3 "Use SQLite3" ON)
 if (USE_SQLITE3)
   find_package (SQLite3)
   if (SQLITE3_FOUND OR SQLite3_FOUND)
+    set (USE_SQLITE3 1)
     set (LINKED_SQLITE3 1)
+  else ()
+    set (USE_SQLITE3 0)
+    set (LINKED_SQLITE3 0)
+    message (STATUS "SQLite3 not found, disabling USE_SQLITE3")
   endif ()
 endif ()
 
@@ -499,13 +513,12 @@ file (GLOB TeXmacs_Pdf_C_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/Pdf/LibAe
 if (USE_RESVG)
   list (APPEND TeXmacs_Std_Plugins_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/Resvg/resvg.cpp")
 endif ()
-if (USE_SQLITE3)
-  file (GLOB_RECURSE TeXmacs_Sqlite_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/Sqlite3/*.cpp")
-  list (APPEND TeXmacs_Std_Plugins_SRCS ${TeXmacs_Sqlite_SRCS})
-endif ()
+file (GLOB_RECURSE TeXmacs_Sqlite_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/Sqlite3/*.cpp")
+list (APPEND TeXmacs_Std_Plugins_SRCS ${TeXmacs_Sqlite_SRCS})
 
 # GUI Sources
 file (GLOB TeXmacs_Qt_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/Qt/*.cpp")
+list (FILTER TeXmacs_Qt_SRCS EXCLUDE REGEX "moc_.*\\.cpp$")
 file (GLOB TeXmacs_Qt_HDRS "${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/Qt/*.hpp")
 
 # System OS Sources
@@ -518,7 +531,15 @@ if (WIN32)
     list (REMOVE_ITEM TeXmacs_OS_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/Windows/windows32_entrypoint.cpp")
   endif ()
 elseif (APPLE)
-  # Apple/Cocoa
+  # Unix system layer plus the Objective-C(++) helpers of Plugins/MacOS
+  enable_language (OBJC OBJCXX)
+  set (CMAKE_OBJCXX_STANDARD 17)
+  set (CMAKE_OBJCXX_STANDARD_REQUIRED ON)
+  file (GLOB TeXmacs_OS_SRCS
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/Unix/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/MacOS/*.m"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/MacOS/*.mm")
+  list (REMOVE_ITEM TeXmacs_OS_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/Unix/unix_entrypoint.cpp")
 else ()
   file (GLOB TeXmacs_OS_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/Unix/*.cpp")
   list (REMOVE_ITEM TeXmacs_OS_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/Unix/unix_entrypoint.cpp")
@@ -547,6 +568,7 @@ set (TeXmacs_All_SRCS
 ### --------------------------------------------------------------------
 
 set (TeXmacs_Include_Dirs
+  ${CMAKE_CURRENT_BINARY_DIR}/src/System
   ${CMAKE_CURRENT_SOURCE_DIR}/src
   ${CMAKE_CURRENT_SOURCE_DIR}/src/Data/Convert
   ${CMAKE_CURRENT_SOURCE_DIR}/src/Data/Document
@@ -604,7 +626,6 @@ set (TeXmacs_Include_Dirs
   ${CMAKE_CURRENT_SOURCE_DIR}/src/Typeset/Concat
   ${CMAKE_CURRENT_SOURCE_DIR}/src/Typeset/Page
   ${CMAKE_CURRENT_SOURCE_DIR}/TeXmacs/include
-  ${CMAKE_CURRENT_BINARY_DIR}/src/System
   ${Guile_INCLUDE_DIRS}
   ${FREETYPE_INCLUDE_DIRS}
   ${PNG_INCLUDE_DIRS}
@@ -630,6 +651,10 @@ if (SQLITE3_INCLUDE_DIRS)
   list (APPEND TeXmacs_Include_Dirs ${SQLITE3_INCLUDE_DIRS})
 elseif (SQLite3_INCLUDE_DIRS)
   list (APPEND TeXmacs_Include_Dirs ${SQLite3_INCLUDE_DIRS})
+elseif (SQLITE3_INCLUDE_DIR)
+  list (APPEND TeXmacs_Include_Dirs ${SQLITE3_INCLUDE_DIR})
+elseif (SQLite3_INCLUDE_DIR)
+  list (APPEND TeXmacs_Include_Dirs ${SQLite3_INCLUDE_DIR})
 endif ()
 
 ### --------------------------------------------------------------------
@@ -646,21 +671,36 @@ set (TeXmacs_Libraries
   ${GNUTLS_EXTRA_LIBS}
 )
 
+if (TM_DYNAMIC_LINKING)
+  list (APPEND TeXmacs_Libraries ${CMAKE_DL_LIBS})
+endif ()
+
 if (USE_RESVG)
   list (APPEND TeXmacs_Libraries ${RESVG_LIBRARIES})
 endif ()
 if (USE_ASPELL)
   list (APPEND TeXmacs_Libraries ${ASPELL_LIBRARIES})
 endif ()
-if (USE_ICONV AND Iconv_LIBRARIES)
-  list (APPEND TeXmacs_Libraries ${Iconv_LIBRARIES})
+if (USE_ICONV)
+  if (Iconv_LIBRARIES)
+    list (APPEND TeXmacs_Libraries ${Iconv_LIBRARIES})
+  elseif (ICONV_LIBRARIES)
+    list (APPEND TeXmacs_Libraries ${ICONV_LIBRARIES})
+  endif ()
 endif ()
 if (USE_SQLITE3)
   if (SQLITE3_LIBRARIES)
     list (APPEND TeXmacs_Libraries ${SQLITE3_LIBRARIES})
   elseif (SQLite3_LIBRARIES)
     list (APPEND TeXmacs_Libraries ${SQLite3_LIBRARIES})
+  elseif (SQLITE3_LIBRARY)
+    list (APPEND TeXmacs_Libraries ${SQLITE3_LIBRARY})
+  elseif (SQLite3_LIBRARY)
+    list (APPEND TeXmacs_Libraries ${SQLite3_LIBRARY})
   endif ()
+endif ()
+if (APPLE)
+  list (APPEND TeXmacs_Libraries "-framework Cocoa" "-framework IOKit")
 endif ()
 if (WIN32)
   list (APPEND TeXmacs_Libraries
@@ -672,10 +712,21 @@ endif ()
 ### Subdirectories
 ### --------------------------------------------------------------------
 
+# Install location of texmacs.bin, relative to CMAKE_INSTALL_PREFIX
+# (the texmacs script configured in misc/ expects it in libexec/TeXmacs/bin)
+set (tmbin "libexec/TeXmacs")
+
 add_subdirectory (src)
 add_subdirectory (plugins)
 add_subdirectory (misc)
 add_subdirectory (TeXmacs)
+
+# C++ unit tests (Qt Test based, see tests/README.md); run them with ctest
+option (TEXMACS_BUILD_TESTS "Build the C++ unit tests in tests/" OFF)
+if (TEXMACS_BUILD_TESTS)
+  enable_testing ()
+  add_subdirectory (tests)
+endif ()
 
 ### --------------------------------------------------------------------
 ### Installation

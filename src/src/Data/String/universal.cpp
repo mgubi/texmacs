@@ -195,9 +195,9 @@ string
 uni_locase_char (string s) {
   if (N(s) == 1) {
     unsigned char c= s[0];
-    if ((is_iso_upcase (c)) ||
-        (c >= ((unsigned char) 0x80) && (c <= ((unsigned char) 0x9F))) ||
-        (c >= ((unsigned char) 0xC0) && (c <= ((unsigned char) 0xDF))))
+    if (c == ((unsigned char) 0x9D)) return "i"; // I with dot above
+    if (c == ((unsigned char) 0x9E)) return s;   // d with stroke
+    if (is_iso_upcase (c))
       return string ((char) (c + 0x20));
     return s;
   }
@@ -231,7 +231,13 @@ uni_locase_char (string s) {
     else if (code >= 0x400 && code <= 0x40F) code += 0x50;
     else if (code >= 0x410 && code <= 0x42F) code += 0x20;
     else if (code >= 0x460 && code <= 0x4FF) {
-      if ((code & 1) == 0) code += 1;
+      // capitals are even, except for the signs 0x482-0x489, which have no
+      // case, the palochka 0x4C0 and 0x4CF, and 0x4C1-0x4CE (odd capitals)
+      if (code >= 0x482 && code <= 0x489);
+      else if (code == 0x4C0) code= 0x4CF;
+      else if (code >= 0x4C1 && code <= 0x4CF) {
+        if ((code & 1) == 1 && code != 0x4CF) code += 1; }
+      else if ((code & 1) == 0) code += 1;
     }
     return "<#" * as_hexadecimal (code) * ">";
   }
@@ -246,9 +252,8 @@ string
 uni_upcase_char (string s) {
   if (N(s) == 1) {
     unsigned char c= s[0];
-    if ((is_iso_locase (c)) ||
-        (c >= ((unsigned char) 0xA0) && (c <= ((unsigned char) 0xBF))) ||
-        (c >= ((unsigned char) 0xE0)))
+    if (c == ((unsigned char) 0x9E)) return string ((char) 0xD0); // D stroke
+    if (is_iso_locase (c))
       return string ((char) (c - 0x20));
     return s;
   }
@@ -273,7 +278,8 @@ uni_upcase_char (string s) {
       else if ((code & 1) == 1) code -= 1;
     }
     else if (code >= 0x3AC && code <= 0x3CE) {
-      if      (code >= 0x3B1 && code <= 0x3CB) code -= 0x20;
+      if      (code == 0x3C2) code= 0x3A3;  // final sigma
+      else if (code >= 0x3B1 && code <= 0x3CB) code -= 0x20;
       else if (code >= 0x3AC && code <= 0x3AC) code -= 0x26;
       else if (code >= 0x3AD && code <= 0x3AF) code -= 0x25;
       else if (code >= 0x3CC && code <= 0x3CC) code -= 0x40;
@@ -282,7 +288,12 @@ uni_upcase_char (string s) {
     else if (code >= 0x450 && code <= 0x45F) code -= 0x50;
     else if (code >= 0x430 && code <= 0x44F) code -= 0x20;
     else if (code >= 0x460 && code <= 0x4FF) {
-      if ((code & 1) == 1) code -= 1;
+      // as in uni_locase_char
+      if (code >= 0x482 && code <= 0x489);
+      else if (code == 0x4CF) code= 0x4C0;
+      else if (code >= 0x4C0 && code <= 0x4CE) {
+        if ((code & 1) == 0 && code != 0x4C0) code -= 1; }
+      else if ((code & 1) == 1) code -= 1;
     }
     return "<#" * as_hexadecimal (code) * ">";
   }
@@ -455,9 +466,11 @@ bool
 uni_is_letter (string s) {
   if (N(s) == 1) {
     unsigned char c= s[0];
+    // above 127 every Cork character is a letter but the section sign, the
+    // inverted marks and the pound sign
     return
       is_alpha (c) ||
-      (((unsigned int) c) >= 128 && (((unsigned int) c) & 97) != 31);
+      (c >= 128 && c != 0x9F && c != 0xBD && c != 0xBE && c != 0xBF);
   }
   else if (starts (s, "<#") && ends (s, ">")) {
     int code= from_hexadecimal (s (2, N(s) - 1));

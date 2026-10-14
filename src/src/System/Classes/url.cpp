@@ -887,6 +887,12 @@ complete (url base, url sub, url u, string filter, bool flag) {
     url res= complete (sub[1], sub[2], u, filter, flag);
     return sub[1] * res;
   }
+  if (is_concat (sub)) {
+    // NOTE: sub[2] may hold alternatives, as obtained by completing
+    // url_any (), so that base * sub would not be a valid base
+    url res= complete (base * sub[1], sub[2], u, filter, flag);
+    return sub[1] * res;
+  }
   return sub * complete (base * sub, u, filter, flag);
 }
 
@@ -1053,7 +1059,7 @@ resolve_in_path (url u) {
   if (use_which) {
     string name = escape_sh (as_string (u));
     string which= var_eval_system ("which " * name * " 2> /dev/null");
-    if (ends (which, name))
+    if (ends (which, as_string (u)))
       return which;
     else if ((which != "") &&
              (!occurs ("bin/which: ", which)) &&

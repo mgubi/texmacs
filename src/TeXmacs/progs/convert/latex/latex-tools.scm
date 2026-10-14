@@ -160,6 +160,16 @@
 (define (latex-catcode-def key im)
   (string-append "\\catcode`\\" key "=\\active \\def" key "{" im "}\n"))
 
+(define (latex-catcode-def* key im)
+  ;; Only activate the character at the beginning of the document:
+  ;; package code read later in the preamble or at \begin{document}
+  ;; uses < and > in numeric comparisons.  In math mode, keep the
+  ;; ordinary math symbol.
+  (string-append "{\\catcode`\\" key "=\\active \\gdef" key
+                 "{\\relax\\ifmmode\\string" key "\\else"
+                 im "\\fi}}\n"
+                 "\\AtBeginDocument{\\catcode`\\" key "=\\active}\n"))
+
 (tm-define (latex-catcode-defs doc)
   (:synopsis "Return necessary catcode definitions for @doc")
   (string-append
@@ -179,11 +189,11 @@
              (keys (map car l2))
              (ims (map (lambda (x)
                          (string-append
-                           "\n\\fontencoding{T1}\\selectfont\\symbol{"
+                           "\\fontencoding{T1}\\selectfont\\symbol{"
                            (cdr x)
                            "}\\fontencoding{\\encodingdefault}"))
                        l2))
-             (l3 (map latex-catcode-def keys ims)))
+             (l3 (map latex-catcode-def* keys ims)))
         (apply string-append l3)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

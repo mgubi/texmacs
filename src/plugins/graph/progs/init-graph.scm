@@ -25,7 +25,7 @@
                      "/plugins/tmpy/session/tm_graph.py\"")))
 
 (plugin-configure graph
-  (:require (python-command))
+  (:require (!= (python-command) ""))
   (:launch ,(graph-launcher))
   (:serializer ,graph-serialize)
   (:session "Graph"))

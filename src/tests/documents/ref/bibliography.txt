@@ -1,0 +1,27 @@
+pages: 1
+--- page 1
+1 Citations
+
+This document cites entries of the file bibliography.bib, which lies next to it, and lets the
+bibliography be generated in the tm-plain style. Line breaking is due to Knuth and Plass [2], and
+the algorithm is described in the TEXbook [1]. LATEX is documented in [3], and TEXMACS in [4].
+Several entries may be cited at once [1, 3], and a citation may carry a detail [1, chapter 14]. An
+entry which is never cited does not appear in the bibliography.
+
+Bibliography
+
+[1]
+Donald E. Knuth. The TEXbook. Addison-Wesley, Reading, Massachusetts, 1984.
+[2]
+Donald E. Knuth and Michael F. Plass. Breaking paragraphs into lines. Software: Practice and Experience,
+11(11):1119–1184, 1981.
+[3]
+Leslie Lamport. LATEX: a document preparation system. Addison-Wesley, Second edition, 1994.
+[4]
+Joris van der Hoeven. GNU TeXmacs: a free, structured, wysiwyg and technical text editor. In Proceedings of
+the GUTenberg conference, number 39–40, pages 39–50. Metz, 2001.
+
+Bibliography
+1
+
+

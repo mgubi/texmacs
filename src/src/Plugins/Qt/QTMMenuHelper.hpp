@@ -476,6 +476,7 @@ class QTMScrollArea : public QScrollArea {
 
 public:
   QTMScrollArea (QWidget* p = NULL) : QScrollArea(p) { };
+  ~QTMScrollArea ();
   void setWidgetAndConnect (QWidget* w);
 
 protected:

@@ -27,7 +27,7 @@
  *
  */
 QTMPrinterSettings::QTMPrinterSettings()
-: collateCopies(true), blackWhite(true), printerName(""), fileName(""), 
+: collateCopies(true), blackWhite(false), printerName(""), fileName(""), 
   paperSize("A4"), dpi(600), firstPage(0), lastPage(0), printOddPages(true), 
   printEvenPages(true), fitToPage(true), copyCount(1), duplex(false),
   pagesPerSide(1), pagesOrder(LR_TB), orientation(Portrait)
@@ -68,7 +68,7 @@ QTMPrinterSettings::getFromQPrinter(const QPrinter& from) {
   copyCount     = from.copyCount ();
 #endif
   collateCopies = from.collateCopies();
-  blackWhite    = (from.colorMode () == QPrinter::Color);
+  blackWhite    = (from.colorMode () == QPrinter::GrayScale);
   printProgram  = from.printProgram();
 }
 
@@ -95,7 +95,7 @@ QTMPrinterSettings::setToQPrinter(QPrinter& to) const {
   to.setCopyCount(copyCount);
 #endif  
   to.setCollateCopies(collateCopies);
-  to.setColorMode(blackWhite ? QPrinter::Color : QPrinter::GrayScale);
+  to.setColorMode(blackWhite ? QPrinter::GrayScale : QPrinter::Color);
 }
 
 /*!
@@ -363,6 +363,9 @@ CupsQTMPrinterSettings::toSystemCommand() const {
   if (fitToPage)
     _cmd += " -o fitplot";
 
+  if (blackWhite)
+    _cmd += " -o print-color-mode=monochrome";
+
   if (pagesPerSide > 1) {
     _cmd += QString(" -o number-up=%1").arg(pagesPerSide);
 
@@ -384,8 +387,8 @@ CupsQTMPrinterSettings::toSystemCommand() const {
   // The page numbers refer to the output pages and not the document's original
   // pages - options like "number-up" can affect the numbering of the pages.
   if (firstPage != 0 || lastPage != 0) {
-    int f = (int)floor(firstPage / pagesPerSide);    f = (f==0) ? 1 : f;
-    int l = (int)ceil (lastPage / pagesPerSide);     l = (l==0) ? 1 : l;
+    int f = (firstPage - 1) / pagesPerSide + 1;     f = (f<=0) ? 1 : f;
+    int l = (lastPage + pagesPerSide - 1) / pagesPerSide; l = (l<=0) ? 1 : l;
     if (firstPage > lastPage )
       _cmd += " -o outputorder=reverse";
     
@@ -537,8 +540,8 @@ WinQTMPrinterSettings::toSystemCommand() const {
   // The page numbers refer to the output pages and not the document's original
   // pages - options like "number-up" can affect the numbering of the pages.
   if (firstPage != 0 || lastPage != 0) {
-    int f = (int)floor(firstPage / pagesPerSide);    f = (f==0) ? 1 : f;
-    int l = (int)ceil (lastPage / pagesPerSide);     l = (l==0) ? 1 : l;
+    int f = (firstPage - 1) / pagesPerSide + 1;     f = (f<=0) ? 1 : f;
+    int l = (lastPage + pagesPerSide - 1) / pagesPerSide; l = (l<=0) ? 1 : l;
     // FIXME: what happens if f > l?
     _cmd += QString(" -from %1 -to %2").arg(f).arg(l);
   }

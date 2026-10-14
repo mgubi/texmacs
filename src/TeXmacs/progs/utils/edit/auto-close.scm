@@ -50,7 +50,9 @@
 	(and (!= t "")
 	     (!= (cAr p) 0)
 	     (nin? (string-ref t (- (cAr p) 1)) l))
-	(> (cAr p) 0))))
+	(and (> (cAr p) 0)
+             ;; open quotes at the beginning of a list item
+             (not (tm-in? t '(item item*)))))))
 
 (define (open-quotes lan)
   (cond ((== lan "none") (insert "\""))

@@ -30,7 +30,7 @@
 (plugin-configure dot 
   (:winpath "Graphviz" "bin")
   (:require (url-exists-in-path? "dot"))
-  (:require (python-command))
+  (:require (!= (python-command) ""))
   (:launch ,(graphviz-launcher))
   (:serializer ,graphviz-serialize)
   (:session "Graphviz"))

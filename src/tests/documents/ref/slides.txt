@@ -1,0 +1,57 @@
+pages: 4
+--- page 1
+A sample presentation
+1/4
+
+A sample presentation
+
+by Ada Lovelace
+
+
+--- page 2
+Lists
+2/4
+
+A presentation is a sequence of screens, each with a title in the bar at the top and its number
+among the screens at the right.
+
+• The paper version prints one screen per page.
+
+• The pages are as large as the screens.
+
+◦Nested items have their own bullets.
+
+
+--- page 3
+Mathematics
+3/4
+
+Theorem 1. For all n > 1, P
+
+k=1
+n
+k3 = (P
+
+k=1
+n
+k)2.
+
+Z
+
+0
+
+1
+x2 dx = 1
+
+3
+
+
+--- page 4
+The last screen
+4/4
+
+1. Screens are numbered.
+
+2. The last one is not followed by an empty page.
+
+

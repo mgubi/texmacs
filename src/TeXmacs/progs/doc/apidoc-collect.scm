@@ -63,10 +63,7 @@
 
 (define (doctree-lan t)
   "Returns the language of the TeXmacs document tree @t."
-  (let* ((s (select t '(initial collection associate)))
-         (flt (lambda (x) (== (tm-ref x 0) "language")))
-         (s2 (list-filter (map tree->stree s) flt)))
-    (or (and (nnull? s2) (tm-ref (car s2) 1)) "english")))
+  (tmfile-language t))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Parsing and processing of explain tags in texmacs trees.
@@ -214,13 +211,21 @@
   (doc-check-cache)
   (doc-retrieve* cache key lan))
 
+(define (doc-delete-cache-file u)
+  ;; only delete inside the cache directory: the preferences
+  ;; holding the cache locations may have been edited by hand
+  (with cache (url-append (get-texmacs-home-path) "system/cache")
+    (cond ((or (not (url-descends? u cache)) (== (url->url u) cache)) (noop))
+          ((url-directory? u) (system-rmdir-recursive u))
+          ((url-exists? u) (system-remove u)))))
+
 (define (doc-delete-cache*)
   (with s (url->system (doc-scm-cache))
-    (display* "I WOULD HAVE deleted the cache at " s ".\n")
+    (doc-delete-cache-file (system->url s))
     (reset-preference "doc:doc-scm-cache")
     (set-message `(replace "The cache at %1 was deleted" (verbatim ,s)) ""))
   (with s (url->system (doc-macro-cache))
-    (display* "I WOULD HAVE deleted the cache at " s ".\n")
+    (doc-delete-cache-file (system->url s))
     (reset-preference "doc:doc-macro-cache")
     (set-message `(replace "The cache at %1 was deleted" (verbatim ,s)) ""))
   (reset-preference "doc:collect-timestamp")

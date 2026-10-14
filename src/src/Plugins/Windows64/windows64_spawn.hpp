@@ -52,7 +52,7 @@ public:
   spawn_system(array<Channel> &ch, string name, array<string> args);
   inline int getpid() { return (pid); }
   int wait();
-  inline bool isRunning() { return (pid?true:false); }
+  inline bool isRunning() { return (pid > 0); }
 private:
   intptr_t pid;
   array<Channel> &channel;

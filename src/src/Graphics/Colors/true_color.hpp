@@ -93,7 +93,6 @@ operator -= (true_color& c1, const true_color& c2) {
 
 inline true_color&
 operator *= (true_color& c1, const true_color& c2) {
-  cout << c1 << ", " << c2 << "\n";
   c1.r *= c2.r; c1.g *= c2.g; c1.b *= c2.b; c1.a *= c2.a;
   return c1;
 }
@@ -127,8 +126,8 @@ min (const true_color& c1, const true_color& c2) {
 
 inline true_color
 max (const true_color& c1, const true_color& c2) {
-  return true_color (max (c1.r, c2.r), min (c1.g, c2.g),
-                     max (c1.b, c2.b), min (c1.a, c2.a));
+  return true_color (max (c1.r, c2.r), max (c1.g, c2.g),
+                     max (c1.b, c2.b), max (c1.a, c2.a));
 }
 
 /******************************************************************************
