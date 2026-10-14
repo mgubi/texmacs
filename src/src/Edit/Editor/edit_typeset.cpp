@@ -991,11 +991,6 @@ edit_typeset_rep::typeset_sub (SI& x1, SI& y1, SI& x2, SI& y2) {
   catch (string msg) {
     the_exception= msg;
     std_error << "Typesetting failure, resetting to empty document\n";
-    // the bridges which were being typeset when the exception came did not
-    // stop recording what they read: their records are gone with them
-    env->record_reads (NULL, false);
-    env->record_lookups (NULL, NULL);
-    env->read_unknown= false;
     assign (rp, tree (DOCUMENT, ""));
     ::notify_assign (ttt, path(), subtree (et, rp));
     eb= ::typeset (ttt, x1, y1, x2, y2);    
@@ -1094,11 +1089,13 @@ edit_typeset_rep::typeset_invalidate_all () {
 // The automatic labels are numbered again, in the order of the document
 // (exec_auto_id in env_exec.cpp), which is to be done before the tables
 // of contents and the indexes are made again: these hold the names of
-// the labels. All the views of the buffer have the same labels.
+// the labels. All the views of the buffer have the same labels. Tells
+// whether a name changed.
 bool
 edit_typeset_rep::typeset_renumber_labels () {
-  // (the tree which holds the numbers to come: see auto_label_tag)
+  // (the tree which holds the numbers to come: see exec_auto_id)
   tree root= is_nil (rp) ? et : et[rp->item];
+  array<int> before= auto_labels_numbers (root);
   if (!auto_labels_renumber (root)) return false;
   for (int i=0; i<N(buf->vws); i++)
     ((tm_view) buf->vws[i])->ed->typeset_invalidate_all ();
@@ -1110,8 +1107,7 @@ edit_typeset_rep::typeset_renumber_labels () {
     env->complete= false;
     clean_unused (env->local_ref, env->touched);
   }
-  auto_labels_numbered (root);
-  return true;
+  return auto_labels_numbers (root) != before;
 }
 
 void

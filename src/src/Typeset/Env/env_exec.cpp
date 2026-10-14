@@ -2080,40 +2080,36 @@ edit_env_rep::exec_has_binding (tree t) {
 * <auto-id|new> takes a number for a new label and <auto-id|last> gives
 * the last one taken (std-automatic.ts also has a macro auto-id, which
 * is what a TeXmacs without this primitive calls: it uses the counter).
-* The number is that of the tag of the document which makes the label:
-* the section, the index entry, the figure. The tag is found from the
-* arguments of the macros which are being expanded (auto_label_tag): the
-* innermost one which has a place in the document is an argument of it.
-* Its number is kept with its tree, in an addendum (ADDENDUM_AUTO_ID,
-* which holds an epoch and the number). It is given when the tag first
-* makes a label, not before, and stays as long as the tree does: a tag
-* which is typeset again makes the same label, in all the windows on the
-* document, which share the tree, and a new tag gets the next number
-* which no tag had. The numbers to come are kept in the same way with the
-* tree of the buffer (an epoch, the next number and whether some tag was
-* numbered out of the order of the document).
 *
-* A tag may make several labels: the first is auto-n and the k-th one
-* auto-n.k. The variable auto-last holds the last name which was given,
-* so that the tag which makes a label is typeset again when the label
-* before it is another one (the next one after a new section is, once).
-* The variable auto-open holds the last names given by the tag and by the
-* tags around it in the document, which may make other labels after one
-* of a tag inside them (an entry of the index before and after the body
-* of a tag, with one in the body): k is one more than in the name which
-* the tag has there. It is a variable, and not a count kept with the
-* tag, because the labels of a tag may be made by several bridges, of
-* which some are not typeset again.
-* A label which no tag of the document makes (in an included file...) is
-* auto-xk, where k is the old counter, auto-nr.
+* The labels of a buffer are numbered from one sequence, kept with the
+* tree of the buffer in an addendum (ADDENDUM_AUTO_ID: an epoch and the
+* next number). A label made by a tag of the document (the section, the
+* index entry, the figure) keeps its number: the tag holds the numbers of
+* its labels in an addendum (the epoch and the numbers), its k-th label
+* has the k-th of them, and a label which it did not make before takes
+* the next number of the sequence. A label which no tag of the buffer
+* makes (in an included file...) takes the next number each time. The
+* name is auto-n, as with the counter: when the labels were numbered in
+* the order in which they are made, the names are those of the counter.
+* This is what a document gets when it is loaded, and again when it is
+* updated (typeset_renumber_labels in edit_typeset.cpp): the epoch of the
+* buffer changes, the numbers of another epoch are not used, and a
+* typesetting of the whole document numbers the labels again. Between two
+* updates the names of the labels already made stay. Outside of a
+* typesetting pass (a converter which expands the macros of a copy of the
+* document) the counter names the labels, which gives the same names in a
+* document which was updated.
 *
-* The numbers are those of the order in which the tags first made a label.
-* When the document is updated (typeset_renumber_labels in
-* edit_typeset.cpp) they are given again, from 1 and in the order of the
-* document, as they are when it is loaded: the epoch of the buffer changes,
-* the numbers of another epoch are not used and everything is typeset
-* again. A table of contents which is not updated after new sections
-* holds, as before, names which are others when the document is loaded.
+* The tag of a label is the one whose arguments the innermost macro which
+* has any is applied to (auto_label_tag). The variable auto-last holds the
+* last name which was given, so that the tag which makes a label is
+* typeset again when the label before it is another one. The variable
+* auto-open holds, for the tag and for the tags around it in the document,
+* which of their labels was made last (tag.k, the tag being the number of
+* its first label): a tag may make other labels after those of a tag
+* inside it. It is a variable, and not a count kept with the tag, because
+* the labels of a tag may be made by several bridges, of which some are
+* not typeset again.
 *
 * With the environment variable TEXMACS_STABLE_LABELS set to "off" the
 * counter is used as before (inc-auto, auto-nr).
@@ -2130,19 +2126,35 @@ auto_label_data (tree t, array<int>& a) {
   return true;
 }
 
+static void
+auto_labels_numbers (tree t, int epoch, array<int>& r) {
+  array<int> a;
+  if (auto_label_data (t, a) && N(a) >= 1 && a[0] == epoch) {
+    r << -1;
+    for (int i=1; i<N(a); i++) r << a[i];
+  }
+  if (is_compound (t))
+    for (int i=0; i<N(t); i++) auto_labels_numbers (t[i], epoch, r);
+}
+
+array<int>
+auto_labels_numbers (tree root) {
+  // the numbers of the labels of the tags, in the order of the document,
+  // and the next number
+  array<int> b, r;
+  if (!auto_label_data (root, b) || N(b) < 2) return r;
+  auto_labels_numbers (root, b[0], r);
+  r << b[1];
+  return r;
+}
+
 bool
 auto_labels_renumber (tree root) {
   array<int> r;
-  if (!auto_label_data (root, r) || r[2] == 0) return false;
+  if (!auto_label_data (root, r) || N(r) < 2) return false;
   r[0]= ++auto_epoch;
   r[1]= 1;
   return true;
-}
-
-void
-auto_labels_numbered (tree root) {
-  array<int> r;
-  if (auto_label_data (root, r)) r[2]= 0;
 }
 
 bool
@@ -2182,10 +2194,8 @@ tree
 edit_env_rep::exec_auto_id (tree t) {
   static bool stable= (get_env ("TEXMACS_STABLE_LABELS") != "off");
   bool fresh= (N(t) >= 1 && exec_string (t[0]) == "new");
-  // outside of a typesetting pass (a converter which expands the macros of
-  // a copy of the document, whose tags are not in the document), the
-  // counter: these are the names of a document which was updated
-  if (!stable || typesetting == 0) {
+  // outside of a typesetting pass of a buffer, the counter
+  if (!stable || typesetting == 0 || !is_compound (auto_buffer)) {
     if (fresh) { (void) exec (compound ("inc-auto")); return ""; }
     return exec (tree (VALUE, "auto-nr"));
   }
@@ -2195,36 +2205,39 @@ edit_env_rep::exec_auto_id (tree t) {
     if (N(last) == 0) return exec (tree (VALUE, "auto-nr"));
     return last;
   }
-  string name;
+  // the sequence of the buffer: an epoch and the next number
+  array<int> r;
+  if (!auto_label_data (auto_buffer, r)) {
+    r= array<int> ();
+    r << (++auto_epoch) << 1;
+    (void) tree_addendum_new (auto_buffer, ADDENDUM_AUTO_ID,
+                              close_box<array<int> > (r), false);
+  }
+  int number;
   tree tag, root;
   path where;
-  if (auto_label_tag (tag, root, where)) {
-    array<int> r, a;
-    if (!auto_label_data (root, r)) {
-      r= array<int> ();
-      r << (++auto_epoch) << 1 << 0;
-      (void) tree_addendum_new (root, ADDENDUM_AUTO_ID,
-                                close_box<array<int> > (r), false);
-    }
+  if (auto_label_tag (tag, root, where) && strong_equal (root, auto_buffer)) {
+    // the numbers of the labels of the tag, given in this epoch
+    array<int> a;
     if (!auto_label_data (tag, a)) {
       a= array<int> ();
-      a << 0 << 0;
+      a << 0;
       (void) tree_addendum_new (tag, ADDENDUM_AUTO_ID,
                                 close_box<array<int> > (a), false);
     }
-    bool given= (a[0] != r[0]);
-    if (given) { a[0]= r[0]; a[1]= r[1]++; }
-    string nr= as_string (a[1]);
-    // the tags around this one which have a number
+    if (a[0] != r[0]) { a->resize (1); a[0]= r[0]; }
+    if (N(a) == 1) a << r[1]++;
+    string key= as_string (a[1]);
+    // the tags around this one which have labels
     array<string> around;
-    // (below the tree of the buffer, which holds the numbers to come)
     tree up= root;
     for (path q= where->next; !is_nil (q) && !is_nil (q->next); q= q->next) {
       up= up[q->item];
       array<int> b;
-      if (auto_label_data (up, b) && b[0] == r[0]) around << as_string (b[1]);
+      if (auto_label_data (up, b) && N(b) >= 2 && b[0] == r[0])
+        around << as_string (b[1]);
     }
-    // the names which they gave last, and the one of this tag
+    // which of their labels each of them made last, and this tag
     tree open (TUPLE), now (TUPLE);
     if (provides ("auto-open")) open= read ("auto-open");
     int k= 1;
@@ -2233,25 +2246,16 @@ edit_env_rep::exec_auto_id (tree t) {
       string s= open[i]->label, base= s;
       int dot= search_forwards (".", s);
       if (dot >= 0) base= s (0, dot);
-      if (base == nr) k= (dot < 0 ? 1 : as_int (s (dot + 1, N(s)))) + 1;
+      if (base == key) k= (dot < 0 ? 1 : as_int (s (dot + 1, N(s)))) + 1;
       else if (contains (base, around)) now << open[i];
     }
-    if (k == 1) {
-      // numbered in the order of the document?
-      auto_seen++;
-      if (given && !(complete && a[1] == auto_seen)) r[2]= 1;
-      name= nr;
-    }
-    else name= nr * "." * as_string (k);
-    now << tree (name);
+    if (N(a) - 1 < k) a << r[1]++;
+    number= a[k];
+    now << tree (key * "." * as_string (k));
     if (now != open) monitored_write ("auto-open", now);
   }
-  else {
-    int n= 1;
-    if (provides ("auto-nr")) n= as_int (read ("auto-nr")) + 1;
-    monitored_write ("auto-nr", as_string (n));
-    name= "x" * as_string (n);
-  }
+  else number= r[1]++;
+  string name= as_string (number);
   if (name != last) monitored_write ("auto-last", name);
   return "";
 }

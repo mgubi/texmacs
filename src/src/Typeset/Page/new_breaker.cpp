@@ -1260,6 +1260,7 @@ new_break_pages (array<page_item> l, space ph, int qual,
     skeleton sk0=
       search_page_breaks (l, ph, qual, fn_sep, fnote_sep, float_sep, fn,
                           first_page, 0, nums, trees, num_off, tree_off);
+    if (sk0 != sk) typeset_check_mismatches++;
     if (sk0 != sk)
       failed_error << "The faster search of the page breaks differs "
                    << "from the search as it was (" << N(l) << " items)" << LF;
@@ -1267,6 +1268,7 @@ new_break_pages (array<page_item> l, space ph, int qual,
 
   if (memo != NULL) {
     // "check": what was kept against what is found
+    if (memo->sk != sk) typeset_check_mismatches++;
     if (memo->sk != sk)
       failed_error << "The skeleton kept for this signature differs "
                    << "from the one found (" << N(l) << " items)" << LF;

@@ -10,6 +10,7 @@
 ******************************************************************************/
 
 #include "Bridge/impl_typesetter.hpp"
+extern tree the_et;
 #include "iterator.hpp"
 #include "sys_utils.hpp" // get_env
 #include <chrono>
@@ -120,6 +121,9 @@ typesetter_rep::local_end (array<page_item>& prev_l, stack_border& prev_sb) {
 ******************************************************************************/
 
 // see typesetter.hpp
+int typeset_check_mismatches= 0;
+int get_typeset_check_mismatches () { return typeset_check_mismatches; }
+
 edit_profile_data edit_profile=
   { get_env ("TEXMACS_EDIT_PROFILE") != "" }; // (and zeros)
 
@@ -163,7 +167,12 @@ typesetter_rep::determine_page_references (box b) {
 
 box
 typesetter_rep::typeset () {
-  edit_env_rep::typesetting_pass pass (env.operator-> ());
+  // (the tree of the buffer, for the automatic labels: see exec_auto_id)
+  path rp= reverse (br->ip);
+  tree buffer= "";
+  if (!is_nil (rp) && rp->item >= 0 && has_subtree (the_et, path (rp->item)))
+    buffer= the_et[rp->item];
+  edit_env_rep::typesetting_pass pass (env.operator-> (), buffer);
   old_patch= hashmap<string,tree> (UNINIT);
   l        = array<page_item> ();
   sb       = stack_border ();
@@ -183,7 +192,6 @@ typesetter_rep::typeset () {
   }
 
   // Typeset
-  env->auto_seen= 0;
   if (env->complete) {
     env->local_aux= hashmap<string,tree> (UNINIT);
     env->missing  = hashmap<string,tree> (UNINIT);
