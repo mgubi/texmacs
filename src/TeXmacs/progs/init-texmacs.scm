@@ -325,6 +325,8 @@
            graphics-focus-icons)
 (lazy-define (graphics graphics-object)
              graphics-reset-state graphics-decorations-update)
+(lazy-menu (graphics graphics-menu) graphics-insert-menu graphics-focus-menu)
+(lazy-define (graphics graphics-group) graphics-selection-active?)
 (lazy-define (graphics graphics-utils) make-graphics)
 (lazy-define (graphics graphics-edit)
              graphics-busy?
