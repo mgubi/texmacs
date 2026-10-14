@@ -139,7 +139,7 @@
 (define (tmof-block? x)
   (and (pair? x)
        (in? (car x) '(meta h1 h2 h3 h4 h5 h6 !h !role !para p blockquote ul ol pre hr
-                      table footnote-def !display !pagebreak !toc))))
+                      table footnote-def !display !pagebreak !toc columns))))
 
 (define (tmof-blank? x)
   (and (string? x) (== (string-trim-spaces x) "")))
@@ -524,7 +524,9 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define (tmof-noop l) '())
-(define (tmof-space l) '(" "))
+(define (tmof-space l)
+  ;; a space; the wide one of a tab of an office document is a tab
+  (if (and (pair? l) (== (car l) "2em")) '((tab)) '(" ")))
 (define (tmof-first l) (if (null? l) '() (tmof (car l))))
 (define (tmof-last l) (if (null? l) '() (tmof (cAr l))))
 (define (tmof-all l) (append-map tmof l))
@@ -688,9 +690,12 @@
          (png (url-glue base ".png"))
          (pdf (url-glue base ".pdf"))
          (svg (url-glue base ".svg"))
-         (r (catch #t
-              (lambda () (tmof-picture* x vector png pdf svg))
-              (lambda args '()))))
+         ;; (without a window, as texmacs -headless, there are no fonts to
+         ;; typeset with: Qt would end TeXmacs)
+         (r (if (headless?) '()
+                (catch #t
+                  (lambda () (tmof-picture* x vector png pdf svg))
+                  (lambda args '())))))
     (for (u (list png pdf svg))
       (when (url-exists? u) (system-remove u)))
     r))
@@ -763,6 +768,33 @@
                                       data))
              (if (null? r) (list (string-append "[" name "]")) r)))
           (else '()))))
+
+(define (tmof-clip-part s unit)
+  ;; the part of a side which "0.1w" says, or #f
+  (and (string? s) (string-ends? s unit)
+       (office-number (substring s 0 (- (string-length s) 1)))))
+
+(define (tmof-clipped l)
+  ;; an image of which parts are cut: the image, with these parts (the
+  ;; style office reads a cropped picture so)
+  (let* ((r (if (null? l) '() (tmof (car l))))
+         (img (and (list-1? r) (func? (car r) 'image) (car r)))
+         (x1 (and (>= (length l) 5) (tmof-clip-part (list-ref l 1) "w")))
+         (y1 (and (>= (length l) 5) (tmof-clip-part (list-ref l 2) "h")))
+         (x2 (and (>= (length l) 5) (tmof-clip-part (list-ref l 3) "w")))
+         (y2 (and (>= (length l) 5) (tmof-clip-part (list-ref l 4) "h"))))
+    (if (not (and img x1 y1 x2 y2 (> x2 x1) (> y2 y1))) r
+        (let* ((attrs (tmof-node-attrs img))
+               (get (lambda (k) (with a (assoc k attrs) (and a (cadr a)))))
+               (w (office-length->cm (get 'width)))
+               (h (office-length->cm (get 'height)))
+               (crop (string-recompose
+                       (map office-decimal (list x1 (- 1 y2) (- 1 x2) y1)) " ")))
+          (if (not (and w h)) r
+              `((image (@ ,@(list-filter attrs (lambda (a) (not (in? (car a) '(width height)))))
+                          (width ,(tmof-cm-string (* w (- x2 x1))))
+                          (height ,(tmof-cm-string (* h (- y2 y1))))
+                          (crop ,crop)))))))))
 
 (define (tmof-specific l)
   ;; what is for another medium only is left out
@@ -844,6 +876,19 @@
         ((and (== var "font-shape") (== val "small-caps"))
          (tmof-wrap 'smallcaps body))
         ((== var "color") (tmof-colored body (tmof-color val)))
+        ;; the alignment of the paragraphs
+        ((and (== var "par-mode") (in? val '("left" "center" "right" "justify")))
+         (if (tmof-has-block? body)
+             (map (lambda (b)
+                    (cond ((func? b 'p) `(!para ((align ,val)) ,@(cdr b)))
+                          ((func? b '!para)
+                           `(!para ((align ,val) ,@(list-filter (cadr b)
+                                                                (lambda (a) (!= (car a) 'align))))
+                                   ,@(cddr b)))
+                          (else b)))
+                  (tmof-blocks body))
+             (if (null? (tmof-trim body)) body
+                 `((!para ((align ,val)) ,@body)))))
         (else body)))
 
 (define (tmof-with l)
@@ -1032,6 +1077,59 @@
 (define (tmof-subsection-numbered l) (tmof-counted-heading 3 l))
 (define (tmof-subsubsection-numbered l) (tmof-counted-heading 4 l))
 
+;; The macros of the style office (office.ts): what they keep is written
+;; again, as it was read
+
+(define (tmof-office-par l)
+  ;; a paragraph of a named style: each of its paragraphs has the style
+  (if (< (length l) 2) '()
+      (with name (tmof-plain (car l))
+        (map (lambda (b)
+               (cond ((func? b 'p) `(!para ((style ,name)) ,@(cdr b)))
+                     ((func? b '!para) `(!para ((style ,name) ,@(cadr b)) ,@(cddr b)))
+                     (else b)))
+             (tmof-blocks (tmof (cadr l)))))))
+
+(define (tmof-attr-wrap tag attrs l)
+  ;; the nodes of the tree l inside the node tag with these attributes
+  (with r (tmof (cadr l))
+    (if (tmof-has-block? r) r
+        (if (null? (tmof-trim r)) '()
+            `((,tag (@ ,@attrs) ,@(tmof-merge r)))))))
+
+(define (tmof-office-span l)
+  (if (< (length l) 2) '() (tmof-attr-wrap 'span `((style ,(tmof-plain (car l)))) l)))
+
+(define (tmof-office-field l)
+  ;; a field: its instruction (or the element of OpenDocument), its result
+  (if (< (length l) 2) '()
+      (let* ((code (tmof-plain (car l)))
+             (r (tmof (cadr l))))
+        `((field (@ ,@(if (string-starts? code "<") `((xml ,code)) `((code ,code))))
+                 ,@(tmof-merge r))))))
+
+(define (tmof-office-change tag l)
+  (if (< (length l) 3) '()
+      (with r (tmof (caddr l))
+        (if (null? r) '()
+            `((,tag (@ ,@(tmof-who l)) ,@(tmof-merge r)))))))
+
+(define (tmof-who l)
+  ;; the author and the date of a comment or of a change, when it has them
+  (list-filter `((author ,(tmof-plain (car l))) (date ,(tmof-plain (cadr l))))
+               (lambda (a) (!= (cadr a) ""))))
+
+(define (tmof-office-ins l) (tmof-office-change 'ins l))
+(define (tmof-office-del l) (tmof-office-change 'del l))
+
+(define (tmof-office-comment l)
+  (if (< (length l) 3) '()
+      `((comment (@ ,@(tmof-who l)) ,@(tmof-blocks (tmof (caddr l)))))))
+
+(define (tmof-office-columns l)
+  (if (< (length l) 2) '()
+      `((columns (@ (count ,(tmof-plain (car l)))) ,@(tmof-blocks (tmof (cadr l)))))))
+
 (define (tmof-part l) (tmof-heading 0 l))
 (define (tmof-chapter l) (tmof-heading 1 l))
 (define (tmof-appendix l) (tmof-heading 'top l))
@@ -1158,10 +1256,19 @@
   ;; a list; a numbered one may have a way of numbering (a, A, i, I)
   (let* ((body (if (null? l) '(document) (car l)))
          (pars (if (func? body 'document) (cdr body) (list body)))
-         (items (tmof-items pars)))
+         ;; the number before the first item, when the list starts at
+         ;; another one than 1
+         (first (and (pair? pars) (func? (car pars) 'concat) (pair? (cdar pars))
+                     (func? (cadar pars) 'assign 2) (== (cadr (cadar pars)) "item-nr")
+                     (string? (caddr (cadar pars)))
+                     (office-integer (caddr (cadar pars)) #f 0 100000)))
+         (pars (if first (cons (cons 'concat (cddar pars)) (cdr pars)) pars))
+         (items (tmof-items pars))
+         (attrs (append (if (null? format) '() `((format ,(car format))))
+                        (if first `((start ,(number->string (+ first 1)))) '()))))
     (if (null? items) '()
         `((,tag
-           ,@(if (null? format) '() `((@ (format ,(car format)))))
+           ,@(if (null? attrs) '() `((@ ,@attrs)))
            ,@(map (lambda (it)
                     (let* ((item (car it))
                            (check (tmof-check item))
@@ -1511,10 +1618,20 @@
            (let* ((rows (tmof-eq-rows x))
                   (numbered (list-filter rows tmof-eq-number))
                   (others (list-filter rows (lambda (r) (not (tmof-eq-number r))))))
-             (tmof-display-numbered
-               `(tabular* ,(tmof-eq-clean x))
-               (map (lambda (r) (cons (tmof-eq-number r) (tmof-labels r))) numbered)
-               (append-map tmof-labels others))))
+             ;; (the class of the formula says that its table is lines
+             ;; of equations, see mathml->omml)
+             (map (lambda (b)
+                    (if (and (func? b '!display) (pair? (cadr b)) (symbol? (car (cadr b))))
+                        (let ((m (cadr b)))
+                          `(!display (,(car m) (@ (class "tm-eqarray")
+                                                  ,@(tmof-node-attrs m))
+                                               ,@(tmof-node-children m))
+                                     ,@(cddr b)))
+                        b))
+                  (tmof-display-numbered
+                    `(tabular* ,(tmof-eq-clean x))
+                    (map (lambda (r) (cons (tmof-eq-number r) (tmof-labels r))) numbered)
+                    (append-map tmof-labels others)))))
           (else (tmof-display x)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1572,6 +1689,20 @@
          '((!pagebreak)))
         ;; what the expansion of the document could not do
         ((func? x 'error) '())
+        ;; the screens of a presentation, each on a page of its own
+        ((func? x 'screens)
+         (append-map (lambda (y)
+                       (with b (tmof (if (and (pair? y) (in? (car y) '(shown hidden))
+                                              (pair? (cdr y)))
+                                         (cadr y) y))
+                         (if (null? b) '() (cons '(!pagebreak) (tmof-blocks b)))))
+                     (cdr x)))
+        ;; the headers and footers of a page: those of the file are kept
+        ;; with it (see the style office)
+        ((in? (car x) '(set-this-page-header set-this-page-footer set-header
+                        set-footer set-odd-page-header set-even-page-header
+                        set-odd-page-footer set-even-page-footer))
+         '())
         ((tmof-drawing? x) (tmof-picture x #t))
         ((tmof-dispatch 'tmoffice-methods% x) => identity)
         ((assoc (car x) tmof-languages) (tmof-code-block (car x) (cdr x)))
@@ -1598,7 +1729,7 @@
   (surround tmof-surround)
   (with tmof-with)
   (compound tmof-compound)
-  ((:or rigid hgroup freeze unfreeze syntax move shift resize clipped
+  ((:or rigid hgroup freeze unfreeze syntax move shift resize
         repeat repeat*)
    tmof-first)
   ((:or datoms dlines dpages dbox locus float) tmof-last)
@@ -1666,6 +1797,14 @@
   ((:or subsection* subsection-title) tmof-subsection)
   ((:or subsubsection* subsubsection-title) tmof-subsubsection)
   ;; (in a document which was not expanded, the headings with numbers)
+  (clipped tmof-clipped)
+  (office-par tmof-office-par)
+  (office-span tmof-office-span)
+  (office-field tmof-office-field)
+  (office-ins tmof-office-ins)
+  (office-del tmof-office-del)
+  (office-comment tmof-office-comment)
+  (office-columns tmof-office-columns)
   (part tmof-part-numbered)
   (part-numbered-title tmof-part-numbered-title)
   (chapter tmof-chapter-numbered)
@@ -1742,10 +1881,13 @@
             ((em strong strike underline mark sub sup smallcaps code)
              (with l (tmof-final-inlines (tmof-node-children x))
                (if (null? l) '() (list (cons (car x) l)))))
-            ((color)
+            ((color span ins del field)
              (with l (tmof-final-inlines (tmof-node-children x))
-               (if (null? l) '()
-                   (list `(color (@ ,@(tmof-node-attrs x)) ,@l)))))
+               (if (and (null? l) (not (func? x 'field))) '()
+                   (list `(,(car x) (@ ,@(tmof-node-attrs x)) ,@l)))))
+            ((comment)
+             (list `(comment (@ ,@(tmof-node-attrs x))
+                             ,@(tmof-final-blocks (tmof-node-children x)))))
             ((a)
              (let ((l (tmof-final-inlines (tmof-node-children x)))
                    (href (with a (assoc 'href (tmof-node-attrs x))
@@ -1755,6 +1897,7 @@
                      (else (list `(link (@ (href ,href)) ,@l))))))
             ((note) (list (cons 'note (tmof-final-blocks (cdr x)))))
             ((br) '((br)))
+            ((tab) '((tab)))
             ((math image bookmark seq) (list x))
             ((ref)
              (with l (tmof-final-inlines (tmof-node-children x))
@@ -1805,6 +1948,9 @@
             ((!display)
              (list `(p (math (@ (display "true") (form "sxml")) ,(cadr x))
                        ,@(if (pair? (cddr x)) `((tab) ,@(cddr x)) '()))))
+            ((columns)
+             (list `(columns (@ ,@(tmof-node-attrs x))
+                             ,@(tmof-final-blocks (tmof-node-children x)))))
             ((blockquote)
              (map (lambda (b)
                     (if (and (func? b 'p) (not (ox-attr b 'role)))
@@ -1817,8 +1963,8 @@
                                       (lambda (y) (func? y 'li)))
                (if (null? items) '()
                    (list `(list (@ (kind ,(if (func? x 'ol) "number" "bullet"))
-                                   ,@(with f (assoc 'format (tmof-node-attrs x))
-                                       (if f (list f) '())))
+                                   ,@(list-filter (tmof-node-attrs x)
+                                                  (lambda (a) (in? (car a) '(format start)))))
                                 ,@(map (lambda (item)
                                          (cons 'item
                                                (tmof-final-blocks
@@ -2003,10 +2149,18 @@
                   (font ,(cond ((== family "ss") "sans")
                                ((== family "tt") "mono")
                                (else #f)))
+                  (body-style ,(get "office-body-style"))
                   ;; (the paragraphs of TeXmacs are justified)
                   (align ,(with m (or (get "par-mode") "justify")
                             (if (in? m '("left" "center" "right")) m "justify"))))))
     (if (list-or (map cadr attrs)) (list (office-node 'setup attrs)) '())))
+
+(define (tmof-package init)
+  ;; the file which the document was read from, in the style office
+  (with p (assoc-ref init "office-package")
+    (if (and (func? p 'tuple 2) (string? (cadr p)) (func? (caddr p) 'raw-data 1))
+        `((package (@ (format ,(cadr p)) (data ,(cadr (caddr p))))))
+        '())))
 
 (define (tmof-initial x)
   ;; the initial environment of the document x, as an association list
@@ -2032,4 +2186,5 @@
              (or (tmfile-extract x 'TeXmacs) (tmfile-extract x 'style))))
   (with body (if tmof-document? (tmfile-extract x 'body) x)
     `(office ,@(if tmof-document? (tmof-setup (tmof-initial x)) '())
+             ,@(if tmof-document? (tmof-package (tmof-initial x)) '())
              ,@(tmof-finalize (tmof-blocks (tmof body))))))

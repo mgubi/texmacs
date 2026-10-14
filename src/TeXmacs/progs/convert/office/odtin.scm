@@ -39,6 +39,8 @@
 (define odt-body-styles (make-ahash-table)) ; style -> plain paragraphs
 (define odt-defaults '())                ; the properties of the default style
 (define odt-list-counts (make-ahash-table)) ; list style -> items so far
+(define odt-used-styles (make-ahash-table)) ; (family . name) of the named styles
+(define odt-changes (make-ahash-table))  ; id -> (kind attributes element)
 
 (define (odt-get props key)
   (with p (assoc key props) (and p (cdr p))))
@@ -107,6 +109,13 @@
           (if v (list (cons 'space-after v)) '()))
         (with v (office-points (ox-attr x 'fo:text-indent))
           (if v (list (cons 'first-indent v)) '()))
+        (with v (office-points (ox-attr x 'fo:margin-left))
+          (if v (list (cons 'indent-left v)) '()))
+        (with v (ox-attr x 'fo:background-color)
+          (if (and v (string-starts? v "#") (!= (locase-all v) "#ffffff"))
+              (list (cons 'background (locase-all v))) '()))
+        (with v (ox-attr x 'fo:border)
+          (if (and v (not (string-starts? v "none"))) '((border . #t)) '()))
         (with v (ox-attr x 'fo:line-height)
           (cond ((not v) '())
                 ((== v "normal") '((line-spacing . 1.0)))
@@ -202,7 +211,13 @@
                   (ox-child x 'style:table-cell-properties))
                 (odt-table-properties (ox-child x 'style:table-properties))
                 (odt-column-properties
-                  (ox-child x 'style:table-column-properties)))))))
+                  (ox-child x 'style:table-column-properties))
+                ;; a section in columns
+                (with c (and (ox-child x 'style:section-properties)
+                             (ox-child (ox-child x 'style:section-properties)
+                                       'style:columns))
+                  (with n (and c (office-integer (ox-attr c 'fo:column-count) 1 1 10))
+                    (if (and n (> n 1)) (list (cons 'columns n)) '()))))))))
       ;; the default style of paragraphs
       (for (x (ox-childs group 'style:default-style))
         (when (== (ox-attr x 'style:family) "paragraph")
@@ -312,6 +327,8 @@
          (s (if (string-ends? s "/") (substring s 0 (- (string-length s) 1)) s)))
     s))
 
+(define odt-apart-depth 0)  ; inside a cell, a note, a box, a header
+
 (define (odt-apart thunk)
   ;; the result of the thunk, which reads what is not in the lists around
   ;; it: a cell, a note, a box of text
@@ -319,7 +336,9 @@
         (old-depth odt-list-depth))
     (set! odt-list-style #f)
     (set! odt-list-depth 0)
+    (set! odt-apart-depth (+ odt-apart-depth 1))
     (with r (thunk)
+      (set! odt-apart-depth (- odt-apart-depth 1))
       (set! odt-list-style old-style)
       (set! odt-list-depth old-depth)
       r)))
@@ -484,10 +503,23 @@
         (else
           (case (car x)
             ((text:span)
-             (if (odt-get (odt-style "text" (ox-attr x 'text:style-name)) 'hidden)
-                 '()
-                 (odt-wrap-text (odt-inlines (ox-children x))
-                                (odt-span-wrappers (ox-attr x 'text:style-name)))))
+             (let* ((name (ox-attr x 'text:style-name))
+                    (named (odt-text-style name)))
+               (cond ((odt-get (odt-style "text" name) 'hidden) '())
+                     ;; a named style of text: a span, with what the span
+                     ;; adds to it by hand
+                     (named
+                      (ahash-set! odt-used-styles (cons "text" named) #t)
+                      (with own (ahash-ref odt-styles (cons "text" name))
+                        (list `(span (@ (style ,named))
+                                     ,@(odt-wrap-text
+                                         (odt-inlines (ox-children x))
+                                         (if (and own (odt-get own 'automatic))
+                                             (odt-wrappers own '())
+                                             '()))))))
+                     (else
+                       (odt-wrap-text (odt-inlines (ox-children x))
+                                      (odt-span-wrappers name))))))
             ;; text which is hidden, or shown only when a condition holds
             ((text:hidden-text text:hidden-paragraph)
              (if (== (ox-attr x 'text:is-hidden) "false")
@@ -545,19 +577,106 @@
             ((text:ruby)
              (with base (ox-child x 'text:ruby-base)
                (if base (odt-inlines (ox-children base)) '())))
-            ;; comments, changes and what has no text of its own
-            ((office:annotation office:annotation-end text:change
-              text:change-start text:change-end text:bookmark-end
+            ((office:annotation) (odt-annotation x))
+            ((text:change text:change-start text:change-end) (odt-change-node x))
+            ;; what has no text of its own
+            ((office:annotation-end text:bookmark-end
               text:reference-mark-end text:soft-page-break
               text:alphabetical-index-mark text:alphabetical-index-mark-start
               text:alphabetical-index-mark-end text:toc-mark
               text:toc-mark-start text:toc-mark-end)
              '())
             ;; fields and anything else: their text
-            (else (odt-inlines (ox-children x)))))))
+            (else (if (memq (car x) odt-fields) (odt-field x)
+                      (odt-inlines (ox-children x))))))))
 
 (define (odt-inlines l)
   (append-map odt-inline l))
+
+(define (odt-text-style name)
+  ;; the named style of text of the span of the style name, or #f: not
+  ;; the styles of the links and notes, nor those of code
+  (let* ((named (odt-named-style name "text"))
+         (names (odt-style-names "text" named)))
+    (and named (pair? names)
+         (ahash-ref odt-styles (cons "text" named))
+         (not (odt-get (ahash-ref odt-styles (cons "text" named)) 'automatic))
+         (not (in? (car names) odt-plain-styles))
+         (not (list-or (map (lambda (n)
+                              (in? n '("source text" "teletype" "verbatim char"
+                                       "code" "example")))
+                            names)))
+         named)))
+
+;; the fields of OpenDocument: their result, and the element to write again
+(define odt-fields
+  '(text:page-number text:page-count text:date text:time text:author-name
+    text:author-initials text:initial-creator text:creator text:creation-date
+    text:creation-time text:modification-date text:print-date text:title
+    text:subject text:description text:keywords text:file-name
+    text:template-name text:chapter text:sender-firstname
+    text:sender-lastname text:sender-company text:user-field-get
+    text:variable-get text:expression text:word-count text:character-count
+    text:paragraph-count text:sheet-name text:user-defined))
+
+(define (odt-field x)
+  (list (apply office-node
+               (cons* 'field
+                      `((odt ,(symbol->string (car x)))
+                        (xml ,(ox-serialize-element (cons (car x)
+                                                          (if (null? (ox-attrs x)) '()
+                                                              (list (cons '@ (ox-attrs x))))))))
+                      (odt-inlines (ox-children x))))))
+
+(define (odt-annotation x)
+  ;; a comment, with its author and its date
+  (let ((get (lambda (tag) (with y (ox-child x tag) (and y (ox-text y))))))
+    (list (apply office-node
+                 (cons* 'comment `((author ,(get 'dc:creator)) (date ,(get 'dc:date)))
+                        (odt-apart
+                          (lambda ()
+                            (odt-blocks (list-filter (ox-children x)
+                                                     (lambda (y)
+                                                       (not (and (pair? y)
+                                                                 (in? (car y) '(dc:creator dc:date))))))))))))))
+
+(define (odt-read-changes text)
+  ;; the regions of the changes which are tracked
+  (set! odt-changes (make-ahash-table))
+  (for (tc (if text (ox-childs text 'text:tracked-changes) '()))
+    (for (r (ox-childs tc 'text:changed-region))
+      (let* ((c (car (append (ox-elements r) '(#f))))
+             (info (and c (ox-child c 'office:change-info)))
+             (get (lambda (tag) (with y (and info (ox-child info tag)) (and y (ox-text y))))))
+        (when c
+          (ahash-set! odt-changes (or (ox-attr r 'text:id) (ox-attr r 'xml:id))
+                      (list (cond ((func? c 'text:insertion) 'ins)
+                                  ((func? c 'text:deletion) 'del)
+                                  (else 'format))
+                            ;; (the date which says that there is none)
+                            `((author ,(get 'dc:creator))
+                              (date ,(with d (get 'dc:date)
+                                       (and d (not (string-starts? d "1970-01-01T00:00:00"))
+                                            d))))
+                            c)))))))
+
+(define (odt-change-node x)
+  ;; the mark of a change in the text
+  (let* ((id (ox-attr x 'text:change-id))
+         (c (and id (ahash-ref odt-changes id))))
+    (cond ((not c) '())
+          ((func? x 'text:change-start)
+           (if (== (car c) 'ins) (list `(!change-start ins ,(cadr c))) '()))
+          ((func? x 'text:change-end)
+           (if (== (car c) 'ins) (list '(!change-end ins)) '()))
+          ;; the text which was deleted, at its place
+          ((== (car c) 'del)
+           (with l (append-map (lambda (p) (odt-inlines (ox-children p)))
+                               (list-filter (ox-elements (caddr c))
+                                            (lambda (p) (in? (car p) '(text:p text:h)))))
+             (if (null? l) '()
+                 (list (apply office-node (cons* 'del (cadr c) l))))))
+          (else '()))))
 
 (define (odt-label-name? name)
   (and (< (string-length name) 200)
@@ -632,12 +751,14 @@
                      (else (odt-role names))))
          (align (odt-get props 'align))
          (r (odt-with-floats
-              (lambda () (odt-trim (odt-inlines (ox-children x))))))
+              (lambda () (odt-trim (office-changes (odt-inlines (ox-children x)))))))
          (wrappers (if (car role) '() (odt-paragraph-wrappers name)))
+         (named (and (not (car role)) (== odt-apart-depth 0) (== odt-list-depth 0)
+                     (odt-named-style name)))
          (l (if (null? wrappers) (car r)
                 (office-merge (odt-wrap-text (car r) wrappers)))))
     ;; (the style of the usual paragraphs is the one of most of them)
-    (when (and (not (car role)) (== odt-list-depth 0))
+    (when (and (not (car role)) (== odt-list-depth 0) (== odt-apart-depth 0))
       (with k (or (odt-named-style name) "")
         (ahash-set! odt-body-styles k (+ 1 (or (ahash-ref odt-body-styles k) 0)))))
     (if (odt-hidden-paragraph? x props) '()
@@ -659,14 +780,21 @@
                                                                         (office-integer
                                                                           (cadr role) 1 1 10))))
                                                     "no"))
-                                    (align ,(odt-align align)))
+                                    (align ,(odt-align align))
+                                    ;; the named style of a plain paragraph
+                                    (style ,(and named
+                                                 (begin
+                                                   (ahash-set! odt-used-styles
+                                                               (cons "paragraph" named) #t)
+                                                   named))))
                                   l))
                     (cdr r)))))))
 
-(define (odt-named-style name)
+(define (odt-named-style name . family)
   ;; the style, or the one it is made from when the program made it for
   ;; what is formatted by hand
-  (with own (and name (ahash-ref odt-styles (cons "paragraph" name)))
+  (let* ((f (if (pair? family) (car family) "paragraph"))
+         (own (and name (ahash-ref odt-styles (cons f name)))))
     (if (and own (odt-get own 'automatic)) (odt-get own 'parent) name)))
 
 (define (odt-align a)
@@ -837,7 +965,15 @@
             ((text:p) (odt-paragraph x #f))
             ((text:list) (odt-list x))
             ((table:table) (odt-table x))
-            ((text:section text:index-body text:index-title
+            ;; a section in columns
+            ((text:section)
+             (let ((n (odt-get (odt-style "section" (ox-attr x 'text:style-name))
+                               'columns))
+                   (l (odt-blocks (ox-children x))))
+               (if (and n (> n 1) (pair? l))
+                   (list `(columns (@ (count ,(number->string n))) ,@l))
+                   l)))
+            ((text:index-body text:index-title
               text:numbered-paragraph draw:custom-shape draw:rect draw:g)
              (odt-blocks (ox-children x)))
             ;; a table of contents is made again by TeXmacs
@@ -926,11 +1062,13 @@
     (and layout (ox-child layout 'style:page-layout-properties))))
 
 (define (odt-body-style)
-  ;; the style of most of the plain paragraphs
+  ;; the style of most of the plain paragraphs, or the one of the text
   (let ((best #f) (n 0))
     (for (kv (ahash-table->list odt-body-styles))
       (when (> (cdr kv) n) (set! best (car kv)) (set! n (cdr kv))))
-    (and best (!= best "") best)))
+    (cond ((and best (!= best "")) best)
+          ((ahash-ref odt-styles (cons "paragraph" "Text_20_body")) "Text_20_body")
+          (else #f))))
 
 (define (odt-setup styles)
   ;; the page, and the usual paragraph
@@ -960,9 +1098,68 @@
                   (space-before ,(num 'space-before))
                   (space-after ,(num 'space-after))
                   (line-spacing ,(num 'line-spacing))
+                  (body-style ,(odt-body-style))
                   (align ,(or (odt-align (odt-get props 'align))
                               (and page "left"))))))
     (if (list-or (map cadr attrs)) (list (office-node 'setup attrs)) '())))
+
+(define (odt-master root)
+  ;; the first page of styles.xml
+  (let ((masters (and root (ox-child root 'office:master-styles))))
+    (and masters
+         (or (list-find (ox-childs masters 'style:master-page)
+                        (lambda (m) (== (ox-attr m 'style:name) "Standard")))
+             (ox-child masters 'style:master-page)))))
+
+(define (odt-headers root)
+  ;; the headers and the footers of the first page style
+  (with master (odt-master root)
+    (if (not master) '()
+        (append-map
+          (lambda (spec)
+            (with x (ox-child master (car spec))
+              (if (or (not x) (== (ox-attr x 'style:display) "false")) '()
+                  (list (apply office-node
+                               (cons* 'header `((place ,(cadr spec)) (kind ,(caddr spec)))
+                                      (odt-apart (lambda () (odt-blocks (ox-children x))))))))))
+          '((style:header "header" "default") (style:footer "footer" "default")
+            (style:header-left "header" "even") (style:footer-left "footer" "even")
+            (style:header-first "header" "first") (style:footer-first "footer" "first"))))))
+
+(define (odt-style-node key)
+  ;; the definition of the named style (family . name)
+  (let* ((family (car key))
+         (name (cdr key))
+         (own (or (ahash-ref odt-styles key) '()))
+         (props (odt-style family name))
+         (yes (lambda (k) (and (odt-get props k) "true")))
+         (num (lambda (k) (with v (odt-get props k) (and v (office-decimal v)))))
+         (font (odt-get props 'font))
+         (par? (== family "paragraph")))
+    (office-node 'style
+                 `((name ,name) (display ,(odt-get own 'name))
+                   (family ,(if par? "paragraph" "text"))
+                   (em ,(yes 'em)) (strong ,(yes 'strong))
+                   (underline ,(yes 'underline)) (strike ,(yes 'strike))
+                   (smallcaps ,(yes 'smallcaps)) (color ,(odt-get props 'color))
+                   (size ,(num 'size))
+                   (font ,(cond ((not font) #f) ((office-monospace? font) "mono")
+                                ((office-sans? font) "sans") (else #f)))
+                   (align ,(and par? (odt-align (odt-get props 'align))))
+                   (indent-left ,(and par? (num 'indent-left)))
+                   (first-indent ,(and par? (num 'first-indent)))
+                   (space-before ,(and par? (num 'space-before)))
+                   (space-after ,(and par? (num 'space-after)))
+                   (background ,(and par? (odt-get props 'background)))
+                   (border ,(and par? (odt-get props 'border) "true"))))))
+
+(define (odt-styles-block)
+  (let* ((body (odt-body-style))
+         (keys (list-filter (map car (ahash-table->list odt-used-styles))
+                            (lambda (k) (not (and (== (car k) "paragraph")
+                                                  (== (cdr k) body))))))
+         (keys (sort keys (lambda (a b) (string<? (cdr a) (cdr b))))))
+    (if (null? keys) '() `((styles ,@(map odt-style-node keys))))))
 
 (define (odt-meta)
   ;; the title and the author of meta.xml
@@ -1007,6 +1204,8 @@
     (set! odt-body-styles (make-ahash-table))
     (set! odt-defaults '())
     (set! odt-list-counts (make-ahash-table))
+    (set! odt-used-styles (make-ahash-table))
+    (set! odt-changes (make-ahash-table))
     r))
 
 (define (odt-parse s)
@@ -1024,12 +1223,19 @@
         (set! odt-body-styles (make-ahash-table))
         (set! odt-defaults '())
         (set! odt-list-counts (make-ahash-table))
+        (set! odt-used-styles (make-ahash-table))
         (with styles (office-xml odt-archive "styles.xml")
           (odt-read-styles styles)
           (odt-read-styles content)
           (let* ((text (and content (ox-path content 'office:body 'office:text)))
+                 (changes (odt-read-changes text))
                  (blocks (and text (odt-blocks (ox-children text))))
+                 (headers (odt-headers styles))
+                 (blocks (if blocks (office-drop-style blocks (odt-body-style)) blocks))
                  (r (if text
-                        `(office ,@(odt-meta) ,@(odt-setup styles) ,@blocks)
+                        `(office ,@(odt-meta) ,@(odt-setup styles) ,@(odt-styles-block)
+                                 ,@headers
+                                 (package (@ (format "odt") (data ,s)))
+                                 ,@blocks)
                         (odt-error "This OpenDocument file has no text"))))
             r)))))

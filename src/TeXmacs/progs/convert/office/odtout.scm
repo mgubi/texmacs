@@ -42,6 +42,8 @@
   ot-id)
 
 (define ot-setup '(setup))  ; the page and the font of the document
+(define ot-changes '())     ; the changes which are tracked, reversed
+(define ot-package #f)      ; the entries of the file the text was read from
 
 (define (ot-style key prefix make)
   ;; the name of the automatic style of this key; (make name) is its
@@ -94,14 +96,18 @@
   ;; the name of the style of the text inside the wrappers props, or #f
   (let* ((tags (list-filter '(code strong em smallcaps strike underline sub sup mark)
                             (lambda (t) (in? t props))))
-         (color (with c (list-find props pair?) (and c (cadr c))))
-         (key (cons 'text (cons color tags))))
-    (and (or (pair? tags) color)
+         (color (with c (assq 'color (list-filter props pair?)) (and c (cadr c))))
+         (parent (with c (assq 'rstyle (list-filter props pair?)) (and c (cadr c))))
+         (key (cons 'text (cons parent (cons color tags)))))
+    (cond ((and parent (null? tags) (not color)) parent)
+          ((not (or (pair? tags) color)) #f)
+          (else
          (ot-style
            key "T"
            (lambda (name)
              `(style:style
-                (@ (style:name ,name) (style:family "text"))
+                (@ (style:name ,name) (style:family "text")
+                   ,@(if parent `((style:parent-style-name ,parent)) '()))
                 (style:text-properties
                   (@ ,@(if (in? 'em tags)
                            '((fo:font-style "italic") (style:font-style-asian "italic")
@@ -131,7 +137,7 @@
                              (style:font-pitch "fixed"))
                            '())
                      ,@(if (in? 'mark tags) '((fo:background-color "#ffff00")) '())
-                     ,@(if color `((fo:color ,color)) '())))))))))
+                     ,@(if color `((fo:color ,color)) '()))))))))))
 
 (define (ot-span props l)
   ;; the nodes l as the text inside the wrappers props
@@ -158,9 +164,9 @@
                      ((== suffix "gif") "image/gif")
                      (else "image/png"))))
     (or (ahash-ref ot-pictures key)
-        (let* ((file (string-append "Pictures/image" (number->string n) "." suffix))
-               (svg-file (and svg (string-append "Pictures/image" (number->string n)
-                                                 ".svg"))))
+        (let* ((base (if ot-package "Pictures/tm-image" "Pictures/image"))
+               (file (string-append base (number->string n) "." suffix))
+               (svg-file (and svg (string-append base (number->string n) ".svg"))))
           (set! ot-files (cons (list file type data) ot-files))
           (when svg
             (set! ot-files (cons (list svg-file "image/svg+xml" svg) ot-files)))
@@ -171,7 +177,15 @@
   (let* ((data (ox-attr x 'data))
          (n (ot-next-id))
          (w (or (office-length->cm (ox-attr x 'width)) 5.0))
-         (h (or (office-length->cm (ox-attr x 'height)) 3.0)))
+         (h (or (office-length->cm (ox-attr x 'height)) 3.0))
+         ;; (a picture of which parts are cut is the whole picture here:
+         ;; the cut of OpenDocument is in the sizes of the file of the image)
+         (c (with s (ox-attr x 'crop)
+              (and s (map (lambda (v) (or (office-number v) 0))
+                          (string-tokenize-by-char s #\space)))))
+         (c (and c (== (length c) 4) c))
+         (w (if c (/ w (max 0.05 (- 1 (car c) (caddr c)))) w))
+         (h (if c (/ h (max 0.05 (- 1 (cadr c) (cadddr c)))) h)))
     (if (not data) '()
         (let* ((files (ot-image-files x n))
                (file (car files))
@@ -372,6 +386,27 @@
             (case (car x)
               ((em strong underline strike sub sup code smallcaps mark)
                (ot-inlines l (cons (car x) props)))
+              ;; a named style of text
+              ((span) (ot-inlines l (cons (list 'rstyle (or (ox-attr x 'style) "")) props)))
+              ;; a field of OpenDocument, with its result; the result only of
+              ;; another one
+              ((field)
+               (let ((inner (ot-inlines l props))
+                     (el (and (ox-attr x 'xml)
+                              (catch #t (lambda () (ox-root (parse-xml (ox-attr x 'xml))))
+                                     (lambda args #f)))))
+                 (if (and el (pair? el) (symbol? (car el)))
+                     (list (append el (append-map (lambda (y)
+                                                    (if (func? y 'text:span) (ox-children y)
+                                                        (list y)))
+                                                  inner)))
+                     inner)))
+              ((comment)
+               (list `(office:annotation
+                        (dc:creator ,(or (ox-attr x 'author) "TeXmacs"))
+                        ,@(if (ox-attr x 'date) `((dc:date ,(ox-attr x 'date))) '())
+                        ,@(ot-blocks-with (ox-children x) "Standard"))))
+              ((ins del) (ot-change x props))
               ((color)
                (ot-inlines l (if (office-color (ox-attr x 'value))
                                  (cons (list 'color (office-color (ox-attr x 'value)))
@@ -401,6 +436,25 @@
               ((image) (ot-image x))
               ((math) (ot-math x))
               (else (ot-inlines l props)))))))
+
+(define (ot-change x props)
+  ;; a change which is tracked: an insertion between its marks, or the
+  ;; place of a deletion, whose text is in the list of the changes
+  (let* ((id (string-append "ct" (number->string (+ (length ot-changes) 1))))
+         (inner (ot-inlines (ox-children x) props))
+         (info `(office:change-info
+                  (dc:creator ,(or (ox-attr x 'author) "TeXmacs"))
+                  (dc:date ,(or (ox-attr x 'date) "1970-01-01T00:00:00")))))
+    (set! ot-changes
+          (cons `(text:changed-region
+                   (@ (text:id ,id) (xml:id ,id))
+                   ,(if (func? x 'ins) `(text:insertion ,info)
+                        `(text:deletion ,info (text:p ,@inner))))
+                ot-changes))
+    (if (func? x 'ins)
+        `((text:change-start (@ (text:change-id ,id))) ,@inner
+          (text:change-end (@ (text:change-id ,id))))
+        `((text:change (@ (text:change-id ,id)))))))
 
 (define (ot-inlines l props)
   (append-map (lambda (x) (ot-inline x props)) l))
@@ -433,6 +487,7 @@
                (@ ,@(cond ((== align "center") '((fo:text-align "center")))
                           ((== align "right") '((fo:text-align "end")))
                           ((== align "left") '((fo:text-align "start")))
+                          ((== align "justify") '((fo:text-align "justify")))
                           (else '()))
                   ,@(if break? '((fo:break-before "page")) '())
                   ,@(if rule?
@@ -446,6 +501,11 @@
                     #f))
          (base (cond (level (string-append "Heading_20_" (number->string level)))
                      ((assoc-ref ot-role-styles role) => identity)
+                     ;; a named style of the file, or the one of its usual
+                     ;; paragraphs
+                     ((ox-attr x 'style) => identity)
+                     ((and (== default "Text_20_body") (ox-attr ot-setup 'body-style))
+                      (ox-attr ot-setup 'body-style))
                      (else default)))
          ;; a formula on its own lines is centered
          (formula? (with c (ox-children x)
@@ -699,6 +759,21 @@
             ((p) (ot-paragraph x default))
             ((list) (ot-list x))
             ((table) (list (ot-table x)))
+            ;; a section in columns
+            ((columns)
+             (let* ((n (number->string (office-integer (ox-attr x 'count) 2 1 10)))
+                    (style (ot-style
+                             (list 'section n) "Sect"
+                             (lambda (name)
+                               `(style:style
+                                  (@ (style:name ,name) (style:family "section"))
+                                  (style:section-properties
+                                    (style:columns (@ (fo:column-count ,n)
+                                                      (fo:column-gap "0.5cm")))))))))
+               (list `(text:section (@ (text:style-name ,style)
+                                       (text:name ,(string-append "Section"
+                                                                  (number->string (ot-next-id)))))
+                                    ,@(ot-blocks-with (ox-children x) default)))))
             ((pagebreak)
              (list `(text:p (@ (text:style-name
                                  ,(ot-paragraph-style "Text_20_body" #f #t #f))))))
@@ -951,6 +1026,9 @@
        ,@(reverse ot-style-list))
      (office:body
        (office:text
+         ;; the changes which are tracked
+         ,@(if (null? ot-changes) '()
+               `((text:tracked-changes ,@(reverse ot-changes))))
          ;; the sequences which the text counts
          ,@(if (null? ot-sequences) '()
                `((text:sequence-decls
@@ -980,13 +1058,119 @@
 ;; Interface
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(define (ot-package-xml name)
+  (with s (and ot-package (ahash-ref ot-package name))
+    (and s (ox-root (parse-xml s)))))
+
+(define (ot-merged-styles mine)
+  ;; The styles of the file which the text was read from: its named styles,
+  ;; its pages with their headers and footers, its fonts, with those of
+  ;; TeXmacs which it does not have, and the page of the document.
+  (with root (ot-package-xml "styles.xml")
+    (if (not root) mine
+        (let* ((names (lambda (x tag)
+                        (map (lambda (y) (or (ox-attr y 'style:name) ""))
+                             (if x (ox-elements x) '()))))
+               (theirs (ox-child root 'office:styles))
+               (ours (ox-child mine 'office:styles))
+               (their-names (names theirs 'style:style))
+               (new-styles (list-filter (if ours (ox-elements ours) '())
+                                        (lambda (y)
+                                          (and (in? (car y) '(style:style text:list-style))
+                                               (not (in? (or (ox-attr y 'style:name) "")
+                                                         their-names))))))
+               ;; (the numbers of the headings are those of TeXmacs)
+               (outline (and ours (ox-child ours 'text:outline-style)))
+               (their-fonts (ox-child root 'office:font-face-decls))
+               (our-fonts (ox-child mine 'office:font-face-decls))
+               (font-names (names their-fonts 'style:font-face))
+               (new-fonts (list-filter (if our-fonts (ox-elements our-fonts) '())
+                                       (lambda (y) (not (in? (ox-attr y 'style:name)
+                                                             font-names)))))
+               (master (odt-standard-master root))
+               (layout-name (and master (ox-attr master 'style:page-layout-name)))
+               (page (ox-child (ox-child (ox-child mine 'office:automatic-styles)
+                                         'style:page-layout)
+                               'style:page-layout-properties))
+               (fix-layout
+                 (lambda (l)
+                   ;; the page of the document in the layout of the first page
+                   (if (not (and (func? l 'style:page-layout)
+                                 (== (ox-attr l 'style:name) layout-name) page))
+                       l
+                       `(style:page-layout
+                          (@ ,@(ox-attrs l))
+                          ,@(map (lambda (y)
+                                   (if (not (func? y 'style:page-layout-properties)) y
+                                       (let* ((mine-attrs (ox-attrs page))
+                                              (keys (map car mine-attrs)))
+                                         `(style:page-layout-properties
+                                            (@ ,@mine-attrs
+                                               ,@(list-filter (ox-attrs y)
+                                                              (lambda (a) (not (in? (car a) keys)))))
+                                            ,@(ox-children y)))))
+                                 (ox-children l))))))
+               (fix (lambda (x)
+                      (cond ((not (pair? x)) x)
+                            ((func? x 'office:styles)
+                             `(office:styles (@ ,@(ox-attrs x))
+                                             ,@(if outline
+                                                   (list-filter (ox-children x)
+                                                                (lambda (y) (not (func? y 'text:outline-style))))
+                                                   (ox-children x))
+                                             ,@(if outline (list outline) '())
+                                             ,@new-styles))
+                            ((func? x 'office:font-face-decls)
+                             `(office:font-face-decls (@ ,@(ox-attrs x)) ,@(ox-children x)
+                                                      ,@new-fonts))
+                            ((func? x 'office:automatic-styles)
+                             `(office:automatic-styles (@ ,@(ox-attrs x))
+                                                       ,@(map fix-layout (ox-children x))))
+                            (else x)))))
+          (cons (car root) (map fix (cdr root)))))))
+
+(define (odt-standard-master root)
+  ;; the first page of the styles root
+  (let ((masters (ox-child root 'office:master-styles)))
+    (and masters
+         (or (list-find (ox-childs masters 'style:master-page)
+                        (lambda (m) (== (ox-attr m 'style:name) "Standard")))
+             (ox-child masters 'style:master-page)))))
+
+(define (ot-kept-entry? name)
+  ;; the entries of the file which are written again
+  (and (not (in? name '("mimetype" "content.xml" "styles.xml" "META-INF/manifest.xml")))
+       (not (string-ends? name "/"))
+       (not (string-starts? name "Pictures/tm-image"))
+       (not (string-starts? name "Object "))
+       (not (string-starts? name "ObjectReplacements/"))
+       (not (string-starts? name "Formula-"))
+       ;; (not the signatures and the picture of the old text)
+       (not (string-starts? name "META-INF/"))
+       (not (string-starts? name "Thumbnails/"))))
+
+(define (ot-media-type name)
+  (cond ((string-ends? name ".xml") "text/xml")
+        ((string-ends? name ".png") "image/png")
+        ((or (string-ends? name ".jpg") (string-ends? name ".jpeg")) "image/jpeg")
+        ((string-ends? name ".svg") "image/svg+xml")
+        ((string-ends? name ".gif") "image/gif")
+        (else "application/octet-stream")))
+
 (tm-define (serialize-odt-document x)
   (:type (-> stree string))
   (:synopsis "Write the office tree @x as an OpenDocument text, a zip archive")
+  (let* ((l (if (func? x 'office) (cdr x) (list x)))
+         (pack (list-find l (lambda (y) (func? y 'package)))))
+    (set! ot-package (and pack (== (ox-attr pack 'format) "odt")
+                          (office-archive (ox-attr pack 'data))))
+    (when (and ot-package (not (ahash-ref ot-package "styles.xml")))
+      (set! ot-package #f)))
   (set! ot-styles (make-ahash-table))
   (set! ot-style-list '())
   (set! ot-files '())
   (set! ot-pictures (make-ahash-table))
+  (set! ot-changes '())
   (set! ot-id 0)
   (set! ot-cell-align #f)
   (set! ot-numbered? (office-numbered-headings? x))
@@ -999,7 +1183,15 @@
          (blocks (if (null? blocks)
                      '((text:p (@ (text:style-name "Text_20_body"))))
                      blocks))
-         (files (reverse ot-files))
+         (content (ot-content blocks))
+         (kept (if ot-package
+                   (sort (list-filter (map car (ahash-table->list ot-package))
+                                      ot-kept-entry?)
+                         string<?)
+                   '()))
+         (files (append (reverse ot-files)
+                        (map (lambda (n) (list n (ot-media-type n) (ahash-ref ot-package n)))
+                             kept)))
          ;; (a directory is in the manifest, not in the archive)
          (entries (list-filter files caddr))
          ;; the type of the file comes first, as the format wants
@@ -1007,12 +1199,14 @@
               (append '("mimetype" "content.xml" "styles.xml" "META-INF/manifest.xml")
                       (map car entries))
               (append (list "application/vnd.oasis.opendocument.text"
-                            (ox-serialize (ot-content blocks))
-                            (ox-serialize (ot-styles-file))
+                            (ox-serialize content)
+                            (ox-serialize (ot-merged-styles (ot-styles-file)))
                             (ox-serialize (ot-manifest files)))
                       (map caddr entries)))))
     (set! ot-styles (make-ahash-table))
     (set! ot-style-list '())
     (set! ot-files '())
     (set! ot-pictures (make-ahash-table))
+    (set! ot-changes '())
+    (set! ot-package #f)
     r))
