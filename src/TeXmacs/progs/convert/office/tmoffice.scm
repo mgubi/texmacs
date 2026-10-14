@@ -1214,9 +1214,17 @@
 (define (tmof-office-del l) (tmof-office-change 'del l))
 
 (define (tmof-office-kind tag l)
-  ;; an underline or a line through of a kind, a spacing of letters
+  ;; an underline or a line through of a kind, a spacing of letters (in
+  ;; points); a value which the office formats do not have is left out
   (if (< (length l) 2) '()
-      (tmof-attr-wrap tag `((value ,(tmof-plain (car l)))) l)))
+      (let* ((v (tmof-plain (car l)))
+             (v (cond ((eq? tag 'underline) (and (in? v office-underline-kinds) v))
+                      ((eq? tag 'strike) (and (== v "double") v))
+                      (else (with n (or (office-number v) (tmof-points v))
+                              (and n (< (abs n) 100) (office-decimal n)))))))
+        (cond (v (tmof-attr-wrap tag `((value ,v)) l))
+              ((eq? tag 'letters) (tmof (cadr l)))
+              (else (tmof-wrap tag (tmof (cadr l))))))))
 
 (define (tmof-office-underline l) (tmof-office-kind 'underline l))
 (define (tmof-office-strike l) (tmof-office-kind 'strike l))

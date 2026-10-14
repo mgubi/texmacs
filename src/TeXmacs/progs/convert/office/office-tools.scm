@@ -304,6 +304,12 @@
     (if (null? l) (cons tag children)
         (cons* tag (cons '@ l) children))))
 
+(define-public office-underline-kinds
+  ;; the kinds of underlines of Word (those of OpenDocument are among them)
+  '("double" "thick" "dotted" "dottedHeavy" "dash" "dashedHeavy" "dashLong"
+    "dashLongHeavy" "dotDash" "dashDotHeavy" "dotDotDash" "dashDotDotHeavy"
+    "wave" "wavyHeavy" "wavyDouble"))
+
 (define office-wrappers
   '(em strong underline strike sub sup code smallcaps mark color span ins del
     size font caps letters))

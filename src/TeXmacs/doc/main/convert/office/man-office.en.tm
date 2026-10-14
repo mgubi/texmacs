@@ -194,8 +194,9 @@
     the spaces, the line spacing, the background and the border of a
     paragraph are kept, in both directions. A font which <TeXmacs> does
     not have is shown in the closest family (with serifs or not), and
-    written with its name. The fonts of the headings of the file are the
-    ones of the titles of the sections. A double line through and the
+    written with its name. The titles of the sections have the look of
+    the headings of the file (font, size, capitals, underlines), and the
+    named styles keep theirs. A double line through and the
     underlines which are not single or double are shown as single ones,
     and the spacing of the letters is not shown. A section with another
     page than the first one is not kept.
