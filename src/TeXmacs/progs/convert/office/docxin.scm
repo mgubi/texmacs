@@ -43,6 +43,7 @@
 (define docx-body-styles (make-ahash-table)) ; style id -> plain paragraphs
 (define docx-floats '())                  ; blocks found inside a paragraph
 (define docx-theme-fonts '())             ; ("minor" . font) ("major" . font)
+(define docx-italic? #f)                  ; the paragraph is italic by its style
 (define docx-used-styles (make-ahash-table)) ; the named styles of the text
 (define docx-comments (make-ahash-table)) ; id -> (author date element)
 (define docx-sections '())                ; the columns of the sections
@@ -533,7 +534,10 @@
             (and (docx-get props 'smallcaps) 'smallcaps)
             (and (docx-get props 'strike) 'strike)
             (and (docx-get props 'underline) 'underline)
-            (and (docx-get props (if complex? 'em-cs 'em)) 'em)
+            ;; (upright text in an italic paragraph is emphasized)
+            (and (or (docx-get props (if complex? 'em-cs 'em))
+                     (and docx-italic? (assoc 'em own) (not (docx-get own 'em))))
+                 'em)
             (and (docx-get props (if complex? 'strong-cs 'strong)) 'strong))
       identity)))
 
@@ -984,12 +988,20 @@
          (more? (and id (!= id "0") (not (car role)) (== kind "none")))
          (item? (and id (!= id "0") (not (car role)) (not more?)))
          (old-floats docx-floats)
+         (old-italic docx-italic?)
          (l (begin
               (set! docx-floats '())
+              ;; (an italic paragraph: the runs of its style are italic)
+              (set! docx-italic?
+                    (docx-get (apply append
+                                     (map cdr (list-filter (docx-style style)
+                                                           (lambda (p) (eq? (car p) 'run)))))
+                              'em))
               (with r (docx-inlines-sub (ox-children x) docx-fields)
                 (set! docx-fields (cdr r))
                 (docx-numbered-formula (office-merge (office-changes (car r)))))))
          (floats (with f docx-floats (set! docx-floats old-floats) f))
+         (_ (set! docx-italic? old-italic))
          (attrs `((role ,(car role)) (level ,(cadr role))
                   ;; the named style of a plain paragraph
                   (style ,(and (not (car role)) (not id) style (null? docx-open-notes)
