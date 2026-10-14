@@ -407,7 +407,10 @@
   (check= (connection-cmdline "tmtestecho" "default" "x") "")
   (check= (tree->stree (connection-result "tmtestecho" "default" "x")) "")
   ;; the plugin gets the name of the session and the lines of the input,
-  ;; and the name of the session again with the output of the command
+  ;; and the name of the session again with the output of the command.
+  ;; Only the name is checked in the result: with Qt pipes, the output of
+  ;; the command is read by the socket notifiers of the event loop, which
+  ;; does not run here, so that the result may come without it.
   (set! chat-seen '())
   (set! notified '())
   (check= (start* "tmtestchat" "plugins-test-chat") "cmdline")
@@ -415,7 +418,8 @@
   (check= chat-seen '("plugins-test-chat" "a b\nc"))
   (check-true (poll "tmtestchat" "plugins-test-chat"
                     (lambda () (nnull? (notified-on "output")))))
-  (check-true (contains? (notified-on "output") "plugins-test-chat=ok"))
+  (check-true (contains? (notified-on "output") "\"plugins-test-chat="))
+  (check-false (contains? (notified-on "output") "\"default="))
   (check= (start* "tmtestchat" "plugins-test-other") "cmdline")
   (connection-write "tmtestchat" "plugins-test-other" "d")
   (check= chat-seen '("plugins-test-other" "d"))
