@@ -709,7 +709,7 @@ bridge_rep::typeset_by_inputs (int desired_status) {
 }
 
 void
-bridge_rep::typeset (int desired_status) {
+bridge_rep::my_resync () {
   // FIXME: this dirty hack ensures a perfect coherence between
   // the bridge and the edit tree at the typesetting stage.
   // This should not be necessary, but we use because the ip_observers
@@ -721,10 +721,50 @@ bridge_rep::typeset (int desired_status) {
     if (ip2 != path (DETACHED))
       ip= ip2;
   }
+}
+
+bool bridge_rep::my_reusable () { return true; }
+bool bridge_rep::my_check_cache () { return false; }
+void bridge_rep::my_stack_start () { ttt->local_start (l, sb); }
+void bridge_rep::my_stack_end () { ttt->local_end (l, sb); }
+
+void
+bridge_rep::typeset (int desired_status) {
+  my_resync ();
 
   //cout << "Typesetting " << st << ", " << desired_status << LF << INDENT;
-  if (typeset_inputs_mode () != 0) typeset_by_inputs (desired_status);
-  else if ((status==desired_status) && (N(ttt->old_patch)==0)) {
+  if (N(removed) != 0) {
+    // (see above: the changes of the paragraphs removed before this one)
+    env->compare_changes (ttt->old_patch, removed);
+    removed= hashmap<string,tree> (UNINIT);
+  }
+  // (what a bridge makes also holds the line items which the bridges
+  // around it left for its first and last lines, ttt->a and ttt->b: the
+  // number of an equation ends up in the lines of its body)
+  bool alone= (N(ttt->a) == 0) && (N(ttt->b) == 0);
+  bool reusable= (status==desired_status) && my_reusable ();
+  bool unread= reusable && (N(ttt->old_patch)!=0) &&
+               reads_known && alone && reads_mode () != 0 &&
+               patch_unread (ttt->old_patch, reads, env) &&
+               same_lookups (env, seen_keys, seen_values);
+  // a bridge used again as in the classic cache (nothing changed around
+  // it, as far as the bookkeeping of the changes says: the paragraphs
+  // removed before it, the bindings above it)
+  bool cached= reusable && (N(ttt->old_patch)==0);
+  // the check mode typesets again both kinds of bridges used again, when
+  bool check= (reads_mode () == 2 && (unread || (cached && reads_known))) ||
+              ((unread || cached) && my_check_cache ());
+  array<SI> old_lines, old_border;
+  array<tree> old_contents;
+  hashmap<string,tree> old_changes (UNINIT);
+  if (check) {
+    old_lines= lines_signature (l);
+    old_border= border_signature (sb);
+    old_contents= lines_contents (l);
+    old_changes= changes;
+  }
+  bool made= false;
+  if (cached && !check) {
     //cout << "cached" << LF;
     env->monitored_patch_env (changes);
     // cout << "changes       = " << changes << LF;
@@ -736,13 +776,24 @@ bridge_rep::typeset (int desired_status) {
     my_clean_links ();
     link_repository old_link_env= env->link_env;
     env->link_env= link_env;
-    ttt->local_start (l, sb);
+    my_stack_start ();
     env->local_start (prev_back);
     if (env->hl_lan != 0) env->lan->highlight (st);
     my_typeset (desired_status);
     env->local_update (ttt->old_patch, changes);
     env->local_end (prev_back);
-    ttt->local_end (l, sb);
+    my_stack_end ();
+    if (check) {
+      if (edit_profile.on) edit_profile.unread++;
+      if (lines_signature (l) != old_lines || changes != old_changes ||
+          border_signature (sb) != old_border ||
+          lines_contents (l) != old_contents) {
+        typeset_check_mismatches++;
+        failed_error << "A bridge which read none of the variables which "
+                     << "changed (" << ttt->old_patch << ") is typeset "
+                     << "otherwise: " << st << LF;
+      }
+    }
     env->link_env= old_link_env;
     status= desired_status;
     // release the old lines now: a phrase box logs the area to be repainted
@@ -753,9 +804,15 @@ bridge_rep::typeset (int desired_status) {
     // cout << "old_patch     = " << ttt->old_patch << LF;
     // cout << "changes       = " << changes << LF;
     // cout << UNINDENT << "Typesetted " << st << ", " << desired_status << LF;
+    made= true;
   }
+  my_insert (made);
   //cout << UNINDENT << "Typesetted " << st << ", " << desired_status << LF;
+}
 
+void
+bridge_rep::my_insert (bool made) {
+  (void) made;
   // ttt->insert_stack (l, sb);
   //if (N(l) == 0); else
   int mode= typeset_caches_mode ();

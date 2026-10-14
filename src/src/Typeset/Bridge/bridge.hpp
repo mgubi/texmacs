@@ -87,6 +87,14 @@ public:
   virtual bool my_typeset_will_be_complete ();
   virtual void my_typeset (int desired_status);
   virtual void exec_until (path p, bool skip_flag= false);
+  // how typeset handles the lines; a block of paragraphs (bridge_document)
+  // stacks them where they go instead of in a stack of its own
+  virtual void my_resync ();          // st and ip as in the edit tree
+  virtual bool my_reusable ();        // may what was made be used again?
+  virtual bool my_check_cache ();     // typeset again what is used again?
+  virtual void my_stack_start ();     // before typesetting the subtree
+  virtual void my_stack_end ();       // after typesetting it
+  virtual void my_insert (bool made); // into the stack of the typesetter
   void typeset (int desired_status);
   bool same_inputs ();
   void give_record (hashmap<string,tree> parent_back);
