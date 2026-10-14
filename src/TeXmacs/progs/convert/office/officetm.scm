@@ -561,7 +561,8 @@
                                             ,(oftm-text (or (ox-attr x 'date) ""))
                                             ,(cond ((null? b) "")
                                                    ((null? (cdr b)) (car b))
-                                                   (else (oftm-concat (list-intersperse b " ")))))))))
+                                                   (else (oftm-concat
+                                                           (list-intersperse b '(next-line))))))))))
               ((ins del)
                (with t (oftm-inlines l)
                  (cond ((== t "") '())
