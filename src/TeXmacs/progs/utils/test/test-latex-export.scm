@@ -15,7 +15,7 @@
   (:use (texmacs texmacs tm-files)
         (generic document-style)
         (utils library cursor)
-        (check check-master)
+        (convert latex tmtex-pdflatex)
         (doc tmdoc)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

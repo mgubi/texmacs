@@ -56,7 +56,7 @@
   of <src-var|item-nr> is restored on exit.
 
   Each document comes with an <hlink|initial
-  environment|../basics/tm-docs.en.tm#init-env> with the initial values of
+  environment|../basics/tm-docs.en.tm#initial-env> with the initial values of
   environment values, <abbr|i.e.> their values just before we typeset the
   document. If an environment variable does not occur in the initial
   environment, then its initial value defaults to its value after typesetting

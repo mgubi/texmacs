@@ -145,6 +145,11 @@
 ;; Quoting, escapes and spaces
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+
+;; what escape-shell gives, posix on Unix (between double quotes on Windows)
+(define (sh s posix)
+  (if (or (os-mingw?) (os-win32?)) (string-append "\"" s "\"") posix))
+
 (define (test-string-quoting)
   ;; string-quote writes a Scheme string literal, string-unquote reads it
   (check= (string-quote "abc") "\"abc\"")
@@ -163,14 +168,16 @@
   ;; escape-verbatim turns newlines and tabs to spaces, drops control bytes
   (check= (escape-verbatim (cork #\a #\newline #\b #\tab #\c 7)) "a b c")
   (check= (escape-verbatim "") "")
-  ;; escape-shell protects the characters special to a POSIX shell
-  (check= (escape-shell "abc") "abc")
-  (check= (escape-shell "a b(c)$d") "a\\ b\\(c\\)\\$d")
-  (check= (escape-shell "x\ny") "x'\n'y")
-  (check= (escape-shell "a&b<c>d?") "a\\&b\\<c\\>d\\?")
-  (check= (escape-shell "a;b|c'd*e~f#g") "a\\;b\\|c\\'d\\*e\\~f\\#g")
+  ;; escape-shell protects the characters special to a POSIX shell (on
+  ;; Windows, it puts the string between double quotes)
+  (check= (escape-shell "abc") (sh "abc" "abc"))
+  (check= (escape-shell "a b(c)$d") (sh "a b(c)$d" "a\\ b\\(c\\)\\$d"))
+  (check= (escape-shell "x\ny") (sh "x\ny" "x'\n'y"))
+  (check= (escape-shell "a&b<c>d?") (sh "a&b<c>d?" "a\\&b\\<c\\>d\\?"))
+  (check= (escape-shell "a;b|c'd*e~f#g")
+          (sh "a;b|c'd*e~f#g" "a\\;b\\|c\\'d\\*e\\~f\\#g"))
   (check= (escape-shell "/usr/bin/x-y_z.1,2:3+4@5%6=7")
-          "/usr/bin/x-y_z.1,2:3+4@5%6=7")
+          (sh "/usr/bin/x-y_z.1,2:3+4@5%6=7" "/usr/bin/x-y_z.1,2:3+4@5%6=7"))
   ;; the shell reads the escaped string back unchanged
   (when (not (or (os-win32?) (os-mingw?)))
     (for (s (list "a b" "a;echo INJECTED" "it's" "x|y" "a*" "~/f" "#c"
@@ -311,7 +318,8 @@
 ;; Urls as data
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define (us u) (url->string u))
+(define (us u) (check-unix (url->string u)))
+(define win? (or (os-mingw?) (os-win32?)))
 
 (define (test-url-syntax)
   ;; parts of a file name
@@ -325,20 +333,20 @@
   (check= (us (url-glue "a/b" ".tm")) "a/b.tm")
   (check= (us (url-unglue "a/b.tm" 3)) "a/b")
   (check= (us (url-glue (url-unglue "x/y.tex" 4) ".pdf")) "x/y.pdf")
-  ;; relative names
-  (check= (us (url-relative "/a/b/c.tm" "d.tm")) "/a/b/d.tm")
-  (check= (us (url-relative "/a/b/c.tm" "../d.tm")) "/a/d.tm")
-  (check= (us (url-delta "/a/b/c.tm" "/a/d/e.tm")) "../d/e.tm")
-  (check= (us (url-delta "/a/b/c.tm" "/a/b/e.tm")) "e.tm")
-  (check= (url-descends? "/a/b/c" "/a") #t)
-  (check= (url-descends? "/a/b" "/a/b") #t)
-  (check= (url-descends? "/a" "/a/b/c") #f)
-  (check= (url-descends? "/ab" "/a") #f)
+  ;; relative names (check-abs: /a/b on Unix, c:/a/b on Windows)
+  (check= (us (url-relative (check-abs "a/b/c.tm") "d.tm")) (check-abs "a/b/d.tm"))
+  (check= (us (url-relative (check-abs "a/b/c.tm") "../d.tm")) (check-abs "a/d.tm"))
+  (check= (us (url-delta (check-abs "a/b/c.tm") (check-abs "a/d/e.tm"))) "../d/e.tm")
+  (check= (us (url-delta (check-abs "a/b/c.tm") (check-abs "a/b/e.tm"))) "e.tm")
+  (check= (url-descends? (check-abs "a/b/c") (check-abs "a")) #t)
+  (check= (url-descends? (check-abs "a/b") (check-abs "a/b")) #t)
+  (check= (url-descends? (check-abs "a") (check-abs "a/b/c")) #f)
+  (check= (url-descends? (check-abs "ab") (check-abs "a")) #f)
   (check= (us (url-append "a/b" "../c")) "a/c")
-  (check= (us (url-append "/a/" "b")) "/a/b")
+  (check= (us (url-append (check-abs "a/") "b")) (check-abs "a/b"))
   (check= (us (url-parent)) "..")
   ;; roots and protocols
-  (check= (url-rooted? "/a/b") #t)
+  (check= (url-rooted? (check-abs "a/b")) #t)
   (check= (url-rooted? "a/b") #f)
   (check= (url-rooted? "http://www.texmacs.org/a") #t)
   (check= (url-rooted-web? "http://www.texmacs.org/a") #t)
@@ -348,7 +356,7 @@
   (check= (url-rooted-protocol? "http://x.org/a" "http") #t)
   (check= (url-rooted-protocol? "http://x.org/a" "ftp") #f)
   (check= (url-root "http://www.texmacs.org/a") "http")
-  (check= (url-root "/a/b") "default")
+  (check= (url-root (check-abs "a/b")) "default")
   (check= (url-root "a/b") "")
   (check= (us (url-unroot "http://www.texmacs.org/a/b")) "www.texmacs.org/a/b")
   (check= (us (root->url "http")) "http:/")
@@ -362,7 +370,9 @@
   ;; the names in an url tree are symbols
   (check= (url->stree "a/b") '(concat a b))
   (check= (url->stree (url-or "a" "b")) '(or a b))
-  (check= (url->stree "/a/b") '(concat (root default) (concat a b)))
+  (check= (url->stree (check-abs "a/b"))
+          (if win? '(concat (root default) (concat c (concat a b)))
+              '(concat (root default) (concat a b))))
   (check= (url->stree "http://x.org/a")
           (list 'concat '(root http) (list 'concat (string->symbol "x.org") 'a)))
   (check= (us (url-ref (url-or "a" (url-or "b" "c")) 1)) "a")
@@ -379,10 +389,12 @@
   (check= (url-format "a.html") "html")
   (check= (url-format "a.scm") "scheme")
   ;; system and unix names
-  (check= (url->system (system->url "/a/b c/d")) "/a/b c/d")
+  (check= (check-unix (url->system (system->url (check-abs "a/b c/d"))))
+          (check-abs "a/b c/d"))
   (check= (url->unix (unix->url "/a/b")) "/a/b")
   (check= (us (unix->url "a/b/c")) "a/b/c")
-  (check= (us (url-unix "/a" "b")) "/a/b")
+  ;; on Windows, /a is the drive a: (as in MSYS)
+  (check= (us (url-unix "/a" "b")) (if win? "a:/b" "/a/b"))
   (check= (url-secure? "/a/b") #f)
   (check= (url-scratch? (url-scratch "a" ".tm" 3)) #t)
   (check= (us (url-tail (url-scratch "a" ".tm" 3))) "a3.tm")
@@ -405,12 +417,14 @@
   (check= (list->tmfs (tmfs->list "x/y/z")) "x/y/z")
   (check= (strip-colon "c:/a/b") "c/a/b")
   (check= (strip-colon "/a/b") "/a/b")
-  (check= (url->tmfs-string "/a/b.tm") "file/a/b.tm")
+  (check= (url->tmfs-string (check-abs "a/b.tm"))
+          (if win? "file/c/a/b.tm" "file/a/b.tm"))
   (check= (url->tmfs-string "a/b.tm") "here/a/b.tm")
   (check= (url->tmfs-string "http://x.org/a") "http/x.org/a")
   (check= (url->tmfs-string (url-append (get-texmacs-path) "doc/x.tm"))
           "tm/doc/x.tm")
-  (check= (us (tmfs-string->url "file/a/b.tm")) "/a/b.tm")
+  (check= (us (tmfs-string->url (if win? "file/c/a/b.tm" "file/a/b.tm")))
+          (check-abs "a/b.tm"))
   (check= (us (tmfs-string->url "here/a/b.tm")) "a/b.tm")
   (check= (us (tmfs-string->url "http/x.org/a")) "http://x.org/a")
   (check= (tmfs-string->url "tm/doc/x.tm")
@@ -463,10 +477,10 @@
   (check= (tails (url-read-directory (tmp-dir) "*"))
           '("a.txt" "c.tm" "sub"))
   ;; concretizing gives the system name of an existing file
-  (check= (url-concretize (tmp-file "sub/d.txt"))
-          (string-append structures-dir "/sub/d.txt"))
-  (check= (url->system (url-concretize* (tmp-file "sub/d.txt")))
-          (string-append structures-dir "/sub/d.txt"))
+  (check= (check-unix (url-concretize (tmp-file "sub/d.txt")))
+          (check-unix (string-append structures-dir "/sub/d.txt")))
+  (check= (check-unix (url->system (url-concretize* (tmp-file "sub/d.txt"))))
+          (check-unix (string-append structures-dir "/sub/d.txt")))
   ;; wildcards, alternatives and searches
   (check= (tails (url->list (url-expand (url-complete
                    (url-append (tmp-dir) (url-wildcard "*.txt")) "r"))))

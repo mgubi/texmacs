@@ -643,7 +643,7 @@ edit_dynamic_rep::make_return_before () {
   bool flag;
   path q= tp;
   while (!is_document (subtree (et, path_up (q)))) q= path_up (q);
-  flag= (N (subtree (et, path_up (q))) == (q->item+1)) || (tp != end (et, q));
+  flag= (N (subtree (et, path_up (q))) == (last_item (q)+1)) || (tp != end (et, q));
   if (flag) {
     flag= insert_return ();
     go_to (end (et, q));

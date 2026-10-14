@@ -28,7 +28,7 @@
 (plugin-configure asymptote
   (:winpath "Asymptote" ".")
   (:require (url-exists-in-path? "asy"))
-  (:require (python-command))
+  (:require (!= (python-command) ""))
   (:launch ,(asy-launcher))
   (:serializer ,asy-serialize)
   (:session "Asymptote")

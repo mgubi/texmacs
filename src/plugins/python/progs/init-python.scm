@@ -53,7 +53,7 @@
   (:winpath "python*" ".")
   (:winpath "Python*" ".")
   (:winpath "Python/Python*" ".")
-  (:require (python-command))
+  (:require (!= (python-command) ""))
   (:launch ,(python-launcher))
   (:preferences (supports-jupyter?))
   (:tab-completion #t)

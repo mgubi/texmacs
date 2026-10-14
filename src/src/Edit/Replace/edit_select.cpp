@@ -621,13 +621,11 @@ edit_select_rep::selection_set (string key, tree t, bool persistant) {
       s= tree_to_generic (t, selection_export * "-snippet");
     else {
       s= tree_to_generic (t, "texmacs-snippet");
-#ifdef QTTEXMACS
       tree tmp;
       tmp= exec_verbatim (t, tp);
       sv= tree_to_generic (tmp, "verbatim-snippet");
       //tmp= exec_html (t, tp);
       //sh= tree_to_generic (tmp, "html-snippet");
-#endif
     }
     s= selection_encode (lan, s);
   }

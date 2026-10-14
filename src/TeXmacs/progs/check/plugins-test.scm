@@ -34,7 +34,7 @@
 ;;     (scheme-eval) are plain functions.
 ;;
 ;; connection-eval has no timeout: it waits until the answer is complete
-;; (see the FIXME in test-connection-status). The suite only sends commands
+;; or the plugin is dead. The suite only sends commands
 ;; whose answers are complete and quick, and the parser is tested with a
 ;; plugin which echoes its input (cat), so that the answer is exactly the
 ;; stream the test writes. Every other wait is a poll with a time limit, and
@@ -102,8 +102,27 @@
   (:handler "mychan" plugins-test-handler))
 
 ;; echoes its input on its standard output and its standard error
+;; (it writes each block, which perl -0005 reads up to its DATA_END, on the
+;; descriptor 2 itself: on Windows the programs of MSYS2 do not open the
+;; pipe of TeXmacs again by the name /dev/stderr, as tee did; and the
+;; command has no $, which is expanded on Unix and not on Windows)
 (plugin-configure tmtesterr
-  (:launch "sh -c \"trap '' INT; printf '\\002verbatim:ready\\005'; exec tee /dev/stderr\"")
+  (:launch "sh -c \"trap '' INT; printf '\\002verbatim:ready\\005'; exec perl -0005 -MIO::Handle -ne 'BEGIN { STDOUT->autoflush (1); STDERR->autoflush (1) } print; print STDERR'\"")
+  (:serializer ,raw-serialize))
+
+;; answers in two pieces, a second apart: two reads of the pipe; it sends
+;; a banner, which the first connection-eval reads when it starts it
+(plugin-configure tmtestsplit
+  (:launch "sh -c \"printf '\\002verbatim:ready\\005'; while read x; do printf '\\002verbatim:a\\002verbatim:'; sleep 1; printf 'b\\005\\005'; done\"")
+  (:serializer ,raw-serialize))
+
+;; answer once and exit, completing their answer or not; they send no
+;; banner, and are started with connection-start, which does not read it
+(plugin-configure tmtestonce
+  (:launch "sh -c \"read x; printf '\\002verbatim:bye\\005'\"")
+  (:serializer ,raw-serialize))
+(plugin-configure tmtestcut
+  (:launch "sh -c \"read x; printf '\\002verbatim:cut'\"")
   (:serializer ,raw-serialize))
 
 ;; two variants, the session name chooses the variant
@@ -186,11 +205,20 @@
   ;; the text of a tree in scheme format, to look for a word in it
   (object->string t))
 
+(define (strings-of t)
+  ;; the strings in a tree in scheme format, in order
+  (cond ((string? t) (list t))
+        ((pair? t) (append-map strings-of t))
+        (else '())))
+
 (define (contains? t what)
   (string-contains? (stree-text t) what))
 
 (define (pid-alive? pid)
-  (== (system (string-append "kill -0 " pid " 2>/dev/null")) 0))
+  ;; NOTE: a process which has exited but is not reaped yet (a zombie) is
+  ;; not alive; the links without Qt reap it once its output is read
+  (== (system (string-append "ps -o stat= -p " pid
+                             " 2>/dev/null | grep -qv '^Z'")) 0))
 
 (define started '())
 
@@ -478,8 +506,12 @@
   (check= (echo (blk "tm-no-such-format:" "bar")) '(document "bar"))
   (check= (echo (blk "ps:" "%!PS"))
           '(document (image (tuple (raw-data "%!PS") "ps") "0.7par" "" "" "")))
+  ;; (the message shows the url of the name, which differs on Windows)
   (check= (echo (blk "file:" "/tm-plugins-test-nothing.png"))
-          '(document "[/tm-plugins-test-nothing.png] does not exist"))
+          `(document ,(string-append
+                       "[" (url->string (system->url
+                                         "/tm-plugins-test-nothing.png"))
+                       "] does not exist")))
   (check= (echo (blk "file:" "/tm-plugins-test-nothing.png?width=3cm"))
           '(document "cm is not allowed, please pt, px or par!"))
   (check= (echo (blk "file:" "/tm-plugins-test-nothing.png?height=3par"))
@@ -548,6 +580,10 @@
   (connection-write-string "tmtestecho" "plugins-test-parse"
                            (string-append BEGIN "verbatim:x" ESCAPE))
   (check= (echo (string-append END "y" END)) (list 'document (string-append "x" END "y")))
+  ;; an answer which comes in two reads is joined as in one read (#177)
+  (check= (eval* "tmtestsplit" "plugins-test-split" "go\n")
+          '(document (concat "a" "b")))
+  (connection-stop "tmtestsplit" "plugins-test-split")
   ;; long answers, more than one read of the pipe
   (with s (make-string 20000 #\a)
     (check= (echo (blk "verbatim:" s)) (list 'document s)))
@@ -678,11 +714,11 @@
   (check= (tree->stree (connection-eval "tm-plugins-test-nothing" "default" "x"))
           "")
   (check= (connection-status "tm-plugins-test-nothing" "default") 0)
-  ;; FIXME: after this failed start, connection-eval in the same session
-  ;; never returns (see the FIXME below); it is not checked
   (check= (start* "tmtestnone" "plugins-test-none")
           "Error: cannot start application")
   (check= (connection-status "tmtestnone" "plugins-test-none") 0)
+  ;; after a failed start, there is no answer (#177)
+  (check= (eval* "tmtestnone" "plugins-test-none" "x") "")
 
   (check= (start* "tmtestecho" "plugins-test-a") "ok")
   (check= (echo* "plugins-test-a" "a1") '(document "a1"))
@@ -699,19 +735,23 @@
   (check= (connection-status "tmtestecho" "plugins-test-a") 0)
   (check= (connection-status "tmtestecho" "plugins-test-b") 2)
   (check= (echo* "plugins-test-b" "b2") '(document "b2"))
-  ;; FIXME: connection-eval on a stopped connection, or on a plugin which
-  ;; exits before its answer is complete, never returns: connection_retrieve
-  ;; (src/System/Link/connection.cpp) loops until the status is
-  ;; WAITING_FOR_INPUT, which a dead link never reaches, and connection_get
-  ;; starts only a connection which was never made. It is not checked; the
-  ;; stopped session is started again before it is evaluated in.
+  ;; a stopped connection gives no answer, and is not started again (#177)
+  (check= (echo* "plugins-test-a" "a5") "")
+  (check= (connection-status "tmtestecho" "plugins-test-a") 0)
   (check= (connection-start "tmtestecho" "plugins-test-a") "ok")
   (check= (echo* "plugins-test-a" "a4") '(document "a4"))
   (check= (connection-status "tmtestecho" "plugins-test-a") 2)
-  ;; FIXME: with the Qt pipes, the status of a plugin whose process has
-  ;; exited by itself stays 2 (or 3) instead of 0: qt_pipe_link.cpp sets
-  ;; alive to false only in stop. It is 0 only after connection-stop, and
-  ;; the check that it is 0 before is left out.
+  ;; a plugin which exits by itself is dead (#177)
+  (check= (start* "tmtestonce" "plugins-test-once") "ok")
+  (check= (eval* "tmtestonce" "plugins-test-once" "x\n") '(document "bye"))
+  (check-true (poll "tmtestonce" "plugins-test-once"
+                    (lambda ()
+                      (== (connection-status "tmtestonce" "plugins-test-once")
+                          0))))
+  ;; and one which exits before the end of its answer gives what it wrote
+  (check= (start* "tmtestcut" "plugins-test-cut") "ok")
+  (check= (eval* "tmtestcut" "plugins-test-cut" "x\n") '(document "cut"))
+  (check= (connection-status "tmtestcut" "plugins-test-cut") 0)
   (connection-stop "tmtestecho" "plugins-test-a")
   (connection-stop "tmtestecho" "plugins-test-b")
   (check= (connection-status "tmtestecho" "plugins-test-a") 0)
@@ -761,10 +801,11 @@
   (check= (sh "plugins-test-sh1" "printf x") '(document "x"))
   (check= (sh "plugins-test-sh1" "echo '<x>' '{y}' '$z'")
           '(document "<x> {y} $z" ""))
-  ;; a failing command: its error message is output, as is its status
+  ;; a failing command: its error message is output, as is its status (1
+  ;; for the ls of BSD and macOS, 2 for the ls of GNU)
   (with r (sh "plugins-test-sh1" "ls /tm-plugins-test-nothing; echo status=$?")
     (check-true (contains? r "tm-plugins-test-nothing"))
-    (check-true (contains? r "status=1"))
+    (check-true (contains? r "status="))
     (check-false (contains? r "status=0")))
   (check= (sh "plugins-test-sh1" "false; echo $?") '(document "1" ""))
   (check= (sh "plugins-test-sh1" "tm-plugins-test-nothing >/dev/null 2>&1; echo $?")
@@ -823,8 +864,11 @@
       (check-true (poll "shell" "plugins-test-sh3"
                         (lambda () (contains? notified "Interrupted"))))
       ;; the pending output of the command, empty, then the message
-      (check= (notified-on "output")
-              '((document "" (with "color" "red" "Interrupted TeXmacs shell"))))
+      ;; NOTE: they may come in one or two notifications, depending on how
+      ;; the output is read
+      (check= (list-filter (strings-of (notified-on "output"))
+                           (lambda (s) (!= s "")))
+              '("color" "red" "Interrupted TeXmacs shell"))
       (connection-stop "shell" "plugins-test-sh3")
       (check= (connection-status "shell" "plugins-test-sh3") 0))))
 
@@ -839,15 +883,16 @@
   ;; tm_python sends its banner and then its prompt, as two blocks: the
   ;; first evaluation reads the banner and may stop after the prompt, its
   ;; answer is then still pending, and an empty line (which tm_python
-  ;; ignores) reads it
+  ;; ignores) reads it. #t, or the answers which were read instead.
   (with r (py ses "6*7")
-    (or (== r '(document "42"))
-        (and (== r "")
-             (with old (ahash-ref plugin-serializer-table "python")
-               (plugin-serializer-set! "python" (lambda (lan t) "\n"))
-               (with r2 (py ses "")
-                 (plugin-serializer-set! "python" old)
-                 (== r2 '(document "42"))))))))
+    (cond ((== r '(document "42")) #t)
+          ((== r "")
+           (with old (ahash-ref plugin-serializer-table "python")
+             (plugin-serializer-set! "python" (lambda (lan t) "\n"))
+             (with r2 (py ses "")
+               (plugin-serializer-set! "python" old)
+               (or (== r2 '(document "42")) (list r r2)))))
+          (else (list r)))))
 
 (define plugin-serializer-table
   ;; the serializers of plugin-cmd.scm
@@ -859,7 +904,7 @@
 ;; the completion with a scheme block, and ends when it is stopped.
 (define (test-python)
   (check-group "python: evaluation")
-  (check-true (py-start "plugins-test-py1"))
+  (check= (py-start "plugins-test-py1") #t)
   (check= (connection-status "python" "plugins-test-py1") 2)
   (check= (py "plugins-test-py1" "6*8") '(document "48"))
   (check= (py "plugins-test-py1" "'a' + 'b'") '(document "ab"))
@@ -899,7 +944,7 @@
           '(tuple "y" "" "ield"))
 
   (check-group "python: two sessions and stop")
-  (check-true (py-start "plugins-test-py2"))
+  (check= (py-start "plugins-test-py2") #t)
   (check= (py "plugins-test-py2" "y = 7") "")
   (check= (py "plugins-test-py1" "y") '(document "5"))
   (check= (py "plugins-test-py2" "y") '(document "7"))
@@ -910,11 +955,15 @@
   (with r (py "plugins-test-py2" '(document "import os" "os.getpid()"))
     (check-true (func? r 'document 1))
     (when (func? r 'document 1)
-      (with pid (cadr r)
-        (check-true (pid-alive? pid))
+      ;; (not on Windows: pid-alive? needs the ps of Unix)
+      (with pid (and (not (os-mingw?)) (cadr r))
+        (when pid (check-true (pid-alive? pid)))
         (connection-stop "python" "plugins-test-py2")
         (check= (connection-status "python" "plugins-test-py2") 0)
-        (check-true (wait-until (lambda () (not (pid-alive? pid))) 5000)))))
+        (if pid
+            (check-true (wait-until (lambda () (not (pid-alive? pid))) 5000))
+            (skip "python: two sessions and stop"
+                  "the end of the process is not checked on Windows")))))
   (check= (py "plugins-test-py1" "y") '(document "5")))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -945,6 +994,41 @@
 ;; External commands
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(define (file-forms u)
+  ;; the forms of the Scheme file @u
+  (with-input-from-file (url-concretize u)
+    (lambda ()
+      (let loop ((acc '()))
+        (with x (read)
+          (if (eof-object? x) (reverse acc) (loop (cons x acc))))))))
+
+(define (python-requirements)
+  ;; the :require clauses of the installed plugins which use python-command
+  (append-map
+   (lambda (dir)
+     (with u (url-append dir (string-append "progs/init-"
+                                            (url->string (url-tail dir))
+                                            ".scm"))
+       (if (not (url-exists? u)) '()
+           (append-map
+            (lambda (form)
+              (if (not (func? form 'plugin-configure)) '()
+                  (map cadr
+                       (list-filter (cddr form)
+                                    (lambda (x)
+                                      (and (func? x :require 1)
+                                           (contains? x "python-command")))))))
+            (file-forms u)))))
+   (url->list (url-expand (url-complete "$TEXMACS_PATH/plugins/*" "d")))))
+
+(define (without-python thunk)
+  ;; the value of @thunk when no python interpreter is found
+  (let ((saved python-command))
+    (set! python-command (lambda () ""))
+    (with r (check-run thunk)
+      (set! python-command saved)
+      r)))
+
 ;; The availability of plugins rests on looking for programs in the path,
 ;; and the plugins which are not sessions run external commands.
 (define (test-external)
@@ -954,16 +1038,21 @@
   (check= (eval-system "true") "")
   (check= (var-eval-system "echo hello") "hello")
   (check-true (url-exists-in-path? "sh"))
-  (check-true (url-exists-in-path? "tm_shell"))
+  ;; (the shell plugin needs a pseudo terminal: not built on Windows)
+  (unless (os-mingw?)
+    (check-true (url-exists-in-path? "tm_shell")))
   (check-false (url-exists-in-path? "tm-plugins-test-no-such-program"))
   (check= (first-in-path "tm-plugins-test-no-such-program" "sh") "sh")
   ;; none found: the empty string, which is a true value
   (check= (first-in-path "tm-plugins-test-no-such-program") "")
-  ;; FIXME: so (:require (python-command)), as in init-python.scm,
-  ;; init-sympy.scm, init-plantuml.scm and init-asymptote.scm, holds
-  ;; without python: a plugin configured with
-  ;; (:require (first-in-path "tm-plugins-test-no-such-program")) is
-  ;; supported. The check that it is not is left out.
+  ;; so the plugins which need python check that python-command is not
+  ;; empty: without python, none of their requirements holds (#12)
+  (check-true (>= (length (python-requirements)) 10))
+  (check= (without-python
+           (lambda ()
+             (list-filter (python-requirements)
+                          (lambda (r) (eval r (current-module))))))
+          '())
   )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

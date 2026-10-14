@@ -14,7 +14,7 @@
 (texmacs-module (convert latex tmtex-widgets)
   (:use (convert latex tmtex)
         (utils library cursor)
-        (check check-master)))
+        (convert latex tmtex-pdflatex)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The widget for examing LaTeX errors

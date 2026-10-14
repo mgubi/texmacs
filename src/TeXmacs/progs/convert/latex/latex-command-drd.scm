@@ -84,7 +84,7 @@
   newcounter stepcounter refstepcounter value
   citealt citealt* citealp*
   citetext citeauthor citeauthor* citeyear onlinecite citeN
-  epsfig url penalty centerline fbox framebox cline cmidrule
+  epsfig url penalty centerline fbox cline cmidrule
   enlargethispage
   newlength newdimen newskip
   Comment COMMENT For ForAll If Input KwData KwResult KwRet lnl nllabel
@@ -140,7 +140,7 @@
   title author thanks marginpar
   part chapter section subsection subsubsection paragraph subparagraph
   includegraphics includegraphics*
-  makebox
+  makebox framebox
   subjclass declaretheorem footnotetext
   xleftarrow xrightarrow xleftrightarrow xminus
   xLeftarrow xRightarrow xLeftrightarrow xequal
@@ -418,4 +418,4 @@
   ((latex-arity% 'x 0)      (latex-ignore-0*% 'x))
   ((latex-arity% 'x 1)      (latex-ignore-1% 'x))
   ((latex-arity% 'x 2)      (latex-ignore-2% 'x))
-  ((latex-optional-arg% 'x) (latex-ignore-1*% 'x)))
+  ((latex-optional-arg% 'x) (latex-ignore-0*% 'x)))

@@ -111,6 +111,7 @@
   (underleftarrow "amsmath")
   (underrightarrow "amsmath")
   (underleftrightarrow "amsmath")
+  (boxed "amsmath")
 
   (sfrac "xfrac")
 

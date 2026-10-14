@@ -51,7 +51,9 @@ CONCRETE_TEMPLATE(matrix,T);
     int i, n= rows * cols;
     T* a= (n == 0? (T*) NULL: tm_new_array<T> (n));
     for (i=0; i<n; i++)
-      a[i]= ((i%(cols+1)) == 0? c: T(0));
+      a[i]= T(0);
+    for (i=0; i<min (rows, cols); i++)
+      a[i*cols + i]= c;
     rep= tm_new<matrix_rep<T> > (a, rows, cols); }
   inline matrix () {
     rep= tm_new<matrix_rep<T> > ((T*) NULL, 0, 0); }
@@ -197,8 +199,8 @@ operator * (matrix<T> m, vector<T> v) {
   int i, j, rows= NR (m), cols= NC (m);
   ASSERT (N (v) == cols, "dimensions don't match");
   vector<T> prod (rows);
-  for (j=0; j<cols; j++)
-    prod[j]= T(0);
+  for (i=0; i<rows; i++)
+    prod[i]= T(0);
   for (i=0; i<rows; i++)
     for (j=0; j<cols; j++)
       prod [i] += m (i, j) * v[j];
@@ -210,8 +212,8 @@ operator * (matrix<T> m, array<T> v) {
   int i, j, rows= NR (m), cols= NC (m);
   ASSERT (N (v) == cols, "dimensions don't match");
   array<T> prod (rows);
-  for (j=0; j<cols; j++)
-    prod[j]= T(0);
+  for (i=0; i<rows; i++)
+    prod[i]= T(0);
   for (i=0; i<rows; i++)
     for (j=0; j<cols; j++)
       prod [i] += m (i, j) * v[j];

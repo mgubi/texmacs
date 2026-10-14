@@ -91,7 +91,7 @@
     Die Kontextvariable wird zusätzlich zur <src-var|prog-language>-Variablen
     benutzt, um die konkrete Implementierung und Version der
     Programmiersprache zu kennzeichnen. Im Fall von
-    <hlink|<name|Maxima>|../../../main/interface/cas/man-maxima.en.tm> können
+    <hlink|<name|Maxima>|../../../../plugins/maxima/doc/maxima-abstract.en.tm> können
     unterschiedliche <name|Lisp>-Versionen Verwendung finden. Manchmal möchte
     man auch unterschiedliche <name|Maxima>-Versionen parallel einsetzen.
   </explain>

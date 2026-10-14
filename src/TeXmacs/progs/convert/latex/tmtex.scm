@@ -2367,8 +2367,18 @@
     ((== (cadr l) "locase") (tex-apply 'MakeLowercase (tmtex (car l))))
     (else (tmtex (car l)))))
 
+;; LaTeX's \fbox typesets its argument in text mode; a frame in a formula
+;; becomes an amsmath \boxed, which is also imported back as a formula
 (define (tmtex-frame s l)
-  `(fbox ,(car l)))
+  (if (tmtex-math-mode?)
+      `(boxed ,(tmtex (car l)))
+      `(fbox ,(tmtex (car l)))))
+
+;; \boxed is only allowed in formulas
+(define (tmtex-boxed s l)
+  (if (tmtex-math-mode?)
+      `(boxed ,(tmtex (car l)))
+      (tmtex `(math (boxed ,(car l))))))
 
 (define (tmtex-colored-frame s l)
   `(colorbox ,(tmtex-decode-color (car l)) ,(tmtex (cadr l))))
@@ -3255,6 +3265,7 @@
   ((:or mmx cpp scm shell scilab) (,tmtex-code-inline 1))
 
   (frame (,tmtex-frame 1))
+  (boxed (,tmtex-boxed 1))
   (colored-frame (,tmtex-colored-frame 2))
   (fcolorbox (,tmtex-fcolorbox 3))
   (rotate (,tmtex-rotate 2))

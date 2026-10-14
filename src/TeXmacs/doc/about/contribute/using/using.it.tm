@@ -19,9 +19,9 @@
   sviluppo di qualche aspetto del programma, non esitate a
   <apply|hyper-link|contattarci|../../authors/contact.it.tm>. Nel menu
   <apply|menu|Help> potete trovare la documentazione relativa al
-  <apply|hyper-link|codice sorgente|../../../devel/source/source.it.tm> di
+  <apply|hyper-link|codice sorgente|../../../devel/source/source.en.tm> di
   <apply|TeXmacs>, al suo <apply|hyper-link|formato
-  documenti|../../../devel/format/format.it.tm>, su come scrivere
+  documenti|../../../devel/format/basics/basics.en.tm>, su come scrivere
   <apply|hyper-link|interfacce|../../../devel/plugin/plugin.it.tm> in altri
   formati e così di seguito.
 

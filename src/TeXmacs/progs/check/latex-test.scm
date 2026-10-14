@@ -218,6 +218,25 @@
   (check= (tl '(math (binom "n" "k"))) "$\\binom{n}{k}$")
   (check= (tl '(math (concat "a" (text "if") "b"))) "$a \\text{if} b$"))
 
+;; LaTeX's \boxed is the boxed macro; a frame is \fbox in text, but \fbox
+;; typesets its argument as text, so a frame in a formula is \boxed
+(define (test-export-boxes)
+  (check-group "export: boxes")
+  (check= (tl '(math (boxed (concat "x" (rsup "2") "+" (frac "1" "2")))))
+          "$\\boxed{x^2 + \\frac{1}{2}}$")
+  (check= (tl '(equation* (document (boxed (concat "y=" (frac "1" "3"))))))
+          "\\[ \\boxed{y = \\frac{1}{3}} \\]")
+  (check= (tl '(boxed "x")) "$\\boxed{x}$")
+  (check= (tl '(frame (concat "text " (math "a")))) "\\fbox{text $a$}")
+  (check= (tl '(frame (concat "x" (rsup "2")))) "\\fbox{x\\tmrsup{2}}")
+  (check= (tl '(math (frame (concat "x" (rsup "2"))))) "$\\boxed{x^2}$")
+  (check= (tl '(fcolorbox "red" "yellow" "warn"))
+          "\\fcolorbox{red}{yellow}{warn}")
+  (check= (tl '(colored-frame "yellow" "hi")) "\\colorbox{yellow}{hi}")
+  (check-true (string-contains?
+               (td '("generic") '(document (concat "a " (math (boxed "x")))))
+               "\\usepackage{amsmath}")))
+
 (define (test-export-big)
   (check-group "export: big operators and delimiters")
   (check= (tl '(math (concat (big "sum") (rsub "i") "x"))) "$\\sum_i x$")
@@ -409,7 +428,13 @@
   (check= (lt "{\\bf x}") '(with "font-series" "bold" "x"))
   (check= (lt "\\textit{x}") '(with "font-shape" "italic" "x"))
   (check= (lt "\\texttt{x}") '(with "font-family" "tt" "x"))
-  (check= (lt "\\textsuperscript{a}") '(rsup "a")))
+  (check= (lt "\\textsuperscript{a}") '(rsup "a"))
+  ;; a space which begins the argument of a command of text is typeset
+  (check= (lt "a\\textbf{ b}") '(concat "a" (with "font-series" "bold" " b")))
+  (check= (lt "a\\emph{ b}") '(concat "a" (em " b")))
+  (check= (lt "a\\mbox{ b }c") "a b c")
+  (check= (lt "$a,\\text{ if }b$") '(math (concat "a," (text " if ") "b")))
+  (check= (lt "\\section{ Intro}") '(section "Intro")))
 
 (define (test-import-sections)
   (check-group "import: sections, paragraphs, spaces")
@@ -436,7 +461,17 @@
   (check= (lt "\\begin{description}\\item[x] a\\end{description}")
           '(document (description (document (concat (item* "x") "a")))))
   (check= (lt "\\begin{itemize}\\item[*] a\\end{itemize}")
-          '(document (itemize (document (concat (item* "*") "a"))))))
+          '(document (itemize (document (concat (item* "*") "a")))))
+  ;; the options of enumitem are dropped, the lists kept
+  (check= (lt "\\begin{itemize}[nosep]\n\\item a\n\\item b\n\\end{itemize}")
+          '(document (itemize (document (concat (item) "a")
+                                        (concat (item) "b")))))
+  (check= (lt "\\begin{description}[style=nextline]\\item[x] a\\end{description}")
+          '(document (description (document (concat (item* "x") "a")))))
+  (check= (lt "\\begin{compactitem}[nosep]\\item a\\end{compactitem}")
+          '(document (itemize (document (concat (item) "a")))))
+  (check= (lt "\\begin{enumerate}[label=(\\alph*)]\\item \\href{http://x.org}{x}\\end{enumerate}")
+          '(document (enumerate (document (concat (item) (hlink "x" "http://x.org")))))))
 
 (define (test-import-references)
   (check-group "import: labels, references, notes")
@@ -447,8 +482,9 @@
   (check= (lt "\\cite{k}") '(cite "k"))
   (check= (lt "\\cite{ab,cd}") '(cite "ab" "cd"))
   (check= (lt "\\cite{a, bc}") '(cite "a" "bc"))
-  ;; FIXME: a last key of one character is dropped, \cite{ab,c} gives
-  ;; (cite "ab"): latex_cite_to_tree (fromtex.cpp) steps over it
+  ;; keys of one character, also the last one
+  (check= (lt "\\cite{ab,c}") '(cite "ab" "c"))
+  (check= (lt "\\cite{a,b,c}") '(cite "a" "b" "c"))
   (check= (lt "\\cite[p. 3]{k}") '(cite-detail "k" "p. 3"))
   (check= (lt "\\href{http://x}{t}") '(hlink "t" "http://x")))
 
@@ -468,6 +504,12 @@
   (check= (lt "$\\mathbf{x}$") '(math "<b-up-x>"))
   (check= (lt "$\\operatorname{rank} A$")
           '(math (concat (math-up "rank") "A")))
+  ;; a text separates the factors around it: no multiplication across it
+  (check= (lt "$a\\text{if}b$") '(math (concat "a" (text "if") "b")))
+  ;; (the space which begins the argument of \text is kept, as in LaTeX)
+  (check= (lt "$x\\text{ for all }y$")
+          '(math (concat "x" (text " for all ") "y")))
+  (check= (lt "$ab$") '(math "a*b"))
   (check= (lt "$\\frac{a}{b}$") '(math (frac "a" "b")))
   (check= (lt "$a\\over b$") '(math (frac "a" "b")))
   (check= (lt "$\\sqrt{x}$") '(math (sqrt "x")))
@@ -484,6 +526,31 @@
   (check= (lt "$\\dot x \\ddot y$")
           '(math (concat (wide "x" "<dot>") (wide "y" "<ddot>"))))
   (check= (lt "$\\underline{u}$") '(math (wide* "u" "<bar>"))))
+
+;; the optional width and position of \framebox and \makebox are dropped
+(define (test-import-boxes)
+  (check-group "import: boxes")
+  (check= (lt "$\\boxed{x^2+\\frac{1}{2}}$")
+          '(math (boxed (concat "x" (rsup "2") "+" (frac "1" "2")))))
+  (check= (lt "\\[\\boxed{y=\\frac13}\\]")
+          '(document (equation* (document (boxed (concat "y=" (frac "1" "3")))))))
+  (check= (lt "\\begin{equation*}\\boxed{a=b}\\end{equation*}")
+          '(document (equation* (document (boxed "a=b")))))
+  (check= (lt "\\fbox{text $a$}") '(frame (concat "text " (math "a"))))
+  (check= (lt "\\framebox{plain}") '(frame "plain"))
+  (check= (lt "\\framebox[3cm]{w}") '(frame "w"))
+  (check= (lt "\\framebox[3cm][c]{centered}") '(frame "centered"))
+  (check= (lt "a \\framebox[2cm][r]{$x$} b")
+          '(concat "a " (frame (math "x")) " b"))
+  (check= (lt "\\makebox{mb}") "mb")
+  (check= (lt "\\makebox[2cm]{mb}") "mb")
+  (check= (lt "\\makebox[3cm][r]{right}") "right")
+  ;; (a text ends the implicit product: no * before it, #271)
+  (check= (lt "$a \\makebox[1cm][l]{t u} b$")
+          '(math (concat "a" (text "t u") "b")))
+  (check= (lt "\\fcolorbox{red}{yellow}{warn}")
+          '(fcolorbox "red" "yellow" "warn"))
+  (check= (lt "\\colorbox{yellow}{hi}") '(colored-frame "yellow" "hi")))
 
 (define (test-import-matrices)
   (check-group "import: matrices")
@@ -550,11 +617,26 @@
   (check= (lt "\\verb|a%b|") '(verbatim "a%b"))
   (check= (lt "\\begin{alltt}\na\nb\n\\end{alltt}")
           '(document (verbatim-code (document "a" "b"))))
-  ;; FIXME: \begin{tmcode}\nx\n\end{tmcode} (as exported from a code
-  ;; block) gives (code (document "" "x" "")): unlike alltt, the line
-  ;; breaks after \begin and before \end become empty lines
+  ;; as alltt, the line breaks after \begin{tmcode} and before \end{tmcode}
+  ;; do not become empty lines, and empty lines inside are kept
+  (check= (lt "\\begin{tmcode}\nx\n\\end{tmcode}") '(code (document "x")))
+  (check= (lt "\\begin{tmcode}[cpp]\na\n\nb\n\\end{tmcode}")
+          '(document (cpp-code (document "a" "" "b"))))
   ;; an unknown environment becomes a tag of the same name
-  (check= (lt "\\begin{unknownenv}x\\end{unknownenv}") '(unknownenv "x")))
+  (check= (lt "\\begin{unknownenv}x\\end{unknownenv}") '(unknownenv "x"))
+  ;; the text of a \parbox is text, also in a formula
+  (check= (lt "\\parbox{3cm}{a $x$}")
+          '(mini-paragraph "3cm" (concat "a " (math "x"))))
+  (check= (lt "$\\parbox{3cm}{a b}$") '(math (mini-paragraph "3cm" (text "a b"))))
+  (check= (lt "\\[\\parbox{3cm}{Given $x$, \\[a=b\\] for all $s$.}\\]")
+          '(document
+             (equation*
+               (document
+                 (mini-paragraph "3cm"
+                   (document
+                     (text (document (concat "Given " (math "x") ",")
+                                     (equation* (document "a=b"))
+                                     (concat "for all " (math "s") "."))))))))))
 
 ;; definitions become assign/macro and their uses macro applications
 (define (test-import-macros)
@@ -590,7 +672,15 @@
   (check= (tree->stree (latex->texmacs (parse-latex "\\emph{x} $a_1$")))
           '(concat (em "x") " " (math (concat "a" (rsub "1")))))
   (check= (tree->stree (parse-latex "\\emph{x}")) '(concat (tuple "\\emph" "x")))
-  (check= (tree->stree (parse-latex-document "x")) '(!file (concat "x"))))
+  (check= (tree->stree (parse-latex-document "x")) '(!file (concat "x")))
+  ;; \parbox[pos][height][inner]{width}{text}: the options after the first
+  ;; are dropped, not read as text
+  (check= (lt "\\parbox[t][3cm][c]{2cm}{a b} c")
+          '(concat (mini-paragraph "2cm" "a b") " c"))
+  (check= (lt "\\parbox[t][3cm]{2cm}{a b} c")
+          '(concat (mini-paragraph "2cm" "a b") " c"))
+  (check= (lt "\\parbox{2cm}{a b} [x] c")
+          '(concat (mini-paragraph "2cm" "a b") " [x] c")))
 
 ;; \begin{document}: in a snippet, the class and the body; in a document,
 ;; the style, the preamble definitions (hidden) and the title
@@ -605,11 +695,15 @@
   (check= (body-of (ld (string-append "\\documentclass{book}\\begin{document}"
                                      "x\n\n\\chapter{C}\n\ny\\end{document}")))
           '(document "x" (chapter "C") "y"))
-  ;; FIXME: a section which starts the body stays in one paragraph with
-  ;; the next one, \begin{document}\section{C}\n\nx\end{document} gives
-  ;; (document (concat (section "C") "x")) where the same snippet gives
-  ;; (document (section "C") "x") (finalize_sections in fromtex_post.cpp
-  ;; splits the other sections)
+  ;; a section which starts the body is a paragraph of its own, as the
+  ;; later ones
+  (check= (body-of (ld (string-append "\\documentclass{article}\\begin{document}"
+                                     "\\section{C}\n\nx\\end{document}")))
+          '(document (section "C") "x"))
+  (check= (body-of (ld (string-append "\\documentclass{article}\\begin{document}"
+                                     "\\section{C}\n\nx\n\n\\section{D}\n\ny"
+                                     "\\end{document}")))
+          '(document (section "C") "x" (section "D") "y"))
   (check= (body-of (ld (string-append
                         "\\documentclass{article}\n\\usepackage{amsmath}\n"
                         "\\newcommand{\\R}{\\mathbb{R}}\n"
@@ -624,8 +718,15 @@
                                (doc-author (author-data (author-name "Ann")))
                                (doc-date (date "")))
                      "x"))
-  ;; FIXME: an author of one character is lost, \author{A} gives no
-  ;; doc-author: get_latex_author_datas (metadata.cpp) skips atomic trees
+  ;; an author of one character is kept
+  (check= (body-of (ld (string-append
+                        "\\documentclass{article}\\begin{document}"
+                        "\\title{T}\\author{A}\\date{D}\\maketitle x"
+                        "\\end{document}")))
+          '(document (doc-data (doc-title "T")
+                               (doc-author (author-data (author-name "A")))
+                               (doc-date "D"))
+                     "x"))
   (check= (body-of (ld (string-append
                         "\\documentclass{article}\\begin{document}"
                         "\\title{T}\\author{Ann}\\date{D}\\maketitle x"
@@ -663,7 +764,7 @@
     (enumerate (document (concat (item) "a")))
     (description (document (concat (item* "x") "a")))
     (label "l") (reference "l") (pageref "l") (eqref "l")
-    (concat "a" (footnote "f")) (cite "k") (cite "ab" "cd")
+    (concat "a" (footnote "f")) (cite "k") (cite "ab" "cd") (cite "k" "l")
     (hlink "t" "http://x") (new-page) (space "1em") (nbsp)
     (verbatim "a%b")
     (math "<alpha>+<infty>") (math "a<leq>b") (math "sin x")
@@ -672,9 +773,14 @@
     (math (concat (big "sum") (rsub "i") "x"))
     (math (concat (big "int") (rsub "0") (rsup "1") "f"))
     (math (binom "n" "k")) (math (op "lim"))
+    (math (concat "a" (text "if") "b"))
     (math (wide "x" "^")) (math (wide "x" "~")) (math (wide "x" "<bar>"))
     (math (wide "x" "<vect>")) (math (wide* "x" "<bar>"))
     (math "<bbb-R>") (math "<cal-A>")
+    (math (boxed (concat "x" (rsup "2") "+" (frac "1" "2"))))
+    (equation* (document (boxed (concat "y=" (frac "1" "3")))))
+    (frame (concat "text " (math "a"))) (frame "x")
+    (fcolorbox "red" "yellow" "warn") (colored-frame "yellow" "hi")
     (equation* (document "x=1")) (equation (document "x=1"))
     (equation (document (concat "x=1" (label "e"))))
     (eqnarray* (document (tformat (table (row (cell "a") (cell "=") (cell "b"))
@@ -694,7 +800,8 @@
 ;;     atom;
 ;;   - text underline and math under-bar are both \underline;
 ;;   - math bold is \tmmathbf, read back as a bold letter;
-;;   - a text in a formula ends an implicit product.
+;;   - a frame in a formula is \boxed, read back as boxed, and \boxed is
+;;     only allowed in formulas.
 (define round-trip-lossy
   '(((math (around* "(" "x" ")")) (math (around "(" "x" ")")))
     ((math (concat (left "(") "x" (right ")"))) (math (around "(" "x" ")")))
@@ -702,7 +809,8 @@
     ((math (concat "a" (lsub "b"))) (math (concat "a" (rsub "b"))))
     ((underline "u") (wide* "u" "<bar>"))
     ((math (with "math-font-series" "bold" "x")) (math "<b-x>"))
-    ((math (concat "a" (text "if") "b")) (math (concat "a*" (text "if") "b")))
+    ((math (frame "x")) (math (boxed "x")))
+    ((boxed "x") (math (boxed "x")))
     ((verbatim (document "a" "b")) (verbatim-code (document "a" "b")))
     ((math (det (tformat (table (row (cell "a") (cell "b"))))))
      (math (around* "|" (tabular* (tformat
@@ -733,7 +841,9 @@
               (check-equal s (lambda () (tl (lt s))) s))
             '("\\section{A}\n\ntext" "$\\frac{a}{b}$" "$x_i^2$" "a\\footnote{f}"
               "\\begin{theorem}\n  T\n\\end{theorem}"
-              "\\begin{equation}\n  x = 1\n\\end{equation}")))
+              "\\begin{equation}\n  x = 1\n\\end{equation}"
+              "$\\boxed{x^2 + \\frac{1}{2}}$" "\\[ \\boxed{y = \\frac{1}{3}} \\]"
+              "\\fbox{text $a$}")))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The suite
@@ -747,13 +857,14 @@
   (with s (convert '(document (TeXmacs "2.1.5") (style (tuple "article"))
                               (body (document (section "A") "text")))
                    "texmacs-stree" "latex-document")
-    (check-true (string? s))
-    (check-true (string-contains s "\\documentclass{article}"))
-    (check-true (string-contains s "\\section{A}"))
-    (check-true (string-contains s "text"))
-    (check-true (< (string-contains s "\\begin{document}")
-                   (string-contains s "\\section{A}")
-                   (string-contains s "\\end{document}")))))
+    ;; NOTE: string-contains is Guile only
+    (with pos (lambda (x) (string-search-forwards x 0 s))
+      (check-true (string? s))
+      (check-true (>= (pos "\\documentclass{article}") 0))
+      (check-true (>= (pos "\\section{A}") 0))
+      (check-true (>= (pos "text") 0))
+      (check-true (< -1 (pos "\\begin{document}") (pos "\\section{A}")
+                     (pos "\\end{document}"))))))
 
 (tm-define (latex-test-failures)
   (check-suite "latex")
@@ -764,6 +875,7 @@
   (test-export-lists)
   (test-export-references)
   (test-export-math)
+  (test-export-boxes)
   (test-export-big)
   (test-export-accents-math)
   (test-export-matrices)
@@ -779,6 +891,7 @@
   (test-import-lists)
   (test-import-references)
   (test-import-math)
+  (test-import-boxes)
   (test-import-matrices)
   (test-import-equations)
   (test-import-tables)

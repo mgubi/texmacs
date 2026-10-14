@@ -9,7 +9,7 @@
   (which corresponds to the <verbatim|.tm> and <verbatim|.ts> file
   extensions). This syntax is designed to be unobtrusive and easy to read, so
   the content of a document can be easily understood from a plain text
-  editor. For instance, the formula (<reference|tm-tree-ex>) is represented
+  editor. For instance, the formula <hlink|<math|x+y+<frac|1|2>+<sqrt|y+z>>|tm-tree.en.tm#tm-tree-ex> is represented
   by
 
   <\quote-env>

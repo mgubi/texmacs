@@ -124,10 +124,12 @@
   (check= (texmacs->mathml "123") '(m:mn "123"))
   (check= (texmacs->mathml "") '(m:mrow))
   (check= (texmacs->mathml '(concat "sin" "x")) '(m:mrow (m:mi "sin") (m:mi "x")))
-  ;; FIXME: a decimal number is cut at the point, which becomes an
-  ;; identifier (tmconcat-math-sub in tmconcat.scm:71 only eats digits):
-  ;; (texmacs->mathml "12.5") gives (m:mrow (m:mn "12") (m:mi ".") (m:mn "5")),
-  ;; expected (m:mn "12.5").
+  ;; a decimal number is one mn; a point which is not between digits is not
+  ;; part of the number
+  (check= (texmacs->mathml "12.5") '(m:mn "12.5"))
+  (check= (texmacs->mathml "x=0.25") '(m:mrow (m:mi "x") (m:mo "=") (m:mn "0.25")))
+  (check= (texmacs->mathml "1.2.3") '(m:mrow (m:mn "1.2") (m:mi ".") (m:mn "3")))
+  (check= (texmacs->mathml "2.") '(m:mrow (m:mn "2") (m:mi ".")))
   (check= (texmacs->mathml '(concat "x" (rsup "2"))) '(m:msup (m:mi "x") (m:mn "2")))
   (check= (texmacs->mathml '(concat "x" (rsub "i"))) '(m:msub (m:mi "x") (m:mi "i")))
   (check= (texmacs->mathml '(concat "x" (rsub "i") (rsup "2")))
@@ -189,11 +191,13 @@
   (check= (texmacs->mathml '(tformat (table (row (cell "a")) (row (cell "1")))))
           '(m:mtable (@ (columnalign "left"))
                      (m:mtr (m:mtd (m:mi "a"))) (m:mtr (m:mtd (m:mn "1")))))
-  ;; FIXME: a table without tformat raises an error (tmmath-table in
-  ;; tmmath.scm:238 gives '() as row and cell formats, of which
-  ;; tmmath-make-rows takes the car, and wraps the table in a list):
-  ;; (texmacs->mathml '(table (row (cell "a")))) raises wrong-type-arg,
-  ;; expected (m:mtable (@ (columnalign "left")) (m:mtr (m:mtd (m:mi "a")))).
+  ;; a table without tformat
+  (check= (texmacs->mathml '(table (row (cell "a"))))
+          '(m:mtable (@ (columnalign "left")) (m:mtr (m:mtd (m:mi "a")))))
+  (check= (texmacs->mathml '(table (row (cell "a") (cell "b")) (row (cell "1") (cell "2"))))
+          '(m:mtable (@ (columnalign "left left"))
+                     (m:mtr (m:mtd (m:mi "a")) (m:mtd (m:mi "b")))
+                     (m:mtr (m:mtd (m:mn "1")) (m:mtd (m:mn "2")))))
   ;; with: the color, the series, the text mode
   (check= (texmacs->mathml '(with "color" "red" "x"))
           '(m:mstyle (@ (mathcolor "red")) (m:mi "x")))
@@ -245,19 +249,8 @@
 
 ;; MathML in an HTML document, in the namespace of MathML (as TeXmacs and
 ;; most tools write it), becomes a math tag, or an equation* with
-;; display="block".
-;; FIXME: MathML without the xmlns attribute, as HTML5 allows it, loses its
-;; first element and makes a paragraph of its own (htmltm-math in
-;; htmltm.scm:363 puts the list of the children as one child,
-;; `,(replace-nsprefix-in-stree c ...)` instead of `,@`, so that the first
-;; child becomes the name of a node, and the handler of h:math is :block):
-;; (convert "<math><mi>x</mi><mo>+</mo><mn>1</mn></math>" "html-snippet"
-;; "texmacs-tree") gives (math "+1"), expected (math "x+1"); and
-;; "<p>Let <math><mi>x</mi></math> be.</p>" gives
-;; (document "Let" (math "") "be."), expected (concat "Let " (math "x") " be.").
-;; FIXME: merror raises an error, a typo in mathtm.scm:154 (matthtm-error):
-;; (mathml-import "<merror><mi>x</mi></merror>") raises unbound-variable,
-;; expected (math (with "color" "red" "x")).
+;; display="block". MathML without the xmlns attribute, as HTML5 allows it,
+;; is read in the same way.
 (define (test-mathml-import)
   (check-group "mathml import")
   (check= (mathml-import "<mi>x</mi>") '(math "x"))
@@ -332,7 +325,19 @@
   (check= (import (string-append "<m:math xmlns:m=\"http://www.w3.org/1998/Math/"
                                  "MathML\"><m:mi>x</m:mi></m:math>")
                   "html-snippet")
-          '(math "x")))
+          '(math "x"))
+  ;; without xmlns
+  (check= (import "<math><mi>x</mi><mo>+</mo><mn>1</mn></math>" "html-snippet")
+          '(math "x+1"))
+  (check= (import "<math><mfrac><mi>a</mi><mi>b</mi></mfrac></math>" "html-snippet")
+          '(math (frac "a" "b")))
+  (check= (import "<p>Let <math><mi>x</mi></math> be.</p>" "html-snippet")
+          '(concat "Let " (math "x") " be."))
+  (check= (import "<math display=\"block\"><mi>x</mi></math>" "html-snippet")
+          '(equation* "x"))
+  ;; an error is shown in red
+  (check= (mathml-import "<merror><mi>x</mi></merror>")
+          '(math (with "color" "red" "x"))))
 
 ;; TeXmacs -> MathML in HTML -> TeXmacs: the formula comes back in a math
 ;; tag.
@@ -349,10 +354,14 @@
   ;; the bar comes back as the wide bar
   (check= (import (html-math '(with "mode" "math" (wide "x" "<bar>"))) "html-snippet")
           '(math (wide "x" "<wide-bar>")))
-  ;; FIXME: a hat does not come back: the export writes the accent as the
-  ;; entity &Hat;, which the import reads as a symbol, not as an accent
-  ;; (mathtm-mover in mathtm.scm:304 only knows the characters): (wide "x" "^")
-  ;; gives (math (above "x" "<#005E>")), expected (math (wide "x" "^")).
+  ;; the hat, which the export writes as the entity &Hat;
+  (check= (import (html-math '(with "mode" "math" (wide "x" "^"))) "html-snippet")
+          '(math (wide "x" "^")))
+  (check= (mathml-import "<mover><mi>x</mi><mo>&Hat;</mo></mover>")
+          '(math (wide "x" "^")))
+  ;; decimal numbers
+  (check= (import (html-math '(with "mode" "math" "x=12.5")) "html-snippet")
+          '(math "x=12.5"))
   (check= (import (html-math '(concat "a " (with "mode" "math" "x") " b"))
                   "html-snippet")
           '(concat "a " (math "x") " b")))
@@ -714,9 +723,15 @@
                 (l (string-tokenize-by-char (substring ps start end) #\space)))
            (map string->number (list-filter l (lambda (x) (!= x ""))))))))
 
+;; a check left out for a missing tool
+(define (images-skip what why)
+  (display* "  SKIP [" what "] " why "\n"))
+
 ;; The size of an image, in points (a pixel is a point when the file gives
 ;; no resolution), is the bounding box of its PostScript form (image->psdoc,
-;; which uses Qt for the bitmaps); an EPS file gives its own bounding box.
+;; which goes through the convert of ImageMagick for the bitmaps and SVG:
+;; without it, every image becomes misc/pixmaps/unknown.eps, and these
+;; checks are skipped); an EPS file gives its own bounding box.
 (define (test-images)
   (check-group "images")
   (let* ((dir (temp-dir))
@@ -745,13 +760,24 @@
     (check= (file-format (string->url "a.tiff")) "tif-file")
     (check-true (file-of-format? png "image"))
     (check-false (file-of-format? (string->url "a.tm") "image"))
-    (check= (bounding-box (image->psdoc png)) '(0 0 30 20))
-    (check= (bounding-box (image->psdoc gif)) '(0 0 40 10))
-    (check= (bounding-box (image->psdoc jpg)) '(0 0 16 24))
-    (check= (bounding-box (image->psdoc pnm)) '(0 0 3 2))
-    (check= (bounding-box (image->psdoc svg)) '(0 0 50 25))
-    ;; image->postscript goes through the converters of the format
-    (check= (bounding-box (image->postscript png)) '(0 0 30 20))
+    ;; (Qt 6 cannot write PostScript: the bitmaps go to PostScript with the
+    ;; convert of ImageMagick, which TeXmacs does not use on Windows, where
+    ;; convert is another command; without it image->psdoc gives the
+    ;; picture of an unknown image)
+    (if (not (has-convert?))
+        (images-skip "the PostScript of bitmaps and svg"
+                     "no convert of ImageMagick (never used on Windows)")
+        (begin
+          (check= (bounding-box (image->psdoc png)) '(0 0 30 20))
+          (check= (bounding-box (image->psdoc gif)) '(0 0 40 10))
+          (check= (bounding-box (image->psdoc jpg)) '(0 0 16 24))
+          (check= (bounding-box (image->psdoc pnm)) '(0 0 3 2))
+          ;; FIXME (#297): the size of an SVG depends on the converter
+          ;; (67 x 34 with the ImageMagick 6 of Ubuntu, which renders it at
+          ;; 96 dpi through rsvg-convert)
+          (display "  SKIP size of an SVG: depends on the converter (#297)\n")
+          ;; image->postscript goes through the converters of the format
+          (check= (bounding-box (image->postscript png)) '(0 0 30 20))))
     (check= (bounding-box (image->postscript eps)) '(10 20 110 70))
     (check-true (string-starts? (image->postscript eps) "%!PS-Adobe"))
     (check= (image->postscript (string->url "a.unknownformat")) "")
@@ -784,21 +810,35 @@
           '(tuple "au" "cdr" "cvs" "dat" "gsm" "ogg" "snd" "voc" "wav"))
   (check= (format-get-suffixes* "animation") '(tuple "gif"))
   (check= (format-default-suffix "image") "png")
-  (with l (cdr (format-get-suffixes* "image"))
-    (for-each (lambda (s) (check-true (in? s l)))
-              '("png" "jpg" "jpeg" "gif" "pnm" "ps" "eps" "pdf" "svg" "tif"
-                "ppm")))
-  (with l (image-formats)
-    (for-each (lambda (f) (check-true (in? f l)))
-              '("gif" "jpeg" "pdf" "png" "pnm" "postscript" "ppm" "svg" "tif")))
+  ;; the image formats are those which a converter takes to PostScript:
+  ;; pdf needs Ghostscript (except on Windows), svg inkscape or
+  ;; rsvg-convert, ppm the convert of ImageMagick
+  (let* ((pdf? (or (os-mingw?) (url-exists-in-path? "gs")))
+         (svg? (or (url-exists-in-path? "inkscape")
+                   (url-exists-in-path? "rsvg-convert")))
+         (ppm? (has-convert?))
+         (opt (lambda (ok? l) (if ok? l '()))))
+    (with l (cdr (format-get-suffixes* "image"))
+      (for-each (lambda (s) (check-true (in? s l)))
+                (append '("png" "jpg" "jpeg" "gif" "pnm" "ps" "eps" "tif")
+                        (opt pdf? '("pdf")) (opt svg? '("svg"))
+                        (opt ppm? '("ppm")))))
+    (with l (image-formats)
+      (for-each (lambda (f) (check-true (in? f l)))
+                (append '("gif" "jpeg" "png" "pnm" "postscript" "tif")
+                        (opt pdf? '("pdf")) (opt svg? '("svg"))
+                        (opt ppm? '("ppm"))))))
   ;; the bitmaps go to PostScript by image->psdoc, without external tool
   (for-each (lambda (fm)
               (check= (converter-search (string-append fm "-file")
                                         "postscript-document")
                       (list (string-append fm "-file") "postscript-document")))
             '("png" "jpeg" "gif" "tif" "pnm"))
-  (check= (converter-search "xfig-file" "postscript-file")
-          '("xfig-file" "postscript-file")))
+  ;; (fig2ps is a shell script of TeXmacs, which Windows does not run)
+  (if (url-exists-in-path? "fig2ps")
+      (check= (converter-search "xfig-file" "postscript-file")
+              '("xfig-file" "postscript-file"))
+      (images-skip "xfig to PostScript" "no fig2ps command")))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Source code formats and the registry

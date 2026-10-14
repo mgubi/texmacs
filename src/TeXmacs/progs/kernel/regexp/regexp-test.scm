@@ -25,3 +25,20 @@
   (:b (:repeat :a)))
 
 ;; (match? '(a b c a b c x) '(:b x))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Regression tests
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (regtest-match?)
+  (regression-test-group
+   "regexp match?" "regexp"
+   (lambda (l) (match? l '(:b x))) :none
+   (test "repeated alternatives" '(a b c a b c x) '(()))
+   (test "empty repetition" '(x) '(()))
+   (test "foreign symbol" '(a d x) #f)))
+
+(tm-define (regtest-regexp)
+  (let ((n (regtest-match?)))
+    (display* "Total: " (object->string n) " tests.\n")
+    (display "Test suite of regexp: ok\n")))

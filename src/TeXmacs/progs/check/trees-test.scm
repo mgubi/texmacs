@@ -441,9 +441,10 @@
   (check= (tm-label (stree->tree "abc")) 'string)
   (check= (map (lambda (x) (map tm->stree (tm-children x))) (frac-forms))
           '(("a" (sqrt "b")) ("a" (sqrt "b"))))
-  ;; FIXME: tm-children and tm->list on an atomic tree crash TeXmacs
-  ;; (segmentation fault in tree-children), where they raise an error on
-  ;; a string.
+  ;; an atomic tree has no children: an error, as for a string (it used to
+  ;; crash TeXmacs)
+  (check-error (tm-children (stree->tree "abc")) #t)
+  (check-error (tree-children (stree->tree "abc")) 'wrong-type-arg)
   (check= (map (lambda (x) (map tm->stree (tm-cdr x))) (frac-forms))
           '(("a" (sqrt "b")) ("a" (sqrt "b"))))
   (check= (map (lambda (x) (tm->stree (tm->list x))) (frac-forms))
@@ -635,9 +636,24 @@
     (check-false (modification-applicable?
                   (stree->tree '(concat "ab" "c"))
                   (modification 'split '(0) 1 0))))
-  ;; FIXME: modification-apply of a modification which is not applicable,
-  ;; such as (modification 'split '(0) 1 0) on (concat "ab" "c"), crashes
-  ;; TeXmacs (segmentation fault in clean_split).
+  ;; a modification which does not apply raises an error (it used to
+  ;; crash TeXmacs in clean_split)
+  (check-error (modification-apply (stree->tree '(concat "ab" "c"))
+                                   (modification 'split '(0) 1 0))
+               'wrong-type-arg)
+  ;; a join in a string (is_applicable read its children)
+  (check-error (modification-apply (stree->tree "abc")
+                                   (modification 'join '() 0))
+               'wrong-type-arg)
+  ;; the same checks for the other ways of applying
+  (check-error (modification-inplace-apply (stree->tree '(concat "ab" "c"))
+                                           (modification 'split '(0) 1 0))
+               'wrong-type-arg)
+  (check-error (patch-apply (stree->tree '(document "ab")) (insert-patch 7 "X"))
+               'wrong-type-arg)
+  (check-error (patch-inplace-apply (stree->tree '(document "ab"))
+                                    (insert-patch 7 "X"))
+               'wrong-type-arg)
   (with t (stree->tree '(concat "ab" "c"))
     (check= (st (modification-apply t (modification 'assign '(1) "z")))
             '(concat "ab" "z"))
@@ -799,6 +815,30 @@
 ;; The suite
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;; edits of the glue which do not apply raise an error instead of crashing
+;; TeXmacs, and the valid ones still work
+(define (test-invalid-edits)
+  (check-group "invalid edits")
+  (let ((cc (lambda () (stree->tree '(concat "a" "b"))))
+        (at (lambda () (stree->tree "abc"))))
+    (check-error (tree-child-insert (at) 0 (stree->tree "x")) 'wrong-type-arg)
+    (check-error (tree-child-insert (cc) 5 (stree->tree "x")) 'wrong-type-arg)
+    (check-error (tree-insert (at) 0 (list (stree->tree "x"))) 'wrong-type-arg)
+    (check-error (tree-insert! (cc) 7 '("x")) 'wrong-type-arg)
+    (check-error (tree-remove! (cc) 5 3) 'wrong-type-arg)
+    (check-error (tree-remove! (at) 1 9) 'wrong-type-arg)
+    (check-error (tree-split! (at) 0 1) 'wrong-type-arg)
+    (check-error (tree-join! (cc) 1) 'wrong-type-arg)
+    (check-error (tree-join! (at) 0) 'wrong-type-arg)
+    (check= (tree->stree (tree-child-insert (cc) 1 (stree->tree "x")))
+            '(concat "a" "x" "b"))
+    (check= (tree->stree (tree-insert! (cc) 2 '("x"))) '(concat "a" "b" "x"))
+    (check= (tree->stree (tree-remove! (at) 1 1)) "ac")
+    (check= (tree->stree (tree-remove! (cc) 0 1)) '(concat "b"))
+    (check= (tree->stree (tree-split! (stree->tree '(concat "ab")) 0 1))
+            '(concat "a" "b"))
+    (check= (tree->stree (tree-join! (cc) 0)) '(concat "ab"))))
+
 (tm-define (trees-test-failures)
   (check-suite "trees")
   (test-conversion)
@@ -831,4 +871,5 @@
   (test-patch-birth-author)
   (test-patch-apply)
   (test-patch-push)
+  (test-invalid-edits)
   (check-end))

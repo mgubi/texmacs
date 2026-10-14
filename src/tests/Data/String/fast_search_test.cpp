@@ -124,6 +124,20 @@ test_empty_pattern () {
 }
 
 // bytes above 127 and the null byte are ordinary characters
+// a pattern longer than the text, also an empty text, finds nothing (it
+// used to index past the table of hash levels and crash)
+static void
+test_longer_than_text () {
+  string_searcher ab ("ab");
+  CHECK_EQ (show (ab->search_all ("abcd")), string ("[]"));
+  CHECK_EQ (ab->search_next ("abcd", 0), -1);
+  string_searcher abc ("abc");
+  CHECK_EQ (show (abc->search_all ("abcd")), string ("[]"));
+  string_searcher empty ("");
+  CHECK_EQ (show (empty->search_all ("a")), string ("[]"));
+  CHECK_EQ (empty->search_next ("a", 0), -1);
+}
+
 static void
 test_binary () {
   string s ("\x00\xff\x80\x00\xff", 5);
@@ -154,9 +168,6 @@ test_against_naive () {
         what= s (b, min (n, b + m));
       }
       else what= random_string (m, alphabet, k);
-      // FIXME: a pattern longer than the text can make search_sub index past
-      // the table of hash levels and crash, so such patterns are left out
-      if (N(what) > n) continue;
       array<int> got= ss->search_all (what);
       array<int> exp= naive_search_all (s, what);
       if (show (got) != show (exp)) {
@@ -242,6 +253,7 @@ main () {
   RUN (test_simple);
   RUN (test_overlapping);
   RUN (test_empty_pattern);
+  RUN (test_longer_than_text);
   RUN (test_binary);
   RUN (test_against_naive);
   RUN (test_long_periodic);

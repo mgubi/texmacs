@@ -210,9 +210,7 @@
 
 ;; integers up to the limits of a C int, and an error beyond them
 (define (test-glue-integers)
-  ;; FIXME: as_hexadecimal (int) recurses forever on -2^31, whose negation
-  ;; overflows, and crashes TeXmacs, so -2^31+1 is the lowest checked
-  (for (n (list 0 1 -1 255 65536 2147483647 -2147483647))
+  (for (n (list 0 1 -1 255 65536 2147483647 -2147483647 -2147483648))
     (glue-check-equal "integers" (number->string n)
                       (lambda () (hexadecimal->integer
                                   (integer->hexadecimal n)))
@@ -256,10 +254,48 @@
                     (lambda () (path-strip '(1 . 2) '())) 'wrong-type-arg)
   (glue-check-error "paths" "a string for a path"
                     (lambda () (path-strip "x" '())) 'wrong-type-arg)
-  (for (s (list "a.tm" "a/b/c.tm" "/abs/path.tm" "a b.tm" ""))
-    (glue-check-equal "urls" s (lambda () (url->string (string->url s))) s))
+  ;; (an absolute name: /abs/path.tm, or /c/abs/path.tm which is c:/abs/path.tm
+  ;; on Windows; check-unix writes the name given back with /)
+  (for (p (list (cons "a.tm" "a.tm") (cons "a/b/c.tm" "a/b/c.tm")
+                (cons (check-unix-abs "abs/path.tm") (check-abs "abs/path.tm"))
+                (cons "a b.tm" "a b.tm") (cons "" "")))
+    (glue-check-equal "urls" (car p)
+                      (lambda () (check-unix (url->string (string->url (car p)))))
+                      (cdr p)))
   (glue-check-equal "urls" "a string for an url"
-                    (lambda () (url->string "x/y.tm")) "x/y.tm"))
+                    (lambda () (check-unix (url->string "x/y.tm"))) "x/y.tm")
+  ;; system-mkdir of no url, and so run-test-suite with a name which is not
+  ;; a directory, used to crash TeXmacs (#163)
+  (glue-check-equal "urls" "system-mkdir of no url"
+                    (lambda () (system-mkdir (url-none)) #t) #t)
+  (glue-check-error "urls" "run-test-suite of a name which is not a directory"
+                    (lambda () (run-test-suite "no-such-test-suite-dir"))
+                    'texmacs-error))
+
+;; processes: evaluate-system sends its inputs to the file descriptors of
+;; the process and reads its outputs. An empty input used to be left open,
+;; so that a process which reads it to its end never stopped, nor TeXmacs,
+;; which waits for it (openssl passwd -stdin of an empty password). A long
+;; input is sent in pieces of 4096 bytes on Unix.
+;; On Windows too (with the cat of MSYS2): the process gets its pipes as its
+;; standard handles, so it sees the end of its input.
+(define (test-glue-processes)
+  (if (not (url-exists-in-path? "cat"))
+      (display "  no cat command, skipped\n")
+      ;; (on Unix, cat is stopped after 20 s when perl is at hand: the check
+      ;; then fails, instead of TeXmacs waiting for cat forever)
+      (let* ((guard (if (and (not (or (os-mingw?) (os-win32?)))
+                             (url-exists-in-path? "perl"))
+                        '("perl" "-e" "alarm 20; exec @ARGV") '()))
+             (cat (lambda (in) (evaluate-system (append guard '("cat"))
+                                                '(0) (list in) '(1 2))))
+             (long (make-string 100000 #\a)))
+        (glue-check-equal "processes" "an input"
+                          (lambda () (cat "abc")) '("0" "abc" ""))
+        (glue-check-equal "processes" "an empty input"
+                          (lambda () (cat "")) '("0" "" ""))
+        (glue-check-equal "processes" "a long input"
+                          (lambda () (cat long)) (list "0" long "")))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The test suite
@@ -288,6 +324,8 @@
   (test-glue-booleans-doubles)
   (glue-group "paths and urls")
   (test-glue-paths-urls)
+  (glue-group "processes")
+  (test-glue-processes)
   (when (nnull? glue-redefined)
     (display* "  redefined in Scheme, not checked: "
               (object->string (reverse glue-redefined)) "\n"))

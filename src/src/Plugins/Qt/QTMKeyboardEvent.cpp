@@ -134,7 +134,7 @@ void QTMKeyboardEvent::computeUnicodeToCork() {
     case 0x301: mTexmacsKeyCombination= "acute"; break;
     case 0x302: mTexmacsKeyCombination= "hat"; break;
     case 0x308: mTexmacsKeyCombination= "umlaut"; break;
-    case 0x33e: mTexmacsKeyCombination= "tilde"; break;
+    case 0x303: mTexmacsKeyCombination= "tilde"; break;
     default:
       QByteArray buf= nss.toUtf8();
       string rr (buf.constData(), buf.size());

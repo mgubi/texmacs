@@ -110,7 +110,7 @@
   Wenn Sie also einen Beitrag zu<TeXmacs> leisten wollen, oder wenn Sie das
   Programm speziell anpassen wollen, dann finden Sie wichtige Informationen
   im <menu|Help>-Menü. <hlink|<menu|Help|Document
-  format>|../../devel/format/format.en.tm> gibt Informationen über das
+  format>|../../devel/format/basics/basics.de.tm> gibt Informationen über das
   <TeXmacs> Dokumentenformat und unter <hlink|<menu|Help|Interfacing>|../../devel/plugin/plugin.en.tm>
   wird \ erklärt, wie<TeXmacs> mit anderen Programmen zusammenarbeiten kann.
   Ein Teil des Quellcodes ist unter <hlink|<menu|Help|Source
