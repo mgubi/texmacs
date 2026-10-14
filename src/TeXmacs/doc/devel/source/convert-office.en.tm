@@ -103,6 +103,30 @@
     the section properties of <name|Word> and the first master page of
     <name|OpenDocument>.
 
+    <item*|The style office>The blocks <scm|(styles (style ...) ...)>
+    (the named styles which the text uses, with their look),
+    <scm|(header <scm-arg|block> ...)> (attributes <verbatim|place> and
+    <verbatim|kind>), <scm|(package)> (the file itself, attribute
+    <verbatim|data>) and <scm|(columns <scm-arg|block> ...)>; the
+    attribute <verbatim|style> of a paragraph and the inlines
+    <scm|(span ...)>, <scm|(field ...)> (attribute <verbatim|code>, or
+    <verbatim|xml> for the element of <name|OpenDocument>),
+    <scm|(comment <scm-arg|block> ...)>, <scm|(ins ...)> and
+    <scm|(del ...)> (attributes <verbatim|author> and <verbatim|date>);
+    the attribute <verbatim|crop> of an image. With the option
+    <verbatim|office-\<gtr\>texmacs:faithful>, <scm|office-\<gtr\>texmacs>
+    makes a document of the style <tmstyle|office>
+    (<source-link|styles/office.ts|TeXmacs/styles/office.ts>): its macros
+    <markup|office-par>, <markup|office-span>, <markup|office-field>,
+    <markup|office-comment>, <markup|office-ins>, <markup|office-del> and
+    <markup|office-columns>, the macros of the named styles
+    (<scm|oftm-style-macros>), the headers (<scm|oftm-headers>) and the
+    file (<verbatim|office-package>) in its initial environment.
+    <scm|texmacs-\<gtr\>office> takes them back (<scm|tmof-package>), and
+    the writers reuse the parts of the file which TeXmacs does not edit
+    (<scm|dx-merged-styles>, <scm|dx-merged-numbering>, the relations which
+    are kept; <scm|ot-merged-styles>).
+
     <item*|Tables>A table has the attributes <verbatim|align>,
     <verbatim|width> (a part of the paragraph, <verbatim|0.5par>) and
     <verbatim|columns> (the parts of the columns in the table). A cell has

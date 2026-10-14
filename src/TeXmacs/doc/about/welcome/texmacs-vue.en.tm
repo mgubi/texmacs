@@ -256,6 +256,13 @@
     headings without numbers. The text of boxes and shapes is imported,
     hidden text is left out, and the chapters of a book are exported with
     their numbers.
+
+    <item>A Word or <name|OpenDocument> file opens in the new style
+    <tmstyle|office>, which keeps its named styles, headers and footers,
+    fields, comments, tracked changes and columns, and writes the file back
+    with its own styles, pages and settings. Cropped pictures, pictures of
+    <name|Windows> (through <name|LibreOffice>), arrays of equations and
+    all the screens of a presentation are converted too.
   </itemize>
 
   <paragraph|13 October 2026>
