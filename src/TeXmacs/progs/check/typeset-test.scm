@@ -782,6 +782,41 @@
      (check= (tree->stree (buffer-tree)) '(document "one" "two again" "three"))
      (check-true (> (rect-x2 (rect 1)) (rect-x1 (rect 1)))))))
 
+;; A length in a unit made by a macro of the document: when the macro
+;; changes, what the environment derived from the length changes too (the
+;; limit of the fractions in a line), also in paragraphs which read none of
+;; the variables which changed.
+(define (test-derived-state)
+  (check-group "derived state")
+  (with-typeset-body
+   '(document (assign "myu-length" (macro "0.1mm"))
+              (assign "math-frac-limit" "5myu")
+              (concat "x " (math (frac "aaaaaaaaaa" "b")) " y")
+              "after")
+   (lambda ()
+     (tree-set (tree-ref (buffer-tree) 0 1 0) "10cm")
+     (update-forced)
+     (let* ((r2 (rect 2)) (r3 (rect 3)))
+       (update-current-buffer)
+       (update-forced)
+       (check= r2 (rect 2))
+       (check= r3 (rect 3))))))
+
+;; The labels are numbered again in the order of the document once, after
+;; a section was added before the others, and not a second time.
+(define (test-renumbering-labels)
+  (check-group "labels numbered again")
+  (with-typeset-body
+   '(document (section "A") (section "B"))
+   (lambda ()
+     (tree-insert (buffer-tree) 0 '((section "N")))
+     (update-forced)
+     (check-true (renumber-auto-labels))
+     (update-forced)
+     (check-false (renumber-auto-labels))
+     (check= (cadr (tree->stree (get-reference "auto-1"))) "1")
+     (check= (cadr (tree->stree (get-reference "auto-3"))) "3"))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The suite
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -815,4 +850,6 @@
   (test-pages)
   (test-pages-kept)
   (test-typesetting-failure)
+  (test-derived-state)
+  (test-renumbering-labels)
   (check-end))

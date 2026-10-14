@@ -617,4 +617,8 @@
                 (generate-all-aux) (wait-update-current-buffer))
                ((== what "buffer") 
                 (wait-update-current-buffer))
+               ;; a table alone: when the labels were numbered again,
+               ;; the other tables hold names which changed
+               ((renumber-auto-labels)
+                (generate-all-aux) (wait-update-current-buffer))
                (else (generate-aux what))))))))

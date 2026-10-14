@@ -40,7 +40,7 @@ edit_env_rep::edit_env_rep (drd_info& drd2,
   local_aux (local_aux2), global_aux (global_aux2),
   local_att (local_att2), global_att (global_att2),
   missing (UNINIT), redefined (), touched (false),
-  read_unknown (false), rec_keys (NULL), rec_values (NULL),
+  read_unknown (false), rec_keys (NULL), rec_values (NULL), typesetting (0),
   auto_seen (0)
 {
   initialize_default_env ();
@@ -184,7 +184,25 @@ edit_env_rep::derived_state () {
   }
   array<tree> r;
   for (int i=0; i<N(names); i++) r << env.h [names[i]];
+  // and the plain variables from which a state was derived (in the order
+  // of their numbers)
+  array<int> ids;
+  for (iterator<int> it= iterate (env_derived_inputs ()); it->busy (); )
+    ids << it->next ();
+  merge_sort (ids);
+  for (int i=0; i<N(ids); i++) {
+    string var= env_var_name (ids[i]);
+    r << tree (var) << env.h [var];
+  }
   return r;
+}
+
+int env_deriving= 0;
+
+hashmap<int,bool>&
+env_derived_inputs () {
+  static hashmap<int,bool> ids (false);
+  return ids;
 }
 
 // a number for each name of variable (see env_table), and back

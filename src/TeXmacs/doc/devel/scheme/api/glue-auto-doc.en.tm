@@ -9431,7 +9431,7 @@ source code.
 <explain-synopsis|no synopsis>
   <|explain>
     Calls the <c++> function <cpp|typeset_renumber_labels> which returns
-    <scm|void>.
+    <scm|bool>.
   </explain>
 
   <\explain>

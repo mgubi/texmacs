@@ -3255,10 +3255,10 @@ tmg_update_current_buffer () {
 tmscm
 tmg_renumber_auto_labels () {
   // TMSCM_DEFER_INTS;
-  get_current_editor()->typeset_renumber_labels ();
+  bool out= get_current_editor()->typeset_renumber_labels ();
   // TMSCM_ALLOW_INTS;
 
-  return TMSCM_UNSPECIFIED;
+  return bool_to_tmscm (out);
 }
 
 tmscm
