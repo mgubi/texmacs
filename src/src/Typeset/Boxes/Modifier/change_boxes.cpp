@@ -304,9 +304,11 @@ public:
   void post_display (renderer &ren);
   // the child is transformed: no culling of its animations by position
   double anim_next (rectangle vis) {
-    return anim_visible (vis)? box_rep::anim_next (): 1.0e12; }
+    return anim_visible (vis)?
+      box_rep::anim_next (anim_everywhere ()): 1.0e12; }
   rectangles anim_invalid (rectangle vis) {
-    return anim_visible (vis)? box_rep::anim_invalid (): rectangles (); }
+    return anim_visible (vis)?
+      box_rep::anim_invalid (anim_everywhere ()): rectangles (); }
   //cursor find_cursor (path bp);
   //selection find_selection (path lbp, path rbp);
   void get_bracket_extents (SI& lo, SI& hi) { lo= y1; hi= y2; }
@@ -352,9 +354,11 @@ public:
   // effects may draw outside the extents of the children: no culling of
   // their animations by position
   double anim_next (rectangle vis) {
-    return anim_visible (vis)? box_rep::anim_next (): 1.0e12; }
+    return anim_visible (vis)?
+      box_rep::anim_next (anim_everywhere ()): 1.0e12; }
   rectangles anim_invalid (rectangle vis) {
-    return anim_visible (vis)? box_rep::anim_invalid (): rectangles (); }
+    return anim_visible (vis)?
+      box_rep::anim_invalid (anim_everywhere ()): rectangles (); }
   void get_bracket_extents (SI& lo, SI& hi) { lo= y1; hi= y2; }
 };
 
