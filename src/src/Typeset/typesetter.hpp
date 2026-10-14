@@ -53,10 +53,18 @@ struct edit_profile_data {
 };
 extern edit_profile_data edit_profile;
 // the differences found by the check modes (TEXMACS_TYPESET_READS,
-// TEXMACS_PAGE_BREAK_CACHE, TEXMACS_PAGE_BREAK_FAST, TEXMACS_PAGE_REUSE
-// set to "check") since the start: a test fails when there are any
+// TEXMACS_PAGE_BREAK_CACHE, TEXMACS_PAGE_BREAK_FAST, TEXMACS_PAGE_REUSE,
+// TEXMACS_TYPESET_CACHES set to "check") since the start: a test fails
+// when there are any
 extern int typeset_check_mismatches;
 int get_typeset_check_mismatches ();
+// the switch of the caches of the typesetter which are not described by
+// one of the variables above (block replay, merged stacks, chunks of lines,
+// shoves, environments, positions), TEXMACS_TYPESET_CACHES:
+// 0 ("off"): nothing is used again, 1: used again, 2 ("check"): made
+// again and compared, a difference counting in typeset_check_mismatches
+int typeset_caches_mode ();
+void typeset_cache_mismatch (string what); // (counts and reports it)
 double edit_profile_now ();        // ms, from an arbitrary origin
 
 box        typeset_as_concat (edit_env env, tree t, path ip);

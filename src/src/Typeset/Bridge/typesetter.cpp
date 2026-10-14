@@ -32,7 +32,6 @@ typesetter_rep::~typesetter_rep () {
   // what holds lines is released while the change log is there for them
   // (see phrase_box_rep; the members would go in the other order)
   tm_delete (kept_pages);
-  shove_cache_forget (shoves);
   br= nil_bridge;
   l = array<page_item> ();
   a = array<line_item> ();
@@ -125,6 +124,23 @@ typesetter_rep::local_end (array<page_item>& prev_l, stack_border& prev_sb) {
 int typeset_check_mismatches= 0;
 int get_typeset_check_mismatches () { return typeset_check_mismatches; }
 
+void
+typeset_cache_mismatch (string what) {
+  typeset_check_mismatches++;
+  failed_error << "What the " << what << " kept differs from what is made "
+               << "again" << LF;
+}
+
+int
+typeset_caches_mode () {
+  static int mode= -1;
+  if (mode < 0) {
+    string s= get_env ("TEXMACS_TYPESET_CACHES");
+    mode= (s == "off"? 0: (s == "check"? 2: 1));
+  }
+  return mode;
+}
+
 edit_profile_data edit_profile=
   { get_env ("TEXMACS_EDIT_PROFILE") != "" }; // (and zeros)
 
@@ -193,7 +209,6 @@ typesetter_rep::typeset () {
   }
 
   // Typeset
-  shove_cache_new_pass (shoves);
   if (env->complete) {
     env->local_aux= hashmap<string,tree> (UNINIT);
     env->missing  = hashmap<string,tree> (UNINIT);
@@ -201,9 +216,11 @@ typesetter_rep::typeset () {
     env->touched  = hashmap<string,bool> (false);
   }
   double t0= edit_profile.on ? edit_profile_now () : 0;
-  br->typeset (PROCESSED+ WANTED_PARAGRAPH);
+  {
+    shove_pass pass (shoves);
+    br->typeset (PROCESSED+ WANTED_PARAGRAPH);
+  }
   double t1= edit_profile.on ? edit_profile_now () : 0;
-  shove_cache_end_pass (shoves);
   pager ppp= tm_new<pager_rep> (br->ip, env, l);
   ppp->memo= kept_pages;
   box rb= ppp->make_pages ();

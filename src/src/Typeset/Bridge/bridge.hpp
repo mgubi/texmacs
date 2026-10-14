@@ -63,6 +63,8 @@ public:
   path                 stack_cache_ip;
   bool                 stack_cache_ok;
   int                  version;  // incremented whenever l is recomputed
+  int                  serial;   // number of the bridge, in the order of
+                                 // creation (never the one of another)
   chunk_cache_rep*     chunk_cache; // see chunk_lines in bridge.cpp
 
 public:
@@ -88,6 +90,13 @@ public:
 };
 
 bool bridge_reads_on (); // see "What is typeset again" in bridge.cpp
+// the reads and the lookups of bridges used again (the tail of a block of
+// paragraphs replayed by bridge_document), for the record of the bridge
+// above them
+void add_reads (edit_env env, bool known, array<int> reads,
+                array<string> keys, array<tree> values);
+// do two lists of page items make the same boxes (the check modes)?
+bool same_page_items (array<page_item> l1, array<page_item> l2);
 
 class bridge {
   ABSTRACT_NULL(bridge);

@@ -74,12 +74,16 @@ struct shove_entry {
 // entries of the current and of the previous pass, by their second box
 struct shove_memo {
   hashmap<pointer,shove_entry> cur, prev;
-  shove_memo* outer;  // memo of an enclosing pass, if any
-  inline shove_memo (): outer (NULL) {}
 };
 
-void shove_cache_new_pass (shove_memo& m);
-void shove_cache_end_pass (shove_memo& m);
-void shove_cache_forget (shove_memo& m);
+// the memo is used while a shove_pass on it exists (the paragraphs of
+// a pass of its typesetter), also when the pass ends by an exception;
+// the passes nest (a typesetter inside a pass of another one)
+struct shove_pass {
+  shove_memo& m;
+  shove_memo* outer;
+  shove_pass (shove_memo& m);
+  ~shove_pass ();
+};
 
 #endif // defined STACKER_H

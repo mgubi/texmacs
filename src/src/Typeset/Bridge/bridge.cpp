@@ -45,7 +45,11 @@ bridge_rep::bridge_rep (typesetter ttt2, tree st2, path ip2):
   ttt (ttt2), env (ttt->env), st (st2), ip (ip2),
   status (CORRUPTED), changes (UNINIT), reads (), reads_known (false),
   removed (UNINIT), bound (UNINIT), stack_cache_ok (false), version (0),
-  chunk_cache (NULL) {}
+  chunk_cache (NULL)
+{
+  static int bridges_made= 0;
+  serial= bridges_made++;
+}
 
 static tree inactive_auto
   (MACRO, "x", tree (REWRITE_INACTIVE, tree (ARG, "x"), "recurse*"));
@@ -400,7 +404,15 @@ chunk_lines (bridge_rep* br, array<page_item> l) {
     }
     if (j - i < 2) { out << l[i]; i= j; continue; }
     pointer key= (pointer) l[i]->b.operator-> ();
-    if (cc->prev->contains (key) && same_lines (cc->prev (key).src, l, i, j)) {
+    if (typeset_caches_mode () != 0 && cc->prev->contains (key) &&
+        same_lines (cc->prev (key).src, l, i, j)) {
+      if (typeset_caches_mode () == 2) {
+        array<page_item> made (1), kept (1);
+        made[0]= merge_line_run (br->ip, l, i, j);
+        kept[0]= cc->prev (key).out;
+        if (!same_page_items (made, kept))
+          typeset_cache_mismatch ("chunk of lines");
+      }
       out << cc->prev (key).out;
       cc->cur (key)= cc->prev (key);
     }
@@ -415,6 +427,43 @@ chunk_lines (bridge_rep* br, array<page_item> l) {
   }
   cc->prev= hashmap<pointer,line_chunk> ();  // see stack_cache in typeset
   return out;
+}
+
+// the single item into which the lines of a bridge are merged outside
+// paper mode (chunks of them when some carry floats or several columns)
+static array<page_item>
+merged_lines (bridge_rep* br) {
+  array<page_item>& l= br->l;
+  path ip= br->ip;
+  bool flag= false;
+  int i, n= N(l);
+  for (i=0; i<n; i++)
+    flag= flag || (N (l[i]->fl) != 0) || (l[i]->nr_cols > 1);
+  if (flag) return chunk_lines (br, l);
+  drop_chunks (br);
+  int first=-1, last=-1;
+  array<box> bs;
+  array<SI>  spc;
+  array<page_item> special_l;
+  for (i=0; i<n; i++)
+    if (l[i]->type != PAGE_CONTROL_ITEM) {
+      if (first == -1 && l[i]->type == PAGE_LINE_ITEM) first= N(bs);
+      bs  << l[i]->b;
+      spc << l[i]->spc->def;
+      last= i;
+    }
+    else if (is_tuple (l[i]->t, "env_page") &&
+             (l[i]->t[1] == PAGE_THIS_TOP ||
+              l[i]->t[1] == PAGE_THIS_BOT ||
+              l[i]->t[1] == PAGE_THIS_BG_COLOR))
+      special_l << l[i];
+  box lb= stack_box (path (ip), bs, spc);
+  if (first != -1) lb= move_box (path (ip), lb, 0, bs[first]->y2);
+  array<page_item> new_l (1);
+  new_l[0]= page_item (lb);
+  new_l[0]->spc= l[last]->spc;
+  new_l << special_l;
+  return new_l;
 }
 
 void
@@ -546,7 +595,7 @@ patch_unread (hashmap<string,tree> patch, array<int> reads, edit_env env) {
 
 // the reads and the lookups of a bridge which was typeset or used again,
 // for the record of the bridge above it
-static void
+void
 add_reads (edit_env env, bool known, array<int> reads,
            array<string> keys, array<tree> values) {
   hashmap<int,bool>* rec= env->read_recorder ();
@@ -600,6 +649,12 @@ border_signature (stack_border sb) {
     << sb->vspc_after->min << sb->vspc_after->def << sb->vspc_after->max
     << (SI) sb->nobr_before << (SI) sb->nobr_after;
   return r;
+}
+
+bool
+same_page_items (array<page_item> l1, array<page_item> l2) {
+  return lines_signature (l1) == lines_signature (l2) &&
+         lines_contents (l1) == lines_contents (l2);
 }
 
 // 'now' is a tuple of the variables which the bridge binds and of their
@@ -795,52 +850,21 @@ bridge_rep::typeset (int desired_status) {
 
   // ttt->insert_stack (l, sb);
   //if (N(l) == 0); else
+  int mode= typeset_caches_mode ();
   if (ttt->paper || (N(l) <= 1)) {
     drop_chunks (this);
     ttt->insert_stack (l, sb);
   }
-  else if (stack_cache_ok && strong_equal (ip, stack_cache_ip))
+  else if (mode != 0 && stack_cache_ok && strong_equal (ip, stack_cache_ip)) {
+    if (mode == 2 && !same_page_items (merged_lines (this), stack_cache))
+      typeset_cache_mismatch ("merged stack of a paragraph");
     ttt->insert_stack (stack_cache, sb);
+  }
   else {
-    bool flag= false;
-    int i, n= N(l);
-    for (i=0; i<n; i++)
-      flag= flag || (N (l[i]->fl) != 0) || (l[i]->nr_cols > 1);
-    if (flag) {
-      stack_cache= chunk_lines (this, l);
-      stack_cache_ip= ip;
-      stack_cache_ok= true;
-      ttt->insert_stack (stack_cache, sb);
-    }
-    else {
-      drop_chunks (this);
-      int first=-1, last=-1;
-      array<box> bs;
-      array<SI>  spc;
-      array<page_item> special_l;
-      for (i=0; i<n; i++)
-	if (l[i]->type != PAGE_CONTROL_ITEM) {
-	  if (first == -1 && l[i]->type == PAGE_LINE_ITEM) first= N(bs);
-	  bs  << l[i]->b;
-	  spc << l[i]->spc->def;
-	  last= i;
-	}
-        else if (is_tuple (l[i]->t, "env_page") &&
-                 (l[i]->t[1] == PAGE_THIS_TOP ||
-                  l[i]->t[1] == PAGE_THIS_BOT ||
-                  l[i]->t[1] == PAGE_THIS_BG_COLOR))
-          special_l << l[i];
-      box lb= stack_box (path (ip), bs, spc);
-      if (first != -1) lb= move_box (path (ip), lb, 0, bs[first]->y2);
-      array<page_item> new_l (1);
-      new_l[0]= page_item (lb);
-      new_l[0]->spc= l[last]->spc;
-      new_l << special_l;
-      stack_cache= new_l;
-      stack_cache_ip= ip;
-      stack_cache_ok= true;
-      ttt->insert_stack (new_l, sb);
-    }
+    stack_cache= merged_lines (this);
+    stack_cache_ip= ip;
+    stack_cache_ok= true;
+    ttt->insert_stack (stack_cache, sb);
   }
 
   //cout << "l   = " << l << LF;

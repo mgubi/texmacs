@@ -69,14 +69,27 @@ stack_box_rep::stack_box_rep (path ip, array<box> bs2, array<SI> spc):
   finalize ();
 }
 
+int typeset_caches_mode (); // see typesetter.hpp
+void typeset_cache_mismatch (string what);
+
 void
 stack_box_rep::position_at (SI x, SI y, rectangles& change_log) {
   // Boxes are not modified once built, so if this stack was already placed
   // at the same absolute position for the same change log, all phrase boxes
   // inside it are up to date and there is nothing to log.  This avoids
   // walking all the lines of a long document at every typesetting pass.
+  // TEXMACS_TYPESET_CACHES "off" walks them all the same, and "check" walks
+  // them and reports a phrase box which logs that it moved.
   SI ax= x + x0, ay= y + y0;
-  if (pos_logs == &change_log && pos_x == ax && pos_y == ay) return;
+  int mode= typeset_caches_mode ();
+  if (mode != 0 && pos_logs == &change_log && pos_x == ax && pos_y == ay) {
+    if (mode == 1) return;
+    rectangles before= change_log;
+    box_rep::position_at (x, y, change_log);
+    if (change_log.operator-> () != before.operator-> ())
+      typeset_cache_mismatch ("position of a stack");
+    return;
+  }
   pos_logs= &change_log; pos_x= ax; pos_y= ay;
   box_rep::position_at (x, y, change_log);
 }

@@ -233,32 +233,18 @@ shove (page_item& item1, page_item& item2,
 * of the typesetter in which they log.
 ******************************************************************************/
 
-// memo of the typesetter which is currently typesetting (NULL outside passes)
+// memo of the innermost shove_pass (NULL outside passes)
 static shove_memo* shove_current= NULL;
 
-void
-shove_cache_new_pass (shove_memo& m) {
-  // a pass of the same memo which did not end (an exception during the
-  // typesetting): what was current before it is current again
-  if (shove_current == &m) shove_current= m.outer;
-  m.prev = m.cur;
-  m.cur  = hashmap<pointer,shove_entry> ();
-  m.outer= shove_current;
+shove_pass::shove_pass (shove_memo& m2): m (m2), outer (shove_current) {
+  m.prev= m.cur;
+  m.cur = hashmap<pointer,shove_entry> ();
   shove_current= &m;
 }
 
-void
-shove_cache_forget (shove_memo& m) {
-  // the memo goes (its typesetter does): it is not current any more
-  if (shove_current == &m) shove_current= m.outer;
-  m.outer= NULL;
-}
-
-void
-shove_cache_end_pass (shove_memo& m) {
-  m.prev = hashmap<pointer,shove_entry> ();
-  shove_current= m.outer;
-  m.outer= NULL;
+shove_pass::~shove_pass () {
+  m.prev= hashmap<pointer,shove_entry> ();
+  shove_current= outer;
 }
 
 static void
@@ -270,7 +256,8 @@ cached_shove (page_item& item1, page_item& item2,
                max (sb->hor_sep, sb2->hor_sep_before),
                max (sb->ver_sep, sb2->ver_sep_before),
                sb->bot, sb2->top };
-  if (shove_current == NULL) {
+  int mode= typeset_caches_mode ();
+  if (shove_current == NULL || mode == 0) {
     // merge_stack outside a typesetting pass: no memo
     item1->spc= item1->spc +
       space (shove_delta (b1, b2, par[0], par[1], par[2], par[3],
@@ -285,6 +272,10 @@ cached_shove (page_item& item1, page_item& item2,
     shove_entry e= (in_cur? shove_cur (key): shove_prev (key));
     bool same= (e.b1 == b1 && e.b2 == b2);
     for (int k=0; same && k<6; k++) same= (e.par[k] == par[k]);
+    if (same && mode == 2 &&
+        e.delta != shove_delta (b1, b2, par[0], par[1], par[2], par[3],
+                                par[4], par[5], array<SI> ()))
+      typeset_cache_mismatch ("memo of the shoves");
     if (same) {
       if (!in_cur) shove_cur (key)= e;
       item1->spc= item1->spc + space (e.delta);

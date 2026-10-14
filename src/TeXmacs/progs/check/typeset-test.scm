@@ -1032,8 +1032,8 @@
 ;; equations (counters), references to earlier equations, index entries
 ;; (automatic labels), footnotes, hidden paragraphs which only pass on a
 ;; space, and a length in a unit made by a macro of the document. When the
-;; check modes are on (TEXMACS_TYPESET_READS=check...), none of them may
-;; have found a difference either.
+;; check modes are on (TEXMACS_TYPESET_READS=check, TEXMACS_TYPESET_CACHES=
+;; check...), none of them may have found a difference either.
 (define rng-state 1)
 (define (rng n)
   (set! rng-state (modulo (+ (* rng-state 1103515245) 12345) 2147483648))
