@@ -24,6 +24,7 @@ protected:
   hashmap<string,tree> stydef;            // environment after styles
   hashmap<string,tree> pre;               // environment after styles and init
   int                  pre_version;       // incremented whenever pre changes
+                                          // (only through set_pre)
   int                  prep_version;      // pre_version of prep_env
   hashmap<string,tree> prep_env;          // default env patched with pre
   array<string>        prep_active;       // active variables of pre
@@ -129,6 +130,8 @@ public:
   array<string> list_atts (bool global);
 
   void     typeset_style_use_cache (tree style);
+  void     set_pre (hashmap<string,tree> h);
+  void     set_pre (string var, tree val);
   void     typeset_preamble ();
   void     typeset_prepare ();
   void     typeset_invalidate_env ();

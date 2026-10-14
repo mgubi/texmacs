@@ -45,7 +45,11 @@ bridge_rep::bridge_rep (typesetter ttt2, tree st2, path ip2):
   ttt (ttt2), env (ttt->env), st (st2), ip (ip2),
   status (CORRUPTED), changes (UNINIT), reads (), reads_known (false),
   removed (UNINIT), bound (UNINIT), stack_cache_ok (false), version (0),
-  chunk_cache (NULL) {}
+  chunk_cache (NULL)
+{
+  static int bridges_made= 0;
+  serial= bridges_made++;
+}
 
 static tree inactive_auto
   (MACRO, "x", tree (REWRITE_INACTIVE, tree (ARG, "x"), "recurse*"));
@@ -396,7 +400,15 @@ chunk_lines (bridge_rep* br, array<page_item> l) {
     }
     if (j - i < 2) { out << l[i]; i= j; continue; }
     pointer key= (pointer) l[i]->b.operator-> ();
-    if (cc->prev->contains (key) && same_lines (cc->prev (key).src, l, i, j)) {
+    if (typeset_caches_mode () != 0 && cc->prev->contains (key) &&
+        same_lines (cc->prev (key).src, l, i, j)) {
+      if (typeset_caches_mode () == 2) {
+        array<page_item> made (1), kept (1);
+        made[0]= merge_line_run (br->ip, l, i, j);
+        kept[0]= cc->prev (key).out;
+        if (!same_page_items (made, kept))
+          typeset_cache_mismatch ("chunk of lines");
+      }
       out << cc->prev (key).out;
       cc->cur (key)= cc->prev (key);
     }
@@ -411,6 +423,43 @@ chunk_lines (bridge_rep* br, array<page_item> l) {
   }
   cc->prev= hashmap<pointer,line_chunk> ();  // see stack_cache in typeset
   return out;
+}
+
+// the single item into which the lines of a bridge are merged outside
+// paper mode (chunks of them when some carry floats or several columns)
+static array<page_item>
+merged_lines (bridge_rep* br) {
+  array<page_item>& l= br->l;
+  path ip= br->ip;
+  bool flag= false;
+  int i, n= N(l);
+  for (i=0; i<n; i++)
+    flag= flag || (N (l[i]->fl) != 0) || (l[i]->nr_cols > 1);
+  if (flag) return chunk_lines (br, l);
+  drop_chunks (br);
+  int first=-1, last=-1;
+  array<box> bs;
+  array<SI>  spc;
+  array<page_item> special_l;
+  for (i=0; i<n; i++)
+    if (l[i]->type != PAGE_CONTROL_ITEM) {
+      if (first == -1 && l[i]->type == PAGE_LINE_ITEM) first= N(bs);
+      bs  << l[i]->b;
+      spc << l[i]->spc->def;
+      last= i;
+    }
+    else if (is_tuple (l[i]->t, "env_page") &&
+             (l[i]->t[1] == PAGE_THIS_TOP ||
+              l[i]->t[1] == PAGE_THIS_BOT ||
+              l[i]->t[1] == PAGE_THIS_BG_COLOR))
+      special_l << l[i];
+  box lb= stack_box (path (ip), bs, spc);
+  if (first != -1) lb= move_box (path (ip), lb, 0, bs[first]->y2);
+  array<page_item> new_l (1);
+  new_l[0]= page_item (lb);
+  new_l[0]->spc= l[last]->spc;
+  new_l << special_l;
+  return new_l;
 }
 
 void
@@ -444,23 +493,29 @@ extern tree the_et;
 
 // the reads and the lookups of a bridge which was typeset or used again,
 // for the record of the bridge above it
-static void
+void
 add_reads (edit_env env, bool known, array<int> reads,
            array<string> keys, array<tree> values) {
   hashmap<int,bool>* rec= env->read_recorder ();
-  if (rec == NULL) return;
-  // the lookups always, also when the variables read are not known: a
-  // bridge used again through the fingerprint still checks them (a
-  // reference looked up by several bridges is one lookup)
-  for (int i=0; i<N(keys); i++) env->record_lookup (keys[i], values[i]);
-  if (env->read_unknown) return;
-  if (!known || N(*rec) + N(reads) > READS_MAX) {
+  if (rec == NULL || env->read_unknown) return;
+  // (a reference looked up by several bridges is one lookup)
+  array<string> new_keys;
+  array<tree> new_values;
+  for (int i=0; i<N(keys); i++)
+    if (!contains (keys[i], *env->rec_keys) && !contains (keys[i], new_keys)) {
+      new_keys << keys[i];
+      new_values << values[i];
+    }
+  if (!known || N(*rec) + N(reads) > READS_MAX ||
+      N(*env->rec_keys) + N(new_keys) > LOOKUPS_MAX) {
     env->read_unknown= true; return; }
   for (int i=0; i<N(reads); i++) rec->operator () (reads[i])= true;
+  (*env->rec_keys) << new_keys;
+  (*env->rec_values) << new_values;
 }
 
 // do the references and attachments looked up still have the values found?
-bool
+static bool
 same_lookups (edit_env env, array<string> keys, array<tree> values) {
   for (int i=0; i<N(keys); i++)
     if (env->lookup_value (keys[i]) != values[i]) return false;
@@ -502,115 +557,40 @@ border_signature (stack_border sb) {
   return r;
 }
 
-/******************************************************************************
-* What is typeset again
-*
-* What a bridge makes is a function of its subtree and of what it was
-* typeset from: the variables which it read before it wrote them, with
-* their values, the state of the environment derived from the variables
-* (the font, the colour...: edit_env_rep::derived_state), the references
-* and attachments which it looked up, and the line items which the bridges
-* around it gave it (ttt->a and ttt->b). These are its inputs. A bridge
-* whose subtree did not change (its status) is used again when all of its
-* inputs are known (no Scheme routine, not too many) and have the values
-* they had, or when the whole environment is as it was (a fingerprint of
-* it, kept as it is written: env_table::fp), which is what a bridge whose
-* inputs are not known needs: then it writes what it wrote (changes, exact
-* for a variable which was not there: env_absent). Nothing about the bridges before it is
-* needed: what changed before it, what was removed or bound above it, is
-* seen in the values of its inputs. The inputs of the bridges below a
-* bridge are among its own, unless it wrote them before.
-*
-* TEXMACS_TYPESET_READS may be "off" (the classic cache: a bridge is used
-* again when the bookkeeping of the changes of the environment, old_patch,
-* says that nothing changed before it) or "check" (a bridge which would be
-* used again is typeset again, and what it makes is compared).
-******************************************************************************/
-
-#define INPUTS_MAX 256
-
-// The line items which a bridge got from the bridges around it: the
-// markers (made again each time the bridge around is typeset) by what they
-// are, the others (the parts of a surround: the name of a theorem, a
-// number...) by the boxes themselves, which the bridge around keeps as
-// long as they are the same (see bridge_surround_rep::my_typeset)
-static tree
-items_signature (array<line_item> a, array<line_item> b) {
-  if (N(a) == 0 && N(b) == 0) return "";
-  tree r (TUPLE);
-  for (int k=0; k<2; k++) {
-    array<line_item> l= (k == 0? a: b);
-    for (int i=0; i<N(l); i++)
-      if (l[i]->type == MARKER_ITEM)
-        r << tree (TUPLE, (tree) l[i]->b, as_string (l[i]->penalty),
-                   as_string (l[i]->spc->def));
-      else r << tree ("box");
-    r << tree ("|");
-  }
-  return r;
-}
-
-static array<box>
-items_boxes (array<line_item> a, array<line_item> b) {
-  array<box> r;
-  for (int k=0; k<2; k++) {
-    array<line_item> l= (k == 0? a: b);
-    for (int i=0; i<N(l); i++)
-      if (l[i]->type != MARKER_ITEM) r << l[i]->b;
-  }
-  return r;
-}
-
-static bool
-same_boxes (array<box> b1, array<box> b2) {
-  if (N(b1) != N(b2)) return false;
-  for (int i=0; i<N(b1); i++)
-    if (b1[i].operator-> () != b2[i].operator-> ()) return false;
-  return true;
-}
-
-static inline bool
-same_value (tree before, tree now) {
-  if (strong_equal (before, now)) return true;
-  if (strong_equal (before, env_absent ()) ||
-      strong_equal (now, env_absent ())) return false;
-  return before == now;
-}
-
 bool
-bridge_rep::same_inputs () {
-  if (N(ttt->a) == 0 && N(ttt->b) == 0) {
-    if (in_items != "") return false; }
-  else if (in_items != items_signature (ttt->a, ttt->b) ||
-           !same_boxes (in_item_boxes, items_boxes (ttt->a, ttt->b)))
-    return false;
-  if (!same_lookups (env, seen_keys, seen_values)) return false;
-  // the whole environment as it was (the fingerprint: also for a bridge
-  // whose inputs are not known), or the inputs
-  if (env->fingerprint () == in_fp) return true;
-  if (!in_known) return false;
-  for (int i=0; i<N(in_vars); i++)
-    if (!same_value (in_vals[i], env->current (in_vars[i]))) return false;
-  return env->derived_state () == in_state;
+same_page_items (array<page_item> l1, array<page_item> l2) {
+  return lines_signature (l1) == lines_signature (l2) &&
+         lines_contents (l1) == lines_contents (l2);
 }
 
-// the inputs of a bridge are inputs of the bridge which is recorded above
-// it, when it did not write them before (parent_back) or read them
-void
-add_inputs (edit_env env, hashmap<string,tree> parent_back, bool known,
-            array<string> vars, array<tree> vals) {
-  array<string>* pv= env->input_vars ();
-  array<tree>* pw= env->input_vals ();
-  hashmap<int,bool>* rec= env->read_recorder ();
-  if (pv == NULL || rec == NULL || env->read_unknown) return;
-  if (!known || N(*pv) + N(vars) > INPUTS_MAX) {
-    env->read_unknown= true; return; }
-  for (int i=0; i<N(vars); i++) {
-    int id= env_var_id (vars[i]);
-    if ((*rec)->contains (id) || parent_back->contains (vars[i])) continue;
-    rec->operator () (id)= true;
-    (*pv) << vars[i];
-    (*pw) << vals[i];
+// 'now' is a tuple of the variables which the bridge binds and of their
+// values. The result is what bind_end needs to put old_patch back, when
+// the bridges below are typeset
+tree
+bridge_rep::bind_start (tree now) {
+  tree outer (TUPLE);
+  for (int i=0; i+1<N(now); i+=2) {
+    if (!is_atomic (now[i])) continue;
+    string var= now[i]->label;
+    bool later= false; // (bound again further on)
+    for (int j=i+2; j+1<N(now); j+=2)
+      if (now[j] == now[i]) later= true;
+    if (later) continue;
+    // (the value bound in the previous pass, which is the last one of
+    // the variable in 'bound')
+    tree prev (UNINIT);
+    bool same= false;
+    if (is_func (bound, TUPLE))
+      for (int j=0; j+1<N(bound); j+=2)
+        if (bound[j] == now[i]) { prev= bound[j+1]; same= (prev == now[i+1]); }
+    // below, the variable has the value of the previous pass when the
+    // binding is the same, whatever it had outside
+    if (same && !ttt->old_patch->contains (var)) continue;
+    if (ttt->old_patch->contains (var))
+      outer << tree (var) << tree ("1") << ttt->old_patch [var];
+    else outer << tree (var) << tree ("0") << tree (UNINIT);
+    if (same) ttt->old_patch->reset (var);
+    else ttt->old_patch (var)= prev;
   }
 }
 
@@ -651,12 +631,10 @@ bridge_rep::typeset_by_inputs (int desired_status) {
   array<tree> was_vals= in_vals, was_values= seen_values, was_state= in_state;
   array<int> was_reads= reads;
   tree was_items= in_items;
-  array<box> was_item_boxes= in_item_boxes;
   unsigned long long was_fp= in_fp;
   if (edit_profile.on) edit_profile.redone++;
   array<tree> state= env->derived_state ();
   tree items= items_signature (ttt->a, ttt->b);
-  array<box> item_boxes= items_boxes (ttt->a, ttt->b);
   unsigned long long fp= env->fingerprint ();
   hashmap<string,tree> prev_back (UNINIT);
   my_clean_links ();
@@ -684,7 +662,6 @@ bridge_rep::typeset_by_inputs (int desired_status) {
   in_vals= my_vals;
   in_state= state;
   in_items= items;
-  in_item_boxes= item_boxes;
   in_fp= fp;
   seen_keys= my_keys;
   seen_values= my_values;
@@ -710,7 +687,6 @@ bridge_rep::typeset_by_inputs (int desired_status) {
     // checked (and not only what the bridge makes)
     in_known= was_known; in_vars= was_vars; in_vals= was_vals;
     in_state= was_state; in_items= was_items; in_fp= was_fp;
-    in_item_boxes= was_item_boxes;
     seen_keys= was_keys; seen_values= was_values; reads= was_reads;
   }
   give_record (prev_back);
@@ -782,52 +758,21 @@ bridge_rep::typeset (int desired_status) {
 
   // ttt->insert_stack (l, sb);
   //if (N(l) == 0); else
+  int mode= typeset_caches_mode ();
   if (ttt->paper || (N(l) <= 1)) {
     drop_chunks (this);
     ttt->insert_stack (l, sb);
   }
-  else if (stack_cache_ok && strong_equal (ip, stack_cache_ip))
+  else if (mode != 0 && stack_cache_ok && strong_equal (ip, stack_cache_ip)) {
+    if (mode == 2 && !same_page_items (merged_lines (this), stack_cache))
+      typeset_cache_mismatch ("merged stack of a paragraph");
     ttt->insert_stack (stack_cache, sb);
+  }
   else {
-    bool flag= false;
-    int i, n= N(l);
-    for (i=0; i<n; i++)
-      flag= flag || (N (l[i]->fl) != 0) || (l[i]->nr_cols > 1);
-    if (flag) {
-      stack_cache= chunk_lines (this, l);
-      stack_cache_ip= ip;
-      stack_cache_ok= true;
-      ttt->insert_stack (stack_cache, sb);
-    }
-    else {
-      drop_chunks (this);
-      int first=-1, last=-1;
-      array<box> bs;
-      array<SI>  spc;
-      array<page_item> special_l;
-      for (i=0; i<n; i++)
-	if (l[i]->type != PAGE_CONTROL_ITEM) {
-	  if (first == -1 && l[i]->type == PAGE_LINE_ITEM) first= N(bs);
-	  bs  << l[i]->b;
-	  spc << l[i]->spc->def;
-	  last= i;
-	}
-        else if (is_tuple (l[i]->t, "env_page") &&
-                 (l[i]->t[1] == PAGE_THIS_TOP ||
-                  l[i]->t[1] == PAGE_THIS_BOT ||
-                  l[i]->t[1] == PAGE_THIS_BG_COLOR))
-          special_l << l[i];
-      box lb= stack_box (path (ip), bs, spc);
-      if (first != -1) lb= move_box (path (ip), lb, 0, bs[first]->y2);
-      array<page_item> new_l (1);
-      new_l[0]= page_item (lb);
-      new_l[0]->spc= l[last]->spc;
-      new_l << special_l;
-      stack_cache= new_l;
-      stack_cache_ip= ip;
-      stack_cache_ok= true;
-      ttt->insert_stack (new_l, sb);
-    }
+    stack_cache= merged_lines (this);
+    stack_cache_ip= ip;
+    stack_cache_ok= true;
+    ttt->insert_stack (stack_cache, sb);
   }
 
   //cout << "l   = " << l << LF;

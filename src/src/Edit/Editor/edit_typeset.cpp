@@ -304,10 +304,30 @@ edit_typeset_rep::typeset_preamble () {
   env->read_env (stydef);
   env->patch_env (init);
   env->update ();
-  env->read_env (pre);
-  pre_version++;
+  hashmap<string,tree> h (UNINIT);
+  env->read_env (h);
+  set_pre (h);
   drd->heuristic_init (pre);
 }
+
+// pre is only changed by these, which tell typeset_prepare that what it
+// kept is not the environment for it any more
+void
+edit_typeset_rep::set_pre (hashmap<string,tree> h) {
+  pre= h;
+  pre_version++;
+}
+
+void
+edit_typeset_rep::set_pre (string var, tree val) {
+  // (val uninit: reset)
+  if (val == tree (UNINIT)) pre->reset (var);
+  else pre (var)= val;
+  pre_version++;
+}
+
+int typeset_caches_mode (); // see typesetter.hpp
+void typeset_cache_mismatch (string what);
 
 void
 edit_typeset_rep::typeset_prepare () {
@@ -318,7 +338,10 @@ edit_typeset_rep::typeset_prepare () {
   // of variables; this happens at every typesetting pass and every get-env.
   // Keep the patched environment and only redo the updates of the variables
   // whose assignment has side effects on the edit_env state.
-  if (prep_version != pre_version) {
+  // TEXMACS_TYPESET_CACHES "off" patches it all the same, and "check"
+  // does both and compares.
+  int mode= typeset_caches_mode ();
+  if (prep_version != pre_version || mode == 0) {
     env->write_default_env ();
     env->patch_env (pre);
     env->read_env (prep_env);
@@ -329,6 +352,14 @@ edit_typeset_rep::typeset_prepare () {
   else {
     env->write_env (prep_env);
     for (int i=0; i<N(prep_active); i++) env->update (prep_active[i]);
+    if (mode == 2) {
+      hashmap<string,tree> kept (UNINIT), made (UNINIT);
+      env->read_env (kept);
+      env->write_default_env ();
+      env->patch_env (pre);
+      env->read_env (made);
+      if (kept != made) typeset_cache_mismatch ("initial environment");
+    }
   }
   env->style_init_env ();
   env->update ();
@@ -983,9 +1014,7 @@ void
 edit_typeset_rep::init_default (string var) {
   if (!init->contains (var)) return;
   init->reset (var);
-  if (stydef->contains (var)) pre(var)= stydef[var];
-  else pre->reset (var);
-  pre_version++;
+  set_pre (var, stydef->contains (var)? stydef[var]: tree (UNINIT));
   notify_change (THE_ENVIRONMENT);
 }
 

@@ -633,6 +633,8 @@ public:
 phrase_box_rep::phrase_box_rep (path ip, array<box> bs, array<SI> spc):
   concat_box_rep (ip, bs, spc, false), logs_ptr (NULL) {}
 
+int typeset_caches_mode (); // see typesetter.hpp
+
 phrase_box_rep::~phrase_box_rep () {
   if (logs_ptr != NULL) {
     rectangles& logs= *logs_ptr;
@@ -646,7 +648,9 @@ void
 phrase_box_rep::position_at (SI x, SI y, rectangles& logs) {
   x += x0; y += y0;
   // unchanged position: the logged pair would be discarded by requires_update
-  if (logs_ptr == &logs && ox == x && oy == y) return;
+  // (the box does not change once built; see stack_box_rep::position_at)
+  if (logs_ptr == &logs && ox == x && oy == y && typeset_caches_mode () != 0)
+    return;
   if (logs_ptr == NULL) logs= rectangles (rectangle (0, 0, 0, 0), logs);
   else logs= rectangles (rectangle (ox+x3, oy+y3, ox+x4, oy+y4), logs);
   ox= x; oy= y;
