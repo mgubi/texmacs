@@ -271,6 +271,8 @@ cmdline_link_rep::write (string s, int channel) {
     close (pp_out [CMDOUT]);
     err= pp_err [CMDIN ];
     close (pp_err [CMDOUT]);
+    // (handed over: the numbers are not kept, so never closed again)
+    pp_in[0]= pp_in[1]= pp_out[0]= pp_out[1]= pp_err[0]= pp_err[1]= -1;
 
     alive= true;
     //cout << "Alive = true\n";
@@ -352,7 +354,9 @@ cmdline_link_rep::listen (int msecs) {
 #endif
   if (!alive) return;
   time_t wait_until= texmacs_time () + msecs;
-  while (true) {
+  // NOTE: the end of the output closes the descriptors (feed): they are
+  // only used while the link is alive
+  while (alive) {
     int nout= N(outbuf), nerr= N(errbuf);
     fd_set rfds;
     FD_ZERO (&rfds);
@@ -362,8 +366,8 @@ cmdline_link_rep::listen (int msecs) {
     tv.tv_sec  = msecs / 1000;
     tv.tv_usec = 1000 * (msecs % 1000);
     int nr= select (max (out, err) + 1, &rfds, NULL, NULL, &tv);
-    if (nr != 0 && FD_ISSET (out, &rfds)) feed (LINK_OUT);
-    if (nr != 0 && FD_ISSET (err, &rfds)) feed (LINK_ERR);
+    if (nr > 0 && FD_ISSET (out, &rfds)) feed (LINK_OUT);
+    if (alive && nr > 0 && FD_ISSET (err, &rfds)) feed (LINK_ERR);
     if (texmacs_time () - wait_until > 0) break;
     if (N(outbuf) == nout && N(errbuf) == nerr) break;
   }
@@ -407,7 +411,7 @@ void cmdline_callback (void *obj, void *info) {
   cmdline_link_rep* con= (cmdline_link_rep*) obj;  
   bool busy= true;
   bool news= false;
-  while (busy) {
+  while (busy && con->alive) {
     fd_set rfds;
     FD_ZERO (&rfds);
     int max_fd= max (con->err, con->out) + 1;
@@ -417,7 +421,10 @@ void cmdline_callback (void *obj, void *info) {
     struct timeval tv;
     tv.tv_sec  = 0;
     tv.tv_usec = 0;
-    select (max_fd, &rfds, NULL, NULL, &tv);
+    int nr= select (max_fd, &rfds, NULL, NULL, &tv);
+    if (nr < 0 && errno == EINTR) continue;
+    // (after an error, the set is unspecified: nothing is read)
+    if (nr <= 0) break;
 
     busy= false;
     if (con->alive && FD_ISSET (con->out, &rfds)) {
