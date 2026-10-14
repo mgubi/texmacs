@@ -653,7 +653,7 @@
                      "<w:shd w:fill='FFEEDD'/><w:spacing w:before='240' w:after='120'"
                      " w:line='360' w:lineRule='auto'/><w:ind w:left='720' w:right='360'"
                      " w:hanging='360'/></w:pPr>"
-                     (wr "big" "<w:rFonts w:ascii='Arial'/><w:sz w:val='28'/>")
+                     (wr "big" "<w:rFonts w:ascii='Zzz Sans'/><w:sz w:val='28'/>")
                      (wr " green" "<w:highlight w:val='green'/>")
                      (wr " blue" "<w:shd w:fill='BDD7EE'/>"))))
          (blocks (docx body))
@@ -662,7 +662,7 @@
             '((p (@ (indent-left "36") (indent-right "18") (first-indent "-18")
                     (space-before "12") (space-after "6") (line-spacing "1.5")
                     (background "#ffeedd") (border "true"))
-                 (font (@ (value "Arial")) (size (@ (value "14")) "big"))
+                 (font (@ (value "Zzz Sans")) (size (@ (value "14")) "big"))
                  (mark (@ (value "#00ff00")) " green")
                  (mark (@ (value "#bdd7ee")) " blue"))))
     (check= (cdr (cadr (cadr doc)))
@@ -688,7 +688,71 @@
       (check-true (export-has? content "fo:margin-left=\"36pt\""))
       (check-true (export-has? content "fo:font-size=\"14pt\""))
       (check-true (export-has? content "fo:background-color=\"#bdd7ee\""))
-      (check= (no-setup (cdr (parse-docx-document docx2))) blocks)))
+      ;; (a font which TeXmacs does not have is the closest family, here)
+      (check= (no-setup (cdr (parse-docx-document docx2)))
+              (list (apply office-node
+                           (cons* 'p (map (lambda (a) (list (car a) (cadr a)))
+                                          (ox-attrs (car blocks)))
+                                  (cons '(font (@ (value "Arial")) (size (@ (value "14")) "big"))
+                                        (cdr (ox-children (car blocks)))))))))
+    ;; in the style office, the name of the font is kept
+    (with doc2 (office->texmacs (cons 'office blocks)
+                                (list (cons "office->texmacs:faithful" "on")))
+      (check-true (>= (string-search-forwards "(office-font \"Zzz Sans\" \"ss\""
+                                              0 (object->string doc2)) 0))
+      (check-true (export-has? (archive-entry (convert doc2 "texmacs-stree" "docx-document")
+                                              "word/document.xml")
+                               "w:ascii=\"Zzz Sans\""))))
+  ;; capitals, underlines and lines through of other kinds, spaced letters
+  ;; and a font which TeXmacs has, from the file to TeXmacs and back
+  (let* ((body (wp (wr "a" "<w:caps/>")
+                   (wr "b" "<w:u w:val='double'/>")
+                   (wr "c" "<w:u w:val='wave'/>")
+                   (wr "d" "<w:dstrike/>")
+                   (wr "e" "<w:spacing w:val='40'/>")
+                   (wr "f" "<w:rFonts w:ascii='Times New Roman'/>")))
+         (blocks (docx body))
+         (opts (list (cons "office->texmacs:faithful" "on")))
+         (doc (office->texmacs (cons 'office blocks) opts))
+         (text (archive-entry (convert doc "texmacs-stree" "docx-document")
+                              "word/document.xml"))
+         (content (archive-entry (convert doc "texmacs-stree" "odt-document")
+                                 "content.xml")))
+    (check= blocks
+            '((p (caps "a") (underline (@ (value "double")) "b")
+                 (underline (@ (value "wave")) "c") (strike (@ (value "double")) "d")
+                 (letters (@ (value "2")) "e") (font (@ (value "Times New Roman")) "f"))))
+    (check= (cadr (cadr doc))
+            '(document (concat (change-case "a" "UPCASE") (office-underline "double" "b")
+                               (office-underline "wave" "c") (office-strike "double" "d")
+                               (office-letters "2" "e")
+                               (with "font" "Times New Roman" "f"))))
+    (check-true (export-has? text "<w:caps/>"))
+    (check-true (export-has? text "<w:u w:val=\"double\"/>"))
+    (check-true (export-has? text "<w:u w:val=\"wave\"/>"))
+    (check-true (export-has? text "<w:dstrike/>"))
+    (check-true (export-has? text "<w:spacing w:val=\"40\"/>"))
+    (check-true (export-has? text "w:ascii=\"Times New Roman\""))
+    (check-true (export-has? content "fo:text-transform=\"uppercase\""))
+    (check-true (export-has? content "style:text-underline-type=\"double\""))
+    (check-true (export-has? content "style:text-underline-style=\"wave\""))
+    (check-true (export-has? content "style:text-line-through-type=\"double\""))
+    (check-true (export-has? content "fo:letter-spacing=\"2pt\""))
+    ;; without the style office: what TeXmacs can show
+    (check= (cadr (cadr (office->texmacs (cons 'office blocks))))
+            '(document (concat (change-case "a" "UPCASE") (underline "b") (underline "c")
+                               (strike-through "d") "e"
+                               (with "font" "Times New Roman" "f")))))
+  ;; the look of the headings of the file (here bold) is the one of the
+  ;; titles of the sections
+  (let* ((doc (office->texmacs
+                (parse-docx-document
+                  (docx-archive (wp (wstyle "Titre1") (wr "Head"))))
+                (list (cons "office->texmacs:faithful" "on"))))
+         (s (object->string doc)))
+    (check-true (>= (string-search-forwards "(associate \"section-title\"" 0 s) 0))
+    (check-true (>= (string-search-forwards "\"font-series\" \"bold\"" 0 s) 0))
+    (check-true (>= (string-search-forwards "(section* \"Head\")" 0 s) 0)))
   ;; an array of equations as Word saves it (one run, its marks inside) is
   ;; lines of equations again
   (check= (cadr (office->texmacs

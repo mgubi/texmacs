@@ -188,13 +188,17 @@
   <paragraph|Limitations>
 
   <\itemize>
-    <item>Of the formatting by hand, the size of a text, its family of
-    fonts (with serifs or not), its highlighting and its color, and the
-    indentations, the spaces, the line spacing, the background and the
-    border of a paragraph are kept, in both directions; the name of a
-    font, the spacing of the letters, the kinds of underlines and the
-    capitals are not, nor is a section with another page than the first
-    one.
+    <item>Of the formatting by hand, the size of a text, its font, its
+    highlighting and its color, the capitals, the kinds of underlines and
+    of lines through, the spacing of the letters, and the indentations,
+    the spaces, the line spacing, the background and the border of a
+    paragraph are kept, in both directions. A font which <TeXmacs> does
+    not have is shown in the closest family (with serifs or not), and
+    written with its name. The fonts of the headings of the file are the
+    ones of the titles of the sections. A double line through and the
+    underlines which are not single or double are shown as single ones,
+    and the spacing of the letters is not shown. A section with another
+    page than the first one is not kept.
 
     <item>A reference of an office document whose text is more than a
     number (\PTable 3\Q, the title of a section) is a link to its

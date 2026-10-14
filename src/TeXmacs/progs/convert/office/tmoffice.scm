@@ -891,6 +891,10 @@
          (with r (office-number val)
            (if (not r) body
                (tmof-attr-wrap* 'size `((value ,(office-decimal (* r tmof-base-size)))) body))))
+        ;; a font of the office programs, by its name
+        ((== var "font")
+         (with f (tmof-office-font val)
+           (if f (tmof-attr-wrap* 'font `((value ,f)) body) body)))
         ((and (== var "font-family") (in? val '("ss" "rm")))
          (tmof-attr-wrap* 'font `((value ,(if (== val "ss") "sans" "serif"))) body))
         ((== var "marked-color")
@@ -918,6 +922,22 @@
         (else body)))
 
 (define tmof-base-size 10.0)  ; the size of the font of the document
+
+(define tmof-texmacs-fonts
+  ;; the fonts of TeXmacs, by the names of the office programs
+  '(("roman" . #f) ("modern" . #f) ("concrete" . #f) ("termes" . "Times New Roman")
+    ("pagella" . "Palatino Linotype") ("bonum" . "Bookman Old Style")
+    ("schola" . "Century Schoolbook") ("heros" . "Arial") ("adventor" . "Century Gothic")
+    ("cursor" . "Courier New") ("chorus" . "Zapf Chancery") ("stix" . "STIX Two Text")
+    ("dejavu" . "DejaVu Serif") ("linux" . "Linux Libertine O") ("libertine" . "Linux Libertine O")))
+
+(define (tmof-office-font f)
+  ;; the name of the font f for the office programs, or #f for the fonts
+  ;; of TeXmacs which have none
+  (cond ((not (string? f)) #f)
+        ((assoc (locase-all f) tmof-texmacs-fonts)
+         => (lambda (p) (cdr p)))
+        (else f)))
 
 (define (tmof-points s)
   ;; the length s in points: fn are the size of the font
@@ -1192,6 +1212,27 @@
 
 (define (tmof-office-ins l) (tmof-office-change 'ins l))
 (define (tmof-office-del l) (tmof-office-change 'del l))
+
+(define (tmof-office-kind tag l)
+  ;; an underline or a line through of a kind, a spacing of letters
+  (if (< (length l) 2) '()
+      (tmof-attr-wrap tag `((value ,(tmof-plain (car l)))) l)))
+
+(define (tmof-office-underline l) (tmof-office-kind 'underline l))
+(define (tmof-office-strike l) (tmof-office-kind 'strike l))
+(define (tmof-office-letters l) (tmof-office-kind 'letters l))
+
+(define (tmof-office-font-tag l)
+  ;; a font which TeXmacs does not have, by its name
+  (if (< (length l) 3) '()
+      (with r (tmof (caddr l))
+        (tmof-attr-wrap* 'font `((value ,(tmof-plain (car l)))) r))))
+
+(define (tmof-change-case l)
+  ;; capitals; the other changes of case are the text as it is
+  (if (< (length l) 2) (tmof-all l)
+      (with r (tmof (car l))
+        (if (== (cadr l) "UPCASE") (tmof-wrap 'caps r) r))))
 
 (define (tmof-office-comment l)
   (if (< (length l) 3) '()
@@ -1876,6 +1917,11 @@
   (office-del tmof-office-del)
   (office-comment tmof-office-comment)
   (office-columns tmof-office-columns)
+  (office-underline tmof-office-underline)
+  (office-strike tmof-office-strike)
+  (office-letters tmof-office-letters)
+  (office-font tmof-office-font-tag)
+  (change-case tmof-change-case)
   (part tmof-part-numbered)
   (part-numbered-title tmof-part-numbered-title)
   (chapter tmof-chapter-numbered)
@@ -1949,10 +1995,10 @@
         ((not (pair? x)) '())
         (else
           (case (car x)
-            ((em strong strike underline sub sup smallcaps code)
+            ((em strong sub sup smallcaps code)
              (with l (tmof-final-inlines (tmof-node-children x))
                (if (null? l) '() (list (cons (car x) l)))))
-            ((color span ins del field size font mark)
+            ((color span ins del field size font mark underline strike caps letters)
              (with l (tmof-final-inlines (tmof-node-children x))
                (cond ((and (null? l) (not (func? x 'field))) '())
                      ((null? (tmof-node-attrs x)) (list (cons (car x) l)))

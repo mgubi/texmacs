@@ -379,16 +379,61 @@
                 t)))
     (if (null? vars) t `(with ,@vars ,t))))
 
+(define oftm-fonts #f)  ; the families of fonts which TeXmacs has, lower case
+
+(define (oftm-known-font f)
+  ;; the name of the family of fonts f, as TeXmacs knows it, or #f
+  (and (string? f) (!= f "")
+       (begin
+         (when (not oftm-fonts)
+           (set! oftm-fonts (make-ahash-table))
+           (catch #t
+             (lambda ()
+               (for (fam (font-database-families))
+                 (when (string? fam) (ahash-set! oftm-fonts (locase-all fam) fam))))
+             (lambda args #f)))
+         (ahash-ref oftm-fonts (locase-all f)))))
+
+(define oftm-title-macros
+  '("section-title" "subsection-title" "subsubsection-title" "paragraph-title"
+    "subparagraph-title"))
+
+(define (oftm-title-macro st)
+  ;; the title of the sections of the level of the style of headings st,
+  ;; in its look: the macro of the style of TeXmacs which typesets them
+  (let* ((n (office-integer (ox-attr st 'level) 0 0 9))
+         (pt (lambda (k) (with v (office-number (ox-attr st k))
+                           (and v (string-append (office-decimal v) "pt")))))
+         (body (oftm-style-text st '(arg "name")))
+         (body (if (ox-attr st 'strong) body
+                   `(with "font-series" "medium" ,body))))
+    (and (>= n 1) (<= n 5)
+         `(associate ,(list-ref oftm-title-macros (- n 1))
+                     (macro "name"
+                       (sectional-normal
+                         (concat (vspace* ,(or (pt 'space-before) "1fn"))
+                                 ,(if (ox-attr st 'strong) `(with "font-series" "bold" ,body)
+                                      body)
+                                 (vspace ,(or (pt 'space-after) "0.5fn")))))))))
+
 (define (oftm-style-macros)
   ;; the macros of the named styles, for the initial environment
-  (map (lambda (kv)
-         (let* ((st (cdr kv))
-                (par? (== (ox-attr st 'family) "paragraph")))
-           `(associate ,(string-append (if par? "office-par-" "office-span-") (car kv))
-                       (macro "body" ,(if par? (oftm-style-paragraph st '(arg "body"))
-                                          (oftm-style-text st '(arg "body")))))))
-       (sort (ahash-table->list oftm-styles)
-             (lambda (a b) (string<? (car a) (car b))))))
+  (append
+    (map (lambda (kv)
+           (let* ((st (cdr kv))
+                  (par? (== (ox-attr st 'family) "paragraph")))
+             `(associate ,(string-append (if par? "office-par-" "office-span-") (car kv))
+                         (macro "body" ,(if par? (oftm-style-paragraph st '(arg "body"))
+                                            (oftm-style-text st '(arg "body")))))))
+         (sort (list-filter (ahash-table->list oftm-styles)
+                            (lambda (kv) (not (ox-attr (cdr kv) 'level))))
+               (lambda (a b) (string<? (car a) (car b)))))
+    ;; the titles of the sections, in the look of the headings of the file
+    (list-filter (map (lambda (kv) (oftm-title-macro (cdr kv)))
+                      (sort (list-filter (ahash-table->list oftm-styles)
+                                         (lambda (kv) (ox-attr (cdr kv) 'level)))
+                            (lambda (a b) (string<? (car a) (car b)))))
+                 identity)))
 
 ;; The labels of what has a number: the bookmarks in a heading, in a
 ;; caption, in a theorem, in an entry of the bibliography, or beside a
@@ -596,8 +641,26 @@
             (case (car x)
               ((em) (oftm-wrap 'em l))
               ((strong) (oftm-wrap 'strong l))
-              ((underline) (oftm-wrap 'underline l))
-              ((strike) (oftm-wrap 'strike-through l))
+              ;; an underline or a line through of a kind (double, wave...)
+              ((underline strike)
+               (let ((t (oftm-inlines l))
+                     (kind (ox-attr x 'value)))
+                 (cond ((== t "") '())
+                       ((and kind oftm-faithful?)
+                        (list `(,(if (func? x 'underline) 'office-underline 'office-strike)
+                                ,kind ,t)))
+                       ((func? x 'underline) (list `(underline ,t)))
+                       (else (list `(strike-through ,t))))))
+              ;; capitals, the spacing of the letters
+              ((caps)
+               (with t (oftm-inlines l)
+                 (if (== t "") '() (list `(change-case ,t "UPCASE")))))
+              ((letters)
+               (with t (oftm-inlines l)
+                 (cond ((== t "") '())
+                       ((and oftm-faithful? (ox-attr x 'value))
+                        (list `(office-letters ,(ox-attr x 'value) ,t)))
+                       (else (list t)))))
               ((sub) (oftm-wrap 'rsub l))
               ((sup) (oftm-wrap 'rsup l))
               ((code) (oftm-wrap 'verbatim l))
@@ -619,6 +682,14 @@
                (let ((t (oftm-inlines l))
                      (f (ox-attr x 'value)))
                  (cond ((== t "") '())
+                       ;; a font which TeXmacs has, by its name
+                       ((oftm-known-font f) => (lambda (name) (list `(with "font" ,name ,t))))
+                       ;; another one: its name is kept in the style office
+                       ((and oftm-faithful? f (not (office-monospace? f)))
+                        (list `(office-font ,f
+                                            ,(cond ((office-sans? f) "ss")
+                                                   (else "rm"))
+                                            ,t)))
                        ((and (office-sans? f) (!= oftm-base-font "sans"))
                         (list `(with "font-family" "ss" ,t)))
                        ((and f (not (office-sans? f)) (not (office-monospace? f))
