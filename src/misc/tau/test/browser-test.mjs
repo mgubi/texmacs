@@ -301,6 +301,63 @@ test("typing", async p => {
 	check("no error of the core", (await p.errors()).length === 0, await p.errors());
 });
 
+test("an input method", async p => {
+	await p.open();
+	await p.newDocument();
+	// a word of Japanese, composed in steps, as the browsers tell it: Safari
+	// ends the composition, then inserts its text once more (insertText);
+	// Chrome says that the text comes from the composition
+	const compose = (steps, end, after) => p.page.evaluate((steps, end, after) => {
+		const a = document.querySelector(".tau-keyboard");
+		a.dispatchEvent(new CompositionEvent("compositionstart", { data: "" }));
+		for (const s of steps) {
+			a.value = s;
+			a.dispatchEvent(new CompositionEvent("compositionupdate", { data: s }));
+			a.dispatchEvent(new InputEvent("input", { data: s, inputType: "insertCompositionText", isComposing: true }));
+		}
+		a.value = end;
+		a.dispatchEvent(new CompositionEvent("compositionend", { data: end }));
+		a.dispatchEvent(new InputEvent("input", { data: end, inputType: after }));
+	}, steps, end, after);
+	const line = async () => {
+		await p.scheme('(set-message (string-append "LINE[" (tree->string (tree-ref (buffer-tree) 0)) "]") "")');
+		const said = await p.until("the core says the line", async () => {
+			const t = await p.page.$eval("#tau-footer-left", e => e.textContent);
+			return /LINE\[/.test(t) && t;
+		});
+		await p.scheme('(set-message "" "")');
+		await p.until("and forgets it", async () => !/LINE\[/.test(await p.page.$eval("#tau-footer-left", e => e.textContent)));
+		return said.replace(/^.*LINE\[/, "").replace(/\].*$/, "");
+	};
+	await compose(["k", "か", "かn", "かな"], "かな", "insertText");
+	await compose(["k", "か", "かn", "かな"], "かな", "insertFromComposition");
+	await sleep(300);
+	check("each word is inserted once", (await line()) === "かなかな", await line());
+	// a composition which a click on another pane interrupts: its preview
+	// goes, and what is typed then is for the other pane
+	await p.choose("View", "New window");
+	await p.until("a second pane", async () => (await p.tabs()).length === 2);
+	await p.until("which has the keyboard", () => p.page.evaluate(() => document.querySelectorAll(".tau-pane")[1].classList.contains("tau-active")));
+	await p.forget();
+	await p.page.evaluate(() => {
+		const a = document.querySelector(".tau-keyboard");
+		a.dispatchEvent(new CompositionEvent("compositionstart", { data: "" }));
+		a.value = "さ";
+		a.dispatchEvent(new CompositionEvent("compositionupdate", { data: "さ" }));
+	});
+	const first = await p.box(".tau-pane .tau-canvas");
+	await p.click(first.x + 150, first.y + 150);
+	await p.type("x");
+	await p.until("the key is sent", async () => (await p.sent("text")).some(m => m.text === "x"));
+	const keys = await p.sent("key"), texts = await p.sent("text");
+	const shown = keys.find(m => m.key === "pre-edit:1:さ");
+	check("the preview was shown in the second pane", !!shown, keys);
+	check("and taken away from it", keys.some(m => m.key === "pre-edit:" && m.view === shown.view), keys);
+	check("what is typed then goes to the first pane", texts.find(m => m.text === "x").view !== shown.view, texts);
+	check("nothing of the composition was inserted", !texts.some(m => m.text.includes("さ")), texts);
+	check("no error of the core", (await p.errors()).length === 0, await p.errors());
+});
+
 test("drawing and scrolling", async p => {
 	await p.open();
 	await p.newDocument();
@@ -381,6 +438,48 @@ test("menus", async p => {
 	check("it is under the pointer", Math.abs(at.x - 700) < 30 && Math.abs(at.y - 420) < 30, at);
 	await p.key("Escape");
 	await p.until("Escape closes it", async () => (await p.count(".tau-popup")) === 0);
+});
+
+test("menus from the keyboard", async p => {
+	await p.open();
+	await p.click(600, 500);
+	const focused = () => p.page.evaluate(() => { const e = document.activeElement; return e && e.closest(".tau-popup") ? e.textContent.trim() : ""; });
+	const top = await p.until("the menu Insert", () => p.find("#tau-menu .tau-entry", "Insert"));
+	await top.click();
+	await p.until("it opens", () => p.count(".tau-popup .tau-entry").then(n => n > 0));
+	await p.key("ArrowDown");
+	const first = await p.until("the first entry takes the keyboard", focused);
+	await p.key("ArrowDown");
+	check("the next one then", (await focused()) && (await focused()) !== first, await focused());
+	await p.key("End");
+	await p.key("ArrowDown");
+	check("after the last, the first again", (await focused()) === first, await focused());
+	// down to a submenu, which right opens and left closes
+	for (let i = 0; i < 40 && !(await focused()).startsWith("Mathematics"); i++) await p.key("ArrowDown");
+	check("the submenu is reached", (await focused()).startsWith("Mathematics"), await focused());
+	await p.key("ArrowRight");
+	await p.until("right opens it, with the keyboard in it", async () => (await p.count(".tau-popup")) === 2 &&
+		await p.page.evaluate(() => document.querySelectorAll(".tau-popup")[1].contains(document.activeElement)));
+	await p.key("ArrowLeft");
+	await p.until("left closes it", async () => (await p.count(".tau-popup")) === 1);
+	check("the keyboard is back on its entry", (await focused()).startsWith("Mathematics"), await focused());
+	// on an entry which is no submenu, right goes to the next menu of the bar
+	await p.key("Escape");
+	await p.until("Escape closes the menus", async () => (await p.count(".tau-popup")) === 0);
+	const edit = await p.find("#tau-menu .tau-entry", "Edit");
+	await edit.click();
+	await p.until("the menu Edit opens", () => p.count(".tau-popup .tau-entry").then(n => n > 0));
+	await p.key("ArrowDown");
+	await p.until("its first entry takes the keyboard", focused);
+	check("which is no submenu", !(await p.page.evaluate(() => !!document.activeElement.closest(".tau-submenu"))));
+	const label = () => p.page.evaluate(() => { const e = document.querySelector("#tau-menu .tau-open"); return e ? e.textContent.trim() : ""; });
+	await p.key("ArrowRight");
+	await p.until("right opens the next menu", async () => (await label()) !== "Edit" && (await label()) !== "" && (await focused()) !== "");
+	await p.key("ArrowLeft");
+	await p.until("left the one before", async () => (await label()) === "Edit");
+	await p.key("Escape");
+	await p.until("Escape closes it", async () => (await p.count(".tau-popup")) === 0);
+	check("nothing was typed into the document", !(await p.tabs())[0].some(t => t.current && t.name.endsWith("•")));
 });
 
 test("colours and palettes", async p => {
@@ -1225,6 +1324,9 @@ test("stopped", async p => {
 	await p.page.evaluate(() => tau.worker.onmessage({ data: { t: "stopped", text: "Maximum call stack size exceeded." } }));
 	await p.until("the page says that Tau stopped", async () => (await p.count(".tau-failure")) === 1);
 	check("with a way to start again", !!(await p.find(".tau-failure .tau-button", "Start Tau again")));
+	// what is said then is in its box, not under the veil
+	await p.page.evaluate(() => tau.worker.onmessage({ data: { t: "forget-blocked" } }));
+	await p.until("a notice in the box of the failure", async () => (await p.count(".tau-failure .tau-notice")) === 1);
 });
 
 test("panes", async p => {

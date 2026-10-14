@@ -33,6 +33,7 @@ export function init(options) {
 	}, true);
 	document.addEventListener("keydown", event => {
 		if (event.key === "Escape" && popups.length) { closePopups(0); afterAction(); }
+		else if (popups.length && menuKey(event)) { event.preventDefault(); event.stopPropagation(); }
 	}, true);
 	// where the context menu goes: where the right button was pressed
 	document.addEventListener("pointerdown", event => {
@@ -320,6 +321,7 @@ function renderSubmenu(node, context) {
 	// is a column (the icon bars at the left)
 	const column = () => document.body.classList.contains("tau-bars-left") && !!b.closest("#tau-icons-0, #tau-icons-1");
 	const open = () => openPopup(b, node, depth, (context.bar || context.dialog) && !column());
+	b.tauOpen = open; // (for the keyboard: menuKey)
 	b.addEventListener("click", () => {
 		if (b.classList.contains("tau-open")) closePopups(depth); else open();
 	});
@@ -361,6 +363,82 @@ async function openPopup(button, node, depth, below) {
 	asMenu(popup);
 	fit(popup);
 	place(popup, button, below);
+}
+
+// The keys of an open menu, for those who do not use the pointer: the
+// arrows go up and down its entries, right opens a submenu (or the next
+// menu of the bar), left goes back (or to the menu before); Home and End.
+// Return and space are those of the entries, which are buttons. True when
+// the key was taken.
+function entriesOf(popup) {
+	return Array.from(popup.querySelectorAll(".tau-entry")).filter(b => !b.disabled && b.offsetParent !== null);
+}
+function focusEntry(popup, which) {
+	const l = entriesOf(popup);
+	if (!l.length) return;
+	(which === "last" ? l[l.length - 1] : l[0]).focus({ preventScroll: false });
+}
+// once the contents of a menu came (they are asked of the core)
+function whenFilled(entry, then) {
+	const tries = Date.now();
+	const look = () => {
+		if (!popups.includes(entry)) return;
+		if (entriesOf(entry.element).length) then(entry.element);
+		else if (Date.now() - tries < 10000) setTimeout(look, 30);
+	};
+	look();
+}
+function openByKey(button) {
+	if (!button.tauOpen) return;
+	button.tauOpen();
+	const entry = popups[popups.length - 1];
+	if (entry && entry.button === button) whenFilled(entry, popup => focusEntry(popup, "first"));
+}
+function menuKey(event) {
+	if (event.isComposing || event.altKey || event.ctrlKey || event.metaKey) return false;
+	const key = event.key;
+	if (!["ArrowDown", "ArrowUp", "ArrowRight", "ArrowLeft", "Home", "End"].includes(key)) return false;
+	const inner = popups[popups.length - 1];
+	const here = document.activeElement;
+	const within = here && inner.element.contains(here);
+	// (the arrows of a field of a menu are its own; the keyboard of the
+	// view, which keeps it when a click does not move it, Safari, is not one)
+	if (within && here.closest("input, select, textarea")) return false;
+	const list = entriesOf(inner.element);
+	if (key === "ArrowDown" || key === "ArrowUp" || key === "Home" || key === "End") {
+		if (!list.length) return true;
+		let i = within ? list.indexOf(here.closest(".tau-entry")) : -1;
+		if (key === "Home") i = 0;
+		else if (key === "End") i = list.length - 1;
+		else if (i < 0) i = key === "ArrowDown" ? 0 : list.length - 1;
+		else i = (i + (key === "ArrowDown" ? 1 : list.length - 1)) % list.length;
+		list[i].focus();
+		return true;
+	}
+	const bar = popups[0].button.closest("#tau-menu, .tau-bar");
+	const tops = bar ? Array.from(bar.querySelectorAll(".tau-submenu")).filter(b => !b.disabled) : [];
+	const t = tops.indexOf(popups[0].button);
+	if (key === "ArrowRight") {
+		const b = within && here.closest(".tau-submenu");
+		if (b) { openByKey(b); return true; }
+		if (t < 0) return false;
+		const next = tops[(t + 1) % tops.length];
+		closePopups(0);
+		openByKey(next);
+		return true;
+	}
+	// ArrowLeft
+	if (popups.length > 1) {
+		const back = inner.button;
+		closePopups(popups.length - 1);
+		back.focus();
+		return true;
+	}
+	if (t < 0) return false;
+	const before = tops[(t + tops.length - 1) % tops.length];
+	closePopups(0);
+	openByKey(before);
+	return true;
 }
 
 // The context menu of a view, which the core describes when the right

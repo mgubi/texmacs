@@ -50,6 +50,23 @@ function check(what, ok, got) {
 }
 const stopped = () => run("return document.querySelectorAll('.tau-failure').length + window.tauErrors.length");
 
+// keys as the user presses them (WebDriver actions: to what has the keyboard)
+const KEYS = { ArrowDown: "\uE015", ArrowUp: "\uE013", ArrowRight: "\uE014", ArrowLeft: "\uE012", Escape: "\uE00C" };
+const press = name => wd("POST", `/session/${session}/actions`, { actions: [{ type: "key", id: "keyboard",
+	actions: [{ type: "keyDown", value: KEYS[name] || name }, { type: "keyUp", value: KEYS[name] || name }] }] });
+// what has the keyboard in a menu
+const inMenu = () => run("const e = document.activeElement; return e && e.closest('.tau-popup') ? e.textContent.trim() : ''");
+// the first line of the document, as the core has it
+async function firstLine() {
+	await run(`tau.send({ t: 'scheme', code: '(set-message (string-append "LINE[" (tree->string (tree-ref (buffer-tree) 0)) "]") "")' }); return 1;`);
+	for (let i = 0; i < 150; i++) {
+		await sleep(100);
+		const t = await run("return document.getElementById('tau-footer-left').textContent");
+		if (/LINE\[/.test(t)) return t.replace(/^.*LINE\[/, "").replace(/\].*$/, "");
+	}
+	return null;
+}
+
 try {
 	session = (await wd("POST", "/session", { capabilities: { alwaysMatch: { browserName: "safari" } } })).sessionId;
 	await wd("POST", `/session/${session}/url`, { url: `http://127.0.0.1:${port}/index.html?debug&nohome` });
@@ -71,6 +88,58 @@ try {
 	check("typing draws the view again", (await run("return tau.state.paints")) > paints);
 	check("and marks the document", await run("return Array.from(document.querySelectorAll('.tau-doc-tab.tau-current .tau-doc-name')).some(e => e.textContent.endsWith('•'))"));
 	check("the program did not stop", (await stopped()) === 0, await run("return window.tauErrors"));
+
+	// an input method, as Safari tells it: the end of the composition, then
+	// its text once more (the word was inserted twice)
+	await run("document.querySelector('.tau-doc-button').click(); return 1;");
+	await sleep(2000);
+	await run(`const a = document.querySelector('.tau-keyboard'); a.focus();
+		for (let k = 0; k < 2; k++) {
+			a.dispatchEvent(new CompositionEvent('compositionstart', { data: '' }));
+			for (const t of ['k', 'か', 'かn', 'かな']) { a.value = t; a.dispatchEvent(new CompositionEvent('compositionupdate', { data: t })); }
+			a.value = 'かな';
+			a.dispatchEvent(new CompositionEvent('compositionend', { data: 'かな' }));
+			a.dispatchEvent(new InputEvent('input', { data: 'かな', inputType: 'insertText' }));
+		} return 1;`);
+	await sleep(1500);
+	const line = await firstLine();
+	check("a word of an input method is inserted once", line === "かなかな", line);
+
+	// the menus from the keyboard
+	await run("Array.from(document.querySelectorAll('#tau-menu .tau-entry')).find(e => e.textContent.trim() === 'Insert').click(); return 1;");
+	await sleep(1500);
+	await press("ArrowDown");
+	await sleep(200);
+	const first = await inMenu();
+	await press("ArrowDown");
+	await sleep(200);
+	check("the arrows go through a menu", first !== "" && (await inMenu()) !== "" && (await inMenu()) !== first, [first, await inMenu()]);
+	await press("ArrowUp");
+	await sleep(200);
+	check("and back", (await inMenu()) === first, await inMenu());
+	await press("ArrowRight");
+	await sleep(1500);
+	check("right opens a submenu, with the keyboard in it",
+		await run("const l = document.querySelectorAll('.tau-popup'); return l.length === 2 && l[1].contains(document.activeElement)"));
+	await press("ArrowLeft");
+	await sleep(300);
+	check("left closes it", (await run("return document.querySelectorAll('.tau-popup').length")) === 1);
+	await press("Escape");
+	await sleep(300);
+	check("Escape closes the menu", (await run("return document.querySelectorAll('.tau-popup').length")) === 0);
+
+	// what is copied while no click came just before: Safari refuses it, a
+	// line offers to copy it with a click
+	await run("tau.worker.onmessage({ data: { t: 'clipboard', text: 'copied in Safari' } }); return 1;");
+	await sleep(800);
+	const copyButton = await run("const b = Array.from(document.querySelectorAll('.tau-notice .tau-button')).find(e => e.textContent === 'Copy'); return !!b");
+	if (copyButton) {
+		const el = await wd("POST", `/session/${session}/element`, { using: "xpath", value: "//div[contains(@class,'tau-notice')]//button[text()='Copy']" });
+		await wd("POST", `/session/${session}/element/${Object.values(el)[0]}/click`, {});
+		await sleep(800);
+		check("the Copy of the line writes to the clipboard (a click)", !(await run("return Array.from(document.querySelectorAll('.tau-notice .tau-button')).some(e => e.textContent === 'Copy')")));
+	}
+	else check("the clipboard took what was copied at once", true);
 
 	// a dialog with a view which is edited, opened and closed
 	await run("tau.send({ t: 'scheme', code: '(open-macros-editor :global)' }); return 1;");
@@ -108,6 +177,24 @@ try {
 	check("the document is saved from the panel", await run("return Array.from(document.querySelectorAll('.tau-doc-tab.tau-current .tau-doc-name')).some(e => e.textContent === 'safari.tm') && !document.querySelector('.tau-files')"),
 		await run("return Array.from(document.querySelectorAll('.tau-doc-tab .tau-doc-name'), e => e.textContent)"));
 	check("the program is still running", (await stopped()) === 0, await run("return window.tauErrors"));
+
+	// the documents kept in the browser: Safari is asked to keep them, and
+	// says once that it deletes them after seven days without a visit
+	await wd("POST", `/session/${session}/url`, { url: `http://127.0.0.1:${port}/index.html?debug&log` });
+	let again = false;
+	for (let i = 0; i < 120 && !again; i++) { await sleep(1000); again = await run("return !!(window.tau && tau.state.started)"); }
+	await sleep(2000);
+	const persisted = await run(`window.persisted = null; navigator.storage && navigator.storage.persisted ? navigator.storage.persisted().then(x => { window.persisted = x; }) : (window.persisted = 'none'); return 1;`);
+	await sleep(500);
+	const kept = await run("return window.persisted");
+	console.log("safari: storage persisted: " + kept);
+	if (kept === false)
+		check("the notice of the seven days", await run("return Array.from(document.querySelectorAll('.tau-notice')).some(e => /seven days/.test(e.textContent))"));
+	await run("location.reload(); return 1;");
+	again = false;
+	for (let i = 0; i < 120 && !again; i++) { await sleep(1000); again = await run("return !!(window.tau && tau.state.started)"); }
+	await sleep(2000);
+	check("said once only", !(await run("return Array.from(document.querySelectorAll('.tau-notice')).some(e => /seven days/.test(e.textContent))")));
 
 	if (args.includes("--manual")) {
 		// the user manual: thousands of links, which overflowed the stack

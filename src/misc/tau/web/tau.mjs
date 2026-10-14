@@ -796,6 +796,21 @@ async function pasteFromBrowser() {
 	focusView(target);
 }
 
+// Safari deletes what a site keeps after seven days in which it was not
+// visited, unless the site may keep it (persist, which Safari grants to a
+// page added to the Home Screen): said once, as long as what the browser
+// keeps is there (a flag among it)
+const isSafari = /^((?!chrome|chromium|android|crios|fxios|edg).)*safari/i.test(navigator.userAgent);
+function evictionNotice() {
+	if (!isSafari && !params.has("eviction")) return;
+	try {
+		if (localStorage.getItem("tau-eviction-said")) return;
+		localStorage.setItem("tau-eviction-said", String(Date.now()));
+	} catch (error) {}
+	notice("Safari deletes the documents which a site keeps once it was not visited for seven days. Save a backup from time to time, or add Tau to the Home Screen.",
+		"Save a backup", () => files.backup());
+}
+
 // What was copied goes to the clipboard of the browser. The browser may
 // refuse it (it wants a click or a key of the user just before, and the
 // core answered later): a line then offers to copy it with a click, which
@@ -881,7 +896,7 @@ worker.onmessage = event => {
 		// them when it wants room, once)
 		if (homeKept && navigator.storage && navigator.storage.persist)
 			navigator.storage.persisted().then(yes => yes || navigator.storage.persist())
-				.then(yes => { if (verbose) console.log("storage persisted: " + yes); }, () => {});
+				.then(yes => { if (verbose) console.log("storage persisted: " + yes); if (!yes) evictionNotice(); }, () => {});
 		// (or the browser could not give them: nothing is written over them)
 		if (!m.homeKept && m.homeError)
 			notice("The documents kept in this browser could not be read (" + m.homeError + "): what is saved here is not kept, and what the browser has is left as it is.");
@@ -1024,16 +1039,21 @@ function notice(text, label, action) {
 		bar.append(b);
 	}
 	bar.append(close);
-	panesElement.parentElement.insertBefore(bar, panesElement);
+	// (once Tau stopped, in the box which says so: the veil hid it, and
+	// what "Forget everything" answered, close the other pages, was not seen)
+	if (failureBox) failureBox.insertBefore(bar, failureBox.querySelector(".tau-failure-actions"));
+	else panesElement.parentElement.insertBefore(bar, panesElement);
 	return bar;
 }
 
 // The program stopped: nothing which is typed reaches it any more
 let failed = false;
+let failureBox = null; // what says so
 function failure(text, title) {
 	if (failed) return;
 	failed = true;
 	const box = el("div", "tau-failure"), again = el("button", "tau-button", "Start Tau again");
+	failureBox = box;
 	again.type = "button";
 	again.addEventListener("click", () => { leaving = true; location.reload(); });
 	// What is kept in the browser is still within reach: a copy of it, and
