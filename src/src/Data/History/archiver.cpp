@@ -188,7 +188,9 @@ archiver_rep::apply (patch p) {
   bool global_old= busy_versioning;
   versioning= true;
   busy_versioning= true;
-  ::apply (p, the_et);
+  // the trees of the patch become part of the document: apply a copy, or
+  // later changes of the document in place would change the archive
+  ::apply (copy (p), the_et);
   versioning= old;
   busy_versioning= global_old;
 }

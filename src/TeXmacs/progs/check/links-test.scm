@@ -1249,7 +1249,25 @@
                           (ignore (document ,@pars))))
     (check= s4 `(document (hide-preamble (document "")) ,@parts))
     (check= s5 s3)
-    (check-undo-redo (list s0 s1 s2 s3 s4 s5))))
+    (check-undo-redo (list s0 s1 s2 s3 s4 s5)))
+  ;; typing in the identifier of a hidden part, between mode changes:
+  ;; undo and redo must not change the archived trees
+  (write-doc "parts-undo-ids.tm" '("article") '()
+             '("intro" (section "One") "a" (section "Two") "b"))
+  (open-for-undo "parts-undo-ids.tm")
+  (let* ((type-id (lambda (s) (tree-insert! (bt 2 0) 0 s)))
+         (s0 (body-now))
+         (s1 (begin (edit (buffer-set-part-mode :one)) (body-now)))
+         (s2 (begin (edit (type-id "q")) (body-now)))
+         (s3 (begin (edit (buffer-set-part-mode :all)) (body-now)))
+         (s4 (begin (edit (buffer-set-part-mode :one)) (body-now)))
+         (s5 (begin (edit (type-id "r")) (body-now))))
+    (check= (st 2 0) "r3")
+    (check= s3 s0)
+    (check-undo-redo (list s0 s1 s2 s3 s4 s5))
+    (for (s (cdr (list s0 s1 s2 s3 s4 s5)))
+      (edit (redo 0))
+      (check= (body-now) s))))
 
 ;; The files to which a document is linked: its bibliography files, with
 ;; the .bib added, relative to the document.
