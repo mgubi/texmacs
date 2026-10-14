@@ -14,10 +14,10 @@
     <expand|item*|<shortcut|(remove-structure-upwards)>>per rimuovere un oggetto o
     un ambiente.
 
-    <expand|item*|<shortcut|(make-space "0.2spc")>per inserire un piccolo
+    <expand|item*|<shortcut|(make-space "0.2spc")>>per inserire un piccolo
     spazio.
 
-    <expand|item*|<shortcut|(make-space -0.2spc)>>per inserire un piccolo
+    <expand|item*|<shortcut|(make-space "-0.2spc")>>per inserire un piccolo
     spazio negativo.
 
     <expand|item*|<shortcut|(structured-insert-start)>>per marcare manualmente

@@ -27,7 +27,7 @@
                      "/plugins/tmpy/session/tm_dratex.py\"")))
 
 (plugin-configure dratex
-  (:require (python-command))
+  (:require (!= (python-command) ""))
   (:require (url-exists-in-path? "latex"))
   (:launch ,(dratex-launcher))
   (:serializer ,dratex-serialize)

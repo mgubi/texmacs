@@ -35,13 +35,13 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (tm-define (live-find-server lid)
-  (let* ((s1 (url->string (url-unroot lid)))
+  (let* ((s1 (url->unix (url-unroot lid)))
          (s2 (if (== (tmfs-car s1) "live") (tmfs-cdr s1) s1))
          (sname (tmfs-car s2)))
     (client-find-server sname)))
 
 (tm-define (live-get-name lid)
-  (let* ((s1 (url->string (url-unroot lid)))
+  (let* ((s1 (url->unix (url-unroot lid)))
          (s2 (if (== (tmfs-car s1) "live") (tmfs-cdr s1) s1))
          (s3 (tmfs-cdr s2))
          (s4 (if (== (tmfs-car s3) "live") (tmfs-cdr s3) s3)))
@@ -67,7 +67,7 @@
   (when (not (ahash-ref live-remote-initializing lid))
     (ahash-set! live-remote-initializing lid (make-ahash-table))
     (ahash-set! (ahash-ref live-remote-initializing lid) vid #t)
-    (let* ((sname (tmfs-car (url->string (url-unroot lid))))
+    (let* ((sname (tmfs-car (url->unix (url-unroot lid))))
            (server (live-find-server lid)))
       (if server
           (client-remote-eval server `(live-open ,lid)

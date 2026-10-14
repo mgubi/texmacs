@@ -1,0 +1,76 @@
+pages: 1
+--- page 1
+A sample article
+
+by Ada Lovelace
+
+Analytical Engine Society
+
+1 October 2026
+
+Abstract
+
+This document exercises the structure of an article: sections, lists, footnotes, references to
+labels and theorem-like environments. Its extracted text and its number of pages are com-
+pared with stored references, so any change of the layout shows up.
+
+1 Introduction
+
+The typesetter breaks paragraphs into lines with a global algorithm, which takes the whole para-
+graph into account when choosing the break points. Long words such as incomprehensibilities,
+characteristically and disproportionately invite hyphenation, and a justified paragraph stretches
+its spaces so that every line but the last fills the measure. This paragraph is long enough to need
+several lines and to show the effect.1
+
+Section 2 shows lists, and Section 3 theorems. Text may be strong, emphasized, verbatim or
+in small capitals.
+
+2 Lists
+
+•
+A first item, short.
+
+•
+A second item which is long enough to wrap onto a second line of the page, so that the
+indentation of continuation lines is checked.
+
+◦
+A nested item.
+
+◦
+Another nested item.
+
+1. One.
+
+2. Two.
+
+3. Three.
+
+Term. The description of the term.
+
+Longer term. A longer description, which also wraps onto a second line when the measure is
+
+not wide enough to hold all of it.
+
+3 Theorems
+
+Definition 1. A prime number is a natural number greater than one which has no divisor other
+than one and itself.
+
+Theorem 2. There are infinitely many prime numbers.
+
+Proof. Suppose there are finitely many, multiply them all and add one: the result has a prime
+divisor which is none of them.
+□
+
+Theorem 2 is due to Euclid.
+
+3.1 A subsection
+
+Remark 3. Subsections are numbered within their section.
+
+1. A footnote is set at the bottom of the page on which its call occurs.
+
+1
+
+

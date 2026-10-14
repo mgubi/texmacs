@@ -34,7 +34,7 @@
 
 (define (server-from-file u)
   (and (url-rooted-protocol? u "tmfs")
-       (with u* (url->string (url-unroot u))
+       (with u* (url->unix (url-unroot u))
          (and (tmfs-cdr u*)
               (tmfs-car (tmfs-cdr u*))))))
 

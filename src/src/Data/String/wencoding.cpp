@@ -96,7 +96,7 @@ looks_universal (string s) {
       bool unicode= s[++i] == '#';
       if (unicode) i++;
       while (i<n && s[i] != '>') {
-        if (unicode && !is_digit (s[i]))
+        if (unicode && !is_hex_digit (s[i]))
           return false;
         if (!unicode && !(is_alpha (s[i]) || s[i] == '-'))
           return false;

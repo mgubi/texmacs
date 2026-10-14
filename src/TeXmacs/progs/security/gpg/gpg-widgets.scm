@@ -39,7 +39,6 @@
   ("gpg default key fingerprint" "" notify-gpg-default-key-fingerprint))
 
 (tm-define (gpg-get-default-key-fingerprint)
-  (:secure #t)
   (:synopsis "Get default key fingerprint")
   (if (or (gpg-secret-key-fingerprint? gpg-default-key-fingerprint)
 	  (== gpg-default-key-fingerprint ""))
@@ -49,7 +48,6 @@
 	 "")))
 
 (tm-define (gpg-set-default-key-fingerprint fingerprint)
-  (:secure #t)
   (:interactive #t)
   (:synopsis "Set default key fingerprint")
   (:argument fingerprint "Key fingerprint")
@@ -136,7 +134,6 @@
 		       (cmd "Ok"))))))))))))
 
 (tm-define (gpg-dialogue-gen-key . callback)
-  (:secure #t)
   (:synopsis "Generate GnuPG key")
   (with cb (if (null? callback) noop (car callback))
     (dialogue-window (gpg-widget-gen-key cb) noop "Generate GnuPG key")))
@@ -183,7 +180,6 @@
     (callback (gpg-encrypt data (cdr action)))))
 
 (tm-define (gpg-dialogue-encrypt data callback)
-  (:secure #t)
   (:synopsis "Interactive GnuPG encryption")
   (dialogue-window gpg-widget-select-public-key-fingerprints
 		   (lambda (x) (gpg-command-encrypt data callback x))
@@ -247,7 +243,6 @@
       (when dec (callback dec)))))
 
 (tm-define (gpg-dialogue-decrypt data fingerprint callback)
-  (:secure #t)
   (:synopsis "Interactive GnuPG decryption")
   (with-wallet
     (with passphrase (wallet-get (list "gpg" fingerprint))
@@ -357,7 +352,6 @@
     (callback (gpg-passphrase-encrypt data (second action)))))
 
 (tm-define (gpg-dialogue-passphrase-encrypt data callback)
-  (:secure #t)
   (:synopsis "Interactive GnuPG passphrase encryption")
   (gpg-ask-new-passphrase
    (lambda (x) (gpg-command-passphrase-encrypt data callback x))))
@@ -433,7 +427,6 @@
     (callback (gpg-passphrase-decrypt data (second action)))))
 
 (tm-define (gpg-dialogue-passphrase-decrypt data callback)
-  (:secure #t)
   (:synopsis "Interactive GnuPG passphrase decryption")
   (gpg-ask-standalone-passphrase
    (lambda (x) (gpg-decryptable? data x))

@@ -528,6 +528,16 @@
          (cons (list (string->symbol " ")) (tmtex-text-list-space (cdr l))))
         (else (tmtex-text-list l))))
 
+;; the UTF-8 characters of the Cork character c. Cork and UTF-8 coincide on the
+;; printable ASCII characters, except the backquote (a left quote in Cork):
+;; they need no conversion, which the text and math exports did for every
+;; character (a call of string-convert per character)
+(define (tmtex-cork-char->utf8 c)
+  (let ((i (char->integer c)))
+    (if (and (>= i 32) (< i 127) (!= i 96))
+        (list c)
+        (string->list (string-convert (char->string c) "Cork" "UTF-8")))))
+
 (define (tmtex-text-list l)
   (if (null? l) l
       (let ((c (car l)))
@@ -565,8 +575,7 @@
               (else
                 (append
                   (if (or tmtex-use-unicode? tmtex-use-ascii?)
-                      (string->list (string-convert (char->string c)
-                                                    "Cork" "UTF-8"))
+                      (tmtex-cork-char->utf8 c)
                       (list c))
                   (tmtex-text-list (cdr l))))))))
 
@@ -601,8 +610,7 @@
               (else
                 (with c
                   (if (or tmtex-use-unicode? tmtex-use-ascii?)
-                      (string->list (string-convert (char->string c)
-                                                    "Cork" "UTF-8"))
+                      (tmtex-cork-char->utf8 c)
                       (list c))
                   (append c (tmtex-math-list (cdr l)))))))))
 
@@ -1856,6 +1864,16 @@
           ((in? unit '("w" "h")) (or val 0))
           (else #f))))
 
+(define (tmtex-image-sized fig hor ver)
+  ;; size the image with the width and height options of includegraphics
+  ;; rather than with resizebox, which TeXmacs does not import back
+  (let* ((w (if (== hor "!") '() (list (string-append "width=" hor))))
+         (h (if (== ver "!") '() (list (string-append "height=" ver))))
+         (opts (string-recompose (append w h) ",")))
+    (if (and (func? fig 'includegraphics 1) (!= opts ""))
+        (list 'includegraphics (list '!option opts) (cadr fig))
+        (list 'resizebox hor ver fig))))
+
 (define (tmtex-image l)
   (if (nstring? (car l))
       (tmtex-eps (cons 'image l))
@@ -1864,7 +1882,7 @@
              (ver (tmtex-image-length (caddr l)))
              (mhor (tmtex-image-mag (cadr l)))
              (mver (tmtex-image-mag (caddr l))))
-        (cond ((or (not mhor) (not mver)) (list 'resizebox hor ver fig))
+        (cond ((or (not mhor) (not mver)) (tmtex-image-sized fig hor ver))
               ((and (== mhor 0.0) (== mver 0.0)) fig)
               ((or (== mhor 1.0) (== mver 1.0)) fig)
               ((== mhor 0.0) (list 'scalebox (number->string mver) fig))
@@ -2357,8 +2375,18 @@
     ((== (cadr l) "locase") (tex-apply 'MakeLowercase (tmtex (car l))))
     (else (tmtex (car l)))))
 
+;; LaTeX's \fbox typesets its argument in text mode; a frame in a formula
+;; becomes an amsmath \boxed, which is also imported back as a formula
 (define (tmtex-frame s l)
-  `(fbox ,(car l)))
+  (if (tmtex-math-mode?)
+      `(boxed ,(tmtex (car l)))
+      `(fbox ,(tmtex (car l)))))
+
+;; \boxed is only allowed in formulas
+(define (tmtex-boxed s l)
+  (if (tmtex-math-mode?)
+      `(boxed ,(tmtex (car l)))
+      (tmtex `(math (boxed ,(car l))))))
 
 (define (tmtex-colored-frame s l)
   `(colorbox ,(tmtex-decode-color (car l)) ,(tmtex (cadr l))))
@@ -3245,6 +3273,7 @@
   ((:or mmx cpp scm shell scilab) (,tmtex-code-inline 1))
 
   (frame (,tmtex-frame 1))
+  (boxed (,tmtex-boxed 1))
   (colored-frame (,tmtex-colored-frame 2))
   (fcolorbox (,tmtex-fcolorbox 3))
   (rotate (,tmtex-rotate 2))

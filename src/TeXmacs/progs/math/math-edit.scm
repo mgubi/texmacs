@@ -163,6 +163,12 @@
 ;; Switching between inlined and displayed equations
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(define (concat-unwrap! doc i)
+  ;; a paragraph @i of @doc which a split left with a single child
+  (with c (tree-ref doc i)
+    (when (and (tree-is? c 'concat) (= (tree-arity c) 1))
+      (tree-set! c (tree-ref c 0)))))
+
 (define-macro (concat-isolate! t)
   `(cond ((not (tree-is? t :up 'concat)) (noop))
 	 ((not (tree-is? t :up :up 'document)) (noop))
@@ -171,11 +177,13 @@
 	  (tree-split (tree-up t 2)
 		      (tree-index (tree-up t))
 		      (+ (tree-index t) 1))
+	  (concat-unwrap! (tree-up t 2) (+ (tree-index (tree-up t)) 1))
 	  (concat-isolate! t))
 	 (else
 	  (tree-split (tree-up t 2)
 		      (tree-index (tree-up t))
 		      (tree-index t))
+	  (concat-unwrap! (tree-up t 2) (- (tree-index (tree-up t)) 1))
 	  (concat-isolate! t))))
 
 (define (math->equation* t)
@@ -449,11 +457,11 @@
               (== (tree-arity t) 3))
          (bracket-circulate (tree-ref t 0) forward? lbrackets)
          (bracket-circulate (tree-ref t 2) forward? rbrackets))
-        ((and (tree-is? t 'left) (> (tree-arity t) 1))
+        ((and (tree-is? t 'left) (> (tree-arity t) 0))
          (bracket-circulate (tree-ref t 0) forward? lbrackets))
-        ((and (tree-is? t 'mid) (> (tree-arity t) 1))
+        ((and (tree-is? t 'mid) (> (tree-arity t) 0))
          (bracket-circulate (tree-ref t 0) forward? mbrackets))
-        ((and (tree-is? t 'right) (> (tree-arity t) 1))
+        ((and (tree-is? t 'right) (> (tree-arity t) 0))
          (bracket-circulate (tree-ref t 0) forward? rbrackets))
         ((and (tree-atomic? t)
               (in? (tree->string t) brackets))
@@ -669,7 +677,8 @@
 (tm-define (math-separator sep large?)
   (when (== large? 'default)
     (set! large? (!= (get-preference "use large brackets") "off")))
-  (when (and (string? sep) (string-starts? sep "<") (string-ends? sep ">"))
+  (when (and large? (string? sep)
+             (string-starts? sep "<") (string-ends? sep ">"))
     (set! sep (substring sep 1 (- (string-length sep) 1))))
   (when (== (get-preference "automatic brackets") "off")
     (make-separator sep large?)

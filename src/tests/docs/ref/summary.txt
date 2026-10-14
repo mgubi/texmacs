@@ -1,0 +1,54 @@
+book	main/man-user-manual.de.tm	log	warning, missing font, loading global substitution list
+book	main/man-user-manual.de.tm	undefined-reference	auto-* (123 page numbers of the table of contents or the index are ?)
+book	main/man-user-manual.en.tm	log	typeset-warning, Redefined sec-man-preferences as A.1
+book	main/man-user-manual.en.tm	log	typeset-warning, Redefined sec-man-preferences as E.3
+book	main/man-user-manual.pt.tm	log	bad link or file <url main/styles/std-dtds/number-env-dtd.en.tm>
+book	main/man-user-manual.zh.tm	log	warning, missing font, loading global substitution list
+file	about/welcome/first.de.tm	language	english in a .de.tm file
+file	about/welcome/welcome.es.tm	broken-link	../../tutorial/tut-tutorial.en.tm
+file	about/welcome/welcome.fr.tm	broken-link	../../tutorial/tut-tutorial.fr.tm
+file	about/welcome/welcome.it.tm	broken-link	../../tutorial/tut-tutorial.en.tm
+file	devel/format/environment/env-font.de.tm	log	warning, missing font, loading global substitution list
+file	devel/format/format.de.tm	broken-branch	leaves.de.tm
+file	devel/format/format.de.tm	broken-branch	planned-changes.en.tm
+file	devel/interface/interface-dynlibs.de.tm	broken-link	../../../../../include/TeXmacs.h
+file	main/math/keyboard/man-enter-math.zh.tm	log	warning, missing font, loading global substitution list
+file	main/styles/std-dtds/header-dtd.pt.tm	language	english in a .pt.tm file
+file	main/styles/std-dtds/header-title-dtd.pt.tm	language	english in a .pt.tm file
+file	main/styles/std-dtds/number-dtds.pt.tm	broken-branch	number-env-dtd.en.tm
+file	main/styles/std-dtds/number-section-dtd.pt.tm	language	english in a .pt.tm file
+file	main/styles/std/std-utils-dtd.de.tm	language	english in a .de.tm file
+file	main/text/man-fonts.de.tm	log	warning, missing font, loading global substitution list
+stat	devel/scheme/scheme.en.tm	idx	12
+stat	devel/scheme/scheme.en.tm	pages	157
+stat	devel/scheme/scheme.en.tm	toc	115
+stat	devel/source/source.en.tm	idx	4
+stat	devel/source/source.en.tm	pages	49
+stat	devel/source/source.en.tm	toc	88
+stat	devel/source/source.fr.tm	idx	2
+stat	devel/source/source.fr.tm	pages	47
+stat	devel/source/source.fr.tm	toc	88
+stat	main/man-user-manual.de.tm	idx	1061
+stat	main/man-user-manual.de.tm	pages	234
+stat	main/man-user-manual.de.tm	toc	297
+stat	main/man-user-manual.en.tm	idx	1251
+stat	main/man-user-manual.en.tm	pages	290
+stat	main/man-user-manual.en.tm	toc	398
+stat	main/man-user-manual.es.tm	idx	248
+stat	main/man-user-manual.es.tm	pages	93
+stat	main/man-user-manual.es.tm	toc	142
+stat	main/man-user-manual.fr.tm	idx	197
+stat	main/man-user-manual.fr.tm	pages	90
+stat	main/man-user-manual.fr.tm	toc	143
+stat	main/man-user-manual.it.tm	idx	316
+stat	main/man-user-manual.it.tm	pages	129
+stat	main/man-user-manual.it.tm	toc	181
+stat	main/man-user-manual.pl.tm	idx	122
+stat	main/man-user-manual.pl.tm	pages	38
+stat	main/man-user-manual.pl.tm	toc	55
+stat	main/man-user-manual.pt.tm	idx	215
+stat	main/man-user-manual.pt.tm	pages	81
+stat	main/man-user-manual.pt.tm	toc	124
+stat	main/man-user-manual.zh.tm	idx	1158
+stat	main/man-user-manual.zh.tm	pages	238
+stat	main/man-user-manual.zh.tm	toc	323

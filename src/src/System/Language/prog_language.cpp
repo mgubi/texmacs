@@ -18,7 +18,8 @@
 #include "iterator.hpp"
 
 prog_language_rep::prog_language_rep (string name):
-  abstract_language_rep (name)
+  abstract_language_rep (name), multi_line_comments (false),
+  current_line (NULL), in_inline_comment (false)
 {
   if (DEBUG_PARSER)
     debug_packrat << "Building the " * name * " language parser" << LF;
@@ -135,6 +136,10 @@ prog_language_rep::customize_comment (tree config) {
       }
       inline_comment_parser.set_starts (inline_comment_starts);
     }
+    // in_comment only knows the C comments /* ... */
+    else if (label == "multi_line" && N(feature) == 2 &&
+             get_label (feature[0]) == "/*" && get_label (feature[1]) == "*/")
+      multi_line_comments= true;
   }
 }
 
@@ -157,13 +162,45 @@ prog_language_rep::customize_preprocessor (tree config) {
     debug_packrat << preprocessor_parser.to_string();
 }
 
+// The tokens of a line are asked in order: an inline comment is a state of
+// the tokenizer, which a comment marker between tokens begins (a marker in a
+// string is part of the string token, as "#" in python) and which lasts to
+// the end of the line. A line asked from the middle (the range primitive) is
+// first tokenized from its start, for that state.
 text_property
 prog_language_rep::advance (tree t, int& pos) {
+  if (pos == 0 || inside (t) != current_line) {
+    current_line= inside (t);
+    in_inline_comment= false;
+    for (int p= 0; p < pos; ) advance_token (t, p);
+  }
+  return advance_token (t, pos);
+}
+
+// a word of a comment, or the blanks between its words (where the lines
+// may break, as before)
+text_property
+prog_language_rep::inline_comment_token (string s, int& pos) {
+  if (blanks_parser.parse (s, pos)) {
+    current_parser= blanks_parser.get_parser_name ();
+    return &tp_space_rep;
+  }
+  int start= pos;
+  while (pos < N(s) && s[pos] != ' ') tm_char_forwards (s, pos);
+  if (pos == start) tm_char_forwards (s, pos);
+  current_parser= inline_comment_parser.get_parser_name ();
+  return &tp_normal_rep;
+}
+
+text_property
+prog_language_rep::advance_token (tree t, int& pos) {
   string s= t->label;
   if (pos>=N(s)) return &tp_normal_rep;
 
   if (string_parser.unfinished ()) {
-    if (string_parser.escaped () && string_parser.parse_escaped (s, pos)) {
+    // Also try when the previous token was an escape sequence itself,
+    // so that consecutive escape sequences (as in "\n\t") are recognized
+    if (string_parser.parse_escaped (s, pos)) {
       current_parser= escaped_char_parser.get_parser_name ();
       return &tp_normal_rep;
     }
@@ -173,6 +210,7 @@ prog_language_rep::advance (tree t, int& pos) {
     }
   }
 
+  if (in_inline_comment) return inline_comment_token (s, pos);
   if (blanks_parser.parse (s, pos)) {
     current_parser= blanks_parser.get_parser_name ();
     return &tp_space_rep;
@@ -180,6 +218,10 @@ prog_language_rep::advance (tree t, int& pos) {
   if (preprocessor_parser.parse (s, pos)) {
     current_parser= preprocessor_parser.get_parser_name ();
     return &tp_normal_rep;
+  }
+  if (inline_comment_parser.can_parse (s, pos)) {
+    in_inline_comment= true;
+    return inline_comment_token (s, pos);
   }
   if (string_parser.parse (s, pos)) {
     current_parser= string_parser.get_parser_name ();
@@ -236,20 +278,15 @@ prog_language_rep::get_color (tree t, int start, int end) {
 
 
   // Coloring as multi-line comment
-  if (in_comment (start, t))
+  if (multi_line_comments && in_comment (start, t))
     return decode_color (lan_name, encode_color ("comment"));
 
   string type= none;
   string s= t->label;
-  
-  // Coloring as inline comment
-  int pos= 0;
-  while (pos <= start) {
-    if (inline_comment_parser.can_parse (s, pos)) {
-      return decode_color (lan_name, encode_color ("comment"));
-    }
-    pos ++;
-  }
+
+  // Coloring as inline comment (a state of the tokenizer, see advance)
+  if (current_parser == "inline_comment_parser")
+    return decode_color (lan_name, encode_color ("comment"));
 
   if (current_parser == "string_parser") {
     type= "constant_string";

@@ -1,0 +1,668 @@
+pages: 2
+--- page 1
+OpenType mathematical fonts
+
+The same formulas are set with each of the OpenType fonts of the Document > Font >
+Mathematical font menu which ship with TeXmacs: the TeX Gyre fonts Termes, Pagella, Bonum
+and Schola, and STIX, each together with the text font of the same family.
+
+1 TeX Gyre Termes
+
+Big delimiters, extensible arrows, small radicals and wide accents; big operators in the text style: ∑k=1
+
+n
+ak,
+∏p p−s and ∫0
+
+∞e−xdx.
+
+(((((((((
+(
+(
+
+1
+2
+a
+b+c
+
+x2+1
+√
+∑k=0
+
+n
+xk )))))))))
+
+)
+),
+⟨
+
+1
+2
+3
+4
+⟩,
+∣x
+
+y∣,
+
+[[[[[[[[[[[
+[
+[
+1
+1+
+1
+
+1+ 1
+x ]]]]]]]]]]]
+
+]
+],
+{a
+
+b}
+
+A→
+
+f B←←←
+←←
+
+h
+
+g C ↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+a longer label D⇒⇒⇒⇒⇒⇒⇒⇒⇒⇒⇒⇒⇒
+⇒⇒
+
+n→∞E,
+x
+√,
+x2+y2
+√
+,
+x+y
+3√
+
+xˆ,
+x+ŷ,
+abcd,
+fg,
+x+y̌,
+x+y,
+AB,
+a+b+c
+⏞,
+a+b+c
+⏟
+
+2 TeX Gyre Pagella
+
+Big delimiters, extensible arrows, small radicals and wide accents; big operators in the text style:
+∑k=1
+
+n
+ak, ∏p p−s and ∫0
+
+∞e−xdx.
+
+((((((((
+(
+(
+
+1
+2
+a
+b+c
+
+x2+1
+√
+∑k=0
+
+n
+xk ))))))))
+
+)
+),
+⟨
+
+1
+2
+3
+4
+⟩,
+∣x
+
+y∣,
+
+[[[[[[[[[[[[
+[
+[
+1
+
+1+
+1
+
+1+
+1
+x ]]]]]]]]]]]]
+
+]
+],
+{a
+
+b}
+
+A→→
+→→
+
+f B ←←←
+←←
+
+h
+
+g C ↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+a longer label D ⇒⇒⇒⇒⇒⇒⇒⇒⇒⇒⇒⇒⇒
+⇒⇒
+
+n→∞E,
+x
+√,
+x2+y2
+√
+,
+x+y
+3√
+
+xˆ,
+x+y,
+abcd,
+fg,
+x+y,
+x+y,
+AB,
+a+b+c
+⏞,
+a+b+c
+⏟
+
+3 TeX Gyre Bonum
+
+Big delimiters, extensible arrows, small radicals and wide accents; big operators in the
+text style: ∑k=1
+
+n
+ak, ∏p p−s and ∫0
+
+∞e −x dx.
+
+((((((((((((
+(
+(
+
+1
+2
+a
+b + c
+
+x 2 + 1
+√
+∑k=0
+
+n
+xk ))))))))))))
+
+)
+),
+⟨
+
+1
+2
+3
+4
+⟩,
+∣x
+
+y∣,
+
+[[[[[[[[[[[
+[
+[
+1
+
+1 +
+1
+
+1 + 1
+x ]]]]]]]]]]]
+
+]
+],
+{a
+
+b}
+
+A →
+
+f B ←
+←
+←
+←←
+
+h
+
+g C ↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+a longer label D ⇒
+⇒
+⇒
+⇒
+⇒
+⇒
+⇒
+⇒
+⇒
+⇒
+⇒
+⇒
+⇒⇒
+
+n→∞E,
+x
+√,
+x 2 + y2
+√
+,
+x + y
+3√
+
+xˆ,
+x + y,
+a b c d,
+f g,
+x + y,
+x + y,
+A B,
+a + b + c
+zzzzzzzz
+z z}|{{{{{{{{
+{ {
+
+,
+a + b + c
+||||||||
+| |{z}}}}}}}}
+} }
+
+1
+
+
+--- page 2
+4 TeX Gyre Schola
+
+Big delimiters, extensible arrows, small radicals and wide accents; big operators in the text
+style: ∑k=1
+
+n
+ak, ∏p p−s and ∫0
+
+∞e−xdx.
+
+((((((((((
+(
+(
+
+1
+2
+a
+b+c
+
+x2+1
+√
+∑k=0
+
+n
+xk ))))))))))
+
+)
+),
+⟨
+
+1
+2
+3
+4
+⟩,
+∣x
+
+y∣,
+
+[[[[[[[[[[[
+[
+[
+1
+
+1+
+1
+
+1+ 1
+x ]]]]]]]]]]]
+
+]
+],
+{a
+
+b}
+
+A →
+
+f B ←
+←
+←
+←←
+
+h
+
+g C ↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+↔
+a longer label D ⇒
+⇒
+⇒
+⇒
+⇒
+⇒
+⇒
+⇒
+⇒
+⇒
+⇒
+⇒
+⇒
+⇒
+⇒
+n→∞E,
+x
+√,
+x2+ y2
+√
+,
+x+ y
+3√
+
+xˆ,
+x+ y,
+abcd,
+fg,
+x+ y,
+x+ y,
+AB,
+a+b+c
+⏞,
+a+b+c
+⏟
+
+5 STIX
+
+Big delimiters, extensible arrows, small radicals and wide accents; big operators in the text style: ∑k=1
+
+n
+ak,
+∏p p−s and ∫0
+
+∞e−xdx.
+
+⎝⎜⎜⎜⎜⎜⎜⎜⎜⎜⎜⎜⎜⎜⎜⎜⎛
+1
+2
+a
+b+c
+
+x2+1
+√
+∑k=0
+
+n
+xk ⎠⎟⎟⎟⎟⎟⎟⎟⎟⎟⎟⎟⎟⎟⎟⎟⎞
+
+,
+⟨
+
+1
+2
+3
+4⟩,
+∣∣∣∣∣∣∣∣∣∣∣∣∣∣∣x
+
+y ∣∣∣∣∣∣∣∣∣∣∣∣∣∣∣
+
+,
+
+⎣⎢⎢⎢⎢⎢⎢⎢⎢⎢⎢⎢⎢⎢⎢⎢⎡
+1
+
+1+
+1
+
+1+ 1
+x ⎦⎥⎥⎥⎥⎥⎥⎥⎥⎥⎥⎥⎥⎥⎥⎥⎤
+
+,
+{
+
+a
+b}
+
+A→
+
+f B←
+←
+←←
+
+h
+
+g C ↔↔↔↔↔↔↔↔↔↔↔↔↔↔↔↔↔↔↔↔↔↔↔↔↔↔↔
+↔
+↔
+a longer label D⇒⇒⇒⇒⇒⇒⇒⇒⇒⇒⇒
+⇒⇒
+
+n→∞
+
+E,
+x
+√,
+x2+y2
+√
+,
+x+y
+3√
+
+xˆ,
+x˜,
+fg,
+x+y,
+AB,
+a+b+c
+⏞
+
+,
+a+b+c
+⏟
+The radicals grow with their contents:
+
+a
+b
+√,
+
+1
+2
+3
+4
+⎷
+⎷
+⎷
+⎷
+⎷
+⎷
+⎷
+⎷
+⎷
+⎷
+⎷
+
+,
+1+
+1+
+1+ x
+√
+√
+√
+
+6 A variable font
+
+This paragraph is set in Skia, a variable font of macOS, in its default instance, with a bold series
+and a slanted shape made from it.
+
+2
+Section 6
+
+

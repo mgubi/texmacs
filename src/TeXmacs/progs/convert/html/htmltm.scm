@@ -37,7 +37,7 @@
     ("purple" (128 0 128)) ("fuchsia" (255 0 255)) ("green" (0 128 0))
     ("lime" (0 255 0)) ("olive" (128 128 0)) ("yellow" (255 255 0))
     ("navy" (0 0 128)) ("blue" (0 0 255)) ("teal" (0 128 128))
-    ("aqua" (0 0 255))))
+    ("aqua" (0 255 255))))
 
 (define (html-named-color->rgb255 s)
   (cond ((assoc-string-ci s html-named-colors) => second)
@@ -360,7 +360,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define (htmltm-math env a c)
-(with cm `(m:math (@ ,@a) ,(replace-nsprefix-in-stree c "h:" "m:"))
+(with cm `(m:math (@ ,@a) ,@(replace-nsprefix-in-stree c "h:" "m:"))
   `(,(mathtm-as-serial env cm))
 ))
 
@@ -524,7 +524,7 @@
   ;;; Links
   (a (handler :mixed :inline htmltm-anchor))
   ;; Elements allowed only in HEAD
-  ((:or (link base)) htmltm-drop)
+  ((:or link base) htmltm-drop)
 
   ;;; Objects images and applets
   (object (handler :mixed :inline htmltm-drop))
@@ -578,7 +578,7 @@
   (mathjax (handler :collapse :inline htmltm-mathjax))
   
   ;;; Math tag in HTML5 (no namespace prefix)
-  (math (handler :mixed :block htmltm-math))
+  (math (handler :mixed :inline htmltm-math))
   
   ;; Tags present in the previous converter
   ;; Unknown: FIG FN NOTE AU LANG PERSON

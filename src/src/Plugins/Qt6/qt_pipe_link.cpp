@@ -26,6 +26,7 @@
 #  include <sys/wait.h>
 #endif
 #include <errno.h>
+#include <QThread>
 
 void close_all_cmdlines ();
 void process_all_cmdlines ();
@@ -110,6 +111,15 @@ qt_pipe_link_rep::watch (int channel) {
 string
 qt_pipe_link_rep::read (int channel) {
   listen (0);
+  if (alive && PipeLink.state () == QProcess::NotRunning) {
+    // the process has exited: what it wrote is read, and the link is dead
+    // once the other channel has been read too
+    PipeLink.feedBuf (QProcess::StandardOutput);
+    PipeLink.feedBuf (QProcess::StandardError);
+    string& other= (channel == LINK_OUT? PipeLink.getErrbuf ():
+                                         PipeLink.getOutbuf ());
+    if (other == "") alive= false;
+  }
   if (channel == LINK_OUT) {
     string r= PipeLink.getOutbuf ();
     PipeLink.setOutbuf ("");
@@ -130,7 +140,12 @@ qt_pipe_link_rep::listen (int msecs) {
   while ((PipeLink.getOutbuf() == "") && (PipeLink.getErrbuf() == "")) {
     PipeLink.listenChannel (QProcess::StandardOutput, 0);
     PipeLink.listenChannel (QProcess::StandardError, 0);
-    if (texmacs_time () - wait_until > 0) break;
+    // (both channels are polled: wait a little between two polls rather
+    // than keep a processor busy, but not once the time is over, so that
+    // listen (0) only polls)
+    if (texmacs_time () - wait_until >= 0) break;
+    if (PipeLink.getOutbuf() == "" && PipeLink.getErrbuf() == "")
+      QThread::msleep (1);
   }
 }
 

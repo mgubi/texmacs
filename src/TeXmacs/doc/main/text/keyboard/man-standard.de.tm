@@ -14,7 +14,7 @@
     <TeXmacs>-Umgebung, die den dargestellten Text enthält. Der
     eingeschlossene Text bleibt erhalten.
 
-    <item*|<shortcut|(make-space "0.2spc")>füge einen kurzen Abstand ein.
+    <item*|<shortcut|(make-space "0.2spc")>>füge einen kurzen Abstand ein.
 
     <item*|<shortcut|(make-space "-0.2spc")>>füge einen kurzen negativen Abstand
     ein.

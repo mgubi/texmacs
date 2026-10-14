@@ -16,6 +16,7 @@
 #include "gui.hpp"
 #include "file.hpp"
 #include "dictionary.hpp"
+#include "locale.hpp"
 
 /******************************************************************************
 * Array-like operations on strings and compound structures

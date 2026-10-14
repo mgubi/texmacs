@@ -65,7 +65,7 @@ struct font_less_eq_operator {
       if (leq (t2[i], t1[i]) && t2[i] != t1[i]) return false;
     }
     if (N(t1) < N(t2)) return true;
-    if (N(t2) > N(t1)) return false;
+    if (N(t1) > N(t2)) return false;
     return true;
   }
 };
@@ -153,7 +153,7 @@ font_database_save_database (url u) {
   string s= scheme_tree_to_block (tree (TUPLE, r));
   save_string (u, s);
   // FIXME: this should not be necessary
-  remove ("$TEXMACS_PATH/system/cache/file_cache");
+  remove (url ("$TEXMACS_HOME_PATH/system/cache/file_cache"));
   cache_refresh ();
 }
 
@@ -171,7 +171,7 @@ font_database_save_features (url u) {
   string s= scheme_tree_to_block (tree (TUPLE, r));
   save_string (u, s);
   // FIXME: this should not be necessary
-  remove ("$TEXMACS_PATH/system/cache/file_cache");
+  remove (url ("$TEXMACS_HOME_PATH/system/cache/file_cache"));
   cache_refresh ();
 }
 
@@ -187,7 +187,7 @@ font_database_save_characteristics (url u) {
   string s= scheme_tree_to_block (tree (TUPLE, r));
   save_string (u, s);
   // FIXME: this should not be necessary
-  remove ("$TEXMACS_PATH/system/cache/file_cache");
+  remove (url ("$TEXMACS_HOME_PATH/system/cache/file_cache"));
   cache_refresh ();
 }
 

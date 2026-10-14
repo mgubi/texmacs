@@ -21,7 +21,7 @@
 
 (tm-define (plugin-output-std-simplify name t)
   ;;(display* "Simplify " t "\n")
-  (cond ((or (func? t 'document 0) (func? 'concat 0)) "")
+  (cond ((or (func? t 'document 0) (func? t 'concat 0)) "")
         ((or (func? t 'document 1) (func? t 'concat 1))
          (plugin-output-simplify name (cadr t)))
         ((and (or (func? t 'document) (func? t 'concat))
@@ -92,7 +92,13 @@
 (define (plugin-start lan ses)
   (when (!= lan "scheme")
     (plugin-set-author lan ses)
-    (connection-start lan ses)))
+    (with msg (connection-start lan ses)
+      (when (string-starts? msg "Error:")
+        (ahash-remove! plugin-started (list lan ses))
+        (ahash-remove! plugin-prompts (list lan ses))
+        (pending-set lan ses (cdr (pending-ref lan ses)))
+        (connection-notify lan ses "error" (stree->tree `(document ,msg)))
+        (plugin-cancel lan ses #t)))))
 
 (tm-define (plugin-write lan ses t mode)
   (ahash-set! plugin-started (list lan ses) (texmacs-time))

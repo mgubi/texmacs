@@ -32,14 +32,25 @@
                 ("owner" ,uid))
     (db-search (if (== kind 'all) query (append query `(("kind" ,kind)))))))
 
+(define (push-notification to kind data)
+  ;; Store a notification for the user with pseudo 'to' and push it
+  ;; to this user if logged in
+  (with nid (add-pending-notification (server-find-user to) kind data)
+    (when (pseudo-logged? to)
+      (server-remote-eval
+        (pseudo-logged? to)
+        `(client-push-notifications ,nid ,(db-get-entry nid))
+        (lambda (ok?) (noop))))))
+
 (tm-define (server-push-message msg)
   (with (action pseudo full-name date doc to mid) msg
-    (with nid (add-pending-notification (server-find-user to) 'message msg)
-      (when (pseudo-logged? to)
-        (server-remote-eval
-          (pseudo-logged? to)
-          `(client-push-notifications ,nid ,(db-get-entry nid))
-          (lambda (ok?) (noop)))))))
+    (push-notification to 'message msg)))
+
+(tm-define (server-push-chat-notification to room msg mid)
+  ;; Notify 'to' of the new message 'msg' with identifier 'mid' in the
+  ;; chat room 'room'; database fields hold strings, so the notification
+  ;; records the name of the room, which the client opens
+  (push-notification to 'chat room))
 
 (tm-define (server-clean-user-notifications uid kind)
   (let* ((notifs (get-user-notifications uid kind)))

@@ -28,7 +28,7 @@
     documentation about the <TeXmacs> format, its primitives and environment
     variables, and the standard style files.
 
-    <item>The <hlink|<menu|Help|Apropos>|../../about/about.en.tm> menu
+    <item>The <hlink|<menu|Help|About>|../../about/about.en.tm> menu
     contains more information about <TeXmacs>, like information about its
     <hlink|authors|../../about/authors/authors.en.tm>, how to <hlink|contact
     us|../../about/authors/contact.en.tm>, and

@@ -1,0 +1,71 @@
+pages: 3
+--- page 1
+1 Words
+
+A ligature joins two letters into one glyph, and kerning moves a pair of letters closer together or
+further apart. A glyph is drawn by a font. Fonts come in families and shapes, such as the italic
+shape.
+
+Words
+1
+
+
+--- page 2
+2 Lines
+
+Paragraphs are broken into lines and lines into pages. Kerning also applies across a line, and every
+font has a design size. The measure is the width of the column, and the leading its vertical spacing.
+
+2
+Section 2
+
+
+--- page 3
+3 Pages
+
+A page holds a number of lines, and its footnotes. A widow is the last line of a paragraph left alone
+at the top of a page.
+
+Glossary
+
+glyph
+the shape which a font draws for a character
+. . . . . . . . . . . . . . . . . . . . . . .
+1
+measure
+the width of a line of text . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+2
+leading
+the distance between the baselines of two lines
+. . . . . . . . . . . . . . . . . . . . . .
+2
+widow . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+3
+
+Index
+
+font . . . . . . . . . . . . . . . . . . . . . . . .
+1–2
+design size
+. . . . . . . . . . . . . . . . . . . . 2
+family . . . . . . . . . . . . . . . . . . . . . . . 1
+shape
+. . . . . . . . . . . . . . . . . . . . . . . 1
+italic . . . . . . . . . . . . . . . . . . . . . . 1
+footnote . . . . . . . . . . . . . . . . . . . . . . . . 3
+
+glyph
+. . . . . . . . . . . . . . . . . . . . . . . . . 1
+kerning
+. . . . . . . . . . . . . . . . . . . . . .
+1–2
+ligature . . . . . . . . . . . . . . . . . . . . . . . . 1
+line breaking . . . . . . . . . . . . . . . . . . . . . 2
+page breaking
+. . . . . . . . . . . . . . . . . .
+2–3
+
+Index
+3
+
+

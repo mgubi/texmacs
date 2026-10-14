@@ -67,8 +67,10 @@
            (if indent?
                (string-append (indent-prefix (tm-car t)) title)
                title)))
-	((tree-is? (tm-car t) 'the-index) "Index")
-	((tree-is? (tm-car t) 'the-glossary) "Glossary")
+	((tm-is? t 'the-index) "Index")
+	((tm-is? t 'the-glossary) "Glossary")
+	((automatic-section*-tag? (tm-car t))
+	 (texmacs->title-string (tm-ref t (- (tm-arity t) 2))))
 	((or (special-section-tag? (tm-car t))
 	     (automatic-section-tag? (tm-car t)))
 	 (upcase-first (string-replace (symbol->string (tm-car t)) "-" " ")))

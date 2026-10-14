@@ -20,7 +20,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define (live-name lid)
-  (let* ((s1 (url->string (url-unroot lid)))
+  (let* ((s1 (url->unix (url-unroot lid)))
          (s2 (if (== (tmfs-car s1) "live") (tmfs-cdr s1) s1))
          (s3 (tmfs-cdr s2))
          (s4 (if (== (tmfs-car s3) "live") (tmfs-cdr s3) s3)))

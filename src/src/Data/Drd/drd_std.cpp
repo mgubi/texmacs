@@ -378,7 +378,7 @@ init_std_drd () {
   init (MOD, "mod",
         fixed (2) -> returns_numeric () -> numeric (0) -> name ("modulo"));
   init (MINIMUM, "minimum",
-        repeat (2, 1) -> returns_numeric () -> numeric (0));
+        repeat (1, 1) -> returns_numeric () -> numeric (0));
   init (MAXIMUM, "maximum",
         repeat (1, 1) -> returns_numeric () -> numeric (0));
   init (MATH_SQRT, "math-sqrt",
@@ -536,7 +536,7 @@ init_std_drd () {
   init (SCRIPT, "script",
         repeat (1, 1, BIFORM) -> returns_adhoc () ->
         accessible (0) -> code (0) -> name (0, "function") ->
-        accessible (1) -> regular (1) -> name (0, "arguments"));
+        accessible (1) -> regular (1) -> name (1, "arguments"));
   init (OBSERVER, "observer",
         fixed (1, 1, BIFORM) -> returns_adhoc () ->
         accessible (0) -> identifier (0) -> name (0, "identifier") ->
@@ -969,7 +969,7 @@ init_std_drd () {
   init (OLD_MOSAIC_ITEM, "old-mosaic-item",
         repeat (1, 1) -> accessible (0));
   init (SET, "set",
-        fixed (1, 1, BIFORM) -> variable (0) -> regular (0));
+        fixed (1, 1, BIFORM) -> variable (0) -> regular (1));
   init (RESET, "reset",
         fixed (1) -> variable (0));
   init (EXPAND, "expand",
@@ -1044,7 +1044,7 @@ init_std_drd () {
   init_var (BG_COLOR, TYPE_COLOR);
   init_var (LOCUS_COLOR, TYPE_COLOR);
   init_var (VISITED_COLOR, TYPE_COLOR);
-  init_var (NO_PATTERNS, TYPE_COLOR);
+  init_var (NO_PATTERNS, TYPE_BOOLEAN);
   init_var (LANGUAGE, TYPE_STRING);
   init_var (SPACING_POLICY, TYPE_ADHOC);
   init_var (ATOM_DECORATIONS, TYPE_ADHOC);

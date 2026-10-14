@@ -100,7 +100,7 @@
   (-> "Plug-ins"
       (link help-plugins-menu))
   (when (url-exists-in-help? "about/about.en.tm")
-	(-> "Apropos"
+	(-> "About"
 	    ("Browse" (load-help-buffer "about/about"))
 	    ---
 	    ("Summary"

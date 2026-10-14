@@ -105,8 +105,12 @@ QTMPipeLink::launchCmd () {
 
   bool ok = waitForStarted();
   if (ok) {
-    connect(this, SIGNAL(readyReadStandardOutput()), SLOT(readErrOut()));
-    connect(this, SIGNAL(readyReadStandardError()), SLOT(readErrOut()));
+    // NOTE: unique, since a process which exited by itself is started
+    // again without disconnecting (see killProcess)
+    connect(this, SIGNAL(readyReadStandardOutput()), SLOT(readErrOut()),
+            Qt::UniqueConnection);
+    connect(this, SIGNAL(readyReadStandardError()), SLOT(readErrOut()),
+            Qt::UniqueConnection);
   }
   return ok;
 }
@@ -123,10 +127,11 @@ void
 QTMPipeLink::feedBuf (ProcessChannel channel) {
   setReadChannel (channel);
   QByteArray tempout = QIODevice::readAll ();
-  if (channel == QProcess::StandardOutput) outbuf << tempout.constData ();
-  else errbuf << tempout.constData ();
+  string s (tempout.constData (), tempout.size ());
+  if (channel == QProcess::StandardOutput) outbuf << s;
+  else errbuf << s;
   if (DEBUG_IO)
-    debug_io << "[OUTPUT " << channel << "]" << debug_io_string (tempout.constData ()) << "\n";
+    debug_io << "[OUTPUT " << channel << "]" << debug_io_string (tempout) << "\n";
 }
 
 bool

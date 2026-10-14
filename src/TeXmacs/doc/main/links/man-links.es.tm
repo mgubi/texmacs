@@ -3,37 +3,24 @@
 <style|tmdoc>
 
 <\body>
-  <expand|tmdoc-title|El manual de GNU <TeXmacs>>
+  <expand|tmdoc-title|Enlaces y contenido generado automáticamente>
 
   <\traverse>
-    <apply|branch|Iniciando|start/man-getting-started.es.tm>
+    <apply|branch|Creación de rótulos, enlaces y referencias|man-create-links.es.tm>
 
-    <apply|branch|Escribir documentos sencillos|text/man-text.es.tm>
+    <apply|branch|Insertar imágenes|man-images.es.tm>
 
-    <apply|branch|Fórmulas matemáticas|math/man-math.es.tm>
+    <apply|branch|Generar una tabla de contenidos|man-toc.es.tm>
 
-    <apply|branch|Material tabular|table/man-table.es.tm>
+    <apply|branch|Compilar una bibliografía|man-bibliography.es.tm>
 
-    <apply|branch|Enlaces y contenido generado
-    automáticamente|links/man-links.es.tm>
+    <apply|branch|Generar un índice|man-index.es.tm>
 
-    <apply|branch|Herramientas de edición|editing/man-editing-tools.en.tm>
+    <apply|branch|Compilar un glosario|man-glossary.es.tm>
 
-    <apply|branch|Características de esquema
-    avanzadas|layout/man-layout.en.tm>
+    <apply|branch|Multiple extractions|man-multiple-extractions.en.tm>
 
-    <apply|branch|Usando <TeXmacs> como una
-    interface|interface/man-itf.en.tm>
-
-    <apply|branch|Archivos de estilo <TeXmacs>|../devel/style/style.es.tm>
-
-    <apply|branch|Sumario de las principales etiquetas
-    <TeXmacs>|styles/std-dtds/dtds.en.tm>
-
-    <apply|branch|Personalizando <TeXmacs>|scheme/man-scheme.en.tm>
-
-    <apply|branch|Compatibilidad con otros
-    formatos|convert/man-convert.en.tm>
+    <apply|branch|Libros y documentos de múltiples archivos|man-multifile.es.tm>
   </traverse>
 
   <apply|tmdoc-copyright|1998--2002|Joris van der Hoeven|Offray Vladimir Luna

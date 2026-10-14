@@ -15,7 +15,7 @@
   para otros formatos pueden ser más complicados de escribir, y podrían
   algunas veces requerir una colaboración más cercana con los autores
   principales de <TeXmacs>. En <apply|hyper-link|<apply|menu|Ayuda|Formato
-  del documento|Examinar>|../../../devel/format/format.en.tm> encontratá
+  del documento|Examinar>|../../../devel/format/basics/basics.en.tm> encontratá
   detalles acerca del formato de datos <apply|TeXmacs> y en
   <apply|hyper-link|<apply|menu|Ayuda|Código fuente|Convertidores a otros
   formatos de datos>|../../../devel/source/conversions.en.tm> damos algunas

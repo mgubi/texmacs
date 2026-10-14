@@ -14,6 +14,7 @@
 
 #include "parser.hpp"
 #include "hashmap.hpp"
+#include "array.hpp"
 
 class keyword_parser_rep : public parser_rep {
 public:
@@ -32,13 +33,17 @@ public:
     if (is_empty (keyword)) return;
 
     keyword_group(keyword)= group;
+    for (int i=0; i<N(keyword); i++)
+      if (keyword[i] == ' ') { phrases << keyword; break; }
   }
 
   void use_keywords_of_lang (string lang_code);
 
 private:
   void do_parse (string s, int& pos);
+  bool can_parse_phrase (string s, int pos);
   hashmap<string, string> keyword_group;
+  array<string> phrases; // the keywords of several words
   string current_keyword;
 };
 

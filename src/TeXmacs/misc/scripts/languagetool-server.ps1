@@ -1,5 +1,5 @@
 param(
-    [int]$Port = 8085
+    [int]$Port = 8081
 )
 
 Write-Output 'LanguageTool server startup'

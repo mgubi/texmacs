@@ -14,9 +14,9 @@
     <expand|item*|<shortcut|(remove-structure-upwards)>>remove um objeto ou
     ambiente.
 
-    <expand|item*|<shortcut|(make-space "0.2spc")>insere um espaço pequeno.
+    <expand|item*|<shortcut|(make-space "0.2spc")>>insere um espaço pequeno.
 
-    <expand|item*|<shortcut|(make-space -0.2spc)>>insere um espaço pequeno
+    <expand|item*|<shortcut|(make-space "-0.2spc")>>insere um espaço pequeno
     negativo.
 
     <expand|item*|<shortcut|(structured-insert-start)>>posiciona manualmente o início
