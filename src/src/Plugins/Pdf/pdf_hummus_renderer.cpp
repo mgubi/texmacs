@@ -1477,6 +1477,17 @@ tex_math_unicode (string fontname) {
             if (d < tfm->bc || d > tfm->ec) break;
             if (table[d] < 0) table[d]= table[c];
           }
+          // the largest variant may be built from pieces (top, middle,
+          // bottom, repeated): each piece is the delimiter, which is what
+          // a search or a copy of the text expects; Hummus writes no
+          // mapping as the character 0, not as nothing
+          if (d >= tfm->bc && d <= tfm->ec && tfm->tag (d) == 3) {
+            int piece[4]= { tfm->top (d), tfm->mid (d),
+                            tfm->bot (d), tfm->rep (d) };
+            for (int k=0; k<4; k++)
+              if (piece[k] > 0 && piece[k] < 256 && table[piece[k]] < 0)
+                table[piece[k]]= table[c];
+          }
         }
     }
     // see requires_hack_notdef_for_tex_font
