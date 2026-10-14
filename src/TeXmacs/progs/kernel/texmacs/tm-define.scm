@@ -98,7 +98,10 @@
 ;; Overloading
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(define cur-cond-kinds '())
+
 (define (ctx-add-condition! kind opt)
+  (set! cur-cond-kinds (append cur-cond-kinds (list kind)))
   (set! cur-conds (ctx-add-condition cur-conds kind opt)))
 
 (define (define-option-mode opt decl)
@@ -137,16 +140,9 @@
 ;; Properties of overloaded functions
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define (filter-conds l)
-  "Remove conditions which depend on arguments from list"
-  (cond ((null? l) l)
-        ((>= (car l) 2) (filter-conds (cddr l)))
-        (else (cons (car l) (cons (cadr l) (filter-conds (cddr l)))))))
-
-(define-public (property-set! var prop what conds*)
+(define-public (property-set! var prop what conds)
   "Associate a property to a function symbol under conditions"
-  (let* ((key (cons var prop))
-         (conds (filter-conds conds*)))
+  (let* ((key (cons var prop)))
     (ahash-set! cur-props-table key
                 (ctx-insert (ahash-ref cur-props-table key) what conds))))
 
@@ -156,8 +152,16 @@
   (let* ((key (cons var prop)))
     (ctx-resolve (ahash-ref cur-props-table key) #f)))
 
+(define (argument-free-conds)
+  ;; the conditions which do not depend on the arguments of the function
+  ;; (modes, of kind 0), under which its properties are stored
+  (let loop ((l cur-conds) (k cur-cond-kinds))
+    (cond ((or (null? l) (null? k)) '())
+          ((>= (car k) 2) (loop (cdr l) (cdr k)))
+          (else (cons (car l) (loop (cdr l) (cdr k)))))))
+
 (define (property-rewrite l)
-  `(property-set! ,@l (list ,@cur-conds)))
+  `(property-set! ,@l (list ,@(argument-free-conds))))
 
 (define ((define-property . l) opt decl)
   (for (which l)
@@ -288,6 +292,7 @@
 
 (define-public-macro (tm-define head . body)
   (set! cur-conds '())
+  (set! cur-cond-kinds '())
   (set! cur-props '())
   (tm-define-sub head body))
 
@@ -326,6 +331,7 @@
 
 (define-public-macro (tm-property head . body)
   (set! cur-conds '())
+  (set! cur-cond-kinds '())
   (set! cur-props '())
   (tm-property-sub head body))
 
@@ -350,10 +356,13 @@
     `(when (not (defined? ',name))
        (tm-define (,name . args)
          ,@opts
-         (let* ((m (resolve-module ',module))
-                (p (module-ref texmacs-user '%module-public-interface))
+         ;; loading the module redefines the name; if it does not, the name
+         ;; is still bound to this stub, which must not call itself again
+         (let* ((p (module-ref texmacs-user '%module-public-interface))
+                (self (module-ref p ',name #f))
+                (m (resolve-module ',module))
                 (r (module-ref p ',name #f)))
-           (if (not r)
+           (if (or (not r) (eq? r self))
                (texmacs-error "lazy-define"
                               ,(string-append "Could not retrieve "
                                               (symbol->string name))))
@@ -362,7 +371,8 @@
 (define-public-macro (lazy-define module . names)
   (receive (opts real-names) (list-break names not-define-option?)
     `(begin
-       ,@(map (lambda (name) (lazy-define-one module opts name)) names))))
+       ,@(map (lambda (name) (lazy-define-one module opts name))
+              real-names))))
 
 (define-public (lazy-define-force name)
   (if (procedure? name) (set! name (procedure-name name)))

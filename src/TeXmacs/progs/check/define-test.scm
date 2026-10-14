@@ -135,6 +135,16 @@
   (define-test-both% #t define-test-on% define-test-flag%)
   (define-test-own% #f define-test-on%))
 
+;; a condition together with a property: the property is stored under the
+;; conditions which do not depend on the arguments (the modes)
+(tm-define (define-test-req x) x)
+(tm-define (define-test-req x) (:require (number? x)) (:synopsis "req") x)
+(tm-define (define-test-in-mode) 1)
+(tm-property (define-test-in-mode) (:mode define-test-on?) (:synopsis "on"))
+(tm-define (define-test-out-mode) 1)
+(tm-property (define-test-out-mode) (:mode define-test-off?)
+  (:synopsis "off"))
+
 ;; overloading by mode
 (tm-define (define-test-m) 'base)
 (tm-define (define-test-m) (:mode define-test-on?) (list 'on (former)))
@@ -233,12 +243,12 @@
   (check= (define-test-later) 1)
   (check= (property 'define-test-redef :synopsis) '("new"))
   (check= (define-test-redef) 'new)
-  ;; FIXME: a tm-define or tm-property which has both a condition (:mode
-  ;; or :require) and a property fails with wrong-type-arg in >=
-  ;; (filter-conds in tm-define.scm expects the conditions as kind/value
-  ;; pairs, but ctx-add-condition only keeps the values), for instance
-  ;;   (tm-define (f x) (:require (number? x)) (:synopsis "s") x)
-  ;; It also leaves the function defined without its property.
+  ;; a property defined under a condition: an argument condition does not
+  ;; apply to properties, a mode does
+  (check= (property 'define-test-req :synopsis) '("req"))
+  (check= (define-test-req 2) 2)
+  (check= (property 'define-test-in-mode :synopsis) '("on"))
+  (check-false (property 'define-test-out-mode :synopsis))
   ;; unknown options are refused when the definition is expanded
   (check-error (eval '(tm-define (define-test-bad) (:no-such-option 1) 1)
                      (current-module))
@@ -371,19 +381,16 @@
   (check-true (procedure? define-test-lazy))
   (check= (length (procedure-sources define-test-lazy)) 1)
   (check= (cadar (procedure-sources define-test-lazy)) 'args)
-  ;; FIXME: calling a stub whose module does not define the name loops
-  ;; forever instead of raising "Could not retrieve": the stub looks the
-  ;; name up in the public interface of texmacs-user, where it finds
-  ;; itself (lazy-define-one in tm-define.scm never uses the module m it
-  ;; resolves), e.g. (lazy-define (check check-lib) foo) (foo) hangs.
-  ;; FIXME: lazy-define with options, such as
-  ;;   (lazy-define (m) (:interactive #t) foo)
-  ;; fails when expanded: it maps lazy-define-one over all the names,
-  ;; options included, instead of over the real names.
-  (check-error (eval '(lazy-define (check define-test-nowhere)
-                        (:interactive #t) define-test-lazy-opt)
-                     (current-module))
-               #t))
+  ;; a stub whose module does not define the name raises an error rather
+  ;; than calling itself again
+  (eval '(lazy-define (check check-lib) define-test-missing) (current-module))
+  (check-error (define-test-missing) 'texmacs-error)
+  ;; options apply to the stubs
+  (eval '(lazy-define (check define-test-nowhere)
+           (:interactive #t) define-test-lazy-opt)
+        (current-module))
+  (check-true (procedure? define-test-lazy-opt))
+  (check= (property 'define-test-lazy-opt :interactive) '(#t)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Modules
