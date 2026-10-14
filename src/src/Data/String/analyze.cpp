@@ -561,7 +561,7 @@ tm_decode (string s) {
       if (j<N(s)) j++;
       if (s(i,j) == "<less>") r << "<";
       else if (s(i,j) == "<gtr>") r << ">";
-      else if (i+7==j && s[i+1]=='#' && s[j-1]=='>')
+      else if (i+3<j && s[i+1]=='#' && s[j-1]=='>')
         r << s(i, j);
       i=j-1;
       if (s[i]!='>') return r;

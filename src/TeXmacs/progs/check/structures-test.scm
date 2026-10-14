@@ -246,6 +246,9 @@
   (check= (string->tmstring "") "")
   (check= (tmstring->string "a<less>b<gtr>c") "a<b>c")
   (check= (tmstring->string (string->tmstring "<x> < y >")) "<x> < y >")
+  ;; the characters written <#...> are kept, whatever their number of digits
+  (check= (tmstring->string "a<#E9>b<#2200>c<#1D54F>d")
+          "a<#E9>b<#2200>c<#1D54F>d")
   ;; object->tmstring writes an object as a string
   (check= (object->tmstring "x") "\"x\"")
   (check= (object->tmstring '(a "b" 1)) "(a \"b\" 1)"))
