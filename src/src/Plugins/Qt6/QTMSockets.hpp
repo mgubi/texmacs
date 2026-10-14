@@ -145,6 +145,8 @@ protected:
 private:
   QPointer<QWebSocket> ws;
   int limit; // at most so many bytes received and not yet read
+  bool logged; // whether the client is logged in
+  int current_limit ();
 };
 
 #endif

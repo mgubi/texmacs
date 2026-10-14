@@ -796,6 +796,11 @@
 (tm-define (client-version>=? uid min-version)
   (>= (or (ahash-ref server-client-version uid) 0) min-version))
 
+(tm-define (server-client-logged? client)
+  ;; for the links of the WebSocket clients, which accept larger messages
+  ;; once their client is logged in (QTMSockets.cpp)
+  (and (ahash-ref server-logged-table client) #t))
+
 (tm-define (server-get-user envelope)
   (with client (car envelope)
     (and client (ahash-ref server-logged-table client))))

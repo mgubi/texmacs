@@ -186,19 +186,23 @@
    notify-tls-server)
   ("tls-server authentication anonymous" "on"
    notify-tls-server-authentication-anonymous)
-  ;; the clients in a browser, whose sockets are WebSockets: "local" serves
-  ;; those of this machine only, "on" any, "off" none. They come to a port
-  ;; of their own, by default the one after the port of the server
-  ;; (QTMSockets.cpp, with the Qt WebSockets module). The origins are those
-  ;; of the pages of a browser which may connect: "local" for the pages of
-  ;; this machine, scheme://host[:port] for others, "*" for any page. The
-  ;; limit, in megabytes, bounds what a client may send that the server
-  ;; has not read yet. These preferences are read when the server starts.
-  ("server websocket" "local"
+  ;; the clients in a browser, whose sockets are WebSockets: "on" serves
+  ;; any machine (in wss when "tls-server" is on and Qt can use the
+  ;; certificate, else only this machine, in ws), "local" those of this
+  ;; machine only, "off" none. They come to a port of their own, by
+  ;; default the one after the port of the server (QTMSockets.cpp, with
+  ;; the Qt WebSockets module). The origins are those of the pages of a
+  ;; browser which may connect: "local" for the pages of this machine,
+  ;; scheme://host[:port] for others, "*" for any page; by default also
+  ;; the version for the browser published on GitHub Pages (every page of
+  ;; mgubi.github.io has this origin). The limit, in megabytes, bounds what
+  ;; a client may send that the server has not read yet (64 KB before it
+  ;; is logged in). These preferences are read when the server starts.
+  ("server websocket" "on"
    notify-server-websocket)
   ("server websocket port" "default"
    notify-server-websocket-port)
-  ("server websocket origins" "local"
+  ("server websocket origins" "local https://mgubi.github.io"
    notify-server-websocket-origins)
   ("server websocket limit" "16"
    notify-server-websocket-limit)
