@@ -81,10 +81,27 @@
     <verbatim|date>, <verbatim|abstract>, <verbatim|heading>,
     <verbatim|quote>, <verbatim|code>, <verbatim|caption>,
     <verbatim|figure>, <verbatim|term>, <verbatim|definition>,
-    <verbatim|toc>), <verbatim|level> and <verbatim|align>;
-    <scm|(list (item <scm-arg|block> ...) ...)> with the attribute
-    <verbatim|kind>; <scm|(table (row (cell <scm-arg|block> ...) ...) ...)>;
-    <scm|(pagebreak)>, <scm|(rule)>, <scm|(toc)> and <scm|(meta ...)>.
+    <verbatim|toc>), <verbatim|level>, <verbatim|numbered>
+    (<verbatim|no> for a heading without number) and <verbatim|align>
+    (when it is not the one of the usual paragraphs);
+    <scm|(list (item <scm-arg|block> ...) ...)> with the attributes
+    <verbatim|kind>, <verbatim|format> (<verbatim|1>, <verbatim|a>,
+    <verbatim|A>, <verbatim|i>, <verbatim|I>) and <verbatim|start>;
+    <scm|(table (row (cell <scm-arg|block> ...) ...) ...)>;
+    <scm|(pagebreak)>, <scm|(rule)>, <scm|(toc)>, <scm|(meta ...)> and
+    <scm|(setup)>.
+
+    <item*|The page>The block <scm|(setup)> has the page (its size, its
+    orientation, its margins) and the usual paragraph of the document: the
+    size and the family of its font, its alignment, the indentation of its
+    first line, the spaces around it and between its lines. The readers
+    take the usual paragraph from the style of most plain paragraphs
+    (<scm|docx-setup>, <scm|odt-setup>), with the defaults of the document
+    and the fonts of the theme; <scm|office-\<gtr\>texmacs> makes it the
+    initial environment of the document (<scm|oftm-setup>), and
+    <scm|texmacs-\<gtr\>office> takes it from there (<scm|tmof-setup>), for
+    the section properties of <name|Word> and the first master page of
+    <name|OpenDocument>.
 
     <item*|Tables>A table has the attributes <verbatim|align>,
     <verbatim|width> (a part of the paragraph, <verbatim|0.5par>) and

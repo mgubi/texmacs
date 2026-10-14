@@ -248,6 +248,14 @@
 
     <item>A small forged Word or <name|OpenDocument> file can no longer
     keep <TeXmacs> busy for hours.
+
+    <item>Word and <name|OpenDocument> files keep their page (size,
+    orientation, margins) and the look of their usual paragraphs (size of
+    the font, a font without serifs, alignment, indentation, spacing) in
+    both directions, the ways of numbering of their lists, and their
+    headings without numbers. The text of boxes and shapes is imported,
+    hidden text is left out, and the chapters of a book are exported with
+    their numbers.
   </itemize>
 
   <paragraph|13 October 2026>
