@@ -164,7 +164,22 @@
   ;; pages which do not start with a digit are kept (#75 item 3)
   (check= (bib-value "@misc{k, pages = {e1002--e1010}}" "pages")
           '(bib-pages "e1002" "e1010"))
-  (check= (bib-value "@misc{k, pages = {xii}}" "pages") '(bib-pages "xii")))
+  (check= (bib-value "@misc{k, pages = {xii}}" "pages") '(bib-pages "xii"))
+  ;; a range is split at "--", and at a single "-" only between two sides
+  ;; of the same kind
+  (check= (bib-value "@misc{k, pages = {A-1--A-10}}" "pages")
+          '(bib-pages "A-1" "A-10"))
+  (check= (bib-value "@misc{k, pages = {S-12}}" "pages") '(bib-pages "S-12"))
+  (check= (bib-value "@misc{k, pages = {e1002-e1010}}" "pages")
+          '(bib-pages "e1002" "e1010"))
+  (check= (bib-value "@misc{k, pages = {xii-xv}}" "pages")
+          '(bib-pages "xii" "xv"))
+  ;; the fields which BibTeX reads verbatim are not converted from LaTeX
+  (with s (string-append "@misc{k, doi = {10.1000/a_b%20}, eprint = {a_b}, "
+                         "url = {http://x.org/a_b}, title = {a_b}}")
+    (check= (bib-value s "doi") "10.1000/a_b%20")
+    (check= (bib-value s "eprint") "a_b")
+    (check= (bib-value s "url") '(slink "http://x.org/a_b"))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Parser: @string and #
@@ -204,6 +219,10 @@
                                     "@misc{k, journal = bar}")
                      "journal")
           "FooY")
+  (check= (bib-value (string-append "@string{FOO = \"Foo\"} @string{bar = FOO} "
+                                    "@misc{k, journal = bar}")
+                     "journal")
+          "Foo")
   ;; an unknown abbreviation inside a # concatenation is kept as its name,
   ;; as when it is alone (#75 item 6)
   (check= (bib-value "@misc{k, journal = unknown # \" X\"}" "journal")
@@ -312,7 +331,11 @@
   ;; file from being converted (#75 item 10)
   (with s "@misc{k, note = {\\begin{x}}, author = {Smith, John}}"
     (check= (bib-value s "author")
-            '(bib-names (bib-name "John" "" "Smith" "")))))
+            '(bib-names (bib-name "John" "" "Smith" "")))
+    ;; and the field itself keeps its LaTeX, instead of becoming empty
+    (check= (bib-value s "note") '(verbatim "\\begin{x}"))
+    (check-true (contains? (bib-out (bib-parse s)) "{\\begin{x}}"))
+    (check-true (pair? (fmt "plain" s)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Built-ins of the engine
@@ -610,7 +633,22 @@
   ;; plain string values are written escaped (#75 item 8)
   (with out (bib-out (bib-parse "@misc{k, note = {50\\% caf\\'e}}"))
     (check-true (contains? out "{50\\% caf{\\'e}}"))
-    (check= (bib-value out "note") "50% caf\xe9")))
+    (check= (bib-value out "note") "50% caf\xe9"))
+  ;; also the strings next to an abbreviation in a field, while @string
+  ;; values are raw LaTeX
+  (with out (bib-out '(document
+                        (bib-string (document (bib-assign "foo" (concat (bib-var "bar") "\\% x"))))
+                        (bib-entry "misc" "k"
+                          (document
+                            (bib-field "note" (concat (bib-var "foo") "50% off"))))))
+    (check-true (contains? out "foo = bar # {\\% x}"))
+    (check-true (contains? out "foo # {50\\% off}")))
+  ;; the verbatim fields are written as they are
+  (with out (bib-out (bib-parse (string-append
+                                  "@misc{k, doi = {10.1000/a_b%20}, "
+                                  "url = {http://x.org/a_b}}")))
+    (check-true (contains? out "{10.1000/a_b%20}"))
+    (check-true (contains? out "{http://x.org/a_b}"))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The bibliography of a document
@@ -713,6 +751,13 @@
         (check-true (string? r2))
         (check-true (contains? r2 "Error: bibtex failed"))
         (check-true (contains? r2 "no-such-style-75.bst")))
+      ;; bibtex writes an empty thebibliography when the .bib is missing
+      (with r3 (tree->stree (bibtex-run "bib" "plain"
+                                        (tmp-file "no-such-file-75.bib")
+                                        '("knuth")))
+        (check-true (string? r3))
+        (check-true (contains? r3 "Error: bibtex failed"))
+        (check-true (contains? r3 "no-such-file-75.bib")))
       (check= (bib-run-dirs) before))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

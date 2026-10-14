@@ -162,10 +162,10 @@ complete_bib_file (url& bib_file, tree bib_t) {
 }
 
 static string
-bibtex_failure (string log) {
+bibtex_failure (string log, int ret) {
   // the first error of bibtex, the line before its "---line n of file"
   int pos= search_forwards ("\n---", 0, log);
-  if (pos < 0) return "see the log of bibtex";
+  if (pos < 0) return "exit status " * as_string (ret);
   int start= pos;
   while (start > 0 && log[start-1] != '\n') start--;
   return log (start, pos);
@@ -203,6 +203,7 @@ bibtex_run (string bib, string style, url bib_file, tree bib_t) {
   save_string (run_dir * "temp.aux", bib_s);
   bool failed= false;
   string log;
+  int ret= 0;
 
 #ifdef OS_WIN32_LATER
   c_string directory (dir);
@@ -218,7 +219,7 @@ bibtex_run (string bib, string style, url bib_file, tree bib_t) {
       debug_shell << cmdln << "\n";
   }
   string out;
-  int ret= system (cmdln, log);
+  ret= system (cmdln, log);
   // the messages of bibtex go to temp.log
   if (!load_string (run_dir * "temp.log", out, false)) log= out * log;
   // some bibtex versions exit with status 1 when there were only warnings
@@ -241,11 +242,15 @@ bibtex_run (string bib, string style, url bib_file, tree bib_t) {
   }
 #endif
 
+  string bbl;
+  bool no_items= load_string (run_dir * "temp.bbl", bbl, false) ||
+                 !occurs ("\\bibitem", bbl);
   tree r= bibtex_load_bbl (bib, run_dir * "temp.bbl");
   rmdir_recursive (run_dir);
-  // a failed run which gave no bibliography is reported with its error
-  if (failed && is_atomic (r) && !starts (r->label, "Error:"))
-    return "Error: bibtex failed (" * bibtex_failure (log) * ")";
+  // a failed run whose .bbl has no item (no .bbl, or an empty
+  // thebibliography) is reported with its error
+  if (failed && no_items)
+    return "Error: bibtex failed (" * bibtex_failure (log, ret) * ")";
   return r;
   /*
   string result;

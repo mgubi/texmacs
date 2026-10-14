@@ -848,15 +848,36 @@ bib_field_pages (string p) {
     res << "0";
     return res;
   }
-  int i= search_forwards ("-", p);
+  // a range is written with "--" (A-1--A-10); a single "-" makes a range
+  // only when both sides are of the same kind (e1002-e1010, xii-xv),
+  // so that S-12 stays one page
+  int i= search_forwards ("--", 0, p), j= i + 2;
+  if (i < 0) {
+    i= search_forwards ("-", 0, p);
+    j= i + 1;
+    if (i > 0 && search_forwards ("-", j, p) < 0) {
+      string a= trim_spaces (p (0, i)), b= trim_spaces (p (j, N(p)));
+      if (N(a) == 0 || N(b) == 0 || is_digit (a[0]) != is_digit (b[0]))
+        i= -1;
+    }
+    else i= -1;
+  }
   if (i <= 0) res << p;
   else {
-    int j= i;
     while (j < N(p) && p[j] == '-') j++;
     res << trim_spaces (p (0, i));
     if (j < N(p)) res << trim_spaces (p (j, N(p)));
   }
   return res;
+}
+
+static bool is_hyper_link (string s);
+
+static bool
+bib_is_verbatim_field (string f) {
+  // the fields which BibTeX and biblatex read verbatim, not as LaTeX
+  return f == "doi" || f == "eprint" || f == "file" || f == "pdf" ||
+         f == "url";
 }
 
 static int
@@ -871,7 +892,8 @@ bib_get_fields (tree t, string& latex) {
               is_atomic (f[1])) {
             latex << bib_names (f[1]->label, nbfields);
           }
-          else if (is_atomic (f[1]) && f[0]->label != "pages") {
+          else if (is_atomic (f[1]) && f[0]->label != "pages" &&
+                   !bib_is_verbatim_field (f[0]->label)) {
             if (!bib_is_blank_string (f[1]->label)) {
               latex << "\\nextbib{}" << bib_to_latex (f[1]->label);
               nbfields++;;
@@ -915,7 +937,10 @@ bib_set_fields (tree& t, array<tree> latex, int& ind) {
           }
           else if (f[0]->label == "pages" && is_atomic (f[1]))
             f[1]= bib_field_pages (f[1]->label);
-          else if (ind < N(latex)) {
+          else if (bib_is_verbatim_field (f[0]->label) && is_atomic (f[1])) {
+            if (is_hyper_link (f[1]->label)) f[1]= compound ("slink", f[1]);
+          }
+          else if (is_atomic (f[1]) && ind < N(latex)) {
             f[1]= latex[ind];
             ind++;
           }
@@ -960,6 +985,23 @@ is_hyper_link (string s) {
 }
 
 static bool
+bib_lost_value (tree old, tree t) {
+  // does a non-blank field of @old become empty in its conversion @t?
+  for (int i= 0; i<N(t); i++) {
+    if (bib_is_entry (t[i]))
+      for (int j= 0; j<N(t[i][2]); j++) {
+        tree f= old[i][2][j];
+        if (bib_is_field (f) && is_atomic (f[1]) &&
+            !bib_is_blank_string (f[1]->label) && t[i][2][j][1] == "")
+          return true;
+      }
+    else if (bib_is_comment (t[i]) && bib_lost_value (old[i], t[i]))
+      return true;
+  }
+  return false;
+}
+
+static bool
 bib_parse_fields_all (tree& t) {
   string fields;
   int nb= bib_get_fields (t, fields);
@@ -979,7 +1021,11 @@ bib_parse_fields_all (tree& t) {
       latex[k]= compound ("slink", latex[k]);
   int i= 0;
   if (nb != N(latex)) return false;
-  bib_set_fields (t, latex, i);
+  // a value which LaTeX cannot parse may also come out empty
+  tree c= copy (t);
+  bib_set_fields (c, latex, i);
+  if (bib_lost_value (t, c)) return false;
+  t= c;
   return true;
 }
 
@@ -989,16 +1035,25 @@ bib_parse_fields_split (tree& t) {
   // so that one problematic value does not prevent the other conversions
   for (int i= 0; i<N(t); i++) {
     tree u (DOCUMENT, t[i]);
-    if (bib_parse_fields_all (u)) continue;
+    if (bib_parse_fields_all (u)) {
+      t[i]= u[0];
+      continue;
+    }
     if (bib_is_entry (t[i]))
       for (int j= 0; j<N(t[i][2]); j++) {
+        if (!bib_is_field (t[i][2][j])) continue;
         tree e= compound ("bib-entry", t[i][0], t[i][1],
                           tree (DOCUMENT, t[i][2][j]));
         tree v (DOCUMENT, e);
-        if (!bib_parse_fields_all (v) && bib_is_field (t[i][2][j]))
+        if (bib_parse_fields_all (v)) t[i][2][j]= v[0][2][0];
+        else {
           bibtex_warning << "Could not convert field '"
                          << t[i][2][j][0]->label << "' of entry '"
                          << t[i][1]->label << "'\n";
+          // keep the LaTeX source, marked so that it is saved back as is
+          tree src= t[i][2][j][1];
+          if (is_atomic (src)) t[i][2][j][1]= compound ("verbatim", src);
+        }
       }
     else if (bib_is_comment (t[i]))
       bib_parse_fields_split (t[i]);
@@ -1105,6 +1160,11 @@ bib_strings_dict (tree t) {
         }
         else if (is_atomic (val))
           dict(key)= val->label;
+        else if (bib_is_var (val)) {
+          string vkey= locase_all (val[0]->label);
+          if (dict->contains (vkey)) dict(key)= dict[vkey];
+          else dict(key)= val[0]->label;
+        }
       }
     }
   }
