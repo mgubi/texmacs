@@ -324,8 +324,8 @@ chunkable (page_item& it) {
 static inline bool
 chunk_boundary (page_item& it) {
   // content defined boundaries (about one every 64 lines), depending on the
-  // geometry of the line only: the same lines give the same chunks, also
-  // after a full retypesetting (which matters for snap_stack_spacing)
+  // geometry of the line only: the same lines give the same chunks,also
+  // after a full retypesetting
   box b= it->b;
   uint64_t h= (uint64_t) (uint32_t) b->w ();
   h= h * 0x9E3779B97F4A7C15ULL + (uint64_t) (uint32_t) b->y1;
@@ -782,16 +782,12 @@ bridge_rep::typeset (int desired_status) {
 
   // ttt->insert_stack (l, sb);
   //if (N(l) == 0); else
-  bool root= (this == ttt->br.operator-> ());
   if (ttt->paper || (N(l) <= 1)) {
     drop_chunks (this);
     ttt->insert_stack (l, sb);
   }
-  else if (stack_cache_ok && strong_equal (ip, stack_cache_ip) &&
-           (!root || stack_cache_snap == ttt->snap_pixel)) {
-    if (root && N(stack_cache) > 0) ttt->last_body= stack_cache[0]->b;
+  else if (stack_cache_ok && strong_equal (ip, stack_cache_ip))
     ttt->insert_stack (stack_cache, sb);
-  }
   else {
     bool flag= false;
     int i, n= N(l);
@@ -800,7 +796,6 @@ bridge_rep::typeset (int desired_status) {
     if (flag) {
       stack_cache= chunk_lines (this, l);
       stack_cache_ip= ip;
-      stack_cache_snap= ttt->snap_pixel;
       stack_cache_ok= true;
       ttt->insert_stack (stack_cache, sb);
     }
@@ -822,18 +817,14 @@ bridge_rep::typeset (int desired_status) {
                   l[i]->t[1] == PAGE_THIS_BOT ||
                   l[i]->t[1] == PAGE_THIS_BG_COLOR))
           special_l << l[i];
-      if (root && ttt->snap_pixel > 0)
-        snap_stack_spacing (bs, spc, ttt->snap_pixel);
       box lb= stack_box (path (ip), bs, spc);
       if (first != -1) lb= move_box (path (ip), lb, 0, bs[first]->y2);
-      if (root) ttt->last_body= lb;
       array<page_item> new_l (1);
       new_l[0]= page_item (lb);
       new_l[0]->spc= l[last]->spc;
       new_l << special_l;
       stack_cache= new_l;
       stack_cache_ip= ip;
-      stack_cache_snap= ttt->snap_pixel;
       stack_cache_ok= true;
       ttt->insert_stack (new_l, sb);
     }

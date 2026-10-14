@@ -237,22 +237,6 @@ shove (page_item& item1, page_item& item2,
 static shove_memo* shove_current= NULL;
 
 void
-snap_stack_spacing (array<box> bs, array<SI>& spc, SI snap) {
-  // Outside paper mode, the distance between the origins of successive
-  // lines of the document is rounded to a multiple of the screen pixel
-  // snap, so that all lines below a change move by a whole number of
-  // pixels and the editor can move their pixels on the screen instead of
-  // redrawing them (see typesetter_rep::find_shift).  Each distance is off
-  // by less than half a pixel; paper mode (and so printing) is unaffected.
-  int i, n= N(bs);
-  for (i=0; i<n-1; i++) {
-    SI d = bs[i]->y1 - spc[i] - bs[i+1]->y2;
-    SI rd= snap * ((SI) tm_round (((double) d) / snap));
-    spc[i] += d - rd;
-  }
-}
-
-void
 shove_cache_new_pass (shove_memo& m) {
   // a pass of the same memo which did not end (an exception during the
   // typesetting): what was current before it is current again

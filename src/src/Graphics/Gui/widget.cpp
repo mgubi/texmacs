@@ -39,7 +39,6 @@ slot_name (const slot s) {
     "SLOT_MOUSE_POINTER",
     "SLOT_INVALIDATE",
     "SLOT_INVALIDATE_ALL",
-    "SLOT_SHIFT_CONTENTS",
     "SLOT_INVALID",
     "SLOT_REPAINT",
     "SLOT_DELAYED_MESSAGE",
