@@ -1239,13 +1239,59 @@ edit_env_rep::exec_use_package (tree t) {
   return "";
 }
 
+// A name in a module or a plugin, as a document gives it: what it says is
+// put into Scheme which is evaluated, so it is checked to be a name and no
+// more (a document could otherwise run any code when it was typeset)
+static bool
+module_name_char (char c) {
+  return is_alpha (c) || is_digit (c) ||
+         c == '-' || c == '_' || c == '+' || c == '*' || c == '!' ||
+         c == '?' || c == '=';
+}
+
+static bool
+is_plugin_name (string s) {
+  if (N(s) == 0) return false;
+  for (int i= 0; i < N(s); i++)
+    if (!module_name_char (s[i])) return false;
+  return true;
+}
+
+// one or more modules, "(utils misc doxygen)" or "(a b) (c d)": lists of
+// names, not nested
+static bool
+is_module_list (string s) {
+  int i= 0, n= N(s), groups= 0;
+  while (true) {
+    while (i < n && s[i] == ' ') i++;
+    if (i == n) return groups > 0;
+    if (s[i] != '(') return false;
+    i++;
+    int names= 0;
+    while (true) {
+      while (i < n && s[i] == ' ') i++;
+      if (i < n && s[i] == ')') { i++; break; }
+      int start= i;
+      while (i < n && module_name_char (s[i])) i++;
+      if (i == start) return false;
+      names++;
+    }
+    if (names == 0) return false;
+    groups++;
+  }
+}
+
 tree
 edit_env_rep::exec_use_module (tree t) {
   int i, n= N(t);
   for (i=0; i<n; i++) {
     string s= exec_string (t[i]);
-    if (starts (s, "(")) eval ("(use-modules " * s * ")");
-    else if (s != "") eval ("(plugin-initialize '" * s * ")");
+    if (starts (s, "(")) {
+      if (is_module_list (s)) eval ("(use-modules " * s * ")");
+      else std_error << "Not a module: " << s << "\n";
+    }
+    else if (is_plugin_name (s)) eval ("(plugin-initialize '" * s * ")");
+    else if (s != "") std_error << "Not a plugin: " << s << "\n";
     assign (THE_MODULES, read (THE_MODULES) * tuple (s));
   }
   return "";
