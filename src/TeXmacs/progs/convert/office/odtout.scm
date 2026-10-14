@@ -305,7 +305,10 @@
                       (with m (ot-plain-mathml (car c))
                         (ox-serialize
                           `(math (@ (xmlns "http://www.w3.org/1998/Math/MathML")
-                                    (display ,(if display? "block" "inline")))
+                                    (display ,(if display? "block" "inline"))
+                                    ;; (lines of equations: see oftm-eqarray)
+                                    ,@(if (== (ox-attr (car c) 'class) "tm-eqarray")
+                                          '((class "tm-eqarray")) '()))
                                  ,@(ox-children m)))))
                      (else (car c))))
          (n (ot-next-id))

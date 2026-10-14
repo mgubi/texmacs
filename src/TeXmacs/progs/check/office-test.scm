@@ -645,6 +645,16 @@
                                                                            (cell "b"))))))))))
          (text (archive-entry (convert doc "texmacs-stree" "docx-document") "word/document.xml")))
     (check-true (export-has? text "<m:eqArr><m:e><m:r><m:t>a</m:t></m:r><m:r><m:t>&amp;</m:t>")))
+  ;; an array of equations as Word saves it (one run, its marks inside) is
+  ;; lines of equations again
+  (check= (cadr (office->texmacs
+                  (parse-docx-document
+                    (docx-archive
+                      (wp "<m:oMathPara><m:oMath><m:eqArr><m:e><m:r><m:t>a&amp;=b</m:t></m:r>"
+                          "</m:e><m:e><m:r><m:t>&amp;=c</m:t></m:r></m:e></m:eqArr>"
+                          "</m:oMath></m:oMathPara>")))))
+          '(body (document (eqnarray* (document (tformat (table (row (cell "a") (cell "=b"))
+                                                                (row (cell "") (cell "=c")))))))))
   (check= (of '(screens (shown "one") (hidden "two")))
           '((p "one") (pagebreak) (p "two"))))
 

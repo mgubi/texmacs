@@ -202,7 +202,57 @@
           (loop (cadr r))
           (oftm-clean-math r)))))
 
+(define (oftm-local x)
+  ;; the name of the element x without its prefix
+  (let* ((s (if (and (pair? x) (symbol? (car x))) (symbol->string (car x)) ""))
+         (i (string-search-forwards ":" 0 s)))
+    (if (>= i 0) (substring s (+ i 1) (string-length s)) s)))
+
+(define (oftm-eqarray-table x)
+  ;; the table of MathML of a formula which is lines of equations (the
+  ;; class tm-eqarray, on the formula or on its table), or #f
+  (let* ((c (ox-children x))
+         (root (cond ((null? c) #f)
+                     ((== (ox-attr x 'form) "sxml") (car c))
+                     ((and (not (ox-attr x 'form)) (string? (car c))
+                           (>= (string-search-forwards "tm-eqarray" 0 (car c)) 0))
+                      (catch #t (lambda () (ox-root (parse-xml (car c))))
+                             (lambda args #f)))
+                     (else #f)))
+         (table? (lambda (y) (and (pair? y) (== (oftm-local y) "mtable"))))
+         (rows (and root (ox-elements root)))
+         (t (and rows (list-1? rows) (table? (car rows)) (car rows))))
+    (and t (or (== (ox-attr root 'class) "tm-eqarray")
+               (== (ox-attr t 'class) "tm-eqarray"))
+         t)))
+
+(define (oftm-mathml-prefix x)
+  ;; the elements of MathML with the prefix m: (OpenDocument has none)
+  (if (and (pair? x) (symbol? (car x)) (not (== (car x) '@))
+           (not (string-starts? (symbol->string (car x)) "m:")))
+      (cons (string->symbol (string-append "m:" (oftm-local x)))
+            (map oftm-mathml-prefix (cdr x)))
+      (if (pair? x) (cons (car x) (map oftm-mathml-prefix (cdr x))) x)))
+
+(define (oftm-eqarray t)
+  ;; lines of equations, each cell a formula
+  (let* ((cell (lambda (d)
+                 (oftm-formula `(math (@ (form "sxml"))
+                                      (m:math ,@(map oftm-mathml-prefix (ox-children d)))))))
+         (rows (map (lambda (r)
+                      (cons 'row (map (lambda (d) (list 'cell (cell d)))
+                                      (list-filter (ox-elements r)
+                                                   (lambda (d) (== (oftm-local d) "mtd"))))))
+                    (list-filter (ox-elements t)
+                                 (lambda (r) (in? (oftm-local r) '("mtr" "mlabeledtr")))))))
+    `(eqnarray* (document (tformat (table ,@rows))))))
+
 (define (oftm-math x)
+  (with t (and (== (ox-attr x 'display) "true") (oftm-eqarray-table x))
+    (if t (list (oftm-eqarray t))
+        (oftm-math* x))))
+
+(define (oftm-math* x)
   (with f (oftm-formula x)
     (cond ((== f "") '())
           ((== (ox-attr x 'display) "true")
@@ -1051,9 +1101,11 @@
                        ;; a formula alone in its paragraph is displayed
                        ((oftm-only-formula x)
                         => (lambda (m)
-                             (with f (oftm-formula m)
-                               (if (== f "") '()
-                                   (list `(equation* (document ,f)))))))
+                             (with t (oftm-eqarray-table m)
+                               (if t (list (oftm-eqarray t))
+                                   (with f (oftm-formula m)
+                                     (if (== f "") '()
+                                         (list `(equation* (document ,f)))))))))
                        (else
                          (with t (oftm-inlines (ox-children x))
                            (if (== t "") '()
