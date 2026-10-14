@@ -1,4 +1,3 @@
-
 /******************************************************************************
 * MODULE     : hyphenate_test.cpp
 * DESCRIPTION: tests of the hyphenation of words by patterns
