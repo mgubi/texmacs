@@ -1029,6 +1029,84 @@
     (check= (string-search-forwards "\\md" 0 s) -1)
     (check-true (>= (string-search-forwards "\\footnote{The note.}" 0 s) 0))))
 
+;; What the second version of the style lost or changed.
+(define (test-style-losses-2)
+  (check-group "style markdown, what is kept (2)")
+  (for-each
+    (lambda (s) (check= (md->md s) s))
+    (list
+      ;; a table which is not changed is written as it was read, with the
+      ;; definitions of its links and of its footnotes
+      "| h |\n| --- |\n| [a] |\n\n[a]: http://x\n"
+      "| h |\n| --- |\n| a[^1] |\n\ntext\n\n[^1]: note\n\nmore\n"
+      "| a | b |\n|---|---|\n| x[^1] | 1 |\n\ntext[^1]\n\n[^1]: note\n"
+      "text[^1]\n\n| a | b |\n|---|---|\n| x[^1] | 1 |\n\n[^1]: note\n"
+      ;; tabs in a header, a link title, the words after a fence
+      (string-append "---\ntitle:" tab-char "x\n---\n\ny\n")
+      (string-append "[a](http://x \"t" tab-char "u\")\n")
+      ;; the definition of a link in an item, before a paragraph
+      "- [x]: http://y\n  b\n"))
+  ;; a link of a table which was changed is written whole
+  (let* ((t (md->tm "| a | b |\n|---|---|\n| [r] | 1 |\n\n[r]: http://x\n"))
+         (walk (lambda (x)
+                 (let loop ((x x))
+                   (cond ((func? x 'md-block-source 3)
+                          `(md-block-source ,(loop (cadr x)) ,@(cddr x)))
+                         ((== x "1") "ONE")
+                         ((pair? x) (cons (car x) (map loop (cdr x))))
+                         (else x))))))
+    (check= (tm->md (walk t))
+            (string-append "| a             | b   |\n| ------------- | --- |\n"
+                           "| [r](http://x) | ONE |\n\n[r]: http://x\n")))
+  ;; a line of code with a tab keeps it when another line is changed
+  (let* ((t (md->tm (string-append "```\nhead\na" tab-char "b\n```\n")))
+         (walk (lambda (x)
+                 (let loop ((x x))
+                   (cond ((func? x 'md-block-source 3)
+                          `(md-block-source ,(loop (cadr x)) ,@(cddr x)))
+                         ((== x "head") "HEAD")
+                         ((pair? x) (cons (car x) (map loop (cdr x))))
+                         (else x))))))
+    (check= (tm->md (walk t)) (string-append "```\nHEAD\na" tab-char "b\n```\n")))
+  ;; rules around a heading or text are not a header
+  (check= (md->tm "---\n# Title\n---\n\ntext\n")
+          '(document (body (document (hrule) (section "Title") (hrule) "text"))
+                     (style "markdown")))
+  (check= (convert "---\n# Title\n---\n\ntext\n" "markdown-snippet" "texmacs-stree")
+          '(document (hrule) (section "Title") (hrule) "text"))
+  ;; a snippet has no header: what it holds is text
+  (check= (convert "---\ntitle: x\n---\n\ntext\n" "markdown-snippet" "texmacs-stree")
+          '(document (hrule) (subsection "title: x") "text"))
+  ;; a header which was edited is read back as a header
+  (for-each
+    (lambda (h)
+      (let* ((md (tm->md (in-style h "x")))
+             (back (md->tm md)))
+        (check= (tm->md back) md)
+        (check-true (func? (cadr (cadr (cadr back))) 'md-metadata))))
+    '((md-metadata (document "hello" (md-meta "title" "T")))
+      (md-metadata (document "" (md-meta "title" "T")))
+      (md-metadata (document "- a" (md-meta "title" "T")))
+      (md-metadata (document "---" (md-meta "title" "T")))))
+  ;; with no key, its lines are paragraphs, and an empty one is not written
+  (check= (tm->md (in-style '(md-metadata (document "hello" "# world")) "x"))
+          "hello\n\n\\# world\n\nx\n")
+  (check= (tm->md (in-style '(md-metadata (document "")) "x")) "x\n")
+  ;; many notes with labels: the same note is found at once
+  (let* ((n 3000)
+         (notes (map (lambda (i)
+                       `(md-footnote ,(string-append "n" (number->string i))
+                                     ,(number->string i)))
+                     (iota n)))
+         (s (tm->md (in-style `(concat "a" ,@notes)))))
+    (check-true (>= (string-search-forwards "[^n2999]: 2999" 0 s) 0)))
+  ;; a key in LaTeX
+  (check-true
+    (>= (string-search-forwards "title:}"  0
+                                (convert (in-style '(md-metadata (document (md-meta "title" "T"))))
+                                         "texmacs-stree" "latex-document"))
+        0)))
+
 ;; The same through a buffer, whose macros are expanded when it is saved.
 (define (test-style-buffer)
   (check-group "style markdown, buffer")
@@ -1131,6 +1209,7 @@
   (test-style-import)
   (test-style-round-trip)
   (test-style-losses)
+  (test-style-losses-2)
   (test-style-buffer)
   (test-format)
   (check-end))

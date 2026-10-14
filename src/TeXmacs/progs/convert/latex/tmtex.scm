@@ -2191,7 +2191,9 @@
 (define (tmtex-md-meta s l)
   (cond ((< (length l) 2) "")
         ((== (car l) "") (tmtex `(verbatim ,(cadr l))))
-        (else (tmtex `(concat (strong (concat ,(car l) ":")) " " ,(cadr l))))))
+        (else (with key (if (string? (car l)) (string-append (car l) ":")
+                            `(concat ,(car l) ":"))
+                (tmtex `(concat (strong ,key) " " ,(cadr l)))))))
 (define (tmtex-md-nothing s l) "")
 
 (define (filter-enunciation-due-to l)

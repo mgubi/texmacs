@@ -65,8 +65,12 @@
     is not written <verbatim|key: value>: an item of a list, a comment, a
     line with other spaces). Keys can be edited, added and removed, and
     are written in their order; a line typed in the header is written as
-    it is. Whatever the header holds between its two lines
-    <verbatim|---> is kept, if its first line is a key or a comment.
+    it is, or as a comment when <name|YAML> has no such line. Whatever the
+    header holds between its two lines <verbatim|---> is kept, if each of
+    its lines is a key, a comment, an item of a list or an indented line,
+    and one of them at least is a key: a heading between two rules stays
+    a heading. A header without key is written as paragraphs, and an empty
+    one is not written.
 
     <item*|Formulas, tables, <name|Html>>They are in <markup|md-source>
     (in a paragraph) or <markup|md-block-source> (on lines of their own),
@@ -75,9 +79,12 @@
     <name|Html> which <TeXmacs> does not understand, a comment for
     instance, is kept and shown as a flag. As soon as the formula, the
     table or the text is edited, it is written by <TeXmacs>. So are the
-    tabs, which are displayed as spaces, the definitions of links to which
+    tabs, which are displayed as spaces (in code, each line with tabs
+    keeps them until it is edited), the definitions of links to which
     nothing refers (the comments <verbatim|[//]: # (text)> among them),
-    and the definitions of footnotes which the text does not use.
+    and the definitions of footnotes which the text does not use. The
+    definitions of the links and footnotes which a table uses are kept
+    too, and a mark of a footnote in a table keeps its label.
 
     <item*|Lists>The lists whose items start with <verbatim|->,
     <verbatim|*> and <verbatim|+> are <markup|itemize-minus>,
@@ -134,7 +141,8 @@
 
     <item*|Header>A <name|YAML> header between two lines <verbatim|---> at
     the start of the file gives the title, the authors
-    (<verbatim|author>, one or a list), the date and the abstract.
+    (<verbatim|author>, one or a list), the date and the abstract. Pasted
+    text has no header: its lines <verbatim|---> are rules.
 
     <item*|Text>Emphasized, strong and struck through text, code, links,
     images, line breaks, the entities of <name|Html>.
