@@ -17,6 +17,25 @@ editable stroke patterns and SVG filters, so it is not pixel-identical to the
 raster. The approved PNG remains the source of the production web and macOS
 exports.
 
+For MuPDF, use one of the simplified variants:
+
+- `tau-mupdf.svg` keeps the blue diagonal gradient, expressed as opaque colored
+  paths rather than an SVG gradient paint server.
+- `tau-mupdf-flat.svg` uses a solid blue tile for the smallest, simplest asset.
+
+Both use only SVG paths, groups, and solid colors. They retain the glyph shapes,
+peach and white fills, grid, and thick slate borders, with no filters, textures,
+patterns, masks, clipping, fonts, embedded images, or external resources. The
+installed MuPDF renderer painted an SVG gradient black, so the gradient variant
+avoids that feature as well. The detailed `tau.svg` remains available for SVG
+editors and renderers that support its effects.
+
+To render either simplified variant with MuPDF:
+
+```sh
+mutool draw -F png -c rgba -w 256 -h 256 -o /tmp/tau-mupdf.png misc/tau/icons/tau-mupdf.svg
+```
+
 To preview the SVG with librsvg (optional):
 
 ```sh
