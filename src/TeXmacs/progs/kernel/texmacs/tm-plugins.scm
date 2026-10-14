@@ -392,6 +392,12 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define-public reconfigure-flag? #t)
+
+;; Other modules should use these accessors: in S7 a public variable which its
+;; module changes with set! keeps its first value in the other modules.
+(define-public (plugin-reconfigure?) reconfigure-flag?)
+(define-public (plugin-reconfigure-set! flag) (set! reconfigure-flag? flag))
+
 (define plugin-loaded-setup? #f)
 (define plugin-cache "$TEXMACS_HOME_PATH/system/cache/plugin_cache.scm")
 
