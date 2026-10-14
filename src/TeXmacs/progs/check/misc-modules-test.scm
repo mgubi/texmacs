@@ -800,13 +800,13 @@
 (define language-locales
   '(("british" "en_GB") ("bulgarian" "bg_BG") ("chinese" "zh_CN")
     ("croatian" "hr_HR") ("czech" "cs_CZ") ("danish" "da_DK")
-    ("dutch" "nl_NL") ("english" "en_US") ("esperanto" "eo_EO")
+    ("dutch" "nl_NL") ("english" "en_US") ("esperanto" "eo")
     ("finnish" "fi_FI") ("french" "fr_FR") ("german" "de_DE")
-    ("greek" "gr_GR") ("hungarian" "hu_HU") ("italian" "it_IT")
+    ("greek" "el_GR") ("hungarian" "hu_HU") ("italian" "it_IT")
     ("japanese" "ja_JP") ("korean" "ko_KR") ("polish" "pl_PL")
     ("portuguese" "pt_PT") ("romanian" "ro_RO") ("russian" "ru_RU")
     ("slovak" "sk_SK") ("slovene" "sl_SI") ("spanish" "es_ES")
-    ("swedish" "sv_SV") ("taiwanese" "zh_TW") ("ukrainian" "uk_UA")))
+    ("swedish" "sv_SE") ("taiwanese" "zh_TW") ("ukrainian" "uk_UA")))
 
 (define (test-language-names)
   (check-group "language names and locales")
@@ -832,10 +832,13 @@
   (check= (locale-to-language "zh_HK") "chinese")
   (check= (locale-to-language "xx_YY") "english")
   (check= (locale-to-language "") "english")
-  ;; FIXME: Greek has the ISO 639 code el, not gr, and Swedish is spoken in
-  ;; SE (System/Language/locale.cpp:118,150,162): (locale-to-language "el_GR")
-  ;; gives "english", expected "greek"; (language-to-locale "swedish")
-  ;; gives "sv_SV", expected "sv_SE".
+  ;; Greek has the ISO 639 code el (gr is still read), Swedish is spoken in
+  ;; SE, and Esperanto has no country
+  (check= (locale-to-language "el_GR") "greek")
+  (check= (locale-to-language "el_GR.UTF-8") "greek")
+  (check= (locale-to-language "gr_GR") "greek")
+  (check= (language-to-locale "swedish") "sv_SE")
+  (check= (locale-to-language "eo") "esperanto")
   (check-true (string? (get-locale-language)))
   (check-true (in? (get-output-language)
                    (cons "american" supported-languages))))
