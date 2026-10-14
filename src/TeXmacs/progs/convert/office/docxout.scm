@@ -45,6 +45,7 @@
 (define dx-comments '())    ; the comments, reversed
 (define dx-used-styles '()) ; (id family) of the named styles of the text
 (define dx-sections? #f)    ; whether the text has sections in columns
+(define dx-italic? #f)      ; the paragraph is italic by its style (Theorem)
 (define dx-package #f)      ; the entries of the file the text was read from
 (define dx-num-offset 0)    ; the lists of this file come first
 (define dx-abstract-offset 0)
@@ -104,7 +105,8 @@
                     (rstyle (list (dx-val 'w:rStyle (cadr rstyle))))
                     (else '()))
               (if (has? 'strong) '((w:b)) '())
-              (if (has? 'em) '((w:i)) '())
+              ;; (emphasis in an italic paragraph is upright, as in TeXmacs)
+              (if (has? 'em) (if dx-italic? '((w:i (@ (w:val "0")))) '((w:i))) '())
               (if (has? 'smallcaps) '((w:smallCaps)) '())
               (if (has? 'strike) '((w:strike)) '())
               (if color
@@ -521,6 +523,12 @@
      (string->number (dx-twips 'margin-right 1440))))
 
 (define (dx-paragraph* x numbered?)
+  (set! dx-italic? (== (dx-paragraph-style x) "Theorem"))
+  (with r (dx-paragraph** x numbered?)
+    (set! dx-italic? #f)
+    r))
+
+(define (dx-paragraph** x numbered?)
   (let* ((style (dx-paragraph-style x))
          (align (or (ox-attr x 'align) dx-cell-align))
          (item dx-item)

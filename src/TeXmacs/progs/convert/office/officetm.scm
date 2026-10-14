@@ -249,8 +249,15 @@
 
 (define (oftm-math x)
   (with t (and (== (ox-attr x 'display) "true") (oftm-eqarray-table x))
-    (if t (list (oftm-eqarray t))
-        (oftm-math* x))))
+    (cond (t (list (oftm-eqarray t)))
+          ;; (a formula alone in a cell, which Word displays, is in the cell)
+          ((and oftm-in-cell? (== (ox-attr x 'display) "true"))
+           (oftm-math* (apply office-node
+                              (cons* 'math (map (lambda (a) (list (car a) (cadr a)))
+                                                (list-filter (ox-attrs x)
+                                                             (lambda (a) (!= (car a) 'display))))
+                                     (ox-children x)))))
+          (else (oftm-math* x)))))
 
 (define (oftm-math* x)
   (with f (oftm-formula x)
