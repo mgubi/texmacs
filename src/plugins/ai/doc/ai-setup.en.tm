@@ -72,8 +72,10 @@
   </description>
 
   and, for all the chatbots, <with|font-series|bold|Show the answer as it
-  came>, <with|font-series|bold|Show the reasoning> and
-  <with|font-series|bold|Show the tokens and the cost>.
+  came>, <with|font-series|bold|Show the reasoning>,
+  <with|font-series|bold|Show the tokens and the cost> and, on the desktop,
+  <with|font-series|bold|Compile the TikZ pictures> (see <hlink|Chatting
+  with a chatbot|ai-sessions.en.tm>).
 
   <subsection*|Network>
 

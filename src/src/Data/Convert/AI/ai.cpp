@@ -1622,7 +1622,9 @@ ai_cut_picture (string code) {
 // The fold of a TikZ picture: with its picture when it was made (the
 // pictures are made as soon as they are complete, while the answer still
 // comes, and kept by their code: ai-picture in ai-batch.scm), else asked
-// for, and pending (ai-run-pending-folds fills it once it is there)
+// for, and pending (ai-run-pending-folds fills it once it is there), unless
+// it is not to be compiled (the preference "ai tikz compile", ai-tikz-policy:
+// the code comes from the model): then the fold, uncompiled
 static tree
 ai_picture_fold (string code) {
   tree fold= ai_script_fold ("tikz", code);
@@ -1631,7 +1633,8 @@ ai_picture_fold (string code) {
     fold= tree (L(fold), fold[0], fold[1], fold[2], as_tree (made));
     return compound ("script-output", A(fold));
   }
-  (void) call ("ai-picture-request", code);
+  object asked= call ("ai-picture-request", code);
+  if (is_bool (asked) && !as_bool (asked)) return fold;
   tree busy= compound ("script-output", fold[0], fold[1], fold[2],
                        compound ("script-busy"));
   return compound ("with", "ai-tikz", "pending", busy);

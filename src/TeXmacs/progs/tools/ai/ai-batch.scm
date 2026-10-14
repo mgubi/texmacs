@@ -62,6 +62,12 @@
       (delayed
         (:idle 100)
         (ai-run-pending-folds)))
+    (when (and (== (ai-tikz-policy) "ask") (nnull? (ai-pictures-awaiting))
+               (not ai-asking-pictures?))
+      (set! ai-asking-pictures? #t)
+      (delayed
+        (:idle 100)
+        (ai-ask-compile-pictures)))
     t))
 
 ;; The TikZ pictures of an answer are folds of the TikZ plug-in (ai.cpp).
@@ -74,6 +80,61 @@
 
 (define ai-pictures (make-ahash-table))   ; code -> output of the plug-in
 (define ai-pictures-busy (make-ahash-table)) ; code -> folds which wait
+
+;; The code of a picture is written by a remote model, and LaTeX runs it:
+;; TeX can read the files of the user (\input), and show them in the
+;; picture. The preference "ai tikz compile" says whether the pictures of
+;; an answer are compiled: "ask" (the default) asks it once the answer is
+;; there, "always" compiles them at once, "never" leaves their folds
+;; uncompiled. An uncompiled picture is a fold of the TikZ plug-in, which its
+;; usual evaluation compiles later. In a web browser the pictures are made by
+;; TikZJax, in the page, which reads no files: they are always made.
+(tm-define (ai-tikz-policy)
+  (with p (get-preference "ai tikz compile")
+    (cond ((defined? 'web-javascript) "always")
+          ((in? p '("always" "never")) p)
+          (else "ask"))))
+
+(define ai-pictures-waiting (make-ahash-table)) ; code -> #t: to be asked
+(define ai-asking-pictures? #f)
+
+;; the codes of the pictures which are not compiled yet, the user to be asked
+(tm-define (ai-pictures-awaiting)
+  (map car (ahash-table->list ai-pictures-waiting)))
+
+(tm-define (ai-pictures-awaiting-clear)
+  (set! ai-pictures-waiting (make-ahash-table)))
+
+(define (ai-tikz-fold-code t)
+  (and (tree-is? t 'script-input) (== (tree-arity t) 4)
+       (tm-equal? (tree-ref t 0) "tikz")
+       (ai-picture-code (tree->stree (tree-ref t 2)))))
+
+;; the uncompiled folds of the pictures of codes, in the document: compiled
+(define (ai-compile-pictures codes)
+  (with l (select (buffer-tree) '(:* script-input))
+    (for (t l)
+      (with code (ai-tikz-fold-code t)
+        (when (and code (in? code codes))
+          (tree-set! t `(with "ai-tikz" "pending"
+                          (script-output ,(tree->stree (tree-ref t 0))
+                                         ,(tree->stree (tree-ref t 1))
+                                         ,(tree->stree (tree-ref t 2))
+                                         (script-busy)))))))
+    (ai-run-pending-folds)))
+
+(tm-define (ai-ask-compile-pictures)
+  (with codes (ai-pictures-awaiting)
+    (ai-pictures-awaiting-clear)
+    (set! ai-asking-pictures? #f)
+    (when (nnull? codes)
+      (user-confirm
+       (string-append "Compile the TikZ pictures of the answer with LaTeX? "
+                      "Their code comes from the model, and could read "
+                      "your files.")
+       #f
+       (lambda (answ)
+         (when answ (ai-compile-pictures codes)))))))
 
 ;; (cork->sourcecode as the code of a fold is sent: cork->utf8 would make the
 ;; ... of \foreach an ellipsis)
@@ -94,7 +155,7 @@
     (and r (stree->tree r))))
 
 ;; the picture of the code is made, unless it is or is being made
-(tm-define (ai-picture-request code)
+(define (ai-picture-make code)
   (when (and (not (ahash-ref ai-pictures code))
              (not (ahash-ref ai-pictures-busy code)))
     (ahash-set! ai-pictures-busy code (list))
@@ -102,8 +163,19 @@
       (add-style-package "tikz"))
     (silent-feed* "tikz" "default" (ai-picture-input code)
                   (lambda (r) (ai-picture-made code r))
-                  '(:math-input :simplify-output)))
-  "")
+                  '(:math-input :simplify-output))))
+
+;; asked by ai.cpp for a complete picture of an answer: #t if it is made,
+;; or being made (its fold waits for it), #f if it is not compiled (its fold
+;; stays uncompiled; with "ask", the user is asked once the answer is there)
+(tm-define (ai-picture-request code)
+  (with policy (ai-tikz-policy)
+    (cond ((or (ahash-ref ai-pictures code) (ahash-ref ai-pictures-busy code))
+           #t)
+          ((== policy "always") (ai-picture-make code) #t)
+          (else
+            (when (== policy "ask") (ahash-set! ai-pictures-waiting code #t))
+            #f))))
 
 (define (ai-fill-fold p r)
   (with t (tree-pointer->tree p)
@@ -137,7 +209,7 @@
                      (r (ahash-ref ai-pictures code)))
                 (if r (tree-set! t 3 r)
                     (begin
-                      (ai-picture-request code)
+                      (ai-picture-make code)
                       (ahash-set! ai-pictures-busy code
                                   (cons (tree->tree-pointer t)
                                         (or (ahash-ref ai-pictures-busy code)

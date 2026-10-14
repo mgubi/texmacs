@@ -15,13 +15,13 @@
 ;; their APIs, converted without a network: the JSON of OpenAI (also that of
 ;; Mistral, OpenRouter, Ollama), of Claude and of Gemini, a stream of
 ;; server-sent events, an error of a provider, pictures in SVG and PNG, and
-;; the fold of the answer as it came, which names the model. The TikZ
-;; pictures are left out: their fold asks the TikZ plug-in for the picture.
+;; the fold of the answer as it came, which names the model, and the TikZ
+;; pictures left uncompiled (their compilation would ask the TikZ plug-in).
 ;; Also the files attached to the questions: their text, what keeps them
 ;; from being sent, and the requests which carry them (made, not sent).
 
 (texmacs-module (check ai-test)
-  (:use (check check-lib)))
+  (:use (check check-lib) (tools ai ai-batch)))
 
 (define (st x) (if (tree? x) (tree->stree x) x))
 
@@ -215,6 +215,51 @@
                              "The answer of gpt-x as it came")
                            (verbatim-code (document "Hi.")))))))))
 
+;; a TikZ picture, written by the model: it is compiled only as the
+;; preference "ai tikz compile" says (ai-tikz-policy); "always" is not
+;; tested (it would run LaTeX), "ask" asks once the answer is there
+;; (ai-result, not called here: no dialogue is opened)
+(define tikz-answer
+  (string-append "\\documentclass{article}\n\\usepackage{tikz}\n"
+                 "\\begin{document}\n"
+                 "\\begin{tikzpicture}\\draw (0,0) -- (1,1);"
+                 "\\end{tikzpicture}\n\\end{document}"))
+
+(define (tikz-fold-of t)
+  (find-tag t 'script-input))
+
+(define (test-tikz)
+  (check-group "TikZ pictures")
+  (ai-pictures-awaiting-clear)
+  (with-preference "ai tikz compile" "never"
+    (lambda ()
+      (check= (ai-tikz-policy) "never")
+      (with t (answer (openai tikz-answer) "openrouter")
+        ;; the fold of the TikZ plug-in, uncompiled, with the code
+        (with f (tikz-fold-of t)
+          (check-true (pair? f))
+          (check-true (and f (== (cadr f) "tikz")))
+          (check-true (and f (contains-text? f "tikzpicture"))))
+        (check-false (find-tag t 'script-output))
+        (check-false (find-tag t 'script-busy)))
+      ;; and nothing is asked
+      (check= (ai-pictures-awaiting) '())))
+  (with-preference "ai tikz compile" "ask"
+    (lambda ()
+      (check= (ai-tikz-policy) "ask")
+      (with t (answer (openai tikz-answer) "openrouter")
+        (check-true (pair? (tikz-fold-of t)))
+        (check-false (find-tag t 'script-output)))
+      ;; the picture waits for the question to the user
+      (check= (length (ai-pictures-awaiting)) 1)
+      (ai-pictures-awaiting-clear)))
+  ;; the default is to ask
+  (with-preference "ai tikz compile" "default"
+    (lambda () (check= (ai-tikz-policy) "ask"))))
+
+(define (contains-text? t what)
+  (string-contains? (object->string t) what))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The files attached to the questions (tools/ai/ai-attachments.scm)
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -326,7 +371,8 @@
       (test-stream)
       (test-errors)
       (test-pictures)
-      (test-reasoning)))
+      (test-reasoning)
+      (test-tikz)))
   (test-raw-fold)
   (test-attachments)
   ;; the prices are read again from the home when they are needed
