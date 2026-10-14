@@ -86,7 +86,23 @@
         (set-message m "Evaluate")))
     (when ok?
       (tree-set! out '(script-busy))
-      (with ptr (tree->tree-pointer out)
+      (let* ((ptr (tree->tree-pointer out))
+             ;; the output so far, above the busy sign, while it comes
+             ;; (see silent-progress); out is then the new tree there
+             (progress
+              (lambda (o e)
+                (with check (tree-pointer->tree ptr)
+                  (when (== check out)
+                    (let* ((l (lambda (x) (if (tm-func? x 'document)
+                                              (filter (lambda (y) (!= y ""))
+                                                      (cdr x))
+                                              (list x))))
+                           (os (l o))
+                           (es (map (lambda (x) `(with "color" "red" ,x))
+                                    (l e))))
+                      (when (nnull? (append os es))
+                        (tree-set! out `(document ,@os ,@es (script-busy)))
+                        (set! out (tree-pointer->tree ptr)))))))))
         (with ret (lambda (r)
                     (with check (tree-pointer->tree ptr)
                       (tree-pointer-detach ptr)
@@ -100,7 +116,7 @@
                               (if (in? :declaration opts)
                                   (set! r in))
                               (insert r))))))
-          (silent-feed* lan ses in ret opts))))))
+          (silent-feed* lan ses in ret (cons progress opts)))))))
 
 (tm-define (script-eval-at where lan session in . opts)
   (script-feed lan session in where opts))

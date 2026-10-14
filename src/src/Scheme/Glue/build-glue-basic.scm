@@ -67,6 +67,7 @@
   (evaluate-system evaluate_system
     (array_string array_string array_int array_string array_int))
   (async-eval-system async_eval_system (bool string object))
+  (http-get http_get (string string array_string))
   (http-post http_post (string string array_string string))
   (http-post-query http_post_query (string string array_string array_string))
   (async-http-post async_http_post (bool string array_string string object))
@@ -582,6 +583,7 @@
   (cpp-ai-latex-command ai_latex_command (string string string string))
   (cpp-ai-latex-request ai_latex_request (string string string string))
   (cpp-ai-latex-output ai_latex_output (tree string string string))
+  (cpp-ai-set-prices ai_set_prices (void string))
   (cpp-ai-chat ai_chat (string string string string))
   (cpp-ai-correct ai_correct (tree content string string))
   (cpp-ai-translate ai_translate (tree content string string string))

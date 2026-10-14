@@ -35,6 +35,7 @@ bool qt_async_http_post (string url, array<string> headers_attr,
 bool qt_async_http_post (string url, array<string> headers_attr,
 			 tree t, int& status, string& outbuf,
 			 string& errbuf, bool& kill);
+void qt_http_async_cancel (string* outbuf);
 
 // post query
 int qt_http_post (string& ret, string url, array<string> headers_attr,
@@ -58,7 +59,10 @@ public:
   ~QTMHTTPHandler () {
     reply->deleteLater ();
     reply= NULL; }
+  bool writes_into (string* o) { return outbuf != NULL && outbuf == o; }
+  void cancel ();
 public slots:
+  void onReadyRead ();
   void onFinished ();
 };
 

@@ -11,7 +11,15 @@
   <name|Unix> systems, it is usually also possible to start <name|Bash> shell
   sessions using <menu|Insert|Session|Shell>. The remainder of the items in
   the <menu|Insert|Session> menu depend on the plug-ins which are installed
-  on your system.
+  on your system. <menu|Insert|Session|AI> starts conversations with
+  chatbots (<name|ChatGPT>, <name|Claude>, <name|Gemini>...), which are
+  described in <hlink|Artificial intelligence tools inside
+  <TeXmacs>|../../../plugins/ai/doc/ai.en.tm>.
+
+  <menu|Insert|Session|Preferences> sets the options of the plug-ins (such
+  as the keys and the models of the chatbots), and
+  <menu|Insert|Session|Redetect> looks again for the plug-ins which are
+  installed, for instance after installing a program.
 
   A session consists of a sequence of input and output fields and possible
   text between them. When pressing <shortcut|(kbd-return)> inside an input

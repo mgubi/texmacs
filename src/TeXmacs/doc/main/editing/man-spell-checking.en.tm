@@ -12,6 +12,11 @@
   which your texts have been written have been installed on your system; this
   is usually the case for English.
 
+  A chatbot can also correct the spelling, the grammar and the style of a
+  selected text (<menu|Tools|Correct>), or translate it
+  (<menu|Tools|Translate>): see <hlink|Correcting, translating and asking
+  about a document|../../../plugins/ai/doc/ai-tools.en.tm>.
+
   When you launch the spell checker (either on the whole text or on a
   selected region), you will be prompted at each misspelled word and the
   footer displays the available options:

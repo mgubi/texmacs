@@ -18,6 +18,8 @@ array<string> http_mask_headers (array<string> headers_attr);
 #if QT_VERSION >= 0x060000
 
 #include <QNetworkAccessManager>
+#include <QNetworkProxy>
+#include <QNetworkProxyFactory>
 #include <QNetworkRequest>
 #include <QNetworkReply>
 #include <QEventLoop>
@@ -27,11 +29,39 @@ array<string> http_mask_headers (array<string> headers_attr);
 #include <QJsonObject>
 #include <QJsonArray>
 #include <QJsonDocument>
+#include <QPointer>
+#include <QList>
 
 // Use a single manager in order to share connections several times
+// the proxy: the preference "http proxy" ("host:port", "socks5://host:port",
+// "direct" for none), else the one of the system (its settings on macOS and
+// Windows, the variables of the environment elsewhere)
+static void
+set_proxy (QNetworkAccessManager* manager) {
+  static string last= "?";
+  string p= get_preference ("http proxy", "");
+  if (p == "default") p= "";
+  if (p == last) return;
+  last= p;
+  if (p == "") {
+    QNetworkProxyFactory::setUseSystemConfiguration (true);
+    manager->setProxy (QNetworkProxy (QNetworkProxy::DefaultProxy));
+  }
+  else if (p == "direct")
+    manager->setProxy (QNetworkProxy (QNetworkProxy::NoProxy));
+  else {
+    if (!occurs ("://", p)) p= "http://" * p;
+    QUrl u (to_qstring (p));
+    QNetworkProxy::ProxyType type= u.scheme ().startsWith ("socks")?
+      QNetworkProxy::Socks5Proxy: QNetworkProxy::HttpProxy;
+    manager->setProxy (QNetworkProxy (type, u.host (), u.port (8080)));
+  }
+}
+
 static QNetworkAccessManager*
 get_manager () {
   static QNetworkAccessManager* manager= new QNetworkAccessManager ();
+  set_proxy (manager);
   string s= get_preference ("http request timeout");
   long t= 10000; // default value is 10s
   if (is_int (s) && as_int (s) >= 0) t= 1000 * as_int (s);
@@ -89,6 +119,38 @@ qt_http_post (string& ret, string url, array<string> headers_attr,
   return qt_http_post (ret, url, headers_attr, &data[0], N(data));
 }
 
+// a GET request (the models of an AI engine)
+int
+qt_http_get (string& ret, string url, array<string> headers_attr) {
+  ret= "";
+  QUrl qurl (utf8_to_qstring (url));
+  if (!qurl.isValid ()) {
+    io_error << "qt_http_get, invalid URL: " << url << LF;
+    return -1;
+  }
+  QNetworkRequest request (qurl);
+  for (int i= 0; i+1 < N(headers_attr); i += 2) {
+    string name= headers_attr[i];
+    string value= headers_attr[i+1];
+    request.setRawHeader (QByteArray (&name[0], N(name)),
+			  QByteArray (&value[0], N(value)));
+  }
+  QNetworkReply* reply= get_manager ()->get (request);
+  if (reply == NULL) {
+    io_error << "qt_http_get, cannot connect to " << url << LF;
+    return -2;
+  }
+  QEventLoop loop;
+  QObject::connect (reply, &QNetworkReply::finished,
+		    &loop, &QEventLoop::quit);
+  loop.exec();
+  // (an answer with an error status, such as a refused key, is read too)
+  QByteArray b= reply->readAll ();
+  ret= string (b.constData (), b.size ());
+  delete reply;
+  return 0;
+}
+
 // conversion from TeXmacs Json
 static QJsonValue
 tree_to_qjson (tree t) {
@@ -113,12 +175,10 @@ tree_to_qjson (tree t) {
     return as_bool (t[0]); }
   else if (is_compound (t, "json-number", 1) && is_atomic (t[0])) {
     return is_int (t[0]) ? as_int (t[0]) : as_double (t[0]); } 
-  if (is_atomic (t)) {
-    if (is_bool (t)) return as_bool (t);
-    if (is_int (t)) return as_int (t);
-    if (is_double (t)) return as_double (t);
-    if (is_string (t)) return utf8_to_qstring (as_string (t));
-  }
+  // a plain atom is a string, as in json.cpp (json_print): the numbers,
+  // the booleans and null of a request are marked (json-number...), and
+  // a question "42" or "true" stays a string
+  if (is_atomic (t)) return utf8_to_qstring (as_string (t));
   io_error << "tree_to_qjson, invalid json tree: " << t << LF;
   return QJsonValue ();
 }
@@ -214,17 +274,58 @@ qt_http_from_json (string s) {
 
 // Asynchroneous variant
 
+// The answer is read as it comes (a stream of server-sent events of an AI
+// engine, which the request link shows as it grows, request_link_rep::
+// partial), as bytes: a piece may end in the middle of a character. A
+// request which is no longer wanted (kill: its session was interrupted) is
+// aborted, and its server stops sending.
+// the requests of the request links which are not over
+static QList<QPointer<QTMHTTPHandler> > qt_http_busy;
+
+// A request which is no longer wanted (an interrupted answer, a link which
+// asks again or is destroyed) is aborted at once, and writes nothing more
+// into its link: nothing of an interrupted answer reaches the next one,
+// which the link may already be waiting for in the same buffers.
+void
+QTMHTTPHandler::cancel () {
+  status= NULL; outbuf= NULL; errbuf= NULL; kill= NULL;
+  if (reply != NULL) reply->abort (); // (onFinished, which forgets it)
+}
+
+void
+qt_http_async_cancel (string* outbuf) {
+  QList<QPointer<QTMHTTPHandler> > l= qt_http_busy;
+  for (int i= 0; i < l.size (); i++)
+    if (!l[i].isNull () && l[i]->writes_into (outbuf)) l[i]->cancel ();
+  qt_http_busy.removeAll (QPointer<QTMHTTPHandler> ());
+}
+
+void
+QTMHTTPHandler::onReadyRead () {
+  if (reply == NULL || outbuf == NULL) return;
+  if (*kill) { reply->abort (); return; }
+  QByteArray b= reply->readAll ();
+  if (b.size () > 0) *outbuf << string (b.constData (), b.size ());
+}
+
 void
 QTMHTTPHandler::onFinished () {
-  if (reply == NULL)
+  qt_http_busy.removeAll (QPointer<QTMHTTPHandler> (this));
+  if (outbuf == NULL) { // (cancelled)
+    if (reply != NULL) reply->close ();
+  }
+  else if (reply == NULL)
     *status= 0;
   else {
-    if (reply->error() != QNetworkReply::NoError) {
+    if (reply->error() == QNetworkReply::OperationCanceledError && *kill)
+      *status= 0;
+    else if (reply->error() != QNetworkReply::NoError) {
       *errbuf << from_qstring_utf8 (reply->errorString ());
       *status= -1;
     }
     else {
-      *outbuf << from_qstring_utf8 (QString (reply->readAll ()));
+      QByteArray b= reply->readAll ();
+      if (b.size () > 0) *outbuf << string (b.constData (), b.size ());
       *status= 0;
     }
     reply->close ();
@@ -279,6 +380,9 @@ qt_async_http_post (string url, array<string> headers_attr,
   }
   QTMHTTPHandler* h=
     new QTMHTTPHandler (reply, &status, &outbuf, &errbuf, &kill);
+  qt_http_busy.append (QPointer<QTMHTTPHandler> (h));
+  QObject::connect (reply, &QNetworkReply::readyRead,
+		    h, &QTMHTTPHandler::onReadyRead);
   QObject::connect (reply, &QNetworkReply::finished,
 		    h, &QTMHTTPHandler::onFinished);
   return h == NULL;
