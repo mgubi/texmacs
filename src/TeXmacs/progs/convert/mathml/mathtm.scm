@@ -151,7 +151,7 @@
   `((with "color" "red" ,message)))
 
 (define (mathtm-merror env a c)
-  (matthtm-error (mathtm-mrow env a c)))
+  (mathtm-error (mathtm-args-serial env c)))
 
 ;(define (mathtm-mstyle env a c)
 ;  (let* ((attrs (mathtm-style a))
@@ -457,7 +457,7 @@
       
 (define (mathtm-annotation env a l) ;
 ;there may be more than one annotation, scan them all
-  (with  r (and (list>1? l) (mathtm-annotation env a cdr (l)))
+  (with  r (and (list>1? l) (mathtm-annotation env a (cdr l)))
     (or  r
       (let* ((an (car l))
         (enc (and (func? an 'm:annotation 2)
@@ -471,7 +471,10 @@
           ((and enc (string-starts? enc "StarMath")) ;ignore
             #f)
           (else
-            (debug-message "debug-convert" (string-append "Mathml contains an unknown annotation type \"" enc "\"\n with value: \n" (third an) "\nTeXmacs is not using it\n"))
+            (let ((val (if (and (list>1? an) (pair? (cddr an))
+                                (string? (third an)))
+                           (third an) "?")))
+              (debug-message "debug-convert" (string-append "Mathml contains an unknown annotation type \"" (or enc "?") "\"\n with value: \n" val "\nTeXmacs is not using it\n")))
             #f)          
            )))))
 

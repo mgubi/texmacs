@@ -365,7 +365,7 @@
 
 (tm-define (structured-insert-vertical t downwards?)
   (:require (mc-context? t))
-  (insert-mc-field t forwards?))
+  (insert-mc-field t downwards?))
 
 (define (remove-mc-field t forwards? structured?)
   (let* ((i (tree-down-index t))
@@ -376,7 +376,7 @@
 		 ((and forwards? (< i (- n 1)))
 		  (tree-go-to t (+ i 1) :start))
 		 ((and forwards? (== i (- n 1)))
-		  (tree-go-to t (+ i -) :end))
+		  (tree-go-to t (- i 1) :end))
 		 ((and (not forwards?) (> i 0))
 		  (tree-go-to t (- i 1) :end))
 		 ((and (not forwards?) (== i 0))
@@ -406,7 +406,7 @@
 
 (tm-define (structured-remove-vertical t downwards?)
   (:require (mc-context? t))
-  (remove-mc-field t forwards? #t))
+  (remove-mc-field t downwards? #t))
 
 (tm-define (kbd-incremental t down?)
   (:require (mc-context? t))

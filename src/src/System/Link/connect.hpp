@@ -22,7 +22,6 @@ void   connection_write (string name, string session, tree t);
 tree   connection_read (string name, string session, string channel= "output");
 void   connection_interrupt (string name, string session);
 void   connection_stop (string name, string session);
-void   connection_stop_all ();
 int    connection_status (string name, string session);
 tree   connection_eval (string name, string session, string s);
 tree   connection_eval (string name, string session, tree t);

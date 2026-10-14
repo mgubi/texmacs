@@ -1,189 +1,23 @@
-book	devel/scheme/scheme.en.tm	bad-arity	line/1
 book	main/man-user-manual.de.tm	log	warning, missing font, loading global substitution list
 book	main/man-user-manual.de.tm	undefined-reference	auto-* (123 page numbers of the table of contents or the index are ?)
-book	main/man-user-manual.de.tm	unknown-tag	initial
 book	main/man-user-manual.en.tm	log	typeset-warning, Redefined sec-man-preferences as A.1
 book	main/man-user-manual.en.tm	log	typeset-warning, Redefined sec-man-preferences as E.3
-book	main/man-user-manual.it.tm	log	bad link or file <url about/authors/maintainers.it.tm>
-book	main/man-user-manual.it.tm	log	bad link or file <url devel/plugin/first.it.tm>
-book	main/man-user-manual.it.tm	log	bad link or file <url devel/style/style.it.tm>
-book	main/man-user-manual.it.tm	unknown-tag	initial
-book	main/man-user-manual.pl.tm	unknown-tag	initial
-book	main/man-user-manual.pt.tm	log	bad link or file <url devel/style/design/ ../keyboard/style-kbd.pt.tm>
-book	main/man-user-manual.pt.tm	log	bad link or file <url main/convert/man-convert.pt.tm>
-book	main/man-user-manual.pt.tm	log	bad link or file <url main/scheme/man-scheme.pt.tm>
-book	main/man-user-manual.pt.tm	log	bad link or file <url main/styles/std-dtds/header-dtd.en.tm>
-book	main/man-user-manual.pt.tm	log	bad link or file <url main/styles/std-dtds/header-title-dtd.en.tm>
 book	main/man-user-manual.pt.tm	log	bad link or file <url main/styles/std-dtds/number-env-dtd.en.tm>
-book	main/man-user-manual.pt.tm	log	bad link or file <url main/styles/std-dtds/number-section-dtd.en.tm>
-book	main/man-user-manual.pt.tm	unknown-tag	initial
-book	main/man-user-manual.zh.tm	log	bad link or file <url main/start/man-getting-started.zh.tmml>
-book	main/man-user-manual.zh.tm	log	bad link or file <url main/table/man-table.zh.tmml>
 book	main/man-user-manual.zh.tm	log	warning, missing font, loading global substitution list
-file	about/about.de.tm	language	english in a .de.tm file
-file	about/authors/about-plugins.de.tm	language	english in a .de.tm file
-file	about/authors/administration.de.tm	language	english in a .de.tm file
-file	about/authors/administration.es.tm	language	english in a .es.tm file
-file	about/authors/authors.de.tm	language	english in a .de.tm file
-file	about/authors/authors.it.tm	broken-branch	maintainers.it.tm
-file	about/authors/contact.de.tm	language	english in a .de.tm file
-file	about/authors/maintainers.de.tm	language	english in a .de.tm file
-file	about/authors/other.de.tm	language	english in a .de.tm file
-file	about/authors/translators.de.tm	language	english in a .de.tm file
-file	about/changes/changes-2.it.tm	language	english in a .it.tm file
-file	about/changes/changes-8.de.tm	language	english in a .de.tm file
-file	about/changes/changes.de.tm	language	english in a .de.tm file
-file	about/contribute/contribute.de.tm	language	english in a .de.tm file
-file	about/contribute/converters/converters.es.tm	broken-link	../../../devel/format/format.en.tm
-file	about/contribute/converters/converters.it.tm	broken-link	../../../devel/format/format.en.tm
-file	about/contribute/develop/develop.it.tm	broken-link	../../projects/projects.it.tm
-file	about/contribute/documentation/tmdoc-style.de.tm	language	english in a .de.tm file
-file	about/contribute/using/using.es.tm	broken-link	../../../devel/format/format.en.tm
-file	about/contribute/using/using.it.tm	broken-link	../../../devel/format/format.it.tm
-file	about/contribute/using/using.it.tm	broken-link	../../../devel/source/source.it.tm
-file	about/philosophy/description.es.tm	language	english in a .es.tm file
-file	about/philosophy/philosophy.de.tm	language	english in a .de.tm file
 file	about/welcome/first.de.tm	language	english in a .de.tm file
-file	about/welcome/welcome.de.tm	broken-link	../../devel/format/format.en.tm
-file	about/welcome/welcome.es.tm	broken-link	../../devel/format/format.en.tm
 file	about/welcome/welcome.es.tm	broken-link	../../tutorial/tut-tutorial.en.tm
 file	about/welcome/welcome.fr.tm	broken-link	../../tutorial/tut-tutorial.fr.tm
-file	about/welcome/welcome.it.tm	broken-link	../../about/changes/changes.it.tm
-file	about/welcome/welcome.it.tm	broken-link	../../devel/format/format.en.tm
 file	about/welcome/welcome.it.tm	broken-link	../../tutorial/tut-tutorial.en.tm
-file	about/welcome/welcome.zh.tm	broken-link	../../main/man-manual.zh.tmml
-file	about/welcome/welcome.zh.tm	broken-link	../../main/start/man-conventions.zh.tmml
-file	devel/format/basics/basics.zh.tm	broken-branch	lengths.zh.tm
-file	devel/format/basics/basics.zh.tm	broken-branch	tm-drd.zh.tm
-file	devel/format/basics/basics.zh.tm	broken-branch	tm-scm.zh.tm
-file	devel/format/basics/basics.zh.tm	broken-branch	tm-tmml.zh.tm
-file	devel/format/basics/tm-scm.en.tm	log	typeset-warning, Undefined reference tm-tree-ex
-file	devel/format/basics/tm-tm.en.tm	log	typeset-warning, Undefined reference tm-tree-ex
-file	devel/format/basics/tm-tm.zh.tm	log	typeset-warning, Undefined reference tm-tree-ex
-file	devel/format/basics/tm-tree.zh.tm	broken-link	lengths.zh.tm
-file	devel/format/basics/tm-tree.zh.tm	broken-link	tm-scm.zh.tm
-file	devel/format/basics/tm-tree.zh.tm	broken-link	tm-tmml.zh.tm
-file	devel/format/basics/typesetting.zh.tm	broken-link	../regular/regular.zh.tm
-file	devel/format/environment/env-font.de.tm	broken-anchor	env-general.de.tm#Vergr\xf6\xfferung
 file	devel/format/environment/env-font.de.tm	log	warning, missing font, loading global substitution list
-file	devel/format/environment/env-general.de.tm	broken-link	../../../main/interface/cas/man-maxima.en.tm
-file	devel/format/environment/environment.en.tm	broken-anchor	../basics/tm-docs.en.tm#init-env
-file	devel/format/format.de.tm	broken-branch	env-vars.en.tm
 file	devel/format/format.de.tm	broken-branch	leaves.de.tm
 file	devel/format/format.de.tm	broken-branch	planned-changes.en.tm
-file	devel/format/format.de.tm	broken-branch	primitives.en.tm
-file	devel/format/regular/prim-formatting.de.tm	language	english in a .de.tm file
-file	devel/format/regular/prim-graphics.de.tm	language	english in a .de.tm file
-file	devel/format/stylesheet/prim-arith.zh.tm	language	english in a .zh.tm file
-file	devel/format/stylesheet/prim-boolean.zh.tm	language	english in a .zh.tm file
-file	devel/format/stylesheet/stylesheet.de.tm	language	english in a .de.tm file
 file	devel/interface/interface-dynlibs.de.tm	broken-link	../../../../../include/TeXmacs.h
-file	devel/interface/interface-intro.en.tm	broken-link	../plugins/plugins.en.tm
-file	devel/plugin/plugin-binary.it.tm	broken-link	../interface/interface-pipes.it.tm
-file	devel/plugin/plugin-config.de.tm	broken-link	../interface/interface-dynlibs.ed.tm
-file	devel/plugin/plugin-config.it.tm	broken-link	../interface/interface-dynlibs.it.tm
-file	devel/plugin/plugin.it.tm	broken-branch	first.it.tm
-file	devel/scheme/overview/overview-architecture.en.tm	bad-arity	line/1
-file	devel/style/customize/customize-layout.de.tm	language	english in a .de.tm file
-file	devel/style/customize/customize-sections.de.tm	language	english in a .de.tm file
-file	devel/style/customize/customize-theorems.de.tm	broken-link	../../../main/styles/std-dtds/env-base-dtd.de.tm
-file	devel/style/customize/customize.de.tm	language	english in a .de.tm file
-file	devel/style/design/design.pt.tm	broken-branch	 ../keyboard/style-kbd.pt.tm
-file	devel/style/design/style-example.de.tm	language	english in a .de.tm file
-file	devel/style/design/style-macro.de.tm	language	english in a .de.tm file
-file	devel/style/keyboard/compute.de.tm	language	english in a .de.tm file
-file	devel/style/keyboard/compute.pt.tm	language	english in a .pt.tm file
-file	devel/style/keyboard/env.pt.tm	language	english in a .pt.tm file
-file	devel/style/keyboard/style-kbd.de.tm	language	english in a .de.tm file
-file	devel/style/keyboard/style-kbd.pt.tm	language	english in a .pt.tm file
-file	devel/style/presentation/src-present-intro.de.tm	language	english in a .de.tm file
-file	devel/style/presentation/src-present.de.tm	language	english in a .de.tm file
-file	main/beamer/man-beamer.fr.tm	broken-branch	man-animations.fr.tm
-file	main/beamer/man-beamer.fr.tm	broken-branch	man-decorations.fr.tm
-file	main/config/man-config-keyboard.zh.tm	broken-link	../scheme/man-keyboard.zh.tm
-file	main/config/man-configuration.de.tm	language	english in a .de.tm file
-file	main/convert/latex/man-bugs.de.tm	language	english in a .de.tm file
-file	main/convert/man-convert.fr.tm	language	english in a .fr.tm file
-file	main/layout/man-layout.fr.tm	language	english in a .fr.tm file
-file	main/layout/man-layout.it.tm	language	english in a .it.tm file
-file	main/links/man-glossary.es.tm	language	english in a .es.tm file
-file	main/links/man-links.de.tm	language	english in a .de.tm file
-file	main/links/man-links.es.tm	broken-branch	../devel/style/style.es.tm
-file	main/links/man-links.es.tm	broken-branch	convert/man-convert.en.tm
-file	main/links/man-links.es.tm	broken-branch	editing/man-editing-tools.en.tm
-file	main/links/man-links.es.tm	broken-branch	interface/man-itf.en.tm
-file	main/links/man-links.es.tm	broken-branch	layout/man-layout.en.tm
-file	main/links/man-links.es.tm	broken-branch	links/man-links.es.tm
-file	main/links/man-links.es.tm	broken-branch	math/man-math.es.tm
-file	main/links/man-links.es.tm	broken-branch	scheme/man-scheme.en.tm
-file	main/links/man-links.es.tm	broken-branch	start/man-getting-started.es.tm
-file	main/links/man-links.es.tm	broken-branch	styles/std-dtds/dtds.en.tm
-file	main/links/man-links.es.tm	broken-branch	table/man-table.es.tm
-file	main/links/man-links.es.tm	broken-branch	text/man-text.es.tm
-file	main/man-manual.it.tm	broken-branch	../devel/style/style.it.tm
-file	main/man-manual.pt.tm	broken-branch	convert/man-convert.pt.tm
-file	main/man-manual.pt.tm	broken-branch	scheme/man-scheme.pt.tm
-file	main/man-user-manual.es.tm	language	english in a .es.tm file
-file	main/man-user-manual.it.tm	broken-branch	../devel/style/style.it.tm
-file	main/man-user-manual.pt.tm	broken-branch	convert/man-convert.pt.tm
-file	main/man-user-manual.pt.tm	broken-branch	scheme/man-scheme.pt.tm
-file	main/man-user-manual.zh.tm	broken-branch	start/man-getting-started.zh.tmml
-file	main/man-user-manual.zh.tm	broken-branch	table/man-table.zh.tmml
 file	main/math/keyboard/man-enter-math.zh.tm	log	warning, missing font, loading global substitution list
-file	main/math/keyboard/man-large.es.tm	language	english in a .es.tm file
-file	main/math/keyboard/man-main.zh.tm	broken-link	../../table/man-create-table.zh.tmml
-file	main/math/keyboard/man-symbols.es.tm	language	english in a .es.tm file
-file	main/math/keyboard/man-wide.pl.tm	language	english in a .pl.tm file
-file	main/math/semantics/man-syntax-correction.zh.tm	broken-link	semantics/man-semantic-annotation.en.tm
-file	main/math/semantics/man-syntax-correction.zh.tm	broken-link	semantics/man-semantics-symbols.zh.tm
-file	main/math/semantics/man-syntax-correction.zh.tm	broken-link	semantics/man-semantics.en.tm#semantic-focus
-file	main/scheme/man-files.es.tm	language	english in a .es.tm file
-file	main/start/man-conventions.fr.tm	broken-link	../config/man-config-keyboard.fr.tm#kbd-escape-table
-file	main/start/man-conventions.pt.tm	broken-link	../config/man-config-kbd-modkeys.pt.tm
-file	main/start/man-getting-started.fr.tm	language	english in a .fr.tm file
-file	main/start/man-setup.pt.tm	broken-link	../config/man-configuration.pt.tm
-file	main/styles/env/env-float-dtd.de.tm	language	english in a .de.tm file
-file	main/styles/env/env-theorem-dtd.de.tm	language	english in a .de.tm file
-file	main/styles/header/header-dtd.de.tm	language	english in a .de.tm file
-file	main/styles/header/header-title-dtd.de.tm	language	english in a .de.tm file
-file	main/styles/std-dtds/env-theorem-dtd.it.tm	language	english in a .it.tm file
 file	main/styles/std-dtds/header-dtd.pt.tm	language	english in a .pt.tm file
-file	main/styles/std-dtds/header-dtds.pt.tm	broken-branch	header-dtd.en.tm
-file	main/styles/std-dtds/header-dtds.pt.tm	broken-branch	header-title-dtd.en.tm
 file	main/styles/std-dtds/header-title-dtd.pt.tm	language	english in a .pt.tm file
 file	main/styles/std-dtds/number-dtds.pt.tm	broken-branch	number-env-dtd.en.tm
-file	main/styles/std-dtds/number-dtds.pt.tm	broken-branch	number-section-dtd.en.tm
 file	main/styles/std-dtds/number-section-dtd.pt.tm	language	english in a .pt.tm file
-file	main/styles/std-dtds/std-automatic-dtd.pt.tm	broken-link	 ../../links/man-index.pt.tm
-file	main/styles/std-dtds/std-list-dtd.es.tm	language	english in a .es.tm file
-file	main/styles/std/std-list-customize.de.tm	language	english in a .de.tm file
-file	main/styles/std/std-list-dtd.de.tm	language	english in a .de.tm file
 file	main/styles/std/std-utils-dtd.de.tm	language	english in a .de.tm file
-file	main/styles/style-organize.de.tm	language	english in a .de.tm file
-file	main/table/man-advanced-features.pt.tm	language	english in a .pt.tm file
-file	main/text/keyboard/man-customize.es.tm	language	english in a .es.tm file
-file	main/text/keyboard/man-dynamic.es.tm	language	english in a .es.tm file
-file	main/text/keyboard/man-dynamic.it.tm	broken-link	../../../devel/style/keyboard/style-kbd.it.tm
-file	main/text/keyboard/man-dynamic.pl.tm	broken-link	../../../devel/style/keyboard/style-kbd.pl.tm
-file	main/text/keyboard/man-dynamic.zh.tm	broken-link	../../../devel/style/keyboard/style-kbd.zh.tm
-file	main/text/keyboard/man-general-rules.de.tm	broken-link	../../config/man-config-kbd-modkeys.en.tm
-file	main/text/keyboard/man-general-rules.pt.tm	broken-link	../../config/man-config-kbd-modkeys.pt.tm
-file	main/text/keyboard/man-hybrid.es.tm	language	english in a .es.tm file
-file	main/text/keyboard/man-keyboard.fr.tm	broken-link	../../config/man-config-keyboard.fr.tm
-file	main/text/keyboard/man-standard.de.tm	language	english in a .de.tm file
-file	main/text/keyboard/man-standard.de.tm	parse	<initial> inside the body (unbalanced brackets?)
-file	main/text/keyboard/man-standard.de.tm	unknown-tag	initial
-file	main/text/keyboard/man-standard.es.tm	language	english in a .es.tm file
-file	main/text/keyboard/man-standard.it.tm	language	english in a .it.tm file
-file	main/text/keyboard/man-standard.it.tm	parse	<initial> inside the body (unbalanced brackets?)
-file	main/text/keyboard/man-standard.it.tm	unknown-tag	initial
-file	main/text/keyboard/man-standard.pl.tm	language	english in a .pl.tm file
-file	main/text/keyboard/man-standard.pl.tm	parse	<initial> inside the body (unbalanced brackets?)
-file	main/text/keyboard/man-standard.pl.tm	unknown-tag	initial
-file	main/text/keyboard/man-standard.pt.tm	language	english in a .pt.tm file
-file	main/text/keyboard/man-standard.pt.tm	parse	<initial> inside the body (unbalanced brackets?)
-file	main/text/keyboard/man-standard.pt.tm	unknown-tag	initial
-file	main/text/keyboard/man-text-kbd.es.tm	language	english in a .es.tm file
 file	main/text/man-fonts.de.tm	log	warning, missing font, loading global substitution list
 stat	devel/scheme/scheme.en.tm	idx	12
 stat	devel/scheme/scheme.en.tm	pages	157
@@ -206,15 +40,15 @@ stat	main/man-user-manual.es.tm	toc	142
 stat	main/man-user-manual.fr.tm	idx	197
 stat	main/man-user-manual.fr.tm	pages	90
 stat	main/man-user-manual.fr.tm	toc	143
-stat	main/man-user-manual.it.tm	idx	235
-stat	main/man-user-manual.it.tm	pages	99
-stat	main/man-user-manual.it.tm	toc	152
+stat	main/man-user-manual.it.tm	idx	316
+stat	main/man-user-manual.it.tm	pages	129
+stat	main/man-user-manual.it.tm	toc	181
 stat	main/man-user-manual.pl.tm	idx	122
 stat	main/man-user-manual.pl.tm	pages	38
 stat	main/man-user-manual.pl.tm	toc	55
-stat	main/man-user-manual.pt.tm	idx	169
-stat	main/man-user-manual.pt.tm	pages	64
-stat	main/man-user-manual.pt.tm	toc	94
-stat	main/man-user-manual.zh.tm	idx	1118
-stat	main/man-user-manual.zh.tm	pages	229
-stat	main/man-user-manual.zh.tm	toc	307
+stat	main/man-user-manual.pt.tm	idx	215
+stat	main/man-user-manual.pt.tm	pages	81
+stat	main/man-user-manual.pt.tm	toc	124
+stat	main/man-user-manual.zh.tm	idx	1158
+stat	main/man-user-manual.zh.tm	pages	238
+stat	main/man-user-manual.zh.tm	toc	323

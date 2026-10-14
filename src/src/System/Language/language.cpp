@@ -252,6 +252,7 @@ initialize_color_encodings () {
   language_rep::color_encoding ("operator_openclose")= 41;
   language_rep::color_encoding ("operator_field")= 42;
   language_rep::color_encoding ("operator_special")= 43;
+  language_rep::color_encoding ("operator_decoration")= 44;
   language_rep::color_encoding ("keyword")= 50;
   language_rep::color_encoding ("keyword_conditional")= 51;
   language_rep::color_encoding ("keyword_control")= 52;
@@ -294,6 +295,7 @@ initialize_color_decodings (string lan_name) {
   lan->color_decoding (41)= get_preference (pfx * "operator_openclose", "#B02020");
   lan->color_decoding (42)= get_preference (pfx * "operator_field", "#888888");
   lan->color_decoding (43)= get_preference (pfx * "operator_special", "orange");
+  lan->color_decoding (44)= get_preference (pfx * "operator_decoration", "orange");
   lan->color_decoding (50)= get_preference (pfx * "keyword", "#309090");
   lan->color_decoding (51)= get_preference (pfx * "keyword_conditional", "#309090");
   lan->color_decoding (52)= get_preference (pfx * "keyword_control", "#000080");
@@ -376,9 +378,13 @@ ad_hoc_language_rep::ad_hoc_language_rep (string nm, language lan, tree hyphs):
   language_rep (nm), base (lan), hyphens ("?")
 {
   if (is_atomic (hyphs)) {
-    string h= hyphs->label;
-    string s= replace (h, "-", "");
-    hyphens (s)= h;
+    array<string> words= tokenize (hyphs->label, " ");
+    for (int i=0; i<N(words); i++)
+      if (N(words[i]) != 0) {
+        string h= words[i];
+        string s= replace (h, "-", "");
+        hyphens (s)= h;
+      }
   }
 }
 

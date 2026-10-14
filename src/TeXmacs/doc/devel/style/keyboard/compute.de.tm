@@ -55,7 +55,7 @@
 
 <\initial>
   <\collection>
-    <associate|language|english>
+    <associate|language|german>
     <associate|preamble|false>
   </collection>
 </initial>

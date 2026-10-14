@@ -29,9 +29,9 @@
 
       <branch|Parcours de la présentation|man-beamer-traversal.fr.tm>
 
-      <branch|Decorations|man-decorations.fr.tm>
+      <branch|Decorations|man-decorations.en.tm>
 
-      <branch|Animations|man-animations.fr.tm>
+      <branch|Animations|man-animations.en.tm>
     </traverse>
 
     <tmdoc-copyright|2010|<abbr|>Joris van der Hoeven>

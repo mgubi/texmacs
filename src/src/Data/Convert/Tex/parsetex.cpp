@@ -69,6 +69,7 @@ struct latex_parser {
   tree parse_length      (string s, int& i);
   tree parse_length      (string s, int& i, int e);
   tree parse_length_name (string s, int& i);
+  string verbatim_encode (string s, bool escape);
   tree parse_verbatim    (string s, int& i, string end, string env);
   tree parse_alltt       (string s, int& i, string end, string env,
                           tree opt= tree (CONCAT));
@@ -671,6 +672,18 @@ is_text_argument (string cmd, int remaining_arity) {
   return cmd == "\\label" || cmd == "\\ref";
 }
 
+// the commands whose argument is a piece of a line of text: a space at the
+// start of it is typeset (a\textbf{ b} is "a b"), where parse skips the
+// spaces which begin a group
+static bool
+keeps_leading_space (string cmd) {
+  return cmd == "\\text" || cmd == "\\textnormal" || cmd == "\\mbox" ||
+         cmd == "\\hbox" || cmd == "\\emph" || cmd == "\\textbf" ||
+         cmd == "\\textit" || cmd == "\\textrm" || cmd == "\\textsf" ||
+         cmd == "\\texttt" || cmd == "\\textsc" || cmd == "\\textsl" ||
+         cmd == "\\textup" || cmd == "\\textmd" || cmd == "\\underline";
+}
+
 void
 skip_linespaces (string s, int& i) {
   int n=N(s);
@@ -952,7 +965,11 @@ latex_parser::parse_command (string s, int& i, string cmd, int change) {
     u = tree(TUPLE, copy (cmd)); // unparsed arguments
     // Should be in a drd.
 
-    bool option2= (cmd == "\\def" || cmd == "\\newenvironment");
+    bool option2= (cmd == "\\def" || cmd == "\\newenvironment" ||
+                   cmd == "\\makebox" || cmd == "\\framebox");
+    // \parbox[pos][height][inner]{width}{text}: the options after the
+    // first one, which TeXmacs does not use, are read and dropped
+    int extra_options= (cmd == "\\parbox")? 2: 0;
     if (is_def (t)) change--;
 
     while (i<n && arity>=0 && (arity>0 || option)) {
@@ -960,6 +977,15 @@ latex_parser::parse_command (string s, int& i, string cmd, int change) {
       while ((j<n) && is_space (s[j])) j++;
       if (j==n) break;
       if (s[i]=='$') break; // in most cases, this should not be an argument
+      if (!option && extra_options > 0 && N(t) == 2 && s[j] == '[') {
+        j++;
+        i=j;
+        (void) parse (s, i, ']', change);
+        u << s (j, i);
+        if ((i<n) && (s[i]==']')) i++;
+        extra_options--;
+        continue;
+      }
       if (option && (is_opening_option (s[j]) ||
                     (type == "algorithm2e" && s[j] == '{'))) {
         char ec= closing_delimiter (s[j]);
@@ -988,6 +1014,15 @@ latex_parser::parse_command (string s, int& i, string cmd, int change) {
         if ((N(t)==1) && (cmd == "\\def")) {
           while ((i<n) && (s[i]!='}')) i++;
           t << s (j, i);
+        }
+        else if (keeps_leading_space (cmd) && i<n &&
+                 (s[i]==' ' || s[i]=='\t')) {
+          tree a= parse (s, i, "}", change);
+          tree c (CONCAT);
+          c << " ";
+          if (is_concat (a)) c << A(a);
+          else if (a != "") c << a;
+          t << c;
         }
         else t << parse (s, i, "}", change);
         if (text_arg) command_type ("!mode")= "math";
@@ -1450,19 +1485,40 @@ verbatim_escape (string s) {
   return r;
 }
 
+string
+latex_parser::verbatim_encode (string s, bool escape) {
+  // verbatim text to TeXmacs encoding: non ASCII characters are UTF-8
+  // in unicode mode; '<' and '>' are escaped if requested
+  int i= 0, n= N(s);
+  string r;
+  while (i<n) {
+    if (escape && s[i] == '<') { r << "<less>"; i++; }
+    else if (escape && s[i] == '>') { r << "<gtr>"; i++; }
+    else if (unicode && ((unsigned char) s[i]) >= 128) {
+      unsigned int code= decode_from_utf8 (s, i);
+      r << utf8_to_cork (encode_as_utf8 (code));
+    }
+    else r << s[i++];
+  }
+  return r;
+}
+
 tree
 latex_parser::parse_verbatim (string s, int& i, string end, string env) {
   int start=i, n= N(s), e= N(end);
   while ((i<(n-e)) && (s(i,i+e)!=end)) i++;
   i+=e;
-  if (N(env) > 0 && env[0] == '\\') {
+  if (env == "\\url") {
     return tree (TUPLE, env, s(start,i-e));
+  }
+  else if (N(env) > 0 && env[0] == '\\') {
+    return tree (TUPLE, env, verbatim_encode (s(start,i-e), true));
   }
   else if (N(env) > 0) {
     string begin= "\\begin-" * env, endenv= "\\end-" * env;
     return tree (CONCAT,
         tree (TUPLE, begin),
-        s(start,i-e),
+        verbatim_encode (s(start,i-e), true),
         tree (TUPLE, endenv));
   }
   else return "";
@@ -1480,19 +1536,19 @@ latex_parser::parse_alltt (string s, int& i, string end, string env, tree opt)
   tree r= tree (CONCAT, b);
   while ((i<(n-e)) && (s(i,i+e)!=end)) {
     if (s[i] == '\\') {
-      r << s(start, i);
+      r << verbatim_encode (s(start, i), false);
       r << parse_backslash (s, i);
       start= i;
     }
     if (s[i] == '<' || s[i] == '>') {
-      r << s(start, i);
+      r << verbatim_encode (s(start, i), false);
       if (s[i] == '<') r << "<less>";
       if (s[i] == '>') r << "<gtr>";
       start= i+1;
     }
     i++;
   }
-  r << s(start, i);
+  r << verbatim_encode (s(start, i), false);
   r << tree (TUPLE, endenv);
   r << "\n";
   i+=e;

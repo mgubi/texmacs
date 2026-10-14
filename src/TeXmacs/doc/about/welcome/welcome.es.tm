@@ -60,7 +60,7 @@
   Si usted quiere contribir a <TeXmacs>, o si quiere adaptar el programa para
   algún propósito particular, entonces usted encotrará información más útil
   en el menú <menu|Help>. El submenú <hlink|<menu|Help|Document
-  format>|../../devel/format/format.en.tm> contiene información acerca del
+  format>|../../devel/format/basics/basics.en.tm> contiene información acerca del
   formato de documento <TeXmacs> y en <hlink|<menu|Help|Interfacing>|../../devel/plugin/plugin.en.tm>
   está explicado como hacer una interface de <TeXmacs> con otros sistemas.
   Una parte del código fuente ha sido documentada en <hlink|<menu|Help|Source

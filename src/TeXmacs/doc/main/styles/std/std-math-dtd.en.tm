@@ -21,6 +21,23 @@
     <markup|binom> macro uses it.
   </explain>
 
+  <\explain|<explain-macro|boxed|formula>>
+    A framed formula, like <with|mode|math|E=<boxed|m*c<rsup|2>>>, which
+    corresponds to the <verbatim|\\boxed> command of <LaTeX>. The formula is
+    typeset in display style and the baseline of the frame is the baseline
+    of the formula.
+  </explain>
+
+  <\explain>
+    <var-val|boxed-sep|3pt>
+
+    <var-val|boxed-border|0.4pt>
+  <|explain>
+    The padding between the formula and the frame of <markup|boxed> and the
+    width of the frame (the defaults are those of <LaTeX>, <verbatim|\\fboxsep>
+    and <verbatim|\\fboxrule>).
+  </explain>
+
   The following are standard mathematical tabular environments:
 
   <\explain|<explain-macro|matrix|table>>

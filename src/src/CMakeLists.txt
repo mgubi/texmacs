@@ -10,8 +10,8 @@ target_include_directories (texmacs_body PUBLIC
 )
 
 target_compile_options (texmacs_body PRIVATE
-  $<$<COMPILE_LANGUAGE:C,CXX>:-include>
-  $<$<COMPILE_LANGUAGE:C,CXX>:${CMAKE_BINARY_DIR}/src/System/config.h>
+  $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:-include>
+  $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:${CMAKE_BINARY_DIR}/src/System/config.h>
 )
 
 target_link_libraries (texmacs_body PUBLIC
@@ -43,8 +43,8 @@ if (WIN32)
 
   target_include_directories (texmacs PRIVATE ${TeXmacs_Include_Dirs})
   target_compile_options (texmacs PRIVATE
-    $<$<COMPILE_LANGUAGE:C,CXX>:-include>
-    $<$<COMPILE_LANGUAGE:C,CXX>:${CMAKE_BINARY_DIR}/src/System/config.h>
+    $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:-include>
+    $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:${CMAKE_BINARY_DIR}/src/System/config.h>
     -UQT_NEEDS_QMAIN
   )
   target_link_libraries (texmacs PRIVATE ${TeXmacs_Libraries})
@@ -59,8 +59,8 @@ if (WIN32)
 
   target_include_directories (texmacs-open PRIVATE ${TeXmacs_Include_Dirs})
   target_compile_options (texmacs-open PRIVATE
-    $<$<COMPILE_LANGUAGE:C,CXX>:-include>
-    $<$<COMPILE_LANGUAGE:C,CXX>:${CMAKE_BINARY_DIR}/src/System/config.h>
+    $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:-include>
+    $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:${CMAKE_BINARY_DIR}/src/System/config.h>
     -UQT_NEEDS_QMAIN
   )
   target_link_libraries (texmacs-open PRIVATE ${TeXmacs_Libraries})
@@ -125,11 +125,12 @@ elseif (APPLE)
   set (TeXmacs_binary_name "TeXmacs")
   add_executable (${TeXmacs_binary_name} MACOSX_BUNDLE
     $<TARGET_OBJECTS:texmacs_body>
+    "${TEXMACS_SOURCE_DIR}/src/Plugins/Unix/unix_entrypoint.cpp"
   )
   target_include_directories (${TeXmacs_binary_name} PRIVATE ${TeXmacs_Include_Dirs})
   target_compile_options (${TeXmacs_binary_name} PRIVATE
-    $<$<COMPILE_LANGUAGE:C,CXX>:-include>
-    $<$<COMPILE_LANGUAGE:C,CXX>:${CMAKE_BINARY_DIR}/src/System/config.h>
+    $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:-include>
+    $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:${CMAKE_BINARY_DIR}/src/System/config.h>
   )
   target_link_libraries (${TeXmacs_binary_name} PRIVATE ${TeXmacs_Libraries})
   set_target_properties (${TeXmacs_binary_name} PROPERTIES
@@ -147,8 +148,8 @@ else ()
   )
   target_include_directories (${TeXmacs_binary_name} PRIVATE ${TeXmacs_Include_Dirs})
   target_compile_options (${TeXmacs_binary_name} PRIVATE
-    $<$<COMPILE_LANGUAGE:C,CXX>:-include>
-    $<$<COMPILE_LANGUAGE:C,CXX>:${CMAKE_BINARY_DIR}/src/System/config.h>
+    $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:-include>
+    $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:${CMAKE_BINARY_DIR}/src/System/config.h>
   )
   target_link_libraries (${TeXmacs_binary_name} PRIVATE ${TeXmacs_Libraries})
   set_target_properties (${TeXmacs_binary_name} PROPERTIES

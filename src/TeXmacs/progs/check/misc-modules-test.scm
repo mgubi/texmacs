@@ -224,13 +224,13 @@
     ;; the answer is cached
     (check-true (url-exists-in-help? "main/man-manual.en.tm"))
     (check-true (url-none? (resolve "main/no-such-topic")))
-    (check-true (ends? (url->system (resolve "main/man-manual"))
+    (check-true (ends? (check-unix (url->system (resolve "main/man-manual")))
                        (if en? "/doc/main/man-manual.en.tm"
                            ".tm")))
     (when en?
-      (check-true (ends? (url->system (resolve "about/about"))
+      (check-true (ends? (check-unix (url->system (resolve "about/about")))
                          "/doc/about/about.en.tm"))
-      (check-true (ends? (url->system (resolve "devel/style/style"))
+      (check-true (ends? (check-unix (url->system (resolve "devel/style/style")))
                          "/doc/devel/style/style.en.tm")))
     ;; every article of the Help menu exists
     (check= (list-filter help-menu-topics
@@ -395,7 +395,9 @@
     (check= (down 'subsubsection) 'paragraph)
     (check= (down 'paragraph) 'subparagraph)
     (check= (lab "foo/bar.en.tm#here") "here")
-    (check= (lab "foo/bar.en.tm") "sec-bar")
+    ;; the label is built from the whole path (pages of the same name in
+    ;; different directories got the same label, #108)
+    (check= (lab "foo/bar.en.tm") "sec-foo-bar")
     (check= (lab 3) #f)
     (check= (internalize '(document (label "sec-x") (hlink "a" "x.en.tm")
                                     (hlink "b" "y.en.tm")))
@@ -459,8 +461,10 @@
                  (system-search-score (tmp-file "one.en.tm") '("first"))))
   ;; a search in a directory gives a page of links, the best one first
   (let* ((docgrep (priv '(doc docgrep) 'docgrep))
-         (r (docgrep "second" misc-dir "*.en.tm"))
-         (none (docgrep "zzzqqq" misc-dir "*.en.tm")))
+         ;; the directory as the application gives it (unix->url)
+         (dir (url->unix (system->url misc-dir)))
+         (r (docgrep "second" dir "*.en.tm"))
+         (none (docgrep "zzzqqq" dir "*.en.tm")))
     (check= (car r) 'document)
     (check= (map url->system (hlinks r))
             (list (url->system (tmp-file "two.en.tm"))))
@@ -1239,16 +1243,49 @@
       (edit (tree-go-to (buffer-tree) 0 0 1 0))
       (edit (structured-remove-horizontal (bt 0) #t))
       (check= (body) '(document (mc (mc-field "false" "b"))))))
-  ;; FIXME: deleting forwards in the last field adds a procedure to a
-  ;; number (education/edu-edit.scm:379, (+ i -)): with the cursor in the
-  ;; last field of (mc (mc-field "false" "a") (mc-field "false" "b")),
-  ;; (structured-remove-horizontal t #t), or kbd-delete in an empty last
-  ;; field, raises wrong-type-arg, expected the field to be removed.
-  ;; FIXME: structured-insert-vertical and structured-remove-vertical on a
-  ;; list use the unbound variable forwards? instead of their argument
-  ;; downwards? (education/edu-edit.scm:368,409):
-  ;; (structured-insert-vertical t #t) raises unbound-variable, expected a
-  ;; new field.
+  ;; deleting forwards in the last field removes it, the cursor goes to the
+  ;; previous one
+  (with-buffer-doc '(document (mc (mc-field "false" "a")
+                                  (mc-field "false" "b")))
+      '("generic")
+    (lambda ()
+      (edit (tree-go-to (buffer-tree) 0 1 1 0))
+      (edit (structured-remove-horizontal (bt 0) #t))
+      (check= (body) '(document (mc (mc-field "false" "a"))))
+      (check= (list-head (rel (cursor-path)) 2) '(0 0))))
+  (with-buffer-doc '(document (mc (mc-field "false" "a")
+                                  (mc-field "false" "")))
+      '("generic")
+    (lambda ()
+      (edit (tree-go-to (buffer-tree) 0 1 1 0))
+      (edit (kbd-delete))
+      (check= (body) '(document (mc (mc-field "false" "a"))))
+      (check= (list-head (rel (cursor-path)) 2) '(0 0))))
+  ;; vertical insertion and removal, downwards and upwards
+  (with-buffer-doc '(document (mc (mc-field "false" "a")
+                                  (mc-field "false" "b")))
+      '("generic")
+    (lambda ()
+      (edit (tree-go-to (buffer-tree) 0 0 1 0))
+      (edit (structured-insert-vertical (bt 0) #t))
+      (check= (body) '(document (mc (mc-field "false" "a")
+                                    (mc-field "false" "")
+                                    (mc-field "false" "b"))))
+      (check= (rel (cursor-path)) '(0 1 1 0))
+      (edit (structured-insert-vertical (bt 0) #f))
+      (check= (body) '(document (mc (mc-field "false" "a")
+                                    (mc-field "false" "")
+                                    (mc-field "false" "")
+                                    (mc-field "false" "b"))))
+      (check= (rel (cursor-path)) '(0 1 1 0))
+      (edit (structured-remove-vertical (bt 0) #t))
+      (check= (body) '(document (mc (mc-field "false" "a")
+                                    (mc-field "false" "")
+                                    (mc-field "false" "b"))))
+      (check= (list-head (rel (cursor-path)) 2) '(0 1))
+      (edit (structured-remove-vertical (bt 0) #f))
+      (check= (body) '(document (mc (mc-field "false" "")
+                                    (mc-field "false" "b"))))))
   ;; popups: one field is selected, the new one
   (with-buffer-doc '(document (mc-popup (mc-field "true" "a")
                                         (mc-field "false" "b")))
@@ -1379,17 +1416,12 @@
     "pine" "reddish" "ridged-paper" "rough-paper" "xperiment"))
 
 ;; the files of the package of the theme @th, in a subdirectory of themes
-;; FIXME: completing a url-any followed by a plain file name aborts TeXmacs
-;; (System/Classes/url.cpp:909, complete, "invalid base url"):
-;; (url-complete (url-append (url-append "$TEXMACS_PATH/packages/themes"
-;; (url-any)) "pine.ts") "fr") throws a C++ exception which is not caught,
-;; expected the url of themes/pine/pine.ts; a wildcard works.
 (define (theme-files th)
   (url->list
    (url-expand
     (url-complete
      (url-append (url-append "$TEXMACS_PATH/packages/themes" (url-any))
-                 (url-wildcard (string-append th ".ts")))
+                 (string-append th ".ts"))
      "fr"))))
 
 (define (test-posters-themes)
@@ -1404,6 +1436,10 @@
                        (lambda (th)
                          (null? (theme-files th))))
           '())
+  (check= (map url->string (theme-files "pine"))
+          (list (url->string (url-expand (url-complete
+                  "$TEXMACS_PATH/packages/themes/pine/pine.ts" "fr")))))
+  (check= (theme-files "no-such-theme") '())
   (check= (style-category "plain-poster-title") :poster-title-style)
   (check-true (style-includes? "poster" "boring-white"))
   (check-true (style-includes? "poster" "framed-poster-title"))

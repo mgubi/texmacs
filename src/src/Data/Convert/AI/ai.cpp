@@ -51,6 +51,12 @@ ai_quote (string s) {
     case '\n':
       r << "\\n";
       break;
+    case '\r':
+      r << "\\r";
+      break;
+    case '\t':
+      r << "\\t";
+      break;
     case '\'':
       r << "'\\''";
       break;
@@ -58,7 +64,9 @@ ai_quote (string s) {
       r << '\\' << s[i];
       break;
     default:
-      r << s[i];
+      if (((unsigned char) s[i]) < 0x20)
+        r << "\\u00" << as_hexadecimal ((unsigned char) s[i], 2);
+      else r << s[i];
     }
   return r;
 }
@@ -314,11 +322,6 @@ get_post_data (string& url, array<string>& headers, tree& data,
     if (is_atomic (t[1][i])) headers << t[1][i]->label;
 }
 
-static inline string
-shell_quote (string s) {
-  return "'" * replace (s, "'", "'\\''") * "'";
-}
-
 static string
 to_shell_command (tree t) {
   if (is_compound (t, "eval_system", 1) && is_atomic (t[0]))
@@ -327,14 +330,12 @@ to_shell_command (tree t) {
       && is_tuple (t[1])) {    
     string url; tree data; array<string> headers;
     get_post_data (url, headers, data, t);
-    string cmd= "curl --silent -X POST " * shell_quote (url) * " \\\n";
-    for (int i= 0; i+1 < N(headers); i += 2)
-      cmd << "  -H " << shell_quote (headers[i])
-	  << ":"  << shell_quote (headers[i+1]) << " \\\n";
-    cmd << "  --data-binary " << shell_quote (tree_to_json (data));
-    return cmd;
+    string args= "--silent -X POST " * shell_quote (url) * " \\\n";
+    args << "  --data-binary " << shell_quote (tree_to_json (data));
+    return curl_command (args, headers);
   }
-  io_error << "as_shell_command, unknown command type: " << t << LF;
+  io_error << "as_shell_command, unknown command type: "
+           << http_mask_request (t) << LF;
   return "";
 }
 
@@ -349,7 +350,8 @@ ai_eval_command (tree t) {
     get_post_data (url, headers, data, t);
     return http_post_json (url, headers, data);
   }
-  io_error << "ai_eval_command, wrong command: " << t << LF;
+  io_error << "ai_eval_command, wrong command: "
+           << http_mask_request (t) << LF;
   return "";
 }
 
@@ -358,13 +360,14 @@ ai_async_eval_command (tree t, object callback) {
   if (is_compound (t, "eval_system", 1) && is_atomic (t[0]))
     return async_eval_system (t[0]->label, callback);
   if (is_compound (t, "http_post", 3) && is_atomic (t[0])
-      && is_tuple (t[1]) && is_atomic (t[2])) {
+      && is_tuple (t[1])) {
     string url; tree data; array<string> headers; 
     get_post_data (url, headers, data, t);
     return async_http_post_json (url, headers, data, callback);
   }
-  io_error << "ai_eval_command, wrong command: " << t << LF;
-  return "";
+  io_error << "ai_async_eval_command, wrong command: "
+           << http_mask_request (t) << LF;
+  return true;
 }
 
 /******************************************************************************
@@ -383,14 +386,15 @@ chatgpt_command (string s, string model, string chat) {
 
 tree
 gemini_command (string s, string model, string chat) {
-  (void) model;
   (void) chat;
   string key= get_env ("GEMINI_API_KEY");
-  string gem= "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
-  string cmd= "curl \"" * gem * "\" \\\n";
-  cmd << "  -H 'Content-Type: application/json' \\\n"
-      << "  -H 'X-goog-api-key: " << key << "' \\\n"
-      << "  -X POST \\"
+  string model_= model;
+  if (model_ == "gemini")
+    model_= get_preference ("gemini model", "gemini-2.0-flash");
+  string gem= "https://generativelanguage.googleapis.com/v1beta/models/"
+    * model_ * ":generateContent";
+  string cmd= shell_quote (gem) * " \\\n";
+  cmd << "  -X POST \\\n"
       << "  -d '{\n"
       << "    \"contents\": [ {\n"
       << "      \"parts\": [ {\n"
@@ -398,7 +402,10 @@ gemini_command (string s, string model, string chat) {
       << "      } ]\n"
       << "    } ]\n"
       << "  }'";
-  return compound ("eval_system", cmd);
+  array<string> headers;
+  headers << string ("Content-Type") << string ("application/json")
+          << string ("X-goog-api-key") << key;
+  return compound ("eval_system", curl_command (cmd, headers));
 }
 
 tree
@@ -408,8 +415,9 @@ ollama_command (string s, string model, string chat) {
   string port  = get_preference ("ollama port", "11434");
   string model_= get_preference ("ollama model", "default");
   if (model_ == "default") model_= as_string (call ("ollama-default-model"));
-  string cmd= "curl http://" * server * ":" * port * "/api/generate -d '{\n";
-  cmd << "\"model\": \"" << model_ << "\",\n"
+  string api= "http://" * server * ":" * port * "/api/generate";
+  string cmd= "curl " * shell_quote (api) * " -d '{\n";
+  cmd << "\"model\": \"" << ai_quote (model_) << "\",\n"
       << "\"prompt\": \"" << ai_quote (s) << "\",\n"
       << "\"stream\": false\n"
       << "}'";
@@ -420,10 +428,8 @@ tree
 mistral_command (string s, string model, string chat) {
   (void) chat;
   string key= get_env ("MISTRAL_API_KEY");
-  string cmd= "curl -X POST \\\n";
-  cmd << "  -H \"Authorization: Bearer " << key << "\" \\\n"
-      << "  -H \"Content-Type: application/json\" \\\n"
-      << "  -d '{\n"
+  string cmd= "-X POST \\\n";
+  cmd << "  -d '{\n"
       << "    \"model\": \"" << model << "\",\n"
       << "    \"messages\": [ {\n"
       << "      \"role\": \"user\",\n"
@@ -431,7 +437,10 @@ mistral_command (string s, string model, string chat) {
       << "    } ]\n"
       << "  }' \\\n"
       << "  https://api.mistral.ai/v1/chat/completions";
-  return compound ("eval_system", cmd);
+  array<string> headers;
+  headers << string ("Authorization") << ("Bearer " * key)
+          << string ("Content-Type") << string ("application/json");
+  return compound ("eval_system", curl_command (cmd, headers));
 }
 
 tree
@@ -812,7 +821,7 @@ ai_correct (tree t, string lan, string model, string chat) {
   tree u= decompress_html (r);
   //cout << "u = " << u << "\n";
   tree ret= tree (TUPLE);
-  ret << ai_post (r, u);
+  ret << ai_post (t, u);
   for (int i= 0; i < N(comments); i++)
     ret << decompress_html (comments[i]);
   return ret;
@@ -848,5 +857,5 @@ ai_translate (tree t, string from, string into, string model, string chat) {
   //cout << "r= " << r << "\n";
   tree u= decompress_html (r);
   //cout << "u = " << u << "\n";
-  return ai_post (r, u);
+  return ai_post (t, u);
 }

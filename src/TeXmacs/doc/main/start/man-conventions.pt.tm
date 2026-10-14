@@ -42,7 +42,7 @@
   <key|escape escape escape> ou
   <prefix|A-C-> no lugar de <prefix|M-A->. Por exemplo, <key|escape w>
   equivale a <key|A-w>. Você pode também <apply|hyper-link|configurar as
-  teclas modificadoras|../config/man-config-kbd-modkeys.pt.tm> para
+  teclas modificadoras|../config/man-config-keyboard.en.tm> para
   aproveitar completamente o poderoso conjunto de atalhos de teclado que é
   fornecido com o <TeXmacs>.
 

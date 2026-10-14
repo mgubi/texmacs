@@ -12,7 +12,7 @@
 
     <item*|<shortcut|(remove-structure-upwards)>>Usuwa zawarte obiekty lub ±rodowiska.
 
-    <item*|<shortcut|(make-space "0.2spc")>Wstawia maªy odst¦p.
+    <item*|<shortcut|(make-space "0.2spc")>>Wstawia maªy odst¦p.
 
     <item*|<shortcut|(make-space "-0.2spc")>>Wstawia maªy ujemny odst¦p.
 

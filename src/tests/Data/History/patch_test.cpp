@@ -268,16 +268,6 @@ commute_modification (int i) {
 
 static const int nr_commute= 49;
 
-// is_applicable crashes on a join below a string (can_join indexes the
-// string as a tree), so such joins are filtered out first
-static bool
-applicable (tree t, modification m) {
-  if (m->k == MOD_JOIN &&
-      (!has_subtree (t, root (m)) || is_atomic (subtree (t, root (m)))))
-    return false;
-  return is_applicable (t, m);
-}
-
 // whenever swap says that m1;m2 can be reordered into m2*;m1*, both orders
 // must give the same tree, and swapping back must be consistent
 static void
@@ -288,9 +278,9 @@ test_commute_modifications () {
     for (int j=0; j<nr_commute; j++) {
       modification m1= commute_modification (i);
       modification m2= commute_modification (j);
-      if (!applicable (t, m1)) continue;
+      if (!is_applicable (t, m1)) continue;
       tree t1= clean_apply (t, m1);
-      if (!applicable (t1, m2)) continue;
+      if (!is_applicable (t1, m2)) continue;
       tree goal= clean_apply (t1, m2);
       modification s1= m1, s2= m2;
       bool r= swap (s1, s2);
@@ -298,12 +288,12 @@ test_commute_modifications () {
       if (!r) { nr_refused++; continue; }
       nr_swapped++;
       string what= show (m1) * " ; " * show (m2);
-      if (!applicable (t, s1)) {
+      if (!is_applicable (t, s1)) {
         CHECK_MSG (false, "swapped first step not applicable: " * what);
         continue;
       }
       tree u1= clean_apply (t, s1);
-      if (!applicable (u1, s2)) {
+      if (!is_applicable (u1, s2)) {
         CHECK_MSG (false, "swapped second step not applicable: " * what);
         continue;
       }
@@ -338,9 +328,9 @@ test_commute_patches () {
     for (int j=0; j<nr_commute; j++) {
       modification m1= commute_modification (i);
       modification m2= commute_modification (j);
-      if (!applicable (t, m1)) continue;
+      if (!is_applicable (t, m1)) continue;
       tree t1= clean_apply (t, m1);
-      if (!applicable (t1, m2)) continue;
+      if (!is_applicable (t1, m2)) continue;
       tree t2= clean_apply (t1, m2);
       patch p1 (m1, invert (m1, t));
       patch p2 (m2, invert (m2, t1));
@@ -348,8 +338,8 @@ test_commute_patches () {
       if (!swap (s1, s2)) continue;
       nr_swapped++;
       string what= show (m1) * " ; " * show (m2);
-      if (!applicable (t, get_modification (s1)) ||
-          !applicable (clean_apply (s1, t), get_modification (s2))) {
+      if (!is_applicable (t, get_modification (s1)) ||
+          !is_applicable (clean_apply (s1, t), get_modification (s2))) {
         CHECK_MSG (false, "swapped patches not applicable: " * what);
         continue;
       }
@@ -359,7 +349,7 @@ test_commute_patches () {
       // the whole sequence is checked, since for an insertion at the place
       // of a removal the swapped inverses are paired with the wrong steps
       modification i2= get_inverse (s2), i1= get_inverse (s1);
-      if (!applicable (t2, i2) || !applicable (clean_apply (t2, i2), i1)) {
+      if (!is_applicable (t2, i2) || !is_applicable (clean_apply (t2, i2), i1)) {
         CHECK_MSG (false, "swapped inverses not applicable: " * what);
         continue;
       }

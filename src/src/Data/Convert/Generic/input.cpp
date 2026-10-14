@@ -173,10 +173,10 @@ texmacs_input_rep::eof () {
 }
 
 void
-texmacs_input_rep::write (tree u) {
-  if (!docs->contains (channel))
-    docs (channel)= tree (DOCUMENT, "");
-  tree& t= docs (channel);
+document_append (tree& t, tree u) {
+  // append u to the non empty document t: the first line of u continues
+  // the last line of t (also used for the answers read in several pieces,
+  // connection_append in System/Link/connection.cpp)
   if (!is_document (u)) u= tree (DOCUMENT, u);
   if (t[N(t)-1] == "") t[N(t)-1]= u[0];
   else if (u[0] != "") {
@@ -185,6 +185,13 @@ texmacs_input_rep::write (tree u) {
     t[N(t)-1] << A(u[0]);
   }
   if (N(u)>1) t << A (u (1, N(u)));
+}
+
+void
+texmacs_input_rep::write (tree u) {
+  if (!docs->contains (channel))
+    docs (channel)= tree (DOCUMENT, "");
+  document_append (docs (channel), u);
 }
 
 tree

@@ -8,7 +8,7 @@
   <\traverse>
     <apply|branch|Numbering of environments|number-env-dtd.en.tm>
 
-    <apply|branch|Numbering of sections|number-section-dtd.en.tm>
+    <apply|branch|Numbering of sections|number-section-dtd.pt.tm>
   </traverse>
 
   <apply|tmdoc-copyright|1998--2002|Joris van der Hoeven>

@@ -761,7 +761,7 @@ build_effect (tree t) {
     double a2  = as_double (t[3]);
     return mix (eff1, a1, eff2, a2);
   }
-  else if (is_func (t, EFF_NORMALIZE)) {
+  else if (is_func (t, EFF_NORMALIZE, 1)) {
     effect eff= build_effect (t[0]);
     return normalize (eff);
   }
@@ -780,7 +780,7 @@ build_effect (tree t) {
   else if (is_func (t, EFF_COLOR_MATRIX, 2)) {
     effect eff = build_effect (t[0]);
     matrix<double> m= as_matrix<double> (t[1]);
-    if (NR (m) != 4 && NC (m) != 5) return argument_effect (0);
+    if (NR (m) < 4 || NC (m) < 5) return argument_effect (0);
     array<double> v;
     for (int i=0; i<4; i++)
       for (int j=0; j<5; j++)
@@ -800,23 +800,23 @@ build_effect (tree t) {
       << 0.0 << 0.0 << 0.0 << 1.0 << 0.0;
     return color_matrix (eff, v);
   }
-  else if (is_func (t, EFF_MAKE_TRANSPARENT)) {
+  else if (is_func (t, EFF_MAKE_TRANSPARENT) && N(t) >= 2) {
     effect eff= build_effect (t[0]);
     color  bgc= named_color (as_string (t[1]));
     double thr= (N(t)<=2)? 1.0: as_double (t[2]);
     return make_transparent (eff, bgc, thr);
   }
-  else if (is_func (t, EFF_MAKE_OPAQUE)) {
+  else if (is_func (t, EFF_MAKE_OPAQUE, 2)) {
     effect eff= build_effect (t[0]);
     color  bgc= named_color (as_string (t[1]));
     return make_opaque (eff, bgc);
   }
-  else if (is_func (t, EFF_RECOLOR)) {
+  else if (is_func (t, EFF_RECOLOR, 2)) {
     effect eff= build_effect (t[0]);
     color  col= named_color (as_string (t[1]));
     return recolor (eff, col);
   }
-  else if (is_func (t, EFF_SKIN)) {
+  else if (is_func (t, EFF_SKIN, 2)) {
     effect eff= build_effect (t[0]);
     color  col= named_color (as_string (t[1]));
     return apply_skin (eff, col);

@@ -84,9 +84,10 @@ parse_string (string s, int& pos, bool force) {
   return false;
 }
 
-static bool
+static int
 begin_comment (string s, int i) {
-  bool comment= false;
+  // the position after the last /* which starts at or before i, or -1
+  int begin= -1;
   int opos, pos= 0;
   do {
     do {
@@ -95,22 +96,23 @@ begin_comment (string s, int i) {
       if (opos < pos) break;
       parse_comment_multi_lines (s, pos);
       if (opos < pos) {
-        comment = true;
+        begin= pos;
         break;
       }
       pos++;
     } while (false);
   } while (pos <= i);
-  return comment;
+  return begin;
 }
 
 static int
-after_begin_comment (int i, tree t) {
+after_begin_comment (int i, tree t, int& col) {
   tree   t2= t;
   string s2= t->label;
   int  line= line_number (t2);
   do {
-    if (begin_comment (s2, i)) return line;
+    col= begin_comment (s2, i);
+    if (col >= 0) return line;
     t2= line_inc (t2, -1);
     --line;
       // line_inc returns tree(_ERROR) upon error
@@ -127,8 +129,9 @@ parse_end_comment (string s, int& pos) {
     pos += 2;
 }
 
-static bool
+static int
 end_comment (string s, int i) {
+  // the position after the first */ which starts at or after i, or -1
   int opos, pos= 0;
   do {
     do {
@@ -136,21 +139,22 @@ end_comment (string s, int i) {
       parse_string (s, pos, false);
       if (opos < pos) break;
       parse_end_comment (s, pos);
-      if (opos < pos && pos>i) return true;
+      if (opos < pos && opos >= i) return pos;
       pos++;
     } while (false);
   } while (pos < N(s));
-  return false;
+  return -1;
 }
 
 static int
-before_end_comment (int i, tree t) {
+before_end_comment (int i, tree t, int& col) {
   int   end= number_of_lines (t);
   tree   t2= t;
   string s2= t2->label;
   int  line= line_number (t2);
   do {
-    if (end_comment (s2, i)) return line;
+    col= end_comment (s2, i);
+    if (col >= 0) return line;
     t2= line_inc (t2, 1);
     ++line;
       // line_inc returns tree(_ERROR) upon error
@@ -163,11 +167,13 @@ before_end_comment (int i, tree t) {
 
 bool
 in_comment (int pos, tree t) {
-  int beg= after_begin_comment (pos, t);
+  // the comment opened by the last /* before pos ends after pos
+  int bcol, ecol;
+  int beg= after_begin_comment (pos, t, bcol);
   if (beg >= 0) {
     int cur= line_number (t);
-    int end= before_end_comment (pos, line_inc (t, beg - cur));
-    return end >= beg && cur <= end;
+    int end= before_end_comment (bcol, line_inc (t, beg - cur), ecol);
+    return end >= beg && (cur < end || (cur == end && pos < ecol));
   }
   return false;
 }

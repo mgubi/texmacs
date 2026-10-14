@@ -244,7 +244,7 @@
   (check= (bib-value "@misc{k, note = {{\\ss}}}" "note") "\xff")
   (check= (bib-value "@misc{k, note = {\\o{}}}" "note") "\xf8")
   (check= (bib-value "@misc{k, author = {G{\\\"o}del, Kurt}}" "author")
-          '(bib-names (bib-name "Kurt" "" "G\xf6del" ""))))
+          `(bib-names (bib-name "Kurt" "" ,(string-append "G\xf6" "del") ""))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Parser: names
@@ -254,13 +254,8 @@
 ;; last jr), in the three forms of BibTeX: "First von Last", "von Last,
 ;; First" and "von Last, Jr, First"; a braced group is one name.
 (define (test-parse-names)
-  ;; FIXME: bib_set_fields (bibtex_functions.cpp:881) reads past the end of
-  ;; the parsed values while it collects names, with no bound check; when
-  ;; the names end the file this read can crash TeXmacs, depending on the
-  ;; memory, e.g. @misc{k, author = {A. Zed and B. Bee and others}} in some
-  ;; sessions. A field after the names keeps the read inside the values.
-  (define (names s) (bib-value (string-append "@misc{k, author = {" s
-                                              "}, year = 2000}")
+  ;; the names end the values, which are not read past their end (#173)
+  (define (names s) (bib-value (string-append "@misc{k, author = {" s "}}")
                                "author"))
   (check-group "parse: names")
   (check= (names "John Smith") '(bib-names (bib-name "John" "" "Smith" "")))
@@ -282,6 +277,9 @@
           '(bib-names (bib-name "A." "" "Zed" "") (bib-name "B." "" "Bee" "")
                       (bib-name "" "" "others" "")))
   (check= (length (names "A and B and C and D")) 5)
+  (check= (bib-value "@misc{k, author = {A. Zed and B. Bee}, year = 2000}"
+                     "author")
+          '(bib-names (bib-name "A." "" "Zed" "") (bib-name "B." "" "Bee" "")))
   (check= (bib-value "@misc{k, editor = {Ed, E. and Fd, F.}}" "editor")
           '(bib-names (bib-name "E." "" "Ed" "") (bib-name "F." "" "Fd" ""))))
 
@@ -461,9 +459,9 @@
                " pages = {10--20}}"))
   (check-group "entry types")
   (check= (one "plain" art)
-          "Donald E. Knuth. The TeXbook thing. J. Comp, 2(3):10\x1520, 1984.")
+          (string-append "Donald E. Knuth. The TeXbook thing. J. Comp, 2(3):10\x15" "20, 1984."))
   (check= (one "abbrv" art)
-          "D. E. Knuth. The TeXbook thing. J. Comp, 2(3):10\x1520, 1984.")
+          (string-append "D. E. Knuth. The TeXbook thing. J. Comp, 2(3):10\x15" "20, 1984."))
   (check= (one "unsrt" art) (one "plain" art))
   (check= (one "alpha" art) (one "plain" art))
   (check= (fmt-labels "alpha" art) '("Knu84"))
@@ -484,15 +482,18 @@
   (check= (one "plain" "@book{e, editor={Ed, E.}, title={B}, publisher={P}, year=1990}")
           "E. Ed, editor. B. P, 1990.")
   (check= (one "plain" "@inproceedings{ip, author={Doe, J.}, title={On Things}, booktitle={Proc. Conf}, editor={Ed, E.}, pages={1--10}, year=2000, address={Paris}, publisher={Pub}}")
-          "J. Doe. On things. In E. Ed, editor, Proc. Conf, pages 1\x1510. Paris, 2000. Pub.")
+          (string-append "J. Doe. On things. In E. Ed, editor, Proc. Conf, pages 1\x15" "10. Paris, 2000. Pub."))
   (check= (one "plain" "@conference{cf, author={Doe, J.}, title={Talk}, booktitle={Conf}, year=2010}")
           "J. Doe. Talk. In Conf. 2010.")
-  ;; FIXME: bib-format-chapter-pages (plain.scm:174) appends ", " and the
-  ;; pages even when there are none, so that an incollection with a chapter
-  ;; and no pages gives "... In Coll, chapter 3.  Pub, 2001." with two
-  ;; spaces, where plain.bst gives "In Coll, chapter 3. Pub, 2001.".
   (check= (one "plain" "@incollection{ic, author={Doe, J.}, title={Chap}, booktitle={Coll}, publisher={Pub}, year=2001, chapter=3, pages={4--5}}")
-          "J. Doe. Chap. In Coll, chapter 3, pages 4\x155. Pub, 2001.")
+          (string-append "J. Doe. Chap. In Coll, chapter 3, pages 4\x15" "5. Pub, 2001."))
+  ;; a chapter without pages is not followed by a comma (#173)
+  (check= (one "plain" "@incollection{ic, author={Doe, J.}, title={Chap}, booktitle={Coll}, publisher={Pub}, year=2001, chapter=3}")
+          "J. Doe. Chap. In Coll, chapter 3. Pub, 2001.")
+  (check= (one "acm" "@incollection{ic, author={Doe, J.}, title={Chap}, booktitle={Coll}, publisher={Pub}, year=2001, chapter=3}")
+          "J. Doe. Chap. In Coll, chapter 3. Pub, 2001.")
+  (check= (one "siam" "@incollection{ic, author={Doe, J.}, title={Chap}, booktitle={Coll}, publisher={Pub}, year=2001, chapter=3}")
+          "J. Doe. Chap. In Coll, chapter 3. Pub, 2001.")
   (check= (one "plain" "@techreport{tr, author={Doe, J.}, title={Report}, institution={Inst}, number={42}, year=2002}")
           "J. Doe. Report. Technical Report 42, Inst, 2002.")
   (check= (one "plain" "@phdthesis{phd, author={Doe, J.}, title={Thesis}, school={Uni}, year=2003}")
@@ -506,7 +507,7 @@
   (check= (one "plain" "@booklet{bk, title={Booklet}, howpublished={Online}, year=2006}")
           "Booklet. Online, 2006.")
   (check= (one "plain" "@inbook{inb, author={Doe, J.}, title={Book}, chapter=2, pages={5--9}, publisher={Pub}, year=2007}")
-          "J. Doe. Book, chapter 2, pages 5\x159. Pub, 2007.")
+          (string-append "J. Doe. Book, chapter 2, pages 5\x15" "9. Pub, 2007."))
   (check= (one "plain" "@proceedings{pr, editor={Ed, E. and Fd, F.}, title={Proc}, year=2008, publisher={Pub}, volume=5, series={LNCS}}")
           "E. Ed and F. Fd, editors. Proc, volume 5 of LNCS. Pub, 2008.")
   (check= (one "plain" "@unpublished{un, author={Doe, J.}, title={Draft}, note={In preparation}, year=2009}")
@@ -545,11 +546,13 @@
              "  year         = {2000}\n"
              "}\n\n"))
     (check= (bib-parse out) (bib-parse src)))
-  ;; FIXME: bibtex-name (bibtexout.scm:86) writes a name with a Jr part as
-  ;; "von Last, First, Jr", which BibTeX reads as "von Last, Jr, First":
-  ;; (bib-name "John" "von" "Neumann" "Jr") is saved as
-  ;; {von Neumann, John, Jr} and reads back with first name "Jr" and
-  ;; Jr part "John", where {von Neumann, Jr, John} is expected.
+  ;; a name with a Jr part is written "von Last, Jr, First" (#173)
+  (let* ((src "@misc{k, author = {von Neumann, Jr, John and Doe, Jr, }}")
+         (out (bib-out (bib-parse src))))
+    (check-true (contains? out "{von Neumann, Jr, John and Doe, Jr, }"))
+    (check= (bib-value out "author")
+            '(bib-names (bib-name "John" "von" "Neumann" "Jr")
+                        (bib-name "" "" "Doe" "Jr"))))
   (check= (bib-out '(document (bib-string (document (bib-assign "foo" "Foo")))
                               (bib-preamble (document (bib-latex "\\def\\x{y}")))
                               (bib-entry "misc" "k"

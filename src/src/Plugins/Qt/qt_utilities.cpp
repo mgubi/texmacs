@@ -339,8 +339,7 @@ utf8_to_qstring (const string& s) {
 string
 from_qstring_utf8 (const QString &s) {
   QByteArray arr= s.toUtf8 ();
-  const char* cstr= arr.constData ();
-  return string ((char*) cstr);
+  return string (arr.constData (), arr.size ());
 }
 
 // This should provide better lookup times
@@ -533,7 +532,7 @@ qt_convert_image (url image, url dest, int w, int h) {// w, h in pixels
   else {
     if (w > 0 && h > 0)
       im= im.scaled (w, h, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
-    im.scaled (w, h).save (utf8_to_qstring (materialize (dest, "")));
+    im.save (utf8_to_qstring (materialize (dest, "")));
   }
 }
 

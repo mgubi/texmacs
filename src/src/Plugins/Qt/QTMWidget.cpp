@@ -350,8 +350,14 @@ QTMWidget::inputMethodEvent (QInputMethodEvent* event) {
       if (DEBUG_QT)
         debug_qt << "IM committing: " << commit_string.toUtf8().data() << LF;
       if (preediting || get_preference ("speech", "off") == "off")
-        for (int i = 0; i < commit_string.size(); ++i)
-          kbdEvent (0, Qt::NoModifier, commit_string[i]);
+        for (int i = 0; i < commit_string.size(); ++i) {
+          // keep surrogate pairs (non-BMP characters) together
+          int n= (commit_string[i].isHighSurrogate () &&
+                  i + 1 < commit_string.size () &&
+                  commit_string[i+1].isLowSurrogate ())? 2: 1;
+          kbdEvent (0, Qt::NoModifier, commit_string.mid (i, n));
+          i += n - 1;
+        }
       else {
         string s= "speech:" * from_qstring (commit_string);
         kbdEvent (0, Qt::NoModifier, to_qstring (s));

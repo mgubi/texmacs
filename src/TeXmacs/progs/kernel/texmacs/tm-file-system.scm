@@ -49,18 +49,23 @@
     (list (if i (substring name 0 i) "file")
           (if i (substring name (+ i 1) (string-length name)) name))))
 
+;; The text of what a load handler gives: a document is read back as
+;; TeXmacs Scheme (stm->texmacs), whose strings are escaped twice: written
+;; by object->tmstring, they were unescaped once too often (\\ became \)
+(define (tmfs-load-result r)
+  (cond ((string? r) r)
+        ((and (pair? r) (== (car r) 'document))
+         (texmacs->stm (stree->tree r)))
+        (else (object->tmstring r))))
+
 (define-public (tmfs-load u)
   "Load url @u on TeXmacs file system."
   (with (class name) (tmfs-decompose-name u)
     (lazy-tmfs-force class)
     (cond ((ahash-ref tmfs-handler-table (cons class 'load)) =>
-           (lambda (handler)
-             (with r (handler name)
-               (if (string? r) r (object->tmstring r)))))
+           (lambda (handler) (tmfs-load-result (handler name))))
           ((ahash-ref tmfs-handler-table (cons #t 'load)) =>
-           (lambda (handler)
-             (with r (handler name)
-               (if (string? r) r (object->tmstring r)))))
+           (lambda (handler) (tmfs-load-result (handler name))))
           (else ""))))
 
 (define-public (tmfs-save u what)
