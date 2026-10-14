@@ -49,7 +49,7 @@
 (tm-define (set-manual-key k v)
   (:synopsis "Set API key to remote plug-in")
   (:argument k "Key name")
-  (:argument v "Key value")
+  (:argument v "password" "Key value")
   (set-preference (string-append k " api key") v)
   (reinit-plugin-cache))
 
