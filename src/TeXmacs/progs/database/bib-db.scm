@@ -246,44 +246,10 @@
         (if (null? r) (set! r (list `(bib-name "" "" "" ""))))
         `(bib-names ,@r))))
 
-(define db-en-dash (string (integer->char 21)))
-
-(define (db-page-range s)
-  ;; the two sides of a range in @s, or #f, as bib_field_pages: a range is
-  ;; written with "--", or with one "-" between sides of the same kind
-  (let* ((i (string-search-forwards "--" 0 s))
-         (j (and (>= i 0)
-                 (let loop ((j i))
-                   (if (and (< j (string-length s))
-                            (== (string-ref s j) #\-))
-                       (loop (+ j 1)) j))))
-         (k (string-search-forwards "-" 0 s)))
-    (cond ((>= (string-search-forwards "," 0 s) 0) #f)
-          ((>= (string-search-forwards ";" 0 s) 0) #f)
-          ((and j (> i 0) (< j (string-length s))
-                (< (string-search-forwards "--" j s) 0))
-           (list (string-trim-both (substring s 0 i))
-                 (string-trim-both (substring s j (string-length s)))))
-          ((and (not j) (> k 0)
-                (< (string-search-forwards "-" (+ k 1) s) 0))
-           (let ((a (string-trim-both (substring s 0 k)))
-                 (b (string-trim-both (substring s (+ k 1) (string-length s)))))
-             (and (!= a "") (!= b "")
-                  (== (char-numeric? (string-ref a 0))
-                      (char-numeric? (string-ref b 0)))
-                  (list a b))))
-          (else #f))))
-
 (define (db-bib-pages t)
-  ;; the pages as the parser of BibTeX gives them (bib_field_pages): a
-  ;; range gives two arguments, other pages ("12, 15--17", "S-12") one
+  ;; the pages as the parser of BibTeX reads them (bib_field_pages)
   (if (not (tm-atomic? t)) t
-      (let* ((s (string-trim-both (string-replace t db-en-dash "--")))
-             (r (db-page-range s)))
-        (cond ((== s "") '(bib-pages))
-              (r `(bib-pages ,@r))
-              (else `(bib-pages ,(string-replace (string-replace s "---" "--")
-                                                 "--" db-en-dash)))))))
+      (tree->stree (bib-field-pages (tm->string t)))))
 
 (define (db-bib-sub-sub type var val)
   (cond ((and (== var "title")

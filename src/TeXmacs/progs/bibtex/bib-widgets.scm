@@ -36,10 +36,30 @@
 
 (define bibwid-preview-max 10)
 
+(define (bibwid-crossref e)
+  ;; the key cross-referenced by the entry @e, or #f
+  (with l (list-filter (cdr (list-ref e 3))
+                       (lambda (f) (and (func? f 'bib-field 2)
+                                        (== (cadr f) "crossref"))))
+    (and (nnull? l) (string? (caddr (car l))) (locase-all (caddr (car l))))))
+
 (define (bibwid-preview-entries t)
-  (if (and (func? t 'document) (> (length (cdr t)) bibwid-preview-max))
-      (cons 'document (sublist (cdr t) 0 bibwid-preview-max))
-      t))
+  ;; the first entries of @t with the entries which they cross-reference,
+  ;; and what is not an entry (@preamble), without the comments
+  (if (not (func? t 'document)) t
+      (let* ((all (list-filter (cdr t) (lambda (x) (func? x 'bib-entry 3))))
+             (shown (if (> (length all) bibwid-preview-max)
+                        (sublist all 0 bibwid-preview-max)
+                        all))
+             (refs (list-filter (map bibwid-crossref shown) (lambda (x) x)))
+             (keep? (lambda (x)
+                      (cond ((func? x 'bib-comment) #f)
+                            ((func? x 'bib-entry 3)
+                             (or (in? x shown)
+                                 (and (string? (caddr x))
+                                      (in? (locase-all (caddr x)) refs))))
+                            (else #t)))))
+        (cons 'document (list-filter (cdr t) keep?)))))
 
 (define (bibwid-output-content t style)
   (cond ((tree-is? t 'string)

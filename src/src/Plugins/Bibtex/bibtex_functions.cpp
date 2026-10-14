@@ -839,7 +839,8 @@ bib_field_pages (string p) {
   // (12, 15--17) are kept as they are written, with an en dash for "--",
   // and an empty field gives no argument
   tree res= compound ("bib-pages");
-  p= trim_spaces (p);
+  // an en dash (a UTF-8 "–" in the file) separates a range as "--" does
+  p= trim_spaces (replace (p, "\25", "--"));
   if (N(p) == 0) return res;
   bool list= occurs (",", p) || occurs (";", p);
   int i= search_forwards ("--", 0, p), j= i;
@@ -869,9 +870,10 @@ static bool is_hyper_link (string s);
 
 static bool
 bib_is_verbatim_field (string f) {
-  // the fields which BibTeX and biblatex read verbatim, not as LaTeX
+  // the fields which BibTeX and biblatex read verbatim, not as LaTeX,
+  // and the keys of other entries
   return f == "doi" || f == "eprint" || f == "file" || f == "pdf" ||
-         f == "url";
+         f == "url" || f == "crossref" || f == "xref";
 }
 
 static int
@@ -1128,6 +1130,19 @@ bib_strings_dict (tree t) {
   dict("toois")= "ACM Transactions on Office Information Systems";
   dict("toplas")= "ACM Transactions on Programming Languages and Systems";
   dict("tcs")= "Theoretical Computer Science";
+  // the months, as in the standard styles of BibTeX
+  dict("jan")= "January";
+  dict("feb")= "February";
+  dict("mar")= "March";
+  dict("apr")= "April";
+  dict("may")= "May";
+  dict("jun")= "June";
+  dict("jul")= "July";
+  dict("aug")= "August";
+  dict("sep")= "September";
+  dict("oct")= "October";
+  dict("nov")= "November";
+  dict("dec")= "December";
   if (L(t) == DOCUMENT) {
     tree str (DOCUMENT);
     for (int i= 0; i<N(t); i++) {

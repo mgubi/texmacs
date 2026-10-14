@@ -190,8 +190,10 @@
         ((>= (string-length s) 12) s)
         (else (bibtex-padded (string-append s " ")))))
 
-;; the fields which BibTeX and biblatex read verbatim, not as LaTeX
-(define bibtex-verbatim-fields '("doi" "eprint" "file" "pdf" "url"))
+;; the fields which BibTeX and biblatex read verbatim, not as LaTeX, and
+;; the keys of other entries
+(define bibtex-verbatim-fields
+  '("doi" "eprint" "file" "pdf" "url" "crossref" "xref"))
 
 (define (bibtex-field x)
   (if (and (list? x) (= 2 (length x)))
