@@ -61,9 +61,12 @@
 
     <item*|The header>The lines of a <name|YAML> header are kept in
     <markup|md-metadata>, one <markup|md-meta> with a key and its value
-    for each of them (and without key for a line which has none: an item
-    of a list, a comment). Keys can be edited, added and removed, and are
-    written in their order.
+    for each of them (and without key for a line which has none, or which
+    is not written <verbatim|key: value>: an item of a list, a comment, a
+    line with other spaces). Keys can be edited, added and removed, and
+    are written in their order; a line typed in the header is written as
+    it is. Whatever the header holds between its two lines
+    <verbatim|---> is kept, if its first line is a key or a comment.
 
     <item*|Formulas, tables, <name|Html>>They are in <markup|md-source>
     (in a paragraph) or <markup|md-block-source> (on lines of their own),
@@ -71,7 +74,10 @@
     <verbatim|\\(x\\)>, a table keeps the widths of its columns, and
     <name|Html> which <TeXmacs> does not understand, a comment for
     instance, is kept and shown as a flag. As soon as the formula, the
-    table or the text is edited, it is written by <TeXmacs>.
+    table or the text is edited, it is written by <TeXmacs>. So are the
+    tabs, which are displayed as spaces, the definitions of links to which
+    nothing refers (the comments <verbatim|[//]: # (text)> among them),
+    and the definitions of footnotes which the text does not use.
 
     <item*|Lists>The lists whose items start with <verbatim|->,
     <verbatim|*> and <verbatim|+> are <markup|itemize-minus>,
@@ -90,11 +96,21 @@
     <item*|Footnotes>A footnote whose label is not its number is
     <markup|md-footnote>, with this label, and <markup|md-footnote-text>
     marks the place where its text is written when this is not the end of
-    the file.
+    the file, in a quotation or a list as well. The text of a footnote is
+    at its first mark; the other marks of the same footnote, a mark inside
+    the text of a footnote and a mark without footnote are kept as they
+    are written. When two footnotes have the same label, the second one
+    gets another label as it is written.
   </description>
 
+  The text which these macros keep is not displayed, and is written as it
+  is: a document of this style which someone else wrote may write text
+  you do not see into the <name|Markdown> file, as <markup|specific> may.
+  The other formats display the macros and leave out what they keep.
+
   What <name|Markdown> writes in several ways is written in one when it
-  is none of the above: the lines of a paragraph are joined, a heading
+  is none of the above: the lines of a paragraph are joined, a tab at the
+  start of a line is spaces, a heading
   with a line under it starts with <verbatim|#>, code is between
   <verbatim|```>, a rule is <verbatim|***>, emphasis is written with
   stars, a link through a definition is written with its address, and a

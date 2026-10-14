@@ -92,7 +92,8 @@
     (check= (len (string-append (rep "![" 40) "a" (rep "](u)" 40))) 2)
     (check= (len (rep "*a_ " 20000)) 2)
     (check= (len (string-append "a**b " (rep "c* " 20000))) 2)
-    (check= (len (rep "*a b~~ c* " 10000)) 20001)
+    ;; (the space which ends the paragraph is not text)
+    (check= (len (rep "*a b~~ c* " 10000)) 20000)
     (check= (len (rep "[a " 20000)) 2)
     (check= (len (string-append (rep "[" 10000) (rep "]" 10000))) 2)
     (check= (len (rep "[a]((" 10000)) 2)
@@ -241,7 +242,21 @@
   ;; two lists of a kind in a row have different markers
   (check= (write-md '(markdown (ul (li (p "a"))) (ul (li (p "b")))
                                (ol (li (p "c"))) (ol (li (p "d")))))
-          "- a\n\n* b\n\n1. c\n\n1) d\n"))
+          "- a\n\n* b\n\n1. c\n\n1) d\n")
+  ;; in an item, a table after a list or a quote, and a quote after a quote,
+  ;; are read so after a blank line only, which makes the list one with
+  ;; blank lines
+  (for-each
+    (lambda (l)
+      (check= (parse* (write-md `(markdown (ul (li ,@l)))))
+              `(markdown (ul (@ (loose "true")) (li ,@l)))))
+    '(((p "a") (ul (li (p "sub")))
+       (table (tr (th "x") (th "y")) (tr (td "1") (td "2"))))
+      ((blockquote (p "q")) (table (tr (th "x")) (tr (td "1"))))
+      ((blockquote (p "q1")) (blockquote (p "q2")))))
+  ;; the definition of a link to which nothing refers
+  (check= (write-md '(markdown (p "a") (ref-def "[//]: # (c)")))
+          "a\n\n[//]: # (c)\n"))
 
 ;; What would be read as markup is escaped, and nothing else.
 (define (test-serialize-escapes)
@@ -716,8 +731,8 @@
                                           "[^" (number->string i) "]: a [^" next
                                           "] [^" next "]\n\n")))
                                     (.. 1 31)))))))
-    (check= (count (import (rep "*a* " 20000))) 40000)
-    (check= (count (import (rep "a `b` " 10000))) 20001)
+    (check= (count (import (rep "*a* " 20000))) 39999)
+    (check= (count (import (rep "a `b` " 10000))) 20000)
     (check= (string-length (export (ems 20000))) 119999)
     (check= (string-length (export (rep "a... " 20000))) 99999)
     (check= (import (string-append "``` \n" (make-string 20000 #\`) "x\n```"))
@@ -799,6 +814,7 @@
       (when (and (pair? r) (== (car r) 'error))
         (check-report #f "the group" (object->string r))))
     (if (url-exists? to) (system-remove to))
+    (system-rmdir dir)
     (buffer-close u)
     (when (buffer-exists? old) (switch-to-buffer old))))
 
@@ -924,6 +940,95 @@
                      (style "markdown")))
           "a[^2]b[^1]\n\n[^2]: new\n\n[^1]: old\n"))
 
+(define tab-char (string #\tab))
+
+(define (in-style . l)
+  `(document (body (document ,@l)) (style "markdown")))
+
+;; What the first version of the style lost or changed.
+(define (test-style-losses)
+  (check-group "style markdown, what is kept")
+  (for-each
+    (lambda (s) (check= (md->md s) s))
+    (list
+      ;; tabs, displayed as spaces, and backquotes which are text
+      (string-append "a" tab-char "b\n")
+      (string-append "`a" tab-char "b`\n")
+      (string-append "```\na" tab-char "b\n```\n")
+      (string-append "| a" tab-char "b | c |\n|---|---|\n| 1 | 2 |\n")
+      (string-append "\\(a" tab-char "b\\)\n")
+      (string-append "# a" tab-char "b\n")
+      "a \\` b and \\`j\\`\n"
+      "two  spaces\n"
+      ;; definitions of footnotes in a quote, an item, another footnote
+      "- item\n\n  [^z]: text\n"
+      "[^a]: outer\n\n    [^b]: inner\n"
+      "x[^a]\n\n> [^a]: note\n"
+      "x[^a]\n\n[^a]: outer\n\n    [^b]: inner\n"
+      ;; definitions of links to which nothing refers, comments
+      "[//]: # (a comment)\n\ntext\n"
+      "text\n\n[unused]: http://x.y \"Title\"\n"
+      ;; marks of footnotes: in a footnote, without definition, repeated
+      "a[^1]\n\n[^1]: see[^2]\n\n[^2]: other\n"
+      "text[^a]\n"
+      "a[^1]\n\n[^1]: first\n\n[^1]: second\n"
+      "a[^1] b[^1]\n\n[^1]: one\n"
+      ;; headers with any keys, with their spaces
+      "---\ntitle: a\nfoo.bar: 1\n---\n\nx\n"
+      "---\n\"og:image\": x\nkey with space: v\n_private: 1\n---\n"
+      "---\ntags: [a,\n  b]\n---\n\nx\n"
+      "---\ntitle:   The  title\n---\n"))
+  ;; the second definition of a link, which is not the one which counts
+  (check= (md->md "[a][r]\n\n[r]: http://x.y\n\n[r]: http://other.z\n")
+          "[a](http://x.y)\n\n[r]: http://other.z\n")
+  ;; a note with many marks is written once
+  (with s (string-append "a[^1]" (apply string-append (make-list 299 " a[^1]"))
+                         "\n\n[^1]: the note\n")
+    (check= (md->md s) s))
+  ;; a document starts with a rule, which is not a header
+  (check= (md->md "---\n\ntext\n\n---\n") "***\n\ntext\n\n***\n")
+  (check= (md->md "---\ntext\n\nmore\n\n---\n") "***\n\ntext\n\nmore\n\n***\n")
+  ;; what is typed in the header, and in the macros
+  (check= (tm->md (in-style '(md-metadata (document (md-meta "title" "T")
+                                                    "author: me"
+                                                    (concat (md-meta "a" "b"))))))
+          "---\ntitle: T\nauthor: me\na: b\n---\n")
+  ;; two notes which got the same label: both are written
+  (check= (tm->md (in-style '(concat "a" (md-footnote "x" "one")
+                                     " b" (md-footnote "x" "two")
+                                     " c" (md-footnote "x" "one"))))
+          "a[^x] b[^x-2] c[^x]\n\n[^x]: one\n\n[^x-2]: two\n")
+  ;; the words after the fence are for the language they name
+  (check= (tm->md (in-style '(md-fence "c" (python-code (document "x")))))
+          "```python\nx\n```\n")
+  (check= (tm->md (in-style '(md-fence "rust ignore"
+                                       (verbatim-code (document "x")))))
+          "```rust ignore\nx\n```\n")
+  ;; a kept block which was moved into a heading or a cell
+  (check= (tm->md (in-style '(section (concat "T " (md-block-source
+                                                     (equation* (document "x"))
+                                                     "\\[x\\]"
+                                                     (equation* (document "x")))))))
+          "# T \\[x\\]\n")
+  ;; an edited cell, and a kept formula with a bar in another one
+  (let* ((t (md->tm "| a | b |\n|---|---|\n| 1 | \\(x\\|y\\) |\n"))
+         (edit (lambda (x)
+                 (if (and (func? x 'cell 1) (== (cadr x) "1")) '(cell "ONE") x)))
+         (walk (lambda (x)
+                 (let loop ((x x))
+                   (cond ((func? x 'md-block-source 3)
+                          `(md-block-source ,(loop (cadr x)) ,@(cddr x)))
+                         ((pair? x) (edit (cons (car x) (map loop (cdr x)))))
+                         (else x))))))
+    (check= (tm->md (walk t))
+            "| a   | b        |\n| --- | -------- |\n| ONE | \\(x\\|y\\) |\n"))
+  ;; the macros in code, and in LaTeX
+  (check= (tm->md (in-style '(verbatim (md-source (math "y") "$y$" (math "y")))))
+          "`y`\n")
+  (with s (convert (md->tm markdown-file) "texmacs-stree" "latex-document")
+    (check= (string-search-forwards "\\md" 0 s) -1)
+    (check-true (>= (string-search-forwards "\\footnote{The note.}" 0 s) 0))))
+
 ;; The same through a buffer, whose macros are expanded when it is saved.
 (define (test-style-buffer)
   (check-group "style markdown, buffer")
@@ -948,11 +1053,24 @@
                   (export-buffer-main u to "markdown" (list :overwrite))
                   (check= (string-load to)
                           (string-replace markdown-file "Some *text*"
-                                          "Other *text*"))))
+                                          "Other *text*"))
+                  ;; the first formula is edited: it is written anew
+                  (let* ((p (tree-ref (buffer-tree) 2))
+                         (f (list-find (tree-children p)
+                                       (lambda (c) (tree-is? c 'md-source)))))
+                    (tree-set (tree-ref f 0) '(math "z")))
+                  (update-forced)
+                  (export-buffer-main u to "markdown" (list :overwrite))
+                  (check= (string-load to)
+                          (string-replace
+                            (string-replace markdown-file "Some *text*"
+                                            "Other *text*")
+                            "$a=b$" "$z$"))))
         (when (and (pair? r) (== (car r) 'error))
           (check-report #f "the group" (object->string r))))
       (if (url-exists? to) (system-remove to))
       (if (url-exists? from) (system-remove from))
+      (system-rmdir dir)
       (buffer-pretend-saved u)
       (buffer-close u)
       (when (buffer-exists? old) (switch-to-buffer old)))))
@@ -1012,6 +1130,7 @@
   (test-export-buffer)
   (test-style-import)
   (test-style-round-trip)
+  (test-style-losses)
   (test-style-buffer)
   (test-format)
   (check-end))
