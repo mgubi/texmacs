@@ -807,15 +807,13 @@
                  (if (null? style) "generic" (car style))
                  ">\n\n<\\body>\n" body "</body>\n"))
 
-(define (generated-body name text . opt)
+(define (generated-with name text style thunk)
   ;; the body after two rounds of Document > Update > All: the citations
-  ;; are known to the bibliography from the second round on. With the
-  ;; optional arguments style and markup, the markup as it is evaluated in
-  ;; the document is returned instead.
+  ;; are known to the bibliography from the second round on; @thunk is
+  ;; called in the buffer, at its end, and the result is (body . value)
   (let* ((f (tmp-file name))
          (old (current-buffer)))
-    (string-save (apply doc-tm (cons text (if (null? opt) '() (list (car opt)))))
-                 f)
+    (string-save (doc-tm text style) f)
     (load-buffer f)
     (switch-to-buffer* f)
     (update-forced)
@@ -825,12 +823,25 @@
     (generate-all-aux)
     (update-current-buffer)
     (update-forced)
-    (with r (if (null? opt) (tree->stree (buffer-get-body f))
-                (tree->stree (texmacs-exec (cadr opt))))
+    (go-end)
+    (let* ((v (thunk))
+           (r (tree->stree (buffer-get-body f))))
       (buffer-pretend-saved f)
       (buffer-close f)
       (when (buffer-exists? old) (switch-to-buffer old))
-      r)))
+      (cons r v))))
+
+(define (generated-body name text . opt)
+  ;; the body of generated-with; with the optional arguments style and
+  ;; markup, the markup as it is evaluated in the document instead
+  (if (null? opt) (car (generated-with name text "generic" (lambda () #f)))
+      (cdr (generated-with name text (car opt)
+                           (lambda ()
+                             (tree->stree (texmacs-exec (cadr opt))))))))
+
+(define (expanded x)
+  ;; the stree @x as the macros expand it at the cursor
+  (tree->stree (texmacs-exec* x)))
 
 (define (generated-bibliography name text)
   (first-of 'bibliography (generated-body name text)))
@@ -848,6 +859,7 @@
   ;; as flat, with the footnotes between braces
   (cond ((or (func? x 'footnote 1) (func? x 'cite-note 1))
          (string-append "{" (flat* (cadr x)) "}"))
+        ((or (func? x 'assign) (func? x 'write)) "")
         ((string? x) x)
         ((func? x 'with) (flat* (cAr x)))
         ((func? x 'TeX) "TeX")
@@ -1061,6 +1073,136 @@
     ;; and they make labels
     (check= (csl-citation-label (car items)) "<#738B>")))
 
+(define three-bib
+  (string-append
+   sample-bib
+   "@article{three, author={Alpha, Ann and Beta, Bob and Gamma, Carl},"
+   " title={Three}, journal={J. Math.}, year=2000, volume=2,"
+   " pages={3--4}}\n"))
+
+(define (test-document-macros)
+  (check-group "citation macros")
+  (string-save three-bib (tmp-file "refs3.bib"))
+  ;; cite-detail of the package cite-author-year has the signature of the
+  ;; standard one; cite* and cite-textual* show all the names. The third
+  ;; citation is the second cite-detail: its cite-add is one too
+  (with r (generated-with
+           "natbib.tm"
+           (string-append
+            "  See <cite-detail|knuth84|pp. 99-101>,"
+            " <cite-detail|knuth84|<em|passim>>, <cite|three>,"
+            " <cite*|three>, <cite-textual|three> and"
+            " <cite-textual*|three>.\n\n"
+            "  <\\bibliography|bib|csl-apa|refs3>\n  </bibliography>\n")
+           "<tuple|generic|cite-author-year>"
+           (lambda ()
+             (list (flat* (expanded '(cite-detail "knuth84" "pp. 99-101")))
+                   (flat* (expanded '(with "cite-nr" "2"
+                                       (cite-detail "knuth84"
+                                                    (em "passim")))))
+                   (flat* (expanded '(cite "three")))
+                   (flat* (expanded '(cite* "three")))
+                   (flat* (expanded '(cite-textual* "three"))))))
+    (with l (bindings (first-of 'bibliography (car r)))
+      (check= (assoc-ref l "bib-cite-p:three,") "(Alpha et al., 2000)")
+      (check= (assoc-ref l "bib-cite-p*:three,")
+              "(Alpha, Beta, & Gamma, 2000)")
+      (check= (assoc-ref l "bib-cite-t:three,") "Alpha et al. (2000)")
+      (check= (assoc-ref l "bib-cite-t*:three,")
+              "Alpha, Beta, & Gamma (2000)"))
+    (check= (cdr r)
+            (list (u "(Knuth, 1984, pp. 99–101)")
+                  "(Knuth, 1984, passim)"
+                  "(Alpha et al., 2000)"
+                  "(Alpha, Beta, & Gamma, 2000)"
+                  "Alpha, Beta, & Gamma (2000)")))
+  ;; in a note style, a textual citation inside a footnote is the names,
+  ;; a comma and the rest
+  (string-save sample-bib (tmp-file "refs.bib"))
+  (with r (generated-with
+           "inline.tm"
+           (string-append
+            "  One<cite|knuth86>, two <cite-textual|knuth86>.\n\n"
+            "  <\\bibliography|bib|csl-chicago-notes-bibliography|refs>\n"
+            "  </bibliography>\n")
+           "generic"
+           (lambda ()
+             (flat* (expanded '(with "cite-note" (value "cite-inline")
+                                     "cite-note-nr" "2"
+                                     (cite-textual "knuth86"))))))
+    (check= (cdr r)
+            "Donald E. Knuth, The TeXbook (Addison-Wesley, 1986)."))
+  ;; the preview of the bibliography dialog: the entries without the
+  ;; citations of the document
+  (with r (generated-with
+           "preview.tm"
+           (string-append
+            "  See <cite|knuth86b> and <cite|knuth84>.\n\n"
+            "  <\\bibliography|bib|csl-apa|refs>\n  </bibliography>\n")
+           "generic"
+           (lambda ()
+             (csl-bib-process "bib" "csl-apa" (bib-parse sample-bib)
+                              '() #f #f)))
+    (check= (length (bindings (first-of 'bibliography (car r)))) 3)
+    (check= (bindings (cdr r)) '())
+    (check= (length (cdr (caddr (first-of 'bib-list (cdr r))))) 3)))
+
+(define note-style
+  ;; a note style which shows the positions of its cites
+  (string-append
+   "<style xmlns=\"http://purl.org/net/xbiblio/csl\" class=\"note\""
+   " version=\"1.0\"><info><title>Notes</title><id>notes</id></info>"
+   "<citation near-note-distance=\"1\"><layout delimiter=\"; \">"
+   "<group delimiter=\" \"><text variable=\"title\"/>"
+   "<choose><if position=\"near-note\"><text value=\"near\"/></if>"
+   "<else><text value=\"far\"/></else></choose>"
+   "<text variable=\"first-reference-note-number\" prefix=\"n\"/>"
+   "</group></layout></citation>"
+   "<bibliography><layout><text variable=\"title\"/></layout>"
+   "</bibliography></style>"))
+
+(define (test-document-notes)
+  (check-group "note numbers")
+  (string-save sample-bib (tmp-file "refs.bib"))
+  (string-save note-style (tmp-file "notes.csl"))
+  ;; the positions count the footnotes, not the citations: the first two
+  ;; citations are in the first footnote, the third one makes the second
+  (with l (bindings
+           (generated-bibliography
+            "positions.tm"
+            (string-append
+             "  A<footnote|x <cite|knuth86> y <cite|knuth84>.>"
+             " B<cite|knuth86> C<cite|knuth84>.\n\n"
+             "  <\\bibliography|bib|csl-notes|refs>\n"
+             "  </bibliography>\n")))
+    (check= (assoc-ref l "bib-cite-p:knuth86,") "The TeXbook far")
+    (check= (assoc-ref l "bib-cite-p:knuth86,#3") "The TeXbook near n1")
+    (check= (assoc-ref l "bib-cite-p:knuth84,#4")
+            "Literate programming far n1")))
+
+(define (test-style-files)
+  (check-group "style files")
+  (when (not (url-exists? (system->url (string-append csl-dir "/styles"))))
+    (system-mkdir (system->url (string-append csl-dir "/styles"))))
+  (set! csl-extra-path (list (system->url csl-dir)))
+  ;; a style which is changed within the same second is read again too
+  (let* ((style (lambda (suffix)
+                  (string-replace small-style "<layout suffix=\".\">"
+                                  (string-append "<layout suffix=\"" suffix
+                                                 "\">"))))
+         (shown (lambda ()
+                  (with r (bib-of "csl-changed")
+                    (and (pair? r) (caddr (car r)))))))
+    (save-style "changed" (style "."))
+    (with s (shown)
+      (check-true (and s (string-ends? s "Reading, MA."))))
+    (save-style "changed" (style " (end)."))
+    (with s (shown)
+      (check-true (and s (string-ends? s "Reading, MA (end)."))))
+    ;; the styles are listed without the processor
+    (check-true (in? "csl-changed" (csl-available-styles))))
+  (set! csl-extra-path '()))
+
 (define (test-document)
   (check-group "document bibliography")
   (string-save sample-bib (tmp-file "refs.bib"))
@@ -1101,7 +1243,8 @@
   (remove-tmp-dir)
   (system-mkdir (system->url csl-dir))
   (for (test (list test-document test-document-citations test-style-errors
-                   test-scripts))
+                   test-scripts test-document-macros test-document-notes
+                   test-style-files))
     (with r (check-run test)
       (when (and (pair? r) (== (car r) 'error))
         (check-report #f "the group" (object->string r)))))

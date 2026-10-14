@@ -100,7 +100,9 @@
   <verbatim|p. 12> or <verbatim|chap. 3>, the following tags are understood:
   <markup|cite-textual> for a citation which is part of the sentence, as in
   ``Knuth (1984) shows'', <markup|cite-author> for the authors alone and
-  <markup|cite-year> for the year alone. With a style which cites in
+  <markup|cite-year> for the year alone. With the package
+  <tmpackage|cite-author-year>, <markup|cite*> and <markup|cite-textual*>
+  show all the authors, without ``et al.''. With a style which cites in
   footnotes, a citation inside a footnote of yours stays in that footnote.
 
   The terms (``and'', ``edited by'', the names of the months) are in the

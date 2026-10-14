@@ -24,6 +24,7 @@
 ;;   locale-cache    a hash table from codes to the locales as the style
 ;;                   sees them
 ;;   title           the title of the style
+;;   parent          for a dependent style, (name . style) of its parent
 ;;
 ;; A locale is a hash table with the entries
 ;;
@@ -36,19 +37,11 @@
 ;;   options         the attributes of cs:style-options
 
 (texmacs-module (csl csl-style)
-  (:use (csl csl-utils)))
+  (:use (csl csl-utils) (csl csl-files)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Files
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(tm-define csl-extra-path '())
-
-(tm-define (csl-directories sub)
-  (:synopsis "The directories where the files of the kind @sub are sought")
-  (append (map (lambda (d) (url-append d sub)) csl-extra-path)
-          (list (url-append "$TEXMACS_HOME_PATH/csl" sub)
-                (url-append "$TEXMACS_PATH/misc/csl" sub))))
 
 (define (find-file sub name)
   (let loop ((l (csl-directories sub)))
@@ -64,6 +57,7 @@
 ;; Styles
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;; the styles which were loaded: name -> (stamp of the file . style)
 (define style-cache (make-ahash-table))
 
 (define (parent-name root)
@@ -117,6 +111,8 @@
                    (ahash-set! style (car p) (cdr p)))
                  (ahash-set! style 'name name)
                  (ahash-set! style 'dependent? #t)
+                 (ahash-set! style 'parent
+                             (cons (parent-name root) parent))
                  (ahash-set! style 'locale-cache (make-ahash-table))
                  (when (csl-attr root 'default-locale)
                    (ahash-set! style 'default-locale
@@ -127,17 +123,28 @@
   (:synopsis "The file of the style @name, or #f")
   (find-file "styles" (string-append name ".csl")))
 
+(define (file-stamp u)
+  ;; tells whether the file @u was changed or another file is found
+  (list (url->string u) (url-last-modified u) (url-size u)))
+
+(define (fresh-parent? style)
+  ;; a dependent style is a copy of its parent, which may have changed
+  (with p (ahash-ref style 'parent)
+    (or (not p) (eq? (csl-load-style (car p) #f) (cdr p)))))
+
 (tm-define (csl-load-style name . opt)
   (:synopsis "The style @name, or #f")
   ;; the optional argument #f refuses a dependent style; a style is read
-  ;; again when its file changed
+  ;; again when its file (or the parent of a dependent style) changed
   (and-with u (csl-style-file name)
-    (let* ((date (url-last-modified u))
+    (let* ((stamp (file-stamp u))
            (old (ahash-ref style-cache name))
-           (style (if (and old (== (car old) date)) (cdr old)
+           (style (if (and old (== (car old) stamp) (fresh-parent? (cdr old)))
+                      (cdr old)
                       (with st (apply csl-style-from-string
                                       (cons* name (string-load u) opt))
-                        (when st (ahash-set! style-cache name (cons date st)))
+                        (if st (ahash-set! style-cache name (cons stamp st))
+                            (ahash-remove! style-cache name))
                         st))))
       (and style
            (not (and (nnull? opt) (not (car opt))

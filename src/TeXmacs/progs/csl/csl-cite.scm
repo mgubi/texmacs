@@ -18,6 +18,7 @@
 ;;   prefix, suffix     rich text around the cite
 ;;   suppress-author    the cite without its names: (1984)
 ;;   author-only        the names alone: Knuth
+;;   all-names          all the names, without et al.
 ;;   position           first, subsequent, ibid or ibid-with-locator
 ;;   near-note, first-note
 ;;
@@ -48,9 +49,9 @@
         (if (and ndp (part 'family)) (rt-cat ndp " " (part 'family))
             (part 'family)))))
 
-(define (default-author proc id)
+(define (default-author proc id all?)
   ;; the names of an item whose cite shows none, as in a numeric style; a
-  ;; work without names is called by its title
+  ;; work without names is called by its title; with @all?, without et al.
   (let* ((item (csl-processor-item proc id))
          (locale (csl-processor-locale proc))
          (names (or (and item
@@ -64,15 +65,19 @@
            (and item (or (csl-item-ref item "title-short")
                          (csl-item-ref item "title"))))
           ((null? (cdr l)) (car l))
-          ((null? (cddr l))
-           (rt-cat (car l) " " (or (csl-term locale "and" #f #f) "and") " "
-                   (cadr l)))
+          ((or (null? (cddr l)) all?)
+           (rt-cat (rt-join (cDr l) ", ")
+                   (if (null? (cddr l)) " " ", ")
+                   (or (csl-term locale "and" #f #f) "and") " "
+                   (cAr l)))
           (else (rt-cat (car l) " "
                         (or (csl-term locale "et-al" #f #f) "et al."))))))
 
 (define (cite-author proc cite p)
   ;; @p is the result of csl-render-cite
-  (if (rt-empty? (cdr p)) (default-author proc (csl-cite-ref cite 'id))
+  (if (rt-empty? (cdr p))
+      (default-author proc (csl-cite-ref cite 'id)
+                      (csl-cite-ref cite 'all-names))
       (cdr p)))
 
 (define (render proc cite)

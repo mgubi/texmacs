@@ -598,6 +598,10 @@
                             (else key))))
       (cond (over (cdr over))
             ((and sort (== key 'name-as-sort-order)) "all")
+            ;; a cite with all its names (cite* of natbib): no et al.
+            ((and (not sort) (ctx-ref ctx 'all-names)
+                  (in? key '(et-al-min et-al-subsequent-min)))
+             #f)
             ((and sort (in? key '(et-al-subsequent-min
                                   et-al-subsequent-use-first)))
              default)

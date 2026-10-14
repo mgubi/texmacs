@@ -56,7 +56,8 @@
            `(with "bg-color" "#ffffff"
               (mini-paragraph "480px"
                 ,(if (csl-style-name? style)
-                     (csl-bib-process "bib" style entries)
+                     ;; the entries alone, not the citations of the document
+                     (csl-bib-process "bib" style entries '() #f #f)
                      (bib-process "bib" style entries))))))))
 
 (define (bibwid-output)

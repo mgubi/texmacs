@@ -69,8 +69,13 @@ the citations are rendered with the bibliography and kept in the document:
    `cite-textual`, `cite-parenthesized`, `cite-author`, `cite-year`, also
    in the packages `cite-author-year` and `cite-sort`) write each citation
    to the auxiliary data `PREFIX-cites`, as
-   `(tuple mode (tuple entry...) nr)` with the modes `p`, `t`, `a`, `y`,
-   and count the citations of the document in `cite-nr`, which is `nr`.
+   `(tuple mode (tuple entry...) nr note)` with the modes `p`, `t`, `a`,
+   `y` (and `p*`, `t*` for `cite*` and `cite-textual*` of
+   `cite-author-year`: all the names, without et al.), count the citations
+   of the document in `cite-nr`, which is `nr`, and give the number `note`
+   of the footnote which holds the citation: the footnote around it
+   (`cite-note-nr`, set by `footnote`), else the next footnote, which is
+   the one a note style makes for it.
 3. At the next update, `csl-bib-process` reads `PREFIX-cites`, renders each
    different citation and puts the results in the first entry of the
    bibliography, as `(set-binding "PREFIX-cite-MODE:SIGNATURE" tree)`;
@@ -89,12 +94,28 @@ reads like one ("p. 12", "chap. 3", "12-15"), else a suffix of the cite.
 In a style of the class note, the macro `cite-note` puts the citation in a
 footnote; inside `footnote`, `cite-note` is `cite-inline`. A textual
 citation then has two bindings: the names (mode `t`), which stay in the
-text, and the rest (mode `n`), which goes to the footnote. The values of
-the bindings are quoted, so that the macros inside them are expanded where
-the citation stands.
+text, and the rest (mode `n`; `t*` and `n*` for `cite-textual*`), which
+goes to the footnote; inside a footnote, the rest follows the names after
+`cite-textual-sep` (a comma). The positions (ibid, near-note,
+first-reference-note-number) count the footnotes in a note style, so that
+two citations in one footnote have the same note number; in the other
+styles they count the citations. The values of the bindings are quoted, so
+that the macros inside them are expanded where the citation stands.
+
+`cite*` and `cite-textual*` of `cite-author-year` (natbib: the full list
+of authors) render their cites with the flag `all-names`, which drops the
+options `et-al-min` and `et-al-subsequent-min` of the style: the names are
+all shown, as CSL shows a list which is shorter than `et-al-min`. CSL has
+no form of its own for this, so the rest of the citation (labels,
+delimiters, "&" or "and") is as the style prints it.
 
 The number N of a citation is counted by the typesetter, which is a
 known limit: see "Open points".
+
+When the macros of `std-automatic.ts`, `env-float.ts` or
+`cite-author-year.ts` are changed, the environments of the styles which
+TeXmacs keeps in `$TEXMACS_HOME_PATH/system/cache` must be removed (the
+test suite runs with a scratch home: remove its `system/cache`).
 
 ## Modules (`TeXmacs/progs/csl`)
 
@@ -108,7 +129,8 @@ known limit: see "Open points".
 | `csl-process` | the processor: sorting, numbering, bibliography, one cite, disambiguation |
 | `csl-cite` | citations of several cites: grouping, collapsing, textual form |
 | `csl-output` | rich text to TeXmacs trees and to the HTML of the fixtures: quotes, flip-flop, punctuation |
-| `csl-bib` | the bibliography and the citations of a document; entry points `csl-bib-process`, `csl-available-styles` |
+| `csl-files` | the directories of the styles, `csl-style-name?`, `csl-available-styles`; small, so that the menus list the styles without loading the processor |
+| `csl-bib` | the bibliography and the citations of a document; entry point `csl-bib-process` (with the optional argument `#f` for cites?, the entries alone: the preview of the bibliography dialog) |
 | `csl-fixtures` | runner of the official fixtures |
 
 All strings are in the TeXmacs encoding. A rendered value is "rich text":
@@ -133,8 +155,9 @@ changes of case skip `nocase` and `raw`.
   style whose parent is dependent too) gives the text "Error: CSL style
   NAME: ..." instead of the bibliography; the citations then show as
   without a CSL style.
-- Styles are kept for the session and read again when their file changes;
-  a style next to the document is read at every update.
+- Styles are kept for the session and read again when their file changes
+  (its path, date or size) or, for a dependent style, when its parent is
+  read again; a style next to the document is read at every update.
 
 ## Mapping of BibTeX entries
 
@@ -168,9 +191,9 @@ As of 2026-10-14.
   the entries of the auxiliary data. A citation which is evaluated but not
   typeset (in a title which is also used for a header) could shift the
   numbers of the citations after it. Foreseen, not reproduced.
-- **A textual citation of a note style inside a footnote of the author.**
-  The names stay in the text and the rest should stay there too
-  (`cite-note` is `cite-inline` inside `footnote`); not tried.
+- **The note numbers are those of `footnote`.** Other notes (custom
+  footnotes, notes of other packages) are not seen, and a footnote counter
+  which is reset (per chapter) makes the distances between notes wrong.
 - **`cite-textual` takes keys only**: "Knuth (1984, p. 12)" cannot be
   written.
 - **Nothing tells that an update is pending.** A new or changed citation

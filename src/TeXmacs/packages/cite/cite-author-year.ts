@@ -131,13 +131,13 @@
 
   <assign|cite-textual*+|<macro|key|<cite-sep><cite-textual*-1|<arg|key>>>>
 
-  <assign|cite-textual*|<xmacro|x|<cite-csl|t|<map-args|cite-csl-key|merge|x>|<map-args|cite-csl-id|tuple|x>|<map-args|cite-add|concat|x>|<cite-textual*-1|<arg|x|0>><map-args|cite-textual*+|concat|x|1>>>>
+  <assign|cite-textual*|<xmacro|x|<cite-csl|t*|<map-args|cite-csl-key|merge|x>|<map-args|cite-csl-id|tuple|x>|<map-args|cite-add|concat|x>|<cite-textual*-1|<arg|x|0>><map-args|cite-textual*+|concat|x|1>>>>
 
   \;
 
   <assign|cite|<xmacro|x|<cite-csl|p|<map-args|cite-csl-key|merge|x>|<map-args|cite-csl-id|tuple|x>|<map-args|cite-add|concat|x>|<render-cite|<cite-raw-1|<arg|x|0>><map-args|cite-raw+|concat|x|1>>>>>
 
-  <assign|cite*|<xmacro|x|<cite-csl|p|<map-args|cite-csl-key|merge|x>|<map-args|cite-csl-id|tuple|x>|<map-args|cite-add|concat|x>|<render-cite|<cite-raw*-1|<arg|x|0>><map-args|cite-raw*+|concat|x|1>>>>>
+  <assign|cite*|<xmacro|x|<cite-csl|p*|<map-args|cite-csl-key|merge|x>|<map-args|cite-csl-id|tuple|x>|<map-args|cite-add|concat|x>|<render-cite|<cite-raw*-1|<arg|x|0>><map-args|cite-raw*+|concat|x|1>>>>>
 
   <assign|cite-detail|<macro|key|details|<cite-csl|p|<merge|<arg|key>|{|<cite-csl-details|<arg|details>>|,>|<tuple|<tuple|<arg|key>|<arg|details>>>|<cite-add|<arg|key>>|<render-cite-detail|<cite-raw-1|<arg|key>>|<arg|details>>>>>
 

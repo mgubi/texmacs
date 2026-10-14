@@ -25,27 +25,14 @@
 ;; that the labels look as the style wants them, or do not show.
 
 (texmacs-module (csl csl-bib)
-  (:use (csl csl-utils) (csl csl-style) (csl csl-data) (csl csl-process)
-        (csl csl-cite) (csl csl-output)))
+  (:use (csl csl-utils) (csl csl-files) (csl csl-style) (csl csl-data)
+        (csl csl-process) (csl csl-cite) (csl csl-output)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Styles
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(tm-define (csl-style-name? style)
-  (:synopsis "Is @style the name of a CSL style, csl-NAME?")
-  (and (string? style) (string-starts? style "csl-")
-       (> (string-length style) 4)))
-
-(tm-define (csl-available-styles)
-  (:synopsis "The names csl-NAME of the CSL styles which are installed")
-  (let* ((files (append-map
-                 (lambda (d)
-                   (if (url-exists? d) (url-read-directory d "*.csl") '()))
-                 (csl-directories "styles")))
-         (names (map (lambda (u) (url->string (url-basename u))) files)))
-    (map (cut string-append "csl-" <>)
-         (list-remove-duplicates (csl-sort names string<?)))))
+;; csl-style-name? and csl-available-styles are in (csl csl-files)
 
 (define (document-style name)
   ;; a style next to the current document comes first; returns the style,
@@ -65,14 +52,17 @@
 
 ;; When a bibliography in a CSL style is present, the citation macros
 ;; (cite-csl in std-automatic.ts) write each citation to the auxiliary data
-;; PREFIX-cites, as (tuple mode (tuple entry ...) nr) where an entry is a
-;; key or (tuple key details), nr is the number of the citation in the
-;; document and the mode is
+;; PREFIX-cites, as (tuple mode (tuple entry ...) nr note) where an entry
+;; is a key or (tuple key details), nr is the number of the citation in the
+;; document, note the number of the footnote which holds the citation (or
+;; would hold it in a style of the class note) and the mode is
 ;;
 ;;   p   the citation as the style prints it: (Knuth, 1984)
 ;;   t   as part of the sentence: Knuth (1984)
 ;;   a   the authors only: Knuth
 ;;   y   without the authors and without the brackets: 1984
+;;   p*  as p, with all the names (no et al.), for cite* of natbib
+;;   t*  as t, with all the names, for cite-textual*
 ;;
 ;; The citations are rendered with the bibliography, which carries them as
 ;; bindings PREFIX-cite-MODE:SIGNATURE; the macros show these bindings. A
@@ -139,33 +129,44 @@
   ;; the signature of such an entry does not tell its details
   (and (func? e 'tuple 2) (not (string? (caddr e)))))
 
+(define (number-at c i)
+  ;; the number in the field @i of the tuple @c, or #f
+  (and (> (length c) i) (string? (list-ref c i))
+       (string->number (list-ref c i))))
+
 (define (document-citations prefix)
   ;; the citations of the document, in order:
-  ;; ((mode signature cites nr own?) ...), or #f for those which cannot be
-  ;; understood; nr is the number which the macros gave to the citation
-  ;; and own? tells that it needs a binding of its own
+  ;; ((mode signature cites nr own? note) ...), or #f for those which
+  ;; cannot be understood; nr is the number which the macros gave to the
+  ;; citation, own? tells that it needs a binding of its own and note is
+  ;; the number of its footnote
   (let* ((aux (tree->stree (get-auxiliary (string-append prefix "-cites"))))
          (l (if (func? aux 'document) (cdr aux) '())))
     (map (lambda (c i)
-           (let* ((ok? (and (or (func? c 'tuple 2) (func? c 'tuple 3))
+           (let* ((ok? (and (func? c 'tuple) (<= 2 (length (cdr c)) 4)
                             (string? (cadr c))
                             (func? (caddr c) 'tuple)))
                   (entries (if ok? (cdr (caddr c)) '()))
                   (sigs (map entry-signature entries))
                   (cites (map entry->cite entries))
-                  (nr (and ok? (func? c 'tuple 3) (string? (cadddr c))
-                           (string->number (cadddr c)))))
+                  (nr (and ok? (number-at c 3))))
              (and ok? (nnull? entries) (list-and sigs) (list-and cites)
                   (list (cadr c)
                         (string-append (cadr c) ":"
                                        (apply string-append sigs))
                         cites
                         (or nr (+ i 1))
-                        (list-or (map rich-details? entries))))))
+                        (list-or (map rich-details? entries))
+                        (or (number-at c 4) nr (+ i 1))))))
          l (iota (length l)))))
+
+(define (all-names cites)
+  (map (lambda (c) (cons '(all-names . #t) c)) cites))
 
 (define (render-citation proc mode cites)
   (cond ((== mode "t") (csl-textual-citation proc cites))
+        ((== mode "t*") (csl-textual-citation proc (all-names cites)))
+        ((== mode "p*") (csl-citation proc (all-names cites)))
         ((== mode "a")
          (csl-citation proc (map (lambda (c) (cons '(author-only . #t) c))
                                  cites)))
@@ -189,8 +190,8 @@
           (else 'first))))
 
 (define (with-positions proc cites last nr first-notes last-notes)
-  ;; the cites of the citation number @nr with their positions; @last
-  ;; holds the cites of the citation before
+  ;; the cites of a citation in the note number @nr with their positions;
+  ;; @last holds the cites of the citation before
   (let* ((area (csl-style-ref (csl-processor-ref proc 'style) 'citation))
          (near (or (string->number (csl-attr area 'near-note-distance "5"))
                    5)))
@@ -220,7 +221,9 @@
   ;; different citation, and one more for a citation which reads
   ;; otherwise where it stands (ibid., a short form). In a note style, a
   ;; citation in the text has two bindings: the names with the mode t and
-  ;; the rest, which goes to a footnote, with the mode n.
+  ;; the rest, which goes to a footnote, with the mode n (t* and n* for
+  ;; the mode t*). The positions count the footnotes in a note style, and
+  ;; the citations in the other ones.
   (let* ((locale (csl-processor-locale proc))
          (first-notes (make-ahash-table))
          (last-notes (make-ahash-table))
@@ -229,24 +232,29 @@
          (render
           ;; a list of (mode . tree)
           (lambda (mode cites)
-            (if (and note? (== mode "t"))
-                (with parts (csl-textual-parts proc cites)
-                  (list (cons "t" (tm (rt-join (map car parts) ", ")))
-                        (cons "n" (tm (rt-join (map cdr parts) "; ")))))
+            (if (and note? (in? mode '("t" "t*")))
+                (let* ((star? (== mode "t*"))
+                       (parts (csl-textual-parts
+                               proc (if star? (all-names cites) cites))))
+                  (list (cons mode (tm (rt-join (map car parts) ", ")))
+                        (cons (if star? "n*" "n")
+                              (tm (rt-join (map cdr parts) "; ")))))
                 (list (cons mode (tm (render-citation proc mode cites)))))))
          (bind
           ;; the values are quoted: the macros inside them are expanded
           ;; where the citation stands
           (lambda (sig suffix l)
-            (map (lambda (p)
-                   `(set-binding ,(string-append prefix "-cite-" (car p)
-                                                 (string-drop sig 1) suffix)
-                                 (quote ,(cdr p))))
-                 l))))
+            (with keys (string-drop sig (string-index sig #\:))
+              (map (lambda (p)
+                     `(set-binding ,(string-append prefix "-cite-" (car p)
+                                                   keys suffix)
+                                   (quote ,(cdr p))))
+                   l)))))
+    ;; the bindings are gathered in reverse order
     (let loop ((l (document-citations prefix)) (last '())
                (r (list `(set-binding ,(string-append prefix "-csl")
                                       ,(if note? "note" "true")))))
-      (cond ((null? l) r)
+      (cond ((null? l) (reverse r))
             ((not (car l)) (loop (cdr l) '() r))
             (else
               (let* ((mode (car (car l)))
@@ -254,12 +262,13 @@
                      (cites (caddr (car l)))
                      (nr (cadddr (car l)))
                      (own? (list-ref (car l) 4))
+                     (note (if note? (list-ref (car l) 5) nr))
                      (old (and (not own?) (ahash-ref done sig)))
                      (new? (not (or own? old)))
                      (generic (or old (render mode cites)))
-                     (placed? (in? mode '("p" "t")))
+                     (placed? (in? mode '("p" "t" "p*" "t*")))
                      (cites* (if placed?
-                                 (with-positions proc cites last nr
+                                 (with-positions proc cites last note
                                                  first-notes last-notes)
                                  cites))
                      (moved? (and placed?
@@ -272,12 +281,13 @@
                 (when (not own?) (ahash-set! done sig generic))
                 (loop (cdr l) (if placed? cites last)
                       (append
-                       r
-                       (if new? (bind sig "" generic) '())
-                       (if (or own? (!= own generic))
-                           (bind sig (string-append "#" (number->string nr))
-                                 own)
-                           '())))))))))
+                       (reverse
+                        (if (or own? (!= own generic))
+                            (bind sig (string-append "#" (number->string nr))
+                                  own)
+                            '()))
+                       (reverse (if new? (bind sig "" generic) '()))
+                       r))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Bibliographies
@@ -285,14 +295,19 @@
 
 (define (in-order items keys)
   ;; the items in the order of the citations @keys, the other ones after
-  (let* ((cited (list-filter
-                 (map (lambda (k)
-                        (list-find items (lambda (i) (== (csl-item-id i) k))))
-                      (list-remove-duplicates keys))
-                 identity))
-         (ids (map csl-item-id cited)))
-    (append cited
-            (list-filter items (lambda (i) (nin? (csl-item-id i) ids))))))
+  (let* ((by-id (make-ahash-table))
+         (seen (make-ahash-table)))
+    (for (i (reverse items)) (ahash-set! by-id (csl-item-id i) i))
+    (let loop ((l keys) (r '()))
+      (if (nnull? l)
+          (with i (and (not (ahash-ref seen (car l)))
+                       (ahash-ref by-id (car l)))
+            (when i (ahash-set! seen (car l) #t))
+            (loop (cdr l) (if i (cons i r) r)))
+          (append (reverse r)
+                  (list-filter items
+                               (lambda (i)
+                                 (not (ahash-ref seen (csl-item-id i))))))))))
 
 (define (split-around s what)
   ;; (prefix . suffix) of the first occurrence of @what in @s, or #f
@@ -330,9 +345,10 @@
 (tm-define (csl-bib-process prefix style t . opt)
   (:synopsis "The bibliography of the BibTeX entries @t in the CSL style")
   ;; the optional arguments are the list of the keys in the order of
-  ;; citation, and the code of a locale to use instead of the language of
-  ;; the document. A style which fails gives a message instead of the
-  ;; bibliography, and the citations show as without a CSL style.
+  ;; citation, the code of a locale to use instead of the language of the
+  ;; document, and #f for the entries alone, without the citations of the
+  ;; document (a preview). A style which fails gives a message instead of
+  ;; the bibliography, and the citations show as without a CSL style.
   (catch #t
     (lambda () (apply process-bibliography (cons* prefix style t opt)))
     (lambda (key . args)
@@ -344,7 +360,8 @@
          (st (document-style name))
          (keys (if (and (nnull? opt) (list? (car opt)))
                    (list-filter (car opt) string?) '()))
-         (forced (and (> (length opt) 1) (cadr opt))))
+         (forced (and (> (length opt) 1) (cadr opt)))
+         (cites? (or (< (length opt) 3) (caddr opt))))
     (cond ((not st)
            (string-append "Error: CSL style " name " not found"))
           ((== st 'invalid)
@@ -375,9 +392,11 @@
                                  (split-around (car labels) (car plain))))
                    (texts (if (or numeric? affixes) plain
                               (map (cut csl->texmacs <> locale) cites)))
-                   (bindings (citation-bindings
-                              prefix proc
-                              (== (csl-style-ref st 'class) "note")))
+                   (bindings (if cites?
+                                 (citation-bindings
+                                  prefix proc
+                                  (== (csl-style-ref st 'class) "note"))
+                                 '()))
                    (hanging? (== (csl-bibliography-option
                                   proc 'hanging-indent "false")
                                  "true"))

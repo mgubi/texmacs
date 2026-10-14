@@ -19,8 +19,8 @@
 ;;   numbers   a hash table from identifiers to citation numbers
 ;;
 ;; A cite is an association list with the key id and, optionally, locator,
-;; label, prefix, suffix, suppress-author, author-only, position and
-;; near-note.
+;; label, prefix, suffix, suppress-author, author-only, all-names, position
+;; and near-note.
 
 (texmacs-module (csl csl-process)
   (:use (csl csl-utils) (csl csl-style) (csl csl-data) (csl csl-render)
@@ -286,6 +286,7 @@
   (ahash-set! ctx 'near-note (csl-cite-ref cite 'near-note))
   (ahash-set! ctx 'first-note (csl-cite-ref cite 'first-note))
   (ahash-set! ctx 'suppress-author (csl-cite-ref cite 'suppress-author))
+  (ahash-set! ctx 'all-names (csl-cite-ref cite 'all-names))
   (when (csl-cite-ref cite 'no-year-suffix)
     (ahash-set! ctx 'year-suffix #f)))
 

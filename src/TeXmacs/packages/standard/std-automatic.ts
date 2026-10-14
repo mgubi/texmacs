@@ -75,9 +75,19 @@
 
   <assign|cite-note|<macro|body|<footnote|<arg|body>>>>
 
+  <assign|cite-note-nr|>
+
+  <assign|cite-textual-sep|<macro|, >>
+
+  <assign|cite-csl-note|<macro|<if|<equal|<value|cite-note-nr>|>|<if|<provides|counter-footnote>|<plus|<value|<counter-footnote>>|1>|1>|<value|cite-note-nr>>>>
+
+  <assign|cite-csl-rest|<macro|rest|<if|<equal|<arg|rest>|>||<if|<equal|<value|cite-note-nr>|>|<cite-note|<arg|rest>>|<cite-textual-sep><cite-note|<arg|rest>>>>>>
+
   <assign|cite-csl-get|<macro|mode|sig|body|<if|<has-binding|<merge|<cite-csl-name|<arg|mode>|<arg|sig>>|#|<value|cite-nr>>>|<get-binding|<merge|<cite-csl-name|<arg|mode>|<arg|sig>>|#|<value|cite-nr>>>|<if|<has-binding|<cite-csl-name|<arg|mode>|<arg|sig>>>|<get-binding|<cite-csl-name|<arg|mode>|<arg|sig>>>|<arg|body>>>>>
 
-  <assign|cite-csl|<macro|mode|sig|data|keys|body|<if|<has-binding|<merge|<value|bib-prefix>|-csl>>|<assign|cite-nr|<plus|<value|cite-nr>|1>><write|<merge|<value|bib-prefix>|-cites>|<tuple|<arg|mode>|<arg|data>|<value|cite-nr>>><arg|keys><if|<equal|<get-binding|<merge|<value|bib-prefix>|-csl>>|note>|<if|<equal|<arg|mode>|p>|<cite-note|<cite-csl-get|p|<arg|sig>|<arg|body>>>|<if|<equal|<arg|mode>|t>|<cite-csl-get|t|<arg|sig>|<arg|body>><cite-note|<cite-csl-get|n|<arg|sig>|>>|<cite-csl-get|<arg|mode>|<arg|sig>|<arg|body>>>>|<cite-csl-get|<arg|mode>|<arg|sig>|<arg|body>>>|<arg|body>>>>
+  <assign|cite-csl-in-note|<macro|mode|sig|body|<if|<or|<equal|<arg|mode>|p>|<equal|<arg|mode>|p*>>|<cite-note|<cite-csl-get|<arg|mode>|<arg|sig>|<arg|body>>>|<if|<or|<equal|<arg|mode>|t>|<equal|<arg|mode>|t*>>|<cite-csl-get|<arg|mode>|<arg|sig>|<arg|body>><cite-csl-rest|<cite-csl-get|<if|<equal|<arg|mode>|t>|n|n*>|<arg|sig>|>>|<cite-csl-get|<arg|mode>|<arg|sig>|<arg|body>>>>>>
+
+  <assign|cite-csl|<macro|mode|sig|data|keys|body|<if|<has-binding|<merge|<value|bib-prefix>|-csl>>|<assign|cite-nr|<plus|<value|cite-nr>|1>><write|<merge|<value|bib-prefix>|-cites>|<tuple|<arg|mode>|<arg|data>|<value|cite-nr>|<cite-csl-note>>><arg|keys><if|<equal|<get-binding|<merge|<value|bib-prefix>|-csl>>|note>|<cite-csl-in-note|<arg|mode>|<arg|sig>|<arg|body>>|<cite-csl-get|<arg|mode>|<arg|sig>|<arg|body>>>|<arg|body>>>>
 
   <assign|cite-std|<xmacro|keys|<render-cite|<cite-arg|<arg|keys|0>><map-args|cite-arg-extra|concat|keys|1>>>>
 

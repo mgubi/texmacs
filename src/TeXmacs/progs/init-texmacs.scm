@@ -152,8 +152,8 @@
 (use-modules (bibtex bib-utils))
 (lazy-define (bibtex bib-complete) current-bib-file citekey-completions)
 (lazy-menu (bibtex bib-widgets) open-bibliography-inserter)
-(lazy-define (csl csl-bib) csl-style-name? csl-available-styles
-             csl-bib-process)
+(lazy-define (csl csl-files) csl-style-name? csl-available-styles)
+(lazy-define (csl csl-bib) csl-bib-process)
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
 ;(display* "memory: " (texmacs-memory) " bytes\n")
 
