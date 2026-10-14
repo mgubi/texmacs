@@ -305,10 +305,9 @@
   (:synopsis "Create a new GnuGP identity")
   (let* ((dir (if (null? homedir) (url-none) (car homedir)))
          (cmd (gpg-executable-gen-key dir))
-         (ret (evaluate-system
-               cmd '(0)
-               (list (gpg-gen-key-make-formatted-input
-                      name email comment passphrase)) '(2 3))))
+         (in (gpg-gen-key-make-formatted-input name email comment passphrase))
+         (ret (evaluate-system cmd '(0) (list in) '(2 3))))
+    (string-wipe! in) ; (the input holds the passphrase)
     (if (!= (car ret) "0")
         (gpg-error cmd (cadr ret) (caddr ret)) #t)))
 

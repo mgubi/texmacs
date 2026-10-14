@@ -57,6 +57,14 @@
   ;; involving unicode or cork.
   (in? c (list #\space (integer->char 9) #\newline #\return)))
 
+(define-public (string-wipe! s)
+  "Overwrite the characters of the string @s (a passphrase once used)."
+  ;; NOTE: only this string is overwritten: the copies which were made of it
+  ;; (by the garbage collector, by string-append, by the GUI) are not
+  (when (and (string? s) (> (string-length s) 0))
+    (catch #t (lambda () (string-fill! s #\space)) (lambda args #f)))
+  "")
+
 (define-public (string-tail s n)
   "Return all but the first @n chars of @s."
   (substring s n (string-length s)))

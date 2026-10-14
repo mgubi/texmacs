@@ -52,6 +52,7 @@ url get_texmacs_home_path ();
 array<string> evaluate_system (array<string> arg,
 			       array<int> fd_in, array<string> in,
 			       array<int> fd_out);
+void secure_wipe (string s);
 
 class object;
 bool async_eval_system (string cmd, object call_back);
