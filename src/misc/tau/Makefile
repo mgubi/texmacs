@@ -159,7 +159,9 @@ $(OUT)/web/tau.js: $(OBJECTS) $(LIBDEPS) $(TM)/misc/wasm/packages.js $(TM)/misc/
 	  -sEXPORTED_RUNTIME_METHODS=ccall,UTF8ToString,HEAPU8,FS,ENV,stringToUTF8OnStack \
 	  -sEXPORTED_FUNCTIONS=_main,_malloc,_free -lidbfs.js \
 	  '-sDEFAULT_LIBRARY_FUNCS_TO_INCLUDE=$$withStackSave,$$stringToUTF8OnStack' \
-	  $(OBJECTS) $(LIBS) -o $(OUT)/stage/tau.js
+	  --emit-symbol-map $(OBJECTS) $(LIBS) -o $(OUT)/stage/tau.js
+	@# (the names of the functions of the program, by their numbers in a
+	@# stack which the browser shows: stage/tau.js.symbols, not served)
 	@# the program and its script go to the page together: a page which is
 	@# loaded while the link runs must not get one of each (it fails with
 	@# calls to functions which are not there)

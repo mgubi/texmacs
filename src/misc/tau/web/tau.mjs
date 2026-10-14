@@ -935,7 +935,7 @@ worker.onmessage = event => {
 		break;
 	case "stopped":
 		failure("The program of Tau stopped on an error and cannot go on: " + m.text +
-			" Documents which were saved are kept; what was typed since is lost.");
+			" Documents which were saved are kept; what was typed since is lost.", undefined, m.stack);
 		break;
 	case "view": {
 		// the view which a window shows: tell it its place, and give it the
@@ -1049,7 +1049,7 @@ function notice(text, label, action) {
 // The program stopped: nothing which is typed reaches it any more
 let failed = false;
 let failureBox = null; // what says so
-function failure(text, title) {
+function failure(text, title, stack) {
 	if (failed) return;
 	failed = true;
 	const box = el("div", "tau-failure"), again = el("button", "tau-button", "Start Tau again");
@@ -1069,7 +1069,14 @@ function failure(text, title) {
 	});
 	const actions = el("div", "tau-failure-actions");
 	actions.append(backup, forget, again);
-	box.append(el("div", "tau-failure-title", title || "Tau stopped"), el("div", "", text), actions);
+	box.append(el("div", "tau-failure-title", title || "Tau stopped"), el("div", "", text));
+	// (where it happened, for a report: shown on demand, to copy)
+	if (stack) {
+		const more = el("details", "tau-failure-stack"), pre = el("pre", "", stack);
+		more.append(el("summary", "", "Details for a report"), pre);
+		box.append(more);
+	}
+	box.append(actions);
 	const veil = el("div", "tau-veil");
 	veil.append(box);
 	document.body.append(veil);

@@ -48,6 +48,10 @@ function check(what, ok, got) {
 	failed++;
 	console.log("safari: FAILED " + what + (got === undefined ? "" : ": " + JSON.stringify(got)));
 }
+// what stops the program, from now on (again after each load of the page)
+const watchErrors = () => run(`window.tauErrors = []; const w = () => { if (!window.tau) return setTimeout(w, 20);
+	tau.worker.addEventListener('message', e => { if (e.data.t === 'stopped' || e.data.t === 'failed') window.tauErrors.push(e.data.text); });
+	tau.worker.addEventListener('error', e => window.tauErrors.push(e.message)); }; w(); return 1;`);
 const stopped = () => run("return document.querySelectorAll('.tau-failure').length + window.tauErrors.length");
 
 // keys as the user presses them (WebDriver actions: to what has the keyboard)
@@ -70,9 +74,7 @@ async function firstLine() {
 try {
 	session = (await wd("POST", "/session", { capabilities: { alwaysMatch: { browserName: "safari" } } })).sessionId;
 	await wd("POST", `/session/${session}/url`, { url: `http://127.0.0.1:${port}/index.html?debug&nohome` });
-	await run(`window.tauErrors = []; const w = () => { if (!window.tau) return setTimeout(w, 20);
-		tau.worker.addEventListener('message', e => { if (e.data.t === 'stopped' || e.data.t === 'failed') window.tauErrors.push(e.data.text); });
-		tau.worker.addEventListener('error', e => window.tauErrors.push(e.message)); }; w(); return 1;`);
+	await watchErrors();
 	let started = false;
 	for (let i = 0; i < 120 && !started; i++) { await sleep(1000); started = await run("return !!(window.tau && tau.state.started)"); }
 	check("the page starts", started);
@@ -181,6 +183,7 @@ try {
 	// the documents kept in the browser: Safari is asked to keep them, and
 	// says once that it deletes them after seven days without a visit
 	await wd("POST", `/session/${session}/url`, { url: `http://127.0.0.1:${port}/index.html?debug&log` });
+	await watchErrors();
 	let again = false;
 	for (let i = 0; i < 120 && !again; i++) { await sleep(1000); again = await run("return !!(window.tau && tau.state.started)"); }
 	await sleep(2000);
@@ -191,6 +194,8 @@ try {
 	if (kept === false)
 		check("the notice of the seven days", await run("return Array.from(document.querySelectorAll('.tau-notice')).some(e => /seven days/.test(e.textContent))"));
 	await run("location.reload(); return 1;");
+	await sleep(500);
+	await watchErrors();
 	again = false;
 	for (let i = 0; i < 120 && !again; i++) { await sleep(1000); again = await run("return !!(window.tau && tau.state.started)"); }
 	await sleep(2000);

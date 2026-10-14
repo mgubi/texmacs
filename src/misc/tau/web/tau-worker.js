@@ -435,7 +435,10 @@ function stopped(error) {
 		/RuntimeError|call stack|unreachable|out of bounds|null function|table entry/i.test(String(error && error.message || error));
 	if (!fatal || dead) return;
 	dead = true;
-	postMessage({ t: "stopped", text: String(error && error.message || error) });
+	// (with where it happened: the functions of the program by their numbers,
+	// which stage/tau.js.symbols names, misc/tau/Makefile)
+	postMessage({ t: "stopped", text: String(error && error.message || error),
+		stack: String(error && error.stack || "").split("\n").slice(0, 40).join("\n") });
 }
 self.addEventListener("error", event => stopped(event.error || event.message));
 self.addEventListener("unhandledrejection", event => stopped(event.reason));
