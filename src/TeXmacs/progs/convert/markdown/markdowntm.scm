@@ -45,6 +45,11 @@
 (define mdtm-numbered-footnotes '())
 (define mdtm-used-footnotes (make-ahash-table))
 (define mdtm-done-footnotes (make-ahash-table))
+
+;; whether a table is being converted which is written back as it was read
+;; while it is not changed: its marks of footnotes are kept as they are,
+;; and the definitions to which only such tables refer stay where they are
+(define mdtm-in-kept-table? #f)
 (define mdtm-defs-last? #f)
 
 (define mdtm-faithful-sections
@@ -252,15 +257,19 @@
 (define (mdtm-pre x)
   (let* ((tag (tmmd-language-tag (or (mdtm-attr x 'lang) "")))
          (s (apply string-append (list-filter (mdtm-children x) string?)))
+         ;; (a line with tabs, which are displayed as spaces, is written as
+         ;; it is while it is not changed)
          (code `(,tag ,(mdtm-document
-                         (map (lambda (l) (mdtm-text (mdtm-expand-tabs l)))
+                         (map (lambda (l)
+                                (with t (mdtm-text (mdtm-expand-tabs l))
+                                  (if (mdtm-control? l) (mdtm-keep t l #f) t)))
                               (mdtm-lines s)))))
          (info (or (mdtm-attr x 'info) (mdtm-attr x 'lang) ""))
          ;; the words after the fence, when the tag is not written with them
          (r (if (and mdtm-faithful? (!= info (tmmd-language-name tag)))
-                `(md-fence ,(mdtm-text info) ,code)
+                `(md-fence ,(mdtm-source-text info) ,code)
                 code)))
-    ;; (code with tabs, which are displayed as spaces, is written as it is)
+    ;; (and so is the whole block)
     (if (mdtm-control? s) (mdtm-keep r (mdtm-written x) #t) r)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -280,6 +289,13 @@
     (cond ((or (not def) (nnull? mdtm-open-footnotes)
                (and mdtm-faithful? (ahash-ref mdtm-done-footnotes label)))
            (mdtm-keep mark (string-append "[^" label "]") #f))
+          (mdtm-in-kept-table?
+            (set! mdtm-open-footnotes (list label))
+            (let* ((l (mdtm-blocks def))
+                   (body (if (list-1? l) (car l) (mdtm-document l))))
+              (set! mdtm-open-footnotes '())
+              (mdtm-keep `(md-footnote ,(mdtm-text label) ,body)
+                         (string-append "[^" label "]") #f)))
           (else
             (ahash-set! mdtm-done-footnotes label #t)
             (set! mdtm-open-footnotes (list label))
@@ -335,7 +351,7 @@
                      (url (mdtm-text (or (mdtm-attr x 'href) "")))
                      (title (or (mdtm-attr x 'title) "")))
                  (if (== title "") `((hlink ,body ,url))
-                     `((hlink* ,body ,url ,(mdtm-text title))))))
+                     `((hlink* ,body ,url ,(mdtm-source-text title))))))
               ((img) (list (mdtm-described-image x)))
               ((br) '((next-line)))
               ((math) (list (mdtm-math (apply string-append l)
@@ -519,8 +535,10 @@
               ((pre) (list (mdtm-pre x)))
               ((hr) '((hrule)))
               ((table)
-               (let ((t (mdtm-table x))
-                     (raw (mdtm-attr x 'source)))
+               (let* ((raw (and mdtm-faithful? (mdtm-attr x 'source)))
+                      (t (begin (set! mdtm-in-kept-table? (and raw #t))
+                                (mdtm-table x))))
+                 (set! mdtm-in-kept-table? #f)
                  (list (if raw (mdtm-keep t raw #t) t))))
               ((displaymath)
                (list (mdtm-display-math (apply string-append l)
@@ -622,19 +640,24 @@
                       (v (and i (string-trim-spaces
                                   (substring s (+ i 1) (string-length s))))))
                  ;; (a line with other spaces around its colon than those
-                 ;; which are written is kept as it is)
-                 (if (and i (== s (if (== v "") (substring s 0 (+ i 1))
-                                      (string-append (substring s 0 i)
-                                                     ": " v))))
-                     `(md-meta ,(mdtm-text (substring s 0 i)) ,(mdtm-text v))
-                     `(md-meta "" ,(mdtm-text s)))))
+                 ;; which are written is kept as it is, and so is a line
+                 ;; with a tab)
+                 (cond ((mdtm-control? s)
+                        `(md-meta "" ,(mdtm-keep (mdtm-text s) s #f)))
+                       ((and i (== s (if (== v "") (substring s 0 (+ i 1))
+                                         (string-append (substring s 0 i)
+                                                        ": " v))))
+                        `(md-meta ,(mdtm-text (substring s 0 i)) ,(mdtm-text v)))
+                       (else `(md-meta "" ,(mdtm-text s))))))
              (if (== source "") '() (mdtm-lines source))))))
 
 (define (mdtm-footnote-labels x)
   ;; the labels of the footnotes of the text, but for those of the
-  ;; definitions, in their order
+  ;; definitions and of the tables (which are written as they were read),
+  ;; in their order
   (cond ((not (pair? x)) '())
         ((func? x 'footnote-def) '())
+        ((and (func? x 'table) (mdtm-attr x 'source)) '())
         ((and (func? x 'footnote 1) (string? (cadr x))) (list (cadr x)))
         (else (append-map mdtm-footnote-labels (cdr x)))))
 
@@ -654,9 +677,17 @@
   ;; header as it is written, and each heading at its level
   (let* ((source (lambda (x) (and (func? x 'meta) (mdtm-attr x 'source))))
          (marks (append-map mdtm-footnote-labels l))
-         (labels (list-remove-duplicates marks))
-         ;; the marks in the texts of the notes, which are kept as they are
-         (inner (append-map mdtm-inner-labels l))
+         ;; (with a table: there may be thousands of them)
+         (labels (with seen (make-ahash-table)
+                   (let loop ((l marks) (acc '()))
+                     (cond ((null? l) (reverse acc))
+                           ((ahash-ref seen (car l)) (loop (cdr l) acc))
+                           (else (ahash-set! seen (car l) #t)
+                                 (loop (cdr l) (cons (car l) acc)))))))
+         ;; the marks in the texts of the notes and in the tables, which are
+         ;; kept as they are
+         (inner (append (append-map mdtm-inner-labels l)
+                        (append-map mdtm-table-labels l)))
          (count (make-ahash-table)))
     (for-each (lambda (m) (ahash-set! count m (+ (or (ahash-ref count m) 0) 1)))
               (append marks inner))
@@ -678,6 +709,14 @@
                           ((func? x 'meta) '())
                           (else (mdtm-block x))))
                   l))))
+
+(define (mdtm-table-labels x)
+  ;; the labels of the footnotes which are referred to in the tables which
+  ;; are written as they were read
+  (cond ((not (pair? x)) '())
+        ((func? x 'footnote-def) '())
+        ((and (func? x 'table) (mdtm-attr x 'source)) (mdtm-footnote-labels* x))
+        (else (append-map mdtm-table-labels (cdr x)))))
 
 (define (mdtm-inner-labels x)
   ;; the labels of the footnotes which are referred to in the texts of the
@@ -735,6 +774,7 @@
     (set! mdtm-used-footnotes (make-ahash-table))
     (set! mdtm-done-footnotes (make-ahash-table))
     (set! mdtm-defs-last? #f)
+    (set! mdtm-in-kept-table? #f)
     (set! mdtm-formulas (make-ahash-table))
     (mdtm-collect-footnotes md)
     (with r (cond ((and file? mdtm-faithful?)

@@ -514,6 +514,12 @@
 (define md-refs (make-ahash-table))
 (define md-refs-used (make-ahash-table))
 
+;; the labels to which a table refers: a table is written back as it was
+;; read while it is not changed, and the definitions which it uses must
+;; then be written too
+(define md-refs-kept (make-ahash-table))
+(define md-in-table? #f)
+
 ;; A block whose text is not parsed yet is (!text tag attributes "text"), and
 ;; the definition of a link (!def label first? "text"), first? when it is
 ;; the first one of its label; the functions below return the blocks and the
@@ -523,6 +529,9 @@
 ;; md-max-depth their marks are text, as nothing is written that deep and
 ;; each level is a call inside the previous one
 (define md-depth 0)
+
+;; whether a snippet is parsed, and not a file
+(define md-snippet? #f)
 (define md-max-depth 100)
 
 (define (md-yaml-key? s)
@@ -539,24 +548,23 @@
                     i
                     (loop (+ i 1))))))))
 
+(define (md-yaml-line? s)
+  ;; can the line be in a YAML header? A key, a comment, an item of a list,
+  ;; a line which is indented (the rest of a value) or a blank line
+  (or (== s "") (md-yaml-key? s) (md-starts? s 0 "#") (md-starts? s 0 "- ")
+      (md-space? (string-ref s 0))))
+
 (define (md-yaml? lines)
   ;; are the lines a YAML header and what follows it, up to a line --- or
-  ;; ... ? Its first line is a key or a comment: a document may start with
-  ;; a rule. What follows is kept as it is written, whatever it holds, but
-  ;; text after a blank line is the document and not a header
-  (and (nnull? lines)
-       (let ((s (md-trim-right (car lines))))
-         (or (md-yaml-key? s) (md-starts? s 0 "#")))
-       (let loop ((l (cdr lines)) (blank? #f))
-         (and (nnull? l)
-              (let ((s (md-trim-right (car l))))
-                (cond ((in? s '("---" "...")) #t)
-                      ((== s "") (loop (cdr l) #t))
-                      ((and blank? (not (or (md-yaml-key? s) (md-space? (string-ref s 0))
-                                            (md-starts? s 0 "#")
-                                            (md-starts? s 0 "- "))))
-                       #f)
-                      (else (loop (cdr l) #f))))))))
+  ;; ... ? Each of its lines is one which YAML has (see md-yaml-line?), and
+  ;; one at least is a key: other lines between two rules are text, and
+  ;; # Title between them is a heading
+  (let loop ((l lines) (key? #f))
+    (and (nnull? l)
+         (let ((s (md-trim-right (car l))))
+           (cond ((in? s '("---" "...")) key?)
+                 ((md-yaml-line? s) (loop (cdr l) (or key? (md-yaml-key? s))))
+                 (else #f))))))
 
 (define (md-lines-until l end)
   ;; the lines of l before its tail end
@@ -565,8 +573,9 @@
         (loop (cdr l) (cons (car l) acc)))))
 
 (define (md-front-matter lines)
-  ;; the YAML header, as (meta (key "value")...), or #f
-  (and (nnull? lines) (== (md-trim-right (car lines)) "---")
+  ;; the YAML header, as (meta (key "value")...), or #f; a snippet has none
+  ;; (its rules and its text are kept)
+  (and (not md-snippet?) (nnull? lines) (== (md-trim-right (car lines)) "---")
        (md-yaml? (cdr lines))
        (let loop ((l (cdr lines)) (acc '()) (key #f))
          (cond ((null? l) #f)
@@ -1250,7 +1259,8 @@
                           ;; a label is short
                           (def (and (< (string-length label) 1000)
                                     (ahash-ref md-refs (md-label label)))))
-                     (if def (ahash-set! md-refs-used (md-label label) #t))
+                     (if def (ahash-set! (if md-in-table? md-refs-kept md-refs-used)
+                                         (md-label label) #t))
                      (and def
                           (cons (md-make-link image? inner
                                               (md-unescape (car def))
@@ -1637,19 +1647,26 @@
          (with l (md-inlines (cadddr x))
            `(,(cadr x) ,@(if (null? (caddr x)) '() `((@ ,@(caddr x)))) ,@l)))
         ((and (pair? x) (in? (car x) '(pre html displaymath meta !def))) x)
+        ((func? x 'table)
+         (set! md-in-table? #t)
+         (with r (cons (car x) (map md-finish (cdr x)))
+           (set! md-in-table? #f)
+           r))
         ((pair? x) (cons (car x) (map md-finish (cdr x))))
         (else x)))
 
 (define (md-unused-defs x)
   ;; once the text is parsed: the definitions of links to which nothing
-  ;; refers are (ref-def "text"), and the others are inlined in the links
+  ;; refers are (ref-def "text"), and the others are inlined in the links;
+  ;; those to which a table refers stay too
   (if (not (and (pair? x) (in? (car x) '(markdown blockquote ul ol li
                                          footnote-def))))
       x
       (cons (car x)
             (append-map (lambda (y)
                           (cond ((not (func? y '!def 3)) (list (md-unused-defs y)))
-                                ((and (caddr y) (ahash-ref md-refs-used (cadr y)))
+                                ((and (caddr y) (ahash-ref md-refs-used (cadr y))
+                                      (not (ahash-ref md-refs-kept (cadr y))))
                                  '())
                                 (else `((ref-def ,(cadddr y))))))
                         (cdr x)))))
@@ -1657,6 +1674,8 @@
 (define (md-parse s)
   (set! md-refs (make-ahash-table))
   (set! md-refs-used (make-ahash-table))
+  (set! md-refs-kept (make-ahash-table))
+  (set! md-in-table? #f)
   (set! md-none #f)
   (set! md-in-link? #f)
   (set! md-depth 0)
@@ -1668,17 +1687,20 @@
          (r (cdr (md-unused-defs (cons 'markdown r)))))
     (set! md-refs (make-ahash-table))
     (set! md-refs-used (make-ahash-table))
+    (set! md-refs-kept (make-ahash-table))
     r))
 
 (tm-define (parse-markdown-document s)
   (:type (-> string stree))
   (:synopsis "Parse the Markdown document @s into a Markdown tree")
+  (set! md-snippet? #f)
   `(!file (markdown ,@(md-parse s))))
 
 (tm-define (parse-markdown-snippet s)
   (:type (-> string stree))
   (:synopsis "Parse the Markdown text @s into a Markdown tree")
-  (with l (md-parse s)
+  (with l (begin (set! md-snippet? #t)
+                 (with r (md-parse s) (set! md-snippet? #f) r))
     ;; a snippet of one paragraph is text
     (if (and (list-1? l) (func? (car l) 'p))
         `(markdown ,@(cdar l))

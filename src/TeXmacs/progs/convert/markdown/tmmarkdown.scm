@@ -36,16 +36,18 @@
 (define tmmd-footnotes '())     ; the definitions of the footnotes, reversed,
 (define tmmd-footnote-nr 0)     ; each with the rank of its mark in the text
 (define tmmd-faithful? #f)      ; a document of the style markdown
-(define tmmd-labels '())        ; the labels which its footnotes keep
+(define tmmd-labels (make-ahash-table)) ; the labels which its footnotes keep
+(define tmmd-note-labels (make-ahash-table)) ; label -> its entry of tmmd-footnotes
 
 (define (tmmd-initialize opts)
   (set! tmmd-html? (!= (assoc-ref opts "texmacs->markdown:html") "off"))
   (set! tmmd-front-matter?
         (!= (assoc-ref opts "texmacs->markdown:front-matter") "off"))
   (set! tmmd-footnotes '())
+  (set! tmmd-note-labels (make-ahash-table))
   (set! tmmd-footnote-nr 0)
   (set! tmmd-faithful? #f)
-  (set! tmmd-labels '())
+  (set! tmmd-labels (make-ahash-table))
   (set! tmmd-image-nr 0))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -196,6 +198,16 @@
 ;; Plain text and mathematics
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(define (tmmd-same-text? s t)
+  ;; are the texts the same but for their spaces and tabs? A line of code
+  ;; or of a header which was kept for its tabs is written as it was read,
+  ;; but not Markdown, which is something else in code
+  (let ((strip (lambda (s)
+                 (list->string
+                   (list-filter (string->list s)
+                                (lambda (c) (not (in? c '(#\space #\tab)))))))))
+    (== (strip s) (strip t))))
+
 (define (tmmd-plain x)
   ;; the text of a tree, as for code: the paragraphs are lines
   (cond ((string? x) (tmmd-code-text x))
@@ -209,7 +221,12 @@
         ((in? (car x) '(label assign hidden-binding set-binding write)) "")
         ((func? x 'with) (tmmd-plain (cAr x)))
         ((func? x 'hlink 2) (tmmd-plain (cadr x)))
-        ;; the macros of the style markdown: what they display
+        ;; the macros of the style markdown: what they display, or the text
+        ;; of the file while they are not changed
+        ((and (in? (car x) '(md-source md-block-source)) (== (length x) 4)
+              (== (cadr x) (cadddr x))
+              (tmmd-same-text? (tmmd-source (caddr x)) (tmmd-plain (cadr x))))
+         (tmmd-source (caddr x)))
         ((and (in? (car x) '(md-source md-block-source md-image md-loose))
               (pair? (cdr x)))
          (tmmd-plain (cadr x)))
@@ -474,14 +491,12 @@
   (set! tmmd-footnote-rank (+ tmmd-footnote-rank 1))
   ;; the body may hold footnotes: it is converted before the list is read
   (let* ((rank tmmd-footnote-rank)
-         (other (and label
-                     (list-find tmmd-footnotes
-                                (lambda (n) (== (cadr (cdr n)) label)))))
+         (other (and label (ahash-ref tmmd-note-labels label)))
          (label (or label
                     (let loop ()
                       (set! tmmd-footnote-nr (+ tmmd-footnote-nr 1))
                       (with s (number->string tmmd-footnote-nr)
-                        (if (in? s tmmd-labels) (loop) s)))))
+                        (if (ahash-ref tmmd-labels s) (loop) s)))))
          (blocks (tmmd-blocks (tmmd body))))
     ;; a label which another note has already: the same note is written
     ;; once, and another one gets a label of its own
@@ -490,16 +505,16 @@
           (else (tmmd-footnote-add* rank label blocks)))))
 
 (define (tmmd-footnote-add* rank label blocks)
-  (set! tmmd-footnotes
-        (cons (cons rank `(footnote-def ,label ,@blocks)) tmmd-footnotes))
+  (with n (cons rank `(footnote-def ,label ,@blocks))
+    (set! tmmd-footnotes (cons n tmmd-footnotes))
+    (ahash-set! tmmd-note-labels label n))
   `((footnote ,label)))
 
 (define (tmmd-new-label label)
   ;; label-2, label-3... the first which no note has
   (let loop ((i 2))
     (with s (string-append label "-" (number->string i))
-      (if (or (in? s tmmd-labels)
-              (list-find tmmd-footnotes (lambda (n) (== (cadr (cdr n)) s))))
+      (if (or (ahash-ref tmmd-labels s) (ahash-ref tmmd-note-labels s))
           (loop (+ i 1))
           s))))
 
@@ -541,6 +556,11 @@
     (with r (tmmd t)
       (set! tmmd-html? html?)
       (set! tmmd-flat? flat?)
+      ;; (the labels of the notes which were added are free again)
+      (let loop ((l tmmd-footnotes))
+        (when (and (pair? l) (not (eq? l notes)))
+          (ahash-remove! tmmd-note-labels (cadr (cdar l)))
+          (loop (cdr l))))
       (set! tmmd-footnotes notes)
       (set! tmmd-footnote-nr nr)
       (set! tmmd-footnote-rank rank)
@@ -600,8 +620,9 @@
   ;; and they are written while the code is still in this language
   (if (< (length l) 2) (tmmd-all l)
       (let* ((info (string-trim-spaces (tmmd-plain (car l))))
-             (i (string-search-forwards " " 0 info))
-             (lang (if (< i 0) info (substring info 0 i)))
+             (i (list-find (iota (string-length info))
+                           (lambda (k) (in? (string-ref info k) '(#\space #\tab)))))
+             (lang (if (not i) info (substring info 0 i)))
              (code (cadr l))
              (tag (and (pair? code) (car code))))
         (if (!= tag (tmmd-language-tag lang)) (tmmd code)
@@ -662,19 +683,47 @@
         ((func? x 'with) (tmmd-meta-text (cAr x)))
         (else (tmmd-plain x))))
 
+(define (tmmd-yaml-key? s)
+  ;; does the line start with a key, as the reader of headers wants it (see
+  ;; md-yaml-key?): text before a colon which ends the line or is followed
+  ;; by a space, and not a space, a dash, # or : first
+  (let ((n (string-length s)))
+    (and (> n 0) (not (in? (string-ref s 0) '(#\space #\tab #\- #\# #\:)))
+         (let loop ((i 1))
+           (and (< i n)
+                (or (and (char=? (string-ref s i) #\:)
+                         (or (== (+ i 1) n)
+                             (in? (string-ref s (+ i 1)) '(#\space #\tab))))
+                    (loop (+ i 1))))))))
+
+(define (tmmd-yaml-line s)
+  ;; the line s of the header as it is written: a line --- or ... would end
+  ;; it, and is written after a space; a line which YAML does not have
+  ;; (text which was typed) is written as a comment
+  (cond ((in? (string-trim-spaces-right s) '("---" "...")) (string-append " " s))
+        ((or (== s "") (tmmd-yaml-key? s) (string-starts? s "#")
+             (string-starts? s "- ") (string-starts? s " ")
+             (string-starts? s (string #\tab)))
+         s)
+        (else (string-append "# " s))))
+
 (define (tmmd-md-metadata l)
-  ;; the header of the file; a line --- or ... in it would end it, and is
-  ;; written after a space
+  ;; the header of the file. With no key in it, it would not be read back
+  ;; as a header: its lines are then paragraphs, and an empty header is
+  ;; not written
   (let* ((s (tmmd-meta-text (if (null? l) '(document) (car l))))
-         (lines (map (lambda (s)
-                       (if (in? (string-trim-spaces-right s) '("---" "..."))
-                           (string-append " " s) s))
-                     (string-tokenize-by-char s #\newline))))
-    `((meta (@ (source ,(let loop ((l lines) (acc '()))
-                          (cond ((null? l) (apply string-append (reverse acc)))
-                                ((null? acc) (loop (cdr l) (list (car l))))
-                                (else (loop (cdr l)
-                                            (cons (car l) (cons "\n" acc))))))))))))
+         (lines (string-tokenize-by-char s #\newline)))
+    (cond ((list-and (map (lambda (s) (== (string-trim-spaces s) "")) lines))
+           '())
+          ((not (list-or (map tmmd-yaml-key? lines)))
+           (map (lambda (s) `(p ,s))
+                (list-filter lines (lambda (s) (!= (string-trim-spaces s) "")))))
+          (else
+            (with lines (map tmmd-yaml-line lines)
+              `((meta (@ (source ,(let loop ((l (cdr lines)) (acc (list (car lines))))
+                                    (if (null? l) (apply string-append (reverse acc))
+                                        (loop (cdr l)
+                                              (cons (car l) (cons "\n" acc))))))))))))))
 
 (define (tmmd-md-h6 l) (tmmd-heading 7 l))
 
@@ -1325,6 +1374,13 @@
         ((func? x '!h) (list (cadr x)))
         (else (append-map tmmd-heading-levels (cdr x)))))
 
+(define (tmmd-ref-def-text? s)
+  ;; is the text kept from the file the definition of a link, [label]: ...?
+  (and (string-starts? s "[") (not (string-starts? s "[^"))
+       (let ((i (string-search-forwards "]:" 0 s))
+             (j (string-search-forwards "\n" 0 s)))
+         (and (> i 0) (or (< j 0) (< i j))))))
+
 (define (tmmd-set-headings x levels)
   ;; the headings of the tree: h1 for the title, or else for the first level
   ;; which is used; the levels below keep their distances
@@ -1334,6 +1390,8 @@
          (cond ((== (cadr x) "table") `(table (@ (source ,(caddr x)))))
                ((== (cadr x) "display")
                 `(displaymath (@ (source ,(caddr x))) ""))
+               ;; (the definition of a link, which nothing uses)
+               ((tmmd-ref-def-text? (caddr x)) `(ref-def ,(caddr x)))
                (else `(html ,(caddr x)))))
         ;; in a document of the style markdown each heading has its
         ;; level: 1 for a section, 2 for a subsection...
@@ -1361,6 +1419,12 @@
          ;; "label"), in a quote, an item or another note as well, and
          ;; after everything else for the others
          (placed (make-ahash-table))
+         (by-label (with t (make-ahash-table)
+                     (for-each (lambda (n)
+                                 (ahash-set! t (cadr n)
+                                             (cons n (or (ahash-ref t (cadr n)) '()))))
+                               (reverse notes))
+                     t))
          (place (lambda (place x)
                   (if (not (and (pair? x)
                                 (in? (car x) '(markdown blockquote ul ol li
@@ -1375,8 +1439,8 @@
                                       (else
                                         (ahash-set! placed (cadr y) #t)
                                         (map (lambda (n) (place place n))
-                                             (list-filter notes
-                                               (lambda (n) (== (cadr n) (cadr y))))))))
+                                             (or (ahash-ref by-label (cadr y))
+                                                 '())))))
                               (cdr x))))))
          (l (cdr (place place (cons 'markdown l))))
          (l (let loop ((ns notes) (acc '()))
@@ -1407,7 +1471,8 @@
              (with style (tmfile-extract x 'style)
                (or (== style "markdown")
                    (and (pair? style) (in? "markdown" (cdr style)))))))
-  (set! tmmd-labels (tmmd-kept-labels x))
+  (set! tmmd-labels (make-ahash-table))
+  (for-each (lambda (s) (ahash-set! tmmd-labels s #t)) (tmmd-kept-labels x))
   (if tmmd-document?
       (with body (tmfile-extract x 'body)
         `(!file (markdown ,@(tmmd-finalize (tmmd-blocks (tmmd body))))))

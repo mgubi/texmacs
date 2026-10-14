@@ -568,11 +568,17 @@
   ;; is a blank line needed between the blocks a and b which follow each
   ;; other in an item? Without it a paragraph would go on the paragraph, the
   ;; quote or the list before it, a table would go on the quote or the
-  ;; list before it, a quote on the quote, and a table or HTML would take
-  ;; what follows; code between fences, a heading, a rule and a list start
-  ;; by themselves
+  ;; list before it, a quote on the quote, a table or HTML would take what
+  ;; follows, and a paragraph which starts as a title would be the title
+  ;; of the definition of a link before it; code between fences, a heading,
+  ;; a rule and a list start by themselves
   (and (pair? a) (pair? b)
-       (or (in? (car a) '(table html ref-def))
+       (or (in? (car a) '(table html))
+           (and (func? a 'ref-def) (func? b 'p)
+                (not (and (pair? (cdr b)) (string? (cadr b))
+                          (> (string-length (cadr b)) 0)
+                          (not (in? (string-ref (cadr b) 0)
+                                    (string->list "\"'("))))))
            (and (func? b 'p) (in? (car a) '(p blockquote ul ol)))
            (and (func? b 'table) (in? (car a) '(blockquote ul ol)))
            (and (func? a 'blockquote) (func? b 'blockquote))
