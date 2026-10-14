@@ -115,8 +115,11 @@ dyn_link_rep::start () {
   string name= lib * ":" * symbol * "-package";
   if (dyn_linked->contains (name))
     routs= dyn_linked [name];
-  if (routs != NULL)
+  if (routs != NULL) {
+    alive= true;
+    ret= string (DATA_BEGIN) * "verbatim:" * string (DATA_END);
     return "continuation of#'" * lib * "'";
+  }
   if (DEBUG_AUTO)
     debug_automatic << "Installing dynamic link '" << lib << "'\n";
 

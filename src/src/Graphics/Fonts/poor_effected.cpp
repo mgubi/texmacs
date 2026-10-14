@@ -105,7 +105,7 @@ poor_effected_font_rep::get_extents (string s, metric& ex) {
       ex->x4 += (m->x4 - sub->x4);
     }
     ex->y3= min (ex->y3, m->y3);
-    ex->y4= min (ex->y4, m->y4);
+    ex->y4= max (ex->y4, m->y4);
   }
 }
 

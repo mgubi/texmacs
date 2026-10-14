@@ -537,6 +537,7 @@
   ("<breve>" "<breve>")
   ("<check>" "<check>")
   ("^" "^")
+  ("<#005E>" "^") ; &Hat;, as the export writes it
   ("~" "~")
   ("¯"  "<wide-bar>")
   ("<invbreve>" "<invbreve>")

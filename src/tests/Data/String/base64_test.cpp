@@ -169,9 +169,35 @@ test_decode_stops_at_padding () {
   CHECK_EQ (decode_base64 ("Zm8=Zm9v"), string ("fo"));
 }
 
+// a final group may come without its padding, padding after a complete
+// group adds nothing, and bytes outside of ASCII are skipped like other
+// characters outside of the alphabet
+static void
+test_decode_unusual_input () {
+  CHECK_EQ (decode_base64 ("QUI"), string ("AB"));
+  CHECK_EQ (decode_base64 ("QQ"), string ("A"));
+  CHECK_EQ (decode_base64 ("Zm9vYmE"), string ("fooba"));
+  CHECK_EQ (decode_base64 ("Q"), string (""));
+  CHECK_EQ (decode_base64 ("="), string (""));
+  CHECK_EQ (decode_base64 ("QUJD="), string ("ABC"));
+  CHECK_EQ (decode_base64 ("QUJD=="), string ("ABC"));
+  CHECK_EQ (decode_base64 ("QU\xffJ\x80" "D"), string ("ABC"));
+  CHECK_EQ (decode_base64 ("\xc3\xa9QUJD"), string ("ABC"));
+  for (int n=0; n<=60; n++) {
+    string s= pseudo_random_bytes (n, n + 3);
+    string e= encode_base64 (s);
+    string bare;
+    for (int i=0; i<N(e); i++)
+      if (e[i] != '=') bare << e[i];
+    CHECK_MSG (decode_base64 (bare) == s,
+               "unpadded round trip of length " * as_string (n));
+  }
+}
+
 int
 main () {
   RUN (test_rfc_vectors);
+  RUN (test_decode_unusual_input);
   RUN (test_extreme_bytes);
   RUN (test_all_byte_values);
   RUN (test_round_trip_lengths);

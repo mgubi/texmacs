@@ -43,6 +43,30 @@
   (display* "Test suite of " name "\n")
   (force-output))
 
+(tm-define (check-root)
+  (:synopsis "The root of the absolute file names of the checks")
+  ;; a name which starts with / is relative on Windows, whose absolute
+  ;; names start with a drive
+  (if (or (os-mingw?) (os-win32?)) "c:/" "/"))
+
+(tm-define (check-abs s)
+  (:synopsis "The absolute file name @s (without its first /) of the checks")
+  (string-append (check-root) s))
+
+(tm-define (check-unix-abs s)
+  (:synopsis "The absolute name @s (without its first /) in the syntax of urls")
+  ;; the syntax of string->url, that of Unix: /c/a is c:/a on Windows (as
+  ;; in MSYS), where c:/a would be the alternatives c and /a
+  (string-append (if (or (os-mingw?) (os-win32?)) "/c/" "/") s))
+
+(tm-define (check-unix s)
+  (:synopsis "The name @s given back by TeXmacs, written as on Unix")
+  ;; with / between the parts of a name and : between alternatives, which
+  ;; are \ and ; on Windows
+  (if (or (os-mingw?) (os-win32?))
+      (string-replace (string-replace s "\\" "/") ";" ":")
+      s))
+
 (tm-define (check-group name)
   (:synopsis "Start the group @name of checks")
   ;; the output is flushed, so that a crash shows the group it was in

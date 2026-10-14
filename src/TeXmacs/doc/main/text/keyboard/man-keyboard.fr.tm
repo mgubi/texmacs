@@ -9,7 +9,7 @@
   générales|../../start/man-conventions.fr.tm> contient des explications sur la
   manière dont les raccourcis clavier sont affichés dans ce manuel. Il peut
   aussi être utile de consulter la section sur <hlink|configuration
-  clavier|../../config/man-config-keyboard.fr.tm>.
+  clavier|../../config/man-config-keyboard.en.tm>.
 
   <\traverse>
     <branch|Règles générales applicables aux

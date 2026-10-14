@@ -334,6 +334,11 @@ tree_to_texmacs (tree t) {
 
   tm_writer tmw;
   tmw.write (t);
+  if ((tmw.spc == " ") && (tmw.tmp == "")) {
+    // protect a final space, as in write_return
+    tmw.spc= "";
+    tmw.tmp= "\\ ";
+  }
   tmw.flush ();
   return tmw.buf;
 }

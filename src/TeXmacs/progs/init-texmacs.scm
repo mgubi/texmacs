@@ -273,10 +273,11 @@
 
 ;(display "Booting programming modes\n")
 (lazy-format (prog prog-format) scheme)
-(lazy-format (code-format) cpp julia scala java json csv)
+(lazy-format (code-format) cpp julia scala java javascript dot json csv)
 (lazy-format (mathemagix-format) mathemagix)
 (lazy-format (caas-format) caas)
 (lazy-format (python-format) python)
+(lazy-format (octave-format) octave)
 (lazy-format (scilab-format) scilab)
 (lazy-keyboard (prog prog-kbd) in-prog?)
 (lazy-menu (prog prog-menu) prog-format-menu prog-format-icons
@@ -320,7 +321,7 @@
 
 ;(display "Booting graphics mode\n")
 (lazy-keyboard (graphics graphics-kbd) in-active-graphics? graphics-wheel)
-(lazy-menu (graphics graphics-menu) graphics-menu graphics-icons
+(lazy-menu (graphics graphics-menu) graphics-icons
            graphics-focus-icons)
 (lazy-define (graphics graphics-object)
              graphics-reset-state graphics-decorations-update)
@@ -521,7 +522,7 @@
 (lazy-define (tools spell spell-edit) spell-user-words continuous-spell-check)
 (lazy-define (tools spell spell-lantool) lantool-server supports-lantool?
 	     lantool-check)
-(lazy-define (tools spell correct-widgets) open-correct)
+(lazy-define (tools spell correct-widgets) update-correct-widget open-correct)
 (use-modules (tools ai ai-batch))
 (lazy-define (tools ai ai-translate) ai-translate* ai-abort-translate)
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
@@ -549,6 +550,7 @@
 ;(display "Booting regression testing\n")
 (lazy-define (check check-master) check-all run-checks run-all-tests
              run-integration-tests run-regression-suite test-suite-names)
+(lazy-define (utils test test-latex-export) run-latex-export-suite)
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
 ;(display* "memory: " (texmacs-memory) " bytes\n")
 

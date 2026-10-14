@@ -65,7 +65,7 @@
     <associate|reduction page left margin|25mm>
     <associate|page bottom margin|30mm>
     <associate|reduction page top margin|15mm>
-    <associate|language|english>
+    <associate|language|portuguese>
   </collection>
 </initial>
 

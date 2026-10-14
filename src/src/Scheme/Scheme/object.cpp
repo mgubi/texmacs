@@ -408,7 +408,7 @@ object eval_file (string name) {
   return tmscm_to_object (eval_scheme_file (name)); }
 bool exec_file (url u) {
   object ret= eval_file (materialize (u));
-  return ret != object ("#<unspecified>"); }
+  return tmscm_is_equal (object_to_tmscm (ret), TMSCM_UNSPECIFIED); }
 
 object call (const char* fun) {
   return tmscm_to_object (call_scheme (eval_scheme(fun))); }

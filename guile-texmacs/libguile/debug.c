@@ -573,6 +573,21 @@ scm_init_debug ()
  scm_c_define_gsubr (s_scm_local_eval, 1, 1, 0, (SCM (*)()) scm_local_eval); ;
  scm_make_synt (s_start_stack, scm_makacro, scm_m_start_stack) ;
  scm_c_define_gsubr (s_scm_debug_object_p, 1, 0, 0, (SCM (*)()) scm_debug_object_p); ;
+  /* registrations which the snarfing of a Windows build left out
+     (the .x files of guile-snarf, pasted in this file), under the
+     conditions of their definitions */
+#if defined(GUILE_DEBUG)
+  scm_c_define_gsubr (s_scm_memcons, 2, 1, 0, (SCM (*)()) scm_memcons); ;
+#endif
+#if defined(GUILE_DEBUG)
+  scm_c_define_gsubr (s_scm_mem_to_proc, 1, 0, 0, (SCM (*)()) scm_mem_to_proc); ;
+#endif
+#if defined(GUILE_DEBUG)
+  scm_c_define_gsubr (s_scm_proc_to_mem, 1, 0, 0, (SCM (*)()) scm_proc_to_mem); ;
+#endif
+#if defined(GUILE_DEBUG)
+  scm_c_define_gsubr (s_scm_debug_hang, 0, 1, 0, (SCM (*)()) scm_debug_hang); ;
+#endif
 
 }
 

@@ -18,6 +18,23 @@ operator_parser_rep::operator_parser_rep () {
   operator_group= hashmap<string, string>();
 }
 
+static inline bool
+is_identifier_char (char c) {
+  return is_alpha (c) || is_digit (c) || c == '_';
+}
+
+static bool
+test_operator (string s, int pos, string oper) {
+  // Alphabetic operators (as "and" or "not") must not match inside identifiers
+  if (!test (s, pos, oper)) return false;
+  int end= pos + N(oper);
+  if (is_identifier_char (oper[0]) && pos > 0 &&
+      is_identifier_char (s[pos-1])) return false;
+  if (is_identifier_char (oper[N(oper)-1]) && end < N(s) &&
+      is_identifier_char (s[end])) return false;
+  return true;
+}
+
 bool
 operator_parser_rep::can_parse (string s, int pos) {
   if (!parser_rep::can_parse (s, pos)) return false;
@@ -25,7 +42,7 @@ operator_parser_rep::can_parse (string s, int pos) {
   iterator<string> iter= iterate (operator_group);
   while (iter->busy ()) {
     string oper= iter->next ();
-    if (test (s, pos, oper)) {
+    if (test_operator (s, pos, oper)) {
       current_oper= oper;
       return true;
     }
@@ -49,7 +66,7 @@ operator_parser_rep::do_parse (string s, int& pos) {
     string oper= iter->next ();
     int oper_size= N(oper);
     if (current_oper_size >= N(oper)) continue;
-    if (starts (oper, current_oper) && test (s, pos, oper)) {
+    if (starts (oper, current_oper) && test_operator (s, pos, oper)) {
       current_oper= oper;
       current_oper_size= oper_size;
     }

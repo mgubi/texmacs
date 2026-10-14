@@ -46,7 +46,7 @@
 
   Es sei daran erinnert, dass die Modifiziertasten, die zur Erzeugung von
   <prefix|M-> und <prefix|M-A-> benutzt werden, im Menü
-  <menu|Edit|Preferences|Keyboard> <hyper-link|konfiguriert|../../config/man-config-kbd-modkeys.en.tm>
+  <menu|Edit|Preferences|Keyboard> <hyper-link|konfiguriert|../../config/man-config-kbd-modkeys.de.tm>
   werden können.
 
   <tmdoc-copyright|1998--2002|Joris van der Hoeven>

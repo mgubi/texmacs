@@ -3115,6 +3115,12 @@ scm_init_goops_builtins (void)
 
   hell = scm_calloc (hell_size * sizeof (*hell));
   hell_mutex = scm_permanent_object (scm_make_mutex ());
+  /* registrations which the snarfing of a Windows build left out
+     (the .x files of guile-snarf, pasted in this file), under the
+     conditions of their definitions */
+#if defined(GUILE_DEBUG)
+  scm_c_define_gsubr (s_scm_pure_generic_p, 1, 0, 0, (SCM (*)()) scm_pure_generic_p); ;
+#endif
 
   create_basic_classes ();
   create_standard_classes ();

@@ -269,7 +269,7 @@ qt_gui_rep::get_selection (string key, tree& t, string& s, string format) {
   bool owns = (format != "temp" && format != "wrapbuf" && key != "primary") &&
   !(key == "mouse" && cb->supportsSelection ());
   
-  if (!owns && md->hasFormat ("application/x-texmacs-pid")) {
+  if (!owns && md && md->hasFormat ("application/x-texmacs-pid")) {
     buf = md->data ("application/x-texmacs-pid");
     if (!(buf.isEmpty())) {
       owns = string (buf.constData(), buf.size())
@@ -283,6 +283,7 @@ qt_gui_rep::get_selection (string key, tree& t, string& s, string format) {
     s = copy (selection_s [key]);
     return true;
   }
+  if (!md) return false;
   
   if (DEBUG_QT)
     debug_qt << "get_selection format: ["  << format << "] mime-types: [" 
@@ -323,13 +324,17 @@ qt_gui_rep::get_selection (string key, tree& t, string& s, string format) {
     }
   }
   else if (format == "verbatim"
-           && (get_preference ("verbatim->texmacs:encoding") == "utf-8" ||
-               get_preference ("verbatim->texmacs:encoding") == "auto"  ))
+           && get_preference ("verbatim->texmacs:encoding") != "utf-8"
+           && get_preference ("verbatim->texmacs:encoding") != "auto"
+           && md->hasFormat ("text/plain"))
+    // verbatim in another encoding: the bytes as they are, which the
+    // converter decodes (they differ from the UTF-8 text only where the
+    // clipboard keeps a legacy encoding, as on X11)
+    buf = md->data ("text/plain").data();
+  else
+    // the other formats (latex, html...) read UTF-8, as before the
+    // "plain/text" typo was fixed (#109)
     buf = md->text().toUtf8 ();
-  else {
-    if (md->hasFormat ("plain/text")) buf = md->data ("plain/text").data();
-    else buf = md->text().toUtf8 ();
-  }
   if (!(buf.isEmpty())) s << string (buf.constData(), buf.size());
   if (input_format == "html-snippet" && seems_buggy_html_paste (s))
     s = correct_buggy_html_paste (s);

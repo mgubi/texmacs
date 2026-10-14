@@ -1038,6 +1038,12 @@ scm_init_gc ()
  scm_c_define_gsubr (s_scm_gc_stats, 0, 0, 0, (SCM (*)()) scm_gc_stats); ;
  scm_c_define_gsubr (s_scm_object_address, 1, 0, 0, (SCM (*)()) scm_object_address); ;
  scm_c_define_gsubr (s_scm_gc, 0, 0, 0, (SCM (*)()) scm_gc); ;
+  /* registrations which the snarfing of a Windows build left out
+     (the .x files of guile-snarf, pasted in this file), under the
+     conditions of their definitions */
+#if ((SCM_DEBUG_CELL_ACCESSES == 1))
+  scm_c_define_gsubr (s_scm_set_debug_cell_accesses_x, 1, 0, 0, (SCM (*)()) scm_set_debug_cell_accesses_x); ;
+#endif
 
 }
 

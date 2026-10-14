@@ -860,7 +860,7 @@
 	(tree-split! v j 1)
 	(tree-insert (tree-ref v j) 0 `(,lan ,ses))
 	(tree-insert (tree-ref v (+ j 1)) 0 `(,lan ,ses))
-	(tree-insert v (+ j 1) '((document "")))
+	(tree-insert v (+ j 1) '(""))
 	(tree-go-to v (+ j 1) :end)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

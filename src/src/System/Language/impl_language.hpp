@@ -77,8 +77,15 @@ struct verb_language_rep: language_rep {
 };
 
 struct prog_language_rep: abstract_language_rep {
+  bool multi_line_comments; // the comment table has (multi_line "/*" "*/")
+  // the line being tokenized, and whether an inline comment has begun in
+  // it (a comment marker between tokens, not in a string)
+  tree_rep* current_line;
+  bool      in_inline_comment;
   prog_language_rep (string name);
   text_property advance (tree t, int& pos);
+  text_property advance_token (tree t, int& pos);
+  text_property inline_comment_token (string s, int& pos);
   array<int> get_hyphens (string s);
   void hyphenate (string s, int after, string& left, string& right);
   string get_color (tree t, int start, int end);

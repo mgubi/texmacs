@@ -28,7 +28,7 @@
 
 ;; Ref: https://ecma-international.org/ecma-262/10.0/index.html#sec-literals-numeric-literals
 (tm-define (parser-feature lan key)
-  (:require (and (== lan "javascript") (== key "number")))
+  (:require (and (== lan "json") (== key "number")))
   `(,(string->symbol key)
     (bool_features
       "sci_notation")))

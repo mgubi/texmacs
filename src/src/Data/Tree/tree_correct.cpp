@@ -699,6 +699,9 @@ invisible_corrector::correct (array<tree> a) {
       for (j= i+1; j<N(a); j++)
         if (tp[j] != SYMBOL_SKIP && tp[j] != SYMBOL_SCRIPT) break;
         else if (a[j] == " ") break;
+        // (a text separates what is around it: a\text{ if }b is no
+        // product of a and b)
+        else if (is_compound (a[j], "text")) break;
       if (j >= N(a) || a[j] == " " || tp[j] != SYMBOL_BASIC)
         continue;
       

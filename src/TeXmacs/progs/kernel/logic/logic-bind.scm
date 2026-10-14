@@ -32,25 +32,6 @@
   "Force a binding of variable @var to @val in @bl."
   (list (acons var val bl)))
 
-(define-public (bind-unify var val bl)
-  "Bind variable @var to @val in @bl and unify if the binding already exists."
-  (if (free-variable? val)
-      (let* ((var2 (cadr val))
-	     (val2 (assoc-ref bl var2)))
-	(if val2 (bind-unify var val2 bl)
-	    (let ((old-val (assoc-ref bl var)))
-	      (cond (old-val (bind-unify var2 old-val bl))
-		    ((== var var2) (list bl))
-		    ((and (number? var2)
-			  (or (not (number? var)) (< var var2)))
-		     (bind-var var2 (free-variable var) bl))
-		    (else (bind-var var val bl))))))
-      (let ((old-val (assoc-ref bl var)))
-	(cond ((not old-val) (bind-var var val bl))
-	      ((free-variable? old-val)
-	       (bind-unify (cadr old-val) val bl))
-	      (else (unify (list val) (list old-val) bl))))))
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Substitution
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

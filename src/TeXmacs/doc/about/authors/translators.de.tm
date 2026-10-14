@@ -1,6 +1,6 @@
 <TeXmacs|1.99.19>
 
-<style|<tuple|tmdoc|english|old-spacing|old-dots|old-lengths>>
+<style|<tuple|tmdoc|german|old-spacing|old-dots|old-lengths>>
 
 <\body>
   <tmdoc-title|Internationalisierung von <TeXmacs>>

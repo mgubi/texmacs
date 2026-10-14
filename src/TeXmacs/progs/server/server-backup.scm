@@ -60,11 +60,36 @@
 ;; Snapshot operations
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;; Snapshot directories are named YYYY-MM-DDTHH:MM:SS (19 chars, ISO 8601).
-;; ISO timestamps sort lexicographically = chronologically.
+;; Snapshot directories are named YYYY-MM-DDTHH-MM-SS (19 chars, ISO 8601
+;; with dashes for the colons), in UTC. They sort lexicographically =
+;; chronologically, also when the clocks change for daylight saving time.
 ;;
 ;; Directory listing goes through TeXmacs's own cross-platform URL layer.
 ;; Mode "d" = directories only; mode "dr" = directories + regular files.
+
+;; The name of a snapshot made at the time @t (seconds since the epoch).
+;; (pretty-date does not know an ISO format: it formats with Qt patterns,
+;; and runs date -r without Qt.)
+(tm-define (snapshot-name t)
+  (define (two n) (string-append (if (< n 10) "0" "") (number->string n)))
+  (let* ((days (quotient t 86400))
+         (secs (remainder t 86400))
+         ;; the civil date of a day number (Howard Hinnant's algorithm)
+         (z    (+ days 719468))
+         (era  (quotient z 146097))
+         (doe  (- z (* era 146097)))
+         (yoe  (quotient (+ (- doe (quotient doe 1460)) (quotient doe 36524)
+                            (- (quotient doe 146096)))
+                         365))
+         (doy  (- doe (- (+ (* 365 yoe) (quotient yoe 4)) (quotient yoe 100))))
+         (mp   (quotient (+ (* 5 doy) 2) 153))
+         (d    (+ (- doy (quotient (+ (* 153 mp) 2) 5)) 1))
+         (m    (if (< mp 10) (+ mp 3) (- mp 9)))
+         (y    (+ yoe (* era 400) (if (<= m 2) 1 0))))
+    (string-append (number->string y) "-" (two m) "-" (two d) "T"
+                   (two (quotient secs 3600)) "-"
+                   (two (quotient (remainder secs 3600) 60)) "-"
+                   (two (remainder secs 60)))))
 
 ;; Return snapshot names (strings) sorted oldest first.
 (tm-define (snapshot-name? s)
@@ -176,7 +201,7 @@
 ;;   - users.scm is atomically rewritten via save-object
 ;;
 ;; Incremental snapshot strategy (hard-link deduplication):
-;;   Each run creates DEST/YYYY-MM-DDTHH:MM:SS/ and hard-links unchanged
+;;   Each run creates DEST/YYYY-MM-DDTHH-MM-SS/ and hard-links unchanged
 ;;   files from the previous snapshot directory, so every snapshot is a
 ;;   self-contained full view of the data while only changed/new files use
 ;;   extra disk space.  No `latest` symlink is needed.
@@ -195,7 +220,7 @@
 (tm-define (server-backup-run)
   (let* ((dest  (url-concretize (string->url (get-preference "server backup destination"))))
          (src   (url-concretize "$TEXMACS_HOME_PATH/server"))
-         (ts    (string-replace (pretty-date (current-time) "iso8601") ":" "-"))
+         (ts    (snapshot-name (current-time)))
          (snaps (list-snapshots dest))
          (prev  (and (pair? snaps)
                      (string-append dest "/" (cAr snaps))))

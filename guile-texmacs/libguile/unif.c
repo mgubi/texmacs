@@ -2988,6 +2988,12 @@ scm_init_unif ()
  scm_c_define_gsubr (s_scm_array_type, 1, 0, 0, (SCM (*)()) scm_array_type); ;
  scm_c_define_gsubr (s_scm_array_prototype, 1, 0, 0, (SCM (*)()) scm_array_prototype); ;
 
+  /* registrations which the snarfing of a Windows build left out
+     (the .x files of guile-snarf, pasted in this file), under the
+     conditions of their definitions */
+#if !((SCM_ENABLE_DEPRECATED))
+  scm_c_define_gsubr (s_scm_i_array_p, 1, 0, 0, (SCM (*)()) scm_i_array_p); ;
+#endif
 
 }
 

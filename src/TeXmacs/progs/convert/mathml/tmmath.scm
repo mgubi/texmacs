@@ -236,7 +236,7 @@
     `(m:mtable (@ ,@l3) ,@(tmmath-make-rows (cdr t) rowf cellf))))
 
 (define (tmmath-table l)
-  (list (tmmath-make-table (cons 'table l) '() '() '() '())))
+  (tmmath-tformat (list (cons 'table l))))
 
 (define (tmmath-tformat l)
   (with t (tmtable-normalize (cons 'tformat l))

@@ -195,7 +195,7 @@ edit_interface_rep::draw_graphics (renderer ren) {
           ren->line (cu->ox-5*pixel, cu->oy, cu->ox+5*pixel, cu->oy);
         }
         else if (tm_curs == "graphics-cross-arrows") {
-          static int s= 6*pixel, a= 2*pixel;
+          int s= 6*pixel, a= 2*pixel;
           ren->set_pencil (pencil (red, pixel));
           ren->line (cu->ox, cu->oy-s, cu->ox, cu->oy+s);
           ren->line (cu->ox-s, cu->oy, cu->ox+s, cu->oy);

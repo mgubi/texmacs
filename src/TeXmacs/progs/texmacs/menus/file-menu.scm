@@ -251,15 +251,18 @@
 
 (define (wrapped-import-pdf-embeded-with-tm tem-pdf)
   (let* ((tem-dir (url-temp-dir))
-         (tem-tm (url-append tem-dir "tem.tm"))
-         (tem-tm2 (url-append tem-dir "extracted.tm")))
-    (if (extract-attachments tem-pdf)
+         (tem-tm2 (url-append tem-dir "extracted.tm"))
+         (main-tm (and (extract-attachments tem-pdf)
+                       (pdf-get-attached-main-tm tem-pdf))))
+    (if (and main-tm (not (url-none? main-tm)))
         (begin
+          ;; the attachments were extracted into <pdf-name>-attachments
+          ;; next to the pdf; make the links of the main document point there
           (string-save
             (serialize-texmacs
               (pdf-replace-linked-path
-                (tree-import (url-relative tem-tm (pdf-get-attached-main-tm tem-pdf)) "texmacs")
-                tem-pdf))
+                (tree-import main-tm "texmacs")
+                main-tm))
             tem-tm2)
           (load-buffer tem-tm2))
         (begin

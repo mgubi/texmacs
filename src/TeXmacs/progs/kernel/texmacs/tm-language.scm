@@ -53,7 +53,7 @@
 
 (define (define-rule-one lan sym l)
   (cond ((null? l)
-         (packrat-define lan sym '(or)))
+         (packrat-define lan sym (tm->tree '(or))))
         ((and (func? (car l) :type 1) (symbol? (cadar l)))
          (packrat-property lan sym "type" (symbol->string (cadar l)))
          (define-rule-one lan sym (cdr l)))

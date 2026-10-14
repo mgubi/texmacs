@@ -2207,7 +2207,7 @@ tmg_tree_children (tmscm arg1) {
   tree in1= tmscm_to_tree (arg1);
 
   // TMSCM_DEFER_INTS;
-  array_tree out= A (in1);
+  array_tree out= tree_children (in1);
   // TMSCM_ALLOW_INTS;
 
   return array_tree_to_tmscm (out);

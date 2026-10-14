@@ -1,6 +1,6 @@
 <TeXmacs|1.0.4.5>
 
-<style|tmdoc>
+<style|<tuple|tmdoc|german>>
 
 <\body>
   <tmdoc-title|Makro Expansion>

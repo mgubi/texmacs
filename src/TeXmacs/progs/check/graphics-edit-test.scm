@@ -1028,6 +1028,8 @@
       (check= (gr) '(graphics "" (point "1" "1") (point "2" "2")))
       (check= (sketch-get) '()))))
 
+(define grp #f)
+
 (define (test-group)
   (check-group "group")
   (with-graphics '("gr-mode" (tuple "group-edit" "group-ungroup"))
@@ -1045,20 +1047,15 @@
         (check= (gr) `(graphics "" (gr-group ,@sel) (point "5" "5")))
         (check= (map tree->stree (sketch-get)) `((gr-group ,@sel))))
       ;; the group is selected: a left click ungroups it
+      (set! grp (cdr (tree->stree (car (sketch-get)))))
       (edit_left-button 'group-edit "0" "0")
       (check= (length (sketch-get)) 2)
       (check= (length (gr)) 5)
       (check= (cAr (gr)) '(point "5" "5"))
       (check-true (in? '(point "1" "1") (gr)))
       (check-true (in? '(line (point "1" "1") (point "2" "2")) (gr)))
-      ;; FIXME: ungrouping reverses the order of the objects, since
-      ;; sketch-commit inserts each object at the same place
-      ;; (graphics/graphics-object.scm:620): (graphics "" (gr-group
-      ;; (point "1" "1") (line ...)) (point "5" "5")) gives (graphics ""
-      ;; (line ...) (point "1" "1") (point "5" "5")), expected the order
-      ;; of the group, (graphics "" (point "1" "1") (line ...) (point "5"
-      ;; "5")).
-      ))
+      ;; the objects come back in the order of the group
+      (check= (gr) `(graphics "" ,@grp (point "5" "5")))))
   ;; group-selected-objects and ungroup-current-object on the sketch
   (with-graphics '("gr-mode" (tuple "group-edit" "move"))
                  '((point "0" "0") (point "1" "1") (point "2" "2"))
@@ -1073,7 +1070,20 @@
       (sketch-toggle (path->tree (at 0 2 1)))
       (ungroup-current-object)
       (check= (gr) '(graphics "" (point "0" "0")
-                              (gr-group (point "1" "1") (point "2" "2")))))))
+                              (gr-group (point "1" "1") (point "2" "2"))))))
+  ;; ungrouping keeps the order of the group, at its place
+  (with-graphics '("gr-mode" (tuple "group-edit" "group-ungroup"))
+                 '((point "0" "0")
+                   (gr-group (point "1" "1") (point "2" "2") (point "3" "3"))
+                   (point "5" "5"))
+    (lambda ()
+      (sketch-toggle (path->tree (at 0 2 2)))
+      (ungroup-current-object)
+      (check= (gr) '(graphics "" (point "0" "0") (point "1" "1")
+                              (point "2" "2") (point "3" "3")
+                              (point "5" "5")))
+      (check= (map tree->stree (sketch-get))
+              '((point "1" "1") (point "2" "2") (point "3" "3"))))))
 
 ;; The operations of the group-edit modes are made between two left clicks,
 ;; by the moves of the mouse between them.
@@ -1096,12 +1106,43 @@
       (edit_left-button 'group-edit "2" "2")
       (check-false sticky-point)
       (check= (gr) '(graphics "" (point "3.0" "3.0") (point "5" "5")))))
-  ;; FIXME: the objects which are moved, zoomed or rotated together come
-  ;; back in the reverse order (graphics/graphics-object.scm:620, see the
-  ;; group group): (graphics "" (point "1" "1") (point "2" "2")) with both
-  ;; selected, (sketch-checkout) (sketch-commit) gives (graphics "" (point
-  ;; "2" "2") (point "1" "1")), expected the same graphics. Only one object
-  ;; is transformed below.
+  ;; the objects taken out together come back in their order and at their
+  ;; places, whatever the order of the selection
+  (with-graphics '("gr-mode" (tuple "group-edit" "move"))
+                 '((point "1" "1") (point "2" "2"))
+    (lambda ()
+      (sketch-toggle (path->tree (at 0 2 1)))
+      (sketch-toggle (path->tree (at 0 2 2)))
+      (sketch-checkout)
+      (sketch-commit)
+      (check= (gr) '(graphics "" (point "1" "1") (point "2" "2")))
+      (check= (map tree->stree (sketch-get))
+              '((point "1" "1") (point "2" "2")))))
+  (with-graphics '("gr-mode" (tuple "group-edit" "move"))
+                 '((point "0" "0") (point "1" "1") (point "5" "5")
+                   (point "2" "2") (point "6" "6"))
+    (lambda ()
+      (sketch-toggle (path->tree (at 0 2 4)))
+      (sketch-toggle (path->tree (at 0 2 2)))
+      (sketch-checkout)
+      (sketch-commit)
+      (check= (gr) '(graphics "" (point "0" "0") (point "1" "1")
+                              (point "5" "5") (point "2" "2")
+                              (point "6" "6")))
+      (check= (map tree->stree (sketch-get))
+              '((point "2" "2") (point "1" "1")))))
+  ;; two objects moved together with the mouse
+  (with-graphics '("gr-mode" (tuple "group-edit" "move"))
+                 '((point "1" "1") (point "5" "5") (point "2" "2"))
+    (lambda ()
+      (edit_right-button 'group-edit "0" "0")
+      (edit_right-button 'group-edit "3" "3")
+      (check= (length (sketch-get)) 2)
+      (edit_left-button 'group-edit "0" "0")
+      (edit_move 'group-edit "1" "1")
+      (edit_left-button 'group-edit "1" "1")
+      (check= (gr) '(graphics "" (point "2.0" "2.0") (point "5" "5")
+                              (point "3.0" "3.0")))))
   (with-graphics '("gr-mode" (tuple "group-edit" "zoom"))
                  '((line (point "1" "0") (point "3" "0")))
     (lambda ()

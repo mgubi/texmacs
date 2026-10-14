@@ -680,20 +680,22 @@ simplify_execed (tree t) {
 }
 
 static tree
-expand_references (tree t, hashmap<string,tree> h) {
+expand_references (tree t, hashmap<string,tree> h, hashmap<string,tree> g) {
+  // h: the references of the buffer, g: those of its project
   if (is_atomic (t)) return t;
   if (is_func (t, REFERENCE, 1) || is_func (t, PAGEREF)) {
     string ref= as_string (simplify_execed (t[0]));
-    if (h->contains (ref)) {
-      int which= is_func (t, REFERENCE, 1)? 0: 1;
+    int which= is_func (t, REFERENCE, 1)? 0: 1;
+    if (h->contains (ref))
       return tree (HLINK, copy (h[ref][which]), "#" * ref);
-    }
+    if (g->contains (ref))
+      return tree (HLINK, copy (g[ref][which]), "#" * ref);
     return tree (HLINK, "?", "#" * ref);
   }
   int i, n= N(t);
   tree r (t, n);
   for (i=0; i<n; i++)
-    r[i]= expand_references (t[i], h);
+    r[i]= expand_references (t[i], h, g);
   return r;  
 }
 
@@ -717,7 +719,7 @@ edit_typeset_rep::exec (tree t, hashmap<string,tree> H, bool expand_refs) {
   env->write_env (H);
   t= env->exec (t);
   if (expand_refs)
-    t= expand_references (t, buf->data->ref);
+    t= expand_references (t, buf->data->ref, env->global_ref);
   t= simplify_execed (t);
   t= simplify_correct (t);
   env->write_env (H2);

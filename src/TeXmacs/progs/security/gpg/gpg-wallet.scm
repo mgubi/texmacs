@@ -134,6 +134,7 @@
                       (begin
                         (gpg-wallet-turn-on new-passphrase)
                         (set! gpg-wallet-table table-backup)
+                        (gpg-wallet-save)
                         (when (not on?) (gpg-wallet-turn-off))
                         (system-remove-directory wallet-backup)
                         #t)

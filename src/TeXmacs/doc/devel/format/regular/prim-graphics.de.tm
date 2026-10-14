@@ -1,6 +1,6 @@
 <TeXmacs|1.0.4.2>
 
-<style|tmdoc>
+<style|<tuple|tmdoc|german>>
 
 <\body>
   <tmdoc-title|Graphik-Konstrukte>

@@ -367,6 +367,12 @@ scm_init_procs ()
  scm_c_define_gsubr (s_scm_procedure_with_setter_p, 1, 0, 0, (SCM (*)()) scm_procedure_with_setter_p); ;
  scm_c_define_gsubr (s_scm_make_procedure_with_setter, 2, 0, 0, (SCM (*)()) scm_make_procedure_with_setter); ;
  scm_c_define_gsubr (s_scm_procedure, 1, 0, 0, (SCM (*)()) scm_procedure); ;
+  /* registrations which the snarfing of a Windows build left out
+     (the .x files of guile-snarf, pasted in this file), under the
+     conditions of their definitions */
+#if defined(CCLO) && defined(GUILE_DEBUG)
+  scm_c_define_gsubr (s_scm_make_cclo, 2, 0, 0, (SCM (*)()) scm_make_cclo); ;
+#endif
  g_setter = ((SCM) (0)); scm_c_define_gsubr_with_generic (s_setter, 1, 0, 0, (SCM (*)()) scm_setter, &g_setter) ;
 
 }
