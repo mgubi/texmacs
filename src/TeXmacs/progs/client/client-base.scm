@@ -117,6 +117,7 @@
 ;;   client-started      when it was opened (texmacs-time, ms)
 ;;   client-heard        when the server was last heard (any message)
 ;;   client-ping-sent    when the ping which is not answered yet was sent
+;;   client-beat         when the heartbeat last ran
 ;;   client-latency      how long the last ping took (ms)
 ;;   client-silent       the user was told that the server does not answer
 ;;   client-stop-reason  why we close the connection ourselves
@@ -126,6 +127,7 @@
 (define client-started (make-ahash-table))
 (define client-heard (make-ahash-table))
 (define client-ping-sent (make-ahash-table))
+(define client-beat (make-ahash-table))
 (define client-latency (make-ahash-table))
 (define client-silent (make-ahash-table))
 (define client-stop-reason (make-ahash-table))
@@ -147,7 +149,8 @@
 (define client-silent-after 25000)  ;; two pings missed: the server is silent
 
 (define (client-forget-state server)
-  (for (t (list client-started client-heard client-ping-sent client-latency
+  (for (t (list client-started client-heard client-ping-sent client-beat
+                client-latency
                 client-silent client-stop-reason client-looking
                 client-token))
     (ahash-remove! t server)))
@@ -200,13 +203,14 @@
   (let* ((name (or (client-find-server-name server) "server"))
          (pseudo (client-find-server-pseudo server))
          (state (client-connection-state server))
-         (heard (ahash-ref client-heard server))
+         (since (or (ahash-ref client-ping-sent server)
+                    (ahash-ref client-heard server)))
          (ms (ahash-ref client-latency server)))
     (cond ((== state :closed) (string-append "Not connected to " name))
           ((== state :silent)
            (string-append "No answer from " name " for "
                           (number->string
-                            (quotient (- (texmacs-time) (or heard 0)) 1000))
+                            (quotient (- (texmacs-time) (or since 0)) 1000))
                           " s"))
           (else
             (string-append "Connected to " name
@@ -260,25 +264,32 @@
 
 (tm-define (client-heartbeat server)
   (:synopsis "Ask the server for a sign of life, and see whether it gave any")
-  ;; any message of the server is a sign of life, the answer to a ping too
-  ;; (an older server answers that it does not know the command)
+  ;; the server is silent when a ping waits for its answer: any message of
+  ;; the server is a sign of life, but when none is expected (the ping was
+  ;; answered) a long silence is no sign of trouble. A heartbeat which runs
+  ;; late (the computer slept, or TeXmacs was busy) gives the ping which
+  ;; waits a new chance: its answer may be there, not read yet.
   (let* ((now (texmacs-time))
-         (heard (or (ahash-ref client-heard server)
-                    (ahash-ref client-started server) now))
-         (quiet (- now heard))
+         (beat (ahash-ref client-beat server))
+         (late? (and beat (> (- now beat) (* 2 client-ping-interval))))
          (name (or (client-find-server-name server) "server"))
          (give-up (* 1000 (max 30 (or (client-get-connection-timeout) 100)))))
-    (cond ((> quiet give-up)
-           (client-close server
-                         (string-append "no answer for "
-                                        (number->string (quotient quiet 1000))
-                                        " s")))
-          ((> quiet client-silent-after)
-           (when (not (ahash-ref client-silent server))
-             (ahash-set! client-silent server #t)
-             (client-notify :silent (string-append
-                                      "the server " name
-                                      " does not answer; still trying")))))
+    (ahash-set! client-beat server now)
+    (when (and late? (ahash-ref client-ping-sent server))
+      (ahash-set! client-ping-sent server now))
+    (with waiting (- now (or (ahash-ref client-ping-sent server) now))
+      (cond ((> waiting give-up)
+             (client-close server
+                           (string-append "no answer for "
+                                          (number->string
+                                            (quotient waiting 1000))
+                                          " s")))
+            ((> waiting client-silent-after)
+             (when (not (ahash-ref client-silent server))
+               (ahash-set! client-silent server #t)
+               (client-notify :silent (string-append
+                                        "the server " name
+                                        " does not answer; still trying"))))))
     (when (and (ahash-ref client-server-active? server)
                (not (ahash-ref client-ping-sent server)))
       (ahash-set! client-ping-sent server now)
