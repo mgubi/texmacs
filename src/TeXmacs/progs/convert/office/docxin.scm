@@ -1259,9 +1259,12 @@
   (with r (catch #t
             (lambda () (docx-parse s))
             (lambda args
-              (docx-error (string-append "This Word document could not be read ("
-                                         (object->string (car args)) ")"))))
+              (docx-error (string-append "This Word document could not be read "
+                                         (office-error-text args)))))
     (set! docx-archive #f)
+    (set! docx-part "word/document.xml")
+    (set! docx-rels (make-ahash-table))
+    (set! docx-lists (make-ahash-table))
     (set! docx-styles (make-ahash-table))
     (set! docx-style-memo (make-ahash-table))
     (set! docx-notes (make-ahash-table))

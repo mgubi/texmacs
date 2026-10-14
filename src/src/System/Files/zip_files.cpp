@@ -10,6 +10,7 @@
 ******************************************************************************/
 
 #include "zip_files.hpp"
+#include "hashset.hpp"
 
 /******************************************************************************
 * Inflate (RFC 1951): the three kinds of blocks, with canonical Huffman codes
@@ -440,6 +441,8 @@ zip_write (array<string> names, array<string> datas) {
   string r, dir;
   int n= min (N (names), N (datas));
   if (n > ZIP_MAX_ENTRIES) return "";
+  for (int i= 0; i < n; i++)
+    if (N (names[i]) > 65535) return "";
   for (int i= 0; i < n; i++) {
     unsigned int crc= crc32_string (datas[i]);
     unsigned int size= (unsigned int) N (datas[i]);
@@ -508,20 +511,23 @@ array<string>
 zip_unpack (string zip) {
   // the names and the data of the entries which can be read, in their
   // order; the directories (names which end with /) are left out. The
-  // directory is read once, and the entries which follow ZIP_MAX_TOTAL
-  // bytes of data are left out
+  // directory is read once. Every entry which is tried counts for its
+  // declared size, read or not (an entry can inflate in full and then
+  // fail its CRC), the entries which follow ZIP_MAX_TOTAL bytes are left
+  // out, and so are the entries whose data another entry already has
   array<zip_entry> dir;
   array<string> r;
   if (!zip_directory (zip, dir)) return r;
+  hashset<int> offsets;
   long long total= 0;
   for (int i= 0; i < N (dir); i++) {
     string name= dir[i].name, data;
     if (N (name) == 0 || name[N (name) - 1] == '/') continue;
+    if (dir[i].method < 0 || offsets->contains (dir[i].offset)) continue;
+    offsets->insert (dir[i].offset);
     if (total + dir[i].usize > ZIP_MAX_TOTAL) break;
-    if (zip_read_entry (zip, dir[i], data)) {
-      r << name << data;
-      total += N (data);
-    }
+    total += dir[i].usize;
+    if (zip_read_entry (zip, dir[i], data)) r << name << data;
   }
   return r;
 }

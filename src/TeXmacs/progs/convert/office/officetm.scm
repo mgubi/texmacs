@@ -896,12 +896,13 @@
 (define (oftm-lines l)
   ;; several paragraphs as the lines of one
   (oftm-concat
-    (let loop ((l l) (acc '()))
+    (let loop ((l l) (acc '()) (first? #t))
       (if (null? l) (reverse acc)
           (loop (cdr l)
                 (append (reverse (if (func? (car l) 'concat) (cdar l)
                                      (list (car l))))
-                        (if (null? acc) acc (cons '(next-line) acc))))))))
+                        (if first? acc (cons '(next-line) acc)))
+                #f)))))
 
 (define (oftm-doc-data l meta)
   ;; the title, from the paragraphs l at the start of the document which
@@ -955,8 +956,8 @@
                 `(document (body ,(oftm-body l)) (style "generic")))
               ;; (what was not foreseen gives a document which says so)
               (lambda args
-                (with msg (string-append "This document could not be converted ("
-                                         (object->string (car args)) ")")
+                (with msg (string-append "This document could not be converted "
+                                         (office-error-text args))
                   (debug-message "convert-error" (string-append msg "\n"))
                   `(document (body (document (with "color" "red" ,msg)))
                              (style "generic")))))

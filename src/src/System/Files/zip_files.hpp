@@ -23,8 +23,10 @@
 
 // The archives come from anywhere: an entry is read only when its data
 // has the size and the CRC-32 which the archive says, and is not larger
-// than ZIP_MAX_ENTRY, and zip_unpack reads at most ZIP_MAX_TOTAL bytes of
-// data. zip_write gives "" for more entries than the format has room for.
+// than ZIP_MAX_ENTRY, and zip_unpack tries at most ZIP_MAX_TOTAL bytes of
+// data (the declared sizes, whether the entries can be read or not), and
+// reads the data at one place of the archive once. zip_write gives "" for
+// more entries, or longer names, than the format has room for.
 #define ZIP_MAX_ENTRY (256 * 1024 * 1024)
 #define ZIP_MAX_TOTAL (512LL * 1024 * 1024)
 #define ZIP_MAX_ENTRIES 65535

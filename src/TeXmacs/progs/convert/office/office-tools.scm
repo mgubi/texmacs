@@ -120,9 +120,11 @@
   (:synopsis "The table of the entries of the zip archive @s, or #f")
   (and (string? s) (zip-archive? s)
        (let ((t (make-ahash-table)))
+         ;; (of two entries with the same name, the first one counts)
          (let loop ((l (zip-unpack s)))
            (when (and (pair? l) (pair? (cdr l)))
-             (ahash-set! t (car l) (cadr l))
+             (when (not (ahash-ref t (car l)))
+               (ahash-set! t (car l) (cadr l)))
              (loop (cddr l))))
          t)))
 
@@ -304,6 +306,14 @@
   ;; the wrapper of the node x around the nodes l
   (if (null? (ox-attrs x)) (cons (car x) l)
       (cons* (car x) (cons '@ (ox-attrs x)) l)))
+
+(tm-define (office-error-text args)
+  (:synopsis "The arguments @args of an error, as a short text for a message")
+  ;; (the key of the error and what it was about: enough to find the bug,
+  ;; and not a whole tree)
+  (with s (object->string args)
+    (if (<= (string-length s) 300) s
+        (string-append (substring s 0 300) "..."))))
 
 (tm-define (office-join-strings l)
   (:synopsis "The list @l with the strings which follow each other as one")
