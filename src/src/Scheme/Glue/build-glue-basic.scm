@@ -614,6 +614,7 @@
   (cpp-ai-latex-command ai_latex_command (string string string string))
   (cpp-ai-latex-request ai_latex_request (string string string string))
   (cpp-ai-latex-output ai_latex_output (tree string string string))
+  (cpp-ai-set-prices ai_set_prices (void string))
   (cpp-ai-chat ai_chat (string string string string))
   (cpp-ai-correct ai_correct (tree content string string))
   (cpp-ai-translate ai_translate (tree content string string string))

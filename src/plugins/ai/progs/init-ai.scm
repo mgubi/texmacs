@@ -302,6 +302,17 @@
     (if (or (not (string? s)) (== s "") (== s "default")) (list)
         (string-decompose s " "))))
 
+;; The list of the models of OpenRouter has their prices, also those of the
+;; models of OpenAI, Anthropic, Google and Mistral: it is kept in the home,
+;; where ai.cpp finds it to estimate the cost of the answers of the engines
+;; which do not give it (ai_estimate_cost). It is asked only here, when the
+;; list of the models of OpenRouter is updated.
+(define (ai-keep-prices ans)
+  (with dir (string->url "$TEXMACS_HOME_PATH/system/ai")
+    (when (not (url-exists? dir)) (system-mkdir dir))
+    (string-save ans (url-append dir "openrouter-models.json"))
+    (cpp-ai-set-prices ans)))
+
 ;; asks the engine its models, keeps them in the preferences; the number of
 ;; models, or a text which says why there are none
 (tm-define (ai-update-models name)
@@ -318,6 +329,7 @@
           (cond ((nnull? l)
                  (set-preference (string-append name " models")
                                  (string-recompose l " "))
+                 (when (== name "openrouter") (ai-keep-prices ans))
                  (length l))
                 ((== ans "") "no answer (network, key, or the site refuses the page)")
                 ((and t (json-ref t "error"))
