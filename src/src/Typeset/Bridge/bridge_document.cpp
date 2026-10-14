@@ -162,8 +162,7 @@ bridge_block_rep::my_stack_start () {
   // (the block is not a paragraph which is typeset again: those are
   // counted when its paragraphs are)
   if (edit_profile.on) edit_profile.redone--;
-  // nothing of what the block made is kept: it holds lines, which log the
-  // place they leave when they go (see phrase_box_rep)
+  // (what the block made is made again)
   ok= false;
   repl= page_item ();
   app= array<page_item> ();

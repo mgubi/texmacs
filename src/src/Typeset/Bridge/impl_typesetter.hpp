@@ -18,7 +18,9 @@ class typesetter_rep {
 public:
   edit_env&    env;
   bridge       br;
-  rectangles   change_log;
+  repaint_log  repaint;  // the areas to repaint (see boxes.hpp)
+  array<box>       placed_boxes; // and, in the check mode, the boxes which
+  array<rectangle> placed_rects; // logged in the last pass, with their areas
   array<brush> old_bgs;
 
   array<page_item> l;      // current lines
@@ -31,8 +33,7 @@ public:
   bool paper;
   page_memo* kept_pages;   // the pages of the last pass (pager.hpp)
 
-  shove_memo shoves;        // memoized shoves (after change_log, in which
-                            // its boxes log when they are destroyed)
+  shove_memo shoves;        // memoized shoves
 
 public:
   typesetter_rep (edit_env& env, tree et, path ip);

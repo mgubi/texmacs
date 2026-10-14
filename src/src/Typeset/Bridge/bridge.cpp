@@ -310,8 +310,7 @@ bridge_rep::~bridge_rep () {
 }
 
 // The chunks of a bridge hold its lines until the next time it makes
-// chunks: when it no longer does (its last float went away), they must go,
-// or a line which is replaced later would not log the place it leaves
+// chunks: when it no longer does (its last float went away), they go
 static inline void
 drop_chunks (bridge_rep* br) {
   if (br->chunk_cache != NULL) {
@@ -421,7 +420,7 @@ chunk_lines (bridge_rep* br, array<page_item> l) {
     }
     i= j;
   }
-  cc->prev= hashmap<pointer,line_chunk> ();  // see stack_cache in typeset
+  cc->prev= hashmap<pointer,line_chunk> ();
   return out;
 }
 
@@ -796,8 +795,7 @@ bridge_rep::typeset (int desired_status) {
     }
     env->link_env= old_link_env;
     status= desired_status;
-    // release the old lines now: a phrase box logs the area to be repainted
-    // when it is destroyed, so a stale cache would leave it on the screen
+    // (the old lines are not used any more)
     stack_cache= array<page_item> ();
     stack_cache_ok= false;
     version++;

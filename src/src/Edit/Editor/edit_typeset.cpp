@@ -1027,7 +1027,7 @@ edit_typeset_rep::typeset_sub (SI& x1, SI& y1, SI& x2, SI& y2) {
   //time_t t1= texmacs_time ();
   typeset_prepare ();
   eb= empty_box (reverse (rp));
-  // saves memory, also necessary for change_log update
+  // saves memory
   bench_start ("typeset");
 #ifdef USE_EXCEPTIONS
   try {

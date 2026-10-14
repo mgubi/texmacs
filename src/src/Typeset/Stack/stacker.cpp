@@ -225,12 +225,8 @@ shove (page_item& item1, page_item& item2,
 * its result is remembered.  Two generations of entries are kept (current
 * and previous pass), which bounds the memory and keeps the referenced boxes
 * alive, so that identity comparisons remain meaningful.  The previous
-* generation is dropped as soon as the paragraphs have been typeset: boxes
-* log the area to be repainted when they are destroyed, so keeping the
-* lines of the previous pass alive until the next one would leave removed
-* lines on the screen.  For the same reason, the memo belongs to the
-* typesetter (see shove_memo): its boxes must not outlive the change log
-* of the typesetter in which they log.
+* generation is dropped as soon as the paragraphs have been typeset.  The
+* memo belongs to the typesetter (see shove_memo).
 ******************************************************************************/
 
 // memo of the innermost shove_pass (NULL outside passes)

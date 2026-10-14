@@ -456,8 +456,7 @@ pager_rep::pages_make () {
   for (i=0; i<n; i++)
     pages << pages_make_page (sk[i]);
   if (memo != NULL) {
-    // the pages which are no longer there are not kept: their lines
-    // must go now, to log the place they leave (see phrase_box_rep)
+    // the pages which are no longer there are not kept
     if (N(memo->texts)   > n) memo->texts  = range (memo->texts, 0, n);
     if (N(memo->headers) > n) memo->headers= range (memo->headers, 0, n);
     if (N(memo->footers) > n) memo->footers= range (memo->footers, 0, n);
