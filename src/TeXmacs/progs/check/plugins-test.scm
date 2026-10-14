@@ -77,8 +77,8 @@
 ;; With a valid plugin cache, plugin-configure does not evaluate :require
 ;; and takes the availability of a plugin from the cache, where the test
 ;; plugins are not: they are configured as if the cache were being rebuilt.
-(define saved-reconfigure-flag reconfigure-flag?)
-(set! reconfigure-flag? #t)
+(define saved-reconfigure-flag (plugin-reconfigure?))
+(plugin-reconfigure-set! #t)  ; (not set!, which S7 does not pass on)
 
 (define (raw-serialize lan t)
   ;; the test plugins receive exactly the string which is evaluated
@@ -130,7 +130,7 @@
             ,(lambda (name chat res) (tm->tree (string-append "res=" res))))
   (:session "Cmdline test"))
 
-(set! reconfigure-flag? saved-reconfigure-flag)
+(plugin-reconfigure-set! saved-reconfigure-flag)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; What the plugins notify
@@ -1065,9 +1065,11 @@
 (define (test-pipes)
   (check-group "pipes: processes")
   ;; (the pipes of pipe_link.cpp, used without Qt: with Qt, a plugin is a
-  ;; QProcess, started without a shell, and Windows without Qt has no pipes)
+  ;; QProcess, started without a shell, and Windows without Qt has no pipes;
+  ;; Scheme cannot tell whether a Qt build uses Qt pipes, so a Qt build
+  ;; configured with --disable-qtpipes skips these checks too)
   (if (or (qt-gui?) (os-mingw?))
-      (display "  SKIP pipes: processes: Qt pipes, or no pipes (Windows)\n")
+      (skip "pipes: processes" "Qt pipes, or no pipes (Windows)")
       (test-pipes*)))
 
 (define (test-pipes*)
