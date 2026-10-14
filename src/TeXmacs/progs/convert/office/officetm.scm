@@ -335,11 +335,21 @@
                           (> (abs (- size oftm-base-size)) 0.1))
                      `("font-size" ,(office-decimal (/ size oftm-base-size)))
                      '())
-                 (cond ((== (get 'font) "sans") '("font-family" "ss"))
+                 (cond ((oftm-known-font (get 'font-name))
+                        => (lambda (name) `("font" ,name)))
+                       ((== (get 'font) "sans") '("font-family" "ss"))
                        ((== (get 'font) "mono") '("font-family" "tt"))
                        (else '()))))
-         (t (if (get 'underline) `(underline ,t) t))
-         (t (if (get 'strike) `(strike-through ,t) t)))
+         ;; (the kinds of underlines and of lines through, the capitals
+         ;; and the spacing of the letters, as in the text)
+         (t (cond ((not (get 'underline)) t)
+                  ((get 'underline-kind) `(office-underline ,(get 'underline-kind) ,t))
+                  (else `(underline ,t))))
+         (t (cond ((not (get 'strike)) t)
+                  ((get 'dstrike) `(office-strike "double" ,t))
+                  (else `(strike-through ,t))))
+         (t (if (get 'caps) `(change-case ,t "UPCASE") t))
+         (t (if (office-number (get 'letters)) `(office-letters ,(get 'letters) ,t) t)))
     (if (null? vars) t `(with ,@vars ,t))))
 
 (define (oftm-style-paragraph st t)
@@ -398,6 +408,12 @@
   '("section-title" "subsection-title" "subsubsection-title" "paragraph-title"
     "subparagraph-title"))
 
+(define (oftm-title-level st)
+  ;; the level of the style of headings st, when TeXmacs has titles of
+  ;; this level (the deeper ones keep the look of their paragraphs)
+  (with n (office-integer (ox-attr st 'level) 0 0 9)
+    (and (>= n 1) (<= n 5) n)))
+
 (define (oftm-title-macro st)
   ;; the title of the sections of the level of the style of headings st,
   ;; in its look: the macro of the style of TeXmacs which typesets them
@@ -426,12 +442,12 @@
                          (macro "body" ,(if par? (oftm-style-paragraph st '(arg "body"))
                                             (oftm-style-text st '(arg "body")))))))
          (sort (list-filter (ahash-table->list oftm-styles)
-                            (lambda (kv) (not (ox-attr (cdr kv) 'level))))
+                            (lambda (kv) (not (oftm-title-level (cdr kv)))))
                (lambda (a b) (string<? (car a) (car b)))))
     ;; the titles of the sections, in the look of the headings of the file
     (list-filter (map (lambda (kv) (oftm-title-macro (cdr kv)))
                       (sort (list-filter (ahash-table->list oftm-styles)
-                                         (lambda (kv) (ox-attr (cdr kv) 'level)))
+                                         (lambda (kv) (oftm-title-level (cdr kv))))
                             (lambda (a b) (string<? (car a) (car b)))))
                  identity)))
 

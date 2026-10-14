@@ -29,6 +29,7 @@
 
 (define odt-archive #f)                  ; the entries of the archive
 (define odt-styles (make-ahash-table))   ; (family . name) -> properties
+(define odt-font-faces (make-ahash-table))  ; declared name -> family of fonts
 (define odt-style-memo (make-ahash-table))
 (define odt-lists (make-ahash-table))    ; (list style . level) -> kind
 (define odt-list-style #f)               ; the style of the list which is read
@@ -103,14 +104,21 @@
               '()))
         (with v (ox-attr x 'fo:font-variant)
           (if v (list (cons 'smallcaps (== v "small-caps"))) '()))
-        (with v (odt-font-name (or (ox-attr x 'style:font-name)
-                                   (ox-attr x 'fo:font-family)))
+        (with v (or (odt-font-face (ox-attr x 'style:font-name))
+                    (odt-font-name (ox-attr x 'fo:font-family)))
           (if v (list (cons 'code (office-monospace? v)) (cons 'font v)) '()))
         (with v (ox-attr x 'text:display)
           (if v (list (cons 'hidden (== v "none"))) '()))
         ;; (a size in percents is one of the parent)
         (with v (office-points (ox-attr x 'fo:font-size))
           (if (and v (> v 0)) (list (cons 'size v)) '())))))
+
+(define (odt-font-face name)
+  ;; the family of fonts of a declared font: its name is often the one of
+  ;; the family, but not always ("Noto Sans1")
+  (and name
+       (with f (ahash-ref odt-font-faces name)
+         (if (string? f) f (odt-font-name name)))))
 
 (define (odt-font-name v)
   ;; the first font of a list of fonts, without its quotes
@@ -215,6 +223,13 @@
 (define (odt-read-styles root)
   ;; the styles of a file: the named ones and the automatic ones
   (when root
+    ;; (the declared fonts first: the styles say their names)
+    (for (decls (ox-childs root 'office:font-face-decls))
+      (for (x (ox-childs decls 'style:font-face))
+        (with name (ox-attr x 'style:name)
+          (when name
+            (ahash-set! odt-font-faces name
+                        (or (odt-font-name (ox-attr x 'svg:font-family)) #t))))))
     (for (group (append (ox-childs root 'office:styles)
                         (ox-childs root 'office:automatic-styles)))
       (for (x (ox-childs group 'style:style))
@@ -1210,6 +1225,11 @@
                    (size ,(num 'size))
                    (font ,(cond ((not font) #f) ((office-monospace? font) "mono")
                                 ((office-sans? font) "sans") (else #f)))
+                   (font-name ,(and font (not (office-monospace? font)) font))
+                   (caps ,(yes 'caps)) (dstrike ,(yes 'dstrike))
+                   (underline-kind ,(and (odt-get props 'underline)
+                                         (odt-get props 'underline-kind)))
+                   (letters ,(num 'letters))
                    (align ,(and par? (odt-align (odt-get props 'align))))
                    (indent-left ,(and par? (num 'indent-left)))
                    (first-indent ,(and par? (num 'first-indent)))
@@ -1259,6 +1279,7 @@
                                         (office-error-text args)))))
     (set! odt-archive #f)
     (set! odt-styles (make-ahash-table))
+    (set! odt-font-faces (make-ahash-table))
     (set! odt-style-memo (make-ahash-table))
     (set! odt-lists (make-ahash-table))
     (set! odt-list-style #f)
@@ -1278,6 +1299,7 @@
   (if (not odt-archive) (odt-error "This file is not an OpenDocument text")
       (let ((content (office-xml odt-archive "content.xml")))
         (set! odt-styles (make-ahash-table))
+        (set! odt-font-faces (make-ahash-table))
         (set! odt-style-memo (make-ahash-table))
         (set! odt-lists (make-ahash-table))
         (set! odt-list-style #f)
