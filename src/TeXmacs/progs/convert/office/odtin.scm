@@ -727,8 +727,10 @@
 (define (odt-merge-lists l)
   ;; A list which goes on at a deeper level after another one is written
   ;; as a new list whose first item has no text, only a list: it is the
-  ;; end of the last item of the list before.
-  (cond ((or (null? l) (null? (cdr l))) l)
+  ;; end of the last item of the list before. (A loop: a document may have
+  ;; many thousands of blocks)
+  (let loop ((l l) (acc '()))
+   (cond ((or (null? l) (null? (cdr l))) (append (reverse acc) l))
         ((and (func? (car l) 'list) (func? (cadr l) 'list)
               (pair? (ox-children (car l))) (pair? (ox-children (cadr l)))
               (with first (car (ox-children (cadr l)))
@@ -744,8 +746,8 @@
                                       (odt-merge-lists
                                         (append (cdr (cAr items)) (cdr first))))
                                ,@(cdr (ox-children b)))))
-           (odt-merge-lists (cons merged (cddr l)))))
-        (else (cons (car l) (odt-merge-lists (cdr l))))))
+           (loop (cons merged (cddr l)) acc)))
+        (else (loop (cdr l) (cons (car l) acc))))))
 
 (define (odt-inline-node? x)
   ;; text where a paragraph should be: some programs write it
@@ -801,6 +803,23 @@
 (tm-define (parse-odt-document s)
   (:type (-> string stree))
   (:synopsis "Read the OpenDocument text @s, a zip archive, into an office tree")
+  ;; (what was not foreseen in a file gives a message too, and the state
+  ;; of the module is reset)
+  (with r (catch #t
+            (lambda () (odt-parse s))
+            (lambda args
+              (odt-error (string-append "This OpenDocument file could not be read ("
+                                        (object->string (car args)) ")"))))
+    (set! odt-archive #f)
+    (set! odt-styles (make-ahash-table))
+    (set! odt-style-memo (make-ahash-table))
+    (set! odt-lists (make-ahash-table))
+    (set! odt-list-style #f)
+    (set! odt-list-depth 0)
+    (set! odt-floats '())
+    r))
+
+(define (odt-parse s)
   (set! odt-archive (office-archive s))
   (if (not odt-archive) (odt-error "This file is not an OpenDocument text")
       (let ((content (office-xml odt-archive "content.xml")))
@@ -816,7 +835,4 @@
                (r (if text
                       `(office ,@(odt-meta) ,@(odt-blocks (ox-children text)))
                       (odt-error "This OpenDocument file has no text"))))
-          (set! odt-archive #f)
-          (set! odt-styles (make-ahash-table))
-          (set! odt-style-memo (make-ahash-table))
           r))))

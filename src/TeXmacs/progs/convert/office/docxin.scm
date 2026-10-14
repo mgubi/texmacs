@@ -1189,27 +1189,31 @@
                                   (cdr items)))))))))))
 
 (define (docx-group-lists l)
-  (cond ((null? l) l)
-        ((docx-item-level (car l))
-         (with r (docx-list l (docx-item-level (car l)))
-           (cons (car r) (docx-group-lists (cdr r)))))
-        ((and (func? (car l) 'p) (ox-attr (car l) 'list-more))
-         (cons (docx-plain-paragraph (car l)) (docx-group-lists (cdr l))))
-        (else (cons (car l) (docx-group-lists (cdr l))))))
+  ;; (loops, here and below: a document may have many thousands of blocks)
+  (let loop ((l l) (acc '()))
+    (cond ((null? l) (reverse acc))
+          ((docx-item-level (car l))
+           (with r (docx-list l (docx-item-level (car l)))
+             (loop (cdr r) (cons (car r) acc))))
+          ((and (func? (car l) 'p) (ox-attr (car l) 'list-more))
+           (loop (cdr l) (cons (docx-plain-paragraph (car l)) acc)))
+          (else (loop (cdr l) (cons (car l) acc))))))
 
 (define (docx-drop-caps l)
   ;; a large first letter is a paragraph of its own: it is the start of
   ;; the next one
-  (cond ((or (null? l) (null? (cdr l))) l)
-        ((and (func? (car l) 'p) (ox-attr (car l) 'dropcap)
-              (func? (cadr l) 'p))
-         (docx-drop-caps
-           (cons (apply office-node
-                        (cons* 'p (ox-attrs (cadr l))
-                               (office-merge (append (ox-children (car l))
-                                                     (ox-children (cadr l))))))
-                 (cddr l))))
-        (else (cons (car l) (docx-drop-caps (cdr l))))))
+  (let loop ((l l) (acc '()))
+    (cond ((or (null? l) (null? (cdr l))) (append (reverse acc) l))
+          ((and (func? (car l) 'p) (ox-attr (car l) 'dropcap)
+                (func? (cadr l) 'p))
+           (loop (cons (apply office-node
+                              (cons* 'p (ox-attrs (cadr l))
+                                     (office-merge
+                                       (append (ox-children (car l))
+                                               (ox-children (cadr l))))))
+                       (cddr l))
+                 acc))
+          (else (loop (cdr l) (cons (car l) acc))))))
 
 (define (docx-blocks l)
   (docx-group-lists (docx-drop-caps (docx-blocks-sub l))))
@@ -1250,6 +1254,22 @@
 (tm-define (parse-docx-document s)
   (:type (-> string stree))
   (:synopsis "Read the Word document @s, a zip archive, into an office tree")
+  ;; (what was not foreseen in a file gives a message too, and the state
+  ;; of the module is reset)
+  (with r (catch #t
+            (lambda () (docx-parse s))
+            (lambda args
+              (docx-error (string-append "This Word document could not be read ("
+                                         (object->string (car args)) ")"))))
+    (set! docx-archive #f)
+    (set! docx-styles (make-ahash-table))
+    (set! docx-style-memo (make-ahash-table))
+    (set! docx-notes (make-ahash-table))
+    (set! docx-open-notes '())
+    (set! docx-fields '())
+    r))
+
+(define (docx-parse s)
   (set! docx-archive (office-archive s))
   (if (not docx-archive) (docx-error "This file is not a Word document")
       (begin
@@ -1269,8 +1289,4 @@
                (r (if body
                       `(office ,@(docx-meta) ,@(docx-blocks (ox-children body)))
                       (docx-error "This Word document has no text"))))
-          (set! docx-archive #f)
-          (set! docx-styles (make-ahash-table))
-          (set! docx-style-memo (make-ahash-table))
-          (set! docx-notes (make-ahash-table))
           r))))

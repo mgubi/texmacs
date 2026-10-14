@@ -75,7 +75,162 @@
     (check= (zip-pack '("mimetype" "dir/a.xml" "bin") (list "x/y" "<a/>" bin)) z))
   (check= (zip-unpack (zip-pack '() '())) '())
   ;; an archive which is cut is no archive
-  (check= (zip-unpack (substring zip-sample 0 100)) '()))
+  (check= (zip-unpack (substring zip-sample 0 100)) '())
+  ;; two entries with the same name are two entries
+  (check= (zip-unpack (zip-pack '("x" "x") '("1" "2"))) '("x" "1" "x" "2"))
+  ;; many entries: the directory is read once
+  (let* ((names (map (lambda (i) (string-append "f" (number->string i)))
+                     (iota 5000)))
+         (z (zip-pack names names)))
+    (check= (length (zip-unpack z)) 10000))
+  ;; more entries than the format has room for
+  (check= (zip-pack (make-list 65536 "a") (make-list 65536 "")) ""))
+
+;; Archives which were damaged, or made to harm: an entry which cannot be
+;; read is left out, and nothing else happens.
+
+(define (le n k)
+  ;; the number n in k bytes, the lowest first
+  (if (== k 0) '() (cons (remainder n 256) (le (quotient n 256) (- k 1)))))
+
+(define (zip-patch s i n)
+  ;; the archive s with the number n in the 4 bytes at i
+  (string-append (substring s 0 i) (apply bytes (le n 4))
+                 (substring s (+ i 4) (string-length s))))
+
+(define (zip-central s k)
+  ;; where the k-th entry of the directory of s starts
+  (let loop ((i 0) (k k))
+    (with j (string-search-forwards (bytes 80 75 1 2) i s)
+      (if (== k 0) j (loop (+ j 4) (- k 1))))))
+
+(define (zip-one data method size crc)
+  ;; an archive with the entry "e" whose data in the archive is data, of
+  ;; the method, which says that it is the size bytes whose CRC is crc
+  (let* ((n (string-length data))
+         (head (lambda (central?)
+                 (append (le (if central? #x02014b50 #x04034b50) 4)
+                         (if central? (le 20 2) '())
+                         (le 20 2) (le 0 2) (le method 2) (le 0 4)
+                         (le crc 4) (le n 4) (le size 4) (le 1 2) (le 0 2))))
+         (local (string-append (apply bytes (head #f)) "e" data))
+         ;; (no comment, the disk, the attributes, the offset 0)
+         (dir (string-append (apply bytes (append (head #t) (le 0 10) (le 0 4)))
+                             "e")))
+    (string-append local dir
+                   (apply bytes (append (le #x06054b50 4) (le 0 4) (le 1 2) (le 1 2)
+                                        (le (string-length dir) 4)
+                                        (le (string-length local) 4) (le 0 2))))))
+
+(define (zip-crc s)
+  ;; the CRC-32 of s, as the archives have it
+  (let* ((z (zip-pack '("x") (list s)))
+         (i (zip-central z 0)))
+    (+ (char->integer (string-ref z (+ i 16)))
+       (* 256 (char->integer (string-ref z (+ i 17))))
+       (* 65536 (char->integer (string-ref z (+ i 18))))
+       (* 16777216 (char->integer (string-ref z (+ i 19)))))))
+
+(define (test-zip-damaged)
+  (check-group "zip, damaged archives")
+  (let ((a (zip-central zip-sample 0))
+        (b (zip-central zip-sample 1))
+        (only-a (list "a.txt" (apply string-append
+                                     (make-list 4 "hello hello hello hello hello hello\n"))))
+        (only-b '("b.txt" "TeXmacs")))
+    ;; a size of the data which deflate cannot make, or which is wrong (it
+    ;; was allocated before anything was read: TeXmacs ended)
+    (check= (zip-unpack (zip-patch zip-sample (+ a 24) #x7fffffff)) only-b)
+    (check= (zip-unpack (zip-patch zip-sample (+ a 24) 20000)) only-b)
+    (check= (zip-unpack (zip-patch zip-sample (+ a 24) 145)) only-b)
+    ;; offsets and sizes near the largest numbers
+    (check= (zip-unpack (zip-patch zip-sample (+ a 42) #x7ffffff0)) only-b)
+    (check= (zip-unpack (zip-patch zip-sample (+ a 42) #xfffffff0)) only-b)
+    (check= (zip-unpack (zip-patch (zip-patch zip-sample (+ b 20) #x7ffffff0)
+                                   (+ b 24) #x7ffffff0))
+            only-a)
+    (check= (zip-unpack (zip-patch zip-sample (- (string-length zip-sample) 6)
+                                   #x7ffffff0))
+            '())
+    ;; data which was changed: its CRC-32 is not the one of the archive
+    (with i (string-search-forwards "TeXmacs" 0 zip-sample)
+      (check= (zip-unpack (string-append (substring zip-sample 0 i) "TeXmacZ"
+                                         (substring zip-sample (+ i 7)
+                                                    (string-length zip-sample))))
+              only-a)))
+  ;; deflated data which is wrong: a stored block whose two lengths do not
+  ;; agree, a code with more codes than its lengths allow, a distance before
+  ;; the start of the data
+  (with crc (zip-crc "TeXmacs")
+    (check= (zip-unpack (zip-one (string-append (bytes 1 7 0 248 255) "TeXmacs")
+                                 8 7 crc))
+            '("e" "TeXmacs"))
+    (check= (zip-unpack (zip-one (string-append (bytes 1 7 0 0 0) "TeXmacs")
+                                 8 7 crc))
+            '()))
+  (check= (zip-unpack (zip-one (bytes 5 0 146 4) 8 1 0)) '())
+  (check= (zip-unpack (zip-one (bytes 3 2 0) 8 3 0)) '()))
+
+;; The parser of XML, which the office formats share with HTML: elements
+;; inside each other and entities which expand to entities have limits.
+(define (test-xml-limits)
+  (check-group "xml limits")
+  (let* ((rep (lambda (n s) (apply string-append (make-list n s))))
+         (depth (lambda (t)
+                  (let loop ((t t) (d 0))
+                    (if (and (pair? t) (pair? (cdr t)) (pair? (cadr t)))
+                        (loop (cadr t) (+ d 1))
+                        d))))
+         (deep (parse-xml (string-append (rep 3000 "<a>") "x" (rep 3000 "</a>")))))
+    (check-true (<= (depth deep) 1001))
+    (check-true (>= (string-search-forwards "\"x\"" 0 (object->string deep)) 0))
+    ;; ten levels of entities of ten each: 10^10 characters
+    (let* ((names '("a" "b" "c" "d" "e" "f" "g" "h" "i" "j"))
+           (decl (apply string-append
+                        (cons "<!ENTITY a \"aaaaaaaaaa\">"
+                              (map (lambda (p q)
+                                     (string-append "<!ENTITY " q " \""
+                                                    (rep 10 (string-append "&" p ";"))
+                                                    "\">"))
+                                   (cDr names) (cdr names)))))
+           (t (parse-xml (string-append "<!DOCTYPE r [" decl "]><r>&j;</r>"))))
+      (check-true (< (string-length (object->string t)) 5000000)))
+    ;; the entities which every document has are not counted
+    (check= (parse-xml "<r>&amp;&lt;</r>") '(*TOP* (r "&<")))))
+
+;; Numbers of a file which Scheme would read as others: the picture has
+;; no size, and the document is read.
+(define (test-office-odd-values)
+  (check-group "odd values")
+  (for (cx '("1e999" "1+2i" "-5" "1/0" "#x10"))
+    (check= (docx (wp "<w:r><w:drawing><wp:inline><wp:extent cx='" cx
+                      "' cy='360000'/><a:blip r:embed='rId2'/></wp:inline>"
+                      "</w:drawing></w:r>"))
+            '((p (image (@ (name "pic.png") (data "PNGDATA") (height "1cm")))))))
+  ;; what was not foreseen gives a document which says so
+  (check= (car (convert "x" "office-stree" "texmacs-stree")) 'document))
+
+;; Long documents are read and written: the functions which walk the
+;; blocks and the runs are loops (the stack of Guile 1.8 ended at 10000).
+(define (test-office-long)
+  (check-group "long documents")
+  (let* ((n 12000)
+         (pars (map (lambda (i) (string-append "P" (number->string i))) (iota n)))
+         (doc `(document (body (document ,@pars)) (style "generic")))
+         (runs `(document (body (document
+                                  (concat ,@(map (lambda (i)
+                                                   (if (even? i)
+                                                       `(strong ,(number->string i))
+                                                       (string-append " " (number->string i) " ")))
+                                                 (iota n)))))
+                          (style "generic")))
+         (body (lambda (t) (cdr (cadr (cadr t))))))
+    (for (fm '("docx-document" "odt-document"))
+      (check= (length (body (convert (convert doc "texmacs-stree" fm)
+                                     fm "texmacs-stree")))
+              n)
+      (with t (convert (convert runs "texmacs-stree" fm) fm "texmacs-stree")
+        (check= (length (cdar (body t))) n)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Word documents
@@ -1782,6 +1937,10 @@
   (:synopsis "Run the tests of the office converters, return the failures")
   (check-suite "office")
   (test-zip)
+  (test-zip-damaged)
+  (test-xml-limits)
+  (test-office-long)
+  (test-office-odd-values)
   (test-lengths)
   (test-docx-text)
   (test-docx-links)

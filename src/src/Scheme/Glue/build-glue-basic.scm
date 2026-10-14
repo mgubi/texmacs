@@ -551,8 +551,9 @@
   (try-latex-export try_latex_export (tree content object url url))
   (parse-xml parse_xml (scheme_tree string))
 
-  ;; zip archives
+  ;; the pictures of a PDF file as SVG, where a library does it
   (pdf->svg-native native_pdf_to_svg (bool url url))
+  ;; zip archives
   (zip-archive? zip_is_archive (bool string))
   (zip-unpack zip_unpack (array_string string))
   (zip-pack zip_write (string array_string array_string))

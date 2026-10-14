@@ -144,16 +144,19 @@
 (define (tmof-merge l)
   ;; with the strings which follow each other as one, and so for the
   ;; texts with the same markup
-  (cond ((null? l) l)
-        ((== (car l) "") (tmof-merge (cdr l)))
-        ((and (pair? (car l))
-              (in? (caar l) '(em strong strike underline mark sub sup smallcaps))
-              (nnull? (cdr l)) (func? (cadr l) (caar l)))
-         (tmof-merge (cons `(,(caar l) ,@(tmof-merge (append (cdar l) (cdadr l))))
-                           (cddr l))))
-        ((and (string? (car l)) (nnull? (cdr l)) (string? (cadr l)))
-         (tmof-merge (cons (string-append (car l) (cadr l)) (cddr l))))
-        (else (cons (car l) (tmof-merge (cdr l))))))
+  ;; (a loop: a paragraph may have many thousands of pieces)
+  (let loop ((l (office-join-strings l)) (acc '()))
+    (cond ((null? l) (reverse acc))
+          ((and (pair? (car l))
+                (in? (caar l) '(em strong strike underline mark sub sup smallcaps))
+                (nnull? (cdr l)) (func? (cadr l) (caar l)))
+           (let run ((m (cddr l)) (kids (append (reverse (cdadr l))
+                                                (reverse (cdar l)))))
+             (if (and (pair? m) (func? (car m) (caar l)))
+                 (run (cdr m) (append (reverse (cdar m)) kids))
+                 (loop m (cons `(,(caar l) ,@(tmof-merge (reverse kids)))
+                               acc)))))
+          (else (loop (cdr l) (cons (car l) acc))))))
 
 (define (tmof-squeeze s)
   ;; with one space for several
@@ -677,43 +680,46 @@
   ;; vector is #t (a drawing: what TeXmacs draws is drawn the same), is
   ;; the text vector when it is one (an image which is an SVG), and is
   ;; left out when vector is #f. Nothing when there is no editor, or no
-  ;; picture.
-  (catch #t
-    (lambda ()
-      (let* ((base (url-temp))
-             (png (url-glue base ".png"))
-             (pdf (url-glue base ".pdf"))
-             (svg (url-glue base ".svg"))
-             (ext (print-snippet png x #t)))
-        (if (not (and (url-exists? png) (list? ext) (>= (length ext) 10)))
-            '()
-            (let* ((data (string-load png))
-                   (dpi (max 1 (list-ref ext 9)))
-                   ;; the box of the ink, in 256th of a dot
-                   (cm (lambda (a b) (max 0.1 (* 2.54 (/ (- b a) (* 256.0 dpi))))))
-                   (w (cm (list-ref ext 0) (list-ref ext 2)))
-                   (h (cm (list-ref ext 1) (list-ref ext 3)))
-                   (vector (cond ((string? vector) vector)
-                                 ((not vector) #f)
-                                 (else
-                                   (and (begin (print-snippet pdf x #t)
-                                               (url-exists? pdf))
-                                        (pdf->svg-native pdf svg)
-                                        (url-exists? svg)
-                                        (string-load svg))))))
-              (for (u (list png pdf svg))
-                (when (url-exists? u) (system-remove u)))
-              (set! tmof-picture-nr (+ tmof-picture-nr 1))
-              (list (apply office-node
-                           (list 'image
-                                 `((name ,(string-append
-                                            "drawing" (number->string tmof-picture-nr)
-                                            ".png"))
-                                   (data ,data)
-                                   (width ,(tmof-cm-string w))
-                                   (height ,(tmof-cm-string h))
-                                   (svg ,vector)))))))))
-    (lambda args '())))
+  ;; picture. The temporary files are removed, whatever happens.
+  (let* ((base (url-temp))
+         (png (url-glue base ".png"))
+         (pdf (url-glue base ".pdf"))
+         (svg (url-glue base ".svg"))
+         (r (catch #t
+              (lambda () (tmof-picture* x vector png pdf svg))
+              (lambda args '()))))
+    (for (u (list png pdf svg))
+      (when (url-exists? u) (system-remove u)))
+    r))
+
+(define (tmof-picture* x vector png pdf svg)
+  (let* ((ext (print-snippet png x #t)))
+    (if (not (and (url-exists? png) (list? ext) (>= (length ext) 10)))
+        '()
+        (let* ((data (string-load png))
+               (dpi (max 1 (list-ref ext 9)))
+               ;; the box of the ink, in 256th of a dot
+               (cm (lambda (a b) (max 0.1 (* 2.54 (/ (- b a) (* 256.0 dpi))))))
+               (w (cm (list-ref ext 0) (list-ref ext 2)))
+               (h (cm (list-ref ext 1) (list-ref ext 3)))
+               (vector (cond ((string? vector) vector)
+                             ((not vector) #f)
+                             (else
+                               (and (begin (print-snippet pdf x #t)
+                                           (url-exists? pdf))
+                                    (pdf->svg-native pdf svg)
+                                    (url-exists? svg)
+                                    (string-load svg))))))
+          (set! tmof-picture-nr (+ tmof-picture-nr 1))
+          (list (apply office-node
+                       (list 'image
+                             `((name ,(string-append
+                                        "drawing" (number->string tmof-picture-nr)
+                                        ".png"))
+                               (data ,data)
+                               (width ,(tmof-cm-string w))
+                               (height ,(tmof-cm-string h))
+                               (svg ,vector)))))))))
 
 (define (tmof-graphics l)
   (tmof-picture (cons 'graphics l) #t))
