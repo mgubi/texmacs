@@ -35,7 +35,8 @@
 ;;     edu-markup.scm;
 ;;   - tools: comments (comment-edit.scm), poster blocks and themes
 ;;     (poster-edit.scm, theme-edit.scm), the end of a spell check
-;;     (spell-edit.scm) and the serialization for AI requests (ai-batch.scm).
+;;     (spell-edit.scm), the serialization for AI requests (ai-batch.scm)
+;;     and the file of the examples of the handwriting recognizer.
 ;;     There is no word counting or statistics tool in progs/tools.
 ;;
 ;; Without a window the initial environment of a buffer is not updated
@@ -1523,6 +1524,21 @@
   (check= (ai-serialize "english" '(with "mode" "math" (frac "a" "b")))
           "$\\frac{a}{b}$"))
 
+;; The examples of the handwriting recognizer are saved in the home of
+;; TeXmacs (TEXMACS_HOME_PATH), which need not be ~/.TeXmacs. A home which
+;; already has learned glyphs is left alone.
+(define (test-handwriting)
+  (check-group "handwriting")
+  (with f (string->url "$TEXMACS_HOME_PATH/system/glyphs.scm")
+    (when (not (url-exists? f))
+      (set! last-glyph '(((0.0 0.0) (1.0 1.0)) ((0.0 1.0) (1.0 0.0))))
+      (learn-glyph "x")
+      (set! last-glyph '())
+      (check-true (url-exists? f))
+      (check= (load-object f)
+              '(("x" (((0.0 0.0) (1.0 1.0)) ((0.0 1.0) (1.0 0.0))))))
+      (system-remove f))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The suite
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1541,6 +1557,6 @@
                   test-spelling
                   test-edu-contexts test-edu-macros test-edu-modes test-mc
                   test-comments test-posters-themes test-spell-edit
-                  test-ai-serialize))
+                  test-ai-serialize test-handwriting))
   (clear-misc-dir)
   (check-end))
