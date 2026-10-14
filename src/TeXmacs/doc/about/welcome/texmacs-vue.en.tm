@@ -235,6 +235,10 @@
     comments <verbatim|[//]: # (text)>), footnotes defined in quotations
     or lists, marked several times or not defined, and a <name|YAML>
     header with any keys. Its export to <LaTeX> compiles.
+
+    <item>Word and <name|OpenDocument> files of any length are read and
+    written (ten thousand paragraphs stopped the converters), and a
+    damaged or forged file gives a message instead of ending <TeXmacs>.
   </itemize>
 
   <paragraph|13 October 2026>
