@@ -55,7 +55,8 @@
         (check parse-test)
         (check macro-drd-test)
         (check crypto-test)
-        (check plugins-test)))
+        (check plugins-test)
+        (kernel texmacs tm-secure-test)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Test LaTeX export
@@ -114,6 +115,7 @@
     ("tm-convert" regtest-tm-convert error)
     ("regexp" regtest-regexp error)
     ("logic-query" regtest-logic-queries error)
+    ("secure" regtest-secure error)
     ("glue" glue-test-failures count)
     ("lists" lists-test-failures count)
     ("base" base-test-failures count)
