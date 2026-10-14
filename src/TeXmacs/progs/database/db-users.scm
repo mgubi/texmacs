@@ -311,7 +311,7 @@
 
 (tm-define (db-set-field id attr vals)
   (when (or (== db-current-user #t)
-            (db-allow? id db-current-user "owner"))
+            (db-allow? id db-current-user "writable"))
     (with-user #t
       (former id attr vals))))
 
@@ -325,7 +325,7 @@
 
 (tm-define (db-set-entry id l)
   (when (or (== db-current-user #t)
-            (db-allow? id db-current-user "owner"))
+            (db-allow? id db-current-user "writable"))
     (with-user #t
       (former id l))))
 

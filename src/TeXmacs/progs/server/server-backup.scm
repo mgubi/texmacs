@@ -19,24 +19,35 @@
 ;; Preferences
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(define server-backup-loaded? #f)
+
+;; The periodic backup is registered again when a preference on which it
+;; depends changes, once this module is loaded
+(define (server-backup-update)
+  (when (and server-backup-loaded? (server-started?))
+    (server-backup-register)))
+
 (define (notify-server-backup-destination var val)
   (when (server-started?)
     (if (string-null? val)
         (server-log-write `info "Server backup disabled (no destination set)")
         (server-log-write `info
-          (string-append "Server backup destination set to " val)))))
+          (string-append "Server backup destination set to " val))))
+  (server-backup-update))
 
 (define (notify-server-backup-interval var val)
   (when (server-started?)
     (server-log-write `info
-      (string-append "Server backup interval set to " val " hours"))))
+      (string-append "Server backup interval set to " val " hours")))
+  (server-backup-update))
 
 (define (notify-server-backup-keep var val) #f)
 
 (define (notify-server-service-backup var val)
   (when (server-started?)
     (server-log-write `info
-                      (string-append "Allowing server periodic backup turned " val))))
+                      (string-append "Allowing server periodic backup turned " val)))
+  (server-backup-update))
 
 (define-preferences
   ("server service backup" "off"
@@ -246,26 +257,43 @@
 							(string-append "Backup snapshot created: " new))
 		  (server-backup-prune dest))))))
 
+(define server-backup-serial 0)
+
+;; Register the periodic backup of a started server; #t when it is
+;; registered. A new registration ends the task of the previous one, and
+;; the task ends when the server stops.
 (tm-define (server-backup-register)
+  (set! server-backup-serial (+ server-backup-serial 1))
   (let* ((dest       (get-preference "server backup destination"))
-         (interval-h (string->number (get-preference "server backup interval"))))
+         (interval-h (string->number (get-preference "server backup interval")))
+         (serial     server-backup-serial))
     (cond
 	  ((not (server-started?))
-	   );(server-log-write `info "Server backup not registered: not in server mode"))
+	   #f);(server-log-write `info "Server backup not registered: not in server mode"))
 	  ((not (server-backup-enabled?))
-	   (server-log-write `info "Server backup disabled"))
+	   (server-log-write `info "Server backup disabled")
+	   #f)
 	  ((string-null? dest)
-	   (server-log-write `info "Server backup not registered: no destination"))
+	   (server-log-write `info "Server backup not registered: no destination")
+	   #f)
 	  ((not (has-rsync?))
-	   (server-log-write `notice "rsync binary not found"))
+	   (server-log-write `notice "rsync binary not found")
+	   #f)
 	  ((or (not interval-h) (<= interval-h 0))
-	   (server-log-write `warning "Server backup not registered: invalid interval"))
+	   (server-log-write `warning "Server backup not registered: invalid interval")
+	   #f)
 	  (else
 		(with interval (* interval-h 3600 1000)
 			  (server-log-write
 				`notice
 				(string-append "Server backup registered: every "
 							   (number->string interval-h) "h → " dest))
-			  (delayed (:on-cpu-idle interval) (server-backup-run)))))))
+			  (delayed
+				(:while (and (server-started?)
+							 (== serial server-backup-serial)))
+				(:on-cpu-idle interval)
+				(server-backup-run))
+			  #t)))))
 
+(set! server-backup-loaded? #t)
 (on-entry (server-backup-register))

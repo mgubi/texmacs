@@ -137,6 +137,9 @@ server_start () {
     tm_delete (net_server);
     net_server= NULL;
   }
+  // the module is loaded before the server is started, and it is not
+  // loaded again when the server is restarted
+  else call ("server-backup-register");
 }
 
 void
