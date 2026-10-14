@@ -74,20 +74,70 @@
 	(cdr (tree-children t))
 	(tree-children t))))
 
-(define (buffer-show-preamble)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Moving paragraphs into and out of wrappers
+;;
+;; The paragraphs are moved with the node operations split, join,
+;; insert-node and remove-node: they keep their identity, and the undo step
+;; of a change of mode only records the wrappers which are made or removed,
+;; not the paragraphs themselves.
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (document-split-groups! t i sizes)
+  ;; split the child @i of @t, a document, into consecutive documents
+  ;; with the numbers of children in @sizes
+  (when (> (length sizes) 1)
+    (let* ((h (quotient (length sizes) 2))
+	   (left (list-head sizes h)))
+      (tree-split t i (apply + left))
+      (document-split-groups! t (+ i 1) (list-tail sizes h))
+      (document-split-groups! t i left))))
+
+(define (document-join-range! t i n)
+  ;; join the @n documents among the children of @t from @i into one;
+  ;; neighbours are joined pairwise, so that each paragraph moves about
+  ;; log n times
+  (when (> n 1)
+    (with h (quotient n 2)
+      (for (k (.. 0 h))
+	(tree-join t (+ i k)))
+      (document-join-range! t i (- n h)))))
+
+(define (buffer-wrap-body)
+  ;; (document [preamble] b1 ... bn) -> (document [preamble] (document b1 ... bn))
+  (let* ((pre? (buffer-has-preamble?))
+	 (t (tree-insert-node (buffer-tree) 0 '(document))))
+    (when pre?
+      (tree-split t 0 1)
+      (tree-remove-node (tree-ref t 0) 0))))
+
+(define (buffer-unwrap-body)
+  ;; (document [preamble] (document b1 ... bn)) -> (document [preamble] b1 ... bn)
   (with t (buffer-tree)
-    (when (tree-is? (tree-ref t 0) 'hide-preamble)
-      (buffer-flatten-parts)
-      (let* ((t (buffer-tree))
-	     (preamble `(show-preamble ,(tree-ref t 0 0)))
-	     (body `(ignore (document ,@(cdr (tree-children t))))))
-	(tree-assign! t `(document ,preamble ,body))))))
+    (when (== (tree-arity t) 2)
+      (tree-insert-node (tree-ref t 0) 0 '(document))
+      (tree-join t 0))
+    (tree-remove-node (buffer-tree) 0)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Showing and hiding the preamble, making and flattening the parts
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (buffer-show-preamble)
+  ;; (document (hide-preamble P) b1 ... bn)
+  ;; -> (document (show-preamble P) (ignore (document b1 ... bn)))
+  (when (tree-is? (tree-ref (buffer-tree) 0) 'hide-preamble)
+    (buffer-flatten-parts)
+    (tree-assign-node (tree-ref (buffer-tree) 0) 'show-preamble)
+    (buffer-wrap-body)
+    (tree-insert-node (tree-ref (buffer-tree) 1) 0 '(ignore))))
 
 (define (buffer-hide-preamble)
   (with t (buffer-tree)
     (when (match? t '(document (show-preamble :%1) (ignore (document :*))))
-      (tree-assign! t `(document (hide-preamble ,(tree-ref t 0 0))
-				 ,@(tree-children (tree-ref t 1 0)))))))
+      (tree-assign-node (tree-ref t 0) 'hide-preamble)
+      (tree-remove-node (tree-ref t 1) 0)
+      (buffer-unwrap-body))))
 
 (tm-define (kbd-remove t forwards?)
   (:require (and (tree-is? t 'show-preamble) (tree-empty? (tree-ref t 0))))
@@ -105,23 +155,110 @@
       (append-map buffer-flatten-subpart (tree-children (tree-ref t 1)))
       (list t)))
 
+(define (document-part? t)
+  (tree-in? t '(show-part hide-part)))
+
+(define (part-with-document? t)
+  ;; a part whose body is a document, whose subparts have documents as bodies
+  (and (== (tree-arity t) 3)
+       (tree-is? (tree-ref t 1) 'document)
+       (not (list-find (tree-children (tree-ref t 1))
+		       (lambda (x)
+			 (and (document-part? x)
+			      (not (and (== (tree-arity x) 3)
+					(tree-is? (tree-ref x 1) 'document)))))))))
+
+(define (document-flatten-part! t i)
+  ;; the child @i of @t becomes a document of the paragraphs which
+  ;; buffer-flatten-part gives for it
+  (if (not (document-part? (tree-ref t i)))
+      (tree-insert-node (tree-ref t i) 0 '(document))
+      (with b (tree-remove-node (tree-ref t i) 1)
+	(when (list-find (tree-children b) document-part?)
+	  (for (k (.. 0 (tree-arity b)))
+	    (if (document-part? (tree-ref b k))
+		(tree-remove-node (tree-ref b k) 1)
+		(tree-insert-node (tree-ref b k) 0 '(document))))
+	  (document-join-range! b 0 (tree-arity b))
+	  (tree-remove-node b 0)))))
+
 (define (buffer-flatten-parts)
-  (when (tree-in? (car (buffer-body-paragraphs)) '(hide-part show-part))
+  (when (document-part? (car (buffer-body-paragraphs)))
     (let* ((t (buffer-tree))
 	   (l (buffer-body-paragraphs))
-	   (parts (apply append (map buffer-flatten-part l)))
-	   (preamble? (tree-in? (tree-ref t 0) '(show-preamble hide-preamble)))
-	   (r (if preamble? (cons (tree-ref t 0) parts) parts)))
-      (tree-assign! t `(document ,@r)))))
+	   (preamble? (tree-in? (tree-ref t 0) '(show-preamble hide-preamble))))
+      (if (list-find l (lambda (x)
+			 (and (document-part? x) (not (part-with-document? x)))))
+	  ;; parts which were not made by buffer-make-parts
+	  (let* ((parts (apply append (map buffer-flatten-part l)))
+		 (r (if preamble? (cons (tree-ref t 0) parts) parts)))
+	    (tree-assign! t `(document ,@r)))
+	  (let* ((s (if preamble? 1 0))
+		 (n (length l)))
+	    (for (k (.. 0 n))
+	      (document-flatten-part! t (+ s k)))
+	    (document-join-range! t s n)
+	    (buffer-unwrap-body))))))
+
+;; The parts which principal-sections-to-document-parts makes are
+;;   (show-part id (document first subpart-1 ... subpart-m) alt)
+;; with subparts (show-part id' (document b1 ... bk) alt'), or
+;;   (show-part id (document first b2 ... bk) alt)
+;; when there are no subparts.
+
+(define (subpart-form? p)
+  (and (pair? p) (== (car p) 'show-part) (== (length p) 4)
+       (pair? (caddr p)) (== (car (caddr p)) 'document)))
+
+(define (part-form? p)
+  (and (subpart-form? p)
+       (pair? (cdr (caddr p)))
+       (with rest (cddr (caddr p))
+	 (or (not (list-find rest pair?))
+	     (not (list-find rest (lambda (x) (not (subpart-form? x)))))))))
+
+(define (part-subparts p)
+  (with rest (cddr (caddr p))
+    (if (and (pair? rest) (pair? (car rest))) rest '())))
+
+(define (subpart-size p)
+  (length (cdr (caddr p))))
+
+(define (part-size p)
+  (with subs (part-subparts p)
+    (if (null? subs) (subpart-size p)
+	(+ 1 (apply + (map subpart-size subs))))))
+
+(define (document-make-part! t i p)
+  ;; the child @i of @t, a document of the paragraphs of the part @p,
+  ;; becomes the part @p
+  (with subs (part-subparts p)
+    (when (nnull? subs)
+      (with w (tree-insert-node (tree-ref t i) 0 '(document))
+	(tree-split w 0 1)
+	(tree-remove-node (tree-ref w 0) 0)
+	(document-split-groups! w 1 (map subpart-size subs))
+	(for (k (.. 0 (length subs)))
+	  (with sp (list-ref subs k)
+	    (tree-insert-node (tree-ref w (+ k 1)) 1
+			      `(show-part ,(cadr sp) ,(cadddr sp))))))))
+  (tree-insert-node (tree-ref t i) 1 `(show-part ,(cadr p) ,(cadddr p))))
 
 (define (buffer-make-parts)
-  (when (not (tree-in? (car (buffer-body-paragraphs)) '(hide-part show-part)))
+  (when (not (document-part? (car (buffer-body-paragraphs))))
     (let* ((t (buffer-tree))
 	   (l (buffer-body-paragraphs))
 	   (parts (principal-sections-to-document-parts l))
-	   (preamble? (tree-in? (tree-ref t 0) '(show-preamble hide-preamble)))
-	   (r (if preamble? (cons (tree-ref t 0) parts) parts)))
-      (tree-assign! t `(document ,@r)))))
+	   (preamble? (tree-in? (tree-ref t 0) '(show-preamble hide-preamble))))
+      (if (or (list-find parts (lambda (p) (not (part-form? p))))
+	      (!= (apply + (map part-size parts)) (length l)))
+	  (with r (if preamble? (cons (tree-ref t 0) parts) parts)
+	    (tree-assign! t `(document ,@r)))
+	  (with s (if preamble? 1 0)
+	    (buffer-wrap-body)
+	    (document-split-groups! (buffer-tree) s (map part-size parts))
+	    (for (k (.. 0 (length parts)))
+	      (document-make-part! (buffer-tree) (+ s k) (list-ref parts k))))))))
 
 (tm-define (buffer-get-part-mode)
   (:synopsis "Get the mode for document part selections")
