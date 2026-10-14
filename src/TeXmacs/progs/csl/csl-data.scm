@@ -84,7 +84,7 @@
 (define (label-part name n)
   (let* ((s (rt->string (or (csl-name-ref name 'family)
                             (csl-name-ref name 'literal) "")))
-         (l (list-filter (csl-chars s) csl-letter?)))
+         (l (list-filter (csl-chars s) csl-word-char?)))
     (apply string-append (list-head l (min n (length l))))))
 
 (tm-define (csl-citation-label item)

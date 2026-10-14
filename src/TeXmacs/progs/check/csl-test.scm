@@ -198,6 +198,9 @@
   (check= (csl-sort '((1 . a) (0 . b) (1 . c) (0 . d))
                     (lambda (x y) (< (car x) (car y))))
           '((0 . b) (0 . d) (1 . a) (1 . c)))
+  ;; a list as long as a large database
+  (with l (iota 20000)
+    (check= (csl-sort (reverse l) <) l))
   ;; a range as TeXmacs writes it
   (check= (csl-number-tokens "12--15") '("12" "-" "15")))
 
@@ -971,6 +974,26 @@
     (check= (flat* (if (func? x 'concat) (cAr x) x))
             (u "(Knuth, 1984, pp. 99–101)"))))
 
+(define (test-scripts)
+  (check-group "scripts without case")
+  ;; the names in CJK sort after the Latin ones, by their code points
+  (let* ((json (string-append
+                "[{\"id\":\"w\",\"type\":\"book\",\"title\":\"A\","
+                "\"author\":[{\"literal\":\"\\u738B\"}]},"
+                "{\"id\":\"l\",\"type\":\"book\",\"title\":\"B\","
+                "\"author\":[{\"literal\":\"\\u674E\"}]},"
+                "{\"id\":\"a\",\"type\":\"book\",\"title\":\"C\","
+                "\"author\":[{\"literal\":\"\\u5B89\"}]},"
+                "{\"id\":\"z\",\"type\":\"book\",\"title\":\"D\","
+                "\"author\":[{\"family\":\"Zed\",\"given\":\"A.\"}],"
+                "\"issued\":{\"date-parts\":[[2000]]}}]"))
+         (items (csl-json->items json))
+         (p (csl-make-processor (csl-style-from-string "small" small-style)
+                                "en-US" items)))
+    (check= (map car (csl-bibliography p)) '("z" "a" "l" "w"))
+    ;; and they make labels
+    (check= (csl-citation-label (car items)) "<#738B>")))
+
 (define (test-document)
   (check-group "document bibliography")
   (string-save sample-bib (tmp-file "refs.bib"))
@@ -1010,7 +1033,7 @@
   (test-styles)
   (remove-tmp-dir)
   (system-mkdir (system->url csl-dir))
-  (for (test (list test-document test-document-citations))
+  (for (test (list test-document test-document-citations test-scripts))
     (with r (check-run test)
       (when (and (pair? r) (== (car r) 'error))
         (check-report #f "the group" (object->string r)))))

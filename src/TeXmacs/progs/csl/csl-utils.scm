@@ -135,6 +135,28 @@
 (tm-define (csl-digit? c)
   (and (== (string-length c) 1) (char-numeric? (string-ref c 0))))
 
+(tm-define (csl-char-code c)
+  (:synopsis "The code point of the character <#XXXX>, or #f")
+  (and (string-starts? c "<#") (string-ends? c ">")
+       (string->number (substring c 2 (- (string-length c) 1)) 16)))
+
+(define caseless-punctuation
+  ;; the punctuation and the symbols among the characters <#XXXX>
+  '((#x80 . #xbf) (#x5be . #x5be) (#x5c0 . #x5c0) (#x5c3 . #x5c3)
+    (#x5f3 . #x5f4) (#x60c . #x60c) (#x61b . #x61b) (#x61f . #x61f)
+    (#x66a . #x66d) (#x2000 . #x2bff) (#x3000 . #x303f) (#xfe10 . #xfe6f)
+    (#xff00 . #xff0f) (#xff1a . #xff20) (#xff3b . #xff40)
+    (#xff5b . #xff65)))
+
+(tm-define (csl-word-char? c)
+  (:synopsis "Is @c a letter, with case or of a script without (CJK...)?")
+  (or (csl-letter? c)
+      (with n (csl-char-code c)
+        (and n (>= n #x80)
+             (not (list-or (map (lambda (r) (and (>= n (car r))
+                                                 (<= n (cdr r))))
+                                caseless-punctuation)))))))
+
 (tm-define (csl-upper? s)
   (:synopsis "Does @s hold letters, none of them in lower case?")
   (and (== s (csl-upcase s)) (!= s (csl-locase s))))
@@ -177,11 +199,12 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define (merge-sorted a b before?)
-  (cond ((null? a) b)
-        ((null? b) a)
-        ((before? (car b) (car a))
-         (cons (car b) (merge-sorted a (cdr b) before?)))
-        (else (cons (car a) (merge-sorted (cdr a) b before?)))))
+  ;; tail recursive: the lists may be as long as a whole database
+  (let loop ((a a) (b b) (r '()))
+    (cond ((null? a) (append (reverse r) b))
+          ((null? b) (append (reverse r) a))
+          ((before? (car b) (car a)) (loop a (cdr b) (cons (car b) r)))
+          (else (loop (cdr a) b (cons (car a) r))))))
 
 (tm-define (csl-sort l before?)
   (:synopsis "The list @l sorted by @before?, equal elements kept in order")

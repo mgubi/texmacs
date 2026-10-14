@@ -30,12 +30,19 @@
 ;; Sorting
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(define (sort-char c)
+  ;; a character <#XXXX> sorts after the Latin letters, by its code point
+  (with n (csl-char-code c)
+    (if n (string-append "~" (csl-pad (string-upcase (number->string n 16)) 6))
+        c)))
+
 (define (sort-string s)
   ;; the punctuation is ignored
   (apply string-append
-         (list-filter (csl-chars (csl-locase (tmstring-unaccent-all s)))
-                      (lambda (c) (or (csl-letter? c) (csl-digit? c)
-                                      (== c " "))))))
+         (map sort-char
+              (list-filter (csl-chars (csl-locase (tmstring-unaccent-all s)))
+                           (lambda (c) (or (csl-word-char? c) (csl-digit? c)
+                                           (== c " ")))))))
 
 (define (sort-key-value proc key-node ctx)
   (ahash-set! ctx 'sort? #t)
