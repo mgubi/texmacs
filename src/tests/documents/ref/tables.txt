@@ -40,12 +40,12 @@ Another paragraph, shorter.
 
 A matrix-like table inside a formula:
 
-
+||||
 
 1 0
 0 1
 
-    = 1.
+|||| = 1.
 
 Tables
 1
