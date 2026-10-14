@@ -1138,6 +1138,7 @@
       (check= (tree->stree (buffer-tree)) s))))
 
 (define (body-now) (tree->stree (buffer-tree)))
+(define (doc-end) (rel (path-end (root-tree) (buffer-path))))
 
 (define (open-for-undo name)
   ;; without a window, the first edit step after a buffer is opened is
@@ -1197,7 +1198,31 @@
     (edit (kbd-remove (bt 0) #t))
     (check= (body-now) s0)
     (check= (cursor) '(0 0))
-    (check-undo-redo (list s0 s1 s0)))
+    (check-undo-redo (list s0 s1 s0))
+    ;; after undo and redo of a toggle, the cursor is at the end of the
+    ;; document, as with an assignment of the whole document: never in
+    ;; the hidden preamble
+    (edit (buffer-make-preamble))
+    (edit (insert "p"))
+    (edit (toggle-preamble-mode))
+    (edit (go-to (at 2 0)))
+    (edit (toggle-preamble-mode))
+    (edit (undo 0))
+    (check= (body-now) `(document (hide-preamble (document "p")) ,@pars))
+    (check= (cursor) (doc-end))
+    (edit (insert "Z"))
+    (check= (st 0) '(hide-preamble (document "p")))
+    (check= (st 5) "bZ")
+    (edit (undo 0))
+    (edit (toggle-preamble-mode))
+    (edit (toggle-preamble-mode))
+    (edit (undo 0))
+    (check= (body-now) `(document (show-preamble (document "p"))
+                                  (ignore (document ,@pars))))
+    (check= (cursor) (doc-end))
+    (edit (redo 0))
+    (check= (body-now) `(document (hide-preamble (document "p")) ,@pars))
+    (check= (cursor) (doc-end)))
   ;; parts with subparts
   (write-doc "parts-undo-book.tm" '("book") '()
              '((chapter "A") "a" (section "A1") "a1" (chapter "B") "b"))

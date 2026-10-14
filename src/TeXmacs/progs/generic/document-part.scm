@@ -103,6 +103,13 @@
 	(tree-join t (+ i k)))
       (document-join-range! t i (- n h)))))
 
+(define (buffer-mark-change)
+  ;; undo puts the cursor at the first change of the step, redo at the
+  ;; last one; relabelling the root to itself, at the start and at the end
+  ;; of a change, puts it at the end of the document, as the assignment of
+  ;; the whole document which these changes replace did
+  (tree-assign-node (buffer-tree) 'document))
+
 (define (buffer-wrap-body)
   ;; (document [preamble] b1 ... bn) -> (document [preamble] (document b1 ... bn))
   (let* ((pre? (buffer-has-preamble?))
@@ -128,16 +135,20 @@
   ;; -> (document (show-preamble P) (ignore (document b1 ... bn)))
   (when (tree-is? (tree-ref (buffer-tree) 0) 'hide-preamble)
     (buffer-flatten-parts)
+    (buffer-mark-change)
     (tree-assign-node (tree-ref (buffer-tree) 0) 'show-preamble)
     (buffer-wrap-body)
-    (tree-insert-node (tree-ref (buffer-tree) 1) 0 '(ignore))))
+    (tree-insert-node (tree-ref (buffer-tree) 1) 0 '(ignore))
+    (buffer-mark-change)))
 
 (define (buffer-hide-preamble)
   (with t (buffer-tree)
     (when (match? t '(document (show-preamble :%1) (ignore (document :*))))
+      (buffer-mark-change)
       (tree-assign-node (tree-ref t 0) 'hide-preamble)
       (tree-remove-node (tree-ref t 1) 0)
-      (buffer-unwrap-body))))
+      (buffer-unwrap-body)
+      (buffer-mark-change))))
 
 (tm-define (kbd-remove t forwards?)
   (:require (and (tree-is? t 'show-preamble) (tree-empty? (tree-ref t 0))))
@@ -195,10 +206,12 @@
 	    (tree-assign! t `(document ,@r)))
 	  (let* ((s (if preamble? 1 0))
 		 (n (length l)))
+	    (buffer-mark-change)
 	    (for (k (.. 0 n))
 	      (document-flatten-part! t (+ s k)))
 	    (document-join-range! t s n)
-	    (buffer-unwrap-body))))))
+	    (buffer-unwrap-body)
+	    (buffer-mark-change))))))
 
 ;; The parts which principal-sections-to-document-parts makes are
 ;;   (show-part id (document first subpart-1 ... subpart-m) alt)
@@ -255,10 +268,12 @@
 	  (with r (if preamble? (cons (tree-ref t 0) parts) parts)
 	    (tree-assign! t `(document ,@r)))
 	  (with s (if preamble? 1 0)
+	    (buffer-mark-change)
 	    (buffer-wrap-body)
 	    (document-split-groups! (buffer-tree) s (map part-size parts))
 	    (for (k (.. 0 (length parts)))
-	      (document-make-part! (buffer-tree) (+ s k) (list-ref parts k))))))))
+	      (document-make-part! (buffer-tree) (+ s k) (list-ref parts k)))
+	    (buffer-mark-change))))))
 
 (tm-define (buffer-get-part-mode)
   (:synopsis "Get the mode for document part selections")
