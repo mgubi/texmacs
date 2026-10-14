@@ -377,6 +377,71 @@
       (check-true (perm "normal/file/no/such/file.en.tm" "read"))
       (check-false (perm "normal/file/no/such/file.en.tm" "write")))))
 
+;; A book whose pages have sections of their own, links to the web and
+;; branches to files which do not exist: book.en.tm traverses chap (which
+;; has a branch to sub), gone and, continued, gone2.
+(define (make-small-book)
+  (save-tmdoc "book.en.tm"
+              '(document
+                 (tmdoc-title "Book")
+                 (traverse (document
+                             (branch "Chap" "chap.en.tm")
+                             (branch "Gone" "gone.en.tm")
+                             (continue "Gone too" "gone2.en.tm")))))
+  (save-tmdoc "chap.en.tm"
+              '(document (tmdoc-title "Chap") "intro"
+                         (section "Inner") "text"
+                         (subsection* "Deeper")
+                         (concat (section "Labelled") (label "lab2"))
+                         (hlink "site" "http://www.texmacs.org/tmweb/home")
+                         (hlink "away" "elsewhere.en.tm")
+                         (branch "Sub" "sub.en.tm")))
+  (save-tmdoc "sub.en.tm"
+              '(document (tmdoc-title "Sub") (section "Inner sub")
+                         (paragraph "Low"))))
+
+(define (test-tmdoc-books)
+  (check-group "tmdoc books")
+  (make-small-book)
+  (let* ((expand (priv '(doc tmdoc) 'tmdoc-expand))
+         (demote (priv '(doc tmdoc) 'tmdoc-demote))
+         (load (ahash-ref tmfs-handler-table (cons "help" 'load)))
+         (m (tmp-file "book.en.tm"))
+         (gone (lambda (name)
+                 `(concat "Broken link. File "
+                          (tt ,(url->unix (tmp-file name)))
+                          " does not exist"))))
+    ;; the sections of a page are below the heading which its title becomes
+    (check= (demote 'section 'chapter) 'section)
+    (check= (demote 'subsection 'chapter) 'subsection)
+    (check= (demote 'section 'section) 'subsection)
+    (check= (demote 'section* 'section) 'subsection*)
+    (check= (demote 'subsection 'subsection) 'paragraph)
+    (check= (demote 'subsection* 'subsection) 'paragraph*)
+    (check= (demote 'section 'appendix) 'section)
+    (check= (demote 'section 'tmdoc-title) 'section)
+    ;; a branch whose file is missing keeps its heading, with a message
+    (check= (expand m m 'title)
+            `(document (title "Book")
+                       (concat (chapter "Chap") (label "sec-chap"))
+                       "intro" (section "Inner") "text"
+                       (subsection* "Deeper")
+                       (concat (section "Labelled") (label "lab2"))
+                       (hlink "site" "http://www.texmacs.org/tmweb/home")
+                       (hlink "away" "elsewhere.en.tm")
+                       (concat (section "Sub") (label "sec-sub"))
+                       (subsection "Inner sub") (subparagraph "Low")
+                       (chapter "Gone") ,(gone "gone.en.tm")
+                       ,(gone "gone2.en.tm")))
+    ;; in the book, the links to the web stay, and those to pages which
+    ;; are not in the book become their text
+    (with r (load (string-append "book/" (url->tmfs-string m)))
+      (with body (cadr (assoc 'body (cdr r)))
+        (check-true (in? '(hlink "site" "http://www.texmacs.org/tmweb/home")
+                         body))
+        (check-true (in? "away" body))
+        (check-true (in? '(chapter "Gone") body))))))
+
 ;; The rewriting functions behind the expansion
 (define (test-tmdoc-rewrite)
   (check-group "tmdoc rewriting")
@@ -1537,6 +1602,7 @@
   (system-mkdir (system->url misc-dir))
   (for-each run-group
             (list test-help-files test-doc-parse test-tmdoc-expand
+                  test-tmdoc-books
                   test-tmdoc-rewrite test-doc-search test-tmdoc-edit
                   test-font-database test-logical-fonts
                   test-font-typesetting test-init-font
