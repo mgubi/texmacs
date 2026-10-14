@@ -324,7 +324,7 @@ system_date (string lan, string fm) {
   while (N(date) > 0 && (date[N(date)-1] == '\n' || date[N(date)-1] == '\r'))
     date= date (0, N(date) - 1);
   if (utf8) date= utf8_to_cork (date);
-  else if ((lan == "cz_CZ") || (lan == "hu_HU") || (lan == "pl_PL"))
+  else if ((lan == "cs_CZ") || (lan == "hu_HU") || (lan == "pl_PL"))
     date= il2_to_cork (date);
   // if (lan == "ru_RU") date= iso_to_koi8 (date);
   set_env (lvar, old);
