@@ -43,6 +43,7 @@ edit_env_rep::edit_env_rep (drd_info& drd2,
   read_unknown (false), rec_keys (NULL), rec_values (NULL), rec_uninit (NULL),
   auto_buffer (""), typesetting (0)
 {
+  env.back_log= &back;
   initialize_default_env ();
   initialize_default_var_type ();
   env= copy (default_env);
@@ -281,7 +282,7 @@ void
 edit_env_rep::leave_uninit (string s) {
   // (as a with leaves it: see rec_uninit)
   if (!env.h->contains (s)) { env.h (s)= tree (UNINIT); update (s); }
-  note_uninit (s, tree (UNINIT));
+  note_uninit (s);
 }
 
 void

@@ -2160,7 +2160,10 @@ auto_labels_numbers (tree root) {
   if (!auto_label_data (root, b) || N(b) < 2) return r;
   epochs << b[0];
   for (int j=2; j+2<N(b); j+=3) epochs << b[j+1];
-  auto_labels_numbers (root, epochs, r);
+  // (the tags below the root: the root holds the sequences, whose epochs
+  // change at each renumbering)
+  if (is_compound (root))
+    for (int i=0; i<N(root); i++) auto_labels_numbers (root[i], epochs, r);
   r << b[1];
   for (int j=2; j+2<N(b); j+=3) r << b[j] << b[j+2];
   return r;

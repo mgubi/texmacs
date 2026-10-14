@@ -532,12 +532,12 @@ bridge_rep::typeset (int desired_status) {
   // removed before it, the bindings above it)
   bool cached= (status==desired_status) && (N(ttt->old_patch)==0);
   // the check mode typesets again both kinds of bridges used again, when
-  // what they read is known (also those which got line items from the
-  // bridges around them, as below a binding), and compares their lines,
-  // their changes and the border of their stack. (A bridge whose reads
-  // are not known may have read more than variables, and typesetting it
-  // again is not always without effect: the labels which no tag makes
-  // take new numbers)
+  // what they read is known, and compares their lines, their changes and
+  // the border of their stack. Not the bridges whose reads are not known,
+  // nor those which got line items from the bridges around them (the first
+  // and the last one below a binding): typesetting them again is not
+  // without effect on what comes after them (the labels which no tag
+  // makes take new numbers...), and the bridges after them would differ
   bool check= reads_mode () == 2 && (unread || (cached && reads_known));
   array<SI> old_lines, old_border;
   array<tree> old_contents;
@@ -586,6 +586,17 @@ bridge_rep::typeset (int desired_status) {
     bool recorded= record.complete () &&
                    N(my_reads) <= READS_MAX && N(my_keys) <= LOOKUPS_MAX;
     reads_known= recorded && alone;
+    // the variables which it leaves with the value UNINIT: among those
+    // which it read or wrote (every write goes through env_table, which
+    // records it), and those of the bridges below it
+    for (iterator<int> it= iterate (my_reads); it->busy (); ) {
+      string var= env_var_name (it->next ());
+      if (!contains (var, my_uninit)) my_uninit << var;
+    }
+    array<string> left;
+    for (int i=0; i<N(my_uninit); i++)
+      if (env->is_uninit (my_uninit[i])) left << my_uninit[i];
+    my_uninit= left;
     reads= array<int> ();
     seen_keys= array<string> ();
     seen_values= array<tree> ();
@@ -599,7 +610,7 @@ bridge_rep::typeset (int desired_status) {
     record.stop ();
     add_reads (env, recorded, reads, seen_keys, seen_values);
     for (int i=0; i<N(my_uninit); i++)
-      env->note_uninit (my_uninit[i], tree (UNINIT));
+      env->note_uninit (my_uninit[i]);
     env->local_update (ttt->old_patch, changes);
     // a variable which the bridge leaves with the value UNINIT now and not
     // in the previous pass, or the other way round, changed (the changes

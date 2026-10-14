@@ -151,13 +151,23 @@ public:
   hashmap<string,tree>  h;
   hashmap<int,bool>*    rec;  // the variables read or written, if recording
   bool                  all;  // the whole table was read, while recording
-  inline env_table (tree init): h (init), rec (NULL), all (false) {}
+  // The values which the variables had before they were written, from
+  // which the changes made by a bridge are found (edit_env_rep::back).
+  // Every write, while a bridge is recorded, goes there: also those of a
+  // binding (a with, a cell...), which puts the value back afterwards, but
+  // a variable which is assigned below a binding would otherwise have the
+  // bound value as its value before, and be missed when it ends with it
+  hashmap<string,tree>* back_log;
+  inline env_table (tree init):
+    h (init), rec (NULL), all (false), back_log (NULL) {}
   inline tree operator [] (string s) {
     if (rec != NULL) rec->operator () (env_var_id (s))= true;
     if (env_deriving > 0) env_note_read (env_var_id (s));
     return h [s]; }
   inline tree& operator () (string s) {
-    if (rec != NULL) rec->operator () (env_var_id (s))= true;
+    if (rec != NULL) {
+      rec->operator () (env_var_id (s))= true;
+      if (back_log != NULL) (*back_log)->write_back (s, h); }
     if (env_deriving > 0) env_note_read (env_var_id (s));
     return h (s); }
   inline bool contains (string s) {
@@ -527,17 +537,21 @@ public:
   // lookup_value finds again
   array<string>* rec_keys;
   array<tree>*   rec_values;
-  // A with puts back the values which it read, which is UNINIT for a
-  // variable which was not there: after the with, the variable is there,
-  // with the value UNINIT, which the changes do not tell apart from not
-  // being there (while 'provides' does). Such variables are recorded too
-  // (rec_uninit): a bridge which is used again puts them there again
-  // (leave_uninit), and when it goes, those which are not there any more
-  // are among the variables which changed (see compare_changes)
+  // A with (a cell...) puts back the values which it read, which is
+  // UNINIT for a variable which was not there: after it, the variable is
+  // there, with the value UNINIT, which the changes do not tell apart from
+  // not being there (while 'provides' does). The variables which a bridge
+  // leaves so are recorded too (bridge_rep::uninit, those of the bridges
+  // below it through rec_uninit): a bridge which is used again puts them
+  // there again (leave_uninit), and when it goes, those which are not
+  // there any more are among the variables which changed (see
+  // compare_changes)
   array<string>* rec_uninit;
-  inline void note_uninit (string s, tree t) {
-    if (rec_uninit != NULL && L(t) == UNINIT && !contains (s, *rec_uninit))
+  inline void note_uninit (string s) {
+    if (rec_uninit != NULL && !contains (s, *rec_uninit))
       (*rec_uninit) << s; }
+  inline bool is_uninit (string s) {
+    return env.h->contains (s) && L(env.h [s]) == UNINIT; }
   void leave_uninit (string s);
   // The tree of the buffer which is being typeset, whose automatic labels
   // are numbered (exec_auto_id in env_exec.cpp), or a tree which is not
@@ -615,10 +629,9 @@ public:
   inline void monitored_write (string s, tree t) {
     back->write_back (s, env.h); env (s)= t; }
   inline void monitored_write_update (string s, tree t) {
-    note_uninit (s, t); back->write_back (s, env.h); env (s)= t; update (s); }
+    back->write_back (s, env.h); env (s)= t; update (s); }
   inline void write (string s, tree t) { env (s)= t; }
-  inline void write_update (string s, tree t) {
-    note_uninit (s, t); env (s)= t; update (s); }
+  inline void write_update (string s, tree t) { env (s)= t; update (s); }
   inline tree local_begin (string s, tree t) {
     // tree r (env [s]); monitored_write_update (s, t); return r;
     tree& val= env (s); tree r (val); val= t; update (s); return r; }

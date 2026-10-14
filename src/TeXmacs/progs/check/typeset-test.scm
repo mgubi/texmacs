@@ -899,7 +899,51 @@
            (tree-set (tree-ref (buffer-tree) 1) "replaced")
            (tree-remove (buffer-tree) 1 1))
        (update-forced)
-       (check-true (same-as-scratch?))))))
+       (check-true (same-as-scratch?)))))
+  ;; a paragraph which binds a variable and then gives it a value: when it
+  ;; goes, the value is not there any more
+  (with-typeset-body
+   '(document (with "v" "B" "x")
+              (concat (with "v" "B" "y") (assign "v" "CCCCCCCCCCCCCCCCCCCC"))
+              "filler"
+              (concat "val: " (value "v") ".")
+              "end")
+   (lambda ()
+     (tree-remove (buffer-tree) 1 1)
+     (update-forced)
+     (check-true (same-as-scratch?))))
+  ;; the same as the with above, with a cell
+  (with-typeset-body
+   '(document (assign "xb" "a-much-longer-value")
+              (concat (tabular (tformat (cwith "1" "1" "1" "1" "xc" "mid-val")
+                                        (table (row (cell "t")))))
+                      (assign "xb" "q"))
+              "plain"
+              (concat "v: " (value "xc") "."))
+   (lambda ()
+     (tree-set (tree-ref (buffer-tree) 1) "replaced")
+     (update-forced)
+     (check-true (same-as-scratch?))))
+  ;; a variable which is assigned below a binding of it: its value before
+  ;; is the one outside, not the bound one
+  (with-typeset-body
+   `(document ,@(map (lambda (i)
+                       (cond ((== i 1) '(assign "foo" "1cm"))
+                             ((== i 5) '(with "par-left" "0cm"
+                                          (document
+                                           (with "foo" "3cm"
+                                             (document (assign "foo" "2cm")
+                                                       "inner"))
+                                           "x" (assign "foo" "3cm"))))
+                             ((== i 20) '(concat "a" (vspace (value "foo")) "b"))
+                             (else (string-append "paragraph "
+                                                  (number->string i)))))
+                     (.. 0 30)))
+   (lambda ()
+     (update-forced)
+     (tree-set (tree-ref (buffer-tree) 20) '(concat "c" (vspace (value "foo")) "d"))
+     (update-forced)
+     (check-true (same-as-scratch?)))))
 
 ;; The labels of the parts of a document are named after the part, and
 ;; numbered from 1 in each part, as the counter does (set-part).
@@ -918,7 +962,26 @@
      (check= (sort (list-filter (list-references)
                                 (lambda (l) (string-starts? l "auto.")))
                    string<?)
-             '("auto.p1-1" "auto.p1-2" "auto.p2-1" "auto.p2-2")))))
+             '("auto.p1-1" "auto.p1-2" "auto.p2-1" "auto.p2-2"))
+     ;; nothing to do the next time
+     (check-false (renumber-auto-labels)))))
+
+;; A tag which is removed and put back by an undo gives its labels the
+;; names they had (the undo puts back a copy with their numbers).
+(define (test-labels-after-undo)
+  (check-group "labels after undo")
+  (with-typeset-body
+   '(document (section "A") "a" (section "B") "b" (section "C") "c")
+   (lambda ()
+     (renumber-auto-labels)
+     (update-forced)
+     (start-editing)
+     (tree-remove (buffer-tree) 2 2)
+     (end-editing)
+     (update-forced)
+     (undo 0)
+     (update-forced)
+     (check= (auto-names) '("auto-1" "auto-2" "auto-3")))))
 
 ;; Random edits of a document, each followed by a typesetting which uses
 ;; again what it can, against a typesetting from scratch in a buffer of its
@@ -1046,5 +1109,6 @@
   (test-label-names)
   (test-bindings-against-scratch)
   (test-labels-of-parts)
+  (test-labels-after-undo)
   (test-incremental-against-scratch)
   (check-end))

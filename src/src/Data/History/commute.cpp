@@ -10,6 +10,7 @@
 ******************************************************************************/
 
 #include "patch.hpp"
+#include "blackbox.hpp"
 
 /******************************************************************************
 * Subroutines
@@ -36,20 +37,41 @@ dup (modification m) {
 * Inversion of modifications
 ******************************************************************************/
 
+// The copy which an undo puts back in the place of the subtree which a
+// modification removes or replaces: it keeps the numbers of the automatic
+// labels of the tags (ADDENDUM_AUTO_ID, see exec_auto_id), which a plain
+// copy does not have, so that a tag which comes back gives its labels the
+// names they had (a copy which is pasted, while the tree is still there,
+// takes new numbers)
+static tree
+copy_for_undo (tree t) {
+  tree c;
+  if (is_atomic (t)) c= copy (t);
+  else {
+    c= tree (L(t), N(t));
+    for (int i=0; i<N(t); i++) c[i]= copy_for_undo (t[i]);
+  }
+  blackbox bb;
+  if (!is_nil (t->obs) && t->obs->get_contents (ADDENDUM_AUTO_ID, bb))
+    (void) tree_addendum_new (c, ADDENDUM_AUTO_ID, bb, false);
+  return c;
+}
+
 modification
 invert (modification m, tree t) {
   ASSERT (is_applicable (t, m), "modification not applicable");
   path rp= root (m);
   switch (m->k) {
   case MOD_ASSIGN:
-    return mod_assign (rp, copy (subtree (t, rp)));
+    return mod_assign (rp, copy_for_undo (subtree (t, rp)));
   case MOD_INSERT:
     return mod_remove (rp, index (m), insert_length (m->t));
   case MOD_REMOVE:
     {
       int i= index (m);
       int n= argument (m);
-      return mod_insert (rp, i, copy (insert_range (subtree (t, rp), i, n)));
+      return mod_insert (rp, i,
+                         copy_for_undo (insert_range (subtree (t, rp), i, n)));
     }
   case MOD_SPLIT:
     return mod_join (rp, index (m));
