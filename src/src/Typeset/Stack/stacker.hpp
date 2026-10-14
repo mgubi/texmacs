@@ -81,5 +81,6 @@ struct shove_memo {
 
 void shove_cache_new_pass (shove_memo& m);
 void shove_cache_end_pass (shove_memo& m);
+void shove_cache_forget (shove_memo& m);
 
 #endif // defined STACKER_H

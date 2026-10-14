@@ -34,6 +34,7 @@ typesetter_rep::~typesetter_rep () {
   // what holds lines is released while the change log is there for them
   // (see phrase_box_rep; the members would go in the other order)
   tm_delete (kept_pages);
+  shove_cache_forget (shoves);
   br= nil_bridge;
   l = array<page_item> ();
   a = array<line_item> ();
