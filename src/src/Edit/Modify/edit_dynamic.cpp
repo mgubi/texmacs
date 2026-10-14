@@ -11,6 +11,7 @@
 
 #include "edit_dynamic.hpp"
 #include "tree_analyze.hpp"
+#include "converter.hpp"
 
 /******************************************************************************
 * Constructors and destructors
@@ -621,8 +622,18 @@ edit_dynamic_rep::activate_symbol () {
   if (is_func (subtree (et, path_up (p)), INACTIVE))
     p= path_up (p);
   string s= st[0]->label;
-  if (is_int (s))
-    assign (p, string (((char) as_int (s))));
+  if (is_int (s)) {
+    // a code of the Cork encoding, or a Unicode code point above 255
+    int code= as_int (s);
+    if (code >= 0 && code <= 255)
+      assign (p, string ((char) code));
+    else if (code > 255 && code <= 0x10FFFF)
+      assign (p, utf8_to_cork (encode_as_utf8 ((unsigned int) code)));
+    else {
+      set_message ("Error: invalid character code", "activate symbol");
+      return;
+    }
+  }
   else {
     int i, n= N(s);
     for (i=0; i<n; i++)
