@@ -660,32 +660,22 @@ cell_box_rep::post_display (renderer& ren) {
 
 class remember_box_rep: public change_box_rep {
 public:
-  rectangles* logs_ptr;
-  SI          ox, oy;
+  placed_box place;  // (it logs the areas to repaint: see boxes.hpp)
 public:
   inline remember_box_rep (path ip, box b):
-    change_box_rep (ip, true), logs_ptr (NULL)
+    change_box_rep (ip, true)
   {
     insert (b, 0, 0);
     position ();
     finalize ();
   }
-  inline ~remember_box_rep () {
-    if (logs_ptr != NULL) {
-      rectangles& logs= *logs_ptr;
-      logs= rectangles (rectangle (ox+x3, oy+y3, ox+x4, oy+y4), logs);
-      logs= rectangles (rectangle (0, 0, 0, 0), logs);
-      // cout << "  8=X " << rectangle (ox+x3, oy+y3, ox+x4, oy+y4) << "\n";
-    }
-  }
-  inline void position_at (SI x, SI y, rectangles& logs) {
+  inline void position_at (SI x, SI y, repaint_log& log) {
+    place.place (this, x + x0, y + y0, log); }
+  inline void keep_placed (repaint_log& log) { place.keep (this, log); }
+  inline void unplace (repaint_log& log) { place.unplace (this, log); }
+  inline void all_placed (SI x, SI y, array<box>& bs, array<rectangle>& rs) {
     x += x0; y += y0;
-    if (logs_ptr == NULL) logs= rectangles (rectangle (0, 0, 0, 0), logs);
-    else logs= rectangles (rectangle (ox+x3, oy+y3, ox+x4, oy+y4), logs);
-    ox= x; oy= y;
-    logs= rectangles (rectangle (ox+x3, oy+y3, ox+x4, oy+y4), logs);
-    logs_ptr= &logs;
-  }
+    bs << box (this); rs << rectangle (x + x3, y + y3, x + x4, y + y4); }
   inline void display (renderer ren) {
     ren->apply_shadow (x1, y1, x2, y2);
   }

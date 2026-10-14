@@ -876,10 +876,114 @@ box_rep::display_links (renderer ren) {
 }
 
 void
-box_rep::position_at (SI x, SI y, rectangles& change_log) {
+box_rep::position_at (SI x, SI y, repaint_log& log) {
   int i, n= subnr ();
   x += x0; y += y0;
-  for (i=0; i<n; i++) subbox (i)->position_at (x, y, change_log);
+  for (i=0; i<n; i++) subbox (i)->position_at (x, y, log);
+}
+
+void box_rep::keep_placed (repaint_log& log) { (void) log; }
+
+void
+box_rep::all_placed (SI x, SI y, array<box>& bs, array<rectangle>& rs) {
+  int i, n= subnr ();
+  x += x0; y += y0;
+  for (i=0; i<n; i++) subbox (i)->all_placed (x, y, bs, rs);
+}
+void box_rep::unplace (repaint_log& log) { (void) log; }
+
+/******************************************************************************
+* The areas to repaint (see boxes.hpp)
+******************************************************************************/
+
+int typeset_caches_mode (); // see typesetter.hpp
+
+static int repaint_logs_made= 0;
+
+repaint_log::repaint_log (): id (repaint_logs_made++), pass (0) {}
+
+void
+repaint_log::start_pass () {
+  pass++;
+  before= placed;
+  placed= array<box> ();
+}
+
+void
+repaint_log::end_pass () {
+  for (int i=0; i<N(before); i++) before[i]->unplace (*this);
+  before= array<box> ();
+}
+
+void
+placed_box::place (box_rep* b, SI x, SI y, repaint_log& log) {
+  rectangle zero (0, 0, 0, 0);
+  rectangle now (x + b->x3, y + b->y3, x + b->x4, y + b->y4);
+  if (id == log.id && pass == log.pass) {
+    // (a box placed twice in the same pass)
+    if (ox != x || oy != y)
+      log.rects= rectangles (now, rectangles (zero, log.rects));
+    return;
+  }
+  bool was= (id == log.id && pass == log.pass - 1);
+  // (an unchanged area would be discarded by requires_update)
+  if (!was || ox != x || oy != y || typeset_caches_mode () == 0) {
+    rectangle old= (was? rectangle (ox + b->x3, oy + b->y3,
+                                    ox + b->x4, oy + b->y4): zero);
+    log.rects= rectangles (now, rectangles (old, log.rects));
+  }
+  id= log.id; pass= log.pass; ox= x; oy= y;
+  log.placed << box (b);
+}
+
+void
+placed_box::keep (box_rep* b, repaint_log& log) {
+  // at the same place as in the previous pass (see stack_box_rep)
+  if (id != log.id || pass == log.pass) return;
+  pass= log.pass;
+  log.placed << box (b);
+}
+
+static bool
+inside (rectangle r, rectangle big) {
+  return r->x1 >= big->x1 && r->y1 >= big->y1 &&
+         r->x2 <= big->x2 && r->y2 <= big->y2;
+}
+
+void typeset_cache_mismatch (string what); // see typesetter.hpp
+
+void
+check_repaint (box b, rectangle r, array<box>& bs, array<rectangle>& rs) {
+  // what has to be repainted: the boxes which are gone, which moved and
+  // which are new (bs and rs: those of the previous pass, then of this one)
+  array<box> nbs;
+  array<rectangle> nrs;
+  b->all_placed (0, 0, nbs, nrs);
+  hashmap<pointer,int> old_at (-1), new_at (-1);
+  for (int i=0; i<N(bs); i++) old_at ((pointer) bs[i].operator-> ())= i;
+  for (int i=0; i<N(nbs); i++) new_at ((pointer) nbs[i].operator-> ())= i;
+  bool ok= true;
+  for (int i=0; i<N(bs); i++) {
+    int j= new_at [(pointer) bs[i].operator-> ()];
+    if ((j < 0 || nrs[j] != rs[i]) && rs[i]->x1 < rs[i]->x2 &&
+        !inside (rs[i], r)) ok= false;
+  }
+  for (int j=0; j<N(nbs); j++) {
+    int i= old_at [(pointer) nbs[j].operator-> ()];
+    if ((i < 0 || nrs[j] != rs[i]) && nrs[j]->x1 < nrs[j]->x2 &&
+        !inside (nrs[j], r)) ok= false;
+  }
+  if (!ok) typeset_cache_mismatch ("log of the areas to repaint");
+  bs= nbs;
+  rs= nrs;
+}
+
+void
+placed_box::unplace (box_rep* b, repaint_log& log) {
+  if (id != log.id || pass == log.pass) return;
+  rectangle old (ox + b->x3, oy + b->y3, ox + b->x4, oy + b->y4);
+  log.rects= rectangles (rectangle (0, 0, 0, 0), rectangles (old, log.rects));
+  id= -1;
 }
 
 void

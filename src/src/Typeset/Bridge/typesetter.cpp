@@ -29,14 +29,7 @@ typesetter_rep::typesetter_rep (edit_env& env2, tree et, path ip):
 }
 
 typesetter_rep::~typesetter_rep () {
-  // what holds lines is released while the change log is there for them
-  // (see phrase_box_rep; the members would go in the other order)
   tm_delete (kept_pages);
-  br= nil_bridge;
-  l = array<page_item> ();
-  a = array<line_item> ();
-  b = array<line_item> ();
-  change_log= rectangles ();
 }
 
 typesetter
@@ -250,7 +243,11 @@ typesetter_rep::typeset (SI& x1b, SI& y1b, SI& x2b, SI& y2b) {
   box b= typeset ();
   // cout << "-------------------------------------------------------------\n";
   double t0= edit_profile.on ? edit_profile_now () : 0;
-  b->position_at (0, 0, change_log);
+  repaint.start_pass ();
+  b->position_at (0, 0, repaint);
+  repaint.end_pass ();
+  rectangles change_log= repaint.rects;
+  repaint.rects= rectangles ();
   if (edit_profile.on) edit_profile.lines += log_length (change_log) / 2;
   change_log= requires_update (change_log);
   if (edit_profile.on) edit_profile.rects += log_length (change_log);
@@ -264,8 +261,9 @@ typesetter_rep::typeset (SI& x1b, SI& y1b, SI& x2b, SI& y2b) {
       r= least_upper_bound (r, rs[i]);
   old_bgs= new_bgs;
   if (edit_profile.on) edit_profile.changes += edit_profile_now () - t0;
+  if (typeset_caches_mode () == 2)
+    check_repaint (b, r, placed_boxes, placed_rects);
   x1b= r->x1; y1b= r->y1; x2b= r->x2; y2b= r->y2;
-  change_log= rectangles ();
   return b;
 }
 
