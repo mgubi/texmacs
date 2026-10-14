@@ -58,6 +58,7 @@ bool async_eval_system (string cmd, object call_back);
 bool async_eval_system (string cmd, int& status, string& outbuf,
 			string& errbuf, bool& kill);
 void async_eval_pending ();
+void async_eval_cancel (string* outbuf);
 
 string get_printing_default ();
 bool has_printing_cmd (void);

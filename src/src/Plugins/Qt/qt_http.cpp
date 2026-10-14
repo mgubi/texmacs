@@ -29,6 +29,8 @@ array<string> http_mask_headers (array<string> headers_attr);
 #include <QJsonObject>
 #include <QJsonArray>
 #include <QJsonDocument>
+#include <QPointer>
+#include <QList>
 
 // Use a single manager in order to share connections several times
 // the proxy: the preference "http proxy" ("host:port", "socks5://host:port",
@@ -277,9 +279,30 @@ qt_http_from_json (string s) {
 // partial), as bytes: a piece may end in the middle of a character. A
 // request which is no longer wanted (kill: its session was interrupted) is
 // aborted, and its server stops sending.
+// the requests of the request links which are not over
+static QList<QPointer<QTMHTTPHandler> > qt_http_busy;
+
+// A request which is no longer wanted (an interrupted answer, a link which
+// asks again or is destroyed) is aborted at once, and writes nothing more
+// into its link: nothing of an interrupted answer reaches the next one,
+// which the link may already be waiting for in the same buffers.
+void
+QTMHTTPHandler::cancel () {
+  status= NULL; outbuf= NULL; errbuf= NULL; kill= NULL;
+  if (reply != NULL) reply->abort (); // (onFinished, which forgets it)
+}
+
+void
+qt_http_async_cancel (string* outbuf) {
+  QList<QPointer<QTMHTTPHandler> > l= qt_http_busy;
+  for (int i= 0; i < l.size (); i++)
+    if (!l[i].isNull () && l[i]->writes_into (outbuf)) l[i]->cancel ();
+  qt_http_busy.removeAll (QPointer<QTMHTTPHandler> ());
+}
+
 void
 QTMHTTPHandler::onReadyRead () {
-  if (reply == NULL) return;
+  if (reply == NULL || outbuf == NULL) return;
   if (*kill) { reply->abort (); return; }
   QByteArray b= reply->readAll ();
   if (b.size () > 0) *outbuf << string (b.constData (), b.size ());
@@ -287,7 +310,11 @@ QTMHTTPHandler::onReadyRead () {
 
 void
 QTMHTTPHandler::onFinished () {
-  if (reply == NULL)
+  qt_http_busy.removeAll (QPointer<QTMHTTPHandler> (this));
+  if (outbuf == NULL) { // (cancelled)
+    if (reply != NULL) reply->close ();
+  }
+  else if (reply == NULL)
     *status= 0;
   else {
     if (reply->error() == QNetworkReply::OperationCanceledError && *kill)
@@ -353,6 +380,7 @@ qt_async_http_post (string url, array<string> headers_attr,
   }
   QTMHTTPHandler* h=
     new QTMHTTPHandler (reply, &status, &outbuf, &errbuf, &kill);
+  qt_http_busy.append (QPointer<QTMHTTPHandler> (h));
   QObject::connect (reply, &QNetworkReply::readyRead,
 		    h, &QTMHTTPHandler::onReadyRead);
   QObject::connect (reply, &QNetworkReply::finished,
