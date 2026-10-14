@@ -174,6 +174,15 @@
           '(bib-pages "e1002" "e1010"))
   (check= (bib-value "@misc{k, pages = {xii-xv}}" "pages")
           '(bib-pages "xii" "xv"))
+  ;; other pages are kept as written, with an en dash for --, and an
+  ;; empty field gives no page
+  (check= (bib-value "@misc{k, pages = {12, 15--17}}" "pages")
+          `(bib-pages ,(string-append "12, 15" "\x15" "17")))
+  (check= (bib-value "@misc{k, pages = {1--2--3}}" "pages")
+          `(bib-pages ,(string-append "1" "\x15" "2" "\x15" "3")))
+  (check= (bib-value "@misc{k, pages = {}, title = {T}}" "pages") '(bib-pages))
+  (check-true (contains? (bib-out (bib-parse "@misc{k, pages = {12, 15--17}}"))
+                         "{12, 15--17}"))
   ;; the fields which BibTeX reads verbatim are not converted from LaTeX
   (with s (string-append "@misc{k, doi = {10.1000/a_b%20}, eprint = {a_b}, "
                          "url = {http://x.org/a_b}, title = {a_b}}")
@@ -572,6 +581,11 @@
   ;; an entry with a crossref cites its parent
   (check= (one "plain" "@article{ar, author={Doe, J.}, title={Crossed}, crossref={pr}, pages={7}}")
           "J. Doe. Crossed. In [pr], page 7.")
+  ;; pages kept as written are several pages, as for multi.page.check
+  (check= (one "plain" "@article{ar, author={Doe, J.}, title={Crossed}, crossref={pr}, pages={7, 9}}")
+          "J. Doe. Crossed. In [pr], pages 7, 9.")
+  (check= (one "plain" "@article{ar, author={Doe, J.}, title={Crossed}, crossref={pr}, pages={S-12}}")
+          "J. Doe. Crossed. In [pr], pages S-12.")
   (check= (fmt-labels "alpha" "@inproceedings{ip, author={Doe, J.}, title={T}, booktitle={B}, year=2000}\n@proceedings{pr, editor={Ed, E. and Fd, F.}, title={Proc}, year=2008}")
           '("Doe00" "EF08")))
 

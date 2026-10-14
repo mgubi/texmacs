@@ -833,26 +833,21 @@ bib_abbreviate (scheme_tree st, scheme_tree s1, scheme_tree s2) {
 
 tree
 bib_field_pages (string p) {
-  tree res= compound ("bib-pages");;
-  int p1, p2;
-  int pos= 0;
-  if (read_int (p, pos, p1)) {
-    res << as_string (p1);
-    while (pos < N(p) && !is_digit (p[pos])) pos++;
-    if (read_int (p, pos, p2))
-      res << as_string (p2);
-    return res;
-  }
+  // one page gives one argument and a range two: a range is written with
+  // "--" (12--34, A-1--A-10), or with a single "-" between two sides of
+  // the same kind (12-34, e1002-e1010, xii-xv, but not S-12); other pages
+  // (12, 15--17) are kept as they are written, with an en dash for "--",
+  // and an empty field gives no argument
+  tree res= compound ("bib-pages");
   p= trim_spaces (p);
-  if (N(p) == 0) {
-    res << "0";
-    return res;
+  if (N(p) == 0) return res;
+  bool list= occurs (",", p) || occurs (";", p);
+  int i= search_forwards ("--", 0, p), j= i;
+  if (i >= 0) {
+    while (j < N(p) && p[j] == '-') j++;
+    if (search_forwards ("--", j, p) >= 0) i= -1;
   }
-  // a range is written with "--" (A-1--A-10); a single "-" makes a range
-  // only when both sides are of the same kind (e1002-e1010, xii-xv),
-  // so that S-12 stays one page
-  int i= search_forwards ("--", 0, p), j= i + 2;
-  if (i < 0) {
+  else {
     i= search_forwards ("-", 0, p);
     j= i + 1;
     if (i > 0 && search_forwards ("-", j, p) < 0) {
@@ -862,12 +857,11 @@ bib_field_pages (string p) {
     }
     else i= -1;
   }
-  if (i <= 0) res << p;
-  else {
-    while (j < N(p) && p[j] == '-') j++;
-    res << trim_spaces (p (0, i));
-    if (j < N(p)) res << trim_spaces (p (j, N(p)));
+  if (!list && i > 0 && j < N(p)) {
+    res << trim_spaces (p (0, i)) << trim_spaces (p (j, N(p)));
+    return res;
   }
+  res << replace (replace (p, "---", "--"), "--", "\25");
   return res;
 }
 
