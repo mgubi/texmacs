@@ -1388,6 +1388,18 @@ from 16 to 1024 pixels. As in the page of TeXmacs Vue
   answer when the window is closed. The page has tests of the same
   document by `?open=`, of the keys of the commands on a Russian layout,
   of touch, of a dialog in a short window, of a menu which changed.
+- **What remained of the split** (2026-10-14). A submenu of the desktop
+  no longer waits for the core in the layout of Vue: 80 ms at most (none
+  when the core is known to be busy), then it opens with "…" in a slot,
+  which its contents fill when they come. A refreshable which is in more
+  than one place (a bar and an open menu) has all of its slots
+  refreshed; a view which has two canvases for a while (a dialog shown
+  again) is drawn on the last one, and the one before takes it again
+  when it goes. A tool which comes with a field gives the keyboard to
+  that field, not to the first field of its type. The shell's queue of
+  frames is held under 256 MB (the core then waits), "Start again" gives
+  the new program no descriptor of the old one, and the page paces the
+  sizes of its canvases as it paces the wheel.
 - **The desktop is not a browser.** The core took itself for one (the
   shell gives it `TEXMACS_WEB_PLATFORM` for the shortcuts of the system):
   the menu had "Files in this browser", the files were asked for in

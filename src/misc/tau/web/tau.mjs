@@ -23,13 +23,17 @@ const worker = new Worker("tau-worker.js" + location.search);
 // after the hand stopped. So one such message is with the core at a time
 // (the worker says when it is done with it: a ping sent after it comes
 // back); what comes meanwhile is added up (the wheel) or replaces what
-// waited (the pointer), and goes when the core is free. Any other message
+// waited (the pointer, a size), and goes when the core is free. Any other message
 // first sends what waits, so that the order is kept.
 let pacing = false, paceId = 0;
 const held = new Map(); // what waits: "scroll:<view>" or "move:<view>" -> message
 function paced(m) {
 	if (m.t === "scroll") return "scroll:" + m.view;
 	if (m.t === "mouse" && m.kind === "move") return "move:" + m.view;
+	// (a size of a canvas too: dragging the line between two panes makes
+	// one at each step, each a whole view to draw; the last one waits, and
+	// the canvas shows only what is drawn for its last place)
+	if (m.t === "place") return "place:" + m.view;
 	return null;
 }
 function sendHeld() {

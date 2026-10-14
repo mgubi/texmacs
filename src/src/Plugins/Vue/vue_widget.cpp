@@ -5624,6 +5624,9 @@ class vue_texmacs_widget_rep : public vue_widget_rep {
   vue_widget main_widget;
   string left_footer, right_footer;
   vue_window win; // weak ref
+#ifdef TAU_SHELL
+  friend void vue_focus_input (widget frame, widget input);
+#endif
   
   bool visibility [10];
   
@@ -5726,6 +5729,20 @@ vue_texmacs_widget_rep::vue_texmacs_widget_rep (int _mask, command _quit)
   right_footer= translate ("Booting");
 };
 
+
+#ifdef TAU_SHELL
+// Tau: the keyboard for a given field of the window of the frame (a tool
+// which comes with a field: by its name, the field of another tool with
+// the same type could have it)
+void
+vue_focus_input (widget frame, widget input) {
+  vue_texmacs_widget_rep* f= dynamic_cast<vue_texmacs_widget_rep*> (frame.rep);
+  vue_input_text_widget_rep* in= dynamic_cast<vue_input_text_widget_rep*> (input.rep);
+  if (f == NULL || in == NULL || f->win == NULL) return;
+  if (!live_inputs->contains ((pointer) in)) return;
+  set_kbd_focus (f->win, in);
+}
+#endif
 
 void
 vue_texmacs_widget_rep::send (slot s, blackbox val) {

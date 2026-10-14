@@ -183,6 +183,19 @@ test("the scroll bar", async () => {
 	} finally { s.stop(); }
 });
 
+test("a menu opened while the core is busy", async () => {
+	// the menu opens at once (the window does not wait for the core) and
+	// its contents come when the core is free again
+	const s = start({ debug: true, scheme: '(delayed (:pause 6000) (system "sleep 8"))',
+		lines: [5, "click 61 16", 40], waitFirst: 30 });
+	try {
+		await until("the menu is asked for", () => /> expand (\d+)/.test(said()), 40000);
+		const n = said().match(/> expand (\d+)/)[1];
+		await until("the menu is filled when they come", () => said().includes("the menu " + n + " is filled"), 30000);
+		check("the core was busy meanwhile", said().includes("the core is busy"), said().slice(-300));
+	} finally { s.stop(); }
+});
+
 test("the core asked to end saves the documents", async () => {
 	const scratch = path.join(home, "texts", "scratch");
 	const s = start({ scheme: "(new-document)", lines: ["click 500 500", "text Rescue me"] });
