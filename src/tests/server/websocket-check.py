@@ -5,18 +5,24 @@ usage: tests/server/websocket-check.py [--bin texmacs.bin] [--home dir]
 
 Starts TeXmacs as a server (no window, QT_QPA_PLATFORM=offscreen) in a
 scratch home, once per configuration of the preferences of the WebSocket
-port, and talks to it from this script as a WebSocket client on localhost:
-the check of the Origin of the handshake, the limit on the size of what a
-client sends, text messages, and the ports which cannot be served (out of
-range, the port of the server itself, a port in use, not a number). The
-server log is read from the output of TeXmacs.
+port, and talks to it from this script as a WebSocket client, from
+127.0.0.1 and from the own non-loopback address of the machine when it
+has one: the modes "on" (the default; ws, wss with a self-signed
+certificate made by openssl, this machine only without a certificate)
+and "local", the check of the Origin of the handshake, the limits on the
+size of what a client sends before and after it logs in (as the
+administrator which the server makes, whose password is in the log),
+text messages, and the ports which cannot be served (out of range, the
+port of the server itself, a port in use, not a number). The server log
+is read from the output of TeXmacs.
 
 The preferences are those of the scratch home (system/preferences.scm,
-written before each start), by default tests/build/server/home: nothing is
-read or written in the home of the user. The ports are taken between
-20000 and 40000, among those which are free; the processes started are
-stopped by their number. Needs a TeXmacs built with the Qt WebSockets module, Qt
-6.4 or later; prints the cases and exits with 1 when one of them fails.
+written before the start, one home per configuration), by default under
+tests/build/server/home: nothing is read or written in the home of the
+user. The ports are taken between 20000 and 40000, among those which are
+free; the processes started are stopped by their number. Needs a TeXmacs
+built with the Qt WebSockets module, Qt 6.4 or later; prints the cases
+and exits with 1 when one of them fails.
 """
 
 import argparse
@@ -25,12 +31,15 @@ import os
 import random
 import re
 import signal
+import shutil
 import socket
+import ssl
 import struct
 import subprocess
 import sys
 import time
 
+OPENSSL = shutil.which("openssl")
 HERE = os.path.dirname(os.path.abspath(__file__))
 TOP = os.path.dirname(os.path.dirname(HERE))
 
@@ -88,11 +97,14 @@ def scm_quote(s):
 
 
 class Server:
-    def __init__(self, args, name, prefs):
+    def __init__(self, args, name, prefs, setup=None):
         self.name = name
-        self.home = args.home
-        self.log = os.path.join(args.home, "..", "server-%s.log" % name)
+        # a home of its own, whose server makes a new administrator
+        self.home = os.path.join(args.home, name)
+        self.log = os.path.join(args.home, "server-%s.log" % name)
         os.makedirs(os.path.join(self.home, "system"), exist_ok=True)
+        if setup:
+            setup(self.home)
         with open(os.path.join(self.home, "system", "preferences.scm"),
                   "w") as f:
             for k, v in sorted(prefs.items()):
@@ -124,6 +136,20 @@ class Server:
             time.sleep(0.5)
         return False
 
+    def wait_log(self, text, timeout=10):
+        """Whether the log has the text, within the time (the output of
+        TeXmacs comes in blocks)."""
+        end = time.time() + timeout
+        while time.time() < end:
+            if text in self.text():
+                return True
+            time.sleep(0.2)
+        return False
+
+    def admin_password(self):
+        m = re.search(r"password: (\S+)", self.text())
+        return m.group(1) if m else None
+
     def text(self):
         self.out.flush()
         with open(self.log, errors="replace") as f:
@@ -143,13 +169,18 @@ class Server:
 class WebSocket:
     """A minimal client: binary or text messages, masked frames."""
 
-    def __init__(self, port, origin=None):
-        self.sock = socket.create_connection(("127.0.0.1", port), timeout=10)
+    def __init__(self, port, origin=None, host="127.0.0.1", tls=False):
+        self.sock = socket.create_connection((host, port), timeout=10)
+        if tls:
+            ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE  # the certificate of the test
+            self.sock = ctx.wrap_socket(self.sock)
         key = base64.b64encode(os.urandom(16)).decode()
-        req = ("GET / HTTP/1.1\r\nHost: 127.0.0.1:%d\r\n"
+        req = ("GET / HTTP/1.1\r\nHost: %s:%d\r\n"
                "Upgrade: websocket\r\nConnection: Upgrade\r\n"
                "Sec-WebSocket-Key: %s\r\nSec-WebSocket-Version: 13\r\n"
-               "Sec-WebSocket-Protocol: binary\r\n" % (port, key))
+               "Sec-WebSocket-Protocol: binary\r\n" % (host, port, key))
         if origin is not None:
             req += "Origin: %s\r\n" % origin
         self.sock.sendall((req + "\r\n").encode())
@@ -242,6 +273,28 @@ class WebSocket:
                 return True
         return False
 
+    def request(self, serial, cmd, timeout=15):
+        """Sends (serial cmd) and returns the payload of the answer."""
+        msg = ("(%d %s)" % (serial, cmd)).encode()
+        self.send(str(len(msg)).encode() + b"\n" + msg)
+        data = b""
+        end = time.time() + timeout
+        while time.time() < end:
+            try:
+                op, payload = self.recv(max(0.1, end - time.time()))
+            except socket.timeout:
+                break
+            if op is None or op == 8:
+                break
+            data += payload
+            if b"(client-remote-" in data and data.endswith(b"))"):
+                break
+        return data
+
+    def login(self, password):
+        return b'"ready"' in self.request(
+            9, "(remote-login \"admin\" %s)" % scm_quote(password))
+
     def close(self):
         try:
             self.sock.close()
@@ -272,9 +325,15 @@ def base_prefs(server_port, **more):
     return prefs
 
 
-def run(args, name, prefs, cases):
+def default_prefs(server_port):
+    # "tls-server" is on by default; it is written all the same, since a
+    # file with one preference only is not read as such
+    return {"server port": str(server_port), "tls-server": "on"}
+
+
+def run(args, name, prefs, cases, setup=None):
     print("%s:" % name)
-    srv = Server(args, name, prefs)
+    srv = Server(args, name, prefs, setup)
     try:
         if not srv.wait():
             check(name + ": the server starts", False, srv.log)
@@ -287,49 +346,143 @@ def run(args, name, prefs, cases):
         srv.stop()
 
 
+def own_address():
+    """A non-loopback IPv4 address of this machine, or None. Connecting a
+    UDP socket sends nothing: it only picks the address of a route."""
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(("192.0.2.1", 9))  # TEST-NET-1, never reached
+        a = s.getsockname()[0]
+    except OSError:
+        a = None
+    finally:
+        s.close()
+    return None if not a or a.startswith("127.") or a == "0.0.0.0" else a
+
+
+def served(w, **kw):
+    try:
+        ws = WebSocket(w, **kw)
+        ok = ws.status == 101 and ws.ping()
+        ws.close()
+        return ok
+    except (OSError, ssl.SSLError):
+        return False
+
+
+def logged_in(srv, w, **kw):
+    """A client logged in as the administrator made at the start."""
+    ws = WebSocket(w, **kw)
+    pw = srv.admin_password()
+    ok = ws.status == 101 and pw is not None and ws.login(pw)
+    check("the administrator logs in", ok)
+    return ws
+
+
 def default_cases(srv):
+    """The default preferences ("on", TLS asked for), without a
+    certificate: this machine only, in ws, and a message in the log."""
     w = srv.port + 1
     log = srv.text()
-    check("the port after the one of the server listens", listening(w))
-    check("the log names the address of the port",
-          ("at 127.0.0.1:%d" % w) in log, "log: " + log[-400:])
+    check("without a certificate, the log says that only this machine is "
+          "served", "only those of this machine, in ws, at 127.0.0.1:%d" % w
+          in log, "log: " + log[-400:])
+    check("without a certificate, a client of 127.0.0.1 is served (ws)",
+          served(w))
+    a = own_address()
+    if a:
+        check("without a certificate, a client at %s is refused" % a,
+              not listening(w, a))
+    for origin in ("http://localhost:8080", "https://mgubi.github.io"):
+        check("by default, a page of %s is accepted" % origin,
+              served(w, origin=origin))
+    check("by default, a page of https://example.org is refused",
+          not served(w, origin="https://example.org"))
+
+
+def local_cases(srv):
+    w = srv.port + 1
+    log = srv.text()
+    check("with 'local', the log names the address 127.0.0.1",
+          ("(ws) at 127.0.0.1:%d" % w) in log, "log: " + log[-400:])
+    check("with 'local', a client of 127.0.0.1 is served", served(w))
+    a = own_address()
+    if a:
+        check("with 'local', a client at %s is refused" % a,
+              not listening(w, a))
+
+
+def on_cases(srv):
+    """"on" without TLS: ws on every address of the machine."""
+    w = srv.port + 1
+    log = srv.text()
+    check("with 'on', the log names the port on every address",
+          ("(ws) at :%d" % w) in log, "log: " + log[-400:])
     ws = WebSocket(w)
     check("a client without Origin is accepted", ws.status == 101,
           str(ws.status))
     check("it is served", ws.status == 101 and ws.ping())
     ws.close()
+    a = own_address()
+    if a:
+        check("with 'on', a client at %s is served" % a, served(w, host=a))
+        check("with 'on', a page of another site is refused at %s" % a,
+              not served(w, host=a, origin="https://example.org"))
     for origin in ("http://localhost:8080", "http://127.0.0.1:3000",
-                   "https://localhost", "http://[::1]:8000"):
+                   "https://localhost", "http://[::1]:8000",
+                   "https://mgubi.github.io"):
         ws = WebSocket(w, origin)
-        check("a page of this machine (%s) is accepted" % origin,
+        check("a page of %s is accepted" % origin,
               ws.status == 101 and ws.ping(), str(ws.status))
         ws.close()
     for origin in ("https://example.org", "http://localhost.example.org",
                    "http://127.0.0.1.example.org:8080", "null",
-                   "file://"):
+                   "file://", "https://other.github.io",
+                   "http://mgubi.github.io"):
         ws = WebSocket(w, origin)
         check("another page (%s) is refused" % origin, ws.status != 101,
               str(ws.status))
         ws.close()
-    # the limit, 16 MB by default
+    # before login, 64 KB
     ws = WebSocket(w)
-    ok = send_big(ws, b"x" * (16 * MB + 1))
-    check("a message above 16 MB closes the link", not ok or ws.closed())
+    ok = send_big(ws, b"x" * (64 * 1024 + 1))
+    check("before login, a message above 64 KB closes the link",
+          not ok or ws.closed())
+    ws.close()
+    check("the log says why",
+          srv.wait_log("before login, at most 65536 bytes"))
+    ws = WebSocket(w)
+    ok = send_big(ws, b"999999999\n" + b"x" * 60000)
+    if ok:
+        ok = send_big(ws, b"x" * 60000)
+    check("before login, an unfinished packet above 64 KB closes the link",
+          not ok or ws.closed())
     ws.close()
     ws = WebSocket(w)
+    msg = b"(2 (websocket-check-ping))" + b" " * 60000
+    ws.send(str(len(msg)).encode() + b"\n" + msg)
+    op, data = ws.recv(20)
+    check("before login, a message of 60 KB is served",
+          op == 2 and b"websocket-check" in data)
+    ws.close()
+    # after login, the limit of the preference: 16 MB by default
+    ws = logged_in(srv, w)
     msg = b"(2 (websocket-check-ping))" + b" " * (4 * MB)
     ws.send(str(len(msg)).encode() + b"\n" + msg)
     op, data = ws.recv(20)
-    check("a message of 4 MB is served", op == 2 and b"websocket-check" in data)
+    check("after login, a message of 4 MB is served",
+          op == 2 and b"websocket-check" in data)
+    ok = send_big(ws, b"x" * (16 * MB + 1))
+    check("after login, a message above 16 MB closes the link",
+          not ok or ws.closed())
     ws.close()
-    # a packet which never ends, in messages below the limit
-    ws = WebSocket(w)
+    ws = logged_in(srv, w)
     ok = send_big(ws, b"999999999\n" + b"x" * MB)
     for i in range(20):
         if not ok:
             break
         ok = send_big(ws, b"x" * MB)
-    check("an unfinished packet above 16 MB closes the link",
+    check("after login, an unfinished packet above 16 MB closes the link",
           not ok or ws.closed())
     ws.close()
     ws = WebSocket(w)
@@ -347,18 +500,45 @@ def default_cases(srv):
         ok = send_big(ws, b"\x83\x00" * (MB // 2), raw=True)
     ws.close()
     t = time.time()
-    try:
-        ws = WebSocket(w)
-        served = ws.status == 101 and ws.ping()
-        ws.close()
-    except OSError:
-        served = False
+    ok = served(w)
     check("after a client which breaks the protocol and goes on sending, "
-          "the next one is served at once", served and time.time() - t < 10,
+          "the next one is served at once", ok and time.time() - t < 10,
           "%.1f s" % (time.time() - t))
-    ws = WebSocket(w)
-    check("the port still serves", ws.status == 101 and ws.ping())
-    ws.close()
+    check("the port still serves", served(w))
+
+
+def make_certificate(home):
+    """A self-signed RSA certificate for the server of the test."""
+    d = os.path.join(home, "server")
+    os.makedirs(d, exist_ok=True)
+    subprocess.run([OPENSSL, "req", "-x509", "-newkey", "rsa:2048", "-nodes",
+                    "-keyout", os.path.join(d, "key.pem"),
+                    "-out", os.path.join(d, "cert.pem"), "-days", "2",
+                    "-subj", "/CN=localhost"],
+                   check=True, stdout=subprocess.DEVNULL,
+                   stderr=subprocess.DEVNULL)
+
+
+def wss_cases(srv):
+    """"on" with TLS and a certificate: wss on every address."""
+    w = srv.port + 1
+    log = srv.text()
+    check("with a certificate, the log announces wss on every address",
+          ("(wss) at :%d" % w) in log, "log: " + log[-400:])
+    check("with a certificate, a client of 127.0.0.1 is served (wss)",
+          served(w, tls=True))
+    check("with a certificate, a client in ws is not served",
+          not served(w))
+    a = own_address()
+    if a:
+        check("with a certificate, a client at %s is served (wss)" % a,
+              served(w, host=a, tls=True))
+        check("with a certificate, a page of https://mgubi.github.io at %s "
+              "is served" % a,
+              served(w, host=a, tls=True, origin="https://mgubi.github.io"))
+        check("with a certificate, a page of another site at %s is refused"
+              % a, not served(w, host=a, tls=True,
+                              origin="https://example.org"))
 
 
 def origins_cases(srv):
@@ -376,17 +556,15 @@ def origins_cases(srv):
             check("an origin not configured (%s) is refused" % origin,
                   ws.status != 101, str(ws.status))
         ws.close()
-    ws = WebSocket(w, "https://mgubi.github.io")
-    ok = send_big(ws, b"x" * (MB + 1))
-    check("with a limit of 1 MB, a message above it closes the link",
-          not ok or ws.closed())
-    ws.close()
-    ws = WebSocket(w, "https://mgubi.github.io")
+    ws = logged_in(srv, w, origin="https://mgubi.github.io")
     msg = b"(4 (websocket-check-ping))" + b" " * (MB // 2)
     ws.send(str(len(msg)).encode() + b"\n" + msg)
     op, data = ws.recv(20)
     check("with a limit of 1 MB, a message of 0.5 MB is served",
           op == 2 and b"websocket-check" in data)
+    ok = send_big(ws, b"x" * (MB + 1))
+    check("with a limit of 1 MB, a message above it closes the link",
+          not ok or ws.closed())
     ws.close()
 
 
@@ -423,7 +601,18 @@ def main():
     os.makedirs(args.home, exist_ok=True)
 
     p = free_port_pair()
-    run(args, "default", base_prefs(p), default_cases)
+    run(args, "default", default_prefs(p), default_cases)
+    p = free_port_pair()
+    run(args, "on", base_prefs(p), on_cases)
+    p = free_port_pair()
+    run(args, "local", dict(base_prefs(p), **{"server websocket": "local"}),
+        local_cases)
+    if OPENSSL:
+        p = free_port_pair()
+        run(args, "wss", default_prefs(p), wss_cases,
+            setup=make_certificate)
+    else:
+        print("wss: skipped, no openssl to make a certificate")
     p = free_port_pair()
     run(args, "origins",
         base_prefs(p, origins="https://mgubi.github.io", limit="1"),
@@ -451,7 +640,11 @@ def main():
     blocker.bind(("127.0.0.1", q))
     blocker.listen(1)
     try:
-        run(args, "in-use", base_prefs(p, port=str(q)),
+        # with "local": Qt listens with SO_REUSEADDR, and on macOS a port
+        # held by another program on 127.0.0.1 or 0.0.0.0 is still taken
+        # on [::] by "on"
+        run(args, "in-use", dict(base_prefs(p, port=str(q)),
+                                 **{"server websocket": "local"}),
             refused_port(q, "in use", free=False))
     finally:
         blocker.close()
