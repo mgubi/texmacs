@@ -988,7 +988,7 @@
               (set! docx-floats '())
               (with r (docx-inlines-sub (ox-children x) docx-fields)
                 (set! docx-fields (cdr r))
-                (office-merge (office-changes (car r))))))
+                (docx-numbered-formula (office-merge (office-changes (car r)))))))
          (floats (with f docx-floats (set! docx-floats old-floats) f))
          (attrs `((role ,(car role)) (level ,(cadr role))
                   ;; the named style of a plain paragraph
@@ -1056,6 +1056,22 @@
       (cond ((null? l) (reverse (flush last)))
             ((func? (car l) '!section) (loop (cdr l) '() (flush (cadr (car l)))))
             (else (loop (cdr l) (cons (car l) part) acc))))))
+
+(define (docx-numbered-formula l)
+  ;; a formula between two tabs, and its number after them, as Word and
+  ;; TeXmacs write a numbered equation: the formula displayed, and its
+  ;; number after a tab
+  (if (and (>= (length l) 4) (func? (car l) 'tab) (func? (cadr l) 'math)
+           (func? (caddr l) 'tab))
+      (let ((m (cadr l)))
+        (cons (apply office-node
+                     (cons* 'math (cons '(display "true")
+                                        (map (lambda (a) (list (car a) (cadr a)))
+                                             (list-filter (ox-attrs m)
+                                                          (lambda (a) (!= (car a) 'display)))))
+                            (ox-children m)))
+              (cddr l)))
+      l))
 
 (define (docx-cut-pages l attrs)
   ;; the paragraph of the nodes l, or several when a break of page is in
