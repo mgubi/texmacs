@@ -266,8 +266,14 @@ endif ()
 ### GUI & Qt Selection
 ### --------------------------------------------------------------------
 
-set (TEXMACS_GUI "Qt" CACHE STRING "TeXmacs Gui (Qt, Qt6, Qt5, Qt4, Aqua, X11)")
+set (TEXMACS_GUI "Qt" CACHE STRING "TeXmacs Gui (Qt, Qt6, Qt5, Qt4)")
+set_property (CACHE TEXMACS_GUI PROPERTY STRINGS Qt Qt6 Qt5 Qt4)
 option (QTPIPES "use Qt pipes" ON)
+
+# (the other interfaces of configure --with-gui are not built by CMake)
+if (NOT TEXMACS_GUI MATCHES "^Qt[456]?$")
+  message (FATAL_ERROR "Unknown TEXMACS_GUI ${TEXMACS_GUI}: Qt, Qt6, Qt5 or Qt4")
+endif ()
 
 if (TEXMACS_GUI MATCHES "Qt.*")
   set (QT_NO_ENTRYPOINT TRUE)
