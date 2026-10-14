@@ -130,7 +130,7 @@ protected:
 class websocket_link_rep: public socket_link_rep {
   Q_OBJECT
 public:
-  websocket_link_rep (int id, QWebSocket* ws);
+  websocket_link_rep (int id, QWebSocket* ws, int limit);
   ~websocket_link_rep ();
   string  start ();
   void    write (string s, int channel=LINK_OUT);
@@ -138,11 +138,13 @@ public:
 public slots:
   void binary_received (const QByteArray& data);
   void text_received (const QString& data);
+  void closing ();
   void closed ();
 protected:
   void close_socket ();
 private:
   QPointer<QWebSocket> ws;
+  int limit; // at most so many bytes received and not yet read
 };
 
 #endif
@@ -181,6 +183,7 @@ private:
   void add_link (socket_link_rep* clt, string from);
 #ifdef QT_WEBSOCKETS_LIB
   QPointer<QWebSocketServer> websocket_server_ptr;
+  int websocket_limit_bytes;
   void start_websockets ();
 #endif
 };

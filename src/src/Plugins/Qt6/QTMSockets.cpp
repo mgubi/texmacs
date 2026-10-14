@@ -25,6 +25,7 @@
 #include <QFile>
 #include <QTimer>
 #include <QHostAddress>
+#include <QWebSocketCorsAuthenticator>
 #ifndef QT_NO_SSL
 #include <QSslCertificate>
 #include <QSslConfiguration>
@@ -709,8 +710,10 @@ no_socket_address () {
   return &none;
 }
 
-websocket_link_rep::websocket_link_rep (int id, QWebSocket* ws2):
-  socket_link_rep (id, no_socket_address (), tm_contact ()), ws (ws2) {
+websocket_link_rep::websocket_link_rep (int id, QWebSocket* ws2,
+                                        int limit2):
+  socket_link_rep (id, no_socket_address (), tm_contact ()),
+  ws (ws2), limit (limit2) {
   host= websocket_host (ws);
 }
 
@@ -731,14 +734,15 @@ websocket_link_rep::start () {
     }
     return msg;
   }
-  // as much as fits in a string, and far less than Qt would take
-  ws->setMaxAllowedIncomingFrameSize (1 << 28);
-  ws->setMaxAllowedIncomingMessageSize (1 << 28);
+  // Qt holds a whole message in memory before it hands it over
+  ws->setMaxAllowedIncomingFrameSize (limit);
+  ws->setMaxAllowedIncomingMessageSize (limit);
   QObject::connect (ws, SIGNAL (binaryMessageReceived (const QByteArray&)),
     this, SLOT (binary_received (const QByteArray&)));
   QObject::connect (ws, SIGNAL (textMessageReceived (const QString&)),
     this, SLOT (text_received (const QString&)));
   QObject::connect (ws, SIGNAL (disconnected ()), this, SLOT (closed ()));
+  QObject::connect (ws, SIGNAL (aboutToClose ()), this, SLOT (closing ()));
   alive= true;
   return "";
 }
@@ -776,6 +780,13 @@ websocket_link_rep::binary_received (const QByteArray& data) {
   if (!exists (this) || !alive) return;
   DEBUG_SOCKET("'websocket_link_rep::binary_received', socket "
     << socket_id << " received size " << (int) data.size ());
+  if (N(input_buffer) + (int) data.size () > limit) {
+    // a packet which never ends, or packets which the server does not read
+    SLOGE ("WebSocket client " * as_string (socket_id) * " sent more than "
+        * as_string (limit) * " bytes which were not read: closing it");
+    stop ();
+    return;
+  }
   input_buffer << string (data.constData (), (int) data.size ());
   if (!is_nil (feed_cmd))
     feed_cmd->apply ();
@@ -783,7 +794,25 @@ websocket_link_rep::binary_received (const QByteArray& data) {
 
 void
 websocket_link_rep::text_received (const QString& data) {
-  binary_received (data.toUtf8 ());
+  // the packets travel in binary messages only
+  (void) data;
+  if (!exists (this) || !alive) return;
+  SLOGE ("WebSocket client " * as_string (socket_id)
+      * " sent a text message: closing it");
+  stop ();
+}
+
+void
+websocket_link_rep::closing () {
+  // Qt closes the WebSocket itself when the client breaks the protocol or
+  // the limit, but goes on reading what the client sends, at a cost which
+  // grows faster than what it reads: with Qt 6.9.2, a client which sends
+  // a few more MB keeps the server busy for minutes. The closing frame is
+  // written when this is called: the socket is dropped at once. Qt tells
+  // this again when the socket closes, that is, from 'abort'.
+  if (!ws) return;
+  QObject::disconnect (ws, SIGNAL (aboutToClose ()), this, SLOT (closing ()));
+  ws->abort ();
 }
 
 void
@@ -825,7 +854,17 @@ checkout (socket_server_rep* s) {
 * the port of the server and its clients are left as they are.
 *
 * The preference "server websocket" says who may come: "local" (the
-* default) only this machine, "on" everybody, "off" nobody. The port speaks
+* default) only this machine, "on" everybody, "off" nobody. A browser lets
+* any page open a WebSocket to any address, so that the pages whose
+* WebSockets are accepted are listed in "server websocket origins": "local"
+* (the default) for the pages served from this machine (http or https
+* from localhost, 127.0.0.1 or [::1]), the origins of other pages
+* (scheme://host[:port]), "*" for every page. A client which sends no
+* Origin is not a page of a browser and is accepted, as on the port of the
+* server; with "on", the page on another machine which is to connect has
+* to be listed. "server websocket limit" bounds, in megabytes, what a client
+* may send that the server has not read yet: a message, or the start of a
+* packet which does not end. The port speaks
 * wss (WebSockets over TLS) when it is open to other machines and the
 * server asks its clients for TLS (preference "tls-server"), so that no
 * password travels in clear; otherwise it speaks ws. A page served over
@@ -852,6 +891,57 @@ websocket_mode () {
   return mode;
 }
 
+static int
+websocket_limit () {
+  string pref= get_preference ("server websocket limit", "16");
+  int mb= is_int (pref) ? as_int (pref) : 16;
+  if (mb < 1) mb= 16;
+  if (mb > 2047) mb= 2047; // the bytes have to fit in an int
+  return mb << 20;
+}
+
+static bool
+websocket_local_origin (string origin) {
+  // a page of this machine: http or https, a loopback host, any port
+  string rest;
+  if (starts (origin, "http://")) rest= origin (7, N(origin));
+  else if (starts (origin, "https://")) rest= origin (8, N(origin));
+  else return false;
+  const char* hosts[]= { "localhost", "127.0.0.1", "[::1]" };
+  for (int i=0; i<3; i++) {
+    string h= hosts[i];
+    if (rest == h) return true;
+    if (starts (rest, h * ":") && N(rest) > N(h) + 1) {
+      int j;
+      for (j= N(h) + 1; j < N(rest); j++)
+        if (!is_digit (rest[j])) break;
+      if (j == N(rest)) return true;
+    }
+  }
+  return false;
+}
+
+static bool
+websocket_origin_allowed (string origin, array<string> allowed) {
+  if (origin == "") return true; // not a page of a browser
+  origin= locase_all (origin);
+  for (int i=0; i<N(allowed); i++) {
+    string a= locase_all (allowed[i]);
+    if (a == "*" || a == origin) return true;
+    if (a == "local" && websocket_local_origin (origin)) return true;
+  }
+  return false;
+}
+
+static array<string>
+websocket_origins () {
+  string pref= get_preference ("server websocket origins", "local");
+  array<string> a= tokenize (replace (pref, ",", " "), " "), r;
+  for (int i=0; i<N(a); i++)
+    if (a[i] != "") r << a[i];
+  return r;
+}
+
 #ifndef QT_NO_SSL
 static QByteArray
 read_server_file (string name) {
@@ -868,11 +958,20 @@ socket_server_rep::start_websockets () {
   string mode= websocket_mode ();
   if (mode == "off") return;
   string pref= get_preference ("server websocket port", "default");
-  int wport= is_int (pref) ? as_int (pref) : port + 1;
+  int wport= port + 1;
+  if (pref != "default") wport= is_int (pref) ? as_int (pref) : -1;
   bool everyone= (mode == "on");
   bool secure= everyone && get_preference ("tls-server") == string ("on");
-  string where= (everyone ? string ("") : string ("localhost")) * ":"
-    * as_string (wport);
+  string where= (everyone ? string ("") : string ("127.0.0.1")) * ":"
+    * (wport < 0 ? pref : as_string (wport));
+  if (wport < 1 || wport > 65535 || wport == (int) port) {
+    SLOGE ("cannot serve WebSocket clients at " * where
+        * (wport == (int) port ? string (": it is the port of the server") :
+                                 string (": not a port")));
+    return;
+  }
+  int limit= websocket_limit ();
+  array<string> origins= websocket_origins ();
 
   // not a child of this server: see 'stop'
   QWebSocketServer* server= new QWebSocketServer (QString ("TeXmacs"),
@@ -915,6 +1014,15 @@ socket_server_rep::start_websockets () {
   server->setMaxPendingConnections (1 << 20);
   int timeout= as_int (get_preference ("server contact timeout", "10000"));
   if (timeout > 0) server->setHandshakeTimeout (timeout);
+  // called during the handshake, which Qt refuses unless it is allowed
+  QObject::connect (server, &QWebSocketServer::originAuthenticationRequired,
+    server, [origins] (QWebSocketCorsAuthenticator* auth) {
+      string origin= string (auth->origin ().toUtf8 ().constData ());
+      if (websocket_origin_allowed (origin, origins)) return;
+      auth->setAllowed (false);
+      SLOGW ("WebSocket refused to a page of " * origin
+          * " (preference \"server websocket origins\")");
+    }, Qt::DirectConnection);
   if (!server->listen (everyone ? QHostAddress (QHostAddress::Any) :
                                   QHostAddress (QHostAddress::LocalHost),
                        (quint16) wport)) {
@@ -924,6 +1032,7 @@ socket_server_rep::start_websockets () {
     return;
   }
   websocket_server_ptr= server;
+  websocket_limit_bytes= limit;
   connect (server, SIGNAL (newConnection ()),
            this, SLOT (websocket_connection ()));
   SLOGI ("waiting for WebSocket clients (" * string (secure ? "wss" : "ws")
@@ -944,7 +1053,7 @@ socket_server_rep::websocket_connection () {
     string from= websocket_host (ws);
     address_from_id (id)= from;
     SLOGI ("WebSocket opened from " * from * " as client " * as_string (id));
-    add_link (new websocket_link_rep (id, ws), from);
+    add_link (new websocket_link_rep (id, ws, websocket_limit_bytes), from);
   }
 }
 

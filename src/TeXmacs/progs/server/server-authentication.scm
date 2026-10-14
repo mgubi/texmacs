@@ -90,6 +90,18 @@
       (string-append "WebSocket port: " val
                      " (takes effect when the server is restarted)"))))
 
+(define (notify-server-websocket-origins var val)
+  (when (server-started?)
+    (server-log-write `info
+      (string-append "WebSocket origins: " val
+                     " (takes effect when the server is restarted)"))))
+
+(define (notify-server-websocket-limit var val)
+  (when (server-started?)
+    (server-log-write `info
+      (string-append "WebSocket limit: " val " MB"
+                     " (takes effect when the server is restarted)"))))
+
 (define (notify-tls-server-authentication-anonymous var val)
   (when (server-started?)
     (server-log-write `info
@@ -177,12 +189,19 @@
   ;; the clients in a browser, whose sockets are WebSockets: "local" serves
   ;; those of this machine only, "on" any, "off" none. They come to a port
   ;; of their own, by default the one after the port of the server
-  ;; (QTMSockets.cpp, with the Qt WebSockets module). Both preferences are
-  ;; read when the server starts.
+  ;; (QTMSockets.cpp, with the Qt WebSockets module). The origins are those
+  ;; of the pages of a browser which may connect: "local" for the pages of
+  ;; this machine, scheme://host[:port] for others, "*" for any page. The
+  ;; limit, in megabytes, bounds what a client may send that the server
+  ;; has not read yet. These preferences are read when the server starts.
   ("server websocket" "local"
    notify-server-websocket)
   ("server websocket port" "default"
    notify-server-websocket-port)
+  ("server websocket origins" "local"
+   notify-server-websocket-origins)
+  ("server websocket limit" "16"
+   notify-server-websocket-limit)
   ("server contact timeout" "10000" ;; 10s
    notify-server-contact-timeout)
   ("server connection timeout" "120" ;; 120s
