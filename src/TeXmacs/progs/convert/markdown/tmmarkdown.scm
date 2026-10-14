@@ -70,7 +70,10 @@
                       (cons what (cons (tmmd-keep (substring s start i) (cdr l))
                                        acc)))))))))
 
-(define (tmmd-text s) (tmmd-keep s '("...")))
+;; (in a document of the style markdown a backquote is one, as it was read:
+;; elsewhere it is the opening quote which TeXmacs displays)
+(define (tmmd-text s)
+  (tmmd-keep s (if tmmd-faithful? '("..." "`") '("..."))))
 (define (tmmd-code-text s) (tmmd-keep s '("..." "`")))
 
 (define (tmmd-block? x)
@@ -108,8 +111,11 @@
           (else (loop (cdr l) (cons (car l) acc) #f)))))
 
 (define (tmmd-trim l)
-  ;; text without spaces and line breaks at its ends
-  (let* ((l (map (lambda (x) (if (string? x) (tmmd-squeeze x) x)) (tmmd-merge l)))
+  ;; text without spaces and line breaks at its ends, and with one space for
+  ;; several, but in a document of the style markdown, written as it was read
+  (let* ((l (map (lambda (x)
+                   (if (and (string? x) (not tmmd-faithful?)) (tmmd-squeeze x) x))
+                 (tmmd-merge l)))
          (drop-start
            (lambda (l)
              (let loop ((l l))
@@ -144,6 +150,8 @@
     (lambda (x)
       (cond ((func? x 'p) (append (cdr x) (list " ")))
             ((func? x '!display) (list `(displaymath ,(cadr x))))
+            ;; (text of the file, which a line holds)
+            ((func? x '!raw 2) (list `(html ,(string-replace (caddr x) "\n" " "))))
             ((tmmd-block? x) '())
             (else (list x))))
     l))
@@ -201,6 +209,13 @@
         ((in? (car x) '(label assign hidden-binding set-binding write)) "")
         ((func? x 'with) (tmmd-plain (cAr x)))
         ((func? x 'hlink 2) (tmmd-plain (cadr x)))
+        ;; the macros of the style markdown: what they display
+        ((and (in? (car x) '(md-source md-block-source md-image md-loose))
+              (pair? (cdr x)))
+         (tmmd-plain (cadr x)))
+        ((func? x 'md-fence 2) (tmmd-plain (caddr x)))
+        ((func? x 'md-kept 2) (tmmd-source (caddr x)))
+        ((in? (car x) '(md-footnote md-footnote-text md-metadata)) "")
         (else (apply string-append (map tmmd-plain (cdr x))))))
 
 (define (tmmd-math-clean x)
@@ -459,14 +474,34 @@
   (set! tmmd-footnote-rank (+ tmmd-footnote-rank 1))
   ;; the body may hold footnotes: it is converted before the list is read
   (let* ((rank tmmd-footnote-rank)
+         (other (and label
+                     (list-find tmmd-footnotes
+                                (lambda (n) (== (cadr (cdr n)) label)))))
          (label (or label
                     (let loop ()
                       (set! tmmd-footnote-nr (+ tmmd-footnote-nr 1))
                       (with s (number->string tmmd-footnote-nr)
                         (if (in? s tmmd-labels) (loop) s)))))
-         (def `(footnote-def ,label ,@(tmmd-blocks (tmmd body)))))
-    (set! tmmd-footnotes (cons (cons rank def) tmmd-footnotes))
-    `((footnote ,label))))
+         (blocks (tmmd-blocks (tmmd body))))
+    ;; a label which another note has already: the same note is written
+    ;; once, and another one gets a label of its own
+    (cond ((and other (== (cddr (cdr other)) blocks)) `((footnote ,label)))
+          (other (tmmd-footnote-add* rank (tmmd-new-label label) blocks))
+          (else (tmmd-footnote-add* rank label blocks)))))
+
+(define (tmmd-footnote-add* rank label blocks)
+  (set! tmmd-footnotes
+        (cons (cons rank `(footnote-def ,label ,@blocks)) tmmd-footnotes))
+  `((footnote ,label)))
+
+(define (tmmd-new-label label)
+  ;; label-2, label-3... the first which no note has
+  (let loop ((i 2))
+    (with s (string-append label "-" (number->string i))
+      (if (or (in? s tmmd-labels)
+              (list-find tmmd-footnotes (lambda (n) (== (cadr (cdr n)) s))))
+          (loop (+ i 1))
+          s))))
 
 (define (tmmd-footnote l)
   (if (null? l) '() (tmmd-footnote-add (car l) #f)))
@@ -561,20 +596,25 @@
        (tmmd-all l)))
 
 (define (tmmd-md-fence l)
-  ;; code with the words which follow its fence: the first is the language
+  ;; code with the words which follow its fence: the first is the language,
+  ;; and they are written while the code is still in this language
   (if (< (length l) 2) (tmmd-all l)
       (let* ((info (string-trim-spaces (tmmd-plain (car l))))
              (i (string-search-forwards " " 0 info))
-             (lang (if (< i 0) info (substring info 0 i))))
-        (map (lambda (x)
-               (if (func? x 'pre)
-                   `(pre ,@(if (== info "") '()
-                               `((@ (lang ,lang)
-                                    ,@(if (== info lang) '() `((info ,info))))))
-                         ,@(if (and (pair? (cdr x)) (func? (cadr x) '@))
-                               (cddr x) (cdr x)))
-                   x))
-             (tmmd (cadr l))))))
+             (lang (if (< i 0) info (substring info 0 i)))
+             (code (cadr l))
+             (tag (and (pair? code) (car code))))
+        (if (!= tag (tmmd-language-tag lang)) (tmmd code)
+            (map (lambda (x)
+                   (if (func? x 'pre)
+                       `(pre ,@(if (== info "") '()
+                                   `((@ (lang ,lang)
+                                        ,@(if (== info lang) '()
+                                              `((info ,info))))))
+                             ,@(if (and (pair? (cdr x)) (func? (cadr x) '@))
+                                   (cddr x) (cdr x)))
+                       x))
+                 (tmmd code))))))
 
 (define (tmmd-md-image l)
   ;; an image with its description and its title
@@ -603,18 +643,34 @@
   (if (< (length l) 2) (tmmd-footnote l)
       (tmmd-footnote-add (cadr l) (tmmd-plain (car l)))))
 
+(define (tmmd-meta-text x)
+  ;; the text of a paragraph of the header: a line for each md-meta, and
+  ;; the text of what was typed
+  (cond ((func? x 'md-meta 2)
+         (let ((key (tmmd-plain (cadr x)))
+               (val (tmmd-plain (caddr x))))
+           (cond ((== key "") val)
+                 ((== val "") (string-append key ":"))
+                 (else (string-append key ": " val)))))
+        ((func? x 'concat) (apply string-append (map tmmd-meta-text (cdr x))))
+        ((func? x 'document)
+         (with l (map tmmd-meta-text (cdr x))
+           (if (null? l) ""
+               (apply string-append
+                      (cons (car l) (append-map (lambda (s) (list "\n" s))
+                                                (cdr l)))))))
+        ((func? x 'with) (tmmd-meta-text (cAr x)))
+        (else (tmmd-plain x))))
+
 (define (tmmd-md-metadata l)
-  ;; the header of the file, a line for each md-meta
-  (let* ((body (if (null? l) '(document) (car l)))
-         (entries (list-filter (if (func? body 'document) (cdr body) (list body))
-                               (lambda (x) (func? x 'md-meta 2))))
-         (line (lambda (x)
-                 (let ((key (tmmd-plain (cadr x)))
-                       (val (tmmd-plain (caddr x))))
-                   (cond ((== key "") val)
-                         ((== val "") (string-append key ":"))
-                         (else (string-append key ": " val)))))))
-    `((meta (@ (source ,(let loop ((l (map line entries)) (acc '()))
+  ;; the header of the file; a line --- or ... in it would end it, and is
+  ;; written after a space
+  (let* ((s (tmmd-meta-text (if (null? l) '(document) (car l))))
+         (lines (map (lambda (s)
+                       (if (in? (string-trim-spaces-right s) '("---" "..."))
+                           (string-append " " s) s))
+                     (string-tokenize-by-char s #\newline))))
+    `((meta (@ (source ,(let loop ((l lines) (acc '()))
                           (cond ((null? l) (apply string-append (reverse acc)))
                                 ((null? acc) (loop (cdr l) (list (car l))))
                                 (else (loop (cdr l)
@@ -914,6 +970,25 @@
     (scilab-code . "scilab") (dot-code . "dot") (mmx-code . "mathemagix")
     (verbatim-code . "") (pseudo-code . "") (render-code . "") (code . "")))
 
+(define tmmd-language-tags
+  ;; the tags of the code in the languages written after a fence
+  '(("c" . cpp-code) ("cpp" . cpp-code) ("c++" . cpp-code) ("cc" . cpp-code)
+    ("h" . cpp-code) ("hpp" . cpp-code)
+    ("python" . python-code) ("py" . python-code) ("python3" . python-code)
+    ("scheme" . scm-code) ("scm" . scm-code) ("lisp" . scm-code)
+    ("guile" . scm-code)
+    ("sh" . shell-code) ("bash" . shell-code) ("shell" . shell-code)
+    ("zsh" . shell-code) ("console" . shell-code)
+    ("java" . java-code) ("javascript" . javascript-code)
+    ("js" . javascript-code) ("json" . json-code) ("julia" . julia-code)
+    ("r" . r-code) ("scala" . scala-code) ("fortran" . fortran-code)
+    ("octave" . octave-code) ("matlab" . octave-code) ("dot" . dot-code)
+    ("scilab" . scilab-code) ("mathemagix" . mmx-code) ("mmx" . mmx-code)))
+
+(tm-define (tmmd-language-tag name)
+  (:synopsis "The tag of code in the language @name, written after a fence")
+  (or (assoc-ref tmmd-language-tags (locase-all name)) 'verbatim-code))
+
 (define (tmmd-code-block tag l)
   (let* ((lang (assoc-ref tmmd-languages tag))
          (s (apply string-append (map tmmd-plain l))))
@@ -972,6 +1047,10 @@
       (cond ((func? x 'p) (list (cdr x)))
             ((func? x '!display) (list (list `(displaymath ,(cadr x)))))
             ((func? x '!h) (list (cddr x)))
+            ((func? x '!raw 2)
+             (map (lambda (s) (list `(html ,s)))
+                  (list-filter (string-tokenize-by-char (caddr x) #\newline)
+                               (lambda (s) (!= s "")))))
             ((func? x 'pre)
              (map (lambda (s) (list `(code ,s)))
                   (list-filter (string-tokenize-by-char (cAr x) #\newline)
@@ -1279,16 +1358,33 @@
   (let* ((notes (map cdr (sort tmmd-footnotes
                                (lambda (a b) (< (car a) (car b))))))
          ;; the texts of the footnotes: where the document says (!note
-         ;; "label"), and after everything else for the others
-         (placed (append-map (lambda (x) (if (func? x '!note 1) (cdr x) '())) l))
-         (l (append
-              (append-map
-                (lambda (x)
-                  (if (func? x '!note 1)
-                      (list-filter notes (lambda (n) (== (cadr n) (cadr x))))
-                      (list x)))
-                l)
-              (list-filter notes (lambda (n) (nin? (cadr n) placed)))))
+         ;; "label"), in a quote, an item or another note as well, and
+         ;; after everything else for the others
+         (placed (make-ahash-table))
+         (place (lambda (place x)
+                  (if (not (and (pair? x)
+                                (in? (car x) '(markdown blockquote ul ol li
+                                               footnote-def))))
+                      x
+                      (cons (car x)
+                            (append-map
+                              (lambda (y)
+                                (cond ((not (func? y '!note 1))
+                                       (list (place place y)))
+                                      ((ahash-ref placed (cadr y)) '())
+                                      (else
+                                        (ahash-set! placed (cadr y) #t)
+                                        (map (lambda (n) (place place n))
+                                             (list-filter notes
+                                               (lambda (n) (== (cadr n) (cadr y))))))))
+                              (cdr x))))))
+         (l (cdr (place place (cons 'markdown l))))
+         (l (let loop ((ns notes) (acc '()))
+              (cond ((null? ns) (append l (reverse acc)))
+                    ((ahash-ref placed (cadr (car ns))) (loop (cdr ns) acc))
+                    (else
+                      (ahash-set! placed (cadr (car ns)) #t)
+                      (loop (cdr ns) (cons (place place (car ns)) acc))))))
          (levels (sort (list-remove-duplicates
                          (append-map tmmd-heading-levels l))
                        <)))

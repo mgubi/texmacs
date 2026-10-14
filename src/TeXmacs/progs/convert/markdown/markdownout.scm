@@ -452,7 +452,11 @@
                (or (and (not cell?) (mdout-attr x 'source))
                    (string-append "$$" (mdout-cell-math (mdout-join l "") cell?)
                                   "$$")))
-              ((html) (mdout-join l ""))
+              ;; (a bar in a cell is written \|: the parser takes the
+              ;; backslash away as it splits the cells)
+              ((html)
+               (with s (mdout-join l "")
+                 (if cell? (string-replace s "|" "\\|") s)))
               ((footnote) (string-append "[^" (mdout-join l "") "]"))
               (else (mdout-inlines l cell?)))))))
 
@@ -563,13 +567,16 @@
 (define (mdout-needs-blank? a b)
   ;; is a blank line needed between the blocks a and b which follow each
   ;; other in an item? Without it a paragraph would go on the paragraph, the
-  ;; quote or the list before it, and a table or HTML would take what
-  ;; follows; code between fences, a heading, a rule, a quote, a list and
-  ;; a table start by themselves
+  ;; quote or the list before it, a table would go on the quote or the
+  ;; list before it, a quote on the quote, and a table or HTML would take
+  ;; what follows; code between fences, a heading, a rule and a list start
+  ;; by themselves
   (and (pair? a) (pair? b)
-       (or (in? (car a) '(table html))
+       (or (in? (car a) '(table html ref-def))
            (and (func? b 'p) (in? (car a) '(p blockquote ul ol)))
-           (and (func? a 'p) (in? (car b) '(html footnote-def))))))
+           (and (func? b 'table) (in? (car a) '(blockquote ul ol)))
+           (and (func? a 'blockquote) (func? b 'blockquote))
+           (and (func? a 'p) (in? (car b) '(html footnote-def ref-def))))))
 
 (define (mdout-loose? x)
   ;; a list is written with blank lines between its items when it had some,
@@ -719,7 +726,7 @@
                (with source (mdout-attr x 'source)
                  (if source (mdout-split source)
                      `("$$" ,@(mdout-split (mdout-join l "")) "$$"))))
-              ((html) (mdout-split (mdout-join l "")))
+              ((html ref-def) (mdout-split (mdout-join l "")))
               ((footnote-def) (mdout-footnote-def x))
               ((markdown) (mdout-blocks l #t))
               ;; inline markup where a block is expected: a paragraph
@@ -753,7 +760,7 @@
 (define (mdout-block? x)
   (and (pair? x)
        (in? (car x) '(meta h1 h2 h3 h4 h5 h6 p blockquote ul ol pre hr table
-                      footnote-def markdown))))
+                      footnote-def ref-def markdown))))
 
 (tm-define (serialize-markdown x)
   (:type (-> stree string))
