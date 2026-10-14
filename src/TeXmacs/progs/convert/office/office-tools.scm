@@ -306,7 +306,7 @@
 
 (define office-wrappers
   '(em strong underline strike sub sup code smallcaps mark color span ins del
-    size font))
+    size font caps letters))
 
 (define (office-same-wrapper? x y)
   ;; two nodes which wrap text in the same way

@@ -58,6 +58,32 @@
 
   <\active*>
     <\src-comment>
+      An underline or a line through of another kind than a single line
+      (double, wave, dotted, dash, thick), text whose letters are spaced,
+      and text in a font which TeXmacs does not have (shown in the family
+      of fonts which is the closest): they are shown as TeXmacs can, and
+      written as they were read.
+    </src-comment>
+  </active*>
+
+  <assign|office-underline|<macro|kind|body|<if|<equal|<arg|kind>|double>|<underline|<underline|<arg|body>>>|<underline|<arg|body>>>>>
+
+  <assign|office-strike|<macro|kind|body|<strike-through|<arg|body>>>>
+
+  <assign|office-letters|<macro|space|body|<arg|body>>>
+
+  <assign|office-font|<macro|name|family|body|<with|font-family|<arg|family>|<arg|body>>>>
+
+  <drd-props|office-font|arity|3|accessible|2>
+
+  <drd-props|office-underline|arity|2|accessible|1>
+
+  <drd-props|office-strike|arity|2|accessible|1>
+
+  <drd-props|office-letters|arity|2|accessible|1>
+
+  <\active*>
+    <\src-comment>
       A field of the office programs (a page number, a date, the title of
       the document...): its instruction, and its result as the file had
       it.

@@ -94,16 +94,19 @@
 
 (define (ot-text-style props)
   ;; the name of the style of the text inside the wrappers props, or #f
-  (let* ((tags (list-filter '(code strong em smallcaps strike underline sub sup mark)
+  (let* ((tags (list-filter '(code strong em smallcaps strike underline sub sup mark
+                              caps dstrike)
                             (lambda (t) (in? t props))))
+         (ukind (with c (assq 'ukind (list-filter props pair?)) (and c (cadr c))))
+         (letters (with c (assq 'letters (list-filter props pair?)) (and c (cadr c))))
          (color (with c (assq 'color (list-filter props pair?)) (and c (cadr c))))
          (parent (with c (assq 'rstyle (list-filter props pair?)) (and c (cadr c))))
          (size (with c (assq 'size (list-filter props pair?)) (and c (cadr c))))
          (font (with c (assq 'font (list-filter props pair?)) (and c (cadr c))))
          (shade (with c (assq 'shade (list-filter props pair?)) (and c (cadr c))))
-         (key (cons 'text (cons* parent size font shade (cons color tags)))))
-    (cond ((and parent (null? tags) (not (or color size font shade))) parent)
-          ((not (or (pair? tags) color size font shade)) #f)
+         (key (cons 'text (cons* parent size font shade ukind letters (cons color tags)))))
+    (cond ((and parent (null? tags) (not (or color size font shade ukind letters))) parent)
+          ((not (or (pair? tags) color size font shade ukind letters)) #f)
           (else
          (ot-style
            key "T"
@@ -121,14 +124,26 @@
                              (style:font-weight-complex "bold"))
                            '())
                      ,@(if (in? 'underline tags)
-                           '((style:text-underline-style "solid")
-                             (style:text-underline-width "auto")
+                           `((style:text-underline-style
+                               ,(cond ((in? ukind '("wave" "dotted" "dash")) ukind)
+                                      ((in? ukind '("dashLong" "dashedHeavy")) "dash")
+                                      ((in? ukind '("wavyHeavy" "wavyDouble")) "wave")
+                                      ((in? ukind '("dottedHeavy" "dotDash" "dotDotDash")) "dotted")
+                                      (else "solid")))
+                             (style:text-underline-width
+                               ,(if (in? ukind '("thick" "dashedHeavy" "wavyHeavy" "dottedHeavy"))
+                                    "bold" "auto"))
+                             ,@(if (in? ukind '("double" "wavyDouble"))
+                                   '((style:text-underline-type "double")) '())
                              (style:text-underline-color "font-color"))
                            '())
                      ,@(if (in? 'strike tags)
-                           '((style:text-line-through-style "solid")
-                             (style:text-line-through-type "single"))
+                           `((style:text-line-through-style "solid")
+                             (style:text-line-through-type
+                               ,(if (in? 'dstrike tags) "double" "single")))
                            '())
+                     ,@(if (in? 'caps tags) '((fo:text-transform "uppercase")) '())
+                     ,@(if letters `((fo:letter-spacing ,(string-append letters "pt"))) '())
                      ,@(cond ((in? 'sup tags) '((style:text-position "super 58%")))
                              ((in? 'sub tags) '((style:text-position "sub 58%")))
                              (else '()))
@@ -399,8 +414,21 @@
         (else
           (let ((l (ox-children x)))
             (case (car x)
-              ((em strong underline strike sub sup code smallcaps)
+              ((em strong sub sup code smallcaps caps)
                (ot-inlines l (cons (car x) props)))
+              ;; an underline or a line through of a kind, letters spaced
+              ((underline)
+               (ot-inlines l (if (ox-attr x 'value)
+                                 (cons* (list 'ukind (ox-attr x 'value)) 'underline props)
+                                 (cons 'underline props))))
+              ((strike)
+               (ot-inlines l (if (== (ox-attr x 'value) "double")
+                                 (cons* 'dstrike 'strike props)
+                                 (cons 'strike props))))
+              ((letters)
+               (ot-inlines l (if (ox-attr x 'value)
+                                 (cons (list 'letters (ox-attr x 'value)) props)
+                                 props)))
               ;; highlighted text, of a color; the size and the font of a text
               ((mark)
                (with c (office-color (ox-attr x 'value))
