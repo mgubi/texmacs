@@ -54,12 +54,16 @@ archiver::archiver (double author, path rp):
 
 void
 archiver_rep::clear () {
+  // NOTE: a document in its saved state remains so without its history
+  confirm ();
+  bool saved= conform_save ();
+  bool autosaved= conform_autosave ();
   archive= make_branches (0);
   current= make_compound (0);
   the_owner= 0;
   depth= 0;
-  last_save= -1;
-  last_autosave= -1;
+  last_save= (saved? 0: -1);
+  last_autosave= (autosaved? 0: -1);
 }
 
 void
@@ -561,7 +565,7 @@ has_marker (patch archive, double m) {
 }
 
 static patch
-remove_marker_bis (patch archive, double m) {
+remove_marker_bis (patch archive, double m, bool& ok) {
   ASSERT (nr_undo (archive) != 0, "marker not found");
   if (is_marker (car (get_undo (archive)), m, false)) {
 #ifdef ADVANCED_DEVELOPER_MODE
@@ -570,7 +574,8 @@ remove_marker_bis (patch archive, double m) {
     if (nr_redo (archive) != 0) {
       // NOTE: temporary fix: turn fatal error into warning
       cout << "TeXmacs] warning, cannot remove marker\n";
-      return make_compound (0);
+      ok= false;
+      return archive;
     }
 #endif
     return cdr (get_undo (archive));
@@ -578,20 +583,33 @@ remove_marker_bis (patch archive, double m) {
   else {
     patch un= get_undo (archive);
     patch re= get_redo (archive);
-    patch rem= remove_marker_bis (cdr (un), m);
+    patch rem= remove_marker_bis (cdr (un), m, ok);
     return make_history (patch (car (un), rem), re);
   }
 }
 
 static patch
 remove_marker (patch archive, double m) {
-  archive= compress (archive);
   if (!has_marker (archive, m)) {
     // NOTE: temporary fix of bug #60743: turn fatal error into warning
     cout << "TeXmacs] warning, marker not found\n";
-    return make_compound (0);
+    return archive;
   }
-  return remove_marker_bis (compress (archive), m);
+  // NOTE: the history remains as it is when the marker cannot be removed
+  bool ok= true;
+  patch removed= remove_marker_bis (compress (archive), m, ok);
+  return ok? removed: archive;
+}
+
+static int
+nr_steps (patch archive) {
+  // the number of successive changes which can be undone
+  int n= 0;
+  while (nr_undo (archive) != 0) {
+    n++;
+    archive= cdr (get_undo (archive));
+  }
+  return n;
 }
 
 void
@@ -611,8 +629,11 @@ archiver_rep::mark_end (double m) {
     //  cout << "CONFIRM: " << current << "\n";
     confirm ();
   }
+  // NOTE: besides the marker, the changes which were made since the marker
+  // and which are compressed into a single one no longer count in the depth
+  int n= nr_steps (archive);
   archive= remove_marker (archive, m);
-  depth--;
+  depth -= n - nr_steps (archive);
   simplify ();
   //show_all ();
 }
@@ -620,18 +641,21 @@ archiver_rep::mark_end (double m) {
 bool
 archiver_rep::mark_cancel (double m) {
   //cout << "Mark cancel " << m << "\n";
+  if (!has_marker (archive, m)) return false;
   cancel ();
   while (nr_undo (archive) != 0) {
     expose ();
     if (is_marker (car (get_undo (archive)), m, false)) {
+      int n= nr_steps (archive);
       archive= remove_marker (archive, m);
-      depth--;
+      depth -= n - nr_steps (archive);
       simplify ();
       return true;
     }
     if (get_author (car (get_undo (archive))) != the_author) {
+      int n= nr_steps (archive);
       archive= remove_marker (archive, m);
-      depth--;
+      depth -= n - nr_steps (archive);
       return false;
     }
     retract ();
