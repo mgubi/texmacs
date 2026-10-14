@@ -139,7 +139,20 @@ evaluate_system (array<string> arg,
 #else
   int ret= unix_system (arg, fd_in, in, fd_out, ptr);
 #endif
+  // the inputs sent to the command (passphrases of GnuPG, of the keychain)
+  // are overwritten once sent, before they are released: they are the
+  // copies made for this call by the glue (evaluate-system), which nobody
+  // reads after it (the C++ callers give no inputs)
+  for (int i= 0; i < N(in); i++) secure_wipe (in[i]);
   return append (as_string (ret), out);
+}
+
+void
+secure_wipe (string s) {
+  // (through a volatile pointer, so that the writes are not left out as
+  // writes to memory which is released afterwards)
+  volatile char* p= (volatile char*) &(s[0]);
+  for (int i= 0; i < N(s); i++) p[i]= 0;
 }
 
 
