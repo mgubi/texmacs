@@ -269,6 +269,8 @@
   ;; equations one above the other: the & of Word marks where they align,
   ;; the cells of a table
   (list `(m:mtable
+           ;; (lines of equations: see oftm-eqarray)
+           (@ (class "tm-eqarray"))
            ,@(map (lambda (e)
                     `(m:mtr ,@(map (lambda (cell) `(m:mtd ,(omml-row cell)))
                                    (omml-split-amps (omml-list (ox-children e))))))
