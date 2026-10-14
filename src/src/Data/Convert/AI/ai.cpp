@@ -1296,24 +1296,27 @@ ai_is_stream (string s) {
   return test (s, i, "data:") || test (s, i, "event:");
 }
 
-static string
-ai_stream_parts (string s, string model, string& err,
-                 string& reasoning, ai_usage_rep& u) {
-  string engine= ai_engine (model);
-  string r;
-  err= "";
-  reasoning= "";
-  int i= 0, n= N(s);
+// the complete lines of s from i (the lines of the events): their text,
+// reasoning, error and usage added to r, reasoning, err and u; i becomes
+// the beginning of the line which is not complete yet. Each line is read
+// once: a stream fed piece by piece (ai_stream_feed) is parsed in a time
+// linear in its length, and an event cut between two pieces is read once
+// its line is complete.
+static void
+ai_stream_lines (string s, int& i, string engine, string& r,
+                 string& reasoning, string& err, ai_usage_rep& u) {
+  int n= N(s);
   while (i < n) {
     int e= i;
     while (e < n && s[e] != '\n') e++;
     if (e >= n) break; // an incomplete line: later
-    string line= s (i, e);
+    int b= i, f= e;
     i= e + 1;
-    if (N(line) > 0 && line[N(line)-1] == '\r') line= line (0, N(line) - 1);
-    if (!starts (line, "data:")) continue;
-    string d= line (5, N(line));
-    while (N(d) > 0 && d[0] == ' ') d= d (1, N(d));
+    if (f > b && s[f-1] == '\r') f--;
+    if (!test (s, b, "data:") || b + 5 > f) continue;
+    b += 5;
+    while (b < f && s[b] == ' ') b++;
+    string d= s (b, f);
     if (d == "" || d == "[DONE]") continue;
     tree t= http_from_json (d);
     tree er= json_get (t, "error");
@@ -1341,6 +1344,16 @@ ai_stream_parts (string s, string model, string& err,
       }
     }
   }
+}
+
+static string
+ai_stream_parts (string s, string model, string& err,
+                 string& reasoning, ai_usage_rep& u) {
+  string r;
+  err= "";
+  reasoning= "";
+  int i= 0;
+  ai_stream_lines (s, i, ai_engine (model), r, reasoning, err, u);
   return ai_split_think (r, reasoning);
 }
 
@@ -1348,6 +1361,41 @@ string
 ai_stream_text (string s, string model, string& err, string& reasoning) {
   ai_usage_rep u;
   return ai_stream_parts (s, model, err, reasoning, u);
+}
+
+// A stream read as it comes (request_link_rep::partial): the lines of the
+// output are parsed once, from where the last call stopped; an output which
+// is not the continuation of the one parsed (a new question, a question
+// asked again) is parsed from its beginning.
+ai_stream_state::ai_stream_state ():
+  pos (0), seen (""), text (""), reasoning (""), err ("") {}
+
+void
+ai_stream_reset (ai_stream_state& st) {
+  st.pos= 0; st.seen= ""; st.text= ""; st.reasoning= ""; st.err= "";
+}
+
+string
+ai_stream_feed (ai_stream_state& st, string s, string model,
+                string& err, string& reasoning) {
+  // (the output only grows while it is the same answer: what was parsed
+  // is its beginning, checked by its last parsed line)
+  if (N(s) < st.pos || s (st.pos - N(st.seen), st.pos) != st.seen)
+    ai_stream_reset (st);
+  ai_usage_rep u;
+  int start= st.pos;
+  ai_stream_lines (s, st.pos, ai_engine (model),
+                   st.text, st.reasoning, st.err, u);
+  if (st.pos > start) {
+    int b= st.pos - 1;
+    while (b > start && s[b-1] != '\n') b--;
+    st.seen= s (b, st.pos);
+  }
+  // (copies: a string of TeXmacs shares its contents, and those of the
+  // state grow in place at the next call)
+  err= copy (st.err);
+  reasoning= copy (st.reasoning);
+  return ai_split_think (copy (st.text), reasoning);
 }
 
 string

@@ -48,6 +48,7 @@ public:
   tree    partial ();
   string  partial_text;  // the text of the answer so far
   tree    partial_tree;  // and what is shown of it
+  ai_stream_state stream; // the output parsed so far (ai_stream_feed)
   tree    request;       // the request, asked again after a failure for a
   int     retries;       // while (too many requests): the times it was,
   double  retry_at;      // when it will be (0 when it will not be),
@@ -168,7 +169,7 @@ request_link_rep::write (string s, int channel) {
   http_async_cancel (&outbuf);
 #endif
   status= 1; outbuf= ""; errbuf= ""; kill= false;
-  partial_text= ""; partial_tree= "";
+  partial_text= ""; partial_tree= ""; ai_stream_reset (stream);
   request= t; retries= 0; retry_at= 0; retry_why= "";
   alive= !eval_request (t, status, outbuf, errbuf, kill);
 }
@@ -182,7 +183,7 @@ request_link_rep::retry_wait () {
     if (texmacs_time () < retry_at) return true;
     retry_at= 0;
     status= 1; outbuf= ""; errbuf= ""; kill= false;
-    partial_text= ""; partial_tree= "";
+    partial_text= ""; partial_tree= ""; ai_stream_reset (stream);
     if (eval_request (request, status, outbuf, errbuf, kill)) alive= false;
     return true;
   }
@@ -270,7 +271,7 @@ request_link_rep::partial () {
   }
   if (outbuf == "") return "";
   string err, reasoning;
-  string r= ai_stream_text (outbuf, name, err, reasoning);
+  string r= ai_stream_feed (stream, outbuf, name, err, reasoning);
   // (while the model thinks: the end of its reasoning)
   string key= (r == "" && reasoning != "")? "\1" * reasoning: r;
   if (key != partial_text) {
