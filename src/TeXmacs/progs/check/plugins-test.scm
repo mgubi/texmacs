@@ -78,7 +78,7 @@
 ;; and takes the availability of a plugin from the cache, where the test
 ;; plugins are not: they are configured as if the cache were being rebuilt.
 (define saved-reconfigure-flag (plugin-reconfigure?))
-(plugin-reconfigure-set! #t)  ; (not set!, which S7 does not pass on)
+(plugin-reconfigure-set! #t)
 
 (define (raw-serialize lan t)
   ;; the test plugins receive exactly the string which is evaluated

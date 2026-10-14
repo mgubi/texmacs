@@ -528,12 +528,12 @@
 ;; Configuration of plugins
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define-public (alt-launcher name) #f)
-
 ;; A plugin which launches other plugins (jupyter) sets alt-launcher with
 ;; this function: in S7 a set! of alt-launcher from another module would not
 ;; change the function which the functions below call.
 (define-public (plugin-alt-launcher-set! fun) (set! alt-launcher fun))
+
+(define-public (alt-launcher name) #f)
 
 (define (plugin-configure-cmd name cmd)
   (cond ((func? cmd :require 1)
