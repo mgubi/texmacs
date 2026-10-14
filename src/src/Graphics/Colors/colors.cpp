@@ -119,15 +119,15 @@ void
 reverse (int& r, int& g, int& b) {
   int m= min (r, min (g, b));
   int M= max (r, max (g, b));
-  int t= (r + g + b) / 3;
-  int tt= 255 - t;
+  // the mean is not rounded: near grey, a rounded mean gives a color most
+  // of its saturation back
+  double t= (r + g + b) / 3.0;
+  double tt= 255.0 - t;
   double mu= 1.0;
   // tt= 6 * tt / 7;
   if (M != m) {
-    double lambda1= max (((double) (t - m)) / t,
-			 ((double) (M - t)) / (255 - t));
-    double lambda2= max (((double) (t - m)) / tt,
-			 ((double) (M - t)) / (255 - tt));
+    double lambda1= max ((t - m) / t, (M - t) / (255.0 - t));
+    double lambda2= max ((t - m) / tt, (M - t) / (255.0 - tt));
     mu= lambda1 / lambda2;
   }
   r= (int) (tt + mu * (r - t) + 0.5);
@@ -247,6 +247,18 @@ cmyk_color (int c, int m, int y, int k, int a) {
 // TODO
 // void
 // get_cmyk_color (color col, int& c, int& m, int& y, int &k, int& a) {
+
+/******************************************************************************
+* Color dictionnaries
+******************************************************************************/
+
+typedef hashmap<string,color> colorhash;
+static colorhash tm_ch, dvips_ch, x11_ch, xc_ch, svg_ch;
+static inline color dvips_color (string s) {return dvips_ch[locase_all (s)];};
+static inline color x11_color   (string s) {return x11_ch  [locase_all (s)];};
+static inline color svg_color   (string s) {return svg_ch  [locase_all (s)];};
+static inline color tm_color    (string s) {return tm_ch   [locase_all (s)];};
+static inline color xc_color    (string s) {return xc_ch   [locase_all (s)];};
 
 /******************************************************************************
 * XPM interface

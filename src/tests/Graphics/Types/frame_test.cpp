@@ -181,6 +181,107 @@ test_jacobian_of_inverse () {
     }
 }
 
+// an affine frame and a compound frame invert and differentiate their
+// inverse as the other frames do
+static void
+test_affine_compound_inverse () {
+  matrix<double> m (1.0, 3, 3);
+  m (0, 0)= 2.0; m (0, 1)= 1.0; m (0, 2)= 5.0;
+  m (1, 0)= -1.0; m (1, 1)= 3.0; m (1, 2)= -1.0;
+  frame fs[]= { affine_2D (m),
+                rotation_2D (point (1.0, 0.0), 0.3) *
+                  scaling (point (2.0, -0.5), point (0.0, 1.0)),
+                affine_2D (m) * slanting (point (0.5, -1.0), 0.25) };
+  array<point> ps= samples ();
+  point v (2.0, -3.0);
+  for (int i=0; i<3; i++)
+    for (int j=0; j<N(ps); j++) {
+      frame f= fs[i];
+      point p= ps[j];
+      string where= "frame " * as_string (i) * " at " * show (p);
+      CHECK_MSG (near_eq (f [f (p)], p, 1.0e-8), "inverse of direct: " * where);
+      CHECK_MSG (near_eq (f (f [p]), p, 1.0e-8), "direct of inverse: " * where);
+      bool error= true;
+      point w= f->jacobian_of_inverse (p, v, error);
+      CHECK (!error);
+      CHECK_MSG (near_eq (w, f [p + v] - f [p], 1.0e-8),
+                 "jacobian_of_inverse: " * where);
+      // the inverted frame asks the frame for the jacobian of its inverse
+      error= true;
+      w= invert (f)->jacobian (p, v, error);
+      CHECK (!error);
+      CHECK_MSG (near_eq (w, f [p + v] - f [p], 1.0e-8),
+                 "jacobian of the inverted frame: " * where);
+    }
+}
+
+// matrices without an inverse: invert refuses them, and the frames made of
+// them send every point back to a finite point
+static void
+test_singular () {
+  matrix<double> z= matrix_2D<double> (1.0, 2.0, 2.0, 4.0);
+  bool thrown= false;
+  try { (void) invert (z); }
+  catch (string msg) { thrown= true; }
+  CHECK (thrown);
+  frame f= linear_2D (z);
+  CHECK_POINT (f (point (1.0, 1.0)), point (3.0, 6.0));
+  CHECK_POINT (f [point (3.0, 6.0)], point (0.0, 0.0));
+  matrix<double> m (1.0, 3, 3);
+  m (0, 0)= 1.0; m (0, 1)= 2.0; m (1, 0)= 2.0; m (1, 1)= 4.0; m (0, 2)= 5.0;
+  frame g= affine_2D (m);
+  point p (3.0, 6.0), v (1.0, 0.0);
+  CHECK_POINT (g [p], p);
+  bool error= false;
+  (void) g->jacobian_of_inverse (p, v, error);
+  CHECK (error);
+}
+
+// frame.cpp defines the bent frames, which frame.hpp does not declare
+frame bend_frame (double (*fun) (double));
+
+static double
+bend_square (double x) {
+  return x * x;
+}
+
+// a bent frame: its jacobians, and the image of a segment, which is not
+// a segment
+static void
+test_bend () {
+  frame f= bend_frame (bend_square);
+  CHECK (!f->linear);
+  CHECK_POINT (f (point (2.0, 1.0)), point (2.0, 5.0));
+  CHECK_POINT (f [point (2.0, 5.0)], point (2.0, 1.0));
+  bool error= true;
+  point w= f->jacobian (point (2.0, 1.0), point (1.0, 1.0), error);
+  CHECK (!error);
+  CHECK_MSG (near_eq (w, point (1.0, 5.0), 1.0e-6),
+             "jacobian of the bend is " * show (w));
+  error= true;
+  w= f->jacobian_of_inverse (point (2.0, 5.0), point (1.0, 5.0), error);
+  CHECK (!error);
+  CHECK_MSG (near_eq (w, point (1.0, 1.0), 1.0e-6),
+             "jacobian of the inverse of the bend is " * show (w));
+  // the parabola above the segment from (0,0) to (2,0)
+  curve c= f (segment (point (0.0, 0.0), point (2.0, 0.0)));
+  CHECK_NEAR (c->curvature (0.0, 1.0), tm_infinity);
+  double eps= 0.01;
+  array<point> a= c->rectify (eps);
+  CHECK (N(a) > 4);
+  CHECK_POINT (a[0], point (0.0, 0.0));
+  CHECK_POINT (a[N(a)-1], point (2.0, 4.0));
+  for (int i=0; i<N(a); i++)
+    CHECK_MSG (near_eq (a[i][1], a[i][0] * a[i][0], 1.0e-9),
+               "point " * show (a[i]) * " is not on the parabola");
+  // the middle of each chord is close to the parabola
+  for (int i=1; i<N(a); i++) {
+    point mid= 0.5 * (a[i-1] + a[i]);
+    CHECK_MSG (fabs (mid[1] - mid[0] * mid[0]) <= 2 * eps,
+               "chord far from the parabola at " * show (mid));
+  }
+}
+
 // direct_bound (p, eps) bounds the displacement of the image
 static void
 test_bounds () {
@@ -376,6 +477,9 @@ main () {
   RUN (test_compose_invert);
   RUN (test_jacobian);
   RUN (test_jacobian_of_inverse);
+  RUN (test_affine_compound_inverse);
+  RUN (test_singular);
+  RUN (test_bend);
   RUN (test_bounds);
   RUN (test_rectangles);
   RUN (test_segment);
