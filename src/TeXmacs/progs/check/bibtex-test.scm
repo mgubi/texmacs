@@ -441,6 +441,25 @@
   (check= (bib-with-style "alpha" bib-sort-key (car (bib-entries sample-bib)))
           "ZB1999    ZED A. BEE B.     1999    T"))
 
+;; A style falls back on another one, which may fall back on a third: the
+;; definitions of all of them hold for it, and for no other style.
+(bib-define-style "tmtest-alpha" "alpha")
+
+(define (test-style-fallback)
+  (check-group "fallback of styles")
+  (check-true (bib-with-style "tmtest-alpha" bib-mode? "tmtest-alpha"))
+  (check-true (bib-with-style "tmtest-alpha" bib-mode? "alpha"))
+  (check-true (bib-with-style "tmtest-alpha" bib-mode? "plain"))
+  (check-true (bib-with-style "alpha" bib-mode? "plain"))
+  (check-false (bib-with-style "alpha" bib-mode? "tmtest-alpha"))
+  (check-false (bib-with-style "plain" bib-mode? "alpha"))
+  (check-false (bib-with-style "abbrv" bib-mode? "alpha"))
+  (check-true (bib-with-style "no-such-style" bib-mode? "plain"))
+  ;; the labels of the other styles are not those of alpha
+  (check= (fmt-labels "plain" sample-bib) '("1" "2" "3" "4" "5" "6" "7" "8"))
+  (check= (map car (fmt "tmtest-alpha" sample-bib))
+          (map car (fmt "alpha" sample-bib))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Entry types in the styles
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -672,6 +691,7 @@
   (test-builtins)
   (test-names)
   (test-sorting-labels)
+  (test-style-fallback)
   (test-entry-types)
   (test-export)
   (remove-tmp-dir)
