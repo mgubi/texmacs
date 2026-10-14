@@ -346,6 +346,8 @@
 (define (test-connection-state)
   (check-group "state of the connections")
   (let* ((heard (priv '(client client-base) 'client-heard))
+         (ping-sent (priv '(client client-base) 'client-ping-sent))
+         (beat (priv '(client client-base) 'client-beat))
          (notify-heard (priv '(client client-base) 'client-notify-heard))
          (events (lambda () (reverse (map car notify-log)))))
     (set! notify-log '())
@@ -362,8 +364,25 @@
                                 "Connected to loophost as rt-alice ("))
     (check= (rcall 9101 '(remote-ping)) "pong")
     (check= (events) '())
-    ;; a server which says nothing for a while, and then again
-    (ahash-set! heard 9101 (- (texmacs-time) 40000))
+    ;; after a freeze of TeXmacs (the computer slept): the server was not
+    ;; heard for long, but no ping waited for an answer
+    (ahash-set! heard 9101 (- (texmacs-time) 200000))
+    (ahash-set! beat 9101 (- (texmacs-time) 200000))
+    (client-heartbeat 9101)
+    (check= (client-connection-state 9101) :connected)
+    (check-true (number? (ahash-ref ping-sent 9101)))
+    (loop-pump)
+    (check-false (ahash-ref ping-sent 9101))
+    ;; a ping sent just before the freeze: its answer may wait unread, and
+    ;; the heartbeat which runs late gives it a new chance
+    (ahash-set! ping-sent 9101 (- (texmacs-time) 200000))
+    (ahash-set! beat 9101 (- (texmacs-time) 200000))
+    (client-heartbeat 9101)
+    (check= (client-connection-state 9101) :connected)
+    (check-true (< (- (texmacs-time) (ahash-ref ping-sent 9101)) 10000))
+    (check= (events) '())
+    ;; a server which does not answer a ping for a while, and then again
+    (ahash-set! ping-sent 9101 (- (texmacs-time) 40000))
     (client-heartbeat 9101)
     (check= (client-connection-state 9101) :silent)
     (check-true (string-starts? (client-connection-status 9101)
@@ -371,6 +390,7 @@
     (client-heartbeat 9101)
     (check= (events) '(:silent))
     (notify-heard 9101)
+    (ahash-remove! ping-sent 9101)
     (check= (client-connection-state 9101) :connected)
     (check= (events) '(:silent :back))
     ;; a server which says nothing for too long: the connection is closed,
@@ -379,7 +399,7 @@
       (client-remote-eval 9102 '(remote-logged?)
                           (lambda (x) (set! r x))
                           (lambda (e) (set! r (list :error e))))
-      (ahash-set! heard 9102 (- (texmacs-time) 200000))
+      (ahash-set! ping-sent 9102 (- (texmacs-time) 200000))
       (check= (client-lost-connections) '())
       (client-heartbeat 9102)
       (check= r '(:error "no answer for 200 s"))
