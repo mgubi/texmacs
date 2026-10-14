@@ -32,3 +32,10 @@ or by regular mail at
 	Universite Paris-Sud
 	91405 Orsay Cedex
 	France
+
+The styles and the locales of the Citation Style Language in the
+directory TeXmacs/misc/csl are not part of the program: they come from
+the CSL project (https://citationstyles.org) and are distributed under
+the Creative Commons Attribution-ShareAlike 3.0 Unported license,
+https://creativecommons.org/licenses/by-sa/3.0/. See the file README.md
+in that directory.
