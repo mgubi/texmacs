@@ -169,6 +169,46 @@
     (when (buffer-exists? old) (switch-to-buffer old))
     (check= (current-buffer) old)))
 
+;; The buffer of an embedded TeXmacs widget (texmacs-input) is embedded in an
+;; alternative window when the widget is made while that window is being
+;; built, between alt-window-handle and alt-window-create, as the dialogues
+;; do: alt-window-search then finds the window to close. A widget made at
+;; another time, as those of the side tools of a main window, is in no
+;; alternative window, whatever windows are open. (The widgets are not put
+;; into the windows here: the window of an embedded widget is only freed in
+;; the event loop.)
+(define (test-embedded)
+  (check-group "embedded buffers")
+  (let* ((old (current-buffer))
+         (w1 (alt-window-handle))
+         (wid1 (make-menu-widget '(vertical (text "x")) 0))
+         (u1 (string->url "tmfs://aux/editing-test-embedded-1"))
+         (u2 (string->url "tmfs://aux/editing-test-embedded-2")))
+    (alt-window-create-plain w1 wid1 "editing-test-1")
+    (with in1 (widget-texmacs-input '(document "a") '(style "generic") u1)
+      (check-true (buffer-exists? u1))
+      (check-false (buffer-embedded? u1))
+      (check= (alt-window-search u1) '())
+      (let* ((w2 (alt-window-handle))
+             (in2 (widget-texmacs-input '(document "b") '(style "generic") u2))
+             (wid2 (make-menu-widget '(vertical (text "y")) 0)))
+        ;; (the window does not exist yet)
+        (check-false (buffer-embedded? u2))
+        (alt-window-create-plain w2 wid2 "editing-test-2")
+        (check-true (buffer-embedded? u2))
+        (check= (alt-window-search u2) (list w2))
+        (check-false (buffer-embedded? u1))
+        (alt-windows-delete (alt-window-search u2))
+        (check-false (buffer-embedded? u2))
+        (check= (alt-window-search u2) '())))
+    (alt-window-delete w1)
+    (buffer-close u1)
+    (buffer-close u2)
+    (check-false (buffer-exists? u1))
+    (check-false (buffer-exists? u2))
+    (when (buffer-exists? old) (switch-to-buffer old))
+    (check= (current-buffer) old)))
+
 ;; A document written to a .tm file and loaded: the body, the style and the
 ;; initial environment of the file are those of the buffer, which is not
 ;; modified by loading.
@@ -724,6 +764,7 @@
   (check-suite "editing")
   (system-mkdir (system->url editing-dir))
   (test-buffers)
+  (test-embedded)
   (test-load)
   (test-insert)
   (test-cursor)
