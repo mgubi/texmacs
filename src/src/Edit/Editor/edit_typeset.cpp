@@ -302,8 +302,23 @@ edit_typeset_rep::typeset_preamble () {
 }
 
 void
+edit_typeset_rep::typeset_bind_project () {
+  // the tables of the project to which the buffer is attached now
+  bool prj= buf->prj != NULL;
+  env->global_ref= &(prj? buf->prj->data->ref: grefs);
+  env->global_aux= &(prj? buf->prj->data->aux: buf->data->aux);
+  env->global_att= &(prj? buf->prj->data->att: buf->data->att);
+}
+
+void
 edit_typeset_rep::typeset_prepare () {
-  env->base_file_name= buf->buf->master;
+  if (env->base_file_name != buf->buf->master) {
+    // the buffer was renamed: its trust is the one of its new name
+    env->base_file_name= buf->buf->master;
+    env->cur_file_name = buf->buf->master;
+    env->secure= is_secure (env->cur_file_name);
+  }
+  typeset_bind_project ();
   env->read_only= buf->buf->read_only;
   env->write_default_env ();
   env->patch_env (pre);
@@ -313,11 +328,12 @@ edit_typeset_rep::typeset_prepare () {
 
 void
 edit_typeset_rep::init_update () {
+  typeset_bind_project ();
   if (buf->prj != NULL) {
     string id= as_string (delta (buf->prj->buf->name, buf->buf->name));
     string lab= "part:" * id;
-    hashmap<string,tree> aux= env->global_aux;
-    hashmap<string,tree> ref= env->global_ref;
+    hashmap<string,tree> aux= *env->global_aux;
+    hashmap<string,tree> ref= *env->global_ref;
     if (aux->contains ("parts")) {
       tree parts= aux ["parts"];
       if (is_func (parts, DOCUMENT))
@@ -719,7 +735,7 @@ edit_typeset_rep::exec (tree t, hashmap<string,tree> H, bool expand_refs) {
   env->write_env (H);
   t= env->exec (t);
   if (expand_refs)
-    t= expand_references (t, buf->data->ref, env->global_ref);
+    t= expand_references (t, buf->data->ref, *env->global_ref);
   t= simplify_execed (t);
   t= simplify_correct (t);
   env->write_env (H2);

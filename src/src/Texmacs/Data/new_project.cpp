@@ -27,17 +27,17 @@ project_attach (string prj_name) {
   url name= get_current_buffer ();
   tm_buffer buf= concrete_buffer (name);
   buf->data->project= prj_name;
+  if (prj_name == "") buf->prj= NULL;
+  else {
+    url full_name= head (buf->buf->name) * prj_name;
+    buf->prj= concrete_buffer_insist (full_name);
+  }
   array<url> vs= buffer_to_views (name);
   for (int i=0; i<N(vs); i++) {
     editor ed= view_to_editor (vs[i]);
     ed->init_update ();
     ed->notify_change (THE_DECORATIONS);
     ed->require_save ();
-  }
-  if (prj_name == "") buf->prj= NULL;
-  else {
-    url full_name= head (buf->buf->name) * prj_name;
-    buf->prj= concrete_buffer_insist (full_name);
   }
 }
 
