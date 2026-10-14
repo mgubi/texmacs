@@ -251,7 +251,14 @@
     as a space, kept as <verbatim|\<less\>#9\<gtr\>>, since the codes
     below 32 are accents in the encoding of <TeXmacs>), the unused
     definitions of links and of footnotes, and the marks of a footnote
-    after its first one (<scm|mdtm-footnote>).
+    after its first one (<scm|mdtm-footnote>). A table which is kept
+    counts neither its links nor its marks of footnotes as uses: the
+    definitions stay as they were written (<scm|md-refs-kept>,
+    <scm|mdtm-in-kept-table?>), since the table is written from its text
+    as long as it is not edited. A header is a header when each of its
+    lines is one which <name|YAML> has and one at least is a key
+    (<scm|md-yaml?>); the export writes only such headers
+    (<scm|tmmd-md-metadata>), and snippets have none.
 
     <item*|Other formats>The <LaTeX> export knows the macros
     (<scm|tmtex-md-body> and the others in <source-link|tmtex.scm|TeXmacs/progs/convert/latex/tmtex.scm>):

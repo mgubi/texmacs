@@ -239,6 +239,15 @@
     <item>Word and <name|OpenDocument> files of any length are read and
     written (ten thousand paragraphs stopped the converters), and a
     damaged or forged file gives a message instead of ending <TeXmacs>.
+
+    <item>A table of a <name|Markdown> file keeps the links and footnotes
+    whose definitions only it uses, a heading between two rules is no
+    longer taken for a <name|YAML> header, and a header edited in
+    <TeXmacs> is read back as a header. Many footnotes are written much
+    faster.
+
+    <item>A small forged Word or <name|OpenDocument> file can no longer
+    keep <TeXmacs> busy for hours.
   </itemize>
 
   <paragraph|13 October 2026>
