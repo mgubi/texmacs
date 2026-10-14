@@ -126,6 +126,7 @@ public:
 
   void     typeset_style_use_cache (tree style);
   void     typeset_preamble ();
+  void     typeset_bind_project ();
   void     typeset_prepare ();
   void     typeset_invalidate_env ();
   void     typeset_exec_until (path p);

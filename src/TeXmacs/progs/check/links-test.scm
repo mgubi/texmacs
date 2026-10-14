@@ -1012,16 +1012,15 @@
       (check-true (buffer-modified? l))
       (check= (user-labels (list-references* #t)) '("a1" "c1" "c2" "eq1"))
       (check= (user-labels (list-references* #f)) '())
-      ;; FIXME: the references of the master are not seen until the file
-      ;; has a new view: the typesetter keeps the global references it was
-      ;; made with (Edit/Editor/edit_typeset.cpp:40) and project_attach
-      ;; (Texmacs/Data/new_project.cpp:26) does not renew them: after
-      ;; (project-attach "master.tm") and update-forced, (texmacs-expand
-      ;; '(get-binding "a1")) gives (uninit), expected "1.1" (as after
-      ;; switch-to-buffer makes a second view).
+      ;; the view which the file had before sees the references of the
+      ;; master, until the file is detached
+      (check= (num "a1") "1.1")
+      (check= (num "c2") "2")
       (project-detach)
+      (update-forced)
       (check-false (project-attached?))
       (check-true (url-none? (project-get)))
+      (check= (num "a1") '(uninit))
       ;; Use as master
       (buffer-toggle-master)
       (check= (get-init "project-flag") "true")

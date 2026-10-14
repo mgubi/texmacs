@@ -35,9 +35,9 @@ edit_env_rep::edit_env_rep (drd_info& drd2,
   base_file_name (base_file_name2),
   cur_file_name (base_file_name2),
   secure (is_secure (base_file_name2)),
-  local_ref (local_ref2), global_ref (global_ref2),
-  local_aux (local_aux2), global_aux (global_aux2),
-  local_att (local_att2), global_att (global_att2),
+  local_ref (local_ref2), global_ref (&global_ref2),
+  local_aux (local_aux2), global_aux (&global_aux2),
+  local_att (local_att2), global_att (&global_att2),
   missing (UNINIT), redefined (), touched (false)
 {
   initialize_default_env ();
