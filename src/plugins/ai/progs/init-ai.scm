@@ -111,6 +111,26 @@
   (if (ai-wallet-key engine) ai-in-wallet
       (or (ai-preference-key engine) "")))
 
+;; the field of a key: a password field, the key is never shown in clear.
+;; A key in the wallet is said so next to the field, which stays empty: an
+;; empty answer keeps it (Delete entries of the wallet removes it)
+(tm-define (ai-api-key-typed engine key)
+  (cond ((not (string? key)) (noop))
+        ((ai-wallet-key engine)
+         (when (!= key "") (ai-set-api-key engine key)))
+        ((!= key (or (ai-preference-key engine) ""))
+         (ai-set-api-key engine key))))
+
+(tm-widget (ai-api-key-input engine width)
+  (hlist
+    (input (ai-api-key-typed engine answer)
+           "password"
+           (list (if (ai-wallet-key engine) ""
+                     (or (ai-preference-key engine) "")))
+           width)
+    (assuming (ai-wallet-key engine)
+      // (text ai-in-wallet))))
+
 (define (ai-store-api-key engine key)
   (if (and (supports-wallet?) (wallet-on?))
       (begin
@@ -733,9 +753,7 @@
     (with model (string-append name " model")
       (aligned
         (item (text "API key")
-          (enum (ai-set-api-key name answer)
-                (list (ai-api-key-shown name) "")
-                (ai-api-key-shown name) "16em"))
+          (dynamic (ai-api-key-input name "16em")))
         (item (text "Model")
           (refreshable "ai-model-list"
             (enum (set-preference model answer)
@@ -791,9 +809,7 @@
             (text "from ALBERT_API_KEY")))
         (assuming (not (albert-env-key?))
           (item (text "API key")
-            (enum (ai-set-api-key "albert" answer)
-                  (list (ai-api-key-shown "albert") "")
-                  (ai-api-key-shown "albert") "11em")))
+            (dynamic (ai-api-key-input "albert" "11em"))))
         (item (text model)
           (enum (set-preference model answer)
 		(albert-variants)

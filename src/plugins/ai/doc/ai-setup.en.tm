@@ -22,7 +22,11 @@
 
   When the wallet of <TeXmacs> is on, the key is kept there, encrypted,
   rather than in the preferences, and the panel shows
-  <with|font-series|bold|(in the wallet)>. On the desktop, the wallet needs
+  <with|font-series|bold|(in the wallet)> next to an empty field: a key
+  typed there replaces it, an empty field keeps it, and
+  <with|font-series|bold|Delete entries> (<menu|Edit|Preferences|Security>, wallet on) removes
+  it. The field of the key is a password field, which never shows the key
+  in clear. On the desktop, the wallet needs
   <name|GnuPG> and the experimental feature
   <with|font-series|bold|Encryption> (<menu|Edit|Preferences|Other>); it is
   then set up in <menu|Edit|Preferences|Security>. In a web browser, which
