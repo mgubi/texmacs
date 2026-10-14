@@ -623,6 +623,7 @@
 "url-resolve"
 "url-resolve-in-path"
 "url-resolve-pattern"
+"symbol->image"
 "url-exists?"
 "url-exists-in-path?"
 "url-exists-in-tex?"

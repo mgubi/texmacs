@@ -4787,6 +4787,14 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(symbol-\<gtr\>image <scm-arg|url> <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|make_symbol_image> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
     <scm|(url-exists? <scm-arg|url>)>
 <explain-synopsis|no synopsis>
   <|explain>
@@ -6299,7 +6307,7 @@ source code.
   </explain>
 
   <\explain>
-    <scm|(window-\<gtr\>view <scm-arg|url>)>
+    <scm|(place-\<gtr\>view <scm-arg|url>)>
 <explain-synopsis|no synopsis>
   <|explain>
     Calls the <c++> function <cpp|window_to_view> which returns
@@ -6315,7 +6323,7 @@ source code.
   </explain>
 
   <\explain>
-    <scm|(view-\<gtr\>window-url <scm-arg|url>)>
+    <scm|(view-\<gtr\>place-url <scm-arg|url>)>
 <explain-synopsis|no synopsis>
   <|explain>
     Calls the <c++> function <cpp|view_to_window> which returns
@@ -6355,7 +6363,7 @@ source code.
   </explain>
 
   <\explain>
-    <scm|(window-set-view <scm-arg|url> <scm-arg|url> <scm-arg|bool>)>
+    <scm|(place-set-view <scm-arg|url> <scm-arg|url> <scm-arg|bool>)>
 <explain-synopsis|no synopsis>
   <|explain>
     Calls the <c++> function <cpp|window_set_view> which returns
@@ -6379,7 +6387,7 @@ source code.
   </explain>
 
   <\explain>
-    <scm|(window-list)>
+    <scm|(place-list)>
 <explain-synopsis|no synopsis>
   <|explain>
     Calls the <c++> function <cpp|windows_list> which returns
@@ -6387,7 +6395,7 @@ source code.
   </explain>
 
   <\explain>
-    <scm|(windows-number)>
+    <scm|(places-number)>
 <explain-synopsis|no synopsis>
   <|explain>
     Calls the <c++> function <cpp|get_nr_windows> which returns
@@ -6395,7 +6403,7 @@ source code.
   </explain>
 
   <\explain>
-    <scm|(current-window)>
+    <scm|(current-place)>
 <explain-synopsis|no synopsis>
   <|explain>
     Calls the <c++> function <cpp|get_current_window> which returns
@@ -6403,7 +6411,7 @@ source code.
   </explain>
 
   <\explain>
-    <scm|(buffer-\<gtr\>windows <scm-arg|url>)>
+    <scm|(buffer-\<gtr\>places <scm-arg|url>)>
 <explain-synopsis|no synopsis>
   <|explain>
     Calls the <c++> function <cpp|buffer_to_windows> which returns
@@ -6411,7 +6419,7 @@ source code.
   </explain>
 
   <\explain>
-    <scm|(window-to-buffer <scm-arg|url>)>
+    <scm|(place-to-buffer <scm-arg|url>)>
 <explain-synopsis|no synopsis>
   <|explain>
     Calls the <c++> function <cpp|window_to_buffer> which returns
@@ -6419,7 +6427,7 @@ source code.
   </explain>
 
   <\explain>
-    <scm|(window-set-buffer <scm-arg|url> <scm-arg|url>)>
+    <scm|(place-set-buffer <scm-arg|url> <scm-arg|url>)>
 <explain-synopsis|no synopsis>
   <|explain>
     Calls the <c++> function <cpp|window_set_buffer> which returns
@@ -6427,7 +6435,7 @@ source code.
   </explain>
 
   <\explain>
-    <scm|(window-focus <scm-arg|url>)>
+    <scm|(place-focus <scm-arg|url>)>
 <explain-synopsis|no synopsis>
   <|explain>
     Calls the <c++> function <cpp|window_focus> which returns
@@ -6435,7 +6443,7 @@ source code.
   </explain>
 
   <\explain>
-    <scm|(switch-to-window <scm-arg|url>)>
+    <scm|(switch-to-place <scm-arg|url>)>
 <explain-synopsis|no synopsis>
   <|explain>
     Calls the <c++> function <cpp|switch_to_window> which returns
@@ -6451,7 +6459,7 @@ source code.
   </explain>
 
   <\explain>
-    <scm|(open-buffer-in-window <scm-arg|url> <scm-arg|content> <scm-arg|content>)>
+    <scm|(open-buffer-in-place <scm-arg|url> <scm-arg|content> <scm-arg|content>)>
 <explain-synopsis|no synopsis>
   <|explain>
     Calls the <c++> function <cpp|new_buffer_in_new_window> which returns
@@ -6459,7 +6467,7 @@ source code.
   </explain>
 
   <\explain>
-    <scm|(open-window)>
+    <scm|(open-place)>
 <explain-synopsis|no synopsis>
   <|explain>
     Calls the <c++> function <cpp|open_window> which returns
@@ -6467,7 +6475,7 @@ source code.
   </explain>
 
   <\explain>
-    <scm|(open-window-geometry <scm-arg|content>)>
+    <scm|(open-place-geometry <scm-arg|content>)>
 <explain-synopsis|no synopsis>
   <|explain>
     Calls the <c++> function <cpp|open_window> which returns
@@ -6475,7 +6483,7 @@ source code.
   </explain>
 
   <\explain>
-    <scm|(clone-window)>
+    <scm|(clone-place)>
 <explain-synopsis|no synopsis>
   <|explain>
     Calls the <c++> function <cpp|clone_window> which returns
@@ -6491,7 +6499,7 @@ source code.
   </explain>
 
   <\explain>
-    <scm|(kill-window <scm-arg|url>)>
+    <scm|(kill-place <scm-arg|url>)>
 <explain-synopsis|no synopsis>
   <|explain>
     Calls the <c++> function <cpp|kill_window> which returns
@@ -6499,7 +6507,7 @@ source code.
   </explain>
 
   <\explain>
-    <scm|(kill-current-window-and-buffer)>
+    <scm|(kill-current-place-and-buffer)>
 <explain-synopsis|no synopsis>
   <|explain>
     Calls the <c++> function <cpp|kill_current_window_and_buffer> which returns
@@ -6891,7 +6899,7 @@ source code.
   </explain>
 
   <\explain>
-    <scm|(window-get-serial)>
+    <scm|(place-get-serial)>
 <explain-synopsis|no synopsis>
   <|explain>
     Calls the <c++> function <cpp|get_window_serial> which returns
@@ -6899,7 +6907,7 @@ source code.
   </explain>
 
   <\explain>
-    <scm|(window-set-property <scm-arg|scheme_tree> <scm-arg|scheme_tree>)>
+    <scm|(place-set-property <scm-arg|scheme_tree> <scm-arg|scheme_tree>)>
 <explain-synopsis|no synopsis>
   <|explain>
     Calls the <c++> function <cpp|set_window_property> which returns
@@ -6907,7 +6915,7 @@ source code.
   </explain>
 
   <\explain>
-    <scm|(window-get-property <scm-arg|scheme_tree>)>
+    <scm|(place-get-property <scm-arg|scheme_tree>)>
 <explain-synopsis|no synopsis>
   <|explain>
     Calls the <c++> function <cpp|get_window_property> which returns
@@ -7019,7 +7027,7 @@ source code.
   </explain>
 
   <\explain>
-    <scm|(set-window-zoom-factor <scm-arg|double>)>
+    <scm|(set-place-zoom-factor <scm-arg|double>)>
 <explain-synopsis|no synopsis>
   <|explain>
     Calls the <c++> function <cpp|set_window_zoom_factor> which returns
@@ -7027,7 +7035,7 @@ source code.
   </explain>
 
   <\explain>
-    <scm|(get-window-zoom-factor)>
+    <scm|(get-place-zoom-factor)>
 <explain-synopsis|no synopsis>
   <|explain>
     Calls the <c++> function <cpp|get_window_zoom_factor> which returns
@@ -9283,7 +9291,7 @@ source code.
   </explain>
 
   <\explain>
-    <scm|(get-window-width)>
+    <scm|(get-view-width)>
 <explain-synopsis|no synopsis>
   <|explain>
     Calls the <c++> function <cpp|get_window_width> which returns
@@ -9291,7 +9299,7 @@ source code.
   </explain>
 
   <\explain>
-    <scm|(get-window-height)>
+    <scm|(get-view-height)>
 <explain-synopsis|no synopsis>
   <|explain>
     Calls the <c++> function <cpp|get_window_height> which returns
@@ -9299,7 +9307,7 @@ source code.
   </explain>
 
   <\explain>
-    <scm|(get-window-x)>
+    <scm|(get-view-x)>
 <explain-synopsis|no synopsis>
   <|explain>
     Calls the <c++> function <cpp|get_window_x> which returns
@@ -9307,7 +9315,7 @@ source code.
   </explain>
 
   <\explain>
-    <scm|(get-window-y)>
+    <scm|(get-view-y)>
 <explain-synopsis|no synopsis>
   <|explain>
     Calls the <c++> function <cpp|get_window_y> which returns
@@ -9395,7 +9403,7 @@ source code.
   </explain>
 
   <\explain>
-    <scm|(refresh-window)>
+    <scm|(refresh-view)>
 <explain-synopsis|no synopsis>
   <|explain>
     Calls the <c++> function <cpp|invalidate_all> which returns
