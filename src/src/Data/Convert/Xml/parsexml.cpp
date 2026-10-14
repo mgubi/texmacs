@@ -47,6 +47,7 @@ struct xml_html_parser {
   tree stack;
   int depth;     // depth of the element which is being built
   int expanded;  // number of characters which declared entities produced
+  bool limited;  // whether a limit was told about
 
   xml_html_parser ();
   inline void skip_space () {
@@ -128,7 +129,8 @@ void load_entities (hashmap<string, string> table, string fname) {
 // Declared entities expand to at most this number of characters in all
 #define XML_MAX_EXPANSION 4000000
 
-xml_html_parser::xml_html_parser (): entities (""), depth (0), expanded (0) {
+xml_html_parser::xml_html_parser ():
+  entities (""), depth (0), expanded (0), limited (false) {
   if (N(html_empty_tag_table) == 0) {
     html_empty_tag_table->insert ("basefont");
     html_empty_tag_table->insert ("br");
@@ -295,7 +297,13 @@ string
 xml_html_parser::expand_entity (string s) {
   if (entities->contains (s)) {
     // entities which are defined by other entities grow fast
-    if (expanded > XML_MAX_EXPANSION) return "";
+    if (expanded > XML_MAX_EXPANSION) {
+      if (!limited)
+        convert_error << "xml: the entities expand to too much text, "
+                      << "the rest of it is left out\n";
+      limited= true;
+      return "";
+    }
     expanded += N(entities[s]);
     return entities[s];
   }
@@ -676,9 +684,14 @@ xml_html_parser::build (tree& r) {
       i++;
       if (html && html_empty_tag_table->contains (name))
         r << sub;
-      else if (depth >= XML_MAX_DEPTH)
+      else if (depth >= XML_MAX_DEPTH) {
         // too deep: the element stays empty and its children follow it
+        if (!limited)
+          convert_error << "xml: the elements are nested too deep, "
+                        << "the deepest ones follow their parents\n";
+        limited= true;
         r << sub;
+      }
       else {
         stack= tuple (name, stack);
         depth++;

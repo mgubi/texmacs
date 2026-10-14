@@ -21,6 +21,14 @@
 // zlib, or the zlib of the PDF writer Hummus), and stored otherwise. No encryption, no zip64, no archives in
 // several parts.
 
+// The archives come from anywhere: an entry is read only when its data
+// has the size and the CRC-32 which the archive says, and is not larger
+// than ZIP_MAX_ENTRY, and zip_unpack reads at most ZIP_MAX_TOTAL bytes of
+// data. zip_write gives "" for more entries than the format has room for.
+#define ZIP_MAX_ENTRY (256 * 1024 * 1024)
+#define ZIP_MAX_TOTAL (512LL * 1024 * 1024)
+#define ZIP_MAX_ENTRIES 65535
+
 // an archive as a string
 bool          zip_is_archive (string zip);
 array<string> zip_entries (string zip);

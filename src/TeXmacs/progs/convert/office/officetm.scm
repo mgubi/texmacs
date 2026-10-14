@@ -45,12 +45,7 @@
 
 (define (oftm-concat l)
   ;; a list of TeXmacs trees as one tree
-  (let* ((l (let loop ((l l))
-              (cond ((null? l) l)
-                    ((== (car l) "") (loop (cdr l)))
-                    ((and (string? (car l)) (pair? (cdr l)) (string? (cadr l)))
-                     (loop (cons (string-append (car l) (cadr l)) (cddr l))))
-                    (else (cons (car l) (loop (cdr l))))))))
+  (let* ((l (office-join-strings l)))
     (cond ((null? l) "")
           ((null? (cdr l)) (car l))
           (else (cons 'concat l)))))
@@ -781,16 +776,22 @@
 (define (oftm-blocks l)
   ;; the paragraphs of TeXmacs for a list of blocks. The blocks which
   ;; belong together are taken together: the lines of a quotation or of a
-  ;; piece of code, a figure or a table and its caption.
-  (cond ((null? l) '())
-        ((not (pair? (car l))) (oftm-blocks (cdr l)))
+  ;; piece of code, a figure or a table and its caption. (A loop: a
+  ;; document may have many thousands of blocks)
+  (let loop ((l l) (acc '()))
+    (if (null? l) (reverse acc)
+        (with r (oftm-block l)
+          (loop (cdr r) (append (reverse (car r)) acc))))))
+
+(define (oftm-block l)
+  ;; the paragraphs for the first blocks of l, and the blocks which remain
+  (cond ((not (pair? (car l))) (cons '() (cdr l)))
         ;; a quotation: the paragraphs of this style which follow each other
         ((oftm-role? (car l) "quote")
          (let loop ((r l) (acc '()))
            (if (and (pair? r) (oftm-role? (car r) "quote"))
                (loop (cdr r) (cons (oftm-inlines (ox-children (car r))) acc))
-               (cons `(quotation ,(oftm-document (reverse acc)))
-                     (oftm-blocks r)))))
+               (cons (list `(quotation ,(oftm-document (reverse acc)))) r))))
         ;; code: each paragraph is a line, or several
         ((oftm-role? (car l) "code")
          (let loop ((r l) (acc '()))
@@ -800,54 +801,53 @@
                                            (string-tokenize-by-char
                                              (oftm-plain (car r)) #\newline)))
                              acc))
-               (cons `(verbatim-code ,(oftm-document (reverse acc)))
-                     (oftm-blocks r)))))
+               (cons (list `(verbatim-code ,(oftm-document (reverse acc)))) r))))
         ;; a table of contents: TeXmacs makes it again from the headings
         ((or (func? (car l) 'toc) (oftm-role? (car l) "toc"))
          (let loop ((r l))
            (if (and (pair? r) (or (func? (car r) 'toc) (oftm-role? (car r) "toc")))
                (loop (cdr r))
-               (cons '(table-of-contents "toc" (document "")) (oftm-blocks r)))))
+               (cons '((table-of-contents "toc" (document ""))) r))))
         ;; a theorem, a remark, a proof
         ((and (func? (car l) 'p)
               (in? (ox-attr (car l) 'role) '("theorem" "remark" "proof"))
               (oftm-theorem l))
-         => (lambda (r) (cons (car r) (oftm-blocks (cdr r)))))
+         => (lambda (r) (cons (list (car r)) (cdr r))))
         ;; the bibliography, without the heading which TeXmacs writes
         ((oftm-role? (car l) "bibitem")
          (with r (oftm-bibliography l)
-           (cons (car r) (oftm-blocks (cdr r)))))
+           (cons (list (car r)) (cdr r))))
         ((and (oftm-role? (car l) "heading") (pair? (cdr l))
               (oftm-role? (cadr l) "bibitem")
               (in? (locase-all (oftm-plain (car l))) '("bibliography" "references")))
-         (oftm-blocks (cdr l)))
+         (cons '() (cdr l)))
         ;; terms and their definitions
         ((oftm-role? (car l) "term")
          (with r (oftm-description l)
-           (cons (car r) (oftm-blocks (cdr r)))))
+           (cons (list (car r)) (cdr r))))
         ;; a figure and its caption, in this order or in the other
         ((and (oftm-only-images? (car l)) (pair? (cdr l))
               (oftm-role? (cadr l) "caption"))
-         (cons `(big-figure ,(oftm-inlines (ox-children (car l)))
-                            ,(oftm-caption (cadr l)))
-               (oftm-blocks (cddr l))))
+         (cons (list `(big-figure ,(oftm-inlines (ox-children (car l)))
+                                  ,(oftm-caption (cadr l))))
+               (cddr l)))
         ((and (oftm-role? (car l) "caption") (pair? (cdr l))
               (oftm-only-images? (cadr l)))
-         (cons `(big-figure ,(oftm-inlines (ox-children (cadr l)))
-                            ,(oftm-caption (car l)))
-               (oftm-blocks (cddr l))))
+         (cons (list `(big-figure ,(oftm-inlines (ox-children (cadr l)))
+                                  ,(oftm-caption (car l))))
+               (cddr l)))
         ;; a table and its caption
         ((and (func? (car l) 'table) (pair? (cdr l))
               (oftm-role? (cadr l) "caption"))
-         (cons `(big-table ,(oftm-table (car l)) ,(oftm-caption (cadr l)))
-               (oftm-blocks (cddr l))))
+         (cons (list `(big-table ,(oftm-table (car l)) ,(oftm-caption (cadr l))))
+               (cddr l)))
         ((and (oftm-role? (car l) "caption") (pair? (cdr l))
               (func? (cadr l) 'table))
-         (cons `(big-table ,(oftm-table (cadr l)) ,(oftm-caption (car l)))
-               (oftm-blocks (cddr l))))
+         (cons (list `(big-table ,(oftm-table (cadr l)) ,(oftm-caption (car l))))
+               (cddr l)))
         (else
           (let ((x (car l)))
-            (append
+            (cons
               (case (car x)
                 ((p)
                  (cond ((oftm-role? x "heading") (oftm-heading x))
@@ -881,7 +881,7 @@
                           ,(oftm-text (apply string-append
                                              (list-filter (cdr x) string?))))))
                 (else '()))
-              (oftm-blocks (cdr l)))))))
+              (cdr l))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The title of the document
@@ -896,11 +896,12 @@
 (define (oftm-lines l)
   ;; several paragraphs as the lines of one
   (oftm-concat
-    (let loop ((l l))
-      (if (null? l) l
-          (append (if (func? (car l) 'concat) (cdar l) (list (car l)))
-                  (if (null? (cdr l)) '()
-                      (cons '(next-line) (loop (cdr l)))))))))
+    (let loop ((l l) (acc '()))
+      (if (null? l) (reverse acc)
+          (loop (cdr l)
+                (append (reverse (if (func? (car l) 'concat) (cdar l)
+                                     (list (car l))))
+                        (if (null? acc) acc (cons '(next-line) acc))))))))
 
 (define (oftm-doc-data l meta)
   ;; the title, from the paragraphs l at the start of the document which
@@ -948,7 +949,16 @@
   (:synopsis "Convert the office tree @x into a TeXmacs document")
   (with l (if (func? x 'office) (cdr x) (list x))
     (set! oftm-numbered-labels (make-ahash-table))
-    (for-each oftm-scan-labels l)
-    (with r `(document (body ,(oftm-body l)) (style "generic"))
+    (with r (catch #t
+              (lambda ()
+                (for-each oftm-scan-labels l)
+                `(document (body ,(oftm-body l)) (style "generic")))
+              ;; (what was not foreseen gives a document which says so)
+              (lambda args
+                (with msg (string-append "This document could not be converted ("
+                                         (object->string (car args)) ")")
+                  (debug-message "convert-error" (string-append msg "\n"))
+                  `(document (body (document (with "color" "red" ,msg)))
+                             (style "generic")))))
       (set! oftm-numbered-labels (make-ahash-table))
       r)))
