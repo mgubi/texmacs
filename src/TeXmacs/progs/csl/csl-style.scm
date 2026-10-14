@@ -99,20 +99,24 @@
     (ahash-set! style 'title (if title (csl-text title) name))
     style))
 
-(tm-define (csl-style-from-string name s)
+(tm-define (csl-style-from-string name s . opt)
   (:synopsis "The style defined by the XML in @s, or #f")
+  ;; with the optional argument #f, a dependent style is refused: the
+  ;; parent of a dependent style has to be an independent one
   (and-with root (csl-parse s)
     (and (== (csl-name root) 'style)
          (if (csl-child root 'citation)
              (and (with-layout (csl-child root 'citation))
                   (make-style name root))
              ;; a dependent style: the parent with the locale of the child
-             (and-with parent (and-with p (parent-name root)
-                                (csl-load-style p))
+             (and-with parent (and (or (null? opt) (car opt))
+                                   (and-with p (parent-name root)
+                                     (csl-load-style p #f)))
                (with style (make-ahash-table)
                  (for (p (ahash-table->list parent))
                    (ahash-set! style (car p) (cdr p)))
                  (ahash-set! style 'name name)
+                 (ahash-set! style 'dependent? #t)
                  (ahash-set! style 'locale-cache (make-ahash-table))
                  (when (csl-attr root 'default-locale)
                    (ahash-set! style 'default-locale
@@ -123,13 +127,22 @@
   (:synopsis "The file of the style @name, or #f")
   (find-file "styles" (string-append name ".csl")))
 
-(tm-define (csl-load-style name)
+(tm-define (csl-load-style name . opt)
   (:synopsis "The style @name, or #f")
-  (or (ahash-ref style-cache name)
-      (and-with u (csl-style-file name)
-        (and-with style (csl-style-from-string name (string-load u))
-          (ahash-set! style-cache name style)
-          style))))
+  ;; the optional argument #f refuses a dependent style; a style is read
+  ;; again when its file changed
+  (and-with u (csl-style-file name)
+    (let* ((date (url-last-modified u))
+           (old (ahash-ref style-cache name))
+           (style (if (and old (== (car old) date)) (cdr old)
+                      (with st (apply csl-style-from-string
+                                      (cons* name (string-load u) opt))
+                        (when st (ahash-set! style-cache name (cons date st)))
+                        st))))
+      (and style
+           (not (and (nnull? opt) (not (car opt))
+                     (csl-style-ref style 'dependent?)))
+           style))))
 
 (tm-define (csl-forget-styles)
   (set! style-cache (make-ahash-table))

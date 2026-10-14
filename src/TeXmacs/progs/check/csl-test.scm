@@ -794,9 +794,12 @@
   (system->url (string-append csl-dir "/" name)))
 
 (define (remove-tmp-dir)
-  (with d (system->url csl-dir)
+  (set! csl-extra-path '())
+  (for (d (list (system->url (string-append csl-dir "/styles"))
+                (system->url csl-dir)))
     (when (url-exists? d)
-      (for (f (url-read-directory d "*")) (system-remove f))
+      (for (f (url-read-directory d "*"))
+        (when (not (url-directory? f)) (system-remove f)))
       (system-remove d))))
 
 (define (doc-tm body . style)
@@ -974,6 +977,70 @@
     (check= (flat* (if (func? x 'concat) (cAr x) x))
             (u "(Knuth, 1984, pp. 99–101)"))))
 
+(define (save-style name text)
+  (string-save text (system->url (string-append csl-dir "/styles/" name
+                                                ".csl"))))
+
+(define (dependent-style parent)
+  (string-append
+   "<style xmlns=\"http://purl.org/net/xbiblio/csl\" class=\"in-text\""
+   " version=\"1.0\"><info><title>D</title><id>d</id>"
+   "<link href=\"http://www.zotero.org/styles/" parent "\""
+   " rel=\"independent-parent\"/></info></style>"))
+
+(define (test-style-errors)
+  (check-group "errors of styles")
+  (system-mkdir (system->url (string-append csl-dir "/styles")))
+  (set! csl-extra-path (list (system->url csl-dir)))
+  (let* ((bib (bib-parse sample-bib))
+         (processed (lambda (style t)
+                      ;; the result, or raised when an error comes through
+                      (catch #t (lambda () (csl-bib-process "bib" style t))
+                        (lambda args 'raised))))
+         (error? (lambda (name)
+                   (with r (processed (string-append "csl-" name) bib)
+                     (and (string? r)
+                          (string-starts? r (string-append "Error: CSL style "
+                                                           name)))))))
+    ;; an error while the style is processed gives a message
+    (with r (processed "csl-apa" 42)
+      (check-true (and (string? r)
+                       (string-starts? r "Error: CSL style apa: "))))
+    ;; a count of names which is no count is ignored
+    (save-style "negative"
+                (string-replace (author-date-style
+                                 "et-al-min=\"1\" et-al-use-first=\"-1\"")
+                                "<names variable=\"author\"/>"
+                                (string-append "<names variable=\"author\">"
+                                               "<name et-al-min=\"1\""
+                                               " et-al-use-first=\"-1\"/>"
+                                               "</names>")))
+    (with b (first-of 'bib-list (processed "csl-negative" bib))
+      (check-true (and b (string-starts? (flat b) "Donald E. Knuth 1984"))))
+    ;; a dependent style needs an independent parent
+    (save-style "self" (dependent-style "self"))
+    (save-style "one" (dependent-style "two"))
+    (save-style "two" (dependent-style "one"))
+    (save-style "child" (dependent-style "apa"))
+    (check-true (error? "self"))
+    (check-true (error? "one"))
+    (check-false (error? "child"))
+    (check= (csl-style-ref (csl-load-style "child") 'title)
+            (csl-style-ref (csl-load-style "apa") 'title))
+    ;; a style is read again when its file changes
+    (save-style "edited" small-style)
+    (with old (csl-style-ref (csl-load-style "edited") 'title)
+      (let* ((u (system->url (string-append csl-dir "/styles/edited.csl")))
+             (date (url-last-modified u))
+             (start (texmacs-time)))
+        (while (and (== (url-last-modified u) date)
+                    (< (- (texmacs-time) start) 5000))
+          (save-style "edited" (string-replace small-style "<title>Small"
+                                               "<title>Edited")))
+        (check= old "Small")
+        (check= (csl-style-ref (csl-load-style "edited") 'title) "Edited"))))
+  (set! csl-extra-path '()))
+
 (define (test-scripts)
   (check-group "scripts without case")
   ;; the names in CJK sort after the Latin ones, by their code points
@@ -1033,7 +1100,8 @@
   (test-styles)
   (remove-tmp-dir)
   (system-mkdir (system->url csl-dir))
-  (for (test (list test-document test-document-citations test-scripts))
+  (for (test (list test-document test-document-citations test-style-errors
+                   test-scripts))
     (with r (check-run test)
       (when (and (pair? r) (== (car r) 'error))
         (check-report #f "the group" (object->string r)))))

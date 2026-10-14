@@ -331,7 +331,15 @@
   (:synopsis "The bibliography of the BibTeX entries @t in the CSL style")
   ;; the optional arguments are the list of the keys in the order of
   ;; citation, and the code of a locale to use instead of the language of
-  ;; the document
+  ;; the document. A style which fails gives a message instead of the
+  ;; bibliography, and the citations show as without a CSL style.
+  (catch #t
+    (lambda () (apply process-bibliography (cons* prefix style t opt)))
+    (lambda (key . args)
+      (string-append "Error: CSL style " (string-drop style 4) ": "
+                     (if (symbol? key) (symbol->string key) "failed")))))
+
+(define (process-bibliography prefix style t . opt)
   (let* ((name (string-drop style 4))
          (st (document-style name))
          (keys (if (and (nnull? opt) (list? (car opt)))

@@ -226,8 +226,10 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define (opt-number opt key)
-  (with v (opt key #f)
-    (and v (string->number v))))
+  ;; a count of names: a style may give anything
+  (and-with v (opt key #f)
+    (with x (string->number v)
+      (and x (integer? x) (exact? x) (>= x 0) x))))
 
 (tm-define (csl-names-shown names opt settings)
   (:synopsis "How many of @names are shown, and whether et al. follows")
