@@ -19,7 +19,20 @@
 #include "server_log.hpp"
 #include "gnutls.hpp"
 #include "tm_timer.hpp"
+#include "file.hpp"
 #include <cctype>
+#ifdef QT_WEBSOCKETS_LIB
+#include <QFile>
+#include <QTimer>
+#include <QHostAddress>
+#include <QWebSocketCorsAuthenticator>
+#ifndef QT_NO_SSL
+#include <QSslCertificate>
+#include <QSslConfiguration>
+#include <QSslSocket>
+#include <QSslKey>
+#endif
+#endif
 
 #if defined(OS_MACOS)
   #include "MacOS/mac_utilities.h"
@@ -456,16 +469,21 @@ socket_link_rep::stop () {
     call ("client-remove", object (socket_id));
   }
   alive= false;
-  ::stop (contact);
-  if (socket_id >= 0) {
-    if (CLOSE(socket_id) && used_by_server ())
-      SLOGE ("cannot close socket " * as_string (socket_id));
-  }
+  close_socket ();
   if (used_by_server ()) // socket created by the server
     emit disconnection (this);
   else
     socket_id= -1;
   checkout (this);
+}
+
+void
+socket_link_rep::close_socket () {
+  ::stop (contact);
+  if (socket_id >= 0) {
+    if (CLOSE(socket_id) && used_by_server ())
+      SLOGE ("cannot close socket " * as_string (socket_id));
+  }
 }
 
 string&
@@ -664,6 +682,183 @@ socket_link_rep::listen (int msecs) {
 }
 
 /******************************************************************************
+* Links of WebSocket clients
+*
+* A client in a browser can only open WebSockets. Such a link carries the
+* usual packets of a TeXmacs client in the binary messages of a QWebSocket,
+* which owns the socket (and its TLS session for wss). Its identifier is
+* not a file descriptor: Qt does not give it.
+******************************************************************************/
+
+#ifdef QT_WEBSOCKETS_LIB
+
+static string
+websocket_host (QWebSocket* ws) {
+  // the address of the client, written as for the other links
+  QHostAddress a= ws->peerAddress ();
+  bool ipv4= false;
+  quint32 v4= a.toIPv4Address (&ipv4);
+  QString name= ipv4 ? QHostAddress (v4).toString () :
+                       QString ("[") + a.toString () + QString ("]");
+  return string (name.toUtf8 ().constData ());
+}
+
+static SOCKADDR_STORAGE*
+no_socket_address () {
+  static SOCKADDR_STORAGE none;
+  memset (&none, 0, sizeof (none));
+  return &none;
+}
+
+// before the client is logged in, it sends a login (a pseudo and a
+// password, or a code), the request of a new account, or the key of the
+// legacy encryption (an RSA public key): a few KB at most
+static const int websocket_login_limit= 1 << 16;
+
+websocket_link_rep::websocket_link_rep (int id, QWebSocket* ws2,
+                                        int limit2):
+  socket_link_rep (id, no_socket_address (), tm_contact ()),
+  ws (ws2), limit (limit2), logged (false) {
+  host= websocket_host (ws);
+}
+
+websocket_link_rep::~websocket_link_rep () {
+  socket_id= -1; // not a socket of ours to close
+}
+
+string
+websocket_link_rep::start () {
+  checkin (this);
+  if (!ws || ws->state () != QAbstractSocket::ConnectedState) {
+    string msg= string ("unexpected closed WebSocket for socket ") *
+      as_string (socket_id);
+    SLOGE (msg);
+    if (ws) {
+      ws->abort ();
+      ws->deleteLater ();
+    }
+    return msg;
+  }
+  // Qt holds a whole message in memory before it hands it over
+  int cap= min (limit, websocket_login_limit);
+  ws->setMaxAllowedIncomingFrameSize (cap);
+  ws->setMaxAllowedIncomingMessageSize (cap);
+  QObject::connect (ws, SIGNAL (binaryMessageReceived (const QByteArray&)),
+    this, SLOT (binary_received (const QByteArray&)));
+  QObject::connect (ws, SIGNAL (textMessageReceived (const QString&)),
+    this, SLOT (text_received (const QString&)));
+  QObject::connect (ws, SIGNAL (disconnected ()), this, SLOT (closed ()));
+  QObject::connect (ws, SIGNAL (aboutToClose ()), this, SLOT (closing ()));
+  alive= true;
+  return "";
+}
+
+void
+websocket_link_rep::close_socket () {
+  if (!ws) return;
+  ws->disconnect (this);
+  if (ws->state () == QAbstractSocket::UnconnectedState) ws->deleteLater ();
+  else {
+    // the closing frame is sent before the socket is closed; the socket
+    // of a client which does not take it is closed all the same
+    QObject::connect (ws, SIGNAL (disconnected ()), ws, SLOT (deleteLater ()));
+    QPointer<QWebSocket> ws_ptr (ws);
+    QTimer::singleShot (5000, ws, [ws_ptr] () {
+      if (!ws_ptr) return;
+      ws_ptr->abort ();
+      ws_ptr->deleteLater ();
+    });
+    ws->close ();
+  }
+}
+
+int
+websocket_link_rep::current_limit () {
+  // the limit of the preference once the client is logged in; the answer
+  // to a login goes out after the server has registered it (see 'write')
+  if (!logged && alive) {
+    logged= as_bool (call ("server-client-logged?", object (socket_id)));
+    if (logged && ws) {
+      ws->setMaxAllowedIncomingFrameSize (limit);
+      ws->setMaxAllowedIncomingMessageSize (limit);
+    }
+  }
+  return logged ? limit : min (limit, websocket_login_limit);
+}
+
+void
+websocket_link_rep::write (string s, int channel) {
+  DEBUG_SOCKET("'websocket_link_rep::write' received size " << N(s));
+  if ((!alive) || (channel != LINK_IN) || !N(s) || !ws)
+    return;
+  (void) current_limit ();
+  c_string buf (s);
+  ws->sendBinaryMessage (QByteArray ((const char*) buf, N(s)));
+}
+
+void
+websocket_link_rep::binary_received (const QByteArray& data) {
+  if (!exists (this) || !alive) return;
+  DEBUG_SOCKET("'websocket_link_rep::binary_received', socket "
+    << socket_id << " received size " << (int) data.size ());
+  int cur= current_limit ();
+  if (N(input_buffer) + (int) data.size () > cur) {
+    // a packet which never ends, or packets which the server does not read
+    SLOGE ("WebSocket client " * as_string (socket_id) * " sent more than "
+        * as_string (cur) * " bytes which were not read"
+        * (logged ? string ("") : string (" before login"))
+        * ": closing it");
+    stop ();
+    return;
+  }
+  input_buffer << string (data.constData (), (int) data.size ());
+  if (!is_nil (feed_cmd))
+    feed_cmd->apply ();
+}
+
+void
+websocket_link_rep::text_received (const QString& data) {
+  // the packets travel in binary messages only
+  (void) data;
+  if (!exists (this) || !alive) return;
+  SLOGE ("WebSocket client " * as_string (socket_id)
+      * " sent a text message: closing it");
+  stop ();
+}
+
+void
+websocket_link_rep::closing () {
+  // Qt closes the WebSocket itself when the client breaks the protocol or
+  // the limit, but goes on reading what the client sends, at a cost which
+  // grows faster than what it reads: with Qt 6.9.2, a client which sends
+  // a few more MB keeps the server busy for minutes. The closing frame is
+  // written when this is called: the socket is dropped at once. Qt tells
+  // this again when the socket closes, that is, from 'abort'.
+  if (!ws) return;
+  QObject::disconnect (ws, SIGNAL (aboutToClose ()), this, SLOT (closing ()));
+  QWebSocketProtocol::CloseCode code= ws->closeCode ();
+  if (code != QWebSocketProtocol::CloseCodeNormal &&
+      code != QWebSocketProtocol::CloseCodeGoingAway)
+    SLOGE ("WebSocket client " * as_string (socket_id) * " closed by Qt: "
+        * string (ws->closeReason ().toUtf8 ().constData ())
+        * (logged || code != QWebSocketProtocol::CloseCodeTooMuchData ?
+           string ("") : string (" (before login, at most ")
+                         * as_string (websocket_login_limit)
+                         * string (" bytes)")));
+  ws->abort ();
+}
+
+void
+websocket_link_rep::closed () {
+  if (!exists (this)) return;
+  DEBUG_SOCKET("'websocket_link_rep::closed', socket "
+    << socket_id << " hung up");
+  stop ();
+}
+
+#endif // QT_WEBSOCKETS_LIB
+
+/******************************************************************************
 * Server
 ******************************************************************************/
 
@@ -683,6 +878,237 @@ static inline void
 checkout (socket_server_rep* s) {
   all_servers->remove ((pointer) s);
 }
+
+/******************************************************************************
+* WebSocket clients of the server
+*
+* The clients in a browser come to a port of their own (by default the one
+* which follows the port of the server), where a QWebSocketServer listens:
+* the port of the server and its clients are left as they are.
+*
+* The preference "server websocket" says who may come: "on" (the default)
+* every machine (all the addresses of this one, IPv4 and IPv6), "local"
+* only this machine (127.0.0.1), "off" nobody. With "on" the port speaks
+* wss (WebSockets over TLS) when the server asks its clients for TLS
+* (preference "tls-server", on by default), so that no password travels
+* in clear; without a certificate which Qt can use, it then serves this
+* machine only, in ws, as with "local", and says so in the log. Otherwise
+* it speaks ws. A page served over https may open ws to this machine, but
+* only wss to another one.
+*
+* A browser lets any page open a WebSocket to any address, so that the
+* pages whose WebSockets are accepted are listed in "server websocket
+* origins": "local" for the pages served from this machine (http or https
+* from localhost, 127.0.0.1 or [::1]), the origins of other pages
+* (scheme://host[:port]), "*" for every page; by default those of this
+* machine and https://mgubi.github.io. A client which sends no Origin is
+* not a page of a browser and is accepted, as on the port of the server.
+*
+* "server websocket limit" bounds, in megabytes, what a client may send
+* that the server has not read yet: a message, or the start of a packet
+* which does not end. Before the client is logged in, the bound is 64 KB.
+*
+* The TLS sessions of wss are those of Qt, with the certificate of the
+* server ($TEXMACS_SERVER_CERT_DIR/cert.pem and key.pem, as in gnutls.cpp),
+* which the browser must trust: a certificate of an authority for the name
+* of the host (Let's Encrypt...), not the self-signed one of the tests.
+******************************************************************************/
+
+#ifdef QT_WEBSOCKETS_LIB
+
+static string
+websocket_mode () {
+#if QT_VERSION < QT_VERSION_CHECK(6,4,0)
+  // a browser gives up when the subprotocol it asked for is not confirmed,
+  // and the sockets of Emscripten ask for one: this needs
+  // QWebSocketServer::setSupportedSubprotocols
+  return "off";
+#endif
+  string mode= get_preference ("server websocket", "on");
+  if (mode == "default") mode= "on";
+  return mode;
+}
+
+// the pages of this machine, and the version of TeXmacs for the browser
+// published from the repository on GitHub Pages; every page of that
+// account (github.io) has the same origin
+#define WEBSOCKET_DEFAULT_ORIGINS "local https://mgubi.github.io"
+
+static int
+websocket_limit () {
+  string pref= get_preference ("server websocket limit", "16");
+  int mb= is_int (pref) ? as_int (pref) : 16;
+  if (mb < 1) mb= 16;
+  if (mb > 2047) mb= 2047; // the bytes have to fit in an int
+  return mb << 20;
+}
+
+static bool
+websocket_local_origin (string origin) {
+  // a page of this machine: http or https, a loopback host, any port
+  string rest;
+  if (starts (origin, "http://")) rest= origin (7, N(origin));
+  else if (starts (origin, "https://")) rest= origin (8, N(origin));
+  else return false;
+  const char* hosts[]= { "localhost", "127.0.0.1", "[::1]" };
+  for (int i=0; i<3; i++) {
+    string h= hosts[i];
+    if (rest == h) return true;
+    if (starts (rest, h * ":") && N(rest) > N(h) + 1) {
+      int j;
+      for (j= N(h) + 1; j < N(rest); j++)
+        if (!is_digit (rest[j])) break;
+      if (j == N(rest)) return true;
+    }
+  }
+  return false;
+}
+
+static bool
+websocket_origin_allowed (string origin, array<string> allowed) {
+  if (origin == "") return true; // not a page of a browser
+  origin= locase_all (origin);
+  for (int i=0; i<N(allowed); i++) {
+    string a= locase_all (allowed[i]);
+    if (a == "*" || a == origin) return true;
+    if (a == "local" && websocket_local_origin (origin)) return true;
+  }
+  return false;
+}
+
+static array<string>
+websocket_origins () {
+  string pref= get_preference ("server websocket origins",
+                               WEBSOCKET_DEFAULT_ORIGINS);
+  array<string> a= tokenize (replace (pref, ",", " "), " "), r;
+  for (int i=0; i<N(a); i++)
+    if (a[i] != "") r << a[i];
+  return r;
+}
+
+#ifndef QT_NO_SSL
+static QByteArray
+read_server_file (string name) {
+  c_string path (concretize (url ("$TEXMACS_SERVER_CERT_DIR/" * name)));
+  QFile file (QString::fromUtf8 ((const char*) path));
+  if (!file.open (QIODevice::ReadOnly)) return QByteArray ();
+  return file.readAll ();
+}
+#endif
+
+void
+socket_server_rep::start_websockets () {
+#if QT_VERSION >= QT_VERSION_CHECK(6,4,0)
+  string mode= websocket_mode ();
+  if (mode == "off") return;
+  string pref= get_preference ("server websocket port", "default");
+  int wport= port + 1;
+  if (pref != "default") wport= is_int (pref) ? as_int (pref) : -1;
+  bool everyone= (mode == "on");
+  bool secure= everyone && get_preference ("tls-server") == string ("on");
+  string sport= (wport < 0 ? pref : as_string (wport));
+  string where= (everyone ? string ("") : string ("127.0.0.1")) * ":" * sport;
+  if (wport < 1 || wport > 65535 || wport == (int) port) {
+    SLOGE ("cannot serve WebSocket clients at " * where
+        * (wport == (int) port ? string (": it is the port of the server") :
+                                 string (": not a port")));
+    return;
+  }
+  int limit= websocket_limit ();
+  array<string> origins= websocket_origins ();
+
+#ifndef QT_NO_SSL
+  QSslConfiguration conf= QSslConfiguration::defaultConfiguration ();
+#endif
+  if (secure) {
+    string why;
+#ifndef QT_NO_SSL
+    QList<QSslCertificate> chain=
+      QSslCertificate::fromData (read_server_file ("cert.pem"), QSsl::Pem);
+    QByteArray pem= read_server_file ("key.pem");
+    QSslKey key (pem, QSsl::Rsa, QSsl::Pem);
+    if (key.isNull ()) key= QSslKey (pem, QSsl::Ec, QSsl::Pem);
+    if (!QSslSocket::supportsSsl ()) why= "Qt has no support for TLS";
+    else if (chain.isEmpty () || key.isNull ())
+      why= "no certificate with an RSA or EC key in $TEXMACS_SERVER_CERT_DIR";
+    else {
+      conf.setLocalCertificateChain (chain);
+      conf.setPrivateKey (key);
+      conf.setPeerVerifyMode (QSslSocket::VerifyNone);
+    }
+#else
+    why= "Qt has no support for TLS";
+#endif
+    if (why != "") {
+      // without TLS no password may come from another machine: the port
+      // serves this machine only, as with "local"
+      where= "127.0.0.1:" * sport;
+      SLOGW ("no WebSocket clients of other machines (wss): " * why
+          * "; only those of this machine, in ws, at " * where);
+      everyone= secure= false;
+    }
+  }
+
+  // not a child of this server: see 'stop'
+  QWebSocketServer* server= new QWebSocketServer (QString ("TeXmacs"),
+    secure ? QWebSocketServer::SecureMode : QWebSocketServer::NonSecureMode);
+#ifndef QT_NO_SSL
+  if (secure) server->setSslConfiguration (conf);
+#endif
+  // the subprotocol of the sockets of Emscripten, which ask for it
+  server->setSupportedSubprotocols (QStringList () << QString ("binary"));
+  // no limit on the clients which are opening: when it is reached Qt
+  // stops accepting, and the server over TLS of Qt 6.9 never starts again
+  // if those clients leave before the end of their handshake, so that a
+  // few connections would close the port for good. Each of them is closed
+  // after the time below anyway.
+  server->setMaxPendingConnections (1 << 20);
+  int timeout= as_int (get_preference ("server contact timeout", "10000"));
+  if (timeout > 0) server->setHandshakeTimeout (timeout);
+  // called during the handshake, which Qt refuses unless it is allowed
+  QObject::connect (server, &QWebSocketServer::originAuthenticationRequired,
+    server, [origins] (QWebSocketCorsAuthenticator* auth) {
+      string origin= string (auth->origin ().toUtf8 ().constData ());
+      if (websocket_origin_allowed (origin, origins)) return;
+      auth->setAllowed (false);
+      SLOGW ("WebSocket refused to a page of " * origin
+          * " (preference \"server websocket origins\")");
+    }, Qt::DirectConnection);
+  if (!server->listen (everyone ? QHostAddress (QHostAddress::Any) :
+                                  QHostAddress (QHostAddress::LocalHost),
+                       (quint16) wport)) {
+    SLOGE ("cannot serve WebSocket clients at " * where * ": "
+        * string (server->errorString ().toUtf8 ().constData ()));
+    delete server;
+    return;
+  }
+  websocket_server_ptr= server;
+  websocket_limit_bytes= limit;
+  connect (server, SIGNAL (newConnection ()),
+           this, SLOT (websocket_connection ()));
+  SLOGI ("waiting for WebSocket clients (" * string (secure ? "wss" : "ws")
+      * ") at " * where);
+#endif
+}
+
+void
+socket_server_rep::websocket_connection () {
+  // the WebSockets which are open: Qt did their handshake
+  static int next_id= 1 << 30; // above any file descriptor
+  if (!exists (this) || !websocket_server_ptr) return;
+  while (websocket_server_ptr->hasPendingConnections ()) {
+    QWebSocket* ws= websocket_server_ptr->nextPendingConnection ();
+    if (next_id == 0x7fffffff) next_id= 1 << 30;
+    while (socket_ptr_from_id->contains (next_id)) next_id++;
+    int id= next_id++;
+    string from= websocket_host (ws);
+    address_from_id (id)= from;
+    SLOGI ("WebSocket opened from " * from * " as client " * as_string (id));
+    add_link (new websocket_link_rep (id, ws, websocket_limit_bytes), from);
+  }
+}
+
+#endif // QT_WEBSOCKETS_LIB
 
 socket_server_rep::socket_server_rep (string host2, unsigned short port2):
   host (host2), port (port2), socket_id (-1), notifier_ptr (NULL),
@@ -767,6 +1193,9 @@ socket_server_rep::start () {
     this, &socket_server_rep::connection);
 #endif
   SLOGI ("waiting for connections at " * host * ":" * as_string (port));
+#ifdef QT_WEBSOCKETS_LIB
+  start_websockets ();
+#endif
   call ("server-create-default-admin-account");
   return "";
 }
@@ -785,6 +1214,16 @@ socket_server_rep::stop () {
     delete notifier_ptr;
     notifier_ptr= NULL;
   }
+#ifdef QT_WEBSOCKETS_LIB
+  if (websocket_server_ptr) {
+    // its port is free at once; the server goes with the clients which
+    // are still opening, once their signals are over
+    websocket_server_ptr->close ();
+    websocket_server_ptr->disconnect (this);
+    websocket_server_ptr->deleteLater ();
+    websocket_server_ptr= NULL;
+  }
+#endif
   safe_server_close (socket_id);
   socket_id= -1;
 #if defined(OS_MACOS)
@@ -799,7 +1238,7 @@ void
 socket_server_rep::connection (int s) {
   if (!exists (this)) return;
   SLOGI ("new connection received from " * as_string (s));
-  int client; socket_link_rep* clt;
+  int client;
   SOCKADDR_STORAGE cltadd;
   socklen_t sz= sizeof (cltadd);
   if (!notifier_ptr->isEnabled ()) return;
@@ -876,22 +1315,28 @@ socket_server_rep::connection (int s) {
   SLOGI ("contact started from " * string_from_socket_address (&cltadd)
     * " at socket " * as_string (client));
 
-  clt= new socket_link_rep (client, &cltadd, contact);
+  add_link (new socket_link_rep (client, &cltadd, contact),
+            string_from_socket_address (&cltadd));
+}
+
+void
+socket_server_rep::add_link (socket_link_rep* clt, string from) {
+  int client= clt->get_socket_id ();
   string st= clt->start ();
   if (st != "") {
-    SLOGE ("'socket_link_rep' failed from "
-      * string_from_socket_address (&cltadd)
+    SLOGE ("'socket_link_rep' failed from " * from
       * " at socket " * as_string (client) * ": " * st);
     clt->stop ();
     clt->deleteLater ();
+    address_from_id->reset (client);
+    return;
   }
   socket_ptr_from_id (clt->get_socket_id ())= (pointer) clt;
   connections->insert ((pointer) clt);
   call ("server-add", object (clt->get_socket_id ()));
   connect (clt, SIGNAL (disconnection(socket_link_rep*)), this,
 	   SLOT (disconnection (socket_link_rep*)));
-  SLOGI ("'socket_link_rep' started from "
-    * string_from_socket_address (&cltadd)
+  SLOGI ("'socket_link_rep' started from " * from
     * " at socket " * as_string (client));
 }
 
