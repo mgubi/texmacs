@@ -15,8 +15,6 @@
 #include "pager.hpp"
 #include "sys_utils.hpp" // get_env
 #include "iterator.hpp"
-box format_snapped_stack (path ip, array<box> bx, array<space> ht, SI height,
-                          SI snap);
 box format_stack (path ip, array<box> bx, array<space> ht, SI height,
 		  bool may_stretch);
 #include "Boxes/construct.hpp"
@@ -56,11 +54,6 @@ pager_rep::pages_format (array<page_item> l, SI ht, SI tcor, SI bcor) {
   }
   if (N(bs) == 0) {
     box b= empty_box (decorate_middle (ip), 0, -ht, 0, 0);
-    return vcorrect_box (b->ip, b, tcor, bcor);
-  }
-  else if (snap > 0) {
-    box b= format_snapped_stack (ip, bs, spc, ht, snap);
-    if (N(bs) >= 2 && (is_nil (body) || N(bs) > body->subnr ())) body= b;
     return vcorrect_box (b->ip, b, tcor, bcor);
   }
   else {

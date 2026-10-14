@@ -46,7 +46,6 @@ protected:
   double        magf;          // the current magnification factor
   SI            pixel;         // current size of a pixel on the screen
   SI            zpixel;        // pixel multiplied by zoom factor
-  SI            draw_pixel;    // pixel of the renderer at the last repaint
   rectangles    copy_always;   // for wiping out cursor
   int           input_mode;    // INPUT_NORMAL, INPUT_SEARCH, INPUT_REPLACE
 
@@ -114,8 +113,6 @@ public:
   void invalidate (SI x1, SI y1, SI x2, SI y2);
   void invalidate (rectangles rs);
   void invalidate_all ();
-  SI   shift_pixel (bool& allowed);
-  rectangle shift_contents (SI y1, SI y2, SI dy);
   void update_visible ();
   void scroll_to (SI x, SI y);
   void set_extents (SI x1, SI y1, SI x2, SI y2);
