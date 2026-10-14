@@ -83,12 +83,12 @@
     (set-boolean-preference pref enable?)
     (reinit-plugin-single lan)))
 
-(set! alt-launcher
-      (lambda (langname)
-        (let ((kernel (plugin->jupyter langname)))
-          (if (and kernel (run-via-jupyter? (jupyter->plugin kernel)))
-              (jupyter-launcher kernel)
-              #f))))
+(plugin-alt-launcher-set!
+ (lambda (langname)
+   (let ((kernel (plugin->jupyter langname)))
+     (if (and kernel (run-via-jupyter? (jupyter->plugin kernel)))
+         (jupyter-launcher kernel)
+         #f))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Handle plugins that are only supported through Jupyter

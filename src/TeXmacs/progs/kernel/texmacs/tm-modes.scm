@@ -271,6 +271,12 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define-public remote-control-flag? #f)
+
+;; Other modules change the flag with this function: in S7 a set! of a public
+;; variable from another module does not change the variable of this module,
+;; which remote-control-mode? reads.
+(define-public (remote-control-set! flag) (set! remote-control-flag? flag))
+
 (define-public remote-control-remap (make-ahash-table))
 
 (define-public (cyrillic-input-method? what)
@@ -328,8 +334,10 @@
         (else (cons (car l) (lazy-initialize-do (cdr l) id)))))
 
 (define-public-macro (lazy-initialize module pred?)
-  `(with id lazy-initialize-id
-     (set! lazy-initialize-id (+ id 1))
+  ;; the expansion calls functions of this module rather than set! its
+  ;; variables: in S7 the set! would change other variables than the ones
+  ;; which lazy-initialize-impl and lazy-initialize-force use
+  `(with id (lazy-initialize-new-id)
      (lazy-initialize-impl id
        (lambda ()
          ,pred?)
@@ -337,9 +345,17 @@
          (import-from ,module)))
      (delayed
        (:idle 5000)
-       (set! lazy-initialize-pending
-             (lazy-initialize-do lazy-initialize-pending id))
+       (lazy-initialize-done id)
        (import-from ,module))))
+
+(define-public (lazy-initialize-new-id)
+  (with id lazy-initialize-id
+    (set! lazy-initialize-id (+ id 1))
+    id))
+
+(define-public (lazy-initialize-done id)
+  (set! lazy-initialize-pending
+        (lazy-initialize-do lazy-initialize-pending id)))
 
 (define-public (lazy-initialize-force)
   (set! lazy-initialize-pending

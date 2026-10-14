@@ -47,6 +47,11 @@
 
 (define-public scheme-completions-built? #f)
 
+;; Other modules ask for the completions with this function: in S7 they see
+;; the first value of scheme-completions-built?, which this module changes.
+(define-public (scheme-completions-ensure)
+  (if (not scheme-completions-built?) (scheme-completions-rebuild)))
+
 (tm-define (all-used-modules)
   (cons (current-module) (module-uses (current-module))))
 

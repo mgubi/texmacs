@@ -201,7 +201,7 @@
 (tm-define (toggle-remote-control-mode)
   (:synopsis "Toggle remote keyboard control mode")
   (:check-mark "v" remote-control-mode?)
-  (set! remote-control-flag? (not remote-control-flag?)))
+  (remote-control-set! (not (remote-control-mode?))))
 
 (define (test-zoom-factor? z)
   (<= (abs (- (get-window-zoom-factor) (eval z))) 0.01))
