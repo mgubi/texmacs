@@ -572,16 +572,18 @@ join (patch& p1, patch p2, tree t) {
       modification i2= get_inverse (p2);
       modification i1= get_inverse (p1);
       bool r= join (m1, m2, t);
+      if (!r) return false;
       bool v= join (i2, i1, clean_apply (p2, clean_apply (p1, t)));
-      if (r && v) p1= patch (m1, i2);
-      return r && v;
+      if (v) p1= patch (m1, i2);
+      return v;
     }
   if (get_type (p1) == PATCH_COMPOUND &&
-      nr_children (p1) > 0 &&
-      nr_children (remove_set_cursor (p1)) == 1)
+      nr_children (p1) > 0)
     {
+      // no copy needed: join only builds new patches on success, and copying
+      // is very expensive for large modifications (bug #62862)
       int nr= nr_children (p1);
-      patch p1b= remove_set_cursor (p1);
+      patch p1b= remove_set_cursor (p1, false);
       if (nr_children (p1b) == 1) {
         bool rf= join (p1b, p2, t);
         if (rf) {
@@ -596,11 +598,10 @@ join (patch& p1, patch p2, tree t) {
       }
     }
   if (get_type (p2) == PATCH_COMPOUND &&
-      nr_children (p2) > 0 &&
-      nr_children (remove_set_cursor (p2)) == 1)
+      nr_children (p2) > 0)
     {
       int nr= nr_children (p2);
-      patch p2b= remove_set_cursor (p2);
+      patch p2b= remove_set_cursor (p2, false);
       if (nr_children (p2b) == 1) {
         bool rf= join (p1, p2b, t);
         if (rf && nr >= 2 && is_set_cursor (child (p2, nr-1))) {
@@ -735,16 +736,17 @@ cursor_hint (patch p, tree t) {
 }
 
 patch
-remove_set_cursor (patch p) {
+remove_set_cursor (patch p, bool copy_flag) {
   switch (get_type (p)) {
   case PATCH_MODIFICATION:
-    if (get_modification (p)->k != MOD_SET_CURSOR) return copy (p);
+    if (get_modification (p)->k != MOD_SET_CURSOR)
+      return copy_flag? copy (p): p;
     return patch (array<patch> ());
   case PATCH_COMPOUND:
     {
       array<patch> r;
       for (int i=0; i<N(p); i++) {
-        patch q= remove_set_cursor (p[i]);
+        patch q= remove_set_cursor (p[i], copy_flag);
         r << children (q);
       }
       if (N(r) == 1) return r[0];
@@ -752,10 +754,10 @@ remove_set_cursor (patch p) {
     }
   case PATCH_BRANCH:
   case PATCH_BIRTH:
-    return copy (p);
+    return copy_flag? copy (p): p;
   case PATCH_AUTHOR:
     {
-      patch q= remove_set_cursor (p[0]);
+      patch q= remove_set_cursor (p[0], copy_flag);
       if (nr_children (q) == 0) return q;
       else return patch (get_author (p), q);
     }
