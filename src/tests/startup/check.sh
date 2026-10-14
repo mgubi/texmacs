@@ -71,6 +71,10 @@ two ()
 quit ()" \
       -headless -x "$atquit" -x "$(show one)" -q -x "$(show two)"
 
+check "headless: -test-suite without its argument quits" \
+      "quit ()" \
+      -headless -x "$atquit" -test-suite
+
 check "-q quits after the files, wherever it is" \
       "quit (startup-b.tm startup-a.tm)" \
       -q -x "$atquit" startup-a.tm startup-b.tm

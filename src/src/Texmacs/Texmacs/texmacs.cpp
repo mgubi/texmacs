@@ -444,19 +444,19 @@ set_global_options  (int argc, char** argv)  {
       else if (s == "-tls-no-verify") tls_no_verify= true;
       else if (s == "-build-manual") {
         // the manual and the test suites quit when they are done
-        exec_exit= false;
+        if (i+1<argc) exec_exit= false;
         if ((++i)<argc)
           extra_init_cmd << "(build-manual "
                          << scm_quote (argv[i]) << " delayed-quit)";
       }
       else if (s == "-reference-suite") {
-        exec_exit= false;
+        if (i+1<argc) exec_exit= false;
         if ((++i)<argc)
           extra_init_cmd << "(build-ref-suite "
                          << scm_quote (argv[i]) << " delayed-quit)";
       }
       else if (s == "-test-suite") {
-        exec_exit= false;
+        if (i+1<argc) exec_exit= false;
         if ((++i)<argc)
           extra_init_cmd << "(run-test-suite "
                          << scm_quote (argv[i]) << "delayed-quit)";
