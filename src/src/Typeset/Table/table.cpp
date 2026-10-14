@@ -392,6 +392,14 @@ table_rep::handle_decorations () {
   nr_cols= new_cols;
   i0     = off_i[i0] + ex_i1[i0];
   j0     = off_j[j0] + ex_j1[j0];
+
+  /*** the column widths are for the new number of columns ***/
+  if (mw != NULL) tm_delete_array (mw);
+  if (lw != NULL) tm_delete_array (lw);
+  if (rw != NULL) tm_delete_array (rw);
+  mw= tm_new_array<SI> (nr_cols);
+  lw= tm_new_array<SI> (nr_cols);
+  rw= tm_new_array<SI> (nr_cols);
 }
 
 void

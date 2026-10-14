@@ -367,7 +367,7 @@ edit_table_rep::table_individualize (path fp, string var) {
             tree with (CWITH);
             with << as_string (i+1) << as_string (i+1)
                  << as_string (j+1) << as_string (j+1)
-                 << copy (st[k][4]) << copy (st[k][5]) << copy (st[k][6]);
+                 << copy (st[k][4]) << copy (st[k][5]);
             ins_format << with;
           }
         remove (fp * k, 1);
