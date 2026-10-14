@@ -1019,11 +1019,16 @@ scheme_of (object x) {
   return "#f";
 }
 
-// the command of an input: its value is the answer under a number
+extern bool vue_committing_inputs; // vue_widget.cpp
+
+// the command of an input: its value is the answer under a number. In a
+// dialog which a return validates (one which asks for values), the value
+// given by return then presses its last button ("Ok"), as in the page
 class answer_command_rep: public command_rep {
   int number;
+  int submit;
 public:
-  answer_command_rep (int n): number (n) {}
+  answer_command_rep (int n, int s= 0): number (n), submit (s) {}
   void apply () {}
   void apply (object args) {
     // (the arguments of the command; an input which is given up says #f)
@@ -1034,6 +1039,10 @@ public:
       for (; !is_null (args); args= cdr (args)) r += " " + scheme_of (car (args));
     else r= " " + scheme_of (args);
     core_say ("answer " + std::to_string (number) + escaped (r));
+    if (submit != 0 && !vue_committing_inputs) {
+      vue_commit_inputs (); // (the other fields of the dialog)
+      core_say ("invoke " + std::to_string (submit));
+    }
   }
   tm_ostream& print (tm_ostream& out) { return out << "answer " << number; }
 };
@@ -1103,6 +1112,21 @@ struct context { bool dialog; bool row; bool sized= false; };
 
 // the first input of what is being made: it takes the keyboard
 static widget first_input;
+
+// the button which a return in a field of the dialog being made presses
+static int dialog_submit= 0;
+
+// the action of the last button among the nodes items (in their order)
+static int
+last_button (const json& items) {
+  int r= 0;
+  for (const json& node : items.a) {
+    if (node["kind"].str () == "entry" && node["button"].truth ())
+      r= node["action"].num ();
+    if (node.has ("items")) { int b= last_button (node["items"]); if (b) r= b; }
+  }
+  return r;
+}
 
 static widget build (const json& node, int style, context c);
 static array<widget> build_items (const json& items, int style, context c);
@@ -1339,7 +1363,8 @@ build (const json& node, int style, context c) {
     }
   }
   else if (kind == "input") {
-    command cmd= tm_new<answer_command_rep> (node["answer"].num ());
+    command cmd= tm_new<answer_command_rep> (node["answer"].num (),
+                                             dialog_submit);
     array<string> def;
     def << node["value"].text ();
     for (const json& v : node["proposals"].a)
@@ -1502,7 +1527,9 @@ show_dialog (const json& m) {
   remove_dialog (id); // (shown again: with its new contents)
   context c= { true, false };
   first_input= widget ();
+  dialog_submit= m["submit"].truth ()? last_button (m["items"]): 0;
   widget body= pack (build_items (m["items"], 0, c), c);
+  dialog_submit= 0;
   command quit= tm_new<close_dialog_command_rep> (id);
   widget win= plain_window_widget (body, m["title"].text (), quit);
   dialogs (id)= win;
@@ -1970,7 +1997,9 @@ handle_message (std::string kind, std::string part, const json& desc) {
   else if (kind == "preference") {
     // a preference which Vue reads (the place of the icon bars, the
     // theme, the icons): they are the core's, which says them
-    string name= desc["name"].text (), value= desc["value"].text ();
+    // (as TeXmacs keeps them, not texts for the screen: no encoding)
+    string name (desc["name"].str ().c_str ());
+    string value (desc["value"].str ().c_str ());
     if (get_user_preference (name, "") != value) {
       set_user_preference (name, value);
       if (name == "gui theme") set_vue_theme (value);

@@ -15,7 +15,10 @@ let afterAction = () => {}; // gives the keyboard back to the view
 let makeView = () => null;   // the canvas of a view in a dialog (tau.mjs)
 let keyName = () => null;    // a key in the notation of TeXmacs (tau.mjs)
 
-const waitingContents = new Map(); // number of a submenu -> resolve
+// number of a submenu -> { asked: answers still to come, resolves }. Only
+// the answer to the last request is used: the core forgets the numbers of
+// the contents it said before when it says them again
+const waitingContents = new Map();
 const waitingFiles = new Map();    // path -> { promise, resolve }
 const popups = [];                 // the open menus, outermost first
 let contextAt = { x: 100, y: 100 }; // where the right button was pressed last
@@ -71,9 +74,11 @@ export function handle(m) {
 		return true;
 	}
 	case "contents": {
-		const resolve = waitingContents.get(m.part);
-		waitingContents.delete(m.part);
-		if (resolve) resolve(m.items);
+		const w = waitingContents.get(m.part);
+		if (w && --w.asked <= 0) {
+			waitingContents.delete(m.part);
+			for (const resolve of w.resolves) resolve(m.items);
+		}
 		return true;
 	}
 	case "popup": showContextMenu(m.items); return true;
@@ -119,7 +124,11 @@ function iconUrl(path) {
 
 function expand(number) {
 	return new Promise(resolve => {
-		waitingContents.set(String(number), resolve);
+		const key = String(number);
+		const w = waitingContents.get(key) || { asked: 0, resolves: [] };
+		w.asked++;
+		w.resolves.push(resolve);
+		waitingContents.set(key, w);
 		send({ t: "expand", number });
 	});
 }
@@ -203,25 +212,29 @@ function tooltip(node) {
 
 const CHECKS = { v: "✓", o: "●", "*": "●" };
 
+const fieldKinds = new Set(["input", "choice", "toggle"]);
+
 // The elements of a list of nodes, in a bar or in a menu
 function renderItems(items, context) {
 	const out = [];
 	for (const node of items || []) {
-		if (context.dialog && renderDialogItem(node, context, out)) continue;
+		// (the fields are those of a dialog in a bar too: the bar of the
+		// focus has some, the label of a tag, its parameters)
+		if ((context.dialog || fieldKinds.has(node.kind)) && renderDialogItem(node, context, out)) continue;
 		switch (node.kind) {
 		case "refreshable":
-			// in a menu the part is kept, to be described again while the
-			// menu is open (the palette of the colour menus); a bar is
-			// described again whole
-			if (!context.bar) {
-				const e = el("div", "tau-refreshable");
+			// the part is kept, to be described again (the palette of the
+			// colour menus while the menu is open); in a bar it is no box
+			// of its own (the bar is not described again for it: its
+			// expansion is the same)
+			{
+				const e = el(context.bar ? "span" : "div", "tau-refreshable");
+				if (context.bar) e.style.display = "contents";
 				e.dataset.refresh = node.number;
 				e.tauContext = context;
 				e.append(...renderItems(node.items, context));
 				out.push(e);
-				break;
 			}
-			out.push(...renderItems(node.items, context));
 			break;
 		case "hlist": case "horizontal":
 			// a row of a menu (a text and a list to choose from)
@@ -544,7 +557,10 @@ function renderInput(node) {
 			// the start and the end, select all, copy, cut, paste, undo)
 			if (event.isComposing || event.keyCode === 229) return;
 			const key = keyName(event);
-			if (!key || [...key].length === 1) return;
+			// (a character is the field's, but for the spell checker the
+			// digits choose a suggestion and + adds the word, as elsewhere)
+			const spell = /^spell/.test(String(node.type || "").replace(/^[^:]*:/, ""));
+			if (!key || ([...key].length === 1 && !(spell && /^[1-9+]$/.test(key)))) return;
 			const base = key.replace(/^([SCAM]-)+/, "");
 			if (["backspace", "delete", "left", "right", "home", "end", "space"].includes(base)) return;
 			if ((event.ctrlKey || event.metaKey) && !event.altKey && ["a", "c", "v", "x", "z", "y"].includes(base.toLowerCase())) return;

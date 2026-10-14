@@ -144,6 +144,18 @@ test("a dialog: typed, then Ok", async () => {
 	} finally { s.stop(); }
 });
 
+test("a dialog: typed, then return", async () => {
+	// (return in a field of a dialog which asks for values presses Ok, as
+	// in the page)
+	const file = out("returned.txt");
+	const s = start({ scheme: `(interactive (lambda (x) (string-save x (system->url "${file}"))) "Text to insert")`,
+		lines: ["text By return", "key return"], waitFirst: 35 });
+	try {
+		await until("the answer is written", () => read(file) !== null, 40000);
+		check("the value which was typed", read(file) === "By return", read(file));
+	} finally { s.stop(); }
+});
+
 test("answers which are not data", async () => {
 	// to the core itself: an answer is read, never evaluated
 	const mark = out("pwned-answer");

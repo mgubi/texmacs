@@ -334,6 +334,9 @@ tau_chrome (int which, object menu) {
   else if (which < 20) part= "side-" * as_string (which - 10);
   else part= "bottom-" * as_string (which - 20);
   string json= as_string (call ("tau-serialize-part", object (part), menu));
+  // (an error is no description: the part is then empty, on both sides;
+  // the page dropped it, and kept a bar whose numbers were forgotten)
+  if (N(json) == 0) json= "{\"items\":[]}";
   tau_post_json ("chrome", part, json);
 }
 

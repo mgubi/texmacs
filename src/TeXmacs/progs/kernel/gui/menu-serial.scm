@@ -105,6 +105,13 @@
 (define serial-refresh (make-ahash-table))  ;; number -> (kind . part)
 (define serial-contents (make-ahash-table)) ;; numbers of contents -> #t
 (define serial-answers (make-ahash-table))  ;; numbers of inputs -> #t
+(define serial-actions (make-ahash-table))  ;; numbers of actions -> #t
+
+(define (serial-keep-action proc)
+  "Keep the action @proc of an entry (tau-invoke)."
+  (with n (serial-keep proc)
+    (ahash-set! serial-actions n #t)
+    n))
 
 (define (serial-keep-contents make)
   "Keep the closure @make, which gives the contents of a submenu (tau-expand)."
@@ -121,14 +128,18 @@
     (ahash-remove! serial-table n)
     (ahash-remove! serial-contents n)
     (ahash-remove! serial-answers n)
+    (ahash-remove! serial-actions n)
     (ahash-remove! serial-refresh n))
   (ahash-remove! serial-parts part))
 
 (define (serial-in-part part thunk)
   "The value of @thunk, whose closures are kept for @part."
+  ;; (the part is given back on an error too: what was described next was
+  ;; kept for a part which was gone)
   (with old serial-part
     (set! serial-part part)
-    (with r (thunk)
+    (with r (catch #t thunk
+              (lambda err (set! serial-part old) (apply throw err)))
       (set! serial-part old)
       r)))
 
@@ -353,7 +364,7 @@
         (enabled . ,enabled?)
         ,@(if (!= (logand style widget-style-button) 0) '((button . #t)) '())
         ,@(if help `((help . ,help)) '())
-        (action . ,(serial-keep action))))))
+        (action . ,(serial-keep-action action))))))
 
 ;; In the page a symbol of a palette is a picture which the core makes: the
 ;; fonts of the browser do not have all the symbols of TeXmacs (<jmath>,
@@ -409,9 +420,10 @@
         (shortcut . ,sh)
         (check . "")
         (enabled . ,(active? style))
-        (help . ,(if (== sh "") symstring
-                     (string-append symstring ",  keyboard equivalent: " sh)))
-        (action . ,(serial-keep (or opt-cmd
+        (help . ,(if (== sh "") (serial-text symstring)
+                     (string-append (serial-text symstring)
+                                    ",  keyboard equivalent: " sh)))
+        (action . ,(serial-keep-action (or opt-cmd
                                     (lambda () (insert symstring)))))))))
 
 (define (serial-submenu p style)
@@ -439,13 +451,29 @@
 (define (serial-nodes items style)
   (list->vector (serial-items-list items style #f)))
 
+(define (continuous-input? type)
+  "Whether the field of the type @type gives its text and the key at each key"
+  ;; (as the other ports say it, vue_widget.cpp: the search and replace
+  ;; bars, the spell checker, the fields of the forms; a type may be
+  ;; "name#serial:type")
+  (let* ((i (string-search-forwards ":" 0 type))
+         (name (if (>= i 0) (substring type 0 i) ""))
+         (t (if (>= i 0) (substring type (+ i 1) (string-length type)) type))
+         (j (string-search-forwards "#" 0 name))
+         (serial (if (>= j 0) (substring name (+ j 1) (string-length name)) "")))
+    (or (string-starts? t "search")
+        (string-starts? t "replace-")
+        (string-starts? t "spell")
+        (string-starts? serial "form-"))))
+
 (define (serial-input p style)
   "The node of the text field @p."
   (with (tag cmd type props width) p
     (with l (list-filter (props) string?)
       `((kind . input) (type . ,type)
-        ;; (these give their text and the key at each key: search-widgets.scm)
-        (continuous . ,(in? type '("search" "replace-what" "replace-by")))
+        ;; (these give their text and the key at each key: search-widgets.scm,
+        ;; spell-widgets.scm)
+        (continuous . ,(and (string? type) (continuous-input? type)))
         (value . ,(if (null? l) "" (serial-text (car l))))
         (proposals . ,(list->vector (map serial-text l)))
         (width . ,width)
@@ -685,6 +713,15 @@
 
 (define (serial-items p style bar?)
   "The nodes of the menu items @p, in a bar if @bar?, with a given @style."
+  ;; (an item whose code fails, a test or a check mark, is left out and
+  ;; said: the whole bar was lost with it, its numbers already forgotten)
+  (catch #t
+    (lambda () (serial-items-now p style bar?))
+    (lambda err
+      (display* "menu item failed: " err "\n")
+      '())))
+
+(define (serial-items-now p style bar?)
   (if (pair? p)
       (cond ((translatable? (car p))
              (list (serial-entry p style)))
@@ -741,10 +778,13 @@
 
 (tm-define (tau-invoke n)
   (:synopsis "Run the action kept under the number @n")
+  ;; (only the number of an action: the contents of a submenu, an input or
+  ;; a view are not run from outside)
   (with x (ahash-ref serial-table n)
-    (if (not x) (serial-stale)
-        (with action (cdr x)
-          (exec-delayed (lambda () (protected-call action)))))))
+    (cond ((not x) (serial-stale))
+          ((ahash-ref serial-actions n)
+           (with action (cdr x)
+             (exec-delayed (lambda () (protected-call action))))))))
 
 (tm-define (tau-answer n . args)
   (:synopsis "Give the value @args of the input kept under the number @n")
@@ -760,13 +800,18 @@
   (for (x (ahash-table->list serial-refresh))
     (let* ((n (car x)) (k (cadr x)) (sub (cddr x)))
       ;; (a part inside another one which was just described is forgotten)
+      ;; (one which fails does not stop the others)
       (when (and (== k kind) (ahash-ref serial-refresh n))
         (with make (cdr (ahash-ref serial-table n))
           (serial-forget sub)
-          (tau-post "refresh" sub
-                    `((number . ,n)
-                      (items . ,(list->vector
-                                 (serial-in-part sub make))))))))))
+          (catch #t
+            (lambda ()
+              (tau-post "refresh" sub
+                        `((number . ,n)
+                          (items . ,(list->vector
+                                     (serial-in-part sub make))))))
+            (lambda err
+              (display* "refresh failed: " err "\n"))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Dialogs

@@ -4546,8 +4546,11 @@ vue_input_text_widget_rep::continuous () {
 // now, before what a button does: the page gives the value of a field when
 // it is left, which a click on a button does, and "Ok" in a dialog which
 // asks for a value had the value before it was typed
+bool vue_committing_inputs= false; // (a value given so is no return)
+
 void
 vue_commit_inputs () {
+  vue_committing_inputs= true;
   array<vue_input_text_widget_rep*> l;
   iterator<pointer> it= iterate (live_inputs);
   while (it->busy ()) l << (vue_input_text_widget_rep*) it->next ();
@@ -4558,6 +4561,7 @@ vue_commit_inputs () {
     w->committed= copy (w->s);
     w->call_back (list_object (object (w->s)));
   }
+  vue_committing_inputs= false;
 }
 #endif
 
