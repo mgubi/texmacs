@@ -152,14 +152,19 @@
     (cond ((null? l) (reverse acc))
           ((and (pair? (car l))
                 (in? (caar l) '(em strong strike underline mark sub sup smallcaps))
-                (nnull? (cdr l)) (func? (cadr l) (caar l)))
+                (null? (tmof-node-attrs (car l)))
+                (nnull? (cdr l)) (func? (cadr l) (caar l))
+                (null? (tmof-node-attrs (cadr l))))
+           ;; (not the markup with attributes: a mark of another color)
            (let run ((m (cddr l)) (kids (append (reverse (cdadr l))
                                                 (reverse (cdar l)))))
-             (if (and (pair? m) (func? (car m) (caar l)))
+             (if (and (pair? m) (func? (car m) (caar l)) (null? (tmof-node-attrs (car m))))
                  (run (cdr m) (append (reverse (cdar m)) kids))
                  (loop m (cons `(,(caar l) ,@(tmof-merge (reverse kids)))
                                acc)))))
           (else (loop (cdr l) (cons (car l) acc))))))
+
+(define tmof-keep-spaces? #f)  ; the spaces of a document of the style office count
 
 (define (tmof-squeeze s)
   ;; with one space for several
@@ -171,7 +176,8 @@
 
 (define (tmof-trim l)
   ;; text without spaces and line breaks at its ends
-  (let* ((l (map (lambda (x) (if (string? x) (tmof-squeeze x) x)) (tmof-merge l)))
+  (let* ((l (map (lambda (x) (if (and (string? x) (not tmof-keep-spaces?)) (tmof-squeeze x) x))
+                 (tmof-merge l)))
          (drop-start
            (lambda (l)
              (let loop ((l l))
@@ -878,18 +884,73 @@
         ((== var "color") (tmof-colored body (tmof-color val)))
         ;; the alignment of the paragraphs
         ((and (== var "par-mode") (in? val '("left" "center" "right" "justify")))
-         (if (tmof-has-block? body)
-             (map (lambda (b)
-                    (cond ((func? b 'p) `(!para ((align ,val)) ,@(cdr b)))
-                          ((func? b '!para)
-                           `(!para ((align ,val) ,@(list-filter (cadr b)
-                                                                (lambda (a) (!= (car a) 'align))))
-                                   ,@(cddr b)))
-                          (else b)))
-                  (tmof-blocks body))
-             (if (null? (tmof-trim body)) body
-                 `((!para ((align ,val)) ,@body)))))
+         (tmof-para-attr body 'align val))
+        ;; the formatting of the text and of the paragraphs, as the style
+        ;; office reads it from a file
+        ((== var "font-size")
+         (with r (office-number val)
+           (if (not r) body
+               (tmof-attr-wrap* 'size `((value ,(office-decimal (* r tmof-base-size)))) body))))
+        ((and (== var "font-family") (in? val '("ss" "rm")))
+         (tmof-attr-wrap* 'font `((value ,(if (== val "ss") "sans" "serif"))) body))
+        ((== var "marked-color")
+         (map (lambda (y)
+                (if (and (func? y 'mark) (not (func? (cadr y) '@)))
+                    `(mark (@ (value ,(or (tmof-color val) val))) ,@(cdr y))
+                    y))
+              body))
+        ((in? var '("par-left" "par-right" "par-first"))
+         (with v (tmof-points val)
+           (if (not v) body
+               (tmof-para-attr body (cdr (assoc var '(("par-left" . indent-left)
+                                                       ("par-right" . indent-right)
+                                                       ("par-first" . first-indent))))
+                               (office-decimal v)))))
+        ((== var "par-sep")
+         (with v (tmof-points val)
+           (if (not v) body
+               (tmof-para-attr body 'line-spacing
+                               (office-decimal (/ (+ 1 (/ v tmof-base-size)) 1.2))))))
+        ((and (== var "ornament-color") (not (in? val '("" "#fff0" "white"))))
+         (tmof-para-attr body 'background (or (tmof-color val) val)))
+        ((and (== var "ornament-border") (not (in? val '("" "0ln" "0pt"))))
+         (tmof-para-attr body 'border "true"))
         (else body)))
+
+(define tmof-base-size 10.0)  ; the size of the font of the document
+
+(define (tmof-points s)
+  ;; the length s in points: fn are the size of the font
+  (cond ((not (string? s)) #f)
+        ((string-ends? s "fn")
+         (with v (office-number (substring s 0 (- (string-length s) 2)))
+           (and v (* v tmof-base-size))))
+        (else (office-points s))))
+
+(define (tmof-para-attr body key val)
+  ;; the paragraphs of the body with the attribute key
+  (if (tmof-has-block? body)
+      (map (lambda (b)
+             (cond ((func? b 'p) `(!para ((,key ,val)) ,@(cdr b)))
+                   ((func? b '!para)
+                    `(!para ((,key ,val) ,@(list-filter (cadr b)
+                                                        (lambda (a) (!= (car a) key))))
+                            ,@(cddr b)))
+                   (else b)))
+           (tmof-blocks body))
+      (if (null? (tmof-trim body)) body
+          `((!para ((,key ,val)) ,@body)))))
+
+(define (tmof-attr-wrap* tag attrs body)
+  ;; the text of body inside the node tag; the paragraphs of blocks each
+  (cond ((tmof-has-block? body)
+         (map (lambda (b)
+                (cond ((func? b 'p) `(p (,tag (@ ,@attrs) ,@(cdr b))))
+                      ((func? b '!para) `(!para ,(cadr b) (,tag (@ ,@attrs) ,@(cddr b))))
+                      (else b)))
+              (tmof-blocks body)))
+        ((null? (tmof-trim body)) body)
+        (else `((,tag (@ ,@attrs) ,@(tmof-merge body))))))
 
 (define (tmof-with l)
   (cond ((null? l) '())
@@ -914,6 +975,16 @@
                           body)))))))
 
 (define (tmof-surround l)
+  ;; the spaces around a paragraph, as the style office writes them
+  (if (and (== (length l) 3) (func? (car l) 'vspace*) (func? (cadr l) 'vspace))
+      (let* ((before (tmof-points (cadr (car l))))
+             (after (tmof-points (cadr (cadr l))))
+             (b (tmof (caddr l)))
+             (b (if before (tmof-para-attr b 'space-before (office-decimal before)) b)))
+        (if after (tmof-para-attr b 'space-after (office-decimal after)) b))
+      (tmof-surround* l)))
+
+(define (tmof-surround* l)
   (if (!= (length l) 3) (tmof-all l)
       (tmof-attach (tmof-inline (tmof (car l)))
                    (tmof (caddr l))
@@ -1878,13 +1949,14 @@
         ((not (pair? x)) '())
         (else
           (case (car x)
-            ((em strong strike underline mark sub sup smallcaps code)
+            ((em strong strike underline sub sup smallcaps code)
              (with l (tmof-final-inlines (tmof-node-children x))
                (if (null? l) '() (list (cons (car x) l)))))
-            ((color span ins del field)
+            ((color span ins del field size font mark)
              (with l (tmof-final-inlines (tmof-node-children x))
-               (if (and (null? l) (not (func? x 'field))) '()
-                   (list `(,(car x) (@ ,@(tmof-node-attrs x)) ,@l)))))
+               (cond ((and (null? l) (not (func? x 'field))) '())
+                     ((null? (tmof-node-attrs x)) (list (cons (car x) l)))
+                     (else (list `(,(car x) (@ ,@(tmof-node-attrs x)) ,@l))))))
             ((comment)
              (list `(comment (@ ,@(tmof-node-attrs x))
                              ,@(tmof-final-blocks (tmof-node-children x)))))
@@ -2184,6 +2256,12 @@
   (set! tmof-document?
         (and (func? x 'document) (tmfile-extract x 'body)
              (or (tmfile-extract x 'TeXmacs) (tmfile-extract x 'style))))
+  (set! tmof-keep-spaces?
+        (and tmof-document? (pair? (tmof-package (tmof-initial x)))))
+  (set! tmof-base-size
+        (or (and tmof-document?
+                 (office-number (or (assoc-ref (tmof-initial x) "font-base-size") "")))
+            10.0))
   (with body (if tmof-document? (tmfile-extract x 'body) x)
     `(office ,@(if tmof-document? (tmof-setup (tmof-initial x)) '())
              ,@(if tmof-document? (tmof-package (tmof-initial x)) '())

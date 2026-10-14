@@ -188,9 +188,13 @@
   <paragraph|Limitations>
 
   <\itemize>
-    <item>The formatting by hand of the text and of the paragraphs (a size,
-    a font, an indentation which no named style gives) is not kept, nor
-    is a section with another page than the first one.
+    <item>Of the formatting by hand, the size of a text, its family of
+    fonts (with serifs or not), its highlighting and its color, and the
+    indentations, the spaces, the line spacing, the background and the
+    border of a paragraph are kept, in both directions; the name of a
+    font, the spacing of the letters, the kinds of underlines and the
+    capitals are not, nor is a section with another page than the first
+    one.
 
     <item>A reference of an office document whose text is more than a
     number (\PTable 3\Q, the title of a section) is a link to its

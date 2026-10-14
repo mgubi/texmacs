@@ -645,6 +645,50 @@
                                                                            (cell "b"))))))))))
          (text (archive-entry (convert doc "texmacs-stree" "docx-document") "word/document.xml")))
     (check-true (export-has? text "<m:eqArr><m:e><m:r><m:t>a</m:t></m:r><m:r><m:t>&amp;</m:t>")))
+  ;; the formatting by hand: the size, the font and the highlighting of a
+  ;; text, the indentations, the spaces, the line spacing, the background
+  ;; and the border of a paragraph, from the file to TeXmacs and back
+  (let* ((body (string-append
+                 (wp "<w:pPr><w:pBdr><w:top w:val='single'/></w:pBdr>"
+                     "<w:shd w:fill='FFEEDD'/><w:spacing w:before='240' w:after='120'"
+                     " w:line='360' w:lineRule='auto'/><w:ind w:left='720' w:right='360'"
+                     " w:hanging='360'/></w:pPr>"
+                     (wr "big" "<w:rFonts w:ascii='Arial'/><w:sz w:val='28'/>")
+                     (wr " green" "<w:highlight w:val='green'/>")
+                     (wr " blue" "<w:shd w:fill='BDD7EE'/>"))))
+         (blocks (docx body))
+         (doc (office->texmacs (cons 'office blocks))))
+    (check= blocks
+            '((p (@ (indent-left "36") (indent-right "18") (first-indent "-18")
+                    (space-before "12") (space-after "6") (line-spacing "1.5")
+                    (background "#ffeedd") (border "true"))
+                 (font (@ (value "Arial")) (size (@ (value "14")) "big"))
+                 (mark (@ (value "#00ff00")) " green")
+                 (mark (@ (value "#bdd7ee")) " blue"))))
+    (check= (cdr (cadr (cadr doc)))
+            '((with "par-left" "36pt" "par-right" "18pt" "par-first" "-18pt"
+                    "par-sep" "0.8fn"
+                (surround (vspace* "12pt") (vspace "6pt")
+                  (with "ornament-color" "#ffeedd" "ornament-border" "1ln"
+                    (ornamented
+                      (concat (with "font-family" "ss" (with "font-size" "1.4" "big"))
+                              (with "marked-color" "#00ff00" (marked " green"))
+                              (with "marked-color" "#bdd7ee" (marked " blue")))))))))
+    ;; and back: the same paragraph, in both formats
+    (let* ((tm `(document (TeXmacs "2.1") (style "generic") (body ,(cadr (cadr doc)))))
+           (docx2 (convert tm "texmacs-stree" "docx-document"))
+           (text (archive-entry docx2 "word/document.xml"))
+           (odt2 (convert tm "texmacs-stree" "odt-document"))
+           (content (archive-entry odt2 "content.xml")))
+      (check-true (export-has? text "<w:sz w:val=\"28\"/>"))
+      (check-true (export-has? text "<w:highlight w:val=\"green\"/>"))
+      (check-true (export-has? text "w:fill=\"BDD7EE\""))
+      (check-true (export-has? text "<w:ind w:left=\"720\" w:right=\"360\" w:hanging=\"360\"/>"))
+      (check-true (export-has? text "<w:spacing w:before=\"240\" w:after=\"120\" w:line=\"360\" w:lineRule=\"auto\"/>"))
+      (check-true (export-has? content "fo:margin-left=\"36pt\""))
+      (check-true (export-has? content "fo:font-size=\"14pt\""))
+      (check-true (export-has? content "fo:background-color=\"#bdd7ee\""))
+      (check= (no-setup (cdr (parse-docx-document docx2))) blocks)))
   ;; an array of equations as Word saves it (one run, its marks inside) is
   ;; lines of equations again
   (check= (cadr (office->texmacs
@@ -1446,7 +1490,7 @@
   (check= (docx (wp "<w:pPr><w:outlineLvl w:val='1.4'/></w:pPr>" (wr "H")))
           '((p (@ (role "heading") (level "2") (numbered "no")) "H")))
   (check= (docx (wp "<w:pPr><w:ind w:left='720.5'/></w:pPr>" (wr "x")))
-          '((p "x"))))
+          '((p (@ (indent-left "36.025")) "x"))))
 
 (define (test-odt-more)
   (check-group "odt more")

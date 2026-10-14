@@ -319,6 +319,7 @@
 (define oftm-styles (make-ahash-table))  ; name -> the node style
 (define oftm-body-style #f)              ; the style of the usual paragraphs
 (define oftm-base-size 10.0)             ; the size of the font of the text
+(define oftm-base-font #f)               ; "sans" for a text without serifs
 
 (define (oftm-style-text st t)
   ;; the text t in the look of the text of the node style st
@@ -343,17 +344,32 @@
 
 (define (oftm-style-paragraph st t)
   ;; the paragraph t in the look of the node style st
+  (oftm-paragraph-format st (oftm-style-text st t) #t))
+
+(define (oftm-direct-paragraph x t)
+  ;; the paragraph t with the formatting by hand of the node p x
+  (oftm-paragraph-format x t #f))
+
+(define (oftm-paragraph-format st t align?)
+  ;; the paragraph t with the indentations, the spaces, the line spacing,
+  ;; the background and the border which the attributes of st say
   (let* ((get (lambda (k) (ox-attr st k)))
          (pt (lambda (k) (with v (office-number (get k))
                            (and v (string-append (office-decimal v) "pt")))))
+         (line (office-number (get 'line-spacing)))
          (vars (append
-                 (if (in? (get 'align) '("left" "center" "right" "justify"))
+                 (if (and align? (in? (get 'align) '("left" "center" "right" "justify")))
                      `("par-mode" ,(get 'align)) '())
                  (if (pt 'indent-left) `("par-left" ,(pt 'indent-left)) '())
-                 (if (pt 'first-indent) `("par-first" ,(pt 'first-indent)) '())))
-         (t (oftm-style-text st t))
+                 (if (pt 'indent-right) `("par-right" ,(pt 'indent-right)) '())
+                 (if (pt 'first-indent) `("par-first" ,(pt 'first-indent)) '())
+                 ;; (a line of TeXmacs is 1.2 times the size of its font)
+                 (if (and line (> line 0) (< line 5))
+                     `("par-sep" ,(string-append (office-decimal (max 0 (- (* 1.2 line) 1)))
+                                                 "fn"))
+                     '())))
          (t (if (or (get 'background) (get 'border))
-                `(with "ornament-color" ,(or (get 'background) "")
+                `(with "ornament-color" ,(or (get 'background) "#fff0")
                        "ornament-border" ,(if (get 'border) "1ln" "0ln")
                        (ornamented ,t))
                 t))
@@ -585,7 +601,30 @@
               ((sub) (oftm-wrap 'rsub l))
               ((sup) (oftm-wrap 'rsup l))
               ((code) (oftm-wrap 'verbatim l))
-              ((mark) (oftm-wrap 'marked l))
+              ((mark)
+               (with t (oftm-inlines l)
+                 (cond ((== t "") '())
+                       ((ox-attr x 'value) (list `(with "marked-color" ,(ox-attr x 'value)
+                                                    (marked ,t))))
+                       (else (list `(marked ,t))))))
+              ;; the size and the font of a text, by hand
+              ((size)
+               (let ((t (oftm-inlines l))
+                     (v (office-number (or (ox-attr x 'value) ""))))
+                 (cond ((== t "") '())
+                       ((and v (> v 0) (< v 200) (> (abs (- v oftm-base-size)) 0.2))
+                        (list `(with "font-size" ,(office-decimal (/ v oftm-base-size)) ,t)))
+                       (else (list t)))))
+              ((font)
+               (let ((t (oftm-inlines l))
+                     (f (ox-attr x 'value)))
+                 (cond ((== t "") '())
+                       ((and (office-sans? f) (!= oftm-base-font "sans"))
+                        (list `(with "font-family" "ss" ,t)))
+                       ((and f (not (office-sans? f)) (not (office-monospace? f))
+                             (== oftm-base-font "sans"))
+                        (list `(with "font-family" "rm" ,t)))
+                       (else (list t)))))
               ((color)
                (let ((t (oftm-inlines l))
                      (v (ox-attr x 'value)))
@@ -1116,7 +1155,8 @@
                        (else
                          (with t (oftm-inlines (ox-children x))
                            (if (== t "") '()
-                               (list (oftm-styled x (oftm-aligned x t))))))))
+                               (list (oftm-styled x (oftm-direct-paragraph
+                                                      x (oftm-aligned x t)))))))))
                 ((list) (oftm-list x))
                 ((table) (list (oftm-table x)))
                 ((pagebreak) '((page-break)))
@@ -1340,6 +1380,7 @@
                   (set! oftm-body-style (and setup (ox-attr setup 'body-style)))
                   (set! oftm-base-size
                         (or (and setup (office-number (ox-attr setup 'font-size))) 10.0))
+                  (set! oftm-base-font (and setup (ox-attr setup 'font)))
                   (for-each oftm-scan-labels l)
                   (let* ((body (oftm-body l))
                          (body (if (null? (cdr headers)) body
