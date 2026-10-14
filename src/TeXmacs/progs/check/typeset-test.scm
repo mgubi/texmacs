@@ -1100,6 +1100,29 @@
                (when (!= inc scr) (set! bad (+ bad 1))))))
          (check= bad 0))))))
 
+;; A variable assigned below a binding of it, and again afterwards, in
+;; the same block of paragraphs: the changes of the block are those of
+;; its paragraphs (its value before is the one outside the binding)
+(define (test-assignments-in-blocks)
+  (check-group "assignments in blocks")
+  (for (off '(10 30 50 70))
+    (with-typeset-body
+     `(document
+       ,@(map (lambda (i)
+                (cond ((== i 1) '(assign "foo" "1cm"))
+                      ((== i off) '(with "foo" "3cm"
+                                     (document (assign "foo" "2cm") "inner")))
+                      ((== i (+ off 3)) '(assign "foo" "3cm"))
+                      ((== i 150) '(concat "a" (vspace (value "foo")) "b"))
+                      (else (string-append "paragraph " (number->string i)))))
+              (.. 0 160)))
+     (lambda ()
+       (update-forced)
+       (tree-set (tree-ref (buffer-tree) 150)
+                 '(concat "c" (vspace (value "foo")) "d"))
+       (update-forced)
+       (check-true (same-as-scratch?))))))
+
 ;; Random edits of a document, each followed by a typesetting which uses
 ;; again what it can, against a typesetting from scratch in a buffer of its
 ;; own: the places of all the paragraphs must be the same. The document
@@ -1397,4 +1420,5 @@
   (test-random-documents)
   (test-block-replay)
   (test-references-after-removals)
+  (test-assignments-in-blocks)
   (check-end))
