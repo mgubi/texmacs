@@ -195,6 +195,11 @@ decompress_tree (tree t, int& spc_mode) {
           val[j]= "";
       return val;
     }
+    // unknown code (for instance of another session of TeXmacs):
+    // the markup is lost, but not its text
+    tree c (CONCAT);
+    for (i=1; i<n; i++) c << t[i];
+    return decompress_tree (c, spc_mode);
   }
   return "";
 }

@@ -29,13 +29,14 @@ void request_callback (void *obj, void *info);
 
 struct request_link_rep: tm_link_rep {
   string name;          // name of the plugin
+  string session;       // name of the session
   int    status;        // negative= error, null= EOF, positive means data
   string outbuf;        // pending output from plugin
   string errbuf;        // pending errors from plugin
   bool   kill;          // the request can be cancelled
   
 public:
-  request_link_rep (string name);
+  request_link_rep (string name, string session);
   ~request_link_rep ();
 
   string  start ();
@@ -49,7 +50,9 @@ public:
   void    feed (int channel);
 };
 
-request_link_rep::request_link_rep (string name2): name (name2) {
+request_link_rep::request_link_rep (string name2, string session2):
+  name (name2), session (session2)
+{
   request_link_set->insert ((pointer) this);
   status = 1;
   outbuf = "";
@@ -64,8 +67,8 @@ request_link_rep::~request_link_rep () {
 }
 
 tm_link
-make_request_link (string name) {
-  return tm_new<request_link_rep> (name);
+make_request_link (string name, string session) {
+  return tm_new<request_link_rep> (name, session);
 }
 
 void
@@ -128,7 +131,7 @@ void
 request_link_rep::write (string s, int channel) {
   // cout << "Write[" << name << "] " << s << "\n";
   if (alive || (channel != LINK_IN)) return;
-  string cmd= as_string (call ("connection-request", name, "default", s));
+  string cmd= as_string (call ("connection-request", name, session, s));
   // cout << "Command[" << name << "," << s << "] = " << cmd << "\n";
   if (cmd == "") {
     status= 0; outbuf= ""; errbuf= ""; kill= false;
