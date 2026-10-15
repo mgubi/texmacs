@@ -60,11 +60,12 @@ struct xml_html_parser {
 
   string transcode (string s);
 
-  string parse_until (string what);
+  string parse_until (string what, bool expand= true);
   string parse_name ();
   string parse_quoted ();
   string expand_entity (string s);
   string expand_entities (string s);
+  string expand_entities (string s, bool declared);
   string parse_entity ();
   tree parse_attribute ();
   tree parse_opening ();
@@ -279,11 +280,11 @@ xml_html_parser::transcode (string s2) {
 ******************************************************************************/
 
 string
-xml_html_parser::parse_until (string what) {
+xml_html_parser::parse_until (string what, bool expand) {
   string r;
   while (s && !test (s, what)) r << s->read (1);
   if (test (s, what)) s += N(what);
-  return expand_entities (r);
+  return expand? expand_entities (r): r;
 }
 
 string
@@ -331,34 +332,46 @@ xml_html_parser::expand_entity (string s) {
 }
 
 string
-xml_html_parser::expand_entities (string s) {
-  // expand until nothing changes
-  while (true) {
-    string r;
-    int i, n= N(s), before= expanded;
-    for (i=0; i<n; ) {
-      if (s[i] == '&' || s[i] == '%') {
-        int start= i++;
-        if (i<n && s[i] == '#') {
+xml_html_parser::expand_entities (string s, bool declared) {
+  string r;
+  int i, n= N(s);
+  for (i=0; i<n; ) {
+    if (s[i] == '&' || s[i] == '%') {
+      int start= i++;
+      if (i<n && s[i] == '#') {
+        i++;
+        if (i<n && (s[i] == 'x' || s[i] == 'X')) {
           i++;
-          if (i<n && (s[i] == 'x' || s[i] == 'X')) {
-            i++;
-            while (i<n && is_hex_digit (s[i])) i++;
-          }
-          else while (i<n && is_digit (s[i])) i++;
+          while (i<n && is_hex_digit (s[i])) i++;
         }
-        else while (i<n && is_name_char (s[i])) i++;
-        if (i<n && s[i] == ';') i++;
-        r << expand_entity (s (start, i));
+        else while (i<n && is_digit (s[i])) i++;
       }
-      else r << s[i++];
+      else while (i<n && is_name_char (s[i])) i++;
+      if (i<n && s[i] == ';') i++;
+      string e= s (start, i);
+      if (!declared) r << expand_entity (e);
+      else if (entities->contains (e)) r << expand_entity (e);
+      else r << e;
     }
-    if (r == s) return r;
+    else r << s[i++];
+  }
+  return r;
+}
+
+string
+xml_html_parser::expand_entities (string s) {
+  // declared entities are expanded until nothing changes; the characters
+  // and predefined entities are expanded once, so that "&amp;lt;" is "&lt;"
+  while (true) {
+    int before= expanded;
+    string r= expand_entities (s, true);
+    if (r == s) break;
     // a pass which used declared entities counts for its length, so that
     // an entity which contains itself ends after a bounded amount of work
     if (expanded != before) expanded += N(r);
     s= r;
   }
+  return expand_entities (s, false);
 }
 
 string
@@ -452,13 +465,13 @@ xml_html_parser::parse_pi () {
 tree
 xml_html_parser::parse_comment () {
   s += 4;
-  return tuple ("comment", parse_until ("-->"));
+  return tuple ("comment", parse_until ("-->", false));
 }
 
 tree
 xml_html_parser::parse_cdata () {
   s += 9;
-  return tuple ("cdata", parse_until ("]]>"));
+  return tuple ("cdata", parse_until ("]]>", false));
 }
 
 tree
