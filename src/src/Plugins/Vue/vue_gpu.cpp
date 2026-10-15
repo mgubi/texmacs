@@ -65,6 +65,8 @@ bool gpu_draw_coverage (renderer r, int key, int w, int h,
                         const unsigned char* cov, int left, int top, color c) {
   (void) r; (void) key; (void) w; (void) h; (void) cov; (void) left; (void) top;
   (void) c; return false; }
+bool gpu_push_matrix (renderer r, const double* m) { (void) r; (void) m; return false; }
+bool gpu_pop_matrix (renderer r) { (void) r; return false; }
 
 #else
 
@@ -1795,6 +1797,32 @@ gpu_draw_coverage (renderer ren, int key, int w, int h, const unsigned char* cov
                    int left, int top, color c) {
   if (!is_gpu_renderer (ren)) return false;
   ((gpu_renderer_rep*) ren)->draw_coverage (key, w, h, cov, left, top, c);
+  return true;
+}
+
+// a transformation given as the matrix which set_transformation computes
+// (in the user space of to_x and to_y, y up), composed with the current
+// one; and the one before again (the commands of the core of Tau)
+bool
+gpu_push_matrix (renderer ren, const double* m) {
+  if (!is_gpu_renderer (ren)) return false;
+  gpu_renderer_rep* g= (gpu_renderer_rep*) ren;
+  std::vector<double> c (m, m + 6);
+  if (!g->trs.empty ()) {
+    const std::vector<double>& p= g->trs.back ();
+    c= { p[0]*m[0] + p[2]*m[1], p[1]*m[0] + p[3]*m[1],
+         p[0]*m[2] + p[2]*m[3], p[1]*m[2] + p[3]*m[3],
+         p[0]*m[4] + p[2]*m[5] + p[4], p[1]*m[4] + p[3]*m[5] + p[5] };
+  }
+  g->trs.push_back (c);
+  return true;
+}
+
+bool
+gpu_pop_matrix (renderer ren) {
+  if (!is_gpu_renderer (ren)) return false;
+  gpu_renderer_rep* g= (gpu_renderer_rep*) ren;
+  if (!g->trs.empty ()) g->trs.pop_back ();
   return true;
 }
 

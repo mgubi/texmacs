@@ -11,6 +11,7 @@
 
 #include "mupdf_renderer.hpp"
 #include <vector>
+#include <functional>
 #include <string>
 #include "analyze.hpp"
 #include "iterator.hpp" // mupdf_image_gc
@@ -162,14 +163,25 @@ mupdf_dry_op (int kind, int bytes) {
 // polygon (n, rgba, n points), 5 an arc (x1, y1, x2, y2, start and length
 // in 1/64 degree, width in 1/16 pixel, rgba, filled), 6 the clip (x1, y1,
 // x2, y2), 7 a picture which is not drawn (x1, y1, x2, y2), 8 a picture
-// (id, left, top, alpha). A picture is sent once too, as its pixels (an id,
-// its width and height, then RGBA, not premultiplied).
+// (id, left, top, alpha), 9 a transformation which applies to what follows
+// (six floats, as their bits: the matrix of PDF which MuPDF concatenates,
+// in the space of to_x and to_y, y up), 10 the one before again. A picture
+// is sent once too, as its pixels (an id, its width and height, then RGBA,
+// not premultiplied), named by what it is (the file of an image and its
+// size on the screen) when the renderer knows it.
 bool mupdf_record= false;
 std::vector<int> mupdf_record_ops;
 std::string mupdf_record_glyphs;
 std::string mupdf_record_images;
 static hashmap<string,int> record_image_id (0);
 static int record_image_next= 1;
+static string record_image_key; // what the next picture is (draw_scalable)
+// the transformations which apply (composed, in the space of to_x and to_y),
+// and the clip in the pixels of the view when each began: a clip set under
+// a transformation is said in the pixels of the view, within that one
+static std::vector<std::vector<double> > record_mats;
+static std::vector<std::vector<int> > record_outer;
+static std::vector<int> record_clip= { -(1 << 24), -(1 << 24), 1 << 24, 1 << 24 };
 static hashmap<string,int> record_glyph_id (0);
 static std::vector<int> record_glyph_place; // per id: mode, a, b, h
 
@@ -567,6 +579,22 @@ mupdf_renderer_rep::set_transformation (frame fr) {
 
   // protected: a q past MuPDF's limit of nested states is an error
   double m[6]= { ux[0], ux[1], uy[0], uy[1], o[0], o[1] };
+  if (mupdf_record) {
+    mupdf_record_ops.push_back (9);
+    for (int i= 0; i < 6; i++) {
+      float f= (float) m[i]; int v; memcpy (&v, &f, 4);
+      mupdf_record_ops.push_back (v);
+    }
+    std::vector<double> c (m, m + 6);
+    if (!record_mats.empty ()) {
+      const std::vector<double>& q= record_mats.back ();
+      c= { q[0]*m[0] + q[2]*m[1], q[1]*m[0] + q[3]*m[1],
+           q[0]*m[2] + q[2]*m[3], q[1]*m[2] + q[3]*m[3],
+           q[0]*m[4] + q[2]*m[5] + q[4], q[1]*m[4] + q[3]*m[5] + q[5] };
+    }
+    record_mats.push_back (c);
+    record_outer.push_back (record_clip);
+  }
   fz_context* ctx= mupdf_context ();
   mupdf_protected ("set_transformation", [&] () {
     proc->op_q (ctx, proc);
@@ -581,6 +609,12 @@ mupdf_renderer_rep::set_transformation (frame fr) {
 void
 mupdf_renderer_rep::reset_transformation () {
   (void) mupdf_dry_op (4, 4);
+  if (mupdf_record) {
+    mupdf_record_ops.push_back (10);
+    // (before unclip, which gives the clip of before back: not transformed)
+    if (!record_mats.empty ()) record_mats.pop_back ();
+    if (!record_outer.empty ()) record_outer.pop_back ();
+  }
   unclip ();
   fz_context* ctx= mupdf_context ();
   mupdf_protected ("reset_transformation", [&] () { proc->op_Q (ctx, proc); });
@@ -599,8 +633,24 @@ mupdf_renderer_rep::set_clipping (SI x1, SI y1, SI x2, SI y2, bool restore) {
   if (mupdf_record) {
     SI a1, b1, a2, b2;
     get_clipping (a1, b1, a2, b2);
-    mupdf_record_ops.insert (mupdf_record_ops.end (),
-      { 6, (int) to_x (a1), (int) -to_y (b2), (int) to_x (a2), (int) -to_y (b1) });
+    std::vector<int> c= { (int) to_x (a1), (int) -to_y (b2), (int) to_x (a2), (int) -to_y (b1) };
+    if (!record_mats.empty ()) {
+      // (under a transformation: where its corners land, within the clip
+      // which was there when the transformation began)
+      const std::vector<double>& q= record_mats.back ();
+      double xs[2]= { to_x (a1), to_x (a2) }, ys[2]= { to_y (b1), to_y (b2) };
+      double lx= 1e30, ly= 1e30, hx= -1e30, hy= -1e30;
+      for (int i= 0; i < 2; i++)
+        for (int j= 0; j < 2; j++) {
+          double X= q[0]*xs[i] + q[2]*ys[j] + q[4], Y= q[1]*xs[i] + q[3]*ys[j] + q[5];
+          lx= min (lx, X); hx= max (hx, X); ly= min (ly, -Y); hy= max (hy, -Y);
+        }
+      const std::vector<int>& o= record_outer.back ();
+      c[0]= max (o[0], (int) floor (lx)); c[1]= max (o[1], (int) floor (ly));
+      c[2]= max (c[0], min (o[2], (int) ceil (hx))); c[3]= max (c[1], min (o[3], (int) ceil (hy)));
+    }
+    record_clip= c;
+    mupdf_record_ops.insert (mupdf_record_ops.end (), { 6, c[0], c[1], c[2], c[3] });
     return;
   }
 
@@ -1154,8 +1204,14 @@ mupdf_renderer_rep::lines (array<SI> x, array<SI> y) {
 
 void
 mupdf_renderer_rep::clear (SI x1, SI y1, SI x2, SI y2) {
+  if (mupdf_record && !is_nil (bg_brush) && bg_brush->get_type () == brush_pattern) {
+    // (a pattern: its picture, tile by tile, as the renderers without
+    // patterns of their own draw it)
+    renderer_rep::clear_pattern (x1, y1, x2, y2);
+    return;
+  }
   if (mupdf_record) {
-    int c= ((is_nil (bg_brush) || bg_brush->get_type () != brush_pattern)? record_rgba (bg): (int) 0xE6E6E6FF);
+    int c= record_rgba (bg);
     mupdf_record_ops.insert (mupdf_record_ops.end (),
       { 1, (int) to_x (min (x1, x2)), (int) -to_y (max (y1, y2)),
         (int) to_x (max (x1, x2)), (int) -to_y (min (y1, y2)), c });
@@ -1283,13 +1339,21 @@ record_pixmap (fz_pixmap* src, int left, int top, int alpha) {
   if (w <= 0 || h <= 0 || (sn != 3 && sn != 4)) return;
   // (named by where it is and what it is like: a pixmap which went and
   // whose place was taken by another one is not taken for it)
-  unsigned long sum= 0;
-  for (int k= 0; k < 64; k++) {
-    int px= (k * 7919) % w, py= (k * 104729) % h;
-    sum= sum * 31 + src->samples [(size_t) py * src->stride + sn * px];
+  string key= record_image_key;
+  record_image_key= "";
+  if (N(key) == 0) {
+    // (a picture which the renderer does not know otherwise: where it is
+    // and what it is like, so that a pixmap which went and whose place was
+    // taken by another one is not taken for it)
+    unsigned long sum= 0;
+    for (int k= 0; k < 64; k++) {
+      int px= (k * 7919) % w, py= (k * 104729) % h;
+      sum= sum * 31 + src->samples [(size_t) py * src->stride + sn * px];
+    }
+    key= "pixmap:" * as_string ((long) (size_t) src) * "/" * as_string (w) *
+         "x" * as_string (h) * "/" * as_string ((long) sum);
   }
-  string key= as_string ((long) (size_t) src) * "/" * as_string (w) * "x" *
-              as_string (h) * "/" * as_string ((long) sum);
+  else key << "/" << as_string (w) << "x" << as_string (h);
   int id= record_image_id [key];
   if (id == 0) {
     id= record_image_next++;
@@ -1314,6 +1378,38 @@ record_pixmap (fz_pixmap* src, int left, int top, int alpha) {
     }
   }
   mupdf_record_ops.insert (mupdf_record_ops.end (), { 8, id, left, top, alpha });
+}
+
+
+// A shape filled with a pattern, in the prototype (mupdf_record): drawn
+// here into a picture of its size, which is sent as a picture (the page
+// and the shell have no patterns of their own for any shape)
+void
+mupdf_renderer_rep::record_pattern_shape (SI x1, SI y1, SI x2, SI y2,
+                                          std::function<void (renderer)> draw) {
+  int bx1= (int) to_x (x1) - 2, bx2= (int) to_x (x2) + 2;
+  int by1= (int) -to_y (y2) - 2, by2= (int) -to_y (y1) + 2;
+  int bw= bx2 - bx1, bh= by2 - by1;
+  if (bw <= 0 || bh <= 0 || bw > 8000 || bh > 8000) return;
+  fz_context* ctx= mupdf_context ();
+  picture pic= native_picture (bw, bh, 0, 0);
+  fz_pixmap* pix= ((mupdf_picture_rep*) pic->get_handle ())->pix;
+  fz_clear_pixmap (ctx, pix);
+  mupdf_record= false;
+  renderer r= picture_renderer (pic, ((double) std_shrinkf * PIXEL) / pixel);
+  r->set_origin (ox - bx1 * pixel, oy + by1 * pixel);
+  r->set_brush (fg_brush);
+  draw (r);
+  delete_renderer (r);
+  mupdf_record= true;
+  // (named by its pixels: the same shape drawn again is the same picture)
+  unsigned long hsh= 1469598103934665603UL;
+  for (int j= 0; j < bh; j++) {
+    const unsigned char* sp= pix->samples + (size_t) j * pix->stride;
+    for (int i= 0; i < 4 * bw; i++) hsh= (hsh ^ sp[i]) * 1099511628211UL;
+  }
+  record_image_key= "shape:" * as_string ((long) hsh);
+  record_pixmap (pix, bx1, by1, 255);
 }
 
 bool
@@ -1447,6 +1543,15 @@ mupdf_renderer_rep::draw_pixmap_scaled_direct (fz_pixmap* src, SI x, SI y,
 
 void
 mupdf_renderer_rep::fill (SI x1, SI y1, SI x2, SI y2) {
+  if (mupdf_record && fill_is_pattern && !is_nil (fg_brush) &&
+      fg_brush->get_type () == brush_pattern) {
+    // (filled with a pattern: drawn as a background of that pattern)
+    brush old= bg_brush;
+    bg_brush= fg_brush;
+    renderer_rep::clear_pattern (x1, y1, x2, y2);
+    bg_brush= old;
+    return;
+  }
   if (mupdf_record) {
     int c= record_rgba (fg);
     mupdf_record_ops.insert (mupdf_record_ops.end (),
@@ -1551,6 +1656,11 @@ mupdf_renderer_rep::arc (SI x1, SI y1, SI x2, SI y2, int alpha, int delta) {
 void
 mupdf_renderer_rep::fill_arc (SI x1, SI y1, SI x2, SI y2,
                               int alpha, int delta) {
+  if (mupdf_record && fill_is_pattern) {
+    record_pattern_shape (min (x1, x2), min (y1, y2), max (x1, x2), max (y1, y2),
+      [&] (renderer r) { r->fill_arc (x1, y1, x2, y2, alpha, delta); });
+    return;
+  }
   if (mupdf_record) {
     mupdf_record_ops.insert (mupdf_record_ops.end (),
       { 5, (int) to_x (min (x1, x2)), (int) -to_y (max (y1, y2)),
@@ -1566,6 +1676,13 @@ mupdf_renderer_rep::fill_arc (SI x1, SI y1, SI x2, SI y2,
 
 void
 mupdf_renderer_rep::polygon (array<SI> x, array<SI> y, bool convex) {
+  if (mupdf_record && fill_is_pattern && min (N(x), N(y)) >= 3) {
+    SI lx= x[0], hx= x[0], ly= y[0], hy= y[0];
+    for (int i= 1; i < min (N(x), N(y)); i++) {
+      lx= min (lx, x[i]); hx= max (hx, x[i]); ly= min (ly, y[i]); hy= max (hy, y[i]); }
+    record_pattern_shape (lx, ly, hx, hy, [&] (renderer r) { r->polygon (x, y, convex); });
+    return;
+  }
   if (mupdf_record) {
     int n= min (N(x), N(y));
     if (n < 3) return;
@@ -2112,11 +2229,15 @@ mupdf_renderer_rep::draw_scalable (scalable im, SI x, SI y, int alpha) {
         // (see form_pixmap); drawn as a drawing otherwise
         int pw= (int) (((double) w)/pixel + 0.5);
         int ph= (int) (((double) h)/pixel + 0.5);
-        if (transform_level == 0 && pw > 0 && ph > 0 &&
+        // (recorded as a picture under a transformation too: the page or
+        // the shell transforms it, mupdf_record)
+        if ((transform_level == 0 || mupdf_record) && pw > 0 && ph > 0 &&
             pw <= 8000 && ph <= 8000) {
           fz_pixmap* pix= form_pixmap (u->t, fm, pw, ph);
+          if (mupdf_record) record_image_key= "form:" * as_string (u);
           if (pix != NULL && draw_pixmap_direct (pix, x - r->x1, y - r->y1, alpha))
             return;
+          record_image_key= "";
         }
         draw_form (mupdf_context (), proc, fm, alpha,
                    ((double) w)/pixel, ((double) h)/pixel,
@@ -2147,10 +2268,13 @@ mupdf_renderer_rep::draw_scalable (scalable im, SI x, SI y, int alpha) {
     // kept drawn at its size on the screen (see image_pixmap)
     double wf= ((double) w)/pixel, hf= ((double) h)/pixel;
     int pw= (int) ceil (wf), ph= (int) ceil (hf);
-    if (transform_level == 0 && pw > 0 && ph > 0 && pw <= 8000 && ph <= 8000) {
+    if ((transform_level == 0 || mupdf_record) &&
+        pw > 0 && ph > 0 && pw <= 8000 && ph <= 8000) {
       fz_pixmap* pix= image_pixmap (u->t, im2->img, wf, hf, pw, ph);
+      if (mupdf_record) record_image_key= "image:" * as_string (u);
       if (pix != NULL && draw_pixmap_direct (pix, x - ox, y - oy, alpha))
         return;
+      record_image_key= "";
     }
     image (mupdf_context (), proc, im2, alpha,
            ((double)w)/pixel, 0,

@@ -925,12 +925,32 @@ function glyphInk(id, color) {
 function replayCommands(ctx, m) {
 	if (m.glyphs.byteLength) addGlyphs(m.glyphs);
 	if (m.images && m.images.byteLength) addPictures(m.images);
-	const o = new Int32Array(m.ops), n = o.length;
+	const o = new Int32Array(m.ops), n = o.length, f = new Float32Array(m.ops);
 	ctx.save();
 	ctx.beginPath(); ctx.rect(m.x, m.y, m.w, m.h); ctx.clip();
 	ctx.save();
+	// the transformations (9, 10): what is drawn is transformed, the clips
+	// are not (they are said in the pixels of the view). The matrix of PDF
+	// (y up) of the core is, in the pixels of the canvas (y down), the same
+	// with b, c and f of the other sign
+	const matrices = [];
+	let matrix = null, applied = true;
+	const apply = () => { if (!applied) { if (matrix) ctx.setTransform(matrix); else ctx.resetTransform(); applied = true; } };
 	for (let i = 0; i < n;) {
-		switch (o[i]) {
+		const op = o[i];
+		if (op !== 6 && op !== 9 && op !== 10) apply();
+		switch (op) {
+		case 9: {
+			const t = new DOMMatrix([f[i + 1], -f[i + 2], -f[i + 3], f[i + 4], f[i + 5], -f[i + 6]]);
+			matrices.push(matrix);
+			matrix = matrix ? matrix.multiply(t) : t;
+			applied = false;
+			i += 7; break;
+		}
+		case 10:
+			matrix = matrices.length ? matrices.pop() : null;
+			applied = false;
+			i += 1; break;
 		case 1:
 			ctx.fillStyle = colorName(o[i + 5]);
 			ctx.fillRect(o[i + 1], o[i + 2], o[i + 3] - o[i + 1], o[i + 4] - o[i + 2]);
@@ -959,8 +979,11 @@ function replayCommands(ctx, m) {
 			i += 10; break;
 		}
 		case 6:
+			// (the restore takes the transformation away too: given again
+			// before what is drawn next)
 			ctx.restore(); ctx.save();
 			ctx.beginPath(); ctx.rect(o[i + 1], o[i + 2], o[i + 3] - o[i + 1], o[i + 4] - o[i + 2]); ctx.clip();
+			applied = !matrix;
 			i += 5; break;
 		case 8: {
 			const pic = pictures.get(o[i + 1]);

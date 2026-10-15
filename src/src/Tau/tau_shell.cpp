@@ -995,6 +995,16 @@ public:
         r->fill (o[i+1] * P, -o[i+4] * P, o[i+3] * P, -o[i+2] * P);
         i += 5;
       }
+      else if (op == 9 && i + 7 <= nops) {
+        double m[6];
+        for (int k= 0; k < 6; k++) { float v; memcpy (&v, &o[i+1+k], 4); m[k]= v; }
+        gpu_push_matrix (r, m);
+        i += 7;
+      }
+      else if (op == 10) {
+        gpu_pop_matrix (r);
+        i += 1;
+      }
       else if (op == 8 && i + 5 <= nops) {
         auto pc= pictures.find (o[i+1]);
         if (pc != pictures.end ())

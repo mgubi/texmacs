@@ -13,6 +13,7 @@
 #define MUPDF_RENDERER_HPP
 
 #include "basic_renderer.hpp"
+#include <functional>
 
 #include <mupdf/fitz.h>
 #include <mupdf/pdf.h>
@@ -93,6 +94,8 @@ protected:
   void register_pattern (brush br, SI pixel);
 
   // direct access to the pixels of the target pixmap (see the notes there)
+  void record_pattern_shape (SI x1, SI y1, SI x2, SI y2,
+                             std::function<void (renderer)> draw);
   bool device_box (SI x1, SI y1, SI x2, SI y2,
                    int& px1, int& py1, int& px2, int& py2);
   bool fill_direct (SI x1, SI y1, SI x2, SI y2, color c);

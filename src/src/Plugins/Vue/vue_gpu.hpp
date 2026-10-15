@@ -66,5 +66,10 @@ bool is_gpu_renderer (renderer ren);
 // (tau_shell.cpp); false when ren is not a renderer of the GPU
 bool gpu_draw_coverage (renderer ren, int key, int w, int h,
                         const unsigned char* cov, int left, int top, color c);
+// a transformation (the matrix which set_transformation computes: in the
+// user space of to_x and to_y, y up), composed with the current one, and
+// the one before it again
+bool gpu_push_matrix (renderer ren, const double* m);
+bool gpu_pop_matrix (renderer ren);
 
 #endif // defined VUE_GPU_HPP
