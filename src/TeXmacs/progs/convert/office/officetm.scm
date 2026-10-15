@@ -363,18 +363,38 @@
                                          more)))))))))
 
 (define (oftm-chapter-field? y)
-  ;; the number of a chapter in the number of a formula (STYLEREF 1 \s)
+  ;; the number of a chapter in the number of a formula (STYLEREF 1 \s:
+  ;; with a switch for a number, not the text of the heading)
   (and (func? y 'field)
-       (string-starts? (locase-all (tm-string-trim (or (ox-attr y 'code) "")))
-                       "styleref")))
+       (with code (locase-all (tm-string-trim (or (ox-attr y 'code) "")))
+         (and (string-starts? code "styleref")
+              (list-or (map (lambda (sw) (>= (string-search-forwards sw 0 code) 0))
+                            '("\\s" "\\n" "\\r" "\\w")))))))
 
 (define (oftm-number-string? y)
-  ;; a string of the brackets and the separators of a number
+  ;; a string of the brackets and the separators of a number (not a point
+  ;; or a dash after its closing bracket, which are text)
   (and (string? y)
        (with s (string-trim-spaces y)
          (and (!= s "")
               (list-and (map (lambda (c) (in? c '(#\( #\) #\[ #\] #\. #\-)))
-                             (string->list s)))))))
+                             (string->list s)))
+              (with l (reverse (string->list s))
+                (not (and (in? (car l) '(#\. #\-))
+                          (list-or (map (lambda (c) (in? c '(#\) #\]))) l)))))))))
+
+(define (oftm-bracket-string? y)
+  ;; a string of a number with a bracket
+  (and (oftm-number-string? y)
+       (list-or (map (lambda (c) (in? c '(#\( #\) #\[ #\])))
+                     (string->list y)))))
+
+(define (oftm-bracket-punctuation y)
+  ;; the punctuation of a string y of closing brackets and punctuation
+  ;; after them (the number of a formula, then the point of the sentence),
+  ;; or #f
+  (with q (oftm-closing-brackets y)
+    (and q (oftm-punctuation-string? (cdr q)) (string-trim-spaces (cdr q)))))
 
 (define (oftm-number-part? y)
   (or (oftm-blank? y) (func? y 'seq) (func? y 'bookmark) (oftm-chapter-field? y)
@@ -423,16 +443,27 @@
                                   (absorb (cdr r) dots marks '())
                                   (list dots (reverse marks) (cons (cdr q) (cdr r)))))))
                       (else (stop r))))))
-         (dots (append (if (== (car p) "") '() (list (car p))) (cadr p)))
+         (with-dots (lambda (d) (append (if (== d "") '() (list d)) (cadr p))))
+         (dots (with-dots (car p)))
          (r (caddr p)))
-    (let num ((s r) (seen '()) (seq? #f))
-      (cond ((and (pair? s) (oftm-number-part? (car s)))
-             (num (cdr s) (cons (car s) seen) (or seq? (func? (car s) 'seq))))
-            ;; (the closing bracket of the number, before more text)
+    ;; (started: whether the number has started, with a bracket, a field;
+    ;; a dash or a point before it is text)
+    (let num ((s r) (seen '()) (seq? #f) (started? #f))
+      (cond ((and (pair? s) (oftm-number-part? (car s))
+                  (or started? (not (oftm-number-string? (car s)))
+                      (oftm-bracket-string? (car s))))
+             (num (cdr s) (cons (car s) seen) (or seq? (func? (car s) 'seq))
+                  (or started? (func? (car s) 'seq) (oftm-chapter-field? (car s))
+                      (oftm-bracket-string? (car s)))))
+            ;; (the closing bracket of the number, before more text; the
+            ;; punctuation just after it goes with the formula)
             ((and seq? (pair? s) (oftm-closing-brackets (car s)))
              => (lambda (q)
-                  (cons (append dots (reverse (cons (car q) seen)))
-                        (cons (cdr q) (cdr s)))))
+                  (let* ((pq (oftm-leading-punctuation (cdr q)))
+                         (d (if pq (string-append (car p) (car pq)) (car p)))
+                         (rest (if pq (cdr pq) (cdr q))))
+                    (cons (append (with-dots d) (reverse (cons (car q) seen)))
+                          (if (oftm-blank? rest) (cdr s) (cons rest (cdr s)))))))
             (seq? (cons (append dots (reverse seen)) s))
             (else (cons dots r))))))
 
@@ -917,7 +948,7 @@
             ((and (func? (car r) 'seq) (not number?))
              (loop (cdr r) word labels #t bold?))
             ;; bold text: the name before the number, the dot after it
-            ((and (func? (car r) 'strong)
+            ((and (func? (car r) 'strong) (not (ox-attr (car r) 'value))
                   (list-and (map (lambda (y) (or (string? y)
                                                  (and (pair? y)
                                                       (in? (car y) '(seq bookmark)))))
@@ -975,17 +1006,21 @@
 
 (define (oftm-numbered-formula x)
   ;; (formula labels) for a paragraph which is a formula on its own lines
-  ;; with its number after it (perhaps with the number of the chapter);
-  ;; else #f
-  (let* ((l (list-filter (ox-children x)
-                         (lambda (y) (not (or (oftm-blank? y) (oftm-number-string? y)))))))
+  ;; with its number after it (perhaps with the number of the chapter),
+  ;; and the punctuation after the formula or after the number; else #f
+  (let* ((l (list-filter (ox-children x) (lambda (y) (not (oftm-blank? y))))))
     (and (pair? l) (func? (car l) 'math)
-         ;; (and the punctuation after the formula)
-         (list-and (map (lambda (y) (or (and (pair? y) (in? (car y) '(tab seq bookmark)))
-                                        (oftm-chapter-field? y)
-                                        (oftm-punctuation-string? y)))
-                        (cdr l)))
-         (list-or (map (lambda (y) (func? y 'seq)) (cdr l)))
+         (let loop ((r (cdr l)) (started? #f) (seq? #f))
+           (cond ((null? r) seq?)
+                 ((func? (car r) 'seq) (loop (cdr r) #t #t))
+                 ((oftm-chapter-field? (car r)) (loop (cdr r) #t seq?))
+                 ((func? (car r) 'bookmark) (loop (cdr r) started? seq?))
+                 ((oftm-bracket-string? (car r)) (loop (cdr r) #t seq?))
+                 ((oftm-punctuation-string? (car r)) (loop (cdr r) started? seq?))
+                 ((and started? (or (oftm-number-string? (car r))
+                                    (oftm-bracket-punctuation (car r))))
+                  (loop (cdr r) started? seq?))
+                 (else #f)))
          (list (car l) (oftm-bookmarks (cons 'p (cdr l)))))))
 
 (define (oftm-bibliography l)
@@ -1033,7 +1068,12 @@
           (let ((l (ox-children x)))
             (case (car x)
               ((em) (oftm-wrap 'em l))
-              ((strong) (oftm-wrap 'strong l))
+              ((strong)
+               ;; (bold by its style, not by hand: medium)
+               (if (== (ox-attr x 'value) "off")
+                   (with t (oftm-inlines l)
+                     (if (== t "") '() (list `(with "font-series" "medium" ,t))))
+                   (oftm-wrap 'strong l)))
               ((overline) (oftm-wrap 'overline l))
               ;; an underline or a line through of a kind (double, wave...)
               ((underline strike)
@@ -1567,7 +1607,21 @@
                         (loop (cdr c) acc))
                        ((oftm-punctuation-string? (car c))
                         (loop (cdr c) (string-append acc (string-trim-spaces (car c)))))
-                       (else acc)))))
+                       (else acc))))
+         ;; (and the punctuation after its number: "(1).")
+         (dots (let loop ((c after) (seq? #f) (closed? #f) (acc dots))
+                 ;; (closed?: after the closing bracket of the number)
+                 (cond ((null? c) acc)
+                       ((func? (car c) 'seq) (loop (cdr c) #t #f acc))
+                       ((not (and seq? (string? (car c)))) (loop (cdr c) seq? closed? acc))
+                       ((oftm-bracket-punctuation (car c))
+                        => (lambda (d) (loop (cdr c) seq? #t (string-append acc d))))
+                       ((and closed? (oftm-punctuation-string? (car c)))
+                        (loop (cdr c) seq? closed? (string-append acc (string-trim-spaces (car c)))))
+                       (else (loop (cdr c) seq?
+                                   (or closed? (list-or (map (lambda (ch) (in? ch '(#\) #\])))
+                                                             (string->list (car c)))))
+                                   acc))))))
     (if (== dots "") f
         (oftm-concat (append (if (func? f 'concat) (cdr f) (list f))
                              (list (oftm-text dots)))))))
