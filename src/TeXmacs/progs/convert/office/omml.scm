@@ -247,9 +247,15 @@
          (sep (get 'm:sepChr "|"))
          (args (map (lambda (e) (omml-row (omml-list (ox-children e))))
                     (ox-childs x 'm:e))))
-    (list `(m:mrow ,@(if (== open "") '() `((m:mo (@ (fence "true")) ,open)))
-                   ,@(list-intersperse args `(m:mo ,sep))
-                   ,@(if (== close "") '() `((m:mo (@ (fence "true")) ,close)))))))
+    (with r `(m:mrow ,@(if (== open "") '() `((m:mo (@ (fence "true")) ,open)))
+                     ,@(list-intersperse args `(m:mo ,sep))
+                     ,@(if (== close "") '() `((m:mo (@ (fence "true")) ,close))))
+      ;; a bracket without the other one (the brace of cases) would take
+      ;; what follows it in the formula: a style keeps it apart, which the
+      ;; import takes away (see oftm-clean-math)
+      (if (or (== open "") (== close ""))
+          (list `(m:mstyle (@ (scriptlevel "0")) ,r))
+          (list r)))))
 
 (define (omml-matrix x)
   (list `(m:mtable
@@ -260,14 +266,22 @@
                   (ox-childs x 'm:mr)))))
 
 (define (omml-array x)
-  ;; equations one above the other: the & of Word marks where they align
+  ;; equations one above the other: the & of Word marks where they align,
+  ;; the cells of a table
   (list `(m:mtable
+           ;; (lines of equations: see oftm-eqarray)
+           (@ (class "tm-eqarray"))
            ,@(map (lambda (e)
-                    `(m:mtr (m:mtd ,(omml-row
-                                      (list-filter
-                                        (omml-list (ox-children e))
-                                        (lambda (t) (!= t '(m:mo "&"))))))))
+                    `(m:mtr ,@(map (lambda (cell) `(m:mtd ,(omml-row cell)))
+                                   (omml-split-amps (omml-list (ox-children e))))))
                   (ox-childs x 'm:e)))))
+
+(define (omml-split-amps l)
+  ;; the nodes l cut at their marks &
+  (let loop ((l l) (cur '()) (acc '()))
+    (cond ((null? l) (reverse (cons (reverse cur) acc)))
+          ((== (car l) '(m:mo "&")) (loop (cdr l) '() (cons (reverse cur) acc)))
+          (else (loop (cdr l) (cons (car l) cur) acc)))))
 
 (define (omml-node x)
   ;; the nodes of MathML for a node of OMML
@@ -560,14 +574,36 @@
                (list `(m:d (m:dPr (m:begChr (@ (m:val ,(or (ox-attr x 'open) "("))))
                                   (m:endChr (@ (m:val ,(or (ox-attr x 'close) ")")))))
                            ,@(map (lambda (y) (mmlo-arg 'm:e y)) c))))
+              ;; the lines of several equations: an array of equations of
+              ;; Word, whose & mark where its lines align
               ((mtable)
+               (if mmlo-eqarray?
+                   (begin
+                     (set! mmlo-eqarray? #f)
+                     (with r
+                         (list `(m:eqArr
+                                  ,@(map (lambda (r)
+                                           ;; (one mark, before the second
+                                           ;; cell: the relation of the line)
+                                           (let ((cells (map (lambda (d) (mmlo-row (ox-children d)))
+                                                             (list-filter (ox-elements r)
+                                                                          (lambda (d) (mmlo-is? d 'mtd))))))
+                                             `(m:e ,@(if (null? cells) '()
+                                                         (append (car cells)
+                                                                 (if (null? (cdr cells)) '()
+                                                                     '((m:r (m:t "&"))))
+                                                                 (apply append (cdr cells)))))))
+                                         (list-filter c (lambda (r) (or (mmlo-is? r 'mtr)
+                                                                        (mmlo-is? r 'mlabeledtr)))))))
+                       (set! mmlo-eqarray? #t)
+                       r))
                (list `(m:m ,@(map (lambda (r)
                                     `(m:mr ,@(map (lambda (d)
                                                     `(m:e ,@(mmlo-row (ox-children d))))
                                                   (list-filter (ox-elements r)
                                                                (lambda (d) (mmlo-is? d 'mtd))))))
                                   (list-filter c (lambda (r) (or (mmlo-is? r 'mtr)
-                                                                 (mmlo-is? r 'mlabeledtr))))))))
+                                                                 (mmlo-is? r 'mlabeledtr)))))))))
               ((mmultiscripts)
                ;; the base with the scripts after it, and the scripts
                ;; before it around them, when there are some
@@ -591,6 +627,13 @@
               ((none mprescripts annotation annotation-xml) '())
               (else (mmlo-row (ox-children x))))))))
 
+(define mmlo-eqarray? #f)  ; the table of the formula is lines of equations
+
 (tm-define (mathml->omml x)
   (:synopsis "The tree of MathML @x as a formula of Word, an element m:oMath")
-  (cons 'm:oMath (mmlo-node x)))
+  ;; (the class tm-eqarray of the formula says that its table is lines of
+  ;; equations, see tmof-equations)
+  (set! mmlo-eqarray? (== (ox-attr x 'class) "tm-eqarray"))
+  (with r (cons 'm:oMath (mmlo-node x))
+    (set! mmlo-eqarray? #f)
+    r))

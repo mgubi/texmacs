@@ -949,6 +949,7 @@ edit_env_rep::update_line_arrows () {
 
 void
 edit_env_rep::update () {
+  struct deriving { deriving () { env_deriving++; } ~deriving () { env_deriving--; } } d;
   zoomf          = normal_zoom (get_double (ZOOM_FACTOR));
   pixel          = (SI) tm_round ((std_shrinkf * PIXEL) / zoomf);
   magn           = get_double (MAGNIFICATION);
@@ -1003,6 +1004,7 @@ edit_env_rep::update () {
 
 void
 edit_env_rep::update (string s) {
+  struct deriving { deriving () { env_deriving++; } ~deriving () { env_deriving--; } } d;
   switch (var_type[s]) {
   case Env_User:
     break;

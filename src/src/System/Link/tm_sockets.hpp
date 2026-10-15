@@ -84,6 +84,10 @@ string socket_debug_io_string (string s, int max);
 * Socket initialization
 ******************************************************************************/
 
+#ifdef __EMSCRIPTEN__
+// the next connection is the one of a login over TLS (see the .cpp)
+void web_socket_over_tls (bool tls);
+#endif
 int try_connect (const char* host, const char* port, int timeout_ms,
                  char* errbuf, size_t errlen);
 
@@ -117,6 +121,9 @@ public:
   void data_set_ready (int);
   void ready_to_send (int);
   void resume_start (int);
+  // whether the connection is still being opened, and since when
+  bool opening () { return alive && handshake; }
+  time_t since;
 private:
   string host;
   unsigned short port;
@@ -167,6 +174,14 @@ private:
   hashmap<int,pointer> socket_ptr_from_id;
   socket_link_rep* find_connection_ptr (int id);
   static void accept_callback (void* obj, void* info);
+  // the port of the WebSocket clients (TeXmacs in a browser)
+  int websocket_id;
+  bool websocket_secure;     // it speaks wss
+  bool websocket_listening;
+  socket_notifier websocket_notifier;
+  void start_websockets ();
+  static void websocket_accept_callback (void* obj, void* info);
+  void close_slow_clients ();
 };
 
 // the links which were stopped and wait to be freed (a link cannot free

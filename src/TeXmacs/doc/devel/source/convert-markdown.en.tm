@@ -56,8 +56,10 @@
     <scm|(blockquote <scm-arg|block> ...)>, <scm|(hr)>,
     <scm|(ul (li <scm-arg|block> ...) ...)>, <scm|(ol ...)>,
     <scm|(pre "code")>, <scm|(table (tr (th ...) ...) (tr (td ...) ...) ...)>,
-    <scm|(displaymath "latex")>, <scm|(html "text")> and
-    <scm|(footnote-def "label" <scm-arg|block> ...)>.
+    <scm|(displaymath "latex")>, <scm|(html "text")>,
+    <scm|(footnote-def "label" <scm-arg|block> ...)> and
+    <scm|(ref-def "text")> for the line of a definition of a link to
+    which nothing refers (the others are inlined in the links).
 
     <item*|Text>Strings, <scm|(em ...)>, <scm|(strong ...)>,
     <scm|(del ...)>, <scm|(code "text")>, <scm|(a ...)>, <scm|(img)>,
@@ -106,11 +108,36 @@
     (<verbatim|~~> included).
   </description>
 
+  A tab at the start of a line goes to the next multiple of four columns
+  for the blocks and stays a tab in what they hold. <scm|md-expand-tabs>
+  reads a tab of width <math|n> as <scm|md-tab-head> followed by
+  <math|n-1> times <scm|md-tab-fill>, two control characters which
+  <scm|md-indent> and <scm|md-space?> count as spaces; the columns which
+  a block takes away (<scm|md-dedent>) leave fills without their head,
+  which are spaces, and <scm|md-untab> makes a head with its fills a tab
+  again in the tree. A text which holds one of these two characters has
+  its tabs read as spaces.
+
   Formulas are recognized before the emphasis, so that <verbatim|_> and
   <verbatim|*> in a formula are left alone. <scm|md-dollar-math> has the
   rules of <name|Pandoc> for the dollars, and <scm|md-literal-brackets?>
   tells the escaped brackets which other programs write
   (<verbatim|\\[2\\]>) from a formula.
+
+  A file may be made to take a time which grows as the square of its
+  length, or faster, and a file of a few kilobytes then hangs the editor.
+  What is looked for and not found is therefore looked for once: the
+  strings which do not occur any more in the text which is cut into
+  tokens, the runs of backquotes of each length (<scm|md-code-runs>) and
+  the brackets with their ends (<scm|md-none>); a formula which does not
+  end before a blank line (<scm|md-no-math-end>) and a comment of
+  <name|HTML> which does not end (<scm|md-no-comment-end?>). The quotations
+  and the lists inside each other are read down to <scm|md-max-depth>
+  levels, each level being a call inside the previous one, and the lists
+  of nodes are walked by loops and not by calls, for the paragraphs of
+  thousands of nodes. On the import a footnote inside a footnote is left
+  as its mark (<scm|mdtm-footnote>): definitions which refer to each other
+  twice would make a document whose size doubles with each of them.
 
   <section|The import>
 
@@ -200,6 +227,66 @@
     written (<scm|tmmd-image>, from <scm|current-save-target>), for a
     whole document only.
   </itemize>
+
+  <section|The style for the files>
+
+  A file is read as a document of the style <tmstyle|markdown>
+  (<source-link|styles/markdown.ts|TeXmacs/styles/markdown.ts>), and written as it was read. The import
+  of a file (<scm|mdtm-faithful?>, off for a piece of text and with the
+  option <verbatim|markdown-\<gtr\>texmacs:faithful>) uses the macros of
+  this style for what the standard tags do not say, and the export knows
+  them (<scm|tmmd-faithful?> for a document of the style, where each
+  heading has its level and a link to <verbatim|#name> is kept).
+
+  <\description>
+    <item*|Structure><markup|md-metadata> and <markup|md-meta> for the
+    lines of the header, of which the tree keeps the source;
+    <markup|md-h6>; <markup|md-loose>; the three lists for the markers
+    <verbatim|->, <verbatim|*> and <verbatim|+> (the attribute
+    <verbatim|marker>); <markup|md-fence> (the attribute
+    <verbatim|info>); <markup|md-image>; <markup|md-footnote> and
+    <markup|md-footnote-text>.
+
+    <item*|Sources><markup|md-source> and <markup|md-block-source> hold a
+    body, the text of the file for it and a copy of the body: a formula,
+    a table, a piece of <name|HTML>, and with an empty body what
+    <TeXmacs> does not understand. Every formula is kept so
+    (<scm|mdtm-keep-math>): to know which ones <TeXmacs> writes in the same
+    way, each would be converted to <LaTeX> again, which takes as long as
+    reading it. The text is written as long as the
+    body is the copy. In a buffer this must be told before the macros are
+    expanded, which changes both: the two macros are replaced by externs
+    (<scm|tmmarkdown-md-source> in <source-link|tmmarkdown-expand.scm|TeXmacs/progs/convert/markdown/tmmarkdown-expand.scm>) which
+    get their arguments as they are and leave <markup|md-kept> with the
+    text, or the body. A text which is kept becomes a node with the
+    attribute <verbatim|source>, which the serializer writes as it is.
+    Kept so as well: text with a tab or another control character (shown
+    as a space, kept as <verbatim|\<less\>#9\<gtr\>>, since the codes
+    below 32 are accents in the encoding of <TeXmacs>), the unused
+    definitions of links and of footnotes, and the marks of a footnote
+    after its first one (<scm|mdtm-footnote>). A table which is kept
+    counts neither its links nor its marks of footnotes as uses: the
+    definitions stay as they were written (<scm|md-refs-kept>,
+    <scm|mdtm-in-kept-table?>), since the table is written from its text
+    as long as it is not edited. A header is a header when each of its
+    lines is one which <name|YAML> has and one at least is a key
+    (<scm|md-yaml?>); the export writes only such headers
+    (<scm|tmmd-md-metadata>), and snippets have none.
+
+    <item*|Other formats>The <LaTeX> export knows the macros
+    (<scm|tmtex-md-body> and the others in <source-link|tmtex.scm|TeXmacs/progs/convert/latex/tmtex.scm>):
+    it writes what they display, and not what they keep.
+  </description>
+
+  The property which the tests check: for a file <math|x>, the file
+  <math|N<around|(|x|)>> which is written after reading it has the same
+  <name|Markdown> tree as <math|x>, and <math|N<around|(|N<around|(|x|)>|)>=N<around|(|x|)>>.
+  The spelling which <math|N> changes is the one which has no node of
+  its own in the tree (lines of a paragraph, headings with a line under
+  them, fences, rules, markers of emphasis, definitions of links,
+  entities). To keep one more, give it an attribute in the parser, a
+  macro in the style, and handle both in the import, the export and the
+  serializer; or keep the block in <markup|md-block-source>.
 
   <section|The serializer>
 

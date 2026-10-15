@@ -22,6 +22,9 @@ struct SDL_Window;
 bool vue_gpu_enabled ();
 // the windows are drawn by the GPU (vue_gui.cpp: not in the single window)
 bool vue_gpu_windows ();
+// the glyphs as the preferences say ("gpu glyphs"...): true when they
+// changed, and everything must be drawn again
+bool vue_gpu_follow_glyph_settings ();
 // before the first window is created: the attributes of its GL context
 void vue_gpu_prepare ();
 // make the (one, shared) GL context current for the window, creating it

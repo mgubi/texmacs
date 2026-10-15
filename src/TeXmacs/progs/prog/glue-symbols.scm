@@ -27,6 +27,7 @@
 (texmacs-module (prog glue-symbols))
 
 (tm-define (all-glued-symbols) '( 
+"typeset-check-mismatches"
 "texmacs-version-release"
 "version-before?"
 "updater-supported?"

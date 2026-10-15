@@ -42,6 +42,9 @@
 
 (define (tmof-initialize opts)
   (set! tmof-flat? #f)
+  (set! tmof-heading-counts (make-list 7 0))
+  (set! tmof-heading-first 7)
+  (set! tmof-part-nr 0)
   (set! tmof-seqs (make-ahash-table))
   (set! tmof-seq-nr 0))
 
@@ -136,7 +139,7 @@
 (define (tmof-block? x)
   (and (pair? x)
        (in? (car x) '(meta h1 h2 h3 h4 h5 h6 !h !role !para p blockquote ul ol pre hr
-                      table footnote-def !display !pagebreak !toc))))
+                      table footnote-def !display !pagebreak !toc columns))))
 
 (define (tmof-blank? x)
   (and (string? x) (== (string-trim-spaces x) "")))
@@ -144,16 +147,24 @@
 (define (tmof-merge l)
   ;; with the strings which follow each other as one, and so for the
   ;; texts with the same markup
-  (cond ((null? l) l)
-        ((== (car l) "") (tmof-merge (cdr l)))
-        ((and (pair? (car l))
-              (in? (caar l) '(em strong strike underline mark sub sup smallcaps))
-              (nnull? (cdr l)) (func? (cadr l) (caar l)))
-         (tmof-merge (cons `(,(caar l) ,@(tmof-merge (append (cdar l) (cdadr l))))
-                           (cddr l))))
-        ((and (string? (car l)) (nnull? (cdr l)) (string? (cadr l)))
-         (tmof-merge (cons (string-append (car l) (cadr l)) (cddr l))))
-        (else (cons (car l) (tmof-merge (cdr l))))))
+  ;; (a loop: a paragraph may have many thousands of pieces)
+  (let loop ((l (office-join-strings l)) (acc '()))
+    (cond ((null? l) (reverse acc))
+          ((and (pair? (car l))
+                (in? (caar l) '(em strong strike underline mark sub sup smallcaps))
+                (null? (tmof-node-attrs (car l)))
+                (nnull? (cdr l)) (func? (cadr l) (caar l))
+                (null? (tmof-node-attrs (cadr l))))
+           ;; (not the markup with attributes: a mark of another color)
+           (let run ((m (cddr l)) (kids (append (reverse (cdadr l))
+                                                (reverse (cdar l)))))
+             (if (and (pair? m) (func? (car m) (caar l)) (null? (tmof-node-attrs (car m))))
+                 (run (cdr m) (append (reverse (cdar m)) kids))
+                 (loop m (cons `(,(caar l) ,@(tmof-merge (reverse kids)))
+                               acc)))))
+          (else (loop (cdr l) (cons (car l) acc))))))
+
+(define tmof-keep-spaces? #f)  ; the spaces of a document of the style office count
 
 (define (tmof-squeeze s)
   ;; with one space for several
@@ -165,7 +176,8 @@
 
 (define (tmof-trim l)
   ;; text without spaces and line breaks at its ends
-  (let* ((l (map (lambda (x) (if (string? x) (tmof-squeeze x) x)) (tmof-merge l)))
+  (let* ((l (map (lambda (x) (if (and (string? x) (not tmof-keep-spaces?)) (tmof-squeeze x) x))
+                 (tmof-merge l)))
          (drop-start
            (lambda (l)
              (let loop ((l l))
@@ -518,7 +530,9 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define (tmof-noop l) '())
-(define (tmof-space l) '(" "))
+(define (tmof-space l)
+  ;; a space; the wide one of a tab of an office document is a tab
+  (if (and (pair? l) (== (car l) "2em")) '((tab)) '(" ")))
 (define (tmof-first l) (if (null? l) '() (tmof (car l))))
 (define (tmof-last l) (if (null? l) '() (tmof (cAr l))))
 (define (tmof-all l) (append-map tmof l))
@@ -588,30 +602,7 @@
 
 (define (tmof-byte s i) (char->integer (string-ref s i)))
 
-(define (tmof-pixels data)
-  ;; (width height) in pixels of an image PNG, GIF or JPEG, or #f
-  (let ((n (string-length data)))
-    (cond ((and (> n 24) (== (tmof-byte data 0) 137) (== (tmof-byte data 1) 80))
-           (list (+ (* 16777216 (tmof-byte data 16)) (* 65536 (tmof-byte data 17))
-                    (* 256 (tmof-byte data 18)) (tmof-byte data 19))
-                 (+ (* 16777216 (tmof-byte data 20)) (* 65536 (tmof-byte data 21))
-                    (* 256 (tmof-byte data 22)) (tmof-byte data 23))))
-          ((and (> n 10) (== (tmof-byte data 0) 71) (== (tmof-byte data 1) 73))
-           (list (+ (tmof-byte data 6) (* 256 (tmof-byte data 7)))
-                 (+ (tmof-byte data 8) (* 256 (tmof-byte data 9)))))
-          ((and (> n 4) (== (tmof-byte data 0) 255) (== (tmof-byte data 1) 216))
-           ;; the segments of a JPEG, up to the one with the size
-           (let loop ((i 2))
-             (cond ((> (+ i 9) n) #f)
-                   ((!= (tmof-byte data i) 255) #f)
-                   ((and (>= (tmof-byte data (+ i 1)) 192)
-                         (<= (tmof-byte data (+ i 1)) 207)
-                         (not (in? (tmof-byte data (+ i 1)) '(196 200 204))))
-                    (list (+ (* 256 (tmof-byte data (+ i 7))) (tmof-byte data (+ i 8)))
-                          (+ (* 256 (tmof-byte data (+ i 5))) (tmof-byte data (+ i 6)))))
-                   (else (loop (+ i 2 (* 256 (tmof-byte data (+ i 2)))
-                                  (tmof-byte data (+ i 3))))))))
-          (else #f))))
+(define (tmof-pixels data) (office-image-pixels data))
 
 (define tmof-text-width 16.0) ; the width of the text, in centimeters
 
@@ -677,43 +668,49 @@
   ;; vector is #t (a drawing: what TeXmacs draws is drawn the same), is
   ;; the text vector when it is one (an image which is an SVG), and is
   ;; left out when vector is #f. Nothing when there is no editor, or no
-  ;; picture.
-  (catch #t
-    (lambda ()
-      (let* ((base (url-temp))
-             (png (url-glue base ".png"))
-             (pdf (url-glue base ".pdf"))
-             (svg (url-glue base ".svg"))
-             (ext (print-snippet png x #t)))
-        (if (not (and (url-exists? png) (list? ext) (>= (length ext) 10)))
-            '()
-            (let* ((data (string-load png))
-                   (dpi (max 1 (list-ref ext 9)))
-                   ;; the box of the ink, in 256th of a dot
-                   (cm (lambda (a b) (max 0.1 (* 2.54 (/ (- b a) (* 256.0 dpi))))))
-                   (w (cm (list-ref ext 0) (list-ref ext 2)))
-                   (h (cm (list-ref ext 1) (list-ref ext 3)))
-                   (vector (cond ((string? vector) vector)
-                                 ((not vector) #f)
-                                 (else
-                                   (and (begin (print-snippet pdf x #t)
-                                               (url-exists? pdf))
-                                        (pdf->svg-native pdf svg)
-                                        (url-exists? svg)
-                                        (string-load svg))))))
-              (for (u (list png pdf svg))
-                (when (url-exists? u) (system-remove u)))
-              (set! tmof-picture-nr (+ tmof-picture-nr 1))
-              (list (apply office-node
-                           (list 'image
-                                 `((name ,(string-append
-                                            "drawing" (number->string tmof-picture-nr)
-                                            ".png"))
-                                   (data ,data)
-                                   (width ,(tmof-cm-string w))
-                                   (height ,(tmof-cm-string h))
-                                   (svg ,vector)))))))))
-    (lambda args '())))
+  ;; picture. The temporary files are removed, whatever happens.
+  (let* ((base (url-temp))
+         (png (url-glue base ".png"))
+         (pdf (url-glue base ".pdf"))
+         (svg (url-glue base ".svg"))
+         ;; (without a window, as texmacs -headless, there are no fonts to
+         ;; typeset with: Qt would end TeXmacs)
+         (r (if (headless?) '()
+                (catch #t
+                  (lambda () (tmof-picture* x vector png pdf svg))
+                  (lambda args '())))))
+    (for (u (list png pdf svg))
+      (when (url-exists? u) (system-remove u)))
+    r))
+
+(define (tmof-picture* x vector png pdf svg)
+  (let* ((ext (print-snippet png x #t)))
+    (if (not (and (url-exists? png) (list? ext) (>= (length ext) 10)))
+        '()
+        (let* ((data (string-load png))
+               (dpi (max 1 (list-ref ext 9)))
+               ;; the box of the ink, in 256th of a dot
+               (cm (lambda (a b) (max 0.1 (* 2.54 (/ (- b a) (* 256.0 dpi))))))
+               (w (cm (list-ref ext 0) (list-ref ext 2)))
+               (h (cm (list-ref ext 1) (list-ref ext 3)))
+               (vector (cond ((string? vector) vector)
+                             ((not vector) #f)
+                             (else
+                               (and (begin (print-snippet pdf x #t)
+                                           (url-exists? pdf))
+                                    (pdf->svg-native pdf svg)
+                                    (url-exists? svg)
+                                    (string-load svg))))))
+          (set! tmof-picture-nr (+ tmof-picture-nr 1))
+          (list (apply office-node
+                       (list 'image
+                             `((name ,(string-append
+                                        "drawing" (number->string tmof-picture-nr)
+                                        ".png"))
+                               (data ,data)
+                               (width ,(tmof-cm-string w))
+                               (height ,(tmof-cm-string h))
+                               (svg ,vector)))))))))
 
 (define (tmof-graphics l)
   (tmof-picture (cons 'graphics l) #t))
@@ -755,10 +752,38 @@
              (if (null? r) (list (string-append "[" name "]")) r)))
           (else '()))))
 
+(define (tmof-clip-part s unit)
+  ;; the part of a side which "0.1w" says, or #f
+  (and (string? s) (string-ends? s unit)
+       (office-number (substring s 0 (- (string-length s) 1)))))
+
+(define (tmof-clipped l)
+  ;; an image of which parts are cut: the image, with these parts (the
+  ;; style office reads a cropped picture so)
+  (let* ((r (if (null? l) '() (tmof (car l))))
+         (img (and (list-1? r) (func? (car r) 'image) (car r)))
+         (x1 (and (>= (length l) 5) (tmof-clip-part (list-ref l 1) "w")))
+         (y1 (and (>= (length l) 5) (tmof-clip-part (list-ref l 2) "h")))
+         (x2 (and (>= (length l) 5) (tmof-clip-part (list-ref l 3) "w")))
+         (y2 (and (>= (length l) 5) (tmof-clip-part (list-ref l 4) "h"))))
+    (if (not (and img x1 y1 x2 y2 (> x2 x1) (> y2 y1))) r
+        (let* ((attrs (tmof-node-attrs img))
+               (get (lambda (k) (with a (assoc k attrs) (and a (cadr a)))))
+               (w (office-length->cm (get 'width)))
+               (h (office-length->cm (get 'height)))
+               (crop (string-recompose
+                       (map office-decimal (list x1 (- 1 y2) (- 1 x2) y1)) " ")))
+          (if (not (and w h)) r
+              `((image (@ ,@(list-filter attrs (lambda (a) (not (in? (car a) '(width height)))))
+                          (width ,(tmof-cm-string (* w (- x2 x1))))
+                          (height ,(tmof-cm-string (* h (- y2 y1))))
+                          (crop ,crop)))))))))
+
 (define (tmof-specific l)
   ;; what is for another medium only is left out
   (cond ((< (length l) 2) '())
-        ((in? (car l) '("texmacs" "screen" "printer" "image")) (tmof (cadr l)))
+        ;; (not what is drawn on the screen only: a mark of a space)
+        ((in? (car l) '("texmacs" "printer" "image")) (tmof (cadr l)))
         (else '())))
 
 (define (tmof-reference l)
@@ -834,7 +859,95 @@
         ((and (== var "font-shape") (== val "small-caps"))
          (tmof-wrap 'smallcaps body))
         ((== var "color") (tmof-colored body (tmof-color val)))
+        ;; the alignment of the paragraphs
+        ((and (== var "par-mode") (in? val '("left" "center" "right" "justify")))
+         (tmof-para-attr body 'align val))
+        ;; the formatting of the text and of the paragraphs, as the style
+        ;; office reads it from a file
+        ((== var "font-size")
+         (with r (office-number val)
+           (if (not r) body
+               (tmof-attr-wrap* 'size `((value ,(office-decimal (* r tmof-base-size)))) body))))
+        ;; a font of the office programs, by its name
+        ((== var "font")
+         (with f (tmof-office-font val)
+           (if f (tmof-attr-wrap* 'font `((value ,f)) body) body)))
+        ((and (== var "font-family") (in? val '("ss" "rm")))
+         (tmof-attr-wrap* 'font `((value ,(if (== val "ss") "sans" "serif"))) body))
+        ((== var "marked-color")
+         (map (lambda (y)
+                (if (and (func? y 'mark) (not (func? (cadr y) '@)))
+                    `(mark (@ (value ,(or (tmof-color val) val))) ,@(cdr y))
+                    y))
+              body))
+        ((in? var '("par-left" "par-right" "par-first"))
+         (with v (tmof-points val)
+           (if (not v) body
+               (tmof-para-attr body (cdr (assoc var '(("par-left" . indent-left)
+                                                       ("par-right" . indent-right)
+                                                       ("par-first" . first-indent))))
+                               (office-decimal v)))))
+        ((== var "par-sep")
+         (with v (tmof-points val)
+           (if (not v) body
+               (tmof-para-attr body 'line-spacing
+                               (office-decimal (/ (+ 1 (/ v tmof-base-size)) 1.2))))))
+        ((and (== var "ornament-color") (not (in? val '("" "#fff0" "white"))))
+         (tmof-para-attr body 'background (or (tmof-color val) val)))
+        ((and (== var "ornament-border") (not (in? val '("" "0ln" "0pt"))))
+         (tmof-para-attr body 'border "true"))
         (else body)))
+
+(define tmof-base-size 10.0)  ; the size of the font of the document
+
+(define tmof-texmacs-fonts
+  ;; the fonts of TeXmacs, by the names of the office programs
+  '(("roman" . #f) ("modern" . #f) ("concrete" . #f) ("termes" . "Times New Roman")
+    ("pagella" . "Palatino Linotype") ("bonum" . "Bookman Old Style")
+    ("schola" . "Century Schoolbook") ("heros" . "Arial") ("adventor" . "Century Gothic")
+    ("cursor" . "Courier New") ("chorus" . "Zapf Chancery") ("stix" . "STIX Two Text")
+    ("dejavu" . "DejaVu Serif") ("linux" . "Linux Libertine O") ("libertine" . "Linux Libertine O")))
+
+(define (tmof-office-font f)
+  ;; the name of the font f for the office programs, or #f for the fonts
+  ;; of TeXmacs which have none
+  (cond ((not (string? f)) #f)
+        ((assoc (locase-all f) tmof-texmacs-fonts)
+         => (lambda (p) (cdr p)))
+        (else f)))
+
+(define (tmof-points s)
+  ;; the length s in points: fn are the size of the font
+  (cond ((not (string? s)) #f)
+        ((string-ends? s "fn")
+         (with v (office-number (substring s 0 (- (string-length s) 2)))
+           (and v (* v tmof-base-size))))
+        (else (office-points s))))
+
+(define (tmof-para-attr body key val)
+  ;; the paragraphs of the body with the attribute key
+  (if (tmof-has-block? body)
+      (map (lambda (b)
+             (cond ((func? b 'p) `(!para ((,key ,val)) ,@(cdr b)))
+                   ((func? b '!para)
+                    `(!para ((,key ,val) ,@(list-filter (cadr b)
+                                                        (lambda (a) (!= (car a) key))))
+                            ,@(cddr b)))
+                   (else b)))
+           (tmof-blocks body))
+      (if (null? (tmof-trim body)) body
+          `((!para ((,key ,val)) ,@body)))))
+
+(define (tmof-attr-wrap* tag attrs body)
+  ;; the text of body inside the node tag; the paragraphs of blocks each
+  (cond ((tmof-has-block? body)
+         (map (lambda (b)
+                (cond ((func? b 'p) `(p (,tag (@ ,@attrs) ,@(cdr b))))
+                      ((func? b '!para) `(!para ,(cadr b) (,tag (@ ,@attrs) ,@(cddr b))))
+                      (else b)))
+              (tmof-blocks body)))
+        ((null? (tmof-trim body)) body)
+        (else `((,tag (@ ,@attrs) ,@(tmof-merge body))))))
 
 (define (tmof-with l)
   (cond ((null? l) '())
@@ -859,6 +972,16 @@
                           body)))))))
 
 (define (tmof-surround l)
+  ;; the spaces around a paragraph, as the style office writes them
+  (if (and (== (length l) 3) (func? (car l) 'vspace*) (func? (cadr l) 'vspace))
+      (let* ((before (tmof-points (cadr (car l))))
+             (after (tmof-points (cadr (cadr l))))
+             (b (tmof (caddr l)))
+             (b (if before (tmof-para-attr b 'space-before (office-decimal before)) b)))
+        (if after (tmof-para-attr b 'space-after (office-decimal after)) b))
+      (tmof-surround* l)))
+
+(define (tmof-surround* l)
   (if (!= (length l) 3) (tmof-all l)
       (tmof-attach (tmof-inline (tmof (car l)))
                    (tmof (caddr l))
@@ -896,10 +1019,55 @@
                       ((tmof-numbered-title (car l)) => identity)
                       (else (loop (cdr l))))))))
 
+(define (tmof-named-title x)
+  ;; (number . title) when the tree x of a title is "Chapter 1", a line
+  ;; and the title, as the styles make the title of a chapter; else #f
+  (and (func? x 'concat) (pair? (cdr x)) (string? (cadr x))
+       (let* ((words (string-tokenize-by-char (cadr x) #\space))
+              (n (and (== (length words) 2) (cadr words)))
+              (rest (let loop ((r (cddr x)))
+                      (cond ((null? r) #f)
+                            ((func? (car r) 'new-line) (cdr r))
+                            ((and (pair? (car r)) (in? (caar r) '(vspace vspace*)))
+                             (loop (cdr r)))
+                            (else #f)))))
+         (and n rest (pair? rest)
+              (or (tmof-number? n)
+                  (list-and (map (lambda (c) (in? c '(#\I #\V #\X #\L #\C)))
+                                 (string->list n))))
+              (cons n (if (list-1? rest) (car rest) (cons 'concat rest)))))))
+
 (define (tmof-heading level l)
   ;; a heading; its number, when it has one, is kept apart: the office
-  ;; programs number the headings themselves
-  (let* ((parts (and (list-1? l) (tmof-numbered-title (car l))))
+  ;; programs number the headings themselves. A part or a chapter starts
+  ;; a page.
+  (append
+    (if (in? level '(0 1)) '((!pagebreak)) '())
+    (if (in? level '(top 1)) (tmof-heading* level (tmof-appendix-title l))
+        (tmof-heading* level l))))
+
+(define (tmof-appendix-title l)
+  ;; "Appendix A", a line and the title are "Appendix A. The title": the
+  ;; office programs number the appendices as the chapters
+  (or (and (list-1? l) (func? (car l) 'concat) (pair? (cdar l)) (string? (cadar l))
+           ;; (not "Chapter 1": a chapter has its number)
+           (with w (string-tokenize-by-char (cadar l) #\space)
+             (not (and (== (length w) 2) (tmof-number? (cadr w)))))
+           (let* ((x (car l))
+                  (rest (let loop ((r (cddr x)))
+                          (cond ((null? r) #f)
+                                ((func? (car r) 'new-line) (cdr r))
+                                ((and (pair? (car r)) (in? (caar r) '(vspace vspace*)))
+                                 (loop (cdr r)))
+                                (else #f)))))
+             (and rest (pair? rest)
+                  (list `(concat ,(cadr x) ". " ,@rest)))))
+      l))
+
+(define (tmof-heading* level l)
+  (let* ((parts (and (list-1? l)
+                     (or (tmof-numbered-title (car l))
+                         (and (in? level '(0 1)) (tmof-named-title (car l))))))
          ;; (the number is the text of its cell, without the space after it)
          (number (and parts
                       (with c (car parts)
@@ -918,6 +1086,180 @@
       (cond ((null? t) '())
             (number `((!h ,level (!number ,number) ,@t)))
             (else `((!h ,level ,@t)))))))
+
+;; The numbers of the headings of a document which was not expanded, as
+;; TeXmacs makes them: the counters of the levels from the first one which
+;; is used
+(define tmof-heading-counts (make-list 7 0))
+(define tmof-heading-first 7)
+
+(define tmof-part-nr 0)
+
+(define (tmof-roman n)
+  ;; the number n < 4000 in capital Roman numerals
+  (let loop ((n n) (l '((1000 . "M") (900 . "CM") (500 . "D") (400 . "CD")
+                        (100 . "C") (90 . "XC") (50 . "L") (40 . "XL") (10 . "X")
+                        (9 . "IX") (5 . "V") (4 . "IV") (1 . "I")))
+             (acc ""))
+    (cond ((or (<= n 0) (null? l)) acc)
+          ((>= n (caar l)) (loop (- n (caar l)) l (string-append acc (cdar l))))
+          (else (loop n (cdr l) acc)))))
+
+(define (tmof-part-heading l)
+  ;; a part: "Part I. Its title", a heading of the first level without a
+  ;; number of the office programs, which do not count the chapters by
+  ;; parts
+  (set! tmof-part-nr (+ tmof-part-nr 1))
+  (append '((!pagebreak))
+          (tmof-heading* 0 (list `(concat ,(string-append "Part " (tmof-roman tmof-part-nr)
+                                                          ". ")
+                                          ,@(if (null? l) '() (list (car l))))))))
+
+(define (tmof-part-numbered-title l) (tmof-part-heading l))
+
+(define (tmof-counted-heading level l)
+  (if (== level 0) (tmof-part-heading l)
+      (tmof-counted-heading* level l)))
+
+(define (tmof-counted-heading* level l)
+  (set! tmof-heading-first (min tmof-heading-first level))
+  (set! tmof-heading-counts
+        (map (lambda (n i) (cond ((== i level) (+ n 1)) ((> i level) 0) (else n)))
+             tmof-heading-counts (iota 7)))
+  (let* ((number (string-recompose
+                   (map number->string
+                        (list-tail (list-head tmof-heading-counts (+ level 1))
+                                   tmof-heading-first))
+                   "."))
+         (t (with old tmof-flat?
+              (set! tmof-flat? #t)
+              (with r (tmof-trim (tmof-inline (tmof-all l)))
+                (set! tmof-flat? old)
+                r))))
+    (append (if (in? level '(0 1)) '((!pagebreak)) '())
+            (if (null? t) '() `((!h ,level (!number ,number) ,@t))))))
+
+(define (tmof-part-numbered l) (tmof-counted-heading 0 l))
+(define (tmof-chapter-numbered l) (tmof-counted-heading 1 l))
+(define (tmof-section-numbered l) (tmof-counted-heading 2 l))
+(define (tmof-subsection-numbered l) (tmof-counted-heading 3 l))
+(define (tmof-subsubsection-numbered l) (tmof-counted-heading 4 l))
+
+;; The macros of the style office (office.ts): what they keep is written
+;; again, as it was read
+
+(define (tmof-office-par l)
+  ;; a paragraph of a named style: each of its paragraphs has the style
+  (if (< (length l) 2) '()
+      (with name (tmof-plain (car l))
+        (map (lambda (b)
+               (cond ((func? b 'p) `(!para ((style ,name)) ,@(cdr b)))
+                     ((func? b '!para) `(!para ((style ,name) ,@(cadr b)) ,@(cddr b)))
+                     (else b)))
+             (tmof-blocks (tmof (cadr l)))))))
+
+(define (tmof-attr-wrap tag attrs l)
+  ;; the nodes of the tree l inside the node tag with these attributes
+  (with r (tmof (cadr l))
+    (if (tmof-has-block? r) r
+        (if (null? (tmof-trim r)) '()
+            `((,tag (@ ,@attrs) ,@(tmof-merge r)))))))
+
+(define (tmof-office-span l)
+  (if (< (length l) 2) '() (tmof-attr-wrap 'span `((style ,(tmof-plain (car l)))) l)))
+
+(define (tmof-office-field l)
+  ;; a field: its instruction (or the element of OpenDocument), its result
+  (if (< (length l) 2) '()
+      (let* ((code (tmof-plain (car l)))
+             (r (tmof (cadr l))))
+        `((field (@ ,@(if (string-starts? code "<") `((xml ,code)) `((code ,code))))
+                 ,@(tmof-merge r))))))
+
+(define (tmof-office-change tag l)
+  (if (< (length l) 3) '()
+      (with r (tmof (caddr l))
+        (if (null? r) '()
+            `((,tag (@ ,@(tmof-who l)) ,@(tmof-merge r)))))))
+
+(define (tmof-who l)
+  ;; the author and the date of a comment or of a change, when it has them
+  (list-filter `((author ,(tmof-plain (car l))) (date ,(tmof-plain (cadr l))))
+               (lambda (a) (!= (cadr a) ""))))
+
+(define (tmof-office-ins l) (tmof-office-change 'ins l))
+(define (tmof-office-del l) (tmof-office-change 'del l))
+
+(define (tmof-office-kind tag l)
+  ;; an underline or a line through of a kind, a spacing of letters (in
+  ;; points); a value which the office formats do not have is left out
+  (if (< (length l) 2) '()
+      (let* ((v (tmof-plain (car l)))
+             (v (cond ((eq? tag 'underline) (and (in? v office-underline-kinds) v))
+                      ((eq? tag 'strike) (and (== v "double") v))
+                      (else (with n (or (office-number v) (tmof-points v))
+                              (and n (< (abs n) 100) (office-decimal n)))))))
+        (cond (v (tmof-attr-wrap tag `((value ,v)) l))
+              ((eq? tag 'letters) (tmof (cadr l)))
+              (else (tmof-wrap tag (tmof (cadr l))))))))
+
+(define (tmof-office-underline l) (tmof-office-kind 'underline l))
+(define (tmof-office-strike l) (tmof-office-kind 'strike l))
+(define (tmof-office-letters l) (tmof-office-kind 'letters l))
+
+(define (tmof-office-font-tag l)
+  ;; a font which TeXmacs does not have, by its name
+  (if (< (length l) 3) '()
+      (with r (tmof (caddr l))
+        (tmof-attr-wrap* 'font `((value ,(tmof-plain (car l)))) r))))
+
+(define (tmof-office-float l)
+  ;; a picture which floats beside its paragraph: where it is, and how the
+  ;; text goes around it
+  (if (< (length l) 3) '()
+      (let* ((side (tmof-plain (car l)))
+             (spec (append-map
+                     (lambda (kv)
+                       (with i (string-search-forwards "=" 0 kv)
+                         (if (<= i 0) '()
+                             (with k (string->symbol (substring kv 0 i))
+                               (if (in? k (append office-float-keys '(next)))
+                                   (list (list k (substring kv (+ i 1) (string-length kv))))
+                                   '())))))
+                     (string-tokenize-by-char (tmof-plain (cadr l)) #\space)))
+             (attrs (cons (list 'float (if (in? side '("left" "right" "center")) side "left"))
+                          (list-filter spec (lambda (a) (!= (car a) 'float))))))
+        (map (lambda (y) (if (func? y 'image) (office-add-attrs y attrs) y))
+             (tmof (caddr l))))))
+
+(define (tmof-change-case l)
+  ;; capitals, lower case; the first letter in capitals is the text as it is
+  (cond ((< (length l) 2) (tmof-all l))
+        ((== (cadr l) "UPCASE") (tmof-wrap 'caps (tmof (car l))))
+        ((== (cadr l) "locase") (tmof-attr-wrap* 'caps '((value "lower")) (tmof (car l))))
+        (else (tmof (car l)))))
+
+(define (tmof-office-capitalize l)
+  ;; the first letters of the words in capitals
+  (if (null? l) '()
+      (tmof-attr-wrap* 'caps '((value "capital")) (tmof (car l)))))
+
+(define (tmof-office-comment l)
+  (if (< (length l) 3) '()
+      `((comment (@ ,@(tmof-who l)) ,@(tmof-blocks (tmof (caddr l)))))))
+
+(define (tmof-office-columns* l)
+  ;; columns with the line between them, and the space between them
+  (if (< (length l) 4) '()
+      `((columns (@ (count ,(tmof-plain (car l)))
+                    ,@(if (== (tmof-plain (cadr l)) "true") '((line "true")) '())
+                    ,@(with g (tmof-plain (caddr l))
+                        (if (office-length->cm g) `((gap ,g)) '())))
+                 ,@(tmof-blocks (tmof (cadddr l)))))))
+
+(define (tmof-office-columns l)
+  (if (< (length l) 2) '()
+      `((columns (@ (count ,(tmof-plain (car l)))) ,@(tmof-blocks (tmof (cadr l)))))))
 
 (define (tmof-part l) (tmof-heading 0 l))
 (define (tmof-chapter l) (tmof-heading 1 l))
@@ -1041,12 +1383,23 @@
           ;; text before the first item
           (else (loop (cdr l) (list (car l) '(item)) acc)))))
 
-(define (tmof-list tag l)
+(define (tmof-list tag l . format)
+  ;; a list; a numbered one may have a way of numbering (a, A, i, I)
   (let* ((body (if (null? l) '(document) (car l)))
          (pars (if (func? body 'document) (cdr body) (list body)))
-         (items (tmof-items pars)))
+         ;; the number before the first item, when the list starts at
+         ;; another one than 1
+         (first (and (pair? pars) (func? (car pars) 'concat) (pair? (cdar pars))
+                     (func? (cadar pars) 'assign 2) (== (cadr (cadar pars)) "item-nr")
+                     (string? (caddr (cadar pars)))
+                     (office-integer (caddr (cadar pars)) #f 0 100000)))
+         (pars (if first (cons (cons 'concat (cddar pars)) (cdr pars)) pars))
+         (items (tmof-items pars))
+         (attrs (append (if (null? format) '() `((format ,(car format))))
+                        (if first `((start ,(number->string (+ first 1)))) '()))))
     (if (null? items) '()
         `((,tag
+           ,@(if (null? attrs) '() `((@ ,@attrs)))
            ,@(map (lambda (it)
                     (let* ((item (car it))
                            (check (tmof-check item))
@@ -1065,6 +1418,10 @@
 
 (define (tmof-itemize l) (tmof-list 'ul l))
 (define (tmof-enumerate l) (tmof-list 'ol l))
+(define (tmof-enumerate-alpha l) (tmof-list 'ol l "a"))
+(define (tmof-enumerate-Alpha l) (tmof-list 'ol l "A"))
+(define (tmof-enumerate-roman l) (tmof-list 'ol l "i"))
+(define (tmof-enumerate-Roman l) (tmof-list 'ol l "I"))
 
 (define (tmof-quotation l)
   (with b (tmof-blocks (tmof-all l))
@@ -1392,10 +1749,20 @@
            (let* ((rows (tmof-eq-rows x))
                   (numbered (list-filter rows tmof-eq-number))
                   (others (list-filter rows (lambda (r) (not (tmof-eq-number r))))))
-             (tmof-display-numbered
-               `(tabular* ,(tmof-eq-clean x))
-               (map (lambda (r) (cons (tmof-eq-number r) (tmof-labels r))) numbered)
-               (append-map tmof-labels others))))
+             ;; (the class of the formula says that its table is lines
+             ;; of equations, see mathml->omml)
+             (map (lambda (b)
+                    (if (and (func? b '!display) (pair? (cadr b)) (symbol? (car (cadr b))))
+                        (let ((m (cadr b)))
+                          `(!display (,(car m) (@ (class "tm-eqarray")
+                                                  ,@(tmof-node-attrs m))
+                                               ,@(tmof-node-children m))
+                                     ,@(cddr b)))
+                        b))
+                  (tmof-display-numbered
+                    `(tabular* ,(tmof-eq-clean x))
+                    (map (lambda (r) (cons (tmof-eq-number r) (tmof-labels r))) numbered)
+                    (append-map tmof-labels others)))))
           (else (tmof-display x)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1451,6 +1818,22 @@
         ((not (symbol? (car x))) '())
         ((in? (car x) '(page-break new-page page-break* new-page*))
          '((!pagebreak)))
+        ;; what the expansion of the document could not do
+        ((func? x 'error) '())
+        ;; the screens of a presentation, each on a page of its own
+        ((func? x 'screens)
+         (append-map (lambda (y)
+                       (with b (tmof (if (and (pair? y) (in? (car y) '(shown hidden))
+                                              (pair? (cdr y)))
+                                         (cadr y) y))
+                         (if (null? b) '() (cons '(!pagebreak) (tmof-blocks b)))))
+                     (cdr x)))
+        ;; the headers and footers of a page: those of the file are kept
+        ;; with it (see the style office)
+        ((in? (car x) '(set-this-page-header set-this-page-footer set-header
+                        set-footer set-odd-page-header set-even-page-header
+                        set-odd-page-footer set-even-page-footer))
+         '())
         ((tmof-drawing? x) (tmof-picture x #t))
         ((tmof-dispatch 'tmoffice-methods% x) => identity)
         ((assoc (car x) tmof-languages) (tmof-code-block (car x) (cdr x)))
@@ -1477,7 +1860,7 @@
   (surround tmof-surround)
   (with tmof-with)
   (compound tmof-compound)
-  ((:or rigid hgroup freeze unfreeze syntax move shift resize clipped
+  ((:or rigid hgroup freeze unfreeze syntax move shift resize
         repeat repeat*)
    tmof-first)
   ((:or datoms dlines dpages dbox locus float) tmof-last)
@@ -1538,12 +1921,35 @@
   (equations-base tmof-equation)
 
   ;; sections and the title
-  ((:or part part* part-title) tmof-part)
-  ((:or chapter chapter* chapter-title) tmof-chapter)
+  ((:or part* part-title) tmof-part)
+  ((:or chapter* chapter-title) tmof-chapter)
   ((:or appendix appendix-title) tmof-appendix)
-  ((:or section section* section-title) tmof-section)
-  ((:or subsection subsection* subsection-title) tmof-subsection)
-  ((:or subsubsection subsubsection* subsubsection-title) tmof-subsubsection)
+  ((:or section* section-title) tmof-section)
+  ((:or subsection* subsection-title) tmof-subsection)
+  ((:or subsubsection* subsubsection-title) tmof-subsubsection)
+  ;; (in a document which was not expanded, the headings with numbers)
+  (clipped tmof-clipped)
+  (office-par tmof-office-par)
+  (office-span tmof-office-span)
+  (office-field tmof-office-field)
+  (office-ins tmof-office-ins)
+  (office-del tmof-office-del)
+  (office-comment tmof-office-comment)
+  (office-columns tmof-office-columns)
+  (office-columns* tmof-office-columns*)
+  (office-underline tmof-office-underline)
+  (office-strike tmof-office-strike)
+  (office-letters tmof-office-letters)
+  (office-font tmof-office-font-tag)
+  (change-case tmof-change-case)
+  (office-capitalize tmof-office-capitalize)
+  (office-float tmof-office-float)
+  (part tmof-part-numbered)
+  (part-numbered-title tmof-part-numbered-title)
+  (chapter tmof-chapter-numbered)
+  (section tmof-section-numbered)
+  (subsection tmof-subsection-numbered)
+  (subsubsection tmof-subsubsection-numbered)
   ((:or paragraph paragraph* paragraph-title) tmof-paragraph)
   ((:or subparagraph subparagraph* subparagraph-title) tmof-subparagraph)
   ((:or doc-data office-doc-data) tmof-doc-data)
@@ -1556,9 +1962,11 @@
   ((:or description description-compact description-dash description-aligned
         description-long description-paragraphs)
    tmof-description)
-  ((:or enumerate enumerate-numeric enumerate-roman enumerate-Roman
-        enumerate-alpha enumerate-Alpha)
-   tmof-enumerate)
+  ((:or enumerate enumerate-numeric) tmof-enumerate)
+  (enumerate-alpha tmof-enumerate-alpha)
+  (enumerate-Alpha tmof-enumerate-Alpha)
+  (enumerate-roman tmof-enumerate-roman)
+  (enumerate-Roman tmof-enumerate-Roman)
   ((:or item item*) tmof-noop)
   ((:or quotation quote-env verse) tmof-quotation)
 
@@ -1609,13 +2017,17 @@
         ((not (pair? x)) '())
         (else
           (case (car x)
-            ((em strong strike underline mark sub sup smallcaps code)
+            ((em strong sub sup smallcaps code)
              (with l (tmof-final-inlines (tmof-node-children x))
                (if (null? l) '() (list (cons (car x) l)))))
-            ((color)
+            ((color span ins del field size font mark underline strike caps letters)
              (with l (tmof-final-inlines (tmof-node-children x))
-               (if (null? l) '()
-                   (list `(color (@ ,@(tmof-node-attrs x)) ,@l)))))
+               (cond ((and (null? l) (not (func? x 'field))) '())
+                     ((null? (tmof-node-attrs x)) (list (cons (car x) l)))
+                     (else (list `(,(car x) (@ ,@(tmof-node-attrs x)) ,@l))))))
+            ((comment)
+             (list `(comment (@ ,@(tmof-node-attrs x))
+                             ,@(tmof-final-blocks (tmof-node-children x)))))
             ((a)
              (let ((l (tmof-final-inlines (tmof-node-children x)))
                    (href (with a (assoc 'href (tmof-node-attrs x))
@@ -1625,6 +2037,7 @@
                      (else (list `(link (@ (href ,href)) ,@l))))))
             ((note) (list (cons 'note (tmof-final-blocks (cdr x)))))
             ((br) '((br)))
+            ((tab) '((tab)))
             ((math image bookmark seq) (list x))
             ((ref)
              (with l (tmof-final-inlines (tmof-node-children x))
@@ -1675,6 +2088,9 @@
             ((!display)
              (list `(p (math (@ (display "true") (form "sxml")) ,(cadr x))
                        ,@(if (pair? (cddr x)) `((tab) ,@(cddr x)) '()))))
+            ((columns)
+             (list `(columns (@ ,@(tmof-node-attrs x))
+                             ,@(tmof-final-blocks (tmof-node-children x)))))
             ((blockquote)
              (map (lambda (b)
                     (if (and (func? b 'p) (not (ox-attr b 'role)))
@@ -1686,7 +2102,9 @@
              (with items (list-filter (tmof-node-children x)
                                       (lambda (y) (func? y 'li)))
                (if (null? items) '()
-                   (list `(list (@ (kind ,(if (func? x 'ol) "number" "bullet")))
+                   (list `(list (@ (kind ,(if (func? x 'ol) "number" "bullet"))
+                                   ,@(list-filter (tmof-node-attrs x)
+                                                  (lambda (a) (in? (car a) '(format start)))))
                                 ,@(map (lambda (item)
                                          (cons 'item
                                                (tmof-final-blocks
@@ -1714,7 +2132,50 @@
             (else '())))))
 
 (define (tmof-final-blocks l)
-  (append-map tmof-final-block l))
+  (tmof-anchor-floats (append-map tmof-final-block l)))
+
+;; A picture which floats beside a paragraph was read from inside it: it
+;; goes back there, at its start (attribute next of office-float)
+
+(define (tmof-next-float? y)
+  (and (func? y 'image) (== (ox-attr y 'next) "true")))
+
+(define (tmof-drop-next y)
+  (if (not (tmof-next-float? y)) y
+      (apply office-node
+             (cons* 'image (list-filter (map (lambda (a) (list (car a) (cadr a)))
+                                             (ox-attrs y))
+                                        (lambda (a) (!= (car a) 'next)))
+                    (ox-children y)))))
+
+(define (tmof-blank? y)
+  (and (string? y) (== (string-trim-spaces y) "")))
+
+(define (tmof-anchor-floats l)
+  (let loop ((l l) (acc '()))
+    (cond ((null? l) (reverse acc))
+          ((and (func? (car l) 'p)
+                (with c (list-filter (ox-children (car l)) (lambda (y) (not (tmof-blank? y))))
+                  (and (pair? c) (list-and (map tmof-next-float? c))))
+                (pair? (cdr l)) (func? (cadr l) 'p))
+           (let* ((imgs (map tmof-drop-next
+                             (list-filter (ox-children (car l)) tmof-next-float?)))
+                  (next (cadr l))
+                  (merged (apply office-node
+                                 (cons* 'p (map (lambda (a) (list (car a) (cadr a)))
+                                                (ox-attrs next))
+                                        (append imgs (ox-children next))))))
+             (loop (cons merged (cddr l)) acc)))
+          ((func? (car l) 'p)
+           (loop (cdr l)
+                 (cons (if (list-or (map tmof-next-float? (ox-children (car l))))
+                           (apply office-node
+                                  (cons* 'p (map (lambda (a) (list (car a) (cadr a)))
+                                                 (ox-attrs (car l)))
+                                         (map tmof-drop-next (ox-children (car l)))))
+                           (car l))
+                       acc)))
+          (else (loop (cdr l) (cons (car l) acc))))))
 
 ;; A label of TeXmacs is the label of the last thing which has a number
 ;; before it: a heading, a theorem, a figure, an equation. In an office
@@ -1729,6 +2190,12 @@
 (define tmof-targets (make-ahash-table))  ; id -> labels, reversed
 (define tmof-target #f)                   ; the last thing with a number
 (define tmof-heading-nr 0)
+(define tmof-inside '())                  ; the numbered things which are around
+(define tmof-only-labels? #f)             ; a paragraph of labels only
+
+;; A label in the text, away from what it is the label of, goes to the
+;; number (a reference shows it), and a bookmark of its own (attribute at)
+;; stays where it was: the label comes back there when the file is read.
 
 (define (tmof-bind-scan x)
   ;; first pass: what each label is the label of
@@ -1747,6 +2214,13 @@
             (set! tmof-target (list "heading" (ox-attr x 'id) (ox-attr x 'number))))
           (for-each tmof-bind-scan (ox-children x)))))
 
+(define (tmof-seq-ids x)
+  ;; the ids of the sequence numbers in the paragraph x
+  (cond ((not (pair? x)) '())
+        ((in? (car x) '(math image @ note)) '())
+        ((func? x 'seq) (if (ox-attr x 'id) (list (ox-attr x 'id)) '()))
+        (else (append-map tmof-seq-ids (ox-children x)))))
+
 (define (tmof-labels-attr id)
   (with l (ahash-ref tmof-targets id)
     (and l (string-recompose (reverse l) " "))))
@@ -1756,7 +2230,10 @@
   (cond ((not (pair? x)) (list x))
         ((in? (car x) '(math image)) (list x))
         ((func? x 'bookmark)
-         (if (ahash-ref tmof-bound (ox-attr x 'name)) '() (list x)))
+         (with target (ahash-ref tmof-bound (ox-attr x 'name))
+           (cond ((not target) (list x))
+                 ((or tmof-only-labels? (in? (cadr target) tmof-inside)) '())
+                 (else (list `(bookmark (@ (name ,(ox-attr x 'name)) (at "true"))))))))
         ((func? x 'seq)
          (list (apply office-node
                       (cons* 'seq `((name ,(ox-attr x 'name)) (id ,(ox-attr x 'id))
@@ -1772,6 +2249,32 @@
                                       (kind ,(and target (car target)))
                                       (target ,(and target (cadr target))))
                                (append-map tmof-bind-node (ox-children x)))))))
+        ((and (func? x 'p) (not (ox-attr x 'inside-done)))
+         ;; (in a heading or a paragraph with numbers, and in a paragraph
+         ;; of labels only, the labels are at their place)
+         (let ((old tmof-inside)
+               (old-only tmof-only-labels?))
+           (set! tmof-inside (append (if (and (== (ox-attr x 'role) "heading") (ox-attr x 'id))
+                                         (list (ox-attr x 'id)) '())
+                                     (tmof-seq-ids x)
+                                     tmof-inside))
+           (set! tmof-only-labels?
+                 (list-and (map (lambda (y) (or (func? y 'bookmark)
+                                                (and (string? y) (== (string-trim-spaces y) ""))))
+                                (ox-children x))))
+           (with r (tmof-bind-node (cons* 'p (cons '@ (cons '(inside-done "true") (ox-attrs x)))
+                                          (ox-children x)))
+             (set! tmof-inside old)
+             (set! tmof-only-labels? old-only)
+             (map (lambda (y)
+                    (if (func? y 'p)
+                        (apply office-node
+                               (cons* 'p (list-filter (map (lambda (a) (list (car a) (cadr a)))
+                                                           (ox-attrs y))
+                                                      (lambda (a) (!= (car a) 'inside-done)))
+                                      (ox-children y)))
+                        y))
+                  r))))
         (else
           (let* ((children (append-map tmof-bind-node (ox-children x)))
                  ;; (the texts around a label which went away are one)
@@ -1820,10 +2323,80 @@
 (define (tmof-finalize l)
   ;; the blocks of the office tree: the first level of headings which is
   ;; used is the level 1
-  (with levels (list-filter (append-map tmof-heading-levels l)
-                            (lambda (n) (and (number? n) (>= n 0))))
+  ;; (the parts are headings of the first level too, without number)
+  (let* ((levels (list-filter (append-map tmof-heading-levels l)
+                              (lambda (n) (and (number? n) (>= n 0)))))
+         (levels (if (list-or (map positive? levels))
+                     (list-filter levels positive?)
+                     levels)))
     (set! tmof-top-level (if (null? levels) 0 (apply min levels)))
-    (tmof-bind (tmof-final-blocks l))))
+    (tmof-single-breaks (tmof-bind (tmof-final-blocks l)))))
+
+(define (tmof-single-breaks l)
+  ;; no break of page at the start, and none after another one
+  (let loop ((l l) (acc '()))
+    (cond ((null? l) (reverse acc))
+          ((and (func? (car l) 'pagebreak)
+                (or (null? acc) (func? (car acc) 'pagebreak)))
+           (loop (cdr l) acc))
+          (else (loop (cdr l) (cons (car l) acc))))))
+
+(define tmof-page-sizes
+  ;; the sizes of the usual pages, in centimeters
+  '(("a3" 29.7 42.0) ("a4" 21.0 29.7) ("a5" 14.8 21.0) ("b5" 17.6 25.0)
+    ("letter" 21.59 27.94) ("legal" 21.59 35.56) ("executive" 18.42 26.67)))
+
+(define (tmof-setup init)
+  ;; the block setup for the initial environment of the document: its
+  ;; page, the size and the family of its font
+  (let* ((get (lambda (var)
+                (with v (assoc-ref init var)
+                  (and (string? v) (!= v "") (!= v "auto") v))))
+         (cm (lambda (var) (with v (get var) (and v (office-length->cm v)))))
+         (len (lambda (x) (string-append (office-decimal x) "cm")))
+         (type (or (get "page-type") "a4"))
+         (size (assoc-ref tmof-page-sizes type))
+         (w (if (== type "user") (cm "page-width") (and size (car size))))
+         (h (if (== type "user") (cm "page-height") (and size (cadr size))))
+         (landscape? (== (get "page-orientation") "landscape"))
+         (w* (if (and w h landscape?) (max w h) w))
+         (h* (if (and w h landscape?) (min w h) h))
+         (family (get "font-family"))
+         (base (and (get "font-base-size") (office-number (get "font-base-size"))))
+         (attrs `((page-width ,(and w* h* (len w*)))
+                  (page-height ,(and w* h* (len h*)))
+                  (landscape ,(and landscape? "true"))
+                  (margin-left ,(and (cm "page-odd") (len (cm "page-odd"))))
+                  (margin-right ,(and (cm "page-right") (len (cm "page-right"))))
+                  (margin-top ,(and (cm "page-top") (len (cm "page-top"))))
+                  (margin-bottom ,(and (cm "page-bot") (len (cm "page-bot"))))
+                  (font-size ,(and base (office-decimal base)))
+                  (font ,(cond ((== family "ss") "sans")
+                               ((== family "tt") "mono")
+                               (else #f)))
+                  (body-style ,(get "office-body-style"))
+                  ;; (the paragraphs of TeXmacs are justified)
+                  (align ,(with m (or (get "par-mode") "justify")
+                            (if (in? m '("left" "center" "right")) m "justify"))))))
+    (if (list-or (map cadr attrs)) (list (office-node 'setup attrs)) '())))
+
+(define (tmof-package init)
+  ;; the file which the document was read from, in the style office
+  (with p (assoc-ref init "office-package")
+    (if (and (func? p 'tuple 2) (string? (cadr p)) (func? (caddr p) 'raw-data 1))
+        `((package (@ (format ,(cadr p)) (data ,(cadr (caddr p))))))
+        '())))
+
+(define (tmof-initial x)
+  ;; the initial environment of the document x, as an association list
+  (with init (and tmof-document? (tmfile-extract x 'initial))
+    (if (func? init 'collection)
+        (append-map (lambda (a)
+                      (if (and (func? a 'associate 2) (string? (cadr a)))
+                          (list (cons (cadr a) (caddr a)))
+                          '()))
+                    (cdr init))
+        '())))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Interface
@@ -1836,5 +2409,13 @@
   (set! tmof-document?
         (and (func? x 'document) (tmfile-extract x 'body)
              (or (tmfile-extract x 'TeXmacs) (tmfile-extract x 'style))))
+  (set! tmof-keep-spaces?
+        (and tmof-document? (pair? (tmof-package (tmof-initial x)))))
+  (set! tmof-base-size
+        (or (and tmof-document?
+                 (office-number (or (assoc-ref (tmof-initial x) "font-base-size") "")))
+            10.0))
   (with body (if tmof-document? (tmfile-extract x 'body) x)
-    `(office ,@(tmof-finalize (tmof-blocks (tmof body))))))
+    `(office ,@(if tmof-document? (tmof-setup (tmof-initial x)) '())
+             ,@(if tmof-document? (tmof-package (tmof-initial x)) '())
+             ,@(tmof-finalize (tmof-blocks (tmof body))))))

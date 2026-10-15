@@ -138,6 +138,11 @@
   ("window tabs" "left" notify-window-tabs)
   ("gui density" (get-default-gui-density) noop)
   ("gui scaling" "default" notify-gui-scaling)
+  ;; the glyphs drawn by the GPU renderer of the Vue interface, which
+  ;; follows them at once (vue_gpu_follow_glyph_settings)
+  ("gpu glyphs" "freetype" noop)
+  ("gpu glyph boldness" "0.22" noop)
+  ("gpu glyph hinting" "light" noop)
   ("gui:responsive tab mode" (get-default-responsive-tab-mode) noop)
   ("interactive footer" "off" noop)
   ("typographic palette set" "Classical" noop)

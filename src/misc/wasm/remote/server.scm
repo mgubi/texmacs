@@ -23,4 +23,5 @@
                                        (generate-salt)))
          (hiddens (server-hide-credentials credentials)))
     (server-set-user-info #f "bob" "Bob" hiddens "bob@localhost" #f)))
-(display* "test server ready, websocket: " (get-preference "server websocket") "\n")
+(display* "test server ready, websocket: " (get-preference "server websocket")
+          ", at the port after the one of the server\n")

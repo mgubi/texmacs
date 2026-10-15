@@ -43,7 +43,8 @@
   (:function serialize-markdown))
 
 (converter markdown-stree texmacs-stree
-  (:function markdown->texmacs))
+  (:function-with-options markdown->texmacs)
+  (:option "markdown->texmacs:faithful" "on"))
 
 (converter texmacs-stree markdown-stree
   (:function-with-options texmacs->markdown)

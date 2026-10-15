@@ -61,22 +61,14 @@ breaker_fast_level () {
   return level;
 }
 
-new_breaker_rep::new_breaker_rep (
-  array<page_item> l2, space ph, int quality2,
-  space fn_sep2, space fnote_sep2, space float_sep2,
-  font fn2, int fp2):
-    l (l2), papyrus_mode (ph == (MAX_SI >> 1)), height (ph),
-    fn_sep (fn_sep2), fnote_sep (fnote_sep2), float_sep (float_sep2),
-    fn (fn2), first_page (fp2), quality (quality2), last_page_flag (true),
-    body_ht (), body_cor (), foot_ht (), foot_tot (),
-    float_ht (), float_tot (), ins_list (),
-    best_prev (path (-1)), best_pens (vpenalty (MAX_INT)),
-    todo_list (false), done_list (false),
-    cache_uniform (array<path> ()),
-    cache_colbreaks (array<path> ()),
-    fast_level (quality2 > 1 ? breaker_fast_level () : 0),
-    old (NULL)
-{
+// What the breaker changes in the items it gets, in the array which it
+// shares with the pager: the skeleton it makes refers to the items as
+// they are after this. new_break_pages does it before it looks for a
+// skeleton it kept, so that the pager gets the same items when the
+// search is skipped, and so that the items are compared as the search
+// sees them. Doing it again changes nothing.
+void
+breaker_prepare_items (array<page_item>& l) {
   // HACK: migrate double column footnotes in single column text
   for (int i=0; i+1<N(l); i++)
     if (l[i]->nr_cols == 1 && N(l[i]->fl)>0) {
@@ -100,6 +92,27 @@ new_breaker_rep::new_breaker_rep (
           }
     }
   // END HACK
+  for (int i=0; i<N(l); i++)
+    if ((i==N(l)-1) || (l[i]->nr_cols!=l[i+1]->nr_cols)) l[i]->penalty=0;
+}
+
+new_breaker_rep::new_breaker_rep (
+  array<page_item> l2, space ph, int quality2,
+  space fn_sep2, space fnote_sep2, space float_sep2,
+  font fn2, int fp2):
+    l (l2), papyrus_mode (ph == (MAX_SI >> 1)), height (ph),
+    fn_sep (fn_sep2), fnote_sep (fnote_sep2), float_sep (float_sep2),
+    fn (fn2), first_page (fp2), quality (quality2), last_page_flag (true),
+    body_ht (), body_cor (), foot_ht (), foot_tot (),
+    float_ht (), float_tot (), ins_list (),
+    best_prev (path (-1)), best_pens (vpenalty (MAX_INT)),
+    todo_list (false), done_list (false),
+    cache_uniform (array<path> ()),
+    cache_colbreaks (array<path> ()),
+    fast_level (quality2 > 1 ? breaker_fast_level () : 0),
+    old (NULL)
+{
+  breaker_prepare_items (l);
 
   int same= 0;
   for (int i=0; i<N(l); i++) {
@@ -1225,6 +1238,7 @@ new_break_pages (array<page_item> l, space ph, int qual,
        << (SI) fnote_sep->min << (SI) fnote_sep->def << (SI) fnote_sep->max
        << (SI) float_sep->min << (SI) float_sep->def << (SI) float_sep->max
        << (SI) fn->y1 << (SI) fn->y2 << (SI) first_page;
+  breaker_prepare_items (l);
   breaker_signature (l, nums, trees, &num_off, &tree_off);
   if (mode != "off")
     for (int i=0; i<BREAKER_MEMOS && memo == NULL; i++)
@@ -1246,6 +1260,7 @@ new_break_pages (array<page_item> l, space ph, int qual,
     skeleton sk0=
       search_page_breaks (l, ph, qual, fn_sep, fnote_sep, float_sep, fn,
                           first_page, 0, nums, trees, num_off, tree_off);
+    if (sk0 != sk) typeset_check_mismatches++;
     if (sk0 != sk)
       failed_error << "The faster search of the page breaks differs "
                    << "from the search as it was (" << N(l) << " items)" << LF;
@@ -1253,6 +1268,7 @@ new_break_pages (array<page_item> l, space ph, int qual,
 
   if (memo != NULL) {
     // "check": what was kept against what is found
+    if (memo->sk != sk) typeset_check_mismatches++;
     if (memo->sk != sk)
       failed_error << "The skeleton kept for this signature differs "
                    << "from the one found (" << N(l) << " items)" << LF;

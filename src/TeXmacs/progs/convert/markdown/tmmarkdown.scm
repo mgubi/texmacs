@@ -33,15 +33,21 @@
 (define tmmd-document? #f)      ; a whole document, and not a piece of one
 (define tmmd-image-nr 0)        ; the images which were saved as files
 (define tmmd-front-matter? #t)  ; the title in a YAML header
-(define tmmd-footnotes '())     ; the definitions of the footnotes, reversed
-(define tmmd-footnote-nr 0)
+(define tmmd-footnotes '())     ; the definitions of the footnotes, reversed,
+(define tmmd-footnote-nr 0)     ; each with the rank of its mark in the text
+(define tmmd-faithful? #f)      ; a document of the style markdown
+(define tmmd-labels (make-ahash-table)) ; the labels which its footnotes keep
+(define tmmd-note-labels (make-ahash-table)) ; label -> its entry of tmmd-footnotes
 
 (define (tmmd-initialize opts)
   (set! tmmd-html? (!= (assoc-ref opts "texmacs->markdown:html") "off"))
   (set! tmmd-front-matter?
         (!= (assoc-ref opts "texmacs->markdown:front-matter") "off"))
   (set! tmmd-footnotes '())
+  (set! tmmd-note-labels (make-ahash-table))
   (set! tmmd-footnote-nr 0)
+  (set! tmmd-faithful? #f)
+  (set! tmmd-labels (make-ahash-table))
   (set! tmmd-image-nr 0))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -53,20 +59,29 @@
   ;; conversion would change: ... into an ellipsis, ` into a quote
   (if (null? l) (cork->utf8 s)
       (let* ((what (car l))
-             (i (string-search-forwards what 0 s)))
-        (if (< i 0) (tmmd-keep s (cdr l))
-            (string-append
-              (tmmd-keep (substring s 0 i) (cdr l)) what
-              (tmmd-keep (substring s (+ i (string-length what))
-                                    (string-length s)) l))))))
+             (n (string-length what)))
+        (let loop ((start 0) (acc '()))
+          (with i (string-search-forwards what start s)
+            (if (< i 0)
+                (apply string-append
+                       (reverse (cons (tmmd-keep (substring s start
+                                                            (string-length s))
+                                                 (cdr l))
+                                      acc)))
+                (loop (+ i n)
+                      (cons what (cons (tmmd-keep (substring s start i) (cdr l))
+                                       acc)))))))))
 
-(define (tmmd-text s) (tmmd-keep s '("...")))
+;; (in a document of the style markdown a backquote is one, as it was read:
+;; elsewhere it is the opening quote which TeXmacs displays)
+(define (tmmd-text s)
+  (tmmd-keep s (if tmmd-faithful? '("..." "`") '("..."))))
 (define (tmmd-code-text s) (tmmd-keep s '("..." "`")))
 
 (define (tmmd-block? x)
   (and (pair? x)
        (in? (car x) '(meta h1 h2 h3 h4 h5 h6 !h p blockquote ul ol pre hr
-                      table footnote-def !display))))
+                      table footnote-def !display !raw !note))))
 
 (define (tmmd-blank? x)
   (and (string? x) (== (string-trim-spaces x) "")))
@@ -74,15 +89,20 @@
 (define (tmmd-merge l)
   ;; with the strings which follow each other as one, and so for the
   ;; emphasized texts and for code: *a**b* would not be read as *ab*
-  (cond ((null? l) l)
-        ((== (car l) "") (tmmd-merge (cdr l)))
-        ((and (pair? (car l)) (in? (caar l) '(em strong del code))
-              (nnull? (cdr l)) (func? (cadr l) (caar l)))
-         (tmmd-merge (cons `(,(caar l) ,@(tmmd-merge (append (cdar l) (cdadr l))))
-                           (cddr l))))
-        ((and (string? (car l)) (nnull? (cdr l)) (string? (cadr l)))
-         (tmmd-merge (cons (string-append (car l) (cadr l)) (cddr l))))
-        (else (cons (car l) (tmmd-merge (cdr l))))))
+  (let loop ((l l) (acc '()))
+    ;; acc: what is merged, the last node first
+    (cond ((null? l) (reverse acc))
+          ((== (car l) "") (loop (cdr l) acc))
+          ((and (nnull? acc) (pair? (car acc))
+                (in? (caar acc) '(em strong del code))
+                (func? (car l) (caar acc)))
+           (loop (cdr l)
+                 (cons `(,(caar acc)
+                         ,@(tmmd-merge (append (cdar acc) (cdar l))))
+                       (cdr acc))))
+          ((and (nnull? acc) (string? (car acc)) (string? (car l)))
+           (loop (cdr l) (cons (string-append (car acc) (car l)) (cdr acc))))
+          (else (loop (cdr l) (cons (car l) acc))))))
 
 (define (tmmd-squeeze s)
   ;; with one space for several
@@ -93,8 +113,11 @@
           (else (loop (cdr l) (cons (car l) acc) #f)))))
 
 (define (tmmd-trim l)
-  ;; text without spaces and line breaks at its ends
-  (let* ((l (map (lambda (x) (if (string? x) (tmmd-squeeze x) x)) (tmmd-merge l)))
+  ;; text without spaces and line breaks at its ends, and with one space for
+  ;; several, but in a document of the style markdown, written as it was read
+  (let* ((l (map (lambda (x)
+                   (if (and (string? x) (not tmmd-faithful?)) (tmmd-squeeze x) x))
+                 (tmmd-merge l)))
          (drop-start
            (lambda (l)
              (let loop ((l l))
@@ -129,6 +152,8 @@
     (lambda (x)
       (cond ((func? x 'p) (append (cdr x) (list " ")))
             ((func? x '!display) (list `(displaymath ,(cadr x))))
+            ;; (text of the file, which a line holds)
+            ((func? x '!raw 2) (list `(html ,(string-replace (caddr x) "\n" " "))))
             ((tmmd-block? x) '())
             (else (list x))))
     l))
@@ -173,6 +198,16 @@
 ;; Plain text and mathematics
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(define (tmmd-same-text? s t)
+  ;; are the texts the same but for their spaces and tabs? A line of code
+  ;; or of a header which was kept for its tabs is written as it was read,
+  ;; but not Markdown, which is something else in code
+  (let ((strip (lambda (s)
+                 (list->string
+                   (list-filter (string->list s)
+                                (lambda (c) (not (in? c '(#\space #\tab)))))))))
+    (== (strip s) (strip t))))
+
 (define (tmmd-plain x)
   ;; the text of a tree, as for code: the paragraphs are lines
   (cond ((string? x) (tmmd-code-text x))
@@ -186,6 +221,18 @@
         ((in? (car x) '(label assign hidden-binding set-binding write)) "")
         ((func? x 'with) (tmmd-plain (cAr x)))
         ((func? x 'hlink 2) (tmmd-plain (cadr x)))
+        ;; the macros of the style markdown: what they display, or the text
+        ;; of the file while they are not changed
+        ((and (in? (car x) '(md-source md-block-source)) (== (length x) 4)
+              (== (cadr x) (cadddr x))
+              (tmmd-same-text? (tmmd-source (caddr x)) (tmmd-plain (cadr x))))
+         (tmmd-source (caddr x)))
+        ((and (in? (car x) '(md-source md-block-source md-image md-loose))
+              (pair? (cdr x)))
+         (tmmd-plain (cadr x)))
+        ((func? x 'md-fence 2) (tmmd-plain (caddr x)))
+        ((func? x 'md-kept 2) (tmmd-source (caddr x)))
+        ((in? (car x) '(md-footnote md-footnote-text md-metadata)) "")
         (else (apply string-append (map tmmd-plain (cdr x))))))
 
 (define (tmmd-math-clean x)
@@ -250,11 +297,13 @@
          (and (not (string-starts? s "<")) s))))
 
 (define (tmmd-math l)
-  (let ((x (if (list-1? l) (car l) `(concat ,@l))))
-    (if (tmmd-symbol x)
-        (list (tmmd-symbol x))
-        (with s (tmmd-inline-latex x)
-          (if (== s "") '() `((math ,s)))))))
+  ;; a formula, also of one symbol, is written in LaTeX, which is read back
+  ;; as a formula; a symbol which LaTeX does not write is its character
+  (let* ((x (if (list-1? l) (car l) `(concat ,@l)))
+         (s (tmmd-inline-latex x)))
+    (cond ((!= s "") `((math ,s)))
+          ((tmmd-symbol x) (list (tmmd-symbol x)))
+          (else '()))))
 
 (define (tmmd-display x . tag)
   (let* ((s (tmmd-display-latex x))
@@ -337,7 +386,10 @@
   (if (< (length l) 2) (tmmd-all l)
       (let* ((body (tmmd (car l)))
              (url (tmmd-plain (cadr l))))
-        (if (or (== url "") (string-starts? url "#") (tmmd-has-block? body))
+        ;; (but in a document of the style markdown, where it is a link
+        ;; of the file to one of its headings)
+        (if (or (== url "") (tmmd-has-block? body)
+                (and (string-starts? url "#") (not tmmd-faithful?)))
             body
             `((a (@ (href ,url)) ,@(tmmd-merge body)))))))
 
@@ -433,16 +485,236 @@
                  (list-intersperse (map tmmd-plain l) ", "))
           "]")))
 
-(define (tmmd-footnote-add body)
-  (set! tmmd-footnote-nr (+ tmmd-footnote-nr 1))
+(define tmmd-footnote-rank 0)
+
+(define (tmmd-footnote-add body label)
+  ;; the footnote with this label, or with the next number which is not
+  ;; the label of another one
+  (set! tmmd-footnote-rank (+ tmmd-footnote-rank 1))
   ;; the body may hold footnotes: it is converted before the list is read
-  (let* ((label (number->string tmmd-footnote-nr))
-         (def `(footnote-def ,label ,@(tmmd-blocks (tmmd body)))))
-    (set! tmmd-footnotes (cons def tmmd-footnotes))
-    `((footnote ,label))))
+  (let* ((rank tmmd-footnote-rank)
+         (other (and label (ahash-ref tmmd-note-labels label)))
+         (label (or label
+                    (let loop ()
+                      (set! tmmd-footnote-nr (+ tmmd-footnote-nr 1))
+                      (with s (number->string tmmd-footnote-nr)
+                        (if (ahash-ref tmmd-labels s) (loop) s)))))
+         (blocks (tmmd-blocks (tmmd body))))
+    ;; a label which another note has already: the same note is written
+    ;; once, and another one gets a label of its own
+    (cond ((and other (== (cddr (cdr other)) blocks)) `((footnote ,label)))
+          (other (tmmd-footnote-add* rank (tmmd-new-label label) blocks))
+          (else (tmmd-footnote-add* rank label blocks)))))
+
+(define (tmmd-footnote-add* rank label blocks)
+  (with n (cons rank `(footnote-def ,label ,@blocks))
+    (set! tmmd-footnotes (cons n tmmd-footnotes))
+    (ahash-set! tmmd-note-labels label n))
+  `((footnote ,label)))
+
+(define (tmmd-new-label label)
+  ;; label-2, label-3... the first which no note has
+  (let loop ((i 2))
+    (with s (string-append label "-" (number->string i))
+      (if (or (ahash-ref tmmd-labels s) (ahash-ref tmmd-note-labels s))
+          (loop (+ i 1))
+          s))))
 
 (define (tmmd-footnote l)
-  (if (null? l) '() (tmmd-footnote-add (car l))))
+  (if (null? l) '() (tmmd-footnote-add (car l) #f)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; The macros of the style markdown
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; The import of a file (markdowntm.scm) uses them for what the standard
+;; tags do not say, and each one is written as what it was read from.
+;; md-source and md-block-source hold a body, the text of the file it was
+;; read from and a copy of the body as it was read: the text is written as
+;; long as the body is this copy, and the body else, which was edited.
+;; When a document is expanded this is told before the expansion
+;; (tmmarkdown-md-source in tmmarkdown-expand.scm, which leaves md-kept
+;; with the text).
+
+(define (tmmd-source x)
+  ;; the text of an argument which holds text of the file: a line, or a
+  ;; tuple of lines
+  (cond ((string? x) (tmmd-code-text x))
+        ((func? x 'tuple)
+         (let loop ((l (cdr x)) (acc '()))
+           (cond ((null? l) (apply string-append (reverse acc)))
+                 ((null? acc) (loop (cdr l) (list (tmmd-source (car l)))))
+                 (else (loop (cdr l) (cons (tmmd-source (car l))
+                                           (cons "\n" acc)))))))
+        (else "")))
+
+(tm-define (tmmd-language-name tag)
+  (:synopsis "The language which is written after the fence of the code @tag")
+  (or (assoc-ref tmmd-languages tag) ""))
+
+(define (tmmd-md-source* kind l)
+  (cond ((null? l) '())
+        ((and (== (length l) 3) (== (car l) (caddr l)))
+         (tmmd-md-kept (list kind (cadr l))))
+        (else (tmmd (car l)))))
+
+(define (tmmd-md-source l) (tmmd-md-source* "inline" l))
+(define (tmmd-md-block-source l)
+  (tmmd-md-source* (if (and (nnull? l) (tmmarkdown-table? (car l)))
+                       "table" "block")
+                   l))
+
+(tm-define (tmmarkdown-table? x)
+  (:synopsis "Is the tree @x a table?")
+  (and (pair? x)
+       (in? (car x) '(block block* tabular tabular* wide-block wide-tabular
+                      tformat table))))
+
+(define (tmmd-md-kept l)
+  ;; (md-kept kind text): the text of the file, in a paragraph or as
+  ;; paragraphs of its own. These are (!raw kind "text") until the document
+  ;; is put together, and then a table, a formula or HTML with this text
+  ;; as their source (see tmmd-set-headings)
+  (if (< (length l) 2) '()
+      (with s (tmmd-source (cadr l))
+        (cond ((== (car l) "inline") `((html ,s)))
+              ((== (car l) "table") `((!raw "table" ,s)))
+              ((or (string-starts? s "$$") (string-starts? s "\\["))
+               `((!raw "display" ,s)))
+              (else `((!raw "html" ,s)))))))
+
+(define (tmmd-md-loose l)
+  ;; the lists of the body, with blank lines between their items
+  (map (lambda (x)
+         (if (and (pair? x) (in? (car x) '(ul ol)))
+             (if (and (pair? (cdr x)) (func? (cadr x) '@))
+                 `(,(car x) (@ (loose "true") ,@(cdadr x)) ,@(cddr x))
+                 `(,(car x) (@ (loose "true")) ,@(cdr x)))
+             x))
+       (tmmd-all l)))
+
+(define (tmmd-md-fence l)
+  ;; code with the words which follow its fence: the first is the language,
+  ;; and they are written while the code is still in this language
+  (if (< (length l) 2) (tmmd-all l)
+      (let* ((info (string-trim-spaces (tmmd-plain (car l))))
+             (i (list-find (iota (string-length info))
+                           (lambda (k) (in? (string-ref info k) '(#\space #\tab)))))
+             (lang (if (not i) info (substring info 0 i)))
+             (code (cadr l))
+             (tag (and (pair? code) (car code))))
+        (if (!= tag (tmmd-language-tag lang)) (tmmd code)
+            (map (lambda (x)
+                   (if (func? x 'pre)
+                       `(pre ,@(if (== info "") '()
+                                   `((@ (lang ,lang)
+                                        ,@(if (== info lang) '()
+                                              `((info ,info))))))
+                             ,@(if (and (pair? (cdr x)) (func? (cadr x) '@))
+                                   (cddr x) (cdr x)))
+                       x))
+                 (tmmd code))))))
+
+(define (tmmd-md-image l)
+  ;; an image with its description and its title
+  (if (< (length l) 3) (tmmd-first l)
+      (let* ((alt (tmmd-trim (tmmd-inline (tmmd (cadr l)))))
+             (title (tmmd-plain (caddr l))))
+        (map (lambda (x)
+               (if (and (func? x 'img) (pair? (cdr x)) (func? (cadr x) '@))
+                   `(img (@ ,@(list-filter (cdadr x)
+                                           (lambda (a) (nin? (car a) '(alt title))))
+                            (alt ,(apply string-append (map tmmd-node-text alt)))
+                            ,@(if (== title "") '() `((title ,title))))
+                         ,@alt)
+                   x))
+             (tmmd (car l))))))
+
+(define (tmmd-node-text x)
+  ;; the text of a node, without its markup
+  (cond ((string? x) x)
+        ((not (pair? x)) "")
+        ((and (pair? (cdr x)) (func? (cadr x) '@))
+         (apply string-append (map tmmd-node-text (cddr x))))
+        (else (apply string-append (map tmmd-node-text (cdr x))))))
+
+(define (tmmd-md-footnote l)
+  (if (< (length l) 2) (tmmd-footnote l)
+      (tmmd-footnote-add (cadr l) (tmmd-plain (car l)))))
+
+(define (tmmd-meta-text x)
+  ;; the text of a paragraph of the header: a line for each md-meta, and
+  ;; the text of what was typed
+  (cond ((func? x 'md-meta 2)
+         (let ((key (tmmd-plain (cadr x)))
+               (val (tmmd-plain (caddr x))))
+           (cond ((== key "") val)
+                 ((== val "") (string-append key ":"))
+                 (else (string-append key ": " val)))))
+        ((func? x 'concat) (apply string-append (map tmmd-meta-text (cdr x))))
+        ((func? x 'document)
+         (with l (map tmmd-meta-text (cdr x))
+           (if (null? l) ""
+               (apply string-append
+                      (cons (car l) (append-map (lambda (s) (list "\n" s))
+                                                (cdr l)))))))
+        ((func? x 'with) (tmmd-meta-text (cAr x)))
+        (else (tmmd-plain x))))
+
+(define (tmmd-yaml-key? s)
+  ;; does the line start with a key, as the reader of headers wants it (see
+  ;; md-yaml-key?): text before a colon which ends the line or is followed
+  ;; by a space, and not a space, a dash, # or : first
+  (let ((n (string-length s)))
+    (and (> n 0) (not (in? (string-ref s 0) '(#\space #\tab #\- #\# #\:)))
+         (let loop ((i 1))
+           (and (< i n)
+                (or (and (char=? (string-ref s i) #\:)
+                         (or (== (+ i 1) n)
+                             (in? (string-ref s (+ i 1)) '(#\space #\tab))))
+                    (loop (+ i 1))))))))
+
+(define (tmmd-yaml-line s)
+  ;; the line s of the header as it is written: a line --- or ... would end
+  ;; it, and is written after a space; a line which YAML does not have
+  ;; (text which was typed) is written as a comment
+  (cond ((in? (string-trim-spaces-right s) '("---" "...")) (string-append " " s))
+        ((or (== s "") (tmmd-yaml-key? s) (string-starts? s "#")
+             (string-starts? s "- ") (string-starts? s " ")
+             (string-starts? s (string #\tab)))
+         s)
+        (else (string-append "# " s))))
+
+(define (tmmd-md-metadata l)
+  ;; the header of the file. With no key in it, it would not be read back
+  ;; as a header: its lines are then paragraphs, and an empty header is
+  ;; not written
+  (let* ((s (tmmd-meta-text (if (null? l) '(document) (car l))))
+         (lines (string-tokenize-by-char s #\newline)))
+    (cond ((list-and (map (lambda (s) (== (string-trim-spaces s) "")) lines))
+           '())
+          ((not (list-or (map tmmd-yaml-key? lines)))
+           (map (lambda (s) `(p ,s))
+                (list-filter lines (lambda (s) (!= (string-trim-spaces s) "")))))
+          (else
+            (with lines (map tmmd-yaml-line lines)
+              `((meta (@ (source ,(let loop ((l (cdr lines)) (acc (list (car lines))))
+                                    (if (null? l) (apply string-append (reverse acc))
+                                        (loop (cdr l)
+                                              (cons (car l) (cons "\n" acc))))))))))))))
+
+(define (tmmd-md-h6 l) (tmmd-heading 7 l))
+
+(define (tmmd-md-footnote-text l)
+  ;; where the text of the footnote with this label is written
+  (if (null? l) '() `((!note ,(tmmd-plain (car l))))))
+
+(define (tmmd-kept-labels x)
+  ;; the labels of the footnotes of the tree which keep theirs
+  (cond ((not (pair? x)) '())
+        ((and (func? x 'md-footnote 2) (string? (cadr x)))
+         (cons (tmmd-plain (cadr x)) (tmmd-kept-labels (caddr x))))
+        (else (append-map tmmd-kept-labels (cdr x)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Variables of the environment
@@ -632,6 +904,16 @@
                   items))))))
 
 (define (tmmd-itemize l) (tmmd-list 'ul l))
+
+(define (tmmd-marked-list marker l)
+  ;; in a document of the style markdown the three lists are those whose
+  ;; items start with a dash, a star and a plus
+  (with r (tmmd-list 'ul l)
+    (if (and tmmd-faithful? (nnull? r))
+        `((ul (@ (marker ,marker)) ,@(cdar r)) ,@(cdr r))
+        r)))
+(define (tmmd-itemize-dot l) (tmmd-marked-list "*" l))
+(define (tmmd-itemize-arrow l) (tmmd-marked-list "+" l))
 (define (tmmd-enumerate l) (tmmd-list 'ol l))
 
 (define (tmmd-quotation l)
@@ -715,6 +997,25 @@
     (scilab-code . "scilab") (dot-code . "dot") (mmx-code . "mathemagix")
     (verbatim-code . "") (pseudo-code . "") (render-code . "") (code . "")))
 
+(define tmmd-language-tags
+  ;; the tags of the code in the languages written after a fence
+  '(("c" . cpp-code) ("cpp" . cpp-code) ("c++" . cpp-code) ("cc" . cpp-code)
+    ("h" . cpp-code) ("hpp" . cpp-code)
+    ("python" . python-code) ("py" . python-code) ("python3" . python-code)
+    ("scheme" . scm-code) ("scm" . scm-code) ("lisp" . scm-code)
+    ("guile" . scm-code)
+    ("sh" . shell-code) ("bash" . shell-code) ("shell" . shell-code)
+    ("zsh" . shell-code) ("console" . shell-code)
+    ("java" . java-code) ("javascript" . javascript-code)
+    ("js" . javascript-code) ("json" . json-code) ("julia" . julia-code)
+    ("r" . r-code) ("scala" . scala-code) ("fortran" . fortran-code)
+    ("octave" . octave-code) ("matlab" . octave-code) ("dot" . dot-code)
+    ("scilab" . scilab-code) ("mathemagix" . mmx-code) ("mmx" . mmx-code)))
+
+(tm-define (tmmd-language-tag name)
+  (:synopsis "The tag of code in the language @name, written after a fence")
+  (or (assoc-ref tmmd-language-tags (locase-all name)) 'verbatim-code))
+
 (define (tmmd-code-block tag l)
   (let* ((lang (assoc-ref tmmd-languages tag))
          (s (apply string-append (map tmmd-plain l))))
@@ -773,6 +1074,10 @@
       (cond ((func? x 'p) (list (cdr x)))
             ((func? x '!display) (list (list `(displaymath ,(cadr x)))))
             ((func? x '!h) (list (cddr x)))
+            ((func? x '!raw 2)
+             (map (lambda (s) (list `(html ,s)))
+                  (list-filter (string-tokenize-by-char (caddr x) #\newline)
+                               (lambda (s) (!= s "")))))
             ((func? x 'pre)
              (map (lambda (s) (list `(code ,s)))
                   (list-filter (string-tokenize-by-char (cAr x) #\newline)
@@ -976,6 +1281,17 @@
   (eqref tmmd-eqref)
   ((:or cite nocite cite-detail) tmmd-cite)
   (footnote tmmd-footnote)
+  (md-source tmmd-md-source)
+  (md-block-source tmmd-md-block-source)
+  (md-kept tmmd-md-kept)
+  (md-loose tmmd-md-loose)
+  (md-fence tmmd-md-fence)
+  (md-image tmmd-md-image)
+  (md-footnote tmmd-md-footnote)
+  (md-metadata tmmd-md-metadata)
+  (md-meta tmmd-noop)
+  (md-h6 tmmd-md-h6)
+  (md-footnote-text tmmd-md-footnote-text)
 
   ;; mathematics
   (math tmmd-math)
@@ -995,7 +1311,9 @@
   ((:or abstract abstract-data) tmmd-abstract)
 
   ;; lists and quotations
-  ((:or itemize itemize-minus itemize-dot itemize-arrow) tmmd-itemize)
+  ((:or itemize itemize-minus) tmmd-itemize)
+  (itemize-dot tmmd-itemize-dot)
+  (itemize-arrow tmmd-itemize-arrow)
   ((:or description description-compact description-dash description-aligned
         description-long description-paragraphs)
    tmmd-itemize)
@@ -1034,11 +1352,32 @@
         ((func? x '!h) (list (cadr x)))
         (else (append-map tmmd-heading-levels (cdr x)))))
 
+(define (tmmd-ref-def-text? s)
+  ;; is the text kept from the file the definition of a link, [label]: ...?
+  (and (string-starts? s "[") (not (string-starts? s "[^"))
+       (let ((i (string-search-forwards "]:" 0 s))
+             (j (string-search-forwards "\n" 0 s)))
+         (and (> i 0) (or (< j 0) (< i j))))))
+
 (define (tmmd-set-headings x levels)
   ;; the headings of the tree: h1 for the title, or else for the first level
   ;; which is used; the levels below keep their distances
   (cond ((not (pair? x)) x)
         ((func? x '!display) `(displaymath ,(cadr x)))
+        ((func? x '!raw 2)
+         (cond ((== (cadr x) "table") `(table (@ (source ,(caddr x)))))
+               ((== (cadr x) "display")
+                `(displaymath (@ (source ,(caddr x))) ""))
+               ;; (the definition of a link, which nothing uses)
+               ((tmmd-ref-def-text? (caddr x)) `(ref-def ,(caddr x)))
+               (else `(html ,(caddr x)))))
+        ;; in a document of the style markdown each heading has its
+        ;; level: 1 for a section, 2 for a subsection...
+        ((and (func? x '!h) tmmd-faithful?)
+         `(,(string->symbol
+              (string-append "h" (number->string
+                                   (max 1 (min 6 (- (cadr x) 1))))))
+           ,@(cddr x)))
         ((func? x '!h)
          (let* ((title? (in? -1 levels))
                 (below (list-filter levels (lambda (l) (>= l 0))))
@@ -1052,10 +1391,42 @@
 
 (define (tmmd-finalize l)
   ;; the blocks of a document: the levels of its headings, its footnotes
-  (let* ((notes (sort tmmd-footnotes
-                      (lambda (a b) (< (string->number (cadr a))
-                                       (string->number (cadr b))))))
-         (l (append l notes))
+  (let* ((notes (map cdr (sort tmmd-footnotes
+                               (lambda (a b) (< (car a) (car b))))))
+         ;; the texts of the footnotes: where the document says (!note
+         ;; "label"), in a quote, an item or another note as well, and
+         ;; after everything else for the others
+         (placed (make-ahash-table))
+         (by-label (with t (make-ahash-table)
+                     (for-each (lambda (n)
+                                 (ahash-set! t (cadr n)
+                                             (cons n (or (ahash-ref t (cadr n)) '()))))
+                               (reverse notes))
+                     t))
+         (place (lambda (place x)
+                  (if (not (and (pair? x)
+                                (in? (car x) '(markdown blockquote ul ol li
+                                               footnote-def))))
+                      x
+                      (cons (car x)
+                            (append-map
+                              (lambda (y)
+                                (cond ((not (func? y '!note 1))
+                                       (list (place place y)))
+                                      ((ahash-ref placed (cadr y)) '())
+                                      (else
+                                        (ahash-set! placed (cadr y) #t)
+                                        (map (lambda (n) (place place n))
+                                             (or (ahash-ref by-label (cadr y))
+                                                 '())))))
+                              (cdr x))))))
+         (l (cdr (place place (cons 'markdown l))))
+         (l (let loop ((ns notes) (acc '()))
+              (cond ((null? ns) (append l (reverse acc)))
+                    ((ahash-ref placed (cadr (car ns))) (loop (cdr ns) acc))
+                    (else
+                      (ahash-set! placed (cadr (car ns)) #t)
+                      (loop (cdr ns) (cons (place place (car ns)) acc))))))
          (levels (sort (list-remove-duplicates
                          (append-map tmmd-heading-levels l))
                        <)))
@@ -1069,9 +1440,17 @@
   (:type (-> stree list stree))
   (:synopsis "Convert the TeXmacs tree @x into a Markdown tree")
   (tmmd-initialize opts)
+  (set! tmmd-footnote-rank 0)
   (set! tmmd-document?
         (and (func? x 'document) (tmfile-extract x 'body)
              (or (tmfile-extract x 'TeXmacs) (tmfile-extract x 'style))))
+  (set! tmmd-faithful?
+        (and tmmd-document?
+             (with style (tmfile-extract x 'style)
+               (or (== style "markdown")
+                   (and (pair? style) (in? "markdown" (cdr style)))))))
+  (set! tmmd-labels (make-ahash-table))
+  (for-each (lambda (s) (ahash-set! tmmd-labels s #t)) (tmmd-kept-labels x))
   (if tmmd-document?
       (with body (tmfile-extract x 'body)
         `(!file (markdown ,@(tmmd-finalize (tmmd-blocks (tmmd body))))))

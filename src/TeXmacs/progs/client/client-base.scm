@@ -152,9 +152,10 @@
 (define (client-unreachable-hint)
   (if (defined? 'web-javascript)
       (string-append ". From a browser the server has to accept WebSocket"
-                     " connections: a server run by TeXmacs Vue does, the"
-                     " servers of other versions of TeXmacs do not (they"
-                     " need a bridge on your machine, see the help page)")
+                     " connections, at the port after its own: a server run"
+                     " by TeXmacs Vue does, the servers of other versions of"
+                     " TeXmacs do not (they need a bridge on your machine,"
+                     " see the help page)")
       " (is a TeXmacs server running there, and reachable?)"))
 
 (define (client-forget-state server)

@@ -36,9 +36,10 @@
 (tm-define (tmoffice-env-patch)
   `(collection
     ,@(map tmoffice-env-macro
-           '(TeXmacs TeX LaTeX hrule item
+           '(TeXmacs TeX LaTeX hrule item nbsp
              ;; the titles of the sections, with their numbers
-             part-title chapter-title section-title subsection-title
+             part-title part-numbered-title chapter-title section-title
+             subsection-title
              subsubsection-title paragraph-title subparagraph-title
              appendix-title
              ;; the table of contents: its title, and the entries which
@@ -81,6 +82,17 @@
              tmdoc-title tmdoc-title* tmdoc-title** tmdoc-copyright
              tmdoc-license tmdoc-flag
              html-tag html-attr html-div-style html-div-class html-style
-             html-class))
+             html-class
+             ;; the macros of the style office
+             office-par office-span office-field office-comment office-ins
+             office-del office-columns office-columns* office-underline office-strike
+             office-letters office-font office-capitalize office-float))
+    ;; the screens of a presentation and the folds: all of them, not
+    ;; only what is shown
+    ,@(map tmoffice-env-macro
+           (append '(screens shown)
+                   (catch #t (lambda () (append (group-resolve 'folded-tag)
+                                                (group-resolve 'unfolded-tag)))
+                          (lambda args '()))))
     (associate "doc-data"
                (xmacro "x" (extern "tmoffice-doc-data" (quote-arg "x"))))))

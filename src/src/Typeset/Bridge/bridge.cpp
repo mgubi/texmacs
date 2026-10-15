@@ -42,7 +42,7 @@ bridge nil_bridge;
 bridge_rep::bridge_rep (typesetter ttt2, tree st2, path ip2):
   ttt (ttt2), env (ttt->env), st (st2), ip (ip2),
   status (CORRUPTED), changes (UNINIT), reads (), reads_known (false),
-  removed (UNINIT) {}
+  removed (UNINIT), bound (UNINIT) {}
 
 static tree inactive_auto
   (MACRO, "x", tree (REWRITE_INACTIVE, tree (ARG, "x"), "recurse*"));
@@ -341,6 +341,14 @@ extern tree the_et;
 * have now, and those which differ enter old_patch, as after a bridge
 * which is typeset again.
 *
+* A bridge which binds variables for the bridges below it (a with, an
+* ornament, a locus, a formatting tag) writes them without a record of
+* the change: they have their values back when it is done, and are not
+* among its changes. Below it they are others than in the previous pass
+* when it binds other values: it keeps what it bound ('bound'), and the
+* variables whose binding differs are in old_patch while the bridges below
+* it are typeset (bind_start and bind_end).
+*
 * TEXMACS_TYPESET_READS may be "off" (typeset again as before) or "check"
 * (typeset again all the same, and report a result which differs).
 ******************************************************************************/
@@ -433,6 +441,44 @@ lines_signature (array<page_item> l) {
   return r;
 }
 
+// 'now' is a tuple of the variables which the bridge binds and of their
+// values. The result is what bind_end needs to put old_patch back, when
+// the bridges below are typeset
+tree
+bridge_rep::bind_start (tree now) {
+  tree outer (TUPLE);
+  if (now == bound) return outer;
+  for (int i=0; i+1<N(now); i+=2) {
+    if (!is_atomic (now[i])) continue;
+    string var= now[i]->label;
+    // (the value bound in the previous pass, which is the last one of
+    // the variable in 'bound')
+    tree prev (UNINIT);
+    bool same= false;
+    if (is_func (bound, TUPLE))
+      for (int j=0; j+1<N(bound); j+=2)
+        if (bound[j] == now[i]) { prev= bound[j+1]; same= (prev == now[i+1]); }
+    for (int j=i+2; j+1<N(now); j+=2)
+      if (now[j] == now[i]) same= true; // (bound again further on)
+    if (same) continue;
+    if (ttt->old_patch->contains (var))
+      outer << tree (var) << tree ("1") << ttt->old_patch [var];
+    else outer << tree (var) << tree ("0") << tree (UNINIT);
+    ttt->old_patch (var)= prev;
+  }
+  bound= copy (now);
+  return outer;
+}
+
+void
+bridge_rep::bind_end (tree outer) {
+  for (int i=N(outer)-3; i>=0; i-=3) {
+    string var= outer[i]->label;
+    if (outer[i+1] == "1") ttt->old_patch (var)= outer[i+2];
+    else ttt->old_patch->reset (var);
+  }
+}
+
 void
 bridge_rep::typeset (int desired_status) {
   // FIXME: this dirty hack ensures a perfect coherence between
@@ -461,7 +507,14 @@ bridge_rep::typeset (int desired_status) {
                reads_known && alone && reads_mode () != 0 &&
                patch_unread (ttt->old_patch, reads, env) &&
                same_lookups (env, seen_keys, seen_values);
-  bool check= unread && reads_mode () == 2;
+  // a bridge used again as in the classic cache (nothing changed around
+  // it, as far as the bookkeeping of the changes says: the paragraphs
+  // removed before it, the bindings above it)
+  bool cached= (status==desired_status) && (N(ttt->old_patch)==0);
+  // the check mode typesets again both kinds of bridges used again, when
+  // what they read is known, and compares
+  bool check= reads_mode () == 2 &&
+              (unread || (cached && reads_known && alone));
   array<SI> old_lines;
   array<tree> old_contents;
   hashmap<string,tree> old_changes (UNINIT);
@@ -470,7 +523,7 @@ bridge_rep::typeset (int desired_status) {
     old_contents= lines_contents (l);
     old_changes= changes;
   }
-  if ((status==desired_status) && (N(ttt->old_patch)==0)) {
+  if (cached && !check) {
     //cout << "cached" << LF;
     if (edit_profile.on) edit_profile.cached++;
     add_reads (env, reads_known, reads, seen_keys, seen_values);
@@ -496,18 +549,13 @@ bridge_rep::typeset (int desired_status) {
     env->local_start (prev_back);
     if (env->hl_lan != 0) env->lan->highlight (st);
     // the variables read by the typesetting of the subtree
-    hashmap<int,bool>* outer_rec= env->read_recorder ();
-    bool outer_all= env->read_all (), outer_unknown= env->read_unknown;
-    array<string>* outer_keys= env->rec_keys;
-    array<tree>* outer_values= env->rec_values;
     hashmap<int,bool> my_reads (false);
     array<string> my_keys;
     array<tree> my_values;
-    env->record_reads (&my_reads, false);
-    env->record_lookups (&my_keys, &my_values);
-    env->read_unknown= false;
+    edit_env_rep::read_record record (env.operator-> (), &my_reads,
+                                      &my_keys, &my_values);
     my_typeset (desired_status);
-    bool recorded= !env->read_unknown && !env->read_all () &&
+    bool recorded= record.complete () &&
                    N(my_reads) <= READS_MAX && N(my_keys) <= LOOKUPS_MAX;
     reads_known= recorded && alone;
     reads= array<int> ();
@@ -520,9 +568,7 @@ bridge_rep::typeset (int desired_status) {
       seen_keys= my_keys;
       seen_values= my_values;
     }
-    env->record_reads (outer_rec, outer_all);
-    env->record_lookups (outer_keys, outer_values);
-    env->read_unknown= outer_unknown;
+    record.stop ();
     add_reads (env, recorded, reads, seen_keys, seen_values);
     env->local_update (ttt->old_patch, changes);
     env->local_end (prev_back);
@@ -530,10 +576,12 @@ bridge_rep::typeset (int desired_status) {
     if (check) {
       if (edit_profile.on) edit_profile.unread++;
       if (lines_signature (l) != old_lines || changes != old_changes ||
-          lines_contents (l) != old_contents)
+          lines_contents (l) != old_contents) {
+        typeset_check_mismatches++;
         failed_error << "A bridge which read none of the variables which "
                      << "changed (" << ttt->old_patch << ") is typeset "
                      << "otherwise: " << st << LF;
+      }
     }
     env->link_env= old_link_env;
     status= desired_status;

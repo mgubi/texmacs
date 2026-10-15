@@ -24,6 +24,7 @@ typedef unsigned int uint;
 
 #include "boxes.hpp"
 #include "editor.hpp"
+#include "typesetter.hpp" // get_typeset_check_mismatches
 #include "universal.hpp"
 #include "convert.hpp"
 #include "file.hpp"
@@ -454,6 +455,7 @@ tree_remove_node (tree r, int pos) {
 
 tmscm 
 scheme_tree_to_tmscm (scheme_tree t) {
+  tmscm_builder building;
   if (is_atomic (t)) {
     string s= t->label;
     if (s == "#t") return tmscm_true ();
@@ -556,6 +558,7 @@ TMSCM_ASSERT (tmscm_is_path (p), p, arg, rout)
 
 tmscm 
 path_to_tmscm (path p) {
+  tmscm_builder building;
   if (is_nil (p)) return tmscm_null ();
   else return tmscm_cons (int_to_tmscm (p->item), path_to_tmscm (p->next));
 }
@@ -826,6 +829,7 @@ TMSCM_ASSERT (tmscm_is_table_string_string (p), p, arg, rout)
 
 tmscm 
 table_string_string_to_tmscm (hashmap<string,string> t) {
+  tmscm_builder building;
   tmscm p= tmscm_null ();
   iterator<string> it= iterate (t);
   while (it->busy ()) {
@@ -882,6 +886,7 @@ TMSCM_ASSERT (tmscm_is_array_int (p), p, arg, rout)
 
 /* static */ tmscm 
 array_int_to_tmscm (array<int> a) {
+  tmscm_builder building;
   int i, n= N(a);
   tmscm p= tmscm_null ();
   for (i=n-1; i>=0; i--) p= tmscm_cons (int_to_tmscm (a[i]), p);
@@ -918,6 +923,7 @@ TMSCM_ASSERT (tmscm_is_array_SI (p), p, arg, rout)
 
 /* static */ tmscm 
 array_SI_to_tmscm (array<SI> a) {
+  tmscm_builder building;
   int i, n= N(a);
   tmscm p= tmscm_null ();
   for (i=n-1; i>=0; i--) p= tmscm_cons (SI_to_tmscm (a[i]), p);
@@ -956,6 +962,7 @@ TMSCM_ASSERT (tmscm_is_array_double (p), p, arg, rout)
 
 /* static */ tmscm 
 array_double_to_tmscm (array<double> a) {
+  tmscm_builder building;
   int i, n= N(a);
   tmscm p= tmscm_null();
   for (i=n-1; i>=0; i--) p= tmscm_cons (double_to_tmscm (a[i]), p);
@@ -985,6 +992,7 @@ TMSCM_ASSERT (tmscm_is_array_array_double (p), p, arg, rout)
 
 /* static */ tmscm 
 array_array_double_to_tmscm (array<array_double> a) {
+  tmscm_builder building;
   int i, n= N(a);
   tmscm p= tmscm_null ();
   for (i=n-1; i>=0; i--) p= tmscm_cons (array_double_to_tmscm (a[i]), p);
@@ -1014,6 +1022,7 @@ TMSCM_ASSERT (tmscm_is_array_array_array_double (p), p, arg, rout)
 
 /* static */ tmscm 
 array_array_array_double_to_tmscm (array<array_array_double> a) {
+  tmscm_builder building;
   int i, n= N(a);
   tmscm p= tmscm_null ();
   for (i=n-1; i>=0; i--) p= tmscm_cons (array_array_double_to_tmscm (a[i]), p);
@@ -1040,6 +1049,7 @@ TMSCM_ASSERT (tmscm_is_array_string (p), p, arg, rout)
 
 /* static */ tmscm 
 array_string_to_tmscm (array<string> a) {
+  tmscm_builder building;
   int i, n= N(a);
   tmscm p= tmscm_null ();
   for (i=n-1; i>=0; i--) p= tmscm_cons (string_to_tmscm (a[i]), p);
@@ -1069,6 +1079,7 @@ TMSCM_ASSERT (tmscm_is_array_tree (p), p, arg, rout)
 
 /* static */ tmscm 
 array_tree_to_tmscm (array<tree> a) {
+  tmscm_builder building;
   int i, n= N(a);
   tmscm p= tmscm_null ();
   for (i=n-1; i>=0; i--) p= tmscm_cons (tree_to_tmscm (a[i]), p);
@@ -1098,6 +1109,7 @@ TMSCM_ASSERT (tmscm_is_array_widget (p), p, arg, rout)
 
 /* static */ tmscm 
 array_widget_to_tmscm (array<widget> a) {
+  tmscm_builder building;
   int i, n= N(a);
   tmscm p= tmscm_null ();
   for (i=n-1; i>=0; i--) p= tmscm_cons (widget_to_tmscm (a[i]), p);
@@ -1128,6 +1140,7 @@ TMSCM_ASSERT (tmscm_is_array_url (p), p, arg, rout)
 
 /* static */ tmscm 
 array_url_to_tmscm (array<url> a) {
+  tmscm_builder building;
   int i, n= N(a);
   tmscm p= tmscm_null ();
   for (i=n-1; i>=0; i--) p= tmscm_cons (url_to_tmscm (a[i]), p);
@@ -1158,6 +1171,7 @@ TMSCM_ASSERT (tmscm_is_array_patch (p), p, arg, rout)
 
 /* static */ tmscm 
 array_patch_to_tmscm (array<patch> a) {
+  tmscm_builder building;
   int i, n= N(a);
   tmscm p= tmscm_null ();
   for (i=n-1; i>=0; i--) p= tmscm_cons (patch_to_tmscm (a[i]), p);
@@ -1187,6 +1201,7 @@ TMSCM_ASSERT (tmscm_is_array_path (p), p, arg, rout)
 
 /* static */ tmscm 
 array_path_to_tmscm (array<path> a) {
+  tmscm_builder building;
   int i, n= N(a);
   tmscm p= tmscm_null ();
   for (i=n-1; i>=0; i--) p= tmscm_cons (path_to_tmscm (a[i]), p);
@@ -1222,6 +1237,7 @@ TMSCM_ASSERT (tmscm_is_list_string (p), p, arg, rout)
 
 tmscm 
 list_string_to_tmscm (list_string l) {
+  tmscm_builder building;
   if (is_nil (l)) return tmscm_null ();
   return tmscm_cons (string_to_tmscm (l->item),
            list_string_to_tmscm (l->next));
@@ -1249,6 +1265,7 @@ TMSCM_ASSERT (tmscm_is_list_tree (p), p, arg, rout)
 
 tmscm 
 list_tree_to_tmscm (list_tree l) {
+  tmscm_builder building;
   if (is_nil (l)) return tmscm_null ();
   return tmscm_cons (tree_to_tmscm (l->item),
            list_tree_to_tmscm (l->next));

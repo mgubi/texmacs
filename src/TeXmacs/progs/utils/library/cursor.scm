@@ -206,6 +206,31 @@
   (when (entry-alive? e)
     (position-delete (car e))))
 
+;; An entry of the history is a position with the body of its buffer. A
+;; position points into the tree of its buffer and must not be read once
+;; that tree is gone: the body, which the entry keeps alive, tells whether
+;; the buffer is still part of the document.
+(define (entry-new p)
+  (with pos (position-new)
+    (position-set pos p)
+    (cons pos (buffer-tree))))
+
+(define (entry-alive? e)
+  (tree-active? (cdr e)))
+
+(define (entry-path e)
+  (and (entry-alive? e) (position-get (car e))))
+
+(define (entry-valid? e)
+  (and-with p (entry-path e)
+    (and (nnull? p)
+         (and-with t (path->tree (cDr p))
+           (not (tm-func? t 'uninit))))))
+
+(define (entry-delete e)
+  (when (entry-alive? e)
+    (position-delete (car e))))
+
 (define (cursor-same? l p)
   (and (nnull? l) (== (entry-path (car l)) p)))
 

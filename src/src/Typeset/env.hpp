@@ -136,6 +136,14 @@
 // variables are recorded by number (env_var_id): the sets of the bridges
 // are arrays of integers.
 int env_var_id (string var);
+// The variables which the environment read while it derived a state from
+// its variables (edit_env_rep::update): a length in a unit made by a user
+// macro, the colour of a pattern... Such a variable is not "plain": when
+// it changes, what was derived from it may change too (plain_variable)
+extern int env_deriving;
+hashmap<int,bool>& env_derived_inputs ();
+inline void env_note_read (int id) {
+  if (env_deriving > 0) env_derived_inputs () (id)= true; }
 string env_var_name (int id);
 class env_table {
 public:
@@ -145,12 +153,15 @@ public:
   inline env_table (tree init): h (init), rec (NULL), all (false) {}
   inline tree operator [] (string s) {
     if (rec != NULL) rec->operator () (env_var_id (s))= true;
+    if (env_deriving > 0) env_note_read (env_var_id (s));
     return h [s]; }
   inline tree& operator () (string s) {
     if (rec != NULL) rec->operator () (env_var_id (s))= true;
+    if (env_deriving > 0) env_note_read (env_var_id (s));
     return h (s); }
   inline bool contains (string s) {
     if (rec != NULL) rec->operator () (env_var_id (s))= true;
+    if (env_deriving > 0) env_note_read (env_var_id (s));
     return h->contains (s); }
   inline env_table& operator = (hashmap<string,tree> h2) { h= h2; return *this; }
   inline operator hashmap<string,tree> () {
@@ -158,12 +169,12 @@ public:
     return h; }
 };
 
-// The automatic labels of a document (exec_auto_id in env_exec.cpp): those
-// of 'root' get new numbers, in the order in which they are typeset, if
-// some were numbered out of the order of the document; this is then to
-// be followed by a complete typesetting and by auto_labels_numbered
+// The automatic labels of a document (exec_auto_id in env_exec.cpp): the
+// numbers of the labels of 'root', in the order of the document, and a
+// new start for them, to be followed by a complete typesetting, which
+// gives the numbers again in the order in which the labels are made
+array<int> auto_labels_numbers (tree root);
 bool auto_labels_renumber (tree root);
-void auto_labels_numbered (tree root);
 
 class edit_env;
 class ornament_parameters;
@@ -422,7 +433,7 @@ private:
   tree exec_has_binding (tree t);
   tree exec_get_attachment (tree t);
   tree exec_auto_id (tree t);
-  bool auto_label_tag (tree& tag, tree& root);
+  bool auto_label_tag (tree& tag, tree& root, path& where);
 
   tree exec_pattern (tree t);
 
@@ -515,22 +526,67 @@ public:
   // lookup_value finds again
   array<string>* rec_keys;
   array<tree>*   rec_values;
-  // The tags which made an automatic label in this pass (exec_auto_id in
-  // env_exec.cpp)
-  int auto_seen;
+  // The tree of the buffer which is being typeset, whose automatic labels
+  // are numbered (exec_auto_id in env_exec.cpp), or a tree which is not
+  // compound when there is none
+  tree auto_buffer;
+  struct typesetting_pass {
+    edit_env_rep* env;
+    tree outer;
+    inline typesetting_pass (edit_env_rep* e, tree buffer):
+      env (e), outer (e->auto_buffer) {
+        env->typesetting++; env->auto_buffer= buffer; }
+    inline ~typesetting_pass () {
+      env->typesetting--; env->auto_buffer= outer; }
+  };
   inline void record_lookups (array<string>* keys, array<tree>* values) {
     rec_keys= keys; rec_values= values; }
+  // A record of what is read for the time of one typesetting (of a bridge,
+  // of a header): the record around it is the current one again when it
+  // stops, and at the latest when it goes, also when an exception ends the
+  // typesetting
+  struct read_record {
+    edit_env_rep* env;
+    hashmap<int,bool>* outer_rec;
+    bool outer_all, outer_unknown, stopped;
+    array<string>* outer_keys;
+    array<tree>* outer_values;
+    inline read_record (edit_env_rep* e, hashmap<int,bool>* rec,
+                        array<string>* keys, array<tree>* values):
+      env (e), outer_rec (e->env.rec), outer_all (e->env.all),
+      outer_unknown (e->read_unknown), stopped (false),
+      outer_keys (e->rec_keys), outer_values (e->rec_values) {
+        env->record_reads (rec, false);
+        env->record_lookups (keys, values);
+        env->read_unknown= false; }
+    // nothing was read but what the record holds
+    inline bool complete () { return !env->read_all () && !env->read_unknown; }
+    inline void stop () {
+      if (stopped) return;
+      env->record_reads (outer_rec, outer_all);
+      env->record_lookups (outer_keys, outer_values);
+      env->read_unknown= outer_unknown;
+      stopped= true; }
+    inline ~read_record () { stop (); }
+  };
   tree lookup_value (string name);
   tree lookup (string name);
-  // a variable whose value is all there is to it: no state of the
-  // environment is derived from it when it is written (the types for
-  // which update (string) does nothing)
   // the values of the variables which are not plain, in a fixed order
   array<tree> derived_state ();
+  // a copy of the table of the variables (not recorded as a read)
+  inline hashmap<string,tree> all_values () { return copy (env.h); }
+  // a variable whose value is all there is to it: no state of the
+  // environment is derived from it when it is written (the types for
+  // which update (string) does nothing) or when another one is (it was
+  // not read while a state was derived: env_derived_inputs)
   inline bool plain_variable (string s) {
     int type= var_type [s];
-    return type == Env_User || type == Env_Fixed ||
-           type == Env_Paragraph || type == Env_Page; }
+    return (type == Env_User || type == Env_Fixed ||
+            type == Env_Paragraph || type == Env_Page) &&
+           !env_derived_inputs ()->contains (env_var_id (s)); }
+  // whether the environment is in the course of a typesetting pass (the
+  // automatic labels: exec_auto_id), and the guard which says so
+  int typesetting;
   // the variables of 'change' had these values at this point of the
   // previous pass: those which have another one now are in the patch
   inline void compare_changes (hashmap<string,tree>& patch,

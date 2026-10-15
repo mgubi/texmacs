@@ -45,7 +45,12 @@ edit_typeset_rep::edit_typeset_rep ():
     init_update ();
 }
 
-edit_typeset_rep::~edit_typeset_rep () { delete_typesetter (ttt); }
+edit_typeset_rep::~edit_typeset_rep () {
+  // a line of the document which is destroyed logs its place in the change
+  // log of the typesetter (phrase_box_rep): the boxes go before it does
+  eb= box ();
+  delete_typesetter (ttt);
+}
 
 void
 edit_typeset_rep::set_data (new_data data) {
@@ -1132,11 +1137,14 @@ edit_typeset_rep::typeset_invalidate_all () {
 // The automatic labels are numbered again, in the order of the document
 // (exec_auto_id in env_exec.cpp), which is to be done before the tables
 // of contents and the indexes are made again: these hold the names of
-// the labels. All the views of the buffer have the same labels.
-void
+// the labels. All the views of the buffer have the same labels. Tells
+// whether a name changed.
+bool
 edit_typeset_rep::typeset_renumber_labels () {
-  tree root= subtree (et, rp);
-  if (!auto_labels_renumber (root)) return;
+  // (the tree which holds the numbers to come: see exec_auto_id)
+  tree root= is_nil (rp) ? et : et[rp->item];
+  array<int> before= auto_labels_numbers (root);
+  if (!auto_labels_renumber (root)) return false;
   for (int i=0; i<N(buf->vws); i++)
     ((tm_view) buf->vws[i])->ed->typeset_invalidate_all ();
   // one pass, for the names: the references are not yet those of the
@@ -1147,7 +1155,7 @@ edit_typeset_rep::typeset_renumber_labels () {
     env->complete= false;
     clean_unused (env->local_ref, env->touched);
   }
-  auto_labels_numbered (root);
+  return auto_labels_numbers (root) != before;
 }
 
 void

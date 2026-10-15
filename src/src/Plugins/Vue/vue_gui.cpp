@@ -4152,6 +4152,10 @@ loop_iteration_body () {
   vue_follow_icon_set (); // a change of the icon set shows at once
   vue_follow_interface_scale (); // and one of the interface scaling
   vue_follow_fonts (); // and a font which came late
+  if (vue_gpu_follow_glyph_settings ()) { // and one of the glyphs
+    vue_simple_widget_rep::invalidate_all_editors ();
+    gui_needs_update= true;
+  }
 #ifdef __EMSCRIPTEN__
   // The browser calls this once per frame (60 or 120 times a second), where
   // the desktop sleeps until an event comes or the pause ends (loop_wait,

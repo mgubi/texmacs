@@ -301,6 +301,14 @@ every frame (2 ms) is gone. Scrolling and zooming the math font catalogue,
 the GPU path draws more frames than MuPDF in every phase, at 1 to 2.3 ms
 of CPU a frame against 4.4 to 5 ms.
 
+The glyphs of the atlas are rendered by FreeType at their size, made as
+bold as those of the Qt port (the preferences "Glyphs on the screen"...,
+see *The GPU renderer*); `?glyphs=texmacs` or `?glyphs=mupdf` chooses the
+bitmaps of TeXmacs or MuPDF's glyphs whatever the preference. On the
+benchmark of the math font catalogue (zooms and scrolls, which make new
+glyphs at each zoom), the repaints take 181 ms with FreeType, 214 ms with
+MuPDF and 455 ms with the bitmaps of TeXmacs (medians of five runs).
+
 `?slug=1` (with `?gpu=1`) draws the glyphs from their outlines instead of
 from bitmaps (Slug, see *The GPU renderer*): on the same benchmark the
 repaints at zoom 2, where the bitmaps of the glyphs are made, cost 0.4 ms
@@ -719,49 +727,61 @@ copy can be edited.
 The collaborative tools (the Remote menu: remote files and directories,
 shared documents, chat) talk to a TeXmacs server over TCP, on port 6561,
 with TLS (GnuTLS) within the connection. A page has no TCP: Emscripten
-makes the sockets of the program WebSockets (`connect` to host:port opens
-`ws://host:port/`, subprotocol `binary`), so the page is a client of any
-server which speaks WebSocket on its port -- a TeXmacs server of this
-branch does.
+makes the sockets of the program WebSockets (subprotocol `binary`). A
+TeXmacs server of this branch serves them at a port of their own, by
+default the one after its port (6562), and leaves its port and its other
+clients as they are. A WebSocket only carries the usual packets.
 
-- **Server** (`src/System/Link/websocket_contact.cpp`): the contact of a
-  new client looks at its first bytes; `GET ` opens the handshake of a
-  WebSocket (the key through SHA-1 and base64, the subprotocol `binary`
-  echoed), and the data goes in binary frames (masked by the client,
-  control frames answered). Any other client gets the contact of before
-  (TLS or plain, preference `tls-server`), unchanged. A client which
-  opens with a TLS record (`0x16`) gets a TLS session first (that of the
-  `tls-server` contact, or one of its own when `tls-server` is off), with
-  the certificate of the server (`$TEXMACS_SERVER_CERT_DIR/cert.pem`,
-  `key.pem`), and its first bytes within TLS say it again: `GET ` is a
-  WebSocket over TLS (`wss`), anything else a TeXmacs client over TLS,
-  handed to the `tls-server` contact with what was read of it (refused when
-  `tls-server` is off). A TeXmacs client speaks first (its login), so this
-  never waits for nothing. The preference `server websocket` says which
-  WebSocket clients are served: `local` (the default: the clients of the
-  same machine), `on` (any: over `wss`, or behind a proxy which does the
-  TLS), `off`. The same in the Qt port (`Plugins/Qt/QTMSockets.cpp`). The
-  link reads its contact until it has no more data (`data_set_ready`): a
-  WebSocket frame (or a TLS record) may hold more than one read, and the
-  socket does not say it is readable again for those; for the same reason
-  it reads once as soon as the contact is active (`resume_start`): the
-  first request of a client over TLS was read to know what it is.
+- **Server**, the port of the WebSockets. Two preferences, read when the
+  server starts: `server websocket` says who is served, `local` (the
+  default: the clients of the same machine, the port listens on
+  127.0.0.1), `on` (any) or `off` (nothing listens); `server websocket
+  port` is the port, `default` for the one after the port of the server.
+  The port speaks `wss` (WebSockets over TLS) when it is open to other
+  machines and the server asks its clients for TLS (`tls-server`), so
+  that no password travels in clear; otherwise it speaks `ws`.
+  - With Qt (`Plugins/Qt/QTMSockets.cpp`, Qt 6.4 or later with the Qt
+    WebSockets module, which is optional): a `QWebSocketServer` listens,
+    Qt does the handshake, the frames and, for `wss`, the TLS;
+    `websocket_link_rep` is the link of such a client. The number of
+    clients which are opening is not limited, because at its limit the
+    TLS server of Qt 6.9 stops accepting for good when those clients
+    leave before the end of their handshake.
+  - Without Qt (`System/Link/tm_sockets.cpp`, the Vue and Cocoa ports):
+    a second listening socket; the contact of its clients
+    (`System/Link/websocket_contact.cpp`) does the handshake of the
+    WebSocket (the key through SHA-1 and base64, the subprotocol `binary`
+    echoed) and the frames (masked by the client, control frames
+    answered), inside a TLS session of GnuTLS for `wss`. The link reads
+    its contact until it has no more data (`data_set_ready`): a frame (or
+    a TLS record) may hold more than one read, and the socket does not
+    say it is readable again for those.
+  Until 13 October 2026 the WebSockets were served on the port of the
+  server itself, told apart by their first bytes; this is gone.
 - **Certificate for `wss`**: one the browser trusts, for the name of the
   host (Let's Encrypt...), ECDSA or RSA: the self-signed certificate
   TeXmacs generates (`generate-self-signed-certificate`) is Ed25519, which
-  the browsers do not accept for TLS (node does).
+  the browsers do not accept for TLS (node does), and which the Qt port
+  does not load.
 - **Client** (the page): `try_connect` does not wait for the connection
   (the WebSocket opens only when the page has the hand again; what is
   written before is queued), and a login "Password via TLS" goes through a
-  plain contact (`tls_client_start`): accounts need nothing new. A page
-  served over https may open `wss` only (a `ws` from it is blocked as mixed
-  content), save to this machine: `try_connect` sets the WebSocket of each
-  connection (`SOCKFS.websocketArgs`), `wss://host:port/` to the other
-  hosts from a page over https, `ws://` otherwise; `?websocket=wss` (or
-  `ws`) in the address of the page says which, whatever the page. The
-  browser does not tell a page why a WebSocket failed: a connection which
-  fails before any data says where it went, and what may be wrong (no
-  server there, `server websocket`, the certificate).
+  plain contact (`tls_client_start`): accounts need nothing new. The port
+  of a login is the one of the server, and `try_connect` goes to the next
+  one (`web_socket_port`; `?websocket-port=N` in the address of the page
+  gives another one). It opens `ws://` to this machine, and `wss://` to
+  another host when the login is one over TLS or the page is served over
+  https (a `ws` from such a page is blocked as mixed content, save to this
+  machine), which is what the server speaks; `?websocket=wss` (or `ws`)
+  says which, whatever the page and the login. One case needs it: a
+  server which is open to other machines and asks for TLS speaks `wss` to
+  the pages of its own machine too. The browser does not tell a page why
+  a WebSocket failed: a connection which fails before any data says where
+  it went, and what may be wrong.
+- **Bridge** (`misc/wasm/remote/ws-bridge.mjs`), for the servers of the
+  other versions of TeXmacs, which have no port for WebSockets: it listens
+  on this machine (6563) and passes the connection on over TLS; the login
+  of the page is then to `localhost`, port 6562.
 - **S7** (on which the desktop builds of this branch run, as the page):
   the server logged a failed login with Guile's `strftime`, and formatted
   its errors with Guile's `display-error` (`format-err`): both fixed.
@@ -772,7 +792,7 @@ secret123, TLS with a self-signed certificate) of a desktop build,
     TEXMACS_HOME_PATH=<a copy of ~/.TeXmacs> TeXmacs/bin/texmacs.bin \
       -headless -server -x '(load "misc/wasm/remote/server.scm")'
 
-`client.mjs` logs in over WebSocket from node; `tls-client.scm` from a
+`client.mjs` logs in over WebSocket from node (at 6562); `tls-client.scm` from a
 desktop client over TCP and TLS (with `-tls-no-verify`: `TM_ARGS` of the
 test runner of Vue); `browser-home.txt` and `browser-create.txt`, scripts
 of `browser-run.mjs`, from the page: the login, the home directory, a
@@ -780,6 +800,21 @@ remote file created and opened (`_vue_web_scheme` runs a Scheme command
 of the page). Checked on 2026-09-27: all of them, a WebSocket client from
 another address refused with `local` and served with `on`, none with
 `off`; the desktop Vue and the Qt (compiled) ports.
+
+Checked again on 2026-10-13, with the WebSockets at their own port: the
+scripted clients of the suite (ws and wss, requests in pieces, large and
+fragmented messages, logins, the values of the preferences, malformed
+first bytes, 200 clients held at once, a server which stops with clients
+in every state) against the desktop Vue port and, on the upstream sources,
+the Qt port; `client.mjs`; from the page (Firefox) the login, the home
+directory and a new remote file over `ws`, and the login over `wss` to
+the address of the machine on the network and to `localhost` with
+`?websocket=wss`; the login with `?websocket-port=` to a server whose
+preference gives another port; the message of a login when nothing
+answers at the port; and the bridge (`ws-bridge.mjs` in front of the port
+of the test server, with `NODE_TLS_REJECT_UNAUTHORIZED=0` for its
+self-signed certificate), from `client.mjs` and from the page. In
+maxs_texmacs the Qt port was only compiled.
 
 The remote tools as a whole (2026-10-08): `remote-check.scm`, loaded by a
 desktop client (`-tls-no-verify -x`) or by the page (written to its file

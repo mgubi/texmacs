@@ -10,6 +10,7 @@
 ******************************************************************************/
 
 #include "Bridge/impl_typesetter.hpp"
+extern tree the_et;
 #include "iterator.hpp"
 #include "sys_utils.hpp" // get_env
 #include <chrono>
@@ -28,7 +29,14 @@ typesetter_rep::typesetter_rep (edit_env& env2, tree et, path ip):
 }
 
 typesetter_rep::~typesetter_rep () {
+  // what holds lines is released while the change log is there for them
+  // (see phrase_box_rep; the members would go in the other order)
   tm_delete (kept_pages);
+  br= nil_bridge;
+  l = array<page_item> ();
+  a = array<line_item> ();
+  b = array<line_item> ();
+  change_log= rectangles ();
 }
 
 typesetter
@@ -113,8 +121,11 @@ typesetter_rep::local_end (array<page_item>& prev_l, stack_border& prev_sb) {
 ******************************************************************************/
 
 // see typesetter.hpp
+int typeset_check_mismatches= 0;
+int get_typeset_check_mismatches () { return typeset_check_mismatches; }
+
 edit_profile_data edit_profile=
-  { get_env ("TEXMACS_EDIT_PROFILE") != "", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+  { get_env ("TEXMACS_EDIT_PROFILE") != "" }; // (and zeros)
 
 double
 edit_profile_now () {
@@ -156,6 +167,12 @@ typesetter_rep::determine_page_references (box b) {
 
 box
 typesetter_rep::typeset () {
+  // (the tree of the buffer, for the automatic labels: see exec_auto_id)
+  path rp= reverse (br->ip);
+  tree buffer= "";
+  if (!is_nil (rp) && rp->item >= 0 && has_subtree (the_et, path (rp->item)))
+    buffer= the_et[rp->item];
+  edit_env_rep::typesetting_pass pass (env.operator-> (), buffer);
   old_patch= hashmap<string,tree> (UNINIT);
   l        = array<page_item> ();
   sb       = stack_border ();
@@ -175,7 +192,6 @@ typesetter_rep::typeset () {
   }
 
   // Typeset
-  env->auto_seen= 0;
   if (env->complete) {
     env->local_aux= hashmap<string,tree> (UNINIT);
     env->missing  = hashmap<string,tree> (UNINIT);
@@ -240,7 +256,13 @@ typesetter_rep::typeset (SI& x1b, SI& y1b, SI& x2b, SI& y2b) {
 void
 notify_assign (typesetter ttt, path p, tree u) {
   // cout << "Assign " << p << ", " << u << "\n";
-  if (is_nil (p)) ttt->br= make_bridge (ttt, u, ttt->br->ip);
+  if (is_nil (p)) {
+    ttt->br= make_bridge (ttt, u, ttt->br->ip);
+    // everything is to be made again, for a reason which may be none
+    // that the pager knows (fonts which arrived, in a browser): the
+    // pages of the last pass are forgotten too
+    *ttt->kept_pages= page_memo ();
+  }
   else ttt->br->notify_assign (p, u);
 }
 

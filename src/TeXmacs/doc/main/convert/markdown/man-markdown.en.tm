@@ -42,7 +42,95 @@
   <name|Pandoc>, a dollar opens a formula only when no space follows it,
   and closes one only when no space precedes it and no digit follows it:
   <verbatim|a price of $5 and $6> has no formula. A formula which is a
-  single symbol, such as an arrow, is written as this character.
+  single symbol, such as an arrow, is written in <LaTeX> too, as
+  <verbatim|$\\rightarrow$>, and is a formula again when it is read.
+
+  <paragraph|The style for Markdown files>
+
+  A file which is opened is a document of the style <tmstyle|markdown>:
+  text without serifs, headings without numbers, and a few macros which
+  keep what <name|Markdown> says and the standard tags do not. Such a
+  document is written as the file it was read from: what you did not
+  touch keeps its meaning, and what <name|Markdown> cannot say in two ways
+  keeps its text; what you edit is written anew.
+
+  <\description>
+    <item*|Headings>The six levels are <markup|section>,
+    <markup|subsection>, <markup|subsubsection>, <markup|paragraph>,
+    <markup|subparagraph> and <markup|md-h6>, whatever the first one of the
+    file is, and a file has no title of its own.
+
+    <item*|The header>The lines of a <name|YAML> header are kept in
+    <markup|md-metadata>, one <markup|md-meta> with a key and its value
+    for each of them (and without key for a line which has none, or which
+    is not written <verbatim|key: value>: an item of a list, a comment, a
+    line with other spaces). Keys can be edited, added and removed, and
+    are written in their order; a line typed in the header is written as
+    it is, or as a comment when <name|YAML> has no such line. Whatever the
+    header holds between its two lines <verbatim|---> is kept, if each of
+    its lines is a key, a comment, an item of a list or an indented line,
+    and one of them at least is a key: a heading between two rules stays
+    a heading. A header without key is written as paragraphs, and an empty
+    one is not written.
+
+    <item*|Formulas, tables, <name|Html>>They are in <markup|md-source>
+    (in a paragraph) or <markup|md-block-source> (on lines of their own),
+    with the text of the file for them: <verbatim|\\(x\\)> stays
+    <verbatim|\\(x\\)>, a table keeps the widths of its columns, and
+    <name|Html> which <TeXmacs> does not understand, a comment for
+    instance, is kept and shown as a flag. As soon as the formula, the
+    table or the text is edited, it is written by <TeXmacs>. So are the
+    tabs, which are displayed as spaces (in code, each line with tabs
+    keeps them until it is edited), the definitions of links to which
+    nothing refers (the comments <verbatim|[//]: # (text)> among them),
+    and the definitions of footnotes which the text does not use. The
+    definitions of the links and footnotes which a table uses are kept
+    too, and a mark of a footnote in a table keeps its label.
+
+    <item*|Lists>The lists whose items start with <verbatim|->,
+    <verbatim|*> and <verbatim|+> are <markup|itemize-minus>,
+    <markup|itemize-dot> and <markup|itemize-arrow>, and a list with blank
+    lines between its items is in <markup|md-loose>.
+
+    <item*|Code>The words after the fence are kept by <markup|md-fence>
+    when the language is not one of those which <TeXmacs> highlights, or
+    is not written as <TeXmacs> writes it (<verbatim|c> for
+    <verbatim|cpp>). A tab which starts a line of code stays a tab, as in
+    a formula, in <name|Html> and in the header.
+
+    <item*|Images>An image with a description or a title is in
+    <markup|md-image>; an image alone with a description and no title is a
+    figure with this caption, as below.
+
+    <item*|Footnotes>A footnote whose label is not its number is
+    <markup|md-footnote>, with this label, and <markup|md-footnote-text>
+    marks the place where its text is written when this is not the end of
+    the file, in a quotation or a list as well. The text of a footnote is
+    at its first mark; the other marks of the same footnote, a mark inside
+    the text of a footnote and a mark without footnote are kept as they
+    are written. When two footnotes have the same label, the second one
+    gets another label as it is written.
+  </description>
+
+  The text which these macros keep is not displayed, and is written as it
+  is: a document of this style which someone else wrote may write text
+  you do not see into the <name|Markdown> file, as <markup|specific> may.
+  The other formats display the macros and leave out what they keep.
+
+  What <name|Markdown> writes in several ways is written in one when it
+  is none of the above: the lines of a paragraph are joined (the spaces
+  and tabs which start them are not text), a heading
+  with a line under it starts with <verbatim|#>, code is between
+  <verbatim|```>, a rule is <verbatim|***>, emphasis is written with
+  stars, a link through a definition is written with its address, and a
+  character written as <verbatim|&amp;> or after a backslash is written
+  as itself unless it would be taken for markup. The file which is
+  written says the same, and is written as itself from then on.
+
+  With <menu|Edit|Preferences|Convert|Markdown> a file is read as a
+  document of the style <tmstyle|generic> instead, with the title and
+  the sections which <TeXmacs> displays for it; text which is pasted is
+  always read so, since it may go into any document.
 
   <paragraph|What is read>
 
@@ -55,7 +143,8 @@
 
     <item*|Header>A <name|YAML> header between two lines <verbatim|---> at
     the start of the file gives the title, the authors
-    (<verbatim|author>, one or a list), the date and the abstract.
+    (<verbatim|author>, one or a list), the date and the abstract. Pasted
+    text has no header: its lines <verbatim|---> are rules.
 
     <item*|Text>Emphasized, strong and struck through text, code, links,
     images, line breaks, the entities of <name|Html>.
@@ -78,7 +167,10 @@
     box as their bullet.
 
     <item*|Code>Between lines of three backquotes or indented by four
-    spaces. The language which follows the backquotes selects the
+    spaces; a tab which starts a line goes to the next column which is a
+    multiple of four, as <name|CommonMark> says, and the columns of it
+    which the indentation of the code or of a list takes are spaces.
+    The language which follows the backquotes selects the
     environment, <markup|python-code>, <markup|scm-code>,
     <markup|cpp-code>..., and <markup|verbatim-code> otherwise.
 
@@ -86,7 +178,10 @@
     in bold. A table too wide for the page gets its width and its cells are
     broken into lines.
 
-    <item*|Quotations, rules, footnotes>
+    <item*|Quotations, rules, footnotes>A footnote does not hold other
+    footnotes: a mark inside the text of a footnote stays as it is written.
+    Quotations and lists inside each other are read down to a hundred
+    levels, and are text beyond.
 
     <item*|<name|Html>>The tags of <name|Html> inside the text are read by
     the <hlink|converter for <name|Html>|../html/man-html.en.tm>.
@@ -140,6 +235,16 @@
     display (<menu|Edit|Preferences|Convert|Markdown> turns this off: they
     are then plain text). Colors, fonts, sizes and alignments are dropped,
     and so are the drawings made with <TeXmacs>.
+
+    <item*|What does not come back>Outside the style
+    <tmstyle|markdown>, a file which is written and read again
+    is not always the document it was. The sizes of the
+    images come back in pixels or as parts of the paragraph, whatever
+    their unit was, and a height which is neither is dropped. The headings
+    start again at the first level, so that the sections of a document
+    with chapters are subsections afterwards. An address which stands in
+    the text is a link when it is read, and braces which follow an image
+    are read as its size.
   </description>
 
   To write something only into the <name|Markdown> file,

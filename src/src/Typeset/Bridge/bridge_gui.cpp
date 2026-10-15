@@ -172,7 +172,9 @@ bridge_ornamented_rep::typeset_ornament (int desired_status) {
   ttt->local_start (l2, sb2);
   a2= ttt->a; b2= ttt->b;
   ttt->a= array<line_item> (); ttt->b= array<line_item> ();
+  tree outer= bind_start (with);
   body->typeset (desired_status);
+  bind_end (outer);
   ttt->a= a2; ttt->b= b2;
   ttt->local_end (l2, sb2);
   for (i-=2; i>=0; i-=2)

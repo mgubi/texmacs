@@ -152,6 +152,8 @@ bridge_formatting_rep::my_typeset (int desired_status) {
     if (v != CELL_FORMAT) ttt->insert_marker (st, ip);
     ttt->insert_surround (a, b);
   }
+  tree outer= bind_start (tree (TUPLE, v, new_format));
   body->typeset (desired_status);
+  bind_end (outer);
   env->local_end (v, old_format);
 }

@@ -85,6 +85,10 @@ Module['preRun'].push(function () {
   if (tmAddress.get ('bars') === 'top') ENV['TEXMACS_VUE_BARS'] = 'top';
   // ?slug=1: the glyphs drawn from their outlines (vue_gpu.cpp, Slug)
   if (tmAddress.get ('slug') === '1') ENV['TEXMACS_VUE_SLUG'] = '1';
+  // ?glyphs=freetype|texmacs|mupdf: the glyphs of the atlas, whatever the
+  // preference "gpu glyphs" (vue_gpu.cpp, read_glyph_settings)
+  if (/^(freetype|texmacs|mupdf)$/.test (tmAddress.get ('glyphs') || ''))
+    ENV['TEXMACS_VUE_GLYPHS'] = tmAddress.get ('glyphs');
   // ?scale=1.5: the interface scaling, whatever the preference (tests)
   if (/^[0-9.]+$/.test (tmAddress.get ('scale') || ''))
     ENV['TEXMACS_VUE_SCALE'] = tmAddress.get ('scale');
@@ -110,6 +114,12 @@ Module['preRun'].push(function () {
     ENV['TEXMACS_PAGE_BREAK_FAST'] = 'check';
     ENV['TEXMACS_PAGE_REUSE'] = 'check';
   }
+  // ?env=TEXMACS_NAME:value (several may be given): an environment
+  // variable of TeXmacs, for tests
+  tmAddress.getAll ('env').forEach (function (e) {
+    var m = /^(TEXMACS_[A-Z0-9_]+):(.*)$/.exec (e);
+    if (m) ENV[m[1]] = m[2];
+  });
   FS.mkdirTree ('/home/web');
   FS.mount (IDBFS, { autoPersist: false }, '/home/web');
   addRunDependency ('home');

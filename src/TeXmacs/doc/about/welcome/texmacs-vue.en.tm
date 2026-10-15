@@ -203,7 +203,8 @@
     computer if it allows the page. <name|Albert> does not answer web pages.
 
     <item>The <menu|Remote> menu connects to a <TeXmacs> server over
-    WebSocket, on the same computer only for now.
+    WebSocket: a server of <TeXmacs> <name|Vue> on the same computer, or
+    one on another computer which is open to browsers.
 
     <item><TeXmacs> <name|Vue> types, scrolls and typesets as fast as the
     desktop program, but its <name|Scheme> runs two to three times slower,
@@ -225,6 +226,103 @@
   <section|Recent changes>
 
   The additions to <TeXmacs> <name|Vue>, the newest first.
+
+  <paragraph|15 October 2026>
+
+  <\itemize>
+    <item>The text on the screen is darker, as heavy as in <TeXmacs> on the
+    desktop, and drawn as fast as before.
+
+    <item><menu|Edit|Preferences>, tab <menu|General>, chooses how the
+    letters are drawn on the screen (<menu|Glyphs on the screen>), how bold
+    they are and how they are fitted to the pixels; a change shows at
+    once.
+  </itemize>
+
+  <paragraph|14 October 2026>
+
+  <\itemize>
+    <item>A <name|Markdown> file keeps more of itself when it is saved:
+    its tabs, the definitions of links to which nothing refers (and the
+    comments <verbatim|[//]: # (text)>), footnotes defined in quotations
+    or lists, marked several times or not defined, and a <name|YAML>
+    header with any keys. Its export to <LaTeX> compiles.
+
+    <item>Word and <name|OpenDocument> files of any length are read and
+    written (ten thousand paragraphs stopped the converters), and a
+    damaged or forged file gives a message instead of ending <TeXmacs>.
+
+    <item>A table of a <name|Markdown> file keeps the links and footnotes
+    whose definitions only it uses, a heading between two rules is no
+    longer taken for a <name|YAML> header, and a header edited in
+    <TeXmacs> is read back as a header. Many footnotes are written much
+    faster.
+
+    <item>A small forged Word or <name|OpenDocument> file can no longer
+    keep <TeXmacs> busy for hours.
+
+    <item>Word and <name|OpenDocument> files keep their page (size,
+    orientation, margins) and the look of their usual paragraphs (size of
+    the font, a font without serifs, alignment, indentation, spacing) in
+    both directions, the ways of numbering of their lists, and their
+    headings without numbers. The text of boxes and shapes is imported,
+    hidden text is left out, and the chapters of a book are exported with
+    their numbers.
+
+    <item>A Word or <name|OpenDocument> file opens in the new style
+    <tmstyle|office>, which keeps its named styles, headers and footers,
+    fields, comments, tracked changes and columns, and writes the file back
+    with its own styles, pages and settings. Cropped pictures, pictures of
+    <name|Windows> (through <name|LibreOffice>), arrays of equations and
+    all the screens of a presentation are converted too.
+  </itemize>
+
+  <paragraph|13 October 2026>
+
+  <\itemize>
+    <item>A <name|Markdown> file is opened as a document of the new style
+    <tmstyle|markdown>, with text without serifs and headings without
+    numbers, and is saved as it was read: its <name|YAML> header, its
+    formulas, tables and <name|Html> keep their text, and so do the levels
+    of its headings, its lists, its code, images and footnotes, as long
+    as you do not edit them. See <menu|Help|Manual|Compatibility with
+    other formats>.
+
+    <item>A <TeXmacs> server now answers the browsers at a port of its
+    own, the one after its usual port (6562 for 6561), and leaves its usual
+    port to the other versions of <TeXmacs>. Nothing changes in the login:
+    the port to give is still the one of the server, and the page goes to
+    the next one. A server started by an older <TeXmacs> <name|Vue> has to
+    be updated together with the page.
+
+    <item>To a server on another computer, a login over TLS goes through
+    secure WebSockets (<verbatim|wss>), whatever the page; to a server on
+    the same computer it stays in clear, without any certificate. Such a
+    server serves the browsers of other computers when its preference
+    <verbatim|server websocket> is <verbatim|on>.
+
+    <item>Editing a long document is faster. A new section, a numbered
+    equation or the join of two paragraphs used to typeset everything
+    after it again, since the numbers changed: now only what shows one of
+    these numbers is. The page breaks are searched faster, and not at all
+    when no line changed its height; the pages which did not change, with
+    their headers and footers, are no longer put together again at every
+    key. In the user manual opened as a book, some 380 pages, a letter
+    takes about 50<nbsp>ms in this page instead of 730, the join of two
+    paragraphs 50 instead of 2100 and a new section 200 instead
+    of 3200 (the typesetting alone, on a recent laptop; the pages are
+    the same as before).
+
+    <item>The entries of a table of contents and of an index keep pointing
+    to their places when sections or index entries are added before them:
+    they no longer wait for <menu|Document|Update|All> to be right again.
+
+    <item>A long document sometimes lost what comes at its end when it was
+    made by a program: the user manual, opened as a book from the
+    <menu|Help> menu, was now and then shown as one endless page instead of
+    its pages. The memory of such a document could be reused while it was
+    still being built.
+  </itemize>
 
   <paragraph|9 October 2026>
 
@@ -276,7 +374,7 @@
     on: run <verbatim|node misc/wasm/remote/ws-bridge.mjs> (from the
     sources of <TeXmacs> <name|Vue>; <verbatim|cloud.texmacs.org> is its
     default), and log in with the server <verbatim|localhost> and the port
-    6563.
+    6562 (the bridge listens at the next one, as a server does).
 
     <item>The menus drop in without stopping halfway. On a display of 120
     Hz the page drew a frame every 8 ms, more than the graphics card

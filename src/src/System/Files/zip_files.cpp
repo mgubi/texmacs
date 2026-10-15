@@ -10,6 +10,7 @@
 ******************************************************************************/
 
 #include "zip_files.hpp"
+#include "hashset.hpp"
 
 /******************************************************************************
 * Inflate (RFC 1951): the three kinds of blocks, with canonical Huffman codes
@@ -200,8 +201,12 @@ inflate_dynamic (inflate_state& s) {
 
 bool
 inflate_string (string in, int start, int size, int out_size, string& out) {
-  // the out_size bytes which the size bytes of in from start on inflate to
-  if (start < 0 || size < 0 || start + size > N (in) || out_size < 0)
+  // the out_size bytes which the size bytes of in from start on inflate to.
+  // Deflate makes at most 1032 bytes of one: a larger size, which would be
+  // allocated before anything is inflated, is refused
+  if (start < 0 || size < 0 || start > N (in) || size > N (in) - start ||
+      out_size < 0 || out_size > ZIP_MAX_ENTRY ||
+      (long long) out_size > 1032LL * size + 64)
     return false;
   inflate_state s;
   s.in= in; s.pos= start; s.end= start + size;
@@ -262,12 +267,17 @@ zip_u32 (string s, int i) {
   return zip_u16 (s, i) | (zip_u16 (s, i+2) << 16);
 }
 
+// The sizes and the offsets are numbers of 32 bits taken from the file:
+// they are compared with the size of the archive before they are added to
+// anything, so that no sum overflows.
+
 struct zip_entry {
-  string name;
-  int    method;   // 0: stored, 8: deflated
-  int    csize;    // the size in the archive
-  int    usize;    // the size of the data
-  int    offset;   // where the local header is
+  string       name;
+  int          method;   // 0: stored, 8: deflated
+  int          csize;    // the size in the archive
+  int          usize;    // the size of the data
+  int          offset;   // where the local header is
+  unsigned int crc;      // the CRC-32 of the data
 };
 
 static int
@@ -286,22 +296,32 @@ zip_directory (string zip, array<zip_entry>& dir) {
   int e= zip_directory_end (zip);
   if (e < 0) return false;
   int count= (int) zip_u16 (zip, e + 10);
-  int pos  = (int) zip_u32 (zip, e + 16);
+  unsigned int first= zip_u32 (zip, e + 16);
+  if (first > (unsigned int) n) return false;
+  int pos= (int) first;
   for (int k= 0; k < count; k++) {
-    if (pos < 0 || pos + 46 > n || zip_u32 (zip, pos) != 0x02014b50u)
-      return false;
+    if (pos > n - 46 || zip_u32 (zip, pos) != 0x02014b50u) return false;
     zip_entry z;
-    z.method= (int) zip_u16 (zip, pos + 10);
-    z.csize = (int) zip_u32 (zip, pos + 20);
-    z.usize = (int) zip_u32 (zip, pos + 24);
+    unsigned int csize = zip_u32 (zip, pos + 20);
+    unsigned int usize = zip_u32 (zip, pos + 24);
+    unsigned int offset= zip_u32 (zip, pos + 42);
     int nlen= (int) zip_u16 (zip, pos + 28);
     int xlen= (int) zip_u16 (zip, pos + 30);
     int clen= (int) zip_u16 (zip, pos + 32);
-    z.offset= (int) zip_u32 (zip, pos + 42);
-    if (pos + 46 + nlen > n || z.csize < 0 || z.usize < 0 || z.offset < 0)
-      return false;
+    if (nlen > n - 46 - pos) return false;
+    z.method= (int) zip_u16 (zip, pos + 10);
+    // (an entry larger than the archive, or than an entry may be, is one
+    // which cannot be read)
+    if (csize > (unsigned int) n || usize > (unsigned int) ZIP_MAX_ENTRY ||
+        offset > (unsigned int) n) {
+      z.method= -1; csize= usize= offset= 0; }
+    z.crc   = zip_u32 (zip, pos + 16);
+    z.csize = (int) csize;
+    z.usize = (int) usize;
+    z.offset= (int) offset;
     z.name= zip (pos + 46, pos + 46 + nlen);
     dir << z;
+    // (the three lengths are below 65536 each: no overflow)
     pos += 46 + nlen + xlen + clen;
   }
   return true;
@@ -322,29 +342,36 @@ zip_entries (string zip) {
   return r;
 }
 
+static bool
+zip_read_entry (string zip, zip_entry& z, string& data) {
+  // the data of the entry z, if it is whole: of its size and its CRC-32
+  int n= N (zip);
+  // the sizes of the local header are its own
+  if (z.offset > n - 30 || zip_u32 (zip, z.offset) != 0x04034b50u)
+    return false;
+  int start= z.offset + 30 + (int) zip_u16 (zip, z.offset + 26) +
+             (int) zip_u16 (zip, z.offset + 28);
+  if (start > n || z.csize > n - start) return false;
+  string r;
+  if (z.method == 0) {
+    if (z.csize != z.usize) return false;
+    r= zip (start, start + z.csize);
+  }
+  else if (z.method == 8) {
+    if (!inflate_string (zip, start, z.csize, z.usize, r)) return false;
+  }
+  else return false;
+  if (crc32_string (r) != z.crc) return false;
+  data= r;
+  return true;
+}
+
 bool
 zip_read (string zip, string name, string& data) {
   array<zip_entry> dir;
   if (!zip_directory (zip, dir)) return false;
-  int n= N (zip);
   for (int i= 0; i < N (dir); i++)
-    if (dir[i].name == name) {
-      zip_entry& z= dir[i];
-      // the sizes of the local header are its own
-      if (z.offset + 30 > n || zip_u32 (zip, z.offset) != 0x04034b50u)
-        return false;
-      int start= z.offset + 30 + (int) zip_u16 (zip, z.offset + 26) +
-                 (int) zip_u16 (zip, z.offset + 28);
-      if (start < 0 || start + z.csize > n) return false;
-      if (z.method == 0) {
-        if (z.csize != z.usize) return false;
-        data= zip (start, start + z.csize);
-        return true;
-      }
-      if (z.method == 8)
-        return inflate_string (zip, start, z.csize, z.usize, data);
-      return false;
-    }
+    if (dir[i].name == name) return zip_read_entry (zip, dir[i], data);
   return false;
 }
 
@@ -413,6 +440,9 @@ zip_write (array<string> names, array<string> datas) {
   // make the same archive.
   string r, dir;
   int n= min (N (names), N (datas));
+  if (n > ZIP_MAX_ENTRIES) return "";
+  for (int i= 0; i < n; i++)
+    if (N (names[i]) > 65535) return "";
   for (int i= 0; i < n; i++) {
     unsigned int crc= crc32_string (datas[i]);
     unsigned int size= (unsigned int) N (datas[i]);
@@ -480,14 +510,24 @@ zip_write (array<string> names, array<string> datas) {
 array<string>
 zip_unpack (string zip) {
   // the names and the data of the entries which can be read, in their
-  // order; the directories (names which end with /) are left out
+  // order; the directories (names which end with /) are left out. The
+  // directory is read once. Every entry which is tried counts for its
+  // declared size, read or not (an entry can inflate in full and then
+  // fail its CRC), the entries which follow ZIP_MAX_TOTAL bytes are left
+  // out, and so are the entries whose data another entry already has
   array<zip_entry> dir;
   array<string> r;
   if (!zip_directory (zip, dir)) return r;
+  hashset<int> offsets;
+  long long total= 0;
   for (int i= 0; i < N (dir); i++) {
     string name= dir[i].name, data;
     if (N (name) == 0 || name[N (name) - 1] == '/') continue;
-    if (zip_read (zip, name, data)) r << name << data;
+    if (dir[i].method < 0 || offsets->contains (dir[i].offset)) continue;
+    offsets->insert (dir[i].offset);
+    if (total + dir[i].usize > ZIP_MAX_TOTAL) break;
+    total += dir[i].usize;
+    if (zip_read_entry (zip, dir[i], data)) r << name << data;
   }
   return r;
 }

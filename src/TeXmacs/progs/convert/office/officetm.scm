@@ -45,12 +45,7 @@
 
 (define (oftm-concat l)
   ;; a list of TeXmacs trees as one tree
-  (let* ((l (let loop ((l l))
-              (cond ((null? l) l)
-                    ((== (car l) "") (loop (cdr l)))
-                    ((and (string? (car l)) (pair? (cdr l)) (string? (cadr l)))
-                     (loop (cons (string-append (car l) (cadr l)) (cddr l))))
-                    (else (cons (car l) (loop (cdr l))))))))
+  (let* ((l (office-join-strings l)))
     (cond ((null? l) "")
           ((null? (cdr l)) (car l))
           (else (cons 'concat l)))))
@@ -172,6 +167,10 @@
   (cond ((string? t) (oftm-concat (oftm-split-spaces t oftm-math-spaces)))
         ((and (func? t 'with 3) (== (cadr t) "mode") (== (caddr t) "text"))
          `(with "mode" "text" ,(oftm-math-text (cadddr t))))
+        ;; a bracket without the other one, kept apart (see omml-delimiters)
+        ((and (func? t 'with 3) (== (cadr t) "math-level") (== (caddr t) "0")
+              (func? (cadddr t) 'around*))
+         (oftm-clean-math (cadddr t)))
         ;; four dots above: an accent which the converter does not know
         ((and (func? t 'above 2) (== (caddr t) "<#20DC>"))
          `(wide ,(oftm-clean-math (cadr t)) "<ddddot>"))
@@ -203,19 +202,140 @@
           (loop (cadr r))
           (oftm-clean-math r)))))
 
+(define (oftm-local x)
+  ;; the name of the element x without its prefix
+  (let* ((s (if (and (pair? x) (symbol? (car x))) (symbol->string (car x)) ""))
+         (i (string-search-forwards ":" 0 s)))
+    (if (>= i 0) (substring s (+ i 1) (string-length s)) s)))
+
+(define (oftm-eqarray-table x)
+  ;; the table of MathML of a formula which is lines of equations (the
+  ;; class tm-eqarray, on the formula or on its table), or #f
+  (let* ((c (ox-children x))
+         (root (cond ((null? c) #f)
+                     ((== (ox-attr x 'form) "sxml") (car c))
+                     ((and (not (ox-attr x 'form)) (string? (car c))
+                           (>= (string-search-forwards "tm-eqarray" 0 (car c)) 0))
+                      (catch #t (lambda () (ox-root (parse-xml (car c))))
+                             (lambda args #f)))
+                     (else #f)))
+         (table? (lambda (y) (and (pair? y) (== (oftm-local y) "mtable"))))
+         (rows (and root (ox-elements root)))
+         (t (and rows (list-1? rows) (table? (car rows)) (car rows))))
+    (and t (or (== (ox-attr root 'class) "tm-eqarray")
+               (== (ox-attr t 'class) "tm-eqarray"))
+         t)))
+
+(define (oftm-mathml-prefix x)
+  ;; the elements of MathML with the prefix m: (OpenDocument has none)
+  (if (and (pair? x) (symbol? (car x)) (not (== (car x) '@))
+           (not (string-starts? (symbol->string (car x)) "m:")))
+      (cons (string->symbol (string-append "m:" (oftm-local x)))
+            (map oftm-mathml-prefix (cdr x)))
+      (if (pair? x) (cons (car x) (map oftm-mathml-prefix (cdr x))) x)))
+
+(define (oftm-eqarray t)
+  ;; lines of equations, each cell a formula
+  (let* ((cell (lambda (d)
+                 (oftm-formula `(math (@ (form "sxml"))
+                                      (m:math ,@(map oftm-mathml-prefix (ox-children d)))))))
+         (rows (map (lambda (r)
+                      (cons 'row (map (lambda (d) (list 'cell (cell d)))
+                                      (list-filter (ox-elements r)
+                                                   (lambda (d) (== (oftm-local d) "mtd"))))))
+                    (list-filter (ox-elements t)
+                                 (lambda (r) (in? (oftm-local r) '("mtr" "mlabeledtr")))))))
+    `(eqnarray* (document (tformat (table ,@rows))))))
+
 (define (oftm-math x)
+  (with t (and (== (ox-attr x 'display) "true") (oftm-eqarray-table x))
+    (cond (t (list (oftm-eqarray t)))
+          ;; (a formula alone in a cell, which Word displays, is in the cell)
+          ((and oftm-in-cell? (== (ox-attr x 'display) "true"))
+           (oftm-math* (apply office-node
+                              (cons* 'math (map (lambda (a) (list (car a) (cadr a)))
+                                                (list-filter (ox-attrs x)
+                                                             (lambda (a) (!= (car a) 'display))))
+                                     (ox-children x)))))
+          (else (oftm-math* x)))))
+
+(define (oftm-math* x)
   (with f (oftm-formula x)
     (cond ((== f "") '())
           ((== (ox-attr x 'display) "true")
            (list `(equation* (document ,f))))
           (else (list `(math ,f))))))
 
+(define (oftm-cropped data name w h crop)
+  ;; the image of which the parts crop ("l t r b", fractions of its sides)
+  ;; are cut: the whole image, larger, inside the rectangle which is shown
+  (let* ((c (map (lambda (v) (or (office-number v) 0))
+                 (string-tokenize-by-char crop #\space)))
+         (c (if (== (length c) 4) c '(0 0 0 0)))
+         (l (car c)) (t (cadr c)) (r (caddr c)) (b (cadddr c))
+         (cm (lambda (v) (string-append (office-decimal v) "cm")))
+         (fw (/ (office-length->cm w) (max 0.05 (- 1 l r))))
+         (fh (/ (office-length->cm h) (max 0.05 (- 1 t b))))
+         (u (lambda (v unit) (string-append (office-decimal v) unit))))
+    `(clipped (image (tuple (raw-data ,data) ,name) ,(cm fw) ,(cm fh) "" "")
+              ,(u l "w") ,(u b "h") ,(u (- 1 r) "w") ,(u (- 1 t) "h"))))
+
 (define (oftm-image x)
+  ;; a picture; one which floats beside its paragraph says where, in the
+  ;; style office
+  (with l (oftm-image-only x)
+    (if (and oftm-faithful? (ox-attr x 'float) (pair? l))
+        (list `(office-float ,(ox-attr x 'float) ,(oftm-float-spec x)
+                             ,(if (null? (cdr l)) (car l) `(concat ,@l))))
+        l)))
+
+(define (oftm-float-spec x)
+  ;; the attributes of a floating picture but its side, as "key=value ..."
+  (string-recompose
+    (append-map (lambda (k)
+                  (with v (ox-attr x k)
+                    (if (and v (!= v "")) (list (string-append (symbol->string k) "=" v)) '())))
+                (append (cdr office-float-keys) '(next)))
+    " "))
+
+(define (oftm-split-floats x)
+  ;; a paragraph with text and pictures which float beside it: each picture
+  ;; is a paragraph before it, on its side, and says that it goes with the
+  ;; next paragraph (TeXmacs does not put text around a picture)
+  (let* ((float? (lambda (y) (and (func? y 'image) (ox-attr y 'float))))
+         (l (if (func? x 'p) (ox-children x) '()))
+         (floats (list-filter l float?))
+         (rest (list-filter l (lambda (y) (not (float? y))))))
+    (if (or (null? floats) (oftm-role? x "heading")
+            (not (list-or (map (lambda (y) (not (and (string? y)
+                                                       (== (string-trim-spaces y) ""))))
+                               rest))))
+        (list x)
+        (append (map (lambda (y)
+                       (office-node 'p `((align ,(ox-attr y 'float)))
+                                    (office-add-attrs y '((next "true")))))
+                     floats)
+                (list (apply office-node
+                             (cons* 'p (map (lambda (a) (list (car a) (cadr a)))
+                                            (ox-attrs x))
+                                    rest)))))))
+
+(define (oftm-image-only x)
   (let* ((name (oftm-text (or (ox-attr x 'name) "")))
          (data (ox-attr x 'data))
          (w (or (ox-attr x 'width) ""))
          (h (or (ox-attr x 'height) "")))
-    (cond (data (list `(image (tuple (raw-data ,data) ,name) ,w ,h "" "")))
+    (cond ;; a picture of Windows: its PNG, or a frame with its name
+          ((and data (office-metafile? name))
+           (with png (office-metafile->png data name)
+             (if png
+                 (oftm-image-only `(image (@ (name ,(string-append name ".png")) (data ,png)
+                                        ,@(list-filter (ox-attrs x)
+                                                       (lambda (a) (not (in? (car a) '(name data))))))))
+                 (list `(frame ,(string-append "[" name "]"))))))
+          ((and data (ox-attr x 'crop) (office-length->cm w) (office-length->cm h))
+           (list (oftm-cropped data name w h (ox-attr x 'crop))))
+          (data (list `(image (tuple (raw-data ,data) ,name) ,w ,h "" "")))
           ;; (an address is not a file to load when the document is opened)
           ((or (>= (string-search-forwards "://" 0 name) 0)
                (string-starts? (locase-all name) "file:"))
@@ -226,6 +346,158 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Inline nodes
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; The alignment of the usual paragraphs of the document: the others say
+;; theirs
+(define oftm-align "justify")
+
+;; In a document of the style office, what the standard tags do not say is
+;; kept with the macros of the style (office.ts): the named styles, the
+;; fields, the comments, the tracked changes. Else the look of the named
+;; styles of text is written out, and the rest is left out.
+(define oftm-faithful? #f)
+(define oftm-styles (make-ahash-table))  ; name -> the node style
+(define oftm-body-style #f)              ; the style of the usual paragraphs
+(define oftm-base-size 10.0)             ; the size of the font of the text
+(define oftm-base-font #f)               ; "sans" for a text without serifs
+
+(define (oftm-style-text st t)
+  ;; the text t in the look of the text of the node style st
+  (let* ((get (lambda (k) (ox-attr st k)))
+         (size (office-number (get 'size)))
+         (vars (append
+                 (if (get 'color) `("color" ,(get 'color)) '())
+                 (if (get 'strong) '("font-series" "bold") '())
+                 (cond ((get 'smallcaps) '("font-shape" "small-caps"))
+                       ((get 'em) '("font-shape" "italic"))
+                       (else '()))
+                 (if (and size (> size 0) (< size 100)
+                          (> (abs (- size oftm-base-size)) 0.1))
+                     `("font-size" ,(office-decimal (/ size oftm-base-size)))
+                     '())
+                 (cond ((oftm-known-font (get 'font-name))
+                        => (lambda (name) `("font" ,name)))
+                       ((== (get 'font) "sans") '("font-family" "ss"))
+                       ((== (get 'font) "mono") '("font-family" "tt"))
+                       (else '()))))
+         ;; (the kinds of underlines and of lines through, the capitals
+         ;; and the spacing of the letters, as in the text)
+         (t (cond ((not (get 'underline)) t)
+                  ((get 'underline-kind) `(office-underline ,(get 'underline-kind) ,t))
+                  (else `(underline ,t))))
+         (t (cond ((not (get 'strike)) t)
+                  ((get 'dstrike) `(office-strike "double" ,t))
+                  (else `(strike-through ,t))))
+         (t (oftm-case (get 'caps) t))
+         (t (if (office-number (get 'letters)) `(office-letters ,(get 'letters) ,t) t)))
+    (if (null? vars) t `(with ,@vars ,t))))
+
+(define (oftm-case kind t)
+  ;; the text t in capitals, in lower case, or with the first letters of
+  ;; its words in capitals (which the style office keeps, but does not show)
+  (cond ((not kind) t)
+        ((== kind "lower") `(change-case ,t "locase"))
+        ((== kind "capital") (if oftm-faithful? `(office-capitalize ,t) t))
+        (else `(change-case ,t "UPCASE"))))
+
+(define (oftm-style-paragraph st t)
+  ;; the paragraph t in the look of the node style st
+  (oftm-paragraph-format st (oftm-style-text st t) #t))
+
+(define (oftm-direct-paragraph x t)
+  ;; the paragraph t with the formatting by hand of the node p x
+  (oftm-paragraph-format x t #f))
+
+(define (oftm-paragraph-format st t align?)
+  ;; the paragraph t with the indentations, the spaces, the line spacing,
+  ;; the background and the border which the attributes of st say
+  (let* ((get (lambda (k) (ox-attr st k)))
+         (pt (lambda (k) (with v (office-number (get k))
+                           (and v (string-append (office-decimal v) "pt")))))
+         (line (office-number (get 'line-spacing)))
+         (vars (append
+                 (if (and align? (in? (get 'align) '("left" "center" "right" "justify")))
+                     `("par-mode" ,(get 'align)) '())
+                 (if (pt 'indent-left) `("par-left" ,(pt 'indent-left)) '())
+                 (if (pt 'indent-right) `("par-right" ,(pt 'indent-right)) '())
+                 (if (pt 'first-indent) `("par-first" ,(pt 'first-indent)) '())
+                 ;; (a line of TeXmacs is 1.2 times the size of its font)
+                 (if (and line (> line 0) (< line 5))
+                     `("par-sep" ,(string-append (office-decimal (max 0 (- (* 1.2 line) 1)))
+                                                 "fn"))
+                     '())))
+         (t (if (or (get 'background) (get 'border))
+                `(with "ornament-color" ,(or (get 'background) "#fff0")
+                       "ornament-border" ,(if (get 'border) "1ln" "0ln")
+                       (ornamented ,t))
+                t))
+         (t (if (or (pt 'space-before) (pt 'space-after))
+                `(surround (vspace* ,(or (pt 'space-before) "0pt"))
+                           (vspace ,(or (pt 'space-after) "0pt")) ,t)
+                t)))
+    (if (null? vars) t `(with ,@vars ,t))))
+
+(define oftm-fonts #f)  ; the families of fonts which TeXmacs has, lower case
+
+(define (oftm-known-font f)
+  ;; the name of the family of fonts f, as TeXmacs knows it, or #f
+  (and (string? f) (!= f "")
+       (begin
+         (when (not oftm-fonts)
+           (set! oftm-fonts (make-ahash-table))
+           (catch #t
+             (lambda ()
+               (for (fam (font-database-families))
+                 (when (string? fam) (ahash-set! oftm-fonts (locase-all fam) fam))))
+             (lambda args #f)))
+         (ahash-ref oftm-fonts (locase-all f)))))
+
+(define oftm-title-macros
+  '("section-title" "subsection-title" "subsubsection-title" "paragraph-title"
+    "subparagraph-title"))
+
+(define (oftm-title-level st)
+  ;; the level of the style of headings st, when TeXmacs has titles of
+  ;; this level (the deeper ones keep the look of their paragraphs)
+  (with n (office-integer (ox-attr st 'level) 0 0 9)
+    (and (>= n 1) (<= n 5) n)))
+
+(define (oftm-title-macro st)
+  ;; the title of the sections of the level of the style of headings st,
+  ;; in its look: the macro of the style of TeXmacs which typesets them
+  (let* ((n (office-integer (ox-attr st 'level) 0 0 9))
+         (pt (lambda (k) (with v (office-number (ox-attr st k))
+                           (and v (string-append (office-decimal v) "pt")))))
+         (body (oftm-style-text st '(arg "name")))
+         (body (if (ox-attr st 'strong) body
+                   `(with "font-series" "medium" ,body))))
+    (and (>= n 1) (<= n 5)
+         `(associate ,(list-ref oftm-title-macros (- n 1))
+                     (macro "name"
+                       (sectional-normal
+                         (concat (vspace* ,(or (pt 'space-before) "1fn"))
+                                 ,(if (ox-attr st 'strong) `(with "font-series" "bold" ,body)
+                                      body)
+                                 (vspace ,(or (pt 'space-after) "0.5fn")))))))))
+
+(define (oftm-style-macros)
+  ;; the macros of the named styles, for the initial environment
+  (append
+    (map (lambda (kv)
+           (let* ((st (cdr kv))
+                  (par? (== (ox-attr st 'family) "paragraph")))
+             `(associate ,(string-append (if par? "office-par-" "office-span-") (car kv))
+                         (macro "body" ,(if par? (oftm-style-paragraph st '(arg "body"))
+                                            (oftm-style-text st '(arg "body")))))))
+         (sort (list-filter (ahash-table->list oftm-styles)
+                            (lambda (kv) (not (oftm-title-level (cdr kv)))))
+               (lambda (a b) (string<? (car a) (car b)))))
+    ;; the titles of the sections, in the look of the headings of the file
+    (list-filter (map (lambda (kv) (oftm-title-macro (cdr kv)))
+                      (sort (list-filter (ahash-table->list oftm-styles)
+                                         (lambda (kv) (oftm-title-level (cdr kv))))
+                            (lambda (a b) (string<? (car a) (car b)))))
+                 identity)))
 
 ;; The labels of what has a number: the bookmarks in a heading, in a
 ;; caption, in a theorem, in an entry of the bibliography, or beside a
@@ -247,20 +519,38 @@
         ((func? x tag) #t)
         (else (list-or (map (lambda (y) (oftm-has? y tag)) (ox-children x))))))
 
-(define (oftm-bookmarks x)
+(define oftm-moved-labels (make-ahash-table))  ; labels with their place
+
+(define (oftm-label-name name)
+  ;; the label of a bookmark, or #f: a label which was away from its number
+  ;; is where its bookmark _TmAt_name is, and not at its number
+  (cond ((not name) #f)
+        ((string-starts? name "_TmAt_") (substring name 6 (string-length name)))
+        ((ahash-ref oftm-moved-labels name) #f)
+        (else name)))
+
+(define (oftm-bookmarks* x)
   ;; the names of the bookmarks inside x, but those of its notes
   (cond ((not (pair? x)) '())
         ((in? (car x) '(math image @ note)) '())
         ((func? x 'bookmark) (if (ox-attr x 'name) (list (ox-attr x 'name)) '()))
-        (else (append-map oftm-bookmarks (ox-children x)))))
+        (else (append-map oftm-bookmarks* (ox-children x)))))
+
+(define (oftm-bookmarks x)
+  ;; the labels of the bookmarks inside x
+  (list-filter (map oftm-label-name (oftm-bookmarks* x)) identity))
 
 (define (oftm-scan-labels x)
   (cond ((not (pair? x)) (noop))
+        ((func? x 'bookmark)
+         (with name (ox-attr x 'name)
+           (when (and name (string-starts? name "_TmAt_"))
+             (ahash-set! oftm-moved-labels (substring name 6 (string-length name)) #t))))
         ((func? x 'p)
          (when (or (in? (ox-attr x 'role)
                         '("heading" "caption" "theorem" "remark" "proof" "bibitem"))
                    (oftm-has? x 'seq))
-           (for (name (oftm-bookmarks x))
+           (for (name (oftm-bookmarks* x))
              (ahash-set! oftm-numbered-labels name #t)))
          (for-each oftm-scan-labels (ox-children x)))
         ((in? (car x) '(math image @)) (noop))
@@ -433,12 +723,61 @@
             (case (car x)
               ((em) (oftm-wrap 'em l))
               ((strong) (oftm-wrap 'strong l))
-              ((underline) (oftm-wrap 'underline l))
-              ((strike) (oftm-wrap 'strike-through l))
+              ;; an underline or a line through of a kind (double, wave...)
+              ((underline strike)
+               (let ((t (oftm-inlines l))
+                     (kind (ox-attr x 'value)))
+                 (cond ((== t "") '())
+                       ((and kind oftm-faithful?)
+                        (list `(,(if (func? x 'underline) 'office-underline 'office-strike)
+                                ,kind ,t)))
+                       ((func? x 'underline) (list `(underline ,t)))
+                       (else (list `(strike-through ,t))))))
+              ;; capitals, the spacing of the letters
+              ((caps)
+               (with t (oftm-inlines l)
+                 (if (== t "") '() (list (oftm-case (or (ox-attr x 'value) "true") t)))))
+              ((letters)
+               (with t (oftm-inlines l)
+                 (cond ((== t "") '())
+                       ((and oftm-faithful? (ox-attr x 'value))
+                        (list `(office-letters ,(ox-attr x 'value) ,t)))
+                       (else (list t)))))
               ((sub) (oftm-wrap 'rsub l))
               ((sup) (oftm-wrap 'rsup l))
               ((code) (oftm-wrap 'verbatim l))
-              ((mark) (oftm-wrap 'marked l))
+              ((mark)
+               (with t (oftm-inlines l)
+                 (cond ((== t "") '())
+                       ((ox-attr x 'value) (list `(with "marked-color" ,(ox-attr x 'value)
+                                                    (marked ,t))))
+                       (else (list `(marked ,t))))))
+              ;; the size and the font of a text, by hand
+              ((size)
+               (let ((t (oftm-inlines l))
+                     (v (office-number (or (ox-attr x 'value) ""))))
+                 (cond ((== t "") '())
+                       ((and v (> v 0) (< v 200) (> (abs (- v oftm-base-size)) 0.2))
+                        (list `(with "font-size" ,(office-decimal (/ v oftm-base-size)) ,t)))
+                       (else (list t)))))
+              ((font)
+               (let ((t (oftm-inlines l))
+                     (f (ox-attr x 'value)))
+                 (cond ((== t "") '())
+                       ;; a font which TeXmacs has, by its name
+                       ((oftm-known-font f) => (lambda (name) (list `(with "font" ,name ,t))))
+                       ;; another one: its name is kept in the style office
+                       ((and oftm-faithful? f (not (office-monospace? f)))
+                        (list `(office-font ,f
+                                            ,(cond ((office-sans? f) "ss")
+                                                   (else "rm"))
+                                            ,t)))
+                       ((and (office-sans? f) (!= oftm-base-font "sans"))
+                        (list `(with "font-family" "ss" ,t)))
+                       ((and f (not (office-sans? f)) (not (office-monospace? f))
+                             (== oftm-base-font "sans"))
+                        (list `(with "font-family" "rm" ,t)))
+                       (else (list t)))))
               ((color)
                (let ((t (oftm-inlines l))
                      (v (ox-attr x 'value)))
@@ -448,6 +787,40 @@
               ((smallcaps)
                (with t (oftm-inlines l)
                  (if (== t "") '() (list `(with "font-shape" "small-caps" ,t)))))
+              ;; a named style of text
+              ((span)
+               (let ((t (oftm-inlines l))
+                     (st (ahash-ref oftm-styles (or (ox-attr x 'style) ""))))
+                 (cond ((== t "") '())
+                       (oftm-faithful? (list `(office-span ,(oftm-text (ox-attr x 'style)) ,t)))
+                       (st (list (oftm-style-text st t)))
+                       (else (list t)))))
+              ;; a field, a comment, the changes which are tracked
+              ((field)
+               (with t (oftm-inlines l)
+                 (if oftm-faithful?
+                     (list `(office-field ,(oftm-text (or (ox-attr x 'code) (ox-attr x 'xml) ""))
+                                          ,t))
+                     (if (== t "") '() (list t)))))
+              ((comment)
+               (if (not oftm-faithful?) '()
+                   ;; (its paragraphs as one line, after its mark)
+                   (with b (oftm-blocks l)
+                     (list `(office-comment ,(oftm-text (or (ox-attr x 'author) ""))
+                                            ,(oftm-text (or (ox-attr x 'date) ""))
+                                            ,(cond ((null? b) "")
+                                                   ((null? (cdr b)) (car b))
+                                                   (else (oftm-concat
+                                                           (list-intersperse b '(next-line))))))))))
+              ((ins del)
+               (with t (oftm-inlines l)
+                 (cond ((== t "") '())
+                       (oftm-faithful?
+                        (list `(,(if (func? x 'ins) 'office-ins 'office-del)
+                                ,(oftm-text (or (ox-attr x 'author) ""))
+                                ,(oftm-text (or (ox-attr x 'date) "")) ,t)))
+                       ((func? x 'ins) (list t))
+                       (else '()))))
               ((link)
                (let ((t (oftm-inlines l))
                      (href (oftm-text (or (ox-attr x 'href) ""))))
@@ -461,7 +834,12 @@
                ;; reference is kept, as a link to its bookmark.
                (let ((t (oftm-inlines l))
                      (name (oftm-text (or (ox-attr x 'name) ""))))
-                 (cond ((== t "") '())
+                 (cond ((and (== t "") (!= name ""))
+                        ;; (a reference whose number the file does not have)
+                        (if (== (ox-attr x 'kind) "page")
+                            (list `(pageref ,name))
+                            (list `(reference ,name))))
+                       ((== t "") '())
                        ((== name "") (list t))
                        ;; the number of the page of a label
                        ((== (ox-attr x 'kind) "page")
@@ -473,7 +851,7 @@
                         (list `(reference ,name)))
                        (else (list `(hlink ,t ,(string-append "#" name)))))))
               ((bookmark)
-               (with name (ox-attr x 'name)
+               (with name (oftm-label-name (ox-attr x 'name))
                  (if name (list `(label ,(oftm-text name))) '())))
               ((note)
                (with b (oftm-blocks l)
@@ -481,6 +859,8 @@
                        ((null? (cdr b)) (list `(footnote ,(car b))))
                        (else (list `(footnote ,(oftm-document b)))))))
               ((br) '((next-line)))
+              ((!htab) '((htab "5mm")))
+              ((!page) '((page-the-page)))
               ((tab) '((space "2em")))
               ((pagebreak) '((page-break)))
               ((image) (oftm-image x))
@@ -699,12 +1079,21 @@
          (t (oftm-inlines (ox-children x))))
     (if (== t "") '() (list (list tag t)))))
 
+(define (oftm-styled x t)
+  ;; the paragraph t in the named style of the node x, in a document of
+  ;; the style office (the usual style is the one of the document)
+  (with name (ox-attr x 'style)
+    (if (and oftm-faithful? name (!= name oftm-body-style))
+        `(office-par ,(oftm-text name) ,t)
+        t)))
+
 (define (oftm-aligned x t)
-  ;; the paragraph t with the alignment of the node x
+  ;; the paragraph t with the alignment of the node x, when it is not the
+  ;; one of the usual paragraphs
   (with a (ox-attr x 'align)
-    (cond ((== a "center") `(with "par-mode" "center" ,t))
-          ((== a "right") `(with "par-mode" "right" ,t))
-          (else t))))
+    (if (and (in? a '("center" "right" "left" "justify")) (!= a oftm-align))
+        `(with "par-mode" ,a ,t)
+        t)))
 
 (define (oftm-item x)
   ;; the paragraphs of an item of a list: the first one starts with the item
@@ -716,10 +1105,29 @@
               (cdr l)))))
 
 (define (oftm-list x)
-  (let ((tag (if (== (ox-attr x 'kind) "number") 'enumerate 'itemize))
-        (items (list-filter (ox-children x) (lambda (y) (func? y 'item)))))
+  ;; a list; a numbered one in its way of numbering, from its first number
+  (let* ((number? (== (ox-attr x 'kind) "number"))
+         (tag (if (not number?) 'itemize
+                  (with f (ox-attr x 'format)
+                    (cond ((== f "a") 'enumerate-alpha)
+                          ((== f "A") 'enumerate-Alpha)
+                          ((== f "i") 'enumerate-roman)
+                          ((== f "I") 'enumerate-Roman)
+                          (else 'enumerate)))))
+         (start (and number? (office-integer (ox-attr x 'start) 1 0 100000)))
+         (items (list-filter (ox-children x) (lambda (y) (func? y 'item))))
+         (l (append-map oftm-item items)))
     (if (null? items) '()
-        (list `(,tag ,(oftm-document (append-map oftm-item items)))))))
+        (list `(,tag ,(oftm-document
+                        (if (and start (!= start 1) (pair? l))
+                            ;; (the number before the first item)
+                            (cons (oftm-concat
+                                    (cons `(assign "item-nr"
+                                                   ,(number->string (- start 1)))
+                                          (if (func? (car l) 'concat) (cdar l)
+                                              (list (car l)))))
+                                  (cdr l))
+                            l)))))))
 
 (define (oftm-role? x role)
   (and (func? x 'p) (== (ox-attr x 'role) role)))
@@ -732,6 +1140,20 @@
                                                   (== (string-trim-spaces y) "")))))
          (and (pair? l)
               (list-and (map (lambda (y) (func? y 'image)) l))))))
+
+(define (oftm-leading-images x)
+  ;; (images . caption) for a paragraph which starts with images and goes
+  ;; on with text, or #f
+  (let loop ((l (ox-children x)) (acc '()))
+    (cond ((and (pair? l) (func? (car l) 'image)) (loop (cdr l) (cons (car l) acc)))
+          ((and (pair? l) (string? (car l)) (== (string-trim-spaces (car l)) "")
+                (pair? acc))
+           (loop (cdr l) acc))
+          ((null? acc) #f)
+          (else (cons (reverse acc)
+                      (apply office-node (cons* 'p (map (lambda (a) (list (car a) (cadr a)))
+                                                       (ox-attrs x))
+                                                l)))))))
 
 (define (oftm-only-formula x)
   ;; the formula of a paragraph which holds nothing else, or #f
@@ -771,26 +1193,39 @@
           (else (cons `(description ,(oftm-document (reverse acc))) l)))))
 
 (define (oftm-caption x)
-  ;; the text of a caption, without "Figure 1." at its start
-  (with start (oftm-named-start (ox-children x))
+  ;; the text of a caption, without "Figure 1." at its start (nor the break
+  ;; of line after the images of a frame of LibreOffice)
+  (let* ((l (let drop ((l (ox-children x)))
+              (if (and (pair? l) (or (func? (car l) 'br)
+                                     (and (string? (car l))
+                                          (== (string-trim-spaces (car l)) ""))))
+                  (drop (cdr l))
+                  l)))
+         (start (oftm-named-start l)))
     (if (and start (cadddr start))
         (oftm-concat (append (oftm-labels (cadr start))
                              (append-map oftm-inline (caddr start))))
-        (oftm-inlines (ox-children x)))))
+        (oftm-inlines l))))
 
 (define (oftm-blocks l)
   ;; the paragraphs of TeXmacs for a list of blocks. The blocks which
   ;; belong together are taken together: the lines of a quotation or of a
-  ;; piece of code, a figure or a table and its caption.
-  (cond ((null? l) '())
-        ((not (pair? (car l))) (oftm-blocks (cdr l)))
+  ;; piece of code, a figure or a table and its caption. (A loop: a
+  ;; document may have many thousands of blocks)
+  (let loop ((l (append-map oftm-split-floats l)) (acc '()))
+    (if (null? l) (reverse acc)
+        (with r (oftm-block l)
+          (loop (cdr r) (append (reverse (car r)) acc))))))
+
+(define (oftm-block l)
+  ;; the paragraphs for the first blocks of l, and the blocks which remain
+  (cond ((not (pair? (car l))) (cons '() (cdr l)))
         ;; a quotation: the paragraphs of this style which follow each other
         ((oftm-role? (car l) "quote")
          (let loop ((r l) (acc '()))
            (if (and (pair? r) (oftm-role? (car r) "quote"))
                (loop (cdr r) (cons (oftm-inlines (ox-children (car r))) acc))
-               (cons `(quotation ,(oftm-document (reverse acc)))
-                     (oftm-blocks r)))))
+               (cons (list `(quotation ,(oftm-document (reverse acc)))) r))))
         ;; code: each paragraph is a line, or several
         ((oftm-role? (car l) "code")
          (let loop ((r l) (acc '()))
@@ -800,54 +1235,60 @@
                                            (string-tokenize-by-char
                                              (oftm-plain (car r)) #\newline)))
                              acc))
-               (cons `(verbatim-code ,(oftm-document (reverse acc)))
-                     (oftm-blocks r)))))
+               (cons (list `(verbatim-code ,(oftm-document (reverse acc)))) r))))
         ;; a table of contents: TeXmacs makes it again from the headings
         ((or (func? (car l) 'toc) (oftm-role? (car l) "toc"))
          (let loop ((r l))
            (if (and (pair? r) (or (func? (car r) 'toc) (oftm-role? (car r) "toc")))
                (loop (cdr r))
-               (cons '(table-of-contents "toc" (document "")) (oftm-blocks r)))))
+               (cons '((table-of-contents "toc" (document ""))) r))))
         ;; a theorem, a remark, a proof
         ((and (func? (car l) 'p)
               (in? (ox-attr (car l) 'role) '("theorem" "remark" "proof"))
               (oftm-theorem l))
-         => (lambda (r) (cons (car r) (oftm-blocks (cdr r)))))
+         => (lambda (r) (cons (list (car r)) (cdr r))))
         ;; the bibliography, without the heading which TeXmacs writes
         ((oftm-role? (car l) "bibitem")
          (with r (oftm-bibliography l)
-           (cons (car r) (oftm-blocks (cdr r)))))
+           (cons (list (car r)) (cdr r))))
         ((and (oftm-role? (car l) "heading") (pair? (cdr l))
               (oftm-role? (cadr l) "bibitem")
               (in? (locase-all (oftm-plain (car l))) '("bibliography" "references")))
-         (oftm-blocks (cdr l)))
+         (cons '() (cdr l)))
         ;; terms and their definitions
         ((oftm-role? (car l) "term")
          (with r (oftm-description l)
-           (cons (car r) (oftm-blocks (cdr r)))))
+           (cons (list (car r)) (cdr r))))
+        ;; a caption which holds its images, as LibreOffice writes it in
+        ;; a frame
+        ((and (oftm-role? (car l) "caption") (oftm-leading-images (car l)))
+         => (lambda (r)
+              (cons (list `(big-figure ,(oftm-inlines (car r))
+                                       ,(oftm-caption (cdr r))))
+                    (cdr l))))
         ;; a figure and its caption, in this order or in the other
         ((and (oftm-only-images? (car l)) (pair? (cdr l))
               (oftm-role? (cadr l) "caption"))
-         (cons `(big-figure ,(oftm-inlines (ox-children (car l)))
-                            ,(oftm-caption (cadr l)))
-               (oftm-blocks (cddr l))))
+         (cons (list `(big-figure ,(oftm-inlines (ox-children (car l)))
+                                  ,(oftm-caption (cadr l))))
+               (cddr l)))
         ((and (oftm-role? (car l) "caption") (pair? (cdr l))
               (oftm-only-images? (cadr l)))
-         (cons `(big-figure ,(oftm-inlines (ox-children (cadr l)))
-                            ,(oftm-caption (car l)))
-               (oftm-blocks (cddr l))))
+         (cons (list `(big-figure ,(oftm-inlines (ox-children (cadr l)))
+                                  ,(oftm-caption (car l))))
+               (cddr l)))
         ;; a table and its caption
         ((and (func? (car l) 'table) (pair? (cdr l))
               (oftm-role? (cadr l) "caption"))
-         (cons `(big-table ,(oftm-table (car l)) ,(oftm-caption (cadr l)))
-               (oftm-blocks (cddr l))))
+         (cons (list `(big-table ,(oftm-table (car l)) ,(oftm-caption (cadr l))))
+               (cddr l)))
         ((and (oftm-role? (car l) "caption") (pair? (cdr l))
               (func? (cadr l) 'table))
-         (cons `(big-table ,(oftm-table (cadr l)) ,(oftm-caption (car l)))
-               (oftm-blocks (cddr l))))
+         (cons (list `(big-table ,(oftm-table (cadr l)) ,(oftm-caption (car l))))
+               (cddr l)))
         (else
           (let ((x (car l)))
-            (append
+            (cons
               (case (car x)
                 ((p)
                  (cond ((oftm-role? x "heading") (oftm-heading x))
@@ -863,25 +1304,42 @@
                                                  (append (if (func? f 'concat) (cdr f)
                                                              (list f))
                                                          (oftm-labels (cadr r)))))))))))
-                       ;; a formula alone in its paragraph is displayed
-                       ((oftm-only-formula x)
+                       ;; a formula alone in its paragraph is displayed (but
+                       ;; in a cell, where Word displays a formula alone)
+                       ((and (not oftm-in-cell?) (oftm-only-formula x))
                         => (lambda (m)
-                             (with f (oftm-formula m)
-                               (if (== f "") '()
-                                   (list `(equation* (document ,f)))))))
+                             (with t (oftm-eqarray-table m)
+                               (if t (list (oftm-eqarray t))
+                                   (with f (oftm-formula m)
+                                     (if (== f "") '()
+                                         (list `(equation* (document ,f)))))))))
                        (else
                          (with t (oftm-inlines (ox-children x))
-                           (if (== t "") '() (list (oftm-aligned x t)))))))
+                           (if (== t "") '()
+                               (list (oftm-styled x (oftm-direct-paragraph
+                                                      x (oftm-aligned x t)))))))))
                 ((list) (oftm-list x))
                 ((table) (list (oftm-table x)))
                 ((pagebreak) '((page-break)))
+                ;; a section in columns
+                ((columns)
+                 (let ((n (or (ox-attr x 'count) "2"))
+                       (b (oftm-document (oftm-blocks (ox-children x))))
+                       (line? (== (ox-attr x 'line) "true"))
+                       (gap (with c (office-length->cm (ox-attr x 'gap))
+                              (and c (office-cm c)))))
+                   (list (cond ((not oftm-faithful?) `(with "par-columns" ,n ,b))
+                               ((or line? gap)
+                                `(office-columns* ,n ,(if line? "true" "false")
+                                                  ,(or gap "") ,b))
+                               (else `(office-columns ,n ,b))))))
                 ;; a file which could not be read says so
                 ((error)
                  (list `(with "color" "red"
                           ,(oftm-text (apply string-append
                                              (list-filter (cdr x) string?))))))
                 (else '()))
-              (oftm-blocks (cdr l)))))))
+              (cdr l))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The title of the document
@@ -896,11 +1354,13 @@
 (define (oftm-lines l)
   ;; several paragraphs as the lines of one
   (oftm-concat
-    (let loop ((l l))
-      (if (null? l) l
-          (append (if (func? (car l) 'concat) (cdar l) (list (car l)))
-                  (if (null? (cdr l)) '()
-                      (cons '(next-line) (loop (cdr l)))))))))
+    (let loop ((l l) (acc '()) (first? #t))
+      (if (null? l) (reverse acc)
+          (loop (cdr l)
+                (append (reverse (if (func? (car l) 'concat) (cdar l)
+                                     (list (car l))))
+                        (if first? acc (cons '(next-line) acc)))
+                #f)))))
 
 (define (oftm-doc-data l meta)
   ;; the title, from the paragraphs l at the start of the document which
@@ -908,10 +1368,9 @@
   (let* ((get (lambda (role)
                 (map (lambda (x) (oftm-inlines (ox-children x)))
                      (list-filter l (lambda (x) (oftm-role? x role))))))
+         ;; (not the title of the properties of the file: it is often the
+         ;; one of a template, which the document does not show)
          (titles (get "title"))
-         (titles (if (and (null? titles) (assoc 'title meta))
-                     (list (oftm-text (cadr (assoc 'title meta))))
-                     titles))
          (subtitles (get "subtitle"))
          (authors (get "author"))
          (dates (get "date"))
@@ -929,9 +1388,118 @@
       (if (null? abstract) '()
           `((abstract-data (abstract ,(oftm-document abstract))))))))
 
+(define (oftm-header-node x)
+  ;; the nodes of a header: its tabs spread the text, its number of the
+  ;; page is the one of the page
+  (cond ((func? x 'tab) '(!htab))
+        ((and (func? x 'field)
+              (in? (locase-all (string-trim-spaces (or (ox-attr x 'code) "")))
+                   '("page" "page \\* mergeformat" "page \\* arabic")))
+         '(!page))
+        ((and (func? x 'field) (== (ox-attr x 'odt) "text:page-number")) '(!page))
+        ((pair? x) (cons (car x) (map oftm-header-node (cdr x))))
+        (else x)))
+
+(define (oftm-header x)
+  ;; the content of a header or a footer, from its paragraphs
+  (let* ((ps (list-filter (ox-children x) (lambda (y) (func? y 'p))))
+         (line (lambda (p)
+                 (let ((t (oftm-inlines (ox-children (oftm-header-node p))))
+                       (a (ox-attr p 'align)))
+                   (cond ((== t "") #f)
+                         ((== a "center") `(concat (htab "5mm") ,t (htab "5mm")))
+                         ((== a "right") `(concat (htab "5mm") ,t))
+                         (else t)))))
+         (l (list-filter (map line ps) identity)))
+    (cond ((null? l) #f)
+          ((null? (cdr l)) (car l))
+          (else (oftm-concat (list-intersperse l " "))))))
+
+(define (oftm-headers l)
+  ;; (initial . start): the headers and footers of the document, in its
+  ;; initial environment, and the ones of the first page, at its start
+  (let ((init '()) (start '()))
+    (for (x (list-filter l (lambda (y) (func? y 'header))))
+      (let ((place (or (ox-attr x 'place) "header"))
+            (kind (or (ox-attr x 'kind) "default"))
+            (t (oftm-header x)))
+        (when t
+          (cond ((== kind "first")
+                 (set! start (cons `(,(if (== place "header") 'set-this-page-header
+                                         'set-this-page-footer) ,t)
+                                   start)))
+                ((== kind "even")
+                 (set! init (cons (list (string-append "page-even-" place) t) init)))
+                (else
+                  (set! init (cons (list (string-append "page-odd-" place) t) init))
+                  (when (not (list-find l (lambda (y) (and (func? y 'header)
+                                                           (== (ox-attr y 'kind) "even")
+                                                           (== (ox-attr y 'place) place)))))
+                    (set! init (cons (list (string-append "page-even-" place) t) init))))))))
+    (cons (reverse init) (reverse start))))
+
+(define oftm-page-types
+  ;; the sizes of the usual pages, in centimeters
+  '(("a3" 29.7 42.0) ("a4" 21.0 29.7) ("a5" 14.8 21.0) ("b5" 17.6 25.0)
+    ("letter" 21.59 27.94) ("legal" 21.59 35.56) ("executive" 18.42 26.67)))
+
+(define (oftm-page-type w h)
+  ;; the name of the page of this size, or #f
+  (with r (list-find oftm-page-types
+                     (lambda (t)
+                       (or (and (< (abs (- w (cadr t))) 0.2) (< (abs (- h (caddr t))) 0.2))
+                           (and (< (abs (- h (cadr t))) 0.2) (< (abs (- w (caddr t))) 0.2)))))
+    (and r (car r))))
+
+(define (oftm-setup x)
+  ;; the environment of the document for its block setup
+  (let* ((get (lambda (key) (ox-attr x key)))
+         (num (lambda (key) (office-number (get key))))
+         (cm (lambda (key) (office-length->cm (get key))))
+         (w (cm 'page-width))
+         (h (cm 'page-height))
+         (type (and w h (oftm-page-type w h)))
+         (pt (lambda (v) (string-append (office-decimal v) "pt")))
+         (size (num 'font-size))
+         (line (num 'line-spacing))
+         (sep (+ (or (num 'space-before) 0) (or (num 'space-after) 0))))
+    (append
+      (cond ((not (and w h)) '())
+            (type `(("page-type" ,type)
+                    ("page-orientation" ,(if (> w h) "landscape" "portrait"))))
+            (else `(("page-type" "user") ("page-width" ,(get 'page-width))
+                    ("page-height" ,(get 'page-height)))))
+      (if (cm 'margin-left)
+          `(("page-odd" ,(get 'margin-left)) ("page-even" ,(get 'margin-left)))
+          '())
+      (if (cm 'margin-right) `(("page-right" ,(get 'margin-right))) '())
+      (if (cm 'margin-top) `(("page-top" ,(get 'margin-top))) '())
+      (if (cm 'margin-bottom) `(("page-bot" ,(get 'margin-bottom))) '())
+      (if (and size (>= size 5) (<= size 50))
+          `(("font-base-size" ,(number->string (inexact->exact (round size)))))
+          '())
+      (cond ((== (get 'font) "sans") '(("font-family" "ss")))
+            ((== (get 'font) "mono") '(("font-family" "tt")))
+            (else '()))
+      ;; the paragraphs of the office programs have the spaces which their
+      ;; style says, and no others
+      (if (get 'align)
+          `(("par-first" ,(pt (max 0 (or (num 'first-indent) 0))))
+            ("par-par-sep" ,(pt (max 0 sep))))
+          '())
+      ;; (a line of TeXmacs is 1.2 times the size of its font)
+      (if (and line (> line 0) (< line 5))
+          `(("par-sep" ,(string-append (office-decimal (max 0 (- (* 1.2 line) 1)))
+                                       "fn")))
+          '())
+      (if (in? (get 'align) '("left" "center" "right"))
+          `(("par-mode" ,(get 'align)))
+          '()))))
+
 (define (oftm-body l)
   (let* ((meta (append-map cdr (list-filter l (lambda (x) (func? x 'meta)))))
-         (blocks (list-filter l (lambda (x) (not (func? x 'meta)))))
+         (blocks (list-filter l (lambda (x) (not (in? (car x) '(meta setup styles
+                                                                    header package))))))
          (title (let loop ((r blocks) (acc '()))
                   (if (and (pair? r) (oftm-title-block? (car r)))
                       (loop (cdr r) (cons (car r) acc))
@@ -943,12 +1511,69 @@
 ;; Interface
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(tm-define (office->texmacs x)
+(tm-define (office->texmacs x . opts)
   (:type (-> stree stree))
   (:synopsis "Convert the office tree @x into a TeXmacs document")
+  ;; with the option office->texmacs:faithful (the converter of the files
+  ;; sets it), a document of the style office
   (with l (if (func? x 'office) (cdr x) (list x))
     (set! oftm-numbered-labels (make-ahash-table))
-    (for-each oftm-scan-labels l)
-    (with r `(document (body ,(oftm-body l)) (style "generic"))
+    (set! oftm-moved-labels (make-ahash-table))
+    (set! oftm-faithful?
+          (== (assoc-ref (if (and (nnull? opts) (list? (car opts))) (car opts) '())
+                         "office->texmacs:faithful")
+              "on"))
+    (set! oftm-styles (make-ahash-table))
+    (for (st (append-map ox-children (list-filter l (lambda (y) (func? y 'styles)))))
+      (when (and (func? st 'style) (ox-attr st 'name))
+        (ahash-set! oftm-styles (ox-attr st 'name) st)))
+    (with r (catch #t
+              (lambda ()
+                (let* ((setup (list-find l (lambda (y) (func? y 'setup))))
+                       (package (list-find l (lambda (y) (func? y 'package))))
+                       (headers (oftm-headers l))
+                       (env (if setup (oftm-setup setup) '()))
+                       (env (append env (car headers)))
+                       (env (if (and oftm-faithful? package (ox-attr package 'data))
+                                (append env
+                                        `(("office-package"
+                                           (tuple ,(or (ox-attr package 'format) "")
+                                                  (raw-data ,(ox-attr package 'data))))))
+                                env))
+                       (env (if (and oftm-faithful? setup (ox-attr setup 'body-style))
+                                (append env `(("office-body-style"
+                                               ,(ox-attr setup 'body-style))))
+                                env)))
+                  (set! oftm-align (or (and setup (ox-attr setup 'align)) "justify"))
+                  (set! oftm-body-style (and setup (ox-attr setup 'body-style)))
+                  (set! oftm-base-size
+                        (or (and setup (office-number (ox-attr setup 'font-size))) 10.0))
+                  (set! oftm-base-font (and setup (ox-attr setup 'font)))
+                  (for-each oftm-scan-labels l)
+                  (let* ((body (oftm-body l))
+                         (body (if (null? (cdr headers)) body
+                                   (oftm-document (append (cdr headers) (cdr body)))))
+                         (macros (if oftm-faithful? (oftm-style-macros) '())))
+                    `(document (body ,body)
+                               (style ,(if (and oftm-faithful?
+                                                (not (list-find l (lambda (y) (func? y 'error)))))
+                                           "office" "generic"))
+                               ,@(if (and (null? env) (null? macros)) '()
+                                     `((initial (collection
+                                                  ,@(map (lambda (a) `(associate ,@a))
+                                                         env)
+                                                  ,@macros))))))))
+              ;; (what was not foreseen gives a document which says so)
+              (lambda args
+                (with msg (string-append "This document could not be converted "
+                                         (office-error-text args))
+                  (debug-message "convert-error" (string-append msg "\n"))
+                  `(document (body (document (with "color" "red" ,msg)))
+                             (style "generic")))))
       (set! oftm-numbered-labels (make-ahash-table))
+      (set! oftm-moved-labels (make-ahash-table))
+      (set! oftm-align "justify")
+      (set! oftm-faithful? #f)
+      (set! oftm-styles (make-ahash-table))
+      (set! oftm-body-style #f)
       r)))

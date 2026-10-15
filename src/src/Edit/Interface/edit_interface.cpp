@@ -876,7 +876,7 @@ edit_interface_rep::apply_changes () {
     double prof_t= 0;
     if (edit_profile.on) {
       bool on= true;
-      edit_profile= edit_profile_data { on, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+      edit_profile= edit_profile_data { on };
       prof_t= edit_profile_now ();
     }
     typeset (x1, y1, x2, y2);

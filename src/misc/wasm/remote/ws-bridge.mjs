@@ -7,8 +7,10 @@
 //   (defaults: cloud.texmacs.org 6561 6563)
 //
 // then, in the page, Remote > Login with the server "localhost" and the
-// local port. The page may open ws://localhost even when it is served
-// over https. The bridge sees what passes in clear (the page leaves the
+// port before the local port (6562): the page opens its WebSocket at the
+// port after the one of the login, where a TeXmacs server answers the
+// browsers. The page may open ws://localhost even when it is served over
+// https. The bridge sees what passes in clear (the page leaves the
 // encryption to the WebSocket, and the bridge does the TLS with the
 // server): run it yourself, on the machine of the browser, and it listens
 // on 127.0.0.1 only. The certificate of the server is checked.
@@ -75,4 +77,4 @@ server.on ('upgrade', (req, sock) => {
   });
 });
 server.listen (local, '127.0.0.1', () =>
-  console.log (`bridge: ws://localhost:${local}/ -> ${host}:${port} (TLS). In the page: server "localhost", port ${local}.`));
+  console.log (`bridge: ws://localhost:${local}/ -> ${host}:${port} (TLS). In the page: server "localhost", port ${local - 1}.`));

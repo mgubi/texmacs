@@ -404,6 +404,90 @@
        (check= (nr "auto-4") "3")
        (check= (nr "auto-6") "4")))))
 
+;; A tag makes its k-th label from the names which it and the tags around
+;; it gave last: a tag inside it which makes a label of its own does not
+;; make it start again.
+(define (test-labels-of-nested-tags)
+  (check-group "labels of nested tags")
+  (with-typeset-body
+   '(document (assign "wrap" (macro "body" (concat (index "start") (arg "body")
+                                                   (index "end"))))
+              (concat "a " (wrap (concat "x" (index "mid") "y")) " b")
+              (concat "c " (wrap "z") " d"))
+   (lambda ()
+     (let* ((autos (list-filter (list-references)
+                                (lambda (l) (string-starts? l "auto-")))))
+       (check= (length autos) 5)
+       (check= (length (list-remove-duplicates autos)) 5)))))
+
+;; A paragraph is not typeset again when the variables which changed are
+;; not among those it read (Typeset/Bridge/bridge.cpp). Below a tag which
+;; binds a variable to a value computed from one which changed, the
+;; paragraphs read the bound variable only, and are typeset again.
+(define (test-reuse-below-bindings)
+  (check-group "reuse below bindings")
+  (let ((lefts (lambda (n)
+                 (map (lambda (i)
+                        (car (tree-bounding-rectangle
+                              (tree-ref (buffer-tree) 1 0 i))))
+                      (.. 0 n)))))
+    (with-typeset-body
+     '(document (assign "quote-left-indentation" "2tab")
+                (quote-env (document "aaa" "bbb" "ccc" "ddd" "eee"))
+                "tail")
+     (lambda ()
+       (with before (lefts 5)
+         (check= (length (list-remove-duplicates before)) 1)
+         (tree-set (tree-ref (buffer-tree) 0 1) "8tab")
+         (update-forced)
+         (with after (lefts 5)
+           (check= (length (list-remove-duplicates after)) 1)
+           (check-true (> (car after) (car before)))))))
+    (with-typeset-body
+     '(document (assign "ornament-hpadding" "1spc")
+                (ornament (document "aaa" "bbb" "ccc"))
+                "tail")
+     (lambda ()
+       (with before (lefts 3)
+         (check= (length (list-remove-duplicates before)) 1)
+         (tree-set (tree-ref (buffer-tree) 0 1) "3cm")
+         (update-forced)
+         (with after (lefts 3)
+           (check= (length (list-remove-duplicates after)) 1)
+           (check-true (> (car after) (car before)))))))))
+
+;; The page breaks which were found are used again when the page items
+;; keep their sizes (Typeset/Page/new_breaker.cpp). The breaker moves a
+;; footnote on two columns of a title on one column to the next item on
+;; two columns: the pager needs this done when the search is skipped too.
+(define (test-page-breaks-kept)
+  (check-group "page breaks kept")
+  (with-typeset-body
+   '(document (with "par-columns" "1"
+                (document (concat "Title"
+                            (footnote (with "par-columns" "2"
+                                        (document "the note"))))))
+              "body one body one body one body one body one"
+              "body two")
+   (lambda ()
+     (init-env "page-medium" "paper")
+     (init-env "par-columns" "2")
+     ;; (the initial environment is in use after an update of the buffer)
+     (update-current-buffer)
+     (update-forced)
+     (with top (lambda () (cadddr (tree-bounding-rectangle
+                                   (tree-ref (buffer-tree) 2))))
+       (with before (top)
+         ;; edits which keep the heights of the lines
+         (tree-set (tree-ref (buffer-tree) 2) "body 2wo")
+         (update-forced)
+         (check= (tree->stree (tree-ref (buffer-tree) 2)) "body 2wo")
+         (check= (top) before)
+         (tree-set (tree-ref (buffer-tree) 2) "body tvo")
+         (update-forced)
+         (check= (tree->stree (tree-ref (buffer-tree) 2)) "body tvo")
+         (check= (top) before))))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Boxes
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -634,6 +718,238 @@
       (check-true (<= p60 (* 3 p20)))
       (check-true (>= p60 (* 3 (- p20 1)))))))
 
+;; The pager keeps the pages of the last pass (Typeset/Page/make_pages.cpp):
+;; a page break with nothing to say at it, pages which go away and come
+;; back, and a paragraph at the same place as after a typesetting of the
+;; whole document.
+(define (test-pages-kept)
+  (check-group "pages kept")
+  (with-typeset-body
+   `(document ,@(map (lambda (i)
+                       `(concat (if-page-break "t" (document)) ,lorem))
+                     (iota 40)))
+   (lambda ()
+     (init-env "page-type" "a5")
+     (update-current-buffer)
+     (update-forced)
+     (with n (get-page-count)
+       (check-true (> n 1))
+       (tree-set (tree-ref (buffer-tree) 0) "changed")
+       (update-forced)
+       (check-true (> (get-page-count) 1)))))
+  (with-typeset-body
+   `(document ,@(map (lambda (i) lorem) (iota 60)))
+   (lambda ()
+     (let* ((n (get-page-count))
+            (r (rect 20)))
+       (check-true (> n 2))
+       ;; a letter in a paragraph: the other pages are kept
+       (tree-set (tree-ref (buffer-tree) 30) (string-append lorem " x"))
+       (update-forced)
+       (check= (get-page-count) n)
+       (check= (rect 20) r)
+       ;; the last pages go away and come back
+       (tree-remove (buffer-tree) 30 30)
+       (update-forced)
+       (with m (get-page-count)
+         (check-true (< m n))
+         ;; (the breaks of a shorter document may be others)
+         (tree-insert (buffer-tree) 30 (map (lambda (i) lorem) (iota 30)))
+         (update-forced)
+         (check= (get-page-count) n)
+         (check= (rect 20) r)
+         ;; as after a typesetting of the whole document
+         (with r2 (rect 50)
+           (update-current-buffer)
+           (update-forced)
+           (check= (rect 50) r2)
+           (check= (get-page-count) n)))))))
+
+;; A document whose typesetting fails is replaced by an empty one, and the
+;; typesetting goes on, in it and in the other buffers (the bridges which
+;; were recording what they read when it failed do not record any more).
+(define (test-typesetting-failure)
+  (check-group "typesetting failure")
+  (with-typeset-body
+   '(document "first" "second" (anim-compose) "third")
+   (lambda ()
+     (check= (tree->stree (buffer-tree)) '(document ""))))
+  (with-typeset-body
+   '(document "one" "two" "three")
+   (lambda ()
+     (tree-set (tree-ref (buffer-tree) 1) "two again")
+     (update-forced)
+     (check= (tree->stree (buffer-tree)) '(document "one" "two again" "three"))
+     (check-true (> (rect-x2 (rect 1)) (rect-x1 (rect 1)))))))
+
+;; A length in a unit made by a macro of the document: when the macro
+;; changes, what the environment derived from the length changes too (the
+;; limit of the fractions in a line), also in paragraphs which read none of
+;; the variables which changed.
+(define (test-derived-state)
+  (check-group "derived state")
+  (with-typeset-body
+   '(document (assign "myu-length" (macro "0.1mm"))
+              (assign "math-frac-limit" "5myu")
+              (concat "x " (math (frac "aaaaaaaaaa" "b")) " y")
+              "after")
+   (lambda ()
+     (tree-set (tree-ref (buffer-tree) 0 1 0) "10cm")
+     (update-forced)
+     (let* ((r2 (rect 2)) (r3 (rect 3)))
+       (update-current-buffer)
+       (update-forced)
+       (check= r2 (rect 2))
+       (check= r3 (rect 3))))))
+
+;; The labels are numbered again in the order of the document once, after
+;; a section was added before the others, and not a second time.
+(define (test-renumbering-labels)
+  (check-group "labels numbered again")
+  (with-typeset-body
+   '(document (section "A") (section "B"))
+   (lambda ()
+     (tree-insert (buffer-tree) 0 '((section "N")))
+     (update-forced)
+     (check-true (renumber-auto-labels))
+     (update-forced)
+     (check-false (renumber-auto-labels))
+     (check= (cadr (tree->stree (get-reference "auto-1"))) "1")
+     (check= (cadr (tree->stree (get-reference "auto-3"))) "3"))))
+
+;; After an update the automatic labels are named as by the counter: auto-1
+;; to auto-n in the order in which they are made, also when a tag makes two
+;; labels, when the index makes one of its own, and after a section was
+;; removed (which gives no new number, but leaves one unused).
+(define (auto-names)
+  (sort (list-filter (list-references)
+                     (lambda (l) (string-starts? l "auto-")))
+        (lambda (x y)
+          (< (string->number (substring x 5 (string-length x)))
+             (string->number (substring y 5 (string-length y)))))))
+
+(define (auto-range n)
+  (map (lambda (i) (string-append "auto-" (number->string (+ i 1))))
+       (iota n)))
+
+(define (test-label-names)
+  (check-group "names of the labels")
+  (with-typeset-body
+   '(document (assign "two" (macro "x" (concat (index (arg "x"))
+                                               (index (arg "x")))))
+              (section "A")
+              (concat "a" (two "first"))
+              (section "B")
+              (concat "b" (index "second"))
+              (section "C")
+              (the-index "idx" (document "")))
+   (lambda ()
+     (renumber-auto-labels)
+     (generate-all-aux)
+     (update-forced)
+     (with names (auto-names)
+       (check= names (auto-range (length names)))
+       (check-true (>= (length names) 7)))
+     ;; a section removed: an update numbers the labels again
+     (tree-remove (buffer-tree) 3 2)
+     (update-forced)
+     (check-true (renumber-auto-labels))
+     (generate-all-aux)
+     (update-forced)
+     (with names (auto-names)
+       (check= names (auto-range (length names))))
+     (check= (cadr (tree->stree (get-reference "auto-1"))) "1")
+     ;; and nothing to do the next time
+     (check-false (renumber-auto-labels)))))
+
+;; Random edits of a document, each followed by a typesetting which uses
+;; again what it can, against a typesetting from scratch in a buffer of its
+;; own: the places of all the paragraphs must be the same. The document
+;; holds what the reuse of the typesetter has to see: sections and numbered
+;; equations (counters), references to earlier equations, index entries
+;; (automatic labels), footnotes, hidden paragraphs which only pass on a
+;; space, and a length in a unit made by a macro of the document. When the
+;; check modes are on (TEXMACS_TYPESET_READS=check...), none of them may
+;; have found a difference either.
+(define rng-state 1)
+(define (rng n)
+  (set! rng-state (modulo (+ (* rng-state 1103515245) 12345) 2147483648))
+  (modulo (quotient rng-state 65536) n))
+
+(define (random-paragraph i)
+  (with s (number->string i)
+    (case (rng 7)
+      ((0) `(section ,(string-append "Section " s)))
+      ((1) `(concat ,(string-append "Text " s " ") (index ,(string-append "key " s))))
+      ((2) `(equation (concat "x" (label ,(string-append "e" s)))))
+      ((3) `(with "par-par-sep" "0fn" (hidden "h")))
+      ((4) `(concat "a" (footnote ,(string-append "note " s)) " b"))
+      ((5) `(concat "f " (math (frac "aaaaaaaaaa" "b"))))
+      (else (string-append "Some text, number " s ".")))))
+
+(define (scratch-places body n)
+  (let* ((old (current-buffer))
+         (u (new-buffer)))
+    (switch-to-buffer* u)
+    (buffer-set-body u (tree-copy body))
+    (update-forced)
+    (with r (map (lambda (i) (rect i)) (iota n))
+      (buffer-close u)
+      (switch-to-buffer* old)
+      r)))
+
+(define (test-incremental-against-scratch)
+  (check-group "incremental against scratch")
+  (set! rng-state 4242)
+  (with-typeset-body
+   `(document (assign "myu-length" (macro "0.1mm"))
+              (assign "math-frac-limit" "5myu")
+              ,@(map random-paragraph (iota 50)))
+   (lambda ()
+     (let ((bad 0) (next 50))
+       (for (step (iota 40))
+         (let* ((t (buffer-tree)) (n (tree-arity t))
+                (op (if (== (modulo step 5) 4) 2 (rng 5))))
+           (cond ((== op 0)
+                  ;; a new paragraph
+                  (tree-insert t (+ 2 (rng (- n 2)))
+                               (list (random-paragraph next)))
+                  (set! next (+ next 1)))
+                 ((and (== op 1) (> n 10))
+                  ;; a paragraph removed (not an equation: references to
+                  ;; it would keep their number until a complete pass)
+                  (with i (+ 2 (rng (- n 2)))
+                    (when (not (tree-is? (tree-ref t i) 'equation))
+                      (tree-remove t i 1))))
+                 ((== op 2)
+                  ;; the unit of the length
+                  (tree-set (tree-ref t 0 1 0)
+                            (if (== (tree->string (tree-ref t 0 1 0)) "10cm")
+                                "0.1mm" "10cm")))
+                 ((== op 3)
+                  ;; a reference to an earlier equation, at the end
+                  (let loop ((i (- n 1)))
+                    (cond ((< i 2) (noop))
+                          ((tree-is? (tree-ref t i) 'equation)
+                           (with lab (tree->stree (tree-ref t i 0 1 0))
+                             (tree-insert t n
+                                          (list `(concat "see " (reference ,lab))))))
+                          (else (loop (- i 1))))))
+                 (else
+                  ;; a word added to a paragraph of text
+                  (with i (+ 2 (rng (- n 2)))
+                    (when (tree-atomic? (tree-ref t i))
+                      (tree-set (tree-ref t i)
+                                (string-append (tree->string (tree-ref t i))
+                                               " more"))))))
+           (update-forced)
+           (let* ((m (tree-arity (buffer-tree)))
+                  (inc (map (lambda (i) (rect i)) (iota m))))
+             (when (!= inc (scratch-places (buffer-tree) m))
+               (set! bad (+ bad 1))))))
+       (check= bad 0)
+       (check= (typeset-check-mismatches) 0)))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The suite
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -659,7 +975,16 @@
   (test-numbering)
   (test-renumbering)
   (test-automatic-labels)
+  (test-labels-of-nested-tags)
+  (test-reuse-below-bindings)
+  (test-page-breaks-kept)
   (test-tables)
   (test-paragraphs)
   (test-pages)
+  (test-pages-kept)
+  (test-typesetting-failure)
+  (test-derived-state)
+  (test-renumbering-labels)
+  (test-label-names)
+  (test-incremental-against-scratch)
   (check-end))

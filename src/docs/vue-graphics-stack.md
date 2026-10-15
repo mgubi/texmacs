@@ -988,14 +988,32 @@ the desktop needed `TEXMACS_VUE_GPU=1`).
   the MuPDF renderer; the store of the active graphics a real copy.
 * **Text and fills** are textured quads in one batch: the glyphs are in
   an atlas (one R8 texture, emptied when full), the fills sample a white
-  corner of it. A glyph of a font with a file is rendered by MuPDF
+  corner of it. A glyph of a FreeType font is rendered by FreeType at its
+  size, in shades of grey, after light hinting, its outline made 0.22
+  pixels bolder (`tt_glyph_coverage`): the bitmaps of TeXmacs which the Qt
+  and X11 ports draw (rendered at `std_shrinkf` = 5 times their size in
+  black and white, then `shrink`) are that much bolder, since `shrink`
+  thickens each stroke by a pixel of the large bitmap, and the text then
+  has the weight of the Qt port's for one rasterization at its size.
+  The preferences (General: "Glyphs on the screen", "Boldness of FreeType
+  glyphs", "Hinting of FreeType glyphs"; `gpu glyphs`, `gpu glyph
+  boldness` in pixels, `gpu glyph hinting` light, none or full) choose
+  the glyphs, and a change is followed at once: the loop compares them
+  at each iteration (`vue_gpu_follow_glyph_settings`), and when they
+  changed empties the atlas and repaints every editor. The variables
+  `TEXMACS_VUE_GLYPHS`, `TEXMACS_VUE_FT_BOLD` and `TEXMACS_VUE_FT_HINT`
+  override them (tests). `texmacs` draws the bitmaps of TeXmacs
+  themselves (also the glyphs of the fonts with no file, whatever the
+  setting), `mupdf` the glyphs as MuPDF renders them
   (`mupdf_glyph_bitmap`: antialiased at its size, its origin on a pixel,
-  as the MuPDF renderer draws its text), so that the text is the MuPDF
-  renderer's to a level or two; the others are the glyph bitmaps of
-  TeXmacs (rendered at `std_shrinkf` = 5 times their size in black and
-  white, then `shrink`, as the X11 port draws them), placed as the MuPDF
-  renderer places them. The bitmaps of TeXmacs were half of a repaint on a
-  page of many fonts, each new glyph rasterized at 25 times its area. A batch is drawn when its target, its texture or its clip (a
+  as the MuPDF renderer draws its text, with no emboldening: lighter; the
+  default from 2026-10-05 to 2026-10-15). All are placed as the MuPDF
+  renderer places its glyphs. In headless Firefox (Apple M1, Retina), a
+  series of zooms and scrolls of the math font catalogue, where each zoom
+  makes new glyphs, takes 181 ms of repaints with FreeType, 214 ms with
+  MuPDF and 455 ms with the bitmaps of TeXmacs (medians of five runs),
+  whose rasterization at 25 times the area of a glyph and `shrink` cost
+  most. A batch is drawn when its target, its texture or its clip (a
   scissor) changes. Thin horizontal and vertical lines (the rules of
   mathematics, the borders of tables) are quads too. Glyphs filled with a
   pattern multiply the coverage by the pattern, sampled from the origin of

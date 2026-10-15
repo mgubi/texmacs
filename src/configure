@@ -31541,6 +31541,7 @@ $at_mod"
   echo "
       LIBS += $LDFLAGS
       QTPLUGIN = qjpeg qgif qico qsvg
+      qtHaveModule(websockets): QT += websockets
     " >>"$pro_file"
 
 
@@ -32448,6 +32449,15 @@ fi
     QT_PACKAGES="$QT_PACKAGES Qt${QT_MAJOR}Svg$QT_PKGCONFIG_SUFFIX"
     QT_PACKAGES="$QT_PACKAGES Qt${QT_MAJOR}PrintSupport$QT_PKGCONFIG_SUFFIX"
     QT_PACKAGES="$QT_PACKAGES Qt${QT_MAJOR}Network$QT_PKGCONFIG_SUFFIX"
+    # optional: the WebSocket clients of the server (QTMSockets.cpp, Qt 6)
+    if test $QT_MAJOR -ge 6 && $PKG_CONFIG --exists Qt${QT_MAJOR}WebSockets$QT_PKGCONFIG_SUFFIX
+then :
+
+      QT_PACKAGES="$QT_PACKAGES Qt${QT_MAJOR}WebSockets$QT_PKGCONFIG_SUFFIX"
+      # moc has to see the classes which depend on it
+      QT_CPPFLAGS="$QT_CPPFLAGS -DQT_WEBSOCKETS_LIB"
+
+fi
     # if CONFIG_OS is GNU_LINUX and QT_VERSION is higher than 6, use wayland
     if test "x$CONFIG_OS" = "xGNU_LINUX"
 then :
@@ -34409,6 +34419,10 @@ printf '%s\n' "enabling Qt port with Widkit" >&6; }
             if test $QT_MAJOR -ge 5
             then QT_PLUGINS_LIST="imageformats,platforms,iconengines"
             else QT_PLUGINS_LIST="accessible,imageformats"
+            fi
+            # the TLS of Qt 6 (WebSocket clients of the server over TLS)
+            if test $QT_MAJOR -ge 6
+            then QT_PLUGINS_LIST="$QT_PLUGINS_LIST,tls"
             fi
          fi
          CONFIG_QTPIPES="yes"
