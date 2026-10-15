@@ -92,6 +92,16 @@ their separators become horizontal, their menus open to the right, and the
 columns scroll when they are too long; the focus and user bars stay above
 the document, at the right of the columns.
 
+The responsive tabs follow the preference "gui:responsive tab mode", read
+when they are made, as in Vue (`responsive_tab_mode` in `ns_widget.mm`;
+`TEXMACS_NS_TAB_MODE` overrides it): "top" plain tabs, "side" (the default)
+a column of tabs on the left of the page, "mobile" the list of the tabs,
+each page with a button back to it, "grid" all the pages in two columns,
+scrolled when they are higher than 640 points (`responsive_tabs_view` in
+`ns_ui_element.mm`, with a tab view without tabs, as large as its largest
+page). Only a few dialogs have them (the consoles of the Debug menu); the
+preferences have icon tabs.
+
 `qt-gui?` holds for this interface, since it implements the widgets of the
 Qt one: the Scheme code uses the same native dialogs and shortcuts.
 

@@ -307,6 +307,229 @@ stack_of (array<widget> a, bool vertical) {
 }
 @end
 
+// The pages of tabs: a body in a holder, with a margin
+static NSView*
+tab_page (widget body_w) {
+  NSView* body= is_nil (body_w)? nil: concrete (body_w)->as_nsview ();
+  if (!body) return nil;
+  NSView* holder= [[[NSView alloc] init] autorelease];
+  [body setTranslatesAutoresizingMaskIntoConstraints: NO];
+  [holder addSubview: body];
+  [NSLayoutConstraint activateConstraints: @[
+    [body.leadingAnchor constraintEqualToAnchor: holder.leadingAnchor constant: 8],
+    [body.trailingAnchor constraintEqualToAnchor: holder.trailingAnchor constant: -8],
+    [body.topAnchor constraintEqualToAnchor: holder.topAnchor constant: 8],
+    [body.bottomAnchor constraintEqualToAnchor: holder.bottomAnchor constant: -8]]];
+  return holder;
+}
+
+// a tab view with the pages, which takes the size of the page shown (see
+// TMTabHelper)
+static NSTabView*
+tab_view (array<widget> tabs, array<widget> bodies) {
+  NSTabView* tv= [[[NSTabView alloc] init] autorelease];
+  for (int i=0; i < min (N(tabs), N(bodies)); i++) {
+    NSTabViewItem* it= [[[NSTabViewItem alloc] init] autorelease];
+    [it setLabel: to_label (text_of (tabs[i]))];
+    NSView* holder= tab_page (bodies[i]);
+    if (holder) [it setView: holder];
+    [tv addTabViewItem: it];
+  }
+  TMTabHelper* th= [[[TMTabHelper alloc] init] autorelease];
+  objc_setAssociatedObject (tv, "TMTabHelper", th, OBJC_ASSOCIATION_RETAIN);
+  [tv setDelegate: th];
+  return tv;
+}
+
+/*! The tabs of the responsive modes (see responsive_tab_mode in
+ ns_widget.mm), with a tab view without tabs: "side", a column of buttons on
+ the left of the page, the one of the page shown on; "mobile", the list of
+ the tabs (the first page), each page with a button back to the list. */
+@interface TMTabChooser : NSObject
+{
+@public
+  NSTabView* tv;            // not retained (the chooser is kept by it)
+  NSMutableArray* buttons;  // of the column ("side")
+  NSInteger offset;         // of the pages ("mobile": after the list)
+}
+- (void) choose: (id) sender;
+- (void) back: (id) sender;
+@end
+
+@implementation TMTabChooser
+- (void) dealloc
+{
+  [buttons release];
+  [super dealloc];
+}
+- (void) choose: (id) sender
+{
+  NSInteger i= [sender tag];
+  for (NSButton* b in buttons)
+    [b setState: [b tag] == i? NSControlStateValueOn: NSControlStateValueOff];
+  if (i + offset < [tv numberOfTabViewItems])
+    [tv selectTabViewItemAtIndex: i + offset];
+}
+- (void) back: (id) sender
+{
+  (void) sender;
+  [tv selectTabViewItemAtIndex: 0];
+}
+@end
+
+// A tab view without tabs has no size of its own: that of its largest page
+// (and of the list of the tabs, "mobile"), so that the dialog shows them
+static void
+fit_pages (NSTabView* tv) {
+  CGFloat w= 0, h= 0;
+  for (NSTabViewItem* it in [tv tabViewItems]) {
+    NSView* v= [it view];
+    if (!v) continue;
+    [v layoutSubtreeIfNeeded];
+    NSSize s= [v fittingSize];
+    w= max (w, s.width); h= max (h, s.height);
+  }
+  [tv setTranslatesAutoresizingMaskIntoConstraints: NO];
+  [[tv.widthAnchor constraintGreaterThanOrEqualToConstant: w] setActive: YES];
+  [[tv.heightAnchor constraintGreaterThanOrEqualToConstant: h] setActive: YES];
+}
+
+// a button of the column or of the list of the tabs
+static NSButton*
+tab_button (NSString* label, url icon, NSInteger i, TMTabChooser* ch, bool list) {
+  NSButton* b= [NSButton buttonWithTitle: label target: ch
+                                  action: @selector(choose:)];
+  [b setTag: i];
+  [b setBezelStyle: NSBezelStyleRecessed];
+  [b setButtonType: list? NSButtonTypeMomentaryPushIn: NSButtonTypePushOnPushOff];
+  [b setShowsBorderOnlyWhileMouseInside: YES];
+  [b setAlignment: NSTextAlignmentLeft];
+  if (!is_none (icon)) {
+    NSImage* im= to_nsimage (icon);
+    if (im) {
+      [b setImage: im];
+      [b setImagePosition: NSImageLeading];
+      [b setImageScaling: NSImageScaleProportionallyDown];
+    }
+  }
+  if (list) {
+    // a chevron at the end: the page opens
+    [b setTitle: [label stringByAppendingString: @"  \u203A"]];
+  }
+  return b;
+}
+
+static NSView*
+responsive_tabs_view (array<url> icons, array<widget> tabs,
+                      array<widget> bodies, string mode) {
+  int n= min (N(tabs), N(bodies));
+  if (mode == "grid") {
+    // all the pages, two in a row, each with its title above it; scrolled
+    // when they are higher than most screens
+    NSStackView* rows= [[[NSStackView alloc] init] autorelease];
+    [rows setOrientation: NSUserInterfaceLayoutOrientationVertical];
+    [rows setAlignment: NSLayoutAttributeLeading];
+    [rows setSpacing: 14];
+    [rows setEdgeInsets: NSEdgeInsetsMake (10, 10, 10, 10)];
+    NSStackView* row= nil;
+    for (int i=0; i < n; i++) {
+      NSTextField* t= [NSTextField labelWithString: to_label (text_of (tabs[i]))];
+      [t setFont: [NSFont boldSystemFontOfSize: [NSFont systemFontSize]]];
+      NSMutableArray* parts= [NSMutableArray arrayWithObject: t];
+      NSView* page= tab_page (bodies[i]);
+      if (page) [parts addObject: page];
+      NSStackView* cell= [NSStackView stackViewWithViews: parts];
+      [cell setOrientation: NSUserInterfaceLayoutOrientationVertical];
+      [cell setAlignment: NSLayoutAttributeLeading];
+      [cell setSpacing: 2];
+      if (i % 2 == 0) {
+        row= [[[NSStackView alloc] init] autorelease];
+        [row setOrientation: NSUserInterfaceLayoutOrientationHorizontal];
+        [row setAlignment: NSLayoutAttributeTop];
+        [row setSpacing: 20];
+        [rows addArrangedSubview: row];
+      }
+      [row addArrangedSubview: cell];
+    }
+    NSSize fs= [rows fittingSize];
+    TMFlippedDocView* doc= [[[TMFlippedDocView alloc]
+                              initWithFrame: NSMakeRect (0, 0, fs.width, fs.height)] autorelease];
+    [rows setFrame: NSMakeRect (0, 0, fs.width, fs.height)];
+    [doc addSubview: rows];
+    NSScrollView* sc= [[[NSScrollView alloc] init] autorelease];
+    [sc setDocumentView: doc];
+    [sc setHasVerticalScroller: YES];
+    [sc setAutohidesScrollers: YES];
+    [sc setDrawsBackground: NO];
+    [sc setTranslatesAutoresizingMaskIntoConstraints: NO];
+    [[sc.widthAnchor constraintEqualToConstant: fs.width + 16] setActive: YES];
+    [[sc.heightAnchor constraintEqualToConstant: min (fs.height, 640.0)] setActive: YES];
+    return sc;
+  }
+  NSTabView* tv= tab_view (tabs, bodies);
+  [tv setTabViewType: NSNoTabsNoBorder];
+  TMTabChooser* ch= [[[TMTabChooser alloc] init] autorelease];
+  ch->tv= tv;
+  ch->buttons= [[NSMutableArray alloc] init];
+  objc_setAssociatedObject (tv, "TMTabChooser", ch, OBJC_ASSOCIATION_RETAIN);
+  NSStackView* col= [[[NSStackView alloc] init] autorelease];
+  [col setOrientation: NSUserInterfaceLayoutOrientationVertical];
+  [col setAlignment: NSLayoutAttributeLeading];
+  [col setSpacing: 2];
+  [col setEdgeInsets: NSEdgeInsetsMake (8, 8, 8, 8)];
+  for (int i=0; i < n; i++) {
+    url icon= i < N(icons)? icons[i]: url_none ();
+    NSButton* b= tab_button ([[tv tabViewItemAtIndex: i] label], icon, i, ch,
+                             mode == "mobile");
+    [col addArrangedSubview: b];
+    [[b.widthAnchor constraintEqualToAnchor: col.widthAnchor constant: -16]
+      setActive: YES];
+    if (mode == "side") [ch->buttons addObject: b];
+  }
+  if (mode == "mobile") {
+    // the list first, then the pages, each with a button back to the list
+    ch->offset= 1;
+    for (int i=0; i < n; i++) {
+      NSTabViewItem* it= [tv tabViewItemAtIndex: i];
+      NSButton* back= [NSButton buttonWithTitle:
+                         [@"\u2039 " stringByAppendingString: [it label]]
+                                         target: ch action: @selector(back:)];
+      [back setBezelStyle: NSBezelStyleRecessed];
+      [back setShowsBorderOnlyWhileMouseInside: YES];
+      NSMutableArray* parts= [NSMutableArray arrayWithObject: back];
+      if ([it view]) [parts addObject: [it view]];
+      NSStackView* page= [NSStackView stackViewWithViews: parts];
+      [page setOrientation: NSUserInterfaceLayoutOrientationVertical];
+      [page setAlignment: NSLayoutAttributeLeading];
+      [page setEdgeInsets: NSEdgeInsetsMake (6, 6, 0, 0)];
+      [it setView: page];
+    }
+    NSTabViewItem* list= [[[NSTabViewItem alloc] init] autorelease];
+    [list setView: col];
+    [tv insertTabViewItem: list atIndex: 0];
+    [tv selectTabViewItemAtIndex: 0];
+    fit_pages (tv);
+    return tv;
+  }
+  fit_pages (tv);
+  // the column keeps the height of its buttons
+  [col setTranslatesAutoresizingMaskIntoConstraints: NO];
+  [[col.heightAnchor constraintGreaterThanOrEqualToConstant:
+      [col fittingSize].height] setActive: YES];
+  // "side": the column, a line, the page
+  if ([ch->buttons count] > 0)
+    [(NSButton*) [ch->buttons objectAtIndex: 0] setState: NSControlStateValueOn];
+  NSBox* line= [[[NSBox alloc] init] autorelease];
+  [line setBoxType: NSBoxSeparator];
+  NSStackView* st= [NSStackView stackViewWithViews:
+                     [NSArray arrayWithObjects: col, line, tv, nil]];
+  [st setOrientation: NSUserInterfaceLayoutOrientationHorizontal];
+  [st setAlignment: NSLayoutAttributeTop];
+  [st setSpacing: 0];
+  [[line.heightAnchor constraintEqualToAnchor: st.heightAnchor] setActive: YES];
+  return st;
+}
+
 static NSView*
 placeholder (string what) {
   // FIXME: widgets which are not implemented yet
@@ -742,6 +965,7 @@ ns_ui_element_rep::get_payload (ns_widget nsw, types check_type) {
     case enum_widget:       case choice_widget:    case filtered_choice_widget:
     case scrollable_widget: case hsplit_widget:    case vsplit_widget:
     case tabs_widget:       case icon_tabs_widget: case resize_widget:
+    case responsive_tabs_widget:
     case refresh_widget:    case refreshable_widget: case balloon_widget:
     case glue_widget:       case tree_view_widget:
       return static_cast<ns_ui_element_rep*> (nsw.rep)->load;
@@ -1357,31 +1581,9 @@ ns_ui_element_rep::as_nsview () {
         T x= open_box<T> (load);
         icons= x.x1; tabs= x.x2; bodies= x.x3;
       }
-      NSTabView* tv= [[[NSTabView alloc] init] autorelease];
-      for (int i=0; i < min (N(tabs), N(bodies)); i++) {
-        NSTabViewItem* it= [[[NSTabViewItem alloc] init] autorelease];
-        [it setLabel: to_label (text_of (tabs[i]))];
-        NSView* body= is_nil (bodies[i])? nil: concrete (bodies[i])->as_nsview ();
-        if (body) {
-          NSView* holder= [[[NSView alloc] init] autorelease];
-          [body setTranslatesAutoresizingMaskIntoConstraints: NO];
-          [holder addSubview: body];
-          [NSLayoutConstraint activateConstraints: @[
-            [body.leadingAnchor constraintEqualToAnchor: holder.leadingAnchor constant: 8],
-            [body.trailingAnchor constraintEqualToAnchor: holder.trailingAnchor constant: -8],
-            [body.topAnchor constraintEqualToAnchor: holder.topAnchor constant: 8],
-            [body.bottomAnchor constraintEqualToAnchor: holder.bottomAnchor constant: -8]]];
-          [it setView: holder];
-        }
-        [tv addTabViewItem: it];
-      }
       // As in the Qt interface, the dialog takes the size of the page shown
       // (see TMTabHelper)
-      {
-        TMTabHelper* th= [[[TMTabHelper alloc] init] autorelease];
-        objc_setAssociatedObject (tv, "TMTabHelper", th, OBJC_ASSOCIATION_RETAIN);
-        [tv setDelegate: th];
-      }
+      NSTabView* tv= tab_view (tabs, bodies);
       if (type == tabs_widget) return tv;
       // the icon tabs: a segmented control with the icons above the tabs
       [tv setTabViewType: NSNoTabsBezelBorder];
@@ -1402,6 +1604,13 @@ ns_ui_element_rep::as_nsview () {
       [st setAlignment: NSLayoutAttributeCenterX];
       [[tv.widthAnchor constraintEqualToAnchor: st.widthAnchor] setActive: YES];
       return st;
+    }
+
+    case responsive_tabs_widget:
+    {
+      typedef quartet<array<url>, array<widget>, array<widget>, string> T;
+      T x= open_box<T> (load);
+      return responsive_tabs_view (x.x1, x.x2, x.x3, x.x4);
     }
 
     case choice_widget:

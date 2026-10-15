@@ -79,6 +79,10 @@ no headless mode. The Widkit duplicates are fixed on `wip_other_guis` too.
     snapshots of a document of one page show the page shifted, with a copy
     of it on the right (the backing store which wraps, `cring`?). Only seen
     in the snapshots, not traced.
+  - Cocoa: plain tabs (`tabs_widget`) in a small dialog leave the window
+    too small, with a black band where the pages should be (seen in the
+    snapshots of a dialog of three short pages; the same before the
+    responsive tabs). The icon tabs of the preferences are fine.
   - Vue on OpenGL under macOS: `SDL_GL_SwapWindow` waits 1.6 to 3 ms a
     present while scrolling; the presents are not paced as those of Metal
     (`ready_to_present`), which is the default on macOS.
