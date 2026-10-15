@@ -1259,9 +1259,15 @@ from 16 to 1024 pixels. As in the page of TeXmacs Vue
   a texture of the view with `vue_gpu` (its glyphs from the atlas:
   `gpu_draw_coverage`). The same to the pixel in the document; 10 KB a
   step through the pipe, the shell's repaint 0.06 ms a frame.
-- **Left**: the transformations of the renderer (rotated pictures), the
-  patterns; a limit to the glyphs and pictures kept by the page and the
-  shell; the commands by default (they are asked for, for now).
+- **Transformations and patterns** (9 and 10: the matrix MuPDF
+  concatenates, which the page and the shell apply; a clip under one said
+  in the pixels of the view, within the one before); a background or a
+  rectangle with a pattern drawn tile by tile, a polygon or an arc with
+  one drawn by MuPDF into a picture. Pictures are named by their file
+  and size on the screen when the renderer knows them.
+- **Left**: a limit to the glyphs and pictures kept by the page and the
+  shell; the pattern of a rotated shape is rotated with it (MuPDF keeps
+  it upright); the commands by default (they are asked for, for now).
 
 ### On the desktop
 
