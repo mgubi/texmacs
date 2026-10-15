@@ -259,6 +259,11 @@
     changes when Word saves the file, and a formula alone in a cell stays
     in the cell.
 
+    <item>Boxes of text and shapes (rectangles, ellipses...) of Word and
+    <name|OpenDocument> files are shown as framed boxes with their fill,
+    on their side, their text can be edited, and they are written back as
+    boxes and shapes.
+
     <item>A <name|Markdown> file keeps the tabs at the start of its lines
     (in code, formulas, tables and the <name|YAML> header), a formula of a
     single symbol is read back as a formula, and files with many formulas
