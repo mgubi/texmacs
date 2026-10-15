@@ -103,8 +103,9 @@ keys typed meanwhile go to TeXmacs, and the real mouse also reaches it.
   all the windows, with their frames;
 * `TEXMACS_NS_MENUS=<depth>`: after 3 seconds, the menu bar is printed with
   its submenus up to this depth (with the shortcuts and check marks); with
-  `TEXMACS_NS_SNAPSHOT`, the images of the items are saved as
-  `item-<i>.png`;
+  `TEXMACS_NS_SNAPSHOT`, the images of the items (and of the views of the
+  items, such as the grid of colours) are saved as `item-<i>.png`, and
+  their names printed under the item;
 * `TEXMACS_NS_SCROLL=<points>`: after 3 seconds, the document is scrolled
   in steps of 40 points, and with `TEXMACS_NS_SNAPSHOT` the window is saved
   after each step (`scroll-<i>.png`);

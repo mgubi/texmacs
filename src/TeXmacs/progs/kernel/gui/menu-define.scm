@@ -790,7 +790,7 @@
 
 
 (tm-define (typographic-palette?)
-  (and (vue-gui?) (!= (typographic-palette-set) "Classical")))
+  (and (or (vue-gui?) (ns-gui?)) (!= (typographic-palette-set) "Classical")))
 
 (tm-menu (typographic-color-tiles cmd l)
   ;; eight colours a line (tile wants a number, not an expression): the
@@ -828,14 +828,14 @@
       (dynamic (standard-color-tiles cmd))))
 
 (tm-menu (standard-color-menu cmd)
-  ;; in Vue, a typographic palette can replace the standard one (Classical),
-  ;; and the choice of it (an enum, which does not close the menu) changes
-  ;; the grid in place: a promise in a refreshable, whose items are made
-  ;; again when it is refreshed
-  (if (vue-gui?)
+  ;; in Vue and Cocoa, a typographic palette can replace the standard one
+  ;; (Classical), and the choice of it (an enum, which does not close the
+  ;; menu) changes the grid in place: a promise in a refreshable, whose
+  ;; items are made again when it is refreshed
+  (if (or (vue-gui?) (ns-gui?))
       (refreshable "typographic-palette"
         (promise (cons 'vertical (standard-color-grid cmd)))))
-  (if (not (vue-gui?))
+  (if (not (or (vue-gui?) (ns-gui?)))
       (dynamic (standard-color-tiles cmd))))
 
 (define (gui-make-pick-color x)
