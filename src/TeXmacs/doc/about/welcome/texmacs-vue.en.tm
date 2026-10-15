@@ -264,6 +264,16 @@
     on their side, their text can be edited, and they are written back as
     boxes and shapes.
 
+    <item>After a review of the Word and <name|OpenDocument> converters,
+    text is no longer lost in formulas with tracked changes, after a field
+    which does not end, in ruby text or in repeated table rows; the
+    numbering of lists, the references to pages and the formatting
+    switched off inside a paragraph come out right; and the files which
+    are written have no section breaks in cells or notes, keep the dashes
+    and quotes of <TeXmacs> and define the styles they use. Links and
+    descriptions of pictures containing <verbatim|&amp;> are read
+    correctly.
+
     <item>A <name|Markdown> file keeps the tabs at the start of its lines
     (in code, formulas, tables and the <name|YAML> header), a formula of a
     single symbol is read back as a formula, and files with many formulas
