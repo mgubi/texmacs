@@ -299,6 +299,9 @@
 /* Use intl library */
 #undef USE_INTL
 
+/* Use Metal for the GPU renderer of the Vue port */
+#undef USE_METAL
+
 /* Use MuPDF library */
 #undef USE_MUPDF
 

@@ -147,6 +147,8 @@ mupdf_src    := $(call findsrc_in,Plugins,@CONFIG_MUPDF@)
 mupdf_c_src  := $(call findc_in,Plugins,@CONFIG_MUPDF@)
 sdl_src    	 := $(call findsrc_in,Plugins,@CONFIG_SDL@)
 vue_src    	 := $(call findsrc_in,Plugins,@CONFIG_VUE@)
+# (the Metal backend of the GPU renderer, on macOS only)
+vue_mm_src   := $(if $(strip @CONFIG_MACOS@),$(call findmm_in,Plugins,@CONFIG_VUE@),)
 vue_c_src    := $(if $(strip @CONFIG_VUE@),clay.c,)
 
 make_c_deps = $(patsubst %.c,Objects/%.o,$(notdir $(1)))
@@ -301,6 +303,7 @@ mupdf_obj    := $(call makeobj,$(mupdf_src))
 mupdf_c_obj  := $(call makeobj_c,$(mupdf_c_src))
 sdl_obj      := $(call makeobj,$(sdl_src))
 vue_obj      := $(call makeobj,$(vue_src))
+vue_mm_obj   := $(call makeobj_mm,$(vue_mm_src))
 vue_c_obj    := $(call makeobj_c,$(vue_c_src))
 
 # To enforce some degree of modularity, each object file must be
@@ -389,6 +392,8 @@ $(sdl_obj): Objects/%.o: %.cpp
 	$(call cxx_incl,$(sdl_incl) $(CXXMUPDF) $(CXXSDL))
 $(vue_obj): Objects/%.o: %.cpp
 	$(call cxx_incl,-std=c++20 $(vue_incl) $(CXXMUPDF) $(CXXVUE))
+$(vue_mm_obj): Objects/%.o: %.mm
+	$(call objcxx_incl,-std=c++20 -fobjc-arc $(vue_incl) $(CXXMUPDF) $(CXXVUE))
 $(vue_c_obj): Objects/%.o: %.c
 	$(call cc_flags,$(vue_incl) $(CXXMUPDF) $(CXXVUE))
 $(gnutls_obj): Objects/%.o: %.cpp
@@ -458,7 +463,7 @@ uses_freetype := $(freetype_obj)
 uses_gnutls   := $(gnutls_obj)
 uses_mupdf    := $(mupdf_obj) $(mupdf_c_obj)
 uses_sdl      := $(sdl_obj)
-uses_vue      := $(vue_obj) $(vue_c_obj)
+uses_vue      := $(vue_obj) $(vue_mm_obj) $(vue_c_obj)
 #"uses_windowsres" is defined above
 
 # Compilation rules
