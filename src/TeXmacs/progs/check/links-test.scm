@@ -1351,6 +1351,18 @@
     (set! states (cons (body-now) states))
     (check-undo-redo (reverse states))))
 
+(define (check-typing-undo name body p)
+  ;; type at the hidden place @p of a document with @body, then undo and
+  ;; redo: the cursor goes to a visible place
+  (write-doc name '("article") '() body)
+  (open-for-undo name)
+  (edit (go-to (apply at p)))
+  (with s0 (body-now)
+    (edit (insert "Z"))
+    (with s1 (body-now)
+      (check-true (!= s1 s0))
+      (check-undo-redo (list s0 s1)))))
+
 (define (test-document-parts-undo-cursor)
   ;; undo and redo of a change of the shown parts leave the cursor in a
   ;; visible place, whatever the layout of the parts; showing a hidden
@@ -1403,7 +1415,21 @@
   (edit (undo 0))
   (check= (st 1 1 1) "a")
   (check= (cursor) '(1 1 1 1))
+  (edit (redo 0))
+  (check= (st 1 1 1) "ax")
+  (check= (cursor) '(1 1 1 2))
   (edit (init-default "preamble"))
+  ;; typing in the alternative of a shown part, and in a shown part which
+  ;; has only an identifier (both only by hand or by a script)
+  (check-typing-undo "parts-undo-alt.tm"
+                     '((show-part "1" (document (section "A") "a") "alt")
+                       (hide-part "2" (document (section "B") "b") ""))
+                     '(0 2 1))
+  (check-typing-undo "parts-undo-short.tm"
+                     '((show-part "1")
+                       (show-part "2" (document (section "B") "b") "")
+                       (hide-part "3" (document (section "C") "c") ""))
+                     '(0 0 0))
   ;; :one: showing a hidden part moves the cursor out of the part which
   ;; is hidden now
   (write-doc "parts-undo-sel.tm" '("article") '()
