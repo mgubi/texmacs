@@ -214,7 +214,10 @@
     <item>A reference of an office document whose text is more than a
     number (\PTable 3\Q, the title of a section) is a link to its
     target, with the text it had. The theorems of a document in another
-    language than English stay paragraphs.
+    language than English stay paragraphs. A label in the text, away from
+    what it is the label of, is written at its number (a reference shows
+    the number) and at its place, as a hidden bookmark <verbatim|_TmAt_>name:
+    it comes back at its place.
 
     <item>A drawing which was exported is a picture: it cannot be edited
     in the office programs, and it comes back as an image. The drawings and

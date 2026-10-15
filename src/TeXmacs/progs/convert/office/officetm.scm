@@ -519,20 +519,38 @@
         ((func? x tag) #t)
         (else (list-or (map (lambda (y) (oftm-has? y tag)) (ox-children x))))))
 
-(define (oftm-bookmarks x)
+(define oftm-moved-labels (make-ahash-table))  ; labels with their place
+
+(define (oftm-label-name name)
+  ;; the label of a bookmark, or #f: a label which was away from its number
+  ;; is where its bookmark _TmAt_name is, and not at its number
+  (cond ((not name) #f)
+        ((string-starts? name "_TmAt_") (substring name 6 (string-length name)))
+        ((ahash-ref oftm-moved-labels name) #f)
+        (else name)))
+
+(define (oftm-bookmarks* x)
   ;; the names of the bookmarks inside x, but those of its notes
   (cond ((not (pair? x)) '())
         ((in? (car x) '(math image @ note)) '())
         ((func? x 'bookmark) (if (ox-attr x 'name) (list (ox-attr x 'name)) '()))
-        (else (append-map oftm-bookmarks (ox-children x)))))
+        (else (append-map oftm-bookmarks* (ox-children x)))))
+
+(define (oftm-bookmarks x)
+  ;; the labels of the bookmarks inside x
+  (list-filter (map oftm-label-name (oftm-bookmarks* x)) identity))
 
 (define (oftm-scan-labels x)
   (cond ((not (pair? x)) (noop))
+        ((func? x 'bookmark)
+         (with name (ox-attr x 'name)
+           (when (and name (string-starts? name "_TmAt_"))
+             (ahash-set! oftm-moved-labels (substring name 6 (string-length name)) #t))))
         ((func? x 'p)
          (when (or (in? (ox-attr x 'role)
                         '("heading" "caption" "theorem" "remark" "proof" "bibitem"))
                    (oftm-has? x 'seq))
-           (for (name (oftm-bookmarks x))
+           (for (name (oftm-bookmarks* x))
              (ahash-set! oftm-numbered-labels name #t)))
          (for-each oftm-scan-labels (ox-children x)))
         ((in? (car x) '(math image @)) (noop))
@@ -833,7 +851,7 @@
                         (list `(reference ,name)))
                        (else (list `(hlink ,t ,(string-append "#" name)))))))
               ((bookmark)
-               (with name (ox-attr x 'name)
+               (with name (oftm-label-name (ox-attr x 'name))
                  (if name (list `(label ,(oftm-text name))) '())))
               ((note)
                (with b (oftm-blocks l)
@@ -1175,12 +1193,19 @@
           (else (cons `(description ,(oftm-document (reverse acc))) l)))))
 
 (define (oftm-caption x)
-  ;; the text of a caption, without "Figure 1." at its start
-  (with start (oftm-named-start (ox-children x))
+  ;; the text of a caption, without "Figure 1." at its start (nor the break
+  ;; of line after the images of a frame of LibreOffice)
+  (let* ((l (let drop ((l (ox-children x)))
+              (if (and (pair? l) (or (func? (car l) 'br)
+                                     (and (string? (car l))
+                                          (== (string-trim-spaces (car l)) ""))))
+                  (drop (cdr l))
+                  l)))
+         (start (oftm-named-start l)))
     (if (and start (cadddr start))
         (oftm-concat (append (oftm-labels (cadr start))
                              (append-map oftm-inline (caddr start))))
-        (oftm-inlines (ox-children x)))))
+        (oftm-inlines l))))
 
 (define (oftm-blocks l)
   ;; the paragraphs of TeXmacs for a list of blocks. The blocks which
@@ -1493,6 +1518,7 @@
   ;; sets it), a document of the style office
   (with l (if (func? x 'office) (cdr x) (list x))
     (set! oftm-numbered-labels (make-ahash-table))
+    (set! oftm-moved-labels (make-ahash-table))
     (set! oftm-faithful?
           (== (assoc-ref (if (and (nnull? opts) (list? (car opts))) (car opts) '())
                          "office->texmacs:faithful")
@@ -1545,6 +1571,7 @@
                   `(document (body (document (with "color" "red" ,msg)))
                              (style "generic")))))
       (set! oftm-numbered-labels (make-ahash-table))
+      (set! oftm-moved-labels (make-ahash-table))
       (set! oftm-align "justify")
       (set! oftm-faithful? #f)
       (set! oftm-styles (make-ahash-table))

@@ -577,7 +577,16 @@
                                                          (office-uri href) #t)))
                                   ,@runs))))))
               ((bookmark)
-               (dx-bookmarked (list (or (ox-attr x 'name) "")) '()))
+               (if (ox-attr x 'at)
+                   ;; (where a label was, away from its number)
+                   (with id (number->string (dx-next-id))
+                     `((w:bookmarkStart
+                         (@ (w:id ,id)
+                            (w:name ,(dx-bookmark-name
+                                       (string-append "_TmAt_"
+                                                      (dx-bookmark-name (or (ox-attr x 'name) "")))))))
+                       (w:bookmarkEnd (@ (w:id ,id)))))
+                   (dx-bookmarked (list (or (ox-attr x 'name) "")) '())))
               ((note) (dx-note x))
               ((br) (list (dx-run '() '(w:br))))
               ((tab) (list (dx-run '() '(w:tab))))

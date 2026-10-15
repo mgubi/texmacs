@@ -565,7 +565,9 @@
                                                  "Visited_20_Internet_20_Link"))
                                             ,@inner))))))
               ((bookmark)
-               (list `(text:bookmark (@ (text:name ,(or (ox-attr x 'name) ""))))))
+               (list `(text:bookmark
+                        (@ (text:name ,(string-append (if (ox-attr x 'at) "_TmAt_" "")
+                                                      (or (ox-attr x 'name) "")))))))
               ((note) (ot-note x))
               ((br) '((text:line-break)))
               ((tab) '((text:tab)))

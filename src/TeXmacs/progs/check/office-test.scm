@@ -2224,6 +2224,30 @@
                " L")
             (p "see " (ref (@ (name "thm:a") (kind "seq") (target "Theorem1")) "1")
                " and " (ref (@ (name "nowhere")) "x"))))
+  ;; a label in the text, away from its theorem: the number has its
+  ;; bookmark, and a bookmark of its own (at) is at its place
+  (check= (of '(document
+                 (render-theorem (concat "Theorem " (with "font-shape" "right" "1"))
+                                 (document "T"))
+                 (concat "text " (label "p") " more")))
+          '((p (@ (role "theorem"))
+               (strong "Theorem " (seq (@ (name "Theorem") (id "Theorem1")
+                                          (labels "p")) "1") ".")
+               " T")
+            (p "text " (bookmark (@ (name "p") (at "true"))) " more")))
+  ;; and read: the label is at its place, not at its number
+  (check= (cadr (cadr (office->texmacs
+                        '(office (p (@ (role "heading") (level "1"))
+                                    (bookmark (@ (name "p"))) "Head")
+                                 (p "text " (bookmark (@ (name "_TmAt_p"))) " more")))))
+          '(document (section "Head") (concat "text " (label "p") " more")))
+  ;; a caption of LibreOffice, after the images of its frame and a break
+  (check= (cadr (cadr (office->texmacs
+                        '(office (p (@ (role "caption")) (image (@ (name "p.png") (data "PNGDATA")))
+                                    (br) "Figure " (seq (@ (name "Figure")) "1")
+                                    ": Cap")))))
+          '(document (big-figure (image (tuple (raw-data "PNGDATA") "p.png") "" "" "" "")
+                                 "Cap")))
   ;; a number which is not the next one of its sequence stands for itself
   (check= (of '(render-theorem "Theorem 2.1" (document "T")))
           '((p (@ (role "theorem"))
