@@ -261,6 +261,7 @@
                 (odt-cell-properties
                   (ox-child x 'style:table-cell-properties))
                 (odt-table-properties (ox-child x 'style:table-properties))
+                (odt-graphic-properties (ox-child x 'style:graphic-properties))
                 (odt-column-properties
                   (ox-child x 'style:table-column-properties))
                 ;; a section in columns
@@ -414,6 +415,66 @@
            (== (if (>= i 0) (substring s (+ i 1) (string-length s)) s)
                "math")))))
 
+(define (odt-graphic-properties x)
+  ;; the properties of a frame which say where it is and how the text goes
+  ;; around it (keys g-...), and the part of its picture which is shown
+  (if (not x) '()
+      (append-map
+        (lambda (p)
+          (with v (ox-attr x (car p))
+            (if v (list (cons (cdr p) v)) '())))
+        '((style:wrap . g-wrap) (style:wrap-contour . g-contour)
+          (style:run-through . g-through) (style:horizontal-pos . g-hpos)
+          (style:horizontal-rel . g-hrel) (style:vertical-pos . g-vpos)
+          (style:vertical-rel . g-vrel) (fo:clip . g-clip)))))
+
+(define (odt-float x width)
+  ;; the attributes of a frame x which floats (office-float-keys), or #f
+  (let* ((anchor (or (ox-attr x 'text:anchor-type) "as-char"))
+         (props (odt-style "graphic" (ox-attr x 'draw:style-name)))
+         (get (lambda (k) (odt-get props k)))
+         (w (get 'g-wrap))
+         (wrap (cond ((in? w '("parallel" "left" "right" "dynamic"))
+                      (if (== (get 'g-contour) "true") "tight" "square"))
+                     ((== w "run-through")
+                      (if (== (get 'g-through) "background") "behind" "front"))
+                     (else "top-bottom")))
+         (side (assoc-ref '(("parallel" . "both") ("left" . "left") ("right" . "right")
+                            ("dynamic" . "largest"))
+                          (or w "")))
+         (hp (get 'g-hpos))
+         (h-pos (cond ((in? hp '("left" "right" "center" "inside" "outside")) hp)
+                      ((in? hp '("from-left" "from-inside")) "offset")
+                      (else "left")))
+         (h-rel (assoc-ref '(("paragraph" . "column") ("paragraph-content" . "column")
+                             ("page" . "page") ("page-content" . "margin")
+                             ("page-start-margin" . "left-margin")
+                             ("page-end-margin" . "right-margin")
+                             ("char" . "character"))
+                           (or (get 'g-hrel) "")))
+         (vp (get 'g-vpos))
+         (v-pos (cond ((in? vp '("top" "bottom")) vp)
+                      ((== vp "middle") "center")
+                      ((== vp "from-top") "offset")
+                      (else "top")))
+         (v-rel (assoc-ref '(("paragraph" . "paragraph") ("paragraph-content" . "paragraph")
+                             ("line" . "line") ("char" . "line") ("page" . "page")
+                             ("page-content" . "margin"))
+                           (or (get 'g-vrel) "")))
+         (len (lambda (v)
+                (cond ((not (string? v)) #f)
+                      ((string-starts? v "-")
+                       (with c (office-length->cm (substring v 1 (string-length v)))
+                         (and c (office-cm (- c)))))
+                      (else (with c (office-length->cm v) (if c (office-cm c) "0cm"))))))
+         (h-offset (and (== h-pos "offset") (len (ox-attr x 'svg:x))))
+         (v-offset (and (== v-pos "offset") (len (ox-attr x 'svg:y)))))
+    (and (in? anchor '("paragraph" "char" "page" "frame"))
+         `((float ,(office-float-side h-pos h-rel h-offset width))
+           (wrap ,wrap) (wrap-side ,side)
+           (h-pos ,h-pos) (h-rel ,(or h-rel "column")) (h-offset ,h-offset)
+           (v-pos ,v-pos) (v-rel ,(or v-rel "paragraph")) (v-offset ,v-offset)))))
+
 (define (odt-frame x)
   ;; a frame: an image, a formula, or a box of text
   (let* ((images (ox-childs x 'draw:image))
@@ -452,7 +513,11 @@
                    ;; another object: its picture, if any
                    (image (odt-frame-image x image alt))
                    (else '()))))
-          (image (odt-frame-image x image alt))
+          (image
+           ;; (a picture which floats beside its paragraph says where)
+           (with float (odt-float x (ox-attr x 'svg:width))
+             (map (lambda (n) (if (and float (func? n 'image)) (office-add-attrs n float) n))
+                  (odt-frame-image x image alt))))
           (box
            ;; the blocks of the box come after the paragraph which the
            ;; frame is in (a figure and its caption, a note in a box)
@@ -460,6 +525,27 @@
              (set! odt-floats (append odt-floats l))
              '()))
           (else '()))))
+
+(define (odt-crop x data)
+  ;; the parts of the picture of the frame x which are cut (fo:clip of its
+  ;; style, in the sizes of the picture itself), as "l t r b", or #f
+  (let* ((clip (odt-get (odt-style "graphic" (ox-attr x 'draw:style-name)) 'g-clip))
+         (i (and clip (string-search-forwards "(" 0 clip)))
+         (j (and clip (string-search-forwards ")" 0 clip)))
+         (l (and i j (> i 0) (> j i)
+                 (map (lambda (v) (or (office-length->cm (string-trim-both v)) 0))
+                      (list-filter (string-tokenize-by-char
+                                     (string-replace (substring clip (+ i 1) j) "," " ")
+                                     #\space)
+                                   (lambda (v) (!= v ""))))))
+         (own (and l (== (length l) 4) (office-image-cm data))))
+    (and own
+         (let* ((part (lambda (v size) (max 0 (min 0.9 (/ v size)))))
+                (c (list (part (cadddr l) (car own)) (part (car l) (cadr own))
+                         (part (cadr l) (car own)) (part (caddr l) (cadr own)))))
+           (and (list-or (map (lambda (v) (> v 0)) c))
+                (< (+ (car c) (caddr c)) 0.95) (< (+ (cadr c) (cadddr c)) 0.95)
+                (string-recompose (map office-decimal c) " "))))))
 
 (define (odt-frame-image x image alt)
   (let* ((href (ox-attr image 'xlink:href))
@@ -472,7 +558,8 @@
                      (data ,data)
                      (width ,(ox-attr x 'svg:width))
                      (height ,(ox-attr x 'svg:height))
-                     (alt ,alt)))))
+                     (alt ,alt)
+                     (crop ,(odt-crop x data))))))
           ;; An image which is not in the archive is not fetched: a link
           ;; to its address on the web, and the text of any other address.
           ((and href (or (string-starts? (locase-all href) "http://")

@@ -212,9 +212,11 @@
     <item>A drawing which was exported is a picture: it cannot be edited
     in the office programs, and it comes back as an image. The drawings and
     charts of the office programs are not imported (but for their
-    pictures), and an image which floats beside the text is placed at the
-    start of its paragraph. In <name|OpenDocument>, a picture of which
-    parts are cut is written whole.
+    pictures). An image which floats beside the text (the text around it)
+    is a paragraph of its own before its paragraph, on its side: <TeXmacs>
+    does not put text around an image. In the style <tmstyle|office> it
+    keeps where it was and how the text went around it, and it floats
+    again in the file which is written.
 
     <item>The bibliography is its entries as they are displayed: the
     data of the references (authors, years) are not exchanged; the
