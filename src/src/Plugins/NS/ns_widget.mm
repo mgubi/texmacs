@@ -19,6 +19,7 @@
 #include "ns_menu.h"
 #include "ns_gui.h"
 #include "gui.hpp"
+#include "sys_utils.hpp" // get_env
 
 
 /******************************************************************************
@@ -976,13 +977,41 @@ widget tooltip_window_widget (widget w, string s) {
   return p;
 }
 
+// Tabs whose presentation is the preference "gui:responsive tab mode", read
+// when they are made, as in the Vue interface: "top" plain tabs, "side" a
+// column of tabs on the left of the page (the default), "mobile" the list of
+// the tabs, a page replacing it with a button back to the list, "grid" all
+// the pages at once, in two columns. TEXMACS_NS_TAB_MODE overrides the
+// preference (the tests)
+static string
+responsive_tab_mode () {
+  string mode= get_env ("TEXMACS_NS_TAB_MODE");
+  if (mode == "") mode= get_preference ("gui:responsive tab mode", "side");
+  if (mode != "top" && mode != "mobile" && mode != "grid") mode= "side";
+  return mode;
+}
+
+static widget
+make_responsive_tabs (array<url> us, array<widget> ts, array<widget> bs,
+                      string mode) {
+  ns_widget wid = ns_ui_element_rep::create (ns_widget_rep::responsive_tabs_widget,
+                                             us, ts, bs, mode);
+  wid->add_children (ts);
+  wid->add_children (bs);
+  return abstract (wid);
+}
+
 widget responsive_tabs_widget (array<widget> tabs, array<widget> bodies) {
-  return tabs_widget (tabs, bodies);
+  string mode= responsive_tab_mode ();
+  if (mode == "top") return tabs_widget (tabs, bodies);
+  return make_responsive_tabs (array<url> (), tabs, bodies, mode);
 }
 
 widget responsive_icon_tabs_widget (array<url> us, array<widget> ts,
                                     array<widget> bs) {
-  return icon_tabs_widget (us, ts, bs);
+  string mode= responsive_tab_mode ();
+  if (mode == "top") return icon_tabs_widget (us, ts, bs);
+  return make_responsive_tabs (us, ts, bs, mode);
 }
 
 /******************************************************************************
