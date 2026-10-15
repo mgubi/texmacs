@@ -297,11 +297,13 @@
          (and (not (string-starts? s "<")) s))))
 
 (define (tmmd-math l)
-  (let ((x (if (list-1? l) (car l) `(concat ,@l))))
-    (if (tmmd-symbol x)
-        (list (tmmd-symbol x))
-        (with s (tmmd-inline-latex x)
-          (if (== s "") '() `((math ,s)))))))
+  ;; a formula, also of one symbol, is written in LaTeX, which is read back
+  ;; as a formula; a symbol which LaTeX does not write is its character
+  (let* ((x (if (list-1? l) (car l) `(concat ,@l)))
+         (s (tmmd-inline-latex x)))
+    (cond ((!= s "") `((math ,s)))
+          ((tmmd-symbol x) (list (tmmd-symbol x)))
+          (else '()))))
 
 (define (tmmd-display x . tag)
   (let* ((s (tmmd-display-latex x))
@@ -545,30 +547,6 @@
                  (else (loop (cdr l) (cons (tmmd-source (car l))
                                            (cons "\n" acc)))))))
         (else "")))
-
-(define (tmmd-normal-nodes t)
-  ;; the nodes for the tree t, whatever the options and the footnotes of
-  ;; the document which is converted
-  (let ((html? tmmd-html?) (flat? tmmd-flat?) (notes tmmd-footnotes)
-        (nr tmmd-footnote-nr) (rank tmmd-footnote-rank))
-    (set! tmmd-html? #t)
-    (set! tmmd-flat? #f)
-    (with r (tmmd t)
-      (set! tmmd-html? html?)
-      (set! tmmd-flat? flat?)
-      ;; (the labels of the notes which were added are free again)
-      (let loop ((l tmmd-footnotes))
-        (when (and (pair? l) (not (eq? l notes)))
-          (ahash-remove! tmmd-note-labels (cadr (cdar l)))
-          (loop (cdr l))))
-      (set! tmmd-footnotes notes)
-      (set! tmmd-footnote-nr nr)
-      (set! tmmd-footnote-rank rank)
-      r)))
-
-(tm-define (tmmd-normal t)
-  (:synopsis "What the TeXmacs tree @t is written as, as a string")
-  (object->string (tmmd-normal-nodes t)))
 
 (tm-define (tmmd-language-name tag)
   (:synopsis "The language which is written after the fence of the code @tag")

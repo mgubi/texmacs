@@ -108,6 +108,16 @@
     (<verbatim|~~> included).
   </description>
 
+  A tab at the start of a line goes to the next multiple of four columns
+  for the blocks and stays a tab in what they hold. <scm|md-expand-tabs>
+  reads a tab of width <math|n> as <scm|md-tab-head> followed by
+  <math|n-1> times <scm|md-tab-fill>, two control characters which
+  <scm|md-indent> and <scm|md-space?> count as spaces; the columns which
+  a block takes away (<scm|md-dedent>) leave fills without their head,
+  which are spaces, and <scm|md-untab> makes a head with its fills a tab
+  again in the tree. A text which holds one of these two characters has
+  its tabs read as spaces.
+
   Formulas are recognized before the emphasis, so that <verbatim|_> and
   <verbatim|*> in a formula are left alone. <scm|md-dollar-math> has the
   rules of <name|Pandoc> for the dollars, and <scm|md-literal-brackets?>
@@ -240,7 +250,10 @@
     <item*|Sources><markup|md-source> and <markup|md-block-source> hold a
     body, the text of the file for it and a copy of the body: a formula,
     a table, a piece of <name|HTML>, and with an empty body what
-    <TeXmacs> does not understand. The text is written as long as the
+    <TeXmacs> does not understand. Every formula is kept so
+    (<scm|mdtm-keep-math>): to know which ones <TeXmacs> writes in the same
+    way, each would be converted to <LaTeX> again, which takes as long as
+    reading it. The text is written as long as the
     body is the copy. In a buffer this must be told before the macros are
     expanded, which changes both: the two macros are replaced by externs
     (<scm|tmmarkdown-md-source> in <source-link|tmmarkdown-expand.scm|TeXmacs/progs/convert/markdown/tmmarkdown-expand.scm>) which
