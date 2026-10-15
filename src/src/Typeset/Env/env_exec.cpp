@@ -2010,33 +2010,37 @@ edit_env_rep::exec_set_binding (tree t) {
   }
   //cout << t << ": " << keys << " -> " << value << "\n";
 
-  for (int i=0; i<N(keys); i++) {
-    string key= keys[i]->label;
-    tree old_value= local_ref[key];
-    string part= as_string (read ("current-part"));
-    if (is_func (old_value, TUPLE) && (N(old_value) >= 2))
-      local_ref (key)= tuple (copy (value), old_value[1]);
-    else local_ref (key)= tuple (copy (value), "?");
-    if (cur_file_name != base_file_name || N(part) != 0) {
-      string extra;
-      if (cur_file_name != base_file_name)
-	extra << as_string (delta (base_file_name, cur_file_name));
-      if (N(part) != 0)
-	extra << "#" << part (1, N(part));
-      local_ref (key) << extra;
-    }
-    touched (key)= true;
-    if (complete && is_tuple (old_value) && N(old_value) >= 1) {
-      string old_s= tree_as_string (old_value[0]);
-      string new_s= tree_as_string (value);
-      if (new_s != old_s && !starts (key, "auto-")) {
-        redefined << tree (TUPLE, key, new_s);
-	//if (new_s == "") typeset_warning << "Redefined " << key << LF;
-	//else typeset_warning << "Redefined " << key << " as " << new_s << LF;
-      }
+  string part= (N(keys) == 0? string (""): as_string (read ("current-part")));
+  string extra;
+  if (cur_file_name != base_file_name || N(part) != 0) {
+    if (cur_file_name != base_file_name)
+      extra << as_string (delta (base_file_name, cur_file_name));
+    if (N(part) != 0)
+      extra << "#" << part (1, N(part));
+  }
+  for (int i=0; i<N(keys); i++)
+    write_binding (keys[i]->label, value, extra);
+  return tree (HIDDEN_BINDING, keys, value);
+}
+
+void
+edit_env_rep::write_binding (string key, tree value, string extra) {
+  if (rec_bindings != NULL) (*rec_bindings) << tuple (key, value, extra);
+  tree old_value= local_ref[key];
+  if (is_func (old_value, TUPLE) && (N(old_value) >= 2))
+    local_ref (key)= tuple (copy (value), old_value[1]);
+  else local_ref (key)= tuple (copy (value), "?");
+  if (N(extra) != 0) local_ref (key) << extra;
+  touched (key)= true;
+  if (complete && is_tuple (old_value) && N(old_value) >= 1) {
+    string old_s= tree_as_string (old_value[0]);
+    string new_s= tree_as_string (value);
+    if (new_s != old_s && !starts (key, "auto-")) {
+      redefined << tree (TUPLE, key, new_s);
+      //if (new_s == "") typeset_warning << "Redefined " << key << LF;
+      //else typeset_warning << "Redefined " << key << " as " << new_s << LF;
     }
   }
-  return tree (HIDDEN_BINDING, keys, value);
 }
 
 tree

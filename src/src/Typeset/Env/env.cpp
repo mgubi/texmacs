@@ -43,8 +43,9 @@ edit_env_rep::edit_env_rep (drd_info& drd2,
   local_att (local_att2), global_att (global_att2),
   missing (UNINIT), redefined (), touched (false),
   read_unknown (false), rec_keys (NULL), rec_values (NULL),
-  rec_key_set (NULL),
-  auto_buffer (""), typesetting (0)
+  rec_key_set (NULL), rec_bindings (NULL),
+  auto_buffer (""), typesetting (0), files_base (""), files_cur (""),
+  files_h (0)
 {
   env.back_log= &back;
   initialize_default_env ();
@@ -193,7 +194,22 @@ edit_env_rep::derived_state () {
     known= N(var_type);
     known_derived= N(env_derived_inputs ());
   }
-  return env.state_fingerprint ();
+  return env.state_fingerprint () ^ files_hash ();
+}
+
+// the files, which are not variables: the bindings record the file in
+// which they are made, relative to the one of the buffer (a buffer saved
+// under another name), and images or links are found from them
+unsigned long long
+edit_env_rep::files_hash () {
+  tree b= base_file_name->t, c= cur_file_name->t;
+  if (b.operator-> () != files_base.operator-> () ||
+      c.operator-> () != files_cur.operator-> ()) {
+    files_base= b; files_cur= c;
+    files_h= env_entry_hash ("\1base-file-name", base_file_name->t) ^
+             env_entry_hash ("\1cur-file-name", cur_file_name->t);
+  }
+  return files_h;
 }
 
 hashmap<string,bool>&
@@ -345,6 +361,18 @@ env_entry_hash (string var, tree val) {
 
 unsigned long long
 env_table::fingerprint () {
+  if (stale) {
+    stale= false;
+    fp= 0;
+    sfp_version= -1;  // (sfp is made again by state_fingerprint)
+    dirty= array<string> ();
+    dirty_set= hashmap<string,bool> (false);
+    for (iterator<string> it= iterate (h); it->busy (); ) {
+      string var= it->next ();
+      fp ^= env_entry_hash (var, h [var]);
+    }
+    return fp;
+  }
   hashmap<string,bool>& state= env_state_vars ();
   for (int i=0; i<N(dirty); i++)
     if (h->contains (dirty[i])) {
@@ -386,15 +414,14 @@ env_table::state_fingerprint () {
 
 void
 env_table::refingerprint () {
+  // (made again when it is asked for: see 'stale')
+  stale= true;
   fp= 0;
   sfp= 0;
   sfp_version= -1;
-  dirty= array<string> ();
-  dirty_set= hashmap<string,bool> (false);
-  if (typeset_inputs_mode () == 0) return;
-  for (iterator<string> it= iterate (h); it->busy (); ) {
-    string var= it->next ();
-    fp ^= env_entry_hash (var, h [var]);
+  if (N(dirty) != 0) {
+    dirty= array<string> ();
+    dirty_set= hashmap<string,bool> (false);
   }
 }
 

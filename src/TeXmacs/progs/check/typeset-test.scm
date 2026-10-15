@@ -1023,6 +1023,83 @@
      (check= (length (id->trees "sur-locus")) 1)
      (check= (length (id->trees "sur-link")) 1))))
 
+;; The bindings which a paragraph or a running header writes (set-binding,
+;; label) are written again when it is used again, in the same order: the
+;; last one wins, as in a typesetting from scratch. A running header which
+;; shows a title typesets its label again, after the body.
+(define (references labels)
+  (map (lambda (l) (tree->stree (get-reference l))) labels))
+
+(define (references-from-scratch labels)
+  (let* ((old (current-buffer)) (st (get-style-tree))
+         (body (tree-copy (buffer-tree))) (u (new-buffer)))
+    (switch-to-buffer* u)
+    (set-style-tree st)
+    (buffer-set-body u body)
+    (init-env "page-medium" "paper")
+    (update-current-buffer)
+    (update-forced)
+    (update-forced)
+    (with r (references labels)
+      (buffer-close u)
+      (switch-to-buffer* old)
+      r)))
+
+(define (with-paper-style style thunk)
+  (lambda ()
+    (set-main-style style)
+    (init-env "page-medium" "paper")
+    (update-current-buffer)
+    (update-forced)
+    (update-forced)
+    (thunk)
+    (update-forced)
+    (update-forced)))
+
+(define (test-bindings-written-again)
+  (check-group "bindings written again")
+  ;; two writers of one key: a theorem inserted before them makes the
+  ;; first one again, the second one is used again
+  (with-typeset-body
+   '(document (theorem (document (concat "Theorem one" (label "x"))))
+              "some text"
+              (concat "a later binding" (set-binding "x" "LATER"))
+              (concat "see " (reference "x")))
+   (lambda ()
+     ((with-paper-style "article"
+        (lambda ()
+          (tree-insert (buffer-tree) 0 '((theorem (document "Before")))))))
+     (check= (references '("x")) (references-from-scratch '("x")))))
+  ;; a section inserted before a labelled section: the running header
+  ;; binds the label again, after the index entry
+  (with-typeset-body
+   '(document (section (concat "Gamma" (label "s3")))
+              (concat "see " (reference "s3"))
+              (index "Gamma"))
+   (lambda ()
+     ((with-paper-style "article"
+        (lambda ()
+          (tree-insert (buffer-tree) 0 '((section "Zero"))))))
+     (check= (references '("s3")) (references-from-scratch '("s3")))))
+  ;; a chapter typeset again, its running header kept
+  (with-typeset-body
+   `(document (chapter (concat "Intro" (label "ch")))
+              (theorem (document (concat "A theorem" (label "th"))))
+              ,@(map (lambda (i)
+                       (string-append "A paragraph long enough to fill two "
+                                      "lines of the page with words, words "
+                                      "and more words, so that the chapter "
+                                      "needs a second page."))
+                     (iota 30))
+              (concat (reference "ch") (reference "th")))
+   (lambda ()
+     ((with-paper-style "book"
+        (lambda ()
+          (tree-assign (tree-ref (buffer-tree) 0)
+                       (tree-copy (tree-ref (buffer-tree) 0))))))
+     (check= (references '("ch" "th"))
+             (references-from-scratch '("ch" "th"))))))
+
 ;; A tag which is removed and put back by an undo gives its labels the
 ;; names they had (the undo puts back a copy with their numbers).
 (define (test-labels-after-undo)
@@ -1333,6 +1410,7 @@
   (test-bindings-against-scratch)
   (test-labels-of-parts)
   (test-loci-of-surround-parts)
+  (test-bindings-written-again)
   (test-labels-after-undo)
   (test-incremental-against-scratch)
   (test-random-documents)
