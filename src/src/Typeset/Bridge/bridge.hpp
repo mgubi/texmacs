@@ -95,19 +95,12 @@ public:
   virtual void my_stack_start ();     // before typesetting the subtree
   virtual void my_stack_end ();       // after typesetting it
   virtual void my_insert (bool made); // into the stack of the typesetter
-  virtual bool my_patches_old ();     // does it keep old_patch up to date?
   void typeset (int desired_status);
   bool same_inputs ();
-  void give_record (hashmap<string,tree> parent_back);
-  void typeset_by_inputs (int desired_status);
+  bool typeset_by_inputs (int desired_status); // (made again?)
 };
 
-bool bridge_reads_on (); // see "What is typeset again" in bridge.cpp
-// the reads and the lookups of bridges used again (the tail of a block of
-// paragraphs replayed by bridge_document), for the record of the bridge
-// above them
-void add_reads (edit_env env, bool known, array<int> reads,
-                array<string> keys, array<tree> values);
+
 // do two lists of page items make the same boxes (the check modes)?
 bool same_page_items (array<page_item> l1, array<page_item> l2);
 

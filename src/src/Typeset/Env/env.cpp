@@ -390,8 +390,23 @@ edit_env_rep::local_start (hashmap<string,tree>& prev_back) {
 
 void
 edit_env_rep::local_changes (hashmap<string,tree>& change) {
-  // (the changes only, without old_patch: see bridge_block_rep)
-  change= invert (back, env.h);
+  // the variables which have another value than before the bridge, with
+  // the value now (env_absent () for a variable which is not there now,
+  // when the inputs are used: a variable which was not there is not one
+  // with the value UNINIT)
+  if (typeset_inputs_mode () == 0) { change= invert (back, env.h); return; }
+  change= hashmap<string,tree> (UNINIT);
+  int i=0, n=back->n;
+  for (; i<n; i++) {
+    list<hashentry<string,tree> > l=back->a[i];
+    for (; !is_nil(l); l=l->next) {
+      tree before= l->item.im, now= env.value (l->item.key);
+      bool same= strong_equal (before, now) ||
+                 (!strong_equal (before, env_absent ()) &&
+                  !strong_equal (now, env_absent ()) && before == now);
+      if (!same) change (l->item.key)= now;
+    }
+  }
 }
 
 void

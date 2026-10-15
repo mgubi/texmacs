@@ -43,9 +43,9 @@ bridge nil_bridge;
 
 bridge_rep::bridge_rep (typesetter ttt2, tree st2, path ip2):
   ttt (ttt2), env (ttt->env), st (st2), ip (ip2),
-  status (CORRUPTED), changes (UNINIT), reads (), reads_known (false),
-  removed (UNINIT), bound (UNINIT), stack_cache_ok (false), version (0),
-  chunk_cache (NULL)
+  status (CORRUPTED), changes (UNINIT), reads (),
+  in_known (false), in_items (""), in_fp (0),
+  stack_cache_ok (false), version (0), chunk_cache (NULL)
 {
   static int bridges_made= 0;
   serial= bridges_made++;
@@ -492,25 +492,17 @@ extern tree the_et;
 
 // the reads and the lookups of a bridge which was typeset or used again,
 // for the record of the bridge above it
-void
+static void
 add_reads (edit_env env, bool known, array<int> reads,
            array<string> keys, array<tree> values) {
   hashmap<int,bool>* rec= env->read_recorder ();
   if (rec == NULL || env->read_unknown) return;
-  // (a reference looked up by several bridges is one lookup)
-  array<string> new_keys;
-  array<tree> new_values;
-  for (int i=0; i<N(keys); i++)
-    if (!contains (keys[i], *env->rec_keys) && !contains (keys[i], new_keys)) {
-      new_keys << keys[i];
-      new_values << values[i];
-    }
   if (!known || N(*rec) + N(reads) > READS_MAX ||
-      N(*env->rec_keys) + N(new_keys) > LOOKUPS_MAX) {
+      N(*env->rec_keys) + N(keys) > LOOKUPS_MAX) {
     env->read_unknown= true; return; }
   for (int i=0; i<N(reads); i++) rec->operator () (reads[i])= true;
-  (*env->rec_keys) << new_keys;
-  (*env->rec_values) << new_values;
+  (*env->rec_keys) << keys;
+  (*env->rec_values) << values;
 }
 
 // do the references and attachments looked up still have the values found?
@@ -562,53 +554,97 @@ same_page_items (array<page_item> l1, array<page_item> l2) {
          lines_contents (l1) == lines_contents (l2);
 }
 
-// 'now' is a tuple of the variables which the bridge binds and of their
-// values. The result is what bind_end needs to put old_patch back, when
-// the bridges below are typeset
-tree
-bridge_rep::bind_start (tree now) {
-  tree outer (TUPLE);
-  for (int i=0; i+1<N(now); i+=2) {
-    if (!is_atomic (now[i])) continue;
-    string var= now[i]->label;
-    bool later= false; // (bound again further on)
-    for (int j=i+2; j+1<N(now); j+=2)
-      if (now[j] == now[i]) later= true;
-    if (later) continue;
-    // (the value bound in the previous pass, which is the last one of
-    // the variable in 'bound')
-    tree prev (UNINIT);
-    bool same= false;
-    if (is_func (bound, TUPLE))
-      for (int j=0; j+1<N(bound); j+=2)
-        if (bound[j] == now[i]) { prev= bound[j+1]; same= (prev == now[i+1]); }
-    // below, the variable has the value of the previous pass when the
-    // binding is the same, whatever it had outside
-    if (same && !ttt->old_patch->contains (var)) continue;
-    if (ttt->old_patch->contains (var))
-      outer << tree (var) << tree ("1") << ttt->old_patch [var];
-    else outer << tree (var) << tree ("0") << tree (UNINIT);
-    if (same) ttt->old_patch->reset (var);
-    else ttt->old_patch (var)= prev;
+/******************************************************************************
+* What is typeset again
+*
+* What a bridge makes is a function of its subtree and of what it was
+* typeset from: the variables which it read before it wrote them, with
+* their values, the state of the environment derived from the variables
+* (the font, the colour...: edit_env_rep::derived_state), the references
+* and attachments which it looked up, and the line items which the bridges
+* around it gave it (ttt->a and ttt->b). These are its inputs. A bridge
+* whose subtree did not change (its status) is used again when all of its
+* inputs are known (no Scheme routine, not too many) and have the values
+* they had, or when the whole environment is as it was (a fingerprint of
+* it, kept as it is written: env_table::fp), which is what a bridge whose
+* inputs are not known needs: then it writes what it wrote (changes, exact
+* for a variable which was not there: env_absent). Nothing about the bridges before it is
+* needed: what changed before it, what was removed or bound above it, is
+* seen in the values of its inputs. The inputs of the bridges below a
+* bridge are among its own, unless it wrote them before.
+*
+* TEXMACS_TYPESET_READS may be "off" (the classic cache: a bridge is used
+* again when the bookkeeping of the changes of the environment, old_patch,
+* says that nothing changed before it) or "check" (a bridge which would be
+* used again is typeset again, and what it makes is compared).
+******************************************************************************/
+
+#define INPUTS_MAX 256
+
+static tree
+items_signature (array<line_item> a, array<line_item> b) {
+  if (N(a) == 0 && N(b) == 0) return "";
+  tree r (TUPLE);
+  for (int k=0; k<2; k++) {
+    array<line_item> l= (k == 0? a: b);
+    for (int i=0; i<N(l); i++)
+      r << tree (TUPLE, as_string (l[i]->type), as_string (l[i]->op_type),
+                 (tree) l[i]->b, as_string (l[i]->b->w ()),
+                 as_string (l[i]->b->h ()), as_string (l[i]->penalty),
+                 as_string (l[i]->spc->def))
+        << l[i]->t;
+    r << tree ("|");
+  }
+  return r;
+}
+
+static inline bool
+same_value (tree before, tree now) {
+  if (strong_equal (before, now)) return true;
+  if (strong_equal (before, env_absent ()) ||
+      strong_equal (now, env_absent ())) return false;
+  return before == now;
+}
+
+bool
+bridge_rep::same_inputs () {
+  if (N(ttt->a) == 0 && N(ttt->b) == 0) {
+    if (in_items != "") return false; }
+  else if (in_items != items_signature (ttt->a, ttt->b)) return false;
+  if (!same_lookups (env, seen_keys, seen_values)) return false;
+  // the whole environment as it was (the fingerprint: also for a bridge
+  // whose inputs are not known), or the inputs
+  if (env->fingerprint () == in_fp) return true;
+  if (!in_known) return false;
+  for (int i=0; i<N(in_vars); i++)
+    if (!same_value (in_vals[i], env->current (in_vars[i]))) return false;
+  return env->derived_state () == in_state;
+}
+
+// the inputs of a bridge are inputs of the bridge which is recorded above
+// it, when it did not write them before (parent_back) or read them
+static void
+add_inputs (edit_env env, hashmap<string,tree> parent_back, bool known,
+            array<string> vars, array<tree> vals) {
+  array<string>* pv= env->input_vars ();
+  array<tree>* pw= env->input_vals ();
+  hashmap<int,bool>* rec= env->read_recorder ();
+  if (pv == NULL || rec == NULL || env->read_unknown) return;
+  if (!known || N(*pv) + N(vars) > INPUTS_MAX) {
+    env->read_unknown= true; return; }
+  for (int i=0; i<N(vars); i++) {
+    int id= env_var_id (vars[i]);
+    if ((*rec)->contains (id) || parent_back->contains (vars[i])) continue;
+    rec->operator () (id)= true;
+    (*pv) << vars[i];
+    (*pw) << vals[i];
   }
 }
 
-void
-bridge_rep::give_record (hashmap<string,tree> parent_back) {
-  // what a bridge gives the record of the bridge above it, whether it was
-  // used again or typeset again (one function, so that the check mode,
-  // which typesets again, gives what the bridge used again gives): its
-  // inputs, which are not all known when it was used again through the
-  // fingerprint, and its reads and lookups
-  add_inputs (env, parent_back, in_known, in_vars, in_vals);
-  add_reads (env, in_known && N(reads) <= READS_MAX, reads,
-             seen_keys, seen_values);
-}
-
-void
+bool
 bridge_rep::typeset_by_inputs (int desired_status) {
-  bool same= (status == desired_status) && same_inputs ();
-  bool check= same && typeset_inputs_mode () == 2;
+  bool same= (status == desired_status) && my_reusable () && same_inputs ();
+  bool check= same && (typeset_inputs_mode () == 2 || my_check_cache ());
   array<SI> old_lines, old_border;
   array<tree> old_contents;
   hashmap<string,tree> old_changes (UNINIT);
@@ -620,17 +656,11 @@ bridge_rep::typeset_by_inputs (int desired_status) {
   }
   if (same && !check) {
     if (edit_profile.on) edit_profile.cached++;
-    give_record (env->values_before ());
+    add_inputs (env, env->values_before (), true, in_vars, in_vals);
+    add_reads (env, true, reads, seen_keys, seen_values);
     env->monitored_patch_env (changes);
-    return;
+    return false;
   }
-  // (in the check mode, what the bridge would have given used again)
-  bool was_known= in_known;
-  array<string> was_vars= in_vars, was_keys= seen_keys;
-  array<tree> was_vals= in_vals, was_values= seen_values, was_state= in_state;
-  array<int> was_reads= reads;
-  tree was_items= in_items;
-  unsigned long long was_fp= in_fp;
   if (edit_profile.on) edit_profile.redone++;
   array<tree> state= env->derived_state ();
   tree items= items_signature (ttt->a, ttt->b);
@@ -639,7 +669,7 @@ bridge_rep::typeset_by_inputs (int desired_status) {
   my_clean_links ();
   link_repository old_link_env= env->link_env;
   env->link_env= link_env;
-  ttt->local_start (l, sb);
+  my_stack_start ();
   env->local_start (prev_back);
   if (env->hl_lan != 0) env->lan->highlight (st);
   hashmap<int,bool> my_reads (false);
@@ -664,47 +694,29 @@ bridge_rep::typeset_by_inputs (int desired_status) {
   in_fp= fp;
   seen_keys= my_keys;
   seen_values= my_values;
+  add_inputs (env, prev_back, known, my_vars, my_vals);
+  add_reads (env, known && N(reads) <= READS_MAX, reads, seen_keys,
+             seen_values);
   env->local_changes (changes);
-  ttt->local_end (l, sb);
-  bool differs= check &&
-    (lines_signature (l) != old_lines || changes != old_changes ||
-     border_signature (sb) != old_border || lines_contents (l) != old_contents);
-  // and its record: when it said that all the inputs were known, it must
-  // hold those which the bridge reads now (a record which misses some, as
-  // one which got the inputs of a bridge below which were not all known,
-  // would use the bridge again when they change)
-  bool missing= false;
-  if (check && was_known) {
-    if (!known) missing= true;
-    for (int i=0; i<N(my_vars) && !missing; i++)
-      if (!contains (my_vars[i], was_vars)) missing= true;
-  }
-  if (check && !differs && !missing) {
-    // the check mode gives the bridge above, and keeps for the next pass,
-    // what the bridge used again would have: the record of the previous
-    // pass, so that what is wrong in it shows when the bridges above are
-    // checked (and not only what the bridge makes)
-    in_known= was_known; in_vars= was_vars; in_vals= was_vals;
-    in_state= was_state; in_items= was_items; in_fp= was_fp;
-    seen_keys= was_keys; seen_values= was_values; reads= was_reads;
-  }
-  give_record (prev_back);
   env->local_end (prev_back);
+  my_stack_end ();
   if (check) {
     if (edit_profile.on) edit_profile.unread++;
-    if (differs) {
+    if (lines_signature (l) != old_lines || changes != old_changes ||
+        border_signature (sb) != old_border ||
+        lines_contents (l) != old_contents) {
       typeset_check_mismatches++;
       failed_error << "A bridge whose inputs were the same is typeset "
                    << "otherwise: " << st << LF;
     }
-    if (missing) {
-      typeset_check_mismatches++;
-      failed_error << "The record of the inputs of a bridge misses some: "
-                   << st << LF;
-    }
   }
   env->link_env= old_link_env;
   status= desired_status;
+  // (the old lines are not used any more)
+  stack_cache= array<page_item> ();
+  stack_cache_ok= false;
+  version++;
+  return true;
 }
 
 void
@@ -724,53 +736,21 @@ bridge_rep::my_resync () {
 
 bool bridge_rep::my_reusable () { return true; }
 bool bridge_rep::my_check_cache () { return false; }
-bool bridge_rep::my_patches_old () { return true; }
 void bridge_rep::my_stack_start () { ttt->local_start (l, sb); }
 void bridge_rep::my_stack_end () { ttt->local_end (l, sb); }
 
 void
 bridge_rep::typeset (int desired_status) {
   my_resync ();
-
   //cout << "Typesetting " << st << ", " << desired_status << LF << INDENT;
-  if (N(removed) != 0) {
-    // (see above: the changes of the paragraphs removed before this one)
-    env->compare_changes (ttt->old_patch, removed);
-    removed= hashmap<string,tree> (UNINIT);
-  }
-  // (what a bridge makes also holds the line items which the bridges
-  // around it left for its first and last lines, ttt->a and ttt->b: the
-  // number of an equation ends up in the lines of its body)
-  bool alone= (N(ttt->a) == 0) && (N(ttt->b) == 0);
-  bool reusable= (status==desired_status) && my_reusable ();
-  bool unread= reusable && (N(ttt->old_patch)!=0) &&
-               reads_known && alone && reads_mode () != 0 &&
-               patch_unread (ttt->old_patch, reads, env) &&
-               same_lookups (env, seen_keys, seen_values);
-  // a bridge used again as in the classic cache (nothing changed around
-  // it, as far as the bookkeeping of the changes says: the paragraphs
-  // removed before it, the bindings above it)
-  bool cached= reusable && (N(ttt->old_patch)==0);
-  // the check mode typesets again both kinds of bridges used again, when
-  bool check= (reads_mode () == 2 && (unread || (cached && reads_known))) ||
-              ((unread || cached) && my_check_cache ());
-  array<SI> old_lines, old_border;
-  array<tree> old_contents;
-  hashmap<string,tree> old_changes (UNINIT);
-  if (check) {
-    old_lines= lines_signature (l);
-    old_border= border_signature (sb);
-    old_contents= lines_contents (l);
-    old_changes= changes;
-  }
-  bool made= false;
-  if (cached && !check) {
+  bool made;
+  if (typeset_inputs_mode () != 0) made= typeset_by_inputs (desired_status);
+  else if ((status==desired_status) && (N(ttt->old_patch)==0)) {
     //cout << "cached" << LF;
     env->monitored_patch_env (changes);
-    // cout << "changes       = " << changes << LF;
+    made= false;
   }
   else {
-    // cout << "Typesetting " << st << ", " << desired_status << LF << INDENT;
     //cout << "recomputing" << LF;
     hashmap<string,tree> prev_back (UNINIT);
     my_clean_links ();
@@ -780,70 +760,15 @@ bridge_rep::typeset (int desired_status) {
     env->local_start (prev_back);
     if (env->hl_lan != 0) env->lan->highlight (st);
     my_typeset (desired_status);
-    bool recorded= record.complete () &&
-                   N(my_reads) <= READS_MAX && N(my_keys) <= LOOKUPS_MAX;
-    reads_known= recorded && alone;
-    // the variables which it leaves with the value UNINIT: among those
-    // which it read or wrote (every write goes through env_table, which
-    // records it), and those of the bridges below it
-    for (iterator<int> it= iterate (my_reads); it->busy (); ) {
-      string var= env_var_name (it->next ());
-      if (!contains (var, my_uninit)) my_uninit << var;
-    }
-    array<string> left;
-    for (int i=0; i<N(my_uninit); i++)
-      if (env->is_uninit (my_uninit[i])) left << my_uninit[i];
-    my_uninit= left;
-    reads= array<int> ();
-    seen_keys= array<string> ();
-    seen_values= array<tree> ();
-    if (recorded) {
-      for (iterator<int> it= iterate (my_reads); it->busy (); )
-        reads << it->next ();
-      merge_sort (reads);
-      seen_keys= my_keys;
-      seen_values= my_values;
-    }
-    record.stop ();
-    add_reads (env, recorded, reads, seen_keys, seen_values);
-    for (int i=0; i<N(my_uninit); i++)
-      env->note_uninit (my_uninit[i]);
-    if (my_patches_old ()) {
-      env->local_update (ttt->old_patch, changes);
-      // a variable which the bridge leaves with the value UNINIT now and
-      // not in the previous pass, or the other way round, changed (the
-      // changes do not tell, see rec_uninit)
-      for (int i=0; i<N(my_uninit); i++)
-        if (!contains (my_uninit[i], uninit))
-          ttt->old_patch (my_uninit[i])= tree (UNINIT);
-      for (int i=0; i<N(uninit); i++)
-        if (!contains (uninit[i], my_uninit))
-          ttt->old_patch (uninit[i])= tree (UNINIT);
-    }
-    else env->local_changes (changes);
-    uninit= my_uninit;
+    env->local_update (ttt->old_patch, changes);
     env->local_end (prev_back);
     my_stack_end ();
-    if (check) {
-      if (edit_profile.on) edit_profile.unread++;
-      if (lines_signature (l) != old_lines || changes != old_changes ||
-          border_signature (sb) != old_border ||
-          lines_contents (l) != old_contents) {
-        typeset_check_mismatches++;
-        failed_error << "A bridge which read none of the variables which "
-                     << "changed (" << ttt->old_patch << ") is typeset "
-                     << "otherwise: " << st << LF;
-      }
-    }
     env->link_env= old_link_env;
     status= desired_status;
     // (the old lines are not used any more)
     stack_cache= array<page_item> ();
     stack_cache_ok= false;
     version++;
-    // cout << "old_patch     = " << ttt->old_patch << LF;
-    // cout << "changes       = " << changes << LF;
-    // cout << UNINDENT << "Typesetted " << st << ", " << desired_status << LF;
     made= true;
   }
   my_insert (made);

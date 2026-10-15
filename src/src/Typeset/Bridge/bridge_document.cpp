@@ -21,11 +21,10 @@
 * merge their cached lines into the global stack.  For long documents this
 * per-paragraph work dominates the cost of a keystroke.  The paragraphs are
 * therefore grouped in blocks, which are bridges (bridge_block_rep): what a
-* bridge records, its changes of the environment, the variables it read
-* and what it looked up (see "What is typeset again" in bridge.cpp), holds
-* for a block as a whole, so that a block whose paragraphs did not change
-* is used again as one bridge, also when the environment changed and the
-* block read none of what changed.
+* bridge records, its changes of the environment and its inputs (see "What
+* is typeset again" in bridge.cpp), holds for a block as a whole, so that a
+* block whose paragraphs did not change is used again as one bridge, also
+* when the environment changed and none of the inputs of the block did.
 *
 * A block does not stack its paragraphs in a stack of its own, which would
 * then be merged with the lines before it: the vertical space after a
@@ -123,10 +122,6 @@ public:
   void my_stack_start ();
   void my_stack_end ();
   void my_insert (bool made);
-  // (its paragraphs keep old_patch up to date, as they are typeset: its
-  // changes, which are those of the previous pass, are not those of the
-  // paragraphs it holds now when they changed)
-  bool my_patches_old () { return false; }
   void my_typeset (int desired_status);
 };
 
@@ -151,9 +146,6 @@ bridge_block_rep::my_reusable () {
     bridge_rep* br= brs[k].operator-> ();
     if (br->version != vers[k] || br->status != PROCESSED + WANTED_PARAGRAPH)
       return false;
-    // the changes of the paragraphs removed before this one are compared
-    // with the environment when it is typeset (bridge_rep::typeset)
-    if (N(br->removed) != 0) return false;
   }
   int i= last_line_item (ttt->l);
   return i >= 0 && N(ttt->l) - i == head_back &&
@@ -229,8 +221,6 @@ class bridge_document_rep: public bridge_rep {
 protected:
   array<bridge> brs;
   bridge acc; // binary splitting acceleration for long documents
-  hashmap<string,tree> removed_last; // as bridge_rep::removed, for the
-                                     // paragraphs removed at the end
   hashmap<int,bridge> blocks; // by the number of their first paragraph
   void typeset_one (int i, int n, int desired_status,
                     array<line_item>& a, array<line_item>& b);
@@ -432,7 +422,10 @@ bridge_document_rep::my_typeset (int desired_status) {
     array<line_item> b= ttt->b;
     hashmap<int,bridge> old_blocks= blocks;
     blocks= hashmap<int,bridge> ();
-    bool use_blocks= (typeset_caches_mode () != 0);
+    // (the blocks are bridges used again when their inputs are the same:
+    // the classic cache would derive old_patch from their changes)
+    bool use_blocks= (typeset_caches_mode () != 0 &&
+                      typeset_inputs_mode () != 0);
     for (int s= 0, e; s < n; s= e) {
       // block s..e-1, without the first and the last paragraph
       e= s + 1;
@@ -454,10 +447,6 @@ bridge_document_rep::my_typeset (int desired_status) {
       ttt->a= array<line_item> ();
       ttt->b= array<line_item> ();
       blk->typeset (PROCESSED + WANTED_PARAGRAPH);
-    }
-    if (N(removed_last) != 0) {
-      env->compare_changes (ttt->old_patch, removed_last);
-      removed_last= hashmap<string,tree> (UNINIT);
     }
   }
   else acc->my_typeset (desired_status);

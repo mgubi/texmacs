@@ -691,6 +691,12 @@ public:
   void local_start (hashmap<string,tree>& prev_back);
   void local_update (hashmap<string,tree>& oldpat, hashmap<string,tree>& chg);
   void local_changes (hashmap<string,tree>& chg);
+  inline array<string>* input_vars () { return env.in_vars; }
+  inline array<tree>* input_vals () { return env.in_vals; }
+  inline tree current (string s) { return env.value (s); }
+  inline unsigned long long fingerprint () { return env.fingerprint (); }
+  inline bool written (string s) { return back->contains (s); }
+  inline hashmap<string,tree> values_before () { return back; }
   void local_end (hashmap<string,tree>& prev_back);
 
   /* updating environment variables */
