@@ -99,6 +99,14 @@ function handle(m) {
 		if (new URLSearchParams(self.location.search).has("debug"))
 			core.ccall("tau_scheme", null, ["string"], [m.code]);
 		break;
+	case "memory":
+		// for the tests: the size of the memory of the program
+		if (new URLSearchParams(self.location.search).has("debug")) postMessage({ t: "memory", text: String(core.HEAPU8.length) });
+		break;
+	case "fonts-arrived":
+		// for the tests: a font which the network brought late (packages.js)
+		if (new URLSearchParams(self.location.search).has("debug")) core._vue_web_font_arrived();
+		break;
 	case "dry":
 		// for the benchmark of the drawing (misc/tau/test/render-bench.mjs)
 		if (new URLSearchParams(self.location.search).has("debug")) core._tau_dry(m.on ? 1 : 0);
@@ -432,7 +440,7 @@ function dispatch(m) {
 let dead = false;
 function stopped(error) {
 	const fatal = error instanceof WebAssembly.RuntimeError || error instanceof RangeError ||
-		/RuntimeError|call stack|unreachable|out of bounds|null function|table entry/i.test(String(error && error.message || error));
+		/RuntimeError|Aborted|OOM|call stack|unreachable|out of bounds|null function|table entry/i.test(String(error && error.message || error));
 	if (!fatal || dead) return;
 	dead = true;
 	// (with where it happened: the functions of the program by their numbers,

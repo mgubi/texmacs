@@ -11,6 +11,22 @@
 // memory, and writing two of them back would lose the files of one. The
 // page which holds the lock "tau-home" (Web Locks) does; another one works
 // in memory only and says so (Module.tauHomeKept is false).
+
+// what went wrong, in words: the errors of IndexedDB and of the file
+// system of Emscripten are objects without a message ([object Object])
+function describeError (err) {
+  if (!err) return 'unknown error';
+  if (typeof err === 'string') return err;
+  var inner = err.target && err.target.error;
+  var parts = [];
+  if (err.name && err.name !== 'Error') parts.push (err.name);
+  if (err.message) parts.push (err.message);
+  if (inner) parts.push ((inner.name || '') + (inner.message ? ': ' + inner.message : ''));
+  if (err.errno !== undefined) parts.push ('errno ' + err.errno + (err.code ? ' ' + err.code : ''));
+  if (parts.length) return parts.join (', ');
+  try { return JSON.stringify (err); } catch (e) { return String (err); }
+}
+
 var TAU_HOME = '/home/tau';
 
 Module['preRun'] = Module['preRun'] || [];
@@ -96,7 +112,7 @@ Module['preRun'].push(function () {
         realSync.call (IDBFS, mount, populate, function (err) {
           if (err && !populate) {
             console.error ('Tau: the home directory cannot be written to the browser: ' + err);
-            try { postMessage ({ t: 'storage', text: String (err && err.message || err) }); } catch (e) {}
+            try { postMessage ({ t: 'storage', text: describeError (err) }); } catch (e) {}
           }
           if (!populate) pending--;
           if (callback) callback (err);

@@ -53,7 +53,11 @@ CFLAGS   := $(OPT) $(EH) -w
 CXXFLAGS := $(OPT) $(EH) -w -std=c++17
 DEPFLAGS := -MMD -MP
 
-LDFLAGS  := $(OPT) $(EH) -sALLOW_MEMORY_GROWTH=1 \
+# (ABORTING_MALLOC: memory which cannot be had stops the program with an
+# error which says so; malloc gave NULL instead, objects were written at 0,
+# and the program failed later on what was there, "call_indirect to a null
+# table entry")
+LDFLAGS  := $(OPT) $(EH) -sALLOW_MEMORY_GROWTH=1 -sABORTING_MALLOC=1 \
   -sINITIAL_MEMORY=268435456 -sSTACK_SIZE=16777216 \
   -sEXIT_RUNTIME=0 -sFORCE_FILESYSTEM=1 -Wl,--error-limit=0
 LIBS     := $(MUPDF_LIB)/libmupdf.a $(MUPDF_LIB)/libmupdf-third.a -lm

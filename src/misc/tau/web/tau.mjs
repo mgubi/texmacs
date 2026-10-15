@@ -934,7 +934,10 @@ worker.onmessage = event => {
 		notice("The browser did not delete what Tau keeps (" + m.text + ").");
 		break;
 	case "stopped":
-		failure("The program of Tau stopped on an error and cannot go on: " + m.text +
+		// (the browser gave no more memory: said as such)
+		if (/\bOOM\b|out of memory|Cannot enlarge memory/i.test(m.text))
+			failure("Tau ran out of memory: the browser gave it no more (" + m.text + "). Documents which were saved are kept; what was typed since is lost. Closing other tabs, or the documents which are open, may help.", "Tau ran out of memory", m.stack);
+		else failure("The program of Tau stopped on an error and cannot go on: " + m.text +
 			" Documents which were saved are kept; what was typed since is lost.", undefined, m.stack);
 		break;
 	case "view": {
