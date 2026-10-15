@@ -277,7 +277,12 @@
     <item>A <name|Markdown> file keeps the tabs at the start of its lines
     (in code, formulas, tables and the <name|YAML> header), a formula of a
     single symbol is read back as a formula, and files with many formulas
-    open faster.
+    open faster. After a review, typographic quotes stay as they are, a
+    file which begins with a byte order mark or holds an entity such as
+    <verbatim|&#1e3;> is read, <verbatim|\<less\>pre\<gtr\>> and
+    <verbatim|\<less\>script\<gtr\>> blocks run to their closing tag, and the
+    <name|Markdown> which is written reads back the same in more cases
+    (nested lists, emphasis next to code, links).
   </itemize>
 
   <paragraph|14 October 2026>
