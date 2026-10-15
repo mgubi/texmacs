@@ -106,7 +106,8 @@
     (check= (len (rep "<!-- x\n\n" 5000)) 5001)
     ;; formulas which do not end, blank lines after indented code, runs of
     ;; backquotes which nothing closes, footnote marks inside each other
-    (check= (len (rep "\\[=\n" 4000)) 4001)
+    ;; (a formula which does not end is text of the paragraph)
+    (check= (len (rep "\\[=\n" 20000)) 2)
     (check= (len (string-append "    a\n" (rep "\n" 8000) "    b\n")) 2)
     (check= (len (string-append "    a\n" (rep "\n" 8000) "b\n")) 3)
     (check= (len (apply string-append
@@ -1212,6 +1213,125 @@
       (when (buffer-exists? old) (switch-to-buffer old)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; After the fourth audit
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; What the parser read otherwise than CommonMark does.
+(define (test-audit-parse)
+  (check-group "audit, parse")
+  ;; an entity has digits only, and the entities of HTML 4 are known
+  (check= (parse* "&#1e3; &#65.0; &#x41; &AElig; &alpha;")
+          `(markdown ,(string-append "&#1e3; &#65.0; A " (bytes 195 134) " "
+                                     (bytes 206 177))))
+  ;; the mark of byte order is not text
+  (check= (parse* (string-append (bytes 239 187 191) "# T")) '(markdown (h1 "T")))
+  (check= (cadr (md-tree (string-append (bytes 239 187 191)
+                                        "---\ntitle: T\n---\n\nx")))
+          '(markdown (meta (@ (source "title: T")) (title "T")) (p "x")))
+  ;; many blocks after a line which starts with a tab
+  (check= (length (cadr (md-tree (string-append tab-char "x\n\n"
+                                                (apply string-append
+                                                       (make-list 10000 "p\n\n"))))))
+          10002)
+  ;; a line without > or indentation does not continue code between fences
+  (check= (parse* "> ```\n> code\nlazy")
+          '(markdown (blockquote (pre "code")) (p "lazy")))
+  (check= (parse* "- ```\n  a\nb") '(markdown (ul (li (pre "a"))) (p "b")))
+  (check= (parse* "> ```\n> x\n> ```\nlazy")
+          '(markdown (blockquote (pre "x")) (p "lazy")))
+  (check= (parse* "> a\nlazy") '(markdown (blockquote (p "a lazy"))))
+  ;; a blank line inside a list of an item, or inside code, does not make
+  ;; the list of the item loose
+  (check= (parse* "- a\n  - b\n\n    c\n- d")
+          '(markdown (ul (li (p "a") (ul (@ (loose "true")) (li (p "b") (p "c"))))
+                         (li (p "d")))))
+  (check= (parse* "- a\n  ```\n  x\n\n  y\n  ```")
+          '(markdown (ul (li (p "a") (pre "x\n\ny")))))
+  ;; <pre>, <script>, <style> and <textarea> go on to their closing tag
+  (check= (parse* "<script>\nvar a;\n\nvar b;\n</script>\n\nafter")
+          '(markdown (html "<script>\nvar a;\n\nvar b;\n</script>") (p "after")))
+  (check= (parse* "<pre>\nnever closed\n\ntext")
+          '(markdown (html "<pre>\nnever closed") (p "text")))
+  ;; a formula which does not end does not end the paragraph
+  (check= (parse* "I paid\n$$5 for it") '(markdown "I paid $$5 for it"))
+  (check= (parse* "text\n$$\nx\n$$") '(markdown (p "text") (displaymath "x")))
+  ;; the address and the title of a definition on the next lines
+  (check= (parse* "[foo]:\n/url\n\n[foo]") '(markdown (a (@ (href "/url")) "foo")))
+  (check= (parse* "[foo]: /url\n\"T\"\n\n[foo]")
+          '(markdown (a (@ (href "/url") (title "T")) "foo")))
+  (check= (parse* "[foo]:\n/url\n'the title'\n\n[foo]")
+          '(markdown (a (@ (href "/url") (title "the title")) "foo")))
+  (check= (parse* "[foo]: /url\nnot a title\n\n[foo]")
+          '(markdown (p "not a title") (p (a (@ (href "/url")) "foo"))))
+  ;; an image with a style is HTML
+  (check= (parse* "a <img src=\"i.png\" style=\"float: right\"> b")
+          '(markdown "a " (html "<img src=\"i.png\" style=\"float: right\">")
+                     " b")))
+
+;; What the serializer wrote which was read back otherwise.
+(define (test-audit-serialize)
+  (check-group "audit, serialize")
+  (let ((rt (lambda (t) (parse* (write-md t)))))
+    ;; HTML after a list does not go into its last item
+    (with s "<td>\n\n  * a\n  * b\n\n  </td>\n</tr>"
+      (check= (rt (parse s)) (parse* s)))
+    ;; emphasis inside emphasis of its kind is that emphasis
+    (check= (write-md '(markdown (em (em "a")))) "*a*")
+    (check= (rt '(markdown (em "a" (em "b")))) '(markdown (em "ab")))
+    (check= (write-md '(markdown (p (del (del "a"))))) "~~a~~\n")
+    (check= (rt '(markdown (em "a" (strong "b" (em "c")) "d")))
+            '(markdown (em "a" (strong "bc") "d")))
+    ;; a paragraph which starts with a tab
+    (check= (write-md `(markdown (p ,(string-append tab-char "tab")))) "tab\n")
+    ;; words after the fence with a backquote: a fence of tildes
+    (check= (rt '(markdown (pre (@ (lang "a`b")) "x\n~~~")))
+            '(markdown (pre (@ (lang "a`b")) "x\n~~~")))
+    ;; backslashes and entities in an address and in a title
+    (for-each (lambda (u)
+                (with t `(markdown (a (@ (href ,u) (title "t\\")) "t"))
+                  (check= (rt t) t)))
+              '("u\\*v" "u&amp;v" "<u>" "a\\"))))
+
+;; What the import and the export lost.
+(define (test-audit-convert)
+  (check-group "audit, convert")
+  (let ((rsquo (bytes 226 128 153))
+        (lsquo (bytes 226 128 152)))
+    ;; the quotes of typography are themselves, in the text and in code
+    (check= (import (string-append "a" rsquo "b" lsquo "c " (bytes 194 181)))
+            "a<#2019>b<#2018>c <#B5>")
+    (for-each (lambda (s) (check= (md->md s) s))
+              (list (string-append "a " rsquo " b " lsquo " c\n")
+                    (string-append "```\n'" rsquo "'\n```\n")
+                    (string-append "`" rsquo "` [a](http://x/" rsquo ")\n")
+                    (string-append "| a |\n| - |\n| " rsquo " |\n"))))
+  ;; a list which cannot interrupt the paragraph of an item
+  (check= (import (export '(itemize (document (concat (item) "a")
+                                              (itemize (document (item)))))))
+          '(itemize (document (concat (item) "a")
+                              (itemize (document (concat (item) ""))))))
+  (with t '(itemize (document (concat (item) "a")
+                              (enumerate (document (concat (assign "item-nr" "1")
+                                                           (item) "b")))))
+    (check= (import (export t)) t))
+  ;; emphasis which starts or ends with code, a link or a formula, next to
+  ;; a letter
+  (for-each (lambda (t) (check= (import (export t)) t))
+            `((concat "the" (em (verbatim "foo")) "s")
+              (concat "see " (em (hlink "x" "u")) "s")
+              (concat "word" (strong (math "x")))
+              (concat ,(string-append "caf" (bytes 233)) (em (verbatim "x"))
+                      ,(bytes 233))))
+  (check= (export '(concat "the" (em (verbatim "foo")) "s"))
+          "th&#101;*`foo`*&#115;")
+  ;; [a] in the text, with a definition of a which the file keeps
+  (with s "Literal \\[a] text\n\n[a]: http://u\n"
+    (check= (md->md s) "Literal [a\\] text\n\n[a]: http://u\n"))
+  ;; many emphasized texts in a row are merged at once
+  (check= (export `(concat ,@(make-list 20000 '(em "b"))))
+          (string-append "*" (make-string 20000 #\b) "*")))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The format
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -1270,5 +1390,8 @@
   (test-style-losses-2)
   (test-style-tabs)
   (test-style-buffer)
+  (test-audit-parse)
+  (test-audit-serialize)
+  (test-audit-convert)
   (test-format)
   (check-end))

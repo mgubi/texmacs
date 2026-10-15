@@ -69,6 +69,8 @@
       (eqv? c md-tab-fill) (eqv? c md-tab-head)))
 (define (md-digit? c)
   (with n (char->integer c) (and (< 47 n) (< n 58))))
+(define (md-hex-digit? c)
+  (or (md-digit? c) (in? (char-downcase c) '(#\a #\b #\c #\d #\e #\f))))
 (define (md-ascii-alpha? c)
   (with n (char->integer c)
     (or (and (< 96 n) (< n 123)) (and (< 64 n) (< n 91)))))
@@ -229,8 +231,10 @@
               (else (loop (cdr l) #f (cons (car l) acc)))))))
 
 (define (md-untab x)
-  ;; the same in each string of the tree x
+  ;; the same in each string of the tree x (a list of many blocks is not
+  ;; gone through with a call for each of them)
   (cond ((string? x) (md-untab-string x))
+        ((list? x) (map md-untab x))
         ((pair? x) (cons (md-untab (car x)) (md-untab (cdr x))))
         (else x)))
 
@@ -419,7 +423,7 @@
                          "h4" "h5" "h6" "head" "header" "hr" "html" "iframe"
                          "li" "main" "nav" "ol" "p" "pre" "script" "section"
                          "style" "summary" "table" "tbody" "td" "tfoot" "th"
-                         "thead" "title" "tr" "ul" "video"))))))
+                         "textarea" "thead" "title" "tr" "ul" "video"))))))
 
 (define (md-literal-brackets? s i e)
   ;; whether the \[ at i, which the \] at e closes, holds plain text and not
@@ -522,6 +526,33 @@
                                     (if title? (substring rest 1 (- m 1))
                                         "")))))))))))
 
+(define (md-ref-def-lines lines)
+  ;; (definition . lines which remain) for the definition of a link which
+  ;; starts the lines: its address may be on the next line, and its title
+  ;; on the line after the address
+  (let* ((one (md-ref-def (car lines)))
+         (next (lambda (l)
+                 (and (nnull? l) (not (md-blank? (car l))) (car l))))
+         (join (lambda (n)
+                 (with l (list-head (append lines '("" "")) n)
+                   (and (list-and (map (lambda (x) (not (md-blank? x))) l))
+                        (md-ref-def (md-join (map md-trim l) " ")))))))
+    (cond ((and (not one) (md-starts? (md-trim (car lines)) 0 "[")
+                (string-ends? (md-trim (car lines)) "]:") (next (cdr lines)))
+           ;; [label]: on its own line
+           (let ((two (join 2))
+                 (three (and (nnull? (cdr lines)) (next (cddr lines)) (join 3))))
+             (cond ((and three (!= (caddr three) "")) (cons three (cdddr lines)))
+                   (two (cons two (cddr lines)))
+                   (else #f))))
+          ((and one (== (caddr one) "") (next (cdr lines)))
+           ;; a title on the next line
+           (with two (join 2)
+             (if (and two (!= (caddr two) "")) (cons two (cddr lines))
+                 (cons one (cdr lines)))))
+          (one (cons one (cdr lines)))
+          (else #f))))
+
 (define (md-footnote-def s)
   ;; (label . text) for the definition of a footnote, [^label]: text
   (let* ((i (md-indent s)))
@@ -532,9 +563,9 @@
                       (md-trim-left (substring s (+ j 2) (string-length s)))))))))
 
 (define (md-interrupts? s)
-  ;; does the line end the paragraph before it?
+  ;; does the line end the paragraph before it? (A formula which starts it
+  ;; does so when it ends: see md-interrupts*)
   (or (md-atx s) (md-fence s) (md-quote s) (md-hr? s) (md-html-block? s)
-      (md-math-start? s)
       (with it (md-item s)
         (and it
              ;; not an empty item, and an ordered list starts with 1
@@ -543,6 +574,18 @@
                                                (- (caddr it) 1))
                                         (string-length s))))
              (or (not (cadddr it)) (== (cadddr it) 1))))))
+
+(define (md-lazy-after? s)
+  ;; can a line without the marks of its quote or its item follow the line
+  ;; s? Only as the text of a paragraph: not after a fence, a heading, a
+  ;; rule
+  (not (or (md-blank? s) (md-fence s) (md-atx s) (md-hr? s))))
+
+(define (md-fence-state fence s)
+  ;; the fence of code which is open after the line s, if fence was before
+  (cond ((not fence) (md-fence s))
+        ((md-fence-end? s fence) #f)
+        (else fence)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Blocks
@@ -721,9 +764,10 @@
                    (else (cons `(pre ,(md-join (reverse acc) "\n")) l)))))
           (else (cons `(pre ,(md-join (reverse acc) "\n")) l)))))
 
-;; A formula which does not end: what closes it, and how many lines
-;; remain after those which were searched for it. The lines before these
-;; hold no such end either, and are not searched again from each of them.
+;; The formulas which do not end: for what closes them, the lines (the
+;; tails of the list of lines) from which it was searched and not found.
+;; A formula which starts on one of these lines does not end either, and
+;; the lines are not searched again from each of them.
 (define md-no-math-end '())
 
 (define (md-math lines)
@@ -734,7 +778,7 @@
   (let* ((first (md-trim (car lines)))
          (close (if (md-starts? first 0 "$$") "$$" "\\]"))
          (none (assoc-ref md-no-math-end close)))
-    (and (not (and none (> (length lines) none)))
+    (and (not (and none (hashq-ref none lines #f)))
       (let loop ((s (substring first 2 (string-length first)))
                  (l (cdr lines)) (acc '()))
         (with e (md-search s 0 close)
@@ -752,40 +796,82 @@
                                 ,tex)
                              (if (== after "") l (cons after l))))))
                 ((or (null? l) (md-blank? (car l)))
-                 (set! md-no-math-end
-                       (cons (cons close (length l)) md-no-math-end))
+                 (with t (or none (make-hash-table 64))
+                   (let mark ((m lines))
+                     (when (and (pair? m) (not (eq? m l)))
+                       (hashq-set! t m #t)
+                       (mark (cdr m))))
+                   (if (not none)
+                       (set! md-no-math-end
+                             (cons (cons close t) md-no-math-end))))
                  #f)
                 (else (loop (car l) (cdr l)
                             (if (md-blank? s) acc (cons s acc))))))))))
 
-;; whether the blocks which are parsed have no --> any more
-(define md-no-comment-end? #f)
+;; the ends of HTML which the blocks that are parsed do not have any more:
+;; "-->", or "raw" for the closing tags of md-raw-tags
+(define md-no-html-end '())
+
+;; the tags of HTML whose text is kept up to their closing tag, also when it
+;; holds blank lines
+(define md-raw-tags '("pre" "script" "style" "textarea"))
+
+(define (md-raw-start? s)
+  ;; does the text s start with one of these tags?
+  (with t (locase-all s)
+    (list-or (map (lambda (name)
+                    (let ((k (+ (string-length name) 1)))
+                      (and (md-starts? t 0 (string-append "<" name))
+                           (or (== k (string-length t))
+                               (in? (string-ref t k) '(#\space #\tab #\>))))))
+                  md-raw-tags))))
+
+(define (md-raw-end? s)
+  (with t (locase-all s)
+    (list-or (map (lambda (name) (md-search t 0 (string-append "</" name ">")))
+                  md-raw-tags))))
 
 (define (md-html lines)
-  ;; HTML up to a blank line; a comment up to the line where it ends
-  (let* ((end? (lambda (s) (md-search s 0 "-->")))
-         (comment? (and (md-starts? (md-trim-left (car lines)) 0 "<!--")
-                        (not md-no-comment-end?)
-                        (or (list-find lines end?)
-                            (begin (set! md-no-comment-end? #t) #f)))))
+  ;; HTML up to a blank line; a comment up to the line where it ends, and
+  ;; so for <pre>, <script>, <style> and <textarea>. The spaces before the
+  ;; block are not kept: they would make an item of a list of it, once the
+  ;; list before it is written with another indentation
+  (let* ((first (md-trim-left (car lines)))
+         (lines (cons first (cdr lines)))
+         (kind (cond ((md-starts? first 0 "<!--") "-->")
+                     ((md-raw-start? first) "raw")
+                     (else #f)))
+         (end? (if (== kind "-->") (lambda (s) (md-search s 0 "-->")) md-raw-end?))
+         (closed? (and kind (not (in? kind md-no-html-end))
+                       (or (list-find lines end?)
+                           (begin (set! md-no-html-end (cons kind md-no-html-end))
+                                  #f)))))
     (let loop ((l lines) (acc '()))
-      (cond ((and comment? (nnull? l) (end? (car l)))
+      (cond ((and closed? (nnull? l) (end? (car l)))
              (cons `(html ,(md-join (reverse (cons (car l) acc)) "\n"))
                    (cdr l)))
-            ((or (null? l) (and (not comment?) (md-blank? (car l))))
+            ((or (null? l) (and (not closed?) (md-blank? (car l))))
              (cons `(html ,(md-join (reverse acc) "\n")) l))
             (else (loop (cdr l) (cons (car l) acc)))))))
 
+(define (md-interrupts* l)
+  ;; does the first line of l end the paragraph before it? $$ or \[ do when
+  ;; the formula which they open ends: I paid\n$$5 is one paragraph
+  (or (md-interrupts? (car l))
+      (and (md-math-start? (car l)) (md-math l) #t)))
+
 (define (md-blockquote lines)
-  (let loop ((l lines) (acc '()))
+  ;; fence: the code between fences which the lines of the quote leave open,
+  ;; which a line without > does not continue
+  (let loop ((l lines) (acc '()) (fence #f))
     (cond ((and (nnull? l) (md-quote (car l)))
-           (loop (cdr l) (cons (md-quote (car l)) acc)))
+           (with q (md-quote (car l))
+             (loop (cdr l) (cons q acc) (md-fence-state fence q))))
           ;; a line without > which continues a paragraph of the quote
-          ((and (nnull? l) (nnull? acc)
-                (not (md-blank? (car l))) (not (md-blank? (car acc)))
-                (not (md-interrupts? (car l)))
-                (not (md-fence (car acc))))
-           (loop (cdr l) (cons (car l) acc)))
+          ((and (nnull? l) (nnull? acc) (not fence)
+                (not (md-blank? (car l))) (md-lazy-after? (car acc))
+                (not (md-interrupts* l)))
+           (loop (cdr l) (cons (car l) acc) fence))
           (else (cons `(blockquote ,@(md-blocks (reverse acc))) l)))))
 
 (define (md-same-list? it kind)
@@ -798,18 +884,22 @@
          (first (car lines))
          (start (if (>= w (string-length first)) ""
                     (substring first w (string-length first)))))
-    (let loop ((l (cdr lines)) (acc (list start)) (blanks '()))
+    ;; fence: the code between fences which the lines of the item leave
+    ;; open, which a line that is not indented does not continue
+    (let loop ((l (cdr lines)) (acc (list start)) (blanks '())
+               (fence (md-fence start)))
       (cond ((null? l) (cons (reverse acc) l))
             ((md-blank? (car l))
-             (loop (cdr l) acc (cons "" blanks)))
+             (loop (cdr l) acc (cons "" blanks) fence))
             ((>= (md-indent (car l)) w)
-             (loop (cdr l)
-                   (cons (md-dedent (car l) w) (append blanks acc)) '()))
+             (with t (md-dedent (car l) w)
+               (loop (cdr l) (cons t (append blanks acc)) '()
+                     (md-fence-state fence t))))
             ;; a line which continues the paragraph of the item
-            ((and (null? blanks) (not (md-blank? (car acc)))
-                  (not (md-interrupts? (car l)))
+            ((and (null? blanks) (not fence) (md-lazy-after? (car acc))
+                  (not (md-interrupts* l))
                   (not (md-item (car l))))
-             (loop (cdr l) (cons (md-trim-left (car l)) acc) '()))
+             (loop (cdr l) (cons (md-trim-left (car l)) acc) '() fence))
             (else (cons (reverse acc) (append (reverse blanks) l)))))))
 
 (define (md-task item)
@@ -836,16 +926,17 @@
                    (item (car r))
                    (task (md-task item))
                    (item* (if task (cdr task) item))
-                   (blocks (md-blocks item*)))
+                   (blocks (md-blocks item*))
+                   (gap? md-gap?))
               (loop (cdr r)
                     (cons `(li ,@(if task `((@ (checked ,(car task)))) '())
                                ,@blocks)
                           items)
                     (or loose?
-                        ;; a blank line between two items, or inside an item
+                        ;; a blank line between two items, or between two
+                        ;; blocks of an item
                         (and (nnull? items) (!= l l*))
-                        (and (> (length blocks) 1)
-                             (list-or (map md-blank? item))))))
+                        gap?)))
             (let* ((start (cadddr it))
                    (attrs (append
                             (if (and ordered? start (!= start 1))
@@ -871,7 +962,7 @@
                       acc)))))
   (let loop ((l (cddr lines))
              (rows (list `(tr ,@(cells 'th (md-split-row (car lines)))))))
-    (if (or (null? l) (md-blank? (car l)) (md-interrupts? (car l))
+    (if (or (null? l) (md-blank? (car l)) (md-interrupts* l)
             (not (md-find (car l) 0 #\|)))
         (cons `(table (@ (source ,(md-join (md-lines-until lines l) "\n")))
                       ,@(reverse rows))
@@ -881,14 +972,17 @@
 
 (define (md-footnote lines def)
   ;; the definition of a footnote: its first line and the indented ones
-  (let loop ((l (cdr lines)) (acc (list (cdr def))) (blanks '()))
+  (let loop ((l (cdr lines)) (acc (list (cdr def))) (blanks '())
+             (fence (md-fence (cdr def))))
     (cond ((and (nnull? l) (md-blank? (car l)))
-           (loop (cdr l) acc (cons "" blanks)))
+           (loop (cdr l) acc (cons "" blanks) fence))
           ((and (nnull? l) (>= (md-indent (car l)) 4))
-           (loop (cdr l) (cons (md-dedent (car l) 4) (append blanks acc)) '()))
-          ((and (nnull? l) (null? blanks) (not (md-interrupts? (car l)))
+           (with t (md-dedent (car l) 4)
+             (loop (cdr l) (cons t (append blanks acc)) '()
+                   (md-fence-state fence t))))
+          ((and (nnull? l) (null? blanks) (not fence) (not (md-interrupts* l))
                 (not (md-footnote-def (car l))))
-           (loop (cdr l) (cons (md-trim-left (car l)) acc) '()))
+           (loop (cdr l) (cons (md-trim-left (car l)) acc) '() fence))
           (else
             (cons `(footnote-def ,(car def) ,@(md-blocks (reverse acc)))
                   (append (reverse blanks) l))))))
@@ -916,7 +1010,7 @@
                     ;; the lines before the header are a paragraph
                     (cons `(!text p () ,(md-trim-right (md-join (reverse (cdr acc)) "\n")))
                           (cons (car acc) l)))))
-          ((md-interrupts? (car l))
+          ((md-interrupts* l)
            (cons `(!text p () ,(md-trim-right (md-join (reverse acc) "\n"))) l))
           (else (loop (cdr l) (cons (md-trim-left (car l)) acc))))))
 
@@ -946,42 +1040,108 @@
           ((md-html-block? s) (md-html lines))
           ((and (md-footnote-def s) (< md-depth md-max-depth))
            (md-nested (lambda () (md-footnote lines (md-footnote-def s)))))
-          ((md-ref-def s)
-           ;; the first definition of a label is the one which counts
-           (let* ((d (md-ref-def s))
-                  (first? (not (ahash-ref md-refs (car d)))))
-             (if first? (ahash-set! md-refs (car d) (cdr d)))
-             (cons `(!def ,(car d) ,first? ,(md-trim s)) (cdr lines))))
+          ((md-ref-def-lines lines)
+           => (lambda (r)
+                ;; the first definition of a label is the one which counts
+                (let* ((d (car r))
+                       (first? (not (ahash-ref md-refs (car d)))))
+                  (if first? (ahash-set! md-refs (car d) (cdr d)))
+                  (cons `(!def ,(car d) ,first?
+                               ,(md-join (map md-trim (md-lines-until lines (cdr r)))
+                                         "\n"))
+                        (cdr r)))))
           (else (md-paragraph lines)))))
 
+;; whether the last blocks which were parsed had a blank line between two of
+;; them: an item of a list with such a line makes the list loose
+(define md-gap? #f)
+
 (define (md-blocks lines)
-  (let ((old md-no-comment-end?)
+  (let ((old md-no-html-end)
         (old-math md-no-math-end))
-    (set! md-no-comment-end? #f)
+    (set! md-no-html-end '())
     (set! md-no-math-end '())
-    (let loop ((l lines) (acc '()))
+    ;; blank?: blank lines after the last block, gap?: such lines before a
+    ;; block (and not those inside a block, as code or a list)
+    (let loop ((l lines) (acc '()) (blank? #f) (gap? #f))
       (cond ((null? l)
-             (set! md-no-comment-end? old)
+             (set! md-no-html-end old)
              (set! md-no-math-end old-math)
+             (set! md-gap? gap?)
              (reverse acc))
-            ((md-blank? (car l)) (loop (cdr l) acc))
+            ((md-blank? (car l)) (loop (cdr l) acc (nnull? acc) gap?))
             (else
               (with r (md-block l)
-                (loop (cdr r) (if (car r) (cons (car r) acc) acc))))))))
+                (if (car r)
+                    (loop (cdr r) (cons (car r) acc) #f (or gap? blank?))
+                    (loop (cdr r) acc blank? gap?))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Text: characters, code, mathematics
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define md-entities
-  '(("amp" . "&") ("lt" . "<") ("gt" . ">") ("quot" . "\"") ("apos" . "'")
-    ("nbsp" . 160) ("copy" . 169) ("reg" . 174) ("deg" . 176)
-    ("plusmn" . 177) ("times" . 215) ("divide" . 247) ("ndash" . 8211)
-    ("mdash" . 8212) ("lsquo" . 8216) ("rsquo" . 8217) ("ldquo" . 8220)
-    ("rdquo" . 8221) ("hellip" . 8230) ("trade" . 8482) ("larr" . 8592)
-    ("rarr" . 8594) ("le" . 8804) ("ge" . 8805) ("ne" . 8800)
-    ("euro" . 8364) ("laquo" . 171) ("raquo" . 187) ("sect" . 167)
-    ("para" . 182) ("middot" . 183) ("bull" . 8226)))
+  ;; the entities of HTML 4, which are those that texts use: the letters of
+  ;; Latin-1, Greek, the signs of typography and of mathematics
+  (let ((t (make-ahash-table))
+        (from (lambda (start names)
+                (let loop ((l (string-tokenize-by-char names #\space)) (n start)
+                           (acc '()))
+                  (if (null? l) acc
+                      (loop (cdr l) (+ n 1)
+                            (if (== (car l) "-") acc
+                                (cons (cons (car l) n) acc))))))))
+    (for-each
+      (lambda (p) (ahash-set! t (car p) (cdr p)))
+      (append
+        '(("amp" . "&") ("lt" . "<") ("gt" . ">") ("quot" . "\"")
+          ("apos" . "'"))
+        (from 160 (string-append
+                    "nbsp iexcl cent pound curren yen brvbar sect uml copy "
+                    "ordf laquo not shy reg macr deg plusmn sup2 sup3 acute "
+                    "micro para middot cedil sup1 ordm raquo frac14 frac12 "
+                    "frac34 iquest Agrave Aacute Acirc Atilde Auml Aring AElig "
+                    "Ccedil Egrave Eacute Ecirc Euml Igrave Iacute Icirc Iuml "
+                    "ETH Ntilde Ograve Oacute Ocirc Otilde Ouml times Oslash "
+                    "Ugrave Uacute Ucirc Uuml Yacute THORN szlig agrave aacute "
+                    "acirc atilde auml aring aelig ccedil egrave eacute ecirc "
+                    "euml igrave iacute icirc iuml eth ntilde ograve oacute "
+                    "ocirc otilde ouml divide oslash ugrave uacute ucirc uuml "
+                    "yacute thorn yuml"))
+        (from 913 (string-append
+                    "Alpha Beta Gamma Delta Epsilon Zeta Eta Theta Iota Kappa "
+                    "Lambda Mu Nu Xi Omicron Pi Rho - Sigma Tau Upsilon Phi "
+                    "Chi Psi Omega"))
+        (from 945 (string-append
+                    "alpha beta gamma delta epsilon zeta eta theta iota kappa "
+                    "lambda mu nu xi omicron pi rho sigmaf sigma tau upsilon "
+                    "phi chi psi omega"))
+        (from 8194 (string-append
+                     "ensp emsp - - - - - thinsp - - zwnj zwj lrm rlm - - - "
+                     "ndash mdash - - - lsquo rsquo sbquo - ldquo rdquo bdquo - "
+                     "dagger Dagger bull - - - hellip - - - - - - - - - permil - "
+                     "prime Prime - - - - - lsaquo rsaquo - - - oline"))
+        (from 8592 "larr uarr rarr darr harr")
+        (from 8656 "lArr uArr rArr dArr hArr")
+        '(("OElig" . 338) ("oelig" . 339) ("Scaron" . 352) ("scaron" . 353)
+          ("Yuml" . 376) ("fnof" . 402) ("circ" . 710) ("tilde" . 732)
+          ("thetasym" . 977) ("upsih" . 978) ("piv" . 982) ("frasl" . 8260)
+          ("euro" . 8364) ("image" . 8465) ("weierp" . 8472) ("real" . 8476)
+          ("trade" . 8482) ("alefsym" . 8501) ("crarr" . 8629)
+          ("forall" . 8704) ("part" . 8706) ("exist" . 8707) ("empty" . 8709)
+          ("nabla" . 8711) ("isin" . 8712) ("notin" . 8713) ("ni" . 8715)
+          ("prod" . 8719) ("sum" . 8721) ("minus" . 8722) ("lowast" . 8727)
+          ("radic" . 8730) ("prop" . 8733) ("infin" . 8734) ("ang" . 8736)
+          ("and" . 8743) ("or" . 8744) ("cap" . 8745) ("cup" . 8746)
+          ("int" . 8747) ("there4" . 8756) ("sim" . 8764) ("cong" . 8773)
+          ("asymp" . 8776) ("ne" . 8800) ("equiv" . 8801) ("le" . 8804)
+          ("ge" . 8805) ("sub" . 8834) ("sup" . 8835) ("nsub" . 8836)
+          ("sube" . 8838) ("supe" . 8839) ("oplus" . 8853) ("otimes" . 8855)
+          ("perp" . 8869) ("sdot" . 8901) ("lceil" . 8968) ("rceil" . 8969)
+          ("lfloor" . 8970) ("rfloor" . 8971) ("lang" . 9001) ("rang" . 9002)
+          ("loz" . 9674) ("spades" . 9824) ("clubs" . 9827) ("hearts" . 9829)
+          ("diams" . 9830))))
+    t))
 
 (define (md-utf8 n)
   ;; the character of code n, in UTF-8
@@ -1010,13 +1170,15 @@
                     (else (loop (+ j 1)))))))
     (and e (> e (+ i 1))
          (let* ((name (substring s (+ i 1) e))
-                (v (cond ((md-starts? name 0 "#x")
-                          (string->number (substring name 2 (string-length name)) 16))
-                         ((md-starts? name 0 "#X")
-                          (string->number (substring name 2 (string-length name)) 16))
-                         ((md-starts? name 0 "#")
-                          (string->number (substring name 1 (string-length name))))
-                         (else (assoc-ref md-entities name)))))
+                ;; (the digits only: string->number would read 1e3 too)
+                (number (lambda (from digit? radix)
+                          (with t (substring name from (string-length name))
+                            (and (!= t "") (list-and (map digit? (string->list t)))
+                                 (string->number t radix)))))
+                (v (cond ((or (md-starts? name 0 "#x") (md-starts? name 0 "#X"))
+                          (number 2 md-hex-digit? 16))
+                         ((md-starts? name 0 "#") (number 1 md-digit? 10))
+                         (else (ahash-ref md-entities name)))))
            (cond ((string? v) (cons v (+ e 1)))
                  ;; (not the half of a pair of UTF-16)
                  ((and (integer? v) (> v 0) (< v 1114112)
@@ -1390,6 +1552,12 @@
                              acc))))
               (else (loop j acc)))))))
 
+(define (md-plain-image? s)
+  ;; has the tag img no other attributes than those of an image of
+  ;; Markdown? Else it is kept as HTML, with its style or its class
+  (list-and (map (lambda (a) (in? (car a) '(src alt title width height)))
+                 (md-html-attributes s))))
+
 (define (md-html-image s)
   ;; the image of the tag img, from the text after its name
   (let* ((l (md-html-attributes s))
@@ -1438,7 +1606,8 @@
                                  (md-search* (md-lower s) (+ e 1) close))))
                     (cond
                       ;; an image is the same as ![...](...), with its sizes
-                      ((and (== name "img") (not closing?))
+                      ((and (== name "img") (not closing?)
+                            (md-plain-image? (substring s j e)))
                        (cons (md-html-image (substring s j e)) (+ e 1)))
                       (c
                         (cons `(html ,(substring s i (+ c (string-length close))))
@@ -1710,6 +1879,11 @@
                                 (else `((ref-def ,(cadddr y))))))
                         (cdr x)))))
 
+;; the mark of byte order which some programs write at the start of a file
+;; of UTF-8: it is not text
+(define md-bom
+  (list->string (map integer->char '(239 187 191))))
+
 (define (md-parse s)
   (set! md-refs (make-ahash-table))
   (set! md-refs-used (make-ahash-table))
@@ -1725,7 +1899,8 @@
       (begin (set! md-tab-head #\space) (set! md-tab-fill #\space))
       (begin (set! md-tab-head (integer->char 30))
              (set! md-tab-fill (integer->char 31))))
-  (let* ((lines (map md-expand-tabs (md-lines s)))
+  (let* ((s (if (md-starts? s 0 md-bom) (substring s 3 (string-length s)) s))
+         (lines (map md-expand-tabs (md-lines s)))
          (front (md-front-matter lines))
          (blocks (md-blocks (if front (cdr front) lines)))
          (r (map md-finish (if front (cons (car front) blocks) blocks)))
