@@ -272,7 +272,11 @@
     are written have no section breaks in cells or notes, keep the dashes
     and quotes of <TeXmacs> and define the styles they use. Addresses of
     links and descriptions of pictures written with <verbatim|&amp;lt;>
-    or <verbatim|&amp;amp;> are read correctly.
+    or <verbatim|&amp;amp;> are read correctly. A file saved in the other
+    format keeps the look of its named styles, the bibliography of
+    <name|Zotero> in a Word file stays a field, pictures linked to the web
+    stay links, a comment in a note stays in the note, and a formula on
+    its own line inside a paragraph is shown on its own line.
 
     <item>A <name|Markdown> file keeps the tabs at the start of its lines
     (in code, formulas, tables and the <name|YAML> header), a formula of a
@@ -282,7 +286,8 @@
     <verbatim|&#1e3;> is read, <verbatim|\<less\>pre\<gtr\>> and
     <verbatim|\<less\>script\<gtr\>> blocks run to their closing tag, and the
     <name|Markdown> which is written reads back the same in more cases
-    (nested lists, emphasis next to code, links).
+    (nested lists, emphasis next to code, links). All the named entities
+    of <name|HTML5> are read.
   </itemize>
 
   <paragraph|14 October 2026>
