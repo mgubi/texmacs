@@ -2190,6 +2190,12 @@
 (define tmof-targets (make-ahash-table))  ; id -> labels, reversed
 (define tmof-target #f)                   ; the last thing with a number
 (define tmof-heading-nr 0)
+(define tmof-inside '())                  ; the numbered things which are around
+(define tmof-only-labels? #f)             ; a paragraph of labels only
+
+;; A label in the text, away from what it is the label of, goes to the
+;; number (a reference shows it), and a bookmark of its own (attribute at)
+;; stays where it was: the label comes back there when the file is read.
 
 (define (tmof-bind-scan x)
   ;; first pass: what each label is the label of
@@ -2208,6 +2214,13 @@
             (set! tmof-target (list "heading" (ox-attr x 'id) (ox-attr x 'number))))
           (for-each tmof-bind-scan (ox-children x)))))
 
+(define (tmof-seq-ids x)
+  ;; the ids of the sequence numbers in the paragraph x
+  (cond ((not (pair? x)) '())
+        ((in? (car x) '(math image @ note)) '())
+        ((func? x 'seq) (if (ox-attr x 'id) (list (ox-attr x 'id)) '()))
+        (else (append-map tmof-seq-ids (ox-children x)))))
+
 (define (tmof-labels-attr id)
   (with l (ahash-ref tmof-targets id)
     (and l (string-recompose (reverse l) " "))))
@@ -2217,7 +2230,10 @@
   (cond ((not (pair? x)) (list x))
         ((in? (car x) '(math image)) (list x))
         ((func? x 'bookmark)
-         (if (ahash-ref tmof-bound (ox-attr x 'name)) '() (list x)))
+         (with target (ahash-ref tmof-bound (ox-attr x 'name))
+           (cond ((not target) (list x))
+                 ((or tmof-only-labels? (in? (cadr target) tmof-inside)) '())
+                 (else (list `(bookmark (@ (name ,(ox-attr x 'name)) (at "true"))))))))
         ((func? x 'seq)
          (list (apply office-node
                       (cons* 'seq `((name ,(ox-attr x 'name)) (id ,(ox-attr x 'id))
@@ -2233,6 +2249,32 @@
                                       (kind ,(and target (car target)))
                                       (target ,(and target (cadr target))))
                                (append-map tmof-bind-node (ox-children x)))))))
+        ((and (func? x 'p) (not (ox-attr x 'inside-done)))
+         ;; (in a heading or a paragraph with numbers, and in a paragraph
+         ;; of labels only, the labels are at their place)
+         (let ((old tmof-inside)
+               (old-only tmof-only-labels?))
+           (set! tmof-inside (append (if (and (== (ox-attr x 'role) "heading") (ox-attr x 'id))
+                                         (list (ox-attr x 'id)) '())
+                                     (tmof-seq-ids x)
+                                     tmof-inside))
+           (set! tmof-only-labels?
+                 (list-and (map (lambda (y) (or (func? y 'bookmark)
+                                                (and (string? y) (== (string-trim-spaces y) ""))))
+                                (ox-children x))))
+           (with r (tmof-bind-node (cons* 'p (cons '@ (cons '(inside-done "true") (ox-attrs x)))
+                                          (ox-children x)))
+             (set! tmof-inside old)
+             (set! tmof-only-labels? old-only)
+             (map (lambda (y)
+                    (if (func? y 'p)
+                        (apply office-node
+                               (cons* 'p (list-filter (map (lambda (a) (list (car a) (cadr a)))
+                                                           (ox-attrs y))
+                                                      (lambda (a) (!= (car a) 'inside-done)))
+                                      (ox-children y)))
+                        y))
+                  r))))
         (else
           (let* ((children (append-map tmof-bind-node (ox-children x)))
                  ;; (the texts around a label which went away are one)
