@@ -254,6 +254,41 @@
                                   (xlink:show "embed") (xlink:actuate "onLoad")))
                    ,@(if (ox-attr x 'alt) `((svg:title ,(ox-attr x 'alt))) '())))))))
 
+(define (ot-box x)
+  ;; a box of text (a frame with a text box) or a shape (with its text), in
+  ;; its line or floating beside its paragraph
+  (let* ((n (ot-next-id))
+         (float? (ox-attr x 'float))
+         (style (ot-frame-style x #f))
+         (anchor (cond ((not float?) "as-char")
+                       ((or (== (ox-attr x 'h-rel) "character")
+                            (== (ox-attr x 'v-rel) "line"))
+                        "char")
+                       (else "paragraph")))
+         (offset (lambda (k) (with v (ox-attr x k)
+                               (if (and (string? v) (!= v "")) v "0cm"))))
+         (w (or (office-length->cm (ox-attr x 'width)) 2.0))
+         (h (or (office-length->cm (ox-attr x 'height)) 1.0))
+         (shape (ox-attr x 'shape))
+         (attrs `((draw:style-name ,style)
+                  (draw:name ,(string-append "Box" (number->string n)))
+                  (text:anchor-type ,anchor)
+                  ,@(if (and float? (== (ox-attr x 'h-pos) "offset"))
+                        `((svg:x ,(offset 'h-offset))) '())
+                  ,@(if (and float? (== (ox-attr x 'v-pos) "offset"))
+                        `((svg:y ,(offset 'v-offset))) '())
+                  (svg:width ,(ot-cm w)) (svg:height ,(ot-cm h))
+                  (draw:z-index ,(if (== (ox-attr x 'wrap) "behind") "0" "1"))))
+         (blocks (ot-blocks-with (ox-children x) "Standard")))
+    (if (and (pair? (ox-children x)) (in? shape '(#f "rect")))
+        (list `(draw:frame (@ ,@attrs)
+                 (draw:text-box (@ (fo:min-height ,(ot-cm h))) ,@blocks)))
+        (list `(draw:custom-shape (@ ,@attrs)
+                 ,@blocks
+                 (draw:enhanced-geometry
+                   (@ (svg:viewBox "0 0 21600 21600")
+                      (draw:type ,(office-shape-for-odf shape)))))))))
+
 (define (ot-frame-style x clip)
   ;; the style of the frame of a picture which floats, or which is cut
   (let* ((get (lambda (k) (ox-attr x k)))
@@ -305,14 +340,53 @@
                  ,@(if (in? wrap '("square" "tight" "through"))
                        '((fo:margin-left "0.32cm") (fo:margin-right "0.32cm"))
                        '()))))
-         (props (append props (if clip `((fo:clip ,clip)) '()))))
+         (props (append props (if clip `((fo:clip ,clip)) '())))
+         ;; (the fill and the line of a box or a shape)
+         (frame? (and (func? x 'box) (pair? (ox-children x))
+                      (in? (ox-attr x 'shape) '(#f "rect"))))
+         (fill (ox-attr x 'fill))
+         (line (ox-attr x 'line))
+         (lw (with v (office-number (ox-attr x 'line-width))
+               (string-append (office-decimal (if (and v (> v 0)) v 0.75)) "pt")))
+         (props (append
+                  props
+                  (cond ((not (func? x 'box)) '())
+                        ((== fill "none") '((draw:fill "none")))
+                        ((office-color fill)
+                         => (lambda (c) `((draw:fill "solid") (draw:fill-color ,c)
+                                          ,@(if frame? `((fo:background-color ,c)) '()))))
+                        (else '()))
+                  (cond ((not (func? x 'box)) '())
+                        ((== line "none")
+                         (if frame? '((fo:border "none")) '((draw:stroke "none"))))
+                        ((office-color line)
+                         => (lambda (c)
+                              (if frame?
+                                  `((fo:border ,(string-append lw " solid " c)))
+                                  `((draw:stroke "solid") (svg:stroke-color ,c)
+                                    (svg:stroke-width ,lw)))))
+                        (else '()))))
+         (keep (lambda (k) (assq k props))))
     (ot-style (cons 'frame props) "frm"
               (lambda (name)
                 `(style:style
                    (@ (style:name ,name) (style:family "graphic")
                       (style:parent-style-name "Graphics"))
                    (style:graphic-properties
-                     (@ ,@props (fo:border "none") (fo:padding "0cm"))))))))
+                     (@ ,@props
+                        ,@(if (keep 'fo:border) '() '((fo:border "none")))
+                        ,@(cond ((not (func? x 'box)) '((fo:padding "0cm")))
+                                ((ot-insets (ox-attr x 'inset)) => identity)
+                                (else '((fo:padding "0.1cm"))))
+                        ,@(if (== (ox-attr x 'grow) "true")
+                              '((draw:auto-grow-height "true")) '()))))))))
+
+(define (ot-insets s)
+  ;; the paddings of a box for its space around its text, "l,t,r,b" in cm
+  (let ((l (and s (map office-number (string-tokenize-by-char s #\,)))))
+    (and l (== (length l) 4) (list-and l)
+         (map (lambda (k v) (list k (ot-cm v)))
+              '(fo:padding-left fo:padding-top fo:padding-right fo:padding-bottom) l))))
 
 (define (ot-local-name tag)
   (let* ((s (symbol->string tag))
@@ -573,6 +647,7 @@
               ((tab) '((text:tab)))
               ((pagebreak) '())
               ((image) (ot-image x))
+              ((box) (ot-box x))
               ((math) (ot-math x))
               (else (ot-inlines l props)))))))
 

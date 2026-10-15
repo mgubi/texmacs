@@ -240,6 +240,68 @@
                                    (a:ext (@ (cx ,cx) (cy ,cy))))
                            (a:prstGeom (@ (prst "rect")) (a:avLst))))))))))))))
 
+(define dx-ns-wps "http://schemas.microsoft.com/office/word/2010/wordprocessingShape")
+(define dx-ns-mc "http://schemas.openxmlformats.org/markup-compatibility/2006")
+
+(define (dx-fill c)
+  ;; the fill of DrawingML for a color, none, or nothing
+  (cond ((== c "none") '((a:noFill)))
+        ((office-color c)
+         => (lambda (v) `((a:solidFill (a:srgbClr (@ (val ,(upcase-all (substring v 1 7)))))))))
+        (else '())))
+
+(define (dx-box x)
+  ;; a box of text or a shape: a shape of Word (wps), in its line or
+  ;; floating beside its paragraph, with the blocks of its text
+  (let* ((n (dx-next-id))
+         (cx (dx-emu (or (ox-attr x 'width) "2cm")))
+         (cy (dx-emu (or (ox-attr x 'height) "1cm")))
+         (shape (office-shape-for-word (ox-attr x 'shape)))
+         (blocks (ox-children x))
+         (lw (with v (office-number (ox-attr x 'line-width))
+               (and v (> v 0) (number->string (inexact->exact (round (* v 12700)))))))
+         (line (with f (dx-fill (ox-attr x 'line))
+                 (cond ((and (null? f) (not lw)) '())
+                       (else `((a:ln (@ ,@(if lw `((w ,lw)) '())) ,@f))))))
+         (text (if (null? blocks) '()
+                   (with l (dx-blocks blocks)
+                     `((wps:txbx
+                         (w:txbxContent ,@(if (null? l) '((w:p)) l))))))))
+    (list
+      `(w:r
+         (mc:AlternateContent
+           (@ (xmlns:mc ,dx-ns-mc) (xmlns:wps ,dx-ns-wps))
+           (mc:Choice
+             (@ (Requires "wps"))
+             (w:drawing
+               (,@(dx-anchor-start x n)
+                 (wp:extent (@ (cx ,cx) (cy ,cy)))
+                 ,@(dx-anchor-wrap x)
+                 (wp:docPr (@ (id ,(number->string n))
+                              (name ,(string-append (if (null? blocks) "Shape " "Text Box ")
+                                                    (number->string n)))))
+                 (a:graphic (@ (xmlns:a ,dx-ns-a))
+                   (a:graphicData (@ (uri ,dx-ns-wps))
+                     (wps:wsp
+                       (wps:cNvSpPr ,@(if (and (pair? blocks) (== shape "rect"))
+                                          '((@ (txBox "1"))) '()))
+                       (wps:spPr
+                         (a:xfrm (a:off (@ (x "0") (y "0"))) (a:ext (@ (cx ,cx) (cy ,cy))))
+                         (a:prstGeom (@ (prst ,shape)) (a:avLst))
+                         ,@(dx-fill (ox-attr x 'fill))
+                         ,@line)
+                       ,@text
+                       (wps:bodyPr (@ (rot "0") (vert "horz") (wrap "square")
+                                      ,@(dx-insets (ox-attr x 'inset)) (anchor "t"))
+                         ,(if (== (ox-attr x 'grow) "true") '(a:spAutoFit) '(a:noAutofit))))))))))))))
+
+(define (dx-insets s)
+  ;; the space around the text of a box, "l,t,r,b" in cm, in EMU
+  (let* ((l (and s (map office-number (string-tokenize-by-char s #\,))))
+         (l (if (and l (== (length l) 4) (list-and l)) l '(0.254 0.127 0.254 0.127))))
+    (map (lambda (k v) (list k (number->string (inexact->exact (round (* v 360000))))))
+         '(lIns tIns rIns bIns) l)))
+
 (define (dx-anchor-start x n)
   ;; the element wp:inline of a picture in the line, or wp:anchor and its
   ;; position for one which floats beside its paragraph
@@ -592,6 +654,7 @@
               ((tab) (list (dx-run '() '(w:tab))))
               ((pagebreak) (list (dx-run '() '(w:br (@ (w:type "page"))))))
               ((image) (dx-image x))
+              ((box) (dx-box x))
               ((math) (dx-math x))
               (else (dx-inlines l props)))))))
 

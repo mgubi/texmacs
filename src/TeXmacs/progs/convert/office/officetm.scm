@@ -65,7 +65,7 @@
   (cond ((string? x) (string-replace (oftm-text x) "<varspace>" " "))
         ((func? x 'br) "\n")
         ((func? x 'tab) "    ")
-        ((and (pair? x) (in? (car x) '(note image math bookmark))) "")
+        ((and (pair? x) (in? (car x) '(note image math bookmark box))) "")
         ((pair? x) (apply string-append (map oftm-plain (ox-children x))))
         (else "")))
 
@@ -289,28 +289,106 @@
                              ,(if (null? (cdr l)) (car l) `(concat ,@l))))
         l)))
 
-(define (oftm-float-spec x)
-  ;; the attributes of a floating picture but its side, as "key=value ..."
+(define (oftm-float-spec x . keys)
+  ;; the attributes of a floating picture but its side (and those of the
+  ;; list keys), as "key=value ..."
   (string-recompose
     (append-map (lambda (k)
                   (with v (ox-attr x k)
                     (if (and v (!= v "")) (list (string-append (symbol->string k) "=" v)) '())))
-                (append (cdr office-float-keys) '(next)))
+                (append (cdr office-float-keys) (if (pair? keys) (car keys) '()) '(next)))
     " "))
+
+;; A box of text or a shape: TeXmacs shows the box as a table of one cell
+;; of its width, with its fill and its line, on its side; a shape without
+;; text as a drawing. In the style office, office-box and office-shape
+;; keep the rest.
+
+(define (oftm-color c) (and (string? c) (string-starts? c "#") c))
+
+(define (oftm-box-table width fill line body)
+  `(tabular
+     (tformat
+       ,@(if (office-length->cm width)
+             `((twith "table-width" ,width) (twith "table-hmode" "exact"))
+             '())
+       (cwith "1" "1" "1" "1" "cell-hyphen" "t")
+       ,@(if (oftm-color fill) `((cwith "1" "1" "1" "1" "cell-background" ,fill)) '())
+       ,@(if (oftm-color line)
+             (map (lambda (b) `(cwith "1" "1" "1" "1" ,b "1ln"))
+                  '("cell-lborder" "cell-rborder" "cell-tborder" "cell-bborder"))
+             '())
+       (table (row (cell ,body))))))
+
+(define (oftm-shape-drawing shape width height fill line)
+  ;; a drawing of the shape, of its size (centered on the origin)
+  (let* ((w (or (office-length->cm width) 2.0))
+         (h (or (office-length->cm height) 1.0))
+         (x (/ w 2)) (y (/ h 2))
+         (pt (lambda (a b) `(point ,(office-decimal a) ,(office-decimal b))))
+         (obj (cond ((== shape "ellipse")
+                     `(cspline ,@(map (lambda (k)
+                                        (with t (* k 0.7853981633974483)
+                                          (pt (* x (cos t)) (* y (sin t)))))
+                                      '(0 1 2 3 4 5 6 7))))
+                    ((== shape "triangle")
+                     `(cline ,(pt (- x) (- y)) ,(pt x (- y)) ,(pt 0 y)))
+                    ((== shape "diamond")
+                     `(cline ,(pt 0 (- y)) ,(pt x 0) ,(pt 0 y) ,(pt (- x) 0)))
+                    (else
+                     `(cline ,(pt (- x) (- y)) ,(pt x (- y)) ,(pt x y) ,(pt (- x) y))))))
+    `(with "gr-frame" (tuple "scale" "1cm" (tuple "0.5gw" "0.5gh"))
+           "gr-geometry" (tuple "geometry" ,(office-cm w) ,(office-cm h) "center")
+       (graphics
+         (with "color" ,(or (oftm-color line) (oftm-color fill) "black")
+               ,@(if (oftm-color fill) `("fill-color" ,fill) '())
+           ,obj)))))
+
+(define (oftm-box x)
+  (let* ((side (or (ox-attr x 'float) ""))
+         (width (or (ox-attr x 'width) ""))
+         (fill (or (ox-attr x 'fill) ""))
+         (line (or (ox-attr x 'line) ""))
+         (blocks (oftm-blocks (ox-children x)))
+         (spec (oftm-float-spec x '(height shape line-width inset grow))))
+    (if (null? blocks)
+        (with d (oftm-shape-drawing (ox-attr x 'shape) width (ox-attr x 'height) fill line)
+          (list (if oftm-faithful?
+                    `(office-shape ,side
+                                   ,(oftm-float-spec x '(width height shape fill line line-width
+                                                         inset grow))
+                                   ,d)
+                    d)))
+        (with body (oftm-document blocks)
+          (list (if oftm-faithful?
+                    `(office-box ,side ,spec ,width ,fill ,line ,body)
+                    (oftm-box-table width fill line body)))))))
 
 (define (oftm-split-floats x)
   ;; a paragraph with text and pictures which float beside it: each picture
   ;; is a paragraph before it, on its side, and says that it goes with the
   ;; next paragraph (TeXmacs does not put text around a picture)
-  (let* ((float? (lambda (y) (and (func? y 'image) (ox-attr y 'float))))
+  (let* ((float? (lambda (y) (or (and (func? y 'image) (ox-attr y 'float))
+                                 (func? y 'box))))
          (l (if (func? x 'p) (ox-children x) '()))
          (floats (list-filter l float?))
          (rest (list-filter l (lambda (y) (not (float? y))))))
-    (if (or (null? floats) (oftm-role? x "heading")
-            (not (list-or (map (lambda (y) (not (and (string? y)
-                                                       (== (string-trim-spaces y) ""))))
-                               rest))))
-        (list x)
+    (cond
+      ((or (null? floats) (oftm-role? x "heading")) (list x))
+      ((not (list-or (map (lambda (y) (not (and (string? y)
+                                                 (== (string-trim-spaces y) ""))))
+                          rest)))
+       ;; (a paragraph of floating things only: on their side)
+       (with sides (map (lambda (y) (ox-attr y 'float)) floats)
+         (if (and (not (ox-attr x 'align)) (car sides)
+                  (list-and (map (lambda (s) (== s (car sides))) sides)))
+             (list (apply office-node
+                          (cons* 'p (append (map (lambda (a) (list (car a) (cadr a)))
+                                                 (ox-attrs x))
+                                            `((align ,(car sides))))
+                                 (ox-children x))))
+             (list x))))
+      (else
         (append (map (lambda (y)
                        (office-node 'p `((align ,(ox-attr y 'float)))
                                     (office-add-attrs y '((next "true")))))
@@ -318,7 +396,7 @@
                 (list (apply office-node
                              (cons* 'p (map (lambda (a) (list (car a) (cadr a)))
                                             (ox-attrs x))
-                                    rest)))))))
+                                    rest))))))))
 
 (define (oftm-image-only x)
   (let* ((name (oftm-text (or (ox-attr x 'name) "")))
@@ -864,6 +942,7 @@
               ((tab) '((space "2em")))
               ((pagebreak) '((page-break)))
               ((image) (oftm-image x))
+              ((box) (oftm-box x))
               ((math) (oftm-math x))
               (else (append-map oftm-inline l)))))))
 

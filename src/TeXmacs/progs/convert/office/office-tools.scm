@@ -315,6 +315,57 @@
 (define-public office-float-keys
   '(float wrap wrap-side h-pos h-rel h-offset v-pos v-rel v-offset))
 
+
+;; A box of text or a shape (a node box) floats as a picture does, with
+;; the same attributes, and has its size (width, height), its shape (the
+;; names of Word: rect, ellipse, roundRect...; odf:name for a shape of
+;; OpenDocument which Word does not have), its fill and its line (colors,
+;; or "none") and the width of its line (line-width, in points), the
+;; space around its text (inset: "left,top,right,bottom", in cm) and
+;; whether it grows with its text (grow "true"); its children are the
+;; blocks of its text, if any.
+(define-public office-box-keys
+  '(width height shape fill line line-width inset grow))
+
+(define-public office-shapes
+  ;; the shapes of Word, and those of OpenDocument (draw:type)
+  '(("rect" . "rectangle") ("ellipse" . "ellipse") ("roundRect" . "round-rectangle")
+    ("triangle" . "isosceles-triangle") ("rtTriangle" . "right-triangle")
+    ("diamond" . "diamond") ("parallelogram" . "parallelogram")
+    ("trapezoid" . "trapezoid") ("pentagon" . "pentagon") ("hexagon" . "hexagon")
+    ("octagon" . "octagon") ("star5" . "star5") ("star4" . "star4")
+    ("star8" . "star8") ("rightArrow" . "right-arrow") ("leftArrow" . "left-arrow")
+    ("upArrow" . "up-arrow") ("downArrow" . "down-arrow") ("cloud" . "cloud")
+    ("heart" . "heart") ("smileyFace" . "smiley") ("can" . "can") ("cube" . "cube")
+    ("plus" . "cross") ("wedgeRectCallout" . "rectangular-callout")
+    ("wedgeRoundRectCallout" . "round-rectangular-callout")
+    ("wedgeEllipseCallout" . "round-callout") ("flowChartProcess" . "flowchart-process")
+    ("flowChartDecision" . "flowchart-decision")
+    ("flowChartTerminator" . "flowchart-terminator")))
+
+(tm-define (office-shape-of-odf type)
+  (:synopsis "The shape of the office tree for the type @type of OpenDocument")
+  (cond ((not (string? type)) "rect")
+        ((list-find office-shapes (lambda (p) (== (cdr p) type))) => car)
+        ;; (a shape which LibreOffice read from Word has its name of Word)
+        ((string-starts? type "ooxml-") (substring type 6 (string-length type)))
+        (else (string-append "odf:" type))))
+
+(tm-define (office-shape-for-odf shape)
+  (:synopsis "The type of OpenDocument for the shape @shape of the office tree")
+  (cond ((not (string? shape)) "rectangle")
+        ((string-starts? shape "odf:") (substring shape 4 (string-length shape)))
+        ((assoc shape office-shapes) => cdr)
+        ;; (LibreOffice has the other shapes of Word under these names)
+        ((!= shape "") (string-append "ooxml-" shape))
+        (else "rectangle")))
+
+(tm-define (office-shape-for-word shape)
+  (:synopsis "The shape of Word for the shape @shape of the office tree")
+  (cond ((not (string? shape)) "rect")
+        ((string-starts? shape "odf:") "rect")
+        (else shape)))
+
 (tm-define (office-float-side h-pos h-rel offset width)
   (:synopsis "Where TeXmacs shows a floating picture: left, right or center")
   (cond ((in? h-pos '("left" "inside")) "left")

@@ -210,6 +210,10 @@
           (string-append "<w:numbering" docx-ns ">" numbering "</w:numbering>")
           docx-rels docx-footnotes)))
 
+(define (docx-blocks-of* archive)
+  ;; the blocks of the office tree of a Word document, without the setup
+  (bare (no-setup (cdr (parse-docx-document archive)))))
+
 (define (docx-blocks-of body styles numbering)
   (bare (cdr (parse-docx-document (docx-file body styles numbering)))))
 
@@ -926,6 +930,88 @@
           '(body (document (block (tformat (twith "table-width" "1par") (twith "table-hmode" "exact")
                                            (cwith "1" "-1" "1" "-1" "cell-hyphen" "t")
                                            (table (row (cell (document "a" (math "x"))))))))))
+  ;; a box of text which floats on the left of its paragraph, and an
+  ;; ellipse with text in its line: their size, fill, line and text
+  (let* ((wsp (lambda (geom fill txt)
+                (string-append
+                  "<wps:wsp><wps:spPr><a:prstGeom prst='" geom "'/>"
+                  "<a:solidFill><a:srgbClr val='" fill "'/></a:solidFill>"
+                  "<a:ln><a:noFill/></a:ln></wps:spPr>"
+                  (if (== txt "") ""
+                      (string-append "<wps:txbx><w:txbxContent>" (wp (wr txt))
+                                     "</w:txbxContent></wps:txbx>"))
+                  "<wps:bodyPr lIns='0' tIns='0' rIns='0' bIns='0'><a:spAutoFit/></wps:bodyPr>"
+                  "</wps:wsp>")))
+         (body (string-append
+                 (wp "<w:r><w:drawing><wp:anchor behindDoc='0'>"
+                     "<wp:positionH relativeFrom='column'><wp:align>left</wp:align></wp:positionH>"
+                     "<wp:positionV relativeFrom='paragraph'><wp:posOffset>0</wp:posOffset>"
+                     "</wp:positionV><wp:extent cx='1800000' cy='720000'/>"
+                     "<wp:wrapSquare wrapText='bothSides'/>"
+                     (wsp "rect" "FFF2CC" "In the box") "</wp:anchor></w:drawing></w:r>"
+                     (wr "Text around."))
+                 (wp "<w:r><w:drawing><wp:inline><wp:extent cx='720000' cy='360000'/>"
+                     (wsp "ellipse" "70AD47" "") "</wp:inline></w:drawing></w:r>")))
+         (blocks (docx body))
+         (doc (office->texmacs (cons 'office blocks)
+                               (list (cons "office->texmacs:faithful" "on"))))
+         (text (archive-entry (convert doc "texmacs-stree" "docx-document") "word/document.xml"))
+         (content (archive-entry (convert doc "texmacs-stree" "odt-document") "content.xml")))
+    (check= blocks
+            '((p (box (@ (float "left") (wrap "square") (wrap-side "both") (h-pos "left")
+                         (h-rel "column") (v-pos "offset") (v-rel "paragraph") (v-offset "0cm")
+                         (width "5cm") (height "2cm") (shape "rect") (fill "#fff2cc")
+                         (line "none") (inset "0,0,0,0") (grow "true"))
+                      (p "In the box"))
+                 "Text around.")
+              (p (box (@ (width "2cm") (height "1cm") (shape "ellipse") (fill "#70ad47")
+                         (line "none") (inset "0,0,0,0") (grow "true"))))))
+    (check= (cadr (cadr (cadr doc)))
+            '(with "par-mode" "left"
+               (office-box "left" "wrap=square wrap-side=both h-pos=left h-rel=column v-pos=offset v-rel=paragraph v-offset=0cm height=2cm shape=rect inset=0,0,0,0 grow=true next=true"
+                           "5cm" "#fff2cc" "none" (document "In the box"))))
+    (check-true (>= (string-search-forwards "(office-shape \"\" " 0 (object->string doc)) 0))
+    ;; read again from both formats: the same boxes
+    (check= (docx-blocks-of* (convert doc "texmacs-stree" "docx-document")) blocks)
+    (check-true (export-has? text "<wps:txbx><w:txbxContent>"))
+    (check-true (export-has? text "<a:prstGeom prst=\"ellipse\">"))
+    (check-true (export-has? text "<a:spAutoFit/>"))
+    (check-true (export-has? content "<draw:text-box"))
+    (check-true (export-has? content "draw:type=\"ellipse\""))
+    (check-true (export-has? content "fo:background-color=\"#fff2cc\"")))
+  ;; a box of text of VML, in an older document
+  (check= (docx (wp "<w:r><w:pict><v:rect style='position:absolute;width:100pt;height:50pt;"
+                    "mso-position-horizontal:right' fillcolor='#ffff00' stroked='f'>"
+                    "<v:textbox><w:txbxContent>" (wp (wr "old")) "</w:txbxContent></v:textbox>"
+                    "<w10:wrap type='square'/></v:rect></w:pict></w:r>" (wr "x")))
+          '((p (box (@ (float "right") (wrap "square") (wrap-side "both") (h-pos "right")
+                       (h-rel "column") (v-pos "offset") (v-rel "paragraph")
+                       (width "3.528cm") (height "1.764cm") (shape "rect") (fill "#ffff00")
+                       (line "none"))
+                    (p "old"))
+               "x")))
+  ;; a frame with a box of text and a shape of OpenDocument
+  (check= (odt-blocks-of
+            (tp "<draw:frame draw:style-name='B' text:anchor-type='paragraph' svg:width='4cm'"
+                " svg:height='2cm'><draw:text-box>" (tp "in") "</draw:text-box></draw:frame>"
+                "<draw:custom-shape draw:style-name='S' text:anchor-type='as-char' svg:width='2cm'"
+                " svg:height='1cm'><draw:enhanced-geometry draw:type='ellipse'/></draw:custom-shape>"
+                "t")
+            ""
+            (string-append
+              "<style:style style:name='B' style:family='graphic'><style:graphic-properties"
+              " style:wrap='right' style:horizontal-pos='left' style:horizontal-rel='paragraph'"
+              " fo:background-color='#ffeeee' fo:border='0.06pt solid #ff0000'/></style:style>"
+              "<style:style style:name='S' style:family='graphic'><style:graphic-properties"
+              " draw:fill='solid' draw:fill-color='#00ff00' draw:stroke='none'/></style:style>"))
+          '((p (box (@ (float "left") (wrap "square") (wrap-side "right") (h-pos "left")
+                       (h-rel "column") (v-pos "top") (v-rel "paragraph") (width "4cm")
+                       (height "2cm") (shape "rect") (fill "#ffeeee") (line "#ff0000")
+                       (line-width "0.06"))
+                    (p "in"))
+               (box (@ (width "2cm") (height "1cm") (shape "ellipse") (fill "#00ff00")
+                       (line "none")))
+               "t")))
   ;; a font of OpenDocument by the name of its declaration: its family
   (check= (odt-blocks-of (tp (tspan "T1" "x"))
                          (string-append
@@ -1804,12 +1890,13 @@
           '((table (@ (columns "0.25 0.75"))
                    (row (cell (@ (borders "none")) (p "1"))
                         (cell (@ (borders "none")) (p "2"))))))
-  ;; a table in a box of text comes after the paragraph of the box
+  ;; a table in a box of text is in the box
   (check= (odt (tp "a<draw:frame><draw:text-box><table:table><table:table-row>"
                    "<table:table-cell>" (tp "in") "</table:table-cell>"
                    "</table:table-row></table:table>" (tp "b")
                    "</draw:text-box></draw:frame>"))
-          '((p "a") (table (row (cell (@ (borders "none")) (p "in")))) (p "b")))
+          '((p "a" (box (@ (shape "rect") (fill "none") (line "none"))
+                       (table (row (cell (@ (borders "none")) (p "in")))) (p "b")))))
   ;; an image which is not in the archive is not one to fetch: a link to
   ;; its address on the web, the text of another address
   (check= (odt (tp "<draw:frame><draw:image xlink:href='http://a.b/p.png'/>"

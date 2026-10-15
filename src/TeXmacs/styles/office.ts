@@ -101,6 +101,26 @@
 
   <\active*>
     <\src-comment>
+      A box of text which floats beside its paragraph, or a shape with
+      text: its side, the rest as "key=value ..." (where it is, its height
+      and its shape), its width, its fill and its line (colors, none, or
+      nothing), and its text. A shape without text: its side, all the rest,
+      and a drawing of it.
+    </src-comment>
+  </active*>
+
+  <assign|office-box|<macro|side|spec|width|fill|line|body|<tabular|<tformat|<twith|table-width|<arg|width>>|<twith|table-hmode|<if|<equal|<arg|width>|>|auto|exact>>|<cwith|1|1|1|1|cell-hyphen|t>|<cwith|1|1|1|1|cell-background|<if|<equal|<arg|fill>|none>||<arg|fill>>>|<cwith|1|1|1|1|cell-lborder|<if|<equal|<arg|line>|none>|0ln|<if|<equal|<arg|line>|>|0ln|1ln>>>|<cwith|1|1|1|1|cell-rborder|<if|<equal|<arg|line>|none>|0ln|<if|<equal|<arg|line>|>|0ln|1ln>>>|<cwith|1|1|1|1|cell-tborder|<if|<equal|<arg|line>|none>|0ln|<if|<equal|<arg|line>|>|0ln|1ln>>>|<cwith|1|1|1|1|cell-bborder|<if|<equal|<arg|line>|none>|0ln|<if|<equal|<arg|line>|>|0ln|1ln>>>|<table|<row|<\cell>
+    <arg|body>
+  </cell>>>>>>>
+
+  <assign|office-shape|<macro|side|spec|drawing|<arg|drawing>>>
+
+  <drd-props|office-box|arity|6|accessible|5>
+
+  <drd-props|office-shape|arity|3>
+
+  <\active*>
+    <\src-comment>
       A field of the office programs (a page number, a date, the title of
       the document...): its instruction, and its result as the file had
       it.

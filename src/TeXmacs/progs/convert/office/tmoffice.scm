@@ -1213,24 +1213,46 @@
       (with r (tmof (caddr l))
         (tmof-attr-wrap* 'font `((value ,(tmof-plain (car l)))) r))))
 
+(define (tmof-spec side spec)
+  ;; the attributes of a floating thing: its side, and the "key=value ..."
+  ;; of the others (a thing without a side is in its line)
+  (let ((l (append-map
+             (lambda (kv)
+               (with i (string-search-forwards "=" 0 kv)
+                 (if (<= i 0) '()
+                     (with k (string->symbol (substring kv 0 i))
+                       (if (in? k (append (cdr office-float-keys) office-box-keys '(next)))
+                           (list (list k (substring kv (+ i 1) (string-length kv))))
+                           '())))))
+             (string-tokenize-by-char (tmof-plain spec) #\space)))
+        (side (tmof-plain side)))
+    (if (in? side '("left" "right" "center"))
+        (cons (list 'float side) l)
+        (list-filter l (lambda (a) (not (in? (car a) (cdr office-float-keys))))))))
+
 (define (tmof-office-float l)
   ;; a picture which floats beside its paragraph: where it is, and how the
   ;; text goes around it
   (if (< (length l) 3) '()
-      (let* ((side (tmof-plain (car l)))
-             (spec (append-map
-                     (lambda (kv)
-                       (with i (string-search-forwards "=" 0 kv)
-                         (if (<= i 0) '()
-                             (with k (string->symbol (substring kv 0 i))
-                               (if (in? k (append office-float-keys '(next)))
-                                   (list (list k (substring kv (+ i 1) (string-length kv))))
-                                   '())))))
-                     (string-tokenize-by-char (tmof-plain (cadr l)) #\space)))
-             (attrs (cons (list 'float (if (in? side '("left" "right" "center")) side "left"))
-                          (list-filter spec (lambda (a) (!= (car a) 'float))))))
+      (with attrs (with a (tmof-spec (car l) (cadr l))
+                    (if (assq 'float a) a (cons '(float "left") a)))
         (map (lambda (y) (if (func? y 'image) (office-add-attrs y attrs) y))
              (tmof (caddr l))))))
+
+(define (tmof-office-box l)
+  ;; a box of text: where it is, its size, its fill and its line, its text
+  (if (< (length l) 6) '()
+      (let* ((attrs (tmof-spec (car l) (cadr l)))
+             (val (lambda (x) (with v (tmof-plain x) (and (!= v "") v))))
+             (attrs (append (list-filter attrs (lambda (a) (not (in? (car a) '(width fill line)))))
+                            `((width ,(val (caddr l))) (fill ,(val (cadddr l)))
+                              (line ,(val (list-ref l 4)))))))
+        `((box (@ ,@(list-filter attrs cadr)) ,@(tmof-blocks (tmof (list-ref l 5))))))))
+
+(define (tmof-office-shape l)
+  ;; a shape without text: all that it is is said by its attributes
+  (if (< (length l) 2) '()
+      `((box (@ ,@(tmof-spec (car l) (cadr l)))))))
 
 (define (tmof-change-case l)
   ;; capitals, lower case; the first letter in capitals is the text as it is
@@ -1944,6 +1966,8 @@
   (change-case tmof-change-case)
   (office-capitalize tmof-office-capitalize)
   (office-float tmof-office-float)
+  (office-box tmof-office-box)
+  (office-shape tmof-office-shape)
   (part tmof-part-numbered)
   (part-numbered-title tmof-part-numbered-title)
   (chapter tmof-chapter-numbered)
@@ -2036,6 +2060,8 @@
                      ((== href "") l)
                      (else (list `(link (@ (href ,href)) ,@l))))))
             ((note) (list (cons 'note (tmof-final-blocks (cdr x)))))
+            ((box) (list `(box (@ ,@(tmof-node-attrs x))
+                               ,@(tmof-final-blocks (tmof-node-children x)))))
             ((br) '((br)))
             ((tab) '((tab)))
             ((math image bookmark seq) (list x))
@@ -2138,12 +2164,12 @@
 ;; goes back there, at its start (attribute next of office-float)
 
 (define (tmof-next-float? y)
-  (and (func? y 'image) (== (ox-attr y 'next) "true")))
+  (and (or (func? y 'image) (func? y 'box)) (== (ox-attr y 'next) "true")))
 
 (define (tmof-drop-next y)
   (if (not (tmof-next-float? y)) y
       (apply office-node
-             (cons* 'image (list-filter (map (lambda (a) (list (car a) (cadr a)))
+             (cons* (car y) (list-filter (map (lambda (a) (list (car a) (cadr a)))
                                              (ox-attrs y))
                                         (lambda (a) (!= (car a) 'next)))
                     (ox-children y)))))
