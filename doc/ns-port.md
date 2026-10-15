@@ -425,7 +425,10 @@ packages/macos/build-ns-app.sh --deps ~/tm-deps-arm64 --arch arm64 --min-macos 1
 
 `build-deps.sh` builds GMP, libltdl, libpng, FreeType and Guile 1.8.8 from
 their sources, as static libraries for this architecture and version of
-macOS; `build-ns-app.sh --deps` then builds with them only (not with
+macOS (with the parts `vue`, SDL3, MuPDF and ThorVG for the Vue port, and
+`tls`, Nettle and GnuTLS: the connections to the TeXmacs servers, such as
+cloud.texmacs.org, which `build-ns-app.sh` enables with `--with-gnutls`
+when the libraries have GnuTLS; the CI builds `vue,tls`); `build-ns-app.sh --deps` then builds with them only (not with
 Homebrew: its `PATH` and `pkg-config` exclude it), with
 `MACOSX_DEPLOYMENT_TARGET` and `--with-osx` (hence `LSMinimumSystemVersion`)
 set to the version. x86_64 on Apple silicon is built under Rosetta (both

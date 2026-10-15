@@ -54,7 +54,7 @@ jobs:
             /etc/ImageMagick-6/policy.xml
 
       - name: Configure
-        run: ./configure --with-scheme=s7 QMAKE=/usr/lib/qt6/bin/qmake
+        run: ./configure --with-scheme=s7 --with-gnutls QMAKE=/usr/lib/qt6/bin/qmake
 
       - name: Build
         run: make -j"$(nproc)"
@@ -112,7 +112,7 @@ jobs:
           # With pkg-config, Qt's flags no longer bring in Winsock (ws2_32),
           # which the socket code needs; configure should add it for MinGW
           ./configure --with-scheme=s7 --with-qt-find-method=pkgconfig \
-            QMAKE=/mingw64/bin/qmake6 LIBS=-lws2_32
+            --with-gnutls QMAKE=/mingw64/bin/qmake6 LIBS=-lws2_32
 
       - name: Build
         run: |
@@ -156,6 +156,7 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             build-essential pkg-config cmake ninja-build meson \
             libfreetype-dev libpng-dev zlib1g-dev libjpeg-dev libsqlite3-dev \
+            libgnutls28-dev \
             libgl-dev libegl-dev libx11-dev libxext-dev libxrandr-dev \
             libxcursor-dev libxi-dev libxss-dev libxfixes-dev libxtst-dev \
             libxkbcommon-dev libdrm-dev libgbm-dev libgles-dev \
@@ -186,7 +187,7 @@ jobs:
       - name: Configure
         run: |
           ./configure --with-gui=vue --with-scheme=s7 --with-sdl3 \
-            --with-mupdf="$DEPS" --with-thorvg="$DEPS" \
+            --with-mupdf="$DEPS" --with-thorvg="$DEPS" --with-gnutls \
             PKG_CONFIG_PATH="$DEPS/lib/pkgconfig"
 
       # NOTE: -k, so that a run shows all the files which do not compile
@@ -288,6 +289,7 @@ jobs:
             mingw-w64-x86_64-sqlite3
             mingw-w64-x86_64-sdl3
             mingw-w64-x86_64-sdl3-ttf
+            mingw-w64-x86_64-gnutls
 
       # NOTE: saved once built, even when TeXmacs does not build
       - name: Cache of the libraries
@@ -316,8 +318,8 @@ jobs:
       - name: Configure
         run: |
           ./configure --with-gui=vue --with-scheme=s7 --with-sdl3 \
-            --with-mupdf="$DEPS" --with-thorvg="$DEPS" LIBS=-lws2_32 \
-            CC=clang CXX=clang++
+            --with-mupdf="$DEPS" --with-thorvg="$DEPS" --with-gnutls \
+            LIBS=-lws2_32 CC=clang CXX=clang++
 
       - name: Build
         run: make -k -j"$(nproc)"

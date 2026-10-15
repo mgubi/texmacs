@@ -72,7 +72,7 @@ jobs:
 
       - name: Libraries
         if: steps.deps-cache.outputs.cache-hit != 'true'
-        run: packages/macos/build-deps.sh "$DEPS" ${{ matrix.arch }} "$MIN_MACOS" vue
+        run: packages/macos/build-deps.sh "$DEPS" ${{ matrix.arch }} "$MIN_MACOS" vue,tls
 
   app:
     needs: deps

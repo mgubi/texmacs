@@ -13,7 +13,8 @@
 #   --thorvg PREFIX       ThorVG, for the GPU renderer of vue (default: the
 #                         --deps PREFIX, when it has it)
 #   --deps PREFIX         the libraries made by build-deps.sh in PREFIX (with
-#                         the part vue for vue, guile for guile),
+#                         the part vue for vue, guile for guile, and tls
+#                         for the connections to the servers: GnuTLS),
 #                         instead of the ones of the system (Homebrew): the
 #                         application then runs on older versions of macOS
 #   --arch ARCH           arm64 or x86_64 (default: the one of the machine;
@@ -103,6 +104,14 @@ if [ $configure = yes ]; then
     [ -n "$thorvg" ] && args="$args --with-thorvg=$thorvg"
   fi
   [ -n "$deps" ] && args="$args --with-freetype=$deps/bin --with-osx=$min"
+  # the connections to the TeXmacs servers (cloud.texmacs.org): GnuTLS of
+  # the --deps PREFIX when it has it (build-deps.sh, part tls), or of the
+  # system (Homebrew)
+  if [ -n "$deps" ]; then
+    [ -f "$deps/lib/pkgconfig/gnutls.pc" ] && args="$args --with-gnutls"
+  elif pkg-config --exists gnutls 2> /dev/null; then
+    args="$args --with-gnutls"
+  fi
   # the headers and the libraries of the dependencies for the other tests
   # (png.h and libpng for the PDF renderer, PDFHummus)
   [ -n "$deps" ] && args="$args CPPFLAGS=-I$deps/include LDFLAGS=-L$deps/lib"
