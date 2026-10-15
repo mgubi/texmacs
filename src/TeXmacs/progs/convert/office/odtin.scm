@@ -244,8 +244,8 @@
   ;; of the default style, or 12pt
   (let loop ((l props) (k 1.0))
     (cond ((null? l)
-           (with s (and (not (eq? props odt-defaults)) (odt-get odt-defaults 'size))
-             (* k (if (and (number? s) (> s 0)) s 12.0))))
+           ;; (the default style in percents: of 12pt)
+           (* k (if (eq? props odt-defaults) 12.0 (odt-props-size odt-defaults))))
           ((and (eq? (caar l) 'size) (number? (cdar l))) (* k (cdar l)))
           ((and (eq? (caar l) 'size-percent) (number? (cdar l)))
            (loop (cdr l) (* k (/ (cdar l) 100.0))))
@@ -789,15 +789,18 @@
                      (height ,(ox-attr x 'svg:height))
                      (alt ,alt)
                      (crop ,(odt-crop x data))))))
-          ;; An image which is not in the archive is not fetched: a link
-          ;; to its address on the web, and the text of any other address.
-          ((and href (or (string-starts? (locase-all href) "http://")
-                         (string-starts? (locase-all href) "https://")))
-           (list `(link (@ (href ,href))
-                        ,(if (and alt (!= (string-trim-spaces alt) "")) alt href))))
-          ((and href (or (>= (string-search-forwards "://" 0 href) 0)
-                         (string-starts? (locase-all href) "file:")))
-           (list href))
+          ;; A picture which is not in the archive (linked) is not
+          ;; fetched: as the Word reader says it, an image at its address
+          ;; on the web, and else an image which is linked (its address
+          ;; is text, see officetm)
+          ((and href (!= href ""))
+           (list (office-node
+                   'image
+                   `((name ,href)
+                     (width ,(ox-attr x 'svg:width))
+                     (height ,(ox-attr x 'svg:height))
+                     (alt ,alt)
+                     (linked ,(and (not (office-web-address? href)) "true"))))))
           (else '()))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -911,8 +914,16 @@
                      (named
                       (ahash-set! odt-used-styles (cons "text" named) #t)
                       (let* ((own (ahash-ref odt-styles (cons "text" name)))
-                             (props (append (if (and own (odt-get own 'automatic)) own '())
-                                            odt-par-props)))
+                             ;; (what the named style says already is not
+                             ;; said again: two overlines are not one)
+                             (style (odt-style "text" named))
+                             (new? (lambda (p) (not (and (assq (car p) style)
+                                                         (equal? (odt-get style (car p))
+                                                                 (cdr p))))))
+                             (props (list-filter
+                                      (append (if (and own (odt-get own 'automatic)) own '())
+                                              odt-par-props)
+                                      new?)))
                         (list `(span (@ (style ,named))
                                      ,@(odt-wrap-text
                                          (odt-span-text
