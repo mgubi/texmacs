@@ -547,9 +547,14 @@
   (check= (export '(math (concat "x" (rsup "2")))) "$x^2$")
   (check= (export '(document "a" (equation* (document "x=1")) "b"))
           "a\n\n$$\nx = 1\n$$\n\nb\n")
-  ;; a formula of one symbol is the character
+  ;; a formula of one symbol is a formula too, and is read back as one
   (check= (export '(concat "a " (math "<rightarrow>") " b"))
-          (string-append "a " (bytes 226 134 146) " b")))
+          "a $\\rightarrow$ b")
+  (for-each
+    (lambda (x)
+      (check= (import (export `(concat "a " (math ,x) " b")))
+              `(concat "a " (math ,x) " b")))
+    '("<alpha>" "<rightarrow>" "<infty>" "<bbb-R>" "<partial>" "x")))
 
 (define (test-export-blocks)
   (check-group "export blocks")
@@ -861,11 +866,13 @@
           '((md-metadata (document (md-meta "title" "T") (md-meta "tags" "")
                                    (md-meta "" "  - a")))
             "x"))
-  ;; a formula as it is written, with a copy of what it was read as; a
-  ;; formula which TeXmacs writes in the same way has no need of it
+  ;; a formula as it is written, with a copy of what it was read as, also
+  ;; one which TeXmacs writes in the same way (to know it would take a
+  ;; conversion to LaTeX of each formula)
   (check= (md-body "$a=b$ $x^2$ \\(y\\)\n")
           '((concat (md-source (math "a=b") "$a=b$" (math "a=b")) " "
-                    (math (concat "x" (rsup "2"))) " "
+                    (md-source (math (concat "x" (rsup "2"))) "$x^2$"
+                               (math (concat "x" (rsup "2")))) " "
                     (md-source (math "y") "\\(y\\)" (math "y")))))
   (check= (md-body "<!-- c -->\n")
           '((md-block-source "" "<less>!-- c --<gtr>" "")))
@@ -1107,6 +1114,57 @@
                                          "texmacs-stree" "latex-document"))
         0)))
 
+;; Tabs at the start of lines: columns for the blocks, tabs in what they hold.
+(define (tabs . l)
+  ;; the strings of l, with each "~" as a tab
+  (string-replace (apply string-append l) "~" tab-char))
+
+(define (test-style-tabs)
+  (check-group "style markdown, tabs at the start of lines")
+  ;; kept: code, HTML, formulas, a header, inside a quote and an item
+  (for-each
+    (lambda (s) (check= (md->md s) s))
+    (list
+      (tabs "```\n~a\n~~b\n```\n")
+      (tabs "```\n~\n  ~ a\n```\n")
+      (tabs "> ```\n> ~x\n> ```\n")
+      (tabs "- a\n\n  ```\n  ~x\n  ```\n")
+      (tabs "$$\n~x\n$$\n")
+      (tabs "<div>\n~x\n</div>\n")
+      (tabs "---\ntitle: T\n~x: 1\n---\n\ny\n")))
+  ;; the blocks see a tab as the columns up to the next multiple of 4
+  (check= (parse (tabs "~code\n~~more\n")) '(markdown (pre "code\n\tmore")))
+  (check= (parse (tabs "    ~x\n  ~y\n")) '(markdown (pre "\tx\ny")))
+  (check= (parse (tabs "```\n~a\n```\n")) '(markdown (pre "\ta")))
+  ;; columns of a tab which an item or a fence take are spaces
+  (check= (parse (tabs "1. a\n\n~~code\n"))
+          '(markdown (ol (@ (loose "true")) (li (p "a") (pre " code")))))
+  (check= (parse (tabs "  ```\n~x\n  ```\n")) '(markdown (pre "  x")))
+  ;; in a paragraph, the spaces which start a line are not text
+  (check= (parse (tabs "a\n~b\n")) '(markdown "a b"))
+  ;; what is written in another way says the same, and is written as itself
+  (for-each
+    (lambda (s)
+      (with t (md->md s)
+        (check= (md-tree t) (md-tree s))
+        (check= (md->md t) t)))
+    (list (tabs "~code\n~~more\n") (tabs "a\n~b\n")
+          (tabs "1. a\n\n~~code\n") (tabs "- a\n~b\n")))
+  ;; a text with the characters which stand for these tabs: spaces, as before
+  (check= (parse (string-append (tabs "```\n~a\n```\n\n")
+                                (string (integer->char 31))))
+          `(markdown (pre "    a") (p ,(string (integer->char 31)))))
+  ;; a line which starts with a tab keeps it when another line is changed
+  (let* ((t (md->tm (tabs "```\nhead\n~b\n```\n")))
+         (walk (lambda (x)
+                 (let loop ((x x))
+                   (cond ((func? x 'md-block-source 3)
+                          `(md-block-source ,(loop (cadr x)) ,@(cddr x)))
+                         ((== x "head") "HEAD")
+                         ((pair? x) (cons (car x) (map loop (cdr x))))
+                         (else x))))))
+    (check= (tm->md (walk t)) (tabs "```\nHEAD\n~b\n```\n"))))
+
 ;; The same through a buffer, whose macros are expanded when it is saved.
 (define (test-style-buffer)
   (check-group "style markdown, buffer")
@@ -1210,6 +1268,7 @@
   (test-style-round-trip)
   (test-style-losses)
   (test-style-losses-2)
+  (test-style-tabs)
   (test-style-buffer)
   (test-format)
   (check-end))

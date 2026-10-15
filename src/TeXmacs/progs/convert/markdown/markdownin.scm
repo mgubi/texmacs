@@ -51,7 +51,22 @@
 
 ;; These are called for each character of a text: they compare the codes
 ;; of the characters with <, which every interpreter does fast.
-(define (md-space? c) (or (eqv? c #\space) (eqv? c #\tab)))
+;; A tab at the start of a line goes to the next multiple of 4 columns for
+;; the blocks (indentation, lists, indented code), and is kept as a tab in
+;; what the blocks hold (code, HTML, formulas, tables). Such a tab of width
+;; n is read as n characters: md-tab-head, then n - 1 times md-tab-fill,
+;; which the blocks count as spaces. A block which takes some of these
+;; columns away leaves fills without their head: spaces, as CommonMark
+;; says. At the end, a head with its fills is a tab again (md-untab). The
+;; two characters are control characters which the text does not hold
+;; (when it does, a tab at the start of a line is spaces, as before).
+(define md-tab-head #\space)
+(define md-tab-fill #\space)
+(define md-tabs? #f)
+
+(define (md-space? c)
+  (or (eqv? c #\space) (eqv? c #\tab)
+      (eqv? c md-tab-fill) (eqv? c md-tab-head)))
 (define (md-digit? c)
   (with n (char->integer c) (and (< 47 n) (< n 58))))
 (define (md-ascii-alpha? c)
@@ -85,7 +100,10 @@
 (define (md-indent s)
   ;; the number of spaces which start the line
   (let loop ((i 0))
-    (if (and (< i (string-length s)) (char=? (string-ref s i) #\space))
+    (if (and (< i (string-length s))
+             (with c (string-ref s i)
+               (or (char=? c #\space) (char=? c md-tab-fill)
+                   (char=? c md-tab-head))))
         (loop (+ i 1)) i)))
 
 (define (md-dedent s n)
@@ -182,18 +200,39 @@
                (and (< a (vector-length v)) (+ (vector-ref v a) n)))))))
 
 (define (md-expand-tabs s)
-  ;; the tabs at the start of the line as spaces, to the next multiple of 4
-  (if (not (md-find s 0 #\tab)) s
+  ;; the tabs at the start of the line as as many columns as they take, to
+  ;; the next multiple of 4 (see md-tab-head)
+  (if (or (== s "") (not (md-space? (string-ref s 0)))
+          (not (md-find s 0 #\tab)))
+      s
       (let loop ((i 0) (col 0) (acc '()))
         (cond ((>= i (string-length s)) (list->string (reverse acc)))
               ((char=? (string-ref s i) #\space)
                (loop (+ i 1) (+ col 1) (cons #\space acc)))
               ((char=? (string-ref s i) #\tab)
+               (set! md-tabs? (not (char=? md-tab-head #\space)))
                (with n (- 4 (remainder col 4))
                  (loop (+ i 1) (+ col n)
-                       (append (make-list n #\space) acc))))
+                       (append (make-list (- n 1) md-tab-fill)
+                               (cons md-tab-head acc)))))
               (else (string-append (list->string (reverse acc))
                                    (substring s i (string-length s))))))))
+
+(define (md-untab-string s)
+  ;; a head with its fills is a tab, and fills alone are spaces
+  (if (not (or (md-find s 0 md-tab-head) (md-find s 0 md-tab-fill))) s
+      (let loop ((l (string->list s)) (head? #f) (acc '()))
+        (cond ((null? l) (list->string (reverse acc)))
+              ((char=? (car l) md-tab-head) (loop (cdr l) #t (cons #\tab acc)))
+              ((char=? (car l) md-tab-fill)
+               (loop (cdr l) head? (if head? acc (cons #\space acc))))
+              (else (loop (cdr l) #f (cons (car l) acc)))))))
+
+(define (md-untab x)
+  ;; the same in each string of the tree x
+  (cond ((string? x) (md-untab-string x))
+        ((pair? x) (cons (md-untab (car x)) (md-untab (cdr x))))
+        (else x)))
 
 (define (md-lines s)
   ;; the lines of the text, without their ends
@@ -1680,11 +1719,18 @@
   (set! md-in-link? #f)
   (set! md-depth 0)
   (set! md-no-math-end '())
+  ;; (the characters for the tabs which start lines, see md-tab-head)
+  (set! md-tabs? #f)
+  (if (or (string-index s (integer->char 30)) (string-index s (integer->char 31)))
+      (begin (set! md-tab-head #\space) (set! md-tab-fill #\space))
+      (begin (set! md-tab-head (integer->char 30))
+             (set! md-tab-fill (integer->char 31))))
   (let* ((lines (map md-expand-tabs (md-lines s)))
          (front (md-front-matter lines))
          (blocks (md-blocks (if front (cdr front) lines)))
          (r (map md-finish (if front (cons (car front) blocks) blocks)))
-         (r (cdr (md-unused-defs (cons 'markdown r)))))
+         (r (cdr (md-unused-defs (cons 'markdown r))))
+         (r (if md-tabs? (md-untab r) r)))
     (set! md-refs (make-ahash-table))
     (set! md-refs-used (make-ahash-table))
     (set! md-refs-kept (make-ahash-table))
