@@ -436,7 +436,62 @@
         '((style:wrap . g-wrap) (style:wrap-contour . g-contour)
           (style:run-through . g-through) (style:horizontal-pos . g-hpos)
           (style:horizontal-rel . g-hrel) (style:vertical-pos . g-vpos)
-          (style:vertical-rel . g-vrel) (fo:clip . g-clip)))))
+          (style:vertical-rel . g-vrel) (fo:clip . g-clip)
+          (draw:fill . g-fill) (draw:fill-color . g-fill-color)
+          (fo:background-color . g-bg) (draw:stroke . g-stroke)
+          (svg:stroke-color . g-stroke-color) (svg:stroke-width . g-stroke-width)
+          (fo:border . g-border) (fo:padding . g-padding)
+          (fo:padding-left . g-pl) (fo:padding-top . g-pt)
+          (fo:padding-right . g-pr) (fo:padding-bottom . g-pb)
+          (draw:auto-grow-height . g-grow)))))
+
+(define (odt-box x kind blocks)
+  ;; a box of text or a shape (of the kind of OpenDocument): where it is,
+  ;; its size, its shape, its fill and its line, and the blocks of its text
+  (let* ((props (odt-style "graphic" (ox-attr x 'draw:style-name)))
+         (get (lambda (k) (odt-get props k)))
+         (width (ox-attr x 'svg:width))
+         (box (ox-child x 'draw:text-box))
+         (height (or (ox-attr x 'svg:height) (and box (ox-attr box 'fo:min-height))))
+         (fill (cond ((== (get 'g-fill) "none") "none")
+                     ((get 'g-fill-color) => office-color)
+                     ((and (get 'g-bg) (!= (get 'g-bg) "transparent"))
+                      (office-color (get 'g-bg)))
+                     ((== kind "frame") "none")
+                     (else #f)))
+         (border (get 'g-border))
+         (line (cond ((== (get 'g-stroke) "none") "none")
+                     ((get 'g-stroke-color) => office-color)
+                     ((and border (!= border "none"))
+                      (or (with i (string-search-forwards "#" 0 border)
+                            (and (>= i 0) (office-color (substring border i (string-length border)))))
+                          "#000000"))
+                     ((== kind "frame") "none")
+                     (else #f)))
+         (lw (with v (or (get 'g-stroke-width)
+                         (and border (car (string-tokenize-by-char border #\space))))
+               (with c (office-length->cm v) (and c (office-decimal (/ c 0.03528))))))
+         (shape (cond ((== kind "frame") "rect")
+                      ((== kind "draw:rect") "rect")
+                      ((in? kind '("draw:ellipse" "draw:circle")) "ellipse")
+                      (else (office-shape-of-odf
+                              (with g (ox-child x 'draw:enhanced-geometry)
+                                (and g (ox-attr g 'draw:type)))))))
+         (pad (lambda (k) (with v (or (get k) (get 'g-padding))
+                            (if (and v (string-starts? v "0")) 0 (or (office-length->cm v) 0)))))
+         (inset (and (or (get 'g-padding) (get 'g-pl))
+                     (string-recompose (map (lambda (k) (office-decimal (pad k)))
+                                            '(g-pl g-pt g-pr g-pb))
+                                       ",")))
+         (grow (and (== (get 'g-grow) "true") (!= kind "frame") "true"))
+         (float (odt-float x width)))
+    (apply office-node
+           (cons* 'box
+                  (append (or float '())
+                          `((width ,width) (height ,height) (shape ,shape)
+                            (fill ,fill) (line ,line) (line-width ,lw)
+                            (inset ,inset) (grow ,grow)))
+                  blocks))))
 
 (define (odt-float x width)
   ;; the attributes of a frame x which floats (office-float-keys), or #f
@@ -528,9 +583,11 @@
            (with float (odt-float x (ox-attr x 'svg:width))
              (map (lambda (n) (if (and float (func? n 'image)) (office-add-attrs n float) n))
                   (odt-frame-image x image alt))))
+          ;; a box of text: a node box, but a figure and its caption (a
+          ;; picture in the box), whose blocks come after the paragraph
+          ((and box (not (ox-find box 'draw:frame)))
+           (list (odt-box x "frame" (odt-apart (lambda () (odt-blocks (ox-children box)))))))
           (box
-           ;; the blocks of the box come after the paragraph which the
-           ;; frame is in (a figure and its caption, a note in a box)
            (with l (odt-apart (lambda () (odt-blocks (ox-children box))))
              (set! odt-floats (append odt-floats l))
              '()))
@@ -726,9 +783,12 @@
                      (if ref (list `(bookmark (@ (name ,ref)))) '())
                      (list `(seq (@ (name ,(or (ox-attr x 'text:name) ""))) ,@l))))))
             ((draw:frame) (odt-frame x))
-            ;; a shape with text: its blocks come after the paragraph
-            ((draw:custom-shape draw:rect draw:ellipse draw:polygon draw:path
-              draw:polyline draw:g draw:circle draw:regular-polygon)
+            ;; a shape, with its text
+            ((draw:custom-shape draw:rect draw:ellipse draw:circle)
+             (list (odt-box x (symbol->string (car x))
+                            (odt-apart (lambda () (odt-blocks (ox-children x)))))))
+            ;; another drawing: its blocks come after the paragraph
+            ((draw:polygon draw:path draw:polyline draw:g draw:regular-polygon)
              (with l (odt-apart (lambda () (odt-blocks (ox-children x))))
                (set! odt-floats (append odt-floats l))
                '()))
@@ -1157,9 +1217,12 @@
                                          (gap ,(odt-get props 'column-gap)))
                                        l)))
                    l)))
-            ((text:index-body text:index-title
-              text:numbered-paragraph draw:custom-shape draw:rect draw:g)
+            ((text:index-body text:index-title text:numbered-paragraph draw:g)
              (odt-blocks (ox-children x)))
+            ;; a shape anchored to the page, with its text
+            ((draw:custom-shape draw:rect draw:ellipse draw:circle)
+             (list (list 'p (odt-box x (symbol->string (car x))
+                                     (odt-apart (lambda () (odt-blocks (ox-children x))))))))
             ;; a table of contents is made again by TeXmacs
             ((text:table-of-content) '((toc)))
             ;; the other indexes and the bibliography: their text

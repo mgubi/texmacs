@@ -77,10 +77,15 @@
 
     <item*|Notes>Footnotes and endnotes are footnotes.
 
-    <item*|Boxes of text>The text of a box or of a shape follows the
-    paragraph which the box is in; a figure in a frame of
-    <name|LibreOffice>, with its caption, is a figure. Hidden text is
-    left out.
+    <item*|Boxes of text and shapes>A box of text, or a shape (a
+    rectangle, an ellipse...) with or without text, is shown as a framed
+    box of its width with its fill, on its side, in a paragraph of its own
+    before the paragraph which it belongs to; a shape without text is a
+    drawing. Their text can be edited, and they are written back as boxes
+    and shapes, in both directions. The shapes in groups and the other
+    drawings give their text after their paragraph. A figure in a frame of
+    <name|LibreOffice>, with its caption, is a figure. Hidden text is left
+    out.
 
     <item*|Quotations and code>From the styles <samp|Quote> and
     <samp|Source Code> (<samp|Quotations> and <samp|Preformatted Text> in
@@ -122,7 +127,10 @@
     <item*|Floating images>An image with the text around it is
     <markup|office-float>, with its side, where it is and how the text
     goes around it: <TeXmacs> shows it in a paragraph of its own, before
-    the paragraph which it belongs to.
+    the paragraph which it belongs to. A box of text is
+    <markup|office-box> (with its side, the rest of where it is, its width,
+    its fill, its line and its text), and a shape without text
+    <markup|office-shape>.
 
     <item*|The file>The file itself is kept in the environment of the
     document: when it is saved again in its format, its named styles, its
