@@ -695,6 +695,7 @@ edit_interface_rep::find_alt_selection_index
 void
 edit_interface_rep::apply_changes () {
   //cout << "Apply changes\n";
+  flush_cursor_hook ();
   //cout << "et= " << et << "\n";
   //cout << "tp= " << tp << "\n";
   //cout << HRULE << "\n";
