@@ -920,14 +920,24 @@
             ;; a section in columns
             ((columns)
              (let* ((n (number->string (office-integer (ox-attr x 'count) 2 1 10)))
+                    (line? (== (ox-attr x 'line) "true"))
+                    (gap (with c (office-length->cm (ox-attr x 'gap))
+                           (if c (ot-cm c) "0.5cm")))
                     (style (ot-style
-                             (list 'section n) "Sect"
+                             (list 'section n line? gap) "Sect"
                              (lambda (name)
                                `(style:style
                                   (@ (style:name ,name) (style:family "section"))
                                   (style:section-properties
                                     (style:columns (@ (fo:column-count ,n)
-                                                      (fo:column-gap "0.5cm")))))))))
+                                                      (fo:column-gap ,gap))
+                                      ;; (the line between the columns)
+                                      ,@(if line?
+                                            '((style:column-sep
+                                                (@ (style:style "solid") (style:width "0.02cm")
+                                                   (style:color "#000000") (style:height "100%")
+                                                   (style:vertical-align "top"))))
+                                            '()))))))))
                (list `(text:section (@ (text:style-name ,style)
                                        (text:name ,(string-append "Section"
                                                                   (number->string (ot-next-id)))))

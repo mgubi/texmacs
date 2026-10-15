@@ -952,7 +952,11 @@
              (set! dx-sections? #t)
              (let ((n (number->string (office-integer (ox-attr x 'count) 2 1 10)))
                    (l (dx-blocks (ox-children x))))
-               (append (list (dx-section-end "1")) l (list (dx-section-end n)))))
+               (append (list (dx-section-end "1")) l
+                       (list (dx-section-end n (ox-attr x 'line)
+                                             (with c (office-length->cm (ox-attr x 'gap))
+                                               (and c (number->string
+                                                        (inexact->exact (round (* c 567)))))))))))
             ((rule)
              (list `(w:p (w:pPr (w:pBdr (w:bottom (@ (w:val "single") (w:sz "6")
                                                      (w:space "1") (w:color "auto"))))))))
@@ -967,7 +971,7 @@
                                "Update this field to see the table of contents."))))
             (else '())))))
 
-(define (dx-section-properties cols)
+(define (dx-section-properties cols . opt)
   ;; the page and the columns of a section, which starts on the same page
   `(w:sectPr
      ,@(if dx-sections? '((w:type (@ (w:val "continuous")))) '())
@@ -980,11 +984,14 @@
                  (w:bottom ,(dx-twips 'margin-bottom 1440))
                  (w:left ,(dx-twips 'margin-left 1440))
                  (w:header "720") (w:footer "720") (w:gutter "0")))
-     (w:cols (@ (w:num ,cols) (w:space "720")))))
+     ;; (the line between the columns, the space between them)
+     (w:cols (@ (w:num ,cols)
+                ,@(if (and (pair? opt) (== (car opt) "true")) '((w:sep "1")) '())
+                (w:space ,(or (and (pair? opt) (pair? (cdr opt)) (cadr opt)) "720"))))))
 
-(define (dx-section-end cols)
+(define (dx-section-end cols . opt)
   ;; a paragraph which ends a section
-  `(w:p (w:pPr ,(dx-section-properties cols))))
+  `(w:p (w:pPr ,(apply dx-section-properties (cons cols opt)))))
 
 (define (dx-blocks l)
   ;; the elements of the blocks l; Word makes one table of two tables

@@ -85,7 +85,7 @@
              html-class
              ;; the macros of the style office
              office-par office-span office-field office-comment office-ins
-             office-del office-columns office-underline office-strike
+             office-del office-columns office-columns* office-underline office-strike
              office-letters office-font office-capitalize office-float))
     ;; the screens of a presentation and the folds: all of them, not
     ;; only what is shown

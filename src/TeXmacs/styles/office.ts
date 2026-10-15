@@ -135,7 +135,8 @@
 
   <\active*>
     <\src-comment>
-      A section of the file in several columns.
+      A section of the file in several columns; with the line between them
+      (which TeXmacs does not draw) and the space between them.
     </src-comment>
   </active*>
 
@@ -145,7 +146,15 @@
     </with>
   </macro>>
 
+  <assign|office-columns*|<\macro|n|line|gap|body>
+    <\with|par-columns|<arg|n>|par-columns-sep|<if|<equal|<arg|gap>|>|<value|par-columns-sep>|<arg|gap>>>
+      <arg|body>
+    </with>
+  </macro>>
+
   <drd-props|office-columns|arity|2|accessible|1>
+
+  <drd-props|office-columns*|arity|4|accessible|3>
 </body>
 
 <\initial>

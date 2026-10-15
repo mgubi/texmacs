@@ -1279,8 +1279,9 @@
                                                  (append (if (func? f 'concat) (cdr f)
                                                              (list f))
                                                          (oftm-labels (cadr r)))))))))))
-                       ;; a formula alone in its paragraph is displayed
-                       ((oftm-only-formula x)
+                       ;; a formula alone in its paragraph is displayed (but
+                       ;; in a cell, where Word displays a formula alone)
+                       ((and (not oftm-in-cell?) (oftm-only-formula x))
                         => (lambda (m)
                              (with t (oftm-eqarray-table m)
                                (if t (list (oftm-eqarray t))
@@ -1298,9 +1299,15 @@
                 ;; a section in columns
                 ((columns)
                  (let ((n (or (ox-attr x 'count) "2"))
-                       (b (oftm-document (oftm-blocks (ox-children x)))))
-                   (list (if oftm-faithful? `(office-columns ,n ,b)
-                             `(with "par-columns" ,n ,b)))))
+                       (b (oftm-document (oftm-blocks (ox-children x))))
+                       (line? (== (ox-attr x 'line) "true"))
+                       (gap (with c (office-length->cm (ox-attr x 'gap))
+                              (and c (office-cm c)))))
+                   (list (cond ((not oftm-faithful?) `(with "par-columns" ,n ,b))
+                               ((or line? gap)
+                                `(office-columns* ,n ,(if line? "true" "false")
+                                                  ,(or gap "") ,b))
+                               (else `(office-columns ,n ,b))))))
                 ;; a file which could not be read says so
                 ((error)
                  (list `(with "color" "red"

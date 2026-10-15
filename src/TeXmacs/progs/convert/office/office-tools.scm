@@ -422,6 +422,19 @@
   (and (pair? x) (pair? y) (== (car x) (car y)) (in? (car x) office-wrappers)
        (== (ox-attrs x) (ox-attrs y))))
 
+(tm-define (office-link-text l)
+  (:synopsis "The text @l of a link without its plain underline")
+  ;; (a link is underlined by its look: Word leaves out an underline which
+  ;; says the same as the style of links, and the text reads the same)
+  (append-map
+    (lambda (y)
+      (cond ((and (func? y 'underline) (null? (ox-attrs y)))
+             (office-link-text (ox-children y)))
+            ((and (pair? y) (in? (car y) office-wrappers))
+             (list (office-wrapper-node y (office-link-text (ox-children y)))))
+            (else (list y))))
+    l))
+
 (define (office-wrapper-node x l)
   ;; the wrapper of the node x around the nodes l
   (if (null? (ox-attrs x)) (cons (car x) l)
