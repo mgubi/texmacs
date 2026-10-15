@@ -511,7 +511,26 @@ function post(message, transfer) {
 	postMessage(message, transfer || []);
 }
 
+// Safari (26) breaks the memory of the program when it makes it larger, in
+// a browser which has been running a while (not in a new one, which
+// automation starts; not in Firefox): objects were read wrong afterwards,
+// and the program stopped in the fonts ("call_indirect to a null table
+// entry") while the user manual was made, whose making takes the memory
+// from 256 to about 850 MB. It starts large there, so that it does not
+// have to grow: as large as the browser gives, from 1.5 GB down. (The
+// pages are only made real when they are written.)
+const isSafari = /^((?!chrome|chromium|android|crios|fxios|edg).)*safari/i.test(navigator.userAgent);
+function startMemory() {
+	if (!isSafari) return {};
+	for (const mb of [1536, 1024, 768]) {
+		try { return { wasmMemory: new WebAssembly.Memory({ initial: mb * 16, maximum: 32768 }) }; }
+		catch (error) {}
+	}
+	return {};
+}
+
 tauCore({
+	...startMemory(),
 	arguments: args,
 	tauPost: post,
 	instantiateWasm,

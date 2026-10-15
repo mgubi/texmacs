@@ -57,7 +57,9 @@ DEPFLAGS := -MMD -MP
 # error which says so; malloc gave NULL instead, objects were written at 0,
 # and the program failed later on what was there, "call_indirect to a null
 # table entry")
-LDFLAGS  := $(OPT) $(EH) -sALLOW_MEMORY_GROWTH=1 -sABORTING_MALLOC=1 \
+# (IMPORTED_MEMORY: the page makes the memory of the program, of the size
+# it wants: Safari starts large, tau-worker.js)
+LDFLAGS  := $(OPT) $(EH) -sALLOW_MEMORY_GROWTH=1 -sABORTING_MALLOC=1 -sIMPORTED_MEMORY=1 \
   -sINITIAL_MEMORY=268435456 -sSTACK_SIZE=16777216 \
   -sEXIT_RUNTIME=0 -sFORCE_FILESYSTEM=1 -Wl,--error-limit=0
 LIBS     := $(MUPDF_LIB)/libmupdf.a $(MUPDF_LIB)/libmupdf-third.a -lm

@@ -79,6 +79,12 @@ try {
 	for (let i = 0; i < 120 && !started; i++) { await sleep(1000); started = await run("return !!(window.tau && tau.state.started)"); }
 	check("the page starts", started);
 	await sleep(3000);
+	// (Safari starts with a large memory, which it does not have to grow:
+	// growing it broke the program there, tau-worker.js)
+	await run("window.memSize = null; tau.worker.addEventListener('message', e => { if (e.data.t === 'memory') window.memSize = +e.data.text; }); tau.worker.postMessage({ t: 'memory' }); return 1;");
+	await sleep(500);
+	const memSize = await run("return window.memSize");
+	check("the program starts with a large memory", memSize >= 768 * 1048576, memSize);
 	check("with its menus and its tabs", await run("return document.querySelectorAll('#tau-menu .tau-entry').length >= 8 && document.querySelectorAll('.tau-doc-tab').length >= 1"));
 
 	// a new document, text which is typed
