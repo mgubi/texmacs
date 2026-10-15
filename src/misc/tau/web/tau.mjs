@@ -866,7 +866,18 @@ setInterval(() => {
 // what it was given, to measure it (it reads a pixel back).
 const gpuSync = params.has("gpusync");
 state.drawTimes = [];
-const glyphMasks = new Map(), glyphInks = new Map(), colorNames = new Map();
+const glyphMasks = new Map(), glyphInks = new Map(), colorNames = new Map(), pictures = new Map();
+function addPictures(buffer) {
+	const d = new DataView(buffer), bytes = new Uint8ClampedArray(buffer);
+	for (let p = 0; p + 12 <= buffer.byteLength;) {
+		const id = d.getInt32(p, true), w = d.getInt32(p + 4, true), h = d.getInt32(p + 8, true);
+		p += 12;
+		const c = new OffscreenCanvas(w, h);
+		c.getContext("2d").putImageData(new ImageData(bytes.slice(p, p + 4 * w * h), w, h), 0, 0);
+		pictures.set(id, c);
+		p += 4 * w * h;
+	}
+}
 function colorName(v) {
 	let c = colorNames.get(v);
 	if (!c) {
@@ -913,6 +924,7 @@ function glyphInk(id, color) {
 }
 function replayCommands(ctx, m) {
 	if (m.glyphs.byteLength) addGlyphs(m.glyphs);
+	if (m.images && m.images.byteLength) addPictures(m.images);
 	const o = new Int32Array(m.ops), n = o.length;
 	ctx.save();
 	ctx.beginPath(); ctx.rect(m.x, m.y, m.w, m.h); ctx.clip();
@@ -950,6 +962,15 @@ function replayCommands(ctx, m) {
 			ctx.restore(); ctx.save();
 			ctx.beginPath(); ctx.rect(o[i + 1], o[i + 2], o[i + 3] - o[i + 1], o[i + 4] - o[i + 2]); ctx.clip();
 			i += 5; break;
+		case 8: {
+			const pic = pictures.get(o[i + 1]);
+			if (pic) {
+				ctx.globalAlpha = o[i + 4] / 255;
+				ctx.drawImage(pic, o[i + 2], o[i + 3]);
+				ctx.globalAlpha = 1;
+			}
+			i += 5; break;
+		}
 		case 7:
 			ctx.fillStyle = "#d8d8d8";
 			ctx.fillRect(o[i + 1], o[i + 2], o[i + 3] - o[i + 1], o[i + 4] - o[i + 2]);

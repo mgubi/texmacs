@@ -161,10 +161,15 @@ mupdf_dry_op (int kind, int bytes) {
 // rgba), 3 a line (n, width in 1/16 pixel, rgba, then n points), 4 a filled
 // polygon (n, rgba, n points), 5 an arc (x1, y1, x2, y2, start and length
 // in 1/64 degree, width in 1/16 pixel, rgba, filled), 6 the clip (x1, y1,
-// x2, y2), 7 a picture which is not drawn (x1, y1, x2, y2).
+// x2, y2), 7 a picture which is not drawn (x1, y1, x2, y2), 8 a picture
+// (id, left, top, alpha). A picture is sent once too, as its pixels (an id,
+// its width and height, then RGBA, not premultiplied).
 bool mupdf_record= false;
 std::vector<int> mupdf_record_ops;
 std::string mupdf_record_glyphs;
+std::string mupdf_record_images;
+static hashmap<string,int> record_image_id (0);
+static int record_image_next= 1;
 static hashmap<string,int> record_glyph_id (0);
 static std::vector<int> record_glyph_place; // per id: mode, a, b, h
 
@@ -1270,9 +1275,55 @@ mupdf_renderer_rep::fill_direct (SI x1, SI y1, SI x2, SI y2, color c) {
 // MuPDF must do it (other formats). opaque says that every pixel of the
 // source has an alpha of 255, which the caller knows and we cannot afford
 // to check: reading the source to find out costs as much as the blit.
+// the picture src at (left, top), sent once (see mupdf_record)
+static void
+record_pixmap (fz_pixmap* src, int left, int top, int alpha) {
+  fz_context* ctx= mupdf_context ();
+  int w= src->w, h= src->h, sn= src->n;
+  if (w <= 0 || h <= 0 || (sn != 3 && sn != 4)) return;
+  // (named by where it is and what it is like: a pixmap which went and
+  // whose place was taken by another one is not taken for it)
+  unsigned long sum= 0;
+  for (int k= 0; k < 64; k++) {
+    int px= (k * 7919) % w, py= (k * 104729) % h;
+    sum= sum * 31 + src->samples [(size_t) py * src->stride + sn * px];
+  }
+  string key= as_string ((long) (size_t) src) * "/" * as_string (w) * "x" *
+              as_string (h) * "/" * as_string ((long) sum);
+  int id= record_image_id [key];
+  if (id == 0) {
+    id= record_image_next++;
+    record_image_id (key)= id;
+    bool bgr= (src->colorspace == fz_device_bgr (ctx));
+    record_int (mupdf_record_images, id);
+    record_int (mupdf_record_images, w);
+    record_int (mupdf_record_images, h);
+    for (int j= 0; j < h; j++) {
+      const unsigned char* sp= src->samples + (size_t) j * src->stride;
+      for (int i= 0; i < w; i++, sp += sn) {
+        int r= sp[0], g= sp[1], b= sp[2], a= (sn == 4? sp[3]: 255);
+        if (bgr) { int t= r; r= b; b= t; }
+        if (sn == 4 && a > 0 && a < 255) {
+          r= min (255, (r * 255) / a); g= min (255, (g * 255) / a);
+          b= min (255, (b * 255) / a); }
+        mupdf_record_images.push_back ((char) r);
+        mupdf_record_images.push_back ((char) g);
+        mupdf_record_images.push_back ((char) b);
+        mupdf_record_images.push_back ((char) a);
+      }
+    }
+  }
+  mupdf_record_ops.insert (mupdf_record_ops.end (), { 8, id, left, top, alpha });
+}
+
 bool
 mupdf_renderer_rep::draw_pixmap_direct (fz_pixmap* src, SI x, SI y, int alpha,
                                        bool opaque) {
+  if (mupdf_record && src != NULL && src->samples != NULL) {
+    int ix1= (int) to_x (x), iy2= (int) -to_y (y);
+    record_pixmap (src, ix1, iy2 - src->h, alpha);
+    return true;
+  }
   if (src == NULL || src->samples == NULL || pixmap == NULL) return false;
   if (pixmap->n != 4 || pixmap->s != 0 || !pixmap->alpha) return false;
   if (src->s != 0 || (!(src->n == 4 && src->alpha) && !(src->n == 3 && !src->alpha)))
@@ -1989,13 +2040,6 @@ cache_pixmap (tree key, fz_pixmap* pix) {
 
 void
 mupdf_renderer_rep::draw_picture (picture p, SI x, SI y, int alpha) {
-  if (mupdf_record) {
-    int l= (int) to_x (x - p->get_origin_x () * pixel);
-    int b= (int) -to_y (y - p->get_origin_y () * pixel);
-    mupdf_record_ops.insert (mupdf_record_ops.end (),
-      { 7, l, b - p->get_height (), l + p->get_width (), b });
-    return;
-  }
   if (mupdf_dry_op (3, 20)) return;
   p= as_mupdf_picture (p);
   mupdf_picture_rep* pict= (mupdf_picture_rep*) p->get_handle ();
@@ -2041,7 +2085,6 @@ mupdf_renderer_rep::draw_picture_scaled (picture p, SI x, SI y, double s,
 
 void
 mupdf_renderer_rep::draw_scalable (scalable im, SI x, SI y, int alpha) {
-  if (mupdf_record) return; // (not in the prototype)
   if (mupdf_dry_op (3, 20)) return;
   // debug_convert << "pdf renderer, draw_scalable "
   //   << im->get_name () << " at " << x << ", " << y

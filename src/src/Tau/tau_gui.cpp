@@ -300,32 +300,37 @@ static void tau_js_paint (int view, int counter, int w, int h,
 extern bool mupdf_record;
 extern std::vector<int> mupdf_record_ops;
 extern std::string mupdf_record_glyphs;
+extern std::string mupdf_record_images;
 
 #ifdef __EMSCRIPTEN__
 EM_JS (void, tau_js_dlist, (int view, int counter, int w, int h,
                             const int* ops, int nops,
                             const unsigned char* gl, int ngl,
+                            const unsigned char* im, int nim,
                             int x1, int y1, int x2, int y2,
                             int ew, int eh, int sx, int sy,
                             int cx, int cy), {
   if (!Module.tauPost) return;
   var o= HEAP32.slice (ops >> 2, (ops >> 2) + nops);
   var g= HEAPU8.slice (gl, gl + ngl);
+  var i= HEAPU8.slice (im, im + nim);
   Module.tauPost ({ t: "dlist", view: view, place: counter,
                     width: w, height: h, ops: o.buffer, glyphs: g.buffer,
+                    images: i.buffer,
                     x: x1, y: y1, w: x2 - x1, h: y2 - y1,
                     extents: { width: ew, height: eh },
                     scroll: { x: sx, y: sy },
-                    caret: { x: cx, y: cy } }, [o.buffer, g.buffer]);
+                    caret: { x: cx, y: cy } }, [o.buffer, g.buffer, i.buffer]);
 });
 #else
 static void tau_js_dlist (int view, int counter, int w, int h,
                           const int* ops, int nops,
                           const unsigned char* gl, int ngl,
+                          const unsigned char* im, int nim,
                           int x1, int y1, int x2, int y2,
                           int ew, int eh, int sx, int sy, int cx, int cy) {
   (void) view; (void) counter; (void) w; (void) h; (void) ops; (void) nops;
-  (void) gl; (void) ngl; (void) x1; (void) y1; (void) x2; (void) y2;
+  (void) gl; (void) ngl; (void) im; (void) nim; (void) x1; (void) y1; (void) x2; (void) y2;
   (void) ew; (void) eh; (void) sx; (void) sy; (void) cx; (void) cy; }
 #endif
 
@@ -569,10 +574,13 @@ tau_turn_now () {
                     mupdf_record_ops.data (), (int) mupdf_record_ops.size (),
                     (const unsigned char*) mupdf_record_glyphs.data (),
                     (int) mupdf_record_glyphs.size (),
+                    (const unsigned char*) mupdf_record_images.data (),
+                    (int) mupdf_record_images.size (),
                     v->drawn_x1, v->drawn_y1, v->drawn_x2, v->drawn_y2,
                     ew, eh, sx, sy, cx, cy);
       mupdf_record_ops.clear ();
       mupdf_record_glyphs.clear ();
+      mupdf_record_images.clear ();
     }
     else
       tau_js_paint (v->id, v->place_counter, v->px_w, v->px_h, v->pixels (),
