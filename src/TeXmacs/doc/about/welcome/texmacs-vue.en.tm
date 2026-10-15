@@ -227,6 +227,36 @@
 
   The additions to <TeXmacs> <name|Vue>, the newest first.
 
+  <paragraph|15 October 2026>
+
+  <\itemize>
+    <item>Word and <name|OpenDocument> files keep their formatting by
+    hand in both directions: the size, font, color and highlighting of the
+    text, capitals, lower case and words beginning with capitals, the
+    kinds of underlines and of lines through, the spacing of the letters,
+    and the indentations, spaces, line spacing, background and border of
+    the paragraphs. A font which <TeXmacs> does not have is shown in the
+    closest family and written back with its name, and the titles of the
+    sections take the look of the headings of the file.
+
+    <item>A picture with the text around it in a Word or
+    <name|OpenDocument> file is shown on its side, in a paragraph of its
+    own, and floats again in the file which is written. Cropped pictures
+    of <name|OpenDocument> files stay cropped, and the line between the
+    columns of a section is kept.
+
+    <item>A label in the text of a Word or <name|OpenDocument> file comes
+    back at its place after a save, the captions of the figures of
+    <name|LibreOffice> are recognized, the underline of links no longer
+    changes when Word saves the file, and a formula alone in a cell stays
+    in the cell.
+
+    <item>A <name|Markdown> file keeps the tabs at the start of its lines
+    (in code, formulas, tables and the <name|YAML> header), a formula of a
+    single symbol is read back as a formula, and files with many formulas
+    open faster.
+  </itemize>
+
   <paragraph|14 October 2026>
 
   <\itemize>
