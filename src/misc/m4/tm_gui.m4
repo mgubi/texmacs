@@ -70,8 +70,10 @@ AC_DEFUN([TM_GUI],[
          if test -z "$CONFIG_MACOS"; then
             AC_MSG_ERROR([the Cocoa port needs the Mac OS X extensions (do not use --disable-macosx-extensions)])
          fi
+         # the canvases drawn by the GPU renderer of the Vue port, with Metal
+         LC_METAL
          COCOA_CFLAGS=""
-         COCOA_LDFLAGS="-framework Cocoa -framework PDFKit"
+         COCOA_LDFLAGS="-framework Cocoa -framework PDFKit $METAL_LDFLAGS"
          CONFIG_GUI="COCOA"
          ;;
       sdl) 

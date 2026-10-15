@@ -91,6 +91,9 @@ public:
   virtual unsigned long long window_flags () = 0;
   virtual bool prepare () = 0;
   virtual bool attach (SDL_Window* w) = 0;
+  // the same for a layer which the GUI made (a CAMetalLayer of the Cocoa
+  // port): false when the backend does not draw into such layers
+  virtual bool attach_layer (void* layer) { (void) layer; return false; }
   virtual string description () = 0;     // the device, once attached
   virtual void begin_screen (int dw, int dh) = 0;
   virtual void present (SDL_Window* w) = 0;

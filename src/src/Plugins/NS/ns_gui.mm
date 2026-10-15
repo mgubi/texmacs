@@ -697,6 +697,8 @@ ns_gui_rep::refresh_language () {
 // the windows are saved as dir/window-<i>.png every few seconds, since other
 // programs are not allowed to capture the windows of TeXmacs
 
+void ns_draw_gpu_canvases (NSView* root, NSBitmapImageRep* rep);
+
 static void
 ns_snapshot (string dir) {
   int n= 0;
@@ -708,6 +710,7 @@ ns_snapshot (string dir) {
     NSBitmapImageRep* rep= [v bitmapImageRepForCachingDisplayInRect: r];
     if (!rep) continue;
     [v cacheDisplayInRect: r toBitmapImageRep: rep];
+    ns_draw_gpu_canvases (v, rep);
     NSData* data= [rep representationUsingType: NSBitmapImageFileTypePNG
                                     properties: [NSDictionary dictionary]];
     string name= dir * "/window-" * as_string (n++) * ".png";
@@ -947,6 +950,7 @@ find_document_scroll_view (NSView* v) {
     NSView* v= [[[sv window] contentView] superview];
     NSBitmapImageRep* rep= [v bitmapImageRepForCachingDisplayInRect: [v bounds]];
     [v cacheDisplayInRect: [v bounds] toBitmapImageRep: rep];
+    ns_draw_gpu_canvases (v, rep);
     NSData* data= [rep representationUsingType: NSBitmapImageFileTypePNG
                                     properties: [NSDictionary dictionary]];
     string name= dir * "/scroll-" * as_string (step++) * ".png";
@@ -1176,6 +1180,7 @@ canvas_frame () {
     NSView* v= [[win contentView] superview];
     NSBitmapImageRep* rep= [v bitmapImageRepForCachingDisplayInRect: [v bounds]];
     [v cacheDisplayInRect: [v bounds] toBitmapImageRep: rep];
+    ns_draw_gpu_canvases (v, rep);
     NSData* data= [rep representationUsingType: NSBitmapImageFileTypePNG
                                     properties: [NSDictionary dictionary]];
     string dir= get_env ("TEXMACS_NS_SNAPSHOT");
