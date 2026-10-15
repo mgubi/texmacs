@@ -360,6 +360,7 @@ edit_modify_rep::undo (bool redoable) {
   if (redoable) {
     path p= arch->undo ();
     if (!is_nil (p)) go_to (p);
+    call ("notify-undo-redo");
   }
   else arch->forget ();
   if (arch->conform_save ()) {
@@ -393,6 +394,7 @@ edit_modify_rep::redo (int i) {
     set_message ("No more redo information available", "redo"); return; }
   path p= arch->redo (i);
   if (!is_nil (p)) go_to (p);
+  call ("notify-undo-redo");
   if (arch->conform_save ()) {
     set_message ("Your document is back in its original state", "undo");
     beep (); }

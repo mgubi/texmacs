@@ -1129,16 +1129,32 @@
   (with back (cdr (reverse states))
     (for (s back)
       (edit (undo 0))
-      (check= (tree->stree (buffer-tree)) s))
+      (check= (tree->stree (buffer-tree)) s)
+      (check-visible))
     (for (s (cdr states))
       (edit (redo 0))
-      (check= (tree->stree (buffer-tree)) s))
+      (check= (tree->stree (buffer-tree)) s)
+      (check-visible))
     (for (s back)
       (edit (undo 0))
-      (check= (tree->stree (buffer-tree)) s))))
+      (check= (tree->stree (buffer-tree)) s)
+      (check-visible))))
 
 (define (body-now) (tree->stree (buffer-tree)))
 (define (doc-end) (rel (path-end (root-tree) (buffer-path))))
+
+(define (cursor-visible?)
+  ;; is the cursor outside the hidden preamble, the hidden body, the
+  ;; hidden parts, and the identifiers and alternatives of the parts?
+  (let loop ((t (buffer-tree)) (p (rel (cursor-path))))
+    (cond ((tree-in? t '(hide-preamble ignore hide-part)) #f)
+          ((or (tree-atomic? t) (null? (cdr p))) #t)
+          ((and (tree-is? t 'show-part) (!= (car p) 1)) #f)
+          (else (loop (tree-ref t (car p)) (cdr p))))))
+
+(define (check-visible)
+  ;; after undo and redo, the cursor is where typing is seen
+  (check-true (cursor-visible?)))
 
 (define (open-for-undo name)
   ;; without a window, the first edit step after a buffer is opened is
@@ -1199,9 +1215,8 @@
     (check= (body-now) s0)
     (check= (cursor) '(0 0))
     (check-undo-redo (list s0 s1 s0))
-    ;; after undo and redo of a toggle, the cursor is at the end of a
-    ;; visible node, where the next key is seen: the shown preamble, the
-    ;; first shown part or the whole document
+    ;; after undo and redo of a toggle, the cursor is in a visible place,
+    ;; also when the change was in the hidden preamble or body
     (edit (buffer-make-preamble))
     (edit (insert "p"))
     (edit (toggle-preamble-mode))
@@ -1209,50 +1224,40 @@
     (edit (toggle-preamble-mode))
     (edit (undo 0))
     (check= (body-now) `(document (hide-preamble (document "p")) ,@pars))
-    (check= (cursor) (doc-end))
-    (edit (insert "Z"))
-    (check= (st 0) '(hide-preamble (document "p")))
-    (check= (st 5) "bZ")
-    (edit (undo 0))
+    (check-visible)
     (edit (toggle-preamble-mode))
     (edit (toggle-preamble-mode))
     (edit (undo 0))
     (check= (body-now) `(document (show-preamble (document "p"))
                                   (ignore (document ,@pars))))
-    (check= (cursor) '(0 0 0 1))
+    (check-visible)
     (edit (redo 0))
     (check= (body-now) `(document (hide-preamble (document "p")) ,@pars))
-    (check= (cursor) (doc-end))
-    (edit (undo 0))
-    (edit (insert "Z"))
-    (check= (st 0) '(show-preamble (document "pZ")))
+    (check-visible)
     (edit (undo 0))
     (edit (toggle-preamble-mode))
-    ;; the same with parts: the cursor goes to the shown part
+    ;; the same with parts
     (edit (buffer-set-part-mode :one))
     (edit (undo 0))
     (check= (body-now) `(document (hide-preamble (document "p")) ,@pars))
-    (check= (cursor) (doc-end))
+    (check-visible)
     (edit (redo 0))
     (check= (st 1) '(show-part "1" (document "intro") ""))
-    (check= (cursor) '(1 1 0 5))
-    (edit (insert "Z"))
-    (check= (st 1 1) '(document "introZ"))
-    (edit (undo 0))
+    (check-visible)
     (edit (buffer-set-part-mode :all))
     (edit (undo 0))
-    (check= (cursor) '(1 1 0 5))
+    (check-visible)
     (edit (buffer-show-part "Two"))
     (check= (st 3 0) "3")
     (check= (st 3) '(show-part "3" (document (section "Two") "b")
                                (document (section "Two"))))
     (edit (undo 0))
-    (check= (cursor) '(1 1 0 5))
+    (check-visible)
     (edit (redo 0))
-    (check= (cursor) '(3 1 1 1))
+    (check-visible)
     (edit (buffer-show-part "Two"))
     (edit (undo 0))
-    (check= (cursor) '(1 1 0 5)))
+    (check-visible))
   ;; parts with subparts
   (write-doc "parts-undo-book.tm" '("book") '()
              '((chapter "A") "a" (section "A1") "a1" (chapter "B") "b"))
@@ -1280,13 +1285,11 @@
     (check= s4 `(document (hide-preamble (document "")) ,@parts))
     (check= s5 s3)
     (check-undo-redo (list s0 s1 s2 s3 s4 s5))
-    ;; the cursor goes to the body of the last shown subpart
+    ;; the redo puts the cursor at the end of the shown chapter, in its
+    ;; last subpart
     (edit (redo 0))
     (check= (body-now) s1)
-    (check= (cursor) '(0 1 2 1 1 2))
-    (edit (insert "Z"))
-    (check= (st 0 1 2 1 1) "a1Z")
-    (edit (undo 0)))
+    (check-visible))
   ;; typing in the identifier of a hidden part, between mode changes:
   ;; undo and redo must not change the archived trees
   (write-doc "parts-undo-ids.tm" '("article") '()
@@ -1307,10 +1310,50 @@
       (check= (body-now) s)))
   (test-document-parts-undo-cursor))
 
+(define part-layouts
+  (let ((b '(hide-part "9" (document (chapter "B") "b") "")))
+    `(("parts-nested.tm"
+       (show-part "1" (document (chapter "A") "a"
+                                (show-part "2" (document (section "A1") "a1"
+                                                         (hide-part "3" (document (subsection "A11") "x") ""))
+                                           ""))
+                  "")
+       ,b)
+      ("parts-strings.tm"
+       (show-part "1" (document "a" "b"
+                                (hide-part "2" (document (section "S") "s") ""))
+                  "")
+       ,b)
+      ("parts-middle.tm"
+       (show-part "1" (document (chapter "A")
+                                (hide-part "2" (document (section "A1") "a1") "")
+                                "a")
+                  "")
+       ,b)
+      ("parts-string.tm" (show-part "1" "" "") ,b)
+      ("parts-preamble.tm"
+       (hide-preamble (document "p"))
+       (show-part "1" (document (chapter "A") "a"
+                                (hide-part "2" (document (section "A1") "a1") ""))
+                  "")
+       ,b))))
+
+(define (check-layout-undo name body)
+  (write-doc name '("book") '() body)
+  (open-for-undo name)
+  (with states (list (body-now))
+    (for (id (buffer-parts-list #t))
+      (edit (buffer-show-part id))
+      (when (!= (body-now) (car states))
+        (set! states (cons (body-now) states))))
+    (edit (toggle-preamble-mode))
+    (set! states (cons (body-now) states))
+    (check-undo-redo (reverse states))))
+
 (define (test-document-parts-undo-cursor)
-  ;; where undo and redo of a change of the shown parts put the cursor
-  ;; (a visible place, preferably in the part which was changed), and
-  ;; where showing a hidden part puts it
+  ;; undo and redo of a change of the shown parts leave the cursor in a
+  ;; visible place, whatever the layout of the parts; showing a hidden
+  ;; part puts the cursor in it
   ;; a shown part whose body is a string
   (write-doc "parts-undo-atom.tm" '("article") '()
              '((show-part "1" "" "")
@@ -1322,10 +1365,10 @@
                           (show-part "2" (document (section "B") "b") "")))
     (edit (undo 0))
     (check= (body-now) s0)
-    (check= (cursor) '(0 1 0))
+    (check-visible)
     (edit (redo 0))
     (check= (body-now) s1)
-    (check= (cursor) '(1 1 1 1)))
+    (check-visible))
   ;; a shown chapter which ends with a hidden section
   (write-doc "parts-undo-nest.tm" '("book") '()
              '((show-part "1" (document (chapter "A") "a"
@@ -1338,9 +1381,13 @@
     (edit (buffer-show-part "B"))
     (edit (undo 0))
     (check= (body-now) s0)
-    (check= (cursor) '(0 1 2 1 1 2))
-    (edit (insert "Z"))
-    (check= (st 0 1 2 1 1) "a1Z"))
+    (check-visible))
+  ;; shown parts which end with a hidden subpart, deeper down or after
+  ;; paragraphs which are strings, with a hidden subpart in the middle,
+  ;; with a body which is a string, and with a preamble: each part shown
+  ;; in turn, then the preamble
+  (for (layout part-layouts)
+    (check-layout-undo (car layout) (cdr layout)))
   ;; :one: showing a hidden part moves the cursor out of the part which
   ;; is hidden now
   (write-doc "parts-undo-sel.tm" '("article") '()
@@ -1353,8 +1400,7 @@
   (check= (tree-label (bt 2)) 'show-part)
   (check= (tree-label (bt 0)) 'hide-part)
   (check= (cursor) '(2 1 0 0))
-  ;; :several: undo of a toggle goes back to the toggled part when it is
-  ;; shown, redo to the first shown part
+  ;; :several: toggling a part, and showing it as a hidden part
   (edit (buffer-set-part-mode :several))
   (edit (buffer-set-part-mode :all))
   (edit (buffer-set-part-mode :several))
@@ -1363,26 +1409,26 @@
     (check= (tree-label (bt 2)) 'hide-part)
     (edit (undo 0))
     (check= (body-now) s0)
-    (check= (cursor) '(2 1 1 1))
+    (check-visible)
     (edit (redo 0))
     (check= (body-now) s1)
-    (check= (cursor) '(0 1 0 5))
+    (check-visible)
     ;; showing it again, by a toggle or as a hidden part
     (edit (buffer-toggle-part "Two"))
     (check= (body-now) s0)
     (edit (undo 0))
-    (check= (cursor) '(0 1 0 5))
+    (check-visible)
     (edit (redo 0))
-    (check= (cursor) '(2 1 1 1))
+    (check-visible)
     (edit (undo 0))
     (check= (body-now) s1)
     (edit (show-hidden-part "3"))
     (check= (body-now) s0)
     (edit (undo 0))
     (check= (body-now) s1)
-    (check= (cursor) '(0 1 0 5))
+    (check-visible)
     (edit (redo 0))
-    (check= (cursor) '(2 1 1 1))))
+    (check-visible)))
 
 ;; The files to which a document is linked: its bibliography files, with
 ;; the .bib added, relative to the document.
