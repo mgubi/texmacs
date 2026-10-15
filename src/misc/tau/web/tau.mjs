@@ -8,6 +8,7 @@
 import * as chrome from "./chrome.mjs";
 import * as app from "./app.mjs";
 import * as files from "./files.mjs";
+import { makeGLSurface } from "./gl.mjs";
 import { translate, makeLayout, learn, askLayout, browserKey, pasteKey, commandLetter } from "./keys.mjs";
 
 const panesElement = document.getElementById("tau-panes");
@@ -131,7 +132,7 @@ function makePane(windowNumber) {
 	panesElement.append(pane.element);
 	panes.set(windowNumber, pane);
 	layoutPanes();
-	attachView(pane);
+	attachView(pane, true);
 	addScrollbars(pane, holder);
 	// a file which is dropped on a pane is opened there
 	pane.canvas.addEventListener("dragover", event => { event.preventDefault(); event.dataTransfer.dropEffect = "copy"; });
@@ -244,9 +245,10 @@ function targetOf(view) {
 
 // What a canvas which shows a view does: it tells the core its place, the
 // keys and the pointer. target has the canvas and the number of its view.
-function attachView(target) {
+function attachView(target, pane) {
 	const canvas = target.canvas;
-	target.context = canvas.getContext("2d");
+	target.surface = pane && useGL && makeGLSurface(canvas, glShared, () => target.sendPlace())
+		|| (pane ? pairSurface(canvas) : canvasSurface(canvas));
 
 	// The place: the size of the canvas in pixels of the screen. Each place
 	// has a number, which the core repeats with what it draws for it.
@@ -981,8 +983,55 @@ function frameInks(o) {
 	}
 	for (const page of atlas.pages) atlasGive(page);
 }
+// Where a view is drawn (attachView): a 2D canvas, which a scroll draws on
+// itself (a view in a dialog); two canvases, one over the other, for a
+// pane: a scroll draws the one shown into the other, which is then shown
+// (a canvas drawn on itself took 3.5 ms in Safari for a step); or WebGL
+// (?gl, gl.mjs). size (w, h), shift (dx, dy), pixels (m), commands (m), and
+// sync () which waits for the canvas (?gpusync).
+function canvasSurface(canvas) {
+	const ctx = canvas.getContext("2d");
+	return {
+		size(w, h) { if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; } },
+		shift(dx, dy) { ctx.drawImage(canvas, dx, dy); },
+		pixels(m) { ctx.putImageData(new ImageData(new Uint8ClampedArray(m.pixels), m.w, m.h), m.x, m.y); },
+		commands(m) { replayCommands(ctx, m); },
+		sync() { ctx.getImageData(0, 0, 1, 1); }
+	};
+}
+function pairSurface(canvas) {
+	// (the one below has no events: the one above has them, seen or not)
+	const below = el("canvas", "tau-canvas-below");
+	canvas.before(below);
+	const a = { canvas, ctx: canvas.getContext("2d") }, b = { canvas: below, ctx: below.getContext("2d") };
+	let shown = a, other = b;
+	return {
+		size(w, h) {
+			for (const c of [canvas, below]) if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
+		},
+		shift(dx, dy) {
+			other.ctx.globalCompositeOperation = "copy";
+			other.ctx.drawImage(shown.canvas, dx, dy);
+			other.ctx.globalCompositeOperation = "source-over";
+			[shown, other] = [other, shown];
+			canvas.classList.toggle("tau-canvas-hidden", shown === b);
+		},
+		pixels(m) { shown.ctx.putImageData(new ImageData(new Uint8ClampedArray(m.pixels), m.w, m.h), m.x, m.y); },
+		commands(m) { replayCommands(shown.ctx, m); },
+		sync() { shown.ctx.getImageData(0, 0, 1, 1); }
+	};
+}
+// what the WebGL surface takes from here
+const useGL = params.has("gl");
+const glShared = { glyphCovs, pictures, drawPath, opSize: OP_SIZE_OF };
+
 // how many commands of each kind a frame has (for ?gpusync)
 const OP_SIZE = { 1: 6, 2: 5, 5: 10, 6: 5, 7: 5, 8: 5, 9: 7, 10: 1 };
+// the number of integers of the command at i (0: not a command)
+function OP_SIZE_OF(o, i) {
+	const op = o[i];
+	return op === 3 ? 4 + 2 * o[i + 1] : op === 4 ? 3 + 2 * o[i + 1] : OP_SIZE[op] || 0;
+}
 function replayCounts(m) {
 	const o = new Int32Array(m.ops), c = {};
 	for (let i = 0; i < o.length;) {
@@ -995,10 +1044,35 @@ function replayCounts(m) {
 	}
 	return c;
 }
+// a line (3), a polygon (4) or an arc (5) of the commands at i, drawn by a
+// 2D canvas (also for the WebGL surface, gl.mjs); the index after it
+function drawPath(ctx, o, i) {
+	if (o[i] === 5) {
+		const x1 = o[i + 1], y1 = o[i + 2], x2 = o[i + 3], y2 = o[i + 4];
+		const a = o[i + 5] * Math.PI / (180 * 64), da = o[i + 6] * Math.PI / (180 * 64);
+		ctx.beginPath();
+		ctx.ellipse((x1 + x2) / 2, (y1 + y2) / 2, Math.max(0, (x2 - x1) / 2), Math.max(0, (y2 - y1) / 2), 0, -a, -a - da, da > 0);
+		if (o[i + 9]) { ctx.fillStyle = colorName(o[i + 8]); ctx.fill(); }
+		else { ctx.lineWidth = o[i + 7] / 16; ctx.strokeStyle = colorName(o[i + 8]); ctx.stroke(); }
+		return i + 10;
+	}
+	const line = o[i] === 3, k = o[i + 1];
+	let p = i + (line ? 4 : 3);
+	ctx.beginPath();
+	for (let j = 0; j < k; j++, p += 2) j ? ctx.lineTo(o[p], o[p + 1]) : ctx.moveTo(o[p], o[p + 1]);
+	if (line) { ctx.lineWidth = o[i + 2] / 16; ctx.strokeStyle = colorName(o[i + 3]); ctx.stroke(); }
+	else { ctx.closePath(); ctx.fillStyle = colorName(o[i + 2]); ctx.fill(); }
+	return p;
+}
+// the glyphs and the pictures which a frame of commands names for the first
+// time: learnt from every frame, also one for a view or a place which is no
+// more (the core sends each once)
+function learnDefinitions(m) {
+	if (m.glyphs && m.glyphs.byteLength) addGlyphs(m.glyphs);
+	if (m.images && m.images.byteLength) addPictures(m.images);
+}
 function replayCommands(ctx, m) {
 	atlasCheck();
-	if (m.glyphs.byteLength) addGlyphs(m.glyphs);
-	if (m.images && m.images.byteLength) addPictures(m.images);
 	const o = new Int32Array(m.ops), n = o.length, f = new Float32Array(m.ops);
 	frameInks(o);
 	ctx.save();
@@ -1035,24 +1109,9 @@ function replayCommands(ctx, m) {
 			if (g) ctx.drawImage(g.page.c, g.x, g.y, g.w, g.h, o[i + 2], o[i + 3], g.w, g.h);
 			i += 5; break;
 		}
-		case 3: case 4: {
-			const line = o[i] === 3, k = o[i + 1];
-			let p = i + (line ? 4 : 3);
-			ctx.beginPath();
-			for (let j = 0; j < k; j++, p += 2) j ? ctx.lineTo(o[p], o[p + 1]) : ctx.moveTo(o[p], o[p + 1]);
-			if (line) { ctx.lineWidth = o[i + 2] / 16; ctx.strokeStyle = colorName(o[i + 3]); ctx.stroke(); }
-			else { ctx.closePath(); ctx.fillStyle = colorName(o[i + 2]); ctx.fill(); }
-			i = p; break;
-		}
-		case 5: {
-			const x1 = o[i + 1], y1 = o[i + 2], x2 = o[i + 3], y2 = o[i + 4];
-			const a = o[i + 5] * Math.PI / (180 * 64), da = o[i + 6] * Math.PI / (180 * 64);
-			ctx.beginPath();
-			ctx.ellipse((x1 + x2) / 2, (y1 + y2) / 2, Math.max(0, (x2 - x1) / 2), Math.max(0, (y2 - y1) / 2), 0, -a, -a - da, da > 0);
-			if (o[i + 9]) { ctx.fillStyle = colorName(o[i + 8]); ctx.fill(); }
-			else { ctx.lineWidth = o[i + 7] / 16; ctx.strokeStyle = colorName(o[i + 8]); ctx.stroke(); }
-			i += 10; break;
-		}
+		case 3: case 4: case 5:
+			i = drawPath(ctx, o, i);
+			break;
 		case 6:
 			// (the restore takes the transformation away too: given again
 			// before what is drawn next)
@@ -1202,30 +1261,27 @@ worker.onmessage = event => {
 		break;
 	}
 	case "dlist": case "paint": {
+		const masks0 = glyphCovs.size, inks0 = state.inksMade;
+		if (m.t === "dlist") learnDefinitions(m);
 		const pane = targetOf(m.view);
 		if (!pane || m.place !== pane.place) break; // for an older place
-		const canvas = pane.canvas;
-		if (canvas.width !== m.width || canvas.height !== m.height) {
-			canvas.width = m.width; canvas.height = m.height;
-		}
+		const surface = pane.surface;
+		surface.size(m.width, m.height);
 		// the rectangle of the canvas which changed: its pixels, or the
-		// commands which draw it (the prototype of the drawing on the GPU)
+		// commands which draw it (the drawing on the GPU)
 		const t0 = performance.now();
 		// a scroll: what the canvas has is moved first, and the paint has
 		// only what came into the view (tau_widget.cpp, shift_pixels)
-		if (m.shift && (m.shift.x || m.shift.y)) {
-			pane.context.drawImage(canvas, m.shift.x, m.shift.y);
-		}
+		if (m.shift && (m.shift.x || m.shift.y)) surface.shift(m.shift.x, m.shift.y);
 		// (?gpusync: the canvas is waited for after the shift too, and the
 		// time is told in parts: the shift, the calls which say what to draw,
 		// the drawing which the canvas does when it is waited for)
-		if (gpuSync) pane.context.getImageData(0, 0, 1, 1);
+		if (gpuSync) surface.sync();
 		const t1 = performance.now();
-		const inks0 = state.inksMade, masks0 = glyphCovs.size;
-		if (m.t === "dlist") replayCommands(pane.context, m);
-		else pane.context.putImageData(new ImageData(new Uint8ClampedArray(m.pixels), m.w, m.h), m.x, m.y);
+		if (m.t === "dlist") surface.commands(m);
+		else surface.pixels(m);
 		const t2 = performance.now();
-		if (gpuSync) pane.context.getImageData(0, 0, 1, 1);
+		if (gpuSync) surface.sync();
 		const t3 = performance.now();
 		state.drawTimes.push(t3 - t0);
 		if (state.drawTimes.length > 500) state.drawTimes.shift();
@@ -1239,7 +1295,11 @@ worker.onmessage = event => {
 		if (pane.showScroll) pane.showScroll();
 		if (pane === focused && !composing) placeArea();
 		state.paints++;
-		if (!state.started) app.started();
+		if (!state.started) {
+			app.started();
+			// (?gl: the views are drawn by WebGL from the commands of the core)
+			if (useGL) worker.postMessage({ t: "gpu", on: 1 });
+		}
 		state.started = true;
 		if (params.has("debug"))
 			setStatus(`view ${m.view} · ${m.width}×${m.height} · document ${m.extents.width}×${m.extents.height}` +

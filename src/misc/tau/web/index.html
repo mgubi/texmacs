@@ -158,6 +158,9 @@ img.tau-symbol { display: block; margin: auto; }
 .tau-view { flex: 1; min-height: 0; position: relative; }
 .tau-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; outline: none; cursor: text;
 	touch-action: none; }
+/* (the canvas of a pane under it, shown when that one is not: tau.mjs, pairSurface) */
+.tau-canvas-below { position: absolute; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none; }
+.tau-canvas.tau-canvas-hidden { opacity: 0; }
 .tau-embedded.tau-editable { touch-action: none; }
 .tau-no-header #tau-menu, .tau-no-header #tau-icons-0, .tau-no-header #tau-icons-1,
 .tau-no-header #tau-icons-2, .tau-no-header #tau-icons-3 { display: none; }

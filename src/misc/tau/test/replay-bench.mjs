@@ -6,12 +6,14 @@
 // "Drawing on the GPU".
 //
 //   node misc/tau/test/replay-bench.mjs --dir build-tau/out/web --tools <dir>
-//        [--browser firefox|safari] [--headed] [--only name]
+//        [--browser firefox|safari] [--headed] [--only name] [--gl]
 //        [--width 1900 --height 1180] [--density 2]
 //
 // Safari is driven by safaridriver ("Allow remote automation"), in a window
 // of the screen (its density is that of the screen); Firefox by puppeteer,
 // headless unless --headed (headless, the canvas may be drawn without the GPU).
+// --gl: the view of the pane drawn by WebGL (?gl, gl.mjs), the pixels as
+// well as the commands.
 
 import { spawn } from "node:child_process";
 import fs from "node:fs";
@@ -50,7 +52,8 @@ const DOCS = [
 // the browser: ev (a JavaScript expression, which may be a promise) -> its value
 const port = await freePort();
 const server = await serve(dir, port);
-const url = `http://127.0.0.1:${port}/index.html?debug&nohome&gpusync`;
+const useGL = args.includes("--gl");
+const url = `http://127.0.0.1:${port}/index.html?debug&nohome&gpusync${useGL ? "&gl" : ""}`;
 let ev, open, close;
 if (which === "safari") {
 	const driverPort = await freePort();
@@ -90,7 +93,7 @@ else {
 	close = async () => { if (page) await page.close(); page = null; };
 	process.on("exit", () => browser.process() && browser.process().kill());
 }
-console.log(`replay: ${which}${which !== "safari" ? (args.includes("--headed") ? ", headed" : ", headless") : ""}, ${width}×${height}`);
+console.log(`replay: ${which}${which !== "safari" ? (args.includes("--headed") ? ", headed" : ", headless") : ""}, ${width}×${height}${useGL ? ", WebGL" : ""}`);
 
 const until = async (test, timeout = 120000) => {
 	for (const end = Date.now() + timeout; Date.now() < end; await sleep(200)) { try { if (await test()) return; } catch (e) {} }
@@ -150,6 +153,8 @@ async function run(doc) {
 		await scroll(-11 * page, 1);
 		return { steps, views };
 	};
+	// (?gl asks for the commands when the page starts: the pixels first)
+	if (useGL) { await ev(`window.step({ t: "gpu", on: 0 })`); await sleep(1500); }
 	const cpu = await pass();
 	await ev(`window.step({ t: "gpu", on: 1 })`);
 	await sleep(1500);
