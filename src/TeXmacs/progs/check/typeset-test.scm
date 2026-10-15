@@ -1123,6 +1123,63 @@
        (update-forced)
        (check-true (same-as-scratch?))))))
 
+;; A paragraph whose inputs are not all known (a date: a Scheme routine)
+;; in a block: when its neighbour is edited, the block is typeset again
+;; and the paragraph is used again through the fingerprint; the block must
+;; not take its inputs for all of them, or a change of what it reads is
+;; not seen.
+(define (paper-places body)
+  ;; the places of the paragraphs of a typesetting of body from scratch,
+  ;; on paper
+  (let* ((old (current-buffer)) (u (new-buffer)))
+    (switch-to-buffer* u)
+    (buffer-set-body u (tree-copy body))
+    (init-env "page-medium" "paper")
+    (update-current-buffer)
+    (update-forced)
+    (update-forced)
+    (with r (map (lambda (i) (rect i)) (iota (tree-arity (buffer-tree))))
+      (buffer-close u)
+      (switch-to-buffer* old)
+      r)))
+
+(define (unknown-inputs-stale? off)
+  (let* ((old (current-buffer)) (u (new-buffer)))
+    (switch-to-buffer* u)
+    (buffer-set-body
+     u (stree->tree
+        `(document
+          ,@(map (lambda (i)
+                   (cond ((== i 1) '(assign "foo" "1cm"))
+                         ((== i off) '(with "zz" "1"
+                                        (document (concat (date) " "
+                                                          (vspace (value "foo"))
+                                                          "x"))))
+                         (else (string-append "paragraph "
+                                              (number->string i)))))
+                 (.. 0 120)))))
+    (init-env "page-medium" "paper")
+    (update-current-buffer)
+    (update-forced)
+    (update-forced)
+    (tree-set (tree-ref (buffer-tree) (+ off 1)) "edited paragraph")
+    (update-forced)
+    (update-forced)
+    (tree-set (tree-ref (buffer-tree) 1) '(assign "foo" "4cm"))
+    (update-forced)
+    (update-forced)
+    (let* ((n (tree-arity (buffer-tree)))
+           (inc (map (lambda (i) (rect i)) (iota n)))
+           (stale? (!= inc (paper-places (buffer-tree)))))
+      (buffer-close u)
+      (when (buffer-exists? old) (switch-to-buffer old))
+      stale?)))
+
+(define (test-unknown-inputs-in-blocks)
+  (check-group "unknown inputs in blocks")
+  ;; (where the blocks begin depends on the bridges made before)
+  (check= (length (list-filter (.. 15 35) unknown-inputs-stale?)) 0))
+
 ;; Random edits of a document, each followed by a typesetting which uses
 ;; again what it can, against a typesetting from scratch in a buffer of its
 ;; own: the places of all the paragraphs must be the same. The document
@@ -1421,4 +1478,5 @@
   (test-block-replay)
   (test-references-after-removals)
   (test-assignments-in-blocks)
+  (test-unknown-inputs-in-blocks)
   (check-end))

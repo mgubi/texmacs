@@ -97,6 +97,7 @@ public:
   virtual void my_insert (bool made); // into the stack of the typesetter
   void typeset (int desired_status);
   bool same_inputs ();
+  void give_record (hashmap<string,tree> parent_back);
   bool typeset_by_inputs (int desired_status); // (made again?)
 };
 
