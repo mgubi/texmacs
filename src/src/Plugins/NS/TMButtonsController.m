@@ -151,6 +151,24 @@
 }
 @end
 
+/*! The separators between the groups of buttons: a thin line across the
+ row, vertical in a row and horizontal in a column */
+@interface TMBarSeparator : NSBox
+{
+@public
+  NSLayoutConstraint *wc, *hc;
+}
+- (void) setVertical: (BOOL) flag;
+@end
+
+@implementation TMBarSeparator
+- (void) setVertical: (BOOL) flag
+{
+  [wc setConstant: flag? 18: 1];
+  [hc setConstant: flag? 1: 18];
+}
+@end
+
 /*! The divider between the main and mode icons and the focus and user
  icons, which have another meaning: a line with a soft shadow below it. */
 @interface TMBarDivider : NSView
@@ -187,6 +205,19 @@
     line = [[NSBox alloc] init];
     [line setBoxType: NSBoxSeparator];
     [view addSubview: line];
+    // the columns at the left, which scroll when they are too long
+    sidePane = [[NSView alloc] init];
+    sideScroll = [[NSScrollView alloc] init];
+    [sideScroll setDrawsBackground: NO];
+    [sideScroll setHasVerticalScroller: YES];
+    [sideScroll setAutohidesScrollers: YES];
+    [sideScroll setScrollerStyle: NSScrollerStyleOverlay];
+    sideView = [[TMFlippedView alloc] init];
+    [sideScroll setDocumentView: sideView];
+    [sidePane addSubview: sideScroll];
+    sideLine = [[NSBox alloc] init];
+    [sideLine setBoxType: NSBoxSeparator];
+    [sidePane addSubview: sideLine];
   }
   return self;
 }
@@ -199,6 +230,10 @@
   [line release];
   [divider release];
   [view release];
+  [sideLine release];
+  [sideView release];
+  [sideScroll release];
+  [sidePane release];
   [super dealloc];
 }
 
@@ -215,7 +250,12 @@
     // the menu below the button, or above it (the footer, which is at the
     // bottom of the window: the button is flipped, y goes down)
     NSPoint at= NSMakePoint (0, NSMaxY ([b bounds]) + 3);
-    if (upward) {
+    NSView *row = [b superview];
+    if ([row isKindOfClass: [NSStackView class]] &&
+        [(NSStackView*) row orientation] == NSUserInterfaceLayoutOrientationVertical)
+      // in a column at the left: to the right of the button
+      at= NSMakePoint (NSMaxX ([b bounds]) + 3, 0);
+    else if (upward) {
       [sm update];
       at= NSMakePoint (0, - [sm size].height - 3);
     }
@@ -271,12 +311,42 @@
 
 - (NSView*) separator
 {
-  NSBox *sep = [[[NSBox alloc] init] autorelease];
+  TMBarSeparator *sep = [[[TMBarSeparator alloc] init] autorelease];
   [sep setBoxType: NSBoxSeparator];
   [sep setTranslatesAutoresizingMaskIntoConstraints: NO];
-  [[sep.widthAnchor constraintEqualToConstant: 1] setActive: YES];
-  [[sep.heightAnchor constraintEqualToConstant: 18] setActive: YES];
+  sep->wc = [sep.widthAnchor constraintEqualToConstant: 1];
+  sep->hc = [sep.heightAnchor constraintEqualToConstant: 18];
+  [sep->wc setActive: YES];
+  [sep->hc setActive: YES];
   return sep;
+}
+
+// a row from left to right, or a column from top to bottom (the main and
+// mode icons at the left of the document); turned around in place, since
+// the views of the items were taken from the menu when the row was made
+- (void) orient:(NSView*) v vertical:(BOOL) flag
+{
+  if (![v isKindOfClass: [NSStackView class]]) return;
+  NSStackView *row = (NSStackView*) v;
+  if (flag) {
+    [row setOrientation: NSUserInterfaceLayoutOrientationVertical];
+    [row setAlignment: NSLayoutAttributeCenterX];
+    [row setEdgeInsets: NSEdgeInsetsMake (4, 3, 8, 3)];
+  }
+  else {
+    [row setOrientation: NSUserInterfaceLayoutOrientationHorizontal];
+    [row setAlignment: NSLayoutAttributeCenterY];
+    [row setEdgeInsets: NSEdgeInsetsMake (1, 8, 1, 8)];
+  }
+  for (NSView *sub in [row arrangedSubviews])
+    if ([sub isKindOfClass: [TMBarSeparator class]])
+      [(TMBarSeparator*) sub setVertical: flag];
+  [row setFrameSize: [row fittingSize]];
+}
+
+- (BOOL) isSideRow:(unsigned) idx
+{
+  return side && idx < 2;
 }
 
 - (NSView*) rowFor:(NSMenu*) menu
@@ -342,6 +412,7 @@
   [self ensureRow: idx];
   [[rowArray objectAtIndex:idx] removeFromSuperview];
   NSView *row = menu? [self rowFor: menu]: [[[NSView alloc] init] autorelease];
+  if ([self isSideRow: idx]) [self orient: row vertical: YES];
   [rowArray replaceObjectAtIndex:idx withObject:row];
   if (menu) [menuArray replaceObjectAtIndex:idx withObject:menu];
   [self layout];
@@ -366,6 +437,7 @@
     BOOL shown = [[shownArray objectAtIndex:i] boolValue] &&
                  [[row subviews] count] > 0;
     if (!shown) { [row removeFromSuperview]; continue; }
+    if ([self isSideRow: i]) continue; // in a column (layoutSide)
     if (i < 2) upper = YES;
     else if (upper && !divided) {
       // the focus and user icons are below a divider
@@ -393,6 +465,64 @@
 - (NSView*) bar
 {
   return view;
+}
+
+- (void) setSide:(BOOL) flag
+{
+  if (flag == side) return;
+  side = flag;
+  for (NSUInteger i = 0; i < [rowArray count] && i < 2; i++) {
+    NSView *row = [rowArray objectAtIndex: i];
+    [row removeFromSuperview];
+    [self orient: row vertical: flag];
+  }
+  [self layout];
+}
+
+- (NSView*) sideBar
+{
+  return sidePane;
+}
+
+- (BOOL) sideShown:(NSUInteger) i
+{
+  if (![self isSideRow: i] || i >= [rowArray count]) return NO;
+  NSView *row = [rowArray objectAtIndex: i];
+  return [[shownArray objectAtIndex: i] boolValue] && [[row subviews] count] > 0;
+}
+
+- (CGFloat) sideWidth
+{
+  CGFloat w = 0;
+  for (NSUInteger i = 0; i < 2; i++)
+    if ([self sideShown: i])
+      w += [[rowArray objectAtIndex: i] fittingSize].width;
+  return w > 0? w + 1: 0;   // and the hairline
+}
+
+- (void) layoutSide
+{
+  // the columns from left to right, from the top of the pane, which is
+  // placed by the window (ns_tm_widget_rep::layout)
+  NSRect pr = [sidePane frame];
+  CGFloat x = 0, h = 0;
+  for (NSUInteger i = 0; i < 2 && i < [rowArray count]; i++) {
+    NSView *row = [rowArray objectAtIndex: i];
+    if (![self sideShown: i]) {
+      if ([row superview] == sideView) [row removeFromSuperview];
+      continue;
+    }
+    if ([row superview] != sideView) [sideView addSubview: row];
+    NSSize sz = [row fittingSize];
+    [row setFrame: NSMakeRect (x, 0, sz.width, sz.height)];
+    x += sz.width;
+    h = MAX (h, sz.height);
+  }
+  CGFloat w = MAX (0, pr.size.width - 1);
+  [sideScroll setFrame: NSMakeRect (0, 0, w, pr.size.height)];
+  [sideView setFrame: NSMakeRect (0, 0, w, MAX (h, pr.size.height))];
+  [sideLine setFrame: NSMakeRect (w, 0, 1, pr.size.height)];
+  [sidePane setHidden: x == 0];
 }
 
 - (NSView*) rowForMenu:(NSMenu*) menu

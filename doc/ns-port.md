@@ -81,7 +81,16 @@ bars; the menus show the shortcuts as native key equivalents (they are
 drawn by the menus, but the keys go to the editor, which handles them as
 in Qt). Dialogs are laid out as in Qt (fields and lists take the extra
 space, grids keep their size, glues share it), and a dialog with tabs is
-resized to the tab shown. The color palettes show the patterns.
+resized to the tab shown. The color palettes show the patterns, and the
+typographic palettes as in Vue.
+
+The main and mode icon bars are above the document, or in two columns at
+its left (the preference "icon bars", General tab, followed at once as in
+Vue; `TEXMACS_NS_BARS=top|left` overrides it): the rows of
+`TMButtonsController` are turned around (`setSide:`, `orient:vertical:`),
+their separators become horizontal, their menus open to the right, and the
+columns scroll when they are too long; the focus and user bars stay above
+the document, at the right of the columns.
 
 `qt-gui?` holds for this interface, since it implements the widgets of the
 Qt one: the Scheme code uses the same native dialogs and shortcuts.

@@ -19,6 +19,7 @@
 #include "gui.hpp"
 #include "widget.hpp"
 #include "message.hpp"
+#include "boot.hpp"
 #include "promise.hpp"
 #include "analyze.hpp"
 #include "file.hpp"
@@ -201,6 +202,8 @@ ns_tm_widget_rep::ns_tm_widget_rep (int mask, command _quit):
   // NOTE: the icon bars are shown above the canvas, as in the Qt interface
   [[bc bar] setAutoresizingMask: NSViewWidthSizable | NSViewMinYMargin];
   [view addSubview: [bc bar]];
+  // or the main and mode icons at the left (the preference "icon bars")
+  [view addSubview: [bc sideBar]];
   //NSView *mt = [bc bar];
   //[mt setFrame:r0];
   //[mt setAutoresizingMask:NSViewMaxXMargin|NSViewMinYMargin];
@@ -229,6 +232,10 @@ ns_tm_widget_rep::ns_tm_widget_rep (int mask, command _quit):
   [[NSNotificationCenter defaultCenter] addObserver: wh
       selector: @selector(notify:)
           name: @"TMToolsChanged" object: view];
+  // a change of the place of the icon bars (see ns_follow_icon_bars)
+  [[NSNotificationCenter defaultCenter] addObserver: wh
+      selector: @selector(notify:)
+          name: @"TMIconBarsChanged" object: nil];
   // NOTE: the window comes later (see plain_window_widget)
   NSArray* names= @[NSWindowDidBecomeMainNotification,
                     NSWindowDidEnterFullScreenNotification,
@@ -346,6 +353,17 @@ ns_tm_widget_rep::update_footer_menus () {
               "(horizontal (link texmacs-footer-path))");
 }
 
+// The main and mode icons at the left of the document (the preference "icon
+// bars" of the General tab, read at each layout, so that a change shows at
+// once, see ns_follow_icon_bars); TEXMACS_NS_BARS=top or left overrides it
+bool
+ns_icon_bars_on_side () {
+  static string forced= get_env ("TEXMACS_NS_BARS");
+  if (forced == "top") return false;
+  if (forced == "left") return true;
+  return get_user_preference ("icon bars", "top") == "left";
+}
+
 void ns_tm_widget_rep::layout()
 {
   // From top to bottom: the icon bars, the left tools, the canvas and the
@@ -357,14 +375,25 @@ void ns_tm_widget_rep::layout()
   CGFloat right_w= max ((CGFloat) 100.0, [[rightField cell] cellSize].width + 4);
   NSSize fs = NSMakeSize (right_w, 26 + 2*vpad); // size of the right footer
   NSRect r = [view bounds];
+  CGFloat foot_h= visibility[5]? fs.height: 0;
+  if (prompt_view)
+    foot_h= max (fs.height, [prompt_view fittingSize].height + 2*vpad);
+  // the main and mode icons in columns at the left of the document, from
+  // the top to the footer, or in the header (the preference "icon bars",
+  // as in the Vue interface)
+  [bc setSide: ns_icon_bars_on_side ()];
+  CGFloat bars_w= visibility[0]? [bc sideWidth]: 0;
+  [[bc sideBar] setFrame: NSMakeRect (0, foot_h, bars_w,
+                                      max (0.0, r.size.height - foot_h))];
+  [[bc sideBar] setHidden: bars_w == 0];
+  [bc layoutSide];
+  r.origin.x += bars_w;
+  r.size.width -= bars_w;
   // NOTE: the header contains the rows of icons, which are shown or hidden
   // one by one (see updateVisibility)
   [[bc bar] setFrameSize: NSMakeSize (r.size.width, [[bc bar] frame].size.height)];
   [bc layout];
   CGFloat bar_h = visibility[0]? [[bc bar] frame].size.height: 0;
-  CGFloat foot_h= visibility[5]? fs.height: 0;
-  if (prompt_view)
-    foot_h= max (fs.height, [prompt_view fittingSize].height + 2*vpad);
   bool show[4];
   NSSize sz[4];
   for (int i=0; i<4; i++) {
@@ -381,18 +410,20 @@ void ns_tm_widget_rep::layout()
   CGFloat bot_h  = show[2]? sz[2].height: 0;
   CGFloat y0= foot_h + extra_h + bot_h;
   CGFloat mid_h= max (0.0, r.size.height - bar_h - y0);
-  [[bc bar] setFrame: NSMakeRect (0, r.size.height - bar_h,
+  CGFloat x0= r.origin.x;
+  [[bc bar] setFrame: NSMakeRect (x0, r.size.height - bar_h,
                                   r.size.width, bar_h)];
   [[bc bar] setHidden: bar_h == 0];
-  [tool_views[1] setFrame: NSMakeRect (0, y0, left_w, mid_h)];
-  [tool_views[0] setFrame: NSMakeRect (r.size.width - side_w, y0, side_w, mid_h)];
-  [sv setFrame: NSMakeRect (left_w, y0, r.size.width - left_w - side_w, mid_h)];
-  [tool_handles[0] setFrame: NSMakeRect (r.size.width - side_w - 3, y0, 6, mid_h)];
-  [tool_handles[1] setFrame: NSMakeRect (left_w - 3, y0, 6, mid_h)];
+  [tool_views[1] setFrame: NSMakeRect (x0, y0, left_w, mid_h)];
+  [tool_views[0] setFrame: NSMakeRect (x0 + r.size.width - side_w, y0, side_w, mid_h)];
+  [sv setFrame: NSMakeRect (x0 + left_w, y0, r.size.width - left_w - side_w, mid_h)];
+  [tool_handles[0] setFrame: NSMakeRect (x0 + r.size.width - side_w - 3, y0, 6, mid_h)];
+  [tool_handles[1] setFrame: NSMakeRect (x0 + left_w - 3, y0, 6, mid_h)];
   [tool_handles[0] setHidden: !show[0]];
   [tool_handles[1] setHidden: !show[1]];
-  [tool_views[2] setFrame: NSMakeRect (0, foot_h + extra_h, r.size.width, bot_h)];
-  [tool_views[3] setFrame: NSMakeRect (0, foot_h, r.size.width, extra_h)];
+  [tool_views[2] setFrame: NSMakeRect (x0, foot_h + extra_h, r.size.width, bot_h)];
+  [tool_views[3] setFrame: NSMakeRect (x0, foot_h, r.size.width, extra_h)];
+  r= [view bounds]; // the footer is as wide as the window
   CGFloat ty= max ((CGFloat) 0.0, floor ((foot_h - text_h) / 2));
   [leftField setFrame: NSMakeRect (pad, ty, r.size.width - fs.width - 2*pad,
                                    min (text_h, foot_h))];
