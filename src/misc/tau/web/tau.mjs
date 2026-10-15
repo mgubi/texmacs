@@ -858,6 +858,109 @@ setInterval(() => {
 	worker.postMessage({ t: "ping", id: ++pingId });
 }, 150);
 
+// The prototype of the drawing on the GPU (render-bench.mjs --gpu): the
+// core says the commands which draw a rectangle of a view (src/Plugins/
+// MuPDF/mupdf_renderer.cpp, mupdf_record), and the canvas draws them. A
+// glyph comes once, as its coverage, and is kept as a small canvas, one
+// for each of its colours. ?gpusync waits for the canvas to be done with
+// what it was given, to measure it (it reads a pixel back).
+const gpuSync = params.has("gpusync");
+state.drawTimes = [];
+const glyphMasks = new Map(), glyphInks = new Map(), colorNames = new Map();
+function colorName(v) {
+	let c = colorNames.get(v);
+	if (!c) {
+		const u = v >>> 0;
+		c = `rgba(${u >>> 24},${(u >>> 16) & 255},${(u >>> 8) & 255},${(u & 255) / 255})`;
+		colorNames.set(v, c);
+	}
+	return c;
+}
+function addGlyphs(buffer) {
+	const d = new DataView(buffer), bytes = new Uint8Array(buffer);
+	for (let p = 0; p + 12 <= buffer.byteLength;) {
+		const id = d.getInt32(p, true), w = d.getInt32(p + 4, true), h = d.getInt32(p + 8, true);
+		p += 12;
+		if (w > 0 && h > 0) {
+			const c = new OffscreenCanvas(w, h), cx = c.getContext("2d"), img = cx.createImageData(w, h);
+			for (let i = 0; i < w * h; i++) {
+				img.data[4 * i] = img.data[4 * i + 1] = img.data[4 * i + 2] = 255;
+				img.data[4 * i + 3] = bytes[p + i];
+			}
+			cx.putImageData(img, 0, 0);
+			glyphMasks.set(id, c);
+		}
+		p += w * h;
+	}
+}
+function glyphInk(id, color) {
+	const key = id * 4294967296 + (color >>> 0);
+	let ink = glyphInks.get(key);
+	if (ink === undefined) {
+		const mask = glyphMasks.get(id);
+		ink = null;
+		if (mask) {
+			ink = new OffscreenCanvas(mask.width, mask.height);
+			const cx = ink.getContext("2d");
+			cx.drawImage(mask, 0, 0);
+			cx.globalCompositeOperation = "source-in";
+			cx.fillStyle = colorName(color);
+			cx.fillRect(0, 0, mask.width, mask.height);
+		}
+		glyphInks.set(key, ink);
+	}
+	return ink;
+}
+function replayCommands(ctx, m) {
+	if (m.glyphs.byteLength) addGlyphs(m.glyphs);
+	const o = new Int32Array(m.ops), n = o.length;
+	ctx.save();
+	ctx.beginPath(); ctx.rect(m.x, m.y, m.w, m.h); ctx.clip();
+	ctx.save();
+	for (let i = 0; i < n;) {
+		switch (o[i]) {
+		case 1:
+			ctx.fillStyle = colorName(o[i + 5]);
+			ctx.fillRect(o[i + 1], o[i + 2], o[i + 3] - o[i + 1], o[i + 4] - o[i + 2]);
+			i += 6; break;
+		case 2: {
+			const ink = glyphInk(o[i + 1], o[i + 4]);
+			if (ink) ctx.drawImage(ink, o[i + 2], o[i + 3]);
+			i += 5; break;
+		}
+		case 3: case 4: {
+			const line = o[i] === 3, k = o[i + 1];
+			let p = i + (line ? 4 : 3);
+			ctx.beginPath();
+			for (let j = 0; j < k; j++, p += 2) j ? ctx.lineTo(o[p], o[p + 1]) : ctx.moveTo(o[p], o[p + 1]);
+			if (line) { ctx.lineWidth = o[i + 2] / 16; ctx.strokeStyle = colorName(o[i + 3]); ctx.stroke(); }
+			else { ctx.closePath(); ctx.fillStyle = colorName(o[i + 2]); ctx.fill(); }
+			i = p; break;
+		}
+		case 5: {
+			const x1 = o[i + 1], y1 = o[i + 2], x2 = o[i + 3], y2 = o[i + 4];
+			const a = o[i + 5] * Math.PI / (180 * 64), da = o[i + 6] * Math.PI / (180 * 64);
+			ctx.beginPath();
+			ctx.ellipse((x1 + x2) / 2, (y1 + y2) / 2, Math.max(0, (x2 - x1) / 2), Math.max(0, (y2 - y1) / 2), 0, -a, -a - da, da > 0);
+			if (o[i + 9]) { ctx.fillStyle = colorName(o[i + 8]); ctx.fill(); }
+			else { ctx.lineWidth = o[i + 7] / 16; ctx.strokeStyle = colorName(o[i + 8]); ctx.stroke(); }
+			i += 10; break;
+		}
+		case 6:
+			ctx.restore(); ctx.save();
+			ctx.beginPath(); ctx.rect(o[i + 1], o[i + 2], o[i + 3] - o[i + 1], o[i + 4] - o[i + 2]); ctx.clip();
+			i += 5; break;
+		case 7:
+			ctx.fillStyle = "#d8d8d8";
+			ctx.fillRect(o[i + 1], o[i + 2], o[i + 3] - o[i + 1], o[i + 4] - o[i + 2]);
+			i += 5; break;
+		default: i = n;
+		}
+	}
+	ctx.restore();
+	ctx.restore();
+}
+
 worker.onmessage = event => {
 	const m = event.data;
 	if (m.t === "pong") {
@@ -979,15 +1082,21 @@ worker.onmessage = event => {
 		showTitle();
 		break;
 	}
-	case "paint": {
+	case "dlist": case "paint": {
 		const pane = targetOf(m.view);
 		if (!pane || m.place !== pane.place) break; // for an older place
 		const canvas = pane.canvas;
 		if (canvas.width !== m.width || canvas.height !== m.height) {
 			canvas.width = m.width; canvas.height = m.height;
 		}
-		// the rectangle of the canvas which changed
-		pane.context.putImageData(new ImageData(new Uint8ClampedArray(m.pixels), m.w, m.h), m.x, m.y);
+		// the rectangle of the canvas which changed: its pixels, or the
+		// commands which draw it (the prototype of the drawing on the GPU)
+		const t0 = performance.now();
+		if (m.t === "dlist") replayCommands(pane.context, m);
+		else pane.context.putImageData(new ImageData(new Uint8ClampedArray(m.pixels), m.w, m.h), m.x, m.y);
+		if (gpuSync) pane.context.getImageData(0, 0, 1, 1);
+		state.drawTimes.push(performance.now() - t0);
+		if (state.drawTimes.length > 500) state.drawTimes.shift();
 		pane.extents = m.extents; pane.scroll = m.scroll; pane.caret = m.caret;
 		if (pane.showScroll) pane.showScroll();
 		if (pane === focused && !composing) placeArea();

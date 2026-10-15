@@ -4,7 +4,12 @@
 // drawing?".
 //
 //   node misc/tau/test/render-bench.mjs --dir build-tau/out/web --tools <dir>
-//        [--only name] [--width 1280 --height 860] [--density 2]
+//        [--only name] [--width 1280 --height 860] [--density 2] [--gpu]
+//
+// --gpu: the prototype of the drawing on the GPU of the page (the core says
+// the commands, the canvas draws them: mupdf_record in mupdf_renderer.cpp);
+// both ways the page waits for its canvas (?gpusync), and the time of the
+// page to draw a step is measured with that of the core.
 //
 // Each document is scrolled (every step draws the whole view) and typed
 // in, twice: as usual, and "dry" (tau_dry: the drawing commands are written
@@ -110,7 +115,7 @@ async function run(doc, density) {
 	const page = await browser.newPage();
 	await page.setViewport({ width: +opt("--width", "1280"), height: +opt("--height", "860"), deviceScaleFactor: density });
 	const env = opt("--env", "");
-	await page.goto(`http://127.0.0.1:${port}/index.html?debug&nohome&profile` + (env ? "&env=" + encodeURIComponent(env) : ""), { waitUntil: "load" });
+	await page.goto(`http://127.0.0.1:${port}/index.html?debug&nohome&profile&gpusync` + (env ? "&env=" + encodeURIComponent(env) : ""), { waitUntil: "load" });
 	const until = async (test, timeout = 90000) => {
 		for (const end = Date.now() + timeout; Date.now() < end; await sleep(100)) { try { const r = await test(); if (r) return r; } catch (error) {} }
 		throw new Error("waited in vain (" + doc.name + ")");
@@ -127,7 +132,8 @@ async function run(doc, density) {
 		window.step = message => new Promise(resolve => {
 			const id = "bench" + (++window.syncs);
 			window.logs = [];
-			window.pongs.set(id, () => resolve(window.logs.join("\n")));
+			window.drawn0 = tau.state.drawTimes.length ? tau.state.drawTimes.reduce((a, b) => a + b, 0) : 0;
+			window.pongs.set(id, () => { window.pageMs = tau.state.drawTimes.reduce((a, b) => a + b, 0) - window.drawn0; resolve(window.logs.join("\n")); });
 			if (message) tau.worker.postMessage(message);
 			tau.worker.postMessage({ t: "ping", id });
 		});
@@ -153,6 +159,7 @@ async function run(doc, density) {
 		await until(() => page.evaluate(name => document.title.includes(name), path.basename(file)));
 	}
 	await sleep(2500);
+	if (gpu) { await page.evaluate(() => window.step({ t: "gpu", on: 1 })); await sleep(1500); }
 	await page.evaluate(() => window.step());
 	if (process.env.BENCH_DEBUG) console.log(doc.name, await page.title(), (await page.evaluate(() => window.step())).slice(0, 300));
 	const view = await page.evaluate(() => tau.active.view);
@@ -165,7 +172,7 @@ async function run(doc, density) {
 	const num = (text, re) => { const l = []; for (const m of text.matchAll(re)) l.push(parseFloat(m[1])); return l; };
 	const pass = async dry => {
 		if (dry) await page.evaluate(() => window.step({ t: "dry", on: 1 }));
-		const scroll = { turn: [], editors: [], drawing: [], sending: [] };
+		const scroll = { turn: [], editors: [], drawing: [], sending: [], page: [] };
 		for (let i = 0; i < 30; i++) {
 			const text = await page.evaluate((view, dy) => window.step({ t: "scroll", view, dx: 0, dy }), view, 90 * density);
 			const turns = [...text.matchAll(/tau-profile turn: ([\d.e-]+) ms \(editors ([\d.e-]+), drawing ([\d.e-]+), sending ([\d.e-]+)/g)];
@@ -173,6 +180,7 @@ async function run(doc, density) {
 			scroll.editors.push(turns.reduce((n, m) => n + parseFloat(m[2]), 0));
 			scroll.drawing.push(turns.reduce((n, m) => n + parseFloat(m[3]), 0));
 			scroll.sending.push(turns.reduce((n, m) => n + parseFloat(m[4]), 0));
+			scroll.page.push(await page.evaluate(() => window.pageMs));
 		}
 		// the cursor in the middle of the view, then letters
 		const x = Math.round(size.w * 0.5), y = Math.round(size.h * 0.5);
@@ -180,7 +188,7 @@ async function run(doc, density) {
 			await page.evaluate((view, kind, x, y) => window.step({ t: "mouse", view, kind, x, y, mods: kind === "press-left" ? 1 : 0, at: Date.now() }), view, kind, x, y);
 		await sleep(700);
 		await page.evaluate(() => window.step());
-		const type = { turn: [], typeset: [], drawing: [], sending: [], pixels: [] };
+		const type = { turn: [], typeset: [], drawing: [], sending: [], pixels: [], page: [] };
 		for (let i = 0; i < 40; i++) {
 			const text = await page.evaluate((view, key) => window.step({ t: "key", view, key }), view, i % 6 === 5 ? "space" : "etaoin"[i % 6]);
 			const turns = [...text.matchAll(/tau-profile turn: ([\d.e-]+) ms \(editors ([\d.e-]+), drawing ([\d.e-]+), sending ([\d.e-]+), pixels (\d+)/g)];
@@ -188,6 +196,7 @@ async function run(doc, density) {
 			type.drawing.push(turns.reduce((n, m) => n + parseFloat(m[3]), 0));
 			type.sending.push(turns.reduce((n, m) => n + parseFloat(m[4]), 0));
 			type.pixels.push(turns.reduce((n, m) => n + parseFloat(m[5]), 0));
+			type.page.push(await page.evaluate(() => window.pageMs));
 			if (process.env.BENCH_DEBUG && !dry && i === 20) console.log(text.split("\n").filter(l => /typeset|turn/.test(l)).join("\n"));
 			type.typeset.push(num(text, /edit-profile typeset: ([\d.e-]+) ms/g).reduce((a, b) => a + b, 0));
 		}
@@ -204,7 +213,9 @@ async function run(doc, density) {
 		return { scroll, type, counts };
 	};
 	await pass(false); // (a first pass warms the caches of the glyphs)
-	const real = await pass(false), dry = await pass(true);
+	// (the dry pass says what saying the commands costs: not with --gpu,
+	// where the commands are said anyway)
+	const real = await pass(false), dry = gpu ? real : await pass(true);
 	if (opt("--edits", "")) {
 		// what each kind of edit costs, stage by stage (the profile of the core)
 		const key = k => page.evaluate((view, key) => window.step({ t: "key", view, key }), view, k);
@@ -268,6 +279,8 @@ async function run(doc, density) {
 }
 
 const onlyDoc = opt("--only", "");
+const gpu = args.includes("--gpu");
+if (gpu) console.log("bench: --gpu, the views drawn by the canvas of the page from the commands of the core");
 for (const density of opt("--density", "") ? [+opt("--density", "")] : opt("--edits", "") ? [2] : [2, 1]) {
 	console.log(`\nbench: view at density ${density}; means in ms of the core, for a step`);
 	console.log("document  what     | turn   | typeset/editors | drawing | of which saying what to draw | sending pixels | commands and bytes of a step");
@@ -281,6 +294,7 @@ for (const density of opt("--density", "") ? [+opt("--density", "")] : opt("--ed
 		const s = r.real.scroll, sd = r.dry.scroll, t = r.real.type, td = r.dry.type;
 		console.log(`${doc.name.padEnd(9)} scroll   |${f1(median(s.turn))} |${f1(median(s.editors))}           |${f1(median(s.drawing))}  |${f1(median(sd.drawing))}` +
 			`                        |${f1(median(s.sending))}          | (the 70 steps of the dry pass: ${all} commands, ${(c.bytes / 1024).toFixed(0)} KB; ${c.glyphs} glyphs, ${c.rects} rectangles, ${c.paths} paths, ${c.pictures} pictures, ${c.state} changes of state, ${c.copies} copies)`);
+		console.log(`${"".padEnd(9)} page     | scroll: the page draws a step in ${median(s.page).toFixed(1)} ms; typing: ${median(t.page).toFixed(1)} ms; a scroll step in all (core + page): ${(median(s.turn) + median(s.page)).toFixed(1)} ms`);
 		console.log(`${"".padEnd(9)} typing   |${f1(median(t.turn))} |${f1(median(t.typeset))}           |${f1(median(t.drawing))}  |${f1(median(td.drawing))}` +
 			`                        |${f1(median(t.sending))}          | ${Math.round(median(t.pixels))} pixels drawn of ${r.size.w * r.size.h}; the document is ${Math.round(r.whole / r.size.h)} views high`);
 	}

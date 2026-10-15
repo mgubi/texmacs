@@ -10,6 +10,8 @@
 ******************************************************************************/
 
 #include "mupdf_renderer.hpp"
+#include <vector>
+#include <string>
 #include "analyze.hpp"
 #include "iterator.hpp" // mupdf_image_gc
 #include "image_files.hpp"
@@ -148,6 +150,36 @@ mupdf_dry_op (int kind, int bytes) {
   mupdf_dry_n[kind]++;
   mupdf_dry_bytes += bytes;
   return true;
+}
+
+// A prototype (src/Tau, misc/tau/test/render-bench.mjs --gpu): when it is
+// on, what is drawn is recorded as a list of commands in the pixels of the
+// view, which the page draws with its canvas (on the GPU), instead of being
+// drawn here. A glyph is sent once, as its coverage (an id, its width and
+// height, then a byte a pixel), and then named by its id. The commands are
+// integers: 1 a rectangle (x1, y1, x2, y2, rgba), 2 a glyph (id, left, top,
+// rgba), 3 a line (n, width in 1/16 pixel, rgba, then n points), 4 a filled
+// polygon (n, rgba, n points), 5 an arc (x1, y1, x2, y2, start and length
+// in 1/64 degree, width in 1/16 pixel, rgba, filled), 6 the clip (x1, y1,
+// x2, y2), 7 a picture which is not drawn (x1, y1, x2, y2).
+bool mupdf_record= false;
+std::vector<int> mupdf_record_ops;
+std::string mupdf_record_glyphs;
+static hashmap<string,int> record_glyph_id (0);
+static std::vector<int> record_glyph_place; // per id: mode, a, b, h
+
+static inline int
+record_rgba (color c) {
+  int r, g, b, a;
+  get_rgb_color (c, r, g, b, a);
+  return (int) (((unsigned) r << 24) | ((unsigned) g << 16) |
+                ((unsigned) b << 8) | (unsigned) a);
+}
+
+static inline void
+record_int (std::string& s, int v) {
+  s.push_back ((char) (v & 255)); s.push_back ((char) ((v >> 8) & 255));
+  s.push_back ((char) ((v >> 16) & 255)); s.push_back ((char) ((v >> 24) & 255));
 }
 
 /******************************************************************************
@@ -559,6 +591,13 @@ void
 mupdf_renderer_rep::set_clipping (SI x1, SI y1, SI x2, SI y2, bool restore) {
   (void) mupdf_dry_op (4, 24);
   renderer_rep::set_clipping (x1, y1, x2, y2, restore);
+  if (mupdf_record) {
+    SI a1, b1, a2, b2;
+    get_clipping (a1, b1, a2, b2);
+    mupdf_record_ops.insert (mupdf_record_ops.end (),
+      { 6, (int) to_x (a1), (int) -to_y (b2), (int) to_x (a2), (int) -to_y (b1) });
+    return;
+  }
 
   end_text();
   if (!proxy) flush_proxy_text (pixmap);
@@ -986,6 +1025,13 @@ mupdf_renderer_rep::tile_direct (SI x1, SI y1, SI x2, SI y2, fz_pixmap* tile) {
 
 void
 mupdf_renderer_rep::clear_device (SI x1, SI y1, SI x2, SI y2) {
+  if (mupdf_record) {
+    int c= (int) 0xE6E6E6FF;
+    mupdf_record_ops.insert (mupdf_record_ops.end (),
+      { 1, (int) to_x (min (x1, x2)), (int) -to_y (max (y1, y2)),
+        (int) to_x (max (x1, x2)), (int) -to_y (min (y1, y2)), c });
+    return;
+  }
   if (mupdf_dry_op (1, 20)) return;
   // the neutral pattern around the pages, as in the Qt port: white, then
   // the pattern image tiled at its natural size
@@ -1053,6 +1099,12 @@ mupdf_renderer_rep::set_background (brush b) {
 
 void
 mupdf_renderer_rep::line (SI x1, SI y1, SI x2, SI y2) {
+  if (mupdf_record) {
+    mupdf_record_ops.insert (mupdf_record_ops.end (),
+      { 3, 2, max (16, (int) ((16.0 * lw) / pixel)), record_rgba (fg),
+        (int) to_x (x1), (int) -to_y (y1), (int) to_x (x2), (int) -to_y (y2) });
+    return;
+  }
   if (mupdf_dry_op (2, 20)) return;
   // debug_convert << "line\n";
   end_text ();
@@ -1063,6 +1115,17 @@ mupdf_renderer_rep::line (SI x1, SI y1, SI x2, SI y2) {
 
 void
 mupdf_renderer_rep::lines (array<SI> x, array<SI> y) {
+  if (mupdf_record) {
+    int n= min (N(x), N(y));
+    if (n < 2) return;
+    mupdf_record_ops.insert (mupdf_record_ops.end (),
+      { 3, n, max (16, (int) ((16.0 * lw) / pixel)), record_rgba (fg) });
+    for (int i= 0; i < n; i++) {
+      mupdf_record_ops.push_back ((int) to_x (x[i]));
+      mupdf_record_ops.push_back ((int) -to_y (y[i]));
+    }
+    return;
+  }
   if (mupdf_dry_op (2, 8 + 8 * N(x))) return;
   // debug_convert << "lines\n";
   end_text ();
@@ -1086,6 +1149,13 @@ mupdf_renderer_rep::lines (array<SI> x, array<SI> y) {
 
 void
 mupdf_renderer_rep::clear (SI x1, SI y1, SI x2, SI y2) {
+  if (mupdf_record) {
+    int c= ((is_nil (bg_brush) || bg_brush->get_type () != brush_pattern)? record_rgba (bg): (int) 0xE6E6E6FF);
+    mupdf_record_ops.insert (mupdf_record_ops.end (),
+      { 1, (int) to_x (min (x1, x2)), (int) -to_y (max (y1, y2)),
+        (int) to_x (max (x1, x2)), (int) -to_y (min (y1, y2)), c });
+    return;
+  }
   if (mupdf_dry_op (1, 20)) return;
   if ((is_nil (bg_brush) || bg_brush->get_type () != brush_pattern) &&
       fill_direct (x1, y1, x2, y2, bg)) return; // a plain background color
@@ -1326,6 +1396,13 @@ mupdf_renderer_rep::draw_pixmap_scaled_direct (fz_pixmap* src, SI x, SI y,
 
 void
 mupdf_renderer_rep::fill (SI x1, SI y1, SI x2, SI y2) {
+  if (mupdf_record) {
+    int c= record_rgba (fg);
+    mupdf_record_ops.insert (mupdf_record_ops.end (),
+      { 1, (int) to_x (min (x1, x2)), (int) -to_y (max (y1, y2)),
+        (int) to_x (max (x1, x2)), (int) -to_y (min (y1, y2)), c });
+    return;
+  }
   if (mupdf_dry_op (1, 20)) return;
   if ((x1<x2) && (y1<y2))
   {
@@ -1407,6 +1484,13 @@ mupdf_renderer_rep::bezier_arc (SI x1, SI y1, SI x2, SI y2,
 
 void
 mupdf_renderer_rep::arc (SI x1, SI y1, SI x2, SI y2, int alpha, int delta) {
+  if (mupdf_record) {
+    mupdf_record_ops.insert (mupdf_record_ops.end (),
+      { 5, (int) to_x (min (x1, x2)), (int) -to_y (max (y1, y2)),
+        (int) to_x (max (x1, x2)), (int) -to_y (min (y1, y2)), alpha, delta,
+        max (16, (int) ((16.0 * lw) / pixel)), record_rgba (fg), 0 });
+    return;
+  }
   if (mupdf_dry_op (2, 28)) return;
   // debug_convert << "arc\n";
   end_text ();
@@ -1416,6 +1500,13 @@ mupdf_renderer_rep::arc (SI x1, SI y1, SI x2, SI y2, int alpha, int delta) {
 void
 mupdf_renderer_rep::fill_arc (SI x1, SI y1, SI x2, SI y2,
                               int alpha, int delta) {
+  if (mupdf_record) {
+    mupdf_record_ops.insert (mupdf_record_ops.end (),
+      { 5, (int) to_x (min (x1, x2)), (int) -to_y (max (y1, y2)),
+        (int) to_x (max (x1, x2)), (int) -to_y (min (y1, y2)), alpha, delta,
+        max (16, (int) ((16.0 * lw) / pixel)), record_rgba (fg), 1 });
+    return;
+  }
   if (mupdf_dry_op (2, 28)) return;
   // debug_convert << "fill_arc\n";
   end_text ();
@@ -1424,6 +1515,16 @@ mupdf_renderer_rep::fill_arc (SI x1, SI y1, SI x2, SI y2,
 
 void
 mupdf_renderer_rep::polygon (array<SI> x, array<SI> y, bool convex) {
+  if (mupdf_record) {
+    int n= min (N(x), N(y));
+    if (n < 3) return;
+    mupdf_record_ops.insert (mupdf_record_ops.end (), { 4, n, record_rgba (fg) });
+    for (int i= 0; i < n; i++) {
+      mupdf_record_ops.push_back ((int) to_x (x[i]));
+      mupdf_record_ops.push_back ((int) -to_y (y[i]));
+    }
+    return;
+  }
   if (mupdf_dry_op (2, 8 + 8 * N(x))) return;
   // debug_convert << "polygon\n";
   int i, n= N(x);
@@ -1888,6 +1989,13 @@ cache_pixmap (tree key, fz_pixmap* pix) {
 
 void
 mupdf_renderer_rep::draw_picture (picture p, SI x, SI y, int alpha) {
+  if (mupdf_record) {
+    int l= (int) to_x (x - p->get_origin_x () * pixel);
+    int b= (int) -to_y (y - p->get_origin_y () * pixel);
+    mupdf_record_ops.insert (mupdf_record_ops.end (),
+      { 7, l, b - p->get_height (), l + p->get_width (), b });
+    return;
+  }
   if (mupdf_dry_op (3, 20)) return;
   p= as_mupdf_picture (p);
   mupdf_picture_rep* pict= (mupdf_picture_rep*) p->get_handle ();
@@ -1915,6 +2023,7 @@ mupdf_renderer_rep::draw_picture (picture p, SI x, SI y, int alpha) {
 void
 mupdf_renderer_rep::draw_picture_scaled (picture p, SI x, SI y, double s,
                                          int alpha) {
+  if (mupdf_record) return; // (not in the prototype)
   if (mupdf_dry_op (3, 28)) return;
   p= as_mupdf_picture (p);
   mupdf_picture_rep* pict= (mupdf_picture_rep*) p->get_handle ();
@@ -1932,6 +2041,7 @@ mupdf_renderer_rep::draw_picture_scaled (picture p, SI x, SI y, double s,
 
 void
 mupdf_renderer_rep::draw_scalable (scalable im, SI x, SI y, int alpha) {
+  if (mupdf_record) return; // (not in the prototype)
   if (mupdf_dry_op (3, 20)) return;
   // debug_convert << "pdf renderer, draw_scalable "
   //   << im->get_name () << " at " << x << ", " << y
@@ -2353,6 +2463,47 @@ mupdf_glyph_outline (string fontname, int c, array<double>& q, double& em) {
 
 void
 mupdf_renderer_rep::draw (int c, font_glyphs fng, SI x, SI y) {
+  if (mupdf_record) {
+    string key= fng->res_name * "/" * as_string (c);
+    int id= record_glyph_id [key];
+    if (id == 0) {
+      // the glyph as MuPDF renders it, else the bitmap of TeXmacs
+      id= (int) (record_glyph_place.size () / 4) + 1;
+      record_glyph_id (key)= id;
+      string cov;
+      int w= 0, h= 0, x0= 0, y0= 0;
+      if (mupdf_glyph_bitmap (fng->res_name, c, cov, w, h, x0, y0))
+        record_glyph_place.insert (record_glyph_place.end (), { 0, x0, y0, h });
+      else {
+        glyph pre_gl= fng->get (c);
+        SI xo= 0, yo= 0;
+        if (!is_nil (pre_gl)) {
+          glyph gl= shrink (pre_gl, std_shrinkf, std_shrinkf, xo, yo, 1.0);
+          w= gl->width; h= gl->height;
+          int nr_cols= min (64, std_shrinkf * std_shrinkf);
+          cov= string (w * h);
+          for (int j= 0; j < h; j++)
+            for (int i= 0; i < w; i++)
+              cov[j*w + i]= (char) min (255, (255 * gl->get_x (i, j)) / nr_cols);
+        }
+        record_glyph_place.insert (record_glyph_place.end (), { 1, (int) xo, (int) yo, h });
+      }
+      record_int (mupdf_record_glyphs, id);
+      record_int (mupdf_record_glyphs, w);
+      record_int (mupdf_record_glyphs, h);
+      for (int i= 0; i < w * h; i++) mupdf_record_glyphs.push_back (cov[i]);
+    }
+    const int* pl= &record_glyph_place [4 * (id - 1)];
+    int left, top;
+    if (pl[0] == 0) { left= (int) to_x (x) + pl[1]; top= (int) -to_y (y) + pl[2]; }
+    else {
+      left= (int) to_x (x - pl[1] * std_shrinkf);
+      top= (int) -to_y (y + pl[2] * std_shrinkf - pl[3] * pixel) - pl[3];
+    }
+    mupdf_record_ops.insert (mupdf_record_ops.end (),
+      { 2, id, left, top, record_rgba (pen->get_color ()) });
+    return;
+  }
   if (mupdf_dry_op (0, 16)) return;
   if (pen->get_type () == pencil_brush &&
       !is_nil (pen->get_brush ()) &&
@@ -2541,6 +2692,7 @@ translate_pixmap (fz_pixmap *dest_pix, fz_irect dest_rect,
 
 void
 mupdf_renderer_rep::fetch (SI x1, SI y1, SI x2, SI y2, renderer ren, SI x, SI y) {
+  if (mupdf_record) return;
   if (mupdf_dry_op (5, 32)) return;
   ASSERT (ren != NULL, "invalid situation");
   if (ren->is_printer ()) return;
@@ -2716,6 +2868,7 @@ mupdf_renderer_rep::put_shadow (renderer ren, SI x1, SI y1, SI x2, SI y2) {
 
 void 
 mupdf_renderer_rep::apply_shadow (SI x1, SI y1, SI x2, SI y2)  {
+  if (mupdf_record) return;
   if (mupdf_dry_op (5, 20)) return;
   if (master == NULL) return;
   if (pixmap == static_cast<mupdf_renderer_rep*>(master)->pixmap) return;

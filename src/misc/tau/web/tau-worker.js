@@ -107,6 +107,11 @@ function handle(m) {
 		if (new URLSearchParams(self.location.search).has("debug"))
 			core.ccall("tau_scheme", null, ["string"], [m.code]);
 		break;
+	case "gpu":
+		// for the tests: the views said as commands, which the page draws
+		// (the prototype of the drawing on the GPU, render-bench.mjs --gpu)
+		if (new URLSearchParams(self.location.search).has("debug")) core._tau_record(m.on ? 1 : 0);
+		break;
 	case "memory":
 		// for the tests: the size of the memory of the program
 		if (new URLSearchParams(self.location.search).has("debug")) postMessage({ t: "memory", text: String(core.HEAPU8.length) });

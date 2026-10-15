@@ -17,6 +17,8 @@
 *   by the serialiser of the interface, and Texmacs/Window.
 ******************************************************************************/
 
+#include <vector>
+#include <string>
 #include "Tau/tau_widget.hpp"
 #include "gui.hpp"
 #include "widget.hpp"
@@ -292,6 +294,41 @@ static void tau_js_paint (int view, int counter, int w, int h,
                     ew, eh, sx, sy, cx, cy); }
 #endif
 
+// The prototype of the drawing on the GPU of the page (mupdf_renderer.cpp,
+// mupdf_record): the commands which drew a rectangle of a view, and the
+// glyphs which they name for the first time, instead of its pixels
+extern bool mupdf_record;
+extern std::vector<int> mupdf_record_ops;
+extern std::string mupdf_record_glyphs;
+
+#ifdef __EMSCRIPTEN__
+EM_JS (void, tau_js_dlist, (int view, int counter, int w, int h,
+                            const int* ops, int nops,
+                            const unsigned char* gl, int ngl,
+                            int x1, int y1, int x2, int y2,
+                            int ew, int eh, int sx, int sy,
+                            int cx, int cy), {
+  if (!Module.tauPost) return;
+  var o= HEAP32.slice (ops >> 2, (ops >> 2) + nops);
+  var g= HEAPU8.slice (gl, gl + ngl);
+  Module.tauPost ({ t: "dlist", view: view, place: counter,
+                    width: w, height: h, ops: o.buffer, glyphs: g.buffer,
+                    x: x1, y: y1, w: x2 - x1, h: y2 - y1,
+                    extents: { width: ew, height: eh },
+                    scroll: { x: sx, y: sy },
+                    caret: { x: cx, y: cy } }, [o.buffer, g.buffer]);
+});
+#else
+static void tau_js_dlist (int view, int counter, int w, int h,
+                          const int* ops, int nops,
+                          const unsigned char* gl, int ngl,
+                          int x1, int y1, int x2, int y2,
+                          int ew, int eh, int sx, int sy, int cx, int cy) {
+  (void) view; (void) counter; (void) w; (void) h; (void) ops; (void) nops;
+  (void) gl; (void) ngl; (void) x1; (void) y1; (void) x2; (void) y2;
+  (void) ew; (void) eh; (void) sx; (void) sy; (void) cx; (void) cy; }
+#endif
+
 static void
 tau_post_view (int id, int window, const char* what) {
   tau_js_view (id, window, what);
@@ -527,9 +564,20 @@ tau_turn_now () {
     int ew, eh, sx, sy, cx, cy;
     v->extents_in_pixels (ew, eh, sx, sy);
     v->cursor_in_pixels (cx, cy);
-    tau_js_paint (v->id, v->place_counter, v->px_w, v->px_h, v->pixels (),
-                  v->drawn_x1, v->drawn_y1, v->drawn_x2, v->drawn_y2,
-                  ew, eh, sx, sy, cx, cy);
+    if (mupdf_record) {
+      tau_js_dlist (v->id, v->place_counter, v->px_w, v->px_h,
+                    mupdf_record_ops.data (), (int) mupdf_record_ops.size (),
+                    (const unsigned char*) mupdf_record_glyphs.data (),
+                    (int) mupdf_record_glyphs.size (),
+                    v->drawn_x1, v->drawn_y1, v->drawn_x2, v->drawn_y2,
+                    ew, eh, sx, sy, cx, cy);
+      mupdf_record_ops.clear ();
+      mupdf_record_glyphs.clear ();
+    }
+    else
+      tau_js_paint (v->id, v->place_counter, v->px_w, v->px_h, v->pixels (),
+                    v->drawn_x1, v->drawn_y1, v->drawn_x2, v->drawn_y2,
+                    ew, eh, sx, sy, cx, cy);
   }
   if (prof) t2= tau_now ();
   // what Scheme has to say to the page (menu-serial.scm)
@@ -1014,6 +1062,20 @@ tau_freeze () {
 #ifdef __EMSCRIPTEN__
   emscripten_cancel_main_loop ();
 #endif
+}
+
+// The prototype of the drawing on the GPU of the page: with on, the views
+// are said as lists of commands, which the page draws (mupdf_record); all
+// of them are drawn again
+EMSCRIPTEN_KEEPALIVE
+void
+tau_record (int on) {
+  mupdf_record= (on != 0);
+  mupdf_record_ops.clear ();
+  mupdf_record_glyphs.clear ();
+  iterator<pointer> it= iterate (simple_widget_rep::all_widgets);
+  while (it->busy ()) ((simple_widget_rep*) it->next ())->invalid_all= true;
+  tau_turn ();
 }
 
 // A benchmark: with on, the views are not drawn, their drawing commands
