@@ -207,6 +207,14 @@ public:
   unsigned long long fingerprint ();
   unsigned long long state_fingerprint ();
   void refingerprint ();
+  // (the fingerprints of a table which is known to hold the same as one
+  // whose fingerprints were made: see edit_env_rep::write_prepared_env)
+  inline void adopt (unsigned long long fp2, unsigned long long sfp2,
+                     int sfp_version2) {
+    stale= false; fp= fp2; sfp= sfp2; sfp_version= sfp_version2;
+    if (N(dirty) != 0) {
+      dirty= array<string> ();
+      dirty_set= hashmap<string,bool> (false); } }
   inline tree value (string s) {
     // (what a variable holds, or env_absent (), without recording)
     return h->contains (s)? h [s]: env_absent (); }
@@ -726,6 +734,7 @@ public:
   void local_end_extents (tree t);
 
   void write_default_env ();
+  void write_prepared_env (hashmap<string,tree> pre);
   void write_env (hashmap<string,tree> user_env);
   void monitored_patch_env (hashmap<string,tree> patch);
   void patch_env (hashmap<string,tree> patch);
@@ -744,6 +753,11 @@ public:
   tree files_base;  // (the files of which files_hash is the hash, held:
   tree files_cur;   // a tree which goes could leave its place to another)
   unsigned long long files_h;
+  // The table made by write_prepared_env, of which the fingerprints are
+  // kept from one pass to the next (held: see files_base)
+  hashmap<string,tree> prep_pre;
+  unsigned long long prep_fp, prep_sfp;
+  int prep_sfp_version;
   inline bool written (string s) { return back->contains (s); }
   inline hashmap<string,tree> values_before () { return back; }
   void local_end (hashmap<string,tree>& prev_back);

@@ -311,8 +311,7 @@ void
 edit_typeset_rep::typeset_prepare () {
   env->base_file_name= buf->buf->master;
   env->read_only= buf->buf->read_only;
-  env->write_default_env ();
-  env->patch_env (pre);
+  env->write_prepared_env (pre);
   env->style_init_env ();
   env->update ();
 }
@@ -966,6 +965,7 @@ void
 edit_typeset_rep::init_default (string var) {
   if (!init->contains (var)) return;
   init->reset (var);
+  pre= copy (pre);  // (not changed in place: see write_prepared_env)
   if (stydef->contains (var)) pre(var)= stydef[var];
   else pre->reset (var);
   notify_change (THE_ENVIRONMENT);
