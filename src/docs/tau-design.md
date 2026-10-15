@@ -1174,7 +1174,10 @@ from 16 to 1024 pixels. As in the page of TeXmacs Vue
   drawing. A thread for the drawing changes nothing there; what a long
   document needs is in the making of the pages. A view of it is some
   9700 commands (5000 rectangles and 4000 changes of state for 640
-  glyphs: not looked into).
+  glyphs: the backgrounds of all the boxes of the document, drawn for
+  any region; fixed 2026-10-15, `box_rep::redraw_background`, see
+  "Drawing on the GPU": a whole view of the manual is now some 1600
+  glyphs and 90 rectangles).
 - **What the key cost in the manual** (looked into the same day): 94 of
   the 113 ms of the pager were the headers and the footers of the 379
   pages, typeset again at every pass, and 12 the texts of the pages,
