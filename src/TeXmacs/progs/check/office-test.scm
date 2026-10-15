@@ -958,7 +958,10 @@
                         d))))
          (deep (parse-xml (string-append (rep 3000 "<a>") "x" (rep 3000 "</a>")))))
     (check-true (<= (depth deep) 1001))
-    (check-true (>= (string-search-forwards "\"x\"" 0 (object->string deep)) 0))
+    ;; (the text is still there; searched in the tree, as the printer of
+    ;; s7 shortens long lists)
+    (check-true (let find ((t deep))
+                  (or (== t "x") (and (pair? t) (list-or (map find t))))))
     ;; ten levels of entities of ten each: 10^10 characters
     (let* ((names '("a" "b" "c" "d" "e" "f" "g" "h" "i" "j"))
            (decl (apply string-append
