@@ -51,6 +51,8 @@
 #include "analyze.hpp"
 #include "font.hpp"
 #include "iterator.hpp"
+#include "Vue/vue_gpu.hpp"
+#include "pencil.hpp"
 #include <SDL3/SDL.h>
 #include <mupdf/fitz.h>
 #include <unistd.h>
@@ -129,7 +131,7 @@ static char**                  shell_argv= NULL; // (to start again)
 // and nothing more of it is read
 static bool
 frame_known (const char* tag, uint32_t len) {
-  static const char* tags[]= { "HELO", "VIEW", "JSON", "PANT", "PONG" };
+  static const char* tags[]= { "HELO", "VIEW", "JSON", "PANT", "PONG", "DLST" };
   bool known= false;
   for (const char* t : tags) known= known || !memcmp (tag, t, 4);
   return known && len <= ((uint32_t) 1 << 30);
@@ -570,6 +572,13 @@ public:
   int     pw, ph;      // the size of the place, in pixels
   picture frame;       // the pixels which the core sent for this place
   fz_pixmap* pix;      // (the pixels themselves: see paint)
+  // the view drawn here on the GPU from the commands of the core (see
+  // commands); the glyphs and the pictures which they name are those of
+  // all the views (the core names them once, whichever view draws them)
+  picture gframe;
+  static std::map<int, std::pair<int,int> > glyph_size;
+  static std::map<int, std::string> glyph_cov;
+  static std::map<int, picture> pictures;
   int     fw, fh;
   int     doc_w;       // the width of the document, in pixels
   bool    centred;     // the frame has the same margin at both sides
@@ -874,6 +883,11 @@ public:
       const unsigned char* low= dst + (ptrdiff_t) (fh - 1) * stride + 4 * (fw / 2);
       below_color= rgb_color (low[0], low[1], low[2]);
     }
+    placed (n, w, h);
+  }
+
+  // after a paint: where the view is in the document, and the cursor
+  void placed (const int32_t* n, int w, int h) {
     if (!embedded && ren != NULL) {
       // the extents of the document and where the view is in it
       // (the numbers of the core within what SI holds: some 2^20 pixels)
@@ -897,7 +911,166 @@ public:
     invalidate_all ();
     needs_update ();
   }
+
+  // The commands which draw a rectangle of the view (DLST, after "gpu 1":
+  // see tau_native_dlist and mupdf_record in mupdf_renderer.cpp), drawn on
+  // the GPU into a texture of the view (vue_gpu.cpp), instead of pixels:
+  // nothing is drawn by the core, and little goes through the pipe
+  void commands (const int32_t* n, const unsigned char* body, size_t bytes) {
+    if (n[0] != view || n[1] != place) return; // for another place
+    int w= n[2], h= n[3], x= n[4], y= n[5], dw= n[6], dh= n[7];
+    int nops= n[16], ngl= n[17], nim= n[18];
+    if (w < 1 || h < 1 || w > 16384 || h > 16384 || dw < 0 || dh < 0 ||
+        nops < 0 || ngl < 0 || nim < 0 ||
+        (size_t) 4 * nops + ngl + nim != bytes) return;
+    if (is_nil (gframe) || w != fw || h != fh) {
+      gframe= gpu_backing_picture (w, h);
+      fw= w; fh= h;
+    }
+    if (is_nil (gframe)) return;
+    int sx= n[14], sy= n[15];
+    if (sx != 0 || sy != 0) gpu_translate_picture (gframe, sx, sy);
+    const int32_t* o= (const int32_t*) body;
+    // the commands, in the pixels of the view (y down)
+    renderer r= gpu_picture_renderer (gframe, std_shrinkf);
+    if (r == NULL) return;
+    SI P= r->pixel;
+    auto col= [] (int v) { unsigned u= (unsigned) v;
+      return rgb_color ((int) (u >> 24), (int) ((u >> 16) & 255), (int) ((u >> 8) & 255), (int) (u & 255)); };
+    // (the clip of the region, and within it the clip which the commands
+    // say: where the core's renderer was clipped, absolutely)
+    int rx1= x, ry1= y, rx2= x + dw, ry2= y + dh;
+    auto clip= [&] (int x1, int y1, int x2, int y2) {
+      x1= std::max (x1, rx1); y1= std::max (y1, ry1);
+      x2= std::max (x1, std::min (x2, rx2)); y2= std::max (y1, std::min (y2, ry2));
+      r->set_clipping (x1 * P, -y2 * P, x2 * P, -y1 * P); };
+    clip (rx1, ry1, rx2, ry2);
+    for (int i= 0; i < nops;) {
+      int op= o[i];
+      if (op == 1 && i + 6 <= nops) {
+        r->set_pencil (pencil (col (o[i+5])));
+        r->fill (o[i+1] * P, -o[i+4] * P, o[i+3] * P, -o[i+2] * P);
+        i += 6;
+      }
+      else if (op == 2 && i + 5 <= nops) {
+        auto gs= glyph_size.find (o[i+1]);
+        if (gs != glyph_size.end () && gs->second.first > 0)
+          gpu_draw_coverage (r, o[i+1], gs->second.first, gs->second.second,
+                             (const unsigned char*) glyph_cov[o[i+1]].data (),
+                             o[i+2], o[i+3], col (o[i+4]));
+        i += 5;
+      }
+      else if ((op == 3 || op == 4) && i + 3 <= nops) {
+        bool line= (op == 3);
+        int k= o[i+1], at= i + (line? 4: 3);
+        if (k < 0 || at + 2 * k > nops) break;
+        array<SI> xs (k), ys (k);
+        for (int j= 0; j < k; j++) { xs[j]= o[at + 2*j] * P; ys[j]= -o[at + 2*j + 1] * P; }
+        if (line) {
+          r->set_pencil (pencil (col (o[i+3]), (o[i+2] * P) / 16));
+          if (k == 2) r->line (xs[0], ys[0], xs[1], ys[1]);
+          else r->lines (xs, ys);
+        }
+        else {
+          r->set_pencil (pencil (col (o[i+2])));
+          r->set_brush (brush (col (o[i+2])));
+          r->polygon (xs, ys);
+        }
+        i= at + 2 * k;
+      }
+      else if (op == 5 && i + 10 <= nops) {
+        r->set_pencil (pencil (col (o[i+8]), (o[i+7] * P) / 16));
+        r->set_brush (brush (col (o[i+8])));
+        SI ax1= o[i+1] * P, ay1= -o[i+4] * P, ax2= o[i+3] * P, ay2= -o[i+2] * P;
+        if (o[i+9]) r->fill_arc (ax1, ay1, ax2, ay2, o[i+5], o[i+6]);
+        else r->arc (ax1, ay1, ax2, ay2, o[i+5], o[i+6]);
+        i += 10;
+      }
+      else if (op == 6 && i + 5 <= nops) {
+        clip (o[i+1], o[i+2], o[i+3], o[i+4]);
+        i += 5;
+      }
+      else if (op == 7 && i + 5 <= nops) {
+        r->set_pencil (pencil (rgb_color (216, 216, 216)));
+        r->fill (o[i+1] * P, -o[i+4] * P, o[i+3] * P, -o[i+2] * P);
+        i += 5;
+      }
+      else if (op == 8 && i + 5 <= nops) {
+        auto pc= pictures.find (o[i+1]);
+        if (pc != pictures.end ())
+          r->draw_picture (pc->second, o[i+2] * P,
+                           -(o[i+3] + pc->second->get_height ()) * P, o[i+4]);
+        i += 5;
+      }
+      else break;
+    }
+    delete_renderer (r);
+    frame= gframe;
+    placed (n, w, h);
+  }
 };
+
+// TAU_SHELL_EVAL: a command of Scheme for the core, once it draws (for
+// the tests: a dialog to open); its pixels or its commands
+static void
+first_drawn () {
+  static bool evaluated= false;
+  if (evaluated) return;
+  evaluated= true;
+  if (getenv ("TAU_SHELL_EVAL") != NULL)
+    core_say ("scheme " + escaped (getenv ("TAU_SHELL_EVAL")));
+}
+
+std::map<int, std::pair<int,int> > tau_view_rep::glyph_size;
+std::map<int, std::string> tau_view_rep::glyph_cov;
+std::map<int, picture> tau_view_rep::pictures;
+
+// The glyphs and the pictures which a frame of commands names for the first
+// time: kept whichever view it is for, even one which is not shown or a
+// place which went (the core sends each once)
+static void
+learn_definitions (const int32_t* n, const unsigned char* body, size_t bytes) {
+  int nops= n[16], ngl= n[17], nim= n[18];
+  if (nops < 0 || ngl < 0 || nim < 0 || (size_t) 4 * nops + ngl + nim != bytes) return;
+  std::map<int, std::pair<int,int> >& glyph_size= tau_view_rep::glyph_size;
+  std::map<int, std::string>& glyph_cov= tau_view_rep::glyph_cov;
+  std::map<int, picture>& pictures= tau_view_rep::pictures;
+  const unsigned char* gl= body + (size_t) 4 * nops;
+  const unsigned char* im= gl + ngl;
+  auto get= [] (const unsigned char* p) { int32_t v; memcpy (&v, p, 4); return (int) v; };
+  // the glyphs and the pictures which come for the first time
+  for (size_t p= 0; p + 12 <= (size_t) ngl;) {
+    int id= get (gl + p), gw= get (gl + p + 4), gh= get (gl + p + 8);
+    p += 12;
+    if (gw < 0 || gh < 0 || p + (size_t) gw * gh > (size_t) ngl) break;
+    glyph_size[id]= std::make_pair (gw, gh);
+    glyph_cov[id]= std::string ((const char*) gl + p, (size_t) gw * gh);
+    p += (size_t) gw * gh;
+  }
+  fz_context* ctx= mupdf_context ();
+  for (size_t p= 0; p + 12 <= (size_t) nim;) {
+    int id= get (im + p), pw2= get (im + p + 4), ph2= get (im + p + 8);
+    p += 12;
+    if (pw2 <= 0 || ph2 <= 0 || p + (size_t) 4 * pw2 * ph2 > (size_t) nim) break;
+    fz_pixmap* pm= mupdf_new_pixmap (pw2, ph2);
+    if (pm != NULL) {
+      unsigned char* d= fz_pixmap_samples (ctx, pm);
+      ptrdiff_t st= fz_pixmap_stride (ctx, pm);
+      const unsigned char* src= im + p;
+      for (int j= 0; j < ph2; j++)
+        for (int i= 0; i < pw2; i++) {
+          const unsigned char* q= src + 4 * ((size_t) j * pw2 + i);
+          unsigned char* t= d + (ptrdiff_t) j * st + 4 * i;
+          int a= q[3]; // (premultiplied, as MuPDF keeps them)
+          t[0]= (unsigned char) (q[0] * a / 255); t[1]= (unsigned char) (q[1] * a / 255);
+          t[2]= (unsigned char) (q[2] * a / 255); t[3]= (unsigned char) a;
+        }
+      pictures[id]= mupdf_picture (pm, 0, 0);
+      fz_drop_pixmap (ctx, pm);
+    }
+    p += (size_t) 4 * pw2 * ph2;
+  }
+}
 
 static tau_view_rep*
 view_canvas (int view) {
@@ -2072,6 +2245,11 @@ handle_frame (core_frame& f) {
                   " of the messages, this program version " +
                   std::to_string (TAU_PROTOCOL);
     }
+    // the views as commands, which the GPU draws (TAU_GPU=1, with the GPU
+    // renderer of Vue: misc/tau/shell/Makefile, THORVG)
+    else if (vue_gpu_windows () && getenv ("TAU_GPU") != NULL &&
+             strcmp (getenv ("TAU_GPU"), "0") != 0)
+      core_say ("gpu 1");
     return;
   }
   if (!hello_seen) {
@@ -2105,14 +2283,19 @@ handle_frame (core_frame& f) {
                n[0], n[1], n[2], n[3], n[4], n[5], n[6], n[7], n[10], n[11], n[8], n[9],
                v == NULL? " (no canvas)": (n[1] != v->place? " (another place)": ""));
     if (v != NULL) v->paint (n, f.body.data () + PANT_HEAD, f.body.size () - PANT_HEAD);
-    // TAU_SHELL_EVAL: a command of Scheme for the core, once it draws
-    // (for the tests: a dialog to open)
-    static bool evaluated= false;
-    if (!evaluated) {
-      evaluated= true;
-      if (getenv ("TAU_SHELL_EVAL") != NULL)
-        core_say ("scheme " + escaped (getenv ("TAU_SHELL_EVAL")));
-    }
+    first_drawn ();
+  }
+  else if (!strcmp (f.tag, "DLST") && f.body.size () >= 76) {
+    int32_t n[19];
+    memcpy (n, f.body.data (), 76);
+    learn_definitions (n, (const unsigned char*) f.body.data () + 76, f.body.size () - 76);
+    tau_view_rep* v= view_canvas (n[0]);
+    static bool debug= (getenv ("TAU_SHELL_DEBUG") != NULL);
+    if (debug)
+      fprintf (stderr, "tau_shell] DLST view %d place %d size %dx%d rect %d,%d %dx%d scroll %d,%d of %dx%d, %d commands\n",
+               n[0], n[1], n[2], n[3], n[4], n[5], n[6], n[7], n[10], n[11], n[8], n[9], n[16]);
+    if (v != NULL) v->commands (n, (const unsigned char*) f.body.data () + 76, f.body.size () - 76);
+    first_drawn ();
   }
   else if (!strcmp (f.tag, "PONG")) {
     if (f.body.size () == 4 && !memcmp (f.body.data (), "busy", 4)) {

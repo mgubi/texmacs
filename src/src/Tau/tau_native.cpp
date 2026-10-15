@@ -30,7 +30,8 @@
 *   the version of these messages (TAU_PROTOCOL); "VIEW" and "JSON" are
 *   text, "PANT" the numbers of a paint (16 integers: the last two how far the
 *   pixels before it are moved first, for a scroll) and then its pixels,
-*   "PONG" the answer to "ping".
+*   "PONG" the answer to "ping", "DLST" the commands which draw what a
+*   paint would have (after "gpu 1": see tau_native_dlist).
 *
 * A ping is answered once the messages before it were handled, and the
 * views they changed drawn and sent (each handler ends with a turn). What
@@ -82,6 +83,7 @@ extern "C" {
   void tau_paste (int view, const char* text, const char* html);
   void tau_buffer (const char* what, int place, const char* name);
   void tau_drop (int view, int x, int y, const char* paths);
+  void tau_record (int on);
 }
 
 // the documents which are not saved, saved aside (tau_gui.cpp)
@@ -204,6 +206,28 @@ tau_native_paint (int view, int counter, int w, int h,
             (size_t) 4 * dw);
   frame ("PANT", nums, sizeof (nums), data, bytes);
   free (data);
+}
+
+// The commands which draw a rectangle of a view, instead of its pixels
+// (the shell draws them on the GPU: "gpu 1", mupdf_record in
+// mupdf_renderer.cpp): the 16 numbers of a paint, then how many commands
+// (integers), bytes of glyphs and bytes of pictures follow, and these
+void
+tau_native_dlist (int view, int counter, int w, int h,
+                  const int* ops, int nops,
+                  const unsigned char* gl, int ngl,
+                  const unsigned char* im, int nim,
+                  int x1, int y1, int x2, int y2,
+                  int ew, int eh, int sx, int sy, int cx, int cy,
+                  int dx, int dy) {
+  if (out () < 0) return;
+  int32_t nums[19]= { view, counter, w, h, x1, y1, x2 - x1, y2 - y1,
+                      ew, eh, sx, sy, cx, cy, dx, dy, nops, ngl, nim };
+  std::string body ((const char*) nums, sizeof (nums));
+  body.append ((const char*) ops, (size_t) 4 * nops);
+  body.append ((const char*) gl, (size_t) ngl);
+  body.append ((const char*) im, (size_t) nim);
+  frame ("DLST", body.data (), body.size ());
 }
 
 /******************************************************************************
@@ -357,6 +381,11 @@ dispatch_now (const std::string& line, void (*turn) (void)) {
     // (answered once all that came before it is done, as in the page)
     std::string id= word (line, pos, true);
     frame ("PONG", id.data (), id.size ());
+  }
+  else if (name == "gpu") {
+    // (the views said as commands, which the shell draws: "DLST")
+    int on= NUM;
+    CHECKED (tau_record (on));
   }
   else if (name == "turn") turn ();
   else if (name != "") told ("a message the core does not know", line);

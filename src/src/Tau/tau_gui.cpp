@@ -324,6 +324,13 @@ EM_JS (void, tau_js_dlist, (int view, int counter, int w, int h,
                     caret: { x: cx, y: cy } }, [o.buffer, g.buffer, i.buffer]);
 });
 #else
+void tau_native_dlist (int view, int counter, int w, int h,
+                       const int* ops, int nops,
+                       const unsigned char* gl, int ngl,
+                       const unsigned char* im, int nim,
+                       int x1, int y1, int x2, int y2,
+                       int ew, int eh, int sx, int sy, int cx, int cy,
+                       int dx, int dy);
 static void tau_js_dlist (int view, int counter, int w, int h,
                           const int* ops, int nops,
                           const unsigned char* gl, int ngl,
@@ -331,10 +338,8 @@ static void tau_js_dlist (int view, int counter, int w, int h,
                           int x1, int y1, int x2, int y2,
                           int ew, int eh, int sx, int sy, int cx, int cy,
                           int dx, int dy) {
-  (void) dx; (void) dy;
-  (void) view; (void) counter; (void) w; (void) h; (void) ops; (void) nops;
-  (void) gl; (void) ngl; (void) im; (void) nim; (void) x1; (void) y1; (void) x2; (void) y2;
-  (void) ew; (void) eh; (void) sx; (void) sy; (void) cx; (void) cy; }
+  tau_native_dlist (view, counter, w, h, ops, nops, gl, ngl, im, nim,
+                    x1, y1, x2, y2, ew, eh, sx, sy, cx, cy, dx, dy); }
 #endif
 
 static void

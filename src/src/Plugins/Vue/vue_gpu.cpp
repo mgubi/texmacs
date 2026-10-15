@@ -61,6 +61,10 @@ picture  gpu_read_screen (int w, int h) { (void) w; (void) h; return picture ();
 bool gpu_draw_picture_scaled (renderer r, picture p, SI x, SI y, double s, int a) {
   (void) r; (void) p; (void) x; (void) y; (void) s; (void) a; return false; }
 bool is_gpu_renderer (renderer r) { (void) r; return false; }
+bool gpu_draw_coverage (renderer r, int key, int w, int h,
+                        const unsigned char* cov, int left, int top, color c) {
+  (void) r; (void) key; (void) w; (void) h; (void) cov; (void) left; (void) top;
+  (void) c; return false; }
 
 #else
 
@@ -1436,6 +1440,8 @@ public:
 
   void draw_picture (picture pict, SI x, SI y, int alpha);
   void draw_picture_scaled (picture pict, SI x, SI y, double s, int alpha);
+  void draw_coverage (int key, int w, int h, const unsigned char* cov,
+                      int left, int top, color c);
 };
 
 gpu_renderer_rep::gpu_renderer_rep (picture p, gpu_target* t2, double zoom):
@@ -1748,6 +1754,48 @@ gpu_renderer_rep::draw (int c, font_glyphs fng, SI x, SI y) {
   user_quad (left, bottom, left + s.w, bottom + s.h, 2, 0,
              s.x / A, s.y / A, (s.x + s.w) / A, (s.y + s.h) / A,
              r / 255.f * fa, g / 255.f * fa, b / 255.f * fa, fa);
+}
+
+// A glyph given as its coverage, as the core of Tau says it (the commands
+// of mupdf_renderer.cpp, mupdf_record: rendered by MuPDF there): in the
+// atlas under its key, drawn with its top left corner at the device pixel
+// (left, top), in the colour c. The coverage comes each time: a glyph
+// which left the atlas (when it was full) is put in it again
+static int coverage_tag;
+
+void
+gpu_renderer_rep::draw_coverage (int key, int w, int h, const unsigned char* cov,
+                                 int left, int top, color c) {
+  if (!ready () || w <= 0 || h <= 0 || w > 512 || h > 512) return;
+  glyph_key k { (void*) &coverage_tag, key };
+  auto it= G.glyphs.find (k);
+  if (it == G.glyphs.end ()) {
+    if (G.ax + w + 1 > ATLAS) { G.ax= 0; G.ay += G.arow + 1; G.arow= 0; }
+    if (G.ay + h + 1 > ATLAS) clear_atlas (); // full: start again
+    if (G.mode == 2) flush_quads ();
+    glBindTexture (GL_TEXTURE_2D, G.atlas);
+    glPixelStorei (GL_UNPACK_ALIGNMENT, 1);
+    glTexSubImage2D (GL_TEXTURE_2D, 0, G.ax, G.ay, w, h, GL_RED, GL_UNSIGNED_BYTE, cov);
+    G.glyphs[k]= { G.ax, G.ay, w, h, 0, 0, true, 0, 0 };
+    G.ax += w + 1; G.arow= max (G.arow, h);
+    it= G.glyphs.find (k);
+  }
+  const glyph_slot& s= it->second;
+  int r, g, b, a;
+  get_rgb_color (c, r, g, b, a);
+  float fa= a / 255.f, A= (float) ATLAS;
+  double l= left, bottom= -(double) (top + s.h);
+  user_quad (l, bottom, l + s.w, bottom + s.h, 2, 0,
+             s.x / A, s.y / A, (s.x + s.w) / A, (s.y + s.h) / A,
+             r / 255.f * fa, g / 255.f * fa, b / 255.f * fa, fa);
+}
+
+bool
+gpu_draw_coverage (renderer ren, int key, int w, int h, const unsigned char* cov,
+                   int left, int top, color c) {
+  if (!is_gpu_renderer (ren)) return false;
+  ((gpu_renderer_rep*) ren)->draw_coverage (key, w, h, cov, left, top, c);
+  return true;
 }
 
 void

@@ -191,7 +191,8 @@ test("the scroll bar", async () => {
 	const s = start({ debug: true, lines: ["press 994 180", "move 994 260", 1, "move 994 340", 1, "release 994 340", 6] });
 	try {
 		await until("the bar is told", () => /> bar \d+ 0 [1-9]/.test(said()), 40000);
-		await until("the view scrolls", () => /PANT .* scroll 0,[1-9]/.test(said()), 10000);
+		// (pixels, or the commands which draw them: TAU_GPU=1)
+		await until("the view scrolls", () => /(PANT|DLST) .* scroll 0,[1-9]/.test(said()), 10000);
 	} finally { s.stop(); }
 });
 

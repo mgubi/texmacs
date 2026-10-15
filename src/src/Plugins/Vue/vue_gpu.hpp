@@ -60,4 +60,11 @@ bool gpu_draw_picture_scaled (renderer ren, picture p, SI x, SI y,
                               double s, int alpha);
 bool is_gpu_renderer (renderer ren);
 
+// a glyph given as its coverage (a byte a pixel, rows from the top), kept
+// in the atlas under key and drawn with its top left corner at the device
+// pixel (left, top) in the colour c: the commands of the core of Tau
+// (tau_shell.cpp); false when ren is not a renderer of the GPU
+bool gpu_draw_coverage (renderer ren, int key, int w, int h,
+                        const unsigned char* cov, int left, int top, color c);
+
 #endif // defined VUE_GPU_HPP
