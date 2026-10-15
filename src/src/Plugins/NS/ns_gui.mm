@@ -19,6 +19,7 @@
 #include "message.hpp"
 #include "scheme.hpp"
 #include "boot.hpp"
+#include "../Vue/vue_gpu.hpp"
 #include "sys_utils.hpp"
 
 #include "tm_window.hpp"
@@ -642,8 +643,11 @@ ns_gui_rep::update () {
 
   if (!postpone_treatment) {
     if (the_interpose_handler) the_interpose_handler();
-    if (ns_follow_glyph_settings ()) // a change of the glyphs
-      ns_simple_widget_rep::invalidate_every ();
+    // a change of the glyphs: of the renderer of Core Graphics, and of the
+    // atlas of the GPU renderer (the canvases drawn by the GPU)
+    bool glyphs= ns_follow_glyph_settings ();
+    if (vue_gpu_follow_glyph_settings ()) glyphs= true;
+    if (glyphs) ns_simple_widget_rep::invalidate_every ();
     ns_simple_widget_rep::repaint_all ();
   }
 
@@ -699,6 +703,8 @@ ns_gui_rep::refresh_language () {
 // the windows are saved as dir/window-<i>.png every few seconds, since other
 // programs are not allowed to capture the windows of TeXmacs
 
+void ns_draw_gpu_canvases (NSView* root, NSBitmapImageRep* rep);
+
 static void
 ns_snapshot (string dir) {
   int n= 0;
@@ -710,6 +716,7 @@ ns_snapshot (string dir) {
     NSBitmapImageRep* rep= [v bitmapImageRepForCachingDisplayInRect: r];
     if (!rep) continue;
     [v cacheDisplayInRect: r toBitmapImageRep: rep];
+    ns_draw_gpu_canvases (v, rep);
     NSData* data= [rep representationUsingType: NSBitmapImageFileTypePNG
                                     properties: [NSDictionary dictionary]];
     string name= dir * "/window-" * as_string (n++) * ".png";
@@ -949,6 +956,7 @@ find_document_scroll_view (NSView* v) {
     NSView* v= [[[sv window] contentView] superview];
     NSBitmapImageRep* rep= [v bitmapImageRepForCachingDisplayInRect: [v bounds]];
     [v cacheDisplayInRect: [v bounds] toBitmapImageRep: rep];
+    ns_draw_gpu_canvases (v, rep);
     NSData* data= [rep representationUsingType: NSBitmapImageFileTypePNG
                                     properties: [NSDictionary dictionary]];
     string name= dir * "/scroll-" * as_string (step++) * ".png";
@@ -1178,6 +1186,7 @@ canvas_frame () {
     NSView* v= [[win contentView] superview];
     NSBitmapImageRep* rep= [v bitmapImageRepForCachingDisplayInRect: [v bounds]];
     [v cacheDisplayInRect: [v bounds] toBitmapImageRep: rep];
+    ns_draw_gpu_canvases (v, rep);
     NSData* data= [rep representationUsingType: NSBitmapImageFileTypePNG
                                     properties: [NSDictionary dictionary]];
     string dir= get_env ("TEXMACS_NS_SNAPSHOT");

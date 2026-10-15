@@ -87,6 +87,21 @@ public:
   NSBitmapImageRep*       backingPixmap;
   int                     ring;  //!< the first row of the view in it
   int                     cring; //!< its first column
+  // drawn by the GPU (gpu_layers_enabled, vue_gpu.hpp): the backing store
+  // is a texture (gpu_store) instead of backingPixmap, shown in a
+  // CAMetalLayer of the view, and scrolled by copies (ring and cring 0)
+  picture                 gpu_store;
+  renderer                gpu_ren;     //!< its renderer
+  void*                   gpu_layer;   //!< the CAMetalLayer of the view
+  void*                   gpu_presenter; //!< shows it once a refresh
+  bool                    gpu_dirty;   //!< the layer shows an older store
+  static bool gpu_mode ();
+  bool has_store ();
+  int store_width ();                  //!< in pixels
+  int store_height ();
+  void show_gpu_store ();              //!< at the next refresh
+  bool present_gpu_store ();           //!< now (false: to be done again)
+  NSView* canvas_view () { return view; }
   bool backing_piece (int i, double a, double b, bool vertical,
                       double& pa, double& pb, double& off);
   void draw_backing_store (NSRect rect); //!< TMView drawRect

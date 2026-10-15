@@ -62,6 +62,11 @@ picture  gpu_read_screen (int w, int h) { (void) w; (void) h; return picture ();
 bool gpu_draw_picture_scaled (renderer r, picture p, SI x, SI y, double s, int a) {
   (void) r; (void) p; (void) x; (void) y; (void) s; (void) a; return false; }
 bool is_gpu_renderer (renderer r) { (void) r; return false; }
+bool gpu_layers_enabled () { return false; }
+bool gpu_show_picture (void* l, picture p, int dw, int dh) {
+  (void) l; (void) p; (void) dw; (void) dh; return false; }
+bool gpu_read_picture (picture p, unsigned char* rgba) {
+  (void) p; (void) rgba; return false; }
 
 #else
 
@@ -70,7 +75,9 @@ bool is_gpu_renderer (renderer r) { (void) r; return false; }
 #include "brush.hpp"
 #include "image_files.hpp"
 #include "file.hpp"
+#ifdef USE_MUPDF
 #include "../MuPDF/mupdf_picture.hpp"
+#endif
 #include "Freetype/tt_face.hpp"
 #include "boot.hpp"
 #include <unordered_map>
@@ -252,7 +259,9 @@ start_gpu () {
   for (int y= 0; y < 4; y++) for (int x= 0; x < 4; x++) zero[y * ATLAS + x]= 255;
   G.atlas= G.B->new_texture (ATLAS, ATLAS, GPU_R8, true, false, zero.data ());
   read_glyph_settings ();
+#ifdef USE_MUPDF
   G.slug_on= (get_env ("TEXMACS_VUE_SLUG") == "1");
+#endif
   if (G.slug_on) cout << "TeXmacs] GPU: glyphs drawn from their outlines (Slug)" << LF;
   G.started= true;
   cout << "TeXmacs] GPU: " << G.B->description () << LF;
@@ -416,7 +425,12 @@ slug_lookup (font_glyphs fng, int c) {
   array<double> q;
   double em= 0;
   G.slug_fonts.push_back (fng);
-  if (!mupdf_glyph_outline (fng->res_name, c, q, em) || em <= 0) {
+#ifdef USE_MUPDF
+  bool ok= mupdf_glyph_outline (fng->res_name, c, q, em);
+#else
+  bool ok= false; // (the outlines come from MuPDF)
+#endif
+  if (!ok || em <= 0) {
     G.slugs[k]= g;
     return NULL;
   }
@@ -616,8 +630,48 @@ evict_textures () {
   }
 }
 
-// a texture from a MuPDF pixmap (premultiplied RGBA, rows from the top);
-// over white when 'over_white' (the neutral pattern)
+// a texture from premultiplied RGBA pixels, rows from the top; over white
+// when 'over_white' (the neutral pattern)
+static gpu_texture
+upload_rgba (int w, int h, std::vector<unsigned char>& rgba, bool repeat,
+             bool over_white) {
+  if (w <= 0 || h <= 0) return NULL;
+  if (over_white)
+    for (size_t i= 0; i < (size_t) w * h; i++) {
+      unsigned char* d= &rgba[4*i];
+      int a= d[3];
+      d[0]= (unsigned char) (d[0] + 255 - a); d[1]= (unsigned char) (d[1] + 255 - a);
+      d[2]= (unsigned char) (d[2] + 255 - a); d[3]= 255;
+    }
+  return G.B->new_texture (w, h, GPU_RGBA8, true, repeat, rgba.data ());
+}
+
+#ifndef USE_MUPDF
+// a texture from any picture (the pixels of TeXmacs have y up, colors not
+// premultiplied), when there is no MuPDF (the Cocoa port)
+static gpu_texture
+upload_picture (picture p, bool repeat, bool over_white= false) {
+  if (is_nil (p)) return NULL;
+  int w= p->get_width (), h= p->get_height ();
+  int ox= p->get_origin_x (), oy= p->get_origin_y ();
+  if (w <= 0 || h <= 0) return NULL;
+  std::vector<unsigned char> rgba ((size_t) w * h * 4);
+  for (int r= 0; r < h; r++)
+    for (int x= 0; x < w; x++) {
+      int cr, cg, cb, ca;
+      get_rgb_color (p->get_pixel (x - ox, (h - 1 - r) - oy), cr, cg, cb, ca);
+      unsigned char* d= &rgba[4 * ((size_t) r * w + x)];
+      d[0]= (unsigned char) ((cr * ca + 127) / 255);
+      d[1]= (unsigned char) ((cg * ca + 127) / 255);
+      d[2]= (unsigned char) ((cb * ca + 127) / 255);
+      d[3]= (unsigned char) ca;
+    }
+  return upload_rgba (w, h, rgba, repeat, over_white);
+}
+#endif
+
+#ifdef USE_MUPDF
+// a texture from a MuPDF pixmap (premultiplied RGBA, rows from the top)
 static gpu_texture
 upload_pixmap (fz_pixmap* pix, bool repeat, bool over_white= false) {
   if (pix == NULL || pix->samples == NULL || pix->w <= 0 || pix->h <= 0) return NULL;
@@ -632,12 +686,25 @@ upload_pixmap (fz_pixmap* pix, bool repeat, bool over_white= false) {
       int r= s[0], g= n >= 3 ? s[1] : s[0], b= n >= 3 ? s[2] : s[0];
       int a= pix->alpha ? s[n - 1] : 255;
       if (bgr) { int tmp= r; r= b; b= tmp; }
-      if (over_white) { r += 255 - a; g += 255 - a; b += 255 - a; a= 255; }
       d[0]= (unsigned char) r; d[1]= (unsigned char) g;
       d[2]= (unsigned char) b; d[3]= (unsigned char) a;
     }
   }
-  return G.B->new_texture (w, h, GPU_RGBA8, true, repeat, rgba.data ());
+  return upload_rgba (w, h, rgba, repeat, over_white);
+}
+#endif
+
+// the texture of the tiles of a pattern, at a size in device pixels
+static gpu_texture
+upload_tile (url u, SI w, SI h, tree eff, SI px, bool over_white= false) {
+#ifdef USE_MUPDF
+  fz_pixmap* pix= mupdf_load_pixmap (u, w, h, eff, px);
+  gpu_texture tex= upload_pixmap (pix, true, over_white);
+  if (pix != NULL) fz_drop_pixmap (mupdf_context (), pix);
+  return tex;
+#else
+  return upload_picture (load_picture (u, w, h, eff, px), true, over_white);
+#endif
 }
 
 static cached_texture*
@@ -645,13 +712,19 @@ picture_texture (picture p) {
   unsigned long long id= p->get_unique_id ();
   auto it= G.textures.find (id);
   if (it != G.textures.end ()) { it->second.last= ++G.tick; return &it->second; }
+#ifdef USE_MUPDF
   picture mp= as_mupdf_picture (p);
   mupdf_picture_rep* r= (mupdf_picture_rep*) mp->get_handle ();
   if (r == NULL || r->pix == NULL) return NULL;
+  int w= r->pix->w, h= r->pix->h;
   gpu_texture tex= upload_pixmap (r->pix, false);
+#else
+  int w= p->get_width (), h= p->get_height ();
+  gpu_texture tex= upload_picture (p, false);
+#endif
   if (tex == NULL) return NULL;
-  size_t bytes= (size_t) r->pix->w * r->pix->h * 4;
-  G.textures[id]= { tex, r->pix->w, r->pix->h, p, ++G.tick, bytes };
+  size_t bytes= (size_t) w * h * 4;
+  G.textures[id]= { tex, w, h, p, ++G.tick, bytes };
   G.texture_bytes += bytes;
   evict_textures ();
   it= G.textures.find (id);
@@ -972,9 +1045,7 @@ pattern_texture (brush br, SI px) {
                    std::to_string (w) + "x" + std::to_string (h);
   auto it= G.patterns.find (key);
   if (it != G.patterns.end ()) return &it->second;
-  fz_pixmap* pix= mupdf_load_pixmap (u, w, h, eff, px);
-  gpu_texture tex= upload_pixmap (pix, true);
-  if (pix != NULL) fz_drop_pixmap (mupdf_context (), pix);
+  gpu_texture tex= upload_tile (u, w, h, eff, px);
   if (tex == NULL) return NULL;
   G.patterns[key]= { tex, (int) w, (int) h, picture (), 0, 0 };
   return &G.patterns[key];
@@ -1023,9 +1094,7 @@ gpu_renderer_rep::clear_device (SI x1, SI y1, SI x2, SI y2) {
                    255);
     url pu; SI w, h; tree eff;
     get_pattern_data (pu, w, h, eff, neutral, pixel);
-    fz_pixmap* pix= mupdf_load_pixmap (pu, w, h, eff, pixel);
-    gpu_texture tex= upload_pixmap (pix, true, true);
-    if (pix != NULL) fz_drop_pixmap (mupdf_context (), pix);
+    gpu_texture tex= upload_tile (pu, w, h, eff, pixel, true);
     if (tex == NULL) { solid (ux1, uy1, ux2, uy2, white); return; }
     G.patterns[key]= { tex, (int) w, (int) h, picture (), 0, 0 };
     it= G.patterns.find (key);
@@ -1105,8 +1174,10 @@ gpu_renderer_rep::draw (int c, font_glyphs fng, SI x, SI y) {
     string mcov;
     int mw= 0, mh= 0, mx= 0, my= 0;
     bool from_mupdf=
+#ifdef USE_MUPDF
       (G.glyph_source == 1 &&
        mupdf_glyph_bitmap (fng->res_name, c, mcov, mw, mh, mx, my)) ||
+#endif
       (G.glyph_source == 2 &&
        tt_glyph_coverage (fng, c, std_shrinkf, G.ft_flags, G.ft_bold,
                           mcov, mw, mh, mx, my));
@@ -1540,22 +1611,76 @@ gpu_draw_picture_scaled (renderer ren, picture p, SI x, SI y, double s, int alph
   return true;
 }
 
+/******************************************************************************
+* Canvases of other ports (Cocoa): backing stores shown in layers
+******************************************************************************/
+
+bool
+gpu_layers_enabled () {
+  static int on= -1;
+  if (on < 0) {
+    on= 0;
+    if (get_env ("TEXMACS_NS_GPU") != "0" && vue_gpu_enabled () &&
+        G.B == gpu_metal_backend ()) {
+      vue_gpu_prepare ();
+      if (vue_gpu_enabled ()) {
+        if (!G.started) start_gpu ();
+        on= 1;
+      }
+    }
+  }
+  return on == 1 && !G.failed;
+}
+
+bool
+gpu_show_picture (void* layer, picture p, int dw, int dh) {
+  gpu_picture_rep* g= as_gpu (p);
+  if (g == NULL || !G.started || dw <= 0 || dh <= 0) return false;
+  if (!ensure_target (&g->t)) return false;
+  gpu_flush_all ();
+  if (!G.B->attach_layer (layer)) return false;
+  G.B->begin_screen (dw, dh);
+  G.B->copy (g->t.tex, g->t.w, g->t.h, 0, 0, g->t.w, g->t.h,
+             NULL, dw, dh, 0, 0, dw, dh);
+  G.B->present (NULL);
+  return true;
+}
+
+bool
+gpu_read_picture (picture p, unsigned char* rgba) {
+  gpu_picture_rep* g= as_gpu (p);
+  if (g == NULL || !ensure_target (&g->t)) return false;
+  gpu_flush_all ();
+  return G.B->read (g->t.tex, g->t.w, g->t.h, 0, 0, g->t.w, g->t.h, rgba);
+}
+
 picture
 gpu_read_screen (int w, int h) {
   gpu_flush_all ();
+  if (w <= 0 || h <= 0) return picture ();
+  std::vector<unsigned char> rows ((size_t) w * h * 4);
+  if (!G.B->read (NULL, w, h, 0, 0, w, h, rows.data ())) return picture ();
+#ifdef USE_MUPDF
   fz_pixmap* pix= mupdf_new_pixmap (w, h);
   if (pix == NULL || pix->w != w || pix->h != h) return picture ();
-  std::vector<unsigned char> rows ((size_t) w * h * 4);
-  if (!G.B->read (NULL, w, h, 0, 0, w, h, rows.data ())) {
-    fz_drop_pixmap (mupdf_context (), pix);
-    return picture ();
-  }
   for (int y= 0; y < h; y++)
     memcpy (pix->samples + (size_t) y * pix->stride,
             rows.data () + (size_t) y * w * 4, (size_t) w * 4);
   picture p= mupdf_picture (pix, 0, 0);
   fz_drop_pixmap (mupdf_context (), pix);
   return p;
+#else
+  picture p= native_picture (w, h, 0, 0);
+  for (int y= 0; y < h; y++)
+    for (int x= 0; x < w; x++) {
+      const unsigned char* d= &rows[4 * ((size_t) y * w + x)];
+      int a= d[3];
+      if (a == 0) { p->set_pixel (x, h - 1 - y, rgb_color (0, 0, 0, 0)); continue; }
+      p->set_pixel (x, h - 1 - y, rgb_color ((255 * d[0] + a/2) / a, (255 * d[1] + a/2) / a,
+                                             (255 * d[2] + a/2) / a, a));
+    }
+  return p;
+#endif
 }
 
 #endif // USE_THORVG || USE_METAL

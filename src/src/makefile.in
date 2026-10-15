@@ -137,6 +137,10 @@ plugins_src  := $(call findsrc_in,Plugins,Bibtex Cairo Imlib2 Sqlite3 \
 x11_src      := $(call findsrc_in,Plugins,@CONFIG_X11@)
 cocoa_m_src  := $(call findm_in,Plugins,@CONFIG_COCOA@ @CONFIG_MACOS@)
 cocoa_mm_src := $(call findmm_in,Plugins,@CONFIG_COCOA@ @CONFIG_MACOS@ @CONFIG_SPARKLE@)
+# the GPU renderer of the Vue port, which draws the canvases of the Cocoa
+# port with Metal (when USE_METAL)
+cocoa_gpu_src    := $(if $(strip @CONFIG_COCOA@),vue_gpu.cpp gpu_backend_gl.cpp,)
+cocoa_gpu_mm_src := $(if $(strip @CONFIG_COCOA@),gpu_backend_metal.mm,)
 os_src       := $(call findsrc_in,Plugins,@CONFIG_OS_COMPAT@)
 ifeq "@CONFIG_QT@" "Qtwk Widkit"
 # the Widkit-on-Qt port takes the few Qt sources it needs from Plugins/Qt
@@ -307,6 +311,8 @@ graphics_obj := $(call makeobj,$(graphics_src))
 x11_obj      := $(call makeobj,$(x11_src))
 cocoa_m_obj  := $(call makeobj_m,$(cocoa_m_src))
 cocoa_mm_obj := $(call makeobj_mm,$(cocoa_mm_src))
+cocoa_gpu_obj    := $(call makeobj,$(cocoa_gpu_src))
+cocoa_gpu_mm_obj := $(call makeobj_mm,$(cocoa_gpu_mm_src))
 os_obj       := $(call makeobj,$(os_src))
 moc_obj	     := $(call makeobj,$(qt_moc_src))
 moc_obj_2	 := $(call makeobj,$(qtwk_moc_src))
@@ -396,6 +402,10 @@ $(cocoa_m_obj): Objects/%.o: %.m
 	$(call objc_incl,$(cocoa_incl) $(CXXCOCOA))
 $(cocoa_mm_obj): Objects/%.o: %.mm
 	$(call objcxx_incl,$(cocoa_incl) $(CXXCOCOA) $(CXXSPARKLE) $(CXXGUI))
+$(cocoa_gpu_obj): Objects/%.o: %.cpp
+	$(call cxx_incl,-std=c++20 $(vue_incl) $(CXXFREETYPE) $(CXXCOCOA))
+$(cocoa_gpu_mm_obj): Objects/%.o: %.mm
+	$(call objcxx_incl,-std=c++20 -fobjc-arc $(vue_incl) $(CXXFREETYPE) $(CXXCOCOA))
 $(texmacs_obj): Objects/%.o: %.cpp
 	$(call cxx_incl,$(texmacs_incl) $(CXXGNUTLS) $(CXXGUI))
 $(texmacs_open_obj): Objects/%.o: %.cpp
@@ -476,7 +486,7 @@ uses_qt       := $(qt_obj) $(moc_obj) $(moc_obj_2)
 uses_qtwk     := $(qtwk_obj)
 uses_gs       := $(gs_obj)
 uses_resvg    := $(resvg_obj)
-uses_cocoa    := $(cocoa_m_obj) $(cocoa_mm_obj)
+uses_cocoa    := $(cocoa_m_obj) $(cocoa_mm_obj) $(cocoa_gpu_obj) $(cocoa_gpu_mm_obj)
 uses_typeset  := $(typeset_obj)
 uses_style    := $(style_obj)
 uses_edit     := $(edit_obj)

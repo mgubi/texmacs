@@ -32,8 +32,10 @@ gpu_backend* gpu_metal_backend () { return NULL; }
 
 #include "tm_ostream.hpp"
 #include "basic.hpp"
+#ifdef VUETEXMACS
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_metal.h>
+#endif
 #import <Metal/Metal.h>
 #import <QuartzCore/CAMetalLayer.h>
 #import <CoreGraphics/CoreGraphics.h>
@@ -201,9 +203,14 @@ class metal_backend: public gpu_backend {
 
 public:
   const char* name () { return "Metal"; }
+#ifdef VUETEXMACS
   unsigned long long window_flags () { return SDL_WINDOW_METAL; }
+#else
+  unsigned long long window_flags () { return 0; }
+#endif
   bool prepare ();
   bool attach (SDL_Window* w);
+  bool attach_layer (void* layer);
   string description () { return device_name * " (Metal)"; }
   void begin_screen (int dw, int dh);
   void present (SDL_Window* w);
@@ -235,10 +242,14 @@ metal_backend::prepare () {
   done= true;
   device= MTLCreateSystemDefaultDevice ();
   if (device == nil) {
-    cout << "TeXmacs] GPU: no Metal device, drawing with MuPDF" << LF;
+    cout << "TeXmacs] GPU: no Metal device, drawing on the CPU" << LF;
     failed= true;
     return false;
   }
+  // (the pipelines before any window: the Cocoa port makes the backing
+  // stores of its canvases before their layers are drawn into)
+  if (!init ()) { failed= true; return false; }
+  started= true;
   return true;
 }
 
@@ -299,13 +310,40 @@ metal_backend::init () {
   return true;
 }
 
+// a layer drawn into by this device (made by SDL or by the Cocoa port)
+static void
+configure_layer (CAMetalLayer* l, id<MTLDevice> device) {
+  if (l.device == device) return;
+  l.device= device;
+  l.pixelFormat= MTLPixelFormatBGRA8Unorm;
+  l.framebufferOnly= NO;          // read back (snapshots) and copied
+  l.displaySyncEnabled= NO;       // several windows: each would wait
+  CGColorSpaceRef cs= CGColorSpaceCreateWithName (kCGColorSpaceSRGB);
+  l.colorspace= cs;
+  CGColorSpaceRelease (cs);
+}
+
+bool
+metal_backend::attach_layer (void* lp) {
+  if (failed || lp == NULL || !started) return false;
+  CAMetalLayer* l= (__bridge CAMetalLayer*) lp;
+  configure_layer (l, device);
+  if (layer != l) {
+    // (what was drawn into the last layer is presented by present)
+    end_encoder ();
+    drawable= nil;
+    layer= l;
+  }
+  return true;
+}
+
 bool
 metal_backend::attach (SDL_Window* w) {
-  if (failed || w == NULL || device == nil) return false;
-  if (!started) {
-    if (!init ()) { failed= true; return false; }
-    started= true;
-  }
+#ifndef VUETEXMACS
+  (void) w;
+  return false;
+#else
+  if (failed || w == NULL || !started) return false;
   unsigned id= (unsigned) SDL_GetWindowID (w);
   auto it= layers.find (id);
   if (it == layers.end ()) {
@@ -315,23 +353,11 @@ metal_backend::attach (SDL_Window* w) {
       return false;
     }
     CAMetalLayer* l= (__bridge CAMetalLayer*) SDL_Metal_GetLayer (v);
-    l.device= device;
-    l.pixelFormat= MTLPixelFormatBGRA8Unorm;
-    l.framebufferOnly= NO;          // read back (snapshots) and copied
-    l.displaySyncEnabled= NO;       // several windows: each would wait
-    CGColorSpaceRef cs= CGColorSpaceCreateWithName (kCGColorSpaceSRGB);
-    l.colorspace= cs;
-    CGColorSpaceRelease (cs);
     layers[id]= l;
     it= layers.find (id);
   }
-  if (layer != it->second) {
-    // (what was drawn into the last window is presented by present)
-    end_encoder ();
-    drawable= nil;
-    layer= it->second;
-  }
-  return true;
+  return attach_layer ((__bridge void*) it->second);
+#endif
 }
 
 void

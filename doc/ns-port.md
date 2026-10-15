@@ -130,6 +130,8 @@ keys typed meanwhile go to TeXmacs, and the real mouse also reaches it.
   `shrink`, as before the outlines (to compare); the preference
   `gpu glyphs` set to `texmacs` does the same (General: "Glyphs on the
   screen", followed at once);
+* `TEXMACS_NS_GPU=0`: the canvases drawn by Core Graphics, as before the
+  GPU renderer (see "Drawn by the GPU" below);
 * `TEXMACS_NS_GLYPH_BOLD=<pixels>`: how much bolder the outlines are made
   (they are stroked too, that wide), instead of the preference
   `gpu glyph boldness` (0.22 by default: the weight of the bitmaps of
@@ -295,6 +297,57 @@ parts of the renderer which used Qt (the tiles of the patterns and their
 pixels, the pictures drawn) go through the pictures of the interface
 (`load_picture`, `save_picture`) when Qt is not there. Without MuPDF, the
 Cocoa interface has no other writer of PDF (see docs/build-and-debug.md).
+
+## Drawn by the GPU
+
+With Metal (`USE_METAL`, on by default on macOS; `--with-metal=no` leaves
+it out) the canvases are drawn by the GPU renderer of the Vue port
+(`src/Plugins/Vue/vue_gpu.cpp` and its Metal backend
+`gpu_backend_metal.mm`, compiled into the Cocoa port too), unless
+`TEXMACS_NS_GPU=0`. The backing store of a canvas is then a texture
+(`gpu_store`, `gpu_backing_picture`) drawn by `gpu_renderer_rep` (glyphs
+from the atlas, the same glyph settings as the Vue port, vector shapes by
+Core Graphics over their box), instead of the bitmap drawn by
+`ns_renderer_rep`; a scroll copies it, shifted (`gpu_translate_picture`:
+`ring` and `cring` stay 0), a resize makes a new one, painted again. It is
+copied into the layer of the view (made by name, so that a build without
+Metal needs no QuartzCore) scaled when the pixels of the screen are not
+those of the store. Without MuPDF (the Cocoa port has none) the pictures and the
+patterns reach their textures through the pixels of the pictures, and Slug
+and the glyphs of MuPDF are not available. The snapshots draw the views,
+which do not show the layer: the store is read back and drawn where the
+canvas is (`ns_draw_gpu_canvases`).
+
+The view hosts a `CAMetalLayer`, and a repaint only marks the canvas
+(`show_gpu_store`): its `TMGpuPresenter`, woken up, copies the store into
+the layer and presents it at the next refresh of the screen
+(`present_gpu_store`), then sleeps until the next mark. It is driven by a
+`CADisplayLink` of the view (macOS 14, made through AppKit, so that
+QuartzCore is not linked to), which follows the refreshes of its screen,
+or else by a timer at 120 Hz. To present at each repaint made the repaints
+wait for the screen: a layer has three drawables, which the compositor
+gives back once it has shown them, and more repaints than refreshes
+blocked in `nextDrawable` (2 to 9 ms a step, depending on the pacing of
+the display); AppKit likewise draws the views marked as needing display
+once a refresh. `TEXMACS_NS_DEBUG_DRAW` prints the presents.
+
+`TEXMACS_NS_BENCH=1` on the FAQ (Apple M4, retina_factor 2, ms a step;
+two runs of each):
+
+| phase | Core Graphics: step | paint | GPU: step | paint |
+|---|---|---|---|---|
+| repaint at zoom 1 | 4.7 | 4.5 | 0.29-0.31 | 0.24 |
+| scroll | 0.6-0.7 | 0.36 | 0.25-0.27 | 0.08 |
+| repaint at zoom 0.75 | 3.4-3.6 | 3.3-3.4 | 0.50-0.52 | 0.43 |
+| zoom (new glyphs) | 51-56 | 6.6-7.4 | 47-52 | 3.5-4.8 |
+
+The worst step of a repaint or a scroll is 1.1 ms (98 ms when presented at
+each repaint). In a run of 70 repaints and scrolls the store was presented
+12 times, 8 ms apart (the refreshes at 120 Hz), a present taking 0.3 ms.
+The first repaint after the start takes some 0.8 s (the first textures,
+the pipelines). Not done yet: the backing store of a new canvas is opaque
+white, where the bitmap was transparent until painted (a canvas which does
+not paint all of itself).
 
 ## Packaging
 

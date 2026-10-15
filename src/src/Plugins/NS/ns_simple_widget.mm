@@ -19,6 +19,7 @@
 #include "ns_utilities.h"
 #include "ns_renderer.h"
 #include "ns_gui.h"
+#include "../Vue/vue_gpu.hpp"
 #include <time.h>
 
 // The benchmark (TEXMACS_NS_BENCH, ns_gui.mm): the time spent drawing into
@@ -99,14 +100,86 @@ ns_bench_now () {
   (void) n;
   if (!wid) return;
   wid->follow_visible_part ();
-  if (wid->backingPixmap && [NSApp isRunning] && [self window])
+  if (wid->has_store () && [NSApp isRunning] && [self window])
     the_gui->force_update ();
+}
+@end
+
+/*! What shows the backing store of a canvas drawn by the GPU, once a
+ refresh of its screen: a repaint only marks the canvas (show_gpu_store),
+ and the presenter, woken up, copies the store into the layer of the view
+ and presents it at the next refresh, then sleeps until the next mark. To
+ present at each repaint made the repaints wait for the screen: a layer has
+ three drawables, which the compositor gives back when it has shown them,
+ so that more repaints than refreshes blocked in nextDrawable; AppKit
+ likewise draws the views marked as needing display once a refresh. Driven
+ by a CADisplayLink of the view (macOS 14), which follows the refreshes of
+ its screen, or else by a timer at 120 Hz. */
+@interface TMGpuPresenter : NSObject
+{
+@public
+  ns_simple_widget_rep* wid;
+  id link;              // a CADisplayLink (macOS 14), or nil
+  NSTimer* timer;       // else
+}
+- (void) wake;
+- (void) stop;
+- (void) tick: (id) sender;
+@end
+
+@implementation TMGpuPresenter
+- (void) wake
+{
+  if (!wid || !wid->canvas_view ()) return;
+  if (@available (macOS 14.0, *)) {
+    if (link == nil) {
+      // (made through AppKit, so that the class itself is not linked to)
+      link= [[(id) wid->canvas_view () displayLinkWithTarget: self
+                                          selector: @selector(tick:)] retain];
+      [link addToRunLoop: [NSRunLoop mainRunLoop] forMode: NSRunLoopCommonModes];
+    }
+    [link setPaused: NO];
+    return;
+  }
+  if (timer == nil) {
+    timer= [[NSTimer timerWithTimeInterval: 1.0 / 120 target: self
+                                  selector: @selector(tick:)
+                                  userInfo: nil repeats: YES] retain];
+    [[NSRunLoop mainRunLoop] addTimer: timer forMode: NSRunLoopCommonModes];
+  }
+}
+
+- (void) sleep
+{
+  if (link != nil) [link setPaused: YES];
+  if (timer != nil) { [timer invalidate]; [timer release]; timer= nil; }
+}
+
+- (void) stop
+{
+  wid= NULL;
+  [self sleep];
+  if (link != nil) { [link invalidate]; [link release]; link= nil; }
+}
+
+- (void) tick: (id) sender
+{
+  (void) sender;
+  static int dbg= -1;
+  if (dbg < 0) dbg= (getenv ("TEXMACS_NS_DEBUG_DRAW") != NULL);
+  if (!wid || !wid->gpu_dirty) { [self sleep]; return; }
+  double t= ns_bench_now ();
+  if (wid->present_gpu_store ()) { wid->gpu_dirty= false; [self sleep]; }
+  ns_bench_display += ns_bench_now () - t;
+  if (dbg) fprintf (stderr, "PRESENT %.3f ms at %.3f\n", 1000 * (ns_bench_now () - t), t);
 }
 @end
 
 ns_simple_widget_rep::ns_simple_widget_rep ()
 : ns_widget_rep (simple_widget),  sequencer (0), view (nil), doc (nil),
-  backingPixmap (nil), ring (0), cring (0), extents (coord4 (0, 0, 0, 0)),
+  backingPixmap (nil), ring (0), cring (0), gpu_ren (NULL), gpu_layer (NULL),
+  gpu_presenter (NULL), gpu_dirty (false),
+  extents (coord4 (0, 0, 0, 0)),
   last_viewport (NSZeroSize) { }
 
 ns_simple_widget_rep::~ns_simple_widget_rep () {
@@ -120,6 +193,111 @@ ns_simple_widget_rep::~ns_simple_widget_rep () {
     [doc release];
   }
   [backingPixmap release];
+  if (gpu_ren != NULL) tm_delete (gpu_ren);
+  if (gpu_presenter != NULL) {
+    [(TMGpuPresenter*) gpu_presenter stop];
+    [(TMGpuPresenter*) gpu_presenter release];
+  }
+  if (gpu_layer != NULL) [(CALayer*) gpu_layer release];
+}
+
+/******************************************************************************
+* The backing store on the GPU (Metal: gpu_layers_enabled)
+******************************************************************************/
+
+bool
+ns_simple_widget_rep::gpu_mode () {
+  return gpu_layers_enabled ();
+}
+
+bool
+ns_simple_widget_rep::has_store () {
+  return gpu_mode () ? !is_nil (gpu_store) : backingPixmap != nil;
+}
+
+int
+ns_simple_widget_rep::store_width () {
+  if (gpu_mode ()) return is_nil (gpu_store) ? 0 : gpu_store->get_width ();
+  return backingPixmap ? (int) [backingPixmap pixelsWide] : 0;
+}
+
+int
+ns_simple_widget_rep::store_height () {
+  if (gpu_mode ()) return is_nil (gpu_store) ? 0 : gpu_store->get_height ();
+  return backingPixmap ? (int) [backingPixmap pixelsHigh] : 0;
+}
+
+// the snapshots (TEXMACS_NS_SNAPSHOT) draw the views, which do not show
+// the CAMetalLayer of a canvas: its store is read back and drawn over the
+// image of the root view, where the canvas is
+static void
+draw_gpu_canvases (NSView* root, NSView* v, NSBitmapImageRep* rep) {
+  if ([NSStringFromClass ([v class]) isEqualToString: @"TMView"]) {
+    ns_simple_widget_rep* wid= (ns_simple_widget_rep*) [(TMView*) v widget];
+    NSRect vis= [v visibleRect];
+    if (wid == NULL || !wid->has_store () || NSIsEmptyRect (vis)) return;
+    NSRect r= [v convertRect: [v bounds] toView: root];
+    NSGraphicsContext* gc= [NSGraphicsContext graphicsContextWithBitmapImageRep: rep];
+    [NSGraphicsContext saveGraphicsState];
+    [NSGraphicsContext setCurrentContext: gc];
+    CGContextRef cgc= [gc CGContext];
+    // the coordinates of the canvas (flipped), within the root view
+    if ([root isFlipped]) CGContextTranslateCTM (cgc, r.origin.x, r.origin.y);
+    else {
+      CGContextTranslateCTM (cgc, r.origin.x, r.origin.y + r.size.height);
+      CGContextScaleCTM (cgc, 1, -1);
+    }
+    wid->draw_backing_store (vis);
+    [NSGraphicsContext restoreGraphicsState];
+    return;
+  }
+  for (NSView* w in [v subviews]) draw_gpu_canvases (root, w, rep);
+}
+
+void
+ns_draw_gpu_canvases (NSView* root, NSBitmapImageRep* rep) {
+  if (!ns_simple_widget_rep::gpu_mode () || root == nil || rep == nil) return;
+  draw_gpu_canvases (root, root, rep);
+}
+
+void
+ns_simple_widget_rep::show_gpu_store () {
+  // at the next refresh of the screen (TMGpuPresenter)
+  if (!view || is_nil (gpu_store)) return;
+  gpu_dirty= true;
+  if (gpu_presenter == NULL) {
+    TMGpuPresenter* p= [[TMGpuPresenter alloc] init];
+    p->wid= this;
+    gpu_presenter= (void*) p;
+  }
+  [(TMGpuPresenter*) gpu_presenter wake];
+}
+
+bool
+ns_simple_widget_rep::present_gpu_store () {
+  // the view hosts a CAMetalLayer (made when first shown: by name, so that
+  // a build without Metal needs no QuartzCore), into which the store is
+  // copied, scaled when the pixels of the screen are not those of the store
+  // (a retina_factor of 1 on a Retina screen); nothing to do while the view
+  // is not in a window (it is shown when it is put back in one)
+  if (!view || is_nil (gpu_store) || ![view window]) return true;
+  if (gpu_layer == NULL) {
+    Class mlc= NSClassFromString (@"CAMetalLayer");
+    if (mlc == nil) return;
+    CALayer* l= [[mlc alloc] init];
+    [l setOpaque: NO];
+    [view setLayer: l];
+    [view setWantsLayer: YES];
+    gpu_layer= (void*) l;
+  }
+  CALayer* l= (CALayer*) gpu_layer;
+  double sc= [[view window] backingScaleFactor];
+  if ([l contentsScale] != sc) [l setContentsScale: sc];
+  NSSize sz= [view bounds].size;
+  int dw= (int) ceil (sz.width * sc), dh= (int) ceil (sz.height * sc);
+  // (a failure is not tried again before the next repaint)
+  gpu_show_picture (gpu_layer, gpu_store, dw, dh);
+  return true;
 }
 
 NSRect
@@ -621,6 +799,11 @@ ns_simple_widget_rep::is_invalid () {
 
 basic_renderer
 ns_simple_widget_rep::get_renderer() {
+  if (gpu_mode ()) {
+    if (gpu_ren == NULL)
+      gpu_ren= gpu_picture_renderer (gpu_store, std_shrinkf * retina_factor);
+    return (basic_renderer) gpu_ren;
+  }
   ns_renderer_rep * ren = the_ns_renderer();
   ren->begin ([NSGraphicsContext graphicsContextWithBitmapImageRep: backingPixmap]);
   return ren;
@@ -717,7 +900,7 @@ ns_simple_widget_rep::backing_piece (int i, double a, double b, bool vertical,
                                      double& pa, double& pb, double& off) {
   // the piece i (0 or 1) of [a, b) (in the pixels of the view), before and
   // after where the backing store wraps, and how far it is moved in it
-  double N= vertical? [backingPixmap pixelsHigh]: [backingPixmap pixelsWide];
+  double N= vertical? store_height (): store_width ();
   double o= vertical? ring: cring;
   double cut= N - o;
   pa= i == 0? a: max (a, cut);
@@ -728,6 +911,34 @@ ns_simple_widget_rep::backing_piece (int i, double a, double b, bool vertical,
 
 void
 ns_simple_widget_rep::draw_backing_store (NSRect rect) {
+  if (gpu_mode ()) {
+    // (shown in the layer: drawn here for the snapshots, which draw the
+    // views) the store read back, its rows from the top as in the view
+    int W= store_width (), H= store_height ();
+    if (W < 1 || H < 1) return;
+    NSMutableData* buf= [NSMutableData dataWithLength: (NSUInteger) W * H * 4];
+    if (!gpu_read_picture (gpu_store, (unsigned char*) [buf mutableBytes])) return;
+    CGDataProviderRef prov= CGDataProviderCreateWithCFData ((CFDataRef) buf);
+    CGColorSpaceRef cs= CGColorSpaceCreateDeviceRGB ();
+    CGImageRef img= CGImageCreate (W, H, 8, 32, W * 4, cs,
+                                   (uint32_t) kCGImageAlphaPremultipliedLast |
+                                   (uint32_t) kCGBitmapByteOrder32Big,
+                                   prov, NULL, false, kCGRenderingIntentDefault);
+    CGColorSpaceRelease (cs);
+    CGDataProviderRelease (prov);
+    if (!img) return;
+    CGContextRef cgc= [[NSGraphicsContext currentContext] CGContext];
+    double k= retina_factor;
+    CGContextSaveGState (cgc);
+    CGContextClipToRect (cgc, NSRectToCGRect (rect));
+    // the view is flipped: the image upside down
+    CGContextTranslateCTM (cgc, 0, H / k);
+    CGContextScaleCTM (cgc, 1, -1);
+    CGContextDrawImage (cgc, CGRectMake (0, 0, W / k, H / k), img);
+    CGContextRestoreGState (cgc);
+    CGImageRelease (img);
+    return;
+  }
   // the part rect of the view (in points), in at most four pieces
   // NOTE: through an image which reads the pixels of the backing store
   // where they are: drawing the NSBitmapImageRep made its memory copy on
@@ -785,12 +996,12 @@ ns_simple_widget_rep::repaint_invalid_regions_bis () {
   
   follow_visible_part ();
   NSPoint origin = [view frame].origin;
-  NSSize sz = [backingPixmap size];
+  bool gpu= gpu_mode ();
+  NSSize sz = NSMakeSize (store_width (), store_height ());
   
   // update backing store origin wrt. TeXmacs document
   // NOTE: there is nothing to move before the backing store has a size
-  if (!backingPixmap || [backingPixmap pixelsWide] < 1 ||
-      [backingPixmap pixelsHigh] < 1)
+  if (!has_store () || store_width () < 1 || store_height () < 1)
     backing_pos= origin;
   // NOTE: when the backing store moves or changes its size, all the view
   // is shown again (the view keeps its old image on screen otherwise)
@@ -805,11 +1016,13 @@ ns_simple_widget_rep::repaint_invalid_regions_bis () {
     double tm0= ns_bench_now ();
     moved= true;
     if (getenv ("TEXMACS_NS_DEBUG_DRAW"))
-      fprintf (stderr, "SHIFT %g -> %g dy %d size %g\n", backing_pos.y, origin.y, dy, [backingPixmap size].height);
+      fprintf (stderr, "SHIFT %g -> %g dy %d size %d\n", backing_pos.y, origin.y, dy, store_height ());
     backing_pos.x += dx / (double) retina_factor;
     backing_pos.y += dy / (double) retina_factor;
     // NOTE: nothing is moved: where the view starts in the backing store
-    shift_backing_store (dx, dy);
+    // (on the GPU: a copy, shifted)
+    if (gpu) gpu_translate_picture (gpu_store, -dx, -dy);
+    else shift_backing_store (dx, dy);
     //cout << "SCROLL CONTENTS BY " << dx << " " << dy << LF;
     
     rectangles invalid;
@@ -822,7 +1035,7 @@ ns_simple_widget_rep::repaint_invalid_regions_bis () {
       invalid_regions = invalid_regions->next;
     }
     
-    sz = [backingPixmap size]; // new size
+    sz = NSMakeSize (store_width (), store_height ()); // new size
     ns_bench_move += ns_bench_now () - tm0;
     
     invalid_regions = invalid & rectangles (rectangle (0,0,
@@ -853,8 +1066,7 @@ ns_simple_widget_rep::repaint_invalid_regions_bis () {
   // update backing store size
   {
     // NOTE: sizes in pixels, rounded as the pixels of the backing store
-    NSSize _oldSize = NSMakeSize ([backingPixmap pixelsWide],
-                                  [backingPixmap pixelsHigh]);
+    NSSize _oldSize = NSMakeSize (store_width (), store_height ());
     NSSize _new_logical_Size = [view frame].size;
     NSSize _newSize = NSMakeSize (ceil (_new_logical_Size.width * retina_factor),
                                   ceil (_new_logical_Size.height * retina_factor));
@@ -864,7 +1076,15 @@ ns_simple_widget_rep::repaint_invalid_regions_bis () {
     
     // NOTE: nothing to draw in an empty canvas (not laid out yet)
     if (_newSize.width < 1 || _newSize.height < 1) return;
-    if ((_newSize.width != _oldSize.width)||(_newSize.height != _oldSize.height)) {
+    if (gpu && ((_newSize.width != _oldSize.width) ||
+                (_newSize.height != _oldSize.height))) {
+      // a new store, white, painted again
+      moved= true;
+      if (gpu_ren != NULL) { tm_delete (gpu_ren); gpu_ren= NULL; }
+      gpu_store= gpu_backing_picture ((int) _newSize.width, (int) _newSize.height);
+      invalidate_rect (0, 0, _newSize.width, _newSize.height);
+    }
+    else if ((_newSize.width != _oldSize.width)||(_newSize.height != _oldSize.height)) {
       moved= true;
       unroll_backing_store ();
       // cout << "RESIZING BITMAP"<< LF;
@@ -916,7 +1136,7 @@ ns_simple_widget_rep::repaint_invalid_regions_bis () {
       rectangles rects = invalid_regions;
       invalid_regions = rectangles();
       
-      NSSize bs= NSMakeSize ([backingPixmap pixelsWide], [backingPixmap pixelsHigh]);
+      NSSize bs= NSMakeSize (store_width (), store_height ());
       double t0= ns_bench_now ();
       while (!is_nil (rects)) {
         // NOTE: with a margin of one pixel, since the conversion to the
@@ -959,7 +1179,10 @@ ns_simple_widget_rep::repaint_invalid_regions_bis () {
       ns_bench_paint += t1 - t0;
       
       // propagate immediately the changes to the screen
-      if (!moved) {
+      if (gpu) {
+        if (!moved) show_gpu_store (); // (timed when presented)
+      }
+      else if (!moved) {
         double k= retina_factor;
         [view displayRect: NSMakeRect (lub->x1 / k, lub->y1 / k,
                                        (lub->x2 - lub->x1) / k,
@@ -968,7 +1191,8 @@ ns_simple_widget_rep::repaint_invalid_regions_bis () {
       }
     } // !is_nil (invalid_regions)
   }
-  if (moved) {
+  if (moved && gpu) show_gpu_store ();
+  else if (moved) {
     double t2= ns_bench_now ();
     [view display];
     ns_bench_display += ns_bench_now () - t2;
