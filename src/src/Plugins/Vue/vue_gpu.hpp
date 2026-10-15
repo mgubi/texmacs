@@ -35,9 +35,15 @@ void vue_gpu_prepare ();
 // context or Metal device with the first window); false when it cannot
 bool vue_gpu_attach (SDL_Window* w);
 void vue_gpu_present (SDL_Window* w);
+// attached, and presenting into the window would not wait for the screen
+// (Metal: the compositor does not hold too many of its frames); else the
+// window is drawn at a later turn of the loop
+bool vue_gpu_ready (SDL_Window* w);
 
 // the backing store of an editor: an opaque texture, white at first
-picture  gpu_backing_picture (int w, int h);
+// (transparent: the canvases of Cocoa, transparent where not painted, as
+// their bitmaps were; the editors of Vue are opaque white)
+picture  gpu_backing_picture (int w, int h, bool transparent= false);
 bool     is_gpu_picture (picture p);
 renderer gpu_picture_renderer (picture p, double zoom);
 // shift the content of a backing store by (dpx, dpy) pixels (y down)

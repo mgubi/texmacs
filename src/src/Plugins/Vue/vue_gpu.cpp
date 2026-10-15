@@ -46,8 +46,9 @@ void vue_gpu_prepare () {}
 unsigned long long vue_gpu_window_flags () { return 0; }
 bool vue_gpu_follow_glyph_settings () { return false; }
 bool vue_gpu_attach (SDL_Window* w) { (void) w; return false; }
+bool vue_gpu_ready (SDL_Window* w) { (void) w; return false; }
 void vue_gpu_present (SDL_Window* w) { (void) w; }
-picture  gpu_backing_picture (int w, int h) { (void) w; (void) h; return picture (); }
+picture  gpu_backing_picture (int w, int h, bool t) { (void) w; (void) h; (void) t; return picture (); }
 bool     is_gpu_picture (picture p) { (void) p; return false; }
 renderer gpu_picture_renderer (picture p, double z) { (void) p; (void) z; return NULL; }
 void     gpu_translate_picture (picture p, int x, int y) { (void) p; (void) x; (void) y; }
@@ -103,6 +104,7 @@ struct gpu_target {
   int dev_w () const { return (screen && dw > 0) ? dw : w; }
   int dev_h () const { return (screen && dh > 0) ? dh : h; }
   unsigned long long gen; // changes with what the texture shows
+  bool transparent;     // made transparent (the canvases of Cocoa), not white
 };
 
 static void gpu_flush_all ();
@@ -130,7 +132,8 @@ struct glyph_slot {
 struct slug_glyph {
   float bx0, by0, bx1, by1;  // the box of the outline, in em units (y up)
   unsigned offset;           // of its header in the texture of bands
-  unsigned nb;               // bands in each direction (0: no ink)
+  unsigned nb;               // bands in each direction (0: no ink), and
+                             // the direction of the outline (high bit)
   float em;                  // pixels a em
   bool outline;              // false: the font has no file, a bitmap then
 };
@@ -278,6 +281,11 @@ vue_gpu_attach (SDL_Window* w) {
   return true;
 }
 
+bool
+vue_gpu_ready (SDL_Window* w) {
+  return vue_gpu_attach (w) && G.B->ready_to_present ();
+}
+
 void
 vue_gpu_present (SDL_Window* w) {
   gpu_flush_all ();
@@ -288,7 +296,7 @@ static bool
 ensure_target (gpu_target* t) {
   if (t->made || t->screen) return true;
   if (!G.started || t->w <= 0 || t->h <= 0) return false;
-  t->tex= G.B->new_target (t->w, t->h);
+  t->tex= G.B->new_target (t->w, t->h, t->transparent);
   if (t->tex == NULL) return false;
   t->made= true;
   return true;
@@ -409,8 +417,10 @@ flush_slug () {
   send_rows (G.index_tex, G.index_rows, G.bands_sent, G.bands.size (), 1,
              GPU_R32UI, G.bands.data ());
   gpu_pass p= make_pass (t, G.sx1, G.sy1, G.sx2, G.sy2);
+  // as bold as the glyphs of the atlas (not those of MuPDF)
+  float bold= (G.glyph_source == 1) ? 0.f : (float) G.ft_bold;
   G.B->draw_slug (p, G.curve_tex, G.index_tex, G.slug_inst.data (),
-                  (int) (G.slug_inst.size () / 13));
+                  (int) (G.slug_inst.size () / 13), bold);
   G.slug_inst.clear ();
   t->gen++;
 }
@@ -452,7 +462,14 @@ slug_lookup (font_glyphs fng, int c) {
       G.curves.insert (G.curves.end (), v, v + 8);
     }
     unsigned nb= (unsigned) max (1, min (8, n / 3));
-    g.nb= nb;
+    // the direction of the outline (the sign of its area, its curves taken
+    // as the polygons of their control points), with which the shader moves
+    // the edges outwards to make the glyph bolder: the high bit of nb
+    double area= 0;
+    for (int i= 0; i < n; i++)
+      for (int j= 0; j < 2; j++)
+        area += q[6*i+2*j] * q[6*i+2*j+3] - q[6*i+2*j+2] * q[6*i+2*j+1];
+    g.nb= nb | (area < 0 ? 0x80000000u : 0u);
     g.offset= (unsigned) G.bands.size ();
     G.bands.resize (G.bands.size () + 4 * nb, 0);
     for (int dir= 0; dir < 2; dir++)
@@ -739,8 +756,8 @@ class gpu_picture_rep: public picture_rep {
 public:
   gpu_target t;
   int ox, oy;
-  gpu_picture_rep (int w, int h):
-    t { w, h, NULL, NULL, false, false, 0, 0, 0 }, ox (0), oy (0) {}
+  gpu_picture_rep (int w, int h, bool transparent= false):
+    t { w, h, NULL, NULL, false, false, 0, 0, 0, transparent }, ox (0), oy (0) {}
   ~gpu_picture_rep () {
     if (G.target == &t || G.vtarget == &t) gpu_flush_all ();
     if (G.target == &t) G.target= NULL;
@@ -767,8 +784,8 @@ protected:
 };
 
 picture
-gpu_backing_picture (int w, int h) {
-  return picture (tm_new<gpu_picture_rep> (max (w, 1), max (h, 1)));
+gpu_backing_picture (int w, int h, bool transparent) {
+  return picture (tm_new<gpu_picture_rep> (max (w, 1), max (h, 1), transparent));
 }
 
 static gpu_picture_rep*
@@ -813,7 +830,7 @@ gpu_translate_picture (picture p, int dpx, int dpy) {
   gpu_target& t= g->t;
   if (dpx >= t.w || -dpx >= t.w || dpy >= t.h || -dpy >= t.h) return;
   gpu_flush_all ();
-  if (t.tex2 == NULL) t.tex2= G.B->new_target (t.w, t.h);
+  if (t.tex2 == NULL) t.tex2= G.B->new_target (t.w, t.h, t.transparent);
   if (t.tex2 == NULL) return;
   int x0= max (0, dpx), x1= min (t.w, t.w + dpx);
   int y0= max (0, dpy), y1= min (t.h, t.h + dpy);
@@ -829,7 +846,7 @@ gpu_copy_picture (picture p) {
   gpu_picture_rep* g= as_gpu (p);
   if (g == NULL || !ensure_target (&g->t)) return picture ();
   gpu_flush_all ();
-  gpu_picture_rep* c= tm_new<gpu_picture_rep> (g->t.w, g->t.h);
+  gpu_picture_rep* c= tm_new<gpu_picture_rep> (g->t.w, g->t.h, g->t.transparent);
   picture cp (c);
   if (!ensure_target (&c->t)) return picture ();
   G.B->copy (g->t.tex, g->t.w, g->t.h, 0, 0, g->t.w, g->t.h,
