@@ -4,6 +4,7 @@
 // drawing?".
 //
 //   node misc/tau/test/render-bench.mjs --dir build-tau/out/web --tools <dir>
+//        [--only name] [--width 1280 --height 860] [--density 2]
 //
 // Each document is scrolled (every step draws the whole view) and typed
 // in, twice: as usual, and "dry" (tau_dry: the drawing commands are written
@@ -51,6 +52,24 @@ function mathDoc() {
 	}
 	return s + tail;
 }
+// figures drawn by TeXmacs: lines, arcs, splines, filled shapes and labels
+function graphicsDoc() {
+	const pt = (x, y) => `<point|${x.toFixed(2)}|${y.toFixed(2)}>`;
+	let s = head;
+	for (let i = 0; i < 30; i++) {
+		let g = "";
+		for (let k = 0; k < 12; k++) {
+			const a = (i * 12 + k) * 0.37, x = 3 * Math.cos(a), y = 2 * Math.sin(a * 1.3);
+			g += `|<line|${pt(-4, -2 + k * 0.3)}|${pt(x, y)}|${pt(4, 2 - k * 0.3)}>`;
+			g += `|<with|fill-color|pastel ${["red", "blue", "green", "yellow"][k % 4]}|<cline|${pt(x, y)}|${pt(x + 0.6, y)}|${pt(x + 0.3, y + 0.5)}>>`;
+			g += `|<spline|${pt(-3, y)}|${pt(-1, -y)}|${pt(1, y)}|${pt(3, -y)}>`;
+			g += `|<carc|${pt(x, y)}|${pt(x + 0.4, y)}|${pt(x, y + 0.4)}>`;
+			g += `|<with|text-at-halign|center|<text-at|<math|x<rsub|${k}>>|${pt(x, y - 0.5)}>>`;
+		}
+		s += "  " + prose(30) + "\n\n  <with|gr-geometry|<tuple|geometry|0.8par|8cm|center>|<graphics|" + g + ">>\n\n";
+	}
+	return s + tail;
+}
 function pictureDoc() {
 	let s = head;
 	for (let i = 0; i < 60; i++)
@@ -63,6 +82,7 @@ const DOCS = [
 	{ name: "maths", text: mathDoc() },
 	{ name: "tables", path: "/texmacs/doc/devel/scheme/api/glue-auto-doc.en.tm" },
 	{ name: "pictures", text: pictureDoc() },
+	{ name: "graphics", text: graphicsDoc() },
 	// one structure which is a single unit of the typesetter
 	{ name: "bigtable", text: head + "  <block|<tformat|<table|" + Array.from({ length: 60 }, (_, r) =>
 		"<row|" + Array.from({ length: 6 }, (_, c) => "<cell|" + prose(4 + (r + c) % 5) + ">").join("|") + ">").join("|") + ">>>\n" + tail },
@@ -88,7 +108,7 @@ const f1 = x => x.toFixed(1).padStart(6);
 
 async function run(doc, density) {
 	const page = await browser.newPage();
-	await page.setViewport({ width: 1280, height: 860, deviceScaleFactor: density });
+	await page.setViewport({ width: +opt("--width", "1280"), height: +opt("--height", "860"), deviceScaleFactor: density });
 	const env = opt("--env", "");
 	await page.goto(`http://127.0.0.1:${port}/index.html?debug&nohome&profile` + (env ? "&env=" + encodeURIComponent(env) : ""), { waitUntil: "load" });
 	const until = async (test, timeout = 90000) => {
@@ -248,7 +268,7 @@ async function run(doc, density) {
 }
 
 const onlyDoc = opt("--only", "");
-for (const density of opt("--edits", "") ? [2] : [2, 1]) {
+for (const density of opt("--density", "") ? [+opt("--density", "")] : opt("--edits", "") ? [2] : [2, 1]) {
 	console.log(`\nbench: view at density ${density}; means in ms of the core, for a step`);
 	console.log("document  what     | turn   | typeset/editors | drawing | of which saying what to draw | sending pixels | commands and bytes of a step");
 	for (const doc of DOCS) {
