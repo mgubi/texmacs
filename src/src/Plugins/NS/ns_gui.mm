@@ -19,6 +19,7 @@
 #include "message.hpp"
 #include "scheme.hpp"
 #include "boot.hpp"
+#include "../Vue/vue_gpu.hpp"
 #include "sys_utils.hpp"
 
 #include "tm_window.hpp"
@@ -640,8 +641,11 @@ ns_gui_rep::update () {
 
   if (!postpone_treatment) {
     if (the_interpose_handler) the_interpose_handler();
-    if (ns_follow_glyph_settings ()) // a change of the glyphs
-      ns_simple_widget_rep::invalidate_every ();
+    // a change of the glyphs: of the renderer of Core Graphics, and of the
+    // atlas of the GPU renderer (the canvases drawn by the GPU)
+    bool glyphs= ns_follow_glyph_settings ();
+    if (vue_gpu_follow_glyph_settings ()) glyphs= true;
+    if (glyphs) ns_simple_widget_rep::invalidate_every ();
     ns_simple_widget_rep::repaint_all ();
   }
 
