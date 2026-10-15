@@ -371,10 +371,11 @@ vue_sdl_base_window_rep::vue_sdl_base_window_rep (vue_widget _content, string _n
     // they are shown via SLOT_VISIBILITY once positioned
     flags= SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_BORDERLESS |
            SDL_WINDOW_ALWAYS_ON_TOP | SDL_WINDOW_HIDDEN | SDL_WINDOW_NOT_FOCUSABLE;
-  // drawn by the GPU (vue_gpu.cpp): every window has a GL drawable, and the
-  // first one makes the context which they all share
+  // drawn by the GPU (vue_gpu.cpp): every window has a drawable of the
+  // backend (GL or Metal), and the first one makes the context or the
+  // device which they all share
   bool gpu= vue_gpu_enabled ();
-  if (gpu) { vue_gpu_prepare (); flags |= SDL_WINDOW_OPENGL; }
+  if (gpu) { vue_gpu_prepare (); flags |= (SDL_WindowFlags) vue_gpu_window_flags (); }
   int win_w= 200, win_h= 200;
   int win_x=30, win_y= 30;
   // the name a window is created with is its title until TeXmacs gives it
