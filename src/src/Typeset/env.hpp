@@ -136,7 +136,6 @@
 // variables are recorded by number (env_var_id): the sets of the bridges
 // are arrays of integers.
 int env_var_id (string var);
-tree env_uninit_marker (); // see edit_env_rep::rec_uninit
 // The variables which the environment read while it derived a state from
 // its variables (edit_env_rep::update): a length in a unit made by a user
 // macro, the colour of a pattern... Such a variable is not "plain": when
@@ -146,6 +145,16 @@ hashmap<int,bool>& env_derived_inputs ();
 inline void env_note_read (int id) {
   if (env_deriving > 0) env_derived_inputs () (id)= true; }
 string env_var_name (int id);
+// TEXMACS_TYPESET_READS: whether a bridge is used again when its inputs
+// are as they were (see "What is typeset again" in bridge.cpp): 1 (the
+// default), 0 ("off": the classic cache), 2 ("check")
+int typeset_inputs_mode ();
+// in the values before writes and in the changes of a bridge (when the
+// inputs are used), a variable which was not there
+tree env_absent ();
+// a hash of a variable and its value, of 64 bits (see env_table::fp)
+unsigned long long env_entry_hash (string var, tree val);
+
 class env_table {
 public:
   hashmap<string,tree>  h;
@@ -158,23 +167,55 @@ public:
   // a variable which is assigned below a binding would otherwise have the
   // bound value as its value before, and be missed when it ends with it
   hashmap<string,tree>* back_log;
+  // The inputs of the bridge which is recorded: the variables which it
+  // read before it wrote them, with the values they had (env_absent ()
+  // for a variable which was not there)
+  array<string>*        in_vars;
+  array<tree>*          in_vals;
+  // When the inputs are used: a fingerprint of the whole table (the
+  // exclusive or of env_entry_hash of its variables), kept as the table is
+  // written. The variables which were written since it was brought up to
+  // date ('dirty') are not in it, and are put back in by fingerprint ().
+  unsigned long long    fp;
+  array<string>         dirty;
+  hashmap<string,bool>  dirty_set;
   inline env_table (tree init):
-    h (init), rec (NULL), all (false), back_log (NULL) {}
-  inline tree operator [] (string s) {
-    if (rec != NULL) rec->operator () (env_var_id (s))= true;
-    if (env_deriving > 0) env_note_read (env_var_id (s));
-    return h [s]; }
-  inline tree& operator () (string s) {
+    h (init), rec (NULL), all (false), back_log (NULL),
+    in_vars (NULL), in_vals (NULL), fp (0), dirty_set (false) {}
+  inline void will_write (string s) {
+    if (typeset_inputs_mode () == 0 || dirty_set->contains (s)) return;
+    if (h->contains (s)) fp ^= env_entry_hash (s, h [s]);
+    dirty_set (s)= true;
+    dirty << s; }
+  unsigned long long fingerprint ();
+  void refingerprint ();
+  inline tree value (string s) {
+    // (what a variable holds, or env_absent (), without recording)
+    return h->contains (s)? h [s]: env_absent (); }
+  inline void log_back (string s) {
+    // the value before the first write of s
+    if (back_log == NULL || (*back_log)->contains (s)) return;
+    if (typeset_inputs_mode () != 0) (*back_log) (s)= value (s);
+    else (*back_log)->write_back (s, h); }
+  inline void note (string s, bool write, bool read= true) {
+    int id= env_var_id (s);
     if (rec != NULL) {
-      rec->operator () (env_var_id (s))= true;
-      if (back_log != NULL) (*back_log)->write_back (s, h); }
-    if (env_deriving > 0) env_note_read (env_var_id (s));
-    return h (s); }
-  inline bool contains (string s) {
-    if (rec != NULL) rec->operator () (env_var_id (s))= true;
-    if (env_deriving > 0) env_note_read (env_var_id (s));
-    return h->contains (s); }
-  inline env_table& operator = (hashmap<string,tree> h2) { h= h2; return *this; }
+      bool first= !(*rec)->contains (id);
+      rec->operator () (id)= true;
+      if (read && first && in_vars != NULL && back_log != NULL &&
+          !(*back_log)->contains (s)) {
+        (*in_vars) << s; (*in_vals) << value (s); }
+      if (write) log_back (s); }
+    if (write) will_write (s);
+    if (env_deriving > 0) env_note_read (id); }
+  inline tree operator [] (string s) { note (s, false); return h [s]; }
+  inline tree& operator () (string s) { note (s, true); return h (s); }
+  // (a write which does not read the value before)
+  inline tree& w (string s) { note (s, true, false); return h (s); }
+  inline bool contains (string s) { note (s, false); return h->contains (s); }
+  inline void remove (string s) { note (s, true); h->reset (s); }
+  inline env_table& operator = (hashmap<string,tree> h2) {
+    h= h2; refingerprint (); return *this; }
   inline operator hashmap<string,tree> () {
     if (rec != NULL) all= true;
     return h; }
@@ -537,22 +578,6 @@ public:
   // lookup_value finds again
   array<string>* rec_keys;
   array<tree>*   rec_values;
-  // A with (a cell...) puts back the values which it read, which is
-  // UNINIT for a variable which was not there: after it, the variable is
-  // there, with the value UNINIT, which the changes do not tell apart from
-  // not being there (while 'provides' does). The variables which a bridge
-  // leaves so are recorded too (bridge_rep::uninit, those of the bridges
-  // below it through rec_uninit): a bridge which is used again puts them
-  // there again (leave_uninit), and when it goes, those which are not
-  // there any more are among the variables which changed (see
-  // compare_changes)
-  array<string>* rec_uninit;
-  inline void note_uninit (string s) {
-    if (rec_uninit != NULL && !contains (s, *rec_uninit))
-      (*rec_uninit) << s; }
-  inline bool is_uninit (string s) {
-    return env.h->contains (s) && L(env.h [s]) == UNINIT; }
-  void leave_uninit (string s);
   // The tree of the buffer which is being typeset, whose automatic labels
   // are numbered (exec_auto_id in env_exec.cpp), or a tree which is not
   // compound when there is none
@@ -578,17 +603,19 @@ public:
     bool outer_all, outer_unknown, stopped;
     array<string>* outer_keys;
     array<tree>* outer_values;
-    array<string>* outer_uninit;
+    array<string>* outer_in_vars;
+    array<tree>* outer_in_vals;
     inline read_record (edit_env_rep* e, hashmap<int,bool>* rec,
                         array<string>* keys, array<tree>* values,
-                        array<string>* uninit= NULL):
+                        array<string>* in_vars= NULL,
+                        array<tree>* in_vals= NULL):
       env (e), outer_rec (e->env.rec), outer_all (e->env.all),
       outer_unknown (e->read_unknown), stopped (false),
       outer_keys (e->rec_keys), outer_values (e->rec_values),
-      outer_uninit (e->rec_uninit) {
+      outer_in_vars (e->env.in_vars), outer_in_vals (e->env.in_vals) {
         env->record_reads (rec, false);
         env->record_lookups (keys, values);
-        env->rec_uninit= uninit;
+        env->env.in_vars= in_vars; env->env.in_vals= in_vals;
         env->read_unknown= false; }
     // nothing was read but what the record holds
     inline bool complete () { return !env->read_all () && !env->read_unknown; }
@@ -596,7 +623,7 @@ public:
       if (stopped) return;
       env->record_reads (outer_rec, outer_all);
       env->record_lookups (outer_keys, outer_values);
-      env->rec_uninit= outer_uninit;
+      env->env.in_vars= outer_in_vars; env->env.in_vals= outer_in_vals;
       env->read_unknown= outer_unknown;
       stopped= true; }
     inline ~read_record () { stop (); }
@@ -621,29 +648,25 @@ public:
   int typesetting;
   // the variables of 'change' had these values at this point of the
   // previous pass: those which have another one now are in the patch
-  // (the entries env_uninit_marker () of 'change' are variables which
-  // were there with the value UNINIT: see rec_uninit)
-  void compare_changes (hashmap<string,tree>& patch,
-                        hashmap<string,tree> change);
 
   inline void monitored_write (string s, tree t) {
-    back->write_back (s, env.h); env (s)= t; }
+    env.log_back (s); env.w (s)= t; }
   inline void monitored_write_update (string s, tree t) {
-    back->write_back (s, env.h); env (s)= t; update (s); }
-  inline void write (string s, tree t) { env (s)= t; }
-  inline void write_update (string s, tree t) { env (s)= t; update (s); }
+    env.log_back (s); env.w (s)= t; update (s); }
+  inline void write (string s, tree t) { env.w (s)= t; }
+  inline void write_update (string s, tree t) { env.w (s)= t; update (s); }
   inline tree local_begin (string s, tree t) {
     // tree r (env [s]); monitored_write_update (s, t); return r;
     tree& val= env (s); tree r (val); val= t; update (s); return r; }
   inline void local_end (string s, tree t) {
-     env (s)= t; update (s); }
+     env.w (s)= t; update (s); }
   inline tree local_begin_script () {
     return local_begin (MATH_LEVEL, as_string (index_level+1)); }
   inline void local_end_script (tree t) {
     local_end (MATH_LEVEL, t); }
   inline void assign (string s, tree t) {
     tree& val= env (s); t= exec(t); if (val != t) {
-      back->write_back (s, env.h); val= t; update (s); } }
+      env.log_back (s); val= t; update (s); } }
   inline bool provides (string s) { return env.contains (s); }
   inline tree read (string s) { return env [s]; }
   tree local_begin_extents (box b);
@@ -656,6 +679,13 @@ public:
   void read_env (hashmap<string,tree>& ret);
   void local_start (hashmap<string,tree>& prev_back);
   void local_update (hashmap<string,tree>& oldpat, hashmap<string,tree>& chg);
+  void local_changes (hashmap<string,tree>& chg);
+  inline array<string>* input_vars () { return env.in_vars; }
+  inline array<tree>* input_vals () { return env.in_vals; }
+  inline tree current (string s) { return env.value (s); }
+  inline unsigned long long fingerprint () { return env.fingerprint (); }
+  inline bool written (string s) { return back->contains (s); }
+  inline hashmap<string,tree> values_before () { return back; }
   void local_end (hashmap<string,tree>& prev_back);
 
   /* updating environment variables */

@@ -139,7 +139,7 @@ bridge_surround_rep::notify_change () {
 
 void
 bridge_surround_rep::my_clean_links () {
-  if (corrupted || (N(ttt->old_patch) != 0))
+  if (corrupted || (N(ttt->old_patch) != 0) || typeset_inputs_mode () != 0)
     link_env= link_repository (true);
 }
 
@@ -160,7 +160,7 @@ bridge_surround_rep::my_typeset_will_be_complete () {
 
 void
 bridge_surround_rep::my_typeset (int desired_status) {
-  if (corrupted || (N(ttt->old_patch) != 0)) {
+  if (corrupted || (N(ttt->old_patch) != 0) || typeset_inputs_mode () != 0) {
     hashmap<string,tree> prev_back (UNINIT);
     env->local_start (prev_back);
     /*

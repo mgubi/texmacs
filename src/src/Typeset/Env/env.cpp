@@ -12,6 +12,8 @@
 #include "env.hpp"
 #include "iterator.hpp"
 #include "merge_sort.hpp"
+#include "sys_utils.hpp" // get_env
+#include <unordered_map>
 extern hashmap<string,int> default_var_type;
 void initialize_default_var_type ();
 extern hashmap<string,tree> default_env;
@@ -40,7 +42,7 @@ edit_env_rep::edit_env_rep (drd_info& drd2,
   local_aux (local_aux2), global_aux (global_aux2),
   local_att (local_att2), global_att (global_att2),
   missing (UNINIT), redefined (), touched (false),
-  read_unknown (false), rec_keys (NULL), rec_values (NULL), rec_uninit (NULL),
+  read_unknown (false), rec_keys (NULL), rec_values (NULL),
   auto_buffer (""), typesetting (0)
 {
   env.back_log= &back;
@@ -245,6 +247,7 @@ edit_env_rep::write_env (hashmap<string,tree> user_env) {
   env= copy (user_env);
 }
 
+// (env_absent () in a patch: the variable goes)
 void
 edit_env_rep::monitored_patch_env (hashmap<string,tree> patch) {
   if (patch->size == 0) return;
@@ -252,7 +255,12 @@ edit_env_rep::monitored_patch_env (hashmap<string,tree> patch) {
   for (; i<n; i++) {
     list<hashentry<string,tree> > l=patch->a[i];
     for (; !is_nil(l); l=l->next)
-      monitored_write_update (l->item.key, l->item.im);
+      if (strong_equal (l->item.im, env_absent ())) {
+        env.log_back (l->item.key);
+        env.remove (l->item.key);
+        update (l->item.key);
+      }
+      else monitored_write_update (l->item.key, l->item.im);
   }
 }
 
@@ -263,48 +271,102 @@ edit_env_rep::patch_env (hashmap<string,tree> patch) {
   for (; i<n; i++) {
     list<hashentry<string,tree> > l=patch->a[i];
     for (; !is_nil(l); l=l->next)
-      write_update (l->item.key, l->item.im);
+      if (strong_equal (l->item.im, env_absent ())) {
+        env.remove (l->item.key);
+        update (l->item.key);
+      }
+      else write_update (l->item.key, l->item.im);
   }
+}
+
+/******************************************************************************
+* The fingerprint of the environment (see env_table::fp)
+******************************************************************************/
+
+static inline unsigned long long
+mix64 (unsigned long long h) {
+  h= (h ^ (h >> 30)) * 0xBF58476D1CE4E5B9ULL;
+  h= (h ^ (h >> 27)) * 0x94D049BB133111EBULL;
+  return h ^ (h >> 31);
+}
+
+static inline unsigned long long
+string_hash64 (string s) {
+  unsigned long long h= 0xCBF29CE484222325ULL;
+  for (int i=0; i<N(s); i++) h= (h ^ (unsigned char) s[i]) * 0x100000001B3ULL;
+  return mix64 (h);
+}
+
+// the hashes of the compound values, by tree (which the memo holds, so
+// that another tree does not come at the same place)
+struct value_hash_entry {
+  tree t; unsigned long long h;
+  value_hash_entry (): t (), h (0) {}
+  value_hash_entry (tree t2, unsigned long long h2): t (t2), h (h2) {}
+};
+static std::unordered_map<void*,value_hash_entry> value_hashes;
+
+static unsigned long long
+value_hash64 (tree t) {
+  if (is_atomic (t)) return string_hash64 (t->label);
+  void* key= (void*) t.operator-> ();
+  auto it= value_hashes.find (key);
+  if (it != value_hashes.end ()) return it->second.h;
+  unsigned long long h= mix64 (0x9E3779B97F4A7C15ULL + (int) L(t));
+  for (int i=0; i<N(t); i++) h= mix64 (h * 31 + value_hash64 (t[i]));
+  if (value_hashes.size () > 500000) value_hashes.clear ();
+  value_hashes[key]= value_hash_entry (t, h);
+  return h;
+}
+
+unsigned long long
+env_entry_hash (string var, tree val) {
+  return mix64 (string_hash64 (var) * 0x9E3779B97F4A7C15ULL ^
+                value_hash64 (val));
+}
+
+unsigned long long
+env_table::fingerprint () {
+  for (int i=0; i<N(dirty); i++)
+    if (h->contains (dirty[i])) fp ^= env_entry_hash (dirty[i], h [dirty[i]]);
+  if (N(dirty) != 0) {
+    dirty= array<string> ();
+    dirty_set= hashmap<string,bool> (false);
+  }
+  return fp;
+}
+
+void
+env_table::refingerprint () {
+  fp= 0;
+  dirty= array<string> ();
+  dirty_set= hashmap<string,bool> (false);
+  if (typeset_inputs_mode () == 0) return;
+  for (iterator<string> it= iterate (h); it->busy (); ) {
+    string var= it->next ();
+    fp ^= env_entry_hash (var, h [var]);
+  }
+}
+
+int
+typeset_inputs_mode () {
+  static int mode= -1;
+  if (mode < 0) {
+    string s= get_env ("TEXMACS_TYPESET_READS");
+    mode= (s == "off"? 0: (s == "check"? 2: 1));
+  }
+  return mode;
+}
+
+tree
+env_absent () {
+  static tree marker (TUPLE, "absent-variable");
+  return marker;
 }
 
 void
 edit_env_rep::read_env (hashmap<string,tree>& ret) {
   ret= copy ((hashmap<string,tree>) env); // (all of it: see env_table)
-}
-
-tree
-env_uninit_marker () {
-  static tree marker (TUPLE, "uninit-marker");
-  return marker;
-}
-
-void
-edit_env_rep::leave_uninit (string s) {
-  // (as a with leaves it: see rec_uninit)
-  if (!env.h->contains (s)) { env.h (s)= tree (UNINIT); update (s); }
-  note_uninit (s);
-}
-
-void
-edit_env_rep::compare_changes (hashmap<string,tree>& patch,
-                               hashmap<string,tree> change) {
-  hashmap<string,tree> plain (UNINIT);
-  bool markers= false;
-  for (iterator<string> it= iterate (change); it->busy (); ) {
-    string var= it->next ();
-    if (!strong_equal (change [var], env_uninit_marker ())) continue;
-    markers= true;
-    // the variable was there with the value UNINIT in the previous pass
-    if (!env.h->contains (var) || L(env.h [var]) != UNINIT)
-      patch (var)= tree (UNINIT);
-  }
-  if (!markers) { patch->post_patch (change, env.h); return; }
-  for (iterator<string> it= iterate (change); it->busy (); ) {
-    string var= it->next ();
-    if (!strong_equal (change [var], env_uninit_marker ()))
-      plain (var)= change [var];
-  }
-  patch->post_patch (plain, env.h);
 }
 
 void
@@ -314,9 +376,35 @@ edit_env_rep::local_start (hashmap<string,tree>& prev_back) {
 }
 
 void
+edit_env_rep::local_changes (hashmap<string,tree>& change) {
+  // the variables which have another value than before the bridge, with
+  // the value now (env_absent () for a variable which is not there now,
+  // when the inputs are used: a variable which was not there is not one
+  // with the value UNINIT)
+  if (typeset_inputs_mode () == 0) { change= invert (back, env.h); return; }
+  change= hashmap<string,tree> (UNINIT);
+  int i=0, n=back->n;
+  for (; i<n; i++) {
+    list<hashentry<string,tree> > l=back->a[i];
+    for (; !is_nil(l); l=l->next) {
+      tree before= l->item.im, now= env.value (l->item.key);
+      bool same= strong_equal (before, now) ||
+                 (!strong_equal (before, env_absent ()) &&
+                  !strong_equal (now, env_absent ()) && before == now);
+      if (!same) change (l->item.key)= now;
+    }
+  }
+}
+
+void
 edit_env_rep::local_update (hashmap<string,tree>& old_patch,
 			    hashmap<string,tree>& change)
 {
+  if (typeset_inputs_mode () != 0) {
+    // (old_patch is not used: see "What is typeset again" in bridge.cpp)
+    local_changes (change);
+    return;
+  }
   old_patch->pre_patch (back, env.h);
   old_patch->post_patch (change, env.h);
   change= invert (back, env.h);

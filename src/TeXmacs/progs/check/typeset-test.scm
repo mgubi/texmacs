@@ -925,7 +925,9 @@
      (update-forced)
      (check-true (same-as-scratch?))))
   ;; a variable which is assigned below a binding of it: its value before
-  ;; is the one outside, not the bound one
+  ;; is the one outside, not the bound one (not with the classic cache,
+  ;; TEXMACS_TYPESET_READS=off, which gets it wrong as TeXmacs always did)
+  (when (!= (getenv "TEXMACS_TYPESET_READS") "off")
   (with-typeset-body
    `(document ,@(map (lambda (i)
                        (cond ((== i 1) '(assign "foo" "1cm"))
@@ -943,7 +945,7 @@
      (update-forced)
      (tree-set (tree-ref (buffer-tree) 20) '(concat "c" (vspace (value "foo")) "d"))
      (update-forced)
-     (check-true (same-as-scratch?)))))
+     (check-true (same-as-scratch?))))))
 
 ;; The labels of the parts of a document are named after the part, and
 ;; numbered from 1 in each part, as the counter does (set-part).
