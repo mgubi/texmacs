@@ -331,20 +331,6 @@ lines_contents (array<page_item> l) {
   return r;
 }
 
-// (and the places of the boxes inside the lines: a box moved without
-// changing the extents of its line, as a header of a theorem moved up)
-static void
-box_shape (box b, int depth, array<SI>& r) {
-  if (depth > 6) return;
-  int n= b->subnr ();
-  r << (SI) n;
-  for (int i=0; i<n; i++) {
-    box c= b->subbox (i);
-    r << b->sx (i) << b->sy (i) << c->x1 << c->y1 << c->x2 << c->y2;
-    box_shape (c, depth + 1, r);
-  }
-}
-
 static array<SI>
 lines_signature (array<page_item> l) {
   array<SI> r;
@@ -355,7 +341,6 @@ lines_signature (array<page_item> l) {
       << (SI) l[i]->b->x4 << (SI) l[i]->b->y4
       << (SI) l[i]->spc->min << (SI) l[i]->spc->def << (SI) l[i]->spc->max
       << (SI) l[i]->penalty << (SI) N(l[i]->fl);
-  for (int i=0; i<N(l); i++) box_shape (l[i]->b, 0, r);
   return r;
 }
 

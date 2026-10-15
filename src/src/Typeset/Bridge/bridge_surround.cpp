@@ -215,15 +215,16 @@ bridge_surround_rep::my_typeset (int desired_status) {
     }
   }
   else {
-    env->monitored_patch_env (changes_before);
     if (typeset_inputs_mode () != 0) {
       // the parts kept: what they read and looked up when they were made
-      // goes to the record of the bridge, as for a bridge used again
+      // goes to the record of the bridge, as for a bridge used again (and
+      // before what they wrote, which they read first: a counter)
       for (int i=0; i<N(parts_keys); i++)
         env->record_lookup (parts_keys[i], parts_values[i]);
       add_inputs (env, env->values_before (), parts_known,
                   parts_vars, parts_vals);
     }
+    env->monitored_patch_env (changes_before);
   }
 
   ttt->insert_marker (st, ip);
