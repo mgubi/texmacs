@@ -1278,7 +1278,19 @@ from 16 to 1024 pixels. As in the page of TeXmacs Vue
   for all the glyphs (an atlas, also in 2D), and the shift without
   drawing the canvas on itself (two canvases, or the view moved);
   WebGL after that, if the calls weigh then.
-- **Left**: a limit to the glyphs and pictures kept by the page and the
+- **The atlas** (done): the page keeps the coverage of each glyph, and
+  draws a glyph in a colour, the first time, into pages of 1024 × 1024
+  (eight, emptied and filled again from the coverage when they overflow).
+  Written into a page between two copies from it, a glyph cost as much as
+  a canvas of its own (Safari gives the whole page to the GPU again), so
+  the glyphs new to a frame are written into the pixels of the pages,
+  kept by the page, and each page gets what changed once before the
+  frame. Safari, the manual: a step 10 → 4.5 ms, a whole view 30 → 4.4
+  ms (3 with pixels); headless Firefox, which draws without the GPU, is
+  as before (a view 12 ms, the calls). The pixels are as before (8 of
+  3.7 M differ in a table of the documentation, also after the atlas has
+  been emptied many times).
+- **Left**: a limit to the pictures kept by the page, and to the glyphs of the
   shell; the pattern of a rotated shape is rotated with it (MuPDF keeps
   it upright); the commands by default (they are asked for, for now).
 

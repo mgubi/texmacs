@@ -861,13 +861,23 @@ setInterval(() => {
 // The prototype of the drawing on the GPU (render-bench.mjs --gpu): the
 // core says the commands which draw a rectangle of a view (src/Plugins/
 // MuPDF/mupdf_renderer.cpp, mupdf_record), and the canvas draws them. A
-// glyph comes once, as its coverage, and is kept as a small canvas, one
-// for each of its colours. ?gpusync waits for the canvas to be done with
-// what it was given, to measure it (it reads a pixel back).
+// glyph comes once, as its coverage, which is kept; the glyph in a colour
+// is drawn into a place of a few large canvases (the atlas) the first time
+// it is asked for, and copied from there. A small canvas for each glyph and
+// colour cost half a millisecond each in Safari (replay-bench.mjs); a page
+// of the atlas changed between the copies costs as much, so the glyphs new
+// to a frame are written first into the pixels of the pages, kept here, and
+// each page is given what changed once, before the frame is drawn. When the
+// atlas is full, it is emptied before the next frame, and the glyphs are
+// drawn into it again from their coverage. ?gpusync waits for the canvas to
+// be done with what it was given, to measure it (it reads a pixel back).
 const gpuSync = params.has("gpusync");
 state.drawTimes = [];
 state.drawParts = [];
-const glyphMasks = new Map(), glyphInks = new Map(), colorNames = new Map(), pictures = new Map();
+state.inksMade = 0;
+const glyphCovs = new Map(), inkPlaces = new Map(), colorNames = new Map(), pictures = new Map();
+const ATLAS = 1024, ATLAS_PAGES = 8, ATLAS_MAX = 256; // (a larger glyph has a canvas of its own)
+const atlas = { pages: [], page: -1, x: 0, y: 0, row: 0 };
 function addPictures(buffer) {
 	const d = new DataView(buffer), bytes = new Uint8ClampedArray(buffer);
 	for (let p = 0; p + 12 <= buffer.byteLength;) {
@@ -893,35 +903,83 @@ function addGlyphs(buffer) {
 	for (let p = 0; p + 12 <= buffer.byteLength;) {
 		const id = d.getInt32(p, true), w = d.getInt32(p + 4, true), h = d.getInt32(p + 8, true);
 		p += 12;
-		if (w > 0 && h > 0) {
-			const c = new OffscreenCanvas(w, h), cx = c.getContext("2d"), img = cx.createImageData(w, h);
-			for (let i = 0; i < w * h; i++) {
-				img.data[4 * i] = img.data[4 * i + 1] = img.data[4 * i + 2] = 255;
-				img.data[4 * i + 3] = bytes[p + i];
-			}
-			cx.putImageData(img, 0, 0);
-			glyphMasks.set(id, c);
-		}
+		if (w > 0 && h > 0) glyphCovs.set(id, { w, h, cov: bytes.slice(p, p + w * h) });
 		p += w * h;
 	}
 }
+// a place of w × h pixels in the atlas (rows of glyphs, a pixel apart: what
+// a transformed glyph samples around it is clear)
+function atlasPlace(w, h) {
+	if (atlas.page >= 0 && atlas.x + w > ATLAS) { atlas.x = 0; atlas.y += atlas.row + 1; atlas.row = 0; }
+	if (atlas.page < 0 || atlas.y + h > ATLAS) {
+		atlas.page++;
+		atlas.x = atlas.y = atlas.row = 0;
+		if (atlas.page === atlas.pages.length) {
+			const c = new OffscreenCanvas(ATLAS, ATLAS);
+			atlas.pages.push({ c, cx: c.getContext("2d"), img: new ImageData(ATLAS, ATLAS), dirty: null });
+		}
+	}
+	const place = { page: atlas.pages[atlas.page], x: atlas.x, y: atlas.y };
+	atlas.x += w + 1;
+	atlas.row = Math.max(atlas.row, h);
+	return place;
+}
+// (before a frame: what overflowed the pages during the last one empties it)
+function atlasCheck() {
+	if (atlas.page < ATLAS_PAGES) return;
+	atlas.pages.length = ATLAS_PAGES;
+	for (const p of atlas.pages) { p.cx.clearRect(0, 0, ATLAS, ATLAS); p.img.data.fill(0); p.dirty = null; }
+	inkPlaces.clear();
+	atlas.page = -1;
+}
 function glyphInk(id, color) {
 	const key = id * 4294967296 + (color >>> 0);
-	let ink = glyphInks.get(key);
-	if (ink === undefined) {
-		const mask = glyphMasks.get(id);
-		ink = null;
-		if (mask) {
-			ink = new OffscreenCanvas(mask.width, mask.height);
-			const cx = ink.getContext("2d");
-			cx.drawImage(mask, 0, 0);
-			cx.globalCompositeOperation = "source-in";
-			cx.fillStyle = colorName(color);
-			cx.fillRect(0, 0, mask.width, mask.height);
+	let place = inkPlaces.get(key);
+	if (place === undefined) {
+		const g = glyphCovs.get(id);
+		place = null;
+		if (g) {
+			const { w, h, cov } = g;
+			if (w > ATLAS_MAX || h > ATLAS_MAX) {
+				const c = new OffscreenCanvas(w, h);
+				place = { page: { c, cx: c.getContext("2d"), img: new ImageData(w, h), dirty: null }, x: 0, y: 0 };
+			}
+			else place = atlasPlace(w, h);
+			place.w = w; place.h = h;
+			const page = place.page, px = page.img.data, stride = 4 * page.img.width, u = color >>> 0;
+			const r = u >>> 24, gr = (u >>> 16) & 255, b = (u >>> 8) & 255, a = u & 255;
+			for (let y = 0, i = 0; y < h; y++)
+				for (let x = 0, j = (place.y + y) * stride + 4 * place.x; x < w; x++, i++, j += 4) {
+					px[j] = r; px[j + 1] = gr; px[j + 2] = b;
+					px[j + 3] = (cov[i] * a + 127) / 255;
+				}
+			const d = page.dirty;
+			page.dirty = d ? [Math.min(d[0], place.x), Math.min(d[1], place.y), Math.max(d[2], place.x + w), Math.max(d[3], place.y + h)]
+				: [place.x, place.y, place.x + w, place.y + h];
+			if (page.c.width !== ATLAS) atlasGive(page);
+			state.inksMade++;
 		}
-		glyphInks.set(key, ink);
+		inkPlaces.set(key, place);
 	}
-	return ink;
+	return place;
+}
+// what changed in a page of the atlas, to its canvas
+function atlasGive(page) {
+	const d = page.dirty;
+	if (d) page.cx.putImageData(page.img, 0, 0, d[0], d[1], d[2] - d[0], d[3] - d[1]);
+	page.dirty = null;
+}
+// the glyphs of a frame in their colours, all in the atlas before it is drawn
+function frameInks(o) {
+	for (let i = 0; i < o.length;) {
+		const op = o[i];
+		if (op === 2) glyphInk(o[i + 1], o[i + 4]);
+		if (op === 3) i += 4 + 2 * o[i + 1];
+		else if (op === 4) i += 3 + 2 * o[i + 1];
+		else if (OP_SIZE[op]) i += OP_SIZE[op];
+		else break;
+	}
+	for (const page of atlas.pages) atlasGive(page);
 }
 // how many commands of each kind a frame has (for ?gpusync)
 const OP_SIZE = { 1: 6, 2: 5, 5: 10, 6: 5, 7: 5, 8: 5, 9: 7, 10: 1 };
@@ -938,9 +996,11 @@ function replayCounts(m) {
 	return c;
 }
 function replayCommands(ctx, m) {
+	atlasCheck();
 	if (m.glyphs.byteLength) addGlyphs(m.glyphs);
 	if (m.images && m.images.byteLength) addPictures(m.images);
 	const o = new Int32Array(m.ops), n = o.length, f = new Float32Array(m.ops);
+	frameInks(o);
 	ctx.save();
 	ctx.beginPath(); ctx.rect(m.x, m.y, m.w, m.h); ctx.clip();
 	ctx.save();
@@ -971,8 +1031,8 @@ function replayCommands(ctx, m) {
 			ctx.fillRect(o[i + 1], o[i + 2], o[i + 3] - o[i + 1], o[i + 4] - o[i + 2]);
 			i += 6; break;
 		case 2: {
-			const ink = glyphInk(o[i + 1], o[i + 4]);
-			if (ink) ctx.drawImage(ink, o[i + 2], o[i + 3]);
+			const g = glyphInk(o[i + 1], o[i + 4]);
+			if (g) ctx.drawImage(g.page.c, g.x, g.y, g.w, g.h, o[i + 2], o[i + 3], g.w, g.h);
 			i += 5; break;
 		}
 		case 3: case 4: {
@@ -1161,7 +1221,7 @@ worker.onmessage = event => {
 		// the drawing which the canvas does when it is waited for)
 		if (gpuSync) pane.context.getImageData(0, 0, 1, 1);
 		const t1 = performance.now();
-		const inks0 = glyphInks.size, masks0 = glyphMasks.size;
+		const inks0 = state.inksMade, masks0 = glyphCovs.size;
 		if (m.t === "dlist") replayCommands(pane.context, m);
 		else pane.context.putImageData(new ImageData(new Uint8ClampedArray(m.pixels), m.w, m.h), m.x, m.y);
 		const t2 = performance.now();
@@ -1172,7 +1232,7 @@ worker.onmessage = event => {
 		if (gpuSync) {
 			state.drawParts.push({ shift: t1 - t0, calls: t2 - t1, raster: t3 - t2,
 				ops: m.t === "dlist" ? replayCounts(m) : null, w: m.w, h: m.h,
-				masks: glyphMasks.size - masks0, inks: glyphInks.size - inks0 });
+				masks: glyphCovs.size - masks0, inks: state.inksMade - inks0 });
 			if (state.drawParts.length > 500) state.drawParts.shift();
 		}
 		pane.extents = m.extents; pane.scroll = m.scroll; pane.caret = m.caret;
