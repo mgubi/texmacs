@@ -89,6 +89,9 @@ public:
   // make the window the one which is drawn (true when it can be); show
   // what was drawn into it
   virtual unsigned long long window_flags () = 0;
+  // when TeXmacs starts: begin what takes time (Metal: the shaders are
+  // compiled in the background), which prepare waits for
+  virtual void warm_up () {}
   virtual bool prepare () = 0;
   virtual bool attach (SDL_Window* w) = 0;
   // the same for a layer which the GUI made (a CAMetalLayer of the Cocoa

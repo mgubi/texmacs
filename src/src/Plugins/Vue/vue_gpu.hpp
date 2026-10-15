@@ -29,6 +29,9 @@ bool vue_gpu_windows ();
 // the glyphs as the preferences say ("gpu glyphs"...): true when they
 // changed, and everything must be drawn again
 bool vue_gpu_follow_glyph_settings ();
+// when the GUI starts: the backend begins what takes time (the shaders of
+// Metal), while TeXmacs boots
+void vue_gpu_warm_up ();
 // before the first window is created: the attributes of its GL context
 void vue_gpu_prepare ();
 // draw into the window from now on (the backend makes the one, shared GL

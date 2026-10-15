@@ -91,6 +91,10 @@ ns_gui_rep::ns_gui_rep (int& argc, char** argv)
     retina_icons= get_user_preference ("retina-icons") == "on"? 2: 1;
   if (has_user_preference ("retina-scale"))
     retina_scale= as_double (get_user_preference ("retina-scale"));
+  // the shaders of the canvases drawn by the GPU, compiled while TeXmacs
+  // boots (gpu_layers_enabled waits for them)
+  const char* ns_gpu= getenv ("TEXMACS_NS_GPU");
+  if (ns_gpu == NULL || strcmp (ns_gpu, "0") != 0) vue_gpu_warm_up ();
 }
 
 

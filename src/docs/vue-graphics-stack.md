@@ -983,7 +983,11 @@ before (until 2026-10-05 the desktop needed `TEXMACS_VUE_GPU=1`).
   the shapes; `gpu_backend_metal.mm` is Metal (macOS; `--with-metal=no`
   leaves it out), with Core Graphics for the shapes, so that it needs no
   ThorVG. On macOS Metal is the default when it is compiled;
-  `TEXMACS_VUE_GPU=gl` or `=metal` chooses. Metal: one device and queue,
+  `TEXMACS_VUE_GPU=gl` or `=metal` chooses. Metal: the shaders and the
+  pipelines are compiled on another thread from the start of the GUI
+  (`vue_gpu_warm_up`, `warm_up`; `prepare` waits for them): when Metal has
+  not cached them, at the first start after an update, they take 150 to
+  300 ms on an Apple M4. One device and queue,
   a `CAMetalLayer` per window (`SDL_Metal_CreateView`, the windows made
   with `SDL_WINDOW_METAL`) whose drawable is taken when the window is
   first drawn into in a frame; the commands go into one command buffer,
