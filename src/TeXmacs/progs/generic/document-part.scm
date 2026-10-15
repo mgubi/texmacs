@@ -371,28 +371,17 @@
 	(else (list-find (tree-children t)
 			 (lambda (x) (document-find-part x id))))))
 
-(define (document-part-changes t id)
-  ;; the parts of @t to relabel so that only the part @id is shown,
-  ;; as pairs (part . new label)
-  (cond ((tree-atomic? t) '())
+(define (document-select-part t id)
+  (cond ((tree-atomic? t) (noop))
 	((tree-in? t '(show-part hide-part))
 	 (with show? (== id (document-part-name t))
-	   (cond ((and show? (tree-is? t 'hide-part))
-		  (list (cons t 'show-part)))
-		 ((and (not show?) (tree-is? t 'show-part))
-		  (list (cons t 'hide-part)))
-		 (else '()))))
-	((not (tree-is? t 'document)) '())
-	(else (append-map (lambda (x) (document-part-changes x id))
-			  (tree-children t)))))
-
-(define (buffer-select-part t id)
-  ;; show the part @id of @t and hide the others; nothing is recorded
-  ;; when it is already the only shown part
-  (with l (document-part-changes t id)
-    (when (nnull? l)
-      (for (c l)
-	(tree-assign-node! (car c) (cdr c))))))
+	   (if (and show? (tree-is? t 'hide-part))
+	       (tree-assign-node! t 'show-part))
+	   (if (and (not show?) (tree-is? t 'show-part))
+	       (tree-assign-node! t 'hide-part))))
+	((not (tree-is? t 'document)) (noop))
+	(else (for-each (lambda (x) (document-select-part x id))
+			(tree-children t)))))
 
 (tm-define (buffer-go-to-part id)
   (:synopsis "Go to the part with name @id")
@@ -402,7 +391,7 @@
 (tm-define (buffer-show-part id)
   (:synopsis "Show the document part with name @id")
   (when (== (buffer-get-part-mode) :one)
-    (buffer-select-part (buffer-tree) id)
+    (document-select-part (buffer-tree) id)
     (buffer-go-to-part id)))
 
 (tm-define (buffer-toggle-part id)
@@ -508,7 +497,7 @@
   (:require (and (tree-is? t 'hide-part) (== (tree-up t) (buffer-tree))))
   (if (== (buffer-get-part-mode) :one)
       (with id (document-part-name t)
-	(buffer-select-part (tree-up t) id)
+	(document-select-part (tree-up t) id)
 	;; the part where the cursor was is hidden now
 	(when (not (list-starts? (cursor-path) (tree->path t)))
 	  (tree-go-to t 1 :start)))

@@ -1141,7 +1141,6 @@
       (check-visible))))
 
 (define (body-now) (tree->stree (buffer-tree)))
-(define (doc-end) (rel (path-end (root-tree) (buffer-path))))
 
 (define (cursor-visible?)
   ;; is the cursor outside the hidden preamble, the hidden body, the
@@ -1342,6 +1341,8 @@
 (define (check-layout-undo name body)
   (write-doc name '("book") '() body)
   (open-for-undo name)
+  ;; showing a part does nothing unless the mode is :one
+  (check= (buffer-get-part-mode) :one)
   (with states (list (body-now))
     (for (id (buffer-parts-list #t))
       (edit (buffer-show-part id))
@@ -1372,6 +1373,7 @@
              '((show-part "1" "" "")
                (hide-part "2" (document (section "B") "b") "")))
   (open-for-undo "parts-undo-atom.tm")
+  (check= (buffer-get-part-mode) :one)
   (let* ((s0 (body-now))
          (s1 (begin (edit (buffer-show-part "B")) (body-now))))
     (check= s1 '(document (hide-part "1" "" "")
@@ -1390,6 +1392,7 @@
                           "")
                (hide-part "4" (document (chapter "B") "b") "")))
   (open-for-undo "parts-undo-nest.tm")
+  (check= (buffer-get-part-mode) :one)
   (with s0 (body-now)
     (edit (buffer-show-part "B"))
     (edit (undo 0))
