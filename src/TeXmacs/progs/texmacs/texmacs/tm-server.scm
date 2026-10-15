@@ -49,9 +49,9 @@
                "graphical interface theme"))
 
 (define (notify-icon-set var val)
-  ;; the Vue interface follows the icon set at once (vue_follow_icon_set);
-  ;; the others at their next start
-  (when (not (vue-gui?)) (notify-restart var val)))
+  ;; the Vue and Cocoa interfaces follow the icon set at once
+  ;; (vue_follow_icon_set, ns_follow_icon_set); the others at their next start
+  (when (not (or (vue-gui?) (ns-gui?))) (notify-restart var val)))
 
 (define (notify-gui-scaling var val)
   ;; the Vue interface follows the scaling at once

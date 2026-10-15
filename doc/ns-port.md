@@ -67,7 +67,10 @@ light or dark variant of the icon sets on `TEXMACS_PIXMAP_PATH`, as in Qt
 equivalents. They follow a change of the appearance of the system: the
 icons of the native controls are drawn in the appearance of their view
 (`to_nsimage`), and the canvases are drawn again with the other variant
-(`TMAppearanceObserver`).
+(`TMAppearanceObserver`). A change of the icon set in the preferences shows
+at once, as in Vue (`ns_follow_icon_set`, in the update loop: the set is
+put on the path again, `ns_icon_generation` is a part of the keys of the
+images of `xpm_image`, and all the views are drawn again).
 
 The look follows macOS where Qt has its own: the selection is translucent
 as in Qt; the icon bars are flat, with a small triangle in the corner of

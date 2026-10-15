@@ -597,6 +597,31 @@ ns_gui_rep::add_event (const queued_event& ev) {
   else need_update();
 }
 
+// The icon set of the preferences, followed at once (as vue_follow_icon_set):
+// when it changes, it is put on the path of the icons (apply_icon_set), and
+// the icons are drawn again from it (their images call xpm_image when they
+// are drawn, see to_nsimage in ns_ui_element.mm; the menus are made again
+// when they open). The loop calls it at each update: a lookup in the
+// preferences
+static bool
+ns_follow_icon_set () {
+  static string current;
+  string now= get_user_preference ("icon set", "neo-classical");
+  if (N(current) == 0) { current= now; return false; }
+  if (now == current) return false;
+  current= now;
+  apply_icon_set ();
+  ns_icon_generation++;
+  return true;
+}
+
+static void
+ns_redisplay_views (NSView* v) {
+  if (v == nil) return;
+  [v setNeedsDisplay: YES];
+  for (NSView* sub in [v subviews]) ns_redisplay_views (sub);
+}
+
 void
 ns_gui_rep::update () {
   time_t std_delay= 90 / 6;
@@ -652,6 +677,10 @@ ns_gui_rep::update () {
     bool glyphs= ns_follow_glyph_settings ();
     if (vue_gpu_follow_glyph_settings ()) glyphs= true;
     if (glyphs) ns_simple_widget_rep::invalidate_every ();
+    if (ns_follow_icon_set ()) {
+      ns_simple_widget_rep::invalidate_every ();
+      for (NSWindow* w in [NSApp windows]) ns_redisplay_views ([w contentView]);
+    }
     ns_simple_widget_rep::repaint_all ();
   }
 

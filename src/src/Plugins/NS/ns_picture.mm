@@ -131,13 +131,16 @@ render_icon (NSImage* im, int w, int h) {
 
 picture raw_load_xpm (url file_name); // picture.cpp
 
+int ns_icon_generation= 0;
+
 NSBitmapImageRep*
 xpm_image (url file_name, string theme) {
   // As in qt_load_xpm, the SVG version of the icon is drawn when there is
   // one, and otherwise its PNG equivalent (at double resolution on retina
   // screens); the size of the image is in points
   static hashmap<string,pointer> cache (NULL);
-  string key= as_string (file_name) * "#" * theme;
+  string key= as_string (file_name) * "#" * theme * "#" *
+              as_string (ns_icon_generation);
   if (cache->contains (key)) return (NSBitmapImageRep*) cache[key];
   string sss;
   double f= 1.0;

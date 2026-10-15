@@ -38,6 +38,9 @@ public:
 
 picture ns_picture (NSBitmapImageRep *im, int ox, int oy);
 NSBitmapImageRep* xpm_image (url file_name, string theme);
+// incremented when the icon set changes (ns_follow_icon_set): the images
+// of xpm_image are those of the set
+extern int ns_icon_generation;
 string ns_icon_theme (NSAppearance* appearance);
 string ns_icon_theme ();
 
