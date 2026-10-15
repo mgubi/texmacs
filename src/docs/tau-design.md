@@ -1265,6 +1265,19 @@ from 16 to 1024 pixels. As in the page of TeXmacs Vue
   rectangle with a pattern drawn tile by tile, a polygon or an arc with
   one drawn by MuPDF into a picture. Pictures are named by their file
   and size on the screen when the renderer knows them.
+- **What the page spends on the commands** (`replay-bench.mjs`; with
+  `?gpusync` each frame tells its shift, its calls to the canvas and the
+  drawing the canvas does when waited for). Safari, a canvas of 2874 ×
+  1848: when the glyphs are known, a scroll step is 4–5 ms with pixels or
+  commands, and nearly all of it is the shift (the canvas drawn on itself,
+  3.5–4 ms; 6–8 ms in Firefox); the calls are 0.03–0.3 ms, a whole view
+  of 3354 glyphs 7 ms against 4 with pixels. Where the glyphs are new (the
+  manual: 9 glyphs and 12 inks a step, 48 and 73 a view) a step is 10 ms
+  and a view 30: a small canvas made for each glyph and each of its
+  colours costs about half a millisecond in Safari. So first one canvas
+  for all the glyphs (an atlas, also in 2D), and the shift without
+  drawing the canvas on itself (two canvases, or the view moved);
+  WebGL after that, if the calls weigh then.
 - **Left**: a limit to the glyphs and pictures kept by the page and the
   shell; the pattern of a rotated shape is rotated with it (MuPDF keeps
   it upright); the commands by default (they are asked for, for now).

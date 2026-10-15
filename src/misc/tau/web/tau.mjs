@@ -866,6 +866,7 @@ setInterval(() => {
 // what it was given, to measure it (it reads a pixel back).
 const gpuSync = params.has("gpusync");
 state.drawTimes = [];
+state.drawParts = [];
 const glyphMasks = new Map(), glyphInks = new Map(), colorNames = new Map(), pictures = new Map();
 function addPictures(buffer) {
 	const d = new DataView(buffer), bytes = new Uint8ClampedArray(buffer);
@@ -921,6 +922,20 @@ function glyphInk(id, color) {
 		glyphInks.set(key, ink);
 	}
 	return ink;
+}
+// how many commands of each kind a frame has (for ?gpusync)
+const OP_SIZE = { 1: 6, 2: 5, 5: 10, 6: 5, 7: 5, 8: 5, 9: 7, 10: 1 };
+function replayCounts(m) {
+	const o = new Int32Array(m.ops), c = {};
+	for (let i = 0; i < o.length;) {
+		const op = o[i];
+		c[op] = (c[op] || 0) + 1;
+		if (op === 3) i += 4 + 2 * o[i + 1];
+		else if (op === 4) i += 3 + 2 * o[i + 1];
+		else if (OP_SIZE[op]) i += OP_SIZE[op];
+		else break;
+	}
+	return c;
 }
 function replayCommands(ctx, m) {
 	if (m.glyphs.byteLength) addGlyphs(m.glyphs);
@@ -1141,11 +1156,25 @@ worker.onmessage = event => {
 		if (m.shift && (m.shift.x || m.shift.y)) {
 			pane.context.drawImage(canvas, m.shift.x, m.shift.y);
 		}
+		// (?gpusync: the canvas is waited for after the shift too, and the
+		// time is told in parts: the shift, the calls which say what to draw,
+		// the drawing which the canvas does when it is waited for)
+		if (gpuSync) pane.context.getImageData(0, 0, 1, 1);
+		const t1 = performance.now();
+		const inks0 = glyphInks.size, masks0 = glyphMasks.size;
 		if (m.t === "dlist") replayCommands(pane.context, m);
 		else pane.context.putImageData(new ImageData(new Uint8ClampedArray(m.pixels), m.w, m.h), m.x, m.y);
+		const t2 = performance.now();
 		if (gpuSync) pane.context.getImageData(0, 0, 1, 1);
-		state.drawTimes.push(performance.now() - t0);
+		const t3 = performance.now();
+		state.drawTimes.push(t3 - t0);
 		if (state.drawTimes.length > 500) state.drawTimes.shift();
+		if (gpuSync) {
+			state.drawParts.push({ shift: t1 - t0, calls: t2 - t1, raster: t3 - t2,
+				ops: m.t === "dlist" ? replayCounts(m) : null, w: m.w, h: m.h,
+				masks: glyphMasks.size - masks0, inks: glyphInks.size - inks0 });
+			if (state.drawParts.length > 500) state.drawParts.shift();
+		}
 		pane.extents = m.extents; pane.scroll = m.scroll; pane.caret = m.caret;
 		if (pane.showScroll) pane.showScroll();
 		if (pane === focused && !composing) placeArea();
