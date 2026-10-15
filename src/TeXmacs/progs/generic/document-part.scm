@@ -473,7 +473,8 @@
                           (list-any (lambda (x) (part-visible-border x #f))
                                     (reverse (list-head l i))))))
                    ((tree-is? t 'show-part)
-                    (part-visible-border (tree-ref t 1) #t))
+                    (and (> (tree-arity t) 1)
+                         (part-visible-border (tree-ref t 1) #t)))
                    (else #f))
              (part-visible-near (cdr ancestors))))))
 
@@ -488,8 +489,9 @@
 (tm-define (notify-undo-redo)
   ;; undo and redo put the cursor at the change, which may be hidden in
   ;; a preamble or in a part which is not shown; move it to a place
-  ;; nearby where typing is seen
-  (:require (document-has-hidden-parts? (buffer-tree)))
+  ;; nearby where typing is seen; in source mode, everything is shown
+  (:require (and (document-has-hidden-parts? (buffer-tree))
+                 (!= (get-init "preamble") "true")))
   (let* ((bp (buffer-path))
          (c (cursor-path)))
     (when (list-starts? c bp)

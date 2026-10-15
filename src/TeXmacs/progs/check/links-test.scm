@@ -1154,7 +1154,8 @@
 
 (define (check-visible)
   ;; after undo and redo, the cursor is where typing is seen
-  (check-true (cursor-visible?)))
+  (check-true (cursor-visible?))
+  (check-true (cursor-accessible?)))
 
 (define (open-for-undo name)
   ;; without a window, the first edit step after a buffer is opened is
@@ -1388,6 +1389,21 @@
   ;; in turn, then the preamble
   (for (layout part-layouts)
     (check-layout-undo (car layout) (cdr layout)))
+  ;; in source mode the hidden parts are shown: the cursor stays where
+  ;; the undone change was
+  (write-doc "parts-undo-src.tm" '("article") '()
+             '("intro" (section "One") "a"))
+  (open-for-undo "parts-undo-src.tm")
+  (edit (buffer-set-part-mode :one))
+  (check= (tree-label (bt 1)) 'hide-part)
+  (edit (init-env "preamble" "true"))
+  (edit (go-to (at 1 1 1 1)))
+  (edit (insert "x"))
+  (check= (st 1 1 1) "ax")
+  (edit (undo 0))
+  (check= (st 1 1 1) "a")
+  (check= (cursor) '(1 1 1 1))
+  (edit (init-default "preamble"))
   ;; :one: showing a hidden part moves the cursor out of the part which
   ;; is hidden now
   (write-doc "parts-undo-sel.tm" '("article") '()
