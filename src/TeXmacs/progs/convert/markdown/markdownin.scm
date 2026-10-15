@@ -770,6 +770,14 @@
 ;; the lines are not searched again from each of them.
 (define md-no-math-end '())
 
+;; tables keyed by the identity of pairs, in Guile (hashq) and in S7
+(define (md-eq-table)
+  (if (defined? 'hashq-set!) (make-hash-table 64) (make-hash-table 64 eq?)))
+(define (md-eq-ref t key)
+  (if (defined? 'hashq-ref) (hashq-ref t key #f) (hash-table-ref t key)))
+(define (md-eq-set! t key)
+  (if (defined? 'hashq-set!) (hashq-set! t key #t) (hash-table-set! t key #t)))
+
 (define (md-math lines)
   ;; a formula between $$ and $$, or \[ and \], on its line or on lines of
   ;; its own; the text which follows its end is a line of those which
@@ -778,7 +786,7 @@
   (let* ((first (md-trim (car lines)))
          (close (if (md-starts? first 0 "$$") "$$" "\\]"))
          (none (assoc-ref md-no-math-end close)))
-    (and (not (and none (hashq-ref none lines #f)))
+    (and (not (and none (md-eq-ref none lines)))
       (let loop ((s (substring first 2 (string-length first)))
                  (l (cdr lines)) (acc '()))
         (with e (md-search s 0 close)
@@ -796,10 +804,10 @@
                                 ,tex)
                              (if (== after "") l (cons after l))))))
                 ((or (null? l) (md-blank? (car l)))
-                 (with t (or none (make-hash-table 64))
+                 (with t (or none (md-eq-table))
                    (let mark ((m lines))
                      (when (and (pair? m) (not (eq? m l)))
-                       (hashq-set! t m #t)
+                       (md-eq-set! t m)
                        (mark (cdr m))))
                    (if (not none)
                        (set! md-no-math-end
