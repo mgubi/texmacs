@@ -149,7 +149,6 @@ public:
   virtual void loci (SI x, SI y, SI d, list<string>& ids, rectangles& rs);
   virtual void display_links (renderer ren);
   virtual void position_at (SI x, SI y, repaint_log& log);
-  virtual void keep_placed (repaint_log& log);
   virtual void unplace (repaint_log& log);
   virtual void all_placed (SI x, SI y, array<box>& bs, array<rectangle>& rs);
   virtual void collect_page_numbers (hashmap<string,tree>& h, tree page);
@@ -309,7 +308,6 @@ struct placed_box {
   SI  ox, oy;    // at this origin
   inline placed_box (): id (-1), pass (0), ox (0), oy (0) {}
   void place (box_rep* b, SI x, SI y, repaint_log& log);
-  void keep (box_rep* b, repaint_log& log);
   void unplace (box_rep* b, repaint_log& log);
 };
 

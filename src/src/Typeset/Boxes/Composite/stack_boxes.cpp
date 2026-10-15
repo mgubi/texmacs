@@ -16,12 +16,6 @@
 ******************************************************************************/
 
 struct stack_box_rep: public composite_box_rep {
-  // the log, the pass and the absolute position of the last position_at,
-  // and the boxes which it placed in the stack
-  int        pos_id, pos_pass;
-  SI         pos_x, pos_y;
-  array<box> placed;
-
   stack_box_rep (path ip, array<box> bs, array<SI> spc); 
   int get_type () { return STACK_BOX; }
   operator tree () {
@@ -33,7 +27,6 @@ struct stack_box_rep: public composite_box_rep {
 
   void      position (array<SI> spc);
   void      finalize ();
-  void      position_at (SI x, SI y, repaint_log& log);
   void      display (renderer ren);
   void      clear_incomplete (rectangles& rs, SI pixel, int i, int i1, int i2);
   bool      access_allowed ();
@@ -63,7 +56,7 @@ stack_box_rep::position (array<SI> spc) {
 }
 
 stack_box_rep::stack_box_rep (path ip, array<box> bs2, array<SI> spc):
-  composite_box_rep (ip), pos_id (-1), pos_pass (0), pos_x (0), pos_y (0)
+  composite_box_rep (ip)
 {
   bs= bs2;
   if (N(bs) != 0)
@@ -71,35 +64,7 @@ stack_box_rep::stack_box_rep (path ip, array<box> bs2, array<SI> spc):
   finalize ();
 }
 
-int typeset_caches_mode (); // see typesetter.hpp
-void typeset_cache_mismatch (string what);
 
-void
-stack_box_rep::position_at (SI x, SI y, repaint_log& log) {
-  // Boxes are not modified once built, so if this stack was placed at the
-  // same absolute position in the previous pass of the same log, the boxes
-  // inside it are at the same place and there is nothing to log: they are
-  // only placed again.  This avoids walking all the lines of a long
-  // document at every typesetting pass.  TEXMACS_TYPESET_CACHES "off" walks
-  // them all the same, and "check" walks them and reports a box which logs
-  // that it moved.
-  SI ax= x + x0, ay= y + y0;
-  int mode= typeset_caches_mode ();
-  bool same= (mode != 0 && pos_id == log.id && pos_pass == log.pass - 1 &&
-              pos_x == ax && pos_y == ay);
-  if (same && mode == 1) {
-    for (int i=0; i<N(placed); i++) placed[i]->keep_placed (log);
-    pos_pass= log.pass;
-    return;
-  }
-  rectangles before= log.rects;
-  int start= N(log.placed);
-  box_rep::position_at (x, y, log);
-  if (same && log.rects.operator-> () != before.operator-> ())
-    typeset_cache_mismatch ("position of a stack");
-  placed= range (log.placed, start, N(log.placed));
-  pos_id= log.id; pos_pass= log.pass; pos_x= ax; pos_y= ay;
-}
 
 void
 stack_box_rep::finalize () {

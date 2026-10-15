@@ -626,7 +626,6 @@ public:
   phrase_box_rep (path ip, array<box> bs, array<SI> spc);
   void position_at (SI x, SI y, repaint_log& log) {
     place.place (this, x + x0, y + y0, log); }
-  void keep_placed (repaint_log& log) { place.keep (this, log); }
   void unplace (repaint_log& log) { place.unplace (this, log); }
   void all_placed (SI x, SI y, array<box>& bs, array<rectangle>& rs) {
     x += x0; y += y0;

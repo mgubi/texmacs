@@ -882,7 +882,6 @@ box_rep::position_at (SI x, SI y, repaint_log& log) {
   for (i=0; i<n; i++) subbox (i)->position_at (x, y, log);
 }
 
-void box_rep::keep_placed (repaint_log& log) { (void) log; }
 
 void
 box_rep::all_placed (SI x, SI y, array<box>& bs, array<rectangle>& rs) {
@@ -933,14 +932,6 @@ placed_box::place (box_rep* b, SI x, SI y, repaint_log& log) {
     log.rects= rectangles (now, rectangles (old, log.rects));
   }
   id= log.id; pass= log.pass; ox= x; oy= y;
-  log.placed << box (b);
-}
-
-void
-placed_box::keep (box_rep* b, repaint_log& log) {
-  // at the same place as in the previous pass (see stack_box_rep)
-  if (id != log.id || pass == log.pass) return;
-  pass= log.pass;
   log.placed << box (b);
 }
 

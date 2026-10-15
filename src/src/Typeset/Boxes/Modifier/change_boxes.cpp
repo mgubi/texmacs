@@ -671,7 +671,6 @@ public:
   }
   inline void position_at (SI x, SI y, repaint_log& log) {
     place.place (this, x + x0, y + y0, log); }
-  inline void keep_placed (repaint_log& log) { place.keep (this, log); }
   inline void unplace (repaint_log& log) { place.unplace (this, log); }
   inline void all_placed (SI x, SI y, array<box>& bs, array<rectangle>& rs) {
     x += x0; y += y0;

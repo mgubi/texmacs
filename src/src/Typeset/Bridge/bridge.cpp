@@ -45,7 +45,7 @@ bridge_rep::bridge_rep (typesetter ttt2, tree st2, path ip2):
   ttt (ttt2), env (ttt->env), st (st2), ip (ip2),
   status (CORRUPTED), changes (UNINIT), reads (),
   in_known (false), in_items (""), in_fp (0),
-  stack_cache_ok (false), version (0), chunk_cache (NULL)
+  version (0), chunk_cache (NULL)
 {
   static int bridges_made= 0;
   serial= bridges_made++;
@@ -814,9 +814,6 @@ bridge_rep::typeset_by_inputs (int desired_status) {
   }
   env->link_env= old_link_env;
   status= desired_status;
-  // (the old lines are not used any more)
-  stack_cache= array<page_item> ();
-  stack_cache_ok= false;
   version++;
   return true;
 }
@@ -867,9 +864,6 @@ bridge_rep::typeset (int desired_status) {
     my_stack_end ();
     env->link_env= old_link_env;
     status= desired_status;
-    // (the old lines are not used any more)
-    stack_cache= array<page_item> ();
-    stack_cache_ok= false;
     version++;
     made= true;
   }
@@ -880,28 +874,9 @@ bridge_rep::typeset (int desired_status) {
 void
 bridge_rep::my_insert (bool made) {
   (void) made;
-  // ttt->insert_stack (l, sb);
-  //if (N(l) == 0); else
-  int mode= typeset_caches_mode ();
   if (ttt->paper || (N(l) <= 1)) {
     drop_chunks (this);
     ttt->insert_stack (l, sb);
   }
-  else if (mode != 0 && stack_cache_ok && strong_equal (ip, stack_cache_ip)) {
-    if (mode == 2 && !same_page_items (merged_lines (this), stack_cache))
-      typeset_cache_mismatch ("merged stack of a paragraph");
-    ttt->insert_stack (stack_cache, sb);
-  }
-  else {
-    stack_cache= merged_lines (this);
-    stack_cache_ip= ip;
-    stack_cache_ok= true;
-    ttt->insert_stack (stack_cache, sb);
-  }
-
-  //cout << "l   = " << l << LF;
-  //cout << "sb  = " << sb << LF;
-  //cout << "l   = " << ttt->l << LF;
-  //cout << "a   = " << ttt->a << LF;
-  //cout << "b   = " << ttt->b << LF;
+  else ttt->insert_stack (merged_lines (this), sb);
 }
