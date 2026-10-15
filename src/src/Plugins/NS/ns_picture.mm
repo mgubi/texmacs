@@ -129,6 +129,8 @@ render_icon (NSImage* im, int w, int h) {
   return [rep retain];
 }
 
+picture raw_load_xpm (url file_name); // picture.cpp
+
 NSBitmapImageRep*
 xpm_image (url file_name, string theme) {
   // As in qt_load_xpm, the SVG version of the icon is drawn when there is
@@ -169,7 +171,8 @@ xpm_image (url file_name, string theme) {
   }
   if (!im) {
     // FIXME: the conversion of the XPM pictures loses the transparency
-    picture p= load_xpm (file_name);
+    // (native: its bitmap is taken)
+    picture p= as_ns_picture (load_xpm (file_name));
     ns_picture_rep* rep= (ns_picture_rep*) p->get_handle ();
     im= [rep->pict retain];
   }
@@ -415,8 +418,14 @@ qt_load_xpm (url file_name) {
     [im release];
     return p;
   }
-  else
-    return error_picture (10, 10);
+  // NOTE: NSImage does not read XPM: an icon which only exists as XPM is
+  // read by TeXmacs (as in the X11 port), and the callers (xpm_image) take
+  // its bitmap, so that the picture must be a native one: the raster
+  // picture of error_picture made them read a bitmap which was not there
+  picture xp= (suffix (file_name) == "xpm") ? raw_load_xpm (file_name) : picture ();
+  if (!is_nil (xp) && xp->get_width () > 0 && xp->get_height () > 0)
+    return as_ns_picture (xp);
+  return as_ns_picture (error_picture (10, 10));
 }
 
 /******************************************************************************
