@@ -88,20 +88,26 @@
 
 (define (tmmd-merge l)
   ;; with the strings which follow each other as one, and so for the
-  ;; emphasized texts and for code: *a**b* would not be read as *ab*
+  ;; emphasized texts and for code: *a**b* would not be read as *ab*. The
+  ;; nodes of a run are merged at once, not each one with those before it
   (let loop ((l l) (acc '()))
     ;; acc: what is merged, the last node first
     (cond ((null? l) (reverse acc))
           ((== (car l) "") (loop (cdr l) acc))
-          ((and (nnull? acc) (pair? (car acc))
-                (in? (caar acc) '(em strong del code))
-                (func? (car l) (caar acc)))
-           (loop (cdr l)
-                 (cons `(,(caar acc)
-                         ,@(tmmd-merge (append (cdar acc) (cdar l))))
-                       (cdr acc))))
-          ((and (nnull? acc) (string? (car acc)) (string? (car l)))
-           (loop (cdr l) (cons (string-append (car acc) (car l)) (cdr acc))))
+          ((string? (car l))
+           (let run ((m (cdr l)) (strs (list (car l))))
+             (if (and (nnull? m) (string? (car m)))
+                 (run (cdr m) (cons (car m) strs))
+                 (loop m (cons (apply string-append (reverse strs)) acc)))))
+          ((and (pair? (car l)) (in? (caar l) '(em strong del code)))
+           (let run ((m (cdr l)) (kids (list (cdar l))))
+             (cond ((and (nnull? m) (== (car m) "")) (run (cdr m) kids))
+                   ((and (nnull? m) (func? (car m) (caar l)))
+                    (run (cdr m) (cons (cdar m) kids)))
+                   (else
+                     (loop m (cons `(,(caar l)
+                                     ,@(tmmd-merge (apply append (reverse kids))))
+                                   acc))))))
           (else (loop (cdr l) (cons (car l) acc))))))
 
 (define (tmmd-squeeze s)
