@@ -426,27 +426,27 @@
   ;; (node . index) of the path down to that node, innermost first
   (let loop ((t t) (p p) (acc '()))
     (if (or (tree-atomic? t) (null? p) (null? (cdr p))
-            (>= (car p) (tree-arity t)))
-        #f
-        (let* ((i (car p))
-               (acc* (cons (cons t i) acc)))
-          (if (or (part-hidden-tag? (tree-ref t i))
-                  (and (tree-is? t 'show-part) (!= i 1)))
-              acc*
-              (loop (tree-ref t i) (cdr p) acc*))))))
+	    (>= (car p) (tree-arity t)))
+	#f
+	(let* ((i (car p))
+	       (acc* (cons (cons t i) acc)))
+	  (if (or (part-hidden-tag? (tree-ref t i))
+		  (and (tree-is? t 'show-part) (!= i 1)))
+	      acc*
+	      (loop (tree-ref t i) (cdr p) acc*))))))
 
 (define (part-visible-border t start?)
   ;; a visible cursor position at the start or the end of @t, or #f
   (cond ((part-hidden-tag? t) #f)
-        ((tree-is? t 'show-part)
-         (and (> (tree-arity t) 1)
-              (part-visible-border (tree-ref t 1) start?)))
-        ((tree-is? t 'document)
-         (list-any (lambda (x) (part-visible-border x start?))
-                   (if start? (tree-children t)
-                       (reverse (tree-children t)))))
-        (start? (path-start (root-tree) (tree->path t)))
-        (else (path-end (root-tree) (tree->path t)))))
+	((tree-is? t 'show-part)
+	 (and (> (tree-arity t) 1)
+	      (part-visible-border (tree-ref t 1) start?)))
+	((tree-is? t 'document)
+	 (list-any (lambda (x) (part-visible-border x start?))
+		   (if start? (tree-children t)
+		       (reverse (tree-children t)))))
+	(start? (path-start (root-tree) (tree->path t)))
+	(else (path-end (root-tree) (tree->path t)))))
 
 (define (part-visible-near ancestors)
   ;; a visible cursor position near the hidden child of the innermost
@@ -454,40 +454,40 @@
   ;; else near that node itself
   (and (nnull? ancestors)
        (let* ((t (caar ancestors))
-              (i (cdar ancestors)))
-         (or (cond ((tree-is? t 'document)
-                    (let ((l (tree-children t)))
-                      (or (list-any (lambda (x) (part-visible-border x #t))
-                                    (list-tail l (+ i 1)))
-                          (list-any (lambda (x) (part-visible-border x #f))
-                                    (reverse (list-head l i))))))
-                   ((tree-is? t 'show-part)
-                    (and (> (tree-arity t) 1)
-                         (part-visible-border (tree-ref t 1) #t)))
-                   (else #f))
-             (part-visible-near (cdr ancestors))))))
+	      (i (cdar ancestors)))
+	 (or (cond ((tree-is? t 'document)
+		    (let ((l (tree-children t)))
+		      (or (list-any (lambda (x) (part-visible-border x #t))
+				    (list-tail l (+ i 1)))
+			  (list-any (lambda (x) (part-visible-border x #f))
+				    (reverse (list-head l i))))))
+		   ((tree-is? t 'show-part)
+		    (and (> (tree-arity t) 1)
+			 (part-visible-border (tree-ref t 1) #t)))
+		   (else #f))
+	     (part-visible-near (cdr ancestors))))))
 
 (define (document-has-hidden-parts? t)
   ;; can a part of the document tree @t be hidden?
   (and (> (tree-arity t) 0)
        (or (tree-in? (tree-ref t 0)
-                     '(show-preamble hide-preamble show-part hide-part))
-           (and (> (tree-arity t) 1)
-                (tree-in? (tree-ref t 1) '(show-part hide-part))))))
+		     '(show-preamble hide-preamble show-part hide-part))
+	   (and (> (tree-arity t) 1)
+		(tree-in? (tree-ref t 1) '(show-part hide-part))))))
 
 (tm-define (notify-undo-redo)
   ;; undo and redo put the cursor at the change, which may be hidden in
   ;; a preamble or in a part which is not shown; move it to a place
   ;; nearby where typing is seen; in source mode, everything is shown
   (:require (and (document-has-hidden-parts? (buffer-tree))
-                 (!= (get-init "preamble") "true")))
+		 (!= (get-init "preamble") "true")))
   (let* ((bp (buffer-path))
-         (c (cursor-path)))
+	 (c (cursor-path)))
     (when (list-starts? c bp)
       (and-with a (part-hidden-ancestors (buffer-tree)
-                                         (list-tail c (length bp)))
-        (and-with p (part-visible-near a)
-          (go-to p))))))
+					 (list-tail c (length bp)))
+	(and-with p (part-visible-near a)
+	  (go-to p))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Making hidden parts visible
@@ -498,7 +498,7 @@
   (if (== (buffer-get-part-mode) :one)
       (with id (document-part-name t)
 	(document-select-part (tree-up t) id)
-	;; the part where the cursor was is hidden now
+	;; only this part is shown now: a cursor outside it is hidden
 	(when (not (list-starts? (cursor-path) (tree->path t)))
 	  (tree-go-to t 1 :start)))
       (tree-assign-node! t 'show-part)))
