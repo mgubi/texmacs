@@ -915,11 +915,26 @@ ns_print_menu (NSMenu* m, int depth, int max_depth) {
       if ([[mi view] isKindOfClass: [NSMatrix class]])
         for (NSCell* c in [(NSMatrix*) [mi view] cells])
           if ([c image]) [imgs addObject: [c image]];
+      // the other views (a palette, a refreshable part): their image
+      if ([mi view] && ![[mi view] isKindOfClass: [NSMatrix class]]) {
+        NSView* v= [mi view];
+        [v layoutSubtreeIfNeeded];
+        NSBitmapImageRep* r= [v bitmapImageRepForCachingDisplayInRect: [v bounds]];
+        if (r) {
+          [v cacheDisplayInRect: [v bounds] toBitmapImageRep: r];
+          NSImage* im= [[NSImage alloc] initWithSize: [v bounds].size];
+          [im addRepresentation: r];
+          [imgs addObject: im];
+          [im release];
+        }
+      }
       for (NSImage* im in imgs) {
         if (n >= 400) break;
         NSData* d= [[NSBitmapImageRep imageRepWithData: [im TIFFRepresentation]]
                      representationUsingType: NSBitmapImageFileTypePNG
                                   properties: [NSDictionary dictionary]];
+        fprintf (stderr, "NSMENU %s  (item-%d.png)\n",
+                 as_charp (string (' ', 2 * depth)), n);
         [d writeToFile: to_nsstring (dir * "/item-" * as_string (n++) * ".png")
             atomically: NO];
       }
