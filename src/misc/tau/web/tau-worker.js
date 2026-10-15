@@ -19,7 +19,15 @@
 
 // what the scripts of the worker complain of is told to the page too
 const consoleError = console.error.bind(console);
-console.error = (...args) => { consoleError(...args); postMessage({ t: "log", text: args.map(String).join(" ") }); };
+console.error = (...args) => {
+	consoleError(...args);
+	postMessage({ t: "log", text: args.map(String).join(" ") });
+	// (a trap of the program in the loop of the turns is said here, and the
+	// loop went on with the program in pieces: it stops, with where it was)
+	const trap = args.find(a => a instanceof WebAssembly.RuntimeError) ||
+		args.find(a => /^RuntimeError\b/.test(String(a)));
+	if (trap) try { stopped(trap); } catch (e) {}
+};
 
 // The progress of the loading, for the panel of the page (app.mjs): the
 // bytes of the files of TeXmacs (misc/wasm/packages.js tells them to
