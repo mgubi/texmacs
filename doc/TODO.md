@@ -72,13 +72,6 @@ no headless mode. The Widkit duplicates are fixed on `wip_other_guis` too.
 - **GPU renderer, after the work of 2026-10-15** (Metal backend, the
   canvases of the Cocoa port on the GPU; `src/docs/vue-graphics-stack.md`,
   "The GPU renderer", and `doc/ns-port.md`, "Drawn by the GPU"):
-  - The Cocoa canvases drawn by Metal were checked through snapshots and
-    `TEXMACS_NS_BENCH` only, never by hand on screen: windows moved between
-    a Retina and an external screen, dialogs with canvases, input methods.
-    Their stores are now transparent until painted, as the bitmaps were, but
-    no canvas which leaves parts unpainted was tried.
-  - The first repaint of a Cocoa canvas on the GPU takes some 0.8 s (the
-    first textures and pipelines); they could be made at the start.
   - One launch of the Cocoa test build quit by itself before its first
     snapshot (no crash report, nothing in the log); four launches after it
     did not.
