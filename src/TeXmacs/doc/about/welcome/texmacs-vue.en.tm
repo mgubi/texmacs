@@ -259,10 +259,35 @@
     changes when Word saves the file, and a formula alone in a cell stays
     in the cell.
 
+    <item>Boxes of text and shapes (rectangles, ellipses...) of Word and
+    <name|OpenDocument> files are shown as framed boxes with their fill,
+    on their side, their text can be edited, and they are written back as
+    boxes and shapes.
+
+    <item>After a review of the Word and <name|OpenDocument> converters,
+    text is no longer lost in formulas with tracked changes, after a field
+    which does not end, in ruby text or in repeated table rows; the
+    numbering of lists, the references to pages and the formatting
+    switched off inside a paragraph come out right; and the files which
+    are written have no section breaks in cells or notes, keep the dashes
+    and quotes of <TeXmacs> and define the styles they use. Addresses of
+    links and descriptions of pictures written with <verbatim|&amp;lt;>
+    or <verbatim|&amp;amp;> are read correctly. A file saved in the other
+    format keeps the look of its named styles, the bibliography of
+    <name|Zotero> in a Word file stays a field, pictures linked to the web
+    stay links, a comment in a note stays in the note, and a formula on
+    its own line inside a paragraph is shown on its own line.
+
     <item>A <name|Markdown> file keeps the tabs at the start of its lines
     (in code, formulas, tables and the <name|YAML> header), a formula of a
     single symbol is read back as a formula, and files with many formulas
-    open faster.
+    open faster. After a review, typographic quotes stay as they are, a
+    file which begins with a byte order mark or holds an entity such as
+    <verbatim|&#1e3;> is read, <verbatim|\<less\>pre\<gtr\>> and
+    <verbatim|\<less\>script\<gtr\>> blocks run to their closing tag, and the
+    <name|Markdown> which is written reads back the same in more cases
+    (nested lists, emphasis next to code, links). All the named entities
+    of <name|HTML5> are read.
   </itemize>
 
   <paragraph|14 October 2026>

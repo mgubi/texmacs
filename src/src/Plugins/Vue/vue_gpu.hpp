@@ -1,7 +1,8 @@
 /******************************************************************************
 * MODULE     : vue_gpu.hpp
-* DESCRIPTION: The GPU renderer of the Vue port (OpenGL, WebGL2 in the
-*              browser): a glyph atlas, textures and ThorVG
+* DESCRIPTION: The GPU renderer of the Vue port: a glyph atlas, textures
+*              and vector shapes, drawn by OpenGL (WebGL2 in the browser)
+*              or Metal (gpu_backend.hpp)
 * COPYRIGHT  : (C) 2026  Massimiliano Gubinelli
 *******************************************************************************
 * This software falls under the GNU general public license version 3 or later.
@@ -17,9 +18,12 @@
 
 struct SDL_Window;
 
-// Whether the windows are drawn by the GPU: compiled with ThorVG
-// (--with-thorvg), unless TEXMACS_VUE_GPU=0. Decided once.
+// Whether the windows are drawn by the GPU: compiled with a backend
+// (OpenGL with --with-thorvg, Metal on macOS), unless TEXMACS_VUE_GPU=0
+// (=gl or =metal chooses the backend). Decided once.
 bool vue_gpu_enabled ();
+// the flags of an SDL window drawn by the GPU (SDL_WINDOW_OPENGL...)
+unsigned long long vue_gpu_window_flags ();
 // the windows are drawn by the GPU (vue_gui.cpp: not in the single window)
 bool vue_gpu_windows ();
 // the glyphs as the preferences say ("gpu glyphs"...): true when they
@@ -27,13 +31,19 @@ bool vue_gpu_windows ();
 bool vue_gpu_follow_glyph_settings ();
 // before the first window is created: the attributes of its GL context
 void vue_gpu_prepare ();
-// make the (one, shared) GL context current for the window, creating it
-// with the first window; false when there is no GL
+// draw into the window from now on (the backend makes the one, shared GL
+// context or Metal device with the first window); false when it cannot
 bool vue_gpu_attach (SDL_Window* w);
 void vue_gpu_present (SDL_Window* w);
+// attached, and presenting into the window would not wait for the screen
+// (Metal: the compositor does not hold too many of its frames); else the
+// window is drawn at a later turn of the loop
+bool vue_gpu_ready (SDL_Window* w);
 
 // the backing store of an editor: an opaque texture, white at first
-picture  gpu_backing_picture (int w, int h);
+// (transparent: the canvases of Cocoa, transparent where not painted, as
+// their bitmaps were; the editors of Vue are opaque white)
+picture  gpu_backing_picture (int w, int h, bool transparent= false);
 bool     is_gpu_picture (picture p);
 renderer gpu_picture_renderer (picture p, double zoom);
 // shift the content of a backing store by (dpx, dpy) pixels (y down)
@@ -59,6 +69,14 @@ picture  gpu_read_screen (int w, int h);
 bool gpu_draw_picture_scaled (renderer ren, picture p, SI x, SI y,
                               double s, int alpha);
 bool is_gpu_renderer (renderer ren);
+// the canvases of the Cocoa port drawn by the GPU (Metal, unless
+// TEXMACS_NS_GPU=0): their backing stores (gpu_backing_picture) are shown in
+// a CAMetalLayer of their view (dw x dh pixels, scaled when the sizes
+// differ), and read back (premultiplied RGBA, rows from the top: the
+// snapshots, which draw the views)
+bool gpu_layers_enabled ();
+bool gpu_show_picture (void* metal_layer, picture p, int dw, int dh);
+bool gpu_read_picture (picture p, unsigned char* rgba);
 
 // a glyph given as its coverage (a byte a pixel, rows from the top), kept
 // in the atlas under key and drawn with its top left corner at the device

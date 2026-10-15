@@ -66,6 +66,61 @@
 (define (mdtm-children x)
   (if (and (pair? (cdr x)) (func? (cadr x) '@)) (cddr x) (cdr x)))
 
+(define (mdtm-utf8-length c)
+  ;; the number of bytes of the character of UTF-8 whose first byte is c
+  (cond ((< c 192) 1) ((< c 224) 2) ((< c 240) 3) (else 4)))
+
+(define (mdtm-utf8-code s)
+  ;; the code of the character of UTF-8 s, or #f when s is not one
+  (let* ((b (map char->integer (string->list s)))
+         (n (length b))
+         (rest (lambda (v l)
+                 (let loop ((v v) (l l))
+                   (cond ((null? l) v)
+                         ((and (>= (car l) 128) (< (car l) 192))
+                          (loop (+ (* v 64) (- (car l) 128)) (cdr l)))
+                         (else #f))))))
+    (cond ((== n 2) (rest (- (car b) 192) (cdr b)))
+          ((== n 3) (rest (- (car b) 224) (cdr b)))
+          ((== n 4) (rest (- (car b) 240) (cdr b)))
+          (else #f))))
+
+(define (mdtm-non-ascii? s)
+  (let loop ((i 0))
+    (and (< i (string-length s))
+         (or (>= (char->integer (string-ref s i)) 128) (loop (+ i 1))))))
+
+(define (mdtm-cork s)
+  ;; the text of UTF-8 in the encoding of TeXmacs. A character which this
+  ;; encoding would make another one, as the apostrophe of typography which
+  ;; it writes ', the opening quote which it writes ` (a backquote in a
+  ;; document of the style markdown) or the micro sign which it writes as
+  ;; the Greek mu, is written by its code: it is written back as it was
+  (with c (utf8->cork s)
+    ;; (s holds no backquote: a ` of c is such a quote)
+    (if (or (not (mdtm-non-ascii? s))
+            (and (== (cork->utf8 c) s) (not (string-index c #\`))))
+        c
+        (let loop ((i 0) (start 0) (acc '()))
+          (define (flush)
+            (if (< start i) (cons (utf8->cork (substring s start i)) acc) acc))
+          (if (>= i (string-length s)) (apply string-append (reverse (flush)))
+              (let ((b (char->integer (string-ref s i))))
+                (if (< b 128) (loop (+ i 1) start acc)
+                    (let* ((e (min (string-length s)
+                                   (+ i (mdtm-utf8-length b))))
+                           (ch (substring s i e))
+                           (code (mdtm-utf8-code ch)))
+                      (if (or (not code)
+                              (with k (utf8->cork ch)
+                                (and (== (cork->utf8 k) ch) (!= k "`"))))
+                          (loop e start acc)
+                          (loop e e
+                                (cons (string-append
+                                        "<#" (upcase-all (number->string code 16))
+                                        ">")
+                                      (flush))))))))))))
+
 (define (mdtm-convert s control)
   ;; the text in the encoding of TeXmacs; a backquote stays one, as it does
   ;; for the other formats (alone, it would be the accent of this encoding),
@@ -74,16 +129,16 @@
   (let ((n (string-length s)))
     (let loop ((i 0) (start 0) (acc '()))
       (if (>= i n)
-          (if (null? acc) (utf8->cork s)
+          (if (null? acc) (mdtm-cork s)
               (apply string-append
-                     (reverse (cons (utf8->cork (substring s start n)) acc))))
+                     (reverse (cons (mdtm-cork (substring s start n)) acc))))
           (let ((c (char->integer (string-ref s i))))
             (cond ((== c 96)
                    (loop (+ i 1) (+ i 1)
-                         (cons* "`" (utf8->cork (substring s start i)) acc)))
+                         (cons* "`" (mdtm-cork (substring s start i)) acc)))
                   ((and (< c 32) (!= c 10))
                    (loop (+ i 1) (+ i 1)
-                         (cons* (control c) (utf8->cork (substring s start i))
+                         (cons* (control c) (mdtm-cork (substring s start i))
                                 acc)))
                   (else (loop (+ i 1) start acc))))))))
 

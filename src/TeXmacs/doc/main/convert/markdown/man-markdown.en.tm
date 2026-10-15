@@ -147,7 +147,9 @@
     text has no header: its lines <verbatim|---> are rules.
 
     <item*|Text>Emphasized, strong and struck through text, code, links,
-    images, line breaks, the entities of <name|Html>.
+    images, line breaks, the entities of <name|Html>. The quotes and the
+    apostrophes of typography stay these characters, also in code and in
+    addresses, and are written back as they were.
 
     <item*|Images and figures>An image alone in its paragraph, with a
     description, <verbatim|![description](file.png)>, is a figure whose
@@ -156,7 +158,9 @@
     <name|Pandoc>. An image inside a text is the image alone. An image may
     have a size, with the attributes of <name|Pandoc>,
     <verbatim|![...](file.png){width=50%}>, or with the tag of
-    <name|Html>, <verbatim|\<less\>img src="file.png" width="300"\<gtr\>>.
+    <name|Html>, <verbatim|\<less\>img src="file.png" width="300"\<gtr\>>;
+    a tag <verbatim|img> with other attributes, as a style, stays
+    <name|Html>.
 
     <item*|Links>A link with a title,
     <verbatim|[text](address "title")>, is a <markup|hlink*>, which keeps
@@ -184,7 +188,10 @@
     levels, and are text beyond.
 
     <item*|<name|Html>>The tags of <name|Html> inside the text are read by
-    the <hlink|converter for <name|Html>|../html/man-html.en.tm>.
+    the <hlink|converter for <name|Html>|../html/man-html.en.tm>. A block
+    of <name|Html> ends at a blank line, but a comment, <verbatim|pre>,
+    <verbatim|script>, <verbatim|style> and <verbatim|textarea> go on to
+    their end.
   </description>
 
   <paragraph|What is written>

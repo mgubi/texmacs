@@ -77,10 +77,15 @@
 
     <item*|Notes>Footnotes and endnotes are footnotes.
 
-    <item*|Boxes of text>The text of a box or of a shape follows the
-    paragraph which the box is in; a figure in a frame of
-    <name|LibreOffice>, with its caption, is a figure. Hidden text is
-    left out.
+    <item*|Boxes of text and shapes>A box of text, or a shape (a
+    rectangle, an ellipse...) with or without text, is shown as a framed
+    box of its width with its fill, on its side, in a paragraph of its own
+    before the paragraph which it belongs to; a shape without text is a
+    drawing. Their text can be edited, and they are written back as boxes
+    and shapes, in both directions. The shapes in groups and the other
+    drawings give their text after their paragraph. A figure in a frame of
+    <name|LibreOffice>, with its caption, is a figure. Hidden text is left
+    out.
 
     <item*|Quotations and code>From the styles <samp|Quote> and
     <samp|Source Code> (<samp|Quotations> and <samp|Preformatted Text> in
@@ -107,7 +112,10 @@
 
     <item*|Fields>A field (a page number, a date, the title of the
     document, a citation of <name|Zotero>) is <markup|office-field>, which
-    shows its result and keeps its instruction.
+    shows its result and keeps its instruction. The bibliography of
+    <name|Zotero> in a Word file, which is several paragraphs, is a field
+    too, so that <name|Zotero> can refresh it after the document is
+    saved.
 
     <item*|Comments and changes>A comment is <markup|office-comment>,
     after its mark, with its author; the text which was inserted and the
@@ -122,13 +130,20 @@
     <item*|Floating images>An image with the text around it is
     <markup|office-float>, with its side, where it is and how the text
     goes around it: <TeXmacs> shows it in a paragraph of its own, before
-    the paragraph which it belongs to.
+    the paragraph which it belongs to. A box of text is
+    <markup|office-box> (with its side, the rest of where it is, its width,
+    its fill, its line and its text), and a shape without text
+    <markup|office-shape>.
 
     <item*|The file>The file itself is kept in the environment of the
     document: when it is saved again in its format, its named styles, its
     pages with their headers and footers, its fonts, its theme, its
     settings and its properties are written again, and the text,
-    its notes, comments and lists are those of <TeXmacs>.
+    its notes, comments and lists are those of <TeXmacs>. Saved in the
+    other format (a Word file as an OpenDocument file, or the reverse), the
+    named styles are written with their look, taken from the macros
+    <verbatim|office-par->name and <verbatim|office-span->name of the
+    document, else from the file.
   </description>
 
   The option <verbatim|office-\<gtr\>texmacs:faithful> of the converter
@@ -203,7 +218,9 @@
     not have is shown in the closest family (with serifs or not), and
     written with its name. The titles of the sections have the look of
     the headings of the file (font, size, capitals, underlines), and the
-    named styles keep theirs. A double line through and the
+    named styles keep theirs. A line over the text is kept in
+    OpenDocument files; Word has none, and gets the text without it. A
+    double line through and the
     underlines which are not single or double are shown as single ones,
     and the spacing of the letters is not shown. Text in lower case, and
     text whose words begin with capitals (kept, but shown as it is), are
@@ -226,12 +243,19 @@
     is a paragraph of its own before its paragraph, on its side: <TeXmacs>
     does not put text around an image. In the style <tmstyle|office> it
     keeps where it was and how the text went around it, and it floats
-    again in the file which is written.
+    again in the file which is written. A picture of a Word file which is
+    linked to an address on the web, and not in the file, is an image with
+    that address, and it stays a link in the file which is written.
 
     <item>The bibliography is its entries as they are displayed: the
     data of the references (authors, years) are not exchanged; the
     citation fields of <name|Zotero> are kept as fields in the style
     <tmstyle|office>.
+
+    <item>A comment in a note of a Word file is read in the note. In a
+    Word file which is written, a comment in a note is at the mark of the
+    note, in the text, since <name|LibreOffice> does not open Word files
+    with comments in their notes.
   </itemize>
 
   <tmdoc-copyright|2026|the <TeXmacs> team>

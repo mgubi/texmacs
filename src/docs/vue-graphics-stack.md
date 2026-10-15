@@ -973,7 +973,41 @@ Makefile builds it by default), `--with-thorvg=no` draws with MuPDF. With
 before (until 2026-10-05 the desktop needed `TEXMACS_VUE_GPU=1`).
 `misc/thorvg-bench` has the measurements which chose the design.
 
-* **One context.** The windows are created with `SDL_WINDOW_OPENGL`, and
+* **Backends.** `vue_gpu.cpp` does not depend on the graphics API: the
+  batches of quads, the atlas and its contents, the outlines of Slug, the
+  caches of the textures and the hash of the frames are its own, and a
+  backend (`gpu_backend.hpp`) has the textures, draws a batch into a
+  target with a scissor, copies between targets, reads pixels back and
+  draws the vector shapes, given as paths (`gpu_shape`).
+  `gpu_backend_gl.cpp` is OpenGL (WebGL2 in the browser), with ThorVG for
+  the shapes; `gpu_backend_metal.mm` is Metal (macOS; `--with-metal=no`
+  leaves it out), with Core Graphics for the shapes, so that it needs no
+  ThorVG. On macOS Metal is the default when it is compiled;
+  `TEXMACS_VUE_GPU=gl` or `=metal` chooses. Metal: one device and queue,
+  a `CAMetalLayer` per window (`SDL_Metal_CreateView`, the windows made
+  with `SDL_WINDOW_METAL`) whose drawable is taken when the window is
+  first drawn into in a frame; the commands go into one command buffer,
+  committed when presented, flushed or read back, and consecutive draws
+  into one target share an encoder; a change of a texture which commands
+  already encoded may read (the atlas, the textures of Slug) is a copy
+  from a buffer, encoded after them; the targets are BGRA8, their first
+  row at the top (`targets_flipped`), and copies at another scale are
+  quads sampled linearly. The shapes are rasterized by Core Graphics over
+  their box, uploaded and composed. A window is not presented again within
+  half a refresh period of its screen (`ready_to_present`, the period from
+  SDL's display mode; `vue_gpu_ready` before it is drawn, the loop coming
+  back within 2 ms otherwise): a layer has three drawables, which the
+  compositor gives back some two refreshes after they were presented, and
+  presented in bursts they ran out, `nextDrawable` waiting 3 to 5 ms a
+  frame while scrolling (presents 10 ms apart); now 6 to 7 ms apart at
+  120 Hz, with no wait. Presented handlers, which would count the frames
+  not shown yet, are not called for a frame replaced before a refresh.
+  Compared with OpenGL on an Apple M4
+  (the math font catalogue, `TEXMACS_VUE_GPU_SYNC=1`): a forced repaint
+  of the editor takes the same time (1.4 ms), a repaint after a zoom 2.0
+  ms instead of 3.2; a page differs on some hundreds of pixels, the edges
+  of the shapes.
+* **One context (OpenGL).** The windows are created with `SDL_WINDOW_OPENGL`, and
   the first one makes the GL context, which is made current for each
   window as it is drawn (`vue_gpu_attach`): textures and framebuffers
   belong to all the windows, and an editor can move between them. The
@@ -1037,13 +1071,25 @@ before (until 2026-10-05 the desktop needed `TEXMACS_VUE_GPU=1`).
   MuPDF renderer's on a third of the pixels the bitmap glyphs differ on.
   The glyphs of fonts with no file, glyphs filled with a pattern and glyphs
   under a transformation keep the atlas. On the Apple M4 a full repaint
-  takes the same CPU time (0.5 ms) and some 0.9 ms more of the GPU.
+  takes the same CPU time (0.5 ms) and some 0.9 ms more of the GPU. They
+  are as bold as those of the atlas (`gpu glyph boldness`): the shader
+  moves each crossing of the rays outwards by half of it, the direction of
+  the outline (the sign of its area, in the high bit of the number of
+  bands) telling outwards, mirrored for the vertical ray, and the quad is
+  padded by it (the text of Pagella and of Georgia, a TrueType font, as
+  dark as with the atlas).
+* **The MuPDF renderer** (no GPU, or `?gpu=0` in the browser) makes its
+  glyphs as bold too: text objects are filled and stroked (text rendering
+  mode 2), the stroke `gpu glyph boldness` pixels wide (a pixel a unit of
+  the user space), unless `gpu glyphs` is `mupdf`; followed at once
+  (`mupdf_follow_glyph_settings`, in the loop beside the settings of the
+  GPU).
 * **Pictures** (icons, images: `cached_load_picture` gives the same picture
   again) are uploaded once, as textures keyed by their unique id (at most
   512 and 256 MB, the least used going first); patterns and the neutral
   pattern of `clear_device` once per size of their tiles, repeated.
 * **Vector graphics** (lines which are not thin rules, polygons, arcs,
-  rounded rectangles) go to ThorVG's GL engine. It draws into a
+  rounded rectangles) go, in the OpenGL backend, to ThorVG's GL engine. It draws into a
   multisampled framebuffer of its own and ends a pass by copying all of it
   over its target, so it cannot draw over what is there, and its
   `viewport` does not limit that copy: it draws into a scratch texture,

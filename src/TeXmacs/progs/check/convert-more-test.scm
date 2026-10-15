@@ -398,6 +398,13 @@
   (check= (parse-xml "<?pi?><a/>") '(*TOP* (*PI* pi "") (a)))
   (check= (parse-xml "<a x=\"&lt;&amp;&quot;\" y='a\"b'/>")
           '(*TOP* (a (@ (x "<&\"") (y "a\"b")))))
+  ;; the entities of XML are replaced once, in attributes and CDATA too
+  (check= (parse-xml "<a x=\"q=1&amp;lt=2&amp;amp;&amp;#65;\"/>")
+          '(*TOP* (a (@ (x "q=1&lt=2&amp;&#65;")))))
+  (check= (parse-xml "<a><![CDATA[a&amp;b]]></a>") '(*TOP* (a "a&amp;b")))
+  (check= (parse-xml (string-append "<!DOCTYPE a [<!ENTITY e \"E&#38;#66;\">"
+                                    "<!ENTITY f \"&e;F\">]><a x=\"&f;\">&f;</a>"))
+          '(*TOP* (*DOCTYPE* "a") (a (@ (x "EBF")) "EBF")))
   (check= (parse-xml "<a  b = 'single' c=\"d\" >  x  </a>")
           '(*TOP* (a (@ (b "single") (c "d")) "  x  ")))
   (check= (parse-xml "<n:a xmlns:n=\"urn:x\"><n:b n:c=\"d\"/></n:a>")

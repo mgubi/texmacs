@@ -31,8 +31,8 @@ N        := $(W)/shell
 PREFIX   ?= /opt/homebrew
 OBJ      := obj
 
-SOURCES  := $(filter-out Tau/%,$(shell grep -v "^\#" $(W)/sources.txt)) Plugins/Vue/vue_gui.cpp Plugins/Vue/vue_widget.cpp Plugins/Vue/vue_gpu.cpp Plugins/Vue/clay.c Tau/tau_shell.cpp
-OBJECTS  := $(patsubst %,$(OBJ)/%.o,$(basename $(SOURCES)))
+SOURCES  := $(filter-out Tau/%,$(shell grep -v "^\#" $(W)/sources.txt)) Plugins/Vue/vue_gui.cpp Plugins/Vue/vue_widget.cpp Plugins/Vue/vue_gpu.cpp Plugins/Vue/gpu_backend_gl.cpp Plugins/Vue/clay.c Tau/tau_shell.cpp
+OBJECTS   = $(patsubst %,$(OBJ)/%.o,$(basename $(SOURCES)))
 
 INCLUDE_DIRS := System System/Boot System/Classes System/Files System/Link \
   System/Misc System/Language Kernel/Abstractions Kernel/Containers \
@@ -54,13 +54,21 @@ CXXFLAGS := $(OPT) -w -std=c++20
 DEPFLAGS := -MMD -MP
 LIBS     := -L$(PREFIX)/lib -lmupdf -lmupdf-third -lfreetype -liconv -lz -lm -lSDL3 -lSDL3_ttf -framework Cocoa
 
-# THORVG=<prefix>: with the GPU renderer of Vue (vue_gpu.cpp: OpenGL and
-# ThorVG, which misc/thorvg/build-thorvg.sh installs in <prefix>); best in
-# a build directory of its own (build-tau-shell-gpu). The core may then
-# say the views as commands, which the shell draws (TAU_GPU=1)
+# THORVG=<prefix>: with the GPU renderer of Vue (vue_gpu.cpp), and its
+# OpenGL backend (gpu_backend_gl.cpp: OpenGL and ThorVG, which
+# misc/thorvg/build-thorvg.sh installs in <prefix>); METAL=1: with its
+# Metal backend (gpu_backend_metal.mm, the shapes drawn by Core Graphics),
+# which is chosen before OpenGL (TEXMACS_VUE_GPU=gl or metal says which).
+# Best in a build directory of its own (build-tau-shell-gpu). The core may
+# then say the views as commands, which the shell draws (TAU_GPU=1)
 ifneq ($(THORVG),)
 CPPFLAGS += -DUSE_THORVG -DGL_SILENCE_DEPRECATION -I$(THORVG)/include/thorvg-1
 LIBS     += $(THORVG)/lib/libthorvg-1.a -framework OpenGL
+endif
+ifneq ($(METAL),)
+SOURCES  += Plugins/Vue/gpu_backend_metal.mm
+CPPFLAGS += -DUSE_METAL
+LIBS     += -framework Metal -framework QuartzCore -framework CoreGraphics
 endif
 
 all: tau_shell core
@@ -83,6 +91,10 @@ shell-check: tau_shell core
 $(OBJ)/%.o: $(S)/%.cpp
 	@mkdir -p $(dir $@)
 	$(CXX) $(CXXFLAGS) $(CPPFLAGS) $(DEPFLAGS) -c $< -o $@
+
+$(OBJ)/%.o: $(S)/%.mm
+	@mkdir -p $(dir $@)
+	$(CXX) $(CXXFLAGS) -fobjc-arc $(CPPFLAGS) $(DEPFLAGS) -c $< -o $@
 
 $(OBJ)/%.o: $(S)/%.c
 	@mkdir -p $(dir $@)

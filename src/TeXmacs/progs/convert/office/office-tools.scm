@@ -42,6 +42,8 @@
 ;;              t, b, l, r which have one, or none) and background
 ;;            (toc inline...)  the table of contents, with its title
 ;;            (pagebreak)
+;;            (field-blocks block...)  a field over several paragraphs (the
+;;              bibliography of Zotero), with the attribute code
 ;;            (error "message")  for a file which could not be read
 ;;   inlines: "text"  (em ...)  (strong ...)  (underline ...)  (strike ...)
 ;;            (sub ...)  (sup ...)  (code ...)  (smallcaps ...)  (mark ...)
@@ -50,7 +52,12 @@
 ;;            (note block...)  (br)  (tab)
 ;;            (image)  with the attributes name, data (the bytes of the
 ;;              file), width, height (lengths of TeXmacs), alt, and svg
-;;              (the text of an SVG of the same picture, when there is one)
+;;              (the text of an SVG of the same picture, when there is one);
+;;              without data, a name on the web (http, https) is a picture
+;;              which the file links to, and linked "true" says that the
+;;              name is the address (relative, or file:) of a picture which
+;;              the file links to: the writers link to it again, and no
+;;              converter reads it
 ;;            (math "MathML")  with the attribute display
 ;;            (bookmark)  (ref ...)  with the attribute name; a ref also
 ;;              has kind (seq, heading) and target when its bookmark is
@@ -315,6 +322,57 @@
 (define-public office-float-keys
   '(float wrap wrap-side h-pos h-rel h-offset v-pos v-rel v-offset))
 
+
+;; A box of text or a shape (a node box) floats as a picture does, with
+;; the same attributes, and has its size (width, height), its shape (the
+;; names of Word: rect, ellipse, roundRect...; odf:name for a shape of
+;; OpenDocument which Word does not have), its fill and its line (colors,
+;; or "none") and the width of its line (line-width, in points), the
+;; space around its text (inset: "left,top,right,bottom", in cm) and
+;; whether it grows with its text (grow "true"); its children are the
+;; blocks of its text, if any.
+(define-public office-box-keys
+  '(width height shape fill line line-width inset grow))
+
+(define-public office-shapes
+  ;; the shapes of Word, and those of OpenDocument (draw:type)
+  '(("rect" . "rectangle") ("ellipse" . "ellipse") ("roundRect" . "round-rectangle")
+    ("triangle" . "isosceles-triangle") ("rtTriangle" . "right-triangle")
+    ("diamond" . "diamond") ("parallelogram" . "parallelogram")
+    ("trapezoid" . "trapezoid") ("pentagon" . "pentagon") ("hexagon" . "hexagon")
+    ("octagon" . "octagon") ("star5" . "star5") ("star4" . "star4")
+    ("star8" . "star8") ("rightArrow" . "right-arrow") ("leftArrow" . "left-arrow")
+    ("upArrow" . "up-arrow") ("downArrow" . "down-arrow") ("cloud" . "cloud")
+    ("heart" . "heart") ("smileyFace" . "smiley") ("can" . "can") ("cube" . "cube")
+    ("plus" . "cross") ("wedgeRectCallout" . "rectangular-callout")
+    ("wedgeRoundRectCallout" . "round-rectangular-callout")
+    ("wedgeEllipseCallout" . "round-callout") ("flowChartProcess" . "flowchart-process")
+    ("flowChartDecision" . "flowchart-decision")
+    ("flowChartTerminator" . "flowchart-terminator")))
+
+(tm-define (office-shape-of-odf type)
+  (:synopsis "The shape of the office tree for the type @type of OpenDocument")
+  (cond ((not (string? type)) "rect")
+        ((list-find office-shapes (lambda (p) (== (cdr p) type))) => car)
+        ;; (a shape which LibreOffice read from Word has its name of Word)
+        ((string-starts? type "ooxml-") (substring type 6 (string-length type)))
+        (else (string-append "odf:" type))))
+
+(tm-define (office-shape-for-odf shape)
+  (:synopsis "The type of OpenDocument for the shape @shape of the office tree")
+  (cond ((not (string? shape)) "rectangle")
+        ((string-starts? shape "odf:") (substring shape 4 (string-length shape)))
+        ((assoc shape office-shapes) => cdr)
+        ;; (LibreOffice has the other shapes of Word under these names)
+        ((!= shape "") (string-append "ooxml-" shape))
+        (else "rectangle")))
+
+(tm-define (office-shape-for-word shape)
+  (:synopsis "The shape of Word for the shape @shape of the office tree")
+  (cond ((not (string? shape)) "rect")
+        ((string-starts? shape "odf:") "rect")
+        (else shape)))
+
 (tm-define (office-float-side h-pos h-rel offset width)
   (:synopsis "Where TeXmacs shows a floating picture: left, right or center")
   (cond ((in? h-pos '("left" "inside")) "left")
@@ -477,8 +535,8 @@
                 (apply office-node
                        (cons* 'p (list-filter (ox-attrs b) (lambda (a) (!= (car a) 'style)))
                               (ox-children b))))
-               ((func? b 'columns)
-                (cons* 'columns (cons '@ (ox-attrs b))
+               ((or (func? b 'columns) (func? b 'field-blocks))
+                (cons* (car b) (cons '@ (ox-attrs b))
                        (office-drop-style (ox-children b) name)))
                (else b)))
        l))
@@ -730,6 +788,13 @@
   (:synopsis "The text of the element @x of XML, without a declaration")
   (apply string-append (ox-serialize-sub x)))
 
+(tm-define (office-web-address? s)
+  (:synopsis "Whether @s is an address on the web (http, https)")
+  ;; (an image there is linked, never fetched by the converters)
+  (and (string? s)
+       (with l (locase-all s)
+         (or (string-starts? l "http://") (string-starts? l "https://")))))
+
 (tm-define (office-uri s)
   (:synopsis "The address @s, with %XX for the bytes which an address cannot hold")
   ;; the spaces, the characters which are not of ASCII, some delimiters
@@ -816,8 +881,10 @@
                          "avenir" "frutiger" "univers" "montserrat"
                          "candara" "corbel" "geneva" "ubuntu" "cantarell"))))))
 
-(tm-define (office-length->cm s)
-  (:synopsis "The length @s (2cm, 1in, 10mm, 12pt, 96px) in centimeters, or #f")
+(tm-define (office-length->cm s . zero?)
+  (:synopsis "The length @s (2cm, 1in, 10mm, 12pt, 1pc, 96px) in centimeters, or #f")
+  ;; (a length of 0 is #f, as the size of a picture, unless @zero? says
+  ;; that it is one, as a margin)
   (and (string? s) (!= s "")
        (let* ((n (string-length s))
               (i (let loop ((i 0))
@@ -826,6 +893,187 @@
                        (loop (+ i 1)) i)))
               (v (string->number (substring s 0 i)))
               (scale (assoc-ref '(("cm" . 1.0) ("mm" . 0.1) ("in" . 2.54)
-                                  ("pt" . 0.03528) ("px" . 0.02646))
+                                  ("pt" . 0.03528) ("pc" . 0.42333) ("px" . 0.02646))
                                 (substring s i n))))
-         (and v scale (> v 0) (* v scale)))))
+         (and v scale (or (> v 0) (and (pair? zero?) (car zero?) (= v 0)))
+              (* v scale)))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; The named styles of a file, for a file of the other format
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(tm-define (office-odf-name id)
+  (:synopsis "The name of the style of OpenDocument @id: My_20_Note is My Note")
+  ;; (its characters but letters and digits are _hh_ in its identifier)
+  (let loop ((l (string->list id)) (acc '()))
+    (cond ((null? l) (list->string (reverse acc)))
+          ((and (char=? (car l) #\_) (pair? (cdr l)))
+           (let* ((rest (cdr l))
+                  (end (list-find-index (if (> (length rest) 5) (sublist rest 0 5) rest)
+                                        (lambda (c) (char=? c #\_))))
+                  (hex (and end (> end 0) (list->string (sublist rest 0 end))))
+                  (n (and hex (list-and (map (lambda (c) (or (char-numeric? c)
+                                                             (in? (char-downcase c)
+                                                                  '(#\a #\b #\c #\d #\e #\f))))
+                                             (string->list hex)))
+                          (string->number hex 16))))
+             (if (and n (>= n 32) (< n 128))
+                 (loop (list-tail rest (+ end 1)) (cons (integer->char n) acc))
+                 (loop (cdr l) (cons (car l) acc)))))
+          (else (loop (cdr l) (cons (car l) acc))))))
+
+;; The attributes of a node style which the macros of a named style of a
+;; document (office-par-name, office-span-name) say: what they do not say
+;; of these is not there (the macros may have been edited).
+(define-public office-macro-style-keys
+  '(color strong em smallcaps size font-name font align indent-left
+    indent-right first-indent line-spacing background border space-before
+    space-after underline underline-kind strike dstrike caps letters))
+
+(define (office-style-key st)
+  (cons (ox-attr st 'family) (ox-attr st 'name)))
+
+(tm-define (office-merged-styles mine theirs)
+  (:synopsis "The nodes style @mine of a document, with those of its file @theirs")
+  ;; A style of mine (of the macros of the document) with the attributes
+  ;; of the style of theirs of its name and family which its macros cannot
+  ;; say (the name to show, the paragraph kept with the next one, the
+  ;; level of a heading); the other styles of theirs after them.
+  (let* ((mine (list-filter mine (lambda (st) (func? st 'style))))
+         (keys (map office-style-key mine))
+         (theirs (list-filter theirs (lambda (st) (func? st 'style)))))
+    (append
+      (map (lambda (st)
+             (let* ((key (office-style-key st))
+                    (other (list-find theirs (lambda (y) (== (office-style-key y) key))))
+                    (have (map car (ox-attrs st)))
+                    (add (if (not other) '()
+                             (list-filter (ox-attrs other)
+                                          (lambda (a) (and (not (in? (car a) have))
+                                                           (not (in? (car a) office-macro-style-keys))))))))
+               (if (null? add) st
+                   (cons* (car st) (cons '@ (append (ox-attrs st) add)) (ox-children st)))))
+           mine)
+      (list-filter theirs (lambda (y) (not (in? (office-style-key y) keys)))))))
+
+(define (office-styles-docx arch)
+  ;; (text names): a small Word document with the styles of the archive
+  ;; arch, whose text uses each of them once, and the names to show
+  (let* ((root (office-xml arch "word/styles.xml"))
+         (styles (if root (ox-childs root 'w:style) '()))
+         (used (list-filter
+                 (map (lambda (y)
+                        (list (ox-attr y 'w:type) (ox-attr y 'w:styleId)
+                              (with n (ox-child y 'w:name) (and n (ox-attr n 'w:val)))))
+                      styles)
+                 (lambda (u) (and (in? (car u) '("paragraph" "character"))
+                                  (string? (cadr u)) (!= (cadr u) "")))))
+         (plain (map (lambda (u) '(w:p (w:r (w:t "x")))) (cons #f used)))
+         (pars (map (lambda (u)
+                      (if (== (car u) "paragraph")
+                          `(w:p (w:pPr (w:pStyle (@ (w:val ,(cadr u))))) (w:r (w:t "x")))
+                          `(w:p (w:r (w:rPr (w:rStyle (@ (w:val ,(cadr u))))) (w:t "x")))))
+                    used))
+         (rel "http://schemas.openxmlformats.org/officeDocument/2006/relationships/")
+         (parts (list-filter
+                  (map (lambda (p)
+                         (with name (car p)
+                           (and (ahash-ref arch name) p)))
+                       (append '(("word/styles.xml" . "styles")
+                                 ("word/numbering.xml" . "numbering")
+                                 ("word/settings.xml" . "settings")
+                                 ("word/fontTable.xml" . "fontTable"))
+                               (map (lambda (n) (cons n "theme"))
+                                    (list-filter (map car (ahash-table->list arch))
+                                                 (lambda (n) (and (string-starts? n "word/theme/")
+                                                                  (string-ends? n ".xml")))))))
+                  identity))
+         (rels `(Relationships
+                  (@ (xmlns "http://schemas.openxmlformats.org/package/2006/relationships"))
+                  ,@(map (lambda (p i)
+                           `(Relationship (@ (Id ,(string-append "rId" (number->string i)))
+                                             (Type ,(string-append rel (cdr p)))
+                                             (Target ,(substring (car p) 5 (string-length (car p)))))))
+                         parts (iota (length parts)))))
+         (doc `(w:document
+                 (@ (xmlns:w "http://schemas.openxmlformats.org/wordprocessingml/2006/main")
+                    (xmlns:r ,(substring rel 0 (- (string-length rel) 1))))
+                 (w:body ,@plain ,@pars))))
+    (list (zip-pack (append '("_rels/.rels" "word/document.xml" "word/_rels/document.xml.rels")
+                            (map car parts))
+                    (append (list (ox-serialize
+                                    `(Relationships
+                                       (@ (xmlns "http://schemas.openxmlformats.org/package/2006/relationships"))
+                                       (Relationship (@ (Id "rId1") (Type ,(string-append rel "officeDocument"))
+                                                        (Target "word/document.xml")))))
+                                  (ox-serialize doc)
+                                  (ox-serialize rels))
+                            (map (lambda (p) (ahash-ref arch (car p))) parts)))
+          (map (lambda (u) (cons (cadr u) (or (caddr u) (cadr u)))) used))))
+
+(define (office-styles-odt arch)
+  ;; (text names): a small OpenDocument text with the styles of the
+  ;; archive arch, whose text uses each of them once, and the names to show
+  (let* ((root (office-xml arch "styles.xml"))
+         (group (and root (ox-child root 'office:styles)))
+         (styles (if group (ox-childs group 'style:style) '()))
+         (used (list-filter
+                 (map (lambda (y)
+                        (list (or (ox-attr y 'style:family) "paragraph")
+                              (ox-attr y 'style:name)
+                              (ox-attr y 'style:display-name)))
+                      styles)
+                 (lambda (u) (and (in? (car u) '("paragraph" "text"))
+                                  (string? (cadr u)) (!= (cadr u) "")))))
+         (plain (map (lambda (u) '(text:p "x")) (cons #f used)))
+         (pars (map (lambda (u)
+                      (if (== (car u) "paragraph")
+                          `(text:p (@ (text:style-name ,(cadr u))) "x")
+                          `(text:p (text:span (@ (text:style-name ,(cadr u))) "x"))))
+                    used))
+         (doc `(office:document-content
+                 (@ (xmlns:office "urn:oasis:names:tc:opendocument:xmlns:office:1.0")
+                    (xmlns:style "urn:oasis:names:tc:opendocument:xmlns:style:1.0")
+                    (xmlns:text "urn:oasis:names:tc:opendocument:xmlns:text:1.0")
+                    (office:version "1.3"))
+                 (office:body (office:text ,@plain ,@pars)))))
+    (list (zip-pack '("mimetype" "content.xml" "styles.xml")
+                    (list "application/vnd.oasis.opendocument.text"
+                          (ox-serialize doc)
+                          (ahash-ref arch "styles.xml")))
+          (map (lambda (u) (cons (cadr u) (or (caddr u) (office-odf-name (cadr u)))))
+               used))))
+
+(define office-package-styles-cache (cons #f '()))
+
+(tm-define (office-package-styles format data)
+  (:synopsis "The nodes style of the named styles of the file @data of @format")
+  ;; As its reader reads them, from a small file with its styles only (the
+  ;; text of the file is not read again), with their names to show as the
+  ;; file says them. The last file is remembered.
+  (if (and (string? (car office-package-styles-cache))
+           (== (car office-package-styles-cache) data))
+      (cdr office-package-styles-cache)
+      (let* ((arch (and (in? format '("docx" "odt")) (office-archive data)))
+             (r (catch #t
+                  (lambda ()
+                    (if (not arch) '()
+                        (let* ((small (if (== format "docx") (office-styles-docx arch)
+                                          (office-styles-odt arch)))
+                               (office (convert (car small) (string-append format "-document")
+                                                "office-stree"))
+                               (l (if (func? office 'office) (cdr office) '()))
+                               (sts (append-map ox-children
+                                                (list-filter l (lambda (y) (func? y 'styles))))))
+                          (map (lambda (st)
+                                 (with d (assoc-ref (cadr small) (ox-attr st 'name))
+                                   (if (not (and (func? st 'style) d)) st
+                                       (cons* 'style
+                                              (cons '@ (cons (list 'display d)
+                                                             (list-filter (ox-attrs st)
+                                                                          (lambda (a) (!= (car a) 'display)))))
+                                              (ox-children st)))))
+                               sts))))
+                  (lambda args '()))))
+        (set! office-package-styles-cache (cons data r))
+        r)))
