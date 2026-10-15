@@ -154,6 +154,10 @@ int typeset_inputs_mode ();
 tree env_absent ();
 // a hash of a variable and its value, of 64 bits (see env_table::fp)
 unsigned long long env_entry_hash (string var, tree val);
+// the variables of the derived state (edit_env_rep::derived_state), and
+// a number which changes with them
+hashmap<string,bool>& env_state_vars ();
+extern int env_state_version;
 
 class env_table {
 public:
@@ -179,15 +183,24 @@ public:
   unsigned long long    fp;
   array<string>         dirty;
   hashmap<string,bool>  dirty_set;
+  // The same for the variables of the derived state only (env_state_vars,
+  // as they were for env_state_version sfp_version)
+  unsigned long long    sfp;
+  int                   sfp_version;
   inline env_table (tree init):
     h (init), rec (NULL), all (false), back_log (NULL),
-    in_vars (NULL), in_vals (NULL), fp (0), dirty_set (false) {}
+    in_vars (NULL), in_vals (NULL), fp (0), dirty_set (false),
+    sfp (0), sfp_version (-1) {}
   inline void will_write (string s) {
     if (typeset_inputs_mode () == 0 || dirty_set->contains (s)) return;
-    if (h->contains (s)) fp ^= env_entry_hash (s, h [s]);
+    if (h->contains (s)) {
+      unsigned long long e= env_entry_hash (s, h [s]);
+      fp ^= e;
+      if (env_state_vars ()->contains (s)) sfp ^= e; }
     dirty_set (s)= true;
     dirty << s; }
   unsigned long long fingerprint ();
+  unsigned long long state_fingerprint ();
   void refingerprint ();
   inline tree value (string s) {
     // (what a variable holds, or env_absent (), without recording)
@@ -640,8 +653,8 @@ public:
   };
   tree lookup_value (string name);
   tree lookup (string name);
-  // the values of the variables which are not plain, in a fixed order
-  array<tree> derived_state ();
+  // a fingerprint of the values of the variables which are not plain
+  unsigned long long derived_state ();
   // a copy of the table of the variables (not recorded as a read)
   inline hashmap<string,tree> all_values () { return copy (env.h); }
   // a variable whose value is all there is to it: no state of the

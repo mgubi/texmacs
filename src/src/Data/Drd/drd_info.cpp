@@ -1073,7 +1073,8 @@ drd_info_rep::heuristic_init (hashmap<string,tree> env2) {
     }
   }
   // cout << "--> " << (texmacs_time ()-tt) << "ms\n";
-  heuristic_env= env2;
+  // (a copy: the editor changes its environment in place, init_default)
+  heuristic_env= copy (env2);
   heuristic_version= version;
   heuristic_valid= true;
 }

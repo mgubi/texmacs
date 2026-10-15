@@ -995,6 +995,34 @@
                    string<?)
              '("auto.A-1" "auto.A-2" "auto.B-1" "auto.B-2")))))
 
+;; The loci and links in the parts of a surround (the left part of a
+;; footnote...) stay registered when its body is edited: the parts are
+;; kept, and so is what they declared.
+(define (test-loci-of-surround-parts)
+  (check-group "loci of surround parts")
+  (with-typeset-body
+   '(document "intro"
+              (surround (concat (locus (id "sur-locus") "L")
+                                (locus (id "sur-link")
+                                       (link "hyperlink" (id "sur-link")
+                                             (url "#somewhere"))
+                                       "H"))
+                        ""
+                        (document "first paragraph" "second paragraph"))
+              "end")
+   (lambda ()
+     (update-forced)
+     (check= (length (id->trees "sur-locus")) 1)
+     (check= (length (id->trees "sur-link")) 1)
+     (tree-set (tree-ref (buffer-tree) 1 2 0) "first paragraph changed")
+     (update-forced)
+     (check= (length (id->trees "sur-locus")) 1)
+     (check= (length (id->trees "sur-link")) 1)
+     (tree-insert (tree-ref (buffer-tree) 1 2) 1 '("inserted"))
+     (update-forced)
+     (check= (length (id->trees "sur-locus")) 1)
+     (check= (length (id->trees "sur-link")) 1))))
+
 ;; A tag which is removed and put back by an undo gives its labels the
 ;; names they had (the undo puts back a copy with their numbers).
 (define (test-labels-after-undo)
@@ -1304,6 +1332,7 @@
   (test-label-names)
   (test-bindings-against-scratch)
   (test-labels-of-parts)
+  (test-loci-of-surround-parts)
   (test-labels-after-undo)
   (test-incremental-against-scratch)
   (test-random-documents)

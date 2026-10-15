@@ -151,8 +151,9 @@ bridge_surround_rep::notify_change () {
 
 void
 bridge_surround_rep::my_clean_links () {
-  if (corrupted || (N(ttt->old_patch) != 0) || typeset_inputs_mode () != 0)
-    link_env= link_repository (true);
+  // the loci and links of the parts: kept with the parts (nothing writes
+  // the environment before my_typeset, which asks the same question)
+  if (parts_again ()) link_env= link_repository (true);
 }
 
 bool

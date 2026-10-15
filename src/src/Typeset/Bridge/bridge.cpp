@@ -42,7 +42,7 @@ bridge nil_bridge;
 bridge_rep::bridge_rep (typesetter ttt2, tree st2, path ip2):
   ttt (ttt2), env (ttt->env), st (st2), ip (ip2),
   status (CORRUPTED), changes (UNINIT), reads (),
-  in_known (false), in_items (""), in_fp (0) {}
+  in_known (false), in_state (0), in_fp (0) {}
 
 static tree inactive_auto
   (MACRO, "x", tree (REWRITE_INACTIVE, tree (ARG, "x"), "recurse*"));
@@ -389,20 +389,24 @@ border_signature (stack_border sb) {
 // are, the others (the parts of a surround: the name of a theorem, a
 // number...) by the boxes themselves, which the bridge around keeps as
 // long as they are the same (see bridge_surround_rep::my_typeset)
-static tree
-items_signature (array<line_item> a, array<line_item> b) {
-  if (N(a) == 0 && N(b) == 0) return "";
-  tree r (TUPLE);
+// (as numbers, and the trees of the markers: no strings to make, which
+// was a tenth of the time of a complete pass)
+static void
+items_signature (array<line_item> a, array<line_item> b,
+                 array<double>& nums, array<tree>& marks) {
+  nums= array<double> ();
+  marks= array<tree> ();
+  if (N(a) == 0 && N(b) == 0) return;
   for (int k=0; k<2; k++) {
     array<line_item> l= (k == 0? a: b);
     for (int i=0; i<N(l); i++)
-      if (l[i]->type == MARKER_ITEM)
-        r << tree (TUPLE, (tree) l[i]->b, as_string (l[i]->penalty),
-                   as_string (l[i]->spc->def));
-      else r << tree ("box");
-    r << tree ("|");
+      if (l[i]->type == MARKER_ITEM) {
+        nums << 1.0 << (double) l[i]->penalty << (double) l[i]->spc->def;
+        marks << (tree) l[i]->b;
+      }
+      else nums << 2.0;
+    nums << 3.0;
   }
-  return r;
 }
 
 static array<box>
@@ -435,10 +439,15 @@ same_value (tree before, tree now) {
 bool
 bridge_rep::same_inputs () {
   if (N(ttt->a) == 0 && N(ttt->b) == 0) {
-    if (in_items != "") return false; }
-  else if (in_items != items_signature (ttt->a, ttt->b) ||
-           !same_boxes (in_item_boxes, items_boxes (ttt->a, ttt->b)))
-    return false;
+    if (N(in_items) != 0) return false; }
+  else {
+    array<double> nums;
+    array<tree> marks;
+    items_signature (ttt->a, ttt->b, nums, marks);
+    if (nums != in_items || marks != in_item_marks ||
+        !same_boxes (in_item_boxes, items_boxes (ttt->a, ttt->b)))
+      return false;
+  }
   if (!same_lookups (env, seen_keys, seen_values)) return false;
   // the whole environment as it was (the fingerprint: also for a bridge
   // whose inputs are not known), or the inputs
@@ -503,14 +512,18 @@ bridge_rep::typeset_by_inputs (int desired_status) {
   // (in the check mode, what the bridge would have given used again)
   bool was_known= in_known;
   array<string> was_vars= in_vars, was_keys= seen_keys;
-  array<tree> was_vals= in_vals, was_values= seen_values, was_state= in_state;
+  array<tree> was_vals= in_vals, was_values= seen_values;
+  unsigned long long was_state= in_state;
   array<int> was_reads= reads;
-  tree was_items= in_items;
+  array<double> was_items= in_items;
+  array<tree> was_marks= in_item_marks;
   array<box> was_item_boxes= in_item_boxes;
   unsigned long long was_fp= in_fp;
   if (edit_profile.on) edit_profile.redone++;
-  array<tree> state= env->derived_state ();
-  tree items= items_signature (ttt->a, ttt->b);
+  unsigned long long state= env->derived_state ();
+  array<double> items;
+  array<tree> marks;
+  items_signature (ttt->a, ttt->b, items, marks);
   array<box> item_boxes= items_boxes (ttt->a, ttt->b);
   unsigned long long fp= env->fingerprint ();
   hashmap<string,tree> prev_back (UNINIT);
@@ -539,6 +552,7 @@ bridge_rep::typeset_by_inputs (int desired_status) {
   in_vals= my_vals;
   in_state= state;
   in_items= items;
+  in_item_marks= marks;
   in_item_boxes= item_boxes;
   in_fp= fp;
   seen_keys= my_keys;
@@ -565,6 +579,7 @@ bridge_rep::typeset_by_inputs (int desired_status) {
     // checked (and not only what the bridge makes)
     in_known= was_known; in_vars= was_vars; in_vals= was_vals;
     in_state= was_state; in_items= was_items; in_fp= was_fp;
+    in_item_marks= was_marks;
     in_item_boxes= was_item_boxes;
     seen_keys= was_keys; seen_values= was_values; reads= was_reads;
   }

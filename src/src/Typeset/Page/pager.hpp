@@ -43,7 +43,7 @@ struct page_text {
 
 struct page_memo {
   array<double>     pars;   // the parameters of the pager
-  array<tree>       state;  // the variables from which the environment
+  unsigned long long state; // the variables from which the environment
                             // derives a state (fonts, colors...)
   array<page_part>  headers;
   array<page_part>  footers;
