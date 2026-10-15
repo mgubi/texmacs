@@ -48,13 +48,14 @@ public:
   // what it was typeset from, when the inputs are used (see "What is
   // typeset again" in bridge.cpp)
   bool                 in_known; // all its inputs are known:
-  array<string>        in_vars;  // the variables read before written
+  array<int>           in_vars;  // the variables read before written
   array<tree>          in_vals;  // with their values (or env_absent ())
   unsigned long long   in_state; // the state derived from the environment
   array<double>        in_items; // the line items it got from around it
   array<tree>          in_item_marks; // (the markers among them)
   array<box>           in_item_boxes; // (those which are not markers)
   unsigned long long   in_fp;    // the fingerprint of the environment
+  array<tree>          out_bindings; // the bindings it wrote, in order
 
   array<page_item>     l;        // the typesetted lines of st
   stack_border         sb;       // border properties of l
@@ -92,7 +93,7 @@ public:
   virtual void my_insert (bool made); // into the stack of the typesetter
   void typeset (int desired_status);
   bool same_inputs ();
-  void give_record (hashmap<string,tree> parent_back);
+  void give_record ();
   bool typeset_by_inputs (int desired_status); // (made again?)
 };
 
@@ -101,8 +102,7 @@ public:
 bool same_page_items (array<page_item> l1, array<page_item> l2);
 
 // the inputs of a bridge below for the record of the bridge above it
-void add_inputs (edit_env env, hashmap<string,tree> parent_back, bool known,
-                 array<string> vars, array<tree> vals);
+void add_inputs (edit_env env, bool known, array<int> vars, array<tree> vals);
 // do the references and attachments looked up still have these values?
 bool same_lookups (edit_env env, array<string> keys, array<tree> values);
 

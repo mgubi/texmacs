@@ -28,6 +28,7 @@ struct page_part {
   array<tree>   values;
   array<string> keys;    // the references it looked up, and their values
   array<tree>   looked;
+  array<tree>   bindings; // the bindings it wrote (a label in a title)
   box           b;       // the result
   inline page_part (): ok (false) {}
 };

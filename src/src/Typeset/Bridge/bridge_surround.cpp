@@ -27,8 +27,9 @@ protected:
   array<string>        parts_keys;
   array<tree>          parts_values;
   bool                 parts_known;  // and what they read, as the inputs of
-  array<string>        parts_vars;   // a bridge (they are typeset first in
+  array<int>           parts_vars;   // a bridge (they are typeset first in
   array<tree>          parts_vals;   // the record of the surround)
+  array<tree>          parts_bindings; // the bindings they wrote
 
 public:
   bridge_surround_rep (typesetter ttt, tree st, path ip);
@@ -186,9 +187,11 @@ bridge_surround_rep::my_typeset (int desired_status) {
     unsigned long long fp= (inputs? env->fingerprint (): 0);
     array<string>* keys= env->rec_keys;
     int k0= (keys == NULL? 0: N(*keys));
-    array<string>* vars= env->input_vars ();
+    array<int>* vars= env->input_vars ();
     int v0= (vars == NULL? 0: N(*vars));
     bool all0= env->read_all (), unknown0= env->read_unknown;
+    array<tree>* bs= env->rec_bindings;
+    int b0= (bs == NULL? 0: N(*bs));
     hashmap<string,tree> prev_back (UNINIT);
     env->local_start (prev_back);
     /*
@@ -210,9 +213,10 @@ bridge_surround_rep::my_typeset (int desired_status) {
                      range (*env->rec_values, k0, N(*keys)));
       parts_known= vars != NULL && (all0 || !env->read_all ()) &&
                    (unknown0 || !env->read_unknown);
-      parts_vars= (vars == NULL? array<string> (): range (*vars, v0, N(*vars)));
+      parts_vars= (vars == NULL? array<int> (): range (*vars, v0, N(*vars)));
       parts_vals= (vars == NULL? array<tree> ():
                    range (*env->input_vals (), v0, N(*vars)));
+      parts_bindings= (bs == NULL? array<tree> (): range (*bs, b0, N(*bs)));
     }
   }
   else {
@@ -222,8 +226,8 @@ bridge_surround_rep::my_typeset (int desired_status) {
       // before what they wrote, which they read first: a counter)
       for (int i=0; i<N(parts_keys); i++)
         env->record_lookup (parts_keys[i], parts_values[i]);
-      add_inputs (env, env->values_before (), parts_known,
-                  parts_vars, parts_vals);
+      add_inputs (env, parts_known, parts_vars, parts_vals);
+      env->write_bindings (parts_bindings);
     }
     env->monitored_patch_env (changes_before);
   }

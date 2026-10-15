@@ -282,6 +282,7 @@ pager_rep::make_part (array<page_part>* parts, tree what) {
     same= env->lookup_value (old.keys[i]) == old.looked[i];
   if (same && page_reuse_mode () == 1) {
     if (edit_profile.on) edit_profile.parts_kept++;
+    env->write_bindings (old.bindings);
     return old.b;
   }
   // typeset, with a record of what is read
@@ -290,13 +291,16 @@ pager_rep::make_part (array<page_part>* parts, tree what) {
   hashmap<string,tree> before= env->all_values ();
   edit_env_rep::read_record record (env.operator-> (), &reads,
                                     &now.keys, &now.looked);
+  edit_env_rep::binding_record bindings (env.operator-> (), &now.bindings);
   box b= typeset_as_concat (env, attach_here (tree (PARA, what),
                                                decorate ()));
+  bindings.stop ();
   now.ok= record.complete () &&
           N(reads) <= PART_READS_MAX && N(now.keys) <= PART_LOOKUPS_MAX;
   record.stop ();
-  if (same && !same_box (b, old.b)) typeset_check_mismatches++;
-  if (same && !same_box (b, old.b))
+  bool differs= same && (!same_box (b, old.b) || now.bindings != old.bindings);
+  if (differs) typeset_check_mismatches++;
+  if (differs)
     cout << "TeXmacs] page " << (nr + 1)
          << ": the header or footer kept differs from the one made" << LF;
   if (now.ok) {

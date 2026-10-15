@@ -590,6 +590,13 @@ same_page_items (array<page_item> l1, array<page_item> l2) {
 * seen in the values of its inputs. The inputs of the bridges below a
 * bridge are among its own, unless it wrote them before.
 *
+* Besides boxes and the environment, typesetting writes bindings (labels,
+* set-binding): a bridge used again writes again those it wrote, in the
+* same order (out_bindings), since the last binding of a key wins (the
+* running headers kept by the pager do the same, see make_part). The
+* auxiliary data (write) is only written by a complete typesetting, which
+* uses no bridge again, and the loci and links stay with the bridge.
+*
 * TEXMACS_TYPESET_READS may be "off" (the classic cache: a bridge is used
 * again when the bookkeeping of the changes of the environment, old_patch,
 * says that nothing changed before it) or "check" (a bridge which would be
@@ -673,33 +680,34 @@ bridge_rep::same_inputs () {
 }
 
 // the inputs of a bridge are inputs of the bridge which is recorded above
-// it, when it did not write them before (parent_back) or read them
+// it, when it did not read or write them before: when its reads are known
+// (read_unknown is not set), those which it wrote are among them (its own
+// writes are noted, and those of the bridges below were given by add_reads)
 void
-add_inputs (edit_env env, hashmap<string,tree> parent_back, bool known,
-            array<string> vars, array<tree> vals) {
-  array<string>* pv= env->input_vars ();
+add_inputs (edit_env env, bool known, array<int> vars, array<tree> vals) {
+  array<int>* pv= env->input_vars ();
   array<tree>* pw= env->input_vals ();
   hashmap<int,bool>* rec= env->read_recorder ();
   if (pv == NULL || rec == NULL || env->read_unknown) return;
   if (!known || N(*pv) + N(vars) > INPUTS_MAX) {
     env->read_unknown= true; return; }
   for (int i=0; i<N(vars); i++) {
-    int id= env_var_id (vars[i]);
-    if ((*rec)->contains (id) || parent_back->contains (vars[i])) continue;
+    int id= vars[i];
+    if ((*rec)->contains (id)) continue;
     rec->operator () (id)= true;
-    (*pv) << vars[i];
+    (*pv) << id;
     (*pw) << vals[i];
   }
 }
 
 void
-bridge_rep::give_record (hashmap<string,tree> parent_back) {
+bridge_rep::give_record () {
   // what a bridge gives the record of the bridge above it, whether it was
   // used again or typeset again (one function, so that the check mode,
   // which typesets again, gives what the bridge used again gives): its
   // inputs, which are not all known when it was used again through the
   // fingerprint, and its reads and lookups
-  add_inputs (env, parent_back, in_known, in_vars, in_vals);
+  add_inputs (env, in_known, in_vars, in_vals);
   add_reads (env, in_known && N(reads) <= READS_MAX, reads,
              seen_keys, seen_values);
 }
@@ -719,19 +727,22 @@ bridge_rep::typeset_by_inputs (int desired_status) {
   }
   if (same && !check) {
     if (edit_profile.on) edit_profile.cached++;
-    give_record (env->values_before ());
+    give_record ();
+    env->write_bindings (out_bindings);
     env->monitored_patch_env (changes);
     return false;
   }
   // (in the check mode, what the bridge would have given used again)
   bool was_known= in_known;
-  array<string> was_vars= in_vars, was_keys= seen_keys;
+  array<int> was_vars= in_vars;
+  array<string> was_keys= seen_keys;
   array<tree> was_vals= in_vals, was_values= seen_values;
   unsigned long long was_state= in_state;
   array<int> was_reads= reads;
   array<double> was_items= in_items;
   array<tree> was_marks= in_item_marks;
   array<box> was_item_boxes= in_item_boxes;
+  array<tree> was_bindings= out_bindings;
   unsigned long long was_fp= in_fp;
   if (edit_profile.on) edit_profile.redone++;
   unsigned long long state= env->derived_state ();
@@ -748,12 +759,15 @@ bridge_rep::typeset_by_inputs (int desired_status) {
   env->local_start (prev_back);
   if (env->hl_lan != 0) env->lan->highlight (st);
   hashmap<int,bool> my_reads (false);
-  array<string> my_keys, my_vars;
+  array<string> my_keys;
+  array<int> my_vars;
   array<tree> my_values, my_vals;
   edit_env_rep::read_record record (env.operator-> (), &my_reads,
                                     &my_keys, &my_values,
                                     &my_vars, &my_vals);
+  edit_env_rep::binding_record bindings (env.operator-> (), &out_bindings);
   my_typeset (desired_status);
+  bindings.stop ();
   bool known= record.complete () && N(my_vars) <= INPUTS_MAX &&
               N(my_keys) <= LOOKUPS_MAX;
   reads= array<int> ();
@@ -775,7 +789,8 @@ bridge_rep::typeset_by_inputs (int desired_status) {
   my_stack_end ();
   bool differs= check &&
     (lines_signature (l) != old_lines || changes != old_changes ||
-     border_signature (sb) != old_border || lines_contents (l) != old_contents);
+     border_signature (sb) != old_border || lines_contents (l) != old_contents ||
+     out_bindings != was_bindings);
   // and its record: when it said that all the inputs were known, it must
   // hold those which the bridge reads now (a record which misses some, as
   // one which got the inputs of a bridge below which were not all known,
@@ -797,7 +812,7 @@ bridge_rep::typeset_by_inputs (int desired_status) {
     in_item_boxes= was_item_boxes;
     seen_keys= was_keys; seen_values= was_values; reads= was_reads;
   }
-  give_record (prev_back);
+  give_record ();
   env->local_end (prev_back);
   if (check) {
     if (edit_profile.on) edit_profile.unread++;
