@@ -679,10 +679,20 @@ simplify_execed (tree t) {
   else return r;
 }
 
+// the conversion to the office formats keeps the references to pages, with
+// their page, since the office programs compute these pages again
+static bool keep_pagerefs= false;
+
 static tree
 expand_references (tree t, hashmap<string,tree> h, hashmap<string,tree> g) {
   // h: the references of the buffer, g: those of its project
   if (is_atomic (t)) return t;
+  if (keep_pagerefs && is_func (t, PAGEREF) && N(t) >= 1) {
+    string ref= as_string (simplify_execed (t[0]));
+    if (h->contains (ref)) return tree (PAGEREF, ref, copy (h[ref][1]));
+    if (g->contains (ref)) return tree (PAGEREF, ref, copy (g[ref][1]));
+    return tree (PAGEREF, ref);
+  }
   if (is_func (t, REFERENCE, 1) || is_func (t, PAGEREF)) {
     string ref= as_string (simplify_execed (t[0]));
     int which= is_func (t, REFERENCE, 1)? 0: 1;
@@ -855,7 +865,10 @@ edit_typeset_rep::exec_office (tree t, path p) {
   hashmap<string,tree> P (UNINIT, patch);
   H->join (P);
   prefix_specific (H, "tmoffice-");
-  return exec (t, H);
+  keep_pagerefs= true;
+  tree r= exec (t, H);
+  keep_pagerefs= false;
+  return r;
 }
 
 tree
