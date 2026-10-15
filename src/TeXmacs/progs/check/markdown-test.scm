@@ -1223,6 +1223,13 @@
   (check= (parse* "&#1e3; &#65.0; &#x41; &AElig; &alpha;")
           `(markdown ,(string-append "&#1e3; &#65.0; A " (bytes 195 134) " "
                                      (bytes 206 177))))
+  ;; and those of HTML5, also of two characters, with their semicolon only
+  (check= (parse* (string-append "&Dcaron; &HilbertSpace; &NotEqualTilde; "
+                                 "&CounterClockwiseContourIntegral;"))
+          `(markdown ,(string-append (bytes 196 142) " " (bytes 226 132 139) " "
+                                     (bytes 226 137 130 204 184) " "
+                                     (bytes 226 136 179))))
+  (check= (parse* "&foobar; &Dcaron &amp x") '(markdown "&foobar; &Dcaron &amp x"))
   ;; the mark of byte order is not text
   (check= (parse* (string-append (bytes 239 187 191) "# T")) '(markdown (h1 "T")))
   (check= (cadr (md-tree (string-append (bytes 239 187 191)

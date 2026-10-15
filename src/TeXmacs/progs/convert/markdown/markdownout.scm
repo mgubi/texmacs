@@ -340,7 +340,7 @@
                   (or (== (+ i 1) n) (mdout-punctuation? (string-ref s (+ i 1)))))
              (loop (+ i 1) (+ i 1) (cons* "\\\\" (substring s start i) acc)))
             ((and (char=? (string-ref s i) #\&)
-                  (let ((e (string-index (substring s i (min n (+ i 12))) #\;)))
+                  (let ((e (string-index (substring s i (min n (+ i 34))) #\;)))
                     (and e (> e 1))))
              (loop (+ i 1) (+ i 1) (cons* "&amp;" (substring s start i) acc)))
             (else (loop (+ i 1) start acc))))))

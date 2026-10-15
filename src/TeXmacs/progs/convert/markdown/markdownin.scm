@@ -1088,6 +1088,9 @@
 ;; Text: characters, code, mathematics
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;; the entities of HTML5 which md-entities does not have
+(lazy-define (convert markdown markdown-entities) markdown-html5-entity)
+
 (define md-entities
   ;; the entities of HTML 4, which are those that texts use: the letters of
   ;; Latin-1, Greek, the signs of typography and of mathematics
@@ -1170,8 +1173,8 @@
 
 (define (md-entity s i)
   ;; (text . end) for the entity which starts at the & at i, or #f; its
-  ;; name is short
-  (let* ((m (min (string-length s) (+ i 11)))
+  ;; name is short (the longest one of HTML5 has 31 letters)
+  (let* ((m (min (string-length s) (+ i 34)))
          (e (let loop ((j (+ i 1)))
               (cond ((>= j m) #f)
                     ((char=? (string-ref s j) #\;) j)
@@ -1186,8 +1189,16 @@
                 (v (cond ((or (md-starts? name 0 "#x") (md-starts? name 0 "#X"))
                           (number 2 md-hex-digit? 16))
                          ((md-starts? name 0 "#") (number 1 md-digit? 10))
-                         (else (ahash-ref md-entities name)))))
+                         ((ahash-ref md-entities name) => identity)
+                         ;; the other entities of HTML5, whose table is
+                         ;; loaded for the first one only
+                         ((list-and (map (lambda (c) (or (md-ascii-alpha? c)
+                                                         (md-digit? c)))
+                                         (string->list name)))
+                          (markdown-html5-entity name))
+                         (else #f))))
            (cond ((string? v) (cons v (+ e 1)))
+                 ((pair? v) (cons (apply string-append (map md-utf8 v)) (+ e 1)))
                  ;; (not the half of a pair of UTF-16)
                  ((and (integer? v) (> v 0) (< v 1114112)
                        (not (and (>= v 55296) (<= v 57343))))
