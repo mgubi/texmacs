@@ -197,7 +197,7 @@ async function run(doc, density) {
 			type.sending.push(turns.reduce((n, m) => n + parseFloat(m[4]), 0));
 			type.pixels.push(turns.reduce((n, m) => n + parseFloat(m[5]), 0));
 			type.page.push(await page.evaluate(() => window.pageMs));
-			if (process.env.BENCH_DEBUG && !dry && i === 20) console.log(text.split("\n").filter(l => /typeset|turn/.test(l)).join("\n"));
+			if (process.env.BENCH_DEBUG && !dry && i === 20) console.log(text.split("\n").filter(l => /typeset|turn|repaint/.test(l)).join("\n"));
 			type.typeset.push(num(text, /edit-profile typeset: ([\d.e-]+) ms/g).reduce((a, b) => a + b, 0));
 		}
 		let counts = null;

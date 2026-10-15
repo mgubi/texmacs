@@ -124,6 +124,34 @@ simple_widget_rep::notify_resize () {
   handle_notify_resize (place_w, place_h);
 }
 
+// The regions to draw, each once: a region which another one holds is
+// left out. A key in a long document asked for the same ones two or three
+// times (the outlines of the structures around the cursor, which are thin
+// strips, before and after the key), and each region drawn costs its own
+// pass over the boxes: some 70 regions for a key in the user manual
+static rectangles
+without_repeats (rectangles l) {
+  array<rectangle> a;
+  for (; !is_nil (l); l= l->next) a << l->item;
+  rectangles r;
+  for (int i= 0; i < N(a); i++) {
+    bool held= false;
+    for (int j= 0; j < N(a) && !held; j++) {
+      if (j == i) continue;
+      rectangle p= a[i];
+      rectangle q= a[j];
+      bool inside= q->x1 <= p->x1 && q->y1 <= p->y1 &&
+                   q->x2 >= p->x2 && q->y2 >= p->y2;
+      bool same= inside && p->x1 == q->x1 && p->y1 == q->y1 &&
+                 p->x2 == q->x2 && p->y2 == q->y2;
+      // (of two which are the same, the first is kept)
+      if (inside && (!same || j < i)) held= true;
+    }
+    if (!held) r= rectangles (a[i], r);
+  }
+  return r;
+}
+
 bool
 simple_widget_rep::repaint () {
   if (ren == NULL) return false;
@@ -163,6 +191,7 @@ simple_widget_rep::repaint () {
   invalid= rectangles ();
   invalid_all= false;
   if (is_nil (todo)) return false;
+  todo= without_repeats (todo);
   rectangle lub= least_upper_bound (todo);
   // the pixels which change: all that is sent to the page
   drawn_x1= max (0, (int) ((lub->x1 - backing_x) / ren->pixel) - 2);
