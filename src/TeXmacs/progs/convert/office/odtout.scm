@@ -89,9 +89,115 @@
       (set! ot-used-styles (cons (list safe family name) ot-used-styles)))
     safe))
 
+(define ot-source-styles '()) ; the nodes style of the document
+
+(define (ot-source-style name family)
+  ;; the node style of this name and family (paragraph or text) which the
+  ;; document has, from its macros or from its file of another format
+  (list-find ot-source-styles
+             (lambda (st) (and (== (ox-attr st 'name) name)
+                               (== (ox-attr st 'family) family)))))
+
+(define (ot-style-pt st k)
+  (with v (office-number (ox-attr st k))
+    (and v (string-append (office-decimal v) "pt"))))
+
+(define (ot-style-paragraph-properties st)
+  ;; the attributes of style:paragraph-properties of a node style
+  (let* ((get (lambda (k) (ox-attr st k)))
+         (line (office-number (get 'line-spacing)))
+         (fill (office-color (get 'background)))
+         (align (get 'align)))
+    (append
+      (if (ot-style-pt st 'space-before) `((fo:margin-top ,(ot-style-pt st 'space-before))) '())
+      (if (ot-style-pt st 'space-after) `((fo:margin-bottom ,(ot-style-pt st 'space-after))) '())
+      (if (ot-style-pt st 'indent-left) `((fo:margin-left ,(ot-style-pt st 'indent-left))) '())
+      (if (ot-style-pt st 'indent-right) `((fo:margin-right ,(ot-style-pt st 'indent-right))) '())
+      (if (ot-style-pt st 'first-indent) `((fo:text-indent ,(ot-style-pt st 'first-indent))) '())
+      (if (and line (> line 0))
+          `((fo:line-height ,(string-append (number->string (inexact->exact (round (* 100 line))))
+                                            "%")))
+          '())
+      (cond ((== align "center") '((fo:text-align "center")))
+            ((== align "right") '((fo:text-align "end")))
+            ((== align "left") '((fo:text-align "start")))
+            ((== align "justify") '((fo:text-align "justify")))
+            (else '()))
+      (if fill `((fo:background-color ,fill)) '())
+      (if (get 'border) '((fo:border "0.5pt solid #000000") (fo:padding "0.05cm")) '())
+      (with v (or (get 'keep-with-next) (get 'keep-next))
+        (if (and v (not (in? v '("false" "no" "0" "auto"))))
+            '((fo:keep-with-next "always")) '())))))
+
+(define (ot-style-text-properties st)
+  ;; the attributes of style:text-properties of a node style
+  (let* ((get (lambda (k) (ox-attr st k)))
+         (font (cond ((get 'font-name) => identity)
+                     ((== (get 'font) "sans") "Arial")
+                     ((== (get 'font) "mono") "Courier New")
+                     (else #f)))
+         (color (office-color (get 'color)))
+         (size (ot-style-pt st 'size))
+         (kind (get 'underline-kind)))
+    (append
+      (if font `((fo:font-family ,(string-append "'" font "'"))) '())
+      (if size `((fo:font-size ,size) (style:font-size-asian ,size)
+                 (style:font-size-complex ,size)) '())
+      (if (get 'strong) '((fo:font-weight "bold") (style:font-weight-asian "bold")
+                          (style:font-weight-complex "bold")) '())
+      (if (get 'em) '((fo:font-style "italic") (style:font-style-asian "italic")
+                      (style:font-style-complex "italic")) '())
+      (if (get 'smallcaps) '((fo:font-variant "small-caps")) '())
+      (if (== (get 'caps) "true") '((fo:text-transform "uppercase")) '())
+      (if color `((fo:color ,color)) '())
+      (if (ot-style-pt st 'letters) `((fo:letter-spacing ,(ot-style-pt st 'letters))) '())
+      (if (get 'underline)
+          `((style:text-underline-style
+              ,(cond ((in? kind '("wave" "dotted" "dash")) kind)
+                     ((in? kind '("wavyHeavy" "wavyDouble")) "wave")
+                     ((in? kind '("dottedHeavy" "dotDash" "dotDotDash")) "dotted")
+                     ((in? kind '("dashLong" "dashedHeavy" "dashLongHeavy")) "dash")
+                     (else "solid")))
+            ,@(if (== kind "double") '((style:text-underline-type "double")) '())
+            (style:text-underline-width "auto") (style:text-underline-color "font-color"))
+          '())
+      (if (get 'strike)
+          `((style:text-line-through-style "solid")
+            ,@(if (get 'dstrike) '((style:text-line-through-type "double")) '()))
+          '()))))
+
+(define (ot-style-of-node u st)
+  ;; the named style u (name family display) with the properties of the
+  ;; node style st (#f for none), after the usual one
+  (let ((par? (== (cadr u) "paragraph"))
+        (display (or (and st (ox-attr st 'display)) (caddr u))))
+    `(style:style
+       (@ (style:name ,(car u)) (style:family ,(cadr u))
+          ,@(if (!= display (car u)) `((style:display-name ,display)) '())
+          ,@(if par? '((style:parent-style-name "Standard") (style:class "text")) '()))
+       ,@(with l (if (and st par?) (ot-style-paragraph-properties st) '())
+           (if (null? l) '() `((style:paragraph-properties (@ ,@l)))))
+       ,@(with l (if st (ot-style-text-properties st) '())
+           (if (null? l) '() `((style:text-properties (@ ,@l))))))))
+
+(define (ot-heading-of-node y st)
+  ;; the style of headings y in the look of the node style st of the
+  ;; document (a heading of the file of another format)
+  `(style:style
+     (@ ,@(ox-attrs y))
+     ,@(with l (ot-style-paragraph-properties st)
+         (if (null? l) '() `((style:paragraph-properties (@ ,@l)))))
+     (style:text-properties
+       (@ ,@(ot-style-text-properties st)
+          ;; (what the style of the file does not say is the usual)
+          ,@(if (ox-attr st 'strong) '() '((fo:font-weight "normal")))
+          ,@(if (ox-attr st 'em) '() '((fo:font-style "normal")))))))
+
 (define (ot-complete-styles styles)
-  ;; the styles of the file, with the named styles which the text has
-  ;; and they do not: a style of this name after the usual one
+  ;; The styles of the file, with the named styles which the text has and
+  ;; they do not: a style of this name, in the look which the document
+  ;; says, after the usual one. Without a file of OpenDocument, the
+  ;; headings have the look of those of the document.
   (let* ((office (ox-child styles 'office:styles))
          (names (if office
                     (map (lambda (y) (or (ox-attr y 'style:name) ""))
@@ -99,18 +205,29 @@
                     '()))
          (new (list-filter (reverse ot-used-styles)
                            (lambda (u) (not (in? (car u) names)))))
-         (element
-           (lambda (u)
-             `(style:style
-                (@ (style:name ,(car u)) (style:family ,(cadr u))
-                   ,@(if (!= (caddr u) (car u)) `((style:display-name ,(caddr u))) '())
-                   ,@(if (== (cadr u) "paragraph")
-                         '((style:parent-style-name "Standard") (style:class "text"))
-                         '()))))))
-    (if (or (null? new) (not office)) styles
+         (headings
+           (if ot-package '()
+               (list-filter
+                 (map (lambda (st)
+                        (with n (office-integer (ox-attr st 'level) 0 0 9)
+                          (and (>= n 1) (== (ox-attr st 'family) "paragraph")
+                               (cons (string-append "Heading_20_" (number->string n)) st))))
+                      ot-source-styles)
+                 identity)))
+         (fix (lambda (y)
+                (with h (and (func? y 'style:style)
+                             (assoc (ox-attr y 'style:name) headings))
+                  (if h (ot-heading-of-node y (cdr h)) y)))))
+    (if (or (and (null? new) (null? headings)) (not office)) styles
         (map (lambda (y)
                (if (func? y 'office:styles)
-                   (append y (map element new))
+                   (append (map fix y)
+                           (map (lambda (u)
+                                  (ot-style-of-node
+                                    u (ot-source-style (caddr u)
+                                                       (if (== (cadr u) "paragraph")
+                                                           "paragraph" "text"))))
+                                new))
                    y))
              styles))))
 
@@ -155,7 +272,7 @@
 (define (ot-text-style props)
   ;; the name of the style of the text inside the wrappers props, or #f
   (let* ((tags (list-filter '(code strong em smallcaps strike underline sub sup mark
-                              caps dstrike)
+                              caps dstrike overline)
                             (lambda (t) (in? t props))))
          (ukind (with c (assq 'ukind (list-filter props pair?)) (and c (cadr c))))
          (tcase (with c (assq 'tcase (list-filter props pair?)) (and c (cadr c))))
@@ -197,6 +314,11 @@
                              ,@(if (in? ukind '("double" "wavyDouble"))
                                    '((style:text-underline-type "double")) '())
                              (style:text-underline-color "font-color"))
+                           '())
+                     ,@(if (in? 'overline tags)
+                           '((style:text-overline-style "solid")
+                             (style:text-overline-width "auto")
+                             (style:text-overline-color "font-color"))
                            '())
                      ,@(if (in? 'strike tags)
                            `((style:text-line-through-style "solid")
@@ -289,8 +411,9 @@
                        (else "paragraph")))
          (offset (lambda (k) (with v (ox-attr x k)
                                (if (and (string? v) (!= v "")) v "0cm")))))
-    (if (not data) '()
-        (let* ((files (ot-image-files x n))
+    (if (not (or data (office-web-address? (ox-attr x 'name)))) '()
+        ;; (a picture on the web: a frame which links to its address)
+        (let* ((files (if data (ot-image-files x n) (list (ox-attr x 'name) #f)))
                (file (car files))
                (svg (cadr files))
                (svg-file (cadr files)))
@@ -652,7 +775,7 @@
         (else
           (let ((l (ox-children x)))
             (case (car x)
-              ((em strong sub sup code smallcaps)
+              ((em strong sub sup code smallcaps overline)
                (ot-inlines l (cons (car x) props)))
               ;; capitals, lower case, first letters in capitals
               ((caps)
@@ -1085,6 +1208,9 @@
             ((p) (ot-paragraph x default))
             ((list) (ot-list x))
             ((table) (list (ot-table x)))
+            ;; a field over several paragraphs: its paragraphs
+            ((field-blocks)
+             (append-map (lambda (y) (ot-block y default)) (ox-children x)))
             ;; a section in columns
             ((columns)
              (let* ((n (number->string (office-integer (ox-attr x 'count) 2 1 10)))
@@ -1342,6 +1468,75 @@
      (office:master-styles
        (style:master-page (@ (style:name "Standard") (style:page-layout-name "pm1"))))))
 
+(define (ot-data-style? x)
+  ;; a style of numbers, dates, times... (number:date-style)
+  (and (pair? x) (symbol? (car x)) (ox-attr x 'style:name)
+       (string-starts? (symbol->string (car x)) "number:")))
+
+(define (ot-data-styles-of x)
+  ;; the styles of numbers, dates and times inside x, as (name . element)
+  (cond ((not (pair? x)) '())
+        ((ot-data-style? x) (list (cons (ox-attr x 'style:name) x)))
+        (else (append-map ot-data-styles-of (ox-elements x)))))
+
+(define (ot-data-style-refs x)
+  ;; the names of the styles of numbers which x refers to
+  (cond ((not (pair? x)) '())
+        ((func? x '@) '())
+        (else
+          (append (list-filter (list (ox-attr x 'style:data-style-name)
+                                     (and (func? x 'style:map)
+                                          (ox-attr x 'style:apply-style-name)))
+                               string?)
+                  (append-map ot-data-style-refs (ox-elements x))))))
+
+(define (ot-drop-data-style-refs x names)
+  ;; x without the references to the styles of numbers which are not names
+  (cond ((not (pair? x)) x)
+        ((func? x '@)
+         (cons '@ (list-filter (cdr x)
+                               (lambda (a) (not (and (eq? (car a) 'style:data-style-name)
+                                                     (not (in? (cadr a) names))))))))
+        (else (cons (car x) (map (lambda (y) (ot-drop-data-style-refs y names)) (cdr x))))))
+
+(define (ot-with-data-styles content)
+  ;; The text with the styles of numbers, dates and times which its fields
+  ;; refer to: those of the file it was read from, among its automatic
+  ;; styles; those of the styles of the file are kept with them; a
+  ;; reference to a style which there is not is left out.
+  (let* ((refs (ot-data-style-refs content)))
+    (if (null? refs) content
+        (let* ((their-content (ot-package-xml "content.xml"))
+               (their-styles (ot-package-xml "styles.xml"))
+               (common (if their-styles
+                           (map car (ot-data-styles-of (ox-child their-styles 'office:styles)))
+                           '()))
+               (auto (append (if their-content
+                                 (ot-data-styles-of
+                                   (ox-child their-content 'office:automatic-styles))
+                                 '())
+                             (if their-styles
+                                 (ot-data-styles-of
+                                   (ox-child their-styles 'office:automatic-styles))
+                                 '())))
+               ;; (a style of numbers may apply another one)
+               (copied (let loop ((todo refs) (done '()))
+                         (cond ((null? todo) (reverse done))
+                               ((or (assoc (car todo) done) (in? (car todo) common)
+                                    (not (assoc (car todo) auto)))
+                                (loop (cdr todo) done))
+                               (else
+                                 (let ((p (assoc (car todo) auto)))
+                                   (loop (append (cdr todo) (ot-data-style-refs (cdr p)))
+                                         (cons p done)))))))
+               (names (append common (map car copied)))
+               (content (ot-drop-data-style-refs content names)))
+          (map (lambda (y)
+                 (if (func? y 'office:automatic-styles)
+                     (append y (map cdr copied))
+                     y))
+               content)))))
+
 (define (ot-content blocks)
   `(office:document-content
      (@ ,@ot-namespaces)
@@ -1517,12 +1712,16 @@
   (set! ot-in-note? #f)
   (set! ot-bookmarks (make-ahash-table))
   (set! ot-used-styles '())
+  (set! ot-source-styles
+        (append-map ox-children
+                    (list-filter (if (func? x 'office) (cdr x) '())
+                                 (lambda (y) (func? y 'styles)))))
   (let* ((blocks (ot-blocks-with (if (func? x 'office) (cdr x) (list x))
                                  "Text_20_body"))
          (blocks (if (null? blocks)
                      '((text:p (@ (text:style-name "Text_20_body"))))
                      blocks))
-         (content (ot-content blocks))
+         (content (ot-with-data-styles (ot-content blocks)))
          (kept (if ot-package
                    (sort (list-filter (map car (ahash-table->list ot-package))
                                       ot-kept-entry?)

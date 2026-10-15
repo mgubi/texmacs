@@ -156,7 +156,7 @@
 (define (tmof-block? x)
   (and (pair? x)
        (in? (car x) '(meta h1 h2 h3 h4 h5 h6 !h !role !para p blockquote ul ol pre hr
-                      table footnote-def !display !pagebreak !toc columns))))
+                      table footnote-def !display !pagebreak !toc columns field-blocks))))
 
 (define (tmof-blank? x)
   (and (string? x) (== (string-trim-spaces x) "")))
@@ -559,6 +559,7 @@
 (define (tmof-del l) (tmof-wrap 'strike (tmof-all l)))
 
 (define (tmof-underline l) (tmof-wrap 'underline (tmof-all l)))
+(define (tmof-overline l) (tmof-wrap 'overline (tmof-all l)))
 
 (define (tmof-marked l) (tmof-wrap 'mark (tmof-all l)))
 
@@ -769,13 +770,22 @@
          (name (cond (inside? (cork->utf8 (caddar l)))
                      ((and (nnull? l) (string? (car l))) (cork->utf8 (car l)))
                      (else "")))
+         ;; (a picture on the web is linked to, never fetched)
+         (web? (and (not inside?) (office-web-address? name)))
          (data (cond (inside? (cadr (cadar l)))
+                     (web? #f)
                      ((!= name "") (tmof-image-data name))
                      (else #f)))
          (suffix (locase-all (url-suffix name)))
          ;; (the format is the one of the bytes, whatever the name says)
          (format (and (string? data) (tmof-image-format data))))
-    (cond ((and format (tmof-pixels data))
+    (cond (web?
+           (let ((len (lambda (k) (with c (and (> (length l) k) (string? (list-ref l k))
+                                               (office-length->cm (list-ref l k)))
+                                    (and c (office-cm c))))))
+             (list (office-node 'image `((name ,name) (width ,(len 1))
+                                         (height ,(len 2)))))))
+          ((and format (tmof-pixels data))
            (with size (tmof-image-sizes l data)
              `((image (@ (name ,(tmof-image-name name format))
                          (data ,data)
@@ -1246,8 +1256,11 @@
   (if (< (length l) 2) '()
       (let* ((code (tmof-plain (car l)))
              (r (tmof (cadr l))))
-        `((field (@ ,@(if (string-starts? code "<") `((xml ,code)) `((code ,code))))
-                 ,@(tmof-merge r))))))
+        (if (func? (cadr l) 'document)
+            ;; (a field over several paragraphs, such as a bibliography)
+            `((field-blocks (@ (code ,code)) ,@(tmof-blocks r)))
+            `((field (@ ,@(if (string-starts? code "<") `((xml ,code)) `((code ,code))))
+                     ,@(tmof-merge r)))))))
 
 (define (tmof-office-change tag l)
   (if (< (length l) 3) '()
@@ -1448,6 +1461,38 @@
           ((and (> n 2) (string-starts? s "[") (string-ends? s "]"))
            (list "[" (tmof-seq '("Reference") (substring s 1 (- n 1))) "] "))
           (else (list s " ")))))
+
+(define (tmof-bib-list l)
+  ;; a list of references which was not expanded: its entries, each with
+  ;; its label [1] (bibitem* gives it, bibitem numbers it), as entries of
+  ;; the bibliography
+  (let* ((body (if (null? l) "" (cAr l)))
+         (pars (if (func? body 'document) (cdr body) (list body)))
+         (nr 0)
+         (entry
+           (lambda (par)
+             (let* ((l (if (func? par 'concat) (cdr par) (list par)))
+                    (head (and (pair? l) (pair? (car l)) (car l))))
+               (cond ((and head (func? head 'bibitem*) (pair? (cdr head)))
+                      (set! nr (+ nr 1))
+                      `(concat (render-bibitem ,(string-append "[" (tmof-plain (cadr head)) "]"))
+                               ,@(cdr l)))
+                     ((and head (func? head 'bibitem) (pair? (cdr head)))
+                      (set! nr (+ nr 1))
+                      `(concat (render-bibitem ,(string-append "[" (number->string nr) "]"))
+                               (label ,(string-append "bib-" (tmof-plain (cadr head))))
+                               ,@(cdr l)))
+                     (else par))))))
+    ;; (in their order, for the numbers)
+    (tmof-description
+      (list `(document ,@(let loop ((l pars) (acc '()))
+                           (if (null? l) (reverse acc)
+                               (loop (cdr l) (cons (entry (car l)) acc)))))))))
+
+(define (tmof-bibliography l)
+  ;; a bibliography which was not expanded: its title and its entries
+  (append (tmof-section '("Bibliography"))
+          (if (null? l) '() (tmof (cAr l)))))
 
 (define (tmof-bibitem-start? par)
   (or (func? par 'render-bibitem)
@@ -1988,6 +2033,7 @@
   ((:or verbatim code* tt samp kbd) tmof-code)
   (render-key tmof-key)
   (underline tmof-underline)
+  (overline tmof-overline)
   ((:or strike-through deleted) tmof-del)
   (marked tmof-marked)
   ((:or rsub lsub) tmof-sub)
@@ -2080,6 +2126,8 @@
   ((:or big-figure small-figure) tmof-big-figure)
   ((:or big-table small-table) tmof-big-table)
   (render-bibitem tmof-bibitem)
+  (bib-list tmof-bib-list)
+  (bibliography tmof-bibliography)
   (label tmof-label)
   ((:or html-div-class html-div-style html-class html-style html-tag
         html-attr)
@@ -2115,7 +2163,7 @@
         ((not (pair? x)) '())
         (else
           (case (car x)
-            ((em strong sub sup smallcaps code)
+            ((em strong sub sup smallcaps code overline)
              (with l (tmof-final-inlines (tmof-node-children x))
                (if (null? l) '() (list (cons (car x) l)))))
             ((color span ins del field size font mark underline strike caps letters)
@@ -2188,9 +2236,9 @@
             ((!display)
              (list `(p (math (@ (display "true") (form "sxml")) ,(cadr x))
                        ,@(if (pair? (cddr x)) `((tab) ,@(cddr x)) '()))))
-            ((columns)
-             (list `(columns (@ ,@(tmof-node-attrs x))
-                             ,@(tmof-final-blocks (tmof-node-children x)))))
+            ((columns field-blocks)
+             (list `(,(car x) (@ ,@(tmof-node-attrs x))
+                              ,@(tmof-final-blocks (tmof-node-children x)))))
             ((blockquote)
              (map (lambda (b)
                     (if (and (func? b 'p) (not (ox-attr b 'role)))
@@ -2499,6 +2547,130 @@
         `((package (@ (format ,(cadr p)) (data ,(cadr (caddr p))))))
         '())))
 
+;; The named styles of the document, for the files of another format than
+;; the one it was read from, and for those of a document of the style
+;; office without its file: from the macros office-par-name and
+;; office-span-name of the document (see oftm-style-macros), and from the
+;; file it was read from, which its reader reads again.
+
+(define (tmof-style-points s)
+  ;; the length s ("12pt", "1fn") in points, as a decimal, or #f
+  (with v (tmof-points s)
+    (and v (office-decimal v))))
+
+(define (tmof-style-attrs x)
+  ;; the attributes of a node style for the body x of the macro of a style
+  (cond ((not (pair? x)) '())
+        ((func? x 'with)
+         (let loop ((l (cdr x)) (acc '()))
+           (if (or (null? l) (null? (cdr l)))
+               (append (reverse acc) (if (pair? l) (tmof-style-attrs (car l)) '()))
+               (let* ((var (car l)) (val (cadr l))
+                      (a (cond ((not (and (string? var) (string? val))) '())
+                               ((== var "color") `((color ,(or (tmof-color val) val))))
+                               ((and (== var "font-series") (== val "bold")) '((strong "true")))
+                               ((and (== var "font-shape") (== val "italic")) '((em "true")))
+                               ((and (== var "font-shape") (== val "small-caps"))
+                                '((smallcaps "true")))
+                               ((== var "font-size")
+                                (with v (office-number val)
+                                  (if v `((size ,(office-decimal (* v tmof-base-size)))) '())))
+                               ((== var "font") `((font-name ,val)))
+                               ((and (== var "font-family") (== val "ss")) '((font "sans")))
+                               ((and (== var "font-family") (== val "tt")) '((font "mono")))
+                               ((and (== var "par-mode")
+                                     (in? val '("left" "center" "right" "justify")))
+                                `((align ,val)))
+                               ((assoc var '(("par-left" . indent-left)
+                                             ("par-right" . indent-right)
+                                             ("par-first" . first-indent)))
+                                => (lambda (p)
+                                     (with v (tmof-style-points val)
+                                       (if v `((,(cdr p) ,v)) '()))))
+                               ((== var "par-sep")
+                                (with v (tmof-points val)
+                                  (if v `((line-spacing ,(office-decimal
+                                                           (/ (+ 1 (/ v tmof-base-size)) 1.2))))
+                                      '())))
+                               ((and (== var "ornament-color") (tmof-color val))
+                                `((background ,(tmof-color val))))
+                               ((and (== var "ornament-border") (!= val "0ln"))
+                                '((border "true")))
+                               (else '()))))
+                 (loop (cddr l) (append (reverse a) acc))))))
+        ((func? x 'surround 3)
+         (let ((before (and (func? (cadr x) 'vspace*) (tmof-style-points (cadadr x))))
+               (after (and (func? (caddr x) 'vspace) (tmof-style-points (cadr (caddr x))))))
+           (append (if before `((space-before ,before)) '())
+                   (if after `((space-after ,after)) '())
+                   (tmof-style-attrs (cadddr x)))))
+        ((func? x 'underline 1) (cons '(underline "true") (tmof-style-attrs (cadr x))))
+        ((func? x 'office-underline 2)
+         (cons* '(underline "true") `(underline-kind ,(cadr x)) (tmof-style-attrs (caddr x))))
+        ((func? x 'strike-through 1) (cons '(strike "true") (tmof-style-attrs (cadr x))))
+        ((func? x 'office-strike 2)
+         (cons* '(strike "true") '(dstrike "true") (tmof-style-attrs (caddr x))))
+        ((func? x 'change-case 2)
+         (append (if (== (caddr x) "UPCASE") '((caps "true")) '())
+                 (tmof-style-attrs (cadr x))))
+        ((func? x 'office-letters 2)
+         (cons `(letters ,(cadr x)) (tmof-style-attrs (caddr x))))
+        ((in? (car x) '(ornamented office-capitalize)) (tmof-style-attrs (cAr x)))
+        (else '())))
+
+(define (tmof-macro-styles init)
+  ;; the nodes style of the macros of the named styles of the document
+  (append-map
+    (lambda (kv)
+      (let* ((name (car kv))
+             (par? (string-starts? name "office-par-"))
+             (span? (string-starts? name "office-span-"))
+             (m (cdr kv)))
+        (if (and (or par? span?) (func? m 'macro 2))
+            (let ((id (substring name (if par? 11 12) (string-length name))))
+              (if (== id "") '()
+                  (list (office-node 'style
+                                     (append `((name ,id) (family ,(if par? "paragraph" "text")))
+                                             (tmof-style-attrs (caddr m)))))))
+            '())))
+    init))
+
+(define tmof-package-styles-cache (cons #f '()))
+
+(define (tmof-package-styles init)
+  ;; the nodes style of the file the document was read from, as its reader
+  ;; reads them
+  (with p (assoc-ref init "office-package")
+    (if (not (and (func? p 'tuple 2) (in? (cadr p) '("docx" "odt"))
+                  (func? (caddr p) 'raw-data 1) (string? (cadr (caddr p)))))
+        '()
+        (let ((data (cadr (caddr p))))
+          (if (and (string? (car tmof-package-styles-cache))
+                   (== (car tmof-package-styles-cache) data))
+              (cdr tmof-package-styles-cache)
+              (let* ((office (catch #t
+                               (lambda ()
+                                 (convert data (string-append (cadr p) "-document")
+                                          "office-stree"))
+                               (lambda args #f)))
+                     (l (if (func? office 'office) (cdr office) '()))
+                     (r (append-map ox-children
+                                    (list-filter l (lambda (y) (func? y 'styles))))))
+                (set! tmof-package-styles-cache (cons data r))
+                r))))))
+
+(define (tmof-styles init)
+  ;; the node styles of the document: those of its macros (which may have
+  ;; been edited), and the others of its file
+  (let* ((mine (tmof-macro-styles init))
+         (key (lambda (st) (cons (ox-attr st 'family) (ox-attr st 'name))))
+         (keys (map key mine))
+         (theirs (list-filter (tmof-package-styles init)
+                              (lambda (st) (and (func? st 'style)
+                                                (not (in? (key st) keys))))))
+         (all (append mine theirs)))
+    (if (null? all) '() `((styles ,@all)))))
+
 (define (tmof-initial x)
   ;; the initial environment of the document x, as an association list
   (with init (and tmof-document? (tmfile-extract x 'initial))
@@ -2530,4 +2702,5 @@
   (with body (if tmof-document? (tmfile-extract x 'body) x)
     `(office ,@(if tmof-document? (tmof-setup (tmof-initial x)) '())
              ,@(if tmof-document? (tmof-package (tmof-initial x)) '())
+             ,@(if tmof-document? (tmof-styles (tmof-initial x)) '())
              ,@(tmof-finalize (tmof-blocks (tmof body))))))
