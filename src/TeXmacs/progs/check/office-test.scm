@@ -742,9 +742,11 @@
     (check-true (export-has? content "style:text-line-through-type=\"double\""))
     (check-true (export-has? content "fo:letter-spacing=\"2pt\""))
     ;; without the style office: what TeXmacs can show
-    (check= (list-head (cdr (cadr (cadr (cadr (office->texmacs (cons 'office blocks)))))) 5)
+    ;; (the rest depends on the fonts of the computer: "e" and the text in
+    ;; Times New Roman are one string when it does not have this font)
+    (check= (list-head (cdr (cadr (cadr (cadr (office->texmacs (cons 'office blocks)))))) 4)
             '((change-case "a" "UPCASE") (underline "b") (underline "c")
-              (strike-through "d") "e"))
+              (strike-through "d")))
     ;; values which the office formats do not have are left out
     (with text (archive-entry
                  (convert '(document (TeXmacs "2.1") (style "office")
