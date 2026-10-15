@@ -959,12 +959,18 @@ git checkout 94277cec8a -- src/Plugins/NanoVG
 
 ### The GPU renderer
 
-With `--with-thorvg=<prefix>` (ThorVG built by `misc/thorvg/build-thorvg.sh
-<prefix>`, `[wasm]` for the browser), the windows are drawn by OpenGL
-(WebGL2 in the browser) instead of MuPDF (`vue_gpu.cpp`,
-`vue_sdl_gpu_window_rep` in `vue_gui.cpp`). With `TEXMACS_VUE_GPU=0`, or
-when no GL context can be made, everything is as before (until 2026-10-05
-the desktop needed `TEXMACS_VUE_GPU=1`).
+With ThorVG, the windows are drawn by OpenGL (WebGL2 in the browser)
+instead of MuPDF (`vue_gpu.cpp`, `vue_sdl_gpu_window_rep` in
+`vue_gui.cpp`). A Vue build uses it whenever it is available: configure
+looks for a ThorVG with its OpenGL engine (a program making a `GlCanvas`
+must link: packaged ones, Homebrew's, usually have the software engine
+only) where `pkg-config thorvg-1` says, in the prefix, `/usr/local`,
+`/opt/homebrew` and `/usr`, and warns when there is none;
+`--with-thorvg=<prefix>` names the one built by
+`misc/thorvg/build-thorvg.sh <prefix>` (`[wasm]` for the browser, whose
+Makefile builds it by default), `--with-thorvg=no` draws with MuPDF. With
+`TEXMACS_VUE_GPU=0`, or when no GL context can be made, everything is as
+before (until 2026-10-05 the desktop needed `TEXMACS_VUE_GPU=1`).
 `misc/thorvg-bench` has the measurements which chose the design.
 
 * **One context.** The windows are created with `SDL_WINDOW_OPENGL`, and
