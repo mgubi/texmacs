@@ -613,6 +613,21 @@ ns_follow_theme () {
   [NSApp setAppearance: a];
 }
 
+// The place of the icon bars (the preference "icon bars"): the windows are
+// laid out again when it changes (they read it, see ns_icon_bars_on_side)
+bool ns_icon_bars_on_side (); // ns_tm_widget.mm
+static void
+ns_follow_icon_bars () {
+  static int current= -1;
+  int now= ns_icon_bars_on_side ()? 1: 0;
+  if (now == current) return;
+  bool first= current < 0;
+  current= now;
+  if (!first)
+    [[NSNotificationCenter defaultCenter]
+      postNotificationName: @"TMIconBarsChanged" object: nil];
+}
+
 static void
 ns_redisplay_views (NSView* v) {
   if (v == nil) return;
@@ -676,6 +691,7 @@ ns_gui_rep::update () {
     if (vue_gpu_follow_glyph_settings ()) glyphs= true;
     if (glyphs) ns_simple_widget_rep::invalidate_every ();
     ns_follow_theme ();
+    ns_follow_icon_bars ();
     ns_simple_widget_rep::repaint_all ();
   }
 
