@@ -34,6 +34,9 @@
 (define ot-cell-align #f)             ; the alignment of the cell around
 (define ot-numbered? #f)              ; the headings are numbered
 (define ot-sequences '())             ; the names of the sequences
+(define ot-in-note? #f)               ; inside a note
+(define ot-bookmarks (make-ahash-table)) ; the bookmarks which are written
+(define ot-used-styles '())           ; (name family) of the named styles
 
 (define ot-text-width 16.0)           ; the width of the text, in centimeters
 
@@ -53,6 +56,63 @@
         (ahash-set! ot-styles key name)
         (set! ot-style-list (cons (make name) ot-style-list))
         name)))
+
+(define (ot-new-bookmark? name)
+  ;; whether the bookmark of this name is not in the file yet (a label
+  ;; which is twice in the text has one bookmark, at its first place)
+  (and (not (ahash-ref ot-bookmarks name))
+       (begin (ahash-set! ot-bookmarks name #t) #t)))
+
+(define (ot-named-style name family)
+  ;; The name in the file of a named style of the text (family paragraph
+  ;; or text), which the styles of the file get if they do not have it.
+  ;; A name has letters, digits, - . and _ only: the others are _hh_ (a
+  ;; space is _20_, as LibreOffice writes it).
+  (if (== name "") ""
+      (ot-named-style* name family)))
+
+(define (ot-named-style* name family)
+  (let* ((safe (apply string-append
+                      (map (lambda (c)
+                             (let ((n (char->integer c)))
+                               (if (or (char-alphabetic? c) (char-numeric? c)
+                                       (in? c '(#\_ #\- #\.)) (>= n 128))
+                                   (char->string c)
+                                   (string-append "_" (number->string n 16) "_"))))
+                           (string->list name))))
+         (safe (if (and (> (string-length safe) 0)
+                        (let ((c (string-ref safe 0)))
+                          (or (char-alphabetic? c) (char=? c #\_)
+                              (>= (char->integer c) 128))))
+                   safe (string-append "_" safe))))
+    (when (and (!= name "") (not (assoc safe ot-used-styles)))
+      (set! ot-used-styles (cons (list safe family name) ot-used-styles)))
+    safe))
+
+(define (ot-complete-styles styles)
+  ;; the styles of the file, with the named styles which the text has
+  ;; and they do not: a style of this name after the usual one
+  (let* ((office (ox-child styles 'office:styles))
+         (names (if office
+                    (map (lambda (y) (or (ox-attr y 'style:name) ""))
+                         (ox-childs office 'style:style))
+                    '()))
+         (new (list-filter (reverse ot-used-styles)
+                           (lambda (u) (not (in? (car u) names)))))
+         (element
+           (lambda (u)
+             `(style:style
+                (@ (style:name ,(car u)) (style:family ,(cadr u))
+                   ,@(if (!= (caddr u) (car u)) `((style:display-name ,(caddr u))) '())
+                   ,@(if (== (cadr u) "paragraph")
+                         '((style:parent-style-name "Standard") (style:class "text"))
+                         '()))))))
+    (if (or (null? new) (not office)) styles
+        (map (lambda (y)
+               (if (func? y 'office:styles)
+                   (append y (map element new))
+                   y))
+             styles))))
 
 (define (ot-cm x)
   (string-append (office-decimal x) "cm"))
@@ -509,11 +569,28 @@
                                    (xlink:type "simple") (xlink:show "embed")
                                    (xlink:actuate "onLoad")))))))))
 
+(define (ot-note-inline x)
+  ;; a note inside a note, which OpenDocument does not have: its text in
+  ;; parentheses where it is
+  (let* ((parts (map (lambda (b)
+                       (if (func? b 'p) (ot-inlines (ox-children b) '())
+                           (with t (ox-text b) (if (== t "") '() (ot-text t)))))
+                     (ox-children x)))
+         (parts (list-filter parts pair?)))
+    (if (null? parts) '()
+        (append (ot-text " (") (apply append (list-intersperse parts (ot-text " ")))
+                (ot-text ")")))))
+
 (define (ot-note x)
+  (if ot-in-note? (ot-note-inline x) (ot-note* x)))
+
+(define (ot-note* x)
   (let* ((n (ot-next-id))
          (old ot-cell-align))
     (set! ot-cell-align #f)
+    (set! ot-in-note? #t)
     (with blocks (ot-blocks-with (ox-children x) "Footnote")
+      (set! ot-in-note? #f)
       (set! ot-cell-align old)
       (list `(text:note
                (@ (text:id ,(string-append "ftn" (number->string n)))
@@ -528,7 +605,7 @@
   ;; bookmarks of its labels, so that a reference to one of them shows
   ;; this number.
   (let* ((name (ox-attr x 'name))
-         (labels (office-labels x))
+         (labels (list-filter (office-labels x) ot-new-bookmark?))
          (inner (ot-inlines (ox-children x) props))
          (number (if (and name (!= name ""))
                      (begin
@@ -550,8 +627,15 @@
   ;; of a heading, or else a link
   (let* ((name (or (ox-attr x 'name) ""))
          (kind (ox-attr x 'kind))
-         (inner (ot-inlines (ox-children x) props)))
+         (inner (ot-inlines (ox-children x) (cons 'link props))))
     (cond ((or (== name "") (null? inner)) inner)
+          ;; (a link has no link inside it: its text only)
+          ((in? 'link props) inner)
+          ;; the page of the label, which the program computes
+          ((== kind "page")
+           (list `(text:bookmark-ref
+                    (@ (text:reference-format "page") (text:ref-name ,name))
+                    ,@inner)))
           ((in? kind '("seq" "heading"))
            (list `(text:bookmark-ref
                     (@ (text:reference-format ,(if (== kind "heading") "number" "text"))
@@ -598,7 +682,9 @@
                                  (cons (list (car x) (ox-attr x 'value)) props)
                                  props)))
               ;; a named style of text
-              ((span) (ot-inlines l (cons (list 'rstyle (or (ox-attr x 'style) "")) props)))
+              ((span) (ot-inlines l (cons (list 'rstyle (ot-named-style (or (ox-attr x 'style) "")
+                                                                        "text"))
+                                          props)))
               ;; a field of OpenDocument, with its result; the result only of
               ;; another one
               ((field)
@@ -627,8 +713,10 @@
               ((ref) (ot-ref x props))
               ((link)
                (let ((href (or (ox-attr x 'href) ""))
-                     (inner (ot-inlines l props)))
+                     (inner (ot-inlines l (cons 'link props))))
                  (cond ((null? inner) '())
+                       ;; (a link has no link inside it: its text only)
+                       ((in? 'link props) inner)
                        ((in? href '("" "#")) inner)
                        (else (list `(text:a (@ (xlink:type "simple")
                                                (xlink:href
@@ -639,9 +727,11 @@
                                                  "Visited_20_Internet_20_Link"))
                                             ,@inner))))))
               ((bookmark)
-               (list `(text:bookmark
-                        (@ (text:name ,(string-append (if (ox-attr x 'at) "_TmAt_" "")
-                                                      (or (ox-attr x 'name) "")))))))
+               (with name (string-append (if (ox-attr x 'at) "_TmAt_" "")
+                                         (or (ox-attr x 'name) ""))
+                 (if (ot-new-bookmark? name)
+                     (list `(text:bookmark (@ (text:name ,name))))
+                     '())))
               ((note) (ot-note x))
               ((br) '((text:line-break)))
               ((tab) '((text:tab)))
@@ -738,9 +828,10 @@
                      ((assoc-ref ot-role-styles role) => identity)
                      ;; a named style of the file, or the one of its usual
                      ;; paragraphs
-                     ((ox-attr x 'style) => identity)
+                     ((ox-attr x 'style)
+                      => (lambda (n) (ot-named-style n "paragraph")))
                      ((and (== default "Text_20_body") (ox-attr ot-setup 'body-style))
-                      (ox-attr ot-setup 'body-style))
+                      (ot-named-style (ox-attr ot-setup 'body-style) "paragraph"))
                      (else default)))
          ;; a formula on its own lines is centered
          (formula? (with c (ox-children x)
@@ -753,7 +844,7 @@
          (l (append
               ;; the bookmarks of the labels of a heading
               (map (lambda (name) `(text:bookmark (@ (text:name ,name))))
-                   (office-labels x))
+                   (list-filter (office-labels x) ot-new-bookmark?))
               (ot-inlines (ox-children x) '()))))
     (if level
         (list `(text:h (@ (text:style-name ,style)
@@ -1423,6 +1514,9 @@
                           (list-find (cdr x) (lambda (y) (func? y 'setup))))
                      '(setup)))
   (set! ot-sequences '())
+  (set! ot-in-note? #f)
+  (set! ot-bookmarks (make-ahash-table))
+  (set! ot-used-styles '())
   (let* ((blocks (ot-blocks-with (if (func? x 'office) (cdr x) (list x))
                                  "Text_20_body"))
          (blocks (if (null? blocks)
@@ -1445,7 +1539,7 @@
                       (map car entries))
               (append (list "application/vnd.oasis.opendocument.text"
                             (ox-serialize content)
-                            (ox-serialize (ot-merged-styles (ot-styles-file)))
+                            (ox-serialize (ot-complete-styles (ot-merged-styles (ot-styles-file))))
                             (ox-serialize (ot-manifest files)))
                       (map caddr entries)))))
     (set! ot-styles (make-ahash-table))

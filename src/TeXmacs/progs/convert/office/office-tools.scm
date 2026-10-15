@@ -867,8 +867,10 @@
                          "avenir" "frutiger" "univers" "montserrat"
                          "candara" "corbel" "geneva" "ubuntu" "cantarell"))))))
 
-(tm-define (office-length->cm s)
-  (:synopsis "The length @s (2cm, 1in, 10mm, 12pt, 96px) in centimeters, or #f")
+(tm-define (office-length->cm s . zero?)
+  (:synopsis "The length @s (2cm, 1in, 10mm, 12pt, 1pc, 96px) in centimeters, or #f")
+  ;; (a length of 0 is #f, as the size of a picture, unless @zero? says
+  ;; that it is one, as a margin)
   (and (string? s) (!= s "")
        (let* ((n (string-length s))
               (i (let loop ((i 0))
@@ -877,6 +879,7 @@
                        (loop (+ i 1)) i)))
               (v (string->number (substring s 0 i)))
               (scale (assoc-ref '(("cm" . 1.0) ("mm" . 0.1) ("in" . 2.54)
-                                  ("pt" . 0.03528) ("px" . 0.02646))
+                                  ("pt" . 0.03528) ("pc" . 0.42333) ("px" . 0.02646))
                                 (substring s i n))))
-         (and v scale (> v 0) (* v scale)))))
+         (and v scale (or (> v 0) (and (pair? zero?) (car zero?) (= v 0)))
+              (* v scale)))))
