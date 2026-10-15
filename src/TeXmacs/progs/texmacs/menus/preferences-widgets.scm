@@ -61,7 +61,11 @@
             (else #f))))
 
 (tm-define (set-retina-boolean-preference which on?)
-  (set-retina-preference which (if on? "on" "off")))
+  (set-retina-preference which (if on? "on" "off"))
+  ;; the Cocoa interface reads them when it starts (ns_gui_rep)
+  (when (ns-gui?)
+    (set-message "Restart in order to let the new setting take effect"
+                 "retina setting")))
 
 (tm-define (reset-retina-preferences)
   (reset-preference "retina-factor")
@@ -237,11 +241,11 @@
               '("Light" "None" "Full")
               (get-pretty-preference "gpu glyph hinting")
               "18em")))
-    (assuming (qt5-gui?)
+    (assuming (or (qt5-gui?) (ns-gui?))
       (meti (hlist // (text "Use retina fonts"))
         (toggle (set-retina-boolean-preference "retina-factor" answer)
                 (get-retina-boolean-preference "retina-factor"))))
-    (assuming (qt5-gui?)
+    (assuming (or (qt5-gui?) (ns-gui?))
       (meti (hlist // (text "Use retina icons"))
         (toggle (set-retina-boolean-preference "retina-icons" answer)
                 (get-retina-boolean-preference "retina-icons"))))))
