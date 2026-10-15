@@ -1681,8 +1681,9 @@ Optional Packages:
                           and some default directories to find Qt binaries
   --with-x                use the X Window System
   --with-sdl3[=ARG]       with sdl3 support [ARG=no]
-  --with-thorvg[=ARG]     with the GPU renderer of the Vue port, ThorVG
-                          installed in ARG [ARG=no]
+  --with-thorvg[=ARG]     the GPU renderer of the Vue port, with ThorVG
+                          installed in ARG (default: found by itself; no: draw
+                          with MuPDF)
 
 Some influential environment variables:
   CC          C compiler command
@@ -36490,27 +36491,100 @@ fi
 
   THORVG_CFLAGS=""
   THORVG_LDFLAGS=""
-  if test "$with_thorvg" = "no" -o "$with_thorvg" = "" ; then
-      { printf '%s\n' "$as_me:${as_lineno-$LINENO}: result: disabling the GPU renderer (no ThorVG)" >&5
-printf '%s\n' "disabling the GPU renderer (no ThorVG)" >&6; }
+  if test "$with_thorvg" = "no" ; then
+    { printf '%s\n' "$as_me:${as_lineno-$LINENO}: result: disabling the GPU renderer (--with-thorvg=no)" >&5
+printf '%s\n' "disabling the GPU renderer (--with-thorvg=no)" >&6; }
   else
-      if test -f "$with_thorvg/include/thorvg-1/thorvg.h" -a \
-              -f "$with_thorvg/lib/libthorvg-1.a" ; then
-        { printf '%s\n' "$as_me:${as_lineno-$LINENO}: result: enabling the GPU renderer with ThorVG in $with_thorvg" >&5
-printf '%s\n' "enabling the GPU renderer with ThorVG in $with_thorvg" >&6; }
+    if test "$with_thorvg" = "" -o "$with_thorvg" = "yes" ; then
+      tm_places=""
+      if test -n "$PKG_CONFIG" -o -n "`which pkg-config 2>/dev/null`" ; then
+        tm_places="`${PKG_CONFIG:-pkg-config} --variable=prefix thorvg-1 2>/dev/null`"
+      fi
+      if test "$prefix" != "NONE" ; then tm_places="$tm_places $prefix" ; fi
+      tm_places="$tm_places /usr/local /opt/homebrew /usr"
+    else
+      tm_places="$with_thorvg"
+    fi
+    { printf '%s\n' "$as_me:${as_lineno-$LINENO}: checking for ThorVG with its OpenGL engine" >&5
+printf %s "checking for ThorVG with its OpenGL engine... " >&6; }
+    tm_found=""
+    for tm_place in $tm_places ; do
+
+  tm_thorvg_cflags=""
+  tm_thorvg_ldflags=""
+  tm_p="$tm_place"
+  if test -n "$tm_p" -a -f "$tm_p/include/thorvg-1/thorvg.h" ; then
+    tm_cflags="-I$tm_p/include/thorvg-1 -DGL_SILENCE_DEPRECATION"
+    if test -f "$tm_p/lib/libthorvg-1.a" ; then
+      tm_cflags="$tm_cflags -DTVG_STATIC"
+      tm_ldflags="$tm_p/lib/libthorvg-1.a"
+    else
+      tm_ldflags="-L$tm_p/lib -lthorvg-1"
+    fi
+    case "${host}" in
+      *darwin*) tm_ldflags="$tm_ldflags -framework OpenGL" ;;
+      *mingw* | *cygwin* | *msys*) tm_ldflags="$tm_ldflags -lopengl32" ;;
+      *) tm_ldflags="$tm_ldflags -lGL -lpthread" ;;
+    esac
+    ac_ext=cpp
+ac_cpp='$CXXCPP $CPPFLAGS'
+ac_compile='$CXX -c $CXXFLAGS $CPPFLAGS conftest.$ac_ext >&5'
+ac_link='$CXX -o conftest$ac_exeext $CXXFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $LIBS >&5'
+ac_compiler_gnu=$ac_cv_cxx_compiler_gnu
+
+    tm_save_CXXFLAGS="$CXXFLAGS"
+    tm_save_LIBS="$LIBS"
+    CXXFLAGS="$CXXFLAGS -std=c++17 $tm_cflags"
+    LIBS="$tm_ldflags $LIBS"
+    cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+#include <thorvg.h>
+int
+main (void)
+{
+return tvg::GlCanvas::gen () == nullptr;
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_cxx_try_link "$LINENO"
+then :
+  tm_thorvg_cflags="$tm_cflags"; tm_thorvg_ldflags="$tm_ldflags"
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.beam \
+    conftest$ac_exeext conftest.$ac_ext
+    CXXFLAGS="$tm_save_CXXFLAGS"
+    LIBS="$tm_save_LIBS"
+    ac_ext=cpp
+ac_cpp='$CXXCPP $CPPFLAGS'
+ac_compile='$CXX -c $CXXFLAGS $CPPFLAGS conftest.$ac_ext >&5'
+ac_link='$CXX -o conftest$ac_exeext $CXXFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $LIBS >&5'
+ac_compiler_gnu=$ac_cv_cxx_compiler_gnu
+
+  fi
+
+      if test -n "$tm_thorvg_ldflags" ; then tm_found="$tm_place" ; break ; fi
+    done
+    if test -n "$tm_found" ; then
+      { printf '%s\n' "$as_me:${as_lineno-$LINENO}: result: in $tm_found" >&5
+printf '%s\n' "in $tm_found" >&6; }
+      { printf '%s\n' "$as_me:${as_lineno-$LINENO}: result: enabling the GPU renderer with ThorVG in $tm_found" >&5
+printf '%s\n' "enabling the GPU renderer with ThorVG in $tm_found" >&6; }
 
 printf '%s\n' "#define USE_THORVG 1" >>confdefs.h
 
-        THORVG_CFLAGS="-I$with_thorvg/include/thorvg-1 -DGL_SILENCE_DEPRECATION -DTVG_STATIC"
-        THORVG_LDFLAGS="$with_thorvg/lib/libthorvg-1.a"
-        case "${host}" in
-          *darwin*) THORVG_LDFLAGS="$THORVG_LDFLAGS -framework OpenGL" ;;
-          *mingw* | *cygwin* | *msys*) THORVG_LDFLAGS="$THORVG_LDFLAGS -lopengl32" ;;
-          *) THORVG_LDFLAGS="$THORVG_LDFLAGS -lGL" ;;
-        esac
+      THORVG_CFLAGS="$tm_thorvg_cflags"
+      THORVG_LDFLAGS="$tm_thorvg_ldflags"
+    else
+      { printf '%s\n' "$as_me:${as_lineno-$LINENO}: result: no" >&5
+printf '%s\n' "no" >&6; }
+      if test "$with_thorvg" = "" ; then
+        { printf '%s\n' "$as_me:${as_lineno-$LINENO}: WARNING: no ThorVG with its OpenGL engine: the Vue port draws with MuPDF (build ThorVG with misc/thorvg/build-thorvg.sh <prefix>, then --with-thorvg=<prefix>)" >&5
+printf '%s\n' "$as_me: WARNING: no ThorVG with its OpenGL engine: the Vue port draws with MuPDF (build ThorVG with misc/thorvg/build-thorvg.sh <prefix>, then --with-thorvg=<prefix>)" >&2;}
       else
-        as_fn_error $? "no ThorVG in $with_thorvg (see misc/thorvg/build-thorvg.sh)" "$LINENO" 5
+        as_fn_error $? "no ThorVG with its OpenGL engine in $tm_places (see misc/thorvg/build-thorvg.sh)" "$LINENO" 5
       fi
+    fi
   fi
 
          VUE_CFLAGS="$SDL3_CFLAGS $THORVG_CFLAGS"
