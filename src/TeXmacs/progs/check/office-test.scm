@@ -897,6 +897,33 @@
       (check-true (export-has? content "fo:clip=\"rect(0cm, 0.661cm, 0cm, 0cm)\""))
       (check-true (export-has? content "style:wrap=\"left\""))
       (check-true (export-has? content "svg:x=\"12cm\""))))
+  ;; a section in columns with a line between them and a space of 1 cm
+  (let* ((blocks (docx (string-append
+                         (wp (wr "one") "<w:pPr><w:sectPr><w:cols w:num='1'/></w:sectPr></w:pPr>")
+                         (wp (wr "two") "<w:pPr><w:sectPr><w:cols w:num='2' w:sep='1'"
+                             " w:space='567'/></w:sectPr></w:pPr>"))))
+         (doc (office->texmacs (cons 'office blocks)
+                               (list (cons "office->texmacs:faithful" "on"))))
+         (text (archive-entry (convert doc "texmacs-stree" "docx-document") "word/document.xml"))
+         (content (archive-entry (convert doc "texmacs-stree" "odt-document") "content.xml")))
+    (check= (cadr blocks) '(columns (@ (count "2") (line "true") (gap "1cm")) (p "two")))
+    (check= (caddr (cadr (cadr doc))) '(office-columns* "2" "true" "1cm" (document "two")))
+    (check-true (export-has? text "<w:cols w:num=\"2\" w:sep=\"1\" w:space=\"567\"/>"))
+    (check-true (export-has? content "<style:column-sep"))
+    (check-true (export-has? content "fo:column-gap=\"1cm\"")))
+  ;; the underline of a link is the one of its look: Word leaves it out
+  (check= (docx (wp "<w:hyperlink w:anchor='x'><w:r><w:rPr><w:rStyle w:val='Hyperlink'/>"
+                    "<w:u w:val='single'/></w:rPr><w:t>l</w:t></w:r></w:hyperlink>"))
+          '((p (link (@ (href "#x")) "l"))))
+  ;; a formula alone in a paragraph of a cell of several paragraphs, which
+  ;; Word displays, stays in the cell
+  (check= (cadr (office->texmacs
+                  '(office (table (row (cell (p "a")
+                                             (p (math (@ (display "true") (form "sxml"))
+                                                      (math (mi "x"))))))))))
+          '(body (document (block (tformat (twith "table-width" "1par") (twith "table-hmode" "exact")
+                                           (cwith "1" "-1" "1" "-1" "cell-hyphen" "t")
+                                           (table (row (cell (document "a" (math "x"))))))))))
   ;; a font of OpenDocument by the name of its declaration: its family
   (check= (odt-blocks-of (tp (tspan "T1" "x"))
                          (string-append

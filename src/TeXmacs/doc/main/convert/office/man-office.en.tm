@@ -115,7 +115,14 @@
     <markup|office-ins> and <markup|office-del>, in color.
 
     <item*|Columns>A section in several columns is
-    <markup|office-columns>.
+    <markup|office-columns>, or <markup|office-columns*> with the line
+    between the columns (which <TeXmacs> does not draw) and the space
+    between them.
+
+    <item*|Floating images>An image with the text around it is
+    <markup|office-float>, with its side, where it is and how the text
+    goes around it: <TeXmacs> shows it in a paragraph of its own, before
+    the paragraph which it belongs to.
 
     <item*|The file>The file itself is kept in the environment of the
     document: when it is saved again in its format, its named styles, its

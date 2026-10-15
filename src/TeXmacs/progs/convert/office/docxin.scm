@@ -934,7 +934,7 @@
            (let* ((mark (assoc-ref (caddr f) "\\l"))
                   (href (string-append arg (if (string? mark)
                                                (string-append "#" mark) ""))))
-             (if (== href "") l (list `(link (@ (href ,href)) ,@l)))))
+             (if (== href "") l (list `(link (@ (href ,href)) ,@(office-link-text l))))))
           ((and (== name "ref") (!= arg ""))
            (list `(ref (@ (name ,arg)) ,@l)))
           ;; the page of a bookmark, not its number
@@ -1045,7 +1045,7 @@
                             (else #f)))
                 (l (docx-inlines (ox-children x))))
            (cond ((null? l) '())
-                 (href (list `(link (@ (href ,href)) ,@l)))
+                 (href (list `(link (@ (href ,href)) ,@(office-link-text l))))
                  (else l))))
         ((func? x 'w:fldSimple)
          (docx-field (or (ox-attr x 'w:instr) "")
@@ -1161,19 +1161,25 @@
             '())))))
 
 (define (docx-columns sect)
-  ;; the number of columns of a section
-  (with c (ox-child sect 'w:cols)
-    (office-integer (and c (ox-attr c 'w:num)) 1 1 10)))
+  ;; the columns of a section: their number, the line between them, the
+  ;; space between them, as attributes of a node columns
+  (let* ((c (ox-child sect 'w:cols))
+         (n (office-integer (and c (ox-attr c 'w:num)) 1 1 10))
+         ;; (the usual space, 720, is the one which is written for none)
+         (gap (with v (and c (office-number (ox-attr c 'w:space)))
+                (and v (>= v 0) (!= v 720) (office-cm (/ v 567.0))))))
+    `((count ,(number->string n))
+      (line ,(and c (in? (ox-attr c 'w:sep) '("1" "true" "on")) "true"))
+      (gap ,gap))))
 
 (define (docx-sections l last)
   ;; the blocks l with the sections in several columns as blocks columns;
   ;; last is the number of columns of the last section
   (let loop ((l l) (part '()) (acc '()))
-    (let ((flush (lambda (n)
+    (let ((flush (lambda (c)
                    (cond ((null? part) acc)
-                         ((> n 1)
-                          (cons `(columns (@ (count ,(number->string n)))
-                                          ,@(reverse part))
+                         ((> (office-integer (cadr (assq 'count c)) 1 1 10) 1)
+                          (cons (apply office-node (cons* 'columns c (reverse part)))
                                 acc))
                          (else (append part acc))))))
       (cond ((null? l) (reverse (flush last)))
@@ -1952,7 +1958,8 @@
                (sect (and body (list-find (reverse (ox-children body))
                                           (lambda (x) (func? x 'w:sectPr)))))
                (blocks (and body (docx-sections (docx-blocks (ox-children body))
-                                                (if sect (docx-columns sect) 1))))
+                                                (if sect (docx-columns sect)
+                                                    '((count "1"))))))
                (headers (docx-headers sect))
                (blocks (and blocks (office-drop-style blocks (docx-body-style))))
                (r (if body

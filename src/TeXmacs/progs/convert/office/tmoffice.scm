@@ -1248,6 +1248,15 @@
   (if (< (length l) 3) '()
       `((comment (@ ,@(tmof-who l)) ,@(tmof-blocks (tmof (caddr l)))))))
 
+(define (tmof-office-columns* l)
+  ;; columns with the line between them, and the space between them
+  (if (< (length l) 4) '()
+      `((columns (@ (count ,(tmof-plain (car l)))
+                    ,@(if (== (tmof-plain (cadr l)) "true") '((line "true")) '())
+                    ,@(with g (tmof-plain (caddr l))
+                        (if (office-length->cm g) `((gap ,g)) '())))
+                 ,@(tmof-blocks (tmof (cadddr l)))))))
+
 (define (tmof-office-columns l)
   (if (< (length l) 2) '()
       `((columns (@ (count ,(tmof-plain (car l)))) ,@(tmof-blocks (tmof (cadr l)))))))
@@ -1927,6 +1936,7 @@
   (office-del tmof-office-del)
   (office-comment tmof-office-comment)
   (office-columns tmof-office-columns)
+  (office-columns* tmof-office-columns*)
   (office-underline tmof-office-underline)
   (office-strike tmof-office-strike)
   (office-letters tmof-office-letters)
