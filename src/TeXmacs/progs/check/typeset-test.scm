@@ -1101,6 +1101,172 @@
        (check= (typeset-check-mismatches) 0)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Random documents against scratch
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; Random documents made of what the audits of the incremental typesetting
+;; found wrong (bindings and assignments of a variable, variables which are
+;; not there, theorems with a name moved by a macro, labels and references,
+;; parts, footnotes, columns, a Scheme routine, hidden paragraphs, tables,
+;; nested documents), random edits of them (insertions, removals, copies,
+;; moves, removals put back as an undo does), and after each edit the
+;; places of all the paragraphs (also
+;; in the nested documents) and the numbers of the references, against a
+;; typesetting from scratch. (typeset-fuzz seed edits size medium) returns
+;; the number of edits after which they differ, for long runs: the suite
+;; runs a few small ones.
+
+(define fz-state 1)
+(define (fz-rnd n)
+  (set! fz-state (modulo (+ (* fz-state 1103515245) 12345) 2147483648))
+  (modulo (quotient fz-state 65536) n))
+(define (fz-pick l) (list-ref l (fz-rnd (length l))))
+(define fz-labels 0)
+(define (fz-label)
+  (set! fz-labels (+ fz-labels 1))
+  (string-append "fz" (number->string fz-labels)))
+(define (fz-text)
+  (fz-pick '("alpha beta gamma" "a much longer paragraph of text which goes on"
+             "x" "short words here" "delta epsilon zeta eta theta iota kappa")))
+(define (fz-length) (fz-pick '("1cm" "2cm" "3mm" "0.5fn" "1fn")))
+
+(define (fz-leaf depth)
+  (case (fz-rnd (if (> depth 0) 15 16))
+    ((0) (fz-text))
+    ((1) `(assign "fa" ,(fz-length)))
+    ((2) `(with "fa" ,(fz-length) (document (assign "fa" ,(fz-length)) "inner")))
+    ((3) `(concat "v " (vspace (value "fa")) "x"))
+    ((4) `(concat "u " (value "fu") "."))
+    ((5) `(with "fu" "z" (document "w")))
+    ((6) `(equation (document (concat "x=y" (label ,(fz-label))))))
+    ((7) `(concat "see " (reference ,(string-append "fz" (number->string
+                                                         (+ 1 (fz-rnd (max 1 fz-labels))))))))
+    ((8) `(theorem (document ,(fz-text) ,(fz-text))))
+    ((9) `(concat "n" (footnote "a note") " " ,(fz-text)))
+    ((10) `(with "par-columns" "2" (document ,(fz-text) ,(fz-text) ,(fz-text))))
+    ((11) `(concat (date) " d"))
+    ((12) `(with "par-par-sep" "0fn" (hidden "h")))
+    ((13) `(tabular (tformat (cwith "1" "1" "1" "1" "fb" "v")
+                             (table (row (cell "c") (cell (value "fb")))))))
+    ((14) `(concat "i " (index ,(fz-text)) " " ,(fz-text)))
+    (else `(with "fb" ,(fz-length)
+             (document ,(fz-leaf (+ depth 1)) ,(fz-leaf (+ depth 1))
+                       ,(fz-leaf (+ depth 1)))))))
+
+(define (fz-document size)
+  `(document (assign "theorem-name"
+                     (macro "name" (move (strong (arg "name")) "0pt" "0pt")))
+             (assign "fa" "1cm")
+             ,@(map (lambda (i) (fz-leaf 0)) (iota size))))
+
+(define (fz-body c)
+  ;; the document inside a paragraph, if any
+  (cond ((and (tree-compound? c) (tree-is? c 'theorem)) (tree-ref c 0))
+        ((and (tree-compound? c) (tree-is? c 'with)
+              (tree-is? (tree-ref c (- (tree-arity c) 1)) 'document))
+         (tree-ref c (- (tree-arity c) 1)))
+        (else #f)))
+
+(define (fz-documents t)
+  (let loop ((i 0) (acc (list t)))
+    (if (>= i (tree-arity t)) acc
+        (with b (fz-body (tree-ref t i))
+          (loop (+ i 1) (if b (append (fz-documents b) acc) acc))))))
+
+(define (fz-places t)
+  (apply append
+         (map (lambda (i)
+                (with c (tree-ref t i)
+                  (cons (tree-bounding-rectangle c)
+                        (with b (fz-body c) (if b (fz-places b) '())))))
+              (iota (tree-arity t)))))
+
+(define (fz-labels-in t)
+  (cond ((tree-atomic? t) '())
+        ((and (tree-is? t 'label) (tree-atomic? (tree-ref t 0)))
+         (list (tree->string (tree-ref t 0))))
+        (else (apply append (map fz-labels-in (tree-children t))))))
+
+(define (fz-snapshot)
+  (list (fz-places (buffer-tree))
+        (map (lambda (l)
+               (with r (tree->stree (get-reference l))
+                 (if (and (pair? r) (pair? (cdr r))) (cadr r) r)))
+             (fz-labels-in (buffer-tree)))))
+
+(define (fz-typeset)
+  (update-forced)
+  (update-forced))
+
+(define (fz-scratch body medium)
+  (let* ((old (current-buffer)) (u (new-buffer)))
+    (switch-to-buffer* u)
+    (buffer-set-body u (tree-copy body))
+    (init-env "page-medium" medium)
+    (update-current-buffer)
+    (fz-typeset)
+    (with r (fz-snapshot)
+      (buffer-close u)
+      (switch-to-buffer* old)
+      r)))
+
+(define (fz-edit)
+  (let* ((ds (fz-documents (buffer-tree)))
+         (d (fz-pick ds))
+         (n (tree-arity d))
+         (pos (if (<= n 2) (min 1 n) (+ 1 (fz-rnd (- n 1))))))
+    (case (fz-rnd 10)
+      ((0 1) (tree-insert d pos (list (fz-leaf 1))))
+      ((2) (when (> n 3) (tree-remove d pos 1)))
+      ((3) (when (> n 5) (tree-remove d pos (min 3 (- n pos)))))
+      ((4) (when (< pos n) (tree-set (tree-ref d pos) (fz-leaf 1))))
+      ((5) ;; removed and put back (as an undo does)
+       (when (< pos n)
+         (with s (tree->stree (tree-ref d pos))
+           (tree-remove d pos 1)
+           (fz-typeset)
+           (tree-insert d pos (list (stree->tree s))))))
+      ((6) ;; replaced by an identical copy (a new bridge)
+       (when (< pos n) (tree-assign (tree-ref d pos) (tree-copy (tree-ref d pos)))))
+      ((7) ;; moved
+       (when (and (< pos n) (> n 3))
+         (with s (tree->stree (tree-ref d pos))
+           (tree-remove d pos 1)
+           (tree-insert d (+ 1 (fz-rnd (- n 2))) (list (stree->tree s))))))
+      ((8) ;; the name of the theorems moved
+       (tree-set (tree-ref (buffer-tree) 0 1 1 2) (fz-pick '("0pt" "2ex" "4ex"))))
+      (else ;; the value of the variable assigned at the start
+       (tree-set (tree-ref (buffer-tree) 1 1) (fz-length))))))
+
+(tm-define (typeset-fuzz seed edits size medium)
+  (:synopsis "Random edits against scratch; the number of edits which differ")
+  (set! fz-state seed)
+  (set! fz-labels 0)
+  (let* ((old (current-buffer)) (u (new-buffer)) (bad 0))
+    (switch-to-buffer* u)
+    (buffer-set-body u (stree->tree (fz-document size)))
+    (init-env "page-medium" medium)
+    (update-current-buffer)
+    (fz-typeset)
+    (for (k (iota edits))
+      (fz-edit)
+      (fz-typeset)
+      (when (!= (fz-snapshot) (fz-scratch (buffer-tree) medium))
+        (set! bad (+ bad 1))))
+    (buffer-close u)
+    (when (buffer-exists? old) (switch-to-buffer old))
+    bad))
+
+(define (test-random-documents)
+  (check-group "random documents against scratch")
+  ;; (not with the classic cache, TEXMACS_TYPESET_READS=off, whose old
+  ;; mistakes these documents find)
+  (when (!= (getenv "TEXMACS_TYPESET_READS") "off")
+    (check= (typeset-fuzz 17 12 30 "paper") 0)
+    (check= (typeset-fuzz 29 12 30 "papyrus") 0)
+    (check= (typeset-check-mismatches) 0)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The suite
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -1140,4 +1306,5 @@
   (test-labels-of-parts)
   (test-labels-after-undo)
   (test-incremental-against-scratch)
+  (test-random-documents)
   (check-end))
