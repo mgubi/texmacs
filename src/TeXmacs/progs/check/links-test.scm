@@ -1199,9 +1199,9 @@
     (check= (body-now) s0)
     (check= (cursor) '(0 0))
     (check-undo-redo (list s0 s1 s0))
-    ;; after undo and redo of a toggle, the cursor is at the end of the
-    ;; document, as with an assignment of the whole document: never in
-    ;; the hidden preamble
+    ;; after undo and redo of a toggle, the cursor is at the end of a
+    ;; visible node, where the next key is seen: the shown preamble, the
+    ;; first shown part or the whole document
     (edit (buffer-make-preamble))
     (edit (insert "p"))
     (edit (toggle-preamble-mode))
@@ -1219,10 +1219,40 @@
     (edit (undo 0))
     (check= (body-now) `(document (show-preamble (document "p"))
                                   (ignore (document ,@pars))))
-    (check= (cursor) (doc-end))
+    (check= (cursor) '(0 0 0 1))
     (edit (redo 0))
     (check= (body-now) `(document (hide-preamble (document "p")) ,@pars))
-    (check= (cursor) (doc-end)))
+    (check= (cursor) (doc-end))
+    (edit (undo 0))
+    (edit (insert "Z"))
+    (check= (st 0) '(show-preamble (document "pZ")))
+    (edit (undo 0))
+    (edit (toggle-preamble-mode))
+    ;; the same with parts: the cursor goes to the shown part
+    (edit (buffer-set-part-mode :one))
+    (edit (undo 0))
+    (check= (body-now) `(document (hide-preamble (document "p")) ,@pars))
+    (check= (cursor) (doc-end))
+    (edit (redo 0))
+    (check= (st 1) '(show-part "1" (document "intro") ""))
+    (check= (cursor) '(1 1 0 5))
+    (edit (insert "Z"))
+    (check= (st 1 1) '(document "introZ"))
+    (edit (undo 0))
+    (edit (buffer-set-part-mode :all))
+    (edit (undo 0))
+    (check= (cursor) '(1 1 0 5))
+    (edit (buffer-show-part "Two"))
+    (check= (st 3 0) "3")
+    (check= (st 3) '(show-part "3" (document (section "Two") "b")
+                               (document (section "Two"))))
+    (edit (undo 0))
+    (check= (cursor) '(1 1 0 5))
+    (edit (redo 0))
+    (check= (cursor) '(3 1 1 1))
+    (edit (buffer-show-part "Two"))
+    (edit (undo 0))
+    (check= (cursor) '(1 1 0 5)))
   ;; parts with subparts
   (write-doc "parts-undo-book.tm" '("book") '()
              '((chapter "A") "a" (section "A1") "a1" (chapter "B") "b"))
@@ -1249,7 +1279,14 @@
                           (ignore (document ,@pars))))
     (check= s4 `(document (hide-preamble (document "")) ,@parts))
     (check= s5 s3)
-    (check-undo-redo (list s0 s1 s2 s3 s4 s5)))
+    (check-undo-redo (list s0 s1 s2 s3 s4 s5))
+    ;; the cursor goes to the body of the last shown subpart
+    (edit (redo 0))
+    (check= (body-now) s1)
+    (check= (cursor) '(0 1 2 1 1 2))
+    (edit (insert "Z"))
+    (check= (st 0 1 2 1 1) "a1Z")
+    (edit (undo 0)))
   ;; typing in the identifier of a hidden part, between mode changes:
   ;; undo and redo must not change the archived trees
   (write-doc "parts-undo-ids.tm" '("article") '()

@@ -103,12 +103,23 @@
 	(tree-join t (+ i k)))
       (document-join-range! t i (- n h)))))
 
+(define (buffer-visible-node)
+  ;; a node whose end is visible: the shown preamble, else the body of the
+  ;; first shown part, else the whole document
+  (with t (buffer-tree)
+    (cond ((tree-is? (tree-ref t 0) 'show-preamble) (tree-ref t 0))
+          ((list-find (buffer-body-paragraphs)
+                      (lambda (x) (tree-is? x 'show-part)))
+           => (lambda (x) (tree-ref x 1)))
+          (else t))))
+
 (define (buffer-mark-change)
   ;; undo puts the cursor at the first change of the step, redo at the
-  ;; last one; relabelling the root to itself, at the start and at the end
-  ;; of a change, puts it at the end of the document, as the assignment of
-  ;; the whole document which these changes replace did
-  (tree-assign-node (buffer-tree) 'document))
+  ;; last one; relabelling a visible node to itself, at the start and at
+  ;; the end of a change, puts it at the end of that node, where typing
+  ;; is seen
+  (with t (buffer-visible-node)
+    (tree-assign-node t (tree-label t))))
 
 (define (buffer-wrap-body)
   ;; (document [preamble] b1 ... bn) -> (document [preamble] (document b1 ... bn))
@@ -381,17 +392,31 @@
 	(else (list-find (tree-children t)
 			 (lambda (x) (document-find-part x id))))))
 
-(define (document-select-part t id)
-  (cond ((tree-atomic? t) (noop))
+(define (document-select-part t id change?)
+  ;; show the part @id of @t and hide the others; with @change? false,
+  ;; only tell whether this changes anything
+  (cond ((tree-atomic? t) #f)
 	((tree-in? t '(show-part hide-part))
 	 (with show? (== id (document-part-name t))
-	   (if (and show? (tree-is? t 'hide-part))
-	       (tree-assign-node! t 'show-part))
-	   (if (and (not show?) (tree-is? t 'show-part))
-	       (tree-assign-node! t 'hide-part))))
-	((not (tree-is? t 'document)) (noop))
-	(else (for-each (lambda (x) (document-select-part x id))
-			(tree-children t)))))
+	   (cond ((and show? (tree-is? t 'hide-part))
+		  (if change? (tree-assign-node! t 'show-part))
+		  #t)
+		 ((and (not show?) (tree-is? t 'show-part))
+		  (if change? (tree-assign-node! t 'hide-part))
+		  #t)
+		 (else #f))))
+	((not (tree-is? t 'document)) #f)
+	(else (with r #f
+		(for (x (tree-children t))
+		  (when (document-select-part x id change?)
+		    (set! r #t)))
+		r))))
+
+(define (buffer-select-part t id)
+  (when (document-select-part t id #f)
+    (buffer-mark-change)
+    (document-select-part t id #t)
+    (buffer-mark-change)))
 
 (tm-define (buffer-go-to-part id)
   (:synopsis "Go to the part with name @id")
@@ -401,7 +426,7 @@
 (tm-define (buffer-show-part id)
   (:synopsis "Show the document part with name @id")
   (when (== (buffer-get-part-mode) :one)
-    (document-select-part (buffer-tree) id)
+    (buffer-select-part (buffer-tree) id)
     (buffer-go-to-part id)))
 
 (tm-define (buffer-toggle-part id)
@@ -411,10 +436,14 @@
     (with t (document-find-part (buffer-tree) id)
       (cond ((not t) (noop))
 	    ((tree-is? t 'show-part)
+	     (buffer-mark-change)
 	     (tree-assign-node! t 'hide-part)
+	     (buffer-mark-change)
 	     (buffer-go-to-part (car (buffer-parts-list #f))))
 	    ((tree-is? t 'hide-part)
+	     (buffer-mark-change)
 	     (tree-assign-node! t 'show-part)
+	     (buffer-mark-change)
 	     (buffer-go-to-part id))))))
 
 (tm-define (buffer-make-preamble)
@@ -432,8 +461,11 @@
   (:require (and (tree-is? t 'hide-part) (== (tree-up t) (buffer-tree))))
   (if (== (buffer-get-part-mode) :one)
       (with id (document-part-name t)
-	(document-select-part (tree-up t) id))
-      (tree-assign-node! t 'show-part)))
+	(buffer-select-part (tree-up t) id))
+      (begin
+	(buffer-mark-change)
+	(tree-assign-node! t 'show-part)
+	(buffer-mark-change))))
 
 (tm-define (show-hidden-part id)
   (:synopsis "Make hidden part with identifier @id visible")

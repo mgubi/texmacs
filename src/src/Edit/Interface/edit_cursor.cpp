@@ -497,6 +497,7 @@ edit_cursor_rep::go_to_after_change (path p) {
 void
 edit_cursor_rep::flush_cursor_hook () {
   nr_changed= 0;
+  hook_defer= false; // also after an exception in go_to_after_change
   if (hook_wait) {
     hook_wait= false;
     if (cu->valid) call ("notify-cursor-moved", object (DIRECT));
