@@ -198,6 +198,8 @@ public:
     if (typeset_inputs_mode () != 0) (*back_log) (s)= value (s);
     else (*back_log)->write_back (s, h); }
   inline void note (string s, bool write, bool read= true) {
+    if (write) will_write (s);
+    if (rec == NULL && env_deriving <= 0) return;
     int id= env_var_id (s);
     if (rec != NULL) {
       bool first= !(*rec)->contains (id);
@@ -206,7 +208,6 @@ public:
           !(*back_log)->contains (s)) {
         (*in_vars) << s; (*in_vals) << value (s); }
       if (write) log_back (s); }
-    if (write) will_write (s);
     if (env_deriving > 0) env_note_read (id); }
   inline tree operator [] (string s) { note (s, false); return h [s]; }
   inline tree& operator () (string s) { note (s, true); return h (s); }

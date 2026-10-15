@@ -76,6 +76,7 @@ public:
   virtual void exec_until (path p, bool skip_flag= false);
   void typeset (int desired_status);
   bool same_inputs ();
+  void give_record (hashmap<string,tree> parent_back);
   void typeset_by_inputs (int desired_status);
 };
 

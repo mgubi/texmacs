@@ -304,12 +304,20 @@ add_reads (edit_env env, bool known, array<int> reads,
            array<string> keys, array<tree> values) {
   hashmap<int,bool>* rec= env->read_recorder ();
   if (rec == NULL || env->read_unknown) return;
+  // (a reference looked up by several bridges is one lookup)
+  array<string> new_keys;
+  array<tree> new_values;
+  for (int i=0; i<N(keys); i++)
+    if (!contains (keys[i], *env->rec_keys) && !contains (keys[i], new_keys)) {
+      new_keys << keys[i];
+      new_values << values[i];
+    }
   if (!known || N(*rec) + N(reads) > READS_MAX ||
-      N(*env->rec_keys) + N(keys) > LOOKUPS_MAX) {
+      N(*env->rec_keys) + N(new_keys) > LOOKUPS_MAX) {
     env->read_unknown= true; return; }
   for (int i=0; i<N(reads); i++) rec->operator () (reads[i])= true;
-  (*env->rec_keys) << keys;
-  (*env->rec_values) << values;
+  (*env->rec_keys) << new_keys;
+  (*env->rec_values) << new_values;
 }
 
 // do the references and attachments looked up still have the values found?
@@ -443,6 +451,18 @@ add_inputs (edit_env env, hashmap<string,tree> parent_back, bool known,
 }
 
 void
+bridge_rep::give_record (hashmap<string,tree> parent_back) {
+  // what a bridge gives the record of the bridge above it, whether it was
+  // used again or typeset again (one function, so that the check mode,
+  // which typesets again, gives what the bridge used again gives): its
+  // inputs, which are not all known when it was used again through the
+  // fingerprint, and its reads and lookups
+  add_inputs (env, parent_back, in_known, in_vars, in_vals);
+  add_reads (env, in_known && N(reads) <= READS_MAX, reads,
+             seen_keys, seen_values);
+}
+
+void
 bridge_rep::typeset_by_inputs (int desired_status) {
   bool same= (status == desired_status) && same_inputs ();
   bool check= same && typeset_inputs_mode () == 2;
@@ -457,11 +477,17 @@ bridge_rep::typeset_by_inputs (int desired_status) {
   }
   if (same && !check) {
     if (edit_profile.on) edit_profile.cached++;
-    add_inputs (env, env->values_before (), true, in_vars, in_vals);
-    add_reads (env, true, reads, seen_keys, seen_values);
+    give_record (env->values_before ());
     env->monitored_patch_env (changes);
     return;
   }
+  // (in the check mode, what the bridge would have given used again)
+  bool was_known= in_known;
+  array<string> was_vars= in_vars, was_keys= seen_keys;
+  array<tree> was_vals= in_vals, was_values= seen_values, was_state= in_state;
+  array<int> was_reads= reads;
+  tree was_items= in_items;
+  unsigned long long was_fp= in_fp;
   if (edit_profile.on) edit_profile.redone++;
   array<tree> state= env->derived_state ();
   tree items= items_signature (ttt->a, ttt->b);
@@ -495,20 +521,43 @@ bridge_rep::typeset_by_inputs (int desired_status) {
   in_fp= fp;
   seen_keys= my_keys;
   seen_values= my_values;
-  add_inputs (env, prev_back, known, my_vars, my_vals);
-  add_reads (env, known && N(reads) <= READS_MAX, reads, seen_keys,
-             seen_values);
   env->local_changes (changes);
-  env->local_end (prev_back);
   ttt->local_end (l, sb);
+  bool differs= check &&
+    (lines_signature (l) != old_lines || changes != old_changes ||
+     border_signature (sb) != old_border || lines_contents (l) != old_contents);
+  // and its record: when it said that all the inputs were known, it must
+  // hold those which the bridge reads now (a record which misses some, as
+  // one which got the inputs of a bridge below which were not all known,
+  // would use the bridge again when they change)
+  bool missing= false;
+  if (check && was_known) {
+    if (!known) missing= true;
+    for (int i=0; i<N(my_vars) && !missing; i++)
+      if (!contains (my_vars[i], was_vars)) missing= true;
+  }
+  if (check && !differs && !missing) {
+    // the check mode gives the bridge above, and keeps for the next pass,
+    // what the bridge used again would have: the record of the previous
+    // pass, so that what is wrong in it shows when the bridges above are
+    // checked (and not only what the bridge makes)
+    in_known= was_known; in_vars= was_vars; in_vals= was_vals;
+    in_state= was_state; in_items= was_items; in_fp= was_fp;
+    seen_keys= was_keys; seen_values= was_values; reads= was_reads;
+  }
+  give_record (prev_back);
+  env->local_end (prev_back);
   if (check) {
     if (edit_profile.on) edit_profile.unread++;
-    if (lines_signature (l) != old_lines || changes != old_changes ||
-        border_signature (sb) != old_border ||
-        lines_contents (l) != old_contents) {
+    if (differs) {
       typeset_check_mismatches++;
       failed_error << "A bridge whose inputs were the same is typeset "
                    << "otherwise: " << st << LF;
+    }
+    if (missing) {
+      typeset_check_mismatches++;
+      failed_error << "The record of the inputs of a bridge misses some: "
+                   << st << LF;
     }
   }
   env->link_env= old_link_env;
