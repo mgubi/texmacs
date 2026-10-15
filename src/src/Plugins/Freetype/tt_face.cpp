@@ -346,6 +346,56 @@ tt_glyph_outline (font_glyphs fng, int i, array<int>& cmds, array<double>& pts) 
   return true;
 }
 
+/******************************************************************************
+* Antialiased bitmaps of glyphs, for the renderers which draw coverage masks
+* (the GPU renderer of the Vue port): the glyph of get at shrinkf times less
+* than its resolution, which is the size on the screen of the bitmap which
+* get makes and shrink reduces, rendered in shades of grey in one pass. The
+* outline is made bold pixels wider and higher (as shrink thickens the
+* strokes) after hinting as flags say (FT_LOAD_TARGET_LIGHT...). The coverage
+* has w by h bytes, rows from the top; its top left corner is x0, y0 pixels
+* from the origin of the glyph (y down)
+******************************************************************************/
+
+#ifdef LINKED_FREETYPE
+#include FT_OUTLINE_H
+#endif
+
+bool
+tt_glyph_coverage (font_glyphs fng, int i, int shrinkf, int flags, double bold,
+                   string& cov, int& w, int& h, int& x0, int& y0) {
+  tt_font_glyphs_rep* g= dynamic_cast<tt_font_glyphs_rep*> (fng.operator-> ());
+  if (g == NULL || g->face->bad_face || shrinkf <= 0) return false;
+  FT_Face face= g->face->ft_face;
+  // 72 dpi: the sizes are in pixels, of 1/64
+  FT_F26Dot6 cw= (FT_F26Dot6) ((((double) g->size) * 64.0 * g->hdpi) / (72.0 * shrinkf) + 0.5);
+  FT_F26Dot6 ch= (FT_F26Dot6) ((((double) g->size) * 64.0 * g->vdpi) / (72.0 * shrinkf) + 0.5);
+  if (ft_set_char_size (face, cw, ch, 72, 72)) return false;
+  FT_UInt glyph_index= decode_index (face, i);
+  bool ok= !ft_load_glyph (face, glyph_index, flags | FT_LOAD_NO_BITMAP);
+  FT_GlyphSlot slot= face->glyph;
+#ifdef LINKED_FREETYPE
+  if (ok && bold > 0 && slot->format == FT_GLYPH_FORMAT_OUTLINE) {
+    FT_Pos b= (FT_Pos) (bold * 64.0 + 0.5);
+    FT_Outline_EmboldenXY (&slot->outline, b, b);
+  }
+#endif
+  if (ok) ok= !ft_render_glyph (slot, FT_RENDER_MODE_NORMAL);
+  // the next get of the metrics and glyphs sets its own size again
+  if (!ok) return false;
+  w= slot->bitmap.width;
+  h= slot->bitmap.rows;
+  x0= slot->bitmap_left;
+  y0= -slot->bitmap_top;
+  cov= string (w * h);
+  int pitch= slot->bitmap.pitch;
+  unsigned char* buf= slot->bitmap.buffer;
+  if (pitch < 0) buf -= pitch * (h - 1);
+  for (int y= 0; y < h; y++, buf += pitch)
+    for (int x= 0; x < w; x++) cov[y*w + x]= (char) buf[x];
+  return true;
+}
+
 glyph&
 tt_font_glyphs_rep::get (int i) {
   if (!face->bad_face && !fng->contains(i)) {
