@@ -556,8 +556,17 @@ mupdf_renderer_rep::begin_text () {
 * filled and stroked (text rendering mode 2), its stroke "gpu glyph boldness"
 * pixels wide (0.22 by default; the user space has a pixel a unit); not when
 * the glyphs are those of MuPDF ("gpu glyphs" mupdf). TEXMACS_VUE_GLYPHS and
-* TEXMACS_VUE_FT_BOLD override the preferences.
+* TEXMACS_VUE_FT_BOLD override the preferences. Not by default in the core
+* of Tau: a stroked glyph is not taken from the cache of MuPDF, and the
+* views of its pixels were drawn 5 to 25 times slower (2026-10-15); the
+* glyphs which it says as commands follow it (mupdf_glyph_bitmap).
 ******************************************************************************/
+
+#ifdef TAUTEXMACS
+#define GLYPH_BOLD_DEFAULT "0"
+#else
+#define GLYPH_BOLD_DEFAULT "0.22"
+#endif
 
 static double mupdf_glyph_bold= -1.0;  // not read yet
 
@@ -567,8 +576,8 @@ read_glyph_bold () {
   if (N(src) == 0) src= get_user_preference ("gpu glyphs", "freetype");
   if (src == "mupdf") return 0.0;
   string b= get_env ("TEXMACS_VUE_FT_BOLD");
-  if (N(b) == 0) b= get_user_preference ("gpu glyph boldness", "0.22");
-  double x= is_double (b) ? as_double (b) : 0.22;
+  if (N(b) == 0) b= get_user_preference ("gpu glyph boldness", GLYPH_BOLD_DEFAULT);
+  double x= is_double (b) ? as_double (b) : as_double (string (GLYPH_BOLD_DEFAULT));
   return max (0.0, min (x, 2.0));
 }
 
@@ -2616,6 +2625,50 @@ glyph_font (string fontname, double& em) {
   return fd->font;
 }
 
+// the glyph filled and stroked as draw renders it when the glyphs are made
+// bolder (text rendering mode 2, glyph_bold): the text of one glyph drawn
+// into a pixmap of its own, an alpha (NULL for a glyph with no ink). The
+// commands of the core of Tau say their glyphs so, as its pixels have them
+static fz_pixmap*
+bold_glyph_pixmap (fz_context* ctx, fz_font* font, int gid, fz_matrix trm,
+                   double bold) {
+  fz_text* text= NULL;
+  fz_stroke_state* stroke= NULL;
+  fz_device* dev= NULL;
+  fz_pixmap* pix= NULL;
+  fz_var (text); fz_var (stroke); fz_var (dev); fz_var (pix);
+  fz_try (ctx) {
+    text= fz_new_text (ctx);
+    fz_show_glyph (ctx, text, font, trm, gid, 0, 0, 0, FZ_BIDI_LTR, FZ_LANG_UNSET);
+    stroke= fz_new_stroke_state (ctx);
+    stroke->linewidth= (float) bold;
+    stroke->linejoin= FZ_LINEJOIN_ROUND;
+    fz_irect box= fz_round_rect (fz_bound_text (ctx, text, stroke, fz_identity));
+    if (!fz_is_empty_irect (box)) {
+      box.x0 -= 1; box.y0 -= 1; box.x1 += 1; box.y1 += 1;
+      pix= fz_new_pixmap_with_bbox (ctx, NULL, box, NULL, 1);
+      fz_clear_pixmap (ctx, pix);
+      dev= fz_new_draw_device (ctx, fz_identity, pix);
+      float black= 0.f;
+      fz_fill_text (ctx, dev, text, fz_identity, fz_device_gray (ctx), &black, 1.f,
+                    fz_default_color_params);
+      fz_stroke_text (ctx, dev, text, stroke, fz_identity, fz_device_gray (ctx),
+                      &black, 1.f, fz_default_color_params);
+      fz_close_device (ctx, dev);
+    }
+  }
+  fz_always (ctx) {
+    fz_drop_device (ctx, dev);
+    fz_drop_stroke_state (ctx, stroke);
+    fz_drop_text (ctx, text);
+  }
+  fz_catch (ctx) {
+    fz_drop_pixmap (ctx, pix);
+    fz_rethrow (ctx);
+  }
+  return pix;
+}
+
 bool
 mupdf_glyph_bitmap (string fontname, int c, string& cov,
                     int& w, int& h, int& x0, int& y0) {
@@ -2629,9 +2682,11 @@ mupdf_glyph_bitmap (string fontname, int c, string& cov,
   fz_matrix ctm= fz_make_matrix ((float) em, 0, 0, (float) -em, 0, 0);
   fz_irect scissor= fz_infinite_irect;
   fz_pixmap* pix= NULL;
+  double bold= glyph_bold ();
   if (!mupdf_protected ("mupdf_glyph_bitmap", [&] () {
-        pix= fz_render_glyph_pixmap (ctx, font, (int) gid, &ctm, &scissor,
-                                     fz_text_aa_level (ctx)); }))
+        if (bold > 0.0) pix= bold_glyph_pixmap (ctx, font, (int) gid, ctm, bold);
+        else pix= fz_render_glyph_pixmap (ctx, font, (int) gid, &ctm, &scissor,
+                                          fz_text_aa_level (ctx)); }))
     return false;
   cov= string ();
   w= h= x0= y0= 0;

@@ -1343,6 +1343,25 @@ from 16 to 1024 pixels. As in the page of TeXmacs Vue
   / commands; view, pixels / commands): Safari 2.3 / 2.1, 7.3 / 2.5 (was
   3.3 / 2.8, 8.5 / 3.6, with a draw of the canvas in each); Firefox 2.8 /
   3.6, 7.3 / 3.1 (was 3.4 / 3.8, 9.3 / 4.4).
+- **The GPU renderer behind a backend** (merged from wip_other_guis
+  through maxs_texmacs, 2026-10-15). `vue_gpu.cpp` asks `gpu_backend.hpp`
+  for textures, batches, copies and shapes: OpenGL with ThorVG
+  (`gpu_backend_gl.cpp`, WebGL2 when built by Emscripten) or Metal
+  (`gpu_backend_metal.mm`, its shapes drawn by Core Graphics). The shell
+  builds both with `THORVG=<prefix> METAL=1`, and starts on Metal
+  (`TEXMACS_VUE_GPU=gl` for OpenGL); its tests pass with `TAU_GPU=1` on
+  either. The merge made the glyphs of the MuPDF renderer bolder (text
+  filled and stroked, the stroke "gpu glyph boldness" pixels wide, 0.22).
+  In the core of Tau that costs much: a stroked glyph is not taken from the
+  cache of MuPDF, and the core drew a scroll step of the manual in 7.9 ms
+  instead of 1.5, a typed letter in a long paragraph in 85 instead of 3.5.
+  The boldness is 0 by default in the core of Tau (`TAUTEXMACS`), the
+  preference still makes it bolder; the glyphs it says as commands follow
+  it (`mupdf_glyph_bitmap` draws the text of the glyph filled and stroked,
+  once a glyph: 58 pixels differ from the pixels of the core on a table of
+  the documentation, at the cursor, instead of 62883 with the glyphs not
+  made bolder). With the commands drawn by the GPU, the bolder glyphs cost
+  nothing: their coverage is made once.
 - **Left**: a limit to the pictures kept by the page (WebGL has one for
   its textures; the page cannot forget a picture, which the core sends
   once), and to the glyphs of the shell; the pattern of a rotated shape is rotated with it (MuPDF keeps
