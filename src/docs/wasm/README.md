@@ -301,6 +301,14 @@ every frame (2 ms) is gone. Scrolling and zooming the math font catalogue,
 the GPU path draws more frames than MuPDF in every phase, at 1 to 2.3 ms
 of CPU a frame against 4.4 to 5 ms.
 
+The glyphs of the atlas are rendered by FreeType at their size, made as
+bold as those of the Qt port (the preferences "Glyphs on the screen"...,
+see *The GPU renderer*); `?glyphs=texmacs` or `?glyphs=mupdf` chooses the
+bitmaps of TeXmacs or MuPDF's glyphs whatever the preference. On the
+benchmark of the math font catalogue (zooms and scrolls, which make new
+glyphs at each zoom), the repaints take 181 ms with FreeType, 214 ms with
+MuPDF and 455 ms with the bitmaps of TeXmacs (medians of five runs).
+
 `?slug=1` (with `?gpu=1`) draws the glyphs from their outlines instead of
 from bitmaps (Slug, see *The GPU renderer*): on the same benchmark the
 repaints at zoom 2, where the bitmaps of the glyphs are made, cost 0.4 ms

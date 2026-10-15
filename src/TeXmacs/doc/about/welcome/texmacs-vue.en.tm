@@ -227,6 +227,18 @@
 
   The additions to <TeXmacs> <name|Vue>, the newest first.
 
+  <paragraph|15 October 2026>
+
+  <\itemize>
+    <item>The text on the screen is darker, as heavy as in <TeXmacs> on the
+    desktop, and drawn as fast as before.
+
+    <item><menu|Edit|Preferences>, tab <menu|General>, chooses how the
+    letters are drawn on the screen (<menu|Glyphs on the screen>), how bold
+    they are and how they are fitted to the pixels; a change shows at
+    once.
+  </itemize>
+
   <paragraph|14 October 2026>
 
   <\itemize>
