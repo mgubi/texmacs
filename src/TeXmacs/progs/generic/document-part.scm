@@ -103,22 +103,38 @@
 	(tree-join t (+ i k)))
       (document-join-range! t i (- n h)))))
 
-(define (buffer-visible-node)
-  ;; a node whose end is visible: the shown preamble, else the body of the
-  ;; first shown part, else the whole document
+(define (part-visible-node p)
+  ;; a node of the shown part @p whose end is visible: the body, unless it
+  ;; ends with a hidden subpart; then its last shown subpart, or else its
+  ;; last compound paragraph which is not a hidden subpart
+  (with body (tree-ref p 1)
+    (if (tree-atomic? body) p
+        (let* ((l (reverse (tree-children body)))
+               (last (and (nnull? l) (car l))))
+          (cond ((not (and last (tree-is? last 'hide-part))) body)
+                ((list-find l (lambda (x) (tree-is? x 'show-part)))
+                 => part-visible-node)
+                ((list-find l (lambda (x) (not (or (tree-atomic? x)
+                                                   (tree-is? x 'hide-part))))))
+                (else body))))))
+
+(define (buffer-visible-node p)
+  ;; a node whose end is visible: the shown preamble, else the part @p
+  ;; if it is shown, else the first shown part, else the whole document
   (with t (buffer-tree)
     (cond ((tree-is? (tree-ref t 0) 'show-preamble) (tree-ref t 0))
+          ((and p (tree-is? p 'show-part)) (part-visible-node p))
           ((list-find (buffer-body-paragraphs)
                       (lambda (x) (tree-is? x 'show-part)))
-           => (lambda (x) (tree-ref x 1)))
+           => part-visible-node)
           (else t))))
 
-(define (buffer-mark-change)
+(define (buffer-mark-change . opt-part)
   ;; undo puts the cursor at the first change of the step, redo at the
   ;; last one; relabelling a visible node to itself, at the start and at
   ;; the end of a change, puts it at the end of that node, where typing
-  ;; is seen
-  (with t (buffer-visible-node)
+  ;; is seen; preferably in the part @opt-part, when it is shown
+  (with t (buffer-visible-node (and (nnull? opt-part) (car opt-part)))
     (tree-assign-node t (tree-label t))))
 
 (define (buffer-wrap-body)
@@ -392,31 +408,30 @@
 	(else (list-find (tree-children t)
 			 (lambda (x) (document-find-part x id))))))
 
-(define (document-select-part t id change?)
-  ;; show the part @id of @t and hide the others; with @change? false,
-  ;; only tell whether this changes anything
-  (cond ((tree-atomic? t) #f)
+(define (document-part-changes t id)
+  ;; the parts of @t to relabel so that only the part @id is shown,
+  ;; as pairs (part . new label)
+  (cond ((tree-atomic? t) '())
 	((tree-in? t '(show-part hide-part))
 	 (with show? (== id (document-part-name t))
 	   (cond ((and show? (tree-is? t 'hide-part))
-		  (if change? (tree-assign-node! t 'show-part))
-		  #t)
+		  (list (cons t 'show-part)))
 		 ((and (not show?) (tree-is? t 'show-part))
-		  (if change? (tree-assign-node! t 'hide-part))
-		  #t)
-		 (else #f))))
-	((not (tree-is? t 'document)) #f)
-	(else (with r #f
-		(for (x (tree-children t))
-		  (when (document-select-part x id change?)
-		    (set! r #t)))
-		r))))
+		  (list (cons t 'hide-part)))
+		 (else '()))))
+	((not (tree-is? t 'document)) '())
+	(else (append-map (lambda (x) (document-part-changes x id))
+			  (tree-children t)))))
 
 (define (buffer-select-part t id)
-  (when (document-select-part t id #f)
-    (buffer-mark-change)
-    (document-select-part t id #t)
-    (buffer-mark-change)))
+  ;; show the part @id of @t and hide the others; nothing is recorded
+  ;; when it is already the only shown part
+  (with l (document-part-changes t id)
+    (when (nnull? l)
+      (buffer-mark-change)
+      (for (c l)
+	(tree-assign-node! (car c) (cdr c)))
+      (buffer-mark-change))))
 
 (tm-define (buffer-go-to-part id)
   (:synopsis "Go to the part with name @id")
@@ -436,14 +451,14 @@
     (with t (document-find-part (buffer-tree) id)
       (cond ((not t) (noop))
 	    ((tree-is? t 'show-part)
-	     (buffer-mark-change)
+	     (buffer-mark-change t)
 	     (tree-assign-node! t 'hide-part)
-	     (buffer-mark-change)
+	     (buffer-mark-change t)
 	     (buffer-go-to-part (car (buffer-parts-list #f))))
 	    ((tree-is? t 'hide-part)
-	     (buffer-mark-change)
+	     (buffer-mark-change t)
 	     (tree-assign-node! t 'show-part)
-	     (buffer-mark-change)
+	     (buffer-mark-change t)
 	     (buffer-go-to-part id))))))
 
 (tm-define (buffer-make-preamble)
@@ -461,11 +476,14 @@
   (:require (and (tree-is? t 'hide-part) (== (tree-up t) (buffer-tree))))
   (if (== (buffer-get-part-mode) :one)
       (with id (document-part-name t)
-	(buffer-select-part (tree-up t) id))
+	(buffer-select-part (tree-up t) id)
+	;; the part where the cursor was is hidden now
+	(when (not (list-starts? (cursor-path) (tree->path t)))
+	  (tree-go-to t 1 :start)))
       (begin
-	(buffer-mark-change)
+	(buffer-mark-change t)
 	(tree-assign-node! t 'show-part)
-	(buffer-mark-change))))
+	(buffer-mark-change t))))
 
 (tm-define (show-hidden-part id)
   (:synopsis "Make hidden part with identifier @id visible")
