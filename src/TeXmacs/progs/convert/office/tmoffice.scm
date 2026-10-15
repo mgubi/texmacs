@@ -133,7 +133,24 @@
               (tmof-keep (substring s (+ i (string-length what))
                                     (string-length s)) l))))))
 
-(define (tmof-text s) (tmof-keep s '("...")))
+(define tmof-ligatures
+  ;; the ligatures of TeXmacs in the text, as the characters of Cork which
+  ;; it shows (as the converter to Html does, see make-ligatures)
+  (list (cons "---" (char->string (integer->char 22)))
+        (cons "--" (char->string (integer->char 21)))
+        (cons "``" (char->string (integer->char 16)))
+        (cons "''" (char->string (integer->char 17)))))
+
+(define (tmof-text s)
+  ;; the text in UTF-8 with its ligatures (-- is an en dash, ``a'' are
+  ;; quotes), a quote ' being the closing quote which TeXmacs shows
+  (let* ((s (let loop ((l tmof-ligatures) (s s))
+              (cond ((null? l) s)
+                    ((< (string-search-forwards (caar l) 0 s) 0) (loop (cdr l) s))
+                    (else (loop (cdr l) (string-replace s (caar l) (cdar l)))))))
+         (r (tmof-keep s '("..."))))
+    (if (< (string-search-forwards "'" 0 r) 0) r
+        (string-replace r "'" (office-utf8 #x2019)))))
 (define (tmof-code-text s) (tmof-keep s '("..." "`")))
 
 (define (tmof-block? x)
@@ -722,6 +739,28 @@
        (or (in? (car x) '(graphics draw-over draw-under))
            (and (func? x 'with) (pair? (cdr x)) (tmof-drawing? (cAr x))))))
 
+(define (tmof-image-format data)
+  ;; the format of the bytes of an image which the office programs show,
+  ;; from its first bytes: "png", "jpg", "gif", or #f
+  (let ((n (string-length data))
+        (b (lambda (i) (char->integer (string-ref data i)))))
+    (cond ((and (> n 8) (== (b 0) 137) (== (b 1) 80) (== (b 2) 78) (== (b 3) 71)) "png")
+          ((and (> n 3) (== (b 0) 255) (== (b 1) 216) (== (b 2) 255)) "jpg")
+          ((and (> n 6) (string-starts? data "GIF8")) "gif")
+          (else #f))))
+
+(define (tmof-image-name name format)
+  ;; the name of the file of an image, with the suffix of its format; an
+  ;; image without a name has one
+  (let* ((tail (if (== name "") "" (url->string (url-tail (unix->url name)))))
+         (tail (if (== tail "") "image" tail))
+         (suffix (locase-all (url-suffix tail)))
+         (base (if (== suffix "") tail
+                   (substring tail 0 (- (string-length tail) (string-length suffix) 1)))))
+    (if (or (== suffix format) (and (== format "jpg") (== suffix "jpeg")))
+        tail
+        (string-append (if (== base "") "image" base) "." format))))
+
 (define (tmof-image l)
   ;; an image which is in the document, or a file which is read
   (let* ((inside? (and (nnull? l) (func? (car l) 'tuple 2)
@@ -733,10 +772,12 @@
          (data (cond (inside? (cadr (cadar l)))
                      ((!= name "") (tmof-image-data name))
                      (else #f)))
-         (suffix (locase-all (url-suffix name))))
-    (cond ((and data (in? suffix '("png" "jpg" "jpeg" "gif")) (tmof-pixels data))
+         (suffix (locase-all (url-suffix name)))
+         ;; (the format is the one of the bytes, whatever the name says)
+         (format (and (string? data) (tmof-image-format data))))
+    (cond ((and format (tmof-pixels data))
            (with size (tmof-image-sizes l data)
-             `((image (@ (name ,(url->string (url-tail (unix->url name))))
+             `((image (@ (name ,(tmof-image-name name format))
                          (data ,data)
                          (width ,(tmof-cm-string (car size)))
                          (height ,(tmof-cm-string (cadr size))))))))
@@ -790,6 +831,16 @@
   ;; a reference which was not expanded: its label
   (list (tmof-plain (if (null? l) "" (car l)))))
 
+(define (tmof-pageref l)
+  ;; a reference to the page of a label (with the page which the editor
+  ;; knows, else ?), which the office programs compute again
+  (if (null? l) '()
+      (let ((name (string-replace (tmof-plain (car l)) " " "_"))
+            (page (if (and (pair? (cdr l)) (!= (tmof-plain (cadr l)) ""))
+                      (tmof-plain (cadr l)) "?")))
+        (if (== name "") '()
+            `((ref (@ (name ,name) (page "true")) ,page))))))
+
 (define (tmof-eqref l)
   (list (string-append "(" (tmof-plain (if (null? l) "" (car l))) ")")))
 
@@ -806,6 +857,25 @@
 
 (define (tmof-footnote l)
   (if (null? l) '() (tmof-footnote-add (car l))))
+
+(define (tmof-note-text x)
+  ;; the text of the box of a note beside the line: its cells
+  (cond ((func? x 'tformat) (tmof-note-text (cAr x)))
+        ((and (pair? x) (in? (car x) '(table row)))
+         `(concat ,@(list-intersperse (map tmof-note-text (cdr x)) " ")))
+        ((func? x 'cell) (if (pair? (cdr x)) (cadr x) ""))
+        (else x)))
+
+(define (tmof-line-note l)
+  ;; a note beside the line (a marginal note): its text, in brackets, in
+  ;; the line (the place of the note, its other arguments, has no meaning)
+  (if (null? l) '()
+      (let* ((r (tmof (tmof-note-text (car l))))
+             (r (append-map (lambda (x)
+                              (if (func? x '!para) (append (cddr x) (list " ")) (list x)))
+                            r))
+             (r (tmof-trim (tmof-inline r))))
+        (if (null? r) '() `("[" ,@r "]")))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Variables of the environment
@@ -859,6 +929,9 @@
         ((and (== var "font-shape") (== val "small-caps"))
          (tmof-wrap 'smallcaps body))
         ((== var "color") (tmof-colored body (tmof-color val)))
+        ;; the background of the text: a highlight of its color
+        ((and (== var "bg-color") (tmof-color val))
+         (tmof-attr-wrap* 'mark `((value ,(tmof-color val))) body))
         ;; the alignment of the paragraphs
         ((and (== var "par-mode") (in? val '("left" "center" "right" "justify")))
          (tmof-para-attr body 'align val))
@@ -1931,10 +2004,11 @@
   (image tmof-image)
   (specific tmof-specific)
   (reference tmof-reference)
-  (pageref tmof-noop)
+  (pageref tmof-pageref)
   (eqref tmof-eqref)
   ((:or cite nocite cite-detail) tmof-cite)
   (footnote tmof-footnote)
+  (line-note tmof-line-note)
 
   ;; mathematics
   (math tmof-math)
@@ -2229,6 +2303,13 @@
         ((in? (car x) '(math image @)) (noop))
         ((func? x 'seq)
          (set! tmof-target (list "seq" (ox-attr x 'id) (ox-text x))))
+        ;; (a label in a note is the label of the note: no number of the
+        ;; office programs, and the reference to it is a link)
+        ((func? x 'note)
+         (with old tmof-target
+           (set! tmof-target #f)
+           (for-each tmof-bind-scan (ox-children x))
+           (set! tmof-target old)))
         ((func? x 'bookmark)
          (when tmof-target
            (ahash-set! tmof-bound (ox-attr x 'name) tmof-target)
@@ -2264,6 +2345,11 @@
          (list (apply office-node
                       (cons* 'seq `((name ,(ox-attr x 'name)) (id ,(ox-attr x 'id))
                                     (labels ,(tmof-labels-attr (ox-attr x 'id))))
+                             (ox-children x)))))
+        ;; a reference to the page of a label
+        ((and (func? x 'ref) (ox-attr x 'page))
+         (list (apply office-node
+                      (cons* 'ref `((name ,(ox-attr x 'name)) (kind "page"))
                              (ox-children x)))))
         ((func? x 'ref)
          (let* ((target (ahash-ref tmof-bound (ox-attr x 'name)))

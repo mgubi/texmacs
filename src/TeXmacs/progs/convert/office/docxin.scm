@@ -55,6 +55,11 @@
 (define (docx-child-val x tag)
   (docx-val (ox-child x tag)))
 
+(define (docx-on? x)
+  ;; an element which is on or off, such as <w:titlePg/>: on when it is
+  ;; there, but for <w:titlePg w:val="0"/>
+  (and x (not (in? (docx-val x) '("0" "false" "off"))) #t))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Properties of runs and of paragraphs
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -169,7 +174,7 @@
                   (if v (list (cons 'list-id v)) '()))
                 (with v (docx-child-val n 'w:ilvl)
                   (if v (list (cons 'list-level v)) '())))))
-        (if (ox-child x 'w:pageBreakBefore) '((page-break . #t)) '())
+        (if (docx-on? (ox-child x 'w:pageBreakBefore)) '((page-break . #t)) '())
         (with ind (ox-child x 'w:ind)
           (with v (and ind (office-integer (or (ox-attr ind 'w:left)
                                                (ox-attr ind 'w:start))
@@ -197,7 +202,7 @@
   ;; the styles of word/styles.xml, with their own properties
   (set! docx-styles (make-ahash-table))
   (set! docx-style-memo (make-ahash-table))
-  (with root (office-xml docx-archive "word/styles.xml")
+  (with root (office-xml docx-archive (docx-entry "styles"))
     (when root
       (with d (ox-child root 'w:docDefaults)
         (set! docx-defaults
@@ -286,8 +291,8 @@
 
 (define (docx-toc-style? name)
   ;; the entries of a table of contents, and its heading
-  (or (string-starts? name "toc ") (string-starts? name "contents ")
-      (== name "table of figures")))
+  ;; (not those of a table of figures, which is no table of contents)
+  (or (string-starts? name "toc ") (string-starts? name "contents ")))
 
 (define (docx-heading-level name)
   ;; "heading 2" is 2
@@ -320,13 +325,52 @@
     (string-recompose (append dir (list "_rels" (string-append (cAr l) ".rels")))
                       "/")))
 
+(define (docx-uri-decode s)
+  ;; the address s with the bytes %XX as themselves: the name of an entry
+  ;; of the archive (media/my%20picture.png is media/my picture.png)
+  (let loop ((l (string->list s)) (acc '()))
+    (cond ((null? l) (list->string (reverse acc)))
+          ((and (char=? (car l) #\%) (pair? (cdr l)) (pair? (cddr l))
+                (docx-hexadecimal (list->string (list (cadr l) (caddr l)))))
+           => (lambda (n) (loop (cdddr l) (cons (integer->char n) acc))))
+          (else (loop (cdr l) (cons (car l) acc))))))
+
 (define (docx-read-rels part)
   (with root (office-xml docx-archive (docx-rels-name part))
     (when root
       (for (x (ox-childs root 'Relationship))
-        (ahash-set! docx-rels (cons part (ox-attr x 'Id))
-                    (list (or (ox-attr x 'Target) "")
-                          (== (ox-attr x 'TargetMode) "External")))))))
+        (let ((target (or (ox-attr x 'Target) ""))
+              (external? (== (ox-attr x 'TargetMode) "External")))
+          (ahash-set! docx-rels (cons part (ox-attr x 'Id))
+                      (list (if external? target (docx-uri-decode target))
+                            external?)))))))
+
+;; The entries of the styles, the lists, the notes... are those which the
+;; relations of the text name by their types, or have the usual names.
+(define docx-entries '())
+
+(define (docx-read-entries)
+  (set! docx-entries '())
+  (with root (office-xml docx-archive (docx-rels-name docx-part))
+    (when root
+      (for (x (ox-childs root 'Relationship))
+        (let* ((type (or (ox-attr x 'Type) ""))
+               (l (string-tokenize-by-char type #\/))
+               (kind (and (pair? l) (cAr l)))
+               (target (ox-attr x 'Target)))
+          (when (and kind target (!= (ox-attr x 'TargetMode) "External")
+                     (not (assoc kind docx-entries)))
+            (set! docx-entries
+                  (cons (cons kind (office-resolve docx-part (docx-uri-decode target)))
+                        docx-entries))))))))
+
+(define (docx-entry kind)
+  ;; the entry of the kind of part (styles, numbering, footnotes, endnotes,
+  ;; comments, settings, theme)
+  (with e (assoc-ref docx-entries kind)
+    (cond ((and e docx-archive (office-entry docx-archive e)) e)
+          ((== kind "theme") "word/theme/theme1.xml")
+          (else (string-append "word/" kind ".xml")))))
 
 (define (docx-rel id)
   ;; (target external?) for the relation id of the entry which is read
@@ -363,7 +407,7 @@
   ;; lists of the same abstract one (each restarts the numbers), so the
   ;; abstract list is what tells two lists apart.
   (set! docx-lists (make-ahash-table))
-  (with root (office-xml docx-archive "word/numbering.xml")
+  (with root (office-xml docx-archive (docx-entry "numbering"))
     (when root
       (let ((abstract (make-ahash-table))
             (nums (make-ahash-table)))
@@ -425,7 +469,7 @@
                         '("separator" "continuationSeparator"
                           "continuationNotice")))
           (ahash-set! docx-notes (cons kind (ox-attr x 'w:id))
-                      (cons entry x)))))))
+                      (cons entry (docx-balance-fields x))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Images and mathematics
@@ -435,7 +479,13 @@
   ;; the image of the relation id, with the parts which are cut from its
   ;; sides, if any
   (with rel (docx-rel id)
-    (if (or (not rel) (cadr rel)) '()
+    (cond
+      ((not rel) '())
+      ;; (a picture which is linked, not in the file: its address)
+      ((cadr rel)
+       (list (office-node 'image `((name ,(car rel)) (width ,width)
+                                   (height ,height) (alt ,alt)))))
+      (else
         (let* ((name (office-resolve docx-part (car rel)))
                (data (office-entry docx-archive name)))
           (if (not data) '()
@@ -443,7 +493,7 @@
                       'image
                       `((name ,(cAr (string-tokenize-by-char name #\/)))
                         (data ,data) (width ,width) (height ,height)
-                        (alt ,alt) (crop ,(and (pair? crop) (car crop)))))))))))
+                        (alt ,alt) (crop ,(and (pair? crop) (car crop))))))))))))
 
 (define (docx-crop x)
   ;; the parts of the picture x which are cut from its left, top, right and
@@ -710,11 +760,14 @@
   (let* ((shapes (list-filter (ox-children x)
                               (lambda (y) (and (pair? y) (in? (car y) '(v:shape v:rect v:oval
                                                                          v:roundrect))))))
-         (sh (and (list-1? shapes) (car shapes))))
-    (if (and sh (not (ox-find sh 'v:imagedata)) (not (func? x 'w:object))
-             (or (ox-find sh 'v:textbox) (not (func? sh 'v:shape))))
-        (docx-vml-box sh)
-        (docx-picture-image x))))
+         (sh (and (list-1? shapes) (car shapes)))
+         ;; (an object of newer documents shows a picture of DrawingML)
+         (drawing (and (null? shapes) (ox-child x 'w:drawing))))
+    (cond (drawing (docx-drawing drawing))
+          ((and sh (not (ox-find sh 'v:imagedata)) (not (func? x 'w:object))
+                (or (ox-find sh 'v:textbox) (not (func? sh 'v:shape))))
+           (docx-vml-box sh))
+          (else (docx-picture-image x)))))
 
 (define (docx-picture-image x)
   (docx-text-boxes x)
@@ -840,11 +893,11 @@
 
 (define (docx-read-comments)
   (set! docx-comments (make-ahash-table))
-  (with root (office-xml docx-archive "word/comments.xml")
+  (with root (office-xml docx-archive (docx-entry "comments"))
     (when root
-      (docx-read-rels "word/comments.xml")
+      (docx-read-rels (docx-entry "comments"))
       (for (x (ox-childs root 'w:comment))
-        (ahash-set! docx-comments (ox-attr x 'w:id) x)))))
+        (ahash-set! docx-comments (ox-attr x 'w:id) (docx-balance-fields x))))))
 
 (define (docx-comment id)
   ;; a comment, with its author and its date, where it is referred to
@@ -853,7 +906,7 @@
         (let ((old-part docx-part)
               (old-notes docx-open-notes)
               (old-fields docx-fields))
-          (set! docx-part "word/comments.xml")
+          (set! docx-part (docx-entry "comments"))
           (set! docx-open-notes (list (cons 'comment id)))
           (set! docx-fields '())
           (with l (docx-blocks (ox-children x))
@@ -993,6 +1046,12 @@
                       (r (append-map docx-run-item (ox-children (car l)))))
                  (if (and (null? r) (eq? floats docx-floats)) (loop (cdr l)) r)))))
         ((func? x 'w:delText) (list (ox-text x)))
+        ;; a text with its reading above it (ruby): the text only
+        ((func? x 'w:ruby)
+         (with base (ox-child x 'w:rubyBase)
+           (if (not base) '()
+               (append-map docx-run (list-filter (docx-unwrap (ox-children base))
+                                                 (lambda (y) (func? y 'w:r)))))))
         ((func? x 'w:commentReference) (docx-comment (ox-attr x 'w:id)))
         ((func? x 'w:footnoteReference) (docx-note 'foot (ox-attr x 'w:id)))
         ((func? x 'w:endnoteReference) (docx-note 'end (ox-attr x 'w:id)))
@@ -1050,7 +1109,23 @@
 
 ;; the switches of a field which are followed by a value
 (define docx-field-switches
-  '(("hyperlink" "\\l" "\\o" "\\t") ("ref" "\\d") ("seq" "\\r" "\\s")))
+  '(("hyperlink" "\\l" "\\o" "\\t") ("ref" "\\d") ("seq" "\\r" "\\s")
+    ("toc" "\\a" "\\b" "\\c" "\\d" "\\f" "\\l" "\\o" "\\p" "\\s" "\\t")))
+
+(define (docx-figures? switches)
+  ;; whether a field TOC with these switches is a table of figures (of the
+  ;; captions, \c and \a; of the entries TC, \f; of the styles of the
+  ;; captions, \t) rather than a table of contents (of the headings, \o
+  ;; and \u: LibreOffice writes \f with \o for one)
+  (let ((has? (lambda (k) (assoc k switches)))
+        (t (assoc-ref switches "\\t")))
+    (and (not (has? "\\o")) (not (has? "\\u"))
+         (or (has? "\\c") (has? "\\a") (has? "\\f")
+             (and (string? t)
+                  (with s (locase-all t)
+                    (or (>= (string-search-forwards "caption" 0 s) 0)
+                        (>= (string-search-forwards "figure" 0 s) 0)
+                        (>= (string-search-forwards "table" 0 s) 0))))))))
 
 (define (docx-field-parse instr)
   ;; (name arguments switches) of the instruction of a field: its name in
@@ -1079,7 +1154,7 @@
   (let* ((f (docx-field-parse instr))
          (name (car f))
          (arg (if (null? (cadr f)) "" (caadr f))))
-    (cond ((== name "toc") (list '(!toc)))
+    (cond ((and (== name "toc") (not (docx-figures? (caddr f)))) (list '(!toc)))
           ((and (null? l) (in? name '("ref" "pageref")) (!= arg ""))
            ;; (a reference whose result was not computed: TeXmacs does it)
            (list `(ref (@ (name ,arg) ,@(if (== name "pageref") '((kind "page")) '())))))
@@ -1108,6 +1183,84 @@
            (list `(field (@ (code ,instr)) ,@l)))
           (else l))))
 
+;; A field which does not end (a run which begins it, and no run which ends
+;; it) would take all the text after it: its runs which begin and separate
+;; it are left out, so that its result is text as any other. The links,
+;; the simple fields and the boxes of text have fields of their own (see
+;; docx-inline and docx-text-boxes), and so do the notes and the comments.
+(define docx-field-scopes '(w:hyperlink w:fldSimple w:txbxContent w:footnote
+                            w:endnote w:comment))
+
+(define (docx-unmatched-fields x)
+  ;; the ranks, in the order of the text, of the elements w:fldChar of x
+  ;; which begin or separate a field that does not end, or end none
+  (let ((n 0) (bad (make-ahash-table)))
+    (let scope ((l (list x)))
+      (let ((stack '()))
+        (for (y l)
+          (let walk ((y y))
+            (cond ((not (pair? y)) #f)
+                  ((func? y 'w:fldChar)
+                   (let ((k n) (type (ox-attr y 'w:fldCharType)))
+                     (set! n (+ n 1))
+                     (cond ((== type "begin") (set! stack (cons (list k) stack)))
+                           ((null? stack) (ahash-set! bad k #t))
+                           ((== type "separate")
+                            (set! stack (cons (cons k (car stack)) (cdr stack))))
+                           ((== type "end") (set! stack (cdr stack))))))
+                  ((and (in? (car y) docx-field-scopes) (not (eq? y x)))
+                   (scope (ox-children y)))
+                  (else (for (z (ox-children y)) (walk z))))))
+        (for (e stack) (for (k e) (ahash-set! bad k #t)))))
+    bad))
+
+(define (docx-balance-fields x)
+  ;; x without the runs of the fields which do not end (or #f for #f)
+  (let ((bad (and x (docx-unmatched-fields x)))
+        (n 0))
+    (if (or (not x) (null? (ahash-table->list bad))) x
+        (let walk ((y x))
+          (cond ((not (pair? y)) y)
+                ((func? y 'w:fldChar)
+                 (let ((k n))
+                   (set! n (+ n 1))
+                   (if (ahash-ref bad k) '(docx:unmatched-field) y)))
+                (else
+                  (let loop ((l (cdr y)) (acc '()))
+                    (if (null? l) (cons (car y) (reverse acc))
+                        (loop (cdr l) (cons (if (func? (car l) '@) (car l) (walk (car l)))
+                                            acc))))))))))
+
+;; the prefixes of the choices of mc:AlternateContent which are read
+(define docx-known-choices
+  '("w14" "w15" "w16" "w16se" "wps" "wpg" "wp14" "a14" "m" "v" "o" "w10"))
+
+(define (docx-readable? x)
+  ;; whether the element x holds something which the reader shows
+  (and (pair? x)
+       (or (in? (car x) '(w:t w:delText w:drawing w:pict w:object w:sym w:tab
+                          w:br w:cr m:oMath m:oMathPara w:footnoteReference
+                          w:endnoteReference w:fldSimple w:instrText w:tbl
+                          w:ruby))
+           (list-or (map docx-readable? (ox-children x))))))
+
+(define (docx-alternative x)
+  ;; the children of the choice of mc:AlternateContent x which is read: the
+  ;; first choice whose prefixes are known, or the fallback, with something
+  ;; to show
+  (with c (list-find
+            (append (list-filter
+                      (ox-childs x 'mc:Choice)
+                      (lambda (c)
+                        (list-and
+                          (map (lambda (p) (in? p docx-known-choices))
+                               (list-filter (string-tokenize-by-char
+                                              (or (ox-attr c 'Requires) "") #\space)
+                                            (lambda (p) (!= p "")))))))
+                    (ox-childs x 'mc:Fallback))
+            docx-readable?)
+    (if c (ox-children c) '())))
+
 (define (docx-unwrap l)
   ;; the children of a paragraph, with those of the elements which only
   ;; hold others in their place
@@ -1127,6 +1280,7 @@
             ((func? x 'w:sdt)
              (with c (ox-child x 'w:sdtContent)
                (if c (docx-unwrap (ox-children c)) '())))
+            ((func? x 'mc:AlternateContent) (docx-unwrap (docx-alternative x)))
             (else (list x))))
     l))
 
@@ -1583,9 +1737,7 @@
 
 (define (docx-row x i rows cols look style tbl-borders)
   (let* ((pr (ox-child x 'w:trPr))
-         (header? (and pr (ox-child pr 'w:tblHeader)
-                       (not (in? (docx-child-val pr 'w:tblHeader)
-                                 '("0" "false")))))
+         (header? (and pr (docx-on? (ox-child pr 'w:tblHeader))))
          (row-parts (docx-row-parts i rows x look)))
     (cons 'row
           (let loop ((l (docx-table-children x 'w:tc))
@@ -1715,26 +1867,49 @@
            (if c (docx-blocks-sub (ox-children c)) '())))
         ((and (pair? x) (in? (car x) '(w:ins w:customXml w:moveTo)))
          (docx-blocks-sub (ox-children x)))
+        ((func? x 'mc:AlternateContent) (docx-blocks-sub (docx-alternative x)))
         (else '())))
 
+(define (docx-mark-first b marks)
+  ;; the block b with the bookmarks marks at the start of its first
+  ;; paragraph (in the first cell of a table), or #f when it has none
+  (cond ((func? b 'p)
+         (apply office-node (cons* 'p (ox-attrs b) (append marks (ox-children b)))))
+        ((and (pair? b) (in? (car b) '(table row cell)))
+         (let loop ((l (ox-children b)) (acc '()))
+           (cond ((null? l) #f)
+                 ((docx-mark-first (car l) marks)
+                  => (lambda (y)
+                       (apply office-node
+                              (cons* (car b) (ox-attrs b)
+                                     (append (reverse acc) (cons y (cdr l)))))))
+                 (else (loop (cdr l) (cons (car l) acc))))))
+        (else #f)))
+
 (define (docx-blocks-sub l)
-  ;; A bookmark between two paragraphs belongs to the next one.
+  ;; A bookmark between two blocks belongs to the next one (to the first
+  ;; paragraph of a table), and one after the last block to this block.
   (let loop ((l l) (marks '()) (acc '()))
-    (cond ((null? l) (reverse acc))
+    (cond ((and (null? l) (pair? marks))
+           (reverse (if (and (pair? acc) (func? (car acc) 'p))
+                        (cons (apply office-node
+                                     (cons* 'p (ox-attrs (car acc))
+                                            (append (ox-children (car acc)) marks)))
+                              (cdr acc))
+                        (cons (cons 'p marks) acc))))
+          ((null? l) (reverse acc))
           ((func? (car l) 'w:bookmarkStart)
            (loop (cdr l) (append marks (docx-inline (car l))) acc))
           (else
-            (with b (docx-block (car l))
-              (if (and (pair? marks) (pair? b) (func? (cAr b) 'p))
-                  (let* ((p (cAr b))
-                         (attrs (ox-attrs p)))
-                    (loop (cdr l) '()
-                          (append
-                            (list (apply office-node
-                                         (cons* 'p attrs
-                                                (append marks (ox-children p)))))
-                            (cdr (reverse b))
-                            acc)))
+            (let* ((b (docx-block (car l)))
+                   (i (and (pair? marks)
+                           (list-find-index b (lambda (y) (docx-mark-first y marks))))))
+              (if i
+                  (loop (cdr l) '()
+                        (append (reverse (append (sublist b 0 i)
+                                                 (list (docx-mark-first (list-ref b i) marks))
+                                                 (sublist b (+ i 1) (length b))))
+                                acc))
                   (loop (cdr l) marks (append (reverse b) acc))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1801,7 +1976,11 @@
                             (cons* 'list
                                    `((kind ,kind)
                                      (format ,(and (!= format "1") format))
-                                     (start ,(and (!= start "1") start)))
+                                     (start ,(and (!= start "1") start))
+                                     ;; (for docx-number-list, which
+                                     ;; takes them away)
+                                     (docx-group ,id) (docx-num ,num)
+                                     (docx-depth ,(number->string level)))
                                    (reverse items)))
                      l))
               ((== n level)
@@ -1816,30 +1995,62 @@
                             (cons (append (car items) (list (car sub)))
                                   (cdr items)))))))))))
 
-(define (docx-continued x key counts)
-  ;; the list x, which goes on with the numbers of the list key before it:
-  ;; the items of one list of Word may be apart, with text between them
-  (let* ((n (length (list-filter (ox-children x) (lambda (y) (func? y 'item)))))
-         (before (ahash-ref counts key)))
-    (ahash-set! counts key (+ n (or before 0)))
-    (if (or (not before) (!= (ox-attr x 'kind) "number")) x
-        (apply office-node
-               (cons* 'list
-                      (append (list-filter (ox-attrs x)
-                                           (lambda (a) (!= (car a) 'start)))
+;; The numbers of a list of Word go on after the paragraphs between its
+;; items, as long as no item of a higher level comes, which starts its
+;; levels again: also in the lists of several lists of Word with the same
+;; abstract one, but for a list which starts again (w:startOverride).
+
+(define (docx-number-list x counts)
+  ;; the list x, with the number of its first item when it goes on with
+  ;; the items before it; counts has, for each abstract list and level,
+  ;; (number of items . list of Word) up to here
+  (let* ((group (ox-attr x 'docx-group))
+         (num (ox-attr x 'docx-num))
+         (depth (office-integer (ox-attr x 'docx-depth) 0 0 8))
+         (key (cons group depth))
+         (old (ahash-ref counts key))
+         (before (and old
+                      (not (and (!= (cdr old) num)
+                                (ahash-ref docx-restarts
+                                           (cons num (number->string depth)))))
+                      (car old)))
+         (n 0)
+         (children
+           (let loop ((l (ox-children x)) (acc '()))
+             (cond ((null? l) (reverse acc))
+                   ((func? (car l) 'item)
+                    ;; (an item starts the deeper levels again)
+                    (set! n (+ n 1))
+                    (for (k (iota (- 8 depth)))
+                      (ahash-remove! counts (cons group (+ depth k 1))))
+                    (loop (cdr l)
+                          (cons (cons 'item
+                                      (map-in-order
+                                        (lambda (y)
+                                          (if (func? y 'list) (docx-number-list y counts) y))
+                                        (cdr (car l))))
+                                acc)))
+                   (else (loop (cdr l) (cons (car l) acc))))))
+         (attrs (list-filter (ox-attrs x)
+                             (lambda (a) (not (in? (car a) '(docx-group docx-num
+                                                            docx-depth)))))))
+    (ahash-set! counts key (cons (+ n (or before 0)) num))
+    (apply office-node
+           (cons* 'list
+                  (if (or (not before) (!= (ox-attr x 'kind) "number")) attrs
+                      (append (list-filter attrs (lambda (a) (!= (car a) 'start)))
                               `((start ,(number->string
                                           (+ before (office-integer (ox-attr x 'start)
-                                                                    1 0 100000))))))
-                      (ox-children x))))))
+                                                                    1 0 100000)))))))
+                  children))))
 
 (define (docx-group-lists l)
   ;; (loops, here and below: a document may have many thousands of blocks)
   (let loop ((l l) (acc '()) (counts (make-ahash-table)))
     (cond ((null? l) (reverse acc))
           ((docx-item-level (car l))
-           (let* ((key (cons (ox-attr (car l) 'list-num) (ox-attr (car l) 'list-level)))
-                  (r (docx-list l (docx-item-level (car l)))))
-             (loop (cdr r) (cons (docx-continued (car r) key counts) acc) counts)))
+           (with r (docx-list l (docx-item-level (car l)))
+             (loop (cdr r) (cons (docx-number-list (car r) counts) acc) counts)))
           ((and (func? (car l) 'p) (ox-attr (car l) 'list-more))
            (loop (cdr l) (cons (docx-plain-paragraph (car l)) acc) counts))
           (else (loop (cdr l) (cons (car l) acc) counts)))))
@@ -1891,7 +2102,7 @@
 (define (docx-read-theme)
   ;; the fonts of the theme, which the styles may name
   (set! docx-theme-fonts '())
-  (let* ((root (office-xml docx-archive "word/theme/theme1.xml"))
+  (let* ((root (office-xml docx-archive (docx-entry "theme")))
          (scheme (and root (ox-find root 'a:fontScheme)))
          (font (lambda (tag)
                  (with x (and scheme (ox-path scheme tag 'a:latin))
@@ -1951,7 +2162,7 @@
 
 (define (docx-part-blocks part)
   ;; the blocks of a part of the archive, as a header
-  (let ((root (office-xml docx-archive part))
+  (let ((root (docx-balance-fields (office-xml docx-archive part)))
         (old-part docx-part)
         (old-fields docx-fields)
         (old-notes docx-open-notes))
@@ -1970,9 +2181,9 @@
 (define (docx-headers sect)
   ;; the headers and the footers of the last section: (header) blocks with
   ;; the attributes place (header, footer) and kind (default, first, even)
-  (let* ((settings (office-xml docx-archive "word/settings.xml"))
-         (even? (and settings (ox-child settings 'w:evenAndOddHeaders)))
-         (first? (and sect (ox-child sect 'w:titlePg))))
+  (let* ((settings (office-xml docx-archive (docx-entry "settings")))
+         (even? (and settings (docx-on? (ox-child settings 'w:evenAndOddHeaders))))
+         (first? (and sect (docx-on? (ox-child sect 'w:titlePg)))))
     (if (not sect) '()
         (append-map
           (lambda (x)
@@ -2050,7 +2261,7 @@
                                 (string-ends? (or (ox-attr x 'Type) "")
                                               "/officeDocument")))))
          (target (and rel (ox-attr rel 'Target))))
-    (if target (office-resolve "" target) "word/document.xml")))
+    (if target (office-resolve "" (docx-uri-decode target)) "word/document.xml")))
 
 ;; A file which cannot be read gives a document which says so, and a
 ;; message, rather than an empty document.
@@ -2085,6 +2296,7 @@
     (set! docx-theme-fonts '())
     (set! docx-used-styles (make-ahash-table))
     (set! docx-comments (make-ahash-table))
+    (set! docx-entries '())
     r))
 
 (define (docx-parse s)
@@ -2102,18 +2314,19 @@
         (set! docx-default-style #f)
         (set! docx-body-styles (make-ahash-table))
         (set! docx-floats '())
+        (docx-read-entries)
         (docx-read-theme)
         (docx-read-styles)
         (when (and (not docx-default-style) (ahash-ref docx-styles "Normal"))
           (set! docx-default-style "Normal"))
         (docx-read-lists)
-        (for (part (list docx-part "word/footnotes.xml" "word/endnotes.xml"))
+        (for (part (list docx-part (docx-entry "footnotes") (docx-entry "endnotes")))
           (docx-read-rels part))
         (set! docx-used-styles (make-ahash-table))
         (docx-read-comments)
-        (docx-read-notes "word/footnotes.xml" 'w:footnote 'foot)
-        (docx-read-notes "word/endnotes.xml" 'w:endnote 'end)
-        (let* ((root (office-xml docx-archive docx-part))
+        (docx-read-notes (docx-entry "footnotes") 'w:footnote 'foot)
+        (docx-read-notes (docx-entry "endnotes") 'w:endnote 'end)
+        (let* ((root (docx-balance-fields (office-xml docx-archive docx-part)))
                (body (and root (ox-child root 'w:body)))
                (sect (and body (list-find (reverse (ox-children body))
                                           (lambda (x) (func? x 'w:sectPr)))))

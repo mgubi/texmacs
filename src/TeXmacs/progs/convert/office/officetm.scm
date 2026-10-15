@@ -924,6 +924,11 @@
                         (if (and (string? t) (oftm-number? t))
                             (list `(pageref ,name))
                             (list `(hlink ,t ,(string-append "#" name)))))
+                       ;; (a text which is not the number of the label,
+                       ;; even when it looks like one: the number of its
+                       ;; chapter)
+                       ((== (ox-attr x 'kind) "text")
+                        (list `(hlink ,t ,(string-append "#" name))))
                        ((and (ahash-ref oftm-numbered-labels (ox-attr x 'name))
                              (string? t) (oftm-number? t))
                         (list `(reference ,name)))
@@ -974,8 +979,13 @@
 (define (oftm-cell-body-sub c)
   (let* ((l (ox-children c))
          (b (if (and (list-1? l) (func? (car l) 'p))
-                ;; (its alignment is the one of the cell)
-                (list (oftm-inlines (ox-children (car l))))
+                ;; (its alignment is the one of the cell; a heading or a
+                ;; line of code alone in a cell is still one)
+                (with t (oftm-inlines (ox-children (car l)))
+                  (list (cond ((== t "") t)
+                              ((oftm-role? (car l) "heading") `(strong ,t))
+                              ((oftm-role? (car l) "code") `(verbatim ,t))
+                              (else t))))
                 (oftm-blocks l)))
          (b (if (and (== (ox-attr c 'header) "true"))
                 (map (lambda (t) (if (or (== t "") (func? t 'strong)) t
@@ -1175,13 +1185,22 @@
         t)))
 
 (define (oftm-item x)
-  ;; the paragraphs of an item of a list: the first one starts with the item
-  (with l (oftm-blocks (ox-children x))
-    (if (null? l) (list '(concat (item) ""))
-        (cons (oftm-concat (cons '(item) (if (func? (car l) 'concat)
-                                             (cdar l)
-                                             (list (car l)))))
-              (cdr l)))))
+  ;; the paragraphs of an item of a list: the first one starts with the
+  ;; item, and with its number when it is not the next one; an item which
+  ;; has no number (a header, an item which holds only a list) is its
+  ;; paragraphs only
+  (let* ((l (oftm-blocks (ox-children x)))
+         (start (office-integer (ox-attr x 'start) #f 0 100000))
+         (marks (append (if start
+                            `((assign "item-nr" ,(number->string (- start 1))))
+                            '())
+                        '((item)))))
+    (cond ((ox-attr x 'unnumbered) l)
+          ((null? l) (list `(concat ,@marks "")))
+          (else (cons (oftm-concat (append marks (if (func? (car l) 'concat)
+                                                     (cdar l)
+                                                     (list (car l)))))
+                      (cdr l))))))
 
 (define (oftm-list x)
   ;; a list; a numbered one in its way of numbering, from its first number
@@ -1535,6 +1554,8 @@
   (let* ((get (lambda (key) (ox-attr x key)))
          (num (lambda (key) (office-number (get key))))
          (cm (lambda (key) (office-length->cm (get key))))
+         ;; (a margin may be 0)
+         (cm0 (lambda (key) (office-length->cm (get key) #t)))
          (w (cm 'page-width))
          (h (cm 'page-height))
          (type (and w h (oftm-page-type w h)))
@@ -1548,12 +1569,12 @@
                     ("page-orientation" ,(if (> w h) "landscape" "portrait"))))
             (else `(("page-type" "user") ("page-width" ,(get 'page-width))
                     ("page-height" ,(get 'page-height)))))
-      (if (cm 'margin-left)
+      (if (cm0 'margin-left)
           `(("page-odd" ,(get 'margin-left)) ("page-even" ,(get 'margin-left)))
           '())
-      (if (cm 'margin-right) `(("page-right" ,(get 'margin-right))) '())
-      (if (cm 'margin-top) `(("page-top" ,(get 'margin-top))) '())
-      (if (cm 'margin-bottom) `(("page-bot" ,(get 'margin-bottom))) '())
+      (if (cm0 'margin-right) `(("page-right" ,(get 'margin-right))) '())
+      (if (cm0 'margin-top) `(("page-top" ,(get 'margin-top))) '())
+      (if (cm0 'margin-bottom) `(("page-bot" ,(get 'margin-bottom))) '())
       (if (and size (>= size 5) (<= size 50))
           `(("font-base-size" ,(number->string (inexact->exact (round size)))))
           '())

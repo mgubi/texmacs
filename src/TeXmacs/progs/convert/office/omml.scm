@@ -323,9 +323,11 @@
                                       (or (omml-property x 'm:accPr 'm:chr)
                                           (omml-utf8 #x302)))))))
             ((m:bar)
-             (if (== (omml-property x 'm:barPr 'm:pos) "bot")
-                 (list `(m:munder ,(omml-arg x 'm:e) (m:mo "_")))
-                 (list `(m:mover (@ (accent "true")) ,(omml-arg x 'm:e) (m:mo ,(omml-utf8 #xaf))))))
+             ;; (below its formula when it says nothing, as ECMA-376 and
+             ;; the converter of Word to MathML have it)
+             (if (== (omml-property x 'm:barPr 'm:pos) "top")
+                 (list `(m:mover (@ (accent "true")) ,(omml-arg x 'm:e) (m:mo ,(omml-utf8 #xaf))))
+                 (list `(m:munder ,(omml-arg x 'm:e) (m:mo "_")))))
             ((m:limLow) (list `(m:munder ,(omml-arg x 'm:e) ,(omml-arg x 'm:lim))))
             ((m:limUpp) (list `(m:mover ,(omml-arg x 'm:e) ,(omml-arg x 'm:lim))))
             ((m:groupChr)
@@ -337,15 +339,30 @@
             ((m:m) (omml-matrix x))
             ((m:eqArr) (omml-array x))
             ;; what only holds a formula
-            ((m:box m:borderBox m:phant)
+            ((m:box m:borderBox)
              (with y (ox-child x 'm:e)
                (if y (omml-list (ox-children y)) '())))
+            ;; a formula which takes its place, but is not shown
+            ((m:phant)
+             (let ((y (ox-child x 'm:e))
+                   (show (omml-property x 'm:phantPr 'm:show)))
+               (cond ((not y) '())
+                     ((in? show '("0" "false" "off"))
+                      (list `(m:mphantom ,(omml-row (omml-list (ox-children y))))))
+                     (else (omml-list (ox-children y))))))
             ((m:oMath m:e m:num m:den m:sub m:sup m:deg m:lim m:fName)
              (omml-list (ox-children x)))
-            ;; a run of the text of Word inside a formula
+            ;; a run of the text of Word inside a formula: its text only
             ((w:r)
-             (with s (ox-text x)
+             (with s (apply string-append (map ox-text (ox-childs x 'w:t)))
                (if (== s "") '() (list `(m:mtext ,(omml-text s))))))
+            ;; the changes which are tracked: what was inserted is there,
+            ;; what was deleted is not
+            ((w:ins w:moveTo w:customXml w:smartTag) (omml-list (ox-children x)))
+            ((w:sdt)
+             (with c (ox-child x 'w:sdtContent)
+               (if c (omml-list (ox-children c)) '())))
+            ((w:del w:moveFrom) '())
             (else '())))))
 
 (define (omml-list l)
@@ -623,9 +640,35 @@
                         (mmlo-scripts (car c) (car after) (cadr after)))
                        (else (mmlo-row c)))))
               ((menclose)
-               (list `(m:borderBox (m:e ,@(mmlo-row c)))))
+               (list `(m:borderBox ,@(mmlo-enclose-properties (ox-attr x 'notation))
+                                   (m:e ,@(mmlo-row c)))))
               ((none mprescripts annotation annotation-xml) '())
               (else (mmlo-row (ox-children x))))))))
+
+(define (mmlo-enclose-properties notation)
+  ;; the element m:borderBoxPr for the notation of menclose: the sides of
+  ;; the box which are not drawn, and the lines through (a box when there
+  ;; is no notation)
+  (let* ((l (if (string? notation) (string-tokenize-by-char notation #\space) '()))
+         (l (list-filter l (lambda (s) (!= s ""))))
+         (has? (lambda (k) (in? k l)))
+         (box? (or (null? l) (has? "box") (has? "roundedbox") (has? "circle")))
+         (side? (lambda (k) (or box? (has? k)
+                                (and (in? k '("left" "top")) (has? "longdiv"))
+                                (and (== k "right") (or (has? "actuarial") (has? "madruwb")))
+                                (and (== k "top") (has? "actuarial"))
+                                (and (== k "bottom") (has? "madruwb")))))
+         (on (lambda (tag) `(,tag (@ (m:val "1")))))
+         (props (append
+                  (if (side? "top") '() (list (on 'm:hideTop)))
+                  (if (side? "bottom") '() (list (on 'm:hideBot)))
+                  (if (side? "left") '() (list (on 'm:hideLeft)))
+                  (if (side? "right") '() (list (on 'm:hideRight)))
+                  (if (has? "horizontalstrike") (list (on 'm:strikeH)) '())
+                  (if (has? "verticalstrike") (list (on 'm:strikeV)) '())
+                  (if (has? "updiagonalstrike") (list (on 'm:strikeBLTR)) '())
+                  (if (has? "downdiagonalstrike") (list (on 'm:strikeTLBR)) '()))))
+    (if (null? props) '() (list `(m:borderBoxPr ,@props)))))
 
 (define mmlo-eqarray? #f)  ; the table of the formula is lines of equations
 
