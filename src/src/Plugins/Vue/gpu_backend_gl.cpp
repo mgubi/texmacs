@@ -93,6 +93,7 @@ gpu_backend* gpu_gl_backend () { return NULL; }
   X(glTexImage2D) \
   X(glTexParameteri) \
   X(glTexSubImage2D) \
+  X(glUniform1f) \
   X(glUniform1i) \
   X(glUniform2f) \
   X(glUseProgram) \
@@ -155,6 +156,7 @@ vue_gl_load () {
 #define glTexImage2D vue_glTexImage2D
 #define glTexParameteri vue_glTexParameteri
 #define glTexSubImage2D vue_glTexSubImage2D
+#define glUniform1f vue_glUniform1f
 #define glUniform1i vue_glUniform1i
 #define glUniform2f vue_glUniform2f
 #define glUseProgram vue_glUseProgram
@@ -216,14 +218,14 @@ static const char* slug_vertex_src= GLSL_HEADER
   "layout(location=1) in vec4 i_box;\n"   // the box (em)
   "layout(location=2) in uvec2 i_band;\n" // offset of the header, bands
   "layout(location=3) in vec4 i_col;\n"
-  "uniform vec2 u_size;\n"
+  "uniform vec2 u_size; uniform float u_bold;\n"
   "out vec2 v_em; flat out vec4 v_box; flat out uvec2 v_band;\n"
   "flat out vec4 v_col; flat out float v_scale;\n"
   "void main () {\n"
   "  int id= gl_VertexID;\n"
   "  vec2 c= vec2 ((id == 1 || id == 3 || id == 4) ? 1.0 : 0.0,\n"
   "                (id == 2 || id == 4 || id == 5) ? 1.0 : 0.0);\n"
-  "  float pad= 1.0 / i_org.z;\n"
+  "  float pad= (1.0 + u_bold) / i_org.z;\n"
   "  vec2 em= mix (i_box.xy - pad, i_box.zw + pad, c);\n"
   "  vec2 p= i_org.xy + vec2 (em.x, -em.y) * i_org.z;\n"
   "  v_em= em; v_box= i_box; v_band= i_band; v_col= i_col; v_scale= i_org.z;\n"
@@ -232,21 +234,21 @@ static const char* slug_vertex_src= GLSL_HEADER
 
 static const char* slug_fragment_src= GLSL_HEADER
   "precision highp int; precision highp usampler2D;\n"
-  "uniform sampler2D u_curves; uniform usampler2D u_bands;\n"
+  "uniform sampler2D u_curves; uniform usampler2D u_bands; uniform float u_bold;\n"
   "in vec2 v_em; flat in vec4 v_box; flat in uvec2 v_band;\n"
   "flat in vec4 v_col; flat in float v_scale;\n"
   "out vec4 o_col;\n"
   "const int W= 1024;\n"
   "uint idx (uint i) { return texelFetch (u_bands, ivec2 (int (i) % W, int (i) / W), 0).r; }\n"
   "vec4 crv (uint k, int j) { int i= int (k) * 2 + j; return texelFetch (u_curves, ivec2 (i % W, i / W), 0); }\n"
-  "float ray (uint start, uint count, bool vertical, out float near) {\n"
+  "float ray (uint start, uint count, bool vertical, float hb, out float near) {\n"
   "  float cov= 0.0; near= 1.0e9;\n"
   "  for (uint n= 0u; n < count; n++) {\n"
   "    uint k= idx (start + n);\n"
   "    vec4 a= crv (k, 0); vec4 b= crv (k, 1);\n"
   "    vec2 p1= a.xy - v_em, p2= a.zw - v_em, p3= b.xy - v_em;\n"
   "    if (vertical) { p1= p1.yx; p2= p2.yx; p3= p3.yx; }\n"
-  "    if (max (max (p1.x, p2.x), p3.x) * v_scale < -0.5) break;\n"
+  "    if (max (max (p1.x, p2.x), p3.x) * v_scale < -0.5 - abs (hb)) break;\n"
   "    uint code= (0x2E74u >> ((p1.y > 0.0 ? 2u : 0u) + (p2.y > 0.0 ? 4u : 0u) +\n"
   "                            (p3.y > 0.0 ? 8u : 0u))) & 3u;\n"
   "    if (code == 0u) continue;\n"
@@ -260,20 +262,23 @@ static const char* slug_fragment_src= GLSL_HEADER
   "    float x1= (A.x * t1 - B.x * 2.0) * t1 + p1.x;\n"
   "    float x2= (A.x * t2 - B.x * 2.0) * t2 + p1.x;\n"
   "    if ((code & 1u) != 0u) {\n"
-  "      cov += clamp (x1 * v_scale + 0.5, 0.0, 1.0); near= min (near, abs (x1 * v_scale)); }\n"
+  "      cov += clamp (x1 * v_scale + 0.5 + hb, 0.0, 1.0); near= min (near, abs (x1 * v_scale + hb)); }\n"
   "    if (code > 1u) {\n"
-  "      cov -= clamp (x2 * v_scale + 0.5, 0.0, 1.0); near= min (near, abs (x2 * v_scale)); }\n"
+  "      cov -= clamp (x2 * v_scale + 0.5 - hb, 0.0, 1.0); near= min (near, abs (x2 * v_scale - hb)); }\n"
   "  }\n"
   "  return cov;\n"
   "}\n"
   "void main () {\n"
-  "  uint nb= v_band.y, h= v_band.x;\n"
+  "  uint nb= v_band.y & 0x7FFFFFFFu, h= v_band.x;\n"
+  // the edges moved outwards by half of u_bold (the direction of the
+  // outline in the high bit; the vertical ray sees it mirrored)
+  "  float hb= ((v_band.y >> 31) != 0u ? 0.5 : -0.5) * u_bold;\n"
   "  vec2 rel= (v_em - v_box.xy) / max (v_box.zw - v_box.xy, vec2 (1.0e-6));\n"
   "  uint by= uint (clamp (floor (rel.y * float (nb)), 0.0, float (nb) - 1.0));\n"
   "  uint bx= uint (clamp (floor (rel.x * float (nb)), 0.0, float (nb) - 1.0));\n"
   "  float nx, ny;\n"
-  "  float cx= abs (ray (idx (h + 2u * by), idx (h + 2u * by + 1u), false, nx));\n"
-  "  float cy= abs (ray (idx (h + 2u * (nb + bx)), idx (h + 2u * (nb + bx) + 1u), true, ny));\n"
+  "  float cx= abs (ray (idx (h + 2u * by), idx (h + 2u * by + 1u), false, hb, nx));\n"
+  "  float cy= abs (ray (idx (h + 2u * (nb + bx)), idx (h + 2u * (nb + bx) + 1u), true, -hb, ny));\n"
   "  float wx= clamp (1.0 - nx * 2.0, 0.0, 1.0), wy= clamp (1.0 - ny * 2.0, 0.0, 1.0);\n"
   "  float c= max ((cx * wx + cy * wy) / max (wx + wy, 1.0 / 65536.0), min (cx, cy));\n"
   "  o_col= v_col * clamp (c, 0.0, 1.0);\n"
@@ -317,7 +322,7 @@ class gl_backend: public gpu_backend {
   GLint u_size= -1, u_mode= -1, u_tex= -1, u_atlas= -1, u_porig= -1, u_ptile= -1;
   GLuint blank= 0;  // 1x1, at the unit of u_tex when a draw has no texture
   GLuint slug_prog= 0, slug_vao= 0, slug_vbo= 0;
-  GLint su_size= -1, su_curves= -1, su_bands= -1;
+  GLint su_size= -1, su_curves= -1, su_bands= -1, su_bold= -1;
   // ThorVG: canvases drawing into scratch targets. A pass ends by copying
   // all of the scratch target (GlBlitTask), whatever it drew, so a pass
   // which fits in SMALL is drawn on a small canvas, moved to its origin;
@@ -349,12 +354,12 @@ public:
                            const void* data);
   void update_texture (gpu_texture t, int x, int y, int w, int h, const void* data);
   void delete_texture (gpu_texture t);
-  gpu_texture new_target (int w, int h);
+  gpu_texture new_target (int w, int h, bool transparent= false);
   bool targets_flipped () { return true; }
 
   void draw_quads (const gpu_pass& p, const gpu_quads& q);
   void draw_slug (const gpu_pass& p, gpu_texture curves, gpu_texture bands,
-                  const float* inst, int n);
+                  const float* inst, int n, float bold);
   void draw_shapes (const gpu_pass& p, const std::vector<gpu_shape>& s,
                     int x1, int y1, int x2, int y2);
   void copy (gpu_texture src, int sw, int sh, int x1, int y1, int x2, int y2,
@@ -443,6 +448,7 @@ gl_backend::init () {
     su_size  = glGetUniformLocation (slug_prog, "u_size");
     su_curves= glGetUniformLocation (slug_prog, "u_curves");
     su_bands = glGetUniformLocation (slug_prog, "u_bands");
+    su_bold  = glGetUniformLocation (slug_prog, "u_bold");
     glGenVertexArrays (1, &slug_vao);
     glGenBuffers (1, &slug_vbo);
   }
@@ -571,14 +577,15 @@ gl_backend::free_target (gpu_texture_rep& t) {
 }
 
 gpu_texture
-gl_backend::new_target (int w, int h) {
+gl_backend::new_target (int w, int h, bool transparent) {
   if (ctx == NULL || w <= 0 || h <= 0) return NULL;
   gpu_texture t= tm_new<gpu_texture_rep> ();
   if (!make_target (*t, w, h)) { free_target (*t); tm_delete (t); return NULL; }
-  // opaque white, as native_opaque_picture
+  // opaque white, as native_opaque_picture, or transparent
   glBindFramebuffer (GL_FRAMEBUFFER, t->fbo);
   glDisable (GL_SCISSOR_TEST);
-  glClearColor (1, 1, 1, 1);
+  if (transparent) glClearColor (0, 0, 0, 0);
+  else glClearColor (1, 1, 1, 1);
   glClear (GL_COLOR_BUFFER_BIT);
   glBindFramebuffer (GL_FRAMEBUFFER, 0);
   return t;
@@ -649,7 +656,7 @@ gl_backend::draw_quads (const gpu_pass& p, const gpu_quads& q) {
 
 void
 gl_backend::draw_slug (const gpu_pass& p, gpu_texture curves, gpu_texture bands,
-                       const float* inst, int n) {
+                       const float* inst, int n, float bold) {
   if (ctx == NULL || slug_prog == 0 || n <= 0 || curves == NULL || bands == NULL)
     return;
   bind_target (p);
@@ -662,6 +669,7 @@ gl_backend::draw_slug (const gpu_pass& p, gpu_texture curves, gpu_texture bands,
   glBlendFunc (GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
   glUseProgram (slug_prog);
   glUniform2f (su_size, (float) p.w, (float) p.h);
+  glUniform1f (su_bold, bold);
   glActiveTexture (GL_TEXTURE0);
   glBindTexture (GL_TEXTURE_2D, curves->tex);
   glUniform1i (su_curves, 0);

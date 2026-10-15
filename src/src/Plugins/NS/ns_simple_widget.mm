@@ -1078,10 +1078,11 @@ ns_simple_widget_rep::repaint_invalid_regions_bis () {
     if (_newSize.width < 1 || _newSize.height < 1) return;
     if (gpu && ((_newSize.width != _oldSize.width) ||
                 (_newSize.height != _oldSize.height))) {
-      // a new store, white, painted again
+      // a new store, transparent until painted, as the bitmap (the
+      // background of the window is shown where TeXmacs does not paint)
       moved= true;
       if (gpu_ren != NULL) { tm_delete (gpu_ren); gpu_ren= NULL; }
-      gpu_store= gpu_backing_picture ((int) _newSize.width, (int) _newSize.height);
+      gpu_store= gpu_backing_picture ((int) _newSize.width, (int) _newSize.height, true);
       invalidate_rect (0, 0, _newSize.width, _newSize.height);
     }
     else if ((_newSize.width != _oldSize.width)||(_newSize.height != _oldSize.height)) {

@@ -97,6 +97,10 @@ public:
   virtual string description () = 0;     // the device, once attached
   virtual void begin_screen (int dw, int dh) = 0;
   virtual void present (SDL_Window* w) = 0;
+  // whether the window (or layer) attached last can be presented without
+  // waiting for the screen (false: the compositor still holds the frames
+  // presented before, and the window is better drawn a little later)
+  virtual bool ready_to_present () { return true; }
 
   // textures: data has rows from the top, without padding (or is NULL: zeros)
   virtual gpu_texture new_texture (int w, int h, gpu_format f, bool linear,
@@ -104,16 +108,19 @@ public:
   virtual void update_texture (gpu_texture t, int x, int y, int w, int h,
                                const void* data) = 0;
   virtual void delete_texture (gpu_texture t) = 0;
-  // a target: an RGBA8 texture which can be drawn into, opaque white
-  virtual gpu_texture new_target (int w, int h) = 0;
+  // a target: an RGBA8 texture which can be drawn into, opaque white or
+  // transparent
+  virtual gpu_texture new_target (int w, int h, bool transparent= false) = 0;
   // the texture of a target has its first row (v = 0) at the bottom (GL)
   virtual bool targets_flipped () = 0;
 
   // drawing (in the order of the calls)
   virtual void draw_quads (const gpu_pass& p, const gpu_quads& q) = 0;
-  // the glyphs of Slug: instances of 13 floats (see vue_gpu.cpp)
+  // the glyphs of Slug: instances of 13 floats (see vue_gpu.cpp), made
+  // bold pixels bolder
   virtual void draw_slug (const gpu_pass& p, gpu_texture curves,
-                          gpu_texture bands, const float* inst, int n) = 0;
+                          gpu_texture bands, const float* inst, int n,
+                          float bold) = 0;
   // the shapes, composed over the box x1..x2, y1..y2 (pixels of the
   // layout, within the scissor of the pass) of the target
   virtual void draw_shapes (const gpu_pass& p, const std::vector<gpu_shape>& s,

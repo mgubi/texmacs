@@ -1307,6 +1307,10 @@ public:
     h= (d->r->y2 - d->r->y1) / d->ren->pixel; }
 };
 
+// a window drawn by the GPU was not drawn, its screen still holding the
+// frames presented before (vue_gpu_ready): the loop comes back soon
+static bool vue_gpu_deferred= false;
+
 void
 vue_sdl_gpu_window_rep::process_redraw () {
   if (!shown || (SDL_GetWindowFlags (sdl_win) &
@@ -1319,7 +1323,9 @@ vue_sdl_gpu_window_rep::process_redraw () {
   follow_app_focus ();
 #endif
   with_window frame (this);
-  if (!vue_gpu_attach (sdl_win)) return;
+  // (not while the screen still holds the frames presented before: the
+  // loop draws the window again at its next turn, with what came meanwhile)
+  if (!vue_gpu_ready (sdl_win)) { vue_gpu_deferred= true; return; }
   int win_w= 0, win_h= 0, dev_w= 0, dev_h= 0;
   SDL_GetWindowSizeInPixels (sdl_win, &dev_w, &dev_h);
   if (dev_w <= 0 || dev_h <= 0) return;
@@ -4087,7 +4093,8 @@ loop_iteration_body () {
   vue_follow_icon_set (); // a change of the icon set shows at once
   vue_follow_interface_scale (); // and one of the interface scaling
   vue_follow_fonts (); // and a font which came late
-  if (vue_gpu_follow_glyph_settings ()) { // and one of the glyphs
+  // and one of the glyphs (those of the GPU, and those of MuPDF)
+  if (vue_gpu_follow_glyph_settings () | mupdf_follow_glyph_settings ()) {
     vue_simple_widget_rep::invalidate_all_editors ();
     gui_needs_update= true;
   }
@@ -4143,6 +4150,13 @@ loop_iteration_body () {
     web_busy= true;
 #endif
     if (!loop_poll (NULL)) loop_wait (8);
+  }
+  if (vue_gpu_deferred) {
+    // a window to draw as soon as its screen takes a frame again (paced at
+    // 2 ms, woken up by any event)
+    vue_gpu_deferred= false;
+    gui_needs_update= true;
+    if (!loop_poll (NULL)) loop_wait (2);
   }
   if (wheel_step ()) {
     // keep the frames coming while the view moves by itself (or while a

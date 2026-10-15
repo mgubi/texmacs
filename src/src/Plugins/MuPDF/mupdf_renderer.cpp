@@ -25,6 +25,7 @@
 #include <mupdf/pdf.h>
 
 #include "mupdf_picture.hpp"
+#include "boot.hpp"
 
 // MuPDF errors and warnings go to the log (an error thrown outside a fz_try
 // block still terminates the process, see mupdf_picture.cpp)
@@ -456,6 +457,7 @@ mupdf_renderer_rep::end () {
 // of a text object and draws them at its end (ET); a proxy draws into the
 // pixmap of another renderer, which must not use those pixels before.
 static mupdf_renderer_rep* proxy_with_text= NULL;
+static double glyph_bold ();  // (see below)
 
 void
 mupdf_renderer_rep::flush_proxy_text (fz_pixmap* pix) {
@@ -472,7 +474,46 @@ mupdf_renderer_rep::begin_text () {
     prev_text_y= to_y(0);
     proc->op_BT (mupdf_context (), proc);
     proc->op_Tm (mupdf_context (), proc, 1, 0, 0, 1, prev_text_x, prev_text_y);
+    // filled and stroked (the glyphs made bolder), or filled
+    proc->op_Tr (mupdf_context (), proc, glyph_bold () > 0.0 ? 2 : 0);
   }
+}
+
+/******************************************************************************
+* The glyphs made bolder, as those of the GPU renderer (vue_gpu.cpp) and of
+* the Qt port, whose bitmaps of TeXmacs are thickened by shrink: the text is
+* filled and stroked (text rendering mode 2), its stroke "gpu glyph boldness"
+* pixels wide (0.22 by default; the user space has a pixel a unit); not when
+* the glyphs are those of MuPDF ("gpu glyphs" mupdf). TEXMACS_VUE_GLYPHS and
+* TEXMACS_VUE_FT_BOLD override the preferences.
+******************************************************************************/
+
+static double mupdf_glyph_bold= -1.0;  // not read yet
+
+static double
+read_glyph_bold () {
+  string src= get_env ("TEXMACS_VUE_GLYPHS");
+  if (N(src) == 0) src= get_user_preference ("gpu glyphs", "freetype");
+  if (src == "mupdf") return 0.0;
+  string b= get_env ("TEXMACS_VUE_FT_BOLD");
+  if (N(b) == 0) b= get_user_preference ("gpu glyph boldness", "0.22");
+  double x= is_double (b) ? as_double (b) : 0.22;
+  return max (0.0, min (x, 2.0));
+}
+
+bool
+mupdf_follow_glyph_settings () {
+  double b= read_glyph_bold ();
+  if (b == mupdf_glyph_bold) return false;
+  bool changed= (mupdf_glyph_bold >= 0.0);
+  mupdf_glyph_bold= b;
+  return changed;
+}
+
+static double
+glyph_bold () {
+  if (mupdf_glyph_bold < 0.0) mupdf_follow_glyph_settings ();
+  return mupdf_glyph_bold;
 }
 
 void
@@ -2367,6 +2408,13 @@ mupdf_renderer_rep::draw (int c, font_glyphs fng, SI x, SI y) {
       gl_index= mupdf_glyph_index (fontdesc->font, c);
     }
     char glyphs[2] = { (char)(gl_index >> 8), (char)(gl_index) };
+    // the width of the stroke which makes the glyphs bolder (the lines
+    // select theirs again, see select_line_width)
+    double bold= glyph_bold ();
+    if (bold > 0.0 && current_width != bold) {
+      proc->op_w (mupdf_context (), proc, bold);
+      current_width= bold;
+    }
     proc->op_Tj (mupdf_context (), proc, glyphs, 2);
     return;
   }

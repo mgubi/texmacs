@@ -345,9 +345,10 @@ The worst step of a repaint or a scroll is 1.1 ms (98 ms when presented at
 each repaint). In a run of 70 repaints and scrolls the store was presented
 12 times, 8 ms apart (the refreshes at 120 Hz), a present taking 0.3 ms.
 The first repaint after the start takes some 0.8 s (the first textures,
-the pipelines). Not done yet: the backing store of a new canvas is opaque
-white, where the bitmap was transparent until painted (a canvas which does
-not paint all of itself).
+the pipelines). The store of a canvas is transparent until painted, as the
+bitmap was (`gpu_backing_picture (w, h, true)`: the background of the
+window shows where TeXmacs does not paint; the editors of the Vue port
+start opaque white).
 
 ## Packaging
 

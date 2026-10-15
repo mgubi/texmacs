@@ -41,6 +41,7 @@ gpu_backend* gpu_metal_backend () { return NULL; }
 #import <CoreGraphics/CoreGraphics.h>
 #include <unordered_map>
 #include <cmath>
+#include <time.h>
 
 struct gpu_texture_rep {
   id<MTLTexture> tex;
@@ -83,7 +84,7 @@ fragment float4 quad_fs (QOut in [[stage_in]], constant QU& u [[buffer(0)]],
   return atlas.sample (as, in.uv).r * in.col;
 }
 
-struct SU { float2 size; };
+struct SU { float2 size; float bold; };
 struct SOut {
   float4 position [[position]];
   float2 em;
@@ -100,7 +101,7 @@ vertex SOut slug_vs (uint vid [[vertex_id]], uint iid [[instance_id]],
   float4 box= float4 (p[3], p[4], p[5], p[6]);
   float2 c= float2 ((vid == 1 || vid == 3 || vid == 4) ? 1.0 : 0.0,
                     (vid == 2 || vid == 4 || vid == 5) ? 1.0 : 0.0);
-  float pad= 1.0 / org.z;
+  float pad= (1.0 + u.bold) / org.z;
   float2 em= mix (box.xy - pad, box.zw + pad, c);
   float2 q= org.xy + float2 (em.x, -em.y) * org.z;
   SOut o;
@@ -120,14 +121,14 @@ static float4 crv (texture2d<float> c, uint k, int j) {
   uint i= k * 2 + j; return c.read (uint2 (i % W, i / W)); }
 
 static float ray (texture2d<float> cv, texture2d<uint> bd, float2 em, float scale,
-                  uint start, uint count, bool vertical, thread float& near) {
+                  uint start, uint count, bool vertical, float hb, thread float& near) {
   float cov= 0.0; near= 1.0e9;
   for (uint n= 0; n < count; n++) {
     uint k= idx (bd, start + n);
     float4 a= crv (cv, k, 0); float4 b= crv (cv, k, 1);
     float2 p1= a.xy - em, p2= a.zw - em, p3= b.xy - em;
     if (vertical) { p1= p1.yx; p2= p2.yx; p3= p3.yx; }
-    if (max (max (p1.x, p2.x), p3.x) * scale < -0.5) break;
+    if (max (max (p1.x, p2.x), p3.x) * scale < -0.5 - abs (hb)) break;
     uint code= (0x2E74u >> ((p1.y > 0.0 ? 2u : 0u) + (p2.y > 0.0 ? 4u : 0u) +
                             (p3.y > 0.0 ? 8u : 0u))) & 3u;
     if (code == 0u) continue;
@@ -141,25 +142,28 @@ static float ray (texture2d<float> cv, texture2d<uint> bd, float2 em, float scal
     float x1= (A.x * t1 - B.x * 2.0) * t1 + p1.x;
     float x2= (A.x * t2 - B.x * 2.0) * t2 + p1.x;
     if ((code & 1u) != 0u) {
-      cov += clamp (x1 * scale + 0.5, 0.0, 1.0); near= min (near, abs (x1 * scale)); }
+      cov += clamp (x1 * scale + 0.5 + hb, 0.0, 1.0); near= min (near, abs (x1 * scale + hb)); }
     if (code > 1u) {
-      cov -= clamp (x2 * scale + 0.5, 0.0, 1.0); near= min (near, abs (x2 * scale)); }
+      cov -= clamp (x2 * scale + 0.5 - hb, 0.0, 1.0); near= min (near, abs (x2 * scale - hb)); }
   }
   return cov;
 }
 
-fragment float4 slug_fs (SOut in [[stage_in]],
+fragment float4 slug_fs (SOut in [[stage_in]], constant SU& u [[buffer(0)]],
                          texture2d<float> curves [[texture(0)]],
                          texture2d<uint> bands [[texture(1)]]) {
-  uint nb= in.band.y, h= in.band.x;
+  uint nb= in.band.y & 0x7FFFFFFFu, h= in.band.x;
+  // the edges moved outwards by half of the boldness (the direction of the
+  // outline in the high bit; the vertical ray sees it mirrored)
+  float hb= ((in.band.y >> 31) != 0u ? 0.5 : -0.5) * u.bold;
   float2 rel= (in.em - in.box.xy) / max (in.box.zw - in.box.xy, float2 (1.0e-6));
   uint by= uint (clamp (floor (rel.y * float (nb)), 0.0, float (nb) - 1.0));
   uint bx= uint (clamp (floor (rel.x * float (nb)), 0.0, float (nb) - 1.0));
   float nx, ny;
   float cx= abs (ray (curves, bands, in.em, in.scale, idx (bands, h + 2u * by),
-                      idx (bands, h + 2u * by + 1u), false, nx));
+                      idx (bands, h + 2u * by + 1u), false, hb, nx));
   float cy= abs (ray (curves, bands, in.em, in.scale, idx (bands, h + 2u * (nb + bx)),
-                      idx (bands, h + 2u * (nb + bx) + 1u), true, ny));
+                      idx (bands, h + 2u * (nb + bx) + 1u), true, -hb, ny));
   float wx= clamp (1.0 - nx * 2.0, 0.0, 1.0), wy= clamp (1.0 - ny * 2.0, 0.0, 1.0);
   float c= max ((cx * wx + cy * wy) / max (wx + wy, 1.0 / 65536.0), min (cx, cy));
   return in.col * clamp (c, 0.0, 1.0);
@@ -185,6 +189,11 @@ class metal_backend: public gpu_backend {
   std::unordered_map<unsigned, CAMetalLayer*> layers;
   CAMetalLayer* layer= nil;              // of the window being drawn
   id<CAMetalDrawable> drawable= nil;     // of this frame, once drawn into
+  // the presents into each layer: when the last one was made, and the
+  // refresh period of its screen (0: not paced, as the layers of Cocoa,
+  // presented by a display link)
+  struct pacing { double last; double period; };
+  std::unordered_map<void*, pacing> pacings;
   // the commands being encoded
   id<MTLCommandBuffer> cmd= nil;
   id<MTLCommandBuffer> last= nil;        // committed last (finish waits)
@@ -214,17 +223,18 @@ public:
   string description () { return device_name * " (Metal)"; }
   void begin_screen (int dw, int dh);
   void present (SDL_Window* w);
+  bool ready_to_present ();
 
   gpu_texture new_texture (int w, int h, gpu_format f, bool linear, bool repeat,
                            const void* data);
   void update_texture (gpu_texture t, int x, int y, int w, int h, const void* data);
   void delete_texture (gpu_texture t);
-  gpu_texture new_target (int w, int h);
+  gpu_texture new_target (int w, int h, bool transparent= false);
   bool targets_flipped () { return false; }
 
   void draw_quads (const gpu_pass& p, const gpu_quads& q);
   void draw_slug (const gpu_pass& p, gpu_texture curves, gpu_texture bands,
-                  const float* inst, int n);
+                  const float* inst, int n, float bold);
   void draw_shapes (const gpu_pass& p, const std::vector<gpu_shape>& s,
                     int x1, int y1, int x2, int y2);
   void copy (gpu_texture src, int sw, int sh, int x1, int y1, int x2, int y2,
@@ -356,7 +366,14 @@ metal_backend::attach (SDL_Window* w) {
     layers[id]= l;
     it= layers.find (id);
   }
-  return attach_layer ((__bridge void*) it->second);
+  if (!attach_layer ((__bridge void*) it->second)) return false;
+  // the refresh period of the screen of the window (it may move)
+  double rate= 60.0;
+  SDL_DisplayID d= SDL_GetDisplayForWindow (w);
+  const SDL_DisplayMode* m= d != 0 ? SDL_GetCurrentDisplayMode (d) : NULL;
+  if (m != NULL && m->refresh_rate > 0) rate= m->refresh_rate;
+  pacings[(__bridge void*) it->second].period= 1000.0 / rate;
+  return true;
 #endif
 }
 
@@ -370,15 +387,42 @@ metal_backend::begin_screen (int dw, int dh) {
   drawable= nil;  // taken when first drawn into
 }
 
+static double
+now_ms () {
+  struct timespec ts;
+  clock_gettime (CLOCK_MONOTONIC, &ts);
+  return ts.tv_sec * 1e3 + ts.tv_nsec * 1e-6;
+}
+
 void
 metal_backend::present (SDL_Window* w) {
   (void) w;
   end_encoder ();
   if (drawable != nil) {
+    if (layer != nil) pacings[(__bridge void*) layer].last= now_ms ();
     [commands () presentDrawable: drawable];
     drawable= nil;
   }
   flush ();
+}
+
+bool
+metal_backend::ready_to_present () {
+  // A layer has three drawables, which the compositor gives back once it
+  // has shown them (some two refreshes later): presented in bursts, faster
+  // than the screen refreshes, they ran out and nextDrawable waited (3 to
+  // 5 ms a frame while scrolling, presents 10 ms apart). So no two presents
+  // within half a refresh period; the window is drawn at a later turn of
+  // the loop otherwise. While scrolling on a screen at 120 Hz, the presents
+  // are then 6 to 7 ms apart and nextDrawable no longer waits; a whole
+  // period skipped a turn of the loop each time (presents 15 ms apart).
+  // (Counting the frames not shown yet with presented handlers did not
+  // work: a frame replaced before a refresh is not reported, and the count
+  // stuck.)
+  if (layer == nil) return true;
+  auto it= pacings.find ((__bridge void*) layer);
+  if (it == pacings.end () || it->second.period <= 0) return true;
+  return now_ms () - it->second.last >= 0.5 * it->second.period;
 }
 
 /******************************************************************************
@@ -532,7 +576,7 @@ metal_backend::delete_texture (gpu_texture t) {
 }
 
 gpu_texture
-metal_backend::new_target (int w, int h) {
+metal_backend::new_target (int w, int h, bool transparent) {
   if (!started || w <= 0 || h <= 0) return NULL;
   MTLTextureDescriptor* d=
     [MTLTextureDescriptor texture2DDescriptorWithPixelFormat: MTLPixelFormatBGRA8Unorm
@@ -541,12 +585,13 @@ metal_backend::new_target (int w, int h) {
   d.usage= MTLTextureUsageRenderTarget | MTLTextureUsageShaderRead;
   id<MTLTexture> t= [device newTextureWithDescriptor: d];
   if (t == nil) return NULL;
-  // opaque white, as native_opaque_picture
+  // opaque white, as native_opaque_picture, or transparent
   end_encoder ();
   MTLRenderPassDescriptor* pd= [MTLRenderPassDescriptor renderPassDescriptor];
   pd.colorAttachments[0].texture= t;
   pd.colorAttachments[0].loadAction= MTLLoadActionClear;
-  pd.colorAttachments[0].clearColor= MTLClearColorMake (1, 1, 1, 1);
+  pd.colorAttachments[0].clearColor= transparent ? MTLClearColorMake (0, 0, 0, 0)
+                                                 : MTLClearColorMake (1, 1, 1, 1);
   pd.colorAttachments[0].storeAction= MTLStoreActionStore;
   [[commands () renderCommandEncoderWithDescriptor: pd] endEncoding];
   gpu_texture r= tm_new<gpu_texture_rep> ();
@@ -588,7 +633,7 @@ metal_backend::draw_quads (const gpu_pass& p, const gpu_quads& q) {
 
 void
 metal_backend::draw_slug (const gpu_pass& p, gpu_texture curves, gpu_texture bands,
-                          const float* inst, int n) {
+                          const float* inst, int n, float bold) {
   if (!started || slug_pipe == nil || n <= 0 || curves == NULL || bands == NULL)
     return;
   id<MTLTexture> target= texture_of (p.target);
@@ -603,8 +648,9 @@ metal_backend::draw_slug (const gpu_pass& p, gpu_texture curves, gpu_texture ban
                                         options: MTLResourceStorageModeShared];
     [e setVertexBuffer: b offset: 0 atIndex: 0];
   }
-  float size[2]= { (float) p.w, (float) p.h };
-  [e setVertexBytes: size length: sizeof (size) atIndex: 1];
+  float su[4]= { (float) p.w, (float) p.h, bold, 0 };
+  [e setVertexBytes: su length: sizeof (su) atIndex: 1];
+  [e setFragmentBytes: su length: sizeof (su) atIndex: 0];
   [e setFragmentTexture: curves->tex atIndex: 0];
   [e setFragmentTexture: bands->tex atIndex: 1];
   [e drawPrimitives: MTLPrimitiveTypeTriangle vertexStart: 0 vertexCount: 6
