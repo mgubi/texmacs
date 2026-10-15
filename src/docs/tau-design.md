@@ -1248,9 +1248,20 @@ from 16 to 1024 pixels. As in the page of TeXmacs Vue
 
   The core's part goes from 10–25 ms to 1–4: it is free sooner for the
   next key. Typing changes little (a small region).
-- **Left**: the desktop (a frame of commands instead of `PANT`, the shell
-  built with ThorVG and OpenGL, the commands drawn by `vue_gpu`), the
-  transformations of the renderer (rotated pictures), the patterns.
+- **A scroll moves the pixels** (protocol 3): the core moves those of the
+  view (`shift_pixels`) and draws only the strips which come into it; the
+  paint says the shift (two more numbers in `PANT`), and the page and the
+  shell move theirs first. A step: the core's part 2.5–3.7 ms instead of
+  12–25 in the page; natively 2.0 ms of drawing and 2.8 MB instead of
+  9.9 ms and 36 MB.
+- **The desktop** (`THORVG=<prefix>` for the shell, `TAU_GPU=1`): the core
+  sends the commands (`DLST`, after "gpu 1"), and the shell draws them into
+  a texture of the view with `vue_gpu` (its glyphs from the atlas:
+  `gpu_draw_coverage`). The same to the pixel in the document; 10 KB a
+  step through the pipe, the shell's repaint 0.06 ms a frame.
+- **Left**: the transformations of the renderer (rotated pictures), the
+  patterns; a limit to the glyphs and pictures kept by the page and the
+  shell; the commands by default (they are asked for, for now).
 
 ### On the desktop
 
