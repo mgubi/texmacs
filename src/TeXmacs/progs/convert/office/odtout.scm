@@ -63,65 +63,119 @@
   (and (not (ahash-ref ot-bookmarks name))
        (begin (ahash-set! ot-bookmarks name #t) #t)))
 
-(define (ot-named-style name family)
-  ;; The name in the file of a named style of the text (family paragraph
-  ;; or text), which the styles of the file get if they do not have it.
-  ;; A name has letters, digits, - . and _ only: the others are _hh_ (a
-  ;; space is _20_, as LibreOffice writes it).
-  (if (== name "") ""
-      (let ((key (cons name family)))
-        (or (ahash-ref ot-style-names key)
-            (with safe (ot-named-style* name family)
-              (ahash-set! ot-style-names key safe)
-              safe)))))
+;; The named styles of the text are the styles of the file of OpenDocument
+;; which the document was read from when they are among them (written as
+;; they are); every other one is a new style, whose name and name to show
+;; clash with no style of TeXmacs (Standard, Text_20_body, Heading_20_1...),
+;; of the file or of the text, even in another case: a style of the
+;; document never changes a style of TeXmacs, and its look stays on its
+;; paragraphs (a style Standard of a file of Word is Standard_20_Doc, whose
+;; name to show is Standard Doc). The names are given before the text is
+;; written, in an order which does not depend on the order of the text.
 
 (define ot-style-names (make-ahash-table)) ; (name . family) -> name in the file
-(define ot-own-names #f) ; (family . name) of the styles of TeXmacs (Standard...)
-(define ot-word-styles (make-ahash-table)) ; (family . name) of the file of Word
+(define ot-new-styles (make-ahash-table))  ; (name . family) -> (safe family name show)
+(define ot-written (make-ahash-table))     ; (name . family) of ot-used-styles
+(define ot-taken #f)         ; family/name in lower case, of the names and names to show
+(define ot-package-names #f) ; (family . name) of the styles of the file of OpenDocument
 
-(define (ot-own-name? family safe)
-  ;; whether safe is the name of a style of this family which the files
-  ;; of TeXmacs have
-  (when (not ot-own-names)
-    (set! ot-own-names
-          (with x (ox-child (ot-styles-file) 'office:styles)
-            (if x (map (lambda (y) (cons (or (ox-attr y 'style:family) "paragraph")
-                                         (or (ox-attr y 'style:name) "")))
-                       (ox-childs x 'style:style))
-                '()))))
-  (in? (cons family safe) ot-own-names))
+(define (ot-safe-name name)
+  ;; A name has letters, digits, - . and _ only: the others are _hh_ (a
+  ;; space is _20_, as LibreOffice writes it).
+  (let ((safe (apply string-append
+                     (map (lambda (c)
+                            (let ((n (char->integer c)))
+                              (if (or (char-alphabetic? c) (char-numeric? c)
+                                      (in? c '(#\_ #\- #\.)) (>= n 128))
+                                  (char->string c)
+                                  (string-append "_" (number->string n 16) "_"))))
+                          (string->list name)))))
+    (if (and (> (string-length safe) 0)
+             (let ((c (string-ref safe 0)))
+               (or (char-alphabetic? c) (char=? c #\_) (>= (char->integer c) 128))))
+        safe (string-append "_" safe))))
 
-(define (ot-named-style* name family)
-  (let* ((safe0 (apply string-append
-                      (map (lambda (c)
-                             (let ((n (char->integer c)))
-                               (if (or (char-alphabetic? c) (char-numeric? c)
-                                       (in? c '(#\_ #\- #\.)) (>= n 128))
-                                   (char->string c)
-                                   (string-append "_" (number->string n 16) "_"))))
-                           (string->list name))))
-         (safe1 (if (and (> (string-length safe0) 0)
-                         (let ((c (string-ref safe0 0)))
-                           (or (char-alphabetic? c) (char=? c #\_)
-                               (>= (char->integer c) 128))))
-                    safe0 (string-append "_" safe0)))
-         (fam (if (== family "paragraph") "paragraph" "text"))
-         ;; (a style of the file of Word which the text was read from whose
-         ;; name is the one of a style of TeXmacs of its family, such as
-         ;; Standard, is another one: Standard_20_2, whose name to show is
-         ;; Standard 2; the styles of the document itself keep their name)
-         (other? (and (ahash-ref ot-word-styles (cons fam name))
-                      (ot-own-name? fam safe1)))
-         (safe (if other? (string-append safe1 "_20_2") safe1)))
-    (when (and (!= name "")
-               (not (list-find ot-used-styles
-                               (lambda (u) (and (== (car u) safe) (== (cadr u) family))))))
-      (set! ot-used-styles
-            (cons (if other?
-                      (list safe family name (string-append (office-odf-name safe1) " 2"))
-                      (list safe family name))
-                  ot-used-styles)))
-    safe))
+(define (ot-taken-key fam s) (string-append fam "/" (locase-all s)))
+
+(define (ot-taken-table)
+  ;; the names of the styles of TeXmacs and of the file of OpenDocument
+  (when (not ot-taken)
+    (set! ot-taken (make-ahash-table))
+    (set! ot-package-names (make-ahash-table))
+    (let ((add (lambda (x package?)
+                 (when x
+                   (for (y (ox-childs x 'style:style))
+                     (let ((fam (or (ox-attr y 'style:family) "paragraph"))
+                           (n (or (ox-attr y 'style:name) ""))
+                           (d (ox-attr y 'style:display-name)))
+                       (ahash-set! ot-taken (ot-taken-key fam n) #t)
+                       (ahash-set! ot-taken (ot-taken-key fam (office-odf-name n)) #t)
+                       (when d (ahash-set! ot-taken (ot-taken-key fam d) #t))
+                       (when package? (ahash-set! ot-package-names (cons fam n) #t))))))))
+      (add (ox-child (ot-styles-file) 'office:styles) #f)
+      (with root (and ot-package (ot-package-xml "styles.xml"))
+        (when root (add (ox-child root 'office:styles) #t)))))
+  ot-taken)
+
+(define (ot-new-style name family)
+  ;; the name in the file of the named style of the text
+  (ot-taken-table)
+  (let* ((fam (if (== family "paragraph") "paragraph" "text"))
+         (safe (ot-safe-name name))
+         (st (ot-source-style name fam))
+         (display (or (and st (ox-attr st 'display)) (office-odf-name safe))))
+    (if (ahash-ref ot-package-names (cons fam safe)) safe
+        (let* ((free? (lambda (s d)
+                        (not (or (ahash-ref ot-taken (ot-taken-key fam s))
+                                 (ahash-ref ot-taken (ot-taken-key fam (office-odf-name s)))
+                                 (ahash-ref ot-taken (ot-taken-key fam d))))))
+               (pick (let loop ((i 0))
+                       (let ((s (string-append safe (if (== i 0) "" "_20_Doc")
+                                               (if (> i 1) (string-append "_20_" (number->string i)) "")))
+                             (d (string-append display (if (== i 0) "" " Doc")
+                                               (if (> i 1) (string-append " " (number->string i)) ""))))
+                         (if (free? s d) (cons s d) (loop (+ i 1))))))
+               (s (car pick))
+               (d (cdr pick)))
+          (ahash-set! ot-taken (ot-taken-key fam s) #t)
+          (ahash-set! ot-taken (ot-taken-key fam (office-odf-name s)) #t)
+          (ahash-set! ot-taken (ot-taken-key fam d) #t)
+          (ahash-set! ot-new-styles (cons name family) (list s family name d))
+          s))))
+
+(define (ot-prepare-styles x)
+  ;; the names of the named styles of the text: the paragraphs before the
+  ;; texts, each in the order of the names
+  (let ((t (make-ahash-table)))
+    (let walk ((x x))
+      (when (and (pair? x) (symbol? (car x)) (not (eq? (car x) '@)))
+        (with s (ox-attr x 'style)
+          (when (and (string? s) (!= s "") (in? (car x) '(p span)))
+            (ahash-set! t (cons s (if (eq? (car x) 'span) "text" "paragraph")) #t)))
+        (for-each walk (ox-children x))))
+    (with s (ox-attr ot-setup 'body-style)
+      (when (and (string? s) (!= s "")) (ahash-set! t (cons s "paragraph") #t)))
+    (for (key (sort (map car (ahash-table->list t))
+                    (lambda (a b)
+                      (if (== (cdr a) (cdr b)) (string<? (car a) (car b))
+                          (== (cdr a) "paragraph")))))
+      (when (not (ahash-ref ot-style-names key))
+        (ahash-set! ot-style-names key (ot-new-style (car key) (cdr key)))))))
+
+(define (ot-named-style name family)
+  ;; The name in the file of a named style of the text (family paragraph
+  ;; or text), which the styles of the file get when it is new.
+  (if (== name "") ""
+      (let* ((key (cons name family))
+             (safe (or (ahash-ref ot-style-names key)
+                       (with s (ot-new-style name family)
+                         (ahash-set! ot-style-names key s)
+                         s)))
+             (new (ahash-ref ot-new-styles key)))
+        (when (and new (not (ahash-ref ot-written key)))
+          (ahash-set! ot-written key #t)
+          (set! ot-used-styles (cons new ot-used-styles)))
+        safe)))
 
 (define ot-source-styles '()) ; the nodes style of the document
 
@@ -222,39 +276,6 @@
        ,@(with l (if st (ot-style-text-properties st) '())
            (if (null? l) '() `((style:text-properties (@ ,@l))))))))
 
-(define ot-toggle-attrs
-  ;; the attributes of text which a node style says by being there
-  '(fo:font-weight style:font-weight-asian style:font-weight-complex
-    fo:font-style style:font-style-asian style:font-style-complex
-    fo:font-variant fo:text-transform style:text-underline-style
-    style:text-underline-type style:text-underline-width
-    style:text-underline-color style:text-overline-style
-    style:text-overline-width style:text-overline-color
-    style:text-line-through-style style:text-line-through-type))
-
-(define (ot-restyle y st)
-  ;; The style y of TeXmacs (Caption, Title...) in the look of the node
-  ;; style st of the document which is this style: what the document says
-  ;; wins, its text is bold, italic... only when it says so, the rest of
-  ;; y is kept.
-  (let* ((par? (== (or (ox-attr y 'style:family) "paragraph") "paragraph"))
-         (merge (lambda (tag mine drop)
-                  (let* ((old (with x (ox-child y tag) (if x (ox-attrs x) '())))
-                         (keys (map car mine))
-                         (all (append (list-filter old (lambda (a) (and (not (in? (car a) keys))
-                                                                        (not (in? (car a) drop)))))
-                                      mine)))
-                    (if (null? all) '() `((,tag (@ ,@all)))))))
-         (ppr (if par? (merge 'style:paragraph-properties
-                              (ot-style-paragraph-properties st) '())
-                  '()))
-         (tpr (merge 'style:text-properties (ot-style-text-properties st) ot-toggle-attrs)))
-    `(style:style (@ ,@(ox-attrs y))
-                  ,@(list-filter (ox-children y)
-                                 (lambda (c) (not (or (func? c 'style:paragraph-properties)
-                                                      (func? c 'style:text-properties)))))
-                  ,@ppr ,@tpr)))
-
 (define (ot-heading-of-node y st)
   ;; the style of headings y in the look of the node style st of the
   ;; document (a heading of the file of another format)
@@ -297,31 +318,11 @@
                                (cons (string-append "Heading_20_" (number->string n)) st))))
                       ot-source-styles)
                  identity)))
-         ;; ((family . name) -> node style: a style of TeXmacs which a
-         ;; style of the document is has the look of the document, when
-         ;; it says one)
-         (restyled
-           (if ot-package '()
-               (list-filter
-                 (map (lambda (u)
-                        (let* ((fam (if (== (cadr u) "paragraph") "paragraph" "text"))
-                               (st (ot-source-style (caddr u) fam)))
-                          (and (ahash-ref have (cons fam (car u)))
-                               st (list-or (map (lambda (k) (ox-attr st k))
-                                                office-macro-style-keys))
-                               (cons (cons fam (car u)) st))))
-                      ot-used-styles)
-                 identity)))
          (fix (lambda (y)
-                (let* ((h (and (func? y 'style:style)
-                               (assoc (ox-attr y 'style:name) headings)))
-                       (y (if h (ot-heading-of-node y (cdr h)) y))
-                       (r (and (func? y 'style:style)
-                               (assoc (cons (or (ox-attr y 'style:family) "paragraph")
-                                            (or (ox-attr y 'style:name) ""))
-                                      restyled))))
-                  (if r (ot-restyle y (cdr r)) y)))))
-    (if (or (and (null? new) (null? headings) (null? restyled)) (not office)) styles
+                (with h (and (func? y 'style:style)
+                             (assoc (ox-attr y 'style:name) headings))
+                  (if h (ot-heading-of-node y (cdr h)) y)))))
+    (if (or (and (null? new) (null? headings)) (not office)) styles
         (map (lambda (y)
                (if (func? y 'office:styles)
                    (append (map fix y)
@@ -1881,9 +1882,11 @@
   (set! ot-in-note? #f)
   (set! ot-bookmarks (make-ahash-table))
   (set! ot-used-styles '())
-  (set! ot-own-names #f)
   (set! ot-style-names (make-ahash-table))
-  (set! ot-word-styles (make-ahash-table))
+  (set! ot-new-styles (make-ahash-table))
+  (set! ot-written (make-ahash-table))
+  (set! ot-taken #f)
+  (set! ot-package-names #f)
   ;; the named styles of the document (of its macros), with those of its
   ;; file of Word (those of a file of OpenDocument are in its styles.xml)
   (set! ot-source-index #f)
@@ -1893,14 +1896,11 @@
                (word (if (and pack (not ot-package) (== (ox-attr pack 'format) "docx"))
                          (office-package-styles "docx" (ox-attr pack 'data))
                          '())))
-          ;; (the styles of the file of Word, also those which its reader
-          ;; reads as a role, such as Bibliography)
-          (when (and pack (not ot-package) (== (ox-attr pack 'format) "docx"))
-            (for (key (office-docx-style-keys (ox-attr pack 'data)))
-              (ahash-set! ot-word-styles key #t)))
           (office-merged-styles
             (append-map ox-children (list-filter l (lambda (y) (func? y 'styles))))
             word)))
+  ;; the names of the named styles of the text
+  (ot-prepare-styles x)
   (let* ((blocks (ot-blocks-with (if (func? x 'office) (cdr x) (list x))
                                  "Text_20_body"))
          (blocks (if (null? blocks)

@@ -814,20 +814,45 @@
 ;; on the web, with %XX for what an address cannot hold; a path of Windows
 ;; (C:\pics\a.png) is a file: address, whose backslashes Word keeps
 ;; (file:///C:\pics\a.png) and which LibreOffice writes with slashes
-;; (file:///C:/pics/a.png); a relative path or a file: address is the same,
-;; with %XX for the spaces and the characters which are not of ASCII.
+;; (file:///C:/pics/a.png); a path of a server (\\server\share\a.png) is
+;; file://server/share/a.png; a relative path or a file: address is the
+;; same, with %XX for the spaces, the characters which are not of ASCII,
+;; # ? [ ] @ (which would end the path) and a % which is not one of %XX.
+
+(define (office-hex-digit? c)
+  (or (char-numeric? c) (in? (char-downcase c) '(#\a #\b #\c #\d #\e #\f))))
+
+(define (office-path-uri s keep)
+  ;; the local path s as an address, keeping the characters keep
+  (let ((n (string-length s)))
+    (let loop ((i 0) (acc '()))
+      (if (>= i n) (apply string-append (reverse acc))
+          (let* ((c (string-ref s i))
+                 (escape? (or (in? c '(#\# #\? #\[ #\] #\@))
+                              (and (char=? c #\%)
+                                   (not (and (< (+ i 2) n)
+                                             (office-hex-digit? (string-ref s (+ i 1)))
+                                             (office-hex-digit? (string-ref s (+ i 2)))))))))
+            (loop (+ i 1)
+                  (cons (if escape?
+                            (string-append "%" (upcase-all (number->string (char->integer c) 16)))
+                            (office-uri (string c) keep))
+                        acc)))))))
 
 (tm-define (office-link-target s word?)
   (:synopsis "The address @s of a linked picture, for Word (@word?) or OpenDocument")
   (if (office-web-address? s) (office-uri s)
       (let* ((n (string-length s))
+             (unc? (and (>= n 3) (string-starts? s "\\\\")))
              (drive? (and (>= n 3) (char-alphabetic? (string-ref s 0))
                           (char=? (string-ref s 1) #\:)
                           (in? (string-ref s 2) '(#\\ #\/))))
-             (s (if drive? (string-append "file:///" s) s)))
-        (if word? (office-uri s '(#\\))
-            (office-uri (list->string (map (lambda (c) (if (char=? c #\\) #\/ c))
-                                           (string->list s))))))))
+             (slashes (lambda (s) (list->string (map (lambda (c) (if (char=? c #\\) #\/ c))
+                                                     (string->list s))))))
+        (cond (unc? (string-append "file:" (office-path-uri (slashes s) '())))
+              (word? (office-path-uri (if drive? (string-append "file:///" s) s) '(#\\)))
+              (else (office-path-uri (slashes (if drive? (string-append "file:///" s) s))
+                                     '()))))))
 
 (tm-define (office-decimal x)
   (:synopsis "The number @x with three decimals at most, and no useless ones")
@@ -1085,21 +1110,6 @@
           (map (lambda (u) (cons (cons (car u) (cadr u))
                                  (or (caddr u) (office-odf-name (cadr u)))))
                used))))
-
-(tm-define (office-docx-style-keys data)
-  (:synopsis "The (family . id) of the styles of paragraphs and text of the Word file @data")
-  (let* ((arch (catch #t (lambda () (office-archive data)) (lambda args #f)))
-         (root (and arch (catch #t (lambda () (office-xml arch "word/styles.xml"))
-                                (lambda args #f)))))
-    (if (not root) '()
-        (list-filter
-          (map (lambda (y)
-                 (with type (ox-attr y 'w:type)
-                   (and (in? type '("paragraph" "character")) (ox-attr y 'w:styleId)
-                        (cons (if (== type "paragraph") "paragraph" "text")
-                              (ox-attr y 'w:styleId)))))
-               (ox-childs root 'w:style))
-          identity))))
 
 (define office-package-styles-cache (cons #f '()))
 

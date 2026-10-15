@@ -771,6 +771,34 @@
                 (< (+ (car c) (caddr c)) 0.95) (< (+ (cadr c) (cadddr c)) 0.95)
                 (string-recompose (map office-decimal c) " "))))))
 
+(define (odt-linked-address? href)
+  ;; whether href is the address of a file outside the archive: on the
+  ;; web, of a file (file:, an absolute path, a path above the archive)
+  (and (string? href)
+       (let ((h (locase-all (string-trim-spaces href))))
+         (and (!= h "")
+              (not (string-starts? h "#"))
+              (not (string-starts? h "data:"))
+              (not (string-starts? h "javascript:"))
+              (or (office-web-address? href)
+                  (string-starts? h "file:")
+                  (string-starts? h "../")
+                  (string-starts? h "/")
+                  (>= (string-search-forwards "://" 0 h) 0)
+                  (and (>= (string-length h) 3) (char-alphabetic? (string-ref h 0))
+                       (char=? (string-ref h 1) #\:)
+                       (in? (string-ref h 2) '(#\\ #\/))))))))
+
+(define (odt-data-image href)
+  ;; the data of a picture written in its address, data:image/...;base64,
+  ;; or #f
+  (and (string? href)
+       (string-starts? (locase-all href) "data:image/")
+       (let ((i (string-search-forwards ";base64," 0 href)))
+         (and (> i 0)
+              (with d (decode-base64 (substring href (+ i 8) (string-length href)))
+                (and (string? d) (!= d "") d))))))
+
 (define (odt-frame-image x image alt)
   (let* ((href (ox-attr image 'xlink:href))
          (name (and href (odt-entry-name href)))
@@ -789,11 +817,24 @@
                      (height ,(ox-attr x 'svg:height))
                      (alt ,alt)
                      (crop ,(odt-crop x data))))))
+          ;; a picture in its address (data:image/png;base64,...)
+          ((odt-data-image href)
+           => (lambda (d)
+                (with shown (odt-image-name "image" d)
+                  (if (not shown) '()
+                   (list (office-node
+                          'image
+                          `((name ,shown)
+                            (data ,d)
+                            (width ,(ox-attr x 'svg:width))
+                            (height ,(ox-attr x 'svg:height))
+                            (alt ,alt))))))))
           ;; A picture which is not in the archive (linked) is not
           ;; fetched: as the Word reader says it, an image at its address
           ;; on the web, and else an image which is linked (its address
-          ;; is text, see officetm)
-          ((and href (!= href ""))
+          ;; is text, see officetm); a part of the archive which is not
+          ;; there is left out
+          ((odt-linked-address? href)
            (list (office-node
                    'image
                    `((name ,href)
@@ -899,6 +940,27 @@
                         (office-wrap (list x) wrappers)))
                   l)))
 
+(define (odt-first-values props)
+  ;; the properties props with the first value of each key only
+  (let ((seen (make-ahash-table)))
+    (list-filter props
+                 (lambda (p)
+                   (and (pair? p)
+                        (not (ahash-ref seen (car p)))
+                        (begin (ahash-set! seen (car p) #t) #t))))))
+
+(define (odt-same-as-style? p props style)
+  ;; whether the property p of a span, of properties props, is the one of
+  ;; its named style (an underline with its kind, a line through which
+  ;; is double or not)
+  (let ((same? (lambda (k) (equal? (assq k props) (assq k style)))))
+    (and (assq (car p) style) (equal? (odt-get style (car p)) (cdr p))
+         (case (car p)
+           ((underline) (same? 'underline-kind))
+           ((strike) (same? 'dstrike))
+           ((dstrike) (same? 'strike))
+           (else #t)))))
+
 (define (odt-inline x)
   ;; the nodes of a child of a paragraph
   (cond ((string? x) (odt-par-text (list (odt-collapse x))))
@@ -914,22 +976,32 @@
                      (named
                       (ahash-set! odt-used-styles (cons "text" named) #t)
                       (let* ((own (ahash-ref odt-styles (cons "text" name)))
-                             ;; (what the named style says already is not
-                             ;; said again: two overlines are not one)
                              (style (odt-style "text" named))
-                             (new? (lambda (p) (not (and (assq (car p) style)
-                                                         (equal? (odt-get style (car p))
-                                                                 (cdr p))))))
-                             (props (list-filter
+                             ;; (the properties of the span: its own, then
+                             ;; those of its named style, then those of
+                             ;; the paragraph; what the named style says
+                             ;; already is not said again: two overlines
+                             ;; are not one)
+                             (props (odt-first-values
                                       (append (if (and own (odt-get own 'automatic)) own '())
-                                              odt-par-props)
-                                      new?)))
+                                              style odt-par-props)))
+                             (props (list-filter props
+                                                 (lambda (p) (not (odt-same-as-style? p props style)))))
+                             ;; (upright or not bold, against the style)
+                             (off (append
+                                    (if (and (odt-get style 'em) (assq 'em props)
+                                             (not (odt-get props 'em)))
+                                        '(em) '())
+                                    (if (and (odt-get style 'strong) (assq 'strong props)
+                                             (not (odt-get props 'strong)))
+                                        '((strong "off")) '())))
+                             (wrappers (append (if (null? props) '() (odt-wrappers props '()))
+                                               off)))
                         (list `(span (@ (style ,named))
                                      ,@(odt-wrap-text
                                          (odt-span-text
                                            (lambda () (odt-inlines (ox-children x))))
-                                         (if (null? props) '()
-                                             (odt-wrappers props '())))))))
+                                         wrappers)))))
                      (else
                        (with w (odt-span-wrappers name)
                          (odt-wrap-text (odt-span-text
