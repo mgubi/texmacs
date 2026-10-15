@@ -344,8 +344,11 @@ two runs of each):
 The worst step of a repaint or a scroll is 1.1 ms (98 ms when presented at
 each repaint). In a run of 70 repaints and scrolls the store was presented
 12 times, 8 ms apart (the refreshes at 120 Hz), a present taking 0.3 ms.
-The first repaint after the start takes some 0.8 s (the first textures,
-the pipelines). The store of a canvas is transparent until painted, as the
+The first repaint after the start takes some 13 ms (the first textures
+and glyphs). The shaders are compiled in the background from the start of
+the GUI (`vue_gpu_warm_up`): when Metal has not cached them (the first
+start after an update) they take 150 to 300 ms, which the main thread no
+longer waits for. The store of a canvas is transparent until painted, as the
 bitmap was (`gpu_backing_picture (w, h, true)`: the background of the
 window shows where TeXmacs does not paint; the editors of the Vue port
 start opaque white).

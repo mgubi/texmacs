@@ -42,6 +42,7 @@
 #if !defined (USE_THORVG) && !defined (USE_METAL)
 
 bool vue_gpu_enabled () { return false; }
+void vue_gpu_warm_up () {}
 void vue_gpu_prepare () {}
 unsigned long long vue_gpu_window_flags () { return 0; }
 bool vue_gpu_follow_glyph_settings () { return false; }
@@ -239,6 +240,11 @@ vue_gpu_enabled () {
   static bool chosen= false;
   if (!chosen) { chosen= true; G.B= choose_backend (); }
   return G.B != NULL && !G.failed;
+}
+
+void
+vue_gpu_warm_up () {
+  if (vue_gpu_enabled ()) G.B->warm_up ();
 }
 
 void

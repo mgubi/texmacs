@@ -184,6 +184,11 @@ class metal_backend: public gpu_backend {
   id<MTLTexture> blank= nil;             // 1x1 white, for unused bindings
   bool failed= false;
   bool started= false;
+  // the shaders and the pipelines, compiled while TeXmacs starts (warm_up:
+  // some 0.3 s when Metal has not cached them, at the first start after an
+  // update); what went wrong, printed by prepare
+  dispatch_group_t compiling= nil;
+  NSMutableString* compile_log= nil;
   string device_name;
   // the windows, by their SDL id: their layers
   std::unordered_map<unsigned, CAMetalLayer*> layers;
@@ -200,6 +205,7 @@ class metal_backend: public gpu_backend {
   id<MTLRenderCommandEncoder> enc= nil;
   id<MTLTexture> enc_target= nil;        // what enc draws into
 
+  void compile ();
   bool init ();
   id<MTLCommandBuffer> commands ();
   void end_encoder ();
@@ -217,6 +223,7 @@ public:
 #else
   unsigned long long window_flags () { return 0; }
 #endif
+  void warm_up ();
   bool prepare ();
   bool attach (SDL_Window* w);
   bool attach_layer (void* layer);
@@ -245,12 +252,24 @@ public:
   void finish ();
 };
 
+void
+metal_backend::warm_up () {
+  if (device != nil || compiling != nil) return;
+  device= MTLCreateSystemDefaultDevice ();
+  if (device == nil) return;
+  compiling= dispatch_group_create ();
+  metal_backend* me= this;
+  dispatch_group_async (compiling,
+                        dispatch_get_global_queue (QOS_CLASS_USER_INITIATED, 0),
+                        ^{ me->compile (); });
+}
+
 bool
 metal_backend::prepare () {
   static bool done= false;
   if (done) return !failed;
   done= true;
-  device= MTLCreateSystemDefaultDevice ();
+  if (device == nil) device= MTLCreateSystemDefaultDevice ();
   if (device == nil) {
     cout << "TeXmacs] GPU: no Metal device, drawing on the CPU" << LF;
     failed= true;
@@ -258,13 +277,18 @@ metal_backend::prepare () {
   }
   // (the pipelines before any window: the Cocoa port makes the backing
   // stores of its canvases before their layers are drawn into)
+  if (compiling != nil) dispatch_group_wait (compiling, DISPATCH_TIME_FOREVER);
+  else compile ();
+  if (compile_log != nil && [compile_log length] > 0)
+    cout << [compile_log UTF8String];
   if (!init ()) { failed= true; return false; }
   started= true;
   return true;
 }
 
 static id<MTLRenderPipelineState>
-make_pipeline (id<MTLDevice> dev, id<MTLLibrary> lib, const char* vs, const char* fs) {
+make_pipeline (id<MTLDevice> dev, id<MTLLibrary> lib, const char* vs, const char* fs,
+               NSMutableString* log) {
   MTLRenderPipelineDescriptor* d= [[MTLRenderPipelineDescriptor alloc] init];
   d.vertexFunction= [lib newFunctionWithName: [NSString stringWithUTF8String: vs]];
   d.fragmentFunction= [lib newFunctionWithName: [NSString stringWithUTF8String: fs]];
@@ -281,25 +305,33 @@ make_pipeline (id<MTLDevice> dev, id<MTLLibrary> lib, const char* vs, const char
   NSError* err= nil;
   id<MTLRenderPipelineState> p= [dev newRenderPipelineStateWithDescriptor: d error: &err];
   if (p == nil)
-    cout << "TeXmacs] GPU: Metal pipeline " << fs << ": "
-         << [[err localizedDescription] UTF8String] << LF;
+    [log appendFormat: @"TeXmacs] GPU: Metal pipeline %s: %@\n",
+                       fs, [err localizedDescription]];
   return p;
+}
+
+// the shaders and the pipelines (on any thread: nothing else is touched;
+// the messages go to compile_log)
+void
+metal_backend::compile () {
+  NSMutableString* log= [NSMutableString string];
+  NSError* err= nil;
+  id<MTLLibrary> lib= [device newLibraryWithSource: [NSString stringWithUTF8String: metal_src]
+                                           options: nil error: &err];
+  if (lib == nil)
+    [log appendFormat: @"TeXmacs] GPU: the Metal shaders do not compile: %@\n",
+                       [err localizedDescription]];
+  else {
+    quad_pipe= make_pipeline (device, lib, "quad_vs", "quad_fs", log);
+    slug_pipe= make_pipeline (device, lib, "slug_vs", "slug_fs", log);
+  }
+  compile_log= log;
 }
 
 bool
 metal_backend::init () {
-  queue= [device newCommandQueue];
-  NSError* err= nil;
-  id<MTLLibrary> lib= [device newLibraryWithSource: [NSString stringWithUTF8String: metal_src]
-                                           options: nil error: &err];
-  if (lib == nil) {
-    cout << "TeXmacs] GPU: the Metal shaders do not compile: "
-         << [[err localizedDescription] UTF8String] << LF;
-    return false;
-  }
-  quad_pipe= make_pipeline (device, lib, "quad_vs", "quad_fs");
-  slug_pipe= make_pipeline (device, lib, "slug_vs", "slug_fs");
   if (quad_pipe == nil) return false;
+  queue= [device newCommandQueue];
   for (int i= 0; i < 4; i++) {
     MTLSamplerDescriptor* s= [[MTLSamplerDescriptor alloc] init];
     s.minFilter= s.magFilter= (i & 1) ? MTLSamplerMinMagFilterLinear

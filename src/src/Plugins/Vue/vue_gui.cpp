@@ -2650,6 +2650,8 @@ void gui_open (int& argc, char** argv) {
     SDL_Log ("Unable to initialize SDL: %s", SDL_GetError ());
     exit (-1);
   }
+  // the shaders of the GPU renderer (Metal), compiled while TeXmacs boots
+  vue_gpu_warm_up ();
 
 #ifdef VUE_SDL_RENDERER
   if (!TTF_Init()) {
