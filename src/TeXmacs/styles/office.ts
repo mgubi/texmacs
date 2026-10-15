@@ -60,9 +60,10 @@
     <\src-comment>
       An underline or a line through of another kind than a single line
       (double, wave, dotted, dash, thick), text whose letters are spaced,
-      and text in a font which TeXmacs does not have (shown in the family
-      of fonts which is the closest): they are shown as TeXmacs can, and
-      written as they were read.
+      text in a font which TeXmacs does not have (shown in the family of
+      fonts which is the closest), and text whose words begin with
+      capitals (shown as it is): they are shown as TeXmacs can, and written
+      as they were read.
     </src-comment>
   </active*>
 
@@ -75,6 +76,10 @@
   <assign|office-font|<macro|name|family|body|<with|font-family|<arg|family>|<arg|body>>>>
 
   <drd-props|office-font|arity|3|accessible|2>
+
+  <assign|office-capitalize|<macro|body|<arg|body>>>
+
+  <drd-props|office-capitalize|arity|1|accessible|0>
 
   <drd-props|office-underline|arity|2|accessible|1>
 

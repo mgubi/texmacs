@@ -198,7 +198,10 @@
     the headings of the file (font, size, capitals, underlines), and the
     named styles keep theirs. A double line through and the
     underlines which are not single or double are shown as single ones,
-    and the spacing of the letters is not shown. A section with another
+    and the spacing of the letters is not shown. Text in lower case, and
+    text whose words begin with capitals (kept, but shown as it is), are
+    kept in OpenDocument files; Word files have neither, and get the text
+    as it is shown. A section with another
     page than the first one is not kept.
 
     <item>A reference of an office document whose text is more than a
