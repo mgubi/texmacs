@@ -458,8 +458,15 @@
                (with runs (dx-inlines l props)
                  (if (ox-attr x 'code) (dx-field-runs (ox-attr x 'code) runs) runs)))
               ((comment) (dx-comment x))
-              ((em strong sub sup code smallcaps caps)
+              ((em strong sub sup code smallcaps)
                (dx-inlines l (cons (car x) props)))
+              ;; capitals; Word has no lower case, which is written as
+              ;; it is shown, nor first letters in capitals
+              ((caps)
+               (cond ((== (ox-attr x 'value) "lower")
+                      (dx-inlines (map dx-lower-case l) props))
+                     ((== (ox-attr x 'value) "capital") (dx-inlines l props))
+                     (else (dx-inlines l (cons 'caps props)))))
               ;; an underline or a line through of a kind, letters spaced
               ((underline)
                (dx-inlines l (if (ox-attr x 'value)
@@ -513,6 +520,15 @@
               ((image) (dx-image x))
               ((math) (dx-math x))
               (else (dx-inlines l props)))))))
+
+(define (dx-lower-case x)
+  ;; the text of x in lower case (the letters of ASCII, as TeXmacs does)
+  (cond ((string? x)
+         (list->string (map (lambda (c) (if (< (char->integer c) 128) (char-downcase c) c))
+                            (string->list x))))
+        ((and (pair? x) (eq? (car x) '@)) x)
+        ((pair? x) (cons (car x) (map dx-lower-case (cdr x))))
+        (else x)))
 
 (define (dx-inlines l props)
   (append-map (lambda (x) (dx-inline x props)) l))

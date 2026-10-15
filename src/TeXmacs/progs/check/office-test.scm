@@ -786,6 +786,30 @@
                                             0 (object->string doc)) 0))
     (check-true (>= (string-search-forwards "(office-underline \"double\" (arg \"body\"))"
                                             0 (object->string doc2)) 0)))
+  ;; lower case, and the first letters of the words in capitals
+  (let* ((auto (string-append
+                 "<style:style style:name='L' style:family='text'>"
+                 "<style:text-properties fo:text-transform='lowercase'/></style:style>"
+                 "<style:style style:name='C' style:family='text'>"
+                 "<style:text-properties fo:text-transform='capitalize'/></style:style>"))
+         (blocks (odt-blocks-of (tp (tspan "L" "ABC") " " (tspan "C" "two words")) "" auto))
+         (doc (office->texmacs (cons 'office blocks)
+                               (list (cons "office->texmacs:faithful" "on"))))
+         (odt2 (archive-entry (convert doc "texmacs-stree" "odt-document") "content.xml"))
+         (docx2 (archive-entry (convert doc "texmacs-stree" "docx-document")
+                               "word/document.xml")))
+    (check= blocks '((p (caps (@ (value "lower")) "ABC") " "
+                        (caps (@ (value "capital")) "two words"))))
+    (check= (cadr (cadr doc))
+            '(document (concat (change-case "ABC" "locase") " "
+                               (office-capitalize "two words"))))
+    (check= (cadr (cadr (office->texmacs (cons 'office blocks))))
+            '(document (concat (change-case "ABC" "locase") " two words")))
+    (check-true (export-has? odt2 "fo:text-transform=\"lowercase\""))
+    (check-true (export-has? odt2 "fo:text-transform=\"capitalize\""))
+    ;; (Word has neither: the text is written as it is shown)
+    (check-true (export-has? docx2 ">abc</w:t>"))
+    (check-false (export-has? docx2 "<w:caps/>")))
   ;; a font of OpenDocument by the name of its declaration: its family
   (check= (odt-blocks-of (tp (tspan "T1" "x"))
                          (string-append

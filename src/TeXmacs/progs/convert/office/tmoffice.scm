@@ -1237,10 +1237,16 @@
         (tmof-attr-wrap* 'font `((value ,(tmof-plain (car l)))) r))))
 
 (define (tmof-change-case l)
-  ;; capitals; the other changes of case are the text as it is
-  (if (< (length l) 2) (tmof-all l)
-      (with r (tmof (car l))
-        (if (== (cadr l) "UPCASE") (tmof-wrap 'caps r) r))))
+  ;; capitals, lower case; the first letter in capitals is the text as it is
+  (cond ((< (length l) 2) (tmof-all l))
+        ((== (cadr l) "UPCASE") (tmof-wrap 'caps (tmof (car l))))
+        ((== (cadr l) "locase") (tmof-attr-wrap* 'caps '((value "lower")) (tmof (car l))))
+        (else (tmof (car l)))))
+
+(define (tmof-office-capitalize l)
+  ;; the first letters of the words in capitals
+  (if (null? l) '()
+      (tmof-attr-wrap* 'caps '((value "capital")) (tmof (car l)))))
 
 (define (tmof-office-comment l)
   (if (< (length l) 3) '()
@@ -1930,6 +1936,7 @@
   (office-letters tmof-office-letters)
   (office-font tmof-office-font-tag)
   (change-case tmof-change-case)
+  (office-capitalize tmof-office-capitalize)
   (part tmof-part-numbered)
   (part-numbered-title tmof-part-numbered-title)
   (chapter tmof-chapter-numbered)

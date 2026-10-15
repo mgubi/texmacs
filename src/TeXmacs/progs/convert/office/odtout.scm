@@ -98,15 +98,16 @@
                               caps dstrike)
                             (lambda (t) (in? t props))))
          (ukind (with c (assq 'ukind (list-filter props pair?)) (and c (cadr c))))
+         (tcase (with c (assq 'tcase (list-filter props pair?)) (and c (cadr c))))
          (letters (with c (assq 'letters (list-filter props pair?)) (and c (cadr c))))
          (color (with c (assq 'color (list-filter props pair?)) (and c (cadr c))))
          (parent (with c (assq 'rstyle (list-filter props pair?)) (and c (cadr c))))
          (size (with c (assq 'size (list-filter props pair?)) (and c (cadr c))))
          (font (with c (assq 'font (list-filter props pair?)) (and c (cadr c))))
          (shade (with c (assq 'shade (list-filter props pair?)) (and c (cadr c))))
-         (key (cons 'text (cons* parent size font shade ukind letters (cons color tags)))))
-    (cond ((and parent (null? tags) (not (or color size font shade ukind letters))) parent)
-          ((not (or (pair? tags) color size font shade ukind letters)) #f)
+         (key (cons 'text (cons* parent size font shade ukind letters tcase (cons color tags)))))
+    (cond ((and parent (null? tags) (not (or color size font shade ukind letters tcase))) parent)
+          ((not (or (pair? tags) color size font shade ukind letters tcase)) #f)
           (else
          (ot-style
            key "T"
@@ -142,7 +143,10 @@
                              (style:text-line-through-type
                                ,(if (in? 'dstrike tags) "double" "single")))
                            '())
-                     ,@(if (in? 'caps tags) '((fo:text-transform "uppercase")) '())
+                     ,@(cond ((in? 'caps tags) '((fo:text-transform "uppercase")))
+                             ((== tcase "lower") '((fo:text-transform "lowercase")))
+                             ((== tcase "capital") '((fo:text-transform "capitalize")))
+                             (else '()))
                      ,@(if letters `((fo:letter-spacing ,(string-append letters "pt"))) '())
                      ,@(cond ((in? 'sup tags) '((style:text-position "super 58%")))
                              ((in? 'sub tags) '((style:text-position "sub 58%")))
@@ -414,8 +418,13 @@
         (else
           (let ((l (ox-children x)))
             (case (car x)
-              ((em strong sub sup code smallcaps caps)
+              ((em strong sub sup code smallcaps)
                (ot-inlines l (cons (car x) props)))
+              ;; capitals, lower case, first letters in capitals
+              ((caps)
+               (ot-inlines l (if (in? (ox-attr x 'value) '("lower" "capital"))
+                                 (cons (list 'tcase (ox-attr x 'value)) props)
+                                 (cons 'caps props))))
               ;; an underline or a line through of a kind, letters spaced
               ((underline)
                (ot-inlines l (if (ox-attr x 'value)

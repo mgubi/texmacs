@@ -348,9 +348,17 @@
          (t (cond ((not (get 'strike)) t)
                   ((get 'dstrike) `(office-strike "double" ,t))
                   (else `(strike-through ,t))))
-         (t (if (get 'caps) `(change-case ,t "UPCASE") t))
+         (t (oftm-case (get 'caps) t))
          (t (if (office-number (get 'letters)) `(office-letters ,(get 'letters) ,t) t)))
     (if (null? vars) t `(with ,@vars ,t))))
+
+(define (oftm-case kind t)
+  ;; the text t in capitals, in lower case, or with the first letters of
+  ;; its words in capitals (which the style office keeps, but does not show)
+  (cond ((not kind) t)
+        ((== kind "lower") `(change-case ,t "locase"))
+        ((== kind "capital") (if oftm-faithful? `(office-capitalize ,t) t))
+        (else `(change-case ,t "UPCASE"))))
 
 (define (oftm-style-paragraph st t)
   ;; the paragraph t in the look of the node style st
@@ -670,7 +678,7 @@
               ;; capitals, the spacing of the letters
               ((caps)
                (with t (oftm-inlines l)
-                 (if (== t "") '() (list `(change-case ,t "UPCASE")))))
+                 (if (== t "") '() (list (oftm-case (or (ox-attr x 'value) "true") t)))))
               ((letters)
                (with t (oftm-inlines l)
                  (cond ((== t "") '())
