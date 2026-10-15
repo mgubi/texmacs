@@ -679,10 +679,20 @@ simplify_execed (tree t) {
   else return r;
 }
 
+// the conversion to the office formats keeps the references to pages, with
+// their page, since the office programs compute these pages again
+static bool keep_pagerefs= false;
+
 static tree
 expand_references (tree t, hashmap<string,tree> h, hashmap<string,tree> g) {
   // h: the references of the buffer, g: those of its project
   if (is_atomic (t)) return t;
+  if (keep_pagerefs && is_func (t, PAGEREF) && N(t) >= 1) {
+    string ref= as_string (simplify_execed (t[0]));
+    if (h->contains (ref)) return tree (PAGEREF, ref, copy (h[ref][1]));
+    if (g->contains (ref)) return tree (PAGEREF, ref, copy (g[ref][1]));
+    return tree (PAGEREF, ref);
+  }
   if (is_func (t, REFERENCE, 1) || is_func (t, PAGEREF)) {
     string ref= as_string (simplify_execed (t[0]));
     int which= is_func (t, REFERENCE, 1)? 0: 1;
@@ -838,6 +848,32 @@ edit_typeset_rep::exec_markdown (tree t, path p) {
 tree
 edit_typeset_rep::exec_markdown (tree t) {
   return exec_markdown (t, rp * 0);
+}
+
+/******************************************************************************
+* The same for the office formats (.docx, .odt): the macros which their
+* converter knows are those of (tmoffice-env-patch).
+******************************************************************************/
+
+tree
+edit_typeset_rep::exec_office (tree t, path p) {
+  t= convert_OTS1_symbols_to_universal_encoding (t);
+  if (p == (rp * 0)) typeset_preamble ();
+  typeset_exec_until (p);
+  hashmap<string,tree> H= copy (cur[p]);
+  tree patch= as_tree (eval ("(stree->tree (tmoffice-env-patch))"));
+  hashmap<string,tree> P (UNINIT, patch);
+  H->join (P);
+  prefix_specific (H, "tmoffice-");
+  keep_pagerefs= true;
+  tree r= exec (t, H);
+  keep_pagerefs= false;
+  return r;
+}
+
+tree
+edit_typeset_rep::exec_office (tree t) {
+  return exec_office (t, rp * 0);
 }
 
 static tree
