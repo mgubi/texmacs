@@ -132,7 +132,8 @@
           ((char=? c #\])
            (or (and next (in? next '(#\( #\:)))
                (and (> i 1) (in? prev '(#\space #\x #\X))
-                    (char=? (string-ref s (- i 2)) #\[))))
+                    (char=? (string-ref s (- i 2)) #\[))
+               (mdout-ref-label? s i)))
           ((char=? c #\^) (and prev (char=? prev #\[)))
           ;; inside a word, _ is not emphasis
           ((char=? c #\_)
@@ -150,6 +151,45 @@
            (if (and next (char=? next #\/)) (set! mdout-address? #t))
            #f)
           (else #f))))
+
+;; the labels of the definitions of links which the text keeps: [label] in
+;; the text would be a link to them
+(define mdout-ref-labels '())
+
+(define (mdout-label s)
+  ;; a label as it is compared: in lowercase, with one space for several
+  (let loop ((l (string->list (string-trim-spaces (locase-all s))))
+             (acc '()) (sp? #f))
+    (cond ((null? l) (list->string (reverse acc)))
+          ((in? (car l) '(#\space #\tab #\newline))
+           (loop (cdr l) (if sp? acc (cons #\space acc)) #t))
+          (else (loop (cdr l) (cons (car l) acc) #f)))))
+
+(define (mdout-ref-label? s i)
+  ;; does the ] at i close a [ which holds one of these labels?
+  (and (nnull? mdout-ref-labels)
+       (let loop ((j (- i 1)))
+         (cond ((< j 0) #f)
+               ((char=? (string-ref s j) #\]) #f)
+               ((char=? (string-ref s j) #\[)
+                (in? (mdout-label (substring s (+ j 1) i)) mdout-ref-labels))
+               (else (loop (- j 1)))))))
+
+(define (mdout-collect-labels x)
+  ;; the labels of the definitions (ref-def "[label]: address") in x, also
+  ;; of those which the text of a file keeps (as HTML of a block)
+  (cond ((and (pair? x) (in? (car x) '(ref-def html)))
+         (let* ((t (string-trim-spaces
+                     (mdout-join (list-filter (cdr x) string?) "")))
+                (b (string-search-forwards "]:" 0 t)))
+           (if (and (string-starts? t "[") (not (string-starts? t "[^"))
+                    (> b 1))
+               (list (mdout-label (substring t 1 b)))
+               '())))
+        ((and (pair? x) (in? (car x) '(!file markdown blockquote ul ol li
+                                       footnote-def)))
+         (append-map mdout-collect-labels (mdout-children x)))
+        (else '())))
 
 ;; whether the text of a link is written: an address in it stays text
 (define mdout-in-link? #f)
@@ -233,8 +273,10 @@
 (define (mdout-escape-start s)
   ;; a line of a paragraph, which must not start as another block
   (let* ((n (string-length s))
+         ;; (the spaces and tabs which start the line would make code of it)
          (i (let loop ((i 0))
-              (if (and (< i n) (char=? (string-ref s i) #\space)) (loop (+ i 1)) i)))
+              (if (and (< i n) (in? (string-ref s i) '(#\space #\tab)))
+                  (loop (+ i 1)) i)))
          (t (substring s i n))
          (m (string-length t))
          (follows? (lambda (j) (or (>= j m) (char=? (string-ref t j) #\space)))))
@@ -284,20 +326,40 @@
                              (!= (string-trim-spaces s) ""))))))
     (string-append q (if pad? " " "") s (if pad? " " "") q)))
 
+(define (mdout-literal s)
+  ;; the text of an address or of a title, which the reader takes the
+  ;; backslashes before punctuation and the entities away from
+  (let ((n (string-length s)))
+    (let loop ((i 0) (start 0) (acc '()))
+      (cond ((>= i n)
+             (if (null? acc) s
+                 (apply string-append (reverse (cons (substring s start n) acc)))))
+            ;; (a backslash at the end would be before the ) or the " which
+            ;; ends the address or the title)
+            ((and (char=? (string-ref s i) #\\)
+                  (or (== (+ i 1) n) (mdout-punctuation? (string-ref s (+ i 1)))))
+             (loop (+ i 1) (+ i 1) (cons* "\\\\" (substring s start i) acc)))
+            ((and (char=? (string-ref s i) #\&)
+                  (let ((e (string-index (substring s i (min n (+ i 12))) #\;)))
+                    (and e (> e 1))))
+             (loop (+ i 1) (+ i 1) (cons* "&amp;" (substring s start i) acc)))
+            (else (loop (+ i 1) start acc))))))
+
 (define (mdout-url s)
-  ;; an address with spaces or parentheses is written between < and >,
-  ;; where these two are written after a backslash
-  (if (or (string-index s #\space) (string-index s #\() (string-index s #\)))
-      (string-append "<" (string-replace (string-replace s "<" "\\<")
-                                         ">" "\\>")
-                     ">")
-      s))
+  ;; an address with spaces or parentheses, or which starts with <, is
+  ;; written between < and >, where these two are written after a backslash
+  (let ((s (mdout-literal s)))
+    (if (or (string-index s #\space) (string-index s #\() (string-index s #\))
+            (mdout-starts? s 0 "<"))
+        (string-append "<" (string-replace (string-replace s "<" "\\<")
+                                           ">" "\\>")
+                       ">")
+        s)))
 
 (define (mdout-title s)
   (if (or (not s) (== s "")) ""
       (string-append " \""
-                     (string-replace (string-replace s "\\" "\\\\")
-                                     "\"" "\\\"")
+                     (string-replace (mdout-literal s) "\"" "\\\"")
                      "\"")))
 
 (define (mdout-html-attr x name)
@@ -365,7 +427,22 @@
         (string-append (substring s 0 i) open (substring s i j) close
                        (substring s j n)))))
 
+;; the kinds of emphasis which the text that is written is inside: *a *b**
+;; would not be read as emphasis inside emphasis, which is emphasis too
+(define mdout-open '())
+
+(define (mdout-mark x)
+  (cond ((func? x 'em) "*") ((func? x 'strong) "**") (else "~~")))
+
 (define (mdout-emphasis x cell? before? after?)
+  (if (in? (car x) mdout-open) (mdout-inlines (mdout-children x) cell?)
+      (with old mdout-open
+        (set! mdout-open (cons (car x) mdout-open))
+        (with r (mdout-emphasis* x cell? before? after?)
+          (set! mdout-open old)
+          r))))
+
+(define (mdout-emphasis* x cell? before? after?)
   ;; emphasis, after a letter or a digit when before? and followed by one
   ;; when after?. Its * would not open before punctuation then, or not
   ;; close after punctuation: the punctuation of its ends goes outside
@@ -460,32 +537,76 @@
               ((footnote) (string-append "[^" (mdout-join l "") "]"))
               (else (mdout-inlines l cell?)))))))
 
+(define (mdout-utf8-start s)
+  ;; where the last character of the string of UTF-8 s starts
+  (let loop ((j (- (string-length s) 1)))
+    (if (and (> j 0) (with c (char->integer (string-ref s j))
+                       (and (>= c 128) (< c 192))))
+        (loop (- j 1)) j)))
+
+(define (mdout-entity s)
+  ;; the character of UTF-8 s as an entity, which is punctuation for the
+  ;; reader as markup goes
+  (let* ((b (map char->integer (string->list s)))
+         (code (if (< (car b) 128) (car b)
+                   (let loop ((v (cond ((< (car b) 224) (- (car b) 192))
+                                       ((< (car b) 240) (- (car b) 224))
+                                       (else (- (car b) 240))))
+                              (l (cdr b)))
+                     (if (null? l) v (loop (+ (* v 64) (- (car l) 128)) (cdr l)))))))
+    (string-append "&#" (number->string code) ";")))
+
+(define (mdout-first-entity x cell?)
+  ;; the text x, whose first character is written as an entity
+  (let* ((c (char->integer (string-ref x 0)))
+         (e (min (string-length x)
+                 (cond ((< c 192) 1) ((< c 224) 2) ((< c 240) 3) (else 4)))))
+    (string-append (mdout-entity (substring x 0 e))
+                   (mdout-escape (substring x e (string-length x)) cell?))))
+
 (define (mdout-inlines l cell?)
   ;; the text of the nodes, each one written with a look at its neighbours
   (if (and (pair? l) (null? (cdr l))) (mdout-inline (car l) cell?)
-      (let loop ((l l) (prev #f) (acc '()))
-        ;; prev: the node before, acc: the texts so far, the last one first
+      (let loop ((l l) (prev #f) (acc '()) (entity? #f))
+        ;; prev: the node before, acc: the texts so far, the last one first,
+        ;; entity?: whether the first character of a text which follows is
+        ;; written as an entity
         (if (null? l) (apply string-append (reverse acc))
             (let* ((x (car l))
-                   (s (cond ((and (pair? x) (in? (car x) '(em strong del)))
-                             (mdout-emphasis
-                               x cell?
-                               (and (nnull? acc) (mdout-alnum? (mdout-last (car acc))))
-                               (and (nnull? (cdr l)) (string? (cadr l))
-                                    (!= (cadr l) "")
-                                    (mdout-alnum? (string-ref (cadr l) 0)))))
-                            ;; a $ before a digit would not close the formula:
-                            ;; the digit is written as its entity
-                            ((and (string? x) (func? prev 'math) (!= x "")
-                                  (mdout-digit? (string-ref x 0)))
-                             (string-append
-                               "&#"
-                               (number->string (char->integer (string-ref x 0)))
-                               ";"
-                               (mdout-escape (substring x 1 (string-length x))
-                                             cell?)))
-                            (else (mdout-inline x cell?)))))
-              (cond ((== s "") (loop (cdr l) prev acc))
+                   (em? (and (pair? x) (in? (car x) '(em strong del))))
+                   (before? (and (nnull? acc) (mdout-alnum? (mdout-last (car acc)))))
+                   (after? (and (nnull? (cdr l)) (string? (cadr l))
+                                (!= (cadr l) "")
+                                (mdout-alnum? (string-ref (cadr l) 0))))
+                   (s (cond (em? (mdout-emphasis x cell? before? after?))
+                            ;; a $ before a digit would not close the formula,
+                            ;; and the * of emphasis which ends with code
+                            ;; would not close before a letter: the character
+                            ;; is written as its entity
+                            ((and (string? x) (!= x "")
+                                  (or entity?
+                                      (and (func? prev 'math)
+                                           (mdout-digit? (string-ref x 0)))))
+                             (mdout-first-entity x cell?))
+                            (else (mdout-inline x cell?))))
+                   (mark (and em? (not (in? (car x) mdout-open)) (mdout-mark x)))
+                   (n (string-length s))
+                   (m (if mark (string-length mark) 0))
+                   ;; emphasis which starts with code after a letter: its *
+                   ;; would not open, but it does after an entity
+                   (open? (and mark before? (string? prev) (> n m)
+                               (mdout-starts? s 0 mark)
+                               (mdout-punctuation? (string-ref s m))))
+                   (close? (and mark after? (> n m)
+                                (mdout-starts? s (- n m) mark)
+                                (mdout-punctuation? (string-ref s (- n m 1)))))
+                   (acc (if (not open?) acc
+                            (with j (mdout-utf8-start (car acc))
+                              (cons* (mdout-entity (substring (car acc) j
+                                                              (string-length (car acc))))
+                                     (substring (car acc) 0 j)
+                                     (cdr acc))))))
+              (cond ((== s "") (loop (cdr l) prev acc entity?))
                     ;; text which ends with ! before a link: not an image
                     ((and (string? prev) (char=? (string-ref s 0) #\[)
                           (char=? (mdout-last (car acc)) #\!))
@@ -493,8 +614,9 @@
                            (cons* s "\\!"
                                   (substring (car acc) 0
                                              (- (string-length (car acc)) 1))
-                                  (cdr acc))))
-                    (else (loop (cdr l) x (cons s acc)))))))))
+                                  (cdr acc))
+                           close?))
+                    (else (loop (cdr l) x (cons s acc) close?))))))))
 
 (define (mdout-last s) (string-ref s (- (string-length s) 1)))
 
@@ -547,10 +669,14 @@
                     (cons key seen)))))))
 
 (define (mdout-pre x)
+  ;; between backquotes, or between tildes when the words after the fence
+  ;; hold a backquote
   (let* ((s (mdout-join (list-filter (mdout-children x) string?) ""))
-         (n (max 3 (+ (mdout-longest-run s #\`) 1)))
-         (fence (make-string n #\`)))
-    `(,(string-append fence (or (mdout-attr x 'info) (mdout-attr x 'lang) ""))
+         (info (or (mdout-attr x 'info) (mdout-attr x 'lang) ""))
+         (c (if (string-index info #\`) #\~ #\`))
+         (n (max 3 (+ (mdout-longest-run s c) 1)))
+         (fence (make-string n c)))
+    `(,(string-append fence info)
       ,@(mdout-split s)
       ,fence)))
 
@@ -582,7 +708,23 @@
            (and (func? b 'p) (in? (car a) '(p blockquote ul ol)))
            (and (func? b 'table) (in? (car a) '(blockquote ul ol)))
            (and (func? a 'blockquote) (func? b 'blockquote))
-           (and (func? a 'p) (in? (car b) '(html footnote-def ref-def))))))
+           (and (func? a 'p) (in? (car b) '(html footnote-def ref-def)))
+           ;; a list which does not interrupt a paragraph: one whose number
+           ;; is not 1, or whose first item is empty
+           (and (func? a 'p) (in? (car b) '(ul ol))
+                (or (and (func? b 'ol) (mdout-attr b 'start)
+                         (!= (mdout-attr b 'start) "1"))
+                    (with l (mdout-children b)
+                      (or (null? l) (mdout-empty-item? (car l)))))))))
+
+(define (mdout-empty-item? x)
+  ;; an item which nothing is written in
+  (list-and (map (lambda (y)
+                   (or (== y "")
+                       (and (func? y 'p)
+                            (list-and (map (lambda (z) (== z ""))
+                                           (mdout-children y))))))
+                 (mdout-children x))))
 
 (define (mdout-loose? x)
   ;; a list is written with blank lines between its items when it had some,
@@ -774,6 +916,7 @@
   (let* ((file? (func? x '!file 1))
          (x (if file? (cadr x) x))
          (l (if (func? x 'markdown) (cdr x) (list x))))
+    (set! mdout-ref-labels (mdout-collect-labels x))
     ;; (a file is blocks, also when it is a formula or HTML alone)
     (if (or (list-or (map mdout-block? l)) (and file? (nnull? l)))
         (string-append (mdout-join (mdout-blocks l #t) "\n") "\n")
