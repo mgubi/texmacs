@@ -1257,8 +1257,10 @@
       (let* ((code (tmof-plain (car l)))
              (r (tmof (cadr l))))
         (if (func? (cadr l) 'document)
-            ;; (a field over several paragraphs, such as a bibliography)
-            `((field-blocks (@ (code ,code)) ,@(tmof-blocks r)))
+            ;; (a field over several paragraphs, such as a bibliography;
+            ;; an element of OpenDocument is its attribute xml)
+            `((field-blocks (@ ,(if (string-starts? code "<") `(xml ,code) `(code ,code)))
+                            ,@(tmof-blocks r)))
             `((field (@ ,@(if (string-starts? code "<") `((xml ,code)) `((code ,code))))
                      ,@(tmof-merge r)))))))
 
@@ -2550,8 +2552,9 @@
 ;; The named styles of the document, for the files of another format than
 ;; the one it was read from, and for those of a document of the style
 ;; office without its file: from the macros office-par-name and
-;; office-span-name of the document (see oftm-style-macros), and from the
-;; file it was read from, which its reader reads again.
+;; office-span-name of the document (see oftm-style-macros). The writers
+;; complete them with the styles of the file of the other format which the
+;; document was read from (office-package-styles, office-merged-styles).
 
 (define (tmof-style-points s)
   ;; the length s ("12pt", "1fn") in points, as a decimal, or #f
@@ -2599,14 +2602,21 @@
                                (else '()))))
                  (loop (cddr l) (append (reverse a) acc))))))
         ((func? x 'surround 3)
-         (let ((before (and (func? (cadr x) 'vspace*) (tmof-style-points (cadadr x))))
-               (after (and (func? (caddr x) 'vspace) (tmof-style-points (cadr (caddr x))))))
+         ;; (a macro which was edited may hold anything: what is not read
+         ;; is left out)
+         (let ((before (and (func? (cadr x) 'vspace*) (pair? (cdadr x))
+                            (tmof-style-points (cadadr x))))
+               (after (and (func? (caddr x) 'vspace) (pair? (cdr (caddr x)))
+                           (tmof-style-points (cadr (caddr x))))))
            (append (if before `((space-before ,before)) '())
                    (if after `((space-after ,after)) '())
                    (tmof-style-attrs (cadddr x)))))
         ((func? x 'underline 1) (cons '(underline "true") (tmof-style-attrs (cadr x))))
+        ((func? x 'overline 1) (cons '(overline "true") (tmof-style-attrs (cadr x))))
         ((func? x 'office-underline 2)
-         (cons* '(underline "true") `(underline-kind ,(cadr x)) (tmof-style-attrs (caddr x))))
+         (cons* '(underline "true")
+                (append (if (string? (cadr x)) `((underline-kind ,(cadr x))) '())
+                        (tmof-style-attrs (caddr x)))))
         ((func? x 'strike-through 1) (cons '(strike "true") (tmof-style-attrs (cadr x))))
         ((func? x 'office-strike 2)
          (cons* '(strike "true") '(dstrike "true") (tmof-style-attrs (caddr x))))
@@ -2614,9 +2624,18 @@
          (append (if (== (caddr x) "UPCASE") '((caps "true")) '())
                  (tmof-style-attrs (cadr x))))
         ((func? x 'office-letters 2)
-         (cons `(letters ,(cadr x)) (tmof-style-attrs (caddr x))))
-        ((in? (car x) '(ornamented office-capitalize)) (tmof-style-attrs (cAr x)))
+         (append (if (string? (cadr x)) `((letters ,(cadr x))) '())
+                 (tmof-style-attrs (caddr x))))
+        ((and (in? (car x) '(ornamented office-capitalize)) (pair? (cdr x)))
+         (tmof-style-attrs (cAr x)))
         (else '())))
+
+(define (tmof-unique-attrs l)
+  ;; the attributes l, each once: the last one counts (the innermost with)
+  (let loop ((l (reverse l)) (acc '()))
+    (cond ((null? l) acc)
+          ((assq (caar l) acc) (loop (cdr l) acc))
+          (else (loop (cdr l) (cons (car l) acc))))))
 
 (define (tmof-macro-styles init)
   ;; the nodes style of the macros of the named styles of the document
@@ -2627,48 +2646,22 @@
              (span? (string-starts? name "office-span-"))
              (m (cdr kv)))
         (if (and (or par? span?) (func? m 'macro 2))
-            (let ((id (substring name (if par? 11 12) (string-length name))))
+            (let ((id (substring name (if par? 11 12) (string-length name)))
+                  ;; (a macro which cannot be read gives a style without
+                  ;; properties, never an error)
+                  (attrs (catch #t (lambda () (tmof-style-attrs (caddr m)))
+                                (lambda args '()))))
               (if (== id "") '()
                   (list (office-node 'style
                                      (append `((name ,id) (family ,(if par? "paragraph" "text")))
-                                             (tmof-style-attrs (caddr m)))))))
+                                             (tmof-unique-attrs attrs))))))
             '())))
     init))
 
-(define tmof-package-styles-cache (cons #f '()))
-
-(define (tmof-package-styles init)
-  ;; the nodes style of the file the document was read from, as its reader
-  ;; reads them
-  (with p (assoc-ref init "office-package")
-    (if (not (and (func? p 'tuple 2) (in? (cadr p) '("docx" "odt"))
-                  (func? (caddr p) 'raw-data 1) (string? (cadr (caddr p)))))
-        '()
-        (let ((data (cadr (caddr p))))
-          (if (and (string? (car tmof-package-styles-cache))
-                   (== (car tmof-package-styles-cache) data))
-              (cdr tmof-package-styles-cache)
-              (let* ((office (catch #t
-                               (lambda ()
-                                 (convert data (string-append (cadr p) "-document")
-                                          "office-stree"))
-                               (lambda args #f)))
-                     (l (if (func? office 'office) (cdr office) '()))
-                     (r (append-map ox-children
-                                    (list-filter l (lambda (y) (func? y 'styles))))))
-                (set! tmof-package-styles-cache (cons data r))
-                r))))))
-
 (define (tmof-styles init)
-  ;; the node styles of the document: those of its macros (which may have
-  ;; been edited), and the others of its file
-  (let* ((mine (tmof-macro-styles init))
-         (key (lambda (st) (cons (ox-attr st 'family) (ox-attr st 'name))))
-         (keys (map key mine))
-         (theirs (list-filter (tmof-package-styles init)
-                              (lambda (st) (and (func? st 'style)
-                                                (not (in? (key st) keys))))))
-         (all (append mine theirs)))
+  ;; the node styles of the macros of the document (which may have been
+  ;; edited)
+  (with all (tmof-macro-styles init)
     (if (null? all) '() `((styles ,@all)))))
 
 (define (tmof-initial x)

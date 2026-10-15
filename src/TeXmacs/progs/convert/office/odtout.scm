@@ -71,8 +71,18 @@
   (if (== name "") ""
       (ot-named-style* name family)))
 
+(define ot-own-names #f) ; the names of the styles of TeXmacs (Standard...)
+
+(define (ot-own-name? safe)
+  ;; whether safe is the name of a style which the files of TeXmacs have
+  (when (not ot-own-names)
+    (set! ot-own-names
+          (with x (ox-child (ot-styles-file) 'office:styles)
+            (if x (map (lambda (y) (or (ox-attr y 'style:name) "")) (ox-elements x)) '()))))
+  (in? safe ot-own-names))
+
 (define (ot-named-style* name family)
-  (let* ((safe (apply string-append
+  (let* ((safe0 (apply string-append
                       (map (lambda (c)
                              (let ((n (char->integer c)))
                                (if (or (char-alphabetic? c) (char-numeric? c)
@@ -80,13 +90,24 @@
                                    (char->string c)
                                    (string-append "_" (number->string n 16) "_"))))
                            (string->list name))))
-         (safe (if (and (> (string-length safe) 0)
-                        (let ((c (string-ref safe 0)))
-                          (or (char-alphabetic? c) (char=? c #\_)
-                              (>= (char->integer c) 128))))
-                   safe (string-append "_" safe))))
+         (safe1 (if (and (> (string-length safe0) 0)
+                         (let ((c (string-ref safe0 0)))
+                           (or (char-alphabetic? c) (char=? c #\_)
+                               (>= (char->integer c) 128))))
+                    safe0 (string-append "_" safe0)))
+         ;; (a style of a file of Word whose name is the one of a style of
+         ;; TeXmacs, such as Standard, is another one: Standard_20_2,
+         ;; whose name to show is Standard 2)
+         (other? (and (not ot-package)
+                      (ot-source-style name (if (== family "paragraph") "paragraph" "text"))
+                      (ot-own-name? safe1)))
+         (safe (if other? (string-append safe1 "_20_2") safe1)))
     (when (and (!= name "") (not (assoc safe ot-used-styles)))
-      (set! ot-used-styles (cons (list safe family name) ot-used-styles)))
+      (set! ot-used-styles
+            (cons (if other?
+                      (list safe family name (string-append (office-odf-name safe1) " 2"))
+                      (list safe family name))
+                  ot-used-styles)))
     safe))
 
 (define ot-source-styles '()) ; the nodes style of the document
@@ -161,6 +182,10 @@
             ,@(if (== kind "double") '((style:text-underline-type "double")) '())
             (style:text-underline-width "auto") (style:text-underline-color "font-color"))
           '())
+      (if (get 'overline)
+          '((style:text-overline-style "solid") (style:text-overline-width "auto")
+            (style:text-overline-color "font-color"))
+          '())
       (if (get 'strike)
           `((style:text-line-through-style "solid")
             ,@(if (get 'dstrike) '((style:text-line-through-type "double")) '()))
@@ -170,7 +195,9 @@
   ;; the named style u (name family display) with the properties of the
   ;; node style st (#f for none), after the usual one
   (let ((par? (== (cadr u) "paragraph"))
-        (display (or (and st (ox-attr st 'display)) (caddr u))))
+        (display (cond ((pair? (cdddr u)) (cadddr u))
+                       ((and st (ox-attr st 'display)) => identity)
+                       (else (caddr u)))))
     `(style:style
        (@ (style:name ,(car u)) (style:family ,(cadr u))
           ,@(if (!= display (car u)) `((style:display-name ,display)) '())
@@ -411,9 +438,15 @@
                        (else "paragraph")))
          (offset (lambda (k) (with v (ox-attr x k)
                                (if (and (string? v) (!= v "")) v "0cm")))))
-    (if (not (or data (office-web-address? (ox-attr x 'name)))) '()
+    (if (not (or data (office-web-address? (ox-attr x 'name))
+                 ;; (a picture which the file read linked to: the same)
+                 (and (== (ox-attr x 'linked) "true") (string? (ox-attr x 'name))
+                      (!= (ox-attr x 'name) ""))))
+        '()
         ;; (a picture on the web: a frame which links to its address)
-        (let* ((files (if data (ot-image-files x n) (list (ox-attr x 'name) #f)))
+        (let* ((files (if data (ot-image-files x n)
+                          ;; (%XX for what an address cannot hold)
+                          (list (office-uri (ox-attr x 'name)) #f)))
                (file (car files))
                (svg (cadr files))
                (svg-file (cadr files)))
@@ -815,7 +848,7 @@
                      (el (and (ox-attr x 'xml)
                               (catch #t (lambda () (ox-root (parse-xml (ox-attr x 'xml))))
                                      (lambda args #f)))))
-                 (if (and el (pair? el) (symbol? (car el)))
+                 (if (and el (pair? el) (symbol? (car el)) (ot-declared? el))
                      (list (append el (append-map (lambda (y)
                                                     (if (func? y 'text:span) (ox-children y)
                                                         (list y)))
@@ -1270,6 +1303,9 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define ot-namespaces
+  ;; all those of the format, as LibreOffice declares them: the elements
+  ;; which are kept from the file which the text was read from (the styles
+  ;; of numbers, the fields) may have any of them
   '((xmlns:office "urn:oasis:names:tc:opendocument:xmlns:office:1.0")
     (xmlns:style "urn:oasis:names:tc:opendocument:xmlns:style:1.0")
     (xmlns:text "urn:oasis:names:tc:opendocument:xmlns:text:1.0")
@@ -1279,6 +1315,32 @@
     (xmlns:xlink "http://www.w3.org/1999/xlink")
     (xmlns:svg "urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0")
     (xmlns:dc "http://purl.org/dc/elements/1.1/")
+    (xmlns:meta "urn:oasis:names:tc:opendocument:xmlns:meta:1.0")
+    (xmlns:number "urn:oasis:names:tc:opendocument:xmlns:datastyle:1.0")
+    (xmlns:chart "urn:oasis:names:tc:opendocument:xmlns:chart:1.0")
+    (xmlns:dr3d "urn:oasis:names:tc:opendocument:xmlns:dr3d:1.0")
+    (xmlns:math "http://www.w3.org/1998/Math/MathML")
+    (xmlns:form "urn:oasis:names:tc:opendocument:xmlns:form:1.0")
+    (xmlns:script "urn:oasis:names:tc:opendocument:xmlns:script:1.0")
+    (xmlns:of "urn:oasis:names:tc:opendocument:xmlns:of:1.2")
+    (xmlns:xhtml "http://www.w3.org/1999/xhtml")
+    (xmlns:grddl "http://www.w3.org/2003/g/data-view#")
+    (xmlns:ooo "http://openoffice.org/2004/office")
+    (xmlns:ooow "http://openoffice.org/2004/writer")
+    (xmlns:oooc "http://openoffice.org/2004/calc")
+    (xmlns:dom "http://www.w3.org/2001/xml-events")
+    (xmlns:xforms "http://www.w3.org/2002/xforms")
+    (xmlns:xsd "http://www.w3.org/2001/XMLSchema")
+    (xmlns:xsi "http://www.w3.org/2001/XMLSchema-instance")
+    (xmlns:rpt "http://openoffice.org/2005/report")
+    (xmlns:officeooo "http://openoffice.org/2009/office")
+    (xmlns:tableooo "http://openoffice.org/2009/table")
+    (xmlns:drawooo "http://openoffice.org/2010/draw")
+    (xmlns:calcext "urn:org:documentfoundation:names:experimental:calc:xmlns:calcext:1.0")
+    (xmlns:loext "urn:org:documentfoundation:names:experimental:office:xmlns:loext:1.0")
+    (xmlns:field "urn:openoffice:names:experimental:ooo-ms-interop:xmlns:field:1.0")
+    (xmlns:formx "urn:openoffice:names:experimental:ooxml-odf-interop:xmlns:form:1.0")
+    (xmlns:css3t "http://www.w3.org/TR/css3-text/")
     (office:version "1.3")))
 
 (define ot-fonts
@@ -1468,6 +1530,27 @@
      (office:master-styles
        (style:master-page (@ (style:name "Standard") (style:page-layout-name "pm1"))))))
 
+(define (ot-prefix-declared? sym)
+  ;; whether the prefix of the name sym (text:p) is declared by the files
+  (let* ((s (symbol->string sym))
+         (i (string-search-forwards ":" 0 s)))
+    (or (< i 0)
+        (with prefix (substring s 0 i)
+          (or (in? prefix '("xml" "xmlns"))
+              (assoc (string->symbol (string-append "xmlns:" prefix)) ot-namespaces))))))
+
+(define (ot-declared? x)
+  ;; whether the prefixes of the names of the element x of a file which
+  ;; is kept are declared by the files which are written
+  (cond ((not (pair? x)) #t)
+        ((not (symbol? (car x))) #t)
+        ((eq? (car x) '@)
+         (list-and (map (lambda (a) (or (not (pair? a)) (not (symbol? (car a)))
+                                        (ot-prefix-declared? (car a))))
+                        (cdr x))))
+        (else (and (ot-prefix-declared? (car x))
+                   (list-and (map ot-declared? (cdr x)))))))
+
 (define (ot-data-style? x)
   ;; a style of numbers, dates, times... (number:date-style)
   (and (pair? x) (symbol? (car x)) (ox-attr x 'style:name)
@@ -1523,7 +1606,9 @@
                (copied (let loop ((todo refs) (done '()))
                          (cond ((null? todo) (reverse done))
                                ((or (assoc (car todo) done) (in? (car todo) common)
-                                    (not (assoc (car todo) auto)))
+                                    (not (assoc (car todo) auto))
+                                    ;; (one whose names are not declared is left out)
+                                    (not (ot-declared? (cdr (assoc (car todo) auto)))))
                                 (loop (cdr todo) done))
                                (else
                                  (let ((p (assoc (car todo) auto)))
@@ -1643,6 +1728,13 @@
                                  (ox-children l))))))
                (fix (lambda (x)
                       (cond ((not (pair? x)) x)
+                            ;; (the prefixes of the styles of TeXmacs are
+                            ;; declared)
+                            ((func? x '@)
+                             (append x (list-filter ot-namespaces
+                                                    (lambda (a)
+                                                      (and (string-starts? (symbol->string (car a)) "xmlns:")
+                                                           (not (assq (car a) (cdr x))))))))
                             ((func? x 'office:styles)
                              `(office:styles (@ ,@(ox-attrs x))
                                              ,@(if outline
@@ -1712,10 +1804,17 @@
   (set! ot-in-note? #f)
   (set! ot-bookmarks (make-ahash-table))
   (set! ot-used-styles '())
+  (set! ot-own-names #f)
+  ;; the named styles of the document (of its macros), with those of its
+  ;; file of Word (those of a file of OpenDocument are in its styles.xml)
   (set! ot-source-styles
-        (append-map ox-children
-                    (list-filter (if (func? x 'office) (cdr x) '())
-                                 (lambda (y) (func? y 'styles)))))
+        (let* ((l (if (func? x 'office) (cdr x) '()))
+               (pack (list-find l (lambda (y) (func? y 'package)))))
+          (office-merged-styles
+            (append-map ox-children (list-filter l (lambda (y) (func? y 'styles))))
+            (if (and pack (not ot-package) (== (ox-attr pack 'format) "docx"))
+                (office-package-styles "docx" (ox-attr pack 'data))
+                '()))))
   (let* ((blocks (ot-blocks-with (if (func? x 'office) (cdr x) (list x))
                                  "Text_20_body"))
          (blocks (if (null? blocks)

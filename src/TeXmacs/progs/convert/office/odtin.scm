@@ -145,7 +145,12 @@
           (if v (list (cons 'hidden (== v "none"))) '()))
         ;; (a size in percents is one of the parent)
         (with v (office-points (ox-attr x 'fo:font-size))
-          (if (and v (> v 0)) (list (cons 'size v)) '())))))
+          (if (and v (> v 0)) (list (cons 'size v)) '()))
+        ;; (for the height of the lines)
+        (with v (ox-attr x 'fo:font-size)
+          (with n (and v (string-ends? v "%")
+                       (office-number (substring v 0 (- (string-length v) 1))))
+            (if (and n (> n 0)) (list (cons 'size-percent n)) '()))))))
 
 (define (odt-font-face name)
   ;; the family of fonts of a declared font: its name is often the one of
@@ -160,14 +165,17 @@
 
 (define (odt-read-font-faces root)
   ;; the declared fonts of a file (of both files before the styles, which
-  ;; say their names)
+  ;; say their names); a font without a family is the one of its name, a
+  ;; font with an empty family (of the theme) is none
   (when root
     (for (decls (ox-childs root 'office:font-face-decls))
       (for (x (ox-childs decls 'style:font-face))
-        (with name (ox-attr x 'style:name)
-          (when name
-            (ahash-set! odt-font-faces name
-                        (or (odt-font-name (ox-attr x 'svg:font-family)) 'none))))))))
+        (let ((name (ox-attr x 'style:name))
+              (family (ox-attr x 'svg:font-family)))
+          (cond ((not name) #f)
+                ((not family) (ahash-remove! odt-font-faces name))
+                (else (ahash-set! odt-font-faces name
+                                  (or (odt-font-name family) 'none)))))))))
 
 (define (odt-font-name v)
   ;; the first font of a list of fonts, without its quotes
@@ -181,10 +189,8 @@
                ((== f "") #f)
                (else f)))))
 
-(define (odt-paragraph-properties x . size)
-  ;; the properties of an element style:paragraph-properties; a height of
-  ;; the lines in a length is a part of the one of a line of the size of
-  ;; the text (12pt if the style says none)
+(define (odt-paragraph-properties x)
+  ;; the properties of an element style:paragraph-properties
   (if (not x) '()
       (append
         (with v (ox-attr x 'fo:text-align)
@@ -214,23 +220,50 @@
                 ((string-ends? v "%")
                  (with n (office-number (substring v 0 (- (string-length v) 1)))
                    (if (and n (> n 0)) (list (cons 'line-spacing (/ n 100.0))) '())))
+                ;; (a length: the part of a line of the size of the text,
+                ;; which odt-resolve-lines finds with the parents)
                 ((office-points v)
-                 => (lambda (h) (if (> h 0) (list (cons 'line-spacing (odt-line-part h 0 size)))
-                                    '())))
+                 => (lambda (h) (if (> h 0) (list (cons 'line-height-pt h)) '())))
                 (else '())))
         ;; (the space between the lines, added to their height)
         (with v (and (not (ox-attr x 'fo:line-height))
                      (office-points (ox-attr x 'style:line-spacing)))
-          (if (and v (> v 0)) (list (cons 'line-spacing (odt-line-part 0 v size))) '()))
+          (if (and v (> v 0)) (list (cons 'line-leading-pt v)) '()))
         (with v (ox-attr x 'fo:keep-with-next)
           (if v (list (cons 'keep-with-next (== v "always"))) '())))))
 
 (define (odt-line-part height leading size)
   ;; the line spacing (1.0 is single) of lines of this height in points, or
-  ;; of single lines with this leading, for text of the size (in a list)
-  (let* ((s (if (and (pair? size) (number? (car size)) (> (car size) 0)) (car size) 12.0))
-         (single (* 1.2 s)))
+  ;; of single lines with this leading, for text of the size in points
+  (let* ((single (* 1.2 size)))
     (/ (round (* 100.0 (/ (if (> height 0) height (+ single leading)) single))) 100.0)))
+
+(define (odt-props-size props)
+  ;; the size of the text of the properties of a style and of its parents
+  ;; (the first size counts, after the sizes in percents before it), then
+  ;; of the default style, or 12pt
+  (let loop ((l props) (k 1.0))
+    (cond ((null? l)
+           (with s (and (not (eq? props odt-defaults)) (odt-get odt-defaults 'size))
+             (* k (if (and (number? s) (> s 0)) s 12.0))))
+          ((and (eq? (caar l) 'size) (number? (cdar l))) (* k (cdar l)))
+          ((and (eq? (caar l) 'size-percent) (number? (cdar l)))
+           (loop (cdr l) (* k (/ (cdar l) 100.0))))
+          (else (loop (cdr l) k)))))
+
+(define (odt-resolve-lines props . chain)
+  ;; the properties, with the line spacing of a height of lines in a
+  ;; length, for the size of the text of the style with its parents (the
+  ;; chain, or props)
+  (with p (list-find props (lambda (p) (in? (car p) '(line-spacing line-height-pt
+                                                                    line-leading-pt))))
+    (if (or (not p) (eq? (car p) 'line-spacing)) props
+        (let ((size (odt-props-size (if (pair? chain) (car chain) props))))
+          (cons (cons 'line-spacing
+                      (if (eq? (car p) 'line-height-pt)
+                          (odt-line-part (cdr p) 0 size)
+                          (odt-line-part 0 (cdr p) size)))
+                props)))))
 
 (define (odt-border-on? x names)
   ;; the first of the attributes names of x which is there: is it a border?
@@ -317,8 +350,7 @@
                   (if v (list (cons 'outline v)) '()))
                 (odt-text-properties (ox-child x 'style:text-properties))
                 (odt-paragraph-properties
-                  (ox-child x 'style:paragraph-properties)
-                  (office-points (ox-attr (ox-child x 'style:text-properties) 'fo:font-size)))
+                  (ox-child x 'style:paragraph-properties))
                 (odt-cell-properties
                   (ox-child x 'style:table-cell-properties))
                 (odt-table-properties (ox-child x 'style:table-properties))
@@ -388,7 +420,7 @@
   ;; the properties of the style, with those of its parents
   (cond ((not name) '())
         ((ahash-ref odt-style-memo (cons family name)) => identity)
-        (else (with r (odt-style-sub family name '())
+        (else (with r (odt-resolve-lines (odt-style-sub family name '()))
                 (ahash-set! odt-style-memo (cons family name) r)
                 r))))
 
@@ -1221,13 +1253,14 @@
   ;; automatic style
   (with own (and (not skip?) name (ahash-ref odt-styles (cons "paragraph" name)))
     (if (not (and own (odt-get own 'automatic))) '()
+      (with own (odt-resolve-lines own (odt-style "paragraph" name))
         (map (lambda (k)
                (with v (odt-get own k)
                  (list k (cond ((number? v) (office-decimal v))
                                ((eq? v #t) "true")
                                (else v)))))
              '(indent-left indent-right first-indent space-before space-after
-               line-spacing background border)))))
+               line-spacing background border))))))
 
 (define (odt-align a)
   (cond ((== a "center") "center")
@@ -1653,6 +1686,7 @@
                                        (and n (number->string n)))))
                    (em ,(yes 'em)) (strong ,(yes 'strong))
                    (underline ,(yes 'underline)) (strike ,(yes 'strike))
+                   (overline ,(yes 'overline))
                    (smallcaps ,(yes 'smallcaps)) (color ,(odt-get props 'color))
                    (size ,(num 'size))
                    (font ,(cond ((not font) #f) ((office-monospace? font) "mono")
@@ -1674,11 +1708,17 @@
                    (keep-with-next ,(and par? (yes 'keep-with-next)))))))
 
 (define (odt-styles-block)
+  ;; the named styles of the text, also the one of the usual paragraphs
+  ;; (whose look is in the setup, but not all of it: the paragraphs kept
+  ;; with the next one)
   (let* ((body (odt-body-style))
-         (keys (list-filter (map car (ahash-table->list odt-used-styles))
-                            (lambda (k) (not (and (== (car k) "paragraph")
-                                                  (== (cdr k) body))))))
-         (keys (sort keys (lambda (a b) (string<? (cdr a) (cdr b))))))
+         (keys (map car (ahash-table->list odt-used-styles)))
+         (keys (if (or (not body) (in? (cons "paragraph" body) keys)
+                       (not (ahash-ref odt-styles (cons "paragraph" body))))
+                   keys (cons (cons "paragraph" body) keys)))
+         (keys (sort keys (lambda (a b) (or (string<? (cdr a) (cdr b))
+                                            (and (== (cdr a) (cdr b))
+                                                 (string<? (car a) (car b))))))))
     (if (null? keys) '() `((styles ,@(map odt-style-node keys))))))
 
 (define (odt-meta)
@@ -1740,6 +1780,8 @@
           (odt-read-font-faces content)
           (odt-read-styles styles #t)
           (odt-read-styles content #f)
+          (set! odt-defaults (odt-resolve-lines odt-defaults))
+          (set! odt-style-memo (make-ahash-table))
           (let* ((text (and content (ox-path content 'office:body 'office:text)))
                  (changes (odt-read-changes text))
                  (blocks (and text (odt-blocks (ox-children text))))

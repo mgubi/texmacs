@@ -2411,6 +2411,175 @@
     (check= (ox-attr b 'line-spacing) "1.5")
     (check= (ox-attr b 'keep-with-next) "true")))
 
+;; Import: the fixes of the second audit of the readers
+
+(define (initial-of doc)
+  ;; the initial environment of a document of TeXmacs, as an association
+  ;; list
+  (with init (list-find (cdr doc) (lambda (y) (func? y 'initial)))
+    (map (lambda (a) (cons (cadr a) (caddr a))) (cdadr init))))
+
+(define (test-import-audit-2)
+  (check-group "import audit 2")
+  (let* ((disp (lambda (s) (string-append "<m:oMathPara><m:oMath>" (mr s)
+                                          "</m:oMath></m:oMathPara>")))
+         (inl (lambda (s) (string-append "<m:oMath>" (mr s) "</m:oMath>")))
+         (fc (lambda (type)
+               (string-append "<w:r><w:fldChar w:fldCharType='" type "'/></w:r>")))
+         (instr (lambda (s)
+                  (string-append "<w:r><w:instrText xml:space='preserve'>" s
+                                 "</w:instrText></w:r>")))
+         (code " ADDIN ZOTERO_BIBL {} CSL_BIBLIOGRAPHY ")
+         (start (string-append (fc "begin") (instr code) (fc "separate")))
+         (zotero (lambda (x) `(field-blocks (@ (code ,code)) ,@x))))
+    ;; 1. the punctuation after a displayed formula goes with it, between
+    ;; two formulas too, and at the start of the text after it
+    (check= (in-tm (docx (wp (wr "Hence") (disp "x") (wr "."))))
+            '("Hence" (equation* (document "x."))))
+    (check= (in-tm (docx (wp (wr "We have") (disp "a") (wr ", ") (disp "b") (wr " so."))))
+            '("We have" (equation* (document "a,")) (equation* (document "b")) "so."))
+    (check= (in-tm (docx (wp (wr "Then") (disp "x") (wr ". And more"))))
+            '("Then" (equation* (document "x.")) "And more"))
+    ;; 2. a formula with its number in a paragraph with text: an equation
+    ;; with its number
+    (check= (in-tm (docx (wp (wr "Text ") (disp "x") "<w:r><w:tab/></w:r>" (wr "(")
+                             (fc "begin") (instr " SEQ Equation ") (fc "separate")
+                             (wr "1") (fc "end") (wr ")"))))
+            '("Text" (equation (document "x"))))
+    ;; 3. a field of paragraphs ends at its end: the text after it, the
+    ;; paragraph which starts with its end, are other paragraphs; two
+    ;; fields of the same instruction are two fields
+    (check= (docx (string-append (wp start (wr "Doe")) (wp (wr "Roe") (fc "end") (wr " Then"))))
+            (list (zotero '((p "Doe") (p "Roe"))) '(p "Then")))
+    (check= (docx (string-append (wp start (wr "Doe")) (wp (wr "Roe"))
+                                 (wp (fc "end") (wr "Body."))))
+            (list (zotero '((p "Doe") (p "Roe"))) '(p "Body.")))
+    (check= (docx (string-append (wp start (wr "A")) (wp (wr "B") (fc "end"))
+                                 (wp start (wr "C")) (wp (wr "D") (fc "end"))))
+            (list (zotero '((p "A") (p "B"))) (zotero '((p "C") (p "D")))))
+    ;; (its end in a link; its paragraphs in a list)
+    (check= (docx (string-append (wp start (wr "A"))
+                                 (wp "<w:hyperlink w:anchor='x'>" (wr "B") (fc "end")
+                                     "</w:hyperlink>")
+                                 (wp (wr "After"))))
+            (list (zotero '((p "A") (p (link (@ (href "#x")) "B")))) '(p "After")))
+    (let ((item (lambda l (apply wp (cons "<w:pPr><w:numPr><w:ilvl w:val='0'/><w:numId w:val='1'/></w:numPr></w:pPr>" l)))))
+      (check= (docx (string-append (item start (wr "Doe")) (item (wr "Roe") (fc "end"))
+                                   (wp (wr "After."))))
+              (list (zotero '((list (@ (kind "bullet")) (item (p "Doe")) (item (p "Roe")))))
+                    '(p "After."))))
+    ;; 4. the paragraphs of the bibliography of Zotero stay as they are,
+    ;; in their style, and are written again so
+    (let* ((styles "<w:style w:type='paragraph' w:styleId='Bibliography'><w:name w:val='Bibliography'/></w:style>")
+           (bp (lambda l (apply wp (cons "<w:pPr><w:pStyle w:val='Bibliography'/></w:pPr>" l))))
+           (z (docx-file (string-append (bp start (wr "Doe, J.")) (bp (wr "Roe, R.") (fc "end"))
+                                        (wp (wr "After.")) "<w:sectPr/>")
+                         styles ""))
+           (blocks (list (zotero '((p (@ (style "Bibliography")) "Doe, J.")
+                                   (p (@ (style "Bibliography")) "Roe, R.")))
+                         '(p "After.")))
+           (t (convert z "docx-document" "texmacs-stree")))
+      (check= (docx-blocks-of* z) blocks)
+      (check= (in-tm (docx-blocks-of* z)) '("Doe, J." "Roe, R." "After."))
+      (check= (list-filter (cdr (cadr (cadr t))) (lambda (b) (func? b 'office-field)))
+              `((office-field ,code (document (office-par "Bibliography" "Doe, J.")
+                                              (office-par "Bibliography" "Roe, R.")))))
+      (check= (list-filter (docx-blocks-of* (convert t "texmacs-stree" "docx-document"))
+                           (lambda (b) (in? (car b) '(p field-blocks))))
+              blocks))
+    ;; 5. the overline of a named style of text
+    (let* ((doc (odt-file (tp "a " (tspan "O" "b"))
+                          (string-append "<office:styles><style:style style:name='O' style:family='text'>"
+                                         "<style:text-properties style:text-overline-style='solid'/>"
+                                         "</style:style></office:styles>")
+                          ""))
+           (office (cdr (parse-odt-document doc))))
+      (check= (in-tm office) '((concat "a " (overline "b"))))
+      (check= (assoc-ref (initial-of (faithful (cons 'office office))) "office-span-O")
+              '(macro "body" (overline (arg "body")))))
+    ;; 6. a height of lines in a length is a part of a line of the size of
+    ;; the text, which the parent says, or in percents of it
+    (let ((spacing (lambda (styles)
+                     (with st (list-find (cdr (parse-odt-document
+                                                (odt-file "<text:p text:style-name='S'>x</text:p>"
+                                                          styles "")))
+                                         (lambda (y) (func? y 'styles)))
+                       (and st (ox-attr (list-find (cdr st) (lambda (y) (== (ox-attr y 'name) "S")))
+                                        'line-spacing))))))
+      (check= (spacing (string-append
+                         "<office:styles><style:style style:name='B' style:family='paragraph'>"
+                         "<style:text-properties fo:font-size='10pt'/></style:style>"
+                         "<style:style style:name='S' style:family='paragraph' style:parent-style-name='B'>"
+                         "<style:paragraph-properties fo:line-height='18pt'/></style:style>"
+                         "</office:styles>"))
+              "1.5")
+      (check= (spacing (string-append
+                         "<office:styles><style:default-style style:family='paragraph'>"
+                         "<style:text-properties fo:font-size='10pt'/></style:default-style>"
+                         "<style:style style:name='S' style:family='paragraph'>"
+                         "<style:paragraph-properties fo:line-height='18pt'/>"
+                         "<style:text-properties fo:font-size='150%'/></style:style>"
+                         "</office:styles>"))
+              "1"))
+    ;; 7. an inline formula with punctuation is in its line; the
+    ;; punctuation before a formula stays before it
+    (check= (in-tm (docx (wp (inl "x") (wr ".")))) '((concat (math "x") ".")))
+    (check= (in-tm (docx (wp (wr ": ") (disp "x")))) '(":" (equation* (document "x"))))
+    ;; 8. a declared font without a family is the font of its name
+    (check= (odt-parts (tp "a " (tspan "T1" "b"))
+                       "<style:style style:name='T1' style:family='text'><style:text-properties style:font-name='Arial'/></style:style>"
+                       (cons "styles.xml"
+                             (string-append "<office:document-styles" odt-ns "><office:font-face-decls>"
+                                            "<style:font-face style:name='Arial'/>"
+                                            "</office:font-face-decls></office:document-styles>")))
+            '((p "a " (font (@ (value "Arial")) "b"))))
+    ;; 9. the space before a paragraph which is cut by its formulas is
+    ;; the one of its first piece
+    (check= (in-tm (docx (wp "<w:pPr><w:jc w:val='center'/><w:spacing w:before='240'/></w:pPr>"
+                             (wr "a ") (disp "x") (wr " b"))))
+            '((surround (vspace* "12pt") (vspace "0pt") (with "par-mode" "center" "a"))
+              (equation* (document "x"))
+              (with "par-mode" "center" "b")))
+    ;; 10. a picture which a Word file links to, not on the web: its name
+    (check= (in-tm (docx-parts (wp "<w:r><w:drawing><wp:inline><wp:extent cx='720000' cy='360000'/>"
+                                   "<a:graphic><a:graphicData><a:blip r:link='rId1'/></a:graphicData>"
+                                   "</a:graphic></wp:inline></w:drawing></w:r>")
+                               (cons "word/_rels/document.xml.rels"
+                                     (string-append "<Relationships><Relationship Id='rId1' Target='img/x.png'"
+                                                    " TargetMode='External'/></Relationships>"))))
+            '("img/x.png"))
+    ;; a style of paragraphs and one of text of the same name both have
+    ;; their macros; the style of the usual paragraphs is a named style
+    ;; too (for what the setup does not say)
+    (let* ((doc (odt-file (string-append (tp "x") "<text:p text:style-name='N'>n</text:p>"
+                                         (tp (tspan "N" "t")))
+                          (string-append "<office:styles>"
+                                         "<style:style style:name='N' style:family='paragraph'>"
+                                         "<style:text-properties fo:font-weight='bold'/></style:style>"
+                                         "<style:style style:name='N' style:family='text'>"
+                                         "<style:text-properties fo:font-style='italic'/></style:style>"
+                                         "</office:styles>")
+                          ""))
+           (init (initial-of (faithful (cons 'office (cdr (parse-odt-document doc)))))))
+      (check= (assoc-ref init "office-par-N")
+              '(macro "body" (with "font-series" "bold" (arg "body"))))
+      (check= (assoc-ref init "office-span-N")
+              '(macro "body" (with "font-shape" "italic" (arg "body")))))
+    (let* ((doc (odt-file (string-append "<text:p text:style-name='K'>kept</text:p>"
+                                         "<text:p text:style-name='K'>also</text:p>" (tp "next"))
+                          (string-append "<office:styles>"
+                                         "<style:style style:name='K' style:family='paragraph'>"
+                                         "<style:paragraph-properties fo:keep-with-next='always'/>"
+                                         "</style:style></office:styles>")
+                          ""))
+           (office (cdr (parse-odt-document doc)))
+           (setup (list-find office (lambda (y) (func? y 'setup))))
+           (styles (list-find office (lambda (y) (func? y 'styles)))))
+      (check= (ox-attr setup 'body-style) "K")
+      (check= (and styles (ox-attr (list-find (cdr styles) (lambda (y) (== (ox-attr y 'name) "K")))
+                                   'keep-with-next))
+              "true"))))
+
 (define (test-import-math)
   (check-group "import math")
   (let ((f (lambda (s) (in-tm (docx (wp (wr "f ") "<m:oMath>" s "</m:oMath>")))))
@@ -3554,6 +3723,186 @@
     (check-true (in? '(concat "a " (overline "o"))
                      (cdr (cadr (cadr (convert odt "odt-document" "texmacs-stree"))))))))
 
+;; The export, after the second audit: XML whose prefixes are declared,
+;; the named styles of the file of the other format, odd macros, the names
+;; of the styles of Word, the addresses of pictures, fields of paragraphs.
+
+(define (export-undeclared x scope)
+  ;; the prefixes of the names of the element x of parse-xml which are not
+  ;; declared (scope: those declared around it)
+  (if (not (and (pair? x) (symbol? (car x)))) '()
+      (let* ((attrs (if (and (pair? (cdr x)) (func? (cadr x) '@)) (cdadr x) '()))
+             (body (if (and (pair? (cdr x)) (func? (cadr x) '@)) (cddr x) (cdr x)))
+             (prefix (lambda (sym)
+                       (let* ((s (symbol->string sym))
+                              (i (string-search-forwards ":" 0 s)))
+                         (and (> i 0) (substring s 0 i)))))
+             (scope (append (list-filter (map (lambda (a) (and (pair? a) (symbol? (car a))
+                                                                (== (prefix (car a)) "xmlns")
+                                                                (substring (symbol->string (car a)) 6
+                                                                           (string-length (symbol->string (car a))))))
+                                              attrs)
+                                         identity)
+                            scope))
+             (bad (lambda (sym) (with p (prefix sym)
+                                  (and p (not (in? p (cons* "xml" "xmlns" scope))) (list p))))))
+        (append (if (in? (car x) '(*TOP* *PI*)) '() (or (bad (car x)) '()))
+                (append-map (lambda (a) (or (and (pair? a) (symbol? (car a)) (bad (car a))) '()))
+                            attrs)
+                (append-map (lambda (y) (export-undeclared y scope)) body)))))
+
+(define (export-xml-ok? z)
+  ;; whether the parts of XML of the archive z are read, with their
+  ;; prefixes declared
+  (with a (office-archive z)
+    (list-and
+      (map (lambda (kv)
+             (or (not (or (string-ends? (car kv) ".xml") (string-ends? (car kv) ".rels")))
+                 (with x (catch #t (lambda () (parse-xml (cdr kv))) (lambda args #f))
+                   (and x (null? (export-undeclared x '()))))))
+           (ahash-table->list a)))))
+
+(define (test-export-audit-2)
+  (check-group "export audit 2")
+  ;; 1. the styles of numbers kept from the file are in declared XML
+  (let* ((ns (string-append "xmlns:office='urn:oasis:names:tc:opendocument:xmlns:office:1.0' "
+                            "xmlns:style='urn:oasis:names:tc:opendocument:xmlns:style:1.0' "
+                            "xmlns:number='urn:oasis:names:tc:opendocument:xmlns:datastyle:1.0'"))
+         (pack (zip-pack '("mimetype" "content.xml" "styles.xml")
+                         (list "application/vnd.oasis.opendocument.text"
+                               (string-append "<office:document-content " ns "><office:automatic-styles><number:date-style style:name='N1'><number:day/></number:date-style></office:automatic-styles><office:body><office:text/></office:body></office:document-content>")
+                               (string-append "<office:document-styles " ns "><office:styles/></office:document-styles>"))))
+         (z (serialize-odt-document
+              `(office (package (@ (format "odt") (data ,pack)))
+                       (p (field (@ (xml "<text:date style:data-style-name=\"N1\"/>")) "today")
+                          (field (@ (xml "<foo:bar xmlns:foo=\"urn:x\"/>")) "odd"))))))
+    (check-true (export-has? (export-entry z "content.xml") "<number:date-style style:name=\"N1\">"))
+    (check-true (export-xml-ok? z))
+    (check-true (export-has? (export-entry z "content.xml") "odd"))
+    (check-false (export-has? (export-entry z "content.xml") "foo:bar")))
+  (for (tree '((office (p "a" (note (p "n" (comment (p "c"))))))
+               (office (p (image (@ (name "https://a.b/c d.png")))))))
+    (check-true (export-xml-ok? (serialize-docx-document tree)))
+    (check-true (export-xml-ok? (serialize-odt-document tree))))
+  ;; 2. 3. a style of the macros of the document, with what only the file
+  ;; of the other format says (its name, the paragraph kept with the next
+  ;; one); the file is not read again for a file of its format
+  (check= (office-merged-styles
+            '((style (@ (name "A") (family "paragraph") (strong "true"))))
+            '((style (@ (name "A") (family "paragraph") (display "A b") (em "true")
+                        (keep-with-next "true")))
+              (style (@ (name "A") (family "text") (em "true")))))
+          '((style (@ (name "A") (family "paragraph") (strong "true") (display "A b")
+                      (keep-with-next "true")))
+            (style (@ (name "A") (family "text") (em "true")))))
+  (let* ((z (zip-pack '("word/document.xml" "word/styles.xml")
+                      (list (string-append "<w:document" docx-ns "><w:body>"
+                                           (wp (wstyle "K") (wr "x")) (wp (wr "y")) (wp (wr "z"))
+                                           "</w:body></w:document>")
+                            (string-append "<w:styles" docx-ns ">"
+                                           "<w:style w:type='paragraph' w:styleId='K'>"
+                                           "<w:name w:val='Keep Me'/><w:pPr><w:keepNext/>"
+                                           "<w:jc w:val='center'/></w:pPr>"
+                                           "</w:style></w:styles>"))))
+         (t (convert z "docx-document" "texmacs-stree"))
+         (office (convert t "texmacs-stree" "office-stree"))
+         (styles (append-map cdr (list-filter (cdr office) (lambda (y) (func? y 'styles)))))
+         (ostyles (export-entry (convert t "texmacs-stree" "odt-document") "styles.xml")))
+    ;; (the styles of the macros only: the file is not read again)
+    (check-false (list-find styles (lambda (st) (ox-attr st 'display))))
+    (check-true (export-has? ostyles "style:display-name=\"Keep Me\""))
+    (check-true (export-has? ostyles "fo:keep-with-next=\"always\""))
+    (check-true (export-has? ostyles "fo:text-align=\"center\""))
+    (with l (office-package-styles "docx" z)
+      (check= (ox-attr (car l) 'display) "Keep Me")
+      (check= (ox-attr (car l) 'keep-with-next) "true")))
+  ;; 4. a macro which cannot be read: a style without its look
+  (let* ((doc '(document (body (document (office-par "Odd" "a")))
+                         (style "office")
+                         (initial (collection
+                                    (associate "office-par-Odd"
+                                               (macro "body" (surround (vspace*) "" (arg "body"))))))))
+         (styles (export-entry (convert doc "texmacs-stree" "docx-document") "word/styles.xml")))
+    (check-true (export-has? styles "w:styleId=\"Odd\"")))
+  ;; a line over the text of a named style, in OpenDocument
+  (let* ((doc '(document (body (document (concat "a " (office-span "Over" "b"))))
+                         (style "office")
+                         (initial (collection
+                                    (associate "office-span-Over"
+                                               (macro "body" (overline (arg "body"))))))))
+         (styles (export-entry (convert doc "texmacs-stree" "odt-document") "styles.xml")))
+    (check-true (export-has? styles "style:text-overline-style=\"solid\"")))
+  ;; 5. the name of a style of OpenDocument in Word is its name to show
+  (let* ((z (odt-file "<text:p text:style-name='My_20_Note'>x</text:p><text:p>y</text:p><text:p>z</text:p>"
+                      (string-append "<office:styles><style:style style:name='My_20_Note'"
+                                     " style:display-name='My Note' style:family='paragraph'>"
+                                     "<style:text-properties fo:font-style='italic'/>"
+                                     "</style:style></office:styles>")
+                      ""))
+         (t (convert z "odt-document" "texmacs-stree"))
+         (styles (export-entry (convert t "texmacs-stree" "docx-document") "word/styles.xml")))
+    (check-true (export-has? styles "<w:name w:val=\"My Note\"/>"))
+    (check= (office-odf-name "A_20__26__20_B") "A & B")
+    (check= (office-odf-name "x_y_z") "x_y_z"))
+  ;; 6. 7. a paragraph and a text of the same name have two styles; a name
+  ;; which Word has is its style
+  (let* ((z (serialize-docx-document
+              '(office (styles (style (@ (name "N") (family "paragraph") (em "true")))
+                               (style (@ (name "N") (family "text") (strong "true"))))
+                       (p (@ (style "N")) "a" (span (@ (style "N")) "b"))
+                       (p (@ (style "Heading_20_1")) "h")
+                       (p (@ (style "normal")) "n"))))
+         (text (export-entry z "word/document.xml"))
+         (styles (export-entry z "word/styles.xml")))
+    (check-true (export-has? text "<w:pStyle w:val=\"N\"/>"))
+    (check-true (export-has? text "<w:rStyle w:val=\"NChar\"/>"))
+    (check-true (export-has? styles "<w:style w:type=\"character\" w:styleId=\"NChar\"><w:name w:val=\"N Char\"/>"))
+    (check-true (export-has? text "<w:pStyle w:val=\"Heading1\"/>"))
+    (check-true (export-has? text "<w:pStyle w:val=\"Normal\"/>"))
+    (check-false (export-has? styles "w:styleId=\"Heading_20_1\""))
+    (check-false (export-has? styles "w:styleId=\"normal\"")))
+  ;; 8. 9. the address of a picture on the web, with %XX, 5cm by 3cm in
+  ;; both formats; a field over paragraphs without them; one of
+  ;; OpenDocument
+  (let* ((tree '(office (p (image (@ (name "https://a.b/c d.png"))))
+                        (field-blocks (@ (code " ADDIN X ")))
+                        (field-blocks (@ (xml "<text:bibliography/>")) (p "b"))))
+         (z (serialize-docx-document tree))
+         (o (serialize-odt-document tree))
+         (text (export-entry z "word/document.xml")))
+    (check-true (export-has? (export-entry z "word/_rels/document.xml.rels")
+                             "Target=\"https://a.b/c%20d.png\""))
+    (check-true (export-has? (export-entry o "content.xml") "xlink:href=\"https://a.b/c%20d.png\""))
+    (check-true (export-has? text "<wp:extent cx=\"1800000\" cy=\"1080000\"/>"))
+    (check-true (export-has? (export-entry o "content.xml") "svg:width=\"5cm\" svg:height=\"3cm\""))
+    (check-true (export-has? text " ADDIN X </w:instrText></w:r><w:r><w:fldChar w:fldCharType=\"separate\"/></w:r><w:r><w:fldChar w:fldCharType=\"end\"/>"))
+    (check-false (export-has? text "bibliography"))
+    (check-true (export-has? text ">b</w:t>")))
+  (check= (convert '(document (office-field "<text:bibliography/>" (document "a" "b")))
+                   "texmacs-stree" "office-stree")
+          '(office (field-blocks (@ (xml "<text:bibliography/>")) (p "a") (p "b"))))
+  ;; a picture which the file linked to (linked) is linked to again; a
+  ;; style with a line over its text; a field around a list
+  (let* ((tree '(office (styles (style (@ (name "O") (family "text") (overline "true"))))
+                        (p (image (@ (name "pics/a b.png") (linked "true"))) (span (@ (style "O")) "o"))
+                        (field-blocks (@ (code " ADDIN L "))
+                                      (list (@ (kind "bullet")) (item (p "i")) (item (p "j"))))))
+         (z (serialize-docx-document tree))
+         (o (serialize-odt-document tree))
+         (text (export-entry z "word/document.xml")))
+    (check-true (export-has? (export-entry z "word/_rels/document.xml.rels")
+                             "Target=\"pics/a%20b.png\" TargetMode=\"External\""))
+    (check-true (export-has? text "r:link="))
+    (check-false (list-find (map car (ahash-table->list (office-archive z)))
+                            (lambda (n) (string-starts? n "word/media/"))))
+    (check-true (export-has? (export-entry o "content.xml") "xlink:href=\"pics/a%20b.png\""))
+    (check-true (export-has? (export-entry o "styles.xml") "style:text-overline-style=\"solid\""))
+    (check-true (export-xml-ok? z))
+    (check-true (export-xml-ok? o))
+    (check-true (export-has? text "<w:fldChar w:fldCharType=\"separate\"/></w:r><w:r><w:t xml:space=\"preserve\">i</w:t>"))
+    (check-true (export-has? text ">j</w:t></w:r><w:r><w:fldChar w:fldCharType=\"end\"/></w:r></w:p>"))
+    (check= (export-count text "fldCharType=\"begin\"") 1)))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The formats
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -3617,6 +3966,7 @@
   (test-docx-unusual)
   (test-odt-more)
   (test-odt-audit)
+  (test-import-audit-2)
   (test-import-math)
   (test-import-files)
   (test-officetm-more)
@@ -3640,5 +3990,6 @@
   (test-export-blocks)
   (test-export-writers)
   (test-export-audit)
+  (test-export-audit-2)
   (test-formats)
   (check-end))
