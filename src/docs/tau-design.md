@@ -1290,6 +1290,37 @@ from 16 to 1024 pixels. As in the page of TeXmacs Vue
   as before (a view 12 ms, the calls). The pixels are as before (8 of
   3.7 M differ in a table of the documentation, also after the atlas has
   been emptied many times).
+- **Two canvases, and WebGL** (`tau.mjs`, `pairSurface`; `gl.mjs`, `?gl`).
+  A pane has two canvases, one over the other: a scroll draws the one
+  shown into the other, which is shown then (the one above, which has the
+  events, is made transparent). WebGL keeps the view in two textures in
+  the same way; rectangles are triangles, glyphs rectangles of an atlas
+  of their coverage (a byte a pixel, the colour given with the corners),
+  pictures textures, lines, polygons and arcs drawn by a 2D canvas and
+  given as pictures; a transformation moves the corners, a clip is the
+  scissor. `?gl` asks the core for the commands when the page starts; a
+  context of WebGL lost and back asks for the view again (its place).
+  The pixels are those of the commands drawn by the 2D canvas (2836 of
+  3.7 M differ from those of the core on rotations and patterns, as with
+  the 2D canvas; a texture of the view left bound while drawn into had
+  made WebGL drop what was drawn). The user manual, a canvas of 2874 ×
+  1848 (1792 in Firefox), ms a frame with `?gpusync` (which waits for the
+  canvas: WebGL pays a read of the GPU each time):
+
+  | | step, pixels | step, commands | view, pixels | view, commands |
+  |---|---|---|---|---|
+  | Safari, one canvas | 4.2 | 4.5 | 3.4 | 4.4 |
+  | Safari, two canvases | 1.8 | 2.9 | 3.5 | 4.5 |
+  | Safari, WebGL | 3.3 | 2.8 | 8.5 | 3.6 |
+  | Firefox (a window), one canvas | 13.7 | 35 | 16 | 34 |
+  | Firefox, two canvases | 9.5 | 37 | 9.8 | 15 |
+  | Firefox, WebGL | 3.4 | 3.8 | 9.3 | 4.4 |
+
+  In Safari two canvases are enough: a scroll step 4.2 → 1.8 ms, and
+  WebGL draws the commands as fast as the 2D canvas draws pixels, not
+  faster. In Firefox the 2D canvas is slow and uneven, WebGL is not (a
+  step 3.4–3.8 ms, a view of commands 4.4). The pixels of the core given
+  to WebGL (a texture of the whole view) are the slow case (8–9 ms).
 - **Left**: a limit to the pictures kept by the page, and to the glyphs of the
   shell; the pattern of a rotated shape is rotated with it (MuPDF keeps
   it upright); the commands by default (they are asked for, for now).
