@@ -43,7 +43,7 @@
 (define dx-numbered? #f)    ; the headings are numbered by Word
 (define dx-setup '(setup))  ; the page and the font of the document
 (define dx-comments '())    ; the comments, reversed
-(define dx-used-styles '()) ; (id family) of the named styles of the text
+(define dx-used-styles '()) ; (id family name display) of the named styles of the text
 (define dx-sections? #f)    ; whether the text has sections in columns
 (define dx-italic? #f)      ; the paragraph is italic by its style (Theorem)
 (define dx-package #f)      ; the entries of the file the text was read from
@@ -212,10 +212,15 @@
   (let* ((data (ox-attr x 'data))
          (n (dx-next-id))
          (cx (dx-emu (ox-attr x 'width)))
-         (cy (dx-emu (ox-attr x 'height)))
-         ;; (a picture on the web: an external relation to its address)
-         (web (and (not data) (office-web-address? (ox-attr x 'name))
-                   (ox-attr x 'name))))
+         ;; (5cm by 3cm without a size, as in the files of OpenDocument)
+         (cy (dx-emu (if (office-length->cm (ox-attr x 'height)) (ox-attr x 'height) "3cm")))
+         ;; (a picture on the web: an external relation to its address,
+         ;; with %XX for what an address cannot hold, as for the links)
+         ;; (a picture which the file read linked to, linked: the same)
+         (web (and (not data) (string? (ox-attr x 'name)) (!= (ox-attr x 'name) "")
+                   (or (office-web-address? (ox-attr x 'name))
+                       (== (ox-attr x 'linked) "true"))
+                   (office-uri (ox-attr x 'name)))))
     (if (not (or data web)) '()
         (let* ((files (if web (list "image" #f) (dx-image-files x n)))
                (file (car files))
@@ -522,11 +527,76 @@
                 (begin (set! dx-note-comments (cons marks dx-note-comments)) '())
                 marks))))))
 
-(define (dx-use-style id family)
-  ;; the named style id of the text, which the styles have
-  (when (not (assoc id dx-used-styles))
-    (set! dx-used-styles (cons (list id family) dx-used-styles)))
-  id)
+(define dx-known-styles #f) ; (name type id) of the styles of the file
+
+(define dx-word-names
+  ;; the names of the styles which Word has (in lower case)
+  (append '("normal" "title" "subtitle" "caption" "quote" "intense quote"
+            "list paragraph" "no spacing" "footnote text" "footnote reference"
+            "endnote text" "endnote reference" "header" "footer" "hyperlink"
+            "followedhyperlink" "strong" "emphasis" "intense emphasis"
+            "subtle emphasis" "subtle reference" "intense reference" "book title"
+            "default paragraph font" "body text" "toc heading" "bibliography"
+            "table grid" "normal table" "no list" "comment text"
+            "comment reference" "balloon text" "plain text" "block text"
+            "list bullet" "list number" "macro text" "date" "signature"
+            "salutation" "table of figures")
+          (map (lambda (i) (string-append "heading " (number->string i))) (cdr (iota 10)))
+          (map (lambda (i) (string-append "toc " (number->string i))) (cdr (iota 10)))))
+
+(define (dx-known)
+  ;; the styles of the file which is written, before the named ones
+  (when (not dx-known-styles)
+    (set! dx-known-styles
+          (map (lambda (y)
+                 (list (locase-all (or (with n (ox-child y 'w:name) (and n (ox-attr n 'w:val)))
+                                       ""))
+                       (ox-attr y 'w:type) (ox-attr y 'w:styleId)))
+               (ox-childs (dx-merged-styles (dx-styles)) 'w:style))))
+  dx-known-styles)
+
+(define (dx-use-style name family)
+  ;; The style id of Word of the named style of the text, which the
+  ;; styles get. A style of the file of this id is this one; a style of
+  ;; the file which has the name of this one (a style Heading_20_1 of
+  ;; OpenDocument is Word's heading 1) is this one; else a new style whose
+  ;; id and name are not those of another one (a paragraph and a text of
+  ;; the same name are MyNote and MyNoteChar).
+  (let* ((type (if (== family "paragraph") "paragraph" "character"))
+         (old (list-find dx-used-styles
+                         (lambda (u) (and (== (caddr u) name) (== (cadr u) family))))))
+    (cond ((== name "") "")
+          (old (car old))
+          (else
+            (let* ((known (dx-known))
+                   (same (list-find known (lambda (k) (and (== (caddr k) name)
+                                                           (== (cadr k) type)))))
+                   (st (dx-source-style name (if (== family "paragraph") "paragraph" "text")))
+                   (display (or (and st (ox-attr st 'display)) (office-odf-name name)))
+                   (named (list-find known (lambda (k) (and (== (car k) (locase-all display))
+                                                            (== (cadr k) type))))))
+              (cond (same name)
+                    (named (caddr named))
+                    (else
+                      (let* ((ids (append (map caddr known) (map car dx-used-styles)))
+                             (names (append (map car known) dx-word-names
+                                            (map (lambda (u) (locase-all (cadddr u)))
+                                                 dx-used-styles)))
+                             (suffix (if (== type "character") "Char" "Par"))
+                             (id (let loop ((i 0))
+                                   (with c (string-append name (if (== i 0) "" suffix)
+                                                          (if (> i 1) (number->string i) ""))
+                                     (if (in? c ids) (loop (+ i 1)) c))))
+                             (show (let loop ((i 0))
+                                     (with c (string-append display
+                                                            (cond ((== i 0) "")
+                                                                  ((== type "character") " Char")
+                                                                  (else " Style"))
+                                                            (if (> i 1) (string-append " " (number->string i)) ""))
+                                       (if (in? (locase-all c) names) (loop (+ i 1)) c)))))
+                        (set! dx-used-styles
+                              (cons (list id family name show) dx-used-styles))
+                        id))))))))
 
 (define (dx-word-name? name)
   ;; a name of a bookmark of Word, which is kept: letters of ASCII, digits
@@ -1112,7 +1182,9 @@
              (if (and (pair? (cdr p)) (func? (cadr p) 'w:pPr))
                  (cons* 'w:p (cadr p) (append start (cddr p)))
                  (cons 'w:p (append start (cdr p)))))))
-    (cond ((or (not instruction) (null? l)) l)
+    (cond ((not instruction) l)
+          ;; (a field without its result: one paragraph with the field)
+          ((null? l) (list (cons 'w:p (append start end))))
           (else
             (let* ((l (if (para? (car l)) (cons (with-start (car l)) (cdr l))
                           (cons (cons 'w:p start) l)))
@@ -1658,27 +1730,11 @@
                                (if (in? k office-underline-kinds) k "single"))))
           '()))))
 
-(define (dx-odf-name id)
-  ;; the name of a style of OpenDocument, whose characters but letters
-  ;; and digits are _hh_ in its identifier: My_20_Note is My Note
-  (let loop ((l (string->list id)) (acc '()))
-    (cond ((null? l) (list->string (reverse acc)))
-          ((and (char=? (car l) #\_) (>= (length l) 4))
-           (let* ((rest (cdr l))
-                  (end (list-find-index rest (lambda (c) (char=? c #\_))))
-                  (hex (and end (> end 0) (<= end 4) (list->string (sublist rest 0 end))))
-                  (n (and hex (string->number hex 16))))
-             (if (and n (>= n 32) (< n 128))
-                 (loop (list-tail rest (+ end 1)) (cons (integer->char n) acc))
-                 (loop (cdr l) (cons (car l) acc)))))
-          (else (loop (cdr l) (cons (car l) acc))))))
-
-(define (dx-style-of-node type id st)
-  ;; the style id of Word with the properties of the node style st (#f
-  ;; for none), after the usual one
+(define (dx-style-of-node type id name st)
+  ;; the style id of Word, whose name is name, with the properties of the
+  ;; node style st (#f for none), after the usual one
   (let* ((ppr (if (and st (== type "paragraph")) (dx-style-paragraph-properties st) '()))
-         (rpr (if st (dx-style-run-properties st) '()))
-         (name (or (and st (ox-attr st 'display)) (dx-odf-name id))))
+         (rpr (if st (dx-style-run-properties st) '())))
     (apply dx-style
            (append (list type id name)
                    (if (== type "paragraph") (list (dx-val 'w:basedOn "Normal")) '())
@@ -1727,16 +1783,17 @@
                               (if h (cdr h) x)))
                           styles)))
          (ids (map (lambda (x) (ox-attr x 'w:styleId)) (ox-childs styles 'w:style)))
+         ;; ((id family name display) of dx-use-style)
          (new (list-filter (reverse dx-used-styles)
                            (lambda (u) (and (!= (car u) "") (not (in? (car u) ids)))))))
     (if (null? new) styles
         (append styles
                 (map (lambda (u)
                        (if (== (cadr u) "paragraph")
-                           (dx-style-of-node "paragraph" (car u)
-                                             (dx-source-style (car u) "paragraph"))
-                           (dx-style-of-node "character" (car u)
-                                             (dx-source-style (car u) "text"))))
+                           (dx-style-of-node "paragraph" (car u) (cadddr u)
+                                             (dx-source-style (caddr u) "paragraph"))
+                           (dx-style-of-node "character" (car u) (cadddr u)
+                                             (dx-source-style (caddr u) "text"))))
                      new)))))
 
 (define (dx-merged-numbering mine)
@@ -1829,10 +1886,17 @@
   (set! dx-no-sections? #f)
   (set! dx-in-comment? #f)
   (set! dx-note-comments '())
+  (set! dx-known-styles #f)
+  ;; the named styles of the document (of its macros), with those of its
+  ;; file of OpenDocument (those of a file of Word are in its styles.xml)
   (set! dx-source-styles
-        (append-map ox-children
-                    (list-filter (if (func? x 'office) (cdr x) '())
-                                 (lambda (y) (func? y 'styles)))))
+        (let* ((l (if (func? x 'office) (cdr x) '()))
+               (pack (list-find l (lambda (y) (func? y 'package)))))
+          (office-merged-styles
+            (append-map ox-children (list-filter l (lambda (y) (func? y 'styles))))
+            (if (and pack (not dx-package) (== (ox-attr pack 'format) "odt"))
+                (office-package-styles "odt" (ox-attr pack 'data))
+                '()))))
   ;; the relations of the files which are always there come first
   (dx-relation "styles" "styles.xml" #f)
   (dx-relation "numbering" "numbering.xml" #f)

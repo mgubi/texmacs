@@ -267,50 +267,115 @@
 (define (oftm-display? y)
   (and (func? y 'math) (== (ox-attr y 'display) "true")))
 
+;; A paragraph with text and displayed formulas: the paragraphs of its
+;; text and the paragraph of each formula, which is an equation (not those
+;; of a cell, nor a heading, a caption..., whose formulas are in the text;
+;; nor a paragraph which is one formula with its number). The punctuation
+;; after a formula and its number go with it; the bookmarks just before it
+;; are its labels; the other bookmarks of a piece without text go with the
+;; formula after them, or with the last paragraph. The space before the
+;; paragraph and the indentation of its first line are those of its first
+;; piece, the space after it is the one of its last piece.
+
+(define (oftm-blank? y)
+  (or (and (string? y) (== (string-trim-spaces y) "")) (func? y 'tab)))
+
 (define (oftm-split-display x)
-  ;; A paragraph with text and displayed formulas: the paragraphs of its
-  ;; text, with its attributes, and the paragraph of each formula, which
-  ;; is an equation (not those of a cell, nor a heading, a caption...,
-  ;; whose formulas are in the text; nor a formula with its number). The
-  ;; bookmarks of a piece without text go with the formula after them, or
-  ;; with the last paragraph.
-  (let* ((l (if (and (func? x 'p) (not (ox-attr x 'role)) (not oftm-in-cell?))
-                (ox-children x) '()))
-         (blank? (lambda (y) (or (and (string? y) (== (string-trim-spaces y) ""))
-                                 (func? y 'tab))))
-         (text? (lambda (y) (not (or (blank? y) (func? y 'bookmark) (oftm-display? y)
-                                     (oftm-punctuation-string? y)))))
-         (attrs (map (lambda (a) (list (car a) (cadr a))) (ox-attrs x)))
-         (par (lambda (kids) (apply office-node (cons* 'p attrs kids))))
-         (text-par (lambda (kids) (par (oftm-trim-piece kids))))
-         (marks (lambda (l) (list-filter l (lambda (y) (func? y 'bookmark))))))
-    (if (not (and (list-or (map oftm-display? l)) (list-or (map text? l))
-                  (not (oftm-numbered-formula x))))
+  (let ((l (if (and (func? x 'p) (not (ox-attr x 'role)) (not oftm-in-cell?))
+               (ox-children x) '())))
+    (if (not (and (list-or (map oftm-display? l)) (not (oftm-numbered-formula x))))
         (list x)
-        (let loop ((l l) (cur '()) (acc '()))
-          ;; cur: the piece of text so far, newest first
-          (let ((text-now? (list-or (map text? cur))))
-            (cond ((and (null? l) text-now?) (reverse (cons (text-par (reverse cur)) acc)))
-                  ((null? l)
-                   (if (or (null? (marks cur)) (null? acc)) (reverse acc)
-                       (reverse (cons (par (append (ox-children (car acc))
-                                                   (marks (reverse cur))))
-                                      (cdr acc)))))
-                  ((and (oftm-display? (car l)) text-now?)
-                   ;; (the bookmarks just before the formula are its labels)
-                   (let split ((before cur) (labels '()))
-                     (if (and (pair? before) (or (blank? (car before))
-                                                 (func? (car before) 'bookmark)))
-                         (split (cdr before)
-                                (if (func? (car before) 'bookmark)
-                                    (cons (car before) labels) labels))
-                         (loop (cdr l) '()
-                               (cons* (par (append labels (list (car l))))
-                                      (text-par (reverse before)) acc)))))
-                  ((oftm-display? (car l))
-                   (loop (cdr l) '()
-                         (cons (par (append (marks (reverse cur)) (list (car l)))) acc)))
-                  (else (loop (cdr l) (cons (car l) cur) acc))))))))
+        (with pieces (oftm-display-pieces l)
+          (if (or (null? pieces) (null? (cdr pieces))) (list x)
+              (oftm-piece-paragraphs x pieces))))))
+
+(define (oftm-display-pieces l)
+  ;; the pieces (text kid...) and (formula kid...) of the children l of a
+  ;; paragraph (in one pass: each child is looked at a bounded number of
+  ;; times)
+  (let loop ((l l) (cur '()) (content? #f) (acc '()))
+    ;; cur: the piece of text so far, newest first; content?: whether it
+    ;; holds more than spaces and bookmarks
+    (cond ((null? l)
+           (cond (content? (reverse (cons (cons 'text (reverse cur)) acc)))
+                 ((or (null? acc) (null? (oftm-marks cur))) (reverse acc))
+                 (else (reverse (cons (append (car acc) (reverse (oftm-marks cur)))
+                                      (cdr acc))))))
+          ((oftm-display? (car l))
+           (let* ((split (oftm-split-labels cur content?))
+                  (acc (if content? (cons (cons 'text (reverse (cdr split))) acc) acc))
+                  (after (oftm-after-formula (cdr l))))
+             (loop (cdr after) '() #f
+                   (cons (append (list 'formula (car l)) (car split) (car after))
+                         acc))))
+          (else (loop (cdr l) (cons (car l) cur)
+                      (or content? (not (or (oftm-blank? (car l))
+                                            (func? (car l) 'bookmark))))
+                      acc)))))
+
+(define (oftm-marks l)
+  (list-filter l (lambda (y) (func? y 'bookmark))))
+
+(define (oftm-split-labels cur content?)
+  ;; (labels . rest) for the piece cur (newest first) before a formula: its
+  ;; bookmarks at its end, or all of them when it has no text
+  (if (not content?) (cons (reverse (oftm-marks cur)) '())
+      (let split ((before cur) (labels '()))
+        (if (and (pair? before) (or (oftm-blank? (car before))
+                                    (func? (car before) 'bookmark)))
+            (split (cdr before)
+                   (if (func? (car before) 'bookmark) (cons (car before) labels) labels))
+            (cons labels before)))))
+
+(define (oftm-leading-punctuation s)
+  ;; (punctuation . rest) for a string s which starts with punctuation
+  (and (string? s)
+       (let* ((n (string-length s))
+              (i (let skip ((i 0))
+                   (if (and (< i n) (char=? (string-ref s i) #\space)) (skip (+ i 1)) i)))
+              (j (let more ((j i))
+                   (if (and (< j n) (in? (string-ref s j) '(#\. #\, #\; #\: #\! #\?)))
+                       (more (+ j 1)) j))))
+         (and (> j i) (cons (substring s i j) (substring s j n))))))
+
+(define (oftm-number-part? y)
+  (or (oftm-blank? y) (func? y 'seq) (func? y 'bookmark)
+      (and (string? y) (in? (string-trim-spaces y) '("(" ")" "()")))))
+
+(define (oftm-after-formula l)
+  ;; (nodes . rest) for the children l after a displayed formula: the
+  ;; nodes which go with it are its punctuation, and its number (a field
+  ;; seq after tabs, in brackets)
+  (let* ((p (let absorb ((r l) (dots ""))
+              (cond ((null? r) (cons dots r))
+                    ((and (string? (car r)) (oftm-blank? (car r))) (absorb (cdr r) dots))
+                    ((oftm-leading-punctuation (car r))
+                     => (lambda (q)
+                          (if (oftm-blank? (cdr q))
+                              (absorb (cdr r) (string-append dots (car q)))
+                              (cons (string-append dots (car q))
+                                    (cons (cdr q) (cdr r))))))
+                    (else (cons dots r)))))
+         (dots (if (== (car p) "") '() (list (car p))))
+         (r (cdr p)))
+    (let num ((s r) (seen '()) (seq? #f))
+      (if (and (pair? s) (oftm-number-part? (car s)))
+          (num (cdr s) (cons (car s) seen) (or seq? (func? (car s) 'seq)))
+          (if seq? (cons (append dots (reverse seen)) s) (cons dots r))))))
+
+(define (oftm-piece-paragraphs x pieces)
+  ;; the paragraphs of the pieces of the paragraph x
+  (let* ((attrs (map (lambda (a) (list (car a) (cadr a))) (ox-attrs x)))
+         (n (length pieces))
+         (without (lambda (keys)
+                    (list-filter attrs (lambda (a) (not (in? (car a) keys)))))))
+    (let loop ((l pieces) (i 0) (acc '()))
+      (if (null? l) (reverse acc)
+          (let* ((keys (append (if (> i 0) '(space-before first-indent) '())
+                               (if (< i (- n 1)) '(space-after) '())))
+                 (kids (if (eq? (caar l) 'text) (oftm-trim-piece (cdar l)) (cdar l))))
+            (loop (cdr l) (+ i 1)
+                  (cons (apply office-node (cons* 'p (without keys) kids)) acc)))))))
 
 (define (oftm-punctuation-string? y)
   ;; a string of the punctuation after a formula
@@ -325,7 +390,7 @@
   ;; (or at its end), also inside the nodes which wrap its text
   (let* ((r (if left? l (reverse l)))
          (x (and (pair? r) (car r)))
-         (trim (lambda (s) (if left? (string-trim s) (string-trim-right s))))
+         (trim (lambda (s) (if left? (tm-string-trim s) (tm-string-trim-right s))))
          (x2 (cond ((string? x) (trim x))
                    ((and (pair? x) (not (in? (car x) '(math image note bookmark box br tab))))
                     (with kids (oftm-trim-side (ox-children x) left?)
@@ -499,8 +564,9 @@
           ;; this address (which the converters never fetch)
           ((office-web-address? name) (list `(image ,name ,w ,h "" "")))
           ;; (another address is not a file to load when the document is
-          ;; opened)
+          ;; opened, nor a file which a Word file links to)
           ((or (>= (string-search-forwards "://" 0 name) 0)
+               (== (ox-attr x 'linked) "true")
                (string-starts? (locase-all name) "file:"))
            (list name))
           ((!= name "") (list `(image ,name ,w ,h "" "")))
@@ -548,6 +614,7 @@
          (t (cond ((not (get 'underline)) t)
                   ((get 'underline-kind) `(office-underline ,(get 'underline-kind) ,t))
                   (else `(underline ,t))))
+         (t (if (get 'overline) `(overline ,t) t))
          (t (cond ((not (get 'strike)) t)
                   ((get 'dstrike) `(office-strike "double" ,t))
                   (else `(strike-through ,t))))
@@ -649,18 +716,24 @@
     (map (lambda (kv)
            (let* ((st (cdr kv))
                   (par? (== (ox-attr st 'family) "paragraph")))
-             `(associate ,(string-append (if par? "office-par-" "office-span-") (car kv))
+             `(associate ,(string-append (if par? "office-par-" "office-span-") (cdar kv))
                          (macro "body" ,(if par? (oftm-style-paragraph st '(arg "body"))
                                             (oftm-style-text st '(arg "body")))))))
          (sort (list-filter (ahash-table->list oftm-styles)
                             (lambda (kv) (not (oftm-title-level (cdr kv)))))
-               (lambda (a b) (string<? (car a) (car b)))))
+               oftm-style-key<?))
     ;; the titles of the sections, in the look of the headings of the file
     (list-filter (map (lambda (kv) (oftm-title-macro (cdr kv)))
                       (sort (list-filter (ahash-table->list oftm-styles)
                                          (lambda (kv) (oftm-title-level (cdr kv))))
-                            (lambda (a b) (string<? (car a) (car b)))))
+                            oftm-style-key<?))
                  identity)))
+
+(define (oftm-style-key<? a b)
+  ;; the order of the entries ((family . name) . style): by name, then by
+  ;; family
+  (or (string<? (cdar a) (cdar b))
+      (and (== (cdar a) (cdar b)) (string<? (caar a) (caar b)))))
 
 ;; The labels of what has a number: the bookmarks in a heading, in a
 ;; caption, in a theorem, in an entry of the bibliography, or beside a
@@ -835,7 +908,9 @@
                                                (in? (string-trim-spaces y)
                                                     '("" "(" ")" "()"))))))))
     (and (pair? l) (func? (car l) 'math)
-         (list-and (map (lambda (y) (and (pair? y) (in? (car y) '(tab seq bookmark))))
+         ;; (and the punctuation after the formula)
+         (list-and (map (lambda (y) (or (and (pair? y) (in? (car y) '(tab seq bookmark)))
+                                        (oftm-punctuation-string? y)))
                         (cdr l)))
          (list-or (map (lambda (y) (func? y 'seq)) (cdr l)))
          (list (car l) (oftm-bookmarks (cons 'p (cdr l)))))))
@@ -954,7 +1029,7 @@
               ;; a named style of text
               ((span)
                (let ((t (oftm-inlines l))
-                     (st (ahash-ref oftm-styles (or (ox-attr x 'style) ""))))
+                     (st (ahash-ref oftm-styles (cons "text" (or (ox-attr x 'style) "")))))
                  (cond ((== t "") '())
                        (oftm-faithful? (list `(office-span ,(oftm-text (ox-attr x 'style)) ,t)))
                        (st (list (oftm-style-text st t)))
@@ -1384,13 +1459,37 @@
 
 (define (oftm-only-formula x)
   ;; the formula of a paragraph which holds nothing else (but bookmarks,
-  ;; the tabs before its label, the punctuation after it), or #f
+  ;; the tabs before its label, the punctuation after a displayed one), or
+  ;; #f. (An inline formula with punctuation is in its line of text, and
+  ;; the punctuation before a formula is text.)
   (with l (list-filter (ox-children x)
-                       (lambda (y) (not (or (and (string? y)
-                                                 (== (string-trim-spaces y) ""))
-                                            (oftm-punctuation-string? y)
-                                            (func? y 'bookmark) (func? y 'tab)))))
-    (and (list-1? l) (func? (car l) 'math) (car l))))
+                       (lambda (y) (not (or (oftm-blank? y) (func? y 'bookmark)))))
+    (and (pair? l) (func? (car l) 'math)
+         (or (null? (cdr l))
+             (and (oftm-display? (car l))
+                  (list-and (map oftm-punctuation-string? (cdr l)))))
+         (car l))))
+
+(define (oftm-without-role b)
+  ;; the block b, a paragraph of a field, not an entry of a bibliography
+  (if (not (oftm-role? b "bibitem")) b
+      (apply office-node
+             (cons* 'p (map (lambda (a) (list (car a) (cadr a)))
+                            (list-filter (ox-attrs b) (lambda (a) (!= (car a) 'role))))
+                    (ox-children b)))))
+
+(define (oftm-formula-dots x f)
+  ;; the formula f of the paragraph x, with the punctuation after it
+  (let* ((after (let loop ((c (ox-children x)))
+                  (cond ((null? c) '())
+                        ((func? (car c) 'math) (cdr c))
+                        (else (loop (cdr c))))))
+         (dots (apply string-append
+                      (map string-trim-spaces
+                           (list-filter after oftm-punctuation-string?)))))
+    (if (== dots "") f
+        (oftm-concat (append (if (func? f 'concat) (cdr f) (list f))
+                             (list (oftm-text dots)))))))
 
 (define (oftm-trim-right s)
   (let loop ((i (string-length s)))
@@ -1527,7 +1626,7 @@
                        ;; a formula with its number: an equation
                        ((oftm-numbered-formula x)
                         => (lambda (r)
-                             (with f (oftm-formula (car r))
+                             (with f (oftm-formula-dots x (oftm-formula (car r)))
                                (if (== f "") '()
                                    (list `(equation
                                             (document
@@ -1541,17 +1640,7 @@
                         => (lambda (m)
                              (with t (oftm-eqarray-table m)
                                (if t (list (oftm-eqarray t))
-                                   (let* ((f (oftm-formula m))
-                                          (dots (apply string-append
-                                                       (map string-trim-spaces
-                                                            (list-filter
-                                                              (ox-children x)
-                                                              oftm-punctuation-string?))))
-                                          (f (if (== dots "") f
-                                                 (oftm-concat
-                                                   (append (if (func? f 'concat) (cdr f)
-                                                               (list f))
-                                                           (list (oftm-text dots))))))
+                                   (let* ((f (oftm-formula-dots x (oftm-formula m)))
                                           (labels (oftm-labels (oftm-bookmarks x))))
                                      (cond ((and (== f "") (null? labels)) '())
                                            ((null? labels)
@@ -1572,8 +1661,11 @@
                 ((table) (list (oftm-table x)))
                 ((pagebreak) '((page-break)))
                 ;; a field over several paragraphs: its result in the field
+                ;; (its paragraphs as they are: those of a bibliography
+                ;; are not entries of TeXmacs, which another program
+                ;; writes again)
                 ((field-blocks)
-                 (with b (oftm-blocks (ox-children x))
+                 (with b (oftm-blocks (map oftm-without-role (ox-children x)))
                    (if oftm-faithful?
                        (list `(office-field ,(oftm-text (or (ox-attr x 'code) ""))
                                             ,(oftm-document b)))
@@ -1784,8 +1876,12 @@
               "on"))
     (set! oftm-styles (make-ahash-table))
     (for (st (append-map ox-children (list-filter l (lambda (y) (func? y 'styles)))))
+      ;; (a style of paragraphs and one of text may have the same name)
       (when (and (func? st 'style) (ox-attr st 'name))
-        (ahash-set! oftm-styles (ox-attr st 'name) st)))
+        (ahash-set! oftm-styles
+                    (cons (if (== (ox-attr st 'family) "paragraph") "paragraph" "text")
+                          (ox-attr st 'name))
+                    st)))
     (with r (catch #t
               (lambda ()
                 (let* ((setup (list-find l (lambda (y) (func? y 'setup))))
