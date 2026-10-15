@@ -65,6 +65,9 @@ public:
 };
 
 ns_renderer_rep *the_ns_renderer();
+// the glyphs as the preferences say ("gpu glyphs", "gpu glyph boldness"):
+// true when they changed, and everything must be drawn again
+bool ns_follow_glyph_settings ();
 
 // the tile of a pattern (owned by a cache)
 NSImage* get_image (url u, int w, int h, tree eff, SI pixel);

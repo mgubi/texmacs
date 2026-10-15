@@ -1,7 +1,8 @@
 /******************************************************************************
 * MODULE     : vue_gpu.cpp
-* DESCRIPTION: The GPU renderer of the Vue port (OpenGL, WebGL2 in the
-*              browser): a glyph atlas, textures and ThorVG
+* DESCRIPTION: The GPU renderer of the Vue port: a glyph atlas, batches of
+*              quads, textures and vector shapes, drawn by a backend
+*              (OpenGL and WebGL2, or Metal: gpu_backend.hpp)
 * COPYRIGHT  : (C) 2026  Massimiliano Gubinelli
 *******************************************************************************
 * This software falls under the GNU general public license version 3 or later.
@@ -12,37 +13,37 @@
 // What the GPU draws, and how (see docs/vue-graphics-stack.md, "The GPU
 // renderer", and misc/thorvg-bench for the measurements behind it):
 //
-// * the windows are drawn into their default framebuffers, all with one GL
-//   context (SDL_GL_MakeCurrent for the window being drawn), so that the
-//   textures, and the framebuffers of the editors, belong to all of them;
-// * the backing store of an editor is a texture with a framebuffer
-//   (gpu_picture_rep), which the editor repaints incrementally as it did
-//   its MuPDF pixmap, and which the window draws as a textured quad; a
-//   scroll copies it to a second texture, shifted, and the two are swapped;
+// * the windows are drawn by the backend (gpu_backend_gl.cpp: one GL
+//   context for all of them; gpu_backend_metal.mm: one Metal device), so
+//   that the textures, and the targets of the editors, belong to all of
+//   them;
+// * the backing store of an editor is a target texture (gpu_picture_rep),
+//   which the editor repaints incrementally as it did its MuPDF pixmap,
+//   and which the window draws as a textured quad; a scroll copies it to a
+//   second texture, shifted, and the two are swapped;
 // * glyphs come from an atlas (one R8 texture) of the glyph bitmaps of
 //   TeXmacs (shrink, as the X11 and the Qt ports draw them), plain fills
 //   from a white corner of the same atlas, so that text and fills go in
 //   one draw call; the pictures (icons, images) are uploaded once, as
 //   textures, and drawn as quads;
-// * lines, polygons, arcs and rounded rectangles go to ThorVG's GL engine,
-//   which draws into a scratch texture of its own (it draws into a
-//   multisampled framebuffer and copies the result over all of its
-//   target, so it cannot draw over what is there); the part it drew is
-//   then composed over the target. Consecutive vector operations are one
-//   ThorVG pass.
+// * lines, polygons, arcs and rounded rectangles are vector shapes
+//   (gpu_shape), which the backend draws over a box of the target (ThorVG
+//   in the GL backend, Core Graphics in the Metal one). Consecutive
+//   vector operations within one clip are one pass.
 //
-// Device coordinates are pixels from the top left of the target, y down.
-// A target is drawn with y = 0 at the top of its framebuffer, as ThorVG
-// draws: the texture of a target has its first row (v = 0) at the bottom of
-// the picture, the texture of an uploaded image at the top.
+// This file does not depend on the API: device coordinates are pixels from
+// the top left of the target, y down, and the backend says whether the
+// texture of a target has its first row at the bottom (GL) or at the top.
 
 #include "vue_gpu.hpp"
+#include "gpu_backend.hpp"
 #include "sys_utils.hpp"
 
-#ifndef USE_THORVG
+#if !defined (USE_THORVG) && !defined (USE_METAL)
 
 bool vue_gpu_enabled () { return false; }
 void vue_gpu_prepare () {}
+unsigned long long vue_gpu_window_flags () { return 0; }
 bool vue_gpu_follow_glyph_settings () { return false; }
 bool vue_gpu_attach (SDL_Window* w) { (void) w; return false; }
 void vue_gpu_present (SDL_Window* w) { (void) w; }
@@ -72,137 +73,6 @@ bool is_gpu_renderer (renderer r) { (void) r; return false; }
 #include "../MuPDF/mupdf_picture.hpp"
 #include "Freetype/tt_face.hpp"
 #include "boot.hpp"
-#include <SDL3/SDL.h>
-#include <thorvg.h>
-#ifdef __EMSCRIPTEN__
-#include <GLES3/gl3.h>
-#else
-#ifdef __APPLE__
-#include <OpenGL/gl3.h>
-#else
-// the prototypes of OpenGL 3 (Linux, Windows), for the types below
-#define GL_GLEXT_PROTOTYPES 1
-#include <SDL3/SDL_opengl.h>
-#endif
-// ThorVG's static library defines its OpenGL entry points as global
-// function pointers named as the functions themselves (glCreateProgram...):
-// a call to the function would be linked to its pointer. The functions
-// used here are loaded by SDL (from the OpenGL framework, libGL or
-// opengl32, once the context is current, as Windows wants) into pointers
-// of their own, which their names are made to mean.
-#define VUE_GL_FUNCTIONS(X) \
-  X(glActiveTexture) \
-  X(glAttachShader) \
-  X(glBindBuffer) \
-  X(glBindFramebuffer) \
-  X(glBindTexture) \
-  X(glBindVertexArray) \
-  X(glBlendEquation) \
-  X(glBlendFunc) \
-  X(glBlitFramebuffer) \
-  X(glBufferData) \
-  X(glCheckFramebufferStatus) \
-  X(glClear) \
-  X(glClearColor) \
-  X(glColorMask) \
-  X(glCompileShader) \
-  X(glCreateProgram) \
-  X(glCreateShader) \
-  X(glDeleteFramebuffers) \
-  X(glDeleteTextures) \
-  X(glDisable) \
-  X(glDrawArrays) \
-  X(glDrawArraysInstanced) \
-  X(glEnable) \
-  X(glEnableVertexAttribArray) \
-  X(glFinish) \
-  X(glFramebufferTexture2D) \
-  X(glGenBuffers) \
-  X(glGenFramebuffers) \
-  X(glGenTextures) \
-  X(glGenVertexArrays) \
-  X(glGetProgramiv) \
-  X(glGetShaderInfoLog) \
-  X(glGetShaderiv) \
-  X(glGetString) \
-  X(glGetUniformLocation) \
-  X(glLinkProgram) \
-  X(glPixelStorei) \
-  X(glReadPixels) \
-  X(glScissor) \
-  X(glShaderSource) \
-  X(glTexImage2D) \
-  X(glTexParameteri) \
-  X(glTexSubImage2D) \
-  X(glUniform1i) \
-  X(glUniform2f) \
-  X(glUseProgram) \
-  X(glVertexAttribDivisor) \
-  X(glVertexAttribIPointer) \
-  X(glVertexAttribPointer) \
-  X(glViewport)
-#define VUE_GL_POINTER(f) static decltype (&::f) vue_##f= NULL;
-VUE_GL_FUNCTIONS (VUE_GL_POINTER)
-static bool
-vue_gl_load () {
-  bool ok= true;
-#define VUE_GL_LOAD(f) \
-  vue_##f= (decltype (vue_##f)) SDL_GL_GetProcAddress (#f); \
-  if (vue_##f == NULL) ok= false;
-  VUE_GL_FUNCTIONS (VUE_GL_LOAD)
-  return ok;
-}
-#define glActiveTexture vue_glActiveTexture
-#define glAttachShader vue_glAttachShader
-#define glBindBuffer vue_glBindBuffer
-#define glBindFramebuffer vue_glBindFramebuffer
-#define glBindTexture vue_glBindTexture
-#define glBindVertexArray vue_glBindVertexArray
-#define glBlendEquation vue_glBlendEquation
-#define glBlendFunc vue_glBlendFunc
-#define glBlitFramebuffer vue_glBlitFramebuffer
-#define glBufferData vue_glBufferData
-#define glCheckFramebufferStatus vue_glCheckFramebufferStatus
-#define glClear vue_glClear
-#define glClearColor vue_glClearColor
-#define glColorMask vue_glColorMask
-#define glCompileShader vue_glCompileShader
-#define glCreateProgram vue_glCreateProgram
-#define glCreateShader vue_glCreateShader
-#define glDeleteFramebuffers vue_glDeleteFramebuffers
-#define glDeleteTextures vue_glDeleteTextures
-#define glDisable vue_glDisable
-#define glDrawArrays vue_glDrawArrays
-#define glDrawArraysInstanced vue_glDrawArraysInstanced
-#define glEnable vue_glEnable
-#define glEnableVertexAttribArray vue_glEnableVertexAttribArray
-#define glFinish vue_glFinish
-#define glFramebufferTexture2D vue_glFramebufferTexture2D
-#define glGenBuffers vue_glGenBuffers
-#define glGenFramebuffers vue_glGenFramebuffers
-#define glGenTextures vue_glGenTextures
-#define glGenVertexArrays vue_glGenVertexArrays
-#define glGetProgramiv vue_glGetProgramiv
-#define glGetShaderInfoLog vue_glGetShaderInfoLog
-#define glGetShaderiv vue_glGetShaderiv
-#define glGetString vue_glGetString
-#define glGetUniformLocation vue_glGetUniformLocation
-#define glLinkProgram vue_glLinkProgram
-#define glPixelStorei vue_glPixelStorei
-#define glReadPixels vue_glReadPixels
-#define glScissor vue_glScissor
-#define glShaderSource vue_glShaderSource
-#define glTexImage2D vue_glTexImage2D
-#define glTexParameteri vue_glTexParameteri
-#define glTexSubImage2D vue_glTexSubImage2D
-#define glUniform1i vue_glUniform1i
-#define glUniform2f vue_glUniform2f
-#define glUseProgram vue_glUseProgram
-#define glVertexAttribDivisor vue_glVertexAttribDivisor
-#define glVertexAttribIPointer vue_glVertexAttribIPointer
-#define glVertexAttribPointer vue_glVertexAttribPointer
-#define glViewport vue_glViewport
-#endif
 #include <unordered_map>
 #include <vector>
 #include <algorithm>
@@ -210,15 +80,15 @@ vue_gl_load () {
 #include <cmath>
 
 /******************************************************************************
-* Targets: a texture with a framebuffer, or the default framebuffer
+* Targets: a texture of the backend, or the window being drawn
 ******************************************************************************/
 
 struct gpu_target {
   int w, h;
-  GLuint fbo, tex;      // fbo 0 (and no texture): the window
-  GLuint fbo2, tex2;    // the other one of a scrolled backing store
+  gpu_texture tex;      // NULL for the window
+  gpu_texture tex2;     // the other one of a scrolled backing store
   bool screen;
-  bool made;            // the GL objects exist (made when first drawn)
+  bool made;            // the texture exists (made when first drawn)
   // the window may be drawn scaled (the interface scaling, vue_scaling in
   // vue_gui.cpp): w x h are then the pixels of its layout, dw x dh those
   // of its framebuffer. Equal to w x h otherwise, and for every texture
@@ -231,32 +101,8 @@ struct gpu_target {
 static void gpu_flush_all ();
 static bool read_glyph_settings ();
 
-static bool
-make_texture_target (GLuint& fbo, GLuint& tex, int w, int h) {
-  glGenTextures (1, &tex);
-  glBindTexture (GL_TEXTURE_2D, tex);
-  glTexImage2D (GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
-  glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-  glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-  glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-  glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-  glGenFramebuffers (1, &fbo);
-  glBindFramebuffer (GL_FRAMEBUFFER, fbo);
-  glFramebufferTexture2D (GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, tex, 0);
-  bool ok= glCheckFramebufferStatus (GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
-  glBindFramebuffer (GL_FRAMEBUFFER, 0);
-  return ok;
-}
-
-static void
-free_texture_target (GLuint& fbo, GLuint& tex) {
-  if (fbo != 0) glDeleteFramebuffers (1, &fbo);
-  if (tex != 0) glDeleteTextures (1, &tex);
-  fbo= tex= 0;
-}
-
 /******************************************************************************
-* The state of the GPU (one context)
+* The state of the GPU (one backend)
 ******************************************************************************/
 
 struct glyph_key {
@@ -283,7 +129,7 @@ struct slug_glyph {
 };
 
 struct cached_texture {
-  GLuint tex;
+  gpu_texture tex;
   int w, h;
   picture keep;         // the picture stays (its unique id is the key)
   unsigned long long last;
@@ -291,35 +137,27 @@ struct cached_texture {
 };
 
 static const int ATLAS= 2048;
+static const int SLUG_W= 1024;   // the width of the two textures of Slug
 
 struct gpu_state {
-  SDL_GLContext ctx= NULL;
+  gpu_backend* B= NULL;         // the backend, chosen once (vue_gpu_enabled)
   bool failed= false;
-  GLuint prog= 0, vao= 0, vbo= 0;
-  GLint u_size= -1, u_mode= -1, u_tex= -1, u_atlas= -1, u_porig= -1, u_ptile= -1;
+  bool started= false;          // the atlas exists: the backend is attached
   // the batch being made: quads of one target, one texture, one clip
   std::vector<float> verts;     // x y u v r g b a (premultiplied)
   gpu_target* target= NULL;
   int mode= 2;                  // 1: texture, 2: atlas, 3: atlas * pattern
   float porig_x= 0, porig_y= 0, ptile_w= 1, ptile_h= 1; // the pattern (3)
-  GLuint tex= 0;
+  gpu_texture tex= NULL;
   int sx1= 0, sy1= 0, sx2= 0, sy2= 0; // the clip (device pixels)
   // the atlas of the glyphs, with a white corner for the fills
-  GLuint atlas= 0;
-  GLuint blank= 0;  // 1x1, at the unit of u_tex when a draw has no texture
+  gpu_texture atlas= NULL;
   int ax= 4, ay= 0, arow= 4;
   std::unordered_map<glyph_key, glyph_slot, glyph_key_hash> glyphs;
   std::unordered_map<glyph_key, slug_glyph, glyph_key_hash> slugs;
   std::vector<font_glyphs> fonts;  // kept alive: their address is the key
-  // ThorVG: canvases drawing into scratch targets, a pass pending. The
-  // pass ends by copying all of the scratch target (GlBlitTask), whatever
-  // it drew, so a pass which fits in SMALL is drawn on a small canvas,
-  // moved to its origin; the others on one as large as the windows
-  tvg::GlCanvas* tvg= NULL;
-  gpu_target scratch= { 0, 0, 0, 0, 0, 0, false, false };
-  tvg::GlCanvas* tvg_small= NULL;
-  gpu_target small= { 0, 0, 0, 0, 0, 0, false, false };
-  std::vector<tvg::Paint*> shapes;
+  // the vector shapes of the pass being made: one target, one clip
+  std::vector<gpu_shape> shapes;
   bool pending= false;
   gpu_target* vtarget= NULL;
   int vx1= 0, vy1= 0, vx2= 0, vy2= 0;          // what the pass covers
@@ -329,8 +167,8 @@ struct gpu_state {
   std::unordered_map<std::string, cached_texture> patterns;
   unsigned long long tick= 0;
   size_t texture_bytes= 0;
-  // the default framebuffer of the window being drawn
-  gpu_target screen= { 0, 0, 0, 0, 0, 0, true, true, 0, 0, 0 };
+  // the window being drawn
+  gpu_target screen= { 0, 0, NULL, NULL, true, true, 0, 0, 0 };
   // the source of the glyphs of the atlas (see read_glyph_settings): 0 the
   // bitmaps of TeXmacs, 1 MuPDF, 2 FreeType in shades of grey, hinted as
   // ft_flags say and made ft_bold pixels bolder
@@ -339,8 +177,7 @@ struct gpu_state {
   double ft_bold= 0.22;
   // glyphs drawn from their outlines (Slug, TEXMACS_VUE_SLUG=1)
   bool slug_on= false;
-  GLuint slug_prog= 0, slug_vao= 0, slug_vbo= 0, curve_tex= 0, index_tex= 0;
-  GLint su_size= -1, su_curves= -1, su_bands= -1;
+  gpu_texture curve_tex= NULL, index_tex= NULL;
   int curve_rows= 0, index_rows= 0;      // allocated rows of the textures
   std::vector<float> curves;             // 4 floats a texel, 2 texels a curve
   std::vector<unsigned> bands;           // headers and lists of curves
@@ -369,13 +206,29 @@ feed (const T& v) { feed_bytes (&v, sizeof (T)); }
 static inline bool
 on_screen (gpu_target* t) { return t != NULL && t->screen; }
 
+#ifndef USE_METAL
+gpu_backend* gpu_metal_backend () { return NULL; }
+#endif
+
+// The backend: TEXMACS_VUE_GPU=0 draws with MuPDF, =gl or =metal chooses
+// the API; by default Metal on macOS when it is compiled (USE_METAL), else
+// OpenGL (USE_THORVG). Decided once.
+static gpu_backend*
+choose_backend () {
+  string v= get_env ("TEXMACS_VUE_GPU");
+  if (v == "0") return NULL;
+  gpu_backend* gl= gpu_gl_backend ();
+  gpu_backend* mtl= gpu_metal_backend ();
+  if (v == "gl" || v == "opengl") return gl;
+  if (v == "metal") return mtl;
+  return mtl != NULL ? mtl : gl;
+}
+
 bool
 vue_gpu_enabled () {
-  static int on= -1;
-  // NOTE: on, as in the browser, unless TEXMACS_VUE_GPU=0 (and drawn with
-  // MuPDF when there is no GL context)
-  if (on < 0) on= (get_env ("TEXMACS_VUE_GPU") != "0") ? 1 : 0;
-  return on == 1 && !G.failed;
+  static bool chosen= false;
+  if (!chosen) { chosen= true; G.B= choose_backend (); }
+  return G.B != NULL && !G.failed;
 }
 
 void
@@ -383,260 +236,52 @@ vue_gpu_prepare () {
   static bool done= false;
   if (done || !vue_gpu_enabled ()) return;
   done= true;
-#ifdef __EMSCRIPTEN__
-  SDL_GL_SetAttribute (SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
-  SDL_GL_SetAttribute (SDL_GL_CONTEXT_MAJOR_VERSION, 3);
-  SDL_GL_SetAttribute (SDL_GL_CONTEXT_MINOR_VERSION, 0);
-#else
-  // NOTE: 4.1 is the core profile of macOS; elsewhere 3.3 (the GLSL of the
-  // shaders, and what ThorVG needs)
-  SDL_GL_SetAttribute (SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
-#ifdef __APPLE__
-  SDL_GL_SetAttribute (SDL_GL_CONTEXT_MAJOR_VERSION, 4);
-  SDL_GL_SetAttribute (SDL_GL_CONTEXT_MINOR_VERSION, 1);
-#else
-  SDL_GL_SetAttribute (SDL_GL_CONTEXT_MAJOR_VERSION, 3);
-  SDL_GL_SetAttribute (SDL_GL_CONTEXT_MINOR_VERSION, 3);
-#endif
-  SDL_GL_SetAttribute (SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_FORWARD_COMPATIBLE_FLAG);
-#endif
-  SDL_GL_SetAttribute (SDL_GL_DOUBLEBUFFER, 1);
-  SDL_GL_SetAttribute (SDL_GL_DEPTH_SIZE, 0);
-  SDL_GL_SetAttribute (SDL_GL_STENCIL_SIZE, 0);
-  SDL_GL_SetAttribute (SDL_GL_SHARE_WITH_CURRENT_CONTEXT, 1);
-#ifndef __EMSCRIPTEN__
-  // NOTE: whether there is OpenGL 3, before the first window is made: the
-  // windows made for the GPU are not drawn without it (Windows with the
-  // driver of Microsoft only, as on the runners of GitHub, has OpenGL 1.1)
-  bool ok= false;
-  SDL_Window* probe= SDL_CreateWindow ("", 1, 1,
-                                       SDL_WINDOW_OPENGL | SDL_WINDOW_HIDDEN);
-  if (probe != NULL) {
-    SDL_GLContext c= SDL_GL_CreateContext (probe);
-    if (c != NULL) {
-      ok= vue_gl_load ();
-      SDL_GL_MakeCurrent (probe, NULL);
-      SDL_GL_DestroyContext (c);
-    }
-    SDL_DestroyWindow (probe);
-  }
-  if (!ok) {
-    cout << "TeXmacs] GPU: no OpenGL 3 (" << SDL_GetError ()
-         << "), drawing with MuPDF" << LF;
-    G.failed= true;
-  }
-#endif
+  if (!G.B->prepare ()) G.failed= true;
 }
 
-/******************************************************************************
-* The program: textured quads, from the atlas (a coverage times a color)
-* or from a texture (premultiplied, times an alpha)
-******************************************************************************/
+unsigned long long
+vue_gpu_window_flags () {
+  return vue_gpu_enabled () ? G.B->window_flags () : 0;
+}
 
-#ifdef __EMSCRIPTEN__
-#define GLSL_HEADER "#version 300 es\nprecision highp float;\n"
-#else
-#define GLSL_HEADER "#version 330 core\n"
-#endif
+// what the renderer keeps on the backend, once it can draw
+static void
+start_gpu () {
+  // the atlas, with a white 4x4 corner (the fills)
+  std::vector<unsigned char> zero (ATLAS * ATLAS, 0);
+  for (int y= 0; y < 4; y++) for (int x= 0; x < 4; x++) zero[y * ATLAS + x]= 255;
+  G.atlas= G.B->new_texture (ATLAS, ATLAS, GPU_R8, true, false, zero.data ());
+  read_glyph_settings ();
+  G.slug_on= (get_env ("TEXMACS_VUE_SLUG") == "1");
+  if (G.slug_on) cout << "TeXmacs] GPU: glyphs drawn from their outlines (Slug)" << LF;
+  G.started= true;
+  cout << "TeXmacs] GPU: " << G.B->description () << LF;
+}
 
-static const char* vertex_src= GLSL_HEADER
-  "layout(location=0) in vec2 a_pos;\n"
-  "layout(location=1) in vec2 a_uv;\n"
-  "layout(location=2) in vec4 a_col;\n"
-  "uniform vec2 u_size;\n"
-  "out vec2 v_uv; out vec4 v_col; out vec2 v_pos;\n"
-  "void main () {\n"
-  "  v_uv= a_uv; v_col= a_col; v_pos= a_pos;\n"
-  "  gl_Position= vec4 (a_pos.x / u_size.x * 2.0 - 1.0,\n"
-  "                     1.0 - a_pos.y / u_size.y * 2.0, 0.0, 1.0);\n"
-  "}\n";
-
-static const char* fragment_src= GLSL_HEADER
-  "uniform int u_mode;\n"
-  "uniform sampler2D u_tex;\n"
-  "uniform sampler2D u_atlas;\n"
-  "uniform vec2 u_porig, u_ptile;\n"
-  "in vec2 v_uv; in vec4 v_col; in vec2 v_pos;\n"
-  "out vec4 o_col;\n"
-  "void main () {\n"
-  "  if (u_mode == 1) o_col= texture (u_tex, v_uv) * v_col.a;\n"
-  "  else if (u_mode == 3)\n"   // a glyph filled with a pattern
-  "    o_col= texture (u_atlas, v_uv).r *\n"
-  "           texture (u_tex, (v_pos - u_porig) / u_ptile) * v_col.a;\n"
-  "  else o_col= texture (u_atlas, v_uv).r * v_col;\n"
-  "}\n";
-
-/******************************************************************************
-* Glyphs drawn from their outlines (Slug: E. Lengyel, "GPU-Centered Font
-* Rendering Directly from Glyph Outlines", JCGT 6 (2), 2017; measured in
-* misc/thorvg-bench). The outline of a glyph is a list of quadratic curves
-* in em units (mupdf_glyph_outline), in a texture of curves (two texels a
-* curve); its box is cut into bands, horizontal and vertical, each listing
-* the curves which cross it, sorted by decreasing maximal x or y, in a
-* texture of indices. For each pixel the fragment shader casts a ray
-* towards +x through the curves of its horizontal band and one towards +y
-* through those of its vertical band; each curve adds or removes coverage
-* from its crossings, the roots which count chosen by the signs of its
-* control points (the 0x2E74 table of the paper, which keeps the winding
-* number right where curves meet); the two estimates are weighted by how
-* close their nearest crossings are to the pixel. A glyph is an instance
-* of a quad: its origin, its size, its box, its bands, its color.
-******************************************************************************/
-
-static const int SLUG_W= 1024;   // the width of the two textures
-
-static const char* slug_vertex_src= GLSL_HEADER
-  "layout(location=0) in vec3 i_org;\n"   // origin (pixels), pixels a em
-  "layout(location=1) in vec4 i_box;\n"   // the box (em)
-  "layout(location=2) in uvec2 i_band;\n" // offset of the header, bands
-  "layout(location=3) in vec4 i_col;\n"
-  "uniform vec2 u_size;\n"
-  "out vec2 v_em; flat out vec4 v_box; flat out uvec2 v_band;\n"
-  "flat out vec4 v_col; flat out float v_scale;\n"
-  "void main () {\n"
-  "  int id= gl_VertexID;\n"
-  "  vec2 c= vec2 ((id == 1 || id == 3 || id == 4) ? 1.0 : 0.0,\n"
-  "                (id == 2 || id == 4 || id == 5) ? 1.0 : 0.0);\n"
-  "  float pad= 1.0 / i_org.z;\n"
-  "  vec2 em= mix (i_box.xy - pad, i_box.zw + pad, c);\n"
-  "  vec2 p= i_org.xy + vec2 (em.x, -em.y) * i_org.z;\n"
-  "  v_em= em; v_box= i_box; v_band= i_band; v_col= i_col; v_scale= i_org.z;\n"
-  "  gl_Position= vec4 (p.x / u_size.x * 2.0 - 1.0, 1.0 - p.y / u_size.y * 2.0, 0.0, 1.0);\n"
-  "}\n";
-
-static const char* slug_fragment_src= GLSL_HEADER
-  "precision highp int; precision highp usampler2D;\n"
-  "uniform sampler2D u_curves; uniform usampler2D u_bands;\n"
-  "in vec2 v_em; flat in vec4 v_box; flat in uvec2 v_band;\n"
-  "flat in vec4 v_col; flat in float v_scale;\n"
-  "out vec4 o_col;\n"
-  "const int W= 1024;\n"
-  "uint idx (uint i) { return texelFetch (u_bands, ivec2 (int (i) % W, int (i) / W), 0).r; }\n"
-  "vec4 crv (uint k, int j) { int i= int (k) * 2 + j; return texelFetch (u_curves, ivec2 (i % W, i / W), 0); }\n"
-  "float ray (uint start, uint count, bool vertical, out float near) {\n"
-  "  float cov= 0.0; near= 1.0e9;\n"
-  "  for (uint n= 0u; n < count; n++) {\n"
-  "    uint k= idx (start + n);\n"
-  "    vec4 a= crv (k, 0); vec4 b= crv (k, 1);\n"
-  "    vec2 p1= a.xy - v_em, p2= a.zw - v_em, p3= b.xy - v_em;\n"
-  "    if (vertical) { p1= p1.yx; p2= p2.yx; p3= p3.yx; }\n"
-  "    if (max (max (p1.x, p2.x), p3.x) * v_scale < -0.5) break;\n"
-  "    uint code= (0x2E74u >> ((p1.y > 0.0 ? 2u : 0u) + (p2.y > 0.0 ? 4u : 0u) +\n"
-  "                            (p3.y > 0.0 ? 8u : 0u))) & 3u;\n"
-  "    if (code == 0u) continue;\n"
-  "    vec2 A= p1 - p2 * 2.0 + p3, B= p1 - p2;\n"
-  "    float t1, t2;\n"
-  "    if (abs (A.y) < 1.0e-5) { t1= t2= p1.y * 0.5 / B.y; }\n"
-  "    else {\n"
-  "      float ra= 1.0 / A.y, d= sqrt (max (B.y * B.y - A.y * p1.y, 0.0));\n"
-  "      t1= (B.y - d) * ra; t2= (B.y + d) * ra;\n"
-  "    }\n"
-  "    float x1= (A.x * t1 - B.x * 2.0) * t1 + p1.x;\n"
-  "    float x2= (A.x * t2 - B.x * 2.0) * t2 + p1.x;\n"
-  "    if ((code & 1u) != 0u) {\n"
-  "      cov += clamp (x1 * v_scale + 0.5, 0.0, 1.0); near= min (near, abs (x1 * v_scale)); }\n"
-  "    if (code > 1u) {\n"
-  "      cov -= clamp (x2 * v_scale + 0.5, 0.0, 1.0); near= min (near, abs (x2 * v_scale)); }\n"
-  "  }\n"
-  "  return cov;\n"
-  "}\n"
-  "void main () {\n"
-  "  uint nb= v_band.y, h= v_band.x;\n"
-  "  vec2 rel= (v_em - v_box.xy) / max (v_box.zw - v_box.xy, vec2 (1.0e-6));\n"
-  "  uint by= uint (clamp (floor (rel.y * float (nb)), 0.0, float (nb) - 1.0));\n"
-  "  uint bx= uint (clamp (floor (rel.x * float (nb)), 0.0, float (nb) - 1.0));\n"
-  "  float nx, ny;\n"
-  "  float cx= abs (ray (idx (h + 2u * by), idx (h + 2u * by + 1u), false, nx));\n"
-  "  float cy= abs (ray (idx (h + 2u * (nb + bx)), idx (h + 2u * (nb + bx) + 1u), true, ny));\n"
-  "  float wx= clamp (1.0 - nx * 2.0, 0.0, 1.0), wy= clamp (1.0 - ny * 2.0, 0.0, 1.0);\n"
-  "  float c= max ((cx * wx + cy * wy) / max (wx + wy, 1.0 / 65536.0), min (cx, cy));\n"
-  "  o_col= v_col * clamp (c, 0.0, 1.0);\n"
-  "}\n";
-
-static GLuint
-compile_shader (GLenum type, const char* src) {
-  GLuint s= glCreateShader (type);
-  glShaderSource (s, 1, &src, NULL);
-  glCompileShader (s);
-  GLint ok= 0;
-  glGetShaderiv (s, GL_COMPILE_STATUS, &ok);
-  if (!ok) {
-    char log[2000]; glGetShaderInfoLog (s, 2000, NULL, log);
-    cout << "TeXmacs] GPU: shader: " << log << LF;
+bool
+vue_gpu_attach (SDL_Window* w) {
+  if (!vue_gpu_enabled () || w == NULL) return false;
+  if (!G.B->attach (w)) {
+    if (!G.started) G.failed= true;
+    return false;
   }
-  return s;
+  if (!G.started) start_gpu ();
+  return true;
+}
+
+void
+vue_gpu_present (SDL_Window* w) {
+  gpu_flush_all ();
+  G.B->present (w);
 }
 
 static bool
-init_gl () {
-  G.prog= glCreateProgram ();
-  glAttachShader (G.prog, compile_shader (GL_VERTEX_SHADER, vertex_src));
-  glAttachShader (G.prog, compile_shader (GL_FRAGMENT_SHADER, fragment_src));
-  glLinkProgram (G.prog);
-  GLint ok= 0;
-  glGetProgramiv (G.prog, GL_LINK_STATUS, &ok);
-  if (!ok) { cout << "TeXmacs] GPU: the program does not link" << LF; return false; }
-  G.u_size = glGetUniformLocation (G.prog, "u_size");
-  G.u_mode = glGetUniformLocation (G.prog, "u_mode");
-  G.u_tex  = glGetUniformLocation (G.prog, "u_tex");
-  G.u_atlas= glGetUniformLocation (G.prog, "u_atlas");
-  G.u_porig= glGetUniformLocation (G.prog, "u_porig");
-  G.u_ptile= glGetUniformLocation (G.prog, "u_ptile");
-  glGenVertexArrays (1, &G.vao);
-  glGenBuffers (1, &G.vbo);
-  // a texture of 1x1 for the units which a draw does not use: the samplers
-  // of the program must always have a complete texture (macOS warns of the
-  // texture 0, "unloadable", otherwise)
-  glGenTextures (1, &G.blank);
-  glBindTexture (GL_TEXTURE_2D, G.blank);
-  {
-    unsigned char white[4]= { 255, 255, 255, 255 };
-    glTexImage2D (GL_TEXTURE_2D, 0, GL_RGBA8, 1, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE, white);
-    glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-  }
-  // the atlas, with a white 4x4 corner (the fills)
-  glGenTextures (1, &G.atlas);
-  glBindTexture (GL_TEXTURE_2D, G.atlas);
-  std::vector<unsigned char> zero (ATLAS * ATLAS, 0);
-  for (int y= 0; y < 4; y++) for (int x= 0; x < 4; x++) zero[y * ATLAS + x]= 255;
-  glPixelStorei (GL_UNPACK_ALIGNMENT, 1);
-  glTexImage2D (GL_TEXTURE_2D, 0, GL_R8, ATLAS, ATLAS, 0, GL_RED, GL_UNSIGNED_BYTE, zero.data ());
-  glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-  glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-  glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-  glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-  read_glyph_settings ();
-  // the program of Slug (TEXMACS_VUE_SLUG=1)
-  G.slug_on= (get_env ("TEXMACS_VUE_SLUG") == "1");
-  if (G.slug_on) {
-    G.slug_prog= glCreateProgram ();
-    glAttachShader (G.slug_prog, compile_shader (GL_VERTEX_SHADER, slug_vertex_src));
-    glAttachShader (G.slug_prog, compile_shader (GL_FRAGMENT_SHADER, slug_fragment_src));
-    glLinkProgram (G.slug_prog);
-    glGetProgramiv (G.slug_prog, GL_LINK_STATUS, &ok);
-    if (!ok) {
-      cout << "TeXmacs] GPU: the program of Slug does not link, bitmap glyphs" << LF;
-      G.slug_on= false;
-    }
-    else {
-      G.su_size  = glGetUniformLocation (G.slug_prog, "u_size");
-      G.su_curves= glGetUniformLocation (G.slug_prog, "u_curves");
-      G.su_bands = glGetUniformLocation (G.slug_prog, "u_bands");
-      glGenVertexArrays (1, &G.slug_vao);
-      glGenBuffers (1, &G.slug_vbo);
-      glGenTextures (1, &G.curve_tex);
-      glGenTextures (1, &G.index_tex);
-      cout << "TeXmacs] GPU: glyphs drawn from their outlines (Slug)" << LF;
-    }
-  }
-  // ThorVG
-  if (tvg::Initializer::init (0) != tvg::Result::Success) {
-    cout << "TeXmacs] GPU: ThorVG does not start" << LF; return false; }
-  G.tvg= tvg::GlCanvas::gen ();
-  G.tvg_small= tvg::GlCanvas::gen ();
-  if (G.tvg == NULL || G.tvg_small == NULL) {
-    cout << "TeXmacs] GPU: no GL canvas in ThorVG" << LF; return false; }
+ensure_target (gpu_target* t) {
+  if (t->made || t->screen) return true;
+  if (!G.started || t->w <= 0 || t->h <= 0) return false;
+  t->tex= G.B->new_target (t->w, t->h);
+  if (t->tex == NULL) return false;
+  t->made= true;
   return true;
 }
 
@@ -683,60 +328,9 @@ clear_atlas () {
 
 bool
 vue_gpu_follow_glyph_settings () {
-  if (G.atlas == 0) return false; // no GPU, or not started
+  if (!G.started) return false; // no GPU, or not started
   if (!read_glyph_settings ()) return false;
   clear_atlas ();
-  return true;
-}
-
-bool
-vue_gpu_attach (SDL_Window* w) {
-  if (!vue_gpu_enabled () || w == NULL) return false;
-  if (G.ctx == NULL) {
-    G.ctx= SDL_GL_CreateContext (w);
-    if (G.ctx == NULL) {
-      cout << "TeXmacs] GPU: no GL context (" << SDL_GetError ()
-           << "), drawing with MuPDF" << LF;
-      G.failed= true;
-      return false;
-    }
-    SDL_GL_MakeCurrent (w, G.ctx);
-#ifndef __EMSCRIPTEN__
-    if (!vue_gl_load ()) {
-      cout << "TeXmacs] GPU: no OpenGL 3, drawing with MuPDF" << LF;
-      SDL_GL_DestroyContext (G.ctx);
-      G.ctx= NULL;
-      G.failed= true;
-      return false;
-    }
-#endif
-    SDL_GL_SetSwapInterval (0); // several windows: each would wait a frame
-    if (!init_gl ()) { G.failed= true; return false; }
-    cout << "TeXmacs] GPU: " << (const char*) glGetString (GL_RENDERER)
-           << ", " << (const char*) glGetString (GL_VERSION) << LF;
-    return true;
-  }
-  return SDL_GL_MakeCurrent (w, G.ctx);
-}
-
-void
-vue_gpu_present (SDL_Window* w) {
-  gpu_flush_all ();
-  SDL_GL_SwapWindow (w);
-}
-
-static bool
-ensure_target (gpu_target* t) {
-  if (t->made || t->screen) return true;
-  if (G.ctx == NULL || t->w <= 0 || t->h <= 0) return false;
-  if (!make_texture_target (t->fbo, t->tex, t->w, t->h)) return false;
-  // opaque white, as native_opaque_picture
-  glBindFramebuffer (GL_FRAMEBUFFER, t->fbo);
-  glDisable (GL_SCISSOR_TEST);
-  glClearColor (1, 1, 1, 1);
-  glClear (GL_COLOR_BUFFER_BIT);
-  glBindFramebuffer (GL_FRAMEBUFFER, 0);
-  t->made= true;
   return true;
 }
 
@@ -744,28 +338,15 @@ ensure_target (gpu_target* t) {
 * Batches of quads
 ******************************************************************************/
 
-static void
-bind_target (gpu_target* t) {
-  glBindFramebuffer (GL_FRAMEBUFFER, t->screen ? 0 : t->fbo);
-  // (the shaders map w x h to the viewport: a scaled window is scaled here)
-  glViewport (0, 0, t->dev_w (), t->dev_h ());
-}
-
-static void
-set_scissor (gpu_target* t, int x1, int y1, int x2, int y2) {
+// a pass of the backend into the target, with a clip (device pixels)
+static gpu_pass
+make_pass (gpu_target* t, int x1, int y1, int x2, int y2) {
   x1= max (x1, 0); y1= max (y1, 0); x2= min (x2, t->w); y2= min (y2, t->h);
   if (x2 < x1) x2= x1;
   if (y2 < y1) y2= y1;
-  glEnable (GL_SCISSOR_TEST);
-  if (t->dev_w () != t->w || t->dev_h () != t->h) {
-    // a scaled window: the pixels which the box touches
-    double fx= (double) t->dev_w () / t->w, fy= (double) t->dev_h () / t->h;
-    int a1= (int) floor (x1 * fx), a2= (int) ceil (x2 * fx);
-    int b1= (int) floor ((t->h - y2) * fy), b2= (int) ceil ((t->h - y1) * fy);
-    glScissor (a1, b1, a2 - a1, b2 - b1);
-    return;
-  }
-  glScissor (x1, t->h - y2, x2 - x1, y2 - y1);
+  gpu_pass p= { t->screen ? NULL : t->tex, t->w, t->h, t->dev_w (), t->dev_h (),
+                x1, y1, x2, y2 };
+  return p;
 }
 
 static void flush_slug ();
@@ -775,63 +356,28 @@ flush_quads () {
   if (G.mode == 4) { flush_slug (); return; }
   if (G.verts.empty () || G.target == NULL) { G.verts.clear (); return; }
   gpu_target* t= G.target;
-  bind_target (t);
-  set_scissor (t, G.sx1, G.sy1, G.sx2, G.sy2);
-  glDisable (GL_DEPTH_TEST);
-  glDisable (GL_STENCIL_TEST);
-  glDisable (GL_CULL_FACE);
-  glColorMask (GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
-  glEnable (GL_BLEND);
-  glBlendEquation (GL_FUNC_ADD);
-  glBlendFunc (GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
-  glUseProgram (G.prog);
-  glUniform2f (G.u_size, (float) t->w, (float) t->h);
-  glUniform1i (G.u_mode, G.mode);
-  glUniform2f (G.u_porig, G.porig_x, G.porig_y);
-  glUniform2f (G.u_ptile, G.ptile_w, G.ptile_h);
-  glActiveTexture (GL_TEXTURE0);
-  glBindTexture (GL_TEXTURE_2D, (G.mode != 2 && G.tex != 0) ? G.tex : G.blank);
-  glUniform1i (G.u_tex, 0);
-  glActiveTexture (GL_TEXTURE1);
-  glBindTexture (GL_TEXTURE_2D, G.atlas);
-  glUniform1i (G.u_atlas, 1);
-  glActiveTexture (GL_TEXTURE0);
-  glBindVertexArray (G.vao);
-  glBindBuffer (GL_ARRAY_BUFFER, G.vbo);
-  glBufferData (GL_ARRAY_BUFFER, G.verts.size () * sizeof (float), G.verts.data (), GL_STREAM_DRAW);
-  glEnableVertexAttribArray (0);
-  glEnableVertexAttribArray (1);
-  glEnableVertexAttribArray (2);
-  glVertexAttribPointer (0, 2, GL_FLOAT, GL_FALSE, 32, (void*) 0);
-  glVertexAttribPointer (1, 2, GL_FLOAT, GL_FALSE, 32, (void*) 8);
-  glVertexAttribPointer (2, 4, GL_FLOAT, GL_FALSE, 32, (void*) 16);
-  glDrawArrays (GL_TRIANGLES, 0, (GLsizei) (G.verts.size () / 8));
-  glBindVertexArray (0);
+  gpu_pass p= make_pass (t, G.sx1, G.sy1, G.sx2, G.sy2);
+  gpu_quads q= { G.mode, G.tex, G.atlas, G.porig_x, G.porig_y, G.ptile_w, G.ptile_h,
+                 G.verts.data (), (int) (G.verts.size () / 8) };
+  G.B->draw_quads (p, q);
   G.verts.clear ();
   t->gen++;
 }
 
-
 // the rows of the textures of Slug which are not there yet; a texture
 // which is full is made twice as tall and sent again
 static void
-send_rows (GLuint tex, int& rows, size_t& sent, size_t total, size_t per_texel,
-           bool is_float, const void* data) {
+send_rows (gpu_texture& tex, int& rows, size_t& sent, size_t total,
+           size_t per_texel, gpu_format fmt, const void* data) {
   size_t texels= total / per_texel;
   int need= (int) ((texels + SLUG_W - 1) / SLUG_W);
   if (need == 0) return;
-  glBindTexture (GL_TEXTURE_2D, tex);
-  glPixelStorei (GL_UNPACK_ALIGNMENT, 4);
-  GLenum ifmt= is_float ? GL_RGBA32F : GL_R32UI;
-  GLenum fmt= is_float ? GL_RGBA : GL_RED_INTEGER;
-  GLenum type= is_float ? GL_FLOAT : GL_UNSIGNED_INT;
-  if (need > rows) {
+  if (need > rows || tex == NULL) {
     int nr= max (need, max (16, rows * 2));
     std::vector<unsigned char> zero ((size_t) nr * SLUG_W * per_texel * 4, 0);
     memcpy (zero.data (), data, total * 4);
-    glTexImage2D (GL_TEXTURE_2D, 0, ifmt, SLUG_W, nr, 0, fmt, type, zero.data ());
-    glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    if (tex != NULL) G.B->delete_texture (tex);
+    tex= G.B->new_texture (SLUG_W, nr, fmt, false, false, zero.data ());
     rows= nr; sent= total;
     return;
   }
@@ -841,7 +387,7 @@ send_rows (GLuint tex, int& rows, size_t& sent, size_t total, size_t per_texel,
   std::vector<unsigned char> buf ((size_t) (need - r0) * SLUG_W * per_texel * 4, 0);
   size_t from= (size_t) r0 * SLUG_W * per_texel;
   memcpy (buf.data (), (const char*) data + from * 4, (total - from) * 4);
-  glTexSubImage2D (GL_TEXTURE_2D, 0, 0, r0, SLUG_W, need - r0, fmt, type, buf.data ());
+  G.B->update_texture (tex, 0, r0, SLUG_W, need - r0, buf.data ());
   sent= total;
 }
 
@@ -849,39 +395,13 @@ static void
 flush_slug () {
   gpu_target* t= G.target;
   if (G.slug_inst.empty () || t == NULL) { G.slug_inst.clear (); return; }
-  send_rows (G.curve_tex, G.curve_rows, G.curves_sent, G.curves.size (), 4, true,
-             G.curves.data ());
-  send_rows (G.index_tex, G.index_rows, G.bands_sent, G.bands.size (), 1, false,
-             G.bands.data ());
-  bind_target (t);
-  set_scissor (t, G.sx1, G.sy1, G.sx2, G.sy2);
-  glDisable (GL_DEPTH_TEST);
-  glDisable (GL_STENCIL_TEST);
-  glDisable (GL_CULL_FACE);
-  glEnable (GL_BLEND);
-  glBlendEquation (GL_FUNC_ADD);
-  glBlendFunc (GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
-  glUseProgram (G.slug_prog);
-  glUniform2f (G.su_size, (float) t->w, (float) t->h);
-  glActiveTexture (GL_TEXTURE0);
-  glBindTexture (GL_TEXTURE_2D, G.curve_tex);
-  glUniform1i (G.su_curves, 0);
-  glActiveTexture (GL_TEXTURE1);
-  glBindTexture (GL_TEXTURE_2D, G.index_tex);
-  glUniform1i (G.su_bands, 1);
-  glActiveTexture (GL_TEXTURE0);
-  glBindVertexArray (G.slug_vao);
-  glBindBuffer (GL_ARRAY_BUFFER, G.slug_vbo);
-  glBufferData (GL_ARRAY_BUFFER, G.slug_inst.size () * 4, G.slug_inst.data (), GL_STREAM_DRAW);
-  const int st= 13 * 4;  // x y em, box, offset nb, color
-  glEnableVertexAttribArray (0); glVertexAttribPointer (0, 3, GL_FLOAT, GL_FALSE, st, (void*) 0);
-  glEnableVertexAttribArray (1); glVertexAttribPointer (1, 4, GL_FLOAT, GL_FALSE, st, (void*) 12);
-  glEnableVertexAttribArray (2); glVertexAttribIPointer (2, 2, GL_UNSIGNED_INT, st, (void*) 28);
-  glEnableVertexAttribArray (3); glVertexAttribPointer (3, 4, GL_FLOAT, GL_FALSE, st, (void*) 36);
-  for (int i= 0; i < 4; i++) glVertexAttribDivisor (i, 1);
-  glDrawArraysInstanced (GL_TRIANGLES, 0, 6, (GLsizei) (G.slug_inst.size () / 13));
-  for (int i= 0; i < 4; i++) glVertexAttribDivisor (i, 0);
-  glBindVertexArray (0);
+  send_rows (G.curve_tex, G.curve_rows, G.curves_sent, G.curves.size (), 4,
+             GPU_RGBA32F, G.curves.data ());
+  send_rows (G.index_tex, G.index_rows, G.bands_sent, G.bands.size (), 1,
+             GPU_R32UI, G.bands.data ());
+  gpu_pass p= make_pass (t, G.sx1, G.sy1, G.sx2, G.sy2);
+  G.B->draw_slug (p, G.curve_tex, G.index_tex, G.slug_inst.data (),
+                  (int) (G.slug_inst.size () / 13));
   G.slug_inst.clear ();
   t->gen++;
 }
@@ -955,7 +475,7 @@ static void flush_vectors ();
 
 // start or go on with a batch for the target, mode, texture and clip
 static void
-batch (gpu_target* t, int mode, GLuint tex, int x1, int y1, int x2, int y2,
+batch (gpu_target* t, int mode, gpu_texture tex, int x1, int y1, int x2, int y2,
        float pox= 0, float poy= 0, float ptw= 1, float pth= 1) {
   if (G.pending) flush_vectors ();
   if (G.target != t || G.mode != mode || (mode != 2 && G.tex != tex) ||
@@ -967,7 +487,7 @@ batch (gpu_target* t, int mode, GLuint tex, int x1, int y1, int x2, int y2,
     G.sx1= x1; G.sy1= y1; G.sx2= x2; G.sy2= y2;
     G.porig_x= pox; G.porig_y= poy; G.ptile_w= ptw; G.ptile_h= pth;
     if (on_screen (t)) {
-      int st[6]= { mode, (int) tex, x1, y1, x2, y2 };
+      long long st[6]= { mode, (long long) (size_t) tex, x1, y1, x2, y2 };
       float pt[4]= { pox, poy, ptw, pth };
       feed (st); feed (pt);
     }
@@ -1005,6 +525,7 @@ gpu_flush_all () {
 void
 gpu_flush () {
   gpu_flush_all ();
+  if (G.started) G.B->flush ();
 }
 
 void
@@ -1016,41 +537,12 @@ gpu_finish () {
   static int sync= -1;
   if (sync < 0) sync= (get_env ("TEXMACS_VUE_GPU_SYNC") == "1") ? 1 : 0;
   gpu_flush_all ();
-  if (G.ctx != NULL && sync) glFinish ();
+  if (G.started) { if (sync) G.B->finish (); else G.B->flush (); }
 }
 
 /******************************************************************************
-* ThorVG passes
+* Passes of vector shapes
 ******************************************************************************/
-
-static bool
-ensure_scratch (int w, int h) {
-  if (G.scratch.made && G.scratch.w >= w && G.scratch.h >= h) return true;
-  int nw= max (w, G.scratch.w), nh= max (h, G.scratch.h);
-  if (G.scratch.made) free_texture_target (G.scratch.fbo, G.scratch.tex);
-  G.scratch.made= false;
-  if (!make_texture_target (G.scratch.fbo, G.scratch.tex, nw, nh)) return false;
-  G.scratch.w= nw; G.scratch.h= nh; G.scratch.made= true;
-  tvg::Result r= G.tvg->target (NULL, NULL, (void*) G.ctx, (int32_t) G.scratch.fbo,
-                                (uint32_t) nw, (uint32_t) nh, tvg::ColorSpace::ABGR8888S);
-  if (r != tvg::Result::Success) {
-    cout << "TeXmacs] GPU: ThorVG cannot draw into its target (" << (int) r << ")" << LF;
-    return false;
-  }
-  return true;
-}
-
-static const int SMALL= 512;
-
-static bool
-ensure_small () {
-  if (G.small.made) return true;
-  if (!make_texture_target (G.small.fbo, G.small.tex, SMALL, SMALL)) return false;
-  G.small.w= G.small.h= SMALL; G.small.made= true;
-  return G.tvg_small->target (NULL, NULL, (void*) G.ctx, (int32_t) G.small.fbo,
-                              SMALL, SMALL, tvg::ColorSpace::ABGR8888S)
-         == tvg::Result::Success;
-}
 
 static void
 flush_vectors () {
@@ -1060,42 +552,17 @@ flush_vectors () {
   int x1= max (G.vx1, G.vsx1), y1= max (G.vy1, G.vsy1);
   int x2= min (G.vx2, G.vsx2), y2= min (G.vy2, G.vsy2);
   x1= max (x1, 0); y1= max (y1, 0); x2= min (x2, t->w); y2= min (y2, t->h);
-  std::vector<tvg::Paint*> shapes;
+  std::vector<gpu_shape> shapes;
   shapes.swap (G.shapes);
-  bool small= (x2 - x1 <= SMALL && y2 - y1 <= SMALL);
-  if (x1 >= x2 || y1 >= y2 ||
-      (small ? !ensure_small () : !ensure_scratch (t->w, t->h))) {
-    for (tvg::Paint* p: shapes) tvg::Paint::rel (p);
-    return;
-  }
-  // the canvas draws all of its target (its viewport does not limit the
-  // copy which ends the pass); only the box is composed below
-  tvg::GlCanvas* c= small ? G.tvg_small : G.tvg;
-  gpu_target& sc= small ? G.small : G.scratch;
-  int ox= small ? x1 : 0, oy= small ? y1 : 0;
-  if (small) {
-    tvg::Scene* scene= tvg::Scene::gen ();
-    for (tvg::Paint* p: shapes) scene->add (p);
-    scene->translate ((float) -ox, (float) -oy);
-    c->add (scene);
-  }
-  else for (tvg::Paint* p: shapes) c->add (p);
-  c->draw (true);
-  c->sync ();
-  c->remove ();
-  // compose what ThorVG drew over the target (premultiplied)
-  float sw= (float) sc.w, sh= (float) sc.h;
-  batch (t, 1, sc.tex, G.vsx1, G.vsy1, G.vsx2, G.vsy2);
-  float px[4]= { (float) x1, (float) x2, (float) x1, (float) x2 };
-  float py[4]= { (float) y1, (float) y1, (float) y2, (float) y2 };
-  quad (px, py, (x1 - ox) / sw, 1.f - (y1 - oy) / sh,
-        (x2 - ox) / sw, 1.f - (y2 - oy) / sh, 1, 1, 1, 1);
-  flush_quads ();
+  if (x1 >= x2 || y1 >= y2) return;
+  gpu_pass p= make_pass (t, G.vsx1, G.vsy1, G.vsx2, G.vsy2);
+  G.B->draw_shapes (p, shapes, x1, y1, x2, y2);
+  t->gen++;
 }
 
-// a ThorVG shape for the target, within the clip, covering a box
+// a shape for the target, within the clip, covering a box
 static void
-add_vector (gpu_target* t, tvg::Shape* p, int sx1, int sy1, int sx2, int sy2,
+add_vector (gpu_target* t, gpu_shape& s, int sx1, int sy1, int sx2, int sy2,
             float bx1, float by1, float bx2, float by2) {
   flush_quads ();
   if (G.pending && (G.vtarget != t || G.vsx1 != sx1 || G.vsy1 != sy1 ||
@@ -1107,19 +574,15 @@ add_vector (gpu_target* t, tvg::Shape* p, int sx1, int sy1, int sx2, int sy2,
     // the shape as drawn: its path, its fill and its stroke
     int k[9]= { 9, sx1, sy1, sx2, sy2, x1, y1, x2, y2 };
     feed (k);
-    const tvg::PathCommand* cmds= NULL; const tvg::Point* pts= NULL;
-    uint32_t nc= 0, np= 0;
-    if (p->path (&cmds, &nc, &pts, &np) == tvg::Result::Success) {
-      if (nc > 0) feed_bytes (cmds, nc * sizeof (tvg::PathCommand));
-      if (np > 0) feed_bytes (pts, np * sizeof (tvg::Point));
-    }
-    uint8_t c[8]= { 0, 0, 0, 0, 0, 0, 0, 0 };
-    p->fill (&c[0], &c[1], &c[2], &c[3]);
-    p->strokeFill (&c[4], &c[5], &c[6], &c[7]);
+    if (!s.cmds.empty ()) feed_bytes (s.cmds.data (), s.cmds.size ());
+    if (!s.pts.empty ()) feed_bytes (s.pts.data (), s.pts.size () * sizeof (float));
+    unsigned char c[12]= { s.fill_rgba[0], s.fill_rgba[1], s.fill_rgba[2], s.fill_rgba[3],
+                           s.stroke_rgba[0], s.stroke_rgba[1], s.stroke_rgba[2],
+                           s.stroke_rgba[3], (unsigned char) s.fill,
+                           (unsigned char) s.stroke, (unsigned char) s.even_odd,
+                           (unsigned char) s.cap };
     feed (c);
-    feed (p->strokeWidth ());
-    feed (p->fillRule ());
-    feed (p->strokeCap ());
+    feed (s.width);
   }
   if (!G.pending) {
     G.pending= true; G.vtarget= t;
@@ -1130,7 +593,7 @@ add_vector (gpu_target* t, tvg::Shape* p, int sx1, int sy1, int sx2, int sy2,
     G.vx1= min (G.vx1, x1); G.vy1= min (G.vy1, y1);
     G.vx2= max (G.vx2, x2); G.vy2= max (G.vy2, y2);
   }
-  G.shapes.push_back (p);
+  G.shapes.push_back (std::move (s));
 }
 
 /******************************************************************************
@@ -1147,7 +610,7 @@ evict_textures () {
       if (oldest == G.textures.end () || it->second.last < oldest->second.last)
         oldest= it;
     if (oldest == G.textures.end ()) break;
-    glDeleteTextures (1, &oldest->second.tex);
+    G.B->delete_texture (oldest->second.tex);
     G.texture_bytes -= oldest->second.bytes;
     G.textures.erase (oldest);
   }
@@ -1155,9 +618,9 @@ evict_textures () {
 
 // a texture from a MuPDF pixmap (premultiplied RGBA, rows from the top);
 // over white when 'over_white' (the neutral pattern)
-static GLuint
+static gpu_texture
 upload_pixmap (fz_pixmap* pix, bool repeat, bool over_white= false) {
-  if (pix == NULL || pix->samples == NULL || pix->w <= 0 || pix->h <= 0) return 0;
+  if (pix == NULL || pix->samples == NULL || pix->w <= 0 || pix->h <= 0) return NULL;
   fz_context* ctx= mupdf_context ();
   int w= pix->w, h= pix->h, n= pix->n;
   bool bgr= (pix->colorspace == fz_device_bgr (ctx));
@@ -1174,17 +637,7 @@ upload_pixmap (fz_pixmap* pix, bool repeat, bool over_white= false) {
       d[2]= (unsigned char) b; d[3]= (unsigned char) a;
     }
   }
-  GLuint tex;
-  glGenTextures (1, &tex);
-  glBindTexture (GL_TEXTURE_2D, tex);
-  glPixelStorei (GL_UNPACK_ALIGNMENT, 4);
-  glTexImage2D (GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, rgba.data ());
-  glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-  glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-  GLint wrap= repeat ? GL_REPEAT : GL_CLAMP_TO_EDGE;
-  glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrap);
-  glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrap);
-  return tex;
+  return G.B->new_texture (w, h, GPU_RGBA8, true, repeat, rgba.data ());
 }
 
 static cached_texture*
@@ -1195,8 +648,8 @@ picture_texture (picture p) {
   picture mp= as_mupdf_picture (p);
   mupdf_picture_rep* r= (mupdf_picture_rep*) mp->get_handle ();
   if (r == NULL || r->pix == NULL) return NULL;
-  GLuint tex= upload_pixmap (r->pix, false);
-  if (tex == 0) return NULL;
+  gpu_texture tex= upload_pixmap (r->pix, false);
+  if (tex == NULL) return NULL;
   size_t bytes= (size_t) r->pix->w * r->pix->h * 4;
   G.textures[id]= { tex, r->pix->w, r->pix->h, p, ++G.tick, bytes };
   G.texture_bytes += bytes;
@@ -1214,14 +667,12 @@ public:
   gpu_target t;
   int ox, oy;
   gpu_picture_rep (int w, int h):
-    t { w, h, 0, 0, 0, 0, false, false }, ox (0), oy (0) {}
+    t { w, h, NULL, NULL, false, false, 0, 0, 0 }, ox (0), oy (0) {}
   ~gpu_picture_rep () {
     if (G.target == &t || G.vtarget == &t) gpu_flush_all ();
     if (G.target == &t) G.target= NULL;
-    if (t.made) {
-      free_texture_target (t.fbo, t.tex);
-      free_texture_target (t.fbo2, t.tex2);
-    }
+    if (t.tex != NULL) G.B->delete_texture (t.tex);
+    if (t.tex2 != NULL) G.B->delete_texture (t.tex2);
   }
   picture_kind get_type () { return picture_native; }
   void* get_handle () { return (void*) this; }
@@ -1235,9 +686,7 @@ protected:
     if (!ensure_target (&t) || x < 0 || y < 0 || x >= t.w || y >= t.h) return 0;
     gpu_flush_all ();
     unsigned char px[4]= { 255, 255, 255, 255 };
-    glBindFramebuffer (GL_FRAMEBUFFER, t.fbo);
-    glReadPixels (x, t.h - 1 - y, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, px);
-    glBindFramebuffer (GL_FRAMEBUFFER, 0);
+    G.B->read (t.tex, t.w, t.h, x, y, 1, 1, px);
     return rgb_color (px[0], px[1], px[2], px[3]);
   }
   void internal_set_pixel (int x, int y, color c) {
@@ -1260,46 +709,28 @@ is_gpu_picture (picture p) {
   return as_gpu (p) != NULL;
 }
 
-// copy a rectangle of src (device pixels, y down) to dst at (dx, dy)
-static void
-blit (GLuint src_fbo, int src_h, int x1, int y1, int x2, int y2,
-      GLuint dst_fbo, int dst_h, int dx, int dy) {
-  int w= x2 - x1, h= y2 - y1;
-  if (w <= 0 || h <= 0) return;
-  glBindFramebuffer (GL_READ_FRAMEBUFFER, src_fbo);
-  glBindFramebuffer (GL_DRAW_FRAMEBUFFER, dst_fbo);
-  glDisable (GL_SCISSOR_TEST);
-  glBlitFramebuffer (x1, src_h - y2, x2, src_h - y1,
-                     dx, dst_h - (dy + h), dx + w, dst_h - dy,
-                     GL_COLOR_BUFFER_BIT, GL_NEAREST);
-  glBindFramebuffer (GL_READ_FRAMEBUFFER, 0);
-  glBindFramebuffer (GL_DRAW_FRAMEBUFFER, 0);
-}
-
-// the same between two targets, one of which may be a scaled window
+// copy a rectangle of src (pixels of its layout, y down) to dst at (dx,
+// dy), one of which may be a scaled window
 static void
 blit (gpu_target* src, int x1, int y1, int x2, int y2,
       gpu_target* dst, int dx, int dy) {
-  GLuint src_fbo= src->screen ? 0 : src->fbo, dst_fbo= dst->screen ? 0 : dst->fbo;
-  if (src->dev_h () == src->h && src->dev_w () == src->w &&
-      dst->dev_h () == dst->h && dst->dev_w () == dst->w) {
-    blit (src_fbo, src->h, x1, y1, x2, y2, dst_fbo, dst->h, dx, dy);
-    return;
-  }
   int w= x2 - x1, h= y2 - y1;
   if (w <= 0 || h <= 0) return;
+  gpu_texture st= src->screen ? NULL : src->tex, dt= dst->screen ? NULL : dst->tex;
+  if (src->dev_h () == src->h && src->dev_w () == src->w &&
+      dst->dev_h () == dst->h && dst->dev_w () == dst->w) {
+    G.B->copy (st, src->w, src->h, x1, y1, x2, y2,
+               dt, dst->w, dst->h, dx, dy, dx + w, dy + h);
+    return;
+  }
   double sfx= (double) src->dev_w () / src->w, sfy= (double) src->dev_h () / src->h;
   double dfx= (double) dst->dev_w () / dst->w, dfy= (double) dst->dev_h () / dst->h;
-  glBindFramebuffer (GL_READ_FRAMEBUFFER, src_fbo);
-  glBindFramebuffer (GL_DRAW_FRAMEBUFFER, dst_fbo);
-  glDisable (GL_SCISSOR_TEST);
-  glBlitFramebuffer ((int) floor (x1 * sfx + 0.5), (int) floor ((src->h - y2) * sfy + 0.5),
-                     (int) floor (x2 * sfx + 0.5), (int) floor ((src->h - y1) * sfy + 0.5),
-                     (int) floor (dx * dfx + 0.5), (int) floor ((dst->h - (dy + h)) * dfy + 0.5),
-                     (int) floor ((dx + w) * dfx + 0.5), (int) floor ((dst->h - dy) * dfy + 0.5),
-                     GL_COLOR_BUFFER_BIT, GL_LINEAR);
-  glBindFramebuffer (GL_READ_FRAMEBUFFER, 0);
-  glBindFramebuffer (GL_DRAW_FRAMEBUFFER, 0);
+  G.B->copy (st, src->dev_w (), src->dev_h (),
+             (int) floor (x1 * sfx + 0.5), (int) floor (y1 * sfy + 0.5),
+             (int) floor (x2 * sfx + 0.5), (int) floor (y2 * sfy + 0.5),
+             dt, dst->dev_w (), dst->dev_h (),
+             (int) floor (dx * dfx + 0.5), (int) floor (dy * dfy + 0.5),
+             (int) floor ((dx + w) * dfx + 0.5), (int) floor ((dy + h) * dfy + 0.5));
 }
 
 void
@@ -1309,12 +740,13 @@ gpu_translate_picture (picture p, int dpx, int dpy) {
   gpu_target& t= g->t;
   if (dpx >= t.w || -dpx >= t.w || dpy >= t.h || -dpy >= t.h) return;
   gpu_flush_all ();
-  if (t.fbo2 == 0 && !make_texture_target (t.fbo2, t.tex2, t.w, t.h)) return;
+  if (t.tex2 == NULL) t.tex2= G.B->new_target (t.w, t.h);
+  if (t.tex2 == NULL) return;
   int x0= max (0, dpx), x1= min (t.w, t.w + dpx);
   int y0= max (0, dpy), y1= min (t.h, t.h + dpy);
-  blit (t.fbo, t.h, x0 - dpx, y0 - dpy, x1 - dpx, y1 - dpy, t.fbo2, t.h, x0, y0);
+  G.B->copy (t.tex, t.w, t.h, x0 - dpx, y0 - dpy, x1 - dpx, y1 - dpy,
+             t.tex2, t.w, t.h, x0, y0, x1, y1);
   // the strips which were not copied are repainted by the caller
-  std::swap (t.fbo, t.fbo2);
   std::swap (t.tex, t.tex2);
   t.gen++;
 }
@@ -1327,7 +759,8 @@ gpu_copy_picture (picture p) {
   gpu_picture_rep* c= tm_new<gpu_picture_rep> (g->t.w, g->t.h);
   picture cp (c);
   if (!ensure_target (&c->t)) return picture ();
-  blit (g->t.fbo, g->t.h, 0, 0, g->t.w, g->t.h, c->t.fbo, c->t.h, 0, 0);
+  G.B->copy (g->t.tex, g->t.w, g->t.h, 0, 0, g->t.w, g->t.h,
+             c->t.tex, c->t.w, c->t.h, 0, 0, c->t.w, c->t.h);
   c->t.gen++;
   c->ox= g->ox; c->oy= g->oy;
   return cp;
@@ -1376,7 +809,7 @@ public:
   bool ready () { return ensure_target (t); }
 
   // a quad of user space corners (x1, y1) bottom left, (x2, y2) top right
-  void user_quad (double x1, double y1, double x2, double y2, int mode, GLuint tex,
+  void user_quad (double x1, double y1, double x2, double y2, int mode, gpu_texture tex,
                   float u0, float v0, float u1, float v1,
                   float r, float g, float b, float a) {
     int s1, s2, s3, s4;
@@ -1392,17 +825,19 @@ public:
     if (a <= 0) return;
     float fa= a / 255.f;
     float w= 2.f / ATLAS; // the white corner
-    user_quad (x1, y1, x2, y2, 2, 0, w * 0.5f, w * 0.5f, w * 1.5f, w * 1.5f,
+    user_quad (x1, y1, x2, y2, 2, NULL, w * 0.5f, w * 0.5f, w * 1.5f, w * 1.5f,
                r / 255.f * fa, g / 255.f * fa, b / 255.f * fa, fa); }
   void pattern_fill (SI x1, SI y1, SI x2, SI y2, brush br);
-  void vector (tvg::Shape* s, float bx1, float by1, float bx2, float by2) {
+  void vector (gpu_shape& s, float bx1, float by1, float bx2, float by2) {
     int s1, s2, s3, s4;
     clip_box (s1, s2, s3, s4);
     add_vector (t, s, s1, s2, s3, s4, bx1, by1, bx2, by2); }
-  void stroke_style (tvg::Shape* s, bool closed= false);
-  void fill_style (tvg::Shape* s, color c) {
+  void stroke_style (gpu_shape& s, bool closed= false);
+  void fill_style (gpu_shape& s, color c) {
     int r, g, b, a; get_rgb_color (c, r, g, b, a);
-    s->fill ((uint8_t) r, (uint8_t) g, (uint8_t) b, (uint8_t) a); }
+    s.fill= true;
+    s.fill_rgba[0]= (unsigned char) r; s.fill_rgba[1]= (unsigned char) g;
+    s.fill_rgba[2]= (unsigned char) b; s.fill_rgba[3]= (unsigned char) a; }
 
   void set_zoom_factor (double zoom, bool safe= true);
   void get_extents (SI& w2, SI& h2) { w2= t->w; h2= t->h; }
@@ -1538,9 +973,9 @@ pattern_texture (brush br, SI px) {
   auto it= G.patterns.find (key);
   if (it != G.patterns.end ()) return &it->second;
   fz_pixmap* pix= mupdf_load_pixmap (u, w, h, eff, px);
-  GLuint tex= upload_pixmap (pix, true);
+  gpu_texture tex= upload_pixmap (pix, true);
   if (pix != NULL) fz_drop_pixmap (mupdf_context (), pix);
-  if (tex == 0) return NULL;
+  if (tex == NULL) return NULL;
   G.patterns[key]= { tex, (int) w, (int) h, picture (), 0, 0 };
   return &G.patterns[key];
 }
@@ -1589,9 +1024,9 @@ gpu_renderer_rep::clear_device (SI x1, SI y1, SI x2, SI y2) {
     url pu; SI w, h; tree eff;
     get_pattern_data (pu, w, h, eff, neutral, pixel);
     fz_pixmap* pix= mupdf_load_pixmap (pu, w, h, eff, pixel);
-    GLuint tex= upload_pixmap (pix, true, true);
+    gpu_texture tex= upload_pixmap (pix, true, true);
     if (pix != NULL) fz_drop_pixmap (mupdf_context (), pix);
-    if (tex == 0) { solid (ux1, uy1, ux2, uy2, white); return; }
+    if (tex == NULL) { solid (ux1, uy1, ux2, uy2, white); return; }
     G.patterns[key]= { tex, (int) w, (int) h, picture (), 0, 0 };
     it= G.patterns.find (key);
   }
@@ -1642,7 +1077,7 @@ gpu_renderer_rep::draw (int c, font_glyphs fng, SI x, SI y) {
       if (g->nb == 0) return; // no ink
       int s1, s2, s3, s4;
       clip_box (s1, s2, s3, s4);
-      batch (t, 4, 0, s1, s2, s3, s4);
+      batch (t, 4, NULL, s1, s2, s3, s4);
       int r, gg, b, a;
       get_rgb_color (fg, r, gg, b, a);
       if (get_reverse_colors ()) reverse (r, gg, b);
@@ -1700,9 +1135,7 @@ gpu_renderer_rep::draw (int c, font_glyphs fng, SI x, SI y) {
       }
       // what is queued from the atlas is drawn before it changes
       if (G.mode == 2) flush_quads ();
-      glBindTexture (GL_TEXTURE_2D, G.atlas);
-      glPixelStorei (GL_UNPACK_ALIGNMENT, 1);
-      glTexSubImage2D (GL_TEXTURE_2D, 0, G.ax, G.ay, w, h, GL_RED, GL_UNSIGNED_BYTE, cov.data ());
+      G.B->update_texture (G.atlas, G.ax, G.ay, w, h, cov.data ());
     }
     G.glyphs[k]= { G.ax, G.ay, w, h, xo, yo, from_mupdf, mx, my };
     G.fonts.push_back (fng);
@@ -1745,22 +1178,23 @@ gpu_renderer_rep::draw (int c, font_glyphs fng, SI x, SI y) {
   get_rgb_color (fg, r, g, b, a);
   if (get_reverse_colors ()) reverse (r, g, b);
   float fa= a / 255.f;
-  user_quad (left, bottom, left + s.w, bottom + s.h, 2, 0,
+  user_quad (left, bottom, left + s.w, bottom + s.h, 2, NULL,
              s.x / A, s.y / A, (s.x + s.w) / A, (s.y + s.h) / A,
              r / 255.f * fa, g / 255.f * fa, b / 255.f * fa, fa);
 }
 
 void
-gpu_renderer_rep::stroke_style (tvg::Shape* s, bool closed) {
+gpu_renderer_rep::stroke_style (gpu_shape& s, bool closed) {
   float w= (float) lw / pixel;
   if (w < 1.f) w= 1.f;
-  s->strokeWidth (w);
+  s.stroke= true;
+  s.width= w;
   int r, g, b, a; get_rgb_color (fg, r, g, b, a);
-  s->strokeFill ((uint8_t) r, (uint8_t) g, (uint8_t) b, (uint8_t) a);
-  if (closed || pen->get_cap () == cap_round) s->strokeCap (tvg::StrokeCap::Round);
-  else if (pen->get_cap () == cap_flat) s->strokeCap (tvg::StrokeCap::Butt);
-  else s->strokeCap (tvg::StrokeCap::Square);
-  s->strokeJoin (tvg::StrokeJoin::Round);
+  s.stroke_rgba[0]= (unsigned char) r; s.stroke_rgba[1]= (unsigned char) g;
+  s.stroke_rgba[2]= (unsigned char) b; s.stroke_rgba[3]= (unsigned char) a;
+  if (closed || pen->get_cap () == cap_round) s.cap= 1;
+  else if (pen->get_cap () == cap_flat) s.cap= 0;
+  else s.cap= 2;
 }
 
 void
@@ -1781,9 +1215,9 @@ gpu_renderer_rep::line (SI x1, SI y1, SI x2, SI y2) {
     solid (qx1, -qy2, qx2, -qy1, fg);
     return;
   }
-  tvg::Shape* s= tvg::Shape::gen ();
-  s->moveTo (ax, ay);
-  s->lineTo (bx, by);
+  gpu_shape s;
+  s.move_to (ax, ay);
+  s.line_to (bx, by);
   stroke_style (s);
   vector (s, min (ax, bx) - w, min (ay, by) - w, max (ax, bx) + w, max (ay, by) + w);
 }
@@ -1792,12 +1226,12 @@ void
 gpu_renderer_rep::lines (array<SI> x, array<SI> y) {
   int n= N(x);
   if (!ready () || N(y) != n || n < 1) return;
-  tvg::Shape* s= tvg::Shape::gen ();
+  gpu_shape s;
   float bx1= 1e9, by1= 1e9, bx2= -1e9, by2= -1e9;
   for (int i= 0; i < n; i++) {
     float px, py;
     map (x[i], y[i], px, py);
-    if (i == 0) s->moveTo (px, py); else s->lineTo (px, py);
+    if (i == 0) s.move_to (px, py); else s.line_to (px, py);
     bx1= min (bx1, px); by1= min (by1, py); bx2= max (bx2, px); by2= max (by2, py);
   }
   stroke_style (s, x[n-1] == x[0] && y[n-1] == y[0]);
@@ -1809,18 +1243,18 @@ void
 gpu_renderer_rep::polygon (array<SI> x, array<SI> y, bool convex) {
   int n= N(x);
   if (!ready () || N(y) != n || n < 1) return;
-  tvg::Shape* s= tvg::Shape::gen ();
+  gpu_shape s;
   float bx1= 1e9, by1= 1e9, bx2= -1e9, by2= -1e9;
   for (int i= 0; i < n; i++) {
     float px, py;
     map (x[i], y[i], px, py);
-    if (i == 0) s->moveTo (px, py); else s->lineTo (px, py);
+    if (i == 0) s.move_to (px, py); else s.line_to (px, py);
     bx1= min (bx1, px); by1= min (by1, py); bx2= max (bx2, px); by2= max (by2, py);
   }
-  s->close ();
+  s.close ();
   // as the MuPDF renderer: nonzero winding for convex polygons, even-odd
   // for the others
-  s->fillRule (convex ? tvg::FillRule::NonZero : tvg::FillRule::EvenOdd);
+  s.even_odd= !convex;
   fill_style (s, fg);
   vector (s, bx1, by1, bx2, by2);
 }
@@ -1842,7 +1276,7 @@ gpu_renderer_rep::bezier_arc (SI x1, SI y1, SI x2, SI y2,
   double bx0= cphi, by0= -sphi;
   double bx1= (4.0 - bx0) / 3.0, by1= (1.0 - bx0) * (3.0 - bx0) / (3.0 * by0);
   double bx2= bx1, by2= -by1, bx3= bx0, by3= -by0;
-  tvg::Shape* s= tvg::Shape::gen ();
+  gpu_shape s;
   auto P= [&] (double bx, double by, double sp, double cp, float& dx, float& dy) {
     device (cx + rx * (bx*cp - by*sp), cy + ry * (bx*sp + by*cp), dx, dy); };
   for (int k= 0; k < n; k++) {
@@ -1852,12 +1286,12 @@ gpu_renderer_rep::bezier_arc (SI x1, SI y1, SI x2, SI y2,
     P (bx1, by1, sp, cp, p1x, p1y);
     P (bx2, by2, sp, cp, p2x, p2y);
     P (bx3, by3, sp, cp, p3x, p3y);
-    if (k == 0) s->moveTo (p0x, p0y);
-    s->cubicTo (p1x, p1y, p2x, p2y, p3x, p3y);
+    if (k == 0) s.move_to (p0x, p0y);
+    s.cubic_to (p1x, p1y, p2x, p2y, p3x, p3y);
   }
   if (filled) fill_style (s, fg);
   else {
-    if (abs (delta) == 360*64) s->close ();
+    if (abs (delta) == 360*64) s.close ();
     stroke_style (s, abs (delta) == 360*64);
   }
   float w= filled ? 0.f : max (1.f, (float) lw / pixel);
@@ -1893,27 +1327,27 @@ gpu_renderer_rep::rounded_rectangle (SI x1, SI y1, SI x2, SI y2,
   double rtl= min ((double) r_tl / pixel, mr), rtr= min ((double) r_tr / pixel, mr);
   double rbr= min ((double) r_br / pixel, mr), rbl= min ((double) r_bl / pixel, mr);
   const double k= 0.5522847498;
-  tvg::Shape* s= tvg::Shape::gen ();
+  gpu_shape s;
   float px, py, c1x, c1y, c2x, c2y;
   // user space (y up): yy1 is the bottom, yy2 the top
-  device (xx1 + rbl, yy1, px, py); s->moveTo (px, py);
-  device (xx2 - rbr, yy1, px, py); s->lineTo (px, py);
+  device (xx1 + rbl, yy1, px, py); s.move_to (px, py);
+  device (xx2 - rbr, yy1, px, py); s.line_to (px, py);
   if (rbr > 0) {
     device (xx2 - rbr + rbr*k, yy1, c1x, c1y); device (xx2, yy1 + rbr - rbr*k, c2x, c2y);
-    device (xx2, yy1 + rbr, px, py); s->cubicTo (c1x, c1y, c2x, c2y, px, py); }
-  device (xx2, yy2 - rtr, px, py); s->lineTo (px, py);
+    device (xx2, yy1 + rbr, px, py); s.cubic_to (c1x, c1y, c2x, c2y, px, py); }
+  device (xx2, yy2 - rtr, px, py); s.line_to (px, py);
   if (rtr > 0) {
     device (xx2, yy2 - rtr + rtr*k, c1x, c1y); device (xx2 - rtr + rtr*k, yy2, c2x, c2y);
-    device (xx2 - rtr, yy2, px, py); s->cubicTo (c1x, c1y, c2x, c2y, px, py); }
-  device (xx1 + rtl, yy2, px, py); s->lineTo (px, py);
+    device (xx2 - rtr, yy2, px, py); s.cubic_to (c1x, c1y, c2x, c2y, px, py); }
+  device (xx1 + rtl, yy2, px, py); s.line_to (px, py);
   if (rtl > 0) {
     device (xx1 + rtl - rtl*k, yy2, c1x, c1y); device (xx1, yy2 - rtl + rtl*k, c2x, c2y);
-    device (xx1, yy2 - rtl, px, py); s->cubicTo (c1x, c1y, c2x, c2y, px, py); }
-  device (xx1, yy1 + rbl, px, py); s->lineTo (px, py);
+    device (xx1, yy2 - rtl, px, py); s.cubic_to (c1x, c1y, c2x, c2y, px, py); }
+  device (xx1, yy1 + rbl, px, py); s.line_to (px, py);
   if (rbl > 0) {
     device (xx1, yy1 + rbl - rbl*k, c1x, c1y); device (xx1 + rbl - rbl*k, yy1, c2x, c2y);
-    device (xx1 + rbl, yy1, px, py); s->cubicTo (c1x, c1y, c2x, c2y, px, py); }
-  s->close ();
+    device (xx1 + rbl, yy1, px, py); s.cubic_to (c1x, c1y, c2x, c2y, px, py); }
+  s.close ();
   if (filled) fill_style (s, fg);
   else stroke_style (s, true);
   float w= filled ? 0.f : max (1.f, (float) lw / pixel);
@@ -1944,7 +1378,10 @@ gpu_renderer_rep::draw_picture_scaled (picture p, SI x, SI y, double sc, int alp
     if (!ensure_target (&g->t)) return;
     // the texture of a target: its first row at the bottom
     if (on_screen (t)) feed (g->t.gen);
-    user_quad (left, bottom, left + w, bottom + h, 1, g->t.tex, 0, 1, 1, 0, a, a, a, a);
+    if (G.B->targets_flipped ())
+      user_quad (left, bottom, left + w, bottom + h, 1, g->t.tex, 0, 1, 1, 0, a, a, a, a);
+    else
+      user_quad (left, bottom, left + w, bottom + h, 1, g->t.tex, 0, 0, 1, 1, a, a, a, a);
     return;
   }
   cached_texture* ct= picture_texture (p);
@@ -2109,15 +1546,16 @@ gpu_read_screen (int w, int h) {
   fz_pixmap* pix= mupdf_new_pixmap (w, h);
   if (pix == NULL || pix->w != w || pix->h != h) return picture ();
   std::vector<unsigned char> rows ((size_t) w * h * 4);
-  glBindFramebuffer (GL_FRAMEBUFFER, 0);
-  glPixelStorei (GL_PACK_ALIGNMENT, 4);
-  glReadPixels (0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, rows.data ());
+  if (!G.B->read (NULL, w, h, 0, 0, w, h, rows.data ())) {
+    fz_drop_pixmap (mupdf_context (), pix);
+    return picture ();
+  }
   for (int y= 0; y < h; y++)
     memcpy (pix->samples + (size_t) y * pix->stride,
-            rows.data () + (size_t) (h - 1 - y) * w * 4, (size_t) w * 4);
+            rows.data () + (size_t) y * w * 4, (size_t) w * 4);
   picture p= mupdf_picture (pix, 0, 0);
   fz_drop_pixmap (mupdf_context (), pix);
   return p;
 }
 
-#endif // USE_THORVG
+#endif // USE_THORVG || USE_METAL

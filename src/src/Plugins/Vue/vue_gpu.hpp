@@ -1,7 +1,8 @@
 /******************************************************************************
 * MODULE     : vue_gpu.hpp
-* DESCRIPTION: The GPU renderer of the Vue port (OpenGL, WebGL2 in the
-*              browser): a glyph atlas, textures and ThorVG
+* DESCRIPTION: The GPU renderer of the Vue port: a glyph atlas, textures
+*              and vector shapes, drawn by OpenGL (WebGL2 in the browser)
+*              or Metal (gpu_backend.hpp)
 * COPYRIGHT  : (C) 2026  Massimiliano Gubinelli
 *******************************************************************************
 * This software falls under the GNU general public license version 3 or later.
@@ -17,9 +18,12 @@
 
 struct SDL_Window;
 
-// Whether the windows are drawn by the GPU: compiled with ThorVG
-// (--with-thorvg), unless TEXMACS_VUE_GPU=0. Decided once.
+// Whether the windows are drawn by the GPU: compiled with a backend
+// (OpenGL with --with-thorvg, Metal on macOS), unless TEXMACS_VUE_GPU=0
+// (=gl or =metal chooses the backend). Decided once.
 bool vue_gpu_enabled ();
+// the flags of an SDL window drawn by the GPU (SDL_WINDOW_OPENGL...)
+unsigned long long vue_gpu_window_flags ();
 // the windows are drawn by the GPU (vue_gui.cpp: not in the single window)
 bool vue_gpu_windows ();
 // the glyphs as the preferences say ("gpu glyphs"...): true when they
@@ -27,8 +31,8 @@ bool vue_gpu_windows ();
 bool vue_gpu_follow_glyph_settings ();
 // before the first window is created: the attributes of its GL context
 void vue_gpu_prepare ();
-// make the (one, shared) GL context current for the window, creating it
-// with the first window; false when there is no GL
+// draw into the window from now on (the backend makes the one, shared GL
+// context or Metal device with the first window); false when it cannot
 bool vue_gpu_attach (SDL_Window* w);
 void vue_gpu_present (SDL_Window* w);
 

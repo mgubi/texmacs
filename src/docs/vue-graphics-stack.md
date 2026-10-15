@@ -973,7 +973,32 @@ Makefile builds it by default), `--with-thorvg=no` draws with MuPDF. With
 before (until 2026-10-05 the desktop needed `TEXMACS_VUE_GPU=1`).
 `misc/thorvg-bench` has the measurements which chose the design.
 
-* **One context.** The windows are created with `SDL_WINDOW_OPENGL`, and
+* **Backends.** `vue_gpu.cpp` does not depend on the graphics API: the
+  batches of quads, the atlas and its contents, the outlines of Slug, the
+  caches of the textures and the hash of the frames are its own, and a
+  backend (`gpu_backend.hpp`) has the textures, draws a batch into a
+  target with a scissor, copies between targets, reads pixels back and
+  draws the vector shapes, given as paths (`gpu_shape`).
+  `gpu_backend_gl.cpp` is OpenGL (WebGL2 in the browser), with ThorVG for
+  the shapes; `gpu_backend_metal.mm` is Metal (macOS; `--with-metal=no`
+  leaves it out), with Core Graphics for the shapes, so that it needs no
+  ThorVG. On macOS Metal is the default when it is compiled;
+  `TEXMACS_VUE_GPU=gl` or `=metal` chooses. Metal: one device and queue,
+  a `CAMetalLayer` per window (`SDL_Metal_CreateView`, the windows made
+  with `SDL_WINDOW_METAL`) whose drawable is taken when the window is
+  first drawn into in a frame; the commands go into one command buffer,
+  committed when presented, flushed or read back, and consecutive draws
+  into one target share an encoder; a change of a texture which commands
+  already encoded may read (the atlas, the textures of Slug) is a copy
+  from a buffer, encoded after them; the targets are BGRA8, their first
+  row at the top (`targets_flipped`), and copies at another scale are
+  quads sampled linearly. The shapes are rasterized by Core Graphics over
+  their box, uploaded and composed. Compared with OpenGL on an Apple M4
+  (the math font catalogue, `TEXMACS_VUE_GPU_SYNC=1`): a forced repaint
+  of the editor takes the same time (1.4 ms), a repaint after a zoom 2.0
+  ms instead of 3.2; a page differs on some hundreds of pixels, the edges
+  of the shapes.
+* **One context (OpenGL).** The windows are created with `SDL_WINDOW_OPENGL`, and
   the first one makes the GL context, which is made current for each
   window as it is drawn (`vue_gpu_attach`): textures and framebuffers
   belong to all the windows, and an editor can move between them. The
@@ -1043,7 +1068,7 @@ before (until 2026-10-05 the desktop needed `TEXMACS_VUE_GPU=1`).
   512 and 256 MB, the least used going first); patterns and the neutral
   pattern of `clear_device` once per size of their tiles, repeated.
 * **Vector graphics** (lines which are not thin rules, polygons, arcs,
-  rounded rectangles) go to ThorVG's GL engine. It draws into a
+  rounded rectangles) go, in the OpenGL backend, to ThorVG's GL engine. It draws into a
   multisampled framebuffer of its own and ends a pass by copying all of it
   over its target, so it cannot draw over what is there, and its
   `viewport` does not limit that copy: it draws into a scratch texture,

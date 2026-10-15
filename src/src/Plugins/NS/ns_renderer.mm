@@ -20,6 +20,7 @@
 #include "ns_utilities.h"
 #include "MacOS/mac_images.h"
 #include "sys_utils.hpp"
+#include "boot.hpp"
 #ifdef USE_FREETYPE
 // Freetype/tt_face.hpp, which needs the headers of FreeType
 bool tt_glyph_outline (font_glyphs fng, int i, array<int>& cmds,
@@ -78,6 +79,40 @@ CONCRETE_NULL_CODE(cg_image);
 
 // bitmaps of all characters
 static hashmap<basic_character,cg_image> character_image;
+
+/******************************************************************************
+* The glyphs as the preferences say (as in the Vue port): "gpu glyphs"
+* texmacs draws the bitmaps of TeXmacs, anything else the outlines (see
+* outline_glyph), made "gpu glyph boldness" pixels bolder, since the bitmaps
+* of TeXmacs, which shrink thickens, are that much bolder (0.22 by
+* default). TEXMACS_NS_GLYPHS=bitmap and TEXMACS_NS_GLYPH_BOLD override
+* them. A change empties the cache of the images of the characters.
+******************************************************************************/
+
+static bool   glyph_outlines= true;
+static double glyph_bold= 0.22;
+
+static string
+glyph_setting (const char* env, string pref, string def) {
+  string v= get_env (env);
+  return (N(v) > 0)? v: get_user_preference (pref, def);
+}
+
+bool
+ns_follow_glyph_settings () {
+  static bool known= false;
+  bool outlines= (get_env ("TEXMACS_NS_GLYPHS") == "bitmap")? false:
+                 (get_user_preference ("gpu glyphs", "freetype") != "texmacs");
+  string b= glyph_setting ("TEXMACS_NS_GLYPH_BOLD", "gpu glyph boldness", "0.22");
+  double bold= is_double (b)? max (0.0, min (as_double (b), 2.0)): 0.22;
+  if (known && outlines == glyph_outlines && bold == glyph_bold) return false;
+  bool changed= known;
+  known= true;
+  glyph_outlines= outlines;
+  glyph_bold= bold;
+  if (changed) character_image= hashmap<basic_character,cg_image> ();
+  return changed;
+}
 // image cache
 static hashmap<string,ns_image> images; 
 
@@ -725,9 +760,8 @@ static bool
 outline_glyph (font_glyphs fng, int c, int r, int g, int b, int a,
                CGImageRef& im, SI& xo, SI& yo, int& w, int& h) {
 #ifdef USE_FREETYPE
-  static int on= -1;
-  if (on < 0) on= (get_env ("TEXMACS_NS_GLYPHS") == "bitmap") ? 0 : 1;
-  if (!on) return false;
+  ns_follow_glyph_settings (); // (read once, before the first glyph)
+  if (!glyph_outlines) return false;
   array<int> cmds;
   array<double> pts;
   if (!tt_glyph_outline (fng, c, cmds, pts)) return false;
@@ -747,6 +781,8 @@ outline_glyph (font_glyphs fng, int c, int r, int g, int b, int a,
   im= NULL; xo= yo= 0; w= h= 0;
   CGRect box= CGPathGetPathBoundingBox (path);
   if (CGRectIsEmpty (box) || CGRectIsNull (box)) { CGPathRelease (path); return true; }
+  // the outline is also stroked, glyph_bold pixels wide (half outside it)
+  box= CGRectInset (box, -glyph_bold / 2, -glyph_bold / 2);
   // the pixels it touches: [L, R) to the right of the origin, [B, T) above
   int L= (int) floor (box.origin.x), R= (int) ceil (box.origin.x + box.size.width);
   int B= (int) floor (box.origin.y), T= (int) ceil (box.origin.y + box.size.height);
@@ -759,7 +795,13 @@ outline_glyph (font_glyphs fng, int c, int r, int g, int b, int a,
   CGContextScaleCTM (ic, 1.0, -1.0);
   CGContextSetRGBFillColor (ic, r / 255.0, g / 255.0, b / 255.0, a / 255.0);
   CGContextAddPath (ic, path);
-  CGContextFillPath (ic);   // nonzero winding, as the fonts are drawn
+  if (glyph_bold > 0) {
+    CGContextSetRGBStrokeColor (ic, r / 255.0, g / 255.0, b / 255.0, a / 255.0);
+    CGContextSetLineWidth (ic, glyph_bold);
+    CGContextSetLineJoin (ic, kCGLineJoinRound);
+    CGContextDrawPath (ic, kCGPathFillStroke); // nonzero winding, as the fonts
+  }
+  else CGContextFillPath (ic);   // nonzero winding, as the fonts are drawn
   CGPathRelease (path);
   im= CGBitmapContextCreateImage (ic);
   CGContextRelease (ic);
