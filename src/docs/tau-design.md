@@ -1214,6 +1214,44 @@ from 16 to 1024 pixels. As in the page of TeXmacs Vue
   The page of the design of the fonts (40 ms of drawing for a step) is
   the exception, and a matter of its own.
 
+### Drawing on the GPU (2026-10-15)
+
+- **In a large view it is worth it.** In a view of 1900 × 1180 at
+  density 2 (a canvas of 7.9 million pixels, a laptop's screen) a step
+  of a scroll is 13–28 ms in the page, the drawing growing with the
+  pixels; the maths, the figures and the manual pass a frame of 16 ms.
+  Natively the core draws such a step in 10 ms and sends it in 6.6
+  (36 MB through the pipe).
+- **Two faults first.** The backgrounds of all the pages of a document
+  were said for each rectangle cleared (`box_rep::redraw_background`:
+  12.8 million rectangles in 70 steps of the manual, 197000 now; also
+  in TeXmacs itself, PR 364 for `wip_fixes`), and a key asked for the
+  same regions two or three times (the outlines around the cursor:
+  `without_repeats` in `tau_widget.cpp`, 70 regions to 19). A key in the
+  manual is drawn in 8.8 ms instead of 47.
+- **The prototype** (`render-bench.mjs --gpu`, the debug message `gpu`):
+  the MuPDF renderer of the core records what it would draw, in the
+  pixels of the view (`mupdf_record`: rectangles, glyphs, lines,
+  polygons, arcs, the clip, pictures; a glyph and a picture sent once),
+  and the page draws it with its canvas. The view of the manual is the
+  same but for 8 of its 3.7 million pixels. A step of a scroll, core
+  and page, the page waiting for its canvas, in ms:
+
+  | document | CPU | GPU |
+  |---|---|---|
+  | prose | 15.1 | 10.1 |
+  | maths | 14.2 | 9.4 |
+  | tables | 14.0 | 9.2 |
+  | pictures | 12.9 | 7.6 |
+  | figures | 27.6 | 10.0 |
+  | user manual | 17.4 | 11.6 |
+
+  The core's part goes from 10–25 ms to 1–4: it is free sooner for the
+  next key. Typing changes little (a small region).
+- **Left**: the desktop (a frame of commands instead of `PANT`, the shell
+  built with ThorVG and OpenGL, the commands drawn by `vue_gpu`), the
+  transformations of the renderer (rotated pictures), the patterns.
+
 ### On the desktop
 
 - Asked 2026-10-13: a desktop GUI for Tau, with Vue (the GUI of
