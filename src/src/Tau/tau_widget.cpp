@@ -24,6 +24,7 @@ simple_widget_rep::simple_widget_rep ():
   resize_pending (false), shown (false), backing (), ren (NULL),
   backing_x (0), backing_y (0),
   drawn_x1 (0), drawn_y1 (0), drawn_x2 (0), drawn_y2 (0),
+  shift_x (0), shift_y (0),
   extents (0, 0, 0, 0), invalid (), invalid_all (true),
   cursor_x (0), cursor_y (0), mouse_grab (false), pointer_name ("")
 {
@@ -169,9 +170,28 @@ simple_widget_rep::repaint () {
   else if (scroll_y > extents->y2) scroll_y= extents->y2;
   scroll_x= grid_floor (scroll_x, ren->pixel);
   scroll_y= grid_floor (scroll_y, ren->pixel);
+  shift_x= shift_y= 0;
   if (scroll_x != backing_x || scroll_y != backing_y) {
+    // A scroll moves what is drawn: the pixels are moved, and only what
+    // comes into the view is drawn (the other side moves its pixels as
+    // well, by shift_x and shift_y, before it takes the new ones). A step
+    // of the wheel drew the whole view, and sent it.
+    int sx= (int) ((backing_x - scroll_x) / ren->pixel);
+    int sy= (int) ((scroll_y - backing_y) / ren->pixel);
     backing_x= scroll_x; backing_y= scroll_y;
-    invalid_all= true;
+    if (!invalid_all && pixels () != NULL &&
+        2 * abs (sx) < px_w && 2 * abs (sy) < px_h) {
+      shift_pixels (sx, sy);
+      shift_x= sx; shift_y= sy;
+      SI p= ren->pixel;
+      SI X1= backing_x, X2= backing_x + px_w * p;
+      SI Y1= backing_y - px_h * p, Y2= backing_y;
+      if (sx > 0) invalid= rectangles (rectangle (X1, Y1, X1 + sx * p, Y2), invalid);
+      if (sx < 0) invalid= rectangles (rectangle (X2 + sx * p, Y1, X2, Y2), invalid);
+      if (sy > 0) invalid= rectangles (rectangle (X1, Y2 - sy * p, X2, Y2), invalid);
+      if (sy < 0) invalid= rectangles (rectangle (X1, Y1, X2, Y1 - sy * p), invalid);
+    }
+    else invalid_all= true;
   }
   if (!invalid_all && is_nil (invalid)) return false;
 
@@ -210,6 +230,24 @@ simple_widget_rep::repaint () {
     todo= todo->next;
   }
   return true;
+}
+
+// the pixels moved by (dx, dy), what leaves the view lost (a scroll)
+void
+simple_widget_rep::shift_pixels (int dx, int dy) {
+  unsigned char* px= pixels ();
+  if (px == NULL || (dx == 0 && dy == 0)) return;
+  size_t stride= (size_t) 4 * px_w;
+  int w= px_w - abs (dx);
+  if (w <= 0 || abs (dy) >= px_h) return;
+  int sx= max (0, -dx), tx= max (0, dx);
+  // (the rows in the order which does not write over those still to move)
+  if (dy > 0)
+    for (int y= px_h - 1; y >= dy; y--)
+      memmove (px + y * stride + 4 * tx, px + (y - dy) * stride + 4 * sx, (size_t) 4 * w);
+  else
+    for (int y= 0; y < px_h + dy; y++)
+      memmove (px + y * stride + 4 * tx, px + (y - dy) * stride + 4 * sx, (size_t) 4 * w);
 }
 
 unsigned char*

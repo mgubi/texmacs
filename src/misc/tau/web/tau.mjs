@@ -1113,6 +1113,11 @@ worker.onmessage = event => {
 		// the rectangle of the canvas which changed: its pixels, or the
 		// commands which draw it (the prototype of the drawing on the GPU)
 		const t0 = performance.now();
+		// a scroll: what the canvas has is moved first, and the paint has
+		// only what came into the view (tau_widget.cpp, shift_pixels)
+		if (m.shift && (m.shift.x || m.shift.y)) {
+			pane.context.drawImage(canvas, m.shift.x, m.shift.y);
+		}
 		if (m.t === "dlist") replayCommands(pane.context, m);
 		else pane.context.putImageData(new ImageData(new Uint8ClampedArray(m.pixels), m.w, m.h), m.x, m.y);
 		if (gpuSync) pane.context.getImageData(0, 0, 1, 1);

@@ -28,7 +28,8 @@
 *   letters, the length of what follows in four bytes (in the order of the
 *   machine: both programs are on it), and that. "HELO" comes first, with
 *   the version of these messages (TAU_PROTOCOL); "VIEW" and "JSON" are
-*   text, "PANT" the numbers of a paint (14 integers) and then its pixels,
+*   text, "PANT" the numbers of a paint (16 integers: the last two how far the
+*   pixels before it are moved first, for a scroll) and then its pixels,
 *   "PONG" the answer to "ping".
 *
 * A ping is answered once the messages before it were handled, and the
@@ -59,7 +60,7 @@
 
 // the version of the messages: the shell says nothing to a core which has
 // another one (tau_shell.cpp)
-#define TAU_PROTOCOL 2
+#define TAU_PROTOCOL 3
 
 // the messages of the other side, as the worker of the page calls them
 // (tau_gui.cpp)
@@ -182,13 +183,15 @@ void
 tau_native_paint (int view, int counter, int w, int h,
                   const unsigned char* pixels,
                   int x1, int y1, int x2, int y2,
-                  int ew, int eh, int sx, int sy, int cx, int cy) {
+                  int ew, int eh, int sx, int sy, int cx, int cy,
+                  int dx, int dy) {
   if (out () < 0 || pixels == NULL) return;
   // the rectangle which changed, its rows one after the other
   int dw= x2 - x1, dh= y2 - y1;
   if (dw <= 0 || dh <= 0) return;
-  int32_t nums[14]= { view, counter, w, h, x1, y1, dw, dh,
-                      ew, eh, sx, sy, cx, cy };
+  // (and how far the pixels before were moved: a scroll, protocol 3)
+  int32_t nums[16]= { view, counter, w, h, x1, y1, dw, dh,
+                      ew, eh, sx, sy, cx, cy, dx, dy };
   size_t bytes= (size_t) 4 * dw * dh;
   if (dw == w) {
     frame ("PANT", nums, sizeof (nums), pixels + (size_t) 4 * w * y1, bytes);

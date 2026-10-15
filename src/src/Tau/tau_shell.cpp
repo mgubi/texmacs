@@ -122,7 +122,7 @@ static std::string             core_wrong;      // why the core is not heard
 static char**                  shell_argv= NULL; // (to start again)
 
 // the version of the messages which this program speaks (tau_native.cpp)
-#define TAU_PROTOCOL 2
+#define TAU_PROTOCOL 3
 
 // The frames which may come, and how long one may be: anything else is a
 // core which is wrong (another program, or a stream which lost its place),
@@ -138,18 +138,21 @@ frame_known (const char* tag, uint32_t len) {
 // A whole picture of a view makes those which wait before it for the same
 // view useless: they are dropped, and the frames do not pile up when the
 // core draws faster than they are shown
+// the numbers which begin a paint (tau_native.cpp): 16 integers
+#define PANT_HEAD 64
+
 static bool
 whole_paint (const core_frame& f, int32_t& view) {
-  if (strcmp (f.tag, "PANT") || f.body.size () < 56) return false;
-  int32_t n[14];
-  memcpy (n, f.body.data (), 56);
+  if (strcmp (f.tag, "PANT") || f.body.size () < PANT_HEAD) return false;
+  int32_t n[16];
+  memcpy (n, f.body.data (), PANT_HEAD);
   view= n[0];
   return n[4] == 0 && n[5] == 0 && n[6] == n[2] && n[7] == n[3];
 }
 
 static bool
 paint_of (const core_frame& f, int32_t view) {
-  if (strcmp (f.tag, "PANT") || f.body.size () < 56) return false;
+  if (strcmp (f.tag, "PANT") || f.body.size () < PANT_HEAD) return false;
   int32_t v;
   memcpy (&v, f.body.data (), 4);
   return v == view;
@@ -832,6 +835,20 @@ public:
         (int64_t) x + dw > fw || (int64_t) y + dh > fh) return;
     unsigned char* dst= fz_pixmap_samples (ctx, pix);
     ptrdiff_t stride= fz_pixmap_stride (ctx, pix);
+    // a scroll: the pixels which were there are moved first, and the
+    // paint has only what came into the view (tau_widget.cpp)
+    int sx= n[14], sy= n[15];
+    if ((sx != 0 || sy != 0) && 2 * abs (sx) < fw && 2 * abs (sy) < fh) {
+      int mw= fw - abs (sx), from= std::max (0, -sx), to= std::max (0, sx);
+      if (sy > 0)
+        for (int row= fh - 1; row >= sy; row--)
+          memmove (dst + (ptrdiff_t) row * stride + 4 * to,
+                   dst + (ptrdiff_t) (row - sy) * stride + 4 * from, (size_t) 4 * mw);
+      else
+        for (int row= 0; row < fh + sy; row++)
+          memmove (dst + (ptrdiff_t) row * stride + 4 * to,
+                   dst + (ptrdiff_t) (row - sy) * stride + 4 * from, (size_t) 4 * mw);
+    }
     for (int row= 0; row < dh; row++)
       memcpy (dst + (ptrdiff_t) (y + row) * stride + (ptrdiff_t) 4 * x,
               px + (size_t) 4 * row * dw, (size_t) 4 * dw);
@@ -2078,16 +2095,16 @@ handle_frame (core_frame& f) {
     tau_view_rep* v= view_of_place (window);
     if (v != NULL) v->set_view (view);
   }
-  else if (!strcmp (f.tag, "PANT") && f.body.size () >= 56) {
-    int32_t n[14];
-    memcpy (n, f.body.data (), 56);
+  else if (!strcmp (f.tag, "PANT") && f.body.size () >= PANT_HEAD) {
+    int32_t n[16];
+    memcpy (n, f.body.data (), PANT_HEAD);
     tau_view_rep* v= view_canvas (n[0]);
     static bool debug= (getenv ("TAU_SHELL_DEBUG") != NULL);
     if (debug)
       fprintf (stderr, "tau_shell] PANT view %d place %d size %dx%d rect %d,%d %dx%d scroll %d,%d of %dx%d%s\n",
                n[0], n[1], n[2], n[3], n[4], n[5], n[6], n[7], n[10], n[11], n[8], n[9],
                v == NULL? " (no canvas)": (n[1] != v->place? " (another place)": ""));
-    if (v != NULL) v->paint (n, f.body.data () + 56, f.body.size () - 56);
+    if (v != NULL) v->paint (n, f.body.data () + PANT_HEAD, f.body.size () - PANT_HEAD);
     // TAU_SHELL_EVAL: a command of Scheme for the core, once it draws
     // (for the tests: a dialog to open)
     static bool evaluated= false;

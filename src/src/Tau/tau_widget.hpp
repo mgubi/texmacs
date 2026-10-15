@@ -50,6 +50,8 @@ public:
   SI       backing_x, backing_y; // the scroll position they are drawn for
   int      drawn_x1, drawn_y1, drawn_x2, drawn_y2; // the pixels which the
                                    // last repaint changed
+  int      shift_x, shift_y;     // and how far the pixels before it were
+                                 // moved first (a scroll: see repaint)
   // what the editor asked
   rectangle  extents;          // of the document
   rectangles invalid;          // regions to draw again
@@ -88,6 +90,7 @@ public:
   bool repaint ();                       // draw what is invalid; true if
                                          // the pixels changed
   unsigned char* pixels ();              // RGBA, px_w * px_h * 4 bytes
+  void shift_pixels (int dx, int dy);    // moved, for a scroll
   void extents_in_pixels (int& w, int& h, int& sx, int& sy);
   void cursor_in_pixels (int& x, int& y);
 

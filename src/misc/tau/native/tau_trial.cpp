@@ -324,9 +324,11 @@ main (int argc, char** argv) {
         const char* kind= (const char*) f.body.data ();
         if (!strcmp (kind, "footer")) footer= "";
       }
-      else if (!strcmp (f.tag, "PANT") && f.body.size () >= 56) {
-        int32_t n[14];
-        memcpy (n, f.body.data (), 56);
+      else if (!strcmp (f.tag, "PANT") && f.body.size () >= 64) {
+        // (16 numbers since protocol 3; the trial does not move its pixels
+        // for a scroll, n[14] and n[15]: what was scrolled is left as is)
+        int32_t n[16];
+        memcpy (n, f.body.data (), 64);
         if (n[0] != view || n[1] != place) continue; // for another place
         int w= n[2], h= n[3];
         if (!tex || w != tex_w || h != tex_h) {
@@ -337,7 +339,7 @@ main (int argc, char** argv) {
         }
         SDL_Rect r= { n[4], n[5], n[6], n[7] };
         Uint64 c0= SDL_GetTicksNS ();
-        SDL_UpdateTexture (tex, &r, f.body.data () + 56, 4 * n[6]);
+        SDL_UpdateTexture (tex, &r, f.body.data () + 64, 4 * n[6]);
         copy_ms.add ((SDL_GetTicksNS () - c0) / 1e6);
         paint_bytes += f.body.size (); paint_count++;
         dirty= true;
