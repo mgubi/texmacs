@@ -350,6 +350,7 @@
   (verbatim-expand exec_verbatim (tree content))
   (latex-expand exec_latex (tree content))
   (html-expand exec_html (tree content))
+  (markdown-expand exec_markdown (tree content))
   (animate-checkout checkout_animation (tree content))
   (animate-commit commit_animation (tree content))
   (idle-time idle_time (int))

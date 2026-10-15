@@ -1192,6 +1192,7 @@
 "verbatim-expand"
 "latex-expand"
 "html-expand"
+"markdown-expand"
 "animate-checkout"
 "animate-commit"
 "idle-time"

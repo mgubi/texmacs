@@ -96,6 +96,8 @@ public:
   tree     exec_verbatim (tree t);
   tree     exec_html (tree t, path p);
   tree     exec_html (tree t);
+  tree     exec_markdown (tree t, path p);
+  tree     exec_markdown (tree t);
   tree     exec_latex (tree t, path p);
   tree     exec_latex (tree t);
   tree     texmacs_exec (tree t);

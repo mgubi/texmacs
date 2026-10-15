@@ -168,6 +168,8 @@ macros, whole documents) and checks round trips, including the ones which
 lose information on purpose. `formats-test.scm` does the same for the .tm,
 Scheme, TMML, HTML and plain text formats, round-trips a common table of
 samples through the TeXmacs formats, and checks the format registry.
+`markdown-test.scm` checks the Markdown converters step by step (the parser,
+the serializer, the import and the export) and their round trips.
 `editing-test.scm` opens buffers and edits them through the commands a user
 or a plugin uses (inserting, the cursor, selections and the clipboard,
 structured editing, the environment, undo and redo, saving and exporting),

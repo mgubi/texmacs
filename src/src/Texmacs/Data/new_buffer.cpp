@@ -568,6 +568,8 @@ buffer_export (url name, url dest, string fm) {
     body= vw->ed->exec_verbatim (body);
   if (fm == "html")
     body= vw->ed->exec_html (body);
+  if (fm == "markdown")
+    body= vw->ed->exec_markdown (body);
   //if (fm == "latex")
   //body= vw->ed->exec_latex (body);
 
