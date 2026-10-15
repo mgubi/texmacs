@@ -50,8 +50,9 @@ public:
   bool                 in_known; // all its inputs are known:
   array<string>        in_vars;  // the variables read before written
   array<tree>          in_vals;  // with their values (or env_absent ())
-  array<tree>          in_state; // the state derived from the environment
-  tree                 in_items; // the line items it got from around it
+  unsigned long long   in_state; // the state derived from the environment
+  array<double>        in_items; // the line items it got from around it
+  array<tree>          in_item_marks; // (the markers among them)
   array<box>           in_item_boxes; // (those which are not markers)
   unsigned long long   in_fp;    // the fingerprint of the environment
 

@@ -253,11 +253,9 @@ pager_rep::memo_start () {
        << (double) float_sep->max << (double) mnote_sep
        << (double) (show_hf? 1: 0) << (double) (paper? 1: 0)
        << (double) page_offset << (double) env->pixel << (double) env->dpi;
-  array<tree> state= env->derived_state ();
-  bool same= N(pars) == N(memo->pars) && N(state) == N(memo->state);
+  unsigned long long state= env->derived_state ();
+  bool same= N(pars) == N(memo->pars) && state == memo->state;
   for (int i=0; same && i<N(pars); i++) same= pars[i] == memo->pars[i];
-  for (int i=0; same && i<N(state); i++)
-    same= same_tree (state[i], memo->state[i]);
   if (!same) {
     memo->pars   = pars;
     memo->state  = state;

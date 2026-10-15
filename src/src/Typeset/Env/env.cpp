@@ -172,34 +172,37 @@ edit_env_rep::lookup (string name) {
   return value;
 }
 
-array<tree>
+// (a fingerprint rather than the values: a bridge keeps it, and there are
+// some 250 such variables)
+unsigned long long
 edit_env_rep::derived_state () {
-  static array<string> names;
-  static int known= -1;
-  if (known != N(var_type)) {
-    names= array<string> ();
+  static int known= -1, known_derived= -1;
+  if (known != N(var_type) || known_derived != N(env_derived_inputs ())) {
+    // the variables which are not plain, and the plain variables from
+    // which a state was derived
+    hashmap<string,bool> vars (false);
     iterator<string> it= iterate (var_type);
     while (it->busy ()) {
       string var= it->next ();
-      if (!plain_variable (var)) names << var;
+      if (!plain_variable (var)) vars (var)= true;
     }
-    merge_sort (names);
+    for (iterator<int> it2= iterate (env_derived_inputs ()); it2->busy (); )
+      vars (env_var_name (it2->next ()))= true;
+    env_state_vars ()= vars;
+    env_state_version++;
     known= N(var_type);
+    known_derived= N(env_derived_inputs ());
   }
-  array<tree> r;
-  for (int i=0; i<N(names); i++) r << env.h [names[i]];
-  // and the plain variables from which a state was derived (in the order
-  // of their numbers)
-  array<int> ids;
-  for (iterator<int> it= iterate (env_derived_inputs ()); it->busy (); )
-    ids << it->next ();
-  merge_sort (ids);
-  for (int i=0; i<N(ids); i++) {
-    string var= env_var_name (ids[i]);
-    r << tree (var) << env.h [var];
-  }
-  return r;
+  return env.state_fingerprint ();
 }
+
+hashmap<string,bool>&
+env_state_vars () {
+  static hashmap<string,bool> vars (false);
+  return vars;
+}
+
+int env_state_version= 0;
 
 int env_deriving= 0;
 
@@ -299,13 +302,19 @@ string_hash64 (string s) {
 }
 
 // the hashes of the compound values, by tree (which the memo holds, so
-// that another tree does not come at the same place)
+// that another tree does not come at the same place). Values are made
+// again at each pass (tuples, copies of macros...): the memo has two
+// generations, the recent entries and the older ones, and the older ones
+// which are not used again go when the recent ones are many. The values
+// used at every pass, as those of the style, stay.
 struct value_hash_entry {
   tree t; unsigned long long h;
   value_hash_entry (): t (), h (0) {}
   value_hash_entry (tree t2, unsigned long long h2): t (t2), h (h2) {}
 };
-static std::unordered_map<void*,value_hash_entry> value_hashes;
+typedef std::unordered_map<void*,value_hash_entry> value_hash_map;
+static value_hash_map value_hashes, value_hashes_old;
+#define VALUE_HASHES_MAX 65536
 
 static unsigned long long
 value_hash64 (tree t) {
@@ -313,9 +322,17 @@ value_hash64 (tree t) {
   void* key= (void*) t.operator-> ();
   auto it= value_hashes.find (key);
   if (it != value_hashes.end ()) return it->second.h;
-  unsigned long long h= mix64 (0x9E3779B97F4A7C15ULL + (int) L(t));
-  for (int i=0; i<N(t); i++) h= mix64 (h * 31 + value_hash64 (t[i]));
-  if (value_hashes.size () > 500000) value_hashes.clear ();
+  unsigned long long h;
+  auto old= value_hashes_old.find (key);
+  if (old != value_hashes_old.end ()) h= old->second.h;
+  else {
+    h= mix64 (0x9E3779B97F4A7C15ULL + (int) L(t));
+    for (int i=0; i<N(t); i++) h= mix64 (h * 31 + value_hash64 (t[i]));
+  }
+  if (value_hashes.size () >= VALUE_HASHES_MAX) {
+    value_hashes_old.swap (value_hashes);
+    value_hashes.clear ();
+  }
   value_hashes[key]= value_hash_entry (t, h);
   return h;
 }
@@ -328,8 +345,13 @@ env_entry_hash (string var, tree val) {
 
 unsigned long long
 env_table::fingerprint () {
+  hashmap<string,bool>& state= env_state_vars ();
   for (int i=0; i<N(dirty); i++)
-    if (h->contains (dirty[i])) fp ^= env_entry_hash (dirty[i], h [dirty[i]]);
+    if (h->contains (dirty[i])) {
+      unsigned long long e= env_entry_hash (dirty[i], h [dirty[i]]);
+      fp ^= e;
+      if (state->contains (dirty[i])) sfp ^= e;
+    }
   if (N(dirty) != 0) {
     dirty= array<string> ();
     dirty_set= hashmap<string,bool> (false);
@@ -337,9 +359,36 @@ env_table::fingerprint () {
   return fp;
 }
 
+unsigned long long
+env_table::state_fingerprint () {
+  if (typeset_inputs_mode () == 0) {
+    // (the fingerprints are not kept in the classic mode: from the values)
+    unsigned long long r= 0;
+    for (iterator<string> it= iterate (env_state_vars ()); it->busy (); ) {
+      string var= it->next ();
+      if (h->contains (var)) r ^= env_entry_hash (var, h [var]);
+    }
+    return r ^ mix64 (0x9E3779B97F4A7C15ULL + env_state_version);
+  }
+  fingerprint ();
+  if (sfp_version != env_state_version) {
+    // the variables of the state changed: sfp is made again (also when
+    // writes in between went in and out under different sets)
+    sfp= 0;
+    for (iterator<string> it= iterate (env_state_vars ()); it->busy (); ) {
+      string var= it->next ();
+      if (h->contains (var)) sfp ^= env_entry_hash (var, h [var]);
+    }
+    sfp_version= env_state_version;
+  }
+  return sfp ^ mix64 (0x9E3779B97F4A7C15ULL + env_state_version);
+}
+
 void
 env_table::refingerprint () {
   fp= 0;
+  sfp= 0;
+  sfp_version= -1;
   dirty= array<string> ();
   dirty_set= hashmap<string,bool> (false);
   if (typeset_inputs_mode () == 0) return;
