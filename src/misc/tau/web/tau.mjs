@@ -1045,8 +1045,11 @@ function replayCounts(m) {
 	return c;
 }
 // a line (3), a polygon (4) or an arc (5) of the commands at i, drawn by a
-// 2D canvas (also for the WebGL surface, gl.mjs); the index after it
+// 2D canvas (also for the WebGL surface, gl.mjs); the index after it. (The
+// ends and the joins are round, as those of the pencils of the core: its
+// renderer, and the shell, draw them so)
 function drawPath(ctx, o, i) {
+	ctx.lineCap = ctx.lineJoin = "round";
 	if (o[i] === 5) {
 		const x1 = o[i + 1], y1 = o[i + 2], x2 = o[i + 3], y2 = o[i + 4];
 		const a = o[i + 5] * Math.PI / (180 * 64), da = o[i + 6] * Math.PI / (180 * 64);
@@ -1109,7 +1112,19 @@ function replayCommands(ctx, m) {
 			if (g) ctx.drawImage(g.page.c, g.x, g.y, g.w, g.h, o[i + 2], o[i + 3], g.w, g.h);
 			i += 5; break;
 		}
-		case 3: case 4: case 5:
+		case 3:
+			// (a thin line of two points along x or y: the rectangle which
+			// its stroke covers, without a path; its round ends are taken as
+			// square, less than half a pixel apart)
+			if (o[i + 1] === 2 && o[i + 2] <= 32 && (o[i + 4] === o[i + 6] || o[i + 5] === o[i + 7])) {
+				const w = o[i + 2] / 16, x1 = o[i + 4], y1 = o[i + 5], x2 = o[i + 6], y2 = o[i + 7];
+				ctx.fillStyle = colorName(o[i + 3]);
+				if (y1 === y2) ctx.fillRect(Math.min(x1, x2) - w / 2, y1 - w / 2, Math.abs(x2 - x1) + w, w);
+				else ctx.fillRect(x1 - w / 2, Math.min(y1, y2) - w / 2, w, Math.abs(y2 - y1) + w);
+				i += 8; break;
+			}
+			// fall through
+		case 4: case 5:
 			i = drawPath(ctx, o, i);
 			break;
 		case 6:

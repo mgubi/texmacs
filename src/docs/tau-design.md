@@ -1324,8 +1324,28 @@ from 16 to 1024 pixels. As in the page of TeXmacs Vue
   faster. In Firefox the 2D canvas is slow and uneven, WebGL is not (a
   step 3.4–3.8 ms, a view of commands 4.4). The pixels of the core given
   to WebGL (a texture of the whole view) are the slow case (8–9 ms).
-- **Left**: a limit to the pictures kept by the page, and to the glyphs of the
-  shell; the pattern of a rotated shape is rotated with it (MuPDF keeps
+- **Small fixes taken from wip_other_guis** (2026-10-15, `gl.mjs`). A line
+  of two points along x or y, 2 pixels wide at most, is rectangles: in
+  WebGL the rows it covers, each of its colour times what it covers of
+  them; in the 2D replay a `fillRect`. The paths which come one after the
+  other are drawn by the 2D canvas together and given once (unless their
+  rectangle would be more than twice what they cover). The canvas of WebGL
+  is drawn once for a refresh of the screen (`requestAnimationFrame`), not
+  for each frame. The textures of the pictures are those used last, 512 or
+  256 MB at most. And the paths of the page have round ends and joins, as
+  those of the core and of the shell (the canvas cut them square: 3471
+  pixels differed from the core on lines, 3350 now; 2777 → 2708 on
+  rotations and patterns; what is left is the core's thin lines, whose
+  width the commands round up to a pixel and whose ends they truncate).
+  `?gpusync` now waits for the texture of the view, not for the canvas:
+  the canvas is drawn at the refresh, as a 2D canvas is put on the screen,
+  and neither is counted. The manual, ms a frame with WebGL (step, pixels
+  / commands; view, pixels / commands): Safari 2.3 / 2.1, 7.3 / 2.5 (was
+  3.3 / 2.8, 8.5 / 3.6, with a draw of the canvas in each); Firefox 2.8 /
+  3.6, 7.3 / 3.1 (was 3.4 / 3.8, 9.3 / 4.4).
+- **Left**: a limit to the pictures kept by the page (WebGL has one for
+  its textures; the page cannot forget a picture, which the core sends
+  once), and to the glyphs of the shell; the pattern of a rotated shape is rotated with it (MuPDF keeps
   it upright); the commands by default (they are asked for, for now).
 
 ### On the desktop

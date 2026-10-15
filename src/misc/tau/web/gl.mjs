@@ -12,6 +12,13 @@
 // given as a picture. A transformation (9 and 10) moves the corners of what
 // is drawn; the clips are said in the pixels of the view, as the scissor.
 //
+// (and, as the GPU path of wip_other_guis does: a thin line along x or y is
+// rectangles, of the coverage which the 2D canvas would give each row or
+// column; the paths which come one after the other are drawn by the 2D
+// canvas together, given once; the canvas is drawn once for a refresh of the
+// screen, not for each frame; the textures of the pictures are kept for the
+// pictures used last, 512 or 256 MB at most)
+//
 // makeGLSurface (canvas, shared, lost): null without WebGL 2; else what
 // tau.mjs asks of a surface (size, shift, pixels, commands, sync). shared
 // has the glyphs and the pictures of the page, drawPath and opSize; lost is
@@ -43,6 +50,7 @@ void main () {
 }`;
 const FLOATS = 9;     // x, y, u, v, r, g, b, a, kind
 const ATLAS = 2048;   // the atlas of the glyphs
+const PICTURES = 512, PICTURE_BYTES = 256 << 20;
 
 export function makeGLSurface(canvas, shared, lost) {
 	const gl = canvas.getContext("webgl2", { alpha: false, antialias: false, depth: false, stencil: false,
@@ -90,7 +98,7 @@ export function makeGLSurface(canvas, shared, lost) {
 		const atlas = texture(gl.LINEAR);
 		gl.texStorage2D(gl.TEXTURE_2D, 1, gl.R8, ATLAS, ATLAS);
 		R = { size: gl.getUniformLocation(program, "size"), atlas, frames: null, shown: 0,
-			stage: texture(gl.NEAREST), path: texture(gl.LINEAR), pictures: new Map(),
+			stage: texture(gl.NEAREST), path: texture(gl.LINEAR), pictures: new Map(), pictureBytes: 0,
 			glyphs: new Map(), ax: 0, ay: 0, arow: 0 };
 		gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
 		W = H = 0;
@@ -151,9 +159,16 @@ export function makeGLSurface(canvas, shared, lost) {
 		quad(x, y, x + W, y + H, 0, 1, 1, 0, 1, 1, 1, 1, 2, null);
 		flush();
 	}
-	function present() {
+	// (at the next refresh of the screen, or when the canvas is waited for)
+	let presenting = 0;
+	function presentNow() {
+		if (presenting) { cancelAnimationFrame(presenting); presenting = 0; }
+		if (!R || !R.frames) return;
 		into(null, canvas.width, canvas.height);
 		copy(R.frames[R.shown].tex, 0, 0);
+	}
+	function present() {
+		if (!presenting) presenting = requestAnimationFrame(() => { presenting = 0; presentNow(); });
 	}
 
 	// the glyphs of a frame in the atlas, before it is drawn
@@ -181,24 +196,63 @@ export function makeGLSurface(canvas, shared, lost) {
 			R.ax = R.ay = R.arow = 0;
 		}
 	}
-	// (a number may come again with other pixels: the texture follows them)
+	// (a number may come again with other pixels: the texture follows them;
+	// the map is in the order of use, the first are given back when too many)
+	function forget(id, t) {
+		gl.deleteTexture(t.tex);
+		R.pictureBytes -= 4 * t.w * t.h;
+		R.pictures.delete(id);
+	}
 	function pictureOf(id) {
 		const pic = shared.pictures.get(id);
 		let t = R.pictures.get(id);
-		if (t && t.pic === pic) return t;
+		if (t && t.pic === pic) { R.pictures.delete(id); R.pictures.set(id, t); return t; }
 		flush();
-		if (t) gl.deleteTexture(t.tex);
-		if (!pic) { R.pictures.delete(id); return null; }
+		if (t) forget(id, t);
+		if (!pic) return null;
+		for (const [old, u] of R.pictures) {
+			if (R.pictures.size < PICTURES && R.pictureBytes + 4 * pic.width * pic.height <= PICTURE_BYTES) break;
+			forget(old, u);
+		}
 		t = { tex: texture(gl.LINEAR), w: pic.width, h: pic.height, pic };
 		gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
 		gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, pic);
 		gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
 		R.pictures.set(id, t);
+		R.pictureBytes += 4 * t.w * t.h;
 		return t;
 	}
-	// a line, a polygon or an arc: drawn by the 2D canvas into the rectangle
-	// which it covers (within the clip), given as a picture
-	function path(o, i, m, clip) {
+	// a line of two points along x or y, 2 pixels wide at most, without a
+	// transformation: the rows (or columns) which its width covers, each a
+	// rectangle of its colour times what it covers of them, as the 2D canvas
+	// (its round ends taken as square, less than half a pixel apart); false
+	// for another line (and nothing drawn unless draw)
+	function straightLine(o, i, m, draw) {
+		if (m || o[i + 1] !== 2 || o[i + 2] > 32) return false;
+		const x1 = o[i + 4], y1 = o[i + 5], x2 = o[i + 6], y2 = o[i + 7], w = o[i + 2] / 16;
+		const along = y1 === y2;
+		if (!along && x1 !== x2 || w <= 0) return false;
+		if (!draw) return true;
+		// (the ends are fractional too: what they cover of their pixel is
+		// taken as all of it, a pixel of the length at most)
+		const a1 = Math.floor((along ? Math.min(x1, x2) : Math.min(y1, y2)) - w / 2);
+		const a2 = Math.ceil((along ? Math.max(x1, x2) : Math.max(y1, y2)) + w / 2);
+		const c = along ? y1 : x1, b1 = c - w / 2, b2 = c + w / 2;
+		color(o[i + 3]);
+		const band = (s1, s2, k) => {
+			if (s2 <= s1 || k <= 0) return;
+			if (along) quad(a1, s1, a2, s2, 0, 0, 0, 0, cr * k, cg * k, cb * k, ca * k, 0, null);
+			else quad(s1, a1, s2, a2, 0, 0, 0, 0, cr * k, cg * k, cb * k, ca * k, 0, null);
+		};
+		const f1 = Math.floor(b1), f2 = Math.floor(b2);
+		if (f1 === f2) { band(f1, f1 + 1, b2 - b1); return true; }
+		band(f1, f1 + 1, f1 + 1 - b1);
+		band(f1 + 1, f2, 1);
+		band(f2, f2 + 1, b2 - f2);
+		return true;
+	}
+	// the rectangle (within the clip) which a line, a polygon or an arc covers
+	function pathBox(o, i, m, clip) {
 		const end = i + shared.opSize(o, i), op = o[i];
 		const xs = [], ys = [];
 		if (op === 5) { xs.push(o[i + 1], o[i + 3], o[i + 1], o[i + 3]); ys.push(o[i + 2], o[i + 2], o[i + 4], o[i + 4]); }
@@ -209,15 +263,36 @@ export function makeGLSurface(canvas, shared, lost) {
 		}
 		const width = op === 3 ? o[i + 2] / 16 : op === 5 && !o[i + 9] ? o[i + 7] / 16 : 0;
 		const pad = 2 + width * (m ? Math.max(Math.hypot(m.a, m.b), Math.hypot(m.c, m.d)) : 1);
-		const x1 = Math.max(clip[0], Math.floor(Math.min(...xs) - pad)), y1 = Math.max(clip[1], Math.floor(Math.min(...ys) - pad));
-		const x2 = Math.min(clip[2], Math.ceil(Math.max(...xs) + pad)), y2 = Math.min(clip[3], Math.ceil(Math.max(...ys) + pad));
-		if (x2 <= x1 || y2 <= y1) return end;
+		return [Math.max(clip[0], Math.floor(Math.min(...xs) - pad)), Math.max(clip[1], Math.floor(Math.min(...ys) - pad)),
+			Math.min(clip[2], Math.ceil(Math.max(...xs) + pad)), Math.min(clip[3], Math.ceil(Math.max(...ys) + pad))];
+	}
+	// the lines, polygons and arcs from i on, one after the other (but the
+	// straight lines, and those which would make the rectangle given too
+	// large): drawn by the 2D canvas into the rectangle which they cover,
+	// given as a picture; the index after them
+	function paths(o, i, m, clip) {
+		const n = o.length, todo = [];
+		let box = null, area = 0;
+		for (; i < n && (o[i] === 3 || o[i] === 4 || o[i] === 5); i += shared.opSize(o, i)) {
+			// (a straight line after paths waits for them to be drawn)
+			if (o[i] === 3 && straightLine(o, i, m, !todo.length)) { if (todo.length) break; continue; }
+			const b = pathBox(o, i, m, clip);
+			if (b[2] <= b[0] || b[3] <= b[1]) continue;
+			const u = box ? [Math.min(box[0], b[0]), Math.min(box[1], b[1]), Math.max(box[2], b[2]), Math.max(box[3], b[3])] : b;
+			const a = (b[2] - b[0]) * (b[3] - b[1]);
+			if (box && (u[2] - u[0]) * (u[3] - u[1]) > Math.max(2 * (area + a), 256 * 256)) break;
+			todo.push(i); box = u; area += a;
+		}
+		if (todo.length) drawPaths(o, todo, m, box);
+		return i;
+	}
+	function drawPaths(o, todo, m, [x1, y1, x2, y2]) {
 		const w = x2 - x1, h = y2 - y1;
 		if (scratch.width !== w || scratch.height !== h) { scratch.width = w; scratch.height = h; }
 		else { sx.setTransform(1, 0, 0, 1, 0, 0); sx.clearRect(0, 0, w, h); }
 		sx.setTransform(1, 0, 0, 1, -x1, -y1);
 		if (m) sx.transform(m.a, m.b, m.c, m.d, m.e, m.f);
-		shared.drawPath(sx, o, i);
+		for (const i of todo) shared.drawPath(sx, o, i);
 		flush();
 		gl.bindTexture(gl.TEXTURE_2D, R.path);
 		gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
@@ -225,7 +300,6 @@ export function makeGLSurface(canvas, shared, lost) {
 		gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
 		bound = R.path;
 		quad(x1, y1, x2, y2, 0, 0, 1, 1, 1, 1, 1, 1, 2, null);
-		return end;
 	}
 
 	return {
@@ -311,7 +385,7 @@ export function makeGLSurface(canvas, shared, lost) {
 					i += 5; break;
 				}
 				case 3: case 4: case 5:
-					i = path(o, i, matrix, clip);
+					i = paths(o, i, matrix, clip);
 					break;
 				case 6:
 					setClip(o[i + 1], o[i + 2], o[i + 3], o[i + 4]);
@@ -335,6 +409,12 @@ export function makeGLSurface(canvas, shared, lost) {
 			gl.disable(gl.SCISSOR_TEST);
 			present();
 		},
-		sync() { if (R) gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel); }
+		// (a pixel of the view read back: the canvas is drawn at the refresh,
+		// as a 2D canvas is put on the screen, and is not waited for)
+		sync() {
+			if (!R || !R.frames) return;
+			into(R.frames[R.shown].fb, W, H);
+			gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
+		}
 	};
 }
