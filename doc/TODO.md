@@ -69,6 +69,27 @@ no headless mode. The Widkit duplicates are fixed on `wip_other_guis` too.
   without being typeset, the rules of `subsequent-author-substitute` which
   work name by name, names in other scripts) are in `doc/csl-design.md`.
 
+- **GPU renderer, after the work of 2026-10-15** (Metal backend, the
+  canvases of the Cocoa port on the GPU; `src/docs/vue-graphics-stack.md`,
+  "The GPU renderer", and `doc/ns-port.md`, "Drawn by the GPU"):
+  - The Cocoa canvases drawn by Metal were checked through snapshots and
+    `TEXMACS_NS_BENCH` only, never by hand on screen: windows moved between
+    a Retina and an external screen, dialogs with canvases, input methods.
+    Their stores are now transparent until painted, as the bitmaps were, but
+    no canvas which leaves parts unpainted was tried.
+  - The first repaint of a Cocoa canvas on the GPU takes some 0.8 s (the
+    first textures and pipelines); they could be made at the start.
+  - One launch of the Cocoa test build quit by itself before its first
+    snapshot (no crash report, nothing in the log); four launches after it
+    did not.
+  - The Cocoa port drawn by Core Graphics (`TEXMACS_NS_GPU=0`): the
+    snapshots of a document of one page show the page shifted, with a copy
+    of it on the right (the backing store which wraps, `cring`?). Only seen
+    in the snapshots, not traced.
+  - Vue on OpenGL under macOS: `SDL_GL_SwapWindow` waits 1.6 to 3 ms a
+    present while scrolling; the presents are not paced as those of Metal
+    (`ready_to_present`), which is the default on macOS.
+
 ## Kept on purpose
 
 - `smart_font_rep::adjusted_dpi` in `src/src/Graphics/Fonts/smart_font.cpp`
@@ -78,6 +99,16 @@ no headless mode. The Widkit duplicates are fixed on `wip_other_guis` too.
   Cursor is chosen by hand.
 
 ## Offered, not asked for
+
+- One GPU API for all the backends: sokol_gfx (OpenGL, WebGL2, Metal,
+  WebGPU, shaders written once with sokol-shdc) or WebGPU (Dawn,
+  emdawnwebgpu), instead of `gpu_backend_gl.cpp` and
+  `gpu_backend_metal.mm`; surveyed on 2026-10-15 (WebGPU is not in every
+  browser yet, so WebGL2 has to stay).
+- The windows of the Vue port presented by a display link, as the canvases
+  of the Cocoa port (`TMGpuPresenter`), instead of the pacing of the loop;
+  and the vector shapes of the Metal backend drawn by the GPU (Core
+  Graphics rasterizes them on the CPU now, over their box).
 
 - Invalidate the style cache automatically when a style or package
   changes (it is now stale until cleared by hand).
