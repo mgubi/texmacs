@@ -19,6 +19,16 @@ protected:
   bool                 corrupted;
   array<line_item>     a;
   array<line_item>     b;
+  // when the inputs are used: the parts are typeset again when the
+  // environment (its fingerprint) or what they looked up is otherwise, and
+  // kept otherwise (the bridges below compare them as boxes)
+  bool                 parts_ok;
+  unsigned long long   parts_fp;
+  array<string>        parts_keys;
+  array<tree>          parts_values;
+  bool                 parts_known;  // and what they read, as the inputs of
+  array<string>        parts_vars;   // a bridge (they are typeset first in
+  array<tree>          parts_vals;   // the record of the surround)
 
 public:
   bridge_surround_rep (typesetter ttt, tree st, path ip);
@@ -34,10 +44,12 @@ public:
   void my_exec_until (path p);
   bool my_typeset_will_be_complete ();
   void my_typeset (int desired_status);
+  bool parts_again ();
 };
 
 bridge_surround_rep::bridge_surround_rep (typesetter ttt, tree st, path ip):
-  bridge_rep (ttt, st, ip), changes_before (UNINIT)
+  bridge_rep (ttt, st, ip), changes_before (UNINIT),
+  parts_ok (false), parts_fp (0), parts_known (false)
 {
   initialize ();
 }
@@ -143,6 +155,14 @@ bridge_surround_rep::my_clean_links () {
     link_env= link_repository (true);
 }
 
+bool
+bridge_surround_rep::parts_again () {
+  if (typeset_inputs_mode () == 0)
+    return corrupted || (N(ttt->old_patch) != 0);
+  return corrupted || !parts_ok || env->fingerprint () != parts_fp ||
+         !same_lookups (env, parts_keys, parts_values);
+}
+
 void
 bridge_surround_rep::my_exec_until (path p) {
   if (p->item == 2) {
@@ -160,7 +180,14 @@ bridge_surround_rep::my_typeset_will_be_complete () {
 
 void
 bridge_surround_rep::my_typeset (int desired_status) {
-  if (corrupted || (N(ttt->old_patch) != 0) || typeset_inputs_mode () != 0) {
+  if (parts_again ()) {
+    bool inputs= (typeset_inputs_mode () != 0);
+    unsigned long long fp= (inputs? env->fingerprint (): 0);
+    array<string>* keys= env->rec_keys;
+    int k0= (keys == NULL? 0: N(*keys));
+    array<string>* vars= env->input_vars ();
+    int v0= (vars == NULL? 0: N(*vars));
+    bool all0= env->read_all (), unknown0= env->read_unknown;
     hashmap<string,tree> prev_back (UNINIT);
     env->local_start (prev_back);
     /*
@@ -173,8 +200,31 @@ bridge_surround_rep::my_typeset (int desired_status) {
     env->local_update (ttt->old_patch, changes_before);
     env->local_end (prev_back);
     corrupted= false;
+    if (inputs) {
+      // (what the parts looked up: added to the record of the bridge)
+      parts_ok= (keys != NULL);
+      parts_fp= fp;
+      parts_keys= (keys == NULL? array<string> (): range (*keys, k0, N(*keys)));
+      parts_values= (keys == NULL? array<tree> ():
+                     range (*env->rec_values, k0, N(*keys)));
+      parts_known= vars != NULL && (all0 || !env->read_all ()) &&
+                   (unknown0 || !env->read_unknown);
+      parts_vars= (vars == NULL? array<string> (): range (*vars, v0, N(*vars)));
+      parts_vals= (vars == NULL? array<tree> ():
+                   range (*env->input_vals (), v0, N(*vars)));
+    }
   }
-  else env->monitored_patch_env (changes_before);
+  else {
+    env->monitored_patch_env (changes_before);
+    if (typeset_inputs_mode () != 0) {
+      // the parts kept: what they read and looked up when they were made
+      // goes to the record of the bridge, as for a bridge used again
+      for (int i=0; i<N(parts_keys); i++)
+        env->record_lookup (parts_keys[i], parts_values[i]);
+      add_inputs (env, env->values_before (), parts_known,
+                  parts_vars, parts_vals);
+    }
+  }
 
   ttt->insert_marker (st, ip);
   ttt->insert_surround (a, b);

@@ -303,25 +303,19 @@ static void
 add_reads (edit_env env, bool known, array<int> reads,
            array<string> keys, array<tree> values) {
   hashmap<int,bool>* rec= env->read_recorder ();
-  if (rec == NULL || env->read_unknown) return;
-  // (a reference looked up by several bridges is one lookup)
-  array<string> new_keys;
-  array<tree> new_values;
-  for (int i=0; i<N(keys); i++)
-    if (!contains (keys[i], *env->rec_keys) && !contains (keys[i], new_keys)) {
-      new_keys << keys[i];
-      new_values << values[i];
-    }
-  if (!known || N(*rec) + N(reads) > READS_MAX ||
-      N(*env->rec_keys) + N(new_keys) > LOOKUPS_MAX) {
+  if (rec == NULL) return;
+  // the lookups always, also when the variables read are not known: a
+  // bridge used again through the fingerprint still checks them (a
+  // reference looked up by several bridges is one lookup)
+  for (int i=0; i<N(keys); i++) env->record_lookup (keys[i], values[i]);
+  if (env->read_unknown) return;
+  if (!known || N(*rec) + N(reads) > READS_MAX) {
     env->read_unknown= true; return; }
   for (int i=0; i<N(reads); i++) rec->operator () (reads[i])= true;
-  (*env->rec_keys) << new_keys;
-  (*env->rec_values) << new_values;
 }
 
 // do the references and attachments looked up still have the values found?
-static bool
+bool
 same_lookups (edit_env env, array<string> keys, array<tree> values) {
   for (int i=0; i<N(keys); i++)
     if (env->lookup_value (keys[i]) != values[i]) return false;
@@ -337,6 +331,20 @@ lines_contents (array<page_item> l) {
   return r;
 }
 
+// (and the places of the boxes inside the lines: a box moved without
+// changing the extents of its line, as a header of a theorem moved up)
+static void
+box_shape (box b, int depth, array<SI>& r) {
+  if (depth > 6) return;
+  int n= b->subnr ();
+  r << (SI) n;
+  for (int i=0; i<n; i++) {
+    box c= b->subbox (i);
+    r << b->sx (i) << b->sy (i) << c->x1 << c->y1 << c->x2 << c->y2;
+    box_shape (c, depth + 1, r);
+  }
+}
+
 static array<SI>
 lines_signature (array<page_item> l) {
   array<SI> r;
@@ -347,6 +355,7 @@ lines_signature (array<page_item> l) {
       << (SI) l[i]->b->x4 << (SI) l[i]->b->y4
       << (SI) l[i]->spc->min << (SI) l[i]->spc->def << (SI) l[i]->spc->max
       << (SI) l[i]->penalty << (SI) N(l[i]->fl);
+  for (int i=0; i<N(l); i++) box_shape (l[i]->b, 0, r);
   return r;
 }
 
@@ -390,6 +399,11 @@ border_signature (stack_border sb) {
 
 #define INPUTS_MAX 256
 
+// The line items which a bridge got from the bridges around it: the
+// markers (made again each time the bridge around is typeset) by what they
+// are, the others (the parts of a surround: the name of a theorem, a
+// number...) by the boxes themselves, which the bridge around keeps as
+// long as they are the same (see bridge_surround_rep::my_typeset)
 static tree
 items_signature (array<line_item> a, array<line_item> b) {
   if (N(a) == 0 && N(b) == 0) return "";
@@ -397,14 +411,32 @@ items_signature (array<line_item> a, array<line_item> b) {
   for (int k=0; k<2; k++) {
     array<line_item> l= (k == 0? a: b);
     for (int i=0; i<N(l); i++)
-      r << tree (TUPLE, as_string (l[i]->type), as_string (l[i]->op_type),
-                 (tree) l[i]->b, as_string (l[i]->b->w ()),
-                 as_string (l[i]->b->h ()), as_string (l[i]->penalty),
-                 as_string (l[i]->spc->def))
-        << l[i]->t;
+      if (l[i]->type == MARKER_ITEM)
+        r << tree (TUPLE, (tree) l[i]->b, as_string (l[i]->penalty),
+                   as_string (l[i]->spc->def));
+      else r << tree ("box");
     r << tree ("|");
   }
   return r;
+}
+
+static array<box>
+items_boxes (array<line_item> a, array<line_item> b) {
+  array<box> r;
+  for (int k=0; k<2; k++) {
+    array<line_item> l= (k == 0? a: b);
+    for (int i=0; i<N(l); i++)
+      if (l[i]->type != MARKER_ITEM) r << l[i]->b;
+  }
+  return r;
+}
+
+static bool
+same_boxes (array<box> b1, array<box> b2) {
+  if (N(b1) != N(b2)) return false;
+  for (int i=0; i<N(b1); i++)
+    if (b1[i].operator-> () != b2[i].operator-> ()) return false;
+  return true;
 }
 
 static inline bool
@@ -419,7 +451,9 @@ bool
 bridge_rep::same_inputs () {
   if (N(ttt->a) == 0 && N(ttt->b) == 0) {
     if (in_items != "") return false; }
-  else if (in_items != items_signature (ttt->a, ttt->b)) return false;
+  else if (in_items != items_signature (ttt->a, ttt->b) ||
+           !same_boxes (in_item_boxes, items_boxes (ttt->a, ttt->b)))
+    return false;
   if (!same_lookups (env, seen_keys, seen_values)) return false;
   // the whole environment as it was (the fingerprint: also for a bridge
   // whose inputs are not known), or the inputs
@@ -432,7 +466,7 @@ bridge_rep::same_inputs () {
 
 // the inputs of a bridge are inputs of the bridge which is recorded above
 // it, when it did not write them before (parent_back) or read them
-static void
+void
 add_inputs (edit_env env, hashmap<string,tree> parent_back, bool known,
             array<string> vars, array<tree> vals) {
   array<string>* pv= env->input_vars ();
@@ -487,10 +521,12 @@ bridge_rep::typeset_by_inputs (int desired_status) {
   array<tree> was_vals= in_vals, was_values= seen_values, was_state= in_state;
   array<int> was_reads= reads;
   tree was_items= in_items;
+  array<box> was_item_boxes= in_item_boxes;
   unsigned long long was_fp= in_fp;
   if (edit_profile.on) edit_profile.redone++;
   array<tree> state= env->derived_state ();
   tree items= items_signature (ttt->a, ttt->b);
+  array<box> item_boxes= items_boxes (ttt->a, ttt->b);
   unsigned long long fp= env->fingerprint ();
   hashmap<string,tree> prev_back (UNINIT);
   my_clean_links ();
@@ -518,6 +554,7 @@ bridge_rep::typeset_by_inputs (int desired_status) {
   in_vals= my_vals;
   in_state= state;
   in_items= items;
+  in_item_boxes= item_boxes;
   in_fp= fp;
   seen_keys= my_keys;
   seen_values= my_values;
@@ -543,6 +580,7 @@ bridge_rep::typeset_by_inputs (int desired_status) {
     // checked (and not only what the bridge makes)
     in_known= was_known; in_vars= was_vars; in_vals= was_vals;
     in_state= was_state; in_items= was_items; in_fp= was_fp;
+    in_item_boxes= was_item_boxes;
     seen_keys= was_keys; seen_values= was_values; reads= was_reads;
   }
   give_record (prev_back);

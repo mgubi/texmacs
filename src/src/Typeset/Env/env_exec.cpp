@@ -2112,8 +2112,9 @@ edit_env_rep::exec_has_binding (tree t) {
 * last name which was given, so that the tag which makes a label is
 * typeset again when the label before it is another one. The variable
 * auto-open holds, for the tag and for the tags around it in the document,
-* which of their labels was made last (tag.k, the tag being the number of
-* its first label): a tag may make other labels after those of a tag
+* which of their labels was made last (tag.k, the tag being the epoch of
+* its sequence and the number of its first label: e:n, since the sequences
+* of the parts all start at 1): a tag may make other labels after those of a tag
 * inside it. It is a variable, and not a count kept with the tag, because
 * the labels of a tag may be made by several bridges, of which some are
 * not typeset again.
@@ -2259,7 +2260,9 @@ edit_env_rep::exec_auto_id (tree t) {
     }
     if (a[0] != r[e]) { a->resize (1); a[0]= r[e]; }
     if (N(a) == 1) a << r[e+1]++;
-    string key= as_string (a[1]);
+    // (the key of a tag: the epoch of its sequence and its first number,
+    // since each part has a sequence of its own, starting at 1)
+    string key= as_string (a[0]) * ":" * as_string (a[1]);
     // the tags around this one which have labels
     array<string> around;
     tree up= root;
@@ -2267,7 +2270,7 @@ edit_env_rep::exec_auto_id (tree t) {
       up= up[q->item];
       array<int> b;
       if (auto_label_data (up, b) && N(b) >= 2 && b[0] == r[e])
-        around << as_string (b[1]);
+        around << (as_string (b[0]) * ":" * as_string (b[1]));
     }
     // which of their labels each of them made last, and this tag
     tree open (TUPLE), now (TUPLE);
@@ -2281,7 +2284,7 @@ edit_env_rep::exec_auto_id (tree t) {
       if (base == key) k= (dot < 0 ? 1 : as_int (s (dot + 1, N(s)))) + 1;
       else if (contains (base, around)) now << open[i];
     }
-    if (N(a) - 1 < k) a << r[e+1]++;
+    while (N(a) - 1 < k) a << r[e+1]++;
     number= a[k];
     now << tree (key * "." * as_string (k));
     if (now != open) monitored_write ("auto-open", now);

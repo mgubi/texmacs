@@ -924,6 +924,19 @@
      (tree-set (tree-ref (buffer-tree) 1) "replaced")
      (update-forced)
      (check-true (same-as-scratch?))))
+  ;; the name of a theorem moved by a macro of the document: the first
+  ;; paragraph of the theorem has it in its first line
+  (with-typeset-body
+   '(document (assign "theorem-name"
+                      (macro "name" (move (strong (arg "name")) "0pt" "0pt")))
+              "intro"
+              (theorem (document "First paragraph of the theorem body."
+                                 "Second paragraph."))
+              "end")
+   (lambda ()
+     (tree-set (tree-ref (buffer-tree) 0 1 1 2) "4ex")
+     (update-forced)
+     (check-true (same-as-scratch?))))
   ;; a variable which is assigned below a binding of it: its value before
   ;; is the one outside, not the bound one (not with the classic cache,
   ;; TEXMACS_TYPESET_READS=off, which gets it wrong as TeXmacs always did)
@@ -966,7 +979,21 @@
                    string<?)
              '("auto.p1-1" "auto.p1-2" "auto.p2-1" "auto.p2-2"))
      ;; nothing to do the next time
-     (check-false (renumber-auto-labels)))))
+     (check-false (renumber-auto-labels))))
+  ;; a tag with two labels at the end of a part and at the start of the
+  ;; next one: the sequences of the parts both start at 1
+  (with-typeset-body
+   '(document (assign "two" (macro "x" (concat (index (arg "x"))
+                                               (index (concat (arg "x") "2")))))
+              (set-part "A" (document (concat "a " (two "foo")) "text a"))
+              (set-part "B" (document (concat "b " (two "bar")) "text b"))
+              "end")
+   (lambda ()
+     (update-forced)
+     (check= (sort (list-filter (list-references)
+                                (lambda (l) (string-starts? l "auto.")))
+                   string<?)
+             '("auto.A-1" "auto.A-2" "auto.B-1" "auto.B-2")))))
 
 ;; A tag which is removed and put back by an undo gives its labels the
 ;; names they had (the undo puts back a copy with their numbers).

@@ -51,6 +51,7 @@ public:
   array<tree>          in_vals;  // with their values (or env_absent ())
   array<tree>          in_state; // the state derived from the environment
   tree                 in_items; // the line items it got from around it
+  array<box>           in_item_boxes; // (those which are not markers)
   unsigned long long   in_fp;    // the fingerprint of the environment
 
   array<page_item>     l;        // the typesetted lines of st
@@ -80,6 +81,12 @@ public:
   void typeset_by_inputs (int desired_status);
 };
 
+
+// the inputs of a bridge below for the record of the bridge above it
+void add_inputs (edit_env env, hashmap<string,tree> parent_back, bool known,
+                 array<string> vars, array<tree> vals);
+// do the references and attachments looked up still have these values?
+bool same_lookups (edit_env env, array<string> keys, array<tree> values);
 
 class bridge {
   ABSTRACT_NULL(bridge);

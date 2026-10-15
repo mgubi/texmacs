@@ -579,6 +579,11 @@ public:
   // lookup_value finds again
   array<string>* rec_keys;
   array<tree>*   rec_values;
+  hashmap<string,bool>* rec_key_set; // (the keys of rec_keys, once each)
+  inline void record_lookup (string name, tree value) {
+    if (rec_keys == NULL || (*rec_key_set)->contains (name)) return;
+    (*rec_key_set) (name)= true;
+    (*rec_keys) << name; (*rec_values) << value; }
   // The tree of the buffer which is being typeset, whose automatic labels
   // are numbered (exec_auto_id in env_exec.cpp), or a tree which is not
   // compound when there is none
@@ -592,8 +597,9 @@ public:
     inline ~typesetting_pass () {
       env->typesetting--; env->auto_buffer= outer; }
   };
-  inline void record_lookups (array<string>* keys, array<tree>* values) {
-    rec_keys= keys; rec_values= values; }
+  inline void record_lookups (array<string>* keys, array<tree>* values,
+                              hashmap<string,bool>* key_set) {
+    rec_keys= keys; rec_values= values; rec_key_set= key_set; }
   // A record of what is read for the time of one typesetting (of a bridge,
   // of a header): the record around it is the current one again when it
   // stops, and at the latest when it goes, also when an exception ends the
@@ -604,6 +610,8 @@ public:
     bool outer_all, outer_unknown, stopped;
     array<string>* outer_keys;
     array<tree>* outer_values;
+    hashmap<string,bool>* outer_key_set;
+    hashmap<string,bool> key_set;
     array<string>* outer_in_vars;
     array<tree>* outer_in_vals;
     inline read_record (edit_env_rep* e, hashmap<int,bool>* rec,
@@ -613,9 +621,10 @@ public:
       env (e), outer_rec (e->env.rec), outer_all (e->env.all),
       outer_unknown (e->read_unknown), stopped (false),
       outer_keys (e->rec_keys), outer_values (e->rec_values),
+      outer_key_set (e->rec_key_set), key_set (false),
       outer_in_vars (e->env.in_vars), outer_in_vals (e->env.in_vals) {
         env->record_reads (rec, false);
-        env->record_lookups (keys, values);
+        env->record_lookups (keys, values, &key_set);
         env->env.in_vars= in_vars; env->env.in_vals= in_vals;
         env->read_unknown= false; }
     // nothing was read but what the record holds
@@ -623,7 +632,7 @@ public:
     inline void stop () {
       if (stopped) return;
       env->record_reads (outer_rec, outer_all);
-      env->record_lookups (outer_keys, outer_values);
+      env->record_lookups (outer_keys, outer_values, outer_key_set);
       env->env.in_vars= outer_in_vars; env->env.in_vals= outer_in_vals;
       env->read_unknown= outer_unknown;
       stopped= true; }

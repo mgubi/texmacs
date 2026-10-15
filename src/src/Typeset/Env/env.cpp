@@ -43,6 +43,7 @@ edit_env_rep::edit_env_rep (drd_info& drd2,
   local_att (local_att2), global_att (global_att2),
   missing (UNINIT), redefined (), touched (false),
   read_unknown (false), rec_keys (NULL), rec_values (NULL),
+  rec_key_set (NULL),
   auto_buffer (""), typesetting (0)
 {
   env.back_log= &back;
@@ -167,7 +168,7 @@ edit_env_rep::lookup_value (string name) {
 tree
 edit_env_rep::lookup (string name) {
   tree value= lookup_value (name);
-  if (rec_keys != NULL) { (*rec_keys) << name; (*rec_values) << value; }
+  record_lookup (name, value);
   return value;
 }
 
