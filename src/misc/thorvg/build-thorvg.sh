@@ -11,7 +11,8 @@
 # lib/libthorvg-1.a). With "wasm" it is built with Emscripten (emcc in the
 # PATH, e.g. after ". misc/wasm/emenv.sh build-wasm") for WebGL2. meson and
 # ninja come from a Python venv in <prefix>/venv. Then configure with
-# --with-thorvg=<prefix>.
+# --with-thorvg=<prefix> (or let configure find it through pkg-config:
+# PKG_CONFIG_PATH=<prefix>/lib/pkgconfig).
 
 set -e
 PREFIX=${1:?usage: build-thorvg.sh <prefix> [wasm]}
