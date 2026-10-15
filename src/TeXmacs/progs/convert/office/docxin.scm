@@ -807,13 +807,18 @@
          (id (docx-get own 'style))
          (names (docx-style-names id))
          ;; (a named style of text is said by docx-run, which wraps the
-         ;; text in a span of this style)
+         ;; text in a span of this style: what the style says already is
+         ;; not said again, italics twice are not italics)
          (props (if (or (null? names) (in? (car names) docx-plain-styles)
                         (docx-code-style? names))
                     (if (and (pair? names) (docx-code-style? names))
                         (append own (docx-style id))
                         own)
-                    own))
+                    (with st (docx-style id)
+                      (list-filter own
+                                   (lambda (p) (not (and (assoc (car p) st)
+                                                         (equal? (docx-get st (car p))
+                                                                 (cdr p)))))))))
          (mark (with m (or (docx-get props 'mark) (docx-get own 'shade))
                  ;; (yellow is the color of highlighting of TeXmacs)
                  (if (and (string? m) (== (locase-all m) "#ffff00")) #t m)))
@@ -1324,9 +1329,10 @@
 ;; result is several paragraphs stays a field: each of its paragraphs has
 ;; a mark (!field-blocks instruction), which docx-paragraph makes its
 ;; attribute field-blocks, and docx-field-blocks puts the paragraphs with
-;; the same one in a block field-blocks. It must start its paragraph (the
-;; text before it would be in the field). Another field over several
-;; paragraphs is its result.
+;; the same one in a block field-blocks. The text before its start, in its
+;; first paragraph, and the text after its end, in its last one, are
+;; paragraphs of their own (see docx-field-segments). Another field over
+;; several paragraphs is its result.
 (define (docx-block-field? instr)
   (string-starts? (car (docx-field-parse instr)) "addin"))
 
@@ -1334,11 +1340,7 @@
   ;; whether the open field f, (state instruction nodes-before . carried),
   ;; is a field of paragraphs
   (and (== (car f) 'result) (docx-block-field? (cadr f))
-       (if (null? (cdddr f))
-           (list-and (map (lambda (y) (or (func? y 'bookmark)
-                                          (and (string? y) (== (string-trim-spaces y) ""))))
-                          (caddr f)))
-           (eq? (cadddr f) 'carried-block))))
+       (or (null? (cdddr f)) (eq? (cadddr f) 'carried-block))))
 
 ;; Each field of paragraphs has its number (two fields with the same
 ;; instruction one after the other are two fields); the part of its last
@@ -1376,31 +1378,82 @@
               (docx-find-field-mark (cdar l))))
         (else (docx-find-field-mark (cdr l)))))
 
-(define (docx-drop-field-marks l)
-  ;; the nodes l without the marks of the fields of paragraphs
-  (append-map (lambda (y)
-                (cond ((docx-field-mark? y) '())
-                      ((and (pair? y) (symbol? (car y)) (not (eq? (car y) '@)))
-                       (list (cons (car y) (docx-drop-field-marks (cdr y)))))
-                      (else (list y))))
-              l))
+(define (docx-has-field-mark? l)
+  ;; whether a mark of a field of paragraphs is in the nodes l
+  (list-or (map (lambda (y)
+                  (or (docx-field-mark? y)
+                      (and (pair? y) (symbol? (car y)) (not (eq? (car y) '@))
+                           (docx-has-field-mark? (cdr y)))))
+                l)))
 
-(define (docx-field-parts l)
-  ;; (in-field . after) for the nodes l of a paragraph of a field
-  (let loop ((r l) (acc '()))
-    (cond ((null? r) (cons (office-merge (docx-drop-field-marks (reverse acc))) '()))
-          ((func? (car r) '!field-blocks-end)
-           (cons (office-merge (docx-drop-field-marks (reverse acc)))
-                 ;; (the paragraph after the field, without the spaces
-                 ;; between them)
-                 (with after (office-merge (docx-drop-field-marks (cdr r)))
-                   (cond ((or (null? after) (not (string? (car after)))) after)
-                         ((== (tm-string-trim (car after)) "") (cdr after))
-                         (else (cons (tm-string-trim (car after)) (cdr after)))))))
-          (else (loop (cdr r) (cons (car r) acc))))))
+(define (docx-hoist-field-marks l)
+  ;; the nodes l with the marks of the fields of paragraphs among them: a
+  ;; node which holds one (a change which is tracked...) is cut in two
+  ;; there
+  (append-map
+    (lambda (y)
+      (if (not (and (pair? y) (symbol? (car y)) (not (eq? (car y) '@))
+                    (not (docx-field-mark? y)) (docx-has-field-mark? (cdr y))))
+          (list y)
+          (let* ((attrs (if (and (pair? (cdr y)) (func? (cadr y) '@)) (list (cadr y)) '()))
+                 (kids (docx-hoist-field-marks (if (null? attrs) (cdr y) (cddr y))))
+                 (wrap (lambda (cur)
+                         (if (null? cur) '()
+                             (list (append (list (car y)) attrs (reverse cur)))))))
+            (let loop ((k kids) (cur '()) (acc '()))
+              (cond ((null? k) (append acc (wrap cur)))
+                    ((docx-field-mark? (car k))
+                     (loop (cdr k) '() (append acc (wrap cur) (list (car k)))))
+                    (else (loop (cdr k) (cons (car k) cur) acc)))))))
+    l))
 
 (define (docx-blank-nodes? l)
   (list-and (map (lambda (y) (and (string? y) (== (string-trim-spaces y) ""))) l)))
+
+(define (docx-trim-side l left?)
+  ;; the nodes l without the spaces at their start (or at their end), also
+  ;; inside the nodes which wrap their text
+  (let* ((r (if left? l (reverse l)))
+         (x (and (pair? r) (car r)))
+         (x2 (cond ((string? x) (if left? (tm-string-trim x) (tm-string-trim-right x)))
+                   ((and (pair? x) (symbol? (car x))
+                         (in? (car x) '(ins del em strong underline strike smallcaps
+                                        color size font span sub sup link)))
+                    (let* ((attrs (if (and (pair? (cdr x)) (func? (cadr x) '@))
+                                      (list (cadr x)) '()))
+                           (kids (docx-trim-side (if (null? attrs) (cdr x) (cddr x)) left?)))
+                      (if (null? kids) "" (append (list (car x)) attrs kids))))
+                   (else x)))
+         (r (cond ((not x) r)
+                  ((== x2 "") (cdr r))
+                  (else (cons x2 (cdr r))))))
+    (if left? r (reverse r))))
+
+(define (docx-trim-nodes l)
+  ;; the nodes l without the spaces at their start and at their end
+  (docx-trim-side (docx-trim-side l #t) #f))
+
+(define (docx-field-segments l)
+  ;; the parts of the nodes l of a paragraph with marks of fields of
+  ;; paragraphs, in their order: each (mark . nodes), mark the one of the
+  ;; field which the part is in, or #f for the text before the start of a
+  ;; field or after its end (without the spaces next to the field). Parts
+  ;; without text are left out, but the part of a paragraph of a field
+  ;; which is empty.
+  (let* ((segs (let loop ((r (docx-hoist-field-marks l)) (mark #f) (cur '()) (acc '()))
+                 ;; (a field which ends where it starts has no part here)
+                 (let ((acc* (if (and (null? cur)
+                                      (or (not mark)
+                                          (and (pair? r) (func? (car r) '!field-blocks-end))))
+                                 acc
+                                 (cons (cons mark (office-merge (reverse cur))) acc))))
+                   (cond ((null? r) (reverse acc*))
+                         ((func? (car r) '!field-blocks) (loop (cdr r) (car r) '() acc*))
+                         ((func? (car r) '!field-blocks-end) (loop (cdr r) #f '() acc*))
+                         (else (loop (cdr r) mark (cons (car r) cur) acc))))))
+         (segs (map (lambda (s) (if (car s) s (cons #f (docx-trim-nodes (cdr s))))) segs)))
+    (if (and (list-1? segs) (car (car segs))) segs
+        (list-filter segs (lambda (s) (not (docx-blank-nodes? (cdr s))))))))
 
 (define (docx-field-pars b)
   ;; the paragraphs of the block b, a paragraph or a list
@@ -1438,13 +1491,20 @@
           ((docx-block-field (car l))
            => (lambda (f)
                 (let sub ((l l) (bs '()))
-                  (if (and (pair? l) (with g (docx-block-field (car l))
-                                       (and g (== (car g) (car f)))))
-                      (sub (cdr l) (cons (docx-strip-field (car l)) bs))
-                      (loop l (cons (apply office-node
-                                           (cons* 'field-blocks `((code ,(cdr f)))
-                                                  (reverse bs)))
-                                    acc))))))
+                  (cond ((and (pair? l) (with g (docx-block-field (car l))
+                                          (and g (== (car g) (car f)))))
+                         (sub (cdr l) (cons (docx-strip-field (car l)) bs)))
+                        ;; (a break of page between two paragraphs of the
+                        ;; field is in it)
+                        ((and (pair? l) (func? (car l) 'pagebreak) (pair? (cdr l))
+                              (with g (docx-block-field (cadr l))
+                                (and g (== (car g) (car f)))))
+                         (sub (cdr l) (cons (car l) bs)))
+                        (else
+                         (loop l (cons (apply office-node
+                                              (cons* 'field-blocks `((code ,(cdr f)))
+                                                     (reverse bs)))
+                                       acc)))))))
           (else (loop (cdr l) (cons (docx-strip-field (car l)) acc))))))
 
 (define (docx-inlines-sub l fields)
@@ -1588,10 +1648,9 @@
          ;; (a paragraph of a field over several, see docx-carried-field)
          (mark (docx-find-field-mark l))
          (field (and mark (cadr mark)))
-         ;; (what comes after the end of the field is another paragraph)
-         (parts (if mark (docx-field-parts l) (cons l '())))
-         (l (car parts))
-         (rest (cdr parts))
+         ;; (what comes before the start of a field or after its end is
+         ;; another paragraph)
+         (segments (and mark (docx-field-segments l)))
          ;; (the paragraphs of a field are as they are: those of the
          ;; bibliography of Zotero are not its entries)
          (role (if (and field (== (car role) "bibitem")) (list #f #f) role))
@@ -1635,9 +1694,24 @@
                                space-after line-spacing background border)))
                   (list-num ,(and item? id))
                   (list-format ,(and item? format (car format)))
-                  (list-start ,(and item? format (cadr format)))
-                  (field-blocks ,field)
-                  (field-serial ,(and mark (number->string (caddr mark)))))))
+                  (list-start ,(and item? format (cadr format)))))
+         ;; (the text of a paragraph of a field before the start of the
+         ;; field or after its end: a plain paragraph which goes on, in
+         ;; its style, with its formatting by hand, not a heading nor an
+         ;; item)
+         (plain-attrs
+          (and mark
+               `((style ,(and (not (car role)) style (null? docx-open-notes) style))
+                 ,(assoc 'align attrs)
+                 (list-id #f)
+                 ,@(map (lambda (k)
+                          (with v (and (not (and id (in? k '(indent-left first-indent))))
+                                       (docx-get own k))
+                            (list k (cond ((number? v) (office-decimal v))
+                                          ((eq? v #t) "true")
+                                          (else v)))))
+                        '(indent-left indent-right first-indent space-before
+                          space-after line-spacing background border))))))
     ;; (the style of a heading, for the look of the titles)
     (when (and (== (car role) "heading") style (null? docx-open-notes))
       (ahash-set! docx-used-styles style #t))
@@ -1648,13 +1722,21 @@
     (append
       (if (docx-get own 'page-break) '((pagebreak)) '())
       (cond ((list-find l (lambda (y) (func? y '!toc))) '((toc)))
-            ;; a paragraph of a field: its part in the field (none when
-            ;; the field ends at its start), and the text after its end
+            ;; a paragraph of fields: its parts in the fields, and the
+            ;; text before or after them (an empty paragraph of a field
+            ;; stays)
             (mark
-             (append (if (docx-blank-nodes? l) '() (docx-cut-pages l attrs))
-                     (if (docx-blank-nodes? rest) '()
-                         (docx-cut-pages rest (list-filter attrs
-                                                           (lambda (a) (not (in? (car a) '(field-blocks field-serial)))))))))
+             (append-map
+               (lambda (s)
+                 (cond ((not (car s)) (docx-cut-pages (cdr s) plain-attrs))
+                       (else
+                        (let ((a (append attrs
+                                         `((field-blocks ,(cadr (car s)))
+                                           (field-serial ,(number->string
+                                                            (caddr (car s))))))))
+                          (if (null? (cdr s)) (list (office-node 'p a))
+                              (docx-cut-pages (cdr s) a))))))
+               segments))
             ((and (null? l) (not item?)) '())
             (else (docx-cut-pages l attrs)))
       floats
@@ -1717,7 +1799,8 @@
                        (cons (apply office-node
                                     (cons* 'p (if first? attrs
                                                   (list-filter attrs
-                                                    (lambda (a) (in? (car a) '(align style)))))
+                                                    (lambda (a) (in? (car a) '(align style field-blocks
+                                                                               field-serial)))))
                                            (reverse part)))
                              acc)))))
       (cond ((null? l) (reverse (flush)))

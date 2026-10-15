@@ -328,40 +328,113 @@
             (cons labels before)))))
 
 (define (oftm-leading-punctuation s)
-  ;; (punctuation . rest) for a string s which starts with punctuation
+  ;; (punctuation . rest) for a string s which starts with punctuation (a
+  ;; point before a digit is not: 3.5, .5)
   (and (string? s)
        (let* ((n (string-length s))
               (i (let skip ((i 0))
                    (if (and (< i n) (char=? (string-ref s i) #\space)) (skip (+ i 1)) i)))
               (j (let more ((j i))
-                   (if (and (< j n) (in? (string-ref s j) '(#\. #\, #\; #\: #\! #\?)))
+                   (if (and (< j n) (in? (string-ref s j) '(#\. #\, #\; #\: #\! #\?))
+                            (not (and (char=? (string-ref s j) #\.) (< (+ j 1) n)
+                                      (char-numeric? (string-ref s (+ j 1))))))
                        (more (+ j 1)) j))))
          (and (> j i) (cons (substring s i j) (substring s j n))))))
 
+(define oftm-text-wrappers
+  '(em strong underline strike overline smallcaps color size font span mark
+    sub sup caps letters))
+
+(define (oftm-wrapper-punctuation y)
+  ;; (punctuation . rest) for a node y which wraps text (em...) and starts
+  ;; with punctuation: rest is the node without it, or #f when nothing
+  ;; else is in it
+  (and (pair? y) (in? (car y) oftm-text-wrappers)
+       (let* ((kids (ox-children y))
+              (q (and (pair? kids) (oftm-leading-punctuation (car kids)))))
+         (and q
+              (let ((more (if (== (cdr q) "") (cdr kids) (cons (cdr q) (cdr kids)))))
+                (cons (car q)
+                      (and (not (list-and (map oftm-blank? more)))
+                           (apply office-node
+                                  (cons* (car y)
+                                         (map (lambda (a) (list (car a) (cadr a)))
+                                              (ox-attrs y))
+                                         more)))))))))
+
+(define (oftm-chapter-field? y)
+  ;; the number of a chapter in the number of a formula (STYLEREF 1 \s)
+  (and (func? y 'field)
+       (string-starts? (locase-all (tm-string-trim (or (ox-attr y 'code) "")))
+                       "styleref")))
+
+(define (oftm-number-string? y)
+  ;; a string of the brackets and the separators of a number
+  (and (string? y)
+       (with s (string-trim-spaces y)
+         (and (!= s "")
+              (list-and (map (lambda (c) (in? c '(#\( #\) #\[ #\] #\. #\-)))
+                             (string->list s)))))))
+
 (define (oftm-number-part? y)
-  (or (oftm-blank? y) (func? y 'seq) (func? y 'bookmark)
-      (and (string? y) (in? (string-trim-spaces y) '("(" ")" "()")))))
+  (or (oftm-blank? y) (func? y 'seq) (func? y 'bookmark) (oftm-chapter-field? y)
+      (oftm-number-string? y)))
+
+(define (oftm-closing-brackets s)
+  ;; (brackets . rest) for a string s which starts with closing brackets,
+  ;; or #f
+  (and (string? s)
+       (let* ((n (string-length s))
+              (i (let skip ((i 0))
+                   (if (and (< i n) (char=? (string-ref s i) #\space)) (skip (+ i 1)) i)))
+              (j (let more ((j i))
+                   (if (and (< j n) (in? (string-ref s j) '(#\) #\])))
+                       (more (+ j 1)) j))))
+         (and (> j i) (cons (substring s i j) (substring s j n))))))
 
 (define (oftm-after-formula l)
   ;; (nodes . rest) for the children l after a displayed formula: the
-  ;; nodes which go with it are its punctuation, and its number (a field
-  ;; seq after tabs, in brackets)
-  (let* ((p (let absorb ((r l) (dots ""))
-              (cond ((null? r) (cons dots r))
-                    ((and (string? (car r)) (oftm-blank? (car r))) (absorb (cdr r) dots))
-                    ((oftm-leading-punctuation (car r))
-                     => (lambda (q)
-                          (if (oftm-blank? (cdr q))
-                              (absorb (cdr r) (string-append dots (car q)))
-                              (cons (string-append dots (car q))
-                                    (cons (cdr q) (cdr r))))))
-                    (else (cons dots r)))))
-         (dots (if (== (car p) "") '() (list (car p))))
-         (r (cdr p)))
+  ;; nodes which go with it are its punctuation (also after bookmarks,
+  ;; which are its labels, and at the start of a node which wraps text),
+  ;; and its number (a field seq after tabs, in brackets, perhaps after
+  ;; the number of the chapter)
+  (let* ((p (let absorb ((r l) (dots "") (marks '()) (pending '()))
+              ;; marks: the bookmarks before punctuation, pending: those
+              ;; after it so far (newest first)
+              (let ((stop (lambda (r)
+                            (list dots (reverse marks) (append (reverse pending) r)))))
+                (cond ((null? r) (stop r))
+                      ((and (string? (car r)) (oftm-blank? (car r)))
+                       (absorb (cdr r) dots marks pending))
+                      ((func? (car r) 'bookmark)
+                       (absorb (cdr r) dots marks (cons (car r) pending)))
+                      ((oftm-leading-punctuation (car r))
+                       => (lambda (q)
+                            (let ((dots (string-append dots (car q)))
+                                  (marks (append pending marks)))
+                              (if (oftm-blank? (cdr q))
+                                  (absorb (cdr r) dots marks '())
+                                  (list dots (reverse marks) (cons (cdr q) (cdr r)))))))
+                      ((oftm-wrapper-punctuation (car r))
+                       => (lambda (q)
+                            (let ((dots (string-append dots (car q)))
+                                  (marks (append pending marks)))
+                              (if (not (cdr q))
+                                  (absorb (cdr r) dots marks '())
+                                  (list dots (reverse marks) (cons (cdr q) (cdr r)))))))
+                      (else (stop r))))))
+         (dots (append (if (== (car p) "") '() (list (car p))) (cadr p)))
+         (r (caddr p)))
     (let num ((s r) (seen '()) (seq? #f))
-      (if (and (pair? s) (oftm-number-part? (car s)))
-          (num (cdr s) (cons (car s) seen) (or seq? (func? (car s) 'seq)))
-          (if seq? (cons (append dots (reverse seen)) s) (cons dots r))))))
+      (cond ((and (pair? s) (oftm-number-part? (car s)))
+             (num (cdr s) (cons (car s) seen) (or seq? (func? (car s) 'seq))))
+            ;; (the closing bracket of the number, before more text)
+            ((and seq? (pair? s) (oftm-closing-brackets (car s)))
+             => (lambda (q)
+                  (cons (append dots (reverse (cons (car q) seen)))
+                        (cons (cdr q) (cdr s)))))
+            (seq? (cons (append dots (reverse seen)) s))
+            (else (cons dots r))))))
 
 (define (oftm-piece-paragraphs x pieces)
   ;; the paragraphs of the pieces of the paragraph x
@@ -902,14 +975,14 @@
 
 (define (oftm-numbered-formula x)
   ;; (formula labels) for a paragraph which is a formula on its own lines
-  ;; with its number after it; else #f
+  ;; with its number after it (perhaps with the number of the chapter);
+  ;; else #f
   (let* ((l (list-filter (ox-children x)
-                         (lambda (y) (not (and (string? y)
-                                               (in? (string-trim-spaces y)
-                                                    '("" "(" ")" "()"))))))))
+                         (lambda (y) (not (or (oftm-blank? y) (oftm-number-string? y)))))))
     (and (pair? l) (func? (car l) 'math)
          ;; (and the punctuation after the formula)
          (list-and (map (lambda (y) (or (and (pair? y) (in? (car y) '(tab seq bookmark)))
+                                        (oftm-chapter-field? y)
                                         (oftm-punctuation-string? y)))
                         (cdr l)))
          (list-or (map (lambda (y) (func? y 'seq)) (cdr l)))
@@ -1471,22 +1544,30 @@
          (car l))))
 
 (define (oftm-without-role b)
-  ;; the block b, a paragraph of a field, not an entry of a bibliography
-  (if (not (oftm-role? b "bibitem")) b
+  ;; the block b, a paragraph of a field, not an entry of a bibliography;
+  ;; an empty one stays (keep-empty)
+  (if (not (and (func? b 'p) (or (oftm-role? b "bibitem") (null? (ox-children b))))) b
       (apply office-node
-             (cons* 'p (map (lambda (a) (list (car a) (cadr a)))
-                            (list-filter (ox-attrs b) (lambda (a) (!= (car a) 'role))))
+             (cons* 'p (append (map (lambda (a) (list (car a) (cadr a)))
+                                    (list-filter (ox-attrs b) (lambda (a) (!= (car a) 'role))))
+                               (if (null? (ox-children b)) '((keep-empty "true")) '()))
                     (ox-children b)))))
 
 (define (oftm-formula-dots x f)
-  ;; the formula f of the paragraph x, with the punctuation after it
+  ;; the formula f of the paragraph x, with the punctuation just after it
+  ;; (not the separators of its number)
   (let* ((after (let loop ((c (ox-children x)))
                   (cond ((null? c) '())
                         ((func? (car c) 'math) (cdr c))
                         (else (loop (cdr c))))))
-         (dots (apply string-append
-                      (map string-trim-spaces
-                           (list-filter after oftm-punctuation-string?)))))
+         (dots (let loop ((c after) (acc ""))
+                 (cond ((null? c) acc)
+                       ((or (func? (car c) 'bookmark)
+                            (and (string? (car c)) (== (string-trim-spaces (car c)) "")))
+                        (loop (cdr c) acc))
+                       ((oftm-punctuation-string? (car c))
+                        (loop (cdr c) (string-append acc (string-trim-spaces (car c)))))
+                       (else acc)))))
     (if (== dots "") f
         (oftm-concat (append (if (func? f 'concat) (cdr f) (list f))
                              (list (oftm-text dots)))))))
@@ -1654,7 +1735,8 @@
                                                                    labels))))))))))))
                        (else
                          (with t (oftm-inlines (ox-children x))
-                           (if (== t "") '()
+                           (if (== t "")
+                               (if (ox-attr x 'keep-empty) (list (oftm-styled x "")) '())
                                (list (oftm-styled x (oftm-direct-paragraph
                                                       x (oftm-aligned x t)))))))))
                 ((list) (oftm-list x))

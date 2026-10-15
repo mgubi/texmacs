@@ -795,18 +795,39 @@
        (with l (locase-all s)
          (or (string-starts? l "http://") (string-starts? l "https://")))))
 
-(tm-define (office-uri s)
+(tm-define (office-uri s . keep)
   (:synopsis "The address @s, with %XX for the bytes which an address cannot hold")
   ;; the spaces, the characters which are not of ASCII, some delimiters
+  ;; (but those of the optional list keep)
   (apply string-append
          (map (lambda (c)
                 (with n (char->integer c)
-                  (if (or (<= n 32) (>= n 127)
-                          (in? c '(#\" #\< #\> #\\ #\^ #\` #\{ #\| #\})))
+                  (if (and (or (<= n 32) (>= n 127)
+                               (in? c '(#\" #\< #\> #\\ #\^ #\` #\{ #\| #\})))
+                           (not (and (pair? keep) (in? c (car keep)))))
                       (string-append "%" (if (< n 16) "0" "")
                                      (upcase-all (number->string n 16)))
                       (string c))))
               (string->list s))))
+
+;; The address of a picture which a file links to, as the programs write it:
+;; on the web, with %XX for what an address cannot hold; a path of Windows
+;; (C:\pics\a.png) is a file: address, whose backslashes Word keeps
+;; (file:///C:\pics\a.png) and which LibreOffice writes with slashes
+;; (file:///C:/pics/a.png); a relative path or a file: address is the same,
+;; with %XX for the spaces and the characters which are not of ASCII.
+
+(tm-define (office-link-target s word?)
+  (:synopsis "The address @s of a linked picture, for Word (@word?) or OpenDocument")
+  (if (office-web-address? s) (office-uri s)
+      (let* ((n (string-length s))
+             (drive? (and (>= n 3) (char-alphabetic? (string-ref s 0))
+                          (char=? (string-ref s 1) #\:)
+                          (in? (string-ref s 2) '(#\\ #\/))))
+             (s (if drive? (string-append "file:///" s) s)))
+        (if word? (office-uri s '(#\\))
+            (office-uri (list->string (map (lambda (c) (if (char=? c #\\) #\/ c))
+                                           (string->list s))))))))
 
 (tm-define (office-decimal x)
   (:synopsis "The number @x with three decimals at most, and no useless ones")
@@ -933,6 +954,17 @@
 (define (office-style-key st)
   (cons (ox-attr st 'family) (ox-attr st 'name)))
 
+;; The node styles l by (name . family), the first of each, for the
+;; writers, which look them up for each named style of the text
+(tm-define (office-style-index l)
+  (:synopsis "A table of the node styles @l by (name . family)")
+  (let ((t (make-ahash-table)))
+    (for (st l)
+      (when (func? st 'style)
+        (with key (cons (ox-attr st 'name) (ox-attr st 'family))
+          (when (not (ahash-ref t key)) (ahash-set! t key st)))))
+    t))
+
 (tm-define (office-merged-styles mine theirs)
   (:synopsis "The nodes style @mine of a document, with those of its file @theirs")
   ;; A style of mine (of the macros of the document) with the attributes
@@ -940,12 +972,17 @@
   ;; say (the name to show, the paragraph kept with the next one, the
   ;; level of a heading); the other styles of theirs after them.
   (let* ((mine (list-filter mine (lambda (st) (func? st 'style))))
-         (keys (map office-style-key mine))
-         (theirs (list-filter theirs (lambda (st) (func? st 'style)))))
+         (keys (make-ahash-table))
+         (theirs (list-filter theirs (lambda (st) (func? st 'style))))
+         (index (make-ahash-table)))
+    (for (st mine) (ahash-set! keys (office-style-key st) #t))
+    (for (st theirs)
+      (with key (office-style-key st)
+        (when (not (ahash-ref index key)) (ahash-set! index key st))))
     (append
       (map (lambda (st)
              (let* ((key (office-style-key st))
-                    (other (list-find theirs (lambda (y) (== (office-style-key y) key))))
+                    (other (ahash-ref index key))
                     (have (map car (ox-attrs st)))
                     (add (if (not other) '()
                              (list-filter (ox-attrs other)
@@ -954,7 +991,7 @@
                (if (null? add) st
                    (cons* (car st) (cons '@ (append (ox-attrs st) add)) (ox-children st)))))
            mine)
-      (list-filter theirs (lambda (y) (not (in? (office-style-key y) keys)))))))
+      (list-filter theirs (lambda (y) (not (ahash-ref keys (office-style-key y))))))))
 
 (define (office-styles-docx arch)
   ;; (text names): a small Word document with the styles of the archive
@@ -1009,7 +1046,10 @@
                                   (ox-serialize doc)
                                   (ox-serialize rels))
                             (map (lambda (p) (ahash-ref arch (car p))) parts)))
-          (map (lambda (u) (cons (cadr u) (or (caddr u) (cadr u)))) used))))
+          ;; (Word's ids are unique; the families are those of the reader)
+          (map (lambda (u) (cons (cons (if (== (car u) "paragraph") "paragraph" "text") (cadr u))
+                                 (or (caddr u) (cadr u))))
+               used))))
 
 (define (office-styles-odt arch)
   ;; (text names): a small OpenDocument text with the styles of the
@@ -1041,8 +1081,25 @@
                     (list "application/vnd.oasis.opendocument.text"
                           (ox-serialize doc)
                           (ahash-ref arch "styles.xml")))
-          (map (lambda (u) (cons (cadr u) (or (caddr u) (office-odf-name (cadr u)))))
+          ;; (a style of paragraphs and one of text may have one name)
+          (map (lambda (u) (cons (cons (car u) (cadr u))
+                                 (or (caddr u) (office-odf-name (cadr u)))))
                used))))
+
+(tm-define (office-docx-style-keys data)
+  (:synopsis "The (family . id) of the styles of paragraphs and text of the Word file @data")
+  (let* ((arch (catch #t (lambda () (office-archive data)) (lambda args #f)))
+         (root (and arch (catch #t (lambda () (office-xml arch "word/styles.xml"))
+                                (lambda args #f)))))
+    (if (not root) '()
+        (list-filter
+          (map (lambda (y)
+                 (with type (ox-attr y 'w:type)
+                   (and (in? type '("paragraph" "character")) (ox-attr y 'w:styleId)
+                        (cons (if (== type "paragraph") "paragraph" "text")
+                              (ox-attr y 'w:styleId)))))
+               (ox-childs root 'w:style))
+          identity))))
 
 (define office-package-styles-cache (cons #f '()))
 
@@ -1066,7 +1123,10 @@
                                (sts (append-map ox-children
                                                 (list-filter l (lambda (y) (func? y 'styles))))))
                           (map (lambda (st)
-                                 (with d (assoc-ref (cadr small) (ox-attr st 'name))
+                                 (with d (assoc-ref (cadr small)
+                                                    (cons (if (== (ox-attr st 'family) "paragraph")
+                                                              "paragraph" "text")
+                                                          (ox-attr st 'name)))
                                    (if (not (and (func? st 'style) d)) st
                                        (cons* 'style
                                               (cons '@ (cons (list 'display d)
