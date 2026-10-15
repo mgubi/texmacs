@@ -614,13 +614,21 @@
                                                                         (mmlo-is? r 'mlabeledtr)))))))
                        (set! mmlo-eqarray? #t)
                        r))
-               (list `(m:m ,@(map (lambda (r)
-                                    `(m:mr ,@(map (lambda (d)
-                                                    `(m:e ,@(mmlo-row (ox-children d))))
-                                                  (list-filter (ox-elements r)
-                                                               (lambda (d) (mmlo-is? d 'mtd))))))
-                                  (list-filter c (lambda (r) (or (mmlo-is? r 'mtr)
-                                                                 (mmlo-is? r 'mlabeledtr)))))))))
+               ;; (Word wants as many cells in each row: short rows are
+               ;; completed with empty cells)
+               (let* ((rows (map (lambda (r)
+                                   (map (lambda (d)
+                                          `(m:e ,@(mmlo-row (ox-children d))))
+                                        (list-filter (ox-elements r)
+                                                     (lambda (d) (mmlo-is? d 'mtd)))))
+                                 (list-filter c (lambda (r) (or (mmlo-is? r 'mtr)
+                                                                (mmlo-is? r 'mlabeledtr))))))
+                      (n (apply max (cons 1 (map length rows)))))
+                 (list `(m:m ,@(map (lambda (cells)
+                                      `(m:mr ,@cells
+                                             ,@(map (lambda (i) '(m:e))
+                                                    (iota (- n (length cells))))))
+                                    rows))))))
               ((mmultiscripts)
                ;; the base with the scripts after it, and the scripts
                ;; before it around them, when there are some

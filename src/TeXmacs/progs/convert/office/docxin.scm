@@ -175,6 +175,7 @@
                 (with v (docx-child-val n 'w:ilvl)
                   (if v (list (cons 'list-level v)) '())))))
         (if (docx-on? (ox-child x 'w:pageBreakBefore)) '((page-break . #t)) '())
+        (docx-toggle x 'w:keepNext 'keep-next)
         (with ind (ox-child x 'w:ind)
           (with v (and ind (office-integer (or (ox-attr ind 'w:left)
                                                (ox-attr ind 'w:start))
@@ -607,7 +608,7 @@
       (lambda (blip)
         (map (lambda (n) (if float (office-add-attrs n float) n))
              (docx-image-node
-               (ox-attr blip 'r:embed)
+               (or (ox-attr blip 'r:embed) (ox-attr blip 'r:link))
                width
                (office-emu->length (and extent (ox-attr extent 'cy)))
                (and props (or (ox-attr props 'descr) (ox-attr props 'title)))
@@ -901,13 +902,18 @@
 
 (define (docx-comment id)
   ;; a comment, with its author and its date, where it is referred to
+  ;; (also in a note, but not in another comment nor in a header)
   (with x (ahash-ref docx-comments id)
-    (if (or (not x) (pair? docx-open-notes)) '()
+    (if (or (not x)
+            (list-or (map (lambda (k) (or (eq? k 'header)
+                                          (and (pair? k) (eq? (car k) 'comment))))
+                          docx-open-notes)))
+        '()
         (let ((old-part docx-part)
               (old-notes docx-open-notes)
               (old-fields docx-fields))
           (set! docx-part (docx-entry "comments"))
-          (set! docx-open-notes (list (cons 'comment id)))
+          (set! docx-open-notes (cons (cons 'comment id) old-notes))
           (set! docx-fields '())
           (with l (docx-blocks (ox-children x))
             (set! docx-part old-part)
@@ -1284,6 +1290,51 @@
             (else (list x))))
     l))
 
+;; A field of an add-in (the bibliography of Zotero, of Mendeley) whose
+;; result is several paragraphs stays a field: each of its paragraphs has
+;; a mark (!field-blocks instruction), which docx-paragraph makes its
+;; attribute field-blocks, and docx-field-blocks puts the paragraphs with
+;; the same one in a block field-blocks. It must start its paragraph (the
+;; text before it would be in the field). Another field over several
+;; paragraphs is its result.
+(define (docx-block-field? instr)
+  (string-starts? (car (docx-field-parse instr)) "addin"))
+
+(define (docx-block-part? f)
+  ;; whether the open field f, (state instruction nodes-before . carried),
+  ;; is a field of paragraphs
+  (and (== (car f) 'result) (docx-block-field? (cadr f))
+       (if (null? (cdddr f))
+           (list-and (map (lambda (y) (or (func? y 'bookmark)
+                                          (and (string? y) (== (string-trim-spaces y) ""))))
+                          (caddr f)))
+           (eq? (cadddr f) 'carried-block))))
+
+(define (docx-carried-field f l)
+  ;; the part in one paragraph of the field f over several, with the nodes
+  ;; l of its result there
+  (with r (docx-field (cadr f) l)
+    (if (docx-block-part? f) (cons `(!field-blocks ,(cadr f)) r) r)))
+
+(define (docx-field-blocks l)
+  ;; the blocks l, with the paragraphs which are of one field together
+  (let loop ((l l) (acc '()))
+    (with code (and (pair? l) (func? (car l) 'p) (ox-attr (car l) 'field-blocks))
+      (if (not code)
+          (if (null? l) (reverse acc) (loop (cdr l) (cons (car l) acc)))
+          (let sub ((l l) (ps '()))
+            (if (and (pair? l) (func? (car l) 'p)
+                     (== (ox-attr (car l) 'field-blocks) code))
+                (sub (cdr l)
+                     (cons (apply office-node
+                                  (cons* 'p (list-filter (ox-attrs (car l))
+                                                         (lambda (a) (!= (car a) 'field-blocks)))
+                                         (ox-children (car l))))
+                           ps))
+                (loop l (cons (apply office-node
+                                     (cons* 'field-blocks `((code ,code)) (reverse ps)))
+                              acc))))))))
+
 (define (docx-inlines-sub l fields)
   ;; (nodes . fields) for the children l of a paragraph. A field is a run
   ;; which begins it, runs with its instruction, a run which separates, the
@@ -1296,14 +1347,16 @@
         ;; what there is here of the fields which go on is kept
         (let close ((acc acc) (open fields) (left '()))
           (if (null? open) (cons (reverse acc) (reverse left))
-              (close (append (reverse (docx-field (cadar open)
-                                                  (if (== (caar open) 'result)
-                                                      (reverse acc) '())))
+              (close (append (reverse (docx-carried-field
+                                        (car open)
+                                        (if (== (caar open) 'result) (reverse acc) '())))
                              (caddar open))
                      (cdr open)
                      ;; (a field which goes on did not start in the
                      ;; next paragraph: it is not a field node there)
-                     (cons (list (caar open) (cadar open) '() 'carried) left))))
+                     (cons (list (caar open) (cadar open) '()
+                                 (if (docx-block-part? (car open)) 'carried-block 'carried))
+                           left))))
         (let* ((x (car l))
                (char (and (func? x 'w:r) (ox-child x 'w:fldChar)))
                (type (and char (ox-attr char 'w:fldCharType)))
@@ -1317,10 +1370,11 @@
                              (cdr fields))))
                 ((and (== type "end") (pair? fields))
                  (loop (cdr l)
-                       (append (reverse (docx-field (cadar fields)
-                                                    (if (== state 'result)
-                                                        (reverse acc) '())
-                                                    (null? (cdddr (car fields)))))
+                       (append (reverse
+                                 (with r (if (== state 'result) (reverse acc) '())
+                                   (if (pair? (cdddr (car fields)))
+                                       (docx-carried-field (car fields) r)
+                                       (docx-field (cadar fields) r #t))))
                                (caddar fields))
                        (cdr fields)))
                 ((== state 'instr)
@@ -1414,6 +1468,11 @@
                 (docx-numbered-formula (office-merge (office-changes (car r)))))))
          (floats (with f docx-floats (set! docx-floats old-floats) f))
          (_ (set! docx-italic? old-italic))
+         ;; (a paragraph of a field over several, see docx-carried-field)
+         (field (with m (list-find l (lambda (y) (func? y '!field-blocks)))
+                  (and m (cadr m))))
+         (l (if field (office-merge (list-filter l (lambda (y) (not (func? y '!field-blocks)))))
+                l))
          (attrs `((role ,(car role)) (level ,(cadr role))
                   ;; the named style of a plain paragraph
                   (style ,(and (not (car role)) (not id) style (null? docx-open-notes)
@@ -1454,7 +1513,8 @@
                                space-after line-spacing background border)))
                   (list-num ,(and item? id))
                   (list-format ,(and item? format (car format)))
-                  (list-start ,(and item? format (cadr format))))))
+                  (list-start ,(and item? format (cadr format)))
+                  (field-blocks ,field))))
     ;; (the style of a heading, for the look of the titles)
     (when (and (== (car role) "heading") style (null? docx-open-notes))
       (ahash-set! docx-used-styles style #t))
@@ -2081,7 +2141,8 @@
           (else (loop (cdr l) (cons (car l) acc))))))
 
 (define (docx-blocks l)
-  (docx-group-lists (docx-drop-caps (docx-single-breaks (docx-blocks-sub l)))))
+  (docx-field-blocks
+    (docx-group-lists (docx-drop-caps (docx-single-breaks (docx-blocks-sub l))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Interface
@@ -2241,6 +2302,8 @@
                    (first-indent ,(and (not char?) (num 'first-indent)))
                    (space-before ,(and (not char?) (num 'space-before)))
                    (space-after ,(and (not char?) (num 'space-after)))
+                   (line-spacing ,(and (not char?) (num 'line-spacing)))
+                   (keep-with-next ,(and (not char?) (docx-get props 'keep-next) "true"))
                    (background ,(and (not char?) (docx-get props 'background)))
                    (border ,(and (not char?) (docx-get props 'border) "true"))))))
 

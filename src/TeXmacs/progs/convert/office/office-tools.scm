@@ -42,6 +42,8 @@
 ;;              t, b, l, r which have one, or none) and background
 ;;            (toc inline...)  the table of contents, with its title
 ;;            (pagebreak)
+;;            (field-blocks block...)  a field over several paragraphs (the
+;;              bibliography of Zotero), with the attribute code
 ;;            (error "message")  for a file which could not be read
 ;;   inlines: "text"  (em ...)  (strong ...)  (underline ...)  (strike ...)
 ;;            (sub ...)  (sup ...)  (code ...)  (smallcaps ...)  (mark ...)
@@ -528,8 +530,8 @@
                 (apply office-node
                        (cons* 'p (list-filter (ox-attrs b) (lambda (a) (!= (car a) 'style)))
                               (ox-children b))))
-               ((func? b 'columns)
-                (cons* 'columns (cons '@ (ox-attrs b))
+               ((or (func? b 'columns) (func? b 'field-blocks))
+                (cons* (car b) (cons '@ (ox-attrs b))
                        (office-drop-style (ox-children b) name)))
                (else b)))
        l))
@@ -780,6 +782,13 @@
 (tm-define (ox-serialize-element x)
   (:synopsis "The text of the element @x of XML, without a declaration")
   (apply string-append (ox-serialize-sub x)))
+
+(tm-define (office-web-address? s)
+  (:synopsis "Whether @s is an address on the web (http, https)")
+  ;; (an image there is linked, never fetched by the converters)
+  (and (string? s)
+       (with l (locase-all s)
+         (or (string-starts? l "http://") (string-starts? l "https://")))))
 
 (tm-define (office-uri s)
   (:synopsis "The address @s, with %XX for the bytes which an address cannot hold")

@@ -248,16 +248,97 @@
     `(eqnarray* (document (tformat (table ,@rows))))))
 
 (define (oftm-math x)
-  (with t (and (== (ox-attr x 'display) "true") (oftm-eqarray-table x))
-    (cond (t (list (oftm-eqarray t)))
-          ;; (a formula alone in a cell, which Word displays, is in the cell)
-          ((and oftm-in-cell? (== (ox-attr x 'display) "true"))
-           (oftm-math* (apply office-node
-                              (cons* 'math (map (lambda (a) (list (car a) (cadr a)))
-                                                (list-filter (ox-attrs x)
-                                                             (lambda (a) (!= (car a) 'display))))
-                                     (ox-children x)))))
-          (else (oftm-math* x)))))
+  ;; A formula in a line of text (a heading, a caption, a cell, a
+  ;; paragraph): in the text, also when it is displayed in the file. (A
+  ;; displayed formula is a paragraph of its own: those of a paragraph with
+  ;; text are made paragraphs by oftm-split-display, the paragraph of a
+  ;; formula alone is an equation in oftm-block.)
+  (oftm-math* (oftm-inline-formula x)))
+
+(define (oftm-inline-formula x)
+  ;; the node math x, not displayed
+  (if (!= (ox-attr x 'display) "true") x
+      (apply office-node
+             (cons* 'math (map (lambda (a) (list (car a) (cadr a)))
+                               (list-filter (ox-attrs x)
+                                            (lambda (a) (!= (car a) 'display))))
+                    (ox-children x)))))
+
+(define (oftm-display? y)
+  (and (func? y 'math) (== (ox-attr y 'display) "true")))
+
+(define (oftm-split-display x)
+  ;; A paragraph with text and displayed formulas: the paragraphs of its
+  ;; text, with its attributes, and the paragraph of each formula, which
+  ;; is an equation (not those of a cell, nor a heading, a caption...,
+  ;; whose formulas are in the text; nor a formula with its number). The
+  ;; bookmarks of a piece without text go with the formula after them, or
+  ;; with the last paragraph.
+  (let* ((l (if (and (func? x 'p) (not (ox-attr x 'role)) (not oftm-in-cell?))
+                (ox-children x) '()))
+         (blank? (lambda (y) (or (and (string? y) (== (string-trim-spaces y) ""))
+                                 (func? y 'tab))))
+         (text? (lambda (y) (not (or (blank? y) (func? y 'bookmark) (oftm-display? y)
+                                     (oftm-punctuation-string? y)))))
+         (attrs (map (lambda (a) (list (car a) (cadr a))) (ox-attrs x)))
+         (par (lambda (kids) (apply office-node (cons* 'p attrs kids))))
+         (text-par (lambda (kids) (par (oftm-trim-piece kids))))
+         (marks (lambda (l) (list-filter l (lambda (y) (func? y 'bookmark))))))
+    (if (not (and (list-or (map oftm-display? l)) (list-or (map text? l))
+                  (not (oftm-numbered-formula x))))
+        (list x)
+        (let loop ((l l) (cur '()) (acc '()))
+          ;; cur: the piece of text so far, newest first
+          (let ((text-now? (list-or (map text? cur))))
+            (cond ((and (null? l) text-now?) (reverse (cons (text-par (reverse cur)) acc)))
+                  ((null? l)
+                   (if (or (null? (marks cur)) (null? acc)) (reverse acc)
+                       (reverse (cons (par (append (ox-children (car acc))
+                                                   (marks (reverse cur))))
+                                      (cdr acc)))))
+                  ((and (oftm-display? (car l)) text-now?)
+                   ;; (the bookmarks just before the formula are its labels)
+                   (let split ((before cur) (labels '()))
+                     (if (and (pair? before) (or (blank? (car before))
+                                                 (func? (car before) 'bookmark)))
+                         (split (cdr before)
+                                (if (func? (car before) 'bookmark)
+                                    (cons (car before) labels) labels))
+                         (loop (cdr l) '()
+                               (cons* (par (append labels (list (car l))))
+                                      (text-par (reverse before)) acc)))))
+                  ((oftm-display? (car l))
+                   (loop (cdr l) '()
+                         (cons (par (append (marks (reverse cur)) (list (car l)))) acc)))
+                  (else (loop (cdr l) (cons (car l) cur) acc))))))))
+
+(define (oftm-punctuation-string? y)
+  ;; a string of the punctuation after a formula
+  (and (string? y)
+       (with s (string-trim-spaces y)
+         (and (!= s "")
+              (list-and (map (lambda (c) (in? c '(#\. #\, #\; #\: #\! #\?)))
+                             (string->list s)))))))
+
+(define (oftm-trim-side l left?)
+  ;; the nodes l of a piece of a paragraph without the spaces at its start
+  ;; (or at its end), also inside the nodes which wrap its text
+  (let* ((r (if left? l (reverse l)))
+         (x (and (pair? r) (car r)))
+         (trim (lambda (s) (if left? (string-trim s) (string-trim-right s))))
+         (x2 (cond ((string? x) (trim x))
+                   ((and (pair? x) (not (in? (car x) '(math image note bookmark box br tab))))
+                    (with kids (oftm-trim-side (ox-children x) left?)
+                      (if (null? (ox-attrs x)) (cons (car x) kids)
+                          (cons* (car x) (cons '@ (ox-attrs x)) kids))))
+                   (else x)))
+         (r (cond ((not x) r)
+                  ((== x2 "") (cdr r))
+                  (else (cons x2 (cdr r))))))
+    (if left? r (reverse r))))
+
+(define (oftm-trim-piece l)
+  (oftm-trim-side (oftm-trim-side l #t) #f))
 
 (define (oftm-math* x)
   (with f (oftm-formula x)
@@ -414,7 +495,11 @@
           ((and data (ox-attr x 'crop) (office-length->cm w) (office-length->cm h))
            (list (oftm-cropped data name w h (ox-attr x 'crop))))
           (data (list `(image (tuple (raw-data ,data) ,name) ,w ,h "" "")))
-          ;; (an address is not a file to load when the document is opened)
+          ;; a picture which the file links to on the web: an image of
+          ;; this address (which the converters never fetch)
+          ((office-web-address? name) (list `(image ,name ,w ,h "" "")))
+          ;; (another address is not a file to load when the document is
+          ;; opened)
           ((or (>= (string-search-forwards "://" 0 name) 0)
                (string-starts? (locase-all name) "file:"))
            (list name))
@@ -801,6 +886,7 @@
             (case (car x)
               ((em) (oftm-wrap 'em l))
               ((strong) (oftm-wrap 'strong l))
+              ((overline) (oftm-wrap 'overline l))
               ;; an underline or a line through of a kind (double, wave...)
               ((underline strike)
                (let ((t (oftm-inlines l))
@@ -988,9 +1074,7 @@
                               (else t))))
                 (oftm-blocks l)))
          (b (if (and (== (ox-attr c 'header) "true"))
-                (map (lambda (t) (if (or (== t "") (func? t 'strong)) t
-                                     `(strong ,t)))
-                     b)
+                (map oftm-strong b)
                 b)))
     (cond ((null? b) "")
           ((null? (cdr b)) (car b))
@@ -1197,10 +1281,55 @@
                         '((item)))))
     (cond ((ox-attr x 'unnumbered) l)
           ((null? l) (list `(concat ,@marks "")))
+          ;; (a formula which starts an item is in its line; another block,
+          ;; a list, a quotation, is after the line of the item)
+          ((func? (car l) 'equation* 1)
+           (cons (oftm-concat (append marks (list `(math ,(oftm-document-body (cadar l))))))
+                 (cdr l)))
+          ((and (pair? (car l)) (in? (caar l) oftm-block-tags))
+           (cons `(concat ,@marks "") l))
           (else (cons (oftm-concat (append marks (if (func? (car l) 'concat)
                                                      (cdar l)
                                                      (list (car l)))))
                       (cdr l))))))
+
+;; the tags of TeXmacs which are paragraphs, not text
+(define oftm-block-tags
+  '(equation equation* eqnarray* quotation verbatim-code itemize enumerate
+    enumerate-alpha enumerate-Alpha enumerate-roman enumerate-Roman description
+    big-figure big-table section subsection subsubsection paragraph subparagraph
+    section* subsection* subsubsection* paragraph* subparagraph* theorem
+    proposition lemma corollary conjecture axiom definition notation remark note
+    example convention warning exercise problem question solution proof
+    bibliography table-of-contents document))
+
+(define (oftm-document-body t)
+  ;; the line of a document of one line
+  (if (and (func? t 'document) (list-1? (cdr t))) (cadr t) t))
+
+(define (oftm-strong t)
+  ;; the paragraph t in bold: inside the items of a list, the paragraphs
+  ;; of a quotation, not around them; a formula, a table stays as it is
+  (cond ((or (== t "") (func? t 'strong)) t)
+        ((and (pair? t) (in? (car t) '(document quotation itemize enumerate
+                                       enumerate-alpha enumerate-Alpha
+                                       enumerate-roman enumerate-Roman description)))
+         (cons (car t) (map oftm-strong (cdr t))))
+        ((and (func? t 'concat) (pair? (cdr t)) (pair? (cadr t))
+              (in? (caadr t) '(item item* assign)))
+         (let loop ((l (cdr t)) (marks '()))
+           (if (and (pair? l) (pair? (car l)) (in? (caar l) '(item item* assign)))
+               (loop (cdr l) (cons (car l) marks))
+               (oftm-concat (append (reverse marks)
+                                    (if (null? l) '()
+                                        (list (oftm-strong (oftm-concat l)))))))))
+        ((and (func? t 'with) (>= (length t) 4) (even? (length t)))
+         (rcons (cDr t) (oftm-strong (cAr t))))
+        ((func? t 'office-par 2) `(office-par ,(cadr t) ,(oftm-strong (caddr t))))
+        ((func? t 'surround 3) `(surround ,(cadr t) ,(caddr t) ,(oftm-strong (cadddr t))))
+        ((and (pair? t) (in? (car t) oftm-block-tags)) t)
+        ((and (pair? t) (in? (car t) '(tabular block eqnarray*))) t)
+        (else `(strong ,t))))
 
 (define (oftm-list x)
   ;; a list; a numbered one in its way of numbering, from its first number
@@ -1254,10 +1383,13 @@
                                                 l)))))))
 
 (define (oftm-only-formula x)
-  ;; the formula of a paragraph which holds nothing else, or #f
+  ;; the formula of a paragraph which holds nothing else (but bookmarks,
+  ;; the tabs before its label, the punctuation after it), or #f
   (with l (list-filter (ox-children x)
-                       (lambda (y) (not (and (string? y)
-                                             (== (string-trim-spaces y) "")))))
+                       (lambda (y) (not (or (and (string? y)
+                                                 (== (string-trim-spaces y) ""))
+                                            (oftm-punctuation-string? y)
+                                            (func? y 'bookmark) (func? y 'tab)))))
     (and (list-1? l) (func? (car l) 'math) (car l))))
 
 (define (oftm-trim-right s)
@@ -1310,7 +1442,8 @@
   ;; belong together are taken together: the lines of a quotation or of a
   ;; piece of code, a figure or a table and its caption. (A loop: a
   ;; document may have many thousands of blocks)
-  (let loop ((l (append-map oftm-split-floats l)) (acc '()))
+  (let loop ((l (append-map oftm-split-display (append-map oftm-split-floats l)))
+             (acc '()))
     (if (null? l) (reverse acc)
         (with r (oftm-block l)
           (loop (cdr r) (append (reverse (car r)) acc))))))
@@ -1408,9 +1541,28 @@
                         => (lambda (m)
                              (with t (oftm-eqarray-table m)
                                (if t (list (oftm-eqarray t))
-                                   (with f (oftm-formula m)
-                                     (if (== f "") '()
-                                         (list `(equation* (document ,f)))))))))
+                                   (let* ((f (oftm-formula m))
+                                          (dots (apply string-append
+                                                       (map string-trim-spaces
+                                                            (list-filter
+                                                              (ox-children x)
+                                                              oftm-punctuation-string?))))
+                                          (f (if (== dots "") f
+                                                 (oftm-concat
+                                                   (append (if (func? f 'concat) (cdr f)
+                                                               (list f))
+                                                           (list (oftm-text dots))))))
+                                          (labels (oftm-labels (oftm-bookmarks x))))
+                                     (cond ((and (== f "") (null? labels)) '())
+                                           ((null? labels)
+                                            (list `(equation* (document ,f))))
+                                           (else
+                                             (list `(equation*
+                                                      (document
+                                                        ,(oftm-concat
+                                                           (append (if (func? f 'concat)
+                                                                       (cdr f) (list f))
+                                                                   labels))))))))))))
                        (else
                          (with t (oftm-inlines (ox-children x))
                            (if (== t "") '()
@@ -1419,6 +1571,13 @@
                 ((list) (oftm-list x))
                 ((table) (list (oftm-table x)))
                 ((pagebreak) '((page-break)))
+                ;; a field over several paragraphs: its result in the field
+                ((field-blocks)
+                 (with b (oftm-blocks (ox-children x))
+                   (if oftm-faithful?
+                       (list `(office-field ,(oftm-text (or (ox-attr x 'code) ""))
+                                            ,(oftm-document b)))
+                       b)))
                 ;; a section in columns
                 ((columns)
                  (let ((n (or (ox-attr x 'count) "2"))

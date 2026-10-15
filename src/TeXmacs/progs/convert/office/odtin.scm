@@ -94,6 +94,8 @@
               '()))
         (with v (ox-attr x 'style:text-underline-style)
           (if v (list (cons 'underline (!= v "none"))) '()))
+        (with v (ox-attr x 'style:text-overline-style)
+          (if v (list (cons 'overline (!= v "none"))) '()))
         ;; the kind of an underline: double, wave, dotted, dash
         (let ((st (ox-attr x 'style:text-underline-style))
               (ty (ox-attr x 'style:text-underline-type)))
@@ -147,10 +149,25 @@
 
 (define (odt-font-face name)
   ;; the family of fonts of a declared font: its name is often the one of
-  ;; the family, but not always ("Noto Sans1")
+  ;; the family, but not always ("Noto Sans1", or "F" for a font of the
+  ;; theme, whose family is empty: no font); the name of a font which is
+  ;; not declared
   (and name
        (with f (ahash-ref odt-font-faces name)
-         (if (string? f) f (odt-font-name name)))))
+         (cond ((string? f) f)
+               (f #f)
+               (else (odt-font-name name))))))
+
+(define (odt-read-font-faces root)
+  ;; the declared fonts of a file (of both files before the styles, which
+  ;; say their names)
+  (when root
+    (for (decls (ox-childs root 'office:font-face-decls))
+      (for (x (ox-childs decls 'style:font-face))
+        (with name (ox-attr x 'style:name)
+          (when name
+            (ahash-set! odt-font-faces name
+                        (or (odt-font-name (ox-attr x 'svg:font-family)) 'none))))))))
 
 (define (odt-font-name v)
   ;; the first font of a list of fonts, without its quotes
@@ -164,8 +181,10 @@
                ((== f "") #f)
                (else f)))))
 
-(define (odt-paragraph-properties x)
-  ;; the properties of an element style:paragraph-properties
+(define (odt-paragraph-properties x . size)
+  ;; the properties of an element style:paragraph-properties; a height of
+  ;; the lines in a length is a part of the one of a line of the size of
+  ;; the text (12pt if the style says none)
   (if (not x) '()
       (append
         (with v (ox-attr x 'fo:text-align)
@@ -195,7 +214,23 @@
                 ((string-ends? v "%")
                  (with n (office-number (substring v 0 (- (string-length v) 1)))
                    (if (and n (> n 0)) (list (cons 'line-spacing (/ n 100.0))) '())))
-                (else '()))))))
+                ((office-points v)
+                 => (lambda (h) (if (> h 0) (list (cons 'line-spacing (odt-line-part h 0 size)))
+                                    '())))
+                (else '())))
+        ;; (the space between the lines, added to their height)
+        (with v (and (not (ox-attr x 'fo:line-height))
+                     (office-points (ox-attr x 'style:line-spacing)))
+          (if (and v (> v 0)) (list (cons 'line-spacing (odt-line-part 0 v size))) '()))
+        (with v (ox-attr x 'fo:keep-with-next)
+          (if v (list (cons 'keep-with-next (== v "always"))) '())))))
+
+(define (odt-line-part height leading size)
+  ;; the line spacing (1.0 is single) of lines of this height in points, or
+  ;; of single lines with this leading, for text of the size (in a list)
+  (let* ((s (if (and (pair? size) (number? (car size)) (> (car size) 0)) (car size) 12.0))
+         (single (* 1.2 s)))
+    (/ (round (* 100.0 (/ (if (> height 0) height (+ single leading)) single))) 100.0)))
 
 (define (odt-border-on? x names)
   ;; the first of the attributes names of x which is there: is it a border?
@@ -259,12 +294,7 @@
   ;; styles.xml, master?, are kept apart: the headers and footers say them)
   (when root
     ;; (the declared fonts first: the styles say their names)
-    (for (decls (ox-childs root 'office:font-face-decls))
-      (for (x (ox-childs decls 'style:font-face))
-        (with name (ox-attr x 'style:name)
-          (when name
-            (ahash-set! odt-font-faces name
-                        (or (odt-font-name (ox-attr x 'svg:font-family)) #t))))))
+    (odt-read-font-faces root)
     (for (group (append (ox-childs root 'office:styles)
                         (ox-childs root 'office:automatic-styles)))
       (for (x (ox-childs group 'style:style))
@@ -287,7 +317,8 @@
                   (if v (list (cons 'outline v)) '()))
                 (odt-text-properties (ox-child x 'style:text-properties))
                 (odt-paragraph-properties
-                  (ox-child x 'style:paragraph-properties))
+                  (ox-child x 'style:paragraph-properties)
+                  (office-points (ox-attr (ox-child x 'style:text-properties) 'fo:font-size)))
                 (odt-cell-properties
                   (ox-child x 'style:table-cell-properties))
                 (odt-table-properties (ox-child x 'style:table-properties))
@@ -815,6 +846,7 @@
             (cond ((not (odt-get props 'underline)) #f)
                   ((odt-get props 'underline-kind) (list 'underline (odt-get props 'underline-kind)))
                   (else 'underline))
+            (and (odt-get props 'overline) 'overline)
             (with v (odt-get props 'caps) (if (string? v) (list 'caps v) (and v 'caps)))
             (with v (odt-get props 'letters) (and v (list 'letters (office-decimal v))))
             (and (odt-get props 'em) 'em)
@@ -1637,7 +1669,9 @@
                    (space-before ,(and par? (num 'space-before)))
                    (space-after ,(and par? (num 'space-after)))
                    (background ,(and par? (odt-get props 'background)))
-                   (border ,(and par? (odt-get props 'border) "true"))))))
+                   (border ,(and par? (odt-get props 'border) "true"))
+                   (line-spacing ,(and par? (num 'line-spacing)))
+                   (keep-with-next ,(and par? (yes 'keep-with-next)))))))
 
 (define (odt-styles-block)
   (let* ((body (odt-body-style))
@@ -1702,6 +1736,8 @@
   (if (not odt-archive) (odt-error "This file is not an OpenDocument text")
       (let ((content (office-xml odt-archive "content.xml")))
         (with styles (office-xml odt-archive "styles.xml")
+          (odt-read-font-faces styles)
+          (odt-read-font-faces content)
           (odt-read-styles styles #t)
           (odt-read-styles content #f)
           (let* ((text (and content (ox-path content 'office:body 'office:text)))
