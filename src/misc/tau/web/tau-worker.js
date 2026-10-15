@@ -438,6 +438,12 @@ function dispatch(m) {
 // WebAssembly, the stack of the browser which is too small...): the page
 // is told, so that the user does not go on typing into nothing
 let dead = false;
+// what the program printed last, for the report of a stop
+const printed = [];
+function lastLines(text) {
+	printed.push(String(text).slice(0, 300));
+	if (printed.length > 25) printed.shift();
+}
 function stopped(error) {
 	const fatal = error instanceof WebAssembly.RuntimeError || error instanceof RangeError ||
 		/RuntimeError|Aborted|OOM|call stack|unreachable|out of bounds|null function|table entry/i.test(String(error && error.message || error));
@@ -446,7 +452,8 @@ function stopped(error) {
 	// (with where it happened: the functions of the program by their numbers,
 	// which stage/tau.js.symbols names, misc/tau/Makefile)
 	postMessage({ t: "stopped", text: String(error && error.message || error),
-		stack: String(error && error.stack || "").split("\n").slice(0, 40).join("\n") });
+		stack: String(error && error.stack || "").split("\n").slice(0, 40).join("\n") +
+			(printed.length ? "\n\nprinted last:\n" + printed.join("\n") : "") });
 }
 self.addEventListener("error", event => stopped(event.error || event.message));
 self.addEventListener("unhandledrejection", event => stopped(event.reason));
@@ -506,8 +513,8 @@ tauCore({
 	// lose it)
 	tauQuit: () => tauModule.tauSaveHome(error =>
 		postMessage({ t: "quit", failed: error ? String(error && error.message || error) : "" })),
-	print: text => postMessage({ t: "log", text }),
-	printErr: text => postMessage({ t: "log", text }),
+	print: text => { lastLines(text); postMessage({ t: "log", text }); },
+	printErr: text => { lastLines(text); postMessage({ t: "log", text }); },
 	setStatus: text => { if (text) postMessage({ t: "status", text }); },
 	// (the program and the files are there: TeXmacs starts)
 	onRuntimeInitialized: () => postMessage({ t: "progress", what: "starting" })

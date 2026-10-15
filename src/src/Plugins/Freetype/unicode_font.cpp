@@ -1398,6 +1398,9 @@ unicode_font_rep::is_ot_integral (string s) {
 
 font
 unicode_font (string family, int size, int hdpi, int vdpi) {
+  // (a resolution of 0 is divided by below)
+  hdpi= max (1, hdpi);
+  vdpi= max (1, vdpi);
   string name= "unicode:" * family * as_string (size) * "@" * as_string (hdpi);
   if (vdpi != hdpi) name << "x" << as_string (vdpi);
   name << hand_tuned_suffix ();

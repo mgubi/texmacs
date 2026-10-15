@@ -2397,9 +2397,10 @@ smart_font_debug_info (font fn, string s, int pos) {
 font
 smart_font_rep::magnify (double zoomx, double zoomy) {
   //if (zoomx != zoomy) return poor_magnify (zoomx, zoomy);
+  // (never a resolution of 0, which the fonts divide by)
   font f= smart_font_bis (family, variant, series, shape, sz,
-                          (int) tm_round (hdpi * zoomx),
-                          (int) tm_round (dpi * zoomy));
+                          max (1, (int) tm_round (hdpi * zoomx)),
+                          max (1, (int) tm_round (dpi * zoomy)));
   for (int i= 0; i < N(feat_tags); i++)
     f= feature_font (f, feat_tags[i], feat_alts[i]);
   return f;
@@ -2691,6 +2692,15 @@ smart_font (string family, string variant, string series, string shape,
   font fn2= smart_font_bis (family, variant, series, shape, sz, dpi, dpi);
   double zoom= ((double) fn1->yx) / max (((double) fn2->yx), 1.0);
   if (fn1->yx < PIXEL || fn2->yx < PIXEL) zoom= 1.0;
+  // (the x-heights of a variant and of the roman font are close: a zoom far
+  // from 1 is a font which was not measured right, and made the variant at
+  // a resolution of 0, which ended the program)
+  if (zoom < 0.2 || zoom > 5.0) {
+    std_error << "Font " << fn2->res_name << " (x-height " << fn2->yx
+              << ") is not scaled to " << fn1->res_name << " (x-height "
+              << fn1->yx << ")\n";
+    zoom= 1.0;
+  }
   if (zoom > 0.975 && zoom < 1.025) return fn2;
   return fn2->magnify (zoom);
 }
