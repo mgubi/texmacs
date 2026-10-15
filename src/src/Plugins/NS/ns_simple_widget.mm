@@ -105,9 +105,80 @@ ns_bench_now () {
 }
 @end
 
+/*! What shows the backing store of a canvas drawn by the GPU, once a
+ refresh of its screen: a repaint only marks the canvas (show_gpu_store),
+ and the presenter, woken up, copies the store into the layer of the view
+ and presents it at the next refresh, then sleeps until the next mark. To
+ present at each repaint made the repaints wait for the screen: a layer has
+ three drawables, which the compositor gives back when it has shown them,
+ so that more repaints than refreshes blocked in nextDrawable; AppKit
+ likewise draws the views marked as needing display once a refresh. Driven
+ by a CADisplayLink of the view (macOS 14), which follows the refreshes of
+ its screen, or else by a timer at 120 Hz. */
+@interface TMGpuPresenter : NSObject
+{
+@public
+  ns_simple_widget_rep* wid;
+  id link;              // a CADisplayLink (macOS 14), or nil
+  NSTimer* timer;       // else
+}
+- (void) wake;
+- (void) stop;
+- (void) tick: (id) sender;
+@end
+
+@implementation TMGpuPresenter
+- (void) wake
+{
+  if (!wid || !wid->canvas_view ()) return;
+  if (@available (macOS 14.0, *)) {
+    if (link == nil) {
+      // (made through AppKit, so that the class itself is not linked to)
+      link= [[(id) wid->canvas_view () displayLinkWithTarget: self
+                                          selector: @selector(tick:)] retain];
+      [link addToRunLoop: [NSRunLoop mainRunLoop] forMode: NSRunLoopCommonModes];
+    }
+    [link setPaused: NO];
+    return;
+  }
+  if (timer == nil) {
+    timer= [[NSTimer timerWithTimeInterval: 1.0 / 120 target: self
+                                  selector: @selector(tick:)
+                                  userInfo: nil repeats: YES] retain];
+    [[NSRunLoop mainRunLoop] addTimer: timer forMode: NSRunLoopCommonModes];
+  }
+}
+
+- (void) sleep
+{
+  if (link != nil) [link setPaused: YES];
+  if (timer != nil) { [timer invalidate]; [timer release]; timer= nil; }
+}
+
+- (void) stop
+{
+  wid= NULL;
+  [self sleep];
+  if (link != nil) { [link invalidate]; [link release]; link= nil; }
+}
+
+- (void) tick: (id) sender
+{
+  (void) sender;
+  static int dbg= -1;
+  if (dbg < 0) dbg= (getenv ("TEXMACS_NS_DEBUG_DRAW") != NULL);
+  if (!wid || !wid->gpu_dirty) { [self sleep]; return; }
+  double t= ns_bench_now ();
+  if (wid->present_gpu_store ()) { wid->gpu_dirty= false; [self sleep]; }
+  ns_bench_display += ns_bench_now () - t;
+  if (dbg) fprintf (stderr, "PRESENT %.3f ms at %.3f\n", 1000 * (ns_bench_now () - t), t);
+}
+@end
+
 ns_simple_widget_rep::ns_simple_widget_rep ()
 : ns_widget_rep (simple_widget),  sequencer (0), view (nil), doc (nil),
   backingPixmap (nil), ring (0), cring (0), gpu_ren (NULL), gpu_layer (NULL),
+  gpu_presenter (NULL), gpu_dirty (false),
   extents (coord4 (0, 0, 0, 0)),
   last_viewport (NSZeroSize) { }
 
@@ -123,6 +194,10 @@ ns_simple_widget_rep::~ns_simple_widget_rep () {
   }
   [backingPixmap release];
   if (gpu_ren != NULL) tm_delete (gpu_ren);
+  if (gpu_presenter != NULL) {
+    [(TMGpuPresenter*) gpu_presenter stop];
+    [(TMGpuPresenter*) gpu_presenter release];
+  }
   if (gpu_layer != NULL) [(CALayer*) gpu_layer release];
 }
 
@@ -187,11 +262,25 @@ ns_draw_gpu_canvases (NSView* root, NSBitmapImageRep* rep) {
 
 void
 ns_simple_widget_rep::show_gpu_store () {
+  // at the next refresh of the screen (TMGpuPresenter)
+  if (!view || is_nil (gpu_store)) return;
+  gpu_dirty= true;
+  if (gpu_presenter == NULL) {
+    TMGpuPresenter* p= [[TMGpuPresenter alloc] init];
+    p->wid= this;
+    gpu_presenter= (void*) p;
+  }
+  [(TMGpuPresenter*) gpu_presenter wake];
+}
+
+bool
+ns_simple_widget_rep::present_gpu_store () {
   // the view hosts a CAMetalLayer (made when first shown: by name, so that
   // a build without Metal needs no QuartzCore), into which the store is
   // copied, scaled when the pixels of the screen are not those of the store
-  // (a retina_factor of 1 on a Retina screen)
-  if (!view || is_nil (gpu_store) || ![view window]) return;
+  // (a retina_factor of 1 on a Retina screen); nothing to do while the view
+  // is not in a window (it is shown when it is put back in one)
+  if (!view || is_nil (gpu_store) || ![view window]) return true;
   if (gpu_layer == NULL) {
     Class mlc= NSClassFromString (@"CAMetalLayer");
     if (mlc == nil) return;
@@ -206,7 +295,9 @@ ns_simple_widget_rep::show_gpu_store () {
   if ([l contentsScale] != sc) [l setContentsScale: sc];
   NSSize sz= [view bounds].size;
   int dw= (int) ceil (sz.width * sc), dh= (int) ceil (sz.height * sc);
+  // (a failure is not tried again before the next repaint)
   gpu_show_picture (gpu_layer, gpu_store, dw, dh);
+  return true;
 }
 
 NSRect
@@ -1089,10 +1180,7 @@ ns_simple_widget_rep::repaint_invalid_regions_bis () {
       
       // propagate immediately the changes to the screen
       if (gpu) {
-        if (!moved) {
-          show_gpu_store ();
-          ns_bench_display += ns_bench_now () - t1;
-        }
+        if (!moved) show_gpu_store (); // (timed when presented)
       }
       else if (!moved) {
         double k= retina_factor;
@@ -1103,11 +1191,7 @@ ns_simple_widget_rep::repaint_invalid_regions_bis () {
       }
     } // !is_nil (invalid_regions)
   }
-  if (moved && gpu) {
-    double t2= ns_bench_now ();
-    show_gpu_store ();
-    ns_bench_display += ns_bench_now () - t2;
-  }
+  if (moved && gpu) show_gpu_store ();
   else if (moved) {
     double t2= ns_bench_now ();
     [view display];

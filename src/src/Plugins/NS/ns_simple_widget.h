@@ -93,11 +93,15 @@ public:
   picture                 gpu_store;
   renderer                gpu_ren;     //!< its renderer
   void*                   gpu_layer;   //!< the CAMetalLayer of the view
+  void*                   gpu_presenter; //!< shows it once a refresh
+  bool                    gpu_dirty;   //!< the layer shows an older store
   static bool gpu_mode ();
   bool has_store ();
   int store_width ();                  //!< in pixels
   int store_height ();
-  void show_gpu_store ();              //!< in the layer of the view
+  void show_gpu_store ();              //!< at the next refresh
+  bool present_gpu_store ();           //!< now (false: to be done again)
+  NSView* canvas_view () { return view; }
   bool backing_piece (int i, double a, double b, bool vertical,
                       double& pa, double& pb, double& off);
   void draw_backing_store (NSRect rect); //!< TMView drawRect
