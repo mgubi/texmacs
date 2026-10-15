@@ -106,6 +106,17 @@ public:
                       double& pa, double& pb, double& off);
   void draw_backing_store (NSRect rect); //!< TMView drawRect
   void unroll_backing_store ();          //!< ring 0 (to save it, say)
+  // the smooth zoom, as in the Vue interface: the picture of the canvas
+  // when the zoom changes, carried to the new size and faded out over the
+  // canvas repainted at the new zoom (see start_zoom_transition)
+  double                  zoom_now;    //!< the zoom of the editor (or 0)
+  bool                    zoom_pending; //!< until the repaint at the new zoom
+  void*                   zoom_image;  //!< the picture of the canvas (CGImageRef)
+  NSRect                  zoom_rect;   //!< where it was (in the scroll view)
+  NSPoint                 zoom_origin; //!< the document then (same)
+  double                  zoom_ratio;  //!< new zoom / old zoom
+  void start_zoom_transition (double new_zoom);
+  void run_zoom_transition ();
   NSPoint                 cursor_pos;  //!< for the input methods
   void follow_visible_part ();  //!< the canvas follows the scrolling
   NSRect viewport ();           //!< the visible part, as in Qt

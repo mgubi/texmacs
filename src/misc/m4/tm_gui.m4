@@ -73,7 +73,7 @@ AC_DEFUN([TM_GUI],[
          # the canvases drawn by the GPU renderer of the Vue port, with Metal
          LC_METAL
          COCOA_CFLAGS=""
-         COCOA_LDFLAGS="-framework Cocoa -framework PDFKit $METAL_LDFLAGS"
+         COCOA_LDFLAGS="-framework Cocoa -framework PDFKit -framework QuartzCore $METAL_LDFLAGS"
          CONFIG_GUI="COCOA"
          ;;
       sdl) 
