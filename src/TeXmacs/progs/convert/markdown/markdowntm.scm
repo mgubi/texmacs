@@ -176,16 +176,6 @@
   (with s (convert `(markdown ,x) "markdown-stree" "markdown-snippet")
     (if (string-ends? s "\n") (substring s 0 (- (string-length s) 1)) s)))
 
-(define (mdtm-plain-math? t)
-  ;; a formula of the tags which are written without the macros of a style:
-  ;; it is written in a document as it is here
-  (or (string? t)
-      (and (pair? t)
-           (in? (car t) '(math equation* document concat rsub rsup lsub lsup
-                          frac sqrt wide around around* left right mid big
-                          text with))
-           (list-and (map mdtm-plain-math? (cdr t))))))
-
 (define (mdtm-keep t raw block?)
   ;; the tree t for the text raw of the file, with this text and a copy of
   ;; t (see tmmd-md-source)
@@ -193,15 +183,14 @@
       `(,(if block? 'md-block-source 'md-source) ,t ,(mdtm-source raw) ,t)))
 
 (define (mdtm-keep-math t tag s raw block?)
-  ;; the formula t which was written as the LaTeX s, in the text raw: with
-  ;; this text, unless t is surely written back so
-  (if (or (not mdtm-faithful?)
-          (and (not raw) (mdtm-plain-math? t)
-               (== (tmmd-normal t) (object->string `((,tag ,s))))))
-      t
-      (mdtm-keep t (or raw (if (== tag 'math) (string-append "$" s "$")
-                               (string-append "$$\n" s "\n$$")))
-                 block?)))
+  ;; the formula t which was written as the LaTeX s, in the text raw, with
+  ;; this text. Each formula keeps it, also one which TeXmacs would write
+  ;; in the same way: to know this, the formula would have to be converted
+  ;; to LaTeX again, which takes as long as reading it. Whether it is
+  ;; written so is decided when it was edited (see tmmd-md-source)
+  (mdtm-keep t (or raw (if (== tag 'math) (string-append "$" s "$")
+                           (string-append "$$\n" s "\n$$")))
+             block?))
 
 (define (mdtm-keep-html t s) (mdtm-keep t s #f))
 
