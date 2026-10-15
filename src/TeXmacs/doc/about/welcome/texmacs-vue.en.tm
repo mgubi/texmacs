@@ -270,9 +270,9 @@
     numbering of lists, the references to pages and the formatting
     switched off inside a paragraph come out right; and the files which
     are written have no section breaks in cells or notes, keep the dashes
-    and quotes of <TeXmacs> and define the styles they use. Links and
-    descriptions of pictures containing <verbatim|&amp;> are read
-    correctly.
+    and quotes of <TeXmacs> and define the styles they use. Addresses of
+    links and descriptions of pictures written with <verbatim|&amp;lt;>
+    or <verbatim|&amp;amp;> are read correctly.
 
     <item>A <name|Markdown> file keeps the tabs at the start of its lines
     (in code, formulas, tables and the <name|YAML> header), a formula of a
