@@ -20,6 +20,9 @@
 #include "ns_renderer.h"
 #include "ns_gui.h"
 #include "../Vue/vue_gpu.hpp"
+#include "boot.hpp"        // get_preference
+#include "scheme.hpp"      // call (the zoom of the editor)
+#import <QuartzCore/QuartzCore.h> // the smooth zoom
 #include <time.h>
 
 // The benchmark (TEXMACS_NS_BENCH, ns_gui.mm): the time spent drawing into
@@ -179,6 +182,8 @@ ns_simple_widget_rep::ns_simple_widget_rep ()
 : ns_widget_rep (simple_widget),  sequencer (0), view (nil), doc (nil),
   backingPixmap (nil), ring (0), cring (0), gpu_ren (NULL), gpu_layer (NULL),
   gpu_presenter (NULL), gpu_dirty (false),
+  zoom_now (0), zoom_pending (false), zoom_image (NULL),
+  zoom_rect (NSZeroRect), zoom_origin (NSZeroPoint), zoom_ratio (1),
   extents (coord4 (0, 0, 0, 0)),
   last_viewport (NSZeroSize) { }
 
@@ -193,6 +198,7 @@ ns_simple_widget_rep::~ns_simple_widget_rep () {
     [doc release];
   }
   [backingPixmap release];
+  if (zoom_image) CGImageRelease ((CGImageRef) zoom_image);
   if (gpu_ren != NULL) tm_delete (gpu_ren);
   if (gpu_presenter != NULL) {
     [(TMGpuPresenter*) gpu_presenter stop];
@@ -561,6 +567,7 @@ ns_simple_widget_rep::send (slot s, blackbox val) {
     {
       check_type<double> (val, s);
       double new_zoom = open_box<double> (val);
+      start_zoom_transition (new_zoom);
       handle_set_zoom_factor (new_zoom);
     }
       break;
@@ -987,7 +994,13 @@ ns_simple_widget_rep::draw_backing_store (NSRect rect) {
 void
 ns_simple_widget_rep::repaint_invalid_regions () {
   double tr0= ns_bench_now ();
+  // the zoom the editor starts with (the first one is not sent to the
+  // widget): the smooth zoom needs the old zoom to scale from
+  if (zoom_now == 0 && is_editor_widget ())
+    zoom_now= as_double (call ("get-window-zoom-factor"));
+  bool repainted= !is_nil (invalid_regions);
   repaint_invalid_regions_bis ();
+  if (zoom_pending && repainted) run_zoom_transition ();
   ns_bench_repaint += ns_bench_now () - tr0;
 }
 
@@ -1220,4 +1233,126 @@ ns_simple_widget_rep::repaint_all () {
         ![w->view isHiddenOrHasHiddenAncestor])
       w->repaint_invalid_regions();
   }
+}
+
+/******************************************************************************
+* The smooth zoom (as vue_simple_widget_rep::start_zoom_transition)
+*
+* When the zoom of an editor changes, the page does not jump from the old
+* size to the new: for a moment the picture of the canvas at the old zoom
+* is carried to the place and the size it has at the new zoom, and fades
+* out, over the canvas repainted at the new zoom. A point p of the document
+* (in points, from its top left) is at A1 + p in the scroll view before the
+* zoom, and at A2 + r p after it (A: the place of the document, r the ratio
+* of the zooms): the picture is scaled by r about its corner, which moves
+* from C to r C + A2 - r A1. The preference "smooth zoom" (default on)
+* turns it off; zooms by less than 3% (a pinch, a step of the wheel) are
+* immediate. Core Animation draws the frames, in a layer above the canvas.
+******************************************************************************/
+
+@interface TMZoomOverlay : NSView
+@end
+
+@implementation TMZoomOverlay
+- (BOOL) isFlipped { return YES; }
+- (NSView*) hitTest: (NSPoint) p { (void) p; return nil; }
+@end
+
+static const double zoom_duration= 0.15; // seconds
+
+void
+ns_simple_widget_rep::start_zoom_transition (double new_zoom) {
+  double old_zoom= zoom_now;
+  zoom_now= new_zoom;
+  if (zoom_image) { CGImageRelease ((CGImageRef) zoom_image); zoom_image= NULL; }
+  zoom_pending= false;
+  if (!is_editor_widget () || old_zoom <= 0 || new_zoom <= 0) return;
+  double r= new_zoom / old_zoom;
+  if (fabs (log (r)) < 0.03 || !has_store () || !view || !doc) return;
+  if (get_preference ("smooth zoom", "on") == "off") return;
+  NSScrollView* sv= [doc enclosingScrollView];
+  if (!sv || ![view window]) return;
+  NSRect vis= [view bounds];
+  if (NSIsEmptyRect (vis)) return;
+  // the picture of the canvas, as the snapshots draw it
+  double k= retina_factor;
+  int W= (int) ceil (vis.size.width * k), H= (int) ceil (vis.size.height * k);
+  NSBitmapImageRep* rep= [[NSBitmapImageRep alloc]
+    initWithBitmapDataPlanes: NULL pixelsWide: W pixelsHigh: H
+    bitsPerSample: 8 samplesPerPixel: 4 hasAlpha: YES isPlanar: NO
+    colorSpaceName: NSDeviceRGBColorSpace bytesPerRow: 0 bitsPerPixel: 0];
+  if (!rep) return;
+  NSGraphicsContext* gc= [NSGraphicsContext graphicsContextWithBitmapImageRep: rep];
+  [NSGraphicsContext saveGraphicsState];
+  [NSGraphicsContext setCurrentContext: gc];
+  CGContextRef cgc= [gc CGContext];
+  CGContextTranslateCTM (cgc, 0, H);
+  CGContextScaleCTM (cgc, k, -k);   // the canvas is flipped
+  draw_backing_store (vis);
+  [NSGraphicsContext restoreGraphicsState];
+  zoom_image= (void*) CGImageRetain ([rep CGImage]);
+  [rep release];
+  if (!zoom_image) return;
+  zoom_rect= [sv convertRect: [view bounds] fromView: view];
+  zoom_origin= [sv convertPoint: NSZeroPoint fromView: doc];
+  zoom_ratio= r;
+  zoom_pending= true;
+}
+
+void
+ns_simple_widget_rep::run_zoom_transition () {
+  zoom_pending= false;
+  CGImageRef img= (CGImageRef) zoom_image;
+  zoom_image= NULL;
+  NSScrollView* sv= [doc enclosingScrollView];
+  if (!img || !sv) { if (img) CGImageRelease (img); return; }
+  // the overlay covers the visible part of the scroll view (flipped)
+  NSRect cf= [[sv contentView] frame];
+  TMZoomOverlay* ov= [[TMZoomOverlay alloc] initWithFrame: cf];
+  [ov setWantsLayer: YES];
+  [sv addSubview: ov positioned: NSWindowAbove relativeTo: nil];
+  NSPoint a1= [ov convertPoint: zoom_origin fromView: sv];
+  NSPoint a2= [ov convertPoint: [sv convertPoint: NSZeroPoint fromView: doc]
+                      fromView: sv];
+  NSRect r1= [ov convertRect: zoom_rect fromView: sv];
+  double r= zoom_ratio;
+  CALayer* l= [CALayer layer];
+  [l setContents: (NSObject*) img];
+  [l setContentsGravity: kCAGravityResize];
+  [l setAnchorPoint: CGPointMake (0, 0)];
+  [l setBounds: CGRectMake (0, 0, r1.size.width, r1.size.height)];
+  [l setPosition: CGPointMake (r1.origin.x, r1.origin.y)];
+  [[ov layer] addSublayer: l];
+  CGImageRelease (img);
+  CGPoint from= CGPointMake (r1.origin.x, r1.origin.y);
+  CGPoint to= CGPointMake (r * r1.origin.x + a2.x - r * a1.x,
+                           r * r1.origin.y + a2.y - r * a1.y);
+  if (getenv ("TEXMACS_NS_DEBUG_DRAW"))
+    fprintf (stderr, "ZOOM r=%g a1=(%g,%g) a2=(%g,%g) from (%g,%g) to (%g,%g) flipped %d\n",
+             r, a1.x, a1.y, a2.x, a2.y, from.x, from.y, to.x, to.y,
+             (int) [[ov layer] isGeometryFlipped]);
+  [CATransaction begin];
+  [CATransaction setAnimationDuration: zoom_duration];
+  [CATransaction setAnimationTimingFunction:
+    [CAMediaTimingFunction functionWithName: kCAMediaTimingFunctionEaseOut]];
+  [CATransaction setCompletionBlock: ^{
+    [ov removeFromSuperview];
+    [ov release];
+  }];
+  CABasicAnimation* pos= [CABasicAnimation animationWithKeyPath: @"position"];
+  pos.fromValue= [NSValue valueWithPoint: NSPointFromCGPoint (from)];
+  pos.toValue= [NSValue valueWithPoint: NSPointFromCGPoint (to)];
+  CABasicAnimation* sc= [CABasicAnimation animationWithKeyPath: @"transform.scale"];
+  sc.fromValue= @1.0;
+  sc.toValue= @(r);
+  CABasicAnimation* op= [CABasicAnimation animationWithKeyPath: @"opacity"];
+  op.fromValue= @1.0;
+  op.toValue= @0.0;
+  [l setPosition: to];
+  [l setTransform: CATransform3DMakeScale (r, r, 1)];
+  [l setOpacity: 0.0];
+  [l addAnimation: pos forKey: @"position"];
+  [l addAnimation: sc forKey: @"scale"];
+  [l addAnimation: op forKey: @"opacity"];
+  [CATransaction commit];
 }
