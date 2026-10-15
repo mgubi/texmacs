@@ -199,7 +199,7 @@
             '("default" "0.25" "0.5" "1" "2" "3")
             (get-pretty-preference "gui scaling")
             "18em"))
-    (assuming (vue-gui?)
+    (assuming (or (vue-gui?) (ns-gui?))
       (item (text "Glyphs on the screen:")
         (enum (set-pretty-preference "gpu glyphs" answer)
               '("FreeType, as dark as Qt" "Bitmaps of TeXmacs, as Qt"

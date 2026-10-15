@@ -640,6 +640,8 @@ ns_gui_rep::update () {
 
   if (!postpone_treatment) {
     if (the_interpose_handler) the_interpose_handler();
+    if (ns_follow_glyph_settings ()) // a change of the glyphs
+      ns_simple_widget_rep::invalidate_every ();
     ns_simple_widget_rep::repaint_all ();
   }
 

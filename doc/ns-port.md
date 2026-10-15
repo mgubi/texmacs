@@ -127,7 +127,14 @@ keys typed meanwhile go to TeXmacs, and the real mouse also reaches it.
 * `TEXMACS_NS_THEME=light|dark`: the appearance, instead of the preference
   `gui theme`;
 * `TEXMACS_NS_GLYPHS=bitmap`: all the glyphs from the bitmaps of
-  `shrink`, as before the outlines (to compare);
+  `shrink`, as before the outlines (to compare); the preference
+  `gpu glyphs` set to `texmacs` does the same (General: "Glyphs on the
+  screen", followed at once);
+* `TEXMACS_NS_GLYPH_BOLD=<pixels>`: how much bolder the outlines are made
+  (they are stroked too, that wide), instead of the preference
+  `gpu glyph boldness` (0.22 by default: the weight of the bitmaps of
+  `shrink`, which thickens their strokes, and of the Qt port; 0 is the
+  outline as it is, lighter);
 * `TEXMACS_NS_DEBUG_RED=1`: when the backing store moves (scrolling), the
   parts which it does not keep are red until they are repainted;
 * `TEXMACS_NS_DEBUG_DRAW=1`: the rectangles redrawn by the canvas are
