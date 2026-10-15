@@ -602,30 +602,7 @@
 
 (define (tmof-byte s i) (char->integer (string-ref s i)))
 
-(define (tmof-pixels data)
-  ;; (width height) in pixels of an image PNG, GIF or JPEG, or #f
-  (let ((n (string-length data)))
-    (cond ((and (> n 24) (== (tmof-byte data 0) 137) (== (tmof-byte data 1) 80))
-           (list (+ (* 16777216 (tmof-byte data 16)) (* 65536 (tmof-byte data 17))
-                    (* 256 (tmof-byte data 18)) (tmof-byte data 19))
-                 (+ (* 16777216 (tmof-byte data 20)) (* 65536 (tmof-byte data 21))
-                    (* 256 (tmof-byte data 22)) (tmof-byte data 23))))
-          ((and (> n 10) (== (tmof-byte data 0) 71) (== (tmof-byte data 1) 73))
-           (list (+ (tmof-byte data 6) (* 256 (tmof-byte data 7)))
-                 (+ (tmof-byte data 8) (* 256 (tmof-byte data 9)))))
-          ((and (> n 4) (== (tmof-byte data 0) 255) (== (tmof-byte data 1) 216))
-           ;; the segments of a JPEG, up to the one with the size
-           (let loop ((i 2))
-             (cond ((> (+ i 9) n) #f)
-                   ((!= (tmof-byte data i) 255) #f)
-                   ((and (>= (tmof-byte data (+ i 1)) 192)
-                         (<= (tmof-byte data (+ i 1)) 207)
-                         (not (in? (tmof-byte data (+ i 1)) '(196 200 204))))
-                    (list (+ (* 256 (tmof-byte data (+ i 7))) (tmof-byte data (+ i 8)))
-                          (+ (* 256 (tmof-byte data (+ i 5))) (tmof-byte data (+ i 6)))))
-                   (else (loop (+ i 2 (* 256 (tmof-byte data (+ i 2)))
-                                  (tmof-byte data (+ i 3))))))))
-          (else #f))))
+(define (tmof-pixels data) (office-image-pixels data))
 
 (define tmof-text-width 16.0) ; the width of the text, in centimeters
 
@@ -1235,6 +1212,25 @@
   (if (< (length l) 3) '()
       (with r (tmof (caddr l))
         (tmof-attr-wrap* 'font `((value ,(tmof-plain (car l)))) r))))
+
+(define (tmof-office-float l)
+  ;; a picture which floats beside its paragraph: where it is, and how the
+  ;; text goes around it
+  (if (< (length l) 3) '()
+      (let* ((side (tmof-plain (car l)))
+             (spec (append-map
+                     (lambda (kv)
+                       (with i (string-search-forwards "=" 0 kv)
+                         (if (<= i 0) '()
+                             (with k (string->symbol (substring kv 0 i))
+                               (if (in? k (append office-float-keys '(next)))
+                                   (list (list k (substring kv (+ i 1) (string-length kv))))
+                                   '())))))
+                     (string-tokenize-by-char (tmof-plain (cadr l)) #\space)))
+             (attrs (cons (list 'float (if (in? side '("left" "right" "center")) side "left"))
+                          (list-filter spec (lambda (a) (!= (car a) 'float))))))
+        (map (lambda (y) (if (func? y 'image) (office-add-attrs y attrs) y))
+             (tmof (caddr l))))))
 
 (define (tmof-change-case l)
   ;; capitals, lower case; the first letter in capitals is the text as it is
@@ -1937,6 +1933,7 @@
   (office-font tmof-office-font-tag)
   (change-case tmof-change-case)
   (office-capitalize tmof-office-capitalize)
+  (office-float tmof-office-float)
   (part tmof-part-numbered)
   (part-numbered-title tmof-part-numbered-title)
   (chapter tmof-chapter-numbered)
@@ -2125,7 +2122,50 @@
             (else '())))))
 
 (define (tmof-final-blocks l)
-  (append-map tmof-final-block l))
+  (tmof-anchor-floats (append-map tmof-final-block l)))
+
+;; A picture which floats beside a paragraph was read from inside it: it
+;; goes back there, at its start (attribute next of office-float)
+
+(define (tmof-next-float? y)
+  (and (func? y 'image) (== (ox-attr y 'next) "true")))
+
+(define (tmof-drop-next y)
+  (if (not (tmof-next-float? y)) y
+      (apply office-node
+             (cons* 'image (list-filter (map (lambda (a) (list (car a) (cadr a)))
+                                             (ox-attrs y))
+                                        (lambda (a) (!= (car a) 'next)))
+                    (ox-children y)))))
+
+(define (tmof-blank? y)
+  (and (string? y) (== (string-trim-spaces y) "")))
+
+(define (tmof-anchor-floats l)
+  (let loop ((l l) (acc '()))
+    (cond ((null? l) (reverse acc))
+          ((and (func? (car l) 'p)
+                (with c (list-filter (ox-children (car l)) (lambda (y) (not (tmof-blank? y))))
+                  (and (pair? c) (list-and (map tmof-next-float? c))))
+                (pair? (cdr l)) (func? (cadr l) 'p))
+           (let* ((imgs (map tmof-drop-next
+                             (list-filter (ox-children (car l)) tmof-next-float?)))
+                  (next (cadr l))
+                  (merged (apply office-node
+                                 (cons* 'p (map (lambda (a) (list (car a) (cadr a)))
+                                                (ox-attrs next))
+                                        (append imgs (ox-children next))))))
+             (loop (cons merged (cddr l)) acc)))
+          ((func? (car l) 'p)
+           (loop (cdr l)
+                 (cons (if (list-or (map tmof-next-float? (ox-children (car l))))
+                           (apply office-node
+                                  (cons* 'p (map (lambda (a) (list (car a) (cadr a)))
+                                                 (ox-attrs (car l)))
+                                         (map tmof-drop-next (ox-children (car l)))))
+                           (car l))
+                       acc)))
+          (else (loop (cdr l) (cons (car l) acc))))))
 
 ;; A label of TeXmacs is the label of the last thing which has a number
 ;; before it: a heading, a theorem, a figure, an equation. In an office

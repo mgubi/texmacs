@@ -281,6 +281,46 @@
               ,(u l "w") ,(u b "h") ,(u (- 1 r) "w") ,(u (- 1 t) "h"))))
 
 (define (oftm-image x)
+  ;; a picture; one which floats beside its paragraph says where, in the
+  ;; style office
+  (with l (oftm-image-only x)
+    (if (and oftm-faithful? (ox-attr x 'float) (pair? l))
+        (list `(office-float ,(ox-attr x 'float) ,(oftm-float-spec x)
+                             ,(if (null? (cdr l)) (car l) `(concat ,@l))))
+        l)))
+
+(define (oftm-float-spec x)
+  ;; the attributes of a floating picture but its side, as "key=value ..."
+  (string-recompose
+    (append-map (lambda (k)
+                  (with v (ox-attr x k)
+                    (if (and v (!= v "")) (list (string-append (symbol->string k) "=" v)) '())))
+                (append (cdr office-float-keys) '(next)))
+    " "))
+
+(define (oftm-split-floats x)
+  ;; a paragraph with text and pictures which float beside it: each picture
+  ;; is a paragraph before it, on its side, and says that it goes with the
+  ;; next paragraph (TeXmacs does not put text around a picture)
+  (let* ((float? (lambda (y) (and (func? y 'image) (ox-attr y 'float))))
+         (l (if (func? x 'p) (ox-children x) '()))
+         (floats (list-filter l float?))
+         (rest (list-filter l (lambda (y) (not (float? y))))))
+    (if (or (null? floats) (oftm-role? x "heading")
+            (not (list-or (map (lambda (y) (not (and (string? y)
+                                                       (== (string-trim-spaces y) ""))))
+                               rest))))
+        (list x)
+        (append (map (lambda (y)
+                       (office-node 'p `((align ,(ox-attr y 'float)))
+                                    (office-add-attrs y '((next "true")))))
+                     floats)
+                (list (apply office-node
+                             (cons* 'p (map (lambda (a) (list (car a) (cadr a)))
+                                            (ox-attrs x))
+                                    rest)))))))
+
+(define (oftm-image-only x)
   (let* ((name (oftm-text (or (ox-attr x 'name) "")))
          (data (ox-attr x 'data))
          (w (or (ox-attr x 'width) ""))
@@ -289,7 +329,7 @@
           ((and data (office-metafile? name))
            (with png (office-metafile->png data name)
              (if png
-                 (oftm-image `(image (@ (name ,(string-append name ".png")) (data ,png)
+                 (oftm-image-only `(image (@ (name ,(string-append name ".png")) (data ,png)
                                         ,@(list-filter (ox-attrs x)
                                                        (lambda (a) (not (in? (car a) '(name data))))))))
                  (list `(frame ,(string-append "[" name "]"))))))
@@ -1147,7 +1187,7 @@
   ;; belong together are taken together: the lines of a quotation or of a
   ;; piece of code, a figure or a table and its caption. (A loop: a
   ;; document may have many thousands of blocks)
-  (let loop ((l l) (acc '()))
+  (let loop ((l (append-map oftm-split-floats l)) (acc '()))
     (if (null? l) (reverse acc)
         (with r (oftm-block l)
           (loop (cdr r) (append (reverse (car r)) acc))))))

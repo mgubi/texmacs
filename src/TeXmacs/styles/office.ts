@@ -89,6 +89,18 @@
 
   <\active*>
     <\src-comment>
+      A picture which floats beside its paragraph, on a side (left, right,
+      center), with where it is and how the text goes around it, as
+      "key=value ...": TeXmacs shows it in a paragraph of its own.
+    </src-comment>
+  </active*>
+
+  <assign|office-float|<macro|side|spec|body|<arg|body>>>
+
+  <drd-props|office-float|arity|3|accessible|2>
+
+  <\active*>
+    <\src-comment>
       A field of the office programs (a page number, a date, the title of
       the document...): its instruction, and its result as the file had
       it.

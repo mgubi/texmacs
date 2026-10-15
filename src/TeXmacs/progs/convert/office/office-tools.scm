@@ -304,6 +304,109 @@
     (if (null? l) (cons tag children)
         (cons* tag (cons '@ l) children))))
 
+;; A floating picture (anchored, with the text around it) has these
+;; attributes, which both formats say in their ways: float (left, right or
+;; center: where TeXmacs shows it, beside its paragraph), wrap (square,
+;; tight, through, top-bottom, front, behind), wrap-side (both, left,
+;; right, largest), h-pos (left, right, center, inside, outside, offset),
+;; h-rel (column, page, margin, character, left-margin, right-margin),
+;; h-offset, v-pos (top, bottom, center, inside, outside, offset), v-rel
+;; (paragraph, line, page, margin, top-margin, bottom-margin), v-offset.
+(define-public office-float-keys
+  '(float wrap wrap-side h-pos h-rel h-offset v-pos v-rel v-offset))
+
+(tm-define (office-float-side h-pos h-rel offset width)
+  (:synopsis "Where TeXmacs shows a floating picture: left, right or center")
+  (cond ((in? h-pos '("left" "inside")) "left")
+        ((in? h-pos '("right" "outside")) "right")
+        ((== h-pos "center") "center")
+        (else
+          ;; (an offset: the side which the middle of the picture is near,
+          ;; in a column of about 16 cm, after a margin of 2.5 cm)
+          (let* ((x (or (office-length->cm offset) 0))
+                 (w (or (office-length->cm width) 0))
+                 (x (if (in? h-rel '("page" "left-margin")) (- x 2.5) x))
+                 (m (+ x (/ w 2))))
+            (cond ((< m 5.5) "left")
+                  ((> m 10.5) "right")
+                  (else "center"))))))
+
+(tm-define (office-cm x)
+  (:synopsis "The length @x in centimeters, as a string")
+  (string-append (office-decimal x) "cm"))
+
+(tm-define (office-add-attrs x attrs)
+  (:synopsis "The node @x with the attributes @attrs (name value) added")
+  (if (not (pair? x)) x
+      (apply office-node (cons* (car x) (append (map (lambda (a) (list (car a) (cadr a)))
+                                                     (ox-attrs x))
+                                                attrs)
+                                (ox-children x)))))
+
+(define (office-byte s i) (char->integer (string-ref s i)))
+
+(tm-define (office-image-pixels data)
+  (:synopsis "(width height) in pixels of the image @data (PNG, GIF, JPEG), or #f")
+  ;; (width height) in pixels of an image PNG, GIF or JPEG, or #f
+  (let ((n (string-length data)))
+    (cond ((and (> n 24) (== (office-byte data 0) 137) (== (office-byte data 1) 80))
+           (list (+ (* 16777216 (office-byte data 16)) (* 65536 (office-byte data 17))
+                    (* 256 (office-byte data 18)) (office-byte data 19))
+                 (+ (* 16777216 (office-byte data 20)) (* 65536 (office-byte data 21))
+                    (* 256 (office-byte data 22)) (office-byte data 23))))
+          ((and (> n 10) (== (office-byte data 0) 71) (== (office-byte data 1) 73))
+           (list (+ (office-byte data 6) (* 256 (office-byte data 7)))
+                 (+ (office-byte data 8) (* 256 (office-byte data 9)))))
+          ((and (> n 4) (== (office-byte data 0) 255) (== (office-byte data 1) 216))
+           ;; the segments of a JPEG, up to the one with the size
+           (let loop ((i 2))
+             (cond ((> (+ i 9) n) #f)
+                   ((!= (office-byte data i) 255) #f)
+                   ((and (>= (office-byte data (+ i 1)) 192)
+                         (<= (office-byte data (+ i 1)) 207)
+                         (not (in? (office-byte data (+ i 1)) '(196 200 204))))
+                    (list (+ (* 256 (office-byte data (+ i 7))) (office-byte data (+ i 8)))
+                          (+ (* 256 (office-byte data (+ i 5))) (office-byte data (+ i 6)))))
+                   (else (loop (+ i 2 (* 256 (office-byte data (+ i 2)))
+                                  (office-byte data (+ i 3))))))))
+          (else #f))))
+
+(tm-define (office-image-dpi data)
+  (:synopsis "The resolution of the image @data in dots per inch (96 when it says none)")
+  (let ((n (string-length data)))
+    (cond ((and (> n 24) (== (office-byte data 0) 137) (== (office-byte data 1) 80))
+           ;; the chunk pHYs of a PNG, before its data
+           (let loop ((i 8))
+             (if (> (+ i 17) n) 96.0
+                 (let ((len (+ (* 16777216 (office-byte data i)) (* 65536 (office-byte data (+ i 1)))
+                               (* 256 (office-byte data (+ i 2))) (office-byte data (+ i 3))))
+                       (tag (substring data (+ i 4) (+ i 8))))
+                   (cond ((== tag "pHYs")
+                          (let ((ppm (+ (* 16777216 (office-byte data (+ i 8)))
+                                        (* 65536 (office-byte data (+ i 9)))
+                                        (* 256 (office-byte data (+ i 10)))
+                                        (office-byte data (+ i 11)))))
+                            (if (and (== (office-byte data (+ i 16)) 1) (> ppm 0))
+                                (* ppm 0.0254) 96.0)))
+                         ((in? tag '("IDAT" "IEND")) 96.0)
+                         (else (loop (+ i 12 len))))))))
+          ((and (> n 18) (== (office-byte data 0) 255) (== (office-byte data 1) 216)
+                (== (substring data 6 10) "JFIF"))
+           ;; the density of JFIF: in dots per inch, or per centimeter
+           (let ((unit (office-byte data 13))
+                 (d (+ (* 256 (office-byte data 14)) (office-byte data 15))))
+             (cond ((and (== unit 1) (> d 0)) (* 1.0 d))
+                   ((and (== unit 2) (> d 0)) (* 2.54 d))
+                   (else 96.0))))
+          (else 96.0))))
+
+(tm-define (office-image-cm data)
+  (:synopsis "(width height) in centimeters of the image @data at its resolution, or #f")
+  (let ((px (office-image-pixels data))
+        (dpi (office-image-dpi data)))
+    (and px (> (car px) 0) (> (cadr px) 0)
+         (list (/ (* 2.54 (car px)) dpi) (/ (* 2.54 (cadr px)) dpi)))))
+
 (define-public office-underline-kinds
   ;; the kinds of underlines of Word (those of OpenDocument are among them)
   '("double" "thick" "dotted" "dottedHeavy" "dash" "dashedHeavy" "dashLong"

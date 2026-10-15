@@ -810,6 +810,93 @@
     ;; (Word has neither: the text is written as it is shown)
     (check-true (export-has? docx2 ">abc</w:t>"))
     (check-false (export-has? docx2 "<w:caps/>")))
+  ;; a picture which floats on the right of its paragraph, the text
+  ;; around it: a paragraph of its own before it, and back in it when the
+  ;; file is written
+  (let* ((body (wp "<w:r><w:drawing><wp:anchor behindDoc='0'>"
+                   "<wp:positionH relativeFrom='column'><wp:align>right</wp:align></wp:positionH>"
+                   "<wp:positionV relativeFrom='paragraph'><wp:posOffset>36000</wp:posOffset>"
+                   "</wp:positionV><wp:extent cx='720000' cy='360000'/>"
+                   "<wp:wrapSquare wrapText='bothSides'/><a:blip r:embed='rId2'/>"
+                   "</wp:anchor></w:drawing></w:r>" (wr "Text around.")))
+         (blocks (docx body))
+         (doc (office->texmacs (cons 'office blocks)
+                               (list (cons "office->texmacs:faithful" "on"))))
+         (back (convert doc "texmacs-stree" "docx-document"))
+         (text (archive-entry back "word/document.xml"))
+         (odt2 (archive-entry (convert doc "texmacs-stree" "odt-document") "content.xml")))
+    (check= blocks
+            '((p (image (@ (name "pic.png") (data "PNGDATA") (width "2cm") (height "1cm")
+                           (float "right") (wrap "square") (wrap-side "both")
+                           (h-pos "right") (h-rel "column") (v-pos "offset")
+                           (v-rel "paragraph") (v-offset "0.1cm")))
+                 "Text around.")))
+    (check= (cadr (cadr doc))
+            '(document (with "par-mode" "right"
+                         (office-float "right" "wrap=square wrap-side=both h-pos=right h-rel=column v-pos=offset v-rel=paragraph v-offset=0.1cm next=true"
+                                       (image (tuple (raw-data "PNGDATA") "pic.png")
+                                              "2cm" "1cm" "" "")))
+                       "Text around."))
+    ;; (without the style office: the picture on its side, in the line)
+    (check= (cadr (cadr (office->texmacs (cons 'office blocks))))
+            '(document (with "par-mode" "right"
+                         (image (tuple (raw-data "PNGDATA") "pic.png") "2cm" "1cm" "" ""))
+                       "Text around."))
+    ;; (read again: the same place, in the same paragraph)
+    (with p (car (no-setup (cdr (parse-docx-document back))))
+      (check= (list-filter (ox-attrs (cadr p)) (lambda (a) (in? (car a) office-float-keys)))
+              (list-filter (ox-attrs (cadar blocks)) (lambda (a) (in? (car a) office-float-keys))))
+      (check= (cddr p) '("Text around.")))
+    (check-true (export-has? text "<wp:align>right</wp:align>"))
+    (check-true (export-has? text "<wp:posOffset>36000</wp:posOffset>"))
+    (check-true (export-has? text "<wp:wrapSquare wrapText=\"bothSides\"/>"))
+    (check-false (export-has? text "<wp:inline"))
+    (check-true (export-has? odt2 "text:anchor-type=\"paragraph\""))
+    (check-true (export-has? odt2 "style:wrap=\"parallel\""))
+    (check-true (export-has? odt2 "style:horizontal-pos=\"right\""))
+    (check-true (export-has? odt2 "svg:y=\"0.1cm\"")))
+  ;; a frame of OpenDocument which floats, and a picture of which parts are
+  ;; cut (fo:clip, in the size of the picture: here 100 pixels at 96 dots
+  ;; per inch, 2.646cm)
+  (let* ((png (string-append (list->string (map integer->char '(137 80 78 71 13 10 26 10 0 0 0 13)))
+                             "IHDR" (list->string (map integer->char '(0 0 0 100 0 0 0 100)))
+                             "rest"))
+         (archive (zip-pack '("mimetype" "content.xml" "styles.xml" "Pictures/p.png")
+                            (list "application/vnd.oasis.opendocument.text"
+                                  (string-append
+                                    "<?xml version='1.0'?><office:document-content" odt-ns ">"
+                                    "<office:automatic-styles>"
+                                    "<style:style style:name='F' style:family='graphic'>"
+                                    "<style:graphic-properties style:wrap='left'"
+                                    " style:horizontal-pos='from-left' style:horizontal-rel='paragraph'"
+                                    " style:vertical-pos='top' style:vertical-rel='paragraph'/></style:style>"
+                                    "<style:style style:name='C' style:family='graphic'>"
+                                    "<style:graphic-properties fo:clip='rect(0cm, 0.6615cm, 0cm, 0cm)'/>"
+                                    "</style:style></office:automatic-styles><office:body><office:text>"
+                                    "<text:p><draw:frame draw:style-name='F' text:anchor-type='paragraph'"
+                                    " svg:x='12cm' svg:width='3cm' svg:height='2cm'>"
+                                    "<draw:image xlink:href='Pictures/p.png'/></draw:frame>Text</text:p>"
+                                    "<text:p><draw:frame draw:style-name='C' text:anchor-type='as-char'"
+                                    " svg:width='3cm' svg:height='4cm'>"
+                                    "<draw:image xlink:href='Pictures/p.png'/></draw:frame></text:p>"
+                                    "</office:text></office:body></office:document-content>")
+                                  (string-append "<office:document-styles" odt-ns "/>")
+                                  png)))
+         (blocks (bare (cdr (parse-odt-document archive)))))
+    (check= (map (lambda (b) (list-filter (ox-attrs (cadr b))
+                                          (lambda (a) (not (in? (car a) '(data name))))))
+                 blocks)
+            '(((width "3cm") (height "2cm") (float "right") (wrap "square")
+               (wrap-side "left") (h-pos "offset") (h-rel "column") (h-offset "12cm")
+               (v-pos "top") (v-rel "paragraph"))
+              ((width "3cm") (height "4cm") (crop "0 0 0.25 0"))))
+    (with content (archive-entry (convert (office->texmacs (cons 'office blocks)
+                                                           (list (cons "office->texmacs:faithful" "on")))
+                                          "texmacs-stree" "odt-document")
+                                 "content.xml")
+      (check-true (export-has? content "fo:clip=\"rect(0cm, 0.661cm, 0cm, 0cm)\""))
+      (check-true (export-has? content "style:wrap=\"left\""))
+      (check-true (export-has? content "svg:x=\"12cm\""))))
   ;; a font of OpenDocument by the name of its declaration: its family
   (check= (odt-blocks-of (tp (tspan "T1" "x"))
                          (string-append

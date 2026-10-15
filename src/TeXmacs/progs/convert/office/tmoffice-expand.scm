@@ -86,7 +86,7 @@
              ;; the macros of the style office
              office-par office-span office-field office-comment office-ins
              office-del office-columns office-underline office-strike
-             office-letters office-font office-capitalize))
+             office-letters office-font office-capitalize office-float))
     ;; the screens of a presentation and the folds: all of them, not
     ;; only what is shown
     ,@(map tmoffice-env-macro
