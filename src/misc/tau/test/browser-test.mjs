@@ -941,10 +941,21 @@ test("the wheel for the editor", async p => {
 	// the page of the design of the fonts: a document which fits its view,
 	// with a list in it which the wheel scrolls (the editor captures it)
 	await p.scheme("(open-font-design)");
+	// (the message has a number of its own, waited for, and is asked again
+	// when the footer of the core, said again after a drag, took its place)
+	let asked = 0;
 	const position = async () => {
-		await p.scheme('(set-message (with t (buffer-tree) (if (> (tree-arity t) 2) (string-append "at " (tree->string (tree-ref (tree-ref t 2) 0))) "no list")) "")');
-		await sleep(300);
-		return p.page.$eval("#tau-footer-left", e => e.textContent);
+		let text = "";
+		for (let tries = 0; tries < 6; tries++) {
+			const tag = " #" + (++asked);
+			await p.scheme(`(set-message (string-append (with t (buffer-tree) (if (> (tree-arity t) 2) (string-append "at " (tree->string (tree-ref (tree-ref t 2) 0))) "no list")) "${tag}") "")`);
+			for (let i = 0; i < 10; i++) {
+				await sleep(100);
+				text = await p.page.$eval("#tau-footer-left", e => e.textContent);
+				if (text.endsWith(tag)) return text.slice(0, text.length - tag.length);
+			}
+		}
+		return text;
 	};
 	await p.until("the page of the fonts, its list at the top", async () => (await position()).includes("at 100%"), 30000);
 	const box = await p.page.$eval(".tau-pane .tau-canvas", c => { const r = c.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; });
