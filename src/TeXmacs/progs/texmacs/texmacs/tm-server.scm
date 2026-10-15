@@ -45,8 +45,10 @@
                "configure look and feel"))
 
 (define (notify-gui-theme var val)
-  (set-message "Restart in order to let the new theme take effect"
-               "graphical interface theme"))
+  ;; the Cocoa interface follows the theme at once (ns_follow_theme)
+  (when (not (ns-gui?))
+    (set-message "Restart in order to let the new theme take effect"
+                 "graphical interface theme")))
 
 (define (notify-icon-set var val)
   ;; the Vue and Cocoa interfaces follow the icon set at once

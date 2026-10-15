@@ -615,6 +615,24 @@ ns_follow_icon_set () {
   return true;
 }
 
+// The theme of the preferences (TEXMACS_NS_THEME overrides it, for the
+// tests): light or dark, or by default that of the system. It is followed at
+// once: the update loop calls this at each update (a lookup in the
+// preferences), and a new appearance draws everything again (the icons
+// follow the appearance, see TMAppearanceObserver)
+static void
+ns_follow_theme () {
+  static string current= "?";
+  string theme= get_env ("TEXMACS_NS_THEME");
+  if (N(theme) == 0) theme= get_user_preference ("gui theme", "default");
+  if (theme == current) return;
+  current= theme;
+  NSAppearance* a= nil;  // the one of the system
+  if (theme == "light") a= [NSAppearance appearanceNamed: NSAppearanceNameAqua];
+  else if (theme == "dark") a= [NSAppearance appearanceNamed: NSAppearanceNameDarkAqua];
+  [NSApp setAppearance: a];
+}
+
 static void
 ns_redisplay_views (NSView* v) {
   if (v == nil) return;
@@ -677,6 +695,7 @@ ns_gui_rep::update () {
     bool glyphs= ns_follow_glyph_settings ();
     if (vue_gpu_follow_glyph_settings ()) glyphs= true;
     if (glyphs) ns_simple_widget_rep::invalidate_every ();
+    ns_follow_theme ();
     if (ns_follow_icon_set ()) {
       ns_simple_widget_rep::invalidate_every ();
       for (NSWindow* w in [NSApp windows]) ns_redisplay_views ([w contentView]);
@@ -1637,15 +1656,7 @@ void gui_open (int& argc, char** argv)
     static TMNSAppDelegate* delegate= [[TMNSAppDelegate alloc] init];
     [NSApp setDelegate: delegate];
   }
-  // The theme of the preferences (TEXMACS_NS_THEME overrides it, for the
-  // tests): light or dark, or by default that of the system. The icons
-  // follow the appearance, also when it changes (see TMAppearanceObserver)
-  string theme= get_env ("TEXMACS_NS_THEME");
-  if (N(theme) == 0) theme= get_user_preference ("gui theme", "default");
-  if (theme == "light")
-    [NSApp setAppearance: [NSAppearance appearanceNamed: NSAppearanceNameAqua]];
-  else if (theme == "dark")
-    [NSApp setAppearance: [NSAppearance appearanceNamed: NSAppearanceNameDarkAqua]];
+  ns_follow_theme ();
   static TMAppearanceObserver* observer= [[TMAppearanceObserver alloc] init];
   (void) observer;
   if (!pool) {

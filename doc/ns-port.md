@@ -61,7 +61,8 @@ macOS and the one of TeXmacs are the same. The windows are not restored at
 the start (`ApplePersistenceIgnoreState`).
 
 The appearance is light or dark after the preference `gui theme`, and by
-default that of the system. The icons are drawn from the SVG files of the
+default that of the system; a change of the preference shows at once
+(`ns_follow_theme`, in the update loop). The icons are drawn from the SVG files of the
 light or dark variant of the icon sets on `TEXMACS_PIXMAP_PATH`, as in Qt
 (so the set of the preference `icon set` is used), otherwise from their PNG
 equivalents. They follow a change of the appearance of the system: the
