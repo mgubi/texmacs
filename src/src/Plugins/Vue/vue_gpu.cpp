@@ -43,6 +43,7 @@
 
 bool vue_gpu_enabled () { return false; }
 void vue_gpu_prepare () {}
+bool vue_gpu_follow_glyph_settings () { return false; }
 bool vue_gpu_attach (SDL_Window* w) { (void) w; return false; }
 void vue_gpu_present (SDL_Window* w) { (void) w; }
 picture  gpu_backing_picture (int w, int h) { (void) w; (void) h; return picture (); }
@@ -69,6 +70,8 @@ bool is_gpu_renderer (renderer r) { (void) r; return false; }
 #include "image_files.hpp"
 #include "file.hpp"
 #include "../MuPDF/mupdf_picture.hpp"
+#include "Freetype/tt_face.hpp"
+#include "boot.hpp"
 #include <SDL3/SDL.h>
 #include <thorvg.h>
 #ifdef __EMSCRIPTEN__
@@ -226,6 +229,7 @@ struct gpu_target {
 };
 
 static void gpu_flush_all ();
+static bool read_glyph_settings ();
 
 static bool
 make_texture_target (GLuint& fbo, GLuint& tex, int w, int h) {
@@ -327,6 +331,12 @@ struct gpu_state {
   size_t texture_bytes= 0;
   // the default framebuffer of the window being drawn
   gpu_target screen= { 0, 0, 0, 0, 0, 0, true, true, 0, 0, 0 };
+  // the source of the glyphs of the atlas (see read_glyph_settings): 0 the
+  // bitmaps of TeXmacs, 1 MuPDF, 2 FreeType in shades of grey, hinted as
+  // ft_flags say and made ft_bold pixels bolder
+  int glyph_source= 2;
+  int ft_flags= 0;
+  double ft_bold= 0.22;
   // glyphs drawn from their outlines (Slug, TEXMACS_VUE_SLUG=1)
   bool slug_on= false;
   GLuint slug_prog= 0, slug_vao= 0, slug_vbo= 0, curve_tex= 0, index_tex= 0;
@@ -596,6 +606,7 @@ init_gl () {
   glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
   glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
   glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+  read_glyph_settings ();
   // the program of Slug (TEXMACS_VUE_SLUG=1)
   G.slug_on= (get_env ("TEXMACS_VUE_SLUG") == "1");
   if (G.slug_on) {
@@ -626,6 +637,55 @@ init_gl () {
   G.tvg_small= tvg::GlCanvas::gen ();
   if (G.tvg == NULL || G.tvg_small == NULL) {
     cout << "TeXmacs] GPU: no GL canvas in ThorVG" << LF; return false; }
+  return true;
+}
+
+/******************************************************************************
+* The glyphs of the atlas, as the preferences say: "gpu glyphs" (freetype,
+* texmacs or mupdf), "gpu glyph boldness" (in pixels, for FreeType) and
+* "gpu glyph hinting" (light, none or full, for FreeType), which the
+* variables TEXMACS_VUE_GLYPHS, TEXMACS_VUE_FT_BOLD and TEXMACS_VUE_FT_HINT
+* override (tests). A change empties the atlas: the loop looks at them at
+* each iteration (vue_gpu_follow_glyph_settings), and repaints everything.
+******************************************************************************/
+
+static string
+glyph_setting (const char* env, string pref, string def) {
+  string v= get_env (env);
+  return (N(v) > 0)? v: get_user_preference (pref, def);
+}
+
+// true when they changed
+static bool
+read_glyph_settings () {
+  string src = glyph_setting ("TEXMACS_VUE_GLYPHS", "gpu glyphs", "freetype");
+  string hint= glyph_setting ("TEXMACS_VUE_FT_HINT", "gpu glyph hinting", "light");
+  string bold= glyph_setting ("TEXMACS_VUE_FT_BOLD", "gpu glyph boldness", "0.22");
+  int    source= (src == "mupdf")? 1: (src == "texmacs")? 0: 2;
+  int    flags = (hint == "none")? FT_LOAD_NO_HINTING:
+                 (hint == "full")? FT_LOAD_DEFAULT: FT_LOAD_TARGET_LIGHT;
+  double b= is_double (bold)? as_double (bold): 0.22;
+  b= max (0.0, min (b, 2.0));
+  if (source == G.glyph_source && flags == G.ft_flags && b == G.ft_bold)
+    return false;
+  G.glyph_source= source; G.ft_flags= flags; G.ft_bold= b;
+  return true;
+}
+
+static void
+clear_atlas () {
+  // what is queued uses the old content
+  gpu_flush_all ();
+  G.glyphs.clear ();
+  G.fonts.clear ();
+  G.ax= 4; G.ay= 0; G.arow= 4;
+}
+
+bool
+vue_gpu_follow_glyph_settings () {
+  if (G.atlas == 0) return false; // no GPU, or not started
+  if (!read_glyph_settings ()) return false;
+  clear_atlas ();
   return true;
 }
 
@@ -1600,12 +1660,21 @@ gpu_renderer_rep::draw (int c, font_glyphs fng, SI x, SI y) {
   glyph_key k { (void*) fng.rep, c };
   auto it= G.glyphs.find (k);
   if (it == G.glyphs.end ()) {
-    // the glyph rendered by MuPDF when its font has a file, antialiased at
-    // its size and as the MuPDF renderer draws it; else the bitmap of
-    // TeXmacs, rendered at std_shrinkf times its size and shrunk
+    // the glyph of a FreeType font rendered at its size in shades of grey,
+    // made as bold as the bitmap of TeXmacs (rendered at std_shrinkf times
+    // its size in black and white and shrunk, which thickens its strokes),
+    // as the Qt port draws it, at the cost of one rasterization; or that
+    // bitmap itself (TEXMACS_VUE_GLYPHS=texmacs, and the fonts with no
+    // file); or the glyph rendered by MuPDF, as the MuPDF renderer draws it
+    // (TEXMACS_VUE_GLYPHS=mupdf: lighter)
     string mcov;
     int mw= 0, mh= 0, mx= 0, my= 0;
-    bool from_mupdf= mupdf_glyph_bitmap (fng->res_name, c, mcov, mw, mh, mx, my);
+    bool from_mupdf=
+      (G.glyph_source == 1 &&
+       mupdf_glyph_bitmap (fng->res_name, c, mcov, mw, mh, mx, my)) ||
+      (G.glyph_source == 2 &&
+       tt_glyph_coverage (fng, c, std_shrinkf, G.ft_flags, G.ft_bold,
+                          mcov, mw, mh, mx, my));
     glyph gl;
     SI xo= 0, yo= 0;
     int w, h;
@@ -1618,13 +1687,7 @@ gpu_renderer_rep::draw (int c, font_glyphs fng, SI x, SI y) {
     }
     if (w > 512 || h > 512) return;
     if (G.ax + w + 1 > ATLAS) { G.ax= 0; G.ay += G.arow + 1; G.arow= 0; }
-    if (G.ay + h + 1 > ATLAS) {
-      // full: start again (what is queued uses the old content)
-      gpu_flush_all ();
-      G.glyphs.clear ();
-      G.fonts.clear ();
-      G.ax= 4; G.ay= 0; G.arow= 4;
-    }
+    if (G.ay + h + 1 > ATLAS) clear_atlas (); // full: start again
     if (w > 0 && h > 0) {
       std::vector<unsigned char> cov ((size_t) w * h);
       if (from_mupdf) memcpy (cov.data (), &mcov[0], (size_t) w * h);

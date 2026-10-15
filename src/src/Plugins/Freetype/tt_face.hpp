@@ -56,6 +56,11 @@ tt_face load_tt_face (string name);
 // get makes its bitmap: false when the font is not a FreeType font (see
 // tt_face.cpp for the commands and the units)
 bool tt_glyph_outline (font_glyphs fng, int i, array<int>& cmds, array<double>& pts);
+// the glyph of a character of a FreeType font in shades of grey, at shrinkf
+// times less than the resolution of get (see tt_face.cpp): false when the
+// font is not a FreeType font
+bool tt_glyph_coverage (font_glyphs fng, int i, int shrinkf, int flags, double bold,
+                        string& cov, int& w, int& h, int& x0, int& y0);
 font_metric tt_font_metric (string family, int size, int hdpi, int vdpi);
 //font_glyphs tt_font_glyphs (string family, int size, int hdpi, int vdpi);
 

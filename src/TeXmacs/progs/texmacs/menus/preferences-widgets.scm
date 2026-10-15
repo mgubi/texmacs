@@ -112,6 +112,16 @@
   ("top" "Above the document")
   ("left" "At the left of the document"))
 
+(define-preference-names-and-validate "gpu glyphs"
+  ("freetype" "FreeType, as dark as Qt")
+  ("texmacs" "Bitmaps of TeXmacs, as Qt")
+  ("mupdf" "MuPDF, lighter"))
+
+(define-preference-names-and-validate "gpu glyph hinting"
+  ("light" "Light")
+  ("none" "None")
+  ("full" "Full"))
+
 (define-preference-names-and-validate "gui density"
   ("compact" "Compact")
   ("normal" "Normal")
@@ -189,6 +199,23 @@
             '("default" "0.25" "0.5" "1" "2" "3")
             (get-pretty-preference "gui scaling")
             "18em"))
+    (assuming (vue-gui?)
+      (item (text "Glyphs on the screen:")
+        (enum (set-pretty-preference "gpu glyphs" answer)
+              '("FreeType, as dark as Qt" "Bitmaps of TeXmacs, as Qt"
+                "MuPDF, lighter")
+              (get-pretty-preference "gpu glyphs")
+              "18em"))
+      (item (text "Boldness of FreeType glyphs:")
+        (enum (set-preference "gpu glyph boldness" answer)
+              '("0" "0.1" "0.22" "0.3" "0.4" "0.5" "")
+              (get-preference "gpu glyph boldness")
+              "18em"))
+      (item (text "Hinting of FreeType glyphs:")
+        (enum (set-pretty-preference "gpu glyph hinting" answer)
+              '("Light" "None" "Full")
+              (get-pretty-preference "gpu glyph hinting")
+              "18em")))
     (assuming (qt5-gui?)
       (meti (hlist // (text "Use retina fonts"))
         (toggle (set-retina-boolean-preference "retina-factor" answer)

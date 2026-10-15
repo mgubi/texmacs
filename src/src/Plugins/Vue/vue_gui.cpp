@@ -3397,6 +3397,10 @@ loop_iteration () {
   time_t t1= 0, t2= 0;
   if (dismiss_finished_wait ()) gui_needs_update= true;
   vue_follow_interface_scale (); // a change of the interface scaling
+  if (vue_gpu_follow_glyph_settings ()) { // a change of the glyphs
+    vue_simple_widget_rep::invalidate_all_editors ();
+    gui_needs_update= true;
+  }
   uint64_t t_frame= vue_now (); // the whole iteration, wait included
   static time_t last_frame= 0; // the last full frame (see frame_wanted)
   bool active= false; // an event, or something moving by itself
