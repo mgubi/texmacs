@@ -42,7 +42,8 @@
   <name|Pandoc>, a dollar opens a formula only when no space follows it,
   and closes one only when no space precedes it and no digit follows it:
   <verbatim|a price of $5 and $6> has no formula. A formula which is a
-  single symbol, such as an arrow, is written as this character.
+  single symbol, such as an arrow, is written in <LaTeX> too, as
+  <verbatim|$\\rightarrow$>, and is a formula again when it is read.
 
   <paragraph|The style for Markdown files>
 
@@ -94,7 +95,8 @@
     <item*|Code>The words after the fence are kept by <markup|md-fence>
     when the language is not one of those which <TeXmacs> highlights, or
     is not written as <TeXmacs> writes it (<verbatim|c> for
-    <verbatim|cpp>).
+    <verbatim|cpp>). A tab which starts a line of code stays a tab, as in
+    a formula, in <name|Html> and in the header.
 
     <item*|Images>An image with a description or a title is in
     <markup|md-image>; an image alone with a description and no title is a
@@ -116,8 +118,8 @@
   The other formats display the macros and leave out what they keep.
 
   What <name|Markdown> writes in several ways is written in one when it
-  is none of the above: the lines of a paragraph are joined, a tab at the
-  start of a line is spaces, a heading
+  is none of the above: the lines of a paragraph are joined (the spaces
+  and tabs which start them are not text), a heading
   with a line under it starts with <verbatim|#>, code is between
   <verbatim|```>, a rule is <verbatim|***>, emphasis is written with
   stars, a link through a definition is written with its address, and a
@@ -165,7 +167,10 @@
     box as their bullet.
 
     <item*|Code>Between lines of three backquotes or indented by four
-    spaces. The language which follows the backquotes selects the
+    spaces; a tab which starts a line goes to the next column which is a
+    multiple of four, as <name|CommonMark> says, and the columns of it
+    which the indentation of the code or of a list takes are spaces.
+    The language which follows the backquotes selects the
     environment, <markup|python-code>, <markup|scm-code>,
     <markup|cpp-code>..., and <markup|verbatim-code> otherwise.
 
@@ -233,8 +238,7 @@
 
     <item*|What does not come back>Outside the style
     <tmstyle|markdown>, a file which is written and read again
-    is not always the document it was. A formula which is a single symbol
-    is written as its character, and is text afterwards. The sizes of the
+    is not always the document it was. The sizes of the
     images come back in pixels or as parts of the paragraph, whatever
     their unit was, and a height which is neither is dropped. The headings
     start again at the first level, so that the sections of a document
