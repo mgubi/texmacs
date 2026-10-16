@@ -1695,12 +1695,36 @@
               dx-header-parts))))
 
 (define (dx-document blocks)
-  `(w:document
-     (@ (xmlns:w ,dx-ns-w) (xmlns:r ,dx-ns-r) (xmlns:m ,dx-ns-m)
-        (xmlns:wp ,dx-ns-wp))
-     (w:body
-       ,@blocks
-       ,(dx-final-section))))
+  (let* ((final (dx-final-section))
+         (refs (list-filter (ox-elements final)
+                            (lambda (y) (in? (car y) '(w:headerReference w:footerReference
+                                                       w:titlePg))))))
+    `(w:document
+       (@ (xmlns:w ,dx-ns-w) (xmlns:r ,dx-ns-r) (xmlns:m ,dx-ns-m)
+          (xmlns:wp ,dx-ns-wp))
+       (w:body
+         ,@(dx-first-section-with-headers blocks refs)
+         ,final))))
+
+(define (dx-first-section-with-headers blocks refs)
+  ;; The blocks, whose first section (when the text has several, for its
+  ;; columns) has the headers and the footers refs of the last one: a
+  ;; section without them has those of the section before, and the first
+  ;; one would have none. (Its pages are the first ones: it has the first
+  ;; page of its own too.)
+  (if (null? refs) blocks
+      (let loop ((l blocks) (acc '()))
+        (cond ((null? l) blocks)
+              ((and (func? (car l) 'w:p 1) (func? (cadr (car l)) 'w:pPr 1)
+                    (func? (cadr (cadr (car l))) 'w:sectPr))
+               (let* ((sp (cadr (cadr (car l))))
+                      (rank (lambda (y) (or (list-find-index dx-section-order
+                                                             (lambda (t) (== t (car y))))
+                                            100)))
+                      (all (append refs (list-filter (cdr sp) pair?)))
+                      (sp* `(w:sectPr ,@(sort all (lambda (a b) (< (rank a) (rank b)))))))
+                 (append (reverse acc) (list `(w:p (w:pPr ,sp*))) (cdr l))))
+              (else (loop (cdr l) (cons (car l) acc)))))))
 
 (define dx-section-order
   ;; the order of the children of w:sectPr which the format wants
@@ -1716,12 +1740,31 @@
   (list (if (func? y 'w:headerReference) "header" "footer")
         (or (ox-attr y 'w:type) "default")))
 
+(define (dx-section-with-headers sp)
+  ;; the properties sp of the last section, without a file of Word, with
+  ;; the references to the headers which were written (a first page of its
+  ;; own when it has one)
+  (let* ((refs (append-map
+                 (lambda (r)
+                   (if (not (caddr r)) '()
+                       (list `(,(if (== (car r) "header") 'w:headerReference
+                                    'w:footerReference)
+                               (@ (w:type ,(cadr r)) (r:id ,(caddr r)))))))
+                 dx-header-refs))
+         (first? (list-find dx-header-refs (lambda (r) (and (== (cadr r) "first") (caddr r)))))
+         (all (append refs (cdr sp) (if first? '((w:titlePg)) '())))
+         (rank (lambda (y) (or (list-find-index dx-section-order
+                                                (lambda (t) (== t (car y))))
+                               100))))
+    (if (null? refs) sp
+        `(w:sectPr ,@(sort all (lambda (a b) (< (rank a) (rank b))))))))
+
 (define (dx-final-section)
   ;; the properties of the last section: those of the file it was read
   ;; from, with its headers and footers (but those which were changed in
   ;; TeXmacs), and the page and the columns of the document
   (with orig (dx-package-section)
-    (if (not orig) (dx-section-properties "1")
+    (if (not orig) (dx-section-with-headers (dx-section-properties "1"))
         (let* ((mine (cdr (dx-section-properties "1")))
                (mine-tags '(w:type w:pgSz w:pgMar w:cols))
                (changed (map (lambda (r) (list (car r) (cadr r))) dx-header-refs))
@@ -1763,7 +1806,9 @@
 ;; The headers and the footers which were changed in TeXmacs (header nodes
 ;; with the attribute changed, see tmof-headers) are new parts, which the
 ;; last section names instead of those of the file; one which was removed
-;; is not named any more.
+;; is not named any more. Without a file of Word (a document of another
+;; format, or one without its file), every header of the document is a new
+;; part.
 
 (define dx-header-parts '()) ; (name place xml rels) of the new parts
 (define dx-header-refs '())  ; (place kind id) of the changed ones, id #f if removed
@@ -1790,12 +1835,44 @@
       (set! dx-rel-ids old-ids)
       (list (string-append "word/tm-" place (number->string n) ".xml") place xml rels))))
 
+(define (dx-headers-to-write l)
+  ;; the header nodes of l which are written: the changed ones, and all
+  ;; of them without a file of Word. (Word leaves the even pages without a
+  ;; header when the file has headers of their own for the even pages and
+  ;; none for this place: the one of the odd pages is then written for
+  ;; them too.)
+  (let* ((l (list-filter l (lambda (y) (and (func? y 'header)
+                                            (or (ox-attr y 'changed)
+                                                (and (not dx-package) (ox-attr y 'same)))))))
+         (place (lambda (y) (if (== (ox-attr y 'place) "footer") "footer" "header")))
+         (even? (lambda (y) (== (ox-attr y 'kind) "even")))
+         (default? (lambda (y) (not (in? (ox-attr y 'kind) '("even" "first"))))))
+    (if (or dx-package (not (list-find l (lambda (y) (and (even? y) (not (ox-attr y 'removed)))))))
+        l
+        (append l
+                (append-map
+                  (lambda (p)
+                    (with d (list-find l (lambda (y) (and (default? y) (== (place y) p))))
+                      (if (or (not d) (ox-attr d 'removed)
+                              (list-find l (lambda (y) (and (even? y) (== (place y) p)))))
+                          '()
+                          (list (apply office-node
+                                       (cons* 'header
+                                              (map (lambda (a)
+                                                     (if (eq? (car a) 'kind) (list 'kind "even")
+                                                         (list (car a) (cadr a))))
+                                                   (ox-attrs d))
+                                              (ox-children d)))))))
+                  '("header" "footer"))))))
+
 (define (dx-write-headers l)
   ;; the new parts of the headers and footers of l which were changed
+  ;; (with the file of Word, the others are its parts; without it, all
+  ;; the headers of the document are written)
   (set! dx-header-parts '())
   (set! dx-header-refs '())
-  (when dx-package
-    (for (x (list-filter l (lambda (y) (and (func? y 'header) (ox-attr y 'changed)))))
+  (begin
+    (for (x (dx-headers-to-write l))
       (let ((place (if (== (ox-attr x 'place) "footer") "footer" "header"))
             (kind (with k (ox-attr x 'kind) (if (in? k '("first" "even")) k "default"))))
         (if (ox-attr x 'removed)
@@ -2269,6 +2346,18 @@
                                             (not (in? (ox-attr y 'PartName) parts))
                                             (exists? (ox-attr y 'PartName))))))))
 
+(define (dx-kept-part n)
+  ;; the part n of the file, as it is written again: the extended
+  ;; properties (docProps/app.xml) say only the program, without the
+  ;; company, the titles of the parts and the counts of the old text
+  (if (== n "docProps/app.xml")
+      (ox-serialize
+        `(Properties
+           (@ (xmlns "http://schemas.openxmlformats.org/officeDocument/2006/extended-properties")
+              (xmlns:vt "http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes"))
+           (Application "TeXmacs")))
+      (ahash-ref dx-package n)))
+
 (tm-define (serialize-docx-document x)
   (:type (-> stree string))
   (:synopsis "Write the office tree @x as a Word document, a zip archive")
@@ -2414,7 +2503,7 @@
                 (map (lambda (h) (ox-serialize (caddr h))) dx-header-parts)
                 (map (lambda (h) (ox-serialize (dx-relations (cadddr h))))
                      (list-filter dx-header-parts (lambda (h) (pair? (cadddr h)))))
-                (map (lambda (n) (ahash-ref dx-package n)) kept)))))
+                (map dx-kept-part kept)))))
     (set! dx-rels '())
     (set! dx-note-rels '())
     (set! dx-rel-ids (make-ahash-table))

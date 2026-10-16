@@ -4844,6 +4844,254 @@
   (check-false (office-metafile->png "" "a.emf")))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Re-audit of the fifth audit: headers, LibreOffice, properties
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (audit6-docx)
+  ;; a Word document whose text is in 12 pt, with a header in 16 pt,
+  ;; centred, a first page of its own (header and footer) and properties
+  (zip-pack
+    '("[Content_Types].xml" "_rels/.rels" "word/document.xml"
+      "word/_rels/document.xml.rels" "word/styles.xml" "word/header1.xml"
+      "word/header2.xml" "word/footer1.xml" "word/footer2.xml" "docProps/app.xml")
+    (list "<Types/>"
+          (string-append
+            "<Relationships xmlns='http://schemas.openxmlformats.org/package/2006/relationships'>"
+            "<Relationship Id='rId1' Type='" audit5-rel "officeDocument' Target='word/document.xml'/>"
+            "<Relationship Id='rId2' Type='" audit5-rel "extended-properties' Target='docProps/app.xml'/>"
+            "</Relationships>")
+          (string-append "<?xml version='1.0'?><w:document" docx-ns "><w:body>"
+                         (wp (wr "Body text")) (wp (wr "More text"))
+                         "<w:sectPr><w:headerReference w:type='default' r:id='rH1'/>"
+                         "<w:headerReference w:type='first' r:id='rH2'/>"
+                         "<w:footerReference w:type='default' r:id='rF1'/>"
+                         "<w:footerReference w:type='first' r:id='rF2'/>"
+                         "<w:pgSz w:w='11906' w:h='16838'/><w:titlePg/></w:sectPr>"
+                         "</w:body></w:document>")
+          (string-append
+            "<Relationships xmlns='http://schemas.openxmlformats.org/package/2006/relationships'>"
+            "<Relationship Id='rH1' Type='" audit5-rel "header' Target='header1.xml'/>"
+            "<Relationship Id='rH2' Type='" audit5-rel "header' Target='header2.xml'/>"
+            "<Relationship Id='rF1' Type='" audit5-rel "footer' Target='footer1.xml'/>"
+            "<Relationship Id='rF2' Type='" audit5-rel "footer' Target='footer2.xml'/>"
+            "</Relationships>")
+          (string-append
+            "<w:styles" docx-ns ">"
+            "<w:style w:type='paragraph' w:default='1' w:styleId='Normal'>"
+            "<w:name w:val='Normal'/><w:rPr><w:sz w:val='24'/></w:rPr></w:style>"
+            "</w:styles>")
+          (string-append "<w:hdr" docx-ns "><w:p><w:pPr><w:jc w:val='center'/></w:pPr>"
+                         (wr "Big head" "<w:sz w:val='32'/>") "</w:p></w:hdr>")
+          (string-append "<w:hdr" docx-ns ">" (wp (wr "First head")) "</w:hdr>")
+          (string-append "<w:ftr" docx-ns ">" (wp (wr "Usual foot")) "</w:ftr>")
+          (string-append "<w:ftr" docx-ns ">" (wp (wr "First foot")) "</w:ftr>")
+          (string-append "<Properties xmlns='http://schemas.openxmlformats.org/officeDocument/"
+                         "2006/extended-properties'><Company>Secret Corp</Company>"
+                         "<TitlesOfParts>Old title</TitlesOfParts></Properties>"))))
+
+(define (audit6-without doc keys)
+  ;; the document doc without the variables keys of its initial environment
+  (map (lambda (x)
+         (if (not (func? x 'initial)) x
+             `(initial (collection ,@(list-filter (cdr (cadr x))
+                                                  (lambda (a) (nin? (cadr a) keys)))))))
+       doc))
+
+(define (audit6-tm-reload doc)
+  ;; the document doc, saved as a .tm file and read again
+  (convert (convert (cons* 'document '(TeXmacs "2.1") (cdr doc))
+                    "texmacs-stree" "texmacs-document")
+           "texmacs-document" "texmacs-stree"))
+
+(define (test-office-audit-6-headers)
+  (check-group "headers after the re-audit")
+  (let* ((z (audit6-docx))
+         (doc (convert z "docx-document" "texmacs-stree"))
+         (export (lambda (d) (convert d "texmacs-stree" "docx-document")))
+         (refs (lambda (z) (archive-entry z "word/document.xml")))
+         (tm-part? (lambda (z) (list-find (archive-names* z)
+                                          (lambda (n) (string-starts? n "word/tm-"))))))
+    ;; an unedited header of a file whose text is not in 10 pt is not
+    ;; rewritten (the header was converted with the size of the file)
+    (with z0 (export doc)
+      (check-false (tm-part? z0))
+      (check-true (in? "word/header1.xml" (archive-names* z0)))
+      (check-true (export-has? (refs z0) "<w:headerReference w:type=\"first\""))
+      (check-true (export-has? (refs z0) "<w:titlePg/>")))
+    ;; also after another file of another base size
+    (convert (docx-archive (wp (wr "plain"))) "docx-document" "texmacs-stree")
+    (check-false (tm-part? (export (convert z "docx-document" "texmacs-stree"))))
+    ;; a paragraph put before the headers of the first page: they are kept
+    (for (d (list doc (audit6-tm-reload doc)))
+      (let* ((d1 (doc-set-body d (lambda (l) (cons "A new first paragraph" l))))
+             (z1 (export d1)))
+        (check-false (tm-part? z1))
+        (check-true (export-has? (refs z1) "<w:headerReference w:type=\"first\""))
+        (check-true (export-has? (refs z1) "<w:footerReference w:type=\"first\""))
+        (check-true (export-has? (refs z1) "<w:titlePg/>"))
+        (check-true (export-has? (refs z1) "A new first paragraph"))))
+    ;; text typed in the paragraph of the markers, and a title above
+    (let* ((d1 (doc-set-body doc (lambda (l)
+                                   (cons* '(doc-title "Title")
+                                          `(concat "Typed " ,(car l)) (cdr l)))))
+           (z1 (export d1)))
+      (check-false (tm-part? z1))
+      (check-true (export-has? (refs z1) "<w:headerReference w:type=\"first\"")))
+    ;; markers which are not found any more: the headers of the first page
+    ;; are those of the file
+    (let* ((d1 (doc-set-body doc (lambda (l)
+                                   (list-filter l (lambda (b)
+                                                    (not (or (func? b 'set-this-page-header)
+                                                             (func? b 'set-this-page-footer))))))))
+           (z1 (export d1)))
+      (check-true (export-has? (refs z1) "<w:headerReference w:type=\"first\""))
+      (check-true (export-has? (refs z1) "<w:titlePg/>")))
+    ;; an empty header of the first page is a header removed
+    (let* ((d1 (doc-set-body doc (lambda (l)
+                                   (map (lambda (b) (if (func? b 'set-this-page-header)
+                                                        '(set-this-page-header "") b))
+                                        l))))
+           (z1 (export d1)))
+      (check-false (export-has? (refs z1) "<w:headerReference w:type=\"first\""))
+      (check-true (export-has? (refs z1) "<w:footerReference w:type=\"first\"")))
+    ;; without the file (the advice of the manual for privacy): every
+    ;; header and footer is written from TeXmacs
+    (let* ((d1 (audit6-without doc '("office-package" "office-original")))
+           (z1 (export d1))
+           (names (archive-names* z1))
+           (parts (list-filter names (lambda (n) (string-starts? n "word/tm-"))))
+           (all (apply string-append (map (lambda (n) (archive-entry z1 n)) parts))))
+      (check= (length parts) 4)
+      (check-true (export-has? all "Big head"))
+      (check-true (export-has? all "First head"))
+      (check-true (export-has? all "Usual foot"))
+      (check-true (export-has? all "First foot"))
+      (check-true (export-has? (refs z1) "<w:headerReference w:type=\"first\""))
+      (check-true (export-has? (refs z1) "<w:footerReference w:type=\"default\""))
+      (check-true (export-has? (refs z1) "<w:titlePg/>"))
+      (check-true (export-has? (archive-entry z1 "[Content_Types].xml") "/word/tm-header1.xml"))
+      (check-false (export-has? (object->string (archive-entry z1 "word/_rels/document.xml.rels"))
+                                "header1.xml\""))
+      (with back (convert z1 "docx-document" "texmacs-stree")
+        (check-true (export-has? (object->string (doc-initial back "page-odd-header")) "Big head"))
+        (check-true (export-has? (object->string back) "(set-this-page-footer \"First foot\")"))))
+    ;; a document of the style office saved before office-original: the
+    ;; headers of its file, as before
+    (with z1 (export (audit6-without doc '("office-original")))
+      (check-false (tm-part? z1))
+      (check-true (export-has? (refs z1) "<w:headerReference w:type=\"first\"")))
+    ;; in the other format: all the headers, the first page too
+    (let* ((o (convert doc "texmacs-stree" "odt-document"))
+           (st (archive-entry o "styles.xml")))
+      (check-true (export-has? st "<style:header>"))
+      (check-true (export-has? st "Big head"))
+      (check-true (export-has? st "<style:header-first>"))
+      (check-true (export-has? st "First head"))
+      (check-true (export-has? st "<style:footer>"))
+      (check-true (export-has? st "First foot"))
+      (check-true (export-has? st "<style:header-style>"))
+      (with back (convert o "odt-document" "texmacs-stree")
+        (check-true (export-has? (object->string (doc-initial back "page-odd-footer")) "Usual foot"))
+        (check-true (export-has? (object->string back) "(set-this-page-header \"First head\")"))))
+    ;; the extended properties of the file: no company, no old titles
+    (let* ((z0 (export doc))
+           (app (archive-entry z0 "docProps/app.xml")))
+      (check-true (string? app))
+      (check-true (export-has? app "<Application>TeXmacs</Application>"))
+      (check-false (export-has? app "Secret Corp"))
+      (check-false (export-has? app "Old title"))))
+  ;; an OpenDocument file with headers of its own for the even pages,
+  ;; written for Word: the footer of the odd pages is on the even ones
+  (let* ((z (zip-pack
+              '("mimetype" "content.xml" "styles.xml")
+              (list "application/vnd.oasis.opendocument.text"
+                    (string-append "<?xml version='1.0'?><office:document-content" odt-ns ">"
+                                   "<office:body><office:text><text:p>Text</text:p>"
+                                   "</office:text></office:body></office:document-content>")
+                    (string-append "<office:document-styles" odt-ns "><office:styles/>"
+                                   "<office:master-styles><style:master-page style:name='Standard'>"
+                                   "<style:header><text:p>Odd head</text:p></style:header>"
+                                   "<style:header-left><text:p>Even head</text:p></style:header-left>"
+                                   "<style:footer><text:p>The foot</text:p></style:footer>"
+                                   "</style:master-page></office:master-styles>"
+                                   "</office:document-styles>"))))
+         (w (convert (convert z "odt-document" "texmacs-stree") "texmacs-stree" "docx-document"))
+         (text (archive-entry w "word/document.xml"))
+         (parts (list-filter (archive-names* w) (lambda (n) (string-starts? n "word/tm-footer")))))
+    (check-true (export-has? text "<w:headerReference w:type=\"even\""))
+    (check-true (export-has? text "<w:footerReference w:type=\"even\""))
+    (check-true (export-has? text "<w:footerReference w:type=\"default\""))
+    (check= (length parts) 2)
+    (check-true (export-has? (archive-entry w "word/settings.xml") "<w:evenAndOddHeaders/>")))
+  ;; a document of TeXmacs with headers, without any file
+  (let* ((d '(document (TeXmacs "2.1") (style "generic")
+                       (body (document "Text"))
+                       (initial (collection (associate "page-odd-header" "My head")))))
+         (w (convert d "texmacs-stree" "docx-document")))
+    (check-true (export-has? (archive-entry w "word/document.xml")
+                             "<w:headerReference w:type=\"default\""))
+    (check-true (export-has? (archive-entry w "word/tm-header1.xml") "My head"))
+    (check-true (export-has? (archive-entry (convert d "texmacs-stree" "odt-document")
+                                            "styles.xml")
+                             "My head")))
+  ;; a text in sections (for columns): the first section has the headers
+  ;; too, since a section without them has those of the section before
+  (let* ((d '(document (TeXmacs "2.1") (style "generic")
+                       (body (document "Text" (office-columns "2" (document "a" "b")) "End"))
+                       (initial (collection (associate "page-odd-header" "My head")))))
+         (text (archive-entry (convert d "texmacs-stree" "docx-document") "word/document.xml"))
+         (i (string-search-forwards "<w:sectPr>" 0 text)))
+    (check-true (>= i 0))
+    (check-true (>= (string-search-forwards "<w:sectPr>" (+ i 1) text) 0))
+    (check-true (text-before? (substring text i (string-length text))
+                              "<w:headerReference" "</w:sectPr>"))))
+
+(define (audit6-alive? pid)
+  (== (string-replace (eval-system (string-append "kill -0 " pid " 2> /dev/null && echo alive"))
+                      "\n" "")
+      "alive"))
+
+(define (test-office-audit-6-soffice)
+  (check-group "LibreOffice stopped with its children")
+  ;; a LibreOffice which hangs in a child (soffice.bin, started by the
+  ;; launcher soffice) is stopped with it
+  (when (not (os-win32?))
+    (let* ((dir (url-temp))
+           (fake (url-append dir "soffice"))
+           (pidf (url-append dir "child.pid"))
+           (groups (list-filter (list (and (url-exists-in-path? "setsid") "setsid")
+                                      (and (url-exists-in-path? "perl") "perl"))
+                                identity)))
+      (system-mkdir dir)
+      (string-save (string-append "#!/bin/sh\nsleep 300 &\necho $! > '"
+                                  (url->system pidf) "'\nwait\n")
+                   fake)
+      (eval-system (string-append "chmod +x '" (url->system fake) "'"))
+      (check-true (pair? groups))
+      (for (g groups)
+        (when (url-exists? pidf) (system-remove pidf))
+        (let* ((t0 (texmacs-time))
+               (_ (eval-system (office-soffice-command (url->system fake) '("--headless")
+                                                       2 #f g)))
+               (ms (- (texmacs-time) t0))
+               (pid (and (url-exists? pidf) (string-replace (string-load pidf) "\n" ""))))
+          (check-true (< ms 30000))
+          (check-true (string? pid))
+          (when (string? pid)
+            (check-false (audit6-alive? pid))
+            ;; (our own child, if it was left)
+            (when (audit6-alive? pid) (eval-system (string-append "kill -9 " pid))))))
+      ;; a LibreOffice which ends in time is not waited for
+      (let* ((t0 (texmacs-time))
+             (_ (eval-system (office-soffice-command "true" '() 60 #f (car groups)))))
+        (check-true (< (- (texmacs-time) t0) 20000)))
+      (for (u (list fake pidf)) (when (url-exists? u) (system-remove u)))
+      (system-rmdir dir)))
+  ;; the command with GNU timeout, which stops the group itself
+  (check-true (string-starts? (office-soffice-command "soffice" '("a b") 5 "timeout" #f)
+                              "'timeout' -s KILL 5 'soffice' 'a b'")))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The formats
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -4941,5 +5189,7 @@
   (test-office-nested-fields)
   (test-office-comment-ranges)
   (test-office-audit-5-misc)
+  (test-office-audit-6-headers)
+  (test-office-audit-6-soffice)
   (test-formats)
   (check-end))

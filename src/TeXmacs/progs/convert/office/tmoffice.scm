@@ -2807,34 +2807,72 @@
                  b)))
          blocks)))
 
+;; The page breaks after which a header at the start of the body is no
+;; longer one of the first page
+(define tmof-page-breaks '(new-page new-page* page-break page-break* pagebreak
+                           new-dpage new-dpage* next-page))
+
 (define (tmof-first-headers body)
-  ;; the headers and the footers of the first page, at the start of the body
-  (let loop ((l (if (func? body 'document) (cdr body) '())) (acc '()))
-    (cond ((null? l) acc)
-          ((func? (car l) 'set-this-page-header 1)
-           (loop (cdr l) (cons (cons "first-header" (cadar l)) acc)))
-          ((func? (car l) 'set-this-page-footer 1)
-           (loop (cdr l) (cons (cons "first-footer" (cadar l)) acc)))
-          (else acc))))
+  ;; the headers and the footers of the first page: the markers which the
+  ;; conversion puts at the start of the body, looked for in the blocks of
+  ;; the first page (a title or a paragraph may have been put before them,
+  ;; or the text typed before them may be in their paragraph)
+  (let ((acc '()) (n 0))
+    (define (add! key v)
+      (when (not (assoc key acc)) (set! acc (cons (cons key v) acc))))
+    (define (scan t)
+      ;; #f at a page break, so that the search stops there
+      (cond ((not (pair? t)) #t)
+            ((in? (car t) tmof-page-breaks) #f)
+            ((func? t 'set-this-page-header 1) (add! "first-header" (cadr t)) #t)
+            ((func? t 'set-this-page-footer 1) (add! "first-footer" (cadr t)) #t)
+            ((in? (car t) '(concat document with surround))
+             (let loop ((l (cdr t)))
+               (cond ((null? l) #t)
+                     ((scan (car l)) (loop (cdr l)))
+                     (else #f))))
+            (else #t)))
+    (let loop ((l (if (func? body 'document) (cdr body) '())))
+      (set! n (+ n 1))
+      (when (and (pair? l) (< n 200) (scan (car l)))
+        (loop (cdr l))))
+    (reverse acc)))
 
 (define (tmof-headers init body)
-  ;; the headers and the footers which were changed, as header nodes with
-  ;; the attribute changed (and removed when there is none any more)
-  (if (not tmof-originals) '()
-      (let* ((first (tmof-first-headers body))
-             (cur (lambda (key)
-                    (with v (if (string-starts? key "first-") (assoc-ref first key)
-                                (assoc-ref init key))
-                      (and v (not (tmof-same? v "")) v))))
-             (orig (lambda (key) (with v (assoc-ref tmof-originals key)
-                                   (and v (not (tmof-same? v "")) v))))
-             (node (lambda (place kind v)
-                     (if v
-                         (apply office-node
-                                (cons* 'header `((place ,place) (kind ,kind) (changed "true"))
-                                       (tmof-header-blocks v)))
-                         (office-node 'header `((place ,place) (kind ,kind)
-                                                (changed "true") (removed "true")))))))
+  ;; The headers and the footers of the document, as header nodes. A
+  ;; document read from a file has those of the file in office-original:
+  ;; the ones which were changed have the attribute changed (and removed
+  ;; when there is none any more), the others the attribute same. The
+  ;; writer of the format of the file writes only the changed ones (the
+  ;; others are the parts of the file); the writer of the other format, or
+  ;; both without the file (office-package and office-original removed for
+  ;; privacy), write all of them. A document of the style office which was
+  ;; saved before office-original existed keeps the headers of its file.
+  (let* ((package? (pair? (tmof-package init)))
+         (first (tmof-first-headers body))
+         (orig (lambda (key)
+                 (with v (and tmof-originals (assoc-ref tmof-originals key))
+                   (and v (not (tmof-same? v "")) v))))
+         (cur (lambda (key)
+                (with v (if (string-starts? key "first-")
+                            ;; (markers not found: the header of the first
+                            ;; page is taken as unchanged, not removed)
+                            (with p (assoc key first)
+                              (if p (cdr p) (orig key)))
+                            (assoc-ref init key))
+                  (and v (not (tmof-same? v "")) v))))
+         (node (lambda (place kind v how)
+                 (if v
+                     (apply office-node
+                            (cons* 'header `((place ,place) (kind ,kind) (,how "true"))
+                                   (tmof-header-blocks v)))
+                     (office-node 'header `((place ,place) (kind ,kind)
+                                            (changed "true") (removed "true"))))))
+         (one (lambda (place kind v changed?)
+                (cond (changed? (list (node place kind v 'changed)))
+                      (v (list (node place kind v 'same)))
+                      (else '())))))
+    (if (and package? (not tmof-originals)) '()
         (append-map
           (lambda (place)
             (let* ((odd (string-append "page-odd-" place))
@@ -2842,16 +2880,19 @@
                    (fst (string-append "first-" place))
                    ;; (without a header of the even pages, they have the
                    ;; one of the odd pages)
-                   (even-before (or (orig even) (orig odd))))
+                   (even-before (if tmof-originals (or (orig even) (orig odd)) (cur odd)))
+                   (even-same? (or (tmof-same? (cur even) (cur odd))
+                                   (and (not (cur even)) (not (orig even))))))
               (append
-                (if (tmof-same? (cur odd) (orig odd)) '()
-                    (list (node place "default" (cur odd))))
-                (if (or (tmof-same? (cur even) even-before)
-                        (and (not (orig even)) (tmof-same? (cur even) (cur odd))))
+                (one place "default" (cur odd)
+                     (if tmof-originals (not (tmof-same? (cur odd) (orig odd))) (cur odd)))
+                (if (and even-same? (or (not tmof-originals) (not (orig even))))
                     '()
-                    (list (node place "even" (cur even))))
-                (if (tmof-same? (cur fst) (orig fst)) '()
-                    (list (node place "first" (cur fst)))))))
+                    (one place "even" (cur even)
+                         (if tmof-originals (not (tmof-same? (cur even) even-before))
+                             (cur even))))
+                (one place "first" (cur fst)
+                     (if tmof-originals (not (tmof-same? (cur fst) (orig fst))) (cur fst))))))
           '("header" "footer")))))
 
 (define (tmof-styles init)

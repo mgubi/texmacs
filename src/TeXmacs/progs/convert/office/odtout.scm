@@ -1799,7 +1799,11 @@
   ;; the names of the automatic styles of styles.xml
   (set! ot-headers '())
   (set! ot-header-styles '())
-  (for (x (list-filter l (lambda (y) (and (func? y 'header) (ox-attr y 'changed)))))
+  ;; (with the file of OpenDocument, the others are its headers; without
+  ;; it, all the headers of the document are written)
+  (for (x (list-filter l (lambda (y) (and (func? y 'header)
+                                          (or (ox-attr y 'changed)
+                                              (and (not ot-package) (ox-attr y 'same)))))))
     (let* ((tag (ot-header-tag x))
            (place (if (== (ox-attr x 'place) "footer") "Footer" "Header")))
       (cond ((not (ox-attr x 'removed))
@@ -1937,7 +1941,7 @@
   ;; its pages with their headers and footers, its fonts, with those of
   ;; TeXmacs which it does not have, and the page of the document.
   (with root (ot-package-xml "styles.xml")
-    (if (not root) mine
+    (if (not root) (ot-own-styles-with-headers mine)
         (let* ((names (lambda (x tag)
                         (map (lambda (y) (or (ox-attr y 'style:name) ""))
                              (if x (ox-elements x) '()))))
@@ -2012,6 +2016,46 @@
                                        (ox-children x))))
                             (else x)))))
           (cons (car root) (map fix (cdr root)))))))
+
+(define (ot-own-styles-with-headers mine)
+  ;; the styles of TeXmacs (without a file of OpenDocument), with the
+  ;; headers of the document on the first page; its layout leaves some
+  ;; space below the header and above the footer
+  (if (null? ot-headers) mine
+      (let* ((tags (map car ot-headers))
+             (header? (list-find tags (lambda (t) (in? t '(style:header style:header-left
+                                                           style:header-first)))))
+             (footer? (list-find tags (lambda (t) (in? t '(style:footer style:footer-left
+                                                           style:footer-first)))))
+             (fix-layout
+               (lambda (l)
+                 (if (not (func? l 'style:page-layout)) l
+                     `(style:page-layout
+                        (@ ,@(ox-attrs l))
+                        ,@(ox-children l)
+                        ,@(if header?
+                              '((style:header-style
+                                  (style:header-footer-properties
+                                    (@ (fo:min-height "0cm") (fo:margin-bottom "0.5cm")))))
+                              '())
+                        ,@(if footer?
+                              '((style:footer-style
+                                  (style:header-footer-properties
+                                    (@ (fo:min-height "0cm") (fo:margin-top "0.5cm")))))
+                              '())))))
+             (fix (lambda (x)
+                    (cond ((func? x 'office:automatic-styles)
+                           `(office:automatic-styles (@ ,@(ox-attrs x))
+                                                     ,@(map fix-layout (ox-children x))
+                                                     ,@ot-header-styles))
+                          ((func? x 'office:master-styles)
+                           `(office:master-styles
+                              (@ ,@(ox-attrs x))
+                              ,@(map (lambda (y) (if (func? y 'style:master-page)
+                                                     (ot-master-with-headers y) y))
+                                     (ox-children x))))
+                          (else x)))))
+        (cons (car mine) (map fix (cdr mine))))))
 
 (define (odt-standard-master root)
   ;; the first page of the styles root
@@ -2091,15 +2135,14 @@
                      '((text:p (@ (text:style-name "Text_20_body"))))
                      blocks))
          (content (ot-with-data-styles (ot-content blocks)))
-         (_ (when ot-package
-              (with root (ot-package-xml "styles.xml")
-                (ot-write-headers
-                  (if (func? x 'office) (cdr x) '())
-                  (append
-                    (map (lambda (y) (or (ox-attr y 'style:name) ""))
-                         (append (ox-elements (or (ox-child root 'office:automatic-styles) '(x)))
-                                 (ox-elements (or (ox-child root 'office:styles) '(x)))))
-                    '())))))
+         (_ (with root (or (ot-package-xml "styles.xml") (ot-styles-file))
+              (ot-write-headers
+                (if (func? x 'office) (cdr x) '())
+                (append
+                  (map (lambda (y) (or (ox-attr y 'style:name) ""))
+                       (append (ox-elements (or (ox-child root 'office:automatic-styles) '(x)))
+                               (ox-elements (or (ox-child root 'office:styles) '(x)))))
+                  '()))))
          (content-xml (ox-serialize content))
          (styles-xml (ox-serialize (ot-complete-styles (ot-merged-styles (ot-styles-file)))))
          ;; (a picture of the file which the text and the styles do not

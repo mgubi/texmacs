@@ -2151,6 +2151,20 @@
               (lambda ()
                 (let* ((setup (list-find l (lambda (y) (func? y 'setup))))
                        (package (list-find l (lambda (y) (func? y 'package))))
+                       ;; (the base size, font, alignment and style of the
+                       ;; file are set before the headers are converted, so
+                       ;; that the headers and their copy in office-original
+                       ;; are made alike: otherwise an unedited header was
+                       ;; taken as edited)
+                       (base (begin
+                               (set! oftm-align
+                                     (or (and setup (ox-attr setup 'align)) "justify"))
+                               (set! oftm-body-style (and setup (ox-attr setup 'body-style)))
+                               (set! oftm-base-size
+                                     (or (and setup (office-number (ox-attr setup 'font-size)))
+                                         10.0))
+                               (set! oftm-base-font (and setup (ox-attr setup 'font)))
+                               #t))
                        (headers (oftm-headers l))
                        (env (if setup (oftm-setup setup) '()))
                        (env (append env (car headers)))
@@ -2164,11 +2178,6 @@
                                 (append env `(("office-body-style"
                                                ,(ox-attr setup 'body-style))))
                                 env)))
-                  (set! oftm-align (or (and setup (ox-attr setup 'align)) "justify"))
-                  (set! oftm-body-style (and setup (ox-attr setup 'body-style)))
-                  (set! oftm-base-size
-                        (or (and setup (office-number (ox-attr setup 'font-size))) 10.0))
-                  (set! oftm-base-font (and setup (ox-attr setup 'font)))
                   (for-each oftm-scan-labels l)
                   ;; (the pictures of Windows, converted all at once)
                   (with pics (oftm-metafiles l)
@@ -2205,4 +2214,6 @@
       (set! oftm-styles (make-ahash-table))
       (set! oftm-title-styles '())
       (set! oftm-body-style #f)
+      (set! oftm-base-size 10.0)
+      (set! oftm-base-font #f)
       r)))

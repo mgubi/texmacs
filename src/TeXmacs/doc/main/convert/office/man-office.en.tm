@@ -67,7 +67,9 @@
     often have are made images by <name|LibreOffice>, when it is installed,
     and are a frame with their name else: all the pictures of a file are
     converted at once, a picture which is there several times once, and a
-    <name|LibreOffice> which does not answer within two minutes is stopped.
+    <name|LibreOffice> which does not answer within two minutes is stopped
+    (under <name|Windows>, the conversion waits for it 30 seconds only,
+    and the pictures which it has not made by then are frames).
     It has a profile of its own, in <verbatim|system/office-profile> of the
     home directory of <TeXmacs>.
 
@@ -122,11 +124,13 @@
 
     <item*|Headers and footers>They are the headers and footers of the
     pages of the document, with the number of the page; those of the
-    first page are at the start of the text. A header or a footer which
-    was changed in <TeXmacs> is written instead of the one of the file, as
-    one paragraph, centered or on the right when it starts with a tab
-    (and ends with one); one which was removed is not written. The others
-    are those of the file, as they were.
+    first page are at the start of the text (a paragraph may be put
+    before them). A header or a footer which was changed in <TeXmacs> is
+    written instead of the one of the file, as one paragraph, centered or
+    on the right when it starts with a tab (and ends with one); one which
+    was removed is not written. The others are those of the file, as they
+    were. In a file of the other format, or without the file (see below),
+    every header and footer is written from <TeXmacs>, in this way.
 
     <item*|Fields>A field (a page number, a date, the title of the
     document, a citation of <name|Zotero>) is <markup|office-field>, which
@@ -174,7 +178,12 @@
     Since the whole file is kept, a <TeXmacs> document of the style
     <tmstyle|office>, saved as a <verbatim|.tm> file, also holds what was
     deleted from it in <TeXmacs>: the old text, comments and pictures, and
-    the properties of the file (its author...). Send the <name|Word> or
+    the properties of the file (its author...). The <name|Word> or
+    <name|OpenDocument> file which <TeXmacs> writes keeps the properties of
+    the file too (<verbatim|docProps/core.xml> or <verbatim|meta.xml>:
+    title, author, dates; the authors of the comments and the changes), but
+    not the company and the titles of its parts
+    (<verbatim|docProps/app.xml>). Send the <name|Word> or
     <name|OpenDocument> file which <TeXmacs> writes rather than the
     <verbatim|.tm> file when that matters, or remove the variables
     <verbatim|office-package> and <verbatim|office-original> from the

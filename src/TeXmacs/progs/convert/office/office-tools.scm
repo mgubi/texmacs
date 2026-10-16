@@ -597,20 +597,59 @@
 
 (define office-soffice-timeout 120) ; seconds, after which LibreOffice is stopped
 
+(define (office-timeout-program)
+  ;; the program timeout of GNU coreutils (gtimeout with Homebrew), or #f
+  (cond ((url-exists-in-path? "timeout") "timeout")
+        ((url-exists-in-path? "gtimeout") "gtimeout")
+        (else #f)))
+
+(define (office-group-launcher)
+  ;; a way of starting a command in a process group of its own, or #f
+  (cond ((url-exists-in-path? "setsid") "setsid")
+        ((url-exists-in-path? "perl") "perl")
+        (else #f)))
+
+(tm-define (office-soffice-command prog args secs timeout group)
+  (:synopsis "The command of the shell which runs @prog with @args for @secs seconds at most")
+  ;; Runs LibreOffice (prog) with the words args, without input, and stops
+  ;; it when it takes longer than secs seconds, so that a LibreOffice which
+  ;; hangs does not stop the conversion. The launcher soffice starts
+  ;; soffice.bin as a child (oosplash under Linux), so the whole process
+  ;; group is stopped: GNU timeout (the program timeout, if not #f) does
+  ;; so; otherwise LibreOffice is started in a process group of its own
+  ;; (group: "setsid", or "perl" for its setpgrp), which is killed (kill -9
+  ;; -- -pgid) after the time, and also when the launcher ended and left a
+  ;; child behind; without either, only the launcher can be stopped. The
+  ;; watcher is stopped with its sleep when LibreOffice ends in time.
+  ;; Under Windows, eval-system waits at most 30 seconds for the command,
+  ;; and does not stop it (windows64_system.cpp): LibreOffice may still
+  ;; run after it.
+  (let* ((cmd (apply string-append
+                     (cons (office-quote prog)
+                           (map (lambda (a) (string-append " " (office-quote a))) args))))
+         (secs (number->string secs))
+         (launch (cond ((== group "setsid") "setsid ")
+                       ((== group "perl") "perl -e 'setpgrp(0,0); exec @ARGV' ")
+                       (else "")))
+         (target (if group "-- -$p" "$p")))
+    (cond ((os-win32?) cmd)
+          (timeout
+           (string-append (office-quote timeout) " -s KILL " secs " " cmd
+                          " < /dev/null > /dev/null 2>&1; true"))
+          (else
+           (string-append launch cmd " < /dev/null > /dev/null 2>&1 & p=$!; "
+                          "( trap 'kill $s; exit' TERM; sleep " secs " & s=$!; wait $s; "
+                          "kill -9 " target " ) > /dev/null 2>&1 < /dev/null & w=$!; "
+                          "wait $p; "
+                          (if group "kill -9 -- -$p > /dev/null 2>&1; " "")
+                          "kill $w > /dev/null 2>&1; true")))))
+
 (define (office-soffice-run prog args)
-  ;; runs LibreOffice with the words args, without input, and stops it
-  ;; (by its process number) when it takes longer than the timeout: a
-  ;; LibreOffice which hangs does not stop the conversion
-  (with cmd (apply string-append
-                   (cons (office-quote prog)
-                         (map (lambda (a) (string-append " " (office-quote a))) args)))
-    (if (os-win32?)
-        (eval-system cmd)
-        (eval-system
-          (string-append cmd " < /dev/null > /dev/null 2>&1 & p=$!; "
-                         "( sleep " (number->string office-soffice-timeout)
-                         "; kill -9 $p ) > /dev/null 2>&1 < /dev/null & w=$!; "
-                         "wait $p; kill $w > /dev/null 2>&1; true")))))
+  (eval-system
+    (if (os-win32?) (office-soffice-command prog args office-soffice-timeout #f #f)
+        (with timeout (office-timeout-program)
+          (office-soffice-command prog args office-soffice-timeout timeout
+                                  (and (not timeout) (office-group-launcher)))))))
 
 (tm-define (office-metafile? name)
   (:synopsis "Whether the file @name is a picture of Windows (EMF, WMF)")
@@ -619,58 +658,92 @@
          (or (string-ends? n ".emf") (string-ends? n ".wmf")))))
 
 ;; The PNG of each picture, by its bytes: a picture which a file has many
-;; times, or which is read again, is converted once (#f when it could not)
+;; times, or which is read again, is converted once. The cache is emptied
+;; before a file when it has office-metafile-cache-size pictures. A picture
+;; which could not be converted is not tried again during the conversion
+;; of the same file (office-metafile-failed, emptied by each call of
+;; office-metafiles->png, that is for each file): LibreOffice, installed
+;; later or which hung, is tried again for the next file.
 (define office-metafile-cache (make-ahash-table))
+(define office-metafile-count 0)
+(define office-metafile-cache-size 256)
+(define office-metafile-failed (make-ahash-table))
 
-(tm-define (office-metafiles->png l)
-  (:synopsis "Convert the pictures of Windows l, a list of (data name), at once")
-  ;; with one LibreOffice for all of them, the PNG of each in the cache
+(define (office-metafile-remember data png)
+  (ahash-set! office-metafile-cache data png)
+  (set! office-metafile-count (+ office-metafile-count 1)))
+
+(define (office-metafiles-convert l)
+  ;; the conversion of the pictures l, a list of (data name), at once
   (let* ((prog (office-soffice))
          (todo (let loop ((l l) (acc '()) (seen (make-ahash-table)))
                  (cond ((null? l) (reverse acc))
                        ((or (not (string? (caar l))) (== (caar l) "")
                             (ahash-ref office-metafile-cache (caar l))
+                            (ahash-ref office-metafile-failed (caar l))
                             (ahash-ref seen (caar l)))
                         (loop (cdr l) acc seen))
                        (else (ahash-set! seen (caar l) #t)
                              (loop (cdr l) (cons (car l) acc) seen))))))
-    (when (and prog (pair? todo))
-      (catch #t
-        (lambda ()
-          (let* ((dir (url-temp))
-                 (profile (url-append (url-expand "$TEXMACS_HOME_PATH")
-                                      "system/office-profile"))
-                 (files (map (lambda (x i)
-                               (let* ((suffix (if (string-ends? (locase-all (cadr x)) ".wmf")
-                                                  ".wmf" ".emf"))
-                                      (base (string-append "picture" (number->string i))))
-                                 (list (car x) (url-append dir (string-append base suffix))
-                                       (url-append dir (string-append base ".png")))))
-                             todo (iota (length todo)))))
-            (system-mkdir dir)
-            (for (f files) (string-save (car f) (cadr f)))
-            (office-soffice-run
-              prog
-              (append (list "--headless"
-                            (string-append "-env:UserInstallation=file://"
-                                           (if (os-win32?) "/" "")
-                                           (string-replace (url->system profile) "\\" "/"))
-                            "--convert-to" "png" "--outdir" (url->system dir))
-                      (map (lambda (f) (url->system (cadr f))) files)))
-            (for (f files)
-              (with r (and (url-exists? (caddr f)) (string-load (caddr f)))
-                (ahash-set! office-metafile-cache (car f)
-                            (if (and r (> (string-length r) 8)) r 'none)))
-              (for (u (cdr f)) (when (url-exists? u) (system-remove u))))
-            (system-rmdir dir)))
-        (lambda args #f)))))
+    (when (pair? todo)
+      (if (not prog)
+          (for (x todo) (ahash-set! office-metafile-failed (car x) #t))
+          (catch #t
+            (lambda ()
+              (let* ((dir (url-temp))
+                     (profile (url-append (url-expand "$TEXMACS_HOME_PATH")
+                                          "system/office-profile"))
+                     (files (map (lambda (x i)
+                                   (let* ((suffix (if (string-ends? (locase-all (cadr x)) ".wmf")
+                                                      ".wmf" ".emf"))
+                                          (base (string-append "picture" (number->string i))))
+                                     (list (car x) (url-append dir (string-append base suffix))
+                                           (url-append dir (string-append base ".png")))))
+                                 todo (iota (length todo))))
+                     (all? #t))
+                (system-mkdir dir)
+                (for (f files) (string-save (car f) (cadr f)))
+                (office-soffice-run
+                  prog
+                  (append (list "--headless"
+                                (string-append "-env:UserInstallation=file://"
+                                               (if (os-win32?) "/" "")
+                                               (string-replace (url->system profile) "\\" "/"))
+                                "--convert-to" "png" "--outdir" (url->system dir))
+                          (map (lambda (f) (url->system (cadr f))) files)))
+                (for (f files)
+                  (with r (and (url-exists? (caddr f)) (string-load (caddr f)))
+                    (if (and r (> (string-length r) 8))
+                        (office-metafile-remember (car f) r)
+                        (begin
+                          (set! all? #f)
+                          (ahash-set! office-metafile-failed (car f) #t)))))
+                ;; (under Windows, LibreOffice may still be running when
+                ;; a picture is missing: its files are then left in the
+                ;; temporary directory of TeXmacs, which goes with it)
+                (when (or all? (not (os-win32?)))
+                  (for (f files)
+                    (for (u (cdr f)) (when (url-exists? u) (system-remove u))))
+                  (system-rmdir dir))))
+            (lambda args
+              (for (x todo) (ahash-set! office-metafile-failed (car x) #t))))))))
+
+(tm-define (office-metafiles->png l)
+  (:synopsis "Convert the pictures of Windows l, a list of (data name), at once")
+  ;; with one LibreOffice for all of them, the PNG of each in the cache
+  (set! office-metafile-failed (make-ahash-table))
+  ;; (the pictures of the files before are dropped when there are many)
+  (when (>= office-metafile-count office-metafile-cache-size)
+    (set! office-metafile-cache (make-ahash-table))
+    (set! office-metafile-count 0))
+  (office-metafiles-convert l))
 
 (tm-define (office-metafile->png data name)
   (:synopsis "The PNG of the picture @data of Windows named @name, or #f")
   (and (string? data) (> (string-length data) 0)
        (begin
          (when (not (ahash-ref office-metafile-cache data))
-           (office-metafiles->png (list (list data name))))
+           (office-metafiles-convert (list (list data name))))
          (with r (ahash-ref office-metafile-cache data)
            (and (string? r) r)))))
 
