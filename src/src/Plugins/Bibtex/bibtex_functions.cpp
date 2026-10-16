@@ -12,6 +12,7 @@
 #include "bibtex_functions.hpp"
 #include "converter.hpp"
 #include "vars.hpp"
+#include "iterator.hpp"
 
 /******************************************************************************
 * Helper functions
@@ -252,6 +253,8 @@ bib_change_first (tree& t, string (*change_fun) (string)) {
   else if (is_func (t, WITH, 3) && t[0] == MATH_FONT)
     return false;
   else if (is_compound (t, "math"))
+    return false;
+  else if (is_compound (t, "keepcase"))
     return false;
   else {
     int pos= 0;
@@ -690,11 +693,18 @@ bib_text_length (string s) {
 
 static int
 bib_tree_length (tree t) {
-  if (is_atomic (t)) return N(t->label);
+  if (is_atomic (t)) {
+    string s= t->label;
+    int pos= 0, n= 0;
+    while (pos < N(s)) { tm_char_forwards (s, pos); n++; }
+    return n;
+  }
   else if (L(t) == WITH) return bib_tree_length (t[N(t)-1]);
+  else if (is_compound (t, "keepcase", 1)) return bib_tree_length (t[0]);
   else if (L(t) == CONCAT || L(t) == DOCUMENT) {
-    int s= 0; (void) s;
+    int s= 0;
     for (int i= 0; i<N(t); i++) s += bib_tree_length (t[i]);
+    return s;
   }
   return 0;
 }
@@ -716,17 +726,19 @@ bib_get_prefix (tree t, string& pre, int& i) {
       string s= t->label;
       int beg= 0;
       while ((beg < N(s)) && (i > 0)) {
-        pre << s[beg];
-        beg++;
+        int end= beg;
+        tm_char_forwards (s, end);
+        pre << s (beg, end);
+        beg= end;
         i--;
       }
       return;
     }
     else {
-      int pos= 0;
-      if (L(t) == WITH) pos= N(t)-1;
+      if (L(t) == WITH) bib_get_prefix (t[N(t)-1], pre, i);
+      else if (is_compound (t, "keepcase", 1)) bib_get_prefix (t[0], pre, i);
       else if (L(t) == CONCAT || L(t) == DOCUMENT)
-        for (int j= pos; j<N(t); j++) bib_get_prefix (t[j], pre, i);
+        for (int j= 0; j<N(t); j++) bib_get_prefix (t[j], pre, i);
     }
   }
 }
@@ -822,18 +834,47 @@ bib_abbreviate (scheme_tree st, scheme_tree s1, scheme_tree s2) {
 
 tree
 bib_field_pages (string p) {
-  tree res= compound ("bib-pages");;
-  int p1, p2;
-  int pos= 0;
-  if (read_int (p, pos, p1)) {
-    res << as_string (p1);
-    while (pos < N(p) && !is_digit (p[pos])) pos++;
-    if (read_int (p, pos, p2))
-      res << as_string (p2);
+  // one page gives one argument and a range two: a range is written with
+  // "--" (12--34, A-1--A-10), or with a single "-" between two sides of
+  // the same kind (12-34, e1002-e1010, xii-xv, but not S-12); other pages
+  // (12, 15--17) are kept as they are written, with an en dash for "--",
+  // and an empty field gives no argument
+  tree res= compound ("bib-pages");
+  // an en dash (a UTF-8 "–" in the file) separates a range as "--" does
+  p= trim_spaces (replace (p, "\25", "--"));
+  if (N(p) == 0) return res;
+  bool list= occurs (",", p) || occurs (";", p);
+  int i= search_forwards ("--", 0, p), j= i;
+  if (i >= 0) {
+    while (j < N(p) && p[j] == '-') j++;
+    if (search_forwards ("--", j, p) >= 0) i= -1;
+  }
+  else {
+    i= search_forwards ("-", 0, p);
+    j= i + 1;
+    if (i > 0 && search_forwards ("-", j, p) < 0) {
+      string a= trim_spaces (p (0, i)), b= trim_spaces (p (j, N(p)));
+      if (N(a) == 0 || N(b) == 0 || is_digit (a[0]) != is_digit (b[0]))
+        i= -1;
+    }
+    else i= -1;
+  }
+  if (!list && i > 0 && j < N(p)) {
+    res << trim_spaces (p (0, i)) << trim_spaces (p (j, N(p)));
     return res;
   }
-  res << "0";
+  res << replace (replace (p, "---", "--"), "--", "\25");
   return res;
+}
+
+static bool is_hyper_link (string s);
+
+static bool
+bib_is_verbatim_field (string f) {
+  // the fields which BibTeX and biblatex read verbatim, not as LaTeX,
+  // and the keys of other entries
+  return f == "doi" || f == "eprint" || f == "file" || f == "pdf" ||
+         f == "url" || f == "crossref" || f == "xref";
 }
 
 static int
@@ -848,7 +889,8 @@ bib_get_fields (tree t, string& latex) {
               is_atomic (f[1])) {
             latex << bib_names (f[1]->label, nbfields);
           }
-          else if (is_atomic (f[1]) && f[0]->label != "pages") {
+          else if (is_atomic (f[1]) && f[0]->label != "pages" &&
+                   !bib_is_verbatim_field (f[0]->label)) {
             if (!bib_is_blank_string (f[1]->label)) {
               latex << "\\nextbib{}" << bib_to_latex (f[1]->label);
               nbfields++;;
@@ -892,7 +934,10 @@ bib_set_fields (tree& t, array<tree> latex, int& ind) {
           }
           else if (f[0]->label == "pages" && is_atomic (f[1]))
             f[1]= bib_field_pages (f[1]->label);
-          else if (ind < N(latex)) {
+          else if (bib_is_verbatim_field (f[0]->label) && is_atomic (f[1])) {
+            if (is_hyper_link (f[1]->label)) f[1]= compound ("slink", f[1]);
+          }
+          else if (is_atomic (f[1]) && ind < N(latex)) {
             f[1]= latex[ind];
             ind++;
           }
@@ -936,26 +981,122 @@ is_hyper_link (string s) {
   return starts (s, "http://") || starts (s, "https://") || starts (s, "ftp://");
 }
 
-void
-bib_parse_fields (tree& t) {
+static void
+bib_latex_content (tree t, bool& text, hashmap<string,int>& envs) {
+  // the text and the environments of a parsed LaTeX value @t
+  if (is_atomic (t)) {
+    if (!bib_is_blank_string (t->label)) text= true;
+  }
+  else if (is_tuple (t) && N(t) > 0 && is_atomic (t[0])) {
+    string cmd= t[0]->label;
+    if (starts (cmd, "\\begin-")) {
+      string env= cmd (7, N(cmd));
+      envs (env)= envs[env] + 1;
+    }
+    else if (starts (cmd, "\\end-")) {
+      string env= cmd (5, N(cmd));
+      envs (env)= envs[env] - 1;
+    }
+    for (int i= 1; i<N(t); i++) bib_latex_content (t[i], text, envs);
+  }
+  else
+    for (int i= 0; i<N(t); i++) bib_latex_content (t[i], text, envs);
+}
+
+static bool
+bib_latex_lost (string val) {
+  // does the LaTeX value @val, which converts to nothing, hold text or an
+  // environment which is not closed? Commands such as \relax legitimately
+  // print nothing, while \begin{x} cannot be converted.
+  bool text= false;
+  hashmap<string,int> envs (0);
+  bib_latex_content (parse_latex (cork_to_sourcecode (val), false, false),
+                     text, envs);
+  if (text) return true;
+  iterator<string> it= iterate (envs);
+  while (it->busy ())
+    if (envs[it->next ()] != 0) return true;
+  return false;
+}
+
+static bool
+bib_lost_value (tree old, tree t) {
+  // does a non-blank field of @old become empty in its conversion @t,
+  // although its LaTeX does not just print nothing?
+  for (int i= 0; i<N(t); i++) {
+    if (bib_is_entry (t[i]))
+      for (int j= 0; j<N(t[i][2]); j++) {
+        tree f= old[i][2][j];
+        if (bib_is_field (f) && is_atomic (f[1]) &&
+            !bib_is_blank_string (f[1]->label) && t[i][2][j][1] == "" &&
+            bib_latex_lost (f[1]->label))
+          return true;
+      }
+    else if (bib_is_comment (t[i]) && bib_lost_value (old[i], t[i]))
+      return true;
+  }
+  return false;
+}
+
+static bool
+bib_parse_fields_all (tree& t) {
   string fields;
   int nb= bib_get_fields (t, fields);
+  // a last value which converts to nothing (empty, or \relax) would give
+  // no element: a sentinel value is added after it, and then removed
+  fields << "\\nextbib{}{xyzyx}";
   array<tree> latex= bib_latex_array (
       latex_to_tree (parse_latex (cork_to_sourcecode (fields), false, false)));
-  if (N(latex) == nb-1 && ends (fields, "\\nextbib{}")) {
-    // FIXME: this dirty hack should not be necessary
-    fields << "{xyzyx}";
-    latex= bib_latex_array (
-      latex_to_tree (parse_latex (cork_to_sourcecode (fields), false, false)));
-    if (latex[N(latex)-1] == "xyzyx") latex[N(latex)-1]= "";
-  }
+  if (N(latex) != nb+1 || latex[nb] != "xyzyx") return false;
+  latex= range (latex, 0, nb);
   //cout << "<<< " << t << LF;
   //cout << ">>> " << latex << LF;
   for (int k=0; k<N(latex); k++)
     if (is_atomic (latex[k]) && is_hyper_link (latex[k]->label))
       latex[k]= compound ("slink", latex[k]);
   int i= 0;
-  if (nb == N(latex)) bib_set_fields (t, latex, i);
+  // a value which LaTeX cannot parse may also come out empty
+  tree c= copy (t);
+  bib_set_fields (c, latex, i);
+  if (bib_lost_value (t, c)) return false;
+  t= c;
+  return true;
+}
+
+static void
+bib_parse_fields_split (tree& t) {
+  // fall back to converting entry by entry, and then field by field,
+  // so that one problematic value does not prevent the other conversions
+  for (int i= 0; i<N(t); i++) {
+    tree u (DOCUMENT, t[i]);
+    if (bib_parse_fields_all (u)) {
+      t[i]= u[0];
+      continue;
+    }
+    if (bib_is_entry (t[i]))
+      for (int j= 0; j<N(t[i][2]); j++) {
+        if (!bib_is_field (t[i][2][j])) continue;
+        tree e= compound ("bib-entry", t[i][0], t[i][1],
+                          tree (DOCUMENT, t[i][2][j]));
+        tree v (DOCUMENT, e);
+        if (bib_parse_fields_all (v)) t[i][2][j]= v[0][2][0];
+        else {
+          bibtex_warning << "Could not convert field '"
+                         << t[i][2][j][0]->label << "' of entry '"
+                         << t[i][1]->label << "'\n";
+          // keep the LaTeX source, marked so that it is saved back as is
+          tree src= t[i][2][j][1];
+          if (is_atomic (src)) t[i][2][j][1]= compound ("verbatim", src);
+        }
+      }
+    else if (bib_is_comment (t[i]))
+      bib_parse_fields_split (t[i]);
+  }
+}
+
+void
+bib_parse_fields (tree& t) {
+  if (!bib_parse_fields_all (t)) bib_parse_fields_split (t);
 }
 
 /******************************************************************************
@@ -1004,6 +1145,15 @@ bib_preamble (tree t) {
 * Entries selection
 ******************************************************************************/
 
+static string
+bib_abbrev_value (hashmap<string,string> dict, string name) {
+  // as BibTeX, an undefined abbreviation expands to nothing, with a warning
+  string key= locase_all (name);
+  if (dict->contains (key)) return dict[key];
+  bibtex_warning << "String name '" << name << "' is undefined\n";
+  return "";
+}
+
 hashmap<string,string>
 bib_strings_dict (tree t) {
   hashmap<string,string> dict ("");
@@ -1027,6 +1177,19 @@ bib_strings_dict (tree t) {
   dict("toois")= "ACM Transactions on Office Information Systems";
   dict("toplas")= "ACM Transactions on Programming Languages and Systems";
   dict("tcs")= "Theoretical Computer Science";
+  // the months, as in the standard styles of BibTeX
+  dict("jan")= "January";
+  dict("feb")= "February";
+  dict("mar")= "March";
+  dict("apr")= "April";
+  dict("may")= "May";
+  dict("jun")= "June";
+  dict("jul")= "July";
+  dict("aug")= "August";
+  dict("sep")= "September";
+  dict("oct")= "October";
+  dict("nov")= "November";
+  dict("dec")= "December";
   if (L(t) == DOCUMENT) {
     tree str (DOCUMENT);
     for (int i= 0; i<N(t); i++) {
@@ -1043,12 +1206,15 @@ bib_strings_dict (tree t) {
           string sval;
           for (int j= 0; j<N(val); j++) {
             if (is_atomic (val[j])) sval << val[j]->label;
-            else if (bib_is_var (val[j])) sval << dict[val[j][0]->label];
+            else if (bib_is_var (val[j]))
+              sval << bib_abbrev_value (dict, val[j][0]->label);
           }
           dict(key)= sval;
         }
         else if (is_atomic (val))
           dict(key)= val->label;
+        else if (bib_is_var (val))
+          dict(key)= bib_abbrev_value (dict, val[0]->label);
       }
     }
   }
@@ -1061,17 +1227,15 @@ bib_subst_str (tree t, hashmap<string,string> dict) {
   else if (L(t) == CONCAT) {
     string s;
     for (int i= 0; i<N(t); i++) {
-      if (bib_is_var (t[i])) s << dict[locase_all (t[i][0]->label)];
+      if (bib_is_var (t[i]))
+        s << bib_abbrev_value (dict, t[i][0]->label);
       else if (is_atomic (t[i])) s << t[i]->label;
       else s << bib_subst_str (t[i], dict);
     }
     return s;
   }
-  else if (bib_is_var (t)) {
-    string key= locase_all (t[0]->label);
-    if (dict->contains (key)) return dict[locase_all (t[0]->label)];
-    else return t[0]->label;
-  }
+  else if (bib_is_var (t))
+    return bib_abbrev_value (dict, t[0]->label);
   else return "";
 }
 
