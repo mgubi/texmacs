@@ -258,9 +258,9 @@ void
 use_modules (tree t) {
   if (is_tuple (t))
     for (int i=0; i<N(t); i++) {
-      string s= as_string (t[i]);
-      if (starts (s, "(")) eval ("(use-modules " * s * ")");
-      else if (s != "") eval ("(plugin-initialize '" * s * ")");
+      // style caches written before the names were checked can hold
+      // anything, so they are checked again here
+      use_module (as_string (t[i]));
     }
 }
 
