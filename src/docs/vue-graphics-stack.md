@@ -1119,6 +1119,15 @@ before (until 2026-10-05 the desktop needed `TEXMACS_VUE_GPU=1`).
   buffer, so nothing stale can show. In the benchmark below, the frames
   between the repaints (pointer moves which change nothing) are no longer
   presented: 6 presents in 10 frames instead of 10.
+* **The multithreaded engine of macOS** (`kCGLCEMPEngine`, enabled when
+  the context is made): the GL commands run on a thread of their own and
+  `SDL_GL_SwapWindow` no longer holds the loop. Without it a swap took
+  2.3 ms (1 to 5) at every present while scrolling, the same in a window
+  of a quarter of the pixels and at any phase of the refreshes of the
+  screen: a cost of the swap, not a wait for the display, which pacing
+  the presents as those of Metal did not shorten. With it a present takes
+  a few microseconds and a frame of a scroll 7.8 ms instead of 9.6 ms
+  (snapshots identical, the editor, dialogs and ThorVG figures).
 * **The profile** (`TEXMACS_VUE_PROFILE`) counts what the CPU does, the
   GPU working in parallel as it does when nothing is measured: its work
   shows as more or fewer frames. `TEXMACS_VUE_GPU_SYNC=1` (`?gpusync=1` in

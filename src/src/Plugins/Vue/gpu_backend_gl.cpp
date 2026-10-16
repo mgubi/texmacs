@@ -37,6 +37,7 @@ gpu_backend* gpu_gl_backend () { return NULL; }
 #else
 #ifdef __APPLE__
 #include <OpenGL/gl3.h>
+#include <OpenGL/OpenGL.h>  // CGLEnable
 #else
 // the prototypes of OpenGL 3 (Linux, Windows), for the types below
 #define GL_GLEXT_PROTOTYPES 1
@@ -484,6 +485,14 @@ gl_backend::attach (SDL_Window* w) {
     }
 #endif
     SDL_GL_SetSwapInterval (0); // several windows: each would wait a frame
+#ifdef __APPLE__
+    // the multithreaded engine: the commands run on a thread of their own,
+    // and SDL_GL_SwapWindow no longer blocks the loop. Without it a swap
+    // took 2.3 ms (1 to 5) at every present, whatever the size of the
+    // window and the rate of the frames (not a wait for the screen), and a
+    // frame of a scroll 9.6 ms instead of 6.4 ms
+    CGLEnable (CGLGetCurrentContext (), kCGLCEMPEngine);
+#endif
     if (!init ()) { failed= true; return false; }
     return true;
   }
