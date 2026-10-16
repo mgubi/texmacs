@@ -769,6 +769,17 @@
       (toggle (set-boolean-preference "texmacs->markdown:front-matter" answer)
               (get-boolean-preference "texmacs->markdown:front-matter")))))
 
+;; Word and OpenDocument ----------
+
+(tm-widget (office-preferences-widget)
+  ======
+  (bold (text "Word, OpenDocument -> TeXmacs"))
+  ===
+  (aligned
+    (meti (hlist // (text "Read a file as a document of the style office, which is written back as it was"))
+      (toggle (set-boolean-preference "office->texmacs:faithful" answer)
+              (get-boolean-preference "office->texmacs:faithful")))))
+
 ;; All converters ----------
 
 (tm-widget (conversion-preferences-widget)
@@ -787,6 +798,9 @@
       (tab (text "Markdown")
         (centered
           (dynamic (markdown-preferences-widget))))
+      (tab (text "Office")
+        (centered
+          (dynamic (office-preferences-widget))))
       (tab (text "Verbatim")
         (centered
           (dynamic (verbatim-preferences-widget))))

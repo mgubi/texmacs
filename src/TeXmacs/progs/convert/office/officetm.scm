@@ -652,6 +652,44 @@
                                             (ox-attrs x))
                                     rest))))))))
 
+(define (oftm-field-code s)
+  ;; The instruction s of a field. A field inside it is between the
+  ;; characters 1 and 2 (see docx-inlines-sub): it is a field without
+  ;; result in the instruction, (concat " IF " (office-field " PAGE " "")
+  ;; " = 3 ...").
+  (let ((open (integer->char 1)) (close (integer->char 2)))
+    (if (< (string-search-forwards (string open) 0 s) 0) (oftm-text s)
+        ;; (pieces . rest of the characters), until the mark which closes
+        (letrec ((parse
+                   (lambda (l depth)
+                     (let loop ((l l) (cs '()) (acc '()))
+                       (let ((flush (lambda () (if (null? cs) acc
+                                                   (cons (oftm-text (list->string (reverse cs)))
+                                                         acc)))))
+                         (cond ((null? l) (cons (reverse (flush)) '()))
+                               ((char=? (car l) open)
+                                (with r (parse (cdr l) (+ depth 1))
+                                  (loop (if (pair? (cdr r)) (cddr r) '()) '()
+                                        (cons `(office-field ,(oftm-concat (car r)) "")
+                                              (flush)))))
+                               ((char=? (car l) close)
+                                (if (> depth 0) (cons (reverse (flush)) l)
+                                    (loop (cdr l) cs acc)))
+                               (else (loop (cdr l) (cons (car l) cs) acc))))))))
+          (oftm-concat (car (parse (string->list s) 0)))))))
+
+(define (oftm-metafiles l)
+  ;; the (data name) of the pictures of Windows in the nodes l
+  (let loop ((todo l) (acc '()))
+    (cond ((null? todo) (reverse acc))
+          ((not (pair? (car todo))) (loop (cdr todo) acc))
+          ((and (func? (car todo) 'image) (ox-attr (car todo) 'data)
+                (office-metafile? (ox-attr (car todo) 'name)))
+           (loop (cdr todo) (cons (list (ox-attr (car todo) 'data) (ox-attr (car todo) 'name))
+                                  acc)))
+          ((func? (car todo) '@) (loop (cdr todo) acc))
+          (else (loop (append (cdr (car todo)) (cdr todo)) acc)))))
+
 (define (oftm-image-only x)
   (let* ((name (oftm-text (or (ox-attr x 'name) "")))
          (data (ox-attr x 'data))
@@ -1157,9 +1195,18 @@
               ((field)
                (with t (oftm-inlines l)
                  (if oftm-faithful?
-                     (list `(office-field ,(oftm-text (or (ox-attr x 'code) (ox-attr x 'xml) ""))
+                     (list `(office-field ,(oftm-field-code (or (ox-attr x 'code) (ox-attr x 'xml) ""))
                                           ,t))
                      (if (== t "") '() (list t)))))
+              ;; a comment on a range of the text: the text, then the
+              ;; comment
+              ((commented)
+               (let ((t (oftm-inlines (if (pair? l) (cDr l) '())))
+                     (c (if (pair? l) (oftm-inline (cAr l)) '())))
+                 (cond ((and (pair? c) (func? (car c) 'office-comment 3) (!= t ""))
+                        (list `(office-commented ,t ,@(cdar c))))
+                       ((== t "") c)
+                       (else (cons t c)))))
               ((comment)
                (if (not oftm-faithful?) '()
                    ;; (its paragraphs as one line, after its mark)
@@ -2002,6 +2049,36 @@
           `(("par-mode" ,(get 'align)))
           '()))))
 
+;; The headers, the footers and the macros of the named styles as they were
+;; read, beside the file in the initial environment (office-original): the
+;; writers compare them with those of the document, and write those which
+;; were changed instead of those of the file.
+(define (oftm-original l macros)
+  ;; (only the headers which the file has: the one of the even pages is the
+  ;; one of the odd pages when the file has none)
+  (let ((pages (list-filter
+                 (map (lambda (x)
+                        (let ((place (or (ox-attr x 'place) "header"))
+                              (kind (or (ox-attr x 'kind) "default"))
+                              (t (oftm-header x)))
+                          (and t `(tuple ,(cond ((== kind "first")
+                                                 (string-append "first-" place))
+                                                ((== kind "even")
+                                                 (string-append "page-even-" place))
+                                                (else (string-append "page-odd-" place)))
+                                         ,t))))
+                      (list-filter l (lambda (y) (func? y 'header))))
+                 identity))
+        (styles (list-filter
+                  (map (lambda (m)
+                         (and (func? m 'associate 2) (string? (cadr m))
+                              (or (string-starts? (cadr m) "office-par-")
+                                  (string-starts? (cadr m) "office-span-"))
+                              `(tuple ,(cadr m) ,(caddr m))))
+                       macros)
+                  identity)))
+    `(("office-original" (tuple ,@pages ,@styles)))))
+
 (define (oftm-body l)
   (let* ((meta (append-map cdr (list-filter l (lambda (x) (func? x 'meta)))))
          (blocks (list-filter l (lambda (x) (not (in? (car x) '(meta setup styles
@@ -2060,10 +2137,16 @@
                         (or (and setup (office-number (ox-attr setup 'font-size))) 10.0))
                   (set! oftm-base-font (and setup (ox-attr setup 'font)))
                   (for-each oftm-scan-labels l)
+                  ;; (the pictures of Windows, converted all at once)
+                  (with pics (oftm-metafiles l)
+                    (when (pair? pics) (office-metafiles->png pics)))
                   (let* ((body (oftm-body l))
                          (body (if (null? (cdr headers)) body
                                    (oftm-document (append (cdr headers) (cdr body)))))
-                         (macros (if oftm-faithful? (oftm-style-macros) '())))
+                         (macros (if oftm-faithful? (oftm-style-macros) '()))
+                         (env (if (and oftm-faithful? package (ox-attr package 'data))
+                                  (append env (oftm-original l macros))
+                                  env)))
                     `(document (body ,body)
                                (style ,(if (and oftm-faithful?
                                                 (not (list-find l (lambda (y) (func? y 'error)))))

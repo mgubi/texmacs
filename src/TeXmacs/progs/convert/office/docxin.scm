@@ -960,7 +960,8 @@
             (list (apply office-node
                          (cons* 'comment
                                 `((author ,(ox-attr x 'w:author))
-                                  (date ,(ox-attr x 'w:date)))
+                                  (date ,(ox-attr x 'w:date))
+                                  (id ,id))
                                 l))))))))
 
 (define (docx-note kind id)
@@ -1644,6 +1645,22 @@
                        (cons (append (list 'result (cadar fields) (caddar fields))
                                      (cdddr (car fields)))
                              (cdr fields))))
+                ;; a field inside the instruction of another one, as
+                ;; IF { PAGE } = 3: its instruction between the characters
+                ;; 1 and 2 in the instruction of the other one (braces are
+                ;; text of instructions, as those of Zotero), its result is
+                ;; left out
+                ((and (== type "end") (pair? fields) (pair? (cdr fields))
+                      (null? (cdddr (car fields)))
+                      (eq? (car (cadr fields)) 'instr))
+                 (loop (cdr l) (caddar fields)
+                       (cons (cons* 'instr
+                                    (string-append (cadr (cadr fields))
+                                                   (string (integer->char 1)) (cadar fields)
+                                                   (string (integer->char 2)))
+                                    (caddr (cadr fields))
+                                    (cdddr (cadr fields)))
+                             (cddr fields))))
                 ((and (== type "end") (pair? fields))
                  (loop (cdr l)
                        (append (reverse
@@ -1680,6 +1697,11 @@
   ;; the nodes of a child of a paragraph
   (cond ((func? x 'w:r) (docx-run x))
         ((and (pair? x) (in? (car x) '(!change-start !change-end))) (list x))
+        ;; (the range of a comment, see office-comment-ranges)
+        ((and (func? x 'w:commentRangeStart) (ox-attr x 'w:id))
+         (list `(!comment-start ,(ox-attr x 'w:id))))
+        ((and (func? x 'w:commentRangeEnd) (ox-attr x 'w:id))
+         (list `(!comment-end ,(ox-attr x 'w:id))))
         ((func? x 'w:hyperlink)
          (let* ((rel (docx-rel (ox-attr x 'r:id)))
                 (anchor (ox-attr x 'w:anchor))

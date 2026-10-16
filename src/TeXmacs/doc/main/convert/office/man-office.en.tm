@@ -65,7 +65,11 @@
     followed by a caption is a figure, and so for a table. The pictures of
     <name|Windows> (<name|Emf>, <name|Wmf>) which <name|Word> documents
     often have are made images by <name|LibreOffice>, when it is installed,
-    and are a frame with their name else.
+    and are a frame with their name else: all the pictures of a file are
+    converted at once, a picture which is there several times once, and a
+    <name|LibreOffice> which does not answer within two minutes is stopped.
+    It has a profile of its own, in <verbatim|system/office-profile> of the
+    home directory of <TeXmacs>.
 
     <item*|Drawings>A drawing made with <TeXmacs> is exported as a
     picture: an <name|Svg> image, which stays sharp at any size, with a
@@ -106,19 +110,36 @@
     file shows it (its font, size, color, alignment, indentation, spacing,
     background and border): the style is a macro <verbatim|office-par->name
     or <verbatim|office-span->name of the document, which can be edited.
+    When the document is saved again in its format, a style whose macro
+    was changed gets the properties which were changed (as bold, italic,
+    the color, the size, the font, the alignment, the indentations, the
+    spaces, the background, the border); its other properties are those of
+    the file. The look of the headings is the one of the titles of the
+    sections (<verbatim|section-title>...), which is not written back.
 
     <item*|Headers and footers>They are the headers and footers of the
-    pages of the document, with the number of the page.
+    pages of the document, with the number of the page; those of the
+    first page are at the start of the text. A header or a footer which
+    was changed in <TeXmacs> is written instead of the one of the file, as
+    one paragraph, centered or on the right when it starts with a tab
+    (and ends with one); one which was removed is not written. The others
+    are those of the file, as they were.
 
     <item*|Fields>A field (a page number, a date, the title of the
     document, a citation of <name|Zotero>) is <markup|office-field>, which
-    shows its result and keeps its instruction. The bibliography of
+    shows its result and keeps its instruction. A field inside the
+    instruction of another one, as <verbatim|PAGE> in <verbatim|IF {
+    PAGE } = 3 "yes" "no">, is an <markup|office-field> inside the
+    instruction, and is written as a field inside the field. The
+    bibliography of
     <name|Zotero> in a Word file, which is several paragraphs, is a field
     too, so that <name|Zotero> can refresh it after the document is
     saved.
 
     <item*|Comments and changes>A comment is <markup|office-comment>,
-    after its mark, with its author; the text which was inserted and the
+    after its mark, with its author, and a comment on a range of the text
+    of a paragraph is <markup|office-commented>, with the text, which is
+    marked, and the comment; the text which was inserted and the
     one which was deleted while the changes are tracked are
     <markup|office-ins> and <markup|office-del>, in color.
 
@@ -136,10 +157,26 @@
     <markup|office-shape>.
 
     <item*|The file>The file itself is kept in the environment of the
-    document: when it is saved again in its format, its named styles, its
-    pages with their headers and footers, its fonts, its theme, its
-    settings and its properties are written again, and the text,
-    its notes, comments and lists are those of <TeXmacs>. Saved in the
+    document (<verbatim|office-package>), with the headers, the footers
+    and the macros of the named styles as they were read
+    (<verbatim|office-original>): when it is saved again in its format,
+    its named styles, its pages with their headers and footers, its fonts,
+    its theme, its settings and its properties are written again (with
+    what was changed in <TeXmacs>), and the text, its notes, comments and
+    lists are those of <TeXmacs>. The parts of the file which nothing that
+    is written names any more (a picture of a paragraph which was deleted,
+    a header which was replaced) are not written, nor the small picture of
+    its first page which <name|Word> files have.
+
+    Since the whole file is kept, a <TeXmacs> document of the style
+    <tmstyle|office>, saved as a <verbatim|.tm> file, also holds what was
+    deleted from it in <TeXmacs>: the old text, comments and pictures, and
+    the properties of the file (its author...). Send the <name|Word> or
+    <name|OpenDocument> file which <TeXmacs> writes rather than the
+    <verbatim|.tm> file when that matters, or remove the variables
+    <verbatim|office-package> and <verbatim|office-original> from the
+    initial environment of the document (it is then written as a new
+    file). Saved in the
     other format (a Word file as an OpenDocument file, or the reverse), the
     named styles are written with their look, taken from the macros
     <verbatim|office-par->name and <verbatim|office-span->name of the
@@ -147,7 +184,9 @@
   </description>
 
   The option <verbatim|office-\<gtr\>texmacs:faithful> of the converter
-  (on by default) makes these documents; without it, a file is a document
+  (on by default, in <menu|Edit|Preferences>, <samp|Convert>,
+  <samp|Office>) makes these
+  documents; without it, a file is a document
   of the style <tmstyle|generic>, with the look of the named styles of its
   text, the results of its fields and its changes accepted.
 

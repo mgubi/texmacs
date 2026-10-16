@@ -1083,9 +1083,14 @@
              (with base (ox-child x 'text:ruby-base)
                (if base (odt-inlines (ox-children base)) '())))
             ((office:annotation) (odt-annotation x))
+            ;; (the end of the range of a comment, see office-comment-ranges)
+            ((office:annotation-end)
+             (if (ox-attr x 'office:name)
+                 (list `(!comment-end ,(ox-attr x 'office:name)))
+                 '()))
             ((text:change text:change-start text:change-end) (odt-change-node x))
             ;; what has no text of its own
-            ((office:annotation-end text:bookmark-end
+            ((text:bookmark-end
               text:reference-mark-end text:soft-page-break
               text:alphabetical-index-mark text:alphabetical-index-mark-start
               text:alphabetical-index-mark-end text:toc-mark
@@ -1136,15 +1141,19 @@
 
 (define (odt-annotation x)
   ;; a comment, with its author and its date
-  (let ((get (lambda (tag) (with y (ox-child x tag) (and y (ox-text y))))))
-    (list (apply office-node
-                 (cons* 'comment `((author ,(get 'dc:creator)) (date ,(get 'dc:date)))
+  (let ((get (lambda (tag) (with y (ox-child x tag) (and y (ox-text y)))))
+        (name (ox-attr x 'office:name)))
+    (append
+      (if name (list `(!comment-start ,name)) '())
+      (list (apply office-node
+                 (cons* 'comment `((author ,(get 'dc:creator)) (date ,(get 'dc:date))
+                                   (id ,name))
                         (odt-apart
                           (lambda ()
                             (odt-blocks (list-filter (ox-children x)
                                                      (lambda (y)
                                                        (not (and (pair? y)
-                                                                 (in? (car y) '(dc:creator dc:date))))))))))))))
+                                                                 (in? (car y) '(dc:creator dc:date)))))))))))))))
 
 (define (odt-read-changes text)
   ;; the regions of the changes which are tracked

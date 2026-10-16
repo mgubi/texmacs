@@ -752,12 +752,40 @@
                                          (char-alphabetic? c)))))
     (if (== t "") "Sequence" t)))
 
+(define (dx-instruction-runs s)
+  ;; The runs of the instruction s of a field: a field inside it, as PAGE
+  ;; in IF { PAGE } = 3 "yes" "no", is between the characters 1 and 2 (see
+  ;; docx-inlines-sub), and is written as a field inside the field, without
+  ;; its result (Word computes it).
+  (let* ((text (lambda (cs) (if (null? cs) '()
+                                (list `(w:r (w:instrText (@ (xml:space "preserve"))
+                                                         ,(list->string (reverse cs))))))))
+         (char (lambda (type) `(w:r (w:fldChar (@ (w:fldCharType ,type)))))))
+    ;; (runs . rest of the characters), until the brace which closes
+    (define (parse l depth)
+      (let loop ((l l) (cs '()) (acc '()))
+        (cond ((null? l) (cons (append acc (text cs)) '()))
+              ((char=? (car l) (integer->char 1))
+               (with r (parse (cdr l) (+ depth 1))
+                 (loop (cdr r) '()
+                       (append acc (text cs) (list (char "begin")) (car r)
+                               (list (char "end"))))))
+              ((and (char=? (car l) (integer->char 2)) (> depth 0))
+               (cons (append acc (text cs)) l))
+              ;; (a mark which closes nothing is left out)
+              ((char=? (car l) (integer->char 2)) (loop (cdr l) cs acc))
+              (else (loop (cdr l) (cons (car l) cs) acc)))))
+    (with r (parse (string->list s) 0)
+      (if (null? (car r)) (text '()) (car r)))))
+
 (define (dx-field-runs instruction runs)
   ;; A field in a paragraph: the runs which begin it, hold its instruction,
   ;; separate it from its result, which is runs, and end it. (The short
   ;; form w:fldSimple is not read by all programs.)
   `((w:r (w:fldChar (@ (w:fldCharType "begin"))))
-    (w:r (w:instrText (@ (xml:space "preserve")) ,instruction))
+    ,@(if (>= (string-search-forwards (string (integer->char 1)) 0 instruction) 0)
+          (dx-instruction-runs instruction)
+          `((w:r (w:instrText (@ (xml:space "preserve")) ,instruction))))
     (w:r (w:fldChar (@ (w:fldCharType "separate"))))
     ,@runs
     (w:r (w:fldChar (@ (w:fldCharType "end"))))))
@@ -840,6 +868,13 @@
                (with runs (dx-inlines l props)
                  (if (ox-attr x 'code) (dx-field-runs (ox-attr x 'code) runs) runs)))
               ((comment) (dx-comment x))
+              ;; a comment on a range: its range around the text
+              ((commented)
+               (if (not (and (pair? l) (func? (cAr l) 'comment))) (dx-inlines l props)
+                   (let* ((marks (dx-comment (cAr l)))
+                          (inner (dx-inlines (cDr l) props)))
+                     (if (!= (length marks) 3) (append inner marks)
+                         (append (list (car marks)) inner (cdr marks))))))
               ((em strong sub sup code smallcaps)
                (dx-inlines l (cons (car x) props)))
               ;; capitals; Word has no lower case, which is written as
@@ -1655,7 +1690,9 @@
        ,(override "/word/footnotes.xml" "footnotes")
        ,(override "/word/settings.xml" "settings")
        ,@(if (and (pair? comments?) (car comments?))
-             (list (override "/word/comments.xml" "comments")) '()))))
+             (list (override "/word/comments.xml" "comments")) '())
+       ,@(map (lambda (h) (override (string-append "/" (car h)) (cadr h)))
+              dx-header-parts))))
 
 (define (dx-document blocks)
   `(w:document
@@ -1672,17 +1709,48 @@
     w:vAlign w:noEndnote w:titlePg w:textDirection w:bidi w:rtlGutter w:docGrid
     w:printerSettings w:sectPrChange))
 
+(define dx-section-ids '()) ; the relations of the headers of the last section
+
+(define (dx-header-key y)
+  ;; (place kind) of a reference to a header or a footer
+  (list (if (func? y 'w:headerReference) "header" "footer")
+        (or (ox-attr y 'w:type) "default")))
+
 (define (dx-final-section)
   ;; the properties of the last section: those of the file it was read
-  ;; from, with its headers and footers, and the page and the columns of
-  ;; the document
+  ;; from, with its headers and footers (but those which were changed in
+  ;; TeXmacs), and the page and the columns of the document
   (with orig (dx-package-section)
     (if (not orig) (dx-section-properties "1")
         (let* ((mine (cdr (dx-section-properties "1")))
                (mine-tags '(w:type w:pgSz w:pgMar w:cols))
+               (changed (map (lambda (r) (list (car r) (cadr r))) dx-header-refs))
                (theirs (list-filter (ox-elements orig)
-                                    (lambda (y) (not (in? (car y) mine-tags)))))
-               (all (append theirs mine))
+                                    (lambda (y) (not (or (in? (car y) mine-tags)
+                                                         (and (in? (car y) '(w:headerReference
+                                                                             w:footerReference))
+                                                              (in? (dx-header-key y) changed)))))))
+               (refs (append-map
+                       (lambda (r)
+                         (if (not (caddr r)) '()
+                             (list `(,(if (== (car r) "header") 'w:headerReference
+                                          'w:footerReference)
+                                     (@ (w:type ,(cadr r)) (r:id ,(caddr r)))))))
+                       dx-header-refs))
+               (all (append theirs refs))
+               ;; (a first page of its own while it has a header or a footer)
+               (first? (list-find all (lambda (y) (and (in? (car y) '(w:headerReference
+                                                                       w:footerReference))
+                                                       (== (ox-attr y 'w:type) "first")))))
+               (all (cond ((not (list-find dx-header-refs (lambda (r) (== (cadr r) "first")))) all)
+                          (first? (if (list-find all (lambda (y) (func? y 'w:titlePg))) all
+                                      (append all '((w:titlePg)))))
+                          (else (list-filter all (lambda (y) (not (func? y 'w:titlePg)))))))
+               (all (append all mine))
+               (_ (set! dx-section-ids
+                        (map (lambda (y) (ox-attr y 'r:id))
+                             (list-filter all (lambda (y) (in? (car y) '(w:headerReference
+                                                                         w:footerReference)))))))
                (rank (lambda (y) (or (list-find-index dx-section-order
                                                       (lambda (t) (== t (car y))))
                                      100))))
@@ -1691,6 +1759,144 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Interface
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; The headers and the footers which were changed in TeXmacs (header nodes
+;; with the attribute changed, see tmof-headers) are new parts, which the
+;; last section names instead of those of the file; one which was removed
+;; is not named any more.
+
+(define dx-header-parts '()) ; (name place xml rels) of the new parts
+(define dx-header-refs '())  ; (place kind id) of the changed ones, id #f if removed
+
+(define (dx-header-part x n)
+  ;; the part of the header node x, the n-th one: (name place xml rels)
+  (let* ((place (if (== (ox-attr x 'place) "footer") "footer" "header"))
+         (old-in dx-in-note?)
+         (old-rels dx-note-rels)
+         (old-ids dx-rel-ids))
+    ;; (its relations are its own, as those of the notes)
+    (set! dx-in-note? #t)
+    (set! dx-note-rels '())
+    (set! dx-rel-ids (make-ahash-table))
+    (let* ((blocks (dx-blocks (ox-children x)))
+           (blocks (if (null? blocks) '((w:p)) blocks))
+           (xml `(,(if (== place "header") 'w:hdr 'w:ftr)
+                  (@ (xmlns:w ,dx-ns-w) (xmlns:r ,dx-ns-r) (xmlns:m ,dx-ns-m)
+                     (xmlns:wp ,dx-ns-wp))
+                  ,@blocks))
+           (rels (reverse dx-note-rels)))
+      (set! dx-in-note? old-in)
+      (set! dx-note-rels old-rels)
+      (set! dx-rel-ids old-ids)
+      (list (string-append "word/tm-" place (number->string n) ".xml") place xml rels))))
+
+(define (dx-write-headers l)
+  ;; the new parts of the headers and footers of l which were changed
+  (set! dx-header-parts '())
+  (set! dx-header-refs '())
+  (when dx-package
+    (for (x (list-filter l (lambda (y) (and (func? y 'header) (ox-attr y 'changed)))))
+      (let ((place (if (== (ox-attr x 'place) "footer") "footer" "header"))
+            (kind (with k (ox-attr x 'kind) (if (in? k '("first" "even")) k "default"))))
+        (if (ox-attr x 'removed)
+            (set! dx-header-refs (cons (list place kind #f) dx-header-refs))
+            (let* ((part (dx-header-part x (+ (length dx-header-parts) 1)))
+                   (id (dx-relation place (substring (car part) 5 (string-length (car part)))
+                                    #f)))
+              (set! dx-header-parts (cons part dx-header-parts))
+              (set! dx-header-refs (cons (list place kind id) dx-header-refs))))))
+    (set! dx-header-parts (reverse dx-header-parts))
+    (set! dx-header-refs (reverse dx-header-refs))))
+
+(define dx-settings-after
+  ;; the children of w:settings which come after w:evenAndOddHeaders
+  '(w:bookFoldRevPrinting w:bookFoldPrinting w:bookFoldPrintingSheets
+    w:drawingGridHorizontalSpacing w:drawingGridVerticalSpacing
+    w:displayHorizontalDrawingGridEvery w:displayVerticalDrawingGridEvery
+    w:doNotUseMarginsForDrawingGridOrigin w:drawingGridHorizontalOrigin
+    w:drawingGridVerticalOrigin w:doNotShadeFormData w:noPunctuationKerning
+    w:characterSpacingControl w:printTwoOnOne w:strictFirstAndLastChars
+    w:noLineBreaksAfter w:noLineBreaksBefore w:savePreviewPicture
+    w:doNotValidateAgainstSchema w:saveInvalidXml w:ignoreMixedContent
+    w:alwaysShowPlaceholderText w:doNotDemarcateInvalidXml w:saveXmlDataOnly
+    w:useXSLTWhenSaving w:saveThroughXslt w:showXMLTags
+    w:alwaysMergeEmptyNamespace w:updateFields w:hdrShapeDefaults w:footnotePr
+    w:endnotePr w:compat w:docVars w:rsids m:mathPr w:attachedSchema
+    w:themeFontLang w:clrSchemeMapping w:doNotIncludeSubdocsInStats
+    w:doNotAutoCompressPictures w:forceUpgrade w:captions w:readModeInkLockDown
+    w:smartTagType sl:schemaLibrary w:shapeDefaults w:doNotEmbedSmartTags
+    w:decimalSymbol w:listSeparator))
+
+(define (dx-even-headers settings)
+  ;; the settings, with headers of their own on the even pages when a new
+  ;; one was written for them
+  (if (or (not (list-find dx-header-refs (lambda (r) (and (== (cadr r) "even") (caddr r)))))
+          (ox-child settings 'w:evenAndOddHeaders))
+      settings
+      (let loop ((l (ox-children settings)) (acc '()))
+        (cond ((or (null? l) (and (pair? (car l)) (in? (caar l) dx-settings-after)))
+               `(w:settings (@ ,@(ox-attrs settings))
+                            ,@(reverse acc) (w:evenAndOddHeaders) ,@l))
+              (else (loop (cdr l) (cons (car l) acc)))))))
+
+;; The parts of the file which are written again are those which the parts
+;; that are written name, through their relations: a picture or a header
+;; which is not used any more is not written, nor the small picture of the
+;; first page of the old text (docProps/thumbnail.jpeg).
+
+(define (dx-uri-decode s)
+  ;; the address s with the bytes %XX as themselves
+  (let loop ((l (string->list s)) (acc '()))
+    (cond ((null? l) (list->string (reverse acc)))
+          ((and (char=? (car l) #\%) (pair? (cdr l)) (pair? (cddr l))
+                (string->number (list->string (list (cadr l) (caddr l))) 16))
+           => (lambda (n) (loop (cdddr l) (cons (integer->char n) acc))))
+          (else (loop (cdr l) (cons (car l) acc))))))
+
+(define (dx-rels-name part)
+  ;; word/document.xml has its relations in word/_rels/document.xml.rels
+  (let* ((l (string-tokenize-by-char part #\/))
+         (dir (if (null? l) '() (reverse (cdr (reverse l))))))
+    (string-recompose (append dir (list "_rels" (string-append (if (null? l) "" (cAr l)) ".rels")))
+                      "/")))
+
+(define (dx-rel-targets base root)
+  ;; the entries which the relations root of the entry base name
+  (if (not (pair? root)) '()
+      (append-map (lambda (r)
+                    (with t (or (ox-attr r 'Target) "")
+                      (if (or (== t "") (== (ox-attr r 'TargetMode) "External")) '()
+                          (list (office-resolve base (dx-uri-decode t))))))
+                  (ox-childs root 'Relationship))))
+
+(define (dx-reachable written)
+  ;; the table of the entries which the relations name, from _rels/.rels;
+  ;; written: (name . relations) of the files of relations which are written
+  (let ((seen (make-ahash-table))
+        (rels (lambda (name)
+                (with w (assoc name written)
+                  (if w (cdr w) (dx-package-xml name))))))
+    (ahash-set! seen "_rels/.rels" #t)
+    (let loop ((todo (dx-rel-targets "root" (rels "_rels/.rels"))))
+      (cond ((null? todo) seen)
+            ((ahash-ref seen (car todo)) (loop (cdr todo)))
+            (else
+              (let* ((p (car todo))
+                     (rn (dx-rels-name p)))
+                (ahash-set! seen p #t)
+                (ahash-set! seen rn #t)
+                (loop (append (dx-rel-targets p (rels rn)) (cdr todo)))))))))
+
+(define (dx-package-root-rels)
+  ;; the relations of the package of the file, without the picture of its
+  ;; first page
+  (with root (dx-package-xml "_rels/.rels")
+    (and root
+         `(,(car root) (@ ,@(ox-attrs root))
+           ,@(list-filter (ox-children root)
+                          (lambda (y) (not (and (func? y 'Relationship)
+                                                (string-ends? (or (ox-attr y 'Type) "")
+                                                              "/thumbnail")))))))))
 
 (define (dx-comments-part)
   `(w:comments
@@ -1734,16 +1940,122 @@
   (with root (dx-package-xml "word/_rels/document.xml.rels")
     (if (not root) '()
         (list-filter (ox-childs root 'Relationship)
-                     (lambda (r) (not (in? (dx-rel-type-name r) dx-written-types)))))))
+                     (lambda (r) (and (not (in? (dx-rel-type-name r) dx-written-types))
+                                      ;; (not the headers which were replaced)
+                                      (or (not (in? (dx-rel-type-name r) '("header" "footer")))
+                                          (in? (ox-attr r 'Id) dx-section-ids))))))))
 
 (define (dx-merged-styles mine)
-  ;; the styles of the file, with those of TeXmacs which it does not have
+  ;; the styles of the file, with those of TeXmacs which it does not have;
+  ;; those whose macros were changed in TeXmacs have their new look
   (with root (dx-package-xml "word/styles.xml")
     (if (not root) mine
         (let* ((ids (map (lambda (x) (ox-attr x 'w:styleId)) (ox-childs root 'w:style)))
                (new (list-filter (ox-childs mine 'w:style)
-                                 (lambda (x) (not (in? (ox-attr x 'w:styleId) ids))))))
+                                 (lambda (x) (not (in? (ox-attr x 'w:styleId) ids)))))
+               (root (cons (car root) (map dx-changed-style (cdr root)))))
           (append root new)))))
+
+;; A named style whose macro was changed in TeXmacs (the attribute changed
+;; of its node style, see tmof-changed-keys): the properties which were
+;; changed are written again, the others are those of the file.
+
+(define dx-style-groups
+  ;; (keys of a node style, tags of w:rPr or w:pPr, tags when they are off)
+  '(((strong) (w:b w:bCs) (w:b w:bCs))
+    ((em) (w:i w:iCs) (w:i w:iCs))
+    ((caps) (w:caps) (w:caps))
+    ((smallcaps) (w:smallCaps) (w:smallCaps))
+    ((strike dstrike) (w:strike w:dstrike) (w:strike w:dstrike))
+    ((color) (w:color) ())
+    ((size) (w:sz w:szCs) ())
+    ((font-name font) (w:rFonts) ())
+    ((letters) (w:spacing) ())
+    ((underline underline-kind) (w:u) (w:u))))
+
+(define dx-style-par-groups
+  '(((align) (w:jc))
+    ((indent-left indent-right first-indent) (w:ind))
+    ((space-before space-after line-spacing) (w:spacing))
+    ((background) (w:shd))
+    ((border) (w:pBdr))))
+
+(define dx-rpr-order
+  '(w:rStyle w:rFonts w:b w:bCs w:i w:iCs w:caps w:smallCaps w:strike w:dstrike
+    w:outline w:shadow w:emboss w:imprint w:noProof w:snapToGrid w:vanish
+    w:webHidden w:color w:spacing w:w w:kern w:position w:sz w:szCs w:highlight
+    w:u w:effect w:bdr w:shd w:fitText w:vertAlign w:rtl w:cs w:em w:lang
+    w:eastAsianLayout w:specVanish w:oMath))
+
+(define dx-ppr-order
+  '(w:pStyle w:keepNext w:keepLines w:pageBreakBefore w:framePr w:widowControl
+    w:numPr w:suppressLineNumbers w:pBdr w:shd w:tabs w:suppressAutoHyphens
+    w:kinsoku w:wordWrap w:overflowPunct w:topLinePunct w:autoSpaceDE
+    w:autoSpaceDN w:bidi w:adjustRightInd w:snapToGrid w:spacing w:ind
+    w:contextualSpacing w:mirrorIndents w:suppressOverlap w:jc w:textDirection
+    w:textAlignment w:textboxTightWrap w:outlineLvl w:divId w:cnfStyle w:rPr
+    w:sectPr w:pPrChange))
+
+(define (dx-sorted l order)
+  (with rank (lambda (y) (or (and (pair? y) (list-find-index order (lambda (t) (== t (car y)))))
+                             100))
+    (sort (list-filter l pair?) (lambda (a b) (< (rank a) (rank b))))))
+
+(define (dx-off tag)
+  (if (== tag 'w:u) '(w:u (@ (w:val "none"))) `(,tag (@ (w:val "0")))))
+
+(define (dx-patch-props props groups changed st make)
+  ;; the children props of w:rPr or w:pPr, with the groups of properties
+  ;; which have a changed key made again from the node style st
+  (let loop ((g groups) (props props))
+    (if (null? g) props
+        (let* ((keys (car (car g)))
+               (tags (cadr (car g)))
+               (off (if (pair? (cddr (car g))) (caddr (car g)) '())))
+          (if (not (list-find keys (lambda (k) (in? k changed))))
+              (loop (cdr g) props)
+              (let* ((sub (office-node 'style (map (lambda (k) (list k (ox-attr st k))) keys)))
+                     (made (list-filter (make sub) (lambda (y) (in? (car y) tags))))
+                     (made (if (null? made) (map dx-off off) made))
+                     (rest (list-filter props (lambda (y) (not (and (pair? y) (in? (car y) tags)))))))
+                (loop (cdr g) (append rest made))))))))
+
+(define (dx-changed-style x)
+  ;; the style x of the file, in the look of its macro when it was changed
+  (let* ((type (and (func? x 'w:style) (ox-attr x 'w:type)))
+         (family (cond ((== type "paragraph") "paragraph")
+                       ((== type "character") "text")
+                       (else #f)))
+         (st (and family (dx-source-style (or (ox-attr x 'w:styleId) "") family)))
+         (changed (and st (ox-attr st 'changed)
+                       (map string->symbol (string-tokenize-by-char (ox-attr st 'changed) #\space)))))
+    (if (not (pair? changed)) x
+        (let* ((ppr (ox-child x 'w:pPr))
+               (rpr (ox-child x 'w:rPr))
+               (new-ppr (and (== family "paragraph")
+                             (dx-sorted (dx-patch-props (if ppr (ox-children ppr) '())
+                                                        dx-style-par-groups changed st
+                                                        dx-style-paragraph-properties)
+                                        dx-ppr-order)))
+               (new-rpr (dx-sorted (dx-patch-props (if rpr (ox-children rpr) '())
+                                                   dx-style-groups changed st
+                                                   dx-style-run-properties)
+                                   dx-rpr-order))
+               (others (list-filter (ox-children x)
+                                    (lambda (y) (not (and (pair? y) (in? (car y) '(w:pPr w:rPr)))))))
+               ;; (w:pPr and w:rPr come after the name, the bases, the
+               ;; priorities... and before the properties of tables)
+               (before (list-filter others (lambda (y) (not (and (pair? y)
+                                                                 (in? (car y) '(w:tblPr w:trPr w:tcPr
+                                                                                w:tblStylePr)))))))
+               (after (list-filter others (lambda (y) (and (pair? y)
+                                                           (in? (car y) '(w:tblPr w:trPr w:tcPr
+                                                                          w:tblStylePr)))))))
+          `(w:style (@ ,@(ox-attrs x))
+                    ,@before
+                    ,@(if (and new-ppr (pair? new-ppr)) `((w:pPr ,@new-ppr)) '())
+                    ,@(if (pair? new-rpr) `((w:rPr ,@new-rpr)) '())
+                    ,@after)))))
 
 (define dx-source-index #f) ; the table of dx-source-styles
 
@@ -1968,6 +2280,7 @@
       (set! dx-package #f)))
   (set! dx-rels '())
   (set! dx-note-rels '())
+  (set! dx-section-ids '())
   (set! dx-rel-ids (make-ahash-table))
   (set! dx-media '())
   (set! dx-media-files (make-ahash-table))
@@ -2023,6 +2336,7 @@
   (let* ((blocks (dx-blocks (if (func? x 'office) (cdr x) (list x))))
          ;; a document has a paragraph at least
          (blocks (if (null? blocks) (list '(w:p)) blocks))
+         (_ (dx-write-headers (if (func? x 'office) (cdr x) '())))
          (document (dx-document blocks))
          (comments? (pair? dx-comments))
          (_ (when comments? (dx-relation "comments" "comments.xml" #f)))
@@ -2043,7 +2357,10 @@
                   (if comments? '("word/comments.xml") '())
                   (if (null? note-rels) '() '("word/_rels/footnotes.xml.rels"))
                   (if (and comments? (pair? note-rels)) '("word/_rels/comments.xml.rels") '())
-                  (map (lambda (m) (string-append "word/media/" (car m))) media)))
+                  (map (lambda (m) (string-append "word/media/" (car m))) media)
+                  (map car dx-header-parts)
+                  (map (lambda (h) (dx-rels-name (car h)))
+                       (list-filter dx-header-parts (lambda (h) (pair? (cadddr h)))))))
          (kept (list-filter kept (lambda (n) (not (in? n names)))))
          (relations (if dx-package
                         `(Relationships
@@ -2051,7 +2368,24 @@
                            ,@(dx-kept-relations)
                            ,@(cddr (dx-relations (reverse dx-rels))))
                         (dx-relations (reverse dx-rels))))
-         (package-rels (and dx-package (ahash-ref dx-package "_rels/.rels")))
+         (package-root (and dx-package (dx-package-root-rels)))
+         (package-rels (and package-root (ox-serialize package-root)))
+         ;; (only the parts of the file which are still named)
+         (seen (and dx-package
+                    (dx-reachable
+                      (append
+                        (list (cons "word/_rels/document.xml.rels" relations))
+                        (if package-root (list (cons "_rels/.rels" package-root)) '())
+                        (if (null? note-rels) '()
+                            (list (cons "word/_rels/footnotes.xml.rels" (dx-relations note-rels))
+                                  (cons "word/_rels/comments.xml.rels" (dx-relations note-rels))))
+                        (map (lambda (h) (cons (dx-rels-name (car h)) (dx-relations (cadddr h))))
+                             dx-header-parts)
+                        ;; (the other parts which TeXmacs writes have no
+                        ;; relations: not those of the old ones)
+                        (map (lambda (n) (cons (dx-rels-name n) '(Relationships)))
+                             (append names dx-replaced-parts))))))
+         (kept (if seen (list-filter kept (lambda (n) (ahash-ref seen n))) kept))
          (r (zip-pack
               (append names kept)
               (append
@@ -2070,13 +2404,16 @@
                       (ox-serialize (dx-complete-styles (dx-merged-styles (dx-styles))))
                       (ox-serialize (dx-merged-numbering (dx-numbering)))
                       (ox-serialize (dx-footnotes))
-                      (ox-serialize (dx-merged-settings (dx-settings))))
+                      (ox-serialize (dx-even-headers (dx-merged-settings (dx-settings)))))
                 (if comments? (list (ox-serialize (dx-comments-part))) '())
                 (if (null? note-rels) '()
                     (list (ox-serialize (dx-relations note-rels))))
                 (if (and comments? (pair? note-rels))
                     (list (ox-serialize (dx-relations note-rels))) '())
                 (map cadr media)
+                (map (lambda (h) (ox-serialize (caddr h))) dx-header-parts)
+                (map (lambda (h) (ox-serialize (dx-relations (cadddr h))))
+                     (list-filter dx-header-parts (lambda (h) (pair? (cadddr h)))))
                 (map (lambda (n) (ahash-ref dx-package n)) kept)))))
     (set! dx-rels '())
     (set! dx-note-rels '())
@@ -2087,4 +2424,6 @@
     (set! dx-lists '())
     (set! dx-comments '())
     (set! dx-package #f)
+    (set! dx-header-parts '())
+    (set! dx-header-refs '())
     r))
