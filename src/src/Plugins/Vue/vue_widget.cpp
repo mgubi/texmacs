@@ -6958,8 +6958,9 @@ vue_simple_widget_rep::renders_opaque (int w, int h) {
 *
 * When the zoom of an editor changes, the page does not jump from the old
 * size to the new: for a moment (zoom_duration) the old picture grows or
-* shrinks to the new size and fades out, over the new one, which grows or
-* shrinks from the old size to its own. Both are scaled about the point of
+* shrinks to the new size, and the new one grows or shrinks from the old
+* size to its own, above it, both opaque (for a zoom in the new one is
+* smaller than the view at first, and the old one shows around it). Both are scaled about the point of
 * the view which the zoom leaves in place, as the editor scrolled after it.
 * The old picture is a copy of the backing store taken when the new zoom
 * arrives (it has not been repainted yet); the new one is the backing store,
@@ -7046,8 +7047,11 @@ vue_simple_widget_rep::render_zoom (void *data) {
     else mr->draw_picture_scaled (p, x, y, sc, alpha);
   };
   uint64_t TMPT0= SDL_GetTicksNS ();
+  // both opaque, the new one above: for a zoom in it starts smaller than
+  // the view, and the old one, grown, shows around it; for a zoom out it
+  // covers the view
+  place (zoom_snap, s, 255);
   place (backing_store, s / r, 255);
-  place (zoom_snap, s, (int) (255.0 * (1.0 - u)));
   R->unclip ();
   cout << "TMPF t=" << (int) (t*1000) << " draw " << (int) ((SDL_GetTicksNS () - TMPT0)/1000000) << "ms" << LF;
   return true;

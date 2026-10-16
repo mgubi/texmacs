@@ -1241,8 +1241,10 @@ ns_simple_widget_rep::repaint_all () {
 * When the zoom of an editor changes, the page does not jump from the old
 * size to the new: for a moment the picture of the canvas at the old zoom
 * and that at the new zoom move together from the place and size of the
-* first to those of the second, the old one fading out over the new one,
-* as in the Vue interface; then the canvas itself is shown again. A point
+* first to those of the second, as in the Vue interface; then the canvas
+* itself is shown again. Both are opaque, the new one above (for a zoom
+* in it is smaller than the view at first, and the old one, grown, shows
+* around it; for a zoom out it covers the view). A point
 * p of the document (in points, from its top left) is at A1 + p in the
 * scroll view before the zoom, and at A2 + r p after it (A: the place of
 * the document, r the ratio of the zooms): a point x of the old picture
@@ -1375,10 +1377,13 @@ ns_simple_widget_rep::run_zoom_transition () {
   CGPoint old1= CGPointMake (r * r1.origin.x + tx, r * r1.origin.y + ty);
   CGPoint new0= CGPointMake ((r2.origin.x - tx) / r, (r2.origin.y - ty) / r);
   CGPoint new1= CGPointMake (r2.origin.x, r2.origin.y);
+  // both opaque, the new one above: for a zoom in it starts smaller than
+  // the view, and the old one, grown, shows around it (the background
+  // showed when the old one faded out); for a zoom out it covers the view
   CALayer* nl= picture_layer (new_img, r2);
   CALayer* ol= picture_layer (old_img, r1);
-  [[ov layer] addSublayer: nl];
   [[ov layer] addSublayer: ol];
+  [[ov layer] addSublayer: nl];
   CGImageRelease (old_img);
   CGImageRelease (new_img);
   if (getenv ("TEXMACS_NS_DEBUG_DRAW"))
@@ -1394,6 +1399,6 @@ ns_simple_widget_rep::run_zoom_transition () {
     [ov release];
   }];
   animate_layer (nl, new0, 1.0 / r, new1, 1.0, 1.0, 1.0);
-  animate_layer (ol, old0, 1.0, old1, r, 1.0, 0.0);
+  animate_layer (ol, old0, 1.0, old1, r, 1.0, 1.0);
   [CATransaction commit];
 }
