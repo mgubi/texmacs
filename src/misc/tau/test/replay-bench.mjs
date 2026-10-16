@@ -62,8 +62,11 @@ const DOCS = [
 const port = await freePort();
 const server = await serve(dir, port);
 const direct = args.includes("--direct");
-const useGL = args.includes("--gl"), coreGL = args.includes("--core") || direct, native = args.includes("--native") || coreGL;
-const url = `http://127.0.0.1:${port}/index.html?debug&nohome${args.includes("--nosync") ? "" : "&gpusync"}${useGL ? "&gl" : ""}${coreGL ? "&coregl" : ""}${direct ? "&direct" : ""}`;
+// (the worker timed waits for its GPU at each frame: not with --nosync,
+// whose round trips would have that wait, 2 to 3 ms, which nothing else has)
+const nosync = args.includes("--nosync");
+const useGL = args.includes("--gl"), coreGL = args.includes("--core") || direct, native = args.includes("--native") || (coreGL && !nosync);
+const url = `http://127.0.0.1:${port}/index.html?debug&nohome${nosync ? "" : "&gpusync"}${useGL ? "&gl" : ""}${coreGL ? "&coregl" : ""}${direct ? "&direct" : ""}`;
 let ev, open, close;
 if (which === "safari") {
 	const driverPort = await freePort();

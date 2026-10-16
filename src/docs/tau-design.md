@@ -1445,19 +1445,22 @@ from 16 to 1024 pixels. As in the page of TeXmacs Vue
   asked for one (Firefox 157 broke, "not on worker thread!", after a few
   times). The page reads the canvas only through `drawImage`; the browser
   test "the views drawn on the canvas of the page". The user manual,
-  median ms as above (`replay-bench.mjs --direct --nosync`), the three
-  ways run in turn on a busy machine (load 4 to 8: only the order counts):
+  median ms as above (`replay-bench.mjs --nosync`), the three ways run in
+  turn on a busy machine (only the order counts):
 
   | | Safari, step | Safari, view | Firefox, step | Firefox, view |
   |---|---|---|---|---|
-  | `gl.mjs` from the commands | 4–6 | 9–18 | 2–3 | 4–7 |
-  | the worker, on the canvas of the page | 5 | 9–11 | 4 | 8 |
-  | the worker, bitmaps | 6–9 | 14–18 | 11–15 | 18–21 |
+  | `gl.mjs` from the commands | 2–3 | 4–5 | 2 | 4 |
+  | the worker, on the canvas of the page | 2–4 | 5–7 | 3 | 4–5 |
+  | the worker, bitmaps | 3 | 7 | 11–13 | 19–21 |
 
-  Twice to three times as fast as the bitmaps in Firefox, near `gl.mjs`;
-  in Safari a little faster than the bitmaps. What is left at each frame:
-  the whole view copied onto the canvas (it keeps nothing), which
-  `preserveDrawingBuffer` and the rectangle alone might spare.
+  Near `gl.mjs`; in Firefox 4 times as fast as the bitmaps (which it
+  reads back). In the worker a frame costs little: WebGL 0.03 ms a step
+  and 0.25 a view, some 60 and 550 calls, none of which waits for the GPU
+  (each call timed). NOTE: the rows of the worker in the table above, and
+  the first runs of this one, waited for its GPU at each frame (the timing
+  of `--native`, which `--core` asked for also with `--nosync`: 2.5 to
+  3 ms a frame); `--nosync` no longer times the worker.
 - **Left** for it: a context for each pane, each with the glyphs and the
   pictures again, or the panes of a window in one canvas behind them.
 - **Left**: a limit to the pictures kept by the page (WebGL has one for
