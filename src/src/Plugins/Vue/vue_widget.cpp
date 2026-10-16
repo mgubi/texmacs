@@ -7284,14 +7284,12 @@ vue_simple_widget_rep::render_zoom (void *data) {
     if (gpu) gpu_draw_picture_scaled (R, p, x, y, sc, alpha);
     else mr->draw_picture_scaled (p, x, y, sc, alpha);
   };
-  uint64_t TMPT0= SDL_GetTicksNS ();
   // both opaque, the new one above: for a zoom in it starts smaller than
   // the view, and the old one, grown, shows around it; for a zoom out it
   // covers the view
   place (zoom_snap, s, 255);
   place (backing_store, s / r, 255);
   R->unclip ();
-  cout << "TMPF t=" << (int) (t*1000) << " draw " << (int) ((SDL_GetTicksNS () - TMPT0)/1000000) << "ms" << LF;
   return true;
 }
 
