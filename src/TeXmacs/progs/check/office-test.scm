@@ -4449,6 +4449,363 @@
     (check-true (export-has? tex "[backgroundcolor=tmhexDDDDDD]"))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Fifth audit: what was changed in TeXmacs, the parts kept, fields, comments
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (doc-initial doc key)
+  (with init (list-find (cdr doc) (lambda (x) (func? x 'initial)))
+    (and init (with a (list-find (cdr (cadr init)) (lambda (a) (== (cadr a) key)))
+                (and a (caddr a))))))
+
+(define (doc-set-initial doc key val)
+  ;; the document doc whose initial environment has val for key
+  (map (lambda (x)
+         (if (not (func? x 'initial)) x
+             (let* ((l (cdr (cadr x)))
+                    (has? (list-find l (lambda (a) (== (cadr a) key)))))
+               `(initial (collection ,@(map (lambda (a) (if (== (cadr a) key)
+                                                             `(associate ,key ,val) a))
+                                            l)
+                                     ,@(if has? '() `((associate ,key ,val))))))))
+       doc))
+
+(define (doc-set-body doc f)
+  ;; the document doc whose blocks are those f makes of its blocks
+  (map (lambda (x) (if (func? x 'body) `(body (document ,@(f (cdr (cadr x))))) x)) doc))
+
+(define (tree-replace x old new)
+  (cond ((== x old) new)
+        ((pair? x) (map (lambda (y) (tree-replace y old new)) x))
+        (else x)))
+
+(define (archive-names* z)
+  (let loop ((l (zip-unpack z)) (acc '()))
+    (if (or (null? l) (null? (cdr l))) (reverse acc) (loop (cddr l) (cons (car l) acc)))))
+
+(define (text-before? s a b)
+  ;; a is in s, and before b
+  (let ((i (string-search-forwards a 0 s)) (j (string-search-forwards b 0 s)))
+    (and (>= i 0) (>= j 0) (< i j))))
+
+(define audit5-rel "http://schemas.openxmlformats.org/officeDocument/2006/relationships/")
+
+(define (audit5-docx body comments?)
+  ;; a Word document with a header (and its picture), a footer, a picture
+  ;; in its text, a picture which nothing uses and the picture of its first
+  ;; page, a named style
+  (zip-pack
+    (append '("[Content_Types].xml" "_rels/.rels" "word/document.xml"
+              "word/_rels/document.xml.rels" "word/styles.xml" "word/header1.xml"
+              "word/_rels/header1.xml.rels" "word/footer1.xml" "word/media/p.png"
+              "word/media/logo.png" "word/media/old.png" "docProps/thumbnail.jpeg")
+            (if comments? '("word/comments.xml") '()))
+    (append
+      (list "<Types/>"
+            (string-append
+              "<Relationships xmlns='http://schemas.openxmlformats.org/package/2006/relationships'>"
+              "<Relationship Id='rId1' Type='" audit5-rel "officeDocument' Target='word/document.xml'/>"
+              "<Relationship Id='rId2' Type='http://schemas.openxmlformats.org/package/2006/"
+              "relationships/metadata/thumbnail' Target='docProps/thumbnail.jpeg'/>"
+              "</Relationships>")
+            (string-append "<?xml version='1.0'?><w:document" docx-ns "><w:body>" body
+                           "<w:sectPr><w:headerReference w:type='default' r:id='rH'/>"
+                           "<w:footerReference w:type='default' r:id='rF'/>"
+                           "<w:pgSz w:w='11906' w:h='16838'/></w:sectPr></w:body></w:document>")
+            (string-append
+              "<Relationships xmlns='http://schemas.openxmlformats.org/package/2006/relationships'>"
+              "<Relationship Id='rH' Type='" audit5-rel "header' Target='header1.xml'/>"
+              "<Relationship Id='rF' Type='" audit5-rel "footer' Target='footer1.xml'/>"
+              "<Relationship Id='rI' Type='" audit5-rel "image' Target='media/p.png'/>"
+              "<Relationship Id='rC' Type='" audit5-rel "comments' Target='comments.xml'/>"
+              "</Relationships>")
+            (string-append
+              "<w:styles" docx-ns ">"
+              "<w:style w:type='paragraph' w:default='1' w:styleId='Normal'>"
+              "<w:name w:val='Normal'/></w:style>"
+              "<w:style w:type='paragraph' w:styleId='Warning'><w:name w:val='Warning'/>"
+              "<w:basedOn w:val='Normal'/><w:pPr><w:keepNext/><w:jc w:val='center'/></w:pPr>"
+              "<w:rPr><w:rFonts w:asciiTheme='majorHAnsi'/><w:b/><w:color w:val='C00000'/>"
+              "<w:lang w:val='fr-FR'/></w:rPr></w:style>"
+              "</w:styles>")
+            (string-append "<w:hdr" docx-ns ">" (wp (wr "Old head"))
+                           "<w:p><w:r><w:drawing><wp:inline><wp:extent cx='720000' cy='360000'/>"
+                           "<pic:blipFill><a:blip r:embed='rL'/></pic:blipFill></wp:inline>"
+                           "</w:drawing></w:r></w:p></w:hdr>")
+            (string-append
+              "<Relationships xmlns='http://schemas.openxmlformats.org/package/2006/relationships'>"
+              "<Relationship Id='rL' Type='" audit5-rel "image' Target='media/logo.png'/>"
+              "</Relationships>")
+            (string-append "<w:ftr" docx-ns ">" (wp (wr "Old foot")) "</w:ftr>")
+            "PNGDATA" "LOGODATA" "OLDDATA" "JPEGDATA")
+      (if comments?
+          (list (string-append "<w:comments" docx-ns "><w:comment w:id='0' w:author='Ann'>"
+                               (wp (wr "a remark")) "</w:comment></w:comments>"))
+          '()))))
+
+(define audit5-picture
+  (string-append "<w:p><w:r><w:drawing><wp:inline><wp:extent cx='720000' cy='360000'/>"
+                 "<pic:blipFill><a:blip r:embed='rI'/></pic:blipFill></wp:inline>"
+                 "</w:drawing></w:r></w:p>"))
+
+(define (test-office-changed)
+  (check-group "office changed in TeXmacs")
+  (let* ((z (audit5-docx (string-append (wp (wstyle "Warning") (wr "careful"))
+                                        (wp (wr "plain")) audit5-picture)
+                         #f))
+         (doc (convert z "docx-document" "texmacs-stree"))
+         (orig (doc-initial doc "office-original"))
+         (export (lambda (d) (convert d "texmacs-stree" "docx-document")))
+         (z0 (export doc))
+         (names0 (archive-names* z0)))
+    ;; what was read is kept beside the file
+    (check-true (func? orig 'tuple))
+    (check= (list-find (cdr orig) (lambda (y) (== (cadr y) "page-odd-header")))
+            '(tuple "page-odd-header"
+                    (concat "Old head " (image (tuple (raw-data "LOGODATA") "logo.png")
+                                               "2cm" "1cm" "" ""))))
+    (check-true (list-find (cdr orig) (lambda (y) (== (cadr y) "office-par-Warning"))))
+    ;; unchanged: the header, the footer and the styles of the file
+    (check-true (in? "word/header1.xml" names0))
+    (check-true (in? "word/footer1.xml" names0))
+    (check-false (list-find names0 (lambda (n) (string-starts? n "word/tm-header"))))
+    (check-true (export-has? (archive-entry z0 "word/styles.xml") "w:asciiTheme=\"majorHAnsi\""))
+    (check-false (export-has? (export-style (archive-entry z0 "word/styles.xml") "Warning") "<w:i/>"))
+    ;; the parts which are kept are those which are named: the picture of
+    ;; the header, not the old picture of the text, nor the one which
+    ;; nothing used, nor the picture of the first page
+    (check-true (in? "word/media/logo.png" names0))
+    (check-false (in? "word/media/p.png" names0))
+    (check-false (in? "word/media/old.png" names0))
+    (check-false (in? "docProps/thumbnail.jpeg" names0))
+    (check-false (export-has? (archive-entry z0 "_rels/.rels") "thumbnail"))
+    (check-true (list-find names0 (lambda (n) (string-starts? n "word/media/tm-"))))
+    ;; the picture deleted in TeXmacs is in the file no more
+    (let* ((d (doc-set-body doc (lambda (l) (list-filter l (lambda (b) (not (export-has? (object->string b) "image")))))))
+           (names (archive-names* (export d))))
+      (check-false (list-find names (lambda (n) (string-starts? n "word/media/tm-"))))
+      (check-false (in? "word/media/p.png" names)))
+    ;; a header which was changed is written instead of the one of the file
+    (let* ((d (doc-set-initial doc "page-odd-header"
+                               '(concat (htab "5mm") "New head " (page-the-page) (htab "5mm"))))
+           (z1 (export d))
+           (names (archive-names* z1))
+           (h (archive-entry z1 "word/tm-header1.xml"))
+           (text (archive-entry z1 "word/document.xml"))
+           (back (convert z1 "docx-document" "texmacs-stree")))
+      (check-true (string? h))
+      (check-true (export-has? h "New head"))
+      (check-true (export-has? h "<w:jc w:val=\"center\"/>"))
+      (check-true (export-has? h " PAGE </w:instrText>"))
+      (check-true (export-has? (archive-entry z1 "[Content_Types].xml") "/word/tm-header1.xml"))
+      (check-true (export-has? text "<w:headerReference w:type=\"default\" r:id=\"rIdTm"))
+      (check-false (export-has? text "r:id=\"rH\""))
+      (check-false (in? "word/header1.xml" names))
+      (check-false (in? "word/media/logo.png" names))
+      (check-true (in? "word/footer1.xml" names))
+      (check-true (export-has? (object->string (doc-initial back "page-odd-header")) "New head"))
+      (check-true (export-has? (object->string (doc-initial back "page-odd-header")) "page-the-page"))
+      (check= (doc-initial back "page-odd-footer") "Old foot"))
+    ;; a header of the first page, a footer which was removed
+    (let* ((d (doc-set-body (doc-set-initial doc "page-odd-footer" "")
+                            (lambda (l) (cons '(set-this-page-header "First") l))))
+           (z1 (export d))
+           (text (archive-entry z1 "word/document.xml"))
+           (back (convert z1 "docx-document" "texmacs-stree")))
+      (check-true (export-has? text "<w:headerReference w:type=\"first\""))
+      (check-true (export-has? text "<w:titlePg/>"))
+      (check-false (export-has? text "<w:footerReference"))
+      (check-false (in? "word/footer1.xml" (archive-names* z1)))
+      (check-true (in? '(set-this-page-header "First") (cdr (cadr (cadr back)))))
+      (check= (doc-initial back "page-odd-footer") #f))
+    ;; a named style whose macro was changed: what was changed is written,
+    ;; the rest of the style of the file is kept
+    (let* ((m (doc-initial doc "office-par-Warning"))
+           (d (doc-set-initial doc "office-par-Warning"
+                               `(macro "body" (with "font-shape" "italic" ,(caddr m)))))
+           (st (export-style (archive-entry (export d) "word/styles.xml") "Warning")))
+      (check-true (export-has? st "<w:i/><w:iCs/>"))
+      (check-true (export-has? st "<w:b/>"))
+      (check-true (export-has? st "w:asciiTheme=\"majorHAnsi\""))
+      (check-true (export-has? st "<w:lang w:val=\"fr-FR\"/>"))
+      (check-true (export-has? st "<w:keepNext/>"))
+      (check-true (text-before? st "<w:keepNext/>" "<w:jc w:val=\"center\"/>")))
+    (let* ((m (doc-initial doc "office-par-Warning"))
+           (d (doc-set-initial doc "office-par-Warning" (tree-replace m "bold" "medium")))
+           (st (export-style (archive-entry (export d) "word/styles.xml") "Warning")))
+      (check-true (export-has? st "<w:b w:val=\"0\"/><w:bCs w:val=\"0\"/>"))
+      (check-true (export-has? st "<w:color w:val=\"C00000\"/>"))))
+  ;; OpenDocument: the header of the first page, the named styles, the
+  ;; pictures which are not used any more
+  (let* ((z (zip-pack
+              '("mimetype" "content.xml" "styles.xml" "Pictures/p.png" "Pictures/old.png"
+                "Pictures/bg.png" "manifest.rdf")
+              (list "application/vnd.oasis.opendocument.text"
+                    (string-append "<?xml version='1.0'?><office:document-content" odt-ns ">"
+                                   "<office:body><office:text>"
+                                   "<text:p text:style-name='Note'>careful</text:p>"
+                                   "<text:p><draw:frame svg:width='2cm' svg:height='1cm'>"
+                                   "<draw:image xlink:href='Pictures/p.png'/></draw:frame></text:p>"
+                                   "</office:text></office:body></office:document-content>")
+                    (string-append "<office:document-styles" odt-ns "><office:styles>"
+                                   "<style:style style:name='Note' style:family='paragraph'>"
+                                   "<style:paragraph-properties fo:margin-left='1cm'/>"
+                                   "<style:text-properties fo:font-weight='bold' fo:color='#c00000'"
+                                   " fo:language='fr'/></style:style>"
+                                   "<style:style style:name='Header' style:family='paragraph'/>"
+                                   "</office:styles><office:automatic-styles>"
+                                   "<style:page-layout style:name='pm1'>"
+                                   "<style:page-layout-properties><style:background-image"
+                                   " xlink:href='Pictures/bg.png'/></style:page-layout-properties>"
+                                   "</style:page-layout></office:automatic-styles>"
+                                   "<office:master-styles><style:master-page style:name='Standard'"
+                                   " style:page-layout-name='pm1'>"
+                                   "<style:header><text:p>Old head</text:p></style:header>"
+                                   "<style:footer><text:p>Old foot</text:p></style:footer>"
+                                   "</style:master-page></office:master-styles>"
+                                   "</office:document-styles>")
+                    "PNGDATA" "OLDDATA" "BGDATA" "<rdf/>")))
+         (doc (convert z "odt-document" "texmacs-stree"))
+         (export (lambda (d) (convert d "texmacs-stree" "odt-document")))
+         (z0 (export doc))
+         (names0 (archive-names* z0)))
+    (check-true (in? "Pictures/bg.png" names0))
+    (check-false (in? "Pictures/old.png" names0))
+    (check-false (in? "Pictures/p.png" names0))
+    (check-true (export-has? (archive-entry z0 "META-INF/manifest.xml")
+                             "manifest:full-path=\"manifest.rdf\" manifest:media-type=\"application/rdf+xml\""))
+    (check-true (export-has? (archive-entry z0 "styles.xml") "<text:p>Old head</text:p>"))
+    (let* ((d (doc-set-body (doc-set-initial doc "page-odd-header" '(concat (htab "5mm") "New head"))
+                            (lambda (l) (cons '(set-this-page-footer "First foot") l))))
+           (z1 (export d))
+           (st (archive-entry z1 "styles.xml"))
+           (back (convert z1 "odt-document" "texmacs-stree")))
+      (check-false (export-has? st "Old head"))
+      (check-true (export-has? st "New head"))
+      (check-true (export-has? st "Old foot"))
+      (check-true (export-has? st "<style:footer-first>"))
+      (check-true (text-before? st "<style:header>" "<style:footer>"))
+      (check-true (text-before? st "<style:footer>" "<style:footer-first>"))
+      ;; (its alignment is an automatic style of styles.xml)
+      (check-true (export-has? st "style:name=\"TmH1P"))
+      (check= (doc-initial back "page-odd-header") '(concat (htab "5mm") "New head"))
+      (check-true (in? '(set-this-page-footer "First foot") (cdr (cadr (cadr back))))))
+    (let* ((m (doc-initial doc "office-par-Note"))
+           (d (doc-set-initial doc "office-par-Note"
+                               `(macro "body" (with "font-shape" "italic" ,(caddr m)))))
+           (st (export-odt-style (archive-entry (export d) "styles.xml") "paragraph" "Note"))
+           (d2 (doc-set-initial doc "office-par-Note" (tree-replace m "bold" "medium")))
+           (st2 (export-odt-style (archive-entry (export d2) "styles.xml") "paragraph" "Note")))
+      (check-true (export-has? st "fo:font-style=\"italic\""))
+      (check-true (export-has? st "fo:font-weight=\"bold\""))
+      (check-true (export-has? st "fo:language=\"fr\""))
+      (check-false (export-has? (export-odt-style (archive-entry z0 "styles.xml") "paragraph" "Note")
+                                "fo:font-style=\"italic\""))
+      (check-true (export-has? st2 "fo:font-weight=\"normal\""))
+      (check-true (export-has? st2 "fo:color=\"#c00000\""))))
+  ;; a document of before office-original: nothing is taken as changed
+  (let* ((z (audit5-docx (wp (wr "plain")) #f))
+         (doc (convert z "docx-document" "texmacs-stree"))
+         (d (doc-set-initial (doc-set-initial doc "office-original" "")
+                             "page-odd-header" "New head"))
+         (z1 (convert d "texmacs-stree" "docx-document")))
+    (check-true (in? "word/header1.xml" (archive-names* z1)))
+    (check-false (export-has? (archive-entry z1 "word/document.xml") "rIdTm"))))
+
+(define (test-office-nested-fields)
+  (check-group "nested fields")
+  (let* ((b "<w:r><w:fldChar w:fldCharType='begin'/></w:r>")
+         (sep "<w:r><w:fldChar w:fldCharType='separate'/></w:r>")
+         (e "<w:r><w:fldChar w:fldCharType='end'/></w:r>")
+         (i (lambda (t) (string-append "<w:r><w:instrText xml:space='preserve'>" t
+                                       "</w:instrText></w:r>")))
+         (one (string (integer->char 1)))
+         (two (string (integer->char 2)))
+         (body (string-append
+                 (wp b (i " IF ") b (i " PAGE ") sep (wr "3") e (i " = 3 \"yes\" \"no\" ")
+                     sep (wr "yes") e)
+                 (wp b (i " = ") b (i " PAGE ") e (i " + 1 ") sep (wr "4") e)))
+         (z (docx-archive body))
+         (blocks (docx body))
+         (doc (convert z "docx-document" "texmacs-stree"))
+         (text (archive-entry (convert doc "texmacs-stree" "docx-document") "word/document.xml"))
+         (back (docx-blocks-of* (convert doc "texmacs-stree" "docx-document"))))
+    ;; the field inside the instruction stays there, not its result
+    (check= blocks
+            `((p (field (@ (code ,(string-append " IF " one " PAGE " two " = 3 \"yes\" \"no\" ")))
+                        "yes"))
+              (p (field (@ (code ,(string-append " = " one " PAGE " two " + 1 "))) "4"))))
+    (check= (cdr (cadr (cadr doc)))
+            '((office-field (concat " IF " (office-field " PAGE " "") " = 3 \"yes\" \"no\" ") "yes")
+              (office-field (concat " = " (office-field " PAGE " "") " + 1 ") "4")))
+    ;; written as a field inside the field, and read back the same
+    (check= (export-count text "w:fldCharType=\"begin\"") 4)
+    (check= (export-count text "w:fldCharType=\"separate\"") 2)
+    (check= (export-count text "w:fldCharType=\"end\"") 4)
+    (check-true (text-before? text "> IF </w:instrText>" "> PAGE </w:instrText>"))
+    (check-true (text-before? text "> PAGE </w:instrText>" "> = 3 \"yes\" \"no\" </w:instrText>"))
+    (check-false (export-has? text one))
+    (check= back blocks)
+    ;; (the braces of an instruction are text, as those of Zotero)
+    (check= (docx (wp b (i " ADDIN ZOTERO_ITEM {\"a\":{}} ") sep (wr "[1]") e))
+            '((p (field (@ (code " ADDIN ZOTERO_ITEM {\"a\":{}} ")) "[1]"))))
+    ;; a mark which closes nothing is not written
+    (check-false (export-has? (archive-entry (serialize-docx-document
+                                              `(office (p (field (@ (code ,(string-append " PAGE" two " ")))
+                                                                 "1"))))
+                                             "word/document.xml")
+                              two))))
+
+(define (odt-blocks-of* archive)
+  (bare (no-setup (cdr (parse-odt-document archive)))))
+
+(define (test-office-comment-ranges)
+  (check-group "comment ranges")
+  (let* ((body (string-append
+                 (wp (wr "before ") "<w:commentRangeStart w:id='0'/>" (wr "the range")
+                     "<w:commentRangeEnd w:id='0'/><w:r><w:commentReference w:id='0'/></w:r>"
+                     (wr " after"))))
+         (z (audit5-docx body #t))
+         (blocks (docx-blocks-of* z))
+         (doc (convert z "docx-document" "texmacs-stree"))
+         (text (archive-entry (convert doc "texmacs-stree" "docx-document") "word/document.xml")))
+    (check= blocks
+            '((p "before " (commented "the range" (comment (@ (author "Ann")) (p "a remark")))
+                 " after")))
+    (check= (cdr (cadr (cadr doc)))
+            '((concat "before " (office-commented "the range" "Ann" "" "a remark") " after")))
+    ;; the range around its text, then the mark of the comment
+    (check-true (text-before? text "<w:commentRangeStart w:id=\"0\"/>" "the range"))
+    (check-true (text-before? text "the range" "<w:commentRangeEnd w:id=\"0\"/>"))
+    (check-true (text-before? text "<w:commentRangeEnd w:id=\"0\"/>" "<w:commentReference"))
+    (check-true (text-before? text "<w:commentReference" " after"))
+    (check= (docx-blocks-of* (convert doc "texmacs-stree" "docx-document")) blocks)
+    ;; a mark without its other one: a comment on a point
+    (check= (docx-blocks-of* (audit5-docx (wp "<w:commentRangeStart w:id='0'/>" (wr "x")
+                                              "<w:r><w:commentReference w:id='0'/></w:r>")
+                                          #t))
+            '((p "x" (comment (@ (author "Ann")) (p "a remark")))))
+    ;; in the other format, and in OpenDocument
+    (let* ((o (convert doc "texmacs-stree" "odt-document"))
+           (c (archive-entry o "content.xml"))
+           (back (odt-blocks-of* o)))
+      (check-true (text-before? c "<office:annotation office:name=" "the range"))
+      (check-true (text-before? c "the range" "<office:annotation-end office:name="))
+      (check= (list-filter back (lambda (b) (func? b 'p))) blocks)))
+  (check= (odt-blocks-of
+            (string-append "<text:p>a <office:annotation office:name='n1'><dc:creator>Bob</dc:creator>"
+                           "<text:p>note</text:p></office:annotation>range"
+                           "<office:annotation-end office:name='n1'/> b</text:p>")
+            "" "")
+          '((p "a " (commented "range" (comment (@ (author "Bob")) (p "note"))) " b"))))
+
+(define (test-office-audit-5-misc)
+  (check-group "fifth audit, other")
+  ;; the reading of a file of the style office, by default
+  (check= (get-preference "office->texmacs:faithful") "on")
+  ;; no picture of Windows without its bytes
+  (check-false (office-metafile->png "" "a.emf")))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The formats
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -4542,5 +4899,9 @@
   (test-export-audit-4)
   (test-office-apps-check)
   (test-latex-office)
+  (test-office-changed)
+  (test-office-nested-fields)
+  (test-office-comment-ranges)
+  (test-office-audit-5-misc)
   (test-formats)
   (check-end))

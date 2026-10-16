@@ -84,7 +84,7 @@
              html-tag html-attr html-div-style html-div-class html-style
              html-class
              ;; the macros of the style office
-             office-par office-span office-field office-comment office-ins
+             office-par office-span office-field office-comment office-commented office-ins
              office-del office-columns office-columns* office-underline office-strike
              office-letters office-font office-capitalize office-float office-box office-shape))
     ;; the screens of a presentation and the folds: all of them, not

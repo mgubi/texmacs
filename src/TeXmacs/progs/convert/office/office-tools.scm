@@ -506,6 +506,42 @@
     (if (<= (string-length s) 300) s
         (string-append (substring s 0 300) "..."))))
 
+(define (office-comment-id x)
+  (and (func? x 'comment) (ox-attr x 'id)))
+
+(define (office-without-id c)
+  (apply office-node
+         (cons* 'comment (map (lambda (a) (list (car a) (cadr a)))
+                              (list-filter (ox-attrs c) (lambda (a) (!= (car a) 'id))))
+                (ox-children c))))
+
+(tm-define (office-comment-ranges l)
+  (:synopsis "The nodes @l with the commented ranges made nodes commented")
+  ;; A comment on a range of the text: the marks (!comment-start id) and
+  ;; (!comment-end id) of the readers around the range, and the node comment
+  ;; with the attribute id, before or after them, become a node commented
+  ;; with the range and the comment, its last child. A mark without its
+  ;; other one or its comment is left out: the comment is on a point.
+  (if (not (list-find l (lambda (y) (or (func? y '!comment-start) (office-comment-id y))))) l
+      (let loop ((l l) (acc '()))
+        (cond ((null? l) (reverse acc))
+              ((func? (car l) '!comment-start)
+               (let* ((id (cadr (car l)))
+                      (rest (cdr l))
+                      (j (list-find-index rest (lambda (y) (and (func? y '!comment-end)
+                                                                (== (cadr y) id)))))
+                      (c (list-find rest (lambda (y) (== (office-comment-id y) id)))))
+                 (if (not (and j c)) (loop (cdr l) acc)
+                     (let ((inside (list-filter (sublist rest 0 j) (lambda (y) (not (eq? y c)))))
+                           (after (list-filter (list-tail rest (+ j 1)) (lambda (y) (not (eq? y c))))))
+                       (loop after (cons (if (null? inside) (office-without-id c)
+                                             `(commented ,@(office-comment-ranges inside)
+                                                         ,(office-without-id c)))
+                                         acc))))))
+              ((func? (car l) '!comment-end) (loop (cdr l) acc))
+              ((office-comment-id (car l)) (loop (cdr l) (cons (office-without-id (car l)) acc)))
+              (else (loop (cdr l) (cons (car l) acc)))))))
+
 (tm-define (office-changes l)
   (:synopsis "The nodes @l with the marks of tracked changes made nodes ins and del")
   ;; the nodes l, with the marks of the tracked changes made nodes ins and
@@ -518,7 +554,7 @@
                                             (reverse acc)))
                      (if (null? (reverse acc)) (caddr (car stack))
                          (cons node (caddr (car stack))))))))
-      (cond ((and (null? l) (null? stack)) (reverse acc))
+      (cond ((and (null? l) (null? stack)) (office-comment-ranges (reverse acc)))
             ((null? l) (loop l (close acc stack) (cdr stack)))
             ((func? (car l) '!change-start)
              (loop (cdr l) '() (cons (list (cadr (car l)) (caddr (car l)) acc) stack)))
@@ -554,8 +590,27 @@
         (else #f)))
 
 (define (office-quote s)
-  ;; s as one word of the shell
-  (string-append "'" (string-replace s "'" "'\\''") "'"))
+  ;; s as one word of the shell (of cmd under Windows)
+  (if (os-win32?)
+      (string-append "\"" (string-replace s "\"" "") "\"")
+      (string-append "'" (string-replace s "'" "'\\''") "'")))
+
+(define office-soffice-timeout 120) ; seconds, after which LibreOffice is stopped
+
+(define (office-soffice-run prog args)
+  ;; runs LibreOffice with the words args, without input, and stops it
+  ;; (by its process number) when it takes longer than the timeout: a
+  ;; LibreOffice which hangs does not stop the conversion
+  (with cmd (apply string-append
+                   (cons (office-quote prog)
+                         (map (lambda (a) (string-append " " (office-quote a))) args)))
+    (if (os-win32?)
+        (eval-system cmd)
+        (eval-system
+          (string-append cmd " < /dev/null > /dev/null 2>&1 & p=$!; "
+                         "( sleep " (number->string office-soffice-timeout)
+                         "; kill -9 $p ) > /dev/null 2>&1 < /dev/null & w=$!; "
+                         "wait $p; kill $w > /dev/null 2>&1; true")))))
 
 (tm-define (office-metafile? name)
   (:synopsis "Whether the file @name is a picture of Windows (EMF, WMF)")
@@ -563,33 +618,61 @@
        (with n (locase-all name)
          (or (string-ends? n ".emf") (string-ends? n ".wmf")))))
 
+;; The PNG of each picture, by its bytes: a picture which a file has many
+;; times, or which is read again, is converted once (#f when it could not)
+(define office-metafile-cache (make-ahash-table))
+
+(tm-define (office-metafiles->png l)
+  (:synopsis "Convert the pictures of Windows l, a list of (data name), at once")
+  ;; with one LibreOffice for all of them, the PNG of each in the cache
+  (let* ((prog (office-soffice))
+         (todo (let loop ((l l) (acc '()) (seen (make-ahash-table)))
+                 (cond ((null? l) (reverse acc))
+                       ((or (not (string? (caar l))) (== (caar l) "")
+                            (ahash-ref office-metafile-cache (caar l))
+                            (ahash-ref seen (caar l)))
+                        (loop (cdr l) acc seen))
+                       (else (ahash-set! seen (caar l) #t)
+                             (loop (cdr l) (cons (car l) acc) seen))))))
+    (when (and prog (pair? todo))
+      (catch #t
+        (lambda ()
+          (let* ((dir (url-temp))
+                 (profile (url-append (url-expand "$TEXMACS_HOME_PATH")
+                                      "system/office-profile"))
+                 (files (map (lambda (x i)
+                               (let* ((suffix (if (string-ends? (locase-all (cadr x)) ".wmf")
+                                                  ".wmf" ".emf"))
+                                      (base (string-append "picture" (number->string i))))
+                                 (list (car x) (url-append dir (string-append base suffix))
+                                       (url-append dir (string-append base ".png")))))
+                             todo (iota (length todo)))))
+            (system-mkdir dir)
+            (for (f files) (string-save (car f) (cadr f)))
+            (office-soffice-run
+              prog
+              (append (list "--headless"
+                            (string-append "-env:UserInstallation=file://"
+                                           (if (os-win32?) "/" "")
+                                           (string-replace (url->system profile) "\\" "/"))
+                            "--convert-to" "png" "--outdir" (url->system dir))
+                      (map (lambda (f) (url->system (cadr f))) files)))
+            (for (f files)
+              (with r (and (url-exists? (caddr f)) (string-load (caddr f)))
+                (ahash-set! office-metafile-cache (car f)
+                            (if (and r (> (string-length r) 8)) r 'none)))
+              (for (u (cdr f)) (when (url-exists? u) (system-remove u))))
+            (system-rmdir dir)))
+        (lambda args #f)))))
+
 (tm-define (office-metafile->png data name)
   (:synopsis "The PNG of the picture @data of Windows named @name, or #f")
-  (let ((prog (office-soffice)))
-    (and prog (string? data) (> (string-length data) 0)
-         (catch #t
-           (lambda ()
-             (let* ((dir (url-temp))
-                    (suffix (if (string-ends? (locase-all name) ".wmf") ".wmf" ".emf"))
-                    (in (url-append dir (string-append "picture" suffix)))
-                    (out (url-append dir "picture.png"))
-                    (profile (url-append (url-expand "$TEXMACS_HOME_PATH")
-                                         "system/office-profile")))
-               (system-mkdir dir)
-               (string-save data in)
-               (eval-system
-                 (string-append (office-quote prog) " --headless "
-                                (office-quote (string-append "-env:UserInstallation=file://"
-                                                             (url->system profile)))
-                                " --convert-to png --outdir "
-                                (office-quote (url->system dir)) " "
-                                (office-quote (url->system in))
-                                " < /dev/null 2>&1"))
-               (with r (and (url-exists? out) (string-load out))
-                 (for (u (list in out)) (when (url-exists? u) (system-remove u)))
-                 (system-rmdir dir)
-                 (and r (> (string-length r) 8) r))))
-           (lambda args #f)))))
+  (and (string? data) (> (string-length data) 0)
+       (begin
+         (when (not (ahash-ref office-metafile-cache data))
+           (office-metafiles->png (list (list data name))))
+         (with r (ahash-ref office-metafile-cache data)
+           (and (string? r) r)))))
 
 (tm-define (office-join-strings l)
   (:synopsis "The list @l with the strings which follow each other as one")

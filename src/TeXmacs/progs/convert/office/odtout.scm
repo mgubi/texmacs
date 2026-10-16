@@ -932,11 +932,15 @@
                                                         (list y)))
                                                   inner)))
                      inner)))
-              ((comment)
-               (list `(office:annotation
-                        (dc:creator ,(or (ox-attr x 'author) "TeXmacs"))
-                        ,@(if (ox-attr x 'date) `((dc:date ,(ox-attr x 'date))) '())
-                        ,@(ot-blocks-with (ox-children x) "Standard"))))
+              ((comment) (list (ot-annotation x #f)))
+              ;; a comment on a range: its start and its end around the text
+              ((commented)
+               (if (not (and (pair? l) (func? (cAr l) 'comment))) (ot-inlines l props)
+                   (let* ((name (string-append "__Annotation__TmC" (number->string (ot-next-id))))
+                          (start (ot-annotation (cAr l) name))
+                          (inner (ot-inlines (cDr l) props)))
+                     (append (list start) inner
+                             (list `(office:annotation-end (@ (office:name ,name))))))))
               ((ins del) (ot-change x props))
               ((color)
                (ot-inlines l (if (office-color (ox-attr x 'value))
@@ -1756,6 +1760,178 @@
   (with s (and ot-package (ahash-ref ot-package name))
     (and s (ox-root (parse-xml s)))))
 
+;; The headers and the footers which were changed in TeXmacs (header nodes
+;; with the attribute changed, see tmof-headers) replace those of the first
+;; page of the file. Their automatic styles are those of styles.xml, under
+;; names of their own.
+
+(define ot-headers '())       ; (element-tag . element) of the new headers
+(define ot-header-styles '()) ; their automatic styles
+
+(define ot-master-order
+  '(style:header style:header-left style:header-first style:footer
+    style:footer-left style:footer-first))
+
+(define (ot-header-tag x)
+  (let ((place (if (== (ox-attr x 'place) "footer") "footer" "header"))
+        (kind (ox-attr x 'kind)))
+    (string->symbol (string-append "style:" place
+                                   (cond ((== kind "even") "-left")
+                                         ((== kind "first") "-first")
+                                         (else ""))))))
+
+(define (ot-rename-styles x names)
+  ;; the element x, with the names of styles of names renamed
+  (cond ((not (pair? x)) x)
+        ((func? x '@)
+         (cons '@ (map (lambda (a)
+                         (if (and (pair? a) (pair? (cdr a)) (string? (cadr a))
+                                  (or (eq? (car a) 'style:name)
+                                      (string-ends? (symbol->string (car a)) "style-name"))
+                                  (assoc (cadr a) names))
+                             (list (car a) (cdr (assoc (cadr a) names)))
+                             a))
+                       (cdr x))))
+        (else (cons (car x) (map (lambda (y) (ot-rename-styles y names)) (cdr x))))))
+
+(define (ot-write-headers l taken)
+  ;; the new headers of the header nodes of l which were changed; taken:
+  ;; the names of the automatic styles of styles.xml
+  (set! ot-headers '())
+  (set! ot-header-styles '())
+  (for (x (list-filter l (lambda (y) (and (func? y 'header) (ox-attr y 'changed)))))
+    (let* ((tag (ot-header-tag x))
+           (place (if (== (ox-attr x 'place) "footer") "Footer" "Header")))
+      (cond ((not (ox-attr x 'removed))
+             (let ((old-styles ot-styles) (old-list ot-style-list))
+               (set! ot-styles (make-ahash-table))
+               (set! ot-style-list '())
+               (let* ((blocks (ot-blocks-with (ox-children x)
+                                              (if (in? place taken) place "Standard")))
+                      (blocks (if (null? blocks) '((text:p)) blocks))
+                      (made (reverse ot-style-list))
+                      (names (map (lambda (st)
+                                    (let* ((n (or (ox-attr st 'style:name) ""))
+                                           (new (let loop ((i 1))
+                                                  (with c (string-append "TmH" (number->string i) n)
+                                                    (if (in? c taken) (loop (+ i 1)) c)))))
+                                      (cons n new)))
+                                  made)))
+                 (set! ot-styles old-styles)
+                 (set! ot-style-list old-list)
+                 (set! ot-header-styles
+                       (append ot-header-styles (map (lambda (st) (ot-rename-styles st names)) made)))
+                 (set! ot-headers
+                       (cons (cons tag (ot-rename-styles `(,tag ,@blocks) names)) ot-headers)))))
+            ((== (ox-attr x 'kind) "even")
+             ;; (the even pages without a header, rather than with the one
+             ;; of the odd pages)
+             (set! ot-headers (cons (cons tag `(,tag (@ (style:display "false")))) ot-headers)))
+            (else (set! ot-headers (cons (cons tag #f) ot-headers)))))))
+
+(define (ot-master-with-headers m)
+  ;; the first page m of the file, with the new headers
+  (if (null? ot-headers) m
+      (let* ((tags (map car ot-headers))
+             (rank (lambda (y) (or (list-find-index ot-master-order (lambda (t) (func? y t))) 100)))
+             (theirs (list-filter (ox-children m)
+                                  (lambda (y) (not (and (pair? y) (in? (car y) tags))))))
+             (mine (list-filter (map cdr ot-headers) identity))
+             (all (append (list-filter theirs pair?) mine)))
+        `(style:master-page (@ ,@(ox-attrs m))
+                            ,@(sort all (lambda (a b) (< (rank a) (rank b))))))))
+
+;; A named style whose macro was changed in TeXmacs (the attribute changed
+;; of its node style, see tmof-changed-keys): the properties which were
+;; changed are written again, the others are those of the file.
+
+(define ot-text-groups
+  ;; (keys of a node style, attributes, attributes when they are off)
+  '(((strong) (fo:font-weight style:font-weight-asian style:font-weight-complex)
+              ((fo:font-weight "normal") (style:font-weight-asian "normal")
+               (style:font-weight-complex "normal")))
+    ((em) (fo:font-style style:font-style-asian style:font-style-complex)
+          ((fo:font-style "normal") (style:font-style-asian "normal")
+           (style:font-style-complex "normal")))
+    ((smallcaps) (fo:font-variant) ((fo:font-variant "normal")))
+    ((caps) (fo:text-transform) ((fo:text-transform "none")))
+    ((color) (fo:color) ())
+    ((size) (fo:font-size style:font-size-asian style:font-size-complex) ())
+    ((font-name font) (fo:font-family style:font-name style:font-family-generic
+                       style:font-pitch) ())
+    ((letters) (fo:letter-spacing) ())
+    ((underline underline-kind)
+     (style:text-underline-style style:text-underline-type style:text-underline-width
+      style:text-underline-color)
+     ((style:text-underline-style "none")))
+    ((strike dstrike) (style:text-line-through-style style:text-line-through-type)
+                      ((style:text-line-through-style "none")))))
+
+(define ot-paragraph-groups
+  '(((space-before) (fo:margin-top) ())
+    ((space-after) (fo:margin-bottom) ())
+    ((indent-left) (fo:margin-left) ())
+    ((indent-right) (fo:margin-right) ())
+    ((first-indent) (fo:text-indent) ())
+    ((line-spacing) (fo:line-height) ())
+    ((align) (fo:text-align) ())
+    ((background) (fo:background-color) ())
+    ((border) (fo:border fo:padding) ())))
+
+(define (ot-patch-attrs attrs groups changed st make)
+  ;; the attributes of style:text-properties or style:paragraph-properties,
+  ;; with the groups which have a changed key made again from st
+  (let loop ((g groups) (attrs attrs))
+    (if (null? g) attrs
+        (let ((keys (car (car g)))
+              (names (cadr (car g)))
+              (off (caddr (car g))))
+          (if (not (list-find keys (lambda (k) (in? k changed))))
+              (loop (cdr g) attrs)
+              (let* ((sub (office-node 'style (map (lambda (k) (list k (ox-attr st k))) keys)))
+                     (made (list-filter (make sub) (lambda (a) (in? (car a) names))))
+                     (made (if (null? made) off made))
+                     (rest (list-filter attrs (lambda (a) (not (in? (car a) names))))))
+                (loop (cdr g) (append rest made))))))))
+
+(define (ot-changed-style x)
+  ;; the style x of the file, in the look of its macro when it was changed
+  (let* ((family (and (func? x 'style:style) (ox-attr x 'style:family)))
+         (st (and (in? family '("paragraph" "text"))
+                  (ot-source-style (or (ox-attr x 'style:name) "") family)))
+         (changed (and st (ox-attr st 'changed)
+                       (map string->symbol (string-tokenize-by-char (ox-attr st 'changed) #\space)))))
+    (if (not (pair? changed)) x
+        (let* ((pp (ox-child x 'style:paragraph-properties))
+               (tp (ox-child x 'style:text-properties))
+               (pp-attrs (and (== family "paragraph")
+                              (ot-patch-attrs (if pp (ox-attrs pp) '()) ot-paragraph-groups
+                                              changed st ot-style-paragraph-properties)))
+               (tp-attrs (ot-patch-attrs (if tp (ox-attrs tp) '()) ot-text-groups
+                                         changed st ot-style-text-properties))
+               (others (list-filter (ox-children x)
+                                    (lambda (y) (not (and (pair? y)
+                                                          (in? (car y) '(style:paragraph-properties
+                                                                         style:text-properties))))))))
+          `(style:style (@ ,@(ox-attrs x))
+                        ,@(if (and pp-attrs (or pp (pair? pp-attrs)))
+                              `((style:paragraph-properties (@ ,@pp-attrs)
+                                                            ,@(if pp (ox-children pp) '())))
+                              '())
+                        ,@(if (or tp (pair? tp-attrs))
+                              `((style:text-properties (@ ,@tp-attrs)
+                                                       ,@(if tp (ox-children tp) '())))
+                              '())
+                        ,@(list-filter others pair?))))))
+
+(define (ot-annotation x name)
+  ;; the element of the comment x, the start of a range when it has a name
+  `(office:annotation
+     ,@(if name `((@ (office:name ,name))) '())
+     (dc:creator ,(or (ox-attr x 'author) "TeXmacs"))
+     ,@(if (ox-attr x 'date) `((dc:date ,(ox-attr x 'date))) '())
+     ,@(ot-blocks-with (ox-children x) "Standard")))
+
 (define (ot-merged-styles mine)
   ;; The styles of the file which the text was read from: its named styles,
   ;; its pages with their headers and footers, its fonts, with those of
@@ -1815,10 +1991,11 @@
                                                            (not (assq (car a) (cdr x))))))))
                             ((func? x 'office:styles)
                              `(office:styles (@ ,@(ox-attrs x))
-                                             ,@(if outline
-                                                   (list-filter (ox-children x)
-                                                                (lambda (y) (not (func? y 'text:outline-style))))
-                                                   (ox-children x))
+                                             ,@(map ot-changed-style
+                                                    (if outline
+                                                        (list-filter (ox-children x)
+                                                                     (lambda (y) (not (func? y 'text:outline-style))))
+                                                        (ox-children x)))
                                              ,@(if outline (list outline) '())
                                              ,@new-styles))
                             ((func? x 'office:font-face-decls)
@@ -1826,7 +2003,13 @@
                                                       ,@new-fonts))
                             ((func? x 'office:automatic-styles)
                              `(office:automatic-styles (@ ,@(ox-attrs x))
-                                                       ,@(map fix-layout (ox-children x))))
+                                                       ,@(map fix-layout (ox-children x))
+                                                       ,@ot-header-styles))
+                            ((func? x 'office:master-styles)
+                             `(office:master-styles
+                                (@ ,@(ox-attrs x))
+                                ,@(map (lambda (y) (if (eq? y master) (ot-master-with-headers y) y))
+                                       (ox-children x))))
                             (else x)))))
           (cons (car root) (map fix (cdr root)))))))
 
@@ -1856,6 +2039,7 @@
         ((or (string-ends? name ".jpg") (string-ends? name ".jpeg")) "image/jpeg")
         ((string-ends? name ".svg") "image/svg+xml")
         ((string-ends? name ".gif") "image/gif")
+        ((string-ends? name ".rdf") "application/rdf+xml")
         (else "application/octet-stream")))
 
 (tm-define (serialize-odt-document x)
@@ -1907,9 +2091,26 @@
                      '((text:p (@ (text:style-name "Text_20_body"))))
                      blocks))
          (content (ot-with-data-styles (ot-content blocks)))
+         (_ (when ot-package
+              (with root (ot-package-xml "styles.xml")
+                (ot-write-headers
+                  (if (func? x 'office) (cdr x) '())
+                  (append
+                    (map (lambda (y) (or (ox-attr y 'style:name) ""))
+                         (append (ox-elements (or (ox-child root 'office:automatic-styles) '(x)))
+                                 (ox-elements (or (ox-child root 'office:styles) '(x)))))
+                    '())))))
+         (content-xml (ox-serialize content))
+         (styles-xml (ox-serialize (ot-complete-styles (ot-merged-styles (ot-styles-file)))))
+         ;; (a picture of the file which the text and the styles do not
+         ;; name any more is not written: it was deleted in TeXmacs)
+         (named? (lambda (n)
+                   (or (not (string-starts? n "Pictures/"))
+                       (>= (string-search-forwards n 0 content-xml) 0)
+                       (>= (string-search-forwards n 0 styles-xml) 0))))
          (kept (if ot-package
                    (sort (list-filter (map car (ahash-table->list ot-package))
-                                      ot-kept-entry?)
+                                      (lambda (n) (and (ot-kept-entry? n) (named? n))))
                          string<?)
                    '()))
          (files (append (reverse ot-files)
@@ -1922,8 +2123,8 @@
               (append '("mimetype" "content.xml" "styles.xml" "META-INF/manifest.xml")
                       (map car entries))
               (append (list "application/vnd.oasis.opendocument.text"
-                            (ox-serialize content)
-                            (ox-serialize (ot-complete-styles (ot-merged-styles (ot-styles-file))))
+                            content-xml
+                            styles-xml
                             (ox-serialize (ot-manifest files)))
                       (map caddr entries)))))
     (set! ot-styles (make-ahash-table))
@@ -1932,4 +2133,6 @@
     (set! ot-pictures (make-ahash-table))
     (set! ot-changes '())
     (set! ot-package #f)
+    (set! ot-headers '())
+    (set! ot-header-styles '())
     r))
