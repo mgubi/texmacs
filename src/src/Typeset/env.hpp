@@ -615,6 +615,17 @@ public:
   // used again writes again, in the same order (the last one wins), as
   // tuples of the key, the value and the file or part
   array<tree>* rec_bindings;
+  // The arrays of variables (the reads or the inputs of a bridge below)
+  // which are all in the record already (add_reads, add_inputs): one
+  // which is given again adds nothing, and is not gone through again
+  // (held, so that another one is not taken for it at the same place)
+  hashmap<pointer,bool>* rec_merged;
+  array<array<int> >* rec_held;
+  inline bool merged (array<int> a) {
+    return rec_merged != NULL && (*rec_merged)->contains (a.operator-> ()); }
+  inline void merging (array<int> a) {
+    if (rec_merged == NULL || N(a) == 0) return;
+    (*rec_merged) (a.operator-> ())= true; (*rec_held) << a; }
   void write_binding (string key, tree value, string extra);
   inline void write_bindings (array<tree> l) {
     for (int i=0; i<N(l); i++)
@@ -665,6 +676,10 @@ public:
     hashmap<string,bool> key_set;
     array<int>* outer_in_vars;
     array<tree>* outer_in_vals;
+    hashmap<pointer,bool>* outer_merged;
+    array<array<int> >* outer_held;
+    hashmap<pointer,bool> merged;
+    array<array<int> > held;
     inline read_record (edit_env_rep* e, hashmap<int,bool>* rec,
                         array<string>* keys, array<tree>* values,
                         array<int>* in_vars= NULL,
@@ -673,10 +688,13 @@ public:
       outer_unknown (e->read_unknown), stopped (false),
       outer_keys (e->rec_keys), outer_values (e->rec_values),
       outer_key_set (e->rec_key_set), key_set (false),
-      outer_in_vars (e->env.in_vars), outer_in_vals (e->env.in_vals) {
+      outer_in_vars (e->env.in_vars), outer_in_vals (e->env.in_vals),
+      outer_merged (e->rec_merged), outer_held (e->rec_held),
+      merged (false) {
         env->record_reads (rec, false);
         env->record_lookups (keys, values, &key_set);
         env->env.in_vars= in_vars; env->env.in_vals= in_vals;
+        env->rec_merged= &merged; env->rec_held= &held;
         env->read_unknown= false; }
     // nothing was read but what the record holds
     inline bool complete () { return !env->read_all () && !env->read_unknown; }
@@ -685,6 +703,7 @@ public:
       env->record_reads (outer_rec, outer_all);
       env->record_lookups (outer_keys, outer_values, outer_key_set);
       env->env.in_vars= outer_in_vars; env->env.in_vals= outer_in_vals;
+      env->rec_merged= outer_merged; env->rec_held= outer_held;
       env->read_unknown= outer_unknown;
       stopped= true; }
     inline ~read_record () { stop (); }
