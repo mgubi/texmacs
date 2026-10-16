@@ -388,6 +388,20 @@ test("drawing and scrolling", async p => {
 	await p.until("a click above the thumb scrolls back", async () => (await scroll()) < before);
 });
 
+test("the GPU renderer of the core", async p => {
+	// (a core built with THORVG, misc/tau/Makefile: the renderer of the shell
+	// on a WebGL 2 context of the worker, tau_gpu.cpp; others say so)
+	await p.open();
+	const said = await p.page.evaluate(() => new Promise(res => {
+		tau.worker.addEventListener("message", e => { if (e.data.t === "gpu-check") res(e.data.text); });
+		tau.worker.postMessage({ t: "gpu-check" });
+		setTimeout(() => res("no answer"), 20000);
+	}));
+	if (said === "not built") return;
+	check("a rectangle, a line (ThorVG), a glyph (the atlas) and a moved rectangle are drawn, and read back",
+		said === "rect 255,0,0,255; line 0,0,255,255; glyph 0,128,0,255; moved 255,0,255,255; white 255,255,255,255", said);
+});
+
 test("paste from the menu", async p => {
 	await p.open();
 	await p.newDocument();

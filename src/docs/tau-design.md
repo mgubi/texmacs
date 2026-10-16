@@ -1362,6 +1362,23 @@ from 16 to 1024 pixels. As in the page of TeXmacs Vue
   the documentation, at the cursor, instead of 62883 with the glyphs not
   made bolder). With the commands drawn by the GPU, the bolder glyphs cost
   nothing: their coverage is made once.
+- **The renderer in C++** (2026-10-16). The plan: the core in the worker
+  draws its own commands with the renderer of the shell (`vue_gpu.cpp`,
+  protocol 3 replayed as `tau_shell.cpp` does), on a WebGL 2 context of the
+  worker, and gives the page what it drew; one renderer for the shell and
+  the page, its glyphs and pictures kept in the core (which can forget a
+  picture and draw it again). `gl.mjs` stays, for the cores built without
+  it. Done: the OpenGL backend without SDL (`gpu_backend_gl.cpp`,
+  `GL_OFFSCREEN`: an OffscreenCanvas which the worker makes, found by
+  Emscripten as `#tau-gpu`), `vue_gpu_start` (the renderer without a
+  window), and the web core built with it when asked (`THORVG=<prefix>`,
+  ThorVG built for WebAssembly with its GL engine; 350 KB more, 21.9 MB).
+  `tau_gpu.cpp` draws a rectangle, a line (ThorVG), a glyph from its
+  coverage (the atlas) and a moved rectangle into a target and reads them
+  back, right in Firefox and Safari 26 (the browser test "the GPU renderer
+  of the core"). Next: the commands of a view replayed into a target in the
+  worker, and the target given to the page (an ImageBitmap of the canvas,
+  drawn by a "bitmaprenderer" canvas: one context for all the views).
 - **Left**: a limit to the pictures kept by the page (WebGL has one for
   its textures; the page cannot forget a picture, which the core sends
   once), and to the glyphs of the shell; the pattern of a rotated shape is rotated with it (MuPDF keeps

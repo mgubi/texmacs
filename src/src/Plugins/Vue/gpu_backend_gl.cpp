@@ -12,7 +12,10 @@
 
 // All the windows are drawn with one GL context (SDL_GL_MakeCurrent for the
 // window being drawn), so that the textures, and the framebuffers of the
-// editors, belong to all of them. A target is a texture with a framebuffer,
+// editors, belong to all of them. Without SDL (the core of Tau in the
+// browser, GL_OFFSCREEN): a WebGL 2 context of its own, on an OffscreenCanvas
+// which the worker of the core makes; it draws targets, which are read or
+// given to the page, and has no window. A target is a texture with a framebuffer,
 // drawn with y = 0 at the top of its framebuffer, as ThorVG draws: its
 // texture has its first row (v = 0) at the bottom of the picture, the
 // texture of an uploaded image at the top. ThorVG's GL engine draws into a
@@ -30,7 +33,13 @@ gpu_backend* gpu_gl_backend () { return NULL; }
 
 #include "tm_ostream.hpp"
 #include "basic.hpp"
+#if defined (__EMSCRIPTEN__) && !defined (VUETEXMACS)
+#define GL_OFFSCREEN 1
+#include <emscripten.h>
+#include <emscripten/html5.h>
+#else
 #include <SDL3/SDL.h>
+#endif
 #include <thorvg.h>
 #ifdef __EMSCRIPTEN__
 #include <GLES3/gl3.h>
@@ -315,8 +324,15 @@ link_program (const char* vs, const char* fs) {
 
 static const int SMALL= 512;
 
+#ifdef GL_OFFSCREEN
+// the canvas of the context: made by the worker, found by its name
+EM_JS (void, gl_offscreen_canvas, (), {
+  specialHTMLTargets["#tau-gpu"]= new OffscreenCanvas (1, 1);
+});
+#endif
+
 class gl_backend: public gpu_backend {
-  SDL_GLContext ctx= NULL;
+  void* ctx= NULL;  // SDL_GLContext, or the handle of the WebGL context
   bool failed= false;
   GLuint prog= 0, vao= 0, vbo= 0;
   GLint u_size= -1, u_mode= -1, u_tex= -1, u_atlas= -1, u_porig= -1, u_ptile= -1;
@@ -343,12 +359,17 @@ class gl_backend: public gpu_backend {
 
 public:
   const char* name () { return "OpenGL"; }
+#ifdef GL_OFFSCREEN
+  unsigned long long window_flags () { return 0; }
+  void present (SDL_Window* w) { (void) w; }
+#else
   unsigned long long window_flags () { return SDL_WINDOW_OPENGL; }
+  void present (SDL_Window* w) { SDL_GL_SwapWindow (w); }
+#endif
   bool prepare ();
   bool attach (SDL_Window* w);
   string description ();
   void begin_screen (int dw, int dh) { (void) dw; (void) dh; }
-  void present (SDL_Window* w) { SDL_GL_SwapWindow (w); }
 
   gpu_texture new_texture (int w, int h, gpu_format f, bool linear, bool repeat,
                            const void* data);
@@ -375,7 +396,9 @@ gl_backend::prepare () {
   static bool done= false;
   if (done) return !failed;
   done= true;
-#ifdef __EMSCRIPTEN__
+#ifdef GL_OFFSCREEN
+  // (the context is made by attach)
+#elif defined (__EMSCRIPTEN__)
   SDL_GL_SetAttribute (SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
   SDL_GL_SetAttribute (SDL_GL_CONTEXT_MAJOR_VERSION, 3);
   SDL_GL_SetAttribute (SDL_GL_CONTEXT_MINOR_VERSION, 0);
@@ -392,10 +415,12 @@ gl_backend::prepare () {
 #endif
   SDL_GL_SetAttribute (SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_FORWARD_COMPATIBLE_FLAG);
 #endif
+#ifndef GL_OFFSCREEN
   SDL_GL_SetAttribute (SDL_GL_DOUBLEBUFFER, 1);
   SDL_GL_SetAttribute (SDL_GL_DEPTH_SIZE, 0);
   SDL_GL_SetAttribute (SDL_GL_STENCIL_SIZE, 0);
   SDL_GL_SetAttribute (SDL_GL_SHARE_WITH_CURRENT_CONTEXT, 1);
+#endif
 #ifndef __EMSCRIPTEN__
   // NOTE: whether there is OpenGL 3, before the first window is made: the
   // windows made for the GPU are not drawn without it (Windows with the
@@ -462,6 +487,33 @@ gl_backend::init () {
   return true;
 }
 
+#ifdef GL_OFFSCREEN
+bool
+gl_backend::attach (SDL_Window* w) {
+  (void) w;  // (no window: see vue_gpu_start)
+  if (failed) return false;
+  if (ctx == NULL) {
+    gl_offscreen_canvas ();
+    EmscriptenWebGLContextAttributes a;
+    emscripten_webgl_init_context_attributes (&a);
+    a.majorVersion= 2; a.minorVersion= 0;
+    a.alpha= true; a.premultipliedAlpha= true;
+    a.depth= false; a.stencil= false; a.antialias= false;
+    a.preserveDrawingBuffer= false;
+    EMSCRIPTEN_WEBGL_CONTEXT_HANDLE h= emscripten_webgl_create_context ("#tau-gpu", &a);
+    if (h <= 0 || emscripten_webgl_make_context_current (h) != EMSCRIPTEN_RESULT_SUCCESS) {
+      cout << "TeXmacs] GPU: no WebGL 2 in the worker" << LF;
+      failed= true;
+      return false;
+    }
+    ctx= (void*) (intptr_t) h;
+    if (!init ()) { failed= true; return false; }
+    return true;
+  }
+  return emscripten_webgl_make_context_current ((EMSCRIPTEN_WEBGL_CONTEXT_HANDLE) (intptr_t) ctx)
+         == EMSCRIPTEN_RESULT_SUCCESS;
+}
+#else
 bool
 gl_backend::attach (SDL_Window* w) {
   if (failed || w == NULL) return false;
@@ -473,11 +525,11 @@ gl_backend::attach (SDL_Window* w) {
       failed= true;
       return false;
     }
-    SDL_GL_MakeCurrent (w, ctx);
+    SDL_GL_MakeCurrent (w, (SDL_GLContext) ctx);
 #ifndef __EMSCRIPTEN__
     if (!vue_gl_load ()) {
       cout << "TeXmacs] GPU: no OpenGL 3, drawing with MuPDF" << LF;
-      SDL_GL_DestroyContext (ctx);
+      SDL_GL_DestroyContext ((SDL_GLContext) ctx);
       ctx= NULL;
       failed= true;
       return false;
@@ -487,8 +539,9 @@ gl_backend::attach (SDL_Window* w) {
     if (!init ()) { failed= true; return false; }
     return true;
   }
-  return SDL_GL_MakeCurrent (w, ctx);
+  return SDL_GL_MakeCurrent (w, (SDL_GLContext) ctx);
 }
+#endif
 
 string
 gl_backend::description () {

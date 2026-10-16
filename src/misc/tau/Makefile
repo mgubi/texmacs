@@ -65,6 +65,20 @@ LDFLAGS  := $(OPT) $(EH) -sALLOW_MEMORY_GROWTH=1 -sABORTING_MALLOC=1 -sIMPORTED_
 LIBS     := $(MUPDF_LIB)/libmupdf.a $(MUPDF_LIB)/libmupdf-third.a -lm
 LIBDEPS  := $(MUPDF_LIB)/libmupdf.a $(MUPDF_LIB)/libmupdf-third.a
 
+# THORVG=<prefix>: the web core with the GPU renderer of the shell
+# (vue_gpu.cpp, gpu_backend_gl.cpp: WebGL 2 on a canvas of the worker, and
+# ThorVG built for WebAssembly, misc/thorvg/build-thorvg.sh, in <prefix>);
+# tau_gpu.cpp says whether it draws (for now). Only those objects are
+# compiled with USE_THORVG, the others are those of the build without it
+ifneq ($(THORVG),)
+GPU_SOURCES := Plugins/Vue/vue_gpu.cpp Plugins/Vue/gpu_backend_gl.cpp Tau/tau_gpu.cpp
+GPU_OBJECTS := $(patsubst %,$(OBJ)/%.o,$(basename $(GPU_SOURCES)))
+GPU_LINK    := $(THORVG)/lib/libthorvg-1.a -sMIN_WEBGL_VERSION=2 -sMAX_WEBGL_VERSION=2
+GPU_FUNCS   := ,$$specialHTMLTargets
+$(GPU_OBJECTS): CPPFLAGS += -DUSE_THORVG -I$(THORVG)/include/thorvg-1
+$(GPU_OBJECTS): CXXFLAGS := $(OPT) $(EH) -w -std=c++20
+endif
+
 all: node
 
 # for node, which sees the host file system as it is (NODERAWFS) and takes
@@ -157,15 +171,15 @@ $(OUT)/web/r/%: $(TM)/plugins/r/web/%
 	@mkdir -p $(OUT)/web/r
 	cp $< $@
 
-$(OUT)/web/tau.js: $(OBJECTS) $(LIBDEPS) $(TM)/misc/wasm/packages.js $(TM)/misc/wasm/workers.js $(TM)/misc/wasm/javascript.js $(W)/web/tau-pre.js $(W)/sources.txt $(W)/Makefile
+$(OUT)/web/tau.js: $(OBJECTS) $(GPU_OBJECTS) $(LINK_FILE) $(LIBDEPS) $(TM)/misc/wasm/packages.js $(TM)/misc/wasm/workers.js $(TM)/misc/wasm/javascript.js $(W)/web/tau-pre.js $(W)/sources.txt $(W)/Makefile
 	@mkdir -p $(OUT)/web $(OUT)/stage
 	em++ $(LDFLAGS) -sMODULARIZE=1 -sEXPORT_NAME=tauCore -sENVIRONMENT=worker \
 	  --pre-js $(TM)/misc/wasm/packages.js --pre-js $(W)/web/tau-pre.js \
 	  --pre-js $(TM)/misc/wasm/workers.js --pre-js $(TM)/misc/wasm/javascript.js \
 	  -sEXPORTED_RUNTIME_METHODS=ccall,UTF8ToString,HEAPU8,FS,ENV,stringToUTF8OnStack \
 	  -sEXPORTED_FUNCTIONS=_main,_malloc,_free -lidbfs.js \
-	  '-sDEFAULT_LIBRARY_FUNCS_TO_INCLUDE=$$withStackSave,$$stringToUTF8OnStack' \
-	  --emit-symbol-map $(OBJECTS) $(LIBS) -o $(OUT)/stage/tau.js
+	  '-sDEFAULT_LIBRARY_FUNCS_TO_INCLUDE=$$withStackSave,$$stringToUTF8OnStack$(GPU_FUNCS)' \
+	  --emit-symbol-map $(OBJECTS) $(GPU_OBJECTS) $(LIBS) $(GPU_LINK) -o $(OUT)/stage/tau.js
 	@# (the names of the functions of the program, by their numbers in a
 	@# stack which the browser shows: stage/tau.js.symbols, not served)
 	@# the program and its script go to the page together: a page which is
@@ -195,7 +209,7 @@ $(OBJ)/%.o: $(S)/%.c
 	@mkdir -p $(dir $@)
 	emcc $(CPPFLAGS) $(DEPFLAGS) $(CFLAGS) -c $< -o $@
 
--include $(OBJECTS:.o=.d)
+-include $(OBJECTS:.o=.d) $(GPU_OBJECTS:.o=.d)
 
 # the flags of the compilation, kept in obj/.flags: an object is compiled
 # again when they change
@@ -204,6 +218,12 @@ $(FLAGS_FILE): FORCE
 	@mkdir -p $(OBJ); echo '$(CPPFLAGS) $(CXXFLAGS) $(CFLAGS) $(EH)' > $@.new; \
 	  if cmp -s $@.new $@; then rm -f $@.new; else mv $@.new $@; fi
 $(OBJECTS): $(FLAGS_FILE)
+# (and whether the web core has the GPU renderer, in obj/.link: it is
+# linked again when that changes)
+LINK_FILE := $(OBJ)/.link
+$(LINK_FILE): FORCE
+	@mkdir -p $(OBJ); echo '$(THORVG)' > $@.new; \
+	  if cmp -s $@.new $@; then rm -f $@.new; else mv $@.new $@; fi
 
 # the core alone under node: a document of the examples is typeset and
 # written as a PDF, with a home directory of its own

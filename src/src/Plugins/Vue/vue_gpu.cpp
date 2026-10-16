@@ -46,6 +46,7 @@ void vue_gpu_prepare () {}
 unsigned long long vue_gpu_window_flags () { return 0; }
 bool vue_gpu_follow_glyph_settings () { return false; }
 bool vue_gpu_attach (SDL_Window* w) { (void) w; return false; }
+bool vue_gpu_start () { return false; }
 bool vue_gpu_ready (SDL_Window* w) { (void) w; return false; }
 void vue_gpu_present (SDL_Window* w) { (void) w; }
 picture  gpu_backing_picture (int w, int h, bool t) { (void) w; (void) h; (void) t; return picture (); }
@@ -280,6 +281,20 @@ bool
 vue_gpu_attach (SDL_Window* w) {
   if (!vue_gpu_enabled () || w == NULL) return false;
   if (!G.B->attach (w)) {
+    if (!G.started) G.failed= true;
+    return false;
+  }
+  if (!G.started) start_gpu ();
+  return true;
+}
+
+// the renderer without a window: the core of Tau in the browser, whose
+// backend has a WebGL context of its own (gpu_backend_gl.cpp, GL_OFFSCREEN)
+bool
+vue_gpu_start () {
+  if (!vue_gpu_enabled ()) return false;
+  vue_gpu_prepare ();
+  if (G.failed || !G.B->attach (NULL)) {
     if (!G.started) G.failed= true;
     return false;
   }

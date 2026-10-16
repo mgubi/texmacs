@@ -112,6 +112,12 @@ function handle(m) {
 		// for the tests, ?debug: by the 2D canvas, render-bench.mjs --gpu)
 		if (["debug", "gl"].some(k => new URLSearchParams(self.location.search).has(k))) core._tau_record(m.on ? 1 : 0);
 		break;
+	case "gpu-check":
+		// for the tests: whether the GPU renderer of the core draws (a core
+		// built with THORVG, tau_gpu.cpp)
+		if (new URLSearchParams(self.location.search).has("debug"))
+			postMessage({ t: "gpu-check", text: core._tau_gpu_check ? core.UTF8ToString(core._tau_gpu_check()) : "not built" });
+		break;
 	case "memory":
 		// for the tests: the size of the memory of the program
 		if (new URLSearchParams(self.location.search).has("debug")) postMessage({ t: "memory", text: String(core.HEAPU8.length) });

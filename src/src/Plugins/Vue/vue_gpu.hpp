@@ -34,6 +34,9 @@ void vue_gpu_prepare ();
 // draw into the window from now on (the backend makes the one, shared GL
 // context or Metal device with the first window); false when it cannot
 bool vue_gpu_attach (SDL_Window* w);
+// the same without a window (the core of Tau in the browser: the backend has
+// a WebGL context of its own); false when it cannot
+bool vue_gpu_start ();
 void vue_gpu_present (SDL_Window* w);
 // attached, and presenting into the window would not wait for the screen
 // (Metal: the compositor does not hold too many of its frames); else the
