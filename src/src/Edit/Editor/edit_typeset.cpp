@@ -338,7 +338,10 @@ edit_typeset_rep::typeset_prepare () {
   // settings, so patching the default environment with it rewrites thousands
   // of variables; this happens at every typesetting pass and every get-env.
   // Keep the patched environment and only redo the updates of the variables
-  // whose assignment has side effects on the edit_env state.
+  // whose assignment has side effects on the edit_env state (which are not
+  // made again by style_init_env and update: active_vars). The table is
+  // made the kept one again by writing back the variables written since
+  // (edit_env_rep::write_prepared_env).
   // TEXMACS_TYPESET_CACHES "off" patches it all the same, and "check"
   // does both and compares.
   int mode= typeset_caches_mode ();
@@ -353,12 +356,16 @@ edit_typeset_rep::typeset_prepare () {
     env->write_prepared_env (pre, prep_env);
     for (int i=0; i<N(prep_active); i++) env->update (prep_active[i]);
     if (mode == 2) {
+      // (and the table written back is used again afterwards, so that it
+      // is what is checked at the next pass)
+      hashmap<string,tree> table= env->prepared_table ();
       hashmap<string,tree> kept (UNINIT), made (UNINIT);
       env->read_env (kept);
       env->write_default_env ();
       env->patch_env (pre);
       env->read_env (made);
       if (kept != made) typeset_cache_mismatch ("initial environment");
+      env->put_back_table (table);
     }
   }
   env->style_init_env ();

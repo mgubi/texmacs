@@ -46,7 +46,7 @@ edit_env_rep::edit_env_rep (drd_info& drd2,
   read_unknown (false), rec_keys (NULL), rec_values (NULL),
   rec_key_set (NULL), rec_bindings (NULL), rec_merged (NULL), rec_held (NULL),
   auto_buffer (""), typesetting (0), files_base (""), files_cur (""),
-  files_h (0), prep_pre (UNINIT), prep_fp (0), prep_sfp (0),
+  files_h (0), prep_pre (UNINIT), prep_made (UNINIT), prep_fp (0), prep_sfp (0),
   prep_sfp_version (-1)
 {
   env.back_log= &back;
@@ -304,8 +304,28 @@ void
 edit_env_rep::write_prepared_env (hashmap<string,tree> pre,
                                   hashmap<string,tree> made) {
   // the same, when what write_default_env and patch_env (pre) make was kept
-  // ('made': edit_typeset_rep::typeset_prepare)
-  env= copy (made);
+  // ('made': edit_typeset_rep::typeset_prepare). When the table is the
+  // one made from it before, the variables written since are written back
+  // (a few, when one paragraph was typeset again, where the table has
+  // thousands of variables)
+  if (env.follow && prep_made.operator-> () == made.operator-> ()) {
+    for (int i=0; i<N(env.touched); i++) {
+      string var= env.touched[i];
+      tree* val= made->find (var);
+      if (val != NULL) env.h (var)= *val;
+      else env.h->reset (var);
+    }
+    env.refingerprint ();
+  }
+  else {
+    env= copy (made);
+    prep_made= made;
+  }
+  if (N(env.touched) != 0) {
+    env.touched= array<string> ();
+    env.touched_set= hashmap<string,bool> (false);
+  }
+  env.follow= true;
   prepared_fingerprint (pre);
 }
 
@@ -542,12 +562,16 @@ env_absent () {
 void
 edit_env_rep::active_vars (hashmap<string,tree> patch, array<string>& vars) {
   // the variables of patch, in the order used by patch_env, for which
-  // write_update does more than storing the value
+  // write_update does more than storing the value, and more than what
+  // style_init_env and update () do anyway after it (the magnification
+  // of the graphics: the font, the colours, the page... are made again
+  // by them, which made the updates of the variables of the style the
+  // half of the time of edit_typeset_rep::typeset_prepare)
   int i=0, n=patch->n;
   for (; i<n; i++) {
     list<hashentry<string,tree> > l=patch->a[i];
     for (; !is_nil(l); l=l->next)
-      if (var_type[l->item.key] != Env_User) vars << l->item.key;
+      if (var_type[l->item.key] == Env_Magnify) vars << l->item.key;
   }
 }
 

@@ -225,10 +225,20 @@ public:
   // as they were for env_state_version sfp_version)
   unsigned long long    sfp;
   int                   sfp_version;
+  // The variables written since the table was the prepared one, while
+  // they are followed: the table is made the prepared one again by writing
+  // them back (edit_env_rep::write_prepared_env), and not by a copy of it
+  bool                  follow;
+  array<string>         touched;
+  hashmap<string,bool>  touched_set;
   inline env_table (tree init):
     h (init), rec (NULL), all (false), back_log (NULL),
     in_vars (NULL), in_hash (NULL), stale (true), fp (0), dirty_set (false),
-    sfp (0), sfp_version (-1) {}
+    sfp (0), sfp_version (-1), follow (false), touched_set (false) {}
+  inline void touch (string s) {
+    if (!follow || touched_set->contains (s)) return;
+    touched_set (s)= true;
+    touched << s; }
   inline void will_write (string s) {
     if (stale || typeset_inputs_mode () == 0 || dirty_set->contains (s))
       return;
@@ -259,7 +269,7 @@ public:
     if (typeset_inputs_mode () != 0) (*back_log) (s)= value (s);
     else (*back_log)->write_back (s, h); }
   inline void note (string s, bool write, bool read= true) {
-    if (write) will_write (s);
+    if (write) { will_write (s); touch (s); }
     if (rec == NULL && env_deriving <= 0) return;
     int id= env_var_id (s);
     if (rec != NULL) {
@@ -277,7 +287,7 @@ public:
   inline bool contains (string s) { note (s, false); return h->contains (s); }
   inline void remove (string s) { note (s, true); h->reset (s); }
   inline env_table& operator = (hashmap<string,tree> h2) {
-    h= h2; refingerprint (); return *this; }
+    h= h2; follow= false; refingerprint (); return *this; }
   inline operator hashmap<string,tree> () {
     if (rec != NULL) all= true;
     return h; }
@@ -821,6 +831,12 @@ public:
   // The table made by write_prepared_env, of which the fingerprints are
   // kept from one pass to the next (held: see files_base)
   hashmap<string,tree> prep_pre;
+  hashmap<string,tree> prep_made; // (the table written back to, held)
+  // (the table itself, and the same put back, still followed, for the
+  // check mode of edit_typeset_rep::typeset_prepare)
+  inline hashmap<string,tree> prepared_table () { return env.h; }
+  inline void put_back_table (hashmap<string,tree> t) {
+    env.h= t; env.follow= true; env.refingerprint (); }
   unsigned long long prep_fp, prep_sfp;
   int prep_sfp_version;
   inline bool written (string s) { return back->contains (s); }
