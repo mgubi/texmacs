@@ -107,7 +107,7 @@
   citetexmacs key tmrsub tmrsup keepcase
   tmtextrm tmtextsf tmtexttt tmtextmd tmtextbf
   tmtextup tmtextsl tmtextit tmtextsc tmmathbf tmmathmd
-  tmverbatim tmop tmstrong tmem tmtt tmname tmsamp tmabbr
+  tmverbatim tmop tmstrong tmstrike tmem tmtt tmname tmsamp tmabbr
   tmdfn tmkbd tmvar tmacronym tmperson tmscript tmdef
   dueto op todo tmdate tmoutput tmerrput tmtiming
   tmsubtitle tmrunningtitle tmrunningauthor

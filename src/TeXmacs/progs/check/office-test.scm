@@ -4406,6 +4406,49 @@
     (check-true (export-has? text "</m:oMath><w:r><w:rPr><w:rStyle w:val=\"FootnoteReference\"/>"))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; LaTeX of the style office
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (test-latex-office)
+  (check-group "latex of office")
+  ;; the tags of the style office are what they show, in LaTeX which
+  ;; pdflatex compiles
+  (let* ((doc `(document
+                 (TeXmacs "2.1") (style "office")
+                 (body (document
+                         (office-par "Note"
+                           (concat "a " (office-span "Key" "b") " "
+                                   (office-ins "Ann" "" "new") " " (office-del "Bob" "" "old") " "
+                                   (office-comment "Ann" "" "remark") " "
+                                   (office-commented "c" "Ann" "" "r2") " "
+                                   (office-font "Liberation Serif" "rm" "f")
+                                   (office-letters "1" "l") (office-underline "double" "u")
+                                   (office-strike "double" "s") (office-field " PAGE " "3")
+                                   (office-capitalize "cap")))
+                         (office-columns "2" (document "col"))
+                         (office-float "left" "" "fl")
+                         (office-box "left" "" "3cm" "" "" (document "in box"))
+                         (with "ornament-color" "#dddddd" (ornamented "box"))
+                         (marked "m")
+                         (strike-through "gone")))))
+         (tex (convert doc "texmacs-stree" "latex-document")))
+    (check-false (export-has? tex "\\office"))
+    (check-false (export-has? tex "\\marked"))
+    (check-false (export-has? tex "\\strikethrough"))
+    (check-true (export-has? tex "\\newcommand{\\tmstrike}"))
+    (check-true (export-has? tex "\\tmstrike{old}"))
+    (check-true (export-has? tex "\\tmstrike{gone}"))
+    (check-true (export-has? tex "{\\underline{{\\underline{u}}}}"))
+    (check-true (export-has? tex "remark]"))
+    (check-true (export-has? tex "in box"))
+    (check-true (export-has? tex "\\colorbox{yellow}{m}"))
+    ;; (the package of the columns, a color #rrggbb by its name)
+    (check-true (export-has? tex "multicol}"))
+    (check-true (export-has? tex "\\begin{multicols}{2}"))
+    (check-true (export-has? tex "\\definecolor{tmhexDDDDDD}{HTML}{DDDDDD}"))
+    (check-true (export-has? tex "[backgroundcolor=tmhexDDDDDD]"))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The formats
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -4498,5 +4541,6 @@
   (test-export-audit-3)
   (test-export-audit-4)
   (test-office-apps-check)
+  (test-latex-office)
   (test-formats)
   (check-end))

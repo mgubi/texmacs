@@ -546,12 +546,19 @@
          ((== 8 (string-length s)) (string-take s 6))
          (else s))))
 
+(tm-define (latex-color-name x)
+  "The name under which the color @x is defined in LaTeX"
+  (if (string-starts? x "#")
+      (string-append "tmhex" (html-color->latex-xcolor x))
+      (string-replace x " " "")))
+
 (define (latex-colors-defs colors)
   (apply string-append
          (map (lambda (x)
                 (string-append
-                  "\\definecolor{" (string-replace x " " "") "}{HTML}{"
-                  (html-color->latex-xcolor (get-hex-color x)) "}\n"))
+                  "\\definecolor{" (latex-color-name x) "}{HTML}{"
+                  (html-color->latex-xcolor
+                    (if (string-starts? x "#") x (get-hex-color x))) "}\n"))
               colors)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
