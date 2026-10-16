@@ -628,13 +628,6 @@ ns_follow_icon_bars () {
       postNotificationName: @"TMIconBarsChanged" object: nil];
 }
 
-static void
-ns_redisplay_views (NSView* v) {
-  if (v == nil) return;
-  [v setNeedsDisplay: YES];
-  for (NSView* sub in [v subviews]) ns_redisplay_views (sub);
-}
-
 void
 ns_gui_rep::update () {
   time_t std_delay= 90 / 6;
