@@ -129,14 +129,19 @@
 (define (make-key-table) (vector (make-ahash-table) (make-ahash-table)))
 
 (define (item-key-of g keys var prod step inherited?)
-  ;; an integer identifying the item
-  (let* ((p (if (< prod 0) start-production (g-production g prod)))
-         (content (list var step inherited? (content-key p step inherited?)))
-         (table (vector-ref keys 0))
-         (old (ahash-ref table content)))
+  ;; an integer identifying the item, memoized by the production and step
+  (let* ((memo (vector-ref keys 1))
+         (k (+ (* (+ (* (+ (* (+ prod 1) 1024) step) 2) (if inherited? 1 0)) 1048576) (+ var 1)))
+         (old (ahash-ref memo k)))
     (or old
-        (let ((id (ahash-size table)))
-          (ahash-set! table content id)
+        (let* ((p (if (< prod 0) start-production (g-production g prod)))
+               (content (list var step inherited? (content-key p step inherited?)))
+               (table (vector-ref keys 0))
+               (id (or (ahash-ref table content)
+                       (let ((id (ahash-size table)))
+                         (ahash-set! table content id)
+                         id))))
+          (ahash-set! memo k id)
           id))))
 
 (define (make-item g keys var prod step inherited?)
@@ -182,7 +187,7 @@
   (cond ((or (= a b) (= b 0)) a)
         ((= a 0) b)
         (else
-         (let* ((key (if (< a b) (cons a b) (cons b a)))
+         (let* ((key (if (< a b) (+ (* a 16777216) b) (+ (* b 16777216) a)))
                 (old (ahash-ref (vector-ref pool 2) key)))
            (or old
                (let ((id (la-intern pool (ts-union (la-get pool a) (la-get pool b)))))
@@ -203,7 +208,7 @@
 
 (define (item-set-insert! set item)
   ;; the entry of item, created with empty lookaheads if needed
-  (let ((k (cons (item-var item) (item-key item))))
+  (let ((k (item-key item)))
     (or (ahash-ref set k)
         (let ((e (vector item 0 0)))
           (ahash-set! set k e)
