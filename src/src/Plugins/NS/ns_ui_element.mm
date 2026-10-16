@@ -278,15 +278,23 @@ stack_of (array<widget> a, bool vertical) {
 - (BOOL) isFlipped { return YES; }
 @end
 
+static void fit_shown_page (NSTabView* tv);
+
 /*! When a tab is chosen, the dialog takes the size of the new page (in the
  main windows, the tools are laid out again). */
 @interface TMTabHelper : NSObject <NSTabViewDelegate>
+{
+@public
+  NSLayoutConstraint* fit_w;  // the size of the page shown (plain tabs), not
+  NSLayoutConstraint* fit_h;  // retained (the tab view keeps them)
+}
 @end
 
 @implementation TMTabHelper
 - (void) tabView: (NSTabView*) tv didSelectTabViewItem: (NSTabViewItem*) it
 {
   (void) it;
+  if (fit_w) fit_shown_page (tv);
   NSWindow* win= [tv window];
   NSView* root= [win contentView];
   if (!win || !root) return;
@@ -306,6 +314,34 @@ stack_of (array<widget> a, bool vertical) {
   [win setFrame: nf display: YES animate: [win isVisible]];
 }
 @end
+
+// A tab view has no size of its own: plain tabs take that of the page
+// shown, with the room of the tabs and of the border around it (without
+// it, a small dialog was as high as the tabs, the pages not shown)
+static void
+fit_shown_page (NSTabView* tv) {
+  TMTabHelper* th= objc_getAssociatedObject (tv, "TMTabHelper");
+  NSView* v= [[tv selectedTabViewItem] view];
+  if (!th || !v) return;
+  [v layoutSubtreeIfNeeded];
+  NSSize s= [v fittingSize];
+  // the room around the pages, from a frame large enough
+  NSRect f= [tv frame];
+  [tv setFrame: NSMakeRect (0, 0, 1000, 1000)];
+  NSRect c= [tv contentRect];
+  [tv setFrame: f];
+  CGFloat w= s.width + 1000 - c.size.width;
+  CGFloat h= s.height + 1000 - c.size.height;
+  if (!th->fit_w) {
+    [tv setTranslatesAutoresizingMaskIntoConstraints: NO];
+    th->fit_w= [tv.widthAnchor constraintGreaterThanOrEqualToConstant: w];
+    th->fit_h= [tv.heightAnchor constraintGreaterThanOrEqualToConstant: h];
+    [th->fit_w setActive: YES];
+    [th->fit_h setActive: YES];
+  }
+  [th->fit_w setConstant: w];
+  [th->fit_h setConstant: h];
+}
 
 // The pages of tabs: a body in a holder, with a margin
 static NSView*
@@ -1584,7 +1620,10 @@ ns_ui_element_rep::as_nsview () {
       // As in the Qt interface, the dialog takes the size of the page shown
       // (see TMTabHelper)
       NSTabView* tv= tab_view (tabs, bodies);
-      if (type == tabs_widget) return tv;
+      if (type == tabs_widget) {
+        fit_shown_page (tv);
+        return tv;
+      }
       // the icon tabs: a segmented control with the icons above the tabs
       [tv setTabViewType: NSNoTabsBezelBorder];
       NSSegmentedControl* sc= [[[NSSegmentedControl alloc] init] autorelease];
