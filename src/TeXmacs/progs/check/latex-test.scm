@@ -867,12 +867,23 @@
   (check= (tl '(colored-frame "#f00" "q")) "\\colorbox{tmhexFF0000}{q}")
   (check= (tl '(colored-frame "Firebrick1" "q")) "\\colorbox{tmhexFF3030}{q}")
   (check= (tl '(with "color" "#123456" "c")) "{\\color[HTML]{123456}c}")
-  ;; a footnote goes in an \mbox; a list is written without the line
+  ;; the line goes inside groups and font commands, where ulem can break
+  ;; it; a footnote is left without the line, and the items of a list get
+  ;; it one by one
+  (check= (tl '(strike-through (concat "a " (em "b") " c")))
+          "\\sout{a }{\\tmem{\\sout{b}}}\\sout{ c}")
+  (check= (tl '(strike-through (with "font-size" "1.41" "big")))
+          "{\\Large \\sout{big}}")
+  ;; struck and highlighted: the line over the color, in both orders
+  (check= (tl '(marked (strike-through "both"))) "\\tmmarked{yellow}{\\sout{both}}")
+  (check= (tl '(strike-through (marked "both"))) "\\tmmarked{yellow}{\\sout{both}}")
+  (check= (tl '(strike-through (with "font-shape" "italic" "it")))
+          "{\\itshape \\sout{it}}")
   (check= (tl '(strike-through (concat "a" (footnote "f") "c")))
-          "\\sout{a\\mbox{\\footnote{f}}c}")
-  (check-false (string-contains?
-                (tl '(strike-through (document "p" (itemize (document (concat (item) "a"))))))
-                "\\sout"))
+          "\\sout{a}\\footnote{f}\\sout{c}")
+  (check-true (string-contains?
+               (tl '(strike-through (document "p" (itemize (document (concat (item) "a"))))))
+               "\\item \\sout{a}"))
   (with s (td '("article")
               '(document (strike-through "x") (marked "y")
                          (with "marked-color" "#ff8800" (marked "z"))
@@ -949,6 +960,10 @@
                          (math (concat "e" (rsup (marked (concat "y" (rsub "i"))))))
                          (equation* (document (concat "c+" (marked (frac "1" "2")))))
                          (strike-through (concat "a" (footnote "f") " c"))
+                         (strike-through (with "font-size" "1" (concat "x " (with "color" "#800000" ,long))))
+                         (marked (em (with "font-series" "bold" ,long)))
+                         (strike-through (concat "see " (hlink ,long "https://example.org")))
+                         (strike-through (tabular (table (row (cell "a") (cell "b")))))
                          (marked (concat "a" (footnote "g") " c"))
                          (strike-through (document "p" (itemize (document (concat (item) "a")))))
                          (marked (document "p" (equation* (document "x"))))

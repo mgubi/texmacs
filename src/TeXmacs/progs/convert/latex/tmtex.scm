@@ -2398,27 +2398,57 @@
   `(fcolorbox ,@(map tmtex-decode-color (cDr l)) ,(tmtex (cAr l))))
 
 ;; Struck and highlighted text are drawn by ulem, whose lines break with
-;; the text; in a formula, the formula goes in \text{...$...$}, as ulem
-;; draws its lines in text mode only. A footnote goes in an \mbox, which
-;; ulem accepts; a list, a table or a displayed formula cannot be in the
-;; argument, and such a block is written without the line.
-(define (tmtex-ulem-block? x)
-  (and (pair? x)
-       (or (in? (car x) '(!eqn !table))
-           (func? (car x) '!begin)
-           (list-or (map tmtex-ulem-block? (cdr x))))))
+;; the text, but not inside a group or the argument of a command, which
+;; ulem sets as one box. So the line goes inside: around each text of the
+;; argument, within its groups, font commands, colors and links, and
+;; through paragraphs, lists and tables. A footnote, a label or a displayed
+;; formula is left without the line (ulem does not accept them). Struck
+;; text inside highlighted text keeps its line, but not the reverse, as
+;; the inner line of ulem is drawn over the outer one. In a
+;; formula, the formula goes in \text{...$...$}, as ulem draws its lines
+;; in text mode only.
+(define tmtex-ulem-structure
+  '(!concat !append !group !document !paragraph !table !row))
 
-(define (tmtex-ulem-footnotes x)
-  (cond ((func? x 'footnote) `(mbox ,x))
-        ((pair? x) (cons (car x) (map tmtex-ulem-footnotes (cdr x))))
-        (else x)))
+(define tmtex-ulem-text-commands
+  '(textbf textit textsl textsc texttt textsf textrm textup textmd emph
+    tmem tmstrong tmtt tmname tmsamp tmabbr tmdfn tmkbd tmvar tmperson
+    tmcolor textcolor href foreignlanguage underline tmmarked))
+
+(define tmtex-ulem-without
+  '(footnote label index !eqn !nextline !newline !linefeed
+    color fontsize selectfont fontfamily fontseries fontshape))
+
+;; the \tmtext... macros are boxes (\text): their declarations instead
+(define tmtex-ulem-declarations
+  '((tmtextrm . rmfamily) (tmtextsf . sffamily) (tmtexttt . ttfamily)
+    (tmtextmd . mdseries) (tmtextbf . bfseries) (tmtextup . upshape)
+    (tmtextsl . slshape) (tmtextit . itshape) (tmtextsc . scshape)))
+
+(define (tmtex-ulem-sink cmd args x)
+  (cond ((string? x)
+         (if (list-and (map char-whitespace? (string->list x))) x
+             `(,cmd ,@args ,x)))
+        ((npair? x) x)
+        ((and (pair? (car x)) (func? (car x) '!begin))
+         (cons (car x) (map (cut tmtex-ulem-sink cmd args <>) (cdr x))))
+        ((nsymbol? (car x)) `(,cmd ,@args ,x))
+        ((in? (car x) tmtex-ulem-structure)
+         (cons (car x) (map (cut tmtex-ulem-sink cmd args <>) (cdr x))))
+        ((in? (car x) tmtex-ulem-without) x)
+        ((null? (cdr x)) x)
+        ((and (assoc (car x) tmtex-ulem-declarations) (null? (cddr x)))
+         `(!group (!append (,(cdr (assoc (car x) tmtex-ulem-declarations)))
+                           " " ,(tmtex-ulem-sink cmd args (cadr x)))))
+        ((in? (car x) tmtex-ulem-text-commands)
+         `(,@(cDr x) ,(tmtex-ulem-sink cmd args (cAr x))))
+        (else `(,cmd ,@args ,x))))
 
 (define (tmtex-text-mode cmd . args)
   (with x (cAr args)
-    (cond ((tmtex-math-mode?)
-           `(text (,cmd ,@(cDr args) (!math ,x))))
-          ((tmtex-ulem-block? x) x)
-          (else `(,cmd ,@(cDr args) ,(tmtex-ulem-footnotes x))))))
+    (if (tmtex-math-mode?)
+        `(text (,cmd ,@(cDr args) (!math ,x)))
+        (tmtex-ulem-sink cmd (cDr args) x))))
 
 (define (tmtex-strike-through s l)
   (tmtex-text-mode 'sout (tmtex (car l))))
