@@ -183,12 +183,13 @@
 
 ;; An entry of the history is a position with the body of its buffer. A
 ;; position points into the tree of its buffer and must not be read once
-;; that tree is gone: the body, which the entry keeps alive, tells whether
-;; the buffer is still part of the document.
+;; that buffer is closed: the body is kept so that one can ask whether it
+;; is still part of the document.
 (define (entry-new p)
-  (with pos (position-new)
-    (position-set pos p)
-    (cons pos (buffer-tree))))
+  (and-with t (and (pair? p) (path->tree (list (car p))))
+    (with pos (position-new)
+      (position-set pos p)
+      (cons pos t))))
 
 (define (entry-alive? e)
   (tree-active? (cdr e)))
@@ -209,14 +210,26 @@
 (define (cursor-same? l p)
   (and (nnull? l) (== (entry-path (car l)) p)))
 
+(define (history-prune h)
+  ;; forget the entries of closed buffers, in every window, so that their
+  ;; trees are not kept; the position of such an entry is not deleted
+  (for (key (map car (ahash-table->list h)))
+    (with l (list-filter (ahash-ref h key) entry-alive?)
+      (if (null? l)
+          (ahash-remove! h key)
+          (ahash-set! h key l)))))
+
 (tm-define (cursor-history-add p)
   (:synopsis "Add current cursor position into the history")
+  (history-prune cursor-history)
+  (history-prune cursor-future)
   (if (cursor-same? (future-get) p)
       (with e (car (future-get))
         (future-set (cdr (future-get)))
         (history-set (cons e (history-get))))
       (when (not (cursor-same? (history-get) p))
-        (history-set (cons (entry-new p) (history-get))))))
+        (and-with e (entry-new p)
+          (history-set (cons e (history-get)))))))
 
 (tm-define (cursor-has-history?)
   (:synopsis "Does there exist a previous position in history?")
