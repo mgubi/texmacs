@@ -68,6 +68,7 @@ edit_interface_rep::edit_interface_rep ():
   pixel ((SI) tm_round ((std_shrinkf * PIXEL) / zoomf)),
   zpixel (max ((SI) tm_round (std_shrinkf * PIXEL), pixel)),
   zoom_time (0), zoom_waiting (false), zoom_shown (0),
+  zoom_anchor (), zoom_anchor_dx (0), zoom_anchor_dy (0),
   copy_always (),
   last_x (0), last_y (0), last_t (0),
   last_scx (0), last_scy (0),
@@ -716,6 +717,40 @@ edit_interface_rep::zoom_defers () {
   return texmacs_time () - zoom_time < zoom_wait;
 }
 
+// When the layout of the new zoom comes, the text under the middle of the
+// view stays in place: the spaces in pixels of the screen (between the
+// pages, above the first one) became larger with the previous layout, and
+// the page moved a bit when they became smaller again
+void
+edit_interface_rep::zoom_anchor_take () {
+  zoom_anchor= path ();
+  update_visible ();
+  SI cx= (vx1 + vx2) / 2, cy= (vy1 + vy2) / 2;
+  path sp= find_innermost_scroll (eb, tp);
+  path p= tree_path (sp, cx, cy, 0);
+  if (is_nil (p) || !(rp <= p)) return;
+  cursor cu= eb->find_check_cursor (p);
+  if (!cu->valid) return;
+  zoom_anchor= p;
+  zoom_anchor_dx= cx - cu->ox;
+  zoom_anchor_dy= cy - cu->oy;
+}
+
+void
+edit_interface_rep::zoom_anchor_keep () {
+  if (is_nil (zoom_anchor)) return;
+  path p= zoom_anchor;
+  zoom_anchor= path ();
+  cursor cu= eb->find_check_cursor (p);
+  if (!cu->valid) return;
+  update_visible ();
+  SI cx= cu->ox + zoom_anchor_dx, cy= cu->oy + zoom_anchor_dy;
+  if (cx == (vx1 + vx2) / 2 && cy == (vy1 + vy2) / 2) return;
+  scroll_to (cx, cy);
+  send_invalidate_all (this);
+  update_visible ();
+}
+
 void
 edit_interface_rep::apply_changes () {
   //cout << "Apply changes\n";
@@ -795,6 +830,7 @@ edit_interface_rep::apply_changes () {
       }
     }
     else {
+      if (zoom_waiting) zoom_anchor_take ();
       zoom_waiting= false;
       init_env (ZOOM_FACTOR, new_zoom);
       notify_change (THE_ENVIRONMENT);
@@ -948,6 +984,7 @@ edit_interface_rep::apply_changes () {
     SERVER (set_extents (ex1, ey1, ex2, ey2));
     //set_extents (eb->x1, eb->y1, eb->x2, eb->y2);
   }
+  zoom_anchor_keep ();
   
   // cout << "Cursor\n";
   temp_invalid_cursor= false;
