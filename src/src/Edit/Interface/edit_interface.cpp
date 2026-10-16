@@ -1080,8 +1080,13 @@ edit_interface_rep::apply_changes () {
     SERVER (set_extents (ex1, ey1, ex2, ey2));
     //set_extents (eb->x1, eb->y1, eb->x2, eb->y2);
   }
+  // the layout of a zoom which waited keeps the place of the text which was
+  // seen (the anchor), and the scrolls made while it waited: the cursor is
+  // not brought into view, unless it or the document changed meanwhile
+  bool zoom_layout= !is_nil (zoom_anchor) &&
+    (env_change & (THE_TREE+THE_CURSOR+THE_SELECTION+THE_FOCUS)) == 0;
   zoom_anchor_keep ();
-  
+
   // cout << "Cursor\n";
   temp_invalid_cursor= false;
   if (env_change & (THE_TREE+THE_ENVIRONMENT+THE_EXTENTS+
@@ -1090,7 +1095,8 @@ edit_interface_rep::apply_changes () {
     go_to_here ();
     env_change= (env_change & (~THE_CURSOR)) | THE_CURSOR_BAK;
     if ((env_change & (THE_TREE+THE_ENVIRONMENT+
-                       THE_CURSOR+THE_SELECTION+THE_FOCUS)) != 0)
+                       THE_CURSOR+THE_SELECTION+THE_FOCUS)) != 0 &&
+        !zoom_layout)
       if (!inside_active_graphics ())
         if ((env_change & THE_FREEZE) == 0 ||
             (env_change & THE_SELECTION) != 0)
