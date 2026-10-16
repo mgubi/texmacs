@@ -97,6 +97,18 @@ hashmap_rep<T,U>::bracket_rw (T x) {
   return rl->item.im;
 }
 
+TMPL U*
+hashmap_rep<T,U>::find (T x) {
+  int hv= hash (x);
+  list<hashentry<T,U> >* l= &(a [hv & (n-1)]);
+  while (!is_nil (*l)) {
+    if ((*l)->item.code == hv && (*l)->item.key == x)
+      return &((*l)->item.im);
+    l= &((*l)->next);
+  }
+  return NULL;
+}
+
 TMPL U
 hashmap_rep<T,U>::bracket_ro (T x) {
   int hv= hash (x);

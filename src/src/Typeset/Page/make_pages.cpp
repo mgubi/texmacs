@@ -286,7 +286,7 @@ pager_rep::make_part (array<page_part>* parts, tree what) {
     return old.b;
   }
   // typeset, with a record of what is read
-  hashmap<int,bool> reads (false);
+  env_id_set reads;
   page_part now;
   hashmap<string,tree> before= env->all_values ();
   edit_env_rep::read_record record (env.operator-> (), &reads,
@@ -296,7 +296,7 @@ pager_rep::make_part (array<page_part>* parts, tree what) {
                                                decorate ()));
   bindings.stop ();
   now.ok= record.complete () &&
-          N(reads) <= PART_READS_MAX && N(now.keys) <= PART_LOOKUPS_MAX;
+          reads.size () <= PART_READS_MAX && N(now.keys) <= PART_LOOKUPS_MAX;
   record.stop ();
   bool differs= same && (!same_box (b, old.b) || now.bindings != old.bindings);
   if (differs) typeset_check_mismatches++;
@@ -304,9 +304,8 @@ pager_rep::make_part (array<page_part>* parts, tree what) {
     cout << "TeXmacs] page " << (nr + 1)
          << ": the header or footer kept differs from the one made" << LF;
   if (now.ok) {
-    iterator<int> it= iterate (reads);
-    while (it->busy ()) {
-      string var= env_var_name (it->next ());
+    for (int i=0; i<reads.size (); i++) {
+      string var= env_var_name (reads.ids[i]);
       tree val= env->read (var);
       // a part which changes a variable it reads would be compared, the
       // next time, with a value which is not the one it started from

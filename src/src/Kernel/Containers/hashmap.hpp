@@ -66,6 +66,7 @@ public:
   bool contains (T x);
   bool empty ();
   U    bracket_ro (T x);
+  U*   find (T x);     // (the entry of x, or NULL: one lookup)
   U&   bracket_rw (T x);
   U&   bracket_rw_debug (T x);
   void join (hashmap<T,U> H);

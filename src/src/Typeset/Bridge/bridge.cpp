@@ -10,11 +10,10 @@
 ******************************************************************************/
 
 #include "bridge.hpp"
-#include "iterator.hpp"
 #include "sys_utils.hpp" // get_env
-#include "merge_sort.hpp"
 #include "Boxes/construct.hpp"
 #include <unordered_map>
+#include <algorithm>
 
 bridge bridge_document (typesetter, tree, path);
 bridge bridge_surround (typesetter, tree, path);
@@ -43,7 +42,8 @@ bridge nil_bridge;
 bridge_rep::bridge_rep (typesetter ttt2, tree st2, path ip2):
   ttt (ttt2), env (ttt->env), st (st2), ip (ip2),
   status (CORRUPTED), changes (UNINIT), reads (),
-  seen_stamp (0), in_known (false), in_state (0), in_fp (0) {}
+  seen_stamp (0), in_known (false), in_vals (0), in_state (0), in_items (0),
+  in_fp (0) {}
 
 static tree inactive_auto
   (MACRO, "x", tree (REWRITE_INACTIVE, tree (ARG, "x"), "recurse*"));
@@ -303,7 +303,7 @@ extern tree the_et;
 static void
 add_reads (edit_env env, bool known, array<int> reads,
            array<string> keys, array<tree> values) {
-  hashmap<int,bool>* rec= env->read_recorder ();
+  env_id_set* rec= env->read_recorder ();
   if (rec == NULL) return;
   // the lookups always, also when the variables read are not known: a
   // bridge used again through the fingerprint still checks them (a
@@ -312,8 +312,9 @@ add_reads (edit_env env, bool known, array<int> reads,
   if (env->read_unknown) return;
   if (!known) { env->read_unknown= true; return; }
   if (env->merged (reads)) return;
-  if (N(*rec) + N(reads) > READS_MAX) { env->read_unknown= true; return; }
-  for (int i=0; i<N(reads); i++) rec->operator () (reads[i])= true;
+  if (rec->size () + N(reads) > READS_MAX) {
+    env->read_unknown= true; return; }
+  for (int i=0; i<N(reads); i++) rec->insert (reads[i]);
   env->merging (reads);
 }
 
@@ -402,7 +403,9 @@ border_signature (stack_border sb) {
 * their values, the state of the environment derived from the variables
 * (the font, the colour...: edit_env_rep::derived_state), the references
 * and attachments which it looked up, and the line items which the bridges
-* around it gave it (ttt->a and ttt->b). These are its inputs. A bridge
+* around it gave it (ttt->a and ttt->b). These are its inputs (the values
+* and the line items are kept as hashes of 64 bits, as the whole environment
+* below: inputs_hash, items_signature). A bridge
 * whose subtree did not change (its status) is used again when all of its
 * inputs are known (no Scheme routine, not too many) and have the values
 * they had, or when the whole environment is as it was (a fingerprint of
@@ -433,24 +436,45 @@ border_signature (stack_border sb) {
 // are, the others (the parts of a surround: the name of a theorem, a
 // number...) by the boxes themselves, which the bridge around keeps as
 // long as they are the same (see bridge_surround_rep::my_typeset)
-// (as numbers, and the trees of the markers: no strings to make, which
-// was a tenth of the time of a complete pass)
-static void
-items_signature (array<line_item> a, array<line_item> b,
-                 array<double>& nums, array<tree>& marks) {
-  nums= array<double> ();
-  marks= array<tree> ();
-  if (N(a) == 0 && N(b) == 0) return;
+// (the markers as a hash of 64 bits, 0 when there are no items: no strings
+// or arrays to make, which were a tenth of the time of a complete pass)
+static inline unsigned long long
+items_mix (unsigned long long h, unsigned long long x) {
+  h= (h ^ x) * 0x9E3779B97F4A7C15ULL;
+  return h ^ (h >> 29);
+}
+
+static unsigned long long
+items_tree_hash (tree t) {
+  if (is_atomic (t)) {
+    unsigned long long h= 0xCBF29CE484222325ULL;
+    string s= t->label;
+    for (int i=0; i<N(s); i++)
+      h= (h ^ (unsigned char) s[i]) * 0x100000001B3ULL;
+    return h;
+  }
+  unsigned long long h= items_mix (0x84222325CBF29CE4ULL, (int) L(t));
+  for (int i=0; i<N(t); i++) h= items_mix (h, items_tree_hash (t[i]));
+  return h;
+}
+
+static unsigned long long
+items_signature (array<line_item> a, array<line_item> b) {
+  if (N(a) == 0 && N(b) == 0) return 0;
+  unsigned long long h= 0x2545F4914F6CDD1DULL;
   for (int k=0; k<2; k++) {
     array<line_item> l= (k == 0? a: b);
     for (int i=0; i<N(l); i++)
       if (l[i]->type == MARKER_ITEM) {
-        nums << 1.0 << (double) l[i]->penalty << (double) l[i]->spc->def;
-        marks << (tree) l[i]->b;
+        h= items_mix (h, 1);
+        h= items_mix (h, (unsigned long long) (long long) l[i]->penalty);
+        h= items_mix (h, (unsigned long long) (long long) l[i]->spc->def);
+        h= items_mix (h, items_tree_hash ((tree) l[i]->b));
       }
-      else nums << 2.0;
-    nums << 3.0;
+      else h= items_mix (h, 2);
+    h= items_mix (h, 3);
   }
+  return (h == 0? 1: h);
 }
 
 static array<box>
@@ -465,41 +489,33 @@ items_boxes (array<line_item> a, array<line_item> b) {
 }
 
 static bool
-same_boxes (array<box> b1, array<box> b2) {
-  if (N(b1) != N(b2)) return false;
-  for (int i=0; i<N(b1); i++)
-    if (b1[i].operator-> () != b2[i].operator-> ()) return false;
-  return true;
-}
-
-static inline bool
-same_value (tree before, tree now) {
-  if (strong_equal (before, now)) return true;
-  if (strong_equal (before, env_absent ()) ||
-      strong_equal (now, env_absent ())) return false;
-  return before == now;
+same_boxes (array<box> b1, array<line_item> a, array<line_item> b) {
+  // (b1 is items_boxes (a, b))
+  int j= 0;
+  for (int k=0; k<2; k++) {
+    array<line_item> l= (k == 0? a: b);
+    for (int i=0; i<N(l); i++)
+      if (l[i]->type != MARKER_ITEM) {
+        if (j >= N(b1) || b1[j].operator-> () != l[i]->b.operator-> ())
+          return false;
+        j++;
+      }
+  }
+  return j == N(b1);
 }
 
 bool
 bridge_rep::same_inputs () {
-  if (N(ttt->a) == 0 && N(ttt->b) == 0) {
-    if (N(in_items) != 0) return false; }
-  else {
-    array<double> nums;
-    array<tree> marks;
-    items_signature (ttt->a, ttt->b, nums, marks);
-    if (nums != in_items || marks != in_item_marks ||
-        !same_boxes (in_item_boxes, items_boxes (ttt->a, ttt->b)))
-      return false;
-  }
+  if (items_signature (ttt->a, ttt->b) != in_items ||
+      !same_boxes (in_item_boxes, ttt->a, ttt->b))
+    return false;
   if (!same_lookups (env, seen_keys, seen_values, seen_stamp)) return false;
   // the whole environment as it was (the fingerprint: also for a bridge
   // whose inputs are not known), or the inputs
   if (env->fingerprint () == in_fp) return true;
   if (!in_known) return false;
-  for (int i=0; i<N(in_vars); i++)
-    if (!same_value (in_vals[i], env->current (in_vars[i]))) return false;
-  return env->derived_state () == in_state;
+  return env->derived_state () == in_state &&
+         env->inputs_hash (in_vars, false) == in_vals;
 }
 
 // the inputs of a bridge are inputs of the bridge which is recorded above
@@ -507,22 +523,28 @@ bridge_rep::same_inputs () {
 // (read_unknown is not set), those which it wrote are among them (its own
 // writes are noted, and those of the bridges below were given by add_reads)
 void
-add_inputs (edit_env env, bool known, array<int> vars, array<tree> vals) {
+add_inputs (edit_env env, bool known, array<int> vars,
+            unsigned long long vals) {
+  // (vals: the hash of their values, the exclusive or of their hashes: when
+  // all of them are added, it is added; otherwise the hashes of those which
+  // are, with the values which they had at the start of the bridge below,
+  // which are those which they had at the start of the one above, which
+  // did not read or write them)
   array<int>* pv= env->input_vars ();
-  array<tree>* pw= env->input_vals ();
-  hashmap<int,bool>* rec= env->read_recorder ();
-  if (pv == NULL || rec == NULL || env->read_unknown) return;
+  unsigned long long* ph= env->input_hash ();
+  env_id_set* rec= env->read_recorder ();
+  if (pv == NULL || ph == NULL || rec == NULL || env->read_unknown) return;
   if (!known) { env->read_unknown= true; return; }
   // (an array all of whose variables are in the record adds nothing)
   if (env->merged (vars)) return;
   if (N(*pv) + N(vars) > INPUTS_MAX) { env->read_unknown= true; return; }
+  int n0= N(*pv);
   for (int i=0; i<N(vars); i++) {
     int id= vars[i];
-    if ((*rec)->contains (id)) continue;
-    rec->operator () (id)= true;
-    (*pv) << id;
-    (*pw) << vals[i];
+    if (rec->insert (id)) (*pv) << id;
   }
+  if (N(*pv) - n0 == N(vars)) *ph ^= vals;
+  else for (int i=n0; i<N(*pv); i++) *ph ^= env->start_hash ((*pv)[i]);
   env->merging (vars);
 }
 
@@ -562,19 +584,17 @@ bridge_rep::typeset_by_inputs (int desired_status) {
   bool was_known= in_known;
   array<int> was_vars= in_vars;
   array<string> was_keys= seen_keys;
-  array<tree> was_vals= in_vals, was_values= seen_values;
+  array<tree> was_values= seen_values;
+  unsigned long long was_vals= in_vals;
   unsigned long long was_state= in_state;
   array<int> was_reads= reads;
-  array<double> was_items= in_items;
-  array<tree> was_marks= in_item_marks;
+  unsigned long long was_items= in_items;
   array<box> was_item_boxes= in_item_boxes;
   array<tree> was_bindings= out_bindings;
   unsigned long long was_fp= in_fp;
   if (edit_profile.on) edit_profile.redone++;
   unsigned long long state= env->derived_state ();
-  array<double> items;
-  array<tree> marks;
-  items_signature (ttt->a, ttt->b, items, marks);
+  unsigned long long items= items_signature (ttt->a, ttt->b);
   array<box> item_boxes= items_boxes (ttt->a, ttt->b);
   unsigned long long fp= env->fingerprint ();
   hashmap<string,tree> prev_back (UNINIT);
@@ -584,10 +604,11 @@ bridge_rep::typeset_by_inputs (int desired_status) {
   ttt->local_start (l, sb);
   env->local_start (prev_back);
   if (env->hl_lan != 0) env->lan->highlight (st);
-  hashmap<int,bool> my_reads (false);
+  env_id_set my_reads;
   array<string> my_keys;
   array<int> my_vars;
-  array<tree> my_values, my_vals;
+  unsigned long long my_vals= 0;
+  array<tree> my_values;
   edit_env_rep::read_record record (env.operator-> (), &my_reads,
                                     &my_keys, &my_values,
                                     &my_vars, &my_vals);
@@ -596,10 +617,8 @@ bridge_rep::typeset_by_inputs (int desired_status) {
   bindings.stop ();
   bool known= record.complete () && N(my_vars) <= INPUTS_MAX &&
               N(my_keys) <= LOOKUPS_MAX;
-  reads= array<int> ();
-  for (iterator<int> it= iterate (my_reads); it->busy (); )
-    reads << it->next ();
-  merge_sort (reads);
+  reads= copy (my_reads.ids);
+  std::sort (A(reads), A(reads) + N(reads));
   reads= shared_ids (reads);
   record.stop ();
   in_known= known;
@@ -607,7 +626,6 @@ bridge_rep::typeset_by_inputs (int desired_status) {
   in_vals= my_vals;
   in_state= state;
   in_items= items;
-  in_item_marks= marks;
   in_item_boxes= item_boxes;
   in_fp= fp;
   seen_keys= my_keys;
@@ -629,6 +647,15 @@ bridge_rep::typeset_by_inputs (int desired_status) {
     for (int i=0; i<N(my_vars) && !missing; i++)
       if (!contains (my_vars[i], was_vars)) missing= true;
   }
+  // (and, in the check mode, the hash of the values of the inputs, made as
+  // they were read and given, is the one of the values which they had at
+  // the start)
+  if (typeset_inputs_mode () == 2 && known &&
+      my_vals != env->inputs_hash (my_vars, true)) {
+    typeset_check_mismatches++;
+    failed_error << "The hash of the inputs of a bridge is not the one of "
+                 << "their values: " << st << LF;
+  }
   if (check && !differs && !missing) {
     // the check mode gives the bridge above, and keeps for the next pass,
     // what the bridge used again would have: the record of the previous
@@ -636,7 +663,6 @@ bridge_rep::typeset_by_inputs (int desired_status) {
     // checked (and not only what the bridge makes)
     in_known= was_known; in_vars= was_vars; in_vals= was_vals;
     in_state= was_state; in_items= was_items; in_fp= was_fp;
-    in_item_marks= was_marks;
     in_item_boxes= was_item_boxes;
     seen_keys= was_keys; seen_values= was_values; reads= was_reads;
     seen_stamp= 0;
