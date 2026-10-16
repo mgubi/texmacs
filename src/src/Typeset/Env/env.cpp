@@ -224,6 +224,30 @@ int env_state_version= 0;
 
 int env_deriving= 0;
 
+int env_id_depth= 0;
+unsigned long long env_id_count= 0;
+
+env_id_level*
+env_id_level_at (int depth) {
+  static array<env_id_level*> levels;
+  while (N(levels) <= depth) {
+    env_id_level* lv= tm_new<env_id_level> ();
+    lv->marks= NULL; lv->n= 0;
+    levels << lv;
+  }
+  return levels[depth];
+}
+
+void
+env_id_grow (env_id_level* lv, int id) {
+  int n= (lv->n == 0? 256: lv->n);
+  while (n <= id) n <<= 1;
+  unsigned long long* m= tm_new_array<unsigned long long> (n);
+  for (int i=0; i<n; i++) m[i]= (i < lv->n? lv->marks[i]: 0);
+  if (lv->marks != NULL) tm_delete_array (lv->marks);
+  lv->marks= m; lv->n= n;
+}
+
 hashmap<int,bool>&
 env_derived_inputs () {
   static hashmap<int,bool> ids (false);
@@ -409,6 +433,28 @@ unsigned long long
 env_entry_hash (string var, tree val) {
   return mix64 (string_hash64 (var) * 0x9E3779B97F4A7C15ULL ^
                 value_hash64 (val));
+}
+
+unsigned long long
+env_input_hash (int id, tree val) {
+  return mix64 (((unsigned long long) id + 1) * 0x9E3779B97F4A7C15ULL ^
+                value_hash64 (val));
+}
+
+unsigned long long
+edit_env_rep::start_hash (int id) {
+  string var= env_var_name (id);
+  tree* before= back->find (var);
+  return env_input_hash (id, before == NULL? env.value (var): *before);
+}
+
+unsigned long long
+edit_env_rep::inputs_hash (array<int> vars, bool at_start) {
+  unsigned long long h= 0;
+  for (int i=0; i<N(vars); i++)
+    h ^= (at_start? start_hash (vars[i]):
+          env_input_hash (vars[i], env.value (env_var_name (vars[i]))));
+  return h;
 }
 
 unsigned long long

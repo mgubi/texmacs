@@ -51,10 +51,10 @@ public:
   // typeset again" in bridge.cpp)
   bool                 in_known; // all its inputs are known:
   array<int>           in_vars;  // the variables read before written
-  array<tree>          in_vals;  // with their values (or env_absent ())
+  unsigned long long   in_vals;  // a hash of their values (inputs_hash)
   unsigned long long   in_state; // the state derived from the environment
-  array<double>        in_items; // the line items it got from around it
-  array<tree>          in_item_marks; // (the markers among them)
+  unsigned long long   in_items; // the line items it got from around it
+                                 // (items_signature)
   array<box>           in_item_boxes; // (those which are not markers)
   unsigned long long   in_fp;    // the fingerprint of the environment
   array<tree>          out_bindings; // the bindings it wrote, in order
@@ -104,7 +104,8 @@ public:
 bool same_page_items (array<page_item> l1, array<page_item> l2);
 
 // the inputs of a bridge below for the record of the bridge above it
-void add_inputs (edit_env env, bool known, array<int> vars, array<tree> vals);
+void add_inputs (edit_env env, bool known, array<int> vars,
+                 unsigned long long vals);
 // do the references and attachments looked up still have these values?
 // ('stamp': the labels_stamp of the tables when they last had them, or 0)
 bool same_lookups (edit_env env, array<string> keys, array<tree> values,

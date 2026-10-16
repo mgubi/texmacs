@@ -29,7 +29,7 @@ protected:
   unsigned long long   parts_stamp;  // (see same_lookups)
   bool                 parts_known;  // and what they read, as the inputs of
   array<int>           parts_vars;   // a bridge (they are typeset first in
-  array<tree>          parts_vals;   // the record of the surround)
+  unsigned long long   parts_vals;   // the record of the surround)
   array<tree>          parts_bindings; // the bindings they wrote
 
 public:
@@ -190,6 +190,8 @@ bridge_surround_rep::my_typeset (int desired_status) {
     int k0= (keys == NULL? 0: N(*keys));
     array<int>* vars= env->input_vars ();
     int v0= (vars == NULL? 0: N(*vars));
+    unsigned long long* vh= env->input_hash ();
+    unsigned long long h0= (vh == NULL? 0: *vh);
     bool all0= env->read_all (), unknown0= env->read_unknown;
     array<tree>* bs= env->rec_bindings;
     int b0= (bs == NULL? 0: N(*bs));
@@ -216,8 +218,7 @@ bridge_surround_rep::my_typeset (int desired_status) {
       parts_known= vars != NULL && (all0 || !env->read_all ()) &&
                    (unknown0 || !env->read_unknown);
       parts_vars= (vars == NULL? array<int> (): range (*vars, v0, N(*vars)));
-      parts_vals= (vars == NULL? array<tree> ():
-                   range (*env->input_vals (), v0, N(*vars)));
+      parts_vals= (vh == NULL? 0: *vh ^ h0);
       parts_bindings= (bs == NULL? array<tree> (): range (*bs, b0, N(*bs)));
     }
   }

@@ -154,15 +154,49 @@ int typeset_inputs_mode ();
 tree env_absent ();
 // a hash of a variable and its value, of 64 bits (see env_table::fp)
 unsigned long long env_entry_hash (string var, tree val);
+// the same for an input of a bridge (by env_var_id: see inputs_hash)
+unsigned long long env_input_hash (int id, tree val);
 // the variables of the derived state (edit_env_rep::derived_state), and
 // a number which changes with them
 hashmap<string,bool>& env_state_vars ();
 extern int env_state_version;
 
+// A set of variables (by env_var_id): the record of what a bridge reads.
+// The variables are kept in the order in which they came, and whether one
+// is there is a look in an array of marks: the sets are made and go as a
+// stack (those of the bridges, whose typesetting is within the one of the
+// bridge above), each with the marks of its depth, in which its own number
+// marks its variables (they were hashmaps, which were about a fifth of the
+// time of a typesetting of the whole document)
+struct env_id_level { unsigned long long* marks; int n; };
+env_id_level* env_id_level_at (int depth);
+void env_id_grow (env_id_level* lv, int id);
+extern int env_id_depth;
+extern unsigned long long env_id_count;
+
+class env_id_set {
+  env_id_level* lv;
+  unsigned long long nr;
+  env_id_set (const env_id_set&);
+  env_id_set& operator = (const env_id_set&);
+public:
+  array<int> ids;
+  inline env_id_set ():
+    lv (env_id_level_at (env_id_depth++)), nr (++env_id_count) {}
+  inline ~env_id_set () { env_id_depth--; }
+  inline bool contains (int id) { return id < lv->n && lv->marks[id] == nr; }
+  inline bool insert (int id) {
+    // (whether it is a new one)
+    if (id >= lv->n) env_id_grow (lv, id);
+    if (lv->marks[id] == nr) return false;
+    lv->marks[id]= nr; ids << id; return true; }
+  inline int size () { return N(ids); }
+};
+
 class env_table {
 public:
   hashmap<string,tree>  h;
-  hashmap<int,bool>*    rec;  // the variables read or written, if recording
+  env_id_set*           rec;  // the variables read or written, if recording
   bool                  all;  // the whole table was read, while recording
   // The values which the variables had before they were written, from
   // which the changes made by a bridge are found (edit_env_rep::back).
@@ -172,10 +206,10 @@ public:
   // bound value as its value before, and be missed when it ends with it
   hashmap<string,tree>* back_log;
   // The inputs of the bridge which is recorded: the variables which it
-  // read before it wrote them, with the values they had (env_absent ()
-  // for a variable which was not there)
+  // read before it wrote them, and a hash of the values which they had
+  // (the exclusive or of their env_input_hash: edit_env_rep::inputs_hash)
   array<int>*           in_vars;  // (by env_var_id)
-  array<tree>*          in_vals;
+  unsigned long long*   in_hash;
   // When the inputs are used: a fingerprint of the whole table (the
   // exclusive or of env_entry_hash of its variables), kept as the table is
   // written. The variables which were written since it was brought up to
@@ -193,7 +227,7 @@ public:
   int                   sfp_version;
   inline env_table (tree init):
     h (init), rec (NULL), all (false), back_log (NULL),
-    in_vars (NULL), in_vals (NULL), stale (true), fp (0), dirty_set (false),
+    in_vars (NULL), in_hash (NULL), stale (true), fp (0), dirty_set (false),
     sfp (0), sfp_version (-1) {}
   inline void will_write (string s) {
     if (stale || typeset_inputs_mode () == 0 || dirty_set->contains (s))
@@ -217,7 +251,8 @@ public:
       dirty_set= hashmap<string,bool> (false); } }
   inline tree value (string s) {
     // (what a variable holds, or env_absent (), without recording)
-    return h->contains (s)? h [s]: env_absent (); }
+    tree* v= h->find (s);
+    return v == NULL? env_absent (): *v; }
   inline void log_back (string s) {
     // the value before the first write of s
     if (back_log == NULL || (*back_log)->contains (s)) return;
@@ -228,11 +263,11 @@ public:
     if (rec == NULL && env_deriving <= 0) return;
     int id= env_var_id (s);
     if (rec != NULL) {
-      bool first= !(*rec)->contains (id);
-      rec->operator () (id)= true;
+      bool first= rec->insert (id);
       if (read && first && in_vars != NULL && back_log != NULL &&
           !(*back_log)->contains (s)) {
-        (*in_vars) << id; (*in_vals) << value (s); }
+        (*in_vars) << id;
+        if (in_hash != NULL) *in_hash ^= env_input_hash (id, value (s)); }
       if (write) log_back (s); }
     if (env_deriving > 0) env_note_read (id); }
   inline tree operator [] (string s) { note (s, false); return h [s]; }
@@ -591,9 +626,9 @@ public:
   // that its record is not all it read (the reads of a bridge below it
   // were not known, or too many to be added).
   bool read_unknown;
-  inline hashmap<int,bool>* read_recorder () { return env.rec; }
+  inline env_id_set* read_recorder () { return env.rec; }
   inline bool read_all () { return env.all; }
-  inline void record_reads (hashmap<int,bool>* rec, bool all) {
+  inline void record_reads (env_id_set* rec, bool all) {
     env.rec= rec; env.all= all; }
   // something which is not a variable is read (whatever a Scheme routine
   // looks at): the record of the variables read does not tell what the
@@ -668,32 +703,32 @@ public:
   // typesetting
   struct read_record {
     edit_env_rep* env;
-    hashmap<int,bool>* outer_rec;
+    env_id_set* outer_rec;
     bool outer_all, outer_unknown, stopped;
     array<string>* outer_keys;
     array<tree>* outer_values;
     hashmap<string,bool>* outer_key_set;
     hashmap<string,bool> key_set;
     array<int>* outer_in_vars;
-    array<tree>* outer_in_vals;
+    unsigned long long* outer_in_hash;
     hashmap<pointer,bool>* outer_merged;
     array<array<int> >* outer_held;
     hashmap<pointer,bool> merged;
     array<array<int> > held;
-    inline read_record (edit_env_rep* e, hashmap<int,bool>* rec,
+    inline read_record (edit_env_rep* e, env_id_set* rec,
                         array<string>* keys, array<tree>* values,
                         array<int>* in_vars= NULL,
-                        array<tree>* in_vals= NULL):
+                        unsigned long long* in_hash= NULL):
       env (e), outer_rec (e->env.rec), outer_all (e->env.all),
       outer_unknown (e->read_unknown), stopped (false),
       outer_keys (e->rec_keys), outer_values (e->rec_values),
       outer_key_set (e->rec_key_set), key_set (false),
-      outer_in_vars (e->env.in_vars), outer_in_vals (e->env.in_vals),
+      outer_in_vars (e->env.in_vars), outer_in_hash (e->env.in_hash),
       outer_merged (e->rec_merged), outer_held (e->rec_held),
       merged (false) {
         env->record_reads (rec, false);
         env->record_lookups (keys, values, &key_set);
-        env->env.in_vars= in_vars; env->env.in_vals= in_vals;
+        env->env.in_vars= in_vars; env->env.in_hash= in_hash;
         env->rec_merged= &merged; env->rec_held= &held;
         env->read_unknown= false; }
     // nothing was read but what the record holds
@@ -702,7 +737,7 @@ public:
       if (stopped) return;
       env->record_reads (outer_rec, outer_all);
       env->record_lookups (outer_keys, outer_values, outer_key_set);
-      env->env.in_vars= outer_in_vars; env->env.in_vals= outer_in_vals;
+      env->env.in_vars= outer_in_vars; env->env.in_hash= outer_in_hash;
       env->rec_merged= outer_merged; env->rec_held= outer_held;
       env->read_unknown= outer_unknown;
       stopped= true; }
@@ -768,7 +803,12 @@ public:
   void local_update (hashmap<string,tree>& oldpat, hashmap<string,tree>& chg);
   void local_changes (hashmap<string,tree>& chg);
   inline array<int>* input_vars () { return env.in_vars; }
-  inline array<tree>* input_vals () { return env.in_vals; }
+  inline unsigned long long* input_hash () { return env.in_hash; }
+  // a hash of the values of the variables 'vars' (by env_var_id): those
+  // which they have now, or (at_start) those which they had at the start
+  // of the bridge which is typeset (back: before it wrote them)
+  unsigned long long inputs_hash (array<int> vars, bool at_start);
+  unsigned long long start_hash (int id);
   inline tree current (string s) { return env.value (s); }
   inline tree current (int id) { return env.value (env_var_name (id)); }
   // the fingerprint of the variables and of the files (see files_hash)
