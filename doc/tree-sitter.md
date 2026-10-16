@@ -307,7 +307,7 @@ file must stay a plain list of lines.
 | B. Generate from `grammar.js` at build time | small sources | needs the tree-sitter CLI (Rust, Node for some grammars) in every build and CI |
 | C. Shared libraries loaded at run time (as Emacs, Neovim, Helix) | binary unchanged; users add languages | we must host binaries per platform or ask users for a compiler; impossible in the browser build |
 | D. Pinned list fetched at build time, linked statically | repository stays small; reproducible (commit hashes); same pattern as `build-deps.sh` | builds need the network or a cache; binary size as in A |
-| E. `grammar.json` shipped, tables generated in Scheme at first use and cached (section 6) | no C, no binaries, no build step; 10-200 KB per language; same in the browser | parsing is interpreted (40-60x slower than C, see 6); external scanners must be ported to Scheme by hand |
+| E. `grammar.json` shipped, tables generated in Scheme at first use and cached (section 6) | no C, no binaries, no build step; 14-240 KB of JSON per language; same in the browser | parsing is interpreted (45-65x slower than C under s7, see 6); external scanners must be ported to Scheme by hand |
 
 Recommendation: **D**, with the list of languages a configure option, and
 **C** added later for user-installed grammars. The prototype uses D with
@@ -434,7 +434,7 @@ concerns all module code of TeXmacs, not only this one.
   julia, bash, r, scala, fortran (to size).
 - Queries (`highlights.scm`) are S-expressions; a query engine for the
   patterns and predicates used by highlighting is still to write.
-- Speed: parsing is 40-60x slower than C under s7; incremental reparsing
+- Speed: parsing is 45-65x slower than C under s7; incremental reparsing
   makes typing cheap, a first parse of a large file is not. The 3x of the
   module environment (above) is the first thing to understand.
 - Guile and femtolisp: only S7 was tried in TeXmacs; the code avoids
