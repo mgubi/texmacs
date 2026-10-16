@@ -166,11 +166,13 @@ typesetter_rep::determine_page_references (box b) {
     string var= it->next ();
     tree   val= copy (h[var]);
     tree   old= env->local_ref [var];
-    if (is_func (old, TUPLE, 2))
-      env->local_ref (var)= tuple (old[0], val);
-    else if (is_func (old, TUPLE, 3))
-      env->local_ref (var)= tuple (old[0], val, old[2]);
-    else env->local_ref (var)= tuple (old, val);
+    tree   now;
+    if (is_func (old, TUPLE, 2)) now= tuple (old[0], val);
+    else if (is_func (old, TUPLE, 3)) now= tuple (old[0], val, old[2]);
+    else now= tuple (old, val);
+    // (not written when it is there already: see labels_stamp)
+    if (!env->local_ref->contains (var) || old != now)
+      env->local_ref (var)= now;
     env->touched (var)= true;
   }
 }

@@ -2027,10 +2027,12 @@ void
 edit_env_rep::write_binding (string key, tree value, string extra) {
   if (rec_bindings != NULL) (*rec_bindings) << tuple (key, value, extra);
   tree old_value= local_ref[key];
-  if (is_func (old_value, TUPLE) && (N(old_value) >= 2))
-    local_ref (key)= tuple (copy (value), old_value[1]);
-  else local_ref (key)= tuple (copy (value), "?");
-  if (N(extra) != 0) local_ref (key) << extra;
+  // (not written when it is there already: see labels_stamp)
+  tree now= tuple (value, (is_func (old_value, TUPLE) && N(old_value) >= 2?
+                           old_value[1]: tree ("?")));
+  if (N(extra) != 0) now << tree (extra);
+  if (!local_ref->contains (key) || old_value != now)
+    local_ref (key)= copy (now);
   touched (key)= true;
   if (complete && is_tuple (old_value) && N(old_value) >= 1) {
     string old_s= tree_as_string (old_value[0]);

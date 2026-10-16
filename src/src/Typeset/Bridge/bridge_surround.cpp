@@ -26,6 +26,7 @@ protected:
   unsigned long long   parts_fp;
   array<string>        parts_keys;
   array<tree>          parts_values;
+  unsigned long long   parts_stamp;  // (see same_lookups)
   bool                 parts_known;  // and what they read, as the inputs of
   array<int>           parts_vars;   // a bridge (they are typeset first in
   array<tree>          parts_vals;   // the record of the surround)
@@ -50,7 +51,7 @@ public:
 
 bridge_surround_rep::bridge_surround_rep (typesetter ttt, tree st, path ip):
   bridge_rep (ttt, st, ip), changes_before (UNINIT),
-  parts_ok (false), parts_fp (0), parts_known (false)
+  parts_ok (false), parts_fp (0), parts_stamp (0), parts_known (false)
 {
   initialize ();
 }
@@ -162,7 +163,7 @@ bridge_surround_rep::parts_again () {
   if (typeset_inputs_mode () == 0)
     return corrupted || (N(ttt->old_patch) != 0);
   return corrupted || !parts_ok || env->fingerprint () != parts_fp ||
-         !same_lookups (env, parts_keys, parts_values);
+         !same_lookups (env, parts_keys, parts_values, parts_stamp);
 }
 
 void
@@ -211,6 +212,7 @@ bridge_surround_rep::my_typeset (int desired_status) {
       parts_keys= (keys == NULL? array<string> (): range (*keys, k0, N(*keys)));
       parts_values= (keys == NULL? array<tree> ():
                      range (*env->rec_values, k0, N(*keys)));
+      parts_stamp= 0;
       parts_known= vars != NULL && (all0 || !env->read_all ()) &&
                    (unknown0 || !env->read_unknown);
       parts_vars= (vars == NULL? array<int> (): range (*vars, v0, N(*vars)));

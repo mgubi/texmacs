@@ -398,6 +398,14 @@ value_hash64 (tree t) {
 }
 
 unsigned long long
+edit_env_rep::labels_stamp () {
+  return mix64 (local_ref->stamp ()) ^
+         mix64 (global_ref->stamp () * 0x9E3779B97F4A7C15ULL + 1) ^
+         mix64 (local_att->stamp () * 0x9E3779B97F4A7C15ULL + 2) ^
+         mix64 (global_att->stamp () * 0x9E3779B97F4A7C15ULL + 3);
+}
+
+unsigned long long
 env_entry_hash (string var, tree val) {
   return mix64 (string_hash64 (var) * 0x9E3779B97F4A7C15ULL ^
                 value_hash64 (val));

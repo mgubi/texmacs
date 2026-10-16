@@ -82,6 +82,7 @@ hashmap_rep<T,U>::empty () {
 
 TMPL U&
 hashmap_rep<T,U>::bracket_rw (T x) {
+  st= new_hashmap_stamp ();
   int hv= hash (x);
   list<hashentry<T,U> >  l (a [hv & (n-1)]);
   while (!is_nil (l)) {
@@ -114,6 +115,7 @@ hashmap_rep<T,U>::reset (T x) {
   list<hashentry<T,U> > *l= &(a [hv & (n-1)]);
   while (!is_nil (*l)) {
     if ((*l)->item.code == hv && (*l)->item.key == x) {
+      st= new_hashmap_stamp ();
       *l= (*l)->next;
       size --;
       if (size < (n>>1) * max) resize (n>>1);
@@ -125,6 +127,7 @@ hashmap_rep<T,U>::reset (T x) {
 
 TMPL void
 hashmap_rep<T,U>::clear () {
+  st= new_hashmap_stamp ();
   tm_delete_array (a);
   a= tm_new_array<list<hashentry<T,U> > > (n);
 }
