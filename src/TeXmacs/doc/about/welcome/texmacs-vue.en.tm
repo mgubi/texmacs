@@ -278,6 +278,14 @@
     stay links, a comment in a note stays in the note, and a formula on
     its own line inside a paragraph is shown on its own line.
 
+    <item>A footnote in a formula is no longer lost in Word and
+    <name|OpenDocument> files: its mark follows the formula, and the point
+    after the mark stays with the formula when the file is read. A
+    paragraph in a style <verbatim|Caption> which is not under a figure
+    keeps its look, plain paragraphs no longer take the look of another
+    style, and a style of the document on the text of a link is kept in
+    Word.
+
     <item>A <name|Markdown> file keeps the tabs at the start of its lines
     (in code, formulas, tables and the <name|YAML> header), a formula of a
     single symbol is read back as a formula, and files with many formulas

@@ -1755,8 +1755,10 @@
          ;; bibliography of Zotero are not its entries)
          (role (if (and field (== (car role) "bibitem")) (list #f #f) role))
          (attrs `((role ,(car role)) (level ,(cadr role))
-                  ;; the named style of a plain paragraph
-                  (style ,(and (not (car role)) (not id) style (null? docx-open-notes)
+                  ;; the named style of a plain paragraph (and of a caption,
+                  ;; for one which is not the one of a figure)
+                  (style ,(and (or (not (car role)) (== (car role) "caption"))
+                               (not id) style (null? docx-open-notes)
                                (begin (ahash-set! docx-used-styles style #t) style)))
                   (align ,(cond ((== align "center") "center")
                                 ((in? align '("right" "end")) "right")
@@ -1884,9 +1886,14 @@
 (define (docx-numbered-formula l)
   ;; a formula between two tabs, and its number after them, as Word and
   ;; TeXmacs write a numbered equation: the formula displayed, and its
-  ;; number after a tab
-  (if (and (>= (length l) 4) (func? (car l) 'tab) (func? (cadr l) 'math)
-           (func? (caddr l) 'tab))
+  ;; number after a tab (the notes of the formula just after it, then
+  ;; perhaps no number)
+  (if (and (>= (length l) 3) (func? (car l) 'tab) (func? (cadr l) 'math)
+           (let* ((k (cddr l))
+                  (after (let skip ((k k))
+                           (if (and (pair? k) (func? (car k) 'note)) (skip (cdr k)) k))))
+             (or (and (pair? after) (func? (car after) 'tab) (pair? (cdr after)))
+                 (and (null? after) (not (eq? after k))))))
       (let ((m (cadr l)))
         (cons (apply office-node
                      (cons* 'math (cons '(display "true")
@@ -2496,9 +2503,11 @@
       (set! docx-theme-fonts (cons (cons "major" (font 'a:majorFont)) docx-theme-fonts)))))
 
 (define (docx-body-style)
-  ;; the style of most of the plain paragraphs, or the usual one
-  (let ((best #f) (n 0))
-    (for (kv (ahash-table->list docx-body-styles))
+  ;; the style of most of the plain paragraphs, or the usual one (the usual
+  ;; one when as many have it, the first name when two have as many)
+  (let ((best #f) (n (or (ahash-ref docx-body-styles "") 0)))
+    (for (kv (sort (ahash-table->list docx-body-styles)
+                   (lambda (a b) (string<? (car a) (car b)))))
       (when (> (cdr kv) n) (set! best (car kv)) (set! n (cdr kv))))
     (if (and best (!= best "")) best docx-default-style)))
 
