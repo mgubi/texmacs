@@ -945,6 +945,21 @@ public:
       x2= std::max (x1, std::min (x2, rx2)); y2= std::max (y1, std::min (y2, ry2));
       r->set_clipping (x1 * P, -y2 * P, x2 * P, -y1 * P); };
     clip (rx1, ry1, rx2, ry2);
+    // (the glyphs first, all in the atlas before the frame is drawn: see
+    // gpu_place_coverage)
+    for (int i= 0, k; i < nops; i += k) {
+      int op= o[i];
+      k= op == 3 ? 4 + 2 * o[i+1] : op == 4 ? 3 + 2 * o[i+1] :
+         op == 1 ? 6 : op == 2 || op == 6 || op == 7 || op == 8 ? 5 :
+         op == 5 ? 10 : op == 9 ? 7 : op == 10 ? 1 : 0;
+      if (k <= 0 || i + k > nops) break;
+      if (op == 2) {
+        auto gs= glyph_size.find (o[i+1]);
+        if (gs != glyph_size.end () && gs->second.first > 0)
+          gpu_place_coverage (o[i+1], gs->second.first, gs->second.second,
+                              (const unsigned char*) glyph_cov[o[i+1]].data ());
+      }
+    }
     for (int i= 0; i < nops;) {
       int op= o[i];
       if (op == 1 && i + 6 <= nops) {

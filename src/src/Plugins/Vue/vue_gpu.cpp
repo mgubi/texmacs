@@ -70,11 +70,14 @@ bool gpu_draw_coverage (renderer r, int key, int w, int h,
   (void) c; return false; }
 bool gpu_push_matrix (renderer r, const double* m) { (void) r; (void) m; return false; }
 bool gpu_pop_matrix (renderer r) { (void) r; return false; }
+void gpu_place_coverage (int key, int w, int h, const unsigned char* cov) {
+  (void) key; (void) w; (void) h; (void) cov; }
 bool gpu_layers_enabled () { return false; }
 bool gpu_show_picture (void* l, picture p, int dw, int dh) {
   (void) l; (void) p; (void) dw; (void) dh; return false; }
 bool gpu_read_picture (picture p, unsigned char* rgba) {
   (void) p; (void) rgba; return false; }
+void gpu_sync_picture (picture p) { (void) p; }
 
 #else
 
@@ -1301,22 +1304,35 @@ gpu_renderer_rep::draw (int c, font_glyphs fng, SI x, SI y) {
 // which left the atlas (when it was full) is put in it again
 static int coverage_tag;
 
+static std::unordered_map<glyph_key, glyph_slot, glyph_key_hash>::iterator
+place_coverage (int key, int w, int h, const unsigned char* cov) {
+  glyph_key k { (void*) &coverage_tag, key };
+  auto it= G.glyphs.find (k);
+  if (it != G.glyphs.end ()) return it;
+  if (G.ax + w + 1 > ATLAS) { G.ax= 0; G.ay += G.arow + 1; G.arow= 0; }
+  if (G.ay + h + 1 > ATLAS) clear_atlas (); // full: start again
+  // what is queued from the atlas is drawn before it changes
+  if (G.mode == 2) flush_quads ();
+  G.B->update_texture (G.atlas, G.ax, G.ay, w, h, cov);
+  G.glyphs[k]= { G.ax, G.ay, w, h, 0, 0, true, 0, 0 };
+  G.ax += w + 1; G.arow= max (G.arow, h);
+  return G.glyphs.find (k);
+}
+
+// the glyphs of a frame put in the atlas before it is drawn: Safari copies
+// all of a texture which changes between the draws which use it (a view of
+// the user manual took 16 ms on the GPU, its glyphs put in as they came)
+void
+gpu_place_coverage (int key, int w, int h, const unsigned char* cov) {
+  if (!G.started || w <= 0 || h <= 0 || w > 512 || h > 512) return;
+  place_coverage (key, w, h, cov);
+}
+
 void
 gpu_renderer_rep::draw_coverage (int key, int w, int h, const unsigned char* cov,
                                  int left, int top, color c) {
   if (!ready () || w <= 0 || h <= 0 || w > 512 || h > 512) return;
-  glyph_key k { (void*) &coverage_tag, key };
-  auto it= G.glyphs.find (k);
-  if (it == G.glyphs.end ()) {
-    if (G.ax + w + 1 > ATLAS) { G.ax= 0; G.ay += G.arow + 1; G.arow= 0; }
-    if (G.ay + h + 1 > ATLAS) clear_atlas (); // full: start again
-    // what is queued from the atlas is drawn before it changes
-    if (G.mode == 2) flush_quads ();
-    G.B->update_texture (G.atlas, G.ax, G.ay, w, h, cov);
-    G.glyphs[k]= { G.ax, G.ay, w, h, 0, 0, true, 0, 0 };
-    G.ax += w + 1; G.arow= max (G.arow, h);
-    it= G.glyphs.find (k);
-  }
+  auto it= place_coverage (key, w, h, cov);
   const glyph_slot& s= it->second;
   int r, g, b, a;
   get_rgb_color (c, r, g, b, a);
@@ -1759,6 +1775,17 @@ gpu_read_picture (picture p, unsigned char* rgba) {
   if (g == NULL || !ensure_target (&g->t)) return false;
   gpu_flush_all ();
   return G.B->read (g->t.tex, g->t.w, g->t.h, 0, 0, g->t.w, g->t.h, rgba);
+}
+
+// what is queued for the picture drawn, and waited for (a pixel read back:
+// glFinish does not wait in WebGL)
+void
+gpu_sync_picture (picture p) {
+  gpu_picture_rep* g= as_gpu (p);
+  if (g == NULL || !ensure_target (&g->t)) return;
+  gpu_flush_all ();
+  unsigned char px[4];
+  G.B->read (g->t.tex, g->t.w, g->t.h, 0, 0, 1, 1, px);
 }
 
 picture

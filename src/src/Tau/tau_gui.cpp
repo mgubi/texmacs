@@ -302,6 +302,15 @@ extern bool mupdf_record;
 extern std::vector<int> mupdf_record_ops;
 extern std::string mupdf_record_glyphs;
 extern std::string mupdf_record_images;
+// (the web core built with the GPU renderer, tau_gpu.cpp: the commands
+// drawn in the worker too, when they are timed; else not linked)
+#ifdef __EMSCRIPTEN__
+extern "C" void tau_gpu_frame (int view, int w, int h, const int* ops, int nops,
+                               const unsigned char* gl, int ngl,
+                               const unsigned char* im, int nim,
+                               int x1, int y1, int x2, int y2, int dx, int dy)
+  __attribute__ ((weak));
+#endif
 
 #ifdef __EMSCRIPTEN__
 EM_JS (void, tau_js_dlist, (int view, int counter, int w, int h,
@@ -578,6 +587,17 @@ tau_turn_now () {
     v->extents_in_pixels (ew, eh, sx, sy);
     v->cursor_in_pixels (cx, cy);
     if (mupdf_record) {
+#ifdef __EMSCRIPTEN__
+      if (tau_gpu_frame)
+        tau_gpu_frame (v->id, v->px_w, v->px_h,
+                       mupdf_record_ops.data (), (int) mupdf_record_ops.size (),
+                       (const unsigned char*) mupdf_record_glyphs.data (),
+                       (int) mupdf_record_glyphs.size (),
+                       (const unsigned char*) mupdf_record_images.data (),
+                       (int) mupdf_record_images.size (),
+                       v->drawn_x1, v->drawn_y1, v->drawn_x2, v->drawn_y2,
+                       v->shift_x, v->shift_y);
+#endif
       tau_js_dlist (v->id, v->place_counter, v->px_w, v->px_h,
                     mupdf_record_ops.data (), (int) mupdf_record_ops.size (),
                     (const unsigned char*) mupdf_record_glyphs.data (),

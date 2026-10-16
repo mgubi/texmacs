@@ -7,13 +7,15 @@
 //
 //   node misc/tau/test/replay-bench.mjs --dir build-tau/out/web --tools <dir>
 //        [--browser firefox|safari] [--headed] [--only name] [--gl]
-//        [--width 1900 --height 1180] [--density 2]
+//        [--native] [--width 1900 --height 1180] [--density 2]
 //
 // Safari is driven by safaridriver ("Allow remote automation"), in a window
 // of the screen (its density is that of the screen); Firefox by puppeteer,
 // headless unless --headed (headless, the canvas may be drawn without the GPU).
 // --gl: the view of the pane drawn by WebGL (?gl, gl.mjs), the pixels as
-// well as the commands.
+// well as the commands. --native: the commands drawn by the GPU renderer
+// of the core in the worker too (a core built with THORVG, tau_gpu.cpp),
+// timed there: the shift, the calls, and the GPU waited for.
 
 import { spawn } from "node:child_process";
 import fs from "node:fs";
@@ -52,7 +54,7 @@ const DOCS = [
 // the browser: ev (a JavaScript expression, which may be a promise) -> its value
 const port = await freePort();
 const server = await serve(dir, port);
-const useGL = args.includes("--gl");
+const useGL = args.includes("--gl"), native = args.includes("--native");
 const url = `http://127.0.0.1:${port}/index.html?debug&nohome&gpusync${useGL ? "&gl" : ""}`;
 let ev, open, close;
 if (which === "safari") {
@@ -137,11 +139,15 @@ async function run(doc) {
 	const whole = await ev("tau.active.extents.height");
 	if (doc.skip) { await ev(`window.step({ t: "scroll", view: ${view}, dx: 0, dy: ${Math.round(whole * doc.skip)} })`); await sleep(1500); }
 	// scroll steps (a strip comes in), then whole views (all is drawn again)
+	let timeNative = false;
 	const scroll = async (dy, n) => {
 		await ev("(tau.state.drawParts = [], 1)");
+		if (timeNative) await ev(`window.step({ t: "gpu-bench", on: 1 })`);
 		for (let i = 0; i < n; i++) await ev(`window.step({ t: "scroll", view: ${view}, dx: 0, dy: ${dy} })`);
 		await sleep(300);
-		return ev("tau.state.drawParts");
+		const parts = await ev("tau.state.drawParts");
+		if (timeNative) parts.native = JSON.parse(await ev(`new Promise(res => { const on = e => { if (e.data.t === "gpu-stats") { tau.worker.removeEventListener("message", on); res(e.data.text); } }; tau.worker.addEventListener("message", on); tau.worker.postMessage({ t: "gpu-stats" }); })`));
+		return parts;
 	};
 	const pass = async () => {
 		const strip = Math.round(canvas.h * 0.08), page = canvas.h;
@@ -158,7 +164,9 @@ async function run(doc) {
 	const cpu = await pass();
 	await ev(`window.step({ t: "gpu", on: 1 })`);
 	await sleep(1500);
+	timeNative = native;
 	const gpu = await pass();
+	if (native) await ev(`window.step({ t: "gpu-bench", on: 0 })`);
 	await close();
 	return { canvas, cpu, gpu };
 }
@@ -181,6 +189,12 @@ for (const doc of DOCS) {
 		row("", "commands, step", r.gpu.steps);
 		row("", "pixels, view", r.cpu.views);
 		row("", "commands, view", r.gpu.views);
+		for (const [what, parts] of [["C++ GPU, step", r.gpu.steps], ["C++ GPU, view", r.gpu.views]]) {
+			const q = parts.native;
+			if (!q || !q.frames) continue;
+			console.log(`${"".padEnd(9)} ${what.padEnd(16)} |${q.shift.toFixed(2).padStart(7)} |${q.calls.toFixed(2).padStart(7)} |${q.gpu.toFixed(2).padStart(7)} |` +
+				`${(q.shift + q.calls + q.gpu).toFixed(2).padStart(7)} | ${String(q.frames).padStart(3)} frames, ${(q.area / 1e6).toFixed(2)} Mpx (in the worker)`);
+		}
 	}
 	catch (error) { console.log(doc.name + ": " + error.message); try { await close(); } catch (e) {} }
 }

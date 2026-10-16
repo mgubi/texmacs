@@ -1376,9 +1376,27 @@ from 16 to 1024 pixels. As in the page of TeXmacs Vue
   `tau_gpu.cpp` draws a rectangle, a line (ThorVG), a glyph from its
   coverage (the atlas) and a moved rectangle into a target and reads them
   back, right in Firefox and Safari 26 (the browser test "the GPU renderer
-  of the core"). Next: the commands of a view replayed into a target in the
-  worker, and the target given to the page (an ImageBitmap of the canvas,
-  drawn by a "bitmaprenderer" canvas: one context for all the views).
+  of the core"). The commands of the views are drawn so in the worker too
+  when they are timed (`replay-bench.mjs --native`, `tau_gpu_frame`: as
+  `tau_shell.cpp` draws them, into a target of each view; not shown yet).
+  The user manual, ms a frame (shift + calls + the GPU waited for, a pixel
+  read back), two runs each:
+
+  | | Safari, step | Safari, view | Firefox, step | Firefox, view |
+  |---|---|---|---|---|
+  | C++, in the worker | 2.7–3.0 | 2.8–4.1 | 2.8–3.1 | 3.3–5.0 |
+  | `gl.mjs`, in the page | 2.3–2.4 | 2.4–3.4 | 2.1–3.3 | 2.3–2.8 |
+  | 2D canvas, in the page | 2.9–3.3 | 4.0–5.1 | 18 | 10 |
+
+  As fast as `gl.mjs`, within what one run differs from another. At first
+  a view took 16 ms on the GPU in Safari (4.5 in Firefox): the glyphs new to
+  a frame were put in the atlas as they came, between the draws which use
+  it, and Safari copies all of a texture which changes so (as it did with
+  the atlas of the 2D canvas); and each of them ended a batch (50 draws a
+  view). `gpu_place_coverage` puts all of them first: one draw a frame, the
+  shell too (`tau_shell.cpp`). Next: the target given to the page (an
+  ImageBitmap of the canvas, drawn by a "bitmaprenderer" canvas: one
+  context for all the views), the page then drawing nothing.
 - **Left**: a limit to the pictures kept by the page (WebGL has one for
   its textures; the page cannot forget a picture, which the core sends
   once), and to the glyphs of the shell; the pattern of a rotated shape is rotated with it (MuPDF keeps

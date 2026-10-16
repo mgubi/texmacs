@@ -80,6 +80,8 @@ bool is_gpu_renderer (renderer ren);
 bool gpu_layers_enabled ();
 bool gpu_show_picture (void* metal_layer, picture p, int dw, int dh);
 bool gpu_read_picture (picture p, unsigned char* rgba);
+// what is queued for p drawn, and the GPU waited for (a pixel read back)
+void gpu_sync_picture (picture p);
 
 // a glyph given as its coverage (a byte a pixel, rows from the top), kept
 // in the atlas under key and drawn with its top left corner at the device
@@ -92,5 +94,8 @@ bool gpu_draw_coverage (renderer ren, int key, int w, int h,
 // the one before it again
 bool gpu_push_matrix (renderer ren, const double* m);
 bool gpu_pop_matrix (renderer ren);
+// a glyph given as its coverage put in the atlas, before the frame which
+// draws it (all the glyphs of a frame first: see vue_gpu.cpp)
+void gpu_place_coverage (int key, int w, int h, const unsigned char* cov);
 
 #endif // defined VUE_GPU_HPP

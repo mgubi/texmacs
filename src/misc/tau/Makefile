@@ -70,6 +70,9 @@ LIBDEPS  := $(MUPDF_LIB)/libmupdf.a $(MUPDF_LIB)/libmupdf-third.a
 # ThorVG built for WebAssembly, misc/thorvg/build-thorvg.sh, in <prefix>);
 # tau_gpu.cpp says whether it draws (for now). Only those objects are
 # compiled with USE_THORVG, the others are those of the build without it
+# (whether the web core has it is kept in obj/.link: it is linked again
+# when that changes)
+LINK_FILE := $(OBJ)/.link
 ifneq ($(THORVG),)
 GPU_SOURCES := Plugins/Vue/vue_gpu.cpp Plugins/Vue/gpu_backend_gl.cpp Tau/tau_gpu.cpp
 GPU_OBJECTS := $(patsubst %,$(OBJ)/%.o,$(basename $(GPU_SOURCES)))
@@ -218,9 +221,6 @@ $(FLAGS_FILE): FORCE
 	@mkdir -p $(OBJ); echo '$(CPPFLAGS) $(CXXFLAGS) $(CFLAGS) $(EH)' > $@.new; \
 	  if cmp -s $@.new $@; then rm -f $@.new; else mv $@.new $@; fi
 $(OBJECTS): $(FLAGS_FILE)
-# (and whether the web core has the GPU renderer, in obj/.link: it is
-# linked again when that changes)
-LINK_FILE := $(OBJ)/.link
 $(LINK_FILE): FORCE
 	@mkdir -p $(OBJ); echo '$(THORVG)' > $@.new; \
 	  if cmp -s $@.new $@; then rm -f $@.new; else mv $@.new $@; fi

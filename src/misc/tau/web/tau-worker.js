@@ -118,6 +118,15 @@ function handle(m) {
 		if (new URLSearchParams(self.location.search).has("debug"))
 			postMessage({ t: "gpu-check", text: core._tau_gpu_check ? core.UTF8ToString(core._tau_gpu_check()) : "not built" });
 		break;
+	case "gpu-bench":
+		// for the benchmark: the commands drawn by the GPU renderer of the
+		// core too, timed (replay-bench.mjs --native); and the means
+		if (new URLSearchParams(self.location.search).has("debug") && core._tau_gpu_bench) core._tau_gpu_bench(m.on ? 1 : 0);
+		break;
+	case "gpu-stats":
+		if (new URLSearchParams(self.location.search).has("debug"))
+			postMessage({ t: "gpu-stats", text: core._tau_gpu_stats ? core.UTF8ToString(core._tau_gpu_stats()) : "{}" });
+		break;
 	case "memory":
 		// for the tests: the size of the memory of the program
 		if (new URLSearchParams(self.location.search).has("debug")) postMessage({ t: "memory", text: String(core.HEAPU8.length) });
