@@ -968,8 +968,14 @@ ns_simple_widget_rep::draw_backing_store (NSRect rect) {
   CGDataProviderRelease (prov);
   if (!img) return;
   double k= retina_factor;
-  double x0= rect.origin.x * k, x1= (rect.origin.x + rect.size.width) * k;
-  double y0= rect.origin.y * k, y1= (rect.origin.y + rect.size.height) * k;
+  // only what the backing store holds: the rectangle asked for may go
+  // beyond the view (the snapshots ask for the whole document view when it
+  // is centered in a wider clip view, from x < 0), and the part outside the
+  // store, cropped from the image, was drawn shifted and wrapped around
+  double x0= max (rect.origin.x * k, 0.0);
+  double x1= min ((rect.origin.x + rect.size.width) * k, (double) W);
+  double y0= max (rect.origin.y * k, 0.0);
+  double y1= min ((rect.origin.y + rect.size.height) * k, (double) H);
   for (int i= 0; i < 2; i++) {
     double xa, xb, xo;
     if (!backing_piece (i, x0, x1, false, xa, xb, xo)) continue;
