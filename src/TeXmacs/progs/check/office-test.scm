@@ -1271,7 +1271,7 @@
   (check= (docx (wp "<w:pPr><w:outlineLvl w:val='2'/></w:pPr>" (wr "Deep")))
           '((p (@ (role "heading") (level "3") (numbered "no")) "Deep")))
   (check= (docx (wp (wstyle "Titre") (wr "T")))
-          '((p (@ (role "title") (align "center")) "T")))
+          '((p (@ (role "title") (style "Titre") (align "center")) "T")))
   (check= (docx (wp (wstyle "Citation") (wr "q"))) '((p (@ (role "quote")) "q")))
   (check= (docx (wp (wstyle "Code") (wr "x=1"))) '((p (@ (role "code")) "x=1")))
   (check= (docx (wp "<w:pPr><w:jc w:val='right'/></w:pPr>" (wr "r")))
@@ -1553,7 +1553,7 @@
   (check= (odt "<text:h text:outline-level='2'>Sub</text:h>")
           '((p (@ (role "heading") (level "2") (numbered "no")) "Sub")))
   (check= (odt "<text:p text:style-name='Title'>T</text:p>")
-          '((p (@ (role "title") (align "center")) "T")))
+          '((p (@ (role "title") (align "center") (style "Title")) "T")))
   ;; an automatic style is what its parent is
   (check= (odt "<text:p text:style-name='P1'>q</text:p>")
           '((p (@ (role "quote") (align "right")) "q")))
@@ -4403,7 +4403,45 @@
                             "word/document.xml")))
     ;; (the mark of the note just after the formula, before the tab of its
     ;; number)
-    (check-true (export-has? text "</m:oMath><w:r><w:rPr><w:rStyle w:val=\"FootnoteReference\"/>"))))
+    (check-true (export-has? text "</m:oMath><w:r><w:rPr><w:rStyle w:val=\"FootnoteReference\"/>")))
+  ;; the title keeps the look of its style in the file: doc-title is
+  ;; redefined in the initial environment
+  (let* ((title (lambda (t)
+                  (with i (list-find (cdr t) (lambda (y) (func? y 'initial)))
+                    (and i (list-find (cdadr i)
+                                      (lambda (a) (and (func? a 'associate)
+                                                       (== (cadr a) "doc-title"))))))))
+         (z (zip-pack '("word/document.xml" "word/styles.xml")
+                      (list (string-append "<w:document" docx-ns "><w:body>"
+                                           (wp (wstyle "Title") (wr "T")) (wp (wr "p"))
+                                           "</w:body></w:document>")
+                            (string-append "<w:styles" docx-ns ">"
+                                           "<w:style w:type='paragraph' w:styleId='Title'>"
+                                           "<w:name w:val='Title'/><w:pPr><w:jc w:val='right'/>"
+                                           "</w:pPr><w:rPr><w:color w:val='FF0000'/></w:rPr>"
+                                           "</w:style></w:styles>"))))
+         (o (odt-file "<text:p text:style-name='Title'>T</text:p><text:p>p</text:p>"
+                      (string-append "<office:styles>"
+                                     "<style:style style:name='Title' style:family='paragraph'>"
+                                     "<style:text-properties fo:color='#ff0000'/></style:style>"
+                                     "</office:styles>")
+                      ""))
+         (dz (convert z "docx-document" "texmacs-stree"))
+         (od (convert o "odt-document" "texmacs-stree")))
+    (check= (cadr (cadr (list-find (cdr dz) (lambda (y) (func? y 'body)))))
+            '(doc-data (doc-title "T")))
+    (check= (title dz)
+            '(associate "doc-title"
+                        (macro "x" (with "par-mode" "right"
+                                     (surround (vspace* "0.5fn") (vspace "0.5fn")
+                                               (with "color" "#ff0000" (arg "x")))))))
+    (check-true (>= (string-search-forwards "(with \"color\" \"#ff0000\" (arg \"x\"))" 0
+                                            (object->string (title od)))
+                    0))
+    ;; (a title without its style keeps the look of TeXmacs)
+    (check= (title (convert (odt-file "<text:p text:style-name='Title'>T</text:p>" "" "")
+                            "odt-document" "texmacs-stree"))
+            #f)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; LaTeX of the style office

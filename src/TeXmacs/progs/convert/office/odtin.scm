@@ -1289,8 +1289,9 @@
                   (if (car role) '() (odt-paragraph-props name))
                   (lambda ()
                     (odt-trim (office-changes (odt-inlines (ox-children x)))))))))
-         ;; (and of a caption, for one which is not the one of a figure)
-         (named (and (or (not (car role)) (== (car role) "caption"))
+         ;; (and of a caption, for one which is not the one of a figure, and of
+         ;; the parts of the title, for their look)
+         (named (and (in? (car role) '(#f "caption" "title" "subtitle" "date"))
                      (== odt-apart-depth 0) (== odt-list-depth 0)
                      (odt-named-style name)))
          (l (car r)))

@@ -1899,6 +1899,28 @@
 (define oftm-title-roles
   '("title" "subtitle" "author" "date" "abstract" "skip"))
 
+;; the macros of the title (doc-title, doc-subtitle, doc-date) with the
+;; node style of their paragraphs in the file
+(define oftm-title-styles '())
+
+(define (oftm-title-part-macro name st)
+  ;; the part name of the title in the look of the style of its paragraphs
+  ;; (and not in the one of TeXmacs): the font, the size and the color, the
+  ;; spaces (0.5fn when the style has none) and the alignment (the one of
+  ;; the usual paragraphs when the style has none)
+  (let* ((align (ox-attr st 'align))
+         (align (if (in? align '("left" "center" "right" "justify")) align oftm-align))
+         (body (oftm-paragraph-format st (oftm-style-text st '(arg "x")) #f))
+         (body (if (or (office-number (ox-attr st 'space-before))
+                       (office-number (ox-attr st 'space-after)))
+                   body
+                   `(surround (vspace* "0.5fn") (vspace "0.5fn") ,body))))
+    `(associate ,name (macro "x" (with "par-mode" ,align ,body)))))
+
+(define (oftm-doc-title-macros)
+  ;; the macros of the parts of the title, for the initial environment
+  (map (lambda (p) (oftm-title-part-macro (car p) (cdr p))) oftm-title-styles))
+
 (define (oftm-title-block? x)
   (and (func? x 'p) (in? (ox-attr x 'role) oftm-title-roles)))
 
@@ -1926,6 +1948,16 @@
          (authors (get "author"))
          (dates (get "date"))
          (abstract (get "abstract")))
+    (set! oftm-title-styles
+          (list-filter
+            (map (lambda (p)
+                   (let* ((x (list-find l (lambda (x) (oftm-role? x (car p)))))
+                          (name (and x (ox-attr x 'style))))
+                     (with st (and name (ahash-ref oftm-styles (cons "paragraph" name)))
+                       (and st (cons (cdr p) st)))))
+                 '(("title" . "doc-title") ("subtitle" . "doc-subtitle")
+                   ("date" . "doc-date")))
+            identity))
     (append
       ;; (a title, a subtitle or a date of several paragraphs has lines)
       (if (and (null? titles) (null? subtitles) (null? authors) (null? dates)) '()
@@ -2107,6 +2139,7 @@
                          "office->texmacs:faithful")
               "on"))
     (set! oftm-styles (make-ahash-table))
+    (set! oftm-title-styles '())
     (for (st (append-map ox-children (list-filter l (lambda (y) (func? y 'styles)))))
       ;; (a style of paragraphs and one of text may have the same name)
       (when (and (func? st 'style) (ox-attr st 'name))
@@ -2143,7 +2176,9 @@
                   (let* ((body (oftm-body l))
                          (body (if (null? (cdr headers)) body
                                    (oftm-document (append (cdr headers) (cdr body)))))
-                         (macros (if oftm-faithful? (oftm-style-macros) '()))
+                         (macros (if oftm-faithful?
+                                     (append (oftm-style-macros) (oftm-doc-title-macros))
+                                     '()))
                          (env (if (and oftm-faithful? package (ox-attr package 'data))
                                   (append env (oftm-original l macros))
                                   env)))
@@ -2168,5 +2203,6 @@
       (set! oftm-align "justify")
       (set! oftm-faithful? #f)
       (set! oftm-styles (make-ahash-table))
+      (set! oftm-title-styles '())
       (set! oftm-body-style #f)
       r)))

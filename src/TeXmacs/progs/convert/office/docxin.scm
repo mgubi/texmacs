@@ -1778,8 +1778,9 @@
          (role (if (and field (== (car role) "bibitem")) (list #f #f) role))
          (attrs `((role ,(car role)) (level ,(cadr role))
                   ;; the named style of a plain paragraph (and of a caption,
-                  ;; for one which is not the one of a figure)
-                  (style ,(and (or (not (car role)) (== (car role) "caption"))
+                  ;; for one which is not the one of a figure, and of the parts
+                  ;; of the title, for their look)
+                  (style ,(and (in? (car role) '(#f "caption" "title" "subtitle" "date"))
                                (not id) style (null? docx-open-notes)
                                (begin (ahash-set! docx-used-styles style #t) style)))
                   (align ,(cond ((== align "center") "center")
