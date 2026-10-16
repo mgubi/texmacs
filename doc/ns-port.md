@@ -102,11 +102,14 @@ scrolled when they are higher than 640 points (`responsive_tabs_view` in
 page). Only a few dialogs have them (the consoles of the Debug menu); the
 preferences have icon tabs.
 
-A change of the zoom of an editor is smooth, as in Vue: the picture of the
-canvas at the old zoom is carried to the place and size it has at the new
-one and fades out (150 ms), over the canvas repainted at the new zoom
+A change of the zoom of an editor is smooth, as in Vue: the pictures of
+the canvas at the old zoom and at the new one move together, from the place
+and size of the first to those of the second, the old one fading out over
+the new one (150 ms); the canvas is hidden meanwhile, then shown again
 (`start_zoom_transition`, `run_zoom_transition` in `ns_simple_widget.mm`:
-a layer above the scroll view, animated by Core Animation). The preference
+layers above the scroll view, on its background, animated by Core
+Animation; moving the old picture alone, over the canvas already at the new
+zoom, showed both). The preference
 "smooth zoom" (default on) turns it off; zooms by less than 3% are
 immediate. With `TEXMACS_NS_DEBUG_DRAW` the geometry of each transition is
 printed.
