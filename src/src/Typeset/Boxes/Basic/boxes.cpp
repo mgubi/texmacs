@@ -617,10 +617,18 @@ box_rep::display_background (renderer ren) {
 void
 box_rep::redraw_background (renderer ren) {
   ren->move_origin (x0, y0);
-  display_background (ren);
-  int i, n=subnr ();
-  for (i=0; i<n; i++)
-    subbox (i)->redraw_background (ren);
+  // (only what is in the region which is drawn: the backgrounds of all the
+  // pages of a document were drawn for each rectangle cleared, some twelve
+  // rectangles for each page, 180000 for a key in the user manual; the
+  // margin is for the shadows of the pages, drawn just outside of them)
+  SI d= 8 * ren->retina_pixel;
+  if (ren->is_visible (min (x1, x3) - d, min (y1, y3) - d,
+                       max (x2, x4) + d, max (y2, y4) + d)) {
+    display_background (ren);
+    int i, n=subnr ();
+    for (i=0; i<n; i++)
+      subbox (i)->redraw_background (ren);
+  }
   ren->move_origin (-x0, -y0);
 }
 
