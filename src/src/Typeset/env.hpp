@@ -672,9 +672,12 @@ public:
     if (rec_merged == NULL || N(a) == 0) return;
     (*rec_merged) (a.operator-> ())= true; (*rec_held) << a; }
   void write_binding (string key, tree value, string extra);
+  tree store_binding (string key, tree value, string extra);
   inline void write_bindings (array<tree> l) {
+    // (those of a bridge used again: the record above gets the same tuples)
+    if (rec_bindings != NULL) (*rec_bindings) << l;
     for (int i=0; i<N(l); i++)
-      write_binding (l[i][0]->label, l[i][1], l[i][2]->label); }
+      store_binding (l[i][0]->label, l[i][1], l[i][2]->label); }
   // a record of the bindings written for the time of one typesetting,
   // added to the record around it when it stops (also on an exception)
   struct binding_record {

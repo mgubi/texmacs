@@ -2025,14 +2025,35 @@ edit_env_rep::exec_set_binding (tree t) {
 
 void
 edit_env_rep::write_binding (string key, tree value, string extra) {
-  if (rec_bindings != NULL) (*rec_bindings) << tuple (key, value, extra);
-  tree old_value= local_ref[key];
-  // (not written when it is there already: see labels_stamp)
-  tree now= tuple (value, (is_func (old_value, TUPLE) && N(old_value) >= 2?
-                           old_value[1]: tree ("?")));
-  if (N(extra) != 0) now << tree (extra);
-  if (!local_ref->contains (key) || old_value != now)
-    local_ref (key)= copy (now);
+  // (the record gets the value as it is in the table, so that the binding
+  // is found there by its pointer when the record is written again)
+  tree stored= store_binding (key, value, extra);
+  if (rec_bindings != NULL) (*rec_bindings) << tuple (key, stored, extra);
+}
+
+tree
+edit_env_rep::store_binding (string key, tree value, string extra) {
+  // (not written when it is there already: see labels_stamp; the binding
+  // would be the tuple of the value, the page of the one there or "?", and
+  // the extra part: it is there when the one there has the same value and
+  // extra part, which is checked without making it, since the bridges used
+  // again write all theirs again at each pass)
+  tree* there= local_ref->find (key);
+  tree old_value= (there == NULL? tree (UNINIT): *there);
+  int n= (N(extra) != 0? 3: 2);
+  bool same= there != NULL && is_func (old_value, TUPLE, n) &&
+             old_value[0] == value &&
+             (n == 2 || (is_atomic (old_value[2]) &&
+                         old_value[2]->label == extra));
+  tree stored= (same? old_value[0]: tree ());
+  if (!same) {
+    tree now= tuple (value, (is_func (old_value, TUPLE) && N(old_value) >= 2?
+                             old_value[1]: tree ("?")));
+    if (N(extra) != 0) now << tree (extra);
+    now= copy (now);
+    local_ref (key)= now;
+    stored= now[0];
+  }
   touched (key)= true;
   if (complete && is_tuple (old_value) && N(old_value) >= 1) {
     string old_s= tree_as_string (old_value[0]);
@@ -2043,6 +2064,7 @@ edit_env_rep::write_binding (string key, tree value, string extra) {
       //else typeset_warning << "Redefined " << key << " as " << new_s << LF;
     }
   }
+  return stored;
 }
 
 tree

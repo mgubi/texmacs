@@ -519,14 +519,11 @@ add_reads (edit_env env, bool known, array<int> reads,
   if (env->read_unknown) return;
   if (!known) { env->read_unknown= true; return; }
   if (env->merged (reads)) return;
-  // (the variables which are not in the record yet count: those of the
-  // bridges below are mostly the same)
-  int fresh= 0;
-  for (int i=0; i<N(reads); i++)
-    if (!rec->contains (reads[i])) fresh++;
-  if (rec->size () + fresh > READS_MAX) {
-    env->read_unknown= true; return; }
+  // (the variables which were not in the record yet count: those of the
+  // bridges below are mostly the same; a record which is too large is
+  // given up, whatever it holds)
   for (int i=0; i<N(reads); i++) rec->insert (reads[i]);
+  if (rec->size () > READS_MAX) { env->read_unknown= true; return; }
   env->merging (reads);
 }
 
@@ -755,15 +752,12 @@ add_inputs (edit_env env, bool known, array<int> vars,
   if (!known) { env->read_unknown= true; return; }
   // (an array all of whose variables are in the record adds nothing)
   if (env->merged (vars)) return;
-  int fresh= 0;
-  for (int i=0; i<N(vars); i++)
-    if (!rec->contains (vars[i])) fresh++;
-  if (N(*pv) + fresh > INPUTS_MAX) { env->read_unknown= true; return; }
   int n0= N(*pv);
   for (int i=0; i<N(vars); i++) {
     int id= vars[i];
     if (rec->insert (id)) (*pv) << id;
   }
+  if (N(*pv) > INPUTS_MAX) { env->read_unknown= true; return; }
   if (N(*pv) - n0 == N(vars)) *ph ^= vals;
   else for (int i=n0; i<N(*pv); i++) *ph ^= env->start_hash ((*pv)[i]);
   env->merging (vars);
