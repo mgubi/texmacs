@@ -35,12 +35,99 @@ kpsewhich (string name) {
   return which;
 }
 
+// The TFM and Type 1 files of the TeX distribution, by name: read once
+// from the databases of kpathsea (the files ls-R, which kpsewhich reads),
+// and from the fonts of TEXMFHOME, which has none, in the order in which
+// kpsewhich looks. kpsewhich, a program which takes some 70 ms to start,
+// was run for each file which TeXmacs does not have (some hundred, for the
+// sizes of the TeX fonts of a document, the first time it is shown).
+// Without a database, kpsewhich is asked as before
+static hashmap<string,string> tex_index ("");
+static int tex_index_state= 0; // 0: not read yet, 1: read, -1: none
+
+static bool
+tex_indexed_name (string name) {
+  return ends (name, ".tfm") || ends (name, ".pfb");
+}
+
+static void
+tex_index_dir (url dir, int depth) {
+  bool err= false;
+  array<string> a= read_directory (dir, err);
+  if (err) return;
+  for (int i= 0; i < N(a); i++) {
+    if (N(a[i]) == 0 || a[i][0] == '.') continue;
+    url u= dir * url (a[i]);
+    if (tex_indexed_name (a[i])) {
+      if (!tex_index->contains (a[i])) tex_index (a[i])= as_string (u);
+    }
+    else if (depth < 8 && is_directory (u)) tex_index_dir (u, depth + 1);
+  }
+}
+
+static void
+tex_index_ls_r (string file) {
+  string s;
+  if (load_string (url_system (file), s, false)) return;
+  string root= file (0, max (0, N(file) - 5)); // without "/ls-R"
+  string dir= root;
+  int i= 0, n= N(s);
+  while (i < n) {
+    int start= i;
+    while (i < n && s[i] != '\n') i++;
+    string line= s (start, i);
+    i++;
+    int l= N(line);
+    if (l == 0 || line[0] == '%') continue;
+    if (line[l-1] == ':') {
+      // a directory: "./fonts/tfm/public/cm:", relative to the root
+      string d= line (0, l-1);
+      if (starts (d, "./")) d= d (2, N(d));
+      else if (d == ".") d= "";
+      dir= (N(d) == 0 || d[0] == '/')? (N(d) == 0? root: d): root * "/" * d;
+    }
+    else if (tex_indexed_name (line) && !tex_index->contains (line))
+      tex_index (line)= dir * "/" * line;
+  }
+}
+
+static bool
+tex_index_ready () {
+  if (tex_index_state == 0) {
+    tex_index_state= -1;
+    bench_start ("tex font index");
+    string home= var_eval_system ("kpsewhich -var-value TEXMFHOME");
+    url fonts= url_system (home) * url ("fonts");
+    if (N(home) > 0 && is_directory (fonts)) tex_index_dir (fonts, 0);
+    string all= var_eval_system ("kpsewhich -all ls-R");
+    int found= 0, i= 0, n= N(all);
+    while (i < n) {
+      int start= i;
+      while (i < n && all[i] != '\n') i++;
+      string file= all (start, i);
+      i++;
+      if (N(file) > 0 && ends (file, "ls-R")) { tex_index_ls_r (file); found++; }
+    }
+    if (found > 0) tex_index_state= 1;
+    bench_cumul ("tex font index");
+  }
+  return tex_index_state == 1;
+}
+
+// the file of the TeX distribution (as kpsewhich, see tex_index)
+static string
+tex_which (string name) {
+  if (tex_indexed_name (name) && tex_index_ready ())
+    return tex_index->contains (name)? tex_index[name]: string ("");
+  return kpsewhich (name);
+}
+
 static url
 resolve_tfm (url name) {
   url r= resolve (the_tfm_path * name);
   if (!is_none (r)) return r;
   if (get_setting ("KPSEWHICH") == "true") {
-    string which= kpsewhich (as_string (name));
+    string which= tex_which (as_string (name));
     if ((which!="") && exists (url_system (which))) return url_system (which);
     // cout << "Missed " << name << "\n";
   }
@@ -67,7 +154,7 @@ resolve_pfb (url name) {
   if (!is_none (r)) return r;
 #ifndef OS_WIN32 // The kpsewhich from MikTeX is bugged for pfb fonts
   if (get_setting ("KPSEWHICH") == "true") {
-    string which= kpsewhich (as_string (name));
+    string which= tex_which (as_string (name));
     if ((which!="") && exists (url_system (which))) return url_system (which);
     // cout << "Missed " << name << "\n";
   }
@@ -87,9 +174,16 @@ tfm_font_path () {
 url
 resolve_tex (url name) {
   string s= as_string (name);
+  // NOTE: a Type 1 font which is not there is remembered too (""), since
+  // kpsewhich is asked for it, which takes some 70 ms (the TeX fonts at
+  // the sizes which only have a Metafont form); the TFM and PK files are
+  // not, since they may be made later (make_tex_tfm, make_tex_pk)
+  bool pfb= ends (s, "pfb");
   if (is_cached ("font_cache.scm", s)) {
-    url u= url_system (cache_get ("font_cache.scm", s) -> label);
-    if (exists (u)) return u;
+    string r= cache_get ("font_cache.scm", s) -> label;
+    if (r == "" && pfb) return url_none ();
+    url u= url_system (r);
+    if (r != "" && exists (u)) return u;
     cache_reset ("font_cache.scm", s);
   }
 
@@ -108,6 +202,7 @@ resolve_tex (url name) {
   bench_cumul ("resolve tex");
 
   if (!is_none (u)) cache_set ("font_cache.scm", s, as_string (u));
+  else if (pfb) cache_set ("font_cache.scm", s, "");
   //cout << "Resolve " << name << " -> " << u << "\n";
   return u;
 }

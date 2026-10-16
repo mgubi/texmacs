@@ -22,6 +22,7 @@ static hashmap<tree,tree> cache_data ("?");
 static hashset<string> cache_loaded;
 static hashset<string> cache_changed;
 static hashmap<string,bool> cache_valid (false);
+static hashset<tree> cache_dropped; // reset in this session (see cache_save)
 
 void
 cache_set (string buffer, tree key, tree t) {
@@ -30,6 +31,7 @@ cache_set (string buffer, tree key, tree t) {
     cache_data (ckey)= t;
     cache_changed->insert (buffer);
   }
+  if (cache_dropped->contains (ckey)) cache_dropped->remove (ckey);
 }
 
 void
@@ -37,6 +39,7 @@ cache_reset (string buffer, tree key) {
   tree ckey= tuple (buffer, key);
   cache_data->reset (ckey);
   cache_changed->insert (buffer);
+  cache_dropped->insert (ckey);
 }
 
 bool
@@ -159,6 +162,22 @@ void
 cache_save (string buffer) {
   if (cache_changed->contains (buffer)) {
     url cache_file= texmacs_home_path * url ("system/cache/" * buffer);
+    if (buffer == "font_cache.scm") {
+      // NOTE: several instances of TeXmacs share the cache, and each one
+      // wrote what it had, so that the fonts found by another one since it
+      // started were lost, and looked for again (some seconds for the TeX
+      // fonts of a document): the entries of the file which this instance
+      // does not have, and did not reset, are kept
+      string old;
+      if (!load_string (cache_file, old, false)) {
+        tree t= scheme_to_tree (old);
+        for (int i=0; i<N(t)-1; i+=2) {
+          tree ckey= tuple (buffer, t[i]);
+          if (!cache_data->contains (ckey) && !cache_dropped->contains (ckey))
+            cache_data (ckey)= t[i+1];
+        }
+      }
+    }
     string cached;
     iterator<tree> it= iterate (cache_data);
     if (buffer == "file_cache" || buffer == "doc_cache") {

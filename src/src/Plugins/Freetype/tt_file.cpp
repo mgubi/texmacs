@@ -21,6 +21,7 @@
 #include "scheme.hpp"
 
 static hashmap<string,string> tt_fonts ("no");
+static bool tt_indexed= false; // see tt_index_find
 
 url
 add_to_path (url u, url d) {
@@ -33,6 +34,7 @@ add_to_path (url u, url d) {
 
 void
 tt_extend_font_path (url u) {
+  tt_indexed= false; // (the index of the files of the path is made again)
   if (!is_directory (u)) u= head (u);
   string old= get_preference ("imported fonts", "");
   if (old == "") set_preference ("imported fonts", as_unix_string (u));
@@ -112,8 +114,46 @@ tt_font_path () {
 #endif
 }
 
+// The files of the directories of the font path, by name: the place of
+// the file in the first directory of the path which has it. The path and
+// its directories are walked once (the system directories and the trees of
+// TeX Live are large, and a font which is not there, as the many sizes of
+// the TeX fonts, which have no sfnt form, was looked for in each of them);
+// a directory imported meanwhile (tt_extend_font_path) makes it again
+static hashmap<string,string> tt_index ("");
+
+static void
+tt_index_add (url dirs) {
+  if (is_none (dirs)) return;
+  if (is_or (dirs)) {
+    tt_index_add (dirs[1]);
+    tt_index_add (dirs[2]);
+    return;
+  }
+  bool err= false;
+  array<string> a= read_directory (dirs, err);
+  if (err) return;
+  for (int i= 0; i < N(a); i++)
+    if (N(a[i]) > 0 && a[i][0] != '.' && !tt_index->contains (a[i]))
+      tt_index (a[i])= as_string (dirs * url (a[i]));
+}
+
 static url
-tt_locate (string name, url tt_path) {
+tt_index_find (string name) {
+  if (!tt_indexed) {
+    tt_indexed= true;
+    tt_index= hashmap<string,string> ("");
+    bench_start ("tt font index");
+    tt_index_add (tt_font_path ());
+    bench_cumul ("tt font index");
+  }
+  if (!tt_index->contains (name)) return url_none ();
+  url u= url_system (tt_index[name]);
+  return exists (u)? u: url_none ();
+}
+
+static url
+tt_locate (string name) {
   if (ends (name, ".pfb")) {
     /*
     if (starts (name, "rpag")) name= "uag" * name (4, N (name) - 4) * "8a.pfb";
@@ -157,8 +197,7 @@ tt_locate (string name, url tt_path) {
 	}
     }
 
-  //cout << "Resolve " << name << " in " << tt_path << "\n";
-  return resolve (tt_path * name);
+  return tt_index_find (name);
 }
 
 url
@@ -172,17 +211,16 @@ tt_font_find_sub (string name) {
   // sign and the code of 'A' is 'a'. TeXmacs asks for characters by Unicode
   // and needs the cmap of the sfnt file. The same choice gives the PDF
   // writer real glyph indices instead of character codes.
-  // The font path is the same for the five suffixes
-  url tt_path= tt_font_path ();
-  u= tt_locate (name * ".otf", tt_path);
+  // (the font path is indexed once, see tt_index_find)
+  u= tt_locate (name * ".otf");
   if (!is_none (u)) return u;
-  u= tt_locate (name * ".ttf", tt_path);
+  u= tt_locate (name * ".ttf");
   if (!is_none (u)) return u;
-  u= tt_locate (name * ".ttc", tt_path);
+  u= tt_locate (name * ".ttc");
   if (!is_none (u)) return u;
-  u= tt_locate (name * ".pfb", tt_path);
+  u= tt_locate (name * ".pfb");
   if (!is_none (u)) return u;
-  u= tt_locate (name * ".dfont", tt_path);
+  u= tt_locate (name * ".dfont");
   return u;
 }
 
