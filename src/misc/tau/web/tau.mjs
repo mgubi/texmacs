@@ -987,8 +987,9 @@ function frameInks(o) {
 // itself (a view in a dialog); two canvases, one over the other, for a
 // pane: a scroll draws the one shown into the other, which is then shown
 // (a canvas drawn on itself took 3.5 ms in Safari for a step); or WebGL
-// (?gl, gl.mjs). size (w, h), shift (dx, dy), pixels (m), commands (m), and
-// sync () which waits for the canvas (?gpusync).
+// (?gl, gl.mjs). size (w, h), shift (dx, dy), pixels (m), commands (m),
+// bitmap (m): the rectangle which the worker drew (?coregl), and sync ()
+// which waits for the canvas (?gpusync).
 function canvasSurface(canvas) {
 	const ctx = canvas.getContext("2d");
 	return {
@@ -996,6 +997,7 @@ function canvasSurface(canvas) {
 		shift(dx, dy) { ctx.drawImage(canvas, dx, dy); },
 		pixels(m) { ctx.putImageData(new ImageData(new Uint8ClampedArray(m.pixels), m.w, m.h), m.x, m.y); },
 		commands(m) { replayCommands(ctx, m); },
+		bitmap(m) { ctx.drawImage(m.bitmap, m.x, m.y); m.bitmap.close(); },
 		sync() { ctx.getImageData(0, 0, 1, 1); }
 	};
 }
@@ -1018,9 +1020,16 @@ function pairSurface(canvas) {
 		},
 		pixels(m) { shown.ctx.putImageData(new ImageData(new Uint8ClampedArray(m.pixels), m.w, m.h), m.x, m.y); },
 		commands(m) { replayCommands(shown.ctx, m); },
+		bitmap(m) { shown.ctx.drawImage(m.bitmap, m.x, m.y); m.bitmap.close(); },
 		sync() { shown.ctx.getImageData(0, 0, 1, 1); }
 	};
 }
+// ?coregl: the views drawn in the worker by the GPU renderer of the core
+// (tau_gpu.cpp), what changed given to the page as bitmaps; the page draws
+// nothing, it shifts its canvas and puts them in. With ?gl on the WebGL
+// surface (in Firefox a 2D canvas shifted takes 5 ms a step; in Safari an
+// ImageBitmap into a texture seemed slower: docs/tau-design.md)
+const coreGL = params.has("coregl");
 // what the WebGL surface takes from here
 const useGL = params.has("gl");
 const glShared = { glyphCovs, pictures, drawPath, opSize: OP_SIZE_OF };
@@ -1279,7 +1288,7 @@ worker.onmessage = event => {
 		const masks0 = glyphCovs.size, inks0 = state.inksMade;
 		if (m.t === "dlist") learnDefinitions(m);
 		const pane = targetOf(m.view);
-		if (!pane || m.place !== pane.place) break; // for an older place
+		if (!pane || m.place !== pane.place) { if (m.bitmap) m.bitmap.close(); break; } // for an older place
 		const surface = pane.surface;
 		surface.size(m.width, m.height);
 		// the rectangle of the canvas which changed: its pixels, or the
@@ -1293,7 +1302,8 @@ worker.onmessage = event => {
 		// the drawing which the canvas does when it is waited for)
 		if (gpuSync) surface.sync();
 		const t1 = performance.now();
-		if (m.t === "dlist") surface.commands(m);
+		if (m.bitmap) surface.bitmap(m);
+		else if (m.t === "dlist") surface.commands(m);
 		else surface.pixels(m);
 		const t2 = performance.now();
 		if (gpuSync) surface.sync();
@@ -1302,7 +1312,7 @@ worker.onmessage = event => {
 		if (state.drawTimes.length > 500) state.drawTimes.shift();
 		if (gpuSync) {
 			state.drawParts.push({ shift: t1 - t0, calls: t2 - t1, raster: t3 - t2,
-				ops: m.t === "dlist" ? replayCounts(m) : null, w: m.w, h: m.h,
+				ops: m.t === "dlist" && !m.bitmap ? replayCounts(m) : null, w: m.w, h: m.h, bitmap: !!m.bitmap,
 				masks: glyphCovs.size - masks0, inks: state.inksMade - inks0 });
 			if (state.drawParts.length > 500) state.drawParts.shift();
 		}
@@ -1312,8 +1322,9 @@ worker.onmessage = event => {
 		state.paints++;
 		if (!state.started) {
 			app.started();
-			// (?gl: the views are drawn by WebGL from the commands of the core)
-			if (useGL) worker.postMessage({ t: "gpu", on: 1 });
+			// (?gl: the views are drawn by WebGL from the commands of the core;
+			// ?coregl: by the core, in the worker)
+			if (useGL || coreGL) worker.postMessage({ t: "gpu", on: 1 });
 		}
 		state.started = true;
 		if (params.has("debug"))

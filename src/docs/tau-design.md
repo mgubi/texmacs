@@ -1376,11 +1376,11 @@ from 16 to 1024 pixels. As in the page of TeXmacs Vue
   `tau_gpu.cpp` draws a rectangle, a line (ThorVG), a glyph from its
   coverage (the atlas) and a moved rectangle into a target and reads them
   back, right in Firefox and Safari 26 (the browser test "the GPU renderer
-  of the core"). The commands of the views are drawn so in the worker too
-  when they are timed (`replay-bench.mjs --native`, `tau_gpu_frame`: as
-  `tau_shell.cpp` draws them, into a target of each view; not shown yet).
+  of the core"). The commands of the views are drawn so in the worker
+  (`replay-bench.mjs --native`, `tau_gpu_frame`: as `tau_shell.cpp` draws
+  them, into a target of each view).
   The user manual, ms a frame (shift + calls + the GPU waited for, a pixel
-  read back), two runs each:
+  read back), two runs each (a target of each view shifted, not shown):
 
   | | Safari, step | Safari, view | Firefox, step | Firefox, view |
   |---|---|---|---|---|
@@ -1394,9 +1394,46 @@ from 16 to 1024 pixels. As in the page of TeXmacs Vue
   it, and Safari copies all of a texture which changes so (as it did with
   the atlas of the 2D canvas); and each of them ended a batch (50 draws a
   view). `gpu_place_coverage` puts all of them first: one draw a frame, the
-  shell too (`tau_shell.cpp`). Next: the target given to the page (an
-  ImageBitmap of the canvas, drawn by a "bitmaprenderer" canvas: one
-  context for all the views), the page then drawing nothing.
+  shell too (`tau_shell.cpp`).
+- **Shown** (`?coregl`, 2026-10-16): the worker draws each view into its
+  target and gives the page what changed, as an ImageBitmap with the
+  message of the frame in place of the commands (`gpu_show_part`: the
+  rectangle copied onto the canvas of the context, sized to it, and
+  `transferToImageBitmap`; `tau_js_dlist` takes it). The page shifts its
+  canvas and puts the bitmap in, as it does the pixels of the core; it
+  learns no glyphs and keeps no pictures. A core without the renderer, or
+  a worker without WebGL 2, sends the pixels. Right: against the pixels of
+  the core, the tables differ by the cursor (60 pixels), the shapes by the
+  edges of their anti-aliasing (2963), as with `gl.mjs`; the browser test
+  "the views drawn in the worker". Two ways tried first: the whole target
+  given each frame (two copies of the view a step, a shift and a copy to
+  the canvas: 3.5 ms in Safari, and Firefox reads the canvas back to make
+  the bitmap, 9 ms a view), and the rectangle alone from one target for
+  all the views (the rectangle which the core says has a margin of 2 or 3
+  pixels which the commands do not draw, the pixels shifted from before:
+  lines of other text showed there). A "bitmaprenderer" canvas on the page
+  was not faster than `drawImage` (Safari, the whole view). The user
+  manual, median ms from a scroll sent to the core done with it (the
+  page's canvas not waited for: `replay-bench.mjs --nosync`), with a quiet
+  machine:
+
+  | | Safari, step | Safari, view | Firefox, step | Firefox, view |
+  |---|---|---|---|---|
+  | pixels of the core | 3–4 | 14–21 | 3 (WebGL) – 9 (2D) | 15–19 |
+  | `gl.mjs` from the commands | 2–3 | 4–6 | 2 | 4 |
+  | the worker, a 2D canvas | 4 | 9 | 7–9 | 12–16 |
+  | the worker, WebGL (`&gl`) | — | — | 5 | 18 |
+
+  Faster than the pixels of the core for a view, not yet as fast as
+  `gl.mjs`. What costs: in the worker, the bitmap (1.5 ms a step in
+  Safari, 2.4 in Firefox; a view 2 and 12: Firefox reads the canvas back);
+  in the page, the shift of a 2D canvas in Firefox (5 ms a step), which the
+  WebGL surface does not have (`?coregl&gl`: an ImageBitmap into a texture,
+  `gl.mjs`). With it Safari seemed slower, but in runs on a busy machine
+  (`gl.mjs` itself 3 times slower): not settled. Next, for Firefox: the
+  canvas of the page given to the worker (`transferControlToOffscreen`),
+  drawn there without a bitmap (a context for each view, or the views of
+  a window in one canvas).
 - **Left**: a limit to the pictures kept by the page (WebGL has one for
   its textures; the page cannot forget a picture, which the core sends
   once), and to the glyphs of the shell; the pattern of a rotated shape is rotated with it (MuPDF keeps

@@ -107,11 +107,21 @@ function handle(m) {
 		if (new URLSearchParams(self.location.search).has("debug"))
 			core.ccall("tau_scheme", null, ["string"], [m.code]);
 		break;
-	case "gpu":
+	case "gpu": {
 		// the views said as commands, which the page draws (?gl: by WebGL;
-		// for the tests, ?debug: by the 2D canvas, render-bench.mjs --gpu)
-		if (["debug", "gl"].some(k => new URLSearchParams(self.location.search).has(k))) core._tau_record(m.on ? 1 : 0);
+		// for the tests, ?debug: by the 2D canvas, render-bench.mjs --gpu);
+		// ?coregl: drawn here by the GPU renderer of the core (tau_gpu.cpp),
+		// and given to the page as bitmaps (none without a GPU: the page
+		// draws the pixels of the core then)
+		const p = new URLSearchParams(self.location.search);
+		if (p.has("coregl")) {
+			const shown = !!core._tau_gpu_show && core._tau_gpu_show(m.on ? 1 : 0) === 1;
+			if (m.on && !shown) break;
+			core._tau_record(shown ? 1 : 0);
+		}
+		else if (["debug", "gl"].some(k => p.has(k))) core._tau_record(m.on ? 1 : 0);
 		break;
+	}
 	case "gpu-check":
 		// for the tests: whether the GPU renderer of the core draws (a core
 		// built with THORVG, tau_gpu.cpp)

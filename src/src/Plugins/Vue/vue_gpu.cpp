@@ -75,6 +75,8 @@ void gpu_place_coverage (int key, int w, int h, const unsigned char* cov) {
 bool gpu_layers_enabled () { return false; }
 bool gpu_show_picture (void* l, picture p, int dw, int dh) {
   (void) l; (void) p; (void) dw; (void) dh; return false; }
+bool gpu_show_part (void* l, picture p, int x, int y, int w, int h) {
+  (void) l; (void) p; (void) x; (void) y; (void) w; (void) h; return false; }
 bool gpu_read_picture (picture p, unsigned char* rgba) {
   (void) p; (void) rgba; return false; }
 void gpu_sync_picture (picture p) { (void) p; }
@@ -1765,6 +1767,20 @@ gpu_show_picture (void* layer, picture p, int dw, int dh) {
   G.B->begin_screen (dw, dh);
   G.B->copy (g->t.tex, g->t.w, g->t.h, 0, 0, g->t.w, g->t.h,
              NULL, dw, dh, 0, 0, dw, dh);
+  G.B->present (NULL);
+  return true;
+}
+
+bool
+gpu_show_part (void* layer, picture p, int x, int y, int w, int h) {
+  gpu_picture_rep* g= as_gpu (p);
+  if (g == NULL || !G.started || w <= 0 || h <= 0) return false;
+  if (!ensure_target (&g->t)) return false;
+  gpu_flush_all ();
+  if (!G.B->attach_layer (layer)) return false;
+  G.B->begin_screen (w, h);
+  G.B->copy (g->t.tex, g->t.w, g->t.h, x, y, x + w, y + h,
+             NULL, w, h, 0, 0, w, h);
   G.B->present (NULL);
   return true;
 }

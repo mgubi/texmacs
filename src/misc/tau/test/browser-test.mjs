@@ -402,6 +402,41 @@ test("the GPU renderer of the core", async p => {
 		said === "rect 255,0,0,255; line 0,0,255,255; glyph 0,128,0,255; moved 255,0,255,255; white 255,255,255,255", said);
 });
 
+test("the views drawn in the worker", async p => {
+	// (?coregl: what changed in a view drawn by the GPU renderer of the core,
+	// and given to the page as a bitmap, tau_gpu.cpp; a core without it, or
+	// a browser without WebGL 2 in a worker, sends the pixels)
+	await p.open("coregl");
+	const built = await p.page.evaluate(() => new Promise(res => {
+		tau.worker.addEventListener("message", e => { if (e.data.t === "gpu-check") res(e.data.text); });
+		tau.worker.postMessage({ t: "gpu-check" });
+		setTimeout(() => res("no answer"), 20000);
+	}));
+	if (built === "not built" || built === "no GPU") return;
+	await p.page.evaluate(() => {
+		window.bitmaps = 0;
+		tau.worker.addEventListener("message", e => { if (e.data.t === "dlist" && e.data.bitmap) window.bitmaps++; });
+	});
+	await p.newDocument();
+	await p.type("Drawn by the core");
+	await p.until("the view comes as bitmaps", () => p.page.evaluate(() => window.bitmaps > 0));
+	// (the text is on the canvas: dark pixels in its top left part)
+	const ink = () => p.page.evaluate(() => {
+		let c = document.querySelector(".tau-pane canvas.tau-canvas");
+		if (c.classList.contains("tau-canvas-hidden")) c = document.querySelector(".tau-pane canvas.tau-canvas-below");
+		// (a canvas of WebGL, gl.mjs, or of 2D when the page has no WebGL)
+		const w = Math.min(c.width, 1200), h = Math.min(c.height, 400), g = c.getContext("webgl2");
+		let d;
+		if (g) { d = new Uint8Array(4 * w * h); g.bindFramebuffer(g.FRAMEBUFFER, null); g.readPixels(0, c.height - h, w, h, g.RGBA, g.UNSIGNED_BYTE, d); }
+		else d = c.getContext("2d").getImageData(0, 0, w, h).data;
+		let n = 0;
+		for (let i = 0; i < d.length; i += 4) if (d[i] + d[i + 1] + d[i + 2] < 200) n++;
+		return n;
+	});
+	// ("Drawn by the core" in 10 pt: some 800 such pixels)
+	await p.until("and the text is shown", async () => (await ink()) > 600);
+});
+
 test("paste from the menu", async p => {
 	await p.open();
 	await p.newDocument();

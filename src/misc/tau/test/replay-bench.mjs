@@ -7,7 +7,7 @@
 //
 //   node misc/tau/test/replay-bench.mjs --dir build-tau/out/web --tools <dir>
 //        [--browser firefox|safari] [--headed] [--only name] [--gl]
-//        [--native] [--width 1900 --height 1180] [--density 2]
+//        [--native] [--core] [--nosync] [--width 1900 --height 1180] [--density 2]
 //
 // Safari is driven by safaridriver ("Allow remote automation"), in a window
 // of the screen (its density is that of the screen); Firefox by puppeteer,
@@ -15,7 +15,12 @@
 // --gl: the view of the pane drawn by WebGL (?gl, gl.mjs), the pixels as
 // well as the commands. --native: the commands drawn by the GPU renderer
 // of the core in the worker too (a core built with THORVG, tau_gpu.cpp),
-// timed there: the shift, the calls, and the GPU waited for.
+// timed there: the bitmap for the page (--core), the calls, and the GPU
+// waited for. --core: the views drawn by it and shown (?coregl), the page
+// shifts its canvas and copies a bitmap;
+// timed in the worker as with --native. "round trip": from the scroll sent
+// by the page to the core done with it (its frame drawn by the page);
+// --nosync: without waiting for the canvases (only the round trips).
 
 import { spawn } from "node:child_process";
 import fs from "node:fs";
@@ -54,8 +59,8 @@ const DOCS = [
 // the browser: ev (a JavaScript expression, which may be a promise) -> its value
 const port = await freePort();
 const server = await serve(dir, port);
-const useGL = args.includes("--gl"), native = args.includes("--native");
-const url = `http://127.0.0.1:${port}/index.html?debug&nohome&gpusync${useGL ? "&gl" : ""}`;
+const useGL = args.includes("--gl"), coreGL = args.includes("--core"), native = args.includes("--native") || coreGL;
+const url = `http://127.0.0.1:${port}/index.html?debug&nohome${args.includes("--nosync") ? "" : "&gpusync"}${useGL ? "&gl" : ""}${coreGL ? "&coregl" : ""}`;
 let ev, open, close;
 if (which === "safari") {
 	const driverPort = await freePort();
@@ -95,7 +100,7 @@ else {
 	close = async () => { if (page) await page.close(); page = null; };
 	process.on("exit", () => browser.process() && browser.process().kill());
 }
-console.log(`replay: ${which}${which !== "safari" ? (args.includes("--headed") ? ", headed" : ", headless") : ""}, ${width}×${height}${useGL ? ", WebGL" : ""}`);
+console.log(`replay: ${which}${which !== "safari" ? (args.includes("--headed") ? ", headed" : ", headless") : ""}, ${width}×${height}${useGL ? ", WebGL" : ""}${coreGL ? ", drawn in the worker" : ""}`);
 
 const until = async (test, timeout = 120000) => {
 	for (const end = Date.now() + timeout; Date.now() < end; await sleep(200)) { try { if (await test()) return; } catch (e) {} }
@@ -110,9 +115,10 @@ async function run(doc) {
 		window.pongs = new Map(); window.syncs = 0;
 		tau.worker.addEventListener("message", e => { const m = e.data;
 			if (m.t === "pong" && window.pongs.has(m.id)) { window.pongs.get(m.id)(); window.pongs.delete(m.id); } });
+		window.walls = [];
 		window.step = message => new Promise(resolve => {
-			const id = "replay" + (++window.syncs);
-			window.pongs.set(id, resolve);
+			const id = "replay" + (++window.syncs), t0 = performance.now();
+			window.pongs.set(id, () => { if (message && message.t === "scroll") window.walls.push(performance.now() - t0); resolve(); });
 			if (message) tau.worker.postMessage(message);
 			tau.worker.postMessage({ t: "ping", id });
 		});
@@ -141,11 +147,12 @@ async function run(doc) {
 	// scroll steps (a strip comes in), then whole views (all is drawn again)
 	let timeNative = false;
 	const scroll = async (dy, n) => {
-		await ev("(tau.state.drawParts = [], 1)");
+		await ev("(tau.state.drawParts = [], window.walls = [], 1)");
 		if (timeNative) await ev(`window.step({ t: "gpu-bench", on: 1 })`);
 		for (let i = 0; i < n; i++) await ev(`window.step({ t: "scroll", view: ${view}, dx: 0, dy: ${dy} })`);
 		await sleep(300);
 		const parts = await ev("tau.state.drawParts");
+		parts.walls = await ev("window.walls");
 		if (timeNative) parts.native = JSON.parse(await ev(`new Promise(res => { const on = e => { if (e.data.t === "gpu-stats") { tau.worker.removeEventListener("message", on); res(e.data.text); } }; tau.worker.addEventListener("message", on); tau.worker.postMessage({ t: "gpu-stats" }); })`));
 		return parts;
 	};
@@ -160,7 +167,7 @@ async function run(doc) {
 		return { steps, views };
 	};
 	// (?gl asks for the commands when the page starts: the pixels first)
-	if (useGL) { await ev(`window.step({ t: "gpu", on: 0 })`); await sleep(1500); }
+	if (useGL || coreGL) { await ev(`window.step({ t: "gpu", on: 0 })`); await sleep(1500); }
 	const cpu = await pass();
 	await ev(`window.step({ t: "gpu", on: 1 })`);
 	await sleep(1500);
@@ -185,15 +192,20 @@ for (const doc of DOCS) {
 	try {
 		const r = await run(doc);
 		console.log(`${doc.name}: canvas ${r.canvas.w}×${r.canvas.h}${r.canvas.isolated ? "" : " (not isolated: the clock has coarse steps)"}`);
+		const drawn = coreGL ? "bitmaps" : "commands";
 		row(doc.name, "pixels, step", r.cpu.steps);
-		row("", "commands, step", r.gpu.steps);
+		row("", drawn + ", step", r.gpu.steps);
 		row("", "pixels, view", r.cpu.views);
-		row("", "commands, view", r.gpu.views);
+		row("", drawn + ", view", r.gpu.views);
 		for (const [what, parts] of [["C++ GPU, step", r.gpu.steps], ["C++ GPU, view", r.gpu.views]]) {
 			const q = parts.native;
 			if (!q || !q.frames) continue;
-			console.log(`${"".padEnd(9)} ${what.padEnd(16)} |${q.shift.toFixed(2).padStart(7)} |${q.calls.toFixed(2).padStart(7)} |${q.gpu.toFixed(2).padStart(7)} |` +
-				`${(q.shift + q.calls + q.gpu).toFixed(2).padStart(7)} | ${String(q.frames).padStart(3)} frames, ${(q.area / 1e6).toFixed(2)} Mpx (in the worker)`);
+			console.log(`${"".padEnd(9)} ${what.padEnd(16)} |${q.show.toFixed(2).padStart(7)} |${q.calls.toFixed(2).padStart(7)} |${q.gpu.toFixed(2).padStart(7)} |` +
+				`${(q.show + q.calls + q.gpu).toFixed(2).padStart(7)} | ${String(q.frames).padStart(3)} frames, ${(q.area / 1e6).toFixed(2)} Mpx (in the worker; the first column: the bitmap for the page)`);
+		}
+		for (const [what, parts] of [["pixels, step", r.cpu.steps], [drawn + ", step", r.gpu.steps], ["pixels, view", r.cpu.views], [drawn + ", view", r.gpu.views]]) {
+			const w = parts.walls.slice().sort((a, b) => a - b);
+			console.log(`${"".padEnd(9)} round trip, ${what.padEnd(16)} | median ${w[w.length >> 1].toFixed(1)}, mean ${mean(w).toFixed(1)} ms of ${w.length}`);
 		}
 	}
 	catch (error) { console.log(doc.name + ": " + error.message); try { await close(); } catch (e) {} }

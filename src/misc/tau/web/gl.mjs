@@ -339,6 +339,20 @@ export function makeGLSurface(canvas, shared, lost) {
 			flush();
 			present();
 		},
+		// (the rectangle which the worker drew, ?coregl: as the pixels)
+		bitmap(m) {
+			if (!R || !R.frames) { m.bitmap.close(); return; }
+			gl.bindTexture(gl.TEXTURE_2D, R.stage);
+			gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, m.bitmap);
+			m.bitmap.close();
+			into(R.frames[R.shown].fb, W, H);
+			gl.disable(gl.BLEND);
+			gl.disable(gl.SCISSOR_TEST);
+			use(R.stage);
+			quad(m.x, m.y, m.x + m.w, m.y + m.h, 0, 0, 1, 1, 1, 1, 1, 1, 2, null);
+			flush();
+			present();
+		},
 		commands(m) {
 			if (!R || !R.frames) return;
 			const o = new Int32Array(m.ops), f = new Float32Array(m.ops), n = o.length;

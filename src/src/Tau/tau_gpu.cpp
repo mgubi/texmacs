@@ -11,10 +11,12 @@
 
 // The core built with the GPU renderer (misc/tau/Makefile, THORVG): the
 // renderer of the shell (vue_gpu.cpp) on a WebGL 2 context of the worker
-// (gpu_backend_gl.cpp, GL_OFFSCREEN), which will draw the commands of the
-// core in the worker (docs/tau-design.md, "The renderer in C++"). For now:
-// whether it draws, for the tests, and how long the commands of the views
-// take it (tau_gpu_bench: they are drawn so too, not shown).
+// (gpu_backend_gl.cpp, GL_OFFSCREEN), which draws the commands of the core
+// in the worker (docs/tau-design.md, "The renderer in C++"): each view in
+// a target of its own, and what changed in it given to the page as an
+// ImageBitmap in place of the commands (tau_gpu_show, tau_gui.cpp), which
+// the page copies to its canvas as it does the pixels of the core. Also whether it draws, for the tests,
+// and how long the frames take it (tau_gpu_bench).
 
 #include "renderer.hpp"
 #include "colors.hpp"
@@ -66,17 +68,22 @@ tau_gpu_check () {
 }
 
 /******************************************************************************
-* The commands of the views drawn in the worker, for the time they take
-* (misc/tau/test/replay-bench.mjs --native): as the shell draws them
-* (tau_shell.cpp, commands), into a target of each view
+* The commands of the views drawn in the worker, as the shell draws them
+* (tau_shell.cpp, commands), into a target of each view, which a scroll
+* shifts as the core shifts its pixels (the rectangle which the core says
+* is drawn has a margin which the commands do not draw: the pixels which
+* were there, shifted). The rectangle alone goes to the page, which puts it
+* in its place after it shifted its canvas, as with the pixels of the core
+* (the whole view cost a copy of it more, and in Firefox a read back: 9 ms).
+* Timed by misc/tau/test/replay-bench.mjs --native, --core
 ******************************************************************************/
 
-static bool bench= false;
+static bool bench= false, show= false;
 static std::map<int, std::pair<int,int> > glyph_size;
 static std::map<int, std::string> glyph_cov;
 static std::map<int, picture> pictures;
-static std::map<int, picture> frames;
-struct bench_part { double shift, calls, gpu; int w, h; };
+static std::map<int, picture> frames;  // the target of each view
+struct bench_part { double calls, show, gpu; int w, h; };
 static std::vector<bench_part> parts;
 
 extern "C" EMSCRIPTEN_KEEPALIVE void
@@ -85,15 +92,30 @@ tau_gpu_bench (int on) {
   parts.clear ();
 }
 
-// the means of the frames drawn since tau_gpu_bench, in ms: shift, calls,
-// gpu (waited for), and their number and pixels
+// the views drawn here and shown to the page (?coregl, tau-worker.js), or
+// not: whether they are (false: no GPU, the page draws the pixels)
+extern "C" EMSCRIPTEN_KEEPALIVE int
+tau_gpu_show (int on) {
+  show= (on != 0) && vue_gpu_start ();
+  return show ? 1 : 0;
+}
+
+// the target of a view which is no more (tau_widget.cpp)
+extern "C" void
+tau_gpu_forget (int view) {
+  frames.erase (view);
+}
+
+// the means of the frames drawn since tau_gpu_bench, in ms: the shift and
+// the calls, the rectangle on the canvas given as a bitmap (show), the GPU
+// waited for; and their number and pixels
 extern "C" EMSCRIPTEN_KEEPALIVE const char*
 tau_gpu_stats () {
   static std::string out;
-  double s= 0, c= 0, g= 0, a= 0; int n= (int) parts.size ();
-  for (auto& p: parts) { s += p.shift; c += p.calls; g += p.gpu; a += (double) p.w * p.h; }
-  if (n > 0) { s /= n; c /= n; g /= n; a /= n; }
-  out= "{\"shift\":" + std::to_string (s) + ",\"calls\":" + std::to_string (c) +
+  double c= 0, s= 0, g= 0, a= 0; int n= (int) parts.size ();
+  for (auto& p: parts) { c += p.calls; s += p.show; g += p.gpu; a += (double) p.w * p.h; }
+  if (n > 0) { c /= n; s /= n; g /= n; a /= n; }
+  out= "{\"calls\":" + std::to_string (c) + ",\"show\":" + std::to_string (s) +
        ",\"gpu\":" + std::to_string (g) + ",\"frames\":" + std::to_string (n) +
        ",\"area\":" + std::to_string (a) + "}";
   return out.c_str ();
@@ -230,27 +252,29 @@ replay (renderer r, const int32_t* o, int nops, int x, int y, int dw, int dh) {
   }
 }
 
-// (called by tau_gui.cpp with each frame of commands, before the page has it)
+// (called by tau_gui.cpp with each frame of commands, before the page has
+// it: the bitmap goes with them, tau_js_dlist)
 extern "C" void
 tau_gpu_frame (int view, int w, int h, const int* ops, int nops,
                const unsigned char* gl, int ngl, const unsigned char* im, int nim,
                int x1, int y1, int x2, int y2, int dx, int dy) {
   // (the glyphs and the pictures are sent once: learnt also when the frames
-  // are not timed)
+  // are not drawn)
   learn (gl, ngl, im, nim);
-  if (!bench) return;
+  if ((!bench && !show) || x2 <= x1 || y2 <= y1) return;
   picture& f= frames[view];
   if (is_nil (f) || f->get_width () != w || f->get_height () != h)
     f= gpu_backing_picture (w, h);
   double t0= emscripten_get_now ();
   if (dx != 0 || dy != 0) gpu_translate_picture (f, dx, dy);
-  gpu_sync_picture (f);
-  double t1= emscripten_get_now ();
   renderer r= gpu_picture_renderer (f, std_shrinkf);
   if (r == NULL) return;
   replay (r, (const int32_t*) ops, nops, x1, y1, x2 - x1, y2 - y1);
   delete_renderer (r);
+  double t1= emscripten_get_now ();
+  if (show) gpu_show_part (NULL, f, x1, y1, x2 - x1, y2 - y1);
   double t2= emscripten_get_now ();
+  if (!bench) return;
   gpu_sync_picture (f);
   double t3= emscripten_get_now ();
   parts.push_back ({ t1 - t0, t2 - t1, t3 - t2, x2 - x1, y2 - y1 });

@@ -329,6 +329,16 @@ static const int SMALL= 512;
 EM_JS (void, gl_offscreen_canvas, (), {
   specialHTMLTargets["#tau-gpu"]= new OffscreenCanvas (1, 1);
 });
+// the screen is the canvas, of the size of what is shown on it
+EM_JS (void, gl_offscreen_size, (int w, int h), {
+  var c= specialHTMLTargets["#tau-gpu"];
+  if (c.width != w) c.width= w;
+  if (c.height != h) c.height= h;
+});
+// what was drawn on it, for the page (tau_gui.cpp, tau_js_dlist, sends it)
+EM_JS (void, gl_offscreen_frame, (), {
+  Module.tauFrame= specialHTMLTargets["#tau-gpu"].transferToImageBitmap ();
+});
 #endif
 
 class gl_backend: public gpu_backend {
@@ -361,7 +371,9 @@ public:
   const char* name () { return "OpenGL"; }
 #ifdef GL_OFFSCREEN
   unsigned long long window_flags () { return 0; }
-  void present (SDL_Window* w) { (void) w; }
+  // (the layer of gpu_show_picture is the canvas: NULL)
+  bool attach_layer (void* layer) { return layer == NULL && attach (NULL); }
+  void present (SDL_Window* w) { (void) w; if (ctx != NULL) gl_offscreen_frame (); }
 #else
   unsigned long long window_flags () { return SDL_WINDOW_OPENGL; }
   void present (SDL_Window* w) { SDL_GL_SwapWindow (w); }
@@ -369,7 +381,11 @@ public:
   bool prepare ();
   bool attach (SDL_Window* w);
   string description ();
+#ifdef GL_OFFSCREEN
+  void begin_screen (int dw, int dh) { gl_offscreen_size (dw, dh); }
+#else
   void begin_screen (int dw, int dh) { (void) dw; (void) dh; }
+#endif
 
   gpu_texture new_texture (int w, int h, gpu_format f, bool linear, bool repeat,
                            const void* data);

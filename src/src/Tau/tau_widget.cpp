@@ -31,9 +31,18 @@ simple_widget_rep::simple_widget_rep ():
   all_widgets->insert ((pointer) this);
 }
 
+// (the web core built with the GPU renderer: the target where the worker
+// draws the view, tau_gpu.cpp; else not linked)
+#ifdef __EMSCRIPTEN__
+extern "C" void tau_gpu_forget (int view) __attribute__ ((weak));
+#endif
+
 simple_widget_rep::~simple_widget_rep () {
   all_widgets->remove ((pointer) this);
   if (ren != NULL) delete_renderer (ren);
+#ifdef __EMSCRIPTEN__
+  if (tau_gpu_forget) tau_gpu_forget (id);
+#endif
 }
 
 simple_widget_rep*

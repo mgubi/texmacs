@@ -79,6 +79,9 @@ bool is_gpu_renderer (renderer ren);
 // snapshots, which draw the views)
 bool gpu_layers_enabled ();
 bool gpu_show_picture (void* metal_layer, picture p, int dw, int dh);
+// the rectangle (x, y, w, h) of p alone, at its size (the core of Tau in the
+// browser: the layer is NULL, the canvas of the worker, see tau_gpu.cpp)
+bool gpu_show_part (void* layer, picture p, int x, int y, int w, int h);
 bool gpu_read_picture (picture p, unsigned char* rgba);
 // what is queued for p drawn, and the GPU waited for (a pixel read back)
 void gpu_sync_picture (picture p);

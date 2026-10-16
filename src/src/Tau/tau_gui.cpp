@@ -303,7 +303,7 @@ extern std::vector<int> mupdf_record_ops;
 extern std::string mupdf_record_glyphs;
 extern std::string mupdf_record_images;
 // (the web core built with the GPU renderer, tau_gpu.cpp: the commands
-// drawn in the worker too, when they are timed; else not linked)
+// drawn in the worker, when they are shown or timed; else not linked)
 #ifdef __EMSCRIPTEN__
 extern "C" void tau_gpu_frame (int view, int w, int h, const int* ops, int nops,
                                const unsigned char* gl, int ngl,
@@ -321,16 +321,24 @@ EM_JS (void, tau_js_dlist, (int view, int counter, int w, int h,
                             int ew, int eh, int sx, int sy,
                             int cx, int cy, int dx, int dy), {
   if (!Module.tauPost) return;
-  var o= HEAP32.slice (ops >> 2, (ops >> 2) + nops);
-  var g= HEAPU8.slice (gl, gl + ngl);
-  var i= HEAPU8.slice (im, im + nim);
-  Module.tauPost ({ t: "dlist", view: view, place: counter,
-                    width: w, height: h, ops: o.buffer, glyphs: g.buffer,
-                    images: i.buffer, shift: { x: dx, y: dy },
-                    x: x1, y: y1, w: x2 - x1, h: y2 - y1,
-                    extents: { width: ew, height: eh },
-                    scroll: { x: sx, y: sy },
-                    caret: { x: cx, y: cy } }, [o.buffer, g.buffer, i.buffer]);
+  // (the worker drew the rectangle, tau_gpu.cpp: as an ImageBitmap, in
+  // place of the commands, which the page does not need)
+  var b= Module.tauFrame;
+  Module.tauFrame= null;
+  if (b && (b.width != x2 - x1 || b.height != y2 - y1)) { b.close (); b= null; }
+  var o= b ? new Int32Array (0) : HEAP32.slice (ops >> 2, (ops >> 2) + nops);
+  var g= b ? new Uint8Array (0) : HEAPU8.slice (gl, gl + ngl);
+  var i= b ? new Uint8Array (0) : HEAPU8.slice (im, im + nim);
+  var m= { t: "dlist", view: view, place: counter,
+           width: w, height: h, ops: o.buffer, glyphs: g.buffer,
+           images: i.buffer, shift: { x: dx, y: dy },
+           x: x1, y: y1, w: x2 - x1, h: y2 - y1,
+           extents: { width: ew, height: eh },
+           scroll: { x: sx, y: sy },
+           caret: { x: cx, y: cy } };
+  var transfer= [o.buffer, g.buffer, i.buffer];
+  if (b) { m.bitmap= b; transfer.push (b); }
+  Module.tauPost (m, transfer);
 });
 #else
 void tau_native_dlist (int view, int counter, int w, int h,
