@@ -1486,6 +1486,24 @@ from 16 to 1024 pixels. As in the page of TeXmacs Vue
   each buffer), `wheel-capture?` 0.06. The pixels of a view said as
   commands are no longer moved: a step 3.3 ms to 1.2. A view (the whole
   canvas drawn, nothing moved) is the editor drawing it, 2.4 to 2.9 ms.
+- **The four ways** (2026-10-17, after that): `replay-bench.mjs
+  --nosync`, two rounds of each, a machine with a load of 2 to 5; mean ms
+  (the clock has steps of 1 ms), a step of the wheel / a view; the pixels
+  as the WebGL surface puts them (`--gl`):
+
+  | | `gl.mjs` | the worker, on the canvas | the worker, bitmaps | the pixels |
+  |---|---|---|---|---|
+  | Firefox, prose | 0.9 / 2.6–4.1 | 1.2–1.6 / 3.5–4.9 | 9.8–10.5 / 17–18 | 2.2–2.5 / 16–17 |
+  | Firefox, tables | 0.9–1.1 / 3.9–4.8 | 1.4–1.5 / 3.8–5.0 | 10.0–10.2 / 18–20 | 2.9–3.2 / 14–15 |
+  | Firefox, manual | 1.3 / 3.5–4.8 | 1.3–1.4 / 4.8–4.9 | 9.9–10.1 / 18 | 3.5–3.6 / 18–20 |
+  | Safari, prose | 1.0–1.3 / 3.8–3.9 | 1.3–1.6 / 3.9–4.4 | 1.7–2.3 / 4.5–5.0 | 3.1–3.2 / 12–14 |
+  | Safari, tables | 0.9–2.0 / 4.0 | 1.5–1.7 / 4.9 | 2.2–2.4 / 5.0–6.1 | 2.5–3.2 / 14–19 |
+  | Safari, manual | 1.5–1.8 / 6.1–6.3 | 1.9 / 5.3–5.4 | 2.6–2.8 / 6.5–7.2 | 3.1–3.6 / 20 |
+
+  `gl.mjs` and the worker on the canvas are within half a millisecond of
+  each other (`gl.mjs` ahead for a step, the worker for a view of the
+  manual in Safari); the bitmaps are near them in Safari and ten times
+  slower in Firefox; the pixels three times slower for a view.
 - **Left**: a limit to the pictures kept by the page (WebGL has one for
   its textures; the page cannot forget a picture, which the core sends
   once), and to the glyphs of the shell; the pattern of a rotated shape is rotated with it (MuPDF keeps
