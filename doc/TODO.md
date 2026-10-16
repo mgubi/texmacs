@@ -75,10 +75,6 @@ no headless mode. The Widkit duplicates are fixed on `wip_other_guis` too.
   - One launch of the Cocoa test build quit by itself before its first
     snapshot (no crash report, nothing in the log); four launches after it
     did not.
-  - The Cocoa port drawn by Core Graphics (`TEXMACS_NS_GPU=0`): the
-    snapshots of a document of one page show the page shifted, with a copy
-    of it on the right (the backing store which wraps, `cring`?). Only seen
-    in the snapshots, not traced.
   - Vue on OpenGL under macOS: `SDL_GL_SwapWindow` waits 1.6 to 3 ms a
     present while scrolling; the presents are not paced as those of Metal
     (`ready_to_present`), which is the default on macOS.
