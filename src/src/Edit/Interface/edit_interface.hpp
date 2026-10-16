@@ -49,6 +49,9 @@ protected:
   time_t        zoom_time;     // when the zoom last changed (0: at start)
   bool          zoom_waiting;  // the layout still has the previous zoom
   double        zoom_shown;    // the zoom the waiting layout is drawn at
+  path          zoom_anchor;   // the text in the middle of the view, which
+  SI            zoom_anchor_dx;// stays there when the layout of the zoom
+  SI            zoom_anchor_dy;// comes (its offset from the middle)
   rectangles    copy_always;   // for wiping out cursor
   int           input_mode;    // INPUT_NORMAL, INPUT_SEARCH, INPUT_REPLACE
 
@@ -233,6 +236,8 @@ public:
   void handle_mouse (string k, SI x, SI y, int m, time_t t, array<double> d);
   void handle_set_zoom_factor (double zoomf);
   bool zoom_defers ();
+  void zoom_anchor_take ();
+  void zoom_anchor_keep ();
   void handle_clear (renderer win, SI x1, SI y1, SI x2, SI y2);
   void handle_repaint (renderer win, SI x1, SI y1, SI x2, SI y2);
 
