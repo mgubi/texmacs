@@ -12,6 +12,7 @@
 #include "bibtex_functions.hpp"
 #include "converter.hpp"
 #include "vars.hpp"
+#include "iterator.hpp"
 
 /******************************************************************************
 * Helper functions
@@ -980,15 +981,55 @@ is_hyper_link (string s) {
   return starts (s, "http://") || starts (s, "https://") || starts (s, "ftp://");
 }
 
+static void
+bib_latex_content (tree t, bool& text, hashmap<string,int>& envs) {
+  // the text and the environments of a parsed LaTeX value @t
+  if (is_atomic (t)) {
+    if (!bib_is_blank_string (t->label)) text= true;
+  }
+  else if (is_tuple (t) && N(t) > 0 && is_atomic (t[0])) {
+    string cmd= t[0]->label;
+    if (starts (cmd, "\\begin-")) {
+      string env= cmd (7, N(cmd));
+      envs (env)= envs[env] + 1;
+    }
+    else if (starts (cmd, "\\end-")) {
+      string env= cmd (5, N(cmd));
+      envs (env)= envs[env] - 1;
+    }
+    for (int i= 1; i<N(t); i++) bib_latex_content (t[i], text, envs);
+  }
+  else
+    for (int i= 0; i<N(t); i++) bib_latex_content (t[i], text, envs);
+}
+
+static bool
+bib_latex_lost (string val) {
+  // does the LaTeX value @val, which converts to nothing, hold text or an
+  // environment which is not closed? Commands such as \relax legitimately
+  // print nothing, while \begin{x} cannot be converted.
+  bool text= false;
+  hashmap<string,int> envs (0);
+  bib_latex_content (parse_latex (cork_to_sourcecode (val), false, false),
+                     text, envs);
+  if (text) return true;
+  iterator<string> it= iterate (envs);
+  while (it->busy ())
+    if (envs[it->next ()] != 0) return true;
+  return false;
+}
+
 static bool
 bib_lost_value (tree old, tree t) {
-  // does a non-blank field of @old become empty in its conversion @t?
+  // does a non-blank field of @old become empty in its conversion @t,
+  // although its LaTeX does not just print nothing?
   for (int i= 0; i<N(t); i++) {
     if (bib_is_entry (t[i]))
       for (int j= 0; j<N(t[i][2]); j++) {
         tree f= old[i][2][j];
         if (bib_is_field (f) && is_atomic (f[1]) &&
-            !bib_is_blank_string (f[1]->label) && t[i][2][j][1] == "")
+            !bib_is_blank_string (f[1]->label) && t[i][2][j][1] == "" &&
+            bib_latex_lost (f[1]->label))
           return true;
       }
     else if (bib_is_comment (t[i]) && bib_lost_value (old[i], t[i]))
@@ -1001,22 +1042,19 @@ static bool
 bib_parse_fields_all (tree& t) {
   string fields;
   int nb= bib_get_fields (t, fields);
+  // a last value which converts to nothing (empty, or \relax) would give
+  // no element: a sentinel value is added after it, and then removed
+  fields << "\\nextbib{}{xyzyx}";
   array<tree> latex= bib_latex_array (
       latex_to_tree (parse_latex (cork_to_sourcecode (fields), false, false)));
-  if (N(latex) == nb-1 && ends (fields, "\\nextbib{}")) {
-    // FIXME: this dirty hack should not be necessary
-    fields << "{xyzyx}";
-    latex= bib_latex_array (
-      latex_to_tree (parse_latex (cork_to_sourcecode (fields), false, false)));
-    if (latex[N(latex)-1] == "xyzyx") latex[N(latex)-1]= "";
-  }
+  if (N(latex) != nb+1 || latex[nb] != "xyzyx") return false;
+  latex= range (latex, 0, nb);
   //cout << "<<< " << t << LF;
   //cout << ">>> " << latex << LF;
   for (int k=0; k<N(latex); k++)
     if (is_atomic (latex[k]) && is_hyper_link (latex[k]->label))
       latex[k]= compound ("slink", latex[k]);
   int i= 0;
-  if (nb != N(latex)) return false;
   // a value which LaTeX cannot parse may also come out empty
   tree c= copy (t);
   bib_set_fields (c, latex, i);
@@ -1107,6 +1145,15 @@ bib_preamble (tree t) {
 * Entries selection
 ******************************************************************************/
 
+static string
+bib_abbrev_value (hashmap<string,string> dict, string name) {
+  // as BibTeX, an undefined abbreviation expands to nothing, with a warning
+  string key= locase_all (name);
+  if (dict->contains (key)) return dict[key];
+  bibtex_warning << "String name '" << name << "' is undefined\n";
+  return "";
+}
+
 hashmap<string,string>
 bib_strings_dict (tree t) {
   hashmap<string,string> dict ("");
@@ -1159,21 +1206,15 @@ bib_strings_dict (tree t) {
           string sval;
           for (int j= 0; j<N(val); j++) {
             if (is_atomic (val[j])) sval << val[j]->label;
-            else if (bib_is_var (val[j])) {
-              string vkey= locase_all (val[j][0]->label);
-              if (dict->contains (vkey)) sval << dict[vkey];
-              else sval << val[j][0]->label;
-            }
+            else if (bib_is_var (val[j]))
+              sval << bib_abbrev_value (dict, val[j][0]->label);
           }
           dict(key)= sval;
         }
         else if (is_atomic (val))
           dict(key)= val->label;
-        else if (bib_is_var (val)) {
-          string vkey= locase_all (val[0]->label);
-          if (dict->contains (vkey)) dict(key)= dict[vkey];
-          else dict(key)= val[0]->label;
-        }
+        else if (bib_is_var (val))
+          dict(key)= bib_abbrev_value (dict, val[0]->label);
       }
     }
   }
@@ -1186,21 +1227,15 @@ bib_subst_str (tree t, hashmap<string,string> dict) {
   else if (L(t) == CONCAT) {
     string s;
     for (int i= 0; i<N(t); i++) {
-      if (bib_is_var (t[i])) {
-        string key= locase_all (t[i][0]->label);
-        if (dict->contains (key)) s << dict[key];
-        else s << t[i][0]->label;
-      }
+      if (bib_is_var (t[i]))
+        s << bib_abbrev_value (dict, t[i][0]->label);
       else if (is_atomic (t[i])) s << t[i]->label;
       else s << bib_subst_str (t[i], dict);
     }
     return s;
   }
-  else if (bib_is_var (t)) {
-    string key= locase_all (t[0]->label);
-    if (dict->contains (key)) return dict[locase_all (t[0]->label)];
-    else return t[0]->label;
-  }
+  else if (bib_is_var (t))
+    return bib_abbrev_value (dict, t[0]->label);
   else return "";
 }
 

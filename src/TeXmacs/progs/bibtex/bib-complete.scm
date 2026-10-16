@@ -46,7 +46,7 @@
                 (url-relative base (url-append (url-ancestor) bibf)))))
     (cond ((url-exists? bibf) bibf)
           ((url-exists? relf) relf)
-          ((url-exists? ancf) (url-resolve ancf "r"))
+          ((url-exists? ancf) (url-resolve ancf "fr"))
           (else #f))))
 
 (tm-define (current-bib-file usecache?)

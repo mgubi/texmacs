@@ -22,6 +22,7 @@
 (define bibwid-use-relative? #t)
 (define bibwid-update-buffer? #t)
 (define bibwid-buffer (string->url ""))
+(define bibwid-opened-url #f)
 
 (define (bibwid-set-url u)
   (cond ((and (== bibwid-use-relative? #t) (url-rooted? u))
@@ -103,7 +104,10 @@
       (when (> (length l) 0)
         (with t (car l)
           (tree-set! t 1 bibwid-style)
-          (tree-set! t 2 (url->string bibwid-url))
+          ;; the file found for the name in the document is shown, but the
+          ;; name is only replaced when another file or path was chosen
+          (if (!= (url->string bibwid-url) bibwid-opened-url)
+              (tree-set! t 2 (url->string bibwid-url)))
           (if bibwid-update-buffer? (update-document "bibliography")))))))
 
 (define (bibwid-set-filename u)
@@ -172,11 +176,13 @@
     (if (and (not (url-none? u)) (!= s ""))
         (with msg (replace "Modifying bibliography for %1" name)
           (bibwid-set-url u)
+          (set! bibwid-opened-url (url->string bibwid-url))
           (set! bibwid-style s)
           (dialogue-window (bibliography-widget #t msg)
                            bibwid-modify "Modify bibliography"))
         (with msg (replace "Inserting bibliography in %1" name)
           (bibwid-set-url (string->url ""))
+          (set! bibwid-opened-url #f)
           (set! bibwid-style "tm-plain")
           (dialogue-window (bibliography-widget #f msg)
                            bibwid-insert "Insert bibliography")))))

@@ -100,6 +100,16 @@
 (define (fmt-labels style s) (map car (fmt style s)))
 (define (fmt-keys style s) (map cadr (fmt style s)))
 
+;; the number of warnings of the BibTeX engine so far which contain @what
+(define (bib-warnings what)
+  (with l (tree->stree (get-debug-messages "Errors" 1000000))
+    (length (list-filter (cdr l)
+                         (lambda (m)
+                           (and (func? m 'tuple) (>= (length m) 3)
+                                (== (cadr m) "bibtex-warning")
+                                (string? (caddr m))
+                                (contains? (caddr m) what)))))))
+
 ;; a TeXmacs bibliography to BibTeX
 (define (bib-out t) (convert t "texmacs-stree" "bibtex-document"))
 
@@ -233,8 +243,11 @@
           "Communications of the ACM")
   (check= (bib-value "@misc{k, journal = tcs # \", vol\"}" "journal")
           "Theoretical Computer Science, vol")
-  ;; an unknown abbreviation alone is kept as its name
-  (check= (bib-value "@misc{k, journal = unknown}" "journal") "unknown")
+  ;; as in BibTeX, an undefined abbreviation expands to nothing, with a
+  ;; warning
+  (with n (bib-warnings "String name 'unknown' is undefined")
+    (check= (bib-value "@misc{k, journal = unknown}" "journal") "")
+    (check= (bib-warnings "String name 'unknown' is undefined") (+ n 1)))
   ;; the @string definitions do not appear in the body
   (check= (length (cdr (bib-parse "@string{foo = \"Foo\"} @misc{k, journal = foo}")))
           1)
@@ -249,10 +262,16 @@
                                     "@misc{k, journal = bar}")
                      "journal")
           "Foo")
-  ;; an unknown abbreviation inside a # concatenation is kept as its name,
-  ;; as when it is alone (#75 item 6)
+  ;; also inside a # concatenation (#75 item 6), and in a @string
   (check= (bib-value "@misc{k, journal = unknown # \" X\"}" "journal")
-          "unknown X"))
+          "X")
+  (check= (bib-value (string-append "@string{bar = unknown # \"Y\"} "
+                                    "@misc{k, journal = bar}")
+                     "journal")
+          "Y")
+  (check= (bib-value "@string{bar = unknown} @misc{k, journal = bar # \"Y\"}"
+                     "journal")
+          "Y"))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Parser: comments
@@ -361,7 +380,23 @@
     ;; and the field itself keeps its LaTeX, instead of becoming empty
     (check= (bib-value s "note") '(verbatim "\\begin{x}"))
     (check-true (contains? (bib-out (bib-parse s)) "{\\begin{x}}"))
-    (check-true (pair? (fmt "plain" s)))))
+    (check-true (pair? (fmt "plain" s))))
+  ;; but LaTeX which prints nothing gives an empty value, also as the last
+  ;; value of the file, and no warning
+  (with n (bib-warnings "Could not convert field")
+    (check= (bib-value "@misc{k, note = {\\relax}}" "note") "")
+    (check= (bib-value "@misc{k, note = {\\ignorespaces}}" "note") "")
+    (check= (bib-value "@misc{k, note = {{\\relax}}, year = 2000}" "note") "")
+    (with s "@misc{k, author = {Smith, John}, note = {\\relax}}"
+      (check= (bib-value s "author")
+              '(bib-names (bib-name "John" "" "Smith" "")))
+      (check= (bib-value s "note") ""))
+    (check= (bib-value "@misc{k, note = {\\relax}, title = {}}" "title") "")
+    (check= (bib-warnings "Could not convert field") n)
+    (check-false (contains? (fmt-text "plain" "@misc{k, note = {\\relax}}")
+                            "relax")))
+  ;; an environment which is not closed is kept as LaTeX, also with text
+  (check= (bib-value "@misc{k, note = {\\end{x}}}" "note") '(verbatim "\\end{x}")))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Built-ins of the engine
