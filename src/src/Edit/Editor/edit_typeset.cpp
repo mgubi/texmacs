@@ -320,7 +320,8 @@ edit_typeset_rep::set_pre (hashmap<string,tree> h) {
 
 void
 edit_typeset_rep::set_pre (string var, tree val) {
-  // (val uninit: reset)
+  // (val uninit: reset; pre is not changed in place: see write_prepared_env)
+  pre= copy (pre);
   if (val == tree (UNINIT)) pre->reset (var);
   else pre (var)= val;
   pre_version++;
@@ -342,15 +343,14 @@ edit_typeset_rep::typeset_prepare () {
   // does both and compares.
   int mode= typeset_caches_mode ();
   if (prep_version != pre_version || mode == 0) {
-    env->write_default_env ();
-    env->patch_env (pre);
+    env->write_prepared_env (pre);
     env->read_env (prep_env);
     prep_active= array<string> ();
     env->active_vars (pre, prep_active);
     prep_version= pre_version;
   }
   else {
-    env->write_env (prep_env);
+    env->write_prepared_env (pre, prep_env);
     for (int i=0; i<N(prep_active); i++) env->update (prep_active[i]);
     if (mode == 2) {
       hashmap<string,tree> kept (UNINIT), made (UNINIT);

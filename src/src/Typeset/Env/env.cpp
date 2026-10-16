@@ -19,6 +19,7 @@ void initialize_default_var_type ();
 extern hashmap<string,tree> default_env;
 void initialize_default_env ();
 #include "page_type.hpp"
+extern int typeset_check_mismatches;
 
 /******************************************************************************
 * Initialization
@@ -45,7 +46,8 @@ edit_env_rep::edit_env_rep (drd_info& drd2,
   read_unknown (false), rec_keys (NULL), rec_values (NULL),
   rec_key_set (NULL), rec_bindings (NULL),
   auto_buffer (""), typesetting (0), files_base (""), files_cur (""),
-  files_h (0)
+  files_h (0), prep_pre (UNINIT), prep_fp (0), prep_sfp (0),
+  prep_sfp_version (-1)
 {
   env.back_log= &back;
   initialize_default_env ();
@@ -260,6 +262,48 @@ env_var_name (int id) {
 void
 edit_env_rep::write_default_env () {
   env= copy (default_env);
+}
+
+void
+edit_env_rep::write_prepared_env (hashmap<string,tree> pre) {
+  // The default table and the table of the style, at the start of each
+  // pass: the same from one pass to the next while 'pre' is the same
+  // table (it is not changed in place: edit_typeset_rep::init_default),
+  // so that the fingerprints of the result are kept, and the table is not
+  // hashed again (in the check mode, it is, and they are compared)
+  write_default_env ();
+  patch_env (pre);
+  prepared_fingerprint (pre);
+}
+
+void
+edit_env_rep::write_prepared_env (hashmap<string,tree> pre,
+                                  hashmap<string,tree> made) {
+  // the same, when what write_default_env and patch_env (pre) make was kept
+  // ('made': edit_typeset_rep::typeset_prepare)
+  env= copy (made);
+  prepared_fingerprint (pre);
+}
+
+void
+edit_env_rep::prepared_fingerprint (hashmap<string,tree> pre) {
+  if (typeset_inputs_mode () == 0) return;
+  bool known= prep_pre.operator-> () == pre.operator-> ();
+  if (known && typeset_inputs_mode () != 2) {
+    env.adopt (prep_fp, prep_sfp, prep_sfp_version);
+    return;
+  }
+  env.state_fingerprint ();
+  if (known && (env.fp != prep_fp || (env.sfp_version == prep_sfp_version &&
+                                      env.sfp != prep_sfp))) {
+    typeset_check_mismatches++;
+    failed_error << "The table of the style has another fingerprint "
+                 << "than before" << LF;
+  }
+  prep_pre= pre;
+  prep_fp= env.fp;
+  prep_sfp= env.sfp;
+  prep_sfp_version= env.sfp_version;
 }
 
 void
