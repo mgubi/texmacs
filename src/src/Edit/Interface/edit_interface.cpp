@@ -896,8 +896,8 @@ edit_interface_rep::apply_changes () {
       cout << "edit-profile typeset: " << total << " ms in " << edit_profile.passes
            << " pass(es): bridges " << edit_profile.bridges << " ms ("
            << edit_profile.redone << " redone, " << edit_profile.cached << " reused"
-           << (edit_profile.unread > 0
-               ? ", " * as_string (edit_profile.unread) * " of them with other variables changed"
+           << (edit_profile.checked > 0
+               ? ", " * as_string (edit_profile.checked) * " checked"
                : string (""))
            << "), pages "
            << edit_profile.pages << " ms"

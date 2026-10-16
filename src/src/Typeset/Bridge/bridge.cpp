@@ -519,7 +519,12 @@ add_reads (edit_env env, bool known, array<int> reads,
   if (env->read_unknown) return;
   if (!known) { env->read_unknown= true; return; }
   if (env->merged (reads)) return;
-  if (rec->size () + N(reads) > READS_MAX) {
+  // (the variables which are not in the record yet count: those of the
+  // bridges below are mostly the same)
+  int fresh= 0;
+  for (int i=0; i<N(reads); i++)
+    if (!rec->contains (reads[i])) fresh++;
+  if (rec->size () + fresh > READS_MAX) {
     env->read_unknown= true; return; }
   for (int i=0; i<N(reads); i++) rec->insert (reads[i]);
   env->merging (reads);
@@ -750,7 +755,10 @@ add_inputs (edit_env env, bool known, array<int> vars,
   if (!known) { env->read_unknown= true; return; }
   // (an array all of whose variables are in the record adds nothing)
   if (env->merged (vars)) return;
-  if (N(*pv) + N(vars) > INPUTS_MAX) { env->read_unknown= true; return; }
+  int fresh= 0;
+  for (int i=0; i<N(vars); i++)
+    if (!rec->contains (vars[i])) fresh++;
+  if (N(*pv) + fresh > INPUTS_MAX) { env->read_unknown= true; return; }
   int n0= N(*pv);
   for (int i=0; i<N(vars); i++) {
     int id= vars[i];
@@ -883,7 +891,7 @@ bridge_rep::typeset_by_inputs (int desired_status) {
   give_record ();
   env->local_end (prev_back);
   if (check) {
-    if (edit_profile.on) edit_profile.unread++;
+    if (edit_profile.on) edit_profile.checked++;
     if (differs) {
       typeset_check_mismatches++;
       failed_error << "A bridge whose inputs were the same is typeset "

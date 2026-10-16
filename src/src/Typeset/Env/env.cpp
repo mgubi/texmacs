@@ -11,7 +11,6 @@
 
 #include "env.hpp"
 #include "iterator.hpp"
-#include "merge_sort.hpp"
 #include "sys_utils.hpp" // get_env
 #include <unordered_map>
 extern hashmap<string,int> default_var_type;

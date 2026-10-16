@@ -56,7 +56,10 @@ breaker_fast_level () {
   static int level= -1;
   if (level < 0) {
     string s= get_env ("TEXMACS_PAGE_BREAK_FAST");
-    level= (is_int (s) && as_int (s) >= 0 && as_int (s) <= 4) ? as_int (s) : 4;
+    if (s == "off") level= 0;
+    else if (is_int (s) && as_int (s) >= 0 && as_int (s) <= 4)
+      level= as_int (s);
+    else level= 4;
   }
   return level;
 }

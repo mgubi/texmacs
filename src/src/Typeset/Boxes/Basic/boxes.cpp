@@ -566,8 +566,11 @@ box_rep::redraw (renderer ren, path p, rectangles& l) {
         i2= max (i2, k);
         // Prepend the new rectangles instead of "l= ll * l": list concatenation
         // copies both operands (recursively), which made this loop quadratic
-        // (and deeply recursive) in the number of redrawn children.
-        for (; !is_nil (ll); ll= ll->next) l= rectangles (ll->item, l);
+        // (and deeply recursive) in the number of redrawn children. They are
+        // prepended in the order of ll (reversed first), as by ll * l: the
+        // last one is the one which clear_incomplete widens.
+        for (ll= reverse (ll); !is_nil (ll); ll= ll->next)
+          l= rectangles (ll->item, l);
       }
     }
     

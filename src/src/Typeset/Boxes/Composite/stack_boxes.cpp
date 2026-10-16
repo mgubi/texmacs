@@ -64,8 +64,6 @@ stack_box_rep::stack_box_rep (path ip, array<box> bs2, array<SI> spc):
   finalize ();
 }
 
-
-
 void
 stack_box_rep::finalize () {
   path old_ip= ip;

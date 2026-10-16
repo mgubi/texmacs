@@ -42,8 +42,8 @@ struct edit_profile_data {
   double bridges, pages, changes;  // ms: the bridges, the pager, the change log
   int    passes;                   // typesetting passes of this edit
   int    cached, redone;           // bridges whose result was reused or not
-  int    unread;                   // of the reused: with other variables changed
-  int    lines, moved;             // lines (and remembered boxes) logged, changed
+  int    checked;                  // of the redone: typeset again by the check
+  int    lines;                    // lines (and remembered boxes) logged
   int    rects;                    // rectangles in the change log
   int    breaks_reused;            // searches of page breaks avoided
   double search;                   // ms: the search of the page breaks
@@ -59,8 +59,8 @@ extern edit_profile_data edit_profile;
 extern int typeset_check_mismatches;
 int get_typeset_check_mismatches ();
 // the switch of the caches of the typesetter which are not described by
-// one of the variables above (block replay, merged stacks, chunks of lines,
-// shoves, environments, positions), TEXMACS_TYPESET_CACHES:
+// one of the variables above (block replay, chunks of lines, shoves, the
+// prepared environment), TEXMACS_TYPESET_CACHES:
 // 0 ("off"): nothing is used again, 1: used again, 2 ("check"): made
 // again and compared, a difference counting in typeset_check_mismatches
 int typeset_caches_mode ();

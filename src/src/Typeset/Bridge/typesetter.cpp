@@ -134,8 +134,13 @@ typeset_caches_mode () {
   return mode;
 }
 
-edit_profile_data edit_profile=
-  { get_env ("TEXMACS_EDIT_PROFILE") != "" }; // (and zeros)
+static bool
+edit_profile_wanted () {
+  string s= get_env ("TEXMACS_EDIT_PROFILE");
+  return s != "" && s != "off" && s != "0";
+}
+
+edit_profile_data edit_profile= { edit_profile_wanted () }; // (and zeros)
 
 double
 edit_profile_now () {

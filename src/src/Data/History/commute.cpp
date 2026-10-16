@@ -42,7 +42,9 @@ dup (modification m) {
 // labels of the tags (ADDENDUM_AUTO_ID, see exec_auto_id), which a plain
 // copy does not have, so that a tag which comes back gives its labels the
 // names they had (a copy which is pasted, while the tree is still there,
-// takes new numbers)
+// takes new numbers). The copy shares the numbers with the tag (the same
+// blackbox, which exec_auto_id changes in place): only one of them is in
+// the document at a time
 static tree
 copy_for_undo (tree t) {
   tree c;
@@ -86,9 +88,17 @@ invert (modification m, tree t) {
     return mod_remove_node (rp, argument (m));
   case MOD_REMOVE_NODE:
     {
+      // (the node which comes back keeps the numbers of the removed one,
+      // and its other children theirs: see raw_insert_node)
       tree u= subtree (t, rp);
       int  i= index (m);
-      return mod_insert_node (rp, i, copy (u (0, i) * u (i+1, N(u))));
+      tree c (L(u), N(u) - 1);
+      for (int j=0; j<N(u); j++)
+        if (j != i) c[j < i? j: j-1]= copy_for_undo (u[j]);
+      blackbox bb;
+      if (!is_nil (u->obs) && u->obs->get_contents (ADDENDUM_AUTO_ID, bb))
+        (void) tree_addendum_new (c, ADDENDUM_AUTO_ID, bb, false);
+      return mod_insert_node (rp, i, c);
     }
   case MOD_SET_CURSOR:
     return m;

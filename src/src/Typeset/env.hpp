@@ -771,8 +771,6 @@ public:
   // whether the environment is in the course of a typesetting pass (the
   // automatic labels: exec_auto_id), and the guard which says so
   int typesetting;
-  // the variables of 'change' had these values at this point of the
-  // previous pass: those which have another one now are in the patch
 
   inline void monitored_write (string s, tree t) {
     env.log_back (s); env.w (s)= t; }
@@ -790,7 +788,10 @@ public:
   inline void local_end_script (tree t) {
     local_end (MATH_LEVEL, t); }
   inline void assign (string s, tree t) {
-    tree& val= env (s); t= exec(t); if (val != t) {
+    // (the value is made before the place of the variable is taken: making
+    // it can add variables, an automatic label for instance, and the table
+    // can then move its entries)
+    t= exec (t); tree& val= env (s); if (val != t) {
       env.log_back (s); val= t; update (s); } }
   inline bool provides (string s) { return env.contains (s); }
   inline tree read (string s) { return env [s]; }
@@ -819,8 +820,6 @@ public:
   // of the bridge which is typeset (back: before it wrote them)
   unsigned long long inputs_hash (array<int> vars, bool at_start);
   unsigned long long start_hash (int id);
-  inline tree current (string s) { return env.value (s); }
-  inline tree current (int id) { return env.value (env_var_name (id)); }
   // the fingerprint of the variables and of the files (see files_hash)
   inline unsigned long long fingerprint () {
     return env.fingerprint () ^ files_hash (); }
@@ -839,8 +838,6 @@ public:
     env.h= t; env.follow= true; env.refingerprint (); }
   unsigned long long prep_fp, prep_sfp;
   int prep_sfp_version;
-  inline bool written (string s) { return back->contains (s); }
-  inline hashmap<string,tree> values_before () { return back; }
   void local_end (hashmap<string,tree>& prev_back);
 
   /* updating environment variables */
