@@ -674,10 +674,14 @@ public:
   void write_binding (string key, tree value, string extra);
   tree store_binding (string key, tree value, string extra);
   inline void write_bindings (array<tree> l) {
-    // (those of a bridge used again: the record above gets the same tuples)
+    // (those of a bridge used again: the record above gets the same tuples,
+    // which take the value stored when it is a new one, so that the next
+    // time it is found by its pointer again)
     if (rec_bindings != NULL) (*rec_bindings) << l;
-    for (int i=0; i<N(l); i++)
-      store_binding (l[i][0]->label, l[i][1], l[i][2]->label); }
+    for (int i=0; i<N(l); i++) {
+      tree t= l[i];
+      tree stored= store_binding (t[0]->label, t[1], t[2]->label);
+      if (stored.operator-> () != t[1].operator-> ()) t[1]= stored; } }
   // a record of the bindings written for the time of one typesetting,
   // added to the record around it when it stops (also on an exception)
   struct binding_record {

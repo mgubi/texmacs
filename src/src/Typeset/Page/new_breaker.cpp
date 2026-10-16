@@ -551,10 +551,6 @@ new_breaker_rep::find_page_breaks_plain (path b1, path b1x, vpenalty prev_pen) {
     if (c.flags & 4) { k++; break; }
   }
   if (keep) cand_cnt[s]= k;
-  else if (fast_level >= 4) {
-    cands.resize (first);
-    cand_cnt[s]= 0;
-  }
 }
 
 void

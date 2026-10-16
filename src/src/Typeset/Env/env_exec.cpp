@@ -2882,6 +2882,12 @@ edit_env_rep::exec_until (tree t, path p, string var, int level) {
   case HLINK:
   case ACTION:
     return exec_until_compound (t, p, var, level);
+  case AUTO_ID:
+    // (as the macro auto-id of a style without the primitive: the counter
+    // goes on, and no number of the document is given out)
+    if (N(t) >= 1 && exec_string (t[0]) == "new")
+      (void) exec (compound ("inc-auto"));
+    return false;
   default:
     if (L(t) < START_EXTENSIONS) {
       int i, n= N(t);

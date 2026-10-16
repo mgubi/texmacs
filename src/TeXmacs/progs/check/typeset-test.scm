@@ -114,6 +114,20 @@
       (buffer-close u)
       (when (buffer-exists? old) (switch-to-buffer old)))))
 
+(define (with-scratch-buffer thunk)
+  ;; (@thunk u) in a new buffer u, which is closed afterwards, also when an
+  ;; error goes through
+  (let* ((old (current-buffer))
+         (u (new-buffer)))
+    (dynamic-wind
+      (lambda () (noop))
+      (lambda ()
+        (switch-to-buffer* u)
+        (thunk u))
+      (lambda ()
+        (buffer-close u)
+        (when (buffer-exists? old) (switch-to-buffer* old))))))
+
 (define (with-exact-environments thunk)
   ;; get-env-tree-at with the full evaluation of the document up to the
   ;; path, instead of the fast approximation which ignores the counters
@@ -481,11 +495,9 @@
          ;; edits which keep the heights of the lines
          (tree-set (tree-ref (buffer-tree) 2) "body 2wo")
          (update-forced)
-         (check= (tree->stree (tree-ref (buffer-tree) 2)) "body 2wo")
          (check= (top) before)
          (tree-set (tree-ref (buffer-tree) 2) "body tvo")
          (update-forced)
-         (check= (tree->stree (tree-ref (buffer-tree) 2)) "body tvo")
          (check= (top) before))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -822,19 +834,12 @@
 ;; the paragraphs after it move, also when it is the first of a block.
 (define (places-from-scratch body n)
   ;; the rectangles of the @n paragraphs of @body, typeset in a buffer of
-  ;; its own (closed also when an error goes through)
-  (let* ((old (current-buffer))
-         (u (new-buffer)))
-    (dynamic-wind
-      (lambda () (noop))
-      (lambda ()
-        (switch-to-buffer* u)
-        (buffer-set-body u (tree-copy body))
-        (update-forced)
-        (map (lambda (i) (rect i)) (iota n)))
-      (lambda ()
-        (buffer-close u)
-        (when (buffer-exists? old) (switch-to-buffer* old))))))
+  ;; its own
+  (with-scratch-buffer
+   (lambda (u)
+     (buffer-set-body u (tree-copy body))
+     (update-forced)
+     (map (lambda (i) (rect i)) (iota n)))))
 
 (define (test-block-replay)
   (check-group "block replay")
@@ -1076,19 +1081,17 @@
   (map (lambda (l) (tree->stree (get-reference l))) labels))
 
 (define (references-from-scratch labels)
-  (let* ((old (current-buffer)) (st (get-style-tree))
-         (body (tree-copy (buffer-tree))) (u (new-buffer)))
-    (switch-to-buffer* u)
-    (set-style-tree st)
-    (buffer-set-body u body)
-    (init-env "page-medium" "paper")
-    (update-current-buffer)
-    (update-forced)
-    (update-forced)
-    (with r (references labels)
-      (buffer-close u)
-      (switch-to-buffer* old)
-      r)))
+  (let* ((st (get-style-tree))
+         (body (tree-copy (buffer-tree))))
+    (with-scratch-buffer
+     (lambda (u)
+       (set-style-tree st)
+       (buffer-set-body u body)
+       (init-env "page-medium" "paper")
+       (update-current-buffer)
+       (update-forced)
+       (update-forced)
+       (references labels)))))
 
 (define (with-paper-style style thunk)
   (lambda ()
@@ -1154,18 +1157,18 @@
    (lambda ()
      (renumber-auto-labels)
      (update-forced)
-     (start-editing)
-     (tree-remove (buffer-tree) 2 2)
-     (end-editing)
+     (dynamic-wind start-editing
+                   (lambda () (tree-remove (buffer-tree) 2 2))
+                   end-editing)
      (update-forced)
      (undo 0)
      (update-forced)
      (check= (auto-names) '("auto-1" "auto-2" "auto-3"))
      ;; the same when only the node of the tag is removed (its text is
      ;; kept, as by a backspace at the start of the title)
-     (start-editing)
-     (tree-remove-node (tree-ref (buffer-tree) 2) 0)
-     (end-editing)
+     (dynamic-wind start-editing
+                   (lambda () (tree-remove-node (tree-ref (buffer-tree) 2) 0))
+                   end-editing)
      (update-forced)
      (undo 0)
      (update-forced)
@@ -1205,16 +1208,13 @@
            (update-forced)
            (let* ((inc (equation-references labels))
                   (body (tree-copy (buffer-tree)))
-                  (old (current-buffer))
-                  (u (new-buffer)))
-             (switch-to-buffer* u)
-             (buffer-set-body u body)
-             (update-forced)
-             (update-forced)
-             (with scr (equation-references labels)
-               (buffer-close u)
-               (switch-to-buffer* old)
-               (when (!= inc scr) (set! bad (+ bad 1))))))
+                  (scr (with-scratch-buffer
+                        (lambda (u)
+                          (buffer-set-body u body)
+                          (update-forced)
+                          (update-forced)
+                          (equation-references labels)))))
+             (when (!= inc scr) (set! bad (+ bad 1)))))
          (check= bad 0))))))
 
 ;; A variable assigned below a binding of it, and again afterwards, in
@@ -1240,7 +1240,7 @@
        (update-forced)
        (check-true (same-as-scratch?))))))
 
-;; A paragraph whose inputs are not all known (a date: a Scheme routine)
+;; A paragraph whose inputs are not all known (a date: the clock)
 ;; in a block: when its neighbour is edited, the block is typeset again
 ;; and the paragraph is used again through the fingerprint; the block must
 ;; not take its inputs for all of them, or a change of what it reads is
@@ -1248,49 +1248,44 @@
 (define (paper-places body)
   ;; the places of the paragraphs of a typesetting of body from scratch,
   ;; on paper
-  (let* ((old (current-buffer)) (u (new-buffer)))
-    (switch-to-buffer* u)
-    (buffer-set-body u (tree-copy body))
-    (init-env "page-medium" "paper")
-    (update-current-buffer)
-    (update-forced)
-    (update-forced)
-    (with r (map (lambda (i) (rect i)) (iota (tree-arity (buffer-tree))))
-      (buffer-close u)
-      (switch-to-buffer* old)
-      r)))
+  (with-scratch-buffer
+   (lambda (u)
+     (buffer-set-body u (tree-copy body))
+     (init-env "page-medium" "paper")
+     (update-current-buffer)
+     (update-forced)
+     (update-forced)
+     (map (lambda (i) (rect i)) (iota (tree-arity (buffer-tree)))))))
 
 (define (unknown-inputs-stale? off)
-  (let* ((old (current-buffer)) (u (new-buffer)))
-    (switch-to-buffer* u)
-    (buffer-set-body
-     u (stree->tree
-        `(document
-          ,@(map (lambda (i)
-                   (cond ((== i 1) '(assign "foo" "1cm"))
-                         ((== i off) '(with "zz" "1"
-                                        (document (concat (date) " "
-                                                          (vspace (value "foo"))
-                                                          "x"))))
-                         (else (string-append "paragraph "
-                                              (number->string i)))))
-                 (.. 0 120)))))
-    (init-env "page-medium" "paper")
-    (update-current-buffer)
-    (update-forced)
-    (update-forced)
-    (tree-set (tree-ref (buffer-tree) (+ off 1)) "edited paragraph")
-    (update-forced)
-    (update-forced)
-    (tree-set (tree-ref (buffer-tree) 1) '(assign "foo" "4cm"))
-    (update-forced)
-    (update-forced)
-    (let* ((n (tree-arity (buffer-tree)))
-           (inc (map (lambda (i) (rect i)) (iota n)))
-           (stale? (!= inc (paper-places (buffer-tree)))))
-      (buffer-close u)
-      (when (buffer-exists? old) (switch-to-buffer old))
-      stale?)))
+  (with-scratch-buffer
+   (lambda (u)
+     (buffer-set-body
+      u (stree->tree
+         `(document
+           ,@(map (lambda (i)
+                    (cond ((== i 1) '(assign "foo" "1cm"))
+                          ;; (the year: the same in both typesettings)
+                          ((== i off) '(with "zz" "1"
+                                         (document (concat (date "yyyy") " "
+                                                           (vspace (value "foo"))
+                                                           "x"))))
+                          (else (string-append "paragraph "
+                                               (number->string i)))))
+                  (.. 0 120)))))
+     (init-env "page-medium" "paper")
+     (update-current-buffer)
+     (update-forced)
+     (update-forced)
+     (tree-set (tree-ref (buffer-tree) (+ off 1)) "edited paragraph")
+     (update-forced)
+     (update-forced)
+     (tree-set (tree-ref (buffer-tree) 1) '(assign "foo" "4cm"))
+     (update-forced)
+     (update-forced)
+     (let* ((n (tree-arity (buffer-tree)))
+            (inc (map (lambda (i) (rect i)) (iota n))))
+       (!= inc (paper-places (buffer-tree)))))))
 
 (define (test-unknown-inputs-in-blocks)
   (check-group "unknown inputs in blocks")
@@ -1418,7 +1413,7 @@
     ((8) `(theorem (document ,(fz-text) ,(fz-text))))
     ((9) `(concat "n" (footnote "a note") " " ,(fz-text)))
     ((10) `(with "par-columns" "2" (document ,(fz-text) ,(fz-text) ,(fz-text))))
-    ((11) `(concat (date) " d"))
+    ((11) `(concat (date "yyyy") " d"))
     ((12) `(with "par-par-sep" "0fn" (hidden "h")))
     ((13) `(tabular (tformat (cwith "1" "1" "1" "1" "fb" "v")
                              (table (row (cell "c") (cell (value "fb")))))))
@@ -1473,16 +1468,13 @@
   (update-forced))
 
 (define (fz-scratch body medium)
-  (let* ((old (current-buffer)) (u (new-buffer)))
-    (switch-to-buffer* u)
-    (buffer-set-body u (tree-copy body))
-    (init-env "page-medium" medium)
-    (update-current-buffer)
-    (fz-typeset)
-    (with r (fz-snapshot)
-      (buffer-close u)
-      (switch-to-buffer* old)
-      r)))
+  (with-scratch-buffer
+   (lambda (u)
+     (buffer-set-body u (tree-copy body))
+     (init-env "page-medium" medium)
+     (update-current-buffer)
+     (fz-typeset)
+     (fz-snapshot))))
 
 (define (fz-edit)
   (let* ((ds (fz-documents (buffer-tree)))

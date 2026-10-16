@@ -337,7 +337,7 @@ column_edge (array<page_item>& l, int i) {
 static inline bool
 chunk_boundary (page_item& it) {
   // content defined boundaries (about one every 64 lines), depending on the
-  // geometry of the line only: the same lines give the same chunks,also
+  // geometry of the line only: the same lines give the same chunks, also
   // after a full retypesetting
   box b= it->b;
   uint64_t h= (uint64_t) (uint32_t) b->w ();

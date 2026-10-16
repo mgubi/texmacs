@@ -47,7 +47,8 @@ edit_typeset_rep::edit_typeset_rep ():
 }
 
 edit_typeset_rep::~edit_typeset_rep () {
-  // the boxes of the document go before the typesetter which made them
+  // the boxes of the document go first; those which the typesetter keeps
+  // (pages, shoves, the repaint log) go with it, in delete_typesetter
   eb= box ();
   delete_typesetter (ttt);
 }
