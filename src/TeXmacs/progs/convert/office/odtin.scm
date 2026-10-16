@@ -1280,7 +1280,9 @@
                   (if (car role) '() (odt-paragraph-props name))
                   (lambda ()
                     (odt-trim (office-changes (odt-inlines (ox-children x)))))))))
-         (named (and (not (car role)) (== odt-apart-depth 0) (== odt-list-depth 0)
+         ;; (and of a caption, for one which is not the one of a figure)
+         (named (and (or (not (car role)) (== (car role) "caption"))
+                     (== odt-apart-depth 0) (== odt-list-depth 0)
                      (odt-named-style name)))
          (l (car r)))
     ;; (the style of a heading, for the look of the titles)
@@ -1683,9 +1685,12 @@
     (and layout (ox-child layout 'style:page-layout-properties))))
 
 (define (odt-body-style)
-  ;; the style of most of the plain paragraphs, or the one of the text
-  (let ((best #f) (n 0))
-    (for (kv (ahash-table->list odt-body-styles))
+  ;; the style of most of the plain paragraphs, or the one of the text (the
+  ;; one of the text when as many have no style, the first name when two
+  ;; have as many)
+  (let ((best #f) (n (or (ahash-ref odt-body-styles "") 0)))
+    (for (kv (sort (ahash-table->list odt-body-styles)
+                   (lambda (a b) (string<? (car a) (car b)))))
       (when (> (cdr kv) n) (set! best (car kv)) (set! n (cdr kv))))
     (cond ((and best (!= best "")) best)
           ((ahash-ref odt-styles (cons "paragraph" "Text_20_body")) "Text_20_body")

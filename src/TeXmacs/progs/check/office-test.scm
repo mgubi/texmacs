@@ -4335,6 +4335,76 @@
   (check= (office-link-target "\\\\server\\share\\a b.png" #t) "file://server/share/a%20b.png")
   (check= (office-link-target "https://x.y/a b.png" #t) "https://x.y/a%20b.png"))
 
+;; Documents of styles of the names of those of the other format, opened in
+;; Word and LibreOffice: a caption which is not the one of a figure keeps
+;; its style, a plain paragraph is not in the style of another one of as
+;; many paragraphs, a style of the document in a link is its look in Word.
+
+(define (test-office-apps-check)
+  (check-group "office apps check")
+  (let* ((body (lambda (t) (cdadr (cadr t))))
+         (z (zip-pack '("word/document.xml" "word/styles.xml")
+                      (list (string-append "<w:document" docx-ns "><w:body>"
+                                           (wp (wstyle "Caption") (wr "c"))
+                                           (wp (wstyle "TextBody") (wr "t")) (wp (wr "p"))
+                                           "</w:body></w:document>")
+                            (string-append "<w:styles" docx-ns ">"
+                                           "<w:style w:type='paragraph' w:styleId='Caption'>"
+                                           "<w:name w:val='Caption'/><w:rPr><w:color w:val='FF8800'/>"
+                                           "</w:rPr></w:style>"
+                                           "<w:style w:type='paragraph' w:styleId='TextBody'>"
+                                           "<w:name w:val='Text Body'/><w:rPr><w:color w:val='AA00AA'/>"
+                                           "</w:rPr></w:style></w:styles>"))))
+         (o (odt-file (string-append "<text:p text:style-name='Caption'>c</text:p>"
+                                     "<text:p text:style-name='MyNote'>m</text:p>"
+                                     "<text:p>p</text:p>")
+                      (string-append "<office:styles>"
+                                     "<style:style style:name='Caption' style:family='paragraph'>"
+                                     "<style:text-properties fo:color='#ff8800'/></style:style>"
+                                     "<style:style style:name='MyNote' style:family='paragraph'>"
+                                     "<style:text-properties fo:color='#008888'/></style:style>"
+                                     "</office:styles>")
+                      "")))
+    (check= (body (convert z "docx-document" "texmacs-stree"))
+            '((office-par "Caption" "c") (office-par "TextBody" "t") "p"))
+    (check= (body (convert o "odt-document" "texmacs-stree"))
+            '((office-par "Caption" "c") (office-par "MyNote" "m") "p"))
+    ;; (a caption of a figure is the one of the figure still)
+    (check= (tm '(p (image (@ (name "f.png"))))
+                '(p (@ (role "caption") (style "Caption")) "The figure"))
+            '((big-figure (image "f.png" "" "" "" "") "The figure"))))
+  (let* ((text (export-entry (serialize-docx-document
+                               '(office (p (link (@ (href "https://a.b"))
+                                                 (span (@ (style "Red")) "r"))
+                                           " " (link (@ (href "https://a.b")) "l"))))
+                             "word/document.xml")))
+    (check-true (export-has? text "<w:rStyle w:val=\"Red\"/>"))
+    (check= (export-count text "<w:rStyle w:val=\"Hyperlink\"/>") 1))
+  ;; a footnote of a formula follows it (a formula of Word or OpenDocument
+  ;; cannot hold it), and its point goes with the formula when it is read
+  (let ((m '(math (@ (display "true") (form "text")) "x")))
+    (check= (in-tm `((p ,m (note (p "n")) ".")))
+            '((equation* (document (concat "x." (text (footnote "n")))))))
+    (check= (in-tm `((p "see " ,m " " (note (p "n")) ". Then")))
+            '("see" (equation* (document (concat "x." (text (footnote "n"))))) "Then")))
+  (for (doc '((equation* (document (concat "x" (footnote "n") ".")))
+              (equation* (document (concat "x" (label "e") (footnote "n") ".")))
+              (concat "a " (math (concat "y" (footnote "m"))) " b")))
+    (for (fm '("docx-document" "odt-document"))
+      (let* ((d `(document (body (document ,doc)) (style "generic")))
+             (back (convert (convert d "texmacs-stree" fm) fm "texmacs-stree"))
+             (body (cadr (list-find (cdr back) (lambda (y) (func? y 'body))))))
+        (check-true (>= (string-search-forwards "(footnote" 0 (object->string body)) 0)))))
+  (let ((text (export-entry (serialize-docx-document
+                              (texmacs->office
+                                '(document (body (document (equation-lab (document (concat "x" (footnote "n"))) "1")))
+                                           (style "generic"))
+                                '()))
+                            "word/document.xml")))
+    ;; (the mark of the note just after the formula, before the tab of its
+    ;; number)
+    (check-true (export-has? text "</m:oMath><w:r><w:rPr><w:rStyle w:val=\"FootnoteReference\"/>"))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The formats
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -4427,5 +4497,6 @@
   (test-export-audit-2)
   (test-export-audit-3)
   (test-export-audit-4)
+  (test-office-apps-check)
   (test-formats)
   (check-end))

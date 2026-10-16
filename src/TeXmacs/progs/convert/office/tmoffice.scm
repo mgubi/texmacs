@@ -229,10 +229,17 @@
     (lambda (x)
       (cond ((func? x 'p) (append (cdr x) (list " ")))
             ((func? x '!display)
-             (list `(math (@ (display "true") (form "sxml")) ,(cadr x))))
+             (cons `(math (@ (display "true") (form "sxml")) ,(cadr x))
+                   (tmof-leading-notes (cddr x))))
             ((tmof-block? x) '())
             (else (list x))))
     l))
+
+(define (tmof-leading-notes l)
+  ;; the notes at the start of l (those of a formula, before its number)
+  (if (and (pair? l) (func? (car l) 'note))
+      (cons (car l) (tmof-leading-notes (cdr l)))
+      '()))
 
 (define (tmof-has-block? l)
   (list-or (map tmof-block? l)))
@@ -327,7 +334,7 @@
   ;; a formula without what is not seen, and with its fractions, its
   ;; binomials and its big operators as the converter of MathML knows them
   (cond ((not (pair? x)) x)
-        ((in? (car x) '(label assign hidden-binding set-binding write)) "")
+        ((in? (car x) '(label assign hidden-binding set-binding write footnote)) "")
         ((and (in? (car x) '(binom tbinom dbinom choose)) (== (length x) 3))
          `(around* "(" ,(tmof-stack (cadr x) (caddr x)) ")"))
         ((func? x 'ontop 2) (tmof-stack (cadr x) (caddr x)))
@@ -490,12 +497,20 @@
        (with s (tmof-text x)
          (and (not (string-starts? s "<")) s))))
 
+(define (tmof-math-notes x)
+  ;; the notes of the footnotes inside the formula x, which a formula of an
+  ;; office document cannot hold: they follow it
+  (cond ((not (pair? x)) '())
+        ((func? x 'footnote 1) (tmof-footnote-add (cadr x)))
+        (else (append-map tmof-math-notes (cdr x)))))
+
 (define (tmof-math l)
   (let ((x (if (list-1? l) (car l) `(concat ,@l))))
     (if (tmof-symbol x)
         (list (tmof-symbol x))
         (with m (tmof-mathml x)
-          (if m `((math (@ (form "sxml")) ,m)) '())))))
+          (append (if m `((math (@ (form "sxml")) ,m)) '())
+                  (tmof-math-notes x))))))
 
 (define tmof-limit-operators
   ;; the big operators whose limits are under and over them in a formula on
@@ -526,6 +541,7 @@
                      (map (lambda (name) `(bookmark (@ (name ,name)))) l))))
     (if m
         `((!display ,m
+                    ,@(tmof-math-notes x)
                     ,@(apply append
                              (list-intersperse
                                (map (lambda (n)
@@ -2235,9 +2251,13 @@
             ((!role) (tmof-final-paragraph `((role ,(cadr x))) (cddr x)))
             ;; a paragraph with its attributes
             ((!para) (tmof-final-paragraph (cadr x) (cddr x)))
+            ;; (the notes of the formula, then its number after a tab)
             ((!display)
-             (list `(p (math (@ (display "true") (form "sxml")) ,(cadr x))
-                       ,@(if (pair? (cddr x)) `((tab) ,@(cddr x)) '()))))
+             (let* ((notes (tmof-leading-notes (cddr x)))
+                    (rest (list-tail (cddr x) (length notes))))
+               (list `(p (math (@ (display "true") (form "sxml")) ,(cadr x))
+                         ,@(tmof-final-inlines notes)
+                         ,@(if (pair? rest) `((tab) ,@rest) '())))))
             ((columns field-blocks)
              (list `(,(car x) (@ ,@(tmof-node-attrs x))
                               ,@(tmof-final-blocks (tmof-node-children x)))))

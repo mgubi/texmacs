@@ -108,9 +108,11 @@
          (ukind (assq 'ukind (list-filter props pair?)))
          (letters (assq 'letters (list-filter props pair?)))
          (l (append
+              ;; (a style of the document in a link is its look, as in
+              ;; TeXmacs)
               (cond ((has? 'code) (list (dx-val 'w:rStyle "VerbatimChar")))
-                    ((has? 'hyperlink) (list (dx-val 'w:rStyle "Hyperlink")))
                     (rstyle (list (dx-val 'w:rStyle (cadr rstyle))))
+                    ((has? 'hyperlink) (list (dx-val 'w:rStyle "Hyperlink")))
                     (else '()))
               ;; (in the order of the format)
               (if font
@@ -973,15 +975,29 @@
                                                           (ox-attrs x))
                                                   (list (car parts))))
                           #f))
+          ;; (the notes of the formula just after it, before the tab of
+          ;; its number)
           (else
             (let* ((m (car parts))
                    (inline `(math (@ ,@(list-filter (ox-attrs m)
                                                     (lambda (a) (!= (car a) 'display))))
-                                  ,@(ox-children m))))
+                                  ,@(ox-children m)))
+                   (notes (let take ((l (cdr parts)))
+                            (if (and (pair? l) (func? (car l) 'note))
+                                (cons (car l) (take (cdr l)))
+                                '())))
+                   (number (let skip ((l (list-tail (cdr parts) (length notes))))
+                             (if (and (pair? l) (or (func? (car l) 'tab)
+                                                    (and (string? (car l))
+                                                         (== (string-trim-spaces (car l)) ""))))
+                                 (skip (cdr l))
+                                 l))))
               (dx-paragraph* (apply office-node
                                     (cons* 'p (map (lambda (a) (list (car a) (cadr a)))
                                                    (ox-attrs x))
-                                           (append (list '(tab) inline '(tab)) (cdr parts))))
+                                           (append (list '(tab) inline) notes
+                                                   (if (null? number) '()
+                                                       (cons '(tab) number)))))
                              #t))))))
 
 (define (dx-twips-of s)
