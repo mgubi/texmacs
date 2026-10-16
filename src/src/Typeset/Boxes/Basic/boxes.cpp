@@ -618,7 +618,7 @@ void
 box_rep::redraw_background (renderer ren) {
   ren->move_origin (x0, y0);
   // (only what is in the region which is drawn: the backgrounds of all the
-  // pages of a document were said for each rectangle cleared, some twelve
+  // pages of a document were drawn for each rectangle cleared, some twelve
   // rectangles for each page, 180000 for a key in the user manual; the
   // margin is for the shadows of the pages, drawn just outside of them)
   SI d= 8 * ren->retina_pixel;
