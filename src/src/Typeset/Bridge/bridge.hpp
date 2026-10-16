@@ -44,6 +44,8 @@ public:
                                  // (sorted env_var_id)
   array<string>        seen_keys;   // the references and attachments it
   array<tree>          seen_values; // looked up, with the values found
+  unsigned long long   seen_stamp;  // the labels_stamp when they were found
+                                    // again (0: not yet; see same_lookups)
   // what it was typeset from, when the inputs are used (see "What is
   // typeset again" in bridge.cpp)
   bool                 in_known; // all its inputs are known:
@@ -87,7 +89,9 @@ public:
 // the inputs of a bridge below for the record of the bridge above it
 void add_inputs (edit_env env, bool known, array<int> vars, array<tree> vals);
 // do the references and attachments looked up still have these values?
-bool same_lookups (edit_env env, array<string> keys, array<tree> values);
+// ('stamp': the labels_stamp of the tables when they last had them, or 0)
+bool same_lookups (edit_env env, array<string> keys, array<tree> values,
+                   unsigned long long& stamp);
 
 class bridge {
   ABSTRACT_NULL(bridge);

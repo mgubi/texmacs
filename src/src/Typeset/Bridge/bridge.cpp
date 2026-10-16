@@ -42,7 +42,7 @@ bridge nil_bridge;
 bridge_rep::bridge_rep (typesetter ttt2, tree st2, path ip2):
   ttt (ttt2), env (ttt->env), st (st2), ip (ip2),
   status (CORRUPTED), changes (UNINIT), reads (),
-  in_known (false), in_state (0), in_fp (0) {}
+  seen_stamp (0), in_known (false), in_state (0), in_fp (0) {}
 
 static tree inactive_auto
   (MACRO, "x", tree (REWRITE_INACTIVE, tree (ARG, "x"), "recurse*"));
@@ -315,10 +315,27 @@ add_reads (edit_env env, bool known, array<int> reads,
 }
 
 // do the references and attachments looked up still have the values found?
+// Not looked up again when the tables did not change since they last had
+// them (the stamp; in the check mode they are, and it is told if they do
+// not have them)
 bool
-same_lookups (edit_env env, array<string> keys, array<tree> values) {
+same_lookups (edit_env env, array<string> keys, array<tree> values,
+              unsigned long long& stamp) {
+  if (N(keys) == 0) return true;
+  unsigned long long now= env->labels_stamp ();
+  bool same_stamp= (stamp == now);
+  if (same_stamp && typeset_inputs_mode () != 2) return true;
   for (int i=0; i<N(keys); i++)
-    if (env->lookup_value (keys[i]) != values[i]) return false;
+    if (env->lookup_value (keys[i]) != values[i]) {
+      if (same_stamp) {
+        typeset_check_mismatches++;
+        failed_error << "A reference changed while its tables did not: "
+                     << keys[i] << LF;
+      }
+      stamp= 0;
+      return false;
+    }
+  stamp= now;
   return true;
 }
 
@@ -455,7 +472,7 @@ bridge_rep::same_inputs () {
         !same_boxes (in_item_boxes, items_boxes (ttt->a, ttt->b)))
       return false;
   }
-  if (!same_lookups (env, seen_keys, seen_values)) return false;
+  if (!same_lookups (env, seen_keys, seen_values, seen_stamp)) return false;
   // the whole environment as it was (the fingerprint: also for a bridge
   // whose inputs are not known), or the inputs
   if (env->fingerprint () == in_fp) return true;
@@ -571,6 +588,7 @@ bridge_rep::typeset_by_inputs (int desired_status) {
   in_fp= fp;
   seen_keys= my_keys;
   seen_values= my_values;
+  seen_stamp= 0;
   env->local_changes (changes);
   ttt->local_end (l, sb);
   bool differs= check &&
@@ -597,6 +615,7 @@ bridge_rep::typeset_by_inputs (int desired_status) {
     in_item_marks= was_marks;
     in_item_boxes= was_item_boxes;
     seen_keys= was_keys; seen_values= was_values; reads= was_reads;
+    seen_stamp= 0;
   }
   give_record ();
   env->local_end (prev_back);

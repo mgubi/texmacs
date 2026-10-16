@@ -735,6 +735,9 @@ public:
 
   void write_default_env ();
   void write_prepared_env (hashmap<string,tree> pre);
+  // the stamps of the tables of the references and attachments: the same
+  // when none of them changed (see hashmap_rep::stamp, same_lookups)
+  unsigned long long labels_stamp ();
   void write_env (hashmap<string,tree> user_env);
   void monitored_patch_env (hashmap<string,tree> patch);
   void patch_env (hashmap<string,tree> patch);
