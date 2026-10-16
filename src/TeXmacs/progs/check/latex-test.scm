@@ -30,7 +30,8 @@
 
 (texmacs-module (check latex-test)
   (:use (check check-lib)
-        (convert latex init-latex)))
+        (convert latex init-latex)
+        (convert latex tmtex-pdflatex)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Helpers
@@ -846,6 +847,128 @@
               "\\fbox{text $a$}")))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Struck and highlighted text, columns, colors by value
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; strike-through was \strikethrough and marked \marked, which LaTeX does
+;; not define; the columns needed multicol, and a color #rrggbb was written
+;; where xcolor wants a name (\colorbox{#f00})
+(define (test-export-strike-marked)
+  (check-group "export: struck and highlighted text")
+  (check= (tl '(strike-through "x")) "\\sout{x}")
+  (check= (tl '(marked "y")) "\\tmmarked{yellow}{y}")
+  (check= (tl '(with "marked-color" "#ff8800" (marked "z")))
+          "\\tmmarked{tmhexFF8800}{z}")
+  ;; in a formula, the formula goes in \text, as ulem works in text mode
+  (check= (tl '(math (concat "a+" (strike-through (concat "x" (rsup "2"))))))
+          "$a + \\text{\\sout{$x^2$}}$")
+  (check= (tl '(math (concat "b+" (marked (concat "y" (rsub "i"))))))
+          "$b + \\text{\\tmmarked{yellow}{$y_i$}}$")
+  (check= (tl '(colored-frame "#f00" "q")) "\\colorbox{tmhexFF0000}{q}")
+  (check= (tl '(colored-frame "Firebrick1" "q")) "\\colorbox{tmhexFF3030}{q}")
+  (check= (tl '(with "color" "#123456" "c")) "{\\color[HTML]{123456}c}")
+  ;; a footnote goes in an \mbox; a list is written without the line
+  (check= (tl '(strike-through (concat "a" (footnote "f") "c")))
+          "\\sout{a\\mbox{\\footnote{f}}c}")
+  (check-false (string-contains?
+                (tl '(strike-through (document "p" (itemize (document (concat (item) "a"))))))
+                "\\sout"))
+  (with s (td '("article")
+              '(document (strike-through "x") (marked "y")
+                         (with "marked-color" "#ff8800" (marked "z"))
+                         (with "par-columns" "2" (document "a" "b"))
+                         (with "ornament-color" "#dddddd" (ornamented "o"))))
+    (check-true (string-contains? s "\\usepackage[normalem]{ulem}"))
+    (check-true (string-contains? s "multicol}"))
+    (check-true (string-contains? s "\\protected\\long\\def\\tmmarked#1#2{"))
+    (check-true (string-contains? s "\\definecolor{tmhexFF8800}{HTML}{FF8800}"))
+    (check-true (string-contains? s "\\definecolor{tmhexDDDDDD}{HTML}{DDDDDD}"))
+    (check-true (string-contains? s "[backgroundcolor=tmhexDDDDDD]"))
+    (check-false (string-contains? s "\\strikethrough"))
+    (check-false (string-contains? s "\\marked")))
+  ;; a color used twice, as #rrggbb and #rrggbbaa, is defined once
+  (with s (td '("article")
+              '(document (colored-frame "#8080ff" "a")
+                         (colored-frame "#8080ff80" "b")))
+    (check= (length (string-decompose s "\\definecolor{tmhex8080FF}")) 2)))
+
+(define (test-import-strike-marked)
+  (check-group "import: struck and highlighted text")
+  (check= (lt "\\sout{x}") '(strike-through "x"))
+  (check= (lt "\\tmmarked{yellow}{y}") '(marked "y"))
+  (check= (lt "\\tmmarked{tmhexFF8800}{z}")
+          '(with "marked-color" "#ff8800" (marked "z")))
+  (check= (lt "\\colorbox{tmhexFF0000}{q}") '(colored-frame "#ff0000" "q"))
+  (check= (lt "\\textcolor{tmhex123456}{c}") '(with "color" "#123456" "c"))
+  (for (x '((strike-through "x") (marked "y")
+            (with "marked-color" "#ff8800" (marked "z"))
+            (colored-frame "#ff0000" "q")))
+    (check-equal x (lambda () (round-trip x)) x)))
+
+;; the LaTeX of these tags is compiled by pdflatex, when it is installed:
+;; the lines of struck and highlighted text break, and formulas compile
+(define latex-pdf-dir
+  (string-append (url->system (url-temp-dir)) "/latex-test-pdf"))
+
+(define (latex-compile name doc)
+  (let* ((dir (system->url latex-pdf-dir))
+         (tex (url-append dir (string-append name ".tex")))
+         (log (url-append dir (string-append name ".log"))))
+    (when (not (url-exists? dir)) (system-mkdir dir))
+    (string-save doc tex)
+    (with r (run-pdflatex tex)
+      (list r (if (url-exists? log) (string-load log) "")))))
+
+(define (remove-latex-pdf-dir)
+  (with d (system->url latex-pdf-dir)
+    (when (url-exists? d)
+      (for-each system-remove (url-read-directory d "*"))
+      (system-rmdir d))))
+
+(define (test-compile-strike-marked)
+  (check-group "export: struck and highlighted text with pdflatex")
+  (if (not (url-exists-in-path? "pdflatex"))
+      (display "  (pdflatex is not installed: not compiled)\n")
+      (let* ((long (string-append
+                    "a long text which runs over several lines, so that "
+                    "its lines have to break, as in a deleted paragraph; "
+                    "a long text which runs over several lines, so that "
+                    "its lines have to break, as in a deleted paragraph"))
+             (doc (td '("article")
+                      `(document
+                         (strike-through ,long)
+                         (marked ,long)
+                         (with "marked-color" "#ff8800" (marked ,long))
+                         (concat "x " (marked (strike-through "both")) " "
+                                 (strike-through (concat "a " (marked "b")))
+                                 " " (marked (concat "y" (rsub "i")))
+                                 " " (strike-through (em "em"))
+                                 " " (marked (strong "s")))
+                         (math (concat "a+" (strike-through
+                                              (concat "x" (rsup "2")))))
+                         (math (concat "e" (rsup (marked (concat "y" (rsub "i"))))))
+                         (equation* (document (concat "c+" (marked (frac "1" "2")))))
+                         (strike-through (concat "a" (footnote "f") " c"))
+                         (marked (concat "a" (footnote "g") " c"))
+                         (strike-through (document "p" (itemize (document (concat (item) "a")))))
+                         (marked (document "p" (equation* (document "x"))))
+                         (marked (document "first paragraph" "second paragraph"))
+                         (strike-through (document "first paragraph" "second paragraph"))
+                         (section (concat "A " (strike-through "struck")
+                                          " " (marked "marked") " title"))
+                         (with "par-columns" "2" (document ,long))
+                         (colored-frame "#f00" "q")
+                         (with "ornament-color" "#dddddd" (ornamented "o")))))
+             (r (latex-compile "strike-marked" doc))
+             (status (car r))
+             (log (cadr r)))
+        (check-true (and status (car status)))
+        (check= (and status (cadr status)) 0)
+        (check-false (string-contains? log "Overfull \\hbox"))
+        (check-false (string-contains? log "Undefined control sequence"))
+        (remove-latex-pdf-dir))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The suite
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -902,4 +1025,7 @@
   (test-import-documents)
   (test-round-trips)
   (test-export-without-view)
+  (test-export-strike-marked)
+  (test-import-strike-marked)
+  (test-compile-strike-marked)
   (check-end))

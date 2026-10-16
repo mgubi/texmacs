@@ -1593,12 +1593,15 @@
            (tmtex-decode-color (get-hex-color s) force-html))
           ((and (== cm "HTML") (nnull? force-html))
            `((!option "HTML") ,(html-color->latex-xcolor s)))
-          ((== cm "texmacs")
+          ((or (== cm "texmacs") (== cm "HTML"))
+           ;; (without force-html, the color is used by its name, as in
+           ;; \colorbox or the options of mdframed: a color #rrggbb is
+           ;; defined under the name tmhexRRGGBB)
            (when (nin? s tmtex-colors)
              (set! tmtex-colors (append (list s) tmtex-colors)))
-           (string-replace s " " ""))
+           (latex-color-name s))
           ((in? cm (list "x11names"))
-           (tmtex-decode-color (get-hex-color s) #t))
+           (apply tmtex-decode-color (cons (get-hex-color s) force-html)))
           (else
             (when (and (nin? cm tmtex-colormaps)
                        (!= cm "xcolor") (!= cm "none"))
@@ -2393,6 +2396,37 @@
 
 (define (tmtex-fcolorbox s l)
   `(fcolorbox ,@(map tmtex-decode-color (cDr l)) ,(tmtex (cAr l))))
+
+;; Struck and highlighted text are drawn by ulem, whose lines break with
+;; the text; in a formula, the formula goes in \text{...$...$}, as ulem
+;; draws its lines in text mode only. A footnote goes in an \mbox, which
+;; ulem accepts; a list, a table or a displayed formula cannot be in the
+;; argument, and such a block is written without the line.
+(define (tmtex-ulem-block? x)
+  (and (pair? x)
+       (or (in? (car x) '(!eqn !table))
+           (func? (car x) '!begin)
+           (list-or (map tmtex-ulem-block? (cdr x))))))
+
+(define (tmtex-ulem-footnotes x)
+  (cond ((func? x 'footnote) `(mbox ,x))
+        ((pair? x) (cons (car x) (map tmtex-ulem-footnotes (cdr x))))
+        (else x)))
+
+(define (tmtex-text-mode cmd . args)
+  (with x (cAr args)
+    (cond ((tmtex-math-mode?)
+           `(text (,cmd ,@(cDr args) (!math ,x))))
+          ((tmtex-ulem-block? x) x)
+          (else `(,cmd ,@(cDr args) ,(tmtex-ulem-footnotes x))))))
+
+(define (tmtex-strike-through s l)
+  (tmtex-text-mode 'sout (tmtex (car l))))
+
+(define (tmtex-marked s l)
+  (let* ((c (or (tmtex-env-get "marked-color") "yellow"))
+         (col (tmtex-decode-color (force-string c))))
+    (tmtex-text-mode 'tmmarked col (tmtex (car l)))))
 
 (define (tmtex-rotate s l)
   (let* ((body (tmtex (cadr l)))
@@ -3276,6 +3310,8 @@
   (boxed (,tmtex-boxed 1))
   (colored-frame (,tmtex-colored-frame 2))
   (fcolorbox (,tmtex-fcolorbox 3))
+  (strike-through (,tmtex-strike-through 1))
+  (marked (,tmtex-marked 1))
   (rotate (,tmtex-rotate 2))
   (condensed (,tmtex-style-first 1))
   (translate (,tmtex-translate 3))
