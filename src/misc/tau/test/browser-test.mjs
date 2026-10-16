@@ -438,8 +438,9 @@ test("the views drawn in the worker", async p => {
 });
 
 test("the views drawn on the canvas of the page", async p => {
-	// (?coregl&direct: the canvas of the pane given to the worker, which
-	// draws on it; the views of the dialogs are pixels, drawn by the page)
+	// (?coregl&direct: the views of the panes drawn by the worker on one
+	// canvas behind them, given to it; the views of the dialogs are pixels,
+	// drawn by the page)
 	await p.open("coregl&direct");
 	const built = await p.page.evaluate(() => new Promise(res => {
 		tau.worker.addEventListener("message", e => { if (e.data.t === "gpu-check") res(e.data.text); });
@@ -450,21 +451,32 @@ test("the views drawn on the canvas of the page", async p => {
 	// (another document in the pane: another view, which the worker draws)
 	await p.newDocument();
 	await p.type("Drawn by the core");
-	// (what the canvas shows, read through a 2D canvas: the page cannot draw
-	// on it, nor read it otherwise)
-	const ink = () => p.page.evaluate(() => {
-		const c = document.querySelector(".tau-pane canvas.tau-canvas");
-		const w = Math.min(c.width, 1200), h = Math.min(c.height, 400);
+	// (what that canvas shows where a pane is, read through a 2D canvas:
+	// the page cannot draw on it, nor read it otherwise)
+	const ink = k => p.page.evaluate(k => {
+		const all = document.querySelector(".tau-canvas-all"), c = document.querySelectorAll(".tau-pane canvas.tau-canvas")[k];
+		const density = window.devicePixelRatio || 1, a = all.getBoundingClientRect(), r = c.getBoundingClientRect();
+		const x0 = Math.round((r.left - a.left) * density), y0 = Math.round((r.top - a.top) * density);
+		const w = Math.min(Math.round(r.width * density), 1200), h = Math.min(Math.round(r.height * density), 400);
 		const o = document.createElement("canvas");
 		o.width = w; o.height = h;
 		const x = o.getContext("2d");
-		x.drawImage(c, 0, 0);
+		x.drawImage(all, x0, y0, w, h, 0, 0, w, h);
 		const d = x.getImageData(0, 0, w, h).data;
 		let n = 0;
 		for (let i = 0; i < d.length; i += 4) if (d[i + 3] > 0 && d[i] + d[i + 1] + d[i + 2] < 200) n++;
 		return n;
-	});
-	await p.until("the text is shown", async () => (await ink()) > 600);
+	}, k);
+	await p.until("the text is shown", async () => (await ink(0)) > 600);
+	// a second pane, which takes the keyboard: both drawn
+	await p.choose("View", "New window");
+	await p.until("a second pane", async () => (await p.tabs()).length === 2);
+	await p.until("which has the keyboard", () => p.page.evaluate(() => document.querySelectorAll(".tau-pane")[1].classList.contains("tau-active")));
+	await sleep(1000);
+	const before = await ink(1);
+	await p.type("And in the other pane");
+	await p.until("its text is shown", async () => (await ink(1)) > before + 600);
+	check("the first one still", (await ink(0)) > 600);
 	await p.choose("Format", "Font");
 	await p.dialog("Font selector");
 	await p.until("and the sample of the dialog", () => p.page.evaluate(() => {

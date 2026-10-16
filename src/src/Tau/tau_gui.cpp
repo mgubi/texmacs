@@ -310,9 +310,10 @@ extern "C" void tau_gpu_frame (int view, int w, int h, const int* ops, int nops,
                                const unsigned char* im, int nim,
                                int x1, int y1, int x2, int y2, int dx, int dy)
   __attribute__ ((weak));
-// (whether a view is said as commands: not the others than the one which
-// the worker draws on the canvas of the page, ?direct)
+// (whether a view is said as commands: with ?direct, only those which
+// the worker draws on the canvas behind the panes; when a turn is drawn)
 extern "C" int tau_gpu_records (int view) __attribute__ ((weak));
+extern "C" void tau_gpu_turn_done () __attribute__ ((weak));
 #endif
 static bool record_all= false;  // tau_record
 
@@ -327,11 +328,11 @@ EM_JS (void, tau_js_dlist, (int view, int counter, int w, int h,
   if (!Module.tauPost) return;
   // (the worker drew the rectangle, tau_gpu.cpp: as an ImageBitmap, in
   // place of the commands, which the page does not need; or on the canvas
-  // of the page, ?direct: nothing to give)
+  // behind the panes, ?direct: nothing to give)
   var b= Module.tauFrame;
   Module.tauFrame= null;
   if (b && (b.width != x2 - x1 || b.height != y2 - y1)) { b.close (); b= null; }
-  var none= b || Module.tauDirectView === view;
+  var none= b || (Module.tauDirectViews && Module.tauDirectViews.has (view));
   var o= none ? new Int32Array (0) : HEAP32.slice (ops >> 2, (ops >> 2) + nops);
   var g= none ? new Uint8Array (0) : HEAPU8.slice (gl, gl + ngl);
   var i= none ? new Uint8Array (0) : HEAPU8.slice (im, im + nim);
@@ -632,6 +633,9 @@ tau_turn_now () {
                     v->drawn_x1, v->drawn_y1, v->drawn_x2, v->drawn_y2,
                     ew, eh, sx, sy, cx, cy, v->shift_x, v->shift_y);
   }
+#ifdef __EMSCRIPTEN__
+  if (tau_gpu_turn_done) tau_gpu_turn_done ();
+#endif
   if (prof) t2= tau_now ();
   // what Scheme has to say to the page (menu-serial.scm)
   string out= as_string (call ("tau-outbox"));

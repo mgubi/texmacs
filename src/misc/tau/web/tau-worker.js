@@ -113,8 +113,8 @@ function handle(m) {
 		// ?coregl: drawn here by the GPU renderer of the core (tau_gpu.cpp),
 		// and given to the page as bitmaps (none without a GPU: the page
 		// draws the pixels of the core then)
-		// (?direct: on the canvas of a pane which the page gave, "canvas";
-		// without a GPU the pixels are put on it here)
+		// (?direct: on the canvas behind the panes which the page gave,
+		// "canvas"; without a GPU the pixels are put on it here)
 		const p = new URLSearchParams(self.location.search);
 		if (p.has("coregl")) {
 			const shown = !!core._tau_gpu_show && core._tau_gpu_show(m.on ? 1 : 0) === 1;
@@ -123,8 +123,9 @@ function handle(m) {
 				// (a canvas with a WebGL context has no other: asked for one,
 				// Firefox (157) broke, "not on worker thread!", a few times
 				// after; nothing is drawn while the GPU is turned off)
-				if (shown) { core._tau_gpu_direct(core.tauDirectView); directGL = true; }
+				if (shown) directGL = true;
 				else if (!direct2d && !directGL) try { direct2d = core.tauDirectCanvas.getContext("2d"); } catch (e) {}
+				placeViews(true);
 				core._tau_record(shown ? 1 : 0);
 				break;
 			}
@@ -139,10 +140,11 @@ function handle(m) {
 		// (before the GPU starts: its WebGL context is made on it)
 		core.tauDirectCanvas = m.canvas;
 		break;
-	case "direct":
-		// the view which that pane shows now: drawn again, as the others
-		core.tauDirectView = m.view;
-		if (gpuShown) { core._tau_gpu_direct(m.view); core._tau_record(1); }
+	case "layout":
+		// ?direct: the size of that canvas, and where the view of each
+		// pane is on it
+		layout = m;
+		placeViews(false);
 		break;
 	case "gpu-check":
 		// for the tests: whether the GPU renderer of the core draws (a core
@@ -544,17 +546,50 @@ function collectFiles(node, files) {
 }
 const DESCRIPTIONS = new Set(["chrome", "contents", "dialog", "refresh", "popup"]);
 let tauModule = null;
-// ?direct: whether the GPU draws; the 2D context of the canvas otherwise
-let gpuShown = false, direct2d = null, directGL = false;
-// the pixels of the view of that canvas put on it (as canvasSurface, tau.mjs)
+// ?direct: whether the GPU draws; the 2D context of the canvas otherwise;
+// the last layout, { width, height, views: [{ view, x, y }] }
+let gpuShown = false, direct2d = null, directGL = false, layout = null;
+// the layout told to the core (a view which comes to be drawn there, or
+// which goes, is drawn again: its pixels and its commands are not kept
+// both), or to the 2D context (whose canvas is cleared when sized: all
+// drawn again)
+function placeViews(started) {
+	if (!layout || !core || !core.tauDirectCanvas) return;
+	const before = core.tauDirectViews, views = new Set(layout.views.map(v => v.view));
+	if (gpuShown) {
+		core.tauDirectViews = views;
+		core._tau_gpu_layout(layout.width, layout.height);
+		for (const v of layout.views) core._tau_gpu_direct(v.view, v.x, v.y);
+		if (started) return;
+		if (!before || before.size !== views.size || [...views].some(v => !before.has(v))) core._tau_record(1);
+		else core._tau_gpu_compose();
+	}
+	else {
+		core.tauDirectViews = null;
+		if (!direct2d) return;
+		const c = direct2d.canvas;
+		if (c.width !== layout.width || c.height !== layout.height) { c.width = layout.width; c.height = layout.height; }
+		else direct2d.clearRect(0, 0, c.width, c.height);
+		if (!started) core._tau_record(0);
+	}
+}
+// the pixels of a view put on that canvas at its place (as canvasSurface,
+// tau.mjs, with a shift inside the view)
 function directPaint(m) {
+	const v = layout && layout.views.find(v => v.view === m.view);
+	if (!v) return;
 	const c = direct2d.canvas;
-	if (c.width !== m.width || c.height !== m.height) { c.width = m.width; c.height = m.height; }
-	if (m.shift && (m.shift.x || m.shift.y)) direct2d.drawImage(c, m.shift.x, m.shift.y);
-	direct2d.putImageData(new ImageData(new Uint8ClampedArray(m.pixels), m.w, m.h), m.x, m.y);
+	direct2d.save();
+	direct2d.beginPath();
+	direct2d.rect(v.x, v.y, m.width, m.height);
+	direct2d.clip();
+	if (m.shift && (m.shift.x || m.shift.y))
+		direct2d.drawImage(c, v.x, v.y, m.width, m.height, v.x + m.shift.x, v.y + m.shift.y, m.width, m.height);
+	direct2d.restore();
+	direct2d.putImageData(new ImageData(new Uint8ClampedArray(m.pixels), m.w, m.h), v.x + m.x, v.y + m.y);
 }
 function post(message, transfer) {
-	if (direct2d && message.t === "paint" && message.view === tauModule.tauDirectView) directPaint(message);
+	if (direct2d && !gpuShown && message.t === "paint") directPaint(message);
 	// what Scheme says at the end of a turn comes together
 	if (message.t === "batch") { for (const m of message.msgs) post(m); return; }
 	if (tauModule && DESCRIPTIONS.has(message.t)) {

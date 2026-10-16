@@ -136,6 +136,11 @@ img.tau-symbol { display: block; margin: auto; }
 .tau-divider:hover, .tau-divider.tau-dragging { background: var(--accent); opacity: 0.5; }
 #tau-center { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 #tau-panes { flex: 1; min-height: 0; display: flex; }
+/* (?coregl&direct: the canvas on which the worker draws the views of the
+   panes, behind them: tau.mjs) */
+.tau-direct #tau-panes { position: relative; }
+.tau-canvas-all { position: absolute; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none; z-index: 0; }
+.tau-direct .tau-pane { z-index: 1; }
 .tau-tool { background: var(--popup); overflow: auto; display: flex; flex-direction: column; }
 .tau-tool[hidden], .tau-tool:empty { display: none; }
 .tau-side { width: 300px; max-width: 60vw; border-left: 1px solid var(--bar-border); padding: 4px; }

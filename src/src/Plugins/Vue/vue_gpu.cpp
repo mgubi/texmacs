@@ -77,6 +77,8 @@ bool gpu_show_picture (void* l, picture p, int dw, int dh) {
   (void) l; (void) p; (void) dw; (void) dh; return false; }
 bool gpu_show_part (void* l, picture p, int x, int y, int w, int h) {
   (void) l; (void) p; (void) x; (void) y; (void) w; (void) h; return false; }
+bool gpu_show_parts (void* l, int w, int h, picture* ps, int* xs, int* ys, int n) {
+  (void) l; (void) w; (void) h; (void) ps; (void) xs; (void) ys; (void) n; return false; }
 bool gpu_read_picture (picture p, unsigned char* rgba) {
   (void) p; (void) rgba; return false; }
 void gpu_sync_picture (picture p) { (void) p; }
@@ -1781,6 +1783,26 @@ gpu_show_part (void* layer, picture p, int x, int y, int w, int h) {
   G.B->begin_screen (w, h);
   G.B->copy (g->t.tex, g->t.w, g->t.h, x, y, x + w, y + h,
              NULL, w, h, 0, 0, w, h);
+  G.B->present (NULL);
+  return true;
+}
+
+bool
+gpu_show_parts (void* layer, int w, int h, picture* ps, int* xs, int* ys, int n) {
+  if (!G.started || w <= 0 || h <= 0) return false;
+  for (int i= 0; i < n; i++) {
+    gpu_picture_rep* g= as_gpu (ps[i]);
+    if (g != NULL) ensure_target (&g->t);
+  }
+  gpu_flush_all ();
+  if (!G.B->attach_layer (layer)) return false;
+  G.B->begin_screen (w, h);
+  for (int i= 0; i < n; i++) {
+    gpu_picture_rep* g= as_gpu (ps[i]);
+    if (g == NULL || g->t.tex == NULL) continue;
+    G.B->copy (g->t.tex, g->t.w, g->t.h, 0, 0, g->t.w, g->t.h,
+               NULL, w, h, xs[i], ys[i], xs[i] + g->t.w, ys[i] + g->t.h);
+  }
   G.B->present (NULL);
   return true;
 }

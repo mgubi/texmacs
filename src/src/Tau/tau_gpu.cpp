@@ -100,25 +100,58 @@ tau_gpu_show (int on) {
   return show ? 1 : 0;
 }
 
-// ?direct: the view whose canvas the page gave to the worker, drawn on it
-// whole at each frame from its target (the canvas has nothing kept between
-// frames); the others are pixels (one WebGL context, on that canvas)
-static int direct= -1;
+// ?direct: the canvas behind the panes, which the page gave to the worker
+// (one WebGL context, on it): the view of each pane is drawn into its
+// target, and the targets are copied whole at their places at the end of
+// a turn (the canvas keeps nothing between frames); the other views (the
+// dialogs) are pixels. tau-worker.js says where the views are
+static bool composing= false;         // a layout was said
+static int all_w= 0, all_h= 0;        // the size of that canvas
+static std::map<int,std::pair<int,int> > placed;  // view -> its place
+static bool dirty= false;             // a view drawn since it was shown
 
 extern "C" EMSCRIPTEN_KEEPALIVE void
-tau_gpu_direct (int view) {
-  direct= view;
+tau_gpu_layout (int w, int h) {
+  composing= true; all_w= w; all_h= h;
+  placed.clear ();
+}
+
+extern "C" EMSCRIPTEN_KEEPALIVE void
+tau_gpu_direct (int view, int x, int y) {
+  placed[view]= std::make_pair (x, y);
 }
 
 extern "C" int
 tau_gpu_records (int view) {
-  return (!show || direct < 0 || view == direct) ? 1 : 0;
+  return (!show || !composing || placed.count (view)) ? 1 : 0;
+}
+
+// the views at their places (when the layout changes, and after a turn)
+extern "C" EMSCRIPTEN_KEEPALIVE void
+tau_gpu_compose () {
+  dirty= false;
+  if (!show || !composing) return;
+  std::vector<picture> ps; std::vector<int> xs, ys;
+  for (auto& v: placed) {
+    auto f= frames.find (v.first);
+    if (f == frames.end () || is_nil (f->second)) continue;
+    ps.push_back (f->second);
+    xs.push_back (v.second.first); ys.push_back (v.second.second);
+  }
+  gpu_show_parts (NULL, all_w, all_h, ps.data (), xs.data (), ys.data (), (int) ps.size ());
+}
+
+// (tau_gui.cpp, when the views of a turn are drawn)
+extern "C" void
+tau_gpu_turn_done () {
+  if (dirty) tau_gpu_compose ();
 }
 
 // the target of a view which is no more (tau_widget.cpp)
 extern "C" void
 tau_gpu_forget (int view) {
   frames.erase (view);
+  placed.erase (view);
 }
 
 // the means of the frames drawn since tau_gpu_bench, in ms: the shift and
@@ -287,7 +320,7 @@ tau_gpu_frame (int view, int w, int h, const int* ops, int nops,
   replay (r, (const int32_t*) ops, nops, x1, y1, x2 - x1, y2 - y1);
   delete_renderer (r);
   double t1= emscripten_get_now ();
-  if (show && view == direct) gpu_show_part (NULL, f, 0, 0, w, h);
+  if (show && composing) dirty= true;
   else if (show) gpu_show_part (NULL, f, x1, y1, x2 - x1, y2 - y1);
   double t2= emscripten_get_now ();
   if (!bench) return;

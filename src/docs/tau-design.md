@@ -1431,38 +1431,47 @@ from 16 to 1024 pixels. As in the page of TeXmacs Vue
   WebGL surface does not have (`?coregl&gl`: an ImageBitmap into a texture,
   `gl.mjs`). With it Safari seemed slower, but in runs on a busy machine
   (`gl.mjs` itself 3 times slower): not settled.
-- **On the canvas of the page** (`?coregl&direct`, 2026-10-16): the canvas
-  of the first pane is given to the worker (`transferControlToOffscreen`,
-  the message "canvas", before the GPU starts) and the WebGL context is
-  made on it; the view which the pane shows (the message "direct") is
-  copied whole from its target onto it at each frame (its canvas keeps
-  nothing between frames) and the browser shows it when the worker is
-  done: no bitmap, nothing for the page to do but the scroll bars and the
-  caret. One context, which cannot share its textures with another: the
-  other views (the dialogs, a second pane) are pixels (`tau_gpu_records`:
-  only that view is said as commands). Without a GPU the worker puts the
-  pixels on the canvas with a 2D context; a canvas which had WebGL is not
-  asked for one (Firefox 157 broke, "not on worker thread!", after a few
-  times). The page reads the canvas only through `drawImage`; the browser
-  test "the views drawn on the canvas of the page". The user manual,
+- **On the canvas of the page** (`?coregl&direct`, 2026-10-16): one
+  canvas behind the panes (`.tau-canvas-all`) is given to the worker
+  (`transferControlToOffscreen`, the message "canvas", before the GPU
+  starts) and the WebGL context is made on it. The page says its size and
+  where the view of each pane is on it ("layout": at each place of a
+  pane, and when a pane goes or the canvas is resized); the view of each
+  pane is drawn into its target, and at the end of a turn
+  (`tau_gpu_turn_done`) the targets are copied whole at their places
+  (`gpu_show_parts`: the canvas keeps nothing between frames), and the
+  browser shows it when the worker is done: no bitmap, nothing for the
+  page to draw but the scroll bars and the caret. The canvases of the
+  panes have nothing drawn on them, and have the events. One canvas
+  because a WebGL context cannot share its textures with another (one
+  context for each pane would have the glyphs and the pictures again in
+  each). The views of the dialogs are pixels (`tau_gpu_records`: only the
+  views of the panes are said as commands); a view which comes to a pane,
+  or goes, is drawn again. Without a GPU the worker puts the pixels on
+  the canvas, each at its place, with a 2D context; a canvas which had
+  WebGL is not asked for one (Firefox 157 broke, "not on worker
+  thread!", after a few times); nothing is drawn then while the GPU is
+  turned off. The page reads the canvas only through `drawImage`; the
+  browser test "the views drawn on the canvas of the page" (two panes, a
+  dialog); in Safari, two panes read back. The user manual (one pane),
   median ms as above (`replay-bench.mjs --nosync`), the three ways run in
   turn on a busy machine (only the order counts):
 
   | | Safari, step | Safari, view | Firefox, step | Firefox, view |
   |---|---|---|---|---|
   | `gl.mjs` from the commands | 2–3 | 4–5 | 2 | 4 |
-  | the worker, on the canvas of the page | 2–4 | 5–7 | 3 | 4–5 |
+  | the worker, on the canvas of the page | 2–3 | 5–7 | 2 | 3–4 |
   | the worker, bitmaps | 3 | 7 | 11–13 | 19–21 |
 
-  Near `gl.mjs`; in Firefox 4 times as fast as the bitmaps (which it
-  reads back). In the worker a frame costs little: WebGL 0.03 ms a step
+  As `gl.mjs` in Firefox, a view 1 or 2 ms slower in Safari; in Firefox 5
+  times as fast as the bitmaps (which it reads back). In the worker a frame costs little: WebGL 0.03 ms a step
   and 0.25 a view, some 60 and 550 calls, none of which waits for the GPU
   (each call timed). NOTE: the rows of the worker in the table above, and
   the first runs of this one, waited for its GPU at each frame (the timing
   of `--native`, which `--core` asked for also with `--nosync`: 2.5 to
   3 ms a frame); `--nosync` no longer times the worker.
-- **Left** for it: a context for each pane, each with the glyphs and the
-  pictures again, or the panes of a window in one canvas behind them.
+- **Left** for it: the pixels of a canvas on which WebGL was, when the
+  GPU is turned off (only `replay-bench.mjs` turns it off).
 - **Left**: a limit to the pictures kept by the page (WebGL has one for
   its textures; the page cannot forget a picture, which the core sends
   once), and to the glyphs of the shell; the pattern of a rotated shape is rotated with it (MuPDF keeps

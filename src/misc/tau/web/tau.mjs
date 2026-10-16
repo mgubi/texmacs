@@ -128,13 +128,8 @@ function makePane(windowNumber) {
 	};
 	const holder = el("div", "tau-view");
 	holder.append(pane.canvas);
-	// ?coregl&direct: the canvas of the first pane is given to the worker,
-	// which draws on it (one WebGL context there: one canvas)
-	if (coreGL && direct && ![...panes.values()].some(p => p.direct)) {
-		pane.direct = true;
-		const canvas = pane.canvas.transferControlToOffscreen();
-		worker.postMessage({ t: "canvas", canvas }, [canvas]);
-	}
+	// (?coregl&direct: drawn by the worker on the canvas behind the panes)
+	pane.direct = !!directCanvas;
 	pane.element.append(pane.tabs, holder);
 	panesElement.append(pane.element);
 	panes.set(windowNumber, pane);
@@ -254,7 +249,7 @@ function targetOf(view) {
 // keys and the pointer. target has the canvas and the number of its view.
 function attachView(target, pane) {
 	const canvas = target.canvas;
-	target.surface = target.direct ? directSurface()
+	target.surface = target.direct ? directSurface(canvas)
 		: pane && useGL && makeGLSurface(canvas, glShared, () => target.sendPlace())
 		|| (pane ? pairSurface(canvas) : canvasSurface(canvas));
 
@@ -268,6 +263,7 @@ function attachView(target, pane) {
 		const height = Math.max(1, Math.round(canvas.clientHeight * density));
 		target.place++;
 		send({ t: "place", view: target.view, width, height, density, place: target.place });
+		if (target.direct) sendLayout();
 	};
 	target.observer = new ResizeObserver(target.sendPlace);
 	target.observer.observe(canvas);
@@ -433,6 +429,7 @@ function removePane(pane) {
 	pane.element.remove();
 	panes.delete(pane.window);
 	layoutPanes();
+	if (directCanvas) sendLayout();
 	if (active === pane) {
 		active = null;
 		const next = panes.values().next().value;
@@ -1032,10 +1029,36 @@ function pairSurface(canvas) {
 		sync() { shown.ctx.getImageData(0, 0, 1, 1); }
 	};
 }
-// ?coregl&direct: a canvas which the worker draws on; nothing to do here
-function directSurface() {
+// ?coregl&direct: the panes are drawn by the worker on one canvas behind
+// them, given to it (one WebGL context, which cannot share its textures
+// with another: one canvas), each view at the place of its pane; the
+// canvas of a pane has nothing drawn on it, and has the events. The views
+// of the dialogs are pixels, as without it
+const direct = params.has("coregl") && params.has("direct") && typeof HTMLCanvasElement.prototype.transferControlToOffscreen === "function";
+const directCanvas = direct ? el("canvas", "tau-canvas-all") : null;
+if (directCanvas) {
+	document.body.classList.add("tau-direct");
+	panesElement.prepend(directCanvas);
+	const canvas = directCanvas.transferControlToOffscreen();
+	worker.postMessage({ t: "canvas", canvas }, [canvas]);
+	new ResizeObserver(() => sendLayout()).observe(directCanvas);
+}
+// where the views are on it, in pixels of the screen
+function sendLayout() {
+	const density = window.devicePixelRatio || 1, at = directCanvas.getBoundingClientRect();
+	const views = [];
+	for (const pane of panes.values()) {
+		if (!pane.view || !pane.canvas.isConnected) continue;
+		const r = pane.canvas.getBoundingClientRect();
+		views.push({ view: pane.view, x: Math.round((r.left - at.left) * density), y: Math.round((r.top - at.top) * density) });
+	}
+	send({ t: "layout", width: Math.max(1, Math.round(directCanvas.clientWidth * density)),
+		height: Math.max(1, Math.round(directCanvas.clientHeight * density)), views });
+}
+function directSurface(canvas) {
 	const none = () => {};
-	return { size: none, shift: none, pixels: none, commands: none, sync: none,
+	return { shift: none, pixels: none, commands: none, sync: none,
+		size(w, h) { if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; } },
 		bitmap(m) { m.bitmap.close(); } };
 }
 // ?coregl: the views drawn in the worker by the GPU renderer of the core
@@ -1044,7 +1067,6 @@ function directSurface() {
 // surface (in Firefox a 2D canvas shifted takes 5 ms a step; in Safari an
 // ImageBitmap into a texture seemed slower: docs/tau-design.md)
 const coreGL = params.has("coregl");
-const direct = params.has("direct") && typeof HTMLCanvasElement.prototype.transferControlToOffscreen === "function";
 // what the WebGL surface takes from here
 const useGL = params.has("gl");
 const glShared = { glyphCovs, pictures, drawPath, opSize: OP_SIZE_OF };
@@ -1270,7 +1292,6 @@ worker.onmessage = event => {
 		const fresh = !panes.has(m.window);
 		const pane = panes.get(m.window) || makePane(m.window);
 		pane.view = m.view;
-		if (pane.direct) worker.postMessage({ t: "direct", view: m.view });
 		pane.sendPlace();
 		if (fresh || !active) focusView(pane);
 		else send({ t: "focus", view: pane.view, focus: focused === pane && document.activeElement === area });
