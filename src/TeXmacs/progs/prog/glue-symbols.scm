@@ -1168,6 +1168,7 @@
 "clear-local-info"
 "refresh-window"
 "update-forced"
+"apply-changes"
 "update-path"
 "update-current-buffer"
 "renumber-auto-labels"

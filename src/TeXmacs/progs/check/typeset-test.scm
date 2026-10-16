@@ -1536,6 +1536,76 @@
     (check= (typeset-fuzz 29 12 30 "papyrus") 0)
     (check= (typeset-check-mismatches) 0)))
 
+;; A zoom typesets again only what reads the size of a pixel (px lengths,
+;; the borders of ornaments, graphics: edit_env_rep::get_pixel), and uses the
+;; rest again (edit_typeset_rep::set_zoom). After each zoom the places of the
+;; paragraphs must be those of a typesetting from scratch at that zoom, and
+;; the check modes may not find a difference. (apply-changes) does what the
+;; event loop does after a zoom of the window.
+(define (zoom-body)
+  `(document
+    ,@(apply append
+        (map (lambda (k)
+               (let ((lab (string-append "zl" (number->string k))))
+                 `((section ,(string-append "Part " (number->string k)))
+                   (concat "a space of " (hspace ,(string-append (number->string (+ k 2)) "px")) " pixels")
+                   (with "ornament-border" "1px" "ornament-hpadding" "3px"
+                     (ornamented (document "ornamented")))
+                   (equation (document (concat "x=" ,(number->string k) (label ,lab))))
+                   (concat "see " (reference ,lab) " and " (hlink "a link" "https://example.org"))
+                   (with "gr-geometry" (tuple "geometry" "3cm" "1cm")
+                     (graphics (spline (point "0" "0") (point "1" "1") (point "2" "0"))))
+                   (with "par-left" "12px" (document "indented in pixels"))
+                   "a paragraph of text which does not depend on the zoom")))
+             (iota 6)))))
+
+(define (zoom-to z)
+  (set-window-zoom-factor z)
+  (apply-changes)
+  (update-forced))
+
+(define (zoom-places)
+  (map (lambda (i) (rect i)) (iota (tree-arity (buffer-tree)))))
+
+(define (zoom-places-from-scratch body z)
+  (with-scratch-buffer
+   (lambda (u)
+     (buffer-set-body u (tree-copy body))
+     (init-env "page-medium" "paper")
+     (set-window-zoom-factor z)
+     (apply-changes)
+     (update-current-buffer)
+     (update-forced)
+     (update-forced)
+     (zoom-places))))
+
+(define (test-zoom)
+  (check-group "zoom")
+  (with-typeset-body
+   (zoom-body)
+   (lambda ()
+     (init-env "page-medium" "paper")
+     (update-current-buffer)
+     (update-forced)
+     (let ((old (get-window-zoom-factor))
+           (mismatches (typeset-check-mismatches)))
+       (set-window-zoom-factor 1.2)
+       (apply-changes)
+       (if (== (get-init "zoom-factor") "1")
+           ;; (without a window, nothing is zoomed)
+           (display "  (no window: the zoom is not tested)\n")
+           (dynamic-wind
+             (lambda () (noop))
+             (lambda ()
+               (for (z '(1.2 1.44 1.2 1.0))
+                 (zoom-to z)
+                 (check= (zoom-places)
+                         (zoom-places-from-scratch (buffer-tree) z)))
+               (check= (typeset-check-mismatches) mismatches))
+             (lambda ()
+               (set-window-zoom-factor old)
+               (apply-changes))))))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The suite
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1583,4 +1653,5 @@
   (test-references-after-removals)
   (test-assignments-in-blocks)
   (test-unknown-inputs-in-blocks)
+  (test-zoom)
   (check-end))

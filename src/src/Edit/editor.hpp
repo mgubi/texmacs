@@ -147,6 +147,9 @@ public:
   editor_rep (server_rep* sv, tm_buffer buf);
   inline virtual ~editor_rep () {}
   bool is_current_editor ();
+  // what the event loop does after the events: applies the changes to the
+  // view (a zoom, the typesetting...), which a test may do at once
+  inline void apply_pending_changes () { apply_changes (); }
   
   /* public routines from edit_interface */
   virtual void suspend () = 0;
