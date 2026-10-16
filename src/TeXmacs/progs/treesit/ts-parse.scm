@@ -25,6 +25,10 @@
 (texmacs-module (treesit ts-parse)
   (:use (treesit ts-base) (treesit ts-language)))
 
+(define-public ts-parse-log #f)   ; a procedure receiving the trace
+
+(define (log . args) (when ts-parse-log (ts-parse-log args)))
+
 (define error-state 0)
 (define error-cost-per-recovery 500)
 (define error-cost-per-missing-tree 110)
@@ -840,13 +844,14 @@
                   (cons cached-token entry)))))
     ;; reusing the nodes of the old tree
     (define (reuse-node v state position last-external)
-      ;; (tree state . entry) or #f
+      ;; (tree state . entry), where tree is #f if no node can be reused and
+      ;; state the state of the version, which a breakdown may change
       (let loop ((state state))
         (let ((t (reusable-node-tree reusable)))
-          (if (not t) #f
+          (if (not t) (cons #f (cons state #f))
               (let* ((offset (reusable-node-offset reusable))
                      (end (if (st-eof? t) 1000000000 (+ offset (st-total-bytes t)))))
-                (cond ((> offset position) #f)
+                (cond ((> offset position) (cons #f (cons state #f)))
                       ((< offset position)
                        (when (or (<= end position) (not (reusable-node-descend! reusable)))
                          (reusable-node-advance! reusable))
@@ -855,6 +860,7 @@
                        (reusable-node-advance! reusable)
                        (loop state))
                       ((or (st-has-changes? t) (st-error? t) (st-missing? t) (st-fragile? t))
+                       (log 'cant-reuse (lang-symbol-name l (st-symbol t)) position)
                        (if (reusable-node-descend! reusable)
                            (loop state)
                            (begin
@@ -864,8 +870,10 @@
                       (else
                        (let ((entry (lang-entry l state (st-leaf-symbol t))))
                          (if (can-reuse-first-leaf? state t entry)
-                             (cons t (cons state entry))
-                             (begin (reusable-node-advance-past-leaf! reusable) #f))))))))))
+                             (begin (log 'reuse (lang-symbol-name l (st-symbol t)) position state)
+                                    (cons t (cons state entry)))
+                             (begin (reusable-node-advance-past-leaf! reusable)
+                                    (cons #f (cons state #f))))))))))))
     (define (breakdown-top-of-stack! v)
       (let loop ((did #f))
         (let ((pop (stack-pop-pending! stack v)))
@@ -947,6 +955,7 @@
                             (merge-paths (+ i 1)))
                           (let* ((state (stack-state stack sv))
                                  (next-state (lang-next-state l state symbol)))
+                            (log 'goto state (lang-symbol-name l symbol) next-state)
                             (when (and end-of-extra? (= next-state state))
                               (set-flag! parent f-extra #t))
                             (if (or fragile? (> n 1) (> initial-count 1))
@@ -1185,8 +1194,10 @@
              (needs-lex #t))
         (let ((r (and allow-reuse old-tree (reuse-node v state position last-external))))
           (when r
-            (set! lookahead (car r)) (set! state (cadr r)) (set! entry (cddr r))
-            (set! did-reuse #t) (set! needs-lex #f)))
+            (set! state (cadr r))
+            (when (car r)
+              (set! lookahead (car r)) (set! entry (cddr r))
+              (set! did-reuse #t) (set! needs-lex #f))))
         (unless lookahead
           (let ((c (get-cached-token state position last-external)))
             (when c (set! lookahead (car c)) (set! entry (cdr c)) (set! needs-lex #f))))
@@ -1194,6 +1205,7 @@
           (when needs-lex
             (set! needs-lex #f)
             (set! lookahead (lex v state))
+            (log 'lexed (and lookahead (lang-symbol-name l (st-symbol lookahead))) position state)
             (if lookahead
                 (begin (set! cached-token lookahead) (set! cached-position position)
                        (set! cached-external last-external)
@@ -1213,10 +1225,12 @@
                              (when (> (st-child-count lookahead) 0)
                                (set! lookahead (breakdown-lookahead lookahead state))
                                (set! next (lang-next-state l state (st-symbol lookahead))))
+                             (log 'shift (lang-symbol-name l (st-symbol lookahead)) next 'version v)
                              (shift! v next lookahead (vector-ref a 2))
                              (when did-reuse (reusable-node-advance! reusable))
                              'done)))
                       ((reduce)
+                       (log 'reduce (lang-symbol-name l (vector-ref a 1)) (vector-ref a 2) 'version v)
                        (let ((rv (reduce! v (vector-ref a 1) (vector-ref a 2) (vector-ref a 3)
                                           (vector-ref a 4) (> n 1) (not lookahead))))
                          (set! did-reduce #t)
@@ -1255,7 +1269,8 @@
                     (set! state (stack-state stack v))
                     (set! needs-lex #t)
                     (loop))
-                   (else (stack-pause! stack v lookahead)))))))))
+                   (else (log 'detect-error (lang-symbol-name l (st-symbol lookahead)) 'version v)
+                         (stack-pause! stack v lookahead)))))))))
     (define (condense-stack!)
       (let ((min-error-cost 1000000000))
         (let loop ((i 0))
@@ -1372,53 +1387,80 @@
 ;; Editing a tree
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(define (len-add a b) (cons (+ (car a) (car b)) (+ (cdr a) (cdr b))))
+(define (len-sub a b) (cons (- (car a) (car b)) (- (cdr a) (cdr b))))
+(define (len-sat-sub a b) (if (> (car a) (car b)) (len-sub a b) (cons 0 0)))
+
+(define (edit-subtree t start old-end new-end)
+  ;; ts_subtree_edit: the edit is given by lengths (offset . rows) relative
+  ;; to the start of t (with its padding)
+  (let* ((noop (and (= (car old-end) (car start)) (= (car new-end) (car start))))
+         (insertion (= (car old-end) (car start)))
+         (parent-column (st-depends-on-column? t))
+         (size (cons (st-size t) (st-size-rows t)))
+         (padding (cons (st-padding t) (st-padding-rows t)))
+         (total (len-add padding size))
+         (end-byte (+ (car total) (st-lookahead-bytes t))))
+    (if (or (> (car start) end-byte) (and noop (= (car start) end-byte)))
+        t
+        (let ((c (st-copy t)))
+          (cond ((<= (car old-end) (car padding))
+                 (set! padding (len-add new-end (len-sub padding old-end))))
+                ((< (car start) (car padding))
+                 (set! size (len-sat-sub size (len-sub old-end padding)))
+                 (set! padding new-end))
+                ((or (< (car start) (car total))
+                     (and (= (car start) (car total)) insertion))
+                 (set! size (len-add (len-sub new-end padding) (len-sat-sub total old-end)))))
+          (vector-set! c 1 (car padding)) (vector-set! c 2 (cdr padding))
+          (vector-set! c 3 (car size)) (vector-set! c 4 (cdr size))
+          (set-flag! c f-has-changes #t)
+          (when (st-children c)
+            (let* ((children (vector-copy*** (st-children c)))
+                   (n (vector-length children)))
+              (let loop ((i 0) (child-right (cons 0 0)) (new-end new-end))
+                (when (< i n)
+                  (let* ((child (vector-ref children i))
+                         (child-size (cons (st-total-bytes child) (st-total-rows child)))
+                         (child-left child-right)
+                         (child-right (len-add child-left child-size)))
+                    (cond
+                     ((< (+ (car child-right) (st-lookahead-bytes child)) (car start))
+                      (loop (+ i 1) child-right new-end))
+                     ((and (or (> (car child-left) (car old-end))
+                               (and (= (car child-left) (car old-end)) (> (car child-size) 0) (> i 0)))
+                           (or (not parent-column) (> (cdr child-left) (cdr padding)))
+                           (or (not (st-depends-on-column? child))
+                               (> (cdr child-left) (cdr old-end))))
+                      #t)
+                     (else
+                      (let ((cs (len-sat-sub start child-left))
+                            (co (len-sat-sub old-end child-left))
+                            (cn (len-sat-sub new-end child-left)))
+                        (if (or (> (car child-right) (car start))
+                                (and (= (car child-right) (car start)) insertion))
+                            (begin
+                              (vector-set! children i (edit-subtree child cs co cn))
+                              (loop (+ i 1) child-right start))
+                            (begin
+                              (vector-set! children i (edit-subtree child cs cs cs))
+                              (loop (+ i 1) child-right new-end)))))))))
+              (vector-set! c 7 children)))
+          c))))
+
 (define-public (ts-tree-edit tree new-text start old-end new-end)
   ;; the tree of a text where the code points start..old-end were replaced
   ;; by start..new-end of new-text: the subtrees which touch the edit are
   ;; marked as changed (and copied), so that ts-parse-codes reuses the others
-  (define (rows-in text from to)
-    (let loop ((i from) (n 0))
-      (if (>= i to) n (loop (+ i 1) (if (= (vector-ref text i) 10) (+ n 1) n)))))
+  (define (rows-before text pos)
+    (let loop ((i 0) (n 0))
+      (if (>= i pos) n (loop (+ i 1) (if (= (vector-ref text i) 10) (+ n 1) n)))))
   (let ((old-text (tree-text tree)))
-    (define (edit t offset)
-      ;; t starts (with its padding) at offset of the old text
-      (let* ((padding-end (+ offset (st-padding t)))
-             (end (+ padding-end (st-size t)))
-             (lookahead-end (+ end (st-lookahead-bytes t))))
-        (cond ((< lookahead-end start) t)
-              ((> offset old-end)
-               t)
-              (else
-               (let ((c (st-copy t))
-                     (delta (- new-end old-end)))
-                 (set-flag! c f-has-changes #t)
-                 ;; the new padding and size, in the new text
-                 (cond ((< start padding-end)
-                        ;; the edit starts in the padding
-                        (let ((new-padding-end (if (<= old-end padding-end)
-                                                   (+ padding-end delta)
-                                                   new-end)))
-                          (vector-set! c 1 (- new-padding-end offset))
-                          (vector-set! c 2 (rows-in new-text offset new-padding-end))
-                          (let ((new-end-pos (if (<= old-end end) (+ end delta) new-padding-end)))
-                            (vector-set! c 3 (max 0 (- new-end-pos new-padding-end)))
-                            (vector-set! c 4 (rows-in new-text new-padding-end
-                                                      (+ new-padding-end (vector-ref c 3)))))))
-                       ((<= start end)
-                        (let ((new-end-pos (if (<= old-end end) (+ end delta) new-end)))
-                          (vector-set! c 3 (- new-end-pos padding-end))
-                          (vector-set! c 4 (rows-in new-text padding-end new-end-pos))))
-                       (else #t))
-                 (when (st-children c)
-                   (let ((children (vector-copy*** (st-children c))))
-                     (let loop ((i 0) (pos offset))
-                       (when (< i (vector-length children))
-                         (let ((child (vector-ref children i)))
-                           (vector-set! children i (edit child pos))
-                           (loop (+ i 1) (+ pos (st-total-bytes child))))))
-                     (vector-set! c 7 children)))
-                 c)))))
-    (vector (edit (tree-root tree) 0) (tree-language tree) new-text)))
+    (vector (edit-subtree (tree-root tree)
+                          (cons start (rows-before old-text start))
+                          (cons old-end (rows-before old-text old-end))
+                          (cons new-end (rows-before new-text new-end)))
+            (tree-language tree) new-text)))
 
 (define (vector-copy*** v)
   (let* ((n (vector-length v)) (r (make-vector n #f)))
