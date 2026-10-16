@@ -44,7 +44,7 @@ edit_env_rep::edit_env_rep (drd_info& drd2,
   local_att (local_att2), global_att (global_att2),
   missing (UNINIT), redefined (), touched (false),
   read_unknown (false), rec_keys (NULL), rec_values (NULL),
-  rec_key_set (NULL), rec_bindings (NULL),
+  rec_key_set (NULL), rec_bindings (NULL), rec_merged (NULL), rec_held (NULL),
   auto_buffer (""), typesetting (0), files_base (""), files_cur (""),
   files_h (0), prep_pre (UNINIT), prep_fp (0), prep_sfp (0),
   prep_sfp_version (-1)

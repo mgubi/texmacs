@@ -16,6 +16,7 @@
 #include "Boxes/construct.hpp"
 #include "Stack/stacker.hpp"
 #include <stdint.h>
+#include <unordered_map>
 
 bridge bridge_document (typesetter, tree, path);
 bridge bridge_surround (typesetter, tree, path);
@@ -517,9 +518,28 @@ add_reads (edit_env env, bool known, array<int> reads,
   // reference looked up by several bridges is one lookup)
   for (int i=0; i<N(keys); i++) env->record_lookup (keys[i], values[i]);
   if (env->read_unknown) return;
-  if (!known || N(*rec) + N(reads) > READS_MAX) {
-    env->read_unknown= true; return; }
+  if (!known) { env->read_unknown= true; return; }
+  if (env->merged (reads)) return;
+  if (N(*rec) + N(reads) > READS_MAX) { env->read_unknown= true; return; }
   for (int i=0; i<N(reads); i++) rec->operator () (reads[i])= true;
+  env->merging (reads);
+}
+
+// The same arrays of variables share one representation (the reads and the
+// inputs of the paragraphs of a document are mostly the same), so that
+// add_reads and add_inputs go through each one once (edit_env_rep::merged)
+static array<int>
+shared_ids (array<int> a) {
+  if (N(a) == 0) return a;
+  static std::unordered_map<unsigned long long, array<int> > table;
+  unsigned long long h= 0xcbf29ce484222325ULL ^ (unsigned long long) N(a);
+  for (int i=0; i<N(a); i++)
+    h= (h ^ (unsigned long long) (unsigned int) a[i]) * 0x100000001b3ULL;
+  auto it= table.find (h);
+  if (it != table.end ()) return (it->second == a? it->second: a);
+  if (table.size () >= 65536) table.clear ();
+  table[h]= a;
+  return a;
 }
 
 // do the references and attachments looked up still have the values found?
@@ -706,8 +726,10 @@ add_inputs (edit_env env, bool known, array<int> vars, array<tree> vals) {
   array<tree>* pw= env->input_vals ();
   hashmap<int,bool>* rec= env->read_recorder ();
   if (pv == NULL || rec == NULL || env->read_unknown) return;
-  if (!known || N(*pv) + N(vars) > INPUTS_MAX) {
-    env->read_unknown= true; return; }
+  if (!known) { env->read_unknown= true; return; }
+  // (an array all of whose variables are in the record adds nothing)
+  if (env->merged (vars)) return;
+  if (N(*pv) + N(vars) > INPUTS_MAX) { env->read_unknown= true; return; }
   for (int i=0; i<N(vars); i++) {
     int id= vars[i];
     if ((*rec)->contains (id)) continue;
@@ -715,6 +737,7 @@ add_inputs (edit_env env, bool known, array<int> vars, array<tree> vals) {
     (*pv) << id;
     (*pw) << vals[i];
   }
+  env->merging (vars);
 }
 
 void
@@ -791,9 +814,10 @@ bridge_rep::typeset_by_inputs (int desired_status) {
   for (iterator<int> it= iterate (my_reads); it->busy (); )
     reads << it->next ();
   merge_sort (reads);
+  reads= shared_ids (reads);
   record.stop ();
   in_known= known;
-  in_vars= my_vars;
+  in_vars= shared_ids (my_vars);
   in_vals= my_vals;
   in_state= state;
   in_items= items;
