@@ -124,7 +124,6 @@
   
   (color     "xcolor")
   (fcolorbox "xcolor")
-  (colorbox "xcolor")
   (textcolor "xcolor")
 
   (euro "eurosym")
@@ -134,7 +133,6 @@
 
   (omicron "pslatex")
   (multicols "multicol")
-  (begin-multicols "multicol")
   (bundle "epic")
   (chunk "epic")
   (bundle "ecltree")

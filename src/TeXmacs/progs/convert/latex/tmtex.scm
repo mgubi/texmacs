@@ -1585,12 +1585,10 @@
            (tmtex-decode-color (get-hex-color s) force-html))
           ((and (== cm "HTML") (nnull? force-html))
            `((!option "HTML") ,(html-color->latex-xcolor s)))
-          ((or (== cm "texmacs") (== cm "HTML"))
-           ;; (a color #rrggbb is defined under a name, for the places
-           ;; where xcolor wants a name, as the options of mdframed)
+          ((== cm "texmacs")
            (when (nin? s tmtex-colors)
              (set! tmtex-colors (append (list s) tmtex-colors)))
-           (latex-color-name s))
+           (string-replace s " " ""))
           ((in? cm (list "x11names"))
            (tmtex-decode-color (get-hex-color s) #t))
           (else
@@ -2233,14 +2231,6 @@
          (tmtex `(with "color" "dark green" (underline ,(tmtex-office-inline (caddr l))))))
         (else
          (tmtex `(with "color" "dark red" (strike-through ,(tmtex-office-inline (caddr l))))))))
-(define (tmtex-strike-through s l)
-  (if (null? l) "" (list 'tmstrike (tmtex (car l)))))
-;; text marked with a background (highlighted in a Word or OpenDocument file)
-(define (tmtex-marked s l)
-  (if (null? l) ""
-      (let* ((c (or (tmtex-env-get "marked-color") "yellow"))
-             (x (tmtex-decode-color (force-string c) #t)))
-        `(colorbox ,@(if (list? x) x (list x)) ,(tmtex (car l))))))
 
 (define (filter-enunciation-due-to l)
   (cond ((func? l 'dueto) (list l))
@@ -3252,8 +3242,6 @@
   (office-comment (,tmtex-office-comment -1))
   (office-commented (,tmtex-office-commented -1))
   ((:or office-ins office-del) (,tmtex-office-change -1))
-  (strike-through (,tmtex-strike-through 1))
-  (marked (,tmtex-marked 1))
   (footnotemark (,tmtex-default 0))
   (footnotemark* (,tmtex-footnotemark 1))
   ((:or description description-compact description-aligned

@@ -372,7 +372,6 @@
   (tmmathmd (ensuremath 1))
   (tmop (ensuremath (operatorname 1)))
   (tmstrong (textbf 1))
-  (tmstrike (!append "{\\leavevmode\\setbox0\\hbox{" 1 "}\\rlap{\\rule[.5ex]{\\wd0}{.4pt}}\\box0}"))
   (tmem (!group "\\em " 1 "\\/"))
   (tmtt (texttt 1))
   (tmdate (today))

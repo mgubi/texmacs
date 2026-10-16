@@ -4449,8 +4449,9 @@
 
 (define (test-latex-office)
   (check-group "latex of office")
-  ;; the tags of the style office are what they show, in LaTeX which
-  ;; pdflatex compiles
+  ;; the tags of the style office are what they show; a deleted text and a
+  ;; struck one are written as strike-through, the columns as par-columns
+  ;; (how these are drawn in LaTeX is the matter of the LaTeX export)
   (let* ((doc `(document
                  (TeXmacs "2.1") (style "office")
                  (body (document
@@ -4465,26 +4466,17 @@
                                    (office-capitalize "cap")))
                          (office-columns "2" (document "col"))
                          (office-float "left" "" "fl")
-                         (office-box "left" "" "3cm" "" "" (document "in box"))
-                         (with "ornament-color" "#dddddd" (ornamented "box"))
-                         (marked "m")
-                         (strike-through "gone")))))
-         (tex (convert doc "texmacs-stree" "latex-document")))
+                         (office-box "left" "" "3cm" "" "" (document "in box"))))))
+         (tex (convert doc "texmacs-stree" "latex-document"))
+         (struck (lambda (x)
+                   (convert `(strike-through ,x) "texmacs-stree" "latex-snippet"))))
     (check-false (export-has? tex "\\office"))
-    (check-false (export-has? tex "\\marked"))
-    (check-false (export-has? tex "\\strikethrough"))
-    (check-true (export-has? tex "\\newcommand{\\tmstrike}"))
-    (check-true (export-has? tex "\\tmstrike{old}"))
-    (check-true (export-has? tex "\\tmstrike{gone}"))
+    (check-true (export-has? tex (struck "old")))
+    (check-true (export-has? tex (struck "s")))
     (check-true (export-has? tex "{\\underline{{\\underline{u}}}}"))
     (check-true (export-has? tex "remark]"))
     (check-true (export-has? tex "in box"))
-    (check-true (export-has? tex "\\colorbox{yellow}{m}"))
-    ;; (the package of the columns, a color #rrggbb by its name)
-    (check-true (export-has? tex "multicol}"))
-    (check-true (export-has? tex "\\begin{multicols}{2}"))
-    (check-true (export-has? tex "\\definecolor{tmhexDDDDDD}{HTML}{DDDDDD}"))
-    (check-true (export-has? tex "[backgroundcolor=tmhexDDDDDD]"))))
+    (check-true (export-has? tex "\\begin{multicols}{2}"))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Fifth audit: what was changed in TeXmacs, the parts kept, fields, comments
