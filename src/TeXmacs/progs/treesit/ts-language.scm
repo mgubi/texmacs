@@ -28,7 +28,8 @@
 ;;   #(accept)  #(recover)
 
 (texmacs-module (treesit ts-language)
-  (:use (treesit ts-base) (treesit ts-grammar) (treesit ts-nfa) (treesit ts-tables)))
+  (:use (treesit ts-base) (treesit ts-grammar) (treesit ts-nfa) (treesit ts-tables)
+        (treesit ts-build)))
 
 (define-public ts-sym-error -1)
 (define-public ts-sym-error-repeat -2)
