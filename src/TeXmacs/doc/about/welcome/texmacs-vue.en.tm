@@ -296,6 +296,12 @@
     <name|Markdown> which is written reads back the same in more cases
     (nested lists, emphasis next to code, links). All the named entities
     of <name|HTML5> are read.
+
+    <item>A Word or <name|OpenDocument> file which was changed in
+    <TeXmacs> is saved back with the changed headers, footers and styles,
+    and with fields inside fields; the title of a file keeps the look of
+    its style; a document of the style <verbatim|office> exports to
+    <LaTeX>.
   </itemize>
 
   <paragraph|14 October 2026>

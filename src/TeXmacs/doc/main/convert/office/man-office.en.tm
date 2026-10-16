@@ -115,7 +115,10 @@
     the color, the size, the font, the alignment, the indentations, the
     spaces, the background, the border); its other properties are those of
     the file. The look of the headings is the one of the titles of the
-    sections (<verbatim|section-title>...), which is not written back.
+    sections (<verbatim|section-title>...), and the look of the title, the
+    subtitle and the date at the start of the document is the one of the
+    macros <verbatim|doc-title>, <verbatim|doc-subtitle> and
+    <verbatim|doc-date> of the document; they are not written back.
 
     <item*|Headers and footers>They are the headers and footers of the
     pages of the document, with the number of the page; those of the
