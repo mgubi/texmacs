@@ -686,11 +686,10 @@ public:
 
 struct locus_box_rep: public change_box_rep {
   list<string> ids;
-  SI pixel;
   string ref;
   string anchor;
-  locus_box_rep (path ip, box b, list<string> ids, SI pixel);
-  locus_box_rep (path ip, box b, list<string> ids, SI pixel, string _rep, string _anchor);
+  locus_box_rep (path ip, box b, list<string> ids);
+  locus_box_rep (path ip, box b, list<string> ids, string _rep, string _anchor);
   operator tree () { return tree (TUPLE, "locus"); }
   box adjust_kerning (int mode, double factor);
   box expand_glyphs (int mode, double factor);
@@ -698,8 +697,8 @@ struct locus_box_rep: public change_box_rep {
   void post_display (renderer &ren);
 };
 
-locus_box_rep::locus_box_rep (path ip, box b, list<string> ids2, SI pixel2):
-  change_box_rep (ip, true), ids (ids2), pixel (pixel2)
+locus_box_rep::locus_box_rep (path ip, box b, list<string> ids2):
+  change_box_rep (ip, true), ids (ids2)
 {
   ref = "";
   anchor = "";
@@ -709,8 +708,8 @@ locus_box_rep::locus_box_rep (path ip, box b, list<string> ids2, SI pixel2):
   finalize ();
 }
 
-locus_box_rep::locus_box_rep (path ip, box b, list<string> ids2, SI pixel2, string _ref, string _anchor):
-  change_box_rep (ip, true), ids (ids2), pixel (pixel2)
+locus_box_rep::locus_box_rep (path ip, box b, list<string> ids2, string _ref, string _anchor):
+  change_box_rep (ip, true), ids (ids2)
 {
   ref = _ref;
   anchor = _anchor;
@@ -723,20 +722,22 @@ locus_box_rep::locus_box_rep (path ip, box b, list<string> ids2, SI pixel2, stri
 box
 locus_box_rep::adjust_kerning (int mode, double factor) {
   box body= bs[0]->adjust_kerning (mode, factor);
-  return locus_box (ip, body, ids, pixel, ref, anchor);
+  return locus_box (ip, body, ids, ref, anchor);
 }
 
 box
 locus_box_rep::expand_glyphs (int mode, double factor) {
   box body= bs[0]->expand_glyphs (mode, factor);
-  return locus_box (ip, body, ids, pixel, ref, anchor);
+  return locus_box (ip, body, ids, ref, anchor);
 }
 
 void
 locus_box_rep::loci (SI x, SI y, SI delta, list<string>& l, rectangles& rs) {
   bs[0]->loci (x, y, delta, l, rs);
   l = l * ids;
-  rs= rs * outlines (rectangles (rectangle (x1, y1, x2, y2)), pixel);
+  // (the editor draws their outlines, with the size of a pixel at the
+  // zoom of its window: edit_interface_rep::update_mouse_loci)
+  rs= rs * rectangles (rectangle (x1, y1, x2, y2));
 }
 
 void
@@ -1034,13 +1035,13 @@ remember_box (path ip, box b) {
 }
 
 box
-locus_box (path ip, box b, list<string> ids, SI pixel) {
-  return tm_new<locus_box_rep> (ip, b, ids, pixel);
+locus_box (path ip, box b, list<string> ids) {
+  return tm_new<locus_box_rep> (ip, b, ids);
 }
 
 box
-locus_box (path ip, box b, list<string> ids, SI pixel, string ref, string anchor) {
-  return tm_new<locus_box_rep> (ip, b, ids, pixel, ref, anchor);
+locus_box (path ip, box b, list<string> ids, string ref, string anchor) {
+  return tm_new<locus_box_rep> (ip, b, ids, ref, anchor);
 }
 
 box

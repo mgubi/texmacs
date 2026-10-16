@@ -252,7 +252,9 @@ pager_rep::memo_start () {
        << (double) float_sep->min << (double) float_sep->def
        << (double) float_sep->max << (double) mnote_sep
        << (double) (show_hf? 1: 0) << (double) (paper? 1: 0)
-       << (double) page_offset << (double) env->pixel << (double) env->dpi;
+       << (double) page_offset << (double) env->dpi;
+  // (not the zoom: a header which depends on it reads it, and the borders
+  // of the pages, which are in pixels, are made outside: make_pages)
   unsigned long long state= env->derived_state ();
   bool same= N(pars) == N(memo->pars) && state == memo->state;
   for (int i=0; same && i<N(pars); i++) same= pars[i] == memo->pars[i];

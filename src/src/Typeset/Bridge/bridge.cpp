@@ -45,7 +45,7 @@ bridge_rep::bridge_rep (typesetter ttt2, tree st2, path ip2):
   ttt (ttt2), env (ttt->env), st (st2), ip (ip2),
   status (CORRUPTED), changes (UNINIT), reads (),
   seen_stamp (0), in_known (false), in_vals (0), in_state (0), in_items (0),
-  in_fp (0), version (0), chunk_cache (NULL)
+  in_fp (0), in_zoom (false), in_zoom_at (""), version (0), chunk_cache (NULL)
 {
   static int bridges_made= 0;
   serial= bridges_made++;
@@ -727,7 +727,8 @@ bridge_rep::same_inputs () {
   if (!same_lookups (env, seen_keys, seen_values, seen_stamp)) return false;
   // the whole environment as it was (the fingerprint: also for a bridge
   // whose inputs are not known), or the inputs
-  if (env->fingerprint () == in_fp) return true;
+  if (env->fingerprint () == in_fp &&
+      (!in_zoom || env->zoom_value () == in_zoom_at)) return true;
   if (!in_known) return false;
   return env->derived_state () == in_state &&
          env->inputs_hash (in_vars, false) == in_vals;
@@ -773,6 +774,7 @@ bridge_rep::give_record () {
   add_inputs (env, in_known, in_vars, in_vals);
   add_reads (env, in_known && N(reads) <= READS_MAX, reads,
              seen_keys, seen_values);
+  if (in_zoom) env->zoom_read ()= true;
 }
 
 bool
@@ -807,6 +809,8 @@ bridge_rep::typeset_by_inputs (int desired_status) {
   array<box> was_item_boxes= in_item_boxes;
   array<tree> was_bindings= out_bindings;
   unsigned long long was_fp= in_fp;
+  bool was_zoom= in_zoom;
+  tree was_zoom_at= in_zoom_at;
   if (edit_profile.on) edit_profile.redone++;
   unsigned long long state= env->derived_state ();
   unsigned long long items= items_signature (ttt->a, ttt->b);
@@ -836,6 +840,8 @@ bridge_rep::typeset_by_inputs (int desired_status) {
   std::sort (A(reads), A(reads) + N(reads));
   reads= shared_ids (reads);
   record.stop ();
+  in_zoom= record.zoom;
+  in_zoom_at= env->zoom_value ();
   in_known= known;
   in_vars= shared_ids (my_vars);
   in_vals= my_vals;
@@ -878,6 +884,7 @@ bridge_rep::typeset_by_inputs (int desired_status) {
     // checked (and not only what the bridge makes)
     in_known= was_known; in_vars= was_vars; in_vals= was_vals;
     in_state= was_state; in_items= was_items; in_fp= was_fp;
+    in_zoom= was_zoom; in_zoom_at= was_zoom_at;
     in_item_boxes= was_item_boxes;
     seen_keys= was_keys; seen_values= was_values; reads= was_reads;
     seen_stamp= 0;

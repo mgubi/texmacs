@@ -792,10 +792,7 @@ edit_interface_rep::apply_changes () {
   if (is_attached (this) && has_current_window ()) {
     tree new_zoom= as_string (zoomf);
     tree old_zoom= get_init_value (ZOOM_FACTOR);
-    if (new_zoom != old_zoom) {
-      init_env (ZOOM_FACTOR, new_zoom);
-      notify_change (THE_ENVIRONMENT);
-    }
+    if (new_zoom != old_zoom) set_zoom (new_zoom);
   
     if (get_init_string (PAGE_MEDIUM) == "automatic")
     {

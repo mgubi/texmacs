@@ -145,6 +145,7 @@ hashmap<int,bool>& env_derived_inputs ();
 inline void env_note_read (int id) {
   if (env_deriving > 0) env_derived_inputs () (id)= true; }
 string env_var_name (int id);
+int env_zoom_id (); // (the id of ZOOM_FACTOR)
 // TEXMACS_TYPESET_READS: whether a bridge is used again when its inputs
 // are as they were (see "What is typeset again" in bridge.cpp): 1 (the
 // default), 0 ("off": the classic cache), 2 ("check")
@@ -198,6 +199,12 @@ public:
   hashmap<string,tree>  h;
   env_id_set*           rec;  // the variables read or written, if recording
   bool                  all;  // the whole table was read, while recording
+                              // (or something else: read_other)
+  // The zoom factor was read while recording, or the whole table: the zoom
+  // is not in the fingerprint (env_entry_hash), and a bridge used again
+  // through the fingerprint which read it is used again only at the same
+  // zoom (bridge_rep::same_inputs)
+  bool                  zoom;
   // The values which the variables had before they were written, from
   // which the changes made by a bridge are found (edit_env_rep::back).
   // Every write, while a bridge is recorded, goes there: also those of a
@@ -232,7 +239,7 @@ public:
   array<string>         touched;
   hashmap<string,bool>  touched_set;
   inline env_table (tree init):
-    h (init), rec (NULL), all (false), back_log (NULL),
+    h (init), rec (NULL), all (false), zoom (false), back_log (NULL),
     in_vars (NULL), in_hash (NULL), stale (true), fp (0), dirty_set (false),
     sfp (0), sfp_version (-1), follow (false), touched_set (false) {}
   inline void touch (string s) {
@@ -274,6 +281,7 @@ public:
     int id= env_var_id (s);
     if (rec != NULL) {
       bool first= rec->insert (id);
+      if (first && id == env_zoom_id ()) zoom= true;
       if (read && first && in_vars != NULL && back_log != NULL &&
           !(*back_log)->contains (s)) {
         (*in_vars) << id;
@@ -289,7 +297,7 @@ public:
   inline env_table& operator = (hashmap<string,tree> h2) {
     h= h2; follow= false; refingerprint (); return *this; }
   inline operator hashmap<string,tree> () {
-    if (rec != NULL) all= true;
+    if (rec != NULL) { all= true; zoom= true; }
     return h; }
 };
 
@@ -337,7 +345,8 @@ public:
   int          dpi;
   double       inch;
   double       zoomf;
-  SI           pixel;
+  SI           zoom_pixel;  // (read with get_pixel, but where it only
+                            // names a cache: typeset_image)
   double       magn;
   double       magn_len;
   double       mgfy;
@@ -636,6 +645,8 @@ public:
   // that its record is not all it read (the reads of a bridge below it
   // were not known, or too many to be added).
   bool read_unknown;
+  inline bool& zoom_read () { return env.zoom; }  // (see env_table)
+  inline tree zoom_value () { return env.value (ZOOM_FACTOR); }
   inline env_id_set* read_recorder () { return env.rec; }
   inline bool read_all () { return env.all; }
   inline void record_reads (env_id_set* rec, bool all) {
@@ -721,7 +732,9 @@ public:
   struct read_record {
     edit_env_rep* env;
     env_id_set* outer_rec;
-    bool outer_all, outer_unknown, stopped;
+    bool outer_all, outer_unknown, outer_zoom;
+    bool zoom;  // (once stopped: the zoom factor was read, see env_table)
+    bool stopped;
     array<string>* outer_keys;
     array<tree>* outer_values;
     hashmap<string,bool>* outer_key_set;
@@ -737,7 +750,8 @@ public:
                         array<int>* in_vars= NULL,
                         unsigned long long* in_hash= NULL):
       env (e), outer_rec (e->env.rec), outer_all (e->env.all),
-      outer_unknown (e->read_unknown), stopped (false),
+      outer_unknown (e->read_unknown), outer_zoom (e->env.zoom), zoom (false),
+      stopped (false),
       outer_keys (e->rec_keys), outer_values (e->rec_values),
       outer_key_set (e->rec_key_set), key_set (false),
       outer_in_vars (e->env.in_vars), outer_in_hash (e->env.in_hash),
@@ -747,11 +761,13 @@ public:
         env->record_lookups (keys, values, &key_set);
         env->env.in_vars= in_vars; env->env.in_hash= in_hash;
         env->rec_merged= &merged; env->rec_held= &held;
-        env->read_unknown= false; }
+        env->read_unknown= false; env->env.zoom= false; }
     // nothing was read but what the record holds
     inline bool complete () { return !env->read_all () && !env->read_unknown; }
     inline void stop () {
       if (stopped) return;
+      zoom= env->env.zoom;
+      env->env.zoom= outer_zoom || zoom;
       env->record_reads (outer_rec, outer_all);
       env->record_lookups (outer_keys, outer_values, outer_key_set);
       env->env.in_vars= outer_in_vars; env->env.in_hash= outer_in_hash;
@@ -771,8 +787,10 @@ public:
   // which update (string) does nothing) or when another one is (it was
   // not read while a state was derived: env_derived_inputs)
   inline bool plain_variable (string s) {
+    // (the zoom factor too: what is derived from it, the size of a pixel,
+    // is read with get_pixel, which counts as a read of it)
     int type= var_type [s];
-    return (type == Env_User || type == Env_Fixed ||
+    return (type == Env_User || type == Env_Fixed || type == Env_Zoom ||
             type == Env_Paragraph || type == Env_Page) &&
            !env_derived_inputs ()->contains (env_var_id (s)); }
   // whether the environment is in the course of a typesetting pass (the
@@ -861,6 +879,7 @@ public:
   void   update_font ();
   void   update_color ();
   void   update_pattern_mode ();
+  void   update_zoom ();
   void   update_mode ();
   void   update_info_level ();
   void   update_language ();
@@ -913,6 +932,10 @@ public:
     tree t= env [var];
     if (is_compound (t)) return 0;
     return as_int (t->label); }
+  // the size of a pixel on the screen, which depends on the zoom: what is
+  // made with it has read the zoom factor, and is made again when the zoom
+  // changes (the rest is not: see edit_typeset_rep::set_zoom)
+  inline SI get_pixel () { (void) env [ZOOM_FACTOR]; return zoom_pixel; }
   inline double get_double (string var) {
     tree t= env [var];
     if (is_compound (t)) return 0.0;

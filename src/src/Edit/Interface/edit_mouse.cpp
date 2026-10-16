@@ -309,6 +309,14 @@ edit_interface_rep::update_mouse_loci () {
   list<string> ids1, ids2;
   rectangles rs1, rs2;
   eb->loci (last_x, last_y, 0, ids1, rs1);
+  {
+    // (the boxes give the areas of the loci, which are outlined here, with
+    // the size of a pixel at the zoom of this window)
+    rectangles outl;
+    for (rectangles r= rs1; !is_nil (r); r= r->next)
+      outl= outl * outlines (rectangles (r->item), pixel);
+    rs1= outl;
+  }
   while (rp <= p) {
     ids2 << get_ids (subtree (et, p));
     p= path_up (p);

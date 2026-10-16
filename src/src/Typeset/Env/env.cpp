@@ -448,8 +448,17 @@ edit_env_rep::labels_stamp () {
          mix64 (global_att->stamp () * 0x9E3779B97F4A7C15ULL + 3);
 }
 
+int
+env_zoom_id () {
+  static int id= env_var_id (ZOOM_FACTOR);
+  return id;
+}
+
 unsigned long long
 env_entry_hash (string var, tree val) {
+  // (not the value of the zoom factor: what read it is made again when it
+  // changes, see env_table::zoom, and a zoom uses the rest again)
+  if (var == ZOOM_FACTOR) return mix64 (string_hash64 (var));
   return mix64 (string_hash64 (var) * 0x9E3779B97F4A7C15ULL ^
                 value_hash64 (val));
 }

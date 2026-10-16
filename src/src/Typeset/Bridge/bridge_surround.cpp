@@ -24,6 +24,8 @@ protected:
   // kept otherwise (the bridges below compare them as boxes)
   bool                 parts_ok;
   unsigned long long   parts_fp;
+  bool                 parts_zoom;   // whether they read the zoom factor,
+  tree                 parts_zoom_at; // at this zoom (see env_table::zoom)
   array<string>        parts_keys;
   array<tree>          parts_values;
   unsigned long long   parts_stamp;  // (see same_lookups)
@@ -51,7 +53,8 @@ public:
 
 bridge_surround_rep::bridge_surround_rep (typesetter ttt, tree st, path ip):
   bridge_rep (ttt, st, ip), changes_before (UNINIT),
-  parts_ok (false), parts_fp (0), parts_stamp (0), parts_known (false)
+  parts_ok (false), parts_fp (0), parts_zoom (false), parts_zoom_at (""),
+  parts_stamp (0), parts_known (false)
 {
   initialize ();
 }
@@ -163,6 +166,7 @@ bridge_surround_rep::parts_again () {
   if (typeset_inputs_mode () == 0)
     return corrupted || (N(ttt->old_patch) != 0);
   return corrupted || !parts_ok || env->fingerprint () != parts_fp ||
+         (parts_zoom && env->zoom_value () != parts_zoom_at) ||
          !same_lookups (env, parts_keys, parts_values, parts_stamp);
 }
 
@@ -193,6 +197,8 @@ bridge_surround_rep::my_typeset (int desired_status) {
     unsigned long long* vh= env->input_hash ();
     unsigned long long h0= (vh == NULL? 0: *vh);
     bool all0= env->read_all (), unknown0= env->read_unknown;
+    bool zoom0= env->zoom_read ();
+    env->zoom_read ()= false;
     array<tree>* bs= env->rec_bindings;
     int b0= (bs == NULL? 0: N(*bs));
     hashmap<string,tree> prev_back (UNINIT);
@@ -207,7 +213,11 @@ bridge_surround_rep::my_typeset (int desired_status) {
     env->local_update (ttt->old_patch, changes_before);
     env->local_end (prev_back);
     corrupted= false;
+    bool zoom= env->zoom_read ();
+    env->zoom_read ()= zoom0 || zoom;
     if (inputs) {
+      parts_zoom= zoom;
+      parts_zoom_at= env->zoom_value ();
       // (what the parts looked up: added to the record of the bridge)
       parts_ok= (keys != NULL);
       parts_fp= fp;
@@ -230,6 +240,7 @@ bridge_surround_rep::my_typeset (int desired_status) {
       for (int i=0; i<N(parts_keys); i++)
         env->record_lookup (parts_keys[i], parts_values[i]);
       add_inputs (env, parts_known, parts_vars, parts_vals);
+      if (parts_zoom) env->zoom_read ()= true;
       env->write_bindings (parts_bindings);
     }
     env->monitored_patch_env (changes_before);

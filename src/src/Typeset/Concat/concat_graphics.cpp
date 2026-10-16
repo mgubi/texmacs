@@ -640,7 +640,7 @@ BEGIN_MAGNIFY
       c= env->fr (recontrol (poly_segment (project2 (b), ipb), a, ipa));
     }
     else if (method == "bezier") {
-      double gpixel= env->fr->inverse_scalar (0.5 * env->pixel);
+      double gpixel= env->fr->inverse_scalar (0.5 * env->get_pixel ());
       double vpixel= gpixel;
       if (is_compound (t[2], "ink-meta") && N(t[2]) >= 2 && is_double (t[2][1]))
         vpixel= as_double (t[2][1]);
@@ -669,7 +669,7 @@ BEGIN_MAGNIFY
       array<point> oval= oval_profile (mx * w, my * w, an, 37);
       array<point> cal = calligraphy (b, oval);
       cal << cal[0];
-      double tol= env->fr->inverse_scalar (0.5 * env->pixel);
+      double tol= env->fr->inverse_scalar (0.5 * env->get_pixel ());
       cal= simplify_polyline (cal, tol);
       c= env->fr (recontrol (poly_segment (cal, ipb), a, ipa));
       color col= env->pen->get_color ();

@@ -1017,6 +1017,22 @@ edit_typeset_rep::init_env (string var, tree by) {
   notify_change (THE_ENVIRONMENT);
 }
 
+// A change of the zoom: only the size of a pixel depends on it (get_pixel
+// in edit_env_rep), so with the inputs of the bridges the document is not
+// typeset from scratch, and what does not read it is used again. The
+// classic cache (TEXMACS_TYPESET_READS=off) typesets it all again.
+void
+edit_typeset_rep::set_zoom (tree z) {
+  if (init (ZOOM_FACTOR) == z) return;
+  if (typeset_inputs_mode () == 0) {
+    init_env (ZOOM_FACTOR, z);
+    return;
+  }
+  init (ZOOM_FACTOR)= z;
+  set_pre (ZOOM_FACTOR, z);
+  notify_change (THE_TREE);
+}
+
 void
 edit_typeset_rep::init_default (string var) {
   if (!init->contains (var)) return;

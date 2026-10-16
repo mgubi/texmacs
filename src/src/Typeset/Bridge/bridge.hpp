@@ -57,6 +57,8 @@ public:
                                  // (items_signature)
   array<box>           in_item_boxes; // (those which are not markers)
   unsigned long long   in_fp;    // the fingerprint of the environment
+  bool                 in_zoom;  // and whether it read the zoom factor,
+  tree                 in_zoom_at; // at this zoom (see env_table::zoom)
   array<tree>          out_bindings; // the bindings it wrote, in order
 
   array<page_item>     l;        // the typesetted lines of st

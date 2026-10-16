@@ -242,7 +242,7 @@ concater_rep::typeset_locus (tree t, path ip) {
             a[i]->op_type != a[i+1]->op_type) {
           path sip= (N(tmp_a)==1? a[i]->b->ip: dip);
           box cc= produce_concat (dip, tmp_a);
-          box lb= locus_box (sip, cc, ids, env->pixel, ref, anchor);
+          box lb= locus_box (sip, cc, ids, ref, anchor);
           line_item item (STD_ITEM, a[i]->op_type, lb, a[i]->penalty);
           item->spc= a[i]->spc;
           new_a << item;
@@ -478,8 +478,10 @@ concater_rep::typeset_image (tree t, path ip) {
   env->local_end ("w-length", old_w);
   env->local_end ("h-length", old_h);
   
-  // print the box
-  box imb= image_box (ip, image, imw, imh, env->alpha, env->pixel);
+  // print the box (the size of a pixel only says where the picture is
+  // cached, and the box takes that of the renderer when it is drawn: it
+  // is not an input of what is typeset, which a zoom does not change)
+  box imb= image_box (ip, image, imw, imh, env->alpha, env->zoom_pixel);
   print (move_box (ip, imb, imx, imy, true));
 }
 
