@@ -31,6 +31,9 @@ simple_widget_rep::simple_widget_rep ():
   all_widgets->insert ((pointer) this);
 }
 
+// (whether what is drawn is said as commands: mupdf_renderer.cpp)
+extern bool mupdf_record;
+
 // (the web core built with the GPU renderer: the target where the worker
 // draws the view, tau_gpu.cpp; else not linked)
 #ifdef __EMSCRIPTEN__
@@ -190,7 +193,10 @@ simple_widget_rep::repaint () {
     backing_x= scroll_x; backing_y= scroll_y;
     if (!invalid_all && pixels () != NULL &&
         2 * abs (sx) < px_w && 2 * abs (sy) < px_h) {
-      shift_pixels (sx, sy);
+      // (a view said as commands, mupdf_record, draws none of its pixels:
+      // they are not moved, 1.2 ms a step of the wheel for a large view;
+      // it is drawn whole when it is pixels again, tau_record)
+      if (!mupdf_record) shift_pixels (sx, sy);
       shift_x= sx; shift_y= sy;
       SI p= ren->pixel;
       SI X1= backing_x, X2= backing_x + px_w * p;

@@ -1472,6 +1472,20 @@ from 16 to 1024 pixels. As in the page of TeXmacs Vue
   3 ms a frame); `--nosync` no longer times the worker.
 - **Left** for it: the pixels of a canvas on which WebGL was, when the
   GPU is turned off (only `replay-bench.mjs` turns it off).
+- **The turn of the core** (2026-10-16): the round trip of a scroll is the
+  turn of the core in the worker (2.3 of 2.4 ms a step in Firefox, the
+  messages and the page the rest), and it was nearly the same with nothing
+  drawn (`tau_dry`): the renderer, either, costs under 1 ms of it. Timed
+  in its parts (a page isolated, `Cross-Origin-Embedder-Policy`, for a
+  clock finer than 1 ms; `?profile` prints only with `&log`), a step of
+  the wheel with `gl.mjs`: the repaint 1.94 ms, of which 1.22 moving the
+  pixels of the view (`shift_pixels`, 20 MB for a view of 2874×1792)
+  which a view said as commands does not draw, and 0.69 the editor
+  drawing the strip; then the pending commands and `apply_changes` 0.17,
+  `tau_state` 0.13 (it is made at each turn, `buffer-in-menu?` asked of
+  each buffer), `wheel-capture?` 0.06. The pixels of a view said as
+  commands are no longer moved: a step 3.3 ms to 1.2. A view (the whole
+  canvas drawn, nothing moved) is the editor drawing it, 2.4 to 2.9 ms.
 - **Left**: a limit to the pictures kept by the page (WebGL has one for
   its textures; the page cannot forget a picture, which the core sends
   once), and to the glyphs of the shell; the pattern of a rotated shape is rotated with it (MuPDF keeps
