@@ -67,6 +67,7 @@ edit_interface_rep::edit_interface_rep ():
   magf (zoomf / std_shrinkf),
   pixel ((SI) tm_round ((std_shrinkf * PIXEL) / zoomf)),
   zpixel (max ((SI) tm_round (std_shrinkf * PIXEL), pixel)),
+  zoom_time (0), zoom_waiting (false), zoom_shown (0),
   copy_always (),
   last_x (0), last_y (0), last_t (0),
   last_scx (0), last_scy (0),
@@ -692,6 +693,29 @@ edit_interface_rep::find_alt_selection_index
     return find_alt_selection_index (alt_sel, y, h, e);
 }
 
+/******************************************************************************
+* A zoom typesets the whole document again (its layout has lengths in
+* pixels of the screen: the unit px, the space between the pages, the
+* width of thin lines): the steps of a zoom which follow each other
+* quickly (a key held down, pressed again and again, the wheel) are
+* typeset once, when they stop. Until then the boxes of the previous zoom
+* are drawn at the new one, at once.
+* The first zoom of a document, a document whose page follows the window
+* and another change of the environment do not wait (the canvas, resized
+* to the new zoom, typesets the parts which changed, as after an edit).
+******************************************************************************/
+
+static const int zoom_wait= 250; // ms
+
+bool
+edit_interface_rep::zoom_defers () {
+  if (zoom_time == 0 || is_nil (eb)) return false;
+  if (env_change & THE_ENVIRONMENT) return false;
+  if (get_init_string (PAGE_MEDIUM) == "automatic") return false;
+  if (get_init_value (ZOOM_FACTOR) == "") return false;
+  return texmacs_time () - zoom_time < zoom_wait;
+}
+
 void
 edit_interface_rep::apply_changes () {
   //cout << "Apply changes\n";
@@ -737,6 +761,13 @@ edit_interface_rep::apply_changes () {
     //cout << "Tremble- " << tremble_count << LF;
   }
 
+  // a zoom which waited for the keys (or the wheel) to stop: now
+  // (none if the zoom came back to that of the layout)
+  if (zoom_waiting && texmacs_time () - zoom_time >= zoom_wait) {
+    if (get_init_value (ZOOM_FACTOR) == as_string (zoomf)) zoom_waiting= false;
+    else env_change |= THE_ENVIRONMENT;
+  }
+
   if (env_change == 0) {
     if (last_change-last_update > 0 &&
         idle_time (INTERRUPTED_EVENT) >= 1000/6)
@@ -752,12 +783,24 @@ edit_interface_rep::apply_changes () {
   if (is_attached (this) && has_current_window ()) {
     tree new_zoom= as_string (zoomf);
     tree old_zoom= get_init_value (ZOOM_FACTOR);
-    if (new_zoom != old_zoom) {
+    if (new_zoom == old_zoom)
+      zoom_waiting= false;
+    else if (zoom_defers ()) {
+      // the boxes typeset at the previous zoom are drawn at the new one
+      if (!zoom_waiting || zoom_shown != zoomf) {
+        zoom_waiting= true;
+        zoom_shown= zoomf;
+        notify_change (THE_EXTENTS);
+        send_invalidate_all (this);
+      }
+    }
+    else {
+      zoom_waiting= false;
       init_env (ZOOM_FACTOR, new_zoom);
       notify_change (THE_ENVIRONMENT);
     }
   
-    if (get_init_string (PAGE_MEDIUM) == "automatic")
+    if (get_init_string (PAGE_MEDIUM) == "automatic" && !zoom_waiting)
     {
       SI wx, wy;
       if (cvw == NULL) ::get_size (get_window (this), wx, wy);
@@ -1239,4 +1282,5 @@ edit_interface_rep::handle_notify_resize (SI w, SI h) {
 void
 edit_interface_rep::handle_set_zoom_factor (double zoom) {
   set_zoom_factor (zoom);
+  zoom_time= texmacs_time ();
 }

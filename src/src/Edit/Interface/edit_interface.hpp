@@ -46,6 +46,9 @@ protected:
   double        magf;          // the current magnification factor
   SI            pixel;         // current size of a pixel on the screen
   SI            zpixel;        // pixel multiplied by zoom factor
+  time_t        zoom_time;     // when the zoom last changed (0: at start)
+  bool          zoom_waiting;  // the layout still has the previous zoom
+  double        zoom_shown;    // the zoom the waiting layout is drawn at
   rectangles    copy_always;   // for wiping out cursor
   int           input_mode;    // INPUT_NORMAL, INPUT_SEARCH, INPUT_REPLACE
 
@@ -220,6 +223,7 @@ public:
   void handle_keyboard_focus (bool has_focus, time_t t);
   void handle_mouse (string k, SI x, SI y, int m, time_t t, array<double> d);
   void handle_set_zoom_factor (double zoomf);
+  bool zoom_defers ();
   void handle_clear (renderer win, SI x1, SI y1, SI x2, SI y2);
   void handle_repaint (renderer win, SI x1, SI y1, SI x2, SI y2);
 
