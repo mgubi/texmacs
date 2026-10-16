@@ -1430,10 +1430,36 @@ from 16 to 1024 pixels. As in the page of TeXmacs Vue
   in the page, the shift of a 2D canvas in Firefox (5 ms a step), which the
   WebGL surface does not have (`?coregl&gl`: an ImageBitmap into a texture,
   `gl.mjs`). With it Safari seemed slower, but in runs on a busy machine
-  (`gl.mjs` itself 3 times slower): not settled. Next, for Firefox: the
-  canvas of the page given to the worker (`transferControlToOffscreen`),
-  drawn there without a bitmap (a context for each view, or the views of
-  a window in one canvas).
+  (`gl.mjs` itself 3 times slower): not settled.
+- **On the canvas of the page** (`?coregl&direct`, 2026-10-16): the canvas
+  of the first pane is given to the worker (`transferControlToOffscreen`,
+  the message "canvas", before the GPU starts) and the WebGL context is
+  made on it; the view which the pane shows (the message "direct") is
+  copied whole from its target onto it at each frame (its canvas keeps
+  nothing between frames) and the browser shows it when the worker is
+  done: no bitmap, nothing for the page to do but the scroll bars and the
+  caret. One context, which cannot share its textures with another: the
+  other views (the dialogs, a second pane) are pixels (`tau_gpu_records`:
+  only that view is said as commands). Without a GPU the worker puts the
+  pixels on the canvas with a 2D context; a canvas which had WebGL is not
+  asked for one (Firefox 157 broke, "not on worker thread!", after a few
+  times). The page reads the canvas only through `drawImage`; the browser
+  test "the views drawn on the canvas of the page". The user manual,
+  median ms as above (`replay-bench.mjs --direct --nosync`), the three
+  ways run in turn on a busy machine (load 4 to 8: only the order counts):
+
+  | | Safari, step | Safari, view | Firefox, step | Firefox, view |
+  |---|---|---|---|---|
+  | `gl.mjs` from the commands | 4–6 | 9–18 | 2–3 | 4–7 |
+  | the worker, on the canvas of the page | 5 | 9–11 | 4 | 8 |
+  | the worker, bitmaps | 6–9 | 14–18 | 11–15 | 18–21 |
+
+  Twice to three times as fast as the bitmaps in Firefox, near `gl.mjs`;
+  in Safari a little faster than the bitmaps. What is left at each frame:
+  the whole view copied onto the canvas (it keeps nothing), which
+  `preserveDrawingBuffer` and the rectangle alone might spare.
+- **Left** for it: a context for each pane, each with the glyphs and the
+  pictures again, or the panes of a window in one canvas behind them.
 - **Left**: a limit to the pictures kept by the page (WebGL has one for
   its textures; the page cannot forget a picture, which the core sends
   once), and to the glyphs of the shell; the pattern of a rotated shape is rotated with it (MuPDF keeps

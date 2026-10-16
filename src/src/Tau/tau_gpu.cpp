@@ -100,6 +100,21 @@ tau_gpu_show (int on) {
   return show ? 1 : 0;
 }
 
+// ?direct: the view whose canvas the page gave to the worker, drawn on it
+// whole at each frame from its target (the canvas has nothing kept between
+// frames); the others are pixels (one WebGL context, on that canvas)
+static int direct= -1;
+
+extern "C" EMSCRIPTEN_KEEPALIVE void
+tau_gpu_direct (int view) {
+  direct= view;
+}
+
+extern "C" int
+tau_gpu_records (int view) {
+  return (!show || direct < 0 || view == direct) ? 1 : 0;
+}
+
 // the target of a view which is no more (tau_widget.cpp)
 extern "C" void
 tau_gpu_forget (int view) {
@@ -272,7 +287,8 @@ tau_gpu_frame (int view, int w, int h, const int* ops, int nops,
   replay (r, (const int32_t*) ops, nops, x1, y1, x2 - x1, y2 - y1);
   delete_renderer (r);
   double t1= emscripten_get_now ();
-  if (show) gpu_show_part (NULL, f, x1, y1, x2 - x1, y2 - y1);
+  if (show && view == direct) gpu_show_part (NULL, f, 0, 0, w, h);
+  else if (show) gpu_show_part (NULL, f, x1, y1, x2 - x1, y2 - y1);
   double t2= emscripten_get_now ();
   if (!bench) return;
   gpu_sync_picture (f);

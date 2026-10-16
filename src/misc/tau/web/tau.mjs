@@ -128,6 +128,13 @@ function makePane(windowNumber) {
 	};
 	const holder = el("div", "tau-view");
 	holder.append(pane.canvas);
+	// ?coregl&direct: the canvas of the first pane is given to the worker,
+	// which draws on it (one WebGL context there: one canvas)
+	if (coreGL && direct && ![...panes.values()].some(p => p.direct)) {
+		pane.direct = true;
+		const canvas = pane.canvas.transferControlToOffscreen();
+		worker.postMessage({ t: "canvas", canvas }, [canvas]);
+	}
 	pane.element.append(pane.tabs, holder);
 	panesElement.append(pane.element);
 	panes.set(windowNumber, pane);
@@ -247,7 +254,8 @@ function targetOf(view) {
 // keys and the pointer. target has the canvas and the number of its view.
 function attachView(target, pane) {
 	const canvas = target.canvas;
-	target.surface = pane && useGL && makeGLSurface(canvas, glShared, () => target.sendPlace())
+	target.surface = target.direct ? directSurface()
+		: pane && useGL && makeGLSurface(canvas, glShared, () => target.sendPlace())
 		|| (pane ? pairSurface(canvas) : canvasSurface(canvas));
 
 	// The place: the size of the canvas in pixels of the screen. Each place
@@ -1024,12 +1032,19 @@ function pairSurface(canvas) {
 		sync() { shown.ctx.getImageData(0, 0, 1, 1); }
 	};
 }
+// ?coregl&direct: a canvas which the worker draws on; nothing to do here
+function directSurface() {
+	const none = () => {};
+	return { size: none, shift: none, pixels: none, commands: none, sync: none,
+		bitmap(m) { m.bitmap.close(); } };
+}
 // ?coregl: the views drawn in the worker by the GPU renderer of the core
 // (tau_gpu.cpp), what changed given to the page as bitmaps; the page draws
 // nothing, it shifts its canvas and puts them in. With ?gl on the WebGL
 // surface (in Firefox a 2D canvas shifted takes 5 ms a step; in Safari an
 // ImageBitmap into a texture seemed slower: docs/tau-design.md)
 const coreGL = params.has("coregl");
+const direct = params.has("direct") && typeof HTMLCanvasElement.prototype.transferControlToOffscreen === "function";
 // what the WebGL surface takes from here
 const useGL = params.has("gl");
 const glShared = { glyphCovs, pictures, drawPath, opSize: OP_SIZE_OF };
@@ -1255,6 +1270,7 @@ worker.onmessage = event => {
 		const fresh = !panes.has(m.window);
 		const pane = panes.get(m.window) || makePane(m.window);
 		pane.view = m.view;
+		if (pane.direct) worker.postMessage({ t: "direct", view: m.view });
 		pane.sendPlace();
 		if (fresh || !active) focusView(pane);
 		else send({ t: "focus", view: pane.view, focus: focused === pane && document.activeElement === area });

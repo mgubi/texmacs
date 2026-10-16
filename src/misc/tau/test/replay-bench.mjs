@@ -7,7 +7,7 @@
 //
 //   node misc/tau/test/replay-bench.mjs --dir build-tau/out/web --tools <dir>
 //        [--browser firefox|safari] [--headed] [--only name] [--gl]
-//        [--native] [--core] [--nosync] [--width 1900 --height 1180] [--density 2]
+//        [--native] [--core] [--direct] [--nosync] [--width 1900 --height 1180] [--density 2]
 //
 // Safari is driven by safaridriver ("Allow remote automation"), in a window
 // of the screen (its density is that of the screen); Firefox by puppeteer,
@@ -20,6 +20,8 @@
 // shifts its canvas and copies a bitmap;
 // timed in the worker as with --native. "round trip": from the scroll sent
 // by the page to the core done with it (its frame drawn by the page);
+// --direct: drawn by it on the canvas of the page, given to the worker
+// (?coregl&direct; the pixels are not shown then);
 // --nosync: without waiting for the canvases (only the round trips).
 
 import { spawn } from "node:child_process";
@@ -59,8 +61,9 @@ const DOCS = [
 // the browser: ev (a JavaScript expression, which may be a promise) -> its value
 const port = await freePort();
 const server = await serve(dir, port);
-const useGL = args.includes("--gl"), coreGL = args.includes("--core"), native = args.includes("--native") || coreGL;
-const url = `http://127.0.0.1:${port}/index.html?debug&nohome${args.includes("--nosync") ? "" : "&gpusync"}${useGL ? "&gl" : ""}${coreGL ? "&coregl" : ""}`;
+const direct = args.includes("--direct");
+const useGL = args.includes("--gl"), coreGL = args.includes("--core") || direct, native = args.includes("--native") || coreGL;
+const url = `http://127.0.0.1:${port}/index.html?debug&nohome${args.includes("--nosync") ? "" : "&gpusync"}${useGL ? "&gl" : ""}${coreGL ? "&coregl" : ""}${direct ? "&direct" : ""}`;
 let ev, open, close;
 if (which === "safari") {
 	const driverPort = await freePort();
@@ -192,7 +195,7 @@ for (const doc of DOCS) {
 	try {
 		const r = await run(doc);
 		console.log(`${doc.name}: canvas ${r.canvas.w}×${r.canvas.h}${r.canvas.isolated ? "" : " (not isolated: the clock has coarse steps)"}`);
-		const drawn = coreGL ? "bitmaps" : "commands";
+		const drawn = direct ? "direct" : coreGL ? "bitmaps" : "commands";
 		row(doc.name, "pixels, step", r.cpu.steps);
 		row("", drawn + ", step", r.gpu.steps);
 		row("", "pixels, view", r.cpu.views);

@@ -437,6 +437,46 @@ test("the views drawn in the worker", async p => {
 	await p.until("and the text is shown", async () => (await ink()) > 600);
 });
 
+test("the views drawn on the canvas of the page", async p => {
+	// (?coregl&direct: the canvas of the pane given to the worker, which
+	// draws on it; the views of the dialogs are pixels, drawn by the page)
+	await p.open("coregl&direct");
+	const built = await p.page.evaluate(() => new Promise(res => {
+		tau.worker.addEventListener("message", e => { if (e.data.t === "gpu-check") res(e.data.text); });
+		tau.worker.postMessage({ t: "gpu-check" });
+		setTimeout(() => res("no answer"), 20000);
+	}));
+	if (built === "not built" || built === "no GPU") return;
+	// (another document in the pane: another view, which the worker draws)
+	await p.newDocument();
+	await p.type("Drawn by the core");
+	// (what the canvas shows, read through a 2D canvas: the page cannot draw
+	// on it, nor read it otherwise)
+	const ink = () => p.page.evaluate(() => {
+		const c = document.querySelector(".tau-pane canvas.tau-canvas");
+		const w = Math.min(c.width, 1200), h = Math.min(c.height, 400);
+		const o = document.createElement("canvas");
+		o.width = w; o.height = h;
+		const x = o.getContext("2d");
+		x.drawImage(c, 0, 0);
+		const d = x.getImageData(0, 0, w, h).data;
+		let n = 0;
+		for (let i = 0; i < d.length; i += 4) if (d[i + 3] > 0 && d[i] + d[i + 1] + d[i + 2] < 200) n++;
+		return n;
+	});
+	await p.until("the text is shown", async () => (await ink()) > 600);
+	await p.choose("Format", "Font");
+	await p.dialog("Font selector");
+	await p.until("and the sample of the dialog", () => p.page.evaluate(() => {
+		const c = document.querySelector(".tau-dialog canvas.tau-embedded");
+		if (!c || c.width < 100) return false;
+		const data = c.getContext("2d").getImageData(0, 0, c.width, Math.min(c.height, 200)).data;
+		let dark = 0;
+		for (let i = 0; i < data.length; i += 4) if (data[i + 3] > 200 && data[i] < 100) dark++;
+		return dark > 50;
+	}), 15000);
+});
+
 test("paste from the menu", async p => {
 	await p.open();
 	await p.newDocument();

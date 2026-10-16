@@ -325,9 +325,10 @@ link_program (const char* vs, const char* fs) {
 static const int SMALL= 512;
 
 #ifdef GL_OFFSCREEN
-// the canvas of the context: made by the worker, found by its name
+// the canvas of the context: made by the worker, found by its name; or the
+// one of the page which was given to the worker (?direct, tau-worker.js)
 EM_JS (void, gl_offscreen_canvas, (), {
-  specialHTMLTargets["#tau-gpu"]= new OffscreenCanvas (1, 1);
+  specialHTMLTargets["#tau-gpu"]= Module.tauDirectCanvas || new OffscreenCanvas (1, 1);
 });
 // the screen is the canvas, of the size of what is shown on it
 EM_JS (void, gl_offscreen_size, (int w, int h), {
@@ -335,9 +336,11 @@ EM_JS (void, gl_offscreen_size, (int w, int h), {
   if (c.width != w) c.width= w;
   if (c.height != h) c.height= h;
 });
-// what was drawn on it, for the page (tau_gui.cpp, tau_js_dlist, sends it)
+// what was drawn on it, for the page (tau_gui.cpp, tau_js_dlist, sends it);
+// the canvas of the page shows it itself, when the worker is done
 EM_JS (void, gl_offscreen_frame, (), {
-  Module.tauFrame= specialHTMLTargets["#tau-gpu"].transferToImageBitmap ();
+  if (!Module.tauDirectCanvas)
+    Module.tauFrame= specialHTMLTargets["#tau-gpu"].transferToImageBitmap ();
 });
 #endif
 

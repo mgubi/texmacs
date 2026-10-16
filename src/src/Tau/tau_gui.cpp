@@ -310,7 +310,11 @@ extern "C" void tau_gpu_frame (int view, int w, int h, const int* ops, int nops,
                                const unsigned char* im, int nim,
                                int x1, int y1, int x2, int y2, int dx, int dy)
   __attribute__ ((weak));
+// (whether a view is said as commands: not the others than the one which
+// the worker draws on the canvas of the page, ?direct)
+extern "C" int tau_gpu_records (int view) __attribute__ ((weak));
 #endif
+static bool record_all= false;  // tau_record
 
 #ifdef __EMSCRIPTEN__
 EM_JS (void, tau_js_dlist, (int view, int counter, int w, int h,
@@ -322,13 +326,15 @@ EM_JS (void, tau_js_dlist, (int view, int counter, int w, int h,
                             int cx, int cy, int dx, int dy), {
   if (!Module.tauPost) return;
   // (the worker drew the rectangle, tau_gpu.cpp: as an ImageBitmap, in
-  // place of the commands, which the page does not need)
+  // place of the commands, which the page does not need; or on the canvas
+  // of the page, ?direct: nothing to give)
   var b= Module.tauFrame;
   Module.tauFrame= null;
   if (b && (b.width != x2 - x1 || b.height != y2 - y1)) { b.close (); b= null; }
-  var o= b ? new Int32Array (0) : HEAP32.slice (ops >> 2, (ops >> 2) + nops);
-  var g= b ? new Uint8Array (0) : HEAPU8.slice (gl, gl + ngl);
-  var i= b ? new Uint8Array (0) : HEAPU8.slice (im, im + nim);
+  var none= b || Module.tauDirectView === view;
+  var o= none ? new Int32Array (0) : HEAP32.slice (ops >> 2, (ops >> 2) + nops);
+  var g= none ? new Uint8Array (0) : HEAPU8.slice (gl, gl + ngl);
+  var i= none ? new Uint8Array (0) : HEAPU8.slice (im, im + nim);
   var m= { t: "dlist", view: view, place: counter,
            width: w, height: h, ops: o.buffer, glyphs: g.buffer,
            images: i.buffer, shift: { x: dx, y: dy },
@@ -589,6 +595,9 @@ tau_turn_now () {
     if (!simple_widget_rep::all_widgets->contains ((pointer) v)) continue;
     if (!v->shown || v->ren == NULL) continue;
     double d0= prof ? tau_now () : 0;
+#ifdef __EMSCRIPTEN__
+    mupdf_record= record_all && (!tau_gpu_records || tau_gpu_records (v->id));
+#endif
     if (!v->repaint ()) continue;
     if (prof) { draw_ms += tau_now () - d0; draw_px += (double) (v->drawn_x2 - v->drawn_x1) * (v->drawn_y2 - v->drawn_y1); }
     int ew, eh, sx, sy, cx, cy;
@@ -1114,7 +1123,7 @@ tau_freeze () {
 EMSCRIPTEN_KEEPALIVE
 void
 tau_record (int on) {
-  mupdf_record= (on != 0);
+  record_all= mupdf_record= (on != 0);
   mupdf_record_ops.clear ();
   mupdf_record_glyphs.clear ();
   iterator<pointer> it= iterate (simple_widget_rep::all_widgets);
