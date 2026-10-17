@@ -254,7 +254,34 @@
      ("compound_statement" "do_group" "if_statement" "elif_clause"
       "else_clause" "case_statement" "case_item" "subshell" "array"
       "command_substitution")
-     ("elif_clause" "else_clause") #f)))
+     ("elif_clause" "else_clause") #f)
+    ("go"
+     ("block" "literal_value" "argument_list" "parameter_list"
+      "expression_switch_statement" "type_switch_statement" "select_statement"
+      "expression_case" "default_case" "type_case" "communication_case"
+      "field_declaration_list" "interface_type" "import_spec_list"
+      "const_declaration" "var_declaration" "parenthesized_expression")
+     ;; gofmt writes case at the indentation of switch
+     ("expression_case" "default_case" "type_case" "communication_case") #f)
+    ("rust"
+     ("block" "declaration_list" "field_declaration_list" "enum_variant_list"
+      "match_block" "match_arm" "arguments" "parameters" "array_expression"
+      "tuple_expression" "field_initializer_list" "use_list" "token_tree"
+      "ordered_field_declaration_list" "where_clause")
+     () #f)
+    ("lua"
+     ("function_declaration" "function_definition" "if_statement"
+      "elseif_statement" "else_statement" "while_statement" "repeat_statement"
+      "for_statement" "do_statement" "table_constructor" "arguments"
+      "parameters" "parenthesized_expression")
+     ("elseif_statement" "else_statement") #f)
+    ("lean"
+     ("def" "theorem" "instance" "abbrev" "example" "structure" "inductive"
+      "by" "do_block" "match" "match_alt" "fun" "have" "let" "where_decls"
+      "if_then_else" "tactic_case" "paren" "anon_ctor" "list_lit" "array_lit"
+      "struct_lit")
+     ()
+     ("paren" "anon_ctor" "list_lit" "array_lit" "struct_lit"))))
 
 (define (line-string doc row)
   (let ((t (tree-ref doc row)))
@@ -443,7 +470,8 @@
 (define line-comments
   '(("c" . "//") ("cpp" . "//") ("java" . "//") ("javascript" . "//")
     ("python" . "#") ("r" . "#") ("julia" . "#") ("scheme" . ";")
-    ("shell" . "#")))
+    ("shell" . "#") ("go" . "//") ("rust" . "//") ("lua" . "--")
+    ("lean" . "--")))
 
 (define-public (syntax-comment-prefix lan)
   (assoc-ref line-comments lan))

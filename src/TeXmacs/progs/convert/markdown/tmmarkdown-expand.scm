@@ -88,7 +88,7 @@
              verbatim-code cpp-code python-code scm-code shell-code
              java-code javascript-code json-code julia-code r-code
              scala-code fortran-code octave-code scilab-code dot-code
-             mmx-code pseudo-code render-code
+             mmx-code go-code lean-code lua-code rust-code pseudo-code render-code
              ;; mathematics, which is converted to LaTeX
              equation* equation-lab equations-base
              eqnarray eqnarray* align align* gather gather* multline

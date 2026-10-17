@@ -251,3 +251,120 @@
 
 (converter csv-snippet texmacs-tree
   (:function csv-snippet->texmacs))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Go source files
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define-format go
+  (:name "Go source code")
+  (:suffix "go"))
+
+(define (texmacs->go x . opts)
+  (texmacs->verbatim x (acons "texmacs->verbatim:encoding" "SourceCode" '())))
+
+(define (go->texmacs x . opts)
+  (code->texmacs x))
+
+(define (go-snippet->texmacs x . opts)
+  (code-snippet->texmacs x))
+
+(converter texmacs-tree go-document
+  (:function texmacs->go))
+
+(converter go-document texmacs-tree
+  (:function go->texmacs))
+
+(converter texmacs-tree go-snippet
+  (:function texmacs->go))
+
+(converter go-snippet texmacs-tree
+  (:function go-snippet->texmacs))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Lean source files
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define-format lean
+  (:name "Lean source code")
+  (:suffix "lean"))
+
+(define (texmacs->lean x . opts)
+  (texmacs->verbatim x (acons "texmacs->verbatim:encoding" "SourceCode" '())))
+
+(define (lean->texmacs x . opts)
+  (code->texmacs x))
+
+(define (lean-snippet->texmacs x . opts)
+  (code-snippet->texmacs x))
+
+(converter texmacs-tree lean-document
+  (:function texmacs->lean))
+
+(converter lean-document texmacs-tree
+  (:function lean->texmacs))
+
+(converter texmacs-tree lean-snippet
+  (:function texmacs->lean))
+
+(converter lean-snippet texmacs-tree
+  (:function lean-snippet->texmacs))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Lua source files
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define-format lua
+  (:name "Lua source code")
+  (:suffix "lua"))
+
+(define (texmacs->lua x . opts)
+  (texmacs->verbatim x (acons "texmacs->verbatim:encoding" "SourceCode" '())))
+
+(define (lua->texmacs x . opts)
+  (code->texmacs x))
+
+(define (lua-snippet->texmacs x . opts)
+  (code-snippet->texmacs x))
+
+(converter texmacs-tree lua-document
+  (:function texmacs->lua))
+
+(converter lua-document texmacs-tree
+  (:function lua->texmacs))
+
+(converter texmacs-tree lua-snippet
+  (:function texmacs->lua))
+
+(converter lua-snippet texmacs-tree
+  (:function lua-snippet->texmacs))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Rust source files
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define-format rust
+  (:name "Rust source code")
+  (:suffix "rs"))
+
+(define (texmacs->rust x . opts)
+  (texmacs->verbatim x (acons "texmacs->verbatim:encoding" "SourceCode" '())))
+
+(define (rust->texmacs x . opts)
+  (code->texmacs x))
+
+(define (rust-snippet->texmacs x . opts)
+  (code-snippet->texmacs x))
+
+(converter texmacs-tree rust-document
+  (:function texmacs->rust))
+
+(converter rust-document texmacs-tree
+  (:function rust->texmacs))
+
+(converter texmacs-tree rust-snippet
+  (:function texmacs->rust))
+
+(converter rust-snippet texmacs-tree
+  (:function rust-snippet->texmacs))

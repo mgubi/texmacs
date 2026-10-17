@@ -69,7 +69,7 @@
              verbatim-code cpp-code python-code scm-code shell-code
              java-code javascript-code json-code julia-code r-code
              scala-code fortran-code octave-code scilab-code dot-code
-             mmx-code pseudo-code render-code
+             mmx-code go-code lean-code lua-code rust-code pseudo-code render-code
              ;; mathematics: the equations, and the fractions and the
              ;; binomials, whose expansion is layout from which the
              ;; converter could not tell what they are

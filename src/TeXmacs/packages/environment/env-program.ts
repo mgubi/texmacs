@@ -193,6 +193,14 @@
 
   <assign|json-lang|<macro|body|<with|mode|prog|prog-language|json|font-family|rm|<arg|body>>>>
 
+  <assign|go-lang|<macro|body|<with|mode|prog|prog-language|go|font-family|rm|<arg|body>>>>
+
+  <assign|lean|<macro|body|<with|mode|prog|prog-language|lean|font-family|rm|<arg|body>>>>
+
+  <assign|lua|<macro|body|<with|mode|prog|prog-language|lua|font-family|rm|<arg|body>>>>
+
+  <assign|rust|<macro|body|<with|mode|prog|prog-language|rust|font-family|rm|<arg|body>>>>
+
   <assign|octave-lang|<macro|body|<with|mode|prog|prog-language|octave|font-family|rm|<arg|body>>>>
 
   <\active*>
@@ -252,6 +260,30 @@
   <assign|json-code|<\macro|body>
     <\pseudo-code>
       <json-lang|<arg|body>>
+    </pseudo-code>
+  </macro>>
+
+  <assign|go-code|<\macro|body>
+    <\pseudo-code>
+      <go-lang|<arg|body>>
+    </pseudo-code>
+  </macro>>
+
+  <assign|lean-code|<\macro|body>
+    <\pseudo-code>
+      <lean|<arg|body>>
+    </pseudo-code>
+  </macro>>
+
+  <assign|lua-code|<\macro|body>
+    <\pseudo-code>
+      <lua|<arg|body>>
+    </pseudo-code>
+  </macro>>
+
+  <assign|rust-code|<\macro|body>
+    <\pseudo-code>
+      <rust|<arg|body>>
     </pseudo-code>
   </macro>>
 

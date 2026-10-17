@@ -26,20 +26,24 @@
   (:use (treesit ts-base) (treesit ts-language) (treesit ts-export)
         (treesit ts-scanner-cpp) (treesit ts-scanner-python)
         (treesit ts-scanner-javascript) (treesit ts-scanner-r)
-        (treesit ts-scanner-julia) (treesit ts-scanner-bash)))
+        (treesit ts-scanner-julia) (treesit ts-scanner-bash)
+        (treesit ts-scanner-rust) (treesit ts-scanner-lua)
+        (treesit ts-scanner-lean)))
 
 ;; to be changed when the generator or the exported data change
 (define-public treesit-generator-version "2")
 
 (define-public treesit-languages
   '("json" "c" "scheme" "cpp" "python" "java" "javascript" "r" "julia"
-    "bash"))
+    "bash" "go" "rust" "lua" "lean"))
 
 ;; the external scanners (ts-scanner-*.scm), for the languages with one
 (define treesit-scanners
   (list (cons "cpp" ts-cpp-scanner) (cons "python" ts-python-scanner)
         (cons "javascript" ts-javascript-scanner) (cons "r" ts-r-scanner)
-        (cons "julia" ts-julia-scanner) (cons "bash" ts-bash-scanner)))
+        (cons "julia" ts-julia-scanner) (cons "bash" ts-bash-scanner)
+        (cons "rust" ts-rust-scanner) (cons "lua" ts-lua-scanner)
+        (cons "lean" ts-lean-scanner)))
 
 (define-public (treesit-supported? lan)
   (and (defined? 'tree-sitter-language-load)

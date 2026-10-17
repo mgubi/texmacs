@@ -810,6 +810,31 @@ Done in part (2026-10-17):
   a `tags.scm` of ours for the functions. 254 KB of scripts parse in 277 ms
   (S7) and 293 ms (femtolisp): the scanner is asked at nearly every word,
   half of its time is interpretation and a quarter the collector.
+- **Go, Rust, Lua and Lean** (same day): new program languages of TeXmacs,
+  highlighted by tree-sitter only (they had no support): a format each
+  (`go`, `rs`, `lua`, `lean`, in `plugins/code/progs/code-format.scm`), a
+  `<lan>-lang.scm` with keywords for the tokenizer until the tables are
+  ready (it also makes the format a program language), the tags `go-lang`,
+  `rust`, `lua`, `lean` and `<lan>-code` (`env-program.ts`), the modes
+  `in-prog-<lan>?`, the Insert menus (which now also list JavaScript and
+  Julia), the code blocks of the Markdown and docx/odt converters, and the
+  rules of indentation and comments of `ts-edit.scm` (in Go, `case` stays at
+  the indentation of `switch`, as gofmt writes it). Grammars (MIT) with
+  their highlight queries and tags; `tags.scm` of ours for Lean. Scanners:
+  `ts-scanner-rust.scm` (string content, raw strings, floats, nested and
+  doc comments; as in C, block comments look at the low byte of the
+  characters), `ts-scanner-lua.scm` (long brackets of strings and comments;
+  as in C an empty state changes nothing), `ts-scanner-lean.scm` (Unicode,
+  dotted and «quoted» identifiers, nested comments, raw strings, norm bars,
+  and the layout tokens of tactic and do blocks with a stack of columns).
+  Go has no scanner. Corpora: go 67, rust 151, lua 42, lean 301 tests,
+  all passing under S7 and femtolisp; highlight captures equal to those of
+  `tree-sitter query` on the examples of the grammars (22000 captures for
+  Go, 12000 for Rust) and on samples for Lua and Lean. Tables: go 0.7 s,
+  rust 1.5 s, lua 0.5 s; Lean 74 s and 8.7 GB (381910 LR(1) states before
+  merging; `tree-sitter generate`: 104 s and 5.6 GB, same 10243 states),
+  so the suite tests Lean only when its tables are cached. Reducing the
+  memory of the LR construction for such grammars is still to do.
 - An S7 pitfall met on the way: in a `do` loop whose body calls a builtin
   through another name (`ahash-set!` is `hash-table-set!`), s7 changes the
   counter in place, so the counter stored as a value (or in a list) ends

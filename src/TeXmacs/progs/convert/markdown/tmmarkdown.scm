@@ -1001,6 +1001,7 @@
     (json-code . "json") (julia-code . "julia") (r-code . "r")
     (scala-code . "scala") (fortran-code . "fortran") (octave-code . "octave")
     (scilab-code . "scilab") (dot-code . "dot") (mmx-code . "mathemagix")
+    (go-code . "go") (lean-code . "lean") (lua-code . "lua") (rust-code . "rust")
     (verbatim-code . "") (pseudo-code . "") (render-code . "") (code . "")))
 
 (define tmmd-language-tags
@@ -1016,7 +1017,9 @@
     ("js" . javascript-code) ("json" . json-code) ("julia" . julia-code)
     ("r" . r-code) ("scala" . scala-code) ("fortran" . fortran-code)
     ("octave" . octave-code) ("matlab" . octave-code) ("dot" . dot-code)
-    ("scilab" . scilab-code) ("mathemagix" . mmx-code) ("mmx" . mmx-code)))
+    ("scilab" . scilab-code) ("mathemagix" . mmx-code) ("mmx" . mmx-code)
+    ("go" . go-code) ("golang" . go-code) ("lean" . lean-code) ("lean4" . lean-code)
+    ("lua" . lua-code) ("rust" . rust-code) ("rs" . rust-code)))
 
 (tm-define (tmmd-language-tag name)
   (:synopsis "The tag of code in the language @name, written after a fence")

@@ -231,12 +231,13 @@
 
 (define-group inline-code-tag
   verbatim scm cpp dot-lang mmx r fortran octave-lang
-  python julia java javascript-lang json-lang scala scilab shell)
+  python julia java javascript-lang json-lang scala scilab shell
+  go-lang lean lua rust)
 
 (define-group block-code-tag
   verbatim-code scm-code cpp-code dot-code mmx-code r-code fortran-code
   octave-code python-code julia-code java-code javascript-code json-code scala-code
-  scilab-code shell-code)
+  scilab-code shell-code go-code lean-code lua-code rust-code)
 
 ;; ornaments
 

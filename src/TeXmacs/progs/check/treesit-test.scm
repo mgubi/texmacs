@@ -559,7 +559,35 @@
         (check= (map (lambda (row) (syntax-language-indentation d row "shell" id 4))
                      (iota 8))
                 '(0 4 8 4 8 4 0 0))
-        (check= (map cadr (syntax-outline d "shell" id)) '("f"))))
+        (check= (map cadr (syntax-outline d "shell" id)) '("f")))
+      ;; Go (case at the indentation of switch), Rust, Lua and Lean
+      (check= (indents "go" '("func f(x int) {" "    switch x {" "    case 1:" "        g()"
+                              "    }" "}"))
+              '(0 4 4 8 4 0))
+      (check= (indents "rust" '("fn f() {" "    match x {" "        1 => g()," "    }" "}"))
+              '(0 4 8 4 0))
+      (check= (indents "lua" '("function f(x)" "    if x then" "        g()" "    else"
+                               "        h()" "    end" "end"))
+              '(0 4 8 4 8 4 0))
+      (when (url-exists? (treesit-cache-url "lean"))
+        (check= (indents "lean" '("def f (x : Nat) : Nat := by" "  simp" ""))
+                '(0 4 4)))
+      (let ((outline (lambda (lan lines)
+                       (map (lambda (d) (list (car d) (cadr d)))
+                            (syntax-outline (stree->tree (cons 'document lines)) lan
+                                            (treesit-language lan))))))
+        (check= (outline "go" '("package p" "func F() {}" "type T struct {}"))
+                '(("function" "F") ("type" "T")))
+        (check= (outline "rust" '("struct S;" "fn f() {}"))
+                '(("class" "S") ("function" "f")))
+        (check= (outline "lua" '("function f() end" "local function g() end"))
+                '(("function" "f") ("function" "g")))
+        (when (url-exists? (treesit-cache-url "lean"))
+          (check= (outline "lean" '("theorem t : True := trivial" "def f := 1"))
+                  '(("theorem" "t") ("function" "f"))))))
+    ;; the formats of the source files
+    (check= (map format-from-suffix '("go" "rs" "lua" "lean"))
+            '("go" "rust" "lua" "lean"))
     ;; the indentation at the cursor, in C++ code (as Return asks it)
     (treesit-generate-cache "cpp")
     (with-test-buffer '(document (cpp-code (document "int f() {" "return 0;" "}")))
@@ -728,6 +756,21 @@
                            "(redirected_statement body: (command name: (command_name (word)) "
                            "argument: (string (string_content))) redirect: (file_redirect "
                            "destination: (word))))))"))
+    ;; Go, Rust, Lua and Lean, as tree-sitter parse gives them
+    (treesit-generate-cache "go")
+    (check= (tree-sitter-parse-sexp (treesit-language "go") "package main\n\nfunc f(x int) int {\n\treturn x + 1\n}\n")
+            "(source_file (package_clause (package_identifier)) (function_declaration name: (identifier) parameters: (parameter_list (parameter_declaration name: (identifier) type: (type_identifier))) result: (type_identifier) body: (block (statement_list (return_statement (expression_list (binary_expression left: (identifier) right: (int_literal))))))))")
+    (treesit-generate-cache "rust")
+    (check= (tree-sitter-parse-sexp (treesit-language "rust") "fn main() {\n    let s = r#\"a\"#; // c\n    let x = 1.5e3;\n}\n")
+            "(source_file (function_item name: (identifier) parameters: (parameters) body: (block (let_declaration pattern: (identifier) value: (raw_string_literal (string_content))) (line_comment) (let_declaration pattern: (identifier) value: (float_literal)))))")
+    (treesit-generate-cache "lua")
+    (check= (tree-sitter-parse-sexp (treesit-language "lua") "local s = [[a]] --[[ c ]]\nprint(s)\n")
+            "(chunk local_declaration: (variable_declaration (assignment_statement (variable_list name: (identifier)) (expression_list value: (string content: (string_content))))) (comment content: (comment_content)) (function_call name: (identifier) arguments: (arguments (identifier))))")
+    ;; (Lean only when its tables are there: making them takes a minute and
+    ;; gigabytes, see doc/tree-sitter.md)
+    (when (url-exists? (treesit-cache-url "lean"))
+      (check= (tree-sitter-parse-sexp (treesit-language "lean") "def f (x : Nat) : Nat := by\n  simp\n")
+              "(module (declaration (def name: (identifier) (binders (explicit_binder name: (identifier) type: (identifier))) type: (identifier) body: (by stmt: (identifier)))))"))
     ;; Java, without scanner
     (treesit-generate-cache "java")
     (check= (tree-sitter-parse-sexp (treesit-language "java") "class A { int f() { return 1; } }")

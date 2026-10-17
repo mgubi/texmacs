@@ -1696,6 +1696,7 @@
     (json-code . "json") (julia-code . "julia") (r-code . "r")
     (scala-code . "scala") (fortran-code . "fortran") (octave-code . "octave")
     (scilab-code . "scilab") (dot-code . "dot") (mmx-code . "mathemagix")
+    (go-code . "go") (lean-code . "lean") (lua-code . "lua") (rust-code . "rust")
     (verbatim-code . "") (pseudo-code . "") (render-code . "") (code . "")))
 
 (define (tmof-code-block tag l)

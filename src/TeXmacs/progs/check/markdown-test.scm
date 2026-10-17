@@ -885,11 +885,14 @@
   (check= (md-body "- a\n\n- b\n")
           '((md-loose (itemize-minus (document (concat (item) "a")
                                                (concat (item) "b"))))))
-  ;; code: the words after the fence, when the tag does not say them
-  (check= (md-body "```python\nx\n```\n\n```py\nx\n```\n\n```rust\nx\n```\n")
+  ;; code: the words after the fence, when the tag does not say them (haskell
+  ;; is a language without a tag of its own)
+  (check= (md-body "```python\nx\n```\n\n```py\nx\n```\n\n```haskell\nx\n```\n")
           '((python-code (document "x"))
             (md-fence "py" (python-code (document "x")))
-            (md-fence "rust" (verbatim-code (document "x")))))
+            (md-fence "haskell" (verbatim-code (document "x")))))
+  (check= (md-body "```rust\nx\n```\n\n```lean\ny\n```\n")
+          '((rust-code (document "x")) (lean-code (document "y"))))
   ;; images and footnotes
   (check= (md-body "a ![d](i.png) ![](j.png) ![d](i.png \"T\")\n")
           '((concat "a " (md-image (image "i.png" "" "" "" "") "d" "") " "
@@ -1009,9 +1012,9 @@
   ;; the words after the fence are for the language they name
   (check= (tm->md (in-style '(md-fence "c" (python-code (document "x")))))
           "```python\nx\n```\n")
-  (check= (tm->md (in-style '(md-fence "rust ignore"
+  (check= (tm->md (in-style '(md-fence "haskell ignore"
                                        (verbatim-code (document "x")))))
-          "```rust ignore\nx\n```\n")
+          "```haskell ignore\nx\n```\n")
   ;; a kept block which was moved into a heading or a cell
   (check= (tm->md (in-style '(section (concat "T " (md-block-source
                                                      (equation* (document "x"))
