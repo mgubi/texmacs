@@ -333,6 +333,14 @@
   (boot-test-loop (and (pair? l) (not (pred? (car l)))) (set! l (cdr l)))
   (and (pair? l) (car l)))
 (define (boot-test-macro*-call x) (boot-test-macro* x))
+
+;; 0006: public definitions bound in the rootlet only (see define-public)
+(define-public boot-test-shared 1)
+(define (boot-test-set-shared! v) (set! boot-test-shared v))
+(define (boot-test-with-kept boot-test-kept) boot-test-kept)
+(boot-test-with-kept 0)
+(define-public boot-test-kept 'kept)
+(define (boot-test-this-module) (resolve-module '(kernel boot boot-s7-test)))
 (define-macro (boot-test-listed-twice x) `(list ,x ,x))
 (define (boot-test-redefine-counted times-ten?)
   (set! boot-test-counted
@@ -412,6 +420,24 @@
              (boot-test-redefine-counted #f)
              (list before after (boot-test-counted-call 3))))
          '(2 20 4))
+   ;; 0006
+   (test "a public definition is not bound in its module"
+         (list (defined? 'boot-test-shared (boot-test-this-module) #t)
+               ((rootlet) 'boot-test-shared))
+         '(#f 1))
+   (test "the module of a public variable sets the binding of the rootlet"
+         (begin (boot-test-set-shared! 2)
+                (let ((v ((rootlet) 'boot-test-shared)))
+                  (boot-test-set-shared! 1)
+                  v))
+         2)
+   (test "a public name with another local binding stays in its module"
+         (list (defined? 'boot-test-kept (boot-test-this-module) #t)
+               ((boot-test-this-module) 'boot-test-kept))
+         '(#t kept))
+   (test "unshadow-global! needs a binding in the rootlet"
+         (unshadow-global! (inlet 'boot-test-unbound-name 1) 'boot-test-unbound-name)
+         #f)
    ;; 0004
    (test "string-ref of 0 on a parameter"
          (list (boot-test-first-char-of "abc") (boot-test-first-char-of "xyz"))

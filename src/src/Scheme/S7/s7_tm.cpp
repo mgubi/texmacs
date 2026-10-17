@@ -338,6 +338,12 @@ static s7_pointer g_getpid (s7_scheme *sc, s7_pointer args)
   return(s7_make_integer(sc, (s7_int)getpid()));
 }
 
+static s7_pointer g_unshadow_global (s7_scheme *sc, s7_pointer args)
+{
+  // see define-public in boot-s7.scm and s7_unshadow_global in s7.c
+  return s7_make_boolean (sc, s7_unshadow_global (sc, s7_car (args), s7_cadr (args)));
+}
+
 void
 initialize_compat () {
 
@@ -352,6 +358,10 @@ initialize_compat () {
             s7_make_typed_function(sc, "getpid", g_getpid, 0, 0,
                                    false, "int getpid(void)",
                                    s7_make_signature(sc, 2, s7_make_symbol(sc, "integer?"), s7_t(sc))));
+
+  s7_define(sc, cur_env, s7_make_symbol(sc, "unshadow-global!"),
+            s7_make_function(sc, "unshadow-global!", g_unshadow_global, 2, 0,
+                             false, "(unshadow-global! let symbol)"));
 }
 
 

@@ -1,0 +1,68 @@
+Unbind a public definition from its module: s7_unshadow_global (TeXmacs)
+
+TeXmacs binds a public definition (define-public) in its module and in
+the rootlet, where the other modules find it. s7 caches, for each symbol,
+the let of its latest local binding, here the module. A lookup walks out
+from the current let, skips the lets which are newer than the cached one
+and scans the slots of the others: from a module created before the
+defining one (typically the module which loaded it), a lookup of the
+public name scans that module and the user module (hundreds of slots) on
+its way to the rootlet. Calls of public functions of other modules were
+up to three times slower than calls in the same module.
+
+The new C function s7_unshadow_global (let, symbol) removes the binding
+of symbol in let and makes the symbol global again (id 0, local slot =
+global slot), as if it had only been defined in the rootlet, so lookups
+go straight there. It does so only when these two bindings are all the
+bindings the symbol ever had (symbol_ctr 2): no other let can hold it,
+and no lookup can be wrong. Otherwise it returns false and changes
+nothing. TeXmacs registers it as (unshadow-global! let symbol) in
+s7_tm.cpp and calls it in define-public (boot-s7.scm).
+
+The debugging symbol_set_id checks that ids only grow, hence
+symbol_set_id_unchecked.
+
+--- a/s7.c
++++ b/s7.c
+@@ -10663,6 +10663,31 @@
+   return(let);
+ }
+ 
++/* TeXmacs: the public definitions of the module system are bound in their module and in the
++ *   rootlet. The symbol then caches the id of the module, and the lookups from the other modules
++ *   scan the lets on their way to the rootlet (the user module has hundreds of slots). When these
++ *   two are the only bindings the symbol ever had, this removes the one in let and makes the
++ *   symbol global again, as if it had only been defined in the rootlet: the lookups go straight
++ *   there. With another binding (a parameter, a local variable, a second definition), a let might
++ *   still hold it, so nothing changes (false is returned).
++ */
++bool s7_unshadow_global(s7_scheme *sc, s7_pointer let, s7_pointer symbol)
++{
++  s7_pointer slot, last_slot = NULL;
++  if ((!is_let(let)) || (let == sc->rootlet) || (!is_symbol(symbol)) || (is_keyword(symbol)) ||
++      (symbol_ctr(symbol) != 2) || (!is_slot(global_slot(symbol))))
++    return(false);
++  for (slot = let_slots(let); is_slot_checked(slot); last_slot = slot, slot = next_slot(slot))
++    if (slot_symbol(slot) == symbol) break;
++  if ((!is_slot_checked(slot)) || (is_immutable_slot(slot)) || (local_slot(symbol) != slot))
++    return(false);
++  if (last_slot) slot_set_next(last_slot, next_slot(slot));
++  else let_set_slots(let, next_slot(slot));
++  set_local_slot(symbol, global_slot(symbol));
++  symbol_set_id_unchecked(symbol, 0);  /* is_global */
++  return(true);
++}
++
+ 
+ /* -------------------------------- sublet -------------------------------- */
+ static s7_pointer sublet_1(s7_scheme *sc, s7_pointer let, s7_pointer bindings, s7_pointer caller)
+--- a/s7.h
++++ b/s7.h
+@@ -447,6 +447,7 @@
+ s7_pointer s7_sublet(s7_scheme *sc, s7_pointer env, s7_pointer bindings);   /* (sublet e ...) */
+ s7_pointer s7_inlet(s7_scheme *sc, s7_pointer bindings);                    /* (inlet ...) */
+ s7_pointer s7_varlet(s7_scheme *sc, s7_pointer env, s7_pointer symbol, s7_pointer value); /* (varlet env symbol value) */
++bool s7_unshadow_global(s7_scheme *sc, s7_pointer env, s7_pointer symbol); /* TeXmacs: see s7.c */
+ s7_pointer s7_let_to_list(s7_scheme *sc, s7_pointer env);                   /* (let->list env) */
+ bool s7_is_let(s7_pointer e);                                               /* (let? e) */
+ s7_pointer s7_let_ref(s7_scheme *sc, s7_pointer env, s7_pointer sym);       /* (let-ref e sym) */
