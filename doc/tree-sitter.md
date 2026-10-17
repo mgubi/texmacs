@@ -343,7 +343,7 @@ split into lazily loaded modules.
 - **Grammar ABI drift.** Pinned commits and the vendored runtime move
   together.
 
-## 5. Plan
+## 5. Plan (superseded by section 7)
 
 1. Runtime in the build, grammar registry, fetch script; `syntax-sexp` on a
    detached tree; unit test of the Cork decode function.
@@ -479,3 +479,99 @@ way to use them.
 With the hybrid, option E keeps its advantages (no compiled code per
 grammar) without the speed penalty; the generator stays in Scheme and runs
 once per grammar (10-35 s for C), its output can be cached or shipped.
+
+## 7. Plan for the TeXmacs side (with the hybrid)
+
+The design of section 3 stands; what changes is where the grammars come
+from (tables generated in Scheme, run by the vendored C runtime) and that
+the runtime, the language loader and queries already exist
+(`Plugins/TreeSitter`, `progs/treesit`). Each phase ends with tests and can
+be merged on its own.
+
+### Phase 1: grammar registry and cached tables
+
+- `progs/treesit/ts-registry.scm`: for a TeXmacs language name (`cpp`,
+  `python`, `json`...), the grammar (`misc/tree-sitter/<lan>/grammar.json`),
+  its queries and, when there is one, its Scheme scanner.
+- Tables: the exported data (`ts-export-language`) cached in
+  `$TEXMACS_HOME_PATH/system/cache/tree-sitter/<lan>-<hash>.tsdyn`, the
+  hash being that of `grammar.json` and of the generator version. Generating
+  C takes 35 s in TeXmacs, so tables are also produced at build time (a
+  target running `texmacs.bin -headless`) and shipped next to the grammar;
+  generating at first use stays the path for grammars added by users.
+- Load the data from C directly (no Scheme string of 1 MB): the glue takes
+  a file name.
+- Builds: CMake and the browser build compile `Plugins/TreeSitter`
+  (`misc/wasm/sources.txt`); `USE_TREE_SITTER` and `syntax-supported?`
+  let the rest of TeXmacs work without it.
+- Tests: the registry, the cache (a changed grammar regenerates), loading
+  every shipped language.
+
+### Phase 2: syntax trees of code regions
+
+- C++ `syntax_tree` (in `Plugins/TreeSitter`): the `TSTree` of a region (a
+  `document` of lines in prog mode, or one string), a line table and the
+  parser. Input through `TSInput.read` row by row with
+  `TSInputEncodingCustom`: the decode function turns a Cork byte or a
+  `<...>` entity into one code point, so that tree-sitter columns are
+  string positions (section 3). Lines which are not strings are flattened.
+- `syntax_observer` on the region root: the modifications of section 3
+  become `ts_tree_edit`; the reparse is lazy, at the first request.
+- Glue for tests and tools: `syntax-sexp`, `syntax-node-at`, `syntax-errors`
+  on a tree with paths.
+- Tests: the trees of documents loaded from files equal those of
+  `tree-sitter parse`; after scripted edits (typing, splitting and joining
+  lines, undo) the incremental tree equals a fresh parse; entities and
+  non-ASCII text map to the right columns.
+
+### Phase 3: highlighting
+
+- `ts_language_rep : language_rep`, chosen by `prog_language (lan)` when the
+  registry has the language: `highlight (t)` runs the query on the rows of
+  the line and stores colours in the existing `highlight_observer`
+  (`attach_highlight`), `advance` and `get_color` read them, like the
+  packrat path in `language.cpp`.
+- Overlaps resolved as in `tree-sitter-highlight` (first pattern wins for
+  a node; nested captures stack).
+- Capture names map to the TeXmacs colour classes by a table in Scheme,
+  longest prefix first (`@keyword` -> `keyword`, `@string` ->
+  `constant_string`, `@function` -> `declare_function`, `@type` ->
+  `declare_type`, `@comment` -> `comment`...); the `syntax:<lan>:<class>`
+  preferences keep working.
+- Invalidation: after a reparse, `ts_tree_get_changed_ranges` names the
+  lines whose colours change (a comment or a string opened above them);
+  their highlight is detached and they are touched, outside the typesetting
+  pass (the point to settle, section 3).
+- First languages: json and c (no scanner), then cpp and python (phase 4).
+  The present tokenizers stay for the other languages and when the build
+  lacks tree-sitter.
+- Tests: colours of sample files per language compared with
+  `tree-sitter highlight` (as classes); typing `/*` and `"""` re-colours the
+  following lines; timing of typing in a large file (`glue_basic.cpp`).
+
+### Phase 4: external scanners
+
+- The scanners stay in Scheme (`ts-scanner-python.scm` exists): the C
+  runtime calls a C trampoline which calls the Scheme `scan` with a lexer
+  object wrapping `TSLexer` (`lexer-lookahead`, `lexer-advance!`...);
+  serialize and deserialize store the Scheme state in the bytes of
+  tree-sitter (`object->string` and `read`, or an id in a table).
+- Ports: cpp (raw strings), javascript, julia, bash, r; each checked with
+  its corpus as python was.
+- Tests: the corpus of each grammar through the C runtime; timing (a scanner
+  call per token boundary).
+
+### Phase 5: clients
+
+In the order of section 3: structural selection and brackets
+(`syntax-node-at`), complete inputs of sessions (`syntax-errors`),
+indentation (`indents.scm`), outline (`tags.scm`).
+
+### Decisions
+
+1. First languages, and whether Scheme (for TeXmacs's own code) is one of
+   them: its grammars are generic, the queries would be ours.
+2. Tables shipped pre-generated (about 1 MB of text for C, less compressed)
+   or generated at first use with a progress message.
+3. Which branch receives this (maxs_texmacs, or a PR to wip_fixes), and
+   whether the browser build is part of phase 1.
