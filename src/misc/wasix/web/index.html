@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TeXmacs on WASIX</title>
+<style>
+  :root { --bg: #fafafa; --fg: #222; --muted: #666; --line: #ccc; --accent: #2a5db0; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #1b1b1b; --fg: #ddd; --muted: #999; --line: #444; --accent: #7aa7f0; }
+  }
+  body { margin: 0; background: var(--bg); color: var(--fg);
+         font: 14px/1.4 system-ui, sans-serif; }
+  header { padding: 10px 16px; border-bottom: 1px solid var(--line); }
+  header h1 { font-size: 16px; margin: 0; }
+  header p { margin: 4px 0 0; color: var(--muted); }
+  main { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+         gap: 12px; padding: 12px 16px; height: calc(100vh - 90px); box-sizing: border-box; }
+  @media (max-width: 800px) { main { grid-template-columns: 1fr; height: auto; } }
+  section { display: flex; flex-direction: column; min-height: 0; gap: 8px; }
+  textarea { flex: 1; min-height: 200px; font: 12px/1.4 ui-monospace, monospace;
+             background: transparent; color: inherit; border: 1px solid var(--line); padding: 8px; }
+  pre#log { flex: 0 0 160px; overflow: auto; margin: 0; padding: 8px; font-size: 11px;
+            border: 1px solid var(--line); white-space: pre-wrap; }
+  iframe { flex: 1; width: 100%; min-height: 400px; border: 1px solid var(--line); background: white; }
+  button { align-self: flex-start; padding: 6px 14px; border: 1px solid var(--accent);
+           background: var(--accent); color: white; border-radius: 4px; cursor: pointer; }
+  button:disabled { opacity: .5; cursor: default; }
+  #status { color: var(--muted); }
+</style>
+</head>
+<body>
+<header>
+  <h1>TeXmacs on WASIX</h1>
+  <p>The WASIX build of TeXmacs, run by the Wasmer SDK in this page: a document typeset to PDF, headless.</p>
+</header>
+<main>
+  <section>
+    <textarea id="source" spellcheck="false"></textarea>
+    <div><button id="run" disabled>Typeset to PDF</button> <span id="status">loading…</span></div>
+    <pre id="log"></pre>
+  </section>
+  <section>
+    <iframe id="pdf" title="PDF"></iframe>
+  </section>
+</main>
+<script type="module" src="texmacs-wasix.js"></script>
+</body>
+</html>

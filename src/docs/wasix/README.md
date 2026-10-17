@@ -54,6 +54,31 @@ the setjmp/longjmp of MuPDF and S7 (Wasmer 7.5 with Cranelift runs them).
 turns a document into a PDF (the MuPDF writer) in about 7 s, most of it the
 compilation of the module by Cranelift.
 
+## Running in the browser
+
+    make -C build-wasix -f ../misc/wasix/Makefile web
+    node misc/wasix/serve.mjs                 # http://localhost:8094/
+
+The page (`misc/wasix/web`) runs TeXmacs in the Wasmer SDK (`@wasmer/sdk`
+0.19.1, npm installed in `build-wasix/sdk` and copied with the page):
+the program and its files make one package of the SDK
+(`packages.create`), each run a sandbox of its own, with the document of
+the text area in `/workspace/in.tm` and the PDF read back from
+`/workspace/out.pdf`. The SDK runs WASIX in Web Workers sharing the memory
+of the program: the page must be cross-origin isolated (`serve.mjs` sends
+COOP and COEP).
+
+The files (`pack-fs.py`, `texmacs-fs.bin` and its index, 32 MB): the boot
+list of the Emscripten build, the Scheme code, the styles and packages,
+the metrics and the Type 1 fonts; not the TrueType and OpenType fonts (75
+MB), nor the documentation.
+
+In headless Chrome 154 (`node misc/wasix/test/browser-pdf.mjs <tools>`,
+with the puppeteer-core and Chrome for Testing of the Emscripten build), the
+page is ready in 0.9 s (local server) and a run, TeXmacs started and the
+document typeset, takes 0.9 to 1.2 s. Under node, the same through the SDK:
+`node misc/wasix/sdk-run.mjs build-wasix in.tm out.pdf`.
+
 ## Changes to the sources (all under `__wasi__`)
 
 - `pipe_link`, `cmdline_link`: the programs of the plugins started by
@@ -73,5 +98,8 @@ compilation of the module by Cranelift.
 | | |
 |---|---|
 | desktop, headless (`wasmer run`) | converts documents to PDF |
-| browser (`@wasmer/sdk`) | not yet |
+| browser and node (`@wasmer/sdk`) | converts documents to PDF |
 | GUI | not yet: WASIX has no display |
+
+Known: in the SDK (not under `wasmer run`) TeXmacs warns 44 times "cannot
+load picture {}" (an icon it looks for and does not find).
