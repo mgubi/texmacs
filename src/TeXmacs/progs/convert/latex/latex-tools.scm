@@ -498,6 +498,10 @@
   (:synopsis "Return the usepackage command for @doc")
   (set! latex-uses-table (make-ahash-table))
   (latex-use-which-package doc)
+  ;; both define \citeauthor, \citeyear, \citep...: with a CSL style, the
+  ;; citations are those of citation-style-language
+  (when (ahash-ref latex-uses-table "citation-style-language")
+    (ahash-remove! latex-uses-table "natbib"))
   (for (p (ahash-table->list latex-packages-option))
     (ahash-set! latex-uses-table (car p) #t))
   (let* ((l1 latex-all-packages)

@@ -43,6 +43,17 @@
 (define tmtex-auto-consume 0)
 (define tmtex-image-root-url (unix->url "image"))
 (define tmtex-image-root-string "image")
+;; whether the export has a .tex file which is saved, next to which the
+;; files it needs can be written
+(define tmtex-image-dir? #f)
+;; the first bibliography of the document in a CSL style, (NAME FILE KEYS):
+;; its citations and its bibliography are then those of the LaTeX package
+;; citation-style-language (see "Citations in a CSL style" below); global,
+;; as tmtex-packages, for the predicate of the mode csl-package% (Guile)
+(tm-define tmtex-csl #f)
+(define tmtex-csl-resource "")
+(define tmtex-csl-file? #f)
+(define tmtex-csl-names* 'unknown)
 (define tmtex-appendices? #f)
 (define tmtex-indirect-bib? #f)
 (define tmtex-mathjax? #f)
@@ -104,7 +115,8 @@
 
   ;; Other styles
   (beamer-style%        (in? tmtex-style '("beamer" "old-beamer")))
-  (natbib-package%      (in? "cite-author-year" tmtex-packages)))
+  (natbib-package%      (in? "cite-author-year" tmtex-packages))
+  (csl-package%         tmtex-csl))
 
 (tm-define (tmtex-style-init body)
   (noop))
@@ -137,7 +149,8 @@
   (set! tmtex-auto-produce 0)
   (set! tmtex-auto-consume 0)
   (set! tmtex-mathjax? #f)
-  (if (== (url-suffix current-save-target) "tex")
+  (set! tmtex-image-dir? (== (url-suffix current-save-target) "tex"))
+  (if tmtex-image-dir?
       (begin
         (set! tmtex-image-root-url (url-unglue current-save-target 4))
         (with suf (url-suffix tmtex-image-root-url)
@@ -2875,32 +2888,212 @@
 (define (tmtex-cite-raw* s l)
   (tex-apply 'citealp* (tmtex-cite-list l)))
 
-(define (tmtex-cite-textual s l)
+(tm-define (tmtex-cite-textual s l)
   (tex-apply 'citet (tmtex-cite-list l)))
 
-(define (tmtex-cite-textual* s l)
+(tm-define (tmtex-cite-textual* s l)
   (tex-apply 'citet* (tmtex-cite-list l)))
 
-(define (tmtex-cite-parenthesized s l)
+(tm-define (tmtex-cite-parenthesized s l)
   (tex-apply 'citep (tmtex-cite-list l)))
 
-(define (tmtex-cite-parenthesized* s l)
+(tm-define (tmtex-cite-parenthesized* s l)
   (tex-apply 'citep* (tmtex-cite-list l)))
 
 (define (tmtex-render-cite s l)
   (tex-apply 'citetext (tmtex (car l))))
 
-(define (tmtex-cite-author s l)
+(tm-define (tmtex-cite-author s l)
   (tex-apply 'citeauthor (tmtex (car l))))
 
-(define (tmtex-cite-author* s l)
+(tm-define (tmtex-cite-author* s l)
   (tex-apply 'citeauthor* (tmtex (car l))))
 
-(define (tmtex-cite-year s l)
+(tm-define (tmtex-cite-year s l)
   (tex-apply 'citeyear (tmtex (car l))))
 
 (define (tmtex-natbib-triple s l)
   `(protect (citeauthoryear ,@(map tmtex l))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Citations in a CSL style
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; A document whose bibliography has a style csl-NAME is exported for the
+;; package citation-style-language (citeproc-lua, run by LuaLaTeX): the
+;; citations stay commands, \printbibliography replaces the rendered
+;; bibliography, and next to the .tex file go the cited entries as BibTeX
+;; (BASE-refs.bib) and the style NAME.csl, so that LaTeX formats them as
+;; TeXmacs does.
+
+(define tmtex-csl-cite-tags
+  '(cite nocite cite-textual cite-textual* cite-parenthesized
+    cite-parenthesized* cite-author cite-author* cite-year))
+
+(define (tmtex-csl-keys t)
+  ;; the keys of the entries of @t: the labels bib-KEY of a rendered
+  ;; bibliography, and the keys of the citations
+  (cond ((npair? t) '())
+        ((and (func? t 'label 1) (string? (cadr t))
+              (string-starts? (cadr t) "bib-"))
+         (list (string-drop (cadr t) 4)))
+        ((in? (car t) tmtex-csl-cite-tags) (list-filter (cdr t) string?))
+        ((and (func? t 'cite-detail 2) (string? (cadr t))) (list (cadr t)))
+        (else (append-map tmtex-csl-keys (cdr t)))))
+
+(define (tmtex-csl-bibliography t)
+  ;; the first bibliography of @t in a CSL style
+  (cond ((npair? t) #f)
+        ((and (func? t 'bibliography 4) (string? (caddr t))
+              (string-starts? (caddr t) "csl-")
+              (> (string-length (caddr t)) 4))
+         t)
+        (else (let loop ((l (cdr t)))
+                (and (pair? l)
+                     (or (tmtex-csl-bibliography (car l)) (loop (cdr l))))))))
+
+(define (tmtex-find-csl body)
+  (and-with b (tmtex-csl-bibliography body)
+    (list (string-drop (caddr b) 4)
+          (if (string? (cadddr b)) (cadddr b) "")
+          (list-remove-duplicates (tmtex-csl-keys body)))))
+
+(define (tmtex-csl-default-resource file)
+  ;; without a .tex file, the .bib file of the bibliography
+  (cond ((== file "") "references.bib")
+        ((string-ends? file ".bib") file)
+        (else (string-append file ".bib"))))
+
+(define (tmtex-csl-style-source name)
+  ;; as csl-bib-process finds it: next to the document first
+  (let* ((dir (and (url-rooted? (current-buffer)) (url-head (current-buffer))))
+         (u (and dir (url-append dir (string-append name ".csl")))))
+    (if (and u (url-exists? u)) u (csl-style-file name))))
+
+(define (tmtex-csl-write-files)
+  ;; next to the .tex file: the cited entries, and the style unless a file
+  ;; of its name is there already
+  (when tmtex-image-dir?
+    (let* ((name (car tmtex-csl))
+           (bib (url-glue tmtex-image-root-url "-refs.bib"))
+           (csl (url-append (url-head tmtex-image-root-url)
+                            (string-append name ".csl")))
+           (src (tmtex-csl-style-source name)))
+      (string-save (bib-entries-as-bibtex (caddr tmtex-csl) (cadr tmtex-csl)) bib)
+      (set! tmtex-csl-resource (url->string (url-tail bib)))
+      (when (and src (not (url-exists? csl)))
+        (string-save (string-load src) csl)))))
+
+(tm-define (tmtex-biblio s l titled?)
+  (:mode csl-package?)
+  (tmtex-csl-write-files)
+  (list 'printbibliography))
+
+(tm-define (latex-extra-preamble)
+  (:mode csl-package?)
+  (let* ((lan (if (pair? tmtex-languages) (car tmtex-languages) "english"))
+         (loc (if (== lan "english") ""
+                  (string-append ", locale = " (csl-language->locale lan)))))
+    (string-append
+     (former)
+     "% the citations and the bibliography are made by the package\n"
+     "% citation-style-language: compile with LuaLaTeX\n"
+     "\\cslsetup{style = " (car tmtex-csl) loc "}\n"
+     ;; TeXmacs does not abbreviate the names of the journals
+     "\\addbibresource[journal-abbreviation=false]{" tmtex-csl-resource "}\n")))
+
+(tm-define (tmtex-cite s l)
+  (:mode csl-package?)
+  (tex-apply 'cite (tmtex-cite-list l)))
+
+(define (tmtex-csl-option key val)
+  ;; key={val}, in one piece (the serializer puts spaces between pieces)
+  (if (string? val) (string-append key "={" (string-trim-both val) "}")
+      `(!concat ,(string-append key "={") ,val "}")))
+
+(tm-define (tmtex-cite-detail s l)
+  (:mode csl-package?)
+  ;; a locator when the details read as one ("pp. 12-14"), else a suffix
+  (let* ((c (tmtex-cite-list (list (car l))))
+         (d (cadr l))
+         (p (and (string? d) (csl-cite-details d)))
+         (opt (cond ((null? p) #f)
+                    ((and p (assoc-ref p 'locator))
+                     (tmtex-csl-option (assoc-ref p 'label)
+                                       (tmtex (assoc-ref p 'locator))))
+                    ((and p (string? (assoc-ref p 'suffix)))
+                     (tmtex-csl-option "suffix" (tmtex (assoc-ref p 'suffix))))
+                    (else (tmtex-csl-option "suffix"
+                                            `(!concat ", " ,(tmtex d)))))))
+    (if opt (tex-apply 'cite `(!option ,opt) c) (tex-apply 'cite c))))
+
+(define (tmtex-csl-names)
+  ;; for a style whose citations show no names ([1], [Knu84]), ((KEY .
+  ;; NAMES) ...) with the names of the entries as TeXmacs shows them in a
+  ;; textual citation:
+  ;; \textcite and \citeauthor of citation-style-language only know the
+  ;; styles whose citations show the names
+  (when (== tmtex-csl-names* 'unknown)
+    (set! tmtex-csl-names*
+          (csl-textual-authors
+           (string-append "csl-" (car tmtex-csl))
+           (bib-entries-as-bibtex (caddr tmtex-csl) (cadr tmtex-csl))
+           (caddr tmtex-csl))))
+  tmtex-csl-names*)
+
+(define (tmtex-csl-numeric-textual names keys)
+  ;; Knuth [1, 2], Lamport [3]: the consecutive works of the same names
+  ;; share their citation
+  (let loop ((l keys) (groups '()))
+    (cond ((pair? l)
+           (with n (or (assoc-ref names (car l)) (car l))
+             (if (and (pair? groups) (== (caar groups) n))
+                 (loop (cdr l) (cons (append (car groups) (list (car l)))
+                                     (cdr groups)))
+                 (loop (cdr l) (cons (list n (car l)) groups)))))
+          (else
+           (tex-concat
+            (list-intersperse
+             (map (lambda (g)
+                    `(!concat ,(tmtex (car g)) " "
+                              ,(tex-apply 'cite (tmtex-cite-list (cdr g)))))
+                  (reverse groups))
+             ", "))))))
+
+(tm-define (tmtex-cite-textual s l)
+  (:mode csl-package?)
+  (with names (tmtex-csl-names)
+    (if names (tmtex-csl-numeric-textual names (list-filter l string?))
+        (tex-apply 'textcite (tmtex-cite-list l)))))
+
+(tm-define (tmtex-cite-textual* s l)
+  (:mode csl-package?)
+  (tmtex-cite-textual s l))
+
+(tm-define (tmtex-cite-author s l)
+  (:mode csl-package?)
+  (with names (and (string? (car l)) (tmtex-csl-names))
+    (if names (tmtex (or (assoc-ref names (car l)) (car l)))
+        (tex-apply 'citeauthor (tmtex (car l))))))
+
+(tm-define (tmtex-cite-year s l)
+  (:mode csl-package?)
+  ;; when the citations show no names, the citation itself, [2], as TeXmacs
+  (if (tmtex-csl-names)
+      (tex-apply 'citeyearpar (tmtex (car l)))
+      (tex-apply 'citeyear (tmtex (car l)))))
+
+(tm-define (tmtex-cite-parenthesized s l)
+  (:mode csl-package?)
+  (tex-apply 'parencite (tmtex-cite-list l)))
+
+(tm-define (tmtex-cite-parenthesized* s l)
+  (:mode csl-package?)
+  (tex-apply 'parencite (tmtex-cite-list l)))
+
+(tm-define (tmtex-cite-author* s l)
+  (:mode csl-package?)
+  (tmtex-cite-author s l))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Glossaries
@@ -3589,17 +3782,25 @@
         (set! tmtex-style (car style))
         (set! tmtex-packages (cdr style))
         (set! tmtex-languages (list lan))
+        (set! tmtex-csl (tmtex-find-csl body))
+        (set! tmtex-csl-names* 'unknown)
+        (set! tmtex-csl-resource
+              (if tmtex-csl (tmtex-csl-default-resource (cadr tmtex-csl)) ""))
         (set! tmtex-colors '())
         (set! tmtex-colormaps '())
         (import-tmtex-styles)
         (tmtex-style-init body)
         (set! doc (tmtex-style-preprocess doc))
-        (with result (tmtex-postprocess (texmacs->latex doc opts))
+        (with result (with-global tmtex-csl-file? #t
+                       (tmtex-postprocess (texmacs->latex doc opts)))
+          ;; tmtex-csl stays for the preamble, made after the conversion
           (set! tmtex-style "generic")
           (set! tmtex-packages '())
           result))
       (let* ((x2 (tree->stree (tmtm-eqnumber->nonumber (stree->tree x))))
              (x3 (tmtm-match-brackets x2)))
+        ;; a snippet has no bibliography of its own
+        (when (not tmtex-csl-file?) (set! tmtex-csl #f))
         (tmtex-initialize opts)
         (with r (tmtex (tmpre-produce x3))
           (if tmtex-mathjax?

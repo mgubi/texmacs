@@ -182,9 +182,14 @@ As of 2026-10-14.
 
 ### What gives a wrong result today
 
-- **LaTeX export.** A document with a `csl-` style exports its bibliography
-  as it is rendered and its citations as `\cite{key}`: LaTeX prints the
-  labels of TeXmacs, not "(Knuth, 1984)" nor the footnotes.
+- **LaTeX export, the corners** (the export itself works since
+  2026-10-18, see "LaTeX export" below). In a note style, `cite-textual`
+  gives the full names of the package ("Donald E. Knuth" where TeXmacs
+  writes "Knuth" after a first citation) and `cite-year` the whole note.
+  `cite-year` keeps the brackets of a style without names ("[2]" where
+  TeXmacs writes "2"). citeproc-lua puts a capital after a brace
+  ("The {\TeX}book" becomes "The TEXBook" in title case) and, in MLA, leaves
+  out the title which tells two works of an author apart.
 - **The later forms of citations can be missed.** The short or ibid form
   of a repeated citation is found by the number of the citation, which the
   typesetter counts as the macros are evaluated, while the processor counts
@@ -246,11 +251,44 @@ As of 2026-10-14.
 
 ## Next steps
 
-1. The LaTeX export of the citations, and a look at documents in a window:
-   what a user meets first.
+1. A look at documents in a window: what a user meets first.
 2. Style management: download by name, the style attached to the document.
 3. CSL-JSON from Zotero.
 4. The remaining fixtures of names, sorting and text case.
+
+## LaTeX export
+
+A document whose first bibliography has a style `csl-NAME` is exported for
+the LaTeX package `citation-style-language` (citeproc-lua, by Zeping Lee,
+in TeX Live), which formats the citations and the bibliography with the CSL
+style itself (`tmtex.scm`, "Citations in a CSL style", mode `csl-package%`):
+
+- the preamble loads the package, without natbib (both define `\citeauthor`
+  and `\citep`), `\cslsetup{style = NAME}` (with the locale of the document
+  when it is not English) and
+  `\addbibresource[journal-abbreviation=false]{BASE-refs.bib}`;
+- `cite` is `\cite`, `cite-detail` `\cite[page={12-14}]` when its details
+  read as a locator (`csl-cite-details`, as for the citations of TeXmacs)
+  and `\cite[suffix={, text}]` otherwise, `cite-textual` `\textcite`,
+  `cite-parenthesized` `\parencite`, `cite-author` `\citeauthor`,
+  `cite-year` `\citeyear`, `nocite` `\nocite`; the bibliography is
+  `\printbibliography`;
+- in a style whose citations show no names (numbers, labels: tested by
+  `csl-citation-shows-names?`), `\textcite` and `\citeauthor` print
+  `[NO_PRINTED_FORM]`, so the names come from TeXmacs
+  (`csl-textual-authors`): "Knuth and van der Hoeven \cite{knuth86b}", and
+  `cite-year` is `\citeyearpar`;
+- next to the .tex file go the cited entries (`bib-entries-as-bibtex`: from the
+  sources of `bib-compile-sub`, or the whole .bib file without the database
+  tool) and a copy of the style, unless a file of its name is there.
+
+Without a .tex file (a conversion to a string) nothing is written and the
+resource is the .bib file of the bibliography. Compared on a document with
+seven kinds of citations in the 13 styles which come with TeXmacs, compiled
+twice with LuaLaTeX: the text is that of TeXmacs in APA, Chicago
+author-date, Elsevier Harvard, Harvard, IEEE, Springer author-date and
+Nature; the others differ as said in "Open points". The suite `csl` checks
+the export (group "LaTeX export"), without running LaTeX.
 
 ## A bug found on the way
 
