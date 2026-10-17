@@ -48,6 +48,8 @@ bool vue_gpu_ready (SDL_Window* w);
 // their bitmaps were; the editors of Vue are opaque white)
 picture  gpu_backing_picture (int w, int h, bool transparent= false);
 bool     is_gpu_picture (picture p);
+// whether its texture is there (false: the GPU could not make it, too large)
+bool     gpu_picture_ready (picture p);
 renderer gpu_picture_renderer (picture p, double zoom);
 // shift the content of a backing store by (dpx, dpy) pixels (y down)
 void     gpu_translate_picture (picture p, int dpx, int dpy);

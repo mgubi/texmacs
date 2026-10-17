@@ -5482,6 +5482,16 @@ vue_plain_window_widget_rep::post_layout () {
   SI cw= (SI) (el.boundingBox.width  * PIXEL / retina_factor),
      ch= (SI) (el.boundingBox.height * PIXEL / retina_factor);
   if (cw <= 0 || ch <= 0) return false;
+  // a popup is never larger than the screen: it would be cut by it anyway,
+  // and its window could not be drawn (Metal has no drawable larger than
+  // 16384 pixels); done before the test below, which shows the popup once
+  // its window has the size of its contents
+  if (popup) {
+    SI sw, sh;
+    gui_root_extents (sw, sh);
+    cw= min (cw, sw);
+    ch= min (ch, sh);
+  }
   // the smallest size of the contents of a dialog (see do_layout): laid out
   // again when it changed
   if (!(popup || autosize)) {
@@ -6658,6 +6668,13 @@ vue_simple_widget_rep::do_layout () {
     // and centered in it, so that it began in the middle of the view (the
     // tooltips, as the previews of references, were cut and half blank)
     extents= rectangle (0, -h, w, 0);
+    // but no larger than the screen, and the rest is scrolled: its backing
+    // store is as large as the box, and a tooltip of a line of 3000
+    // characters asked for a texture of 66162 pixels, which no GPU makes
+    // (so that nothing at all was shown)
+    SI sw, sh;
+    gui_root_extents (sw, sh);
+    w= min (w, sw); h= min (h, sh);
     // a typeset box has its natural size, unless it was given one: a
     // "resize" around it is a pane of that size, which it has to fill
     // (its own background is painted over the whole of its rectangle)
@@ -7195,8 +7212,9 @@ vue_simple_widget_rep::render (void *data) {
 bool
 vue_simple_widget_rep::renders_opaque (int w, int h) {
   if (!is_nil (zoom_snap) || is_nil (backing_store)) return false;
-  if (is_gpu_picture (backing_store)) // a texture, opaque
-    return backing_store->get_width () >= w && backing_store->get_height () >= h;
+  if (is_gpu_picture (backing_store)) // a texture, opaque, if it could be made
+    return gpu_picture_ready (backing_store) &&
+           backing_store->get_width () >= w && backing_store->get_height () >= h;
   mupdf_picture_rep* p= (mupdf_picture_rep*) backing_store->get_handle ();
   return p != NULL && p->opaque && p->w >= w && p->h >= h;
 }

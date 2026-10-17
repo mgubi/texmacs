@@ -114,6 +114,9 @@ public:
   // a target: an RGBA8 texture which can be drawn into, opaque white or
   // transparent
   virtual gpu_texture new_target (int w, int h, bool transparent= false) = 0;
+  // the largest side of a texture or a target: larger ones are not made
+  // (new_texture and new_target return NULL)
+  virtual int max_texture_side () = 0;
   // the texture of a target has its first row (v = 0) at the bottom (GL)
   virtual bool targets_flipped () = 0;
 

@@ -51,6 +51,7 @@ bool vue_gpu_ready (SDL_Window* w) { (void) w; return false; }
 void vue_gpu_present (SDL_Window* w) { (void) w; }
 picture  gpu_backing_picture (int w, int h, bool t) { (void) w; (void) h; (void) t; return picture (); }
 bool     is_gpu_picture (picture p) { (void) p; return false; }
+bool     gpu_picture_ready (picture p) { (void) p; return false; }
 renderer gpu_picture_renderer (picture p, double z) { (void) p; (void) z; return NULL; }
 void     gpu_translate_picture (picture p, int x, int y) { (void) p; (void) x; (void) y; }
 picture  gpu_copy_picture (picture p) { return p; }
@@ -654,12 +655,40 @@ evict_textures () {
   }
 }
 
+// the factor by which a picture of w x h pixels is reduced to fit in a
+// texture (1: it fits)
+static int
+reduction (int w, int h) {
+  int side= G.B->max_texture_side ();
+  if (side <= 0 || (w <= side && h <= side)) return 1;
+  return (max (w, h) + side - 1) / side;
+}
+
 // a texture from premultiplied RGBA pixels, rows from the top; over white
 // when 'over_white' (the neutral pattern)
 static gpu_texture
 upload_rgba (int w, int h, std::vector<unsigned char>& rgba, bool repeat,
              bool over_white) {
   if (w <= 0 || h <= 0) return NULL;
+  // larger than the GPU takes (an image at a large zoom): averaged over
+  // squares of k x k pixels, which the quads, in coordinates from 0 to 1,
+  // draw at the same place (the colors are premultiplied, so averages)
+  int k= reduction (w, h);
+  if (k > 1) {
+    int nw= (w + k - 1) / k, nh= (h + k - 1) / k;
+    std::vector<unsigned char> small ((size_t) nw * nh * 4);
+    for (int y= 0; y < nh; y++)
+      for (int x= 0; x < nw; x++) {
+        int sum[4]= { 0, 0, 0, 0 }, n= 0;
+        for (int yy= y * k; yy < min (h, (y + 1) * k); yy++)
+          for (int xx= x * k; xx < min (w, (x + 1) * k); xx++, n++)
+            for (int c= 0; c < 4; c++) sum[c] += rgba[((size_t) yy * w + xx) * 4 + c];
+        for (int c= 0; c < 4; c++)
+          small[((size_t) y * nw + x) * 4 + c]= (unsigned char) (sum[c] / n);
+      }
+    rgba.swap (small);
+    w= nw; h= nh;
+  }
   if (over_white)
     for (size_t i= 0; i < (size_t) w * h; i++) {
       unsigned char* d= &rgba[4*i];
@@ -747,7 +776,8 @@ picture_texture (picture p) {
   gpu_texture tex= upload_picture (p, false);
 #endif
   if (tex == NULL) return NULL;
-  size_t bytes= (size_t) w * h * 4;
+  int k= reduction (w, h);
+  size_t bytes= (size_t) ((w + k - 1) / k) * ((h + k - 1) / k) * 4;
   G.textures[id]= { tex, w, h, p, ++G.tick, bytes };
   G.texture_bytes += bytes;
   evict_textures ();
@@ -804,6 +834,12 @@ as_gpu (picture p) {
 bool
 is_gpu_picture (picture p) {
   return as_gpu (p) != NULL;
+}
+
+bool
+gpu_picture_ready (picture p) {
+  gpu_picture_rep* g= as_gpu (p);
+  return g != NULL && ensure_target (&g->t);
 }
 
 // copy a rectangle of src (pixels of its layout, y down) to dst at (dx,

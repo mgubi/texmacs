@@ -237,6 +237,7 @@ public:
   void update_texture (gpu_texture t, int x, int y, int w, int h, const void* data);
   void delete_texture (gpu_texture t);
   gpu_texture new_target (int w, int h, bool transparent= false);
+  int max_texture_side ();
   bool targets_flipped () { return false; }
 
   void draw_quads (const gpu_pass& p, const gpu_quads& q);
@@ -544,9 +545,14 @@ pixel_format (gpu_format f, int& bpp) {
 
 // The largest side of a texture: Metal stops the program (an assertion of
 // the validation of its descriptor) for a larger one, as a box of text with
-// a very long line asked for one 30638 pixels wide. Such a texture is not
+// a very long line asked for one 66162 pixels wide. Such a texture is not
 // made: what would be drawn with it is left out (the callers check)
 static const int metal_max_side= 16384;
+
+int
+metal_backend::max_texture_side () {
+  return metal_max_side;
+}
 
 static bool
 too_large (int w, int h) {

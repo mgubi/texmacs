@@ -81,6 +81,7 @@ gpu_backend* gpu_gl_backend () { return NULL; }
   X(glGenFramebuffers) \
   X(glGenTextures) \
   X(glGenVertexArrays) \
+  X(glGetIntegerv) \
   X(glGetProgramiv) \
   X(glGetShaderInfoLog) \
   X(glGetShaderiv) \
@@ -144,6 +145,7 @@ vue_gl_load () {
 #define glGenFramebuffers vue_glGenFramebuffers
 #define glGenTextures vue_glGenTextures
 #define glGenVertexArrays vue_glGenVertexArrays
+#define glGetIntegerv vue_glGetIntegerv
 #define glGetProgramiv vue_glGetProgramiv
 #define glGetShaderInfoLog vue_glGetShaderInfoLog
 #define glGetShaderiv vue_glGetShaderiv
@@ -322,6 +324,7 @@ class gl_backend: public gpu_backend {
   GLuint prog= 0, vao= 0, vbo= 0;
   GLint u_size= -1, u_mode= -1, u_tex= -1, u_atlas= -1, u_porig= -1, u_ptile= -1;
   GLuint blank= 0;  // 1x1, at the unit of u_tex when a draw has no texture
+  int max_side= 0;  // GL_MAX_TEXTURE_SIZE
   GLuint slug_prog= 0, slug_vao= 0, slug_vbo= 0;
   GLint su_size= -1, su_curves= -1, su_bands= -1, su_bold= -1;
   // ThorVG: canvases drawing into scratch targets. A pass ends by copying
@@ -356,6 +359,7 @@ public:
   void update_texture (gpu_texture t, int x, int y, int w, int h, const void* data);
   void delete_texture (gpu_texture t);
   gpu_texture new_target (int w, int h, bool transparent= false);
+  int max_texture_side () { return max_side; }
   bool targets_flipped () { return true; }
 
   void draw_quads (const gpu_pass& p, const gpu_quads& q);
@@ -426,6 +430,9 @@ bool
 gl_backend::init () {
   prog= link_program (vertex_src, fragment_src);
   if (prog == 0) { cout << "TeXmacs] GPU: the program does not link" << LF; return false; }
+  GLint m= 0;
+  glGetIntegerv (GL_MAX_TEXTURE_SIZE, &m);
+  max_side= (int) m;
   u_size = glGetUniformLocation (prog, "u_size");
   u_mode = glGetUniformLocation (prog, "u_mode");
   u_tex  = glGetUniformLocation (prog, "u_tex");
@@ -520,10 +527,26 @@ formats (gpu_format f, GLenum& ifmt, GLenum& fmt, GLenum& type, int& bpp) {
   }
 }
 
+// The largest side of a texture is that of the GL (often 16384, 4096 or
+// 8192 in a browser): a larger one is not made, and OpenGL says nothing
+// (GL_INVALID_VALUE), so that it was drawn black or not at all. What would
+// be drawn with it is left out (the callers check)
+static bool
+too_large (int w, int h, int max_side) {
+  if (max_side <= 0 || (w <= max_side && h <= max_side)) return false;
+  static bool warned= false;
+  if (!warned) {
+    warned= true;
+    cout << "TeXmacs] GPU: a texture of " << w << "x" << h
+         << " is larger than " << max_side << ", not drawn" << LF;
+  }
+  return true;
+}
+
 gpu_texture
 gl_backend::new_texture (int w, int h, gpu_format f, bool linear, bool repeat,
                          const void* data) {
-  if (ctx == NULL || w <= 0 || h <= 0) return NULL;
+  if (ctx == NULL || w <= 0 || h <= 0 || too_large (w, h, max_side)) return NULL;
   GLenum ifmt, fmt, type; int bpp;
   formats (f, ifmt, fmt, type, bpp);
   gpu_texture t= tm_new<gpu_texture_rep> ();
@@ -587,7 +610,7 @@ gl_backend::free_target (gpu_texture_rep& t) {
 
 gpu_texture
 gl_backend::new_target (int w, int h, bool transparent) {
-  if (ctx == NULL || w <= 0 || h <= 0) return NULL;
+  if (ctx == NULL || w <= 0 || h <= 0 || too_large (w, h, max_side)) return NULL;
   gpu_texture t= tm_new<gpu_texture_rep> ();
   if (!make_target (*t, w, h)) { free_target (*t); tm_delete (t); return NULL; }
   // opaque white, as native_opaque_picture, or transparent
