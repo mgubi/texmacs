@@ -393,8 +393,7 @@
 
 (define-public reconfigure-flag? #t)
 
-;; Other modules should use these accessors: in S7 a public variable which its
-;; module changes with set! keeps its first value in the other modules.
+;; Other modules read and set the flag with these accessors.
 (define-public (plugin-reconfigure?) reconfigure-flag?)
 (define-public (plugin-reconfigure-set! flag) (set! reconfigure-flag? flag))
 
