@@ -63,7 +63,14 @@
           (list 'concat (list 'rep 0 #f (list 'class (list (cons 0 42) (cons 43 cs-end))))
                 (list 'rep 1 #f (list 'lit 42))))
   (check= (parse-pattern "x{2}" #f) (list 'rep 2 2 (list 'lit 120)))
-  (check= (parse-pattern "(?i)k" #f) (list 'class (list (cons 75 76) (cons 107 108)))))
+  (check= (parse-pattern "(?i)k" #f) (list 'class (list (cons 75 76) (cons 107 108))))
+  ;; the operations on the items of a class (tree-sitter-julia uses &&)
+  (check= (parse-pattern "[a-z&&[^aeiou]]" #f)
+          (list 'class (list (cons 98 101) (cons 102 105) (cons 106 111) (cons 112 117)
+                             (cons 118 123))))
+  (check= (parse-pattern "[a-f--c]" #f) (list 'class (list (cons 97 99) (cons 100 103))))
+  (check= (parse-pattern "[a-c~~b-d]" #f) (list 'class (list (cons 97 98) (cons 100 101))))
+  (check= (parse-pattern "[^a-z&&b]" #f) (list 'class (list (cons 0 98) (cons 99 cs-end)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The tables of the JSON grammar

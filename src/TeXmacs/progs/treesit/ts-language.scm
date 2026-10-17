@@ -75,6 +75,80 @@
         (else (let ((e (list-ref (g-ref g 'external-tokens) (sym-index s))))
                 (cons (vector-ref e 0) (vector-ref e 1))))))
 
+(define identifier-names
+  ;; render.rs: the names of the characters in the C identifiers
+  '((126 . "TILDE") (96 . "BQUOTE") (33 . "BANG") (64 . "AT") (35 . "POUND")
+    (36 . "DOLLAR") (37 . "PERCENT") (94 . "CARET") (38 . "AMP") (42 . "STAR")
+    (40 . "LPAREN") (41 . "RPAREN") (45 . "DASH") (43 . "PLUS") (61 . "EQ")
+    (123 . "LBRACE") (125 . "RBRACE") (91 . "LBRACK") (93 . "RBRACK")
+    (92 . "BSLASH") (124 . "PIPE") (58 . "COLON") (59 . "SEMI") (34 . "DQUOTE")
+    (39 . "SQUOTE") (60 . "LT") (62 . "GT") (44 . "COMMA") (46 . "DOT")
+    (63 . "QMARK") (47 . "SLASH") (10 . "LF") (13 . "CR") (9 . "TAB") (0 . "NULL")
+    (1 . "SOH") (2 . "STX") (3 . "ETX") (4 . "EOT") (5 . "ENQ") (6 . "ACK")
+    (7 . "BEL") (8 . "BS") (11 . "VTAB") (12 . "FF") (14 . "SO") (15 . "SI")
+    (16 . "DLE") (17 . "DC1") (18 . "DC2") (19 . "DC3") (20 . "DC4") (21 . "NAK")
+    (22 . "SYN") (23 . "ETB") (24 . "CAN") (25 . "EM") (26 . "SUB") (27 . "ESC")
+    (28 . "FS") (29 . "GS") (30 . "RS") (31 . "US") (127 . "DEL") (#xfeff . "BOM")))
+
+(define (hex-digits n width)
+  (let ((h (number->string n 16)))
+    (string-append (make-string (max 0 (- width (string-length h))) #\0) h)))
+
+(define (separator acc)
+  ;; _ before the name of a character, unless acc is empty or ends with _
+  (let ((n (string-length acc)))
+    (if (or (= n 0) (char=? (string-ref acc (- n 1)) #\_)) "" "_")))
+
+(define (sanitize-identifier name)
+  ;; render.rs (sanitize_identifier)
+  (let loop ((l (utf8->codes name)) (acc ""))
+    (if (null? l) acc
+        (let ((c (car l)))
+          (cond ((or (and (>= c 48) (<= c 57)) (and (>= c 65) (<= c 90))
+                     (and (>= c 97) (<= c 122)) (= c 95))
+                 (loop (cdr l) (string-append acc (string (integer->char c)))))
+                ((and (= c 32) (= (string-length name) 1))
+                 (loop (cdr l) (string-append acc (separator acc)
+                                              "SPACE")))
+                ((assv c identifier-names)
+                 => (lambda (p)
+                      (loop (cdr l) (string-append acc (separator acc)
+                                                   (cdr p)))))
+                ((and (>= c #x80) (<= c #xffff))
+                 (loop (cdr l) (string-append acc "u" (hex-digits c 4))))
+                ((> c #xffff)
+                 (loop (cdr l) (string-append acc "U" (hex-digits c 8))))
+                (else (loop (cdr l) acc)))))))
+
+(define (symbol-identifiers g symbols)
+  ;; render.rs (assign_symbol_id): the C identifier of each symbol, a number
+  ;; telling apart those of the same name
+  (let ((used (make-ahash-table)))
+    (list->vector
+     (ts-map (lambda (s)
+               (let ((id (if (= s sym-end) "ts_builtin_sym_end"
+                             (let* ((md (symbol-metadata g s))
+                                    (k (cdr md))
+                                    (base (string-append
+                                           (cond ((= k vt-auxiliary) "aux_sym_")
+                                                 ((= k vt-anonymous) "anon_sym_")
+                                                 (else "sym_"))
+                                           (sanitize-identifier (car md)))))
+                               (let suffix ((id base) (n 1))
+                                 (if (ahash-ref used id)
+                                     (suffix (string-append base (number->string (+ n 1))) (+ n 1))
+                                     id))))))
+                 (ahash-set! used id #t)
+                 id))
+             symbols))))
+
+(define (string-set-insert x l)
+  ;; insert x in the sorted list of strings l, if it is not in it
+  (cond ((null? l) (list x))
+        ((string=? x (car l)) l)
+        ((string<? x (car l)) (cons x l))
+        (else (cons (car l) (string-set-insert x (cdr l))))))
+
 ;; the part of a language which depends on the symbols only (not on the
 ;; states); the native export (ts-export.scm) sends it to C++
 (define-public (sp-ids sp) (vector-ref sp 0))
@@ -93,18 +167,32 @@
 (define-public (sp-keyword-capture sp) (vector-ref sp 13))
 
 (define-public (ts-language-symbols g symbols infos)
-  ;; symbols as the tables order them, infos the production infos
+  ;; symbols as the tables order them, infos the production infos; as
+  ;; render.rs, the aliases and the supertypes go through the C identifiers
+  ;; of the symbols, which decide their order
   (let* ((n-symbols (length symbols))
+         (symbol-vector (list->vector symbols))
          (ids (make-ahash-table))
          (default-aliases (g-ref g 'default-aliases))
          (supertypes (g-ref g 'supertypes)))
     (ts-map-index (lambda (i s) (ahash-set! ids s i)) symbols)
     (ahash-set! ids sym-eont 0)
     (let* ((token-count (length (ts-filter (lambda (s) (not (non-terminal? s))) symbols)))
+           (public (public-symbol-map g symbols ids default-aliases))
+           (identifiers (symbol-identifiers g symbols))
            (names (make-gvec))
-           (metadata (make-gvec))
-           (unique-aliases (make-gvec))
-           (alias-ids (make-ahash-table)))
+           (metadata (make-gvec)))
+      (define (symbols-for-alias alias)
+        ;; the positions of the symbols which are the node of alias
+        (let ((kind (if (cdr alias) vt-named vt-anonymous)))
+          (let loop ((i 0) (acc '()))
+            (if (= i n-symbols) (reverse acc)
+                (let* ((s (vector-ref symbol-vector i))
+                       (a (ahash-ref default-aliases s))
+                       (ok (if a (equal? a alias)
+                               (let ((md (symbol-metadata g s)))
+                                 (and (equal? (car md) (car alias)) (= (cdr md) kind))))))
+                  (loop (+ i 1) (if ok (cons i acc) acc)))))))
       (for-each
        (lambda (s)
          (let ((alias (ahash-ref default-aliases s))
@@ -118,45 +206,63 @@
                                    ((= k vt-hidden) (if (member s supertypes) 6 2))
                                    (else 0)))))))
        symbols)
-      ;; the aliases of the productions
-      (define (alias-id alias)
-        (or (ahash-ref alias-ids alias)
-            (let* ((kind (if (cdr alias) vt-named vt-anonymous))
-                   (existing (ts-list-index
-                              (lambda (s)
-                                (let ((a (ahash-ref default-aliases s)))
-                                  (if a (equal? a alias)
-                                      (let ((md (symbol-metadata g s)))
-                                        (and (equal? (car md) (car alias)) (= (cdr md) kind))))))
-                              symbols))
-                   (id (or existing
-                           (let ((k (gvec-length unique-aliases)))
-                             (gvec-push! unique-aliases alias)
-                             (+ n-symbols k)))))
-              (ahash-set! alias-ids alias id)
-              id)))
-      (let* ((alias-sequences
-              (list->vector
-               (ts-map (lambda (info) (list->vector (ts-map (lambda (a) (if a (alias-id a) 0))
-                                                            (car info))))
-                       (vector->list infos))))
-             (field-names (ts-sort (ts-dedup (apply append (ts-map (lambda (info) (map car (cdr info)))
-                                                                   (vector->list infos))))
-                                   string<?))
-             (field-maps
-              (list->vector
-               (ts-map (lambda (info)
-                         (apply append
-                                (ts-map (lambda (f)
-                                          (ts-map (lambda (loc) (vector (car f) (car loc) (cdr loc)))
-                                                  (cdr f)))
-                                        (cdr info))))
-                       (vector->list infos)))))
-        (gvec-for-each (lambda (a)
-                         (gvec-push! names (car a))
-                         (gvec-push! metadata (if (cdr a) 3 1)))
-                       unique-aliases)
-        (let* ((word (g-ref g 'word))
+      ;; the aliases of the productions: the public symbol of the first symbol
+      ;; which is their node, else an alias of its own, sorted by name
+      (let* ((alias-table (make-ahash-table))   ; alias -> (id . identifier)
+             (unique
+              (let loop ((l (apply append (ts-map car (vector->list infos)))) (acc '()))
+                (cond ((null? l) acc)
+                      ((or (not (car l)) (ahash-ref alias-table (car l)) (member (car l) acc))
+                       (loop (cdr l) acc))
+                      ((pair? (symbols-for-alias (car l)))
+                       (let ((p (vector-ref public (car (symbols-for-alias (car l))))))
+                         (ahash-set! alias-table (car l) (cons p (vector-ref identifiers p)))
+                         (loop (cdr l) acc)))
+                      (else (loop (cdr l) (cons (car l) acc))))))
+             (unique (ts-sort unique
+                              (lambda (a b)
+                                (or (string<? (car a) (car b))
+                                    (and (string=? (car a) (car b)) (not (cdr a)) (cdr b))))))
+             (by-identifier (make-ahash-table)))
+        (ts-map-index (lambda (k a)
+                        (ahash-set! alias-table a
+                                    (cons (+ n-symbols k)
+                                          (string-append (if (cdr a) "alias_sym_" "anon_alias_sym_")
+                                                         (sanitize-identifier (car a))))))
+                      unique)
+        ;; (not a do loop: under S7, the counter of a do loop whose body
+        ;; calls ahash-set! is changed in place, and all the values stored
+        ;; would be its last one)
+        (let loop ((i 0))
+          (when (< i n-symbols)
+            (ahash-set! by-identifier (vector-ref identifiers i) i)
+            (loop (+ i 1))))
+        (for-each (lambda (a) (let ((e (ahash-ref alias-table a)))
+                                (ahash-set! by-identifier (cdr e) (car e))))
+                  unique)
+        (for-each (lambda (a)
+                    (gvec-push! names (car a))
+                    (gvec-push! metadata (if (cdr a) 3 1)))
+                  unique)
+        (let* ((alias-sequences
+                (list->vector
+                 (ts-map (lambda (info)
+                           (list->vector (ts-map (lambda (a) (if a (car (ahash-ref alias-table a)) 0))
+                                                 (car info))))
+                         (vector->list infos))))
+               (field-names (ts-sort (ts-dedup (apply append (ts-map (lambda (info) (map car (cdr info)))
+                                                                     (vector->list infos))))
+                                     string<?))
+               (field-maps
+                (list->vector
+                 (ts-map (lambda (info)
+                           (apply append
+                                  (ts-map (lambda (f)
+                                            (ts-map (lambda (loc) (vector (car f) (car loc) (cdr loc)))
+                                                    (cdr f)))
+                                          (cdr info))))
+                         (vector->list infos))))
+               (word (g-ref g 'word))
                (externals (g-ref g 'external-tokens))
                (external-symbols
                 (list->vector
@@ -166,17 +272,15 @@
                                      0))
                                externals)))
                (supertype-ids (ts-map (lambda (s) (ahash-ref ids s))
-                                      (ts-filter (lambda (s) (ahash-ref ids s)) supertypes)))
-               ;; the aliases met from here on are not in the names
-               (alias-count (gvec-length unique-aliases))
-               (name-vector (gvec->vector names))
-               (metadata-vector (gvec->vector metadata))
-               (alias-map (query-alias-map g ids alias-id default-aliases))
-               (supertype-map (query-supertype-map g ids alias-id)))
-          (vector ids token-count name-vector metadata-vector
+                                      (ts-filter (lambda (s) (ahash-ref ids s)) supertypes))))
+          (vector ids token-count (gvec->vector names) (gvec->vector metadata)
                   alias-sequences (list->vector field-names) field-maps
-                  external-symbols supertype-ids alias-count alias-map supertype-map
-                  (public-symbol-map g symbols ids default-aliases)
+                  external-symbols supertype-ids (length unique)
+                  (query-alias-map g ids public identifiers alias-table by-identifier
+                                   default-aliases)
+                  (query-supertype-map g ids identifiers alias-table by-identifier
+                                       symbols-for-alias)
+                  public
                   (if (and word (ahash-ref ids word)) (ahash-ref ids word) 0)))))))
 
 (define-public (tables->language g t)
@@ -246,20 +350,25 @@
                 (sp-supertype-map sp)
                 (sp-public-symbols sp))))))
 
-(define (query-alias-map g ids alias-id default-aliases)
-  ;; the aliases (other than the default one) under which each non-terminal
-  ;; appears in the productions
+(define (query-alias-map g ids public identifiers alias-table by-identifier default-aliases)
+  ;; render.rs: the aliases (other than the default one) under which each
+  ;; non-terminal appears in the productions, in the order of their C
+  ;; identifiers, after the public symbol of the non-terminal
   (let ((table (make-ahash-table)))
     (vector-for-each***
      (lambda (p)
        (do ((i 0 (+ i 1))) ((= i (prod-length p)))
          (let* ((step (prod-step p i)) (s (step-symbol step)) (a (step-alias step)))
            (when (and a (non-terminal? s) (ahash-ref ids s)
-                      (not (equal? a (ahash-ref default-aliases s))))
-             (let ((id (alias-id a)))
-               (ahash-set! table s (ts-insert id (or (ahash-ref table s) '()))))))))
+                      (not (equal? a (ahash-ref default-aliases s)))
+                      (ahash-ref alias-table a))
+             (ahash-set! table s (string-set-insert (cdr (ahash-ref alias-table a))
+                                                    (or (ahash-ref table s) '())))))))
      (g-ref g 'productions))
-    (ts-map (lambda (kv) (cons (ahash-ref ids (car kv)) (cons (ahash-ref ids (car kv)) (cdr kv))))
+    (ts-map (lambda (kv)
+              (let ((id (ahash-ref ids (car kv))))
+                (cons id (cons (vector-ref public id)
+                               (ts-map (lambda (x) (ahash-ref by-identifier x)) (cdr kv))))))
             (ts-sort (ahash-table->list table) (lambda (a b) (< (car a) (car b)))))))
 
 (define (vector-for-each*** fun v)
@@ -274,20 +383,32 @@
         (unless (ahash-ref first c) (ahash-set! first c (+ i 1)))
         (vector-set! v i (- (ahash-ref first c) 1))))))
 
-(define (query-supertype-map g ids alias-id)
-  ;; each supertype with the sorted symbols of its visible children
-  (ts-sort
-   (ts-filter (lambda (x) x)
-              (ts-map (lambda (s)
-                        (and (non-terminal? s) (ahash-ref ids s)
-                             (cons (ahash-ref ids s)
-                                   (list->ts
-                                    (ts-filter (lambda (x) x)
-                                               (ts-map (lambda (t) (if (pair? t) (alias-id t) (ahash-ref ids t)))
-                                                       (vector-ref (g-ref g 'variable-children)
-                                                                   (sym-index s))))))))
-                      (g-ref g 'supertypes)))
-   (lambda (a b) (< (car a) (car b)))))
+(define (query-supertype-map g ids identifiers alias-table by-identifier symbols-for-alias)
+  ;; render.rs: each supertype with its visible children, the supertypes and
+  ;; the children in the order of their C identifiers; an aliased child is
+  ;; the alias of the productions, else the symbols which are its node
+  (let* ((entries
+          (ts-filter
+           (lambda (x) x)
+           (ts-map
+            (lambda (s)
+              (and (non-terminal? s) (ahash-ref ids s)
+                   (let ((children '()))
+                     (for-each
+                      (lambda (t)
+                        (for-each (lambda (x) (set! children (string-set-insert x children)))
+                                  (cond ((not (pair? t))
+                                         (if (ahash-ref ids t)
+                                             (list (vector-ref identifiers (ahash-ref ids t)))
+                                             '()))
+                                        ((ahash-ref alias-table t) => (lambda (e) (list (cdr e))))
+                                        (else (ts-map (lambda (p) (vector-ref identifiers p))
+                                                      (symbols-for-alias t))))))
+                      (vector-ref (g-ref g 'variable-children) (sym-index s)))
+                     (list (vector-ref identifiers (ahash-ref ids s)) (ahash-ref ids s) children))))
+            (g-ref g 'supertypes)))))
+    (ts-map (lambda (e) (cons (cadr e) (ts-map (lambda (x) (ahash-ref by-identifier x)) (caddr e))))
+            (ts-sort entries (lambda (a b) (string<? (car a) (car b)))))))
 
 (define (public-symbol-map g symbols ids default-aliases)
   ;; render.rs: the symbols which are the same node to the public API (the

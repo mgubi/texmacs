@@ -31,6 +31,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -2600,9 +2601,13 @@ tree_sitter_tables_finish (int id, string data) {
     t->used_symbols ();
     std::vector<state_t*> states= t->b->states;
     t->b->states.clear ();
+    bool profile= getenv ("TS_PROFILE") != NULL;
+    if (profile) fprintf (stderr, "ts-tables: %d LR states\n", (int) states.size ());
     states= t->merge (states);
+    if (profile) fprintf (stderr, "ts-tables: %d after merging\n", (int) states.size ());
     t->remove_unit_reductions (states);
     states= t->remove_unused (states);
+    if (profile) fprintf (stderr, "ts-tables: %d used\n", (int) states.size ());
     states= t->reorder (states);
     t->build_lex_tables (states);
     t->b->states= states;

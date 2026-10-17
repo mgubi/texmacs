@@ -65,7 +65,8 @@ def parse_corpus(path):
     return tests
 
 def normalize(s):
-    s = re.sub(r";[^\n]*", "", s) if not s.lstrip().startswith("(") else s
+    # the comment lines, as tree-sitter test removes them
+    s = re.sub(r"(?m)^\s*;.*$", "", s)
     s = re.sub(r"\s+", " ", s).strip()
     s = re.sub(r"\( ", "(", s)
     s = re.sub(r" \)", ")", s)
