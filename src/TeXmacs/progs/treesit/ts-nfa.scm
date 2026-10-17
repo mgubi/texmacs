@@ -188,6 +188,10 @@
         (ahash-ref unicode-table key)
         (ts-error "unsupported Unicode property" name))))
 
+(define-public (ts-unicode-property name)
+  ;; the character set of a Unicode property, for the scanners
+  (unicode-property name))
+
 (define-public (parse-pattern str case-insensitive?)
   ;; the Hir of a pattern
   (let* ((codes (list->vector (utf8->codes str)))

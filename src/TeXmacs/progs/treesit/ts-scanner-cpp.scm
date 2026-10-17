@@ -16,7 +16,7 @@
 ;; of the scanners is described in ts-scanner-python.scm.
 
 (texmacs-module (treesit ts-scanner-cpp)
-  (:use (treesit ts-base) (treesit ts-parse)))
+  (:use (treesit ts-base) (treesit ts-parse) (treesit ts-chars)))
 
 (define t-raw-string-delimiter 0)
 (define t-raw-string-content 1)
@@ -25,12 +25,6 @@
 
 ;; the payload is #(delimiter): the list of the code points of the opening
 ;; delimiter of the present raw string, '() outside
-
-(define (cpp-space? c)
-  ;; iswspace
-  (or (= c 32) (and (>= c 9) (<= c 13)) (= c #x85) (= c #xa0) (= c #x1680)
-      (and (>= c #x2000) (<= c #x200a)) (= c #x2028) (= c #x2029)
-      (= c #x202f) (= c #x205f) (= c #x3000)))
 
 (define (scan-delimiter p lx)
   (let ((d (vector-ref p 0)))
@@ -44,7 +38,7 @@
         (let loop ((acc '()) (n 0))
           (let ((c (lexer-lookahead lx)))
             (cond ((or (>= n max-delimiter-length) (lexer-eof? lx) (= c 92)
-                       (cpp-space? c))
+                       (ts-wspace? c))
                    #f)
                   ((= c 40)
                    (vector-set! p 0 (reverse acc))

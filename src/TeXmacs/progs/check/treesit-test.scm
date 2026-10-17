@@ -511,7 +511,21 @@
                 '((0 3 "keyword") (4 5 "variable_function")))
         (check= (tree-sitter-line-colors "python" (tree-ref d 2)) '((0 4 "constant_string")))
         (check= (tree-sitter-line-colors "python" (tree-ref d 3))
-                '((4 10 "keyword") (13 14 "operator") (15 16 "constant_number") (18 21 "comment")))))))
+                '((4 10 "keyword") (13 14 "operator") (15 16 "constant_number") (18 21 "comment")))))
+    ;; JavaScript: automatic semicolons and template strings by its scanner
+    (treesit-generate-cache "javascript")
+    (check= (tree-sitter-parse-sexp (treesit-language "javascript") "a = 1\nb = `x${a}`\n")
+            (string-append "(program (expression_statement (assignment_expression left: (identifier) "
+                           "right: (number))) (expression_statement (assignment_expression "
+                           "left: (identifier) right: (template_string (string_fragment) "
+                           "(template_substitution (identifier))))))"))
+    ;; Java, without scanner
+    (treesit-generate-cache "java")
+    (check= (tree-sitter-parse-sexp (treesit-language "java") "class A { int f() { return 1; } }")
+            (string-append "(program (class_declaration name: (identifier) body: (class_body "
+                           "(method_declaration type: (integral_type) name: (identifier) "
+                           "parameters: (formal_parameters) body: (block (return_statement "
+                           "(decimal_integer_literal)))))))"))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The parse states built in C++
