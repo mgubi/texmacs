@@ -24,6 +24,7 @@
 
 #include "tree_sitter_glue.hpp"
 #include <algorithm>
+#include <chrono>
 #include <functional>
 #include <iterator>
 #include <map>
@@ -47,6 +48,18 @@ inline int sym_kind (int s) { return s / KB; }
 inline int sym_index (int s) { return s % KB; }
 inline int terminal (int i) { return K_TERMINAL * KB + i; }
 inline int non_terminal (int i) { return K_NONTERMINAL * KB + i; }
+
+// under TS_PROFILE, the time since the previous lap (what = NULL starts)
+void
+lap (const char* what) {
+  static bool profile= getenv ("TS_PROFILE") != NULL;
+  static std::chrono::steady_clock::time_point last;
+  std::chrono::steady_clock::time_point now= std::chrono::steady_clock::now ();
+  if (profile && what != NULL)
+    fprintf (stderr, "ts-tables: %s %d ms\n", what, (int)
+             std::chrono::duration_cast<std::chrono::milliseconds> (now - last).count ());
+  last= now;
+}
 inline int external (int i) { return K_EXTERNAL * KB + i; }
 inline bool is_terminal (int s) { return sym_kind (s) == K_TERMINAL; }
 inline bool is_non_terminal (int s) { return sym_kind (s) == K_NONTERMINAL; }
@@ -448,12 +461,22 @@ struct entry_t {
 
 struct item_set_t {
   // an item set while it is built: its entries by key, in insertion order
+  // (the index pos of the keys is made once the set is no longer small, and
+  // covers the first pos.size () entries)
   std::unordered_map<int, int> pos;
   std::vector<entry_t> entries;
   entry_t& insert (item_t* item) {
-    std::unordered_map<int,int>::iterator it= pos.find (item->key);
-    if (it != pos.end ()) return entries[it->second];
-    pos[item->key]= (int) entries.size ();
+    int key= item->key;
+    if (entries.size () <= 16) {
+      for (size_t k= 0; k < entries.size (); k++)
+        if (entries[k].item->key == key) return entries[k];
+    }
+    else {
+      for (size_t k= pos.size (); k < entries.size (); k++)
+        pos[entries[k].item->key]= (int) k;
+      std::unordered_map<int,int>::iterator it= pos.find (key);
+      if (it != pos.end ()) return entries[it->second];
+    }
     entry_t e= { item, 0, 0 };
     entries.push_back (e);
     return entries.back ();
@@ -560,7 +583,10 @@ struct builder_t {
   // the parse table
   std::vector<state_t*> states;
   std::vector<std::vector<entry_t> > kernels;
-  std::vector<ivec> preceding;   // reversed
+  // the preceding symbols of the states, as shared lists: a state has a
+  // node, a node is (symbol . parent node), node 0 the empty list
+  ivec preceding;
+  std::vector<std::pair<int,int> > preceding_nodes;
   std::unordered_map<std::vector<ll>, int, vec_hash> state_ids;
   std::unordered_map<std::vector<ll>, int, vec_hash> core_ids;
   std::vector<std::pair<int, std::vector<aux_info_t> > > queue;
@@ -569,9 +595,10 @@ struct builder_t {
   std::vector<prod_info_t> production_infos;
   std::unordered_map<int,int> production_info_ids;
   int max_aliased_length;
-  std::vector<ivec> used_conflicts;   // in the order of the Scheme list
+  std::vector<ivec> used_conflicts;   // reversed: the Scheme list conses
 
-  builder_t (grammar_t& g2): g (g2), items (g2), queue_head (0), max_aliased_length (1) {}
+  builder_t (grammar_t& g2): g (g2), items (g2), queue_head (0), max_aliased_length (1),
+    preceding_nodes (1, std::make_pair (-1, -1)) {}
   ~builder_t () { for (size_t i= 0; i < states.size (); i++) delete states[i]; }
 
   const ivec& first_set (int s) { return first[s]; }
@@ -585,12 +612,15 @@ struct builder_t {
 
   void make_builder ();
   std::vector<entry_t> closure (const std::vector<entry_t>& kernel);
-  int add_state (const ivec& preceding_symbols, const std::vector<aux_info_t>& aux,
+  int add_state (int pre, const std::vector<aux_info_t>& aux,
                  const std::vector<entry_t>& entries);
+  int cons_preceding (int symbol, int pre) {
+    preceding_nodes.push_back (std::make_pair (symbol, pre));
+    return (int) preceding_nodes.size () - 1; }
   int production_id (item_t* item);
   int compare_precedence (int lk, int lv, const ivec& lsyms, int rk, int rv, const ivec& rsyms);
   void handle_conflict (state_t* state, const std::vector<entry_t>& entries,
-                        const ivec& preceding_symbols, const std::vector<aux_info_t>& aux,
+                        int pre, const std::vector<aux_info_t>& aux,
                         int lookahead, red_info_t& ri);
   void add_actions (int state_id, const std::vector<aux_info_t>& aux,
                     const std::vector<entry_t>& entries);
@@ -770,7 +800,7 @@ builder_t::closure (const std::vector<entry_t>& kernel) {
 }
 
 int
-builder_t::add_state (const ivec& preceding_symbols, const std::vector<aux_info_t>& aux,
+builder_t::add_state (int pre, const std::vector<aux_info_t>& aux,
                       const std::vector<entry_t>& entries) {
   std::vector<ll> sig, core;
   for (size_t i= 0; i < entries.size (); i++) {
@@ -790,7 +820,7 @@ builder_t::add_state (const ivec& preceding_symbols, const std::vector<aux_info_
   s->id= id; s->core= core_id; s->eof_gated= false;
   states.push_back (s);
   kernels.push_back (entries);
-  preceding.push_back (preceding_symbols);
+  preceding.push_back (pre);
   state_ids[sig]= id;
   queue.push_back (std::make_pair (id, aux));
   return id;
@@ -869,7 +899,7 @@ item_done (const item_t* i) { return i->at == NULL; }
 
 void
 builder_t::handle_conflict (state_t* state, const std::vector<entry_t>& entries,
-                            const ivec& preceding_symbols, const std::vector<aux_info_t>& aux,
+                            int pre, const std::vector<aux_info_t>& aux,
                             int lookahead, red_info_t& ri) {
   tentry_t* entry= state->terms.ref (lookahead);
   std::vector<std::pair<std::pair<int,int>, int> > shift_precs;   // ((kind value) . symbol)
@@ -950,9 +980,12 @@ builder_t::handle_conflict (state_t* state, const std::vector<entry_t>& entries,
     std::stable_sort (actual.begin (), actual.end ());
     actual.erase (std::unique (actual.begin (), actual.end ()), actual.end ());
     if (std::find (g.conflicts.begin (), g.conflicts.end (), actual) != g.conflicts.end ())
-      used_conflicts.insert (used_conflicts.begin (), actual);
+      used_conflicts.push_back (actual);
     else {
       std::string m= "unresolved conflict for symbol sequence: ";
+      ivec preceding_symbols;   // reversed
+      for (int x= pre; x != 0; x= preceding_nodes[x].second)
+        preceding_symbols.push_back (preceding_nodes[x].first);
       for (int k= (int) preceding_symbols.size () - 1; k >= 0; k--)
         m += g.symbol_name (preceding_symbols[k]) + " ";
       m += "* " + g.symbol_name (lookahead) + "; add a conflict for these rules: ";
@@ -979,7 +1012,7 @@ void
 builder_t::add_actions (int state_id, const std::vector<aux_info_t>& aux_in,
                         const std::vector<entry_t>& entries) {
   state_t* state= states[state_id];
-  ivec preceding_symbols= preceding[state_id];
+  int pre= preceding[state_id];
   std::map<int, item_set_t> terminal_successors, non_terminal_successors;
   ivec conflicted;
   std::unordered_map<int, red_info_t> reduction_infos;
@@ -1070,9 +1103,7 @@ builder_t::add_actions (int state_id, const std::vector<aux_info_t>& aux_in,
   for (std::map<int,item_set_t>::iterator it= terminal_successors.begin ();
        it != terminal_successors.end (); ++it) {
     int symbol= it->first;
-    ivec pre= preceding_symbols;
-    pre.insert (pre.begin (), symbol);   // (cons symbol preceding)
-    int next_id= add_state (pre, aux, it->second.sorted ());
+    int next_id= add_state (cons_preceding (symbol, pre), aux, it->second.sorted ());
     if (!state->terms.has (symbol)) {
       tentry_t te; te.reusable= true;
       state->terms.set (symbol, te);
@@ -1083,13 +1114,11 @@ builder_t::add_actions (int state_id, const std::vector<aux_info_t>& aux_in,
   }
   for (std::map<int,item_set_t>::iterator it= non_terminal_successors.begin ();
        it != non_terminal_successors.end (); ++it) {
-    ivec pre= preceding_symbols;
-    pre.insert (pre.begin (), it->first);
-    int next_id= add_state (pre, aux, it->second.sorted ());
+    int next_id= add_state (cons_preceding (it->first, pre), aux, it->second.sorted ());
     state->nonterms.set (it->first, make_action (A_GOTO, next_id));
   }
   for (size_t k= 0; k < conflicted.size (); k++)
-    handle_conflict (state, entries, preceding_symbols, aux, conflicted[k],
+    handle_conflict (state, entries, pre, aux, conflicted[k],
                      reduction_infos[conflicted[k]]);
   if (state->terms.has (SYM_EONT)) {
     if (state->terms.size () > 1)
@@ -1134,12 +1163,12 @@ builder_t::build () {
   make_builder ();
   prod_info_t empty;
   production_infos.push_back (empty);
-  add_state (ivec (), std::vector<aux_info_t> (), std::vector<entry_t> ());
+  add_state (0, std::vector<aux_info_t> (), std::vector<entry_t> ());
   {
     std::vector<entry_t> k;
     entry_t e= { items.make (-1, -1, 0, false), pool.intern (ivec (1, SYM_END)), 0 };
     k.push_back (e);
-    add_state (ivec (), std::vector<aux_info_t> (), k);
+    add_state (0, std::vector<aux_info_t> (), k);
   }
   // the states of the non-terminal extras
   {
@@ -1157,7 +1186,7 @@ builder_t::build () {
     for (std::map<int,item_set_t>::iterator it= by_first.begin (); it != by_first.end (); ++it) {
       if (is_non_terminal (it->first))
         throw ts_fail ("non-terminal used in a non-terminal extra rule " + g.symbol_name (it->first));
-      int id= add_state (ivec (), std::vector<aux_info_t> (), it->second.sorted ());
+      int id= add_state (0, std::vector<aux_info_t> (), it->second.sorted ());
       non_terminal_extra_states.push_back (std::make_pair (it->first, id));
     }
   }
@@ -1744,9 +1773,9 @@ last_shift_target (const std::vector<action_t>& actions) {
   return actions.back ().a;
 }
 
-static bool
+template<typename F> static bool
 split_groups (std::vector<ivec>& groups, ivec& group_of, size_t start,
-              std::function<bool(int,int)> should_split,
+              const F& should_split,
               std::vector<bool>* dirty, const std::vector<ivec>* preds) {
   bool result= false;
   std::vector<bool> is_split (group_of.size (), false);
@@ -1841,14 +1870,13 @@ tables_t::merge (std::vector<state_t*> states) {
     }
     return false;
   };
-  std::unordered_map<ll, bool> token_memo;
+  // for the terminals, 0 unknown, 1 no conflict, 2 conflict
+  std::vector<char> token_memo ((size_t) ns * n, 0);
   auto token_conflicts_memo= [&] (int right, int new_token) -> bool {
-    ll key= (ll) right * 4194304 + new_token;
-    std::unordered_map<ll,bool>::iterator it= token_memo.find (key);
-    if (it != token_memo.end ()) return it->second;
-    bool r= token_conflicts (right, new_token);
-    token_memo[key]= r;
-    return r;
+    if (!is_terminal (new_token)) return token_conflicts (right, new_token);
+    char& m= token_memo[(size_t) right * n + sym_index (new_token)];
+    if (m == 0) m= token_conflicts (right, new_token)? 2: 1;
+    return m == 2;
   };
   auto entries_conflict= [&] (const tentry_t& e1, const tentry_t& e2) -> bool {
     const std::vector<action_t>& a1= e1.actions;
@@ -1943,9 +1971,78 @@ tables_t::merge (std::vector<state_t*> states) {
     }
   }
   // (the Scheme code conses the predecessors: the order does not matter)
-  split_groups (groups, group_of, 0, states_conflict, NULL, NULL);
+  lap ("merge: setup");
+  // the split by conflicts, as split_groups with states_conflict, but two
+  // states with the same terminal entries (the shift targets up to their
+  // group) have the same fate: only the first of each class is compared
+  auto same_entries= [&] (int s1, int s2) -> bool {
+    if (states[s1]->reserved != states[s2]->reserved) return false;
+    const std::vector<std::pair<int,int> >& v1= sorted_entries[s1];
+    const std::vector<std::pair<int,int> >& v2= sorted_entries[s2];
+    if (v1.size () != v2.size ()) return false;
+    for (size_t k= 0; k < v1.size (); k++) {
+      if (v1[k].first != v2[k].first) return false;
+      const std::vector<action_t>& a1= states[s1]->terms.vals[v1[k].second].actions;
+      const std::vector<action_t>& a2= states[s2]->terms.vals[v2[k].second].actions;
+      if (a1.size () != a2.size ()) return false;
+      for (size_t j= 0; j < a1.size (); j++) {
+        const action_t& x= a1[j];
+        const action_t& y= a2[j];
+        if (x.kind != y.kind || x.b != y.b || x.c != y.c || x.d != y.d) return false;
+        if (x.kind == A_SHIFT? group_of[x.a] != group_of[y.a]: x.a != y.a) return false;
+      }
+    }
+    return true;
+  };
+  auto entries_hash= [&] (int s) -> size_t {
+    size_t h= states[s]->reserved.size ();
+    const std::vector<std::pair<int,int> >& v= sorted_entries[s];
+    for (size_t k= 0; k < v.size (); k++) {
+      h= h * 1000003u ^ (size_t) v[k].first;
+      const std::vector<action_t>& as= states[s]->terms.vals[v[k].second].actions;
+      for (size_t j= 0; j < as.size (); j++)
+        h= h * 1000003u ^ (size_t) (as[j].kind == A_SHIFT? group_of[as[j].a]: as[j].a);
+    }
+    return h;
+  };
+  for (size_t gid= 0; gid < groups.size (); gid++) {
+    const ivec ids= groups[gid];
+    // per position: the position of the state which splits it, or -1
+    ivec splitter (ids.size (), -1);
+    ivec staying;   // positions of the first staying state of each class
+    std::unordered_map<size_t, ivec> classes;   // hash -> positions of firsts
+    for (size_t x= 0; x < ids.size (); x++) {
+      ivec& firsts= classes[entries_hash (ids[x])];
+      int first= -1;
+      for (size_t k= 0; k < firsts.size () && first < 0; k++)
+        if (same_entries (ids[firsts[k]], ids[x])) first= firsts[k];
+      if (first >= 0) { splitter[x]= splitter[first]; continue; }
+      firsts.push_back ((int) x);
+      for (size_t k= 0; k < staying.size (); k++)
+        if (states_conflict (ids[staying[k]], ids[x])) { splitter[x]= staying[k]; break; }
+      if (splitter[x] < 0) staying.push_back ((int) x);
+    }
+    // the split states in the order in which split_groups finds them
+    std::vector<std::pair<int,int> > split;
+    ivec rest;
+    for (size_t x= 0; x < ids.size (); x++)
+      if (splitter[x] < 0) rest.push_back (ids[x]);
+      else split.push_back (std::make_pair (splitter[x], (int) x));
+    if (split.empty ()) continue;
+    std::stable_sort (split.begin (), split.end ());
+    groups[gid]= rest;
+    int nw= (int) groups.size ();
+    ivec moved;
+    for (size_t k= 0; k < split.size (); k++) {
+      moved.push_back (ids[split[k].second]);
+      group_of[ids[split[k].second]]= nw;
+    }
+    groups.push_back (moved);
+  }
+  lap ("merge: conflicts");
   std::vector<bool> dirty (groups.size (), true);
   while (split_groups (groups, group_of, 0, successors_differ, &dirty, &preds)) {}
+  lap ("merge: successors");
   // the groups of the error state and of the start state come first
   for (int k= 0; k < 2; k++) {
     size_t pos= 0;
@@ -2550,13 +2647,18 @@ tree_sitter_tables_start (string data) {
   try {
     c_string cs (data);
     reader_t r (cs, ((const char*) cs) + N(data));
+    lap (NULL);
     read_grammar (t->g, r);
     t->n= t->g.n_terminals;
+    lap ("read grammar");
     t->b= new builder_t (t->g);
     t->b->build ();
+    lap ("lr");
     t->compute_following ();
     t->coincident_index ();
+    lap ("following, coincident");
     t->token_conflicts ();
+    lap ("token conflicts");
     int id= ++tables_counter;
     all_tables[id]= t;
     out += "(ok "; w_int (out, id);
@@ -2597,19 +2699,24 @@ tree_sitter_tables_finish (int id, string data) {
     t->keywords= r.syms ();
     r.skip ();
     keep= r.p < r.e && r.num () == 1;
+    lap (NULL);
     t->populate_error_state ();
     t->used_symbols ();
     std::vector<state_t*> states= t->b->states;
     t->b->states.clear ();
     bool profile= getenv ("TS_PROFILE") != NULL;
     if (profile) fprintf (stderr, "ts-tables: %d LR states\n", (int) states.size ());
+    lap ("error state");
     states= t->merge (states);
     if (profile) fprintf (stderr, "ts-tables: %d after merging\n", (int) states.size ());
+    lap ("merge");
     t->remove_unit_reductions (states);
     states= t->remove_unused (states);
     if (profile) fprintf (stderr, "ts-tables: %d used\n", (int) states.size ());
     states= t->reorder (states);
+    lap ("unit, unused, reorder");
     t->build_lex_tables (states);
+    lap ("lex");
     t->b->states= states;
     grammar_t& g= t->g;
     out += keep? "(ok #f ": "(ok (";
@@ -2665,7 +2772,7 @@ tree_sitter_tables_finish (int id, string data) {
     out += ") ";
     w_int (out, t->b->max_aliased_length);
     out += "(";
-    for (size_t k= 0; k < t->b->used_conflicts.size (); k++) write_syms (out, t->b->used_conflicts[k]);
+    for (size_t k= t->b->used_conflicts.size (); k > 0; k--) write_syms (out, t->b->used_conflicts[k-1]);
     out += ") ";
     if (keep) out += "#f #f";
     else {
