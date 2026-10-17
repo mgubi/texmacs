@@ -134,11 +134,12 @@
       seconds; with <scm|:permanent>, this is used for periodic maintenance,
       such as the backups of the server.
 
-      <item*|<scm|(:refresh <scm-arg|ms>)>>Meant to evaluate
-      <scm-arg|body> after a change of the document, once the user has been
-      inactive during <scm-arg|ms> milliseconds. It is not used in the
-      sources, and its current implementation never evaluates
-      <scm-arg|body>.
+      <item*|<scm|(:refresh <scm-arg|ms>)>>Evaluate <scm-arg|body> once
+      the user has been inactive during <scm-arg|ms> milliseconds. With
+      <scm|:permanent> after it, <scm-arg|body> is evaluated again after
+      each later change of the document, once the user has been inactive
+      again during <scm-arg|ms> milliseconds; without a change, nothing
+      happens.
 
       <item*|<scm|(:require <scm-arg|cond>)>>Postpone the evaluation until
       <scm-arg|cond> holds.

@@ -6,15 +6,11 @@ went); add what you find. Paths are relative to the repository root.
 
 ## Waiting for a decision
 
-- **Merge PR #215 and PR #311 into `wip_fixes`.** #215 fixes the keyboard
-  maps (`kbd-unmap` rewrites keys, reverse bindings, `:require` conditions,
-  graphics menus, a bare predicate in `kbd-unmap`); #311 makes
-  `delayed (:refresh ms)` run its body and maps the BibTeX style `abstract`
-  to `tm-abstract` when `bibtex` is not installed. Then merge `wip_fixes`
-  into `maxs_texmacs` again (it was merged on 2026-10-07, before these
-  PRs) and update
-  `src/TeXmacs/doc/devel/scheme/utils/utils-dialogue.en.tm`, which says
-  that `:refresh` does not work.
+- **Merge PR #215 into `wip_fixes`.** It fixes the keyboard maps
+  (`kbd-unmap` rewrites keys, reverse bindings, `:require` conditions,
+  graphics menus, a bare predicate in `kbd-unmap`). Then merge `wip_fixes`
+  into `maxs_texmacs` again. (#311, `delayed (:refresh ms)`, was merged on
+  2026-10-14 and is here; the developer manual says how `:refresh` works.)
 
 ## Bugs found, not fixed
 
