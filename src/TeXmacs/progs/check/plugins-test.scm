@@ -1088,7 +1088,7 @@
                (url-append pipes-dir "wrapper.sh")))
 
 (define saved-reconfigure-flag* (plugin-reconfigure?))
-(plugin-reconfigure-set! #t)  ; (not set!, which S7 does not pass on)
+(plugin-reconfigure-set! #t)
 
 (plugin-configure tmtestwrapper
   (:launch ,(string-append "sh '" (pipes-file "wrapper.sh") "'"))
