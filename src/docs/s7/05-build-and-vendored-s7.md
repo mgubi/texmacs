@@ -74,7 +74,7 @@ the generators (`build-glue.scm`, `make-apidoc-*.scm`).
 ## 5.2 The vendored s7
 
 `src/Scheme/S7/s7.c` and `s7.h` are **s7 11.9 (21-Sep-2026) as released**
-(`https://ccrma.stanford.edu/software/s7/s7.tar.gz`), with five local
+(`https://ccrma.stanford.edu/software/s7/s7.tar.gz`), with six local
 patches (below). The patches are kept in `src/Scheme/S7/patches/`, made
 one after the other from stock s7, with a description at the top of each
 and a `README.md`; the changed code is marked `TeXmacs:` in `s7.c`.
@@ -163,6 +163,20 @@ unchanged), which `start_scheme` sets to `#t`.
   editing suites gain about 5%, within the noise of a loaded machine. Less
   than the time the macros took (§6.2) because the copied pairs are still
   optimized again at each use.
+
+**Patch 0006, unbinding public definitions from their module.** s7 caches,
+for each symbol, the let of its latest local binding, and a lookup scans the
+older lets on its way there (§2.3). A public definition was bound in its
+module and in the rootlet, so the lookups from modules older than the
+defining one scanned their own let and the user module. The patch adds
+`s7_unshadow_global (sc, let, symbol)`, registered as `unshadow-global!`
+in `s7_tm.cpp`: it removes the binding of `symbol` in `let` and makes the
+symbol global again, as if it had only been defined in the rootlet. It does
+so only when these two are the only bindings the symbol ever had (s7's
+`symbol_ctr` is 2), so no other let can hold it; otherwise it changes
+nothing and returns `#f`. `define-public` calls it (§2.2). The Scheme
+scanners of tree-sitter became 3x faster; the regression suites pass
+unchanged.
 
 **No patch of the lookups.** Earlier versions of the port patched s7's symbol
 lookup:

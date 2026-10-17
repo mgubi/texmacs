@@ -10663,6 +10663,31 @@ static s7_pointer g_cutlet(s7_scheme *sc, s7_pointer args)
   return(let);
 }
 
+/* TeXmacs: the public definitions of the module system are bound in their module and in the
+ *   rootlet. The symbol then caches the id of the module, and the lookups from the other modules
+ *   scan the lets on their way to the rootlet (the user module has hundreds of slots). When these
+ *   two are the only bindings the symbol ever had, this removes the one in let and makes the
+ *   symbol global again, as if it had only been defined in the rootlet: the lookups go straight
+ *   there. With another binding (a parameter, a local variable, a second definition), a let might
+ *   still hold it, so nothing changes (false is returned).
+ */
+bool s7_unshadow_global(s7_scheme *sc, s7_pointer let, s7_pointer symbol)
+{
+  s7_pointer slot, last_slot = NULL;
+  if ((!is_let(let)) || (let == sc->rootlet) || (!is_symbol(symbol)) || (is_keyword(symbol)) ||
+      (symbol_ctr(symbol) != 2) || (!is_slot(global_slot(symbol))))
+    return(false);
+  for (slot = let_slots(let); is_slot_checked(slot); last_slot = slot, slot = next_slot(slot))
+    if (slot_symbol(slot) == symbol) break;
+  if ((!is_slot_checked(slot)) || (is_immutable_slot(slot)) || (local_slot(symbol) != slot))
+    return(false);
+  if (last_slot) slot_set_next(last_slot, next_slot(slot));
+  else let_set_slots(let, next_slot(slot));
+  set_local_slot(symbol, global_slot(symbol));
+  symbol_set_id_unchecked(symbol, 0);  /* is_global */
+  return(true);
+}
+
 
 /* -------------------------------- sublet -------------------------------- */
 static s7_pointer sublet_1(s7_scheme *sc, s7_pointer let, s7_pointer bindings, s7_pointer caller)
