@@ -60,8 +60,9 @@ is what `tests/CMakeLists.txt` expects of them. New tests are written in
 ordinary TeXmacs C++ over `tests/tm_test.hpp`, which brings `CHECK`,
 `CHECK_MSG`, `CHECK_EQ` and `SKIP`, and a `main` which lists its tests with
 `RUN` and returns `test_report ()`: a test then needs no QtTest idiom (the
-Makefile still links QtTest into every binary, with the macOS
-`-framework QtTest`). `tests/Makefile` builds both kinds, and runs `moc` only
+Makefile still links QtTest into every binary of a Qt build, as the build
+links the other modules of Qt: `-framework QtTest` on macOS, `-lQt6Test`
+on Linux and Windows). `tests/Makefile` builds both kinds, and runs `moc` only
 on the sources which declare a `Q_OBJECT`. A build without Qt (Vue, Cocoa:
 no `moc`) builds and runs only the tests over `tm_test.hpp`, and links no
 QtTest; it says how many QtTest tests it leaves out.

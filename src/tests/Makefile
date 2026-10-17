@@ -42,7 +42,11 @@ include $(BUILD)/flags.mk
 TM_OBJS := $(filter-out %/unix_entrypoint.o %/windows32_entrypoint.o \
                         %/windows64_entrypoint.o, $(wildcard $(SRC)/Objects/*.o))
 
-TEST_LIBS := -framework QtTest
+# QtTest, as the build links the other modules of Qt (pkg-config):
+# -framework QtWidgets on macOS gives -framework QtTest, -lQt6Widgets on
+# Linux and Windows -lQt6Test
+TEST_LIBS := $(if $(filter -framework,$(TM_QTLIBS)),-framework QtTest,\
+               $(patsubst %Widgets,%Test,$(filter -l%Widgets,$(TM_QTLIBS))))
 
 # without Qt (the Vue and Cocoa builds: no moc), only the tests over
 # tests/tm_test.hpp; those written against QtTest are left out

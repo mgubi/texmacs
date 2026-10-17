@@ -59,6 +59,10 @@ jobs:
       - name: Build
         run: make -j"$(nproc)"
 
+      # the C++ unit tests (tests/Makefile), QtTest ones included
+      - name: Unit tests
+        run: make -C tests
+
       - name: Run the regression suites
         run: ../.github/scripts/run-tests.sh TeXmacs/bin/texmacs.bin
 
@@ -206,6 +210,10 @@ jobs:
           cmd=$(make -n Objects/texmacs.bin 2> /dev/null | grep -- "-o Objects/texmacs.bin" | tail -1)
           echo "${cmd:0:200}..."
           eval "$cmd -Wl,--trace-symbol=TTF_OpenFont -Wl,--trace" 2>&1 | grep -i "sdl\|TTF_OpenFont\|vue-deps" | head -40 || true
+
+      # the C++ unit tests without Qt (those over tests/tm_test.hpp)
+      - name: Unit tests
+        run: LD_LIBRARY_PATH="$DEPS/lib" make -C tests
 
       # SDL3 and SDL3_ttf next to TeXmacs (the script TeXmacs/bin/texmacs
       # puts TeXmacs/lib in LD_LIBRARY_PATH)
