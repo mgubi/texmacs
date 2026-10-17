@@ -8966,6 +8966,19 @@ tmg_tree_sitter_language_new (tmscm arg1) {
 }
 
 tmscm
+tmg_tree_sitter_language_load (tmscm arg1) {
+  TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "tree-sitter-language-load");
+
+  url in1= tmscm_to_url (arg1);
+
+  // TMSCM_DEFER_INTS;
+  int out= tree_sitter_language_load (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return int_to_tmscm (out);
+}
+
+tmscm
 tmg_tree_sitter_parse_sexp (tmscm arg1, tmscm arg2) {
   TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "tree-sitter-parse-sexp");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "tree-sitter-parse-sexp");
@@ -12420,6 +12433,7 @@ initialize_glue_basic () {
   tmscm_install_procedure ("sql-exec",  tmg_sql_exec, 2, 0, 0);
   tmscm_install_procedure ("sql-quote",  tmg_sql_quote, 1, 0, 0);
   tmscm_install_procedure ("tree-sitter-language-new",  tmg_tree_sitter_language_new, 1, 0, 0);
+  tmscm_install_procedure ("tree-sitter-language-load",  tmg_tree_sitter_language_load, 1, 0, 0);
   tmscm_install_procedure ("tree-sitter-parse-sexp",  tmg_tree_sitter_parse_sexp, 2, 0, 0);
   tmscm_install_procedure ("tree-sitter-query-new",  tmg_tree_sitter_query_new, 2, 0, 0);
   tmscm_install_procedure ("tree-sitter-query-capture-names",  tmg_tree_sitter_query_capture_names, 1, 0, 0);

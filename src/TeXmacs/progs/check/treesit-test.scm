@@ -27,7 +27,7 @@
   (:use (check check-lib)
         (treesit ts-base) (treesit ts-grammar) (treesit ts-nfa)
         (treesit ts-tables) (treesit ts-build) (treesit ts-language)
-        (treesit ts-parse) (treesit ts-export)))
+        (treesit ts-parse) (treesit ts-export) (treesit ts-registry)))
 
 (define (json-grammar-file)
   (url->system (url-concretize "$TEXMACS_PATH/misc/tree-sitter/json/grammar.json")))
@@ -288,6 +288,28 @@
             '((0 1 "short") (0 1 "ab") (4 6 "long") (9 10 "short") (9 10 "x")))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; The registry
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (test-registry)
+  ;; the grammars shipped in misc/tree-sitter, and the cache of the tables
+  ;; (made here without the background process of treesit-prepare)
+  (check-false (treesit-supported? "fortran"))
+  (for (lan treesit-languages)
+    (check-true (url-exists? (treesit-grammar-url lan))))
+  (when (defined? 'tree-sitter-language-load)
+    (check-true (treesit-supported? "json"))
+    (let ((file (treesit-cache-url "json")))
+      (check= (url-suffix file) "tsdyn")
+      (treesit-generate-cache "json")
+      (check-true (url-exists? file))
+      (let ((id (treesit-language "json")))
+        (check-true (integer? id))
+        (check= (tree-sitter-parse-sexp id "[1, 2")
+                "(document (array (number) (number) (MISSING \"]\")))")
+        (check= (treesit-language "json") id)))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Master routine
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -301,4 +323,5 @@
   (test-save)
   (test-calc)
   (test-c-runtime)
+  (test-registry)
   (check-end))

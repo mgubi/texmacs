@@ -16,6 +16,7 @@
 #include "tree_sitter_glue.hpp"
 #include "array.hpp"
 #include "tm_ostream.hpp"
+#include "file.hpp"
 #include "ts_dynamic.h"
 #include "tree-sitter/include/tree_sitter/api.h"
 #include <stdlib.h>
@@ -44,6 +45,14 @@ tree_sitter_language_new (string data) {
   }
   ts_languages << l;
   return N(ts_languages) - 1;
+}
+
+int
+tree_sitter_language_load (url file) {
+  // the language of a file written by ts-export-language, or -1
+  string data;
+  if (load_string (file, data, false)) return -1;
+  return tree_sitter_language_new (data);
 }
 
 string

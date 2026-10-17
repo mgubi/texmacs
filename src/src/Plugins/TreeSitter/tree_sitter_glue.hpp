@@ -12,8 +12,10 @@
 #define TREE_SITTER_GLUE_H
 #include "string.hpp"
 #include "array.hpp"
+#include "url.hpp"
 
 int    tree_sitter_language_new (string data);
+int    tree_sitter_language_load (url file);
 string tree_sitter_parse_sexp (int language, string text);
 int    tree_sitter_query_new (int language, string source);
 array<string> tree_sitter_query_capture_names (int query);
