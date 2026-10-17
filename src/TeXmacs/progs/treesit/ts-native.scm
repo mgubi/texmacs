@@ -12,16 +12,16 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;; The LR(1) construction (ts-tables.scm) and the stages of build-tables!
-;; which act on its states (the error state, the merging of compatible
-;; states, the unit reductions, the unused states, the order) are done by a
-;; port in C++ when TeXmacs has it: the same tables, much faster for large
-;; grammars (C++: about 100000 states before merging). The token conflicts,
-;; the keywords and the lex tables stay here.
+;; (the token conflicts, the error state, the merging of compatible states,
+;; the unit reductions, the unused states, the order, the lex tables) are
+;; done by a port in C++ when TeXmacs has it: the same tables, much faster
+;; for large grammars (C++: about 100000 states before merging). The
+;; keywords are chosen here.
 ;;
 ;; The syntax grammar goes to C++ as a text of integers and strings LEN:BYTES
 ;; (write-syntax-grammar); C++ keeps the states and gives back, as data for
-;; read, the tokens which may follow each token and the coincident tokens,
-;; then, given the token conflicts and the keywords, the final states.
+;; read, the tokens which may follow each token, the coincident tokens and
+;; the token conflicts, then, given the keywords, the final states.
 
 (texmacs-module (treesit ts-native)
   (:use (treesit ts-base) (treesit ts-grammar) (treesit ts-nfa) (treesit ts-tables)))
@@ -161,7 +161,7 @@
     (for-each (lambda (d) (gvec-push! v (vector (car d) (cadr d) (caddr d)))) l)
     v))
 
-(define-public (ts-native-build g identify-keywords make-token-conflict-map . keep?)
+(define-public (ts-native-build g identify-keywords . keep?)
   ;; the parse table as build-tables! makes it, with its lex tables:
   ;; (t tc ci keywords lex); with keep? the states stay in C++ and the
   ;; result is (id . t), t without the states, for tree-sitter-tables-export
@@ -169,20 +169,15 @@
   (let* ((text (call-with-output-string (lambda (port) (write-syntax-grammar g port))))
          (r (string->object (tree-sitter-tables-start text))))
     (when (eq? (car r) 'error) (ts-error (cadr r)))
-    (ts-profile "lr")
-    ;; r = (ok id following contains without-word)
+    (ts-profile "lr, token conflicts (C++)")
+    ;; r = (ok id following contains without-word token-conflicts)
     (let* ((id (list-ref r 1))
-           (following (list->vector (list-ref r 2)))
-           (n (vector-length following))
-           (tc (make-token-conflict-map g following))
-           (ci (begin (ts-profile "token conflicts")
-                      (vector n (bits->vector (list-ref r 3)) (bits->vector (list-ref r 4)))))
+           (n (length (list-ref r 2)))
+           (tc (vector n (list-ref r 5)))
+           (ci (vector n (bits->vector (list-ref r 3)) (bits->vector (list-ref r 4))))
            (keywords (identify-keywords g tc ci))
            (input (call-with-output-string
                    (lambda (port)
-                     (let ((m (vector-ref tc 1)))
-                       (do ((i 0 (+ i 1))) ((= i (vector-length m)))
-                         (w-int (vector-ref m i) port)))
                      (w-syms keywords port)
                      (when (pair? keep?) (w-int 1 port)))))
            (d (begin (ts-profile "keywords")

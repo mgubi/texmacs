@@ -735,6 +735,14 @@ Done in part (2026-10-17):
   C++ now: grammar 0.5 s, LR 3.2 s, token conflicts 5.8 s (Scheme),
   states and lex tables 2.4 s, language 0.5 s. The token conflicts are
   the largest stage left in Scheme.
+- **Token conflicts in C++** (same day): `tree-sitter-tables-start` now
+  also runs the NFAs of each pair of tokens (`make-token-conflict-map`)
+  and sends the statuses back with the following tokens, for the choice of
+  the keywords (still in Scheme). Tables byte-identical. Generation under
+  S7 in TeXmacs: cpp 6.5 s and 1.2 GB (LR and token conflicts 3.2 s,
+  states and lex tables 2.2 s, grammar 0.6 s, language 0.4 s), c 0.74 s,
+  python 0.49 s, scheme 0.2 s. What remains in Scheme is reading the
+  grammar, its NFA and the keywords.
 
 As planned initially:
 

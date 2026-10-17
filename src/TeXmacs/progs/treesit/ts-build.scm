@@ -979,14 +979,14 @@
   ;; the parse table of build-parse-table, completed
   (ts-profile "grammar")
   (if (ts-native-tables?)
-      (apply build-tables-end! g (ts-native-build g identify-keywords make-token-conflict-map))
+      (apply build-tables-end! g (ts-native-build g identify-keywords))
       (build-tables-scheme! g)))
 
 (define-public (build-tables-for-export g)
   ;; (id . t): the tables made in C++ and kept there for
   ;; tree-sitter-tables-export, t with the symbols and the production infos
   (ts-profile "grammar")
-  (ts-native-build g identify-keywords make-token-conflict-map #t))
+  (ts-native-build g identify-keywords #t))
 
 (define (build-tables-end! g t tc ci keywords lex)
   ;; the last details, after the merging of the states and the lex tables

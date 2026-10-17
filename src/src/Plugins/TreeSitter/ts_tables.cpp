@@ -29,6 +29,7 @@
 #include <map>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 #include <stdlib.h>
 #include <string.h>
@@ -1518,6 +1519,7 @@ struct tables_t {
   bool coincident (int a, int b) { return contains[n * a + b]; }
 
   void coincident_index ();
+  void token_conflicts ();
   ivec following_tokens (int k);
   std::vector<ivec> following;
   void compute_following ();
@@ -1588,6 +1590,97 @@ tables_t::coincident_index () {
         }
       }
   }
+}
+
+/* The token conflicts (token_conflicts.rs, make-token-conflict-map of
+   ts-build.scm): for each pair of tokens i and j, the NFAs of both are run
+   on the same characters, and the statuses say how one can get in the way of
+   the other: tc[n * i + j] for i, tc[n * j + i] for j. */
+
+const int MATCHES_PREFIX= 1, DOES_MATCH_CONTINUATION= 2, MATCHES_DIFFERENT_STRING= 32;
+
+void
+tables_t::token_conflicts () {
+  lexer_t lx (g);
+  int n_nfa= (int) g.nfa.size ();
+  ivec var_of (n_nfa, 0);
+  for (int s= 0; s < n_nfa; s++) var_of[s]= lx.variable_index (s);
+  std::vector<cset> starting (n), following_chars (n);
+  for (int k= 0; k < n; k++) {
+    ivec ids= lx.closure (ivec (1, g.start_state[k]));
+    for (size_t x= 0; x < ids.size (); x++)
+      if (g.nfa[ids[x]].kind == 0) starting[k]= cs_add (starting[k], g.nfa[ids[x]].chars);
+  }
+  for (int k= 0; k < n; k++)
+    for (size_t x= 0; x < following[k].size (); x++)
+      if (is_terminal (following[k][x]))
+        following_chars[k]= cs_add (following_chars[k], starting[sym_index (following[k][x])]);
+  tc.assign ((size_t) n * n, 0);
+  for (int i= 0; i < n; i++)
+    for (int j= 0; j < i; j++) {
+      int r0= 0, r1= 0;
+      auto mark= [&] (int who, int bit) { if (who == i) r0 |= bit; else r1 |= bit; };
+      std::unordered_set<ivec, vec_hash> visited;
+      std::vector<ivec> queue;
+      ivec first;
+      first.push_back (g.start_state[i]);
+      first.push_back (g.start_state[j]);
+      queue.push_back (first);
+      while (!queue.empty ()) {
+        ivec state_set= queue.back ();
+        queue.pop_back ();
+        int first_live= var_of[state_set[0]];
+        bool all_same= true;
+        for (size_t x= 0; x < state_set.size () && all_same; x++)
+          if (var_of[state_set[x]] != first_live) all_same= false;
+        if (all_same) { mark (first_live == i? i: j, MATCHES_DIFFERENT_STRING); continue; }
+        ivec ids= lx.closure (state_set);
+        int within_sep= -1;   // unknown
+        bool has_completion= false;
+        int c_id= 0, c_prec= 0;
+        std::vector<std::pair<int,int> > cs= lx.completions (ids);
+        for (size_t x= 0; x < cs.size (); x++) {
+          int id= cs[x].first, prec= cs[x].second;
+          if (within_sep < 0) within_sep= lx.any_separator (ids)? 1: 0;
+          if (within_sep == 1) mark (id == i? i: j, DOES_MATCH_SEPARATORS);
+          if (has_completion) {
+            if (id != c_id) {
+              int preferred;
+              if (lx.prefer_token (c_prec, c_id, prec, id)) preferred= c_id;
+              else { c_id= id; c_prec= prec; preferred= id; }
+              mark (preferred == i? i: j, MATCHES_SAME_STRING);
+            }
+          }
+          else { has_completion= true; c_id= id; c_prec= prec; }
+        }
+        std::vector<transition_t> ts= lx.transitions (ids);
+        for (size_t x= 0; x < ts.size (); x++) {
+          const transition_t& t= ts[x];
+          if (has_completion) {
+            int prev= -1, advanced= -1;
+            bool found= false;
+            for (size_t k= 0; k < t.states.size () && !found; k++) {
+              int v= var_of[t.states[k]];
+              if (v == prev) continue;
+              if (v == c_id) found= true;
+              else { prev= v; advanced= v; }
+            }
+            if (advanced >= 0 && !found) {
+              if (lx.prefer_transition (t, c_id, c_prec, within_sep == 1)) {
+                int other= advanced == i? j: i;
+                mark (advanced == i? i: j, DOES_MATCH_CONTINUATION);
+                if (!cs_intersect (t.chars, following_chars[other]).empty ())
+                  mark (advanced == i? i: j, DOES_MATCH_VALID_CONTINUATION);
+              }
+              else mark (c_id == i? i: j, MATCHES_PREFIX);
+            }
+          }
+          if (visited.insert (t.states).second) queue.push_back (t.states);
+        }
+      }
+      tc[(size_t) n * i + j]= r0;
+      tc[(size_t) n * j + i]= r1;
+    }
 }
 
 void
@@ -2450,7 +2543,7 @@ int tables_counter= 0;
 
 string
 tree_sitter_tables_start (string data) {
-  // (ok id following contains without-word), or (error message)
+  // (ok id following contains without-word token-conflicts), or (error message)
   tables_t* t= new tables_t;
   std::string out;
   try {
@@ -2462,6 +2555,7 @@ tree_sitter_tables_start (string data) {
     t->b->build ();
     t->compute_following ();
     t->coincident_index ();
+    t->token_conflicts ();
     int id= ++tables_counter;
     all_tables[id]= t;
     out += "(ok "; w_int (out, id);
@@ -2471,7 +2565,9 @@ tree_sitter_tables_start (string data) {
     for (size_t i= 0; i < t->contains.size (); i++) out += t->contains[i]? '1': '0';
     out += "\" \"";
     for (size_t i= 0; i < t->without_word.size (); i++) out += t->without_word[i]? '1': '0';
-    out += "\")";
+    out += "\" #(";
+    for (size_t i= 0; i < t->tc.size (); i++) w_int (out, t->tc[i]);
+    out += "))";
   }
   catch (ts_fail& f) {
     delete t;
@@ -2497,8 +2593,6 @@ tree_sitter_tables_finish (int id, string data) {
   try {
     c_string cs (data);
     reader_t r (cs, ((const char*) cs) + N(data));
-    t->tc.resize ((size_t) t->n * t->n);
-    for (size_t i= 0; i < t->tc.size (); i++) t->tc[i]= (int) r.num ();
     t->keywords= r.syms ();
     r.skip ();
     keep= r.p < r.e && r.num () == 1;
