@@ -11,11 +11,12 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;; A server knows the documents which are open (didOpen), by their URI;
-;; each change gives it the whole new text (didChange without a range,
-;; which all servers accept) with a higher version, and only when the text
-;; has changed. The diagnostics which the servers publish are kept by URI,
-;; and lsp-diagnostics-changed is called for each publication (the editor
-;; will show them).
+;; each change gives it, with a higher version and only when the text has
+;; changed, the part of the text which differs if it takes incremental
+;; changes (kind 2), else the whole new text (didChange without a range).
+;; The diagnostics which the servers publish are kept by URI (normalized:
+;; uri-key), and lsp-diagnostics-changed is called for each publication
+;; (the editor will show them).
 ;;
 ;; The buffers: a source file (the code style, a line in each paragraph)
 ;; is a document of the server of its language (prog-language), for the
@@ -45,7 +46,8 @@
 
 (define (sync-kind c)
   ;; 0: no changes, 1: whole texts, 2: changes (to which whole texts are
-  ;; sent too); servers which do not say are given the changes
+  ;; sent too); servers which do not say, and servers which are still
+  ;; initializing, are given whole texts
   (if (lsp-client-running? c)
       (or (lsp-number-value (sync-option c "change")) 1)
       1))

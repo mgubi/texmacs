@@ -25,7 +25,8 @@
   The preference <verbatim|lsp> (default <verbatim|on>, read by
   <scm|lsp-on?>) is toggled by <menu|Follow source files>; setting it to
   <verbatim|off> calls <scm|lsp-turn-off>, which stops and forgets all the
-  servers and hides the diagnostics.
+  servers and removes the underlines in each buffer which has some; setting
+  it to <verbatim|on> again follows all the open buffers (<verbatim|follow-all>).
 
   <section|The hooks of the editor>
 
@@ -71,7 +72,9 @@
   <scm|version-notify-saved> gives the text at once and then sends
   <verbatim|didSave>; <scm|notify-buffer-closed> sends <verbatim|didClose>
   for a followed buffer and forgets it (a renamed buffer is followed under
-  its new name at its next change).
+  its new name at its next change). <scm|lsp-buffer-followed?> tells whether
+  the current buffer is followed (the table <verbatim|followed>, without
+  mode predicates).
 
   <section|Diagnostics>
 
@@ -81,13 +84,21 @@
   shows the diagnostics at once if it is the one of the current buffer;
   otherwise they are shown when the cursor next moves in that buffer.
   <scm|lsp-show-diagnostics> converts each diagnostic to the lines of the
-  buffer as they are now (diagnostics beyond the last line are left out, an
-  empty range is widened to one character, hints count as information),
-  keeps them in the table <verbatim|shown>, and sets three <em|alternative
-  selections> of the editor, with <scm|set-alt-selection>:
-  <verbatim|lsp-errors>, <verbatim|lsp-warnings> and
-  <verbatim|lsp-infos>, each a list of paths, start and end of each range.
-  <scm|lsp-hide-diagnostics> cancels them.
+  buffer as they are now (a vector of them; diagnostics beyond the last
+  line are left out, an empty range is widened to one character, hints
+  count as information), keeps them in the table <verbatim|shown>, and
+  sets (<verbatim|draw-diagnostics>) three <em|alternative selections> of
+  the editor, with <scm|set-alt-selection>: <verbatim|lsp-errors>,
+  <verbatim|lsp-warnings> and <verbatim|lsp-infos>, each a list of paths,
+  start and end of each range, sorted in the order of the text (the editor
+  looks for the visible ones by a binary search). <scm|lsp-hide-diagnostics>
+  cancels them.
+
+  Until the server publishes new ones, the diagnostics shown follow the
+  lines: the redefined hook <scm|lsp-document-lines-changed> (called at each
+  <verbatim|didChange>) moves those after the changed lines, drops those in
+  them (an edit removes their underlines) and draws them again; <key|F8>
+  and the messages at the cursor use these positions.
 
   <paragraph*|Drawing them>
 
@@ -98,11 +109,13 @@
   <verbatim|#e02020>, <verbatim|#e09000> and <verbatim|#2080e0>, into
   <cpp|diagnostic_rects> and <cpp|diagnostic_colors>
   (<source-link|edit_interface.hpp|src/Edit/Interface/edit_interface.hpp>).
-  As for the spell errors, only about 100 ranges around the visible part
-  are computed when there are many. The ranges were computed by a program
-  for an older text, so a range whose paths are no longer valid cursor
-  positions of the document, or whose end is before its start, is skipped
-  (<cpp|valid_cursor_path>). <cpp|apply_changes> calls it when the tree, the
+  The ranges were computed by a program for an older text, so a range
+  whose paths are no longer valid cursor positions of the document, or
+  whose end is before its start, is dropped first (<cpp|valid_cursor_path>).
+  Then, as for the spell errors, only about 100 ranges around the visible
+  part are computed when there are many (<cpp|find_alt_selection_index>, a
+  binary search which assumes the ranges in the order of the text and
+  valid). <cpp|apply_changes> calls it when the tree, the
   environment, the extents, the selections or the spell errors have
   changed, or when the visible part has moved, but not when only the cursor
   moves. <source-link|edit_repaint.cpp|src/Edit/Interface/edit_repaint.cpp>
@@ -127,7 +140,8 @@
   current text (<scm|lsp-buffer-sync>) and send the request at
   <scm|lsp-cursor-position>. The position is only defined when the cursor
   is in the text of a line, that is when the cursor path is the path of the
-  buffer followed by a line and an offset.
+  buffer followed by a line and an offset; it is computed from that line
+  only (<scm|lsp-buffer-position>), and so is the word before the cursor.
 
   <paragraph*|Completion>
 
@@ -166,7 +180,9 @@
 
   <paragraph*|Information at the mouse>
 
-  The redefined <scm|mouse-event> notes each move in a followed buffer
+  The redefined <scm|mouse-event> (without mode predicates, as
+  <scm|notify-cursor-moved>, see <hlink|the pitfalls|lsp-pitfalls.en.tm>)
+  notes each move in a followed buffer
   (unless the preference <verbatim|lsp:mouse hover> is
   <verbatim|off>); once the mouse has rested 600 ms (a <scm|delayed> check
   which waits again while it moves), the point under it is turned into a
@@ -180,10 +196,13 @@
 
   <paragraph*|Signatures>
 
-  The redefined <scm|keyboard-press> asks for
-  <verbatim|textDocument/signatureHelp> after a trigger character of the
-  server (<verbatim|(> and <verbatim|,> by default), without waiting;
-  <scm|lsp-signature-markup> makes the label of the active signature, with
+  The redefined <scm|keyboard-press> (without mode predicates either) asks
+  for <verbatim|textDocument/signatureHelp> after a trigger character of
+  the server (<verbatim|(> and <verbatim|,> by default), without waiting; a
+  new request cancels the one which is awaited, and an answer is shown only
+  if the cursor is still in the same buffer and on the same line (an answer
+  may come late). <scm|lsp-signature-markup> makes the label of the active
+  signature, with
   the active parameter (a substring, or offsets) between guillemets, for
   the status bar, which a <verbatim|)> clears (the status bar shows text,
   not markup: a bold parameter looked as the others). The parts of the
@@ -219,7 +238,9 @@
   <scm|lsp-client-ended> is redefined to say on the status bar that the
   server has ended. <scm|lsp-restart> stops the client of the buffer if it
   runs, forgets its entry, empties <verbatim|followed> and synchronizes the
-  buffer, which starts a new server. <scm|lsp-stop-servers> calls
+  buffer, which starts a new server; all the open buffers are then
+  followed again (<verbatim|follow-all>), so that the other files of the
+  project reach the new server too. <scm|lsp-stop-servers> calls
   <scm|lsp-stop-all>; since the entries are kept, the servers stay
   stopped.
 
@@ -242,40 +263,75 @@
   new text) for the formatting, <verbatim|WorkspaceEdit>s (the
   <verbatim|TextEdit>s of one or more files, as <verbatim|changes> or
   <verbatim|documentChanges>) for a rename and the quick fixes.
-  <scm|lsp-apply-to-lines> applies them to the Cork lines of a buffer, from
-  the last one to the first, so that the ranges of the others stay valid;
-  <scm|lsp-set-lines> then changes the document only where its lines
-  differ (the common lines at its start and at its end are kept), which
-  keeps the markup of the other lines and the undo history short. A line
-  which differs is replaced, so the cursor would leave it: its new place
-  is computed by <scm|lsp-move-through-edits> (the same before an edit,
-  shifted after it, inside it the same while the new text is still
-  there), and the cursor goes there. A file which is not open is loaded
-  in a buffer.
+  <scm|lsp-apply-to-lines> applies them to the Cork lines of a buffer in one
+  pass (linear in the size of the file, also for the thousands of edits of
+  a formatter): the edits are sorted by their start, edits with the same
+  start in the order of the server (by their index: the <verbatim|sort> of
+  <name|S7> is not stable), and the text between them is copied from a
+  vector of the lines; a position beyond the text is clamped to its end,
+  and an edit which overlaps the previous one (which a server should not
+  send) starts where that one ended. <scm|lsp-set-lines> then changes the
+  document only where its lines differ (the common lines at its start and
+  at its end are kept, the others compared in vectors), which keeps the
+  markup of the other lines and the undo history short. A line which
+  differs is replaced, so the cursor would leave it: its new place is
+  computed by <scm|lsp-move-through-edits> (the same before an edit,
+  shifted after it, also on its line when the new text is longer, inside
+  it the same while the new text is still there), and the
+  cursor goes there. A file which is not open is loaded in a buffer.
 
   <scm|lsp-format> asks for <verbatim|textDocument/formatting> (or
   <verbatim|rangeFormatting> for the selection), <scm|lsp-rename> (an
-  interactive command) for <verbatim|textDocument/rename>, and
-  <scm|lsp-quick-fix> for <verbatim|textDocument/codeAction> at the cursor,
-  with the diagnostics of its line: a single action is run at once, several
-  are listed on the page <verbatim|Quick fixes>, as actions which call
-  <scm|lsp-run-fix>. An action may have an edit and a command
-  (<verbatim|workspace/executeCommand>), after which the server may ask for
-  an edit itself (<verbatim|workspace/applyEdit>, answered by
-  <scm|lsp-apply-workspace-edit>). The client declares these abilities in
+  interactive command) for <verbatim|textDocument/rename>, after giving the
+  servers the texts of all the buffers which have changed
+  (<scm|lsp-sync-pending>: the edits are made for the texts which the
+  server has), and <scm|lsp-quick-fix> for
+  <verbatim|textDocument/codeAction> at the cursor, with the diagnostics of
+  its line: a single action is run at once, several are listed on the page
+  <verbatim|Quick fixes>, as actions which call <scm|lsp-run-fix>. The page
+  keeps the buffer and its text (<verbatim|fixes-buffer>,
+  <verbatim|fixes-text>), since the ranges of the fixes are those of that
+  text: a fix is applied only to its buffer, and refused with a message if
+  that buffer has been closed or its text has changed since. An action may
+  have an edit and a command (<verbatim|workspace/executeCommand>), after
+  which the server may ask for an edit itself
+  (<verbatim|workspace/applyEdit>, applied by
+  <scm|lsp-apply-workspace-edit>, which returns the number of files
+  changed; the answer is <verbatim|applied> <verbatim|false>, with a
+  <verbatim|failureReason>, when a file could not be opened). The client
+  declares these abilities in
   <verbatim|initialize> (code action literals, label offsets of the
   parameters, <verbatim|applyEdit>, document changes), else
   <name|clangd> proposes commands instead of edits.
 
   <section|Keys and menu>
 
-  <source-link|lsp-kbd.scm|TeXmacs/progs/lsp/lsp-kbd.scm> binds, in the
-  mode <scm|in-prog?>, <key|F12> to <scm|lsp-goto-definition>,
+  <source-link|lsp-kbd.scm|TeXmacs/progs/lsp/lsp-kbd.scm> defines the mode
+  <scm|in-lsp%>, <scm|(lsp-followed?)> within <scm|in-prog%>: a buffer which
+  a server follows, while the preference <verbatim|lsp> is on
+  (<scm|lsp-followed?> uses <scm|lsp-buffer-followed?>). Elsewhere
+  <key|F12> and <key|S-F12> keep their meaning (the slides, the folds). It
+  binds, in the mode <scm|in-lsp?>, <key|F12> to <scm|lsp-goto-definition>,
   <key|S-F12> to <scm|lsp-hover>, <key|F8> and <key|S-F8> to
   <scm|lsp-next-diagnostic>, <key|std F> to <scm|lsp-format>, <key|std E> to
   the rename, <key|std .> to <scm|lsp-quick-fix>, <key|std M> to
   <scm|lsp-show-diagnostics-list> (<key|F2>, the key of renames in other
   editors, is taken), and defines <scm|lsp-menu>.
+
+  <section|The status bar and the font of source files>
+
+  In a source file (<scm|footer-in-source?> in
+  <source-link|footer-menu.scm|TeXmacs/progs/texmacs/menus/footer-menu.scm>:
+  <scm|in-prog?> and the initial <verbatim|mode> is <verbatim|prog>), the
+  status bar shows the language only, without the fonts and colors of the
+  document; code in a document keeps them. The font of source files is the
+  preference <verbatim|editor:code font> (Inconsolata by default, offered
+  in <source-link|preferences-widgets.scm|TeXmacs/progs/texmacs/menus/preferences-widgets.scm>):
+  <cpp|attach_subformat> (<source-link|new_buffer.cpp|src/Texmacs/Data/new_buffer.cpp>)
+  sets it as <verbatim|prog-font> in the initial environment of a source
+  file which is opened, and <scm|notify-code-font>
+  (<source-link|tm-server.scm|TeXmacs/progs/texmacs/texmacs/tm-server.scm>)
+  gives a new value to the open source files, which stay unmodified.
 
   <section|The format of C files>
 

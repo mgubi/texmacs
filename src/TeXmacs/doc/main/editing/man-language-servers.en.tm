@@ -63,6 +63,10 @@
   stops all the servers; when it is checked again, they are started again
   as the files need them.
 
+  The keys described below work in the files which a server follows;
+  elsewhere, <key|F12> and <key|S-F12> keep their usual meaning (in
+  presentations).
+
   The setting is the preference <verbatim|lsp> (<verbatim|on> or
   <verbatim|off>). Only files on disk are followed. The other preference of
   the servers is <verbatim|lsp:mouse hover> (see below).
@@ -102,13 +106,17 @@
   <verbatim|clangd>, for instance, finds the <verbatim|compile_commands.json>
   of the project.
 
-  <TeXmacs> does not send options of its own to the servers (no
-  <verbatim|initializationOptions> nor <verbatim|workspace/configuration>):
-  each server is configured with its own files, as with other editors, for
+  <TeXmacs> does not send options of its own to the servers: there are no
+  <verbatim|initializationOptions>, and a server which asks for its
+  settings (<verbatim|workspace/configuration>) is answered that there are
+  none. Each server is configured with its own files, as with other editors, for
   instance a <verbatim|.clangd> file for <verbatim|clangd> or the
   <verbatim|pyproject.toml> of a <name|Python> project for
   <verbatim|pylsp> and <verbatim|pyright>. Servers which run on another
   computer, reached through a network connection, are not supported yet.
+
+  A server which does not answer within two minutes when it is started is
+  ended, with a line in its log (see <menu|Server log> below).
 
   <paragraph*|Choosing the servers>
 
@@ -123,14 +131,16 @@
     (lsp-server-set! "python" '("pyright-langserver --stdio"))
   </scm-code>
 
-  A command may also start with the full path of the program, and may be
-  followed by its options, separated by spaces.
+  A command may also start with the full path of the program (a path
+  without spaces), and may be followed by its options, separated by
+  spaces.
 
-  A server can be given in the same way for another language, provided
-  <TeXmacs> has a format for its files: the language of a file is its
-  format (<verbatim|cpp>, <verbatim|c>, <verbatim|python>...) or, for a
-  buffer in program mode, its programming language. For instance, if the
-  <name|Rust> files have a format <verbatim|rust>:
+  The language of a file is its format (<verbatim|cpp>, <verbatim|c>,
+  <verbatim|python>...) or, for a buffer in program mode, its programming
+  language. A server can be given in the same way for another language,
+  but only once <TeXmacs> has a format for its files: there is none for
+  <name|Rust>, for instance, and one has to be defined first (by a
+  plugin). With a format <verbatim|rust>, the server would be given by
 
   <\scm-code>
     (lsp-server-set! "rust" '("rust-analyzer"))
@@ -145,9 +155,10 @@
   diagnostic, <key|S-F8> to the previous one (both start again at the other
   end of the file).
 
-  The diagnostics are those of the text which the server was last given:
-  while you type, they stay where they were until the server sends new
-  ones, a moment after you have paused.
+  The diagnostics are those of the text which the server was last given.
+  While you type, the underlines disappear; when you pause, those which
+  are not in the lines you changed come back, moved with the text, until
+  the server sends new diagnostics a moment later.
 
   <paragraph*|Completion>
 
@@ -158,7 +169,7 @@
   is inserted and, if there are others, they are listed on the status bar
   and further presses of <key|tab> (or <key|S-tab>) cycle through them, as
   for the other completions of <TeXmacs>. If the server proposes nothing,
-  or cannot complete, the editor's own completion is tried instead.
+  the editor's own completion is tried instead.
 
   <paragraph*|Information and definitions>
 
@@ -192,8 +203,8 @@
     symbol is shown when the mouse rests on it (see below).
 
     <item*|<menu|Restart server>>Stops the server of the current file (if it
-    runs) and starts it again. This also starts a server which has ended or
-    which was stopped.
+    runs) and starts it again; the files which are open are given to it
+    again. This also starts a server which has ended or which was stopped.
 
     <item*|<menu|Server log>>Opens a page with what the server of the
     current file has written: its messages, the errors it printed and those
@@ -234,10 +245,11 @@
   progress), the number of errors and warnings of the file (a click shows
   their list) and the signature which is being typed.
 
-  With <menu|View|Interactive status bar>, the status bar of a source file
-  only shows its language: the menus of the fonts and the colours of the
-  text are left out, since the code is coloured by its language and its
-  font is the one of the preferences.
+  With <menu|View|Interactive status bar> (in the versions of <TeXmacs>
+  which have it), the status bar of a source file only shows its
+  language: the menus of the fonts and the colours of the text are left
+  out, since the code is coloured by its language and its font is the one
+  of the preferences. The code in a document keeps them.
 
   <paragraph*|The list of diagnostics>
 
@@ -259,9 +271,12 @@
   be saved.
 
   <key|std .> asks the server for the corrections at the cursor (for instance
-  \Pdid you mean ...?\Q for a misspelled name): a single one
-  is applied at once; when there are several, they are listed on a page,
-  from which one is applied by clicking on it.
+  \Pdid you mean ...?\Q for a misspelled name), together with the other
+  changes which it proposes there (such as refactorings): a single one is
+  applied at once; when there are several, they are listed on a page, from
+  which one is applied by clicking on it. If the file has been edited
+  since the page was opened, the change is not applied (it was made for
+  the former text): ask for the corrections again.
 
   <paragraph*|Incremental synchronization>
 

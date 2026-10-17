@@ -49,8 +49,15 @@
   source file is a document with one line per paragraph, so that
   <scm|lsp-lines> gives the lines of a body (markup inside a line is
   converted with <scm|texmacs-\<gtr\>verbatim>). The server gets the text
-  in <name|UTF-8> (<scm|lsp-lines-\<gtr\>text>, and
-  <scm|lsp-text-\<gtr\>lines> back).
+  in <name|UTF-8>: <scm|lsp-lines-\<gtr\>text> joins converted lines, and
+  <scm|lsp-text-\<gtr\>lines> splits a text of a server. The text of a
+  buffer, though, is built in <c++> (<scm|lsp-document-text>, see
+  <hlink|the link|lsp-link.en.tm>), without a <scheme> list of its lines:
+  for a long file, such lists at each pause of the typing filled the heap.
+  <scm|lsp-lines-\<gtr\>text> remains for the tests and the texts which
+  are not buffers. <scm|(lsp-line lines i)> gives a line of a list or of a
+  vector (<scm|""> if there is none): a vector when many lines of a long
+  file are looked for.
 
   A position of the protocol is a line and a <em|character>, counted in
   <name|UTF-16> units, the default encoding of the protocol (and the only
@@ -79,7 +86,8 @@
   name of the format) to lists of commands, filled with
   <scm|lsp-server-set!>. <scm|lsp-server-command> gives the first command
   whose program (its first word) is found: in the <verbatim|PATH>, or as a
-  file if it contains a slash. <scm|lsp-server-known?> tells whether a
+  file if it contains a slash or a backslash (a <name|Windows> path).
+  <scm|lsp-server-known?> tells whether a
   language has commands at all, installed or not.
 
   <paragraph*|The life of a client>
@@ -102,8 +110,14 @@
     <verbatim|rootUri> and as the only workspace folder, and the
     capabilities of the client: <name|UTF-16> positions, <verbatim|didSave>,
     hovers in plain text or markdown, completion without snippets,
-    definitions, configuration, workspace folders and progress. Every other
-    message waits in the queue.
+    definitions, configuration, workspace folders and progress. The
+    answers to the requests of the server are sent at once (a server may
+    ask before it answers); every other message waits in the queue, where
+    a <verbatim|didChange> with the whole text of a document replaces those
+    of the same document which wait (the queue of a server which is slow to
+    start does not grow by a copy of the file at each pause). A server
+    which has not answered after <scm|lsp-initialize-timeout> (120 s) is
+    killed by <scm|lsp-client-check-initialized>, with a line in its log.
 
     <item*|<verbatim|running>>The answer has come: its capabilities are
     kept, <verbatim|initialized> is sent and then the queue. An error
@@ -139,7 +153,10 @@
   <scm|lsp-client-handle> sorts the messages: a message with a method and an
   <verbatim|id> is a request of the server, with a method only a
   notification, with an <verbatim|id> only the answer to one of our
-  requests. The requests of the servers are answered by the procedures of
+  requests. An answer with <verbatim|"error": null> is no error, and an
+  answer whose <verbatim|id> is null (an error of the server about a
+  message which it could not read) goes to the log. The requests of the
+  servers are answered by the procedures of
   <scm|lsp-server-request-set!> (method <math|\<rightarrow\>> procedure of
   the client and the parameters, whose value is the result; an unknown
   method gets the error <verbatim|-32601>, a procedure which fails
@@ -161,7 +178,8 @@
 
   The clients are kept in a table under their language and root.
   <scm|lsp-client-for> returns the client of a language and root, and
-  starts one if there is none; <scm|lsp-client-find> only returns a running
+  starts one if there is none; <scm|lsp-client-find> returns the client
+  only if it is alive (starting, initializing or running) and never starts
   one. A client is kept in the table once its server has ended (stopped,
   crashed, or which could not start), and <scm|lsp-client-for> then gives
   <scm|#f>: a server is <em|not started again> until its entry is
@@ -186,23 +204,44 @@
   already); <scm|lsp-document-change> sends
   <verbatim|textDocument/didChange> with a higher version, only if the text
   has changed and if the server wants changes (its
-  <verbatim|textDocumentSync> is not 0): the <em|whole> new text (a change
-  without a range, which all servers accept), or, if the server takes
-  incremental changes (kind 2), only the part which differs.
-  <scm|lsp-text-change> finds it: the old and the new text have a common
-  start and a common end (in bytes of <name|UTF-8>, moved back to the
-  boundaries of characters), and what lies between them in the old text is
-  replaced by what lies between them in the new one, its range given as
-  positions (line, <name|UTF-16> units); <scm|lsp-document-save> sends
-  <verbatim|textDocument/didSave> if the server asks for it, with the text
-  if it asks for <verbatim|includeText>; <scm|lsp-document-close> sends
-  <verbatim|textDocument/didClose>.
+  <verbatim|textDocumentSync> is not 0). If the server takes incremental
+  changes (kind 2) and is running, only the part which differs is sent;
+  otherwise (kind 1, a server which does not say, or one which is still
+  initializing) the <em|whole> new text, a change without a range.
+  <scm|lsp-text-change> finds the part: the old and the new text have a
+  common start and a common end (in bytes of <name|UTF-8>, compared by
+  blocks of 4 KB first, then moved back to the boundaries of characters),
+  and what lies between them in the old text is replaced by what lies
+  between them in the new one, its range given as positions (line,
+  <name|UTF-16> units, the lines counted with <scm|string-search-forwards>).
+  Each change also calls the hook <scm|(lsp-document-lines-changed uri
+  first last added)>, with the lines <scm|first> to <scm|last> of the old
+  text which became <scm|added>+1 lines (<scm|lsp-text-lines-change>): the
+  editor moves the diagnostics which it shows.
+
+  <scm|lsp-document-save> sends <verbatim|textDocument/didSave> if the
+  server asks for it, with the text if it asks for
+  <verbatim|includeText>; a <verbatim|textDocumentSync> which is a number
+  (a kind of change alone) gets the saves too, without the text, as other
+  clients do. <scm|lsp-document-close> sends
+  <verbatim|textDocument/didClose> and forgets the diagnostics of the
+  document. A server whose <verbatim|openClose> is <verbatim|false> gets
+  neither <verbatim|didOpen> nor <verbatim|didClose> (its documents are
+  still kept).
 
   <paragraph*|Diagnostics>
 
   The notification <verbatim|textDocument/publishDiagnostics> replaces the
   diagnostics kept for its <abbr|URI> and calls the hook
-  <scm|lsp-diagnostics-changed>. <scm|lsp-diagnostics>,
+  <scm|lsp-diagnostics-changed>. The <abbr|URI>s are kept as <TeXmacs>
+  writes them (<verbatim|uri-key>: decoded and encoded again), since a
+  server may write the same file otherwise (<verbatim|%c3%a9> for
+  <verbatim|%C3%A9>, <verbatim|%3A> for <verbatim|:>).
+  <scm|lsp-forget-diagnostics> forgets those of a document (and calls the
+  hook): of a document which is closed, and of all the documents of a
+  client which is <verbatim|dead> (through
+  <scm|lsp-client-status-changed>), so that they do not stay underlined,
+  also after a restart. <scm|lsp-diagnostics>,
   <scm|lsp-diagnostic-severity> (<scm|error>, <scm|warning>, <scm|info>,
   <scm|hint>; error by default), <scm|lsp-diagnostic-message> (in Cork) and
   <scm|lsp-diagnostic-range> (as line, offset, line, offset in given lines)
@@ -222,16 +261,27 @@
   <verbatim|compile_flags.txt>, <verbatim|pyproject.toml>,
   <verbatim|setup.py>, <verbatim|package.json>, <verbatim|Cargo.toml>,
   <verbatim|go.mod>, <verbatim|build.sbt> or <verbatim|pom.xml>, else the
-  directory of the file. <scm|lsp-language-id> gives the
+  directory of the file. The root is asked for at each key, so it is kept
+  per directory (<scm|lsp-forget-project-roots> looks for them again).
+  <scm|lsp-language-id> gives the
   <verbatim|languageId> of the protocol (<verbatim|typescript> for the
   <verbatim|.ts> files of the language <verbatim|javascript>...).
 
   <scm|lsp-buffer-client> gives the client of a buffer and starts it if
-  needed, <scm|lsp-buffer-client*> only a running one;
-  <scm|lsp-buffer-open>, <scm|lsp-buffer-sync> and <scm|lsp-buffer-close>
-  open, update and close the document of a buffer, and
-  <scm|lsp-cursor-position> gives the position of the cursor in the
-  protocol. All of them take the current buffer by default.
+  needed, <scm|lsp-buffer-client*> only a live one which exists already
+  (<scm|lsp-client-find>); <scm|lsp-buffer-open>, <scm|lsp-buffer-sync> and
+  <scm|lsp-buffer-close> open, update and close the document of a buffer,
+  with its text from <scm|lsp-buffer-text> (<scm|lsp-document-text> of its
+  body), and <scm|lsp-cursor-position> gives the position of the cursor in
+  the protocol. All of them take the current buffer by default.
+
+  The requests at the cursor read one line only, not all the lines of the
+  buffer: <scm|lsp-buffer-line> gives a line of the buffer in Cork,
+  <scm|lsp-buffer-position> the position of the protocol at a line and an
+  offset of the buffer, and <scm|lsp-buffer-line+offset> the line and the
+  offset of a position. <scm|lsp-buffer-lines> (all the lines, as a list)
+  is left for the diagnostics which are shown, which take them as a
+  vector.
 
   <tmdoc-copyright|2026|the <TeXmacs> team>
 

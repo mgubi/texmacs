@@ -16,13 +16,16 @@
   <verbatim|Name: value> ended by <verbatim|CR LF>, then an empty line. Only
   <verbatim|Content-Length>, the length of the message in <em|bytes>, is
   used; the other fields (<verbatim|Content-Type>) are ignored, and the
-  name of the field is compared without case.
+  name of the field is compared without case. A header whose lines end by
+  <verbatim|LF> alone (against the protocol) is read too, and a negative
+  length is refused.
 
   <cpp|lsp_link_rep> is a <cpp|tm_link_rep> (<source-link|tm_link.hpp|src/System/Link/tm_link.hpp>)
   built on another link, the <em|transport>, which carries the bytes:
   <cpp|make_lsp_link (make_pipe_link (cmd))> for a program
-  (<source-link|pipe_link.cpp|src/System/Link/pipe_link.cpp>); a socket or a
-  <name|Web Worker> could be used the same way. Its fields:
+  (<source-link|pipe_link.cpp|src/System/Link/pipe_link.cpp>, whose writes
+  do not block, see below); a socket or a <name|Web Worker> could be used
+  the same way. Its fields:
 
   <\description>
     <item*|<cpp|ln>>The transport.
@@ -32,7 +35,10 @@
     once all of <cpp|buf> is used or once it reaches 64 KB, so that a large
     message which comes in many parts is not copied at each part.
 
-    <item*|<cpp|msgs>>The whole messages which have not been read yet.
+    <item*|<cpp|msgs>, <cpp|first>>The whole messages which have not been
+    read yet, from <cpp|first> on. A read only moves <cpp|first>; the array
+    is emptied once all its messages are read, so that the messages are not
+    copied at each read.
 
     <item*|<cpp|errbuf>>What the server wrote on its standard error, and the
     errors of the framing.
@@ -42,7 +48,8 @@
   </description>
 
   <cpp|write (s, LINK_IN)> sends <cpp|lsp_frame (s)>, that is
-  <verbatim|Content-Length: <em|n>\\r\\n\\r\\n> followed by <cpp|s>.
+  <verbatim|Content-Length: <em|n>\\r\\n\\r\\n> followed by <cpp|s>, to
+  the transport.
   <cpp|drain> reads what the transport has received on <cpp|LINK_OUT> and
   <cpp|LINK_ERR>, and <cpp|parse> moves the whole messages from <cpp|buf>
   to <cpp|msgs>. Some servers print lines on their standard output by
@@ -61,6 +68,29 @@
   complete. When the transport ends, the link is no longer
   <cpp|alive>.
 
+  <section|Writes which do not block>
+
+  A server which does not read its input (it is busy, or it waits until it
+  can write its own output, which nobody reads while the editor waits)
+  would block a write to its pipe once the pipe is full, and thus freeze
+  the editor. <cpp|tm_link_rep::set_blocking_write> (<source-link|tm_link.hpp|src/System/Link/tm_link.hpp>)
+  therefore lets a link write without blocking; by default (<cpp|true>)
+  it waits until all is written, as the plug-ins expect, and
+  <cpp|lsp_start> sets it to <cpp|false> for the pipe of each server.
+
+  In <source-link|pipe_link.cpp|src/System/Link/pipe_link.cpp>, the input
+  of the child is then non-blocking (<verbatim|O_NONBLOCK>), and a write
+  appends to <cpp|inbuf> (from <cpp|inpos> on) what the child has not
+  taken yet. <cpp|flush_input (msecs)> writes what the child takes, for at
+  most <cpp|msecs>, and reads its output meanwhile; <cpp|write> calls it
+  for 100 ms, and <cpp|listen> writes what is left whenever the pipe can
+  take more, so that the rest goes at the next turns of the event loop.
+  The blocking writes of the plug-ins also retry a partial or interrupted
+  write instead of losing the rest. With <name|Qt>, the pipe is a
+  <cpp|QProcess> (<source-link|QTMPipeLink.cpp|src/Plugins/Qt/QTMPipeLink.cpp>),
+  which keeps the rest itself: its flag <cpp|blocking> only tells
+  <cpp|writeStdin> whether to wait with <cpp|waitForBytesWritten>.
+
   <section|The clients of the <scheme> programs>
 
   The second half of the file keeps a list <cpp|lsp_clients> of
@@ -72,12 +102,12 @@
 
   <\description>
     <item*|<scm|(lsp-start cmd call-back)>>Starts the program <scm|cmd> on a
-    pipe and returns the <scm|id> of its client, or a string with the
-    error if it cannot be started.
+    pipe which does not block the writes, and returns the <scm|id> of its
+    client, or a string with the error if it cannot be started.
 
     <item*|<scm|(lsp-send id msg)>>Sends the message <scm|msg> (the
     <name|JSON> text, without header); <scm|#f> if the client is not
-    alive.
+    alive, also when its link died while writing.
 
     <item*|<scm|(lsp-listen id msecs)>>Waits for at most <scm|msecs> until
     the server has sent something, then dispatches what has come to the call
@@ -89,6 +119,14 @@
     <item*|<scm|(lsp-stop id)>>Stops the server at once (the
     <verbatim|shutdown> and <verbatim|exit> of the protocol are sent before,
     in <scheme>); its call back gets nothing more.
+
+    <item*|<scm|(lsp-document-text t)>>The text of the source document
+    <scm|t> (a tree), in <name|UTF-8>, for its server
+    (<cpp|lsp_document_text>): its lines joined by <verbatim|LF>, each
+    converted from Cork apart, a line with markup as its verbatim text on
+    one line. It is the text of <scm|lsp-lines-\<gtr\>text> of
+    <scm|lsp-lines>, without the <scheme> lists of the lines, which fill
+    the heap for a long file.
   </description>
 
   The call back is called with a kind and a string:
@@ -116,7 +154,10 @@
   <cpp|lsp_dispatch> goes over the clients which have <cpp|news> (or whose
   link has ended) and gives each one first its errors, then <em|one>
   message; it sets <cpp|news> again for a client which gave a message, and
-  loops until no call back was called. A client whose link has ended and
+  loops until no call back was called, or for about 100 ms at most: a
+  server which sends without pause (progress, logs) does not keep the
+  editor from its events, and the rest is dispatched at the next turns
+  (the <cpp|news> of the clients stay). A client whose link has ended and
   whose errors are all given gets <scm|"exit"> and is marked
   <cpp|exited>.
 

@@ -48,7 +48,10 @@
 
     \ \ --\<gtr\> lsp-follow-buffer \ --(idle 300 ms)--\<gtr\> lsp-sync-pending
 
-    \ \ --\<gtr\> lsp-buffer-sync \ --\<gtr\> textDocument/didChange (whole text)
+    \ \ --\<gtr\> lsp-buffer-sync \ --\<gtr\> lsp-document-text (the text, in <c++>)
+
+    \ \ --\<gtr\> textDocument/didChange (the part which differs, or the
+    whole text)
 
     \ \ --\<gtr\> lsp-send \ --\<gtr\> "Content-Length: n\\r\\n\\r\\n{...}" on the pipe
 
@@ -70,11 +73,18 @@
     <abbr|LSP> link (framing of the messages over another link) and the
     clients of the <scheme> programs: <cpp|lsp_start>, <cpp|lsp_send>,
     <cpp|lsp_listen>, <cpp|lsp_alive>, <cpp|lsp_stop> and
-    <cpp|process_all_lsp>.
+    <cpp|process_all_lsp>; <cpp|lsp_document_text>, the text of a source
+    document for its server.
+
+    <item*|<source-link|tm_link.hpp|src/System/Link/tm_link.hpp>,
+    <source-link|pipe_link.cpp|src/System/Link/pipe_link.cpp>,
+    <source-link|QTMPipeLink.cpp|src/Plugins/Qt/QTMPipeLink.cpp>>The
+    writes which do not block (<cpp|set_blocking_write>), for the pipes of
+    the servers.
 
     <item*|<source-link|build-glue-basic.scm|src/Scheme/Glue/build-glue-basic.scm>>The
     glue routines <scm|lsp-start>, <scm|lsp-send>, <scm|lsp-listen>,
-    <scm|lsp-alive?> and <scm|lsp-stop>.
+    <scm|lsp-alive?>, <scm|lsp-stop> and <scm|lsp-document-text>.
 
     <item*|<source-link|tm_server.cpp|src/Texmacs/Server/tm_server.cpp>>The
     interpose handler, which calls <cpp|process_all_lsp>.
@@ -97,8 +107,8 @@
     <item*|<source-link|lsp-actions.scm|TeXmacs/progs/lsp/lsp-actions.scm>>The
     edits of the servers: formatting, renames, quick fixes.
 
-    <item*|<source-link|lsp-kbd.scm|TeXmacs/progs/lsp/lsp-kbd.scm>>The keys
-    and the menu <scm|lsp-menu>.
+    <item*|<source-link|lsp-kbd.scm|TeXmacs/progs/lsp/lsp-kbd.scm>>The mode
+    <scm|in-lsp%>, the keys, the menu <scm|lsp-menu> and the focus bar.
 
     <item*|<source-link|init-texmacs.scm|TeXmacs/progs/init-texmacs.scm>,
     <source-link|tools-menu.scm|TeXmacs/progs/texmacs/menus/tools-menu.scm>>The
@@ -111,7 +121,19 @@
     diagnostics.
 
     <item*|<source-link|new_buffer.cpp|src/Texmacs/Data/new_buffer.cpp>>The
-    hook <scm|notify-buffer-closed>.
+    hook <scm|notify-buffer-closed>, and the font of a source file which is
+    opened (<cpp|attach_subformat> sets <cpp|PROG_FONT> to the preference
+    <verbatim|editor:code font>).
+
+    <item*|<source-link|tm-server.scm|TeXmacs/progs/texmacs/texmacs/tm-server.scm>,
+    <source-link|preferences-widgets.scm|TeXmacs/progs/texmacs/menus/preferences-widgets.scm>>The
+    preference <verbatim|editor:code font>: <scm|notify-code-font> gives
+    its new value to the open source files, and the preferences offer the
+    monospaced fonts.
+
+    <item*|<source-link|footer-menu.scm|TeXmacs/progs/texmacs/menus/footer-menu.scm>>The
+    status bar of a source file (<scm|footer-in-source?>): its language,
+    without fonts and colors.
 
     <item*|<source-link|cursor.scm|TeXmacs/progs/utils/library/cursor.scm>>The
     default (empty) definitions of the hooks.

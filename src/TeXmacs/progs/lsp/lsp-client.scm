@@ -529,7 +529,7 @@
   (string-append lan "\n" (or root "")))
 
 (tm-define (lsp-client-find lan root)
-  (:synopsis "The running client for @lan and @root, or #f (none is started)")
+  (:synopsis "The live client for @lan and @root, or #f (none is started)")
   (with c (ahash-ref clients (client-key lan root))
     (and c (lsp-client-alive? c) c)))
 
