@@ -128,6 +128,7 @@ struct glyph_slot {
   SI xo, yo;            // the offsets of shrink
   bool mupdf;           // rendered by MuPDF: placed by dx, dy instead
   int dx, dy;           // its top left corner from the origin (pixels, y down)
+  bool big;             // too large for the atlas: drawn from its outline
 };
 
 struct slug_glyph {
@@ -1161,29 +1162,29 @@ gpu_renderer_rep::draw (int c, font_glyphs fng, SI x, SI y) {
   if (!ready ()) return;
   bool pattern= pen->get_type () == pencil_brush && !is_nil (pen->get_brush ()) &&
                 pen->get_brush ()->get_type () == brush_pattern;
-  if (G.slug_on && trs.empty () && !pattern) {
-    // from its outline (Slug), where the MuPDF renderer draws it: the
-    // glyph of its font file at the origin, a em of g->em pixels
+  // from its outline (Slug), where the MuPDF renderer draws it: the glyph
+  // of its font file at the origin, a em of g->em pixels (false: no outline)
+  auto outline= [&] () {
     slug_glyph* g= slug_lookup (fng, c);
-    if (g != NULL) {
-      if (g->nb == 0) return; // no ink
-      int s1, s2, s3, s4;
-      clip_box (s1, s2, s3, s4);
-      batch (t, 4, NULL, s1, s2, s3, s4);
-      int r, gg, b, a;
-      get_rgb_color (fg, r, gg, b, a);
-      if (get_reverse_colors ()) reverse (r, gg, b);
-      float fa= a / 255.f;
-      float ox_= (float) to_x (x), oy_= (float) -to_y (y);
-      unsigned off= g->offset, nb= g->nb;
-      float inst[13]= { ox_, oy_, g->em, g->bx0, g->by0, g->bx1, g->by1, 0, 0,
-                        r / 255.f * fa, gg / 255.f * fa, b / 255.f * fa, fa };
-      memcpy (&inst[7], &off, 4); memcpy (&inst[8], &nb, 4);
-      G.slug_inst.insert (G.slug_inst.end (), inst, inst + 13);
-      if (on_screen (t)) feed (inst);
-      return;
-    }
-  }
+    if (g == NULL) return false;
+    if (g->nb == 0) return true; // no ink
+    int s1, s2, s3, s4;
+    clip_box (s1, s2, s3, s4);
+    batch (t, 4, NULL, s1, s2, s3, s4);
+    int r, gg, b, a;
+    get_rgb_color (fg, r, gg, b, a);
+    if (get_reverse_colors ()) reverse (r, gg, b);
+    float fa= a / 255.f;
+    float ox_= (float) to_x (x), oy_= (float) -to_y (y);
+    unsigned off= g->offset, nb= g->nb;
+    float inst[13]= { ox_, oy_, g->em, g->bx0, g->by0, g->bx1, g->by1, 0, 0,
+                      r / 255.f * fa, gg / 255.f * fa, b / 255.f * fa, fa };
+    memcpy (&inst[7], &off, 4); memcpy (&inst[8], &nb, 4);
+    G.slug_inst.insert (G.slug_inst.end (), inst, inst + 13);
+    if (on_screen (t)) feed (inst);
+    return true;
+  };
+  if (G.slug_on && trs.empty () && !pattern && outline ()) return;
   glyph_key k { (void*) fng.rep, c };
   auto it= G.glyphs.find (k);
   if (it == G.glyphs.end ()) {
@@ -1214,7 +1215,14 @@ gpu_renderer_rep::draw (int c, font_glyphs fng, SI x, SI y) {
       gl= shrink (pre_gl, std_shrinkf, std_shrinkf, xo, yo, 1.0);
       w= gl->width; h= gl->height;
     }
-    if (w > 512 || h > 512) return;
+    // (a glyph of more than 512 pixels, a large zoom: from its outline,
+    // remembered so as not to be rendered again; none without an outline)
+    if (w > 512 || h > 512) {
+      G.glyphs[k]= { 0, 0, w, h, xo, yo, from_mupdf, mx, my, true };
+      G.fonts.push_back (fng);
+      if (trs.empty () && !pattern) outline ();
+      return;
+    }
     if (G.ax + w + 1 > ATLAS) { G.ax= 0; G.ay += G.arow + 1; G.arow= 0; }
     if (G.ay + h + 1 > ATLAS) clear_atlas (); // full: start again
     if (w > 0 && h > 0) {
@@ -1231,12 +1239,13 @@ gpu_renderer_rep::draw (int c, font_glyphs fng, SI x, SI y) {
       if (G.mode == 2) flush_quads ();
       G.B->update_texture (G.atlas, G.ax, G.ay, w, h, cov.data ());
     }
-    G.glyphs[k]= { G.ax, G.ay, w, h, xo, yo, from_mupdf, mx, my };
+    G.glyphs[k]= { G.ax, G.ay, w, h, xo, yo, from_mupdf, mx, my, false };
     G.fonts.push_back (fng);
     G.ax += w + 1; G.arow= max (G.arow, h);
     it= G.glyphs.find (k);
   }
   const glyph_slot& s= it->second;
+  if (s.big) { if (trs.empty () && !pattern) outline (); return; }
   if (s.w <= 0 || s.h <= 0) return;
   // placed as the MuPDF renderer places its glyphs: rendered by MuPDF from
   // the origin, or as its images of the bitmaps of TeXmacs

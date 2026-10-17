@@ -2298,6 +2298,41 @@ glyph_font (string fontname, double& em) {
   return fd->font;
 }
 
+// a glyph which MuPDF does not render (more than 256 pixels, MAX_GLYPH_SIZE:
+// a large zoom), filled from its outline by a draw device into a pixmap of
+// its own, an alpha (NULL for a glyph with no ink)
+static fz_pixmap*
+outline_glyph_pixmap (fz_context* ctx, fz_font* font, int gid, fz_matrix trm) {
+  fz_text* text= NULL;
+  fz_device* dev= NULL;
+  fz_pixmap* pix= NULL;
+  fz_var (text); fz_var (dev); fz_var (pix);
+  fz_try (ctx) {
+    text= fz_new_text (ctx);
+    fz_show_glyph (ctx, text, font, trm, gid, 0, 0, 0, FZ_BIDI_LTR, FZ_LANG_UNSET);
+    fz_irect box= fz_round_rect (fz_bound_text (ctx, text, NULL, fz_identity));
+    if (!fz_is_empty_irect (box)) {
+      box.x0 -= 1; box.y0 -= 1; box.x1 += 1; box.y1 += 1;
+      pix= fz_new_pixmap_with_bbox (ctx, NULL, box, NULL, 1);
+      fz_clear_pixmap (ctx, pix);
+      dev= fz_new_draw_device (ctx, fz_identity, pix);
+      float black= 0.f;
+      fz_fill_text (ctx, dev, text, fz_identity, fz_device_gray (ctx), &black, 1.f,
+                    fz_default_color_params);
+      fz_close_device (ctx, dev);
+    }
+  }
+  fz_always (ctx) {
+    fz_drop_device (ctx, dev);
+    fz_drop_text (ctx, text);
+  }
+  fz_catch (ctx) {
+    fz_drop_pixmap (ctx, pix);
+    fz_rethrow (ctx);
+  }
+  return pix;
+}
+
 bool
 mupdf_glyph_bitmap (string fontname, int c, string& cov,
                     int& w, int& h, int& x0, int& y0) {
@@ -2313,7 +2348,8 @@ mupdf_glyph_bitmap (string fontname, int c, string& cov,
   fz_pixmap* pix= NULL;
   if (!mupdf_protected ("mupdf_glyph_bitmap", [&] () {
         pix= fz_render_glyph_pixmap (ctx, font, (int) gid, &ctm, &scissor,
-                                     fz_text_aa_level (ctx)); }))
+                                     fz_text_aa_level (ctx));
+        if (pix == NULL) pix= outline_glyph_pixmap (ctx, font, (int) gid, ctm); }))
     return false;
   cov= string ();
   w= h= x0= y0= 0;

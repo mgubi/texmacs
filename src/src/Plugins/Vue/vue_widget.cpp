@@ -6964,8 +6964,13 @@ vue_simple_widget_rep::repaint_invalid_regions () {
       absolute_scroll=false;
     }
     
-    // clamp the new position
-    if (scroll_pos.x1 < extents->x1) scroll_pos.x1= extents->x1;
+    // clamp the new position (a document narrower than the view centered
+    // in it, as the Qt port centers its canvas: the editor centers it only
+    // when it fits with room for a scroll bar, and a page fit to the width
+    // does not, by rounding)
+    if (extents->x2 - extents->x1 < sz.x1)
+      scroll_pos.x1= extents->x1 - (sz.x1 - (extents->x2 - extents->x1)) / 2;
+    else if (scroll_pos.x1 < extents->x1) scroll_pos.x1= extents->x1;
     else if (scroll_pos.x1 + sz.x1 > extents->x2)
       scroll_pos.x1= max (extents->x2 - sz.x1, extents->x1);
     if (scroll_pos.x2 - sz.x2 < extents->y1)

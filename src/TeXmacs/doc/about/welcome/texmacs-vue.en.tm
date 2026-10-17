@@ -227,6 +227,15 @@
 
   The additions to <TeXmacs> <name|Vue>, the newest first.
 
+  <paragraph|17 October 2026>
+
+  <\itemize>
+    <item>At a large zoom the letters no longer disappear.
+
+    <item>A page made as wide as the window (<menu|View|Fit to screen width>) is
+    in its middle, not against its left side.
+  </itemize>
+
   <paragraph|15 October 2026>
 
   <\itemize>
