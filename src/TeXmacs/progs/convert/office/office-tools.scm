@@ -42,6 +42,8 @@
 ;;              t, b, l, r which have one, or none) and background
 ;;            (toc inline...)  the table of contents, with its title
 ;;            (pagebreak)
+;;            (field-blocks block...)  a field over several paragraphs (the
+;;              bibliography of Zotero), with the attribute code
 ;;            (error "message")  for a file which could not be read
 ;;   inlines: "text"  (em ...)  (strong ...)  (underline ...)  (strike ...)
 ;;            (sub ...)  (sup ...)  (code ...)  (smallcaps ...)  (mark ...)
@@ -50,7 +52,12 @@
 ;;            (note block...)  (br)  (tab)
 ;;            (image)  with the attributes name, data (the bytes of the
 ;;              file), width, height (lengths of TeXmacs), alt, and svg
-;;              (the text of an SVG of the same picture, when there is one)
+;;              (the text of an SVG of the same picture, when there is one);
+;;              without data, a name on the web (http, https) is a picture
+;;              which the file links to, and linked "true" says that the
+;;              name is the address (relative, or file:) of a picture which
+;;              the file links to: the writers link to it again, and no
+;;              converter reads it
 ;;            (math "MathML")  with the attribute display
 ;;            (bookmark)  (ref ...)  with the attribute name; a ref also
 ;;              has kind (seq, heading) and target when its bookmark is
@@ -304,13 +311,187 @@
     (if (null? l) (cons tag children)
         (cons* tag (cons '@ l) children))))
 
+;; A floating picture (anchored, with the text around it) has these
+;; attributes, which both formats say in their ways: float (left, right or
+;; center: where TeXmacs shows it, beside its paragraph), wrap (square,
+;; tight, through, top-bottom, front, behind), wrap-side (both, left,
+;; right, largest), h-pos (left, right, center, inside, outside, offset),
+;; h-rel (column, page, margin, character, left-margin, right-margin),
+;; h-offset, v-pos (top, bottom, center, inside, outside, offset), v-rel
+;; (paragraph, line, page, margin, top-margin, bottom-margin), v-offset.
+(define-public office-float-keys
+  '(float wrap wrap-side h-pos h-rel h-offset v-pos v-rel v-offset))
+
+
+;; A box of text or a shape (a node box) floats as a picture does, with
+;; the same attributes, and has its size (width, height), its shape (the
+;; names of Word: rect, ellipse, roundRect...; odf:name for a shape of
+;; OpenDocument which Word does not have), its fill and its line (colors,
+;; or "none") and the width of its line (line-width, in points), the
+;; space around its text (inset: "left,top,right,bottom", in cm) and
+;; whether it grows with its text (grow "true"); its children are the
+;; blocks of its text, if any.
+(define-public office-box-keys
+  '(width height shape fill line line-width inset grow))
+
+(define-public office-shapes
+  ;; the shapes of Word, and those of OpenDocument (draw:type)
+  '(("rect" . "rectangle") ("ellipse" . "ellipse") ("roundRect" . "round-rectangle")
+    ("triangle" . "isosceles-triangle") ("rtTriangle" . "right-triangle")
+    ("diamond" . "diamond") ("parallelogram" . "parallelogram")
+    ("trapezoid" . "trapezoid") ("pentagon" . "pentagon") ("hexagon" . "hexagon")
+    ("octagon" . "octagon") ("star5" . "star5") ("star4" . "star4")
+    ("star8" . "star8") ("rightArrow" . "right-arrow") ("leftArrow" . "left-arrow")
+    ("upArrow" . "up-arrow") ("downArrow" . "down-arrow") ("cloud" . "cloud")
+    ("heart" . "heart") ("smileyFace" . "smiley") ("can" . "can") ("cube" . "cube")
+    ("plus" . "cross") ("wedgeRectCallout" . "rectangular-callout")
+    ("wedgeRoundRectCallout" . "round-rectangular-callout")
+    ("wedgeEllipseCallout" . "round-callout") ("flowChartProcess" . "flowchart-process")
+    ("flowChartDecision" . "flowchart-decision")
+    ("flowChartTerminator" . "flowchart-terminator")))
+
+(tm-define (office-shape-of-odf type)
+  (:synopsis "The shape of the office tree for the type @type of OpenDocument")
+  (cond ((not (string? type)) "rect")
+        ((list-find office-shapes (lambda (p) (== (cdr p) type))) => car)
+        ;; (a shape which LibreOffice read from Word has its name of Word)
+        ((string-starts? type "ooxml-") (substring type 6 (string-length type)))
+        (else (string-append "odf:" type))))
+
+(tm-define (office-shape-for-odf shape)
+  (:synopsis "The type of OpenDocument for the shape @shape of the office tree")
+  (cond ((not (string? shape)) "rectangle")
+        ((string-starts? shape "odf:") (substring shape 4 (string-length shape)))
+        ((assoc shape office-shapes) => cdr)
+        ;; (LibreOffice has the other shapes of Word under these names)
+        ((!= shape "") (string-append "ooxml-" shape))
+        (else "rectangle")))
+
+(tm-define (office-shape-for-word shape)
+  (:synopsis "The shape of Word for the shape @shape of the office tree")
+  (cond ((not (string? shape)) "rect")
+        ((string-starts? shape "odf:") "rect")
+        (else shape)))
+
+(tm-define (office-float-side h-pos h-rel offset width)
+  (:synopsis "Where TeXmacs shows a floating picture: left, right or center")
+  (cond ((in? h-pos '("left" "inside")) "left")
+        ((in? h-pos '("right" "outside")) "right")
+        ((== h-pos "center") "center")
+        (else
+          ;; (an offset: the side which the middle of the picture is near,
+          ;; in a column of about 16 cm, after a margin of 2.5 cm)
+          (let* ((x (or (office-length->cm offset) 0))
+                 (w (or (office-length->cm width) 0))
+                 (x (if (in? h-rel '("page" "left-margin")) (- x 2.5) x))
+                 (m (+ x (/ w 2))))
+            (cond ((< m 5.5) "left")
+                  ((> m 10.5) "right")
+                  (else "center"))))))
+
+(tm-define (office-cm x)
+  (:synopsis "The length @x in centimeters, as a string")
+  (string-append (office-decimal x) "cm"))
+
+(tm-define (office-add-attrs x attrs)
+  (:synopsis "The node @x with the attributes @attrs (name value) added")
+  (if (not (pair? x)) x
+      (apply office-node (cons* (car x) (append (map (lambda (a) (list (car a) (cadr a)))
+                                                     (ox-attrs x))
+                                                attrs)
+                                (ox-children x)))))
+
+(define (office-byte s i) (char->integer (string-ref s i)))
+
+(tm-define (office-image-pixels data)
+  (:synopsis "(width height) in pixels of the image @data (PNG, GIF, JPEG), or #f")
+  ;; (width height) in pixels of an image PNG, GIF or JPEG, or #f
+  (let ((n (string-length data)))
+    (cond ((and (> n 24) (== (office-byte data 0) 137) (== (office-byte data 1) 80))
+           (list (+ (* 16777216 (office-byte data 16)) (* 65536 (office-byte data 17))
+                    (* 256 (office-byte data 18)) (office-byte data 19))
+                 (+ (* 16777216 (office-byte data 20)) (* 65536 (office-byte data 21))
+                    (* 256 (office-byte data 22)) (office-byte data 23))))
+          ((and (> n 10) (== (office-byte data 0) 71) (== (office-byte data 1) 73))
+           (list (+ (office-byte data 6) (* 256 (office-byte data 7)))
+                 (+ (office-byte data 8) (* 256 (office-byte data 9)))))
+          ((and (> n 4) (== (office-byte data 0) 255) (== (office-byte data 1) 216))
+           ;; the segments of a JPEG, up to the one with the size
+           (let loop ((i 2))
+             (cond ((> (+ i 9) n) #f)
+                   ((!= (office-byte data i) 255) #f)
+                   ((and (>= (office-byte data (+ i 1)) 192)
+                         (<= (office-byte data (+ i 1)) 207)
+                         (not (in? (office-byte data (+ i 1)) '(196 200 204))))
+                    (list (+ (* 256 (office-byte data (+ i 7))) (office-byte data (+ i 8)))
+                          (+ (* 256 (office-byte data (+ i 5))) (office-byte data (+ i 6)))))
+                   (else (loop (+ i 2 (* 256 (office-byte data (+ i 2)))
+                                  (office-byte data (+ i 3))))))))
+          (else #f))))
+
+(tm-define (office-image-dpi data)
+  (:synopsis "The resolution of the image @data in dots per inch (96 when it says none)")
+  (let ((n (string-length data)))
+    (cond ((and (> n 24) (== (office-byte data 0) 137) (== (office-byte data 1) 80))
+           ;; the chunk pHYs of a PNG, before its data
+           (let loop ((i 8))
+             (if (> (+ i 17) n) 96.0
+                 (let ((len (+ (* 16777216 (office-byte data i)) (* 65536 (office-byte data (+ i 1)))
+                               (* 256 (office-byte data (+ i 2))) (office-byte data (+ i 3))))
+                       (tag (substring data (+ i 4) (+ i 8))))
+                   (cond ((== tag "pHYs")
+                          (let ((ppm (+ (* 16777216 (office-byte data (+ i 8)))
+                                        (* 65536 (office-byte data (+ i 9)))
+                                        (* 256 (office-byte data (+ i 10)))
+                                        (office-byte data (+ i 11)))))
+                            (if (and (== (office-byte data (+ i 16)) 1) (> ppm 0))
+                                (* ppm 0.0254) 96.0)))
+                         ((in? tag '("IDAT" "IEND")) 96.0)
+                         (else (loop (+ i 12 len))))))))
+          ((and (> n 18) (== (office-byte data 0) 255) (== (office-byte data 1) 216)
+                (== (substring data 6 10) "JFIF"))
+           ;; the density of JFIF: in dots per inch, or per centimeter
+           (let ((unit (office-byte data 13))
+                 (d (+ (* 256 (office-byte data 14)) (office-byte data 15))))
+             (cond ((and (== unit 1) (> d 0)) (* 1.0 d))
+                   ((and (== unit 2) (> d 0)) (* 2.54 d))
+                   (else 96.0))))
+          (else 96.0))))
+
+(tm-define (office-image-cm data)
+  (:synopsis "(width height) in centimeters of the image @data at its resolution, or #f")
+  (let ((px (office-image-pixels data))
+        (dpi (office-image-dpi data)))
+    (and px (> (car px) 0) (> (cadr px) 0)
+         (list (/ (* 2.54 (car px)) dpi) (/ (* 2.54 (cadr px)) dpi)))))
+
+(define-public office-underline-kinds
+  ;; the kinds of underlines of Word (those of OpenDocument are among them)
+  '("double" "thick" "dotted" "dottedHeavy" "dash" "dashedHeavy" "dashLong"
+    "dashLongHeavy" "dotDash" "dashDotHeavy" "dotDotDash" "dashDotDotHeavy"
+    "wave" "wavyHeavy" "wavyDouble"))
+
 (define office-wrappers
-  '(em strong underline strike sub sup code smallcaps mark color))
+  '(em strong underline strike sub sup code smallcaps mark color span ins del
+    size font caps letters))
 
 (define (office-same-wrapper? x y)
   ;; two nodes which wrap text in the same way
   (and (pair? x) (pair? y) (== (car x) (car y)) (in? (car x) office-wrappers)
        (== (ox-attrs x) (ox-attrs y))))
+
+(tm-define (office-link-text l)
+  (:synopsis "The text @l of a link without its plain underline")
+  ;; (a link is underlined by its look: Word leaves out an underline which
+  ;; says the same as the style of links, and the text reads the same)
+  (append-map
+    (lambda (y)
+      (cond ((and (func? y 'underline) (null? (ox-attrs y)))
+             (office-link-text (ox-children y)))
+            ((and (pair? y) (in? (car y) office-wrappers))
+             (list (office-wrapper-node y (office-link-text (ox-children y)))))
+            (else (list y))))
+    l))
 
 (define (office-wrapper-node x l)
   ;; the wrapper of the node x around the nodes l
@@ -324,6 +505,252 @@
   (with s (object->string args)
     (if (<= (string-length s) 300) s
         (string-append (substring s 0 300) "..."))))
+
+(define (office-comment-id x)
+  (and (func? x 'comment) (ox-attr x 'id)))
+
+(define (office-without-id c)
+  (apply office-node
+         (cons* 'comment (map (lambda (a) (list (car a) (cadr a)))
+                              (list-filter (ox-attrs c) (lambda (a) (!= (car a) 'id))))
+                (ox-children c))))
+
+(tm-define (office-comment-ranges l)
+  (:synopsis "The nodes @l with the commented ranges made nodes commented")
+  ;; A comment on a range of the text: the marks (!comment-start id) and
+  ;; (!comment-end id) of the readers around the range, and the node comment
+  ;; with the attribute id, before or after them, become a node commented
+  ;; with the range and the comment, its last child. A mark without its
+  ;; other one or its comment is left out: the comment is on a point.
+  (if (not (list-find l (lambda (y) (or (func? y '!comment-start) (office-comment-id y))))) l
+      (let loop ((l l) (acc '()))
+        (cond ((null? l) (reverse acc))
+              ((func? (car l) '!comment-start)
+               (let* ((id (cadr (car l)))
+                      (rest (cdr l))
+                      (j (list-find-index rest (lambda (y) (and (func? y '!comment-end)
+                                                                (== (cadr y) id)))))
+                      (c (list-find rest (lambda (y) (== (office-comment-id y) id)))))
+                 (if (not (and j c)) (loop (cdr l) acc)
+                     (let ((inside (list-filter (sublist rest 0 j) (lambda (y) (not (eq? y c)))))
+                           (after (list-filter (list-tail rest (+ j 1)) (lambda (y) (not (eq? y c))))))
+                       (loop after (cons (if (null? inside) (office-without-id c)
+                                             `(commented ,@(office-comment-ranges inside)
+                                                         ,(office-without-id c)))
+                                         acc))))))
+              ((func? (car l) '!comment-end) (loop (cdr l) acc))
+              ((office-comment-id (car l)) (loop (cdr l) (cons (office-without-id (car l)) acc)))
+              (else (loop (cdr l) (cons (car l) acc)))))))
+
+(tm-define (office-changes l)
+  (:synopsis "The nodes @l with the marks of tracked changes made nodes ins and del")
+  ;; the nodes l, with the marks of the tracked changes made nodes ins and
+  ;; del around what they hold (a change which goes on in the next
+  ;; paragraph ends with this one)
+  (let loop ((l l) (acc '()) (stack '()))
+    (let ((close (lambda (acc stack)
+                   (with node (apply office-node
+                                     (cons* (car (car stack)) (cadr (car stack))
+                                            (reverse acc)))
+                     (if (null? (reverse acc)) (caddr (car stack))
+                         (cons node (caddr (car stack))))))))
+      (cond ((and (null? l) (null? stack)) (office-comment-ranges (reverse acc)))
+            ((null? l) (loop l (close acc stack) (cdr stack)))
+            ((func? (car l) '!change-start)
+             (loop (cdr l) '() (cons (list (cadr (car l)) (caddr (car l)) acc) stack)))
+            ((func? (car l) '!change-end)
+             (if (null? stack) (loop (cdr l) acc stack)
+                 (loop (cdr l) (close acc stack) (cdr stack))))
+            (else (loop (cdr l) (cons (car l) acc) stack))))))
+
+(tm-define (office-drop-style l name)
+  (:synopsis "The blocks @l without the style @name of their paragraphs")
+  ;; (the paragraphs of the usual style say none)
+  (map (lambda (b)
+         (cond ((and (func? b 'p) (== (ox-attr b 'style) name))
+                (apply office-node
+                       (cons* 'p (list-filter (ox-attrs b) (lambda (a) (!= (car a) 'style)))
+                              (ox-children b))))
+               ((or (func? b 'columns) (func? b 'field-blocks))
+                (cons* (car b) (cons '@ (ox-attrs b))
+                       (office-drop-style (ox-children b) name)))
+               (else b)))
+       l))
+
+;; The pictures of Windows (EMF, WMF), which Word documents often have, are
+;; read by no part of TeXmacs: LibreOffice, when it is there, makes a PNG
+;; of them, with a profile of its own in the home directory of TeXmacs.
+
+(define (office-soffice)
+  ;; the program of LibreOffice, or #f
+  (cond ((url-exists-in-path? "soffice") "soffice")
+        ((url-exists-in-path? "libreoffice") "libreoffice")
+        ((url-exists? "/Applications/LibreOffice.app/Contents/MacOS/soffice")
+         "/Applications/LibreOffice.app/Contents/MacOS/soffice")
+        (else #f)))
+
+(define (office-quote s)
+  ;; s as one word of the shell (of cmd under Windows)
+  (if (os-win32?)
+      (string-append "\"" (string-replace s "\"" "") "\"")
+      (string-append "'" (string-replace s "'" "'\\''") "'")))
+
+(define office-soffice-timeout 120) ; seconds, after which LibreOffice is stopped
+
+(define (office-timeout-program)
+  ;; the program timeout of GNU coreutils (gtimeout with Homebrew), or #f
+  (cond ((url-exists-in-path? "timeout") "timeout")
+        ((url-exists-in-path? "gtimeout") "gtimeout")
+        (else #f)))
+
+(define (office-group-launcher)
+  ;; a way of starting a command in a process group of its own, or #f
+  (cond ((url-exists-in-path? "setsid") "setsid")
+        ((url-exists-in-path? "perl") "perl")
+        (else #f)))
+
+(tm-define (office-soffice-command prog args secs timeout group)
+  (:synopsis "The command of the shell which runs @prog with @args for @secs seconds at most")
+  ;; Runs LibreOffice (prog) with the words args, without input, and stops
+  ;; it when it takes longer than secs seconds, so that a LibreOffice which
+  ;; hangs does not stop the conversion. The launcher soffice starts
+  ;; soffice.bin as a child (oosplash under Linux), so the whole process
+  ;; group is stopped: GNU timeout (the program timeout, if not #f) does
+  ;; so, in the group of its own which it makes; that group is also
+  ;; killed when the launcher ended in time and left a child behind.
+  ;; Otherwise LibreOffice is started in a process group of its own
+  ;; (group: "setsid", or "perl" for its setpgrp), which is killed (kill -9
+  ;; -pgid, without --, which the kill of dash rejects) after the time, and
+  ;; also when the launcher ended and left a child behind; without either,
+  ;; only the launcher can be stopped. The watcher is stopped with its
+  ;; sleep when LibreOffice ends in time. If no group of its own was made,
+  ;; -pgid names no group (the pid of a process which is not a leader).
+  ;; Under Windows, eval-system waits at most 30 seconds for the command,
+  ;; and does not stop it (windows64_system.cpp): LibreOffice may still
+  ;; run after it.
+  (let* ((cmd (apply string-append
+                     (cons (office-quote prog)
+                           (map (lambda (a) (string-append " " (office-quote a))) args))))
+         (secs (number->string secs))
+         (launch (cond ((== group "setsid") "setsid ")
+                       ((== group "perl") "perl -e 'setpgrp(0,0); exec @ARGV' ")
+                       (else "")))
+         (target (if group "-$p" "$p")))
+    (cond ((os-win32?) cmd)
+          (timeout
+           (string-append (office-quote timeout) " -s KILL " secs " " cmd
+                          " < /dev/null > /dev/null 2>&1 & p=$!; wait $p 2> /dev/null; "
+                          "kill -9 -$p > /dev/null 2>&1; true"))
+          (else
+           (string-append launch cmd " < /dev/null > /dev/null 2>&1 & p=$!; "
+                          "( trap 'kill $s; exit' TERM; sleep " secs " & s=$!; wait $s; "
+                          "kill -9 " target " ) > /dev/null 2>&1 < /dev/null & w=$!; "
+                          "wait $p 2> /dev/null; "
+                          (if group "kill -9 -$p > /dev/null 2>&1; " "")
+                          "kill $w > /dev/null 2>&1; true")))))
+
+(define (office-soffice-run prog args)
+  (eval-system
+    (if (os-win32?) (office-soffice-command prog args office-soffice-timeout #f #f)
+        (with timeout (office-timeout-program)
+          (office-soffice-command prog args office-soffice-timeout timeout
+                                  (and (not timeout) (office-group-launcher)))))))
+
+(tm-define (office-metafile? name)
+  (:synopsis "Whether the file @name is a picture of Windows (EMF, WMF)")
+  (and (string? name)
+       (with n (locase-all name)
+         (or (string-ends? n ".emf") (string-ends? n ".wmf")))))
+
+;; The PNG of each picture, by its bytes: a picture which a file has many
+;; times, or which is read again, is converted once. The cache is emptied
+;; before a file when it has office-metafile-cache-size pictures. A picture
+;; which could not be converted is not tried again during the conversion
+;; of the same file (office-metafile-failed, emptied by each call of
+;; office-metafiles->png, that is for each file): LibreOffice, installed
+;; later or which hung, is tried again for the next file.
+(define office-metafile-cache (make-ahash-table))
+(define office-metafile-count 0)
+(define office-metafile-cache-size 256)
+(define office-metafile-failed (make-ahash-table))
+
+(define (office-metafile-remember data png)
+  (ahash-set! office-metafile-cache data png)
+  (set! office-metafile-count (+ office-metafile-count 1)))
+
+(define (office-metafiles-convert l)
+  ;; the conversion of the pictures l, a list of (data name), at once
+  (let* ((prog (office-soffice))
+         (todo (let loop ((l l) (acc '()) (seen (make-ahash-table)))
+                 (cond ((null? l) (reverse acc))
+                       ((or (not (string? (caar l))) (== (caar l) "")
+                            (ahash-ref office-metafile-cache (caar l))
+                            (ahash-ref office-metafile-failed (caar l))
+                            (ahash-ref seen (caar l)))
+                        (loop (cdr l) acc seen))
+                       (else (ahash-set! seen (caar l) #t)
+                             (loop (cdr l) (cons (car l) acc) seen))))))
+    (when (pair? todo)
+      (if (not prog)
+          (for (x todo) (ahash-set! office-metafile-failed (car x) #t))
+          (catch #t
+            (lambda ()
+              (let* ((dir (url-temp))
+                     (profile (url-append (url-expand "$TEXMACS_HOME_PATH")
+                                          "system/office-profile"))
+                     (files (map (lambda (x i)
+                                   (let* ((suffix (if (string-ends? (locase-all (cadr x)) ".wmf")
+                                                      ".wmf" ".emf"))
+                                          (base (string-append "picture" (number->string i))))
+                                     (list (car x) (url-append dir (string-append base suffix))
+                                           (url-append dir (string-append base ".png")))))
+                                 todo (iota (length todo))))
+                     (all? #t))
+                (system-mkdir dir)
+                (for (f files) (string-save (car f) (cadr f)))
+                (office-soffice-run
+                  prog
+                  (append (list "--headless"
+                                (string-append "-env:UserInstallation=file://"
+                                               (if (os-win32?) "/" "")
+                                               (string-replace (url->system profile) "\\" "/"))
+                                "--convert-to" "png" "--outdir" (url->system dir))
+                          (map (lambda (f) (url->system (cadr f))) files)))
+                (for (f files)
+                  (with r (and (url-exists? (caddr f)) (string-load (caddr f)))
+                    (if (and r (> (string-length r) 8))
+                        (office-metafile-remember (car f) r)
+                        (begin
+                          (set! all? #f)
+                          (ahash-set! office-metafile-failed (car f) #t)))))
+                ;; (under Windows, LibreOffice may still be running when
+                ;; a picture is missing: its files are then left in the
+                ;; temporary directory of TeXmacs, which goes with it)
+                (when (or all? (not (os-win32?)))
+                  (for (f files)
+                    (for (u (cdr f)) (when (url-exists? u) (system-remove u))))
+                  (system-rmdir dir))))
+            (lambda args
+              (for (x todo) (ahash-set! office-metafile-failed (car x) #t))))))))
+
+(tm-define (office-metafiles->png l)
+  (:synopsis "Convert the pictures of Windows l, a list of (data name), at once")
+  ;; with one LibreOffice for all of them, the PNG of each in the cache
+  (set! office-metafile-failed (make-ahash-table))
+  ;; (the pictures of the files before are dropped when there are many)
+  (when (>= office-metafile-count office-metafile-cache-size)
+    (set! office-metafile-cache (make-ahash-table))
+    (set! office-metafile-count 0))
+  (office-metafiles-convert l))
+
+(tm-define (office-metafile->png data name)
+  (:synopsis "The PNG of the picture @data of Windows named @name, or #f")
+  (and (string? data) (> (string-length data) 0)
+       (begin
+         (when (not (ahash-ref office-metafile-cache data))
+           (office-metafiles-convert (list (list data name))))
+         (with r (ahash-ref office-metafile-cache data)
+           (and (string? r) r)))))
 
 (tm-define (office-join-strings l)
   (:synopsis "The list @l with the strings which follow each other as one")
@@ -369,6 +796,24 @@
          (office-wrap (list `(,(caar props) (@ (value ,(cadar props))) ,@l))
                       (cdr props)))
         (else (office-wrap (list (cons (car props) l)) (cdr props)))))
+
+(define office-highlights
+  ;; the colors of the highlighting of Word
+  '(("yellow" . "#ffff00") ("green" . "#00ff00") ("cyan" . "#00ffff")
+    ("magenta" . "#ff00ff") ("blue" . "#0000ff") ("red" . "#ff0000")
+    ("darkBlue" . "#000080") ("darkCyan" . "#008080") ("darkGreen" . "#008000")
+    ("darkMagenta" . "#800080") ("darkRed" . "#800000")
+    ("darkYellow" . "#808000") ("darkGray" . "#808080")
+    ("lightGray" . "#c0c0c0") ("black" . "#000000") ("white" . "#ffffff")))
+
+(tm-define (office-highlight-color name)
+  (:synopsis "The color #rrggbb of the highlighting @name of Word, or #f")
+  (assoc-ref office-highlights name))
+
+(tm-define (office-highlight-name color)
+  (:synopsis "The highlighting of Word of the color @color, or #f")
+  (with p (list-find office-highlights (lambda (p) (== (cdr p) (locase-all color))))
+    (and p (car p))))
 
 (tm-define (office-color s)
   (:synopsis "The color @s of a text as #rrggbb, or #f for none or black")
@@ -504,18 +949,71 @@
   (:synopsis "The text of the element @x of XML, without a declaration")
   (apply string-append (ox-serialize-sub x)))
 
-(tm-define (office-uri s)
+(tm-define (office-web-address? s)
+  (:synopsis "Whether @s is an address on the web (http, https)")
+  ;; (an image there is linked, never fetched by the converters)
+  (and (string? s)
+       (with l (locase-all s)
+         (or (string-starts? l "http://") (string-starts? l "https://")))))
+
+(tm-define (office-uri s . keep)
   (:synopsis "The address @s, with %XX for the bytes which an address cannot hold")
   ;; the spaces, the characters which are not of ASCII, some delimiters
+  ;; (but those of the optional list keep)
   (apply string-append
          (map (lambda (c)
                 (with n (char->integer c)
-                  (if (or (<= n 32) (>= n 127)
-                          (in? c '(#\" #\< #\> #\\ #\^ #\` #\{ #\| #\})))
+                  (if (and (or (<= n 32) (>= n 127)
+                               (in? c '(#\" #\< #\> #\\ #\^ #\` #\{ #\| #\})))
+                           (not (and (pair? keep) (in? c (car keep)))))
                       (string-append "%" (if (< n 16) "0" "")
                                      (upcase-all (number->string n 16)))
                       (string c))))
               (string->list s))))
+
+;; The address of a picture which a file links to, as the programs write it:
+;; on the web, with %XX for what an address cannot hold; a path of Windows
+;; (C:\pics\a.png) is a file: address, whose backslashes Word keeps
+;; (file:///C:\pics\a.png) and which LibreOffice writes with slashes
+;; (file:///C:/pics/a.png); a path of a server (\\server\share\a.png) is
+;; file://server/share/a.png; a relative path or a file: address is the
+;; same, with %XX for the spaces, the characters which are not of ASCII,
+;; # ? [ ] @ (which would end the path) and a % which is not one of %XX.
+
+(define (office-hex-digit? c)
+  (or (char-numeric? c) (in? (char-downcase c) '(#\a #\b #\c #\d #\e #\f))))
+
+(define (office-path-uri s keep)
+  ;; the local path s as an address, keeping the characters keep
+  (let ((n (string-length s)))
+    (let loop ((i 0) (acc '()))
+      (if (>= i n) (apply string-append (reverse acc))
+          (let* ((c (string-ref s i))
+                 (escape? (or (in? c '(#\# #\? #\[ #\] #\@))
+                              (and (char=? c #\%)
+                                   (not (and (< (+ i 2) n)
+                                             (office-hex-digit? (string-ref s (+ i 1)))
+                                             (office-hex-digit? (string-ref s (+ i 2)))))))))
+            (loop (+ i 1)
+                  (cons (if escape?
+                            (string-append "%" (upcase-all (number->string (char->integer c) 16)))
+                            (office-uri (string c) keep))
+                        acc)))))))
+
+(tm-define (office-link-target s word?)
+  (:synopsis "The address @s of a linked picture, for Word (@word?) or OpenDocument")
+  (if (office-web-address? s) (office-uri s)
+      (let* ((n (string-length s))
+             (unc? (and (>= n 3) (string-starts? s "\\\\")))
+             (drive? (and (>= n 3) (char-alphabetic? (string-ref s 0))
+                          (char=? (string-ref s 1) #\:)
+                          (in? (string-ref s 2) '(#\\ #\/))))
+             (slashes (lambda (s) (list->string (map (lambda (c) (if (char=? c #\\) #\/ c))
+                                                     (string->list s))))))
+        (cond (unc? (string-append "file:" (office-path-uri (slashes s) '())))
+              (word? (office-path-uri (if drive? (string-append "file:///" s) s) '(#\\)))
+              (else (office-path-uri (slashes (if drive? (string-append "file:///" s) s))
+                                     '()))))))
 
 (tm-define (office-decimal x)
   (:synopsis "The number @x with three decimals at most, and no useless ones")
@@ -590,8 +1088,10 @@
                          "avenir" "frutiger" "univers" "montserrat"
                          "candara" "corbel" "geneva" "ubuntu" "cantarell"))))))
 
-(tm-define (office-length->cm s)
-  (:synopsis "The length @s (2cm, 1in, 10mm, 12pt, 96px) in centimeters, or #f")
+(tm-define (office-length->cm s . zero?)
+  (:synopsis "The length @s (2cm, 1in, 10mm, 12pt, 1pc, 96px) in centimeters, or #f")
+  ;; (a length of 0 is #f, as the size of a picture, unless @zero? says
+  ;; that it is one, as a margin)
   (and (string? s) (!= s "")
        (let* ((n (string-length s))
               (i (let loop ((i 0))
@@ -600,6 +1100,211 @@
                        (loop (+ i 1)) i)))
               (v (string->number (substring s 0 i)))
               (scale (assoc-ref '(("cm" . 1.0) ("mm" . 0.1) ("in" . 2.54)
-                                  ("pt" . 0.03528) ("px" . 0.02646))
+                                  ("pt" . 0.03528) ("pc" . 0.42333) ("px" . 0.02646))
                                 (substring s i n))))
-         (and v scale (> v 0) (* v scale)))))
+         (and v scale (or (> v 0) (and (pair? zero?) (car zero?) (= v 0)))
+              (* v scale)))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; The named styles of a file, for a file of the other format
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(tm-define (office-odf-name id)
+  (:synopsis "The name of the style of OpenDocument @id: My_20_Note is My Note")
+  ;; (its characters but letters and digits are _hh_ in its identifier)
+  (let loop ((l (string->list id)) (acc '()))
+    (cond ((null? l) (list->string (reverse acc)))
+          ((and (char=? (car l) #\_) (pair? (cdr l)))
+           (let* ((rest (cdr l))
+                  (end (list-find-index (if (> (length rest) 5) (sublist rest 0 5) rest)
+                                        (lambda (c) (char=? c #\_))))
+                  (hex (and end (> end 0) (list->string (sublist rest 0 end))))
+                  (n (and hex (list-and (map (lambda (c) (or (char-numeric? c)
+                                                             (in? (char-downcase c)
+                                                                  '(#\a #\b #\c #\d #\e #\f))))
+                                             (string->list hex)))
+                          (string->number hex 16))))
+             (if (and n (>= n 32) (< n 128))
+                 (loop (list-tail rest (+ end 1)) (cons (integer->char n) acc))
+                 (loop (cdr l) (cons (car l) acc)))))
+          (else (loop (cdr l) (cons (car l) acc))))))
+
+;; The attributes of a node style which the macros of a named style of a
+;; document (office-par-name, office-span-name) say: what they do not say
+;; of these is not there (the macros may have been edited).
+(define-public office-macro-style-keys
+  '(color strong em smallcaps size font-name font align indent-left
+    indent-right first-indent line-spacing background border space-before
+    space-after underline underline-kind strike dstrike caps letters))
+
+(define (office-style-key st)
+  (cons (ox-attr st 'family) (ox-attr st 'name)))
+
+;; The node styles l by (name . family), the first of each, for the
+;; writers, which look them up for each named style of the text
+(tm-define (office-style-index l)
+  (:synopsis "A table of the node styles @l by (name . family)")
+  (let ((t (make-ahash-table)))
+    (for (st l)
+      (when (func? st 'style)
+        (with key (cons (ox-attr st 'name) (ox-attr st 'family))
+          (when (not (ahash-ref t key)) (ahash-set! t key st)))))
+    t))
+
+(tm-define (office-merged-styles mine theirs)
+  (:synopsis "The nodes style @mine of a document, with those of its file @theirs")
+  ;; A style of mine (of the macros of the document) with the attributes
+  ;; of the style of theirs of its name and family which its macros cannot
+  ;; say (the name to show, the paragraph kept with the next one, the
+  ;; level of a heading); the other styles of theirs after them.
+  (let* ((mine (list-filter mine (lambda (st) (func? st 'style))))
+         (keys (make-ahash-table))
+         (theirs (list-filter theirs (lambda (st) (func? st 'style))))
+         (index (make-ahash-table)))
+    (for (st mine) (ahash-set! keys (office-style-key st) #t))
+    (for (st theirs)
+      (with key (office-style-key st)
+        (when (not (ahash-ref index key)) (ahash-set! index key st))))
+    (append
+      (map (lambda (st)
+             (let* ((key (office-style-key st))
+                    (other (ahash-ref index key))
+                    (have (map car (ox-attrs st)))
+                    (add (if (not other) '()
+                             (list-filter (ox-attrs other)
+                                          (lambda (a) (and (not (in? (car a) have))
+                                                           (not (in? (car a) office-macro-style-keys))))))))
+               (if (null? add) st
+                   (cons* (car st) (cons '@ (append (ox-attrs st) add)) (ox-children st)))))
+           mine)
+      (list-filter theirs (lambda (y) (not (ahash-ref keys (office-style-key y))))))))
+
+(define (office-styles-docx arch)
+  ;; (text names): a small Word document with the styles of the archive
+  ;; arch, whose text uses each of them once, and the names to show
+  (let* ((root (office-xml arch "word/styles.xml"))
+         (styles (if root (ox-childs root 'w:style) '()))
+         (used (list-filter
+                 (map (lambda (y)
+                        (list (ox-attr y 'w:type) (ox-attr y 'w:styleId)
+                              (with n (ox-child y 'w:name) (and n (ox-attr n 'w:val)))))
+                      styles)
+                 (lambda (u) (and (in? (car u) '("paragraph" "character"))
+                                  (string? (cadr u)) (!= (cadr u) "")))))
+         (plain (map (lambda (u) '(w:p (w:r (w:t "x")))) (cons #f used)))
+         (pars (map (lambda (u)
+                      (if (== (car u) "paragraph")
+                          `(w:p (w:pPr (w:pStyle (@ (w:val ,(cadr u))))) (w:r (w:t "x")))
+                          `(w:p (w:r (w:rPr (w:rStyle (@ (w:val ,(cadr u))))) (w:t "x")))))
+                    used))
+         (rel "http://schemas.openxmlformats.org/officeDocument/2006/relationships/")
+         (parts (list-filter
+                  (map (lambda (p)
+                         (with name (car p)
+                           (and (ahash-ref arch name) p)))
+                       (append '(("word/styles.xml" . "styles")
+                                 ("word/numbering.xml" . "numbering")
+                                 ("word/settings.xml" . "settings")
+                                 ("word/fontTable.xml" . "fontTable"))
+                               (map (lambda (n) (cons n "theme"))
+                                    (list-filter (map car (ahash-table->list arch))
+                                                 (lambda (n) (and (string-starts? n "word/theme/")
+                                                                  (string-ends? n ".xml")))))))
+                  identity))
+         (rels `(Relationships
+                  (@ (xmlns "http://schemas.openxmlformats.org/package/2006/relationships"))
+                  ,@(map (lambda (p i)
+                           `(Relationship (@ (Id ,(string-append "rId" (number->string i)))
+                                             (Type ,(string-append rel (cdr p)))
+                                             (Target ,(substring (car p) 5 (string-length (car p)))))))
+                         parts (iota (length parts)))))
+         (doc `(w:document
+                 (@ (xmlns:w "http://schemas.openxmlformats.org/wordprocessingml/2006/main")
+                    (xmlns:r ,(substring rel 0 (- (string-length rel) 1))))
+                 (w:body ,@plain ,@pars))))
+    (list (zip-pack (append '("_rels/.rels" "word/document.xml" "word/_rels/document.xml.rels")
+                            (map car parts))
+                    (append (list (ox-serialize
+                                    `(Relationships
+                                       (@ (xmlns "http://schemas.openxmlformats.org/package/2006/relationships"))
+                                       (Relationship (@ (Id "rId1") (Type ,(string-append rel "officeDocument"))
+                                                        (Target "word/document.xml")))))
+                                  (ox-serialize doc)
+                                  (ox-serialize rels))
+                            (map (lambda (p) (ahash-ref arch (car p))) parts)))
+          ;; (Word's ids are unique; the families are those of the reader)
+          (map (lambda (u) (cons (cons (if (== (car u) "paragraph") "paragraph" "text") (cadr u))
+                                 (or (caddr u) (cadr u))))
+               used))))
+
+(define (office-styles-odt arch)
+  ;; (text names): a small OpenDocument text with the styles of the
+  ;; archive arch, whose text uses each of them once, and the names to show
+  (let* ((root (office-xml arch "styles.xml"))
+         (group (and root (ox-child root 'office:styles)))
+         (styles (if group (ox-childs group 'style:style) '()))
+         (used (list-filter
+                 (map (lambda (y)
+                        (list (or (ox-attr y 'style:family) "paragraph")
+                              (ox-attr y 'style:name)
+                              (ox-attr y 'style:display-name)))
+                      styles)
+                 (lambda (u) (and (in? (car u) '("paragraph" "text"))
+                                  (string? (cadr u)) (!= (cadr u) "")))))
+         (plain (map (lambda (u) '(text:p "x")) (cons #f used)))
+         (pars (map (lambda (u)
+                      (if (== (car u) "paragraph")
+                          `(text:p (@ (text:style-name ,(cadr u))) "x")
+                          `(text:p (text:span (@ (text:style-name ,(cadr u))) "x"))))
+                    used))
+         (doc `(office:document-content
+                 (@ (xmlns:office "urn:oasis:names:tc:opendocument:xmlns:office:1.0")
+                    (xmlns:style "urn:oasis:names:tc:opendocument:xmlns:style:1.0")
+                    (xmlns:text "urn:oasis:names:tc:opendocument:xmlns:text:1.0")
+                    (office:version "1.3"))
+                 (office:body (office:text ,@plain ,@pars)))))
+    (list (zip-pack '("mimetype" "content.xml" "styles.xml")
+                    (list "application/vnd.oasis.opendocument.text"
+                          (ox-serialize doc)
+                          (ahash-ref arch "styles.xml")))
+          ;; (a style of paragraphs and one of text may have one name)
+          (map (lambda (u) (cons (cons (car u) (cadr u))
+                                 (or (caddr u) (office-odf-name (cadr u)))))
+               used))))
+
+(define office-package-styles-cache (cons #f '()))
+
+(tm-define (office-package-styles format data)
+  (:synopsis "The nodes style of the named styles of the file @data of @format")
+  ;; As its reader reads them, from a small file with its styles only (the
+  ;; text of the file is not read again), with their names to show as the
+  ;; file says them. The last file is remembered.
+  (if (and (string? (car office-package-styles-cache))
+           (== (car office-package-styles-cache) data))
+      (cdr office-package-styles-cache)
+      (let* ((arch (and (in? format '("docx" "odt")) (office-archive data)))
+             (r (catch #t
+                  (lambda ()
+                    (if (not arch) '()
+                        (let* ((small (if (== format "docx") (office-styles-docx arch)
+                                          (office-styles-odt arch)))
+                               (office (convert (car small) (string-append format "-document")
+                                                "office-stree"))
+                               (l (if (func? office 'office) (cdr office) '()))
+                               (sts (append-map ox-children
+                                                (list-filter l (lambda (y) (func? y 'styles))))))
+                          (map (lambda (st)
+                                 (with d (assoc-ref (cadr small)
+                                                    (cons (if (== (ox-attr st 'family) "paragraph")
+                                                              "paragraph" "text")
+                                                          (ox-attr st 'name)))
+                                   (if (not (and (func? st 'style) d)) st
+                                       (cons* 'style
+                                              (cons '@ (cons (list 'display d)
+                                                             (list-filter (ox-attrs st)
+                                                                          (lambda (a) (!= (car a) 'display)))))
+                                              (ox-children st)))))
+                               sts))))
+                  (lambda args '()))))
+        (set! office-package-styles-cache (cons data r))
+        r)))

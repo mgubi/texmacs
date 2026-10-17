@@ -36,7 +36,8 @@
   (:function parse-odt-document))
 
 (converter office-stree texmacs-stree
-  (:function office->texmacs))
+  (:function-with-options office->texmacs)
+  (:option "office->texmacs:faithful" "on"))
 
 (lazy-define (convert office tmoffice) texmacs->office)
 

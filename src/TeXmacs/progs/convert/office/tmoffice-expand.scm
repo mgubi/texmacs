@@ -82,6 +82,17 @@
              tmdoc-title tmdoc-title* tmdoc-title** tmdoc-copyright
              tmdoc-license tmdoc-flag
              html-tag html-attr html-div-style html-div-class html-style
-             html-class))
+             html-class
+             ;; the macros of the style office
+             office-par office-span office-field office-comment office-commented office-ins
+             office-del office-columns office-columns* office-underline office-strike
+             office-letters office-font office-capitalize office-float office-box office-shape))
+    ;; the screens of a presentation and the folds: all of them, not
+    ;; only what is shown
+    ,@(map tmoffice-env-macro
+           (append '(screens shown)
+                   (catch #t (lambda () (append (group-resolve 'folded-tag)
+                                                (group-resolve 'unfolded-tag)))
+                          (lambda args '()))))
     (associate "doc-data"
                (xmacro "x" (extern "tmoffice-doc-data" (quote-arg "x"))))))
