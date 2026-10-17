@@ -96,6 +96,7 @@ public:
 
   /* routines for dealing with shrinked coordinates */
   int  get_pixel_size ();
+  rectangle visible_part ();
   SI   get_visible_width ();
   SI   get_visible_height ();
   SI   get_window_width ();
@@ -139,6 +140,7 @@ public:
   void update_menus ();
   int  find_alt_selection_index (range_set alt_sel, SI y, int b, int e);
   void apply_changes ();
+  void apply_pending_changes ();
   void animate ();
 
   /* miscellaneous */

@@ -64,4 +64,26 @@ array<page_item> typeset_stack (edit_env env, tree t, path ip,
 void merge_stack (array<page_item>& l, stack_border& sb,
 		  array<page_item> l2, stack_border sb2);
 
+struct shove_entry {
+  box b1, b2;
+  SI  par[6];
+  SI  delta;
+};
+
+// memo of the shoves between paragraphs, owned by a typesetter:
+// entries of the current and of the previous pass, by their second box
+struct shove_memo {
+  hashmap<pointer,shove_entry> cur, prev;
+};
+
+// the memo is used while a shove_pass on it exists (the paragraphs of
+// a pass of its typesetter), also when the pass ends by an exception;
+// the passes nest (a typesetter inside a pass of another one)
+struct shove_pass {
+  shove_memo& m;
+  shove_memo* outer;
+  shove_pass (shove_memo& m);
+  ~shove_pass ();
+};
+
 #endif // defined STACKER_H

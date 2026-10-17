@@ -27,6 +27,7 @@
 (texmacs-module (prog glue-symbols))
 
 (tm-define (all-glued-symbols) '( 
+"typeset-check-mismatches"
 "texmacs-version-release"
 "version-before?"
 "updater-supported?"
@@ -1167,8 +1168,10 @@
 "clear-local-info"
 "refresh-window"
 "update-forced"
+"apply-changes"
 "update-path"
 "update-current-buffer"
+"renumber-auto-labels"
 "update-players"
 "generate-all-aux"
 "generate-aux"

@@ -13,6 +13,8 @@
 #include "Format/page_item.hpp"
 #include "Format/stack_border.hpp"
 #include "pager.hpp"
+#include "sys_utils.hpp" // get_env
+#include "iterator.hpp"
 box format_stack (path ip, array<box> bx, array<space> ht, SI height,
 		  bool may_stretch);
 #include "Boxes/construct.hpp"
@@ -165,11 +167,263 @@ pager_rep::pages_format (pagelet pg) {
   }
 }
 
+/******************************************************************************
+* The pages of the last pass
+*
+* The pager puts all the pages together at each pass: the lines of each
+* page are stacked and stretched to its height, and its header and footer
+* are typeset. After an edit nearly all the pages are made of the same
+* lines as before, and have the same header and footer: what was made in
+* the last pass is kept by the typesetter (page_memo in pager.hpp) and
+* used again, page by page.
+*
+* The text of a page is used again when it is made of the same boxes (the
+* very same ones: a bridge which is used again gives the boxes it gave)
+* with the same spaces, in insertions of the same kinds, heights and
+* stretches (text_parts lists all of this, as pages_format uses it). A
+* header or footer is used again when the tree to typeset is the same, the
+* variables which its typesetting read have the values they had, and so
+* have the references it looked up; one which reads something else (a
+* Scheme routine, the date) is typeset again, and so are all of them in a
+* complete pass, which collects the references which are used. Nothing is
+* kept when a parameter of the pager changed, or a variable from which the
+* environment derives a state which is not read as a variable (the font,
+* the color...).
+*
+* The environment variable TEXMACS_PAGE_REUSE may be "off" (everything is
+* made again) or "check" (made again too, and compared with what is kept).
+******************************************************************************/
+
+#define PART_READS_MAX   256
+#define PART_LOOKUPS_MAX 64
+
+// 0: nothing is used again, 1: used again, 2: made again and compared
+static int
+page_reuse_mode () {
+  static int mode= -1;
+  if (mode < 0) {
+    string s= get_env ("TEXMACS_PAGE_REUSE");
+    mode= (s == "off"? 0: (s == "check"? 2: 1));
+  }
+  return mode;
+}
+
+static bool
+same_tree (tree t, tree u) {
+  return strong_equal (t, u) || t == u;
+}
+
+static bool
+same_box (box b1, box b2) {
+  return b1->w () == b2->w () && b1->h () == b2->h () &&
+         ((tree) b1) == ((tree) b2);
+}
+
+static bool
+same_text (page_text& t1, page_text& t2) {
+  if (N(t1.bs) != N(t2.bs) || N(t1.nums) != N(t2.nums) ||
+      N(t1.ts) != N(t2.ts)) return false;
+  for (int i=0; i<N(t1.bs); i++)
+    if (t1.bs[i].operator -> () != t2.bs[i].operator -> ()) return false;
+  for (int i=0; i<N(t1.nums); i++)
+    if (t1.nums[i] != t2.nums[i]) return false;
+  for (int i=0; i<N(t1.ts); i++)
+    if (!same_tree (t1.ts[i], t2.ts[i])) return false;
+  return true;
+}
+
+void
+pager_rep::memo_start () {
+  if (memo == NULL) return;
+  if (page_reuse_mode () == 0) {
+    // as before: nothing is kept, nor looked at
+    *memo= page_memo ();
+    memo= NULL;
+    return;
+  }
+  array<double> pars;
+  pars << (double) text_width << (double) text_height << (double) width
+       << (double) height << (double) odd << (double) even << (double) top
+       << (double) bot << (double) may_extend << (double) may_shrink
+       << (double) head_sep << (double) foot_sep << (double) col_sep
+       << (double) fn_sep->min << (double) fn_sep->def << (double) fn_sep->max
+       << (double) fnote_sep->min << (double) fnote_sep->def
+       << (double) fnote_sep->max << (double) fnote_bl
+       << (double) float_sep->min << (double) float_sep->def
+       << (double) float_sep->max << (double) mnote_sep
+       << (double) (show_hf? 1: 0) << (double) (paper? 1: 0)
+       << (double) page_offset << (double) env->dpi;
+  // (not the zoom: a header which depends on it reads it, and the borders
+  // of the pages, which are in pixels, are made outside: make_pages)
+  unsigned long long state= env->derived_state ();
+  bool same= N(pars) == N(memo->pars) && state == memo->state;
+  for (int i=0; same && i<N(pars); i++) same= pars[i] == memo->pars[i];
+  if (!same) {
+    memo->pars   = pars;
+    memo->state  = state;
+    memo->headers= array<page_part> ();
+    memo->footers= array<page_part> ();
+    memo->texts  = array<page_text> ();
+  }
+}
+
+// a header or a footer of the page which is being made
+box
+pager_rep::make_part (array<page_part>* parts, tree what) {
+  if (parts == NULL)
+    return typeset_as_concat (env, attach_here (tree (PARA, what),
+                                                decorate ()));
+  int nr= N(pages);
+  while (N(*parts) <= nr) (*parts) << page_part ();
+  page_part& old= (*parts) [nr];
+  bool same= old.ok && page_reuse_mode () != 0 && !env->complete &&
+             same_tree (old.what, what);
+  for (int i=0; same && i<N(old.vars); i++)
+    same= same_tree (env->read (old.vars[i]), old.values[i]);
+  for (int i=0; same && i<N(old.keys); i++)
+    same= env->lookup_value (old.keys[i]) == old.looked[i];
+  if (same && page_reuse_mode () == 1) {
+    if (edit_profile.on) edit_profile.parts_kept++;
+    env->write_bindings (old.bindings);
+    return old.b;
+  }
+  // typeset, with a record of what is read
+  env_id_set reads;
+  page_part now;
+  hashmap<string,tree> before= env->all_values ();
+  edit_env_rep::read_record record (env.operator-> (), &reads,
+                                    &now.keys, &now.looked);
+  edit_env_rep::binding_record bindings (env.operator-> (), &now.bindings);
+  box b= typeset_as_concat (env, attach_here (tree (PARA, what),
+                                               decorate ()));
+  bindings.stop ();
+  now.ok= record.complete () &&
+          reads.size () <= PART_READS_MAX && N(now.keys) <= PART_LOOKUPS_MAX;
+  record.stop ();
+  bool differs= same && (!same_box (b, old.b) || now.bindings != old.bindings);
+  if (differs) typeset_check_mismatches++;
+  if (differs)
+    cout << "TeXmacs] page " << (nr + 1)
+         << ": the header or footer kept differs from the one made" << LF;
+  if (now.ok) {
+    for (int i=0; i<reads.size (); i++) {
+      string var= env_var_name (reads.ids[i]);
+      tree val= env->read (var);
+      // a part which changes a variable it reads would be compared, the
+      // next time, with a value which is not the one it started from
+      if (!same_tree (val, before [var])) now.ok= false;
+      now.vars << var;
+      now.values << val;
+    }
+  }
+  now.what= what;
+  now.b= b;
+  old= now;
+  return b;
+}
+
+// what the text of a page is made of, in the order of pages_format; the
+// control items are obeyed as they are there (once more does not matter)
+void
+pager_rep::text_parts (insertion ins, page_text& pt) {
+  pt.ts << ins->type;
+  pt.nums << (double) ins->ht->min << (double) ins->ht->def
+          << (double) ins->ht->max << (double) ins->xh->min
+          << (double) ins->xh->def << (double) ins->xh->max
+          << ins->stretch << (double) ins->top_cor << (double) ins->bot_cor;
+  if (is_tuple (ins->type, "multi-column")) {
+    pt.nums << (double) N(ins->sk);
+    for (int col=0; col<N(ins->sk); col++)
+      text_parts (ins->sk[col], pt);
+  }
+  else {
+    array<page_item> sub_l= sub (l, ins->begin, ins->end);
+    pt.nums << (double) N(sub_l);
+    for (int i=0; i<N(sub_l); i++) {
+      page_item item= sub_l[i];
+      if (item->type == PAGE_CONTROL_ITEM) {
+        pt.ts << item->t;
+        if (is_tuple (item->t, "env_page")) {
+          if (((item->t[1] == PAGE_THIS_HEADER) ||
+               (item->t[1] == PAGE_THIS_FOOTER)) &&
+              (item->t[2] == "")) style (item->t[1]->label)= " ";
+          else if (item->t[1] == PAGE_NR)
+            page_offset= as_int (item->t[2]->label)- N(pages)- 1;
+          else style (item->t[1]->label)= copy (item->t[2]);
+        }
+      }
+      else {
+        pt.bs << item->b;
+        pt.nums << (double) item->spc->min << (double) item->spc->def
+                << (double) item->spc->max;
+      }
+    }
+  }
+}
+
+void
+pager_rep::text_parts (pagelet pg, page_text& pt) {
+  int n= N(pg->ins);
+  pt.nums << (double) n << pg->stretch;
+  // a pagelet without insertions takes the place of the last page
+  if (n == 0) pt.ok= false;
+  for (int i=0; i<n; i++) {
+    insertion ins= pg->ins[i];
+    text_parts (ins, pt);
+    if (i < n-1) {
+      // the space after the insertion, in the cases in which pages_format
+      // takes it (the end of an empty insertion is no item)
+      insertion next= pg->ins[i+1];
+      bool fnote= is_tuple (ins->type, "footnote");
+      bool nfnote= is_tuple (next->type, "footnote");
+      bool mcol= ins->type != next->type && !nfnote &&
+                 !is_tuple (ins->type, "float") &&
+                 (is_tuple (ins->type, "multi-column") ||
+                  is_tuple (next->type, "multi-column"));
+      if (mcol || (fnote && nfnote)) {
+        page_item item= access (l, path_dec (ins->end));
+        pt.nums << (double) item->spc->min << (double) item->spc->def
+                << (double) item->spc->max;
+      }
+    }
+  }
+}
+
 box
 pager_rep::pages_make_page (pagelet pg) {
   double old= env->magn_len;
   env->magn_len= 1.0;
-  box sb= pages_format (pg);
+  box sb;
+  int nr_page= N(pages);
+  page_text now;
+  now.ok= true;
+  if (memo != NULL) text_parts (pg, now);
+  if (memo == NULL || !now.ok) {
+    sb= pages_format (pg);
+    if (memo != NULL && nr_page < N(memo->texts))
+      memo->texts [nr_page]= page_text ();
+  }
+  else {
+    // the text of the last pass, when it was made of the same boxes
+    while (N(memo->texts) <= nr_page) memo->texts << page_text ();
+    page_text& old_text= memo->texts [nr_page];
+    bool same= old_text.ok && page_reuse_mode () != 0 &&
+               same_text (old_text, now);
+    if (same && page_reuse_mode () == 1) {
+      sb= old_text.b;
+      if (edit_profile.on) edit_profile.texts_kept++;
+    }
+    else {
+      sb= pages_format (pg);
+      if (same && !same_box (sb, old_text.b)) typeset_check_mismatches++;
+      if (same && !same_box (sb, old_text.b))
+        cout << "TeXmacs] page " << (nr_page + 1)
+             << ": the text kept differs from the one made" << LF;
+      now.b= sb;
+      old_text= now;
+    }
+  }
+  if (edit_profile.on) edit_profile.pages_made++;
   box lb= move_box (ip, sb, 0, 0);
   int nr= N(pages) + 1 + page_offset;
   SI  left= (nr&1)==0? even: odd;
@@ -204,6 +458,12 @@ pager_rep::pages_make () {
   int i, n= N(sk);
   for (i=0; i<n; i++)
     pages << pages_make_page (sk[i]);
+  if (memo != NULL) {
+    // the pages which are no longer there are not kept
+    if (N(memo->texts)   > n) memo->texts  = range (memo->texts, 0, n);
+    if (N(memo->headers) > n) memo->headers= range (memo->headers, 0, n);
+    if (N(memo->footers) > n) memo->footers= range (memo->footers, 0, n);
+  }
 }
 
 void

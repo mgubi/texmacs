@@ -316,7 +316,7 @@ edit_env_rep::get_page_width (bool deco) {
   SI w= page_user_width + page_odd_margin + page_right_margin;
   if (get_string (PAGE_MEDIUM) == "paper" &&
       get_string (PAGE_BORDER) != "none" &&
-      deco) w += 20 * pixel;
+      deco) w += 20 * get_pixel ();
   return w;
 }
 
@@ -326,11 +326,11 @@ edit_env_rep::get_pages_width (bool deco) {
   if (get_string (PAGE_MEDIUM) == "paper" &&
       get_string (PAGE_BORDER) != "attached" &&
       get_string (PAGE_BORDER) != "none" &&
-      deco) w += 20 * pixel;
+      deco) w += 20 * get_pixel ();
   w= w * page_packet;
   if (get_string (PAGE_MEDIUM) == "paper" &&
       get_string (PAGE_BORDER) == "attached" &&
-      deco) w += 20 * pixel;
+      deco) w += 20 * get_pixel ();
   return w;
 }
 
@@ -339,7 +339,7 @@ edit_env_rep::get_page_height (bool deco) {
   SI h= page_user_height + page_top_margin + page_bottom_margin;
   if (get_string (PAGE_MEDIUM) == "paper" &&
       get_string (PAGE_BORDER) != "none" &&
-      deco) h += 20 * pixel;
+      deco) h += 20 * get_pixel ();
   return h;
 }
 
@@ -928,9 +928,18 @@ edit_env_rep::update_line_arrows () {
 }
 
 void
+edit_env_rep::update_zoom () {
+  // (not a read of the zoom factor: what depends on it reads it with
+  // get_pixel, and the zoom factor is not part of the derived state)
+  tree z= env.value (ZOOM_FACTOR);
+  zoomf= normal_zoom (is_atomic (z)? as_double (z->label): 1.0);
+  zoom_pixel= (SI) tm_round ((std_shrinkf * PIXEL) / zoomf);
+}
+
+void
 edit_env_rep::update () {
-  zoomf          = normal_zoom (get_double (ZOOM_FACTOR));
-  pixel          = (SI) tm_round ((std_shrinkf * PIXEL) / zoomf);
+  struct deriving { deriving () { env_deriving++; } ~deriving () { env_deriving--; } } d;
+  update_zoom ();
   magn           = get_double (MAGNIFICATION);
   magn_len       = (get_string (LENGTH_MODE) == "fixed"? 1.0: magn);
   index_level    = get_int (MATH_LEVEL);
@@ -983,14 +992,14 @@ edit_env_rep::update () {
 
 void
 edit_env_rep::update (string s) {
+  struct deriving { deriving () { env_deriving++; } ~deriving () { env_deriving--; } } d;
   switch (var_type[s]) {
   case Env_User:
     break;
   case Env_Fixed:
     break;
   case Env_Zoom:
-    zoomf= normal_zoom (get_double (ZOOM_FACTOR));
-    pixel= (SI) tm_round ((std_shrinkf * PIXEL) / zoomf);
+    update_zoom ();
     break;
   case Env_Magnification:
     magn= get_double (MAGNIFICATION);

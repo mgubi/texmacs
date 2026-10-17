@@ -20,6 +20,7 @@
 
 #include "boxes.hpp"
 #include "editor.hpp"
+#include "typesetter.hpp" // get_typeset_check_mismatches
 #include "universal.hpp"
 #include "convert.hpp"
 #include "file.hpp"

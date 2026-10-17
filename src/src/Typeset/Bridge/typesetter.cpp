@@ -11,6 +11,10 @@
 
 #include "Bridge/impl_typesetter.hpp"
 #include "iterator.hpp"
+#include "sys_utils.hpp" // get_env
+#include <chrono>
+
+extern tree the_et;
 
 /******************************************************************************
 * Constructor and destructor
@@ -22,6 +26,11 @@ typesetter_rep::typesetter_rep (edit_env& env2, tree et, path ip):
   paper= (env->get_string (PAGE_MEDIUM) == "paper");
   br= make_bridge (this, et, ip);
   x1= y1= x2= y2=0;
+  kept_pages= tm_new<page_memo> ();
+}
+
+typesetter_rep::~typesetter_rep () {
+  tm_delete (kept_pages);
 }
 
 typesetter
@@ -105,6 +114,41 @@ typesetter_rep::local_end (array<page_item>& prev_l, stack_border& prev_sb) {
 * Main typesetting routines
 ******************************************************************************/
 
+// see typesetter.hpp
+int typeset_check_mismatches= 0;
+int get_typeset_check_mismatches () { return typeset_check_mismatches; }
+
+void
+typeset_cache_mismatch (string what) {
+  typeset_check_mismatches++;
+  failed_error << "What the " << what << " kept differs from what is made "
+               << "again" << LF;
+}
+
+int
+typeset_caches_mode () {
+  static int mode= -1;
+  if (mode < 0) {
+    string s= get_env ("TEXMACS_TYPESET_CACHES");
+    mode= (s == "off"? 0: (s == "check"? 2: 1));
+  }
+  return mode;
+}
+
+static bool
+edit_profile_wanted () {
+  string s= get_env ("TEXMACS_EDIT_PROFILE");
+  return s != "" && s != "off" && s != "0";
+}
+
+edit_profile_data edit_profile= { edit_profile_wanted () }; // (and zeros)
+
+double
+edit_profile_now () {
+  using namespace std::chrono;
+  return duration<double, std::milli> (steady_clock::now ().time_since_epoch ()).count ();
+}
+
 static rectangles
 requires_update (rectangles log) {
   rectangles rs;
@@ -128,17 +172,25 @@ typesetter_rep::determine_page_references (box b) {
     string var= it->next ();
     tree   val= copy (h[var]);
     tree   old= env->local_ref [var];
-    if (is_func (old, TUPLE, 2))
-      env->local_ref (var)= tuple (old[0], val);
-    else if (is_func (old, TUPLE, 3))
-      env->local_ref (var)= tuple (old[0], val, old[2]);
-    else env->local_ref (var)= tuple (old, val);
+    tree   now;
+    if (is_func (old, TUPLE, 2)) now= tuple (old[0], val);
+    else if (is_func (old, TUPLE, 3)) now= tuple (old[0], val, old[2]);
+    else now= tuple (old, val);
+    // (not written when it is there already: see labels_stamp)
+    if (!env->local_ref->contains (var) || old != now)
+      env->local_ref (var)= now;
     env->touched (var)= true;
   }
 }
 
 box
 typesetter_rep::typeset () {
+  // (the tree of the buffer, for the automatic labels: see exec_auto_id)
+  path rp= reverse (br->ip);
+  tree buffer= "";
+  if (!is_nil (rp) && rp->item >= 0 && has_subtree (the_et, path (rp->item)))
+    buffer= the_et[rp->item];
+  edit_env_rep::typesetting_pass pass (env.operator-> (), buffer);
   old_patch= hashmap<string,tree> (UNINIT);
   l        = array<page_item> ();
   sb       = stack_border ();
@@ -164,13 +216,33 @@ typesetter_rep::typeset () {
     env->redefined= array<tree> ();
     env->touched  = hashmap<string,bool> (false);
   }
-  br->typeset (PROCESSED+ WANTED_PARAGRAPH);
+  double t0= edit_profile.on ? edit_profile_now () : 0;
+  {
+    shove_pass pass (shoves);
+    br->typeset (PROCESSED+ WANTED_PARAGRAPH);
+  }
+  double t1= edit_profile.on ? edit_profile_now () : 0;
   pager ppp= tm_new<pager_rep> (br->ip, env, l);
+  ppp->memo= kept_pages;
   box rb= ppp->make_pages ();
   if (env->complete && paper) determine_page_references (rb);
   tm_delete (ppp);
+  if (edit_profile.on) {
+    edit_profile.bridges += t1 - t0;
+    edit_profile.pages   += edit_profile_now () - t1;
+    edit_profile.passes++;
+  }
   // env->complete= false;  // moved to edit_typeset_rep::typeset
   return rb;
+}
+
+// the length of the change log, without a recursion as deep as it is long
+// (N of a list: too deep for a browser after the first pass of a book)
+static int
+log_length (rectangles l) {
+  int n= 0;
+  for (; !is_nil (l); l= l->next) n++;
+  return n;
 }
 
 box
@@ -178,8 +250,15 @@ typesetter_rep::typeset (SI& x1b, SI& y1b, SI& x2b, SI& y2b) {
   x1= x1b; y1= y1b; x2=x2b; y2= y2b;
   box b= typeset ();
   // cout << "-------------------------------------------------------------\n";
-  b->position_at (0, 0, change_log);
+  double t0= edit_profile.on ? edit_profile_now () : 0;
+  repaint.start_pass ();
+  b->position_at (0, 0, repaint);
+  repaint.end_pass ();
+  rectangles change_log= repaint.rects;
+  repaint.rects= rectangles ();
+  if (edit_profile.on) edit_profile.lines += log_length (change_log) / 2;
   change_log= requires_update (change_log);
+  if (edit_profile.on) edit_profile.rects += log_length (change_log);
   rectangle r (0, 0, 0, 0);
   if (!is_nil (change_log)) r= least_upper_bound (change_log);
   array<brush> new_bgs;
@@ -189,8 +268,10 @@ typesetter_rep::typeset (SI& x1b, SI& y1b, SI& x2b, SI& y2b) {
     if (new_bgs[i] != old_bgs[i])
       r= least_upper_bound (r, rs[i]);
   old_bgs= new_bgs;
+  if (edit_profile.on) edit_profile.changes += edit_profile_now () - t0;
+  if (typeset_caches_mode () == 2)
+    check_repaint (b, r, placed_boxes, placed_rects);
   x1b= r->x1; y1b= r->y1; x2b= r->x2; y2b= r->y2;
-  change_log= rectangles ();
   return b;
 }
 
@@ -201,7 +282,13 @@ typesetter_rep::typeset (SI& x1b, SI& y1b, SI& x2b, SI& y2b) {
 void
 notify_assign (typesetter ttt, path p, tree u) {
   // cout << "Assign " << p << ", " << u << "\n";
-  if (is_nil (p)) ttt->br= make_bridge (ttt, u, ttt->br->ip);
+  if (is_nil (p)) {
+    ttt->br= make_bridge (ttt, u, ttt->br->ip);
+    // everything is to be made again, for a reason which may be none
+    // that the pager knows (fonts which arrived, in a browser): the
+    // pages of the last pass are forgotten too
+    *ttt->kept_pages= page_memo ();
+  }
   else ttt->br->notify_assign (p, u);
 }
 
@@ -236,7 +323,7 @@ notify_assign_node (typesetter ttt, path p, tree_label op) {
   int i, n= N(t);
   tree r (op, n);
   for (i=0; i<n; i++) r[i]= t[i];
-  if (is_nil (p)) ttt->br= make_bridge (ttt, r, ttt->br->ip);
+  if (is_nil (p)) notify_assign (ttt, p, r);
   else ttt->br->notify_assign (p, r);
 }
 
@@ -248,7 +335,7 @@ notify_insert_node (typesetter ttt, path p, tree t) {
   for (i=0; i<pos; i++) r[i]= t[i];
   r[pos]= subtree (ttt->br->st, path_up (p));
   for (i=pos; i<n; i++) r[i+1]= t[i];
-  if (is_nil (path_up (p))) ttt->br= make_bridge (ttt, r, ttt->br->ip);
+  if (is_nil (path_up (p))) notify_assign (ttt, path (), r);
   else ttt->br->notify_assign (path_up (p), r);
 }
 
@@ -256,7 +343,7 @@ void
 notify_remove_node (typesetter ttt, path p) {
   // cout << "Remove node " << p << "\n";
   tree t= subtree (ttt->br->st, p);
-  if (is_nil (path_up (p))) ttt->br= make_bridge (ttt, t, ttt->br->ip);
+  if (is_nil (path_up (p))) notify_assign (ttt, path (), t);
   else ttt->br->notify_assign (path_up (p), t);
 }
 

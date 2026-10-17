@@ -486,9 +486,9 @@ tree edit_env_rep::exec_tmpt_length () {
 
 tree edit_env_rep::exec_px_length () {
 #ifndef OS_MACOS
-  return tree (TMLEN, as_string ((int) (retina_zoom * pixel)));
+  return tree (TMLEN, as_string ((int) (retina_zoom * get_pixel ())));
 #else
-  return tree (TMLEN, as_string (pixel));
+  return tree (TMLEN, as_string (get_pixel ()));
 #endif
 }
 
@@ -502,7 +502,7 @@ tree edit_env_rep::exec_guipx_length () {
   else if (tm_style_sheet == "") scale= 2.6666;
   else scale= 1.8 * retina_scale;
 #endif
-  return tree (TMLEN, as_string ((int) floor (scale * pixel + 0.5)));
+  return tree (TMLEN, as_string ((int) floor (scale * get_pixel () + 0.5)));
 }
 
 tree edit_env_rep::exec_lcorner_length () {
