@@ -178,6 +178,7 @@ edit_process_rep::generate_bibliography (
       if (bib_t[i] == "*") star= true;
     if (!bibtex_present () && !starts (style, "tm-") && !csl) {
       if (style == "abbrv") style= "tm-abbrv";
+      else if (style == "abstract") style= "tm-abstract";
       else if (style == "acm") style= "tm-acm";
       else if (style == "alpha") style= "tm-alpha";
       else if (style == "elsart-num") style= "tm-elsart-num";
@@ -498,7 +499,8 @@ edit_process_rep::generate_index (string idx) {
     locale_less_eq_operator::le= get_std_locale (get_init_string ("language"));
 #else
     locale_less_eq_operator::locale_name = language_to_locale (get_init_string ("language"));
-    locale_less_eq_operator::locale_name[2] = '-';
+    if (N (locale_less_eq_operator::locale_name) > 2)
+      locale_less_eq_operator::locale_name[2] = '-';
 #endif
     merge_sort_leq<string,locale_less_eq_operator> (entry);
 #else

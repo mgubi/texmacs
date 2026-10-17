@@ -298,7 +298,7 @@
 (tm-define (safely-kill-window . opt-name)
   (cond ((and (buffer-embedded? (current-buffer)) (null? opt-name))
          (alt-windows-delete (alt-window-search (current-buffer))))
-        ((<= (windows-number) 1)
+        ((<= (length (window-list)) 1)
          (safely-quit-TeXmacs))
         ((nnull? opt-name)
          (if (buffer-modified? (window->buffer (car opt-name)))

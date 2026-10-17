@@ -119,7 +119,8 @@ ispeller_rep::check (string word) {
     return "ok"; 
   }
 
-  tree t (TUPLE, word);
+  // Same format as parse_ispell: number of suggestions, then suggestions
+  tree t (TUPLE);
   
   const AspellWordList* suggestions = aspell_speller_suggest (speller, c_word, len);
   AspellStringEnumeration* elements = aspell_word_list_elements (suggestions);
@@ -131,7 +132,7 @@ ispeller_rep::check (string word) {
   
   delete_aspell_string_enumeration (elements);
 
-  return t;
+  return tree (TUPLE, as_string (N(t))) * t;
 }
 
 void

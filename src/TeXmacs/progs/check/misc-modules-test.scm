@@ -382,6 +382,71 @@
       (check-true (perm "normal/file/no/such/file.en.tm" "read"))
       (check-false (perm "normal/file/no/such/file.en.tm" "write")))))
 
+;; A book whose pages have sections of their own, links to the web and
+;; branches to files which do not exist: book.en.tm traverses chap (which
+;; has a branch to sub), gone and, continued, gone2.
+(define (make-small-book)
+  (save-tmdoc "book.en.tm"
+              '(document
+                 (tmdoc-title "Book")
+                 (traverse (document
+                             (branch "Chap" "chap.en.tm")
+                             (branch "Gone" "gone.en.tm")
+                             (continue "Gone too" "gone2.en.tm")))))
+  (save-tmdoc "chap.en.tm"
+              '(document (tmdoc-title "Chap") "intro"
+                         (section "Inner") "text"
+                         (subsection* "Deeper")
+                         (concat (section "Labelled") (label "lab2"))
+                         (hlink "site" "http://www.texmacs.org/tmweb/home")
+                         (hlink "away" "elsewhere.en.tm")
+                         (branch "Sub" "sub.en.tm")))
+  (save-tmdoc "sub.en.tm"
+              '(document (tmdoc-title "Sub") (section "Inner sub")
+                         (paragraph "Low"))))
+
+(define (test-tmdoc-books)
+  (check-group "tmdoc books")
+  (make-small-book)
+  (let* ((expand (priv '(doc tmdoc) 'tmdoc-expand))
+         (demote (priv '(doc tmdoc) 'tmdoc-demote))
+         (load (ahash-ref tmfs-handler-table (cons "help" 'load)))
+         (m (tmp-file "book.en.tm"))
+         (gone (lambda (name)
+                 `(concat "Broken link. File "
+                          (tt ,(url->unix (tmp-file name)))
+                          " does not exist"))))
+    ;; the sections of a page are below the heading which its title becomes
+    (check= (demote 'section 'chapter) 'section)
+    (check= (demote 'subsection 'chapter) 'subsection)
+    (check= (demote 'section 'section) 'subsection)
+    (check= (demote 'section* 'section) 'subsection*)
+    (check= (demote 'subsection 'subsection) 'paragraph)
+    (check= (demote 'subsection* 'subsection) 'paragraph*)
+    (check= (demote 'section 'appendix) 'section)
+    (check= (demote 'section 'tmdoc-title) 'section)
+    ;; a branch whose file is missing keeps its heading, with a message
+    (check= (expand m m 'title)
+            `(document (title "Book")
+                       (concat (chapter "Chap") (label "sec-chap"))
+                       "intro" (section "Inner") "text"
+                       (subsection* "Deeper")
+                       (concat (section "Labelled") (label "lab2"))
+                       (hlink "site" "http://www.texmacs.org/tmweb/home")
+                       (hlink "away" "elsewhere.en.tm")
+                       (concat (section "Sub") (label "sec-sub"))
+                       (subsection "Inner sub") (subparagraph "Low")
+                       (chapter "Gone") ,(gone "gone.en.tm")
+                       ,(gone "gone2.en.tm")))
+    ;; in the book, the links to the web stay, and those to pages which
+    ;; are not in the book become their text
+    (with r (load (string-append "book/" (url->tmfs-string m)))
+      (with body (cadr (assoc 'body (cdr r)))
+        (check-true (in? '(hlink "site" "http://www.texmacs.org/tmweb/home")
+                         body))
+        (check-true (in? "away" body))
+        (check-true (in? '(chapter "Gone") body))))))
+
 ;; The rewriting functions behind the expansion
 (define (test-tmdoc-rewrite)
   (check-group "tmdoc rewriting")
@@ -1775,13 +1840,13 @@
 (define language-locales
   '(("british" "en_GB") ("bulgarian" "bg_BG") ("chinese" "zh_CN")
     ("croatian" "hr_HR") ("czech" "cs_CZ") ("danish" "da_DK")
-    ("dutch" "nl_NL") ("english" "en_US") ("esperanto" "eo_EO")
+    ("dutch" "nl_NL") ("english" "en_US") ("esperanto" "eo")
     ("finnish" "fi_FI") ("french" "fr_FR") ("german" "de_DE")
-    ("greek" "gr_GR") ("hungarian" "hu_HU") ("italian" "it_IT")
+    ("greek" "el_GR") ("hungarian" "hu_HU") ("italian" "it_IT")
     ("japanese" "ja_JP") ("korean" "ko_KR") ("polish" "pl_PL")
     ("portuguese" "pt_PT") ("romanian" "ro_RO") ("russian" "ru_RU")
     ("slovak" "sk_SK") ("slovene" "sl_SI") ("spanish" "es_ES")
-    ("swedish" "sv_SV") ("taiwanese" "zh_TW") ("ukrainian" "uk_UA")))
+    ("swedish" "sv_SE") ("taiwanese" "zh_TW") ("ukrainian" "uk_UA")))
 
 (define (test-language-names)
   (check-group "language names and locales")
@@ -1807,10 +1872,13 @@
   (check= (locale-to-language "zh_HK") "chinese")
   (check= (locale-to-language "xx_YY") "english")
   (check= (locale-to-language "") "english")
-  ;; FIXME: Greek has the ISO 639 code el, not gr, and Swedish is spoken in
-  ;; SE (System/Language/locale.cpp:118,150,162): (locale-to-language "el_GR")
-  ;; gives "english", expected "greek"; (language-to-locale "swedish")
-  ;; gives "sv_SV", expected "sv_SE".
+  ;; Greek has the ISO 639 code el (gr is still read), Swedish is spoken in
+  ;; SE, and Esperanto has no country
+  (check= (locale-to-language "el_GR") "greek")
+  (check= (locale-to-language "el_GR.UTF-8") "greek")
+  (check= (locale-to-language "gr_GR") "greek")
+  (check= (language-to-locale "swedish") "sv_SE")
+  (check= (locale-to-language "eo") "esperanto")
   (check-true (string? (get-locale-language)))
   (check-true (in? (get-output-language)
                    (cons "american" supported-languages))))
@@ -2509,6 +2577,7 @@
   (system-mkdir (system->url misc-dir))
   (for-each run-group
             (list test-help-files test-doc-parse test-tmdoc-expand
+                  test-tmdoc-books
                   test-tmdoc-rewrite test-doc-search test-tmdoc-edit
                   test-font-database test-font-design test-cursor-history
                   test-font-design-page

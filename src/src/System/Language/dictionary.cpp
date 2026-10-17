@@ -27,6 +27,21 @@ RESOURCE_CODE(dictionary);
 dictionary_rep::dictionary_rep (string from2, string to2):
   rep<dictionary> (from2 * "-" * to2), table ("?"), from (from2), to (to2) {}
 
+static bool
+is_utf8_with_non_ascii (string s) {
+  // Dictionaries are either UTF-8 or Cork encoded: check for valid UTF-8
+  bool non_ascii= false;
+  int i= 0, n= N(s);
+  while (i < n) {
+    if ((unsigned char) s[i] < 128) { i++; continue; }
+    int start= i;
+    unsigned int code= decode_from_utf8 (s, i);
+    if (encode_as_utf8 (code) != s (start, i)) return false;
+    non_ascii= true;
+  }
+  return non_ascii;
+}
+
 void
 dictionary_rep::load (url u) {
   if (is_none (u)) return;
@@ -38,6 +53,7 @@ dictionary_rep::load (url u) {
 
   string s;
   if (load_string (u, s, false)) return;
+  bool utf8= is_utf8_with_non_ascii (s);
   tree t= block_to_scheme_tree (s);
   if (!is_tuple (t)) return;
 
@@ -48,11 +64,7 @@ dictionary_rep::load (url u) {
     {
       string l= t[i][0]->label; if (is_quoted (l)) l= scm_unquote (l);
       string r= t[i][1]->label; if (is_quoted (r)) r= scm_unquote (r);
-      if (to == "chinese" ||  to == "japanese"  ||
-          to == "korean"  ||  to == "taiwanese" ||
-          to == "russian" ||  to == "ukrainian" || to == "bulgarian" ||
-          to == "german" || to == "greek" || to == "slovak")
-        r= utf8_to_cork (r);
+      if (utf8) r= utf8_to_cork (r);
       table (l)= r;
     }
 }

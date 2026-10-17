@@ -419,7 +419,7 @@ get_from_web (url name) {
   
   if (tool == "wget") {
     cmd= "wget --header='User-Agent: TeXmacs-" TEXMACS_VERSION "' -q";
-    cmd << " --no-check-certificate --tries=1";
+    cmd << " --tries=1";
     cmd << " -O " << tmp_s << " " << escape_sh (web_encode (as_string (name)));
   }
   

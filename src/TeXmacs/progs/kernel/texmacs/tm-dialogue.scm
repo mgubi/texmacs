@@ -88,7 +88,7 @@
            `(let* ((,sym #f)
                    (proc ,(delayed-sub (cdr body))))
               (lambda ()
-                (if (!= ,sym (change-time)) 0
+                (if (== ,sym (change-time)) ,(cadar body)
                     (with left (- ,(cadar body) (idle-time))
                       (if (> left 0) left
                           (begin
