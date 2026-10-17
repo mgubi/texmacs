@@ -195,7 +195,12 @@ edit_env_rep::derived_state () {
     known= N(var_type);
     known_derived= N(env_derived_inputs ());
   }
-  return env.state_fingerprint () ^ files_hash ();
+  unsigned long long h= env.state_fingerprint () ^ files_hash ();
+  // (the zoom factor, which env_entry_hash leaves out, when a state was
+  // derived from it)
+  if (env_zoom_derived ())
+    h ^= env_input_hash (env_zoom_id (), zoom_value ());
+  return h;
 }
 
 // the files, which are not variables: the bindings record the file in
@@ -452,6 +457,11 @@ int
 env_zoom_id () {
   static int id= env_var_id (ZOOM_FACTOR);
   return id;
+}
+
+bool
+env_zoom_derived () {
+  return env_derived_inputs ()->contains (env_zoom_id ());
 }
 
 unsigned long long

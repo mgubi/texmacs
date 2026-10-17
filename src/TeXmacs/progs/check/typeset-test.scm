@@ -1567,11 +1567,12 @@
 (define (zoom-places)
   (map (lambda (i) (rect i)) (iota (tree-arity (buffer-tree)))))
 
-(define (zoom-places-from-scratch body z)
+(define (zoom-places-from-scratch body z inits)
   (with-scratch-buffer
    (lambda (u)
      (buffer-set-body u (tree-copy body))
      (init-env "page-medium" "paper")
+     (for (i inits) (init-env (car i) (cadr i)))
      (set-window-zoom-factor z)
      (apply-changes)
      (update-current-buffer)
@@ -1579,16 +1580,18 @@
      (update-forced)
      (zoom-places))))
 
-(define (test-zoom)
-  (check-group "zoom")
+(define (zoom-check body inits zooms)
+  ;; @body with the initial environment @inits zoomed to each of @zooms
   (with-typeset-body
-   (zoom-body)
+   body
    (lambda ()
      (init-env "page-medium" "paper")
+     (for (i inits) (init-env (car i) (cadr i)))
      (update-current-buffer)
      (update-forced)
      (let ((old (get-window-zoom-factor))
            (mismatches (typeset-check-mismatches)))
+       ;; (a zoom other than 1, which a window takes)
        (set-window-zoom-factor 1.2)
        (apply-changes)
        (if (== (get-init "zoom-factor") "1")
@@ -1597,14 +1600,35 @@
            (dynamic-wind
              (lambda () (noop))
              (lambda ()
-               (for (z '(1.2 1.44 1.2 1.0))
+               (for (z zooms)
                  (zoom-to z)
                  (check= (zoom-places)
-                         (zoom-places-from-scratch (buffer-tree) z)))
+                         (zoom-places-from-scratch (buffer-tree) z inits)))
                (check= (typeset-check-mismatches) mismatches))
              (lambda ()
                (set-window-zoom-factor old)
                (apply-changes))))))))
+
+;; A length of the derived state in pixels (math-frac-limit: whether a
+;; fraction is wide) makes the zoom factor an input of the derived state,
+;; which no bridge reads itself: every bridge is then used again only at the
+;; same zoom (env_zoom_derived). This one goes last, since what the state
+;; was derived from is known for the rest of the session.
+(define (zoom-derived-body)
+  `(document
+    ,@(map (lambda (k)
+             `(concat "text " (math (frac ,(apply string-append
+                                                  (map (lambda (i) "abcd")
+                                                       (iota (+ k 1))))
+                                          "b"))
+                      " more"))
+           (iota 12))))
+
+(define (test-zoom)
+  (check-group "zoom")
+  (zoom-check (zoom-body) '() '(1.2 1.44 1.2 1.0))
+  (zoom-check (zoom-derived-body) '(("math-frac-limit" "100px"))
+              '(1.0 2.0 1.0)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The suite

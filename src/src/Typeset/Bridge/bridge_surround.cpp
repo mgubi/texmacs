@@ -166,7 +166,8 @@ bridge_surround_rep::parts_again () {
   if (typeset_inputs_mode () == 0)
     return corrupted || (N(ttt->old_patch) != 0);
   return corrupted || !parts_ok || env->fingerprint () != parts_fp ||
-         (parts_zoom && env->zoom_value () != parts_zoom_at) ||
+         ((parts_zoom || env_zoom_derived ()) &&
+          env->zoom_value () != parts_zoom_at) ||
          !same_lookups (env, parts_keys, parts_values, parts_stamp);
 }
 

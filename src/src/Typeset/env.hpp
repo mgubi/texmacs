@@ -146,6 +146,10 @@ inline void env_note_read (int id) {
   if (env_deriving > 0) env_derived_inputs () (id)= true; }
 string env_var_name (int id);
 int env_zoom_id (); // (the id of ZOOM_FACTOR)
+// whether a state was derived from the zoom factor (a length of the state in
+// px, as math-frac-limit: env_derived_inputs). Its value is then in the
+// derived state, and every bridge is used again only at the same zoom
+bool env_zoom_derived ();
 // TEXMACS_TYPESET_READS: whether a bridge is used again when its inputs
 // are as they were (see "What is typeset again" in bridge.cpp): 1 (the
 // default), 0 ("off": the classic cache), 2 ("check")

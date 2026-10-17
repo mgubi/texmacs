@@ -726,9 +726,12 @@ bridge_rep::same_inputs () {
     return false;
   if (!same_lookups (env, seen_keys, seen_values, seen_stamp)) return false;
   // the whole environment as it was (the fingerprint: also for a bridge
-  // whose inputs are not known), or the inputs
+  // whose inputs are not known), or the inputs. The zoom factor is not in
+  // the fingerprint: the same zoom when the bridge read it, or when a state
+  // was derived from it (which the fingerprint does not see either)
   if (env->fingerprint () == in_fp &&
-      (!in_zoom || env->zoom_value () == in_zoom_at)) return true;
+      ((!in_zoom && !env_zoom_derived ()) ||
+       env->zoom_value () == in_zoom_at)) return true;
   if (!in_known) return false;
   return env->derived_state () == in_state &&
          env->inputs_hash (in_vars, false) == in_vals;
