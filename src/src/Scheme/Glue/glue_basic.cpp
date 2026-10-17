@@ -9245,6 +9245,34 @@ tmg_tree_sitter_lexer_eofP () {
 }
 
 tmscm
+tmg_tree_sitter_tables_start (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "tree-sitter-tables-start");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  string out= tree_sitter_tables_start (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return string_to_tmscm (out);
+}
+
+tmscm
+tmg_tree_sitter_tables_finish (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "tree-sitter-tables-finish");
+  TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "tree-sitter-tables-finish");
+
+  int in1= tmscm_to_int (arg1);
+  string in2= tmscm_to_string (arg2);
+
+  // TMSCM_DEFER_INTS;
+  string out= tree_sitter_tables_finish (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return string_to_tmscm (out);
+}
+
+tmscm
 tmg_server_define_error_codes () {
   // TMSCM_DEFER_INTS;
   server_define_error_codes ();
@@ -12662,6 +12690,8 @@ initialize_glue_basic () {
   tmscm_install_procedure ("tree-sitter-lexer-set-result",  tmg_tree_sitter_lexer_set_result, 1, 0, 0);
   tmscm_install_procedure ("tree-sitter-lexer-column",  tmg_tree_sitter_lexer_column, 0, 0, 0);
   tmscm_install_procedure ("tree-sitter-lexer-eof?",  tmg_tree_sitter_lexer_eofP, 0, 0, 0);
+  tmscm_install_procedure ("tree-sitter-tables-start",  tmg_tree_sitter_tables_start, 1, 0, 0);
+  tmscm_install_procedure ("tree-sitter-tables-finish",  tmg_tree_sitter_tables_finish, 2, 0, 0);
   tmscm_install_procedure ("server-define-error-codes",  tmg_server_define_error_codes, 0, 0, 0);
   tmscm_install_procedure ("server-start",  tmg_server_start, 0, 0, 0);
   tmscm_install_procedure ("server-stop",  tmg_server_stop, 0, 0, 0);

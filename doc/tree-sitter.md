@@ -671,6 +671,29 @@ Done in part (2026-10-17):
   actions, so no cheap equality shortcut), and on femtolisp a loop
   written in Scheme is slower than the built-in `equal?` it replaced
   (merge 163 s with it, reverted).
+- **C++ port of the state stages** (2026-10-17,
+  `Plugins/TreeSitter/ts_tables.cpp`, used through `progs/treesit/
+  ts-native.scm` when the glue `tree-sitter-tables-start` exists): the LR(1)
+  construction, the following tokens, the coincident tokens, the error
+  state, the used symbols, the merging, the unit reductions, the unused
+  states and the order. The token conflicts, the keywords and the lex
+  tables stay in Scheme. The tables are byte-identical to those of the
+  Scheme code (json, scheme, c, python, cpp; the treesit suite compares
+  both paths, `ts-set-native-tables!` or `TS_SCHEME_TABLES=1` select the
+  Scheme one). C++ grammar:
+
+  | | S7 in TeXmacs | femtolisp in TeXmacs |
+  |---|---|---|
+  | before | about 30 min, 6.5 GB | 252 s, 3.6 GB |
+  | LR (C++) | 3.2 s | 2.9 s |
+  | merge etc. (C++) | 3.3 s | 2.9 s |
+  | token conflicts | 5.5 s | 4.6 s |
+  | lex tables (Scheme) | 89 s | 37 s |
+  | language | 21 s | 5.7 s |
+  | total | 141 s, 4.7 GB | 56 s, 1.4 GB |
+
+  C: 9.9 s instead of 24.8 s (S7), python 7.6 s instead of 18.0 s. The lex
+  tables are now most of the time.
 
 As planned initially:
 

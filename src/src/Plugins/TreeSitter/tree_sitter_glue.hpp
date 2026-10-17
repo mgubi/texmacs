@@ -28,5 +28,7 @@ void tree_sitter_lexer_mark_end ();
 void tree_sitter_lexer_set_result (int symbol);
 int  tree_sitter_lexer_column ();
 bool tree_sitter_lexer_eof ();
+string tree_sitter_tables_start (string grammar);
+string tree_sitter_tables_finish (int id, string data);
 
 #endif // TREE_SITTER_GLUE_H

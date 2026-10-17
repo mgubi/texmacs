@@ -28,7 +28,7 @@
         (treesit ts-base) (treesit ts-grammar) (treesit ts-nfa)
         (treesit ts-tables) (treesit ts-build) (treesit ts-language)
         (treesit ts-parse) (treesit ts-export) (treesit ts-registry)
-        (treesit ts-highlight) (treesit ts-scanner-cpp)))
+        (treesit ts-highlight) (treesit ts-scanner-cpp) (treesit ts-native)))
 
 (define (json-grammar-file)
   (url->system (url-concretize "$TEXMACS_PATH/misc/tree-sitter/json/grammar.json")))
@@ -508,6 +508,38 @@
                 '((4 10 "keyword") (13 14 "operator") (15 16 "constant_number") (18 21 "comment")))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; The parse states built in C++
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (tables-both-ways grammar)
+  ;; the exported tables of grammar, with the states built in C++ and in Scheme
+  (let ((native (ts-export-language->string (ts-generate-language grammar))))
+    (ts-set-native-tables! #f)
+    (let ((scheme (catch #t
+                    (lambda () (ts-export-language->string (ts-generate-language grammar)))
+                    (lambda args (ts-set-native-tables! #t) (apply throw args)))))
+      (ts-set-native-tables! #t)
+      (cons native scheme))))
+
+(define (test-native)
+  (when (ts-native-tables?)
+    ;; the same tables, byte for byte (precedences, fields, aliases, a
+    ;; keyword, conflicts and inlined rules, externals)
+    (for (g (list (ts-read-file (json-grammar-file)) calc-grammar raw-grammar
+                  (string-load (url-concretize "$TEXMACS_PATH/misc/tree-sitter/scheme/grammar.json"))))
+      (let ((r (tables-both-ways g)))
+        (check-true (string=? (car r) (cdr r)))))
+    ;; the errors of the construction
+    (let ((bad (string-append
+                "{\"name\": \"bad\", \"rules\": {\"e\": {\"type\": \"CHOICE\", \"members\": ["
+                "{\"type\": \"SEQ\", \"members\": [{\"type\": \"SYMBOL\", \"name\": \"e\"},"
+                " {\"type\": \"STRING\", \"value\": \"+\"}, {\"type\": \"SYMBOL\", \"name\": \"e\"}]},"
+                "{\"type\": \"STRING\", \"value\": \"x\"}]}}}")))
+      (check= (catch #t (lambda () (ts-generate-language bad) "no error")
+                (lambda args (if (string-index (object->string args) #\*) "conflict" args)))
+              "conflict"))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Master routine
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -525,4 +557,5 @@
   (test-regions)
   (test-highlight)
   (test-scanners)
+  (test-native)
   (check-end))

@@ -465,3 +465,18 @@
           (if (eof-object? c)
               (list->string (reverse acc))
               (loop (cons c acc))))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Profiling
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define profile-start #f)
+(define profile-last 0)
+(define-public (ts-profile what)
+  ;; with TS_PROFILE=1, the time since the last step, in ms
+  (when (and (defined? 'getenv) (getenv "TS_PROFILE"))
+    (let ((now (texmacs-time)))
+      (when profile-start
+        (display* "ts-profile: " what " " (- now profile-last) " ms\n"))
+      (set! profile-start #t)
+      (set! profile-last now))))

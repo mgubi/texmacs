@@ -21,7 +21,8 @@
 ;; advance actions a list of (chars state . in-main-token?).
 
 (texmacs-module (treesit ts-build)
-  (:use (treesit ts-base) (treesit ts-grammar) (treesit ts-nfa) (treesit ts-tables)))
+  (:use (treesit ts-base) (treesit ts-grammar) (treesit ts-nfa) (treesit ts-tables)
+        (treesit ts-native)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Tokens which may follow each other
@@ -974,20 +975,27 @@
 ;; All the tables
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define profile-start #f)
-(define profile-last 0)
-(define-public (ts-profile what)
-  ;; with TS_PROFILE=1, the time since the last step, in ms
-  (when (and (defined? 'getenv) (getenv "TS_PROFILE"))
-    (let ((now (texmacs-time)))
-      (when profile-start
-        (display* "ts-profile: " what " " (- now profile-last) " ms\n"))
-      (set! profile-start #t)
-      (set! profile-last now))))
-
 (define-public (build-tables! g)
   ;; the parse table of build-parse-table, completed
   (ts-profile "start")
+  (if (ts-native-tables?)
+      (apply build-tables-end! g (ts-native-build g identify-keywords make-token-conflict-map))
+      (build-tables-scheme! g)))
+
+(define (build-tables-end! g t tc ci keywords)
+  ;; the lex tables and the last details, after the merging of the states
+  (let* ((states (ahash-ref t 'states))
+         (lex (build-lex-tables g states keywords tc ci)))
+    (ts-profile "lex")
+    (ahash-set! t 'external-lex-states (populate-external-lex-states! g states))
+    (mark-fragile-tokens! states tc)
+    (ahash-set! t 'lex-table (car lex))
+    (ahash-set! t 'keyword-lex-table (cdr lex))
+    (ahash-set! t 'keywords keywords)
+    (ahash-set! t 'token-conflicts tc)
+    t))
+
+(define (build-tables-scheme! g)
   (let* ((t (build-parse-table g))
          (b (begin (ts-profile "lr") (ahash-ref t 'builder)))
          (states (ahash-ref t 'states))

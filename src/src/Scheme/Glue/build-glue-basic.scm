@@ -758,6 +758,8 @@
   (tree-sitter-lexer-set-result tree_sitter_lexer_set_result (void int))
   (tree-sitter-lexer-column tree_sitter_lexer_column (int))
   (tree-sitter-lexer-eof? tree_sitter_lexer_eof (bool))
+  (tree-sitter-tables-start tree_sitter_tables_start (string string))
+  (tree-sitter-tables-finish tree_sitter_tables_finish (string int string))
 
   ;; TeXmacs servers and clients
   (server-define-error-codes server_define_error_codes (void))
