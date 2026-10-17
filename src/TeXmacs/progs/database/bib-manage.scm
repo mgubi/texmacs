@@ -357,6 +357,29 @@
           (string-save full-doc auto)
           (bibtex-run prefix style auto names)))))
 
+(define (bib-file-of fname)
+  ;; the .bib file of a bibliography, as find_bib_file (edit_process.cpp)
+  ;; finds it: as it is named, or next to the document
+  (let* ((name (if (string-ends? fname ".bib") fname
+                   (string-append fname ".bib")))
+         (u (string->url name))
+         (r (url-relative (current-buffer) u)))
+    (cond ((url-exists? u) u)
+          ((url-exists? r) r)
+          (else #f))))
+
+(tm-define (bib-export-bibtex names fname)
+  (:synopsis "The entries @names of the bibliography of file @fname, as BibTeX")
+  ;; from the sources of bib-compile-sub (the document, the .bib file, the
+  ;; database, Zotero); without the database tool, the whole .bib file
+  (let* ((f (and (string? fname) (!= fname "") (bib-file-of fname))))
+    (if (supports-db?)
+        (let* ((all-files (bib-sources (if f (list f) '())))
+               (l (apply bib-retrieve-entries (cons names all-files)))
+               (doc `(document ,@(map db->bib (map cdr l)))))
+          (convert doc "texmacs-stree" "bibtex-document"))
+        (if f (string-load f) ""))))
+
 (tm-define (bib-compile prefix style names . bib-files)
   (when (and (tm? names) (tm-func? names 'document))
     (set! names (tm-children (tm->stree names))))

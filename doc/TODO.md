@@ -50,13 +50,12 @@ no headless mode. The Widkit duplicates are fixed on `wip_other_guis` too.
   proposed for `wip_fixes` (PRs #323 to #326): the same changes, which
   merge without conflict. The rename dialog (#318) was tried in Vue only.
 
-- **CSL: the LaTeX export does not know the citations of the style.** A
-  document with a `csl-` style exports its bibliography as it is rendered
-  and its citations as `\cite{key}`, so LaTeX prints the labels of TeXmacs
-  instead of "(Knuth, 1984)" or of the footnotes. The other open points of
-  the CSL processor (the later forms of citations which are evaluated
-  without being typeset, the rules of `subsequent-author-substitute` which
-  work name by name, names in other scripts) are in `doc/csl-design.md`.
+- **CSL: the open points of the processor** (the later forms of citations
+  which are evaluated without being typeset, the rules of
+  `subsequent-author-substitute` which work name by name, names in other
+  scripts, the corners of the LaTeX export in note styles) are in
+  `doc/csl-design.md`. The LaTeX export uses the package
+  `citation-style-language` since 2026-10-18.
 
 - **GPU renderer, after the work of 2026-10-15** (Metal backend, the
   canvases of the Cocoa port on the GPU; `src/docs/vue-graphics-stack.md`,

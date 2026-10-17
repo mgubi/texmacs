@@ -974,6 +974,84 @@
                            "Addison-Wesley. Reading, MA."))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; The LaTeX export, for the package citation-style-language
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (exported-latex name text)
+  ;; the document @text, updated as in generated-body and exported to
+  ;; NAME.tex next to it
+  (let* ((f (tmp-file (string-append name ".tm")))
+         (tex (tmp-file (string-append name ".tex")))
+         (old (current-buffer)))
+    (string-save (doc-tm text) f)
+    (load-buffer f)
+    (switch-to-buffer* f)
+    (for (i (.. 0 3))
+      (update-forced)
+      (generate-all-aux)
+      (update-current-buffer))
+    (update-forced)
+    (when (url-exists? tex) (system-remove tex))
+    (export-buffer-main (current-buffer) tex "latex" '())
+    (buffer-pretend-saved f)
+    (buffer-close f)
+    (when (buffer-exists? old) (switch-to-buffer old))
+    (if (url-exists? tex) (string-load tex) "")))
+
+(define (one-line s)
+  ;; the lines of @s joined, with single spaces (the export breaks lines)
+  (let loop ((s (string-replace s "\n" " ")))
+    (with r (string-replace s "  " " ")
+      (if (== r s) s (loop r)))))
+
+(define (has? s what)
+  (>= (string-search-forwards what 0 (one-line s)) 0))
+
+(define (test-latex-export)
+  (check-group "LaTeX export")
+  (string-save sample-bib (tmp-file "refs.bib"))
+  (let* ((s (exported-latex
+             "ieee-export"
+             (string-append
+              "  See <cite|knuth84|knuth86>, <cite-detail|knuth86|pp. 12-14>,"
+              " <cite-detail|knuth84|for the idea>, <cite-textual|knuth86b>"
+              " and <cite-author|knuth84>.\n\n"
+              "  <\\bibliography|bib|csl-ieee|refs>\n  </bibliography>\n")))
+         (bib (tmp-file "ieee-export-refs.bib")))
+    (check-true (has? s "\\usepackage{citation-style-language}"))
+    (check-true (not (has? s "natbib")))
+    (check-true (has? s "\\cslsetup{style = ieee}"))
+    (check-true (has? s "\\addbibresource[journal-abbreviation=false]{ieee-export-refs.bib}"))
+    (check-true (has? s "\\cite{knuth84,knuth86}"))
+    ;; a locator, else a suffix of the cite
+    (check-true (has? s "\\cite[page={12-14}]{knuth86}"))
+    (check-true (has? s "\\cite[suffix={, for the idea}]{knuth84}"))
+    ;; the names of a numeric style come from TeXmacs: \textcite and
+    ;; \citeauthor of the package would print NO_PRINTED_FORM
+    (check-true (has? s "Knuth and van der Hoeven {\\cite{knuth86b}}"))
+    (check-true (not (has? s "\\citeauthor")))
+    (check-true (has? s "\\printbibliography"))
+    (check-true (not (has? s "thebibliography")))
+    ;; next to the .tex file, the entries and the style
+    (check-true (url-exists? bib))
+    (check-true (and (url-exists? bib) (has? (string-load bib) "knuth86b")))
+    (check-true (url-exists? (tmp-file "ieee.csl"))))
+  ;; a style whose citations show the names: the commands of the package
+  (with s (exported-latex
+           "apa-export"
+           (string-append
+            "  See <cite-textual|knuth86b>, <cite-author|knuth84>"
+            " and <cite-year|knuth84>.\n\n"
+            "  <\\bibliography|bib|csl-apa|refs>\n  </bibliography>\n"))
+    (check-true (has? s "\\cslsetup{style = apa}"))
+    (check-true (has? s "\\textcite{knuth86b}"))
+    (check-true (has? s "\\citeauthor{knuth84}"))
+    (check-true (has? s "\\citeyear{knuth84}")))
+  ;; a snippet converted afterwards has no CSL bibliography
+  (check= (convert '(cite-textual "knuth84") "texmacs-stree" "latex-snippet")
+          "{\\citet{knuth84}}"))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Master routine
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -987,7 +1065,7 @@
   (test-styles)
   (remove-tmp-dir)
   (system-mkdir (system->url csl-dir))
-  (for (test (list test-document test-document-citations))
+  (for (test (list test-document test-document-citations test-latex-export))
     (with r (check-run test)
       (when (and (pair? r) (== (car r) 'error))
         (check-report #f "the group" (object->string r)))))
