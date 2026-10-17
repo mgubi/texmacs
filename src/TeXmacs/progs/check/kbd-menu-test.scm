@@ -1196,7 +1196,10 @@
 ;; about all the documents which are not saved, also when dialogs are open:
 ;; windows-number counts their windows too. No dialog is opened and nothing
 ;; is closed here: windows-number and kill-window are replaced for the time
-;; of the check.
+;; of the check. (With S7 the replacement does not reach safely-kill-window,
+;; which was read before it and keeps calling the glue functions: the check
+;; then only sees that the only window quits, through safely-quit-TeXmacs
+;; above. These glue functions have no Scheme wrapper to redefine instead.)
 (define (test-close-window)
   (check-group "closing windows")
   (in-buffer '(document "text") '(0 0)
