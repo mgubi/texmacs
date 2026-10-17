@@ -344,9 +344,13 @@
 ;; Quick fixes (code actions)
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;; the client and the actions last proposed, for the page of the fixes
+;; the client and the actions last proposed, for the page of the fixes,
+;; with the buffer and its text then (the ranges of the fixes are those
+;; of that text)
 (define fixes-client #f)
 (define fixes '())
+(define fixes-buffer #f)
+(define fixes-text #f)
 
 (tm-define (lsp-run-action c a)
   (:synopsis "Runs the code action (or command) @a of the server of @c")
@@ -373,7 +377,17 @@
       (when (url-rooted-tmfs? (current-buffer))
         (with u (current-buffer)
           (buffer-close u)))
-      (lsp-run-action fixes-client a))))
+      (cond ((not (and fixes-buffer (buffer-exists? fixes-buffer)))
+             (set-message "The file of the fixes has been closed" ""))
+            ((!= (lsp-buffer-text fixes-buffer) fixes-text)
+             ;; (its ranges would no longer be those of the text)
+             (switch-to-buffer fixes-buffer)
+             (set-message "The file has changed: ask for the fixes again"
+                          ""))
+            (else
+             (when (!= (current-buffer) fixes-buffer)
+               (switch-to-buffer fixes-buffer))
+             (lsp-run-action fixes-client a))))))
 
 (define (action-title a)
   (utf8->cork (or (lsp-ref a "title") "(untitled)")))
@@ -421,6 +435,8 @@
           (else
            (set! fixes-client (car r))
            (set! fixes (cadr r))
+           (set! fixes-buffer (current-buffer))
+           (set! fixes-text (lsp-buffer-text))
            (open-auxiliary
             "Quick fixes"
             `(document

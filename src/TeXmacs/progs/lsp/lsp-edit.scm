@@ -711,24 +711,40 @@
   (set-message "" "")
   (lsp-status-refresh))
 
+;; the request of a signature which is awaited (client . id), at most one
+(define signature-request #f)
+
 (tm-define (lsp-signature-help)
   (:synopsis "Shows the signature of the function at the cursor")
   (let ((c (lsp-buffer-client*))
         (uri (lsp-buffer-uri))
-        (pos (lsp-cursor-position)))
+        (pos (lsp-cursor-position))
+        (u (current-buffer))
+        (lo (cursor-line+offset)))
     (when (and c uri pos (capable? c "signatureHelpProvider"))
       (lsp-buffer-sync)
-      (lsp-request c "textDocument/signatureHelp"
-                   (lsp-object "textDocument" (lsp-object "uri" uri)
-                               "position" pos)
-                   (lambda (r e)
-                     (with l (and (not e) r (not (lsp-null? r))
-                                  (lsp-signature-parts r))
-                       (cond (l (set! signature-shown? #t)
-                                (set! signature-parts l)
-                                (set-message (mark-parts l) "")
-                                (lsp-status-refresh))
-                             (signature-shown? (hide-signature)))))))))
+      (when signature-request
+        (lsp-cancel (car signature-request) (cdr signature-request)))
+      (set! signature-request
+        (cons c
+          (lsp-request
+           c "textDocument/signatureHelp"
+           (lsp-object "textDocument" (lsp-object "uri" uri)
+                       "position" pos)
+           (lambda (r e)
+             (set! signature-request #f)
+             ;; (shown only in the same buffer, with the cursor on the same
+             ;; line: an answer may come late)
+             (let* ((lo2 (cursor-line+offset))
+                    (here? (and (== (current-buffer) u) lo lo2
+                                (== (car lo) (car lo2))))
+                    (l (and here? (not e) r (not (lsp-null? r))
+                            (lsp-signature-parts r))))
+               (cond (l (set! signature-shown? #t)
+                        (set! signature-parts l)
+                        (set-message (mark-parts l) "")
+                        (lsp-status-refresh))
+                     (signature-shown? (hide-signature)))))))))))
 
 (tm-define (keyboard-press key time)
   ;; (no mode predicates: see notify-cursor-moved)
@@ -802,9 +818,16 @@
       (lsp-client-forget (car k) (cadr k)))
     (set! followed (make-ahash-table))
     (with c (lsp-buffer-sync)
+      ;; (the other open buffers are followed again, by the new server)
+      (follow-all)
       (if (and c (lsp-client-alive? c))
           (set-message "Language server started" "")
           (set-message "No language server for this buffer" "")))))
+
+(define (follow-all)
+  ;; the buffers which are open are followed (their texts go to their
+  ;; servers, after a pause)
+  (for (u (buffer-list)) (lsp-follow-buffer u)))
 
 (tm-define (lsp-stop-servers)
   (:synopsis "Ends all the language servers, until they are restarted")
@@ -942,15 +965,18 @@
   (lsp-forget-all)
   (set! followed (make-ahash-table))
   (set! pending (make-ahash-table))
-  (set! shown (make-ahash-table))
-  (lsp-hide-diagnostics))
+  ;; (the underlines are removed in each buffer which has some)
+  (for (u (buffer-list))
+    (when (ahash-ref shown (lsp-buffer-uri u))
+      (with-buffer u (lsp-hide-diagnostics))))
+  (set! shown (make-ahash-table)))
 
 (define-preferences
-  ("lsp" "on" (lambda (pref val) (when (== val "off") (lsp-turn-off))))
+  ("lsp" "on" (lambda (pref val)
+                (if (== val "off") (lsp-turn-off) (follow-all))))
   ("lsp:mouse hover" "on" (lambda (pref val) (noop))))
 
 ;; the buffers which were loaded before this module
 (delayed
   (:idle 500)
-  (when (lsp-on?)
-    (for (u (buffer-list)) (lsp-follow-buffer u))))
+  (when (lsp-on?) (follow-all)))

@@ -366,6 +366,31 @@
       (check-true (string-contains? (cadr (car (lsp-client-log c)))
                                     "no answer to initialize")))))
 
+(define (publish c uri n)
+  (feed c (lsp-object "jsonrpc" "2.0"
+                      "method" "textDocument/publishDiagnostics"
+                      "params" (lsp-object
+                                "uri" uri
+                                "diagnostics"
+                                (lsp-list->array
+                                 (make-list n (lsp-object "message" "m")))))))
+
+(define (test-diagnostics-state)
+  (check-group "diagnostics of servers")
+  (with c (running-client (lsp-number 2))
+    ;; a server which writes the URI otherwise (lower case hexadecimal, an
+    ;; escaped colon): the same file
+    (publish c "file:///tmp/a%3ab/x%c3%a9.c" 2)
+    (check= (length (lsp-diagnostics (lsp-path->uri "/tmp/a:b/x\xc3\xa9.c")))
+            2)
+    ;; the diagnostics of the documents of a server which ends are
+    ;; forgotten
+    (lsp-document-open c "file:///tmp/y.c" "c" "int y;")
+    (publish c "file:///tmp/y.c" 1)
+    (check= (length (lsp-diagnostics "file:///tmp/y.c")) 1)
+    (lsp-client-kill c)
+    (check= (lsp-diagnostics "file:///tmp/y.c") '())))
+
 (define (test-requests)
   (check-group "requests")
   (let* ((c (running-client (lsp-number 1)))
@@ -1007,6 +1032,7 @@
   (test-uris)
   (test-initialize)
   (test-initialize-slow)
+  (test-diagnostics-state)
   (test-requests)
   (test-server-requests)
   (test-end)

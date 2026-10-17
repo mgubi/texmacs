@@ -203,6 +203,7 @@
   (:synopsis "Closes the document @uri")
   (when (lsp-document-open? c uri)
     (ahash-remove! (lsp-client-ref c 'documents) uri)
+    (lsp-forget-diagnostics uri)
     (lsp-notify c "textDocument/didClose"
                 (lsp-object "textDocument" (text-document uri)))))
 
@@ -213,9 +214,30 @@
 ;; uri -> the list of the diagnostics last published (strees)
 (define diagnostics (make-ahash-table))
 
+(define (uri-key uri)
+  ;; @uri written as we write it: a server may write the same file
+  ;; otherwise (%c3%a9 for %C3%A9, %3A for :)
+  (with p (lsp-uri->path uri)
+    (if p (lsp-path->uri p) uri)))
+
 (tm-define (lsp-diagnostics uri)
   (:synopsis "The diagnostics last published for @uri")
-  (or (ahash-ref diagnostics uri) '()))
+  (or (ahash-ref diagnostics (uri-key uri)) '()))
+
+(tm-define (lsp-forget-diagnostics uri)
+  (:synopsis "The diagnostics of @uri are forgotten (its server has ended)")
+  (with key (uri-key uri)
+    (when (ahash-ref diagnostics key)
+      (ahash-remove! diagnostics key)
+      (lsp-diagnostics-changed key))))
+
+(tm-define (lsp-client-status-changed c)
+  ;; the diagnostics of a server which has ended are forgotten (they
+  ;; would stay underlined, also after a restart)
+  (former c)
+  (when (== (lsp-client-state c) 'dead)
+    (for (uri (map car (ahash-table->list (lsp-client-ref c 'documents))))
+      (lsp-forget-diagnostics uri))))
 
 (tm-define (lsp-diagnostics-changed uri)
   (:synopsis "Called when the diagnostics of @uri have been published")
@@ -242,8 +264,10 @@
   (lambda (c params)
     (with uri (lsp-ref params "uri")
       (when (string? uri)
-        (ahash-set! diagnostics uri (lsp-items (lsp-ref params "diagnostics")))
-        (lsp-diagnostics-changed uri)))))
+        (with key (uri-key uri)
+          (ahash-set! diagnostics key
+                      (lsp-items (lsp-ref params "diagnostics")))
+          (lsp-diagnostics-changed key))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Buffers
