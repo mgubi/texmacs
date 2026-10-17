@@ -38,7 +38,7 @@
             ,(string-append "maxima.bat -p \"" (getenv "TEXMACS_PATH")
                             "\\plugins\\maxima\\lisp\\texmacs-maxima.lisp\""))))
       (with version-list
-          (if reconfigure-flag? (maxima-versions) (plugin-versions "maxima"))
+          (if (plugin-reconfigure?) (maxima-versions) (plugin-versions "maxima"))
         (if (and version-list (list? version-list) (nnull? version-list))
             (let* ((default (car version-list))
                    (rest (cdr version-list))

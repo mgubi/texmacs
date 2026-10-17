@@ -392,6 +392,12 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define-public reconfigure-flag? #t)
+
+;; Other modules should use these accessors: in S7 a public variable which its
+;; module changes with set! keeps its first value in the other modules.
+(define-public (plugin-reconfigure?) reconfigure-flag?)
+(define-public (plugin-reconfigure-set! flag) (set! reconfigure-flag? flag))
+
 (define plugin-loaded-setup? #f)
 (define plugin-cache "$TEXMACS_HOME_PATH/system/cache/plugin_cache.scm")
 
@@ -521,6 +527,11 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Configuration of plugins
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; A plugin which launches other plugins (jupyter) sets alt-launcher with
+;; this function: in S7 a set! of alt-launcher from another module would not
+;; change the function which the functions below call.
+(define-public (plugin-alt-launcher-set! fun) (set! alt-launcher fun))
 
 (define-public (alt-launcher name) #f)
 

@@ -146,7 +146,7 @@
 
 (tm-define (kbd-variant t forwards?)
   (:mode in-prog-scheme?)
-  (if (not scheme-completions-built?) (scheme-completions-rebuild))
+  (scheme-completions-ensure)
   (custom-complete (tm->tree (scheme-completions (cursor-word)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
