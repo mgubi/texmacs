@@ -35,8 +35,10 @@
   ;; (a number is the kind of change, with open and close)
   (with s (lsp-ref (lsp-client-capabilities c) "textDocumentSync")
     (cond ((lsp-number-value s)
+           ;; (as other clients do: the saves too, without their text)
            (cond ((== key "openClose") (lsp-boolean (> (lsp-number-value s) 0)))
                  ((== key "change") s)
+                 ((== key "save") (lsp-object))
                  (else #f)))
           ((func? s 'attr) (lsp-ref s key))
           (else #f))))
@@ -65,12 +67,17 @@
       (lsp-document-change c uri text)
       (begin
         (ahash-set! (lsp-client-ref c 'documents) uri (list 1 text lan-id))
-        (lsp-notify c "textDocument/didOpen"
-                    (lsp-object "textDocument"
-                                (lsp-object "uri" uri
-                                            "languageId" lan-id
-                                            "version" (lsp-number 1)
-                                            "text" text))))))
+        (when (open-close? c)
+          (lsp-notify c "textDocument/didOpen"
+                      (lsp-object "textDocument"
+                                  (lsp-object "uri" uri
+                                              "languageId" lan-id
+                                              "version" (lsp-number 1)
+                                              "text" text)))))))
+
+(define (open-close? c)
+  ;; does the server take didOpen and didClose? (yes unless it says no)
+  (!= (sync-option c "openClose") '(json-boolean "false")))
 
 ;; Incremental changes: the old and the new text have a common start and a
 ;; common end (bytes of utf8, at the boundaries of characters); what lies
@@ -204,8 +211,9 @@
   (when (lsp-document-open? c uri)
     (ahash-remove! (lsp-client-ref c 'documents) uri)
     (lsp-forget-diagnostics uri)
-    (lsp-notify c "textDocument/didClose"
-                (lsp-object "textDocument" (text-document uri)))))
+    (when (open-close? c)
+      (lsp-notify c "textDocument/didClose"
+                  (lsp-object "textDocument" (text-document uri))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Diagnostics

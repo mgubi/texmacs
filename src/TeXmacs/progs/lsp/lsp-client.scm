@@ -65,7 +65,10 @@
   (list-find (or (ahash-ref lsp-servers lan) '())
              (lambda (cmd)
                (with p (command-program cmd)
-                 (if (>= (string-search-forwards "/" 0 p) 0)
+                 ;; (a path with a directory, also on Windows; a program
+                 ;; whose path has spaces is not found: see the help)
+                 (if (or (>= (string-search-forwards "/" 0 p) 0)
+                         (>= (string-search-forwards "\\" 0 p) 0))
                      (url-exists? (system->url p))
                      (url-exists-in-path? p))))))
 
@@ -397,10 +400,19 @@
   (let* ((n (lsp-number-value id))
          (pending (ahash-ref c 'pending))
          (h (and n (ahash-ref pending n))))
+    ;; (an error of the server about a message it could not read has the
+    ;; id null: it goes to the log)
+    (when (not n)
+      (lsp-client-log-add c "error"
+                          (string-append "answer to no request: "
+                                         (or (lsp-ref msg "error" "message")
+                                             ""))))
     (when h
       (ahash-remove! pending n)
       (with e (lsp-ref msg "error")
-        (if e (h #f e) (h (or (lsp-ref msg "result") (lsp-null)) #f))))))
+        ;; ("error": null is no error)
+        (if (and e (not (lsp-null? e))) (h #f e)
+            (h (or (lsp-ref msg "result") (lsp-null)) #f))))))
 
 (define (handle-notification c method params)
   (for-each (lambda (x) ((cdr x) c params))

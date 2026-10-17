@@ -235,16 +235,27 @@
 (tm-define (lsp-apply-workspace-edit w)
   (:synopsis "Applies the WorkspaceEdit @w; the number of files changed")
   (with files (lsp-workspace-edit-files w)
-    (for (f files)
-      (with u (uri->buffer (car f))
-        (when u (lsp-apply-buffer-edits u (cadr f)))))
-    (length files)))
+    (length (list-filter
+             (map (lambda (f)
+                    (with u (uri->buffer (car f))
+                      ;; (#f: the file could not be opened)
+                      (and u (or (null? (cadr f))
+                                 (lsp-apply-buffer-edits u (cadr f))))))
+                  files)
+             identity))))
 
-;; the server asks for edits (after a command of a code action)
+;; the server asks for edits (after a command of a code action); it is told
+;; whether all its files could be changed
 (lsp-server-request-set! "workspace/applyEdit"
   (lambda (c params)
-    (lsp-apply-workspace-edit (or (lsp-ref params "edit") (lsp-object)))
-    (lsp-object "applied" (lsp-boolean #t))))
+    (let* ((w (or (lsp-ref params "edit") (lsp-object)))
+           (n (length (lsp-workspace-edit-files w)))
+           (done (lsp-apply-workspace-edit w)))
+      (lsp-buffer-sync)
+      (if (== done n)
+          (lsp-object "applied" (lsp-boolean #t))
+          (lsp-object "applied" (lsp-boolean #f)
+                      "failureReason" "a file could not be opened")))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Formatting
@@ -316,6 +327,9 @@
            (set-message "The language server cannot rename" ""))
           ((== new-name "") (noop))
           (else
+           ;; (all the open files first: the edits are made for the texts
+           ;; which the server has)
+           (lsp-sync-pending)
            (lsp-buffer-sync)
            (with a (lsp-request-wait
                     c "textDocument/rename"
