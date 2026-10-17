@@ -28,7 +28,7 @@
         (treesit ts-base) (treesit ts-grammar) (treesit ts-nfa)
         (treesit ts-tables) (treesit ts-build) (treesit ts-language)
         (treesit ts-parse) (treesit ts-export) (treesit ts-registry)
-        (treesit ts-highlight)))
+        (treesit ts-highlight) (treesit ts-scanner-cpp)))
 
 (define (json-grammar-file)
   (url->system (url-concretize "$TEXMACS_PATH/misc/tree-sitter/json/grammar.json")))
@@ -468,6 +468,46 @@
                     (15 17 "constant") (17 18 "operator_openclose"))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; External scanners in the C runtime
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define raw-grammar
+  ;; the raw strings of tree-sitter-cpp, with its external tokens
+  "{\"name\": \"raw\", \"extras\": [{\"type\": \"PATTERN\", \"value\": \"\\\\s\"}], \"externals\": [{\"type\": \"SYMBOL\", \"name\": \"raw_string_delimiter\"}, {\"type\": \"SYMBOL\", \"name\": \"raw_string_content\"}], \"rules\": {\"program\": {\"type\": \"REPEAT\", \"content\": {\"type\": \"SYMBOL\", \"name\": \"raw_string_literal\"}}, \"raw_string_literal\": {\"type\": \"SEQ\", \"members\": [{\"type\": \"CHOICE\", \"members\": [{\"type\": \"STRING\", \"value\": \"R\\\"\"}, {\"type\": \"STRING\", \"value\": \"LR\\\"\"}]}, {\"type\": \"CHOICE\", \"members\": [{\"type\": \"SEQ\", \"members\": [{\"type\": \"FIELD\", \"name\": \"delimiter\", \"content\": {\"type\": \"SYMBOL\", \"name\": \"raw_string_delimiter\"}}, {\"type\": \"STRING\", \"value\": \"(\"}, {\"type\": \"SYMBOL\", \"name\": \"raw_string_content\"}, {\"type\": \"STRING\", \"value\": \")\"}, {\"type\": \"SYMBOL\", \"name\": \"raw_string_delimiter\"}]}, {\"type\": \"SEQ\", \"members\": [{\"type\": \"STRING\", \"value\": \"(\"}, {\"type\": \"SYMBOL\", \"name\": \"raw_string_content\"}, {\"type\": \"STRING\", \"value\": \")\"}]}]}, {\"type\": \"STRING\", \"value\": \"\\\"\"}]}}}")
+
+(define (test-scanners)
+  (when (defined? 'tree-sitter-set-scanner)
+    ;; the scanner of C++ (in Scheme) called by the C runtime; the state
+    ;; (the delimiter) goes through the buffer of tree-sitter
+    (let* ((l (ts-generate-language raw-grammar))
+           (id (tree-sitter-language-new (ts-export-language->string l))))
+      (check-true (tree-sitter-set-scanner id (ts-cpp-scanner)))
+      (check= (tree-sitter-parse-sexp id "R\"x(a)\"b)x\" R\"(c)\"")
+              (string-append "(program (raw_string_literal delimiter: (raw_string_delimiter) "
+                             "(raw_string_content) (raw_string_delimiter)) "
+                             "(raw_string_literal (raw_string_content)))"))
+      ;; and the same with the parser in Scheme
+      (set-lang-external-scanner! l (ts-cpp-scanner))
+      (check= (ts-tree->string (ts-parse-string l "R\"x(a)\"b)x\""))
+              "(program (raw_string_literal delimiter: (raw_string_delimiter) (raw_string_content) (raw_string_delimiter)))"))
+    ;; Python: indentation, newlines and strings by its scanner
+    (treesit-generate-cache "python")
+    (let ((py (treesit-language "python")))
+      (check-true (integer? py))
+      (check= (tree-sitter-parse-sexp py "if x:\n    y = '''a\nb'''\nz\n")
+              (string-append "(module (if_statement condition: (identifier) consequence: "
+                             "(block (assignment left: (identifier) "
+                             "right: (string (string_start) (string_content) (string_end)))))"
+                             " (identifier))"))
+      (let ((d (stree->tree '(document "def f(x):" "    s = \"\"\"a" "b\"\"\"" "    return x + 1  # c"))))
+        (tree-sitter-line-colors "python" d)
+        (check= (tree-sitter-line-colors "python" (tree-ref d 0))
+                '((0 3 "keyword") (4 5 "variable_function")))
+        (check= (tree-sitter-line-colors "python" (tree-ref d 2)) '((0 4 "constant_string")))
+        (check= (tree-sitter-line-colors "python" (tree-ref d 3))
+                '((4 10 "keyword") (13 14 "operator") (15 16 "constant_number") (18 21 "comment")))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Master routine
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -484,4 +524,5 @@
   (test-registry)
   (test-regions)
   (test-highlight)
+  (test-scanners)
   (check-end))

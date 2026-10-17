@@ -751,6 +751,13 @@
   (tree-sitter-pending-updates tree_sitter_pending_updates (array_tree))
   (tree-sitter-line-colors tree_sitter_line_colors (object string tree))
   (tree-sitter-set-highlighting tree_sitter_set_highlighting (void bool))
+  (tree-sitter-set-scanner tree_sitter_set_scanner (bool int object))
+  (tree-sitter-lexer-lookahead tree_sitter_lexer_lookahead (int))
+  (tree-sitter-lexer-advance tree_sitter_lexer_advance (void bool))
+  (tree-sitter-lexer-mark-end tree_sitter_lexer_mark_end (void))
+  (tree-sitter-lexer-set-result tree_sitter_lexer_set_result (void int))
+  (tree-sitter-lexer-column tree_sitter_lexer_column (int))
+  (tree-sitter-lexer-eof? tree_sitter_lexer_eof (bool))
 
   ;; TeXmacs servers and clients
   (server-define-error-codes server_define_error_codes (void))

@@ -13,6 +13,7 @@
 #include "string.hpp"
 #include "array.hpp"
 #include "url.hpp"
+#include "scheme.hpp"
 
 int    tree_sitter_language_new (string data);
 int    tree_sitter_language_load (url file);
@@ -20,5 +21,12 @@ string tree_sitter_parse_sexp (int language, string text);
 int    tree_sitter_query_new (int language, string source);
 array<string> tree_sitter_query_capture_names (int query);
 array<int>    tree_sitter_query_captures (int query, string text);
+bool tree_sitter_set_scanner (int language, object scanner);
+int  tree_sitter_lexer_lookahead ();
+void tree_sitter_lexer_advance (bool skip);
+void tree_sitter_lexer_mark_end ();
+void tree_sitter_lexer_set_result (int symbol);
+int  tree_sitter_lexer_column ();
+bool tree_sitter_lexer_eof ();
 
 #endif // TREE_SITTER_GLUE_H

@@ -23,12 +23,17 @@
 ;; are ready.
 
 (texmacs-module (treesit ts-registry)
-  (:use (treesit ts-base) (treesit ts-language) (treesit ts-export)))
+  (:use (treesit ts-base) (treesit ts-language) (treesit ts-export)
+        (treesit ts-scanner-cpp) (treesit ts-scanner-python)))
 
 ;; to be changed when the generator or the exported data change
 (define-public treesit-generator-version "1")
 
-(define-public treesit-languages '("json" "c" "scheme"))
+(define-public treesit-languages '("json" "c" "scheme" "cpp" "python"))
+
+;; the external scanners (ts-scanner-*.scm), for the languages with one
+(define treesit-scanners
+  (list (cons "cpp" ts-cpp-scanner) (cons "python" ts-python-scanner)))
 
 (define-public (treesit-supported? lan)
   (and (defined? 'tree-sitter-language-load)
@@ -86,8 +91,10 @@
   (cond ((ahash-ref loaded lan) => identity)
         ((not (treesit-supported? lan)) #f)
         ((url-exists? (treesit-cache-url lan))
-         (let ((id (tree-sitter-language-load (treesit-cache-url lan))))
+         (let ((id (tree-sitter-language-load (treesit-cache-url lan)))
+               (scanner (assoc-ref treesit-scanners lan)))
            (and (>= id 0)
+                (or (not scanner) (tree-sitter-set-scanner id (scanner)))
                 (begin (ahash-set! loaded lan id) id))))
         (else (treesit-prepare lan (lambda (id) (noop))) #f)))
 

@@ -206,7 +206,8 @@ treesit_language_rep::get_color (tree t, int start, int end) {
 bool
 tree_sitter_wraps (string lan) {
   // the program languages which tree-sitter may highlight
-  return lan == "scheme" || lan == "json" || lan == "c";
+  return lan == "scheme" || lan == "json" || lan == "c" || lan == "cpp" ||
+         lan == "python";
 }
 
 language_rep*

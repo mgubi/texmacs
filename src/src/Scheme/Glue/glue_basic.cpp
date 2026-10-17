@@ -9168,6 +9168,83 @@ tmg_tree_sitter_set_highlighting (tmscm arg1) {
 }
 
 tmscm
+tmg_tree_sitter_set_scanner (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "tree-sitter-set-scanner");
+  TMSCM_ASSERT_OBJECT (arg2, TMSCM_ARG2, "tree-sitter-set-scanner");
+
+  int in1= tmscm_to_int (arg1);
+  object in2= tmscm_to_object (arg2);
+
+  // TMSCM_DEFER_INTS;
+  bool out= tree_sitter_set_scanner (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return bool_to_tmscm (out);
+}
+
+tmscm
+tmg_tree_sitter_lexer_lookahead () {
+  // TMSCM_DEFER_INTS;
+  int out= tree_sitter_lexer_lookahead ();
+  // TMSCM_ALLOW_INTS;
+
+  return int_to_tmscm (out);
+}
+
+tmscm
+tmg_tree_sitter_lexer_advance (tmscm arg1) {
+  TMSCM_ASSERT_BOOL (arg1, TMSCM_ARG1, "tree-sitter-lexer-advance");
+
+  bool in1= tmscm_to_bool (arg1);
+
+  // TMSCM_DEFER_INTS;
+  tree_sitter_lexer_advance (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_tree_sitter_lexer_mark_end () {
+  // TMSCM_DEFER_INTS;
+  tree_sitter_lexer_mark_end ();
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_tree_sitter_lexer_set_result (tmscm arg1) {
+  TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "tree-sitter-lexer-set-result");
+
+  int in1= tmscm_to_int (arg1);
+
+  // TMSCM_DEFER_INTS;
+  tree_sitter_lexer_set_result (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_tree_sitter_lexer_column () {
+  // TMSCM_DEFER_INTS;
+  int out= tree_sitter_lexer_column ();
+  // TMSCM_ALLOW_INTS;
+
+  return int_to_tmscm (out);
+}
+
+tmscm
+tmg_tree_sitter_lexer_eofP () {
+  // TMSCM_DEFER_INTS;
+  bool out= tree_sitter_lexer_eof ();
+  // TMSCM_ALLOW_INTS;
+
+  return bool_to_tmscm (out);
+}
+
+tmscm
 tmg_server_define_error_codes () {
   // TMSCM_DEFER_INTS;
   server_define_error_codes ();
@@ -12578,6 +12655,13 @@ initialize_glue_basic () {
   tmscm_install_procedure ("tree-sitter-pending-updates",  tmg_tree_sitter_pending_updates, 0, 0, 0);
   tmscm_install_procedure ("tree-sitter-line-colors",  tmg_tree_sitter_line_colors, 2, 0, 0);
   tmscm_install_procedure ("tree-sitter-set-highlighting",  tmg_tree_sitter_set_highlighting, 1, 0, 0);
+  tmscm_install_procedure ("tree-sitter-set-scanner",  tmg_tree_sitter_set_scanner, 2, 0, 0);
+  tmscm_install_procedure ("tree-sitter-lexer-lookahead",  tmg_tree_sitter_lexer_lookahead, 0, 0, 0);
+  tmscm_install_procedure ("tree-sitter-lexer-advance",  tmg_tree_sitter_lexer_advance, 1, 0, 0);
+  tmscm_install_procedure ("tree-sitter-lexer-mark-end",  tmg_tree_sitter_lexer_mark_end, 0, 0, 0);
+  tmscm_install_procedure ("tree-sitter-lexer-set-result",  tmg_tree_sitter_lexer_set_result, 1, 0, 0);
+  tmscm_install_procedure ("tree-sitter-lexer-column",  tmg_tree_sitter_lexer_column, 0, 0, 0);
+  tmscm_install_procedure ("tree-sitter-lexer-eof?",  tmg_tree_sitter_lexer_eofP, 0, 0, 0);
   tmscm_install_procedure ("server-define-error-codes",  tmg_server_define_error_codes, 0, 0, 0);
   tmscm_install_procedure ("server-start",  tmg_server_start, 0, 0, 0);
   tmscm_install_procedure ("server-stop",  tmg_server_stop, 0, 0, 0);

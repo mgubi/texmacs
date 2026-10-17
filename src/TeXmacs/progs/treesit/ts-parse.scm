@@ -605,15 +605,22 @@
 
 ;; The lexer works on #(text length position rows token-start token-start-rows
 ;; token-end token-end-rows result-symbol): text is a vector of code points.
+;; The public functions, those of the external scanners, also act on the
+;; lexer of the C runtime (any other value than a vector: the scanner is
+;; then called by Plugins/TreeSitter/tree_sitter_glue.cpp).
 
 (define (make-lexer text) (vector text (vector-length text) 0 0 0 0 -1 0 0))
 (define (lexer-text lx) (vector-ref lx 0))
 (define (lexer-length lx) (vector-ref lx 1))
 (define-public (lexer-position lx) (vector-ref lx 2))
 (define (lexer-rows lx) (vector-ref lx 3))
-(define-public (lexer-eof? lx) (>= (vector-ref lx 2) (vector-ref lx 1)))
+(define-public (lexer-eof? lx)
+  (if (vector? lx) (>= (vector-ref lx 2) (vector-ref lx 1))
+      (tree-sitter-lexer-eof?)))
 (define-public (lexer-lookahead lx)
-  (if (lexer-eof? lx) 0 (vector-ref (vector-ref lx 0) (vector-ref lx 2))))
+  (cond ((not (vector? lx)) (tree-sitter-lexer-lookahead))
+        ((lexer-eof? lx) 0)
+        (else (vector-ref (vector-ref lx 0) (vector-ref lx 2)))))
 
 (define (lexer-reset! lx position rows)
   (vector-set! lx 2 position)
@@ -626,6 +633,10 @@
   (vector-set! lx 8 0))
 
 (define-public (lexer-advance! lx skip?)
+  (if (vector? lx) (lexer-advance-vector! lx skip?)
+      (tree-sitter-lexer-advance skip?)))
+
+(define (lexer-advance-vector! lx skip?)
   (unless (lexer-eof? lx)
     (when (= (lexer-lookahead lx) 10) (vector-set! lx 3 (+ (vector-ref lx 3) 1)))
     (vector-set! lx 2 (+ (vector-ref lx 2) 1)))
@@ -634,10 +645,14 @@
     (vector-set! lx 5 (vector-ref lx 3))))
 
 (define-public (lexer-mark-end! lx)
-  (vector-set! lx 6 (vector-ref lx 2))
-  (vector-set! lx 7 (vector-ref lx 3)))
+  (if (vector? lx)
+      (begin (vector-set! lx 6 (vector-ref lx 2))
+             (vector-set! lx 7 (vector-ref lx 3)))
+      (tree-sitter-lexer-mark-end)))
 
-(define-public (lexer-set-result! lx symbol) (vector-set! lx 8 symbol))
+(define-public (lexer-set-result! lx symbol)
+  (if (vector? lx) (vector-set! lx 8 symbol)
+      (tree-sitter-lexer-set-result symbol)))
 
 (define (lexer-finish! lx lookahead-end)
   ;; the new end of the lookahead
@@ -646,6 +661,10 @@
 
 (define-public (lexer-column lx)
   ;; the column of the current position
+  (if (not (vector? lx)) (tree-sitter-lexer-column)
+      (lexer-column-vector lx)))
+
+(define (lexer-column-vector lx)
   (let ((text (lexer-text lx)))
     (let loop ((i (- (lexer-position lx) 1)) (col 0))
       (if (or (< i 0) (= (vector-ref text i) 10)) col (loop (- i 1) (+ col 1))))))
@@ -667,10 +686,10 @@
                        result)))
       (if (lexer-eof? lx)
           (let ((eof (vector-ref state 1)))
-            (if eof (begin (lexer-advance! lx #f) (loop eof result)) result))
+            (if eof (begin (lexer-advance-vector! lx #f) (loop eof result)) result))
           (let ((a (lex-transition state (lexer-lookahead lx))))
             (if a
-                (begin (lexer-advance! lx (not (vector-ref a 2)))
+                (begin (lexer-advance-vector! lx (not (vector-ref a 2)))
                        (loop (vector-ref a 1) result))
                 result))))))
 
@@ -792,7 +811,7 @@
                                      (begin (lexer-set-result! lx ts-sym-error) #t)
                                      (begin
                                        (when (= (lexer-position lx) error-end)
-                                         (lexer-advance! lx #f))
+                                         (lexer-advance-vector! lx #f))
                                        (set! error-end (lexer-position lx))
                                        (set! error-end-rows (lexer-rows lx))
                                        (loop mode))))))))))

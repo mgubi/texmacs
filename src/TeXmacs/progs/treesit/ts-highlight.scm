@@ -25,7 +25,8 @@
 
 ;; program language of TeXmacs -> language of tree-sitter
 (define-public treesit-highlight-languages
-  '(("scheme" . "scheme") ("json" . "json") ("c" . "c")))
+  ;; (not yet cpp: generating its tables takes 10 minutes and 6 GB)
+  '(("scheme" . "scheme") ("json" . "json") ("c" . "c") ("python" . "python")))
 
 ;; capture name -> colour class (initialize_color_encodings in
 ;; System/Language/language.cpp); the longest prefix of the name decides,
@@ -77,12 +78,24 @@
   (url-concretize
    (string-append "$TEXMACS_PATH/misc/tree-sitter/" ts "/highlights.scm")))
 
+(define (query-source ts)
+  ;; the highlight query of ts, after those it inherits (a first line
+  ;; "; inherits: a,b", as in tree-sitter-cpp)
+  (let* ((s (string-load (query-url ts)))
+         (first (car (string-decompose s "\n")))
+         (pre "; inherits: "))
+    (if (not (string-starts? first pre)) s
+        (apply string-append
+               (append (map (lambda (x) (string-append (query-source x) "\n"))
+                            (string-decompose (string-drop first (string-length pre)) ","))
+                       (list s))))))
+
 (define-public (treesit-install-highlighter lan id)
   ;; give the highlighter of lan to the C++ side, if its query compiles
   (let* ((ts (assoc-ref treesit-highlight-languages lan))
          (file (and ts (query-url ts)))
          (q (and id file (url-exists? file)
-                 (tree-sitter-query-new id (string-load file)))))
+                 (tree-sitter-query-new id (query-source ts)))))
     (and q (>= q 0)
          (begin
            (tree-sitter-set-highlighter

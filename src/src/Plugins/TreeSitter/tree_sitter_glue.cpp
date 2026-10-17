@@ -18,7 +18,9 @@
 #include "tm_ostream.hpp"
 #include "file.hpp"
 #include "ts_dynamic.h"
+#include "scheme.hpp"
 #include "tree-sitter/include/tree_sitter/api.h"
+#include "tree-sitter/src/parser.h"
 #include <stdlib.h>
 #include <string.h>
 #include <regex>
@@ -265,4 +267,137 @@ int
 tree_sitter_query_language (int query) {
   if (query < 0 || query >= N(ts_queries)) return -1;
   return ts_queries[query]->language;
+}
+
+/******************************************************************************
+* External scanners written in Scheme
+******************************************************************************/
+
+/* The scanner of a language is a Scheme vector #(create scan deserialize
+   serialize), as for progs/treesit/ts-parse.scm. The runtime calls the
+   functions below, which call Scheme; while the Scheme scan runs, the
+   lexer functions of ts-parse.scm act on the current TSLexer through the
+   glue tree-sitter-lexer-... The state of the scanner is stored in the
+   buffer of tree-sitter as the text of the Scheme value. As create has no
+   argument, each language with a scanner has its own create function. */
+
+struct ts_scanner_entry {
+  object create, scan, deserialize, serialize;
+  int external_count;
+};
+static array<ts_scanner_entry*> ts_scanners;
+
+struct ts_scanner_payload {
+  ts_scanner_entry* scanner;
+  object state;
+};
+
+static TSLexer* current_lexer= NULL;
+
+static void*
+scanner_create (int slot) {
+  ts_scanner_payload* p= new ts_scanner_payload;
+  p->scanner= ts_scanners[slot];
+  p->state= call (p->scanner->create);
+  return p;
+}
+
+#define SCANNER_SLOT(n) \
+  static void* scanner_create_##n () { return scanner_create (n); }
+SCANNER_SLOT(0) SCANNER_SLOT(1) SCANNER_SLOT(2) SCANNER_SLOT(3)
+SCANNER_SLOT(4) SCANNER_SLOT(5) SCANNER_SLOT(6) SCANNER_SLOT(7)
+SCANNER_SLOT(8) SCANNER_SLOT(9) SCANNER_SLOT(10) SCANNER_SLOT(11)
+SCANNER_SLOT(12) SCANNER_SLOT(13) SCANNER_SLOT(14) SCANNER_SLOT(15)
+static void* (*scanner_creates[16]) (void)= {
+  scanner_create_0, scanner_create_1, scanner_create_2, scanner_create_3,
+  scanner_create_4, scanner_create_5, scanner_create_6, scanner_create_7,
+  scanner_create_8, scanner_create_9, scanner_create_10, scanner_create_11,
+  scanner_create_12, scanner_create_13, scanner_create_14, scanner_create_15 };
+
+static void
+scanner_destroy (void* payload) {
+  delete (ts_scanner_payload*) payload;
+}
+
+static bool
+scanner_scan (void* payload, TSLexer* lexer, const bool* valid) {
+  ts_scanner_payload* p= (ts_scanner_payload*) payload;
+  array<object> v;
+  for (int i= 0; i < p->scanner->external_count; i++) v << object (valid[i]);
+  TSLexer* old= current_lexer;
+  current_lexer= lexer;
+  object r= call (p->scanner->scan, p->state, symbol_object ("c-lexer"),
+                  call ("list->vector", as_list_object (v)));
+  current_lexer= old;
+  return as_bool (r);
+}
+
+static unsigned
+scanner_serialize (void* payload, char* buffer) {
+  ts_scanner_payload* p= (ts_scanner_payload*) payload;
+  object v= call (p->scanner->serialize, p->state);
+  if (is_bool (v) && !as_bool (v)) return 0;
+  string s= object_to_string (v);
+  if (N(s) > TREE_SITTER_SERIALIZATION_BUFFER_SIZE) return 0;
+  for (int i= 0; i < N(s); i++) buffer[i]= s[i];
+  return (unsigned) N(s);
+}
+
+static void
+scanner_deserialize (void* payload, const char* buffer, unsigned length) {
+  ts_scanner_payload* p= (ts_scanner_payload*) payload;
+  object v= (length == 0)? object (false):
+            string_to_object (string (buffer, (int) length));
+  call (p->scanner->deserialize, p->state, v);
+}
+
+bool
+tree_sitter_set_scanner (int language, object scanner) {
+  // give a Scheme scanner to a language (before its first parse)
+  if (language < 0 || language >= N(ts_languages)) return false;
+  if (N(ts_scanners) >= 16) return false;
+  TSLanguage* l= (TSLanguage*) ts_languages[language];
+  ts_scanner_entry* e= new ts_scanner_entry;
+  e->create= call ("vector-ref", scanner, object (0));
+  e->scan= call ("vector-ref", scanner, object (1));
+  e->deserialize= call ("vector-ref", scanner, object (2));
+  e->serialize= call ("vector-ref", scanner, object (3));
+  e->external_count= (int) l->external_token_count;
+  l->external_scanner.create= scanner_creates[N(ts_scanners)];
+  l->external_scanner.destroy= scanner_destroy;
+  l->external_scanner.scan= scanner_scan;
+  l->external_scanner.serialize= scanner_serialize;
+  l->external_scanner.deserialize= scanner_deserialize;
+  ts_scanners << e;
+  return true;
+}
+
+int
+tree_sitter_lexer_lookahead () {
+  return current_lexer == NULL? 0: (int) current_lexer->lookahead;
+}
+
+void
+tree_sitter_lexer_advance (bool skip) {
+  if (current_lexer != NULL) current_lexer->advance (current_lexer, skip);
+}
+
+void
+tree_sitter_lexer_mark_end () {
+  if (current_lexer != NULL) current_lexer->mark_end (current_lexer);
+}
+
+void
+tree_sitter_lexer_set_result (int symbol) {
+  if (current_lexer != NULL) current_lexer->result_symbol= (TSSymbol) symbol;
+}
+
+int
+tree_sitter_lexer_column () {
+  return current_lexer == NULL? 0: (int) current_lexer->get_column (current_lexer);
+}
+
+bool
+tree_sitter_lexer_eof () {
+  return current_lexer == NULL || current_lexer->eof (current_lexer);
 }
