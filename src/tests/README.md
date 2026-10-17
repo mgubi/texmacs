@@ -62,7 +62,9 @@ ordinary TeXmacs C++ over `tests/tm_test.hpp`, which brings `CHECK`,
 `RUN` and returns `test_report ()`: a test then needs no QtTest idiom (the
 Makefile still links QtTest into every binary, with the macOS
 `-framework QtTest`). `tests/Makefile` builds both kinds, and runs `moc` only
-on the sources which declare a `Q_OBJECT`.
+on the sources which declare a `Q_OBJECT`. A build without Qt (Vue, Cocoa:
+no `moc`) builds and runs only the tests over `tm_test.hpp`, and links no
+QtTest; it says how many QtTest tests it leaves out.
 
 The OpenType tests use the fonts shipped in `TeXmacs/fonts/truetype`, so a
 plain `make -C tests` runs them. `make -C tests TM_TEST_FONT_DIR=/path/to/fonts`

@@ -292,10 +292,19 @@ test_case_cork () {
   CHECK_EQ (uni_locase_char ("Z"), string ("z"));
   CHECK_EQ (uni_upcase_char ("1"), string ("1"));
   CHECK_EQ (uni_locase_char ("<"), string ("<"));
-  for (int c=0x80; c<0xA0; c++) {
+  for (int c=0x80; c<0x9D; c++) {
     CHECK_BYTES (uni_locase_char (cork_byte (c)), cork_byte (c+0x20));
     CHECK_BYTES (uni_upcase_char (cork_byte (c+0x20)), cork_byte (c));
   }
+  // the three bytes after them are not pairs: I with a dot (whose small
+  // letter is i), d with a stroke (whose capital is that of Eth, 0xD0) and
+  // the section sign, then the inverted marks and the pound sign
+  CHECK_BYTES (uni_locase_char (cork_byte (0x9D)), string ("i"));
+  CHECK_BYTES (uni_upcase_char (cork_byte (0x9E)), cork_byte (0xD0));
+  for (int c=0x9F; c<0xA0; c++)
+    CHECK_BYTES (uni_locase_char (cork_byte (c)), cork_byte (c));
+  for (int c=0xBD; c<0xC0; c++)
+    CHECK_BYTES (uni_upcase_char (cork_byte (c)), cork_byte (c));
   for (int c=0xC0; c<0xE0; c++) {
     CHECK_BYTES (uni_locase_char (cork_byte (c)), cork_byte (c+0x20));
     CHECK_BYTES (uni_upcase_char (cork_byte (c+0x20)), cork_byte (c));

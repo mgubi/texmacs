@@ -44,6 +44,15 @@ TM_OBJS := $(filter-out %/unix_entrypoint.o %/windows32_entrypoint.o \
 
 TEST_LIBS := -framework QtTest
 
+# without Qt (the Vue and Cocoa builds: no moc), only the tests over
+# tests/tm_test.hpp; those written against QtTest are left out
+ifeq ($(strip $(TM_MOC)),)
+QT_TESTS  := $(patsubst %.cpp,%,$(notdir $(shell grep -l Q_OBJECT $(TEST_SRC))))
+TESTS     := $(filter-out $(QT_TESTS),$(TESTS))
+TEST_LIBS :=
+$(info tests: no Qt in this build, the $(words $(QT_TESTS)) tests of QtTest are left out)
+endif
+
 # environment for running the tests
 export TEXMACS_PATH      := $(TOP)/TeXmacs
 export TEXMACS_HOME_PATH := $(BUILD)/home
