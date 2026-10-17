@@ -4411,6 +4411,22 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(json-\<gtr\>typed-tree <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|json_to_typed_tree> which returns
+    <scm|tree>.
+  </explain>
+
+  <\explain>
+    <scm|(typed-tree-\<gtr\>json <scm-arg|content>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|typed_tree_to_json> which returns
+    <scm|string>.
+  </explain>
+
+  <\explain>
     <scm|(lantool-correct <scm-arg|string> <scm-arg|string>)>
 <explain-synopsis|no synopsis>
   <|explain>

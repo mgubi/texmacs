@@ -16,9 +16,17 @@
 ;; server is needed: cat sends back the framed messages which it gets, and
 ;; printf writes the bytes of a server, headers included. The call back of
 ;; a link keeps what it gets in a list of events (kind data).
+;;
+;; The protocol in Scheme (progs/lsp): the messages as strees of the JSON
+;; converter, the texts and positions, the URIs; the clients, on procedures
+;; which keep what they send and are given the answers (no server); the
+;; documents, a source file in a buffer, and clangd when it is installed.
 
 (texmacs-module (check lsp-test)
-  (:use (check check-lib)))
+  (:use (check check-lib)
+        (lsp lsp-base)
+        (lsp lsp-client)
+        (lsp lsp-documents)))
 
 (define events '())
 
@@ -143,6 +151,331 @@
   (check-true #t))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Messages, texts and URIs (lsp-base)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (test-messages)
+  (check-group "messages")
+  (with t (lsp-read "{\"id\":1,\"ok\":true,\"x\":null,\"a\":[2.5,\"s\"]}")
+    (check= t '(attr "id" (json-number "1") "ok" (json-boolean "true")
+                     "x" (json-null)
+                     "a" (tuple (json-number "2.5") "s")))
+    (check= (lsp-number-value (lsp-ref t "id")) 1)
+    (check-true (lsp-true? (lsp-ref t "ok")))
+    (check-true (lsp-null? (lsp-ref t "x")))
+    (check= (lsp-ref t "a" 1) "s")
+    (check= (lsp-ref t "a" 2) #f)
+    (check= (lsp-ref t "nothing") #f)
+    (check= (lsp-items (lsp-ref t "a")) '((json-number "2.5") "s"))
+    ;; written and read again
+    (check= (lsp-read (lsp-write t)) t))
+  (check= (lsp-read (lsp-write (lsp-object "s" "a\"b\n" "e" (lsp-array))))
+          '(attr "s" "a\"b\n" "e" (tuple)))
+  (check= (lsp-read (lsp-write (lsp-object))) '(attr))
+  ;; (the converter reads anything)
+  (check= (lsp-read "not json at all") '(json-null))
+  (check= (lsp-read "") #f))
+
+(define e-acute (string (integer->char 233)))   ; in Cork
+(define smiley "<#1F600>")                       ; beyond U+FFFF
+
+(define (test-texts)
+  (check-group "texts")
+  (check= (lsp-utf16-length "abc") 3)
+  (check= (lsp-utf16-length (cork->utf8 e-acute)) 1)
+  (check= (lsp-utf16-length (cork->utf8 smiley)) 2)
+  (with line (string-append "a" e-acute smiley "b")
+    (check= (map (lambda (o) (lsp-offset->character line o)) '(0 1 2 10 11))
+            '(0 1 2 4 5))
+    (check= (map (lambda (ch) (lsp-character->offset line ch)) '(0 1 2 3 4 5 9))
+            '(0 1 2 2 10 11 11)))
+  (check= (lsp-lines '(document "int x;" "" "}")) '("int x;" "" "}"))
+  (check= (lsp-lines->text (list "a" e-acute "")) (string-append "a\n"
+                                                    (cork->utf8 e-acute) "\n"))
+  (check= (lsp-text->lines "a\r\nb\n") '("a" "b" ""))
+  (with lines (list "x" (string-append e-acute smiley "y"))
+    (check= (lsp-position lines 1 9)
+            '(attr "line" (json-number "1") "character" (json-number "3")))
+    (check= (lsp-position->line+offset lines (lsp-position lines 1 9)) '(1 9))))
+
+(define (test-uris)
+  (check-group "uris")
+  (check= (lsp-path->uri "/tmp/a b/c.cpp") "file:///tmp/a%20b/c.cpp")
+  (check= (lsp-path->uri (string-append "/tmp/caf" (cork->utf8 e-acute)))
+          "file:///tmp/caf%C3%A9")
+  (check= (lsp-uri->path "file:///tmp/a%20b/c.cpp") "/tmp/a b/c.cpp")
+  (check= (lsp-uri->path "file:///c:/x/y.py") "c:/x/y.py")
+  (check= (lsp-uri->path "untitled:1") #f))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Clients on procedures (lsp-client)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define sent '())
+
+(define (fake-client)
+  ;; a client whose messages are kept in sent (as strees)
+  (set! sent '())
+  (lsp-client-make "fake"
+                   (lambda (s) (set! sent (append sent (list (lsp-read s)))))
+                   ignore ignore))
+
+(define (sent-methods)
+  (map (lambda (m) (lsp-ref m "method")) sent))
+
+(define (feed c . msgs)
+  (for-each (lambda (m) (lsp-client-receive c "message" (lsp-write m))) msgs))
+
+(define (answer-to id result)
+  (lsp-object "jsonrpc" "2.0" "id" (lsp-number id) "result" result))
+
+(define (running-client sync)
+  ;; a fake client, initialized, with the textDocumentSync @sync
+  (with c (fake-client)
+    (lsp-client-initialize c "/tmp/project")
+    (feed c (answer-to 1 (lsp-object "capabilities"
+                                     (lsp-object "textDocumentSync" sync))))
+    (set! sent '())
+    c))
+
+(define (test-initialize)
+  (check-group "initialize")
+  (with c (fake-client)
+    (check= (lsp-client-state c) 'new)
+    (lsp-client-initialize c "/tmp/project")
+    (check= (lsp-client-state c) 'initializing)
+    (check= (sent-methods) '("initialize"))
+    (check= (lsp-ref (car sent) "id") '(json-number "1"))
+    (check= (lsp-ref (car sent) "params" "rootUri") "file:///tmp/project")
+    (check= (lsp-ref (car sent) "params" "capabilities" "general"
+                     "positionEncodings" 0)
+            "utf-16")
+    ;; what is sent before the answer waits for it
+    (lsp-notify c "textDocument/didOpen" (lsp-object))
+    (check= (length sent) 1)
+    (feed c (answer-to 1 (lsp-object "capabilities"
+                                     (lsp-object "hoverProvider"
+                                                 (lsp-boolean #t)))))
+    (check= (lsp-client-state c) 'running)
+    (check-true (lsp-true? (lsp-ref (lsp-client-capabilities c)
+                                    "hoverProvider")))
+    (check= (sent-methods)
+            '("initialize" "initialized" "textDocument/didOpen"))))
+
+(define (test-requests)
+  (check-group "requests")
+  (let* ((c (running-client (lsp-number 1)))
+         (got '())
+         (h (lambda (r e) (set! got (append got (list (list r e))))))
+         (id1 (lsp-request c "textDocument/hover" (lsp-object) h))
+         (id2 (lsp-request c "shutdown" #f h)))
+    (check= (list id1 id2) '(2 3))
+    (check= (lsp-ref (car sent) "params") '(attr))
+    (check= (lsp-ref (cadr sent) "params") #f)
+    ;; the answers, in another order
+    (feed c (lsp-object "jsonrpc" "2.0" "id" (lsp-number 3)
+                        "error" (lsp-object "code" (lsp-number -32600)
+                                            "message" "no")))
+    (feed c (answer-to 2 (lsp-number 42)))
+    (check= (length got) 2)
+    (check= (lsp-ref (cadr (car got)) "message") "no")
+    (check= (car (cadr got)) '(json-number "42"))
+    ;; an answer to nothing, and a null result
+    (feed c (answer-to 99 (lsp-null)))
+    (check= (length got) 2)
+    (lsp-request c "x" #f h)
+    (feed c (answer-to 4 (lsp-null)))
+    (check= (cAr got) '((json-null) #f))
+    ;; a cancelled request is not answered
+    (with id (lsp-request c "y" #f h)
+      (lsp-cancel c id)
+      (check= (lsp-ref (cAr sent) "method") "$/cancelRequest")
+      (feed c (answer-to id (lsp-number 1)))
+      (check= (length got) 3))))
+
+(define (test-server-requests)
+  (check-group "requests of servers")
+  (with c (running-client (lsp-number 1))
+    (feed c (lsp-object "jsonrpc" "2.0" "id" (lsp-number 7)
+                        "method" "workspace/configuration"
+                        "params" (lsp-object "items" (lsp-array (lsp-object)
+                                                                (lsp-object)))))
+    (check= (cAr sent) '(attr "jsonrpc" "2.0" "id" (json-number "7")
+                              "result" (tuple (json-null) (json-null))))
+    ;; the id of the answer is the one of the request, a string here
+    (feed c (lsp-object "jsonrpc" "2.0" "id" "abc"
+                        "method" "window/workDoneProgress/create"
+                        "params" (lsp-object "token" "t")))
+    (check= (cAr sent) '(attr "jsonrpc" "2.0" "id" "abc"
+                              "result" (json-null)))
+    (feed c (lsp-object "jsonrpc" "2.0" "id" (lsp-number 8)
+                        "method" "workspace/somethingNew"))
+    (check= (lsp-ref (cAr sent) "error" "code") '(json-number "-32601"))
+    ;; notifications and logs
+    (feed c (lsp-object "jsonrpc" "2.0" "method" "window/logMessage"
+                        "params" (lsp-object "type" (lsp-number 3)
+                                             "message" "indexing")))
+    (lsp-client-receive c "stderr" "some output\n")
+    (lsp-client-receive c "message" "[1, 2]")
+    (check= (map car (lsp-client-log c)) '("log" "stderr" "error"))
+    (check= (cadr (car (lsp-client-log c))) "indexing")))
+
+(define (test-end)
+  (check-group "end")
+  (let* ((c (running-client (lsp-number 1)))
+         (got #f)
+         (h (lambda (r e) (set! got e))))
+    (lsp-request c "textDocument/hover" (lsp-object) h)
+    (lsp-client-receive c "exit" "")
+    (check= (lsp-client-state c) 'dead)
+    (check-false (lsp-client-alive? c))
+    (check= (lsp-ref got "code") '(json-number "-32099"))
+    ;; a request to a dead server fails at once, and nothing is sent
+    (set! got #f)
+    (set! sent '())
+    (lsp-request c "textDocument/hover" (lsp-object) h)
+    (check-true (and got #t))
+    (check= sent '())))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Documents and diagnostics (lsp-documents)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (test-documents)
+  (check-group "documents")
+  (with c (running-client (lsp-object "openClose" (lsp-boolean #t)
+                                      "change" (lsp-number 2)
+                                      "save" (lsp-object "includeText"
+                                                         (lsp-boolean #t))))
+    (lsp-document-open c "file:///a.c" "c" "int x;\n")
+    (check= (sent-methods) '("textDocument/didOpen"))
+    (check= (lsp-ref (car sent) "params" "textDocument" "version")
+            '(json-number "1"))
+    (check= (lsp-ref (car sent) "params" "textDocument" "text") "int x;\n")
+    ;; the same text is not sent again
+    (lsp-document-change c "file:///a.c" "int x;\n")
+    (check= (length sent) 1)
+    (lsp-document-change c "file:///a.c" "int y;\n")
+    (check= (lsp-ref (cAr sent) "params" "textDocument" "version")
+            '(json-number "2"))
+    (check= (lsp-ref (cAr sent) "params" "contentChanges" 0 "text") "int y;\n")
+    (check= (lsp-document-version c "file:///a.c") 2)
+    (lsp-document-save c "file:///a.c")
+    (check= (lsp-ref (cAr sent) "params" "text") "int y;\n")
+    (lsp-document-close c "file:///a.c")
+    (check= (lsp-ref (cAr sent) "method") "textDocument/didClose")
+    (check-false (lsp-document-open? c "file:///a.c"))
+    ;; a document which is not open is not changed
+    (lsp-document-change c "file:///a.c" "int z;\n")
+    (check= (length sent) 4))
+  ;; a server which does not want changes, nor saves
+  (with c (running-client (lsp-object "change" (lsp-number 0)))
+    (lsp-document-open c "file:///b.c" "c" "1")
+    (lsp-document-change c "file:///b.c" "2")
+    (lsp-document-save c "file:///b.c")
+    (check= (sent-methods) '("textDocument/didOpen"))))
+
+(define (test-diagnostics)
+  (check-group "diagnostics")
+  (with c (running-client (lsp-number 1))
+    (feed c (lsp-object
+             "jsonrpc" "2.0" "method" "textDocument/publishDiagnostics"
+             "params"
+             (lsp-object
+              "uri" "file:///d.c"
+              "diagnostics"
+              (lsp-array
+               (lsp-object "range" (lsp-object
+                                    "start" (lsp-object "line" (lsp-number 1)
+                                                        "character"
+                                                        (lsp-number 1))
+                                    "end" (lsp-object "line" (lsp-number 1)
+                                                      "character"
+                                                      (lsp-number 3)))
+                           "severity" (lsp-number 2)
+                           "message" (string-append "caf"
+                                                    (cork->utf8 e-acute)))))))
+    (with l (lsp-diagnostics "file:///d.c")
+      (check= (length l) 1)
+      (check= (lsp-diagnostic-severity (car l)) 'warning)
+      (check= (lsp-diagnostic-message (car l)) (string-append "caf" e-acute))
+      (check= (lsp-diagnostic-range (car l) (list "" (string-append e-acute
+                                                                    "ab")))
+              '(1 1 1 3)))
+    (check= (lsp-diagnostics "file:///other.c") '())))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; A source file in a buffer, and clangd
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define lsp-dir
+  (string-append (url->system (url-temp-dir)) "/lsp-tmp"))
+
+(define (lsp-file name)
+  (string-append lsp-dir "/" name))
+
+(define (setup-project)
+  ;; lsp-tmp/proj, a project (compile_flags.txt) with a C++ file in src
+  (system-mkdir (system->url (lsp-file "proj/src")))
+  (string-save "" (system->url (lsp-file "proj/compile_flags.txt")))
+  (string-save "int main() {\n  return x;\n}\n"
+               (system->url (lsp-file "proj/src/main.cpp"))))
+
+(define (test-buffer)
+  (check-group "buffer")
+  (setup-project)
+  (with path (lsp-file "proj/src/main.cpp")
+    (check= (lsp-project-root path) (lsp-file "proj"))
+    (check= (lsp-language-id "cpp" path) "cpp")
+    (check= (lsp-language-id "cpp" (lsp-file "x.c")) "c")
+    (let ((old (current-buffer))
+          (u (system->url path)))
+      (load-buffer u)
+      (check= (url->system (current-buffer)) path)
+      (check= (lsp-buffer-language) "cpp")
+      (check= (lsp-buffer-uri) (lsp-path->uri path))
+      (check= (lsp-buffer-lines) '("int main() {" "  return x;" "}" ""))
+      (check= (lsp-lines->text (lsp-buffer-lines))
+              "int main() {\n  return x;\n}\n")
+      (go-to-path (append (buffer-path) '(1 9)))
+      (check= (lsp-cursor-position)
+              '(attr "line" (json-number "1") "character" (json-number "9")))
+      (when (url-exists-in-path? "clangd")
+        (test-clangd path))
+      (buffer-close u)
+      (when (buffer-exists? old) (switch-to-buffer old))))
+  (system-rmdir-recursive (system->url lsp-dir)))
+
+(define (test-clangd path)
+  (check-group "clangd")
+  (let* ((c (lsp-buffer-open))
+         (uri (lsp-path->uri path)))
+    (check-true (and c (lsp-client-alive? c)))
+    (check= (lsp-client-ref c 'root) (lsp-file "proj"))
+    (lsp-wait c (lambda () (nnull? (lsp-diagnostics uri))) 20000)
+    (check= (lsp-client-state c) 'running)
+    (with l (lsp-diagnostics uri)
+      (check-true (nnull? l))
+      (when (nnull? l)
+        (check= (lsp-diagnostic-severity (car l)) 'error)
+        (check= (lsp-diagnostic-range (car l) (lsp-buffer-lines))
+                '(1 9 1 10))))
+    ;; the cursor on main
+    (go-to-path (append (buffer-path) '(0 5)))
+    (with a (lsp-request-wait c "textDocument/hover"
+                              (lsp-object "textDocument" (lsp-object "uri" uri)
+                                          "position" (lsp-cursor-position))
+                              10000)
+      (check= (car a) 'result)
+      (check-true (string? (lsp-ref (cadr a) "contents" "value"))))
+    ;; the same client for the buffer, until it is stopped
+    (check-true (eq? (lsp-buffer-client) c))
+    (lsp-buffer-close)
+    (check-false (lsp-document-open? c uri))
+    (lsp-client-stop c)
+    (check= (lsp-client-state c) 'dead)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The suite
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -154,4 +487,14 @@
     (test-headers)
     (test-stderr)
     (test-errors))
+  (test-messages)
+  (test-texts)
+  (test-uris)
+  (test-initialize)
+  (test-requests)
+  (test-server-requests)
+  (test-end)
+  (test-documents)
+  (test-diagnostics)
+  (test-buffer)
   (check-end))

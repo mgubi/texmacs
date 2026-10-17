@@ -619,6 +619,8 @@
   (cpp-ai-translate ai_translate (tree content string string string))
   (json->tree json_to_tree (tree string))
   (tree->json tree_to_json (string content))
+  (json->typed-tree json_to_typed_tree (tree string))
+  (typed-tree->json typed_tree_to_json (string content))
   (lantool-correct lantool_correct (string string string))
 
   ;; routines for urls

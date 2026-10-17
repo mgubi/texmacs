@@ -7459,6 +7459,32 @@ tmg_tree_2json (tmscm arg1) {
 }
 
 tmscm
+tmg_json_2typed_tree (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "json->typed-tree");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  tree out= json_to_typed_tree (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return tree_to_tmscm (out);
+}
+
+tmscm
+tmg_typed_tree_2json (tmscm arg1) {
+  TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "typed-tree->json");
+
+  content in1= tmscm_to_content (arg1);
+
+  // TMSCM_DEFER_INTS;
+  string out= typed_tree_to_json (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return string_to_tmscm (out);
+}
+
+tmscm
 tmg_lantool_correct (tmscm arg1, tmscm arg2) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "lantool-correct");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "lantool-correct");
@@ -12311,6 +12337,8 @@ initialize_glue_basic () {
   tmscm_install_procedure ("cpp-ai-translate",  tmg_cpp_ai_translate, 4, 0, 0);
   tmscm_install_procedure ("json->tree",  tmg_json_2tree, 1, 0, 0);
   tmscm_install_procedure ("tree->json",  tmg_tree_2json, 1, 0, 0);
+  tmscm_install_procedure ("json->typed-tree",  tmg_json_2typed_tree, 1, 0, 0);
+  tmscm_install_procedure ("typed-tree->json",  tmg_typed_tree_2json, 1, 0, 0);
   tmscm_install_procedure ("lantool-correct",  tmg_lantool_correct, 2, 0, 0);
   tmscm_install_procedure ("url->url",  tmg_url_2url, 1, 0, 0);
   tmscm_install_procedure ("root->url",  tmg_root_2url, 1, 0, 0);
