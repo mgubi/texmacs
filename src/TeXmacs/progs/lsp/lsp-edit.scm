@@ -118,16 +118,16 @@
   (and (lsp-on?) (lsp-buffer-uri)))
 
 (define (diagnostic-item d lines)
-  ;; the diagnostic @d in @lines, or #f if it is beyond them; an empty
-  ;; range covers a character
-  (let* ((n (length lines))
+  ;; the diagnostic @d in @lines (a vector), or #f if it is beyond them;
+  ;; an empty range covers a character
+  (let* ((n (vector-length lines))
          (r (lsp-diagnostic-range d lines))
          (l1 (car r)) (o1 (cadr r))
          (l2 (min (caddr r) (- n 1)))
          (o2 (if (< (caddr r) n) (cadddr r)
-                 (string-length (list-ref lines (- n 1))))))
+                 (string-length (vector-ref lines (- n 1))))))
     (and (< l1 n) (>= l1 0)
-         (with len (string-length (list-ref lines l1))
+         (with len (string-length (vector-ref lines l1))
            (when (and (== l1 l2) (<= o2 o1))
              (set! o2 (min len (+ o1 1)))
              (when (<= o2 o1) (set! o1 (max 0 (- o2 1)))))
@@ -149,7 +149,8 @@
 (tm-define (lsp-show-diagnostics)
   (:synopsis "Shows the diagnostics of the current buffer")
   (let* ((uri (lsp-buffer-uri))
-         (lines (lsp-buffer-lines))
+         ;; (a vector: each diagnostic looks for its lines)
+         (lines (list->vector (lsp-buffer-lines)))
          ;; (at most lsp-max-diagnostics: a file with thousands of
          ;; warnings would make each redraw slow)
          (all (if uri (lsp-diagnostics uri) '()))
@@ -161,9 +162,33 @@
     (when uri
       (ahash-remove! stale uri)
       (ahash-set! shown uri l))
-    (set-alt-selection "lsp-errors" (severity-paths l 'error))
-    (set-alt-selection "lsp-warnings" (severity-paths l 'warning))
-    (set-alt-selection "lsp-infos" (severity-paths l 'info))))
+    (draw-diagnostics l)))
+
+(define (draw-diagnostics l)
+  (set-alt-selection "lsp-errors" (severity-paths l 'error))
+  (set-alt-selection "lsp-warnings" (severity-paths l 'warning))
+  (set-alt-selection "lsp-infos" (severity-paths l 'info)))
+
+(tm-define (lsp-document-lines-changed uri first last added)
+  ;; the diagnostics shown follow the lines, until the server sends new
+  ;; ones: those after the change are moved, those in it are dropped (an
+  ;; edit removes the underlines; F8 and the messages at the cursor use
+  ;; these positions)
+  (former uri first last added)
+  (with l (ahash-ref shown uri)
+    (when l
+      (let* ((delta (- added (- last first)))
+             (move (lambda (x)
+                     (cond ((< (list-ref x 3) first) x)
+                           ((> (list-ref x 1) last)
+                            (list (car x)
+                                  (+ (list-ref x 1) delta) (list-ref x 2)
+                                  (+ (list-ref x 3) delta) (list-ref x 4)
+                                  (list-ref x 5)))
+                           (else #f))))
+             (l2 (list-filter (map move l) identity)))
+        (ahash-set! shown uri l2)
+        (when (== (current-uri) uri) (draw-diagnostics l2))))))
 
 (tm-define (lsp-hide-diagnostics)
   (cancel-alt-selection "lsp-errors")
@@ -387,10 +412,7 @@
 
 (define (cursor-line)
   (with lo (cursor-line+offset)
-    (and lo
-         (with lines (lsp-buffer-lines)
-           (and (< (car lo) (length lines))
-                (list (list-ref lines (car lo)) (cadr lo)))))))
+    (and lo (list (lsp-buffer-line (car lo)) (cadr lo)))))
 
 (define (completion-text item)
   (with t (or (lsp-ref item "insertText")
@@ -591,8 +613,7 @@
         (cons c (lsp-request
                  c "textDocument/hover"
                  (lsp-object "textDocument" (lsp-object "uri" uri)
-                             "position" (lsp-position (lsp-buffer-lines)
-                                                      (car r) (cadr r)))
+                             "position" (lsp-buffer-position (car r) (cadr r)))
                  (lambda (res e)
                    (set! mouse-request #f)
                    ;; (only if the mouse is still on the same word)
@@ -740,8 +761,7 @@
                 ((buffer-exists? u) (switch-to-buffer u))
                 (else (load-buffer u)))
           (when (== (current-buffer) u)
-            (with lo (lsp-position->line+offset (lsp-buffer-lines)
-                                                (lsp-ref range "start"))
+            (with lo (lsp-buffer-line+offset (lsp-ref range "start"))
               (go-to-path (append (buffer-path) lo))))))))
 
 (tm-define (lsp-goto-definition)

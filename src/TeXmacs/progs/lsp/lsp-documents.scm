@@ -83,9 +83,18 @@
        (with c (char->integer (string-ref s i))
          (and (>= c 128) (< c 192)))))
 
+(define block 4096)
+
 (define (common-start a b)
-  (let* ((n (min (string-length a) (string-length b))))
-    (let loop ((i 0))
+  ;; (by blocks first: a byte loop over a long file is slow in Scheme)
+  (let* ((n (min (string-length a) (string-length b)))
+         (i0 (let blocks ((i 0))
+               (if (and (<= (+ i block) n)
+                        (== (substring a i (+ i block))
+                            (substring b i (+ i block))))
+                   (blocks (+ i block))
+                   i))))
+    (let loop ((i i0))
       (if (and (< i n) (== (string-ref a i) (string-ref b i)))
           (loop (+ i 1))
           ;; (back to the start of a character)
@@ -97,8 +106,14 @@
 (define (common-end a b start)
   ;; the length of the common end of @a and @b, after @start in both
   (let* ((na (string-length a)) (nb (string-length b))
-         (n (- (min na nb) start)))
-    (let loop ((k 0))
+         (n (- (min na nb) start))
+         (k0 (let blocks ((k 0))
+               (if (and (<= (+ k block) n)
+                        (== (substring a (- na k block) (- na k))
+                            (substring b (- nb k block) (- nb k))))
+                   (blocks (+ k block))
+                   k))))
+    (let loop ((k k0))
       (if (and (< k n)
                (== (string-ref a (- na k 1)) (string-ref b (- nb k 1))))
           (loop (+ k 1))
@@ -108,16 +123,26 @@
                 (fwd (- k 1))
                 k))))))
 
+(define (line+start s i)
+  ;; the line of the byte @i of the utf8 @s, and the start of that line
+  ;; (from line to line: string-search-forwards is quick)
+  (let loop ((line 0) (start 0))
+    (with j (string-search-forwards "\n" start s)
+      (if (or (< j 0) (>= j i)) (list line start)
+          (loop (+ line 1) (+ j 1))))))
+
 (define (offset->position s i)
   ;; the position (line, UTF-16 units) of the byte @i of the utf8 @s
-  (let loop ((j 0) (line 0) (start 0))
-    (if (>= j i)
-        (lsp-object "line" (lsp-number line)
-                    "character" (lsp-number
-                                 (lsp-utf16-length (substring s start i))))
-        (if (== (string-ref s j) #\newline)
-            (loop (+ j 1) (+ line 1) (+ j 1))
-            (loop (+ j 1) line start)))))
+  (with ls (line+start s i)
+    (lsp-object "line" (lsp-number (car ls))
+                "character" (lsp-number
+                             (lsp-utf16-length (substring s (cadr ls) i))))))
+
+(define (count-lines s)
+  ;; the number of LF in @s
+  (let loop ((n 0) (start 0))
+    (with j (string-search-forwards "\n" start s)
+      (if (< j 0) n (loop (+ n 1) (+ j 1))))))
 
 (tm-define (lsp-text-change old new)
   (:synopsis "The incremental change (a TextDocumentContentChangeEvent)")
@@ -129,12 +154,28 @@
                                                     (- (string-length old) k)))
                 "text" (substring new a (- (string-length new) k)))))
 
+(tm-define (lsp-text-lines-change old new)
+  (:synopsis "The lines changed from @old to @new: (first last added)")
+  ;; the lines first to last of @old become added + 1 lines
+  (let* ((a (common-start old new))
+         (k (common-end old new a))
+         (l1 (car (line+start old a)))
+         (l2 (car (line+start old (- (string-length old) k)))))
+    (list l1 l2 (count-lines (substring new a (- (string-length new) k))))))
+
+(tm-define (lsp-document-lines-changed uri first last added)
+  (:synopsis "The lines @first to @last of @uri became @added + 1 lines")
+  ;; (the diagnostics which are shown follow them: see lsp-edit)
+  (noop))
+
 (tm-define (lsp-document-change c uri text)
   (:synopsis "The document @uri now has @text: sent if it has changed")
   ;; the change only, when the server takes them (kind 2), else the text
   (with d (ahash-ref (lsp-client-ref c 'documents) uri)
     (when (and d (!= (cadr d) text) (> (sync-kind c) 0))
       (with v (+ (car d) 1)
+        (apply lsp-document-lines-changed uri
+               (lsp-text-lines-change (cadr d) text))
         (ahash-set! (lsp-client-ref c 'documents) uri (list v text (caddr d)))
         (lsp-notify c "textDocument/didChange"
                     (lsp-object "textDocument"
@@ -212,8 +253,23 @@
   '(".git" "compile_commands.json" "compile_flags.txt" "pyproject.toml"
     "setup.py" "package.json" "Cargo.toml" "go.mod" "build.sbt" "pom.xml"))
 
+(define project-roots (make-ahash-table))
+
 (tm-define (lsp-project-root path)
   (:synopsis "The directory of the project of the file at the system @path")
+  ;; (kept for each directory: it is asked for at each key, and looks for
+  ;; ten files in each directory up to the root)
+  (with dir (url->system (url-head (system->url path)))
+    (or (ahash-ref project-roots dir)
+        (with r (project-root path)
+          (ahash-set! project-roots dir r)
+          r))))
+
+(tm-define (lsp-forget-project-roots)
+  (:synopsis "The projects of the files are looked for again")
+  (set! project-roots (make-ahash-table)))
+
+(define (project-root path)
   (let* ((dir (url-head (system->url path)))
          (top dir))
     (let loop ((d dir) (i 0))
@@ -317,5 +373,30 @@
   (let* ((p (cursor-path))
          (b (buffer-path))
          (r (and (list-starts? p b) (list-tail p (length b)))))
-    (and r (= (length r) 2)
-         (lsp-position (lsp-buffer-lines) (car r) (cadr r)))))
+    (and r (= (length r) 2) (lsp-buffer-position (car r) (cadr r)))))
+
+;; (the line of a position only: all the lines of a long file, at each
+;; request, would make a list as long as the file)
+
+(tm-define (lsp-buffer-line i . opt)
+  (:synopsis "The line @i of the buffer (current by default), in Cork")
+  (let* ((body (buffer-get-body (the-buffer opt)))
+         (t (cond ((and (tree-is? body 'document) (>= i 0)
+                        (< i (tree-arity body)))
+                   (tree-ref body i))
+                  ((and (== i 0) (not (tree-is? body 'document))) body)
+                  (else #f))))
+    (if t (car (lsp-lines t)) "")))
+
+(tm-define (lsp-buffer-position line offset)
+  (:synopsis "The position at @offset of the line @line of the buffer")
+  (lsp-object "line" (lsp-number line)
+              "character" (lsp-number
+                           (lsp-offset->character (lsp-buffer-line line)
+                                                  offset))))
+
+(tm-define (lsp-buffer-line+offset pos)
+  (:synopsis "The line and the offset in the buffer of the position @pos")
+  (let* ((line (or (lsp-number-value (lsp-ref pos "line")) 0))
+         (ch (or (lsp-number-value (lsp-ref pos "character")) 0)))
+    (list line (lsp-character->offset (lsp-buffer-line line) ch))))

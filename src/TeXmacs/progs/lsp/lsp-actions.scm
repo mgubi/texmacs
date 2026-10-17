@@ -265,9 +265,8 @@
               (r1 (and (list-starts? p1 b) (list-tail p1 (length b))))
               (r2 (and (list-starts? p2 b) (list-tail p2 (length b)))))
          (and r1 r2 (= (length r1) 2) (= (length r2) 2)
-              (with lines (lsp-buffer-lines)
-                (lsp-object "start" (lsp-position lines (car r1) (cadr r1))
-                            "end" (lsp-position lines (car r2) (cadr r2))))))))
+              (lsp-object "start" (lsp-buffer-position (car r1) (cadr r1))
+                          "end" (lsp-buffer-position (car r2) (cadr r2)))))))
 
 (tm-define (lsp-format)
   (:synopsis "Formats the selection, or the buffer, with the language server")
