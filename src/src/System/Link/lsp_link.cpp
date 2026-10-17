@@ -32,6 +32,7 @@ struct lsp_link_rep: tm_link_rep {
   array<string> msgs;    // the whole messages, not yet read
   string        head;    // the first of them (watch)
   string        errbuf;  // what the server wrote on stderr
+  bool          news;    // something has come since the last dispatch
 
 public:
   lsp_link_rep (tm_link ln);
@@ -58,7 +59,7 @@ lsp_link_callback (void* obj, void* info) {
     con->apply_command ();
 }
 
-lsp_link_rep::lsp_link_rep (tm_link ln2): ln (ln2), pos (0) {
+lsp_link_rep::lsp_link_rep (tm_link ln2): ln (ln2), pos (0), news (false) {
   alive= false;
 }
 
@@ -95,25 +96,31 @@ lsp_link_rep::write (string s, int channel) {
 
 bool
 lsp_link_rep::parse () {
-  // the next whole message of buf into msgs (false: none yet)
+  // the next whole message of buf into msgs (false: none yet). The lines
+  // of a header are ended by CR LF, but a line which a server prints on
+  // stdout by mistake may end by LF alone and come just before a header:
+  // the lines are split at each LF, and those which are not "Name: value"
+  // are passed on as errors
   int end= search_forwards ("\r\n\r\n", pos, buf);
   if (end < 0) return false;
   int len= -1, i= pos;
   while (i < end) {
-    int e= search_forwards ("\r\n", i, buf);
+    int e= search_forwards ("\n", i, buf);
     if (e < 0 || e > end) e= end;
     string line= buf (i, e);
+    if (N(line) > 0 && line[N(line)-1] == '\r') line= line (0, N(line)-1);
     int colon= search_forwards (":", line);
     if (colon > 0 &&
         locase_all (trim_spaces (line (0, colon))) == "content-length") {
       string val= trim_spaces (line (colon + 1, N(line)));
       if (N(val) > 0 && N(val) < 10 && is_int (val)) len= as_int (val);
     }
-    i= e + 2;
+    else if (colon <= 0 && line != "")
+      errbuf << "lsp: skipped '" << line << "'\n";
+    i= e + 1;
   }
   if (len < 0) {
-    // not a header (e.g. a line which a server printed on stdout by
-    // mistake): it is passed on as an error and skipped
+    // not a header: it is passed on as an error and skipped
     errbuf << "lsp: no Content-Length in '" << buf (pos, end) << "'\n";
     pos= end + 4;
     return true;
@@ -141,6 +148,7 @@ lsp_link_rep::drain () {
   }
   if (err != "") errbuf << err;
   if (!ln->alive) alive= false;
+  if (out != "" || err != "" || !alive) news= true;
 }
 
 string&
@@ -205,6 +213,7 @@ lsp_link_rep::stop () {
 struct lsp_client {
   int     id;
   tm_link ln;
+  lsp_link_rep* rep;  // (the link, which ln keeps)
   object  call_back;
   bool    exited;     // "exit" was sent
   bool    removed;    // stopped by lsp_stop
@@ -212,7 +221,7 @@ struct lsp_client {
 
 static array<lsp_client*> lsp_clients;
 static int lsp_client_counter= 0;
-static bool lsp_dispatching= false;
+static int lsp_dispatching= 0;  // the depth of the dispatches
 
 static lsp_client*
 lsp_find (int id) {
@@ -224,16 +233,21 @@ lsp_find (int id) {
 
 static void
 lsp_dispatch () {
-  // what the servers have sent, to the call backs; a call back may send,
-  // listen or stop again: what comes meanwhile is sent by the loop below
-  if (lsp_dispatching) return;
-  lsp_dispatching= true;
+  // what the servers have sent, to the call backs, for the clients which
+  // have news (the pipes tell them, lsp_link_callback). A call back may
+  // send, listen or stop again: a call back which waits for an answer
+  // (lsp-request-wait) dispatches within this dispatch. No client is
+  // deleted meanwhile (process_all_lsp), and the clients which are added
+  // come at the end of lsp_clients
+  lsp_dispatching++;
   bool busy= true;
   while (busy) {
     busy= false;
     for (int i=0; i<N(lsp_clients); i++) {
       lsp_client* c= lsp_clients[i];
       if (c->removed || c->exited) continue;
+      if (!c->rep->news && c->ln->alive) continue;
+      c->rep->news= false;
       string err= c->ln->read (LINK_ERR);
       if (err != "") {
         call (c->call_back, object ("stderr"), object (err));
@@ -242,6 +256,8 @@ lsp_dispatch () {
       if (c->removed) continue;
       string msg= c->ln->read (LINK_OUT);
       if (msg != "") {
+        // (the other messages of the client are read at the next round)
+        c->rep->news= true;
         call (c->call_back, object ("message"), object (msg));
         busy= true;
       }
@@ -252,7 +268,7 @@ lsp_dispatch () {
       }
     }
   }
-  lsp_dispatching= false;
+  lsp_dispatching--;
 }
 
 void
@@ -262,6 +278,8 @@ process_all_lsp () {
   // here, with their links
   if (N(lsp_clients) == 0) return;
   lsp_dispatch ();
+  // (not within a dispatch: a call back which runs an event loop)
+  if (lsp_dispatching > 0) return;
   array<lsp_client*> left;
   for (int i=0; i<N(lsp_clients); i++)
     if (lsp_clients[i]->removed || lsp_clients[i]->exited)
@@ -278,6 +296,7 @@ lsp_start (string cmd, object call_back) {
   lsp_client* c= tm_new<lsp_client> ();
   c->id= ++lsp_client_counter;
   c->ln= ln;
+  c->rep= (lsp_link_rep*) ln.rep;
   c->call_back= call_back;
   c->exited= false;
   c->removed= false;

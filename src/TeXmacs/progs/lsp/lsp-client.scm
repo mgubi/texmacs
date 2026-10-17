@@ -248,9 +248,15 @@
           (lsp-client-initialize c root)))
     c))
 
+(tm-define (lsp-client-ended c)
+  (:synopsis "Called when the server of @c ends without being stopped")
+  (noop))
+
 (define (client-ended c)
   ;; the server has ended: the handlers of its requests get an error
-  (ahash-set! c 'state 'dead)
+  (with unexpected? (not (ahash-ref c 'stopped))
+    (ahash-set! c 'state 'dead)
+    (when unexpected? (lsp-client-ended c)))
   (ahash-set! c 'queue '())
   (let* ((pending (ahash-ref c 'pending))
          (handlers (map cdr (ahash-table->list pending)))
@@ -262,11 +268,13 @@
 (tm-define (lsp-client-kill c)
   (:synopsis "Ends the server of @c at once")
   (when (!= (ahash-ref c 'state) 'dead)
+    (ahash-set! c 'stopped #t)
     ((ahash-ref c 'stop))
     (client-ended c)))
 
 (tm-define (lsp-client-stop c)
   (:synopsis "Ends the server of @c: shutdown, exit, then at most 3 s")
+  (ahash-set! c 'stopped #t)
   (if (not (lsp-client-running? c)) (lsp-client-kill c)
       (begin
         (lsp-request-wait c "shutdown" #f 2000)
@@ -390,30 +398,70 @@
 ;; The clients of the languages and projects
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;; A client is kept once its server has ended (stopped, crashed, or which
+;; could not start): the server is not started again for its language and
+;; project until it is forgotten (lsp-client-forget, the restart of the
+;; user), else a server which ends at once would be started at each pause
+;; of the typing.
 (define clients (make-ahash-table))
+
+(define (client-key lan root)
+  (string-append lan "\n" (or root "")))
 
 (tm-define (lsp-client-find lan root)
   (:synopsis "The running client for @lan and @root, or #f (none is started)")
-  (with c (ahash-ref clients (string-append lan "\n" (or root "")))
+  (with c (ahash-ref clients (client-key lan root))
     (and c (lsp-client-alive? c) c)))
 
 (tm-define (lsp-client-for lan root)
   (:synopsis "The client for the language @lan and the directory @root")
-  ;; a server is started if there is none yet; #f if there is no server
-  (let* ((key (string-append lan "\n" (or root "")))
+  ;; a server is started if there is none yet; #f if there is no server,
+  ;; or if it has ended (see above)
+  (let* ((key (client-key lan root))
          (c (ahash-ref clients key)))
-    (if (and c (lsp-client-alive? c)) c
-        (with cmd (lsp-server-command lan)
-          (and cmd
-               (with c (lsp-client-start cmd root)
-                 (ahash-set! clients key c)
-                 c))))))
+    (cond ((and c (lsp-client-alive? c)) c)
+          (c #f)
+          (else
+           (with cmd (lsp-server-command lan)
+             (and cmd
+                  (with c (lsp-client-start cmd root)
+                    (ahash-set! clients key c)
+                    (and (lsp-client-alive? c) c))))))))
+
+(tm-define (lsp-client-entry lan root)
+  (:synopsis "The client for @lan and @root, also if its server has ended")
+  (ahash-ref clients (client-key lan root)))
+
+(tm-define (lsp-client-forget lan root)
+  (:synopsis "The server for @lan and @root may be started again")
+  (ahash-remove! clients (client-key lan root)))
+
+(tm-define (lsp-forget-all)
+  (:synopsis "All the servers may be started again")
+  (set! clients (make-ahash-table)))
 
 (tm-define (lsp-clients)
   (:synopsis "The clients of the servers which are running")
   (list-filter (map cdr (ahash-table->list clients)) lsp-client-alive?))
 
 (tm-define (lsp-stop-all)
-  (:synopsis "Ends all the servers")
-  (for-each lsp-client-stop (lsp-clients))
-  (set! clients (make-ahash-table)))
+  (:synopsis "Ends all the servers, together, in at most 2 s")
+  ;; shutdown to all, exit to each one which answers; those which have not
+  ;; ended after 2 s are killed. They are not started again (see above).
+  (with l (lsp-clients)
+    (for (c l)
+      (ahash-set! c 'stopped #t)
+      (if (lsp-client-running? c)
+          (begin
+            (lsp-request c "shutdown" #f
+                         (lambda (r e) (lsp-notify c "exit" #f)))
+            (ahash-set! c 'state 'stopping))
+          (lsp-client-kill c)))
+    (with end (+ (texmacs-time) 2000)
+      (while (and (< (texmacs-time) end)
+                  (list-or (map (lambda (c) (!= (lsp-client-state c) 'dead))
+                                l)))
+        (for (c l)
+          (when (!= (lsp-client-state c) 'dead)
+            (lsp-client-listen c 10)))))
+    (for-each lsp-client-kill l)))

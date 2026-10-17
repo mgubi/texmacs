@@ -269,14 +269,19 @@
            (lsp-object "textDocument" (lsp-object "uri" uri)
                        "position" pos)))))
 
+(define (capable? c capability)
+  (not (lsp-null? (lsp-ref (lsp-client-capabilities c) capability))))
+
 (define (request-at-cursor method capability)
   ;; the result of the request @method at the cursor, or #f (with a
   ;; message): the server of the buffer must have @capability
-  (let ((c (lsp-buffer-client*))
-        (params (cursor-params)))
+  ;; (the client is found first: synchronizing the text would start one)
+  (let* ((c (lsp-buffer-client*))
+         (ok? (and c (capable? c capability)))
+         (params (and ok? (cursor-params))))
     (cond ((not c)
            (set-message "No language server for this buffer" "") #f)
-          ((lsp-null? (lsp-ref (lsp-client-capabilities c) capability))
+          ((not ok?)
            (set-message "The language server cannot do this" "") #f)
           ((not params) #f)
           (else
@@ -318,16 +323,6 @@
               (lsp-ref item "label"))
     (if (string? t) (string-trim-both t) "")))
 
-(define (string-trim-both s)
-  (let* ((l (string->list s))
-         (sp? (lambda (c) (in? c '(#\space #\tab))))
-         (l1 (list-drop-while l sp?))
-         (l2 (reverse (list-drop-while (reverse l1) sp?))))
-    (list->string l2)))
-
-(define (list-drop-while l pred?)
-  (if (and (pair? l) (pred? (car l))) (list-drop-while (cdr l) pred?) l))
-
 (define (completion-items r)
   (let* ((items (if (func? r 'tuple) (cdr r) (lsp-items (lsp-ref r "items"))))
          (key (lambda (x) (or (lsp-ref x "sortText") (completion-text x)))))
@@ -345,28 +340,54 @@
                     (loop (cdr l) (cons s acc) (+ n 1))))
               (loop (cdr l) acc n))))))
 
-(tm-define (lsp-complete)
+(tm-define (lsp-completion-tuple word line off l)
+  (:synopsis "The argument of custom-complete for the suffixes @l of @word")
+  ;; custom-complete inserts a suffix after the prefix which ends at the
+  ;; cursor: after a . -> or :: (@word is empty), the character before the
+  ;; cursor is that prefix, and the suffixes are the whole names
+  (cond ((null? l) #f)
+        ((!= word "") `(tuple ,word ,@l))
+        ((> off 0) `(tuple ,(substring line (- off 1) off) ,@l))
+        (else #f)))
+
+;; the completion which is awaited (client . id), at most one
+(define completion-request #f)
+
+(define (completion-answer r word line off fallback?)
+  (with t (lsp-completion-tuple word line off (lsp-completions word r))
+    (cond (t (custom-complete (stree->tree t)))
+          ((and fallback? (complete-try?)) (noop))
+          (else (set-message "No completions" "")))))
+
+(tm-define (lsp-complete . opt)
   (:synopsis "Completes the word at the cursor with the language server")
-  (with lo (cursor-line)
-    (when lo
-      (let* ((line (car lo)) (off (cadr lo))
-             (word (word-before line off))
-             (r (request-at-cursor "textDocument/completion"
-                                   "completionProvider")))
-        (when r
-          (with l (lsp-completions word r)
-            (cond ((null? l) (set-message "No completions" ""))
-                  ((!= word "")
-                   (custom-complete (stree->tree `(tuple ,word ,@l))))
-                  ((> off 0)
-                   ;; after a . -> or ::, the character before the cursor
-                   ;; is the prefix of the completions
-                   (with c (substring line (- off 1) off)
-                     (custom-complete
-                      (stree->tree `(tuple ,c ,@(map (lambda (s)
-                                                      (string-append c s))
-                                                    l))))))
-                  (else (set-message "No completions" "")))))))))
+  ;; the answer is awaited apart, and applied if the cursor has not moved
+  ;; meanwhile; without completions, those of the editor (complete-try?)
+  ;; are tried if @opt is (#t)
+  (let ((lo (cursor-line))
+        (c (lsp-buffer-client*))
+        (fallback? (and (pair? opt) (car opt))))
+    (cond ((not lo) (noop))
+          ((not (and c (capable? c "completionProvider")))
+           (when (not (and fallback? (complete-try?)))
+             (set-message "No completions" "")))
+          (else
+           (let* ((line (car lo)) (off (cadr lo))
+                  (word (word-before line off))
+                  (u (current-buffer))
+                  (p (cursor-path))
+                  (params (cursor-params)))
+             (when completion-request
+               (lsp-cancel (car completion-request) (cdr completion-request)))
+             (set! completion-request
+               (cons c (lsp-request
+                        c "textDocument/completion" params
+                        (lambda (r e)
+                          (set! completion-request #f)
+                          (when (and (not e) (== (current-buffer) u)
+                                     (== (cursor-path) p))
+                            (completion-answer r word line off
+                                               fallback?)))))))))))
 
 (define (followed-buffer?)
   (== (ahash-ref followed (url->string (current-buffer))) #t))
@@ -381,12 +402,13 @@
                 (and (string? t) (<= (cadr lo) (string-length t))
                      (with c (string-ref t (- (cadr lo) 1))
                        (or (word-char? c) (in? c '(#\. #\> #\:))))))))
-       (lsp-buffer-client*)
+       (with c (lsp-buffer-client*)
+         (and c (capable? c "completionProvider")))
        #t))
 
 (tm-define (kbd-variant t forwards?)
   (:require (and forwards? (lsp-completion-here?)))
-  (lsp-complete))
+  (lsp-complete #t))
 
 ;; Information at the cursor (hover)
 
@@ -484,17 +506,46 @@
 ;; Servers
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(define (buffer-key)
+  ;; the language and the project of the current buffer, or #f
+  (let ((lan (lsp-buffer-language))
+        (p (lsp-buffer-path)))
+    (and lan p (list lan (lsp-project-root p)))))
+
+(define (buffer-client-entry)
+  ;; the client of the current buffer, also if its server has ended
+  (and-with k (buffer-key)
+    (lsp-client-entry (car k) (cadr k))))
+
+(tm-define (lsp-client-ended c)
+  (former c)
+  (set-message (string-append "The language server has ended "
+                              "(Tools, Language servers, Server log)")
+               (utf8->cork (lsp-client-ref c 'name))))
+
 (tm-define (lsp-restart)
   (:synopsis "Restarts the language server of the current buffer")
-  (with c (lsp-buffer-client*)
-    (when c (lsp-client-stop c))
+  ;; (also one which has ended or which has been stopped)
+  (with k (buffer-key)
+    (when k
+      (and-with c (lsp-client-find (car k) (cadr k))
+        (lsp-client-stop c))
+      (lsp-client-forget (car k) (cadr k)))
     (set! followed (make-ahash-table))
-    (if (lsp-buffer-sync) (set-message "Language server started" "")
-        (set-message "No language server for this buffer" ""))))
+    (with c (lsp-buffer-sync)
+      (if (and c (lsp-client-alive? c))
+          (set-message "Language server started" "")
+          (set-message "No language server for this buffer" "")))))
+
+(tm-define (lsp-stop-servers)
+  (:synopsis "Ends all the language servers, until they are restarted")
+  (lsp-stop-all)
+  (set! pending (make-ahash-table))
+  (set-message "Language servers stopped" "Restart server starts one again"))
 
 (tm-define (lsp-show-log)
   (:synopsis "Shows what the language server of the buffer has written")
-  (with c (lsp-buffer-client*)
+  (with c (buffer-client-entry)
     (if (not c) (set-message "No language server for this buffer" "")
         (open-auxiliary
          "Language server"
@@ -514,7 +565,9 @@
                  (lsp-client-log c)))))))))
 
 (tm-define (lsp-turn-off)
+  ;; (they are started again when the preference is on again)
   (lsp-stop-all)
+  (lsp-forget-all)
   (set! followed (make-ahash-table))
   (set! pending (make-ahash-table))
   (set! shown (make-ahash-table))

@@ -1282,7 +1282,9 @@ edit_interface_rep::apply_changes () {
     call ("notify-buffer-changed", object (as_string (get_name ())));
 
   // cout << "Handling diagnostics";
-  if ((env_change & (THE_CURSOR + THE_FOCUS + THE_TREE + THE_ENVIRONMENT +
+  // (the cursor does not move them: only the text, its typesetting, the
+  // alt selections which hold them and the visible part do)
+  if ((env_change & (THE_TREE + THE_ENVIRONMENT + THE_EXTENTS +
                      THE_SELECTION + THE_SPELL_ERRORS)) ||
       new_visible != last_visible)
     update_diagnostic_rects (new_visible);

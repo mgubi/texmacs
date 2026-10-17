@@ -121,7 +121,43 @@
     (wait-exit id)
     (check= (events-of "message") (list "{}"))
     (check-true (string-contains? (apply string-append (events-of "stderr"))
-                                  "Loading..."))))
+                                  "Loading...")))
+  ;; a line ended by LF alone, just before a header, is skipped too: the
+  ;; header is still read
+  (let ((id (start (string-append
+                    "printf 'Starting...\\n"
+                    "Content-Length: 2\\r\\n\\r\\n{}'"))))
+    (wait-exit id)
+    (check= (events-of "message") (list "{}"))
+    (check-true (string-contains? (apply string-append (events-of "stderr"))
+                                  "skipped 'Starting...'"))))
+
+(define (test-nested)
+  (check-group "waiting in a call back")
+  ;; a call back which waits for the next message gets it (the call backs
+  ;; are dispatched within the dispatch)
+  (let* ((got '())
+         (inner #f)
+         (id #f))
+    (set! id (lsp-start "cat"
+                        (lambda (kind data)
+                          (when (== kind "message")
+                            (set! got (append got (list data)))
+                            (when (== data "1")
+                              (lsp-send id "2")
+                              (let loop ((i 0))
+                                (when (and (< i 30) (not (in? "2" got)))
+                                  (lsp-listen id 100)
+                                  (loop (+ i 1))))
+                              (set! inner (in? "2" got)))))))
+    (lsp-send id "1")
+    (let loop ((i 0))
+      (when (and (< i 50) (not inner))
+        (lsp-listen id 100)
+        (loop (+ i 1))))
+    (check-true inner)
+    (check= got '("1" "2"))
+    (lsp-stop id)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Errors and the end of a server
@@ -535,7 +571,11 @@
           (check= (car r) 'result)
           (check-true (in? "ute_value"
                            (lsp-completions "comp" (cadr r)))))
+        ;; (the answer is awaited apart)
         (lsp-complete)
+        (lsp-wait c (lambda ()
+                      (> (string-length (list-ref (lsp-buffer-lines) 3)) 6))
+                  10000)
         (with line (list-ref (lsp-buffer-lines) 3)
           (check-true (string-starts? line "  comp"))
           (check-true (> (string-length line) 6)))
@@ -566,8 +606,38 @@
           (buffer-close u)
           (check= (cAr methods) "textDocument/didClose")
           (check-false (lsp-document-open? c uri)))
-        (lsp-client-stop c)))
+        ;; stopped servers are not started again until they are restarted
+        (lsp-stop-servers)
+        (check= (lsp-client-state c) 'dead)
+        (with root (lsp-file "proj")
+          (check= (lsp-client-for "cpp" root) #f)
+          (check-true (lsp-client-entry "cpp" root))
+          (lsp-client-forget "cpp" root)
+          (check= (lsp-client-entry "cpp" root) #f))))
     (when (buffer-exists? u) (buffer-close u))))
+
+(define (test-ended)
+  (check-group "servers which end")
+  ;; a server which ends at once is not started again at each request
+  (lsp-server-set! "lsp-test-lang" '("sh -c 'exit 0'"))
+  (let* ((root "/tmp/lsp-test-project")
+         (c (lsp-client-for "lsp-test-lang" root)))
+    (check-true (and c #t))
+    (when c
+      (lsp-wait c (lambda () (== (lsp-client-state c) 'dead)) 5000)
+      (check= (lsp-client-state c) 'dead)
+      (check= (lsp-client-for "lsp-test-lang" root) #f)
+      (check= (lsp-client-entry "lsp-test-lang" root) c)
+      (lsp-client-forget "lsp-test-lang" root)
+      (with c2 (lsp-client-for "lsp-test-lang" root)
+        (check-true (and c2 (not (eq? c2 c)))))
+      (lsp-client-forget "lsp-test-lang" root)))
+  ;; the suffixes of completions after a . (the prefix is the dot)
+  (check= (lsp-completion-tuple "" "  s." 4 '("field" "x"))
+          '(tuple "." "field" "x"))
+  (check= (lsp-completion-tuple "fi" "  s.fi" 6 '("eld"))
+          '(tuple "fi" "eld"))
+  (check= (lsp-completion-tuple "" "" 0 '("a")) #f))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The suite
@@ -580,6 +650,7 @@
     (test-echo)
     (test-headers)
     (test-stderr)
+    (test-nested)
     (test-errors))
   (test-messages)
   (test-texts)
@@ -588,7 +659,10 @@
   (test-requests)
   (test-server-requests)
   (test-end)
+  (when (not (or (os-mingw?) (os-win32?)))
+    (test-ended))
   (test-documents)
   (test-diagnostics)
   (test-buffer)
+  (lsp-forget-all)
   (check-end))

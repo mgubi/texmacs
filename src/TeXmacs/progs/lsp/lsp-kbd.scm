@@ -36,4 +36,4 @@
   ---
   ("Restart server" (lsp-restart))
   ("Server log" (lsp-show-log))
-  ("Stop all servers" (lsp-stop-all)))
+  ("Stop all servers" (lsp-stop-servers)))
