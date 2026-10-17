@@ -982,11 +982,9 @@
       (apply build-tables-end! g (ts-native-build g identify-keywords make-token-conflict-map))
       (build-tables-scheme! g)))
 
-(define (build-tables-end! g t tc ci keywords)
-  ;; the lex tables and the last details, after the merging of the states
-  (let* ((states (ahash-ref t 'states))
-         (lex (build-lex-tables g states keywords tc ci)))
-    (ts-profile "lex")
+(define (build-tables-end! g t tc ci keywords lex)
+  ;; the last details, after the merging of the states and the lex tables
+  (let* ((states (ahash-ref t 'states)))
     (ahash-set! t 'external-lex-states (populate-external-lex-states! g states))
     (mark-fragile-tokens! states tc)
     (ahash-set! t 'lex-table (car lex))

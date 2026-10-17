@@ -24,7 +24,7 @@
 ;; then, given the token conflicts and the keywords, the final states.
 
 (texmacs-module (treesit ts-native)
-  (:use (treesit ts-base) (treesit ts-grammar) (treesit ts-tables)))
+  (:use (treesit ts-base) (treesit ts-grammar) (treesit ts-nfa) (treesit ts-tables)))
 
 (define native-enabled #t)
 
@@ -118,6 +118,24 @@
         (for-each (lambda (f) (w-str f port)) fs)))
     (w-syms (map car (ahash-table->list (g-ref g 'default-aliases))) port)
     (w-syms (g-ref g 'supertypes) port)
+    ;; the NFA of the tokens, for the lex tables
+    (let ((nfa (g-ref g 'nfa)))
+      (w-int (vector-length nfa) port)
+      (do ((i 0 (+ i 1))) ((= i (vector-length nfa)))
+        (let ((s (vector-ref nfa i)))
+          (case (vector-ref s 0)
+            ((advance)
+             (w-int 0 port)
+             (w-int (length (vector-ref s 1)) port)
+             (for-each (lambda (r) (w-int (car r) port) (w-int (cdr r) port)) (vector-ref s 1))
+             (w-int (vector-ref s 2) port)
+             (w-int (vector-ref s 3) port)
+             (w-int (if (vector-ref s 4) 1 0) port))
+            ((split) (w-int 1 port) (w-int (vector-ref s 1) port) (w-int (vector-ref s 2) port))
+            (else (w-int 2 port) (w-int (vector-ref s 1) port) (w-int (vector-ref s 2) port))))))
+    (do ((i 0 (+ i 1))) ((= i (vector-length lexical)))
+      (w-int (lex-implicit-precedence (vector-ref lexical i)) port)
+      (w-int (lex-start-state (vector-ref lexical i)) port))
     (display "end" port)))
 
 (define (bits->vector s)
@@ -126,19 +144,26 @@
       (vector-set! v i (char=? (string-ref s i) #\1)))))
 
 (define (state-from-data d)
-  ;; (id core eof-gated? reserved terminal-entries non-terminal-entries)
+  ;; (id core eof-gated? reserved terminal-entries non-terminal-entries lex)
   (let ((s (make-state (car d) (list-ref d 1))))
     (vector-set! s 7 (list-ref d 2))
     (vector-set! s 3 (list-ref d 3))
+    (vector-set! s 4 (list-ref d 6))
     (for-each (lambda (e) (om-set! (state-terminals s) (car e) (vector (cddr e) (cadr e))))
               (list-ref d 4))
     (for-each (lambda (e) (om-set! (state-nonterminals s) (car e) (cdr e)))
               (list-ref d 5))
     s))
 
+(define (lex-table-from-data l)
+  ;; a list of (accept eof-action advance-actions), as in ts-build.scm
+  (let ((v (make-gvec)))
+    (for-each (lambda (d) (gvec-push! v (vector (car d) (cadr d) (caddr d)))) l)
+    v))
+
 (define-public (ts-native-build g identify-keywords make-token-conflict-map)
-  ;; the parse table as build-tables! makes it, before its lex tables:
-  ;; (t tc ci keywords)
+  ;; the parse table as build-tables! makes it, with its lex tables:
+  ;; (t tc ci keywords lex)
   (compute-variable-fields! g)
   (let* ((text (call-with-output-string (lambda (port) (write-syntax-grammar g port))))
          (r (string->object (tree-sitter-tables-start text))))
@@ -162,7 +187,8 @@
                      (string->object (tree-sitter-tables-finish id input))))
            (t (make-ahash-table)))
       (when (eq? (car d) 'error) (ts-error (cadr d)))
-      ;; d = (ok states symbols production-infos max-aliased used-conflicts)
+      ;; d = (ok states symbols production-infos max-aliased used-conflicts
+      ;;      main-lex-table keyword-lex-table)
       (let ((states (make-gvec)))
         (for-each (lambda (sd) (gvec-push! states (state-from-data sd))) (list-ref d 1))
         (ahash-set! t 'states states))
@@ -173,5 +199,6 @@
       (ahash-set! t 'builder #f)
       (when (pair? (list-ref d 5))
         (g-set! g 'used-conflicts (append (list-ref d 5) (or (g-ref g 'used-conflicts) '()))))
-      (ts-profile "states (C++)")
-      (list t tc ci keywords))))
+      (ts-profile "states and lex tables (C++)")
+      (list t tc ci keywords
+            (cons (lex-table-from-data (list-ref d 6)) (lex-table-from-data (list-ref d 7)))))))

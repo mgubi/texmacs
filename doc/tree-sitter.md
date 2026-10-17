@@ -694,6 +694,15 @@ Done in part (2026-10-17):
 
   C: 9.9 s instead of 24.8 s (S7), python 7.6 s instead of 18.0 s. The lex
   tables are now most of the time.
+- **Lex tables in C++ too** (same day): the NFA and the start states of the
+  tokens go with the grammar; the grouping of the parse states by
+  compatible token sets, the DFA of each group and of the keywords, the
+  minimization and the order are in `ts_tables.cpp`; tables still
+  byte-identical (json, scheme, c, python, cpp). C++ grammar: S7 52 s
+  and 4.8 GB, femtolisp 19 s and 1.4 GB (C 7.4 s, python 4.8 s under S7).
+  What remains in Scheme: reading and preparing the grammar and its NFA,
+  the token conflicts (5 s), the runtime language (`tables->language`,
+  21 s under S7, 6 s under femtolisp).
 
 As planned initially:
 

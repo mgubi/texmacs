@@ -144,6 +144,11 @@ struct grammar_t {
   std::vector<std::vector<int> > var_fields;                   // string ids
   ivec default_aliased, supertypes;
   prod_t start;
+  // the NFA of the tokens: kind 0 advance (chars next prec sep), 1 split
+  // (a b), 2 accept (token prec)
+  struct nfa_node { int kind; std::vector<std::pair<int,int> > chars; int a, b, prec; bool sep; };
+  std::vector<nfa_node> nfa;
+  ivec implicit_prec, start_state;
 
   int intern (const std::string& s) {
     std::map<std::string,int>::iterator it= string_ids.find (s);
@@ -277,6 +282,28 @@ read_grammar (grammar_t& g, reader_t& r) {
   }
   g.default_aliased= r.syms ();
   g.supertypes= r.syms ();
+  int nn= (int) r.num ();
+  for (int i= 0; i < nn; i++) {
+    grammar_t::nfa_node x;
+    x.kind= (int) r.num ();
+    x.a= x.b= x.prec= 0; x.sep= false;
+    if (x.kind == 0) {
+      int nc= (int) r.num ();
+      for (int k= 0; k < nc; k++) {
+        int a= (int) r.num (), b= (int) r.num ();
+        x.chars.push_back (std::make_pair (a, b));
+      }
+      x.a= (int) r.num ();
+      x.prec= (int) r.num ();
+      x.sep= r.num () != 0;
+    }
+    else { x.a= (int) r.num (); x.b= (int) r.num (); if (x.kind == 2) x.prec= x.b; }
+    g.nfa.push_back (x);
+  }
+  for (int i= 0; i < g.n_terminals; i++) {
+    g.implicit_prec.push_back ((int) r.num ());
+    g.start_state.push_back ((int) r.num ());
+  }
   r.word ("end");
   // the augmented start production
   step_t s0= { non_terminal (0), 0, 0, 0, -1, 0, -1, 65535 };
@@ -1143,6 +1170,327 @@ builder_t::build () {
   }
 }
 
+
+/******************************************************************************
+* Character sets (sorted lists of half-open ranges, as in ts-base.scm)
+******************************************************************************/
+
+typedef std::vector<std::pair<int,int> > cset;
+const int CS_END= 0x110000;
+
+cset
+cs_add_range (const cset& cs, int start, int end) {
+  cset r;
+  size_t i= 0;
+  while (i < cs.size ()) {
+    if (cs[i].first > end) break;
+    if (cs[i].second >= start) {
+      int s= std::min (start, cs[i].first), e= std::max (end, cs[i].second);
+      i++;
+      while (i < cs.size () && cs[i].first <= e) { e= std::max (e, cs[i].second); i++; }
+      r.push_back (std::make_pair (s, e));
+      r.insert (r.end (), cs.begin () + i, cs.end ());
+      return r;
+    }
+    r.push_back (cs[i]);
+    i++;
+  }
+  r.push_back (std::make_pair (start, end));
+  r.insert (r.end (), cs.begin () + i, cs.end ());
+  return r;
+}
+
+cset
+cs_add (const cset& a, const cset& b) {
+  cset r= a;
+  for (size_t i= 0; i < b.size (); i++) r= cs_add_range (r, b[i].first, b[i].second);
+  return r;
+}
+
+cset
+cs_negate (const cset& cs) {
+  cset r;
+  int prev= 0;
+  for (size_t i= 0; i < cs.size (); i++) {
+    if (prev < cs[i].first) r.push_back (std::make_pair (prev, cs[i].first));
+    prev= cs[i].second;
+  }
+  if (prev < CS_END) r.push_back (std::make_pair (prev, CS_END));
+  return r;
+}
+
+cset
+cs_intersect (const cset& a, const cset& b) {
+  cset r;
+  size_t i= 0, j= 0;
+  while (i < a.size () && j < b.size ()) {
+    if (a[i].second <= b[j].first) i++;
+    else if (b[j].second <= a[i].first) j++;
+    else {
+      r.push_back (std::make_pair (std::max (a[i].first, b[j].first),
+                                   std::min (a[i].second, b[j].second)));
+      if (a[i].second < b[j].second) i++; else j++;
+    }
+  }
+  return r;
+}
+
+inline cset cs_difference (const cset& a, const cset& b) { return cs_intersect (a, cs_negate (b)); }
+
+ll
+cs_count (const cset& cs) {
+  ll n= 0;
+  for (size_t i= 0; i < cs.size (); i++) n += cs[i].second - cs[i].first;
+  return n;
+}
+
+int
+cs_compare (const cset& a, const cset& b) {
+  int c= cmp ((int) 0, 0);
+  ll na= cs_count (a), nb= cs_count (b);
+  if (na != nb) return na < nb? -1: 1;
+  for (size_t i= 0; i < a.size () && i < b.size (); i++) {
+    int la= a[i].second - a[i].first, lb= b[i].second - b[i].first;
+    c= cmp (la, lb);
+    if (c != 0) return c;
+    if (a[i].first != b[i].first) return cmp (a[i].first, b[i].first);
+  }
+  return 0;
+}
+
+/******************************************************************************
+* NFA cursors (ts-nfa.scm)
+******************************************************************************/
+
+struct transition_t {
+  cset chars;
+  bool sep;
+  int prec;
+  ivec states;
+};
+
+struct lexer_t {
+  grammar_t& g;
+  lexer_t (grammar_t& g2): g (g2) {}
+
+  ivec closure (const ivec& ids) {
+    std::vector<bool> seen (g.nfa.size (), false);
+    ivec todo (ids.rbegin (), ids.rend ()), acc;
+    while (!todo.empty ()) {
+      int x= todo.back (); todo.pop_back ();
+      if (seen[x]) continue;
+      seen[x]= true;
+      const grammar_t::nfa_node& s= g.nfa[x];
+      if (s.kind == 1) { todo.push_back (s.b); todo.push_back (s.a); }
+      else acc.push_back (x);
+    }
+    std::sort (acc.begin (), acc.end ());
+    return acc;
+  }
+
+  std::vector<std::pair<int,int> > completions (const ivec& ids) {
+    // (token . precedence)
+    std::vector<std::pair<int,int> > r;
+    for (size_t i= 0; i < ids.size (); i++)
+      if (g.nfa[ids[i]].kind == 2) r.push_back (std::make_pair (g.nfa[ids[i]].a, g.nfa[ids[i]].prec));
+    return r;
+  }
+
+  bool any_separator (const ivec& ids) {
+    for (size_t i= 0; i < ids.size (); i++)
+      if (g.nfa[ids[i]].kind == 0 && g.nfa[ids[i]].sep) return true;
+    return false;
+  }
+
+  std::vector<transition_t> transitions (const ivec& ids) {
+    std::vector<transition_t> result;
+    for (size_t k= 0; k < ids.size (); k++) {
+      const grammar_t::nfa_node& raw= g.nfa[ids[k]];
+      if (raw.kind != 0) continue;
+      cset chars= raw.chars;
+      bool sep= raw.sep;
+      int prec= raw.prec, state= raw.a;
+      for (size_t i= 0; i < result.size () && !chars.empty (); i++) {
+        cset inter= cs_intersect (result[i].chars, chars);
+        if (inter.empty ()) continue;
+        cset rest= cs_difference (result[i].chars, inter);
+        transition_t nw;
+        nw.chars= inter;
+        nw.sep= result[i].sep && sep;
+        nw.prec= std::max (result[i].prec, prec);
+        nw.states= set_insert (state, result[i].states);
+        chars= cs_difference (chars, inter);
+        if (rest.empty ()) result[i]= nw;
+        else {
+          result[i].chars= rest;
+          result.push_back (nw);
+        }
+      }
+      if (!chars.empty ()) {
+        transition_t t;
+        t.chars= chars; t.sep= sep; t.prec= prec; t.states= ivec (1, state);
+        result.push_back (t);
+      }
+    }
+    std::vector<transition_t> acc;
+    for (size_t k= 0; k < result.size (); k++) {
+      const transition_t& t= result[k];
+      int same= -1;
+      for (size_t j= 0; j < acc.size (); j++)
+        if (acc[j].states == t.states && acc[j].sep == t.sep && acc[j].prec == t.prec) { same= (int) j; break; }
+      if (same >= 0) acc[same].chars= cs_add (acc[same].chars, t.chars);
+      else acc.push_back (t);
+    }
+    std::stable_sort (acc.begin (), acc.end (), [] (const transition_t& a, const transition_t& b) {
+      return cs_compare (a.chars, b.chars) < 0; });
+    return acc;
+  }
+
+  int variable_index (int state) {
+    int lo= 0, hi= g.n_terminals;
+    while (lo < hi) {
+      int mid= (lo + hi) / 2;
+      if (g.start_state[mid] < state) lo= mid + 1; else hi= mid;
+    }
+    return lo;
+  }
+
+  bool prefer_token (int lprec, int ltok, int rprec, int rtok) {
+    if (lprec < rprec) return false;
+    if (lprec > rprec) return true;
+    int l= g.implicit_prec[ltok], r= g.implicit_prec[rtok];
+    if (l < r) return false;
+    if (l > r) return true;
+    return ltok < rtok;
+  }
+
+  bool prefer_transition (const transition_t& t, int completed_id, int completed_prec, bool has_sep) {
+    if (t.prec < completed_prec) return false;
+    if (t.prec == completed_prec) {
+      if (t.sep) return false;
+      if (!has_sep) return true;
+      for (size_t i= 0; i < t.states.size (); i++)
+        if (variable_index (t.states[i]) == completed_id) return true;
+      return false;
+    }
+    return true;
+  }
+};
+
+/******************************************************************************
+* Lex tables (build_lex_table.rs, as ts-build.scm)
+******************************************************************************/
+
+struct lex_adv_t { cset chars; int state; bool main; };
+
+struct lex_state_t {
+  int accept;              // symbol, or -1
+  int eof, eof_main;       // eof action: state or -1
+  std::vector<lex_adv_t> adv;
+};
+
+struct lex_builder_t {
+  lexer_t lx;
+  std::vector<lex_state_t> table;
+  std::map<std::pair<bool, ivec>, int> ids;
+  std::vector<std::pair<int, std::pair<ivec,bool> > > pending;
+  size_t pending_head;
+  lex_builder_t (grammar_t& g): lx (g), pending_head (0) {}
+
+  std::pair<int,bool> add_state (const ivec& nfa_states, bool eof_valid) {
+    ivec c= lx.closure (nfa_states);
+    std::pair<bool,ivec> key (eof_valid, c);
+    std::map<std::pair<bool,ivec>,int>::iterator it= ids.find (key);
+    if (it != ids.end ()) return std::make_pair (it->second, false);
+    int id= (int) table.size ();
+    lex_state_t s; s.accept= -1; s.eof= -1; s.eof_main= 0;
+    table.push_back (s);
+    ids[key]= id;
+    pending.push_back (std::make_pair (id, std::make_pair (c, eof_valid)));
+    return std::make_pair (id, true);
+  }
+
+  void populate (int id, const ivec& c, bool eof_valid) {
+    bool has_completion= false;
+    std::pair<int,int> completion (0, 0);   // (token . precedence)
+    std::vector<std::pair<int,int> > cs= lx.completions (c);
+    for (size_t k= 0; k < cs.size (); k++)
+      if (!(has_completion && lx.prefer_token (completion.second, completion.first,
+                                               cs[k].second, cs[k].first))) {
+        completion= cs[k]; has_completion= true; }
+    std::vector<transition_t> ts= lx.transitions (c);
+    bool has_sep= lx.any_separator (c);
+    if (eof_valid) {
+      int next= add_state (ivec (), false).first;
+      table[id].eof= next; table[id].eof_main= 1;
+    }
+    for (size_t k= 0; k < ts.size (); k++) {
+      const transition_t& t= ts[k];
+      if (has_completion && !lx.prefer_transition (t, completion.first, completion.second, has_sep))
+        continue;
+      int next= add_state (t.states, eof_valid && t.sep).first;
+      lex_adv_t a; a.chars= t.chars; a.state= next; a.main= !t.sep;
+      table[id].adv.push_back (a);
+    }
+    if (has_completion) table[id].accept= terminal (completion.first);
+    else if (c.empty ()) table[id].accept= SYM_END;
+  }
+
+  int add_state_for_tokens (const ivec& tokens) {
+    bool eof_valid= false;
+    ivec nfa_states;
+    for (size_t k= 0; k < tokens.size (); k++)
+      if (is_terminal (tokens[k])) nfa_states.push_back (lx.g.start_state[sym_index (tokens[k])]);
+      else eof_valid= true;
+    std::pair<int,bool> r= add_state (nfa_states, eof_valid);
+    while (pending_head < pending.size ()) {
+      std::pair<int, std::pair<ivec,bool> > e= pending[pending_head++];
+      populate (e.first, e.second.first, e.second.second);
+    }
+    return r.first;
+  }
+};
+
+static int
+opt_cmp_int (int x, int y) {
+  if (x < 0 && y < 0) return 0;
+  if (x < 0) return -1;
+  if (y < 0) return 1;
+  return cmp (x, y);
+}
+
+static bool
+lex_state_less (const lex_state_t& a, const lex_state_t& b) {
+  int c= opt_cmp_int (a.accept, b.accept);
+  if (c != 0) return c < 0;
+  if (a.eof < 0 && b.eof >= 0) return true;
+  if (a.eof >= 0 && b.eof < 0) return false;
+  if (a.eof >= 0) {
+    c= cmp (a.eof, b.eof);
+    if (c == 0) c= cmp (a.eof_main, b.eof_main);
+    if (c != 0) return c < 0;
+  }
+  for (size_t i= 0; i < a.adv.size () && i < b.adv.size (); i++) {
+    c= cs_compare (a.adv[i].chars, b.adv[i].chars);
+    if (c == 0) c= cmp (a.adv[i].state, b.adv[i].state);
+    if (c == 0) c= cmp (a.adv[i].main? 1: 0, b.adv[i].main? 1: 0);
+    if (c != 0) return c < 0;
+  }
+  return a.adv.size () < b.adv.size ();
+}
+
+static std::vector<lex_state_t>
+renumber_lex (const std::vector<lex_state_t>& table, const ivec& order, const ivec& new_of) {
+  std::vector<lex_state_t> r;
+  for (size_t k= 0; k < order.size (); k++) {
+    lex_state_t s= table[order[k]];
+    if (s.eof >= 0) s.eof= new_of[s.eof];
+    for (size_t j= 0; j < s.adv.size (); j++) s.adv[j].state= new_of[s.adv[j].state];
+    r.push_back (s);
+  }
+  return r;
+}
+
 /******************************************************************************
 * The stages after the construction
 ******************************************************************************/
@@ -1179,6 +1527,13 @@ struct tables_t {
   void remove_unit_reductions (std::vector<state_t*>& states);
   std::vector<state_t*> remove_unused (std::vector<state_t*> states);
   std::vector<state_t*> reorder (std::vector<state_t*> states);
+  // the lex tables
+  bool does_match_prefix (int i, int j) { return (status (i, j) & 1) != 0; }
+  bool does_overlap (int i, int j) {
+    return (status (i, j) & (DOES_MATCH_SEPARATORS | 1 | MATCHES_SAME_STRING | 2)) != 0; }
+  ivec lex_of;                  // the lex state of each parse state
+  std::vector<lex_state_t> main_table, keyword_table;
+  void build_lex_tables (std::vector<state_t*>& states);
 };
 
 void
@@ -1633,6 +1988,118 @@ tables_t::reorder (std::vector<state_t*> states) {
   return r;
 }
 
+
+void
+tables_t::build_lex_tables (std::vector<state_t*>& states) {
+  int word= g.word;
+  if (word >= 0) {
+    lex_builder_t lb (g);
+    lb.add_state_for_tokens (keywords);
+    keyword_table= lb.table;
+  }
+  std::vector<bool> is_keyword (n, false);
+  for (size_t k= 0; k < keywords.size (); k++) is_keyword[sym_index (keywords[k])]= true;
+  auto check_conflicts= [this] (int i, const ivec& set) -> bool {
+    for (size_t k= 0; k < set.size (); k++) {
+      if (!is_terminal (set[k])) continue;
+      int j= sym_index (set[k]);
+      if (does_conflict (i, j) || does_match_prefix (i, j) ||
+          ((does_overlap (i, j) || does_overlap (j, i)) && !coincident (i, j)))
+        return true;
+    }
+    return false;
+  };
+  std::vector<std::pair<ivec, ivec> > by_token_set;
+  for (size_t si= 0; si < states.size (); si++) {
+    state_t* s= states[si];
+    ivec tokens;
+    auto add= [&] (int t) {
+      if (is_terminal (t)) tokens= set_insert (is_keyword[sym_index (t)]? word: t, tokens);
+      else if (t == SYM_END) tokens= set_insert (t, tokens);
+    };
+    for (int k= 0; k < s->terms.size (); k++) add (s->terms.keys[k]);
+    for (size_t k= 0; k < s->reserved.size (); k++) add (s->reserved[k]);
+    bool merged= false;
+    for (size_t e= 0; e < by_token_set.size () && !merged; e++) {
+      const ivec& a= by_token_set[e].first;
+      bool bad= false;
+      for (size_t k= 0; k < a.size () && !bad; k++)
+        if (is_terminal (a[k]) && !set_contains (tokens, a[k]) &&
+            check_conflicts (sym_index (a[k]), tokens)) bad= true;
+      for (size_t k= 0; k < tokens.size () && !bad; k++)
+        if (is_terminal (tokens[k]) && !set_contains (a, tokens[k]) &&
+            check_conflicts (sym_index (tokens[k]), a)) bad= true;
+      if (!bad) {
+        by_token_set[e].first= set_union (a, tokens);
+        by_token_set[e].second.push_back ((int) si);
+        merged= true;
+      }
+    }
+    if (!merged) by_token_set.push_back (std::make_pair (tokens, ivec (1, (int) si)));
+  }
+  lex_of.assign (states.size (), 0);
+  lex_builder_t lb (g);
+  for (size_t e= 0; e < by_token_set.size (); e++) {
+    int id= lb.add_state_for_tokens (by_token_set[e].first);
+    for (size_t k= 0; k < by_token_set[e].second.size (); k++) lex_of[by_token_set[e].second[k]]= id;
+  }
+  // minimize
+  std::vector<lex_state_t>& table= lb.table;
+  int nt= (int) table.size ();
+  std::map<std::vector<ll>, int> sig_ids;
+  std::vector<ivec> groups0;
+  for (int i= 0; i < nt; i++) {
+    std::vector<ll> sig;
+    sig.push_back (i == 0); sig.push_back (table[i].accept); sig.push_back (table[i].eof >= 0);
+    for (size_t k= 0; k < table[i].adv.size (); k++) {
+      sig.push_back (-1);
+      for (size_t j= 0; j < table[i].adv[k].chars.size (); j++) {
+        sig.push_back (table[i].adv[k].chars[j].first); sig.push_back (table[i].adv[k].chars[j].second); }
+      sig.push_back (-2); sig.push_back (table[i].adv[k].main);
+    }
+    std::map<std::vector<ll>,int>::iterator it= sig_ids.find (sig);
+    if (it == sig_ids.end ()) { sig_ids[sig]= (int) groups0.size (); groups0.push_back (ivec (1, i)); }
+    else groups0[it->second].push_back (i);
+  }
+  std::stable_sort (groups0.begin (), groups0.end (),
+                    [] (const ivec& a, const ivec& b) {
+                      return std::lexicographical_compare (a.begin (), a.end (), b.begin (), b.end ()); });
+  std::vector<ivec> groups= groups0;
+  for (size_t x= 0; x < groups.size (); x++)
+    if (std::find (groups[x].begin (), groups[x].end (), 0) != groups[x].end ()) {
+      std::swap (groups[0], groups[x]); break; }
+  ivec group_of (nt, 0);
+  for (size_t k= 0; k < groups.size (); k++)
+    for (size_t x= 0; x < groups[k].size (); x++) group_of[groups[k][x]]= (int) k;
+  auto differ= [&] (int l, int r) -> bool {
+    const std::vector<lex_adv_t>& a= table[l].adv;
+    const std::vector<lex_adv_t>& b= table[r].adv;
+    for (size_t k= 0; k < a.size () && k < b.size (); k++)
+      if (group_of[a[k].state] != group_of[b[k].state]) return true;
+    return false;
+  };
+  while (split_groups (groups, group_of, 1, differ, NULL, NULL)) {}
+  std::vector<lex_state_t> mini;
+  for (size_t k= 0; k < groups.size (); k++) {
+    lex_state_t s= table[groups[k][0]];
+    if (s.eof >= 0) s.eof= group_of[s.eof];
+    for (size_t j= 0; j < s.adv.size (); j++) s.adv[j].state= group_of[s.adv[j].state];
+    mini.push_back (s);
+  }
+  for (size_t i= 0; i < lex_of.size (); i++) lex_of[i]= group_of[lex_of[i]];
+  // sort
+  int nm= (int) mini.size ();
+  ivec order;
+  for (int i= 1; i < nm; i++) order.push_back (i);
+  std::stable_sort (order.begin (), order.end (),
+                    [&mini] (int a, int b) { return lex_state_less (mini[a], mini[b]); });
+  order.insert (order.begin (), 0);
+  ivec new_of (nm, 0);
+  for (int k= 0; k < nm; k++) new_of[order[k]]= k;
+  main_table= renumber_lex (mini, order, new_of);
+  for (size_t i= 0; i < lex_of.size (); i++) lex_of[i]= new_of[lex_of[i]];
+}
+
 /******************************************************************************
 * Writing the results for the Scheme reader
 ******************************************************************************/
@@ -1669,6 +2136,30 @@ void
 write_syms (std::string& out, const ivec& l) {
   out += "(";
   for (size_t i= 0; i < l.size (); i++) w_int (out, l[i]);
+  out += ")";
+}
+
+void
+write_lex_table (std::string& out, const std::vector<lex_state_t>& table) {
+  out += "(";
+  for (size_t i= 0; i < table.size (); i++) {
+    const lex_state_t& s= table[i];
+    out += "(";
+    if (s.accept < 0) out += "#f "; else w_int (out, s.accept);
+    if (s.eof < 0) out += "#f ";
+    else { out += "("; out += std::to_string (s.eof); out += s.eof_main? " . #t) ": " . #f) "; }
+    out += "(";
+    for (size_t k= 0; k < s.adv.size (); k++) {
+      out += "((";
+      for (size_t j= 0; j < s.adv[k].chars.size (); j++) {
+        out += "("; out += std::to_string (s.adv[k].chars[j].first); out += " . ";
+        out += std::to_string (s.adv[k].chars[j].second); out += ")";
+      }
+      out += ") "; out += std::to_string (s.adv[k].state);
+      out += s.adv[k].main? " . #t)": " . #f)";
+    }
+    out += "))\n";
+  }
   out += ")";
 }
 
@@ -1738,6 +2229,7 @@ tree_sitter_tables_finish (int id, string data) {
     t->remove_unit_reductions (states);
     states= t->remove_unused (states);
     states= t->reorder (states);
+    t->build_lex_tables (states);
     t->b->states= states;
     grammar_t& g= t->g;
     out += "(ok (";
@@ -1762,7 +2254,9 @@ tree_sitter_tables_finish (int id, string data) {
         else out += "shift-extra";
         out += ")";
       }
-      out += "))\n";
+      out += ") ";
+      w_int (out, t->lex_of[si]);
+      out += ")\n";
     }
     out += ") ";
     write_syms (out, t->symbols);
@@ -1792,7 +2286,11 @@ tree_sitter_tables_finish (int id, string data) {
     w_int (out, t->b->max_aliased_length);
     out += "(";
     for (size_t k= 0; k < t->b->used_conflicts.size (); k++) write_syms (out, t->b->used_conflicts[k]);
-    out += "))";
+    out += ") ";
+    write_lex_table (out, t->main_table);
+    out += " ";
+    write_lex_table (out, t->keyword_table);
+    out += ")";
   }
   catch (ts_fail& f) {
     out= "(error ";
