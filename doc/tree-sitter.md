@@ -380,11 +380,14 @@ of the runtime: no generated C, no shared libraries, nothing to build.
 | `ts-language` | `render.rs` (the data of `parser.c`) | the runtime tables as plain data, saved and read back |
 | `ts-parse` | `parser.c`, `stack.c`, `subtree.c`, `lexer.c` | the GLR parser with error recovery, reuse of an edited tree (`ts_subtree_edit`), nodes and fields, `ts_node_string` |
 | `ts-scanner-python` | `scanner.c` of tree-sitter-python | the external scanner (indentation, strings) |
+| `ts-scan` | | what the scanners share: their vectors, the names of their tokens, their loops over characters |
 
 An external scanner is `#(create scan deserialize serialize)`: `scan` gets
 the lexer (`lexer-lookahead`, `lexer-advance!`, `lexer-mark-end!`,
 `lexer-set-result!`, `lexer-eof?`, `lexer-column`) and the vector of valid
-external tokens; the state is any Scheme value compared with `equal?`.
+external tokens; the state is any Scheme value compared with `equal?`
+(and not modified once serialized). `ts-scan.scm` makes these vectors and
+has the loops shared by the scanners (see phase 4).
 
 The text is a vector of code points; offsets count code points, which fits
 the decoding of TeXmacs strings planned in section 3.
@@ -425,7 +428,9 @@ same code defined at top level: a closure whose environment is not the
 rootlet is slow in the s7 of TeXmacs (a recursive list insertion: 170 ms
 in a module, 50 ms in the rootlet), while a standalone s7 built from the
 same `s7.c` shows a 20 % difference only. The cause is not found yet; it
-concerns all module code of TeXmacs, not only this one.
+concerns all module code of TeXmacs, not only this one. (Found later for
+the calls of public functions of other modules: see "Scanner speed" in
+phase 4.)
 
 ### Open
 
@@ -798,6 +803,41 @@ Done in part (2026-10-17):
   them; `highlights.py LANGUAGE GRAMMAR-DIR FILE...` compares the captures
   with those of `tree-sitter query`; `compare.c` compares a `.tsdyn` of
   the cache with the `parser.c` of `tree-sitter generate`.
+
+- **Scanner speed** (same day). Time to parse a file of about 100 KB
+  through the C runtime in TeXmacs, with three changes made in turn:
+
+  | language | before | public names | trampolines | `ts-scan.scm` |
+  |---|---|---|---|---|
+  | c (no scanner) | 8 ms | 5 ms | 5 ms | 5 ms |
+  | cpp | 20 ms | 15 ms | 15 ms | 15 ms |
+  | python | 365 ms | 118 ms | 64 ms | 42 ms |
+  | javascript (247 KB) | 597 ms | 181 ms | 86 ms | 71 ms |
+  | r | 698 ms | 256 ms | 101 ms | 95 ms |
+  | julia | 223 ms | 88 ms | 40 ms | 35 ms |
+
+  - **Public names.** Two thirds of the time went into looking up the
+    public lexer functions of `ts-parse.scm`. `define-public` bound a name
+    in its module and in the rootlet; s7 caches the let of the latest local
+    binding of a symbol, so a lookup from a module older than the defining
+    one scanned that module and the user module (about 250 slots) before
+    reaching the rootlet. `define-public` now removes the module's binding
+    (s7 patch 0006, `docs/s7/02-boot-and-modules.md`), which is likely a
+    good part of the 3x of module code (section 6), for all of TeXmacs.
+  - **Trampolines** (`tree_sitter_glue.cpp`). Each scan built the vector of
+    valid tokens with `(list->vector ...)` evaluated from a string, and
+    each deserialize read the state back with the Scheme reader. Now the
+    vectors are made once for each row of the table of the external
+    states, the texts of the serialized states are mapped back to their
+    values, and the procedures are looked up once.
+  - **`ts-scan.scm`**: `define-external-tokens` names the tokens (no
+    numbered constants), `record-scanner` makes a scanner whose state is a
+    vector of fields, `stateless-scanner` one without state, and the loops
+    over characters run in C on the lexer of the C runtime
+    (`scan-advance-until!`, `scan-advance-while!`, `scan-skip-spaces!`;
+    `scan-word!`, `scan-accept!`); the Python scanner leaves with
+    `call-with-exit` instead of `call/cc`. The five scanners use it; the
+    corpora pass, and the trees of the benchmark files are unchanged.
 
 As planned initially:
 

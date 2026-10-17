@@ -14,27 +14,16 @@
 ;; an expression except inside parentheses and brackets (so the scanner
 ;; keeps the stack of the open brackets), the else after newlines in braces,
 ;; and the raw strings r"-(...)-". The protocol of the scanners is described
-;; in ts-scanner-python.scm.
+;; in ts-scan.scm.
 
 (texmacs-module (treesit ts-scanner-r)
-  (:use (treesit ts-base) (treesit ts-parse) (treesit ts-chars)))
+  (:use (treesit ts-base) (treesit ts-parse) (treesit ts-chars)
+        (treesit ts-scan)))
 
-(define t-start 0)
-(define t-newline 1)
-(define t-semicolon 2)
-(define t-raw-string-open 3)
-(define t-raw-string-content 4)
-(define t-raw-string-close 5)
-(define t-else 6)
-(define t-open-paren 7)
-(define t-close-paren 8)
-(define t-open-brace 9)
-(define t-close-brace 10)
-(define t-open-bracket 11)
-(define t-close-bracket 12)
-(define t-open-bracket2 13)
-(define t-close-bracket2 14)
-(define t-error-sentinel 15)
+(define-external-tokens start newline semicolon raw-string-open
+  raw-string-content raw-string-close else open-paren close-paren open-brace
+  close-brace open-bracket close-bracket open-bracket2 close-bracket2
+  error-sentinel)
 
 (define scope-top-level 0)
 (define scope-brace 1)
@@ -89,12 +78,9 @@
   (or (ts-walnum? c) (= c (r-char #\_)) (= c (r-char #\.)) (>= c 128)))
 
 (define (scan-else lx)
-  (let loop ((l (string->list "else")))
-    (cond ((pair? l)
-           (and (= (lexer-lookahead lx) (r-char (car l)))
-                (begin (lexer-advance! lx #f) (loop (cdr l)))))
-          ((identifier-continuation? (lexer-lookahead lx)) #f)
-          (else (lexer-mark-end! lx) (lexer-set-result! lx t-else) #t))))
+  (and (scan-word! lx "else")
+       (not (identifier-continuation? (lexer-lookahead lx)))
+       (scan-accept! lx t-else)))
 
 (define (scan-else-with-leading-newlines lx)
   (let loop ()
@@ -136,12 +122,16 @@
 
 (define (scan-raw-string-content-or-close p lx)
   (define (la) (lexer-lookahead lx))
-  (let ((closing (vector-ref p 1))
-        (hyphens (vector-ref p 2))
-        (q (vector-ref p 3)))
+  (let* ((closing (vector-ref p 1))
+         (hyphens (vector-ref p 2))
+         (q (vector-ref p 3))
+         (stop (string (integer->char closing))))
     (let loop ((any-content #f))
       (cond ((lexer-eof? lx) #f)
-            ((not (= (la) closing)) (lexer-advance! lx #f) (loop #t))
+            ((not (= (la) closing))
+             (when (= (scan-advance-until! lx stop #f) 0)  ; a null character
+               (lexer-advance! lx #f))
+             (loop #t))
             (else
              (lexer-mark-end! lx)
              (lexer-advance! lx #f)
@@ -170,9 +160,7 @@
 (define (scan-token lx t)
   ;; one character
   (lexer-advance! lx #f)
-  (lexer-mark-end! lx)
-  (lexer-set-result! lx t)
-  #t)
+  (scan-accept! lx t))
 
 (define (scan-open-block p lx scope t)
   (and (scopes-push! p scope) (scan-token lx t)))
@@ -204,12 +192,10 @@
         ((valid? t-raw-string-close) (scan-raw-string-close p lx))
         (else
          ;; the whitespace, and the newlines inside parentheses and brackets
-         (let loop ()
-           (when (and (ts-wspace? (la))
-                      (or (not (la? #\newline))
-                          (memv (scopes-peek p) (list scope-paren scope-bracket scope-bracket2))))
-             (lexer-advance! lx #t)
-             (loop)))
+         (scan-skip-spaces! lx #t (and (memv (scopes-peek p)
+                                             (list scope-paren scope-bracket
+                                                   scope-bracket2))
+                                       #t))
          (cond ((and (valid? t-semicolon) (la? #\;)) (scan-token lx t-semicolon))
                ((and (valid? t-open-paren) (la? #\())
                 (scan-open-block p lx scope-paren t-open-paren))

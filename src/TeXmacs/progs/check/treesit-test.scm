@@ -28,7 +28,8 @@
         (treesit ts-base) (treesit ts-grammar) (treesit ts-nfa)
         (treesit ts-tables) (treesit ts-build) (treesit ts-language)
         (treesit ts-parse) (treesit ts-export) (treesit ts-registry)
-        (treesit ts-highlight) (treesit ts-scanner-cpp) (treesit ts-native)))
+        (treesit ts-highlight) (treesit ts-scanner-cpp) (treesit ts-native)
+        (treesit ts-scan)))
 
 (define (json-grammar-file)
   (url->system (url-concretize "$TEXMACS_PATH/misc/tree-sitter/json/grammar.json")))
@@ -488,6 +489,46 @@
   ;; the raw strings of tree-sitter-cpp, with its external tokens
   "{\"name\": \"raw\", \"extras\": [{\"type\": \"PATTERN\", \"value\": \"\\\\s\"}], \"externals\": [{\"type\": \"SYMBOL\", \"name\": \"raw_string_delimiter\"}, {\"type\": \"SYMBOL\", \"name\": \"raw_string_content\"}], \"rules\": {\"program\": {\"type\": \"REPEAT\", \"content\": {\"type\": \"SYMBOL\", \"name\": \"raw_string_literal\"}}, \"raw_string_literal\": {\"type\": \"SEQ\", \"members\": [{\"type\": \"CHOICE\", \"members\": [{\"type\": \"STRING\", \"value\": \"R\\\"\"}, {\"type\": \"STRING\", \"value\": \"LR\\\"\"}]}, {\"type\": \"CHOICE\", \"members\": [{\"type\": \"SEQ\", \"members\": [{\"type\": \"FIELD\", \"name\": \"delimiter\", \"content\": {\"type\": \"SYMBOL\", \"name\": \"raw_string_delimiter\"}}, {\"type\": \"STRING\", \"value\": \"(\"}, {\"type\": \"SYMBOL\", \"name\": \"raw_string_content\"}, {\"type\": \"STRING\", \"value\": \")\"}, {\"type\": \"SYMBOL\", \"name\": \"raw_string_delimiter\"}]}, {\"type\": \"SEQ\", \"members\": [{\"type\": \"STRING\", \"value\": \"(\"}, {\"type\": \"SYMBOL\", \"name\": \"raw_string_content\"}, {\"type\": \"STRING\", \"value\": \")\"}]}]}, {\"type\": \"STRING\", \"value\": \"\\\"\"}]}}}")
 
+(define (scan-lexer s)
+  ;; a lexer of ts-parse.scm on the text s
+  (let ((text (list->vector (map char->integer (string->list s)))))
+    (vector text (vector-length text) 0 0 0 0 -1 0 0)))
+
+(define-external-tokens first-token second-token)
+
+(define (test-scan)
+  ;; the helpers of ts-scan.scm, on the lexer in Scheme
+  (let ((lx (scan-lexer "abcx")))
+    (check= (scan-advance-until! lx "xy" #f) 3)
+    (check-true (scan-char? lx #\x))
+    (check= (scan-advance-until! lx "q" #f) 1)
+    (check= (scan-advance-until! lx "q" #f) 0))
+  (let ((lx (scan-lexer "abac")))
+    (check= (scan-advance-while! lx "ab" #f) 3)
+    (check= (lexer-lookahead lx) (char->integer #\c)))
+  (let ((lx (scan-lexer (string #\space #\tab #\newline #\x))))
+    (check= (scan-skip-spaces! lx #t #f) 2)
+    (check= (scan-skip-spaces! lx #t #t) 1))
+  (let ((lx (scan-lexer "elsewhere")))
+    (check-true (scan-word! lx "else"))
+    (check= (lexer-position lx) 4)
+    (check-false (scan-word! lx "wx")))
+  (let ((lx (scan-lexer "x")))
+    (check-true (scan-accept! lx 3))
+    (check= (vector-ref lx 8) 3))
+  (check= (list t-first-token t-second-token) '(0 1))
+  ;; the state of a record scanner: #f for the initial one
+  (let* ((sc (record-scanner (vector '(0) #f) (lambda (p lx valid) #f)))
+         (p ((vector-ref sc 0))))
+    (check= ((vector-ref sc 3) p) #f)
+    (vector-set! p 0 '(4 0))
+    (let ((state ((vector-ref sc 3) p)))
+      (check= state '((4 0) #f))
+      ((vector-ref sc 2) p #f)
+      (check= (vector-ref p 0) '(0))
+      ((vector-ref sc 2) p state)
+      (check= (vector-ref p 0) '(4 0)))))
+
 (define (test-scanners)
   (when (defined? 'tree-sitter-set-scanner)
     ;; the scanner of C++ (in Scheme) called by the C runtime; the state
@@ -593,6 +634,7 @@
   (test-registry)
   (test-regions)
   (test-highlight)
+  (test-scan)
   (test-scanners)
   (test-native)
   (check-end))

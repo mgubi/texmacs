@@ -12,37 +12,15 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;; A port of src/scanner.c of tree-sitter-python (MIT): newlines,
-;; indentation and the delimiters of strings.
-;;
-;; An external scanner, for ts-parse.scm, is a vector of four procedures
-;;
-;;   #(create scan deserialize serialize)
-;;
-;; create gives the payload, (scan payload lexer valid) tells whether a token
-;; was found (valid is the vector of the external tokens which the parser
-;; accepts, by their index in the externals of the grammar) and sets the
-;; result with lexer-set-result!, (serialize payload) is the state as a value
-;; which equal? compares and (deserialize payload state) restores it, #f
-;; being the initial state.
-;;
-;; (The escape is not called return: under femtolisp, return is a special
-;; form, which returns from the innermost function.)
+;; indentation and the delimiters of strings. The protocol of the scanners
+;; is described in ts-scan.scm.
 
 (texmacs-module (treesit ts-scanner-python)
-  (:use (treesit ts-base) (treesit ts-parse)))
+  (:use (treesit ts-base) (treesit ts-parse) (treesit ts-scan)))
 
-(define t-newline 0)
-(define t-indent 1)
-(define t-dedent 2)
-(define t-string-start 3)
-(define t-string-content 4)
-(define t-escape-interpolation 5)
-(define t-string-end 6)
-(define t-comment 7)
-(define t-close-paren 8)
-(define t-close-bracket 9)
-(define t-close-brace 10)
-(define t-except 11)
+(define-external-tokens newline indent dedent string-start string-content
+  escape-interpolation string-end comment close-paren close-bracket
+  close-brace except)
 
 (define d-single 1)
 (define d-double 2)
@@ -65,19 +43,9 @@
 (define (indents s) (vector-ref s 0))
 (define (delimiters s) (vector-ref s 1))
 
-(define (python-create) (vector (list 0) '() #f))
-
-(define (python-serialize s)
-  (list (vector-ref s 2) (delimiters s) (indents s)))
-
-(define (python-deserialize s state)
-  (if state
-      (begin (vector-set! s 2 (car state))
-             (vector-set! s 1 (cadr state))
-             (vector-set! s 0 (caddr state)))
-      (begin (vector-set! s 0 (list 0))
-             (vector-set! s 1 '())
-             (vector-set! s 2 #f))))
+;; the characters which end a run of plain characters in strings
+(define (content-stops d)
+  (string-append "\\\n{}" (string (integer->char (end-character d)))))
 
 (define (python-scan s lx valid)
   (define (valid? i) (vector-ref valid i))
@@ -92,7 +60,7 @@
          (within-brackets (or (valid? t-close-brace) (valid? t-close-paren)
                               (valid? t-close-bracket)))
          (advanced-once #f))
-    (call-with-current-continuation
+    (call-with-exit
      (lambda (exit-with)
        ;; {{ and }} in f-strings
        (when (and (valid? t-escape-interpolation) (pair? (delimiters s))
@@ -110,6 +78,7 @@
        (when (and (valid? t-string-content) (pair? (delimiters s)) (not error-recovery))
          (let* ((d (car (delimiters s)))
                 (end-char (end-character d))
+                (stops (content-stops d))
                 (has-content advanced-once))
            (let loop ()
              (unless (= (la) 0)
@@ -157,7 +126,11 @@
                        (exit-with #t))))
                 ((and (la? #\newline) has-content (not (delim? d d-triple)))
                  (exit-with #f))
-                (else (advance!) (set! has-content #t) (loop)))))))
+                (else
+                 (advance!)
+                 (scan-advance-until! lx stops #f)
+                 (set! has-content #t)
+                 (loop)))))))
        ;; newlines and indentation
        (mark!)
        (let ((found-eol #f)
@@ -165,14 +138,16 @@
              (first-comment-indent -1))
          (let loop ()
            (cond ((la? #\newline) (set! found-eol #t) (set! indent 0) (skip!) (loop))
-                 ((la? #\space) (set! indent (+ indent 1)) (skip!) (loop))
+                 ((la? #\space)
+                  (set! indent (+ indent (scan-advance-while! lx " " #t)))
+                  (loop))
                  ((or (la? #\return) (= (la) 12)) (set! indent 0) (skip!) (loop))
                  ((la? #\tab) (set! indent (+ indent 8)) (skip!) (loop))
                  ((and (la? #\#) (or (valid? t-indent) (valid? t-dedent) (valid? t-newline)
                                      (valid? t-except)))
                   (unless found-eol (exit-with #f))
                   (when (= first-comment-indent -1) (set! first-comment-indent indent))
-                  (let comment () (unless (or (= (la) 0) (la? #\newline)) (skip!) (comment)))
+                  (scan-advance-until! lx "\n" #t)
                   (skip!)
                   (set! indent 0)
                   (loop))
@@ -211,13 +186,14 @@
              (let loop ()
                (unless (= (la) 0)
                  (let ((c (la)))
-                   (cond ((memv c (map char->integer '(#\f #\F #\t #\T)))
+                   ;; fFtT, rR, bB, uU
+                   (cond ((memv c '(102 70 116 84))
                           (set! d (logior d d-format)) (set! has-flags #t) (advance!) (loop))
-                         ((memv c (map char->integer '(#\r #\R)))
+                         ((memv c '(114 82))
                           (set! d (logior d d-raw)) (set! has-flags #t) (advance!) (loop))
-                         ((memv c (map char->integer '(#\b #\B)))
+                         ((memv c '(98 66))
                           (set! d (logior d d-bytes)) (set! has-flags #t) (advance!) (loop))
-                         ((memv c (map char->integer '(#\u #\U)))
+                         ((memv c '(117 85))
                           (set! has-flags #t) (advance!) (loop))))))
              (cond ((la? #\`)
                     (set! d (logior d d-back)) (advance!) (mark!))
@@ -240,4 +216,4 @@
          #f)))))
 
 (define-public (ts-python-scanner)
-  (vector python-create python-scan python-deserialize python-serialize))
+  (record-scanner (vector (list 0) '() #f) python-scan))

@@ -14,34 +14,24 @@
 ;; nested block comments #= =#, the brackets and quotes which follow a
 ;; token immediately, and the content of strings and commands (one or three
 ;; delimiters, with or without interpolations). The scanner has no state.
-;; The protocol of the scanners is described in ts-scanner-python.scm.
+;; The protocol of the scanners is described in ts-scan.scm.
 
 (texmacs-module (treesit ts-scanner-julia)
-  (:use (treesit ts-base) (treesit ts-parse)))
+  (:use (treesit ts-base) (treesit ts-parse) (treesit ts-scan)))
 
-(define t-block-comment-rest 0)
-(define t-immediate-paren 1)
-(define t-immediate-bracket 2)
-(define t-immediate-brace 3)
-(define t-immediate-string-start 4)
-(define t-immediate-command-start 5)
-(define t-content-cmd-1 6)
-(define t-content-cmd-1-raw 7)
-(define t-content-cmd-3 8)
-(define t-content-cmd-3-raw 9)
-(define t-content-str-1 10)
-(define t-content-str-1-raw 11)
-(define t-content-str-3 12)
-(define t-content-str-3-raw 13)
-(define t-end-cmd 14)
-(define t-end-str 15)
+(define-external-tokens block-comment-rest immediate-paren immediate-bracket
+  immediate-brace immediate-string-start immediate-command-start
+  content-cmd-1 content-cmd-1-raw content-cmd-3 content-cmd-3-raw
+  content-str-1 content-str-1-raw content-str-3 content-str-3-raw
+  end-cmd end-str)
 
 (define (jl-char c) (char->integer c))
 
 (define (scan-content lx content end-char n-delim interp?)
   (define (la) (lexer-lookahead lx))
   (define (advance!) (lexer-advance! lx #f))
-  (let ((end (if (= end-char (jl-char #\")) t-end-str t-end-cmd)))
+  (let ((end (if (= end-char (jl-char #\")) t-end-str t-end-cmd))
+        (stops (string #\$ #\\ (integer->char end-char))))
     (let loop ((has-content #f))
       (let ((next (la)))
         (if (= next 0) #f
@@ -64,7 +54,11 @@
                          (lexer-set-result! lx content)
                          (begin (lexer-mark-end! lx) (lexer-set-result! lx end)))
                      #t)
-                    (else (advance!) (loop #t)))))))))
+                    (else
+                     ;; and over the characters which would come here too
+                     (advance!)
+                     (scan-advance-until! lx stops #f)
+                     (loop #t)))))))))
 
 (define (scan-block-comment lx)
   ;; the first #= is read by the lexer of tree-sitter
@@ -82,7 +76,7 @@
                    ((= (la) (jl-char #\=)) (advance!) (loop #f (+ depth 1)))
                    (else (loop #f depth))))
             ((= c 0) #f)
-            (else (advance!) (loop #f depth))))))
+            (else (scan-advance-until! lx "=#" #f) (loop #f depth))))))
 
 (define (julia-scan p lx valid)
   (define (valid? i) (vector-ref valid i))
@@ -109,7 +103,4 @@
                     (scan-content lx t-content-cmd-3-raw bq 3 #f)))))))
 
 (define-public (ts-julia-scanner)
-  (vector (lambda () #f)
-          julia-scan
-          (lambda (p state) #t)
-          (lambda (p) #f)))
+  (stateless-scanner julia-scan))

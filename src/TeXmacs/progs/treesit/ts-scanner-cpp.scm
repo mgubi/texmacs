@@ -13,13 +13,13 @@
 
 ;; A port of src/scanner.c of tree-sitter-cpp (MIT): the delimiter and the
 ;; content of the raw strings R"delimiter(content)delimiter". The protocol
-;; of the scanners is described in ts-scanner-python.scm.
+;; of the scanners is described in ts-scan.scm.
 
 (texmacs-module (treesit ts-scanner-cpp)
-  (:use (treesit ts-base) (treesit ts-parse) (treesit ts-chars)))
+  (:use (treesit ts-base) (treesit ts-parse) (treesit ts-chars)
+        (treesit ts-scan)))
 
-(define t-raw-string-delimiter 0)
-(define t-raw-string-content 1)
+(define-external-tokens raw-string-delimiter raw-string-content)
 
 (define max-delimiter-length 16)
 
@@ -46,23 +46,24 @@
                   (else (lexer-advance! lx #f) (loop (cons c acc) (+ n 1)))))))))
 
 (define (scan-content p lx)
-  (let* ((d (list->vector (vector-ref p 0)))
-         (n (vector-length d)))
-    ;; i: the progress through the delimiter since the last ), or -1
-    (let loop ((i -1))
-      (if (lexer-eof? lx)
-          (begin (lexer-mark-end! lx) #t)
-          (let* ((c (lexer-lookahead lx))
-                 (i (cond ((< i 0) i)
-                          ((= i n) (if (= c 34) 'done -1))
-                          ((= c (vector-ref d i)) (+ i 1))
-                          (else -1))))
-            (if (eq? i 'done) #t
-                (let ((i (if (and (= i -1) (= c 41))
-                             (begin (lexer-mark-end! lx) 0)
-                             i)))
-                  (lexer-advance! lx #f)
-                  (loop i))))))))
+  ;; up to the ) of )delimiter"
+  (let ((d (vector-ref p 0)))
+    (let loop ()
+      (scan-advance-until! lx ")" #f)
+      (cond ((lexer-eof? lx) (lexer-mark-end! lx) #t)
+            ((not (= (lexer-lookahead lx) 41))  ; a null character
+             (lexer-advance! lx #f)
+             (loop))
+            (else
+             (lexer-mark-end! lx)
+             (lexer-advance! lx #f)
+             (let delimiter ((l d))
+               (cond ((pair? l)
+                      (if (= (lexer-lookahead lx) (car l))
+                          (begin (lexer-advance! lx #f) (delimiter (cdr l)))
+                          (loop)))
+                     ((= (lexer-lookahead lx) 34) #t)
+                     (else (loop)))))))))
 
 (define (cpp-scan p lx valid)
   (let ((delim? (vector-ref valid t-raw-string-delimiter))
@@ -77,7 +78,4 @@
           (else #f))))
 
 (define-public (ts-cpp-scanner)
-  (vector (lambda () (vector '()))
-          cpp-scan
-          (lambda (p state) (vector-set! p 0 (or state '())))
-          (lambda (p) (let ((d (vector-ref p 0))) (and (pair? d) d)))))
+  (record-scanner (vector '()) cpp-scan))

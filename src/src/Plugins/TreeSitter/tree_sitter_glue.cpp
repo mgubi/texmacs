@@ -438,3 +438,59 @@ bool
 tree_sitter_lexer_eof () {
   return current_lexer == NULL || current_lexer->eof (current_lexer);
 }
+
+/* The loops over characters of the scanners (progs/treesit/ts-scan.scm):
+   each advances over characters while they are in (or not in) a set, and
+   gives their number. The sets are ASCII characters; the end of the text
+   (lookahead 0) stops them. */
+
+static int
+lexer_advance_over (string chars, bool in, bool skip) {
+  if (current_lexer == NULL) return 0;
+  bool set[128];
+  for (int i= 0; i < 128; i++) set[i]= false;
+  for (int i= 0; i < N(chars); i++)
+    if (((unsigned char) chars[i]) < 128) set[(int) chars[i]]= true;
+  int n= 0;
+  while (true) {
+    int32_t c= current_lexer->lookahead;
+    if (c == 0 || current_lexer->eof (current_lexer)) break;
+    if ((c < 128 && set[c]) != in) break;
+    current_lexer->advance (current_lexer, skip);
+    n++;
+  }
+  return n;
+}
+
+int
+tree_sitter_lexer_advance_while (string chars, bool skip) {
+  return lexer_advance_over (chars, true, skip);
+}
+
+int
+tree_sitter_lexer_advance_until (string chars, bool skip) {
+  return lexer_advance_over (chars, false, skip);
+}
+
+static bool
+lexer_space (int32_t c) {
+  // as ts-wspace? in progs/treesit/ts-chars.scm
+  return c == 32 || (c >= 9 && c <= 13) || c == 0x85 || c == 0xa0 ||
+         c == 0x1680 || (c >= 0x2000 && c <= 0x200a) || c == 0x2028 ||
+         c == 0x2029 || c == 0x202f || c == 0x205f || c == 0x3000;
+}
+
+int
+tree_sitter_lexer_skip_spaces (bool skip, bool newlines) {
+  // advances over white space, and over newlines if newlines
+  if (current_lexer == NULL) return 0;
+  int n= 0;
+  while (true) {
+    int32_t c= current_lexer->lookahead;
+    if (!lexer_space (c) || (c == 10 && !newlines)) break;
+    if (current_lexer->eof (current_lexer)) break;
+    current_lexer->advance (current_lexer, skip);
+    n++;
+  }
+  return n;
+}

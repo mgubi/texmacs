@@ -13,19 +13,14 @@
 ;; A port of src/scanner.c of tree-sitter-javascript (MIT): the automatic
 ;; semicolons, the characters of template strings, the ? of the conditional
 ;; expressions, the HTML comments and the text of JSX. The scanner has no
-;; state. The protocol of the scanners is described in ts-scanner-python.scm.
+;; state. The protocol of the scanners is described in ts-scan.scm.
 
 (texmacs-module (treesit ts-scanner-javascript)
-  (:use (treesit ts-base) (treesit ts-parse) (treesit ts-chars)))
+  (:use (treesit ts-base) (treesit ts-parse) (treesit ts-chars)
+        (treesit ts-scan)))
 
-(define t-automatic-semicolon 0)
-(define t-template-chars 1)
-(define t-ternary-qmark 2)
-(define t-html-comment 3)
-(define t-logical-or 4)
-(define t-escape-sequence 5)
-(define t-regex-pattern 6)
-(define t-jsx-text 7)
+(define-external-tokens automatic-semicolon template-chars ternary-qmark
+  html-comment logical-or escape-sequence regex-pattern jsx-text)
 
 (define (js-newline? c) (or (= c 10) (= c #x2028) (= c #x2029)))
 (define (js-char c) (char->integer c))
@@ -41,7 +36,7 @@
              (lexer-advance! lx #f)
              (if (= (lexer-lookahead lx) (js-char #\{)) has-content (loop #t)))
             ((= c (js-char #\\)) has-content)
-            (else (lexer-advance! lx #f) (loop #t))))))
+            (else (scan-advance-until! lx "`$\\" #f) (loop #t))))))
 
 ;; the results of scan-whitespace-and-comments
 (define ws-reject 0)
@@ -53,7 +48,7 @@
   (define (la) (lexer-lookahead lx))
   (define (skip!) (lexer-advance! lx #t))
   (let loop ((saw-block-newline #f))
-    (let spaces () (when (ts-wspace? (la)) (skip!) (spaces)))
+    (scan-skip-spaces! lx #t #t)
     (if (not (= (la) (js-char #\/))) ws-accept
         (begin
           (skip!)
@@ -129,7 +124,7 @@
 
 (define (scan-ternary-qmark lx)
   (define (la) (lexer-lookahead lx))
-  (let spaces () (when (ts-wspace? (la)) (lexer-advance! lx #t) (spaces)))
+  (scan-skip-spaces! lx #t #t)
   (and (= (la) (js-char #\?))
        (begin
          (lexer-advance! lx #f)
@@ -143,15 +138,9 @@
 
 (define (scan-html-comment lx)
   (define (la) (lexer-lookahead lx))
-  (define (expect s)
-    ;; advance over the characters of s, #f if one is missing
-    (let loop ((l (string->list s)))
-      (cond ((null? l) #t)
-            ((not (= (la) (js-char (car l)))) #f)
-            (else (lexer-advance! lx #f) (loop (cdr l))))))
-  (let spaces () (when (ts-wspace? (la)) (lexer-advance! lx #t) (spaces)))
-  (and (cond ((= (la) (js-char #\<)) (expect "<!--"))
-             ((= (la) (js-char #\-)) (expect "-->"))
+  (scan-skip-spaces! lx #t #t)
+  (and (cond ((= (la) (js-char #\<)) (scan-word! lx "<!--"))
+             ((= (la) (js-char #\-)) (scan-word! lx "-->"))
              (else #f))
        (begin
          (let line ()
@@ -192,7 +181,4 @@
         (else #f)))
 
 (define-public (ts-javascript-scanner)
-  (vector (lambda () #f)
-          javascript-scan
-          (lambda (p state) #t)
-          (lambda (p) #f)))
+  (stateless-scanner javascript-scan))
