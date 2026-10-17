@@ -616,11 +616,15 @@
   ;; hangs does not stop the conversion. The launcher soffice starts
   ;; soffice.bin as a child (oosplash under Linux), so the whole process
   ;; group is stopped: GNU timeout (the program timeout, if not #f) does
-  ;; so; otherwise LibreOffice is started in a process group of its own
+  ;; so, in the group of its own which it makes; that group is also
+  ;; killed when the launcher ended in time and left a child behind.
+  ;; Otherwise LibreOffice is started in a process group of its own
   ;; (group: "setsid", or "perl" for its setpgrp), which is killed (kill -9
-  ;; -- -pgid) after the time, and also when the launcher ended and left a
-  ;; child behind; without either, only the launcher can be stopped. The
-  ;; watcher is stopped with its sleep when LibreOffice ends in time.
+  ;; -pgid, without --, which the kill of dash rejects) after the time, and
+  ;; also when the launcher ended and left a child behind; without either,
+  ;; only the launcher can be stopped. The watcher is stopped with its
+  ;; sleep when LibreOffice ends in time. If no group of its own was made,
+  ;; -pgid names no group (the pid of a process which is not a leader).
   ;; Under Windows, eval-system waits at most 30 seconds for the command,
   ;; and does not stop it (windows64_system.cpp): LibreOffice may still
   ;; run after it.
@@ -631,17 +635,18 @@
          (launch (cond ((== group "setsid") "setsid ")
                        ((== group "perl") "perl -e 'setpgrp(0,0); exec @ARGV' ")
                        (else "")))
-         (target (if group "-- -$p" "$p")))
+         (target (if group "-$p" "$p")))
     (cond ((os-win32?) cmd)
           (timeout
            (string-append (office-quote timeout) " -s KILL " secs " " cmd
-                          " < /dev/null > /dev/null 2>&1; true"))
+                          " < /dev/null > /dev/null 2>&1 & p=$!; wait $p 2> /dev/null; "
+                          "kill -9 -$p > /dev/null 2>&1; true"))
           (else
            (string-append launch cmd " < /dev/null > /dev/null 2>&1 & p=$!; "
                           "( trap 'kill $s; exit' TERM; sleep " secs " & s=$!; wait $s; "
                           "kill -9 " target " ) > /dev/null 2>&1 < /dev/null & w=$!; "
-                          "wait $p; "
-                          (if group "kill -9 -- -$p > /dev/null 2>&1; " "")
+                          "wait $p 2> /dev/null; "
+                          (if group "kill -9 -$p > /dev/null 2>&1; " "")
                           "kill $w > /dev/null 2>&1; true")))))
 
 (define (office-soffice-run prog args)

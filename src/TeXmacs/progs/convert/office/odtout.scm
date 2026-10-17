@@ -1831,7 +1831,25 @@
              ;; (the even pages without a header, rather than with the one
              ;; of the odd pages)
              (set! ot-headers (cons (cons tag `(,tag (@ (style:display "false")))) ot-headers)))
+            ((== (ox-attr x 'kind) "first")
+             ;; (an empty header of the first page, rather than the one of
+             ;; the odd pages there)
+             (set! ot-headers (cons (cons tag `(,tag (text:p))) ot-headers)))
             (else (set! ot-headers (cons (cons tag #f) ot-headers)))))))
+
+(define (ot-with-main-headers l)
+  ;; the headers and footers l of a page, with an empty header (footer)
+  ;; when there is a header (footer) of the even or of the first page but
+  ;; none of the odd pages: LibreOffice shows the others only with it
+  (append l
+          (append-map
+            (lambda (g)
+              (if (and (not (list-find l (lambda (y) (func? y (car g)))))
+                       (list-find l (lambda (y) (and (pair? y) (in? (car y) (cdr g))))))
+                  (list `(,(car g) (text:p)))
+                  '()))
+            '((style:header style:header-left style:header-first)
+              (style:footer style:footer-left style:footer-first)))))
 
 (define (ot-master-with-headers m)
   ;; the first page m of the file, with the new headers
@@ -1841,7 +1859,7 @@
              (theirs (list-filter (ox-children m)
                                   (lambda (y) (not (and (pair? y) (in? (car y) tags))))))
              (mine (list-filter (map cdr ot-headers) identity))
-             (all (append (list-filter theirs pair?) mine)))
+             (all (ot-with-main-headers (append (list-filter theirs pair?) mine))))
         `(style:master-page (@ ,@(ox-attrs m))
                             ,@(sort all (lambda (a b) (< (rank a) (rank b))))))))
 

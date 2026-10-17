@@ -125,7 +125,12 @@
     <item*|Headers and footers>They are the headers and footers of the
     pages of the document, with the number of the page; those of the
     first page are at the start of the text (a paragraph may be put
-    before them). A header or a footer which was changed in <TeXmacs> is
+    before them). A header or a footer of the first page is removed by
+    emptying it: when its marker is deleted, the one of the file is
+    written back. In a document without a header of the first page in its
+    file (or made in <TeXmacs>), only a marker at the very start of the
+    text is the one of the first page; one further on is for a later
+    page, and is not written. A header or a footer which was changed in <TeXmacs> is
     written instead of the one of the file, as one paragraph, centered or
     on the right when it starts with a tab (and ends with one); one which
     was removed is not written. The others are those of the file, as they

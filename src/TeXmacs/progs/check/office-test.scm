@@ -5038,50 +5038,260 @@
     (check-true (text-before? (substring text i (string-length text))
                               "<w:headerReference" "</w:sectPr>"))))
 
+(define (audit7-docx n)
+  ;; a Word document of n paragraphs with a header of the odd pages only
+  (zip-pack
+    '("[Content_Types].xml" "_rels/.rels" "word/document.xml"
+      "word/_rels/document.xml.rels" "word/header1.xml")
+    (list "<Types/>"
+          (string-append
+            "<Relationships xmlns='http://schemas.openxmlformats.org/package/2006/relationships'>"
+            "<Relationship Id='rId1' Type='" audit5-rel "officeDocument' Target='word/document.xml'/>"
+            "</Relationships>")
+          (string-append "<?xml version='1.0'?><w:document" docx-ns "><w:body>"
+                         (apply string-append
+                                (map (lambda (i) (wp (wr (string-append "Paragraph "
+                                                                        (number->string i)))))
+                                     (.. 0 n)))
+                         "<w:sectPr><w:headerReference w:type='default' r:id='rH1'/>"
+                         "<w:pgSz w:w='11906' w:h='16838'/></w:sectPr>"
+                         "</w:body></w:document>")
+          (string-append
+            "<Relationships xmlns='http://schemas.openxmlformats.org/package/2006/relationships'>"
+            "<Relationship Id='rH1' Type='" audit5-rel "header' Target='header1.xml'/>"
+            "</Relationships>")
+          (string-append "<w:hdr" docx-ns ">" (wp (wr "Odd head")) "</w:hdr>"))))
+
+(define (audit7-docx-sections)
+  ;; a Word document of two sections, whose headers are named by the first
+  ;; one only (the second one has them from it), with a first page of its
+  ;; own
+  (zip-pack
+    '("[Content_Types].xml" "_rels/.rels" "word/document.xml"
+      "word/_rels/document.xml.rels" "word/header1.xml" "word/header2.xml" "word/footer1.xml")
+    (list "<Types/>"
+          (string-append
+            "<Relationships xmlns='http://schemas.openxmlformats.org/package/2006/relationships'>"
+            "<Relationship Id='rId1' Type='" audit5-rel "officeDocument' Target='word/document.xml'/>"
+            "</Relationships>")
+          (string-append "<?xml version='1.0'?><w:document" docx-ns "><w:body>"
+                         "<w:p><w:pPr><w:sectPr><w:headerReference w:type='default' r:id='rH1'/>"
+                         "<w:headerReference w:type='first' r:id='rH2'/>"
+                         "<w:footerReference w:type='default' r:id='rF1'/>"
+                         "<w:type w:val='nextPage'/><w:titlePg/></w:sectPr></w:pPr>"
+                         (wr "Section one") "</w:p>"
+                         (wp (wr "Section two"))
+                         "<w:sectPr><w:footerReference w:type='default' r:id='rF1'/>"
+                         "<w:pgSz w:w='11906' w:h='16838'/></w:sectPr>"
+                         "</w:body></w:document>")
+          (string-append
+            "<Relationships xmlns='http://schemas.openxmlformats.org/package/2006/relationships'>"
+            "<Relationship Id='rH1' Type='" audit5-rel "header' Target='header1.xml'/>"
+            "<Relationship Id='rH2' Type='" audit5-rel "header' Target='header2.xml'/>"
+            "<Relationship Id='rF1' Type='" audit5-rel "footer' Target='footer1.xml'/>"
+            "</Relationships>")
+          (string-append "<w:hdr" docx-ns ">" (wp (wr "Inherited head")) "</w:hdr>")
+          (string-append "<w:hdr" docx-ns ">" (wp (wr "First head")) "</w:hdr>")
+          (string-append "<w:ftr" docx-ns ">" (wp (wr "Own foot")) "</w:ftr>"))))
+
+(define (audit7-odt master)
+  ;; an OpenDocument text of 3 paragraphs whose first page is master
+  (zip-pack
+    '("mimetype" "content.xml" "styles.xml")
+    (list "application/vnd.oasis.opendocument.text"
+          (string-append "<?xml version='1.0'?><office:document-content" odt-ns ">"
+                         "<office:body><office:text><text:p>One</text:p><text:p>Two</text:p>"
+                         "<text:p>Three</text:p></office:text></office:body>"
+                         "</office:document-content>")
+          (string-append "<office:document-styles" odt-ns "><office:styles/>"
+                         "<office:master-styles><style:master-page style:name='Standard'>"
+                         master "</style:master-page></office:master-styles>"
+                         "</office:document-styles>"))))
+
+(define (audit7-insert l k x)
+  ;; the list l with x before its element k
+  (if (or (null? l) (<= k 0)) (cons x l)
+      (cons (car l) (audit7-insert (cdr l) (- k 1) x))))
+
+(define (test-office-audit-7-headers)
+  (check-group "headers of the first page, second re-audit")
+  (let* ((docx (lambda (d) (archive-entry (convert d "texmacs-stree" "docx-document")
+                                          "word/document.xml")))
+         (odt (lambda (d) (archive-entry (convert d "texmacs-stree" "odt-document")
+                                         "styles.xml")))
+         (paras (map (lambda (i) (string-append "Paragraph " (number->string i))) (.. 0 70)))
+         (plain (lambda (body)
+                  `(document (TeXmacs "2.1") (style "generic") (body (document ,@body))
+                             (initial (collection (associate "page-odd-header" "Odd head")))))))
+    ;; a document of TeXmacs with a header for a later page (about page 3):
+    ;; no header of the first page
+    (with d (plain (audit7-insert paras 61 '(set-this-page-header "Deep head")))
+      (check-false (export-has? (docx d) "<w:titlePg/>"))
+      (check-false (export-has? (docx d) "w:type=\"first\""))
+      (check-false (export-has? (odt d) "<style:header-first>"))
+      (check-false (export-has? (odt d) "Deep head")))
+    ;; at the start of the body, it is the header of the first page
+    (with d (plain (cons '(set-this-page-header "First head") paras))
+      (check-true (export-has? (docx d) "<w:titlePg/>"))
+      (check-true (export-has? (docx d) "w:type=\"first\""))
+      (check-true (export-has? (odt d) "<style:header-first>"))
+      (check-true (export-has? (odt d) "First head")))
+    ;; a document whose only header is the one of the first page: in
+    ;; OpenDocument, an empty header of the odd pages too, without which
+    ;; LibreOffice does not show it
+    (let* ((d `(document (TeXmacs "2.1") (style "generic")
+                         (body (document (set-this-page-header "Only first") "Text"))))
+           (st (odt d)))
+      (check-true (export-has? st "<style:header-first>"))
+      (check-true (export-has? st "Only first"))
+      (check-true (export-has? st "<style:header><text:p/></style:header>"))
+      (check-true (export-has? (docx d) "<w:titlePg/>")))
+    ;; a file without a header of the first page, with a marker added
+    ;; further on: neither in the file nor in the other format
+    (let* ((t (convert (audit7-docx 20) "docx-document" "texmacs-stree"))
+           (d (doc-set-body t (lambda (l) (audit7-insert l 12 '(set-this-page-header "Deep head")))))
+           (w (convert d "texmacs-stree" "docx-document")))
+      (check-false (export-has? (archive-entry w "word/document.xml") "<w:titlePg/>"))
+      (check-false (export-has? (archive-entry w "word/document.xml") "w:type=\"first\""))
+      (check-true (export-has? (archive-entry w "word/document.xml") "w:type=\"default\""))
+      (check-false (export-has? (odt d) "<style:header-first>"))
+      ;; but at the very start, it is the header of the first page
+      (with d (doc-set-body t (lambda (l) (cons '(set-this-page-header "New first") l)))
+        (check-true (export-has? (docx d) "<w:titlePg/>"))
+        (check-true (export-has? (docx d) "w:type=\"first\""))))
+    ;; the markers of the import, with a paragraph before them: still the
+    ;; header of the first page
+    (let* ((t (convert (audit6-docx) "docx-document" "texmacs-stree"))
+           (d (doc-set-body t (lambda (l) (append (list-head paras 3) l)))))
+      (check-true (export-has? (docx d) "<w:headerReference w:type=\"first\""))
+      (check-true (export-has? (docx d) "<w:titlePg/>"))))
+  ;; a header named by an earlier section only: it is the one of the
+  ;; document, and the last section names it when the file is written again
+  (let* ((t (convert (audit7-docx-sections) "docx-document" "texmacs-stree"))
+         (w (convert t "texmacs-stree" "docx-document"))
+         (text (archive-entry w "word/document.xml"))
+         (i (string-search-backwards "<w:sectPr>" (string-length text) text))
+         (last (if (>= i 0) (substring text i (string-length text)) "")))
+    (check-true (export-has? (object->string (doc-initial t "page-odd-header")) "Inherited head"))
+    (check-true (export-has? (object->string (doc-initial t "page-odd-footer")) "Own foot"))
+    (check-true (export-has? last "<w:headerReference w:type=\"default\" r:id=\"rH1\"/>"))
+    (check-true (export-has? last "<w:footerReference w:type=\"default\" r:id=\"rF1\"/>"))
+    (check-true (export-has? (object->string t) "(set-this-page-header \"First head\")"))
+    (check-true (export-has? last "<w:headerReference w:type=\"first\" r:id=\"rH2\"/>"))
+    (check-true (export-has? last "<w:titlePg/>"))
+    (check-true (in? "word/header1.xml" (archive-names* w)))
+    (check-true (export-has? (archive-entry w "word/_rels/document.xml.rels") "header1.xml"))
+    (check-true (export-has? (archive-entry (convert t "texmacs-stree" "odt-document") "styles.xml")
+                             "Inherited head")))
+  ;; OpenDocument: a header removed while another one of the page stays
+  (let* ((master (string-append "<style:header><text:p>Odd head</text:p></style:header>"
+                                "<style:header-left><text:p>Even head</text:p></style:header-left>"
+                                "<style:header-first><text:p>First head</text:p></style:header-first>"))
+         (t (convert (audit7-odt master) "odt-document" "texmacs-stree"))
+         (st (lambda (d) (archive-entry (convert d "texmacs-stree" "odt-document") "styles.xml"))))
+    ;; the odd and even headers emptied: an empty header of the odd pages,
+    ;; so that the first page keeps its own
+    (with s (st (doc-set-initial (doc-set-initial t "page-odd-header" "") "page-even-header" ""))
+      (check-true (export-has? s "<style:header><text:p/></style:header>"))
+      (check-true (export-has? s "First head"))
+      (check-false (export-has? s "Odd head"))
+      (check-false (export-has? s "Even head")))
+    ;; the header of the first page emptied: an empty one, rather than the
+    ;; one of the odd pages there
+    (with s (st (doc-set-body t (lambda (l)
+                                  (map (lambda (b) (if (func? b 'set-this-page-header)
+                                                       '(set-this-page-header "") b))
+                                       l))))
+      (check-true (export-has? s "<style:header-first><text:p/></style:header-first>"))
+      (check-false (export-has? s "First head"))
+      (check-true (export-has? s "Odd head")))))
+
 (define (audit6-alive? pid)
   (== (string-replace (eval-system (string-append "kill -0 " pid " 2> /dev/null && echo alive"))
                       "\n" "")
       "alive"))
 
+(define (audit6-run sh cmd)
+  ;; runs cmd with the shell sh, beside a process of the caller's group
+  ;; (the canary): whether the canary survived
+  (with out (eval-system (string-append "sleep 60 > /dev/null 2>&1 & c=$!; " sh " -c '"
+                                        (string-replace cmd "'" "'\\''") "'"
+                                        "; kill -0 $c 2> /dev/null && echo canary; "
+                                        "kill $c 2> /dev/null; true"))
+    (>= (string-search-forwards "canary" 0 out) 0)))
+
 (define (test-office-audit-6-soffice)
   (check-group "LibreOffice stopped with its children")
   ;; a LibreOffice which hangs in a child (soffice.bin, started by the
-  ;; launcher soffice) is stopped with it
+  ;; launcher soffice) is stopped with it, and a child left by a launcher
+  ;; which ended is stopped too; with /bin/sh and, when it exists, with
+  ;; /bin/dash (the /bin/sh of Debian, whose kill has no --); the group of
+  ;; the caller is not touched
   (when (not (os-win32?))
     (let* ((dir (url-temp))
-           (fake (url-append dir "soffice"))
+           (hang (url-append dir "soffice"))
+           (detach (url-append dir "soffice-detach"))
+           (fake-timeout (url-append dir "timeout"))
            (pidf (url-append dir "child.pid"))
+           (pids (url->system pidf))
+           (shells (if (url-exists? "/bin/dash") '("/bin/sh" "/bin/dash") '("/bin/sh")))
            (groups (list-filter (list (and (url-exists-in-path? "setsid") "setsid")
                                       (and (url-exists-in-path? "perl") "perl"))
                                 identity)))
       (system-mkdir dir)
-      (string-save (string-append "#!/bin/sh\nsleep 300 &\necho $! > '"
-                                  (url->system pidf) "'\nwait\n")
-                   fake)
-      (eval-system (string-append "chmod +x '" (url->system fake) "'"))
+      (string-save (string-append "#!/bin/sh\nsleep 300 &\necho $! > '" pids "'\nwait\n")
+                   hang)
+      (string-save (string-append "#!/bin/sh\nsleep 300 > /dev/null 2>&1 < /dev/null &\n"
+                                  "echo $! > '" pids "'\nexit 0\n")
+                   detach)
+      ;; GNU timeout -s KILL secs cmd, as far as used here: a group of its
+      ;; own, the command killed with the group after secs seconds
+      (string-save (string-append "#!/usr/bin/env perl\n"
+                                  "shift; shift; my $secs = shift; setpgrp(0, 0);\n"
+                                  "my $pid = fork(); if ($pid == 0) { exec @ARGV; exit 127; }\n"
+                                  "$SIG{ALRM} = sub { kill 'KILL', $pid; kill 'KILL', -$$; };\n"
+                                  "alarm $secs; waitpid($pid, 0); exit($? >> 8);\n")
+                   fake-timeout)
+      (for (u (list hang detach fake-timeout))
+        (eval-system (string-append "chmod +x '" (url->system u) "'")))
       (check-true (pair? groups))
-      (for (g groups)
-        (when (url-exists? pidf) (system-remove pidf))
-        (let* ((t0 (texmacs-time))
-               (_ (eval-system (office-soffice-command (url->system fake) '("--headless")
-                                                       2 #f g)))
-               (ms (- (texmacs-time) t0))
-               (pid (and (url-exists? pidf) (string-replace (string-load pidf) "\n" ""))))
-          (check-true (< ms 30000))
-          (check-true (string? pid))
-          (when (string? pid)
-            (check-false (audit6-alive? pid))
-            ;; (our own child, if it was left)
-            (when (audit6-alive? pid) (eval-system (string-append "kill -9 " pid))))))
+      ;; (5 seconds: the first start of a new script may be slow)
+      (for (sh shells)
+        (for (fake (list hang detach))
+          (for (how (append groups (if (url-exists-in-path? "perl") '("timeout") '())))
+            (when (url-exists? pidf) (system-remove pidf))
+            (let* ((cmd (if (== how "timeout")
+                            (office-soffice-command (url->system fake) '("--headless") 5
+                                                    (url->system fake-timeout) #f)
+                            (office-soffice-command (url->system fake) '("--headless") 5
+                                                    #f how)))
+                   (t0 (texmacs-time))
+                   (canary? (audit6-run sh cmd))
+                   (ms (- (texmacs-time) t0))
+                   (pid (and (url-exists? pidf)
+                             (string-replace (string-load pidf) "\n" ""))))
+              (check-true (< ms 30000))
+              (check-true canary?)
+              (check-true (string? pid))
+              (when (string? pid)
+                (check-false (audit6-alive? pid))
+                ;; (our own child, if it was left)
+                (when (audit6-alive? pid) (eval-system (string-append "kill -9 " pid))))))))
       ;; a LibreOffice which ends in time is not waited for
-      (let* ((t0 (texmacs-time))
-             (_ (eval-system (office-soffice-command "true" '() 60 #f (car groups)))))
-        (check-true (< (- (texmacs-time) t0) 20000)))
-      (for (u (list fake pidf)) (when (url-exists? u) (system-remove u)))
+      (for (sh shells)
+        (let* ((t0 (texmacs-time))
+               (canary? (audit6-run sh (office-soffice-command "true" '() 60 #f (car groups)))))
+          (check-true canary?)
+          (check-true (< (- (texmacs-time) t0) 20000))))
+      (for (u (list hang detach fake-timeout pidf)) (when (url-exists? u) (system-remove u)))
       (system-rmdir dir)))
   ;; the command with GNU timeout, which stops the group itself
   (check-true (string-starts? (office-soffice-command "soffice" '("a b") 5 "timeout" #f)
-                              "'timeout' -s KILL 5 'soffice' 'a b'")))
+                              "'timeout' -s KILL 5 'soffice' 'a b'"))
+  ;; no "kill --", which dash rejects
+  (check-true (< (string-search-forwards "kill -9 --" 0
+                                         (office-soffice-command "soffice" '() 5 #f "perl"))
+                 0)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The formats
@@ -5183,5 +5393,6 @@
   (test-office-audit-5-misc)
   (test-office-audit-6-headers)
   (test-office-audit-6-soffice)
+  (test-office-audit-7-headers)
   (test-formats)
   (check-end))

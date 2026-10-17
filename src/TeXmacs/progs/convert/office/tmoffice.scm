@@ -2812,11 +2812,29 @@
 (define tmof-page-breaks '(new-page new-page* page-break page-break* pagebreak
                            new-dpage new-dpage* next-page))
 
+(define (tmof-leading-headers body)
+  ;; the headers and the footers of the first page given by the markers
+  ;; at the very start of the body (the blocks before the first other one)
+  (let loop ((l (if (func? body 'document) (cdr body) '())) (acc '()))
+    (cond ((null? l) (reverse acc))
+          ((and (func? (car l) 'set-this-page-header 1)
+                (not (assoc "first-header" acc)))
+           (loop (cdr l) (cons (cons "first-header" (cadar l)) acc)))
+          ((and (func? (car l) 'set-this-page-footer 1)
+                (not (assoc "first-footer" acc)))
+           (loop (cdr l) (cons (cons "first-footer" (cadar l)) acc)))
+          ((or (func? (car l) 'set-this-page-header 1)
+               (func? (car l) 'set-this-page-footer 1))
+           (loop (cdr l) acc))
+          (else (reverse acc)))))
+
 (define (tmof-first-headers body)
   ;; the headers and the footers of the first page: the markers which the
   ;; conversion puts at the start of the body, looked for in the blocks of
   ;; the first page (a title or a paragraph may have been put before them,
-  ;; or the text typed before them may be in their paragraph)
+  ;; or the text typed before them may be in their paragraph). Only for a
+  ;; file which has a header (or footer) of the first page: elsewhere, a
+  ;; marker after the first blocks is for a later page (tmof-headers).
   (let ((acc '()) (n 0))
     (define (add! key v)
       (when (not (assoc key acc)) (set! acc (cons (cons key v) acc))))
@@ -2849,15 +2867,21 @@
   ;; privacy), write all of them. A document of the style office which was
   ;; saved before office-original existed keeps the headers of its file.
   (let* ((package? (pair? (tmof-package init)))
-         (first (tmof-first-headers body))
          (orig (lambda (key)
                  (with v (and tmof-originals (assoc-ref tmof-originals key))
                    (and v (not (tmof-same? v "")) v))))
+         ;; (the markers are looked for in the whole first page only when
+         ;; the file has that header of the first page, which the import
+         ;; put there; otherwise only at the start of the body, since a
+         ;; marker further on is meant for a later page)
+         (wide (tmof-first-headers body))
+         (lead (tmof-leading-headers body))
+         (first (lambda (key) (assoc key (if (orig key) wide lead))))
          (cur (lambda (key)
                 (with v (if (string-starts? key "first-")
                             ;; (markers not found: the header of the first
                             ;; page is taken as unchanged, not removed)
-                            (with p (assoc key first)
+                            (with p (first key)
                               (if p (cdr p) (orig key)))
                             (assoc-ref init key))
                   (and v (not (tmof-same? v "")) v))))

@@ -1990,11 +1990,47 @@
     (and s (ox-root (parse-xml s)))))
 
 (define (dx-package-section)
-  ;; the properties of the last section of the file
+  ;; the properties of the last section of the file, with the references
+  ;; to the headers and footers of the sections before which it has not
+  ;; itself (a section has those of the section before, as in Word; the
+  ;; import reads them so, docx-headers), and a first page of its own when
+  ;; the first section has one
   (let* ((root (dx-package-xml "word/document.xml"))
-         (body (and root (ox-child root 'w:body))))
-    (and body (list-find (reverse (ox-children body))
-                         (lambda (y) (func? y 'w:sectPr))))))
+         (body (and root (ox-child root 'w:body)))
+         (last (and body (list-find (reverse (ox-children body))
+                                    (lambda (y) (func? y 'w:sectPr))))))
+    (if (not last) #f
+        (let* ((before (append-map
+                         (lambda (x)
+                           (if (and (func? x 'w:p) (ox-child x 'w:pPr)
+                                    (ox-child (ox-child x 'w:pPr) 'w:sectPr))
+                               (list (ox-child (ox-child x 'w:pPr) 'w:sectPr))
+                               '()))
+                         (ox-children body)))
+               (ref? (lambda (y) (in? (car y) '(w:headerReference w:footerReference))))
+               (inherited
+                 (let loop ((l (reverse before))
+                            (acc (list-filter (ox-elements last) ref?))
+                            (new '()))
+                   (if (null? l) (reverse new)
+                       (let* ((mine (list-filter (list-filter (ox-elements (car l)) ref?)
+                                                 (lambda (y)
+                                                   (not (list-find acc
+                                                                   (lambda (z)
+                                                                     (== (dx-header-key z)
+                                                                         (dx-header-key y)))))))))
+                         (loop (cdr l) (append acc mine) (append (reverse mine) new))))))
+               ;; (the first page of the document is the one of the first
+               ;; section, read so by docx-headers)
+               (title? (and (pair? before) (not (ox-child last 'w:titlePg))
+                            (with t (ox-child (car before) 'w:titlePg)
+                              (and t (nin? (ox-attr t 'w:val) '("0" "false" "off"))))
+                            (list-find (append (ox-elements last) inherited)
+                                       (lambda (y) (and (ref? y)
+                                                        (== (ox-attr y 'w:type) "first")))))))
+          (if (and (null? inherited) (not title?)) last
+              `(w:sectPr ,@(ox-elements last) ,@inherited
+                         ,@(if title? '((w:titlePg)) '())))))))
 
 (define (dx-max-id root tag attr)
   ;; the largest number of the attribute attr of the elements tag

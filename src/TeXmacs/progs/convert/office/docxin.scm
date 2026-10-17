@@ -2593,12 +2593,37 @@
             (set! docx-open-notes old-notes)
             l)))))
 
-(define (docx-headers sect)
-  ;; the headers and the footers of the last section: (header) blocks with
-  ;; the attributes place (header, footer) and kind (default, first, even)
+(define (docx-body-sects body)
+  ;; the properties of the sections of the body, in their order: those of
+  ;; a paragraph which ends a section, then the last one
+  (append-map (lambda (x)
+                (cond ((func? x 'w:sectPr) (list x))
+                      ((and (func? x 'w:p) (ox-child x 'w:pPr)
+                            (ox-child (ox-child x 'w:pPr) 'w:sectPr))
+                       (list (ox-child (ox-child x 'w:pPr) 'w:sectPr)))
+                      (else '())))
+              (if body (ox-children body) '())))
+
+(define (docx-headers sect sects)
+  ;; the headers and the footers of the last section sect: (header) blocks
+  ;; with the attributes place (header, footer) and kind (default, first,
+  ;; even). A section without a reference of a kind has the one of the
+  ;; section before (sects: all the sections), as in Word.
   (let* ((settings (office-xml docx-archive (docx-entry "settings")))
          (even? (and settings (docx-on? (ox-child settings 'w:evenAndOddHeaders))))
-         (first? (and sect (docx-on? (ox-child sect 'w:titlePg)))))
+         ;; (the first page of the document is the one of the first
+         ;; section, when it has a first page of its own)
+         (first? (and sect (or (docx-on? (ox-child sect 'w:titlePg))
+                               (and (pair? sects)
+                                    (docx-on? (ox-child (car sects) 'w:titlePg))))))
+         (ref? (lambda (x) (or (func? x 'w:headerReference) (func? x 'w:footerReference))))
+         (key (lambda (x) (list (car x) (or (ox-attr x 'w:type) "default"))))
+         (new? (lambda (acc) (lambda (x) (not (list-find acc (lambda (y) (== (key y) (key x))))))))
+         (refs (let loop ((l (reverse sects)) (acc '()))
+                 (if (null? l) acc
+                     (loop (cdr l)
+                           (append acc (list-filter (list-filter (ox-children (car l)) ref?)
+                                                    (new? acc))))))))
     (if (not sect) '()
         (append-map
           (lambda (x)
@@ -2612,9 +2637,7 @@
                   (list (apply office-node
                                (cons* 'header `((place ,place) (kind ,kind))
                                       (docx-part-blocks part)))))))
-          (list-filter (ox-children sect)
-                       (lambda (x) (or (func? x 'w:headerReference)
-                                       (func? x 'w:footerReference))))))))
+          refs))))
 
 (define (docx-style-node id)
   ;; the definition of the named style id, for the style of the document
@@ -2750,7 +2773,7 @@
                (blocks (and body (docx-sections (docx-blocks (ox-children body))
                                                 (if sect (docx-columns sect)
                                                     '((count "1"))))))
-               (headers (docx-headers sect))
+               (headers (docx-headers sect (docx-body-sects body)))
                (blocks (and blocks (office-drop-style blocks (docx-body-style))))
                (r (if body
                       `(office ,@(docx-meta) ,@(docx-setup body) ,@(docx-styles-block)
