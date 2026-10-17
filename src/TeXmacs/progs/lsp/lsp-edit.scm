@@ -543,30 +543,57 @@
   (set! pending (make-ahash-table))
   (set-message "Language servers stopped" "Restart server starts one again"))
 
+(define (log-body c)
+  ;; the body of the page of the log of @c
+  `(document
+    (with "font-family" "tt" "par-first" "0cm"
+      (document
+       ,(utf8->cork (string-append (lsp-client-ref c 'name) " ("
+                                   (symbol->string (lsp-client-state c))
+                                   ")"))
+       ,@(append-map
+          (lambda (x)
+            (map (lambda (l) (utf8->cork (string-append (car x) ": " l)))
+                 (list-filter (string-decompose (cadr x) "\n")
+                              (lambda (l) (!= l "")))))
+          (lsp-client-log c))))))
+
+;; the client whose log is on the page of the logs, and whether a refresh
+;; of the page is due
+(define log-client #f)
+(define log-refresh? #f)
+
+(define (log-page)
+  (aux-name "Language server"))
+
 (tm-define (lsp-show-log)
   (:synopsis "Shows what the language server of the buffer has written")
+  ;; the page follows the log as long as it is open (lsp-log-refresh)
   (with c (buffer-client-entry)
     (if (not c) (set-message "No language server for this buffer" "")
-        ;; (a whole document, with its style and its body)
-        (open-auxiliary
-         "Language server"
-         `(document
-           (style (tuple "generic"))
-           (body
-           (document
-           (with "font-family" "tt" "par-first" "0cm"
-             (document
-              ,(utf8->cork (string-append (lsp-client-ref c 'name) " ("
-                                          (symbol->string
-                                           (lsp-client-state c))
-                                          ")"))
-              ,@(append-map
-                 (lambda (x)
-                   (map (lambda (l) (utf8->cork (string-append (car x) ": "
-                                                               l)))
-                        (list-filter (string-decompose (cadr x) "\n")
-                                     (lambda (l) (!= l "")))))
-                 (lsp-client-log c)))))))))))
+        (begin
+          (set! log-client c)
+          ;; (a whole document, with its style and its body)
+          (open-auxiliary "Language server"
+                          `(document (style (tuple "generic"))
+                                     (body ,(log-body c))))))))
+
+(tm-define (lsp-log-refresh)
+  (:synopsis "The page of the log shows the log as it is now")
+  (set! log-refresh? #f)
+  (when log-client
+    (with u (log-page)
+      (if (buffer-exists? u)
+          (buffer-set-body u (stree->tree (log-body log-client)))
+          (set! log-client #f)))))
+
+(tm-define (lsp-client-log-changed c)
+  (former c)
+  (when (and (eq? c log-client) (not log-refresh?))
+    (set! log-refresh? #t)
+    (delayed
+      (:pause 300)
+      (lsp-log-refresh))))
 
 (tm-define (lsp-turn-off)
   ;; (they are started again when the preference is on again)

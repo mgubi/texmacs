@@ -104,11 +104,16 @@
 
 (define lsp-log-length 200)
 
+(tm-define (lsp-client-log-changed c)
+  (:synopsis "Called when the log or the state of @c has changed")
+  (noop))
+
 (tm-define (lsp-client-log-add c kind s)
   (with l (cons (list kind s) (ahash-ref c 'log))
     (ahash-set! c 'log (if (> (length l) lsp-log-length)
                            (sublist l 0 lsp-log-length)
-                           l))))
+                           l))
+    (lsp-client-log-changed c)))
 
 (define (client-send c msg)
   ;; sends @msg (an stree), or keeps it until the server is initialized
@@ -256,6 +261,7 @@
   ;; the server has ended: the handlers of its requests get an error
   (with unexpected? (not (ahash-ref c 'stopped))
     (ahash-set! c 'state 'dead)
+    (lsp-client-log-changed c)
     (when unexpected? (lsp-client-ended c)))
   (ahash-set! c 'queue '())
   (let* ((pending (ahash-ref c 'pending))
