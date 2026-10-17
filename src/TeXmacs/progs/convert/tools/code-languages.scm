@@ -12,32 +12,20 @@
 
 ;; The Markdown and docx/odt converters write the language of a block of
 ;; code (after the fence of Markdown, as the language of a pre block) and
-;; read it back. This table is the one place where the languages are
-;; listed: add a language here and both converters know it.
+;; read it back. The languages and their names come from the list of the
+;; program languages (kernel/texmacs/tm-program-languages.scm).
 
 (texmacs-module (convert tools code-languages))
 
 ;; (tag name other-names...): name is written, all names are read
 (define code-languages
-  '((cpp-code "cpp" "c" "c++" "cc" "h" "hpp")
-    (python-code "python" "py" "python3")
-    (scm-code "scheme" "scm" "lisp" "guile")
-    (shell-code "sh" "bash" "shell" "zsh" "console")
-    (java-code "java")
-    (javascript-code "javascript" "js")
-    (json-code "json")
-    (julia-code "julia")
-    (r-code "r")
-    (scala-code "scala")
-    (fortran-code "fortran")
-    (octave-code "octave" "matlab")
-    (scilab-code "scilab")
-    (dot-code "dot")
-    (mmx-code "mathemagix" "mmx")
-    (go-code "go" "golang")
-    (lean-code "lean" "lean4")
-    (lua-code "lua")
-    (rust-code "rust" "rs")))
+  (list-filter
+   (map (lambda (lan)
+          (let ((tag (program-language-block-tag lan))
+                (names (program-language-names lan)))
+            (and tag (pair? names) (cons tag names))))
+        (program-languages))
+   identity))
 
 ;; the blocks of code without a language
 (define plain-code-tags '(verbatim-code pseudo-code render-code code))

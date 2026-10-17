@@ -835,6 +835,18 @@ Done in part (2026-10-17):
   merging; `tree-sitter generate`: 104 s and 5.6 GB, same 10243 states),
   so the suite tests Lean only when its tables are cached. Reducing the
   memory of the LR construction for such grammars is still to do.
+- **One list of the program languages** (2026-10-18):
+  `kernel/texmacs/tm-program-languages.scm` lists each program language with
+  its menu label, its inline and block tags, its grammar, its line comment
+  and its names in other formats. The modes `in-<lan>%` and
+  `in-prog-<lan>%`, the groups of the code tags, the Insert menus, the
+  languages of the Markdown and docx/odt converters
+  (`convert/tools/code-languages.scm`), the highlighting and editing of
+  `progs/treesit`, and the languages which C++ wraps (`tree_sitter_wraps`,
+  now filled at the start through the glue `tree-sitter-wrap-language`)
+  are made from it. A new language still needs, besides its entry: the
+  macros of its tags (`env-program.ts`), its format and `<lan>-lang.scm`
+  (`plugins/code`), its grammar, and the port of its scanner if it has one.
 - An S7 pitfall met on the way: in a `do` loop whose body calls a builtin
   through another name (`ahash-set!` is `hash-table-set!`), s7 changes the
   counter in place, so the counter stored as a value (or in a list) ends

@@ -383,14 +383,11 @@
 
 (define tags-queries '())  ; ((id . query or #f) ...)
 
-;; the grammars whose name is not that of the program language
-(define grammar-names '(("shell" . "bash")))
-
 (define (tags-query lan id)
   ;; the query of the definitions of the program language lan, or #f
   (let ((known (assoc id tags-queries)))
     (if known (cdr known)
-        (let* ((g (or (assoc-ref grammar-names lan) lan))
+        (let* ((g (or (program-language-grammar lan) lan))
                (u (url-concretize
                    (string-append "$TEXMACS_PATH/misc/tree-sitter/" g "/tags.scm")))
                (q (and (url-exists? u)
@@ -467,14 +464,9 @@
 ;; Comments
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define line-comments
-  '(("c" . "//") ("cpp" . "//") ("java" . "//") ("javascript" . "//")
-    ("python" . "#") ("r" . "#") ("julia" . "#") ("scheme" . ";")
-    ("shell" . "#") ("go" . "//") ("rust" . "//") ("lua" . "--")
-    ("lean" . "--")))
-
 (define-public (syntax-comment-prefix lan)
-  (assoc-ref line-comments lan))
+  ;; the start of a line comment (tm-program-languages.scm)
+  (program-language-comment lan))
 
 (define-public (toggle-line-comments lines prefix)
   ;; comment the strings lines with prefix, or uncomment them when they all

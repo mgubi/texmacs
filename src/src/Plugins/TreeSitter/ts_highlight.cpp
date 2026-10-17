@@ -26,6 +26,7 @@
 #include "observer.hpp"
 #include "path.hpp"
 #include "hashmap.hpp"
+#include "hashset.hpp"
 
 extern tree the_et;
 int tree_sitter_query_language (int query);
@@ -211,13 +212,19 @@ treesit_language_rep::get_color (tree t, int start, int end) {
 * Interface
 ******************************************************************************/
 
+static hashset<string> wrapped_languages;
+
+void
+tree_sitter_wrap_language (string lan) {
+  // lan may be highlighted by tree-sitter (called at the start for the
+  // program languages with a grammar, see tm-program-languages.scm)
+  wrapped_languages->insert (lan);
+}
+
 bool
 tree_sitter_wraps (string lan) {
   // the program languages which tree-sitter may highlight
-  return lan == "scheme" || lan == "json" || lan == "c" || lan == "cpp" ||
-         lan == "python" || lan == "java" || lan == "javascript" || lan == "r" ||
-         lan == "julia" || lan == "shell" || lan == "go" || lan == "rust" ||
-         lan == "lua" || lan == "lean";
+  return wrapped_languages->contains (lan);
 }
 
 language_rep*

@@ -33,9 +33,8 @@
 ;; to be changed when the generator or the exported data change
 (define-public treesit-generator-version "2")
 
-(define-public treesit-languages
-  '("json" "c" "scheme" "cpp" "python" "java" "javascript" "r" "julia"
-    "bash" "go" "rust" "lua" "lean"))
+;; the grammars (of the program languages, tm-program-languages.scm)
+(define-public treesit-languages (program-language-grammars))
 
 ;; the external scanners (ts-scanner-*.scm), for the languages with one
 (define treesit-scanners

@@ -9223,6 +9223,19 @@ tmg_tree_sitter_set_highlighting (tmscm arg1) {
 }
 
 tmscm
+tmg_tree_sitter_wrap_language (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "tree-sitter-wrap-language");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  tree_sitter_wrap_language (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
 tmg_tree_sitter_program_language (tmscm arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "tree-sitter-program-language");
 
@@ -12814,6 +12827,7 @@ initialize_glue_basic () {
   tmscm_install_procedure ("tree-sitter-pending-updates",  tmg_tree_sitter_pending_updates, 0, 0, 0);
   tmscm_install_procedure ("tree-sitter-line-colors",  tmg_tree_sitter_line_colors, 2, 0, 0);
   tmscm_install_procedure ("tree-sitter-set-highlighting",  tmg_tree_sitter_set_highlighting, 1, 0, 0);
+  tmscm_install_procedure ("tree-sitter-wrap-language",  tmg_tree_sitter_wrap_language, 1, 0, 0);
   tmscm_install_procedure ("tree-sitter-program-language",  tmg_tree_sitter_program_language, 1, 0, 0);
   tmscm_install_procedure ("tree-sitter-set-scanner",  tmg_tree_sitter_set_scanner, 2, 0, 0);
   tmscm_install_procedure ("tree-sitter-lexer-lookahead",  tmg_tree_sitter_lexer_lookahead, 0, 0, 0);

@@ -14,6 +14,7 @@
 #include "scheme.hpp"
 
 bool tree_sitter_wraps (string lan);
+void tree_sitter_wrap_language (string lan);
 language_rep* tree_sitter_language (string lan, language_rep* base);
 void tree_sitter_set_highlighter (string lan, int query, array<string> classes);
 array<tree> tree_sitter_pending_updates ();

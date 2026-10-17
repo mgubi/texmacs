@@ -24,11 +24,13 @@
   ("tree-sitter highlighting" "on" noop))
 
 ;; program language of TeXmacs -> language of tree-sitter
+;; (from the list of the program languages, tm-program-languages.scm)
 (define-public treesit-highlight-languages
-  '(("scheme" . "scheme") ("json" . "json") ("c" . "c") ("cpp" . "cpp")
-    ("python" . "python") ("java" . "java") ("javascript" . "javascript")
-    ("r" . "r") ("julia" . "julia") ("shell" . "bash") ("go" . "go")
-    ("rust" . "rust") ("lua" . "lua") ("lean" . "lean")))
+  (list-filter (map (lambda (lan)
+                      (let ((g (program-language-grammar lan)))
+                        (and g (cons lan g))))
+                    (program-languages))
+               identity))
 
 ;; capture name -> colour class (initialize_color_encodings in
 ;; System/Language/language.cpp); the longest prefix of the name decides,
