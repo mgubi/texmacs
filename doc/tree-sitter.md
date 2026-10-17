@@ -439,3 +439,30 @@ concerns all module code of TeXmacs, not only this one.
   module environment (above) is the first thing to understand.
 - Guile and femtolisp: only S7 was tried in TeXmacs; the code avoids
   S7-specific forms (own sort, maps from left to right, own writer of data).
+
+### The hybrid: Scheme tables, C runtime
+
+The tables generated in Scheme can also run in the C runtime of tree-sitter,
+vendored in `src/Plugins/TreeSitter/tree-sitter` (0.27.1, MIT, 0.8 MB):
+`ts-export-language` (`ts-export.scm`) writes them, `ts_dynamic.c` fills a
+`TSLanguage` with them (every state a large state; the lex functions
+interpret the lex tables, through one of 32 slots since the runtime calls
+them without the language; minimal query tables). Glue:
+`tree-sitter-language-new`, `tree-sitter-parse-sexp`. No C is generated per
+grammar.
+
+- JSON 7/7 and C 85/85 corpus tests pass with it (standalone harness); the
+  tree of `lib/src/parser.c` is that of the Scheme parser and of the C
+  parser; after 30 random edits the incremental trees are those of the
+  compiled tree-sitter-c parser at every step (both differ from a fresh
+  parse after edits with errors, which is tree-sitter's behaviour).
+- Speed in TeXmacs: `parser.c` in 6 ms (Scheme parser 2.2 s). The C tables
+  load in 1.7 ms from data of 1 MB; their export from Scheme takes 1.4 s in
+  TeXmacs, so the exported data should be cached rather than the Scheme
+  language.
+- Only the autotools build compiles it so far (not CMake, not the browser
+  build). External scanners would be callbacks into Scheme (not done).
+
+With the hybrid, option E keeps its advantages (no compiled code per
+grammar) without the speed penalty; the generator stays in Scheme and runs
+once per grammar (10-35 s for C), its output can be cached or shipped.
