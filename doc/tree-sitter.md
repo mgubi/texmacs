@@ -833,8 +833,17 @@ Done in part (2026-10-17):
   Go, 12000 for Rust) and on samples for Lua and Lean. Tables: go 0.7 s,
   rust 1.5 s, lua 0.5 s; Lean 74 s and 8.7 GB (381910 LR(1) states before
   merging; `tree-sitter generate`: 104 s and 5.6 GB, same 10243 states),
-  so the suite tests Lean only when its tables are cached. Reducing the
-  memory of the LR construction for such grammars is still to do.
+  so the suite tests Lean only when its tables are cached. Memory, the
+  next day: the structures of the construction (item sets, lookahead sets,
+  signatures of the states) are freed when the states are built; the index
+  of the symbols of a state becomes a sorted vector once the state is
+  complete (it was a hash table per state); an entry keeps its first
+  action in place (no allocation, it nearly always has one); the memo of
+  the token conflicts of the merging takes two bits per state and token.
+  Lean: peak 4.7 GB (memory in use after the construction 3.3 GB, was
+  6.9), 68 s; the tables of the 14 grammars are byte-identical. With
+  `TS_PROFILE`, each stage also prints the peak resident memory and the
+  memory in use.
 - **One list of the program languages** (2026-10-18):
   `kernel/texmacs/tm-program-languages.scm` lists each program language with
   its menu label, its inline and block tags, its grammar, its line comment

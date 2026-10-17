@@ -25,6 +25,11 @@
 #include "tree_sitter_glue.hpp"
 #include <algorithm>
 #include <chrono>
+#include <climits>
+#include <sys/resource.h>
+#ifdef __APPLE__
+#include <malloc/malloc.h>
+#endif
 #include <functional>
 #include <iterator>
 #include <map>
@@ -55,9 +60,23 @@ lap (const char* what) {
   static bool profile= getenv ("TS_PROFILE") != NULL;
   static std::chrono::steady_clock::time_point last;
   std::chrono::steady_clock::time_point now= std::chrono::steady_clock::now ();
-  if (profile && what != NULL)
-    fprintf (stderr, "ts-tables: %s %d ms\n", what, (int)
-             std::chrono::duration_cast<std::chrono::milliseconds> (now - last).count ());
+  if (profile && what != NULL) {
+    struct rusage u;
+    getrusage (RUSAGE_SELF, &u);
+    // the peak resident memory so far, in MB (ru_maxrss: bytes on macOS)
+#ifdef __APPLE__
+    long mb= (long) (u.ru_maxrss / (1024 * 1024));
+    malloc_statistics_t st;
+    malloc_zone_statistics (NULL, &st);
+    long used= (long) (st.size_in_use / (1024 * 1024));
+#else
+    long mb= (long) (u.ru_maxrss / 1024);
+    long used= -1;
+#endif
+    fprintf (stderr, "ts-tables: %s %d ms, peak %ld MB, in use %ld MB\n", what, (int)
+             std::chrono::duration_cast<std::chrono::milliseconds> (now - last).count (),
+             mb, used);
+  }
   last= now;
 }
 inline int external (int i) { return K_EXTERNAL * KB + i; }
@@ -350,7 +369,14 @@ struct items_t {
   std::unordered_map<ll, item_t*> item_memo;
   std::vector<item_t*> all;
   items_t (grammar_t& g2): g (g2) {}
-  ~items_t () { for (size_t i= 0; i < all.size (); i++) delete all[i]; }
+  ~items_t () { clear (); }
+  void clear () {
+    for (size_t i= 0; i < all.size (); i++) delete all[i];
+    std::vector<item_t*> ().swap (all);
+    std::unordered_map<std::vector<ll>, int, vec_hash> ().swap (contents);
+    std::unordered_map<ll, int> ().swap (key_memo);
+    std::unordered_map<ll, item_t*> ().swap (item_memo);
+  }
 
   const prod_t& production (int prod) { return prod < 0? g.start: g.prods[prod]; }
 
@@ -506,25 +532,107 @@ struct action_t {
 inline action_t make_action (int kind, int a= 0, int b= 0, int c= 0, int d= 0) {
   action_t x= { kind, a, b, c, d }; return x; }
 
+struct action_list_t {
+  // the actions of an entry of a parse state: nearly always one, kept in
+  // place; the others, if any, in rest (tens of millions of entries for a
+  // large grammar, so no allocation for the usual case)
+  action_t first;
+  int n;
+  std::vector<action_t>* rest;
+  action_list_t (): n (0), rest (NULL) {}
+  action_list_t (const action_list_t& o): first (o.first), n (o.n),
+    rest (o.rest == NULL? NULL: new std::vector<action_t> (*o.rest)) {}
+  action_list_t& operator = (const action_list_t& o) {
+    if (this == &o) return *this;
+    first= o.first; n= o.n;
+    delete rest;
+    rest= (o.rest == NULL? NULL: new std::vector<action_t> (*o.rest));
+    return *this;
+  }
+  action_list_t (action_list_t&& o) noexcept: first (o.first), n (o.n), rest (o.rest) {
+    o.rest= NULL; o.n= 0; }
+  action_list_t& operator = (action_list_t&& o) noexcept {
+    if (this == &o) return *this;
+    delete rest;
+    first= o.first; n= o.n; rest= o.rest;
+    o.rest= NULL; o.n= 0;
+    return *this;
+  }
+  ~action_list_t () { delete rest; }
+  size_t size () const { return (size_t) n; }
+  bool empty () const { return n == 0; }
+  action_t& operator [] (size_t i) { return i == 0? first: (*rest)[i - 1]; }
+  const action_t& operator [] (size_t i) const { return i == 0? first: (*rest)[i - 1]; }
+  action_t& back () { return (*this)[n - 1]; }
+  const action_t& back () const { return (*this)[n - 1]; }
+  void push_back (const action_t& a) {
+    if (n == 0) first= a;
+    else {
+      if (rest == NULL) rest= new std::vector<action_t> ();
+      rest->push_back (a);
+    }
+    n++;
+  }
+  void pop_back () { if (n > 1) rest->pop_back (); n--; }
+  void clear () { delete rest; rest= NULL; n= 0; }
+  bool contains (const action_t& a) const {
+    for (int i= 0; i < n; i++) if ((*this)[i] == a) return true;
+    return false;
+  }
+  bool operator == (const action_list_t& o) const {
+    if (n != o.n) return false;
+    for (int i= 0; i < n; i++) if (!((*this)[i] == o[i])) return false;
+    return true;
+  }
+};
+
 struct tentry_t {
-  std::vector<action_t> actions;
+  action_list_t actions;
   bool reusable;
 };
 
 template<class T> struct omap_t {
-  // a map from symbols which remembers the order of insertion
+  // a map from symbols which remembers the order of insertion; its index of
+  // the keys is a hash table while the map is built, then (freeze) a sorted
+  // vector, much smaller: the parse states of a large grammar are hundreds
+  // of thousands before their merging
   ivec keys;
   std::vector<T> vals;
   std::unordered_map<int,int> pos;
+  std::vector<std::pair<int,int> > index;   // (key, position), once frozen
+  bool frozen= false;
   int find (int k) const {
-    std::unordered_map<int,int>::const_iterator it= pos.find (k);
-    return it == pos.end ()? -1: it->second; }
+    if (!frozen) {
+      std::unordered_map<int,int>::const_iterator it= pos.find (k);
+      return it == pos.end ()? -1: it->second;
+    }
+    std::vector<std::pair<int,int> >::const_iterator it=
+      std::lower_bound (index.begin (), index.end (), std::make_pair (k, INT_MIN));
+    return (it != index.end () && it->first == k)? it->second: -1;
+  }
   bool has (int k) const { return find (k) >= 0; }
   T* ref (int k) { int i= find (k); return i < 0? NULL: &vals[i]; }
   void set (int k, const T& v) {
     int i= find (k);
-    if (i >= 0) vals[i]= v;
-    else { pos[k]= (int) keys.size (); keys.push_back (k); vals.push_back (v); }
+    if (i >= 0) { vals[i]= v; return; }
+    int p= (int) keys.size ();
+    keys.push_back (k);
+    vals.push_back (v);
+    if (!frozen) pos[k]= p;
+    else index.insert (std::lower_bound (index.begin (), index.end (),
+                                         std::make_pair (k, INT_MIN)),
+                       std::make_pair (k, p));
+  }
+  void freeze () {
+    if (frozen) return;
+    index.clear ();
+    for (size_t p= 0; p < keys.size (); p++)
+      index.push_back (std::make_pair (keys[p], (int) p));
+    std::sort (index.begin (), index.end ());
+    std::unordered_map<int,int> ().swap (pos);
+    keys.shrink_to_fit ();
+    vals.shrink_to_fit ();
+    frozen= true;
   }
   int size () const { return (int) keys.size (); }
 };
@@ -602,6 +710,7 @@ struct builder_t {
   ~builder_t () { for (size_t i= 0; i < states.size (); i++) delete states[i]; }
 
   const ivec& first_set (int s) { return first[s]; }
+  void release_construction ();
   int first_set_id (int s) {
     std::unordered_map<int,int>::iterator it= first_ids.find (s);
     if (it != first_ids.end ()) return it->second;
@@ -923,7 +1032,7 @@ builder_t::handle_conflict (state_t* state, const std::vector<entry_t>& entries,
     else if (set_contains (pool.get (entries[k].las), lookahead) && !item_augmented (item))
       adjoin (item);
   }
-  std::vector<action_t>& actions= entry->actions;
+  action_list_t& actions= entry->actions;
   action_t last= actions.back ();
   bool repetition= false;
   if (last.kind == A_SHIFT && !conflicting.empty ()) {
@@ -1076,7 +1185,7 @@ builder_t::add_actions (int state_id, const std::vector<aux_info_t>& aux_in,
             ri.left= ri.right= ri.none= false;
           }
           else if (c == 0) {
-            if (std::find (te->actions.begin (), te->actions.end (), action) == te->actions.end ()) {
+            if (!te->actions.contains (action)) {
               te->actions.push_back (action);
               conflicted= set_insert (la, conflicted);
             }
@@ -1198,7 +1307,29 @@ builder_t::build () {
     kernels[e.first].clear ();
     kernels[e.first].shrink_to_fit ();
     add_actions (e.first, e.second, entries);
+    // the state is complete
+    states[e.first]->terms.freeze ();
+    states[e.first]->nonterms.freeze ();
   }
+  release_construction ();
+}
+
+template<class T> static void
+release (T& x) {
+  // free the memory of a container
+  T ().swap (x);
+}
+
+void
+builder_t::release_construction () {
+  // what only the construction of the states needs (the item sets, the
+  // lookahead sets, the signatures of the states): the next stages use the
+  // states, the first and last sets and the production infos
+  items.clear ();
+  release (pool.sets); release (pool.ids); release (pool.unions);
+  release (additions); release (first_ids);
+  release (kernels); release (preceding); release (preceding_nodes);
+  release (state_ids); release (core_ids); release (queue);
 }
 
 
@@ -1768,7 +1899,7 @@ tables_t::used_symbols () {
 }
 
 static int
-last_shift_target (const std::vector<action_t>& actions) {
+last_shift_target (const action_list_t& actions) {
   if (actions.empty () || actions.back ().kind != A_SHIFT) return -1;
   return actions.back ().a;
 }
@@ -1820,7 +1951,7 @@ remap_states (std::vector<state_t*>& states, const ivec& fun) {
   for (size_t si= 0; si < states.size (); si++) {
     state_t* s= states[si];
     for (int k= 0; k < s->terms.size (); k++) {
-      std::vector<action_t>& as= s->terms.vals[k].actions;
+      action_list_t& as= s->terms.vals[k].actions;
       for (size_t j= 0; j < as.size (); j++)
         if (as[j].kind == A_SHIFT) as[j].a= fun[as[j].a];
     }
@@ -1870,17 +2001,24 @@ tables_t::merge (std::vector<state_t*> states) {
     }
     return false;
   };
-  // for the terminals, 0 unknown, 1 no conflict, 2 conflict
-  std::vector<char> token_memo ((size_t) ns * n, 0);
+  // for the terminals, 0 unknown, 1 no conflict, 2 conflict, in two bits
+  // (states times terminals: a gigabyte in bytes for a large grammar)
+  std::vector<unsigned char> token_memo (((size_t) ns * n + 3) / 4, 0);
   auto token_conflicts_memo= [&] (int right, int new_token) -> bool {
     if (!is_terminal (new_token)) return token_conflicts (right, new_token);
-    char& m= token_memo[(size_t) right * n + sym_index (new_token)];
-    if (m == 0) m= token_conflicts (right, new_token)? 2: 1;
+    size_t i= (size_t) right * n + sym_index (new_token);
+    unsigned char& byte= token_memo[i / 4];
+    int shift= (int) (i % 4) * 2;
+    int m= (byte >> shift) & 3;
+    if (m == 0) {
+      m= token_conflicts (right, new_token)? 2: 1;
+      byte= (unsigned char) (byte | (m << shift));
+    }
     return m == 2;
   };
   auto entries_conflict= [&] (const tentry_t& e1, const tentry_t& e2) -> bool {
-    const std::vector<action_t>& a1= e1.actions;
-    const std::vector<action_t>& a2= e2.actions;
+    const action_list_t& a1= e1.actions;
+    const action_list_t& a2= e2.actions;
     if (a1 == a2) return false;
     if (a1.size () != a2.size ()) return true;
     for (size_t k= 0; k < a1.size (); k++) {
@@ -1982,8 +2120,8 @@ tables_t::merge (std::vector<state_t*> states) {
     if (v1.size () != v2.size ()) return false;
     for (size_t k= 0; k < v1.size (); k++) {
       if (v1[k].first != v2[k].first) return false;
-      const std::vector<action_t>& a1= states[s1]->terms.vals[v1[k].second].actions;
-      const std::vector<action_t>& a2= states[s2]->terms.vals[v2[k].second].actions;
+      const action_list_t& a1= states[s1]->terms.vals[v1[k].second].actions;
+      const action_list_t& a2= states[s2]->terms.vals[v2[k].second].actions;
       if (a1.size () != a2.size ()) return false;
       for (size_t j= 0; j < a1.size (); j++) {
         const action_t& x= a1[j];
@@ -1999,7 +2137,7 @@ tables_t::merge (std::vector<state_t*> states) {
     const std::vector<std::pair<int,int> >& v= sorted_entries[s];
     for (size_t k= 0; k < v.size (); k++) {
       h= h * 1000003u ^ (size_t) v[k].first;
-      const std::vector<action_t>& as= states[s]->terms.vals[v[k].second].actions;
+      const action_list_t& as= states[s]->terms.vals[v[k].second].actions;
       for (size_t j= 0; j < as.size (); j++)
         h= h * 1000003u ^ (size_t) (as[j].kind == A_SHIFT? group_of[as[j].a]: as[j].a);
     }
@@ -2091,7 +2229,7 @@ tables_t::remove_unit_reductions (std::vector<state_t*>& states) {
     int symbol= -1;
     bool only= true;
     for (int k= 0; k < s->terms.size () && only; k++) {
-      const std::vector<action_t>& as= s->terms.vals[k].actions;
+      const action_list_t& as= s->terms.vals[k].actions;
       for (size_t j= 0; j < as.size () && only; j++) {
         const action_t& a= as[j];
         if (a.kind == A_SHIFT_EXTRA) continue;
@@ -2121,7 +2259,7 @@ tables_t::remove_unit_reductions (std::vector<state_t*>& states) {
         if (g2 && g2->kind == A_GOTO) s->nonterms.vals[k]= *g2;
       }
       for (int k= 0; k < s->terms.size (); k++) {
-        std::vector<action_t>& as= s->terms.vals[k].actions;
+        action_list_t& as= s->terms.vals[k].actions;
         for (size_t j= 0; j < as.size (); j++) {
           if (as[j].kind != A_SHIFT) continue;
           std::unordered_map<int,int>::iterator it= unit.find (as[j].a);
@@ -2147,7 +2285,7 @@ tables_t::remove_unused (std::vector<state_t*> states) {
   for (int i= 0; i < ns; i++) {
     state_t* s= states[i];
     for (int k= 0; k < s->terms.size (); k++) {
-      const std::vector<action_t>& as= s->terms.vals[k].actions;
+      const action_list_t& as= s->terms.vals[k].actions;
       for (size_t j= 0; j < as.size (); j++) if (as[j].kind == A_SHIFT) used[as[j].a]= true;
     }
     for (int k= 0; k < s->nonterms.size (); k++)
@@ -2476,7 +2614,7 @@ tables_t::export_language (reader_t& r, std::string& out) {
     for (int k= 0; k < s->terms.size (); k++) {
       table_value_t v;
       v.entry= true; v.reusable= s->terms.vals[k].reusable; v.state= 0;
-      const std::vector<action_t>& as= s->terms.vals[k].actions;
+      const action_list_t& as= s->terms.vals[k].actions;
       for (size_t j= 0; j < as.size (); j++) {
         const action_t& a= as[j];
         ivec c;
@@ -2729,7 +2867,7 @@ tree_sitter_tables_finish (int id, string data) {
       for (int k= 0; k < s->terms.size (); k++) {
         out += "("; w_int (out, s->terms.keys[k]);
         out += s->terms.vals[k].reusable? "#t": "#f";
-        const std::vector<action_t>& as= s->terms.vals[k].actions;
+        const action_list_t& as= s->terms.vals[k].actions;
         for (size_t j= 0; j < as.size (); j++) { out += ' '; write_action (out, as[j]); }
         out += ")";
       }
