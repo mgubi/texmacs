@@ -483,6 +483,8 @@
       (load-buffer u)
       (check= (url->system (current-buffer)) path)
       (check= (lsp-buffer-language) "c")
+      ;; (in the font of source files, a preference: Inconsolata)
+      (check= (get-init "prog-font") (get-preference "editor:code font"))
       (check= (lsp-buffer-client*) #f)
       (check= (lsp-buffer-uri) (lsp-path->uri path))
       (check= (lsp-buffer-lines) '("int main() {" "  return x;" "}" ""))

@@ -14,6 +14,12 @@
   shows information about the symbol at the cursor and jumps to its
   definition.
 
+  Source files are shown in a monospaced font, <name|Inconsolata> by
+  default; another one can be chosen in <menu|Edit|Preferences|Other|Font of
+  source code> (the change reaches the files which are open). This font is
+  the one of source files only: the code in a document keeps the fonts of
+  the document.
+
   <paragraph*|Installing language servers>
 
   <TeXmacs> does not include any language server: you have to install the

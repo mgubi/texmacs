@@ -12,7 +12,8 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (texmacs-module (texmacs menus preferences-widgets)
-  (:use (texmacs menus preferences-menu)))
+  (:use (texmacs menus preferences-menu)
+        (fonts font-short-menu)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Validation Macro
@@ -1013,8 +1014,28 @@
       (text "Console") >>
       ("Open debug console" (open-debug-console)))))
 
+;; the fonts of source files: the TeXmacs typewriter font and the
+;; installed monospaced fonts, as (label master)
+(define (code-font-choices)
+  (cons (list "TeXmacs typewriter" "roman")
+        (map (lambda (p) (list (car p) (cadr p))) (text-font-list 'mono))))
+
+(define (code-font-label)
+  (with f (get-preference "editor:code font")
+    (with p (list-find (code-font-choices) (lambda (p) (== (cadr p) f)))
+      (if p (car p) f))))
+
+(define (set-code-font label)
+  (with p (assoc label (code-font-choices))
+    (when p (set-preference "editor:code font" (cadr p)))))
+
 (tm-widget (misc-preferences-widget)
   (aligned
+    (item (text "Font of source code:")
+      (enum (set-code-font answer)
+            (map car (code-font-choices))
+            (code-font-label)
+            "12em"))
     (item (text "Automatically save:")
       (enum (set-pretty-preference "autosave" answer)
             '("5 sec" "30 sec" "120 sec" "300 sec" "Disable")

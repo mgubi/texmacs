@@ -121,8 +121,24 @@
   (set-message "Restart in order to let the new setting take effect"
                "configure graphical interface"))
 
+;; the font of source files (programs open as code, not documents with
+;; code in them): the master of a monospaced text font (font-short-menu),
+;; or roman, the typewriter font of TeXmacs; new_buffer.cpp sets it in
+;; the initial environment of a source file which is opened, and a change
+;; reaches the open ones (which stay unmodified: their text is the same)
+(define (notify-code-font var val)
+  (with font (if (in? val '("" "default")) "Inconsolatazi4" val)
+    (for (u (buffer-list))
+      (with-buffer u
+        (when (and (== (get-style-list) '("code"))
+                   (!= (get-init "prog-font") font))
+          (with modified? (buffer-modified? u)
+            (init-env "prog-font" font)
+            (when (not modified?) (buffer-pretend-saved u))))))))
+
 (define-preferences
   ("profile" "beginner" (lambda args (noop)))
+  ("editor:code font" "Inconsolatazi4" notify-code-font)
   ("look and feel" "default" notify-look-and-feel)
   ("case sensitive shortcuts" "default" noop)
   ("detailed menus" "detailed" noop)
