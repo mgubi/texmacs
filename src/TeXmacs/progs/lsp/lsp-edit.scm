@@ -137,12 +137,18 @@
                  (lsp-diagnostic-message d))))))
 
 (define (severity-paths l severity)
-  (with b (buffer-path)
+  ;; (in the order of the text: the editor looks for the visible ones by
+  ;; a binary search, when there are many)
+  (let* ((b (buffer-path))
+         (xs (sort (list-filter l (lambda (x) (== (car x) severity)))
+                   (lambda (x y)
+                     (or (< (list-ref x 1) (list-ref y 1))
+                         (and (== (list-ref x 1) (list-ref y 1))
+                              (< (list-ref x 2) (list-ref y 2))))))))
     (append-map (lambda (x)
-                  (if (!= (car x) severity) '()
-                      (list (append b (list (list-ref x 1) (list-ref x 2)))
-                            (append b (list (list-ref x 3) (list-ref x 4))))))
-                l)))
+                  (list (append b (list (list-ref x 1) (list-ref x 2)))
+                        (append b (list (list-ref x 3) (list-ref x 4)))))
+                xs)))
 
 (define lsp-max-diagnostics 1000)
 
@@ -488,6 +494,10 @@
 
 (define (followed-buffer?)
   (== (ahash-ref followed (url->string (current-buffer))) #t))
+
+(tm-define (lsp-buffer-followed?)
+  (:synopsis "Does a language server follow the current buffer?")
+  (followed-buffer?))
 
 (tm-define (lsp-completion-here?)
   ;; tab completes after a word, a . a -> or a ::, in a source file which a

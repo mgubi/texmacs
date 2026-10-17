@@ -176,15 +176,19 @@
   (with lan (get-env "prog-language")
     (if (in? lan '("" "verbatim")) "Program" (format-get-name lan))))
 
-;; in a program, its language only: the fonts and the colours of code are
-;; those of its language (the font of source files is a preference)
+;; in a source file, its language only: the fonts and the colours of code
+;; are those of its language, and its font is a preference (code in a
+;; document keeps the tools of the document)
+(tm-define (footer-in-source?)
+  (and (in-prog?) (== (get-init "mode") "prog")))
+
 (menu-bind texmacs-footer-environment
   (if (in-text?)
       (=> (balloon (eval (footer-language-label)) "Language")
           (link text-language-menu)))
   (if (in-math?) (text "Math"))
   (if (in-prog?) (text (footer-prog-label)))
-  (if (not (in-prog?))
+  (if (not (footer-in-source?))
       (=> (balloon (eval (footer-font-label)) "Font")
           (link footer-font-menu))
       (=> (balloon (eval (footer-size-label)) "Font size")

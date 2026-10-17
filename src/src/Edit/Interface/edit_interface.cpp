@@ -810,8 +810,17 @@ edit_interface_rep::update_diagnostic_rects (rectangle new_visible) {
   diagnostic_rects = array<rectangles> ();
   diagnostic_colors= array<color> ();
   for (int k=0; k<3; k++) {
-    range_set sel= get_alt_selection (names[k]);
-    if (is_empty (sel)) continue;
+    range_set all= get_alt_selection (names[k]);
+    if (is_empty (all)) continue;
+    // the ranges which are still ranges of the text, before the search of
+    // the visible ones (which computes the selections of some of them);
+    // the program gives them in the order of the text
+    range_set sel;
+    for (int i=0; i+1<N(all); i+=2)
+      if (valid_cursor_path (et, all[i]) &&
+          valid_cursor_path (et, all[i+1]) &&
+          !path_less (all[i+1], all[i]))
+        sel << all[i] << all[i+1];
     color col= named_color (colors[k]);
     int b= 0, e= N(sel);
     if (e - b >= 200) {
@@ -819,9 +828,6 @@ edit_interface_rep::update_diagnostic_rects (rectangle new_visible) {
       e= min (find_alt_selection_index (sel, vy1, b, e) + 100, e);
     }
     for (int i=b; i+1<e; i+=2) {
-      if (!valid_cursor_path (et, sel[i]) ||
-          !valid_cursor_path (et, sel[i+1]) ||
-          path_less (sel[i+1], sel[i])) continue;
       selection s= compute_selection (simple_range (sel[i], sel[i+1]));
       if (N(s->rs) == 0) continue;
       diagnostic_rects  << s->rs;

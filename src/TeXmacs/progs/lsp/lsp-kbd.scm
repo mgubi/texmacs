@@ -23,8 +23,17 @@
         (lsp lsp-edit)
         (lsp lsp-actions)))
 
+(tm-define (lsp-followed?)
+  (:synopsis "Does a language server follow the current buffer?")
+  (and (lsp-on?) (lsp-buffer-followed?)))
+
+;; the keys are those of the buffers which a server follows: elsewhere F12
+;; and S-F12 keep their meaning (the slides, the folds)
+(texmacs-modes
+  (in-lsp% (lsp-followed?) in-prog%))
+
 (kbd-map
-  (:mode in-prog?)
+  (:mode in-lsp?)
   ("F12" (lsp-goto-definition))
   ("S-F12" (lsp-hover))
   ("F8" (lsp-next-diagnostic #t))
