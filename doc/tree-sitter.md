@@ -463,6 +463,19 @@ grammar.
 - Only the autotools build compiles it so far (not CMake, not the browser
   build). External scanners would be callbacks into Scheme (not done).
 
+Queries run in the C engine too (`tree-sitter-query-new`,
+`tree-sitter-query-captures`, which evaluates `#eq?`, `#match?`,
+`#any-of?` and their negations). This needs the query tables of `parser.c`
+from the generator (public symbols, aliases of non-terminals, primary
+states, supertypes); with them the captures of `highlights.scm` and
+`tags.scm` of tree-sitter-c and of `highlights.scm` of tree-sitter-json are
+those of the compiled parsers, and with predicates the 8814 captures of C
+`highlights.scm` on `parser.c` are those of `tree-sitter query`, in order
+(7 ms for parse and query in TeXmacs). The `.scm` query files are not
+Scheme: s7 reads them, Guile stops at `#match?`, and captures,
+quantifiers and anchors follow their node, so the C engine is the simpler
+way to use them.
+
 With the hybrid, option E keeps its advantages (no compiled code per
 grammar) without the speed penalty; the generator stays in Scheme and runs
 once per grammar (10-35 s for C), its output can be cached or shipped.
