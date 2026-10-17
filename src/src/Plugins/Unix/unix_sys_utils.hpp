@@ -23,6 +23,9 @@ int unix_system (array<string> arg,
 		 array<int> fd_in, array<string> str_in,
 		 array<int> fd_out, array<string*> str_out);
 
+int unix_spawn_shell (string cmd, int fd_in, int fd_out, int fd_err,
+                      array<int> fd_close);
+
 string unix_get_login ();
 string unix_get_username ();
 

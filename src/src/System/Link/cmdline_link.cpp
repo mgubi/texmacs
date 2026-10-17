@@ -29,6 +29,9 @@
 #include <signal.h>
 #include <sys/wait.h>
 #define TM_FD_SET(fd, set) FD_SET(fd, set)
+#ifdef __wasi__
+#include "Unix/unix_sys_utils.hpp" // unix_spawn_shell
+#endif
 #else
 namespace wsoc {
 #include <winsock2.h>
@@ -196,7 +199,15 @@ cmdline_link_rep::write (string s, int channel) {
   int e1= pipe (pp_in ); (void) e1;
   int e2= pipe (pp_out); (void) e2;
   int e3= pipe (pp_err); (void) e3;
+#ifdef __wasi__
+  // no fork in WASIX, but posix_spawn
+  array<int> parent_ends;
+  parent_ends << pp_in[CMDOUT] << pp_out[CMDIN] << pp_err[CMDIN];
+  pid= unix_spawn_shell (cmd, pp_in[CMDIN], pp_out[CMDOUT], pp_err[CMDOUT],
+                         parent_ends);
+#else
   pid= fork ();
+#endif
   if (pid < 0) { // no process (a page has none): not a live program
     int* fds[3]= { pp_in, pp_out, pp_err };
     for (int i= 0; i < 3; i++)
@@ -205,6 +216,7 @@ cmdline_link_rep::write (string s, int channel) {
     errbuf << "Error: cannot start '" << cmd << "'\n";
     return;
   }
+#ifndef __wasi__
   if (pid==0) { // the child
     setsid();
     close (pp_in  [CMDOUT]);
@@ -221,7 +233,9 @@ cmdline_link_rep::write (string s, int channel) {
     exit (127);
     // exit (system (cmd) != 0);
   }
-  else { // the main process
+  else
+#endif
+  { // the main process
     in = pp_in  [CMDOUT];
     close (pp_in [CMDIN]);
     out= pp_out [CMDIN ];

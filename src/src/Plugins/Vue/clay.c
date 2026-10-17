@@ -8,8 +8,9 @@
 #include <stdio.h>  // snprintf, for vue_clay_capacity_report
 
 // the renderer of the Clay examples, through SDL's own renderer and
-// SDL3_ttf: not in the browser build (see VUE_SDL_RENDERER in vue_gui.cpp)
-#ifndef __EMSCRIPTEN__
+// SDL3_ttf: not in the browser and WASIX builds (see VUE_SDL_RENDERER in
+// vue_gui.cpp)
+#if !defined(__EMSCRIPTEN__) && !defined(__wasi__)
 #include "clay_renderer_SDL3.c"
 #endif
 #include <assert.h>

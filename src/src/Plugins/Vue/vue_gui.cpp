@@ -57,8 +57,8 @@
 #endif
 #endif
 // SDL3_ttf serves only the rendering through SDL's own renderer (see
-// vue_sdl_window_rep), which the browser build leaves out
-#ifndef __EMSCRIPTEN__
+// vue_sdl_window_rep), which the browser and WASIX builds leave out
+#if !defined(__EMSCRIPTEN__) && !defined(__wasi__)
 #define VUE_SDL_RENDERER 1
 #endif
 #ifdef VUE_SDL_RENDERER

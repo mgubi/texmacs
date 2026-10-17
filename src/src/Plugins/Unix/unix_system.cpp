@@ -63,6 +63,13 @@ string texmacs_get_last_error_str() {
   return strerror(errno);
 }
 
+#ifdef __wasi__
+// WASIX declares flock but does not implement it: the files are not locked
+// (a WASIX TeXmacs runs alone in its file system)
+static int tm_flock(int fd, int op) { (void) fd; (void) op; return 0; }
+#define flock tm_flock
+#endif
+
 void texmacs_lock_file(FILE *&file, bool nonblock) {
   int file_descriptor = fileno(file);
   int flags = LOCK_EX;
@@ -174,12 +181,28 @@ texmacs_dirent texmacs_readdir (TEXMACS_DIR dirp) {
   return {true, texmacs_ainsi_to_utf8 (entry->d_name)};
 }
 
+#ifdef __wasi__
+// the file systems of Wasmer give no permissions (st_mode is the type
+// only): a file is taken as readable and writable, a directory as
+// searchable too, else TeXmacs found none of its files
+static int
+wasix_permissions (int ret, struct_stat* buf) {
+  if (ret == 0 && (buf->st_mode & 0777) == 0)
+    buf->st_mode |= S_ISDIR (buf->st_mode)? 0755: 0644;
+  return ret;
+}
+#else
+#define wasix_permissions(ret, buf) (ret)
+#endif
+
 int texmacs_stat (string filename, struct_stat* buf) {
-  return stat (texmacs_utf8_string_to_system_string (filename).c_str(), buf);
+  return wasix_permissions
+    (stat (texmacs_utf8_string_to_system_string (filename).c_str(), buf), buf);
 }
 
 int texmacs_lstat (string filename, struct_stat* buf) {
-  return lstat (texmacs_utf8_string_to_system_string (filename).c_str(), buf);
+  return wasix_permissions
+    (lstat (texmacs_utf8_string_to_system_string (filename).c_str(), buf), buf);
 }
 
 bool texmacs_mkdir (string dirname, int mode) {

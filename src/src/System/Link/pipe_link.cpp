@@ -30,6 +30,9 @@
 #include <errno.h>
 #include <fcntl.h>
 #endif
+#ifdef __wasi__
+#include "Unix/unix_sys_utils.hpp" // unix_spawn_shell
+#endif
 #if !defined(__APPLE__) && !defined(__FreeBSD__)
 #include <malloc.h>
 #endif
@@ -237,11 +240,18 @@ pipe_link_rep::start () {
   argv[1]= const_cast<char*> ("-c");
   argv[2]= _cmd;
   argv[3]= NULL;
+#ifdef __wasi__
+  // no fork in WASIX, but posix_spawn (the ends of TeXmacs are FD_CLOEXEC)
+  pid= unix_spawn_shell (cmd, pp_in[IN], pp_out[OUT], pp_err[OUT],
+                         array<int> ());
+#else
   pid= fork ();
+#endif
   if (pid < 0) { // no process: not a live program
     close_pipes ();
     return "Error: cannot start '" * cmd * "'";
   }
+#ifndef __wasi__
   if (pid==0) { // the child
     setsid();
     close (pp_in  [OUT]);
@@ -256,7 +266,9 @@ pipe_link_rep::start () {
     execve ("/bin/sh", argv, environ);
     _exit (127);
   }
-  else { // the main process
+  else
+#endif
+  { // the main process
     in = pp_in  [OUT];
     close (pp_in [IN]);
     out= pp_out [IN ];

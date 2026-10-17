@@ -71,6 +71,7 @@ config.status
 packages/msix/AppxManifest.xml
 packages/msix/AppxManifestStore.xml
 /build-wasm/
+/build-wasix/
 # the makefile of the browser build is a source, not a generated file
 !/misc/wasm/Makefile
 

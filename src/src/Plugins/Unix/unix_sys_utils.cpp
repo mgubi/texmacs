@@ -261,6 +261,44 @@ _new_session (_spawnattr_t& attr) {
 #endif
 }
 
+int
+unix_spawn_shell (string cmd, int fd_in, int fd_out, int fd_err,
+                  array<int> fd_close) {
+  // Run "sh -c cmd" in a new session, with fd_in, fd_out and fd_err as its
+  // standard input, output and error, the descriptors fd_close closed in
+  // it; the pid of the process, or -1. Where there is no fork (WASIX: the
+  // pipes of the plugins), as the fork and exec of pipe_link do elsewhere
+  _file_actions_t file_actions;
+  if (file_actions.status () != 0) return -1;
+  int fds[3]= { fd_in, fd_out, fd_err };
+  for (int i= 0; i < 3; i++)
+    if (posix_spawn_file_actions_adddup2 (&file_actions.rep, fds[i], i) != 0)
+      return -1;
+  for (int i= 0; i < 3; i++)
+    if (fds[i] > 2 &&
+        posix_spawn_file_actions_addclose (&file_actions.rep, fds[i]) != 0)
+      return -1;
+  for (int i= 0; i < N(fd_close); i++)
+    if (posix_spawn_file_actions_addclose (&file_actions.rep, fd_close[i]) != 0)
+      return -1;
+  _spawnattr_t attr;
+  if (!_new_session (attr)) return -1;
+  c_string _cmd (cmd);
+  char* argv[4];
+  argv[0]= const_cast<char*> ("sh");
+  argv[1]= const_cast<char*> ("-c");
+  argv[2]= _cmd;
+  argv[3]= NULL;
+  pid_t pid;
+#ifdef __EMSCRIPTEN__
+  return -1; // no processes in the browser
+#else
+  if (posix_spawn (&pid, "/bin/sh", &file_actions.rep, &attr.rep,
+                   argv, environ) != 0) return -1;
+  return (int) pid;
+#endif
+}
+
 // time during which the output of a terminated command is still collected
 // (processes which it started in the background may hold its pipes)
 #define _LINGER_TIME 2000
@@ -545,6 +583,16 @@ unix_system_finished (unix_process_rep* rep,
   // NOTE: the process is only reaped at the end, so that its process
   // group still exists, and can be killed (see unix_system_kill)
   if (!rep->exited) {
+#ifdef __wasi__
+    // no waitid in WASIX: the process is reaped at once (its group cannot
+    // be killed afterwards; the waitpid below then finds nothing)
+    int st;
+    pid_t w= waitpid (rep->pid, &st, WNOHANG);
+    if (w == 0) return false;
+    rep->exited= true;
+    if (w < 0 || !WIFEXITED (st)) rep->status= -1;
+    else rep->status= WEXITSTATUS (st);
+#else
     siginfo_t info;
     info.si_pid= 0;
     int wret= waitid (P_PID, rep->pid, &info, WEXITED | WNOHANG | WNOWAIT);
@@ -552,6 +600,7 @@ unix_system_finished (unix_process_rep* rep,
     rep->exited= true;
     if (wret != 0 || info.si_code != CLD_EXITED) rep->status= -1;
     else rep->status= info.si_status;
+#endif
   }
   if ((rep->has_in && !rep->in.finished) ||
       !rep->out.finished || !rep->err.finished)
