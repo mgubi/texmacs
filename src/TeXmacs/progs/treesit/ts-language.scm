@@ -286,7 +286,9 @@
   (let ((g (parse-grammar-json (string->json json-string))))
     (prepare-syntax-grammar! g)
     (expand-tokens! g)
-    (tables->language g (build-tables! g))))
+    (let ((l (tables->language g (build-tables! g))))
+      (ts-profile "language")
+      l)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Saving and loading

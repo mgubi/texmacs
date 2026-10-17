@@ -974,21 +974,36 @@
 ;; All the tables
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(define profile-start #f)
+(define profile-last 0)
+(define-public (ts-profile what)
+  ;; with TS_PROFILE=1, the time since the last step, in ms
+  (when (and (defined? 'getenv) (getenv "TS_PROFILE"))
+    (let ((now (texmacs-time)))
+      (when profile-start
+        (display* "ts-profile: " what " " (- now profile-last) " ms\n"))
+      (set! profile-start #t)
+      (set! profile-last now))))
+
 (define-public (build-tables! g)
   ;; the parse table of build-parse-table, completed
+  (ts-profile "start")
   (let* ((t (build-parse-table g))
-         (b (ahash-ref t 'builder))
+         (b (begin (ts-profile "lr") (ahash-ref t 'builder)))
          (states (ahash-ref t 'states))
          (tc (make-token-conflict-map g (following-tokens g b)))
-         (ci (make-coincident-index g states))
-         (keywords (identify-keywords g tc ci)))
+         (ci (begin (ts-profile "token conflicts") (make-coincident-index g states)))
+         (keywords (begin (ts-profile "coincident") (identify-keywords g tc ci))))
     (populate-error-state! g states tc ci keywords)
     (ahash-set! t 'symbols (used-symbols g states))
+    (ts-profile "keywords, error state")
     (let* ((states (merge-compatible-states! g states tc keywords))
-           (states (begin (remove-unit-reductions! g states) states))
+           (states (begin (ts-profile "merge") (remove-unit-reductions! g states) states))
            (states (remove-unused-states states))
            (states (reorder-states-by-descending-size states))
-           (lex (build-lex-tables g states keywords tc ci)))
+           (lex (begin (ts-profile "unit, unused, reorder")
+                       (build-lex-tables g states keywords tc ci))))
+      (ts-profile "lex")
       (ahash-set! t 'external-lex-states (populate-external-lex-states! g states))
       (mark-fragile-tokens! states tc)
       (ahash-set! t 'states states)

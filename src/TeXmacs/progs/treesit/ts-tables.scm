@@ -84,8 +84,12 @@
 (define start-production
   (vector (vector (vector (non-terminal 0) #f #f #f #f 65535)) 0 #f))
 
-(define-public (item-production g item)
-  (if (< (vector-ref item 1) 0) start-production (g-production g (vector-ref item 1))))
+;; An item is #(var prod step inherited? key production step prev-step
+;; sort-key): the production, the step at the dot and the one before (or #f)
+;; are those of the grammar, computed once; the sort key orders as item<?.
+;; Items are made by make-lr-item only, shared and never modified.
+
+(define-public (item-production g item) (vector-ref item 5))
 
 (define-public (item-var item) (vector-ref item 0))
 (define-public (item-prod item) (vector-ref item 1))
@@ -94,19 +98,14 @@
 (define-public (item-key item) (vector-ref item 4))
 (define-public (item-augmented? item) (< (vector-ref item 0) 0))
 
-(define-public (item-step g item)
-  (let ((p (item-production g item)) (i (item-step-index item)))
-    (and (< i (prod-length p)) (prod-step p i))))
+(define-public (item-step g item) (vector-ref item 6))
 
 (define-public (item-symbol g item)
-  (let ((s (item-step g item))) (and s (step-symbol s))))
+  (let ((s (vector-ref item 6))) (and s (step-symbol s))))
 
-(define-public (item-done? g item)
-  (= (item-step-index item) (prod-length (item-production g item))))
+(define-public (item-done? g item) (not (vector-ref item 6)))
 
-(define (item-prev-step g item)
-  (and (> (item-step-index item) 0)
-       (prod-step (item-production g item) (- (item-step-index item) 1))))
+(define (item-prev-step g item) (vector-ref item 7))
 
 (define-public (item-precedence g item)
   (let ((s (item-prev-step g item))) (and s (step-prec s))))
@@ -126,7 +125,7 @@
                   (ts-take steps dot))
           (list-tail steps dot))))
 
-(define (make-key-table) (vector (make-ahash-table) (make-ahash-table)))
+(define (make-key-table) (vector (make-ahash-table) (make-ahash-table) (make-ahash-table)))
 
 (define (item-key-of g keys var prod step inherited?)
   ;; an integer identifying the item, memoized by the production and step
@@ -144,8 +143,24 @@
           (ahash-set! memo k id)
           id))))
 
+(define item-key-limit 2097152)
+
 (define (make-lr-item g keys var prod step inherited?)
-  (vector var prod step inherited? (item-key-of g keys var prod step inherited?)))
+  ;; the item, shared with the earlier ones of the same fields
+  (let* ((memo (vector-ref keys 2))
+         (k (+ (* (+ (* (+ (* (+ prod 1) 1024) step) 2) (if inherited? 1 0)) 1048576) (+ var 1))))
+    (or (ahash-ref memo k)
+        (let* ((key (item-key-of g keys var prod step inherited?))
+               (p (if (< prod 0) start-production (g-production g prod)))
+               (n (prod-length p))
+               (item (vector var prod step inherited? key p
+                             (and (< step n) (prod-step p step))
+                             (and (> step 0) (prod-step p (- step 1)))
+                             (+ (* (+ (* step item-key-limit) var 1) item-key-limit) key))))
+          (when (or (>= key item-key-limit) (>= (+ var 1) item-key-limit))
+            (ts-error "too many items for the sort keys"))
+          (ahash-set! memo k item)
+          item))))
 
 (define (item-successor g keys item)
   (make-lr-item g keys (item-var item) (item-prod item) (+ (item-step-index item) 1)
@@ -158,13 +173,8 @@
   (make-lr-item g keys (item-var item) (item-prod item) (item-step-index item) #t))
 
 (define (item<? a b)
-  ;; the order of tree-sitter: step, then variable, then the rest
-  (let ((sa (item-step-index a)) (sb (item-step-index b)))
-    (or (< sa sb)
-        (and (= sa sb)
-             (let ((va (item-var a)) (vb (item-var b)))
-               (or (< va vb)
-                   (and (= va vb) (< (item-key a) (item-key b)))))))))
+  ;; the order of tree-sitter: step, then variable, then the key
+  (< (vector-ref a 8) (vector-ref b 8)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Lookahead sets
@@ -219,14 +229,48 @@
   (ts-sort (map cdr (ahash-table->list set))
            (lambda (a b) (item<? (vector-ref a 0) (vector-ref b 0)))))
 
+;; Item sets are identified by vectors of integers (the key of an item
+;; determines its variable), interned in a table from a hash of the vector
+;; to the alist of the vectors with that hash and their ids: smaller and
+;; faster to hash than lists of lists.
+
 (define (entries-signature entries)
-  ;; what identifies an item set
-  (ts-map (lambda (e) (list (item-var (vector-ref e 0)) (item-key (vector-ref e 0))
-                            (vector-ref e 1) (vector-ref e 2)))
-          entries))
+  ;; what identifies an item set: key, lookaheads and reserved of each item
+  (let ((v (make-vector (* 3 (length entries)) 0)))
+    (let loop ((l entries) (i 0))
+      (if (null? l) v
+          (let ((e (car l)))
+            (vector-set! v i (item-key (vector-ref e 0)))
+            (vector-set! v (+ i 1) (vector-ref e 1))
+            (vector-set! v (+ i 2) (vector-ref e 2))
+            (loop (cdr l) (+ i 3)))))))
 
 (define (entries-core entries)
-  (ts-map (lambda (e) (cons (item-var (vector-ref e 0)) (item-key (vector-ref e 0)))) entries))
+  ;; what identifies the core of an item set: the keys of its items
+  (list->vector (ts-map (lambda (e) (item-key (vector-ref e 0))) entries)))
+
+(define (int-vector-hash v)
+  (let loop ((i 0) (h (vector-length v)))
+    (if (= i (vector-length v)) h
+        (loop (+ i 1) (modulo (+ (* h 31) (vector-ref v i)) 1000000007)))))
+
+(define (make-vector-table) (vector (make-ahash-table) 0))
+
+(define (vector-table-ref t v)
+  ;; the id of v, or #f
+  (let ((bucket (ahash-ref (vector-ref t 0) (int-vector-hash v))))
+    (and bucket (let ((x (assoc v bucket))) (and x (cdr x))))))
+
+(define (vector-table-intern! t v)
+  ;; the id of v, a new one (0, 1, ...) if v was not there
+  (let* ((h (int-vector-hash v))
+         (bucket (or (ahash-ref (vector-ref t 0) h) '()))
+         (x (assoc v bucket)))
+    (if x (cdr x)
+        (let ((id (vector-ref t 1)))
+          (ahash-set! (vector-ref t 0) h (cons (cons v id) bucket))
+          (vector-set! t 1 (+ id 1))
+          id))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; First and last sets, closures
@@ -541,8 +585,8 @@
          (states (make-gvec))
          (kernels (make-gvec))
          (preceding (make-gvec))
-         (state-ids (make-ahash-table))
-         (core-ids (make-ahash-table))
+         (state-ids (make-vector-table))
+         (core-ids (make-vector-table))
          (queue '())
          (queue-tail '())
          (non-terminal-extra-states '())
@@ -557,19 +601,16 @@
         (if (null? queue) (set! queue cell) (set-cdr! queue-tail cell))
         (set! queue-tail cell)))
     (define (add-state! preceding-symbols aux-symbols entries)
+      ;; preceding-symbols are in reverse order, sharing their tails
       (let* ((sig (entries-signature entries))
-             (old (ahash-ref state-ids sig)))
+             (old (vector-table-ref state-ids sig)))
         (or old
-            (let* ((core (entries-core entries))
-                   (core-id (or (ahash-ref core-ids core)
-                                (let ((id (ahash-size core-ids)))
-                                  (ahash-set! core-ids core id)
-                                  id)))
+            (let* ((core-id (vector-table-intern! core-ids (entries-core entries)))
                    (id (gvec-length states)))
               (gvec-push! states (make-state id core-id))
               (gvec-push! kernels entries)
               (gvec-push! preceding preceding-symbols)
-              (ahash-set! state-ids sig id)
+              (vector-table-intern! state-ids sig)
               (enqueue! (cons id aux-symbols))
               id))))
     (define (production-id item)
@@ -687,7 +728,7 @@
                                    "unresolved conflict for symbol sequence: "
                                    (apply string-append
                                           (ts-map (lambda (s) (string-append (symbol-name g s) " "))
-                                                  preceding-symbols))
+                                                  (reverse preceding-symbols)))
                                    "* " (symbol-name g lookahead)
                                    "; add a conflict for these rules: "
                                    (apply string-append
@@ -776,7 +817,7 @@
         (for-each
          (lambda (kv)
            (let* ((symbol (car kv))
-                  (next-id (add-state! (append preceding-symbols (list symbol)) aux-symbols
+                  (next-id (add-state! (cons symbol preceding-symbols) aux-symbols
                                        (item-set-entries (cdr kv))))
                   (te (state-entry! state symbol)))
              (when (pair? (entry-actions te)) (set! conflicted (ts-insert symbol conflicted)))
@@ -784,7 +825,7 @@
          (ts-sort (ahash-table->list terminal-successors) (lambda (a b) (< (car a) (car b)))))
         (for-each
          (lambda (kv)
-           (let ((next-id (add-state! (append preceding-symbols (list (car kv))) aux-symbols
+           (let ((next-id (add-state! (cons (car kv) preceding-symbols) aux-symbols
                                       (item-set-entries (cdr kv)))))
              (om-set! (state-nonterminals state) (car kv) (list 'goto next-id))))
          (ts-sort (ahash-table->list non-terminal-successors) (lambda (a b) (< (car a) (car b)))))
@@ -852,6 +893,7 @@
           (set! queue (cdr queue))
           (add-actions! (car e) (cdr e)
                         (transitive-closure g keys b (gvec-ref kernels (car e))))
+          (gvec-set! kernels (car e) #f)
           (loop))))
     (let ((t (make-ahash-table)))
       (ahash-set! t 'states states)
