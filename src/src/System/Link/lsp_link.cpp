@@ -18,6 +18,7 @@
 
 #include "lsp_link.hpp"
 #include "analyze.hpp"
+#include "convert.hpp"
 #include "scheme.hpp"
 #include "tm_timer.hpp"
 
@@ -336,4 +337,39 @@ lsp_stop (int id) {
   if (c == NULL) return;
   c->ln->stop ();
   c->removed= true;
+}
+
+/******************************************************************************
+* The text of a document
+******************************************************************************/
+
+static string
+lsp_line_text (tree t) {
+  // a line which is not a string, on one line
+  if (is_atomic (t)) return cork_to_utf8 (t->label);
+  string s= utf8_to_cork (tree_to_verbatim (t, false, "SourceCode"));
+  return cork_to_utf8 (replace (s, "\n", " "));
+}
+
+string
+lsp_document_text (tree t) {
+  // the same text as lsp-lines->text of lsp-lines in Scheme, without the
+  // lists of the lines there (each line converted apart: a newline is a
+  // character in Cork)
+  if (is_atomic (t)) {
+    array<string> a= tokenize (t->label, "\n");
+    string r;
+    for (int i=0; i<N(a); i++) {
+      if (i > 0) r << "\n";
+      r << cork_to_utf8 (a[i]);
+    }
+    return r;
+  }
+  if (!is_func (t, DOCUMENT)) return lsp_line_text (t);
+  string r;
+  for (int i=0; i<N(t); i++) {
+    if (i > 0) r << "\n";
+    r << lsp_line_text (t[i]);
+  }
+  return r;
 }

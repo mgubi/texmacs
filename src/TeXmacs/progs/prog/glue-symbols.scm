@@ -723,6 +723,7 @@
 "lsp-listen"
 "lsp-alive?"
 "lsp-stop"
+"lsp-document-text"
 "widget-printer"
 "widget-color-picker"
 "widget-extend"

@@ -790,6 +790,7 @@
   (lsp-listen lsp_listen (void int int))
   (lsp-alive? lsp_alive (bool int))
   (lsp-stop lsp_stop (void int))
+  (lsp-document-text lsp_document_text (string tree))
 
   ;; widgets
   (widget-printer printer_widget (widget command url))

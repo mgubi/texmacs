@@ -5587,6 +5587,14 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(lsp-document-text <scm-arg|tree>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|lsp_document_text> which returns
+    <scm|string>.
+  </explain>
+
+  <\explain>
     <scm|(widget-printer <scm-arg|command> <scm-arg|url>)>
 <explain-synopsis|no synopsis>
   <|explain>

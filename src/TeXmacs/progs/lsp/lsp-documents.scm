@@ -266,6 +266,11 @@
   (:synopsis "The lines of the buffer, in Cork")
   (lsp-lines (buffer-get-body (the-buffer opt))))
 
+(tm-define (lsp-buffer-text . opt)
+  (:synopsis "The text of the buffer, in utf8, for its server")
+  ;; (built in C++: lists of the lines of a long file would fill the heap)
+  (lsp-document-text (buffer-get-body (the-buffer opt))))
+
 (tm-define (lsp-buffer-client . opt)
   (:synopsis "The client of the server of the buffer (started if needed)")
   (let ((lan (apply lsp-buffer-language opt))
@@ -286,7 +291,7 @@
       (lsp-document-open c (apply lsp-buffer-uri opt)
                          (lsp-language-id (apply lsp-buffer-language opt)
                                           (apply lsp-buffer-path opt))
-                         (lsp-lines->text (apply lsp-buffer-lines opt))))
+                         (apply lsp-buffer-text opt)))
     c))
 
 (tm-define (lsp-buffer-sync . opt)
@@ -296,7 +301,7 @@
     (when (and c uri (lsp-client-alive? c))
       (if (lsp-document-open? c uri)
           (lsp-document-change c uri
-                               (lsp-lines->text (apply lsp-buffer-lines opt)))
+                               (apply lsp-buffer-text opt))
           (apply lsp-buffer-open opt)))
     c))
 

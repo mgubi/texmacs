@@ -30,4 +30,8 @@ bool   lsp_alive (int id);
 void   lsp_stop (int id);
 void   process_all_lsp ();
 
+// The text of a source document (the lines of a document tree), in utf8,
+// for its server: a line which is not a string (markup) is its verbatim text
+string lsp_document_text (tree t);
+
 #endif // LSP_LINK_H

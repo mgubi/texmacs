@@ -9472,6 +9472,19 @@ tmg_lsp_stop (tmscm arg1) {
 }
 
 tmscm
+tmg_lsp_document_text (tmscm arg1) {
+  TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "lsp-document-text");
+
+  tree in1= tmscm_to_tree (arg1);
+
+  // TMSCM_DEFER_INTS;
+  string out= lsp_document_text (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return string_to_tmscm (out);
+}
+
+tmscm
 tmg_widget_printer (tmscm arg1, tmscm arg2) {
   TMSCM_ASSERT_COMMAND (arg1, TMSCM_ARG1, "widget-printer");
   TMSCM_ASSERT_URL (arg2, TMSCM_ARG2, "widget-printer");
@@ -12484,6 +12497,7 @@ initialize_glue_basic () {
   tmscm_install_procedure ("lsp-listen",  tmg_lsp_listen, 2, 0, 0);
   tmscm_install_procedure ("lsp-alive?",  tmg_lsp_aliveP, 1, 0, 0);
   tmscm_install_procedure ("lsp-stop",  tmg_lsp_stop, 1, 0, 0);
+  tmscm_install_procedure ("lsp-document-text",  tmg_lsp_document_text, 1, 0, 0);
   tmscm_install_procedure ("widget-printer",  tmg_widget_printer, 2, 0, 0);
   tmscm_install_procedure ("widget-color-picker",  tmg_widget_color_picker, 3, 0, 0);
   tmscm_install_procedure ("widget-extend",  tmg_widget_extend, 2, 0, 0);
