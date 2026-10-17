@@ -846,10 +846,10 @@ edit_interface_rep::apply_changes () {
   // the zoom came back to that of the layout). Not a change of the
   // environment, which would typeset everything again: set_zoom says what
   // to typeset
-  if (zoom_waiting && texmacs_time () - zoom_time >= zoom_wait) {
-    if (get_init_value (ZOOM_FACTOR) == as_string (zoomf)) zoom_waiting= false;
-    else env_change |= THE_EXTENTS;
-  }
+  // (when the zoom came back to that of the layout, the extents and the
+  // picture of the zoom in between are made again below)
+  if (zoom_waiting && texmacs_time () - zoom_time >= zoom_wait)
+    env_change |= THE_EXTENTS;
 
   if (env_change == 0) {
     if (last_change-last_update > 0 &&
@@ -868,8 +868,15 @@ edit_interface_rep::apply_changes () {
   if (is_attached (this) && has_current_window ()) {
     tree new_zoom= as_string (zoomf);
     tree old_zoom= get_init_value (ZOOM_FACTOR);
-    if (new_zoom == old_zoom)
+    if (new_zoom == old_zoom) {
+      // a zoom which waited came back to that of the layout: the extents
+      // and the picture were made at the zoom in between
+      if (zoom_waiting) {
+        notify_change (THE_EXTENTS);
+        send_invalidate_all (this);
+      }
       zoom_waiting= false;
+    }
     else if (zoom_defers ()) {
       // the boxes typeset at the previous zoom are drawn at the new one
       if (!zoom_waiting || zoom_shown != zoomf) {
