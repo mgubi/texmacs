@@ -66,7 +66,8 @@
   as the files need them.
 
   The setting is the preference <verbatim|lsp> (<verbatim|on> or
-  <verbatim|off>). Only files on disk are followed.
+  <verbatim|off>). Only files on disk are followed. The other preference of
+  the servers is <verbatim|lsp:mouse hover> (see below).
 
   <paragraph*|Projects>
 
@@ -90,6 +91,27 @@
   <verbatim|compile_flags.txt> with one compiler option per line, at the top
   of the project.
 
+  <paragraph*|How the servers are run>
+
+  A server is a program on your computer, which <TeXmacs> starts itself
+  and with which it communicates through the standard input and output of
+  the program. There is one server for each language and each project: it
+  is started the first time a file of that language and that project is
+  opened, the other files of the project then share it, and a file of
+  another project gets a server of its own. When it starts, a server is
+  told the directory of its project (the <verbatim|rootUri> and the
+  <verbatim|workspaceFolders> of the protocol), which is how
+  <verbatim|clangd>, for instance, finds the <verbatim|compile_commands.json>
+  of the project.
+
+  <TeXmacs> does not send options of its own to the servers (no
+  <verbatim|initializationOptions> nor <verbatim|workspace/configuration>):
+  each server is configured with its own files, as with other editors, for
+  instance a <verbatim|.clangd> file for <verbatim|clangd> or the
+  <verbatim|pyproject.toml> of a <name|Python> project for
+  <verbatim|pylsp> and <verbatim|pyright>. Servers which run on another
+  computer, reached through a network connection, are not supported yet.
+
   <paragraph*|Choosing the servers>
 
   The servers of a format can be changed in your personal initialization
@@ -103,7 +125,18 @@
     (lsp-server-set! "python" '("pyright-langserver --stdio"))
   </scm-code>
 
-  A command may also start with the full path of the program.
+  A command may also start with the full path of the program, and may be
+  followed by its options, separated by spaces.
+
+  A server can be given in the same way for another language, provided
+  <TeXmacs> has a format for its files: the language of a file is its
+  format (<verbatim|cpp>, <verbatim|c>, <verbatim|python>...) or, for a
+  buffer in program mode, its programming language. For instance, if the
+  <name|Rust> files have a format <verbatim|rust>:
+
+  <\scm-code>
+    (lsp-server-set! "rust" '("rust-analyzer"))
+  </scm-code>
 
   <paragraph*|Diagnostics>
 
