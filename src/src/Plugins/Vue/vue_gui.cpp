@@ -11,6 +11,9 @@
 #include "vue_gui.hpp"
 #include "vue_widget.hpp"
 #include "vue_gpu.hpp"
+#ifdef __wasi__
+#include "vue_stream.hpp" // the display of WASIX, a stream to a host
+#endif
 
 #include "array.hpp"
 #include "hashmap.hpp"
@@ -587,6 +590,9 @@ vue_sdl_base_window_rep::update_title () {
   // SDL takes UTF-8, the names of TeXmacs are in its own encoding
   c_string s (cork_to_utf8 (name));
   SDL_SetWindowTitle (sdl_win, s);
+#ifdef __wasi__
+  vue_stream_title (cork_to_utf8 (name));
+#endif
 }
 
 void
@@ -1239,6 +1245,9 @@ vue_sdl_mupdf_window_rep::process_redraw () {
     static int reported= 0;
     if (reported++ < 3) SDL_Log ("SDL_UpdateWindowSurface failed: %s", SDL_GetError ());
   }
+#ifdef __wasi__
+  vue_stream_present (sdl_win, window_surf);
+#endif
   if (vue_profile_on) vue_upload_ns += SDL_GetTicksNS () - t_ns;
   t1= t2; t2= texmacs_time ();
   if (DEBUG_VUE && t2 - t1 > 30)
@@ -1803,6 +1812,10 @@ single_window_mode () {
 #ifdef __EMSCRIPTEN__
   return true;
 #else
+#ifdef __wasi__
+  // one window for the host of the stream (its windows are virtual)
+  if (vue_stream_on ()) return true;
+#endif
   static int on= -1;
   if (on < 0) {
     string v= get_env ("TEXMACS_VUE_SINGLE_WINDOW");
@@ -2040,6 +2053,9 @@ vue_virtual_window_rep::update_title () {
   if (promoted && the_host != NULL) {
     c_string s (cork_to_utf8 (mod_name));
     SDL_SetWindowTitle (the_host->sdl_win, s);
+#ifdef __wasi__
+    vue_stream_title (cork_to_utf8 (mod_name));
+#endif
   }
 }
 
@@ -2164,6 +2180,9 @@ set_frame_cursor (int e) {
   }
   if (cursors[e] == NULL) cursors[e]= SDL_CreateSystemCursor (c);
   if (cursors[e] != NULL) SDL_SetCursor (cursors[e]);
+#ifdef __wasi__
+  vue_stream_cursor ((int) c);
+#endif
 }
 
 void
@@ -3130,6 +3149,9 @@ void gui_open (int& argc, char** argv) {
   // (SDL drops them by default), see the kinetic scrolling notes below
   SDL_SetHint (SDL_HINT_MAC_SCROLL_MOMENTUM, "1");
   SDL_SetMainReady (); // TeXmacs has its own main (no SDL_main.h)
+#ifdef __wasi__
+  vue_stream_open (); // the dummy driver of SDL, the stream to the host
+#endif
   if (!SDL_Init (SDL_INIT_VIDEO)) { // no audio backend is needed
     SDL_Log ("Unable to initialize SDL: %s", SDL_GetError ());
     exit (-1);
@@ -3761,6 +3783,11 @@ apply_default_focus () {
 static bool
 loop_poll (SDL_Event* event) {
   watch_may_run= true;
+#ifdef __wasi__
+  // the events of the host, once those of the last ones have been handled
+  // (the text events point to texts which the next pump replaces)
+  if (vue_stream_on () && !SDL_PollEvent (NULL)) vue_stream_pump ();
+#endif
   bool r= SDL_PollEvent (event);
   watch_may_run= false;
   return r;
@@ -3776,6 +3803,15 @@ loop_wait (int ms) {
 #ifdef __EMSCRIPTEN__
   (void) ms; // the browser paces the frames (see gui_start_loop)
 #else
+#ifdef __wasi__
+  // woken by the host (the events of SDL come from it only)
+  if (vue_stream_on ()) {
+    watch_may_run= true;
+    if (!SDL_PollEvent (NULL)) vue_stream_wait (ms);
+    watch_may_run= false;
+    return;
+  }
+#endif
   watch_may_run= true;
   SDL_WaitEventTimeout (NULL, ms);
   watch_may_run= false;
@@ -4777,6 +4813,9 @@ mouse_buttons () {
   float x, y;
   Uint32 buttons= SDL_GetGlobalMouseState (&x, &y);
   if (script_active) buttons= script_buttons; // synthetic events
+#ifdef __wasi__
+  if (vue_stream_on ()) buttons= vue_stream_buttons (); // those of the host
+#endif
   return buttons;
 }
 

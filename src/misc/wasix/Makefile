@@ -36,7 +36,8 @@ export WASIXCC_WASM_EXCEPTIONS := yes
 CC       := $(WASIXCC)/wasixcc
 CXX      := $(WASIXCC)/wasix++
 
-SOURCES  := $(shell cat $(W)/sources.txt)
+# (and the stream of the display, which only WASIX has: vue_stream.hpp)
+SOURCES  := $(shell cat $(W)/sources.txt) Plugins/Vue/vue_stream.cpp
 OBJECTS  := $(patsubst %,$(OBJ)/%.o,$(basename $(SOURCES)))
 HUNSPELL := hunspell-1.7.2
 HUNSPELL_SRC := affentry affixmgr csutil filemgr hashmgr hunspell hunzip \

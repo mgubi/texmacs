@@ -772,9 +772,15 @@ immediate_options (int argc, char** argv) {
 }
 
 #include <cstdio>
+#ifdef __wasi__
+#include "Vue/vue_stream.hpp" // vue_stream_redirect
+#endif
 
 int
 texmacs_entrypoint (int argc, char** argv) {
+#ifdef __wasi__
+  vue_stream_redirect (); // before anything is printed (TEXMACS_DISPLAY=stream)
+#endif
   immediate_options (argc, argv);
 
 #ifdef STACK_SIZE
