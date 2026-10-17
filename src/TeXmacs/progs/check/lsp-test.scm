@@ -29,7 +29,8 @@
         (lsp lsp-base)
         (lsp lsp-client)
         (lsp lsp-documents)
-        (lsp lsp-edit)))
+        (lsp lsp-edit)
+        (lsp lsp-actions)))
 
 (define events '())
 
@@ -217,6 +218,7 @@
 
 (define e-acute (string (integer->char 233)))   ; in Cork
 (define smiley "<#1F600>")                       ; beyond U+FFFF
+(define smiley-utf8 (bytes 240 159 152 128))     ; the same, in utf8
 
 (define (test-texts)
   (check-group "texts")
@@ -397,7 +399,13 @@
     (lsp-document-change c "file:///a.c" "int y;\n")
     (check= (lsp-ref (cAr sent) "params" "textDocument" "version")
             '(json-number "2"))
-    (check= (lsp-ref (cAr sent) "params" "contentChanges" 0 "text") "int y;\n")
+    ;; (the server takes changes: only y replaces x)
+    (check= (lsp-ref (cAr sent) "params" "contentChanges" 0)
+            '(attr "range" (attr "start" (attr "line" (json-number "0")
+                                               "character" (json-number "4"))
+                                 "end" (attr "line" (json-number "0")
+                                             "character" (json-number "5")))
+                   "text" "y"))
     (check= (lsp-document-version c "file:///a.c") 2)
     (lsp-document-save c "file:///a.c")
     (check= (lsp-ref (cAr sent) "params" "text") "int y;\n")
@@ -485,7 +493,8 @@
               '(attr "line" (json-number "1") "character" (json-number "9")))
       (when (url-exists-in-path? "clangd")
         (test-clangd path)
-        (test-editor))
+        (test-editor)
+        (test-actions))
       (buffer-close u)
       (when (buffer-exists? old) (switch-to-buffer old))))
   (system-rmdir-recursive (system->url lsp-dir)))
@@ -635,6 +644,159 @@
           (check= (lsp-client-entry "cpp" root) #f))))
     (when (buffer-exists? u) (buffer-close u))))
 
+;; the edits of servers, without a server
+
+(define (change old new)
+  (with c (lsp-text-change old new)
+    (list (lsp-number-value (lsp-ref c "range" "start" "line"))
+          (lsp-number-value (lsp-ref c "range" "start" "character"))
+          (lsp-number-value (lsp-ref c "range" "end" "line"))
+          (lsp-number-value (lsp-ref c "range" "end" "character"))
+          (lsp-ref c "text"))))
+
+(define (text-edit l1 c1 l2 c2 text)
+  (lsp-object "range"
+              (lsp-object "start" (lsp-object "line" (lsp-number l1)
+                                              "character" (lsp-number c1))
+                          "end" (lsp-object "line" (lsp-number l2)
+                                            "character" (lsp-number c2)))
+              "newText" text))
+
+(define (test-edits)
+  (check-group "edits")
+  ;; incremental changes
+  (check= (change "int x;\n" "int y;\n") '(0 4 0 5 "y"))
+  (check= (change "a" "ab") '(0 1 0 1 "b"))
+  (check= (change "a\nb\n" "a\nx\nb\n") '(1 0 1 0 "x\n"))
+  (check= (change "a\nbc\n" "a\n") '(1 0 2 0 ""))
+  ;; (a change inside a character of two bytes replaces it whole)
+  (check= (change (string-append (bytes 195 169) "\n")
+                  (string-append (bytes 195 168) "\n"))
+          (list 0 0 0 1 (bytes 195 168)))
+  (check= (change (string-append "x" smiley-utf8 "y") (string-append "x" smiley-utf8 "z"))
+          '(0 3 0 4 "z"))
+  ;; text edits on lines, from the last one to the first
+  (check= (lsp-apply-to-lines '("int x = 1;" "foo")
+                              (list (text-edit 0 4 0 5 "yy")
+                                    (text-edit 1 0 1 3 "bar\nbaz")))
+          '("int yy = 1;" "bar" "baz"))
+  (check= (lsp-apply-to-lines '("a" "b" "c") (list (text-edit 0 1 2 0 "")))
+          '("ac"))
+  (check= (lsp-apply-to-lines '("ab") (list (text-edit 0 1 0 1 "1")
+                                           (text-edit 0 2 0 2 "2")))
+          '("a1b2"))
+  ;; the lines of a document tree, changed where they differ
+  (with t (stree->tree '(document "a" "b" "c"))
+    ;; (1 line replaced and 1 inserted, in 2 places of the old ones)
+    (check= (lsp-set-lines t '("a" "B" "c" "d")) 3)
+    (check= (tree->stree t) '(document "a" "B" "c" "d"))
+    (lsp-set-lines t '("a" "d"))
+    (check= (tree->stree t) '(document "a" "d")))
+  ;; workspace edits, as a map or as document changes
+  (check= (map car (lsp-workspace-edit-files
+                    (lsp-object "changes"
+                                (lsp-object "file:///a.c"
+                                            (lsp-array (text-edit 0 0 0 0 "x"))
+                                            "file:///b.c" (lsp-array)))))
+          '("file:///a.c" "file:///b.c"))
+  (check= (map car (lsp-workspace-edit-files
+                    (lsp-object "documentChanges"
+                                (lsp-array
+                                 (lsp-object "textDocument"
+                                             (lsp-object "uri" "file:///c.c"
+                                                         "version" (lsp-null))
+                                             "edits" (lsp-array))))))
+          '("file:///c.c"))
+  ;; signatures, the current parameter in bold
+  (with sig (lsp-object "signatures"
+                        (lsp-array (lsp-object "label" "int f(int a, int b)"
+                                               "parameters"
+                                               (lsp-array
+                                                (lsp-object "label" "int a")
+                                                (lsp-object "label" "int b"))))
+                        "activeParameter" (lsp-number 1))
+    (check= (lsp-signature-markup sig)
+            '(concat "int f(int a, " (strong "int b") ")")))
+  (check= (lsp-signature-markup
+           (lsp-object "signatures"
+                       (lsp-array (lsp-object "label" "g(x)"
+                                              "parameters"
+                                              (lsp-array
+                                               (lsp-object "label"
+                                                           (lsp-array
+                                                            (lsp-number 2)
+                                                            (lsp-number 3))))))
+                       "activeParameter" (lsp-number 0)))
+          '(concat "g(" (strong "x") ")"))
+  ;; the point under the mouse (the hovers at rest)
+  (update-forced)
+  (check-true (list? (xy->path 0 0))))
+
+;; the actions of clangd, on a third file of the project
+
+(define actions-text
+  (string-append "int   twice (int v) { return 2*v; }\n"
+                 "int main () {\n"
+                 "  int a= twicee (1);\n"
+                 "  return a + twice (a);\n"
+                 "}\n"))
+
+(define (test-actions)
+  (check-group "actions")
+  (let* ((path (lsp-file "proj/src/actions.cpp"))
+         (u (system->url path))
+         (uri (lsp-path->uri path))
+         (c #f))
+    (string-save actions-text u)
+    (load-buffer u)
+    (notify-buffer-changed (url->string u))
+    (lsp-sync-pending)
+    (set! c (lsp-buffer-client*))
+    (check-true (and c (lsp-client-alive? c)))
+    (when c
+      (lsp-wait c (lambda () (nnull? (lsp-diagnostics uri))) 20000)
+      ;; the page of the diagnostics
+      (lsp-show-diagnostics-list)
+      (with page (current-buffer)
+        (check-true (url-rooted-tmfs? page))
+        (check-true (string-contains?
+                     (object->string (tree->stree (buffer-get-body page)))
+                     "twicee"))
+        (switch-to-buffer u)
+        (buffer-close page))
+      ;; a quick fix: did you mean twice?
+      (go-to-path (append (buffer-path) '(2 10)))
+      (with r (lsp-code-actions-at-cursor)
+        (check-true (and r (nnull? (cadr r))))
+        (when (and r (nnull? (cadr r)))
+          (lsp-run-action c (car (cadr r)))))
+      (check= (list-ref (lsp-buffer-lines) 2) "  int a= twice (1);")
+      ;; the signature of twice
+      (go-to-path (append (buffer-path) '(3 20)))
+      (with a (lsp-request-wait c "textDocument/signatureHelp"
+                                (lsp-object "textDocument" (lsp-object "uri" uri)
+                                            "position" (lsp-cursor-position))
+                                10000)
+        (check= (car a) 'result)
+        (check-true (string-contains? (object->string
+                                       (lsp-signature-markup (cadr a)))
+                                      "int v")))
+      ;; a rename everywhere
+      (go-to-path (append (buffer-path) '(0 8)))
+      (lsp-rename "thrice")
+      (with all (apply string-append (lsp-buffer-lines))
+        (check-false (string-contains? all "twice"))
+        (check= (length (string-decompose all "thrice")) 4))
+      ;; the formatting of the whole file
+      (lsp-format)
+      (check-false (string-starts? (list-ref (lsp-buffer-lines) 0) "int   "))
+      ;; after the changes (incremental ones), the server sees no errors
+      (lsp-wait c (lambda () (null? (lsp-diagnostics uri))) 20000)
+      (check= (lsp-diagnostics uri) '())
+      (lsp-stop-servers)
+      (lsp-client-forget "cpp" (lsp-file "proj")))
+    (when (buffer-exists? u) (buffer-close u))))
+
 (define (test-ended)
   (check-group "servers which end")
   ;; a server which ends at once is not started again at each request
@@ -680,6 +842,7 @@
   (test-end)
   (when (not (or (os-mingw?) (os-win32?)))
     (test-ended))
+  (test-edits)
   (test-documents)
   (test-diagnostics)
   (test-buffer)

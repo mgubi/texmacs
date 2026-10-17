@@ -72,8 +72,66 @@
                                             "version" (lsp-number 1)
                                             "text" text))))))
 
+;; Incremental changes: the old and the new text have a common start and a
+;; common end (bytes of utf8, at the boundaries of characters); what lies
+;; between them in the old text is replaced by what lies between them in
+;; the new one, and the range is given as positions (line, UTF-16 units)
+
+(define (continuation? s i)
+  ;; is the byte @i of the utf8 string @s inside a character?
+  (and (< i (string-length s))
+       (with c (char->integer (string-ref s i))
+         (and (>= c 128) (< c 192)))))
+
+(define (common-start a b)
+  (let* ((n (min (string-length a) (string-length b))))
+    (let loop ((i 0))
+      (if (and (< i n) (== (string-ref a i) (string-ref b i)))
+          (loop (+ i 1))
+          ;; (back to the start of a character)
+          (let back ((i i))
+            (if (and (> i 0) (or (continuation? a i) (continuation? b i)))
+                (back (- i 1))
+                i))))))
+
+(define (common-end a b start)
+  ;; the length of the common end of @a and @b, after @start in both
+  (let* ((na (string-length a)) (nb (string-length b))
+         (n (- (min na nb) start)))
+    (let loop ((k 0))
+      (if (and (< k n)
+               (== (string-ref a (- na k 1)) (string-ref b (- nb k 1))))
+          (loop (+ k 1))
+          ;; (the end begins at the start of a character)
+          (let fwd ((k k))
+            (if (and (> k 0) (continuation? a (- na k)))
+                (fwd (- k 1))
+                k))))))
+
+(define (offset->position s i)
+  ;; the position (line, UTF-16 units) of the byte @i of the utf8 @s
+  (let loop ((j 0) (line 0) (start 0))
+    (if (>= j i)
+        (lsp-object "line" (lsp-number line)
+                    "character" (lsp-number
+                                 (lsp-utf16-length (substring s start i))))
+        (if (== (string-ref s j) #\newline)
+            (loop (+ j 1) (+ line 1) (+ j 1))
+            (loop (+ j 1) line start)))))
+
+(tm-define (lsp-text-change old new)
+  (:synopsis "The incremental change (a TextDocumentContentChangeEvent)")
+  (let* ((a (common-start old new))
+         (k (common-end old new a)))
+    (lsp-object "range"
+                (lsp-object "start" (offset->position old a)
+                            "end" (offset->position old
+                                                    (- (string-length old) k)))
+                "text" (substring new a (- (string-length new) k)))))
+
 (tm-define (lsp-document-change c uri text)
   (:synopsis "The document @uri now has @text: sent if it has changed")
+  ;; the change only, when the server takes them (kind 2), else the text
   (with d (ahash-ref (lsp-client-ref c 'documents) uri)
     (when (and d (!= (cadr d) text) (> (sync-kind c) 0))
       (with v (+ (car d) 1)
@@ -83,7 +141,10 @@
                                 (lsp-object "uri" uri
                                             "version" (lsp-number v))
                                 "contentChanges"
-                                (lsp-array (lsp-object "text" text))))))))
+                                (lsp-array
+                                 (if (== (sync-kind c) 2)
+                                     (lsp-text-change (cadr d) text)
+                                     (lsp-object "text" text)))))))))
 
 (tm-define (lsp-document-save c uri)
   (:synopsis "The document @uri has been saved")

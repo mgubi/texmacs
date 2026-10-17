@@ -187,6 +187,7 @@
   (key-press-complete complete_keypress (bool string))
   (mouse-any mouse_any (void string int int int double array_double))
   (get-mouse-position get_mouse_position (array_SI))
+  (xy->path xy_to_path (path int int))
   (set-mouse-pointer set_pointer (void string string))
   (set-predef-mouse-pointer set_pointer (void string))
   

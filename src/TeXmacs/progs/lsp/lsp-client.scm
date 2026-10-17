@@ -198,9 +198,31 @@
     "completion" (lsp-object
                   "completionItem" (lsp-object "snippetSupport"
                                                (lsp-boolean #f)))
-    "definition" (lsp-object))
+    "definition" (lsp-object)
+    "formatting" (lsp-object)
+    "rangeFormatting" (lsp-object)
+    "rename" (lsp-object "prepareSupport" (lsp-boolean #f))
+    "signatureHelp"
+    (lsp-object "signatureInformation"
+                (lsp-object "parameterInformation"
+                            (lsp-object "labelOffsetSupport"
+                                        (lsp-boolean #t))))
+    "codeAction"
+    (lsp-object "codeActionLiteralSupport"
+                (lsp-object "codeActionKind"
+                            (lsp-object "valueSet"
+                                        (lsp-array "quickfix" "refactor"
+                                                   "refactor.extract"
+                                                   "refactor.inline"
+                                                   "refactor.rewrite"
+                                                   "source"
+                                                   "source.organizeImports")))))
    "workspace" (lsp-object "configuration" (lsp-boolean #t)
-                           "workspaceFolders" (lsp-boolean #t))
+                           "workspaceFolders" (lsp-boolean #t)
+                           "applyEdit" (lsp-boolean #t)
+                           "workspaceEdit" (lsp-object "documentChanges"
+                                                       (lsp-boolean #t))
+                           "executeCommand" (lsp-object))
    "window" (lsp-object "workDoneProgress" (lsp-boolean #t))))
 
 (tm-define (lsp-client-initialize c root)

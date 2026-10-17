@@ -8459,6 +8459,14 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(xy-\<gtr\>path <scm-arg|int> <scm-arg|int>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|xy_to_path> which returns
+    <scm|path>.
+  </explain>
+
+  <\explain>
     <scm|(set-mouse-pointer <scm-arg|string> <scm-arg|string>)>
 <explain-synopsis|no synopsis>
   <|explain>

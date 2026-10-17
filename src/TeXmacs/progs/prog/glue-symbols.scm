@@ -1082,6 +1082,7 @@
 "key-press-complete"
 "mouse-any"
 "get-mouse-position"
+"xy->path"
 "set-mouse-pointer"
 "set-predef-mouse-pointer"
 "go-to-path"

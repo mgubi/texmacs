@@ -144,15 +144,20 @@
                             (append b (list (list-ref x 3) (list-ref x 4))))))
                 l)))
 
+(define lsp-max-diagnostics 1000)
+
 (tm-define (lsp-show-diagnostics)
   (:synopsis "Shows the diagnostics of the current buffer")
   (let* ((uri (lsp-buffer-uri))
          (lines (lsp-buffer-lines))
-         (l (if uri
-                (list-filter (map (lambda (d) (diagnostic-item d lines))
-                                  (lsp-diagnostics uri))
-                             identity)
-                '())))
+         ;; (at most lsp-max-diagnostics: a file with thousands of
+         ;; warnings would make each redraw slow)
+         (all (if uri (lsp-diagnostics uri) '()))
+         (ds (if (> (length all) lsp-max-diagnostics)
+                 (sublist all 0 lsp-max-diagnostics)
+                 all))
+         (l (list-filter (map (lambda (d) (diagnostic-item d lines)) ds)
+                         identity)))
     (when uri
       (ahash-remove! stale uri)
       (ahash-set! shown uri l))
@@ -450,25 +455,174 @@
     (close-tooltip hover-id)
     (set! hover-id #f)))
 
+(define (show-hover r p anchor type)
+  ;; the hover @r in a balloon at the tree @anchor (of the path @p): type
+  ;; "keyboard" (closed when the cursor moves) or "mouse" (when the mouse
+  ;; leaves it); #f if it says nothing
+  (let* ((text (if (and r (not (lsp-null? r))) (hover-text r) ""))
+         (l (useful-lines text)))
+    (cond ((null? l) #f)
+          ((headless?)
+           (set-message (utf8->cork (car l))
+                        (if (null? (cdr l)) "" (utf8->cork (cadr l))))
+           #t)
+          (else
+           (let ((id (string-append "lsp-hover:" (object->string p)))
+                 (doc (lsp-hover-document text)))
+             (set! hover-id id)
+             (show-tooltip id anchor `(preview-balloon ,doc)
+                           "auto" "auto" type 0.8)
+             #t)))))
+
 (tm-define (lsp-hover)
   (:synopsis "Shows what the language server says about the cursor")
   ;; in a balloon at the cursor, as the previews of references (show-tooltip,
   ;; preview-balloon); it is closed when the cursor moves
   (lsp-hover-close)
-  (let* ((r (request-at-cursor "textDocument/hover" "hoverProvider"))
-         (text (if (and r (not (lsp-null? r))) (hover-text r) ""))
-         (l (useful-lines text)))
-    (cond ((null? l)
-           (when r (set-message "No information" "")))
-          ((headless?)
-           (set-message (utf8->cork (car l))
-                        (if (null? (cdr l)) "" (utf8->cork (cadr l)))))
-          (else
-        (let ((id (string-append "lsp-hover:" (object->string (cursor-path))))
-              (doc (lsp-hover-document text)))
-          (set! hover-id id)
-          (show-tooltip id (cursor-tree) `(preview-balloon ,doc)
-                        "auto" "auto" "keyboard" 0.8))))))
+  (with r (request-at-cursor "textDocument/hover" "hoverProvider")
+    (when (and r (not (show-hover r (cursor-path) (cursor-tree) "keyboard")))
+      (set-message "No information" ""))))
+
+;; Information at the mouse: when the mouse rests on a word of a source file
+;; which a server follows (preference "lsp:mouse hover"), the hover of the
+;; server is asked, and shown if the mouse is still there
+
+(define mouse-last #f)        ; (x y time) of the last move
+(define mouse-scheduled? #f)
+(define mouse-at #f)          ; the path asked last
+(define mouse-request #f)     ; (client . id) of the hover awaited
+(define mouse-rest 600)       ; ms
+
+(tm-define (lsp-mouse-hover-on?)
+  (!= (get-preference "lsp:mouse hover") "off"))
+
+(define (mouse-word? p)
+  ;; is the position @p (in a line) on a word?
+  (with t (path->tree (cDr p))
+    (and (tree-atomic? t)
+         (let ((s (tree->string t)) (o (cAr p)))
+           (and (< o (string-length s))
+                (word-char? (string-ref s o)))))))
+
+(define (mouse-hover x y)
+  (let* ((p (xy->path x y))
+         (b (buffer-path))
+         (r (and (list-starts? p b) (list-tail p (length b))))
+         (c (lsp-buffer-client*))
+         (uri (lsp-buffer-uri))
+         (u (current-buffer)))
+    (when (and r (= (length r) 2) (!= p mouse-at) c uri
+               (capable? c "hoverProvider") (mouse-word? p))
+      (set! mouse-at p)
+      (when mouse-request
+        (lsp-cancel (car mouse-request) (cdr mouse-request)))
+      (lsp-buffer-sync)
+      (set! mouse-request
+        (cons c (lsp-request
+                 c "textDocument/hover"
+                 (lsp-object "textDocument" (lsp-object "uri" uri)
+                             "position" (lsp-position (lsp-buffer-lines)
+                                                      (car r) (cadr r)))
+                 (lambda (res e)
+                   (set! mouse-request #f)
+                   ;; (only if the mouse is still on the same word)
+                   (when (and (not e) mouse-last (== (current-buffer) u)
+                              (== (xy->path (car mouse-last) (cadr mouse-last))
+                                  p))
+                     (lsp-hover-close)
+                     (show-hover res p (path->tree (cDr p)) "mouse")))))))))
+
+(define (mouse-check)
+  (set! mouse-scheduled? #f)
+  (when mouse-last
+    (with dt (- (texmacs-time) (caddr mouse-last))
+      (if (< dt mouse-rest)
+          (begin
+            (set! mouse-scheduled? #t)
+            (delayed (:pause (+ (- mouse-rest dt) 20)) (mouse-check)))
+          (mouse-hover (car mouse-last) (cadr mouse-last))))))
+
+(tm-define (mouse-event key x y mods time data)
+  ;; (no mode predicates: see notify-cursor-moved)
+  (former key x y mods time data)
+  (when (and (== key "move") (lsp-on?) (followed-buffer?)
+             (lsp-mouse-hover-on?))
+    (set! mouse-last (list x y (texmacs-time)))
+    (when (not mouse-scheduled?)
+      (set! mouse-scheduled? #t)
+      (delayed (:pause mouse-rest) (mouse-check)))))
+
+;; Signatures: after a ( or a , (the trigger characters of the server), the
+;; signature of the function whose arguments are typed is shown on the
+;; status bar, with the current argument in bold
+
+(define signature-shown? #f)
+
+(define (signature-triggers c)
+  (with l (lsp-items (lsp-ref (lsp-client-capabilities c)
+                              "signatureHelpProvider" "triggerCharacters"))
+    (if (null? l) '("(" ",") l)))
+
+(define (bold-parameter label param)
+  ;; the Cork markup of @label (utf8) with its part @param (a string, or
+  ;; offsets) in bold
+  (let* ((range (cond ((string? param)
+                       (with i (string-search-forwards param 0 label)
+                         (and (>= i 0) (list i (+ i (string-length param))))))
+                      ((func? param 'tuple 2)
+                       (let ((a (lsp-number-value (cadr param)))
+                             (b (lsp-number-value (caddr param))))
+                         (and a b (<= 0 a b (string-length label))
+                              (list a b))))
+                      (else #f))))
+    (if (not range) (utf8->cork label)
+        `(concat ,(utf8->cork (substring label 0 (car range)))
+                 (strong ,(utf8->cork (substring label (car range)
+                                                 (cadr range))))
+                 ,(utf8->cork (substring label (cadr range)
+                                         (string-length label)))))))
+
+(tm-define (lsp-signature-markup r)
+  (:synopsis "The markup of the SignatureHelp @r, or #f")
+  (let* ((sigs (lsp-items (lsp-ref r "signatures")))
+         (i (or (lsp-number-value (lsp-ref r "activeSignature")) 0))
+         (s (and (nnull? sigs)
+                 (if (< i (length sigs)) (list-ref sigs i) (car sigs))))
+         (label (and s (lsp-ref s "label")))
+         (ap (and s (or (lsp-number-value (lsp-ref r "activeParameter"))
+                        (lsp-number-value (lsp-ref s "activeParameter")))))
+         (param (and ap (lsp-ref s "parameters" ap "label"))))
+    (and (string? label) (bold-parameter label param))))
+
+(tm-define (lsp-signature-help)
+  (:synopsis "Shows the signature of the function at the cursor")
+  (let ((c (lsp-buffer-client*))
+        (uri (lsp-buffer-uri))
+        (pos (lsp-cursor-position)))
+    (when (and c uri pos (capable? c "signatureHelpProvider"))
+      (lsp-buffer-sync)
+      (lsp-request c "textDocument/signatureHelp"
+                   (lsp-object "textDocument" (lsp-object "uri" uri)
+                               "position" pos)
+                   (lambda (r e)
+                     (with m (and (not e) r (not (lsp-null? r))
+                                  (lsp-signature-markup r))
+                       (cond (m (set! signature-shown? #t)
+                                (set-message m ""))
+                             (signature-shown?
+                              (set! signature-shown? #f)
+                              (set-message "" "")))))))))
+
+(tm-define (keyboard-press key time)
+  ;; (no mode predicates: see notify-cursor-moved)
+  (former key time)
+  (when (and (lsp-on?) (followed-buffer?))
+    (with c (lsp-buffer-client*)
+      (when c
+        (cond ((in? key (signature-triggers c)) (lsp-signature-help))
+              ((and signature-shown? (== key ")"))
+               (set! signature-shown? #f)
+               (set-message "" "")))))))
 
 ;; Definitions
 
@@ -595,6 +749,78 @@
       (:pause 300)
       (lsp-log-refresh))))
 
+(define diags-uri #f)          ; the file whose diagnostics are on the page
+(define diags-refresh? #f)
+
+(define (diags-page)
+  (aux-name "Diagnostics"))
+
+(define (severity-label s)
+  (cond ((== s 'error) `(with "color" "#c02020" "error"))
+        ((== s 'warning) `(with "color" "#b07000" "warning"))
+        ((== s 'hint) "hint")
+        (else "note")))
+
+(define (diags-body uri)
+  ;; the body of the page of the diagnostics of @uri: one line by
+  ;; diagnostic, which goes to it when clicked
+  (let* ((ds (lsp-diagnostics uri))
+         (p (or (lsp-uri->path uri) uri)))
+    `(document
+      (strong ,(utf8->cork p))
+      ,@(if (null? ds) '("No diagnostics")
+            (map (lambda (d)
+                   (let ((l (or (lsp-number-value
+                                 (lsp-ref d "range" "start" "line")) 0))
+                         (ch (or (lsp-number-value
+                                  (lsp-ref d "range" "start" "character")) 0)))
+                     `(action (concat ,(number->string (+ l 1)) ":"
+                                      ,(number->string (+ ch 1)) " "
+                                      ,(severity-label
+                                        (lsp-diagnostic-severity d))
+                                      ": "
+                                      ,(first-line (lsp-diagnostic-message d)))
+                              ,(string-append "(lsp-goto-position "
+                                              (object->string uri) " "
+                                              (number->string l) " "
+                                              (number->string ch) ")"))))
+                 ds)))))
+
+(tm-define (lsp-goto-position uri line ch)
+  (:synopsis "Goes to the line @line and the character @ch of @uri")
+  (:secure #t)
+  (lsp-goto-location uri (lsp-object "start"
+                                     (lsp-object "line" (lsp-number line)
+                                                 "character"
+                                                 (lsp-number ch)))))
+
+(tm-define (lsp-show-diagnostics-list)
+  (:synopsis "Shows the diagnostics of the buffer on a page")
+  ;; the page follows the diagnostics as long as it is open
+  (with uri (lsp-buffer-uri)
+    (if (not uri) (set-message "No language server for this buffer" "")
+        (begin
+          (set! diags-uri uri)
+          (open-auxiliary "Diagnostics"
+                          `(document (style (tuple "generic"))
+                                     (body ,(diags-body uri))))))))
+
+(tm-define (lsp-diagnostics-list-refresh)
+  (set! diags-refresh? #f)
+  (when diags-uri
+    (with u (diags-page)
+      (if (buffer-exists? u)
+          (buffer-set-body u (stree->tree (diags-body diags-uri)))
+          (set! diags-uri #f)))))
+
+(tm-define (lsp-diagnostics-changed uri)
+  (former uri)
+  (when (and (== uri diags-uri) (not diags-refresh?))
+    (set! diags-refresh? #t)
+    (delayed
+      (:pause 300)
+      (lsp-diagnostics-list-refresh))))
+
 (tm-define (lsp-turn-off)
   ;; (they are started again when the preference is on again)
   (lsp-stop-all)
@@ -605,7 +831,8 @@
   (lsp-hide-diagnostics))
 
 (define-preferences
-  ("lsp" "on" (lambda (pref val) (when (== val "off") (lsp-turn-off)))))
+  ("lsp" "on" (lambda (pref val) (when (== val "off") (lsp-turn-off))))
+  ("lsp:mouse hover" "on" (lambda (pref val) (noop))))
 
 ;; the buffers which were loaded before this module
 (delayed
