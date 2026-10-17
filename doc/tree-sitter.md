@@ -516,6 +516,23 @@ suite. As planned initially:
 
 ### Phase 2: syntax trees of code regions
 
+Done (2026-10-17): `Plugins/TreeSitter/syntax_region.cpp`, glue
+`syntax-region-sexp`, `syntax-region-node-at`, `syntax-region-errors`,
+`syntax-region-statistics`, `syntax-region-forget` (region tree and
+language index; results with (row column) positions in the TeXmacs
+strings). One change to the design below: **no observer**. A region keeps
+the lines of its last parse (TeXmacs strings, shared, so the copy is
+cheap); at each request the lines are compared with the current ones and
+the difference becomes one `ts_tree_edit` (first and last changed lines,
+then the common prefix and suffix of the changed text). This covers every
+kind of modification, undo and remote edits included, without following
+the modification stream, and costs one string comparison per line per
+request. Regions are kept for the 32 most recently used roots (by tree
+identity). Tests: 40 random edits of `progs/treesit/ts-parse.scm` (typing
+in symbols, splitting and joining lines), each reparsed incrementally and
+compared with a full parse; entities and Cork characters at their string
+positions; error and missing ranges. As planned initially:
+
 - C++ `syntax_tree` (in `Plugins/TreeSitter`): the `TSTree` of a region (a
   `document` of lines in prog mode, or one string), a line table and the
   parser. Input through `TSInput.read` row by row with

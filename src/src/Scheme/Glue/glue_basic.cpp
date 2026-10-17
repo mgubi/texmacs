@@ -9037,6 +9037,83 @@ tmg_tree_sitter_query_captures (tmscm arg1, tmscm arg2) {
 }
 
 tmscm
+tmg_syntax_region_sexp (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "syntax-region-sexp");
+  TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "syntax-region-sexp");
+
+  tree in1= tmscm_to_tree (arg1);
+  int in2= tmscm_to_int (arg2);
+
+  // TMSCM_DEFER_INTS;
+  string out= syntax_region_sexp (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return string_to_tmscm (out);
+}
+
+tmscm
+tmg_syntax_region_node_at (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4) {
+  TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "syntax-region-node-at");
+  TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "syntax-region-node-at");
+  TMSCM_ASSERT_INT (arg3, TMSCM_ARG3, "syntax-region-node-at");
+  TMSCM_ASSERT_INT (arg4, TMSCM_ARG4, "syntax-region-node-at");
+
+  tree in1= tmscm_to_tree (arg1);
+  int in2= tmscm_to_int (arg2);
+  int in3= tmscm_to_int (arg3);
+  int in4= tmscm_to_int (arg4);
+
+  // TMSCM_DEFER_INTS;
+  object out= syntax_region_node_at (in1, in2, in3, in4);
+  // TMSCM_ALLOW_INTS;
+
+  return object_to_tmscm (out);
+}
+
+tmscm
+tmg_syntax_region_errors (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "syntax-region-errors");
+  TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "syntax-region-errors");
+
+  tree in1= tmscm_to_tree (arg1);
+  int in2= tmscm_to_int (arg2);
+
+  // TMSCM_DEFER_INTS;
+  object out= syntax_region_errors (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return object_to_tmscm (out);
+}
+
+tmscm
+tmg_syntax_region_statistics (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "syntax-region-statistics");
+  TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "syntax-region-statistics");
+
+  tree in1= tmscm_to_tree (arg1);
+  int in2= tmscm_to_int (arg2);
+
+  // TMSCM_DEFER_INTS;
+  array_int out= syntax_region_statistics (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return array_int_to_tmscm (out);
+}
+
+tmscm
+tmg_syntax_region_forget (tmscm arg1) {
+  TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "syntax-region-forget");
+
+  tree in1= tmscm_to_tree (arg1);
+
+  // TMSCM_DEFER_INTS;
+  syntax_region_forget (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
 tmg_server_define_error_codes () {
   // TMSCM_DEFER_INTS;
   server_define_error_codes ();
@@ -12438,6 +12515,11 @@ initialize_glue_basic () {
   tmscm_install_procedure ("tree-sitter-query-new",  tmg_tree_sitter_query_new, 2, 0, 0);
   tmscm_install_procedure ("tree-sitter-query-capture-names",  tmg_tree_sitter_query_capture_names, 1, 0, 0);
   tmscm_install_procedure ("tree-sitter-query-captures",  tmg_tree_sitter_query_captures, 2, 0, 0);
+  tmscm_install_procedure ("syntax-region-sexp",  tmg_syntax_region_sexp, 2, 0, 0);
+  tmscm_install_procedure ("syntax-region-node-at",  tmg_syntax_region_node_at, 4, 0, 0);
+  tmscm_install_procedure ("syntax-region-errors",  tmg_syntax_region_errors, 2, 0, 0);
+  tmscm_install_procedure ("syntax-region-statistics",  tmg_syntax_region_statistics, 2, 0, 0);
+  tmscm_install_procedure ("syntax-region-forget",  tmg_syntax_region_forget, 1, 0, 0);
   tmscm_install_procedure ("server-define-error-codes",  tmg_server_define_error_codes, 0, 0, 0);
   tmscm_install_procedure ("server-start",  tmg_server_start, 0, 0, 0);
   tmscm_install_procedure ("server-stop",  tmg_server_stop, 0, 0, 0);

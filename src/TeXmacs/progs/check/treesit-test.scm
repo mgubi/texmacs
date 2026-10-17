@@ -310,6 +310,94 @@
         (check= (treesit-language "json") id)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Code regions
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (split-lines s)
+  (let loop ((i 0) (start 0) (acc '()))
+    (cond ((= i (string-length s)) (reverse (cons (substring s start i) acc)))
+          ((char=? (string-ref s i) #\newline)
+           (loop (+ i 1) (+ i 1) (cons (substring s start i) acc)))
+          (else (loop (+ i 1) start acc)))))
+
+(define (join-lines l)
+  (if (null? l) ""
+      (apply string-append (car l) (map (lambda (x) (string-append "\n" x)) (cdr l)))))
+
+(define (region-text t)
+  ;; the text of a region, in UTF-8
+  (join-lines (map (lambda (l) (cork->utf8 (tree->string l))) (tree-children t))))
+
+(define (letter? c) (or (char-alphabetic? c) (char=? c #\-)))
+
+(define (safe-line? s)
+  ;; a line which stays valid when split or joined
+  (not (or (string-index s #\;) (string-index s #\") (string-index s #\#)
+           (string-index s #\\) (string-index s #\|) (string-index s #\<))))
+
+(define seed 12345)
+(define (random-below n)
+  (set! seed (modulo (+ (* seed 1103515245) 12345) 2147483648))
+  (modulo (quotient seed 65536) n))
+
+(define (test-region-edits id file edits)
+  ;; edits which keep the program valid: letters typed in symbols, lines
+  ;; split at a space and joined; after each one the tree of the region,
+  ;; brought up to date incrementally, is that of a full parse
+  (let* ((t (stree->tree (cons 'document (map utf8->cork (split-lines (string-load file))))))
+         (n (tree-arity t)))
+    (check= (syntax-region-sexp t id) (tree-sitter-parse-sexp id (region-text t)))
+    (do ((k 0 (+ k 1))) ((= k edits))
+      (let* ((i (random-below (tree-arity t)))
+             (s (tree->string (tree-ref t i)))
+             (kind (random-below 3)))
+        (cond ((and (= kind 0) (> (string-length s) 1))
+               (let ((p (+ 1 (random-below (- (string-length s) 1)))))
+                 (when (and (letter? (string-ref s (- p 1))) (letter? (string-ref s p)))
+                   (tree-insert! (tree-ref t i) p "x"))))
+              ((and (= kind 1) (safe-line? s) (string-index s #\space))
+               (let ((p (string-index s #\space)))
+                 (tree-split! t i p)))
+              ((and (= kind 2) (< (+ i 1) (tree-arity t)) (safe-line? s)
+                    (safe-line? (tree->string (tree-ref t (+ i 1)))))
+               (tree-insert! (tree-ref t i) (string-length s) " ")
+               (tree-join! t i)))
+        (check= (syntax-region-sexp t id) (tree-sitter-parse-sexp id (region-text t)))))
+    (check= (car (syntax-region-statistics t id)) 1)
+    (check-true (> (cadr (syntax-region-statistics t id)) 0))
+    (syntax-region-forget t)))
+
+(define (test-regions)
+  (when (defined? 'syntax-region-sexp)
+    (let ((json (treesit-language "json")))
+      ;; entities and Cork: columns are positions in the TeXmacs strings
+      (let ((t (stree->tree `(document "[\"a<less>b\", " ,(string-append "\"" (utf8->cork (bytes 195 169)) "t\\u00e9\"]")))))
+        (check= (syntax-region-sexp t json)
+                (string-append "(document (array (string (string_content)) "
+                               "(string (string_content) (escape_sequence) (string_content))))"))
+        (check= (car (syntax-region-node-at t json 0 3)) '("string_content" #t (0 2) (0 10) #f))
+        (check= (car (syntax-region-node-at t json 1 3)) '("escape_sequence" #t (1 3) (1 5) #f)))
+      ;; a single string is a region too
+      (check= (syntax-region-sexp (string->tree "[true") json)
+              "(document (array (true) (MISSING \"]\")))")
+      (check= (syntax-region-errors (stree->tree '(document "[1, 2")) json)
+              '(("missing" (0 5) (0 5))))
+      ;; edits of a JSON document
+      (let ((t (stree->tree '(document "{\"a\": [1, 2]," " \"b\": null}"))))
+        (syntax-region-sexp t json)
+        (tree-insert! (tree-ref t 0) 11 ", 3")
+        (tree-set! t 1 " \"b\": {}}")
+        (check= (syntax-region-sexp t json) (tree-sitter-parse-sexp json (region-text t)))
+        (check= (syntax-region-statistics t json) '(1 1))))
+    (treesit-generate-cache "scheme")
+    (let ((scheme (treesit-language "scheme")))
+      (check-true (integer? scheme))
+      (test-region-edits scheme (url-concretize "$TEXMACS_PATH/progs/treesit/ts-parse.scm") 40)
+      ;; <less> is the symbol <
+      (let ((t (stree->tree '(document "(if (<less> a b) a b)"))))
+        (check= (car (syntax-region-node-at t scheme 0 5)) '("symbol" #t (0 5) (0 11) #f))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Master routine
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -324,4 +412,5 @@
   (test-calc)
   (test-c-runtime)
   (test-registry)
+  (test-regions)
   (check-end))

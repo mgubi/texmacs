@@ -684,6 +684,7 @@ list (APPEND TeXmacs_Std_Plugins_SRCS ${TeXmacs_Sqlite_SRCS})
 set (TeXmacs_TreeSitter_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/TreeSitter")
 list (APPEND TeXmacs_Std_Plugins_SRCS
   "${TeXmacs_TreeSitter_DIR}/tree_sitter_glue.cpp"
+  "${TeXmacs_TreeSitter_DIR}/syntax_region.cpp"
   "${TeXmacs_TreeSitter_DIR}/tree_sitter_lib.c"
   "${TeXmacs_TreeSitter_DIR}/ts_dynamic.c")
 # (their include directories are set in src/CMakeLists.txt, where the

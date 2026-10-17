@@ -34,6 +34,13 @@ struct ts_query_entry {
 };
 static array<ts_query_entry*> ts_queries;
 
+const TSLanguage*
+tree_sitter_get_language (int language) {
+  // the language of an index of tree-sitter-language-new, or NULL
+  if (language < 0 || language >= N(ts_languages)) return NULL;
+  return ts_languages[language];
+}
+
 int
 tree_sitter_language_new (string data) {
   c_string s (data);

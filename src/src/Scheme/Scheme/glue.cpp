@@ -34,6 +34,7 @@ typedef unsigned int uint;
 #include "Database/database.hpp"
 #include "Sqlite3/sqlite3.hpp"
 #include "TreeSitter/tree_sitter_glue.hpp"
+#include "TreeSitter/syntax_region.hpp"
 #include "Updater/tm_updater.hpp"
 
 tmscm 

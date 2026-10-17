@@ -742,6 +742,11 @@
   (tree-sitter-query-new tree_sitter_query_new (int int string))
   (tree-sitter-query-capture-names tree_sitter_query_capture_names (array_string int))
   (tree-sitter-query-captures tree_sitter_query_captures (array_int int string))
+  (syntax-region-sexp syntax_region_sexp (string tree int))
+  (syntax-region-node-at syntax_region_node_at (object tree int int int))
+  (syntax-region-errors syntax_region_errors (object tree int))
+  (syntax-region-statistics syntax_region_statistics (array_int tree int))
+  (syntax-region-forget syntax_region_forget (void tree))
 
   ;; TeXmacs servers and clients
   (server-define-error-codes server_define_error_codes (void))
