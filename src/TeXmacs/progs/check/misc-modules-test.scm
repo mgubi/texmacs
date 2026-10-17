@@ -142,6 +142,23 @@
       (buffer-close u)
       (when (buffer-exists? old) (switch-to-buffer old)))))
 
+(define (in-shared-window group)
+  ;; @group with the buffers in one window: with a window per buffer, a page
+  ;; such as the one of the font design opens a window which closing its
+  ;; buffer leaves, and later suites expect a single window. The preference
+  ;; is only changed in memory, nothing is saved
+  (lambda ()
+    (let* ((which "buffer management")
+           (had? (cpp-has-preference? which))
+           (old (get-preference which)))
+      (cpp-set-preference which "shared")
+      (with r (check-run group)
+        (if had?
+            (cpp-set-preference which old)
+            (cpp-reset-preference which))
+        (when (and (pair? r) (== (car r) 'error))
+          (check-report #f "the group" (object->string r)))))))
+
 (define (run-group thunk)
   ;; an error in a group counts as one failure
   (with r (check-run thunk)
@@ -2580,10 +2597,10 @@
                   test-tmdoc-books
                   test-tmdoc-rewrite test-doc-search test-tmdoc-edit
                   test-font-database test-font-design test-cursor-history
-                  test-font-design-page
+                  (in-shared-window test-font-design-page)
                   test-font-design-apply
                   test-font-variants test-font-variant-menus test-font-weights
-                  test-font-design-variants
+                  (in-shared-window test-font-design-variants)
                   test-font-custom test-font-features test-logical-fonts
                   test-font-typesetting test-init-font
                   test-language-names test-translations test-hyphenation
