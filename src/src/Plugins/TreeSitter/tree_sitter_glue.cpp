@@ -15,6 +15,7 @@
 
 #include "tree_sitter_glue.hpp"
 #include "array.hpp"
+#include "hashmap.hpp"
 #include "tm_ostream.hpp"
 #include "file.hpp"
 #include "ts_dynamic.h"
@@ -279,12 +280,30 @@ tree_sitter_query_language (int query) {
    lexer functions of ts-parse.scm act on the current TSLexer through the
    glue tree-sitter-lexer-... The state of the scanner is stored in the
    buffer of tree-sitter as the text of the Scheme value. As create has no
-   argument, each language with a scanner has its own create function. */
+   argument, each language with a scanner has its own create function.
+
+   A scan is called for each token where the parser accepts an external
+   one, so the trampolines avoid the evaluation of Scheme strings: the
+   vectors of the valid tokens are made once for each row of the table of
+   the external states of the language (valid points into it), and the
+   texts of the states are mapped back to the values which were serialized
+   (states are values which are not modified afterwards), so that the
+   reader is only needed for texts from elsewhere. */
 
 struct ts_scanner_entry {
   object create, scan, deserialize, serialize;
   int external_count;
+  const bool* states;          // the table of the external states
+  array<object> valid;         // the vectors of its rows, made when needed
+  hashmap<string,object> read; // the texts of the serialized states
 };
+
+static object
+scanner_procedure (const char* name) {
+  static hashmap<string,object> procs;
+  if (!procs->contains (name)) procs (name)= eval (name);
+  return procs [name];
+}
 static array<ts_scanner_entry*> ts_scanners;
 
 struct ts_scanner_payload {
@@ -322,12 +341,19 @@ scanner_destroy (void* payload) {
 static bool
 scanner_scan (void* payload, TSLexer* lexer, const bool* valid) {
   ts_scanner_payload* p= (ts_scanner_payload*) payload;
-  array<object> v;
-  for (int i= 0; i < p->scanner->external_count; i++) v << object (valid[i]);
+  static object c_lexer= symbol_object ("c-lexer");
+  ts_scanner_entry* e= p->scanner;
+  int n= e->external_count;
+  int row= (valid == NULL || n == 0)? 0: (int) ((valid - e->states) / n);
+  if (row >= N(e->valid) || is_null (e->valid[row])) {
+    array<object> v;
+    for (int i= 0; i < n; i++) v << object (valid != NULL && valid[i]);
+    while (N(e->valid) <= row) e->valid << object ();
+    e->valid[row]= call (scanner_procedure ("list->vector"), as_list_object (v));
+  }
   TSLexer* old= current_lexer;
   current_lexer= lexer;
-  object r= call (p->scanner->scan, p->state, symbol_object ("c-lexer"),
-                  call ("list->vector", as_list_object (v)));
+  object r= call (e->scan, p->state, c_lexer, e->valid[row]);
   current_lexer= old;
   return as_bool (r);
 }
@@ -337,8 +363,13 @@ scanner_serialize (void* payload, char* buffer) {
   ts_scanner_payload* p= (ts_scanner_payload*) payload;
   object v= call (p->scanner->serialize, p->state);
   if (is_bool (v) && !as_bool (v)) return 0;
-  string s= object_to_string (v);
+  string s= as_string (call (scanner_procedure ("object->string"), v));
   if (N(s) > TREE_SITTER_SERIALIZATION_BUFFER_SIZE) return 0;
+  hashmap<string,object>& read= p->scanner->read;
+  if (!read->contains (s)) {
+    if (N(read) >= 4096) read= hashmap<string,object> ();
+    read (s)= v;
+  }
   for (int i= 0; i < N(s); i++) buffer[i]= s[i];
   return (unsigned) N(s);
 }
@@ -346,8 +377,13 @@ scanner_serialize (void* payload, char* buffer) {
 static void
 scanner_deserialize (void* payload, const char* buffer, unsigned length) {
   ts_scanner_payload* p= (ts_scanner_payload*) payload;
-  object v= (length == 0)? object (false):
-            string_to_object (string (buffer, (int) length));
+  object v= object (false);
+  if (length != 0) {
+    string s (buffer, (int) length);
+    hashmap<string,object>& read= p->scanner->read;
+    if (read->contains (s)) v= read [s];
+    else v= call (scanner_procedure ("string->object"), s);
+  }
   call (p->scanner->deserialize, p->state, v);
 }
 
@@ -363,6 +399,7 @@ tree_sitter_set_scanner (int language, object scanner) {
   e->deserialize= call ("vector-ref", scanner, object (2));
   e->serialize= call ("vector-ref", scanner, object (3));
   e->external_count= (int) l->external_token_count;
+  e->states= l->external_scanner.states;
   l->external_scanner.create= scanner_creates[N(ts_scanners)];
   l->external_scanner.destroy= scanner_destroy;
   l->external_scanner.scan= scanner_scan;
