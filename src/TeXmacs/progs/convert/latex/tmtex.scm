@@ -49,8 +49,9 @@
 (define tmtex-image-dir? #f)
 ;; the first bibliography of the document in a CSL style, (NAME FILE KEYS):
 ;; its citations and its bibliography are then those of the LaTeX package
-;; citation-style-language (see "Citations in a CSL style" below)
-(define tmtex-csl #f)
+;; citation-style-language (see "Citations in a CSL style" below); global,
+;; as tmtex-packages, for the predicate of the mode csl-package% (Guile)
+(tm-define tmtex-csl #f)
 (define tmtex-csl-resource "")
 (define tmtex-csl-file? #f)
 (define tmtex-csl-names* 'unknown)
