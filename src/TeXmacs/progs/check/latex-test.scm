@@ -884,6 +884,37 @@
   (check-true (string-contains?
                (tl '(strike-through (document "p" (itemize (document (concat (item) "a"))))))
                "\\item \\sout{a}"))
+  ;; the line goes over the spaces between commands, and over the special
+  ;; characters and formulas with the text around them
+  (check= (tl '(strike-through "50% & #1"))  "\\sout{50\\% \\& \\#1}")
+  (check= (tl '(strike-through (concat "a" (math "x") "b"))) "\\sout{a$x$b}")
+  (check= (string-replace (tl '(marked (concat (em "b") " " (strong "c"))))
+                          "\n" " ")
+          (string-append "{\\tmem{\\tmmarked{yellow}{b}}}\\tmmarked{yellow}{ }"
+                         "{\\tmstrong{\\tmmarked{yellow}{c}}}"))
+  ;; a centered block, a description item and a verbatim block
+  (check= (tl '(strike-through (center (document "a b")))) "{\\center{\\sout{a b}}}")
+  (check-true (string-contains?
+               (tl '(strike-through (description (document (concat (item* "key") "val")))))
+               "\\item[key] \\sout{val}"))
+  (check-false (string-contains?
+                (tl '(strike-through (document "a" (verbatim (document "x" "y")))))
+                "\\sout{\n"))
+  ;; a displayed formula: each cell in \text, in display style
+  (check-true (string-contains?
+               (tl '(strike-through (document "a" (equation (document "x=1")))))
+               "\\text{\\sout{$\\displaystyle x = 1$}}"))
+  (check-true (string-contains?
+               (tl '(marked (document (equation* (document "x=1")))))
+               "\\[ \\text{\\tmmarked{yellow}{$\\displaystyle x = 1$}} \\]"))
+  (with s (tl '(strike-through
+                (align (document (table (row (cell "x") (cell "=1")))))))
+    (check-true (string-contains? s "\\text{\\sout{$\\displaystyle x$}} &"))
+    (check-true (string-contains? s "\\text{\\sout{$\\displaystyle {}="))
+    (check-false (string-contains? s "\\sout{x}")))
+  (check-true (string-contains?
+               (tl '(strike-through (document (equation (document (concat (label "e") "x"))))))
+               "\\label{e}\\text{\\sout{$\\displaystyle x$}}"))
   (with s (td '("article")
               '(document (strike-through "x") (marked "y")
                          (with "marked-color" "#ff8800" (marked "z"))
@@ -892,6 +923,8 @@
     (check-true (string-contains? s "\\usepackage[normalem]{ulem}"))
     (check-true (string-contains? s "multicol}"))
     (check-true (string-contains? s "\\protected\\long\\def\\tmmarked#1#2{"))
+    (check-true (string-contains?
+                 s "\\pdfstringdefDisableCommands{\\def\\tmmarked#1#2{#2}}"))
     (check-true (string-contains? s "\\definecolor{tmhexFF8800}{HTML}{FF8800}"))
     (check-true (string-contains? s "\\definecolor{tmhexDDDDDD}{HTML}{DDDDDD}"))
     (check-true (string-contains? s "[backgroundcolor=tmhexDDDDDD]"))
@@ -911,6 +944,7 @@
           '(with "marked-color" "#ff8800" (marked "z")))
   (check= (lt "\\colorbox{tmhexFF0000}{q}") '(colored-frame "#ff0000" "q"))
   (check= (lt "\\textcolor{tmhex123456}{c}") '(with "color" "#123456" "c"))
+  (check= (lt "\\textcolor{tmhexGGGGGG}{c}") '(with "color" "tmhexGGGGGG" "c"))
   (for (x '((strike-through "x") (marked "y")
             (with "marked-color" "#ff8800" (marked "z"))
             (colored-frame "#ff0000" "q")))
@@ -924,11 +958,13 @@
 (define (latex-compile name doc)
   (let* ((dir (system->url latex-pdf-dir))
          (tex (url-append dir (string-append name ".tex")))
-         (log (url-append dir (string-append name ".log"))))
+         (log (url-append dir (string-append name ".log")))
+         (out (url-append dir (string-append name ".out"))))
     (when (not (url-exists? dir)) (system-mkdir dir))
     (string-save doc tex)
     (with r (run-pdflatex tex)
-      (list r (if (url-exists? log) (string-load log) "")))))
+      (list r (if (url-exists? log) (string-load log) "")
+            (if (url-exists? out) (string-load out) "")))))
 
 (define (remove-latex-pdf-dir)
   (with d (system->url latex-pdf-dir)
@@ -973,14 +1009,38 @@
                                           " " (marked "marked") " title"))
                          (with "par-columns" "2" (document ,long))
                          (colored-frame "#f00" "q")
-                         (with "ornament-color" "#dddddd" (ornamented "o")))))
+                         (with "ornament-color" "#dddddd" (ornamented "o"))
+                         ;; displayed formulas, centered blocks, lists of
+                         ;; descriptions, verbatim and code blocks
+                         (strike-through
+                          (document "a" (equation (document (concat (label "eq") "x=1")))
+                                    (align (document (table (row (cell "x") (cell "=1"))
+                                                            (row (cell "y") (cell "=2")))))
+                                    (eqnarray* (document (table (row (cell "x") (cell "=") (cell "1")))))
+                                    (gather (document (table (row (cell "z")))))
+                                    "b"))
+                         (marked (document (equation* (document (concat (frac "1" "2") "+" (big "sum") (rsub "i") "x" (rsub "i"))))
+                                           (align* (document (table (row (cell "u") (cell "=v")))))))
+                         (strike-through (center (document "centered" "text")))
+                         (marked (center (document "centered")))
+                         (strike-through (description (document (concat (item* "key") ,long))))
+                         (marked (description (document (concat (item* "key") "value"))))
+                         (strike-through (document "a" (verbatim (document "x_1 %" "y")) "b"))
+                         (marked (document (cpp-code (document "int x;")) "b"))
+                         (strike-through (concat "50% & #1 " (with "mode" "math" "<ldots>")
+                                                 " " (em "e") " " (strong "s") " " ,long)))))
              (r (latex-compile "strike-marked" doc))
              (status (car r))
-             (log (cadr r)))
+             (log (cadr r))
+             (out (caddr r)))
         (check-true (and status (car status)))
         (check= (and status (cadr status)) 0)
         (check-false (string-contains? log "Overfull \\hbox"))
         (check-false (string-contains? log "Undefined control sequence"))
+        ;; the PDF bookmark of a title has its text, not the color
+        (check-true (string-contains?
+                     out "\\000m\\000a\\000r\\000k\\000e\\000d"))
+        (check-false (string-contains? out "\\000y\\000e\\000l"))
         (remove-latex-pdf-dir))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

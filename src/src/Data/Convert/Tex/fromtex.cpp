@@ -1269,9 +1269,11 @@ string_arg (tree t, bool url) {
 static tree
 latex_color_arg (tree t) {
   // the export defines a color #rrggbb under the name tmhexRRGGBB
-  if (is_atomic (t) && N(t->label) == 11 && starts (t->label, "tmhex"))
-    return "#" * locase_all (t->label (5, 11));
-  return t;
+  if (!is_atomic (t) || N(t->label) != 11 || !starts (t->label, "tmhex"))
+    return t;
+  for (int i= 5; i < 11; i++)
+    if (!is_hex_digit (t->label[i])) return t;
+  return "#" * locase_all (t->label (5, 11));
 }
 
 tree
