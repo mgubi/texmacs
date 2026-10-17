@@ -385,6 +385,67 @@
                         split)))))))
     result))
 
+(define (split-conflicting-groups! states groups group-of conflict? key-of key-hash)
+  ;; split-state-id-groups! with conflict? and neither dirty nor preds, for a
+  ;; conflict? which gives the same answers for two states with equal keys
+  ;; (key-of with the current group-of) and none for them: such states have
+  ;; the same fate, so only the first of each key is compared. A state is
+  ;; split by the first state before it which stays and conflicts with it,
+  ;; and the split states come in the order in which split-state-id-groups!
+  ;; finds them. (named lets: under S7 a do counter stored in a table is
+  ;; altered by the next iterations)
+  (let gloop ((gid 0))
+    (when (< gid (gvec-length groups))
+      (let* ((ids (list->vector (gvec-ref groups gid)))
+             (m (vector-length ids))
+             (splitter (make-vector m #f))   ; the position which splits each one
+             (keys (make-vector m #f))
+             (classes (make-ahash-table))    ; hash -> positions of the firsts
+             (staying (make-gvec)))          ; positions of the firsts which stay
+        (let xloop ((x 0))
+          (when (< x m)
+            (let* ((s (gvec-ref states (vector-ref ids x)))
+                   (key (key-of s group-of))
+                   (h (key-hash key))
+                   (firsts (or (ahash-ref classes h) '()))
+                   (first (let floop ((l firsts))
+                            (cond ((null? l) #f)
+                                  ((equal? (vector-ref keys (car l)) key) (car l))
+                                  (else (floop (cdr l)))))))
+              (vector-set! keys x key)
+              (if first
+                  (vector-set! splitter x (vector-ref splitter first))
+                  (begin
+                    (ahash-set! classes h (cons x firsts))
+                    (let sloop ((k 0))
+                      (cond ((= k (gvec-length staying)) (gvec-push! staying x))
+                            ((conflict? (gvec-ref states (vector-ref ids (gvec-ref staying k)))
+                                        s group-of)
+                             (vector-set! splitter x (gvec-ref staying k)))
+                            (else (sloop (+ k 1)))))))
+              (xloop (+ x 1)))))
+        (let ((by-splitter (make-vector m '())))
+          (let rloop ((x (- m 1)) (rest '()))
+            (if (>= x 0)
+                (let ((sp (vector-ref splitter x)))
+                  (if sp
+                      (begin
+                        (vector-set! by-splitter sp (cons (vector-ref ids x)
+                                                          (vector-ref by-splitter sp)))
+                        (rloop (- x 1) rest))
+                      (rloop (- x 1) (cons (vector-ref ids x) rest))))
+                (let ((split (let cloop ((k (- (gvec-length staying) 1)) (acc '()))
+                               (if (< k 0) acc
+                                   (cloop (- k 1) (append (vector-ref by-splitter
+                                                                      (gvec-ref staying k))
+                                                          acc))))))
+                  (when (pair? split)
+                    (gvec-set! groups gid rest)
+                    (let ((new (gvec-length groups)))
+                      (for-each (lambda (i) (vector-set! group-of i new)) split)
+                      (gvec-push! groups split)))))))
+        (gloop (+ gid 1))))))
+
 (define (last-shift-target actions)
   (let ((a (and (pair? actions) (ts-last actions))))
     (and a (eq? (car a) 'shift) (cadr a))))
@@ -544,7 +605,32 @@
                 (when (eq? (cadr x) 'goto)
                   (let ((t (caddr x)))
                     (vector-set! v t (cons i (vector-ref v t)))))))))))
-    (split-state-id-groups! states groups group-of 0 states-conflict? #f #f)
+    (define (entries-key s group-of)
+      ;; what states-conflict? sees of s: the reserved words and the
+      ;; entries, the shift targets replaced by their groups
+      (cons (state-reserved s)
+            (ts-map (lambda (p)
+                      (cons (car p)
+                            (ts-map (lambda (a)
+                                      (if (eq? (car a) 'shift)
+                                          (cons 'shift (cons (vector-ref group-of (cadr a))
+                                                             (cddr a)))
+                                          a))
+                                    (entry-actions (cdr p)))))
+                    (vector->list (vector-ref state-entries (state-id s))))))
+    (define (key-hash key)
+      ;; from the tokens and the numbers after the kinds of the actions
+      (let loop ((l (cdr key)) (h (length (car key))))
+        (if (null? l) h
+            (loop (cdr l)
+                  (let aloop ((as (cdar l)) (h (modulo (+ (* h 31) (caar l)) 1000000007)))
+                    (if (null? as) h
+                        (let ((a (car as)))
+                          (aloop (cdr as)
+                                 (if (and (pair? (cdr a)) (integer? (cadr a)))
+                                     (modulo (+ (* h 31) (cadr a)) 1000000007)
+                                     (modulo (+ h 1) 1000000007))))))))))
+    (split-conflicting-groups! states groups group-of states-conflict? entries-key key-hash)
     (let ((dirty (make-gvec)))
       (do ((i 0 (+ i 1))) ((= i (gvec-length groups))) (gvec-push! dirty #t))
       (let loop ()
