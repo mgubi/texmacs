@@ -422,6 +422,7 @@ font_database_init_scanned () {
 
 void
 font_database_build (url u) {
+  tt_font_index_reset (); // (the files found by the scan are looked up)
   if (!scanned_files_ready) font_database_init_scanned ();
   if (is_none (u));
   else if (is_or (u)) {

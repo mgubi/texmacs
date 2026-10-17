@@ -18,6 +18,7 @@
 
 url    tt_font_path ();
 void   tt_extend_font_path (url u);
+void   tt_font_index_reset ();
 bool   tt_font_exists (string name);
 url    tt_font_find (string name);
 string tt_find_name (string name, int size);

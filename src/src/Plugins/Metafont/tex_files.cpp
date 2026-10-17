@@ -37,7 +37,8 @@ kpsewhich (string name) {
 
 // The TFM and Type 1 files of the TeX distribution, by name: read once
 // from the databases of kpathsea (the files ls-R, which kpsewhich reads),
-// and from the fonts of TEXMFHOME, which has none, in the order in which
+// and from the font trees of the user, which have none (TEXMFCONFIG,
+// TEXMFVAR, TEXMFHOME), in the order in which
 // kpsewhich looks. kpsewhich, a program which takes some 70 ms to start,
 // was run for each file which TeXmacs does not have (some hundred, for the
 // sizes of the TeX fonts of a document, the first time it is shown).
@@ -95,10 +96,27 @@ static bool
 tex_index_ready () {
   if (tex_index_state == 0) {
     tex_index_state= -1;
+    tex_index= hashmap<string,string> ("");
     bench_start ("tex font index");
-    string home= var_eval_system ("kpsewhich -var-value TEXMFHOME");
-    url fonts= url_system (home) * url ("fonts");
-    if (N(home) > 0 && is_directory (fonts)) tex_index_dir (fonts, 0);
+    // the trees which kpsewhich searches on the disk (TEXMFCONFIG,
+    // TEXMFVAR, TEXMFHOME of the user, before the trees with an ls-R,
+    // which are marked with !!): their fonts, in this order
+    string path= var_eval_system ("kpsewhich -show-path=tfm");
+#ifdef OS_MINGW
+    char sep= ';';
+#else
+    char sep= ':';
+#endif
+    int j= 0, m= N(path);
+    while (j < m) {
+      int start= j;
+      while (j < m && path[j] != sep) j++;
+      string d= path (start, j);
+      j++;
+      if (N(d) == 0 || starts (d, "!!") || !ends (d, "/fonts/tfm//")) continue;
+      url fonts= url_system (d (0, N(d) - 6));
+      if (is_directory (fonts)) tex_index_dir (fonts, 0);
+    }
     string all= var_eval_system ("kpsewhich -all ls-R");
     int found= 0, i= 0, n= N(all);
     while (i < n) {
@@ -245,6 +263,7 @@ make_tex_tfm (string name) {
     r= system (s);
   }
   if (r) cout << "TeXmacs] system command failed: " << s << "\n";
+  tex_index_state= 0; // (the index is read again, with the new file)
 }
 
 void

@@ -33,6 +33,11 @@ add_to_path (url u, url d) {
 }
 
 void
+tt_font_index_reset () {
+  tt_indexed= false; // (made again at the next look up, see tt_index_find)
+}
+
+void
 tt_extend_font_path (url u) {
   tt_indexed= false; // (the index of the files of the path is made again)
   if (!is_directory (u)) u= head (u);
@@ -147,7 +152,16 @@ tt_index_find (string name) {
     tt_index_add (tt_font_path ());
     bench_cumul ("tt font index");
   }
-  if (!tt_index->contains (name)) return url_none ();
+  if (!tt_index->contains (name)) {
+    // the file systems of macOS store the names in decomposed Unicode, and
+    // find a file by any form of its name, unlike the index: the names
+    // which are not ASCII (as the Hiragino fonts asked by font.cpp) are
+    // looked for in the directories
+    for (int i= 0; i < N(name); i++)
+      if (((unsigned char) name[i]) >= 128)
+        return resolve (tt_font_path () * name);
+    return url_none ();
+  }
   url u= url_system (tt_index[name]);
   return exists (u)? u: url_none ();
 }
