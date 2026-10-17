@@ -144,18 +144,18 @@
           (ahash-set! memo k id)
           id))))
 
-(define (make-item g keys var prod step inherited?)
+(define (make-lr-item g keys var prod step inherited?)
   (vector var prod step inherited? (item-key-of g keys var prod step inherited?)))
 
 (define (item-successor g keys item)
-  (make-item g keys (item-var item) (item-prod item) (+ (item-step-index item) 1)
+  (make-lr-item g keys (item-var item) (item-prod item) (+ (item-step-index item) 1)
              (item-inherited? item)))
 
 (define (item-substitute g keys item prod)
-  (make-item g keys (item-var item) prod (item-step-index item) (item-inherited? item)))
+  (make-lr-item g keys (item-var item) prod (item-step-index item) (item-inherited? item)))
 
 (define (item-with-inherited g keys item)
-  (make-item g keys (item-var item) (item-prod item) (item-step-index item) #t))
+  (make-lr-item g keys (item-var item) (item-prod item) (item-step-index item) #t))
 
 (define (item<? a b)
   ;; the order of tree-sitter: step, then variable, then the rest
@@ -345,7 +345,7 @@
                     (let ((ids (g-inlined g pid 0)))
                       (for-each
                        (lambda (id)
-                         (let ((a (cons (make-item g keys v id 0 #f)
+                         (let ((a (cons (make-lr-item g keys v id 0 #f)
                                         (if (prod-eof? (g-production g id)) eof-info base))))
                            (unless (member a result) (set! result (cons a result)))))
                        (or ids (list pid)))))
@@ -824,7 +824,7 @@
     (gvec-push! production-infos (cons '() '()))
     (add-state! '() '() '())
     (add-state! '() '()
-                (list (vector (make-item g keys -1 -1 0 #f) (la-intern pool (list sym-end)) 0)))
+                (list (vector (make-lr-item g keys -1 -1 0 #f) (la-intern pool (list sym-end)) 0)))
     ;; the states of the non-terminal extras
     (let ((by-first (make-ahash-table)))
       (for-each
@@ -835,7 +835,7 @@
                (let* ((first (step-symbol (prod-step (g-production g pid) 0)))
                       (set (or (ahash-ref by-first first)
                                (let ((s (make-item-set))) (ahash-set! by-first first s) s)))
-                      (e (item-set-insert! set (make-item g keys (sym-index extra) pid 1 #f))))
+                      (e (item-set-insert! set (make-lr-item g keys (sym-index extra) pid 1 #f))))
                  (vector-set! e 1 (la-insert pool (vector-ref e 1) sym-eont)))))))
        (g-ref g 'extra-symbols))
       (for-each

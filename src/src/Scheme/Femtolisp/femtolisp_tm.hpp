@@ -78,6 +78,9 @@ inline bool tmscm_is_string (tmscm obj) { return fltm_is_string (obj.v); }
 inline bool tmscm_is_symbol (tmscm obj) {
   return FLTM_TAG (obj.v) == FLTM_TAG_SYM; }
 
+// nothing to do while C++ code builds a list: every tmscm is a root (see
+// above, and the class of this name for S7)
+struct tmscm_builder { inline tmscm_builder () {} inline ~tmscm_builder () {} };
 inline tmscm tmscm_cons (tmscm obj1, tmscm obj2) {
   return tmscm (fltm_cons (obj1.v, obj2.v)); }
 inline tmscm tmscm_car (tmscm obj) { return tmscm (fltm_car (obj.v)); }

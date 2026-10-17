@@ -65,7 +65,8 @@ The patches
       (mkboot1.lsp compiles them twice)
 0010  compile-unknown-call: hook for the calls of names not yet defined
 0011  *keep-source*: compiled functions keep their source (procedure-source)
-0012  the heap stops growing at 1 Gb, with an out of memory error
+0012  the heap stops growing at 1 Gb, with an out of memory error (8 Gb
+      since 0023)
 0013  *defer-macro-errors*
 0014  a datum at the very end of the input is read (eof only when nothing is left)
 0015  [ and ] are symbol characters, as in Guile (vectors are #(...))
@@ -82,6 +83,8 @@ The patches
 0022  a function with its source (*keep-source*) hashes as its source, which
       stays the same when the stub of a lazy function becomes the compiled
       function (boot-femtolisp.scm)
+0023  the size of the heap has 64 bits: it stops growing at 8 Gb instead of
+      1 Gb (0012)
 
 The patches which change system.lsp or compiler.lsp regenerate flisp.boot.
 

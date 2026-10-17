@@ -635,6 +635,29 @@ Done in part (2026-10-17):
 - Open: how to make large grammars practical (C++ stages in TeXmacs,
   compact Scheme representations, shipping tables for large grammars, or
   the 3x slowdown of S7 module code).
+- **Femtolisp** (2026-10-17, `--with-scheme=femtolisp`, Vue): the
+  generator runs 3 to 4 times faster inside TeXmacs than under S7, and
+  needs less memory, with byte-identical tables:
+
+  | grammar | S7 in TeXmacs | femtolisp in TeXmacs |
+  |---|---|---|
+  | python | 24.8 s | 7.8 s |
+  | c | 50.3 s | 12.1 s |
+  | cpp | about 30 min, 6.5 GB (estimate) | 262 s, 3.7 GB |
+
+  (standalone s7, outside TeXmacs: python 7.4 s, c 10.9 s, cpp 645 s and
+  6.5 GB). C++ needed a heap above 1 GB: femtolisp patch 0023 makes the
+  heap size 64 bits (the heap now stops at 8 GB). Two pitfalls of
+  femtolisp met on the way, both fixed by renaming: `return` is a
+  special form (the escape procedure of the Python scanner was called
+  `return`, so `(return #t)` returned from the innermost function and the
+  scan went on), and a global macro wins over a local function of the
+  same name (a local `extract` of `ts-grammar.scm` was expanded as the
+  macro `extract` of `kernel/library/iterator.scm`, which only the full
+  test run loads). The femtolisp build of this base needed a no-op
+  `tmscm_builder` (it did not compile); its suites: 48 of 49 pass (`treesit`
+  included), `markdown` hangs and `office` fails one check ("xml limits",
+  memory-error on 3000 nested elements), both also without patch 0023.
 
 As planned initially:
 

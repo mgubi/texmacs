@@ -24,6 +24,9 @@
 ;; result with lexer-set-result!, (serialize payload) is the state as a value
 ;; which equal? compares and (deserialize payload state) restores it, #f
 ;; being the initial state.
+;;
+;; (The escape is not called return: under femtolisp, return is a special
+;; form, which returns from the innermost function.)
 
 (texmacs-module (treesit ts-scanner-python)
   (:use (treesit ts-base) (treesit ts-parse)))
@@ -90,7 +93,7 @@
                               (valid? t-close-bracket)))
          (advanced-once #f))
     (call-with-current-continuation
-     (lambda (return)
+     (lambda (exit-with)
        ;; {{ and }} in f-strings
        (when (and (valid? t-escape-interpolation) (pair? (delimiters s))
                   (or (la? #\{) (la? #\})) (not error-recovery))
@@ -101,8 +104,8 @@
                (advance!)
                (set! advanced-once #t)
                (if (or (and (la? #\{) left) (and (la? #\}) (not left)))
-                   (begin (advance!) (mark!) (result! t-escape-interpolation) (return #t))
-                   (return #f))))))
+                   (begin (advance!) (mark!) (result! t-escape-interpolation) (exit-with #t))
+                   (exit-with #f))))))
        ;; the content of strings
        (when (and (valid? t-string-content) (pair? (delimiters s)) (not error-recovery))
          (let* ((d (car (delimiters s)))
@@ -112,7 +115,7 @@
              (unless (= (la) 0)
                (cond
                 ((and (or advanced-once (la? #\{) (la? #\})) (delim? d d-format))
-                 (mark!) (result! t-string-content) (return has-content))
+                 (mark!) (result! t-string-content) (exit-with has-content))
                 ((la? #\\)
                  (cond ((delim? d d-raw)
                         (advance!)
@@ -125,8 +128,8 @@
                         (advance!)
                         (if (or (la? #\N) (la? #\u) (la? #\U))
                             (begin (advance!) (advance!) (set! has-content #t) (loop))
-                            (begin (result! t-string-content) (return has-content))))
-                       (else (mark!) (result! t-string-content) (return has-content))))
+                            (begin (result! t-string-content) (exit-with has-content))))
+                       (else (mark!) (result! t-string-content) (exit-with has-content))))
                 ((= (la) end-char)
                  (if (delim? d d-triple)
                      (begin
@@ -142,18 +145,18 @@
                                        (begin (advance!) (mark!) (pop-delimiter!)
                                               (result! t-string-end)
                                               (vector-set! s 2 #f)))
-                                   (return #t))
-                                 (begin (mark!) (result! t-string-content) (return #t))))
-                           (begin (mark!) (result! t-string-content) (return #t))))
+                                   (exit-with #t))
+                                 (begin (mark!) (result! t-string-content) (exit-with #t))))
+                           (begin (mark!) (result! t-string-content) (exit-with #t))))
                      (begin
                        (if has-content
                            (result! t-string-content)
                            (begin (advance!) (pop-delimiter!) (result! t-string-end)
                                   (vector-set! s 2 #f)))
                        (mark!)
-                       (return #t))))
+                       (exit-with #t))))
                 ((and (la? #\newline) has-content (not (delim? d d-triple)))
-                 (return #f))
+                 (exit-with #f))
                 (else (advance!) (set! has-content #t) (loop)))))))
        ;; newlines and indentation
        (mark!)
@@ -167,7 +170,7 @@
                  ((la? #\tab) (set! indent (+ indent 8)) (skip!) (loop))
                  ((and (la? #\#) (or (valid? t-indent) (valid? t-dedent) (valid? t-newline)
                                      (valid? t-except)))
-                  (unless found-eol (return #f))
+                  (unless found-eol (exit-with #f))
                   (when (= first-comment-indent -1) (set! first-comment-indent indent))
                   (let comment () (unless (or (= (la) 0) (la? #\newline)) (skip!) (comment)))
                   (skip!)
@@ -178,7 +181,7 @@
                   (when (la? #\return) (skip!))
                   (if (or (la? #\newline) (lexer-eof? lx))
                       (begin (skip!) (loop))
-                      (return #f)))
+                      (exit-with #f)))
                  ((lexer-eof? lx) (set! indent 0) (set! found-eol #t))
                  (else #t)))
          (when found-eol
@@ -187,7 +190,7 @@
                (when (and (valid? t-indent) (> indent current))
                  (vector-set! s 0 (cons indent (indents s)))
                  (result! t-indent)
-                 (return #t))
+                 (exit-with #t))
                (let ((string-start-next (or (la? #\") (la? #\') (la? #\`))))
                  (when (and (or (valid? t-dedent)
                                 (and (not (valid? t-newline))
@@ -198,10 +201,10 @@
                             (< first-comment-indent current))
                    (vector-set! s 0 (cdr (indents s)))
                    (result! t-dedent)
-                   (return #t)))))
+                   (exit-with #t)))))
            (when (and (valid? t-newline) (not error-recovery))
              (result! t-newline)
-             (return #t)))
+             (exit-with #t)))
          ;; the start of strings
          (when (and (= first-comment-indent -1) (valid? t-string-start))
            (let ((d 0) (has-flags #f))
@@ -232,8 +235,8 @@
                (vector-set! s 1 (cons d (delimiters s)))
                (result! t-string-start)
                (vector-set! s 2 (delim? d d-format))
-               (return #t))
-             (when has-flags (return #f))))
+               (exit-with #t))
+             (when has-flags (exit-with #f))))
          #f)))))
 
 (define-public (ts-python-scanner)
