@@ -37,7 +37,7 @@ What is open is listed in "Open points" below.
 
 Conformance: `csl-run-fixtures` of `(csl csl-fixtures)` runs the official
 fixtures (`processor-tests/humans` of the CSL test-suite, not distributed
-with TeXmacs): 646 of 845 pass, 136 fail, 63 are skipped (they give a
+with TeXmacs): 652 of 845 pass, 130 fail, 63 are skipped (they give a
 history of citations, abbreviations or other things which the runner does
 not feed yet). The results are the same with S7 and with Guile 1.8. The
 failures are mostly conventions of citeproc-js (markup inside fields,
@@ -182,7 +182,7 @@ As of 2026-10-12, with the processor merged into `maxs_texmacs`.
 
 ### What was not checked
 
-- **The fixtures**: 646 of 845 pass, 136 fail, 63 are skipped because the
+- **The fixtures**: 652 of 845 pass, 130 fail, 63 are skipped because the
   runner does not feed histories of citations nor abbreviations.
 - **Real styles**: only the 13 styles which come along were compared with
   pandoc, on bibliographies of eight references, and the differences of
@@ -223,5 +223,13 @@ A run of all fixtures in one process raises now and then errors
 run. They were seen with the Vue build and with a Qt build, mostly with
 `(*s7* 'cache-macro-expansions?)` on (the local s7 patch 0005, which
 TeXmacs enables), and once with it off. Guile runs the same fixtures
-without any error. It looks like a pair which is collected while it is in
-use; not investigated further here.
+without any error.
+
+It was the collector of S7 taking the cells of a list which C++ was still
+building (S7 does not see the variables of C++), fixed by 0f460c3db4 on
+2026-10-13: a `tmscm_builder` holds the collector while a list is built
+(`src/docs/s7/01-cpp-binding.md`, 1.5). Checked on 2026-10-17: 23 runs of
+all fixtures, no error; the same tree with the builder emptied, 4 errors
+in each of 10 runs (in `condition_NumberIsNumeric`,
+`disambiguate_DisambiguateTrueReflectedInBibliography`,
+`sort_ConditionalMacroDates` and `sort_TestInheritance`), as before.

@@ -49,14 +49,6 @@ no headless mode. The Widkit duplicates are fixed on `wip_other_guis` too.
   proposed for `wip_fixes` (PRs #323 to #326): the same changes, which
   merge without conflict. The rename dialog (#318) was tried in Vue only.
 
-- **S7 raises `car: argument is a free cell` now and then in long runs**
-  (found on 2026-10-09 with the fixtures of the CSL test suite, 845 styles
-  processed in one process; also seen in the benchmark of the converters).
-  Four errors in each run with `(*s7* 'cache-macro-expansions?)` on, as
-  TeXmacs runs S7 (the local patch 0005), rarely with it off; never with
-  Guile or femtolisp, which give the same results on the same code. A pair
-  seems to be collected while it is in use. Not investigated. To reproduce:
-  `csl-run-fixtures` of `(csl csl-fixtures)`, see `doc/csl-design.md`.
 - **CSL: the LaTeX export does not know the citations of the style.** A
   document with a `csl-` style exports its bibliography as it is rendered
   and its citations as `\cite{key}`, so LaTeX prints the labels of TeXmacs
