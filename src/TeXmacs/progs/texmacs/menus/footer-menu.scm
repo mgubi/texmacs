@@ -21,7 +21,8 @@
 ;; is false), the GUI shows the text of the message instead.
 
 (texmacs-module (texmacs menus footer-menu)
-  (:use (generic format-menu)
+  (:use (generic format-edit)
+        (generic format-menu)
         (fonts font-old-menu)
         (fonts font-short-menu)
         (fonts fonts-opentype)
@@ -170,23 +171,31 @@
   (if (in-math?) (dynamic (footer-math-font-menu)))
   (if (not (in-math?)) (dynamic (footer-text-font-menu))))
 
+(tm-define (footer-prog-label)
+  ;; the language of the program at the cursor
+  (with lan (get-env "prog-language")
+    (if (in? lan '("" "verbatim")) "Program" (format-get-name lan))))
+
+;; in a program, its language only: the fonts and the colours of code are
+;; those of its language (the font of source files is a preference)
 (menu-bind texmacs-footer-environment
   (if (in-text?)
       (=> (balloon (eval (footer-language-label)) "Language")
           (link text-language-menu)))
   (if (in-math?) (text "Math"))
-  (if (in-prog?) (text "Program"))
-  (=> (balloon (eval (footer-font-label)) "Font")
-      (link footer-font-menu))
-  (=> (balloon (eval (footer-size-label)) "Font size")
-      (link font-size-menu))
-  (if (!= (footer-effects-label) "")
-    (=> (balloon (eval (footer-effects-label)) "Font effects")
-        (link text-font-effects-menu)))
-  ;; the colour: a swatch, and its name as the menu
-  (color (get-env "color") #f #f 10 10)
-  (=> (balloon (eval (footer-color-label)) "Colour")
-      (link color-menu)))
+  (if (in-prog?) (text (footer-prog-label)))
+  (if (not (in-prog?))
+      (=> (balloon (eval (footer-font-label)) "Font")
+          (link footer-font-menu))
+      (=> (balloon (eval (footer-size-label)) "Font size")
+          (link font-size-menu))
+      (if (!= (footer-effects-label) "")
+        (=> (balloon (eval (footer-effects-label)) "Font effects")
+            (link text-font-effects-menu)))
+      ;; the colour: a swatch, and its name as the menu
+      (color (get-env "color") #f #f 10 10)
+      (=> (balloon (eval (footer-color-label)) "Colour")
+          (link color-menu))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The tags around the cursor
