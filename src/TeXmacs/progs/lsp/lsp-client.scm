@@ -41,6 +41,7 @@
   (ahash-set! lsp-servers lan cmds))
 
 (lsp-server-set! "cpp" '("clangd"))
+(lsp-server-set! "c" '("clangd"))
 (lsp-server-set! "python" '("pylsp" "pyright-langserver --stdio"
                             "basedpyright-langserver --stdio"))
 (lsp-server-set! "javascript" '("typescript-language-server --stdio"))

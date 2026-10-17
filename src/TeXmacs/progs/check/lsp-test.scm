@@ -418,24 +418,28 @@
   (string-append lsp-dir "/" name))
 
 (define (setup-project)
-  ;; lsp-tmp/proj, a project (compile_flags.txt) with a C++ file in src
+  ;; lsp-tmp/proj, a project (compile_flags.txt) with a C file in src
   (system-mkdir (system->url (lsp-file "proj/src")))
   (string-save "" (system->url (lsp-file "proj/compile_flags.txt")))
   (string-save "int main() {\n  return x;\n}\n"
-               (system->url (lsp-file "proj/src/main.cpp"))))
+               (system->url (lsp-file "proj/src/main.c"))))
 
 (define (test-buffer)
   (check-group "buffer")
   (setup-project)
-  (with path (lsp-file "proj/src/main.cpp")
+  (with path (lsp-file "proj/src/main.c")
     (check= (lsp-project-root path) (lsp-file "proj"))
-    (check= (lsp-language-id "cpp" path) "cpp")
-    (check= (lsp-language-id "cpp" (lsp-file "x.c")) "c")
+    (check= (lsp-language-id "c" path) "c")
+    (check= (lsp-language-id "cpp" (lsp-file "x.cpp")) "cpp")
+    ;; .c and .h files are C (the format c, the language c)
+    (check= (url-format (system->url path)) "c")
+    (check= (url-format (system->url (lsp-file "x.h"))) "c")
     (let ((old (current-buffer))
           (u (system->url path)))
       (load-buffer u)
       (check= (url->system (current-buffer)) path)
-      (check= (lsp-buffer-language) "cpp")
+      (check= (lsp-buffer-language) "c")
+      (check= (lsp-buffer-client*) #f)
       (check= (lsp-buffer-uri) (lsp-path->uri path))
       (check= (lsp-buffer-lines) '("int main() {" "  return x;" "}" ""))
       (check= (lsp-lines->text (lsp-buffer-lines))
@@ -537,8 +541,33 @@
           (check-true (> (string-length line) 6)))
         (lsp-hide-diagnostics)
         (check= (get-alt-selection "lsp-errors") '())
+        ;; information at the cursor, in a balloon at the line, which must
+        ;; be typeset (the event loop does it before each key)
+        (go-to-path (append (buffer-path) '(2 16)))
+        (update-forced)
+        (lsp-hover)
+        (lsp-hover-close)
+        (check-true (pair? (lsp-hover-document "**int** x")))
+        ;; what is sent when the buffer is saved and closed
+        (let* ((methods '())
+               (send (lsp-client-ref c 'send)))
+          (lsp-client-set! c 'send
+                           (lambda (s)
+                             (set! methods (append methods
+                                                   (list (lsp-ref (lsp-read s)
+                                                                  "method"))))
+                             (send s)))
+          (go-to-path (append (buffer-path) '(3 2)))
+          (insert "x")
+          (buffer-save u)
+          (version-notify-saved u)
+          (check= methods '("textDocument/didChange" "textDocument/didSave"))
+          (check= (lsp-document-version c uri) 3)
+          (buffer-close u)
+          (check= (cAr methods) "textDocument/didClose")
+          (check-false (lsp-document-open? c uri)))
         (lsp-client-stop c)))
-    (buffer-close u)))
+    (when (buffer-exists? u) (buffer-close u))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The suite

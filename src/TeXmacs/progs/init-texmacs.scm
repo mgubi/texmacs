@@ -22,6 +22,7 @@
 (use-modules (utils library cpp-wrap))
 (lazy-define (utils library cursor) notify-cursor-moved)
 (lazy-define (utils library cursor) notify-buffer-changed)
+(lazy-define (utils library cursor) notify-buffer-closed)
 (lazy-define (utils edit variants) make-inline-tag-list make-wrapped-tag-list)
 (lazy-define (utils cas cas-out) cas->stree)
 (lazy-define (utils plugins plugin-cmd) pre-serialize verbatim-serialize)
@@ -193,7 +194,7 @@
 
 ;(display "Booting programming modes\n")
 (lazy-format (prog prog-format) scheme)
-(lazy-format (code-format) cpp julia scala java javascript dot json csv)
+(lazy-format (code-format) c cpp julia scala java javascript dot json csv)
 (lazy-format (mathemagix-format) mathemagix)
 (lazy-format (caas-format) caas)
 (lazy-format (python-format) python)

@@ -73,6 +73,8 @@ remove_buffer (tm_buffer buf) {
   int nr, n= N(bufs);
   for (nr=0; nr<n; nr++)
     if (bufs[nr] == buf) {
+      // (the programs which follow the buffer: language servers)
+      call ("notify-buffer-closed", object (as_string (buf->buf->name)));
       for (int i=0; i<N(buf->vws); i++)
         delete_view (abstract_view (buf->vws[i]));
       if (n == 1 && number_of_servers () == 0)
@@ -153,6 +155,7 @@ rename_buffer (url name, url new_name) {
   kill_buffer (new_name);
   tm_buffer buf= concrete_buffer (name);
   if (is_nil (buf)) return;
+  call ("notify-buffer-closed", object (as_string (name)));
   notify_rename_before (name);
   buf->buf->name= new_name;
   buf->buf->master= new_name;

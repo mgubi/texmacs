@@ -43,6 +43,36 @@
   (:function cpp-snippet->texmacs))
 
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; C source files
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define-format c
+  (:name "C source code")
+  (:suffix "c" "h"))
+
+(define (texmacs->c x . opts)
+  (texmacs->verbatim x (acons "texmacs->verbatim:encoding" "SourceCode" '())))
+
+(define (c->texmacs x . opts)
+  (code->texmacs x))
+
+(define (c-snippet->texmacs x . opts)
+  (code-snippet->texmacs x))
+
+(converter texmacs-tree c-document
+  (:function texmacs->c))
+
+(converter c-document texmacs-tree
+  (:function c->texmacs))
+
+(converter texmacs-tree c-snippet
+  (:function texmacs->c))
+
+(converter c-snippet texmacs-tree
+  (:function c-snippet->texmacs))
+
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Julia source files
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

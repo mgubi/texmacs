@@ -1000,9 +1000,10 @@
 (define (test-tables)
   ;; every table module loads, and its features are lists headed by the key
   (for (m '((python-lang) (java-lang) (scala-lang) (julia-lang) (json-lang)
-            (csv-lang) (cpp-lang) (dot-lang) (javascript-lang) (octave-lang)))
+            (csv-lang) (c-lang) (cpp-lang) (dot-lang) (javascript-lang)
+            (octave-lang)))
     (check= (begin (module-provide m) (module-available? m)) #t))
-  (for (lan '("python" "java" "scala" "julia" "json" "csv" "cpp" "dot"
+  (for (lan '("python" "java" "scala" "julia" "json" "csv" "c" "cpp" "dot"
               "javascript" "octave"))
     (for (key '("keyword" "operator" "number" "string" "comment"))
       (check= (car (feature lan key)) (string->symbol key))))

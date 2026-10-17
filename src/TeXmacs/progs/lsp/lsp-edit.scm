@@ -84,6 +84,26 @@
     (with u (name->buffer name)
       (when u (lsp-follow-buffer u)))))
 
+(tm-define (notify-buffer-closed name)
+  ;; the buffer is closed, or renamed (save as): its document is closed on
+  ;; the server (the new name is followed when it is saved or changed)
+  (former name)
+  (when (== (ahash-ref followed name) #t)
+    (ahash-remove! followed name)
+    (ahash-remove! pending name)
+    (lsp-buffer-close (string->url name))))
+
+(tm-define (version-notify-saved name)
+  ;; the server gets the text which has been saved, then didSave
+  (former name)
+  (when (lsp-on?)
+    (with key (url->string name)
+      (when (and (buffer-exists? name) (follow? key name))
+        (ahash-remove! pending key)
+        (with c (lsp-buffer-sync name)
+          (when (and c (lsp-client-alive? c))
+            (lsp-document-save c (lsp-buffer-uri name))))))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Diagnostics
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -390,17 +410,43 @@
                (lambda (l) (and (!= l "") (not (string-starts? l "```"))
                                 (!= l "---")))))
 
+(tm-define (lsp-hover-document text)
+  (:synopsis "The document of the text @text (markdown, utf8) of a hover")
+  ;; markdown, which servers use for the hovers, or else lines as they are
+  (with t (catch #t
+            (lambda () (convert text "markdown-snippet" "texmacs-stree"))
+            (lambda args #f))
+    (if (and t (!= t "") (!= t '(document)) (!= t '(document "")))
+        t
+        `(document ,@(map (lambda (l) `(verbatim ,(utf8->cork l)))
+                          (useful-lines text))))))
+
+(define hover-id #f)
+
+(tm-define (lsp-hover-close)
+  (when hover-id
+    (close-tooltip hover-id)
+    (set! hover-id #f)))
+
 (tm-define (lsp-hover)
   (:synopsis "Shows what the language server says about the cursor")
-  (with r (request-at-cursor "textDocument/hover" "hoverProvider")
-    (with l (if (and r (not (lsp-null? r)))
-                (useful-lines (hover-text r))
-                '())
-      (cond ((null? l) (when r (set-message "No information" "")))
-            (else
-             (set-message (utf8->cork (car l))
-                          (if (null? (cdr l)) ""
-                              (utf8->cork (cadr l)))))))))
+  ;; in a balloon at the cursor, as the previews of references (show-tooltip,
+  ;; preview-balloon); it is closed when the cursor moves
+  (lsp-hover-close)
+  (let* ((r (request-at-cursor "textDocument/hover" "hoverProvider"))
+         (text (if (and r (not (lsp-null? r))) (hover-text r) ""))
+         (l (useful-lines text)))
+    (cond ((null? l)
+           (when r (set-message "No information" "")))
+          ((headless?)
+           (set-message (utf8->cork (car l))
+                        (if (null? (cdr l)) "" (utf8->cork (cadr l)))))
+          (else
+        (let ((id (string-append "lsp-hover:" (object->string (cursor-path))))
+              (doc (lsp-hover-document text)))
+          (set! hover-id id)
+          (show-tooltip id (cursor-tree) `(preview-balloon ,doc)
+                        "auto" "auto" "keyboard" 0.8))))))
 
 ;; Definitions
 

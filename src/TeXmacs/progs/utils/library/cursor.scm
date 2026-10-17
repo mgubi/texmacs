@@ -160,6 +160,11 @@
 (tm-define (notify-buffer-changed name)
   (noop))
 
+; Hook for the buffer @name (a string) which is closed, or renamed (then
+; @name is its former name)
+(tm-define (notify-buffer-closed name)
+  (noop))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Predicates
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
