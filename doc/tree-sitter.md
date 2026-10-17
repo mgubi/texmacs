@@ -753,6 +753,13 @@ Done in part (2026-10-17):
   Through the C runtime in TeXmacs, the corpus of java passes (108 tests)
   and that of javascript too (116); the highlight captures equal those of
   `tree-sitter query` on samples and on the test/highlight files of both.
+- **R** (same day): `ts-scanner-r.scm` ports the scanner of r-lib/
+  tree-sitter-r (the newlines, which end an expression except inside
+  parentheses and brackets, so the scanner keeps the stack of the open
+  brackets, serialized as a string of one digit per bracket; the else
+  after newlines in braces; the raw strings `r"-(...)-"`). Tables in 0.3 s;
+  corpus 89 tests pass, highlight captures equal on a sample and on the 8
+  files of test/highlight.
 - Tools (`src/misc/tree-sitter`): `corpus.py LANGUAGE CORPUS...` runs the
   corpus tests of a grammar in TeXmacs as `tree-sitter test` compares
   them; `highlights.py LANGUAGE GRAMMAR-DIR FILE...` compares the captures

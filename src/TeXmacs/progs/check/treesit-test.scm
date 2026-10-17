@@ -519,6 +519,13 @@
                            "right: (number))) (expression_statement (assignment_expression "
                            "left: (identifier) right: (template_string (string_fragment) "
                            "(template_substitution (identifier))))))"))
+    ;; R: the newline inside parentheses and the raw string by its scanner
+    (treesit-generate-cache "r")
+    (check= (tree-sitter-parse-sexp (treesit-language "r") "x <- f(1,\n  r\"-(a)-\")\ny")
+            (string-append "(program (binary_operator lhs: (identifier) rhs: (call function: "
+                           "(identifier) arguments: (arguments argument: (argument value: (float)) "
+                           "(comma) argument: (argument value: (string open: (string_open) "
+                           "content: (string_content) close: (string_close)))))) (identifier))"))
     ;; Java, without scanner
     (treesit-generate-cache "java")
     (check= (tree-sitter-parse-sexp (treesit-language "java") "class A { int f() { return 1; } }")
