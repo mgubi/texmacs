@@ -743,6 +743,20 @@ Done in part (2026-10-17):
   states and lex tables 2.2 s, grammar 0.6 s, language 0.4 s), c 0.74 s,
   python 0.49 s, scheme 0.2 s. What remains in Scheme is reading the
   grammar, its NFA and the keywords.
+- **Java and JavaScript** (same day). Java has no scanner: registered and
+  highlighted as it is. `ts-scanner-javascript.scm` ports the scanner of
+  tree-sitter-javascript (automatic semicolons, template strings, `?` of
+  the conditional expressions, HTML comments, JSX text); the highlight
+  query is highlights.scm, highlights-jsx.scm and highlights-params.scm in
+  the order of its tree-sitter.json. The character classes of C
+  (`iswspace`...) are in `ts-chars.scm`. Generation: about 0.8 s each.
+  Through the C runtime in TeXmacs, the corpus of java passes (108 tests)
+  and that of javascript too (116); the highlight captures equal those of
+  `tree-sitter query` on samples and on the test/highlight files of both.
+- Tools (`src/misc/tree-sitter`): `corpus.py LANGUAGE CORPUS...` runs the
+  corpus tests of a grammar in TeXmacs as `tree-sitter test` compares
+  them; `highlights.py LANGUAGE GRAMMAR-DIR FILE...` compares the captures
+  with those of `tree-sitter query`.
 
 As planned initially:
 
