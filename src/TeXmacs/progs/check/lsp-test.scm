@@ -685,6 +685,21 @@
   (check= (lsp-apply-to-lines '("ab") (list (text-edit 0 1 0 1 "1")
                                            (text-edit 0 2 0 2 "2")))
           '("a1b2"))
+  ;; the cursor through the edits: before, inside, after on the line and
+  ;; below
+  (with es (list (text-edit 0 4 0 5 "yy") (text-edit 1 0 1 3 "bar\nbaz"))
+    (check= (lsp-move-through-edits '("int x = 1;" "foo") es '(0 2)) '(0 2))
+    (check= (lsp-move-through-edits '("int x = 1;" "foo") es '(0 4)) '(0 4))
+    (check= (lsp-move-through-edits '("int x = 1;" "foo") es '(0 8)) '(0 9))
+    (check= (lsp-move-through-edits '("int x = 1;" "foo") es '(1 2)) '(2 3))
+    (check= (lsp-move-through-edits '("int x = 1;" "foo" "z") es '(2 1))
+            '(3 1)))
+  (check= (lsp-move-through-edits '("abcdef") (list (text-edit 0 1 0 5 "x"))
+                                  '(0 4))
+          '(0 2))
+  (check= (lsp-move-through-edits '("a" "b" "c") (list (text-edit 0 1 2 0 ""))
+                                  '(2 1))
+          '(0 2))
   ;; the lines of a document tree, changed where they differ
   (with t (stree->tree '(document "a" "b" "c"))
     ;; (1 line replaced and 1 inserted, in 2 places of the old ones)
@@ -771,6 +786,8 @@
         (when (and r (nnull? (cadr r)))
           (lsp-run-action c (car (cadr r)))))
       (check= (list-ref (lsp-buffer-lines) 2) "  int a= twice (1);")
+      ;; (the cursor stays where it was, its line was replaced)
+      (check= (cursor-rel) '(2 10))
       ;; the signature of twice
       (go-to-path (append (buffer-path) '(3 20)))
       (with a (lsp-request-wait c "textDocument/signatureHelp"

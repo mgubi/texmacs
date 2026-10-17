@@ -226,8 +226,12 @@
   the last one to the first, so that the ranges of the others stay valid;
   <scm|lsp-set-lines> then changes the document only where its lines
   differ (the common lines at its start and at its end are kept), which
-  keeps the cursor, the markup of the other lines and the undo history
-  short. A file which is not open is loaded in a buffer.
+  keeps the markup of the other lines and the undo history short. A line
+  which differs is replaced, so the cursor would leave it: its new place
+  is computed by <scm|lsp-move-through-edits> (the same before an edit,
+  shifted after it, inside it the same while the new text is still
+  there), and the cursor goes there. A file which is not open is loaded
+  in a buffer.
 
   <scm|lsp-format> asks for <verbatim|textDocument/formatting> (or
   <verbatim|rangeFormatting> for the selection), <scm|lsp-rename> (an

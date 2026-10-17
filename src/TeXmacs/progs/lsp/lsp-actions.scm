@@ -18,8 +18,9 @@
 ;; The edits of a file are applied to the lines of its buffer (Cork), from
 ;; the last one to the first, so that the ranges of the others stay valid;
 ;; the buffer is then changed only where its lines differ (the common lines
-;; at the start and at the end are kept), which keeps the cursor, the
-;; markup of the other lines and the undo history short. A file which is
+;; at the start and at the end are kept), which keeps the markup of the
+;; other lines and the undo history short; the cursor is moved with the
+;; text (lsp-move-through-edits), since its line may be replaced. A file which is
 ;; not open is loaded in a buffer (it is then modified, to be saved).
 
 (texmacs-module (lsp lsp-actions)
@@ -64,18 +65,46 @@
             mid
             (if (< (+ l2 1) n) (list-tail lines (+ l2 1)) '()))))
 
-(tm-define (lsp-apply-to-lines lines edits)
-  (:synopsis "The Cork @lines once the TextEdits @edits are applied")
+(define (sorted-edits lines edits)
+  ;; the ranges and Cork texts of @edits, the last ones first (sort is
+  ;; stable: equal starts keep the order of the server, which is then
+  ;; reversed by the insertion)
   (let* ((rs (map (lambda (e)
                     (list (edit-range lines e)
                           (utf8->cork (or (lsp-ref e "newText") ""))))
-                  edits))
-         ;; the last ones first (sort is stable: equal starts keep the
-         ;; order of the server, which is then reversed by the insertion)
-         (sorted (sort rs (lambda (a b) (before? (car b) (car a))))))
-    (let loop ((l lines) (rs sorted))
-      (if (null? rs) l
-          (loop (apply-one l (car (car rs)) (cadr (car rs))) (cdr rs))))))
+                  edits)))
+    (sort rs (lambda (a b) (before? (car b) (car a))))))
+
+(tm-define (lsp-apply-to-lines lines edits)
+  (:synopsis "The Cork @lines once the TextEdits @edits are applied")
+  (let loop ((l lines) (rs (sorted-edits lines edits)))
+    (if (null? rs) l
+        (loop (apply-one l (car (car rs)) (cadr (car rs))) (cdr rs)))))
+
+(define (move-one lo r text)
+  ;; the line and offset @lo once the range @r is replaced by @text: the
+  ;; same before the range, inside it the same if @text is still there
+  ;; (else its end), shifted after
+  (let ((l (car lo)) (o (cadr lo))
+        (l1 (car r)) (o1 (cadr r)) (l2 (caddr r)) (o2 (cadddr r)))
+    (if (before? lo r) lo
+        (let* ((pieces (split-lines text))
+               (k (length pieces))
+               (last (string-length (list-ref pieces (- k 1))))
+               (end-l (+ l1 (- k 1)))
+               (end-o (if (= k 1) (+ o1 last) last)))
+          (cond ((and (== l l1) (== end-l l1) (<= o end-o)) lo)
+                ((not (before? (list l2 o2) lo)) (list end-l end-o))
+                ((== l l2) (list end-l (+ end-o (- o o2))))
+                (else (list (+ l (- end-l l2)) o)))))))
+
+(tm-define (lsp-move-through-edits lines edits lo)
+  (:synopsis "The line and offset @lo of @lines once @edits are applied")
+  ;; (the edits are applied from the last one: those after @lo leave it,
+  ;; those before shift it, and their ranges stay those of @lines)
+  (let loop ((lo lo) (rs (sorted-edits lines edits)))
+    (if (null? rs) lo
+        (loop (move-one lo (car (car rs)) (cadr (car rs))) (cdr rs)))))
 
 (define (common-prefix a b)
   (let loop ((a a) (b b) (n 0))
@@ -130,9 +159,23 @@
   (and (nnull? edits)
        (in-buffer u
          (lambda ()
+           ;; (the cursor follows the text: its line may be replaced)
            (let* ((body (buffer-tree))
-                  (lines (lsp-apply-to-lines (lsp-lines body) edits)))
-             (lsp-set-lines body lines))))))
+                  (old (lsp-lines body))
+                  (lines (lsp-apply-to-lines old edits))
+                  (b (buffer-path))
+                  (p (cursor-path))
+                  (lo (and (list-starts? p b)
+                           (with r (list-tail p (length b))
+                             (and (= (length r) 2) r))))
+                  (n (lsp-set-lines body lines)))
+             (when lo
+               (let* ((lo2 (lsp-move-through-edits old edits lo))
+                      (l (max 0 (min (car lo2) (- (length lines) 1))))
+                      (o (max 0 (min (cadr lo2)
+                                     (string-length (line-at lines l))))))
+                 (go-to (append b (list l o)))))
+             n)))))
 
 (define (uri->buffer uri)
   (with p (lsp-uri->path uri)
