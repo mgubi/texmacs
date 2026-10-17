@@ -792,6 +792,24 @@ Done in part (2026-10-17):
   states and the primary states, differ. Julia: corpus 63 tests pass,
   highlight captures equal; tables in 11 s and 1.5 GB under S7 (tree-sitter
   generate: 4 s, 0.7 GB), most of it in the merging and the lex tables.
+- **Bash** (same day, after phase 5): `ts-scanner-bash.scm` ports the
+  scanner of tree-sitter-bash (1217 lines of C: heredocs, the words of
+  expansions, regular expressions and extended globs, variable names, file
+  descriptors, concatenations). The C code is followed closely, quirks
+  included: restoring a state never shrinks the stack of the heredocs (an
+  empty state resets their fields, a state with fewer heredocs overwrites
+  the first ones), a delimiter keeps the null character which ends it and
+  is compared as by `strcmp`, characters are stored as the chars of C; its
+  labels (`regex:`, `extglob_pattern:`, `expansion_word:`, `brace_start:`)
+  are procedures which give their result or let the next one go on, as the
+  `goto`s fall through. Tables in 1.5 s under S7; the corpus passes (100
+  tests, S7 and femtolisp); the highlight captures equal those of
+  `tree-sitter query` on the 8 scripts of its examples. The program language
+  of TeXmacs is `shell` (`shell-code`, Shell sessions), highlighted with the
+  grammar of bash; indentation rules and `#` comments in `ts-edit.scm`, and
+  a `tags.scm` of ours for the functions. 254 KB of scripts parse in 277 ms
+  (S7) and 293 ms (femtolisp): the scanner is asked at nearly every word,
+  half of its time is interpretation and a quarter the collector.
 - An S7 pitfall met on the way: in a `do` loop whose body calls a builtin
   through another name (`ahash-set!` is `hash-table-set!`), s7 changes the
   counter in place, so the counter stored as a value (or in a list) ends

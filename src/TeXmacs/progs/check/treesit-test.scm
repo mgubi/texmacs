@@ -550,7 +550,16 @@
               '(0 4 8 0 0))
       (check= (indents "julia" '("function f(x)" "    if x" "        1" "    else"
                                  "        2" "    end" "end"))
-              '(0 4 8 4 8 4 0)))
+              '(0 4 8 4 8 4 0))
+      ;; shell code, with the grammar of bash
+      (treesit-generate-cache "bash")
+      (let ((id (treesit-language "bash"))
+            (d (stree->tree '(document "f() {" "    if [ -n $1 ]; then" "        echo a"
+                                       "    else" "        echo b" "    fi" "}" ""))))
+        (check= (map (lambda (row) (syntax-language-indentation d row "shell" id 4))
+                     (iota 8))
+                '(0 4 8 4 8 4 0 0))
+        (check= (map cadr (syntax-outline d "shell" id)) '("f"))))
     ;; the indentation at the cursor, in C++ code (as Return asks it)
     (treesit-generate-cache "cpp")
     (with-test-buffer '(document (cpp-code (document "int f() {" "return 0;" "}")))
@@ -708,6 +717,17 @@
                            "(identifier) arguments: (arguments argument: (argument value: (float)) "
                            "(comma) argument: (argument value: (string open: (string_open) "
                            "content: (string_content) close: (string_close)))))) (identifier))"))
+    ;; Bash: a heredoc and a function, as tree-sitter parse gives them
+    (treesit-generate-cache "bash")
+    (check= (tree-sitter-parse-sexp (treesit-language "bash")
+                                    "cat <<EOF\nhi $x\nEOF\nf() {\n  echo \"a b\" > /dev/null\n}\n")
+            (string-append "(program (redirected_statement body: (command name: (command_name "
+                           "(word))) redirect: (heredoc_redirect (heredoc_start) (heredoc_body "
+                           "(simple_expansion (variable_name)) (heredoc_content)) (heredoc_end))) "
+                           "(function_definition name: (word) body: (compound_statement "
+                           "(redirected_statement body: (command name: (command_name (word)) "
+                           "argument: (string (string_content))) redirect: (file_redirect "
+                           "destination: (word))))))"))
     ;; Java, without scanner
     (treesit-generate-cache "java")
     (check= (tree-sitter-parse-sexp (treesit-language "java") "class A { int f() { return 1; } }")

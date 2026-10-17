@@ -249,7 +249,12 @@
       "quote_statement" "else_clause" "elseif_clause" "catch_clause"
       "finally_clause" "vector_expression" "tuple_expression"
       "parenthesized_expression" "call_expression")
-     ("else_clause" "elseif_clause" "catch_clause" "finally_clause") #f)))
+     ("else_clause" "elseif_clause" "catch_clause" "finally_clause") #f)
+    ("shell"
+     ("compound_statement" "do_group" "if_statement" "elif_clause"
+      "else_clause" "case_statement" "case_item" "subshell" "array"
+      "command_substitution")
+     ("elif_clause" "else_clause") #f)))
 
 (define (line-string doc row)
   (let ((t (tree-ref doc row)))
@@ -351,12 +356,16 @@
 
 (define tags-queries '())  ; ((id . query or #f) ...)
 
+;; the grammars whose name is not that of the program language
+(define grammar-names '(("shell" . "bash")))
+
 (define (tags-query lan id)
   ;; the query of the definitions of the program language lan, or #f
   (let ((known (assoc id tags-queries)))
     (if known (cdr known)
-        (let* ((u (url-concretize
-                   (string-append "$TEXMACS_PATH/misc/tree-sitter/" lan "/tags.scm")))
+        (let* ((g (or (assoc-ref grammar-names lan) lan))
+               (u (url-concretize
+                   (string-append "$TEXMACS_PATH/misc/tree-sitter/" g "/tags.scm")))
                (q (and (url-exists? u)
                        (tree-sitter-query-new id (string-load u))))
                (r (and q (>= q 0) q)))
@@ -433,7 +442,8 @@
 
 (define line-comments
   '(("c" . "//") ("cpp" . "//") ("java" . "//") ("javascript" . "//")
-    ("python" . "#") ("r" . "#") ("julia" . "#") ("scheme" . ";")))
+    ("python" . "#") ("r" . "#") ("julia" . "#") ("scheme" . ";")
+    ("shell" . "#")))
 
 (define-public (syntax-comment-prefix lan)
   (assoc-ref line-comments lan))

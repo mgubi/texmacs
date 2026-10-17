@@ -216,7 +216,7 @@ tree_sitter_wraps (string lan) {
   // the program languages which tree-sitter may highlight
   return lan == "scheme" || lan == "json" || lan == "c" || lan == "cpp" ||
          lan == "python" || lan == "java" || lan == "javascript" || lan == "r" ||
-         lan == "julia";
+         lan == "julia" || lan == "shell";
 }
 
 language_rep*
