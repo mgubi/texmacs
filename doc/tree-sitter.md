@@ -500,8 +500,8 @@ be merged on its own.
   tokenizer is used.
 - Load the data from C directly (no Scheme string of 1 MB): the glue takes
   a file name.
-- Builds: CMake and the browser build compile `Plugins/TreeSitter`
-  (`misc/wasm/sources.txt`); `USE_TREE_SITTER` and `syntax-supported?`
+- Builds: CMake compiles `Plugins/TreeSitter` too (the browser build,
+  `misc/wasm/sources.txt`, later); `USE_TREE_SITTER` and `syntax-supported?`
   let the rest of TeXmacs work without it.
 - Tests: the registry, the cache (a changed grammar regenerates), loading
   every shipped language.
@@ -541,7 +541,8 @@ be merged on its own.
   lines whose colours change (a comment or a string opened above them);
   their highlight is detached and they are touched, outside the typesetting
   pass (the point to settle, section 3).
-- First languages: json and c (no scanner), then cpp and python (phase 4).
+- First languages: json, c and scheme (no scanner), then cpp and python
+  (phase 4).
   The present tokenizers stay for the other languages and when the build
   lacks tree-sitter.
 - Tests: colours of sample files per language compared with
@@ -568,8 +569,8 @@ indentation (`indents.scm`), outline (`tags.scm`).
 
 ### Decisions
 
-1. Open: the first languages, and whether Scheme (for TeXmacs's own code)
-   is one of them: its grammars are generic, the queries would be ours.
+1. Decided (2026-10-17): the first languages are json, c and **scheme**
+   (for TeXmacs's own code; the grammar is generic, the queries are ours).
 2. Decided (2026-10-17): the tables are **generated at first use** and
    cached in `$TEXMACS_HOME_PATH`; only `grammar.json` and the queries are
    shipped. Consequences for phase 1: the first opening of a file of a
@@ -579,5 +580,5 @@ indentation (`indents.scm`), outline (`tags.scm`).
    generator should get faster (the 3x of module code under S7, section 6,
    is the first thing to look at). No build-time target.
 3. Decided (2026-10-17): the work is based on `maxs_texmacs`
-   (`wip_ts_experiment` started from it); whether the browser build is part
-   of phase 1 is open.
+   (`wip_ts_experiment` started from it). The desktop builds come first;
+   the browser build later.
