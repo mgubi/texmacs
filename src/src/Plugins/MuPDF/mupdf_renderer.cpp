@@ -2627,7 +2627,8 @@ glyph_font (string fontname, double& em) {
 
 // the glyph filled and stroked as draw renders it when the glyphs are made
 // bolder (text rendering mode 2, glyph_bold): the text of one glyph drawn
-// into a pixmap of its own, an alpha (NULL for a glyph with no ink). The
+// into a pixmap of its own, an alpha (NULL for a glyph with no ink; not
+// made bolder when bold is 0: a glyph too large for MuPDF's cache). The
 // commands of the core of Tau say their glyphs so, as its pixels have them
 static fz_pixmap*
 bold_glyph_pixmap (fz_context* ctx, fz_font* font, int gid, fz_matrix trm,
@@ -2640,9 +2641,11 @@ bold_glyph_pixmap (fz_context* ctx, fz_font* font, int gid, fz_matrix trm,
   fz_try (ctx) {
     text= fz_new_text (ctx);
     fz_show_glyph (ctx, text, font, trm, gid, 0, 0, 0, FZ_BIDI_LTR, FZ_LANG_UNSET);
-    stroke= fz_new_stroke_state (ctx);
-    stroke->linewidth= (float) bold;
-    stroke->linejoin= FZ_LINEJOIN_ROUND;
+    if (bold > 0.0) {
+      stroke= fz_new_stroke_state (ctx);
+      stroke->linewidth= (float) bold;
+      stroke->linejoin= FZ_LINEJOIN_ROUND;
+    }
     fz_irect box= fz_round_rect (fz_bound_text (ctx, text, stroke, fz_identity));
     if (!fz_is_empty_irect (box)) {
       box.x0 -= 1; box.y0 -= 1; box.x1 += 1; box.y1 += 1;
@@ -2652,8 +2655,9 @@ bold_glyph_pixmap (fz_context* ctx, fz_font* font, int gid, fz_matrix trm,
       float black= 0.f;
       fz_fill_text (ctx, dev, text, fz_identity, fz_device_gray (ctx), &black, 1.f,
                     fz_default_color_params);
-      fz_stroke_text (ctx, dev, text, stroke, fz_identity, fz_device_gray (ctx),
-                      &black, 1.f, fz_default_color_params);
+      if (stroke != NULL)
+        fz_stroke_text (ctx, dev, text, stroke, fz_identity, fz_device_gray (ctx),
+                        &black, 1.f, fz_default_color_params);
       fz_close_device (ctx, dev);
     }
   }
@@ -2686,7 +2690,11 @@ mupdf_glyph_bitmap (string fontname, int c, string& cov,
   if (!mupdf_protected ("mupdf_glyph_bitmap", [&] () {
         if (bold > 0.0) pix= bold_glyph_pixmap (ctx, font, (int) gid, ctm, bold);
         else pix= fz_render_glyph_pixmap (ctx, font, (int) gid, &ctm, &scissor,
-                                          fz_text_aa_level (ctx)); }))
+                                          fz_text_aa_level (ctx));
+        // (MuPDF renders no glyph of more than 256 pixels, MAX_GLYPH_SIZE,
+        // a large zoom: filled from its outline then, by a draw device)
+        if (pix == NULL && bold <= 0.0)
+          pix= bold_glyph_pixmap (ctx, font, (int) gid, ctm, 0.0); }))
     return false;
   cov= string ();
   w= h= x0= y0= 0;
