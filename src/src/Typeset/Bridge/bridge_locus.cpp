@@ -144,8 +144,6 @@ bridge_locus_rep::my_typeset (int desired_status) {
   tree old_col= env->read (COLOR);
   env->write_update (COLOR, col);
   ttt->insert_marker (st, ip);
-  tree outer= bind_start (tree (TUPLE, COLOR, col));
   body->typeset (desired_status);
-  bind_end (outer);
   env->write_update (COLOR, old_col);
 }

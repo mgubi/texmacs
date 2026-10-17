@@ -151,6 +151,9 @@ public:
   editor_rep (server_rep* sv, tm_buffer buf);
   inline virtual ~editor_rep () {}
   bool is_current_editor ();
+  // what the event loop does after the events: applies the changes to the
+  // view (a zoom, the typesetting...), which a test may do at once
+  virtual void apply_pending_changes () = 0;
   
   /* public routines from edit_interface */
   virtual void suspend () = 0;
@@ -341,6 +344,7 @@ public:
   virtual tree     get_init_all () = 0;
   virtual void     init_env (string var, tree by) = 0;
   virtual void     init_default (string var) = 0;
+  virtual void     set_zoom (tree z) = 0;
   virtual tree     get_ref (string key) = 0;
   virtual tree     get_aux (string key) = 0;
   virtual tree     get_att (string key) = 0;

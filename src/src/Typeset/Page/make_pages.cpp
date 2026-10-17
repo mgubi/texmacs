@@ -252,12 +252,12 @@ pager_rep::memo_start () {
        << (double) float_sep->min << (double) float_sep->def
        << (double) float_sep->max << (double) mnote_sep
        << (double) (show_hf? 1: 0) << (double) (paper? 1: 0)
-       << (double) page_offset << (double) env->pixel << (double) env->dpi;
-  array<tree> state= env->derived_state ();
-  bool same= N(pars) == N(memo->pars) && N(state) == N(memo->state);
+       << (double) page_offset << (double) env->dpi;
+  // (not the zoom: a header which depends on it reads it, and the borders
+  // of the pages, which are in pixels, are made outside: make_pages)
+  unsigned long long state= env->derived_state ();
+  bool same= N(pars) == N(memo->pars) && state == memo->state;
   for (int i=0; same && i<N(pars); i++) same= pars[i] == memo->pars[i];
-  for (int i=0; same && i<N(state); i++)
-    same= same_tree (state[i], memo->state[i]);
   if (!same) {
     memo->pars   = pars;
     memo->state  = state;
@@ -284,27 +284,30 @@ pager_rep::make_part (array<page_part>* parts, tree what) {
     same= env->lookup_value (old.keys[i]) == old.looked[i];
   if (same && page_reuse_mode () == 1) {
     if (edit_profile.on) edit_profile.parts_kept++;
+    env->write_bindings (old.bindings);
     return old.b;
   }
   // typeset, with a record of what is read
-  hashmap<int,bool> reads (false);
+  env_id_set reads;
   page_part now;
   hashmap<string,tree> before= env->all_values ();
   edit_env_rep::read_record record (env.operator-> (), &reads,
                                     &now.keys, &now.looked);
+  edit_env_rep::binding_record bindings (env.operator-> (), &now.bindings);
   box b= typeset_as_concat (env, attach_here (tree (PARA, what),
                                                decorate ()));
+  bindings.stop ();
   now.ok= record.complete () &&
-          N(reads) <= PART_READS_MAX && N(now.keys) <= PART_LOOKUPS_MAX;
+          reads.size () <= PART_READS_MAX && N(now.keys) <= PART_LOOKUPS_MAX;
   record.stop ();
-  if (same && !same_box (b, old.b)) typeset_check_mismatches++;
-  if (same && !same_box (b, old.b))
+  bool differs= same && (!same_box (b, old.b) || now.bindings != old.bindings);
+  if (differs) typeset_check_mismatches++;
+  if (differs)
     cout << "TeXmacs] page " << (nr + 1)
          << ": the header or footer kept differs from the one made" << LF;
   if (now.ok) {
-    iterator<int> it= iterate (reads);
-    while (it->busy ()) {
-      string var= env_var_name (it->next ());
+    for (int i=0; i<reads.size (); i++) {
+      string var= env_var_name (reads.ids[i]);
       tree val= env->read (var);
       // a part which changes a variable it reads would be compared, the
       // next time, with a value which is not the one it started from
@@ -456,8 +459,7 @@ pager_rep::pages_make () {
   for (i=0; i<n; i++)
     pages << pages_make_page (sk[i]);
   if (memo != NULL) {
-    // the pages which are no longer there are not kept: their lines
-    // must go now, to log the place they leave (see phrase_box_rep)
+    // the pages which are no longer there are not kept
     if (N(memo->texts)   > n) memo->texts  = range (memo->texts, 0, n);
     if (N(memo->headers) > n) memo->headers= range (memo->headers, 0, n);
     if (N(memo->footers) > n) memo->footers= range (memo->footers, 0, n);

@@ -3,7 +3,11 @@
 #
 # usage: tests/scheme/check.sh [suite...]
 #
-#   all          the regression suites of check-master.scm (the default)
+#   all          the regression suites of check-master.scm
+#   typeset-check  the typeset suite with the caches of the typesetting in
+#                their check modes (TEXMACS_TYPESET_READS=check...), which
+#                make each cached result again and count the differences
+#   (no suite: all and typeset-check)
 #   integration  the integration suites (server backup, cache...)
 #   <name>       one suite of check-master.scm, such as glue or tmhtml
 #   <file.scm>   a test module which is not listed yet: foo-test.scm is
@@ -27,11 +31,17 @@ export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
 mkdir -p "$out" "$TEXMACS_HOME_PATH"
 timeout=${TM_TEST_TIMEOUT:-600}
 
-[ $# -eq 0 ] && set -- all
+[ $# -eq 0 ] && set -- all typeset-check
 status=0
 for suite in "$@"; do
+  checks=
   case $suite in
     all)         expr="(run-all-tests)"; name=all ;;
+    typeset-check)
+      expr="(run-regression-suite \"typeset\")"; name=typeset-check
+      checks="TEXMACS_TYPESET_READS=check TEXMACS_TYPESET_CACHES=check
+              TEXMACS_PAGE_REUSE=check TEXMACS_PAGE_BREAK_FAST=check
+              TEXMACS_PAGE_BREAK_CACHE=check" ;;
     integration) expr="(run-integration-tests)"; name=integration ;;
     *.scm)
       file=$(cd "$(dirname "$suite")" && pwd)/$(basename "$suite")
@@ -40,7 +50,7 @@ for suite in "$@"; do
     *)           expr="(run-regression-suite \"$suite\")"; name=$suite ;;
   esac
   log="$out/$name.log"
-  perl -e 'alarm shift; exec @ARGV' "$timeout" "$bin" \
+  env $checks perl -e 'alarm shift; exec @ARGV' "$timeout" "$bin" \
     -x "(exit (catch #t (lambda () (min 1 $expr))
                         (lambda args (display* \"error: \" args \"\\n\") 2)))" \
     -q > "$log" 2>&1

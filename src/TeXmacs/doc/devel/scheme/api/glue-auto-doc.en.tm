@@ -9419,6 +9419,14 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(apply-changes)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|apply_pending_changes> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
     <scm|(update-path <scm-arg|path>)>
 <explain-synopsis|no synopsis>
   <|explain>

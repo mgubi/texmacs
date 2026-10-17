@@ -2010,33 +2010,61 @@ edit_env_rep::exec_set_binding (tree t) {
   }
   //cout << t << ": " << keys << " -> " << value << "\n";
 
-  for (int i=0; i<N(keys); i++) {
-    string key= keys[i]->label;
-    tree old_value= local_ref[key];
-    string part= as_string (read ("current-part"));
-    if (is_func (old_value, TUPLE) && (N(old_value) >= 2))
-      local_ref (key)= tuple (copy (value), old_value[1]);
-    else local_ref (key)= tuple (copy (value), "?");
-    if (cur_file_name != base_file_name || N(part) != 0) {
-      string extra;
-      if (cur_file_name != base_file_name)
-	extra << as_string (delta (base_file_name, cur_file_name));
-      if (N(part) != 0)
-	extra << "#" << part (1, N(part));
-      local_ref (key) << extra;
-    }
-    touched (key)= true;
-    if (complete && is_tuple (old_value) && N(old_value) >= 1) {
-      string old_s= tree_as_string (old_value[0]);
-      string new_s= tree_as_string (value);
-      if (new_s != old_s && !starts (key, "auto-")) {
-        redefined << tree (TUPLE, key, new_s);
-	//if (new_s == "") typeset_warning << "Redefined " << key << LF;
-	//else typeset_warning << "Redefined " << key << " as " << new_s << LF;
-      }
+  string part= (N(keys) == 0? string (""): as_string (read ("current-part")));
+  string extra;
+  if (cur_file_name != base_file_name || N(part) != 0) {
+    if (cur_file_name != base_file_name)
+      extra << as_string (delta (base_file_name, cur_file_name));
+    if (N(part) != 0)
+      extra << "#" << part (1, N(part));
+  }
+  for (int i=0; i<N(keys); i++)
+    write_binding (keys[i]->label, value, extra);
+  return tree (HIDDEN_BINDING, keys, value);
+}
+
+void
+edit_env_rep::write_binding (string key, tree value, string extra) {
+  // (the record gets the value as it is in the table, so that the binding
+  // is found there by its pointer when the record is written again)
+  tree stored= store_binding (key, value, extra);
+  if (rec_bindings != NULL) (*rec_bindings) << tuple (key, stored, extra);
+}
+
+tree
+edit_env_rep::store_binding (string key, tree value, string extra) {
+  // (not written when it is there already: see labels_stamp; the binding
+  // would be the tuple of the value, the page of the one there or "?", and
+  // the extra part: it is there when the one there has the same value and
+  // extra part, which is checked without making it, since the bridges used
+  // again write all theirs again at each pass)
+  tree* there= local_ref->find (key);
+  tree old_value= (there == NULL? tree (UNINIT): *there);
+  int n= (N(extra) != 0? 3: 2);
+  bool same= there != NULL && is_func (old_value, TUPLE, n) &&
+             old_value[0] == value &&
+             (n == 2 || (is_atomic (old_value[2]) &&
+                         old_value[2]->label == extra));
+  tree stored= (same? old_value[0]: tree ());
+  if (!same) {
+    tree now= tuple (value, (is_func (old_value, TUPLE) && N(old_value) >= 2?
+                             old_value[1]: tree ("?")));
+    if (N(extra) != 0) now << tree (extra);
+    now= copy (now);
+    local_ref (key)= now;
+    stored= now[0];
+  }
+  touched (key)= true;
+  if (complete && is_tuple (old_value) && N(old_value) >= 1) {
+    string old_s= tree_as_string (old_value[0]);
+    string new_s= tree_as_string (value);
+    if (new_s != old_s && !starts (key, "auto-")) {
+      redefined << tree (TUPLE, key, new_s);
+      //if (new_s == "") typeset_warning << "Redefined " << key << LF;
+      //else typeset_warning << "Redefined " << key << " as " << new_s << LF;
     }
   }
-  return tree (HIDDEN_BINDING, keys, value);
+  return stored;
 }
 
 tree
@@ -2091,6 +2119,13 @@ edit_env_rep::exec_has_binding (tree t) {
 * makes (in an included file...) takes the next number each time. The
 * name is auto-n, as with the counter: when the labels were numbered in
 * the order in which they are made, the names are those of the counter.
+* The parts of a document (show-part, hide-part: set-part in
+* std-automatic.ts) start the counter again, and the labels of a part
+* are named after it: each part has a sequence of its own, with its own
+* epoch, so that a tag which goes to another part takes new numbers there.
+* The addendum of the buffer holds the epoch and the next number of the
+* labels outside of the parts, then for each part its number (auto_part),
+* its epoch and its next number.
 * This is what a document gets when it is loaded, and again when it is
 * updated (typeset_renumber_labels in edit_typeset.cpp): the epoch of the
 * buffer changes, the numbers of another epoch are not used, and a
@@ -2105,8 +2140,9 @@ edit_env_rep::exec_has_binding (tree t) {
 * last name which was given, so that the tag which makes a label is
 * typeset again when the label before it is another one. The variable
 * auto-open holds, for the tag and for the tags around it in the document,
-* which of their labels was made last (tag.k, the tag being the number of
-* its first label): a tag may make other labels after those of a tag
+* which of their labels was made last (tag.k, the tag being the epoch of
+* its sequence and the number of its first label: e:n, since the sequences
+* of the parts all start at 1): a tag may make other labels after those of a tag
 * inside it. It is a variable, and not a count kept with the tag, because
 * the labels of a tag may be made by several bridges, of which some are
 * not typeset again.
@@ -2126,25 +2162,39 @@ auto_label_data (tree t, array<int>& a) {
   return true;
 }
 
+static int
+auto_part (string part) {
+  // (the number of a part, from 1, for the addendum of the buffer)
+  static hashmap<string,int> parts (0);
+  if (!parts->contains (part)) parts (part)= N(parts) + 1;
+  return parts [part];
+}
+
 static void
-auto_labels_numbers (tree t, int epoch, array<int>& r) {
+auto_labels_numbers (tree t, array<int>& epochs, array<int>& r) {
   array<int> a;
-  if (auto_label_data (t, a) && N(a) >= 1 && a[0] == epoch) {
+  if (auto_label_data (t, a) && N(a) >= 1 && contains (a[0], epochs)) {
     r << -1;
     for (int i=1; i<N(a); i++) r << a[i];
   }
   if (is_compound (t))
-    for (int i=0; i<N(t); i++) auto_labels_numbers (t[i], epoch, r);
+    for (int i=0; i<N(t); i++) auto_labels_numbers (t[i], epochs, r);
 }
 
 array<int>
 auto_labels_numbers (tree root) {
   // the numbers of the labels of the tags, in the order of the document,
   // and the next number
-  array<int> b, r;
+  array<int> b, r, epochs;
   if (!auto_label_data (root, b) || N(b) < 2) return r;
-  auto_labels_numbers (root, b[0], r);
+  epochs << b[0];
+  for (int j=2; j+2<N(b); j+=3) epochs << b[j+1];
+  // (the tags below the root: the root holds the sequences, whose epochs
+  // change at each renumbering)
+  if (is_compound (root))
+    for (int i=0; i<N(root); i++) auto_labels_numbers (root[i], epochs, r);
   r << b[1];
+  for (int j=2; j+2<N(b); j+=3) r << b[j] << b[j+2];
   return r;
 }
 
@@ -2154,6 +2204,7 @@ auto_labels_renumber (tree root) {
   if (!auto_label_data (root, r) || N(r) < 2) return false;
   r[0]= ++auto_epoch;
   r[1]= 1;
+  for (int j=2; j+2<N(r); j+=3) { r[j+1]= ++auto_epoch; r[j+2]= 1; }
   return true;
 }
 
@@ -2213,6 +2264,16 @@ edit_env_rep::exec_auto_id (tree t) {
     (void) tree_addendum_new (auto_buffer, ADDENDUM_AUTO_ID,
                               close_box<array<int> > (r), false);
   }
+  // the sequence of the part: its epoch is r[e] and its next number r[e+1]
+  int e= 0;
+  string part= "";
+  if (provides ("current-part")) part= as_string (read ("current-part"));
+  if (N(part) != 0) {
+    int id= auto_part (part);
+    for (int j=2; j+2<N(r) && e == 0; j+=3)
+      if (r[j] == id) e= j+1;
+    if (e == 0) { e= N(r) + 1; r << id << (++auto_epoch) << 1; }
+  }
   int number;
   tree tag, root;
   path where;
@@ -2225,17 +2286,19 @@ edit_env_rep::exec_auto_id (tree t) {
       (void) tree_addendum_new (tag, ADDENDUM_AUTO_ID,
                                 close_box<array<int> > (a), false);
     }
-    if (a[0] != r[0]) { a->resize (1); a[0]= r[0]; }
-    if (N(a) == 1) a << r[1]++;
-    string key= as_string (a[1]);
+    if (a[0] != r[e]) { a->resize (1); a[0]= r[e]; }
+    if (N(a) == 1) a << r[e+1]++;
+    // (the key of a tag: the epoch of its sequence and its first number,
+    // since each part has a sequence of its own, starting at 1)
+    string key= as_string (a[0]) * ":" * as_string (a[1]);
     // the tags around this one which have labels
     array<string> around;
     tree up= root;
     for (path q= where->next; !is_nil (q) && !is_nil (q->next); q= q->next) {
       up= up[q->item];
       array<int> b;
-      if (auto_label_data (up, b) && N(b) >= 2 && b[0] == r[0])
-        around << as_string (b[1]);
+      if (auto_label_data (up, b) && N(b) >= 2 && b[0] == r[e])
+        around << (as_string (b[0]) * ":" * as_string (b[1]));
     }
     // which of their labels each of them made last, and this tag
     tree open (TUPLE), now (TUPLE);
@@ -2249,12 +2312,12 @@ edit_env_rep::exec_auto_id (tree t) {
       if (base == key) k= (dot < 0 ? 1 : as_int (s (dot + 1, N(s)))) + 1;
       else if (contains (base, around)) now << open[i];
     }
-    if (N(a) - 1 < k) a << r[1]++;
+    while (N(a) - 1 < k) a << r[e+1]++;
     number= a[k];
     now << tree (key * "." * as_string (k));
     if (now != open) monitored_write ("auto-open", now);
   }
-  else number= r[1]++;
+  else number= r[e+1]++;
   string name= as_string (number);
   if (name != last) monitored_write ("auto-last", name);
   return "";
@@ -2819,6 +2882,12 @@ edit_env_rep::exec_until (tree t, path p, string var, int level) {
   case HLINK:
   case ACTION:
     return exec_until_compound (t, p, var, level);
+  case AUTO_ID:
+    // (as the macro auto-id of a style without the primitive: the counter
+    // goes on, and no number of the document is given out)
+    if (N(t) >= 1 && exec_string (t[0]) == "new")
+      (void) exec (compound ("inc-auto"));
+    return false;
   default:
     if (L(t) < START_EXTENSIONS) {
       int i, n= N(t);

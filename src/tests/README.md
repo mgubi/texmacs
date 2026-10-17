@@ -144,7 +144,8 @@ moved.
 exits with their status:
 
 ```
-tests/scheme/check.sh                     # the regression suites
+tests/scheme/check.sh                     # the regression suites, and typeset-check
+tests/scheme/check.sh typeset-check       # the typeset suite in the check modes
 tests/scheme/check.sh integration         # the integration suites
 tests/scheme/check.sh glue tmhtml         # some suites, by name
 tests/scheme/check.sh path/to/foo-test.scm  # a suite not listed yet
@@ -155,7 +156,12 @@ regression suites, which `run-all-tests` runs, and the integration suites
 (server backup, cache, notifications and tmfs), which have side effects and
 which `run-integration-tests` runs. Both run every suite, also after one
 has failed, and return the number of failed suites; `run-regression-suite`
-runs one suite by name. `integration-test-group` adds the tests which
+runs one suite by name. `typeset-check` runs the `typeset` suite again
+with the caches of the typesetting in their check modes
+(`TEXMACS_TYPESET_READS=check`, `TEXMACS_TYPESET_CACHES=check` and the
+page switches), which make each cached result again and count the
+differences: its checks of `typeset-check-mismatches` find nothing
+otherwise. `integration-test-group` adds the tests which
 fail to `integration-failure-total`, which is how their failures are
 counted.
 

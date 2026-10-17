@@ -201,6 +201,15 @@ edit_interface_rep::invalidate_all () {
   send_invalidate_all (this);
 }
 
+rectangle
+edit_interface_rep::visible_part () {
+  // the part of the document on the screen (animations elsewhere are
+  // neither advanced nor repainted)
+  update_visible ();
+  SI m= 16 * pixel;
+  return rectangle (vx1 - m, vy1 - m, vx2 + m, vy2 + m);
+}
+
 void
 edit_interface_rep::update_visible () {
   SERVER (get_visible (vx1, vy1, vx2, vy2));
@@ -782,8 +791,14 @@ edit_interface_rep::zoom_anchor_keep () {
   update_visible ();
 }
 
+// (apply_changes at work: apply_pending_changes does not start it again)
+static int applying_changes= 0;
+
 void
 edit_interface_rep::apply_changes () {
+  struct applying {
+    applying () { applying_changes++; }
+    ~applying () { applying_changes--; } } busy;
   //cout << "Apply changes\n";
   //cout << "et= " << et << "\n";
   //cout << "tp= " << tp << "\n";
@@ -827,11 +842,13 @@ edit_interface_rep::apply_changes () {
     //cout << "Tremble- " << tremble_count << LF;
   }
 
-  // a zoom which waited for the keys (or the wheel) to stop: now
-  // (none if the zoom came back to that of the layout)
+  // a zoom which waited for the keys (or the wheel) to stop: now (none if
+  // the zoom came back to that of the layout). Not a change of the
+  // environment, which would typeset everything again: set_zoom says what
+  // to typeset
   if (zoom_waiting && texmacs_time () - zoom_time >= zoom_wait) {
     if (get_init_value (ZOOM_FACTOR) == as_string (zoomf)) zoom_waiting= false;
-    else env_change |= THE_ENVIRONMENT;
+    else env_change |= THE_EXTENTS;
   }
 
   if (env_change == 0) {
@@ -846,6 +863,8 @@ edit_interface_rep::apply_changes () {
   
   // cout << "Handling automatic resizing\n";
   int sb= 1;
+  bool zoomed= false;
+  bool zoom_tree= false; // the tree changed only for the zoom
   if (is_attached (this) && has_current_window ()) {
     tree new_zoom= as_string (zoomf);
     tree old_zoom= get_init_value (ZOOM_FACTOR);
@@ -863,8 +882,10 @@ edit_interface_rep::apply_changes () {
     else {
       if (zoom_waiting) zoom_anchor_take ();
       zoom_waiting= false;
-      init_env (ZOOM_FACTOR, new_zoom);
-      notify_change (THE_ENVIRONMENT);
+      zoom_tree= (env_change & THE_TREE) == 0;
+      set_zoom (new_zoom);
+      // (everything on the screen moves, also what was not typeset again)
+      zoomed= true;
     }
   
     if (get_init_string (PAGE_MEDIUM) == "automatic" && !zoom_waiting)
@@ -987,8 +1008,8 @@ edit_interface_rep::apply_changes () {
       cout << "edit-profile typeset: " << total << " ms in " << edit_profile.passes
            << " pass(es): bridges " << edit_profile.bridges << " ms ("
            << edit_profile.redone << " redone, " << edit_profile.cached << " reused"
-           << (edit_profile.unread > 0
-               ? ", " * as_string (edit_profile.unread) * " of them with other variables changed"
+           << (edit_profile.checked > 0
+               ? ", " * as_string (edit_profile.checked) * " checked"
                : string (""))
            << "), pages "
            << edit_profile.pages << " ms"
@@ -1083,8 +1104,10 @@ edit_interface_rep::apply_changes () {
   // the layout of a zoom which waited keeps the place of the text which was
   // seen (the anchor), and the scrolls made while it waited: the cursor is
   // not brought into view, unless it or the document changed meanwhile
-  bool zoom_layout= !is_nil (zoom_anchor) &&
-    (env_change & (THE_TREE+THE_CURSOR+THE_SELECTION+THE_FOCUS)) == 0;
+  // (set_zoom announces a change of the tree: the parts which depend on
+  // the zoom are typeset again)
+  int edits= THE_CURSOR+THE_SELECTION+THE_FOCUS + (zoom_tree? 0: THE_TREE);
+  bool zoom_layout= !is_nil (zoom_anchor) && (env_change & edits) == 0;
   zoom_anchor_keep ();
 
   // cout << "Cursor\n";
@@ -1301,7 +1324,7 @@ edit_interface_rep::apply_changes () {
   }
   
   // cout << "Handling environment changes\n";
-  if (env_change & THE_ENVIRONMENT)
+  if ((env_change & THE_ENVIRONMENT) || zoomed)
     send_invalidate_all (this);
 
   // cout << "Handling menus\n";
@@ -1318,16 +1341,39 @@ edit_interface_rep::apply_changes () {
   manual_focus_release ();
 }
 
+// what the event loop does after the events, at once (a test zooms with
+// it): as the event loop, only for a view in a window (tm_server_rep), and
+// not from within apply_changes (from Scheme which it calls)
+void
+edit_interface_rep::apply_pending_changes () {
+  if (applying_changes > 0 || headless_mode ||
+      !is_attached (this) || !has_current_window ()) return;
+  // at once: a zoom which waits for more steps (zoom_defers) is laid out,
+  // also when nothing else changed (apply_changes would do nothing)
+  zoom_time= 0;
+  if (get_init_value (ZOOM_FACTOR) != as_string (zoomf))
+    notify_change (THE_EXTENTS);
+  apply_changes ();
+}
+
 /******************************************************************************
 * Animations
 ******************************************************************************/
 
 void
 edit_interface_rep::animate () {
-  if (((double) texmacs_time ()) >= anim_next) {
-    rectangles rs= eb->anim_invalid ();
-    invalidate (rs);
-    stored_rects= rectangles ();
+  double now= (double) texmacs_time ();
+  if (now >= anim_next) {
+    rectangle vis= visible_part ();
+    rectangles rs= eb->anim_invalid (vis);
+    if (is_nil (rs))
+      // nothing to repaint (e.g. the animations left the screen), so that
+      // draw_text will not update anim_next: do it here
+      anim_next= max (now + 25.0, eb->anim_next (vis));
+    else {
+      invalidate (rs);
+      stored_rects= rectangles ();
+    }
   }
 }
 

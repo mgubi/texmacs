@@ -328,6 +328,7 @@
   (clear-local-info clear_local_info (void))
   (refresh-window invalidate_all (void))
   (update-forced typeset_forced (void))
+  (apply-changes apply_pending_changes (void))
   (update-path typeset_invalidate (void path))
   (update-current-buffer typeset_invalidate_all (void))
   (renumber-auto-labels typeset_renumber_labels (bool))

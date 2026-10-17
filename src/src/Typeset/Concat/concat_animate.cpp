@@ -232,7 +232,8 @@ concater_rep::typeset_video (tree t, path ip) {
     SI   h  = env->as_length (env->exec (t[2]));
     int  len= env->as_length (env->exec (t[3]));
     bool rep= env->exec (t[4]) != "false";
-    print (video_box (ip, pl, video, w, h, env->alpha, len, rep, env->pixel));
+    print (video_box (ip, pl, video, w, h, env->alpha, len, rep,
+                      env->zoom_pixel)); // (as for an image)
   }
   else typeset_dynamic (tree (_ERROR, "bad video", t[0]), ip);
 }
