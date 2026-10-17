@@ -146,10 +146,10 @@
     <item*|<menu|Next diagnostic>, <menu|Previous diagnostic>>As <key|F8>
     and <key|S-F8>.
 
-    <item*|<menu|List of diagnostics>>As <key|A-D> (see below).
+    <item*|<menu|List of diagnostics>>As <key|std M> (see below).
 
     <item*|<menu|Format>, <menu|Rename symbol...>, <menu|Quick fix>>As
-    <key|A-F>, <key|A-R> and <key|A-Q> (see below).
+    <key|std F>, <key|std E> and <key|std .> (see below).
 
     <item*|<menu|Information on mouse rest>>Whether the information about a
     symbol is shown when the mouse rests on it (see below).
@@ -189,7 +189,7 @@
 
   <paragraph*|The list of diagnostics>
 
-  <key|A-D> opens a page with all the diagnostics of the current file, one
+  <key|std M> opens a page with all the diagnostics of the current file, one
   per line, with its line, its column, its severity and its message.
   Clicking on a line goes to the place of the diagnostic. The page is
   updated while it stays open, each time the server publishes new
@@ -197,16 +197,16 @@
 
   <paragraph*|Formatting, renaming and quick fixes>
 
-  <key|A-F> formats the selection, or the whole file if nothing is
+  <key|std F> formats the selection, or the whole file if nothing is
   selected, as the server does it (for instance with <verbatim|clang-format>
   for <name|clangd>).
 
-  <key|A-R> asks for a new name and renames the symbol at the cursor
+  <key|std E> asks for a new name and renames the symbol at the cursor
   wherever the server finds it: in the current file and in the other files
   of the project. The files which are not open are loaded, and are then to
   be saved.
 
-  <key|A-Q> asks the server for the corrections at the cursor (for instance
+  <key|std .> asks the server for the corrections at the cursor (for instance
   \Pdid you mean ...?\Q for a misspelled name): a single one
   is applied at once; when there are several, they are listed on a page,
   from which one is applied by clicking on it.

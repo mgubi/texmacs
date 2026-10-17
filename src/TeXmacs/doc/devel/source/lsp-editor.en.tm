@@ -248,8 +248,8 @@
   <source-link|lsp-kbd.scm|TeXmacs/progs/lsp/lsp-kbd.scm> binds, in the
   mode <scm|in-prog?>, <key|F12> to <scm|lsp-goto-definition>,
   <key|S-F12> to <scm|lsp-hover>, <key|F8> and <key|S-F8> to
-  <scm|lsp-next-diagnostic>, <key|A-F> to <scm|lsp-format>, <key|A-R> to
-  the rename, <key|A-Q> to <scm|lsp-quick-fix>, <key|A-D> to
+  <scm|lsp-next-diagnostic>, <key|std F> to <scm|lsp-format>, <key|std E> to
+  the rename, <key|std .> to <scm|lsp-quick-fix>, <key|std M> to
   <scm|lsp-show-diagnostics-list> (<key|F2>, the key of renames in other
   editors, is taken), and defines <scm|lsp-menu>.
 

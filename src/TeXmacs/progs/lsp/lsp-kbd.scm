@@ -12,8 +12,10 @@
 
 ;; The keys are those of other editors where TeXmacs leaves them free: F12
 ;; for the definition, F8 for the diagnostics; tab completes (lsp-edit,
-;; kbd-variant); A-F formats, A-R renames, A-Q proposes the fixes, A-D lists
-;; the diagnostics (F2, the key of renames elsewhere, is taken).
+;; kbd-variant); std . proposes the fixes, std F formats, std E renames,
+;; std M lists the diagnostics (F2, the key of renames elsewhere, is taken).
+;; NOTE: no A- keys: on macOS option composes a character (option q is
+;; a ligature), and the key never reaches the editor.
 
 (texmacs-module (lsp lsp-kbd)
   (:use (kernel gui kbd-define)
@@ -26,10 +28,10 @@
   ("S-F12" (lsp-hover))
   ("F8" (lsp-next-diagnostic #t))
   ("S-F8" (lsp-next-diagnostic #f))
-  ("A-F" (lsp-format))
-  ("A-R" (interactive lsp-rename))
-  ("A-Q" (lsp-quick-fix))
-  ("A-D" (lsp-show-diagnostics-list)))
+  ("std F" (lsp-format))
+  ("std E" (interactive lsp-rename))
+  ("std ." (lsp-quick-fix))
+  ("std M" (lsp-show-diagnostics-list)))
 
 (menu-bind lsp-menu
   ((check "Follow source files" "v" (lsp-on?))
