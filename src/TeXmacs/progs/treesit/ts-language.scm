@@ -75,9 +75,26 @@
         (else (let ((e (list-ref (g-ref g 'external-tokens) (sym-index s))))
                 (cons (vector-ref e 0) (vector-ref e 1))))))
 
-(define-public (tables->language g t)
-  (let* ((symbols (ahash-ref t 'symbols))
-         (n-symbols (length symbols))
+;; the part of a language which depends on the symbols only (not on the
+;; states); the native export (ts-export.scm) sends it to C++
+(define-public (sp-ids sp) (vector-ref sp 0))
+(define-public (sp-token-count sp) (vector-ref sp 1))
+(define-public (sp-names sp) (vector-ref sp 2))
+(define-public (sp-metadata sp) (vector-ref sp 3))
+(define-public (sp-alias-sequences sp) (vector-ref sp 4))
+(define-public (sp-field-names sp) (vector-ref sp 5))
+(define-public (sp-field-maps sp) (vector-ref sp 6))
+(define-public (sp-external-symbols sp) (vector-ref sp 7))
+(define-public (sp-supertypes sp) (vector-ref sp 8))
+(define-public (sp-alias-count sp) (vector-ref sp 9))
+(define-public (sp-alias-map sp) (vector-ref sp 10))
+(define-public (sp-supertype-map sp) (vector-ref sp 11))
+(define-public (sp-public-symbols sp) (vector-ref sp 12))
+(define-public (sp-keyword-capture sp) (vector-ref sp 13))
+
+(define-public (ts-language-symbols g symbols infos)
+  ;; symbols as the tables order them, infos the production infos
+  (let* ((n-symbols (length symbols))
          (ids (make-ahash-table))
          (default-aliases (g-ref g 'default-aliases))
          (supertypes (g-ref g 'supertypes)))
@@ -118,8 +135,7 @@
                              (+ n-symbols k)))))
               (ahash-set! alias-ids alias id)
               id)))
-      (let* ((infos (ahash-ref t 'production-infos))
-             (alias-sequences
+      (let* ((alias-sequences
               (list->vector
                (ts-map (lambda (info) (list->vector (ts-map (lambda (a) (if a (alias-id a) 0))
                                                             (car info))))
@@ -140,76 +156,95 @@
                          (gvec-push! names (car a))
                          (gvec-push! metadata (if (cdr a) 3 1)))
                        unique-aliases)
-        (let* ((states (ahash-ref t 'states))
-               (n-states (gvec-length states))
-               (table (make-ahash-table))
-               (lex-modes (make-vector n-states #f))
-               (word (g-ref g 'word)))
-          (define (convert-action a)
-            (case (car a)
-              ((shift) (vector 'shift (cadr a) #f (caddr a)))
-              ((shift-extra) (vector 'shift 0 #t #f))
-              ((recover) (vector 'recover))
-              ((accept) (vector 'accept))
-              ((reduce) (vector 'reduce (ahash-ref ids (cadr a)) (caddr a) (cadddr a) (list-ref a 4)))
-              (else (ts-error "unknown action" a))))
-          (do ((i 0 (+ i 1))) ((= i n-states))
-            (let ((s (gvec-ref states i)))
-              (om-for-each
-               (lambda (sym e)
-                 (ahash-set! table (+ (* i n-symbols) (ahash-ref ids sym))
-                             (vector (list->vector (ts-map convert-action (entry-actions e)))
-                                     (entry-reusable? e))))
-               (state-terminals s))
-              (om-for-each
-               (lambda (sym a)
-                 (ahash-set! table (+ (* i n-symbols) (ahash-ref ids sym))
-                             (if (eq? (car a) 'goto) (cadr a) i)))
-               (state-nonterminals s))
-              (vector-set! lex-modes i
-                           (vector (if (om-has? (state-terminals s) sym-eont) -1 (state-lex s))
-                                   (state-external-lex s)
-                                   (ts-map (lambda (r) (ahash-ref ids r))
-                                           (ts-filter (lambda (r) (ahash-ref ids r))
-                                                      (state-reserved s)))))))
-          (define (convert-lex-table lt)
-            (list->vector
-             (ts-map (lambda (s)
-                       (vector (let ((a (vector-ref s 0))) (if a (ahash-ref ids a) #f))
-                               (let ((e (vector-ref s 1))) (if e (car e) #f))
-                               (ts-map (lambda (a) (vector (car a) (cadr a) (cddr a)))
-                                       (vector-ref s 2))))
-                     (gvec->list lt))))
-          (let* ((externals (g-ref g 'external-tokens))
-                 (external-symbols
-                  (list->vector
-                   (ts-map-index (lambda (i e)
-                                   (or (ahash-ref ids (external i))
-                                       (and (vector-ref e 2) (ahash-ref ids (vector-ref e 2)))
-                                       0))
-                                 externals)))
-                 (external-states
-                  (list->vector
-                   (ts-map (lambda (set)
-                             (let ((v (make-vector (length externals) #f)))
-                               (for-each (lambda (s) (vector-set! v (sym-index s) #t)) set)
-                               v))
-                           (vector->list (ahash-ref t 'external-lex-states))))))
-            (vector (g-ref g 'name) n-symbols token-count n-states
-                    (gvec->vector names) (gvec->vector metadata) table lex-modes
-                    (convert-lex-table (ahash-ref t 'lex-table))
-                    (convert-lex-table (ahash-ref t 'keyword-lex-table))
-                    (if (and word (ahash-ref ids word)) (ahash-ref ids word) 0)
-                    alias-sequences field-maps external-symbols external-states
-                    (list->vector field-names)
-                    (ts-map (lambda (s) (ahash-ref ids s))
-                            (ts-filter (lambda (s) (ahash-ref ids s)) supertypes))
-                    #f
-                    (gvec-length unique-aliases)
-                    (query-alias-map g ids alias-id default-aliases)
-                    (primary-states states)
-                    (query-supertype-map g ids alias-id)
-                    (public-symbol-map g symbols ids default-aliases))))))))
+        (let* ((word (g-ref g 'word))
+               (externals (g-ref g 'external-tokens))
+               (external-symbols
+                (list->vector
+                 (ts-map-index (lambda (i e)
+                                 (or (ahash-ref ids (external i))
+                                     (and (vector-ref e 2) (ahash-ref ids (vector-ref e 2)))
+                                     0))
+                               externals)))
+               (supertype-ids (ts-map (lambda (s) (ahash-ref ids s))
+                                      (ts-filter (lambda (s) (ahash-ref ids s)) supertypes)))
+               ;; the aliases met from here on are not in the names
+               (alias-count (gvec-length unique-aliases))
+               (name-vector (gvec->vector names))
+               (metadata-vector (gvec->vector metadata))
+               (alias-map (query-alias-map g ids alias-id default-aliases))
+               (supertype-map (query-supertype-map g ids alias-id)))
+          (vector ids token-count name-vector metadata-vector
+                  alias-sequences (list->vector field-names) field-maps
+                  external-symbols supertype-ids alias-count alias-map supertype-map
+                  (public-symbol-map g symbols ids default-aliases)
+                  (if (and word (ahash-ref ids word)) (ahash-ref ids word) 0)))))))
+
+(define-public (tables->language g t)
+  (let* ((symbols (ahash-ref t 'symbols))
+         (n-symbols (length symbols))
+         (sp (ts-language-symbols g symbols (ahash-ref t 'production-infos)))
+         (ids (sp-ids sp)))
+    (let* ((states (ahash-ref t 'states))
+           (n-states (gvec-length states))
+           (table (make-ahash-table))
+           (lex-modes (make-vector n-states #f)))
+      (define (convert-action a)
+        (case (car a)
+          ((shift) (vector 'shift (cadr a) #f (caddr a)))
+          ((shift-extra) (vector 'shift 0 #t #f))
+          ((recover) (vector 'recover))
+          ((accept) (vector 'accept))
+          ((reduce) (vector 'reduce (ahash-ref ids (cadr a)) (caddr a) (cadddr a) (list-ref a 4)))
+          (else (ts-error "unknown action" a))))
+      (do ((i 0 (+ i 1))) ((= i n-states))
+        (let ((s (gvec-ref states i)))
+          (om-for-each
+           (lambda (sym e)
+             (ahash-set! table (+ (* i n-symbols) (ahash-ref ids sym))
+                         (vector (list->vector (ts-map convert-action (entry-actions e)))
+                                 (entry-reusable? e))))
+           (state-terminals s))
+          (om-for-each
+           (lambda (sym a)
+             (ahash-set! table (+ (* i n-symbols) (ahash-ref ids sym))
+                         (if (eq? (car a) 'goto) (cadr a) i)))
+           (state-nonterminals s))
+          (vector-set! lex-modes i
+                       (vector (if (om-has? (state-terminals s) sym-eont) -1 (state-lex s))
+                               (state-external-lex s)
+                               (ts-map (lambda (r) (ahash-ref ids r))
+                                       (ts-filter (lambda (r) (ahash-ref ids r))
+                                                  (state-reserved s)))))))
+      (ts-profile "parse table")
+      (define (convert-lex-table lt)
+        (list->vector
+         (ts-map (lambda (s)
+                   (vector (let ((a (vector-ref s 0))) (if a (ahash-ref ids a) #f))
+                           (let ((e (vector-ref s 1))) (if e (car e) #f))
+                           (ts-map (lambda (a) (vector (car a) (cadr a) (cddr a)))
+                                   (vector-ref s 2))))
+                 (gvec->list lt))))
+      (let* ((externals (g-ref g 'external-tokens))
+             (external-states
+              (list->vector
+               (ts-map (lambda (set)
+                         (let ((v (make-vector (length externals) #f)))
+                           (for-each (lambda (s) (vector-set! v (sym-index s) #t)) set)
+                           v))
+                       (vector->list (ahash-ref t 'external-lex-states))))))
+        (vector (g-ref g 'name) n-symbols (sp-token-count sp) n-states
+                (sp-names sp) (sp-metadata sp) table lex-modes
+                (convert-lex-table (ahash-ref t 'lex-table))
+                (convert-lex-table (ahash-ref t 'keyword-lex-table))
+                (sp-keyword-capture sp)
+                (sp-alias-sequences sp) (sp-field-maps sp) (sp-external-symbols sp)
+                external-states (sp-field-names sp) (sp-supertypes sp)
+                #f
+                (sp-alias-count sp)
+                (sp-alias-map sp)
+                (primary-states states)
+                (sp-supertype-map sp)
+                (sp-public-symbols sp))))))
 
 (define (query-alias-map g ids alias-id default-aliases)
   ;; the aliases (other than the default one) under which each non-terminal
@@ -281,14 +316,20 @@
      symbols)
     (list->vector (ts-map (lambda (s) (ahash-ref ids (ahash-ref mapping s))) symbols))))
 
-(define-public (ts-generate-language json-string)
-  ;; the language of the text of a grammar.json
+(define-public (ts-read-grammar json-string)
+  ;; the grammar of the text of a grammar.json, ready for the tables
+  (ts-profile "start")
   (let ((g (parse-grammar-json (string->json json-string))))
     (prepare-syntax-grammar! g)
     (expand-tokens! g)
-    (let ((l (tables->language g (build-tables! g))))
-      (ts-profile "language")
-      l)))
+    g))
+
+(define-public (ts-generate-language json-string)
+  ;; the language of the text of a grammar.json
+  (let* ((g (ts-read-grammar json-string))
+         (l (tables->language g (build-tables! g))))
+    (ts-profile "language")
+    l))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Saving and loading

@@ -711,6 +711,30 @@ Done in part (2026-10-17):
   The generation in TeXmacs under S7 (`TS_PROFILE=1`): LR 3.5 s, token
   conflicts 7.3 s, states and lex tables (C++) 4.0 s, language 32.7 s,
   68 s in all; the runtime language is now half of the time.
+- **The runtime language written by C++** (same day). Finer stages showed
+  where the 68 s went: the fragile tokens (`mark-fragile-tokens!`, 18.7 s)
+  and the writing of the `.tsdyn` text (`ts-export-language`, 17.6 s, 1.7
+  million numbers), more than the language itself. With the native
+  tables, the states now stay in C++ (`tree-sitter-tables-finish` with
+  the flag 1), and `tree-sitter-tables-export` writes the whole text: the
+  external lex states, the fragile tokens, the parse table and its action
+  lists, the lex modes, the reserved words, the lex tables and the primary
+  states. Scheme sends what only depends on the symbols (names, metadata,
+  fields, aliases, the maps of the queries: `ts-language-symbols`, shared
+  with `tables->language`). `ts-generate-tsdyn` (`ts-export.scm`) is the
+  entry point; `treesit-generate-cache` uses it. The texts are
+  byte-identical to those of `ts-export-language` for json, scheme, c,
+  python and cpp (the treesit suite compares them).
+
+  | grammar (S7 in TeXmacs) | before | now |
+  |---|---|---|
+  | c | 7.4 s | 3.9 s |
+  | python | 4.8 s | 2.4 s |
+  | cpp | 68 s, 4.8 GB | 12.5 s, 1.3 GB |
+
+  C++ now: grammar 0.5 s, LR 3.2 s, token conflicts 5.8 s (Scheme),
+  states and lex tables 2.4 s, language 0.5 s. The token conflicts are
+  the largest stage left in Scheme.
 
 As planned initially:
 

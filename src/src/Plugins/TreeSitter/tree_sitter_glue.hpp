@@ -30,5 +30,6 @@ int  tree_sitter_lexer_column ();
 bool tree_sitter_lexer_eof ();
 string tree_sitter_tables_start (string grammar);
 string tree_sitter_tables_finish (int id, string data);
+string tree_sitter_tables_export (int id, string data);
 
 #endif // TREE_SITTER_GLUE_H

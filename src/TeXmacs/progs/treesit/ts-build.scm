@@ -977,16 +977,24 @@
 
 (define-public (build-tables! g)
   ;; the parse table of build-parse-table, completed
-  (ts-profile "start")
+  (ts-profile "grammar")
   (if (ts-native-tables?)
       (apply build-tables-end! g (ts-native-build g identify-keywords make-token-conflict-map))
       (build-tables-scheme! g)))
+
+(define-public (build-tables-for-export g)
+  ;; (id . t): the tables made in C++ and kept there for
+  ;; tree-sitter-tables-export, t with the symbols and the production infos
+  (ts-profile "grammar")
+  (ts-native-build g identify-keywords make-token-conflict-map #t))
 
 (define (build-tables-end! g t tc ci keywords lex)
   ;; the last details, after the merging of the states and the lex tables
   (let* ((states (ahash-ref t 'states)))
     (ahash-set! t 'external-lex-states (populate-external-lex-states! g states))
+    (ts-profile "external lex states")
     (mark-fragile-tokens! states tc)
+    (ts-profile "fragile tokens")
     (ahash-set! t 'lex-table (car lex))
     (ahash-set! t 'keyword-lex-table (cdr lex))
     (ahash-set! t 'keywords keywords)

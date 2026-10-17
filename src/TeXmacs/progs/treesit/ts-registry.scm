@@ -72,9 +72,9 @@
   ;; sees half of it
   (let* ((file (treesit-cache-url lan))
          (tmp (url-glue file ".part"))
-         (l (ts-generate-language (string-load (treesit-grammar-url lan)))))
+         (s (ts-generate-tsdyn (string-load (treesit-grammar-url lan)))))
     (system-mkdir (cache-dir))
-    (ts-export-language-file l (url->system tmp))
+    (string-save s tmp)
     (system-move tmp file)
     file))
 

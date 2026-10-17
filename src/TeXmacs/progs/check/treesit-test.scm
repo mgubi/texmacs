@@ -534,7 +534,10 @@
     (for (g (list (ts-read-file (json-grammar-file)) calc-grammar raw-grammar
                   (string-load (url-concretize "$TEXMACS_PATH/misc/tree-sitter/scheme/grammar.json"))))
       (let ((r (tables-both-ways g)))
-        (check-true (string=? (car r) (cdr r)))))
+        (check-true (string=? (car r) (cdr r)))
+        ;; and the same text when C++ writes it
+        (when (defined? 'tree-sitter-tables-export)
+          (check-true (string=? (ts-generate-tsdyn g) (car r))))))
     ;; the errors of the construction
     (let ((bad (string-append
                 "{\"name\": \"bad\", \"rules\": {\"e\": {\"type\": \"CHOICE\", \"members\": ["

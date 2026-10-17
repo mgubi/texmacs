@@ -161,9 +161,10 @@
     (for-each (lambda (d) (gvec-push! v (vector (car d) (cadr d) (caddr d)))) l)
     v))
 
-(define-public (ts-native-build g identify-keywords make-token-conflict-map)
+(define-public (ts-native-build g identify-keywords make-token-conflict-map . keep?)
   ;; the parse table as build-tables! makes it, with its lex tables:
-  ;; (t tc ci keywords lex)
+  ;; (t tc ci keywords lex); with keep? the states stay in C++ and the
+  ;; result is (id . t), t without the states, for tree-sitter-tables-export
   (compute-variable-fields! g)
   (let* ((text (call-with-output-string (lambda (port) (write-syntax-grammar g port))))
          (r (string->object (tree-sitter-tables-start text))))
@@ -182,16 +183,18 @@
                      (let ((m (vector-ref tc 1)))
                        (do ((i 0 (+ i 1))) ((= i (vector-length m)))
                          (w-int (vector-ref m i) port)))
-                     (w-syms keywords port))))
+                     (w-syms keywords port)
+                     (when (pair? keep?) (w-int 1 port)))))
            (d (begin (ts-profile "keywords")
                      (string->object (tree-sitter-tables-finish id input))))
            (t (make-ahash-table)))
       (when (eq? (car d) 'error) (ts-error (cadr d)))
       ;; d = (ok states symbols production-infos max-aliased used-conflicts
       ;;      main-lex-table keyword-lex-table)
-      (let ((states (make-gvec)))
-        (for-each (lambda (sd) (gvec-push! states (state-from-data sd))) (list-ref d 1))
-        (ahash-set! t 'states states))
+      (when (list-ref d 1)
+        (let ((states (make-gvec)))
+          (for-each (lambda (sd) (gvec-push! states (state-from-data sd))) (list-ref d 1))
+          (ahash-set! t 'states states)))
       (ahash-set! t 'symbols (list-ref d 2))
       (ahash-set! t 'production-infos (list->vector (list-ref d 3)))
       (ahash-set! t 'max-aliased-production-length (list-ref d 4))
@@ -200,5 +203,6 @@
       (when (pair? (list-ref d 5))
         (g-set! g 'used-conflicts (append (list-ref d 5) (or (g-ref g 'used-conflicts) '()))))
       (ts-profile "states and lex tables (C++)")
-      (list t tc ci keywords
-            (cons (lex-table-from-data (list-ref d 6)) (lex-table-from-data (list-ref d 7)))))))
+      (if (pair? keep?) (cons id t)
+          (list t tc ci keywords
+                (cons (lex-table-from-data (list-ref d 6)) (lex-table-from-data (list-ref d 7))))))))

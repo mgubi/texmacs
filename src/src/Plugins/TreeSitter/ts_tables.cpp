@@ -1534,6 +1534,8 @@ struct tables_t {
   ivec lex_of;                  // the lex state of each parse state
   std::vector<lex_state_t> main_table, keyword_table;
   void build_lex_tables (std::vector<state_t*>& states);
+  // the language for the C runtime
+  void export_language (reader_t& r, std::string& out);
 };
 
 void
@@ -2163,6 +2165,280 @@ write_lex_table (std::string& out, const std::vector<lex_state_t>& table) {
   out += ")";
 }
 
+/******************************************************************************
+* The language for the C runtime (ts-language.scm and ts-export.scm)
+******************************************************************************/
+
+typedef std::vector<std::vector<int> > action_list;   // kind and 4 values
+
+struct table_value_t {
+  bool entry;           // the actions of a token, else the state of a goto
+  action_list actions;
+  bool reusable;
+  int state;
+};
+
+static void
+export_lex_table (std::string& out, const std::vector<lex_state_t>& table,
+                  const std::unordered_map<int,int>& ids) {
+  w_int (out, (ll) table.size ());
+  for (size_t i= 0; i < table.size (); i++) {
+    const lex_state_t& s= table[i];
+    std::unordered_map<int,int>::const_iterator it= ids.find (s.accept);
+    w_int (out, s.accept < 0 || it == ids.end ()? -1: it->second);
+    w_int (out, s.eof);
+    w_int (out, (ll) s.adv.size ());
+    for (size_t k= 0; k < s.adv.size (); k++) {
+      w_int (out, s.adv[k].state);
+      w_int (out, s.adv[k].main? 0: 1);
+      w_int (out, (ll) s.adv[k].chars.size ());
+      for (size_t j= 0; j < s.adv[k].chars.size (); j++) {
+        w_int (out, s.adv[k].chars[j].first);
+        w_int (out, s.adv[k].chars[j].second);
+      }
+    }
+  }
+}
+
+static void
+copy_ints (reader_t& r, std::string& out) {
+  // a count and as many integers
+  ll n= r.num ();
+  for (ll i= 0; i < n; i++) w_int (out, r.num ());
+}
+
+static void
+copy_strings (reader_t& r, std::string& out) {
+  ll n= r.num ();
+  for (ll i= 0; i < n; i++) {
+    std::string s= r.str ();
+    w_int (out, (ll) s.size ());
+    out.back ()= ':';
+    out += s;
+    out += ' ';
+  }
+}
+
+static void
+copy_symbol_lists (reader_t& r, std::string& out, bool with_count) {
+  // a count, then symbol count symbol...
+  ll n= r.num ();
+  if (with_count) w_int (out, n);
+  for (ll i= 0; i < n; i++) { w_int (out, r.num ()); ll k= r.num (); w_int (out, k);
+    for (ll j= 0; j < k; j++) w_int (out, r.num ()); }
+}
+
+void
+tables_t::export_language (reader_t& r, std::string& out) {
+  std::vector<state_t*>& states= b->states;
+  int n_states= (int) states.size ();
+  int n_symbols= (int) symbols.size ();
+  std::unordered_map<int,int> ids;
+  for (int i= 0; i < n_symbols; i++) ids[symbols[i]]= i;
+  ids[SYM_EONT]= 0;
+  auto id_of= [&ids] (int s) -> int {
+    std::unordered_map<int,int>::iterator it= ids.find (s);
+    if (it == ids.end ()) throw ts_fail ("tables: a symbol without id");
+    return it->second;
+  };
+  // the external lex states (populate-external-lex-states!)
+  std::unordered_map<int,int> by_internal;
+  for (int i= 0; i < g.n_externals; i++)
+    if (g.external_internal[i] >= 0) by_internal[g.external_internal[i]]= i;
+  std::vector<ivec> ext_states (1);
+  std::map<ivec,int> ext_ids;
+  ext_ids[ivec ()]= 0;
+  ivec ext_of (n_states, 0);
+  for (int si= 0; si < n_states; si++) {
+    state_t* s= states[si];
+    ivec tokens;
+    for (int k= 0; k < s->terms.size (); k++) {
+      int t= s->terms.keys[k];
+      if (is_external (t)) tokens= set_insert (t, tokens);
+      else if (is_terminal (t) && by_internal.count (t))
+        tokens= set_insert (external (by_internal[t]), tokens);
+    }
+    std::map<ivec,int>::iterator it= ext_ids.find (tokens);
+    if (it != ext_ids.end ()) ext_of[si]= it->second;
+    else {
+      ext_of[si]= ext_ids[tokens]= (int) ext_states.size ();
+      ext_states.push_back (tokens);
+    }
+  }
+  // the fragile tokens (mark-fragile-tokens!)
+  for (int si= 0; si < n_states; si++) {
+    state_t* s= states[si];
+    ivec valid;
+    for (int k= 0; k < s->terms.size (); k++)
+      if (is_terminal (s->terms.keys[k])) valid.push_back (sym_index (s->terms.keys[k]));
+    for (int k= 0; k < s->terms.size (); k++) {
+      int t= s->terms.keys[k];
+      if (!is_terminal (t)) continue;
+      for (size_t x= 0; x < valid.size (); x++)
+        if (does_overlap (valid[x], sym_index (t))) { s->terms.vals[k].reusable= false; break; }
+    }
+  }
+  // the parse table, by state and symbol id (tables->language)
+  std::vector<std::map<int, table_value_t> > table (n_states);
+  for (int si= 0; si < n_states; si++) {
+    state_t* s= states[si];
+    for (int k= 0; k < s->terms.size (); k++) {
+      table_value_t v;
+      v.entry= true; v.reusable= s->terms.vals[k].reusable; v.state= 0;
+      const std::vector<action_t>& as= s->terms.vals[k].actions;
+      for (size_t j= 0; j < as.size (); j++) {
+        const action_t& a= as[j];
+        ivec c;
+        switch (a.kind) {
+        case A_SHIFT: c= { 0, a.a, 0, a.b? 1: 0 }; break;
+        case A_SHIFT_EXTRA: c= { 0, 0, 1, 0 }; break;
+        case A_REDUCE: c= { 1, id_of (a.a), a.b, a.c, a.d }; break;
+        case A_ACCEPT: c= { 2 }; break;
+        case A_RECOVER: c= { 3 }; break;
+        default: throw ts_fail ("tables: unknown action");
+        }
+        v.actions.push_back (c);
+      }
+      table[si][id_of (s->terms.keys[k])]= v;
+    }
+    for (int k= 0; k < s->nonterms.size (); k++) {
+      table_value_t v;
+      v.entry= false; v.reusable= false;
+      const action_t& a= s->nonterms.vals[k];
+      v.state= a.kind == A_GOTO? a.a: si;
+      table[si][id_of (s->nonterms.keys[k])]= v;
+    }
+  }
+  // the symbol part made by Scheme
+  std::string name= r.str ();
+  ll alias_count= r.num ();
+  std::string names, metadata, field_names;
+  copy_strings (r, names);
+  copy_ints (r, metadata);
+  ll n_fields= r.num ();
+  for (ll i= 0; i < n_fields; i++) {
+    std::string f= r.str ();
+    field_names += std::to_string (f.size ()) + ":" + f + " ";
+  }
+  ll n_pids= r.num ();
+  std::vector<ivec> alias_seqs (n_pids);
+  for (ll i= 0; i < n_pids; i++) alias_seqs[i]= r.syms ();
+  std::string field_maps;
+  if (r.num () != n_pids) throw ts_fail ("tables: field maps");
+  for (ll i= 0; i < n_pids; i++) {
+    ll k= r.num ();
+    w_int (field_maps, k);
+    for (ll j= 0; j < 3 * k; j++) w_int (field_maps, r.num ());
+  }
+  std::string external_symbols, public_symbols, alias_map, supertype_map;
+  copy_ints (r, external_symbols);
+  copy_ints (r, public_symbols);
+  copy_symbol_lists (r, alias_map, false);
+  copy_symbol_lists (r, supertype_map, true);
+  // the action lists, numbered in the order of the table
+  std::map<std::pair<action_list,bool>, int> list_ids;
+  std::vector<const table_value_t*> list_order;
+  table_value_t empty;
+  empty.entry= true; empty.reusable= false; empty.state= 0;
+  list_ids[std::make_pair (action_list (), false)]= 0;
+  list_order.push_back (&empty);
+  std::vector<std::vector<std::pair<int,int> > > entries (n_states);
+  ivec children (n_pids, 0);
+  for (int si= 0; si < n_states; si++)
+    for (std::map<int,table_value_t>::iterator it= table[si].begin (); it != table[si].end (); ++it) {
+      const table_value_t& v= it->second;
+      int x= v.state;
+      if (v.entry) {
+        std::pair<action_list,bool> key (v.actions, v.reusable);
+        std::map<std::pair<action_list,bool>, int>::iterator f= list_ids.find (key);
+        if (f != list_ids.end ()) x= f->second;
+        else { x= list_ids[key]= (int) list_order.size (); list_order.push_back (&v); }
+        for (size_t j= 0; j < v.actions.size (); j++)
+          if (v.actions[j][0] == 1 && v.actions[j][4] < n_pids)
+            children[v.actions[j][4]]= std::max (children[v.actions[j][4]], v.actions[j][2]);
+      }
+      entries[si].push_back (std::make_pair (it->first, x));
+    }
+  int max_alias= 1;
+  for (ll i= 0; i < n_pids; i++)
+    max_alias= std::max (max_alias, std::max ((int) alias_seqs[i].size (), children[i]));
+  // the reserved words of the states
+  std::map<ivec,int> reserved_ids;
+  std::vector<ivec> reserved_order;
+  reserved_ids[ivec ()]= 0;
+  reserved_order.push_back (ivec ());
+  ivec reserved_of (n_states, 0);
+  for (int si= 0; si < n_states; si++) {
+    ivec set;
+    for (size_t k= 0; k < states[si]->reserved.size (); k++)
+      if (ids.count (states[si]->reserved[k])) set.push_back (ids[states[si]->reserved[k]]);
+    std::map<ivec,int>::iterator f= reserved_ids.find (set);
+    if (f != reserved_ids.end ()) reserved_of[si]= f->second;
+    else {
+      reserved_of[si]= reserved_ids[set]= (int) reserved_order.size ();
+      reserved_order.push_back (set);
+    }
+  }
+  int token_count= 0;
+  for (int i= 0; i < n_symbols; i++) if (!is_non_terminal (symbols[i])) token_count++;
+  int keyword_capture= g.word >= 0 && ids.count (g.word)? ids[g.word]: 0;
+  // writing
+  out += "tsdyn1 ";
+  out += std::to_string (name.size ()) + ":" + name + " ";
+  w_int (out, n_symbols); w_int (out, alias_count); w_int (out, token_count);
+  w_int (out, g.n_externals); w_int (out, n_states); w_int (out, n_fields);
+  w_int (out, n_pids); w_int (out, max_alias); w_int (out, keyword_capture);
+  out += names; out += metadata; out += field_names;
+  w_int (out, (ll) list_order.size ());
+  for (size_t i= 0; i < list_order.size (); i++) {
+    const table_value_t& v= *list_order[i];
+    w_int (out, v.reusable? 1: 0);
+    w_int (out, (ll) v.actions.size ());
+    for (size_t j= 0; j < v.actions.size (); j++)
+      for (size_t k= 0; k < v.actions[j].size (); k++) w_int (out, v.actions[j][k]);
+  }
+  for (int si= 0; si < n_states; si++) {
+    w_int (out, (ll) entries[si].size ());
+    for (size_t k= 0; k < entries[si].size (); k++) {
+      w_int (out, entries[si][k].first); w_int (out, entries[si][k].second); }
+  }
+  for (int si= 0; si < n_states; si++) {
+    w_int (out, states[si]->terms.has (SYM_EONT)? 65535: lex_of[si]);
+    w_int (out, ext_of[si]);
+    w_int (out, reserved_of[si]);
+  }
+  size_t reserved_size= 0;
+  for (size_t i= 0; i < reserved_order.size (); i++)
+    reserved_size= std::max (reserved_size, reserved_order[i].size ());
+  w_int (out, (ll) reserved_order.size ());
+  w_int (out, (ll) reserved_size);
+  for (size_t i= 0; i < reserved_order.size (); i++)
+    for (size_t k= 0; k < reserved_size; k++)
+      w_int (out, k < reserved_order[i].size ()? reserved_order[i][k]: 0);
+  for (ll i= 0; i < n_pids; i++)
+    for (int k= 0; k < max_alias; k++)
+      w_int (out, k < (int) alias_seqs[i].size ()? alias_seqs[i][k]: 0);
+  out += field_maps;
+  out += external_symbols;
+  w_int (out, (ll) ext_states.size ());
+  for (size_t i= 0; i < ext_states.size (); i++)
+    for (int k= 0; k < g.n_externals; k++)
+      w_int (out, set_contains (ext_states[i], external (k))? 1: 0);
+  export_lex_table (out, main_table, ids);
+  export_lex_table (out, keyword_table, ids);
+  out += public_symbols;
+  out += alias_map;
+  w_int (out, 0);
+  std::unordered_map<int,int> first_of_core;
+  for (int si= 0; si < n_states; si++) {
+    std::unordered_map<int,int>::iterator f= first_of_core.find (states[si]->core);
+    if (f == first_of_core.end ()) { first_of_core[states[si]->core]= si; w_int (out, si); }
+    else w_int (out, f->second);
+  }
+  out += supertype_map;
+  out += '\n';
+}
+
 std::map<int, tables_t*> all_tables;
 int tables_counter= 0;
 
@@ -2208,19 +2484,24 @@ tree_sitter_tables_start (string data) {
 
 string
 tree_sitter_tables_finish (int id, string data) {
-  // (ok states symbols production-infos max-aliased used-conflicts), or
-  // (error message); the tables of id are freed
+  // (ok states symbols production-infos max-aliased used-conflicts
+  // main-lex-table keyword-lex-table), or (error message); the tables of id
+  // are freed, unless data ends with the flag 1: then they are kept for
+  // tree_sitter_tables_export, and the states and the lex tables are #f
   std::map<int,tables_t*>::iterator it= all_tables.find (id);
   if (it == all_tables.end ()) return "(error \"tree-sitter tables: unknown id\")";
   tables_t* t= it->second;
   all_tables.erase (it);
   std::string out;
+  bool keep= false;
   try {
     c_string cs (data);
     reader_t r (cs, ((const char*) cs) + N(data));
     t->tc.resize ((size_t) t->n * t->n);
     for (size_t i= 0; i < t->tc.size (); i++) t->tc[i]= (int) r.num ();
     t->keywords= r.syms ();
+    r.skip ();
+    keep= r.p < r.e && r.num () == 1;
     t->populate_error_state ();
     t->used_symbols ();
     std::vector<state_t*> states= t->b->states;
@@ -2232,8 +2513,8 @@ tree_sitter_tables_finish (int id, string data) {
     t->build_lex_tables (states);
     t->b->states= states;
     grammar_t& g= t->g;
-    out += "(ok (";
-    for (size_t si= 0; si < states.size (); si++) {
+    out += keep? "(ok #f ": "(ok (";
+    for (size_t si= 0; si < states.size () && !keep; si++) {
       state_t* s= states[si];
       out += "("; w_int (out, s->id); w_int (out, s->core);
       out += s->eof_gated? "#t ": "#f ";
@@ -2258,7 +2539,7 @@ tree_sitter_tables_finish (int id, string data) {
       w_int (out, t->lex_of[si]);
       out += ")\n";
     }
-    out += ") ";
+    if (!keep) out += ") ";
     write_syms (out, t->symbols);
     out += " (";
     const std::vector<prod_info_t>& infos= t->b->production_infos;
@@ -2287,10 +2568,39 @@ tree_sitter_tables_finish (int id, string data) {
     out += "(";
     for (size_t k= 0; k < t->b->used_conflicts.size (); k++) write_syms (out, t->b->used_conflicts[k]);
     out += ") ";
-    write_lex_table (out, t->main_table);
-    out += " ";
-    write_lex_table (out, t->keyword_table);
+    if (keep) out += "#f #f";
+    else {
+      write_lex_table (out, t->main_table);
+      out += " ";
+      write_lex_table (out, t->keyword_table);
+    }
     out += ")";
+  }
+  catch (ts_fail& f) {
+    out= "(error ";
+    write_string (out, f.message);
+    out += ")";
+    keep= false;
+  }
+  if (keep) all_tables[id]= t;
+  else delete t;
+  return string (out.c_str (), (int) out.size ());
+}
+
+string
+tree_sitter_tables_export (int id, string data) {
+  // the tables of id for ts_dynamic.c, as ts-export.scm writes them, or
+  // (error message); data has what depends on the symbols only (see
+  // ts-native.scm); the tables of id are freed
+  std::map<int,tables_t*>::iterator it= all_tables.find (id);
+  if (it == all_tables.end ()) return "(error \"tree-sitter tables: unknown id\")";
+  tables_t* t= it->second;
+  all_tables.erase (it);
+  std::string out;
+  try {
+    c_string cs (data);
+    reader_t r (cs, ((const char*) cs) + N(data));
+    t->export_language (r, out);
   }
   catch (ts_fail& f) {
     out= "(error ";

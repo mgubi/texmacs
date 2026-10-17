@@ -47,7 +47,8 @@
 ;;     state; supertype count, then supertype count subtype ...
 
 (texmacs-module (treesit ts-export)
-  (:use (treesit ts-base) (treesit ts-language)))
+  (:use (treesit ts-base) (treesit ts-grammar) (treesit ts-build) (treesit ts-native)
+        (treesit ts-language)))
 
 (define (export-string s port)
   (display (string-length s) port)
@@ -228,6 +229,73 @@
 
 (define-public (ts-export-language-file l file)
   (call-with-output-file file (lambda (port) (ts-export-language l port))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; The same text written by C++ (Plugins/TreeSitter/ts_tables.cpp)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; With the native tables, the states stay in C++, which writes the parts of
+;; the text which depend on them (the parse table, the lex modes and tables,
+;; the external lex states, the fragile tokens, the primary states). Scheme
+;; sends the rest, which only depends on the symbols, in the order of the
+;; text: name alias-count, the names, the metadata, the field names, the
+;; alias sequences, the field maps, the external symbols, the public
+;; symbols, the alias map, the supertype map; lists start with their length.
+
+(define (export-symbol-lists l port)
+  (export-int (length l) port)
+  (for-each (lambda (e)
+              (export-int (car e) port)
+              (export-int (length (cdr e)) port)
+              (for-each (lambda (x) (export-int x port)) (cdr e)))
+            l))
+
+(define (export-symbol-part g sp port)
+  (let ((field-names (vector->list (sp-field-names sp)))
+        (ints (lambda (v)
+                (export-int (vector-length v) port)
+                (do ((i 0 (+ i 1))) ((= i (vector-length v)))
+                  (export-int (vector-ref v i) port)))))
+    (export-string (g-ref g 'name) port)
+    (export-int (sp-alias-count sp) port)
+    (export-int (vector-length (sp-names sp)) port)
+    (do ((i 0 (+ i 1))) ((= i (vector-length (sp-names sp))))
+      (export-string (vector-ref (sp-names sp) i) port))
+    (ints (sp-metadata sp))
+    (export-int (length field-names) port)
+    (for-each (lambda (f) (export-string f port)) field-names)
+    (export-int (vector-length (sp-alias-sequences sp)) port)
+    (do ((i 0 (+ i 1))) ((= i (vector-length (sp-alias-sequences sp))))
+      (ints (vector-ref (sp-alias-sequences sp) i)))
+    (export-int (vector-length (sp-field-maps sp)) port)
+    (do ((i 0 (+ i 1))) ((= i (vector-length (sp-field-maps sp))))
+      (let ((fields (vector-ref (sp-field-maps sp) i)))
+        (export-int (length fields) port)
+        (for-each (lambda (f)
+                    (export-int (+ 1 (ts-position (vector-ref f 0) field-names)) port)
+                    (export-int (vector-ref f 1) port)
+                    (export-int (if (vector-ref f 2) 1 0) port))
+                  fields)))
+    (ints (sp-external-symbols sp))
+    (ints (sp-public-symbols sp))
+    (export-symbol-lists (sp-alias-map sp) port)
+    (export-symbol-lists (sp-supertype-map sp) port)))
+
+(define-public (ts-generate-tsdyn json-string)
+  ;; the text of ts-export-language for the grammar json-string; made by C++
+  ;; when the tables are
+  (if (not (and (ts-native-tables?) (defined? 'tree-sitter-tables-export)))
+      (ts-export-language->string (ts-generate-language json-string))
+      (let* ((g (ts-read-grammar json-string))
+             (r (build-tables-for-export g))
+             (t (cdr r))
+             (sp (ts-language-symbols g (ahash-ref t 'symbols) (ahash-ref t 'production-infos)))
+             (s (tree-sitter-tables-export
+                 (car r) (call-with-output-string (lambda (port) (export-symbol-part g sp port))))))
+        (ts-profile "language (C++)")
+        (when (string-starts? s "(error")
+          (ts-error (cadr (string->object s))))
+        s)))
 
 (define-public (ts-export-language->string l)
   (call-with-output-string (lambda (port) (ts-export-language l port))))
