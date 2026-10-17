@@ -49,7 +49,8 @@
 (lsp-server-set! "scala" '("metals"))
 (lsp-server-set! "julia" '("julia-language-server"))
 (lsp-server-set! "json" '("vscode-json-language-server --stdio"))
-(lsp-server-set! "latex" '("texlab"))
+;; (no texlab for latex: a .tex file is converted to a document, which is
+;; not its source, and a server would get the text of that document)
 
 (tm-define (lsp-server-known? lan)
   (:synopsis "Is there a language server for @lan (installed or not)?")
@@ -115,15 +116,35 @@
                            l))
     (lsp-client-log-changed c)))
 
+(define (full-change-uri msg)
+  ;; the document of @msg if it is a didChange with the whole text
+  (and (== (lsp-ref msg "method") "textDocument/didChange")
+       (with l (lsp-items (lsp-ref msg "params" "contentChanges"))
+         (and (== (length l) 1) (not (lsp-ref (car l) "range"))
+              (lsp-ref msg "params" "textDocument" "uri")))))
+
+(define (queue-message c msg)
+  ;; @msg waits for the end of the initialization. A whole text replaces
+  ;; the whole texts of the same document which are waiting: the queue of
+  ;; a server which is slow to start does not grow with each pause in
+  ;; the typing (each one a copy of the file)
+  (let* ((uri (full-change-uri msg))
+         (q (ahash-ref c 'queue))
+         (q* (if uri (list-filter q (lambda (m) (!= (full-change-uri m) uri)))
+                 q)))
+    (ahash-set! c 'queue (cons msg q*))))
+
 (define (client-send c msg)
-  ;; sends @msg (an stree), or keeps it until the server is initialized
+  ;; sends @msg (an stree), or keeps it until the server is initialized.
+  ;; (The answers to the requests of the server are sent at once: a server
+  ;; may ask before it answers initialize.)
   (with st (ahash-ref c 'state)
     (cond ((or (== st 'running) (== st 'stopping)
-               (and (== st 'initializing) (== (lsp-ref msg "method")
-                                               "initialize")))
+               (and (== st 'initializing)
+                    (or (== (lsp-ref msg "method") "initialize")
+                        (not (lsp-ref msg "method")))))
            ((ahash-ref c 'send) (lsp-write msg)))
-          ((in? st '(new initializing))
-           (ahash-set! c 'queue (cons msg (ahash-ref c 'queue))))
+          ((in? st '(new initializing)) (queue-message c msg))
           (else #f))))
 
 (tm-define (lsp-request c method params handler)
@@ -235,6 +256,10 @@
                       (lsp-array (lsp-object "uri" uri
                                              "name" (root-name root)))
                       (lsp-null))))
+    ;; (a server which never answers is ended, see below)
+    (delayed
+      (:pause lsp-initialize-timeout)
+      (lsp-client-check-initialized c))
     (lsp-request
      c "initialize"
      (lsp-object "processId" (lsp-null)
@@ -256,6 +281,18 @@
              (with q (reverse (ahash-ref c 'queue))
                (ahash-set! c 'queue '())
                (for-each (lambda (msg) (client-send c msg)) q))))))))
+
+(define-public lsp-initialize-timeout 120000)
+
+(tm-define (lsp-client-check-initialized c)
+  (:synopsis "Ends the server of @c if it has not answered initialize yet")
+  (when (== (ahash-ref c 'state) 'initializing)
+    (lsp-client-log-add c "error"
+                        (string-append "no answer to initialize in "
+                                       (number->string
+                                        (quotient lsp-initialize-timeout 1000))
+                                       " s: the server is ended"))
+    (lsp-client-kill c)))
 
 (tm-define (lsp-client-start cmd root)
   (:synopsis "A client of the server started by @cmd, for @root")

@@ -335,6 +335,37 @@
     (check= (sent-methods)
             '("initialize" "initialized" "textDocument/didOpen"))))
 
+(define (full-change uri text)
+  (lsp-object "textDocument" (lsp-object "uri" uri "version" (lsp-number 2))
+              "contentChanges" (lsp-array (lsp-object "text" text))))
+
+(define (test-initialize-slow)
+  (check-group "a server which is slow to start")
+  (with c (fake-client)
+    (lsp-client-initialize c "/tmp/project")
+    ;; the whole texts of a document wait once (the last one), the others
+    ;; and the other documents keep their order
+    (lsp-notify c "textDocument/didOpen" (lsp-object))
+    (lsp-notify c "textDocument/didChange" (full-change "file:///a" "1"))
+    (lsp-notify c "textDocument/didChange" (full-change "file:///b" "x"))
+    (lsp-notify c "textDocument/didChange" (full-change "file:///a" "2"))
+    (lsp-notify c "textDocument/didChange" (full-change "file:///a" "3"))
+    (check= (length (lsp-client-ref c 'queue)) 3)
+    ;; a request of the server is answered at once
+    (feed c (lsp-object "jsonrpc" "2.0" "id" (lsp-number 7)
+                        "method" "no/such/method"))
+    (check= (length sent) 2)
+    (check= (lsp-ref (cAr sent) "id") '(json-number "7"))
+    ;; no answer to initialize: the server is ended, the requests which
+    ;; wait get an error
+    (let* ((got #f)
+           (id (lsp-request c "x" #f (lambda (r e) (set! got e)))))
+      (lsp-client-check-initialized c)
+      (check= (lsp-client-state c) 'dead)
+      (check-true (and got #t))
+      (check-true (string-contains? (cadr (car (lsp-client-log c)))
+                                    "no answer to initialize")))))
+
 (define (test-requests)
   (check-group "requests")
   (let* ((c (running-client (lsp-number 1)))
@@ -914,6 +945,10 @@
 
 (define (test-ended)
   (check-group "servers which end")
+  ;; the languages with servers: not latex (a .tex file is converted to a
+  ;; document, not edited as source)
+  (check-true (lsp-server-known? "cpp"))
+  (check-false (lsp-server-known? "latex"))
   ;; a server which ends at once is not started again at each request
   (lsp-server-set! "lsp-test-lang" '("sh -c 'exit 0'"))
   (let* ((root "/tmp/lsp-test-project")
@@ -953,6 +988,7 @@
   (test-texts)
   (test-uris)
   (test-initialize)
+  (test-initialize-slow)
   (test-requests)
   (test-server-requests)
   (test-end)
