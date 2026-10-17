@@ -5531,6 +5531,46 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(lsp-start <scm-arg|string> <scm-arg|object>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|lsp_start> which returns
+    <scm|object>.
+  </explain>
+
+  <\explain>
+    <scm|(lsp-send <scm-arg|int> <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|lsp_send> which returns
+    <scm|bool>.
+  </explain>
+
+  <\explain>
+    <scm|(lsp-listen <scm-arg|int> <scm-arg|int>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|lsp_listen> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(lsp-alive? <scm-arg|int>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|lsp_alive> which returns
+    <scm|bool>.
+  </explain>
+
+  <\explain>
+    <scm|(lsp-stop <scm-arg|int>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|lsp_stop> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
     <scm|(widget-printer <scm-arg|command> <scm-arg|url>)>
 <explain-synopsis|no synopsis>
   <|explain>

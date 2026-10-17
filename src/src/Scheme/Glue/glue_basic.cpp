@@ -9375,6 +9375,77 @@ tmg_connection_stop (tmscm arg1, tmscm arg2) {
 }
 
 tmscm
+tmg_lsp_start (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "lsp-start");
+  TMSCM_ASSERT_OBJECT (arg2, TMSCM_ARG2, "lsp-start");
+
+  string in1= tmscm_to_string (arg1);
+  object in2= tmscm_to_object (arg2);
+
+  // TMSCM_DEFER_INTS;
+  object out= lsp_start (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return object_to_tmscm (out);
+}
+
+tmscm
+tmg_lsp_send (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "lsp-send");
+  TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "lsp-send");
+
+  int in1= tmscm_to_int (arg1);
+  string in2= tmscm_to_string (arg2);
+
+  // TMSCM_DEFER_INTS;
+  bool out= lsp_send (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return bool_to_tmscm (out);
+}
+
+tmscm
+tmg_lsp_listen (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "lsp-listen");
+  TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "lsp-listen");
+
+  int in1= tmscm_to_int (arg1);
+  int in2= tmscm_to_int (arg2);
+
+  // TMSCM_DEFER_INTS;
+  lsp_listen (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_lsp_aliveP (tmscm arg1) {
+  TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "lsp-alive?");
+
+  int in1= tmscm_to_int (arg1);
+
+  // TMSCM_DEFER_INTS;
+  bool out= lsp_alive (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return bool_to_tmscm (out);
+}
+
+tmscm
+tmg_lsp_stop (tmscm arg1) {
+  TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "lsp-stop");
+
+  int in1= tmscm_to_int (arg1);
+
+  // TMSCM_DEFER_INTS;
+  lsp_stop (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
 tmg_widget_printer (tmscm arg1, tmscm arg2) {
   TMSCM_ASSERT_COMMAND (arg1, TMSCM_ARG1, "widget-printer");
   TMSCM_ASSERT_URL (arg2, TMSCM_ARG2, "widget-printer");
@@ -12380,6 +12451,11 @@ initialize_glue_basic () {
   tmscm_install_procedure ("connection-eval",  tmg_connection_eval, 3, 0, 0);
   tmscm_install_procedure ("connection-interrupt",  tmg_connection_interrupt, 2, 0, 0);
   tmscm_install_procedure ("connection-stop",  tmg_connection_stop, 2, 0, 0);
+  tmscm_install_procedure ("lsp-start",  tmg_lsp_start, 2, 0, 0);
+  tmscm_install_procedure ("lsp-send",  tmg_lsp_send, 2, 0, 0);
+  tmscm_install_procedure ("lsp-listen",  tmg_lsp_listen, 2, 0, 0);
+  tmscm_install_procedure ("lsp-alive?",  tmg_lsp_aliveP, 1, 0, 0);
+  tmscm_install_procedure ("lsp-stop",  tmg_lsp_stop, 1, 0, 0);
   tmscm_install_procedure ("widget-printer",  tmg_widget_printer, 2, 0, 0);
   tmscm_install_procedure ("widget-color-picker",  tmg_widget_color_picker, 3, 0, 0);
   tmscm_install_procedure ("widget-extend",  tmg_widget_extend, 2, 0, 0);

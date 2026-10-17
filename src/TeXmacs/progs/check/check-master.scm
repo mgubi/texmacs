@@ -58,6 +58,7 @@
         (check graphics-edit-test)
         (check version-test)
         (check git-test)
+        (check lsp-test)
         (check links-test)
         (check misc-modules-test)
         (check remote-test)
@@ -180,6 +181,8 @@
     ;; server and clients in this process, with databases in the temporary
     ;; directory and the server files of the (scratch) home, which it cleans
     ("remote" remote-test-failures count)
+    ;; starts sh, cat and printf as language servers, and stops them
+    ("lsp" lsp-test-failures count)
     ;; starts plugin processes (shell, python when present) and stops them
     ("plugins" plugins-test-failures count)
     ;; loads every lazy menu, and maps and unmaps test keys

@@ -1286,6 +1286,7 @@ tmscm_to_list_tree (tmscm p) {
 #include "tm_window.hpp"
 #include "boot.hpp"
 #include "connect.hpp"
+#include "lsp_link.hpp"
 #include "convert.hpp"
 #include "file.hpp"
 #include "image_files.hpp"

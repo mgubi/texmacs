@@ -782,6 +782,12 @@
   (connection-eval connection_eval (tree string string content))
   (connection-interrupt connection_interrupt (void string string))
   (connection-stop connection_stop (void string string))
+  ;; language servers (Language Server Protocol, progs/lsp)
+  (lsp-start lsp_start (object string object))
+  (lsp-send lsp_send (bool int string))
+  (lsp-listen lsp_listen (void int int))
+  (lsp-alive? lsp_alive (bool int))
+  (lsp-stop lsp_stop (void int))
 
   ;; widgets
   (widget-printer printer_widget (widget command url))
