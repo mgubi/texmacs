@@ -11,8 +11,12 @@
 #ifndef TREE_SITTER_GLUE_H
 #define TREE_SITTER_GLUE_H
 #include "string.hpp"
+#include "array.hpp"
 
 int    tree_sitter_language_new (string data);
 string tree_sitter_parse_sexp (int language, string text);
+int    tree_sitter_query_new (int language, string source);
+array<string> tree_sitter_query_capture_names (int query);
+array<int>    tree_sitter_query_captures (int query, string text);
 
 #endif // TREE_SITTER_GLUE_H

@@ -55,6 +55,12 @@
 (define-public (lang-external-scanner l) (vector-ref l 17))
 (define-public (set-lang-external-scanner! l s) (vector-set! l 17 s))
 (define-public (lang-alias-count l) (vector-ref l 18))
+;; for the queries of the C runtime (render.rs: ts_non_terminal_alias_map,
+;; ts_primary_state_ids, the supertype map, ts_symbol_map)
+(define-public (lang-alias-map l) (vector-ref l 19))       ; list of (symbol public alias ...)
+(define-public (lang-primary-states l) (vector-ref l 20))  ; vector
+(define-public (lang-supertype-map l) (vector-ref l 21))   ; list of (supertype subtype ...)
+(define-public (lang-public-symbols l) (vector-ref l 22))  ; vector
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; From the tables of the generator
@@ -199,7 +205,81 @@
                     (ts-map (lambda (s) (ahash-ref ids s))
                             (ts-filter (lambda (s) (ahash-ref ids s)) supertypes))
                     #f
-                    (gvec-length unique-aliases))))))))
+                    (gvec-length unique-aliases)
+                    (query-alias-map g ids alias-id default-aliases)
+                    (primary-states states)
+                    (query-supertype-map g ids alias-id)
+                    (public-symbol-map g symbols ids default-aliases))))))))
+
+(define (query-alias-map g ids alias-id default-aliases)
+  ;; the aliases (other than the default one) under which each non-terminal
+  ;; appears in the productions
+  (let ((table (make-ahash-table)))
+    (vector-for-each***
+     (lambda (p)
+       (do ((i 0 (+ i 1))) ((= i (prod-length p)))
+         (let* ((step (prod-step p i)) (s (step-symbol step)) (a (step-alias step)))
+           (when (and a (non-terminal? s) (ahash-ref ids s)
+                      (not (equal? a (ahash-ref default-aliases s))))
+             (let ((id (alias-id a)))
+               (ahash-set! table s (ts-insert id (or (ahash-ref table s) '()))))))))
+     (g-ref g 'productions))
+    (ts-map (lambda (kv) (cons (ahash-ref ids (car kv)) (cons (ahash-ref ids (car kv)) (cdr kv))))
+            (ts-sort (ahash-table->list table) (lambda (a b) (< (car a) (car b)))))))
+
+(define (vector-for-each*** fun v)
+  (do ((i 0 (+ i 1))) ((= i (vector-length v))) (fun (vector-ref v i))))
+
+(define (primary-states states)
+  ;; the first state of the same core as each state
+  (let ((first (make-ahash-table))
+        (v (make-vector (gvec-length states) 0)))
+    (do ((i 0 (+ i 1))) ((= i (gvec-length states)) v)
+      (let ((c (state-core (gvec-ref states i))))
+        (unless (ahash-ref first c) (ahash-set! first c (+ i 1)))
+        (vector-set! v i (- (ahash-ref first c) 1))))))
+
+(define (query-supertype-map g ids alias-id)
+  ;; each supertype with the sorted symbols of its visible children
+  (ts-sort
+   (ts-filter (lambda (x) x)
+              (ts-map (lambda (s)
+                        (and (non-terminal? s) (ahash-ref ids s)
+                             (cons (ahash-ref ids s)
+                                   (list->ts
+                                    (ts-filter (lambda (x) x)
+                                               (ts-map (lambda (t) (if (pair? t) (alias-id t) (ahash-ref ids t)))
+                                                       (vector-ref (g-ref g 'variable-children)
+                                                                   (sym-index s))))))))
+                      (g-ref g 'supertypes)))
+   (lambda (a b) (< (car a) (car b)))))
+
+(define (public-symbol-map g symbols ids default-aliases)
+  ;; render.rs: the symbols which are the same node to the public API (the
+  ;; same alias, or tokens with the same name and kind) share a symbol
+  (let ((mapping (make-ahash-table)))
+    (for-each
+     (lambda (s)
+       (let ((a (ahash-ref default-aliases s))
+             (m s))
+         (cond (a
+                (let ((kind (if (cdr a) vt-named vt-anonymous)))
+                  (let loop ((l symbols))
+                    (when (pair? l)
+                      (let ((o (car l)) (oa (ahash-ref default-aliases (car l))))
+                        (cond (oa (when (and (< o m) (equal? oa a)) (set! m o)) (loop (cdr l)))
+                              ((equal? (symbol-metadata g o) (cons (car a) kind)) (set! m o))
+                              (else (loop (cdr l)))))))))
+               ((terminal? s)
+                (let ((md (symbol-metadata g s)))
+                  (let loop ((l symbols))
+                    (when (pair? l)
+                      (if (equal? (symbol-metadata g (car l)) md)
+                          (unless (eqv? (ahash-ref mapping (car l)) s) (set! m (car l)))
+                          (loop (cdr l))))))))
+         (ahash-set! mapping s m)))
+     symbols)
+    (list->vector (ts-map (lambda (s) (ahash-ref ids (ahash-ref mapping s))) symbols))))
 
 (define-public (ts-generate-language json-string)
   ;; the language of the text of a grammar.json

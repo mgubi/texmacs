@@ -16,8 +16,8 @@
    - the lex functions interpret the lex tables; since the runtime calls
      them without the language, each loaded language takes one of
      TSDYN_MAX_LANGUAGES slots, with its own pair of functions;
-   - the tables used only by queries are minimal (no alias map, every state
-     primary, no supertype map). */
+   - the tables used by queries (public symbols, alias map, primary states,
+     supertypes) come from the generator as in parser.c. */
 
 #include "ts_dynamic.h"
 #include "tree-sitter/src/parser.h"   /* the definition of TSLanguage */
@@ -244,6 +244,9 @@ tsdyn_language_delete (const TSLanguage *language) {
   free ((void *) l->external_scanner.symbol_map);
   free ((void *) l->primary_state_ids);
   free ((void *) l->reserved_words);
+  free ((void *) l->supertype_symbols);
+  free ((void *) l->supertype_map_slices);
+  free ((void *) l->supertype_map_entries);
   if (d->symbol_names)
     for (uint32_t i = 0; i < d->name_count; i++) free (d->symbol_names[i]);
   free (d->symbol_names);
@@ -446,6 +449,52 @@ tsdyn_language_new (const char *data, size_t length, const char **error) {
   dyn_lex_table (r, &d->lexer);
   dyn_lex_table (r, &d->keyword_lexer);
   if (r->failed) DYN_FAIL ("bad lex tables");
+
+  /* the tables of the queries */
+  for (uint32_t i = 0; i < symbol_count; i++) {
+    uint32_t m = (uint32_t) dyn_int (r);
+    if (m >= names) r->failed = true;
+    else public_map[i] = (TSSymbol) m;
+  }
+  size_t acap = 16, an = 0;
+  uint16_t *amap = calloc (acap, sizeof (uint16_t));
+  for (;;) {
+    long symbol = dyn_int (r);
+    if (r->failed || symbol == 0) break;
+    long count = dyn_int (r);
+    if (an + count + 3 > acap) {
+      while (an + count + 3 > acap) acap *= 2;
+      amap = realloc (amap, acap * sizeof (uint16_t)); }
+    amap[an++] = (uint16_t) symbol;
+    amap[an++] = (uint16_t) count;
+    for (long k = 0; k < count; k++) amap[an++] = (uint16_t) dyn_int (r);
+  }
+  amap[an] = 0;
+  free ((void *) l->alias_map);
+  l->alias_map = amap;
+  for (uint32_t s = 0; s < state_count; s++) primary[s] = (TSStateId) dyn_int (r);
+  uint32_t supertype_count = (uint32_t) dyn_int (r);
+  TSSymbol *supertypes = calloc (supertype_count + 1, sizeof (TSSymbol));
+  TSMapSlice *super_slices = calloc (names, sizeof (TSMapSlice));
+  size_t scap = 16, sn = 0;
+  TSSymbol *super_entries = calloc (scap, sizeof (TSSymbol));
+  for (uint32_t i = 0; i < supertype_count && !r->failed; i++) {
+    uint32_t symbol = (uint32_t) dyn_int (r);
+    uint32_t count = (uint32_t) dyn_int (r);
+    if (symbol >= names) { r->failed = true; break; }
+    supertypes[i] = (TSSymbol) symbol;
+    super_slices[symbol].index = (uint16_t) sn;
+    super_slices[symbol].length = (uint16_t) count;
+    for (uint32_t k = 0; k < count; k++) {
+      if (sn == scap) { scap *= 2; super_entries = realloc (super_entries, scap * sizeof (TSSymbol)); }
+      super_entries[sn++] = (TSSymbol) dyn_int (r);
+    }
+  }
+  l->supertype_count = supertype_count;
+  l->supertype_symbols = supertypes;
+  l->supertype_map_slices = super_slices;
+  l->supertype_map_entries = super_entries;
+  if (r->failed) DYN_FAIL ("bad query tables");
 
   d->slot = slot;
   dyn_slots[slot] = d;

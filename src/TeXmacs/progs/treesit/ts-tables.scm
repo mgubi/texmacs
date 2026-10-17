@@ -481,6 +481,8 @@
                                 (vector-ref fields (sym-index s)))
                       (extend-children! (vector-ref children (sym-index s))))))))))
         (when changed (loop))))
+    (g-set! g 'variable-children
+            (list->vector (ts-map (lambda (l) (ts-filter visible? l)) (vector->list children))))
     (g-set! g 'variable-fields
             (list->vector
              (ts-map (lambda (fl)

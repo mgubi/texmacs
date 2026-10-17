@@ -259,7 +259,33 @@
         (for (s (list "1 + 2 * 3;" "2 ^ 3 ^ 4;" "let x = (y + 1) * 2;" "lets;" "1 +;"))
           (check= (tree-sitter-parse-sexp cc s)
                   (ts-tree->string (ts-parse-string calc s)))))
-      (check= (tree-sitter-language-new "nonsense") -1))))
+      (check= (tree-sitter-language-new "nonsense") -1)
+      (test-c-queries c (ts-c-language calc)))))
+
+(define (captures q text)
+  ;; the captures as (start end name)
+  (let ((names (tree-sitter-query-capture-names q)))
+    (let loop ((l (tree-sitter-query-captures q text)) (acc '()))
+      (if (null? l) (reverse acc)
+          (loop (cdddr l) (cons (list (car l) (cadr l) (list-ref names (caddr l))) acc))))))
+
+(define (test-c-queries c cc)
+  ;; the highlighting query of tree-sitter-json, and the predicates
+  (let ((q (tree-sitter-query-new
+            c (ts-read-file (url->system (url-concretize
+                                          "$TEXMACS_PATH/misc/tree-sitter/json/highlights.scm"))))))
+    (check-true (>= q 0))
+    (check= (captures q "{\"a\": [1, true, null]}")
+            '((1 4 "string.special.key") (1 4 "string") (7 8 "number")
+              (10 14 "constant.builtin") (16 20 "constant.builtin"))))
+  (check= (tree-sitter-query-new c "(nonsense) @x") -1)
+  (let ((q (tree-sitter-query-new
+            cc (string-append "((variable) @short (#match? @short \"^[a-z]$\"))"
+                              "((variable) @long (#not-match? @long \"^[a-z]$\"))"
+                              "((variable) @x (#eq? @x \"x\"))"
+                              "((variable) @ab (#any-of? @ab \"a\" \"b\"))"))))
+    (check= (captures q "a + xy * x;")
+            '((0 1 "short") (0 1 "ab") (4 6 "long") (9 10 "short") (9 10 "x")))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Master routine

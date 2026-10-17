@@ -738,6 +738,9 @@
   (sql-quote sql_quote (string string))
   (tree-sitter-language-new tree_sitter_language_new (int string))
   (tree-sitter-parse-sexp tree_sitter_parse_sexp (string int string))
+  (tree-sitter-query-new tree_sitter_query_new (int int string))
+  (tree-sitter-query-capture-names tree_sitter_query_capture_names (array_string int))
+  (tree-sitter-query-captures tree_sitter_query_captures (array_int int string))
 
   ;; TeXmacs servers and clients
   (server-define-error-codes server_define_error_codes (void))

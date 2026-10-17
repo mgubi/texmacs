@@ -42,6 +42,9 @@
 ;;   the main lex table and the keyword lex table: state count, then for
 ;;     each state accept (-1 for none) eof-state (-1) transition count, a
 ;;     transition being next skip range-count start end ...
+;;   for the queries: the public symbol of each symbol; the alias map
+;;     (symbol count public alias ..., then 0); the primary state of each
+;;     state; supertype count, then supertype count subtype ...
 
 (texmacs-module (treesit ts-export)
   (:use (treesit ts-base) (treesit ts-language)))
@@ -204,6 +207,23 @@
     ;; the lexers
     (export-lex-table (lang-lex-table l) port)
     (export-lex-table (lang-keyword-table l) port)
+    ;; for the queries
+    (let ((public (lang-public-symbols l)))
+      (do ((i 0 (+ i 1))) ((= i (vector-length public))) (export-int (vector-ref public i) port)))
+    (for-each (lambda (e)
+                (export-int (car e) port)
+                (export-int (length (cdr e)) port)
+                (for-each (lambda (x) (export-int x port)) (cdr e)))
+              (lang-alias-map l))
+    (export-int 0 port)
+    (let ((primary (lang-primary-states l)))
+      (do ((i 0 (+ i 1))) ((= i (vector-length primary))) (export-int (vector-ref primary i) port)))
+    (export-int (length (lang-supertype-map l)) port)
+    (for-each (lambda (e)
+                (export-int (car e) port)
+                (export-int (length (cdr e)) port)
+                (for-each (lambda (x) (export-int x port)) (cdr e)))
+              (lang-supertype-map l))
     (newline port)))
 
 (define-public (ts-export-language-file l file)
