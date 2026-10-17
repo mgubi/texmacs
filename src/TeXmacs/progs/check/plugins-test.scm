@@ -1066,8 +1066,9 @@
 ;; How the processes of the plugins are started and stopped (the pipes
 ;; without Qt: pipe_link.cpp; the Qt pipes start the program themselves).
 ;; A wrapper script which runs its program as a child (without exec) dies
-;; at once on SIGTERM: the program, which needs 0.2 s to clean up (it then
-;; writes a file), is given the time to do so. A command may start with a
+;; at once on SIGTERM: the program, which needs 0.05 s to clean up (it then
+;; writes a file), is given the time to do so (connection-stop waits for it
+;; 1 s with Qt, 2 s without, then kills it). A command may start with a
 ;; word of the shell. When PATH is not set, sh looks for programs in its
 ;; default path. A plugin which closes its standard error goes on.
 
@@ -1077,7 +1078,7 @@
 (define (write-pipes-scripts)
   (when (not (url-exists? pipes-dir)) (system-mkdir pipes-dir))
   (string-save (string-append
-                "trap 'sleep 0.2; echo done > \"" (pipes-file "cleaned") "\";"
+                "trap 'sleep 0.05; echo done > \"" (pipes-file "cleaned") "\";"
                 " exit 0' TERM\n"
                 "printf '\\002verbatim:ready\\005'\n"
                 "while :; do sleep 0.05; done\n")
@@ -1133,9 +1134,16 @@
       (when (url-exists? mark) (system-remove mark))
       (check= (start* "tmtestwrapper" "plugins-test-wrapper") "ok")
       (pause "0.5")  ; (the program runs, its trap is set)
-      (connection-stop "tmtestwrapper" "plugins-test-wrapper")
-      ;; the program cleaned up before connection-stop returned
-      (check-true (url-exists? mark)))
+      (let ((start (texmacs-time)))
+        (connection-stop "tmtestwrapper" "plugins-test-wrapper")
+        ;; the program cleaned up before connection-stop returned; when
+        ;; not, the time says why: the whole wait of connection-stop (1 or
+        ;; 2 s), it was killed on a slow machine; less, it was not waited for
+        (check= (if (url-exists? mark) "cleaned"
+                    (string-append "not cleaned, connection-stop returned after "
+                                   (number->string (- (texmacs-time) start))
+                                   " ms"))
+                "cleaned")))
     ;; a command starting with a reserved word of the shell
     (check= (start* "tmtestshellword" "plugins-test-word") "ok")
     (check= (eval* "tmtestshellword" "plugins-test-word" (blk "verbatim:" "w"))
