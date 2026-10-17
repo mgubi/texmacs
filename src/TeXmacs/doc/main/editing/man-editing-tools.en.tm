@@ -36,6 +36,8 @@
     <branch|Versioning tools|man-versioning.en.tm>
 
     <branch|Working with Git|man-git.en.tm>
+
+    <branch|Language servers for source code|man-language-servers.en.tm>
   </traverse>
 
   <tmdoc-copyright|1998\U2020|Joris van der Hoeven>

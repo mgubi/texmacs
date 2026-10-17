@@ -1,0 +1,157 @@
+<TeXmacs|2.1.4>
+
+<style|<tuple|tmdoc|english>>
+
+<\body>
+  <tmdoc-title|The link to the servers>
+
+  This page describes <source-link|lsp_link.cpp|src/System/Link/lsp_link.cpp>:
+  how the messages of a language server are framed over its pipe, and how
+  they reach the <scheme> programs. The link does not know the protocol
+  itself: it only cuts the bytes into messages.
+
+  <section|Framing>
+
+  Each message of the protocol is preceded by a header: lines
+  <verbatim|Name: value> ended by <verbatim|CR LF>, then an empty line. Only
+  <verbatim|Content-Length>, the length of the message in <em|bytes>, is
+  used; the other fields (<verbatim|Content-Type>) are ignored, and the
+  name of the field is compared without case.
+
+  <cpp|lsp_link_rep> is a <cpp|tm_link_rep> (<source-link|tm_link.hpp|src/System/Link/tm_link.hpp>)
+  built on another link, the <em|transport>, which carries the bytes:
+  <cpp|make_lsp_link (make_pipe_link (cmd))> for a program
+  (<source-link|pipe_link.cpp|src/System/Link/pipe_link.cpp>); a socket or a
+  <name|Web Worker> could be used the same way. Its fields:
+
+  <\description>
+    <item*|<cpp|ln>>The transport.
+
+    <item*|<cpp|buf>, <cpp|pos>>The bytes received which are not yet a
+    whole message, from <cpp|pos> on. The part before <cpp|pos> is dropped
+    once all of <cpp|buf> is used or once it reaches 64 KB, so that a large
+    message which comes in many parts is not copied at each part.
+
+    <item*|<cpp|msgs>>The whole messages which have not been read yet.
+
+    <item*|<cpp|errbuf>>What the server wrote on its standard error, and the
+    errors of the framing.
+
+    <item*|<cpp|news>>Set when something has come (bytes, errors, the end of
+    the server) since the last dispatch, see below.
+  </description>
+
+  <cpp|write (s, LINK_IN)> sends <cpp|lsp_frame (s)>, that is
+  <verbatim|Content-Length: <em|n>\\r\\n\\r\\n> followed by <cpp|s>.
+  <cpp|drain> reads what the transport has received on <cpp|LINK_OUT> and
+  <cpp|LINK_ERR>, and <cpp|parse> moves the whole messages from <cpp|buf>
+  to <cpp|msgs>. Some servers print lines on their standard output by
+  mistake; <cpp|parse> therefore splits the header at each <verbatim|LF>
+  (not only at <verbatim|CR LF>) and passes the lines which are not
+  <verbatim|Name: value> to <cpp|errbuf> (<verbatim|lsp: skipped '...'>),
+  and a block without <verbatim|Content-Length> is skipped with an error
+  (<verbatim|lsp: no Content-Length in '...'>) instead of blocking the
+  link.
+
+  <cpp|read (LINK_OUT)> returns the next whole message (or the empty
+  string), <cpp|read (LINK_ERR)> returns and empties <cpp|errbuf>. <cpp|listen
+  (msecs)> waits until a whole message, an error or the end of the server
+  has come, for at most <cpp|msecs>: the bytes of a message may come in
+  several parts, so it listens to the transport again until the message is
+  complete. When the transport ends, the link is no longer
+  <cpp|alive>.
+
+  <section|The clients of the <scheme> programs>
+
+  The second half of the file keeps a list <cpp|lsp_clients> of
+  <cpp|lsp_client> records: an integer <cpp|id>, the link, a <scheme> call
+  back, and two flags, <cpp|exited> (the call back got its
+  <verbatim|"exit">) and <cpp|removed> (stopped by <cpp|lsp_stop>). The glue
+  routines of <source-link|build-glue-basic.scm|src/Scheme/Glue/build-glue-basic.scm>
+  give them to <scheme>:
+
+  <\description>
+    <item*|<scm|(lsp-start cmd call-back)>>Starts the program <scm|cmd> on a
+    pipe and returns the <scm|id> of its client, or a string with the
+    error if it cannot be started.
+
+    <item*|<scm|(lsp-send id msg)>>Sends the message <scm|msg> (the
+    <name|JSON> text, without header); <scm|#f> if the client is not
+    alive.
+
+    <item*|<scm|(lsp-listen id msecs)>>Waits for at most <scm|msecs> until
+    the server has sent something, then dispatches what has come to the call
+    backs. This is how a request is waited for synchronously
+    (<scm|lsp-request-wait>), and how the tests wait.
+
+    <item*|<scm|(lsp-alive? id)>>Whether the server runs.
+
+    <item*|<scm|(lsp-stop id)>>Stops the server at once (the
+    <verbatim|shutdown> and <verbatim|exit> of the protocol are sent before,
+    in <scheme>); its call back gets nothing more.
+  </description>
+
+  The call back is called with a kind and a string:
+  <scm|"message"> and the <name|JSON> text of one message,
+  <scm|"stderr"> and what the server wrote on its standard error (with the
+  errors of the framing), or <scm|"exit"> and <scm|""> once, when the
+  server has ended and everything it sent has been given.
+
+  <section|Dispatching>
+
+  The command of the transport (<cpp|lsp_link_callback>, called by the
+  pipe when data arrive) only <em|drains>: the bytes are framed and
+  <cpp|news> is set, but no <scheme> code runs there. The call backs are
+  called by <cpp|lsp_dispatch>, from two places:
+
+  <\itemize>
+    <item><cpp|process_all_lsp>, which the interpose handler of the server
+    (<cpp|tm_server_rep::interpose_handler> in
+    <source-link|tm_server.cpp|src/Texmacs/Server/tm_server.cpp>) calls at
+    each turn of the event loop, with all the GUIs;
+
+    <item><cpp|lsp_listen>, after waiting.
+  </itemize>
+
+  <cpp|lsp_dispatch> goes over the clients which have <cpp|news> (or whose
+  link has ended) and gives each one first its errors, then <em|one>
+  message; it sets <cpp|news> again for a client which gave a message, and
+  loops until no call back was called. A client whose link has ended and
+  whose errors are all given gets <scm|"exit"> and is marked
+  <cpp|exited>.
+
+  A call back may send, listen or stop in its turn. In particular a call
+  back which waits for the answer of a request (<scm|lsp-request-wait>, for
+  instance a handler which asks the server something) calls
+  <cpp|lsp_listen>, and thus dispatches <em|within> the dispatch. To keep
+  this safe:
+
+  <\itemize>
+    <item>a counter <cpp|lsp_dispatching> holds the depth of the nested
+    dispatches;
+
+    <item>no client is deleted during a dispatch: <cpp|lsp_stop> only marks
+    it <cpp|removed>, and <cpp|process_all_lsp> deletes the clients which
+    are <cpp|removed> or <cpp|exited>, with their links, only when
+    <cpp|lsp_dispatching> is 0 (it can be called from an event loop which
+    runs inside a call back);
+
+    <item>clients which are started during a dispatch are added at the end
+    of <cpp|lsp_clients>, so that the loop over the clients stays valid;
+
+    <item>the <cpp|news> flag is per link, so that a dispatch does not read
+    the links which have nothing new.
+  </itemize>
+
+  <tmdoc-copyright|2026|the <TeXmacs> team>
+
+  <tmdoc-license|Permission is granted to copy, distribute and/or modify this
+  document under the terms of the GNU Free Documentation License, Version 1.1
+  or any later version published by the Free Software Foundation; with no
+  Invariant Sections, with no Front-Cover Texts, and with no Back-Cover
+  Texts. A copy of the license is included in the section entitled "GNU Free
+  Documentation License".>
+</body>
+
+<initial|<\collection>
+</collection>>
