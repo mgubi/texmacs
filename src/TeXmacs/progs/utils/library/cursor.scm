@@ -155,6 +155,11 @@
 (tm-define (notify-cursor-moved status)
   (noop))
 
+; Hook for the changes of the text of the buffer @name (a string), after
+; they are typeset (language servers follow them)
+(tm-define (notify-buffer-changed name)
+  (noop))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Predicates
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

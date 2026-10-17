@@ -20,13 +20,16 @@
 ;; The protocol in Scheme (progs/lsp): the messages as strees of the JSON
 ;; converter, the texts and positions, the URIs; the clients, on procedures
 ;; which keep what they send and are given the answers (no server); the
-;; documents, a source file in a buffer, and clangd when it is installed.
+;; documents, a source file in a buffer, and clangd when it is installed;
+;; with clangd, the editor (lsp-edit): the buffer followed, the diagnostics
+;; underlined (alt selections), definitions and completion.
 
 (texmacs-module (check lsp-test)
   (:use (check check-lib)
         (lsp lsp-base)
         (lsp lsp-client)
-        (lsp lsp-documents)))
+        (lsp lsp-documents)
+        (lsp lsp-edit)))
 
 (define events '())
 
@@ -441,7 +444,8 @@
       (check= (lsp-cursor-position)
               '(attr "line" (json-number "1") "character" (json-number "9")))
       (when (url-exists-in-path? "clangd")
-        (test-clangd path))
+        (test-clangd path)
+        (test-editor))
       (buffer-close u)
       (when (buffer-exists? old) (switch-to-buffer old))))
   (system-rmdir-recursive (system->url lsp-dir)))
@@ -474,6 +478,67 @@
     (check-false (lsp-document-open? c uri))
     (lsp-client-stop c)
     (check= (lsp-client-state c) 'dead)))
+
+;; the editor, on a second file of the project
+
+(define edit-text
+  (string-append "int compute_value () { return 1; }\n"
+                 "int main () {\n"
+                 "  return x + compute_value ();\n"
+                 "  comp\n"
+                 "}\n"))
+
+(define (cursor-rel)
+  (list-tail (cursor-path) (length (buffer-path))))
+
+(define (test-editor)
+  (check-group "editor")
+  (let* ((path (lsp-file "proj/src/edit.cpp"))
+         (u (system->url path))
+         (uri (lsp-path->uri path)))
+    (string-save edit-text u)
+    (load-buffer u)
+    (check= (url->system (current-buffer)) path)
+    ;; the editor notifies the changes, the text is given after a pause
+    (notify-buffer-changed (url->string u))
+    (lsp-sync-pending)
+    (with c (lsp-buffer-client*)
+      (check-true (and c (lsp-client-alive? c)))
+      (check-true (and c (lsp-document-open? c uri)))
+      (when c
+        (lsp-wait c (lambda () (nnull? (lsp-diagnostics uri))) 20000)
+        (lsp-show-diagnostics)
+        (with errs (get-alt-selection "lsp-errors")
+          (check-true (>= (length errs) 2))
+          (check-true (in? (append (buffer-path) '(2 9)) errs)))
+        ;; from the start to the first error
+        (go-to-path (append (buffer-path) '(0 0)))
+        (lsp-next-diagnostic #t)
+        (check= (cursor-rel) '(2 9))
+        ;; the definition of compute_value
+        (go-to-path (append (buffer-path) '(2 16)))
+        (lsp-goto-definition)
+        (check= (current-buffer) u)
+        (check= (cursor-rel) '(0 4))
+        ;; completion of comp
+        (go-to-path (append (buffer-path) '(3 6)))
+        (check-true (lsp-completion-here?))
+        (with r (lsp-request-wait c "textDocument/completion"
+                                  (lsp-object "textDocument"
+                                              (lsp-object "uri" uri)
+                                              "position" (lsp-cursor-position))
+                                  10000)
+          (check= (car r) 'result)
+          (check-true (in? "ute_value"
+                           (lsp-completions "comp" (cadr r)))))
+        (lsp-complete)
+        (with line (list-ref (lsp-buffer-lines) 3)
+          (check-true (string-starts? line "  comp"))
+          (check-true (> (string-length line) 6)))
+        (lsp-hide-diagnostics)
+        (check= (get-alt-selection "lsp-errors") '())
+        (lsp-client-stop c)))
+    (buffer-close u)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The suite

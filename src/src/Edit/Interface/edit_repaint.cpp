@@ -269,6 +269,16 @@ edit_interface_rep::draw_selection (renderer ren, rectangle r) {
     ren->draw_rectangles (spell_error_rects[i] & visible);
 #endif
   }
+  for (int i=0; i<N(diagnostic_rects); i++) {
+    // underlined, at the bottom of each line of the range
+    ren->set_pencil (pencil (diagnostic_colors[i], 2 * ren->pixel));
+    rectangles l= diagnostic_rects[i] & visible;
+    for (; !is_nil (l); l= l->next) {
+      rectangle lr (l->item);
+      SI y= lr->y1 + ren->pixel;
+      ren->line (lr->x1, y, lr->x2, y);
+    }
+  }
   if (!is_nil (selection_rects)) {
     color col= get_env_color (SELECTION_COLOR);
     if (table_selection) col= get_env_color (TABLE_SELECTION_COLOR);

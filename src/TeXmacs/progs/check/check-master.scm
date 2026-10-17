@@ -181,12 +181,14 @@
     ;; server and clients in this process, with databases in the temporary
     ;; directory and the server files of the (scratch) home, which it cleans
     ("remote" remote-test-failures count)
-    ;; starts sh, cat and printf as language servers, and stops them
-    ("lsp" lsp-test-failures count)
     ;; starts plugin processes (shell, python when present) and stops them
     ("plugins" plugins-test-failures count)
     ;; loads every lazy menu, and maps and unmaps test keys
     ("kbd-menu" kbd-menu-test-failures count)
+    ;; starts sh, cat and printf as language servers, and stops them; with
+    ;; clangd, edits a C++ buffer, which loads the keyboard maps of programs:
+    ;; after kbd-menu, whose math checks must come before (see there)
+    ("lsp" lsp-test-failures count)
     ;; loads every style package, and with them the Scheme modules they use
     ("macro-drd" macro-drd-test-failures count)
     ("tm-define-regression" regtest-tm-define error)

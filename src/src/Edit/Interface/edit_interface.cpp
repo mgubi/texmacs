@@ -782,6 +782,56 @@ edit_interface_rep::zoom_anchor_keep () {
   update_visible ();
 }
 
+/******************************************************************************
+* The diagnostics of language servers
+******************************************************************************/
+
+static bool
+valid_cursor_path (tree t, path p) {
+  // is @p a cursor position in @t? (the ranges of diagnostics are made by
+  // the programs for a former text, which may have changed since)
+  if (is_nil (p)) return false;
+  while (!is_nil (p->next)) {
+    if (is_atomic (t) || p->item < 0 || p->item >= N(t)) return false;
+    t= t[p->item];
+    p= p->next;
+  }
+  if (is_atomic (t)) return p->item >= 0 && p->item <= N(t->label);
+  return p->item == 0 || p->item == 1;
+}
+
+void
+edit_interface_rep::update_diagnostic_rects (rectangle new_visible) {
+  static const char* names[]= { "lsp-errors", "lsp-warnings", "lsp-infos" };
+  static const char* colors[]= { "#e02020", "#e09000", "#2080e0" };
+  rectangles visible (new_visible);
+  for (int i=0; i<N(diagnostic_rects); i++)
+    invalidate (thicken (diagnostic_rects[i], 0, 3*pixel) & visible);
+  diagnostic_rects = array<rectangles> ();
+  diagnostic_colors= array<color> ();
+  for (int k=0; k<3; k++) {
+    range_set sel= get_alt_selection (names[k]);
+    if (is_empty (sel)) continue;
+    color col= named_color (colors[k]);
+    int b= 0, e= N(sel);
+    if (e - b >= 200) {
+      b= max (find_alt_selection_index (sel, vy2, b, e) - 100, b);
+      e= min (find_alt_selection_index (sel, vy1, b, e) + 100, e);
+    }
+    for (int i=b; i+1<e; i+=2) {
+      if (!valid_cursor_path (et, sel[i]) ||
+          !valid_cursor_path (et, sel[i+1]) ||
+          path_less (sel[i+1], sel[i])) continue;
+      selection s= compute_selection (simple_range (sel[i], sel[i+1]));
+      if (N(s->rs) == 0) continue;
+      diagnostic_rects  << s->rs;
+      diagnostic_colors << col;
+    }
+  }
+  for (int i=0; i<N(diagnostic_rects); i++)
+    invalidate (thicken (diagnostic_rects[i], 0, 3*pixel) & visible);
+}
+
 void
 edit_interface_rep::apply_changes () {
   //cout << "Apply changes\n";
@@ -1226,6 +1276,16 @@ edit_interface_rep::apply_changes () {
       call ("continuous-spell-check");
     else set_alt_selection ("spell-errors", range_set ());
   }
+
+  // the programs which follow the text of the buffer (language servers)
+  if (env_change & THE_TREE)
+    call ("notify-buffer-changed", object (as_string (get_name ())));
+
+  // cout << "Handling diagnostics";
+  if ((env_change & (THE_CURSOR + THE_FOCUS + THE_TREE + THE_ENVIRONMENT +
+                     THE_SELECTION + THE_SPELL_ERRORS)) ||
+      new_visible != last_visible)
+    update_diagnostic_rects (new_visible);
   if (env_change & (THE_CURSOR + THE_FOCUS + THE_TREE +
                     THE_ENVIRONMENT + THE_SELECTION + THE_SPELL_ERRORS)) {
     range_set errs= get_alt_selection ("spell-errors");
