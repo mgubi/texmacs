@@ -2476,14 +2476,20 @@
         ((in? (car x) tmtex-ulem-text-commands) 'inside)
         (else 'atom)))
 
+(define (tmtex-ulem-group x)
+  ;; ulem reads its argument token by token, and stops at the & of a
+  ;; matrix or a table in a formula: a formula goes in a group, one box
+  (if (func? x '!math) `(!group ,x) x))
+
 (define (tmtex-ulem-runs cmd args l k)
   ;; the consecutive atoms of a concatenation get one line
   (cond ((null? l) l)
         ((== (car k) 'atom)
          (receive (r rest)
              (list-break (map cons l k) (lambda (p) (!= (cdr p) 'atom)))
-           (cons (if (null? (cdr r)) `(,cmd ,@args ,(caar r))
-                     `(,cmd ,@args (!concat ,@(map car r))))
+           (cons (if (null? (cdr r)) `(,cmd ,@args ,(tmtex-ulem-group (caar r)))
+                     `(,cmd ,@args (!concat ,@(map tmtex-ulem-group
+                                                   (map car r)))))
                  (tmtex-ulem-runs cmd args (map car rest) (map cdr rest)))))
         (else (cons (tmtex-ulem-sink cmd args (car l))
                     (tmtex-ulem-runs cmd args (cdr l) (cdr k))))))
@@ -2506,7 +2512,8 @@
                 (list-drop-while l tmtex-ulem-whitespace?)
                 tmtex-ulem-whitespace?)
         (list `(text (,cmd ,@args
-                           (!math (!concat (displaystyle) " " ,@pre ,@l*))))))))
+                           (!group
+                            (!math (!concat (displaystyle) " " ,@pre ,@l*)))))))))
 
 (define (tmtex-ulem-math-concat cmd args pre l)
   (receive (r rest)
@@ -2541,7 +2548,7 @@
 
 (define (tmtex-ulem-sink cmd args x)
   (with k (tmtex-ulem-kind x)
-    (cond ((== k 'atom) `(,cmd ,@args ,x))
+    (cond ((== k 'atom) `(,cmd ,@args ,(tmtex-ulem-group x)))
           ((!= k 'inside) x)
           ((func? x '!concat)
            (cons '!concat (tmtex-ulem-concat cmd args (cdr x))))
@@ -2565,7 +2572,7 @@
 (define (tmtex-text-mode cmd . args)
   (with x (cAr args)
     (if (tmtex-math-mode?)
-        `(text (,cmd ,@(cDr args) (!math ,x)))
+        `(text (,cmd ,@(cDr args) (!group (!math ,x))))
         (tmtex-ulem-sink cmd (cDr args) x))))
 
 (define (tmtex-strike-through s l)

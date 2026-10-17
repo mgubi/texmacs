@@ -861,9 +861,9 @@
           "\\tmmarked{tmhexFF8800}{z}")
   ;; in a formula, the formula goes in \text, as ulem works in text mode
   (check= (tl '(math (concat "a+" (strike-through (concat "x" (rsup "2"))))))
-          "$a + \\text{\\sout{$x^2$}}$")
+          "$a + \\text{\\sout{{$x^2$}}}$")
   (check= (tl '(math (concat "b+" (marked (concat "y" (rsub "i"))))))
-          "$b + \\text{\\tmmarked{yellow}{$y_i$}}$")
+          "$b + \\text{\\tmmarked{yellow}{{$y_i$}}}$")
   (check= (tl '(colored-frame "#f00" "q")) "\\colorbox{tmhexFF0000}{q}")
   (check= (tl '(colored-frame "Firebrick1" "q")) "\\colorbox{tmhexFF3030}{q}")
   (check= (tl '(with "color" "#123456" "c")) "{\\color[HTML]{123456}c}")
@@ -887,7 +887,7 @@
   ;; the line goes over the spaces between commands, and over the special
   ;; characters and formulas with the text around them
   (check= (tl '(strike-through "50% & #1"))  "\\sout{50\\% \\& \\#1}")
-  (check= (tl '(strike-through (concat "a" (math "x") "b"))) "\\sout{a$x$b}")
+  (check= (tl '(strike-through (concat "a" (math "x") "b"))) "\\sout{a{$x$}b}")
   (check= (string-replace (tl '(marked (concat (em "b") " " (strong "c"))))
                           "\n" " ")
           (string-append "{\\tmem{\\tmmarked{yellow}{b}}}\\tmmarked{yellow}{ }"
@@ -903,18 +903,18 @@
   ;; a displayed formula: each cell in \text, in display style
   (check-true (string-contains?
                (tl '(strike-through (document "a" (equation (document "x=1")))))
-               "\\text{\\sout{$\\displaystyle x = 1$}}"))
+               "\\text{\\sout{{$\\displaystyle x = 1$}}}"))
   (check-true (string-contains?
                (tl '(marked (document (equation* (document "x=1")))))
-               "\\[ \\text{\\tmmarked{yellow}{$\\displaystyle x = 1$}} \\]"))
+               "\\[ \\text{\\tmmarked{yellow}{{$\\displaystyle x = 1$}}} \\]"))
   (with s (tl '(strike-through
                 (align (document (table (row (cell "x") (cell "=1")))))))
-    (check-true (string-contains? s "\\text{\\sout{$\\displaystyle x$}} &"))
-    (check-true (string-contains? s "\\text{\\sout{$\\displaystyle {}="))
+    (check-true (string-contains? s "\\text{\\sout{{$\\displaystyle x$}}} &"))
+    (check-true (string-contains? s "\\text{\\sout{{$\\displaystyle {}="))
     (check-false (string-contains? s "\\sout{x}")))
   (check-true (string-contains?
                (tl '(strike-through (document (equation (document (concat (label "e") "x"))))))
-               "\\label{e}\\text{\\sout{$\\displaystyle x$}}"))
+               "\\label{e}\\text{\\sout{{$\\displaystyle x$}}}"))
   (with s (td '("article")
               '(document (strike-through "x") (marked "y")
                          (with "marked-color" "#ff8800" (marked "z"))
@@ -1027,6 +1027,13 @@
                          (marked (description (document (concat (item* "key") "value"))))
                          (strike-through (document "a" (verbatim (document "x_1 %" "y")) "b"))
                          (marked (document (cpp-code (document "int x;")) "b"))
+                         ;; formulas with an & (matrices, cases, tables)
+                         (strike-through (equation* (document (concat "f(x)=" (choice (tformat (table (row (cell "1") (cell "x<gtr>0")) (row (cell "0") (cell "x<leqslant>0")))))))))
+                         (marked (equation* (document (concat "A=" (matrix (tformat (table (row (cell "1") (cell "2")) (row (cell "3") (cell "4")))))))))
+                         (strike-through (align (document (table (row (cell "B") (cell (concat "=" (matrix (tformat (table (row (cell "1") (cell "2"))))))))))))
+                         (marked (equation* (document (tabular (table (row (cell "a") (cell "b")))))))
+                         (strike-through (concat "a " (math (concat "A=" (matrix (tformat (table (row (cell "1") (cell "2"))))))) " b"))
+                         (math (concat "x+" (marked (matrix (tformat (table (row (cell "1") (cell "2"))))))))
                          (strike-through (concat "50% & #1 " (with "mode" "math" "<ldots>")
                                                  " " (em "e") " " (strong "s") " " ,long)))))
              (r (latex-compile "strike-marked" doc))
