@@ -30,7 +30,8 @@ struct lsp_link_rep: tm_link_rep {
   tm_link       ln;      // the link which carries the bytes
   string        buf;     // the bytes received, not yet a whole message
   int           pos;     // the start of what is left in buf
-  array<string> msgs;    // the whole messages, not yet read
+  array<string> msgs;    // the whole messages, from msgs [first]
+  int           first;   // the next message to be read
   string        head;    // the first of them (watch)
   string        errbuf;  // what the server wrote on stderr
   bool          news;    // something has come since the last dispatch
@@ -56,11 +57,12 @@ lsp_link_callback (void* obj, void* info) {
   (void) info;
   lsp_link_rep* con= (lsp_link_rep*) obj;
   con->drain ();
-  if (N(con->msgs) > 0 || con->errbuf != "" || !con->alive)
+  if (N(con->msgs) > con->first || con->errbuf != "" || !con->alive)
     con->apply_command ();
 }
 
-lsp_link_rep::lsp_link_rep (tm_link ln2): ln (ln2), pos (0), news (false) {
+lsp_link_rep::lsp_link_rep (tm_link ln2):
+  ln (ln2), pos (0), first (0), news (false) {
   alive= false;
 }
 
@@ -81,7 +83,8 @@ lsp_frame (string msg) {
 string
 lsp_link_rep::start () {
   if (alive) return "busy";
-  buf= ""; pos= 0; msgs= array<string> (); head= ""; errbuf= "";
+  buf= ""; pos= 0; msgs= array<string> (); first= 0; head= "";
+  errbuf= "";
   string r= ln->start ();
   if (r != "ok") return r;
   alive= true;
@@ -101,8 +104,11 @@ lsp_link_rep::parse () {
   // of a header are ended by CR LF, but a line which a server prints on
   // stdout by mistake may end by LF alone and come just before a header:
   // the lines are split at each LF, and those which are not "Name: value"
-  // are passed on as errors
-  int end= search_forwards ("\r\n\r\n", pos, buf);
+  // are passed on as errors. A server which ends the lines of its headers
+  // by LF alone (against the protocol) is understood too.
+  int end= search_forwards ("\r\n\r\n", pos, buf), sep= 4;
+  int lf= search_forwards ("\n\n", pos, buf);
+  if (lf >= 0 && (end < 0 || lf < end)) { end= lf; sep= 2; }
   if (end < 0) return false;
   int len= -1, i= pos;
   while (i < end) {
@@ -114,7 +120,8 @@ lsp_link_rep::parse () {
     if (colon > 0 &&
         locase_all (trim_spaces (line (0, colon))) == "content-length") {
       string val= trim_spaces (line (colon + 1, N(line)));
-      if (N(val) > 0 && N(val) < 10 && is_int (val)) len= as_int (val);
+      if (N(val) > 0 && N(val) < 10 && is_int (val) && val[0] != '-')
+        len= as_int (val);
     }
     else if (colon <= 0 && line != "")
       errbuf << "lsp: skipped '" << line << "'\n";
@@ -123,12 +130,12 @@ lsp_link_rep::parse () {
   if (len < 0) {
     // not a header: it is passed on as an error and skipped
     errbuf << "lsp: no Content-Length in '" << buf (pos, end) << "'\n";
-    pos= end + 4;
+    pos= end + sep;
     return true;
   }
-  if (N(buf) - (end + 4) < len) return false;
-  msgs << buf (end + 4, end + 4 + len);
-  pos= end + 4 + len;
+  if (N(buf) - (end + sep) < len) return false;
+  msgs << buf (end + sep, end + sep + len);
+  pos= end + sep + len;
   return true;
 }
 
@@ -156,7 +163,7 @@ string&
 lsp_link_rep::watch (int channel) {
   static string empty_string= "";
   if (channel == LINK_OUT) {
-    head= (N(msgs) > 0? msgs[0]: string (""));
+    head= (N(msgs) > first? msgs[first]: string (""));
     return head;
   }
   else if (channel == LINK_ERR) return errbuf;
@@ -165,11 +172,12 @@ lsp_link_rep::watch (int channel) {
 
 string
 lsp_link_rep::read (int channel) {
-  if (N(msgs) == 0 && errbuf == "") drain ();
+  if (N(msgs) == first && errbuf == "") drain ();
   if (channel == LINK_OUT) {
-    if (N(msgs) == 0) return "";
-    string r= msgs[0];
-    msgs= range (msgs, 1, N(msgs));
+    if (N(msgs) == first) return "";
+    // (the messages read are dropped together: no copy for each one)
+    string r= msgs[first++];
+    if (first == N(msgs)) { msgs= array<string> (); first= 0; }
     return r;
   }
   else if (channel == LINK_ERR) {
@@ -186,7 +194,7 @@ lsp_link_rep::listen (int msecs) {
   // most msecs: the bytes of a message may come in several parts
   time_t wait_until= texmacs_time () + msecs;
   drain ();
-  while (alive && N(msgs) == 0 && errbuf == "") {
+  while (alive && N(msgs) == first && errbuf == "") {
     time_t left= wait_until - texmacs_time ();
     if (left <= 0) break;
     ln->listen ((int) left);
@@ -240,9 +248,13 @@ lsp_dispatch () {
   // (lsp-request-wait) dispatches within this dispatch. No client is
   // deleted meanwhile (process_all_lsp), and the clients which are added
   // come at the end of lsp_clients
+  // At most about 100 ms per dispatch: a server which sends without
+  // pause (progress, logs) does not keep the editor from its events, the
+  // rest is dispatched at the next turns (the news of the clients stay)
   lsp_dispatching++;
+  time_t start= texmacs_time ();
   bool busy= true;
-  while (busy) {
+  while (busy && texmacs_time () - start < 100) {
     busy= false;
     for (int i=0; i<N(lsp_clients); i++) {
       lsp_client* c= lsp_clients[i];
@@ -291,7 +303,11 @@ process_all_lsp () {
 
 object
 lsp_start (string cmd, object call_back) {
-  tm_link ln= make_lsp_link (make_pipe_link (cmd));
+  // (a server which does not read its input does not freeze the editor:
+  // what it does not take yet is written at the next turns)
+  tm_link tr= make_pipe_link (cmd);
+  tr->set_blocking_write (false);
+  tm_link ln= make_lsp_link (tr);
   string r= ln->start ();
   if (r != "ok") return object (r == ""? string ("Error: no server"): r);
   lsp_client* c= tm_new<lsp_client> ();
@@ -310,7 +326,7 @@ lsp_send (int id, string msg) {
   lsp_client* c= lsp_find (id);
   if (c == NULL || !c->ln->alive) return false;
   c->ln->write (msg, LINK_IN);
-  return true;
+  return c->ln->alive;
 }
 
 void

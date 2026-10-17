@@ -65,6 +65,9 @@ struct pipe_link_rep: tm_link_rep {
 
   string outbuf;        // pending output from plugin
   string errbuf;        // pending errors from plugin
+  bool   blocking;      // write waits until all is written (the default)
+  string inbuf;         // input not taken by the child yet (not blocking)
+  int    inpos;         // from inbuf [inpos]
 
   socket_notifier snout, snerr;
   
@@ -79,8 +82,10 @@ public:
   void    listen (int msecs);
   void    interrupt ();
   void    stop ();
+  void    set_blocking_write (bool b);
 
   void    feed (int channel);
+  void    flush_input (int msecs);
   void    close_fds ();
   void    close_pipes ();
   void    close_err ();
@@ -93,6 +98,9 @@ pipe_link_rep::pipe_link_rep (string cmd2): cmd (cmd2) {
   err    = pp_err[0]= pp_err[1]= -1;
   outbuf = "";
   errbuf = "";
+  blocking= true;
+  inbuf  = "";
+  inpos  = 0;
   alive  = false;
   pid    = -1;  // no process yet: terminate_child does nothing
 }
@@ -267,6 +275,7 @@ pipe_link_rep::start () {
     pp_in[0]= pp_in[1]= pp_out[0]= pp_out[1]= pp_err[0]= pp_err[1]= -1;
 
     alive= true;
+    if (!blocking) set_blocking_write (false);
     snout = socket_notifier (out, &pipe_callback, this, NULL);
     snerr = socket_notifier (err, &pipe_callback, this, NULL);
     add_notifier (snout);
@@ -317,9 +326,75 @@ pipe_link_rep::write (string s, int channel) {
 #ifndef OS_MINGW
   if ((!alive) || (channel != LINK_IN)) return;
   if (DEBUG_IO) debug_io << "[INPUT]" << debug_io_string (s);
+  if (!blocking) {
+    inbuf << s;
+    flush_input (100);
+    return;
+  }
+  // (a write may take a part only, or be interrupted by a signal)
   c_string _s (s);
-  int err= ::write (in, _s, N(s));
-  (void) err;
+  const char* p= _s;
+  int n= N(s), done= 0;
+  while (done < n) {
+    ssize_t r= ::write (in, p + done, n - done);
+    if (r > 0) done += r;
+    else if (r < 0 && errno == EINTR) continue;
+    else {
+      io_error << "Write failed for '" << cmd << "'\n";
+      break;
+    }
+  }
+#endif
+}
+
+void
+pipe_link_rep::set_blocking_write (bool b) {
+#ifndef OS_MINGW
+  blocking= b;
+  if (alive && in != -1) {
+    int fl= fcntl (in, F_GETFL);
+    fcntl (in, F_SETFL, b? (fl & ~O_NONBLOCK): (fl | O_NONBLOCK));
+  }
+#else
+  (void) b;
+#endif
+}
+
+void
+pipe_link_rep::flush_input (int msecs) {
+  // writes what the child takes of inbuf, waiting at most msecs for it to
+  // take more; its output is read meanwhile (a child which waits until it
+  // can write would otherwise never read)
+#ifndef OS_MINGW
+  time_t wait_until= texmacs_time () + msecs;
+  while (alive && inpos < N(inbuf)) {
+    ssize_t r= ::write (in, &(inbuf[inpos]), N(inbuf) - inpos);
+    if (r > 0) { inpos += r; continue; }
+    if (r < 0 && errno == EINTR) continue;
+    if (r < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
+      io_error << "Write failed for '" << cmd << "'\n";
+      inpos= N(inbuf);
+      break;
+    }
+    time_t left= wait_until - texmacs_time ();
+    if (left <= 0) break;
+    fd_set rfds, wfds;
+    FD_ZERO (&rfds);
+    FD_ZERO (&wfds);
+    FD_SET (out, &rfds);
+    if (err != -1) FD_SET (err, &rfds);
+    FD_SET (in, &wfds);
+    struct timeval tv;
+    tv.tv_sec  = left / 1000;
+    tv.tv_usec = 1000 * (left % 1000);
+    int nr= select (max (in, max (out, err)) + 1, &rfds, &wfds, NULL, &tv);
+    if (nr > 0 && FD_ISSET (out, &rfds)) feed (LINK_OUT);
+    if (alive && nr > 0 && err != -1 && FD_ISSET (err, &rfds))
+      feed (LINK_ERR);
+  }
+  if (inpos >= N(inbuf)) { inbuf= ""; inpos= 0; }
+#else
+  (void) msecs;
 #endif
 }
 
@@ -388,20 +463,27 @@ pipe_link_rep::listen (int msecs) {
   (void) msecs;
 #else
   if (!alive) return;
+  if (inpos < N(inbuf)) flush_input (0);
   time_t wait_until= texmacs_time () + msecs;
   while (alive && (outbuf == "") && (errbuf == "")) {
-    fd_set rfds;
+    fd_set rfds, wfds;
     FD_ZERO (&rfds);
+    FD_ZERO (&wfds);
     FD_SET (out, &rfds);
     if (err != -1) FD_SET (err, &rfds);
+    // (the input which is left is written while waiting)
+    bool pending= (inpos < N(inbuf));
+    if (pending) FD_SET (in, &wfds);
     // NOTE: only the time which is left is waited for, and listen (0)
     // checks the pipes once (it is called by each read)
     time_t left= max ((time_t) 0, wait_until - texmacs_time ());
     struct timeval tv;
     tv.tv_sec  = left / 1000;
     tv.tv_usec = 1000 * (left % 1000);
-    int nr= select (max (out, err) + 1, &rfds, NULL, NULL, &tv);
-    if (nr > 0 && FD_ISSET (out, &rfds)) feed (LINK_OUT);
+    int nr= select (max (in, max (out, err)) + 1, &rfds,
+                    pending? &wfds: NULL, NULL, &tv);
+    if (nr > 0 && pending && FD_ISSET (in, &wfds)) flush_input (0);
+    if (alive && nr > 0 && FD_ISSET (out, &rfds)) feed (LINK_OUT);
     if (alive && nr > 0 && err != -1 && FD_ISSET (err, &rfds))
       feed (LINK_ERR);
     if (msecs == 0 || texmacs_time () - wait_until >= 0) break;
@@ -423,6 +505,7 @@ pipe_link_rep::stop () {
   if (!alive) return;
   terminate_child (pid);
   alive= false;
+  inbuf= ""; inpos= 0;
 
   remove_notifier (snout);
   remove_notifier (snerr);

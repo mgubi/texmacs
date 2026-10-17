@@ -123,6 +123,14 @@
     (check= (events-of "message") (list "{}"))
     (check-true (string-contains? (apply string-append (events-of "stderr"))
                                   "Loading...")))
+  ;; headers whose lines are ended by LF alone (against the protocol)
+  (let ((id (start "printf 'Content-Length: 2\\n\\n{}Content-Length: 3\\n\\n[1]'")))
+    (wait-exit id)
+    (check= (events-of "message") (list "{}" "[1]")))
+  ;; a negative length is not one
+  (let ((id (start "printf 'Content-Length: -2\\r\\n\\r\\nContent-Length: 2\\r\\n\\r\\n{}'")))
+    (wait-exit id)
+    (check= (events-of "message") (list "{}")))
   ;; a line ended by LF alone, just before a header, is skipped too: the
   ;; header is still read
   (let ((id (start (string-append
@@ -177,6 +185,25 @@
     ;; nothing is sent once the server is stopped, not even its end
     (lsp-listen id 100)
     (check= (events-of "exit") '())))
+
+(define (test-blocked-server)
+  (check-group "a server which does not read")
+  ;; a long message to a server which does not read its input returns at
+  ;; once (the editor would freeze), and a long message to one which reads
+  ;; arrives whole
+  (let* ((id (start "sleep 10"))
+         (big (make-string 4000000 #\a))
+         (t0 (texmacs-time)))
+    (check-true (lsp-send id big))
+    (check-true (< (- (texmacs-time) t0) 1000))
+    (check-true (lsp-alive? id))
+    (lsp-stop id))
+  (let* ((id (start "cat"))
+         (big (make-string 2000000 #\b)))
+    (lsp-send id big)
+    (wait-messages id 1)
+    (check= (map string-length (events-of "message")) '(2000000))
+    (lsp-stop id)))
 
 (define (test-errors)
   (check-group "errors")
@@ -888,6 +915,7 @@
     (test-headers)
     (test-stderr)
     (test-nested)
+    (test-blocked-server)
     (test-errors))
   (test-messages)
   (test-texts)
