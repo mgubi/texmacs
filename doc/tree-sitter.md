@@ -613,6 +613,31 @@ As planned initially:
 
 ### Phase 4: external scanners
 
+Done in part (2026-10-17):
+
+- Scanners stay in Scheme and serve both parsers:
+  `tree_sitter_set_scanner` installs C trampolines (one create function
+  per language, 16 slots) which call the Scheme `create`/`scan`/
+  `serialize`/`deserialize`; the public lexer functions of `ts-parse.scm`
+  act on the current `TSLexer` when given something else than a Scheme
+  lexer; the state goes into tree-sitter's buffer as the text of the value.
+- `ts-scanner-cpp.scm` (raw strings). With the Scheme scanners, the C runtime
+  passes the corpus of tree-sitter-cpp (124 tests, 16 ms in all) and of
+  tree-sitter-python (117 tests, 90 ms).
+- Python is highlighted (tables in 20 s in TeXmacs). C++ is registered
+  but **not highlighted**: its tables come out exact (11734 states, 570
+  symbols, as `tree-sitter generate`) but cost about 10 minutes and 6 GB
+  standalone, so about half an hour in TeXmacs: 100525 LR(1) states before
+  merging (LR construction about 100 s and 5 GB), then about 10 million
+  pairs compared in the first pass of the merging (`tree-sitter generate`:
+  5 s, 0.5 GB). The later passes of the merging now only look at the
+  groups which can still split (tables byte-identical).
+- Open: how to make large grammars practical (C++ stages in TeXmacs,
+  compact Scheme representations, shipping tables for large grammars, or
+  the 3x slowdown of S7 module code).
+
+As planned initially:
+
 - The scanners stay in Scheme (`ts-scanner-python.scm` exists): the C
   runtime calls a C trampoline which calls the Scheme `scan` with a lexer
   object wrapping `TSLexer` (`lexer-lookahead`, `lexer-advance!`...);
