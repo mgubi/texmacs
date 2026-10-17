@@ -490,6 +490,14 @@ be merged on its own.
 
 ### Phase 1: grammar registry and cached tables
 
+Done (2026-10-17, commit "grammars of json, c and scheme, generated at
+first use"): `ts-registry.scm` (`treesit-language`, `treesit-prepare`,
+`treesit-generate-cache`), the grammars in `misc/tree-sitter`, the glue
+`tree-sitter-language-load`, CMake. The background generation runs
+`texmacs.bin -headless -x ... (exit 0)`; a test of the whole asynchronous
+path needs `-headless -X` (the loop keeps running), so it is not in the
+suite. As planned initially:
+
 - `progs/treesit/ts-registry.scm`: for a TeXmacs language name (`cpp`,
   `python`, `json`...), the grammar (`misc/tree-sitter/<lan>/grammar.json`),
   its queries and, when there is one, its Scheme scanner.
