@@ -29,7 +29,7 @@
         (treesit ts-tables) (treesit ts-build) (treesit ts-language)
         (treesit ts-parse) (treesit ts-export) (treesit ts-registry)
         (treesit ts-highlight) (treesit ts-scanner-cpp) (treesit ts-native)
-        (treesit ts-scan)))
+        (treesit ts-scan) (treesit ts-edit)))
 
 (define (json-grammar-file)
   (url->system (url-concretize "$TEXMACS_PATH/misc/tree-sitter/json/grammar.json")))
@@ -482,6 +482,77 @@
                     (15 17 "constant") (17 18 "operator_openclose"))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Editing with the syntax trees (ts-edit.scm)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (test-edit)
+  (when (defined? 'syntax-region-node-range)
+    (treesit-generate-cache "python")
+    (let ((py (treesit-language "python"))
+          (d (stree->tree '(document "f(a, \"(x\")" "if b:" "    g([1, 2])"))))
+      ;; brackets, not those of strings
+      (check= (syntax-matching-bracket d py '(0 1)) '(0 9))
+      (check= (syntax-matching-bracket d py '(0 9)) '(0 1))
+      (check= (syntax-matching-bracket d py '(0 6)) #f)
+      (check= (syntax-matching-bracket d py '(0 0)) #f)
+      (check= (syntax-matching-bracket d py '(2 6)) '(2 11))
+      (check= (syntax-matching-bracket d py '(2 12)) '(2 5))
+      ;; the selection grows by nodes
+      (check= (syntax-enlarge-range d py '(2 7) '(2 7)) '((2 7) (2 8)))
+      (check= (syntax-enlarge-range d py '(2 7) '(2 8)) '((2 6) (2 12)))
+      (check= (syntax-enlarge-range d py '(2 6) '(2 12)) '((2 5) (2 13)))
+      (check= (syntax-enlarge-range d py '(0 0) '(2 13)) #f))
+    ;; inputs of sessions which more lines must complete
+    (let ((py (treesit-language "python"))
+          (incomplete? (lambda (lines lan)
+                         (syntax-incomplete? (stree->tree (cons 'document lines)) lan))))
+      (check-true (incomplete? '("def f(x):") py))
+      (check-true (incomplete? '("f(1," "  2") py))
+      (check-true (incomplete? '("x = [1, 2" "") py))
+      (check-false (incomplete? '("x = 1") py))
+      (check-false (incomplete? '("def f(x):" "    return x") py))
+      (check-false (incomplete? '("x = ) + 1") py))
+      (check-false (incomplete? '("") py))
+      (treesit-generate-cache "scheme")
+      (let ((scm (treesit-language "scheme")))
+        (check-true (incomplete? '("(define (f x)") scm))
+        (check-false (incomplete? '("(+ 1 2)") scm))))
+    ;; Return in a Python session: a new line while the input is open
+    (with-test-buffer '(document (session "python" "default"
+                                   (document (input "<gtr><gtr><gtr> " (document "def f(x):")))))
+      (lambda (u b)
+        (update-forced)
+        (let* ((in (tree-ref b 0 2 0))
+               (line (tree->path (tree-ref in 1 0))))
+          (when (>= (tree-sitter-program-language "python") 0)
+            (go-to (rcons line 9))
+            (kbd-enter in #f)
+            (check= (tree->stree (tree-ref in 1)) '(document "def f(x):" ""))))))
+    ;; at the cursor, in the code of a buffer
+    (with-test-buffer '(document (scm-code (document "(define x 1)" "(if x \"(\" 'b)")))
+      (lambda (u b)
+        (update-forced)
+        (let* ((code (tree-ref b 0 0))
+               (line (tree->path (tree-ref code 1))))
+          (check-true (integer? (tree-sitter-program-language "scheme")))
+          (go-to (rcons line 4))
+          (check-true (syntax-select-enlarge))
+          (check= (list (selection-get-start) (selection-get-end))
+                  (list (rcons line 4) (rcons line 5)))
+          (check-true (syntax-select-enlarge))
+          (check= (list (selection-get-start) (selection-get-end))
+                  (list (rcons line 0) (rcons line 13)))
+          (selection-cancel)
+          (go-to (rcons line 0))
+          (check-true (syntax-select-brackets))
+          (check= (get-alt-selection "brackets")
+                  (list (rcons line 0) (rcons line 1) (rcons line 12) (rcons line 13)))
+          ;; the ( of the string has no match
+          (go-to (rcons line 7))
+          (syntax-select-brackets)
+          (check= (get-alt-selection "brackets") '()))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; External scanners in the C runtime
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -632,6 +703,7 @@
   (test-regions)
   (test-highlight)
   (test-scan)
+  (test-edit)
   (test-scanners)
   (test-native)
   (check-end))

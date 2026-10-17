@@ -13,7 +13,8 @@
 
 (texmacs-module (prog prog-edit)
   (:use (utils library tree)
-        (utils library cursor)))
+        (utils library cursor)
+        (treesit ts-edit)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Basic routines for textual programs
@@ -157,6 +158,11 @@
 
 (tm-define (select-brackets-after-movement lbs rbs esc)
   (:synopsis "Highlight any of @lbs (matching @rbs) after a cursor movement")
+  ;; by the syntax tree when there is one (see treesit/ts-edit.scm)
+  (or (syntax-select-brackets)
+      (select-brackets-by-characters lbs rbs esc)))
+
+(define (select-brackets-by-characters lbs rbs esc)
   (let* ((p (cursor-path))
          (p* (path-- p))
          (ch (program-character p))
@@ -197,6 +203,16 @@
 (define kbd-select-enlarging 0) ; 0=no, 1=started, 2=selecting
 
 (tm-define (program-select-enlarge lb rb)
+  ;; by the syntax tree when there is one (see treesit/ts-edit.scm)
+  (or (syntax-select-enlarge)
+      (program-select-enlarge-by-brackets lb rb)))
+
+(tm-define (kbd-select-enlarge)
+  (:mode in-prog?)
+  (:require (syntax-cursor-language))
+  (syntax-select-enlarge))
+
+(define (program-select-enlarge-by-brackets lb rb)
   (if (== 0 kbd-select-enlarging)
       (set! kbd-select-enlarging 1)
       (if (and (not (selection-active-any?)) (== 2 kbd-select-enlarging))

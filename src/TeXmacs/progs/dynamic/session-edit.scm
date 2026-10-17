@@ -16,7 +16,8 @@
 	(utils library cursor)
 	(utils plugins plugin-cmd)
 	(dynamic session-drd)
-	(dynamic fold-edit)))
+	(dynamic fold-edit)
+	(treesit ts-edit)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Where to find plug-in binaries
@@ -624,6 +625,9 @@
 (tm-define (kbd-enter t shift?)
   (:require (field-input-context? t))
   (cond ((xor (session-multiline-input?) shift?)
+         (insert-return))
+        ((syntax-input-incomplete? (tree-ref t 1))
+         ;; an open bracket or block (by the syntax tree, see ts-edit.scm)
          (insert-return))
         ((session-supports-input-done?)
          (let* ((lan (get-env "prog-language"))

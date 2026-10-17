@@ -858,6 +858,26 @@ In the order of section 3: structural selection and brackets
 (`syntax-node-at`), complete inputs of sessions (`syntax-errors`),
 indentation (`indents.scm`), outline (`tags.scm`).
 
+`progs/treesit/ts-edit.scm` holds the clients. It only uses the glue, so
+that the editing modules load it without the generator. A client works
+where tree-sitter highlights the code: `tree-sitter-program-language`
+gives the language of a program language once its highlighter is
+installed, and the old behaviour stays elsewhere.
+
+- **Selection and brackets** (2026-10-17). `program-select-enlarge`, and
+  `kbd-select-enlarge` in program mode, select the smallest syntax node
+  around the selection (`syntax-region-node-range`, new: the nodes around a
+  range). `select-brackets-after-movement` matches a bracket token with the
+  bracket at the other end of its parent node, so brackets in strings and
+  comments have no match.
+- **Inputs of sessions** (same day). In `kbd-enter` of sessions and of
+  program fields, Return opens a new line when the input can only be
+  completed by more lines: an error or a missing node reaches the end of the
+  text (an open bracket), or the text ends with an empty node (Python
+  accepts `def f(x):` at the end of a text with an empty block; the new
+  `syntax-region-last-nodes` gives the nodes along the last children).
+  Other errors go to the interpreter, which reports them.
+
 ### Decisions
 
 1. Decided (2026-10-17): the first languages are json, c and **scheme**

@@ -21,7 +21,10 @@
 
 string syntax_region_sexp (tree region, int language);
 object syntax_region_node_at (tree region, int language, int row, int column);
+object syntax_region_node_range (tree region, int language,
+                                 int row1, int col1, int row2, int col2);
 object syntax_region_errors (tree region, int language);
+object syntax_region_last_nodes (tree region, int language);
 array<int> syntax_region_statistics (tree region, int language);
 void syntax_region_forget (tree region);
 array<array<int> > syntax_region_highlight (tree region, int language,

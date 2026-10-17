@@ -323,12 +323,20 @@ node_object (TSNode n, const char* field) {
 object
 syntax_region_node_at (tree root, int language, int row, int column) {
   // the nodes around a position, innermost first
+  return syntax_region_node_range (root, language, row, column, row, column);
+}
+
+object
+syntax_region_node_range (tree root, int language,
+                          int row1, int col1, int row2, int col2) {
+  // the nodes which contain a range, innermost first
   syntax_region_rep* r= get_region (root, language);
   array<object> l;
   if (r == NULL) return as_list_object (l);
-  TSPoint p= { (uint32_t) row, (uint32_t) column };
+  TSPoint p1= { (uint32_t) row1, (uint32_t) col1 };
+  TSPoint p2= { (uint32_t) row2, (uint32_t) col2 };
   TSNode top= ts_tree_root_node (r->tree);
-  TSNode n= ts_node_descendant_for_point_range (top, p, p);
+  TSNode n= ts_node_descendant_for_point_range (top, p1, p2);
   while (!ts_node_is_null (n)) {
     TSNode parent= ts_node_parent (n);
     const char* field= NULL;
@@ -341,6 +349,23 @@ syntax_region_node_at (tree root, int language, int row, int column) {
     }
     l << node_object (n, field);
     n= parent;
+  }
+  return as_list_object (l);
+}
+
+object
+syntax_region_last_nodes (tree root, int language) {
+  // the root, its last child, the last child of that one..., outermost
+  // first: where the text ends (an empty block of Python is found there)
+  syntax_region_rep* r= get_region (root, language);
+  array<object> l;
+  if (r == NULL) return as_list_object (l);
+  TSNode n= ts_tree_root_node (r->tree);
+  while (!ts_node_is_null (n)) {
+    l << node_object (n, NULL);
+    uint32_t k= ts_node_child_count (n);
+    if (k == 0) break;
+    n= ts_node_child (n, k - 1);
   }
   return as_list_object (l);
 }

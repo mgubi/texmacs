@@ -62,6 +62,14 @@ tree_sitter_set_highlighter (string lan, int query, array<string> classes) {
   highlighters (lan)= h;
 }
 
+int
+tree_sitter_program_language (string lan) {
+  // the language of tree-sitter of the program language lan, once its
+  // highlighter is installed, else -1 (for the editing functions)
+  if (!highlighting_on || highlighters[lan] == NULL) return -1;
+  return highlighters[lan]->language;
+}
+
 array<tree>
 tree_sitter_pending_updates () {
   // the lines whose colours changed without them being modified

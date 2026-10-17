@@ -18,6 +18,7 @@ language_rep* tree_sitter_language (string lan, language_rep* base);
 void tree_sitter_set_highlighter (string lan, int query, array<string> classes);
 array<tree> tree_sitter_pending_updates ();
 void tree_sitter_set_highlighting (bool on);
+int tree_sitter_program_language (string lan);
 object tree_sitter_line_colors (string lan, tree t);
 
 #endif // TS_HIGHLIGHT_H

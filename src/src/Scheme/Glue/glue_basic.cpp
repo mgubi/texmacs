@@ -9071,6 +9071,29 @@ tmg_syntax_region_node_at (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4) {
 }
 
 tmscm
+tmg_syntax_region_node_range (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4, tmscm arg5, tmscm arg6) {
+  TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "syntax-region-node-range");
+  TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "syntax-region-node-range");
+  TMSCM_ASSERT_INT (arg3, TMSCM_ARG3, "syntax-region-node-range");
+  TMSCM_ASSERT_INT (arg4, TMSCM_ARG4, "syntax-region-node-range");
+  TMSCM_ASSERT_INT (arg5, TMSCM_ARG5, "syntax-region-node-range");
+  TMSCM_ASSERT_INT (arg6, TMSCM_ARG6, "syntax-region-node-range");
+
+  tree in1= tmscm_to_tree (arg1);
+  int in2= tmscm_to_int (arg2);
+  int in3= tmscm_to_int (arg3);
+  int in4= tmscm_to_int (arg4);
+  int in5= tmscm_to_int (arg5);
+  int in6= tmscm_to_int (arg6);
+
+  // TMSCM_DEFER_INTS;
+  object out= syntax_region_node_range (in1, in2, in3, in4, in5, in6);
+  // TMSCM_ALLOW_INTS;
+
+  return object_to_tmscm (out);
+}
+
+tmscm
 tmg_syntax_region_errors (tmscm arg1, tmscm arg2) {
   TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "syntax-region-errors");
   TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "syntax-region-errors");
@@ -9080,6 +9103,21 @@ tmg_syntax_region_errors (tmscm arg1, tmscm arg2) {
 
   // TMSCM_DEFER_INTS;
   object out= syntax_region_errors (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return object_to_tmscm (out);
+}
+
+tmscm
+tmg_syntax_region_last_nodes (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "syntax-region-last-nodes");
+  TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "syntax-region-last-nodes");
+
+  tree in1= tmscm_to_tree (arg1);
+  int in2= tmscm_to_int (arg2);
+
+  // TMSCM_DEFER_INTS;
+  object out= syntax_region_last_nodes (in1, in2);
   // TMSCM_ALLOW_INTS;
 
   return object_to_tmscm (out);
@@ -9165,6 +9203,19 @@ tmg_tree_sitter_set_highlighting (tmscm arg1) {
   // TMSCM_ALLOW_INTS;
 
   return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_tree_sitter_program_language (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "tree-sitter-program-language");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  int out= tree_sitter_program_language (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return int_to_tmscm (out);
 }
 
 tmscm
@@ -12736,13 +12787,16 @@ initialize_glue_basic () {
   tmscm_install_procedure ("tree-sitter-query-captures",  tmg_tree_sitter_query_captures, 2, 0, 0);
   tmscm_install_procedure ("syntax-region-sexp",  tmg_syntax_region_sexp, 2, 0, 0);
   tmscm_install_procedure ("syntax-region-node-at",  tmg_syntax_region_node_at, 4, 0, 0);
+  tmscm_install_procedure ("syntax-region-node-range",  tmg_syntax_region_node_range, 6, 0, 0);
   tmscm_install_procedure ("syntax-region-errors",  tmg_syntax_region_errors, 2, 0, 0);
+  tmscm_install_procedure ("syntax-region-last-nodes",  tmg_syntax_region_last_nodes, 2, 0, 0);
   tmscm_install_procedure ("syntax-region-statistics",  tmg_syntax_region_statistics, 2, 0, 0);
   tmscm_install_procedure ("syntax-region-forget",  tmg_syntax_region_forget, 1, 0, 0);
   tmscm_install_procedure ("tree-sitter-set-highlighter",  tmg_tree_sitter_set_highlighter, 3, 0, 0);
   tmscm_install_procedure ("tree-sitter-pending-updates",  tmg_tree_sitter_pending_updates, 0, 0, 0);
   tmscm_install_procedure ("tree-sitter-line-colors",  tmg_tree_sitter_line_colors, 2, 0, 0);
   tmscm_install_procedure ("tree-sitter-set-highlighting",  tmg_tree_sitter_set_highlighting, 1, 0, 0);
+  tmscm_install_procedure ("tree-sitter-program-language",  tmg_tree_sitter_program_language, 1, 0, 0);
   tmscm_install_procedure ("tree-sitter-set-scanner",  tmg_tree_sitter_set_scanner, 2, 0, 0);
   tmscm_install_procedure ("tree-sitter-lexer-lookahead",  tmg_tree_sitter_lexer_lookahead, 0, 0, 0);
   tmscm_install_procedure ("tree-sitter-lexer-advance",  tmg_tree_sitter_lexer_advance, 1, 0, 0);
