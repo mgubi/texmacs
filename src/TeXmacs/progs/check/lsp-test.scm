@@ -30,7 +30,8 @@
         (lsp lsp-client)
         (lsp lsp-documents)
         (lsp lsp-edit)
-        (lsp lsp-actions)))
+        (lsp lsp-actions)
+        (lsp lsp-kbd)))
 
 (define events '())
 
@@ -967,10 +968,9 @@
         (switch-to-buffer u)
         (buffer-close page))
       ;; the status in the focus bar: the server, ready, and its errors
-      ;; the keys of the servers are those of the followed buffers, and the
-      ;; status bar of a source file has no fonts
-      (check-true (in-lsp?))
-      (check-true (footer-in-source?))
+      ;; the keys of the servers are those of the followed buffers (mode
+      ;; in-lsp%, with in-prog%, which depends on the typesetting)
+      (check-true (lsp-followed?))
       (with st (lsp-focus-status)
         (check-true (pair? st))
         (when (pair? st)
