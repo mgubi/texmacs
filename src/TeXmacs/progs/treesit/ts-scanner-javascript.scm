@@ -19,8 +19,14 @@
   (:use (treesit ts-base) (treesit ts-parse) (treesit ts-chars)
         (treesit ts-scan)))
 
-(define-external-tokens automatic-semicolon template-chars ternary-qmark
-  html-comment logical-or escape-sequence regex-pattern jsx-text)
+(define t-automatic-semicolon 0)
+(define t-template-chars 1)
+(define t-ternary-qmark 2)
+(define t-html-comment 3)
+(define t-logical-or 4)
+(define t-escape-sequence 5)
+(define t-regex-pattern 6)
+(define t-jsx-text 7)
 
 (define (js-newline? c) (or (= c 10) (= c #x2028) (= c #x2029)))
 (define (js-char c) (char->integer c))

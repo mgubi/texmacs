@@ -830,14 +830,15 @@ Done in part (2026-10-17):
     vectors are made once for each row of the table of the external
     states, the texts of the serialized states are mapped back to their
     values, and the procedures are looked up once.
-  - **`ts-scan.scm`**: `define-external-tokens` names the tokens (no
-    numbered constants), `record-scanner` makes a scanner whose state is a
+  - **`ts-scan.scm`**: `record-scanner` makes a scanner whose state is a
     vector of fields, `stateless-scanner` one without state, and the loops
     over characters run in C on the lexer of the C runtime
     (`scan-advance-until!`, `scan-advance-while!`, `scan-skip-spaces!`;
     `scan-word!`, `scan-accept!`); the Python scanner leaves with
     `call-with-exit` instead of `call/cc`. The five scanners use it; the
-    corpora pass, and the trees of the benchmark files are unchanged.
+    corpora pass, and the trees of the benchmark files are unchanged. (A
+    macro naming the tokens was tried and dropped: under femtolisp, the
+    definitions made by a macro are not private to their module.)
 
 As planned initially:
 

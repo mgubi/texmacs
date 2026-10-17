@@ -19,11 +19,22 @@
 (texmacs-module (treesit ts-scanner-julia)
   (:use (treesit ts-base) (treesit ts-parse) (treesit ts-scan)))
 
-(define-external-tokens block-comment-rest immediate-paren immediate-bracket
-  immediate-brace immediate-string-start immediate-command-start
-  content-cmd-1 content-cmd-1-raw content-cmd-3 content-cmd-3-raw
-  content-str-1 content-str-1-raw content-str-3 content-str-3-raw
-  end-cmd end-str)
+(define t-block-comment-rest 0)
+(define t-immediate-paren 1)
+(define t-immediate-bracket 2)
+(define t-immediate-brace 3)
+(define t-immediate-string-start 4)
+(define t-immediate-command-start 5)
+(define t-content-cmd-1 6)
+(define t-content-cmd-1-raw 7)
+(define t-content-cmd-3 8)
+(define t-content-cmd-3-raw 9)
+(define t-content-str-1 10)
+(define t-content-str-1-raw 11)
+(define t-content-str-3 12)
+(define t-content-str-3-raw 13)
+(define t-end-cmd 14)
+(define t-end-str 15)
 
 (define (jl-char c) (char->integer c))
 

@@ -22,9 +22,8 @@
 ;; which equal? compares, which is not modified afterwards, #f for the
 ;; initial state, and (deserialize payload state) restores it.
 ;;
-;; This module makes such vectors (define-external-tokens, record-scanner,
-;; stateless-scanner) and gives the loops over characters which the
-;; scanners share. On the lexer of the C runtime, the loops run in C. The
+;; This module makes such vectors (record-scanner, stateless-scanner) and
+;; gives the loops over characters which the scanners share. On the lexer of the C runtime, the loops run in C. The
 ;; loops stop at the lookahead 0, the end of the text or a null character.
 ;;
 ;; To leave a scan early, use call-with-exit (call/cc is costly under S7;
@@ -38,16 +37,10 @@
 ;; Scanners
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;; (define-external-tokens newline indent ...) defines t-newline as 0,
-;; t-indent as 1..., the order of the externals of the grammar
-(define-public-macro (define-external-tokens . names)
-  (let loop ((l names) (i 0) (acc '()))
-    (if (null? l) `(begin ,@(reverse acc))
-        (loop (cdr l) (+ i 1)
-              (cons `(define ,(string->symbol
-                               (string-append "t-" (symbol->string (car l))))
-                       ,i)
-                    acc)))))
+;; The scanners name their tokens with plain definitions, (define t-newline
+;; 0)..., in the order of the externals of the grammar: under femtolisp, a
+;; module finds its private names in its source before macros are expanded,
+;; so definitions made by a macro would be global and clash between scanners.
 
 (define-public (record-scanner init scan)
   ;; the payload is a copy of the vector init, of values which are not

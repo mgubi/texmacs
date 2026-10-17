@@ -19,7 +19,8 @@
   (:use (treesit ts-base) (treesit ts-parse) (treesit ts-chars)
         (treesit ts-scan)))
 
-(define-external-tokens raw-string-delimiter raw-string-content)
+(define t-raw-string-delimiter 0)
+(define t-raw-string-content 1)
 
 (define max-delimiter-length 16)
 

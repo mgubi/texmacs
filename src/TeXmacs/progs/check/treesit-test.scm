@@ -494,8 +494,6 @@
   (let ((text (list->vector (map char->integer (string->list s)))))
     (vector text (vector-length text) 0 0 0 0 -1 0 0)))
 
-(define-external-tokens first-token second-token)
-
 (define (test-scan)
   ;; the helpers of ts-scan.scm, on the lexer in Scheme
   (let ((lx (scan-lexer "abcx")))
@@ -516,7 +514,6 @@
   (let ((lx (scan-lexer "x")))
     (check-true (scan-accept! lx 3))
     (check= (vector-ref lx 8) 3))
-  (check= (list t-first-token t-second-token) '(0 1))
   ;; the state of a record scanner: #f for the initial one
   (let* ((sc (record-scanner (vector '(0) #f) (lambda (p lx valid) #f)))
          (p ((vector-ref sc 0))))

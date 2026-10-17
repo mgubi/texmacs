@@ -18,9 +18,18 @@
 (texmacs-module (treesit ts-scanner-python)
   (:use (treesit ts-base) (treesit ts-parse) (treesit ts-scan)))
 
-(define-external-tokens newline indent dedent string-start string-content
-  escape-interpolation string-end comment close-paren close-bracket
-  close-brace except)
+(define t-newline 0)
+(define t-indent 1)
+(define t-dedent 2)
+(define t-string-start 3)
+(define t-string-content 4)
+(define t-escape-interpolation 5)
+(define t-string-end 6)
+(define t-comment 7)
+(define t-close-paren 8)
+(define t-close-bracket 9)
+(define t-close-brace 10)
+(define t-except 11)
 
 (define d-single 1)
 (define d-double 2)

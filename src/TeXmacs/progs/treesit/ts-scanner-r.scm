@@ -20,10 +20,22 @@
   (:use (treesit ts-base) (treesit ts-parse) (treesit ts-chars)
         (treesit ts-scan)))
 
-(define-external-tokens start newline semicolon raw-string-open
-  raw-string-content raw-string-close else open-paren close-paren open-brace
-  close-brace open-bracket close-bracket open-bracket2 close-bracket2
-  error-sentinel)
+(define t-start 0)
+(define t-newline 1)
+(define t-semicolon 2)
+(define t-raw-string-open 3)
+(define t-raw-string-content 4)
+(define t-raw-string-close 5)
+(define t-else 6)
+(define t-open-paren 7)
+(define t-close-paren 8)
+(define t-open-brace 9)
+(define t-close-brace 10)
+(define t-open-bracket 11)
+(define t-close-bracket 12)
+(define t-open-bracket2 13)
+(define t-close-bracket2 14)
+(define t-error-sentinel 15)
 
 (define scope-top-level 0)
 (define scope-brace 1)
