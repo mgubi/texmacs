@@ -186,7 +186,26 @@
   <scm|lsp-signature-markup> makes the label of the active signature, with
   the active parameter (a substring, or offsets) between guillemets, for
   the status bar, which a <verbatim|)> clears (the status bar shows text,
-  not markup: a bold parameter looked as the others).
+  not markup: a bold parameter looked as the others). The parts of the
+  label (<scm|lsp-signature-parts>: before the parameter, the parameter,
+  after it) are kept for the focus bar, which shows the parameter in bold.
+
+  <paragraph*|The focus bar>
+
+  <source-link|lsp-kbd.scm|TeXmacs/progs/lsp/lsp-kbd.scm> adds
+  <scm|lsp-focus-icons> to <scm|focus-code-icons> (of
+  <source-link|prog-menu.scm|TeXmacs/progs/prog/prog-menu.scm>):
+  <scm|lsp-focus-status> gives the name of the server of the current
+  buffer, its state (<scm|starting>, <scm|ready>, <scm|stopped>, or
+  <scm|none> before it is started), its work and the numbers of errors and
+  warnings shown. The focus bar is made again at each key, so the language
+  and the project of a buffer are kept, and the command of a server once it
+  is found in the <verbatim|PATH>. The client calls
+  <scm|lsp-client-status-changed> when its state changes and when a
+  <verbatim|$/progress> notification comes (<scm|lsp-client-progress>
+  gives the text of the work, while it lasts); the editor then asks for an
+  update of the menus, once for many changes (<scm|lsp-status-refresh>),
+  as for new diagnostics and signatures.
 
   <paragraph*|Definitions>
 

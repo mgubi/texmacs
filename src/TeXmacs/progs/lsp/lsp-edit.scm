@@ -174,7 +174,77 @@
   (former uri)
   (ahash-set! stale uri #t)
   (when (== (current-uri) uri)
-    (lsp-show-diagnostics)))
+    (lsp-show-diagnostics)
+    (lsp-status-refresh)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; The status, for the focus bar (lsp-kbd)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; The focus bar is made again at each key: the language and the project of
+;; a buffer (the project needs the files around it) are kept, buffer name
+;; -> (language root)
+(define buffer-servers (make-ahash-table))
+(define refresh-scheduled? #f)
+
+(define (buffer-server u)
+  (with name (url->string u)
+    (or (ahash-ref buffer-servers name)
+        (let* ((lan (lsp-buffer-language u))
+               (p (lsp-buffer-path u))
+               (r (list lan (and lan p (lsp-project-root p)))))
+          (ahash-set! buffer-servers name r)
+          r))))
+
+(tm-define (lsp-status-refresh)
+  (:synopsis "The focus bar shows the new status, soon")
+  ;; (once for many changes: a server reports its progress often)
+  (when (not refresh-scheduled?)
+    (set! refresh-scheduled? #t)
+    (delayed
+      (:idle 100)
+      (set! refresh-scheduled? #f)
+      (update-menus))))
+
+(tm-define (lsp-client-status-changed c)
+  (former c)
+  (lsp-status-refresh))
+
+(tm-define (lsp-focus-status)
+  (:synopsis "The status of the server of the current buffer, or #f")
+  ;; (name state progress errors warnings): the state is starting,
+  ;; ready, stopped or none (not started yet), progress a string or #f
+  (and (lsp-on?) (followed-buffer?)
+       (let* ((u (current-buffer))
+              (ls (buffer-server u))
+              (c (and (car ls) (lsp-client-entry (car ls) (cadr ls))))
+              (st (and c (lsp-client-state c)))
+              (uri (lsp-buffer-uri))
+              (l (or (and uri (ahash-ref shown uri)) '())))
+         (list (if c (command-name (lsp-client-ref c 'name))
+                   (command-name (or (lsp-server-command* (car ls)) "")))
+               (cond ((not c) 'none)
+                     ((in? st '(new initializing)) 'starting)
+                     ((== st 'running) 'ready)
+                     (else 'stopped))
+               (and c (lsp-client-progress c))
+               (length (list-filter l (lambda (x) (== (car x) 'error))))
+               (length (list-filter l (lambda (x) (== (car x) 'warning))))))))
+
+(define (command-name cmd)
+  ;; the program of a command, without its directory
+  (with p (car (append (string-tokenize-by-char cmd #\space) (list "")))
+    (with i (string-search-backwards "/" (string-length p) p)
+      (if (>= i 0) (substring p (+ i 1) (string-length p)) p))))
+
+(define server-commands (make-ahash-table))
+
+(define (lsp-server-command* lan)
+  ;; the command of the server of @lan, kept (it is looked for in the PATH)
+  (or (ahash-ref server-commands lan)
+      (with cmd (and lan (lsp-server-command lan))
+        (when cmd (ahash-set! server-commands lan cmd))
+        cmd)))
 
 (define (cursor-line+offset)
   ;; the line and offset of the cursor in a source file, or #f
@@ -564,9 +634,9 @@
                               "signatureHelpProvider" "triggerCharacters"))
     (if (null? l) '("(" ",") l)))
 
-(define (mark-parameter label param)
-  ;; the Cork string @label (utf8) with its part @param (a string, or
-  ;; offsets) between guillemets
+(define (parameter-parts label param)
+  ;; the Cork strings before, of and after the part @param (a string, or
+  ;; offsets) of @label (utf8); all of it before when it is not there
   (let* ((range (cond ((string? param)
                        (with i (string-search-forwards param 0 label)
                          (and (>= i 0) (list i (+ i (string-length param))))))
@@ -576,17 +646,22 @@
                          (and a b (<= 0 a b (string-length label))
                               (list a b))))
                       (else #f))))
-    (if (not range) (utf8->cork label)
-        ;; (19 and 20 are the guillemets in Cork)
-        (string-append (utf8->cork (substring label 0 (car range)))
-                       (string (integer->char 19))
-                       (utf8->cork (substring label (car range) (cadr range)))
-                       (string (integer->char 20))
-                       (utf8->cork (substring label (cadr range)
-                                              (string-length label)))))))
+    (if (not range) (list (utf8->cork label) "" "")
+        (list (utf8->cork (substring label 0 (car range)))
+              (utf8->cork (substring label (car range) (cadr range)))
+              (utf8->cork (substring label (cadr range)
+                                     (string-length label)))))))
 
-(tm-define (lsp-signature-markup r)
-  (:synopsis "The text (Cork) of the SignatureHelp @r, or #f")
+(define (mark-parts l)
+  ;; the parts @l as one Cork string, the parameter between guillemets
+  ;; (19 and 20 in Cork)
+  (if (== (cadr l) "") (car l)
+      (string-append (car l) (string (integer->char 19)) (cadr l)
+                     (string (integer->char 20)) (caddr l))))
+
+(tm-define (lsp-signature-parts r)
+  (:synopsis "The parts (Cork) of the SignatureHelp @r, or #f")
+  ;; before the active parameter, the parameter, after it
   (let* ((sigs (lsp-items (lsp-ref r "signatures")))
          (i (or (lsp-number-value (lsp-ref r "activeSignature")) 0))
          (s (and (nnull? sigs)
@@ -595,7 +670,25 @@
          (ap (and s (or (lsp-number-value (lsp-ref r "activeParameter"))
                         (lsp-number-value (lsp-ref s "activeParameter")))))
          (param (and ap (lsp-ref s "parameters" ap "label"))))
-    (and (string? label) (mark-parameter label param))))
+    (and (string? label) (parameter-parts label param))))
+
+(tm-define (lsp-signature-markup r)
+  (:synopsis "The text (Cork) of the SignatureHelp @r, or #f")
+  (with l (lsp-signature-parts r)
+    (and l (mark-parts l))))
+
+;; the parts of the signature shown, for the focus bar (lsp-kbd)
+(define signature-parts #f)
+
+(tm-define (lsp-focus-signature)
+  (:synopsis "The parts of the signature which is shown, or #f")
+  signature-parts)
+
+(define (hide-signature)
+  (set! signature-shown? #f)
+  (set! signature-parts #f)
+  (set-message "" "")
+  (lsp-status-refresh))
 
 (tm-define (lsp-signature-help)
   (:synopsis "Shows the signature of the function at the cursor")
@@ -608,13 +701,13 @@
                    (lsp-object "textDocument" (lsp-object "uri" uri)
                                "position" pos)
                    (lambda (r e)
-                     (with m (and (not e) r (not (lsp-null? r))
-                                  (lsp-signature-markup r))
-                       (cond (m (set! signature-shown? #t)
-                                (set-message m ""))
-                             (signature-shown?
-                              (set! signature-shown? #f)
-                              (set-message "" "")))))))))
+                     (with l (and (not e) r (not (lsp-null? r))
+                                  (lsp-signature-parts r))
+                       (cond (l (set! signature-shown? #t)
+                                (set! signature-parts l)
+                                (set-message (mark-parts l) "")
+                                (lsp-status-refresh))
+                             (signature-shown? (hide-signature)))))))))
 
 (tm-define (keyboard-press key time)
   ;; (no mode predicates: see notify-cursor-moved)
@@ -624,8 +717,7 @@
       (when c
         (cond ((in? key (signature-triggers c)) (lsp-signature-help))
               ((and signature-shown? (== key ")"))
-               (set! signature-shown? #f)
-               (set-message "" "")))))))
+               (hide-signature)))))))
 
 ;; Definitions
 

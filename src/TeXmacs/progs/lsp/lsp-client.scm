@@ -251,6 +251,7 @@
              (ahash-set! c 'capabilities
                          (or (lsp-ref r "capabilities") (lsp-object)))
              (ahash-set! c 'state 'running)
+             (lsp-client-status-changed c)
              (lsp-notify c "initialized" (lsp-object))
              (with q (reverse (ahash-ref c 'queue))
                (ahash-set! c 'queue '())
@@ -279,11 +280,17 @@
   (:synopsis "Called when the server of @c ends without being stopped")
   (noop))
 
+(tm-define (lsp-client-status-changed c)
+  (:synopsis "Called when the state or the progress of @c changes")
+  (noop))
+
 (define (client-ended c)
   ;; the server has ended: the handlers of its requests get an error
   (with unexpected? (not (ahash-ref c 'stopped))
     (ahash-set! c 'state 'dead)
+    (ahash-remove! c 'progress)
     (lsp-client-log-changed c)
+    (lsp-client-status-changed c)
     (when unexpected? (lsp-client-ended c)))
   (ahash-set! c 'queue '())
   (let* ((pending (ahash-ref c 'pending))
@@ -402,6 +409,42 @@
 
 (lsp-server-request-set! "window/workDoneProgress/create"
   (lambda (c params) (lsp-null)))
+
+;; the work of a server (the indexing of clangd...): token -> its text,
+;; while it lasts (begin, reports, end)
+(lsp-notification-set! "$/progress" 'progress
+  (lambda (c params)
+    (let* ((token (object->string (lsp-ref params "token")))
+           (v (lsp-ref params "value"))
+           (kind (lsp-ref v "kind"))
+           (table (or (ahash-ref c 'progress)
+                      (with t (make-ahash-table)
+                        (ahash-set! c 'progress t)
+                        t))))
+      (if (== kind "end")
+          (ahash-remove! table token)
+          (let* ((old (or (ahash-ref table token) (list "" "" #f)))
+                 (title (or (lsp-ref v "title") (car old)))
+                 (msg (or (lsp-ref v "message") (cadr old)))
+                 (pct (or (lsp-number-value (lsp-ref v "percentage"))
+                          (caddr old))))
+            (ahash-set! table token (list title msg pct))))
+      (lsp-client-status-changed c))))
+
+(tm-define (lsp-client-progress c)
+  (:synopsis "The text (utf8) of the work of the server of @c, or #f")
+  (with l (map cdr (ahash-table->list (or (ahash-ref c 'progress)
+                                          (make-ahash-table))))
+    (and (nnull? l)
+         (let* ((p (car l))
+                (words (list-filter (list (car p) (cadr p)
+                                          (and (caddr p)
+                                               (string-append
+                                                (number->string (inexact->exact (round (caddr p))))
+                                                "%")))
+                                    (lambda (x) (and (string? x)
+                                                     (!= x ""))))))
+           (and (nnull? words) (string-recompose words " "))))))
 
 (lsp-server-request-set! "client/registerCapability"
   (lambda (c params) (lsp-null)))

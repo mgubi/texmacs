@@ -191,8 +191,22 @@
   After an opening bracket or a comma (the characters which the server
   asks for), the signature of the function whose arguments are being typed
   is shown on the status bar, with the current argument between
-  guillemets, as in <verbatim|f (int a, \Sint b\T)>. The
-  closing bracket removes it.
+  guillemets, as in <verbatim|f (int a, \Sint b\T)>, and on the focus bar,
+  with the current argument in bold. The closing bracket removes it.
+
+  <paragraph*|The focus bar>
+
+  In a source file which a server follows, the focus bar shows, after the
+  language of the file, the name of the server (a menu, the one of
+  <menu|Tools|Language servers>), whether it is starting or has stopped,
+  the work it is doing (such as the indexing of the project, with its
+  progress), the number of errors and warnings of the file (a click shows
+  their list) and the signature which is being typed.
+
+  With <menu|View|Interactive status bar>, the status bar of a source file
+  only shows its language: the menus of the fonts and the colours of the
+  text are left out, since the code is coloured by its language and its
+  font is the one of the preferences.
 
   <paragraph*|The list of diagnostics>
 

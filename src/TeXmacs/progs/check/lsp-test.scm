@@ -734,7 +734,24 @@
                         "activeParameter" (lsp-number 1))
     (check= (lsp-signature-markup sig)
             (string-append "int f(int a, " (string (integer->char 19))
-                           "int b" (string (integer->char 20)) ")")))
+                           "int b" (string (integer->char 20)) ")"))
+    ;; (the parts, for the focus bar)
+    (check= (lsp-signature-parts sig) '("int f(int a, " "int b" ")")))
+  ;; the progress of the work of a server, while it lasts
+  (with c (lsp-client-make "fake" ignore ignore ignore)
+    (define (progress value)
+      (lsp-client-handle c (lsp-object "jsonrpc" "2.0" "method" "$/progress"
+                                       "params" (lsp-object "token" "t"
+                                                            "value" value))))
+    (check= (lsp-client-progress c) #f)
+    (progress (lsp-object "kind" "begin" "title" "indexing"
+                          "percentage" (lsp-number 10)))
+    (check= (lsp-client-progress c) "indexing 10%")
+    (progress (lsp-object "kind" "report" "message" "1/2"
+                          "percentage" (lsp-number 50)))
+    (check= (lsp-client-progress c) "indexing 1/2 50%")
+    (progress (lsp-object "kind" "end"))
+    (check= (lsp-client-progress c) #f))
   (check= (lsp-signature-markup
            (lsp-object "signatures"
                        (lsp-array (lsp-object "label" "g(x)"
@@ -783,6 +800,18 @@
                      "twicee"))
         (switch-to-buffer u)
         (buffer-close page))
+      ;; the status in the focus bar: the server, ready, and its errors
+      (with st (lsp-focus-status)
+        (check-true (pair? st))
+        (when (pair? st)
+          (check= (car st) "clangd")
+          (check= (cadr st) 'ready)
+          (check-true (>= (list-ref st 3) 1))))
+      (check-true (string-contains?
+                   (object->string (menu-expand
+                                    '(horizontal (dynamic (lsp-focus-icons)))))
+                   "clangd"))
+      (check-true (make-menu-widget '(horizontal (link texmacs-focus-icons)) 0))
       ;; a quick fix: did you mean twice?
       (go-to-path (append (buffer-path) '(2 10)))
       (with r (lsp-code-actions-at-cursor)

@@ -19,6 +19,7 @@
 
 (texmacs-module (lsp lsp-kbd)
   (:use (kernel gui kbd-define)
+        (prog prog-menu)
         (lsp lsp-edit)
         (lsp lsp-actions)))
 
@@ -54,3 +55,53 @@
   ("Restart server" (lsp-restart))
   ("Server log" (lsp-show-log))
   ("Stop all servers" (lsp-stop-servers)))
+
+;; The focus bar of a source file which a server follows: after the name of
+;; the language, the server and its state (its menu), its work (indexing...),
+;; the signature which is typed (the current argument in bold) and the
+;; numbers of errors and warnings (their list)
+
+(define (status-label st)
+  (with name (car st)
+    (case (cadr st)
+      ((starting) (string-append name ": starting"))
+      ((ready) name)
+      ((stopped) (string-append name ": stopped"))
+      (else name))))
+
+(define (problems-label st)
+  (let ((e (list-ref st 3)) (w (list-ref st 4)))
+    (cond ((and (== e 0) (== w 0)) "No problems")
+          ((== w 0) (if (== e 1) "1 error" (string-append (number->string e)
+                                                          " errors")))
+          ((== e 0) (if (== w 1) "1 warning"
+                        (string-append (number->string w) " warnings")))
+          (else (string-append (number->string e)
+                               (if (== e 1) " error, " " errors, ")
+                               (number->string w)
+                               (if (== w 1) " warning" " warnings"))))))
+
+(tm-menu (lsp-focus-icons)
+  (with st (lsp-focus-status)
+    (assuming st
+      //
+      (mini #t
+        (=> (balloon (eval (status-label st)) "The language server")
+            (link lsp-menu)))
+      (assuming (caddr st)
+        (mini #t (inert ((eval (utf8->cork (caddr st))) (noop)))))
+      (assuming (!= (cadr st) 'none)
+        (mini #t
+          ((balloon (eval (problems-label st)) "List of diagnostics")
+           (lsp-show-diagnostics-list))))
+      (with sig (lsp-focus-signature)
+        (assuming sig
+          //
+          (mini #t
+            (text (car sig))
+            (bold (text (cadr sig)))
+            (text (caddr sig))))))))
+
+(tm-menu (focus-code-icons t)
+  (dynamic (former t))
+  (dynamic (lsp-focus-icons)))
