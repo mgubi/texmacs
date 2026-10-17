@@ -495,10 +495,9 @@ be merged on its own.
   its queries and, when there is one, its Scheme scanner.
 - Tables: the exported data (`ts-export-language`) cached in
   `$TEXMACS_HOME_PATH/system/cache/tree-sitter/<lan>-<hash>.tsdyn`, the
-  hash being that of `grammar.json` and of the generator version. Generating
-  C takes 35 s in TeXmacs, so tables are also produced at build time (a
-  target running `texmacs.bin -headless`) and shipped next to the grammar;
-  generating at first use stays the path for grammars added by users.
+  hash being that of `grammar.json` and of the generator version, made at
+  the first use of the language (decision 2 below): until then the present
+  tokenizer is used.
 - Load the data from C directly (no Scheme string of 1 MB): the glue takes
   a file name.
 - Builds: CMake and the browser build compile `Plugins/TreeSitter`
@@ -569,9 +568,16 @@ indentation (`indents.scm`), outline (`tags.scm`).
 
 ### Decisions
 
-1. First languages, and whether Scheme (for TeXmacs's own code) is one of
-   them: its grammars are generic, the queries would be ours.
-2. Tables shipped pre-generated (about 1 MB of text for C, less compressed)
-   or generated at first use with a progress message.
-3. Which branch receives this (maxs_texmacs, or a PR to wip_fixes), and
-   whether the browser build is part of phase 1.
+1. Open: the first languages, and whether Scheme (for TeXmacs's own code)
+   is one of them: its grammars are generic, the queries would be ours.
+2. Decided (2026-10-17): the tables are **generated at first use** and
+   cached in `$TEXMACS_HOME_PATH`; only `grammar.json` and the queries are
+   shipped. Consequences for phase 1: the first opening of a file of a
+   large grammar costs the generation (35 s for C in TeXmacs today, 10 s
+   under a standalone s7), so it must not block: the present tokenizer
+   colours the file until the tables are ready, with a message, and the
+   generator should get faster (the 3x of module code under S7, section 6,
+   is the first thing to look at). No build-time target.
+3. Decided (2026-10-17): the work is based on `maxs_texmacs`
+   (`wip_ts_experiment` started from it); whether the browser build is part
+   of phase 1 is open.
