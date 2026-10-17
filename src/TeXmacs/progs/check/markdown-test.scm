@@ -24,7 +24,7 @@
 ;; (tmmarkdown-expand.scm), is tested with one document at the end.
 
 (texmacs-module (check markdown-test)
-  (:use (check check-lib)))
+  (:use (check check-lib) (convert tools code-languages)))
 
 (define (parse s) (convert s "markdown-snippet" "markdown-stree"))
 (define (plain t)
@@ -893,6 +893,11 @@
             (md-fence "haskell" (verbatim-code (document "x")))))
   (check= (md-body "```rust\nx\n```\n\n```lean\ny\n```\n")
           '((rust-code (document "x")) (lean-code (document "y"))))
+  ;; the table of the languages shared with docx/odt (code-languages.scm)
+  (check= (map code-language-tag '("golang" "c++" "unknown"))
+          '(go-code cpp-code #f))
+  (check= (map code-language-name '(lean-code verbatim-code section))
+          '("lean" "" #f))
   ;; images and footnotes
   (check= (md-body "a ![d](i.png) ![](j.png) ![d](i.png \"T\")\n")
           '((concat "a " (md-image (image "i.png" "" "" "" "") "d" "") " "

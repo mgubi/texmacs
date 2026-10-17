@@ -27,6 +27,7 @@
 
 (texmacs-module (convert office tmoffice)
   (:use (convert office office-tools)
+        (convert tools code-languages)
         (convert mathml tmmath)
         (convert mathml mathml-drd)))
 
@@ -1690,17 +1691,8 @@
 (define (tmof-big-figure l) (tmof-figure "Figure" l))
 (define (tmof-big-table l) (tmof-figure "Table" l))
 
-(define tmof-languages
-  '((cpp-code . "cpp") (python-code . "python") (scm-code . "scheme")
-    (shell-code . "sh") (java-code . "java") (javascript-code . "javascript")
-    (json-code . "json") (julia-code . "julia") (r-code . "r")
-    (scala-code . "scala") (fortran-code . "fortran") (octave-code . "octave")
-    (scilab-code . "scilab") (dot-code . "dot") (mmx-code . "mathemagix")
-    (go-code . "go") (lean-code . "lean") (lua-code . "lua") (rust-code . "rust")
-    (verbatim-code . "") (pseudo-code . "") (render-code . "") (code . "")))
-
 (define (tmof-code-block tag l)
-  (let* ((lang (assoc-ref tmof-languages tag))
+  (let* ((lang (code-language-name tag))
          (s (apply string-append (map tmof-plain l))))
     `((pre ,@(if (== lang "") '() `((@ (lang ,lang)))) ,s))))
 
@@ -2021,7 +2013,7 @@
          '())
         ((tmof-drawing? x) (tmof-picture x #t))
         ((tmof-dispatch 'tmoffice-methods% x) => identity)
-        ((assoc (car x) tmof-languages) (tmof-code-block (car x) (cdr x)))
+        ((code-language-name (car x)) (tmof-code-block (car x) (cdr x)))
         ((in? (car x) '(tabular tabular* block block* wide-tabular wide-block
                         tformat table))
          (tmof-table (car x) (cdr x)))

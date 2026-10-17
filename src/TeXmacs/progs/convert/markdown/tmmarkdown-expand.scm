@@ -21,7 +21,8 @@
 ;; cannot express. The same is done for Html, see tmhtml-expand.scm.
 
 (texmacs-module (convert markdown tmmarkdown-expand)
-  (:use (convert markdown tmmarkdown)))
+  (:use (convert markdown tmmarkdown)
+        (convert tools code-languages)))
 
 (define (tmmarkdown-env-macro name)
   `(associate ,(symbol->string name)
@@ -60,7 +61,8 @@
 (tm-define (tmmarkdown-env-patch)
   `(collection
     ,@(map tmmarkdown-env-macro
-           '(TeXmacs TeX LaTeX hrule item
+           (append
+            '(TeXmacs TeX LaTeX hrule item
              ;; the titles of the sections, with their numbers
              part-title chapter-title section-title subsection-title
              subsubsection-title paragraph-title subparagraph-title
@@ -84,11 +86,7 @@
              render-big-algorithm render-small-algorithm
              footnote render-bibitem
              quotation quote-env verse
-             ;; code
-             verbatim-code cpp-code python-code scm-code shell-code
-             java-code javascript-code json-code julia-code r-code
-             scala-code fortran-code octave-code scilab-code dot-code
-             mmx-code go-code lean-code lua-code rust-code pseudo-code render-code
+             ;; (the blocks of code are added after this list)
              ;; mathematics, which is converted to LaTeX
              equation* equation-lab equations-base
              eqnarray eqnarray* align align* gather gather* multline
@@ -102,7 +100,8 @@
              html-class
              ;; the macros of the style markdown
              md-loose md-fence md-image md-footnote md-footnote-text
-             md-metadata md-meta md-h6))
+             md-metadata md-meta md-h6)
+            (code-block-tags)))
     (associate "md-source"
                (xmacro "x" (extern "tmmarkdown-md-inline-source"
                                    (quote-arg "x"))))
