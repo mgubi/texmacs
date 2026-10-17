@@ -219,7 +219,7 @@
   (:argument void "not used")
   (:returns "nothing")
   ;;the format of the graphics is set in the preferences
-  (if (not (or (qt-gui?) (vue-gui?)))
+  (if (not (or (qt-gui?) (ns-gui?) (vue-gui?)))
     (set-message "Qt, Cocoa and Vue GUIs only, sorry. Use \"Export selection...\"" "")
     (if (not (selection-active-any?))
       (set-message "no selection!" "")

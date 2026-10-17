@@ -320,7 +320,9 @@ tool_size (NSView* v) {
   if (!wid) return;
   NSView* sup= [self superview];
   NSPoint p= [sup convertPoint: [e locationInWindow] fromView: nil];
-  double w= (which == 0)? [sup bounds].size.width - p.x: p.x;
+  // the left tools start after the icon bars, when these are at the left
+  double x0= [wid->tool_views[1] frame].origin.x;
+  double w= (which == 0)? [sup bounds].size.width - p.x: p.x - x0;
   wid->tool_widths[which]= max (w, 60.0);
   wid->layout ();
 }

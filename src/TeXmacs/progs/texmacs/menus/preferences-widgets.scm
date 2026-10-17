@@ -184,7 +184,10 @@
             (get-pretty-preference "buffer management")
             "18em"))
     (item (text "User interface theme:")
-      (enum (set-pretty-preference* "gui theme" answer)
+      ;; the Cocoa interface follows the theme at once, without a restart
+      (enum (if (ns-gui?)
+                (set-pretty-preference "gui theme" answer)
+                (set-pretty-preference* "gui theme" answer))
             (if qt6-or-later-gui?
                 '("Default" "Bright" "Dark" "")
                 '("Default" "Bright" "Dark" "Native" "Legacy" "")
