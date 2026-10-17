@@ -31,7 +31,8 @@
         (lsp lsp-documents)
         (lsp lsp-edit)
         (lsp lsp-actions)
-        (lsp lsp-kbd)))
+        (lsp lsp-kbd)
+        (lsp lsp-navigate)))
 
 (define events '())
 
@@ -418,6 +419,39 @@
                                             "message" "parse error")))
     (check-true (string-contains? (cadr (car (lsp-client-log c)))
                                   "parse error"))))
+
+(define (sym name kind line . children)
+  (lsp-object "name" name "kind" (lsp-number kind)
+              "range" (lsp-object "start" (lsp-object "line" (lsp-number line)
+                                                      "character" (lsp-number 0))
+                                  "end" (lsp-object "line" (lsp-number line)
+                                                    "character" (lsp-number 9)))
+              "children" (lsp-list->array children)))
+
+(define (test-outline)
+  (check-group "outline")
+  (check= (lsp-symbol-kind-name 12) "function")
+  (check= (lsp-symbol-kind-name 5) "class")
+  (check= (lsp-symbol-kind-name 99) "symbol")
+  ;; DocumentSymbols, nested
+  (check= (lsp-outline-entries
+           (lsp-array (sym "Point" 23 0 (sym "x" 8 1) (sym "y" 8 2))
+                      (sym "main" 12 5)))
+          '((0 "struct" "Point" "" 0 0) (1 "field" "x" "" 1 0)
+            (1 "field" "y" "" 2 0) (0 "function" "main" "" 5 0)))
+  ;; SymbolInformations, flat, in the order of the file
+  (with si (lambda (name kind line)
+             (lsp-object "name" name "kind" (lsp-number kind)
+                         "location"
+                         (lsp-object "uri" "file:///a.c"
+                                     "range" (lsp-object
+                                              "start" (lsp-object
+                                                       "line" (lsp-number line)
+                                                       "character"
+                                                       (lsp-number 2))))))
+    (check= (lsp-outline-entries (lsp-array (si "b" 12 7) (si "a" 13 3)))
+            '((0 "variable" "a" "" 3 2) (0 "function" "b" "" 7 2))))
+  (check= (lsp-outline-entries (lsp-array)) '()))
 
 (define (test-requests)
   (check-group "requests")
@@ -1001,6 +1035,27 @@
         (check-true (string-contains? (object->string
                                        (lsp-signature-markup (cadr a)))
                                       "int v")))
+      ;; the references of twice (after the fix: three places), and the
+      ;; outline of the file, on pages
+      (go-to-path (append (buffer-path) '(0 8)))
+      (lsp-references)
+      (with page (current-buffer)
+        (check-true (url-rooted-tmfs? page))
+        (with s (object->string (tree->stree (buffer-get-body page)))
+          (check-true (string-contains? s "3 places"))
+          (check-true (string-contains? s "src/actions.cpp"))
+          (check-true (string-contains? s "twice (a)")))
+        (switch-to-buffer u)
+        (buffer-close page))
+      (lsp-outline)
+      (with page (current-buffer)
+        (check-true (url-rooted-tmfs? page))
+        (with s (object->string (tree->stree (buffer-get-body page)))
+          (check-true (string-contains? s "function"))
+          (check-true (string-contains? s "twice"))
+          (check-true (string-contains? s "main")))
+        (switch-to-buffer u)
+        (buffer-close page))
       ;; a rename everywhere
       (go-to-path (append (buffer-path) '(0 8)))
       (lsp-rename "thrice")
@@ -1065,6 +1120,7 @@
   (test-initialize-slow)
   (test-diagnostics-state)
   (test-sync-options)
+  (test-outline)
   (test-requests)
   (test-server-requests)
   (test-end)

@@ -223,6 +223,9 @@
                   "completionItem" (lsp-object "snippetSupport"
                                                (lsp-boolean #f)))
     "definition" (lsp-object)
+    "references" (lsp-object)
+    "documentSymbol" (lsp-object "hierarchicalDocumentSymbolSupport"
+                                 (lsp-boolean #t))
     "formatting" (lsp-object)
     "rangeFormatting" (lsp-object)
     "rename" (lsp-object "prepareSupport" (lsp-boolean #f))

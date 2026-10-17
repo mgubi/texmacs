@@ -13,7 +13,8 @@
 ;; The keys are those of other editors where TeXmacs leaves them free: F12
 ;; for the definition, F8 for the diagnostics; tab completes (lsp-edit,
 ;; kbd-variant); std . proposes the fixes, std F formats, std E renames,
-;; std M lists the diagnostics (F2, the key of renames elsewhere, is taken).
+;; std M lists the diagnostics (F2, the key of renames elsewhere, is taken),
+;; std U the references of a symbol, std O the outline of the file.
 ;; NOTE: no A- keys: on macOS option composes a character (option q is
 ;; a ligature), and the key never reaches the editor.
 
@@ -21,7 +22,8 @@
   (:use (kernel gui kbd-define)
         (prog prog-menu)
         (lsp lsp-edit)
-        (lsp lsp-actions)))
+        (lsp lsp-actions)
+        (lsp lsp-navigate)))
 
 (tm-define (lsp-followed?)
   (:synopsis "Does a language server follow the current buffer?")
@@ -41,13 +43,17 @@
   ("std F" (lsp-format))
   ("std E" (interactive lsp-rename))
   ("std ." (lsp-quick-fix))
-  ("std M" (lsp-show-diagnostics-list)))
+  ("std M" (lsp-show-diagnostics-list))
+  ("std U" (lsp-references))
+  ("std O" (lsp-outline)))
 
 (menu-bind lsp-menu
   ((check "Follow source files" "v" (lsp-on?))
    (toggle-preference "lsp"))
   ---
   ("Go to definition" (lsp-goto-definition))
+  ("Find references" (lsp-references))
+  ("Outline" (lsp-outline))
   ("Information at cursor" (lsp-hover))
   ("Complete" (lsp-complete))
   ("Next diagnostic" (lsp-next-diagnostic #t))

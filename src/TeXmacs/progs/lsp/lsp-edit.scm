@@ -378,13 +378,19 @@
 (define (capable? c capability)
   (not (lsp-null? (lsp-ref (lsp-client-capabilities c) capability))))
 
-(define (request-at-cursor method capability)
+(tm-define (lsp-request-at-cursor-with method capability extend)
+  (:synopsis "As request-at-cursor, with the parameters given to @extend")
+  (request-at-cursor method capability extend))
+
+(define (request-at-cursor method capability . opt)
   ;; the result of the request @method at the cursor, or #f (with a
-  ;; message): the server of the buffer must have @capability
+  ;; message): the server of the buffer must have @capability; @opt may
+  ;; give a function which adds to the parameters
   ;; (the client is found first: synchronizing the text would start one)
   (let* ((c (lsp-buffer-client*))
          (ok? (and c (capable? c capability)))
-         (params (and ok? (cursor-params))))
+         (params0 (and ok? (cursor-params)))
+         (params (if (and params0 (pair? opt)) ((car opt) params0) params0)))
     (cond ((not c)
            (set-message "No language server for this buffer" "") #f)
           ((not ok?)
