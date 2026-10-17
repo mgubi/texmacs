@@ -174,7 +174,12 @@ simple_widget_rep::repaint () {
     scroll_y += place_h / 2;
     absolute_scroll= false;
   }
-  if (scroll_x < extents->x1) scroll_x= extents->x1;
+  // (a document narrower than the view is centered in it, as the Qt port
+  // centers its canvas: the editor centers it only when it fits with room
+  // for a scroll bar, and a page fit to the width does not, by rounding)
+  if (extents->x2 - extents->x1 < place_w)
+    scroll_x= extents->x1 - (place_w - (extents->x2 - extents->x1)) / 2;
+  else if (scroll_x < extents->x1) scroll_x= extents->x1;
   else if (scroll_x + place_w > extents->x2)
     scroll_x= max (extents->x2 - place_w, extents->x1);
   if (scroll_y - place_h < extents->y1)
@@ -277,7 +282,7 @@ simple_widget_rep::extents_in_pixels (int& w, int& h, int& sx, int& sy) {
   SI px= (ren == NULL? PIXEL: ren->pixel);
   w = (int) ((extents->x2 - extents->x1) / px);
   h = (int) ((extents->y2 - extents->y1) / px);
-  sx= (int) ((backing_x - extents->x1) / px);
+  sx= max (0, (int) ((backing_x - extents->x1) / px));
   sy= (int) ((extents->y2 - backing_y) / px);
 }
 
