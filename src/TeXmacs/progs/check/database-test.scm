@@ -668,8 +668,8 @@
         ;; a new identifier is stored
         (db-import-entry "i1" '(("type" "article") ("name" "imp")
                                 ("title" "X")))
-        (check= (db-get-entry "i1")
-                '(("type" "article") ("name" "imp") ("title" "X")))
+        (check= (sorted-entry (db-get-entry "i1"))
+                '(("name" "imp") ("title" "X") ("type" "article")))
         ;; an existing identifier is not changed
         (db-import-entry "i1" '(("type" "article") ("name" "imp")
                                 ("title" "Y")))
@@ -752,8 +752,8 @@
                   (db-entry "s1" "book" "Saved" (document)
                             (document (db-field "title" "S")))
                   (db-entry "s2" "misc" "Other" (document) (document))))
-      (check= (db-get-entry "s1")
-              '(("type" "book") ("name" "Saved") ("title" "S")))
+      (check= (sorted-entry (db-get-entry "s1"))
+              '(("name" "Saved") ("title" "S") ("type" "book")))
       (check= (db-get-entry "s2") '(("type" "misc") ("name" "Other")))
       ;; an entry whose identifier exists is not saved again
       (db-save '(document (db-entry "s2" "misc" "Changed" (document)
