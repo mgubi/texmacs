@@ -414,6 +414,28 @@ capture_less (const ts_capture& a, const ts_capture& b) {
   return a.end > b.end;
 }
 
+object
+syntax_region_captures (tree root, int language, int query) {
+  // the captures of a query in the region, in the order of the text, after
+  // the predicates: (capture (row column) (row column))
+  syntax_region_rep* r= get_region (root, language);
+  array<object> l;
+  if (r == NULL) return as_list_object (l);
+  string text;
+  for (int i= 0; i < N(r->lines); i++) {
+    if (i > 0) text << "\n";
+    text << r->lines[i];
+  }
+  array<int> caps;
+  c_string ctext (text);
+  tree_sitter_query_run (query, ts_tree_root_node (r->tree), ctext, caps);
+  for (int i= 0; i + 2 < N(caps); i += 3)
+    l << list_object (object (caps[i+2]),
+                      point_object (point_of (r->offsets, caps[i])),
+                      point_object (point_of (r->offsets, caps[i+1])));
+  return as_list_object (l);
+}
+
 array<array<int> >
 syntax_region_highlight (tree root, int language, int query, array<int> colors) {
   // the colour codes of each position of each line, for the query with the

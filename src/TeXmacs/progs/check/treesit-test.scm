@@ -526,8 +526,65 @@
                (line (tree->path (tree-ref in 1 0))))
           (when (>= (tree-sitter-program-language "python") 0)
             (go-to (rcons line 9))
+            ;; (kbd-enter is called directly: a key in program code would
+            ;; load the keyboard of programs, which changes the suites run
+            ;; afterwards in the same TeXmacs)
             (kbd-enter in #f)
             (check= (tree->stree (tree-ref in 1)) '(document "def f(x):" ""))))))
+    ;; indentation: the indentation of each line of a program, computed
+    (let ((indents
+           (lambda (lan lines)
+             (treesit-generate-cache lan)
+             (let ((id (treesit-language lan))
+                   (d (stree->tree (cons 'document lines))))
+               (map (lambda (row) (syntax-language-indentation d row lan id 4))
+                    (iota (length lines)))))))
+      ;; (the lines are indented as computed, except the blank ones)
+      (check= (indents "python" '("def f(x):" "" "    if x:" "        y = [1]" ""
+                                  "    else:" "        return g(1," ""))
+              '(0 4 4 8 8 4 8 12))
+      (check= (indents "c" '("int f(int x) {" "" "    if (x)" ""
+                             "        return 1;" "}" "" "int g();"))
+              '(0 4 4 8 8 0 0 0))
+      (check= (indents "javascript" '("function f() {" "    x = [1," "        2];" "}" ""))
+              '(0 4 8 0 0))
+      (check= (indents "julia" '("function f(x)" "    if x" "        1" "    else"
+                                 "        2" "    end" "end"))
+              '(0 4 8 4 8 4 0)))
+    ;; the indentation at the cursor, in C++ code (as Return asks it)
+    (treesit-generate-cache "cpp")
+    (with-test-buffer '(document (cpp-code (document "int f() {" "return 0;" "}")))
+      (lambda (u b)
+        (update-forced)
+        (let* ((code (tree-ref b 0 0))
+               (line (tree->path (tree-ref code 1))))
+          (when (>= (tree-sitter-program-language "cpp") 0)
+            (go-to (rcons line 0))
+            (check= (map (lambda (row) (syntax-compute-indentation code row 4))
+                         '(0 1 2))
+                    '(0 4 0))))))
+    ;; the definitions (tags.scm)
+    (let ((outline (lambda (lan lines)
+                     (treesit-generate-cache lan)
+                     (map (lambda (d) (list (car d) (cadr d) (caddr d)))
+                          (syntax-outline (stree->tree (cons 'document lines)) lan
+                                          (treesit-language lan))))))
+      (check= (outline "python" '("class A:" "    def f(self):" "        g(1)" "X = 1"))
+              ;; (not X: as with tree-sitter query, the pattern of the
+              ;; constants of tags.scm finds nothing, expression_statement
+              ;; being a supertype)
+              '(("class" "A" (0 6)) ("function" "f" (1 8))))
+      (check= (outline "c" '("struct s { int a; };" "int f(int x) { return x; }"))
+              '(("class" "s" (0 7)) ("function" "f" (1 4))))
+      (check= (outline "julia" '("module M" "f(x) = 1" "function g(y)" "end" "end"))
+              '(("module" "M" (0 7)) ("function" "f" (1 0)) ("function" "g" (2 9))))
+      (check= (outline "scheme" '("(define (f x) x)" "(tm-define g 1)"))
+              '(("function" "f" (0 9)) ("variable" "g" (1 11))))
+      (check= (outline "json" '("{}")) '()))
+    ;; comments
+    (check= (toggle-line-comments '("  a" "" "    b") "#") '("  # a" "" "  #   b"))
+    (check= (toggle-line-comments '("  # a" "" "  #   b") "#") '("  a" "" "    b"))
+    (check= (toggle-line-comments '("// a" "b") "//") '("// // a" "// b"))
     ;; at the cursor, in the code of a buffer
     (with-test-buffer '(document (scm-code (document "(define x 1)" "(if x \"(\" 'b)")))
       (lambda (u b)
@@ -535,6 +592,10 @@
         (let* ((code (tree-ref b 0 0))
                (line (tree->path (tree-ref code 1))))
           (check-true (integer? (tree-sitter-program-language "scheme")))
+          (go-to (rcons line 4))
+          (check= (map cadr (syntax-definitions-at-cursor)) '("x"))
+          (check-true (syntax-go-to-definition))
+          (check= (cursor-path) (rcons (tree->path (tree-ref code 0)) 8))
           (go-to (rcons line 4))
           (check-true (syntax-select-enlarge))
           (check= (list (selection-get-start) (selection-get-end))
@@ -550,7 +611,12 @@
           ;; the ( of the string has no match
           (go-to (rcons line 7))
           (syntax-select-brackets)
-          (check= (get-alt-selection "brackets") '()))))))
+          (check= (get-alt-selection "brackets") '())
+          ;; comments
+          (check-true (syntax-toggle-comment))
+          (check= (tree->string (tree-ref code 1)) "; (if x \"(\" 'b)")
+          (syntax-toggle-comment)
+          (check= (tree->string (tree-ref code 1)) "(if x \"(\" 'b)"))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; External scanners in the C runtime

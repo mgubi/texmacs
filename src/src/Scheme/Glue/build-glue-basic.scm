@@ -747,6 +747,7 @@
   (syntax-region-node-range syntax_region_node_range (object tree int int int int int))
   (syntax-region-errors syntax_region_errors (object tree int))
   (syntax-region-last-nodes syntax_region_last_nodes (object tree int))
+  (syntax-region-captures syntax_region_captures (object tree int int))
   (syntax-region-statistics syntax_region_statistics (array_int tree int))
   (syntax-region-forget syntax_region_forget (void tree))
   (tree-sitter-set-highlighter tree_sitter_set_highlighter (void string int array_string))

@@ -9124,6 +9124,23 @@ tmg_syntax_region_last_nodes (tmscm arg1, tmscm arg2) {
 }
 
 tmscm
+tmg_syntax_region_captures (tmscm arg1, tmscm arg2, tmscm arg3) {
+  TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "syntax-region-captures");
+  TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "syntax-region-captures");
+  TMSCM_ASSERT_INT (arg3, TMSCM_ARG3, "syntax-region-captures");
+
+  tree in1= tmscm_to_tree (arg1);
+  int in2= tmscm_to_int (arg2);
+  int in3= tmscm_to_int (arg3);
+
+  // TMSCM_DEFER_INTS;
+  object out= syntax_region_captures (in1, in2, in3);
+  // TMSCM_ALLOW_INTS;
+
+  return object_to_tmscm (out);
+}
+
+tmscm
 tmg_syntax_region_statistics (tmscm arg1, tmscm arg2) {
   TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "syntax-region-statistics");
   TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "syntax-region-statistics");
@@ -12790,6 +12807,7 @@ initialize_glue_basic () {
   tmscm_install_procedure ("syntax-region-node-range",  tmg_syntax_region_node_range, 6, 0, 0);
   tmscm_install_procedure ("syntax-region-errors",  tmg_syntax_region_errors, 2, 0, 0);
   tmscm_install_procedure ("syntax-region-last-nodes",  tmg_syntax_region_last_nodes, 2, 0, 0);
+  tmscm_install_procedure ("syntax-region-captures",  tmg_syntax_region_captures, 3, 0, 0);
   tmscm_install_procedure ("syntax-region-statistics",  tmg_syntax_region_statistics, 2, 0, 0);
   tmscm_install_procedure ("syntax-region-forget",  tmg_syntax_region_forget, 1, 0, 0);
   tmscm_install_procedure ("tree-sitter-set-highlighter",  tmg_tree_sitter_set_highlighter, 3, 0, 0);

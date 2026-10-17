@@ -192,3 +192,307 @@
   ;; the same for the input of a session, in the language at the cursor
   (let ((id (tree-sitter-program-language (get-env "prog-language"))))
     (and (>= id 0) (syntax-incomplete? body id))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Indentation
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; A line is indented one step more than the line where the innermost node
+;; of an indenting type which is still open around it starts; as much as that
+;; line when it starts with the token which closes that node (}, ), end) or
+;; with a branch (else, except...). For each program language: the indenting
+;; types, the branches, and for an offside language (Python, whose blocks
+;; end where the indentation goes back) the types of its brackets: only
+;; those are closed before a line.
+
+(define c-indenting
+  '("compound_statement" "field_declaration_list" "declaration_list"
+    "enumerator_list" "initializer_list" "argument_list" "parameter_list"
+    "case_statement" "if_statement" "for_statement" "while_statement"
+    "do_statement" "else_clause" "parenthesized_expression"))
+
+(define syntax-indent-rules
+  `(("c" ,c-indenting ("else_clause") #f)
+    ("cpp" ,(append c-indenting '("lambda_expression" "try_statement"))
+     ("else_clause") #f)
+    ("python"
+     ("function_definition" "class_definition" "if_statement" "for_statement"
+      "while_statement" "with_statement" "try_statement" "match_statement"
+      "case_clause" "elif_clause" "else_clause" "except_clause"
+      "finally_clause" "argument_list" "parameters" "list" "dictionary" "set"
+      "tuple" "parenthesized_expression")
+     ("elif_clause" "else_clause" "except_clause" "finally_clause")
+     ("argument_list" "parameters" "list" "dictionary" "set" "tuple"
+      "parenthesized_expression"))
+    ("java"
+     ("block" "class_body" "interface_body" "enum_body" "argument_list"
+      "formal_parameters" "array_initializer" "switch_block"
+      "switch_block_statement_group" "if_statement" "for_statement"
+      "while_statement" "do_statement" "parenthesized_expression")
+     () #f)
+    ("javascript"
+     ("statement_block" "object" "array" "arguments" "formal_parameters"
+      "class_body" "switch_body" "switch_case" "switch_default"
+      "template_substitution" "parenthesized_expression" "if_statement"
+      "for_statement" "while_statement" "do_statement" "else_clause")
+     ("else_clause") #f)
+    ("json" ("object" "array") () #f)
+    ("r"
+     ("braced_expression" "call_arguments" "parameters"
+      "parenthesized_expression" "if_statement" "for_statement"
+      "while_statement" "repeat_statement" "function_definition")
+     () #f)
+    ("julia"
+     ("function_definition" "macro_definition" "module_definition"
+      "struct_definition" "if_statement" "for_statement" "while_statement"
+      "let_statement" "try_statement" "do_clause" "compound_statement"
+      "quote_statement" "else_clause" "elseif_clause" "catch_clause"
+      "finally_clause" "vector_expression" "tuple_expression"
+      "parenthesized_expression" "call_expression")
+     ("else_clause" "elseif_clause" "catch_clause" "finally_clause") #f)))
+
+(define (line-string doc row)
+  (let ((t (tree-ref doc row)))
+    (if (and t (tree-atomic? t)) (tree->string t) "")))
+
+(define (line-indent doc row)
+  (let* ((s (line-string doc row)) (n (string-length s)))
+    (let loop ((i 0))
+      (if (and (< i n) (== (string-ref s i) #\space)) (loop (+ i 1)) i))))
+
+(define (first-non-space s)
+  (let ((n (string-length s)))
+    (let loop ((i 0))
+      (cond ((= i n) #f)
+            ((char-whitespace? (string-ref s i)) (loop (+ i 1)))
+            (else i)))))
+
+(define (previous-text-end doc row)
+  ;; the point after the last character which is not a space, before row
+  (let loop ((r (- row 1)))
+    (if (< r 0) #f
+        (let* ((s (line-string doc r))
+               (n (let trim ((n (string-length s)))
+                    (if (and (> n 0) (char-whitespace? (string-ref s (- n 1))))
+                        (trim (- n 1))
+                        n))))
+          (if (> n 0) (list r n) (loop (- r 1)))))))
+
+(define-public (syntax-indentation doc row lan rules tab)
+  ;; the indentation of the line row of doc (a document of lines), by the
+  ;; rules of its language (an entry of syntax-indent-rules)
+  (let* ((indenting (cadr rules))
+         (branches (caddr rules))
+         (brackets (cadddr rules))
+         (s (line-string doc row))
+         (c0 (first-non-space s))
+         (prev (and (not c0) (previous-text-end doc row)))
+         (p (cond (c0 (list row c0))
+                  (prev (list (car prev) (- (cadr prev) 1)))
+                  (else #f))))
+    (if (not p) 0
+        (let* ((nodes (syntax-region-node-range doc lan (car p) (cadr p)
+                                                (car p) (cadr p)))
+               (errors (if prev (syntax-region-errors doc lan) '()))
+               (closed? (lambda (n)
+                          ;; complete before the (blank) line
+                          (and prev
+                               (point<=? (node-end n) prev)
+                               (or (not brackets) (in? (node-type n) brackets))
+                               (not (list-or
+                                     (map (lambda (e)
+                                            (and (point<=? (node-start n) (cadr e))
+                                                 (point<=? (caddr e) (node-end n))))
+                                          errors))))))
+               ;; after an unfinished construct (an unclosed bracket),
+               ;; error recovery leaves an ERROR node instead of its node
+               (a (list-find nodes
+                             (lambda (n)
+                               (and (or (in? (node-type n) indenting)
+                                        (and prev (== (node-type n) "ERROR")))
+                                    (< (car (node-start n)) row)
+                                    (not (closed? n)))))))
+          (if (not a) 0
+              (let* ((n0 (car nodes))
+                     (parent (and (pair? (cdr nodes)) (cadr nodes)))
+                     (closing? (and c0 (not (node-named? n0))
+                                    (== (node-start n0) p)
+                                    (== parent a)
+                                    (== (node-end n0) (node-end a))))
+                     (first (let loop ((l nodes) (best #f))
+                              (if (and (pair? l) (== (node-start (car l)) p))
+                                  (loop (cdr l) (car l))
+                                  best)))
+                     (branch? (and c0 first (in? (node-type first) branches))))
+                (+ (line-indent doc (car (node-start a)))
+                   (if (or closing? branch?) 0 tab))))))))
+
+(define-public (syntax-language-indentation doc row lan id tab)
+  ;; the same for the program language lan, whose language of tree-sitter
+  ;; is id; #f without rules for lan
+  (let ((rules (assoc lan syntax-indent-rules)))
+    (and rules (tree-is? doc 'document)
+         (syntax-indentation doc row id rules tab))))
+
+(define-public (syntax-compute-indentation doc row tab)
+  ;; the indentation of a line of the program at the cursor, or #f when
+  ;; its language has no syntax tree or no rules
+  (let* ((lan (get-env "prog-language"))
+         (id (tree-sitter-program-language lan)))
+    (and (>= id 0) (syntax-language-indentation doc row lan id tab))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Outline: the definitions of a program
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; The definitions are the captures @definition.<kind> of the query
+;; misc/tree-sitter/<language>/tags.scm, as in tree-sitter-tags, each with
+;; the first capture @name inside it.
+
+(define tags-queries '())  ; ((id . query or #f) ...)
+
+(define (tags-query lan id)
+  ;; the query of the definitions of the program language lan, or #f
+  (let ((known (assoc id tags-queries)))
+    (if known (cdr known)
+        (let* ((u (url-concretize
+                   (string-append "$TEXMACS_PATH/misc/tree-sitter/" lan "/tags.scm")))
+               (q (and (url-exists? u)
+                       (tree-sitter-query-new id (string-load u))))
+               (r (and q (>= q 0) q)))
+          (set! tags-queries (cons (cons id r) tags-queries))
+          r))))
+
+(define (region-text root start end)
+  ;; the text between two points of the same line
+  (let ((line (if (tree-is? root 'document) (tree-ref root (car start)) root)))
+    (if (and line (tree-atomic? line) (= (car start) (car end)))
+        (let ((s (tree->string line)))
+          (substring s (min (cadr start) (string-length s))
+                     (min (cadr end) (string-length s))))
+        "")))
+
+(define-public (syntax-outline root lan id)
+  ;; the definitions of a region of the program language lan (language id
+  ;; of tree-sitter): (kind name start end) in the order of the text, kind
+  ;; being "function", "class"... and start the position of the name
+  (let ((q (tags-query lan id)))
+    (if (not q) '()
+        (let* ((names (tree-sitter-query-capture-names q))
+               (caps (syntax-region-captures root id q))
+               (cap-name (lambda (c) (list-ref names (car c))))
+               (defs (list-filter caps (lambda (c) (string-starts? (cap-name c)
+                                                                   "definition."))))
+               (nms (list-filter caps (lambda (c) (== (cap-name c) "name")))))
+          (let loop ((l defs) (acc '()))
+            (if (null? l) (reverse acc)
+                (let* ((d (car l))
+                       (n (list-find nms (lambda (n) (and (point<=? (cadr d) (cadr n))
+                                                          (point<=? (caddr n) (caddr d))))))
+                       (item (and n (list (string-drop (cap-name d) 11)
+                                          (region-text root (cadr n) (caddr n))
+                                          (cadr n) (caddr d)))))
+                  (loop (cdr l)
+                        (if (and item (not (list-find acc (lambda (x)
+                                                            (== (caddr x) (caddr item))))))
+                            (cons item acc)
+                            acc)))))))))
+
+(define (cursor-outline)
+  ;; (ctx id definitions) for the code at the cursor, or #f
+  (let* ((lan (get-env "prog-language"))
+         (id (syntax-cursor-language))
+         (ctx (and id (path-context (cursor-path) id))))
+    (and ctx (list ctx id (syntax-outline (cadr ctx) lan id)))))
+
+(define-public (syntax-go-to-point ctx point)
+  (go-to (context-path ctx point)))
+
+(define-public (syntax-definitions-at-cursor)
+  ;; the definitions of the code at the cursor: (kind name path)
+  (let ((o (cursor-outline)))
+    (if (not o) '()
+        (map (lambda (d) (list (car d) (cadr d) (context-path (car o) (caddr d))))
+             (caddr o)))))
+
+(define-public (syntax-go-to-definition)
+  ;; go to the definition of the name at the cursor in the same code; #f
+  ;; when there is none
+  (let ((o (cursor-outline)))
+    (and o
+         (let* ((ctx (car o))
+                (l (syntax-region-node-at (cadr ctx) (cadr o) (caddr ctx) (cadddr ctx)))
+                (n (and (pair? l) (node-named? (car l)) (car l)))
+                (name (and n (region-text (cadr ctx) (node-start n) (node-end n))))
+                (d (and name (list-find (caddr o) (lambda (d) (== (cadr d) name))))))
+           (and d (begin (go-to (context-path ctx (caddr d))) #t))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Comments
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define line-comments
+  '(("c" . "//") ("cpp" . "//") ("java" . "//") ("javascript" . "//")
+    ("python" . "#") ("r" . "#") ("julia" . "#") ("scheme" . ";")))
+
+(define-public (syntax-comment-prefix lan)
+  (assoc-ref line-comments lan))
+
+(define-public (toggle-line-comments lines prefix)
+  ;; comment the strings lines with prefix, or uncomment them when they all
+  ;; are (blank lines aside); the new lines
+  (let* ((full (list-filter lines (lambda (s) (first-non-space s))))
+         (commented? (lambda (s) (let ((i (first-non-space s)))
+                                   (string-starts? (substring s i (string-length s))
+                                                   prefix))))
+         (all? (and (nnull? full) (list-and (map commented? full))))
+         (indent (if (null? full) 0 (apply min (map first-non-space full))))
+         (k (string-length prefix)))
+    (map (lambda (s)
+           (let ((i (first-non-space s)))
+             (cond ((not i) s)
+                   (all?
+                    (let* ((j (+ i k))
+                           (j* (if (and (< j (string-length s))
+                                        (== (string-ref s j) #\space))
+                                   (+ j 1) j)))
+                      (string-append (substring s 0 i)
+                                     (substring s j* (string-length s)))))
+                   (else
+                    (string-append (substring s 0 indent) prefix " "
+                                   (substring s indent (string-length s)))))))
+         lines)))
+
+(define-public (syntax-toggle-comment)
+  ;; comment or uncomment the lines of the selection, or the line of the
+  ;; cursor, in program code; #f when its language has no line comments
+  (let* ((prefix (syntax-comment-prefix (get-env "prog-language")))
+         (sel? (selection-active-normal?))
+         (a (and prefix (path-context (if sel? (selection-get-start) (cursor-path)) 0)))
+         (b (and a (path-context (if sel? (selection-get-end) (cursor-path)) 0))))
+    (and a b (== (car a) (car b)) (tree-is? (cadr a) 'document)
+         (let* ((root (cadr a))
+                (rows (map (lambda (i) (+ i (caddr a)))
+                           (iota (+ (- (caddr b) (caddr a)) 1))))
+                (lines (map (lambda (r) (tree->string (tree-ref root r))) rows))
+                (new (toggle-line-comments lines prefix)))
+           (for-each (lambda (r s) (when (!= s (tree->string (tree-ref root r)))
+                                     (tree-set (tree-ref root r) s)))
+                     rows new)
+           #t))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Menu
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(tm-menu (syntax-definitions-menu)
+  (for (d (syntax-definitions-at-cursor))
+    ((eval (string-append (cadr d) " (" (car d) ")"))
+     (go-to (caddr d)))))
+
+(tm-menu (focus-extra-menu t)
+  (:require (and (in-prog?) (syntax-cursor-language)))
+  (-> "Definitions" (dynamic (syntax-definitions-menu)))
+  ("Go to definition" (syntax-go-to-definition))
+  (assuming (syntax-comment-prefix (get-env "prog-language"))
+    ("Toggle comment" (syntax-toggle-comment))))

@@ -877,6 +877,37 @@ installed, and the old behaviour stays elsewhere.
   accepts `def f(x):` at the end of a text with an empty block; the new
   `syntax-region-last-nodes` gives the nodes along the last children).
   Other errors go to the interpreter, which reports them.
+- **Indentation** (same day). `program-compute-indentation` asks the tree
+  first (the generic definition, and those of Python and Java; Scheme
+  keeps its own). A line gets the indentation of the line where the
+  innermost open node of an indenting type starts, plus a tab stop; none
+  when it starts with the token which closes that node (`}`, `)`, `end`)
+  or with a branch (`else`, `elif`, `except`, ...). The types are listed
+  per language in `ts-edit.scm` (c, cpp, python, java, javascript, json,
+  r, julia). For a blank line, a node which ends before it without error
+  is closed; in Python only brackets close, its blocks end where the
+  indentation goes back; after an unfinished construct, the ERROR node of
+  the error recovery counts as open. C/C++, JavaScript, JSON, R and Julia
+  had no indentation; Python's no longer takes a `#` in a string for a
+  comment. Found on the way: the indentation of `scheme-edit.scm` was
+  declared with `(:require in-prog-scheme?)`, a condition which is always
+  true (the procedure, not its value), so it applied to every program
+  language without its own; now `(:mode in-prog-scheme?)`.
+- **Outline and comments** (same day). The definitions are the captures
+  `@definition.<kind>` of `misc/tree-sitter/<lan>/tags.scm` with their
+  `@name`, as in tree-sitter-tags (new glue `syntax-region-captures`, the
+  captures of a query on a region): the files of the grammars for c, cpp,
+  python, java, javascript and r, ours for julia and scheme (the TeXmacs
+  definers `tm-define`, `tm-menu`...). In program code the Focus menu has
+  Definitions (go to one), Go to definition (of the name at the cursor,
+  in the same code) and Toggle comment (line comments of the lines of the
+  selection). The `@definition.constant` pattern of tree-sitter-python
+  finds nothing (`expression_statement` is a supertype), as with
+  `tree-sitter query`.
+- A pitfall of the tests: the suites run in one TeXmacs, and a key typed
+  in program code loads the keyboard of programs and its modules, which
+  changed the highlighting of Fortran and the entering of mathematics in
+  the suites run afterwards; the tests call the functions instead.
 
 ### Decisions
 

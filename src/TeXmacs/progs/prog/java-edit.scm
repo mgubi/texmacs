@@ -20,5 +20,6 @@
 
 (tm-define (program-compute-indentation doc row col)
   (:mode in-prog-java?)
-  (get-tabstop))
+  (or (syntax-compute-indentation doc row (get-tabstop))
+      (get-tabstop)))
 

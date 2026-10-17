@@ -301,9 +301,10 @@
     (with t (cursor-tree)
       (tree-set t (string-set-indent (tree->string t) i)))))
 
-; Redefine this for specific languages
+; Redefine this for specific languages (by default, by the syntax tree
+; when there is one, see treesit/ts-edit.scm)
 (tm-define (program-compute-indentation doc row col)
-  0)
+  (or (syntax-compute-indentation doc row (get-tabstop)) 0))
 
 (tm-define (program-indent-line doc row unindent?)
   ; TODO: implement unindent for general languages
