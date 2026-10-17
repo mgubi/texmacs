@@ -37,9 +37,7 @@
   --stdio>>>|<row|<cell|<name|JSON> (<verbatim|json>)>|<cell|<verbatim|vscode-json-language-server
   --stdio>>>|<row|<cell|<name|Java> (<verbatim|java>)>|<cell|<verbatim|jdtls>>>|<row|<cell|<name|Scala>
   (<verbatim|scala>)>|<cell|<verbatim|metals>>>|<row|<cell|<name|Julia>
-  (<verbatim|julia>)>|<cell|<verbatim|julia-language-server>>>|<row|<cell|<LaTeX>
-  (<verbatim|latex>)>|<cell|<verbatim|texlab> (registered, but not used
-  for now)>>>>>>
+  (<verbatim|julia>)>|<cell|<verbatim|julia-language-server>>>>>>>
     The language servers known by <TeXmacs>.
   </big-table>
 
