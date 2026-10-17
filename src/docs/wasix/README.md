@@ -54,30 +54,59 @@ the setjmp/longjmp of MuPDF and S7 (Wasmer 7.5 with Cranelift runs them).
 turns a document into a PDF (the MuPDF writer) in about 7 s, most of it the
 compilation of the module by Cranelift.
 
+## The interface: a stream of pixels and events
+
+WASIX has no display. With `TEXMACS_DISPLAY=stream`
+(`src/Plugins/Vue/vue_stream.cpp`, the protocol at its top), TeXmacs runs
+in single-window mode in a window of SDL's dummy video driver; after each
+redraw it sends the tiles (64x64, those of a row joined) which changed on
+its standard output, and it takes the pointer, the keyboard, the focus and
+the size of the display from its standard input, as SDL events (the
+standard input is polled when SDL's queue is empty, and wakes the loop).
+What TeXmacs prints goes to the standard error, from the start of `main`.
+A host shows the frames:
+
+- on the desktop, `texmacs-wasix` (`misc/wasix/host`, native, SDL3), which
+  runs `wasmer run` itself:
+
+      make -C misc/wasix/host OUT=$PWD/build-wasix/out
+      build-wasix/out/texmacs-wasix -tm $PWD/TeXmacs -wasm build-wasix/out/texmacs.wasm
+
+  (the TeXmacs tree as `/texmacs`, `~/.TeXmacs-wasix` as the home, the
+  current directory as `/work`);
+- in the browser, the page `index.html` (below);
+- for the tests, `misc/wasix/stream-client.mjs` under node
+  (`test/stream-wasmer.mjs`: wasmer; `test/stream-sdk.mjs`: the SDK).
+
 ## Running in the browser
 
     make -C build-wasix -f ../misc/wasix/Makefile web
     node misc/wasix/serve.mjs                 # http://localhost:8094/
 
-The page (`misc/wasix/web`) runs TeXmacs in the Wasmer SDK (`@wasmer/sdk`
-0.19.1, npm installed in `build-wasix/sdk` and copied with the page):
-the program and its files make one package of the SDK
-(`packages.create`), each run a sandbox of its own, with the document of
-the text area in `/workspace/in.tm` and the PDF read back from
-`/workspace/out.pdf`. The SDK runs WASIX in Web Workers sharing the memory
-of the program: the page must be cross-origin isolated (`serve.mjs` sends
-COOP and COEP).
+The page (`misc/wasix/web/index.html`, `texmacs-gui.js`) runs TeXmacs in
+the Wasmer SDK (`@wasmer/sdk` 0.19.1, npm installed in `build-wasix/sdk`
+and copied with the page): the program and its files make one package of
+the SDK (`packages.create`), spawned in a sandbox with its standard input
+and output piped; the page draws the rectangles in a canvas and sends the
+events of the canvas (the keys as SDL scancodes and keycodes, US layout,
+and their text). The SDK runs WASIX in Web Workers sharing the memory of
+the program: the page must be cross-origin isolated (`serve.mjs` sends COOP
+and COEP).
 
-The files (`pack-fs.py`, `texmacs-fs.bin` and its index, 32 MB): the boot
-list of the Emscripten build, the Scheme code, the styles and packages,
-the metrics and the Type 1 fonts; not the TrueType and OpenType fonts (75
-MB), nor the documentation.
+The files (`pack-fs.py`, `texmacs-fs.bin` and its index): the whole tree of
+`TEXMACS_PATH` but the binaries of the plugins, 155 MB (with fewer files,
+the icons were not found).
 
-In headless Chrome 154 (`node misc/wasix/test/browser-pdf.mjs <tools>`,
-with the puppeteer-core and Chrome for Testing of the Emscripten build), the
-page is ready in 0.9 s (local server) and a run, TeXmacs started and the
-document typeset, takes 0.9 to 1.2 s. Under node, the same through the SDK:
+`pdf.html` is the headless use: the document of a text area typeset to PDF
+by a TeXmacs started for it (0.9 to 1.2 s a run in Chrome). Under node:
 `node misc/wasix/sdk-run.mjs build-wasix in.tm out.pdf`.
+
+Tests in headless Chrome 154 with the puppeteer-core and Chrome for
+Testing of the Emscripten build (`<tools>`, see `misc/wasm/browser-run.mjs`):
+`node misc/wasix/test/browser-gui.mjs <tools> <out dir>` (the File menu, a
+new document, text and a formula typed with the keyboard of the page; the
+first frame 7.5 s after the page is opened, from a local server) and
+`node misc/wasix/test/browser-pdf.mjs <tools>`.
 
 ## Changes to the sources (all under `__wasi__`)
 
@@ -99,7 +128,12 @@ document typeset, takes 0.9 to 1.2 s. Under node, the same through the SDK:
 |---|---|
 | desktop, headless (`wasmer run`) | converts documents to PDF |
 | browser and node (`@wasmer/sdk`) | converts documents to PDF |
-| GUI | not yet: WASIX has no display |
+| GUI on the desktop (`texmacs-wasix`) | runs: menus, editing |
+| GUI in the browser (`index.html`) | runs: menus, editing |
 
-Known: in the SDK (not under `wasmer run`) TeXmacs warns 44 times "cannot
-load picture {}" (an icon it looks for and does not find).
+Not yet: a pixel density above 1 (blurry on HiDPI displays); compression
+of the stream (raw pixels: 6 MB for the first frames at 1000x700); the
+home of the page in the browser's storage (it lives in the memory of the
+sandbox); the clipboard, files from and to the page; the browser's
+keyboard layouts beyond the text they type; the plugins' programs (WASIX
+packages for them).

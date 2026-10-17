@@ -1,4 +1,4 @@
-// The page of the WASIX build (misc/wasix/web/index.html): TeXmacs run by the
+// The page of the WASIX build (misc/wasix/web/pdf.html): TeXmacs run by the
 // Wasmer SDK (sdk/, a copy of @wasmer/sdk), headless, on the document of the
 // text area; the PDF it writes is shown in the frame.
 //

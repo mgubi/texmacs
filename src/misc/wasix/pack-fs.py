@@ -9,51 +9,33 @@
 # in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
 ###############################################################################
 #
-#   pack-fs.py <TeXmacs dir> <boot list> <output prefix>
+#   pack-fs.py <TeXmacs dir> <output prefix>
 #
 # Writes <output prefix>.bin, the concatenation of the files, and
 # <output prefix>.json, their index ([path, offset, size], the paths as the
 # program sees them, under /texmacs). The runners of the SDK (sdk-run.mjs,
 # the page) give them to the package of TeXmacs as its files.
 #
-# The files are those which TeXmacs opens when it starts and typesets a
-# document: the boot list of the Emscripten build (misc/wasm/boot-files.txt,
-# its files only) and the small groups which it reads at unforeseeable
-# times, as the boot package of the Emscripten build (misc/wasm/package.py),
-# and the Type 1 fonts (13 MB: the TeX fonts of the formulas; the TrueType
-# and OpenType fonts, 75 MB, only as far as the boot list has them)
+# The whole tree of TEXMACS_PATH is shipped, so that the program finds what
+# it finds on the desktop, but the binaries of the plugins (bin/), which
+# are no programs of WASIX
 
 import json, os, sys
 
-GROUPS = ['progs/', 'styles/', 'packages/', 'texts/', 'plugins/', 'langs/encoding/',
-          'fonts/tfm/', 'fonts/enc/', 'fonts/virtual/', 'fonts/type1/',
-          'misc/pixmaps/neoclassical/light/']
-FILES = ['SVNREV', 'fonts/font-database.scm', 'fonts/font-characteristics.scm',
-         'fonts/font-features.scm', 'fonts/font-substitutions.scm',
-         'fonts/pdf-font-issues.scm', 'misc/pixmaps/light/TeXmacs.svg']
-# (as misc/wasm/package.py: the programs and the documentation of the plugins)
-EXCLUDE_DIRS = ['bin', 'doc']
+EXCLUDE_DIRS = ['bin']
+EXCLUDE_FILES = ['.DS_Store']
 
 def main ():
-    tm, boot, prefix = sys.argv[1:4]
-    names = set (FILES)
-    for g in GROUPS:
-        for root, dirs, files in os.walk (os.path.join (tm, g)):
-            if g == 'plugins/':
-                dirs[:] = [d for d in dirs if d not in EXCLUDE_DIRS]
-            for f in files:
-                if f != '.DS_Store':
-                    names.add (os.path.relpath (os.path.join (root, f), tm))
-    with open (boot) as b:
-        for line in b:
-            p = line.strip ()
-            if p.startswith ('/texmacs/'):
-                rel = p[len ('/texmacs/'):]
-                if os.path.isfile (os.path.join (tm, rel)):
-                    names.add (rel)
+    tm, prefix = sys.argv[1:3]
+    names = []
+    for root, dirs, files in os.walk (tm):
+        dirs[:] = sorted (d for d in dirs if d not in EXCLUDE_DIRS)
+        for f in sorted (files):
+            if f not in EXCLUDE_FILES:
+                names.append (os.path.relpath (os.path.join (root, f), tm))
     index, offset = [], 0
     with open (prefix + '.bin', 'wb') as out:
-        for rel in sorted (names):
+        for rel in names:
             with open (os.path.join (tm, rel), 'rb') as f:
                 data = f.read ()
             out.write (data)

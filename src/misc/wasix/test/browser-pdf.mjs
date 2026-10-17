@@ -41,7 +41,7 @@ try {
   page.on ('console', m => console.log ('[page]', m.text ()));
   page.on ('pageerror', e => console.log ('[page error]', e.message));
   const t0 = Date.now ();
-  await page.goto (`http://127.0.0.1:${port}/`);
+  await page.goto (`http://127.0.0.1:${port}/pdf.html`);
   console.log ('isolated:', await page.evaluate (() => crossOriginIsolated));
   await page.waitForFunction (() => window.tmWasix && window.tmWasix.ready,
                               { timeout: 300000, polling: 200 });

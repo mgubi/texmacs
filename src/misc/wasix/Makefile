@@ -83,14 +83,14 @@ $(OUT)/texmacs.wasm: $(OBJECTS) $(LIBDEPS)
 	@mkdir -p $(OUT)
 	$(CXX) $(LDFLAGS) $(OBJECTS) $(LIBS) -o $@
 
-# the page (misc/wasix/web): the program, its files (pack-fs.py: those of
-# the boot of TeXmacs, its Scheme code and the Type 1 fonts) and the Wasmer
+# the page (misc/wasix/web): the program, its files (pack-fs.py: the whole
+# tree of TEXMACS_PATH but the binaries of the plugins) and the Wasmer
 # SDK, npm installed in sdk/ (SDK_VERSION) and copied to out/web/sdk;
 # served with the headers which the SDK needs by misc/wasix/serve.mjs
 SDK_VERSION ?= 0.19.1
 SDK := $(CURDIR)/sdk/node_modules/@wasmer/sdk
 web: $(OUT)/web/texmacs.wasm $(OUT)/web/texmacs-fs.json $(OUT)/web/sdk/dist/index.js \
-  $(OUT)/web/index.html $(OUT)/web/texmacs-wasix.js
+  $(OUT)/web/index.html $(OUT)/web/texmacs-gui.js $(OUT)/web/pdf.html $(OUT)/web/pdf.js
 
 $(OUT)/web/texmacs.wasm: $(OUT)/texmacs.wasm
 	@mkdir -p $(OUT)/web
@@ -98,7 +98,7 @@ $(OUT)/web/texmacs.wasm: $(OUT)/texmacs.wasm
 
 $(OUT)/web/texmacs-fs.json: FORCE $(TM)/TeXmacs/SVNREV plugins-sync
 	@mkdir -p $(OUT)/web
-	python3 $(X)/pack-fs.py $(TM)/TeXmacs $(W)/boot-files.txt $(OUT)/web/texmacs-fs
+	python3 $(X)/pack-fs.py $(TM)/TeXmacs $(OUT)/web/texmacs-fs
 
 $(SDK)/dist/index.js:
 	mkdir -p sdk && cd sdk && ([ -f package.json ] || npm init -y > /dev/null) && \
