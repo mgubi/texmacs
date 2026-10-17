@@ -747,6 +747,10 @@
   (syntax-region-errors syntax_region_errors (object tree int))
   (syntax-region-statistics syntax_region_statistics (array_int tree int))
   (syntax-region-forget syntax_region_forget (void tree))
+  (tree-sitter-set-highlighter tree_sitter_set_highlighter (void string int array_string))
+  (tree-sitter-pending-updates tree_sitter_pending_updates (array_tree))
+  (tree-sitter-line-colors tree_sitter_line_colors (object string tree))
+  (tree-sitter-set-highlighting tree_sitter_set_highlighting (void bool))
 
   ;; TeXmacs servers and clients
   (server-define-error-codes server_define_error_codes (void))

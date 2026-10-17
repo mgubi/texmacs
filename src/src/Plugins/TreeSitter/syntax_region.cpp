@@ -14,8 +14,12 @@
 #include "tree-sitter/include/tree_sitter/api.h"
 #include <stdlib.h>
 #include <string.h>
+#include <algorithm>
+#include <vector>
 
 const TSLanguage* tree_sitter_get_language (int language);
+void tree_sitter_query_run (int query, TSNode root, const char* text,
+                            array<int>& r);
 
 /******************************************************************************
 * Decoding the TeXmacs encoding
@@ -95,6 +99,9 @@ struct syntax_region_rep {
   TSParser* parser;
   TSTree* tree;
   int full_parses, incremental_parses;
+  int version;                 // changes at each parse
+  int hl_query, hl_version;    // the colours below are for these
+  array<array<int> > hl_cols;  // colour per position, per line
 };
 
 static array<syntax_region_rep*> regions;
@@ -170,6 +177,7 @@ region_parse (syntax_region_rep* r, TSTree* old) {
   TSTree* t= ts_parser_parse (r->parser, old, input);
   if (old != NULL) ts_tree_delete (old);
   r->tree= t;
+  r->version++;
 }
 
 static string
@@ -255,6 +263,9 @@ get_region (tree root, int language) {
   r->tree= NULL;
   r->full_parses= 1;
   r->incremental_parses= 0;
+  r->version= 0;
+  r->hl_query= -1;
+  r->hl_version= -1;
   ts_parser_set_language (r->parser, lang);
   region_parse (r, NULL);
   if (N(regions) >= max_regions) {
@@ -363,4 +374,64 @@ syntax_region_statistics (tree root, int language) {
   syntax_region_rep* r= get_region (root, language);
   if (r != NULL) a << r->full_parses << r->incremental_parses;
   return a;
+}
+
+/******************************************************************************
+* Colours of the lines
+******************************************************************************/
+
+struct ts_capture { int start, end, color; };
+
+static bool
+capture_less (const ts_capture& a, const ts_capture& b) {
+  // in the order of the text, and the outer node first
+  if (a.start != b.start) return a.start < b.start;
+  return a.end > b.end;
+}
+
+array<array<int> >
+syntax_region_highlight (tree root, int language, int query, array<int> colors) {
+  // the colour codes of each position of each line, for the query with the
+  // colour code of each capture (0: no colour). As in tree-sitter-highlight,
+  // the last pattern which captures a node gives its colour (none when its
+  // capture has no colour), and an inner node is painted over an outer one.
+  // Nodes are told apart by their ranges.
+  syntax_region_rep* r= get_region (root, language);
+  if (r == NULL) return array<array<int> > ();
+  if (r->hl_query == query && r->hl_version == r->version) return r->hl_cols;
+  string text;
+  for (int i= 0; i < N(r->lines); i++) {
+    if (i > 0) text << "\n";
+    text << r->lines[i];
+  }
+  array<int> caps;
+  c_string ctext (text);
+  tree_sitter_query_run (query, ts_tree_root_node (r->tree), ctext, caps);
+  std::vector<ts_capture> v;
+  for (int i= 0; i + 2 < N(caps); i += 3) {
+    int c= caps[i+2];
+    int col= (c >= 0 && c < N(colors))? colors[c]: 0;
+    v.push_back (ts_capture { caps[i], caps[i+1], col });
+  }
+  std::stable_sort (v.begin (), v.end (), capture_less);
+  array<int> paint (N(text));
+  for (int i= 0; i < N(text); i++) paint[i]= 0;
+  for (size_t k= 0; k < v.size (); k++) {
+    if (k + 1 < v.size () && v[k].start == v[k+1].start && v[k].end == v[k+1].end)
+      continue;
+    if (v[k].color == 0) continue;
+    int a= max (v[k].start, 0), b= min (v[k].end, N(text));
+    for (int i= a; i < b; i++) paint[i]= v[k].color;
+  }
+  array<array<int> > cols;
+  for (int i= 0; i < N(r->lines); i++) {
+    int n= N(r->lines[i]), o= r->offsets[i];
+    array<int> c (n);
+    for (int j= 0; j < n; j++) c[j]= paint[o + j];
+    cols << c;
+  }
+  r->hl_query= query;
+  r->hl_version= r->version;
+  r->hl_cols= cols;
+  return cols;
 }

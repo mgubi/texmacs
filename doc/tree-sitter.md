@@ -550,6 +550,43 @@ positions; error and missing ranges. As planned initially:
 
 ### Phase 3: highlighting
 
+Done (2026-10-17), with these differences from the plan below:
+
+- `Plugins/TreeSitter/ts_highlight.cpp`: `prog_language` wraps the usual
+  language of `scheme`, `json` and `c` in a `treesit_language_rep`, which
+  delegates to it until Scheme installs a highlighter
+  (`progs/treesit/ts-highlight.scm`, asked for by C++ at the first
+  highlight of the language: `treesit-highlighter-request`; the tables are
+  then loaded from the cache or generated in the background, and the open
+  buffers typeset again). Preference `tree-sitter highlighting` (default
+  on); `tree-sitter-set-highlighting` switches it off without writing
+  preferences (the `parse` suite does, to test the tokenizers).
+- The region of a line is its parent document, found by the ip of the line;
+  a detached line or a single string is a region by itself. The query runs
+  on the whole region once per parse (`syntax_region_highlight` caches the
+  colours per line).
+- Overlaps as tree-sitter-highlight really does: for one node the **last**
+  pattern wins (`highlight.rs`: "keep iterating over any later highlighting
+  patterns that also match this node"), an inner node over an outer one.
+  The upstream queries are written for this.
+- Capture names to classes: `treesit-capture-classes`, longest dotted
+  prefix; unknown names (`@variable`) keep the colour of the text. The
+  colours are those of the classes (`syntax:<lan>:<class>` preferences), so
+  Scheme code now has the palette of the other program languages, not the
+  environment colours of `scheme_language_rep`.
+- Queries: `misc/tree-sitter/c/highlights.scm` from tree-sitter-c,
+  `json/highlights.scm` from tree-sitter-json, and our own
+  `scheme/highlights.scm` (the forms of TeXmacs, `<less>` and `<gtr>`: the
+  predicates see the TeXmacs strings).
+- Lines whose colours change without being modified are typeset again by
+  `treesit-schedule-updates` (delayed, `update-path`).
+- No `cpp` yet: the TeXmacs `cpp` mode needs tree-sitter-cpp (phase 4, its
+  scanner). Typing in `parser.c` (2316 lines): first highlight 94 ms, then
+  4.8 ms per edit (reparse plus the whole query); restricting the query to
+  `ts_tree_get_changed_ranges` is left for later.
+
+As planned initially:
+
 - `ts_language_rep : language_rep`, chosen by `prog_language (lan)` when the
   registry has the language: `highlight (t)` runs the query on the rows of
   the line and stores colours in the existing `highlight_observer`

@@ -9114,6 +9114,60 @@ tmg_syntax_region_forget (tmscm arg1) {
 }
 
 tmscm
+tmg_tree_sitter_set_highlighter (tmscm arg1, tmscm arg2, tmscm arg3) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "tree-sitter-set-highlighter");
+  TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "tree-sitter-set-highlighter");
+  TMSCM_ASSERT_ARRAY_STRING (arg3, TMSCM_ARG3, "tree-sitter-set-highlighter");
+
+  string in1= tmscm_to_string (arg1);
+  int in2= tmscm_to_int (arg2);
+  array_string in3= tmscm_to_array_string (arg3);
+
+  // TMSCM_DEFER_INTS;
+  tree_sitter_set_highlighter (in1, in2, in3);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_tree_sitter_pending_updates () {
+  // TMSCM_DEFER_INTS;
+  array_tree out= tree_sitter_pending_updates ();
+  // TMSCM_ALLOW_INTS;
+
+  return array_tree_to_tmscm (out);
+}
+
+tmscm
+tmg_tree_sitter_line_colors (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "tree-sitter-line-colors");
+  TMSCM_ASSERT_TREE (arg2, TMSCM_ARG2, "tree-sitter-line-colors");
+
+  string in1= tmscm_to_string (arg1);
+  tree in2= tmscm_to_tree (arg2);
+
+  // TMSCM_DEFER_INTS;
+  object out= tree_sitter_line_colors (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return object_to_tmscm (out);
+}
+
+tmscm
+tmg_tree_sitter_set_highlighting (tmscm arg1) {
+  TMSCM_ASSERT_BOOL (arg1, TMSCM_ARG1, "tree-sitter-set-highlighting");
+
+  bool in1= tmscm_to_bool (arg1);
+
+  // TMSCM_DEFER_INTS;
+  tree_sitter_set_highlighting (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
 tmg_server_define_error_codes () {
   // TMSCM_DEFER_INTS;
   server_define_error_codes ();
@@ -12520,6 +12574,10 @@ initialize_glue_basic () {
   tmscm_install_procedure ("syntax-region-errors",  tmg_syntax_region_errors, 2, 0, 0);
   tmscm_install_procedure ("syntax-region-statistics",  tmg_syntax_region_statistics, 2, 0, 0);
   tmscm_install_procedure ("syntax-region-forget",  tmg_syntax_region_forget, 1, 0, 0);
+  tmscm_install_procedure ("tree-sitter-set-highlighter",  tmg_tree_sitter_set_highlighter, 3, 0, 0);
+  tmscm_install_procedure ("tree-sitter-pending-updates",  tmg_tree_sitter_pending_updates, 0, 0, 0);
+  tmscm_install_procedure ("tree-sitter-line-colors",  tmg_tree_sitter_line_colors, 2, 0, 0);
+  tmscm_install_procedure ("tree-sitter-set-highlighting",  tmg_tree_sitter_set_highlighting, 1, 0, 0);
   tmscm_install_procedure ("server-define-error-codes",  tmg_server_define_error_codes, 0, 0, 0);
   tmscm_install_procedure ("server-start",  tmg_server_start, 0, 0, 0);
   tmscm_install_procedure ("server-stop",  tmg_server_stop, 0, 0, 0);

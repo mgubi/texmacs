@@ -27,7 +27,8 @@
   (:use (check check-lib)
         (treesit ts-base) (treesit ts-grammar) (treesit ts-nfa)
         (treesit ts-tables) (treesit ts-build) (treesit ts-language)
-        (treesit ts-parse) (treesit ts-export) (treesit ts-registry)))
+        (treesit ts-parse) (treesit ts-export) (treesit ts-registry)
+        (treesit ts-highlight)))
 
 (define (json-grammar-file)
   (url->system (url-concretize "$TEXMACS_PATH/misc/tree-sitter/json/grammar.json")))
@@ -398,6 +399,75 @@
         (check= (car (syntax-region-node-at t scheme 0 5)) '("symbol" #t (0 5) (0 11) #f))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Highlighting
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (with-test-buffer doc thunk)
+  (let* ((old (current-buffer))
+         (u (new-buffer)))
+    (switch-to-buffer* u)
+    (buffer-set-body u (stree->tree doc))
+    (thunk u (buffer-get-body u))
+    (buffer-close u)
+    (when (buffer-exists? old) (switch-to-buffer old))))
+
+(define (test-highlight)
+  (check= (treesit-capture-class "keyword") "keyword")
+  (check= (treesit-capture-class "keyword.control.return") "keyword_control")
+  (check= (treesit-capture-class "string.special.key") "declare_identifier")
+  (check= (treesit-capture-class "variable") "")
+  (check= (treesit-capture-class "stringy") "")
+  (when (defined? 'tree-sitter-line-colors)
+    (treesit-generate-cache "c")
+    ;; Scheme, with <less> as the operator <
+    (let ((d (stree->tree '(document "(define (f x)" "  (if (<less> x 1) \"a\\n\" 'b)) ; c"))))
+      (tree-sitter-line-colors "scheme" d)
+      (check= (tree-sitter-line-colors "scheme" (tree-ref d 0))
+              '((0 1 "operator_openclose") (1 7 "keyword") (8 9 "operator_openclose")
+                (9 10 "variable_function") (12 13 "operator_openclose")))
+      (check= (tree-sitter-line-colors "scheme" (tree-ref d 1))
+              '((2 3 "operator_openclose") (3 5 "keyword") (6 7 "operator_openclose")
+                (7 13 "operator") (16 17 "constant_number") (17 18 "operator_openclose")
+                (19 21 "constant_string") (21 23 "constant_char") (23 24 "constant_string")
+                (25 27 "constant") (27 29 "operator_openclose") (30 33 "comment"))))
+    ;; a comment over several lines of C
+    (let ((d (stree->tree '(document "int x = 1;" "/* a" "b */ return 0;"))))
+      (tree-sitter-line-colors "c" d)
+      (check= (tree-sitter-line-colors "c" (tree-ref d 0))
+              '((0 3 "declare_type") (6 7 "operator") (8 9 "constant_number")
+                (9 10 "operator_field")))
+      (check= (tree-sitter-line-colors "c" (tree-ref d 1)) '((0 4 "comment")))
+      (check= (tree-sitter-line-colors "c" (tree-ref d 2))
+              '((0 4 "comment") (5 11 "keyword") (12 13 "constant_number")
+                (13 14 "operator_field"))))
+    ;; in a buffer, a modified line is highlighted with its region (found by
+    ;; its ip), and the other lines whose colours change are to be typeset
+    ;; again
+    (with-test-buffer '(document "int x;" "y = 1;" "z */")
+      (lambda (u b)
+        (tree-sitter-line-colors "c" (tree-ref b 0))
+        (check= (tree-sitter-line-colors "c" (tree-ref b 1))
+                '((2 3 "operator") (4 5 "constant_number") (5 6 "operator_field")))
+        (tree-insert! (tree-ref b 0) 0 "/* ")
+        (check= (tree-sitter-line-colors "c" (tree-ref b 0)) '((0 9 "comment")))
+        (check= (tree-sitter-line-colors "c" (tree-ref b 1)) '((0 6 "comment")))
+        (let ((p (tree-sitter-pending-updates)))
+          (check= (map tree->string p) '("y = 1;" "z */"))
+          (check-true (tree-eq? (car p) (tree-ref b 1))))))
+    ;; the typesetter highlights the code of scm-code
+    (with-test-buffer '(document (scm-code (document "(define x 1)" "(if x \"a\" 'b)")))
+      (lambda (u b)
+        (update-forced)
+        (let ((code (tree-ref b 0 0)))
+          (tree-insert! (tree-ref code 1) 1 "when ")
+          (update-forced)
+          ;; made by the typesetter, then updated after the edit
+          (check= (syntax-region-statistics code (treesit-language "scheme")) '(1 1))
+          (check= (tree-sitter-line-colors "scheme" (tree-ref code 1))
+                  '((0 1 "operator_openclose") (1 5 "keyword") (11 14 "constant_string")
+                    (15 17 "constant") (17 18 "operator_openclose"))))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Master routine
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -413,4 +483,5 @@
   (test-c-runtime)
   (test-registry)
   (test-regions)
+  (test-highlight)
   (check-end))

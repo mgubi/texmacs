@@ -201,14 +201,8 @@ satisfies_predicates (ts_query_entry* e, const TSQueryMatch& m, const char* text
   return true;
 }
 
-array<int>
-tree_sitter_query_captures (int query, string text) {
-  // start, end (in bytes) and capture index of each capture of the query in
-  // the tree of text, in the order of the text, after the predicates
-  array<int> r;
-  if (query < 0 || query >= N(ts_queries)) return r;
-  ts_query_entry* e= ts_queries[query];
-  TSQuery* q= e->query;
+static std::vector<int>
+regex_bases (TSQuery* q) {
   // the index of the first regular expression of each pattern
   std::vector<int> regex_base;
   int count= 0;
@@ -225,16 +219,23 @@ tree_sitter_query_captures (int query, string text) {
           steps[i+2].type == TSQueryPredicateStepTypeString) count++;
     }
   }
-  TSParser* p= ts_parser_new ();
-  ts_parser_set_language (p, ts_languages[e->language]);
-  c_string s (text);
-  TSTree* t= ts_parser_parse_string (p, NULL, s, (uint32_t) N(text));
+  return regex_base;
+}
+
+void
+tree_sitter_query_run (int query, TSNode root, const char* text, array<int>& r) {
+  // append start, end (in bytes) and capture index of each capture of the
+  // query under root, in the order of the text, after the predicates
+  if (query < 0 || query >= N(ts_queries)) return;
+  ts_query_entry* e= ts_queries[query];
+  TSQuery* q= e->query;
+  std::vector<int> regex_base= regex_bases (q);
   TSQueryCursor* c= ts_query_cursor_new ();
-  ts_query_cursor_exec (c, q, ts_tree_root_node (t));
+  ts_query_cursor_exec (c, q, root);
   TSQueryMatch m;
   uint32_t index;
   while (ts_query_cursor_next_capture (c, &m, &index)) {
-    if (!satisfies_predicates (e, m, s, regex_base)) {
+    if (!satisfies_predicates (e, m, text, regex_base)) {
       ts_query_cursor_remove_match (c, m.id);
       continue;
     }
@@ -243,7 +244,25 @@ tree_sitter_query_captures (int query, string text) {
       << (int) cap.index;
   }
   ts_query_cursor_delete (c);
+}
+
+array<int>
+tree_sitter_query_captures (int query, string text) {
+  // the captures of the query in the tree of text (see tree_sitter_query_run)
+  array<int> r;
+  if (query < 0 || query >= N(ts_queries)) return r;
+  TSParser* p= ts_parser_new ();
+  ts_parser_set_language (p, ts_languages[ts_queries[query]->language]);
+  c_string s (text);
+  TSTree* t= ts_parser_parse_string (p, NULL, s, (uint32_t) N(text));
+  tree_sitter_query_run (query, ts_tree_root_node (t), s, r);
   ts_tree_delete (t);
   ts_parser_delete (p);
   return r;
+}
+
+int
+tree_sitter_query_language (int query) {
+  if (query < 0 || query >= N(ts_queries)) return -1;
+  return ts_queries[query]->language;
 }

@@ -24,5 +24,7 @@ object syntax_region_node_at (tree region, int language, int row, int column);
 object syntax_region_errors (tree region, int language);
 array<int> syntax_region_statistics (tree region, int language);
 void syntax_region_forget (tree region);
+array<array<int> > syntax_region_highlight (tree region, int language,
+                                            int query, array<int> colors);
 
 #endif // SYNTAX_REGION_H
