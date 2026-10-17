@@ -624,8 +624,8 @@ Done in part (2026-10-17):
 - `ts-scanner-cpp.scm` (raw strings). With the Scheme scanners, the C runtime
   passes the corpus of tree-sitter-cpp (124 tests, 16 ms in all) and of
   tree-sitter-python (117 tests, 90 ms).
-- Python is highlighted (tables in 20 s in TeXmacs). C++ is registered
-  but **not highlighted**: its tables come out exact (11734 states, 570
+- Python is highlighted (tables in 20 s in TeXmacs). C++ was registered
+  but not highlighted (it is now, see below): its tables come out exact (11734 states, 570
   symbols, as `tree-sitter generate`) but cost about 10 minutes and 6 GB
   standalone, so about half an hour in TeXmacs: 100525 LR(1) states before
   merging (LR construction about 100 s and 5 GB), then about 10 million
@@ -703,6 +703,14 @@ Done in part (2026-10-17):
   What remains in Scheme: reading and preparing the grammar and its NFA,
   the token conflicts (5 s), the runtime language (`tables->language`,
   21 s under S7, 6 s under femtolisp).
+- **C++ highlighted** (same day): with the tables in about a minute,
+  `cpp` joins the highlighted languages. Its captures (the query of
+  tree-sitter-c followed by that of tree-sitter-cpp, as `; inherits: c`
+  says) equal those of `tree-sitter query` in order: 127 on a sample with
+  templates, lambdas and raw strings, 18510 on `ts_tables.cpp` (87 KB).
+  The generation in TeXmacs under S7 (`TS_PROFILE=1`): LR 3.5 s, token
+  conflicts 7.3 s, states and lex tables (C++) 4.0 s, language 32.7 s,
+  68 s in all; the runtime language is now half of the time.
 
 As planned initially:
 

@@ -25,8 +25,8 @@
 
 ;; program language of TeXmacs -> language of tree-sitter
 (define-public treesit-highlight-languages
-  ;; (not yet cpp: generating its tables takes 10 minutes and 6 GB)
-  '(("scheme" . "scheme") ("json" . "json") ("c" . "c") ("python" . "python")))
+  '(("scheme" . "scheme") ("json" . "json") ("c" . "c") ("cpp" . "cpp")
+    ("python" . "python")))
 
 ;; capture name -> colour class (initialize_color_encodings in
 ;; System/Language/language.cpp); the longest prefix of the name decides,

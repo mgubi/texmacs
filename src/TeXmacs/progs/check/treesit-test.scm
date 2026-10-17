@@ -298,6 +298,12 @@
   (check-false (treesit-supported? "fortran"))
   (for (lan treesit-languages)
     (check-true (url-exists? (treesit-grammar-url lan))))
+  ;; each highlighted language has its grammar and its query
+  (for (p treesit-highlight-languages)
+    (check-true (in? (cdr p) treesit-languages))
+    (check-true (url-exists? (url-concretize
+                              (string-append "$TEXMACS_PATH/misc/tree-sitter/"
+                                             (cdr p) "/highlights.scm")))))
   (when (defined? 'tree-sitter-language-load)
     (check-true (treesit-supported? "json"))
     (let ((file (treesit-cache-url "json")))
