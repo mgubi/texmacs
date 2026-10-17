@@ -98,7 +98,7 @@ enum tree_label {
   FIND_ACCESSIBLE, HLINK, ACTION, RELAY,
   SET_BINDING, GET_BINDING, HAS_BINDING, HIDDEN_BINDING,
   LABEL, REFERENCE, PAGEREF,
-  GET_ATTACHMENT, WRITE, TOC_NOTIFY, CACHE_REF, AUTO_ID,
+  GET_ATTACHMENT, WRITE, TOC_NOTIFY, CACHE_REF,
 
   // various other tags
   TUPLE, ATTR, TMLEN, COLLECTION, ASSOCIATE, BACKUP, _PATTERN, GRADIENT,
@@ -145,6 +145,10 @@ enum tree_label {
   SET, RESET, EXPAND, VAR_EXPAND, HIDE_EXPAND,
   APPLY, BEGIN, END, FUNC, ENV,
   AUTHORIZE, POSTSCRIPT,
+
+  // added since: after the others, whose numbers stay (a cache_ref sends
+  // the number of a tag to the clients: tree_cache::generate_cache_ref)
+  AUTO_ID,
 
   // user extensions
   START_EXTENSIONS

@@ -149,7 +149,7 @@ public:
   bool is_current_editor ();
   // what the event loop does after the events: applies the changes to the
   // view (a zoom, the typesetting...), which a test may do at once
-  inline void apply_pending_changes () { apply_changes (); }
+  virtual void apply_pending_changes () = 0;
   
   /* public routines from edit_interface */
   virtual void suspend () = 0;

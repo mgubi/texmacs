@@ -732,8 +732,14 @@ edit_interface_rep::find_alt_selection_index
     return find_alt_selection_index (alt_sel, y, h, e);
 }
 
+// (apply_changes at work: apply_pending_changes does not start it again)
+static int applying_changes= 0;
+
 void
 edit_interface_rep::apply_changes () {
+  struct applying {
+    applying () { applying_changes++; }
+    ~applying () { applying_changes--; } } busy;
   //cout << "Apply changes\n";
   //cout << "et= " << et << "\n";
   //cout << "tp= " << tp << "\n";
@@ -789,10 +795,15 @@ edit_interface_rep::apply_changes () {
   
   // cout << "Handling automatic resizing\n";
   int sb= 1;
+  bool zoomed= false;
   if (is_attached (this) && has_current_window ()) {
     tree new_zoom= as_string (zoomf);
     tree old_zoom= get_init_value (ZOOM_FACTOR);
-    if (new_zoom != old_zoom) set_zoom (new_zoom);
+    if (new_zoom != old_zoom) {
+      set_zoom (new_zoom);
+      // (everything on the screen moves, also what was not typeset again)
+      zoomed= true;
+    }
   
     if (get_init_string (PAGE_MEDIUM) == "automatic")
     {
@@ -1191,7 +1202,7 @@ edit_interface_rep::apply_changes () {
   }
   
   // cout << "Handling environment changes\n";
-  if (env_change & THE_ENVIRONMENT)
+  if ((env_change & THE_ENVIRONMENT) || zoomed)
     send_invalidate_all (this);
 
   // cout << "Handling menus\n";
@@ -1206,6 +1217,16 @@ edit_interface_rep::apply_changes () {
   last_update = last_change-1;
   last_visible= new_visible;
   manual_focus_release ();
+}
+
+// what the event loop does after the events, at once (a test zooms with
+// it): as the event loop, only for a view in a window (tm_server_rep), and
+// not from within apply_changes (from Scheme which it calls)
+void
+edit_interface_rep::apply_pending_changes () {
+  if (applying_changes > 0 || headless_mode ||
+      !is_attached (this) || !has_current_window ()) return;
+  apply_changes ();
 }
 
 /******************************************************************************

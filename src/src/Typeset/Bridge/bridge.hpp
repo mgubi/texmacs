@@ -69,6 +69,9 @@ public:
   int                  serial;   // number of the bridge, in the order of
                                  // creation (never the one of another)
   chunk_cache_rep*     chunk_cache; // see chunk_lines in bridge.cpp
+  array<page_item>     merged;   // l merged into one item (merged_lines),
+  int                  merged_version; // for this version of l
+  path                 merged_ip;      // and this path
 
 public:
   bridge_rep (typesetter ttt, tree st, path ip);

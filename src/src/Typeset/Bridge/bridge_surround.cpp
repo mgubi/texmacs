@@ -191,6 +191,7 @@ bridge_surround_rep::my_typeset (int desired_status) {
   if (parts_again ()) {
     bool inputs= (typeset_inputs_mode () != 0);
     unsigned long long fp= (inputs? env->fingerprint (): 0);
+    tree zoom_at= env->zoom_value ();
     array<string>* keys= env->rec_keys;
     int k0= (keys == NULL? 0: N(*keys));
     array<int>* vars= env->input_vars ();
@@ -218,7 +219,7 @@ bridge_surround_rep::my_typeset (int desired_status) {
     env->zoom_read ()= zoom0 || zoom;
     if (inputs) {
       parts_zoom= zoom;
-      parts_zoom_at= env->zoom_value ();
+      parts_zoom_at= zoom_at;
       // (what the parts looked up: added to the record of the bridge)
       parts_ok= (keys != NULL);
       parts_fp= fp;

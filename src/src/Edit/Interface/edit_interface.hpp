@@ -140,6 +140,7 @@ public:
   void update_menus ();
   int  find_alt_selection_index (range_set alt_sel, SI y, int b, int e);
   void apply_changes ();
+  void apply_pending_changes ();
   void animate ();
 
   /* miscellaneous */

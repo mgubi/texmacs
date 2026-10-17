@@ -45,7 +45,8 @@ bridge_rep::bridge_rep (typesetter ttt2, tree st2, path ip2):
   ttt (ttt2), env (ttt->env), st (st2), ip (ip2),
   status (CORRUPTED), changes (UNINIT), reads (),
   seen_stamp (0), in_known (false), in_vals (0), in_state (0), in_items (0),
-  in_fp (0), in_zoom (false), in_zoom_at (""), version (0), chunk_cache (NULL)
+  in_fp (0), in_zoom (false), in_zoom_at (""), version (0), chunk_cache (NULL),
+  merged_version (-1)
 {
   static int bridges_made= 0;
   serial= bridges_made++;
@@ -451,6 +452,14 @@ merged_lines (bridge_rep* br) {
   if (flag && typeset_caches_mode () == 0) { drop_chunks (br); return l; }
   if (flag) return chunk_lines (br, l);
   drop_chunks (br);
+  // the item made before when l is the same: a block of paragraphs which
+  // follows finds the item before it (bridge_block_rep::my_reusable), also
+  // outside paper mode (TEXMACS_TYPESET_CACHES "off": made again; "check":
+  // made again, and compared with it)
+  int mode= typeset_caches_mode ();
+  bool kept= mode != 0 && br->merged_version == br->version &&
+             N(br->merged) != 0 && strong_equal (br->merged_ip, br->ip);
+  if (kept && mode == 1) return br->merged;
   int first=-1, last=-1;
   array<box> bs;
   array<SI>  spc;
@@ -473,6 +482,17 @@ merged_lines (bridge_rep* br) {
   new_l[0]= page_item (lb);
   new_l[0]->spc= l[last]->spc;
   new_l << special_l;
+  if (kept) {
+    // (the check mode: the item kept is used, as with the cache on)
+    if (!same_page_items (new_l, br->merged))
+      typeset_cache_mismatch ("merged lines of a paragraph");
+    return br->merged;
+  }
+  if (mode != 0) {
+    br->merged= new_l;
+    br->merged_version= br->version;
+    br->merged_ip= br->ip;
+  }
   return new_l;
 }
 
@@ -819,6 +839,7 @@ bridge_rep::typeset_by_inputs (int desired_status) {
   unsigned long long items= items_signature (ttt->a, ttt->b);
   array<box> item_boxes= items_boxes (ttt->a, ttt->b);
   unsigned long long fp= env->fingerprint ();
+  tree zoom_at= env->zoom_value ();  // (as fp: before it, which same_inputs sees)
   hashmap<string,tree> prev_back (UNINIT);
   my_clean_links ();
   link_repository old_link_env= env->link_env;
@@ -844,7 +865,7 @@ bridge_rep::typeset_by_inputs (int desired_status) {
   reads= shared_ids (reads);
   record.stop ();
   in_zoom= record.zoom;
-  in_zoom_at= env->zoom_value ();
+  in_zoom_at= zoom_at;
   in_known= known;
   in_vars= shared_ids (my_vars);
   in_vals= my_vals;
