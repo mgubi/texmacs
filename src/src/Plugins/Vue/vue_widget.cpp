@@ -6653,6 +6653,11 @@ vue_simple_widget_rep::do_layout () {
     // typeset boxes (texmacs-output) have their natural size; editors,
     // embedded or not, fill their container (their size hint is the screen)
     handle_get_size_hint (w, h);
+    // its extents are its own (an editor tells its own, SLOT_EXTENTS): left
+    // at (0,0,0,0), the box was taken for a document narrower than the view
+    // and centered in it, so that it began in the middle of the view (the
+    // tooltips, as the previews of references, were cut and half blank)
+    extents= rectangle (0, -h, w, 0);
     // a typeset box has its natural size, unless it was given one: a
     // "resize" around it is a pane of that size, which it has to fill
     // (its own background is painted over the whole of its rectangle)
