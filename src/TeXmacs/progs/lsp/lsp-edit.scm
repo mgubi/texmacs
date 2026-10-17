@@ -554,7 +554,8 @@
 
 ;; Signatures: after a ( or a , (the trigger characters of the server), the
 ;; signature of the function whose arguments are typed is shown on the
-;; status bar, with the current argument in bold
+;; status bar, with the current argument between guillemets (the status
+;; bar shows text, not markup: a bold argument was shown as the others)
 
 (define signature-shown? #f)
 
@@ -563,9 +564,9 @@
                               "signatureHelpProvider" "triggerCharacters"))
     (if (null? l) '("(" ",") l)))
 
-(define (bold-parameter label param)
-  ;; the Cork markup of @label (utf8) with its part @param (a string, or
-  ;; offsets) in bold
+(define (mark-parameter label param)
+  ;; the Cork string @label (utf8) with its part @param (a string, or
+  ;; offsets) between guillemets
   (let* ((range (cond ((string? param)
                        (with i (string-search-forwards param 0 label)
                          (and (>= i 0) (list i (+ i (string-length param))))))
@@ -576,14 +577,16 @@
                               (list a b))))
                       (else #f))))
     (if (not range) (utf8->cork label)
-        `(concat ,(utf8->cork (substring label 0 (car range)))
-                 (strong ,(utf8->cork (substring label (car range)
-                                                 (cadr range))))
-                 ,(utf8->cork (substring label (cadr range)
-                                         (string-length label)))))))
+        ;; (19 and 20 are the guillemets in Cork)
+        (string-append (utf8->cork (substring label 0 (car range)))
+                       (string (integer->char 19))
+                       (utf8->cork (substring label (car range) (cadr range)))
+                       (string (integer->char 20))
+                       (utf8->cork (substring label (cadr range)
+                                              (string-length label)))))))
 
 (tm-define (lsp-signature-markup r)
-  (:synopsis "The markup of the SignatureHelp @r, or #f")
+  (:synopsis "The text (Cork) of the SignatureHelp @r, or #f")
   (let* ((sigs (lsp-items (lsp-ref r "signatures")))
          (i (or (lsp-number-value (lsp-ref r "activeSignature")) 0))
          (s (and (nnull? sigs)
@@ -592,7 +595,7 @@
          (ap (and s (or (lsp-number-value (lsp-ref r "activeParameter"))
                         (lsp-number-value (lsp-ref s "activeParameter")))))
          (param (and ap (lsp-ref s "parameters" ap "label"))))
-    (and (string? label) (bold-parameter label param))))
+    (and (string? label) (mark-parameter label param))))
 
 (tm-define (lsp-signature-help)
   (:synopsis "Shows the signature of the function at the cursor")

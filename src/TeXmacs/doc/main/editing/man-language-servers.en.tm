@@ -190,7 +190,8 @@
 
   After an opening bracket or a comma (the characters which the server
   asks for), the signature of the function whose arguments are being typed
-  is shown on the status bar, with the current argument in bold. The
+  is shown on the status bar, with the current argument between
+  guillemets, as in <verbatim|f (int a, \Sint b\T)>. The
   closing bracket removes it.
 
   <paragraph*|The list of diagnostics>

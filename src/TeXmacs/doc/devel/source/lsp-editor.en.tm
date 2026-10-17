@@ -184,8 +184,9 @@
   <verbatim|textDocument/signatureHelp> after a trigger character of the
   server (<verbatim|(> and <verbatim|,> by default), without waiting;
   <scm|lsp-signature-markup> makes the label of the active signature, with
-  the active parameter (a substring, or offsets) in bold, for the status
-  bar, which a <verbatim|)> clears.
+  the active parameter (a substring, or offsets) between guillemets, for
+  the status bar, which a <verbatim|)> clears (the status bar shows text,
+  not markup: a bold parameter looked as the others).
 
   <paragraph*|Definitions>
 

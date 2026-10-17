@@ -724,7 +724,7 @@
                                                          "version" (lsp-null))
                                              "edits" (lsp-array))))))
           '("file:///c.c"))
-  ;; signatures, the current parameter in bold
+  ;; signatures, the current parameter between guillemets (19 and 20)
   (with sig (lsp-object "signatures"
                         (lsp-array (lsp-object "label" "int f(int a, int b)"
                                                "parameters"
@@ -733,7 +733,8 @@
                                                 (lsp-object "label" "int b"))))
                         "activeParameter" (lsp-number 1))
     (check= (lsp-signature-markup sig)
-            '(concat "int f(int a, " (strong "int b") ")")))
+            (string-append "int f(int a, " (string (integer->char 19))
+                           "int b" (string (integer->char 20)) ")")))
   (check= (lsp-signature-markup
            (lsp-object "signatures"
                        (lsp-array (lsp-object "label" "g(x)"
@@ -744,7 +745,8 @@
                                                             (lsp-number 2)
                                                             (lsp-number 3))))))
                        "activeParameter" (lsp-number 0)))
-          '(concat "g(" (strong "x") ")"))
+          (string-append "g(" (string (integer->char 19)) "x"
+                         (string (integer->char 20)) ")"))
   ;; the point under the mouse (the hovers at rest)
   (update-forced)
   (check-true (list? (xy->path 0 0))))
