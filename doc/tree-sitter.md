@@ -760,10 +760,44 @@ Done in part (2026-10-17):
   after newlines in braces; the raw strings `r"-(...)-"`). Tables in 0.3 s;
   corpus 89 tests pass, highlight captures equal on a sample and on the 8
   files of test/highlight.
+- **Julia** (same day): `ts-scanner-julia.scm` ports the scanner of
+  tree-sitter-julia (nested block comments, the brackets and quotes right
+  after a token, the content of strings and commands). Its grammar found
+  two bugs of the generator, which the other grammars did not show:
+  - Its identifier pattern uses an intersection of classes,
+    `[...&&[^0-9#*]]`; the parser of patterns did not know the operators
+    of classes of the regex crate (`&&`, `--`, `~~`), so the identifier
+    could start with almost anything, it conflicted with every token, no
+    keyword was found for 14 of them, and the merging kept 56999 states
+    (tree-sitter: 8267). Fixed in `ts-nfa.scm`; `treesit-generator-version`
+    is now 2, so that the cached tables are made again.
+  - Then its highlight query did not compile (error 5, "structure"): the
+    symbol part of the language did not follow render.rs. An alias is the
+    *public* symbol of the first symbol which is its node; the aliases of
+    their own come from the productions only, sorted by name; the alias map
+    and the supertype map are ordered (and the supertype map deduplicated)
+    by the C identifiers of the symbols, which `ts-language.scm` now makes
+    as render.rs does (`sanitize-identifier`, numbers for equal names). The
+    previous output differed from parser.c on json, c, python and cpp too
+    (alias ids, children of supertypes), without visible effect there.
+  Now the symbol part equals that of parser.c for json, c, python, cpp and
+  julia (`compare.c`), and the parse tables are the same up to the numbers
+  of the states: tree-sitter orders the states of the same size with an
+  unstable sort, so the numbers of some states, and with them the lex
+  states and the primary states, differ. Julia: corpus 63 tests pass,
+  highlight captures equal; tables in 11 s and 1.5 GB under S7 (tree-sitter
+  generate: 4 s, 0.7 GB), most of it in the merging and the lex tables.
+- An S7 pitfall met on the way: in a `do` loop whose body calls a builtin
+  through another name (`ahash-set!` is `hash-table-set!`), s7 changes the
+  counter in place, so the counter stored as a value (or in a list) ends
+  as its last value; called by its own name, `hash-table-set!` is safe. It
+  concerns all the code of TeXmacs under S7 which stores a `do` counter
+  with `ahash-set!`; in `ts-language.scm` the loop is now a named let.
 - Tools (`src/misc/tree-sitter`): `corpus.py LANGUAGE CORPUS...` runs the
   corpus tests of a grammar in TeXmacs as `tree-sitter test` compares
   them; `highlights.py LANGUAGE GRAMMAR-DIR FILE...` compares the captures
-  with those of `tree-sitter query`.
+  with those of `tree-sitter query`; `compare.c` compares a `.tsdyn` of
+  the cache with the `parser.c` of `tree-sitter generate`.
 
 As planned initially:
 
