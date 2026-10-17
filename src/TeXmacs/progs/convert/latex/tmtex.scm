@@ -3045,7 +3045,7 @@
            (csl (url-append (url-head tmtex-image-root-url)
                             (string-append name ".csl")))
            (src (tmtex-csl-style-source name)))
-      (string-save (bib-export-bibtex (caddr tmtex-csl) (cadr tmtex-csl)) bib)
+      (string-save (bib-entries-as-bibtex (caddr tmtex-csl) (cadr tmtex-csl)) bib)
       (set! tmtex-csl-resource (url->string (url-tail bib)))
       (when (and src (not (url-exists? csl)))
         (string-save (string-load src) csl)))))
@@ -3103,7 +3103,7 @@
     (set! tmtex-csl-names*
           (csl-textual-authors
            (string-append "csl-" (car tmtex-csl))
-           (bib-export-bibtex (caddr tmtex-csl) (cadr tmtex-csl))
+           (bib-entries-as-bibtex (caddr tmtex-csl) (cadr tmtex-csl))
            (caddr tmtex-csl))))
   tmtex-csl-names*)
 

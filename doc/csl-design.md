@@ -242,7 +242,7 @@ style itself (`tmtex.scm`, "Citations in a CSL style", mode `csl-package%`):
   `[NO_PRINTED_FORM]`, so the names come from TeXmacs
   (`csl-textual-authors`): "Knuth and van der Hoeven \cite{knuth86b}", and
   `cite-year` is `\citeyearpar`;
-- next to the .tex file go the cited entries (`bib-export-bibtex`: from the
+- next to the .tex file go the cited entries (`bib-entries-as-bibtex`: from the
   sources of `bib-compile-sub`, or the whole .bib file without the database
   tool) and a copy of the style, unless a file of its name is there.
 

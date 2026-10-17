@@ -361,7 +361,7 @@
 (lazy-define (database bib-db) zealous-bib-import zealous-bib-export)
 (lazy-define (database bib-manage)
              bib-import-bibtex bib-compile bib-attach open-bib-chooser
-             bib-export-bibtex)
+             bib-entries-as-bibtex)
 (lazy-define (database bib-local) open-biblio)
 (lazy-define (database ai-agents-db) ai-agents-get-corrector
 	     ai-agents-get-interlocutor ai-agents-get-translator

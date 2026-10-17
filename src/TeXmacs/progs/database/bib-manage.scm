@@ -368,7 +368,7 @@
           ((url-exists? r) r)
           (else #f))))
 
-(tm-define (bib-export-bibtex names fname)
+(tm-define (bib-entries-as-bibtex names fname)
   (:synopsis "The entries @names of the bibliography of file @fname, as BibTeX")
   ;; from the sources of bib-compile-sub (the document, the .bib file, the
   ;; database, Zotero); without the database tool, the whole .bib file
