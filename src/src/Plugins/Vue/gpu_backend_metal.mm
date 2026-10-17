@@ -542,10 +542,28 @@ pixel_format (gpu_format f, int& bpp) {
   }
 }
 
+// The largest side of a texture: Metal stops the program (an assertion of
+// the validation of its descriptor) for a larger one, as a box of text with
+// a very long line asked for one 30638 pixels wide. Such a texture is not
+// made: what would be drawn with it is left out (the callers check)
+static const int metal_max_side= 16384;
+
+static bool
+too_large (int w, int h) {
+  if (w <= metal_max_side && h <= metal_max_side) return false;
+  static bool warned= false;
+  if (!warned) {
+    warned= true;
+    cout << "TeXmacs] GPU: a texture of " << w << "x" << h
+         << " is larger than " << metal_max_side << ", not drawn" << LF;
+  }
+  return true;
+}
+
 gpu_texture
 metal_backend::new_texture (int w, int h, gpu_format f, bool linear, bool repeat,
                             const void* data) {
-  if (!started || w <= 0 || h <= 0) return NULL;
+  if (!started || w <= 0 || h <= 0 || too_large (w, h)) return NULL;
   int bpp;
   MTLPixelFormat pf= pixel_format (f, bpp);
   MTLTextureDescriptor* d=
@@ -609,7 +627,7 @@ metal_backend::delete_texture (gpu_texture t) {
 
 gpu_texture
 metal_backend::new_target (int w, int h, bool transparent) {
-  if (!started || w <= 0 || h <= 0) return NULL;
+  if (!started || w <= 0 || h <= 0 || too_large (w, h)) return NULL;
   MTLTextureDescriptor* d=
     [MTLTextureDescriptor texture2DDescriptorWithPixelFormat: MTLPixelFormatBGRA8Unorm
                                                        width: w height: h mipmapped: NO];
