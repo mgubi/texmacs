@@ -579,6 +579,16 @@
         (with line (list-ref (lsp-buffer-lines) 3)
           (check-true (string-starts? line "  comp"))
           (check-true (> (string-length line) 6)))
+        ;; the log of the server, on a page of its own
+        (lsp-show-log)
+        (with aux (current-buffer)
+          (check-true (url-rooted-tmfs? aux))
+          (with t (object->string (tree->stree (buffer-get-body aux)))
+            (check-true (string-contains? t "clangd ("))
+            (check-true (string-contains? t "stderr: ")))
+          (switch-to-buffer u)
+          (buffer-close aux))
+        (check= (current-buffer) u)
         (lsp-hide-diagnostics)
         (check= (get-alt-selection "lsp-errors") '())
         ;; information at the cursor, in a balloon at the line, which must

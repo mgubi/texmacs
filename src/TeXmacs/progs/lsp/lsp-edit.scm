@@ -547,9 +547,13 @@
   (:synopsis "Shows what the language server of the buffer has written")
   (with c (buffer-client-entry)
     (if (not c) (set-message "No language server for this buffer" "")
+        ;; (a whole document, with its style and its body)
         (open-auxiliary
          "Language server"
          `(document
+           (style (tuple "generic"))
+           (body
+           (document
            (with "font-family" "tt" "par-first" "0cm"
              (document
               ,(utf8->cork (string-append (lsp-client-ref c 'name) " ("
@@ -562,7 +566,7 @@
                                                                l)))
                         (list-filter (string-decompose (cadr x) "\n")
                                      (lambda (l) (!= l "")))))
-                 (lsp-client-log c)))))))))
+                 (lsp-client-log c)))))))))))
 
 (tm-define (lsp-turn-off)
   ;; (they are started again when the preference is on again)
