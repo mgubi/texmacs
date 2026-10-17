@@ -158,8 +158,17 @@
          (cmd (if (or (os-win32?) (os-mingw?)) (escape-shell (converter-shell-cmd l from to))
              (converter-shell-cmd l from to))))
     ;;(display* "shell: " cmd "\n")
-    (system cmd)
-    (if (url-exists? to) to #f)))
+    ;; a destination which cannot be made concrete (a relative one) would be
+    ;; left out of the command, and the tool would choose a file of its own
+    ;; (ps2pdf: one named after the source, in the current directory)
+    (if (== (url-concretize to) "")
+        (begin
+          (display* "TeXmacs] cannot convert to " (url->system to)
+                    ": not a full path\n")
+          #f)
+        (begin
+          (system cmd)
+          (if (url-exists? to) to #f)))))
 
 (define-public (converter-save s opts)
   "Helper routine for define-format macro"

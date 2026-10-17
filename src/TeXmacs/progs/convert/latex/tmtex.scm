@@ -43,6 +43,10 @@
 (define tmtex-auto-consume 0)
 (define tmtex-image-root-url (unix->url "image"))
 (define tmtex-image-root-string "image")
+;; whether converted images have a place: next to the .tex file which is
+;; saved (without one, a conversion to a string, they would go into the
+;; current directory of TeXmacs, which the LaTeX does not know)
+(define tmtex-image-dir? #f)
 (define tmtex-appendices? #f)
 (define tmtex-indirect-bib? #f)
 (define tmtex-mathjax? #f)
@@ -137,7 +141,8 @@
   (set! tmtex-auto-produce 0)
   (set! tmtex-auto-consume 0)
   (set! tmtex-mathjax? #f)
-  (if (== (url-suffix current-save-target) "tex")
+  (set! tmtex-image-dir? (== (url-suffix current-save-target) "tex"))
+  (if tmtex-image-dir?
       (begin
         (set! tmtex-image-root-url (url-unglue current-save-target 4))
         (with suf (url-suffix tmtex-image-root-url)
@@ -1835,7 +1840,10 @@
   (let* ((u (url-relative current-save-target (unix->url name)))
          (suffix (url-suffix u))
          (fm (string-append (format-from-suffix suffix) "-file")))
-    (if (and (url-exists? u) (in? suffix (list "eps" "pdf" "png" "jpg")))
+    ;; used as it is when LaTeX reads it, or when there is no .tex file
+    ;; next to which a converted image could be written
+    (if (or (not tmtex-image-dir?)
+            (and (url-exists? u) (in? suffix (list "eps" "pdf" "png" "jpg"))))
         (with p (url->string "$TEXMACS_PATH")
           (set! name (string-replace name "$TEXMACS_PATH" p))
           (set! name (string-replace name "file://" ""))
