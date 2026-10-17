@@ -33,6 +33,7 @@ typedef unsigned int uint;
 #include "Freetype/tt_tools.hpp"
 #include "Database/database.hpp"
 #include "Sqlite3/sqlite3.hpp"
+#include "TreeSitter/tree_sitter_glue.hpp"
 #include "Updater/tm_updater.hpp"
 
 tmscm 

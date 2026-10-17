@@ -736,6 +736,8 @@
   (supports-sql? sqlite3_present (bool))
   (sql-exec sql_exec (scheme_tree url string))
   (sql-quote sql_quote (string string))
+  (tree-sitter-language-new tree_sitter_language_new (int string))
+  (tree-sitter-parse-sexp tree_sitter_parse_sexp (string int string))
 
   ;; TeXmacs servers and clients
   (server-define-error-codes server_define_error_codes (void))

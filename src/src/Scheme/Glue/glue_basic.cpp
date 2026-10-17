@@ -8953,6 +8953,34 @@ tmg_sql_quote (tmscm arg1) {
 }
 
 tmscm
+tmg_tree_sitter_language_new (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "tree-sitter-language-new");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  int out= tree_sitter_language_new (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return int_to_tmscm (out);
+}
+
+tmscm
+tmg_tree_sitter_parse_sexp (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "tree-sitter-parse-sexp");
+  TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "tree-sitter-parse-sexp");
+
+  int in1= tmscm_to_int (arg1);
+  string in2= tmscm_to_string (arg2);
+
+  // TMSCM_DEFER_INTS;
+  string out= tree_sitter_parse_sexp (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return string_to_tmscm (out);
+}
+
+tmscm
 tmg_server_define_error_codes () {
   // TMSCM_DEFER_INTS;
   server_define_error_codes ();
@@ -12348,6 +12376,8 @@ initialize_glue_basic () {
   tmscm_install_procedure ("supports-sql?",  tmg_supports_sqlP, 0, 0, 0);
   tmscm_install_procedure ("sql-exec",  tmg_sql_exec, 2, 0, 0);
   tmscm_install_procedure ("sql-quote",  tmg_sql_quote, 1, 0, 0);
+  tmscm_install_procedure ("tree-sitter-language-new",  tmg_tree_sitter_language_new, 1, 0, 0);
+  tmscm_install_procedure ("tree-sitter-parse-sexp",  tmg_tree_sitter_parse_sexp, 2, 0, 0);
   tmscm_install_procedure ("server-define-error-codes",  tmg_server_define_error_codes, 0, 0, 0);
   tmscm_install_procedure ("server-start",  tmg_server_start, 0, 0, 0);
   tmscm_install_procedure ("server-stop",  tmg_server_stop, 0, 0, 0);

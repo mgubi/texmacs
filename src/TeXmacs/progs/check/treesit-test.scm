@@ -19,13 +19,15 @@
 ;;     15 tokens, 44 lex states, 2 production infos);
 ;;   - the trees of JSON texts, with errors, the corpus tests of
 ;;     tree-sitter-json, and reparsing after edits;
-;;   - a small grammar written here, with precedences and fields.
+;;   - a small grammar written here, with precedences and fields;
+;;   - the same languages run by the C runtime of tree-sitter
+;;     (Plugins/TreeSitter), when TeXmacs is built with it.
 
 (texmacs-module (check treesit-test)
   (:use (check check-lib)
         (treesit ts-base) (treesit ts-grammar) (treesit ts-nfa)
         (treesit ts-tables) (treesit ts-build) (treesit ts-language)
-        (treesit ts-parse)))
+        (treesit ts-parse) (treesit ts-export)))
 
 (define (json-grammar-file)
   (url->system (url-concretize "$TEXMACS_PATH/misc/tree-sitter/json/grammar.json")))
@@ -241,6 +243,25 @@
     (check= (p "1 +;") "(program (binary left: (number) right: (MISSING variable)))")))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; The C runtime
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (test-c-runtime)
+  ;; the C runtime gives the trees of the Scheme parser
+  (when (defined? 'tree-sitter-language-new)
+    (let ((c (ts-c-language (json-lang)))
+          (calc (ts-generate-language calc-grammar)))
+      (check-true (integer? c))
+      (for (s (append (map car corpus)
+                      (list "{\"a\": 1}" "[1, 2" "{\"a\" 1}" "[1 2 3]" "")))
+        (check= (tree-sitter-parse-sexp c s) (parse s)))
+      (let ((cc (ts-c-language calc)))
+        (for (s (list "1 + 2 * 3;" "2 ^ 3 ^ 4;" "let x = (y + 1) * 2;" "lets;" "1 +;"))
+          (check= (tree-sitter-parse-sexp cc s)
+                  (ts-tree->string (ts-parse-string calc s)))))
+      (check= (tree-sitter-language-new "nonsense") -1))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Master routine
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -253,4 +274,5 @@
   (test-edits)
   (test-save)
   (test-calc)
+  (test-c-runtime)
   (check-end))
