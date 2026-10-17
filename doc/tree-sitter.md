@@ -658,6 +658,19 @@ Done in part (2026-10-17):
   `tmscm_builder` (it did not compile); its suites: 48 of 49 pass (`treesit`
   included), `markdown` hangs and `office` fails one check ("xml limits",
   memory-error on 3000 nested elements), both also without patch 0023.
+- Compact representation (2026-10-17, `TS_PROFILE=1` prints the stages).
+  C++ on femtolisp in TeXmacs before: LR 57 s, token conflicts 5,
+  coincident 12, merge 133, lex 37, language 6 (252 s, 3.6 GB). Items now
+  carry their production, steps and an integer sort key, and state keys
+  are integer vectors: LR 47 s (C standalone: 3.7 -> 2.5 s), tables
+  identical, memory barely lower (3.5 GB). The cost of the LR stage was
+  accessor chains (each `item-step` went through the grammar's hash
+  table), not the size of the keys. The merge did not improve: its
+  first pass walks the sorted entries of about 10 million pairs of
+  states (C: 58% of the pairs have the same tokens, 10% the same
+  actions, so no cheap equality shortcut), and on femtolisp a loop
+  written in Scheme is slower than the built-in `equal?` it replaced
+  (merge 163 s with it, reverted).
 
 As planned initially:
 
