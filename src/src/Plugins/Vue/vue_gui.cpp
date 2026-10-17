@@ -3974,11 +3974,27 @@ static void loop_iteration_body ();
 // the browser, which stopped the page ("uncaught exception", reload): it is
 // reported here, as handle_exceptions does on the desktop, and the loop goes
 // on with a redraw.
+#ifdef OS_MACOS
+// the autorelease pools of the Objective-C runtime (as @autoreleasepool)
+extern "C" void* objc_autoreleasePoolPush (void);
+extern "C" void  objc_autoreleasePoolPop (void* pool);
+#endif
+
 static void
 loop_iteration () {
 #ifdef __EMSCRIPTEN__
   web_in_iteration= true;
   web_loop_started= true;
+#endif
+#ifdef OS_MACOS
+  // each turn of the loop has its pool: the objects which Metal and AppKit
+  // give back autoreleased (the drawables of the windows, the command
+  // buffers...) were released only by a pool which was never drained. With
+  // a window wholly behind another, whose drawables the system does not
+  // show, nextDrawable then waited a second at each redraw (the cursor
+  // moved slowly) and made a new drawable each time: 145 GB in three
+  // minutes, until macOS ran out of memory
+  void* pool= objc_autoreleasePoolPush ();
 #endif
   try {
     loop_iteration_body ();
@@ -3990,6 +4006,9 @@ loop_iteration () {
     gui_wait= false;
     request_partial_redraw= true;
   }
+#ifdef OS_MACOS
+  objc_autoreleasePoolPop (pool);
+#endif
 #ifdef __EMSCRIPTEN__
   web_in_iteration= false;
 #endif
