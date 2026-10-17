@@ -145,9 +145,23 @@
                          l)))
        (string-decompose text "\n")))
 
+(tm-define (lsp-line lines i)
+  (:synopsis "The line @i of @lines (a list or a vector), \"\" if none")
+  ;; (a vector for many positions in a long file: list-ref walks the list)
+  (if (vector? lines)
+      (if (and (>= i 0) (< i (vector-length lines))) (vector-ref lines i) "")
+      (with l (and (>= i 0) (list-tail* lines i))
+        (if (pair? l) (car l) ""))))
+
+(define (list-tail* l i)
+  ;; the tail of @l after @i elements, #f if it is shorter
+  (cond ((== i 0) l)
+        ((pair? l) (list-tail* (cdr l) (- i 1)))
+        (else #f)))
+
 (tm-define (lsp-position lines line offset)
   (:synopsis "The position at @offset of the line @line of @lines")
-  (with s (if (and (>= line 0) (< line (length lines))) (list-ref lines line) "")
+  (with s (lsp-line lines line)
     (lsp-object "line" (lsp-number line)
                 "character" (lsp-number (lsp-offset->character s offset)))))
 
@@ -155,8 +169,7 @@
   (:synopsis "The line and the offset in @lines of the position @pos")
   (let* ((line (or (lsp-number-value (lsp-ref pos "line")) 0))
          (ch (or (lsp-number-value (lsp-ref pos "character")) 0))
-         (s (if (and (>= line 0) (< line (length lines)))
-                (list-ref lines line) "")))
+         (s (lsp-line lines line)))
     (list line (lsp-character->offset s ch))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

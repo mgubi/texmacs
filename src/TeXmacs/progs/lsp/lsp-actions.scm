@@ -49,37 +49,63 @@
          (if (string-ends? l "\r") (substring l 0 (- (string-length l) 1)) l))
        (string-decompose s "\n")))
 
-(define (line-at lines i)
-  (if (and (>= i 0) (< i (length lines))) (list-ref lines i) ""))
-
-(define (apply-one lines r text)
-  ;; @lines with the range @r replaced by the Cork @text
-  (let* ((l1 (car r)) (o1 (cadr r)) (l2 (caddr r)) (o2 (cadddr r))
-         (n (length lines))
-         (s1 (line-at lines l1))
-         (s2 (line-at lines l2))
-         (head (substring s1 0 (min o1 (string-length s1))))
-         (tail (substring s2 (min o2 (string-length s2)) (string-length s2)))
-         (mid (split-lines (string-append head text tail))))
-    (append (sublist lines 0 (min l1 n))
-            mid
-            (if (< (+ l2 1) n) (list-tail lines (+ l2 1)) '()))))
-
 (define (sorted-edits lines edits)
-  ;; the ranges and Cork texts of @edits, the last ones first (sort is
-  ;; stable: equal starts keep the order of the server, which is then
-  ;; reversed by the insertion)
-  (let* ((rs (map (lambda (e)
+  ;; the ranges and Cork texts of @edits, the last ones first. Of edits
+  ;; with the same start, the last one of the server comes first: applied
+  ;; from the end, they then come in the order of the server (two
+  ;; insertions A and B give AB, as the protocol says). (The order of the
+  ;; server is its index: the sort of S7 is not stable.)
+  (let* ((rs (map (lambda (e i)
                     (list (edit-range lines e)
-                          (utf8->cork (or (lsp-ref e "newText") ""))))
-                  edits)))
-    (sort rs (lambda (a b) (before? (car b) (car a))))))
+                          (utf8->cork (or (lsp-ref e "newText") ""))
+                          i))
+                  edits (.. 0 (length edits)))))
+    (sort rs (lambda (a b)
+               (or (before? (car b) (car a))
+                   (and (not (before? (car a) (car b)))
+                        (> (caddr a) (caddr b))))))))
 
 (tm-define (lsp-apply-to-lines lines edits)
   (:synopsis "The Cork @lines once the TextEdits @edits are applied")
-  (let loop ((l lines) (rs (sorted-edits lines edits)))
-    (if (null? rs) l
-        (loop (apply-one l (car (car rs)) (cadr (car rs))) (cdr rs)))))
+  ;; in one pass over @lines, from the first edit: the text between the
+  ;; edits is copied, then the new texts (linear in the size of the file,
+  ;; also for thousands of edits, as from a formatter)
+  (let* ((v (list->vector (if (null? lines) '("") lines)))
+         (n (vector-length v))
+         (last-pos (list (- n 1) (string-length (vector-ref v (- n 1)))))
+         (rs (reverse (sorted-edits v edits)))
+         (acc '()))
+    (define (clamp p)
+      ;; a position in the text (a server may give one beyond its end)
+      (if (>= (car p) n) last-pos
+          (with s (vector-ref v (car p))
+            (list (car p) (min (cadr p) (string-length s))))))
+    (define (emit s) (set! acc (cons s acc)))
+    (define (copy from to)
+      ;; the text from the position @from to the position @to
+      (let ((l1 (car from)) (o1 (cadr from)) (l2 (car to)) (o2 (cadr to)))
+        (if (== l1 l2)
+            (when (< o1 o2) (emit (substring (vector-ref v l1) o1 o2)))
+            (let ((s1 (vector-ref v l1)))
+              (emit (substring s1 o1 (string-length s1)))
+              (do ((i (+ l1 1) (+ i 1))) ((> i l2))
+                (emit "\n")
+                (emit (if (< i l2) (vector-ref v i)
+                          (substring (vector-ref v l2) 0 o2))))))))
+    (let loop ((at '(0 0)) (rs rs))
+      (if (null? rs)
+          (copy at last-pos)
+          (let* ((r (car (car rs)))
+                 (start (clamp (list (car r) (cadr r))))
+                 (end (clamp (list (caddr r) (cadddr r))))
+                 ;; (overlapping edits, which a server should not send:
+                 ;; the next one starts where the previous one ended)
+                 (start* (if (before? start at) at start))
+                 (end* (if (before? end start*) start* end)))
+            (copy at start*)
+            (emit (cadr (car rs)))
+            (loop end* (cdr rs)))))
+    (split-lines (apply string-append (reverse acc)))))
 
 (define (move-one lo r text)
   ;; the line and offset @lo once the range @r is replaced by @text: the
@@ -93,16 +119,18 @@
                (last (string-length (list-ref pieces (- k 1))))
                (end-l (+ l1 (- k 1)))
                (end-o (if (= k 1) (+ o1 last) last)))
-          (cond ((and (== l l1) (== end-l l1) (<= o end-o)) lo)
-                ((not (before? (list l2 o2) lo)) (list end-l end-o))
-                ((== l l2) (list end-l (+ end-o (- o o2))))
-                (else (list (+ l (- end-l l2)) o)))))))
+          (cond ((before? (list l2 o2) lo)
+                 ;; after the range: shifted
+                 (if (== l l2) (list end-l (+ end-o (- o o2)))
+                     (list (+ l (- end-l l2)) o)))
+                ((and (== l l1) (== end-l l1) (<= o end-o)) lo)
+                (else (list end-l end-o)))))))
 
 (tm-define (lsp-move-through-edits lines edits lo)
   (:synopsis "The line and offset @lo of @lines once @edits are applied")
   ;; (the edits are applied from the last one: those after @lo leave it,
   ;; those before shift it, and their ranges stay those of @lines)
-  (let loop ((lo lo) (rs (sorted-edits lines edits)))
+  (let loop ((lo lo) (rs (sorted-edits (list->vector lines) edits)))
     (if (null? rs) lo
         (loop (move-one lo (car (car rs)) (cadr (car rs))) (cdr rs)))))
 
@@ -117,6 +145,7 @@
   ;; the number of lines which have changed
   ;; (only the lines which differ, see above)
   (let* ((old (lsp-lines body))
+         (ov (list->vector old)) (nv (list->vector lines))
          (n (length old)) (m (length lines))
          (p (common-prefix old lines))
          (s (min (common-prefix (reverse old) (reverse lines))
@@ -127,9 +156,9 @@
     ;; (a line is replaced in its document: tree-assign! of the string
     ;; of a line did not reach the document which holds it)
     (do ((i 0 (+ i 1))) ((>= i both))
-      (when (!= (list-ref old (+ p i)) (list-ref lines (+ p i)))
+      (when (!= (vector-ref ov (+ p i)) (vector-ref nv (+ p i)))
         (tree-remove! body (+ p i) 1)
-        (tree-insert! body (+ p i) (list (list-ref lines (+ p i))))))
+        (tree-insert! body (+ p i) (list (vector-ref nv (+ p i))))))
     (cond ((> new-mid old-mid)
            (tree-insert! body (+ p old-mid)
                          (sublist lines (+ p old-mid) (+ p new-mid))))
@@ -173,7 +202,7 @@
                (let* ((lo2 (lsp-move-through-edits old edits lo))
                       (l (max 0 (min (car lo2) (- (length lines) 1))))
                       (o (max 0 (min (cadr lo2)
-                                     (string-length (line-at lines l))))))
+                                     (string-length (lsp-line lines l))))))
                  (go-to (append b (list l o)))))
              n)))))
 
