@@ -139,7 +139,7 @@ cocoa_m_src  := $(call findm_in,Plugins,@CONFIG_COCOA@ @CONFIG_MACOS@)
 cocoa_mm_src := $(call findmm_in,Plugins,@CONFIG_COCOA@ @CONFIG_MACOS@ @CONFIG_SPARKLE@)
 # the GPU renderer of the Vue port, which draws the canvases of the Cocoa
 # port with Metal (when USE_METAL)
-cocoa_gpu_src    := $(if $(strip @CONFIG_COCOA@),vue_gpu.cpp gpu_backend_gl.cpp,)
+cocoa_gpu_src    := $(if $(strip @CONFIG_COCOA@),vue_gpu.cpp gpu_backend_gl.cpp gpu_backend_wg.cpp,)
 cocoa_gpu_mm_src := $(if $(strip @CONFIG_COCOA@),gpu_backend_metal.mm,)
 os_src       := $(call findsrc_in,Plugins,@CONFIG_OS_COMPAT@)
 ifeq "@CONFIG_QT@" "Qtwk Widkit"
