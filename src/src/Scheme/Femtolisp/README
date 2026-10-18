@@ -91,6 +91,15 @@ The patches
 0025  the GC handles grow (1024 before: a recursion through map failed past
       500 levels), and a call from C within 512 KB of the end of the stack
       of C is a stack overflow error rather than a crash
+0026  > <= >= of two variables or constants are compiled as the
+      instructions < = number? (they were calls); <= and >= are false when
+      a number is a NaN
+0027  equal? of long lists without hashing their pairs (only structures
+      with cycles or more than 65536 pairs get to cyc_compare)
+
+fl_core.c also binds vector-ref, vector-set!, vector-length, char->integer
+and integer->char as constants to the builtins aref, aset!, length, fixnum
+and wchar, which the compiler makes instructions.
 
 The patches which change system.lsp or compiler.lsp regenerate flisp.boot.
 

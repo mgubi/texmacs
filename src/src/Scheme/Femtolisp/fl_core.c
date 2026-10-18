@@ -503,6 +503,20 @@ fltm_print_frames (void) {
   }
 }
 
+/* the procedures of R7RS which are builtins of femtolisp under another
+   name: constants bound to the builtins, which the compiler makes
+   instructions (they were functions calling the builtins,
+   r5rs-femtolisp.scm) */
+static void
+fltm_alias_builtins () {
+  static const char* aliases[][2]= {
+    { "vector-ref", "aref" }, { "vector-set!", "aset!" },
+    { "vector-length", "length" }, { "char->integer", "fixnum" },
+    { "integer->char", "wchar" } };
+  for (size_t i= 0; i < sizeof (aliases) / sizeof (aliases[0]); i++)
+    setc (symbol (aliases[i][0]), symbol_value (symbol (aliases[i][1])));
+}
+
 int
 fltm_init (size_t heap_size, const char* boot, size_t boot_length) {
   int failed= 0;
@@ -520,8 +534,10 @@ fltm_init (size_t heap_size, const char* boot, size_t boot_length) {
       ios_write (s, (char*) boot, boot_length);
       ios_seek (s, 0);
       failed= fl_load_system_image (f);
-      if (!failed)
+      if (!failed) {
+        fltm_alias_builtins ();
         (void) fl_applyn (0, symbol_value (symbol ("__init_globals")));
+      }
     }
     FL_CATCH_EXTERN {
       ios_puts ("femtolisp: fatal error during the initialization:\n",
