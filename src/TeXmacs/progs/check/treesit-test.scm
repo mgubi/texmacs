@@ -454,6 +454,16 @@
       (check= (tree-sitter-line-colors "c" (tree-ref d 2))
               '((0 4 "comment") (5 11 "keyword") (12 13 "constant_number")
                 (13 14 "operator_field"))))
+    ;; unmatched brackets have the colour of errors
+    (let ((colors (lambda (lan line)
+                    (let ((d (stree->tree (list 'document line))))
+                      (tree-sitter-line-colors lan d)
+                      (list-filter (tree-sitter-line-colors lan (tree-ref d 0))
+                                   (lambda (r) (== (caddr r) "error")))))))
+      (check= (colors "c" "int x = (1 + 2;") '((8 9 "error")))
+      (check= (colors "c" "int f() { return 1; } }") '((22 23 "error")))
+      (check= (colors "scheme" "(define (f x) (g x)") '((0 1 "error")))
+      (check= (colors "c" "int x = (1 + 2);") '()))
     ;; injections: the script and the style of HTML in JavaScript and CSS,
     ;; the arguments of a macro of Rust in Rust
     ;; (another suite may have asked for a highlighter before its tables
@@ -773,7 +783,47 @@
           (check= (line 3) "\"\"")
           (check-true (syntax-delete-bracket #f))
           (check= (line 3) ""))))
-    ;; structured moves: from node to node, around, inside, and from
+;; structural edits: swap, delete, raise, remove brackets, wrap
+    (with-test-buffer '(document (scm-code (document "(list a (f b) c)" "(g (h x))"
+                                                     "(k y)" "(m (p q)" "   r)")))
+      (lambda (u b)
+        (update-forced)
+        (let* ((code (tree-ref b 0 0))
+               (at (lambda (row col) (rcons (tree->path (tree-ref code row)) col)))
+               (line (lambda (row) (tree->string (tree-ref code row)))))
+          (go-to (at 0 6))
+          (check-true (syntax-swap-node #t))
+          (check= (line 0) "(list (f b) a c)")
+          (check= (cursor-path) (at 0 12))
+          (check-true (syntax-swap-node #f))
+          (check= (line 0) "(list a (f b) c)")
+          (check= (cursor-path) (at 0 6))
+          (check-true (syntax-delete-node #t))
+          (check= (line 0) "(list  (f b) c)")
+          (go-to (at 0 10))
+          (check-true (syntax-raise-node))
+          (check= (line 0) "(list  b c)")
+          (check= (cursor-path) (at 0 7))
+          (go-to (at 1 6))
+          (check-true (syntax-splice-brackets))
+          (check= (line 1) "(g h x)")
+          (check= (cursor-path) (at 1 5))
+          (go-to (at 2 3))
+          (check-true (syntax-wrap-node "[" "]"))
+          (check= (line 2) "(k [y])")
+          ;; on a closing bracket there is no node; backwards, the node which
+          ;; ends at the cursor
+          (go-to (at 2 6))
+          (check-false (syntax-delete-node #t))
+          (go-to (at 2 2))
+          (check-true (syntax-delete-node #f))
+          (check= (line 2) "( [y])")
+          ;; over two lines
+          (go-to (at 3 3))
+          (check-true (syntax-swap-node #t))
+          (check= (list (line 3) (line 4)) '("(m r" "   (p q))"))
+          (check= (cursor-path) (at 4 3)))))
+        ;; structured moves: from node to node, around, inside, and from
     ;; definition to definition
     (with-test-buffer '(document (scm-code (document "(define (f x) x)"
                                                      "(define (g y) (f y))"

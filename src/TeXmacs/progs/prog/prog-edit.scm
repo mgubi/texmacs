@@ -277,6 +277,25 @@
   (:require (syntax-cursor-language))
   (syntax-move-definition -1))
 
+;; the structured removals, by the syntax tree: the brackets around the
+;; cursor (keeping what is between them), the node at the cursor or before
+(tm-define (program-remove-structure)
+  (remove-structure-upwards))
+
+(tm-define (program-remove-structure)
+  (:require (syntax-cursor-language))
+  (syntax-splice-brackets))
+
+(tm-define (structured-remove-right)
+  (:mode in-prog?)
+  (:require (syntax-cursor-language))
+  (syntax-delete-node #t))
+
+(tm-define (structured-remove-left)
+  (:mode in-prog?)
+  (:require (syntax-cursor-language))
+  (syntax-delete-node #f))
+
 (define (program-select-enlarge-by-brackets lb rb)
   (if (== 0 kbd-select-enlarging)
       (set! kbd-select-enlarging 1)

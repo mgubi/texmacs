@@ -30,6 +30,8 @@
   ("cmd tab" (program-indent #f))
   ("cmd S-tab" (program-indent #t)) ; TODO
   ("cmd A-tab" (program-indent-all #f))
+  ("structured:cmd delete" (program-remove-structure))
+  ("structured:cmd backspace" (program-remove-structure))
 
   ;; override some text mode shortcuts
   ("space var" (insert-tabstop))

@@ -10,6 +10,7 @@
 
 #include "syntax_region.hpp"
 #include "ts_captures.hpp"
+#include "language.hpp"
 #include "converter.hpp"
 #include "hashmap.hpp"
 #include "tree-sitter/include/tree_sitter/api.h"
@@ -533,6 +534,53 @@ paint_injection (const char* text, int start, int end, int language,
   ts_parser_delete (p);
 }
 
+static bool
+bracket_type (const char* t) {
+  return t[0] != '\0' && t[1] == '\0' && strchr ("()[]{}", t[0]) != NULL;
+}
+
+static char
+opening_bracket (char c) {
+  return c == ')'? '(': c == ']'? '[': c == '}'? '{': '\0';
+}
+
+static void
+paint_node (TSNode n, array<int>& paint, int from, int to, int code) {
+  int a= max ((int) ts_node_start_byte (n), from);
+  int b= min ((int) ts_node_end_byte (n), to);
+  for (int i= a; i < b; i++) paint[i - from]= code;
+}
+
+static void
+paint_unmatched (TSNode n, array<int>& paint, int from, int to, int code) {
+  // paint in the colour code the brackets which error recovery left
+  // unmatched: those directly in an ERROR node, and the opening bracket of
+  // a node where a closing one is MISSING (only the nodes with errors are
+  // visited)
+  if (!ts_node_has_error (n)) return;
+  if ((int) ts_node_end_byte (n) < from || (int) ts_node_start_byte (n) > to) return;
+  bool err= ts_node_is_error (n);
+  uint32_t k= ts_node_child_count (n);
+  for (uint32_t i= 0; i < k; i++) {
+    TSNode c= ts_node_child (n, i);
+    const char* type= ts_node_type (c);
+    if (ts_node_is_missing (c) && bracket_type (type)) {
+      char open= opening_bracket (type[0]);
+      for (uint32_t j= 0; j < i && open != '\0'; j++) {
+        TSNode o= ts_node_child (n, j);
+        const char* t= ts_node_type (o);
+        if (!ts_node_is_named (o) && t[0] == open && t[1] == '\0') {
+          paint_node (o, paint, from, to, code);
+          break;
+        }
+      }
+    }
+    else if (err && !ts_node_is_named (c) && bracket_type (type))
+      paint_node (c, paint, from, to, code);
+    else paint_unmatched (c, paint, from, to, code);
+  }
+}
+
 array<array<int> >
 syntax_region_highlight (tree root, int language, int query, array<int> colors,
                          int injections, ts_injection_resolver resolve,
@@ -587,6 +635,7 @@ syntax_region_highlight (tree root, int language, int query, array<int> colors,
                          lan2, query2, colors2, paint, from, to);
     }
   }
+  paint_unmatched (top, paint, from, to, encode_color ("error"));
   for (int i= first; i <= last; i++) {
     int m= N(r->lines[i]), o= r->offsets[i] - from;
     array<int> c (m);
@@ -667,6 +716,84 @@ syntax_region_node_move (tree root, int language, int row, int col, int dir) {
   if (ts_node_is_null (target)) return r;
   TSPoint s= ts_node_start_point (target);
   r << (int) s.row << (int) s.column;
+  return r;
+}
+
+static void
+push_range (array<int>& r, TSNode n) {
+  // the start and end (row column row column) of n, or -1 four times
+  if (ts_node_is_null (n)) { r << -1 << -1 << -1 << -1; return; }
+  TSPoint a= ts_node_start_point (n), b= ts_node_end_point (n);
+  r << (int) a.row << (int) a.column << (int) b.row << (int) b.column;
+}
+
+static bool
+encloses_with_brackets (TSNode n) {
+  // does n start with an opening bracket and end with the matching one?
+  uint32_t k= ts_node_child_count (n);
+  if (k < 2) return false;
+  TSNode a= ts_node_child (n, 0), b= ts_node_child (n, k - 1);
+  const char* ta= ts_node_type (a);
+  const char* tb= ts_node_type (b);
+  return !ts_node_is_named (a) && !ts_node_is_named (b) && !ts_node_is_missing (b) &&
+         bracket_type (ta) && bracket_type (tb) && opening_bracket (tb[0]) == ta[0];
+}
+
+array<int>
+syntax_region_node_info (tree root, int language, int row, int col) {
+  // the ranges around the point, for the structural edits: the node at the
+  // point (the largest named node which starts there, or else the named
+  // leaf which contains it), its next and previous named siblings, its
+  // named parent (not the root), the innermost node around the point which
+  // is a pair of brackets, and the largest named node which ends at the
+  // point; empty without a tree
+  array<int> r;
+  syntax_region_rep* reg= get_region (root, language);
+  if (reg == NULL) return r;
+  TSNode top= ts_tree_root_node (reg->tree);
+  TSPoint p= { (uint32_t) row, (uint32_t) col };
+  TSNode none= { { 0, 0, 0, 0 }, NULL, NULL };
+  TSNode node= ts_node_named_descendant_for_point_range (top, p, p);
+  if (!ts_node_is_null (node) && point_equal (ts_node_start_point (node), p))
+    while (true) {
+      TSNode up= ts_node_parent (node);
+      if (ts_node_is_null (up) || ts_node_is_null (ts_node_parent (up)) ||
+          !point_equal (ts_node_start_point (up), p)) break;
+      node= up;
+    }
+  else if (!ts_node_is_null (node) && ts_node_named_child_count (node) != 0)
+    node= none;   // inside a node with parts, but at none of them
+  bool real= !ts_node_is_null (node) && !ts_node_is_null (ts_node_parent (node));
+  push_range (r, real? node: none);
+  push_range (r, real? ts_node_next_named_sibling (node): none);
+  push_range (r, real? ts_node_prev_named_sibling (node): none);
+  TSNode parent= real? ts_node_parent (node): none;
+  while (!ts_node_is_null (parent) && !ts_node_is_named (parent))
+    parent= ts_node_parent (parent);
+  if (!ts_node_is_null (parent) && ts_node_is_null (ts_node_parent (parent)))
+    parent= none;
+  push_range (r, parent);
+  TSNode pair= none;
+  for (TSNode n= ts_node_descendant_for_point_range (top, p, p);
+       !ts_node_is_null (n); n= ts_node_parent (n))
+    if (encloses_with_brackets (n) && point_before (ts_node_start_point (n), p) &&
+        point_before (p, ts_node_end_point (n))) { pair= n; break; }
+  push_range (r, pair);
+  TSNode before= none;
+  if (col > 0) {
+    TSPoint q= { (uint32_t) row, (uint32_t) (col - 1) };
+    TSNode n= ts_node_named_descendant_for_point_range (top, q, q);
+    if (!ts_node_is_null (n) && point_equal (ts_node_end_point (n), p)) {
+      while (true) {
+        TSNode up= ts_node_parent (n);
+        if (ts_node_is_null (up) || ts_node_is_null (ts_node_parent (up)) ||
+            !point_equal (ts_node_end_point (up), p)) break;
+        n= up;
+      }
+      if (!ts_node_is_null (ts_node_parent (n))) before= n;
+    }
+  }
+  push_range (r, before);
   return r;
 }
 

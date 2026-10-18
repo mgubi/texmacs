@@ -276,6 +276,135 @@
                 (delete-pair ctx root lan q))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Structural edits
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; Edits of whole syntax nodes, which keep the brackets balanced: delete a
+;; node, swap it with its neighbour, replace the node around it by it
+;; (raise), remove the brackets around the cursor (splice), wrap a node in
+;; brackets. The ranges come from syntax-region-node-info.
+
+(define (node-info ctx lan)
+  ;; ((start end) of: the node, its next and previous siblings, its parent,
+  ;; the pair of brackets around the point, the node which ends at the
+  ;; point), each #f when there is none
+  (let ((v (syntax-region-node-info (cadr ctx) lan (caddr ctx) (cadddr ctx))))
+    (and (pair? v)
+         (let loop ((v v) (acc '()))
+           (if (null? v) (reverse acc)
+               (let ((r (list (list (car v) (cadr v)) (list (caddr v) (cadddr v)))))
+                 (loop (cddddr v) (cons (and (>= (car v) 0) r) acc))))))))
+
+(define (range-text root a b)
+  ;; the text from the point a to the point b of a document of lines
+  (if (== (car a) (car b))
+      (substring (line-string root (car a)) (cadr a) (cadr b))
+      (let loop ((row (+ (car a) 1))
+                 (acc (list (string-drop (line-string root (car a)) (cadr a)))))
+        (if (= row (car b))
+            (apply string-append
+                   (list-intersperse (reverse (cons (substring (line-string root row) 0 (cadr b))
+                                                    acc))
+                                     "\n"))
+            (loop (+ row 1) (cons (line-string root row) acc))))))
+
+(define (point-after p text)
+  ;; the point after text written from the point p
+  (let loop ((l (string->list text)) (row (car p)) (col (cadr p)))
+    (cond ((null? l) (list row col))
+          ((== (car l) #\newline) (loop (cdr l) (+ row 1) 0))
+          (else (loop (cdr l) row (+ col 1))))))
+
+(define (replace-range! root a b text)
+  ;; replace the text from a to b of a document of lines by text
+  (let* ((pre (substring (line-string root (car a)) 0 (cadr a)))
+         (post (string-drop (line-string root (car b)) (cadr b)))
+         (new (let ((l (string-decompose (string-append pre text post) "\n")))
+                (if (null? l) (list "") l))))
+    (tree-set (tree-ref root (car a)) (car new))
+    (when (> (car b) (car a))
+      (tree-remove! root (+ (car a) 1) (- (car b) (car a))))
+    (when (pair? (cdr new))
+      (tree-insert! root (+ (car a) 1) (cdr new)))))
+
+(define (with-structure proc)
+  ;; call (proc ctx root info) for the code at the cursor, info being the
+  ;; ranges of node-info; #f without a tree, or when proc gives #f
+  (let ((c (cursor-code)))
+    (and c (tree-is? (cadr (car c)) 'document)
+         (let ((info (node-info (car c) (cadr c))))
+           (and info (proc (car c) (cadr (car c)) info))))))
+
+(define-public (syntax-delete-node forward?)
+  ;; delete the node at the cursor (or, unless forward?, the one which ends
+  ;; at the cursor)
+  (with-structure
+    (lambda (ctx root info)
+      (let ((n (if forward? (list-ref info 0) (list-ref info 5))))
+        (and n
+             (begin
+               (replace-range! root (car n) (cadr n) "")
+               (move-to ctx (car n))
+               #t))))))
+
+(define-public (syntax-swap-node forward?)
+  ;; swap the node at the cursor with the next (or previous) one; the cursor
+  ;; stays at the start of the node, which has moved
+  (with-structure
+    (lambda (ctx root info)
+      (let* ((n (list-ref info 0))
+             (m (if forward? (list-ref info 1) (list-ref info 2))))
+        (and n m
+             (let* ((first (if forward? n m)) (second (if forward? m n))
+                    (a (range-text root (car first) (cadr first)))
+                    (between (range-text root (cadr first) (car second)))
+                    (b (range-text root (car second) (cadr second))))
+               (replace-range! root (car first) (cadr second)
+                               (string-append b between a))
+               (move-to ctx (if forward?
+                                (point-after (car first) (string-append b between))
+                                (car first)))
+               #t))))))
+
+(define-public (syntax-raise-node)
+  ;; replace the node around the node at the cursor by it
+  (with-structure
+    (lambda (ctx root info)
+      (let ((n (list-ref info 0)) (parent (list-ref info 3)))
+        (and n parent
+             (let ((text (range-text root (car n) (cadr n))))
+               (replace-range! root (car parent) (cadr parent) text)
+               (move-to ctx (car parent))
+               #t))))))
+
+(define-public (syntax-splice-brackets)
+  ;; remove the innermost pair of brackets around the cursor, keeping what
+  ;; is between them
+  (with-structure
+    (lambda (ctx root info)
+      (let ((pair (list-ref info 4)) (p (cddr ctx)))
+        (and pair
+             (let* ((a (car pair)) (b (cadr pair))
+                    (close (list (car b) (- (cadr b) 1))))
+               ;; the closing bracket first, the points before it do not move
+               (replace-range! root close b "")
+               (replace-range! root a (list (car a) (+ (cadr a) 1)) "")
+               (move-to ctx (if (== (car p) (car a)) (list (car p) (- (cadr p) 1)) p))
+               #t))))))
+
+(define-public (syntax-wrap-node lb rb)
+  ;; put the node at the cursor between the brackets lb and rb
+  (with-structure
+    (lambda (ctx root info)
+      (let ((n (list-ref info 0)))
+        (and n
+             (begin
+               (replace-range! root (cadr n) (cadr n) rb)
+               (replace-range! root (car n) (car n) lb)
+               (move-to ctx (list (car (car n)) (+ (cadr (car n)) 1)))
+               #t))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Inputs of sessions
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -662,5 +791,14 @@
   ("Previous definition" (syntax-move-definition -1))
   ("Next definition" (syntax-move-definition 1))
   ("Select definition" (syntax-select-definition))
+  (-> "Structure"
+      ("Delete node" (syntax-delete-node #t))
+      ("Swap with next" (syntax-swap-node #t))
+      ("Swap with previous" (syntax-swap-node #f))
+      ("Raise node" (syntax-raise-node))
+      ("Remove brackets" (syntax-splice-brackets))
+      ("Wrap in parentheses" (syntax-wrap-node "(" ")"))
+      ("Wrap in brackets" (syntax-wrap-node "[" "]"))
+      ("Wrap in braces" (syntax-wrap-node "{" "}")))
   (assuming (syntax-comment-prefix (get-env "prog-language"))
     ("Toggle comment" (syntax-toggle-comment))))

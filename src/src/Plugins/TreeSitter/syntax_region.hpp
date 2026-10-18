@@ -31,6 +31,7 @@ void syntax_region_forget (tree region);
 int syntax_region_indent (tree region, int language, int query, int row, int tab);
 array<int> syntax_region_node_move (tree region, int language,
                                    int row, int col, int dir);
+array<int> syntax_region_node_info (tree region, int language, int row, int col);
 // the highlight query and colours of a language named in an injection
 typedef bool (*ts_injection_resolver) (string name, int& language, int& query,
                                        array<int>& colors);
