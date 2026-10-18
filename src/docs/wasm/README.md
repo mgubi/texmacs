@@ -329,7 +329,7 @@ draws with WebGL2. The canvas and the targets are BGRA8, the format the
 browsers prefer (another costs them a copy at each frame). Nothing is read
 back from the GPU (asynchronous in WebGPU). Tested in headless Chrome 154
 (`browser-run.mjs --browser <Chrome> --query '?gpu=webgpu'`): menus,
-editing, no error of WebGPU. Firefox (147, headless) has `navigator.gpu`
+editing, no error of WebGPU. Firefox (157, headless) has `navigator.gpu`
 but gives no adapter: the page draws with WebGL2, as it should.
 
 `misc/wasm/test/gpu-bench.mjs` compares the three renderers on a long
