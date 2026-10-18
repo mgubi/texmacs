@@ -839,9 +839,12 @@
   (lsp-document-text lsp_document_text (string tree))
   (lsp-decorate-line lsp_decorate_line (void tree tree tree))
   (lsp-undecorate-line lsp_undecorate_line (void tree))
-  (lsp-fold-line lsp_fold_line (void tree bool))
-  (lsp-line-folded? lsp_line_folded (bool tree))
-  (lsp-fold-marker lsp_fold_marker (void tree string))
+  (code-line-fold-state code_line_fold_state (int tree))
+  (code-set-line-fold-state code_set_line_fold_state (void tree int))
+  (code-column code_column (int string int int))
+  (code-utf16-column code_utf16_column (int string int))
+  (code-utf16-offset code_utf16_offset (int string int))
+  (code-indent-end code_indent_end (int string))
 
   ;; widgets
   (widget-printer printer_widget (widget command url))

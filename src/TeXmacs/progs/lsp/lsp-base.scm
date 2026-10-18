@@ -112,37 +112,15 @@
 
 (tm-define (lsp-offset->character line offset)
   (:synopsis "The character of a position at @offset of the Cork @line")
-  (lsp-utf16-length (cork->sourcecode (substring line 0 (min offset
-                                                       (string-length line))))))
-
-(define plain-line #f)
-(define plain-line? #f)
-
-(define (plain? line)
-  ;; one byte for each character of @line, of one UTF-16 unit (no special
-  ;; character of Cork, which starts by <, and no byte of 128 or more); the
-  ;; last line asked about is remembered (the tokens of a line come together)
-  (when (not (eq? line plain-line))
-    (set! plain-line line)
-    (set! plain-line?
-          (let ((n (string-length line)))
-            (let loop ((i 0))
-              (or (>= i n)
-                  (with c (string-ref line i)
-                    (and (not (char=? c #\<)) (< (char->integer c) 128)
-                         (loop (+ i 1)))))))))
-  plain-line?)
+  ;; (the positions of the core, System/Language/code_lines.cpp, which
+  ;; tree-sitter uses too)
+  (code-utf16-column line offset))
 
 (tm-define (lsp-character->offset line ch)
   (:synopsis "The offset in the Cork @line of the character @ch of a position")
   ;; (a position inside a character, which a server should not give, is
   ;; at its start; one beyond the end of the line at its end)
-  (if (plain? line) (max 0 (min ch (string-length line)))
-  (let loop ((l (tmstring->list line)) (pos 0) (n 0))
-    (if (or (null? l) (>= n ch)) pos
-        (with m (+ n (lsp-utf16-length (cork->sourcecode (car l))))
-          (if (> m ch) pos
-              (loop (cdr l) (+ pos (string-length (car l))) m)))))))
+  (code-utf16-offset line ch))
 
 (define (verbatim-line t)
   ;; a line which is not a string (markup in a source file), as a string

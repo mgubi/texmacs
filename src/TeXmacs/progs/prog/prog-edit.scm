@@ -297,17 +297,10 @@
   (when (and prog-balanced-brackets? (syntax-cursor-language))
     (syntax-close-tag)))
 
-;; folds (std ( and std ), as for the folds of language servers)
-(tm-define (program-fold) (noop))
-(tm-define (program-unfold) (noop))
-
-(tm-define (program-fold)
-  (:require (syntax-cursor-language))
-  (syntax-fold-block))
-
-(tm-define (program-unfold)
-  (:require (syntax-cursor-language))
-  (syntax-unfold-block))
+;; folds (std ( and std )): those of the features of program code, which
+;; ask tree-sitter or the language servers for the blocks (code-fold.scm)
+(tm-define (program-fold) (code-fold))
+(tm-define (program-unfold) (code-unfold))
 
 (tm-define (structured-remove-right)
   (:mode in-prog?)
@@ -392,18 +385,10 @@
   ;; (a tab where the lines are indented by tabs)
   (if (program-indent-tabs?) (program-tab-width) (get-tabstop)))
 
-(define (blank? c)
-  (or (== c " ") (== c "<#9>")))
-
 (tm-define (string-column s offset)
   (:synopsis "the column of the place at @offset of @s (tabs at their stops)")
-  (let ((tw (program-tab-width)))
-    (let loop ((l (tmstring->list (substring s 0 (min offset
-                                                      (string-length s)))))
-               (col 0))
-      (cond ((null? l) col)
-            ((== (car l) "<#9>") (loop (cdr l) (+ col (- tw (remainder col tw)))))
-            (else (loop (cdr l) (+ col 1)))))))
+  ;; (the columns of the core, System/Language/code_lines.cpp)
+  (code-column s offset (program-tab-width)))
 
 (tm-define (insert-tabstop)
   ;; (a tab where the lines are indented by tabs, else spaces up to the
@@ -429,10 +414,7 @@
 
 (tm-define (string-indent-end s)
   (:synopsis "the offset in @s of its first character which is not blank")
-  (let loop ((l (tmstring->list s)) (pos 0))
-    (if (and (nnull? l) (blank? (car l)))
-        (loop (cdr l) (+ pos (string-length (car l))))
-        pos)))
+  (code-indent-end s))
 
 (tm-define (string-get-indent s)
   (:synopsis "get the indentation of @s (a column: tabs at their stops)")

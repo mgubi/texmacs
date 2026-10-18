@@ -10,23 +10,12 @@
 ******************************************************************************/
 
 #include "edit_cursor.hpp"
-#include "lsp_decorations.hpp"
+#include "code_lines.hpp"
 #include "iterator.hpp"
 #include "tm_buffer.hpp"
 #include "tree_traverse.hpp"
 #include "drd_mode.hpp"
 #include "analyze.hpp"
-#include "../../Plugins/TreeSitter/ts_highlight.hpp"
-
-static void
-notify_cursor_in_fold (tree et, path tp) {
-  // the cursor has no box: if it is in a line which a language server has
-  // folded, the fold is told (it moves the cursor, or opens)
-  if (is_nil (tp) || is_nil (path_up (tp)) || !has_subtree (et, path_up (tp)))
-    return;
-  if (lsp_line_folded (subtree (et, path_up (tp))))
-    call ("lsp-cursor-in-fold");
-}
 
 /******************************************************************************
 * Constructor and destructor
@@ -227,15 +216,19 @@ edit_cursor_rep::adjust_ghost_cursor (int status) {
   }
 }
 
+static path last_outside_folds;
+
 static void
 unfold_at_cursor (tree et, path tp) {
-  // a hidden line of program code (a fold) is unfolded when the cursor
-  // arrives in it (progs/treesit/ts-edit.scm)
+  // the cursor arrives in a hidden line of program code (a fold): it goes
+  // over the fold, or the fold opens (progs/code/code-fold.scm), which is
+  // told where the cursor was before, outside of the folds
   if (is_nil (tp) || is_nil (tp->next)) return;
   path p= path_up (tp);
   if (!has_subtree (et, p)) return;
-  if (tree_sitter_fold_state (subtree (et, p)) == 1)
-    call ("syntax-unfold-at-cursor");
+  if (code_line_fold_state (subtree (et, p)) == 1)
+    call ("code-cursor-in-fold", object (last_outside_folds), object (tp));
+  else last_outside_folds= tp;
 }
 
 void
@@ -245,7 +238,6 @@ edit_cursor_rep::notify_cursor_moved (int status) {
   notify_change (THE_CURSOR);
   unfold_at_cursor (et, tp);
   if (cu->valid) call ("notify-cursor-moved", object (status));
-  else notify_cursor_in_fold (et, tp);
 }
 
 void
@@ -467,7 +459,6 @@ edit_cursor_rep::go_to_here () {
   notify_change (THE_CURSOR);
   unfold_at_cursor (et, tp);
   if (cu->valid) call ("notify-cursor-moved", object (DIRECT));
-  else notify_cursor_in_fold (et, tp);
 }
 
 void
@@ -493,7 +484,6 @@ edit_cursor_rep::go_to (path p) {
       notify_change (THE_CURSOR);
     unfold_at_cursor (et, tp);
     if (cu->valid) call ("notify-cursor-moved", object (DIRECT));
-    else notify_cursor_in_fold (et, tp);
   }
 }
 

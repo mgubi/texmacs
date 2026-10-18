@@ -10,93 +10,19 @@
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;; A fold changes what is shown, not the document: its lines stay in the
-;; buffer (saved, sent to the server, searched, undone as usual), but the
-;; typesetter does not show them (lsp-fold-line, C++: insert_paragraph skips
-;; them), and the first line of the fold ends with a marker. The blocks are
-;; those of the server (textDocument/foldingRange): std ( folds the block at
-;; the cursor, std ) unfolds it, the menu folds or unfolds all of them.
-;;
-;; A fold is kept as the tree of its first line and the trees of the lines
-;; which it hides, with their texts: after each change of the buffer, a fold
-;; whose lines are no longer where they were is dropped, and the lines whose
-;; texts have changed are registered again (the typesetter shows a line
-;; whose text is not the one which was folded). The cursor does not stay in
-;; a hidden line: moving right from the first line of a fold goes after it,
-;; moving left from the line after it goes to the end of its first line, and
-;; a fold where the cursor comes otherwise (a search, a definition) opens.
+;; The blocks of a source file which its server gives
+;; (textDocument/foldingRange), for the folds of program code, which are
+;; those of the core (progs/code/code-fold.scm): this module is their
+;; provider (lsp-code.scm), and keeps the names of its former commands. A
+;; block (start end) of the server is folded as its first line shown and
+;; the lines after it up to end hidden.
 
 (texmacs-module (lsp lsp-fold)
   (:use (lsp lsp-base)
         (lsp lsp-client)
         (lsp lsp-documents)
-        (lsp lsp-edit)))
-
-;; the marker at the end of the first line of a fold (Cork)
-(define fold-marker " <#2026> ")
-
-;; buffer name -> its folds, each (head hidden labels head-label)
-(define folds (make-ahash-table))
-
-(define (buffer-key) (url->string (current-buffer)))
-(define (current-folds) (or (ahash-ref folds (buffer-key)) '()))
-
-(define (fold-head f) (car f))
-(define (fold-hidden f) (cadr f))
-
-(define (body) (buffer-get-body (current-buffer)))
-
-(define (fold-index f b)
-  ;; the line of the first line of @f in the body @b, or #f if the fold is
-  ;; no longer there (its lines moved, or were removed)
-  (let ((h (fold-head f)))
-    (and (tree-is? b 'document)
-         (tree-up h) (tree-eq? (tree-up h) b)
-         (with i (tree-index h)
-           (and (< (+ i (length (fold-hidden f))) (tree-arity b))
-                (let loop ((l (fold-hidden f)) (k (+ i 1)))
-                  (cond ((null? l) i)
-                        ((tree-eq? (car l) (tree-ref b k)) (loop (cdr l) (+ k 1)))
-                        (else #f))))))))
-
-(define (make-fold b start end)
-  (let* ((head (tree-ref b start))
-         (hidden (map (lambda (k) (tree-ref b k)) (.. (+ start 1) (+ end 1)))))
-    (list head hidden (map tree->string hidden) (tree->string head))))
-
-(define (show-lines b from to)
-  ;; the lines from to to are typeset again
-  (if (> (- to from) 2000) (update-current-buffer)
-      (with p (buffer-path)
-        (for (k (.. from (min (+ to 1) (tree-arity b))))
-          (update-path (append p (list k)))))))
-
-(define (register! fs)
-  ;; the folds @fs are given to the typesetter
-  (for (f fs)
-    (for (t (fold-hidden f)) (lsp-fold-line t #t))
-    (lsp-fold-marker (fold-head f) fold-marker)))
-
-(define (unregister! f)
-  (for (t (fold-hidden f)) (lsp-fold-line t #f))
-  (lsp-fold-marker (fold-head f) ""))
-
-(define (set-folds! fs)
-  ;; the folds of the current buffer are @fs: those which go are shown
-  ;; again, those which come are hidden (a line in two folds stays hidden)
-  (let ((old (current-folds))
-        (b (body)))
-    (for (f old) (unregister! f))
-    (register! fs)
-    (if (null? fs) (ahash-remove! folds (buffer-key))
-        (ahash-set! folds (buffer-key) fs))
-    (for (f (append old fs))
-      (with i (fold-index f b)
-        (when i (show-lines b i (+ i (length (fold-hidden f)))))))))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; The blocks of the server
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+        (lsp lsp-edit)
+        (code code-fold)))
 
 (tm-define (lsp-folding-ranges-of r)
   (:synopsis "The FoldingRanges @r as (start end), the blocks of lines")
@@ -141,45 +67,6 @@
 ;; Commands
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define (cursor-lo)
-  (let* ((p (cursor-path))
-         (b (buffer-path)))
-    (and (list-starts? p b)
-         (with r (list-tail p (length b))
-           (and (= (length r) 2) r)))))
-
-(define (folded-at? b start)
-  (list-or (map (lambda (f) (== (fold-index f b) start)) (current-folds))))
-
-(define (end-of-line b i)
-  (append (buffer-path) (list i (string-length (tree->string (tree-ref b i))))))
-
-(tm-define (lsp-fold-block start end)
-  (:synopsis "Folds the lines @start to @end: @start stays, with a marker")
-  (let ((b (body))
-        (lo (cursor-lo)))
-    (when (and (tree-is? b 'document) (< start end) (< end (tree-arity b))
-               (not (folded-at? b start)))
-      (set-folds! (cons (make-fold b start end) (current-folds)))
-      ;; (the cursor does not stay in a hidden line)
-      (when (and lo (> (car lo) start) (<= (car lo) end))
-        (go-to-path (end-of-line b start))))))
-
-(tm-define (lsp-fold)
-  (:synopsis "Folds the block at the cursor")
-  (let ((lo (cursor-lo))
-        (ranges (folding-ranges)))
-    (when (and lo ranges)
-      (let* ((b (body))
-             ;; (the blocks which are not folded yet)
-             (open (list-filter ranges
-                                (lambda (r) (not (folded-at? b (car r))))))
-             (r (lsp-innermost-range open (car lo))))
-        (if r (lsp-fold-block (car r) (cadr r))
-            (set-message "No block to fold here" ""))))))
-
-;; (a block which a server gives twice, with the same first line: the
-;; larger one)
 (define (distinct-ranges ranges)
   (let ((t (make-ahash-table)))
     (for (r ranges)
@@ -189,172 +76,54 @@
     (sort (map cdr (ahash-table->list t))
           (lambda (x y) (< (car x) (car y))))))
 
-(define (hides? f b line)
-  (with i (fold-index f b)
-    (and i (< i line) (<= line (+ i (length (fold-hidden f)))))))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; The provider
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define (hiding-fold b line)
-  ;; the outermost fold which hides @line (its first line is shown), or #f
-  (let* ((in (list-filter (current-folds) (lambda (f) (hides? f b line)))))
-    (and (nnull? in)
-         (car (sort in (lambda (x y) (< (fold-index x b) (fold-index y b))))))))
+(tm-define (lsp-can-fold?)
+  (:synopsis "Does a server which can fold follow the current buffer?")
+  (and (lsp-on?) (lsp-buffer-followed?)
+       (with c (lsp-buffer-client*)
+         (and c (lsp-client-running? c)
+              (lsp-client-capable? c "foldingRangeProvider")))))
 
-(define (fold-at b line)
-  ;; the innermost fold whose first line or block contains @line
-  (let* ((in (list-filter
-              (current-folds)
-              (lambda (f)
-                (with i (fold-index f b)
-                  (and i (<= i line)
-                       (<= line (+ i (length (fold-hidden f))))))))))
-    (and (nnull? in)
-         (car (sort in (lambda (x y) (> (fold-index x b) (fold-index y b))))))))
+(define (in-source-file?)
+  ;; (the cursor is in the lines of the buffer, which its server sees)
+  (with c (code-cursor-lines)
+    (and c (tree-eq? (car c) (buffer-get-body (current-buffer))))))
 
-(tm-define (lsp-unfold)
-  (:synopsis "Unfolds the block at the cursor")
-  (let* ((lo (cursor-lo))
-         (b (body))
-         (f (and lo (fold-at b (car lo)))))
-    (if (not f) (set-message "No folded block here" "")
-        (set-folds! (list-filter (current-folds)
-                                 (lambda (g) (not (eq? g f))))))))
+(tm-define (lsp-fold-ranges)
+  (:synopsis "The blocks of the server around the cursor, as (start end)")
+  (let ((c (code-cursor-lines))
+        (ranges (and (in-source-file?) (folding-ranges))))
+    (and c ranges
+         (list-filter ranges (lambda (r) (and (<= (car r) (cadr c))
+                                               (<= (cadr c) (cadr r))))))))
 
-(tm-define (lsp-fold-all)
-  (:synopsis "Folds all the blocks of the buffer")
-  (with ranges (folding-ranges)
-    (when ranges
-      (let* ((b (body))
-             (new (map (lambda (r) (make-fold b (car r) (cadr r)))
-                       (list-filter (distinct-ranges ranges)
-                                    (lambda (r)
-                                      (and (< (cadr r) (tree-arity b))
-                                           (not (folded-at? b (car r)))))))))
-        (set-folds! (append new (current-folds)))
-        (with lo (cursor-lo)
-          (when (and lo (lsp-line-folded? (tree-ref b (car lo))))
-            (with f (hiding-fold b (car lo))
-              (when f (go-to-path (end-of-line b (fold-index f b)))))))))))
+(tm-define (lsp-all-fold-ranges)
+  (:synopsis "All the blocks of the server, as (start end)")
+  (with ranges (and (in-source-file?) (folding-ranges))
+    (and ranges (distinct-ranges ranges))))
 
-(tm-define (lsp-unfold-all)
-  (:synopsis "Unfolds all the blocks of the buffer")
-  (set-folds! '()))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; The former commands
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (body) (buffer-get-body (current-buffer)))
+
+(tm-define (lsp-fold-block start end)
+  (:synopsis "Folds the lines @start to @end: @start stays shown")
+  (code-fold-lines (body) start end))
+
+(tm-define (lsp-fold) (code-fold))
+(tm-define (lsp-unfold) (code-unfold))
+(tm-define (lsp-fold-all) (code-fold-all))
+(tm-define (lsp-unfold-all) (code-unfold-all))
 
 (tm-define (lsp-folds)
   (:synopsis "The folds of the current buffer, as (start end)")
-  (with b (body)
-    (sort (list-filter (map (lambda (f)
-                              (with i (fold-index f b)
-                                (and i (list i (+ i (length (fold-hidden f)))))))
-                            (current-folds))
-                       identity)
-          (lambda (x y) (< (car x) (car y))))))
+  (code-folds (body)))
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; The folds and the edits, the cursor
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(define (refresh-fold f b)
-  ;; @f after a change of the buffer: #f if it is no longer there, else @f
-  ;; with the texts of its lines now (those which changed are registered
-  ;; again and typeset again)
-  (with i (fold-index f b)
-    (if (not i) (begin (unregister! f) #f)
-        (let ((labels (map tree->string (fold-hidden f)))
-              (head-label (tree->string (fold-head f))))
-          (when (!= head-label (cadddr f))
-            (lsp-fold-marker (fold-head f) fold-marker)
-            (show-lines b i i))
-          (when (!= labels (caddr f))
-            (for (t (fold-hidden f)) (lsp-fold-line t #t))
-            (show-lines b i (+ i (length labels))))
-          (list (fold-head f) (fold-hidden f) labels head-label)))))
-
-(tm-define (notify-buffer-changed name)
-  (former name)
-  (with fs (ahash-ref folds name)
-    (when (and fs (== name (buffer-key)))
-      (let* ((b (body))
-             (new (list-filter (map (lambda (f) (refresh-fold f b)) fs)
-                               identity)))
-        (when (!= (length new) (length fs))
-          ;; (a fold which went: its lines are shown, but those of the folds
-          ;; which stay and are in it are hidden again)
-          (register! new)
-          (update-current-buffer))
-        (if (null? new) (ahash-remove! folds name)
-            (ahash-set! folds name new))))))
-
-(define last-lo #f)
-(define cursor-fix-scheduled? #f)
-
-(define (line-length b i)
-  (string-length (tree->string (tree-ref b i))))
-
-(define (fix-cursor)
-  ;; after a move of the cursor: in a hidden line, it goes over the fold
-  ;; when it moves right from the end of the first line of the fold into
-  ;; the start of its first hidden line, or left from the start of the line
-  ;; after it into the end of its last hidden line (the arrows; up and down
-  ;; go over the lines which have no boxes); else (a search, a jump to a
-  ;; definition, a diagnostic...) the folds which hide it open. Elsewhere,
-  ;; its place is kept (the place it comes from)
-  (set! cursor-fix-scheduled? #f)
-  (let* ((lo (cursor-lo))
-         (b (body))
-         (f (and lo (tree-is? b 'document) (< (car lo) (tree-arity b))
-                 (lsp-line-folded? (tree-ref b (car lo)))
-                 (hiding-fold b (car lo)))))
-    (if (not f) (set! last-lo lo)
-        (let* ((i (fold-index f b))
-               (end (+ i (length (fold-hidden f)))))
-          (cond ((and last-lo (== last-lo (list i (line-length b i)))
-                      (== lo (list (+ i 1) 0))
-                      (< (+ end 1) (tree-arity b)))
-                 ;; (right: the start of the line after it)
-                 (go-to-path (append (buffer-path) (list (+ end 1) 0))))
-                ((and last-lo (== last-lo (list (+ end 1) 0))
-                      (== lo (list end (line-length b end))))
-                 ;; (left: the end of its first line)
-                 (go-to-path (end-of-line b i)))
-                (else
-                 ;; (all the folds which hide it: those in it too)
-                 (set-folds! (list-filter (current-folds)
-                                          (lambda (g)
-                                            (not (hides? g b (car lo))))))))))))
-
-(define (schedule-fix)
-  (when (not cursor-fix-scheduled?)
-    (set! cursor-fix-scheduled? #t)
-    (delayed (fix-cursor))))
-
-(tm-define (notify-cursor-moved status)
-  ;; NOTE: no mode predicates (see lsp-edit). The cursor is looked at once
-  ;; the move is done (the path of the cursor is not yet the new one here)
-  (former status)
-  (when (nnull? (current-folds)) (schedule-fix)))
-
-(tm-define (lsp-cursor-in-fold)
-  ;; (called by the editor when the cursor is in a line which it does not
-  ;; show: notify-cursor-moved is not, the cursor has no box)
-  (schedule-fix))
-
-(tm-define (notify-buffer-closed name)
-  ;; (the lines of a closed buffer are forgotten)
-  (with fs (ahash-ref folds name)
-    (when fs
-      (for (f fs) (unregister! f))
-      (ahash-remove! folds name)
-      ;; (a buffer which is renamed, saved as another file, stays: its
-      ;; lines are shown)
-      (delayed
-        (:idle 1)
-        (when (buffer-exists? (current-buffer)) (update-current-buffer)))))
-  (former name))
-
-(tm-define (lsp-turn-off)
-  ;; (the folds are those of the servers: all of them open)
-  (former)
-  (for (name (map car (ahash-table->list folds)))
-    (with u (string->url name)
-      (when (buffer-exists? u)
-        (with-buffer u (lsp-unfold-all))))))
+(tm-define (lsp-line-folded? t)
+  (:synopsis "Is the line @t hidden by a fold?")
+  (== (code-line-fold-state t) 1))

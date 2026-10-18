@@ -642,6 +642,40 @@
          (update-path (tree->path (tree-ref root row)))
          #t)))
 
+(define (rows->range s rows)
+  (and (pair? rows) (list s (cAr rows))))
+
+(define-public (syntax-fold-ranges)
+  ;; the blocks which can be folded around the cursor, as (first last):
+  ;; the nodes of several lines, without the line which closes them (for
+  ;; the folds of the core, progs/code/code-fold.scm); #f without a tree
+  (let ((c (cursor-code)))
+    (and c (tree-is? (cadr (car c)) 'document)
+         (let* ((ctx (car c)) (lan (cadr c)) (root (cadr ctx)) (p (cddr ctx)))
+           (list-filter
+            (map (lambda (n)
+                   (and (< (car (node-start n)) (car (node-end n)))
+                        (rows->range (car (node-start n))
+                                     (fold-rows root lan n))))
+                 (syntax-region-node-range root lan (car p) (cadr p)
+                                           (car p) (cadr p)))
+            identity)))))
+
+(define-public (syntax-fold-all-ranges)
+  ;; the definitions of several lines of the code at the cursor, as blocks
+  ;; (first last); #f without a tree
+  (let ((o (cursor-outline)))
+    (and o
+         (let* ((ctx (car o)) (lan (cadr o)) (root (cadr ctx)))
+           (list-filter
+            (map (lambda (d)
+                   (let ((n (list "" #t (list-ref d 4) (cadddr d))))
+                     (and (< (car (node-start n)) (car (node-end n)))
+                          (rows->range (car (node-start n))
+                                       (fold-rows root lan n)))))
+                 (caddr o))
+            identity)))))
+
 (define-public (syntax-fold-block)
   ;; fold the innermost node of several lines around the cursor; #f when
   ;; there is none
@@ -1087,10 +1121,10 @@
   ("Next definition" (syntax-move-definition 1))
   ("Select definition" (syntax-select-definition))
   (-> "Folds"
-      ("Fold block" (syntax-fold-block))
-      ("Unfold block" (syntax-unfold-block))
-      ("Fold all definitions" (syntax-fold-definitions))
-      ("Unfold all" (syntax-unfold-all)))
+      ("Fold block" (code-fold))
+      ("Unfold block" (code-unfold))
+      ("Fold all blocks" (code-fold-all))
+      ("Unfold all" (code-unfold-all)))
   (-> "Structure"
       ("Delete node" (syntax-delete-node #t))
       ("Swap with next" (syntax-swap-node #t))

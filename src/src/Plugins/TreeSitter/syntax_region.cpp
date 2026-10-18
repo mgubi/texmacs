@@ -8,6 +8,7 @@
 * in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
 ******************************************************************************/
 
+#include "code_lines.hpp"
 #include "syntax_region.hpp"
 #include "ts_captures.hpp"
 #include "language.hpp"
@@ -861,32 +862,40 @@ syntax_region_node_info (tree root, int language, int row, int col) {
    indent.increment and indent.avoid_last_matching_next. Rows and columns
    are those of the lines of the region (positions in the TeXmacs strings). */
 
+// (the positions and columns are those of the core, System/Language/
+// code_lines.cpp: a tab of a source file is the character <#9>, which goes
+// to the next stop of every indent_tab columns, the step of the indentation
+// asked for, which is the width of a tab where the lines are indented by
+// tabs, see program-indent-step)
+static int indent_tab= 8;
+
 static int
 indent_columns (string s) {
-  int i= 0;
-  while (i < N(s) && (s[i] == ' ' || s[i] == '\t')) i++;
-  return i;
+  // the offset of the first character of @s which is not blank
+  return code_indent_end (s);
+}
+
+static int
+indent_width (string s) {
+  // the column of the first character of @s which is not blank
+  return code_column (s, code_indent_end (s), indent_tab);
 }
 
 static string
 trimmed (string s) {
-  int a= 0, b= N(s);
-  while (a < b && (s[a] == ' ' || s[a] == '\t')) a++;
-  while (b > a && (s[b-1] == ' ' || s[b-1] == '\t')) b--;
+  int a= code_indent_end (s), b= N(s);
+  while (b > a && (s[b-1] == ' ' || s[b-1] == '\t' ||
+                   (b - 4 >= a && is_source_tab (s, b-4))))
+    b -= (s[b-1] == '>'? 4: 1);
   return s (a, b);
 }
 
 static int
 char_column (string line, int col) {
   // the column of a position of a TeXmacs string in characters: an entity
-  // <name> counts as one (as get-offset of prog/scheme-edit.scm)
-  int r= 0, inc= 1;
-  for (int i= 0; i < col && i < N(line); i++) {
-    if (line[i] == '<') inc= 0;
-    else if (line[i] == '>') { r++; inc= 1; }
-    else r += inc;
-  }
-  return r;
+  // <name> counts as one (as get-offset of prog/scheme-edit.scm), a tab
+  // goes to its stop
+  return code_column (line, col, indent_tab);
 }
 
 static bool
@@ -973,7 +982,9 @@ find_delimiter (array<string>& lines, TSNode node, const std::string& delim,
     string line= row < N(lines)? lines[row]: string ("");
     is_end= true;
     for (int k= (int) e.column; k < N(line); k++)
-      if (line[k] != ' ' && line[k] != '\t' && delim.find (line[k]) == std::string::npos)
+      if (is_source_tab (line, k)) k += 3;
+      else if (line[k] != ' ' && line[k] != '\t' &&
+               delim.find (line[k]) == std::string::npos)
         is_end= false;
     return true;
   }
@@ -982,6 +993,7 @@ find_delimiter (array<string>& lines, TSNode node, const std::string& delim,
 
 int
 syntax_region_indent (tree root, int language, int query, int row, int tab) {
+  indent_tab= max (1, tab);
   // the indentation of the line row by the query (indents.scm); -1 when
   // the line keeps the indentation it would have without the query
   // (@indent.auto), -2 without a syntax tree
@@ -1108,7 +1120,7 @@ syntax_region_indent (tree root, int language, int query, int row, int tab) {
         }
         if (c_srow >= 0 && c_srow != o_srow && c_srow == row &&
             meta.count ("indent.avoid_last_matching_next") &&
-            indent <= indent_columns (lines[o_srow]) + tab)
+            indent <= indent_width (lines[o_srow]) + tab)
           indent += tab;
         is_processed= true;
         if (absolute) return indent;

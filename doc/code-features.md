@@ -190,6 +190,27 @@ server of each language (`(server "clangd")`), replacing the defaults of
 2. The core pieces with the current behaviour: positions (3.2), line state
    with layers (3.3) and folds (3.4) in the core; the header includes of the
    core on the features removed; tree-sitter's helpers tab-aware.
+   - Folds (done): the state of a hidden line is in the core
+     (`System/Language/code_lines.cpp`, glue `code-line-fold-state`,
+     `code-set-line-fold-state`); `bridge.cpp` and `edit_cursor.cpp` no
+     longer include `ts_highlight.hpp`. The folds of the LSP (lines not
+     typeset, `lsp_fold_line`, `notify_cursor_in_fold`, the markers) are
+     gone. `progs/code/code-fold.scm`: the commands `code-fold`,
+     `code-unfold`, `code-fold-all`, `code-unfold-all` (std ( and std ), the
+     menus of both), the hidden lines (`code-fold-lines`, `code-folds`...),
+     and the cursor (`code-cursor-in-fold`, which C++ calls with the last
+     place of the cursor outside of the folds and the new one: the arrows
+     go over a fold, a jump opens it at once). The blocks come from the
+     feature `fold-ranges` / `fold-all-ranges`: the adapters
+     `progs/lsp/lsp-code.scm` (rank 10, `folding-ranges` of the server) and
+     `progs/treesit/ts-code.scm` (rank 20, the nodes of several lines),
+     loaded by `code-features.scm` when their files are there. A fold in a
+     fold is one run of hidden lines; replacing the first line of a fold
+     keeps it (the LSP dropped it). Suite `code` (23 checks, providers of its
+     own, without tree-sitter or a server). In a window: in a C++ file, the
+     server gives the block, the arrows go over it, Fold all folds the body
+     of main.
+   - Positions, line state with layers (colours, hints): next.
 3. Source regions (3.1): the diff out of `syntax_region.cpp`; tree-sitter and
    the LSP as listeners; per-edit timings on large files (s7.c, parser.c).
 4. Providers (3.5): the `code-*` commands, the preferences, the menu and keys;

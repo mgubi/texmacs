@@ -814,20 +814,26 @@
     (check= (lsp-apply-decorations u uri '()) 0)
     (check= (lsp-decorations uri) '())
     (tree-assign! body (stree->tree saved))
-    ;; a fold in a fold: when the outer one goes (its first line is
-    ;; replaced), the inner one stays folded
+    ;; folds, those of the core (code-fold.scm): a state of the hidden
+    ;; lines; a fold in a fold makes one run of hidden lines, which stays
+    ;; when the first line is replaced; a hidden line which is edited
+    ;; forgets it
     (lsp-fold-block 1 2)
+    (check= (lsp-folds) '((1 2)))
     (lsp-fold-block 0 2)
-    (check= (lsp-folds) '((0 2) (1 2)))
+    (check= (lsp-folds) '((0 2)))
+    ;; (the cursor after the fold: arriving in a hidden line opens it)
+    (go-to-path (append (buffer-path) '(3 0)))
     (tree-remove! body 0 1)
     (tree-insert! body 0 (list (car (cdr saved))))
-    (notify-buffer-changed (url->string u))
-    (check= (lsp-folds) '((1 2)))
+    (check= (lsp-folds) '((0 2)))
     (check-true (lsp-line-folded? (tree-ref body 2)))
-    (check-false (lsp-line-folded? (tree-ref body 1)))
+    (tree-insert! (tree-ref body 2) 0 " ")
+    (check= (lsp-folds) '((0 1)))
+    (go-to-path (append (buffer-path) '(0 0)))
     (lsp-unfold-all)
     (check= (lsp-folds) '())
-    (check-false (lsp-line-folded? (tree-ref body 2)))
+    (check-false (lsp-line-folded? (tree-ref body 1)))
     (tree-assign! body (stree->tree saved))))
 
 (define (test-clangd path)

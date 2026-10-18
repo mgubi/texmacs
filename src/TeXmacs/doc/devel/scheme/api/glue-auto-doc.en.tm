@@ -5979,27 +5979,51 @@ source code.
   </explain>
 
   <\explain>
-    <scm|(lsp-fold-line <scm-arg|tree> <scm-arg|bool>)>
+    <scm|(code-line-fold-state <scm-arg|tree>)>
 <explain-synopsis|no synopsis>
   <|explain>
-    Calls the <c++> function <cpp|lsp_fold_line> which returns
+    Calls the <c++> function <cpp|code_line_fold_state> which returns
+    <scm|int>.
+  </explain>
+
+  <\explain>
+    <scm|(code-set-line-fold-state <scm-arg|tree> <scm-arg|int>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|code_set_line_fold_state> which returns
     <scm|void>.
   </explain>
 
   <\explain>
-    <scm|(lsp-line-folded? <scm-arg|tree>)>
+    <scm|(code-column <scm-arg|string> <scm-arg|int> <scm-arg|int>)>
 <explain-synopsis|no synopsis>
   <|explain>
-    Calls the <c++> function <cpp|lsp_line_folded> which returns
-    <scm|bool>.
+    Calls the <c++> function <cpp|code_column> which returns
+    <scm|int>.
   </explain>
 
   <\explain>
-    <scm|(lsp-fold-marker <scm-arg|tree> <scm-arg|string>)>
+    <scm|(code-utf16-column <scm-arg|string> <scm-arg|int>)>
 <explain-synopsis|no synopsis>
   <|explain>
-    Calls the <c++> function <cpp|lsp_fold_marker> which returns
-    <scm|void>.
+    Calls the <c++> function <cpp|code_utf16_column> which returns
+    <scm|int>.
+  </explain>
+
+  <\explain>
+    <scm|(code-utf16-offset <scm-arg|string> <scm-arg|int>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|code_utf16_offset> which returns
+    <scm|int>.
+  </explain>
+
+  <\explain>
+    <scm|(code-indent-end <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|code_indent_end> which returns
+    <scm|int>.
   </explain>
 
   <\explain>

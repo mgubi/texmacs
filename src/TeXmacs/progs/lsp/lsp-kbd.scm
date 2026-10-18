@@ -51,9 +51,7 @@
   ("std U" (lsp-references))
   ("std O" (lsp-outline))
   ("std P" (interactive lsp-find-symbol))
-  ("std H" (lsp-call-hierarchy))
-  ("std (" (lsp-fold))
-  ("std )" (lsp-unfold)))
+  ("std H" (lsp-call-hierarchy)))
 
 (menu-bind lsp-menu
   ((check "Follow source files" "v" (lsp-on?))

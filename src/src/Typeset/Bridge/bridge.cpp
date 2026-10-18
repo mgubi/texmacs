@@ -10,7 +10,7 @@
 ******************************************************************************/
 
 #include "bridge.hpp"
-#include "../../Plugins/TreeSitter/ts_highlight.hpp"
+#include "code_lines.hpp"
 #include "iterator.hpp"
 #include "sys_utils.hpp" // get_env
 #include "Boxes/construct.hpp"
@@ -938,18 +938,18 @@ bridge_rep::typeset_by_inputs (int desired_status) {
 
 void
 bridge_rep::fold_line (tree t, array<page_item>& items) {
-  // a folded line of program code (see Plugins/TreeSitter/ts_highlight.cpp)
+  // a folded line of program code (see System/Language/code_lines.hpp)
   // takes no room and is not drawn (its boxes stay, for the cursor), and
   // the line before folded lines ends with a mark
   bool before_fold= false;
-  if (tree_sitter_fold_state (t) == 0 && !is_nil (ip) && !is_nil (ip->next) &&
+  if (code_line_fold_state (t) == 0 && !is_nil (ip) && !is_nil (ip->next) &&
       is_accessible (ip)) {
     tree parent= subtree (the_et, reverse (ip->next));
     int k= ip->item;
     before_fold= is_document (parent) && k + 1 < N(parent) &&
-                 tree_sitter_fold_state (parent[k+1]) == 1;
+                 code_line_fold_state (parent[k+1]) == 1;
   }
-  if (tree_sitter_fold_state (t) == 1) {
+  if (code_line_fold_state (t) == 1) {
     for (int i=0; i<N(items); i++)
       if (items[i]->type != PAGE_CONTROL_ITEM) {
         box b= items[i]->b;

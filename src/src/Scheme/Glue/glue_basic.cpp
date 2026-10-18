@@ -10179,46 +10179,91 @@ tmg_lsp_undecorate_line (tmscm arg1) {
 }
 
 tmscm
-tmg_lsp_fold_line (tmscm arg1, tmscm arg2) {
-  TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "lsp-fold-line");
-  TMSCM_ASSERT_BOOL (arg2, TMSCM_ARG2, "lsp-fold-line");
+tmg_code_line_fold_state (tmscm arg1) {
+  TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "code-line-fold-state");
 
   tree in1= tmscm_to_tree (arg1);
-  bool in2= tmscm_to_bool (arg2);
 
   // TMSCM_DEFER_INTS;
-  lsp_fold_line (in1, in2);
+  int out= code_line_fold_state (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return int_to_tmscm (out);
+}
+
+tmscm
+tmg_code_set_line_fold_state (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "code-set-line-fold-state");
+  TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "code-set-line-fold-state");
+
+  tree in1= tmscm_to_tree (arg1);
+  int in2= tmscm_to_int (arg2);
+
+  // TMSCM_DEFER_INTS;
+  code_set_line_fold_state (in1, in2);
   // TMSCM_ALLOW_INTS;
 
   return TMSCM_UNSPECIFIED;
 }
 
 tmscm
-tmg_lsp_line_foldedP (tmscm arg1) {
-  TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "lsp-line-folded?");
+tmg_code_column (tmscm arg1, tmscm arg2, tmscm arg3) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "code-column");
+  TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "code-column");
+  TMSCM_ASSERT_INT (arg3, TMSCM_ARG3, "code-column");
 
-  tree in1= tmscm_to_tree (arg1);
+  string in1= tmscm_to_string (arg1);
+  int in2= tmscm_to_int (arg2);
+  int in3= tmscm_to_int (arg3);
 
   // TMSCM_DEFER_INTS;
-  bool out= lsp_line_folded (in1);
+  int out= code_column (in1, in2, in3);
   // TMSCM_ALLOW_INTS;
 
-  return bool_to_tmscm (out);
+  return int_to_tmscm (out);
 }
 
 tmscm
-tmg_lsp_fold_marker (tmscm arg1, tmscm arg2) {
-  TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "lsp-fold-marker");
-  TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "lsp-fold-marker");
+tmg_code_utf16_column (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "code-utf16-column");
+  TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "code-utf16-column");
 
-  tree in1= tmscm_to_tree (arg1);
-  string in2= tmscm_to_string (arg2);
+  string in1= tmscm_to_string (arg1);
+  int in2= tmscm_to_int (arg2);
 
   // TMSCM_DEFER_INTS;
-  lsp_fold_marker (in1, in2);
+  int out= code_utf16_column (in1, in2);
   // TMSCM_ALLOW_INTS;
 
-  return TMSCM_UNSPECIFIED;
+  return int_to_tmscm (out);
+}
+
+tmscm
+tmg_code_utf16_offset (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "code-utf16-offset");
+  TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "code-utf16-offset");
+
+  string in1= tmscm_to_string (arg1);
+  int in2= tmscm_to_int (arg2);
+
+  // TMSCM_DEFER_INTS;
+  int out= code_utf16_offset (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return int_to_tmscm (out);
+}
+
+tmscm
+tmg_code_indent_end (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "code-indent-end");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  int out= code_indent_end (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return int_to_tmscm (out);
 }
 
 tmscm
@@ -13283,9 +13328,12 @@ initialize_glue_basic () {
   tmscm_install_procedure ("lsp-document-text",  tmg_lsp_document_text, 1, 0, 0);
   tmscm_install_procedure ("lsp-decorate-line",  tmg_lsp_decorate_line, 3, 0, 0);
   tmscm_install_procedure ("lsp-undecorate-line",  tmg_lsp_undecorate_line, 1, 0, 0);
-  tmscm_install_procedure ("lsp-fold-line",  tmg_lsp_fold_line, 2, 0, 0);
-  tmscm_install_procedure ("lsp-line-folded?",  tmg_lsp_line_foldedP, 1, 0, 0);
-  tmscm_install_procedure ("lsp-fold-marker",  tmg_lsp_fold_marker, 2, 0, 0);
+  tmscm_install_procedure ("code-line-fold-state",  tmg_code_line_fold_state, 1, 0, 0);
+  tmscm_install_procedure ("code-set-line-fold-state",  tmg_code_set_line_fold_state, 2, 0, 0);
+  tmscm_install_procedure ("code-column",  tmg_code_column, 3, 0, 0);
+  tmscm_install_procedure ("code-utf16-column",  tmg_code_utf16_column, 2, 0, 0);
+  tmscm_install_procedure ("code-utf16-offset",  tmg_code_utf16_offset, 2, 0, 0);
+  tmscm_install_procedure ("code-indent-end",  tmg_code_indent_end, 1, 0, 0);
   tmscm_install_procedure ("widget-printer",  tmg_widget_printer, 2, 0, 0);
   tmscm_install_procedure ("widget-color-picker",  tmg_widget_color_picker, 3, 0, 0);
   tmscm_install_procedure ("widget-extend",  tmg_widget_extend, 2, 0, 0);

@@ -14,6 +14,7 @@
 #include "analyze.hpp"
 #include "boot.hpp"
 #include "lsp_decorations.hpp"
+#include "code_lines.hpp"
 
 lazy make_lazy_vstream (edit_env env, tree t, path ip, tree channel);
 
@@ -235,8 +236,7 @@ void
 concater_rep::typeset_prog_string (tree t, path ip, int pos, int end) {
   // (a line which a language server has decorated: see below)
   lsp_line_decorations* d= lsp_line_decorations_of (t);
-  if (d != NULL || lsp_fold_marker_of (t) != "") {
-    typeset_lsp_string (t, ip, pos, end, d); return; }
+  if (d != NULL) { typeset_lsp_string (t, ip, pos, end, d); return; }
   array<space> spc_tab= env->fn->get_normal_spacing (env->spacing_policy);
   string s= t->label;
   int    start;
@@ -244,7 +244,7 @@ concater_rep::typeset_prog_string (tree t, path ip, int pos, int end) {
   // the line, which the range primitive typesets)
   bool tabs  = search_forwards ("<#9>", s) >= 0;
   int  tw    = (tabs? max (1, env->get_int (PROG_TAB_WIDTH)): 8);
-  int  column= (tabs? prog_column (s, 0, pos, 0, tw): 0);
+  int  column= (tabs? code_column (s, pos, tw): 0);
 
   do {
     start= pos;
@@ -329,7 +329,7 @@ concater_rep::typeset_lsp_string (tree t, path ip, int pos, int end,
   // (the tabs at their stops, as in typeset_prog_string)
   bool tabs  = search_forwards ("<#9>", s) >= 0;
   int  tw    = (tabs? max (1, env->get_int (PROG_TAB_WIDTH)): 8);
-  int  column= (tabs? prog_column (s, 0, pos, 0, tw): 0);
+  int  column= (tabs? code_column (s, pos, tw): 0);
   do {
     start= pos;
     text_property tp= env->lan->advance (t, pos);
@@ -351,11 +351,6 @@ concater_rep::typeset_lsp_string (tree t, path ip, int pos, int end,
       PRINT_SPACE (tp->spc_before)
       string color= env->lan->get_color (t, start, pos);
       int i= start;
-      if (d == NULL) {  // (a marker of a fold only)
-        if (tabs) typeset_prog_piece (s, ip, start, pos, color, column, tw);
-        else typeset_colored_substring (s (start, pos), ip, start, color);
-        i= pos;
-      }
       while (i < pos) {
         // the piece from i: up to the next start or end of a coloured
         // piece, with its colour if one covers i
@@ -374,12 +369,9 @@ concater_rep::typeset_lsp_string (tree t, path ip, int pos, int end,
       PRINT_SPACE (tp->spc_after)
     }
   } while (pos<end);
-  // the hints at the end of the line, then the marker of a fold
-  if (end == N(s)) {
-    typeset_lsp_hints (d, ip, N(s), N(s) + 1);
-    string m= lsp_fold_marker_of (t);
-    if (m != "") typeset_lsp_text (m, ip);
-  }
+  // the hints at the end of the line (the marks of the folds are those of
+  // bridge_rep::fold_line)
+  if (end == N(s)) typeset_lsp_hints (d, ip, N(s), N(s) + 1);
 }
 
 /******************************************************************************

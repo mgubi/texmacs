@@ -30,13 +30,6 @@ struct lsp_line_decorations {
 // text) ...), both in the order of the line
 void lsp_decorate_line (tree line, tree colors, tree hints);
 void lsp_undecorate_line (tree line);
-// a folded line: kept in the document, but not typeset
-void lsp_fold_line (tree line, bool folded);
-bool lsp_line_folded (tree line);
-// the marker at the end of the first line of a fold ("" for none), and the
-// marker of @line (or "": none, or not for its present text)
-void   lsp_fold_marker (tree line, string text);
-string lsp_fold_marker_of (tree line);
 // the decorations of @line, or NULL (none, or not for its present text)
 lsp_line_decorations* lsp_line_decorations_of (tree line);
 

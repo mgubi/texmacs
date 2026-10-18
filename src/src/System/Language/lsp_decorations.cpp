@@ -10,8 +10,8 @@
 
 // The decorations are kept for the representation of the tree of a line
 // (its address, which is only compared). The Scheme programs keep the trees
-// of the lines which they decorate or fold, until they undecorate them
-// (lsp-decorate.scm, lsp-fold.scm): a line which is removed is not freed
+// of the lines which they decorate, until they undecorate them
+// (lsp-decorate.scm): a line which is removed is not freed
 // meanwhile, and its address cannot be taken by a line made later; the
 // text of the line is checked too (a line which is edited keeps its tree).
 // The lines which have none cost a lookup in an empty table: the
@@ -68,56 +68,4 @@ lsp_line_decorations_of (tree line) {
   lsp_line_decorations* d= find_decorations (line);
   if (d == NULL || d->label != line->label) return NULL;
   return d;
-}
-
-/******************************************************************************
-* Folded lines
-******************************************************************************/
-
-// line -> its text when it was folded
-static hashmap<pointer,pointer> lsp_folded (NULL);
-
-void
-lsp_fold_line (tree line, bool folded) {
-  pointer key= (pointer) inside (line);
-  if (lsp_folded->contains (key)) {
-    tm_delete<string> ((string*) lsp_folded [key]);
-    lsp_folded->reset (key);
-  }
-  if (folded && is_atomic (line))
-    lsp_folded (key)= (pointer) tm_new<string> (line->label);
-}
-
-bool
-lsp_line_folded (tree line) {
-  if (N(lsp_folded) == 0 || !is_atomic (line)) return false;
-  pointer key= (pointer) inside (line);
-  if (!lsp_folded->contains (key)) return false;
-  return *((string*) lsp_folded [key]) == line->label;
-}
-
-// line -> (its text, its marker)
-static hashmap<pointer,pointer> lsp_markers (NULL);
-
-void
-lsp_fold_marker (tree line, string text) {
-  pointer key= (pointer) inside (line);
-  if (lsp_markers->contains (key)) {
-    tm_delete<array<string> > ((array<string>*) lsp_markers [key]);
-    lsp_markers->reset (key);
-  }
-  if (text != "" && is_atomic (line)) {
-    array<string>* m= tm_new<array<string> > ();
-    *m << line->label << text;
-    lsp_markers (key)= (pointer) m;
-  }
-}
-
-string
-lsp_fold_marker_of (tree line) {
-  if (N(lsp_markers) == 0 || !is_atomic (line)) return "";
-  pointer key= (pointer) inside (line);
-  if (!lsp_markers->contains (key)) return "";
-  array<string>& m= *((array<string>*) lsp_markers [key]);
-  return m[0] == line->label? m[1]: string ("");
 }
