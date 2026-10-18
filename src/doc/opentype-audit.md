@@ -101,7 +101,10 @@ What is left:
 - **Seen and not traced**: a bus error at startup, twice during the audit
   and once in the fixed build, never reproduced; four checks of the suite
   `latex` (import of `eqnarray` and `align`) which fail on the first run
-  with a new home directory and pass afterwards.
+  with a new home directory and pass afterwards. (Traced on 2026-10-18:
+  `wip_opentype` lacks 2ffd02fbcc, PR #259, where `is_equation_env` makes
+  its labels with `make_tree_label`; `maxs_texmacs` has it and passes with
+  a new home, Vue and Qt.)
 
 Also fixed on the way: `rhd`, `shortleftarrow` and `shortrightarrow` had two
 LaTeX packages each and could not be exported, already at the base; the unit

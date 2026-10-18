@@ -23,8 +23,9 @@ went); add what you find. Paths are relative to the repository root.
   compiled anywhere yet: the Linux and Windows branches of the
   font path in `src/src/Plugins/Freetype/tt_file.cpp` (TeX Live of any year
   on Linux). Seen and not traced: a bus error at startup (three times, never
-  reproduced), four import checks of the suite `latex` which fail on the
-  first run with a new home directory only.
+  reproduced). (The four import checks of the suite `latex` which failed on
+  the first run with a new home directory: the branch of the audit lacked
+  2ffd02fbcc, PR #259, which is here; checked on 2026-10-18.)
 - **Cursor history.** PR #337 on `wip_fixes` holds the fix which is already
   here (278d12fc27): a saved position whose buffer was closed was read
   after its tree was freed.
