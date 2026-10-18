@@ -205,9 +205,9 @@
        (with c (lsp-buffer-client*)
          (and c (lsp-client-running? c)
               (lsp-client-capable? c "documentSymbolProvider")))
-       ;; (the cursor in the lines of the buffer, which its server sees)
-       (with c (code-cursor-lines)
-         (and c (tree-eq? (car c) (lsp-target-root))))))
+       ;; (the cursor in the lines which its server sees: those of the
+       ;; buffer, of a code block or of the unit of its blocks)
+       (lsp-cursor-in-target?)))
 
 (tm-define (lsp-outline-at-cursor)
   (:synopsis "The outline of the buffer, for code-navigate.scm")
@@ -222,7 +222,9 @@
                     (lsp-object "textDocument" (lsp-object "uri" uri))
                     5000)
              (and (== (car a) 'result)
-                  (map (lambda (e)
+                  ;; (an entry beyond the blocks of a unit has no place)
+                  (list-filter
+                   (map (lambda (e)
                          (list (car e) (cadr e)
                                (utf8->cork (caddr e))
                                (utf8->cork (first-line* (cadddr e)))
@@ -232,7 +234,8 @@
                                         "line" (lsp-number (list-ref e 4))
                                         "character"
                                         (lsp-number (list-ref e 5)))))))
-                       (lsp-outline-entries (cadr a)))))))))
+                       (lsp-outline-entries (cadr a)))
+                   (lambda (e) (list-ref e 4)))))))))
 
 (define (first-line* s)
   (with i (string-search-forwards "\n" 0 s)

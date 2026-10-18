@@ -377,7 +377,7 @@ server of each language (`(server "clangd")`), replacing the defaults of
      mapping; an edit of a unit is written back to its blocks when it
      changes the lines of one block only. The colours and the inlay hints
      of the servers are given to the lines of blocks and units too. The
-     outline and the folds of a unit are those of tree-sitter. Suite lsp,
+     outline of a unit is that of all its blocks, its folds those inside a block (lsp-fold.scm maps them). Suite lsp,
      group "code blocks together" (with clangd: a name of a block known in
      the next one, a definition and a rename across them); in a window.
    - Tree-sitter, a keystroke: the region is changed in place (lines,

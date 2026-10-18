@@ -87,23 +87,36 @@
          (and c (lsp-client-running? c)
               (lsp-client-capable? c "foldingRangeProvider")))))
 
-(define (in-source-file?)
-  ;; (the cursor is in the lines of the buffer, which its server sees)
-  (with c (code-cursor-lines)
-    (and c (tree-eq? (car c) (lsp-target-root)))))
+(define (cursor-window)
+  ;; (offset count): the lines of the code at the cursor (a source file, a
+  ;; code block) among those which its server sees (the same, or those of
+  ;; the unit of the blocks of a language), or #f
+  (let ((c (code-cursor-lines))
+        (lo (lsp-target-lo (cursor-path))))
+    (and c lo (list (- (car lo) (cadr c)) (tree-arity (car c))))))
+
+(define (in-window ranges w)
+  ;; the blocks of @ranges in the window @w, as rows of its lines
+  (let ((off (car w)) (n (cadr w)))
+    (map (lambda (r) (list (- (car r) off) (- (cadr r) off)))
+         (list-filter ranges (lambda (r) (and (<= off (car r))
+                                               (< (cadr r) (+ off n))))))))
 
 (tm-define (lsp-fold-ranges)
   (:synopsis "The blocks of the server around the cursor, as (start end)")
-  (let ((c (code-cursor-lines))
-        (ranges (and (in-source-file?) (folding-ranges))))
+  (let* ((c (code-cursor-lines))
+         (w (cursor-window))
+         (ranges (and w (folding-ranges))))
     (and c ranges
-         (list-filter ranges (lambda (r) (and (<= (car r) (cadr c))
-                                               (<= (cadr c) (cadr r))))))))
+         (list-filter (in-window ranges w)
+                      (lambda (r) (and (<= (car r) (cadr c))
+                                       (<= (cadr c) (cadr r))))))))
 
 (tm-define (lsp-all-fold-ranges)
   (:synopsis "All the blocks of the server, as (start end)")
-  (with ranges (and (in-source-file?) (folding-ranges))
-    (and ranges (distinct-ranges ranges))))
+  (let* ((w (cursor-window))
+         (ranges (and w (folding-ranges))))
+    (and ranges (distinct-ranges (in-window ranges w)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The former commands

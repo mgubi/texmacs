@@ -400,7 +400,12 @@ edit_interface_rep::set_right_footer () {
   tree lf;
   if (is_atomic (st)) lf= compute_text_footer (st);
   else lf= compute_operation_footer (st);
-  if (N(focus_get (false))+1 >= N(tp)) cf= concat (cf, lf);
+  // (the character at the cursor, where the focus is around it; in program
+  // code also when the focus is the whole document, as in a source file:
+  // a tab or a space is then told apart)
+  if (N(focus_get (false))+1 >= N(tp) ||
+      (is_atomic (st) && get_env_string (MODE) == "prog"))
+    cf= concat (cf, lf);
   set_right_footer (cf);
 }
 

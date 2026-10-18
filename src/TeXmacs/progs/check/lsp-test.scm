@@ -1012,6 +1012,21 @@
                         10000)
               (check-true (!= (tree->stree (code-line-layers (tree-ref (path->tree b2) 0)))
                               '(tuple (tuple) (tuple)))))
+            ;; the folds and the outline of the server, in the blocks (the
+            ;; closing brace of the first block on a line of its own: the
+            ;; server folds the body before it)
+            (let ((r1 (path->tree b1)))
+              (tree-remove! r1 1 1)
+              (tree-insert! r1 1 '("  return 2 * n;" "}")))
+            (notify-buffer-changed (url->string u))
+            (lsp-sync-pending)
+            (go-to-path (append b1 '(0 0)))
+            (check= (lsp-fold-ranges) '((0 1)))
+            (with o (lsp-outline-at-cursor)
+              (check= (and o (map caddr o)) '("twice" "g"))
+              (check= (and o (= (length o) 2) (list-ref (cadr o) 4))
+                      (append b2 '(0 4))))
+            (go-to-path (append b1 '(0 4)))
             ;; a rename of twice changes both blocks
             (with r (lsp-request-wait c "textDocument/rename"
                                       (lsp-object "textDocument" (lsp-object "uri" uri)

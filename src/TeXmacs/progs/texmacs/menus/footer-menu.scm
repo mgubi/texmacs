@@ -273,6 +273,7 @@
                (c (substring s (footer-char-start s i) i)))
           (cond ((== c "") "start")
                 ((== c " ") (if (in-math?) "apply" "space"))
+                ((== c "<#9>") "tab")   ; (a tab of a source file)
                 ((and (string-starts? c "<") (not (string-starts? c "<#"))
                       (> (string-length c) 2))
                  (string-append c " (" (substring c 1 (- (string-length c) 1))
