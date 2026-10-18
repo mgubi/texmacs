@@ -482,7 +482,31 @@
                 (18 19 "operator_openclose") (20 25 "variable_identifier")
                 (25 26 "operator_field") (31 39 "operator_openclose")
                 (44 49 "operator_openclose"))))
-    (let ((d (stree->tree '(document "println!(\"{}\", x + 1);"))))
+;; injections in injections (CSS in a template of the script of HTML),
+    ;; and, after edits in the script (its tree parsed again incrementally),
+    ;; the colors of a fresh highlighting
+    (with-test-buffer '(document (html-code (document "<less>script<gtr>"
+                                                      "var s = css`a { color: red }`;"
+                                                      "var t = 1;"
+                                                      "<less>/script<gtr>")))
+      (lambda (u b)
+        (update-forced)
+        (let* ((code (tree-ref b 0 0))
+               (all (lambda (doc)
+                      (tree-sitter-line-colors "html" doc)
+                      (map (lambda (i) (tree-sitter-line-colors "html" (tree-ref doc i)))
+                           (iota (tree-arity doc))))))
+          (check-true (in? '(16 21 "variable_identifier")   ; color
+                           (tree-sitter-line-colors "html" (tree-ref code 1))))
+          (all code)
+          (tree-insert! (tree-ref code 2) 0 "/* ")
+          (all code)
+          (tree-insert! (tree-ref code 1) 0 "*/ ")
+          (all code)
+          (tree-remove! (tree-ref code 2) 0 3)
+          (check= (all code) (all (stree->tree (tree->stree code))))
+          (tree-sitter-pending-updates))))   ; (not for the tests below)
+        (let ((d (stree->tree '(document "println!(\"{}\", x + 1);"))))
       (tree-sitter-line-colors "rust" d)
       (check= (tree-sitter-line-colors "rust" (tree-ref d 0))
               '((0 8 "preprocessor") (8 9 "operator_openclose") (9 13 "constant_string")

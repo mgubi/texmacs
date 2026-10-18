@@ -93,7 +93,8 @@ tree_sitter_reset_highlights () {
 }
 
 static bool
-resolve_injection (string name, int& language, int& query, array<int>& colors) {
+resolve_injection (string name, int& language, int& query, array<int>& colors,
+                   int& injections) {
   // the highlighter of the program language which name stands for; its
   // first use asks for it (it may arrive later, see the epoch)
   string lan= injection_names[name];
@@ -108,6 +109,7 @@ resolve_injection (string name, int& language, int& query, array<int>& colors) {
   language= h->language;
   query= h->query;
   colors= h->colors;
+  injections= h->injections;
   return true;
 }
 
