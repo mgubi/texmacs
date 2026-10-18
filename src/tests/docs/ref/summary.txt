@@ -9,7 +9,6 @@ file	about/welcome/welcome.it.tm	broken-link	../../tutorial/tut-tutorial.en.tm
 file	devel/format/format.de.tm	broken-branch	leaves.de.tm
 file	devel/format/format.de.tm	broken-branch	planned-changes.en.tm
 file	devel/interface/interface-dynlibs.de.tm	broken-link	../../../../../include/TeXmacs.h
-file	main/links/man-images.zh.tm	log	MuPDF error in mupdf_image_size: syntax error in attributes
 file	main/styles/std-dtds/header-dtd.pt.tm	language	english in a .pt.tm file
 file	main/styles/std-dtds/header-title-dtd.pt.tm	language	english in a .pt.tm file
 file	main/styles/std-dtds/number-dtds.pt.tm	broken-branch	number-env-dtd.en.tm
