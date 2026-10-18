@@ -393,6 +393,23 @@ server of each language (`(server "clangd")`), replacing the defaults of
    - The leftovers of the tabs: a tab in search, its name in the footer,
      the tab width of open files, the indenters of R and Mathemagix.
 
+Audit of phase 9 (2026-10-18): the opening bracket of a closing one which is
+MISSING after the bytes coloured again is painted again (the walk looks at the
+last child; the opening brackets are remembered on the way, not looked for
+backwards from the root); a line with markup is compared by its text (it made
+a reparse at each query); the server's colours of blocks and units go when
+their file is closed (also when the blocks are no longer followed or joined),
+and their lines are typeset again; the edits of a unit keep the lines with
+markup and the cursor, and refresh the unit first; the diagnostics of a unit
+are placed as the server last saw its blocks; a query at the cursor refreshes
+the lines of its block only (the whole unit when its blocks or their lengths
+change); a block whose language changes leaves its unit; a block which an
+edit empties keeps a line; tab in the search of code is not taken by the
+indentation of R and Mathemagix, nor by the completion. Tests: an unclosed
+bracket after an edit (treesit), the edits of a unit which add a line or
+would join blocks, a strict rename, the switch to single blocks which closes
+the unit and takes its colours away (lsp).
+
 Audit (2026-10-18), after phase 8; the fixes:
 - Without tree-sitter, the modules of sessions and programs loaded ts-edit.scm
   (whose public functions replaced the stubs): all go through
