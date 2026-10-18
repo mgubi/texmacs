@@ -224,6 +224,23 @@
                  (when (not (url-exists? u))
                    (docs-problem file "missing-image" (cadr x))))))))))
 
+;; A block (several paragraphs: a list, an environment) inside a line, as
+;; when the text after </itemize> comes on the next line of the source,
+;; without a blank line: the line is typeset with the block as one box of
+;; its natural width, whose paragraphs are not broken, and the page becomes
+;; wider. The editor never makes it (correct_concat_block repairs it, but
+;; only in the import of LaTeX).
+(define (docs-check-blocks file s)
+  (docs-walk s
+    (lambda (x)
+      (when (== (car x) 'concat)
+        (for-each (lambda (y)
+                    (when (and (pair? y) (symbol? (car y))
+                               (tree-multi-paragraph? (stree->tree y)))
+                      (docs-problem file "block-in-line"
+                                    (symbol->string (car y)))))
+                  (cdr x))))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Parsing
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -275,6 +292,7 @@
           (update-forced)
           (docs-check-tags file (buffer-tree))
           (docs-check-links file (tree->stree (buffer-tree)))
+          (docs-check-blocks file (tree->stree (buffer-tree)))
           (buffer-close u)
           (when (and old (buffer-exists? old)) (switch-to-buffer old)))))
     (docs-write "END\t" file "\t"

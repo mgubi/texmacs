@@ -32,8 +32,10 @@
 # with a wrong number of arguments, branches of tmdoc (branch,
 # extra-branch, continue) whose file tmdoc-expand would not find, hyperlinks
 # to files which do not exist or to labels which the target does not
-# define, missing images, and the warnings and errors of the log while the
-# file is typeset.
+# define, missing images, blocks (lists, environments) inside a line of
+# text (block-in-line: a missing blank line after </itemize> in the source,
+# whose list is then not broken into lines), and the warnings and errors of
+# the log while the file is typeset.
 #
 # Output in tests/build/docs: the PDFs and their text, out-*.txt (raw
 # results), log-*.txt (TeXmacs logs), summary.txt, which is compared with
@@ -79,6 +81,12 @@ export LC_ALL=C   # the files are Cork-encoded, not UTF-8
 export TEXMACS_PATH="$top/TeXmacs"
 export TEXMACS_HOME_PATH="${TM_TEST_HOME:-$out/home}"
 mkdir -p "$out" "$TEXMACS_HOME_PATH"
+# The caches of the home give a file as it was when its directory last
+# changed (is_up_to_date in data_cache.cpp compares the time of the
+# directory, which a file edited in place leaves as it was): the files
+# changed since the last run would be checked as they were then
+cache="$TEXMACS_HOME_PATH/system/cache"
+rm -f "$cache/doc_cache" "$cache/file_cache" "$cache/validate_cache.scm"
 timeout=${TM_DOCS_TIMEOUT:-900}
 scm="$here/build.scm"
 [ -z "$lans" ] && lans=$(find "$doc" -name '*.tm' |

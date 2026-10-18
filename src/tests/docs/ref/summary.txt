@@ -6,17 +6,15 @@ file	about/welcome/first.de.tm	language	english in a .de.tm file
 file	about/welcome/welcome.es.tm	broken-link	../../tutorial/tut-tutorial.en.tm
 file	about/welcome/welcome.fr.tm	broken-link	../../tutorial/tut-tutorial.fr.tm
 file	about/welcome/welcome.it.tm	broken-link	../../tutorial/tut-tutorial.en.tm
-file	devel/format/environment/env-font.de.tm	log	warning, missing font, loading global substitution list
 file	devel/format/format.de.tm	broken-branch	leaves.de.tm
 file	devel/format/format.de.tm	broken-branch	planned-changes.en.tm
 file	devel/interface/interface-dynlibs.de.tm	broken-link	../../../../../include/TeXmacs.h
-file	main/math/keyboard/man-enter-math.zh.tm	log	warning, missing font, loading global substitution list
+file	main/links/man-images.zh.tm	log	MuPDF error in mupdf_image_size: syntax error in attributes
 file	main/styles/std-dtds/header-dtd.pt.tm	language	english in a .pt.tm file
 file	main/styles/std-dtds/header-title-dtd.pt.tm	language	english in a .pt.tm file
 file	main/styles/std-dtds/number-dtds.pt.tm	broken-branch	number-env-dtd.en.tm
 file	main/styles/std-dtds/number-section-dtd.pt.tm	language	english in a .pt.tm file
 file	main/styles/std/std-utils-dtd.de.tm	language	english in a .de.tm file
-file	main/text/man-fonts.de.tm	log	warning, missing font, loading global substitution list
 stat	devel/scheme/scheme.en.tm	idx	27
 stat	devel/scheme/scheme.en.tm	pages	229
 stat	devel/scheme/scheme.en.tm	toc	214
