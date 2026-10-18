@@ -211,13 +211,17 @@ if has vue; then
   echo "== MuPDF $MUPDF_VERSION"
   fetch "https://mupdf.com/downloads/archive/mupdf-$MUPDF_VERSION-source.tar.gz" $MUPDF_SHA256
   # its own third-party libraries (libmupdf-third), but FreeType (the one
-  # of TeXmacs) and zlib (of macOS); no viewers, no OCR
+  # of TeXmacs) and zlib (of macOS); no viewers, no OCR; without the fonts
+  # which MuPDF builds in (some 30 MB of Noto, CJK, SIL, emoji...): TeXmacs
+  # typesets with its own fonts, and a PDF image whose fonts are not
+  # embedded keeps the base 14 ones (as misc/wasm/build-mupdf.sh)
+  tofu="-DTOFU -DTOFU_CJK -DTOFU_SIL -DTOFU_EMOJI -DTOFU_HISTORIC -DTOFU_SYMBOL"
   mupdf_make="prefix=$prefix build=release HAVE_X11=no HAVE_GLUT=no
     HAVE_CURL=no USE_TESSERACT=no USE_SYSTEM_LIBS=no
     USE_SYSTEM_FREETYPE=yes SYS_FREETYPE_CFLAGS=-I$prefix/include/freetype2
     SYS_FREETYPE_LIBS=-L$prefix/lib\ -lfreetype\ -lpng16\ -lz
     USE_SYSTEM_ZLIB=yes SYS_ZLIB_CFLAGS= SYS_ZLIB_LIBS=-lz
-    XCFLAGS=-arch\ $arch XLDFLAGS=-arch\ $arch shared=no verbose=yes"
+    XCFLAGS=\"-arch $arch $tofu\" XLDFLAGS=-arch\\ $arch shared=no verbose=yes"
   eval make -j"$jobs" $mupdf_make libs
   eval make $mupdf_make install-libs
   # NOTE: only the headers and the libraries (install-libs), not the tools

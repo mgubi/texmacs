@@ -78,7 +78,10 @@ if has mupdf; then
   echo "== MuPDF $MUPDF_VERSION"
   # NOTE: with MinGW, MuPDF takes SSE for granted (_M_AMD64), and its SSE
   # 4.1 code needs the option (which Windows 11 has, SSE 4.2 even)
-  xcflags=-fPIC
+  # without the fonts which MuPDF builds in (some 30 MB of Noto, CJK, SIL,
+  # emoji...): TeXmacs typesets with its own fonts, and a PDF image whose
+  # fonts are not embedded keeps the base 14 ones (as misc/wasm/build-mupdf.sh)
+  xcflags="-fPIC -DTOFU -DTOFU_CJK -DTOFU_SIL -DTOFU_EMOJI -DTOFU_HISTORIC -DTOFU_SYMBOL"
   case "$(uname -s)" in MINGW*|MSYS*) xcflags="$xcflags -msse4.1";; esac
   fetch "https://mupdf.com/downloads/archive/mupdf-$MUPDF_VERSION-source.tar.gz" $MUPDF_SHA256
   # its own third-party libraries (libmupdf-third), but FreeType and zlib
