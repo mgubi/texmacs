@@ -308,6 +308,12 @@ $(OBJ)/Scheme/Femtolisp/%.o: $(S)/Scheme/Femtolisp/%.c
 	@mkdir -p $(dir $@)
 	emcc $(CPPFLAGS) -I$(S)/Scheme/Femtolisp/femtolisp/llt $(DEPFLAGS) $(CFLAGS) -c $< -o $@
 
+# the runtime of tree-sitter, vendored with its headers (as in src/makefile.in)
+$(OBJ)/Plugins/TreeSitter/%.o: $(S)/Plugins/TreeSitter/%.c
+	@mkdir -p $(dir $@)
+	emcc $(CPPFLAGS) -I$(S)/Plugins/TreeSitter/tree-sitter/include \
+	  -I$(S)/Plugins/TreeSitter/tree-sitter/src $(DEPFLAGS) $(CFLAGS) -c $< -o $@
+
 $(OBJ)/%.o: $(S)/%.c
 	@mkdir -p $(dir $@)
 	emcc $(CPPFLAGS) $(DEPFLAGS) $(CFLAGS) -c $< -o $@
