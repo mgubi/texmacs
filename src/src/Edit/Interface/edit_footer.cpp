@@ -78,7 +78,12 @@ edit_interface_rep::set_left_footer () {
     string session= get_env_string (PROG_SESSION);
     switch (connection_status (lan, session)) {
     case CONNECTION_DEAD:
-      s= s << " [dead]";
+      // a plug-in of requests (an HTTP API) or of a command line has its
+      // link only while it answers: between two, it is waiting
+      if (as_bool (call ("connection-request?", lan)) ||
+          as_bool (call ("connection-cmdline?", lan)))
+        s= s << " [idle]";
+      else s= s << " [dead]";
       break;
     case CONNECTION_DYING:
     case WAITING_FOR_OUTPUT:

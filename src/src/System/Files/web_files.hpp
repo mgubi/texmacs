@@ -30,6 +30,7 @@ array<string> http_mask_headers (array<string> headers_attr);
 tree http_mask_request (tree t);
 string shell_quote (string s);
 string curl_command (string args, array<string> headers_attr);
+string curl_post_command (string address, array<string> headers_attr, string data);
 
 // HTTP requests
 #if defined(QTTEXMACS) && AC_QT_MAJOR_VERSION >= 6
@@ -51,10 +52,17 @@ bool qt_async_http_post (string url, array<string> headers_attr,
 bool qt_async_http_post (string url, array<string> headers_attr, tree data,
 			 int& status, string& outbuf, string& errbuf,
 			 bool& kill);
+void qt_http_async_cancel (string* outbuf);
 
 inline tree
 http_from_json (string s) {
   return qt_http_from_json (s); }
+
+int qt_http_get (string& ret, string url, array<string> headers_attr);
+
+inline int
+http_get (string& ret, string url, array<string> headers_attr) {
+  return qt_http_get (ret, url, headers_attr); }
 
 inline int
 http_post (string& ret, string url,
@@ -103,6 +111,7 @@ http_from_json (string s) {
   const int mode= JSON_NULL | JSON_BOOLEAN | JSON_NUMBER;
   return json_to_tree (s, mode); }
 
+int http_get (string& ret, string url, array<string> headers_attr);
 int http_post (string& ret, string url, array<string> headers_attr,
 	       string data);
 int http_post_json (string& ret, string url, array<string> headers_attr,
@@ -120,6 +129,12 @@ bool async_http_post_json (string url, array<string> headers_attr, tree data,
 			   bool& kill);
 
 #endif
+
+// the proxy of a request to u (libcurl, curl): "" when curl decides (the
+// variables of the environment), "direct" for none, else the proxy; and the
+// option of a curl command line which says it
+string http_proxy (string u);
+string curl_proxy_option (string u);
 
 inline string
 http_post (string url, array<string> headers_attr, string data) {
@@ -141,5 +156,19 @@ http_post_query (string url, array<string> headers_attr, array<string> attr) {
   http_post_query (ret, url, headers_attr, attr);
   return ret;
 }
+
+// a GET request (the models of an AI engine): its answer
+inline string
+http_get (string url, array<string> headers_attr) {
+  string ret;
+  http_get (ret, url, headers_attr);
+  return ret;
+}
+
+// the requests made with libcurl (web_files.cpp): driven at each turn of the
+// main loop, and those whose answer goes to outbuf stopped and forgotten (no
+// operation without libcurl)
+void http_async_pending ();
+void http_async_cancel (string* outbuf);
 
 #endif // defined WEB_FILES_H

@@ -99,7 +99,7 @@ json_parse_string (string s, int& pos, int mode) {
     if (s[pos] == '\"') { pos++; break; }
     else if (s[pos] == '\\' && pos + 1 < N(s)) {
       pos++;
-      if (s[pos] == '\"' || s[pos] == '\\') r << s[pos++];
+      if (s[pos] == '\"' || s[pos] == '\\' || s[pos] == '/') r << s[pos++];
       else if (s[pos] == 'b') { pos++; r << '\b'; }
       else if (s[pos] == 'f') { pos++; r << '\f'; }
       else if (s[pos] == 'n') { pos++; r << '\n'; }
@@ -268,7 +268,10 @@ json_print_string (string& r, string s, int mode) {
     case '\r': r << "\\r"; break;
     case '\"': r << '\\' << s[i]; break;
     case '\\': r << '\\' << s[i]; break;
-    default: r << s[i];
+    default:
+      if (((unsigned char) s[i]) < 0x20)
+        r << "\\u00" << as_hexadecimal ((int) (unsigned char) s[i], 2);
+      else r << s[i];
     }
   r << "\"";
 }

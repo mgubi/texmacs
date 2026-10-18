@@ -149,7 +149,23 @@ string ai_output (string s, string model, string chat= "");
 array<string> ai_get_body (string r);
 string ai_latex_command (string s, string model, string chat= "");
 string ai_latex_request (string s, string model, string chat= "");
+string ai_stream_text (string s, string model, string& err);
+string ai_stream_text (string s, string model, string& err, string& reasoning);
+struct ai_stream_state {
+  int    pos;       // the beginning of the line which is not parsed yet
+  string seen;      // the last line parsed (the output is its continuation)
+  string text, reasoning, err; // of the lines parsed
+  ai_stream_state ();
+};
+void ai_stream_reset (ai_stream_state& st);
+string ai_stream_feed (ai_stream_state& st, string s, string model,
+                       string& err, string& reasoning);
+tree ai_reasoning_partial (string reasoning);
+int ai_retry_delay (string s, string model, int attempt, string& why);
+tree ai_latex_body_to_tree (string r);
+tree ai_latex_partial (string r);
 tree ai_latex_output (string s, string model, string chat= "");
+void ai_set_prices (string json);
 string ai_chat (string s, string model, string agent, string chat= "");
 tree ai_translate (tree t, string from, string into, string m, string c= "");
 tree ai_correct (tree t, string lan, string model, string chat= "");

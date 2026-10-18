@@ -66,11 +66,17 @@
        ((eval (format-get-name name))
         (insert-go-to `(converter-input ,name "" "") '(1 0)))))
 
+(tm-menu (supported-executable-item name)
+  ((eval (session-name name)) (make-script-input* name "default")))
+
 (tm-menu (supported-executable-menu)
-  (for (name (session-list))
-    (with menu-name (session-name name)
-      ((eval menu-name)
-       (make-script-input* name "default")))))
+  (for (x (session-menu-entries (session-list)))
+    (assuming (string? x)
+      (dynamic (supported-executable-item x)))
+    (assuming (pair? x)
+      (-> (eval (car x))
+          (for (name (cdr x))
+            (dynamic (supported-executable-item name)))))))
 
 (menu-bind insert-fold-menu
   (-> "Folded"

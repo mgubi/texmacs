@@ -146,7 +146,20 @@ evaluate_system (array<string> arg,
 #else
   int ret= unix_system (arg, fd_in, in, fd_out, ptr);
 #endif
+  // the inputs sent to the command (passphrases of GnuPG, of the keychain)
+  // are overwritten once sent, before they are released: they are the
+  // copies made for this call by the glue (evaluate-system), which nobody
+  // reads after it (the C++ callers give no inputs)
+  for (int i= 0; i < N(in); i++) secure_wipe (in[i]);
   return append (as_string (ret), out);
+}
+
+void
+secure_wipe (string s) {
+  // (through a volatile pointer, so that the writes are not left out as
+  // writes to memory which is released afterwards)
+  volatile char* p= (volatile char*) &(s[0]);
+  for (int i= 0; i < N(s); i++) p[i]= 0;
 }
 
 
@@ -264,6 +277,11 @@ tm_poll (struct tm_pollfd* fds, int nfds, int timeout_ms) {
 #include <stdlib.h>
 #include <pthread.h>
 #include <string.h>
+#if defined (OS_MINGW) || defined (OS_WIN)
+#include <io.h>
+#else
+#include <unistd.h>
+#endif
 #include "scheme.hpp"
 
 struct async_handle {
@@ -272,8 +290,12 @@ struct async_handle {
   char*  buf;
   int    len;
   int    cap;
+  pthread_mutex_t lock; // buf, len and the pointers below, which the
+                        // reading thread uses
+  bool   cancelled; // no longer wanted (async_eval_cancel): it writes nothing
   // either
-  object call_back;
+  object* call_back; // (a pointer: a handle of a request link makes no
+                     // object, and needs no Scheme)
   // or
   int*    status;
   string* outbuf;
@@ -282,16 +304,28 @@ struct async_handle {
   async_handle (FILE* fp2, object call_back2):
     fp (fp2), done (false),
     buf ((char*) malloc (4096)), len (0), cap (4096),
-    call_back (call_back2),
-    status (NULL), outbuf (NULL), errbuf (NULL), kill (NULL) {}
+    cancelled (false), call_back (tm_new<object> (call_back2)),
+    status (NULL), outbuf (NULL), errbuf (NULL), kill (NULL) {
+      pthread_mutex_init (&lock, NULL); }
   async_handle (FILE* fp2, int& st, string& out,
 		string& err, bool& k):
     fp (fp2), done (false),
-    buf ((char*) malloc (4096)), len (0), cap (4096),
-    status (&st), outbuf (&out), errbuf (&err), kill (&k) {}
+    buf ((char*) malloc (4096)), len (0), cap (4096), cancelled (false),
+    call_back (NULL), status (&st), outbuf (&out), errbuf (&err), kill (&k) {
+      pthread_mutex_init (&lock, NULL); }
+  ~async_handle () {
+    if (call_back != NULL) tm_delete<object> (call_back);
+    pthread_mutex_destroy (&lock); }
 };
 
 array<async_handle*> async_busy;
+
+// a handle which is no longer wanted: cancelled, or its request killed
+// (called with its lock held: async_eval_cancel changes kill)
+static bool
+async_unwanted (async_handle* handle) {
+  return handle->cancelled || (handle->kill != NULL && *(handle->kill));
+}
 
 void*
 async_read_output (void* arg) {
@@ -303,18 +337,30 @@ async_read_output (void* arg) {
   charp& buf = handle->buf;
   int&   len = handle->len;
   int&   cap = handle->cap;
-  if (handle->kill != NULL && *(handle->kill)) {
+  pthread_mutex_lock (&handle->lock);
+  bool unwanted= async_unwanted (handle);
+  pthread_mutex_unlock (&handle->lock);
+  if (unwanted) {
     pclose (fp);
     fp  = NULL;
     done= true;
     return NULL;
   }
+  // what is there is read as it comes (read, not fread, which waits for
+  // a whole buffer): a request link shows the output so far (a streamed
+  // answer, see async_eval_pending); a handle which is no longer wanted
+  // stops reading
   while (true) {
     char buffer[4096];
     int bytes_read;
-    bytes_read= fread (buffer, 1, sizeof (buffer), fp);
+    bytes_read= read (fileno (fp), buffer, sizeof (buffer));
     if (bytes_read <= 0) break;
-    if (bytes_read + len > cap) {
+    pthread_mutex_lock (&handle->lock);
+    if (async_unwanted (handle)) {
+      pthread_mutex_unlock (&handle->lock);
+      break;
+    }
+    while (bytes_read + len > cap) {
       char* buf2= (char*) malloc (2 * cap);
       for (int i=0; i<len; i++) buf2[i]= buf[i];
       free ((void*) buf);
@@ -324,6 +370,7 @@ async_read_output (void* arg) {
     for (int i=0; i<bytes_read; i++)
       buf[len+i]= buffer[i];
     len += bytes_read;
+    pthread_mutex_unlock (&handle->lock);
   }
 
   pclose (fp);
@@ -388,8 +435,9 @@ async_eval_pending () {
     if (async_busy[i]->done) {
       async_handle* handle= async_busy[i];
       string out (handle->buf, handle->len);
-      if (handle->status == NULL)
-	call (async_busy[i]->call_back, out);
+      if (handle->cancelled);
+      else if (handle->status == NULL)
+	call (*(async_busy[i]->call_back), out);
       else {
 	*(handle->status)= 0;
 	*(handle->outbuf)= out;
@@ -400,5 +448,36 @@ async_eval_pending () {
       async_busy= append (range (async_busy, 0, i),
                           range (async_busy, i + 1, N(async_busy)));
     }
-    else i++;
+    else {
+      // the output so far, for a request link (its partial answer)
+      async_handle* handle= async_busy[i];
+      if (handle->outbuf != NULL && !handle->cancelled &&
+          (handle->kill == NULL || !*(handle->kill))) {
+        pthread_mutex_lock (&handle->lock);
+        if (handle->len > N(*(handle->outbuf)))
+          *(handle->outbuf)= string (handle->buf, handle->len);
+        pthread_mutex_unlock (&handle->lock);
+      }
+      i++;
+    }
+}
+
+// The commands of a request link (the curl program, see web_files.cpp)
+// which write into outbuf are no longer wanted: an interrupted answer, or
+// a link which asks again or is destroyed. They write nothing more into the
+// link (its status, its output, its errors), and their output is dropped:
+// nothing of an interrupted answer reaches the next one.
+void
+async_eval_cancel (string* outbuf) {
+  for (int i=0; i<N(async_busy); i++) {
+    async_handle* handle= async_busy[i];
+    if (handle->outbuf != outbuf || handle->cancelled) continue;
+    pthread_mutex_lock (&handle->lock);
+    handle->cancelled= true;
+    handle->status= NULL;
+    handle->outbuf= NULL;
+    handle->errbuf= NULL;
+    handle->kill= NULL;
+    pthread_mutex_unlock (&handle->lock);
+  }
 }
