@@ -11612,6 +11612,52 @@
                     }
                   }
                 ]
+              },
+              {
+                "type": "SEQ",
+                "members": [
+                  {
+                    "type": "PATTERN",
+                    "value": "[0-9]+"
+                  },
+                  {
+                    "type": "PATTERN",
+                    "value": "[a-df-zA-DF-Z!$%&*\\/:<=>?^_~|]"
+                  },
+                  {
+                    "type": "REPEAT",
+                    "content": {
+                      "type": "CHOICE",
+                      "members": [
+                        {
+                          "type": "CHOICE",
+                          "members": [
+                            {
+                              "type": "PATTERN",
+                              "value": "[A-Za-z!$%&*\\/:<=>?^_~|]"
+                            },
+                            {
+                              "type": "PATTERN",
+                              "value": "[^\\x00-\\x7F\\p{Cc}\\p{Cf}\\p{Cn}\\p{Mc}\\p{Me}\\p{Nd}\\p{Pe}\\p{Pf}\\p{Pi}\\p{Ps}\\p{Zs}\\p{Zl}\\p{Zp}]"
+                            },
+                            {
+                              "type": "PATTERN",
+                              "value": "\\\\x[0-9a-fA-F]+;"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "PATTERN",
+                          "value": "[0-9+.@-]"
+                        },
+                        {
+                          "type": "PATTERN",
+                          "value": "[\\p{Nd}\\p{Mc}\\p{Me}]"
+                        }
+                      ]
+                    }
+                  }
+                ]
               }
             ]
           },

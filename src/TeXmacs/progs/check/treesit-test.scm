@@ -636,6 +636,8 @@
 ;; Scheme as prog/scheme-edit.scm indents it (the keywords of tm-mode.el
       ;; and their arity, the alignment with the arguments), on the tree: a
       ;; character #\) or a quote in a string does not count
+      ;; (a symbol may start with digits, as 2d-list in TeXmacs)
+      (check= (indents "scheme" '("(define 2d-list" "  (list 1))")) '(0 2))
       (check= (indents "scheme" '("(define (f x)" "  (let ((y x)" "        (z 1))"
                                   "    (g y" "       z)))" "(when x" "  y)"
                                   "(with a b" "  c)" "(let" "    ((x 1))"

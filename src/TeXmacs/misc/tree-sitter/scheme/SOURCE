@@ -4,3 +4,5 @@ tags.scm is written for TeXmacs.
 In the grammar, for the Scheme of TeXmacs (S7, Guile): the hexadecimal escapes
 of strings need no final semicolon (\x10), and | is a character of symbols (no
 |...| symbols of R7RS).
+Symbols may start with digits followed by a letter other than e (2d-list,
+as in TeXmacs; 1e5 stays a number).
