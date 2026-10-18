@@ -192,7 +192,9 @@
 
 (tm-define (version-notify-saved name)
   (:require (git-root name))
-  (git-refresh (git-root name)))
+  (git-refresh (git-root name))
+  ;; (the other tools which follow the saves: language servers)
+  (former name))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; File status

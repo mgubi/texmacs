@@ -10,6 +10,8 @@
 ******************************************************************************/
 
 #include "Bridge/impl_typesetter.hpp"
+#include "lsp_decorations.hpp"
+extern tree the_et;
 #include "iterator.hpp"
 #include "sys_utils.hpp" // get_env
 #include <chrono>
@@ -60,6 +62,9 @@ typesetter_rep::insert_parunit (tree t, path ip) {
 void
 typesetter_rep::insert_paragraph (tree t, path ip) {
   // cout << "Typesetting " << t << ", " << ip << "\n";
+  // (a line of a source file which a language server has folded: it stays
+  // in the document, but it is not shown)
+  if (lsp_line_folded (t)) return;
   stack_border     temp_sb;
   array<page_item> temp_l= typeset_stack (env, t, ip, a, b, temp_sb);
   insert_stack (temp_l, temp_sb);

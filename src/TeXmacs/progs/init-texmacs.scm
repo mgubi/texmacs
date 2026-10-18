@@ -23,6 +23,8 @@
 (lazy-define (utils library cursor) notify-cursor-moved)
 (lazy-define (treesit ts-highlight)
              treesit-highlighter-request treesit-schedule-updates)
+(lazy-define (utils library cursor) notify-buffer-changed)
+(lazy-define (utils library cursor) notify-buffer-closed)
 (lazy-define (utils edit variants) make-inline-tag-list make-wrapped-tag-list)
 (lazy-define (utils cas cas-out) cas->stree)
 (lazy-define (utils plugins plugin-cmd) pre-serialize verbatim-serialize)
@@ -195,7 +197,7 @@
 
 ;(display "Booting programming modes\n")
 (lazy-format (prog prog-format) scheme)
-(lazy-format (code-format) cpp julia scala java javascript dot json csv
+(lazy-format (code-format) c cpp julia scala java javascript dot json csv
              go lean lua rust typescript css toml yaml ocaml haskell)
 (lazy-format (mathemagix-format) mathemagix)
 (lazy-format (caas-format) caas)
@@ -203,6 +205,11 @@
 (lazy-format (octave-format) octave)
 (lazy-format (scilab-format) scilab)
 (lazy-keyboard (prog prog-kbd) in-prog?)
+(lazy-keyboard (lsp lsp-kbd) in-prog?)
+(lazy-menu (lsp lsp-kbd) lsp-menu)
+;; the language servers follow the source files (preference "lsp")
+(when (!= (get-preference "lsp") "off")
+  (delayed (:idle 1000) (module-provide '(lsp lsp-kbd))))
 (lazy-menu (prog prog-menu) prog-format-menu prog-format-icons prog-icons)
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
 ;(display* "memory: " (texmacs-memory) " bytes\n")

@@ -28,6 +28,10 @@ text_property
 scheme_language_rep::advance (tree t, int& pos) {
   string s= t->label;
   if (pos==N(s)) return &tp_normal_rep;
+  if (is_source_tab (s, pos)) {
+    pos += 4;
+    return &tp_space_rep;
+  }
   switch (s[pos]) {
   case ' ':
     pos++;
@@ -37,7 +41,8 @@ scheme_language_rep::advance (tree t, int& pos) {
     pos++;
     return &tp_normal_rep;
   }
-  while ((pos<N(s)) && (s[pos]!=' ') && (s[pos]!='(') && (s[pos]!=')')) pos++;
+  while ((pos<N(s)) && (s[pos]!=' ') && (s[pos]!='(') && (s[pos]!=')') &&
+         !is_source_tab (s, pos)) pos++;
   if (pos < N(s) && pos >= 2 && (s[pos] == '(' || s[pos] == ')'))
     if (s[pos-2] == '#' && s[pos-1] == '\\') pos++;
   return &tp_normal_rep;

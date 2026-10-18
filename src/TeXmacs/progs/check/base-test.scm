@@ -253,6 +253,10 @@
   (check= (string-recompose-comma '("a" "b" "c")) "a, b, c")
   (check= (string-recompose-comma '("a")) "a")
   (check= (string-recompose-comma '()) "")
+  ;; linear: the lines of a long source file (quadratic, this took minutes
+  ;; and gigabytes)
+  (with l (make-list 100000 (make-string 40 #\a))
+    (check= (string-length (string-recompose l "\n")) 4099999))
   (check= (raw-quote "x") "\"x\"")
   (check= (raw-quote "") "\"\"")
   (check= (raw-quote "a\"b") "\"a\"b\""))

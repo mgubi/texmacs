@@ -1864,6 +1864,21 @@ tmg_get_mouse_position () {
 }
 
 tmscm
+tmg_xy_2path (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "xy->path");
+  TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "xy->path");
+
+  int in1= tmscm_to_int (arg1);
+  int in2= tmscm_to_int (arg2);
+
+  // TMSCM_DEFER_INTS;
+  path out= get_current_editor()->xy_to_path (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return path_to_tmscm (out);
+}
+
+tmscm
 tmg_set_mouse_pointer (tmscm arg1, tmscm arg2) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "set-mouse-pointer");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "set-mouse-pointer");
@@ -3899,6 +3914,7 @@ initialize_glue_editor () {
   tmscm_install_procedure ("key-press-complete",  tmg_key_press_complete, 1, 0, 0);
   tmscm_install_procedure ("mouse-any",  tmg_mouse_any, 6, 0, 0);
   tmscm_install_procedure ("get-mouse-position",  tmg_get_mouse_position, 0, 0, 0);
+  tmscm_install_procedure ("xy->path",  tmg_xy_2path, 2, 0, 0);
   tmscm_install_procedure ("set-mouse-pointer",  tmg_set_mouse_pointer, 2, 0, 0);
   tmscm_install_procedure ("set-predef-mouse-pointer",  tmg_set_predef_mouse_pointer, 1, 0, 0);
   tmscm_install_procedure ("go-to-path",  tmg_go_to_path, 1, 0, 0);

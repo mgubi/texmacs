@@ -13,6 +13,7 @@
 #include "formatter.hpp"
 #include "analyze.hpp"
 #include "boot.hpp"
+#include "lsp_decorations.hpp"
 
 lazy make_lazy_vstream (edit_env env, tree t, path ip, tree channel);
 
@@ -175,11 +176,75 @@ concater_rep::typeset_math_string (tree t, path ip, int pos, int end) {
   } while (pos<end);
 }
 
+/******************************************************************************
+* Tabs of source files
+******************************************************************************/
+
+// A tab of a source file is the character <#9> of its line (see
+// source_document_to_tree). In a program, it goes to the next tab stop,
+// every prog-tab-width columns, a column being a character (the font of
+// programs is monospaced). It is shown as a light arrow at the start of
+// its gap, a box with a decorated path; the cursor is at its ends, which
+// are empty boxes, as for the spaces.
+
+static int
+prog_column (string s, int from, int to, int col, int tw) {
+  // the column after s(from,to), which starts at the column col
+  int i= from;
+  while (i < to) {
+    if (is_source_tab (s, i)) { col += tw - col % tw; i += 4; }
+    else { tm_char_forwards (s, i); col++; }
+  }
+  return col;
+}
+
+void
+concater_rep::typeset_prog_tab (path ip, int pos, int& col, int tw) {
+  // the tab at pos, from the column col (which is then the one after it)
+  int n= tw - col % tw;
+  col += n;
+  SI  w= n * env->fn->spc->def;
+  typeset_substring ("", ip, pos);
+  color c = named_color ("#c8c8c8", env->alpha);
+  box   tb= text_box (decorate (ip), 0, "<rightarrow>", env->fn, c);
+  box   rb= resize_box (decorate (ip), tb, 0, tb->y1, w, tb->y2);
+  a << line_item (STD_ITEM, OP_SKIP, rb, HYPH_INVALID);
+  typeset_substring ("", ip, pos + 4);
+}
+
+void
+concater_rep::typeset_prog_piece (string s, path ip, int start, int end,
+                                  string col, int& column, int tw) {
+  // s(start,end), in the colour col, with its tabs at their stops
+  int i= start;
+  while (i < end) {
+    if (is_source_tab (s, i)) {
+      typeset_prog_tab (ip, i, column, tw);
+      i += 4;
+      continue;
+    }
+    int j= i;
+    while (j < end && !is_source_tab (s, j)) j++;
+    typeset_colored_substring (s (i, j), ip, i, col);
+    column= prog_column (s, i, j, column, tw);
+    i= j;
+  }
+}
+
 void
 concater_rep::typeset_prog_string (tree t, path ip, int pos, int end) {
+  // (a line which a language server has decorated: see below)
+  lsp_line_decorations* d= lsp_line_decorations_of (t);
+  if (d != NULL || lsp_fold_marker_of (t) != "") {
+    typeset_lsp_string (t, ip, pos, end, d); return; }
   array<space> spc_tab= env->fn->get_normal_spacing (env->spacing_policy);
   string s= t->label;
   int    start;
+  // (the column of each tab is that of the line, also from the middle of
+  // the line, which the range primitive typesets)
+  bool tabs  = search_forwards ("<#9>", s) >= 0;
+  int  tw    = (tabs? max (1, env->get_int (PROG_TAB_WIDTH)): 8);
+  int  column= (tabs? prog_column (s, 0, pos, 0, tw): 0);
 
   do {
     start= pos;
@@ -192,7 +257,10 @@ concater_rep::typeset_prog_string (tree t, path ip, int pos, int end) {
       PRINT_SPACE (tp->spc_after);
       if ((pos==end) || (s[pos]==' '))
         typeset_substring ("", ip, pos);
+      column++;
     }
+    else if (tabs && pos-start == 4 && is_source_tab (s, start)) // a tab
+      typeset_prog_tab (ip, start, column, tw);
     else { // strings
       penalty_max (tp->pen_before);
       PRINT_SPACE (tp->spc_before)
@@ -200,11 +268,118 @@ concater_rep::typeset_prog_string (tree t, path ip, int pos, int end) {
       string content= s (start, pos);
       // cout << "[" << start << "," << pos << ") "
       //      << content << " (" << color << ")" << LF;
-      typeset_colored_substring (content, ip, start, color);
+      if (tabs) typeset_prog_piece (s, ip, start, pos, color, column, tw);
+      else typeset_colored_substring (content, ip, start, color);
       penalty_min (tp->pen_after);
       PRINT_SPACE (tp->spc_after)
     }
   } while (pos<end);
+}
+
+/******************************************************************************
+* Lines of code decorated by a language server: pieces with colours of
+* their own (semantic tokens) and hints before some characters (inlay
+* hints), which are not part of the text: their boxes have decorated
+* paths, the cursor does not go into them
+******************************************************************************/
+
+void
+concater_rep::typeset_lsp_text (string h, path ip) {
+  // a text which is not part of the document, in grey; its spaces are
+  // empty boxes of the width of a space (a space of the text of a program
+  // would be shown as a visible space, and spaces which are printed are
+  // merged)
+  color c= named_color ("#909090", env->alpha);
+  int i= 0, n= N(h);
+  while (i < n) {
+    if (h[i] == ' ') {
+      // (not a string item: the line breaker reads the text of those)
+      box b= empty_box (decorate (ip), 0, 0, env->fn->spc->def, env->fn->yx);
+      a << line_item (STD_ITEM, OP_SKIP, b, HYPH_INVALID);
+      i++;
+      continue;
+    }
+    int j= i;
+    while (j < n && h[j] != ' ') j++;
+    box b= text_box (decorate (ip), 0, h (i, j), env->fn, c);
+    a << line_item (STRING_ITEM, OP_SKIP, b, HYPH_INVALID, env->lan);
+    i= j;
+  }
+}
+
+void
+concater_rep::typeset_lsp_hints (lsp_line_decorations* d, path ip,
+                                 int from, int to) {
+  // the hints before the characters from to to (excluded)
+  if (d == NULL) return;
+  for (int i=0; i<N(d->hint_pos); i++)
+    if (d->hint_pos[i] >= from && d->hint_pos[i] < to)
+      typeset_lsp_text (d->hint_text[i], ip);
+}
+
+void
+concater_rep::typeset_lsp_string (tree t, path ip, int pos, int end,
+                                  lsp_line_decorations* d) {
+  // as typeset_prog_string, the pieces of a token which have colours of
+  // their own typeset apart, and the hints before the tokens (a hint
+  // inside a token comes before it)
+  array<space> spc_tab= env->fn->get_normal_spacing (env->spacing_policy);
+  string s= t->label;
+  int    start;
+  // (the tabs at their stops, as in typeset_prog_string)
+  bool tabs  = search_forwards ("<#9>", s) >= 0;
+  int  tw    = (tabs? max (1, env->get_int (PROG_TAB_WIDTH)): 8);
+  int  column= (tabs? prog_column (s, 0, pos, 0, tw): 0);
+  do {
+    start= pos;
+    text_property tp= env->lan->advance (t, pos);
+    if (pos > end) pos= end;
+    typeset_lsp_hints (d, ip, start, pos);
+    if ((pos-start == 1) && (s[start]==' ')) { // spaces
+      if (start == 0) typeset_substring ("", ip, 0);
+      penalty_min (tp->pen_after);
+      PRINT_SPACE (tp->spc_before);
+      PRINT_SPACE (tp->spc_after);
+      if ((pos==end) || (s[pos]==' '))
+        typeset_substring ("", ip, pos);
+      column++;
+    }
+    else if (tabs && pos-start == 4 && is_source_tab (s, start)) // a tab
+      typeset_prog_tab (ip, start, column, tw);
+    else { // strings
+      penalty_max (tp->pen_before);
+      PRINT_SPACE (tp->spc_before)
+      string color= env->lan->get_color (t, start, pos);
+      int i= start;
+      if (d == NULL) {  // (a marker of a fold only)
+        if (tabs) typeset_prog_piece (s, ip, start, pos, color, column, tw);
+        else typeset_colored_substring (s (start, pos), ip, start, color);
+        i= pos;
+      }
+      while (i < pos) {
+        // the piece from i: up to the next start or end of a coloured
+        // piece, with its colour if one covers i
+        int j= pos;
+        string col= color;
+        for (int k=0; k<N(d->col_start); k++) {
+          int a0= d->col_start[k], a1= d->col_end[k];
+          if (a0 <= i && i < a1) { col= d->col_color[k]; j= min (j, a1); }
+          else if (a0 > i && a0 < j) j= a0;
+        }
+        if (tabs) typeset_prog_piece (s, ip, i, j, col, column, tw);
+        else typeset_colored_substring (s (i, j), ip, i, col);
+        i= j;
+      }
+      penalty_min (tp->pen_after);
+      PRINT_SPACE (tp->spc_after)
+    }
+  } while (pos<end);
+  // the hints at the end of the line, then the marker of a fold
+  if (end == N(s)) {
+    typeset_lsp_hints (d, ip, N(s), N(s) + 1);
+    string m= lsp_fold_marker_of (t);
+    if (m != "") typeset_lsp_text (m, ip);
+  }
 }
 
 /******************************************************************************

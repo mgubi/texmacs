@@ -155,6 +155,21 @@
 (tm-define (notify-cursor-moved status)
   (noop))
 
+; Hook for the changes of the text of the buffer @name (a string), after
+; they are typeset (language servers follow them)
+(tm-define (notify-buffer-changed name)
+  (noop))
+
+; Hook for the cursor in a line which a language server has folded (it is
+; not shown): the fold moves the cursor, or opens (lsp-fold)
+(tm-define (lsp-cursor-in-fold)
+  (noop))
+
+; Hook for the buffer @name (a string) which is closed, or renamed (then
+; @name is its former name)
+(tm-define (notify-buffer-closed name)
+  (noop))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Predicates
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

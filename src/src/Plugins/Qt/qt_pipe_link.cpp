@@ -55,6 +55,7 @@ public:
   void    interrupt ();
   void    stop ();
   void    feed (int channel);
+  void    set_blocking_write (bool b) { PipeLink.blocking= b; }
 };
 
 qt_pipe_link_rep::qt_pipe_link_rep (string cmd) : PipeLink (cmd) {

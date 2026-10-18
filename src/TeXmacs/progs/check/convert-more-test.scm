@@ -896,7 +896,8 @@
 
 ;; Each source code format is verbatim with the encoding SourceCode: one
 ;; paragraph per line, the symbols in UTF-8, the ASCII kept as it is (no
-;; quotes of TeX), and back.
+;; quotes of TeX), and back. A document is a source file, which keeps its
+;; tabs, line ends and encoding (see source-files-test.scm).
 (define (test-code-formats)
   (check-group "code formats")
   (for-each
@@ -922,13 +923,18 @@
                           (initial (collection
                                     (associate "language" "verbatim")
                                     (associate "font-family" "tt")
-                                    (associate "par-first" "0cm")))))
+                                    (associate "par-first" "0cm")
+                                    ;; (to save the file as it was)
+                                    (associate "source-encoding" "utf-8")
+                                    (associate "source-line-ends" "unix")
+                                    (associate "source-indent" "spaces")))))
        (with code '(document "def f(x):" "    return x <less> 1" "" "# \xe9")
          (check= (import (export code snip) snip) code))))
    code-formats)
-  ;; the markup is lost, the tabs are expanded
+  ;; the markup is lost; the tabs are kept, as the character <#9>
   (check= (export '(concat "x" (em "y")) "cpp-snippet") "xy")
-  (check= (import "a\tb" "python-snippet") "a       b")
+  (check= (import "a\tb" "python-snippet") "a<#9>b")
+  (check= (export "a<#9>b" "python-snippet") "a\tb")
   ;; a Cork byte 0x09 is a macron, not a tab
   (check= (export "a\tb" "python-snippet") (string-append "a" (u8 #xAF) "b"))
   ;; the verbatim export, unlike the source code, makes quotes of ``

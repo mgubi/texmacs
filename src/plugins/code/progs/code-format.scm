@@ -39,6 +39,7 @@
          (:function code-snippet->texmacs)))))
 
 (define-code-format cpp "C++ source code" "cpp" "cc" "hpp" "hh")
+(define-code-format c "C source code" "c" "h")
 (define-code-format julia "Julia source code" "jl")
 (define-code-format java "Java source code" "java")
 (define-code-format scala "Scala source code" "scala" "sc" "sbt")

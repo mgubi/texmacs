@@ -1082,6 +1082,7 @@ init_std_drd () {
   init_var (PROG_FONT_FAMILY, TYPE_STRING);
   init_var (PROG_FONT_SERIES, TYPE_STRING);
   init_var (PROG_FONT_SHAPE, TYPE_STRING);
+  init_var (PROG_TAB_WIDTH, TYPE_INTEGER);
   init_var (PROG_SESSION, TYPE_STRING);
 
   init_var (KEYWORD_COLOR, TYPE_COLOR);

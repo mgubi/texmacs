@@ -18,6 +18,7 @@
 #include "dictionary.hpp"
 #include "new_document.hpp"
 #include "merge_sort.hpp"
+#include "scheme.hpp"
 
 array<tm_buffer> bufs;
 
@@ -73,6 +74,8 @@ remove_buffer (tm_buffer buf) {
   int nr, n= N(bufs);
   for (nr=0; nr<n; nr++)
     if (bufs[nr] == buf) {
+      // (the programs which follow the buffer: language servers)
+      call ("notify-buffer-closed", object (as_string (buf->buf->name)));
       for (int i=0; i<N(buf->vws); i++)
         delete_view (abstract_view (buf->vws[i]));
       if (n == 1 && number_of_servers () == 0)
@@ -153,6 +156,7 @@ rename_buffer (url name, url new_name) {
   kill_buffer (new_name);
   tm_buffer buf= concrete_buffer (name);
   if (is_nil (buf)) return;
+  call ("notify-buffer-closed", object (as_string (name)));
   notify_rename_before (name);
   buf->buf->name= new_name;
   buf->buf->master= new_name;
@@ -433,6 +437,10 @@ attach_subformat (tree t, url u, string fm) {
   hashmap<string,tree> h (UNINIT, extract (t, "initial"));
   h (MODE)= "prog";
   h (PROG_LANGUAGE)= fm;
+  // the font of source files, a preference (tm-server.scm)
+  h (PROG_FONT)= get_preference ("editor:code font", "Inconsolatazi4");
+  // the columns between the tab stops of source files (a preference)
+  h (PROG_TAB_WIDTH)= get_preference ("editor:code tab width", "8");
   tree t2= change_doc_attr (t, "initial", make_collection (h));
   return change_doc_attr (t2, "style", tree ("code"));
 }

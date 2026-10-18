@@ -53,6 +53,14 @@ public:
   // what is shown of an answer which is not complete yet ("" when the link
   // gives none: see request_link.cpp), on the channel "progress"
   virtual tree    partial () { return ""; }
+  // with false, write returns at once: what the program does not take yet
+  // is kept and written later, when the link is written to or listened to
+  // (a language server which does not read its input then cannot freeze
+  // the editor); the default, true, waits until all is written
+  virtual void    set_blocking_write (bool b) { (void) b; }
+  // some input is not written yet (see set_blocking_write): listen (0)
+  // writes what the program takes of it
+  virtual bool    pending_write () { return false; }
 
   void write_packet (string s, int channel);
   bool complete_packet (int channel);

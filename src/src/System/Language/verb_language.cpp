@@ -33,6 +33,10 @@ verb_language_rep::advance (tree t, int& pos) {
     pos++;
     return &tp_space_rep;
   }
+  if (is_source_tab (s, pos)) {
+    pos += 4;
+    return &tp_space_rep;
+  }
   if (is_sep_char (s[pos])) {
     pos++;
     while (pos<N(s) && is_sep_char (s[pos]) && s[pos] != '-') pos++;
@@ -41,7 +45,8 @@ verb_language_rep::advance (tree t, int& pos) {
 
   array<int> cols= obtain_highlight (t, hl_lan);
   if (N(cols) == 0)
-    while ((pos<N(s)) && (s[pos]!=' ') && !is_sep_char (s[pos])) pos++;
+    while ((pos<N(s)) && (s[pos]!=' ') && !is_sep_char (s[pos]) &&
+           !is_source_tab (s, pos)) pos++;
   else if ((pos<N(s)) && (s[pos]!=' ') && !is_sep_char (s[pos])) {
     pos++;
     while ((pos<N(s)) && (s[pos]!=' ') && !is_sep_char (s[pos]) &&

@@ -1042,7 +1042,11 @@
   ;; the macros in code, and in LaTeX
   (check= (tm->md (in-style '(verbatim (md-source (math "y") "$y$" (math "y")))))
           "`y`\n")
-  (with s (convert (md->tm markdown-file) "texmacs-stree" "latex-document")
+  ;; (as for a file in the temporary directory: the images of the LaTeX
+  ;; go next to it, not in the current directory)
+  (with s (with-global current-save-target
+              (url-append (url-temp-dir) "markdown-losses.tex")
+            (convert (md->tm markdown-file) "texmacs-stree" "latex-document"))
     (check= (string-search-forwards "\\md" 0 s) -1)
     (check-true (>= (string-search-forwards "\\footnote{The note.}" 0 s) 0))))
 

@@ -37,4 +37,6 @@
 (tm-define (notify-cursor-moved status)
   (:require prog-highlight-brackets?)
   (:mode in-prog-cpp?)
+  ;; (the other hooks run too: language servers)
+  (former status)
   (select-brackets-after-movement "([{" ")]}" "\\"))

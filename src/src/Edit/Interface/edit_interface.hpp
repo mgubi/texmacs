@@ -73,6 +73,10 @@ protected:
   array<string>     user_cursor_colors;
   array<string>     user_cursor_names;
   array<rectangles> spell_error_rects;
+  // the diagnostics of language servers (alt selections lsp-errors...),
+  // underlined in their colors
+  array<rectangles> diagnostic_rects;
+  array<color>      diagnostic_colors;
   rectangle     last_visible;
   rectangle     last_extents;
   rectangles    env_rects;
@@ -155,6 +159,7 @@ public:
   int  change_time ();
   void update_menus ();
   int  find_alt_selection_index (range_set alt_sel, SI y, int b, int e);
+  void update_diagnostic_rects (rectangle new_visible);
   void apply_changes ();
   void apply_pending_changes ();
   void animate ();
@@ -198,6 +203,7 @@ public:
   void mouse_any (string s, SI x, SI y, int m, time_t t, array<double> d);
   bool mouse_message (string message, SI x, SI y);
   color mouse_clickable_color ();
+  path  xy_to_path (SI x, SI y);
   void mouse_click (SI x, SI y);
   bool mouse_extra_click (SI x, SI y);
   void mouse_drag (SI x, SI y);

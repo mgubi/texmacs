@@ -23,6 +23,7 @@
 #include "analyze.hpp"
 #include "dictionary.hpp"
 #include "tm_link.hpp"
+#include "lsp_link.hpp"
 #include "socket_notifier.hpp"
 #include "new_style.hpp"
 #include "Database/database.hpp"
@@ -241,6 +242,7 @@ tm_server_rep::interpose_handler () {
 #endif
   process_all_workers (); // the plugins which are Web Workers (browser)
   async_eval_pending ();
+  process_all_lsp (); // the messages of the language servers
   http_async_pending (); // the requests made with libcurl
 #if !defined (QTTEXMACS) && !defined (AQUATEXMACS)
   // the plug-ins which make HTTP requests (request_link.cpp, the AI

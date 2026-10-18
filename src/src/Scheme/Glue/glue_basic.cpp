@@ -6759,6 +6759,45 @@ tmg_cpp_verbatim_2texmacs (tmscm arg1, tmscm arg2, tmscm arg3) {
 }
 
 tmscm
+tmg_cpp_source_2texmacs (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "cpp-source->texmacs");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  tree out= source_document_to_tree (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return tree_to_tmscm (out);
+}
+
+tmscm
+tmg_cpp_source_snippet_2texmacs (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "cpp-source-snippet->texmacs");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  tree out= source_snippet_to_tree (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return tree_to_tmscm (out);
+}
+
+tmscm
+tmg_source_2cork (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "source->cork");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  string out= source_text_to_cork (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return string_to_tmscm (out);
+}
+
+tmscm
 tmg_parse_latex (tmscm arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "parse-latex");
 
@@ -7453,6 +7492,32 @@ tmg_tree_2json (tmscm arg1) {
 
   // TMSCM_DEFER_INTS;
   string out= tree_to_json (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return string_to_tmscm (out);
+}
+
+tmscm
+tmg_json_2typed_tree (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "json->typed-tree");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  tree out= json_to_typed_tree (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return tree_to_tmscm (out);
+}
+
+tmscm
+tmg_typed_tree_2json (tmscm arg1) {
+  TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "typed-tree->json");
+
+  content in1= tmscm_to_content (arg1);
+
+  // TMSCM_DEFER_INTS;
+  string out= typed_tree_to_json (in1);
   // TMSCM_ALLOW_INTS;
 
   return string_to_tmscm (out);
@@ -9973,6 +10038,163 @@ tmg_connection_stop (tmscm arg1, tmscm arg2) {
 
   // TMSCM_DEFER_INTS;
   connection_stop (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_lsp_start (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "lsp-start");
+  TMSCM_ASSERT_OBJECT (arg2, TMSCM_ARG2, "lsp-start");
+
+  string in1= tmscm_to_string (arg1);
+  object in2= tmscm_to_object (arg2);
+
+  // TMSCM_DEFER_INTS;
+  object out= lsp_start (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return object_to_tmscm (out);
+}
+
+tmscm
+tmg_lsp_send (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "lsp-send");
+  TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "lsp-send");
+
+  int in1= tmscm_to_int (arg1);
+  string in2= tmscm_to_string (arg2);
+
+  // TMSCM_DEFER_INTS;
+  bool out= lsp_send (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return bool_to_tmscm (out);
+}
+
+tmscm
+tmg_lsp_listen (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "lsp-listen");
+  TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "lsp-listen");
+
+  int in1= tmscm_to_int (arg1);
+  int in2= tmscm_to_int (arg2);
+
+  // TMSCM_DEFER_INTS;
+  lsp_listen (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_lsp_aliveP (tmscm arg1) {
+  TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "lsp-alive?");
+
+  int in1= tmscm_to_int (arg1);
+
+  // TMSCM_DEFER_INTS;
+  bool out= lsp_alive (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return bool_to_tmscm (out);
+}
+
+tmscm
+tmg_lsp_stop (tmscm arg1) {
+  TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "lsp-stop");
+
+  int in1= tmscm_to_int (arg1);
+
+  // TMSCM_DEFER_INTS;
+  lsp_stop (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_lsp_document_text (tmscm arg1) {
+  TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "lsp-document-text");
+
+  tree in1= tmscm_to_tree (arg1);
+
+  // TMSCM_DEFER_INTS;
+  string out= lsp_document_text (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return string_to_tmscm (out);
+}
+
+tmscm
+tmg_lsp_decorate_line (tmscm arg1, tmscm arg2, tmscm arg3) {
+  TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "lsp-decorate-line");
+  TMSCM_ASSERT_TREE (arg2, TMSCM_ARG2, "lsp-decorate-line");
+  TMSCM_ASSERT_TREE (arg3, TMSCM_ARG3, "lsp-decorate-line");
+
+  tree in1= tmscm_to_tree (arg1);
+  tree in2= tmscm_to_tree (arg2);
+  tree in3= tmscm_to_tree (arg3);
+
+  // TMSCM_DEFER_INTS;
+  lsp_decorate_line (in1, in2, in3);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_lsp_undecorate_line (tmscm arg1) {
+  TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "lsp-undecorate-line");
+
+  tree in1= tmscm_to_tree (arg1);
+
+  // TMSCM_DEFER_INTS;
+  lsp_undecorate_line (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_lsp_fold_line (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "lsp-fold-line");
+  TMSCM_ASSERT_BOOL (arg2, TMSCM_ARG2, "lsp-fold-line");
+
+  tree in1= tmscm_to_tree (arg1);
+  bool in2= tmscm_to_bool (arg2);
+
+  // TMSCM_DEFER_INTS;
+  lsp_fold_line (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_lsp_line_foldedP (tmscm arg1) {
+  TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "lsp-line-folded?");
+
+  tree in1= tmscm_to_tree (arg1);
+
+  // TMSCM_DEFER_INTS;
+  bool out= lsp_line_folded (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return bool_to_tmscm (out);
+}
+
+tmscm
+tmg_lsp_fold_marker (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "lsp-fold-marker");
+  TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "lsp-fold-marker");
+
+  tree in1= tmscm_to_tree (arg1);
+  string in2= tmscm_to_string (arg2);
+
+  // TMSCM_DEFER_INTS;
+  lsp_fold_marker (in1, in2);
   // TMSCM_ALLOW_INTS;
 
   return TMSCM_UNSPECIFIED;
@@ -12796,6 +13018,9 @@ initialize_glue_basic () {
   tmscm_install_procedure ("cpp-texmacs->verbatim",  tmg_cpp_texmacs_2verbatim, 3, 0, 0);
   tmscm_install_procedure ("cpp-verbatim-snippet->texmacs",  tmg_cpp_verbatim_snippet_2texmacs, 3, 0, 0);
   tmscm_install_procedure ("cpp-verbatim->texmacs",  tmg_cpp_verbatim_2texmacs, 3, 0, 0);
+  tmscm_install_procedure ("cpp-source->texmacs",  tmg_cpp_source_2texmacs, 1, 0, 0);
+  tmscm_install_procedure ("cpp-source-snippet->texmacs",  tmg_cpp_source_snippet_2texmacs, 1, 0, 0);
+  tmscm_install_procedure ("source->cork",  tmg_source_2cork, 1, 0, 0);
   tmscm_install_procedure ("parse-latex",  tmg_parse_latex, 1, 0, 0);
   tmscm_install_procedure ("parse-latex-document",  tmg_parse_latex_document, 1, 0, 0);
   tmscm_install_procedure ("latex->texmacs",  tmg_latex_2texmacs, 1, 0, 0);
@@ -12844,6 +13069,8 @@ initialize_glue_basic () {
   tmscm_install_procedure ("cpp-ai-translate",  tmg_cpp_ai_translate, 4, 0, 0);
   tmscm_install_procedure ("json->tree",  tmg_json_2tree, 1, 0, 0);
   tmscm_install_procedure ("tree->json",  tmg_tree_2json, 1, 0, 0);
+  tmscm_install_procedure ("json->typed-tree",  tmg_json_2typed_tree, 1, 0, 0);
+  tmscm_install_procedure ("typed-tree->json",  tmg_typed_tree_2json, 1, 0, 0);
   tmscm_install_procedure ("lantool-correct",  tmg_lantool_correct, 2, 0, 0);
   tmscm_install_procedure ("url->url",  tmg_url_2url, 1, 0, 0);
   tmscm_install_procedure ("root->url",  tmg_root_2url, 1, 0, 0);
@@ -13026,6 +13253,17 @@ initialize_glue_basic () {
   tmscm_install_procedure ("connection-eval",  tmg_connection_eval, 3, 0, 0);
   tmscm_install_procedure ("connection-interrupt",  tmg_connection_interrupt, 2, 0, 0);
   tmscm_install_procedure ("connection-stop",  tmg_connection_stop, 2, 0, 0);
+  tmscm_install_procedure ("lsp-start",  tmg_lsp_start, 2, 0, 0);
+  tmscm_install_procedure ("lsp-send",  tmg_lsp_send, 2, 0, 0);
+  tmscm_install_procedure ("lsp-listen",  tmg_lsp_listen, 2, 0, 0);
+  tmscm_install_procedure ("lsp-alive?",  tmg_lsp_aliveP, 1, 0, 0);
+  tmscm_install_procedure ("lsp-stop",  tmg_lsp_stop, 1, 0, 0);
+  tmscm_install_procedure ("lsp-document-text",  tmg_lsp_document_text, 1, 0, 0);
+  tmscm_install_procedure ("lsp-decorate-line",  tmg_lsp_decorate_line, 3, 0, 0);
+  tmscm_install_procedure ("lsp-undecorate-line",  tmg_lsp_undecorate_line, 1, 0, 0);
+  tmscm_install_procedure ("lsp-fold-line",  tmg_lsp_fold_line, 2, 0, 0);
+  tmscm_install_procedure ("lsp-line-folded?",  tmg_lsp_line_foldedP, 1, 0, 0);
+  tmscm_install_procedure ("lsp-fold-marker",  tmg_lsp_fold_marker, 2, 0, 0);
   tmscm_install_procedure ("widget-printer",  tmg_widget_printer, 2, 0, 0);
   tmscm_install_procedure ("widget-color-picker",  tmg_widget_color_picker, 3, 0, 0);
   tmscm_install_procedure ("widget-extend",  tmg_widget_extend, 2, 0, 0);

@@ -388,3 +388,19 @@ json_get (tree t, tree key, int mode) {
     if (t[i] == key) return t[i+1];
   return json_null (mode);
 }
+
+/******************************************************************************
+* Typed JSON (null, booleans and numbers kept apart from the strings)
+******************************************************************************/
+
+tree
+json_to_typed_tree (string s) {
+  return json_to_tree (s, JSON_NULL | JSON_BOOLEAN | JSON_NUMBER);
+}
+
+string
+typed_tree_to_json (tree t) {
+  // on one line, as the messages of the protocols (LSP, JSON-RPC)
+  return tree_to_json (t, JSON_NULL | JSON_BOOLEAN | JSON_NUMBER |
+                          JSON_SHORT_ARRAY | JSON_SHORT_OBJECT);
+}

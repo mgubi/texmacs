@@ -43,6 +43,7 @@
         (check define-test)
         (check latex-test)
         (check formats-test)
+        (check source-files-test)
         (check markdown-test)
         (check office-test)
         (check editing-test)
@@ -59,6 +60,7 @@
         (check graphics-edit-test)
         (check version-test)
         (check git-test)
+        (check lsp-test)
         (check links-test)
         (check misc-modules-test)
         (check remote-test)
@@ -143,6 +145,7 @@
     ("trees" trees-test-failures count)
     ("latex" latex-test-failures count)
     ("formats" formats-test-failures count)
+    ("source-files" source-files-test-failures count)
     ("markdown" markdown-test-failures count)
     ("office" office-test-failures count)
     ;; opens buffers and edits them
@@ -187,6 +190,10 @@
     ("plugins" plugins-test-failures count)
     ;; loads every lazy menu, and maps and unmaps test keys
     ("kbd-menu" kbd-menu-test-failures count)
+    ;; starts sh, cat and printf as language servers, and stops them; with
+    ;; clangd, edits a C++ buffer, which loads the keyboard maps of programs:
+    ;; after kbd-menu, whose math checks must come before (see there)
+    ("lsp" lsp-test-failures count)
     ;; loads every style package, and with them the Scheme modules they use
     ("macro-drd" macro-drd-test-failures count)
     ("tm-define-regression" regtest-tm-define error)

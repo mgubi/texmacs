@@ -4027,6 +4027,30 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(cpp-source-\<gtr\>texmacs <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|source_document_to_tree> which returns
+    <scm|tree>.
+  </explain>
+
+  <\explain>
+    <scm|(cpp-source-snippet-\<gtr\>texmacs <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|source_snippet_to_tree> which returns
+    <scm|tree>.
+  </explain>
+
+  <\explain>
+    <scm|(source-\<gtr\>cork <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|source_text_to_cork> which returns
+    <scm|string>.
+  </explain>
+
+  <\explain>
     <scm|(parse-latex <scm-arg|string>)>
 <explain-synopsis|no synopsis>
   <|explain>
@@ -4407,6 +4431,22 @@ source code.
 <explain-synopsis|no synopsis>
   <|explain>
     Calls the <c++> function <cpp|tree_to_json> which returns
+    <scm|string>.
+  </explain>
+
+  <\explain>
+    <scm|(json-\<gtr\>typed-tree <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|json_to_typed_tree> which returns
+    <scm|tree>.
+  </explain>
+
+  <\explain>
+    <scm|(typed-tree-\<gtr\>json <scm-arg|content>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|typed_tree_to_json> which returns
     <scm|string>.
   </explain>
 
@@ -5527,6 +5567,94 @@ source code.
 <explain-synopsis|no synopsis>
   <|explain>
     Calls the <c++> function <cpp|connection_stop> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(lsp-start <scm-arg|string> <scm-arg|object>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|lsp_start> which returns
+    <scm|object>.
+  </explain>
+
+  <\explain>
+    <scm|(lsp-send <scm-arg|int> <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|lsp_send> which returns
+    <scm|bool>.
+  </explain>
+
+  <\explain>
+    <scm|(lsp-listen <scm-arg|int> <scm-arg|int>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|lsp_listen> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(lsp-alive? <scm-arg|int>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|lsp_alive> which returns
+    <scm|bool>.
+  </explain>
+
+  <\explain>
+    <scm|(lsp-stop <scm-arg|int>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|lsp_stop> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(lsp-document-text <scm-arg|tree>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|lsp_document_text> which returns
+    <scm|string>.
+  </explain>
+
+  <\explain>
+    <scm|(lsp-decorate-line <scm-arg|tree> <scm-arg|tree> <scm-arg|tree>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|lsp_decorate_line> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(lsp-undecorate-line <scm-arg|tree>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|lsp_undecorate_line> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(lsp-fold-line <scm-arg|tree> <scm-arg|bool>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|lsp_fold_line> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(lsp-line-folded? <scm-arg|tree>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|lsp_line_folded> which returns
+    <scm|bool>.
+  </explain>
+
+  <\explain>
+    <scm|(lsp-fold-marker <scm-arg|tree> <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|lsp_fold_marker> which returns
     <scm|void>.
   </explain>
 
@@ -8400,6 +8528,14 @@ source code.
   <|explain>
     Calls the <c++> function <cpp|get_mouse_position> which returns
     <scm|array_SI>.
+  </explain>
+
+  <\explain>
+    <scm|(xy-\<gtr\>path <scm-arg|int> <scm-arg|int>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|xy_to_path> which returns
+    <scm|path>.
   </explain>
 
   <\explain>

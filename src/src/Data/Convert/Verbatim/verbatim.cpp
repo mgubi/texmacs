@@ -257,9 +257,40 @@ latin1_to_cork (string s) {
   return utf8_to_cork (u);
 }
 
+static string
+utf8_to_latin1 (string u) {
+  string r;
+  for (int i=0; i<N(u); ) {
+    unsigned int code= decode_from_utf8 (u, i);
+    if (code < 256) r << ((char) code);
+    else r << '?';
+  }
+  return r;
+}
+
+static string
+tree_to_source (tree t, string enc, string ends) {
+  // a source file as it was loaded (see source_document_to_tree): its
+  // characters (tabs and the other control characters are <#..>, written
+  // as they are by cork_to_sourcecode), its encoding and its line ends
+  string buf= var_cork_to_sourcecode (as_verbatim (t, false));
+  if (enc == "iso-8859-1") buf= utf8_to_latin1 (buf);
+  if (ends == "dos") return unix_to_dos (buf);
+  if (ends == "mac") return replace (buf, "\n", "\r");
+  return buf;
+}
+
 string
 tree_to_verbatim (tree t, bool wrap, string enc) {
   if (enc == "default") enc= "auto";
+  if (enc == "SourceCode" && !is_snippet (t)) {
+    // (a source file loaded by source_document_to_tree)
+    hashmap<string,tree> h (UNINIT, extract (t, "initial"));
+    tree enc= h ["source-encoding"], ends= h ["source-line-ends"];
+    if (is_atomic (ends) && ends->label != "")
+      return tree_to_source (t, is_atomic (enc)? enc->label: string ("utf-8"),
+                             ends->label);
+  }
   string buf= as_verbatim (t, wrap);
   if (enc == "auto")
     enc= get_locale_charset ();
@@ -375,4 +406,146 @@ verbatim_document_to_tree (string s, bool wrap, string enc) {
                     tree (ASSOCIATE, FONT_FAMILY, "tt"),
                     tree (ASSOCIATE, PAR_FIRST, "0cm"));
   return tree (DOCUMENT, compound ("body", t), compound ("initial", init));
+}
+
+/******************************************************************************
+* Source files, as they are
+******************************************************************************/
+
+// A source file is loaded so that it is saved as it was: its tabs and its
+// other control characters are kept as characters <#..> of Cork (a byte 9
+// of Cork is a macron, a tab is not expanded to spaces), the characters
+// which are not valid UTF-8 are those of ISO-8859-1 (the file is then
+// written in it), and its line ends (LF, CR LF or CR) are those it is
+// written with; a file whose line ends are mixed keeps its CR as <#D>.
+// The encoding and the line ends are in the initial environment of the
+// document (source-encoding, source-line-ends), which tree_to_verbatim
+// follows with the encoding SourceCode, and so is the indentation of its
+// lines (source-indent: tabs, spaces, or "" if none), which the new lines
+// follow (prog-edit.scm).
+
+static bool
+valid_utf8 (string s) {
+  int i= 0, n= N(s);
+  while (i < n) {
+    unsigned char c= (unsigned char) s[i];
+    int k;
+    if (c < 0x80) k= 0;
+    else if (c >= 0xC2 && c < 0xE0) k= 1;
+    else if (c >= 0xE0 && c < 0xF0) k= 2;
+    else if (c >= 0xF0 && c < 0xF5) k= 3;
+    else return false;
+    if (i + k >= n) return false;
+    for (int j=1; j<=k; j++)
+      if ((((unsigned char) s[i+j]) >> 6) != 2) return false;
+    i += k + 1;
+  }
+  return true;
+}
+
+static string
+source_line_to_cork (string u) {
+  // the utf8 line @u in Cork, its control characters as <#..>
+  string r;
+  int i= 0, n= N(u);
+  while (i < n) {
+    int start= i;
+    while (i < n && ((unsigned char) u[i]) >= 32 && u[i] != 127) i++;
+    if (i > start) r << sourcecode_to_cork (u (start, i));
+    if (i < n) {
+      r << "<#" << as_hexadecimal ((int) (unsigned char) u[i]) << ">";
+      i++;
+    }
+  }
+  return r;
+}
+
+tree
+source_document_to_tree (string s) {
+  string enc= "utf-8";
+  if (!valid_utf8 (s)) {
+    enc= "iso-8859-1";
+    string u;
+    for (int i=0; i<N(s); i++)
+      u << encode_as_utf8 ((unsigned int) (unsigned char) s[i]);
+    s= u;
+  }
+  int crlf= 0, lf= 0, cr= 0, n= N(s);
+  for (int i=0; i<n; i++)
+    if (s[i] == '\r') {
+      if (i+1 < n && s[i+1] == '\n') { crlf++; i++; }
+      else cr++;
+    }
+    else if (s[i] == '\n') lf++;
+  string ends= "unix";
+  if (crlf > 0 && lf == 0 && cr == 0) { ends= "dos"; s= dos_to_unix (s); }
+  else if (cr > 0 && lf == 0 && crlf == 0) {
+    ends= "mac"; s= replace (s, "\r", "\n"); }
+  // (else a CR which is left is a character of its line)
+  // the indentation of its lines: by tabs, by spaces, or none
+  int by_tabs= 0, by_spaces= 0;
+  for (int i=0; i<N(s); i++)
+    if (i == 0 || s[i-1] == '\n') {
+      if (s[i] == '\t') by_tabs++;
+      else if (s[i] == ' ' && i+1 < N(s) && s[i+1] == ' ') by_spaces++;
+    }
+  string indent= (by_tabs > by_spaces? string ("tabs"):
+                  by_spaces > 0? string ("spaces"): string (""));
+  tree body;
+  if (search_forwards ("\n", s) < 0) body= source_line_to_cork (s);
+  else {
+    body= tree (DOCUMENT);
+    int j= 0;
+    for (int i=0; i<=N(s); i++)
+      if (i == N(s) || s[i] == '\n') {
+        body << tree (source_line_to_cork (s (j, i)));
+        j= i+1;
+      }
+  }
+  tree init = tree (COLLECTION,
+                    tree (ASSOCIATE, LANGUAGE, "verbatim"),
+                    tree (ASSOCIATE, FONT_FAMILY, "tt"),
+                    tree (ASSOCIATE, PAR_FIRST, "0cm"),
+                    tree (ASSOCIATE, "source-encoding", enc),
+                    tree (ASSOCIATE, "source-line-ends", ends),
+                    tree (ASSOCIATE, "source-indent", indent));
+  return tree (DOCUMENT, compound ("body", body), compound ("initial", init));
+}
+
+tree
+source_snippet_to_tree (string s) {
+  // a piece of source code (pasted in a program): its tabs and control
+  // characters kept as in source_document_to_tree, its line ends LF
+  if (!valid_utf8 (s)) {
+    string u;
+    for (int i=0; i<N(s); i++)
+      u << encode_as_utf8 ((unsigned int) (unsigned char) s[i]);
+    s= u;
+  }
+  s= mac_to_unix (dos_to_unix (s));
+  if (search_forwards ("\n", s) < 0) return source_line_to_cork (s);
+  tree t (DOCUMENT);
+  int j= 0;
+  for (int i=0; i<=N(s); i++)
+    if (i == N(s) || s[i] == '\n') {
+      t << tree (source_line_to_cork (s (j, i)));
+      j= i+1;
+    }
+  return t;
+}
+
+string
+source_text_to_cork (string s) {
+  // a text of source code (utf8) in Cork, as its lines are loaded: tabs and
+  // control characters as <#..>, the newlines kept (as for the texts which
+  // language servers give)
+  string r;
+  int j= 0;
+  for (int i=0; i<=N(s); i++)
+    if (i == N(s) || s[i] == '\n') {
+      if (j > 0) r << "\n";
+      r << source_line_to_cork (s (j, i));
+      j= i+1;
+    }
+  return r;
 }

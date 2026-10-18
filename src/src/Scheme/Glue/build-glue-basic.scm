@@ -568,6 +568,9 @@
   (cpp-texmacs->verbatim tree_to_verbatim (string tree bool string))
   (cpp-verbatim-snippet->texmacs verbatim_to_tree (tree string bool string))
   (cpp-verbatim->texmacs verbatim_document_to_tree (tree string bool string))
+  (cpp-source->texmacs source_document_to_tree (tree string))
+  (cpp-source-snippet->texmacs source_snippet_to_tree (tree string))
+  (source->cork source_text_to_cork (string string))
   (parse-latex parse_latex (tree string))
   (parse-latex-document parse_latex_document (tree string))
   (latex->texmacs latex_to_tree (tree tree))
@@ -619,6 +622,8 @@
   (cpp-ai-translate ai_translate (tree content string string string))
   (json->tree json_to_tree (tree string))
   (tree->json tree_to_json (string content))
+  (json->typed-tree json_to_typed_tree (tree string))
+  (typed-tree->json typed_tree_to_json (string content))
   (lantool-correct lantool_correct (string string string))
 
   ;; routines for urls
@@ -824,6 +829,18 @@
   (connection-eval connection_eval (tree string string content))
   (connection-interrupt connection_interrupt (void string string))
   (connection-stop connection_stop (void string string))
+  ;; language servers (Language Server Protocol, progs/lsp)
+  (lsp-start lsp_start (object string object))
+  (lsp-send lsp_send (bool int string))
+  (lsp-listen lsp_listen (void int int))
+  (lsp-alive? lsp_alive (bool int))
+  (lsp-stop lsp_stop (void int))
+  (lsp-document-text lsp_document_text (string tree))
+  (lsp-decorate-line lsp_decorate_line (void tree tree tree))
+  (lsp-undecorate-line lsp_undecorate_line (void tree))
+  (lsp-fold-line lsp_fold_line (void tree bool))
+  (lsp-line-folded? lsp_line_folded (bool tree))
+  (lsp-fold-marker lsp_fold_marker (void tree string))
 
   ;; widgets
   (widget-printer printer_widget (widget command url))

@@ -27,8 +27,11 @@
 ; FIXME: '#' in a string is interpreted as a comment
 (define (strip-comment-buggy s)
   "Removes comment from python line."
-  (with i (string-index s #\#)
-    (if i (string-take s i) s)))
+  ;; (a # of a character of Cork, as the tab <#9>, is not a comment)
+  (let loop ((l (tmstring->list s)) (i 0))
+    (cond ((null? l) s)
+          ((== (car l) "#") (string-take s i))
+          (else (loop (cdr l) (+ i (string-length (car l))))))))
 
 (tm-define (program-compute-indentation doc row col)
   (:mode in-prog-python?)
@@ -41,7 +44,7 @@
              (s (string-strip-right (strip-comment-buggy (if r r ""))))
              (i (string-get-indent s))
              (c (if (== s "") "" (string-take-right s 1))))
-        (if (== c ":") (+ i (get-tabstop)) i))))
+        (if (== c ":") (+ i (program-indent-step)) i))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Automatic insertion, highlighting and selection of brackets and quotes
@@ -62,5 +65,7 @@
 (tm-define (notify-cursor-moved status)
   (:require prog-highlight-brackets?)
   (:mode in-prog-python?)
+  ;; (the other hooks run too: language servers)
+  (former status)
   (select-brackets-after-movement "([{" ")]}" "\\"))
 
