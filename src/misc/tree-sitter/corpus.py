@@ -111,9 +111,14 @@ def main():
         sys.exit(2)
     lan = args[0]
     tests = []
+    skipped = 0
     for f in corpus_files(args[1:]):
         for t in parse_corpus(f):
-            if not any(a.startswith(":skip") for a in t[1]):
+            # tests marked :language(name) are for the grammar name only
+            langs = [a[len(":language("):-1] for a in t[1] if a.startswith(":language(")]
+            if any(a.startswith(":skip") for a in t[1]) or (langs and lan not in langs):
+                skipped += 1
+            else:
                 tests.append((os.path.basename(f),) + t)
     work = tempfile.mkdtemp(prefix="corpus-")
     run(lan, [t[1:] for t in tests], work)
@@ -136,7 +141,8 @@ def main():
             if verbose:
                 print("  expected: " + normalize(expected))
                 print("  actual:   " + normalize(actual))
-    print("%s: %d tests, %d failed" % (lan, len(tests), failed))
+    print("%s: %d tests, %d failed%s" % (lan, len(tests), failed,
+                                          ", %d skipped" % skipped if skipped else ""))
     sys.exit(1 if failed else 0)
 
 main()

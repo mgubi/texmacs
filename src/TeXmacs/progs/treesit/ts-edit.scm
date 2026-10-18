@@ -203,7 +203,8 @@
 ;; with a branch (else, except...). For each program language: the indenting
 ;; types, the branches, and for an offside language (Python, whose blocks
 ;; end where the indentation goes back) the types of its brackets: only
-;; those are closed before a line.
+;; those are closed before a line; optionally, the named types which close
+;; a node (as the end tags of HTML), besides its last token.
 
 (define c-indenting
   '("compound_statement" "field_declaration_list" "declaration_list"
@@ -255,6 +256,17 @@
       "else_clause" "case_statement" "case_item" "subshell" "array"
       "command_substitution")
      ("elif_clause" "else_clause") #f)
+    ("typescript"
+     ("statement_block" "object" "array" "arguments" "formal_parameters"
+      "class_body" "interface_body" "object_type" "enum_body" "switch_body"
+      "switch_case" "switch_default" "template_substitution"
+      "parenthesized_expression" "type_arguments" "type_parameters"
+      "if_statement" "for_statement" "while_statement" "do_statement"
+      "else_clause")
+     ("else_clause") #f)
+    ("css" ("block" "arguments") () #f)
+    ("toml" ("array" "inline_table") () #f)
+    ("html" ("element" "script_element" "style_element") () #f ("end_tag"))
     ("go"
      ("block" "literal_value" "argument_list" "parameter_list"
       "expression_switch_statement" "type_switch_statement" "select_statement"
@@ -316,6 +328,7 @@
   (let* ((indenting (cadr rules))
          (branches (caddr rules))
          (brackets (cadddr rules))
+         (closers (let ((l (list-tail rules 4))) (if (pair? l) (car l) '())))
          (s (line-string doc row))
          (c0 (first-non-space s))
          (prev (and (not c0) (previous-text-end doc row)))
@@ -355,9 +368,14 @@
                               (if (and (pair? l) (== (node-start (car l)) p))
                                   (loop (cdr l) (car l))
                                   best)))
+                     ;; a named closer (</div>) which ends a, its parent
+                     (closer? (and c0 first (in? (node-type first) closers)
+                                   (let ((up (memq first nodes)))
+                                     (and (pair? (cdr up)) (== (cadr up) a)))
+                                   (== (node-end first) (node-end a))))
                      (branch? (and c0 first (in? (node-type first) branches))))
                 (+ (line-indent doc (car (node-start a)))
-                   (if (or closing? branch?) 0 tab))))))))
+                   (if (or closing? closer? branch?) 0 tab))))))))
 
 (define-public (syntax-language-indentation doc row lan id tab)
   ;; the same for the program language lan, whose language of tree-sitter

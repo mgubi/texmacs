@@ -201,6 +201,18 @@
 
   <assign|rust|<macro|body|<with|mode|prog|prog-language|rust|font-family|rm|<arg|body>>>>
 
+  <assign|typescript-lang|<macro|body|<with|mode|prog|prog-language|typescript|font-family|rm|<arg|body>>>>
+
+  <assign|html-lang|<macro|body|<with|mode|prog|prog-language|html|font-family|rm|<arg|body>>>>
+
+  <assign|css-lang|<macro|body|<with|mode|prog|prog-language|css|font-family|rm|<arg|body>>>>
+
+  <assign|toml-lang|<macro|body|<with|mode|prog|prog-language|toml|font-family|rm|<arg|body>>>>
+
+  <assign|ocaml-lang|<macro|body|<with|mode|prog|prog-language|ocaml|font-family|rm|<arg|body>>>>
+
+  <assign|latex-lang|<macro|body|<with|mode|prog|prog-language|latex|font-family|rm|<arg|body>>>>
+
   <assign|octave-lang|<macro|body|<with|mode|prog|prog-language|octave|font-family|rm|<arg|body>>>>
 
   <\active*>
@@ -284,6 +296,42 @@
   <assign|rust-code|<\macro|body>
     <\pseudo-code>
       <rust|<arg|body>>
+    </pseudo-code>
+  </macro>>
+
+  <assign|typescript-code|<\macro|body>
+    <\pseudo-code>
+      <typescript-lang|<arg|body>>
+    </pseudo-code>
+  </macro>>
+
+  <assign|html-code|<\macro|body>
+    <\pseudo-code>
+      <html-lang|<arg|body>>
+    </pseudo-code>
+  </macro>>
+
+  <assign|css-code|<\macro|body>
+    <\pseudo-code>
+      <css-lang|<arg|body>>
+    </pseudo-code>
+  </macro>>
+
+  <assign|toml-code|<\macro|body>
+    <\pseudo-code>
+      <toml-lang|<arg|body>>
+    </pseudo-code>
+  </macro>>
+
+  <assign|ocaml-code|<\macro|body>
+    <\pseudo-code>
+      <ocaml-lang|<arg|body>>
+    </pseudo-code>
+  </macro>>
+
+  <assign|latex-code|<\macro|body>
+    <\pseudo-code>
+      <latex-lang|<arg|body>>
     </pseudo-code>
   </macro>>
 

@@ -1,0 +1,4 @@
+typescript/src/grammar.json of https://github.com/tree-sitter/tree-sitter-typescript.git
+(commit 75b3874edb2dc714fb1fd77a32013d0f8699989f), with its LICENSE; highlights.scm is queries/highlights.scm and the
+highlights.scm of tree-sitter-javascript (commit 58404d8cf191d69f2674a8fd507bd5776f46cb11) in this order, as
+tree-sitter.json lists them; tags.scm likewise.

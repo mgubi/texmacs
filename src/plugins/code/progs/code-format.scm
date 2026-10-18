@@ -50,3 +50,7 @@
 (define-code-format lean "Lean source code" "lean")
 (define-code-format lua "Lua source code" "lua")
 (define-code-format rust "Rust source code" "rs")
+(define-code-format typescript "TypeScript source code" "tsx" "mts" "cts")
+(define-code-format css "CSS style sheet" "css")
+(define-code-format toml "TOML" "toml")
+(define-code-format ocaml "OCaml source code" "ml" "mli")

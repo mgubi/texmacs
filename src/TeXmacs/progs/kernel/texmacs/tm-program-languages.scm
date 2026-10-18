@@ -65,6 +65,18 @@
      (names "lua"))
     ("rust" (label "Rust") (tags rust rust-code) (grammar "rust")
      (comment "//") (names "rust" "rs"))
+    ("typescript" (label "TypeScript") (tags typescript-lang typescript-code) (grammar "typescript") (comment "//")
+     (names "typescript" "ts" "tsx"))
+    ("html" (label "HTML") (tags html-lang html-code) (grammar "html")
+     (names "html" "xhtml"))
+    ("css" (label "CSS") (tags css-lang css-code) (grammar "css")
+     (names "css"))
+    ("toml" (label "TOML") (tags toml-lang toml-code) (grammar "toml") (comment "#")
+     (names "toml"))
+    ("ocaml" (label "OCaml") (tags ocaml-lang ocaml-code) (grammar "ocaml")
+     (names "ocaml" "ml"))
+    ("latex" (label "LaTeX") (tags latex-lang latex-code) (grammar "latex") (comment "%")
+     (names "latex" "tex"))
     ;; C has a grammar, which the tests use; its code is written as C++
     ("c" (grammar "c") (comment "//"))))
 
