@@ -213,6 +213,8 @@
 
     <branch|The <name|Word> and <name|OpenDocument>
     converters|convert-office.en.tm>
+
+    <branch|Source files|convert-source-files.en.tm>
   </traverse>
 
   <tmdoc-copyright|2026|the <TeXmacs> team>

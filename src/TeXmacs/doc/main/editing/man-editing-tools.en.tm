@@ -36,6 +36,8 @@
     <branch|Versioning tools|man-versioning.en.tm>
 
     <branch|Working with Git|man-git.en.tm>
+
+    <branch|Editing source files|man-source-files.en.tm>
   </traverse>
 
   <tmdoc-copyright|1998\U2020|Joris van der Hoeven>
