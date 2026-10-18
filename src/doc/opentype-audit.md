@@ -45,9 +45,13 @@ What is left:
   stay in the main family too. Every shipped style now comes back as itself
   from the variables of the font selector.
 - **C5**: the boxes are wrapped as the primes are and the tree-to-box
-  direction is tested; the box-to-tree direction (a click, an arrow key)
-  needs a window and was not run. The rectangle of a prime changed with it:
-  it is now the glyph.
+  direction is tested. The box-to-tree direction was checked in a window on
+  2026-10-18 (Vue test `math-cursor`): Right goes through the same 23
+  positions of a formula with primes, wide accents and negations in the TeX
+  font, Latin Modern Math, STIX Two Math and TeX Gyre Pagella Math, and a
+  click at each position gives back its path, but for the 4 positions which
+  two paths share, as in the TeX font. The rectangle of a prime changed
+  with it: it is now the glyph.
 - **C15** (script sizes rounded to whole points): not changed, needs
   fractional font sizes.
 - **B1**: in Latin Modern Math an upright word in a script has no `ff`

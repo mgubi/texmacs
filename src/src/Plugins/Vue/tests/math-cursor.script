@@ -1,0 +1,435 @@
+# made by math-cursor.py: see math-cursor.scm
+wait 8000
+scheme (c5-setup)
+wait 2500
+scheme (c5-font 0)
+wait 1500
+scheme (c5-record)
+wait 200
+key Right
+wait 120
+scheme (c5-record)
+wait 120
+key Right
+wait 120
+scheme (c5-record)
+wait 120
+key Right
+wait 120
+scheme (c5-record)
+wait 120
+key Right
+wait 120
+scheme (c5-record)
+wait 120
+key Right
+wait 120
+scheme (c5-record)
+wait 120
+key Right
+wait 120
+scheme (c5-record)
+wait 120
+key Right
+wait 120
+scheme (c5-record)
+wait 120
+key Right
+wait 120
+scheme (c5-record)
+wait 120
+key Right
+wait 120
+scheme (c5-record)
+wait 120
+key Right
+wait 120
+scheme (c5-record)
+wait 120
+key Right
+wait 120
+scheme (c5-record)
+wait 120
+key Right
+wait 120
+scheme (c5-record)
+wait 120
+key Right
+wait 120
+scheme (c5-record)
+wait 120
+key Right
+wait 120
+scheme (c5-record)
+wait 120
+key Right
+wait 120
+scheme (c5-record)
+wait 120
+key Right
+wait 120
+scheme (c5-record)
+wait 120
+key Right
+wait 120
+scheme (c5-record)
+wait 120
+key Right
+wait 120
+scheme (c5-record)
+wait 120
+key Right
+wait 120
+scheme (c5-record)
+wait 120
+key Right
+wait 120
+scheme (c5-record)
+wait 120
+key Right
+wait 120
+scheme (c5-record)
+wait 120
+key Right
+wait 120
+scheme (c5-record)
+wait 120
+key Right
+wait 120
+scheme (c5-record)
+wait 120
+key Right
+wait 120
+scheme (c5-record)
+wait 120
+key Right
+wait 120
+scheme (c5-record)
+wait 120
+key Right
+wait 120
+scheme (c5-record)
+wait 120
+scheme (c5-click-press 0)
+wait 150
+scheme (c5-click-check 0)
+wait 80
+scheme (c5-click-press 1)
+wait 150
+scheme (c5-click-check 1)
+wait 80
+scheme (c5-click-press 2)
+wait 150
+scheme (c5-click-check 2)
+wait 80
+scheme (c5-click-press 3)
+wait 150
+scheme (c5-click-check 3)
+wait 80
+scheme (c5-click-press 4)
+wait 150
+scheme (c5-click-check 4)
+wait 80
+scheme (c5-click-press 5)
+wait 150
+scheme (c5-click-check 5)
+wait 80
+scheme (c5-click-press 6)
+wait 150
+scheme (c5-click-check 6)
+wait 80
+scheme (c5-click-press 7)
+wait 150
+scheme (c5-click-check 7)
+wait 80
+scheme (c5-click-press 8)
+wait 150
+scheme (c5-click-check 8)
+wait 80
+scheme (c5-click-press 9)
+wait 150
+scheme (c5-click-check 9)
+wait 80
+scheme (c5-click-press 10)
+wait 150
+scheme (c5-click-check 10)
+wait 80
+scheme (c5-click-press 11)
+wait 150
+scheme (c5-click-check 11)
+wait 80
+scheme (c5-click-press 12)
+wait 150
+scheme (c5-click-check 12)
+wait 80
+scheme (c5-click-press 13)
+wait 150
+scheme (c5-click-check 13)
+wait 80
+scheme (c5-click-press 14)
+wait 150
+scheme (c5-click-check 14)
+wait 80
+scheme (c5-click-press 15)
+wait 150
+scheme (c5-click-check 15)
+wait 80
+scheme (c5-click-press 16)
+wait 150
+scheme (c5-click-check 16)
+wait 80
+scheme (c5-click-press 17)
+wait 150
+scheme (c5-click-check 17)
+wait 80
+scheme (c5-click-press 18)
+wait 150
+scheme (c5-click-check 18)
+wait 80
+scheme (c5-click-press 19)
+wait 150
+scheme (c5-click-check 19)
+wait 80
+scheme (c5-click-press 20)
+wait 150
+scheme (c5-click-check 20)
+wait 80
+scheme (c5-click-press 21)
+wait 150
+scheme (c5-click-check 21)
+wait 80
+scheme (c5-click-press 22)
+wait 150
+scheme (c5-click-check 22)
+wait 80
+scheme (c5-click-press 23)
+wait 150
+scheme (c5-click-check 23)
+wait 80
+scheme (c5-click-press 24)
+wait 150
+scheme (c5-click-check 24)
+wait 80
+scheme (c5-click-press 25)
+wait 150
+scheme (c5-click-check 25)
+wait 80
+scheme (c5-font-done 0)
+wait 300
+scheme (c5-font 1)
+wait 1500
+scheme (c5-record)
+wait 200
+key Right
+wait 120
+scheme (c5-record)
+wait 120
+key Right
+wait 120
+scheme (c5-record)
+wait 120
+key Right
+wait 120
+scheme (c5-record)
+wait 120
+key Right
+wait 120
+scheme (c5-record)
+wait 120
+key Right
+wait 120
+scheme (c5-record)
+wait 120
+key Right
+wait 120
+scheme (c5-record)
+wait 120
+key Right
+wait 120
+scheme (c5-record)
+wait 120
+key Right
+wait 120
+scheme (c5-record)
+wait 120
+key Right
+wait 120
+scheme (c5-record)
+wait 120
+key Right
+wait 120
+scheme (c5-record)
+wait 120
+key Right
+wait 120
+scheme (c5-record)
+wait 120
+key Right
+wait 120
+scheme (c5-record)
+wait 120
+key Right
+wait 120
+scheme (c5-record)
+wait 120
+key Right
+wait 120
+scheme (c5-record)
+wait 120
+key Right
+wait 120
+scheme (c5-record)
+wait 120
+key Right
+wait 120
+scheme (c5-record)
+wait 120
+key Right
+wait 120
+scheme (c5-record)
+wait 120
+key Right
+wait 120
+scheme (c5-record)
+wait 120
+key Right
+wait 120
+scheme (c5-record)
+wait 120
+key Right
+wait 120
+scheme (c5-record)
+wait 120
+key Right
+wait 120
+scheme (c5-record)
+wait 120
+key Right
+wait 120
+scheme (c5-record)
+wait 120
+key Right
+wait 120
+scheme (c5-record)
+wait 120
+key Right
+wait 120
+scheme (c5-record)
+wait 120
+key Right
+wait 120
+scheme (c5-record)
+wait 120
+key Right
+wait 120
+scheme (c5-record)
+wait 120
+scheme (c5-click-press 0)
+wait 150
+scheme (c5-click-check 0)
+wait 80
+scheme (c5-click-press 1)
+wait 150
+scheme (c5-click-check 1)
+wait 80
+scheme (c5-click-press 2)
+wait 150
+scheme (c5-click-check 2)
+wait 80
+scheme (c5-click-press 3)
+wait 150
+scheme (c5-click-check 3)
+wait 80
+scheme (c5-click-press 4)
+wait 150
+scheme (c5-click-check 4)
+wait 80
+scheme (c5-click-press 5)
+wait 150
+scheme (c5-click-check 5)
+wait 80
+scheme (c5-click-press 6)
+wait 150
+scheme (c5-click-check 6)
+wait 80
+scheme (c5-click-press 7)
+wait 150
+scheme (c5-click-check 7)
+wait 80
+scheme (c5-click-press 8)
+wait 150
+scheme (c5-click-check 8)
+wait 80
+scheme (c5-click-press 9)
+wait 150
+scheme (c5-click-check 9)
+wait 80
+scheme (c5-click-press 10)
+wait 150
+scheme (c5-click-check 10)
+wait 80
+scheme (c5-click-press 11)
+wait 150
+scheme (c5-click-check 11)
+wait 80
+scheme (c5-click-press 12)
+wait 150
+scheme (c5-click-check 12)
+wait 80
+scheme (c5-click-press 13)
+wait 150
+scheme (c5-click-check 13)
+wait 80
+scheme (c5-click-press 14)
+wait 150
+scheme (c5-click-check 14)
+wait 80
+scheme (c5-click-press 15)
+wait 150
+scheme (c5-click-check 15)
+wait 80
+scheme (c5-click-press 16)
+wait 150
+scheme (c5-click-check 16)
+wait 80
+scheme (c5-click-press 17)
+wait 150
+scheme (c5-click-check 17)
+wait 80
+scheme (c5-click-press 18)
+wait 150
+scheme (c5-click-check 18)
+wait 80
+scheme (c5-click-press 19)
+wait 150
+scheme (c5-click-check 19)
+wait 80
+scheme (c5-click-press 20)
+wait 150
+scheme (c5-click-check 20)
+wait 80
+scheme (c5-click-press 21)
+wait 150
+scheme (c5-click-check 21)
+wait 80
+scheme (c5-click-press 22)
+wait 150
+scheme (c5-click-check 22)
+wait 80
+scheme (c5-click-press 23)
+wait 150
+scheme (c5-click-check 23)
+wait 80
+scheme (c5-click-press 24)
+wait 150
+scheme (c5-click-check 24)
+wait 80
+scheme (c5-click-press 25)
+wait 150
+scheme (c5-click-check 25)
+wait 80
+scheme (c5-font-done 1)
+wait 300
+scheme (c5-end)
+wait 800
+snapshot math-cursor

@@ -15,11 +15,12 @@ went); add what you find. Paths are relative to the repository root.
 ## Bugs found, not fixed
 
 - **OpenType work, after the audit of 2026-10-13** (`src/doc/opentype-audit.md`,
-  section "State after the fixes", has the full list). Not tried in a window:
-  the cursor under an accent or around a negation in a formula (the boxes
-  are wrapped as the primes are, only the tree-to-box direction is tested),
-  the font design page with its row of variants, the menu Format > Font >
-  Weight. Not compiled anywhere yet: the Linux and Windows branches of the
+  section "State after the fixes", has the full list). Tried in a window on
+  2026-10-18, all as they should be: the cursor in a formula with primes,
+  accents and negations (Vue test `math-cursor`), the font design page with
+  its row of variants (IBM Plex), Format > Font > Weight (with "complex
+  actions" set to menus; the eight weights of IBM Plex, Light applied). Not
+  compiled anywhere yet: the Linux and Windows branches of the
   font path in `src/src/Plugins/Freetype/tt_file.cpp` (TeX Live of any year
   on Linux). Seen and not traced: a bus error at startup (three times, never
   reproduced), four import checks of the suite `latex` which fail on the
