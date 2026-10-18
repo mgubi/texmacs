@@ -45,7 +45,9 @@ the other, and one without both is the TeXmacs of `maxs_texmacs`.
   there (`notify_cursor_in_fold`). Both run in `edit_cursor.cpp`.
 - Scheme commands overloaded by both with `tm-define` (indentation, brackets,
   selection, moves): the last one loaded wins.
-- The Focus menu: entries of both.
+- The Focus menu: entries of both. The keys std ( and std ): the folds of
+  tree-sitter (prog-kbd.scm) and those of the LSP (lsp-kbd.scm, mode in-lsp%,
+  which wins in the files which a server follows).
 - Positions: tree-sitter counts bytes of the Cork strings, the LSP UTF-16
   units (converted in Scheme, character by character).
 - Tabs: `wip_lsp` keeps them as the Cork character `<#9>`; the indentation
@@ -57,6 +59,11 @@ the other, and one without both is the TeXmacs of `maxs_texmacs`.
   does not compile.
 
 ## 3. The common mechanism
+
+The rule (also that of the comparison with the design of the user, which
+says the same): tree-sitter does what has to happen at each key, a server
+refines it when it runs; and what both use is in the core, so that each of
+them can be left out.
 
 Five pieces, in the core (no reference to tree-sitter or to the LSP), which
 the two features use through adapters. The rule: the core defines the
@@ -126,16 +133,25 @@ hover...) ask the providers of the feature, by rank, among those which are
 available for the buffer and the cursor (a grammar is loaded, a server
 follows the file). The default ranks:
 
-- syntax and immediate (colours, brackets, moves, selection, indentation on
-  Return, session input, comments, structural edits): tree-sitter; a server
-  only where there is no grammar (selectionRange, onTypeFormatting);
+- syntax and immediate, at each key (colours, brackets, closing keywords
+  and tags, moves, selection, indentation on Return, session input,
+  comments, structural edits): tree-sitter; a server only where there is no
+  grammar (selectionRange, onTypeFormatting). The formatting of the server
+  stays a command;
 - meaning or project (diagnostics, completion, hover, signature, definitions
   and references over files, rename, fixes, formatting, symbols, calls, hints,
   semantic colours): the server; tree-sitter where there is no server
   (definitions and highlights in the same code, syntax errors as
   diagnostics);
 - both (outline, folds): the server when one follows the file, else
-  tree-sitter.
+  tree-sitter;
+- completion: the server, with tree-sitter giving the context (no completion
+  in a string or a comment) and, without a server, the names of the code
+  (locals, definitions) as completions;
+- errors: both, each as it is. The unmatched brackets of tree-sitter (red)
+  at once, while typing; the diagnostics of the server when they come. The
+  other syntax errors of tree-sitter (ERROR and MISSING nodes) are shown as
+  diagnostics only without a server, which would say the same.
 
 A preference per feature (`code:<feature>`: auto, syntax, server, off). The
 keys and the Focus menu are those of the `code-*` commands, with the entries
@@ -164,7 +180,8 @@ server of each language (`(server "clangd")`), replacing the defaults of
 
 ## 5. Phases
 
-1. Merge (done): `wip_ts` + `wip_lsp`, conflicts resolved conservatively, the
+1. Merge (done; and the later commits of `wip_ts`: closing keywords and
+   tags, fold keys, the browser): `wip_ts` + `wip_lsp`, conflicts resolved conservatively, the
    two mechanisms side by side; the 55 suites pass (treesit 423 checks, lsp
    350). In a window, clangd follows a C file with tabs (colours, folds); the
    C files are not highlighted by tree-sitter yet: the grammar `c` is for the

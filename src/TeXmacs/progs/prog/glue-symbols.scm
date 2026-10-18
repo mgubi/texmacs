@@ -704,6 +704,7 @@
 "syntax-region-statistics"
 "syntax-region-forget"
 "syntax-region-indent"
+"syntax-region-errors-with"
 "syntax-region-node-move"
 "syntax-region-node-info"
 "tree-sitter-set-highlighter"

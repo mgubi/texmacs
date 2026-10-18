@@ -5435,6 +5435,14 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(syntax-region-errors-with <scm-arg|tree> <scm-arg|int> <scm-arg|int> <scm-arg|int> <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|syntax_region_errors_with> which returns
+    <scm|int>.
+  </explain>
+
+  <\explain>
     <scm|(syntax-region-node-move <scm-arg|tree> <scm-arg|int> <scm-arg|int> <scm-arg|int> <scm-arg|int>)>
 <explain-synopsis|no synopsis>
   <|explain>
