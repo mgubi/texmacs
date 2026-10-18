@@ -158,8 +158,15 @@
          (cmd (if (or (os-win32?) (os-mingw?)) (escape-shell (converter-shell-cmd l from to))
              (converter-shell-cmd l from to))))
     ;;(display* "shell: " cmd "\n")
-    (system cmd)
-    (if (url-exists? to) to #f)))
+    ;; (a file which cannot be named, such as a relative url of a file which
+    ;; does not exist yet, would leave out an argument of the command: the
+    ;; program would then write where it runs)
+    (if (or (and (in? 'from l) (== (url-concretize from) ""))
+            (and (in? 'to l) (== (url-concretize to) "")))
+        #f
+        (begin
+          (system cmd)
+          (if (url-exists? to) to #f)))))
 
 (define-public (converter-save s opts)
   "Helper routine for define-format macro"
