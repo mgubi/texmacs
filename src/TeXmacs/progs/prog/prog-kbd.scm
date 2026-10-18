@@ -32,6 +32,9 @@
   ("cmd A-tab" (program-indent-all #f))
   ("std (" (program-fold))
   ("std )" (program-unfold))
+  ;; (from the server which follows the file, else from the syntax tree)
+  ("F12" (code-go-to-definition))
+  ("std O" (code-outline))
   ("structured:cmd delete" (program-remove-structure))
   ("structured:cmd backspace" (program-remove-structure))
 

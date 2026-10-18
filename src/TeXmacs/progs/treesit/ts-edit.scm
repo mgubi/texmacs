@@ -984,6 +984,16 @@
          (ctx (and id (path-context (cursor-path) id))))
     (and ctx (list ctx id (syntax-outline (cadr ctx) lan id)))))
 
+(define-public (syntax-outline-at-cursor)
+  ;; the definitions of the code at the cursor as entries of an outline
+  ;; (level kind name detail path), for progs/code/code-navigate.scm; #f
+  ;; without a syntax tree
+  (let ((o (cursor-outline)))
+    (and o
+         (map (lambda (d) (list 0 (car d) (cadr d) ""
+                                (context-path (car o) (caddr d))))
+              (caddr o)))))
+
 (define-public (syntax-go-to-point ctx point)
   (go-to (context-path ctx point)))
 
@@ -1113,18 +1123,13 @@
     ((eval (string-append (cadr d) " (" (car d) ")"))
      (go-to (caddr d)))))
 
-(tm-menu (focus-extra-menu t)
+(tm-menu (code-syntax-menu)
+  ;; (after the entries of the features of program code, which come from
+  ;; tree-sitter or from a server: progs/code/code-menu.scm)
   (:require (and (in-prog?) (syntax-cursor-language)))
-  (-> "Definitions" (dynamic (syntax-definitions-menu)))
-  ("Go to definition" (syntax-go-to-definition))
   ("Previous definition" (syntax-move-definition -1))
   ("Next definition" (syntax-move-definition 1))
   ("Select definition" (syntax-select-definition))
-  (-> "Folds"
-      ("Fold block" (code-fold))
-      ("Unfold block" (code-unfold))
-      ("Fold all blocks" (code-fold-all))
-      ("Unfold all" (code-unfold-all)))
   (-> "Structure"
       ("Delete node" (syntax-delete-node #t))
       ("Swap with next" (syntax-swap-node #t))

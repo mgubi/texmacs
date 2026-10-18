@@ -28,7 +28,8 @@
 (texmacs-module (lsp lsp-edit)
   (:use (lsp lsp-base)
         (lsp lsp-client)
-        (lsp lsp-documents)))
+        (lsp lsp-documents)
+        (code code-navigate)))
 
 (tm-define (lsp-on?)
   (:synopsis "Do language servers follow the source files?")
@@ -849,12 +850,24 @@
             (with lo (lsp-buffer-line+offset (lsp-ref range "start"))
               (go-to-path (append (buffer-path) lo))))))))
 
-(tm-define (lsp-goto-definition)
-  (:synopsis "Goes to the definition of the symbol at the cursor")
+(tm-define (lsp-definition-at-cursor)
+  (:synopsis "Goes to the definition of the symbol at the cursor, #t if it did")
+  ;; (for code-navigate.scm: #f lets the next provider look for it)
   (with r (request-at-cursor "textDocument/definition" "definitionProvider")
     (with loc (and r (location-of r))
-      (if loc (apply lsp-goto-location loc)
-          (when r (set-message "No definition found" ""))))))
+      (and loc (begin (apply lsp-goto-location loc) #t)))))
+
+(tm-define (lsp-can-find-definitions?)
+  (:synopsis "Does a server which finds definitions follow the buffer?")
+  (and (lsp-on?) (lsp-buffer-followed?)
+       (with c (lsp-buffer-client*)
+         (and c (lsp-client-running? c)
+              (lsp-client-capable? c "definitionProvider")))))
+
+(tm-define (lsp-goto-definition)
+  (:synopsis "Goes to the definition of the symbol at the cursor")
+  ;; (the server first, else the syntax tree: code-navigate.scm)
+  (code-go-to-definition))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Servers

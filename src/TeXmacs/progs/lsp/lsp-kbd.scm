@@ -40,7 +40,6 @@
 
 (kbd-map
   (:mode in-lsp?)
-  ("F12" (lsp-goto-definition))
   ("S-F12" (lsp-hover))
   ("F8" (lsp-next-diagnostic #t))
   ("S-F8" (lsp-next-diagnostic #f))
@@ -49,7 +48,6 @@
   ("std ." (lsp-quick-fix))
   ("std M" (lsp-show-diagnostics-list))
   ("std U" (lsp-references))
-  ("std O" (lsp-outline))
   ("std P" (interactive lsp-find-symbol))
   ("std H" (lsp-call-hierarchy)))
 

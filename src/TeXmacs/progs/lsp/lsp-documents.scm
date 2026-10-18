@@ -418,6 +418,8 @@
     (cond ((and (== lan "cpp") (== suffix "c")) "c")
           ((== lan "javascript")
            (if (in? suffix '("ts" "mts" "cts")) "typescript" "javascript"))
+          ;; (as the table of the program languages says, when it is there)
+          ((defined? 'program-language-lsp-id) (program-language-lsp-id lan))
           (else lan))))
 
 (define (the-buffer opt)

@@ -25,7 +25,9 @@
   (:use (lsp lsp-base)
         (lsp lsp-client)
         (lsp lsp-documents)
-        (lsp lsp-edit)))
+        (lsp lsp-edit)
+        (code code-fold)
+        (code code-navigate)))
 
 (define (goto-command uri line ch)
   (string-append "(lsp-goto-position " (object->string uri) " "
@@ -197,96 +199,49 @@
                                (< (list-ref a 5) (list-ref b 5))))))
             l))))
 
-(define (outline-body c uri entries)
-  (with root (and c (lsp-client-ref c 'root))
-    `(document
-      (strong (concat "Outline of " (verbatim ,(file-label uri root))))
-      ,@(if (null? entries) '("No symbols")
-            (map (lambda (e)
-                   `(action (concat
-                             ,(make-string (* 4 (car e)) #\space)
-                             (with "color" "#606060" ,(cadr e))
-                             " "
-                             (strong (verbatim ,(utf8->cork (caddr e))))
-                             ,@(if (== (cadddr e) "") '()
-                                   (list " "
-                                         `(with "color" "#606060"
-                                            (verbatim
-                                             ,(utf8->cork
-                                               (first-line* (cadddr e))))))))
-                            ,(goto-command uri (list-ref e 4) (list-ref e 5))))
-                 entries)))))
+(tm-define (lsp-can-outline?)
+  (:synopsis "Does a server which gives symbols follow the code at the cursor?")
+  (and (lsp-on?) (lsp-buffer-followed?)
+       (with c (lsp-buffer-client*)
+         (and c (lsp-client-running? c)
+              (lsp-client-capable? c "documentSymbolProvider")))
+       ;; (the cursor in the lines of the buffer, which its server sees)
+       (with c (code-cursor-lines)
+         (and c (tree-eq? (car c) (buffer-get-body (current-buffer)))))))
 
-(define (first-line* s)
-  (with i (string-search-forwards "\n" 0 s)
-    (if (>= i 0) (substring s 0 i) s)))
-
-(define outline-uri #f)        ; the file whose outline is on the page
-(define outline-client #f)
-(define outline-refresh? #f)
-
-(define (outline-page)
-  (aux-name "Outline"))
-
-(define (request-outline c uri handler)
-  ;; asks @c for the symbols of @uri; @handler gets the entries, or #f
-  (lsp-request c "textDocument/documentSymbol"
-               (lsp-object "textDocument" (lsp-object "uri" uri))
-               (lambda (r e)
-                 (handler (and (not e) r (lsp-outline-entries r))))))
-
-(tm-define (lsp-outline)
-  (:synopsis "Shows the outline of the buffer on a page")
+(tm-define (lsp-outline-at-cursor)
+  (:synopsis "The outline of the buffer, for code-navigate.scm")
+  ;; (level kind name detail path), the names in Cork; #f without answer
   (let ((c (lsp-buffer-client*))
         (uri (lsp-buffer-uri)))
-    (cond ((not (and c uri))
-           (set-message "No language server for this buffer" ""))
-          ((not (lsp-client-capable? c "documentSymbolProvider"))
-           (set-message "The language server cannot do this" ""))
-          (else
+    (and c uri
+         (begin
            (lsp-buffer-sync)
            (with a (lsp-request-wait
                     c "textDocument/documentSymbol"
                     (lsp-object "textDocument" (lsp-object "uri" uri))
                     5000)
-             (if (!= (car a) 'result)
-                 (set-message "The language server does not answer" "")
-                 (begin
-                   (set! outline-uri uri)
-                   (set! outline-client c)
-                   (open-auxiliary
-                    "Outline"
-                    `(document (style (tuple "generic"))
-                               (body ,(outline-body
-                                       c uri (lsp-outline-entries
-                                            (cadr a)))))))))))))
+             (and (== (car a) 'result)
+                  (map (lambda (e)
+                         (list (car e) (cadr e)
+                               (utf8->cork (caddr e))
+                               (utf8->cork (first-line* (cadddr e)))
+                               (append (buffer-path)
+                                       (lsp-buffer-line+offset
+                                        (lsp-object
+                                         "line" (lsp-number (list-ref e 4))
+                                         "character"
+                                         (lsp-number (list-ref e 5)))))))
+                       (lsp-outline-entries (cadr a)))))))))
 
-(tm-define (lsp-outline-refresh)
-  (:synopsis "The page of the outline shows the symbols of the file now")
-  (set! outline-refresh? #f)
-  (when (and outline-uri outline-client)
-    (if (not (and (buffer-exists? (outline-page))
-                  (lsp-client-alive? outline-client)))
-        (begin (set! outline-uri #f) (set! outline-client #f))
-        (with uri outline-uri
-          (request-outline
-           outline-client uri
-           (lambda (entries)
-             (when (and entries (== uri outline-uri)
-                        (buffer-exists? (outline-page)))
-               (buffer-set-body (outline-page)
-                                (stree->tree (outline-body outline-client
-                                                           uri entries))))))))))
+(define (first-line* s)
+  (with i (string-search-forwards "\n" 0 s)
+    (if (>= i 0) (substring s 0 i) s)))
 
-(tm-define (lsp-diagnostics-changed uri)
-  ;; (the server publishes its diagnostics once it has seen a change: the
-  ;; outline is asked for again then)
-  (former uri)
-  (when (and (== uri outline-uri) (not outline-refresh?))
-    (set! outline-refresh? #t)
-    (delayed
-      (:pause 300)
-      (lsp-outline-refresh))))
+(tm-define (lsp-outline)
+  (:synopsis "Shows the outline of the buffer on a page")
+  ;; (the page of the features of program code, code-navigate.scm)
+  (code-outline))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The uses of the symbol at the cursor, highlighted

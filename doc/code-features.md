@@ -247,6 +247,27 @@ server of each language (`(server "clangd")`), replacing the defaults of
      texts (the tests of the protocol) keep the former path.
 4. Providers (3.5): the `code-*` commands, the preferences, the menu and keys;
    the commands of both moved behind them; the language table with servers.
+   - Done for the features which both give: the folds (phase 2), the
+     outline and the definitions (`progs/code/code-navigate.scm`: features
+     `outline`, entries (level kind name detail path), and `definition`,
+     which answers #t when it went; `code-outline` shows a page which
+     follows the buffer, `code-definitions-menu`, `code-go-to-definition`).
+     The servers give their symbols and their definitions (also in other
+     files), tree-sitter its tags (also in code blocks). One menu Focus in
+     program code (`progs/code/code-menu.scm`): the entries of the features
+     which a provider serves at the cursor, then those of the syntax tree
+     (`code-syntax-menu`, tree-sitter). The keys F12 (definition) and std O
+     (outline) are those of all program code (prog-kbd.scm), no longer of
+     the files which a server follows only. The table of the program
+     languages has the commands of their servers (`servers`, and `lsp-id`
+     for a languageId which is not the name), which the LSP takes when the
+     table is there (22 languages); C is highlighted by tree-sitter. In a
+     window: in a C file, F12 goes to the definition in another file (the
+     server), the outline page shows its symbols.
+   - Left as they are, given by one of them only: the indentation, the
+     selection, the brackets and the structural edits (tree-sitter), the
+     diagnostics, completion, hovers, references, renames, fixes, symbols of
+     the project and calls (the servers).
 5. Fallbacks across: syntax errors of tree-sitter as diagnostics without a
    server; LSP selectionRange and documentSymbol without a grammar; later,
    servers for code blocks of documents (virtual documents).

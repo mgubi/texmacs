@@ -19,7 +19,12 @@
 
 (texmacs-module (lsp lsp-code)
   (:use (code code-features)
-        (lsp lsp-fold)))
+        (lsp lsp-fold)
+        (lsp lsp-edit)
+        (lsp lsp-navigate)))
 
 (code-provider-set! 'fold-ranges 'server 10 lsp-can-fold? lsp-fold-ranges)
 (code-provider-set! 'fold-all-ranges 'server 10 lsp-can-fold? lsp-all-fold-ranges)
+(code-provider-set! 'outline 'server 10 lsp-can-outline? lsp-outline-at-cursor)
+(code-provider-set! 'definition 'server 10 lsp-can-find-definitions?
+                    lsp-definition-at-cursor)

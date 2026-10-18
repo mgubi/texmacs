@@ -28,3 +28,11 @@
 (code-provider-set! 'fold-all-ranges 'syntax 20
                     (lambda () (and (syntax-cursor-language) #t))
                     syntax-fold-all-ranges)
+
+(code-provider-set! 'outline 'syntax 20
+                    (lambda () (and (syntax-cursor-language) #t))
+                    syntax-outline-at-cursor)
+
+(code-provider-set! 'definition 'syntax 20
+                    (lambda () (and (syntax-cursor-language) #t))
+                    syntax-go-to-definition)

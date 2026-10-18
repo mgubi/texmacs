@@ -14,7 +14,8 @@
 (texmacs-module (prog prog-edit)
   (:use (utils library tree)
         (utils library cursor)
-        (treesit ts-edit)))
+        (treesit ts-edit)
+        (code code-menu)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Basic routines for textual programs

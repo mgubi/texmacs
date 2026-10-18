@@ -749,6 +749,9 @@
     (check= (lsp-project-root path) (lsp-file "proj"))
     (check= (lsp-language-id "c" path) "c")
     (check= (lsp-language-id "cpp" (lsp-file "x.cpp")) "cpp")
+    ;; the servers and the ids of the table of the program languages
+    (check-true (lsp-server-known? "go"))
+    (check= (lsp-language-id "shell" (lsp-file "x.sh")) "shellscript")
     ;; .c and .h files are C (the format c, the language c)
     (check= (url-format (system->url path)) "c")
     (check= (url-format (system->url (lsp-file "x.h"))) "c")

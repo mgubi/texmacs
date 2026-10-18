@@ -52,6 +52,14 @@
 ;; (no texlab for latex: a .tex file is converted to a document, which is
 ;; not its source, and a server would get the text of that document)
 
+;; the servers of the table of the program languages of TeXmacs
+;; (kernel/texmacs/tm-program-languages.scm), when it is there; else those
+;; above
+(when (defined? 'program-language-servers)
+  (for (lan (program-languages))
+    (with cmds (program-language-servers lan)
+      (when (nnull? cmds) (lsp-server-set! lan cmds)))))
+
 (tm-define (lsp-server-known? lan)
   (:synopsis "Is there a language server for @lan (installed or not)?")
   (and (ahash-ref lsp-servers lan) #t))
