@@ -43,6 +43,7 @@
         (check define-test)
         (check latex-test)
         (check formats-test)
+        (check source-files-test)
         (check markdown-test)
         (check office-test)
         (check editing-test)
@@ -143,6 +144,7 @@
     ("trees" trees-test-failures count)
     ("latex" latex-test-failures count)
     ("formats" formats-test-failures count)
+    ("source-files" source-files-test-failures count)
     ("markdown" markdown-test-failures count)
     ("office" office-test-failures count)
     ;; opens buffers and edits them

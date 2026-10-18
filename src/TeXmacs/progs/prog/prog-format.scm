@@ -24,7 +24,7 @@
   (texmacs->verbatim x (acons "texmacs->verbatim:encoding" "SourceCode" '())))
 
 (define (scheme->texmacs x . opts)
-  (verbatim->texmacs x (acons "verbatim->texmacs:encoding" "SourceCode" '())))
+  (code->texmacs x))
 
 (define (scheme-snippet->texmacs x . opts)
   (verbatim-snippet->texmacs x 

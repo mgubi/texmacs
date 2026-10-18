@@ -896,7 +896,8 @@
 
 ;; Each source code format is verbatim with the encoding SourceCode: one
 ;; paragraph per line, the symbols in UTF-8, the ASCII kept as it is (no
-;; quotes of TeX), and back.
+;; quotes of TeX), and back. A document is a source file, which keeps its
+;; tabs, line ends and encoding (see source-files-test.scm).
 (define (test-code-formats)
   (check-group "code formats")
   (for-each
@@ -922,7 +923,10 @@
                           (initial (collection
                                     (associate "language" "verbatim")
                                     (associate "font-family" "tt")
-                                    (associate "par-first" "0cm")))))
+                                    (associate "par-first" "0cm")
+                                    ;; (to save the file as it was)
+                                    (associate "source-encoding" "utf-8")
+                                    (associate "source-line-ends" "unix")))))
        (with code '(document "def f(x):" "    return x <less> 1" "" "# \xe9")
          (check= (import (export code snip) snip) code))))
    code-formats)

@@ -568,6 +568,7 @@
   (cpp-texmacs->verbatim tree_to_verbatim (string tree bool string))
   (cpp-verbatim-snippet->texmacs verbatim_to_tree (tree string bool string))
   (cpp-verbatim->texmacs verbatim_document_to_tree (tree string bool string))
+  (cpp-source->texmacs source_document_to_tree (tree string))
   (parse-latex parse_latex (tree string))
   (parse-latex-document parse_latex_document (tree string))
   (latex->texmacs latex_to_tree (tree tree))
