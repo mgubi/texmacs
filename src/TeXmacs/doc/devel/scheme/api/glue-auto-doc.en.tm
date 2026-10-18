@@ -5963,19 +5963,27 @@ source code.
   </explain>
 
   <\explain>
-    <scm|(lsp-decorate-line <scm-arg|tree> <scm-arg|tree> <scm-arg|tree>)>
+    <scm|(code-set-line-layers <scm-arg|tree> <scm-arg|tree> <scm-arg|tree>)>
 <explain-synopsis|no synopsis>
   <|explain>
-    Calls the <c++> function <cpp|lsp_decorate_line> which returns
+    Calls the <c++> function <cpp|code_set_line_layers> which returns
     <scm|void>.
   </explain>
 
   <\explain>
-    <scm|(lsp-undecorate-line <scm-arg|tree>)>
+    <scm|(code-clear-line-layers <scm-arg|tree>)>
 <explain-synopsis|no synopsis>
   <|explain>
-    Calls the <c++> function <cpp|lsp_undecorate_line> which returns
+    Calls the <c++> function <cpp|code_clear_line_layers> which returns
     <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(code-line-layers <scm-arg|tree>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|code_line_layers_tree> which returns
+    <scm|tree>.
   </explain>
 
   <\explain>

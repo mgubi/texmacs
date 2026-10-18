@@ -210,7 +210,22 @@ server of each language (`(server "clangd")`), replacing the defaults of
      own, without tree-sitter or a server). In a window: in a C++ file, the
      server gives the block, the arrows go over it, Fold all folds the body
      of main.
-   - Positions, line state with layers (colours, hints): next.
+   - Positions (done): `code-column` (tabs at their stops), `code-utf16-column`
+     and `code-utf16-offset` (the units of the servers), `code-indent-end`;
+     used by the LSP (`lsp-offset->character`, `lsp-character->offset`), by
+     the indentation of tree-sitter (`indent_columns`, `trimmed`,
+     `find_delimiter`, `char_column` of `syntax_region.cpp`, now right with
+     tabs), by `prog-edit.scm` and by the typesetter.
+   - Layers (done): the colours and the hints of a line are kept on its
+     highlight observers (`code-set-line-layers`, `code-clear-line-layers`,
+     `code-line-layers`), drawn by `typeset_layered_string` over the colours
+     of the language (those of tree-sitter in a C++ file); an edited line
+     forgets them. `lsp_decorations.cpp` (the hashmap keyed by the
+     addresses of the trees) is gone.
+   - Left for phase 6: `tm_server.cpp` calls `process_all_lsp`, and
+     `prog_language.cpp` wraps the languages of tree-sitter
+     (`tree_sitter_wraps`): the two places where the core names a
+     feature, to be turned into registrations.
 3. Source regions (3.1): the diff out of `syntax_region.cpp`; tree-sitter and
    the LSP as listeners; per-edit timings on large files (s7.c, parser.c).
 4. Providers (3.5): the `code-*` commands, the preferences, the menu and keys;

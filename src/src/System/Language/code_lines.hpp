@@ -24,6 +24,26 @@
 int  code_line_fold_state (tree line);
 void code_set_line_fold_state (tree line, int state);
 
+// layers of a line which a feature draws over the colours of its language:
+// colours of pieces of the line (the semantic tokens of a language server,
+// drawn for the kinds which it gives only) and hints shown before some of
+// its characters (inlay hints), which are not part of the text
+struct code_line_layers {
+  array<int>    col_start;   // the pieces which have a colour of their own
+  array<int>    col_end;
+  array<string> col_color;
+  array<int>    hint_pos;    // the hints, before the character hint_pos
+  array<string> hint_text;
+};
+
+// colours: (tuple (tuple start end color) ...), hints: (tuple (tuple pos
+// text) ...), both in the order of the line
+void code_set_line_layers (tree line, tree colors, tree hints);
+void code_clear_line_layers (tree line);
+// the layers of @line (false: none), and as a tree (tuple colors hints)
+bool code_line_layers_of (tree line, code_line_layers& l);
+tree code_line_layers_tree (tree line);
+
 // positions in a line of program code (a Cork string, see doc/code-features.md):
 // offsets are those of the string; a character of Cork (a byte, or <...>)
 // is one column, a tab (<#9>, see source_document_to_tree) goes to the next

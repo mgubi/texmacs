@@ -50,11 +50,11 @@ class concater_rep {
   void typeset_text_string (tree t, path ip, int start, int end);
   void typeset_math_string (tree t, path ip, int start, int end);
   void typeset_prog_string (tree t, path ip, int start, int end);
-  void typeset_lsp_string (tree t, path ip, int start, int end,
-                           struct lsp_line_decorations* d);
-  void typeset_lsp_hints (struct lsp_line_decorations* d, path ip,
-                          int from, int to);
-  void typeset_lsp_text (string text, path ip);
+  void typeset_layered_string (tree t, path ip, int start, int end,
+                               struct code_line_layers* d);
+  void typeset_layer_hints (struct code_line_layers* d, path ip,
+                            int from, int to);
+  void typeset_layer_text (string text, path ip);
   void typeset_prog_tab (path ip, int pos, int& col, int tw);
   void typeset_prog_piece (string s, path ip, int start, int end,
                            string col, int& column, int tw);

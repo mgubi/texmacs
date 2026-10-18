@@ -13,7 +13,6 @@
 #include "formatter.hpp"
 #include "analyze.hpp"
 #include "boot.hpp"
-#include "lsp_decorations.hpp"
 #include "code_lines.hpp"
 
 lazy make_lazy_vstream (edit_env env, tree t, path ip, tree channel);
@@ -234,9 +233,10 @@ concater_rep::typeset_prog_piece (string s, path ip, int start, int end,
 
 void
 concater_rep::typeset_prog_string (tree t, path ip, int pos, int end) {
-  // (a line which a language server has decorated: see below)
-  lsp_line_decorations* d= lsp_line_decorations_of (t);
-  if (d != NULL) { typeset_lsp_string (t, ip, pos, end, d); return; }
+  // (a line which has layers, given by a language server: see below)
+  code_line_layers layers;
+  if (code_line_layers_of (t, layers)) {
+    typeset_layered_string (t, ip, pos, end, &layers); return; }
   array<space> spc_tab= env->fn->get_normal_spacing (env->spacing_policy);
   string s= t->label;
   int    start;
@@ -277,14 +277,15 @@ concater_rep::typeset_prog_string (tree t, path ip, int pos, int end) {
 }
 
 /******************************************************************************
-* Lines of code decorated by a language server: pieces with colours of
-* their own (semantic tokens) and hints before some characters (inlay
-* hints), which are not part of the text: their boxes have decorated
-* paths, the cursor does not go into them
+* Lines of code with layers (System/Language/code_lines.hpp, which a
+* language server gives): pieces with colours of their own (semantic
+* tokens) and hints before some characters (inlay hints), which are not
+* part of the text: their boxes have decorated paths, the cursor does not
+* go into them
 ******************************************************************************/
 
 void
-concater_rep::typeset_lsp_text (string h, path ip) {
+concater_rep::typeset_layer_text (string h, path ip) {
   // a text which is not part of the document, in grey; its spaces are
   // empty boxes of the width of a space (a space of the text of a program
   // would be shown as a visible space, and spaces which are printed are
@@ -308,18 +309,18 @@ concater_rep::typeset_lsp_text (string h, path ip) {
 }
 
 void
-concater_rep::typeset_lsp_hints (lsp_line_decorations* d, path ip,
-                                 int from, int to) {
+concater_rep::typeset_layer_hints (code_line_layers* d, path ip,
+                                   int from, int to) {
   // the hints before the characters from to to (excluded)
   if (d == NULL) return;
   for (int i=0; i<N(d->hint_pos); i++)
     if (d->hint_pos[i] >= from && d->hint_pos[i] < to)
-      typeset_lsp_text (d->hint_text[i], ip);
+      typeset_layer_text (d->hint_text[i], ip);
 }
 
 void
-concater_rep::typeset_lsp_string (tree t, path ip, int pos, int end,
-                                  lsp_line_decorations* d) {
+concater_rep::typeset_layered_string (tree t, path ip, int pos, int end,
+                                      code_line_layers* d) {
   // as typeset_prog_string, the pieces of a token which have colours of
   // their own typeset apart, and the hints before the tokens (a hint
   // inside a token comes before it)
@@ -334,7 +335,7 @@ concater_rep::typeset_lsp_string (tree t, path ip, int pos, int end,
     start= pos;
     text_property tp= env->lan->advance (t, pos);
     if (pos > end) pos= end;
-    typeset_lsp_hints (d, ip, start, pos);
+    typeset_layer_hints (d, ip, start, pos);
     if ((pos-start == 1) && (s[start]==' ')) { // spaces
       if (start == 0) typeset_substring ("", ip, 0);
       penalty_min (tp->pen_after);
@@ -371,7 +372,7 @@ concater_rep::typeset_lsp_string (tree t, path ip, int pos, int end,
   } while (pos<end);
   // the hints at the end of the line (the marks of the folds are those of
   // bridge_rep::fold_line)
-  if (end == N(s)) typeset_lsp_hints (d, ip, N(s), N(s) + 1);
+  if (end == N(s)) typeset_layer_hints (d, ip, N(s), N(s) + 1);
 }
 
 /******************************************************************************

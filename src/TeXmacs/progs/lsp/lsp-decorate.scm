@@ -14,11 +14,12 @@
 ;; diagnostics then), it is asked for the kinds of its names (semantic
 ;; tokens: functions, types, macros...) and for its inlay hints (the names
 ;; of the parameters before the arguments, the types which are deduced).
-;; They are given to the typesetter line by line (lsp-decorate-line, C++,
-;; lsp_decorations.cpp): the names get the colours of their kinds, the hints
-;; are shown in grey before their characters, and are not part of the text.
-;; The decorations of a line are kept with its text: a line which is edited
-;; loses them until the server has answered again. Only the lines whose
+;; They are given to the typesetter line by line, as the layers of the
+;; lines of the core (code-set-line-layers, System/Language/code_lines.cpp):
+;; the names get the colours of their kinds, over those of the syntax, the
+;; hints are shown in grey before their characters, and are not part of the
+;; text. The layers are kept on the line (its highlight observers): a line
+;; which is edited loses them until the server has answered again. Only the lines whose
 ;; decorations change are typeset again. Keywords, comments, strings and
 ;; numbers keep the colours of the editor (those of the preferences of the
 ;; syntax); the kinds which the editor does not see get theirs.
@@ -143,10 +144,8 @@
                  items)))
 
 ;; uri -> line -> (tree text colors hints): what the lines of the buffer
-;; have now, with their trees and their texts then (the trees are kept here:
-;; the decorations of the typesetter are kept for the addresses of the
-;; trees, which a line made later would otherwise take, see
-;; lsp_decorations.cpp); and uri -> its buffer
+;; were given, with their trees and their texts then (to find the lines
+;; which moved, and those which were edited); and uri -> its buffer
 (define decorated (make-ahash-table))
 (define decorated-buffers (make-ahash-table))
 
@@ -194,7 +193,7 @@
             (if j
                 (ahash-set! kept j #t)
                 (begin
-                  (lsp-decorate-line t
+                  (code-set-line-layers t
                                      (stree->tree (decoration-tree (car (cadr d))))
                                      (stree->tree (decoration-tree (cadr (cadr d)))))
                   (set! changed (cons i changed))))))))
@@ -206,7 +205,7 @@
                (k (line-index t body))
                (o (and k (ahash-ref new k))))
           (when (not (and o (tree-eq? (car o) t)))
-            (lsp-undecorate-line t)
+            (code-clear-line-layers t)
             (when k (set! changed (cons k changed)))))))
     (ahash-set! decorated uri new)
     (ahash-set! decorated-buffers uri u)
@@ -305,7 +304,7 @@
   (with old (ahash-ref decorated uri)
     (when old
       (for (x (ahash-table->list old))
-        (lsp-undecorate-line (cadr x))))
+        (code-clear-line-layers (cadr x))))
     (ahash-remove! decorated uri)
     (ahash-remove! decorated-buffers uri)))
 

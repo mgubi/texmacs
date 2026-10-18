@@ -10149,33 +10149,46 @@ tmg_lsp_document_text (tmscm arg1) {
 }
 
 tmscm
-tmg_lsp_decorate_line (tmscm arg1, tmscm arg2, tmscm arg3) {
-  TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "lsp-decorate-line");
-  TMSCM_ASSERT_TREE (arg2, TMSCM_ARG2, "lsp-decorate-line");
-  TMSCM_ASSERT_TREE (arg3, TMSCM_ARG3, "lsp-decorate-line");
+tmg_code_set_line_layers (tmscm arg1, tmscm arg2, tmscm arg3) {
+  TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "code-set-line-layers");
+  TMSCM_ASSERT_TREE (arg2, TMSCM_ARG2, "code-set-line-layers");
+  TMSCM_ASSERT_TREE (arg3, TMSCM_ARG3, "code-set-line-layers");
 
   tree in1= tmscm_to_tree (arg1);
   tree in2= tmscm_to_tree (arg2);
   tree in3= tmscm_to_tree (arg3);
 
   // TMSCM_DEFER_INTS;
-  lsp_decorate_line (in1, in2, in3);
+  code_set_line_layers (in1, in2, in3);
   // TMSCM_ALLOW_INTS;
 
   return TMSCM_UNSPECIFIED;
 }
 
 tmscm
-tmg_lsp_undecorate_line (tmscm arg1) {
-  TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "lsp-undecorate-line");
+tmg_code_clear_line_layers (tmscm arg1) {
+  TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "code-clear-line-layers");
 
   tree in1= tmscm_to_tree (arg1);
 
   // TMSCM_DEFER_INTS;
-  lsp_undecorate_line (in1);
+  code_clear_line_layers (in1);
   // TMSCM_ALLOW_INTS;
 
   return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_code_line_layers (tmscm arg1) {
+  TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "code-line-layers");
+
+  tree in1= tmscm_to_tree (arg1);
+
+  // TMSCM_DEFER_INTS;
+  tree out= code_line_layers_tree (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return tree_to_tmscm (out);
 }
 
 tmscm
@@ -13326,8 +13339,9 @@ initialize_glue_basic () {
   tmscm_install_procedure ("lsp-alive?",  tmg_lsp_aliveP, 1, 0, 0);
   tmscm_install_procedure ("lsp-stop",  tmg_lsp_stop, 1, 0, 0);
   tmscm_install_procedure ("lsp-document-text",  tmg_lsp_document_text, 1, 0, 0);
-  tmscm_install_procedure ("lsp-decorate-line",  tmg_lsp_decorate_line, 3, 0, 0);
-  tmscm_install_procedure ("lsp-undecorate-line",  tmg_lsp_undecorate_line, 1, 0, 0);
+  tmscm_install_procedure ("code-set-line-layers",  tmg_code_set_line_layers, 3, 0, 0);
+  tmscm_install_procedure ("code-clear-line-layers",  tmg_code_clear_line_layers, 1, 0, 0);
+  tmscm_install_procedure ("code-line-layers",  tmg_code_line_layers, 1, 0, 0);
   tmscm_install_procedure ("code-line-fold-state",  tmg_code_line_fold_state, 1, 0, 0);
   tmscm_install_procedure ("code-set-line-fold-state",  tmg_code_set_line_fold_state, 2, 0, 0);
   tmscm_install_procedure ("code-column",  tmg_code_column, 3, 0, 0);
