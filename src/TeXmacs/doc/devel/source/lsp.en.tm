@@ -52,7 +52,9 @@
 
     \ \ --\<gtr\> lsp-follow-buffer \ --(idle 300 ms)--\<gtr\> lsp-sync-pending
 
-    \ \ --\<gtr\> lsp-buffer-sync \ --\<gtr\> lsp-document-text (the text, in <c++>)
+    \ \ --\<gtr\> lsp-buffer-sync \ --\<gtr\> lsp-document-change-lines
+
+    \ \ --\<gtr\> code-snapshot-change (the lines which differ, in <c++>)
 
     \ \ --\<gtr\> textDocument/didChange (the part which differs, or the
     whole text)
@@ -122,7 +124,8 @@
     edits of the servers: formatting, renames, quick fixes.
 
     <item*|<source-link|lsp-navigate.scm|TeXmacs/progs/lsp/lsp-navigate.scm>>The
-    pages of the references of a symbol and of the outline of a file, the
+    page of the references of a symbol, the provider of the outline of a
+    file (the page is that of the core, <verbatim|code-navigate.scm>), the
     symbols of a project (<verbatim|workspace/symbol>, <key|std P>), the call
     hierarchy (<key|std H>), and the highlights of the symbol at the cursor
     (<verbatim|textDocument/documentHighlight>, the alternative selection

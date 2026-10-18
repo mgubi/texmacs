@@ -595,7 +595,7 @@
 ;; A fold hides the lines of a syntax node after its first one, which gets
 ;; a mark; the last line stays when it is only the closing token of the
 ;; node (}, end...). Folds are a state of the view, kept on the hidden lines
-;; (see tree_sitter_set_fold_state in Plugins/TreeSitter/ts_highlight.cpp),
+;; by the core (progs/code/code-fold.scm, System/Language/code_lines.cpp),
 ;; not markup: the document, its export and the editing of programs do not
 ;; see them, nor what is printed. The state of a line is the number of the
 ;; folds which hide it: folds nest, and unfolding one keeps those inside it.

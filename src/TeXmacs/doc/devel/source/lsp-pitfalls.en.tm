@@ -79,7 +79,13 @@
   actions: the page of the diagnostics, the focus bar, a quick fix, the
   signature, the references and the outline, the highlights, folding and
   unfolding a block, the symbols of the project and the calls, the
-  colours and hints, a rename and the formatting.
+  colours and hints, a rename and the formatting. On a document of the
+  project, it tests the code blocks (the group <verbatim|code blocks>,
+  turned on by <scm|lsp-blocks-force!>, not by the preference): their
+  virtual files, the target at the cursor, their diagnostics at their
+  places, the definition in a block, a paragraph inserted above them, a
+  block removed and one whose language changes, and a place in a block of
+  a closed document.
 
   The suite runs <em|after> <verbatim|kbd-menu> in <scm|check-master>:
   editing a <c++> buffer loads the keyboard maps of programs, and the
@@ -109,7 +115,7 @@
     <item><em|Hooks with <scm|:require> or <scm|:mode> must call
     <scm|former>.> A hook such as <scm|notify-cursor-moved> is redefined by
     several modules: the language servers (<verbatim|lsp-edit>,
-    <verbatim|lsp-navigate>, <verbatim|lsp-fold>) call <scm|former> and have
+    <verbatim|lsp-navigate>) call <scm|former> and have
     no condition, but a definition with a <scm|:require> or a <scm|:mode>
     which holds replaces the definitions loaded before it. If it does not
     call <scm|former>, those are skipped: without it, the highlights of
@@ -123,13 +129,9 @@
     which remembers the last string by <scm|eq?> is only safe while it
     keeps a reference to that string: a string which is freed may have its
     address taken by a new one, which would then be taken for it. The
-    cache <verbatim|plain?> of
-    <source-link|lsp-base.scm|TeXmacs/progs/lsp/lsp-base.scm> (whether a
-    line has one byte and one <name|UTF-16> unit per character) therefore
-    keeps the line which it was asked about in <verbatim|plain-line>. The
     same holds for the trees of the lines which the typesetter knows by
-    their addresses: <verbatim|lsp-decorate> and <verbatim|lsp-fold> keep
-    them while they are decorated or folded.
+    their addresses: <verbatim|lsp-decorate> keeps them (its table
+    <verbatim|decorated>) while they are decorated.
 
     <item><em|<scm|tree-bounding-rectangle> needs an up-to-date
     typesetting.> <scm|show-tooltip> places the balloon of a hover with the
@@ -173,8 +175,9 @@
     <item><em|Long files.> A source file of 100000 lines is a document of
     100000 paragraphs, and a <scheme> list of its lines at each pause of the
     typing, or <scm|list-ref> on such a list for each position, costs much
-    time and memory. The text for the server is therefore built in <c++>
-    (<scm|lsp-document-text>), the requests at the cursor read one line
+    time and memory. The server is therefore given a snapshot of the lines
+    in <c++> (<scm|code-snapshot-new>, <scm|code-snapshot-change>), whose
+    text is made only when it is asked for, the requests at the cursor read one line
     (<scm|lsp-buffer-line>), the edits and the diagnostics use vectors
     (<scm|lsp-line>), and the texts are compared by blocks. Converting a
     whole text between Cork and <name|UTF-8> at once does not work either:

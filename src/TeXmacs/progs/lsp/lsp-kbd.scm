@@ -10,13 +10,15 @@
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;; The keys are those of other editors where TeXmacs leaves them free: F12
-;; for the definition, F8 for the diagnostics; tab completes (lsp-edit,
-;; kbd-variant); std . proposes the fixes, std F formats, std E renames,
-;; std M lists the diagnostics (F2, the key of renames elsewhere, is taken),
-;; std U the references of a symbol, std O the outline of the file, std P
-;; the symbols of the project, std H the calls of a function, std ( and std )
-;; fold and unfold the block at the cursor.
+;; The keys are those of other editors where TeXmacs leaves them free. Those
+;; of the features which tree-sitter gives too are those of all program
+;; code (prog/prog-kbd.scm: F12 the definition, F8 the diagnostics, std O
+;; the outline, std ( and std ) the folds), which ask the server first. Here,
+;; those of a server only: S-F12 the information at the cursor, std . the
+;; fixes, std F formats, std E renames, std M lists the diagnostics (F2,
+;; the key of renames elsewhere, is taken), std U the references of a
+;; symbol, std P the symbols of the project, std H the calls of a function;
+;; tab completes (lsp-edit, kbd-variant).
 ;; NOTE: no A- keys: on macOS option composes a character (option q is
 ;; a ligature), and the key never reaches the editor.
 

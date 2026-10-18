@@ -57,10 +57,15 @@
   as a file is loaded (<scm|source-\<gtr\>cork>: a tab is the character
   <verbatim|\<less\>#9\<gtr\>> of a line, one <name|UTF-16> unit for the
   server; see <hlink|source files|convert-source-files.en.tm>); so are the
-  texts of the edits and of the completions. The text of a
-  buffer, though, is built in <c++> (<scm|lsp-document-text>, see
-  <hlink|the link|lsp-link.en.tm>), without a <scheme> list of its lines:
-  for a long file, such lists at each pause of the typing filled the heap.
+  texts of the edits and of the completions. A buffer, though, is given
+  to its server from a <em|snapshot> of its lines in <c++>
+  (<scm|code-snapshot-new>, <scm|code-snapshot-change>,
+  <source-link|code_regions.cpp|src/System/Language/code_regions.cpp>),
+  which gives the text and then the part of it which changed, without a
+  <scheme> list of its lines: for a long file, such lists at each pause of
+  the typing filled the heap (<scm|lsp-document-text>, of
+  <hlink|the link|lsp-link.en.tm>, gives the whole text of lines, for the
+  documents without a snapshot).
   <scm|lsp-lines-\<gtr\>text> remains for the tests and the texts which
   are not buffers. <scm|(lsp-line lines i)> gives a line of a list or of a
   vector (<scm|""> if there is none): a vector when many lines of a long
@@ -75,8 +80,10 @@
   the middle of a Cork character goes to its start, one beyond the end of
   the line to its end; in a line whose characters are all of one byte and
   one unit, without the <verbatim|\<less\>> of the special characters of
-  Cork, <scm|lsp-character-\<gtr\>offset> gives the character itself, and the last line asked about is remembered, since
-  the tokens of a line come together), and <scm|lsp-position> and
+  Cork, <scm|lsp-character-\<gtr\>offset> gives the character itself).
+  Both are those of the core, <scm|code-utf16-column> and
+  <scm|code-utf16-offset>
+  (<source-link|code_lines.cpp|src/System/Language/code_lines.cpp>), and <scm|lsp-position> and
   <scm|lsp-position-\<gtr\>line+offset> convert whole positions.
 
   <paragraph*|URIs>
@@ -247,7 +254,9 @@
 
   <source-link|lsp-documents.scm|TeXmacs/progs/lsp/lsp-documents.scm> keeps,
   per client, the open documents by <abbr|URI>, each with its version, its
-  last text and its language id. <scm|lsp-document-open> sends
+  last text (or <scm|#f>), its language id and, for the lines of a buffer,
+  the snapshot of the lines which the server has
+  (<scm|lsp-document-open-lines>, <scm|lsp-document-change-lines>). <scm|lsp-document-open> sends
   <verbatim|textDocument/didOpen> (or changes a document which is open
   already); <scm|lsp-document-change> sends
   <verbatim|textDocument/didChange> with a higher version, only if the text
@@ -322,8 +331,8 @@
   needed, <scm|lsp-buffer-client*> only a live one which exists already
   (<scm|lsp-client-find>); <scm|lsp-buffer-open>, <scm|lsp-buffer-sync> and
   <scm|lsp-buffer-close> open, update and close the document of a buffer,
-  with its text from <scm|lsp-buffer-text> (<scm|lsp-document-text> of its
-  body), and <scm|lsp-cursor-position> gives the position of the cursor in
+  from a snapshot of its lines (in a document, of each of its code
+  blocks), and <scm|lsp-cursor-position> gives the position of the cursor in
   the protocol. All of them take the current buffer by default.
 
   The requests at the cursor read one line only, not all the lines of the

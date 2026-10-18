@@ -6,11 +6,11 @@
   <tmdoc-title|The features of program code: syntax trees and language
   servers>
 
-  Two features know program code: tree-sitter (the syntax of a piece of
-  code, at once, in source files, code blocks and sessions: the chapter
-  <verbatim|doc/tree-sitter.md> of the sources) and the <hlink|language
-  servers|lsp.en.tm> (the meaning of the code, over a project, after a
-  while, in source files). Either may be left out of a build
+  Two features know program code: <hlink|tree-sitter|treesit.en.tm> (the
+  syntax of a piece of code, at once, in source files, code blocks and
+  sessions) and the <hlink|language servers|lsp.en.tm> (the meaning of the
+  code, over a project, after a while, in source files and, when the user
+  asks for it, in the code blocks of documents). Either may be left out of a build
   (<verbatim|--disable-tree-sitter>, <verbatim|--disable-lsp>, in
   <source-link|tm_code.m4|misc/m4/tm_code.m4>; <verbatim|USE_TREE_SITTER>,
   <verbatim|USE_LSP> in CMake). What both use is in the core, which names
@@ -75,7 +75,12 @@
   (rank 10, <scm|'server>), which are loaded when their feature is part of
   the build (its glue). Without tree-sitter, its functions which the
   editing of programs calls answer that the code has no syntax tree
-  (<source-link|code-syntax-none.scm|TeXmacs/progs/code/code-syntax-none.scm>).
+  (<source-link|code-syntax-none.scm|TeXmacs/progs/code/code-syntax-none.scm>):
+  the modules which call them load
+  <source-link|code-syntax.scm|TeXmacs/progs/code/code-syntax.scm>, which
+  loads <source-link|ts-edit.scm|TeXmacs/progs/treesit/ts-edit.scm> or those stubs. <scm|code-ask> goes to the
+  next provider when one answers <scm|#f> or <scm|'()>: a server which
+  has no block at the cursor lets tree-sitter fold.
 
   <\description>
     <item*|<source-link|code-fold.scm|TeXmacs/progs/code/code-fold.scm>>The
@@ -83,8 +88,11 @@
     <scm|'fold-all-ranges>) from the server when one follows the file,
     else from the syntax tree; the cursor (<scm|code-cursor-in-fold>,
     called by <source-link|edit_cursor.cpp|src/Edit/Interface/edit_cursor.cpp>
-    with the last place of the cursor outside of the folds): the arrows go
-    over a fold, a jump opens the folds around, from the innermost.
+    with the last place of the cursor of its editor outside of the folds):
+    the arrows go over a fold, a jump opens the folds around, from the
+    innermost. A fold nests in another one (at most 9 deep: the states of
+    the lines); the first line of a fold ends with a mark, which the bridge
+    of the line adds when the next line is hidden.
 
     <item*|<source-link|code-navigate.scm|TeXmacs/progs/code/code-navigate.scm>>The
     outline (<scm|'outline>, std O, a page which follows the buffer) and the
@@ -103,14 +111,47 @@
 
     <item*|<source-link|code-menu.scm|TeXmacs/progs/code/code-menu.scm>>The
     menu <menu|Focus> of program code: the entries of the features which a
-    provider serves at the cursor, then those of the syntax tree
-    (<scm|code-syntax-menu>).
+    provider serves at the cursor, the diagnostics, then those which only a
+    server gives (<scm|code-server-menu>, from <verbatim|lsp-code.scm>) and
+    those of the syntax tree (<scm|code-syntax-menu>, from
+    <verbatim|ts-edit.scm>), and those of a session or a program input.
   </description>
+
+  <section|The code blocks of documents>
+
+  The language servers see a code block of a document (when the
+  preference <verbatim|lsp:code blocks> is on) as a file of its own, which
+  is never written: <source-link|lsp-blocks.scm|TeXmacs/progs/lsp/lsp-blocks.scm>.
+  The functions of the buffer of the servers, called without a buffer,
+  are those of the <em|target>, the code at the cursor: the lines of a
+  source file, or of the block (<scm|lsp-target-root>, and
+  <scm|lsp-target-base>, the path of its lines); the features of program
+  code are given at the cursor in the same way in both. The diagnostics of
+  all the blocks of a document are those of the source <scm|'server> of
+  <source-link|code-diagnostics.scm|TeXmacs/progs/code/code-diagnostics.scm>, each at the place of its block.
+
+  <section|The tokens of the typesetting>
+
+  A line of program code is typeset as tokens (<cpp|typeset_prog_string>,
+  <source-link|concat_text.cpp|src/Typeset/Concat/concat_text.cpp>), which
+  the language of the line gives (<cpp|advance>, <cpp|get_color>). Where
+  tree-sitter colours a line, they are the leaves of its syntax tree, cut
+  at the spaces (<hlink|highlighting|treesit-highlight.en.tm>); elsewhere,
+  those of the language of <TeXmacs> (<hlink|syntax
+  highlighting|syntax-highlighting.en.tm>). The layers of the servers are
+  drawn over either.
 
   The suite <verbatim|code>
   (<source-link|code-test.scm|TeXmacs/progs/check/code-test.scm>) tests the
   core with providers of its own, in every build; the suites
   <verbatim|treesit> and <verbatim|lsp> run when their feature is there.
+
+  <\traverse>
+    <branch|Adding a feature or a provider|code-features-howto.en.tm>
+
+    <branch|Pitfalls of the features of program
+    code|code-features-pitfalls.en.tm>
+  </traverse>
 
   <tmdoc-copyright|2026|the <TeXmacs> team>
 

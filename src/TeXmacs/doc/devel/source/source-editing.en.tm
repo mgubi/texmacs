@@ -32,6 +32,8 @@
     <branch|The graphics editor|graphics-editor.en.tm>
 
     <branch|Syntax highlighting and programming languages|syntax-highlighting.en.tm>
+
+    <branch|Syntax trees of program code: tree-sitter|treesit.en.tm>
   </traverse>
 
   <tmdoc-copyright|2026|the <TeXmacs> team>

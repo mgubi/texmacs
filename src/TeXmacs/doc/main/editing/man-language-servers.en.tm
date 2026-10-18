@@ -27,17 +27,7 @@
   <verbatim|PATH>. For each format of source files, <TeXmacs> knows the
   following servers and uses the first one which is installed:
 
-  <\big-table|<tabular|<tformat|<cwith|1|1|1|-1|font-series|bold>|<table|<row|<cell|Format>|<cell|Command
-  of the server>>|<row|<cell|C (<verbatim|c>), <c++>
-  (<verbatim|cpp>)>|<cell|<verbatim|clangd>>>|<row|<cell|<name|Python>
-  (<verbatim|python>)>|<cell|<verbatim|pylsp>>>|<row|<cell|>|<cell|<verbatim|pyright-langserver
-  --stdio>>>|<row|<cell|>|<cell|<verbatim|basedpyright-langserver
-  --stdio>>>|<row|<cell|<name|JavaScript>
-  (<verbatim|javascript>)>|<cell|<verbatim|typescript-language-server
-  --stdio>>>|<row|<cell|<name|JSON> (<verbatim|json>)>|<cell|<verbatim|vscode-json-language-server
-  --stdio>>>|<row|<cell|<name|Java> (<verbatim|java>)>|<cell|<verbatim|jdtls>>>|<row|<cell|<name|Scala>
-  (<verbatim|scala>)>|<cell|<verbatim|metals>>>|<row|<cell|<name|Julia>
-  (<verbatim|julia>)>|<cell|<verbatim|julia-language-server>>>>>>>
+  <\big-table|<tabular|<tformat|<cwith|1|1|1|-1|font-series|bold>|<table|<row|<cell|Format>|<cell|Command of the server>>|<row|<cell|C (<verbatim|c>), <c++> (<verbatim|cpp>)>|<cell|<verbatim|clangd>>>|<row|<cell|<name|Fortran> (<verbatim|fortran>)>|<cell|<verbatim|fortls>>>|<row|<cell|<name|Python> (<verbatim|python>)>|<cell|<verbatim|pylsp>>>|<row|<cell|>|<cell|<verbatim|pyright-langserver --stdio>>>|<row|<cell|>|<cell|<verbatim|basedpyright-langserver --stdio>>>|<row|<cell|<name|Julia> (<verbatim|julia>)>|<cell|<verbatim|julia-language-server>>>|<row|<cell|<name|Java> (<verbatim|java>)>|<cell|<verbatim|jdtls>>>|<row|<cell|<name|JavaScript> (<verbatim|javascript>), <name|TypeScript> (<verbatim|typescript>)>|<cell|<verbatim|typescript-language-server --stdio>>>|<row|<cell|<name|JSON> (<verbatim|json>)>|<cell|<verbatim|vscode-json-language-server --stdio>>>|<row|<cell|<name|Scala> (<verbatim|scala>)>|<cell|<verbatim|metals>>>|<row|<cell|Shell (<verbatim|shell>)>|<cell|<verbatim|bash-language-server start>>>|<row|<cell|<name|Go> (<verbatim|go>)>|<cell|<verbatim|gopls>>>|<row|<cell|<name|Lean> (<verbatim|lean>)>|<cell|<verbatim|lake serve>>>|<row|<cell|<name|Lua> (<verbatim|lua>)>|<cell|<verbatim|lua-language-server>>>|<row|<cell|<name|Rust> (<verbatim|rust>)>|<cell|<verbatim|rust-analyzer>>>|<row|<cell|HTML (<verbatim|html>)>|<cell|<verbatim|vscode-html-language-server --stdio>>>|<row|<cell|CSS (<verbatim|css>)>|<cell|<verbatim|vscode-css-language-server --stdio>>>|<row|<cell|TOML (<verbatim|toml>)>|<cell|<verbatim|taplo lsp stdio>>>|<row|<cell|YAML (<verbatim|yaml>)>|<cell|<verbatim|yaml-language-server --stdio>>>|<row|<cell|<name|Haskell> (<verbatim|haskell>)>|<cell|<verbatim|haskell-language-server-wrapper --lsp>>>|<row|<cell|<name|OCaml> (<verbatim|ocaml>)>|<cell|<verbatim|ocamllsp>>>>>>>
     The language servers known by <TeXmacs>.
   </big-table>
 
@@ -63,9 +53,13 @@
   stops all the servers; when it is checked again, they are started again
   as the files need them.
 
-  The keys described below work in the files which a server follows;
-  elsewhere, <key|F12> and <key|S-F12> keep their usual meaning (in
-  presentations).
+  <key|S-F12> and the keys <key|std F>, <key|std E>, <key|std .>,
+  <key|std M>, <key|std U>, <key|std P> and <key|std H> described below work
+  in the files which a server follows; elsewhere, <key|S-F12> keeps its
+  usual meaning (in presentations). <key|F12>, <key|std O>, <key|F8> and
+  the keys of the folds work in all program code: from the server where
+  one follows it, else from the syntax tree (see <hlink|editing program
+  code|man-program-code.en.tm>).
 
   The setting is the preference <verbatim|lsp> (<verbatim|on> or
   <verbatim|off>). Only files on disk are followed. The other preferences of
@@ -81,7 +75,7 @@
   code>, in a language which has a server) are followed too, each block as
   a file of its own: the server sees a file next to the document, named
   after it (<verbatim|.notes.tm-block1.cpp> for the first block of
-  <verbatim|notes.tm>), which is never written, in the project of the
+  <verbatim|notes.tm> given to a server; a block keeps its number), which is never written, in the project of the
   document. In a block, the diagnostics, the completion, the information
   at the cursor, the definitions, the references, the outline, the folds,
   formatting, renaming and quick fixes work as in a source file; the names
@@ -155,12 +149,12 @@
   The language of a file is its format (<verbatim|cpp>, <verbatim|c>,
   <verbatim|python>...) or, for a buffer in program mode, its programming
   language. A server can be given in the same way for another language,
-  but only once <TeXmacs> has a format for its files: there is none for
-  <name|Rust>, for instance, and one has to be defined first (by a
-  plugin). With a format <verbatim|rust>, the server would be given by
+  but only once <TeXmacs> has a format for its files (defined by a plugin,
+  for a language which has none). With a format <verbatim|zig>, for
+  instance, the server would be given by
 
   <\scm-code>
-    (lsp-server-set! "rust" '("rust-analyzer"))
+    (lsp-server-set! "zig" '("zls"))
   </scm-code>
 
   <paragraph*|Diagnostics>
@@ -204,6 +198,9 @@
   <\description>
     <item*|<menu|Follow source files>>Whether the servers follow the source
     files (see above).
+
+    <item*|<menu|Follow the code blocks of documents>>Whether they follow
+    the code blocks of the documents too (see above).
 
     <item*|<menu|Find references>, <menu|Outline>, <menu|Find symbol in
     project...>, <menu|Calls>>As <key|std U>, <key|std O>, <key|std P> and
@@ -349,7 +346,8 @@
   <paragraph*|Folding>
 
   <key|std (> folds the block at the cursor (the body of a function, a
-  class, a loop...: the blocks are those of the server): its first line
+  class, a loop...: the blocks are those of the server, else those of the
+  syntax tree): its first line
   stays, ended by an ellipsis, and its other lines are no longer shown.
   <key|std )> unfolds it; <menu|Tools|Language servers|Fold all> folds all
   the blocks, and <menu|Unfold all> shows them again.
@@ -360,10 +358,11 @@
   (right at the end of the line, or down) goes to the line after it,
   moving back from the line after it (left at its start, or up) goes to
   its first line, and a block where the cursor comes otherwise (a search,
-  a definition, a diagnostic) opens. A block whose first line is replaced
-  or whose lines are removed or moved by an edit opens too (the blocks
-  folded in it stay folded). The blocks open when the file is saved under
-  another name and when the language servers are turned off.
+  a definition, a diagnostic) opens. A hidden line which is edited is
+  shown again; the folds stay with their lines when other lines are
+  inserted or removed. The folds are those of all program code (see
+  <hlink|editing program code|man-program-code.en.tm>): they stay when the
+  language servers are turned off.
 
   <paragraph*|Colours and inlay hints>
 

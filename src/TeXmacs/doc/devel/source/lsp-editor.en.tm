@@ -11,9 +11,10 @@
 
   <section|Loading>
 
-  <source-link|init-texmacs.scm|TeXmacs/progs/init-texmacs.scm> declares
-  <scm|(lazy-keyboard (lsp lsp-kbd) in-prog?)> and <scm|(lazy-menu (lsp
-  lsp-kbd) lsp-menu)>, and, when the preference <verbatim|lsp> is not
+  In a build with the servers (the glue routine <scm|lsp-start> is
+  defined), <source-link|init-texmacs.scm|TeXmacs/progs/init-texmacs.scm>
+  declares <scm|(lazy-keyboard (lsp lsp-kbd) in-prog?)> and
+  <scm|(lazy-menu (lsp lsp-kbd) lsp-menu)>, and, when the preference <verbatim|lsp> is not
   <verbatim|off>, loads <verbatim|(lsp lsp-kbd)> after an idle second, so
   that the source files are followed without a key or the menu being used
   first. <verbatim|lsp-kbd> uses <verbatim|lsp-edit>, which uses the other
@@ -70,11 +71,25 @@
   a file which has just been loaded.
 
   <scm|version-notify-saved> gives the text at once and then sends
-  <verbatim|didSave>; <scm|notify-buffer-closed> sends <verbatim|didClose>
+  <verbatim|didSave> (in a document, it looks for all its code blocks
+  again, <scm|lsp-blocks-rescan>); <scm|notify-buffer-closed> sends <verbatim|didClose>
   for a followed buffer and forgets it (a renamed buffer is followed under
   its new name at its next change). <scm|lsp-buffer-followed?> tells whether
   the current buffer is followed (the table <verbatim|followed>, without
   mode predicates).
+
+  In a document which is not a source file, with the preference
+  <verbatim|lsp:code blocks> on, the code blocks are followed
+  (<source-link|lsp-blocks.scm|TeXmacs/progs/lsp/lsp-blocks.scm>): the
+  document is in <verbatim|followed>, and <scm|lsp-buffer-sync> of it gives
+  each block to its server as a virtual file. The functions of the buffer
+  without a buffer argument are those of the <em|target>, the code at the
+  cursor: a block, or the lines of a source file (<scm|lsp-target-root>,
+  <scm|lsp-target-base>, in
+  <source-link|lsp-documents.scm|TeXmacs/progs/lsp/lsp-documents.scm>), so
+  that the requests at the cursor go to the server of the block; a buffer
+  is followed at the cursor (<scm|lsp-buffer-followed?>) when it is a
+  source file or the cursor is in one of its blocks.
 
   <section|Diagnostics>
 
@@ -131,8 +146,13 @@
   line of the message of the diagnostic at the cursor (errors first), as
   <verbatim|Error: ...>, <verbatim|Warning: ...> or <verbatim|Note: ...>;
   the message is cleared when the cursor leaves it.
-  <scm|lsp-next-diagnostic> goes to the start of the next (or previous)
-  diagnostic of <verbatim|shown>, and wraps around.
+  <scm|lsp-next-diagnostic> (the menu of the servers) goes to the start of
+  the next (or previous) diagnostic of <verbatim|shown>, and wraps around;
+  <key|F8> is <scm|code-next-diagnostic> of the core, which goes through
+  the diagnostics of all the sources of the buffer. In a document, the
+  diagnostics of all its blocks are drawn, each at the place of its block
+  (<verbatim|draw-diagnostics>), again after each change of the document
+  (a paragraph inserted above a block moves it).
 
   <section|Requests at the cursor>
 
@@ -247,12 +267,14 @@
   one with its line: that of the buffer of the file if it is open, else of
   the file on disk. At most 2000 references are shown.
 
-  <scm|lsp-outline> (<key|std O>) asks for
-  <verbatim|textDocument/documentSymbol>; <scm|lsp-outline-entries> turns
-  the answer into lines (depth, kind, name, detail, position): nested
-  DocumentSymbols in their order, or flat SymbolInformations sorted by
-  position. The page is asked for again (asynchronously) when the server
-  publishes the diagnostics of its file, as long as it is open.
+  The outline (<key|std O>, <scm|code-outline> of the core, which
+  <scm|lsp-outline> calls) asks the provider <scm|lsp-outline-at-cursor>,
+  which asks for <verbatim|textDocument/documentSymbol>;
+  <scm|lsp-outline-entries> turns the answer into lines (depth, kind,
+  name, detail, position): nested DocumentSymbols in their order, or flat
+  SymbolInformations sorted by position. The page is made again by the
+  core (<source-link|code-navigate.scm|TeXmacs/progs/code/code-navigate.scm>)
+  after a pause in the changes of its buffer, as long as it is open.
 
   <scm|lsp-find-symbol> (<key|std P>) asks for
   <verbatim|workspace/symbol> with the name which it is given and lists at
@@ -426,16 +448,21 @@
   <scm|in-lsp%>, <scm|(lsp-followed?)> within <scm|in-prog%>: a buffer which
   a server follows, while the preference <verbatim|lsp> is on
   (<scm|lsp-followed?> uses <scm|lsp-buffer-followed?>). Elsewhere
-  <key|F12> and <key|S-F12> keep their meaning (the slides, the folds). It
-  binds, in the mode <scm|in-lsp?>, <key|F12> to <scm|lsp-goto-definition>,
-  <key|S-F12> to <scm|lsp-hover>, <key|F8> and <key|S-F8> to
-  <scm|lsp-next-diagnostic>, <key|std F> to <scm|lsp-format>, <key|std E> to
-  the rename, <key|std .> to <scm|lsp-quick-fix>, <key|std M> to
+  <key|S-F12> keeps its meaning (the slides). It binds, in the mode
+  <scm|in-lsp?>, the keys which only a server serves: <key|S-F12> to
+  <scm|lsp-hover>, <key|std F> to <scm|lsp-format>, <key|std E> to the
+  rename, <key|std .> to <scm|lsp-quick-fix>, <key|std M> to
   <scm|lsp-show-diagnostics-list> (<key|F2>, the key of renames in other
-  editors, is taken), <key|std U> to <scm|lsp-references>, <key|std O> to
-  <scm|lsp-outline>, <key|std P> to <scm|lsp-find-symbol> (interactive),
-  <key|std H> to <scm|lsp-call-hierarchy>, <key|std (> to <scm|lsp-fold>
-  and <key|std )> to <scm|lsp-unfold>, and defines <scm|lsp-menu>.
+  editors, is taken), <key|std U> to <scm|lsp-references>, <key|std P> to
+  <scm|lsp-find-symbol> (interactive) and <key|std H> to
+  <scm|lsp-call-hierarchy>, and defines <scm|lsp-menu>. The keys of the
+  features which tree-sitter gives too are those of all program code, in
+  <source-link|prog-kbd.scm|TeXmacs/progs/prog/prog-kbd.scm>: <key|F12>
+  (<scm|code-go-to-definition>), <key|std O> (<scm|code-outline>),
+  <key|F8> and <key|S-F8> (<scm|code-next-diagnostic>), <key|std (> and
+  <key|std )> (the folds of the core); they ask the server first where one
+  follows the code (<hlink|the features of program
+  code|code-features.en.tm>).
 
   <section|The status bar and the font of source files>
 

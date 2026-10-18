@@ -32,7 +32,7 @@ the other, and one without both is the TeXmacs of `maxs_texmacs`.
 | highlights of a name | (locals, not done) | documentHighlight |
 | only it | moves, selection, brackets, structural edits, indentation, session input, comments | diagnostics, completion, hover, signature, references, rename, fixes, formatting, symbols, calls, inlay hints |
 
-## 2. Where they meet today (in this merge)
+## 2. Where they met at the merge (before phase 2; see the phases for now)
 
 - The typesetter: `prog_language` returns a tree-sitter wrapper (colours in
   the highlight observers of the lines, codes >= 1000000); `typeset_prog_string`
@@ -256,7 +256,8 @@ server of each language (`(server "clangd")`), replacing the defaults of
      files), tree-sitter its tags (also in code blocks). One menu Focus in
      program code (`progs/code/code-menu.scm`): the entries of the features
      which a provider serves at the cursor, then those of the syntax tree
-     (`code-syntax-menu`, tree-sitter). The keys F12 (definition) and std O
+     (`code-syntax-menu`, tree-sitter); later also the diagnostics and the
+     entries of a server only (`code-server-menu`, lsp-code.scm). The keys F12 (definition) and std O
      (outline) are those of all program code (prog-kbd.scm), no longer of
      the files which a server follows only. The table of the program
      languages has the commands of their servers (`servers`, and `lsp-id`
@@ -304,9 +305,10 @@ server of each language (`(server "clangd")`), replacing the defaults of
      languages by `set_prog_language_wrapper`, the servers process their
      messages by `add_link_processor` (registered at the first lsp-start).
      In Scheme, a feature is there when its glue is (`tree-sitter-program-language`,
-     `lsp-start`): the adapters are loaded then, prog-edit.scm loads
-     ts-edit.scm or else code-syntax-none.scm (its functions answer that
-     there is no syntax tree), the LSP is started and its menu shown only
+     `lsp-start`): the adapters are loaded then, the modules of the editing
+     of programs (prog-edit, session-edit, program-edit) load
+     code-syntax.scm, which loads ts-edit.scm or else code-syntax-none.scm
+     (its functions answer that there is no syntax tree), the LSP is started and its menu shown only
      then, and check-master skips the suites of a missing feature.
    - Docs: the page "Editing program code" says what comes from which; the
      developer page "The features of program code" (devel/source/code-features.en.tm)

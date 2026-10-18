@@ -72,8 +72,9 @@
   <paragraph*|Folds>
 
   <shortcut|(program-fold)> folds the block at the cursor: its lines are
-  hidden, but the first one, which ends with <verbatim|...>, and the
-  closing line of the block. <shortcut|(program-unfold)> unfolds it.
+  hidden, but the first one, which ends with <verbatim|...>, and, for the
+  blocks of the syntax tree, the closing line of the block (those of a
+  server end where it says). <shortcut|(program-unfold)> unfolds it.
   <menu|Focus|Folds> also folds all the blocks, and unfolds all. Folds nest:
   folding a block around a fold keeps it, and unfolding the outer one shows
   it folded again. Folds change what is shown, not the document: the hidden
