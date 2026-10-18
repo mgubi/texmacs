@@ -216,7 +216,7 @@ editor windows).
 
 ## Documentation
 
-* Help ▸ TeXmacs Upsilon features, in TeXmacs: what this branch brings, for
+* Help ▸ Upsilon features, in TeXmacs: what this branch brings, for
   its users, with links to the pages of the manual
   ([`src/TeXmacs/doc/about/welcome/upsilon-texmacs.en.tm`](src/TeXmacs/doc/about/welcome/upsilon-texmacs.en.tm))
 * [src/TeXmacs/doc/devel/](src/TeXmacs/doc/devel/): the developer

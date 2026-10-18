@@ -34,7 +34,7 @@
 	("Welcome" (load-help-article "about/welcome/new-welcome"))
 	("Getting started" (load-help-article "about/welcome/start"))
 	(when (url-exists-in-help? "about/welcome/upsilon-texmacs.en.tm")
-	  ("TeXmacs Upsilon features"
+	  ("Upsilon features"
 	   (load-help-article "about/welcome/upsilon-texmacs")))
 	;; the browser build (web-files is defined by the Vue plugin there)
 	(if (defined? 'web-files)

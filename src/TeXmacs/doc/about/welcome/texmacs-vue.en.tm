@@ -74,7 +74,7 @@
     <with|font-series|bold|What does not work> below).
   </itemize>
 
-  <menu|Help|TeXmacs Upsilon features> describes what this version of
+  <menu|Help|Upsilon features> describes what this version of
   <TeXmacs> adds to the official one, in the browser and on the desktop.
 
   <section|Your files>
@@ -293,7 +293,7 @@
     <TeXmacs> Upsilon. <name|Vue> remains the name of the
     interface.
 
-    <item><menu|Help|TeXmacs Upsilon features>, a new page, says what this
+    <item><menu|Help|Upsilon features>, a new page, says what this
     version of <TeXmacs> adds to the official one; this page has a section
     <with|font-series|bold|What works in the page>.
 
