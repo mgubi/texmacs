@@ -1,0 +1,30 @@
+No signal mask saved by the jumps of s7_call and the like (TeXmacs)
+
+s7 saves the place to jump to on an error, throw or call-with-exit with
+sigsetjmp (buf, 1) in set_jump_info, at each s7_call, s7_read,
+s7_load... Saving the signal mask is a system call (sigprocmask): about
+10% of the time of the external scanners of tree-sitter, which C calls
+for nearly every token. These jumps never leave a signal handler (the
+only one which does, siglet of s7_is_valid for SIGSEGV, keeps its mask),
+so the mask is the same when they jump as when it was saved, and there
+is nothing to restore: savemask 0. On Windows s7 uses setjmp, which
+saves no mask either. Parses with a Scheme scanner were 7 to 10% faster.
+
+--- a/s7.c
++++ b/s7.c
+@@ -32131,11 +32131,14 @@
+       LongJmp(*(Sc->Goto_Start), Error_Jump);	\
+   } while (0)
+ 
++/* TeXmacs: no signal mask saved (savemask 0): these jumps never leave a
++ *   signal handler, and saving the mask is a system call at each s7_call
++ */
+ #define set_jump_info(Sc, Tag)			\
+   do {						\
+     Sc->longjmp_ok = true;			\
+     Sc->setjmp_loc = Tag;			\
+-    jump_loc = (jump_loc_t)SetJmp(new_goto_start, 1);	\
++    jump_loc = (jump_loc_t)SetJmp(new_goto_start, 0);	\
+     Sc->Goto_Start = &new_goto_start;		\
+   } while (0)
+ 
