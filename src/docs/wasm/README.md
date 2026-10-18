@@ -315,6 +315,25 @@ repaints at zoom 2, where the bitmaps of the glyphs are made, cost 0.4 ms
 of CPU a frame instead of 1.2 ms, and the other phases are the same or a
 little faster.
 
+`?gpu=webgpu` (2026-10-18, a test for now) draws with WebGPU instead of
+WebGL2: the backend `src/Plugins/Vue/gpu_backend_wg.cpp` (the shaders of
+the GL backend in WGSL), ThorVG's WebGPU engine for the shapes (ThorVG is
+built with both engines, `build-thorvg.sh`), and Dawn's `webgpu.h` for
+Emscripten (the port emdawnwebgpu, `--use-port=emdawnwebgpu`). The same
+backend draws the WASIX build over its stream (`docs/wasix/README.md`).
+The device of WebGPU comes asynchronously and the program cannot wait
+(no ASYNCIFY): `web-pre.js` asks for it before TeXmacs starts (a dependency
+of the run) and gives it in `Module.preinitializedWebGPUDevice`, which the
+backend takes (`emscripten_webgpu_get_device`); without WebGPU the page
+draws with WebGL2. The canvas and the targets are BGRA8, the format the
+browsers prefer (another costs them a copy at each frame). Nothing is read
+back from the GPU (asynchronous in WebGPU). Tested in headless Chrome 154
+(`browser-run.mjs --browser <Chrome> --query '?gpu=webgpu'`): menus,
+editing, no error of WebGPU; on a light test (wheel over the welcome
+document) the three renderers draw at the rate of the display with less
+than 1 ms of CPU a frame. To do: a heavier comparison with WebGL2, then
+WebGPU by default where the browser has it.
+
 ## Optimization
 
 `OPT` of the Makefile (`-O2` by default) is that of the compilation and of

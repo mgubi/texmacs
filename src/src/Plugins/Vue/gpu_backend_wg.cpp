@@ -1,8 +1,9 @@
 /******************************************************************************
 * MODULE     : gpu_backend_wg.cpp
 * DESCRIPTION: The WebGPU backend of the GPU renderer of the Vue port, with
-*              ThorVG's WebGPU engine for the vector shapes: the WASIX build,
-*              whose WebGPU is that of the host (misc/wasix/webgpu)
+*              ThorVG's WebGPU engine for the vector shapes: in the browser
+*              (Emscripten, Dawn's webgpu.h for it: emdawnwebgpu), and in the
+*              WASIX build, whose WebGPU is that of the host (misc/wasix/webgpu)
 * COPYRIGHT  : (C) 2026  Massimiliano Gubinelli
 *******************************************************************************
 * This software falls under the GNU general public license version 3 or later.
@@ -10,11 +11,21 @@
 * in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
 ******************************************************************************/
 
-// The calls of webgpu.h go to the host of the stream (webgpu_wire.cpp): the
+// In the browser (Emscripten) the calls of webgpu.h are those of the WebGPU
+// of the page (emdawnwebgpu), the window the canvas of SDL (#canvas). The
+// device is asked for by the page before TeXmacs starts (web-pre.js: it
+// comes asynchronously, and the program cannot wait without ASYNCIFY), and
+// taken here with emscripten_webgpu_get_device. A frame is drawn in one
+// iteration of the main loop, a task of the page, at whose end the browser
+// shows the canvas: nothing is presented here.
+// In WASIX the calls go to the host of the stream (webgpu_wire.cpp): the
 // page of the browser makes them on its WebGPU, and the window is its
-// canvas. Nothing comes back: no pixels are read (read fails), no errors.
-// The canvas is RGBA8, as the targets, so that a copy between them is one
-// of WebGPU; the targets have y = 0 at the top, as the windows.
+// canvas. Nothing comes back from WebGPU in either case (it is asynchronous
+// in a browser): no pixels are read (read fails).
+// The canvas is BGRA8 (the format browsers prefer: another one costs them a
+// copy at each frame), as the targets, so that a copy between them is one
+// of WebGPU; the textures of the pictures are RGBA8 (their data). The
+// targets have y = 0 at the top, as the windows.
 //
 // The draws of a target follow each other in one render pass, until the
 // target changes or a copy comes; the vertices and the uniforms of the
@@ -25,7 +36,7 @@
 
 #include "gpu_backend.hpp"
 
-#if !defined (__wasi__) || !defined (USE_THORVG)
+#if !(defined (__wasi__) || defined (__EMSCRIPTEN__)) || !defined (USE_THORVG)
 
 gpu_backend* gpu_webgpu_backend () { return NULL; }
 
@@ -36,7 +47,16 @@ gpu_backend* gpu_webgpu_backend () { return NULL; }
 #include <SDL3/SDL.h>
 #include <thorvg.h>
 #include <webgpu/webgpu.h>
+#ifdef __wasi__
 #include "webgpu_wire.h"
+#else
+#include <emscripten.h>
+// whether the page has asked for a device (web-pre.js): without it,
+// emscripten_webgpu_get_device fails
+EM_JS (int, tm_webgpu_has_device, (), {
+  return Module['preinitializedWebGPUDevice'] ? 1 : 0;
+});
+#endif
 #include <cmath>
 #include <map>
 #include <tuple>
@@ -155,7 +175,7 @@ static const char* slug_src=
 
 static const int SMALL= 512;
 static const int UNIFORM_STRIDE= 256; // minUniformBufferOffsetAlignment
-static const WGPUTextureFormat TARGET_FORMAT= WGPUTextureFormat_RGBA8Unorm;
+static const WGPUTextureFormat TARGET_FORMAT= WGPUTextureFormat_BGRA8Unorm;
 
 class wg_backend: public gpu_backend {
   bool failed= false, started= false;
@@ -229,7 +249,11 @@ public:
   unsigned long long window_flags () { return 0; }
   bool prepare () { return !failed; }
   bool attach (SDL_Window* w);
+#ifdef __wasi__
   string description () { return started ? string ("WebGPU of the host (WASIX)") : string (""); }
+#else
+  string description () { return started ? string ("WebGPU") : string (""); }
+#endif
   void begin_screen (int dw, int dh);
   void present (SDL_Window* w);
   void begin_frame ();
@@ -271,6 +295,23 @@ wg_backend::attach (SDL_Window* w) {
   if (failed) return false;
   if (started) return true;
   instance= wgpuCreateInstance (NULL);
+#ifdef __EMSCRIPTEN__
+  if (!tm_webgpu_has_device ()) {
+    cout << "TeXmacs] GPU: the page has no WebGPU device, drawing with MuPDF" << LF;
+    failed= true; return false;
+  }
+  device= emscripten_webgpu_get_device ();
+  queue= wgpuDeviceGetQueue (device);
+  WGPUEmscriptenSurfaceSourceCanvasHTMLSelector canvas= {};
+  canvas.chain.sType= WGPUSType_EmscriptenSurfaceSourceCanvasHTMLSelector;
+  canvas.selector= SV ("#canvas");
+  WGPUSurfaceDescriptor csd= {};
+  csd.nextInChain= &canvas.chain;
+  surface= wgpuInstanceCreateSurface (instance, &csd);
+  if (surface == NULL || !init ()) { failed= true; return false; }
+  started= true;
+  return true;
+#endif
   WGPURequestAdapterCallbackInfo ac= {};
   ac.callback= [] (WGPURequestAdapterStatus, WGPUAdapter a, WGPUStringView,
                    void* self, void*) { ((wg_backend*) self)->adapter= a; };
@@ -461,30 +502,45 @@ wg_backend::present (SDL_Window* w) {
   if (!started) return;
   if (screen.tex != NULL) {
     submit ();
+#ifdef __wasi__
     wgpuSurfacePresent (surface);
+#endif
+    // (in the browser the canvas is shown at the end of the iteration)
     release_screen ();
   }
+#ifdef __wasi__
   if (in_frame) { in_frame= false; wgpuWireRelease (1); }
+#endif
 }
 
+// (the frames are held on the wire only: in the browser what is drawn and
+// not presented costs nothing to keep)
 void
 wg_backend::begin_frame () {
+#ifdef __wasi__
   if (!started) return;
   if (in_frame) skip_frame ();
   submit ();
   wgpuWireHold ();
   in_frame= true;
   effects= false;
+#endif
 }
 
 void
 wg_backend::skip_frame () {
+#ifdef __wasi__
   if (!started || !in_frame) return;
   submit ();
   release_screen ();
   in_frame= false;
   // the same frame as the last one: not sent, unless it made something
   wgpuWireRelease (effects ? 1 : 0);
+#else
+  if (!started) return;
+  submit ();
+  release_screen ();
+#endif
 }
 
 /******************************************************************************
@@ -501,8 +557,9 @@ format_of (gpu_format f, int& bpp) {
   }
 }
 
-// (bgra: the targets of ThorVG, whose last pass, a blit, is made for the
-// format of its context, BGRA8 when it draws into a texture)
+// (bgra: the targets, as the canvas, and those of ThorVG, whose last pass,
+// a blit, is made for the format of its context, BGRA8 when it draws into a
+// texture)
 bool
 wg_backend::make_texture (gpu_texture_rep& t, int w, int h, gpu_format f, bool target,
                           bool bgra) {
@@ -587,7 +644,7 @@ wg_backend::new_target (int w, int h, bool transparent) {
   if (!started || w <= 0 || h <= 0 || w > 8192 || h > 8192) return NULL;
   gpu_texture t= tm_new<gpu_texture_rep> ();
   t->linear= false; t->repeat= false;
-  make_texture (*t, w, h, GPU_RGBA8, true);
+  make_texture (*t, w, h, GPU_RGBA8, true, true);
   // opaque white, as native_opaque_picture, or transparent
   gpu_pass p= { t, w, h, w, h, 0, 0, w, h };
   if (transparent) begin_pass (p, true, 0, 0, 0, 0);
@@ -996,4 +1053,4 @@ gpu_webgpu_backend () {
   return b;
 }
 
-#endif // __wasi__ && USE_THORVG
+#endif // (__wasi__ || __EMSCRIPTEN__) && USE_THORVG

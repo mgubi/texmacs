@@ -235,6 +235,8 @@ choose_backend () {
 #ifdef __wasi__
   return (v == "webgpu") ? gpu_webgpu_backend () : NULL;
 #endif
+  // (the browser: WebGPU when the page asks for it, ?gpu=webgpu)
+  if (v == "webgpu" && gpu_webgpu_backend () != NULL) return gpu_webgpu_backend ();
   gpu_backend* gl= gpu_gl_backend ();
   gpu_backend* mtl= gpu_metal_backend ();
   if (v == "gl" || v == "opengl") return gl;

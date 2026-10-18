@@ -9,7 +9,10 @@
 # threads: TeXmacs gives it paths, and draws the glyphs and the images
 # itself) and installs it in <prefix> (include/thorvg-1/thorvg.h,
 # lib/libthorvg-1.a). With "wasm" it is built with Emscripten (emcc in the
-# PATH, e.g. after ". misc/wasm/emenv.sh build-wasm") for WebGL2. meson and
+# PATH, e.g. after ". misc/wasm/emenv.sh build-wasm") with its GL engine
+# (WebGL2) and its WebGPU engine (Dawn's webgpu.h for Emscripten,
+# emdawnwebgpu: the page draws with WebGPU when the browser has it, see
+# gpu_backend_wg.cpp); THORVG_ENGINES=gl for the GL engine alone. meson and
 # ninja come from a Python venv in <prefix>/venv. Then configure with
 # --with-thorvg=<prefix> (or let configure find it through pkg-config:
 # PKG_CONFIG_PATH=<prefix>/lib/pkgconfig).
@@ -40,7 +43,11 @@ fi
   git clone -q --depth 1 --branch "$THORVG_VERSION" https://github.com/thorvg/thorvg.git "$PREFIX/src"
 
 ENGINES=gl
+[ "$TARGET" = wasm ] && ENGINES=${THORVG_ENGINES:-gl,wg}
 [ "$TARGET" = wasix ] && ENGINES=wg
+# (webgpu.h for Emscripten: the port emdawnwebgpu, at compile and link time)
+EMWG=
+case "$ENGINES" in *wg*) EMWG=", '--use-port=emdawnwebgpu'";; esac
 OPTS="-Dengines=$ENGINES -Dloaders= -Dthreads=false -Dfile=false -Dextra= -Dstatic=true
       -Ddefault_library=static -Dbuildtype=release --libdir=lib"
 BUILD="$PREFIX/build-$TARGET"
@@ -55,8 +62,8 @@ ar = 'emar'
 strip = 'emstrip'
 
 [built-in options]
-c_args = ['-O2', '-fwasm-exceptions']
-cpp_args = ['-O2', '-fwasm-exceptions']
+c_args = ['-O2', '-fwasm-exceptions'$EMWG]
+cpp_args = ['-O2', '-fwasm-exceptions'$EMWG]
 
 [host_machine]
 system = 'emscripten'

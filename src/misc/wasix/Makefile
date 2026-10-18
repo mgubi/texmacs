@@ -38,8 +38,7 @@ CXX      := $(WASIXCC)/wasix++
 
 # (and the stream of the display, which only WASIX has: vue_stream.hpp, and
 # the WebGPU backend of the GPU renderer, on the WebGPU of the host)
-SOURCES  := $(shell cat $(W)/sources.txt) Plugins/Vue/vue_stream.cpp \
-  Plugins/Vue/gpu_backend_wg.cpp
+SOURCES  := $(shell cat $(W)/sources.txt) Plugins/Vue/vue_stream.cpp
 OBJECTS  := $(patsubst %,$(OBJ)/%.o,$(basename $(SOURCES)))
 HUNSPELL := hunspell-1.7.2
 HUNSPELL_SRC := affentry affixmgr csutil filemgr hashmgr hunspell hunzip \

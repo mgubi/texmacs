@@ -227,6 +227,16 @@
 
   The additions to <TeXmacs> <name|Vue>, the newest first.
 
+  <paragraph|18 October 2026>
+
+  <\itemize>
+    <item>The windows can be drawn with <name|WebGPU>, the newer graphics
+    interface of the browsers, instead of <name|WebGL2>: add
+    <verbatim|?gpu=webgpu> to the address of the page (a test for now;
+    without <name|WebGPU> the page draws with <name|WebGL2> as before). The
+    menu <with|font-series|bold|TeXmacs <name|Vue>> says which one draws.
+  </itemize>
+
   <paragraph|17 October 2026>
 
   <\itemize>

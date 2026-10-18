@@ -67,10 +67,31 @@ Module['preRun'].push(function () {
   // the console (TEXMACS_VUE_PROFILE, see vue_profile_frame in vue_gui.cpp)
   var prof = /^\d+$/.exec (tmAddress.get ('profile') || '');
   if (prof) ENV['TEXMACS_VUE_PROFILE'] = prof[0];
+  // ?gpu=webgpu: drawn by WebGPU (gpu_backend_wg.cpp, ThorVG's WebGPU
+  // engine). The device comes asynchronously and TeXmacs cannot wait for
+  // it (no ASYNCIFY): it is asked for here, TeXmacs starting once it has
+  // come (a dependency of the run), and taken by the program from
+  // Module.preinitializedWebGPUDevice; without it, WebGL2 as below
+  if (tmAddress.get ('gpu') === 'webgpu' && typeof navigator !== 'undefined' && navigator.gpu) {
+    ENV['TEXMACS_VUE_GPU'] = '1'; // (WebGL2 if WebGPU fails)
+    addRunDependency ('tm-webgpu');
+    navigator.gpu.requestAdapter ()
+      .then (function (a) { return a ? a.requestDevice () : null; })
+      .then (function (d) {
+        if (!d) { console.warn ('TeXmacs: no WebGPU device, drawing with WebGL2'); return; }
+        Module['preinitializedWebGPUDevice'] = d;
+        ENV['TEXMACS_VUE_GPU'] = 'webgpu';
+        window.tmWebGPU = true;
+        d.addEventListener ('uncapturederror', function (e) {
+          console.warn ('TeXmacs: WebGPU: ' + e.error.message); });
+      })
+      .catch (function (e) { console.warn ('TeXmacs: WebGPU: ' + e); })
+      .finally (function () { removeRunDependency ('tm-webgpu'); });
+  }
   // drawn by WebGL2 (vue_gpu.cpp) in a build with ThorVG, unless the
   // address says texmacs.html?gpu=0 or the browser has no WebGL2 (the window
   // of SDL would then have no surface for MuPDF to draw on)
-  if (tmAddress.get ('gpu') !== '0') {
+  else if (tmAddress.get ('gpu') !== '0') {
     var webgl2 = false;
     try {
       var probe = document.createElement ('canvas');
