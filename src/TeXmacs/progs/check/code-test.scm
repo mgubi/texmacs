@@ -211,19 +211,25 @@
                             (lambda () (list (list 0 "function" "f" "()" f-at)
                                              (list 1 "variable" "g" "" g-at))))
         (check= (map caddr (code-outline-entries)) '("f" "g"))
-        ;; the page of the outline: its entries go to their places
-        (with windows (window-list)
+        ;; the page of the outline: its entries go to their places. (The
+        ;; page comes in the current window: with a window per buffer, it
+        ;; would come in a window of its own, which stays for the suites
+        ;; run afterwards, and which Qt cannot delete when TeXmacs quits
+        ;; just after closing it; the preference is set in memory only)
+        (let* ((which "buffer management")
+               (had? (cpp-has-preference? which))
+               (old (get-preference which)))
+          (cpp-set-preference which "shared")
           (code-outline)
+          (if had?
+              (cpp-set-preference which old)
+              (cpp-reset-preference which))
           (with page (current-buffer)
             (check-true (url-rooted-tmfs? page))
             (with s (object->string (tree->stree (buffer-get-body page)))
               (check-true (string-contains? s "function"))
               (check-true (string-contains? s "code-go-to")))
-            (buffer-close page))
-          ;; (with a window per buffer, the page came in a window of its
-          ;; own, which would stay for the suites run afterwards)
-          (for (win (window-list))
-            (when (nin? win windows) (kill-window win))))
+            (buffer-close page)))
         ;; a provider which finds nothing lets the next one look
         (code-provider-set! 'definition 'first 0 (lambda () #t)
                             (lambda () (set! jumps (cons 'first jumps)) #f))
