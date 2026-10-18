@@ -19,6 +19,7 @@
 
 #include <QCoreApplication>
 #include <QElapsedTimer>
+#include <QPointer>
 #include <QThread>
 #include <QTcpServer>
 #include <QTcpSocket>
