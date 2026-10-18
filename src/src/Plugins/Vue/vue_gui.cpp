@@ -4107,6 +4107,12 @@ vue_follow_interface_scale () {
 static const time_t web_frame_dt= 12; // the least time between two frames (ms)
 #endif
 
+#ifdef OS_MACOS
+// the autorelease pools of the Objective-C runtime (as @autoreleasepool)
+extern "C" void* objc_autoreleasePoolPush (void);
+extern "C" void  objc_autoreleasePoolPop (void* pool);
+#endif
+
 static void
 loop_iteration_body () {
   int& delay= loop_delay;
@@ -4340,7 +4346,22 @@ void gui_start_loop () {
   // unwound, which is why the server of TeXmacs_main is not on it there.
   emscripten_set_main_loop (loop_iteration, 0, true);
 #else
-  while (nr_windows > 0 || number_of_servers () > 0) loop_iteration ();
+  while (nr_windows > 0 || number_of_servers () > 0) {
+#ifdef OS_MACOS
+    // each turn of the loop has its pool: the objects which Metal and
+    // AppKit give back autoreleased (the drawables of the windows, the
+    // command buffers...) were released only by a pool which was never
+    // drained. With a window wholly behind another, whose drawables the
+    // system does not show, nextDrawable then waited a second at each
+    // redraw (the cursor moved slowly) and made a new drawable each time:
+    // 145 GB in three minutes, until macOS ran out of memory
+    void* pool= objc_autoreleasePoolPush ();
+    loop_iteration ();
+    objc_autoreleasePoolPop (pool);
+#else
+    loop_iteration ();
+#endif
+  }
 #endif
 }
 
