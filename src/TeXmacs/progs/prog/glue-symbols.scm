@@ -724,6 +724,8 @@
 "lsp-alive?"
 "lsp-stop"
 "lsp-document-text"
+"lsp-decorate-line"
+"lsp-undecorate-line"
 "widget-printer"
 "widget-color-picker"
 "widget-extend"

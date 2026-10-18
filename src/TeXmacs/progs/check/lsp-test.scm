@@ -32,7 +32,8 @@
         (lsp lsp-edit)
         (lsp lsp-actions)
         (lsp lsp-kbd)
-        (lsp lsp-navigate)))
+        (lsp lsp-navigate)
+        (lsp lsp-decorate)))
 
 (define events '())
 
@@ -452,6 +453,40 @@
     (check= (lsp-outline-entries (lsp-array (si "b" 12 7) (si "a" 13 3)))
             '((0 "variable" "a" "" 3 2) (0 "function" "b" "" 7 2))))
   (check= (lsp-outline-entries (lsp-array)) '()))
+
+(define (test-decorations)
+  (check-group "colours and hints")
+  ;; semantic tokens: relative lines and starts, the types of the legend
+  (check= (lsp-decode-tokens '(0 4 5 0 0  0 6 3 1 0  2 2 4 0 0)
+                             #("function" "variable"))
+          '((0 4 5 "function") (0 10 3 "variable") (2 2 4 "function")))
+  (check= (lsp-decode-tokens '(0 1 2 7 0) #("function")) '())
+  (check= (lsp-token-color "c" "variable") #f)
+  (check-true (string? (lsp-token-color "c" "function")))
+  ;; the text of a hint, with its paddings
+  (check= (lsp-hint-text (lsp-object "label" "x:" "paddingRight"
+                                     (lsp-boolean #t)))
+          "x: ")
+  (check= (lsp-hint-text (lsp-object "label" (lsp-array
+                                              (lsp-object "value" ": ")
+                                              (lsp-object "value" "int"))))
+          ": int")
+  ;; by line, in Cork offsets (an accent is one unit), in their order
+  (let* ((lines (vector (string-append "f" e-acute "g(1);") "int y;"))
+         (hint (lsp-object "position" (lsp-object "line" (lsp-number 0)
+                                                  "character" (lsp-number 4))
+                           "label" "x:"))
+         (d (lsp-line-decorations lines "c"
+                                  '((0 2 1 "function") (0 0 1 "function")
+                                    (1 0 3 "variable"))
+                                  (list hint))))
+    (check= (length d) 1)
+    (check= (car (car d)) 0)
+    (check= (map (lambda (x) (list (car x) (cadr x)))
+                 (car (cadr (car d))))
+            (list (list 0 1) (list 2 (+ 2 (string-length "g")))))
+    (check= (cadr (cadr (car d)))
+            (list (list (+ 3 (string-length e-acute)) "x:")))))
 
 (define (test-requests)
   (check-group "requests")
@@ -1056,6 +1091,15 @@
           (check-true (string-contains? s "main")))
         (switch-to-buffer u)
         (buffer-close page))
+      ;; the colours of the server: twice is a function (and the hint of
+      ;; its parameter v, when clangd gives inlay hints)
+      (lsp-decorate-current)
+      (lsp-wait c (lambda () (nnull? (lsp-decorations uri))) 10000)
+      (with d (assoc 0 (lsp-decorations uri))
+        (check-true (and d (nnull? (cadr d))))
+        (when (and d (nnull? (cadr d)))
+          (check= (list (car (car (cadr d))) (cadr (car (cadr d))))
+                  '(6 11))))
       ;; a rename everywhere
       (go-to-path (append (buffer-path) '(0 8)))
       (lsp-rename "thrice")
@@ -1121,6 +1165,7 @@
   (test-diagnostics-state)
   (test-sync-options)
   (test-outline)
+  (test-decorations)
   (test-requests)
   (test-server-requests)
   (test-end)

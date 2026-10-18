@@ -226,6 +226,18 @@
     "references" (lsp-object)
     "documentSymbol" (lsp-object "hierarchicalDocumentSymbolSupport"
                                  (lsp-boolean #t))
+    "semanticTokens"
+    (lsp-object "requests" (lsp-object "full" (lsp-boolean #t))
+                "tokenTypes" (lsp-array "namespace" "type" "class" "enum"
+                                        "interface" "struct" "typeParameter"
+                                        "parameter" "variable" "property"
+                                        "enumMember" "event" "function"
+                                        "method" "macro" "keyword" "modifier"
+                                        "comment" "string" "number" "regexp"
+                                        "operator" "decorator")
+                "tokenModifiers" (lsp-array)
+                "formats" (lsp-array "relative"))
+    "inlayHint" (lsp-object)
     "formatting" (lsp-object)
     "rangeFormatting" (lsp-object)
     "rename" (lsp-object "prepareSupport" (lsp-boolean #f))

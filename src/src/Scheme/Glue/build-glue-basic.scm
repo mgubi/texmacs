@@ -791,6 +791,8 @@
   (lsp-alive? lsp_alive (bool int))
   (lsp-stop lsp_stop (void int))
   (lsp-document-text lsp_document_text (string tree))
+  (lsp-decorate-line lsp_decorate_line (void tree tree tree))
+  (lsp-undecorate-line lsp_undecorate_line (void tree))
 
   ;; widgets
   (widget-printer printer_widget (widget command url))

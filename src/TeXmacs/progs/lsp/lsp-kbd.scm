@@ -23,7 +23,8 @@
         (prog prog-menu)
         (lsp lsp-edit)
         (lsp lsp-actions)
-        (lsp lsp-navigate)))
+        (lsp lsp-navigate)
+        (lsp lsp-decorate)))
 
 (tm-define (lsp-followed?)
   (:synopsis "Does a language server follow the current buffer?")
@@ -66,6 +67,11 @@
   ---
   ((check "Information on mouse rest" "v" (lsp-mouse-hover-on?))
    (toggle-preference "lsp:mouse hover"))
+  ((check "Colours of the server" "v"
+          (!= (get-preference "lsp:semantic colors") "off"))
+   (toggle-preference "lsp:semantic colors"))
+  ((check "Inlay hints" "v" (!= (get-preference "lsp:inlay hints") "off"))
+   (toggle-preference "lsp:inlay hints"))
   ---
   ("Restart server" (lsp-restart))
   ("Server log" (lsp-show-log))

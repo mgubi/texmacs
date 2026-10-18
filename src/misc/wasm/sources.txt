@@ -299,6 +299,7 @@ System/Link/cmdline_link.cpp
 System/Link/connection.cpp
 System/Link/dyn_link.cpp
 System/Link/lsp_link.cpp
+System/Language/lsp_decorations.cpp
 System/Link/pipe_link.cpp
 System/Link/request_link.cpp
 System/Link/socket_contact.cpp

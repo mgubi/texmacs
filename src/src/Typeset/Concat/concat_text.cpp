@@ -13,6 +13,7 @@
 #include "formatter.hpp"
 #include "analyze.hpp"
 #include "boot.hpp"
+#include "lsp_decorations.hpp"
 
 lazy make_lazy_vstream (edit_env env, tree t, path ip, tree channel);
 
@@ -177,6 +178,9 @@ concater_rep::typeset_math_string (tree t, path ip, int pos, int end) {
 
 void
 concater_rep::typeset_prog_string (tree t, path ip, int pos, int end) {
+  // (a line which a language server has decorated: see below)
+  lsp_line_decorations* d= lsp_line_decorations_of (t);
+  if (d != NULL) { typeset_lsp_string (t, ip, pos, end, d); return; }
   array<space> spc_tab= env->fn->get_normal_spacing (env->spacing_policy);
   string s= t->label;
   int    start;
@@ -205,6 +209,83 @@ concater_rep::typeset_prog_string (tree t, path ip, int pos, int end) {
       PRINT_SPACE (tp->spc_after)
     }
   } while (pos<end);
+}
+
+/******************************************************************************
+* Lines of code decorated by a language server: pieces with colours of
+* their own (semantic tokens) and hints before some characters (inlay
+* hints), which are not part of the text: their boxes have decorated
+* paths, the cursor does not go into them
+******************************************************************************/
+
+void
+concater_rep::typeset_lsp_hints (lsp_line_decorations* d, path ip,
+                                 int from, int to) {
+  // the hints before the characters from to to (excluded)
+  for (int i=0; i<N(d->hint_pos); i++)
+    if (d->hint_pos[i] >= from && d->hint_pos[i] < to) {
+      // (the spaces around a hint, its paddings, are spaces: a space of
+      // the text of a program would be shown as a visible space)
+      string h= d->hint_text[i];
+      int b0= 0, e0= N(h);
+      while (b0 < e0 && h[b0] == ' ') b0++;
+      while (e0 > b0 && h[e0-1] == ' ') e0--;
+      if (b0 > 0) print (env->fn->spc);
+      if (b0 < e0) {
+        color c= named_color ("#909090", env->alpha);
+        box b= text_box (decorate (ip), 0, h (b0, e0), env->fn, c);
+        a << line_item (STRING_ITEM, OP_SKIP, b, HYPH_INVALID, env->lan);
+      }
+      if (e0 < N(h)) print (env->fn->spc);
+    }
+}
+
+void
+concater_rep::typeset_lsp_string (tree t, path ip, int pos, int end,
+                                  lsp_line_decorations* d) {
+  // as typeset_prog_string, the pieces of a token which have colours of
+  // their own typeset apart, and the hints before the tokens (a hint
+  // inside a token comes before it)
+  array<space> spc_tab= env->fn->get_normal_spacing (env->spacing_policy);
+  string s= t->label;
+  int    start;
+  do {
+    start= pos;
+    text_property tp= env->lan->advance (t, pos);
+    if (pos > end) pos= end;
+    typeset_lsp_hints (d, ip, start, pos);
+    if ((pos-start == 1) && (s[start]==' ')) { // spaces
+      if (start == 0) typeset_substring ("", ip, 0);
+      penalty_min (tp->pen_after);
+      PRINT_SPACE (tp->spc_before);
+      PRINT_SPACE (tp->spc_after);
+      if ((pos==end) || (s[pos]==' '))
+        typeset_substring ("", ip, pos);
+    }
+    else { // strings
+      penalty_max (tp->pen_before);
+      PRINT_SPACE (tp->spc_before)
+      string color= env->lan->get_color (t, start, pos);
+      int i= start;
+      while (i < pos) {
+        // the piece from i: up to the next start or end of a coloured
+        // piece, with its colour if one covers i
+        int j= pos;
+        string col= color;
+        for (int k=0; k<N(d->col_start); k++) {
+          int a0= d->col_start[k], a1= d->col_end[k];
+          if (a0 <= i && i < a1) { col= d->col_color[k]; j= min (j, a1); }
+          else if (a0 > i && a0 < j) j= a0;
+        }
+        typeset_colored_substring (s (i, j), ip, i, col);
+        i= j;
+      }
+      penalty_min (tp->pen_after);
+      PRINT_SPACE (tp->spc_after)
+    }
+  } while (pos<end);
+  // the hints at the end of the line
+  if (end == N(s)) typeset_lsp_hints (d, ip, N(s), N(s) + 1);
 }
 
 /******************************************************************************

@@ -9485,6 +9485,36 @@ tmg_lsp_document_text (tmscm arg1) {
 }
 
 tmscm
+tmg_lsp_decorate_line (tmscm arg1, tmscm arg2, tmscm arg3) {
+  TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "lsp-decorate-line");
+  TMSCM_ASSERT_TREE (arg2, TMSCM_ARG2, "lsp-decorate-line");
+  TMSCM_ASSERT_TREE (arg3, TMSCM_ARG3, "lsp-decorate-line");
+
+  tree in1= tmscm_to_tree (arg1);
+  tree in2= tmscm_to_tree (arg2);
+  tree in3= tmscm_to_tree (arg3);
+
+  // TMSCM_DEFER_INTS;
+  lsp_decorate_line (in1, in2, in3);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_lsp_undecorate_line (tmscm arg1) {
+  TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "lsp-undecorate-line");
+
+  tree in1= tmscm_to_tree (arg1);
+
+  // TMSCM_DEFER_INTS;
+  lsp_undecorate_line (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
 tmg_widget_printer (tmscm arg1, tmscm arg2) {
   TMSCM_ASSERT_COMMAND (arg1, TMSCM_ARG1, "widget-printer");
   TMSCM_ASSERT_URL (arg2, TMSCM_ARG2, "widget-printer");
@@ -12498,6 +12528,8 @@ initialize_glue_basic () {
   tmscm_install_procedure ("lsp-alive?",  tmg_lsp_aliveP, 1, 0, 0);
   tmscm_install_procedure ("lsp-stop",  tmg_lsp_stop, 1, 0, 0);
   tmscm_install_procedure ("lsp-document-text",  tmg_lsp_document_text, 1, 0, 0);
+  tmscm_install_procedure ("lsp-decorate-line",  tmg_lsp_decorate_line, 3, 0, 0);
+  tmscm_install_procedure ("lsp-undecorate-line",  tmg_lsp_undecorate_line, 1, 0, 0);
   tmscm_install_procedure ("widget-printer",  tmg_widget_printer, 2, 0, 0);
   tmscm_install_procedure ("widget-color-picker",  tmg_widget_color_picker, 3, 0, 0);
   tmscm_install_procedure ("widget-extend",  tmg_widget_extend, 2, 0, 0);

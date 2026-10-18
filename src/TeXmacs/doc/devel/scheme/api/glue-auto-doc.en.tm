@@ -5595,6 +5595,22 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(lsp-decorate-line <scm-arg|tree> <scm-arg|tree> <scm-arg|tree>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|lsp_decorate_line> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(lsp-undecorate-line <scm-arg|tree>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|lsp_undecorate_line> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
     <scm|(widget-printer <scm-arg|command> <scm-arg|url>)>
 <explain-synopsis|no synopsis>
   <|explain>
