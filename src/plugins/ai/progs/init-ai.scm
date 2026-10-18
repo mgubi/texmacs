@@ -159,7 +159,13 @@
            (ai-store-api-key engine key)))
         (ai-store-api-key engine key))))
 
-(when (supports-wallet?)
+;; (once: this file is loaded again when a key is given or the wallet is
+;; turned on, and each load added a hook, which loads it again, so that the
+;; hooks doubled each time; the flag outlives the loads)
+(define ai-wallet-hook-added?
+  (and (defined? 'ai-wallet-hook-added?) ai-wallet-hook-added?))
+(when (and (supports-wallet?) (not ai-wallet-hook-added?))
+  (set! ai-wallet-hook-added? #t)
   (wallet-add-on-hook (lambda () (reinit-plugin-single "ai"))))
 
 (tm-define (ai-models)
@@ -560,9 +566,7 @@
          (s (and doc (tree-up doc)))
          (s (if field
                 (and s (tree-is? s 'session) s)
-                (and (defined? 'ai-fold-pop) (ai-fold-pop name)))))
-    (when (and (not field) (defined? 'ai-fold-result-push))
-      (ai-fold-result-push name s))
+                (and (defined? 'ai-fold-pop) (ai-fold-pop name chat)))))
     (set! ai-fold-of-request (and (not field) s))
     (set! ai-model-of-request (or (and s (ai-session-var s "ai-model")) ""))
     (set! ai-document-of-request
@@ -1342,8 +1346,8 @@
     (when s (ai-set-session-var s "ai-document" "true"))))
 
 ;; the answer in a fold: the answer alone, its tokens on the status bar and
-;; around the fold (ai-usage); the fold of the answer is the one which
-;; ai-request-prepare gave to tools/ai/ai-folds.scm (ai-fold-result-push)
+;; around the fold (ai-usage); the fold of the answer is the one of the
+;; pending request (ai-fold-result-pop, tools/ai/ai-folds.scm)
 
 (define (ai-usage-fields x)
   ;; the data of the line of the tokens (ai_usage_line in ai.cpp)
@@ -1360,7 +1364,7 @@
              ;; (the plug-in may give an empty result first)
              (f (and (not (in? x '("" (document) (document ""))))
                      (defined? 'ai-fold-result-pop)
-                     (ai-fold-result-pop name))))
+                     (ai-fold-result-pop name chat))))
         (when (nnull? u)
           (set-message (car u) (session-name name)))
         (when (and f (nnull? data))

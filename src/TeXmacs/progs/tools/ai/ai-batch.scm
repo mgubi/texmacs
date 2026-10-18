@@ -45,17 +45,27 @@
   (cpp-ai-latex-command cmd name chat))
 
 (tm-define (ai-request name chat cmd)
-  ;; (the model of the session or the fold which asks, init-ai.scm)
-  (when (defined? 'ai-request-prepare) (ai-request-prepare name chat))
-  (with missing (or (and (defined? (quote ai-key-missing)) (ai-key-missing name))
-                    ;; (a file of the question which cannot be sent)
-                    (and (defined? 'ai-request-attachment-problem)
-                         (ai-request-attachment-problem name chat)))
-    (with r (if missing
-                (object->string `(error ,missing)) ; no request (request_link)
-                (cpp-ai-latex-request cmd name chat))
-      (when (defined? 'ai-request-done) (ai-request-done))
-      r)))
+  ;; (the model of the session or the fold which asks, init-ai.scm; its
+  ;; globals are reset whatever happens, an error is the answer: they
+  ;; were left to the next requests, of any engine, when the making of the
+  ;; request failed)
+  (with r (catch #t
+            (lambda ()
+              (when (defined? 'ai-request-prepare) (ai-request-prepare name chat))
+              (with missing (or (and (defined? (quote ai-key-missing))
+                                     (ai-key-missing name))
+                                ;; (a file of the question which cannot be sent)
+                                (and (defined? 'ai-request-attachment-problem)
+                                     (ai-request-attachment-problem name chat)))
+                (if missing
+                    (object->string `(error ,missing)) ; no request (request_link)
+                    (cpp-ai-latex-request cmd name chat))))
+            (lambda args
+              (object->string
+               `(error ,(string-append "Error: the request could not be made ("
+                                       (object->string args) ")")))))
+    (when (defined? 'ai-request-done) (ai-request-done))
+    r))
 
 (tm-define (ai-result name chat res)
   (with t (cpp-ai-latex-output res name chat)
