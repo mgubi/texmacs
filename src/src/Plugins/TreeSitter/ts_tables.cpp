@@ -26,7 +26,9 @@
 #include <algorithm>
 #include <chrono>
 #include <climits>
+#ifndef _WIN32
 #include <sys/resource.h>
+#endif
 #ifdef __APPLE__
 #include <malloc/malloc.h>
 #endif
@@ -61,17 +63,22 @@ lap (const char* what) {
   static std::chrono::steady_clock::time_point last;
   std::chrono::steady_clock::time_point now= std::chrono::steady_clock::now ();
   if (profile && what != NULL) {
+    // the peak resident memory so far, in MB (ru_maxrss: bytes on macOS;
+    // not known on Windows, which has no getrusage)
+#ifndef _WIN32
     struct rusage u;
     getrusage (RUSAGE_SELF, &u);
-    // the peak resident memory so far, in MB (ru_maxrss: bytes on macOS)
+#endif
 #ifdef __APPLE__
     long mb= (long) (u.ru_maxrss / (1024 * 1024));
     malloc_statistics_t st;
     malloc_zone_statistics (NULL, &st);
     long used= (long) (st.size_in_use / (1024 * 1024));
-#else
+#elif !defined (_WIN32)
     long mb= (long) (u.ru_maxrss / 1024);
     long used= -1;
+#else
+    long mb= -1, used= -1;
 #endif
     fprintf (stderr, "ts-tables: %s %d ms, peak %ld MB, in use %ld MB\n", what, (int)
              std::chrono::duration_cast<std::chrono::milliseconds> (now - last).count (),
