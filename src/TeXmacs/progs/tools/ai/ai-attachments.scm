@@ -151,6 +151,26 @@
         l)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; The files which may be sent
+;;
+;; A document says which files are attached (their names and where they
+;; are), and the frame shows only the name: a document received from
+;; someone else could attach any file of this system, which a question of
+;; its session would send. A file is sent only once it was attached in this
+;; TeXmacs (Attach, a drop), or the user allowed it when a question would
+;; send it (ai-request-attachment-problem, init-ai.scm).
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define ai-allowed-files (make-ahash-table)) ; file (UTF-8) -> #t
+
+(tm-define (ai-allow-files l)
+  (for-each (lambda (a) (ahash-set! ai-allowed-files (cadr a) #t)) l))
+
+;; the attachments (name file) of l which were neither attached nor allowed
+(tm-define (ai-files-not-allowed l)
+  (list-filter l (lambda (a) (not (ahash-ref ai-allowed-files (cadr a))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Attaching a file
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -188,6 +208,7 @@
                                     "nor a PDF file")
                      "Attach a file")
         (begin
+          (ai-allow-files (list (list name file)))
           (insert `(ai-attachment ,(utf8->cork name) ,(utf8->cork file)))
           ;; (the cursor after it, where the question goes on)
           (with t (tree-innermost 'ai-attachment)

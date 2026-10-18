@@ -261,6 +261,37 @@
   (string-contains? (object->string t) what))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; An answer does not read nor write the files of the system
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (test-answer-files)
+  (check-group "answers and the files of the system")
+  ;; an image which the answer names, elsewhere than in the temporary
+  ;; directory, is not put in the document (a reference is left)
+  (let* ((png (url->system (url-concretize
+                            "$TEXMACS_PATH/misc/images/texmacs-20.png")))
+         (t (answer (openai (string-append
+                             "\\documentclass{article}\n\\begin{document}\n"
+                             "\\includegraphics{" png "}\n\\end{document}"))
+                    "openrouter"))
+         (img (find-tag t 'image)))
+    (check-true (or (not img) (string? (cadr img)))))
+  ;; the file of an SVG of Albert is written in the temporary directory,
+  ;; whatever its name says
+  (let* ((svg (string-append "<svg xmlns=\"http://www.w3.org/2000/svg\" "
+                             "width=\"4\" height=\"4\"/>"))
+         (out (url-append (url-temp-dir) "../ai-test-escape.svg"))
+         (in (url-append (url-temp-dir) "ai-test-escape.svg")))
+    (when (url-exists? out) (system-remove out))
+    (answer (openai (string-append
+                     "\\begin{filecontents*}{../ai-test-escape.svg}\n" svg
+                     "\n\\end{filecontents*}\n\\includegraphics{../ai-test-escape.svg}"))
+            "albert")
+    (check-true (not (url-exists? out)))
+    (check-true (url-exists? in))
+    (when (url-exists? in) (system-remove in))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The files attached to the questions (tools/ai/ai-attachments.scm)
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -320,6 +351,12 @@
              (ai-stree-attachments `(concat "a" (ai-attachment "t" ,txt)
                                             (ai-attachment "p.png" ,png))))
             (list (string-append "image/png\tp.png\t" png)))
+    ;; a file which came with a document is sent once it is allowed (the
+    ;; files attached here are allowed by ai-insert-attachment)
+    (with l (list (list "keys.json" (attach-file "keys.json")))
+      (check= (ai-files-not-allowed l) l)
+      (ai-allow-files l)
+      (check= (ai-files-not-allowed l) '()))
     ;; what is not sent
     (check= (ai-attachments-problem "claude" (list (list "p.png" png) (list "u.pdf" pdf)))
             #f)
@@ -375,6 +412,7 @@
       (test-tikz)))
   (test-raw-fold)
   (test-attachments)
+  (test-answer-files)
   ;; the prices are read again from the home when they are needed
   (cpp-ai-set-prices "")
   (check-end))
