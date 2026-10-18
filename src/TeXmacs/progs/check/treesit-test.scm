@@ -609,6 +609,14 @@
               '(0 4 8 4 8 4 8 12 4 0 0))
       (check= (indents "python" '("s = \"\"\"a" "  b" "\"\"\"" "def f():" "    return 1"))
               '(0 0 2 0 4))
+;; Scheme as prog/scheme-edit.scm indents it (the keywords of tm-mode.el
+      ;; and their arity, the alignment with the arguments), on the tree: a
+      ;; character #\) or a quote in a string does not count
+      (check= (indents "scheme" '("(define (f x)" "  (let ((y x)" "        (z 1))"
+                                  "    (g y" "       z)))" "(when x" "  y)"
+                                  "(with a b" "  c)" "(let" "    ((x 1))"
+                                  "  (list #\\) \"(\"" "        x))"))
+              '(0 2 8 4 7 0 2 0 2 0 4 2 8))
       (check= (indents "javascript" '("function f() {" "    x = [1," "        2];" "}" ""))
               '(0 4 8 0 0))
       (check= (indents "julia" '("function f(x)" "    if x" "        1" "    else"

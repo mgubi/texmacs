@@ -823,6 +823,71 @@ trimmed (string s) {
   return s (a, b);
 }
 
+static int
+char_column (string line, int col) {
+  // the column of a position of a TeXmacs string in characters: an entity
+  // <name> counts as one (as get-offset of prog/scheme-edit.scm)
+  int r= 0, inc= 1;
+  for (int i= 0; i < col && i < N(line); i++) {
+    if (line[i] == '<') inc= 0;
+    else if (line[i] == '>') { r++; inc= 1; }
+    else r += inc;
+  }
+  return r;
+}
+
+static bool
+point_less (TSPoint a, TSPoint b) {
+  return a.row < b.row || (a.row == b.row && a.column < b.column);
+}
+
+static ts_properties* captured (ts_node_captures& q, const char* name, TSNode n);
+
+static int
+lisp_indent (array<string>& lines, TSNode top, ts_node_captures& q, int row) {
+  // the indentation of Lisp of prog/scheme-edit.scm on the tree: in the
+  // innermost list (@indent.lisp) around the line, with the elements which
+  // come before it, the first being the operator of arity i (indent.arity,
+  // from the keywords of TeXmacs) or none: aligned with the reference
+  // argument (the first element on the line of the last one, but not the
+  // operator unless it is alone), or, for a keyword, the column of the
+  // operator plus 3 for its first i arguments and plus 1 for the next one
+  TSPoint p= { (uint32_t) row, 0 };
+  TSNode n= ts_node_descendant_for_point_range (top, p, p);
+  ts_properties* lisp= NULL;
+  while (!ts_node_is_null (n)) {
+    lisp= captured (q, "indent.lisp", n);
+    if (lisp != NULL && point_less (ts_node_start_point (n), p)) break;
+    lisp= NULL;
+    n= ts_node_parent (n);
+  }
+  if (lisp == NULL) return 0;
+  array<TSNode> elems;
+  uint32_t k= ts_node_named_child_count (n);
+  for (uint32_t i= 0; i < k; i++) {
+    TSNode c= ts_node_named_child (n, i);
+    if (std::string (ts_node_type (c)).find ("comment") != std::string::npos) continue;
+    if ((int) ts_node_start_point (c).row >= row) break;
+    elems << c;
+  }
+  int nr= N(elems);
+  if (nr == 0) return 0;
+  // the reference argument
+  int j= nr - 1;
+  while (j > 1 && ts_node_start_point (elems[j-1]).row == ts_node_start_point (elems[j]).row)
+    j--;
+  TSNode a= elems[j];
+  auto offset= [&] (TSNode e) {
+    TSPoint s= ts_node_start_point (e);
+    return char_column (lines[s.row], (int) s.column);
+  };
+  if (!lisp->count ("indent.arity")) return offset (a);
+  int arity= atoi ((*lisp)["indent.arity"].c_str ());
+  if (nr <= arity) return offset (elems[0]) + 3;
+  if (nr == arity + 1) return offset (elems[0]) + 1;
+  return offset (a);
+}
+
 static TSNode
 node_at (TSNode root, int row, int col) {
   TSPoint a= { (uint32_t) row, (uint32_t) max (col, 0) };
@@ -885,6 +950,7 @@ syntax_region_indent (tree root, int language, int query, int row, int tab) {
     r->ind_version= r->version;
   }
   ts_node_captures& q= r->ind_caps;
+  if (q.count ("indent.lisp")) return lisp_indent (lines, top, q, row);
   TSNode node= { { 0, 0, 0, 0 }, NULL, NULL };
   bool found= false;
   if (indent_columns (lines[row]) == N(lines[row])) {
@@ -984,7 +1050,7 @@ syntax_region_indent (tree root, int language, int query, int row, int tab) {
           int increment= 1;
           if (meta.count ("indent.increment"))
             increment= atoi (meta["indent.increment"].c_str ());
-          indent= o_scol + increment;
+          indent= char_column (lines[o_srow], o_scol) + increment;
           absolute= true;
         }
         if (c_srow >= 0 && c_srow != o_srow && c_srow == row &&

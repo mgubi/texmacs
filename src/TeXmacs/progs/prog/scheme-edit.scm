@@ -129,6 +129,12 @@
 
 (tm-define (program-compute-indentation doc row col)
   (:mode in-prog-scheme?)
+  ;; by the syntax tree when there is one (the same rules, from
+  ;; misc/tree-sitter/scheme/indents.scm), else by the characters
+  (or (syntax-compute-indentation doc row (get-tabstop))
+      (scheme-indentation-by-characters doc row col)))
+
+(tm-define (scheme-indentation-by-characters doc row col)
   (let* ((l (previous-arguments doc row col 10))
          (t (reference-type doc l))
          (i (indent-get-arity t))

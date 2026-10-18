@@ -1130,6 +1130,33 @@ installed, and the old behaviour stays elsewhere.
   arriving in a hidden line unfolds it (`edit_cursor.cpp`); saving,
   copying, exporting see all the lines; printing shows what the screen
   shows. Focus > Folds: Fold or unfold, Fold all definitions, Unfold all.
+- **Scheme indented by the tree** (same day). `prog/scheme-edit.scm` indents
+  Lisp by scanning characters back to the open bracket: aligned with the
+  first argument on the line of the last one, or, after a keyword of
+  `progs/tm-mode.el` of arity i (`utils/misc/tm-keywords.scm`), the column
+  of the operator plus 3 for its first i arguments and plus 1 for the
+  body. The model of Neovim cannot say this (its captures go to nodes, not
+  to lines, and it cannot count the elements before a line), so
+  `misc/tree-sitter/scheme/indents.scm` is generated from tm-mode.el
+  (`misc/tree-sitter/gen-scheme-indents.py`: every list and vector is
+  `@indent.lisp`, the lists of a keyword get `indent.arity`) and
+  `syntax_region_indent` applies the same rules on the tree (columns in
+  characters, an entity `<name>` counting as one, as `get-offset` does;
+  the aligned indents of Neovim now count so too).
+  `program-compute-indentation` of Scheme asks the tree first. Checked on
+  all the Scheme of TeXmacs (595 files, 238074 lines): 232775 lines get
+  the same indentation; of the 5299 others, 4654 follow lines indented with
+  tabs (the scanner takes a tab for a character of a word), 500 follow a
+  character such as `#\)` or a string with `\"` (which the scanner takes
+  for a bracket or the end of a string), 115 follow a quote or unquote
+  prefix (`'(`, `,@`, counted as one more argument), 18 are at top level
+  after comments or comment lines, 6 are `(:use`, which tm-mode.el lists as
+  nullary but the old lookup misses (the files are indented as the tree
+  says), 5 are in strings over several lines; one is wrong in the tree:
+  `2d-list`, which the grammar reads as a number and a symbol. The grammar
+  also got two changes for the Scheme of TeXmacs: hexadecimal escapes
+  without semicolon (`"\x10"`, which made ERROR nodes in 30 files) and `|`
+  as a character of symbols (no `|...|` symbols of R7RS).
 - A pitfall of the tests: the suites run in one TeXmacs, and a key typed
   in program code loads the keyboard of programs and its modules, which
   changed the highlighting of Fortran and the entering of mathematics in
