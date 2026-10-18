@@ -4035,6 +4035,14 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(cpp-source-snippet-\<gtr\>texmacs <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|source_snippet_to_tree> which returns
+    <scm|tree>.
+  </explain>
+
+  <\explain>
     <scm|(parse-latex <scm-arg|string>)>
 <explain-synopsis|no synopsis>
   <|explain>

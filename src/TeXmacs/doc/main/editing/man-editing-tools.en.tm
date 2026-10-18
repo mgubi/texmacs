@@ -37,6 +37,8 @@
 
     <branch|Working with Git|man-git.en.tm>
 
+    <branch|Editing source files|man-source-files.en.tm>
+
     <branch|Language servers for source code|man-language-servers.en.tm>
   </traverse>
 
