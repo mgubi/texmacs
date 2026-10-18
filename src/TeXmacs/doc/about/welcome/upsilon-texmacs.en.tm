@@ -161,11 +161,11 @@
 
   <section|Builds and problems>
 
-  Builds for <name|macOS> (<name|Cocoa> and <name|Vue>), <name|Linux> and
-  <name|Windows> (<name|Qt> and <name|Vue>) are made by the continuous
-  integration of the repository; the <name|macOS> applications are in the
-  pre-release
-  <hlink|upsilon-latest|https://github.com/mgubi/texmacs/releases/tag/upsilon-latest>.
+  Builds for <name|macOS> (<name|Cocoa>, <name|Vue> and <name|Qt>),
+  <name|Linux> and <name|Windows> (<name|Qt> and <name|Vue>) are made by the
+  continuous integration of the repository at each change, and can be
+  downloaded from
+  <hlink|mgubi.github.io/texmacs/downloads.html|https://mgubi.github.io/texmacs/downloads.html>.
   Problems are reported in the
   <hlink|issues|https://github.com/mgubi/texmacs/issues> of the
   repository, not to the official <TeXmacs>.

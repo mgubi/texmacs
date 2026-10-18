@@ -125,7 +125,7 @@ all: $(OUT)/texmacs.js
 # declared in shell.html
 WEB_ICONS := $(foreach n,16 32 48 64 128 192,$(OUT)/web/texmacs-vue-$(n).png) $(OUT)/web/favicon.ico
 
-web: $(OUT)/web/texmacs.html $(OUT)/web/texmacs-files.json $(WEB_ICONS) tikzjax asymptote python r
+web: $(OUT)/web/texmacs.html $(OUT)/web/texmacs-files.json $(WEB_ICONS) $(OUT)/web/downloads.html tikzjax asymptote python r
 
 # the TeX of the TikZ plugin (plugins/tikz, src/docs/wasm/tikzjax.md):
 # TikZJax, fetched by get-tikzjax.sh, without its fonts and the part of its
@@ -199,6 +199,12 @@ $(OUT)/web/texmacs-vue-%.png: $(TM)/TeXmacs/misc/images/texmacs-vue-%.png
 	cp $< $@
 
 $(OUT)/web/favicon.ico: $(TM)/TeXmacs/misc/images/texmacs-vue.ico
+	@mkdir -p $(OUT)/web
+	cp $< $@
+
+# the page of the desktop builds (the files of the pre-release upsilon-latest,
+# listed from the API of GitHub)
+$(OUT)/web/downloads.html: $(W)/downloads.html
 	@mkdir -p $(OUT)/web
 	cp $< $@
 

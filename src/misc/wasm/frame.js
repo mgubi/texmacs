@@ -1256,7 +1256,7 @@ var tmFrame = (function () {
            'mathematics included. Expect rough edges: ',
            ['more info and limitations', showAbout], '. ',
            ['Sources and notes on GitHub', 'https://github.com/mgubi/texmacs/tree/upsilon_texmacs'],
-           '.']);
+           '; ', ['TeXmacs Upsilon for macOS, Linux and Windows', 'downloads.html'], '.']);
     para (['A link to this page can open a document from the web, and pass options and ' +
            'Scheme commands to TeXmacs: see ', ['the options of the address', showAddressOptions],
            '.']);

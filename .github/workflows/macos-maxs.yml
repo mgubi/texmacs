@@ -253,8 +253,11 @@ jobs:
           retention-days: 14
 
   release:
-    needs: dmg
-    if: github.ref == 'refs/heads/upsilon_ci'
+    # the files of macOS in the pre-release upsilon-latest; the Linux and
+    # Windows packages are added to it by maxs-linux-windows.yml. Each
+    # workflow replaces and removes only its own files
+    needs: [dmg, qt]
+    if: always() && github.ref == 'refs/heads/upsilon_ci' && needs.dmg.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -266,6 +269,12 @@ jobs:
           path: dist
           merge-multiple: true
 
+      - uses: actions/download-artifact@v8
+        if: needs.qt.result == 'success'
+        with:
+          name: texmacs-qt-macos-arm64
+          path: dist
+
       - name: The pre-release upsilon-latest
         env:
           GH_TOKEN: ${{ github.token }}
@@ -273,39 +282,62 @@ jobs:
         run: |
           ls dist/*-cocoa-universal.dmg dist/*-vue-universal.dmg || { echo "error: a disk image is missing"; exit 1; }
           tag=upsilon-latest
+          built="commit ${GITHUB_SHA:0:10}, $(date -u +%Y-%m-%d)"
           cat > notes.md << EOF
-          The latest build of GNU TeXmacs from the branch \`upsilon_texmacs\`
-          (commit ${GITHUB_SHA:0:10}, $(date -u +%Y-%m-%d)), with the S7
-          Scheme interpreter; it is replaced at each build. The tag
-          \`upsilon-latest\` does not follow the builds: the commit built is
-          the one named here.
+          The latest builds of TeXmacs Upsilon, an enhanced and bleeding-edge
+          version of GNU TeXmacs with experimental features, from the branch
+          \`upsilon_texmacs\`, with the S7 Scheme interpreter. Each file is
+          replaced at each build of its platform, and its label names the
+          commit it was built from (the macOS files: ${built}). The tag
+          \`upsilon-latest\` does not follow the builds. The list of the
+          files, with what each one is: https://mgubi.github.io/texmacs/downloads.html
 
-          * \`TeXmacs-*-cocoa-universal.dmg\`: the native interface of macOS
-            (Cocoa), see [doc/ns-port.md](https://github.com/${GH_REPO}/blob/${GITHUB_SHA}/doc/ns-port.md).
-          * \`TeXmacs-*-vue-universal.dmg\`: the Vue port (SDL3 and Clay),
-            drawn by the GPU (OpenGL and ThorVG; \`TEXMACS_VUE_GPU=0\` to
-            draw with MuPDF), see [vue-graphics-stack.md](https://github.com/${GH_REPO}/blob/${GITHUB_SHA}/src/docs/vue-graphics-stack.md).
-          * One application for Apple silicon and Intel, macOS 13 or later.
-          * Signed ad hoc and not notarized: macOS refuses to open it the
-            first time. Open it from the context menu (Open), or allow it
-            in System Settings > Privacy & Security, or remove the
-            quarantine: \`xattr -dr com.apple.quarantine /Applications/TeXmacs.app\`
+          * macOS (Apple silicon and Intel, macOS 13 or later):
+            \`TeXmacs-*-cocoa-universal.dmg\`, the native interface (Cocoa),
+            see [doc/ns-port.md](https://github.com/${GH_REPO}/blob/${GITHUB_SHA}/doc/ns-port.md);
+            \`TeXmacs-*-vue-universal.dmg\`, the Vue interface, drawn by the
+            GPU, see [vue-graphics-stack.md](https://github.com/${GH_REPO}/blob/${GITHUB_SHA}/src/docs/vue-graphics-stack.md);
+            \`texmacs-qt-macos-arm64.zip\`, Qt 6, Apple silicon only.
+            Signed ad hoc and not notarized: macOS refuses to open them the
+            first time. Open the application from its context menu (Open),
+            or allow it in System Settings > Privacy & Security, or remove
+            the quarantine: \`xattr -dr com.apple.quarantine /Applications/TeXmacs.app\`
+          * Linux (x86_64, built on Ubuntu 24.04):
+            \`texmacs-linux-x86_64.tar.gz\` (Qt 6) and
+            \`texmacs-vue-linux-x86_64.tar.gz\` (Vue): unpack, and run
+            \`TEXMACS_PATH=\$PWD/TeXmacs TeXmacs/bin/texmacs\` in the folder of
+            the archive. The Qt build uses the Qt 6 of the system (Ubuntu:
+            \`sudo apt install libqt6svg6 qt6-qpa-plugins\`).
+          * Windows (x86_64): \`texmacs-windows-x86_64.zip\` (Qt 6) and
+            \`texmacs-vue-windows-x86_64.zip\` (Vue): unpack, and run
+            \`TeXmacs-Windows\\bin\\texmacs.exe\`.
 
-          Built by [this run](https://github.com/${GH_REPO}/actions/runs/${GITHUB_RUN_ID}).
+          The macOS files were built by [this run](https://github.com/${GH_REPO}/actions/runs/${GITHUB_RUN_ID}).
           EOF
+          label () {
+            case "$1" in
+              *-cocoa-universal.dmg) echo "macOS, Cocoa, universal ($built)" ;;
+              *-vue-universal.dmg)   echo "macOS, Vue, universal ($built)" ;;
+              texmacs-qt-macos-*)    echo "macOS, Qt 6, Apple silicon ($built)" ;;
+            esac
+          }
+          files=()
+          for f in dist/*; do files+=("$f#$(label "$(basename "$f")")"); done
           # The release is updated in place and its tag never moves: the token
           # of the workflow cannot create a tag on a commit whose workflow
           # files are no longer those of the branch (HTTP 403, it needs the
           # scope workflow), which happens as soon as a build is overtaken.
           # Deleting and recreating the release lost it at the first refusal.
           if gh release view "$tag" > /dev/null 2>&1; then
-            gh release upload "$tag" dist/*.dmg --clobber
+            gh release upload "$tag" "${files[@]}" --clobber
+            # the disk images of a former version: removed (the files of
+            # Linux and Windows belong to the other workflow)
             for old in $(gh release view "$tag" --json assets -q '.assets[].name'); do
-              [ -e "dist/$old" ] || gh release delete-asset "$tag" "$old" --yes
+              case "$old" in *.dmg) [ -e "dist/$old" ] || gh release delete-asset "$tag" "$old" --yes ;; esac
             done
             gh release edit "$tag" --notes-file notes.md
           else
-            gh release create "$tag" dist/*.dmg --target "$GITHUB_SHA" --prerelease \
-              --title "TeXmacs upsilon_texmacs for macOS (Cocoa and Vue), latest build" --notes-file notes.md ||
+            gh release create "$tag" "${files[@]}" --target "$GITHUB_SHA" --prerelease \
+              --title "TeXmacs Upsilon, latest builds" --notes-file notes.md ||
               { echo "error: create the release $tag once by hand (gh release create with the scope workflow)"; exit 1; }
           fi

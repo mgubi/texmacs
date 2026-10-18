@@ -408,3 +408,66 @@ jobs:
           name: snapshots-vue-windows
           path: snapshots
           if-no-files-found: ignore
+
+  release:
+    # the packages of the jobs which passed, in the pre-release
+    # upsilon-latest (made by macos-maxs.yml, which writes its notes): each
+    # file replaces the one of the former build, with a label naming the
+    # commit; the files of macOS are not touched
+    needs: [linux, windows, linux-vue, windows-vue]
+    if: always() && github.ref == 'refs/heads/upsilon_ci'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        if: needs.linux.result == 'success'
+        with:
+          name: texmacs-linux-x86_64
+          path: dist
+      - uses: actions/download-artifact@v4
+        if: needs.windows.result == 'success'
+        with:
+          name: texmacs-windows-x86_64
+          path: dist
+      - uses: actions/download-artifact@v4
+        if: needs.linux-vue.result == 'success'
+        with:
+          name: texmacs-vue-linux-x86_64
+          path: dist
+      - uses: actions/download-artifact@v4
+        if: needs.windows-vue.result == 'success'
+        with:
+          name: texmacs-vue-windows-x86_64
+          path: dist
+
+      - name: The files of Linux and Windows in upsilon-latest
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          tag=upsilon-latest
+          built="commit ${GITHUB_SHA:0:10}, $(date -u +%Y-%m-%d)"
+          shopt -s nullglob
+          files=()
+          for f in dist/*; do
+            case "$(basename "$f")" in
+              texmacs-linux-*)       l="Linux, Qt 6, x86_64" ;;
+              texmacs-vue-linux-*)   l="Linux, Vue, x86_64" ;;
+              texmacs-windows-*)     l="Windows, Qt 6, x86_64" ;;
+              texmacs-vue-windows-*) l="Windows, Vue, x86_64" ;;
+              *) continue ;;
+            esac
+            files+=("$f#$l ($built)")
+          done
+          [ ${#files[@]} -gt 0 ] || { echo "no package passed: nothing to publish"; exit 0; }
+          if ! gh release view "$tag" > /dev/null 2>&1; then
+            # (the macOS workflow makes it, with its notes; it may not have yet)
+            gh release create "$tag" --target "$GITHUB_SHA" --prerelease \
+              --title "TeXmacs Upsilon, latest builds" \
+              --notes "The latest builds of TeXmacs Upsilon: https://mgubi.github.io/texmacs/downloads.html" ||
+              gh release view "$tag" > /dev/null ||
+              { echo "error: create the release $tag once by hand (gh release create with the scope workflow)"; exit 1; }
+          fi
+          gh release upload "$tag" "${files[@]}" --clobber

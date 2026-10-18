@@ -43,24 +43,24 @@ below.
 
 ## Builds to download
 
-The CI of the branch `upsilon_ci` (`git push -f origin upsilon_texmacs:upsilon_ci`)
-builds and tests every platform:
+**<https://mgubi.github.io/texmacs/downloads.html>** lists the latest
+builds of every platform, which anyone can download, without a GitHub
+login. They are made and tested by the CI of the branch `upsilon_ci`
+(`git push -f origin upsilon_texmacs:upsilon_ci`), with s7, and are the
+files of the pre-release
+[`upsilon-latest`](https://github.com/mgubi/texmacs/releases/tag/upsilon-latest):
+each one is replaced at each build of its platform, and its label names
+the commit it was built from.
 
-* **macOS** (Apple silicon and Intel, macOS 13 or later, s7): the Cocoa and
-  the Vue applications as universal disk images, in the pre-release
-  [`upsilon-latest`](https://github.com/mgubi/texmacs/releases/tag/upsilon-latest),
-  replaced at each build (its notes name the commit built). They are signed
-  ad hoc and not notarized: open the application from its context menu the
-  first time, or run
-  `xattr -dr com.apple.quarantine /Applications/TeXmacs.app`. A Qt 6 build
-  for Apple silicon is an artifact of the same workflow
-  (`.github/workflows/macos-maxs.yml`).
-* **Linux** (Ubuntu 24.04, x86_64) and **Windows** (MSYS2 MinGW-w64,
-  x86_64), with Qt 6 or with Vue: artifacts of the workflow *Linux and
-  Windows (upsilon_texmacs, Qt and Vue)*
-  (`.github/workflows/maxs-linux-windows.yml`) on the
-  [Actions page](https://github.com/mgubi/texmacs/actions); downloading
-  them needs a GitHub login, and they expire after some weeks.
+* **macOS** (Apple silicon and Intel, macOS 13 or later): the Cocoa and
+  the Vue applications as universal disk images, and Qt 6 for Apple
+  silicon (`.github/workflows/macos-maxs.yml`). They are signed ad hoc and
+  not notarized: open the application from its context menu the first
+  time, or run `xattr -dr com.apple.quarantine /Applications/TeXmacs.app`.
+* **Linux** (built on Ubuntu 24.04, x86_64) and **Windows** (MSYS2
+  MinGW-w64, x86_64), with Qt 6 or with Vue
+  (`.github/workflows/maxs-linux-windows.yml`). The Linux Qt build uses
+  the Qt 6 of the system.
 * **The browser**: <https://mgubi.github.io/texmacs/>, see below.
 
 Problems are reported in the

@@ -280,6 +280,12 @@
   <paragraph|18 October 2026>
 
   <\itemize>
+    <item>A page of the site,
+    <hlink|downloads.html|https://mgubi.github.io/texmacs/downloads.html>,
+    lists the builds of <TeXmacs> Upsilon for <name|macOS>, <name|Linux> and
+    <name|Windows>, which anyone can download; the menu of
+    <with|font-series|bold|TeXmacs <name|Vue>> links to it.
+
     <item>This version of <TeXmacs> is now called <TeXmacs> Upsilon (it was
     Max's <TeXmacs>), and its branch <verbatim|upsilon_texmacs>.
 
