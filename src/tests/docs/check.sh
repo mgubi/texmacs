@@ -94,7 +94,7 @@ run_tm () {
   perl -e 'alarm shift; exec @ARGV' "$timeout" "$bin" \
     -x "(begin (catch #t (lambda () (load \"$scm\") $2)
                          (lambda args (display* \"error: \" args \"\\n\")))
-               (quit))" -q >> "$1" 2>&1
+               (quit-TeXmacs))" -q >> "$1" 2>&1
 }
 
 # the warnings and errors which TeXmacs prints between the BEGIN and END
@@ -107,7 +107,9 @@ log_problems () {
     /^TEXMACS_PATH is set|^Welcome to TeXmacs|^warning: guile hooks/ { cur = ""; next }
     /^(PROBLEM|INFO)\t/ { next }
     cur == "" { next }
-    /approximating font|convert command is deprecated|Generating (table|index)/ { next }
+    # (missing font: the font database of the home was just made or
+    # merged, which loads the global list once; it names no font)
+    /approximating font|convert command is deprecated|Generating (table|index)|missing font, loading global substitution list/ { next }
     type == "book" && /Undefined reference/ { next }
     tolower($0) ~ /warning|error|abort|segmentation|exception|bad link/ {
       msg = $0; gsub(doc, "", msg); sub(/^TeXmacs\] /, "", msg)

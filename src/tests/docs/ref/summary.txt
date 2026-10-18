@@ -1,7 +1,5 @@
 book	main/man-user-manual.de.tm	log	warning, missing font, loading global substitution list
 book	main/man-user-manual.de.tm	undefined-reference	auto-* (123 page numbers of the table of contents or the index are ?)
-book	main/man-user-manual.en.tm	log	typeset-warning, Redefined sec-man-preferences as A.1
-book	main/man-user-manual.en.tm	log	typeset-warning, Redefined sec-man-preferences as E.3
 book	main/man-user-manual.pt.tm	log	bad link or file <url main/styles/std-dtds/number-env-dtd.en.tm>
 book	main/man-user-manual.zh.tm	log	warning, missing font, loading global substitution list
 file	about/welcome/first.de.tm	language	english in a .de.tm file
@@ -19,21 +17,21 @@ file	main/styles/std-dtds/number-dtds.pt.tm	broken-branch	number-env-dtd.en.tm
 file	main/styles/std-dtds/number-section-dtd.pt.tm	language	english in a .pt.tm file
 file	main/styles/std/std-utils-dtd.de.tm	language	english in a .de.tm file
 file	main/text/man-fonts.de.tm	log	warning, missing font, loading global substitution list
-stat	devel/scheme/scheme.en.tm	idx	12
-stat	devel/scheme/scheme.en.tm	pages	157
-stat	devel/scheme/scheme.en.tm	toc	115
-stat	devel/source/source.en.tm	idx	4
-stat	devel/source/source.en.tm	pages	49
-stat	devel/source/source.en.tm	toc	88
+stat	devel/scheme/scheme.en.tm	idx	27
+stat	devel/scheme/scheme.en.tm	pages	229
+stat	devel/scheme/scheme.en.tm	toc	214
+stat	devel/source/source.en.tm	idx	293
+stat	devel/source/source.en.tm	pages	987
+stat	devel/source/source.en.tm	toc	1887
 stat	devel/source/source.fr.tm	idx	2
 stat	devel/source/source.fr.tm	pages	47
 stat	devel/source/source.fr.tm	toc	88
 stat	main/man-user-manual.de.tm	idx	1061
 stat	main/man-user-manual.de.tm	pages	234
 stat	main/man-user-manual.de.tm	toc	297
-stat	main/man-user-manual.en.tm	idx	1251
-stat	main/man-user-manual.en.tm	pages	290
-stat	main/man-user-manual.en.tm	toc	398
+stat	main/man-user-manual.en.tm	idx	1839
+stat	main/man-user-manual.en.tm	pages	385
+stat	main/man-user-manual.en.tm	toc	571
 stat	main/man-user-manual.es.tm	idx	248
 stat	main/man-user-manual.es.tm	pages	93
 stat	main/man-user-manual.es.tm	toc	142
