@@ -82,6 +82,25 @@
   images (<name|Claude> among them): they draw in <name|TikZ> or
   <name|SVG>.
 
+  <subsection*|Attached files>
+
+  <with|font-series|bold|Attach> in the focus bar of a session attaches a
+  file to the question at the cursor; it shows as its name in a frame,
+  which is deleted as a character. A question may have several. The text
+  files (LaTeX, Markdown, BibTeX, the sources of programs, plain text) are
+  sent after the text of the question, a <TeXmacs> document as LaTeX; the
+  images (PNG, JPEG, GIF, WebP) and the PDF files are sent as such, to
+  <name|ChatGPT>, <name|Claude>, <name|Gemini> and <name|OpenRouter>
+  (<name|Mistral> and <name|Ollama> take the images but not the PDF files,
+  with the models which see images, and <name|Albert> the text files only).
+  A file larger than 20 MB is not sent.
+
+  The document keeps the name of each file and where it is, not the file
+  itself: a file which was moved or deleted is said to be missing when its
+  question is asked. The files stay with their question: the questions
+  above the one which is asked, sent as its context, go with their files,
+  whose tokens are then counted again.
+
   <subsection*|Reasoning, tokens and costs>
 
   The models which reason before they answer keep their reasoning folded
