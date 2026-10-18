@@ -4,6 +4,17 @@
 #include <setjmp.h>
 #include <stdint.h>
 
+// the jumps of the errors save and restore no signal mask (a system call
+// each on macOS, where setjmp saves it; glibc's does not): they never leave
+// a signal handler
+#ifdef __APPLE__
+#define fl_setjmp(b) _setjmp(b)
+#define fl_longjmp(b, v) _longjmp(b, v)
+#else
+#define fl_setjmp(b) setjmp(b)
+#define fl_longjmp(b, v) longjmp(b, v)
+#endif
+
 typedef uptrint_t value_t;
 typedef int_t fixnum_t;
 #ifdef BITS64
@@ -183,7 +194,7 @@ extern value_t fl_lasterror;
 #define FL_TRY_EXTERN                                                   \
   fl_exception_context_t _ctx; int l__tr, l__ca;                        \
   fl_savestate(&_ctx); fl_ctx = &_ctx;                                  \
-  if (!setjmp(_ctx.buf))                                                \
+  if (!fl_setjmp(_ctx.buf))                                             \
     for (l__tr=1; l__tr; l__tr=0, (void)(fl_ctx=fl_ctx->prev))
 
 #define FL_CATCH_EXTERN \

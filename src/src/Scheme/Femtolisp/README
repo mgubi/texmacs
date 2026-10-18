@@ -85,6 +85,9 @@ The patches
       function (boot-femtolisp.scm)
 0023  the size of the heap has 64 bits: it stops growing at 8 Gb instead of
       1 Gb (0012)
+0024  on macOS the jumps of the errors save and restore no signal mask
+      (_setjmp, _longjmp): a system call less at each call from C, a fifth
+      of the time of the scanners of tree-sitter
 
 The patches which change system.lsp or compiler.lsp regenerate flisp.boot.
 
