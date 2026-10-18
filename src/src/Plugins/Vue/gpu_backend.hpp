@@ -141,11 +141,16 @@ public:
   // RGBA, rows from the top
   virtual bool read (gpu_texture src, int sw, int sh,
                      int x, int y, int w, int h, unsigned char* rgba) = 0;
+  // a frame of a window which is not presented (the same as the last one,
+  // vue_gpu_skip): a backend whose screen lives for one frame (WebGPU in
+  // the browser) lets it go
+  virtual void skip_frame () {}
   virtual void flush () = 0;    // what was drawn goes to the GPU
   virtual void finish () = 0;   // and is done
 };
 
 gpu_backend* gpu_gl_backend ();     // NULL when not compiled (USE_THORVG)
 gpu_backend* gpu_metal_backend ();  // NULL when not compiled (USE_METAL)
+gpu_backend* gpu_webgpu_backend (); // the browser only (gpu_backend_wg.cpp)
 
 #endif // defined GPU_BACKEND_HPP

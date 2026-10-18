@@ -1201,8 +1201,11 @@ var tmFrame = (function () {
   // failed at the start, in which case the canvas is a 2D one)
   function drawnBy () {
     var c = document.getElementById ('canvas'), gl = null;
-    try { if (c && typeof runtimeInitialized !== 'undefined' && runtimeInitialized)
-            gl = c.getContext ('webgl2'); } catch (e) {}
+    var ready = c && typeof runtimeInitialized !== 'undefined' && runtimeInitialized;
+    // (WebGPU: ?gpu=webgpu, the device given by web-pre.js)
+    try { if (ready && window.tmWebGPU && c.getContext ('webgpu'))
+            return 'Drawn by the GPU (WebGPU and ThorVG).'; } catch (e) {}
+    try { if (ready) gl = c.getContext ('webgl2'); } catch (e) {}
     if (gl) return 'Drawn by the GPU (WebGL2 and ThorVG).';
     var why = !app.thorvg ? 'this build has no ThorVG'
             : (typeof tmAddress !== 'undefined' && tmAddress.get ('gpu') === '0') ? 'the address says ?gpu=0'

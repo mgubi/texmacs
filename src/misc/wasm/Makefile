@@ -91,7 +91,9 @@ override THORVG :=
 endif
 THORVG_LIB :=
 ifneq ($(THORVG),)
-CPPFLAGS += -DUSE_THORVG -I$(THORVG)/include/thorvg-1
+# (and its WebGPU engine: Dawn's webgpu.h for Emscripten, the port
+# emdawnwebgpu, with which the page draws by WebGPU, gpu_backend_wg.cpp)
+CPPFLAGS += -DUSE_THORVG -I$(THORVG)/include/thorvg-1 --use-port=emdawnwebgpu
 THORVG_LIB := $(THORVG)/lib/libthorvg-1.a
 endif
 
@@ -107,7 +109,7 @@ LDFLAGS  := $(OPT) $(EH) -sUSE_SDL=3 -sALLOW_MEMORY_GROWTH=1 \
 LIBS     := $(MUPDF_LIB)/libmupdf.a $(MUPDF_LIB)/libmupdf-third.a -lm
 ifneq ($(THORVG),)
 LIBS     += $(THORVG)/lib/libthorvg-1.a
-LDFLAGS  += -sMAX_WEBGL_VERSION=2 -sMIN_WEBGL_VERSION=2
+LDFLAGS  += -sMAX_WEBGL_VERSION=2 -sMIN_WEBGL_VERSION=2 --use-port=emdawnwebgpu
 endif
 # a new MuPDF (build-mupdf.sh, its patches) links the program again
 LIBDEPS  := $(MUPDF_LIB)/libmupdf.a $(MUPDF_LIB)/libmupdf-third.a $(THORVG_LIB)

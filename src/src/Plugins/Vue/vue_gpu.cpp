@@ -49,6 +49,7 @@ bool vue_gpu_follow_glyph_settings () { return false; }
 bool vue_gpu_attach (SDL_Window* w) { (void) w; return false; }
 bool vue_gpu_ready (SDL_Window* w) { (void) w; return false; }
 void vue_gpu_present (SDL_Window* w) { (void) w; }
+void vue_gpu_skip (SDL_Window* w) { (void) w; }
 picture  gpu_backing_picture (int w, int h, bool t) { (void) w; (void) h; (void) t; return picture (); }
 bool     is_gpu_picture (picture p) { (void) p; return false; }
 bool     gpu_picture_ready (picture p) { (void) p; return false; }
@@ -225,11 +226,13 @@ gpu_backend* gpu_metal_backend () { return NULL; }
 
 // The backend: TEXMACS_VUE_GPU=0 draws with MuPDF, =gl or =metal chooses
 // the API; by default Metal on macOS when it is compiled (USE_METAL), else
-// OpenGL (USE_THORVG). Decided once.
+// OpenGL (USE_THORVG). Decided once. In the browser, =webgpu draws with
+// WebGPU (when the page has its device, see web-pre.js)
 static gpu_backend*
 choose_backend () {
   string v= get_env ("TEXMACS_VUE_GPU");
   if (v == "0") return NULL;
+  if (v == "webgpu" && gpu_webgpu_backend () != NULL) return gpu_webgpu_backend ();
   gpu_backend* gl= gpu_gl_backend ();
   gpu_backend* mtl= gpu_metal_backend ();
   if (v == "gl" || v == "opengl") return gl;
@@ -298,6 +301,13 @@ void
 vue_gpu_present (SDL_Window* w) {
   gpu_flush_all ();
   G.B->present (w);
+}
+
+void
+vue_gpu_skip (SDL_Window* w) {
+  (void) w;
+  gpu_flush_all ();
+  G.B->skip_frame ();
 }
 
 static bool

@@ -1391,7 +1391,7 @@ vue_sdl_gpu_window_rep::process_redraw () {
       }
     }
   }
-  if (same) return;
+  if (same) { vue_gpu_skip (sdl_win); return; }
   presented= h;
   t_ns= vue_profile_on ? SDL_GetTicksNS () : 0;
   vue_gpu_present (sdl_win);

@@ -259,6 +259,7 @@ Plugins/Updater/tm_updater.cpp
 Plugins/Updater/tm_winsparkle.cpp
 Plugins/Vue/clay.c
 Plugins/Vue/gpu_backend_gl.cpp
+Plugins/Vue/gpu_backend_wg.cpp
 Plugins/Vue/vue_gpu.cpp
 Plugins/Vue/vue_gui.cpp
 Plugins/Vue/vue_widget.cpp
