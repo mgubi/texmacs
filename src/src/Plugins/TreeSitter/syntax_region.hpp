@@ -35,6 +35,7 @@ array<array<int> > syntax_region_highlight (tree region, int language,
                                             int query, array<int> colors,
                                             int injections= -1,
                                             ts_injection_resolver resolve= NULL,
-                                            int epoch= 0);
+                                            int epoch= 0,
+                                            array<int>* recoloured= NULL);
 
 #endif // SYNTAX_REGION_H

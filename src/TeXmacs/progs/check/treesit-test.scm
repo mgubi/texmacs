@@ -492,6 +492,26 @@
         (let ((p (tree-sitter-pending-updates)))
           (check= (map tree->string p) '("y = 1;" "z */"))
           (check-true (tree-eq? (car p) (tree-ref b 1))))))
+    ;; after edits, the colours (only the lines out of date are coloured
+    ;; again) are those of a fresh highlighting
+    (with-test-buffer '(document "int a = 1;" "char* s = \"x\";" "int b = 2;"
+                                 "/* c */ int c;" "return a + b;")
+      (lambda (u b)
+        (let ((all (lambda (doc)
+                     (tree-sitter-line-colors "c" doc)
+                     (map (lambda (i) (tree-sitter-line-colors "c" (tree-ref doc i)))
+                          (iota (tree-arity doc))))))
+          (all b)
+          (tree-insert! (tree-ref b 0) 0 "/* ")
+          (all b)
+          (tree-insert! (tree-ref b 2) 10 " */")
+          (all b)
+          (tree-remove! (tree-ref b 0) 0 3)
+          (all b)
+          (tree-insert! b 2 '("x = \"open;" "y;"))
+          (all b)
+          (tree-remove! b 1 2)
+          (check= (all b) (all (stree->tree (tree->stree b)))))))
     ;; the typesetter highlights the code of scm-code
     (with-test-buffer '(document (scm-code (document "(define x 1)" "(if x \"a\" 'b)")))
       (lambda (u b)

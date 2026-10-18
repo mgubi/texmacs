@@ -226,14 +226,17 @@ regex_bases (TSQuery* q) {
 }
 
 void
-tree_sitter_query_run (int query, TSNode root, const char* text, array<int>& r) {
+tree_sitter_query_run (int query, TSNode root, const char* text, array<int>& r,
+                       int from= 0, int to= -1) {
   // append start, end (in bytes) and capture index of each capture of the
-  // query under root, in the order of the text, after the predicates
+  // query under root, in the order of the text, after the predicates; only
+  // the captures of the matches which meet the bytes from..to when to >= 0
   if (query < 0 || query >= N(ts_queries)) return;
   ts_query_entry* e= ts_queries[query];
   TSQuery* q= e->query;
   std::vector<int> regex_base= regex_bases (q);
   TSQueryCursor* c= ts_query_cursor_new ();
+  if (to >= 0) ts_query_cursor_set_byte_range (c, (uint32_t) from, (uint32_t) to);
   ts_query_cursor_exec (c, q, root);
   TSQueryMatch m;
   uint32_t index;
@@ -270,11 +273,12 @@ injection_property (TSQuery* q, uint32_t pattern) {
 
 void
 tree_sitter_query_injections (int query, TSNode root, const char* text,
-                              array<int>& ranges, array<string>& languages) {
+                              array<int>& ranges, array<string>& languages,
+                              int from, int to) {
   // the injections of a query (injections.scm) under root, after the
   // predicates: the start and end (in bytes) of each @injection.content,
   // and its language, the text of @injection.language or the value of
-  // #set! injection.language
+  // #set! injection.language; only those which meet from..to when to >= 0
   if (query < 0 || query >= N(ts_queries)) return;
   ts_query_entry* e= ts_queries[query];
   TSQuery* q= e->query;
@@ -289,6 +293,7 @@ tree_sitter_query_injections (int query, TSNode root, const char* text,
   if (content < 0) return;
   std::vector<int> regex_base= regex_bases (q);
   TSQueryCursor* c= ts_query_cursor_new ();
+  if (to >= 0) ts_query_cursor_set_byte_range (c, (uint32_t) from, (uint32_t) to);
   ts_query_cursor_exec (c, q, root);
   TSQueryMatch m;
   while (ts_query_cursor_next_match (c, &m)) {

@@ -19,9 +19,10 @@
 
 const TSLanguage* tree_sitter_get_language (int language);
 void tree_sitter_query_run (int query, TSNode root, const char* text,
-                            array<int>& r);
+                            array<int>& r, int from= 0, int to= -1);
 void tree_sitter_query_injections (int query, TSNode root, const char* text,
-                                   array<int>& ranges, array<string>& languages);
+                                   array<int>& ranges, array<string>& languages,
+                                   int from= 0, int to= -1);
 
 /******************************************************************************
 * Decoding the TeXmacs encoding
@@ -102,9 +103,9 @@ struct syntax_region_rep {
   TSTree* tree;
   int full_parses, incremental_parses;
   int version;                 // changes at each parse
-  int hl_query, hl_version;    // the colours below are for these
-  int hl_injections, hl_epoch;
-  array<array<int> > hl_cols;  // colour per position, per line
+  int hl_query, hl_injections, hl_epoch;  // the colours below are for these
+  array<array<int> > hl_cols;  // colour per position, per line (or empty)
+  array<bool> hl_dirty;        // the lines whose colours are out of date
 };
 
 static array<syntax_region_rep*> regions;
@@ -221,8 +222,30 @@ region_update (syntax_region_rep* r) {
   ts_tree_edit (r->tree, &e);
   r->lines= cur;
   r->offsets= new_offsets;
+  TSTree* old_tree= ts_tree_copy (r->tree);
   region_parse (r, r->tree);
   r->incremental_parses++;
+  // the colours: those of the unchanged lines are kept, the changed lines
+  // and those where the syntax changed (a comment opened above them...)
+  // are out of date
+  if (N(r->hl_cols) == n0) {
+    array<array<int> > cols;
+    array<bool> dirty;
+    for (int i= 0; i < a; i++) { cols << r->hl_cols[i]; dirty << r->hl_dirty[i]; }
+    for (int i= a; i < n1 - b; i++) { cols << array<int> (); dirty << true; }
+    for (int i= n0 - b; i < n0; i++) { cols << r->hl_cols[i]; dirty << r->hl_dirty[i]; }
+    uint32_t count;
+    TSRange* ranges= ts_tree_get_changed_ranges (old_tree, r->tree, &count);
+    for (uint32_t k= 0; k < count; k++) {
+      int r1= (int) ranges[k].start_point.row;
+      int r2= min ((int) ranges[k].end_point.row, n1 - 1);
+      for (int i= max (r1, 0); i <= r2; i++) dirty[i]= true;
+    }
+    free (ranges);
+    r->hl_cols= cols;
+    r->hl_dirty= dirty;
+  }
+  ts_tree_delete (old_tree);
 }
 
 static void
@@ -253,6 +276,7 @@ get_region (tree root, int language) {
         r->tree= NULL;
         region_parse (r, NULL);
         r->full_parses++;
+        r->hl_cols= array<array<int> > ();
       }
       else region_update (r);
       return r;
@@ -268,7 +292,6 @@ get_region (tree root, int language) {
   r->incremental_parses= 0;
   r->version= 0;
   r->hl_query= -1;
-  r->hl_version= -1;
   r->hl_injections= -1;
   r->hl_epoch= -1;
   ts_parser_set_language (r->parser, lang);
@@ -445,7 +468,7 @@ static void
 paint_captures (array<int>& caps, array<int>& colors, array<int>& paint,
                 int offset, int end) {
   // paint the captures (start, end, capture index) of a query, shifted by
-  // offset, up to end. As in tree-sitter-highlight, the last pattern which
+  // offset, between max (offset, 0) and end (paint has end positions). As in tree-sitter-highlight, the last pattern which
   // captures a node gives its colour (none when its capture has no colour),
   // and an inner node is painted over an outer one. Nodes are told apart
   // by their ranges.
@@ -460,7 +483,7 @@ paint_captures (array<int>& caps, array<int>& colors, array<int>& paint,
     if (k + 1 < v.size () && v[k].start == v[k+1].start && v[k].end == v[k+1].end)
       continue;
     if (v[k].color == 0) continue;
-    int a= max (v[k].start, offset), b= min (v[k].end, end);
+    int a= max (v[k].start, max (offset, 0)), b= min (v[k].end, end);
     for (int i= a; i < b; i++) paint[i]= v[k].color;
   }
 }
@@ -478,9 +501,10 @@ text_read (void* payload, uint32_t byte, TSPoint p, uint32_t* bytes_read) {
 
 static void
 paint_injection (const char* text, int start, int end, int language,
-                 int query, array<int>& colors, array<int>& paint) {
+                 int query, array<int>& colors, array<int>& paint,
+                 int from, int to) {
   // the text start..end parsed in another language and painted with its
-  // highlight query
+  // highlight query, where it meets from..to (paint holds these positions)
   const TSLanguage* lang= tree_sitter_get_language (language);
   if (lang == NULL || start >= end) return;
   TSParser* p= ts_parser_new ();
@@ -493,8 +517,10 @@ paint_injection (const char* text, int start, int end, int language,
     string sub (text + start, end - start);
     c_string csub (sub);
     array<int> caps;
-    tree_sitter_query_run (query, ts_tree_root_node (t), csub, caps);
-    paint_captures (caps, colors, paint, start, end);
+    tree_sitter_query_run (query, ts_tree_root_node (t), csub, caps,
+                           max (from - start, 0), min (to, end) - start);
+    // (an injection which starts before from has a negative offset)
+    paint_captures (caps, colors, paint, start - from, min (end, to) - from);
     ts_tree_delete (t);
   }
   ts_parser_delete (p);
@@ -503,52 +529,64 @@ paint_injection (const char* text, int start, int end, int language,
 array<array<int> >
 syntax_region_highlight (tree root, int language, int query, array<int> colors,
                          int injections, ts_injection_resolver resolve,
-                         int epoch) {
+                         int epoch, array<int>* recoloured) {
   // the colour codes of each position of each line, for the query with the
   // colour code of each capture (0: no colour; see paint_captures); then
   // the injections (a query of injections.scm, or -1): the ranges which it
   // gives in other languages, coloured by the highlighters of these
-  // languages (resolve, which epoch changes) over the colours of the region
+  // languages (resolve, which epoch changes) over the colours of the region.
+  // After an edit, only the lines whose colours are out of date are
+  // coloured again (the query runs on their bytes); their rows are appended
+  // to recoloured, when given.
   syntax_region_rep* r= get_region (root, language);
   if (r == NULL) return array<array<int> > ();
-  if (r->hl_query == query && r->hl_version == r->version &&
-      r->hl_injections == injections && r->hl_epoch == epoch)
-    return r->hl_cols;
+  int n= N(r->lines);
+  if (r->hl_query != query || r->hl_injections != injections ||
+      r->hl_epoch != epoch || N(r->hl_cols) != n) {
+    r->hl_cols= array<array<int> > (n);
+    r->hl_dirty= array<bool> (n);
+    for (int i= 0; i < n; i++) r->hl_dirty[i]= true;
+    r->hl_query= query;
+    r->hl_injections= injections;
+    r->hl_epoch= epoch;
+  }
+  int first= 0, last= n - 1;
+  while (first < n && !r->hl_dirty[first]) first++;
+  while (last >= first && !r->hl_dirty[last]) last--;
+  if (first > last) return r->hl_cols;
   string text;
-  for (int i= 0; i < N(r->lines); i++) {
+  for (int i= 0; i < n; i++) {
     if (i > 0) text << "\n";
     text << r->lines[i];
   }
+  int from= r->offsets[first];
+  int to= r->offsets[last] + N(r->lines[last]);
   array<int> caps;
   c_string ctext (text);
   TSNode top= ts_tree_root_node (r->tree);
-  tree_sitter_query_run (query, top, ctext, caps);
-  array<int> paint (N(text));
-  for (int i= 0; i < N(text); i++) paint[i]= 0;
-  paint_captures (caps, colors, paint, 0, N(text));
+  tree_sitter_query_run (query, top, ctext, caps, from, to);
+  array<int> paint (to - from);
+  for (int i= 0; i < to - from; i++) paint[i]= 0;
+  paint_captures (caps, colors, paint, -from, to - from);
   if (injections >= 0 && resolve != NULL) {
     array<int> ranges;
     array<string> names;
-    tree_sitter_query_injections (injections, top, ctext, ranges, names);
+    tree_sitter_query_injections (injections, top, ctext, ranges, names, from, to);
     for (int k= 0; k < N(names); k++) {
       int lan2, query2;
       array<int> colors2;
       if (resolve (names[k], lan2, query2, colors2))
         paint_injection (ctext, ranges[2*k], min (ranges[2*k+1], N(text)),
-                         lan2, query2, colors2, paint);
+                         lan2, query2, colors2, paint, from, to);
     }
   }
-  array<array<int> > cols;
-  for (int i= 0; i < N(r->lines); i++) {
-    int n= N(r->lines[i]), o= r->offsets[i];
-    array<int> c (n);
-    for (int j= 0; j < n; j++) c[j]= paint[o + j];
-    cols << c;
+  for (int i= first; i <= last; i++) {
+    int m= N(r->lines[i]), o= r->offsets[i] - from;
+    array<int> c (m);
+    for (int j= 0; j < m; j++) c[j]= paint[o + j];
+    r->hl_cols[i]= c;
+    r->hl_dirty[i]= false;
+    if (recoloured != NULL) (*recoloured) << i;
   }
-  r->hl_query= query;
-  r->hl_version= r->version;
-  r->hl_injections= injections;
-  r->hl_epoch= epoch;
-  r->hl_cols= cols;
-  return cols;
+  return r->hl_cols;
 }

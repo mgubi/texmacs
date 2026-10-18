@@ -221,17 +221,30 @@ treesit_language_rep::highlight (tree t) {
       region= t;
     }
   }
+  array<int> recoloured;
   array<array<int> > cols=
     syntax_region_highlight (region, h->language, h->query, h->colors,
-                             h->injections, resolve_injection, highlight_epoch);
+                             h->injections, resolve_injection, highlight_epoch,
+                             &recoloured);
   if (is_atomic (region)) {
     if (N(cols) == 1) set_line_colors (region, hl_lan, cols[0], false);
     return;
   }
   if (N(cols) != N(region)) return;
-  for (int i= 0; i < N(region); i++)
-    set_line_colors (region[i], hl_lan, cols[i], i != row);
-  if (!has_highlight (region, hl_lan)) attach_highlight (region, hl_lan, 0, 0, 1);
+  if (!has_highlight (region, hl_lan)) {
+    // the first time: all the lines
+    for (int i= 0; i < N(region); i++)
+      set_line_colors (region[i], hl_lan, cols[i], i != row);
+    attach_highlight (region, hl_lan, 0, 0, 1);
+  }
+  else {
+    // the lines coloured again, and the line asked for (a line without
+    // colours of its own, as after an undo, gets them when it is typeset)
+    for (int k= 0; k < N(recoloured); k++)
+      if (recoloured[k] != row)
+        set_line_colors (region[recoloured[k]], hl_lan, cols[recoloured[k]], true);
+    if (row >= 0) set_line_colors (region[row], hl_lan, cols[row], false);
+  }
   if (N(pending_updates) > 0 && !updates_scheduled) {
     updates_scheduled= true;
     call ("treesit-schedule-updates");
