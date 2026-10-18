@@ -133,7 +133,9 @@ Known weaknesses, all structural:
 - Strings are in the TeXmacs universal encoding: Cork bytes, and
   `<less>`, `<gtr>`, `<alpha>`, `<#3B1>` entities. String offsets are
   neither UTF-8 nor code point offsets.
-- Tabs are expanded on load.
+- Tabs are expanded on load. (Since the source format of `wip_source_tabs`,
+  in the branches which have it, a tab is the character `<#9>` of a line,
+  typeset to its tab stop; tree-sitter reads it as the code point 9.)
 
 ### Edit notification
 
@@ -162,7 +164,7 @@ tree. `highlight_observer` and `undo_observer` are existing consumers.
 ```
  Scheme tools: selection, brackets, indentation, outline, completeness of input
         |                                   (progs/prog/syntax-*.scm)
- Scheme glue: syntax-node-at, syntax-query, syntax-errors, syntax-sexp
+ Scheme glue: syntax-region-node-at, -captures, -errors, -sexp...
         |
  ts_language_rep : language_rep        highlight (), advance (), get_color ()
         |
@@ -247,9 +249,10 @@ per-line colour array (kept in the existing `highlight_observer`), and
   (preference, off by default).
 - Predicates `#eq?`, `#any-of?`, `#match?`, `#not-...`, `#set!` are
   evaluated in C++; regular expressions are compiled once per query.
-- Query files live in `TeXmacs/progs/syntax/<lan>/{highlights,locals,tags,indents}.scm`,
-  copied from the grammar and adapted; a file in `$TEXMACS_HOME_PATH`
-  overrides. For Scheme we write our own, using the TeXmacs keyword lists
+- Query files live in `TeXmacs/misc/tree-sitter/<grammar>/` (`highlights`,
+  `injections`, `tags`, `indents`, `closers`), next to the grammar, copied
+  from its repository and adapted; they are read from `$TEXMACS_PATH` only
+  (a file in `$TEXMACS_HOME_PATH` does not override them). For Scheme we write our own, using the TeXmacs keyword lists
   (`tm-define`, `tm-menu`, the glue symbols), since the generic grammar only
   knows lists and symbols.
 
@@ -266,6 +269,11 @@ plain data with TeXmacs paths:
 | `(syntax-query t name [start end])` | the captures of the query `name`: `(capture start end)` |
 | `(syntax-errors t)` | the ranges of error and missing nodes |
 | `(syntax-sexp t)` | the tree as an S-expression, for debugging and tests |
+
+(As made, these are the glue routines `syntax-region-node-at`,
+`syntax-region-node-range`, `syntax-region-captures`, `syntax-region-errors`,
+`syntax-region-sexp`... of `build-glue-basic.scm`, which take the region,
+a document of lines, and the language of tree-sitter.)
 
 ### Clients, in order
 
@@ -404,7 +412,8 @@ the decoding of TeXmacs strings planned in section 3.
   `argparse.py` (98 KB) are those of the C parsers, error recovery included.
 - Edits: after 20 insertions in identifiers and 30 random edits of
   `parser.c`, the reparsed tree is always the tree of a full parse.
-- Suite `treesit` (`check/treesit-test.scm`, 47 checks, in `check-master`):
+- Suite `treesit` (`check/treesit-test.scm`, 47 checks then, many more
+  since, in `check-master`):
   helpers, the tables and trees of the JSON grammar of `misc/tree-sitter`,
   edits, saving a language, a small grammar written in the test.
 
@@ -532,8 +541,9 @@ the difference becomes one `ts_tree_edit` (first and last changed lines,
 then the common prefix and suffix of the changed text). This covers every
 kind of modification, undo and remote edits included, without following
 the modification stream, and costs one string comparison per line per
-request. Regions are kept for the 32 most recently used roots (by tree
-identity). Tests: 40 random edits of `progs/treesit/ts-parse.scm` (typing
+request. Regions are kept for the most recently used roots (by tree
+identity): 32 at first, now at most 256 regions and 32 MB of text
+(`max_regions`, `max_region_bytes`). Tests: 40 random edits of `progs/treesit/ts-parse.scm` (typing
 in symbols, splitting and joining lines), each reparsed incrementally and
 compared with a full parse; entities and Cork characters at their string
 positions; error and missing ranges. As planned initially:
@@ -604,8 +614,8 @@ As planned initially:
   the line and stores colours in the existing `highlight_observer`
   (`attach_highlight`), `advance` and `get_color` read them, like the
   packrat path in `language.cpp`.
-- Overlaps resolved as in `tree-sitter-highlight` (first pattern wins for
-  a node; nested captures stack).
+- Overlaps resolved as in `tree-sitter-highlight` (the last pattern which
+  captures a node wins, as made in phase 3; nested captures stack).
 - Capture names map to the TeXmacs colour classes by a table in Scheme,
   longest prefix first (`@keyword` -> `keyword`, `@string` ->
   `constant_string`, `@function` -> `declare_function`, `@type` ->
@@ -980,7 +990,10 @@ Done in part (2026-10-17):
   program language through the names of `tm-program-languages.scm`) and
   painted with its highlight query over the colours of the region. The
   injected parts are parsed again whenever the region changes (not
-  incrementally), and injections do not nest. An injected language whose
+  incrementally), and injections do not nest. (Later: the injected parts
+  of the first level are kept, at most 64 per region, and parsed again
+  incrementally; injections nest to a depth of 3, the deeper parts being
+  parsed again at each colouring.) An injected language whose
   tables are not ready is asked for at its first use; when its highlighter
   arrives, `tree-sitter-reset-highlights` makes the highlighted languages
   take a new highlight code, so that the lines are coloured again.
@@ -1058,7 +1071,8 @@ installed, and the old behaviour stays elsewhere.
   when it starts with the token which closes that node (`}`, `)`, `end`)
   or with a branch (`else`, `elif`, `except`, ...). The types are listed
   per language in `ts-edit.scm` (c, cpp, python, java, javascript, json,
-  r, julia). For a blank line, a node which ends before it without error
+  r, julia; later replaced by the queries `indents.scm`, the rules of
+  `syntax-indent-rules` staying for yaml, latex, lean and haskell). For a blank line, a node which ends before it without error
   is closed; in Python only brackets close, its blocks end where the
   indentation goes back; after an unfinished construct, the ERROR node of
   the error recovery counts as open. C/C++, JavaScript, JSON, R and Julia
@@ -1262,8 +1276,9 @@ installed, and the old behaviour stays elsewhere.
 2. Decided (2026-10-17): the tables are **generated at first use** and
    cached in `$TEXMACS_HOME_PATH`; only `grammar.json` and the queries are
    shipped. Consequences for phase 1: the first opening of a file of a
-   large grammar costs the generation (35 s for C in TeXmacs today, 10 s
-   under a standalone s7), so it must not block: the present tokenizer
+   large grammar costs the generation (35 s for C in TeXmacs then, 10 s
+   under a standalone s7; since then the tables are shipped, and C takes
+   0.74 s with the native tables), so it must not block: the present tokenizer
    colours the file until the tables are ready, with a message, and the
    generator should get faster (the 3x of module code under S7, section 6,
    is the first thing to look at). No build-time target.

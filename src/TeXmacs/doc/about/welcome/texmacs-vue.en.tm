@@ -247,7 +247,8 @@
     (<shortcut|(program-fold)> and <shortcut|(program-unfold)>); the lines
     are indented by the structure of the code.
 
-    <item>Folds nest, and are not printed; the code inside the scripts of
+    <item>Folds nest, and change only the view: the hidden lines are
+    printed; the code inside the scripts of
     HTML is colored again only where it changes; the <menu|Definitions> of
     <LaTeX> (sections, labels, macros), CSS, TOML, YAML, JSON and HTML;
     indentation of <LaTeX> and Haskell; <menu|Toggle comment> in HTML, CSS

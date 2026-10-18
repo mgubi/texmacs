@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdarg.h>
 #include <string.h>
@@ -90,12 +91,10 @@ value_t fl_table(value_t *args, uint32_t nargs)
     value_t nt;
     // prevent small tables from being added to finalizer list
     if (cnt <= HT_N_INLINE) {
-        tabletype->vtable->finalize = NULL;
-        nt = cvalue(tabletype, sizeof(htable_t));
-        tabletype->vtable->finalize = free_htable;
+        nt = cvalue_no_finalizer(tabletype, sizeof(htable_t));
     }
     else {
-        nt = cvalue(tabletype, 2*sizeof(void*));
+        nt = cvalue(tabletype, offsetof(htable_t, _space));
     }
     htable_t *h = (htable_t*)cv_data((cvalue_t*)ptr(nt));
     htable_new(h, cnt/2);
@@ -106,6 +105,12 @@ value_t fl_table(value_t *args, uint32_t nargs)
             equalhash_put(h, (void*)k, (void*)arg);
         else
             k = arg;
+    }
+    // TeXmacs, from Julia's femtolisp: a small table which outgrew its
+    // inline space (collisions) needs the finalizer too
+    if (cnt <= HT_N_INLINE && h->table != &h->_space[0]) {
+        add_finalizer((cvalue_t*)ptr(nt));
+        ((cvalue_t*)ptr(nt))->len = offsetof(htable_t, _space);
     }
     return nt;
 }
@@ -121,7 +126,7 @@ value_t fl_table_put(value_t *args, uint32_t nargs)
     if (table0 == &h->_space[0] && h->table != &h->_space[0]) {
         cvalue_t *cv = (cvalue_t*)ptr(args[0]);
         add_finalizer(cv);
-        cv->len = 2*sizeof(void*);
+        cv->len = offsetof(htable_t, _space);
     }
     return args[0];
 }

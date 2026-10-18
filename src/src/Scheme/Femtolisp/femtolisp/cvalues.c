@@ -131,7 +131,11 @@ static value_t cprim(fltype_t *type, size_t sz)
     return tagptr(pcp, TAG_CPRIM);
 }
 
-value_t cvalue(fltype_t *type, size_t sz)
+// TeXmacs, from Julia's femtolisp: with may_finalize 0, a cvalue whose
+// type has a finalizer is not added to the list of finalizers (fl_table
+// turned the finalizer of its type off around the allocation, and the
+// tables freed by a collection there were never finalized)
+static value_t _cvalue(fltype_t *type, size_t sz, int may_finalize)
 {
     cvalue_t *pcv;
     int str=0;
@@ -150,7 +154,8 @@ value_t cvalue(fltype_t *type, size_t sz)
         pcv = (cvalue_t*)alloc_words(nw);
         pcv->type = type;
         pcv->data = &pcv->_space[0];
-        if (type->vtable != NULL && type->vtable->finalize != NULL)
+        if (may_finalize && type->vtable != NULL &&
+            type->vtable->finalize != NULL)
             add_finalizer(pcv);
     }
     else {
@@ -168,6 +173,16 @@ value_t cvalue(fltype_t *type, size_t sz)
     }
     pcv->len = sz;
     return tagptr(pcv, TAG_CVALUE);
+}
+
+value_t cvalue(fltype_t *type, size_t sz)
+{
+    return _cvalue(type, sz, 1);
+}
+
+value_t cvalue_no_finalizer(fltype_t *type, size_t sz)
+{
+    return _cvalue(type, sz, 0);
 }
 
 value_t cvalue_from_data(fltype_t *type, void *data, size_t sz)

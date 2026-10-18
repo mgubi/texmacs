@@ -30,6 +30,7 @@
 */
 
 #include <stdlib.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <string.h>
 #include <setjmp.h>
@@ -245,7 +246,8 @@ symbol_t *symtab = NULL;
 
 int fl_is_keyword_name(char *str, size_t len)
 {
-    return ((str[0] == ':' || str[len-1] == ':') && str[1] != '\0');
+    // TeXmacs: len>1, str[len-1] was read before an empty name (||)
+    return len>1 && ((str[0] == ':' || str[len-1] == ':') && str[1] != '\0');
 }
 
 static symbol_t *mk_symbol(char *str)
@@ -253,7 +255,7 @@ static symbol_t *mk_symbol(char *str)
     symbol_t *sym;
     size_t len = strlen(str);
 
-    sym = (symbol_t*)malloc(sizeof(symbol_t)-sizeof(void*) + len + 1);
+    sym = (symbol_t*)malloc((offsetof(symbol_t,name) + len + 1 + 7) & -8);
     assert(((uptrint_t)sym & 0x7) == 0); // make sure malloc aligns 8
     sym->left = sym->right = NULL;
     sym->flags = 0;
@@ -625,7 +627,10 @@ void gc(int mustgrow)
         }
         grew = !grew;
     }
-    if (curheap > lim)  // all data was live
+    // all data was live: gc again and grow the heap, but always leave 4
+    // words, so that a closure is allocated without another check (TeXmacs,
+    // from Julia's femtolisp: lim-2 was 2 bytes, not 2 words)
+    if ((value_t*)curheap > ((value_t*)lim)-2)
         gc(0);
 }
 
@@ -957,9 +962,17 @@ static uint32_t process_keys(value_t kwtable,
      (((int16_t)a[1])<<8)))
 #define PUT_INT32(a,i) (*(int32_t*)(a) = bswap_32((int32_t)(i)))
 #else
-#define GET_INT32(a) (*(int32_t*)a)
-#define GET_INT16(a) (*(int16_t*)a)
-#define PUT_INT32(a,i) (*(int32_t*)(a) = (int32_t)(i))
+// TeXmacs, from Julia's femtolisp: the operands of the bytecode are not
+// aligned, a read through a cast pointer is undefined (memcpy compiles to
+// the same instructions)
+static inline int32_t get_int32(const void *a)
+{ int32_t v; memcpy(&v, a, 4); return v; }
+static inline int16_t get_int16(const void *a)
+{ int16_t v; memcpy(&v, a, 2); return v; }
+static inline void put_int32(void *a, int32_t v) { memcpy(a, &v, 4); }
+#define GET_INT32(a) get_int32(a)
+#define GET_INT16(a) get_int16(a)
+#define PUT_INT32(a,i) put_int32((a), (int32_t)(i))
 #endif
 #define SWAP_INT32(a) (*(int32_t*)(a) = bswap_32(*(int32_t*)(a)))
 #define SWAP_INT16(a) (*(int16_t*)(a) = bswap_16(*(int16_t*)(a)))
@@ -1794,7 +1807,7 @@ static value_t apply_cl(uint32_t nargs)
             else {
                 PUSH(Stack[bp]); // env has already been captured; share
             }
-            if (curheap > lim-2)
+            if ((value_t*)curheap > ((value_t*)lim)-2)
                 gc(0);
             pv = (value_t*)curheap;
             curheap += (4*sizeof(value_t));
@@ -2208,6 +2221,46 @@ value_t fl_stacktrace(value_t *args, u_int32_t nargs)
     return _stacktrace(fl_throwing_frame ? fl_throwing_frame : curr_frame);
 }
 
+// TeXmacs, from Julia's femtolisp (2f0f7f16e5, one list only there): for-each
+// in C, twice as fast as in system.lsp; with several lists, it stops at
+// the end of the shortest
+value_t fl_foreach(value_t *args, u_int32_t nargs)
+{
+    if (nargs < 2)
+        lerror(ArgError, "for-each: too few arguments");
+    int64_t argSP = args-Stack;
+    assert(argSP >= 0 && argSP < N_STACK);
+    if (nargs == 2) {
+        if (SP+2 > N_STACK) grow_stack();
+        PUSH(FL_T);
+        PUSH(FL_T);
+        while (iscons(Stack[argSP+1])) {
+            Stack[SP-2] = Stack[argSP];
+            Stack[SP-1] = car_(Stack[argSP+1]);
+            _applyn(1);
+            Stack[argSP+1] = cdr_(Stack[argSP+1]);
+        }
+        POPN(2);
+    }
+    else {
+        size_t i;
+        while (1) {
+            for (i=1; i < nargs; i++)
+                if (!iscons(Stack[argSP+i]))
+                    return FL_T;
+            while (SP+nargs > N_STACK) grow_stack();
+            PUSH(Stack[argSP]);
+            for (i=1; i < nargs; i++) {
+                PUSH(car_(Stack[argSP+i]));
+                Stack[argSP+i] = cdr_(Stack[argSP+i]);
+            }
+            _applyn(nargs-1);
+            POPN(nargs);
+        }
+    }
+    return FL_T;
+}
+
 value_t fl_map1(value_t *args, u_int32_t nargs)
 {
     if (nargs < 2)
@@ -2291,6 +2344,7 @@ static builtinspec_t core_builtin_info[] = {
     { "append", fl_append },
     { "list*", fl_liststar },
     { "map", fl_map1 },
+    { "for-each", fl_foreach },
     { NULL, NULL }
 };
 
