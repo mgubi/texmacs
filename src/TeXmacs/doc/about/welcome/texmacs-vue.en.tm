@@ -243,6 +243,14 @@
     <item><verbatim|?gpu=0> in the address of the page draws with
     <name|MuPDF> again, as it says (it drew with <name|WebGL2>); so does a
     browser without <name|WebGL2>.
+
+    <item>Files can be attached to the questions of the chatbots:
+    <with|font-series|bold|Attach> in the focus bar of a session or of an
+    executable fold takes a file of the panel of the files, and a file
+    dropped on the page while the cursor is in a question is attached to
+    it. Text files go after the question, images and <name|PDF> files as
+    such (to <name|ChatGPT>, <name|Claude>, <name|Gemini> and
+    <name|OpenRouter>).
   </itemize>
 
   <paragraph|17 October 2026>
