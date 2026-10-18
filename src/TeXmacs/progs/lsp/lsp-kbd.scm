@@ -52,6 +52,8 @@
 (menu-bind lsp-menu
   ((check "Follow source files" "v" (lsp-on?))
    (toggle-preference "lsp"))
+  ((check "Follow the code blocks of documents" "v" (lsp-blocks-on?))
+   (toggle-preference "lsp:code blocks"))
   ---
   ("Go to definition" (lsp-goto-definition))
   ("Find references" (lsp-references))

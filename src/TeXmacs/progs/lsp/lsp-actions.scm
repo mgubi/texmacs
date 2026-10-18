@@ -182,17 +182,18 @@
         (switch-to-buffer old))
       r)))
 
-(tm-define (lsp-apply-buffer-edits u edits)
+(tm-define (lsp-apply-buffer-edits u edits . opt)
   (:synopsis "Applies the TextEdits @edits to the buffer @u")
-  ;; the number of lines which have changed, or #f
+  ;; the number of lines which have changed, or #f; in the lines of the
+  ;; buffer, or in those in @opt (a code block of the buffer)
   (and (nnull? edits)
        (in-buffer u
          (lambda ()
            ;; (the cursor follows the text: its line may be replaced)
-           (let* ((body (buffer-tree))
+           (let* ((body (if (pair? opt) (car opt) (buffer-tree)))
                   (old (lsp-lines body))
                   (lines (lsp-apply-to-lines old edits))
-                  (b (buffer-path))
+                  (b (if (pair? opt) (tree->path body) (buffer-path)))
                   (p (cursor-path))
                   (lo (and (list-starts? p b)
                            (with r (list-tail p (length b))
@@ -205,6 +206,17 @@
                                      (string-length (lsp-line lines l))))))
                  (go-to (append b (list l o)))))
              n)))))
+
+(define (uri->place uri)
+  ;; (buffer root) of @uri: root is #f for the buffer of a file, the lines
+  ;; of the code block for the virtual file of a block (lsp-blocks.scm)
+  (let* ((p (lsp-uri->path uri))
+         (b (and p (lsp-block-of-path p))))
+    (if (and b (buffer-exists? (system->url (car b)))
+             (tree->path (cadr b)))
+        (list (system->url (car b)) (cadr b))
+        (with u (uri->buffer uri)
+          (and u (list u #f))))))
 
 (define (uri->buffer uri)
   ;; the buffer of @uri: the open one whose uri is the same (its path may be
@@ -241,10 +253,14 @@
   (with files (lsp-workspace-edit-files w)
     (length (list-filter
              (map (lambda (f)
-                    (with u (uri->buffer (car f))
+                    (with pl (uri->place (car f))
                       ;; (#f: the file could not be opened)
-                      (and u (or (null? (cadr f))
-                                 (lsp-apply-buffer-edits u (cadr f))))))
+                      (and pl (or (null? (cadr f))
+                                  (if (cadr pl)
+                                      (lsp-apply-buffer-edits (car pl) (cadr f)
+                                                              (cadr pl))
+                                      (lsp-apply-buffer-edits (car pl)
+                                                              (cadr f)))))))
                   files)
              identity))))
 
@@ -263,12 +279,13 @@
                             (lsp-ref x "textDocument" "version")))
                         (key (and uri (lsp-uri-key uri)))
                         (mine (and key (lsp-document-version c key)))
-                        (u (and uri (uri->buffer uri))))
+                        (pl (and uri (uri->place uri)))
+                        (u (and pl (car pl))))
                    (and v mine
                         (or (!= v mine)
                             (and u (buffer-exists? u)
                                  (lsp-document-changed-since?
-                                  c key (buffer-get-body u)))))))
+                                  c key (or (cadr pl) (buffer-get-body u))))))))
                (cdr dc))))))
 
 ;; the edits which servers asked for (workspace/applyEdit), since the start:
@@ -313,7 +330,7 @@
 (define (selection-range)
   ;; the range of the selection in the current buffer, or #f
   (and (selection-active-any?)
-       (let* ((b (buffer-path))
+       (let* ((b (lsp-target-base))
               (p1 (selection-get-start))
               (p2 (selection-get-end))
               (r1 (and (list-starts? p1 b) (list-tail p1 (length b))))
@@ -353,7 +370,8 @@
                     (set-message "Already formatted" ""))
                    (else
                     (lsp-apply-buffer-edits (current-buffer)
-                                            (lsp-items (cadr a)))
+                                            (lsp-items (cadr a))
+                                            (lsp-target-root))
                     (lsp-buffer-sync)
                     (set-message "Formatted" ""))))))))
 
@@ -500,7 +518,7 @@
            (set! fixes-buffer (current-buffer))
            ;; (a snapshot of the lines, see code_regions.cpp)
            (when fixes-text (code-snapshot-delete fixes-text))
-           (set! fixes-text (code-snapshot-new (buffer-get-body (current-buffer))))
+           (set! fixes-text (code-snapshot-new (lsp-target-root)))
            (open-auxiliary
             "Quick fixes"
             `(document

@@ -207,7 +207,7 @@
               (lsp-client-capable? c "documentSymbolProvider")))
        ;; (the cursor in the lines of the buffer, which its server sees)
        (with c (code-cursor-lines)
-         (and c (tree-eq? (car c) (buffer-get-body (current-buffer)))))))
+         (and c (tree-eq? (car c) (lsp-target-root))))))
 
 (tm-define (lsp-outline-at-cursor)
   (:synopsis "The outline of the buffer, for code-navigate.scm")
@@ -226,7 +226,7 @@
                          (list (car e) (cadr e)
                                (utf8->cork (caddr e))
                                (utf8->cork (first-line* (cadddr e)))
-                               (append (buffer-path)
+                               (append (lsp-target-base)
                                        (lsp-buffer-line+offset
                                         (lsp-object
                                          "line" (lsp-number (list-ref e 4))
@@ -264,7 +264,7 @@
 (define (cursor-lo)
   ;; the line and offset of the cursor in a source file, or #f
   (let* ((p (cursor-path))
-         (b (buffer-path)))
+         (b (lsp-target-base)))
     (and (list-starts? p b)
          (with r (list-tail p (length b))
            (and (= (length r) 2) r)))))
@@ -300,7 +300,7 @@
 (define hl-edits-asked 0)
 
 (define (show-highlights ranges)
-  (with b (buffer-path)
+  (with b (lsp-target-base)
     (set! hl-ranges ranges)
     (set! hl-buffer (current-buffer))
     (if (null? ranges) (cancel-alt-selection "lsp-highlights")

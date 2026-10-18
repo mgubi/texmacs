@@ -51,12 +51,19 @@
   (list-find (buffer-list) (lambda (b) (== (url->string b) name))))
 
 (define (follow? name u)
+  ;; (a source file of a language with a server; a document which is a
+  ;; file, for its code blocks, when they are followed: lsp-blocks.scm)
   (with r (ahash-ref followed name)
-    (if r (== r #t)
-        (let* ((lan (and (lsp-buffer-path u) (lsp-buffer-language u)))
-               (ok (and lan (lsp-server-command lan) #t)))
-          (ahash-set! followed name (if ok #t 'no))
-          ok))))
+    (cond ((== r #t) #t)
+          ((and (lsp-buffer-path u) (not (lsp-source-buffer? u)))
+           (and (lsp-blocks-on?)
+                (begin (ahash-set! followed name #t) #t)))
+          (r #f)
+          (else
+           (let* ((lan (and (lsp-buffer-path u) (lsp-buffer-language u)))
+                  (ok (and lan (lsp-server-command lan) #t)))
+             (ahash-set! followed name (if ok #t 'no))
+             ok)))))
 
 (define (schedule-sync)
   (when (not scheduled?)
@@ -139,20 +146,6 @@
                  l1 o1 l2 o2
                  (lsp-diagnostic-message d))))))
 
-(define (severity-paths l severity)
-  ;; (in the order of the text: the editor looks for the visible ones by
-  ;; a binary search, when there are many)
-  (let* ((b (buffer-path))
-         (xs (sort (list-filter l (lambda (x) (== (car x) severity)))
-                   (lambda (x y)
-                     (or (< (list-ref x 1) (list-ref y 1))
-                         (and (== (list-ref x 1) (list-ref y 1))
-                              (< (list-ref x 2) (list-ref y 2))))))))
-    (append-map (lambda (x)
-                  (list (append b (list (list-ref x 1) (list-ref x 2)))
-                        (append b (list (list-ref x 3) (list-ref x 4)))))
-                xs)))
-
 (define lsp-max-diagnostics 1000)
 
 (define (most-severe-first ds)
@@ -163,36 +156,58 @@
             (list-filter ds (lambda (d) (== (sev d) 2)))
             (list-filter ds (lambda (d) (> (sev d) 2))))))
 
-(tm-define (lsp-show-diagnostics)
-  (:synopsis "Shows the diagnostics of the current buffer")
-  (let* ((uri (lsp-buffer-uri))
-         ;; (a vector: each diagnostic looks for its lines)
-         (lines (list->vector (lsp-buffer-lines)))
+(define (buffer-uris)
+  ;; (uri . root) of the code of the current buffer which servers see: the
+  ;; buffer of a source file, or the code blocks of a document
+  (if (lsp-source-buffer?)
+      (with uri (lsp-buffer-uri (current-buffer))
+        (if uri (list (cons uri (buffer-get-body (current-buffer)))) '()))
+      (with doc (lsp-buffer-path (current-buffer))
+        (if (not doc) '()
+            (map (lambda (e) (cons (lsp-path->uri (caddr e)) (car e)))
+                 (lsp-block-entries doc))))))
+
+(define (in-current-buffer? uri)
+  (and (lsp-on?) uri (assoc uri (buffer-uris)) #t))
+
+(define (show-uri uri root)
+  ;; the diagnostics of @uri, in the lines @root, are kept as shown
+  (let* ((lines (list->vector (lsp-lines root)))
          ;; (at most lsp-max-diagnostics: a file with thousands of
          ;; warnings would make each redraw slow)
-         (all (if uri (lsp-diagnostics uri) '()))
+         (all (lsp-diagnostics uri))
          (ds (if (> (length all) lsp-max-diagnostics)
                  (sublist (most-severe-first all) 0 lsp-max-diagnostics)
-                 all))
-         (l (list-filter (map (lambda (d) (diagnostic-item d lines)) ds)
-                         identity)))
-    (when uri
-      (ahash-remove! stale uri)
-      (ahash-set! shown uri l))
-    (draw-diagnostics l)))
+                 all)))
+    (ahash-remove! stale uri)
+    (ahash-set! shown uri
+                (list-filter (map (lambda (d) (diagnostic-item d lines)) ds)
+                             identity))))
 
-(define (draw-diagnostics l)
+(tm-define (lsp-show-diagnostics)
+  (:synopsis "Shows the diagnostics of the current buffer")
+  ;; (of its code blocks, in a document)
+  (for (x (buffer-uris)) (show-uri (car x) (cdr x)))
+  (draw-diagnostics))
+
+(define (draw-diagnostics)
   ;; (as the diagnostics of the source server of the core, with those of
-  ;; the other sources: progs/code/code-diagnostics.scm)
-  (with b (buffer-path)
-    (code-set-diagnostics
-     'server
-     (map (lambda (x)
-            (list (car x)
-                  (append b (list (list-ref x 1) (list-ref x 2)))
-                  (append b (list (list-ref x 3) (list-ref x 4)))
-                  (list-ref x 5)))
-          l))))
+  ;; the other sources: progs/code/code-diagnostics.scm; each code at the
+  ;; place of its lines)
+  (code-set-diagnostics
+   'server
+   (append-map
+    (lambda (x)
+      (let ((b (tree->path (cdr x)))
+            (l (or (ahash-ref shown (car x)) '())))
+        (if (not b) '()
+            (map (lambda (x)
+                   (list (car x)
+                         (append b (list (list-ref x 1) (list-ref x 2)))
+                         (append b (list (list-ref x 3) (list-ref x 4)))
+                         (list-ref x 5)))
+                 l))))
+    (buffer-uris))))
 
 (tm-define (lsp-document-lines-changed uri first last added)
   ;; the diagnostics shown follow the lines, until the server sends new
@@ -213,7 +228,7 @@
                            (else #f))))
              (l2 (list-filter (map move l) identity)))
         (ahash-set! shown uri l2)
-        (when (== (current-uri) uri) (draw-diagnostics l2))))))
+        (when (in-current-buffer? uri) (draw-diagnostics))))))
 
 (tm-define (lsp-hide-diagnostics)
   (code-clear-diagnostics 'server))
@@ -221,7 +236,7 @@
 (tm-define (lsp-diagnostics-changed uri)
   (former uri)
   (ahash-set! stale uri #t)
-  (when (== (current-uri) uri)
+  (when (in-current-buffer? uri)
     (lsp-show-diagnostics)
     (lsp-status-refresh)))
 
@@ -297,7 +312,7 @@
 (define (cursor-line+offset)
   ;; the line and offset of the cursor in a source file, or #f
   (let* ((p (cursor-path))
-         (b (buffer-path)))
+         (b (lsp-target-base)))
     (and (list-starts? p b)
          (with r (list-tail p (length b))
            (and (= (length r) 2) r)))))
@@ -375,12 +390,12 @@
                      (if forward? (car sorted) (cAr sorted))))))
     (if (not x) (set-message "No diagnostics" "")
         ;; (the lines may have changed since: the place is in the buffer)
-        (let* ((b (buffer-get-body (current-buffer)))
+        (let* ((b (lsp-target-root))
                (n (if (tree-is? b 'document) (tree-arity b) 1))
                (l (max 0 (min (list-ref x 1) (- n 1))))
                (o (max 0 (min (list-ref x 2)
                               (string-length (lsp-buffer-line l))))))
-          (go-to-path (append (buffer-path) (list l o)))))))
+          (go-to-path (append (lsp-target-base) (list l o)))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Requests at the cursor
@@ -527,7 +542,10 @@
                                                fallback?)))))))))))
 
 (define (followed-buffer?)
-  (== (ahash-ref followed (url->string (current-buffer))) #t))
+  ;; (in a document, the cursor in one of its code blocks)
+  (and (== (ahash-ref followed (url->string (current-buffer))) #t)
+       (or (lsp-source-buffer?) (lsp-cursor-block) #f)
+       #t))
 
 (tm-define (lsp-buffer-followed?)
   (:synopsis "Does a language server follow the current buffer?")
@@ -653,7 +671,7 @@
 
 (define (mouse-hover x y)
   (let* ((p (xy->path x y))
-         (b (buffer-path))
+         (b (lsp-target-base))
          (r (and (list-starts? p b) (list-tail p (length b))))
          (c (lsp-buffer-client*))
          (uri (lsp-buffer-uri))
@@ -847,18 +865,32 @@
                           (lsp-ref x "targetSelectionRange"))))
            (and (string? uri) range (list uri range))))))
 
+(define (goto-block b range)
+  ;; b: (doc root lan), a code block of the document doc (lsp-blocks.scm)
+  (with u (system->url (car b))
+    (when (!= u (current-buffer)) (switch-to-buffer u))
+    (when (and (== (current-buffer) u) (tree->path (cadr b)))
+      (go-to-path (append (tree->path (cadr b))
+                          (lsp-buffer-line+offset (lsp-ref range "start")
+                                                  (cadr b)))))))
+
 (tm-define (lsp-goto-location uri range)
   (:synopsis "Opens the file of @uri at the start of @range")
-  (with path (lsp-uri->path uri)
-    (if (not path) (set-message "Cannot open this location" "")
-        (with u (system->url path)
-          ;; (switching to the current buffer would make a second view)
-          (cond ((== u (current-buffer)) (noop))
-                ((buffer-exists? u) (switch-to-buffer u))
-                (else (load-buffer u)))
-          (when (== (current-buffer) u)
-            (with lo (lsp-buffer-line+offset (lsp-ref range "start"))
-              (go-to-path (append (buffer-path) lo))))))))
+  ;; (or the document of the code block whose virtual file it is)
+  (let* ((path (lsp-uri->path uri))
+         (b (and path (lsp-block-of-path path))))
+    (cond ((and b (buffer-exists? (system->url (car b))))
+           (goto-block b range))
+          ((not path) (set-message "Cannot open this location" ""))
+          (else
+           (with u (system->url path)
+             ;; (switching to the current buffer would make a second view)
+             (cond ((== u (current-buffer)) (noop))
+                   ((buffer-exists? u) (switch-to-buffer u))
+                   (else (load-buffer u)))
+             (when (== (current-buffer) u)
+               (with lo (lsp-buffer-line+offset (lsp-ref range "start"))
+                 (go-to-path (append (lsp-target-base) lo)))))))))
 
 (tm-define (lsp-definition-at-cursor)
   (:synopsis "Goes to the definition of the symbol at the cursor, #t if it did")
@@ -1067,13 +1099,28 @@
   (set! pending (make-ahash-table))
   ;; (the underlines are removed in each buffer which has some)
   (for (u (buffer-list))
-    (when (ahash-ref shown (lsp-buffer-uri u))
+    (when (or (ahash-ref shown (lsp-buffer-uri u))
+              (and (lsp-buffer-path u)
+                   (nnull? (lsp-block-entries (lsp-buffer-path u)))))
       (with-buffer u (lsp-hide-diagnostics))))
   (set! shown (make-ahash-table)))
+
+(define (unfollow-blocks)
+  ;; the code blocks of the documents are no longer followed
+  (for (u (buffer-list))
+    (with name (url->string u)
+      (when (and (== (ahash-ref followed name) #t)
+                 (not (lsp-source-buffer? u)))
+        (ahash-remove! followed name)
+        (ahash-remove! pending name)
+        (lsp-buffer-close u)
+        (with-buffer u (lsp-hide-diagnostics))))))
 
 (define-preferences
   ("lsp" "on" (lambda (pref val)
                 (if (== val "off") (lsp-turn-off) (follow-all))))
+  ("lsp:code blocks" "off" (lambda (pref val)
+                             (if (== val "on") (follow-all) (unfollow-blocks))))
   ("lsp:mouse hover" "on" (lambda (pref val) (noop))))
 
 ;; the buffers which were loaded before this module

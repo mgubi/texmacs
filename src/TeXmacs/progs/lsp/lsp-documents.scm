@@ -21,11 +21,16 @@
 ;; The buffers: a source file (the code style, a line in each paragraph)
 ;; is a document of the server of its language (prog-language), for the
 ;; project around it: the nearest directory with a .git, a
-;; compile_commands.json... or else its own directory.
+;; compile_commands.json... or else its own directory. In the other
+;; documents, the code blocks are documents of their own (lsp-blocks.scm),
+;; when the preference "lsp:code blocks" is on: the functions of the buffer
+;; without a buffer as argument are then those of the block at the cursor
+;; (its lines, its virtual file), the target of the commands.
 
 (texmacs-module (lsp lsp-documents)
   (:use (lsp lsp-base)
-        (lsp lsp-client)))
+        (lsp lsp-client)
+        (lsp lsp-blocks)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Documents
@@ -425,26 +430,63 @@
 (define (the-buffer opt)
   (if (pair? opt) (car opt) (current-buffer)))
 
-(tm-define (lsp-buffer-language . opt)
-  (:synopsis "The language of the buffer (current by default), if it is code")
-  ;; the format of a source file is its language (cpp, python...); the
-  ;; environment of a file which has just been loaded is not merged yet
-  (let* ((u (the-buffer opt))
-         (f (and (not (url-rooted-tmfs? u)) (url-format u))))
+(define (source-language u)
+  ;; the language of the buffer @u if it is a source file
+  ;; (the format of a source file is its language: cpp, python...; the
+  ;; environment of a file which has just been loaded is not merged yet)
+  (let* ((f (and (not (url-rooted-tmfs? u)) (url-format u))))
     (cond ((and (string? f) (lsp-server-known? f)) f)
           ((and (== u (current-buffer)) (== (get-init "mode") "prog"))
            (with lan (get-init "prog-language")
              (and (string? lan) (!= lan "") (!= lan "verbatim") lan)))
           (else #f))))
 
+(define (file-path u)
+  ;; the system path of the file of the buffer @u, or #f
+  (and (not (url-rooted-tmfs? u))
+       (not (url-none? u))
+       ;; (a file on the web is not one which a server can read)
+       (not (url-rooted-web? u))
+       (url->system u)))
+
+(tm-define (lsp-source-buffer? . opt)
+  (:synopsis "Is the buffer (current by default) a source file?")
+  (and (source-language (the-buffer opt)) #t))
+
+(tm-define (lsp-cursor-block)
+  (:synopsis "(root lan) of the code block at the cursor which a server may follow")
+  ;; (in a document which is a file, not a source file)
+  (and (lsp-blocks-on?)
+       (not (source-language (current-buffer)))
+       (file-path (current-buffer))
+       (lsp-block-at (cursor-path))))
+
+(define (target-block opt)
+  (and (null? opt) (lsp-cursor-block)))
+
+(tm-define (lsp-target-root . opt)
+  (:synopsis "The lines of the buffer, or of the code block at the cursor")
+  (with b (target-block opt)
+    (if b (car b) (buffer-get-body (the-buffer opt)))))
+
+(tm-define (lsp-target-base)
+  (:synopsis "The path of the lines of the code at the cursor")
+  ;; (the place of the line l, offset o is (append base (list l o)))
+  (with b (target-block '())
+    (if b (tree->path (car b)) (buffer-path))))
+
+(tm-define (lsp-buffer-language . opt)
+  (:synopsis "The language of the buffer (current by default), if it is code")
+  ;; (or of the code block at the cursor)
+  (or (source-language (the-buffer opt))
+      (with b (target-block opt) (and b (cadr b)))))
+
 (tm-define (lsp-buffer-path . opt)
   (:synopsis "The system path of the file of the buffer, or #f")
-  (with u (the-buffer opt)
-    (and (not (url-rooted-tmfs? u))
-         (not (url-none? u))
-         ;; (a file on the web is not one which a server can read)
-         (not (url-rooted-web? u))
-         (url->system u))))
+  ;; (or of the virtual file of the code block at the cursor)
+  (let ((p (file-path (the-buffer opt)))
+        (b (target-block opt)))
+    (if (and p b) (lsp-block-path p (car b) (cadr b)) p)))
 
 (tm-define (lsp-buffer-uri . opt)
   (with p (apply lsp-buffer-path opt)
@@ -452,12 +494,12 @@
 
 (tm-define (lsp-buffer-lines . opt)
   (:synopsis "The lines of the buffer, in Cork")
-  (lsp-lines (buffer-get-body (the-buffer opt))))
+  (lsp-lines (apply lsp-target-root opt)))
 
 (tm-define (lsp-buffer-text . opt)
   (:synopsis "The text of the buffer, in utf8, for its server")
   ;; (built in C++: lists of the lines of a long file would fill the heap)
-  (lsp-document-text (buffer-get-body (the-buffer opt))))
+  (lsp-document-text (apply lsp-target-root opt)))
 
 (tm-define (lsp-buffer-client . opt)
   (:synopsis "The client of the server of the buffer (started if needed)")
@@ -479,30 +521,71 @@
       (lsp-document-open-lines c (apply lsp-buffer-uri opt)
                                (lsp-language-id (apply lsp-buffer-language opt)
                                                 (apply lsp-buffer-path opt))
-                               (buffer-get-body (the-buffer opt))))
+                               (apply lsp-target-root opt)))
     c))
+
+(define (sync-blocks u)
+  ;; the code blocks of the document @u, given to their servers; those
+  ;; which are no longer there are closed
+  (let* ((doc (file-path u))
+         (blocks (if (and doc (lsp-blocks-on?))
+                     (lsp-document-blocks (buffer-get-body u))
+                     '()))
+         (old (if doc (lsp-block-entries doc) '())))
+    (for (b blocks)
+      (let* ((path (lsp-block-path doc (car b) (cadr b)))
+             (c (lsp-client-for (cadr b) (lsp-project-root path)))
+             (uri (lsp-path->uri path)))
+        (when (and c (lsp-client-alive? c))
+          (if (lsp-document-open? c uri)
+              (lsp-document-change-lines c uri (car b))
+              (lsp-document-open-lines c uri (lsp-language-id (cadr b) path)
+                                       (car b))))))
+    (for (e old)
+      (when (not (list-find blocks (lambda (b) (tree-eq? (car b) (car e)))))
+        (close-block e)))
+    (when doc
+      (lsp-block-entries-set!
+       doc (list-filter (lsp-block-entries doc)
+                        (lambda (e) (list-find blocks
+                                               (lambda (b) (tree-eq? (car b) (car e))))))))
+    #f))
+
+(define (close-block e)
+  ;; e: (root lan path)
+  (with c (lsp-client-find (cadr e) (lsp-project-root (caddr e)))
+    (when c (lsp-document-close c (lsp-path->uri (caddr e))))))
 
 (tm-define (lsp-buffer-sync . opt)
   (:synopsis "Gives the text of the buffer to its server (opened if needed)")
-  (let ((c (apply lsp-buffer-client opt))
-        (uri (apply lsp-buffer-uri opt)))
-    (when (and c uri (lsp-client-alive? c))
-      (if (lsp-document-open? c uri)
-          (lsp-document-change-lines c uri (buffer-get-body (the-buffer opt)))
-          (apply lsp-buffer-open opt)))
-    c))
+  ;; (the code blocks of a document which is not a source file; #f then)
+  (if (and (pair? opt) (not (source-language (car opt))))
+      (sync-blocks (car opt))
+      (let ((c (apply lsp-buffer-client opt))
+            (uri (apply lsp-buffer-uri opt)))
+        (when (and c uri (lsp-client-alive? c))
+          (if (lsp-document-open? c uri)
+              (lsp-document-change-lines c uri (apply lsp-target-root opt))
+              (apply lsp-buffer-open opt)))
+        c)))
 
 (tm-define (lsp-buffer-close . opt)
   (:synopsis "Closes the buffer on its server")
-  (let ((c (apply lsp-buffer-client* opt))
-        (uri (apply lsp-buffer-uri opt)))
-    (when (and c uri) (lsp-document-close c uri))))
+  ;; (and the code blocks of a document)
+  (if (and (pair? opt) (not (source-language (car opt))))
+      (with doc (file-path (car opt))
+        (when doc
+          (for (e (lsp-block-entries doc)) (close-block e))
+          (lsp-block-entries-set! doc '())))
+      (let ((c (apply lsp-buffer-client* opt))
+            (uri (apply lsp-buffer-uri opt)))
+        (when (and c uri) (lsp-document-close c uri)))))
 
 (tm-define (lsp-cursor-position)
   (:synopsis "The position of the cursor in the current buffer, or #f")
   ;; in a source file, the cursor is at an offset of a line (paragraph)
   (let* ((p (cursor-path))
-         (b (buffer-path))
+         (b (lsp-target-base))
          (r (and (list-starts? p b) (list-tail p (length b)))))
     (and r (= (length r) 2) (lsp-buffer-position (car r) (cadr r)))))
 
@@ -511,7 +594,7 @@
 
 (tm-define (lsp-buffer-line i . opt)
   (:synopsis "The line @i of the buffer (current by default), in Cork")
-  (let* ((body (buffer-get-body (the-buffer opt)))
+  (let* ((body (apply lsp-target-root opt))
          (t (cond ((and (tree-is? body 'document) (>= i 0)
                         (< i (tree-arity body)))
                    (tree-ref body i))
@@ -526,12 +609,21 @@
                            (lsp-offset->character (lsp-buffer-line line)
                                                   offset))))
 
-(tm-define (lsp-buffer-line+offset pos)
+(define (root-line body i)
+  (let ((t (cond ((and (tree-is? body 'document) (>= i 0)
+                       (< i (tree-arity body)))
+                  (tree-ref body i))
+                 ((and (== i 0) (not (tree-is? body 'document))) body)
+                 (else #f))))
+    (if t (car (lsp-lines t)) "")))
+
+(tm-define (lsp-buffer-line+offset pos . opt)
   (:synopsis "The line and the offset in the buffer of the position @pos")
-  ;; (a position outside of the buffer, which a server may give for a file
-  ;; which has changed since, is at its start or at its end: the cursor
-  ;; is never put on a line which is not there)
-  (let* ((body (buffer-get-body (current-buffer)))
+  ;; (in the lines of the code at the cursor, or in the lines @opt; a
+  ;; position outside of them, which a server may give for a file which
+  ;; has changed since, is at their start or at their end: the cursor is
+  ;; never put on a line which is not there)
+  (let* ((body (if (pair? opt) (car opt) (lsp-target-root)))
          (n (if (tree-is? body 'document) (tree-arity body) 1))
          (v (or (lsp-number-value (lsp-ref pos "line")) 0))
          (l (if (and (real? v) (not (nan? v))) (inexact->exact (floor v)) 0))
@@ -539,5 +631,5 @@
          (c (or (lsp-number-value (lsp-ref pos "character")) 0))
          (ch (if (and (real? c) (not (nan? c))) (inexact->exact (floor c)) 0)))
     (if (>= l n)
-        (list line (string-length (lsp-buffer-line line)))
-        (list line (lsp-character->offset (lsp-buffer-line line) ch)))))
+        (list line (string-length (root-line body line)))
+        (list line (lsp-character->offset (root-line body line) ch)))))

@@ -780,6 +780,7 @@
         (test-clangd path)
         (test-editor)
         (test-actions))
+      (test-blocks)
       (buffer-close u)
       (when (buffer-exists? old) (switch-to-buffer old))))
   (system-rmdir-recursive (system->url lsp-dir)))
@@ -867,6 +868,95 @@
     (check-false (lsp-document-open? c uri))
     (lsp-client-stop c)
     (check= (lsp-client-state c) 'dead)))
+
+;; the code blocks of a document of the project (lsp-blocks.scm)
+
+(define block-lines
+  '("int twice (int n) { return 2 * n; }" "int g () { return twice (y); }"))
+
+(define (test-blocks)
+  (check-group "code blocks")
+  (let* ((path (lsp-file "proj/src/notes.tm"))
+         (u (system->url path))
+         (doc `(document "Some text."
+                         (cpp-code (document ,@block-lines))
+                         "More text."
+                         (cpp-code (document "int h () { return 3; }")))))
+    (string-save (serialize-texmacs
+                  (stree->tree `(document (TeXmacs ,(texmacs-version))
+                                          (style "generic") (body ,doc))))
+                 u)
+    (load-buffer u)
+    (lsp-blocks-force! #t)
+    (let* ((bs (lsp-document-blocks (buffer-get-body u)))
+           (b1 (and (pair? bs) (tree->path (car (car bs)))))
+           (b2 (and (= (length bs) 2) (tree->path (car (cadr bs))))))
+      (check= (map cadr bs) '("cpp" "cpp"))
+      (when (and b1 b2)
+        ;; the code at the cursor is the block, in a virtual file of its own
+        (go-to-path (append b1 '(1 4)))
+        (check-true (and (lsp-cursor-block) #t))
+        (check-false (lsp-source-buffer?))
+        (check= (lsp-buffer-language) "cpp")
+        (check= (lsp-buffer-path) (lsp-file "proj/src/.notes-block1.cpp"))
+        (check= (lsp-buffer-lines) block-lines)
+        (check= (lsp-buffer-line 1) (cadr block-lines))
+        (check= (lsp-cursor-position) (lsp-buffer-position 1 4))
+        (check= (lsp-target-base) b1)
+        (go-to-path (append b2 '(0 0)))
+        (check= (lsp-buffer-path) (lsp-file "proj/src/.notes-block2.cpp"))
+        (go-to-path (append b1 '(0 0)))
+        (check= (lsp-buffer-path) (lsp-file "proj/src/.notes-block1.cpp"))
+        (check= (lsp-block-of-path (lsp-file "proj/src/.notes-block2.cpp"))
+                (list path (car (cadr bs)) "cpp"))
+        ;; outside of the blocks, the document is not code
+        (go-to-path (append (buffer-path) '(0 0)))
+        (check-false (lsp-cursor-block))
+        (check= (lsp-buffer-language) #f)
+        ;; not followed when the blocks are not
+        (lsp-blocks-force! #f)
+        (go-to-path (append b1 '(0 0)))
+        (check-false (lsp-cursor-block))
+        (lsp-blocks-force! #t)
+        (when (url-exists-in-path? "clangd")
+          (test-blocks-clangd u b1 b2))))
+    (lsp-buffer-close u)
+    (lsp-blocks-force! 'pref)
+    (buffer-close u)))
+
+(define (test-blocks-clangd u b1 b2)
+  (let ((uri1 (lsp-path->uri (lsp-file "proj/src/.notes-block1.cpp")))
+        (uri2 (lsp-path->uri (lsp-file "proj/src/.notes-block2.cpp"))))
+    ;; the blocks are given to the server after a change
+    (notify-buffer-changed (url->string u))
+    (lsp-sync-pending)
+    (go-to-path (append b1 '(1 4)))
+    (with c (lsp-buffer-client*)
+      (check-true (and c (lsp-client-alive? c)))
+      (when c
+        (check-true (lsp-document-open? c uri1))
+        (check-true (lsp-document-open? c uri2))
+        (check-true (lsp-buffer-followed?))
+        ;; the diagnostics of a block are underlined at its lines
+        (lsp-wait c (lambda () (nnull? (lsp-diagnostics uri1))) 20000)
+        (lsp-show-diagnostics)
+        (with errs (get-alt-selection "code-errors")
+          (check-true (in? (append b1 '(1 25)) errs)))
+        (check-true (nnull? (code-diagnostics 'server)))
+        ;; the definition of twice, in the block
+        (go-to-path (append b1 '(1 18)))
+        (lsp-goto-definition)
+        (check= (current-buffer) u)
+        (check= (cursor-path) (append b1 '(0 4)))
+        ;; a block which is removed is closed on the server
+        (tree-remove! (buffer-get-body u) 3 1)
+        (notify-buffer-changed (url->string u))
+        (lsp-sync-pending)
+        (check-false (lsp-document-open? c uri2))
+        (check-true (lsp-document-open? c uri1))
+        ;; and the document closes the others
+        (lsp-buffer-close u)
+        (check-false (lsp-document-open? c uri1))))))
 
 ;; the editor, on a second file of the project
 

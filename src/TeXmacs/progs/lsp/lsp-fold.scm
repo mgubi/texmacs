@@ -90,7 +90,7 @@
 (define (in-source-file?)
   ;; (the cursor is in the lines of the buffer, which its server sees)
   (with c (code-cursor-lines)
-    (and c (tree-eq? (car c) (buffer-get-body (current-buffer))))))
+    (and c (tree-eq? (car c) (lsp-target-root)))))
 
 (tm-define (lsp-fold-ranges)
   (:synopsis "The blocks of the server around the cursor, as (start end)")
@@ -109,7 +109,7 @@
 ;; The former commands
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define (body) (buffer-get-body (current-buffer)))
+(define (body) (lsp-target-root))
 
 (tm-define (lsp-fold-block start end)
   (:synopsis "Folds the lines @start to @end: @start stays shown")
