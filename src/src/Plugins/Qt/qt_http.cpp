@@ -69,6 +69,25 @@ get_manager () {
   return manager;
 }
 
+// the time a POST may go without any byte, in ms: the preference "http
+// request timeout" (s) when it is given, else 5 minutes. The engines of AI
+// answer the requests which are not streamed (Correct, Translate, the
+// pictures of the image models) only once the whole answer is there, and
+// a model which reasons sends nothing for a while: the 10 s of the other
+// requests (get_manager) cut them off.
+static int
+qt_post_timeout () {
+  string s= get_preference ("http request timeout");
+  if (is_int (s) && as_int (s) >= 0) return 1000 * as_int (s);
+  return 300000;
+}
+
+static QNetworkReply*
+qt_post (QNetworkRequest request, QByteArray data) {
+  request.setTransferTimeout (qt_post_timeout ());
+  return get_manager ()->post (request, data);
+}
+
 // post raw data
 static int
 qt_http_post (string& ret, string url, array<string> headers_attr,
@@ -91,7 +110,7 @@ qt_http_post (string& ret, string url, array<string> headers_attr,
 			  QByteArray (&value[0], N(value)));
   }
   QNetworkReply* reply=
-    get_manager ()->post (request, QByteArray (data, n));
+    qt_post (request, QByteArray (data, n));
   if (reply == NULL) {
     io_error << "qt_http_post, cannot connect to " << url << LF;
     return -2;
@@ -103,6 +122,11 @@ qt_http_post (string& ret, string url, array<string> headers_attr,
   if (reply->error () != QNetworkReply::NoError) {
     io_error << "qt_http_post, in reply from " << url << ": "
 	     << from_qstring_utf8 (reply->errorString ()) << LF;
+    // (the answer of an error status, such as a refused key or a quota,
+    // says why: the AI engines give it as JSON, which is shown)
+    QByteArray b= reply->readAll ();
+    ret= string (b.constData (), b.size ());
+    delete reply;
     return -3;
   }
   ret= from_qstring_utf8 (QString (reply->readAll ()));
@@ -338,14 +362,14 @@ QTMHTTPHandler_callback::onFinished () {
   if (reply == NULL)
     call (callback, string (""));
   else {
+    // (also after an error: who waits for the answer is called, with what
+    // came, which says why for an error status)
     if (reply->error() != QNetworkReply::NoError)
       io_error << "http_post from "
 	       << from_qstring_utf8 (reply->url ().host ()) << ": "
 	       << from_qstring_utf8 (reply->errorString ()) << LF;
-    else {
-      string buffer= from_qstring_utf8 (QString (reply->readAll ()));
-      call (callback, buffer);
-    }
+    string buffer= from_qstring_utf8 (QString (reply->readAll ()));
+    call (callback, buffer);
     reply->close ();
   }
   this->deleteLater ();
@@ -373,7 +397,7 @@ qt_async_http_post (string url, array<string> headers_attr,
 			  QByteArray (&value[0], N(value)));
   }
   QNetworkReply* reply=
-    get_manager ()->post (request, QByteArray (data, n));
+    qt_post (request, QByteArray (data, n));
   if (reply == NULL) {
     errbuf << "cannot connect to " << url << LF;
     return true;
@@ -409,7 +433,7 @@ qt_async_http_post (string url, array<string> headers_attr,
 			  QByteArray (&value[0], N(value)));
   }
   QNetworkReply* reply=
-    get_manager ()->post (request, QByteArray (data, n));
+    qt_post (request, QByteArray (data, n));
   if (reply == NULL) {
     io_error << "qt_async_http_post, cannot connect to " << url << LF;
     return true;
