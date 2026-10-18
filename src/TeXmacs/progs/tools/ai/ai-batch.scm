@@ -12,6 +12,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (texmacs-module (tools ai ai-batch)
+  (:use (tools ai ai-attachments))
   (version version-compare))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -24,10 +25,17 @@
   (if (tm-atomic? t)
       (with s (tm->string t)
         (cork->sourcecode s))
-      (with s (convert (tm->stree t) "texmacs-stree" "latex-snippet"
-                       (cons "texmacs->latex:encoding" "utf-8"))
+      ;; (the files attached to the question: the text files after it, the
+      ;; others sent by ai.cpp, ai-attachments.scm)
+      (let* ((x (tm->stree t))
+             (files (ai-stree-attachments x))
+             (x (if (null? files) x (ai-strip-attachments x)))
+             (s (if (and (string? x) (not (null? files)))
+                    (cork->sourcecode x)
+                    (convert x "texmacs-stree" "latex-snippet"
+                             (cons "texmacs->latex:encoding" "utf-8")))))
         ;;(display* "s = " s "\n")
-        s)))
+        (string-append s (ai-attachments-text files)))))
 
 (tm-define (ai-cmdline name chat cmd)
   (cpp-ai-latex-command cmd name chat))
@@ -35,7 +43,10 @@
 (tm-define (ai-request name chat cmd)
   ;; (the model of the session or the fold which asks, init-ai.scm)
   (when (defined? 'ai-request-prepare) (ai-request-prepare name chat))
-  (with missing (and (defined? (quote ai-key-missing)) (ai-key-missing name))
+  (with missing (or (and (defined? (quote ai-key-missing)) (ai-key-missing name))
+                    ;; (a file of the question which cannot be sent)
+                    (and (defined? 'ai-request-attachment-problem)
+                         (ai-request-attachment-problem name chat)))
     (with r (if missing
                 (object->string `(error ,missing)) ; no request (request_link)
                 (cpp-ai-latex-request cmd name chat))

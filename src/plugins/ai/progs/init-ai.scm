@@ -617,31 +617,56 @@
                          "The questions are sent with the document")
                      (session-name lan))))))
 
+;; the fields above the one which is evaluated whose question and answer
+;; go with it (the last ones, ai-context-size), as (field question answer);
+;; #f when the field is not in a document, '() for a fold
+(define (ai-context-fields name chat field)
+  (with doc (and field (tree-up field))
+    (cond ((not field) '())
+          ((not (and doc (tm-func? doc 'document))) #f)
+          (else
+           (let* ((i (tree-index field))
+                  (l (append-map
+                      (lambda (j)
+                        (with f (tree-ref doc j)
+                          (if (not (tree-in? f ai-io-tags)) (list)
+                              (let ((q (ai-field-text name (tree-ref f 1)))
+                                    (a (ai-field-text name (tree-ref f 2))))
+                                (if (or (== q "") (== a "")
+                                        (string-starts? a "Error:"))
+                                    (list)
+                                    (list (list f q a)))))))
+                      (.. 0 i)))
+                  (n (ai-context-size name)))
+             (if (> (length l) n) (list-tail l (- (length l) n)) l))))))
+
 (tm-define (ai-session-context name chat)
+  (with l (ai-context-fields name chat (ai-pending-field name chat))
+    (and l (append-map cdr l))))
+
+;; the files of the questions (attachments, tools/ai/ai-attachments.scm)
+;; which ai.cpp sends as parts of their messages: "i<tab>mime<tab>name<tab>
+;; file", i the question (0 the first of the context, the last the one
+;; which is asked)
+(define (ai-field-attachments f)
+  (ai-binary-attachments (ai-stree-attachments (tree->stree (tree-ref f 1)))))
+
+(tm-define (ai-session-attachments name chat)
   (let* ((field (ai-pending-field name chat))
-         (doc (and field (tree-up field))))
-    ;; (a fold: its question alone)
-    (if (not field) '()
-        (let ()
-          (if (not (and doc (tm-func? doc 'document))) #f
-              (let* ((i (tree-index field))
-                     (pairs
-                      (append-map
-                       (lambda (j)
-                         (with f (tree-ref doc j)
-                           (if (not (tree-in? f ai-io-tags)) (list)
-                               (let ((q (ai-field-text name (tree-ref f 1)))
-                                     (a (ai-field-text name (tree-ref f 2))))
-                                 (if (or (== q "") (== a "")
-                                         (string-starts? a "Error:"))
-                                     (list)
-                                     (list (list q a)))))))
-                       (.. 0 i)))
-                     (n (ai-context-size name))
-                     (kept (if (> (length pairs) n)
-                               (list-tail pairs (- (length pairs) n))
-                               pairs)))
-                (apply append kept)))))))
+         (l (or (ai-context-fields name chat field) '()))
+         (fs (append (map car l) (if field (list field) '()))))
+    (append-map (lambda (i)
+                  (map (lambda (a) (string-append (number->string i) "\t" a))
+                       (ai-field-attachments (list-ref fs i))))
+                (.. 0 (length fs)))))
+
+;; why the files of the question cannot be sent, or #f (ai-request)
+(tm-define (ai-request-attachment-problem name chat)
+  (with field (ai-pending-field name chat)
+    (and field
+         (with p (ai-attachments-problem
+                  name (ai-stree-attachments (tree->stree (tree-ref field 1))))
+           (and p (string-append (upcase-first p) "."))))))
 
 ;; the first line of a session: the engine and its model
 (define (ai-banner lan)
@@ -1133,6 +1158,9 @@
         (=> (balloon (eval (ai-reasoning-label lan))
                      "How much the model reasons before it answers")
             (dynamic (focus-ai-reasoning-menu lan))))
+    //
+    ((balloon "Attach" "Attach a file to the question: a text, an image or a PDF file")
+     (ai-attach-file))
     (if (ai-answer-field lan)
         //
         ((balloon "Insert answer" "Insert the answer after the session")

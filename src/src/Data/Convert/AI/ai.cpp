@@ -470,6 +470,94 @@ ai_default_agent (string model, string agent) {
   return agent == as_string (call ("ai-default-instructions", model));
 }
 
+/******************************************************************************
+* The files attached to the questions: images and PDF files
+******************************************************************************/
+
+// The images and the PDF files of the questions of the conversation which
+// is asked, which go as parts of their messages (ai-session-attachments in
+// init-ai.scm; the text files are already in the text of the questions):
+// for the i-th question of the conversation, its files as triples (mime,
+// name, file). Read with the conversation (ai_conversation).
+static array<array<string> > ai_files;
+
+static void
+ai_read_attachments (string model, string chat) {
+  ai_files= array<array<string> > ();
+  object o= call ("ai-session-attachments", model, chat);
+  if (!is_array_string (o)) return;
+  array<string> a= as_array_string (o);
+  for (int k= 0; k < N(a); k++) {
+    array<string> f= tokenize (a[k], "\t");
+    if (N(f) != 4 || !is_int (f[0])) continue;
+    int i= as_int (f[0]);
+    while (N(ai_files) <= i) ai_files << array<string> ();
+    ai_files[i] << f[1] << f[2] << f[3];
+  }
+}
+
+static array<string>
+ai_question_files (int i) {
+  if (i < 0 || i >= N(ai_files)) return array<string> ();
+  return ai_files[i];
+}
+
+// the content of a file, in base64 without line breaks ("" if unreadable:
+// ai-attachments-problem made sure that it was there)
+static string
+ai_file_base64 (string file) {
+  string s;
+  if (load_string (url_system (file), s, false)) return "";
+  return replace (encode_base64 (s), "\n", "");
+}
+
+// a question with its files, as the APIs of OpenAI take it: images as data
+// URLs (Mistral: the URL alone, not in an object), PDF files as files
+static tree
+openai_content (string text, array<string> f, bool mistral) {
+  array<tree> v;
+  if (text != "") v << json_object ("type", "text", "text", text);
+  for (int k= 0; k+2 < N(f); k += 3) {
+    string url= "data:" * f[k] * ";base64," * ai_file_base64 (f[k+2]);
+    if (f[k] == "application/pdf") {
+      tree file= json_object ("filename", f[k+1], "file_data", url);
+      v << json_object ("type", "file", "file", file);
+    }
+    else if (mistral) v << json_object ("type", "image_url", "image_url", url);
+    else v << json_object ("type", "image_url",
+                           "image_url", json_object ("url", url));
+  }
+  return json_array (v);
+}
+
+// as Anthropic takes it: the files first, as base64 sources
+static tree
+claude_content (string text, array<string> f) {
+  array<tree> v;
+  for (int k= 0; k+2 < N(f); k += 3) {
+    array<tree> a;
+    a << tree ("type") << tree ("base64") << tree ("media_type") << tree (f[k])
+      << tree ("data") << tree (ai_file_base64 (f[k+2]));
+    tree src= json_object (a);
+    v << json_object ("type", f[k] == "application/pdf"? "document": "image",
+                      "source", src);
+  }
+  if (text != "" || N(v) == 0) v << json_object ("type", "text", "text", text);
+  return json_array (v);
+}
+
+// as Gemini takes it: parts inline, then the text
+static tree
+gemini_parts (string text, array<string> f) {
+  array<tree> v;
+  for (int k= 0; k+2 < N(f); k += 3)
+    v << json_object ("inlineData",
+                      json_object ("mimeType", f[k],
+                                   "data", ai_file_base64 (f[k+2])));
+  if (text != "" || N(v) == 0) v << json_object ("text", text);
+  return json_array (v);
+}
+
 // the conversation: (role, text) pairs, the last one the prompt. In a
 // session it is the one of the session (ai-session-context in init-ai.scm:
 // the questions and the answers of the fields above, as LaTeX), else the
@@ -477,10 +565,12 @@ ai_default_agent (string model, string agent) {
 static array<string>
 ai_conversation (string s, string model, string chat, bool history) {
   array<string> v;
+  ai_files= array<array<string> > ();
   if (history) {
     ai_set_current_prompt (s, model, chat);
     object c= call ("ai-session-context", model, chat);
     if (is_array_string (c)) {
+      ai_read_attachments (model, chat);
       array<string> a= as_array_string (c);
       for (int i= 0; i+1 < N(a); i += 2)
         v << string ("user") << a[i] << string ("assistant") << a[i+1];
@@ -502,20 +592,25 @@ ai_conversation (string s, string model, string chat, bool history) {
 
 // the messages of the APIs of OpenAI (also those of Mistral, Albert, Ollama)
 static tree
-openai_messages (string agent, array<string> conv) {
+openai_messages (string agent, array<string> conv, bool mistral) {
   array<tree> v;
   if (agent != "") v << json_object ("role", "system", "content", agent);
-  for (int i= 0; i+1 < N(conv); i += 2)
-    v << json_object ("role", conv[i], "content", conv[i+1]);
+  for (int i= 0, q= 0; i+1 < N(conv); i += 2) {
+    array<string> f;
+    if (conv[i] == "user") f= ai_question_files (q++);
+    if (N(f) == 0) v << json_object ("role", conv[i], "content", conv[i+1]);
+    else v << json_object ("role", conv[i],
+                           "content", openai_content (conv[i+1], f, mistral));
+  }
   return json_array (v);
 }
 
 static tree
 openai_style_command (string url, array<string> headers, string model_name,
                       string agent, array<string> conv, bool images= false,
-                      array<tree> extra= array<tree> ()) {
+                      array<tree> extra= array<tree> (), bool mistral= false) {
   array<tree> d (tree ("model"), tree (model_name),
-                 tree ("messages"), openai_messages (agent, conv));
+                 tree ("messages"), openai_messages (agent, conv, mistral));
   if (images) {
     array<tree> m (tree ("image"), tree ("text"));
     d << tree ("modalities") << json_array (m);
@@ -573,7 +668,7 @@ mistral_command (string s, string model, string agent,
     array<string> ("Authorization", "Bearer " * key,
                    "Content-Type", "application/json"),
     ai_model_name ("open-mistral-7b", "mistral-small-latest"), agent,
-    ai_conversation (s, model, chat, history));
+    ai_conversation (s, model, chat, history), false, array<tree> (), true);
 }
 
 tree
@@ -642,10 +737,11 @@ gemini_command (string s, string model, string agent,
   string name= ai_model_name ("gemini", "gemini-2.5-flash");
   array<string> conv= ai_conversation (s, model, chat, history);
   array<tree> contents;
-  for (int i= 0; i+1 < N(conv); i += 2) {
-    tree part= json_object ("text", conv[i+1]);
+  for (int i= 0, q= 0; i+1 < N(conv); i += 2) {
+    array<string> f;
+    if (conv[i] == "user") f= ai_question_files (q++);
     contents << json_object ("role", conv[i] == "user"? "user": "model",
-                             "parts", json_array (part));
+                             "parts", gemini_parts (conv[i+1], f));
   }
   bool image= ai_image_model (name);
   if (image && ai_default_agent (model, agent)) agent= ai_image_agent;
@@ -708,8 +804,13 @@ claude_command (string s, string model, string agent,
   string name= ai_model_name ("claude", "claude-sonnet-5-5");
   array<string> conv= ai_conversation (s, model, chat, history);
   array<tree> msgs;
-  for (int i= 0; i+1 < N(conv); i += 2)
-    msgs << json_object ("role", conv[i], "content", conv[i+1]);
+  for (int i= 0, q= 0; i+1 < N(conv); i += 2) {
+    array<string> f;
+    if (conv[i] == "user") f= ai_question_files (q++);
+    if (N(f) == 0) msgs << json_object ("role", conv[i], "content", conv[i+1]);
+    else msgs << json_object ("role", conv[i],
+                              "content", claude_content (conv[i+1], f));
+  }
   array<tree> d;
   d << tree ("model") << tree (name)
     << tree ("max_tokens")

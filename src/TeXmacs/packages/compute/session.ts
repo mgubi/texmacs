@@ -115,6 +115,8 @@
   <assign|timing|<macro|time|<small|<htab|5mm><with|color|dark
   grey|<arg|time>>>>>
 
+  <assign|ai-attachment|<macro|name|file|<with|mode|text|font-family|ss|ornament-shape|rounded|ornament-color|#eeeeee|ornament-border|1ln|ornament-hpadding|0.4spc|ornament-vpadding|0.15spc|<ornament|<small|<arg|name>>>>>>
+
   <\active*>
     <\src-comment>
       Textual fields.

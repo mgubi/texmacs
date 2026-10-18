@@ -17,6 +17,8 @@
 ;; server-sent events, an error of a provider, pictures in SVG and PNG, and
 ;; the fold of the answer as it came, which names the model, and the TikZ
 ;; pictures left uncompiled (their compilation would ask the TikZ plug-in).
+;; Also the files attached to the questions: their text, what keeps them
+;; from being sent, and the requests which carry them (made, not sent).
 
 (texmacs-module (check ai-test)
   (:use (check check-lib) (tools ai ai-batch)))
@@ -258,6 +260,106 @@
 (define (contains-text? t what)
   (string-contains? (object->string t) what))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; The files attached to the questions (tools/ai/ai-attachments.scm)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (has? what s)
+  (and (string? s) (>= (string-search-forwards what 0 s) 0)))
+
+(define (tm-file name)
+  (url->system (url-concretize (string-append "$TEXMACS_PATH/" name))))
+
+(define attach-dir (url-append (url-temp-dir) "ai-test-attach"))
+(define (attach-file name) (url->system (url-append attach-dir name)))
+
+;; a session asked by the test: one exchange above, the question asked; a
+;; PDF file with the exchange and a PNG file with the question
+(define attach-session? #f)
+(define attach-files '())
+
+(tm-define (ai-session-context name chat)
+  (:require attach-session?)
+  (list "Q1" "A1"))
+
+(tm-define (ai-session-attachments name chat)
+  (:require attach-session?)
+  attach-files)
+
+;; the JSON of the request of an engine for the question "Describe"
+(define (attach-request engine)
+  (set! attach-session? #t)
+  (with r (catch #t
+            (lambda ()
+              (with x (string->object (cpp-ai-latex-request "Describe" engine "check"))
+                (tree->json (stree->tree (cAr x)))))
+            (lambda args (object->string args)))
+    (set! attach-session? #f)
+    r))
+
+(define (test-attachments)
+  (check-group "attachments")
+  (when (not (url-exists? attach-dir)) (system-mkdir attach-dir))
+  (string-save "The secret word is avocado." (url-append attach-dir "notes.txt"))
+  (string-save "PK" (url-append attach-dir "n.zip"))
+  (let ((txt (attach-file "notes.txt"))
+        (png (tm-file "misc/images/texmacs-20.png"))
+        (pdf (tm-file "misc/pixmaps/unknown.pdf")))
+    ;; the kinds of files
+    (check= (map ai-attachment-kind (list txt png pdf "a.tm" "a.zip"))
+            '("text" "image" "pdf" "texmacs" #f))
+    ;; a text file comes after the question, the others not in its text
+    (check= (ai-serialize "claude"
+                          (stree->tree `(document (concat "Read " (ai-attachment "notes.txt" ,txt)))))
+            (string-append "Read \n\nThe attached file notes.txt:\n\n```\n"
+                           "The secret word is avocado.\n```"))
+    (check= (ai-serialize "claude"
+                          (stree->tree `(concat "Look " (ai-attachment "p.png" ,png))))
+            "Look ")
+    (check= (ai-binary-attachments
+             (ai-stree-attachments `(concat "a" (ai-attachment "t" ,txt)
+                                            (ai-attachment "p.png" ,png))))
+            (list (string-append "image/png\tp.png\t" png)))
+    ;; what is not sent
+    (check= (ai-attachments-problem "claude" (list (list "p.png" png) (list "u.pdf" pdf)))
+            #f)
+    (check= (has? "not there" (ai-attachments-problem "claude" (list (list "x.png" (attach-file "x.png"))))) #t)
+    (check= (has? "PDF" (ai-attachments-problem "ollama" (list (list "u.pdf" pdf)))) #t)
+    (check= (has? "image" (ai-attachments-problem "albert" (list (list "p.png" png)))) #t)
+    (check= (has? "neither" (ai-attachments-problem "claude" (list (list "n.zip" (attach-file "n.zip"))))) #t)
+    ;; the requests: the PDF file with the first question, the PNG file
+    ;; with the one asked, each as its API takes it
+    (lazy-plugin-force)
+    (set! attach-files
+          (list (string-append "0\tapplication/pdf\tunknown.pdf\t" pdf)
+                (string-append "1\timage/png\ttexmacs-20.png\t" png)))
+    (with c (attach-request "claude")
+      (check= (has? "\"type\": \"document\"" c) #t)
+      (check= (has? "\"media_type\": \"application/pdf\"" c) #t)
+      (check= (has? "\"media_type\": \"image/png\"" c) #t)
+      (check= (has? "\"data\": \"iVBORw0KGgo" c) #t)
+      ;; (base64 without line breaks)
+      (check= (not (has? "\\n" (substring c (string-search-forwards "iVBORw0KGgo" 0 c)
+                                          (string-length c)))) #t))
+    (with c (attach-request "chatgpt")
+      (check= (has? "\"file_data\": \"data:application/pdf;base64,JVBERi" c) #t)
+      (check= (has? "\"url\": \"data:image/png;base64,iVBORw0KGgo" c) #t))
+    (with c (attach-request "openrouter")
+      (check= (has? "\"filename\": \"unknown.pdf\"" c) #t)
+      (check= (has? "\"url\": \"data:image/png;base64,iVBORw0KGgo" c) #t))
+    (with c (attach-request "open-mistral-7b")
+      (check= (has? "\"image_url\": \"data:image/png;base64,iVBORw0KGgo" c) #t))
+    (with c (attach-request "gemini")
+      (check= (has? "\"mimeType\": \"application/pdf\"" c) #t)
+      (check= (has? "\"mimeType\": \"image/png\"" c) #t))
+    ;; without files: the messages as before
+    (set! attach-files '())
+    (with c (attach-request "claude")
+      (check= (has? "\"content\": \"Describe\"" c) #t)
+      (check= (not (has? "iVBORw0KGgo" c)) #t)))
+  (system-remove (url-append attach-dir "notes.txt"))
+  (system-remove (url-append attach-dir "n.zip")))
+
 (tm-define (ai-test-failures)
   (check-suite "ai")
   ;; no prices: the conversion reads none from the home, and never asks the
@@ -272,6 +374,7 @@
       (test-reasoning)
       (test-tikz)))
   (test-raw-fold)
+  (test-attachments)
   ;; the prices are read again from the home when they are needed
   (cpp-ai-set-prices "")
   (check-end))
