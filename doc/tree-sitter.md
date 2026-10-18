@@ -1182,6 +1182,56 @@ installed, and the old behaviour stays elsewhere.
   the page at the first use of a language (about 100 ms). Under node, 100
   KB of Python parse in 55 ms (42 on the desktop); in the page (headless
   Firefox) the parses and colors are those of the desktop.
+- **Loose ends** (same day):
+  - `ts_xz.c` is in the CMake lists too (the CI builds with configure).
+  - The regions are cached by least recent use up to 256 regions and 32 MB
+    of text (32 regions before): a document of 100 code blocks edited in
+    turn went from 5.9 to 0.5 ms per edit.
+  - Folds nest (a line's state is its depth, highlight codes 999991..9),
+    are not typeset while printing (`typeset_folds`, `edit_main.cpp`), and
+    Fold all definitions folds the top-level blocks of several lines in a
+    language without outline.
+  - Injections are incremental: each region keeps the trees of its
+    injected parts, edits them with the host tree and recolors only their
+    changed ranges; they nest up to depth 3. With the raw text of the HTML
+    scanner read at once, an edit in a 3000-line script went from 124 to
+    8 ms.
+  - The Scheme grammar reads symbols starting with digits (`2d-list`).
+  - Indentation of LaTeX (rules) and Haskell (layout rule); outlines of
+    our own for CSS, TOML, YAML, JSON, HTML and LaTeX; Toggle comment with
+    block comments per line where there are no line comments.
+- **Scanner speed, again** (same day): no change kept. In Bash (254 KB in
+  0.2 s, 58,500 scans) and Haskell (70 KB in 0.16 s) the scanner is two
+  thirds to three quarters of the parse, but spread over the conditions
+  of the port: a lookahead in a variable, no closures per scan, runs of
+  word characters read at once measured nothing. What is left is in s7:
+  each `s7_call` does a `sigsetjmp` which saves the signal mask (a system
+  call, about 10% of the scans) and the collections of the large TeXmacs
+  heap (a quarter of the Haskell scans). Saving no mask in `set_jump_info`
+  of s7.c measured 7 to 10% faster (Haskell 161 to 148 ms, Bash 193 to 178,
+  YAML 303 to 282), a 4 times larger heap 6%. Not done: the first is a
+  local patch of s7 for all of TeXmacs (a signal handler jumping out of
+  Scheme would no longer restore the mask), the second costs memory.
+- **The old highlighters stay** (decided after a look, same day): a
+  language of tree-sitter wraps the usual language of TeXmacs and still
+  calls its `advance` for every token typeset (the cut of the text into
+  tokens and their properties for the typesetting: spaces, breaks), as
+  well as its hyphenation and groups; only the colors come from the tree.
+  The usual languages also color the code when the preference
+  `tree-sitter highlighting` is off. Removing them would need a cut into
+  tokens made from the tree first. The bracket functions of
+  `prog/*-edit.scm` are redefined, not removed (`wip_lsp` changes them).
+- User documentation: `doc/main/editing/man-program-code.en.tm` (Editing
+  program code, in Editing tools), and Program coloring by syntax trees in
+  the preferences (Other).
+- **Checking and updating the grammars**: `misc/tree-sitter/check-grammars.py
+  REPOS [LANGUAGE...]` compares each grammar with its clone in REPOS (the
+  commit of SOURCE, whether its grammar.json is ours), then runs its corpus
+  (corpus.py) and the captures of its test/highlight files (highlights.py).
+  `--update LANGUAGE` copies the grammar.json of the clone and records its
+  commit; then `ship-tables.sh LANGUAGE`, the checks again, and the treesit
+  suite. The queries are updated by hand (some are ours or patched, see
+  SOURCE).
 - A pitfall of the tests: the suites run in one TeXmacs, and a key typed
   in program code loads the keyboard of programs and its modules, which
   changed the highlighting of Fortran and the entering of mathematics in

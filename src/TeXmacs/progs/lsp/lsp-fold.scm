@@ -126,4 +126,4 @@
 
 (tm-define (lsp-line-folded? t)
   (:synopsis "Is the line @t hidden by a fold?")
-  (== (code-line-fold-state t) 1))
+  (> (code-line-fold-state t) 0))

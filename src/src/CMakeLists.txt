@@ -13,6 +13,7 @@ target_include_directories (texmacs_body PUBLIC
 set_source_files_properties (
   "${TEXMACS_SOURCE_DIR}/src/Plugins/TreeSitter/tree_sitter_lib.c"
   "${TEXMACS_SOURCE_DIR}/src/Plugins/TreeSitter/ts_dynamic.c"
+  "${TEXMACS_SOURCE_DIR}/src/Plugins/TreeSitter/ts_xz.c"
   PROPERTIES INCLUDE_DIRECTORIES
   "${TEXMACS_SOURCE_DIR}/src/Plugins/TreeSitter/tree-sitter/include;${TEXMACS_SOURCE_DIR}/src/Plugins/TreeSitter/tree-sitter/src")
 

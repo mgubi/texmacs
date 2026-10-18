@@ -74,10 +74,15 @@
       (check-false (code-hidden? b 0))
       (check= (tree->stree b)
               '(document "int f () {" "  int x;" "  return x;" "}" ""))
-      ;; (not again, nor from a hidden line)
+      ;; (not twice at the same line); a fold in a fold makes its lines
+      ;; deeper, unfolding the outer one keeps it
       (check-false (code-fold-lines b 0 2))
-      (check-false (code-fold-lines b 1 2))
+      (check-true (code-fold-lines b 1 2))
+      (check= (code-folds b) '((0 2) (1 2)))
+      (check= (code-fold-depth b 2) 2)
       (check-true (code-unfold-lines b 0))
+      (check= (code-folds b) '((1 2)))
+      (check-true (code-unfold-lines b 1))
       (check= (code-folds b) '())
       ;; the blocks of a provider: the innermost one around the cursor
       (code-provider-set! 'fold-ranges 'test 0 (lambda () #t)
@@ -92,8 +97,11 @@
       (check= (code-folds b) '((0 1)))
       (code-unfold-all)
       (check= (code-folds b) '())
-      ;; a jump into a hidden line opens the fold
-      (code-fold-lines b 0 2)
+      ;; a jump into a hidden line opens the folds around it, from the
+      ;; innermost
+      (code-fold-lines b 1 2)
+      (code-fold-lines b 0 3)
+      (check= (code-folds b) '((0 3) (1 2)))
       (code-cursor-in-fold (append (buffer-path) '(4 0))
                            (append (buffer-path) '(2 1)))
       (check= (code-folds b) '())

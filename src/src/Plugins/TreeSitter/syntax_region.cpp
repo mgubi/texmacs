@@ -114,10 +114,103 @@ struct syntax_region_rep {
   array<bool> hl_dirty;        // the lines whose colours are out of date
   int ind_query, ind_version;  // the captures below are for these
   ts_node_captures ind_caps;   // of the query of indentation
+  std::vector<struct injected_tree> injected;   // see below
 };
 
+// the tree of a part of a region in another language (an injection), kept
+// and edited with the region, so that it is parsed again incrementally
+struct injected_tree {
+  int start, end;     // in the text of the region
+  int language;
+  TSTree* tree;
+  string text;        // its text, when it was parsed
+  bool fresh;         // tree is the parse of text
+};
+
+static TSTree* parse_text (int language, string text, TSTree* old);
+
+static void
+clear_injected (syntax_region_rep* r) {
+  for (size_t i= 0; i < r->injected.size (); i++)
+    ts_tree_delete (r->injected[i].tree);
+  r->injected.clear ();
+}
+
+static TSPoint
+point_in (string& s, int byte) {
+  // the point of a byte of s
+  uint32_t row= 0, col= 0;
+  for (int i= 0; i < byte && i < N(s); i++)
+    if (s[i] == '\n') { row++; col= 0; } else col++;
+  return TSPoint { row, col };
+}
+
+static TSPoint
+point_after (TSPoint p, string& ins) {
+  for (int i= 0; i < N(ins); i++)
+    if (ins[i] == '\n') { p.row++; p.column= 0; } else p.column++;
+  return p;
+}
+
+static void
+edit_injected (syntax_region_rep* r, int start, int old_end, int new_end,
+               string ins, array<int>& changed, array<int>& parts) {
+  // the edit start..old_end -> ins of the region on its injected trees: an
+  // edit inside a part is made on its tree, which is parsed again at once,
+  // one before it moves it, one across its bounds drops it. Appends to
+  // changed the ranges (in the new text) where the syntax of the parts
+  // changed, and to parts the ranges of the parts which were parsed again
+  int delta= new_end - old_end;
+  std::vector<injected_tree> kept;
+  for (size_t i= 0; i < r->injected.size (); i++) {
+    injected_tree it= r->injected[i];
+    if (old_end < it.start) { it.start += delta; it.end += delta; }
+    else if (start > it.end) ;
+    else if (start >= it.start && old_end <= it.end) {
+      int rs= start - it.start, ro= old_end - it.start;
+      TSInputEdit e;
+      e.start_byte= (uint32_t) rs;
+      e.old_end_byte= (uint32_t) ro;
+      e.new_end_byte= (uint32_t) (rs + N(ins));
+      e.start_point= point_in (it.text, rs);
+      e.old_end_point= point_in (it.text, ro);
+      e.new_end_point= point_after (e.start_point, ins);
+      ts_tree_edit (it.tree, &e);
+      it.text= it.text (0, rs) * ins * it.text (ro, N(it.text));
+      it.end += delta;
+      TSTree* t= parse_text (it.language, it.text, it.tree);
+      if (t != NULL) {
+        uint32_t count;
+        TSRange* rg= ts_tree_get_changed_ranges (it.tree, t, &count);
+        for (uint32_t k= 0; k < count; k++)
+          changed << (it.start + (int) rg[k].start_byte)
+                  << (it.start + (int) rg[k].end_byte);
+        free (rg);
+        changed << (it.start + rs) << (it.start + rs + N(ins));
+        parts << it.start << it.end;
+        ts_tree_delete (it.tree);
+        it.tree= t;
+        it.fresh= true;
+      }
+      else it.fresh= false;
+    }
+    else { ts_tree_delete (it.tree); continue; }
+    kept.push_back (it);
+  }
+  r->injected= kept;
+}
+
 static array<syntax_region_rep*> regions;
-static const int max_regions= 32;
+// the regions kept, the most recently used first: at most max_regions, of
+// max_region_bytes of text in all (a document with many blocks of code
+// would else parse them again at each edit, going round them)
+static const int max_regions= 256;
+static const int max_region_bytes= 32 * 1024 * 1024;
+
+static int
+region_bytes (syntax_region_rep* r) {
+  return N(r->offsets) == 0? 0: r->offsets[N(r->offsets) - 1];
+}
 
 static void
 flatten (tree t, string& r) {
@@ -227,6 +320,9 @@ region_update (syntax_region_rep* r) {
   e.old_end_point= point_of (r->offsets, old_end);
   e.new_end_point= point_of (new_offsets, new_end);
   ts_tree_edit (r->tree, &e);
+  array<int> inj_changed, inj_parts;
+  edit_injected (r, start, old_end, new_end, ns (p, N(ns) - s),
+                 inj_changed, inj_parts);
   r->lines= cur;
   r->offsets= new_offsets;
   TSTree* old_tree= ts_tree_copy (r->tree);
@@ -244,11 +340,24 @@ region_update (syntax_region_rep* r) {
     uint32_t count;
     TSRange* ranges= ts_tree_get_changed_ranges (old_tree, r->tree, &count);
     for (uint32_t k= 0; k < count; k++) {
+      // (not the changes inside the parts in other languages which were
+      // parsed again: a script of HTML is one token; their own changes are
+      // below)
+      int b1= (int) ranges[k].start_byte, b2= (int) ranges[k].end_byte;
+      bool inside= false;
+      for (int j= 0; j + 1 < N(inj_parts); j += 2)
+        if (inj_parts[j] <= b1 && b2 <= inj_parts[j+1]) inside= true;
+      if (inside) continue;
       int r1= (int) ranges[k].start_point.row;
       int r2= min ((int) ranges[k].end_point.row, n1 - 1);
       for (int i= max (r1, 0); i <= r2; i++) dirty[i]= true;
     }
     free (ranges);
+    for (int j= 0; j + 1 < N(inj_changed); j += 2) {
+      int r1= (int) point_of (new_offsets, inj_changed[j]).row;
+      int r2= min ((int) point_of (new_offsets, inj_changed[j+1]).row, n1 - 1);
+      for (int i= max (r1, 0); i <= r2; i++) dirty[i]= true;
+    }
     r->hl_cols= cols;
     r->hl_dirty= dirty;
   }
@@ -257,6 +366,7 @@ region_update (syntax_region_rep* r) {
 
 static void
 region_delete (syntax_region_rep* r) {
+  clear_injected (r);
   if (r->tree != NULL) ts_tree_delete (r->tree);
   ts_parser_delete (r->parser);
   tm_delete (r);
@@ -281,6 +391,7 @@ get_region (tree root, int language) {
         r->lines= region_lines (root);
         r->offsets= line_offsets (r->lines);
         r->tree= NULL;
+        clear_injected (r);
         region_parse (r, NULL);
         r->full_parses++;
         r->hl_cols= array<array<int> > ();
@@ -305,7 +416,11 @@ get_region (tree root, int language) {
   r->hl_epoch= -1;
   ts_parser_set_language (r->parser, lang);
   region_parse (r, NULL);
-  if (N(regions) >= max_regions) {
+  int total= region_bytes (r);
+  for (int i= 0; i < N(regions); i++) total += region_bytes (regions[i]);
+  while (N(regions) > 0 &&
+         (N(regions) >= max_regions || total > max_region_bytes)) {
+    total -= region_bytes (regions[N(regions) - 1]);
     region_delete (regions[N(regions) - 1]);
     regions->resize (N(regions) - 1);
   }
@@ -508,31 +623,85 @@ text_read (void* payload, uint32_t byte, TSPoint p, uint32_t* bytes_read) {
   return t->s + byte;
 }
 
+static TSTree*
+parse_text (int language, string text, TSTree* old) {
+  // the tree of text in language, incrementally from old (edited) if given
+  const TSLanguage* lang= tree_sitter_get_language (language);
+  if (lang == NULL) return NULL;
+  TSParser* p= ts_parser_new ();
+  if (!ts_parser_set_language (p, lang)) { ts_parser_delete (p); return NULL; }
+  c_string ctext (text);
+  text_input in= { (const char*) ctext, (uint32_t) N(text) };
+  TSInput input= { &in, text_read, TSInputEncodingCustom, texmacs_decode };
+  TSTree* t= ts_parser_parse (p, old, input);
+  ts_parser_delete (p);
+  return t;
+}
+
+static const int max_injected= 64;      // trees kept per region
+static const int max_injection_depth= 3;
+
 static void
-paint_injection (const char* text, int start, int end, int language,
-                 int query, array<int>& colors, array<int>& paint,
-                 int from, int to) {
+paint_injection (syntax_region_rep* r, const char* text, int start, int end,
+                 int language, int query, int injections, array<int>& colors,
+                 array<int>& paint, int from, int to,
+                 ts_injection_resolver resolve, int depth) {
   // the text start..end parsed in another language and painted with its
-  // highlight query, where it meets from..to (paint holds these positions)
+  // highlight query, where it meets from..to (paint holds these positions);
+  // then the injections of that language in it. The tree of a part of the
+  // region (r) is kept and parsed again incrementally; those of the parts
+  // in it (r NULL) are not
   const TSLanguage* lang= tree_sitter_get_language (language);
   if (lang == NULL || start >= end) return;
-  TSParser* p= ts_parser_new ();
-  if (!ts_parser_set_language (p, lang)) { ts_parser_delete (p); return; }
-  text_input in= { text + start, (uint32_t) (end - start) };
-  TSInput input= { &in, text_read, TSInputEncodingCustom, texmacs_decode };
-  TSTree* t= ts_parser_parse (p, NULL, input);
-  if (t != NULL) {
-    // the predicates read the text of the injection, from its start
-    string sub (text + start, end - start);
-    c_string csub (sub);
-    array<int> caps;
-    tree_sitter_query_run (query, ts_tree_root_node (t), csub, caps,
-                           max (from - start, 0), min (to, end) - start);
-    // (an injection which starts before from has a negative offset)
-    paint_captures (caps, colors, paint, start - from, min (end, to) - from);
-    ts_tree_delete (t);
+  string sub (text + start, end - start);
+  TSTree* old= NULL;
+  bool fresh= false;
+  int slot= -1;
+  if (r != NULL)
+    for (size_t i= 0; i < r->injected.size (); i++) {
+      injected_tree& it= r->injected[i];
+      if (it.start == start && it.end == end && it.language == language &&
+          it.text == sub) {
+        old= it.tree; fresh= it.fresh; slot= (int) i; break;
+      }
+    }
+  TSTree* t= fresh? old: parse_text (language, sub, old);
+  if (t == NULL) return;
+  // the predicates read the text of the injection, from its start
+  c_string csub (sub);
+  array<int> caps;
+  int sub_from= max (from - start, 0), sub_to= min (to, end) - start;
+  tree_sitter_query_run (query, ts_tree_root_node (t), csub, caps, sub_from, sub_to);
+  // (an injection which starts before from has a negative offset)
+  paint_captures (caps, colors, paint, start - from, min (end, to) - from);
+  if (injections >= 0 && resolve != NULL && depth < max_injection_depth) {
+    array<int> ranges;
+    array<string> names;
+    tree_sitter_query_injections (injections, ts_tree_root_node (t), csub,
+                                  ranges, names, sub_from, sub_to);
+    for (int k= 0; k < N(names); k++) {
+      int lan2, query2, injections2;
+      array<int> colors2;
+      if (resolve (names[k], lan2, query2, colors2, injections2))
+        paint_injection (NULL, text, start + ranges[2*k],
+                         start + min (ranges[2*k+1], N(sub)), lan2, query2,
+                         injections2, colors2, paint, from, to, resolve,
+                         depth + 1);
+    }
   }
-  ts_parser_delete (p);
+  if (r == NULL) ts_tree_delete (t);
+  else if (slot >= 0) {
+    if (!fresh) ts_tree_delete (r->injected[slot].tree);
+    r->injected[slot].tree= t;
+    r->injected[slot].fresh= true;
+  }
+  else {
+    if ((int) r->injected.size () >= max_injected) {
+      ts_tree_delete (r->injected[0].tree);
+      r->injected.erase (r->injected.begin ());
+    }
+    r->injected.push_back (injected_tree { start, end, language, t, sub, true });
+  }
 }
 
 static bool
@@ -590,7 +759,8 @@ syntax_region_highlight (tree root, int language, int query, array<int> colors,
   // colour code of each capture (0: no colour; see paint_captures); then
   // the injections (a query of injections.scm, or -1): the ranges which it
   // gives in other languages, coloured by the highlighters of these
-  // languages (resolve, which epoch changes) over the colours of the region.
+  // languages (resolve, which epoch changes) over the colours of the region,
+  // and the injections in those (see paint_injection).
   // After an edit, only the lines whose colours are out of date are
   // coloured again (the query runs on their bytes); their rows are appended
   // to recoloured, when given.
@@ -629,11 +799,12 @@ syntax_region_highlight (tree root, int language, int query, array<int> colors,
     array<string> names;
     tree_sitter_query_injections (injections, top, ctext, ranges, names, from, to);
     for (int k= 0; k < N(names); k++) {
-      int lan2, query2;
+      int lan2, query2, injections2;
       array<int> colors2;
-      if (resolve (names[k], lan2, query2, colors2))
-        paint_injection (ctext, ranges[2*k], min (ranges[2*k+1], N(text)),
-                         lan2, query2, colors2, paint, from, to);
+      if (resolve (names[k], lan2, query2, colors2, injections2))
+        paint_injection (r, ctext, ranges[2*k], min (ranges[2*k+1], N(text)),
+                         lan2, query2, injections2, colors2, paint, from, to,
+                         resolve, 1);
     }
   }
   paint_unmatched (top, paint, from, to, encode_color ("error"));

@@ -18,22 +18,30 @@
 * Folds
 ******************************************************************************/
 
-// (a highlight of a code of its own, which no language uses)
-#define CODE_FOLD_HIDDEN 999998
+// The state of a line is the number of the folds which hide it (folds nest),
+// kept as a highlight of a code of its own for each number (which no
+// language uses)
+#define CODE_FOLD_CODES 999990   // CODE_FOLD_CODES + 1 ... + CODE_FOLD_MAX
+#define CODE_FOLD_MAX 9
 
 void remove_highlight (observer& obs, int lan);
 
 int
 code_line_fold_state (tree t) {
-  if (!is_atomic (t)) return 0;
-  return has_highlight (t, CODE_FOLD_HIDDEN)? 1: 0;
+  if (!is_atomic (t) || is_nil (t->obs)) return 0;
+  for (int d= 1; d <= CODE_FOLD_MAX; d++)
+    if (has_highlight (t, CODE_FOLD_CODES + d)) return d;
+  return 0;
 }
 
 void
 code_set_line_fold_state (tree t, int state) {
   if (!is_atomic (t)) return;
-  if (!is_nil (t->obs)) remove_highlight (t->obs, CODE_FOLD_HIDDEN);
-  if (state == 1) attach_highlight (t, CODE_FOLD_HIDDEN, 0, 0, 0);
+  if (!is_nil (t->obs))
+    for (int d= 1; d <= CODE_FOLD_MAX; d++)
+      remove_highlight (t->obs, CODE_FOLD_CODES + d);
+  if (state > 0)
+    attach_highlight (t, CODE_FOLD_CODES + min (state, CODE_FOLD_MAX), 0, 0, 0);
 }
 
 /******************************************************************************
@@ -44,8 +52,8 @@ code_set_line_fold_state (tree t, int state) {
 // one, 0 for none; its hints: for each position, the end of the line too,
 // the number of its text plus one. The colours and the texts are numbered
 // once: they are few, and repeated)
-#define CODE_LAYER_COLORS 999997
-#define CODE_LAYER_HINTS  999996
+#define CODE_LAYER_COLORS 999981
+#define CODE_LAYER_HINTS  999980
 
 static array<string> layer_names;
 static hashmap<string,int> layer_numbers (-1);

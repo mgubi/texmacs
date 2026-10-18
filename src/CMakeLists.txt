@@ -688,7 +688,8 @@ list (APPEND TeXmacs_Std_Plugins_SRCS
   "${TeXmacs_TreeSitter_DIR}/ts_highlight.cpp"
   "${TeXmacs_TreeSitter_DIR}/ts_tables.cpp"
   "${TeXmacs_TreeSitter_DIR}/tree_sitter_lib.c"
-  "${TeXmacs_TreeSitter_DIR}/ts_dynamic.c")
+  "${TeXmacs_TreeSitter_DIR}/ts_dynamic.c"
+  "${TeXmacs_TreeSitter_DIR}/ts_xz.c")
 # (their include directories are set in src/CMakeLists.txt, where the
 # target is)
 

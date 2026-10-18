@@ -936,20 +936,24 @@ bridge_rep::typeset_by_inputs (int desired_status) {
   return true;
 }
 
+// folds are shown on the screen, not in what is printed (print_doc)
+bool typeset_folds= true;
+
 void
 bridge_rep::fold_line (tree t, array<page_item>& items) {
   // a folded line of program code (see System/Language/code_lines.hpp)
   // takes no room and is not drawn (its boxes stay, for the cursor), and
   // the line before folded lines ends with a mark
+  if (!typeset_folds) return;
   bool before_fold= false;
   if (code_line_fold_state (t) == 0 && !is_nil (ip) && !is_nil (ip->next) &&
       is_accessible (ip)) {
     tree parent= subtree (the_et, reverse (ip->next));
     int k= ip->item;
     before_fold= is_document (parent) && k + 1 < N(parent) &&
-                 code_line_fold_state (parent[k+1]) == 1;
+                 code_line_fold_state (parent[k+1]) > 0;
   }
-  if (code_line_fold_state (t) == 1) {
+  if (code_line_fold_state (t) > 0) {
     for (int i=0; i<N(items); i++)
       if (items[i]->type != PAGE_CONTROL_ITEM) {
         box b= items[i]->b;

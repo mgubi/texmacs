@@ -18,9 +18,11 @@
 // an edited line forgets it. The features of programs (tree-sitter, the
 // language servers) set it; the typesetter and the editor read it.
 
-// a fold: a hidden line (1) takes no room and is not drawn (its boxes stay,
-// for the cursor, see bridge_rep::fold_line); the line before hidden lines
-// ends with a mark. The lines are then to be typeset again (update-path)
+// a fold: a hidden line takes no room and is not drawn (its boxes stay,
+// for the cursor, see bridge_rep::fold_line), except when it is printed;
+// the line before hidden lines ends with a mark. The state of a line is
+// the number of the folds which hide it (0: shown; folds nest, up to 9).
+// The lines are then to be typeset again (update-path)
 int  code_line_fold_state (tree line);
 void code_set_line_fold_state (tree line, int state);
 

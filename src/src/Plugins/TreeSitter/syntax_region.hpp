@@ -35,7 +35,7 @@ array<int> syntax_region_node_move (tree region, int language,
 array<int> syntax_region_node_info (tree region, int language, int row, int col);
 // the highlight query and colours of a language named in an injection
 typedef bool (*ts_injection_resolver) (string name, int& language, int& query,
-                                       array<int>& colors);
+                                       array<int>& colors, int& injections);
 array<array<int> > syntax_region_highlight (tree region, int language,
                                             int query, array<int> colors,
                                             int injections= -1,

@@ -482,7 +482,31 @@
                 (18 19 "operator_openclose") (20 25 "variable_identifier")
                 (25 26 "operator_field") (31 39 "operator_openclose")
                 (44 49 "operator_openclose"))))
-    (let ((d (stree->tree '(document "println!(\"{}\", x + 1);"))))
+;; injections in injections (CSS in a template of the script of HTML),
+    ;; and, after edits in the script (its tree parsed again incrementally),
+    ;; the colors of a fresh highlighting
+    (with-test-buffer '(document (html-code (document "<less>script<gtr>"
+                                                      "var s = css`a { color: red }`;"
+                                                      "var t = 1;"
+                                                      "<less>/script<gtr>")))
+      (lambda (u b)
+        (update-forced)
+        (let* ((code (tree-ref b 0 0))
+               (all (lambda (doc)
+                      (tree-sitter-line-colors "html" doc)
+                      (map (lambda (i) (tree-sitter-line-colors "html" (tree-ref doc i)))
+                           (iota (tree-arity doc))))))
+          (check-true (in? '(16 21 "variable_identifier")   ; color
+                           (tree-sitter-line-colors "html" (tree-ref code 1))))
+          (all code)
+          (tree-insert! (tree-ref code 2) 0 "/* ")
+          (all code)
+          (tree-insert! (tree-ref code 1) 0 "*/ ")
+          (all code)
+          (tree-remove! (tree-ref code 2) 0 3)
+          (check= (all code) (all (stree->tree (tree->stree code))))
+          (tree-sitter-pending-updates))))   ; (not for the tests below)
+        (let ((d (stree->tree '(document "println!(\"{}\", x + 1);"))))
       (tree-sitter-line-colors "rust" d)
       (check= (tree-sitter-line-colors "rust" (tree-ref d 0))
               '((0 8 "preprocessor") (8 9 "operator_openclose") (9 13 "constant_string")
@@ -612,6 +636,17 @@
 ;; Scheme as prog/scheme-edit.scm indents it (the keywords of tm-mode.el
       ;; and their arity, the alignment with the arguments), on the tree: a
       ;; character #\) or a quote in a string does not count
+;; LaTeX: environments and groups indent, \end goes back; Haskell: one
+      ;; step after a line which ends with where, do, = ..., else as the line
+      ;; before (a comment at its end does not count)
+      (check= (indents "latex" '("\\begin{itemize}" "  \\item a" "  \\begin{equation}"
+                                 "    x" "  \\end{equation}" "\\end{itemize}"))
+              '(0 4 4 6 2 0))
+      (check= (indents "haskell" '("f x = do" "    let y = 1" "    print y" "  where"
+                                   "    z = 3 -- where" ""))
+              '(0 4 4 4 6 4))
+      ;; (a symbol may start with digits, as 2d-list in TeXmacs)
+      (check= (indents "scheme" '("(define 2d-list" "  (list 1))")) '(0 2))
       (check= (indents "scheme" '("(define (f x)" "  (let ((y x)" "        (z 1))"
                                   "    (g y" "       z)))" "(when x" "  y)"
                                   "(with a b" "  c)" "(let" "    ((x 1))"
@@ -673,6 +708,21 @@
                 '(("interface" "I") ("function" "f")))
         (check= (outline "ocaml" '("let f x = x" "module M = struct end"))
                 '(("function" "f") ("module" "M")))
+;; outlines of ours for CSS, TOML, YAML, JSON, HTML and LaTeX
+        (for-each treesit-generate-cache '("css" "toml" "yaml" "json" "html" "latex"))
+        (check= (outline "css" '("a, b:hover { color: red }" "@keyframes spin { }"))
+                '(("rule" "a, b:hover") ("keyframes" "spin")))
+        (check= (outline "toml" '("x = 1" "[server]" "host = 1" "[[items]]"))
+                '(("table" "server") ("table" "items")))
+        (check= (outline "yaml" '("name: x" "jobs:" "  build: y"))
+                '(("key" "name") ("key" "jobs") ("key" "build")))
+        (check= (outline "json" '("{\"a\": 1, \"b\": {\"c\": 2}}"))
+                '(("key" "a") ("key" "b") ("key" "c")))
+        (check= (outline "html" '("<less>h1<gtr>Title<less>/h1<gtr>"
+                                  "<less>div id=\"main\"<gtr><less>/div<gtr>"))
+                '(("heading" "Title") ("element" "main")))
+        (check= (outline "latex" '("\\section{Intro}\\label{sec:i}" "\\newcommand{\\foo}{x}"))
+                '(("section" "Intro") ("label" "sec:i") ("macro" "\\foo")))
         ;; the two equations of f are one definition
         (check= (outline "haskell" '("f 0 = 1" "f n = n" "data D = D" "class C a where"))
                 '(("function" "f") ("class" "D") ("interface" "C")))))
@@ -715,6 +765,11 @@
     (check= (toggle-line-comments '("  a" "" "    b") "#") '("  # a" "" "  #   b"))
     (check= (toggle-line-comments '("  # a" "" "  #   b") "#") '("  a" "" "    b"))
     (check= (toggle-line-comments '("// a" "b") "//") '("// // a" "// b"))
+    ;; with block comments, for the languages which have no line comments
+    (check= (toggle-block-comments '("a {" "" "  b;") '("/*" . "*/"))
+            '("/* a { */" "" "  /* b; */"))
+    (check= (toggle-block-comments '("/* a { */" "" "  /* b; */") '("/*" . "*/"))
+            '("a {" "" "  b;"))
     ;; at the cursor, in the code of a buffer
     (with-test-buffer '(document (scm-code (document "(define x 1)" "(if x \"(\" 'b)")))
       (lambda (u b)
@@ -856,6 +911,39 @@
           (syntax-fold-definitions)
           (check-true (syntax-unfold-all))
           (check= (states) '(0 0 0 0)))))
+    ;; folds nest: unfolding the outer one keeps the inner one
+    (for-each (lambda (l) (treesit-generate-cache l) (treesit-highlighter-request l))
+              '("cpp" "css"))
+    (with-test-buffer '(document (cpp-code (document "int f () {" "  if (x) {" "    a ();"
+                                                     "  }" "}")))
+      (lambda (u b)
+        (update-forced)
+        (let* ((code (tree-ref b 0 0))
+               (at (lambda (row col) (rcons (tree->path (tree-ref code row)) col)))
+               (states (lambda () (map (lambda (i) (tree-sitter-fold-state (tree-ref code i)))
+                                       (iota 5)))))
+          (go-to (at 2 4))
+          (check-true (syntax-fold-block))
+          (check= (states) '(0 0 1 0 0))
+          (go-to (at 0 0))
+          (check-true (syntax-fold-block))
+          (check= (states) '(0 1 2 1 0))
+          (check-false (syntax-fold-block))   ; folded already
+          (check-true (syntax-unfold-block))
+          (check= (states) '(0 0 1 0 0))
+          (syntax-fold-block)
+          (go-to (at 2 2))                   ; into both folds
+          (check= (states) '(0 0 0 0 0)))))
+    ;; without definitions (CSS has no tags.scm), the blocks at the top level
+    (with-test-buffer '(document (css-code (document "a {" "  color: red;" "}" "b {"
+                                                     "  x: y;" "}")))
+      (lambda (u b)
+        (update-forced)
+        (let ((code (tree-ref b 0 0)))
+          (go-to (rcons (tree->path (tree-ref code 0)) 0))
+          (check-true (syntax-fold-definitions))
+          (check= (map (lambda (i) (tree-sitter-fold-state (tree-ref code i))) (iota 6))
+                  '(0 1 0 0 1 0)))))
     ;; closing keywords and tags: after Return, the keyword which closes the
     ;; block opened by the line before (the first of the grammar which makes
     ;; fewer errors), the \end of a \begin; the end tag of HTML after the >

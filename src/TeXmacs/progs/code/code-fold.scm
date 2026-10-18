@@ -14,9 +14,9 @@
 ;; A fold hides lines of program code: of a source file, of a code block, of a
 ;; session input (a document of lines). It is a state of the view, kept on the
 ;; hidden lines (code-set-line-fold-state, System/Language/code_lines.cpp), not
-;; markup: the document, its export and the editing do not see it, and a line
-;; which is modified forgets it. The hidden lines after a shown line are a
-;; fold, which the shown line ends by a mark (Typeset/Bridge/bridge.cpp).
+;; markup: the document, its export, its printing and the editing do not see
+;; it, and a line which is modified forgets it. A shown line before hidden
+;; lines ends by a mark (Typeset/Bridge/bridge.cpp).
 ;;
 ;; The blocks which can be folded come from providers (code-features.scm):
 ;;   fold-ranges     (procedure) the blocks around the cursor
@@ -39,10 +39,20 @@
 ;; The hidden lines
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;; The state of a line is the number of the folds which hide it: folds nest.
+;; A fold starts at a line when the next line is hidden by more folds;
+;; folding a block around a fold makes its lines deeper, unfolding it keeps
+;; the folds inside (as the folds of tree-sitter, progs/treesit/ts-edit.scm).
+
+(tm-define (code-fold-depth root row)
+  (:synopsis "The number of the folds which hide the line @row of @root")
+  (if (and (tree-is? root 'document) (>= row 0) (< row (tree-arity root)))
+      (code-line-fold-state (tree-ref root row))
+      0))
+
 (tm-define (code-hidden? root row)
   (:synopsis "Is the line @row of the lines @root hidden by a fold?")
-  (and (tree-is? root 'document) (>= row 0) (< row (tree-arity root))
-       (== (code-line-fold-state (tree-ref root row)) 1)))
+  (> (code-fold-depth root row) 0))
 
 (define (update-line line)
   ;; (the line is typeset again; while the document is modified, as when
@@ -51,46 +61,54 @@
     (if p (update-path p)
         (delayed (with p (tree->path line) (when p (update-path p)))))))
 
-(define (set-hidden! root row on)
+(define (set-depth! root row d)
   (let ((line (tree-ref root row)))
-    (when (!= (code-hidden? root row) on)
-      (code-set-line-fold-state line (if on 1 0))
+    (when (!= (code-fold-depth root row) d)
+      (code-set-line-fold-state line (max d 0))
       (update-line line))))
+
+(define (fold-starts? root row)
+  (> (code-fold-depth root (+ row 1)) (code-fold-depth root row)))
 
 (tm-define (code-fold-lines root first last)
   (:synopsis "Hides the lines after @first up to @last of @root")
-  ;; (not when the first line is hidden by another fold, nor when it is
-  ;; already that of a fold); whether there was something to hide
+  ;; (not when a fold starts already at the first line); whether there was
+  ;; something to hide
   (and (tree-is? root 'document) (< first last) (< last (tree-arity root))
-       (not (code-hidden? root first))
-       (not (code-hidden? root (+ first 1)))
+       (not (fold-starts? root first))
        (begin
-         (for (r (.. (+ first 1) (+ last 1))) (set-hidden! root r #t))
+         (for (r (.. (+ first 1) (+ last 1)))
+           (set-depth! root r (+ (code-fold-depth root r) 1)))
          (update-line (tree-ref root first))   ; its mark
          #t)))
 
 (tm-define (code-unfold-lines root row)
-  (:synopsis "Shows the lines of the fold after the line @row of @root")
-  ;; whether there was one
-  (and (not (code-hidden? root row)) (code-hidden? root (+ row 1))
-       (begin
+  (:synopsis "Shows the lines of the fold which starts at the line @row of @root")
+  ;; (the folds inside it stay); whether there was one
+  (and (fold-starts? root row)
+       (let ((d0 (code-fold-depth root row)))
          (let loop ((r (+ row 1)))
-           (when (code-hidden? root r)
-             (set-hidden! root r #f)
+           (when (> (code-fold-depth root r) d0)
+             (set-depth! root r (- (code-fold-depth root r) 1))
              (loop (+ r 1))))
          (update-line (tree-ref root row))
          #t)))
 
 (tm-define (code-folds root)
-  (:synopsis "The folds of the lines @root, as (first last)")
+  (:synopsis "The folds of the lines @root, as (first last), outer ones first")
   (if (not (tree-is? root 'document)) '()
-      (let loop ((r 0) (acc '()))
-        (cond ((>= r (tree-arity root)) (reverse acc))
-              ((code-hidden? root r)
-               (let end ((e r))
-                 (if (code-hidden? root (+ e 1)) (end (+ e 1))
-                     (loop (+ e 1) (cons (list (- r 1) e) acc)))))
-              (else (loop (+ r 1) acc))))))
+      (let ((n (tree-arity root)))
+        (let loop ((r 0) (acc '()))
+          (if (>= (+ r 1) n) (reverse acc)
+              (loop (+ r 1)
+                    (if (fold-starts? root r)
+                        (let ((d0 (code-fold-depth root r)))
+                          (let end ((e (+ r 1)))
+                            (if (and (< (+ e 1) n)
+                                     (> (code-fold-depth root (+ e 1)) d0))
+                                (end (+ e 1))
+                                (cons (list r e) acc))))
+                        acc)))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The code at the cursor
@@ -135,8 +153,7 @@
                (ranges (or (code-ask 'fold-ranges) '()))
                ;; (those which are not folded yet)
                (open (list-filter ranges
-                                  (lambda (r) (not (code-hidden? root
-                                                                 (+ (car r) 1))))))
+                                  (lambda (r) (not (fold-starts? root (car r))))))
                (r (innermost open row)))
           (if (not (and r (code-fold-lines root (car r) (cadr r))))
               (set-message "No block to fold here" "")
@@ -171,8 +188,11 @@
   (:synopsis "Unfolds all the blocks of the code at the cursor")
   (with c (code-cursor-lines)
     (when c
-      (for (f (code-folds (car c)))
-        (code-unfold-lines (car c) (car f))))))
+      (let loop ()
+        (with fs (code-folds (car c))
+          (when (nnull? fs)
+            (for (f fs) (code-unfold-lines (car c) (car f)))
+            (loop)))))))
 
 (tm-define (code-can-fold?)
   (:synopsis "Can the blocks of the code at the cursor be folded?")
@@ -183,10 +203,21 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define (fold-of root row)
-  ;; the first line of the fold which hides @row, and its last line
+  ;; the first line of the outermost fold which hides @row, and its last
+  ;; line
   (let ((first (let loop ((k row)) (if (code-hidden? root k) (loop (- k 1)) k)))
         (last (let loop ((k row)) (if (code-hidden? root (+ k 1)) (loop (+ k 1)) k))))
     (list first last)))
+
+(define (unfold-around! root row)
+  ;; the folds which hide @row open, from the innermost
+  (when (code-hidden? root row)
+    (let find ((r (- row 1)))
+      (cond ((< r 0) (noop))
+            ((< (code-fold-depth root r) (code-fold-depth root row))
+             (code-unfold-lines root r)
+             (unfold-around! root row))
+            (else (find (- r 1)))))))
 
 (tm-define (code-cursor-in-fold old new)
   (:synopsis "The cursor comes from @old to @new, in a hidden line")
@@ -212,5 +243,5 @@
                               (line-length root first))
                  (delayed (go-to p))))
               (else
-               ;; (the fold which hides it opens, with those in it)
-               (code-unfold-lines root first)))))))
+               ;; (the folds which hide it open, from the innermost)
+               (unfold-around! root row)))))))

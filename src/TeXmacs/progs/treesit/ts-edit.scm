@@ -595,49 +595,58 @@
 ;; node (}, end...). Folds are a state of the view, kept on the hidden lines
 ;; (see tree_sitter_set_fold_state in Plugins/TreeSitter/ts_highlight.cpp),
 ;; not markup: the document, its export and the editing of programs do not
-;; see them. The line before hidden lines gets the mark (Typeset/Bridge/
-;; bridge.cpp). Modifying a hidden line forgets its state, and the cursor
-;; arriving in a hidden line unfolds its fold (Edit/Interface/edit_cursor.cpp).
+;; see them, nor what is printed. The state of a line is the number of the
+;; folds which hide it: folds nest, and unfolding one keeps those inside it.
+;; The line before hidden lines gets the mark (Typeset/Bridge/bridge.cpp).
+;; Modifying a hidden line forgets its state, and the cursor arriving in a
+;; hidden line unfolds the folds around it (Edit/Interface/edit_cursor.cpp).
 
-(define (hidden? root row)
-  (and (>= row 0) (< row (tree-arity root))
-       (== (tree-sitter-fold-state (tree-ref root row)) 1)))
+(define (depth root row)
+  (if (and (>= row 0) (< row (tree-arity root)))
+      (tree-sitter-fold-state (tree-ref root row))
+      0))
 
-(define (set-hidden! root row on)
+(define (hidden? root row) (> (depth root row) 0))
+
+(define (set-depth! root row d)
   (let ((line (tree-ref root row)))
-    (when (!= (hidden? root row) on)
-      (tree-sitter-set-fold-state line (if on 1 0))
+    (when (!= (depth root row) d)
+      (tree-sitter-set-fold-state line (max d 0))
       (update-path (tree->path line)))))
+
+(define (fold-starts? root row)
+  ;; does a fold start at row (hide the lines after it)?
+  (> (depth root (+ row 1)) (depth root row)))
 
 (define (fold-rows root lan n)
   ;; the rows which a fold of the node n hides
   (let* ((s (car (node-start n))) (e (car (node-end n)))
          (c (first-non-space (line-string root e)))
          (leaf (and c (syntax-region-node-at root lan e c)))
-         (closing? (and (pair? leaf) (pair? (cdr leaf))
+         ;; the line is only the token which ends the node (}, end...)
+         (closing? (and (pair? leaf)
                         (not (node-named? (car leaf)))
-                        (== (node-start (cadr leaf)) (node-start n))
-                        (== (node-end (cadr leaf)) (node-end n))))
+                        (== (node-end (car leaf)) (node-end n))))
          (last (if closing? (- e 1) e)))
     (if (< last (+ s 1)) '() (map (lambda (i) (+ s 1 i)) (iota (- last s))))))
 
 (define (fold-node! root lan n)
-  ;; fold the node n (not when its first line is hidden by another fold);
+  ;; fold the node n (not when a fold starts already at its first line);
   ;; whether there was something to hide
   (let ((rows (fold-rows root lan n)) (s (car (node-start n))))
-    (and (pair? rows) (not (hidden? root s))
+    (and (pair? rows) (not (fold-starts? root s))
          (begin
-           (for-each (lambda (r) (set-hidden! root r #t)) rows)
+           (for-each (lambda (r) (set-depth! root r (+ (depth root r) 1))) rows)
            (update-path (tree->path (tree-ref root s)))   ; its mark
            #t))))
 
 (define (unfold-at! root row)
-  ;; unfold the fold after row; whether there was one
-  (and (not (hidden? root row)) (hidden? root (+ row 1))
-       (begin
+  ;; unfold the fold which starts at row; whether there was one
+  (and (fold-starts? root row)
+       (let ((d0 (depth root row)))
          (let loop ((r (+ row 1)))
-           (when (hidden? root r)
-             (set-hidden! root r #f)
+           (when (> (depth root r) d0)
+             (set-depth! root r (- (depth root r) 1))
              (loop (+ r 1))))
          (update-path (tree->path (tree-ref root row)))
          #t)))
@@ -703,15 +712,30 @@
   (or (syntax-unfold-block) (syntax-fold-block)))
 
 (define-public (syntax-fold-definitions)
-  ;; fold all the definitions of several lines of the code at the cursor
+  ;; fold all the definitions of several lines of the code at the cursor,
+  ;; or, in a language without definitions (tags.scm), its blocks at the
+  ;; top level
   (let ((o (cursor-outline)))
     (and o
          (let* ((ctx (car o)) (lan (cadr o)) (root (cadr ctx)))
-           (for-each (lambda (d)
-                       (let ((n (list "" #t (list-ref d 4) (cadddr d))))
-                         (when (< (car (node-start n)) (car (node-end n)))
-                           (fold-node! root lan n))))
-                     (caddr o))
+           (if (pair? (caddr o))
+               (for-each (lambda (d)
+                           (let ((n (list "" #t (list-ref d 4) (cadddr d))))
+                             (when (< (car (node-start n)) (car (node-end n)))
+                               (fold-node! root lan n))))
+                         (caddr o))
+               (for-each
+                (lambda (row)
+                  (let* ((c (first-non-space (line-string root row)))
+                         (info (and c (not (hidden? root row))
+                                    (node-info (list (car ctx) root row c) lan))))
+                    ;; the node which starts the line, whose parent is the root
+                    (when (and info (list-ref info 0) (not (list-ref info 3))
+                               (< (car (car (list-ref info 0)))
+                                  (car (cadr (list-ref info 0)))))
+                      (let ((n (list-ref info 0)))
+                        (fold-node! root lan (list "" #t (car n) (cadr n)))))))
+                (iota (tree-arity root))))
            #t))))
 
 (define-public (syntax-unfold-all)
@@ -719,7 +743,8 @@
   (let ((c (cursor-code)))
     (and c (tree-is? (cadr (car c)) 'document)
          (let ((root (cadr (car c))))
-           (for-each (lambda (r) (when (hidden? root r) (unfold-at! root (- r 1))))
+           (for-each (lambda (r) (set-depth! root r 0)) (iota (tree-arity root)))
+           (for-each (lambda (r) (update-path (tree->path (tree-ref root r))))
                      (iota (tree-arity root)))
            #t))))
 
@@ -729,9 +754,16 @@
          (line (and (pair? p) (path->tree (cDr p))))
          (root (and line (pair? (cDr p)) (path->tree (cDDr p)))))
     (when (and root (tree-is? root 'document))
-      (let loop ((r (cAr (cDr p))))
-        (when (>= r 0)
-          (if (hidden? root r) (loop (- r 1)) (unfold-at! root r)))))))
+      ;; the folds around the line, from the innermost
+      (let ((row (cAr (cDr p))))
+        (let unfold ()
+          (when (hidden? root row)
+            (let find ((r (- row 1)))
+              (cond ((< r 0) (noop))
+                    ((< (depth root r) (depth root row))
+                     (unfold-at! root r)
+                     (unfold))
+                    (else (find (- r 1)))))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Inputs of sessions
@@ -790,9 +822,15 @@
 
 (define syntax-indent-rules
   ;; the languages whose grammars have no query indents.scm (or a weaker
-  ;; one: that of Neovim for YAML only indents after a block)
+  ;; one: that of Neovim for YAML only indents after a block); for Haskell,
+  ;; a rule of layout (see layout-indentation)
   `(("yaml" ("block_mapping_pair" "block_sequence_item" "flow_mapping" "flow_sequence")
      () ("flow_mapping" "flow_sequence") #t)
+    ("latex"
+     ("generic_environment" "math_environment" "curly_group" "brack_group")
+     ("end") #f)
+    ("haskell" layout
+     ("where" "do" "of" "let" "=" "->" "then" "else" "(" "[" "{" "," "|"))
     ("lean"
      ("def" "theorem" "instance" "abbrev" "example" "structure" "inductive"
       "by" "do_block" "match" "match_alt" "fun" "have" "let" "where_decls"
@@ -913,7 +951,41 @@
                         (if p (line-indent doc (car p)) 0)))
                      (else #f)))
              (let ((rules (assoc lan syntax-indent-rules)))
-               (and rules (syntax-indentation doc row id rules tab)))))))
+               (cond ((not rules) #f)
+                     ((== (cadr rules) 'layout)
+                      (layout-indentation doc row id (caddr rules) tab))
+                     (else (syntax-indentation doc row id rules tab))))))))
+
+(define (layout-indentation doc row lan openers tab)
+  ;; for a language of layout (Haskell): one step more than the line before
+  ;; when that line ends with an opener (where, do, =, an open bracket...),
+  ;; else as much as it (a comment which ends the line does not count)
+  (let ((p (previous-text-end doc row)))
+    (if (not p) 0
+        (let* ((r (car p))
+               (s (line-string doc r))
+               (end (let ((l (syntax-region-node-at doc lan r (- (cadr p) 1))))
+                      ;; before a comment at the end of the line
+                      (if (and (pair? l) (string-contains? (node-type (car l)) "comment")
+                               (== (car (node-start (car l))) r)
+                               (> (cadr (node-start (car l))) 0))
+                          (cadr (node-start (car l)))
+                          (cadr p))))
+               (text (let trim ((n end))
+                       (if (and (> n 0) (char-whitespace? (string-ref s (- n 1))))
+                           (trim (- n 1))
+                           (substring s 0 n))))
+               (opens? (list-or
+                        (map (lambda (o)
+                               (and (string-ends? text o)
+                                    ;; a word ends there, not a part of one
+                                    (let ((k (- (string-length text) (string-length o))))
+                                      (or (= k 0)
+                                          (not (char-alphabetic? (string-ref o 0)))
+                                          (not (char-alphabetic?
+                                                (string-ref text (- k 1))))))))
+                             openers))))
+          (+ (line-indent doc r) (if opens? tab 0))))))
 
 (define-public (syntax-compute-indentation doc row tab)
   ;; the indentation of a line of the program at the cursor, or #f when
@@ -1134,19 +1206,53 @@
                                    (substring s indent (string-length s)))))))
          lines)))
 
+(define-public (toggle-block-comments lines block)
+  ;; the same with block comments, one for each line, for the languages
+  ;; without line comments: block is (start . end)
+  (let* ((b (car block)) (e (cdr block))
+         (full (list-filter lines (lambda (s) (first-non-space s))))
+         (body (lambda (s) (string-drop s (first-non-space s))))
+         (commented? (lambda (s) (let ((t (body s)))
+                                   (and (string-starts? t b) (string-ends? t e)
+                                        (>= (string-length t)
+                                            (+ (string-length b) (string-length e)))))))
+         (all? (and (nnull? full) (list-and (map commented? full)))))
+    (map (lambda (s)
+           (let ((i (first-non-space s)))
+             (cond ((not i) s)
+                   (all?
+                    (let* ((t (body s))
+                           (in (substring t (string-length b)
+                                          (- (string-length t) (string-length e))))
+                           (in (if (string-starts? in " ") (string-drop in 1) in))
+                           (in (if (string-ends? in " ") (string-drop-right in 1) in)))
+                      (string-append (substring s 0 i) in)))
+                   (else
+                    (string-append (substring s 0 i) b " " (body s) " " e)))))
+         lines)))
+
+(define-public (syntax-comment-any lan)
+  ;; whether the lines of lan can be commented (line or block comments)
+  (or (syntax-comment-prefix lan) (program-language-block-comment lan)))
+
 (define-public (syntax-toggle-comment)
   ;; comment or uncomment the lines of the selection, or the line of the
-  ;; cursor, in program code; #f when its language has no line comments
-  (let* ((prefix (syntax-comment-prefix (get-env "prog-language")))
+  ;; cursor, in program code, with line comments or else block comments; #f
+  ;; when its language has neither
+  (let* ((lan (get-env "prog-language"))
+         (prefix (syntax-comment-prefix lan))
+         (block (program-language-block-comment lan))
          (sel? (selection-active-normal?))
-         (a (and prefix (path-context (if sel? (selection-get-start) (cursor-path)) 0)))
+         (a (and (or prefix block)
+                 (path-context (if sel? (selection-get-start) (cursor-path)) 0)))
          (b (and a (path-context (if sel? (selection-get-end) (cursor-path)) 0))))
     (and a b (== (car a) (car b)) (tree-is? (cadr a) 'document)
          (let* ((root (cadr a))
                 (rows (map (lambda (i) (+ i (caddr a)))
                            (iota (+ (- (caddr b) (caddr a)) 1))))
                 (lines (map (lambda (r) (tree->string (tree-ref root r))) rows))
-                (new (toggle-line-comments lines prefix)))
+                (new (if prefix (toggle-line-comments lines prefix)
+                         (toggle-block-comments lines block))))
            (for-each (lambda (r s) (when (!= s (tree->string (tree-ref root r)))
                                      (tree-set (tree-ref root r) s)))
                      rows new)
@@ -1178,5 +1284,5 @@
       ("Wrap in parentheses" (syntax-wrap-node "(" ")"))
       ("Wrap in brackets" (syntax-wrap-node "[" "]"))
       ("Wrap in braces" (syntax-wrap-node "{" "}")))
-  (assuming (syntax-comment-prefix (get-env "prog-language"))
+  (assuming (syntax-comment-any (get-env "prog-language"))
     ("Toggle comment" (syntax-toggle-comment))))

@@ -172,6 +172,10 @@
               (n (string-length delim)))
          (lexer-mark-end! lx)
          (let loop ((i 0))
+           ;; before a <, nothing can start the end tag: the characters up
+           ;; to it go at once (in C on the lexer of the C runtime)
+           (when (and (= i 0) (> (scan-advance-until! lx "<" #f) 0))
+             (lexer-mark-end! lx))
            (let ((c (lexer-lookahead lx)))
              (unless (= c 0)
                (if (= (upper c) (char->integer (string-ref delim i)))

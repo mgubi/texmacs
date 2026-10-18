@@ -226,7 +226,7 @@ unfold_at_cursor (tree et, path tp) {
   if (is_nil (tp) || is_nil (tp->next)) return;
   path p= path_up (tp);
   if (!has_subtree (et, p)) return;
-  if (code_line_fold_state (subtree (et, p)) == 1)
+  if (code_line_fold_state (subtree (et, p)) > 0)
     call ("code-cursor-in-fold", object (last_outside_folds), object (tp));
   else last_outside_folds= tp;
 }
