@@ -358,6 +358,8 @@ struct item_t {
   const step_t* at;     // the step at the dot, or NULL
   const step_t* prev;   // the step before the dot, or NULL
   ll sort_key;
+  item_t* next;         // the successor and the inherited item, once made
+  item_t* inherit;
 };
 
 const ll ITEM_KEY_LIMIT= 2097152;
@@ -431,14 +433,19 @@ struct items_t {
     if (key >= ITEM_KEY_LIMIT || var + 1 >= ITEM_KEY_LIMIT)
       throw ts_fail ("too many items for the sort keys");
     item->sort_key= ((ll) step * ITEM_KEY_LIMIT + var + 1) * ITEM_KEY_LIMIT + key;
+    item->next= NULL; item->inherit= NULL;
     item_memo[k]= item;
     all.push_back (item);
     return item;
   }
 
-  item_t* successor (item_t* i) { return make (i->var, i->prod, i->step + 1, i->inherited); }
+  item_t* successor (item_t* i) {
+    if (i->next == NULL) i->next= make (i->var, i->prod, i->step + 1, i->inherited);
+    return i->next; }
   item_t* substitute (item_t* i, int prod) { return make (i->var, prod, i->step, i->inherited); }
-  item_t* with_inherited (item_t* i) { return make (i->var, i->prod, i->step, true); }
+  item_t* with_inherited (item_t* i) {
+    if (i->inherit == NULL) i->inherit= make (i->var, i->prod, i->step, true);
+    return i->inherit; }
 };
 
 inline int item_symbol (const item_t* i) { return i->at? i->at->symbol: -1; }
@@ -704,6 +711,23 @@ struct builder_t {
   std::unordered_map<int,int> production_info_ids;
   int max_aliased_length;
   std::vector<ivec> used_conflicts;   // reversed: the Scheme list conses
+  // scratch buffers of the construction, kept from state to state (the
+  // allocations were a third of its time)
+  struct succ_t { int symbol; int order; entry_t entry; };
+  std::vector<succ_t> succ_buf;
+  std::vector<int> key_pos, key_stamp;   // by item key
+  int stamp= 0;
+  std::vector<ll> sig_buf, core_buf;
+  int next_stamp () {
+    if (++stamp == INT_MAX) { std::fill (key_stamp.begin (), key_stamp.end (), 0); stamp= 1; }
+    return stamp;
+  }
+  void index_key (int key) {
+    if (key >= (int) key_pos.size ()) {
+      key_pos.resize (key + 1024, 0);
+      key_stamp.resize (key + 1024, 0);
+    }
+  }
 
   builder_t (grammar_t& g2): g (g2), items (g2), queue_head (0), max_aliased_length (1),
     preceding_nodes (1, std::make_pair (-1, -1)) {}
@@ -863,7 +887,20 @@ builder_t::make_builder () {
 
 std::vector<entry_t>
 builder_t::closure (const std::vector<entry_t>& kernel) {
-  item_set_t set;
+  // the entries by item key, in the order of their first insertion, as
+  // item_set_t, with an index by key in key_pos (valid where key_stamp is st)
+  std::vector<entry_t> set;
+  int st= next_stamp ();
+  auto insert= [&] (item_t* item) -> entry_t& {
+    int key= item->key;
+    index_key (key);
+    if (key_stamp[key] == st) return set[key_pos[key]];
+    key_stamp[key]= st;
+    key_pos[key]= (int) set.size ();
+    entry_t e= { item, 0, 0 };
+    set.push_back (e);
+    return set.back ();
+  };
   int word= g.word;
   for (size_t k= 0; k < kernel.size (); k++) {
     const entry_t& entry= kernel[k];
@@ -890,7 +927,7 @@ builder_t::closure (const std::vector<entry_t>& kernel) {
         const std::vector<addition_t>& adds= additions[sym_index (s)];
         for (size_t a= 0; a < adds.size (); a++) {
           const addition_t& info= adds[a];
-          entry_t& e= set.insert (info.item);
+          entry_t& e= insert (info.item);
           e.las= pool.unite (e.las, info.las);
           if (info.has_word) e.reserved= std::max (e.reserved, info.reserved);
           if (info.propagates) {
@@ -900,26 +937,32 @@ builder_t::closure (const std::vector<entry_t>& kernel) {
           }
         }
       }
-      entry_t& e= set.insert (it);
+      entry_t& e= insert (it);
       e.las= pool.unite (e.las, las);
       e.reserved= std::max (e.reserved, reserved);
     }
   }
-  return set.sorted ();
+  std::stable_sort (set.begin (), set.end (),
+                    [] (const entry_t& a, const entry_t& b) {
+                      return a.item->sort_key < b.item->sort_key; });
+  return set;
 }
 
 int
 builder_t::add_state (int pre, const std::vector<aux_info_t>& aux,
                       const std::vector<entry_t>& entries) {
-  std::vector<ll> sig, core;
+  std::vector<ll>& sig= sig_buf;
+  std::vector<ll>& core= core_buf;
+  sig.clear ();
   for (size_t i= 0; i < entries.size (); i++) {
     sig.push_back (entries[i].item->key);
     sig.push_back (entries[i].las);
     sig.push_back (entries[i].reserved);
-    core.push_back (entries[i].item->key);
   }
   std::unordered_map<std::vector<ll>,int,vec_hash>::iterator it= state_ids.find (sig);
   if (it != state_ids.end ()) return it->second;
+  core.clear ();
+  for (size_t i= 0; i < entries.size (); i++) core.push_back (entries[i].item->key);
   int core_id;
   std::unordered_map<std::vector<ll>,int,vec_hash>::iterator ct= core_ids.find (core);
   if (ct != core_ids.end ()) core_id= ct->second;
@@ -1122,7 +1165,9 @@ builder_t::add_actions (int state_id, const std::vector<aux_info_t>& aux_in,
                         const std::vector<entry_t>& entries) {
   state_t* state= states[state_id];
   int pre= preceding[state_id];
-  std::map<int, item_set_t> terminal_successors, non_terminal_successors;
+  // the successors: (symbol, entry) in the order of the entries, grouped
+  // below by symbol (in increasing order, terminals first, as std::map did)
+  succ_buf.clear ();
   ivec conflicted;
   std::unordered_map<int, red_info_t> reduction_infos;
   std::unordered_map<int, aux_info_t> aux_info;
@@ -1133,9 +1178,7 @@ builder_t::add_actions (int state_id, const std::vector<aux_info_t>& aux_in,
     int next= item_symbol (item);
     if (next >= 0) {
       item_t* successor= items.successor (item);
-      std::map<int,item_set_t>* table= &terminal_successors;
       if (is_non_terminal (next)) {
-        table= &non_terminal_successors;
         if (g.var_kinds[sym_index (next)] == VT_AUXILIARY) {
           std::unordered_map<int,aux_info_t>::iterator it= aux_info.find (next);
           if (it == aux_info.end ())
@@ -1146,9 +1189,10 @@ builder_t::add_actions (int state_id, const std::vector<aux_info_t>& aux_in,
             !g.var_fields[sym_index (next)].empty ())
           successor= items.with_inherited (successor);
       }
-      entry_t& se= (*table)[next].insert (successor);
-      se.las= pool.unite (se.las, e.las);
-      se.reserved= std::max (se.reserved, e.reserved);
+      succ_t x;
+      x.symbol= next; x.order= (int) succ_buf.size ();
+      x.entry.item= successor; x.entry.las= e.las; x.entry.reserved= e.reserved;
+      succ_buf.push_back (x);
     }
     else {
       int symbol= non_terminal (std::max (0, item->var));
@@ -1209,10 +1253,45 @@ builder_t::add_actions (int state_id, const std::vector<aux_info_t>& aux_in,
       if (r.empty () || !(r.back () == aux[k])) r.push_back (aux[k]);
     aux= r;
   }
-  for (std::map<int,item_set_t>::iterator it= terminal_successors.begin ();
-       it != terminal_successors.end (); ++it) {
-    int symbol= it->first;
-    int next_id= add_state (cons_preceding (symbol, pre), aux, it->second.sorted ());
+  // the successors by symbol: the entries merged by item key, in the order
+  // of their first insertion, then sorted (item_set_t::insert and sorted)
+  std::stable_sort (succ_buf.begin (), succ_buf.end (),
+                    [] (const succ_t& a, const succ_t& b) {
+                      bool ta= !is_non_terminal (a.symbol), tb= !is_non_terminal (b.symbol);
+                      if (ta != tb) return ta;
+                      return a.symbol < b.symbol; });
+  std::vector<std::pair<int, std::vector<entry_t> > > terminal_successors, non_terminal_successors;
+  for (size_t k= 0; k < succ_buf.size (); ) {
+    size_t l= k;
+    int symbol= succ_buf[k].symbol;
+    std::vector<entry_t> group;
+    int st= next_stamp ();
+    for (; l < succ_buf.size () && succ_buf[l].symbol == symbol; l++) {
+      const entry_t& e= succ_buf[l].entry;
+      int key= e.item->key;
+      index_key (key);
+      if (key_stamp[key] == st) {
+        entry_t& se= group[key_pos[key]];
+        se.las= pool.unite (se.las, e.las);
+        se.reserved= std::max (se.reserved, e.reserved);
+      }
+      else {
+        key_stamp[key]= st;
+        key_pos[key]= (int) group.size ();
+        entry_t se= { e.item, pool.unite (0, e.las), std::max (0, e.reserved) };
+        group.push_back (se);
+      }
+    }
+    std::stable_sort (group.begin (), group.end (),
+                      [] (const entry_t& a, const entry_t& b) {
+                        return a.item->sort_key < b.item->sort_key; });
+    if (is_non_terminal (symbol)) non_terminal_successors.push_back (std::make_pair (symbol, group));
+    else terminal_successors.push_back (std::make_pair (symbol, group));
+    k= l;
+  }
+  for (size_t ti= 0; ti < terminal_successors.size (); ti++) {
+    int symbol= terminal_successors[ti].first;
+    int next_id= add_state (cons_preceding (symbol, pre), aux, terminal_successors[ti].second);
     if (!state->terms.has (symbol)) {
       tentry_t te; te.reusable= true;
       state->terms.set (symbol, te);
@@ -1221,10 +1300,10 @@ builder_t::add_actions (int state_id, const std::vector<aux_info_t>& aux_in,
     if (!te->actions.empty ()) conflicted= set_insert (symbol, conflicted);
     te->actions.push_back (make_action (A_SHIFT, next_id, 0));
   }
-  for (std::map<int,item_set_t>::iterator it= non_terminal_successors.begin ();
-       it != non_terminal_successors.end (); ++it) {
-    int next_id= add_state (cons_preceding (it->first, pre), aux, it->second.sorted ());
-    state->nonterms.set (it->first, make_action (A_GOTO, next_id));
+  for (size_t ni= 0; ni < non_terminal_successors.size (); ni++) {
+    int symbol= non_terminal_successors[ni].first;
+    int next_id= add_state (cons_preceding (symbol, pre), aux, non_terminal_successors[ni].second);
+    state->nonterms.set (symbol, make_action (A_GOTO, next_id));
   }
   for (size_t k= 0; k < conflicted.size (); k++)
     handle_conflict (state, entries, pre, aux, conflicted[k],

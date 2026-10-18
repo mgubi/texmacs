@@ -309,6 +309,11 @@ static array<ts_scanner_entry*> ts_scanners;
 struct ts_scanner_payload {
   ts_scanner_entry* scanner;
   object state;
+  // the text of the state which the payload holds, when known: restoring
+  // that text again (tree-sitter does it before each scan, usually with
+  // the state just serialized) needs no call of Scheme
+  bool known;
+  string text;
 };
 
 static TSLexer* current_lexer= NULL;
@@ -318,6 +323,7 @@ scanner_create (int slot) {
   ts_scanner_payload* p= new ts_scanner_payload;
   p->scanner= ts_scanners[slot];
   p->state= call (p->scanner->create);
+  p->known= false;
   return p;
 }
 
@@ -353,6 +359,7 @@ scanner_scan (void* payload, TSLexer* lexer, const bool* valid) {
   }
   TSLexer* old= current_lexer;
   current_lexer= lexer;
+  p->known= false;   // the scan may change the state, even when it fails
   object r= call (e->scan, p->state, c_lexer, e->valid[row]);
   current_lexer= old;
   return as_bool (r);
@@ -362,21 +369,28 @@ static unsigned
 scanner_serialize (void* payload, char* buffer) {
   ts_scanner_payload* p= (ts_scanner_payload*) payload;
   object v= call (p->scanner->serialize, p->state);
-  if (is_bool (v) && !as_bool (v)) return 0;
+  if (is_bool (v) && !as_bool (v)) {
+    p->known= true; p->text= "";
+    return 0;
+  }
   string s= as_string (call (scanner_procedure ("object->string"), v));
-  if (N(s) > TREE_SITTER_SERIALIZATION_BUFFER_SIZE) return 0;
+  if (N(s) > TREE_SITTER_SERIALIZATION_BUFFER_SIZE) { p->known= false; return 0; }
   hashmap<string,object>& read= p->scanner->read;
   if (!read->contains (s)) {
     if (N(read) >= 4096) read= hashmap<string,object> ();
     read (s)= v;
   }
   for (int i= 0; i < N(s); i++) buffer[i]= s[i];
+  p->known= true; p->text= s;
   return (unsigned) N(s);
 }
 
 static void
 scanner_deserialize (void* payload, const char* buffer, unsigned length) {
   ts_scanner_payload* p= (ts_scanner_payload*) payload;
+  if (p->known && N(p->text) == (int) length &&
+      (length == 0 || memcmp (&(p->text[0]), buffer, length) == 0))
+    return;
   object v= object (false);
   if (length != 0) {
     string s (buffer, (int) length);
@@ -385,6 +399,7 @@ scanner_deserialize (void* payload, const char* buffer, unsigned length) {
     else v= call (scanner_procedure ("string->object"), s);
   }
   call (p->scanner->deserialize, p->state, v);
+  p->known= true; p->text= string (buffer, (int) length);
 }
 
 bool
