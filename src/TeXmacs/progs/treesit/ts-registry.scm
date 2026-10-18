@@ -76,8 +76,11 @@
                 (modulo (+ (* b 65599) c) 16777199))))))
 
 (define-public (treesit-cache-url lan)
-  ;; the file of the tables of the present grammar of lan
-  (let ((grammar (string-load (treesit-grammar-url lan))))
+  ;; the file of the tables of the present grammar of lan (the hash is that
+  ;; of the text without carriage returns: a checkout with CRLF line ends,
+  ;; as git makes on Windows, has the same tables, and the shipped ones)
+  (let ((grammar (string-replace (string-load (treesit-grammar-url lan))
+                                 "\r" "")))
     (url-append (cache-dir)
                 (string-append lan "-" (text-hash (string-append treesit-generator-version
                                                                  grammar))
