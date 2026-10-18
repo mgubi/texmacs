@@ -85,7 +85,9 @@
       (texmacs->code (tm->tree t) (car enc))))
 
 (tm-define (code->texmacs x . opts)
-  (verbatim->texmacs x (acons "verbatim->texmacs:encoding" "SourceCode" '())))
+  ;; (a source file is kept as it is: tabs, line ends, encoding, so that it
+  ;; is saved as it was, see source_document_to_tree)
+  (cpp-source->texmacs x))
 
 (tm-define (code-snippet->texmacs x . opts)
   (verbatim-snippet->texmacs x (acons "verbatim->texmacs:encoding" "SourceCode" '())))

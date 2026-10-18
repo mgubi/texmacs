@@ -4027,6 +4027,14 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(cpp-source-\<gtr\>texmacs <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|source_document_to_tree> which returns
+    <scm|tree>.
+  </explain>
+
+  <\explain>
     <scm|(parse-latex <scm-arg|string>)>
 <explain-synopsis|no synopsis>
   <|explain>
