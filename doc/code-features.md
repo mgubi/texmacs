@@ -410,6 +410,25 @@ bracket after an edit (treesit), the edits of a unit which add a line or
 would join blocks, a strict rename, the switch to single blocks which closes
 the unit and takes its colours away (lsp).
 
+10. The cost of a key in a long file (2026-10-18). Measured on real keys in a
+    C file of 50000 lines (Vue, TEXMACS_EDIT_PROFILE): 48 ms per key, of
+    which typesetting 31 ms; the scripts with -x mislead (no typesetting
+    between their edits). Two causes, both growing with the file:
+    - Outside paper mode, the lines of the document were merged into one
+      stack box at each key (57% of the typesetting): merged_lines now
+      stacks the cached chunks of chunk_lines from 512 lines (PR #371 on
+      wip_fixes, and on this branch): typesetting 31 to 20 ms.
+    - Tree-sitter: its own incremental parse grows with the nodes at the
+      top level (measured with its runtime alone: 13 ms after one character
+      in 100000 lines of C). A region of more than 6000 lines is cut into
+      parts of about 2000 lines at nodes of the top level
+      (syntax_group_rep, syntax_region.cpp), each a region of its own;
+      the colouring after a key: 11.4 to 2.65 ms for 100000 lines.
+    With both: 40 letters 1947 to 975 ms, typesetting per key 31 to 15 ms.
+    The rest which grows with the file: the comparison of the lines of the
+    region at each request, the reuse checks of the bridges, the changed
+    rectangles (6.6 ms).
+
 Audit (2026-10-18), after phase 8; the fixes:
 - Without tree-sitter, the modules of sessions and programs loaded ts-edit.scm
   (whose public functions replaced the stubs): all go through

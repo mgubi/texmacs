@@ -86,9 +86,33 @@
   then the parse starts from the edited tree, and
   <cpp|ts_tree_get_changed_ranges> between the old and the new tree tells
   which other lines changed in structure (a comment opened above them).
-  Comparing the lines costs one string comparison per line and request,
-  and covers every kind of change in the same way: typing, splitting and
-  joining lines, undo, remote edits, a whole line assigned.
+  Comparing the lines costs one comparison of addresses per line and
+  request (the strings of the lines which did not change are those of the
+  document), and covers every kind of change in the same way: typing,
+  splitting and joining lines, undo, remote edits, a whole line assigned.
+  When the number of the lines stays (a keystroke), the lines, their
+  offsets, the text and the colours of the region are changed in place
+  (<cpp|update_lines>).
+
+  <paragraph*|Long regions>
+
+  An incremental parse of tree-sitter costs more as the nodes at the top
+  level are more (13 ms for 100000 lines of C, after one character). A
+  region of more than 6000 lines is therefore cut into parts of about 2000
+  lines (<cpp|syntax_group_rep>): each part is a region of its own over a
+  slice of the lines, cut where a node at the top level of the parse of
+  the whole region starts (after a node without error), so that an edit
+  parses its part again only (about 1 ms for a part of C). The requests go to
+  the part of their line, their lines made local to it and those of their
+  answers global again (<cpp|row_base>); those about the whole region (the
+  errors, the captures of the outline, the colours) gather the answers of
+  all the parts. An edit which leaves an error in the last node of a part
+  (an unclosed comment) joins it to the next one, whose text may now be in
+  the comment; an edit over several parts joins them; a part longer than
+  three parts is cut again when it ends without error. The parts do not
+  see each other: a construct which goes over a cut (none at the top
+  level, by its choice) would be parsed in two pieces until the parts are
+  joined.
 
   The regions are kept in a list, the most recently used first, up to
   <cpp|max_regions> (256) regions and <cpp|max_region_bytes> (32 MB) of
