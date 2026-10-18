@@ -207,8 +207,12 @@
              n)))))
 
 (define (uri->buffer uri)
-  (with p (lsp-uri->path uri)
-    (and p (system->url p))))
+  ;; the buffer of @uri: the open one whose uri is the same (its path may be
+  ;; written otherwise: c: for C:), or the url of the file
+  (with key (lsp-uri-key uri)
+    (or (list-find (buffer-list) (lambda (u) (== (lsp-buffer-uri u) key)))
+        (with p (lsp-uri->path uri)
+          (and p (system->url p))))))
 
 (tm-define (lsp-workspace-edit-files w)
   (:synopsis "The files of the WorkspaceEdit @w, with their edits")
@@ -267,6 +271,10 @@
                                      (lsp-document-sent-text c key)))))))
                (cdr dc))))))
 
+;; the edits which servers asked for (workspace/applyEdit), since the start:
+;; an answer which was waited for while one came is for a former text
+(define server-edits 0)
+
 ;; the server asks for edits (after a command of a code action); it is told
 ;; whether all its files could be changed
 (lsp-server-request-set! "workspace/applyEdit"
@@ -278,7 +286,8 @@
             (set-message "The edit of the server is for an older text" "")
             (lsp-object "applied" (lsp-boolean #f)
                         "failureReason" "the file has changed"))
-          (with done (lsp-apply-workspace-edit w)
+          (with done (begin (set! server-edits (+ server-edits 1))
+                            (lsp-apply-workspace-edit w))
             (lsp-buffer-sync)
             (if (== done n)
                 (lsp-object "applied" (lsp-boolean #t))
@@ -322,15 +331,18 @@
            (set-message "The language server cannot format" ""))
           (else
            (lsp-buffer-sync)
-           (with a (lsp-request-wait
+           (let* ((edits server-edits)
+                  (a (lsp-request-wait
                     c method
                     (apply lsp-object
                            `("textDocument" ,(lsp-object "uri" uri)
                              ,@(if range (list "range" range) '())
                              "options" ,(formatting-options)))
-                    5000)
+                    5000)))
              (cond ((!= (car a) 'result)
                     (set-message "The formatting failed" ""))
+                   ((!= server-edits edits)
+                    (set-message "The file has changed meanwhile" ""))
                    ((null? (lsp-items (cadr a)))
                     (set-message "Already formatted" ""))
                    (else
@@ -359,12 +371,13 @@
            ;; which the server has)
            (lsp-sync-pending)
            (lsp-buffer-sync)
-           (with a (lsp-request-wait
+           (let* ((edits server-edits)
+                  (a (lsp-request-wait
                     c "textDocument/rename"
                     (lsp-object "textDocument" (lsp-object "uri" uri)
                                 "position" pos
                                 "newName" (cork->utf8 new-name))
-                    10000)
+                    10000)))
              (cond ((== (car a) 'error)
                     (set-message (utf8->cork (or (lsp-ref (cadr a) "message")
                                                  "The rename failed"))
@@ -373,6 +386,8 @@
                     (set-message "The language server does not answer" ""))
                    ((lsp-null? (cadr a))
                     (set-message "Nothing to rename here" ""))
+                   ((!= server-edits edits)
+                    (set-message "The files have changed meanwhile" ""))
                    (else
                     (with n (lsp-apply-workspace-edit (cadr a))
                       (lsp-buffer-sync)

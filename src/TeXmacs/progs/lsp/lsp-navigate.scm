@@ -340,6 +340,10 @@
   (:synopsis "The ranges highlighted, as (line offset line offset)")
   hl-ranges)
 
+;; (the edits since the start, and when the highlights were asked)
+(define hl-edits 0)
+(define hl-edits-asked 0)
+
 (define (show-highlights ranges)
   (with b (buffer-path)
     (set! hl-ranges ranges)
@@ -366,6 +370,7 @@
       (lsp-sync-pending)
       (when hl-request
         (lsp-cancel (car hl-request) (cdr hl-request)))
+      (set! hl-edits-asked hl-edits)
       (set! hl-request
         (cons c
           (lsp-request
@@ -374,8 +379,10 @@
                        "position" (lsp-buffer-position (car lo) (cadr lo)))
            (lambda (r e)
              (set! hl-request #f)
-             ;; (only if the cursor is still there)
-             (when (and (== (current-buffer) u) (== (cursor-lo) lo))
+             ;; (only if the cursor is still there, and the text has not
+             ;; changed: an edit may leave the cursor in place)
+             (when (and (== (current-buffer) u) (== (cursor-lo) lo)
+                        (== hl-edits hl-edits-asked))
                (show-highlights
                 (if (or e (not r) (lsp-null? r)) '()
                     (lsp-highlight-ranges r)))))))))))
@@ -394,6 +401,7 @@
 (tm-define (notify-buffer-changed name)
   ;; (an edit removes the highlights: they are asked for again)
   (former name)
+  (set! hl-edits (+ hl-edits 1))
   (when (nnull? hl-ranges)
     (set! hl-ranges '())
     (set! hl-buffer #f)))

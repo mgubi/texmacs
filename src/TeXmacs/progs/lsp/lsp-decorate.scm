@@ -164,23 +164,26 @@
 (tm-define (lsp-apply-decorations u uri decos)
   (:synopsis "Gives the decorations @decos (line, colors, hints) to @u")
   ;; (the lines whose decorations change are typeset again; a line which
-  ;; has moved, after a line inserted or removed above it, and keeps its
+  ;; has moved, after lines inserted or removed above it, and keeps its
   ;; decorations is not)
   (let* ((body (buffer-get-body u))
          (n (if (tree-is? body 'document) (tree-arity body) 0))
          (old (or (ahash-ref decorated uri) (make-ahash-table)))
          (new (make-ahash-table))
          (kept (make-ahash-table))
-         (changed '())
-         (shift 0))
+         (now (make-ahash-table))
+         (changed '()))
+    ;; (the place now of each line which was decorated: those which moved,
+    ;; after lines inserted or removed above them, are found there)
+    (for (x (ahash-table->list old))
+      (with k (line-index (cadr x) body)
+        (when k (ahash-set! now k (car x)))))
     (define (old-place t text i ds)
       ;; the line which @t (now at @i) was, if it had the decorations @ds
       ;; for its present @text then, or #f
-      (list-find (list i (- i shift) (- i 1) (+ i 1))
-        (lambda (j)
-          (with o (ahash-ref old j)
-            (and o (not (ahash-ref kept j)) (tree-eq? (car o) t)
-                 (== (cadr o) text) (== (cddr o) ds))))))
+      (let* ((j (ahash-ref now i))
+             (o (and j (ahash-ref old j))))
+        (and o (tree-eq? (car o) t) (== (cadr o) text) (== (cddr o) ds) j)))
     (for (d decos)
       (with i (car d)
         (when (< i n)
@@ -189,9 +192,7 @@
                  (j (old-place t text i (cadr d))))
             (ahash-set! new i (cons t (cons text (cadr d))))
             (if j
-                (begin
-                  (ahash-set! kept j #t)
-                  (set! shift (- i j)))
+                (ahash-set! kept j #t)
                 (begin
                   (lsp-decorate-line t
                                      (stree->tree (decoration-tree (car (cadr d))))

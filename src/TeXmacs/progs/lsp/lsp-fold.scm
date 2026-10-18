@@ -292,10 +292,12 @@
 
 (define (fix-cursor)
   ;; after a move of the cursor: in a hidden line, it goes over the fold
-  ;; when it comes from the line before it into its first hidden line, or
-  ;; from the line after it into its last one (the arrows); else (a search,
-  ;; a jump to a definition, a diagnostic...) the fold opens. Elsewhere, its
-  ;; place is kept (the place it comes from)
+  ;; when it moves right from the end of the first line of the fold into
+  ;; the start of its first hidden line, or left from the start of the line
+  ;; after it into the end of its last hidden line (the arrows; up and down
+  ;; go over the lines which have no boxes); else (a search, a jump to a
+  ;; definition, a diagnostic...) the folds which hide it open. Elsewhere,
+  ;; its place is kept (the place it comes from)
   (set! cursor-fix-scheduled? #f)
   (let* ((lo (cursor-lo))
          (b (body))
@@ -304,22 +306,16 @@
                  (hiding-fold b (car lo)))))
     (if (not f) (set! last-lo lo)
         (let* ((i (fold-index f b))
-               (end (+ i (length (fold-hidden f))))
-               (col (cadr lo)))
-          (cond ((and last-lo (== (car last-lo) i) (== (car lo) (+ i 1))
+               (end (+ i (length (fold-hidden f)))))
+          (cond ((and last-lo (== last-lo (list i (line-length b i)))
+                      (== lo (list (+ i 1) 0))
                       (< (+ end 1) (tree-arity b)))
-                 ;; (forwards: the line after it)
-                 (go-to-path (append (buffer-path)
-                                     (list (+ end 1)
-                                           (min col (line-length b (+ end 1)))))))
-                ((and last-lo (== (car last-lo) (+ end 1)) (== (car lo) end))
-                 ;; (backwards: its first line, at its end from the start of
-                 ;; the line after it)
-                 (go-to-path (append (buffer-path)
-                                     (list i (if (and (== (cadr last-lo) 0)
-                                                      (== col (line-length b end)))
-                                                 (line-length b i)
-                                                 (min col (line-length b i)))))))
+                 ;; (right: the start of the line after it)
+                 (go-to-path (append (buffer-path) (list (+ end 1) 0))))
+                ((and last-lo (== last-lo (list (+ end 1) 0))
+                      (== lo (list end (line-length b end))))
+                 ;; (left: the end of its first line)
+                 (go-to-path (end-of-line b i)))
                 (else
                  ;; (all the folds which hide it: those in it too)
                  (set-folds! (list-filter (current-folds)

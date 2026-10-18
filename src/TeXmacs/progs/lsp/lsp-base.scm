@@ -205,7 +205,15 @@
 
 (tm-define (lsp-path->uri path)
   (:synopsis "The URI of the file at the (utf8) system @path")
-  (let* ((p (string-replace path "\\" "/"))
+  (let* ((p0 (string-replace path "\\" "/"))
+         ;; (c:/x and C:/x are the same file: the drive is in capitals, as
+         ;; lsp-uri->path gives it)
+         (p (if (and (>= (string-length p0) 2)
+                     (char-alphabetic? (string-ref p0 0))
+                     (== (string-ref p0 1) #\:))
+                (string-append (string (char-upcase (string-ref p0 0)))
+                               (substring p0 1 (string-length p0)))
+                p0))
          (p* (if (string-starts? p "/") p (string-append "/" p))))
     (string-append
      "file://"

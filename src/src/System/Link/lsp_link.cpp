@@ -97,8 +97,10 @@ void
 lsp_link_rep::write (string s, int channel) {
   if (!alive || channel != LINK_IN) return;
   ln->write (lsp_frame (s), LINK_IN);
-  // (what the server has sent while it was written to is in the buffers of
-  // the pipe, whose notifier will not tell it again)
+  // (what the server has sent is taken at once: a listen of the pipe, as
+  // the one of each dispatch which writes what is left, reads the output
+  // of the server into the buffers of the pipe, whose notifier would not
+  // tell it again)
   drain ();
 }
 

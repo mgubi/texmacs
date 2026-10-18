@@ -360,6 +360,8 @@
   (with u (the-buffer opt)
     (and (not (url-rooted-tmfs? u))
          (not (url-none? u))
+         ;; (a file on the web is not one which a server can read)
+         (not (url-rooted-web? u))
          (url->system u))))
 
 (tm-define (lsp-buffer-uri . opt)
@@ -445,6 +447,16 @@
 
 (tm-define (lsp-buffer-line+offset pos)
   (:synopsis "The line and the offset in the buffer of the position @pos")
-  (let* ((line (or (lsp-number-value (lsp-ref pos "line")) 0))
-         (ch (or (lsp-number-value (lsp-ref pos "character")) 0)))
-    (list line (lsp-character->offset (lsp-buffer-line line) ch))))
+  ;; (a position outside of the buffer, which a server may give for a file
+  ;; which has changed since, is at its start or at its end: the cursor
+  ;; is never put on a line which is not there)
+  (let* ((body (buffer-get-body (current-buffer)))
+         (n (if (tree-is? body 'document) (tree-arity body) 1))
+         (v (or (lsp-number-value (lsp-ref pos "line")) 0))
+         (l (if (and (real? v) (not (nan? v))) (inexact->exact (floor v)) 0))
+         (line (max 0 (min l (- n 1))))
+         (c (or (lsp-number-value (lsp-ref pos "character")) 0))
+         (ch (if (and (real? c) (not (nan? c))) (inexact->exact (floor c)) 0)))
+    (if (>= l n)
+        (list line (string-length (lsp-buffer-line line)))
+        (list line (lsp-character->offset (lsp-buffer-line line) ch)))))

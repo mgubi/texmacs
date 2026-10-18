@@ -152,6 +152,14 @@
 
 (define lsp-max-diagnostics 1000)
 
+(define (most-severe-first ds)
+  ;; @ds, the errors first, then the warnings, then the others, each in
+  ;; their order (those which are kept when there are too many)
+  (with sev (lambda (d) (or (lsp-number-value (lsp-ref d "severity")) 1))
+    (append (list-filter ds (lambda (d) (<= (sev d) 1)))
+            (list-filter ds (lambda (d) (== (sev d) 2)))
+            (list-filter ds (lambda (d) (> (sev d) 2))))))
+
 (tm-define (lsp-show-diagnostics)
   (:synopsis "Shows the diagnostics of the current buffer")
   (let* ((uri (lsp-buffer-uri))
@@ -161,7 +169,7 @@
          ;; warnings would make each redraw slow)
          (all (if uri (lsp-diagnostics uri) '()))
          (ds (if (> (length all) lsp-max-diagnostics)
-                 (sublist all 0 lsp-max-diagnostics)
+                 (sublist (most-severe-first all) 0 lsp-max-diagnostics)
                  all))
          (l (list-filter (map (lambda (d) (diagnostic-item d lines)) ds)
                          identity)))
@@ -357,8 +365,13 @@
                 (and (nnull? sorted)
                      (if forward? (car sorted) (cAr sorted))))))
     (if (not x) (set-message "No diagnostics" "")
-        (go-to-path (append (buffer-path)
-                            (list (list-ref x 1) (list-ref x 2)))))))
+        ;; (the lines may have changed since: the place is in the buffer)
+        (let* ((b (buffer-get-body (current-buffer)))
+               (n (if (tree-is? b 'document) (tree-arity b) 1))
+               (l (max 0 (min (list-ref x 1) (- n 1))))
+               (o (max 0 (min (list-ref x 2)
+                              (string-length (lsp-buffer-line l))))))
+          (go-to-path (append (buffer-path) (list l o)))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Requests at the cursor
@@ -427,10 +440,16 @@
     (and lo (list (lsp-buffer-line (car lo)) (cadr lo)))))
 
 (define (completion-text item)
-  (with t (or (lsp-ref item "insertText")
-              (lsp-ref item "textEdit" "newText")
+  ;; (the edit of an item comes before its insertText, as in the protocol;
+  ;; a text of several lines is cut at its first one: a line of a source
+  ;; file is a string)
+  (with t (or (lsp-ref item "textEdit" "newText")
+              (lsp-ref item "insertText")
               (lsp-ref item "label"))
-    (if (string? t) (string-trim-both t) "")))
+    (if (string? t)
+        (with i (string-search-forwards "\n" 0 t)
+          (string-trim-both (if (>= i 0) (substring t 0 i) t)))
+        "")))
 
 (define (completion-items r)
   (let* ((items (if (func? r 'tuple) (cdr r) (lsp-items (lsp-ref r "items"))))
@@ -525,19 +544,25 @@
 
 ;; Information at the cursor (hover)
 
+(define (marked-string x)
+  ;; a MarkedString as markdown: a string, or a language and a value (code)
+  (if (string? x) x
+      (string-append "```" (or (lsp-ref x "language") "") "\n"
+                     (or (lsp-ref x "value") "") "\n```")))
+
 (define (hover-text r)
-  ;; the text of the contents of a hover: MarkupContent, MarkedString (a
-  ;; string, or language and value) or an array of them
+  ;; the text of the contents of a hover and whether it is markdown:
+  ;; MarkupContent (its kind says), MarkedString (markdown, or code) or an
+  ;; array of them
   (with c (lsp-ref r "contents")
-    (cond ((string? c) c)
+    (cond ((string? c) (list c #t))
           ((func? c 'tuple)
-           (string-recompose (map (lambda (x)
-                                    (if (string? x) x
-                                        (or (lsp-ref x "value") "")))
-                                  (cdr c))
-                             "\n"))
-          ((lsp-ref c "value") (lsp-ref c "value"))
-          (else ""))))
+           (list (string-recompose (map marked-string (cdr c)) "\n\n") #t))
+          ((lsp-ref c "kind")
+           (list (or (lsp-ref c "value") "")
+                 (!= (lsp-ref c "kind") "plaintext")))
+          ((lsp-ref c "value") (list (marked-string c) #t))
+          (else (list "" #f)))))
 
 (define (useful-lines s)
   ;; the lines of @s which say something (no fences or rules of markdown)
@@ -545,12 +570,14 @@
                (lambda (l) (and (!= l "") (not (string-starts? l "```"))
                                 (!= l "---")))))
 
-(tm-define (lsp-hover-document text)
+(tm-define (lsp-hover-document text . opt)
   (:synopsis "The document of the text @text (markdown, utf8) of a hover")
   ;; markdown, which servers use for the hovers, or else lines as they are
-  (with t (catch #t
-            (lambda () (convert text "markdown-snippet" "texmacs-stree"))
-            (lambda args #f))
+  ;; (also for a text which is not markdown, when (car opt) is #f)
+  (with t (and (or (null? opt) (car opt))
+               (catch #t
+                 (lambda () (convert text "markdown-snippet" "texmacs-stree"))
+                 (lambda args #f)))
     (if (and t (!= t "") (!= t '(document)) (!= t '(document "")))
         t
         `(document ,@(map (lambda (l) `(verbatim ,(utf8->cork l)))
@@ -567,7 +594,8 @@
   ;; the hover @r in a balloon at the tree @anchor (of the path @p): type
   ;; "keyboard" (closed when the cursor moves) or "mouse" (when the mouse
   ;; leaves it); #f if it says nothing
-  (let* ((text (if (and r (not (lsp-null? r))) (hover-text r) ""))
+  (let* ((h (if (and r (not (lsp-null? r))) (hover-text r) (list "" #f)))
+         (text (car h))
          (l (useful-lines text)))
     (cond ((null? l) #f)
           ((headless?)
@@ -576,7 +604,7 @@
            #t)
           (else
            (let ((id (string-append "lsp-hover:" (object->string p)))
-                 (doc (lsp-hover-document text)))
+                 (doc (lsp-hover-document text (cadr h))))
              (set! hover-id id)
              (show-tooltip id anchor `(preview-balloon ,doc)
                            "auto" "auto" type 0.8)
@@ -619,7 +647,9 @@
          (c (lsp-buffer-client*))
          (uri (lsp-buffer-uri))
          (u (current-buffer)))
-    (when (and r (= (length r) 2) (!= p mouse-at) c uri
+    ;; (a place which the mouse has left is asked again when it comes back)
+    (when (!= p mouse-at) (set! mouse-at #f))
+    (when (and r (= (length r) 2) (not mouse-at) c uri
                (capable? c "hoverProvider") (mouse-word? p))
       (set! mouse-at p)
       (when mouse-request
@@ -675,7 +705,12 @@
   ;; the byte of the utf8 string @s at the UTF-16 unit @k, or #f (past it)
   (let ((n (string-length s)))
     (let loop ((i 0) (u 0))
-      (cond ((>= u k) (and (<= i n) i))
+      ;; (at a character only: the rest of the bytes of one are passed)
+      (cond ((and (>= u k)
+                  (or (>= i n)
+                      (with c (char->integer (string-ref s i))
+                        (or (< c 128) (>= c 192)))))
+             i)
             ((>= i n) #f)
             (else
              (with c (char->integer (string-ref s i))
@@ -842,6 +877,14 @@
                               "(Tools, Language servers, Server log)")
                (utf8->cork (lsp-client-ref c 'name))))
 
+(define (forget-caches)
+  ;; (the buffers, their servers and their projects are looked for again:
+  ;; a project may have been made since, or a server added)
+  (set! followed (make-ahash-table))
+  (set! buffer-servers (make-ahash-table))
+  (set! server-commands (make-ahash-table))
+  (lsp-forget-project-roots))
+
 (tm-define (lsp-restart)
   (:synopsis "Restarts the language server of the current buffer")
   ;; (also one which has ended or which has been stopped)
@@ -850,7 +893,7 @@
       (and-with c (lsp-client-find (car k) (cadr k))
         (lsp-client-stop c))
       (lsp-client-forget (car k) (cadr k)))
-    (set! followed (make-ahash-table))
+    (forget-caches)
     (with c (lsp-buffer-sync)
       ;; (the other open buffers are followed again, by the new server)
       (follow-all)
@@ -997,7 +1040,7 @@
   ;; (they are started again when the preference is on again)
   (lsp-stop-all)
   (lsp-forget-all)
-  (set! followed (make-ahash-table))
+  (forget-caches)
   (set! pending (make-ahash-table))
   ;; (the underlines are removed in each buffer which has some)
   (for (u (buffer-list))

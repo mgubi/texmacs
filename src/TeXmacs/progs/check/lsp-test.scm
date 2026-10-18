@@ -292,7 +292,8 @@
   (check= (lsp-uri-key "file:///c%3A/x/y.py") (lsp-path->uri "C:/x/y.py"))
   (check= (lsp-uri->path "file:/tmp/x.c") "/tmp/x.c")
   (check= (lsp-uri->path "file:///a%+1b") "/a%+1b")
-  (check= (lsp-uri->path "untitled:1") #f))
+  (check= (lsp-uri->path "untitled:1") #f)
+  (check= (lsp-path->uri "c:/x/y.py") "file:///C:/x/y.py"))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Clients on procedures (lsp-client)
@@ -773,15 +774,26 @@
          (saved (tree->stree body))
          (uri (lsp-buffer-uri))
          (red (lambda (l) (list l (list '((0 3 "red")) '())))))
+    ;; (positions outside of the buffer are in it)
+    (check= (lsp-buffer-line+offset (lsp-object "line" (lsp-number 99)
+                                                "character" (lsp-number 2)))
+            (list (- (tree-arity body) 1)
+                  (string-length (lsp-buffer-line (- (tree-arity body) 1)))))
+    (check= (lsp-buffer-line+offset (lsp-object "line" (lsp-number -3)
+                                                "character" (lsp-number 2)))
+            '(0 2))
     (check= (lsp-apply-decorations u uri (list (red 0))) 1)
     (check= (lsp-decorations uri) '((0 ((0 3 "red")) ())))
     (check= (lsp-apply-decorations u uri (list (red 0))) 0)
     ;; a line which is edited is decorated again, with the same colours
     (tree-insert! (tree-ref body 0) 0 "x")
     (check= (lsp-apply-decorations u uri (list (red 0))) 1)
-    ;; a line which moves keeps its decorations
+    ;; a line which moves keeps its decorations (also by several lines)
     (tree-insert! body 0 '("// a"))
     (check= (lsp-apply-decorations u uri (list (red 1))) 0)
+    (tree-insert! body 0 '("// b" "// c"))
+    (check= (lsp-apply-decorations u uri (list (red 3))) 0)
+    (tree-remove! body 0 2)
     ;; a line which is removed loses them
     (tree-remove! body 1 1)
     (check= (lsp-apply-decorations u uri '()) 0)
@@ -1105,6 +1117,27 @@
                                                 (lsp-object "label" "x"))))
                         "activeParameter" (lsp-number 0))
     (check= (lsp-signature-parts sig) '("max(int " "x" ")")))
+  ;; (an offset just after a character of several bytes)
+  (let* ((label (string-append "f(" (cork->utf8 e-acute) ")"))
+         (sig (lsp-object "signatures"
+                          (lsp-array (lsp-object "label" label
+                                                 "parameters"
+                                                 (lsp-array
+                                                  (lsp-object "label"
+                                                              (lsp-array
+                                                               (lsp-number 2)
+                                                               (lsp-number 3))))))
+                          "activeParameter" (lsp-number 0))))
+    (check= (lsp-signature-parts sig) (list "f(" e-acute ")")))
+  ;; a hover in plain text is not markdown
+  (check= (lsp-hover-document "int *a, int *b" #f)
+          '(document (verbatim "int *a, int *b")))
+  ;; the edit of a completion comes before its insertText
+  (check= (lsp-completions "fo" (lsp-array
+                                 (lsp-object "label" "foo" "insertText" "fox"
+                                             "textEdit"
+                                             (lsp-object "newText" "foo"))))
+          '("o"))
   ;; the progress of the work of a server, while it lasts
   (with c (lsp-client-make "fake" ignore ignore ignore)
     (define (progress value)
