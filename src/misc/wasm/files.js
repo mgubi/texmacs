@@ -7,7 +7,7 @@
 //   upload files, whole folders (a project with its images) or a zip, make
 //   folders, rename, delete, download a file, or a folder as a zip;
 //   back up the whole home directory in a zip and restore it (the menu of
-//   TeXmacs Vue), to keep it safe or to move it to another browser;
+//   TeXmacs Upsilon), to keep it safe or to move it to another browser;
 // - in the same panel, the TeXmacs folder of the user (~/.TeXmacs), as a
 //   place of its own;
 // - in the same panel, the files of TeXmacs (/texmacs: its styles,
@@ -248,7 +248,7 @@ var tmFiles = (function () {
       .map (function (f) {
         return { rel: BACKUP_ROOT + f.rel, bytes: FS.readFile (f.path), time: mtime (f.path) }; });
     var bytes = files.reduce (function (n, f) { return n + f.bytes.length; }, 0);
-    var note = { format: 1, application: 'TeXmacs Vue', made: new Date ().toISOString (),
+    var note = { format: 1, application: 'TeXmacs Upsilon', made: new Date ().toISOString (),
                  address: (typeof location !== 'undefined' ? location.origin + location.pathname : ''),
                  files: files.length, bytes: bytes };
     files.unshift ({ rel: BACKUP_NOTE, time: Date.now (),
@@ -278,7 +278,7 @@ var tmFiles = (function () {
         if (backedUp (rel)) entries.push ({ rel: rel, bytes: e.bytes, time: e.time });
       }
     });
-    if (!note || note.format !== 1) throw new Error ('this zip is not a backup of TeXmacs Vue');
+    if (!note || note.format !== 1) throw new Error ('this zip is not a backup of TeXmacs Upsilon');
     return { note: note, entries: entries };
   }
   // The files of a backup are written over those of the home directory (a
@@ -557,7 +557,7 @@ var tmFiles = (function () {
     }
     if (mode === 'browse') {
       // the backup of all of it (the home directory), as in the menu of
-      // TeXmacs Vue: not in the dialogs to open and to save, which a
+      // TeXmacs Upsilon: not in the dialogs to open and to save, which a
       // restore, reloading the page, would not end well
       var b1 = button ('Save a backup', function () { backup (); });
       b1.id = 'tm-files-backup';

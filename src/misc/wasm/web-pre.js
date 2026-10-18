@@ -448,7 +448,7 @@ var tmHome = (function () {
       setTimeout (function () {
         watching = false;
         if (claims !== seen) { watchOwner (); return; }
-        say ('TeXmacs Vue is no longer open in another tab. Reload this page to use it ' +
+        say ('TeXmacs Upsilon is no longer open in another tab. Reload this page to use it ' +
              'here with your saved files (the changes made in this tab are not kept).',
              [['Reload', function () { location.reload (); }]]);
       }, 5000);
@@ -476,7 +476,7 @@ var tmHome = (function () {
       if (e.data.type !== 'takeover' || readOnly || !release) return;
       flush (function () {
         var r = release; release = null;
-        becomeReadOnly ('TeXmacs Vue is now used in another tab of this browser: the ' +
+        becomeReadOnly ('TeXmacs Upsilon is now used in another tab of this browser: the ' +
                         'documents you save here are kept, your preferences are not.', true);
         r ();
       });
@@ -491,7 +491,7 @@ var tmHome = (function () {
     navigator.locks.request (LOCK, opts, function (lock) {
       decided = true;
       if (!lock) {
-        becomeReadOnly ('TeXmacs Vue is also open in another tab of this browser: the ' +
+        becomeReadOnly ('TeXmacs Upsilon is also open in another tab of this browser: the ' +
                         'documents you save here are kept, your preferences are not.');
         cont ();
         return;
@@ -502,7 +502,7 @@ var tmHome = (function () {
     }).catch (function (e) {
       // the tab which had TeXmacs did not let go in time
       if (decided) return;
-      becomeReadOnly ('TeXmacs Vue is still open in another tab of this browser: the ' +
+      becomeReadOnly ('TeXmacs Upsilon is still open in another tab of this browser: the ' +
                       'documents you save here are kept, your preferences are not.');
       cont ();
     });

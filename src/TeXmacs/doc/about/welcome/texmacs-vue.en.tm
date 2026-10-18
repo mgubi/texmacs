@@ -5,10 +5,10 @@
 <\body>
   <tmdoc-title|<TeXmacs> in the browser>
 
-  <TeXmacs> <name|Vue> is an experimental port of <TeXmacs> which runs in a page of
-  a web browser. It is the same <TeXmacs>, compiled to WebAssembly, with a
-  new interface, <name|Vue>, which draws the menus, the tool bars and the dialogs
-  itself. Nothing is installed on your computer, and nothing you write is
+  <TeXmacs> Upsilon, an enhanced and bleeding-edge version of <TeXmacs> with
+  experimental features, also runs in a page of a web browser. It is the
+  same <TeXmacs>, compiled to WebAssembly, with a new interface,
+  <name|Vue>, which draws the menus, the tool bars and the dialogs itself. Nothing is installed on your computer, and nothing you write is
   sent anywhere: the documents stay in the browser, on your computer, until
   you save a copy of them.
 
@@ -37,7 +37,7 @@
   browser asks first (in its own words). Safari on the iPhone and the iPad
   never asks.
 
-  The <with|font-series|bold|TeXmacs <name|Vue>> button at the top left of the
+  The <with|font-series|bold|Upsilon> button at the top left of the
   page opens a menu of the page itself: the version of <TeXmacs>, the state
   of its files and the storage they use, <menu|Files in this browser...>,
   <menu|Save a backup> and <menu|Restore a backup...> (see below),
@@ -116,7 +116,7 @@
 
   What the browser keeps is lost when its data for this site are cleared,
   and it is not seen by another browser or another computer. In the menu of
-  <with|font-series|bold|TeXmacs <name|Vue>>, <menu|Save a backup> saves
+  <with|font-series|bold|Upsilon>, <menu|Save a backup> saves
   on your computer a zip archive of all of it: your documents and your
   <verbatim|.TeXmacs> folder, with your preferences, your own styles and
   the wallet (which stays encrypted: its passphrase opens it). A document
@@ -138,10 +138,10 @@
     documents you want to keep, or download a backup now and then.
   </warning*>
 
-  <TeXmacs> <name|Vue> may be open in several tabs of the browser: each of
+  <TeXmacs> Upsilon may be open in several tabs of the browser: each of
   them keeps the documents it saves, and the others see the new version.
   Your preferences (the <verbatim|.TeXmacs> folder) are kept by one tab at a
-  time: when <TeXmacs> <name|Vue> is already open in another tab, a new tab
+  time: when <TeXmacs> Upsilon is already open in another tab, a new tab
   says so; <with|font-series|bold|Use TeXmacs here> moves the preferences to
   it (the other tab keeps its last changes first). When the tab which has
   them is closed, the others offer to reload. Two tabs which save the same
@@ -228,7 +228,7 @@
   allow other pages to read it, and the images the document refers to are
   not fetched with it. Other options of the address run Scheme commands (the
   page asks before running them) or show debugging messages: see the
-  options of the address in the <with|font-series|bold|TeXmacs <name|Vue>> menu.
+  options of the address in the <with|font-series|bold|Upsilon> menu.
 
   <section|What does not work>
 
@@ -256,7 +256,7 @@
     October 2026 below). The language servers of program code, which are
     programs, do not work either.
 
-    <item><TeXmacs> <name|Vue> types, scrolls and typesets as fast as the
+    <item><TeXmacs> Upsilon types, scrolls and typesets as fast as the
     desktop program, but its <name|Scheme> runs two to three times slower,
     which shows in the commands which are mostly <name|Scheme> (the
     conversions, some menus) and at the start.
@@ -264,7 +264,7 @@
 
   <section|Reporting problems>
 
-  <TeXmacs> <name|Vue> is experimental. A problem which does not happen with the
+  <TeXmacs> Upsilon is experimental. A problem which does not happen with the
   <TeXmacs> you install on your computer is a problem of this port: please
   report it on the <hlink|issue page of the
   port|https://github.com/mgubi/texmacs/issues>, not to the <TeXmacs>
@@ -275,7 +275,7 @@
 
   <section|Recent changes>
 
-  The additions to <TeXmacs> <name|Vue>, the newest first.
+  The additions to <TeXmacs> Upsilon, the newest first.
 
   <paragraph|18 October 2026>
 
@@ -284,10 +284,14 @@
     <hlink|downloads.html|https://mgubi.github.io/texmacs/downloads.html>,
     lists the builds of <TeXmacs> Upsilon for <name|macOS>, <name|Linux> and
     <name|Windows>, which anyone can download; the menu of
-    <with|font-series|bold|TeXmacs <name|Vue>> links to it.
+    <with|font-series|bold|Upsilon> links to it.
 
     <item>This version of <TeXmacs> is now called <TeXmacs> Upsilon (it was
-    Max's <TeXmacs>), and its branch <verbatim|upsilon_texmacs>.
+    Max's <TeXmacs>, and <TeXmacs> <name|Vue> in the browser), and its
+    branch <verbatim|upsilon_texmacs>: the menu of the page is
+    <with|font-series|bold|Upsilon>, and its title and its messages say
+    <TeXmacs> Upsilon. <name|Vue> remains the name of the
+    interface.
 
     <item><menu|Help|TeXmacs Upsilon features>, a new page, says what this
     version of <TeXmacs> adds to the official one; this page has a section
@@ -325,7 +329,7 @@
     before, and so do those which give no <name|WebGPU>.
     <verbatim|?gpu=webgpu> in the address of the page asks for
     <name|WebGPU> in any browser, <verbatim|?gpu=webgl> for <name|WebGL2>.
-    The menu <with|font-series|bold|TeXmacs <name|Vue>> says which one
+    The menu <with|font-series|bold|Upsilon> says which one
     draws.
 
     <item><verbatim|?gpu=0> in the address of the page draws with
@@ -481,7 +485,7 @@
     own, the one after its usual port (6562 for 6561), and leaves its usual
     port to the other versions of <TeXmacs>. Nothing changes in the login:
     the port to give is still the one of the server, and the page goes to
-    the next one. A server started by an older <TeXmacs> <name|Vue> has to
+    the next one. A server started by an older <TeXmacs> Upsilon has to
     be updated together with the page.
 
     <item>To a server on another computer, a login over TLS goes through
@@ -548,7 +552,7 @@
     WebSockets, which those servers do not answer. The message now says
     so. Until they do, a bridge on your own machine passes the connection
     on: run <verbatim|node misc/wasm/remote/ws-bridge.mjs> (from the
-    sources of <TeXmacs> <name|Vue>; <verbatim|cloud.texmacs.org> is its
+    sources of <TeXmacs> Upsilon; <verbatim|cloud.texmacs.org> is its
     default), and log in with the server <verbatim|localhost> and the port
     6562 (the bridge listens at the next one, as a server does).
 
@@ -663,7 +667,7 @@
     offers <menu|Remote|Start server>.
 
     <item><menu|Save a backup> and <menu|Restore a backup...>, in the
-    menu of <TeXmacs> <name|Vue>: all your files and your preferences in one
+    menu <with|font-series|bold|Upsilon>: all your files and your preferences in one
     zip archive, to keep them safe or to move them to another browser (see
     <with|font-series|bold|Your files>).
 
@@ -696,7 +700,7 @@
     click): <menu|Move to a new browser tab> moves its document to a new tab
     of the browser.
 
-    <item>The other tabs of the browser in which <TeXmacs> <name|Vue> is open
+    <item>The other tabs of the browser in which <TeXmacs> Upsilon is open
     keep the documents they save (only the preferences are kept by one tab),
     and each tab sees the documents the others saved.
 
@@ -723,7 +727,7 @@
   <paragraph|6 October 2026>
 
   <\itemize>
-    <item>The tabs of the windows, the menu of <TeXmacs> <name|Vue> and its
+    <item>The tabs of the windows, the menu <with|font-series|bold|Upsilon> and its
     dialogs follow the dark theme, as the rest of the interface (the theme of the
     preferences, or the appearance of the system).
 
@@ -745,7 +749,7 @@
     <item>PDF pictures are shown again (they were a question mark since the
     windows are drawn by the GPU).
 
-    <item>The menu <with|font-series|bold|TeXmacs <name|Vue>> says how the
+    <item>The menu <with|font-series|bold|Upsilon> says how the
     page draws: with the GPU (<name|WebGL2> and <name|ThorVG>, whose version
     is given with the other libraries) or with <name|MuPDF>, and why.
 
@@ -771,7 +775,7 @@
     slows this down.
 
     <item>Two tabs no longer overwrite each other's files: a second tab of
-    <TeXmacs> <name|Vue> is read-only, says so, and can take <TeXmacs> over
+    <TeXmacs> Upsilon is read-only, says so, and can take <TeXmacs> over
     with <with|font-series|bold|Use TeXmacs here>.
 
     <item>A reference of <name|Zotero> cited from the search window is
@@ -1211,7 +1215,7 @@
 
     <item>The links to other sites open in the browser.
 
-    <item>The logo of <TeXmacs> <name|Vue>, which is also the icon of the
+    <item>The logo of <TeXmacs> Upsilon, which is also the icon of the
     page.
 
     <item>A document at an address with a port opens instead of crashing.
@@ -1236,7 +1240,7 @@
   <paragraph|27 September 2026>
 
   <\itemize>
-    <item><TeXmacs> <name|Vue> is published on <name|GitHub Pages>, built
+    <item><TeXmacs> Upsilon is published on <name|GitHub Pages>, built
     by the continuous integration of the repository.
 
     <item>The clipboard of the system, with the shortcuts of the platform of
@@ -1252,7 +1256,7 @@
     <item>The storage of the page: its size, its removal, and the files of
     <TeXmacs> itself.
 
-    <item>The <with|font-series|bold|TeXmacs <name|Vue>> menu: the progress
+    <item>The <with|font-series|bold|Upsilon> menu: the progress
     of the loading, the software of the page, more information and the
     limits.
 

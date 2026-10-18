@@ -86,7 +86,7 @@ var tmProgress = (function () {
     panel.id = 'tm-loading';
     panel.innerHTML =
       '<div class="tm-head"><img src="texmacs-vue-128.png" alt="">' +
-      '<div><div class="tm-title">TeXmacs Vue<span class="tm-badge">experimental</span></div>' +
+      '<div><div class="tm-title">TeXmacs Upsilon<span class="tm-badge">experimental</span></div>' +
       '<div class="tm-version"></div></div></div>' +
       '<div class="tm-about">A free editor for scientific documents, running ' +
       'entirely in your browser. Its source is on <a ' +
