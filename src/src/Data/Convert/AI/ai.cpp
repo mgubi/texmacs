@@ -164,6 +164,28 @@ replace_tikz_by_pdf (string s) {
   return replace_tikz_by_pdf (aux);
 }
 
+// a file name given by an answer, as a name of the temporary directory: its
+// last part, without what could leave the directory
+static string
+ai_safe_file_name (string name) {
+  int i= N(name);
+  while (i > 0 && name[i-1] != '/' && name[i-1] != '\\') i--;
+  string r= name (i, N(name));
+  if (r == "" || r == "." || r == "..") r= "picture.svg";
+  return r;
+}
+
+// whether a file is in the temporary directory of TeXmacs, where the
+// pictures of an answer are written (extract_svg, the images of the image
+// models): the images of an answer are only read from there
+static bool
+ai_in_temp_dir (url u) {
+  // (with / on Windows too, as extract_svg writes the names)
+  string d= replace (as_string (url_temp_dir ()), "\\", "/");
+  string f= replace (as_string (u), "\\", "/");
+  return N(d) > 0 && starts (f, d * "/") && !occurs ("/../", f);
+}
+
 static string
 extract_svg (string s) {
   //cout << s << LF;
@@ -188,6 +210,10 @@ extract_svg (string s) {
   //cout << "file=" << file << LF;
   string name= trim_spaces (s (beg_name_pos, end_name_pos));
   //cout << "name= " << name << LF;
+  // (the name comes from the answer: only its last part, in the temporary
+  // directory, so that ../ cannot write elsewhere)
+  string given= name; // (as the answer refers to it)
+  name= ai_safe_file_name (name);
   url temp= url_temp_dir ();
   url f= temp * name;
   //cout << "f= " << as_string (f) << LF;
@@ -196,9 +222,9 @@ extract_svg (string s) {
     * s (end_file_pos + N(end_file_tag), N(s));
   ret= replace (ret, "\\includesvg", "\\includegraphics");
   string f_str= replace (as_string (f), "\\", "/");
-  ret= replace (ret, "{" * name * "}", "{" * f_str * "}");
-  if (ends (name, ".svg")) {
-    string b= name (0, N(name) - 4);
+  ret= replace (ret, "{" * given * "}", "{" * f_str * "}");
+  if (ends (given, ".svg")) {
+    string b= given (0, N(given) - 4);
     ret= replace (ret, "{" * b * "}", "{" * f_str * "}");
   }
   //cout << "---\n" << ret <<"\n---\n";
@@ -1486,7 +1512,11 @@ embed_images (tree t) {
     string im_name= cork_to_utf8 (as_string (a[0]));
     url image= url_system (im_name);
     if (!exists (image)) image= url (im_name);
-    if (!exists (image)) image= url_temp_dir () * (im_name * ".svg");
+    if (!exists (image))
+      image= url_temp_dir () * (ai_safe_file_name (im_name) * ".svg");
+    // (the answer names the image: a file elsewhere, which the answer may
+    // name to have it put in the document, is not read)
+    if (!ai_in_temp_dir (image)) return t;
     string type= "", data;
     tree s (IMAGE);
     load_string (image, data, false);

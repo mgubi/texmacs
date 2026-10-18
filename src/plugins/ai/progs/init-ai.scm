@@ -678,12 +678,46 @@
                         (ai-question-files (list-ref qs i)))))
                 (.. 0 (length qs)))))
 
-;; why the files of the question cannot be sent, or #f (ai-request)
+;; the files which a question would send: those of the questions of its
+;; context, and its own
+(define (ai-sent-files name chat)
+  (let* ((field (ai-pending-field name chat))
+         (l (or (ai-context-fields name chat field) '()))
+         (q (ai-asked-question name chat)))
+    (append (append-map (lambda (x) (ai-question-files (tree-ref (car x) 1))) l)
+            (if q (ai-question-files q) '()))))
+
+(define (ai-file-list l)
+  (string-recompose
+   (map (lambda (a) (string-append (car a) " (" (cadr a) ")")) l) ", "))
+
+;; why the files of the question cannot be sent, or #f (ai-request): files
+;; which came with the document and were not allowed yet (a dialog asks),
+;; else what keeps the files of the question itself from being sent
 (tm-define (ai-request-attachment-problem name chat)
-  (with q (ai-asked-question name chat)
-    (and q
-         (with p (ai-attachments-problem name (ai-question-files q))
-           (and p (string-append (upcase-first p) "."))))))
+  (let* ((q (ai-asked-question name chat))
+         (new (ai-files-not-allowed (ai-sent-files name chat))))
+    (cond ((nnull? new)
+           (delayed
+             (:idle 10)
+             (user-confirm
+              (string-append "Send these files, which came with the document, "
+                             "to " (session-name name) "? "
+                             (utf8->cork (ai-file-list new)))
+              #f
+              (lambda (yes?)
+                (when yes?
+                  (ai-allow-files new)
+                  (set-message "The files are allowed: ask the question again"
+                               (session-name name))))))
+           (string-append
+            "The question would send files which came with the document, "
+            "not attached here: " (ai-file-list new)
+            ". Allow them in the dialog, then ask again."))
+          ((not q) #f)
+          (else
+           (with p (ai-attachments-problem name (ai-question-files q))
+             (and p (string-append (upcase-first p) ".")))))))
 
 ;; the first line of a session: the engine and its model
 (define (ai-banner lan)
