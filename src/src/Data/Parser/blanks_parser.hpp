@@ -20,13 +20,12 @@ public:
   string get_parser_name () { return "blanks_parser"; }
 
   bool can_parse (string s, int pos) {
-    return pos<N(s) && (s[pos]==' ' || s[pos]=='\t');
+    return pos<N(s) && (s[pos]==' ' || s[pos]=='\t' || is_source_tab (s, pos));
   }
 
 private:
   void do_parse (string s, int& pos) {
-    (void) s;
-    pos++;
+    pos += (is_source_tab (s, pos)? 4: 1);
   }
 };
 
