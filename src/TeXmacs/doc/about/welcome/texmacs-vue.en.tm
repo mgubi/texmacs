@@ -255,6 +255,24 @@
     and <name|OCaml>. The help on program code is the section Editing program code
     of <menu|Help|Manual|Editing tools>.
 
+    <item>In program code, the syntax errors are underlined after a pause
+    in the typing, and <key|F8> goes from one to the next;
+    <shortcut|(code-go-to-definition)> goes to the definition of the name
+    at the cursor and <shortcut|(code-outline)> shows the outline of the
+    code on a page; <key|tab> completes a name with the names defined in
+    the code (in a session, the program completes as before).
+
+    <item>The lines of program code are cut into the tokens of their
+    syntax tree, and typing in a long source file costs much less (a file
+    of 100000 lines of C: three times less); a line keeps the right colors
+    when a line above it is removed (an unclosed comment closed). The
+    mark ... of a new fold shows at once, and <menu|Unfold all> shows the
+    lines of a fold whose first line was deleted.
+
+    <item>In a source file which is indented by tabs, <key|tab> in the
+    search looks for a tab, and the columns between the tab stops
+    (<menu|Edit|Preferences>) change in the files which are open.
+
     <item>The windows are drawn with <name|WebGPU>, the newer graphics
     interface of the browsers, in <name|Chrome> and the other browsers of
     <name|Chromium> (<name|Edge>...): as fast as with <name|WebGL2>, and
