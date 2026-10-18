@@ -71,7 +71,7 @@
   When <verbatim|clangd> is installed, the suite also runs it on that
   project (hover, diagnostics, the client of a buffer) and tests the editor
   on a <c++> file: the buffer followed, the diagnostics underlined (the
-  alternative selection <verbatim|lsp-errors>), <key|F8>, the definition,
+  alternative selection <verbatim|code-errors>), <key|F8>, the definition,
   the completion (synchronous and asynchronous), the log page and its
   refresh, the hover balloon, the <verbatim|didChange>, <verbatim|didSave>
   and <verbatim|didClose> sent when the buffer is saved and closed, and the

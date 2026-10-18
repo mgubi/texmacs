@@ -21,6 +21,9 @@
   <\traverse>
     <branch|The plug-in machinery|plugin-machinery.en.tm>
 
+    <branch|The features of program code: syntax trees and language
+    servers|code-features.en.tm>
+
     <branch|The client of language servers|lsp.en.tm>
 
     <branch|Collaboration, remote servers and versioning|collaboration.en.tm>

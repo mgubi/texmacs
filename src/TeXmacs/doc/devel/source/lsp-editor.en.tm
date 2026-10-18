@@ -88,8 +88,11 @@
   line are left out, an empty range is widened to one character, hints
   count as information), keeps them in the table <verbatim|shown>, and
   sets (<verbatim|draw-diagnostics>) three <em|alternative selections> of
-  the editor, with <scm|set-alt-selection>: <verbatim|lsp-errors>,
-  <verbatim|lsp-warnings> and <verbatim|lsp-infos>, each a list of paths,
+  the editor, as the diagnostics of the source <scm|'server> of the core
+  (<scm|code-set-diagnostics>, <source-link|code-diagnostics.scm|TeXmacs/progs/code/code-diagnostics.scm>,
+  with the syntax errors of tree-sitter where no server follows the code):
+  <verbatim|code-errors>, <verbatim|code-warnings> and <verbatim|code-infos>,
+  each a list of paths,
   start and end of each range, sorted in the order of the text (the editor
   looks for the visible ones by a binary search). <scm|lsp-hide-diagnostics>
   cancels them.
@@ -276,44 +279,18 @@
 
   <section|Folding>
 
-  A fold changes what is shown, not the document.
-  <source-link|lsp-fold.scm|TeXmacs/progs/lsp/lsp-fold.scm> keeps the folds of
-  each buffer: the tree of the first line, the trees of the hidden lines,
-  and their texts. <scm|lsp-fold-line> (glue, <source-link|lsp_decorations.cpp|src/System/Language/lsp_decorations.cpp>)
-  marks a line as folded, with its text then; <cpp|typesetter_rep::insert_paragraph>
-  (<source-link|typesetter.cpp|src/Typeset/Bridge/typesetter.cpp>) does not
-  typeset a folded line whose text is still that one, so that its paragraph
-  is not in the page. <scm|lsp-fold-marker> gives the first line its marker,
-  typeset after the end of the line as the inlay hints
-  (<cpp|typeset_lsp_text>).
-
-  The blocks are the <verbatim|textDocument/foldingRange> of the server
-  (lines only, <scm|lsp-folding-ranges-of>); <scm|lsp-fold> folds the
-  innermost block at the cursor which is not folded yet
-  (<scm|lsp-innermost-range>), <scm|lsp-unfold> the innermost fold at the
-  cursor. A server may give the same block twice, or two blocks with the
-  same first line: when all the blocks are folded, those with the same
-  first line are reduced to the larger one. After each change of the
-  buffer (<scm|notify-buffer-changed>), a fold whose lines are no longer
-  next to its first line in the document is dropped, and the lines whose
-  texts have changed are marked again and typeset again. When a fold is
-  dropped, the folds which stay are given to the typesetter again: the
-  lines of a fold nested in the one which went stay hidden.
-
-  A cursor in a folded line has no box: <cpp|edit_cursor_rep> does not call
-  <scm|notify-cursor-moved> then, but <scm|lsp-cursor-in-fold> (<source-link|edit_cursor.cpp|src/Edit/Interface/edit_cursor.cpp>).
-  Both schedule a check (<scm|delayed>: the path of the cursor is not the
-  new one yet in <scm|notify-cursor-moved>), which keeps the last place of
-  the cursor outside the folds. A cursor in a hidden line belongs to the
-  outermost fold which hides it (<verbatim|hiding-fold>, whose first line
-  is shown). It skips the fold only when it moves right from the end of
-  the first line of the fold into the start of its first hidden line (it
-  goes to the start of the line after the fold) or left from the start of
-  the line after the fold into the end of its last hidden line (it goes to
-  the end of the first line of the fold): the arrows. Up and down go over
-  the lines which have no boxes by themselves. Any other move into the
-  fold (a search, a jump to a definition or a diagnostic) opens it, with
-  the folds in it which hide the line.
+  The folds are those of the core (<hlink|the features of program
+  code|code-features.en.tm>, <source-link|code-fold.scm|TeXmacs/progs/code/code-fold.scm>):
+  a state of the hidden lines, which tree-sitter folds too.
+  <source-link|lsp-fold.scm|TeXmacs/progs/lsp/lsp-fold.scm> is the provider
+  of their blocks when a server follows the file: the
+  <verbatim|textDocument/foldingRange> of the server (lines only,
+  <scm|lsp-folding-ranges-of>; those around the cursor,
+  <scm|lsp-fold-ranges>, and all of them, <scm|lsp-all-fold-ranges>, a
+  block given twice with the same first line reduced to the larger one).
+  It keeps the names of its former commands (<scm|lsp-fold>,
+  <scm|lsp-unfold>, <scm|lsp-folds>, <scm|lsp-line-folded?>), which call
+  the core.
 
   <section|Colours and inlay hints>
 
@@ -336,8 +313,10 @@
   colours of the language of <TeXmacs>; <scm|lsp-line-decorations> gives,
   line by line, the coloured pieces and the hints in Cork offsets.
 
-  <scm|lsp-apply-decorations> gives them to the typesetter with
-  <scm|lsp-decorate-line> (glue), for the lines whose decorations change,
+  <scm|lsp-apply-decorations> gives them to the typesetter as the layers of
+  the lines of the core (<scm|code-set-line-layers>, see <hlink|the
+  features of program code|code-features.en.tm>), for the lines whose
+  decorations change,
   and typesets those lines again (<scm|update-path>; the whole buffer
   beyond 2000 lines). Its table <verbatim|decorated> keeps, for each
   decorated line of a buffer, the tree of the line, its text then and its
@@ -345,16 +324,12 @@
   above it: its place now is that of its tree) and keeps its tree, its
   text and its decorations is not given again nor typeset again; a line which was edited (the same tree, another
   text) is given again. The lines which have no decorations any more, and
-  those which were removed from the document, lose theirs. Keeping the
-  trees also keeps the lines which were removed from being freed while
-  they are decorated: the typesetter knows them by their addresses, which
-  a line made later could otherwise take.
-  <source-link|lsp_decorations.cpp|src/System/Language/lsp_decorations.cpp>
-  keeps them for the tree of each line, with its text then:
-  <cpp|lsp_line_decorations_of> gives none for a line whose text has
-  changed, so that an edited line is typeset as usual until the next
-  answer. <cpp|concater_rep::typeset_prog_string> (<source-link|concat_text.cpp|src/Typeset/Concat/concat_text.cpp>)
-  calls <cpp|typeset_lsp_string> for a decorated line: the pieces of a token
+  those which were removed from the document, lose theirs. The layers are
+  kept on the highlight observers of the lines
+  (<source-link|code_lines.cpp|src/System/Language/code_lines.cpp>), which
+  an edit of a line detaches: an edited line is typeset as usual until the
+  next answer. <cpp|concater_rep::typeset_prog_string> (<source-link|concat_text.cpp|src/Typeset/Concat/concat_text.cpp>)
+  calls <cpp|typeset_layered_string> for a line with layers: the pieces of a token
   with colours of their own are typeset apart, and the hints come before
   the tokens where they are, as grey text boxes with decorated paths (the
   cursor does not go into them), their spaces and paddings as empty boxes

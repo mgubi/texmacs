@@ -65,7 +65,7 @@
 
     \ \ --\<gtr\> textDocument/publishDiagnostics \ --\<gtr\> lsp-diagnostics-changed
 
-    \ \ --\<gtr\> set-alt-selection "lsp-errors" ... \ --\<gtr\>
+    \ \ --\<gtr\> code-set-diagnostics 'server ... \ --\<gtr\>
     update_diagnostic_rects
   </verbatim-code>
 
@@ -119,16 +119,19 @@
     <verbatim|lsp-highlights>).
 
     <item*|<source-link|lsp-fold.scm|TeXmacs/progs/lsp/lsp-fold.scm>>The
-    folding of blocks (<key|std (> and <key|std )>): the folds are kept as
-    the trees of their lines, and given to <c++> with <scm|lsp-fold-line>
-    and <scm|lsp-fold-marker>.
+    blocks of the server for the folds of the core (<key|std (> and
+    <key|std )>, <hlink|the features of program code|code-features.en.tm>).
+
+    <item*|<source-link|lsp-code.scm|TeXmacs/progs/lsp/lsp-code.scm>>The
+    adapter of the server for the features of program code: its folds, its
+    outline, its definitions and whether it gives the diagnostics.
 
     <item*|<source-link|lsp-decorate.scm|TeXmacs/progs/lsp/lsp-decorate.scm>,
-    <source-link|lsp_decorations.cpp|src/System/Language/lsp_decorations.cpp>,
+    <source-link|code_lines.cpp|src/System/Language/code_lines.cpp>,
     <source-link|concat_text.cpp|src/Typeset/Concat/concat_text.cpp>>The
     colours of semantic tokens and the inlay hints: asked for in
-    <scheme>, kept for the lines in <c++>, typeset by
-    <cpp|typeset_lsp_string>.
+    <scheme>, kept as the layers of the lines in <c++>, typeset by
+    <cpp|typeset_layered_string>.
 
     <item*|<source-link|lsp-kbd.scm|TeXmacs/progs/lsp/lsp-kbd.scm>>The mode
     <scm|in-lsp%>, the keys, the menu <scm|lsp-menu> and the focus bar.
@@ -142,13 +145,6 @@
     <source-link|edit_repaint.cpp|src/Edit/Interface/edit_repaint.cpp>>The
     hook <scm|notify-buffer-changed> and the underlines of the
     diagnostics.
-
-    <item*|<source-link|typesetter.cpp|src/Typeset/Bridge/typesetter.cpp>>
-    <cpp|insert_paragraph> skips the folded lines.
-
-    <item*|<source-link|edit_cursor.cpp|src/Edit/Interface/edit_cursor.cpp>>
-    <scm|lsp-cursor-in-fold> is called when the cursor has no box (it is in
-    a folded line).
 
     <item*|<source-link|edit_mouse.cpp|src/Edit/Interface/edit_mouse.cpp>>The
     point under the mouse as a cursor position (<scm|xy-\<gtr\>path>), for

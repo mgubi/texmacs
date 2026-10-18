@@ -293,6 +293,24 @@ server of each language (`(server "clangd")`), replacing the defaults of
      servers for the code blocks of documents.
 6. Builds without each feature (configure options), the suite `code`, docs:
    a developer chapter on the code features and one user page per feature.
+   - Done. `--disable-tree-sitter` and `--disable-lsp` (misc/m4/tm_code.m4,
+     `USE_TREE_SITTER` and `USE_LSP` in config.h; the CMake options of the
+     same names; the browser build has tree-sitter, not the servers): the
+     plugin TreeSitter and its C runtime are compiled only with tree-sitter
+     (@CONFIG_TREE_SITTER@ in makefile.in), lsp_link.cpp only with the
+     servers; their glue is in build-glue-treesit.scm and build-glue-lsp.scm
+     (glue_treesit.cpp, glue_lsp.cpp, included by glue.cpp with their
+     feature). The core names neither: tree-sitter wraps the program
+     languages by `set_prog_language_wrapper`, the servers process their
+     messages by `add_link_processor` (registered at the first lsp-start).
+     In Scheme, a feature is there when its glue is (`tree-sitter-program-language`,
+     `lsp-start`): the adapters are loaded then, prog-edit.scm loads
+     ts-edit.scm or else code-syntax-none.scm (its functions answer that
+     there is no syntax tree), the LSP is started and its menu shown only
+     then, and check-master skips the suites of a missing feature.
+   - Docs: the page "Editing program code" says what comes from which; the
+     developer page "The features of program code" (devel/source/code-features.en.tm)
+     describes the core; the pages of the LSP point to it.
 
 Each phase keeps the suites passing and the two feature branches unchanged:
 what is shared is written here, then given back to the branches (or the

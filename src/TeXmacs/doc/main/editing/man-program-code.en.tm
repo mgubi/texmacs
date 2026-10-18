@@ -74,10 +74,31 @@
   <shortcut|(program-fold)> folds the block at the cursor: its lines are
   hidden, but the first one, which ends with <verbatim|...>, and the
   closing line of the block. <shortcut|(program-unfold)> unfolds it.
-  <menu|Focus|Folds> also folds all the definitions, and unfolds all. Folds
-  change what is shown, not the document: the hidden lines are saved,
-  printed, copied and searched as usual, and moving the cursor into a fold
-  opens it.
+  <menu|Focus|Folds> also folds all the blocks, and unfolds all. Folds nest:
+  folding a block around a fold keeps it, and unfolding the outer one shows
+  it folded again. Folds change what is shown, not the document: the hidden
+  lines are saved, printed, copied and searched as usual. Moving the cursor
+  right at the end of the first line of a fold, or left at the start of the
+  line after it, goes over the fold; arriving in it otherwise (a search, a
+  definition, a diagnostic) opens it.
+
+  <paragraph*|With a language server>
+
+  In a source file which a language server follows (see <hlink|language
+  servers for source code|man-language-servers.en.tm>), the server and the
+  syntax tree share the work: what has to happen at each key (the colors,
+  the brackets, the indentation, the structural edits) comes from the
+  syntax tree, and the server refines it when it runs. The blocks of the
+  folds, the outline (<shortcut|(code-outline)>, <menu|Focus|Outline>) and
+  the definitions (<shortcut|(code-go-to-definition)>, also in the other
+  files of the project) come from the server; without one, from the syntax
+  tree, also in the code of documents. The names which the server knows
+  get colors of their own over those of the syntax. <shortcut|(code-next-diagnostic #t)>
+  goes to the next diagnostic: those of the server, or, where no server
+  follows the code, the syntax errors of the tree (after a pause in the
+  typing; a bracket without its partner is shown at once). <key|tab>
+  completes a name with the server, not in a string or a comment, and,
+  without a server, with the names of the definitions of the code.
 
   <paragraph*|Preferences>
 
