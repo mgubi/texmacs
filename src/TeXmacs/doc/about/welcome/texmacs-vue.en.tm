@@ -230,6 +230,16 @@
   <paragraph|18 October 2026>
 
   <\itemize>
+    <item>The windows are drawn with <name|WebGPU>, the newer graphics
+    interface of the browsers, in <name|Chrome> and the other browsers of
+    <name|Chromium> (<name|Edge>...): as fast as with <name|WebGL2>, and
+    faster when zooming. The other browsers draw with <name|WebGL2> as
+    before, and so do those which give no <name|WebGPU>.
+    <verbatim|?gpu=webgpu> in the address of the page asks for
+    <name|WebGPU> in any browser, <verbatim|?gpu=webgl> for <name|WebGL2>.
+    The menu <with|font-series|bold|TeXmacs <name|Vue>> says which one
+    draws.
+
     <item><verbatim|?gpu=0> in the address of the page draws with
     <name|MuPDF> again, as it says (it drew with <name|WebGL2>); so does a
     browser without <name|WebGL2>.
