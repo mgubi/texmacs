@@ -1094,6 +1094,20 @@ installed, and the old behaviour stays elsewhere.
   Next definition and Select definition. Folding is not done: it would
   move lines into a fold tag inside a code block, which the regions, the
   editing of programs and the export of code do not expect.
+- **Balanced brackets** (same day): with the automatic brackets of
+  programs (preference `prog:automatic brackets`, still off by default), the
+  brackets and quotes of code with a syntax tree stay balanced: an opening
+  bracket or quote comes with its closing one (alone before a word, as in
+  VS Code; around the selection when there is one), a closing bracket is
+  typed over the matching one in front of it, Backspace or Delete on one of
+  an empty pair deletes both, on one of a pair with content (brackets, or
+  the quotes of a string) selects the pair, so that a second key deletes it.
+  In strings and comments, which the tree tells apart, these are plain
+  characters, but the closing quote of a string is typed over. One
+  implementation for all the languages of tree-sitter (`bracket-open` and
+  `bracket-close` of `prog-edit.scm` redefined when there is a tree, and
+  generic keys for the languages without keys of their own); pasted text
+  is left as it is.
 - A pitfall of the tests: the suites run in one TeXmacs, and a key typed
   in program code loads the keyboard of programs and its modules, which
   changed the highlighting of Fortran and the entering of mathematics in

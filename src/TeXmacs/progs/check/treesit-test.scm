@@ -729,6 +729,50 @@
           (check= (tree->string (tree-ref code 1)) "; (if x \"(\" 'b)")
           (syntax-toggle-comment)
           (check= (tree->string (tree-ref code 1)) "(if x \"(\" 'b)"))))
+    ;; balanced brackets: pairs, typing over a closing bracket, deleting an
+    ;; empty pair, selecting a pair with content; in strings, characters
+    (with-test-buffer '(document (scm-code (document "(f x)" "" "(display \"ab\")" "")))
+      (lambda (u b)
+        (update-forced)
+        (let* ((code (tree-ref b 0 0))
+               (at (lambda (row col) (rcons (tree->path (tree-ref code row)) col)))
+               (line (lambda (row) (tree->string (tree-ref code row)))))
+          (go-to (at 1 0))
+          (check-true (syntax-bracket-open "(" ")"))
+          (check= (line 1) "()")
+          (check= (cursor-path) (at 1 1))
+          (insert "a")
+          (check-true (syntax-bracket-close "(" ")"))
+          (check= (line 1) "(a)")
+          (check= (cursor-path) (at 1 3))
+          (check-true (syntax-delete-bracket #f))   ; selects (a)
+          (check= (list (selection-get-start) (selection-get-end))
+                  (list (at 1 0) (at 1 3)))
+          (selection-cancel)
+          (go-to (at 1 2))
+          (syntax-bracket-open "[" "]")
+          (check= (line 1) "(a[])")
+          (check-true (syntax-delete-bracket #f))   ; deletes []
+          (check= (line 1) "(a)")
+          (check= (cursor-path) (at 1 2))
+          ;; before a word, an opening bracket alone
+          (go-to (at 0 3))
+          (syntax-bracket-open "(" ")")
+          (check= (line 0) "(f (x)")
+          ;; in a string, plain characters, and its closing quote typed over
+          (go-to (at 2 11))
+          (syntax-bracket-open "(" ")")
+          (check= (line 2) "(display \"a(b\")")
+          (go-to (at 2 13))
+          (syntax-bracket-open "\"" "\"")
+          (check= (line 2) "(display \"a(b\")")
+          (check= (cursor-path) (at 2 14))
+          ;; quotes in code come in pairs, and an empty string goes at once
+          (go-to (at 3 0))
+          (syntax-bracket-open "\"" "\"")
+          (check= (line 3) "\"\"")
+          (check-true (syntax-delete-bracket #f))
+          (check= (line 3) ""))))
     ;; structured moves: from node to node, around, inside, and from
     ;; definition to definition
     (with-test-buffer '(document (scm-code (document "(define (f x) x)"

@@ -197,6 +197,40 @@
     (insert rb)
     (if prog-highlight-brackets? (select-brackets p lb rb))))
 
+;; in code with a syntax tree, the brackets stay balanced (see "Balanced
+;; brackets" in treesit/ts-edit.scm)
+(tm-define (bracket-open lb rb esc)
+  (:require (and prog-auto-close-brackets? (syntax-cursor-language)))
+  (syntax-bracket-open lb rb)
+  (if prog-highlight-brackets? (syntax-select-brackets)))
+
+(tm-define (bracket-close lb rb esc)
+  (:require (and prog-auto-close-brackets? (syntax-cursor-language)))
+  (syntax-bracket-close lb rb)
+  (if prog-highlight-brackets? (syntax-select-brackets)))
+
+(tm-define (kbd-backspace)
+  (:mode in-prog?)
+  (:require (and prog-auto-close-brackets? (syntax-cursor-language)))
+  (when (not (syntax-delete-bracket #f)) (former)))
+
+(tm-define (kbd-delete)
+  (:mode in-prog?)
+  (:require (and prog-auto-close-brackets? (syntax-cursor-language)))
+  (when (not (syntax-delete-bracket #t)) (former)))
+
+;; the brackets of the program languages without keys of their own
+(tm-define (program-bracket-open lb rb) (insert lb))
+(tm-define (program-bracket-close lb rb) (insert rb))
+
+(tm-define (program-bracket-open lb rb)
+  (:require (syntax-cursor-language))
+  (bracket-open lb rb "\\"))
+
+(tm-define (program-bracket-close lb rb)
+  (:require (syntax-cursor-language))
+  (bracket-close lb rb "\\"))
+
 ; HACK! I'd like to use selection-active-enlarging? But current C++ code
 ; doesn't mix well with this selection mechanism. Also: if mouse selections
 ; ever use program-select-enlarge, this has to be disabled.

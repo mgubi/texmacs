@@ -156,6 +156,126 @@
            #t))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Balanced brackets
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; With the automatic brackets of programs (preference), the brackets and
+;; the quotes of code stay balanced as they are typed and deleted (see
+;; bracket-open... in prog/prog-edit.scm): an opening bracket comes with its
+;; closing one, a closing bracket is typed over the one which is there, and
+;; deleting one of an empty pair deletes both, while deleting a bracket of a
+;; pair with content selects the pair (a second deletion removes it). The
+;; tree tells the brackets of the code from the characters of strings and
+;; comments, which stay plain characters. Text which is pasted or written
+;; otherwise is left as it is.
+
+(define (literal-type? type)
+  ;; a node of a string or of a comment (by the names of the grammars)
+  (or (string-contains? type "string") (string-contains? type "comment")
+      (string-contains? type "char") (string-contains? type "heredoc")
+      (string-contains? type "regex")))
+
+(define (literal-around root lan p)
+  ;; the node of a string or comment which strictly contains the point p
+  (list-find (syntax-region-node-range root lan (car p) (cadr p) (car p) (cadr p))
+             (lambda (n) (and (literal-type? (node-type n))
+                              (point<? (node-start n) p)
+                              (point<? p (node-end n))))))
+
+(define (char-at root p)
+  ;; the character at the point p, as a string, or ""
+  (let* ((s (line-string root (car p))) (c (cadr p)))
+    (if (and (>= c 0) (< c (string-length s))) (substring s c (+ c 1)) "")))
+
+(define (word-char? c)
+  (and (== (string-length c) 1)
+       (let ((ch (string-ref c 0)))
+         (or (char-alphabetic? ch) (char-numeric? ch) (== ch #\_)))))
+
+(define (cursor-code)
+  ;; (ctx lan) for the code at the cursor, or #f
+  (let* ((lan (syntax-cursor-language))
+         (ctx (and lan (path-context (cursor-path) lan))))
+    (and ctx (list ctx lan))))
+
+(define (move-to ctx p) (go-to (context-path ctx p)))
+
+(define-public (syntax-bracket-open lb rb)
+  ;; type the opening bracket or quote lb, whose closing one is rb; #f when
+  ;; the code has no syntax tree
+  (let ((c (cursor-code)))
+    (and c
+         (let* ((ctx (car c)) (lan (cadr c)) (root (cadr ctx)) (p (cddr ctx))
+                (next (char-at root p)))
+           (cond ((selection-active-normal?)
+                  (clipboard-cut "temp")
+                  (insert-go-to (string-append lb rb) '(1))
+                  (clipboard-paste "temp"))
+                 ((literal-around root lan p)
+                  ;; in a string: its closing quote is typed over
+                  (if (and (== lb rb) (== next lb))
+                      (move-to ctx (list (car p) (+ (cadr p) 1)))
+                      (insert lb)))
+                 ((word-char? next) (insert lb))
+                 (else (insert-go-to (string-append lb rb) '(1))))
+           #t))))
+
+(define-public (syntax-bracket-close lb rb)
+  ;; type the closing bracket rb; #f when the code has no syntax tree
+  (let ((c (cursor-code)))
+    (and c
+         (let* ((ctx (car c)) (lan (cadr c)) (root (cadr ctx)) (p (cddr ctx)))
+           (if (and (== (char-at root p) rb)
+                    (not (literal-around root lan p))
+                    (syntax-matching-bracket root lan p))
+               (move-to ctx (list (car p) (+ (cadr p) 1)))
+               (insert rb))
+           #t))))
+
+(define (quote-pair root lan p)
+  ;; when a string starts or ends with the quote at p: (start end) of it
+  (let ((n (list-find (syntax-region-node-range root lan (car p) (cadr p)
+                                                (car p) (+ (cadr p) 1))
+                      (lambda (n) (and (string-contains? (node-type n) "string")
+                                       (or (== (node-start n) p)
+                                           (== (node-end n)
+                                               (list (car p) (+ (cadr p) 1)))))))))
+    (and n (list (node-start n) (node-end n)))))
+
+(define (pair-at root lan p)
+  ;; the pair of brackets or quotes of which the character at p is one:
+  ;; (start end) from the opening one to after the closing one, or #f
+  (let ((q (syntax-matching-bracket root lan p)))
+    (if q
+        (let ((a (if (point<? p q) p q)) (b (if (point<? p q) q p)))
+          (list a (list (car b) (+ (cadr b) 1))))
+        (quote-pair root lan p))))
+
+(define (delete-pair ctx root lan p)
+  ;; delete or select the pair of the character at p; whether there was one
+  (let ((pair (pair-at root lan p)))
+    (and pair
+         (let ((a (car pair)) (b (cadr pair)))
+           (if (and (== (car a) (car b)) (== (+ (cadr a) 2) (cadr b)))
+               ;; empty: both go
+               (begin
+                 (tree-remove! (tree-ref root (car a)) (cadr a) 2)
+                 (move-to ctx a))
+               (selection-set (context-path ctx a) (context-path ctx b)))
+           #t))))
+
+(define-public (syntax-delete-bracket forward?)
+  ;; Backspace (or Delete when forward?) on a bracket or quote of the code:
+  ;; #f when there is none there (the usual deletion then applies)
+  (let ((c (cursor-code)))
+    (and c (not (selection-active-any?))
+         (let* ((ctx (car c)) (lan (cadr c)) (root (cadr ctx)) (p (cddr ctx))
+                (q (if forward? p (list (car p) (- (cadr p) 1)))))
+           (and (>= (cadr q) 0)
+                (tree-is? root 'document)
+                (delete-pair ctx root lan q))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Inputs of sessions
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
