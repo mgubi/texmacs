@@ -20,7 +20,7 @@
 
 (tm-define (program-compute-indentation doc row col)
   (:mode in-prog-dot?)
-  (get-tabstop))
+  (program-indent-step))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Automatic insertion, highlighting and selection of brackets and quotes

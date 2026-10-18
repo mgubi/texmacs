@@ -93,9 +93,51 @@
         (check-true (in? '(associate "source-encoding" "iso-8859-1")
                          (cdadr init)))))))
 
+(define (in-file name text proc)
+  ;; @proc called in a buffer of @text, the file @name
+  (let* ((u (url-append dir name))
+         (old (current-buffer)))
+    (string-save text u)
+    (when (buffer-exists? u) (buffer-close u))
+    (load-buffer u)
+    (proc)
+    (buffer-close u)
+    (when (buffer-exists? old) (switch-to-buffer old))))
+
+(define (test-indentation)
+  (check-group "indentation")
+  ;; (loaded here, not with this module: check-master loads all the tests
+  ;; in each suite, and the keys of programs must not be there for the
+  ;; tests of mathematics, see kbd-menu-test.scm)
+  (use-modules (prog prog-edit))
+  ;; a file indented by tabs: tabs at stops of 8 columns (the preference)
+  (in-file "e.cpp" (string-append "int f () {\n" tab "return 1;\n}\n")
+    (lambda ()
+      (check= (get-init "source-indent") "tabs")
+      (check= (program-tab-width) 8)
+      (check-true (program-indent-tabs?))
+      (check= (string-get-indent "<#9>  x") 10)
+      (check= (string-get-indent "  <#9>x") 8)
+      (check= (string-indent-end "<#9>  x") 6)
+      (check= (string-column "a<#9>b" 5) 8)
+      (check= (string-set-indent "  x" 12) "<#9>    x")
+      (check= (string-set-indent "<#9><#9>x" 0) "x")))
+  ;; (one level of indentation is a tab there: Return after a line of
+  ;; Python which ends by a colon adds one, which needs the mode of the
+  ;; cursor, which is not known here: it was checked in a window)
+  (in-file "g.py" (string-append "def f():\n" tab "y\n")
+    (lambda () (check= (program-indent-step) 8)))
+  ;; a file indented by spaces
+  (in-file "f.cpp" "int f () {\n    return 1;\n}\n"
+    (lambda ()
+      (check= (get-init "source-indent") "spaces")
+      (check-false (program-indent-tabs?))
+      (check= (string-set-indent "<#9>x" 4) "    x"))))
+
 (tm-define (source-files-test-failures)
   (check-suite "source-files")
   (system-mkdir dir)
   (test-round-trips)
   (test-lines)
+  (test-indentation)
   (check-end))

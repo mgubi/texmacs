@@ -529,6 +529,7 @@
 "cpp-verbatim-snippet->texmacs"
 "cpp-verbatim->texmacs"
 "cpp-source->texmacs"
+"cpp-source-snippet->texmacs"
 "parse-latex"
 "parse-latex-document"
 "latex->texmacs"

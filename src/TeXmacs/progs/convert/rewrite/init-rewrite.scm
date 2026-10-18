@@ -90,7 +90,8 @@
   (cpp-source->texmacs x))
 
 (tm-define (code-snippet->texmacs x . opts)
-  (verbatim-snippet->texmacs x (acons "verbatim->texmacs:encoding" "SourceCode" '())))
+  ;; (its tabs are kept, as in a source file)
+  (cpp-source-snippet->texmacs x))
 
 (converter texmacs-tree code-document
   (:function texmacs->code))

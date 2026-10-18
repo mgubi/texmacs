@@ -123,6 +123,12 @@
 
 (define-preferences
   ("profile" "beginner" (lambda args (noop)))
+  ;; the columns between the tab stops of source files, when they are
+  ;; opened (prog-tab-width), and the indentation of the new lines of the
+  ;; files which have none yet (a file indented by tabs or by spaces keeps
+  ;; its own, source-indent: prog-edit.scm)
+  ("editor:code tab width" "8" noop)
+  ("editor:code indent" "spaces" noop)
   ("look and feel" "default" notify-look-and-feel)
   ("case sensitive shortcuts" "default" noop)
   ("detailed menus" "detailed" noop)

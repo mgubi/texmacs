@@ -248,14 +248,53 @@
                  `(replace "Wrong tabstop: %1" ,tabstop*) "User preferences")
                 8))))
 
+(tm-define (program-tab-width)
+  (:synopsis "the columns between the tab stops of the program")
+  (with w (string->number (get-env "prog-tab-width"))
+    (if (and w (> w 0)) w 8)))
+
+(tm-define (program-indent-tabs?)
+  (:synopsis "are the lines of the program indented by tabs?")
+  ;; (as its lines are, else as a language wants, else as preferred)
+  (with st (get-init "source-indent")
+    (cond ((== st "tabs") #t)
+          ((== st "spaces") #f)
+          ((in? (get-env "prog-language") '("go" "makefile")) #t)
+          (else (== (get-preference "editor:code indent") "tabs")))))
+
+(tm-define (program-indent-step)
+  (:synopsis "the columns of one level of indentation")
+  ;; (a tab where the lines are indented by tabs)
+  (if (program-indent-tabs?) (program-tab-width) (get-tabstop)))
+
+(define (blank? c)
+  (or (== c " ") (== c "<#9>")))
+
+(tm-define (string-column s offset)
+  (:synopsis "the column of the place at @offset of @s (tabs at their stops)")
+  (let ((tw (program-tab-width)))
+    (let loop ((l (tmstring->list (substring s 0 (min offset
+                                                      (string-length s)))))
+               (col 0))
+      (cond ((null? l) col)
+            ((== (car l) "<#9>") (loop (cdr l) (+ col (- tw (remainder col tw)))))
+            (else (loop (cdr l) (+ col 1)))))))
+
 (tm-define (insert-tabstop)
-  (with w (get-tabstop)
-    (with fill (- w (remainder (cAr (cursor-path)) w))
-      (if (> fill 0) (insert (make-string fill #\space))))))
+  ;; (a tab where the lines are indented by tabs, else spaces up to the
+  ;; next tab stop, from the column of the cursor)
+  (if (program-indent-tabs?) (insert "<#9>")
+      (let* ((w (get-tabstop))
+             (t (cursor-tree))
+             (col (if (tree-atomic? t)
+                      (string-column (tree->string t) (cAr (cursor-path)))
+                      (cAr (cursor-path))))
+             (fill (- w (remainder col w))))
+        (if (> fill 0) (insert (make-string fill #\space))))))
 
 ;;HACK: should rewrite program-indent-line to accept unindent
 (tm-define (remove-tabstop)
-  (with w (get-tabstop)
+  (with w (program-indent-step)
     (with c (program-get-indent)
       (if (>= c w) (program-set-indent (- c w))))))
 
@@ -263,15 +302,27 @@
 ;; Automatic indentation
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(tm-define (string-indent-end s)
+  (:synopsis "the offset in @s of its first character which is not blank")
+  (let loop ((l (tmstring->list s)) (pos 0))
+    (if (and (nnull? l) (blank? (car l)))
+        (loop (cdr l) (+ pos (string-length (car l))))
+        pos)))
+
 (tm-define (string-get-indent s)
-  (:synopsis "get the indentation of @s")
-  (with pos (list-find-index (string->list s) char-non-space?)
-    (or pos (string-length s))))
+  (:synopsis "get the indentation of @s (a column: tabs at their stops)")
+  (string-column s (string-indent-end s)))
 
 (tm-define (string-set-indent s i)
-  (:synopsis "set the indentation of @s to @i spaces")
-  (let* ((l (make-string i #\space))
-         (r (substring s (string-get-indent s) (string-length s))))
+  (:synopsis "set the indentation of @s to the column @i")
+  ;; (by tabs then spaces, or by spaces, as the program is indented)
+  (let* ((tw (program-tab-width))
+         (l (if (program-indent-tabs?)
+                (string-append (apply string-append
+                                      (make-list (quotient i tw) "<#9>"))
+                               (make-string (remainder i tw) #\space))
+                (make-string i #\space)))
+         (r (substring s (string-indent-end s) (string-length s))))
     (string-append l r)))
 
 (tm-define (program-get-indent)
@@ -291,11 +342,12 @@
 
 (tm-define (program-indent-line doc row unindent?)
   ; TODO: implement unindent for general languages
+  ;; (the offset of the end of the indentation, where the cursor goes)
   (let* ((i (program-compute-indentation doc row -1))
          (t (tree-ref doc row)))
     ; HACK: I should change program-set-indent to accept line numbers
     (tree-set t (string-set-indent (tree->string t) i))
-    i))
+    (string-indent-end (tree->string (tree-ref doc row)))))
 
 (tm-define (program-indent-all unindent?)
   (:synopsis "indent a whole program")

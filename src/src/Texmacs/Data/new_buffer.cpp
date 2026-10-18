@@ -18,6 +18,7 @@
 #include "dictionary.hpp"
 #include "new_document.hpp"
 #include "merge_sort.hpp"
+#include "scheme.hpp"
 
 array<tm_buffer> bufs;
 
@@ -433,6 +434,8 @@ attach_subformat (tree t, url u, string fm) {
   hashmap<string,tree> h (UNINIT, extract (t, "initial"));
   h (MODE)= "prog";
   h (PROG_LANGUAGE)= fm;
+  // the columns between the tab stops of source files (a preference)
+  h (PROG_TAB_WIDTH)= get_preference ("editor:code tab width", "8");
   tree t2= change_doc_attr (t, "initial", make_collection (h));
   return change_doc_attr (t2, "style", tree ("code"));
 }

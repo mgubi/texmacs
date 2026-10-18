@@ -20,5 +20,5 @@
 
 (tm-define (program-compute-indentation doc row col)
   (:mode in-prog-java?)
-  (get-tabstop))
+  (program-indent-step))
 
