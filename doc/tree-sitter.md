@@ -1194,6 +1194,14 @@ installed, and the old behaviour stays elsewhere.
 - User documentation: `doc/main/editing/man-program-code.en.tm` (Editing
   program code, in Editing tools), and Program coloring by syntax trees in
   the preferences (Other).
+- **Checking and updating the grammars**: `misc/tree-sitter/check-grammars.py
+  REPOS [LANGUAGE...]` compares each grammar with its clone in REPOS (the
+  commit of SOURCE, whether its grammar.json is ours), then runs its corpus
+  (corpus.py) and the captures of its test/highlight files (highlights.py).
+  `--update LANGUAGE` copies the grammar.json of the clone and records its
+  commit; then `ship-tables.sh LANGUAGE`, the checks again, and the treesit
+  suite. The queries are updated by hand (some are ours or patched, see
+  SOURCE).
 - A pitfall of the tests: the suites run in one TeXmacs, and a key typed
   in program code loads the keyboard of programs and its modules, which
   changed the highlighting of Fortran and the entering of mathematics in
