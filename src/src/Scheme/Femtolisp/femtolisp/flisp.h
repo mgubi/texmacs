@@ -37,10 +37,10 @@ typedef struct _symbol_t {
     // below fields are private
     struct _symbol_t *left;
     struct _symbol_t *right;
-    union {
-        char name[1];
-        void *_pad;    // ensure field aligned to pointer size
-    };
+    // TeXmacs, from Julia's femtolisp: a flexible array, as the name is
+    // longer than the field (strcpy into char name[1] aborts with
+    // _FORTIFY_SOURCE)
+    char name[] __attribute__((aligned(sizeof(void*))));
 } symbol_t;
 
 typedef struct {
@@ -63,7 +63,8 @@ typedef struct {
 #define tag(x) ((x)&0x7)
 #define ptr(x) ((void*)((x)&(~(value_t)0x7)))
 #define tagptr(p,t) (((value_t)(p)) | (t))
-#define fixnum(x) ((value_t)(((fixnum_t)(x))<<2))
+// TeXmacs: shifted unsigned (a left shift of a negative value is undefined)
+#define fixnum(x) ((value_t)(((uptrint_t)(x))<<2))
 #define numval(x)  (((fixnum_t)(x))>>2)
 #ifdef BITS64
 #define fits_fixnum(x) (((x)>>61) == 0 || (~((x)>>61)) == 0)
