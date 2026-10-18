@@ -102,6 +102,10 @@ The patches
 0030  tables: the finalizers of small tables are neither lost nor missing
       (a leak at each table made during a collection)
       (0028-0030 come from Julia's femtolisp, src/flisp of JuliaLang/julia)
+0031  undefined behaviour (from Julia's femtolisp): symbol names as flexible
+      arrays (_FORTIFY_SOURCE), unaligned bytecode operands read with
+      memcpy, unsigned shift in fixnum, keyword test of an empty name
+0032  for-each is a builtin in C (several lists stop at the shortest)
 
 fl_core.c also binds vector-ref, vector-set!, vector-length, char->integer
 and integer->char as constants to the builtins aref, aset!, length, fixnum
