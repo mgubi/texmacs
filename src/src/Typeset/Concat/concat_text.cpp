@@ -176,6 +176,61 @@ concater_rep::typeset_math_string (tree t, path ip, int pos, int end) {
   } while (pos<end);
 }
 
+/******************************************************************************
+* Tabs of source files
+******************************************************************************/
+
+// A tab of a source file is the character <#9> of its line (see
+// source_document_to_tree). In a program, it goes to the next tab stop,
+// every prog-tab-width columns, a column being a character (the font of
+// programs is monospaced). It is shown as a light arrow at the start of
+// its gap, a box with a decorated path; the cursor is at its ends, which
+// are empty boxes, as for the spaces.
+
+static int
+prog_column (string s, int from, int to, int col, int tw) {
+  // the column after s(from,to), which starts at the column col
+  int i= from;
+  while (i < to) {
+    if (is_source_tab (s, i)) { col += tw - col % tw; i += 4; }
+    else { tm_char_forwards (s, i); col++; }
+  }
+  return col;
+}
+
+void
+concater_rep::typeset_prog_tab (path ip, int pos, int& col, int tw) {
+  // the tab at pos, from the column col (which is then the one after it)
+  int n= tw - col % tw;
+  col += n;
+  SI  w= n * env->fn->spc->def;
+  typeset_substring ("", ip, pos);
+  color c = named_color ("#c8c8c8", env->alpha);
+  box   tb= text_box (decorate (ip), 0, "<rightarrow>", env->fn, c);
+  box   rb= resize_box (decorate (ip), tb, 0, tb->y1, w, tb->y2);
+  a << line_item (STD_ITEM, OP_SKIP, rb, HYPH_INVALID);
+  typeset_substring ("", ip, pos + 4);
+}
+
+void
+concater_rep::typeset_prog_piece (string s, path ip, int start, int end,
+                                  string col, int& column, int tw) {
+  // s(start,end), in the colour col, with its tabs at their stops
+  int i= start;
+  while (i < end) {
+    if (is_source_tab (s, i)) {
+      typeset_prog_tab (ip, i, column, tw);
+      i += 4;
+      continue;
+    }
+    int j= i;
+    while (j < end && !is_source_tab (s, j)) j++;
+    typeset_colored_substring (s (i, j), ip, i, col);
+    column= prog_column (s, i, j, column, tw);
+    i= j;
+  }
+}
+
 void
 concater_rep::typeset_prog_string (tree t, path ip, int pos, int end) {
   // (a line which a language server has decorated: see below)
@@ -185,6 +240,11 @@ concater_rep::typeset_prog_string (tree t, path ip, int pos, int end) {
   array<space> spc_tab= env->fn->get_normal_spacing (env->spacing_policy);
   string s= t->label;
   int    start;
+  // (the column of each tab is that of the line, also from the middle of
+  // the line, which the range primitive typesets)
+  bool tabs  = search_forwards ("<#9>", s) >= 0;
+  int  tw    = (tabs? max (1, env->get_int (PROG_TAB_WIDTH)): 8);
+  int  column= (tabs? prog_column (s, 0, pos, 0, tw): 0);
 
   do {
     start= pos;
@@ -197,7 +257,10 @@ concater_rep::typeset_prog_string (tree t, path ip, int pos, int end) {
       PRINT_SPACE (tp->spc_after);
       if ((pos==end) || (s[pos]==' '))
         typeset_substring ("", ip, pos);
+      column++;
     }
+    else if (tabs && pos-start == 4 && is_source_tab (s, start)) // a tab
+      typeset_prog_tab (ip, start, column, tw);
     else { // strings
       penalty_max (tp->pen_before);
       PRINT_SPACE (tp->spc_before)
@@ -205,7 +268,8 @@ concater_rep::typeset_prog_string (tree t, path ip, int pos, int end) {
       string content= s (start, pos);
       // cout << "[" << start << "," << pos << ") "
       //      << content << " (" << color << ")" << LF;
-      typeset_colored_substring (content, ip, start, color);
+      if (tabs) typeset_prog_piece (s, ip, start, pos, color, column, tw);
+      else typeset_colored_substring (content, ip, start, color);
       penalty_min (tp->pen_after);
       PRINT_SPACE (tp->spc_after)
     }

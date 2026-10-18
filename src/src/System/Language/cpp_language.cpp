@@ -32,6 +32,10 @@ cpp_language_rep::advance (tree t, int& pos) {
     pos++;
     return &tp_space_rep;
   }
+  if (is_source_tab (s, pos)) {
+    pos += 4;
+    return &tp_space_rep;
+  }
   if (c >= '0' && c <= '9') {
     parse_number (s, pos);
     return &tp_normal_rep;

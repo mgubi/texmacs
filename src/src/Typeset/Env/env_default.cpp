@@ -118,6 +118,7 @@ initialize_default_env () {
   env (PROG_FONT_FAMILY) = "tt";        // the font family in prog mode
   env (PROG_FONT_SERIES) = "medium";    // the font series in prog mode
   env (PROG_FONT_SHAPE)  = "right";     // the font shape in prog mode
+  env (PROG_TAB_WIDTH)   = "8";         // the columns between tab stops
   env (PROG_SESSION)     = "default";   // computer algebra session name
 
   env (KEYWORD_COLOR)     = "#8020c0";   // syntax highlight color for keywords
