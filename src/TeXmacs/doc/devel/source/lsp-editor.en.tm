@@ -265,8 +265,9 @@
   <scm|:idle 300>), <scm|lsp-highlight-at-cursor> sends the changes which
   wait (<scm|lsp-sync-pending>), asks for
   <verbatim|textDocument/documentHighlight> (the previous request is
-  cancelled) and, if the cursor has not moved, sets the alternative
-  selection <verbatim|lsp-highlights>, which
+  cancelled) and, if the cursor has not moved and the buffer has not
+  changed (a count of the changes: an edit may leave the cursor in place),
+  sets the alternative selection <verbatim|lsp-highlights>, which
   <source-link|edit_interface.cpp|src/Edit/Interface/edit_interface.cpp>
   draws as the matches of a search (with <verbatim|alternate> and
   <verbatim|brackets>). The highlights are cleared when the cursor leaves
@@ -305,13 +306,14 @@
   new one yet in <scm|notify-cursor-moved>), which keeps the last place of
   the cursor outside the folds. A cursor in a hidden line belongs to the
   outermost fold which hides it (<verbatim|hiding-fold>, whose first line
-  is shown). It skips the fold only when it comes from its first line into
-  its first hidden line (it goes to the line after the fold, in the same
-  column if it can) or from the line after the fold into its last hidden
-  line (it goes to the first line of the fold, at its end if it came from
-  the start of the line). Any other move into the fold (a search, a jump to
-  a definition or a diagnostic) opens it, with the folds in it which hide
-  the line.
+  is shown). It skips the fold only when it moves right from the end of
+  the first line of the fold into the start of its first hidden line (it
+  goes to the start of the line after the fold) or left from the start of
+  the line after the fold into the end of its last hidden line (it goes to
+  the end of the first line of the fold): the arrows. Up and down go over
+  the lines which have no boxes by themselves. Any other move into the
+  fold (a search, a jump to a definition or a diagnostic) opens it, with
+  the folds in it which hide the line.
 
   <section|Colours and inlay hints>
 
@@ -339,9 +341,9 @@
   and typesets those lines again (<scm|update-path>; the whole buffer
   beyond 2000 lines). Its table <verbatim|decorated> keeps, for each
   decorated line of a buffer, the tree of the line, its text then and its
-  decorations. A line which has moved (a line was inserted or removed
-  above it) and keeps its tree, its text and its decorations is not given
-  again nor typeset again; a line which was edited (the same tree, another
+  decorations. A line which has moved (lines were inserted or removed
+  above it: its place now is that of its tree) and keeps its tree, its
+  text and its decorations is not given again nor typeset again; a line which was edited (the same tree, another
   text) is given again. The lines which have no decorations any more, and
   those which were removed from the document, lose theirs. Keeping the
   trees also keeps the lines which were removed from being freed while
@@ -364,7 +366,9 @@
 
   <scm|lsp-client-ended> is redefined to say on the status bar that the
   server has ended. <scm|lsp-restart> stops the client of the buffer if it
-  runs, forgets its entry, empties <verbatim|followed> and synchronizes the
+  runs, forgets its entry, empties <verbatim|followed> and the caches of
+  the servers of the buffers, of their commands and of the projects (a
+  project may have been made since, a server added), and synchronizes the
   buffer, which starts a new server; all the open buffers are then
   followed again (<verbatim|follow-all>), so that the other files of the
   project reach the new server too. <scm|lsp-stop-servers> calls
@@ -431,8 +435,12 @@
   with a message) when <scm|lsp-workspace-edit-stale?> holds, that is when
   a <verbatim|TextDocumentEdit> is for another version of its document than
   the one which the client gave, or when the buffer of that document has
-  changed since its text was given to the server. The client
-  declares these abilities in
+  changed since its text was given to the server. Such an edit may also
+  come while the editor waits for the answer to a format or a rename
+  (<scm|lsp-request-wait> dispatches the messages of the servers): the
+  edits of the servers are counted (<verbatim|server-edits>), and an
+  answer which came after one is not applied (\Pthe file has changed
+  meanwhile\Q). The client declares these abilities in
   <verbatim|initialize> (code action literals, label offsets of the
   parameters, <verbatim|applyEdit>, document changes), else
   <name|clangd> proposes commands instead of edits.

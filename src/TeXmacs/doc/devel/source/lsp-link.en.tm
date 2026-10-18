@@ -49,10 +49,11 @@
 
   <cpp|write (s, LINK_IN)> sends <cpp|lsp_frame (s)>, that is
   <verbatim|Content-Length: <em|n>\\r\\n\\r\\n> followed by <cpp|s>, to
-  the transport, and then drains it: what the server sent while it was
-  written to (<cpp|flush_input> reads the output of the child meanwhile)
-  is in the buffers of the pipe, whose notifier will not tell it again,
-  and would otherwise wait for the next notification.
+  the transport, and then drains it: what the server has sent is taken at
+  once (a <cpp|listen> of the pipe, as the one of each dispatch which
+  writes what is left of the input, reads the output of the child into the
+  buffers of the pipe, whose notifier will not tell it again, and it would
+  otherwise wait for the next notification).
   <cpp|drain> reads what the transport has received on <cpp|LINK_OUT> and
   <cpp|LINK_ERR>, and <cpp|parse> moves the whole messages from <cpp|buf>
   to <cpp|msgs>. Some servers print lines on their standard output by
@@ -89,7 +90,7 @@
   of the child is then non-blocking (<verbatim|O_NONBLOCK>), and a write
   appends to <cpp|inbuf> (from <cpp|inpos> on) what the child has not
   taken yet. <cpp|flush_input (msecs)> writes what the child takes, for at
-  most <cpp|msecs>, and reads its output meanwhile; <cpp|write> calls it
+  most <cpp|msecs>, and reads its output while it waits; <cpp|write> calls it
   with 0, that is it tries once without waiting, so that a child which
   reads no more costs no wait at each write. What is left is written by
   <cpp|listen>, whenever the pipe can take more: the virtual

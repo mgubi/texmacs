@@ -221,7 +221,10 @@
 
     <item*|<menu|Restart server>>Stops the server of the current file (if it
     runs) and starts it again; the files which are open are given to it
-    again. This also starts a server which has ended or which was stopped.
+    again. This also starts a server which has ended or which was stopped,
+    and looks again for the project of each file (after a
+    <verbatim|git init>, or once a <verbatim|compile_commands.json> has
+    been made).
 
     <item*|<menu|Server log>>Opens a page with what the server of the
     current file has written: its messages, the errors it printed and those

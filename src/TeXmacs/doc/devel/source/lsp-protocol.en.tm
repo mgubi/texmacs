@@ -77,10 +77,11 @@
   <scm|lsp-path-\<gtr\>uri> turns a system path into a
   <verbatim|file://> <abbr|URI>, encoding with <verbatim|%XX> every byte
   which is not a letter, a digit or one of <verbatim|-._~/:>; backslashes
-  become slashes. <scm|lsp-uri-\<gtr\>path> decodes, and removes the slash
-  before a drive letter (<verbatim|file:///c:/x> on <name|Windows>), which
-  it writes in capitals (<verbatim|c:> and <verbatim|C:> are the same
-  drive, and servers write either). It also accepts <verbatim|file:/x>,
+  become slashes, and a drive letter is written in capitals.
+  <scm|lsp-uri-\<gtr\>path> decodes, and removes the slash before a drive
+  letter (<verbatim|file:///c:/x> on <name|Windows>), which it writes in
+  capitals too (<verbatim|c:> and <verbatim|C:> are the same drive, and
+  servers write either: both directions give the same form). It also accepts <verbatim|file:/x>,
   without the authority, as the same file as <verbatim|file:///x>, and
   keeps a <verbatim|%> which is not followed by two hexadecimal digits as
   it is.
