@@ -30,6 +30,7 @@ array<string> http_mask_headers (array<string> headers_attr);
 tree http_mask_request (tree t);
 string shell_quote (string s);
 string curl_command (string args, array<string> headers_attr);
+string curl_post_command (string address, array<string> headers_attr, string data);
 
 // HTTP requests
 #if defined(QTTEXMACS) && AC_QT_MAJOR_VERSION >= 6

@@ -360,10 +360,8 @@ to_shell_command (tree t) {
       && is_tuple (t[1])) {    
     string url; tree data; array<string> headers;
     get_post_data (url, headers, data, t);
-    string args= "--silent --no-buffer" * curl_proxy_option (url) *
-      " -X POST " * shell_quote (url) * " \\\n";
-    args << "  --data-binary " << shell_quote (tree_to_json (data));
-    return curl_command (args, headers);
+    // (the data in a file, as the headers: curl_post_command)
+    return curl_post_command (url, headers, tree_to_json (data));
   }
   io_error << "as_shell_command, unknown command type: "
            << http_mask_request (t) << LF;

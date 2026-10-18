@@ -434,6 +434,28 @@ curl_command (string args, array<string> headers_attr) {
   return "{ rm -f " * f * "; curl -H @- " * args * "; } < " * f;
 }
 
+string
+curl_post_command (string address, array<string> headers_attr, string data) {
+  // Shell command for a POST of data with the curl program. The data go
+  // into a temporary file of mode 600, which curl reads (--data-binary
+  // @file) and which is removed once curl is done, with its status kept:
+  // on the command line, a request of more than 128 kB (an attached image,
+  // the document as context) failed on Linux, which takes no longer
+  // argument, and the question could be read by ps.
+  url tmp= url_temp (".txt");
+  if (save_private_string (tmp, data)) {
+    io_error << "curl_post_command, cannot write the data to "
+             << as_string (tmp) << LF;
+    return "";
+  }
+  string d= shell_quote (as_string (tmp));
+  string args= "--silent --no-buffer" * curl_proxy_option (address) *
+    " -X POST " * shell_quote (address) * " --data-binary @" * d;
+  string cmd= curl_command (args, headers_attr);
+  if (cmd == "") { remove (tmp); return ""; }
+  return "{ " * cmd * "; s=$?; rm -f " * d * "; exit $s; }";
+}
+
 /******************************************************************************
 * HTTP requests
 ******************************************************************************/
@@ -686,10 +708,9 @@ void http_async_cancel (string* outbuf) { async_eval_cancel (outbuf); }
 
 static string
 to_shell_command (string url, array<string> headers_attr, string data) {
-  string args= "--silent --no-buffer" * curl_proxy_option (url) *
-    " -X POST " * shell_quote (url) * " \\\n";
-  args << "  --data-binary " << shell_quote (data);
-  string cmd= curl_command (args, headers_attr);
+  // the headers (and the keys among them) and the data go into files, not
+  // onto the command line (curl_post_command)
+  string cmd= curl_post_command (url, headers_attr, data);
   if (DEBUG_IO)
     debug_io << "http_post, launching" << LF
 	     << cmd << LF;
