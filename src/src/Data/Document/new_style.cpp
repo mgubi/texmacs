@@ -27,6 +27,8 @@ struct style_data_rep {
   drd_info drd_void;
   hashmap<tree,hashmap<string,tree> > style_cached;
   hashmap<tree,drd_info> drd_cached;
+  // the files which a style reads, with their times (style_file_times)
+  hashmap<tree,tree> style_files;
 
   style_data_rep ():
     style_cache (hashmap<string,tree> (UNINIT)),
@@ -35,7 +37,8 @@ struct style_data_rep {
     style_void (UNINIT),
     drd_void ("void"),
     style_cached (style_void),
-    drd_cached (drd_void) {}
+    drd_cached (drd_void),
+    style_files (tree (TUPLE)) {}
 };
 
 static style_data_rep* sd= NULL;
@@ -71,6 +74,53 @@ preprocess_style (tree st, url name) {
   }
   //if (r != st) cout << "old: " << st << "\nnew: " << r << "\n";
   return r;
+}
+
+/******************************************************************************
+* The files which a style reads
+*
+* A style is computed by executing its packages (use-package), which read
+* the files of the packages they use in turn: while it is computed, the
+* files which are read are noted (style_note_file, by exec_use_package),
+* and kept with the style and its cache on disk, with their times. The
+* cache of a style is valid as long as none of them changed: before, a
+* style or a package changed outside TeXmacs (an update, another editor)
+* kept its old definitions until the cache was cleared by hand.
+******************************************************************************/
+
+static array<string>* style_reading= NULL; // the files of the style computed
+
+void
+style_note_file (url u) {
+  if (style_reading != NULL) *style_reading << as_string (u);
+}
+
+static tree
+style_file_times (array<string> files) {
+  tree r (TUPLE);
+  hashset<string> done;
+  for (int i=0; i<N(files); i++)
+    if (!done->contains (files[i])) {
+      done->insert (files[i]);
+      int t= last_modified (url_system (files[i]), false);
+      r << tuple (files[i], as_string (t));
+    }
+  return r;
+}
+
+static bool
+style_files_unchanged (tree files) {
+  // (no file: a cache made before the files were noted, made again)
+  if (!is_tuple (files) || N(files) == 0) return false;
+  for (int i=0; i<N(files); i++) {
+    tree f= files[i];
+    if (!is_tuple (f) || N(f) != 2) return false;
+    if (!is_atomic (f[0]) || !is_atomic (f[1])) return false;
+    // (not from the cache of stat: a file edited in place is not seen there)
+    int t= last_modified (url_system (f[0]->label), false);
+    if (as_string (t) != f[1]->label) return false;
+  }
+  return true;
 }
 
 /******************************************************************************
@@ -115,8 +165,11 @@ style_set_cache (tree style, hashmap<string,tree> H, tree t) {
   sd->style_cache (copy (style))= H;
   sd->style_drd   (copy (style))= t;
   url name ("$TEXMACS_HOME_PATH/system/cache", cache_file_name (style));
-  if (!exists (name)) {
-    save_string (name, tree_to_scheme (tuple ((tree) H, t)));
+  // with the files which the style read and their times (the file on
+  // disk may be one which was found out of date: it is replaced)
+  if (sd->style_files->contains (style)) {
+    tree files= sd->style_files [style];
+    save_string (name, tree_to_scheme (tuple ((tree) H, t, files)));
     // cout << "saved " << name << LF;
   }
 }
@@ -137,11 +190,15 @@ style_get_cache (tree style, hashmap<string,tree>& H, tree& t, bool& f) {
     if (exists (name) && (!load_string (name, s, false))) {
       //cout << "loaded " << name << LF;
       tree p= scheme_to_tree (s);
-      H= hashmap<string,tree> (UNINIT, p[0]);
-      t= p[1];
-      sd->style_cache (copy (style))= H;
-      sd->style_drd   (copy (style))= t;
-      f= true;
+      // (computed again when a file which the style read has changed)
+      if (is_tuple (p) && N(p) >= 3 && style_files_unchanged (p[2])) {
+        H= hashmap<string,tree> (UNINIT, p[0]);
+        t= p[1];
+        sd->style_cache (copy (style))= H;
+        sd->style_drd   (copy (style))= t;
+        sd->style_files (copy (style))= p[2];
+        f= true;
+      }
     }
   }
 }
@@ -182,7 +239,14 @@ compute_env_and_drd (tree style) {
       drd->set_environment (H);
     }
     if (!ok) {
+      // (the files which are read, for the cache: see style_note_file)
+      array<string> files;
+      array<string>* outer= style_reading;
+      style_reading= &files;
       env->exec (tree (USE_PACKAGE, A (style)));
+      style_reading= outer;
+      if (outer != NULL) *outer << files;
+      sd->style_files (copy (style))= style_file_times (files);
       env->read_env (H);
       drd->heuristic_init (H);
     }

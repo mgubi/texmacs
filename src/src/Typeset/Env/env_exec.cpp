@@ -19,6 +19,7 @@
 #include "typesetter.hpp"
 #include "drd_mode.hpp"
 #include "dictionary.hpp"
+#include "new_style.hpp"
 #include "blackbox.hpp"
 #include "iterator.hpp"
 
@@ -1235,6 +1236,8 @@ edit_env_rep::exec_use_package (tree t) {
     else name= styp * (as_string (t[i]) * string (".ts"));
     name= resolve (name);
     //cout << as_string (t[i]) << " -> " << name << "\n";
+    // (for the cache of the style which is computed, see new_style.cpp)
+    if (!is_none (name)) style_note_file (name);
     string doc_s;
     if (!load_string (name, doc_s, false)) {
       tree doc= texmacs_document_to_tree (doc_s);
