@@ -99,7 +99,7 @@
 ;; Shipped tables
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;; The tables of the grammars are shipped (1.4 MB; generating them all takes
+;; The tables of the grammars are shipped (1.6 MB for 22 grammars; generating them all takes
 ;; more than a minute at the first start, Lean alone a minute and gigabytes),
 ;; compressed by xz, as misc/tree-sitter/<lan>/<name of the cache file>.xz:
 ;; the name holds the hash of the grammar and of the generator, so tables
