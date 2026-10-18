@@ -261,6 +261,11 @@
             '(0 1 2 4 5))
     (check= (map (lambda (ch) (lsp-character->offset line ch)) '(0 1 2 3 4 5 9))
             '(0 1 2 2 10 11 11)))
+  ;; (the lines of one byte for each character, and the others)
+  (check= (map (lambda (ch) (lsp-character->offset "abc" ch)) '(-1 0 2 9))
+          '(0 0 2 3))
+  (check= (map (lambda (ch) (lsp-character->offset "a<less>b" ch)) '(1 2 3))
+          '(1 7 8))
   (check= (lsp-lines '(document "int x;" "" "}")) '("int x;" "" "}"))
   (check= (lsp-lines->text (list "a" e-acute "")) (string-append "a\n"
                                                     (cork->utf8 e-acute) "\n"))
@@ -281,7 +286,12 @@
   (check= (lsp-path->uri (string-append "/tmp/caf" (cork->utf8 e-acute)))
           "file:///tmp/caf%C3%A9")
   (check= (lsp-uri->path "file:///tmp/a%20b/c.cpp") "/tmp/a b/c.cpp")
-  (check= (lsp-uri->path "file:///c:/x/y.py") "c:/x/y.py")
+  ;; (a drive is written in capitals, as servers write it otherwise)
+  (check= (lsp-uri->path "file:///c:/x/y.py") "C:/x/y.py")
+  (check= (lsp-uri->path "file:///c%3A/x/y.py") "C:/x/y.py")
+  (check= (lsp-uri-key "file:///c%3A/x/y.py") (lsp-path->uri "C:/x/y.py"))
+  (check= (lsp-uri->path "file:/tmp/x.c") "/tmp/x.c")
+  (check= (lsp-uri->path "file:///a%+1b") "/a%+1b")
   (check= (lsp-uri->path "untitled:1") #f))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -499,6 +509,58 @@
     (check= (cadr (cadr (car d)))
             (list (list (+ 3 (string-length e-acute)) "x:")))))
 
+(define (test-protocol-points)
+  (check-group "capabilities, versions, cancels")
+  ;; a capability which a server gives as false: it has not
+  (with c (fake-client)
+    (lsp-client-initialize c "/tmp/project")
+    (feed c (answer-to 1 (lsp-object "capabilities"
+                                     (lsp-object "hoverProvider"
+                                                 (lsp-boolean #t)
+                                                 "renameProvider"
+                                                 (lsp-boolean #f)))))
+    (check-true (lsp-client-capable? c "hoverProvider"))
+    (check-false (lsp-client-capable? c "renameProvider"))
+    (check-false (lsp-client-capable? c "definitionProvider")))
+  ;; a request which is cancelled before the server is initialized is not
+  ;; sent at all
+  (with c (fake-client)
+    (lsp-client-initialize c "/tmp/project")
+    (with id (lsp-request c "textDocument/hover" #f ignore)
+      (lsp-cancel c id))
+    (check= (lsp-client-ref c 'queue) '())
+    (feed c (answer-to 1 (lsp-object "capabilities" (lsp-object))))
+    (check= (sent-methods) '("initialize" "initialized")))
+  ;; the diagnostics of an older version of a text are left
+  (with c (running-client (lsp-number 1))
+    (lsp-document-open c "file:///tmp/v.c" "c" "int a;")
+    (lsp-document-change c "file:///tmp/v.c" "int b;")
+    (with pub (lambda (v n)
+                (feed c (lsp-object "jsonrpc" "2.0"
+                                    "method" "textDocument/publishDiagnostics"
+                                    "params" (lsp-object
+                                              "uri" "file:///tmp/v.c"
+                                              "version" (lsp-number v)
+                                              "diagnostics"
+                                              (lsp-list->array
+                                               (make-list n (lsp-object
+                                                             "message" "m")))))))
+      (pub 1 3)
+      (check= (lsp-diagnostics "file:///tmp/v.c") '())
+      (pub 2 2)
+      (check= (length (lsp-diagnostics "file:///tmp/v.c")) 2))
+    ;; the edits for an older version are refused
+    (with w (lambda (v)
+              (lsp-object "documentChanges"
+                          (lsp-array
+                           (lsp-object "textDocument"
+                                       (lsp-object "uri" "file:///tmp/v.c"
+                                                   "version" (lsp-number v))
+                                       "edits" (lsp-array)))))
+      (check-true (lsp-workspace-edit-stale? c (w 1)))
+      (check-false (lsp-workspace-edit-stale? c (w 2))))
+    (lsp-client-kill c)))
+
 (define (test-requests)
   (check-group "requests")
   (let* ((c (running-client (lsp-number 1)))
@@ -694,6 +756,7 @@
       (go-to-path (append (buffer-path) '(1 9)))
       (check= (lsp-cursor-position)
               '(attr "line" (json-number "1") "character" (json-number "9")))
+      (test-lines-of-buffer u)
       (when (url-exists-in-path? "clangd")
         (test-clangd path)
         (test-editor)
@@ -701,6 +764,44 @@
       (buffer-close u)
       (when (buffer-exists? old) (switch-to-buffer old))))
   (system-rmdir-recursive (system->url lsp-dir)))
+
+(define (test-lines-of-buffer u)
+  ;; the decorations and the folds of the lines of @u, without a server
+  ;; (its text is given back at the end)
+  (check-group "decorations and folds of lines")
+  (let* ((body (buffer-get-body u))
+         (saved (tree->stree body))
+         (uri (lsp-buffer-uri))
+         (red (lambda (l) (list l (list '((0 3 "red")) '())))))
+    (check= (lsp-apply-decorations u uri (list (red 0))) 1)
+    (check= (lsp-decorations uri) '((0 ((0 3 "red")) ())))
+    (check= (lsp-apply-decorations u uri (list (red 0))) 0)
+    ;; a line which is edited is decorated again, with the same colours
+    (tree-insert! (tree-ref body 0) 0 "x")
+    (check= (lsp-apply-decorations u uri (list (red 0))) 1)
+    ;; a line which moves keeps its decorations
+    (tree-insert! body 0 '("// a"))
+    (check= (lsp-apply-decorations u uri (list (red 1))) 0)
+    ;; a line which is removed loses them
+    (tree-remove! body 1 1)
+    (check= (lsp-apply-decorations u uri '()) 0)
+    (check= (lsp-decorations uri) '())
+    (tree-assign! body (stree->tree saved))
+    ;; a fold in a fold: when the outer one goes (its first line is
+    ;; replaced), the inner one stays folded
+    (lsp-fold-block 1 2)
+    (lsp-fold-block 0 2)
+    (check= (lsp-folds) '((0 2) (1 2)))
+    (tree-remove! body 0 1)
+    (tree-insert! body 0 (list (car (cdr saved))))
+    (notify-buffer-changed (url->string u))
+    (check= (lsp-folds) '((1 2)))
+    (check-true (lsp-line-folded? (tree-ref body 2)))
+    (check-false (lsp-line-folded? (tree-ref body 1)))
+    (lsp-unfold-all)
+    (check= (lsp-folds) '())
+    (check-false (lsp-line-folded? (tree-ref body 2)))
+    (tree-assign! body (stree->tree saved))))
 
 (define (test-clangd path)
   (check-group "clangd")
@@ -984,6 +1085,26 @@
                            "int b" (string (integer->char 20)) ")"))
     ;; (the parts, for the focus bar)
     (check= (lsp-signature-parts sig) '("int f(int a, " "int b" ")")))
+  ;; offsets of a parameter in UTF-16 units; a name after the parenthesis
+  (let* ((label (string-append "f(" (cork->utf8 e-acute) ", int b)"))
+         (sig (lsp-object "signatures"
+                          (lsp-array (lsp-object "label" label
+                                                 "parameters"
+                                                 (lsp-array
+                                                  (lsp-object "label"
+                                                              (lsp-array
+                                                               (lsp-number 5)
+                                                               (lsp-number 10))))))
+                          "activeParameter" (lsp-number 0))))
+    (check= (lsp-signature-parts sig)
+            (list (string-append "f(" e-acute ", ") "int b" ")")))
+  (with sig (lsp-object "signatures"
+                        (lsp-array (lsp-object "label" "max(int x)"
+                                               "parameters"
+                                               (lsp-array
+                                                (lsp-object "label" "x"))))
+                        "activeParameter" (lsp-number 0))
+    (check= (lsp-signature-parts sig) '("max(int " "x" ")")))
   ;; the progress of the work of a server, while it lasts
   (with c (lsp-client-make "fake" ignore ignore ignore)
     (define (progress value)
@@ -1216,6 +1337,7 @@
   (test-decorations)
   (test-requests)
   (test-server-requests)
+  (test-protocol-points)
   (test-end)
   (when (not (or (os-mingw?) (os-win32?)))
     (test-ended))

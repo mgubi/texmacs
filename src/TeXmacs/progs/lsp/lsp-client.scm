@@ -104,6 +104,12 @@
   (in? (ahash-ref c 'state) '(new initializing running)))
 (tm-define (lsp-client-running? c) (== (ahash-ref c 'state) 'running))
 (tm-define (lsp-client-capabilities c) (ahash-ref c 'capabilities))
+
+(tm-define (lsp-client-capable? c capability)
+  (:synopsis "Whether the server of @c has the @capability (a *Provider)")
+  ;; (a server may give false for one it has not, as it may leave it out)
+  (with v (lsp-ref (lsp-client-capabilities c) capability)
+    (not (or (lsp-null? v) (== v '(json-boolean "false"))))))
 (tm-define (lsp-client-log c) (reverse (ahash-ref c 'log)))
 
 (define lsp-log-length 200)
@@ -177,7 +183,15 @@
   (:synopsis "Cancels the request @id: its handler will not be called")
   (when (ahash-ref (ahash-ref c 'pending) id)
     (ahash-remove! (ahash-ref c 'pending) id)
-    (lsp-notify c "$/cancelRequest" (lsp-object "id" (lsp-number id)))))
+    (with q (ahash-ref c 'queue)
+      (if (list-find q (lambda (m) (== (lsp-number-value (lsp-ref m "id")) id)))
+          ;; (not sent yet, the server is starting: it is not sent)
+          (ahash-set! c 'queue
+                      (list-filter q (lambda (m)
+                                       (!= (lsp-number-value (lsp-ref m "id"))
+                                           id))))
+          (lsp-notify c "$/cancelRequest"
+                      (lsp-object "id" (lsp-number id)))))))
 
 (tm-define (lsp-client-listen c msecs)
   ((ahash-ref c 'listen) msecs))
@@ -217,7 +231,8 @@
    (lsp-object
     "synchronization" (lsp-object "didSave" (lsp-boolean #t)
                                   "dynamicRegistration" (lsp-boolean #f))
-    "publishDiagnostics" (lsp-object "relatedInformation" (lsp-boolean #f))
+    "publishDiagnostics" (lsp-object "relatedInformation" (lsp-boolean #f)
+                                      "versionSupport" (lsp-boolean #t))
     "hover" (lsp-object "contentFormat" (lsp-array "plaintext" "markdown"))
     "completion" (lsp-object
                   "completionItem" (lsp-object "snippetSupport"

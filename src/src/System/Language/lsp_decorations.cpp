@@ -9,10 +9,13 @@
 ******************************************************************************/
 
 // The decorations are kept for the representation of the tree of a line
-// (its address, which is only compared: a line which is freed and whose
-// address is taken again by another one has another text, almost always,
-// and the text is checked). The lines which have none cost a lookup in an
-// empty table: the typesetting of the other documents does not change.
+// (its address, which is only compared). The Scheme programs keep the trees
+// of the lines which they decorate or fold, until they undecorate them
+// (lsp-decorate.scm, lsp-fold.scm): a line which is removed is not freed
+// meanwhile, and its address cannot be taken by a line made later; the
+// text of the line is checked too (a line which is edited keeps its tree).
+// The lines which have none cost a lookup in an empty table: the
+// typesetting of the other documents does not change.
 
 #include "lsp_decorations.hpp"
 #include "hashmap.hpp"

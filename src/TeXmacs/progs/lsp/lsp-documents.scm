@@ -62,6 +62,11 @@
   (with d (ahash-ref (lsp-client-ref c 'documents) uri)
     (and d (car d))))
 
+(tm-define (lsp-document-sent-text c uri)
+  (:synopsis "The text of @uri which @c was given last, or #f")
+  (with d (ahash-ref (lsp-client-ref c 'documents) uri)
+    (and d (cadr d))))
+
 (tm-define (lsp-document-open c uri lan-id text)
   (:synopsis "Opens the document @uri, in the language @lan-id, with @text")
   ;; (a document which is open already is changed)
@@ -230,6 +235,10 @@
   (with p (lsp-uri->path uri)
     (if p (lsp-path->uri p) uri)))
 
+(tm-define (lsp-uri-key uri)
+  (:synopsis "@uri written as the client writes it")
+  (uri-key uri))
+
 (tm-define (lsp-diagnostics uri)
   (:synopsis "The diagnostics last published for @uri")
   (or (ahash-ref diagnostics (uri-key uri)) '()))
@@ -274,10 +283,15 @@
   (lambda (c params)
     (with uri (lsp-ref params "uri")
       (when (string? uri)
-        (with key (uri-key uri)
-          (ahash-set! diagnostics key
-                      (lsp-items (lsp-ref params "diagnostics")))
-          (lsp-diagnostics-changed key))))))
+        (let* ((key (uri-key uri))
+               (v (lsp-number-value (lsp-ref params "version")))
+               (mine (lsp-document-version c key)))
+          ;; (those of an older text are left: those of the text which the
+          ;; server has now come after them)
+          (when (not (and v mine (< v mine)))
+            (ahash-set! diagnostics key
+                        (lsp-items (lsp-ref params "diagnostics")))
+            (lsp-diagnostics-changed key)))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Buffers

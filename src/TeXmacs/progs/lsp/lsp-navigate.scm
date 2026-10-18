@@ -241,8 +241,7 @@
         (uri (lsp-buffer-uri)))
     (cond ((not (and c uri))
            (set-message "No language server for this buffer" ""))
-          ((lsp-null? (lsp-ref (lsp-client-capabilities c)
-                               "documentSymbolProvider"))
+          ((not (lsp-client-capable? c "documentSymbolProvider"))
            (set-message "The language server cannot do this" ""))
           (else
            (lsp-buffer-sync)
@@ -362,8 +361,7 @@
          (u (current-buffer)))
     (when (and c uri lo (lsp-client-running? c) (lsp-buffer-followed?)
                (not (in-highlights? lo))
-               (not (lsp-null? (lsp-ref (lsp-client-capabilities c)
-                                        "documentHighlightProvider"))))
+               (lsp-client-capable? c "documentHighlightProvider"))
       ;; (the server must have the text: the changes which wait are sent)
       (lsp-sync-pending)
       (when hl-request
@@ -442,8 +440,7 @@
   (:argument query "Symbol")
   (let ((c (lsp-buffer-client*)))
     (cond ((not c) (set-message "No language server for this buffer" ""))
-          ((lsp-null? (lsp-ref (lsp-client-capabilities c)
-                               "workspaceSymbolProvider"))
+          ((not (lsp-client-capable? c "workspaceSymbolProvider"))
            (set-message "The language server cannot do this" ""))
           (else
            (with a (lsp-request-wait c "workspace/symbol"
@@ -523,6 +520,11 @@
               `(document (style (tuple "generic"))
                          (body ,(lsp-calls-body item (items in) (items out)
                                                 (lsp-client-ref c 'root))))))))))
+
+(tm-define (lsp-turn-off)
+  ;; (the highlights go with the servers)
+  (former)
+  (clear-highlights))
 
 (define-preferences
   ("lsp:highlight" "on" (lambda (pref val)

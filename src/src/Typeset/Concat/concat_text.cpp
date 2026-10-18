@@ -222,12 +222,19 @@ concater_rep::typeset_prog_string (tree t, path ip, int pos, int end) {
 void
 concater_rep::typeset_lsp_text (string h, path ip) {
   // a text which is not part of the document, in grey; its spaces are
-  // spaces (a space of the text of a program would be shown as a visible
-  // space)
+  // empty boxes of the width of a space (a space of the text of a program
+  // would be shown as a visible space, and spaces which are printed are
+  // merged)
   color c= named_color ("#909090", env->alpha);
   int i= 0, n= N(h);
   while (i < n) {
-    if (h[i] == ' ') { print (env->fn->spc); i++; continue; }
+    if (h[i] == ' ') {
+      // (not a string item: the line breaker reads the text of those)
+      box b= empty_box (decorate (ip), 0, 0, env->fn->spc->def, env->fn->yx);
+      a << line_item (STD_ITEM, OP_SKIP, b, HYPH_INVALID);
+      i++;
+      continue;
+    }
     int j= i;
     while (j < n && h[j] != ' ') j++;
     box b= text_box (decorate (ip), 0, h (i, j), env->fn, c);

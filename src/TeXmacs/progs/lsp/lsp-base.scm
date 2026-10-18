@@ -108,15 +108,34 @@
   (lsp-utf16-length (cork->utf8 (substring line 0 (min offset
                                                        (string-length line))))))
 
+(define plain-line #f)
+(define plain-line? #f)
+
+(define (plain? line)
+  ;; one byte for each character of @line, of one UTF-16 unit (no special
+  ;; character of Cork, which starts by <, and no byte of 128 or more); the
+  ;; last line asked about is remembered (the tokens of a line come together)
+  (when (not (eq? line plain-line))
+    (set! plain-line line)
+    (set! plain-line?
+          (let ((n (string-length line)))
+            (let loop ((i 0))
+              (or (>= i n)
+                  (with c (string-ref line i)
+                    (and (not (char=? c #\<)) (< (char->integer c) 128)
+                         (loop (+ i 1)))))))))
+  plain-line?)
+
 (tm-define (lsp-character->offset line ch)
   (:synopsis "The offset in the Cork @line of the character @ch of a position")
   ;; (a position inside a character, which a server should not give, is
   ;; at its start; one beyond the end of the line at its end)
+  (if (plain? line) (max 0 (min ch (string-length line)))
   (let loop ((l (tmstring->list line)) (pos 0) (n 0))
     (if (or (null? l) (>= n ch)) pos
         (with m (+ n (lsp-utf16-length (cork->utf8 (car l))))
           (if (> m ch) pos
-              (loop (cdr l) (+ pos (string-length (car l))) m))))))
+              (loop (cdr l) (+ pos (string-length (car l))) m)))))))
 
 (define (verbatim-line t)
   ;; a line which is not a string (markup in a source file), as a string
@@ -197,22 +216,31 @@
                        (string-append "%" (hex2 (char->integer c)))))
                  (string->list p*))))))
 
+(define (hex-digit? c)
+  (or (char-numeric? c) (in? (char-downcase c) '(#\a #\b #\c #\d #\e #\f))))
+
 (tm-define (lsp-uri->path uri)
   (:synopsis "The system path of the file of @uri (file://...), or #f")
-  (and (string-starts? uri "file://")
-       (let loop ((l (string->list (substring uri 7 (string-length uri))))
+  ;; (file:/x, without the authority, is the same file as file:///x)
+  (and (string-starts? uri "file:/")
+       (let loop ((l (string->list
+                      (if (string-starts? uri "file://")
+                          (substring uri 7 (string-length uri))
+                          (substring uri 5 (string-length uri)))))
                   (r '()))
          (cond ((null? l)
                 (with p (list->string (reverse r))
-                  ;; file:///c:/x on Windows
+                  ;; file:///c:/x on Windows (C: as c: are the same drive,
+                  ;; which some servers write as c%3A)
                   (if (and (>= (string-length p) 3)
                            (== (string-ref p 0) #\/)
+                           (char-alphabetic? (string-ref p 1))
                            (== (string-ref p 2) #\:))
-                      (substring p 1 (string-length p))
+                      (string-append (string (char-upcase (string-ref p 1)))
+                                     (substring p 2 (string-length p)))
                       p)))
                ((and (== (car l) #\%) (>= (length l) 3)
-                     (string->number (list->string (list (cadr l) (caddr l)))
-                                     16))
+                     (hex-digit? (cadr l)) (hex-digit? (caddr l)))
                 (loop (cdddr l)
                       (cons (integer->char
                              (string->number

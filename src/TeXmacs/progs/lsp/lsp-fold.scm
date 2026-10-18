@@ -114,8 +114,7 @@
         (uri (lsp-buffer-uri)))
     (cond ((not (and c uri))
            (set-message "No language server for this buffer" "") #f)
-          ((lsp-null? (lsp-ref (lsp-client-capabilities c)
-                               "foldingRangeProvider"))
+          ((not (lsp-client-capable? c "foldingRangeProvider"))
            (set-message "The language server cannot fold" "") #f)
           (else
            ;; (the server must have the text: the changes which wait)
@@ -179,6 +178,27 @@
         (if r (lsp-fold-block (car r) (cadr r))
             (set-message "No block to fold here" ""))))))
 
+;; (a block which a server gives twice, with the same first line: the
+;; larger one)
+(define (distinct-ranges ranges)
+  (let ((t (make-ahash-table)))
+    (for (r ranges)
+      (with o (ahash-ref t (car r))
+        (when (or (not o) (> (cadr r) (cadr o)))
+          (ahash-set! t (car r) r))))
+    (sort (map cdr (ahash-table->list t))
+          (lambda (x y) (< (car x) (car y))))))
+
+(define (hides? f b line)
+  (with i (fold-index f b)
+    (and i (< i line) (<= line (+ i (length (fold-hidden f)))))))
+
+(define (hiding-fold b line)
+  ;; the outermost fold which hides @line (its first line is shown), or #f
+  (let* ((in (list-filter (current-folds) (lambda (f) (hides? f b line)))))
+    (and (nnull? in)
+         (car (sort in (lambda (x y) (< (fold-index x b) (fold-index y b))))))))
+
 (define (fold-at b line)
   ;; the innermost fold whose first line or block contains @line
   (let* ((in (list-filter
@@ -205,14 +225,14 @@
     (when ranges
       (let* ((b (body))
              (new (map (lambda (r) (make-fold b (car r) (cadr r)))
-                       (list-filter ranges
+                       (list-filter (distinct-ranges ranges)
                                     (lambda (r)
                                       (and (< (cadr r) (tree-arity b))
                                            (not (folded-at? b (car r)))))))))
         (set-folds! (append new (current-folds)))
         (with lo (cursor-lo)
           (when (and lo (lsp-line-folded? (tree-ref b (car lo))))
-            (with f (fold-at b (car lo))
+            (with f (hiding-fold b (car lo))
               (when f (go-to-path (end-of-line b (fold-index f b)))))))))))
 
 (tm-define (lsp-unfold-all)
@@ -257,7 +277,9 @@
              (new (list-filter (map (lambda (f) (refresh-fold f b)) fs)
                                identity)))
         (when (!= (length new) (length fs))
-          ;; (a fold which went: its lines are shown)
+          ;; (a fold which went: its lines are shown, but those of the folds
+          ;; which stay and are in it are hidden again)
+          (register! new)
           (update-current-buffer))
         (if (null? new) (ahash-remove! folds name)
             (ahash-set! folds name new))))))
@@ -265,31 +287,44 @@
 (define last-lo #f)
 (define cursor-fix-scheduled? #f)
 
+(define (line-length b i)
+  (string-length (tree->string (tree-ref b i))))
+
 (define (fix-cursor)
-  ;; after a move of the cursor: in a hidden line, it goes over the fold, or
-  ;; the fold opens; elsewhere, its place is kept (the place it comes from)
+  ;; after a move of the cursor: in a hidden line, it goes over the fold
+  ;; when it comes from the line before it into its first hidden line, or
+  ;; from the line after it into its last one (the arrows); else (a search,
+  ;; a jump to a definition, a diagnostic...) the fold opens. Elsewhere, its
+  ;; place is kept (the place it comes from)
   (set! cursor-fix-scheduled? #f)
   (let* ((lo (cursor-lo))
          (b (body))
          (f (and lo (tree-is? b 'document) (< (car lo) (tree-arity b))
                  (lsp-line-folded? (tree-ref b (car lo)))
-                 (fold-at b (car lo)))))
+                 (hiding-fold b (car lo)))))
     (if (not f) (set! last-lo lo)
         (let* ((i (fold-index f b))
-               (end (+ i (length (fold-hidden f)))))
-          (cond ((and last-lo (== (car last-lo) i)
-                      (== (cadr last-lo)
-                          (string-length (tree->string (tree-ref b i))))
+               (end (+ i (length (fold-hidden f))))
+               (col (cadr lo)))
+          (cond ((and last-lo (== (car last-lo) i) (== (car lo) (+ i 1))
                       (< (+ end 1) (tree-arity b)))
-                 ;; (from the end of its first line, forwards: after it)
-                 (go-to-path (append (buffer-path) (list (+ end 1) 0))))
-                ((and last-lo (== (car last-lo) (+ end 1)) (== (cadr last-lo) 0))
-                 ;; (from the start of the line after it, backwards: the
-                 ;; end of its first line)
-                 (go-to-path (end-of-line b i)))
+                 ;; (forwards: the line after it)
+                 (go-to-path (append (buffer-path)
+                                     (list (+ end 1)
+                                           (min col (line-length b (+ end 1)))))))
+                ((and last-lo (== (car last-lo) (+ end 1)) (== (car lo) end))
+                 ;; (backwards: its first line, at its end from the start of
+                 ;; the line after it)
+                 (go-to-path (append (buffer-path)
+                                     (list i (if (and (== (cadr last-lo) 0)
+                                                      (== col (line-length b end)))
+                                                 (line-length b i)
+                                                 (min col (line-length b i)))))))
                 (else
+                 ;; (all the folds which hide it: those in it too)
                  (set-folds! (list-filter (current-folds)
-                                          (lambda (g) (not (eq? g f)))))))))))
+                                          (lambda (g)
+                                            (not (hides? g b (car lo))))))))))))
 
 (define (schedule-fix)
   (when (not cursor-fix-scheduled?)
@@ -312,7 +347,12 @@
   (with fs (ahash-ref folds name)
     (when fs
       (for (f fs) (unregister! f))
-      (ahash-remove! folds name)))
+      (ahash-remove! folds name)
+      ;; (a buffer which is renamed, saved as another file, stays: its
+      ;; lines are shown)
+      (delayed
+        (:idle 1)
+        (when (buffer-exists? (current-buffer)) (update-current-buffer)))))
   (former name))
 
 (tm-define (lsp-turn-off)

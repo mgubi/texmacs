@@ -244,18 +244,46 @@
                   files)
              identity))))
 
+(tm-define (lsp-workspace-edit-stale? c w)
+  (:synopsis "Whether the WorkspaceEdit @w of @c is for texts changed since")
+  ;; (the TextDocumentEdits give the version of their file which they are
+  ;; for: the edits come later than the answer to a request, after an
+  ;; executeCommand, and the buffer may have changed meanwhile, also when
+  ;; its server was not given its text yet)
+  (with dc (lsp-ref w "documentChanges")
+    (and (func? dc 'tuple)
+         (list-or
+          (map (lambda (x)
+                 (let* ((uri (lsp-ref x "textDocument" "uri"))
+                        (v (lsp-number-value
+                            (lsp-ref x "textDocument" "version")))
+                        (key (and uri (lsp-uri-key uri)))
+                        (mine (and key (lsp-document-version c key)))
+                        (u (and uri (uri->buffer uri))))
+                   (and v mine
+                        (or (!= v mine)
+                            (and u (buffer-exists? u)
+                                 (!= (lsp-buffer-text u)
+                                     (lsp-document-sent-text c key)))))))
+               (cdr dc))))))
+
 ;; the server asks for edits (after a command of a code action); it is told
 ;; whether all its files could be changed
 (lsp-server-request-set! "workspace/applyEdit"
   (lambda (c params)
     (let* ((w (or (lsp-ref params "edit") (lsp-object)))
-           (n (length (lsp-workspace-edit-files w)))
-           (done (lsp-apply-workspace-edit w)))
-      (lsp-buffer-sync)
-      (if (== done n)
-          (lsp-object "applied" (lsp-boolean #t))
-          (lsp-object "applied" (lsp-boolean #f)
-                      "failureReason" "a file could not be opened")))))
+           (n (length (lsp-workspace-edit-files w))))
+      (if (lsp-workspace-edit-stale? c w)
+          (begin
+            (set-message "The edit of the server is for an older text" "")
+            (lsp-object "applied" (lsp-boolean #f)
+                        "failureReason" "the file has changed"))
+          (with done (lsp-apply-workspace-edit w)
+            (lsp-buffer-sync)
+            (if (== done n)
+                (lsp-object "applied" (lsp-boolean #t))
+                (lsp-object "applied" (lsp-boolean #f)
+                            "failureReason" "a file could not be opened")))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Formatting
@@ -290,7 +318,7 @@
                   "documentFormattingProvider")))
     (cond ((not (and c uri))
            (set-message "No language server for this buffer" ""))
-          ((lsp-null? (lsp-ref (lsp-client-capabilities c) cap))
+          ((not (lsp-client-capable? c cap))
            (set-message "The language server cannot format" ""))
           (else
            (lsp-buffer-sync)
@@ -323,7 +351,7 @@
         (pos (lsp-cursor-position)))
     (cond ((not (and c uri pos))
            (set-message "No language server for this buffer" ""))
-          ((lsp-null? (lsp-ref (lsp-client-capabilities c) "renameProvider"))
+          ((not (lsp-client-capable? c "renameProvider"))
            (set-message "The language server cannot rename" ""))
           ((== new-name "") (noop))
           (else
@@ -413,8 +441,7 @@
          (uri (lsp-buffer-uri))
          (pos (lsp-cursor-position)))
     (and c uri pos
-         (not (lsp-null? (lsp-ref (lsp-client-capabilities c)
-                                  "codeActionProvider")))
+         (lsp-client-capable? c "codeActionProvider")
          (begin
            (lsp-buffer-sync)
            (let* ((diags (list-filter

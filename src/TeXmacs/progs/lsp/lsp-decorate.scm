@@ -142,8 +142,11 @@
                                   x)))
                  items)))
 
-;; uri -> line -> (colors hints): what the lines of the buffer have now,
-;; and uri -> its buffer
+;; uri -> line -> (tree text colors hints): what the lines of the buffer
+;; have now, with their trees and their texts then (the trees are kept here:
+;; the decorations of the typesetter are kept for the addresses of the
+;; trees, which a line made later would otherwise take, see
+;; lsp_decorations.cpp); and uri -> its buffer
 (define decorated (make-ahash-table))
 (define decorated-buffers (make-ahash-table))
 
@@ -151,30 +154,59 @@
   (:synopsis "The decorations of the lines of @uri: (line colors hints)")
   (with t (ahash-ref decorated uri)
     (if (not t) '()
-        (sort (map (lambda (x) (cons (car x) (cdr x))) (ahash-table->list t))
+        (sort (map (lambda (x) (cons (car x) (cdddr x))) (ahash-table->list t))
               (lambda (x y) (< (car x) (car y)))))))
+
+(define (line-index t body)
+  ;; the place of the line @t in @body, or #f (it was removed)
+  (and (tree-up t) (tree-eq? (tree-up t) body) (tree-index t)))
 
 (tm-define (lsp-apply-decorations u uri decos)
   (:synopsis "Gives the decorations @decos (line, colors, hints) to @u")
-  ;; (the lines whose decorations change are typeset again)
+  ;; (the lines whose decorations change are typeset again; a line which
+  ;; has moved, after a line inserted or removed above it, and keeps its
+  ;; decorations is not)
   (let* ((body (buffer-get-body u))
          (n (if (tree-is? body 'document) (tree-arity body) 0))
          (old (or (ahash-ref decorated uri) (make-ahash-table)))
          (new (make-ahash-table))
-         (changed '()))
+         (kept (make-ahash-table))
+         (changed '())
+         (shift 0))
+    (define (old-place t text i ds)
+      ;; the line which @t (now at @i) was, if it had the decorations @ds
+      ;; for its present @text then, or #f
+      (list-find (list i (- i shift) (- i 1) (+ i 1))
+        (lambda (j)
+          (with o (ahash-ref old j)
+            (and o (not (ahash-ref kept j)) (tree-eq? (car o) t)
+                 (== (cadr o) text) (== (cddr o) ds))))))
     (for (d decos)
-      (when (< (car d) n)
-        (ahash-set! new (car d) (cadr d))))
+      (with i (car d)
+        (when (< i n)
+          (let* ((t (tree-ref body i))
+                 (text (if (tree-atomic? t) (tree->string t) ""))
+                 (j (old-place t text i (cadr d))))
+            (ahash-set! new i (cons t (cons text (cadr d))))
+            (if j
+                (begin
+                  (ahash-set! kept j #t)
+                  (set! shift (- i j)))
+                (begin
+                  (lsp-decorate-line t
+                                     (stree->tree (decoration-tree (car (cadr d))))
+                                     (stree->tree (decoration-tree (cadr (cadr d)))))
+                  (set! changed (cons i changed))))))))
+    ;; the other lines lose theirs (those which have none now, those which
+    ;; were removed), unless they were just decorated again where they are
     (for (x (ahash-table->list old))
-      (when (and (< (car x) n) (not (ahash-ref new (car x))))
-        (lsp-undecorate-line (tree-ref body (car x)))
-        (set! changed (cons (car x) changed))))
-    (for (x (ahash-table->list new))
-      (when (!= (ahash-ref old (car x)) (cdr x))
-        (lsp-decorate-line (tree-ref body (car x))
-                           (stree->tree (decoration-tree (car (cdr x))))
-                           (stree->tree (decoration-tree (cadr (cdr x)))))
-        (set! changed (cons (car x) changed))))
+      (when (not (ahash-ref kept (car x)))
+        (let* ((t (cadr x))
+               (k (line-index t body))
+               (o (and k (ahash-ref new k))))
+          (when (not (and o (tree-eq? (car o) t)))
+            (lsp-undecorate-line t)
+            (when k (set! changed (cons k changed)))))))
     (ahash-set! decorated uri new)
     (ahash-set! decorated-buffers uri u)
     (when (and (nnull? changed) (== (current-buffer) u))
@@ -183,8 +215,20 @@
             (for (l changed) (update-path (append b (list l)))))))
     (length changed)))
 
+(define (end-position lines)
+  ;; the position of the end of the text of @lines (not past it: a server
+  ;; may refuse such a range)
+  (let* ((n (vector-length lines))
+         (last (if (> n 0) (vector-ref lines (- n 1)) "")))
+    (lsp-object "line" (lsp-number (max 0 (- n 1)))
+                "character" (lsp-number (lsp-offset->character
+                                         last (string-length last))))))
+
 (define (request-decorations c u uri)
   ;; asks @c for the tokens and the hints of @u, then decorates it
+  ;; (the server is given the text first: its answers are for the text of
+  ;; the buffer, which is compared when they come)
+  (lsp-sync-pending)
   (let* ((lines (list->vector (lsp-buffer-lines u)))
          (n (vector-length lines))
          (lan (or (lsp-buffer-language u) ""))
@@ -193,14 +237,16 @@
     (define (done)
       (set! left (- left 1))
       (when (and (== left 0) (buffer-exists? u)
-                 ;; (only for the text which was asked about)
+                 ;; (only for the text which was asked about, and in the
+                 ;; buffer which is shown: the lines which change are
+                 ;; typeset again)
+                 (== (current-buffer) u)
                  (== (lsp-buffer-text u) text))
         (lsp-apply-decorations u uri (lsp-line-decorations
                                       lines lan (or tokens '())
                                       (or hints '())))))
     (if (and (colors-on?)
-             (not (lsp-null? (lsp-ref (lsp-client-capabilities c)
-                                      "semanticTokensProvider"))))
+             (lsp-client-capable? c "semanticTokensProvider"))
         (lsp-request c "textDocument/semanticTokens/full"
                      (lsp-object "textDocument" (lsp-object "uri" uri))
                      (lambda (r e)
@@ -211,17 +257,14 @@
                        (done)))
         (done))
     (if (and (hints-on?)
-             (not (lsp-null? (lsp-ref (lsp-client-capabilities c)
-                                      "inlayHintProvider"))))
+             (lsp-client-capable? c "inlayHintProvider"))
         (lsp-request c "textDocument/inlayHint"
                      (lsp-object "textDocument" (lsp-object "uri" uri)
                                  "range" (lsp-object
                                           "start" (lsp-object
                                                    "line" (lsp-number 0)
                                                    "character" (lsp-number 0))
-                                          "end" (lsp-object
-                                                 "line" (lsp-number n)
-                                                 "character" (lsp-number 0))))
+                                          "end" (end-position lines)))
                      (lambda (r e)
                        (when (and (not e) r (not (lsp-null? r)))
                          (set! hints (lsp-items r)))
@@ -258,13 +301,10 @@
 
 (tm-define (lsp-forget-decorations uri)
   (:synopsis "The lines of @uri lose their decorations")
-  (let ((u (ahash-ref decorated-buffers uri))
-        (old (ahash-ref decorated uri)))
-    (when (and u old (buffer-exists? u))
-      (with body (buffer-get-body u)
-        (for (x (ahash-table->list old))
-          (when (and (tree-is? body 'document) (< (car x) (tree-arity body)))
-            (lsp-undecorate-line (tree-ref body (car x)))))))
+  (with old (ahash-ref decorated uri)
+    (when old
+      (for (x (ahash-table->list old))
+        (lsp-undecorate-line (cadr x))))
     (ahash-remove! decorated uri)
     (ahash-remove! decorated-buffers uri)))
 
@@ -272,7 +312,13 @@
   ;; (before the buffer goes: its lines lose their decorations)
   (with u (string->url name)
     (and-with uri (lsp-buffer-uri u)
-      (lsp-forget-decorations uri)))
+      (when (ahash-ref decorated uri)
+        (lsp-forget-decorations uri)
+        ;; (a buffer which is renamed, saved as another file, stays: its
+        ;; lines are typeset again)
+        (delayed
+          (:idle 1)
+          (when (buffer-exists? (current-buffer)) (update-current-buffer))))))
   (former name))
 
 (tm-define (lsp-turn-off)

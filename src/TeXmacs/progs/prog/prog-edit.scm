@@ -219,6 +219,8 @@
 (tm-define (notify-cursor-moved status)
   (:require prog-highlight-brackets?)
   (:require (not (in-prog?)))
+  ;; (the other hooks run too: language servers)
+  (former status)
   (if (nnull? (get-alt-selection "brackets"))
       (cancel-alt-selection "brackets")))
 

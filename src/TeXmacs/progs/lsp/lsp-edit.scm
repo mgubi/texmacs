@@ -376,7 +376,7 @@
                        "position" pos)))))
 
 (define (capable? c capability)
-  (not (lsp-null? (lsp-ref (lsp-client-capabilities c) capability))))
+  (lsp-client-capable? c capability))
 
 (tm-define (lsp-request-at-cursor-with method capability extend)
   (:synopsis "As request-at-cursor, with the parameters given to @extend")
@@ -671,17 +671,35 @@
                               "signatureHelpProvider" "triggerCharacters"))
     (if (null? l) '("(" ",") l)))
 
+(define (utf16->byte s k)
+  ;; the byte of the utf8 string @s at the UTF-16 unit @k, or #f (past it)
+  (let ((n (string-length s)))
+    (let loop ((i 0) (u 0))
+      (cond ((>= u k) (and (<= i n) i))
+            ((>= i n) #f)
+            (else
+             (with c (char->integer (string-ref s i))
+               (loop (+ i 1)
+                     (cond ((< c 128) (+ u 1))
+                           ((< c 192) u)
+                           ((< c 240) (+ u 1))
+                           (else (+ u 2))))))))))
+
 (define (parameter-parts label param)
   ;; the Cork strings before, of and after the part @param (a string, or
-  ;; offsets) of @label (utf8); all of it before when it is not there
+  ;; offsets in UTF-16 units) of @label (utf8); all of it before when it is
+  ;; not there. A string is looked for after the name of the function (from
+  ;; its first parenthesis: "x" in "max(int x)" is not the x of max)
   (let* ((range (cond ((string? param)
-                       (with i (string-search-forwards param 0 label)
+                       (let* ((p (string-search-forwards "(" 0 label))
+                              (i (string-search-forwards param (max p 0) label)))
                          (and (>= i 0) (list i (+ i (string-length param))))))
                       ((func? param 'tuple 2)
-                       (let ((a (lsp-number-value (cadr param)))
-                             (b (lsp-number-value (caddr param))))
-                         (and a b (<= 0 a b (string-length label))
-                              (list a b))))
+                       (let* ((a (lsp-number-value (cadr param)))
+                              (b (lsp-number-value (caddr param)))
+                              (a* (and a (>= a 0) (utf16->byte label a)))
+                              (b* (and b (utf16->byte label b))))
+                         (and a* b* (<= a* b*) (list a* b*))))
                       (else #f))))
     (if (not range) (list (utf8->cork label) "" "")
         (list (utf8->cork (substring label 0 (car range)))
