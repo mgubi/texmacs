@@ -15,6 +15,7 @@
 #include "tree_traverse.hpp"
 #include "drd_mode.hpp"
 #include "analyze.hpp"
+#include "../../Plugins/TreeSitter/ts_highlight.hpp"
 
 /******************************************************************************
 * Constructor and destructor
@@ -215,11 +216,23 @@ edit_cursor_rep::adjust_ghost_cursor (int status) {
   }
 }
 
+static void
+unfold_at_cursor (tree et, path tp) {
+  // a hidden line of program code (a fold) is unfolded when the cursor
+  // arrives in it (progs/treesit/ts-edit.scm)
+  if (is_nil (tp) || is_nil (tp->next)) return;
+  path p= path_up (tp);
+  if (!has_subtree (et, p)) return;
+  if (tree_sitter_fold_state (subtree (et, p)) == 1)
+    call ("syntax-unfold-at-cursor");
+}
+
 void
 edit_cursor_rep::notify_cursor_moved (int status) {
   mv_status= status;
   cu= eb->find_check_cursor (tp);
   notify_change (THE_CURSOR);
+  unfold_at_cursor (et, tp);
   if (cu->valid) call ("notify-cursor-moved", object (status));
 }
 
@@ -440,6 +453,7 @@ edit_cursor_rep::go_to_here () {
     }
   }
   notify_change (THE_CURSOR);
+  unfold_at_cursor (et, tp);
   if (cu->valid) call ("notify-cursor-moved", object (DIRECT));
 }
 
@@ -464,7 +478,8 @@ edit_cursor_rep::go_to (path p) {
       notify_change (THE_CURSOR, THE_FREEZE);
     else
       notify_change (THE_CURSOR);
-    if (cu->valid) call ("notify-cursor-moved", object (DIRECT));
+    unfold_at_cursor (et, tp);
+  if (cu->valid) call ("notify-cursor-moved", object (DIRECT));
   }
 }
 

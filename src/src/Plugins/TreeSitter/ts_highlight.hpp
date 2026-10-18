@@ -20,6 +20,8 @@ void tree_sitter_set_highlighter (string lan, int query, array<string> classes);
 void tree_sitter_set_injections (string lan, int query);
 void tree_sitter_set_injection_name (string name, string lan);
 void tree_sitter_reset_highlights ();
+int  tree_sitter_fold_state (tree t);
+void tree_sitter_set_fold_state (tree t, int state);
 array<tree> tree_sitter_pending_updates ();
 void tree_sitter_set_highlighting (bool on);
 int tree_sitter_program_language (string lan);

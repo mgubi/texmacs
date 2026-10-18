@@ -71,6 +71,7 @@ public:
   virtual void my_typeset (int desired_status);
   virtual void exec_until (path p, bool skip_flag= false);
   void typeset (int desired_status);
+  void fold_line (tree t, array<page_item>& items);
   tree bind_start (tree now);
   void bind_end (tree outer);
 };

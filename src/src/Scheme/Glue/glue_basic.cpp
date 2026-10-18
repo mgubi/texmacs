@@ -9286,6 +9286,34 @@ tmg_tree_sitter_reset_highlights () {
 }
 
 tmscm
+tmg_tree_sitter_fold_state (tmscm arg1) {
+  TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "tree-sitter-fold-state");
+
+  tree in1= tmscm_to_tree (arg1);
+
+  // TMSCM_DEFER_INTS;
+  int out= tree_sitter_fold_state (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return int_to_tmscm (out);
+}
+
+tmscm
+tmg_tree_sitter_set_fold_state (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "tree-sitter-set-fold-state");
+  TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "tree-sitter-set-fold-state");
+
+  tree in1= tmscm_to_tree (arg1);
+  int in2= tmscm_to_int (arg2);
+
+  // TMSCM_DEFER_INTS;
+  tree_sitter_set_fold_state (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
 tmg_tree_sitter_pending_updates () {
   // TMSCM_DEFER_INTS;
   array_tree out= tree_sitter_pending_updates ();
@@ -12945,6 +12973,8 @@ initialize_glue_basic () {
   tmscm_install_procedure ("tree-sitter-set-injections",  tmg_tree_sitter_set_injections, 2, 0, 0);
   tmscm_install_procedure ("tree-sitter-set-injection-name",  tmg_tree_sitter_set_injection_name, 2, 0, 0);
   tmscm_install_procedure ("tree-sitter-reset-highlights",  tmg_tree_sitter_reset_highlights, 0, 0, 0);
+  tmscm_install_procedure ("tree-sitter-fold-state",  tmg_tree_sitter_fold_state, 1, 0, 0);
+  tmscm_install_procedure ("tree-sitter-set-fold-state",  tmg_tree_sitter_set_fold_state, 2, 0, 0);
   tmscm_install_procedure ("tree-sitter-pending-updates",  tmg_tree_sitter_pending_updates, 0, 0, 0);
   tmscm_install_procedure ("tree-sitter-line-colors",  tmg_tree_sitter_line_colors, 2, 0, 0);
   tmscm_install_procedure ("tree-sitter-set-highlighting",  tmg_tree_sitter_set_highlighting, 1, 0, 0);

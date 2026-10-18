@@ -1091,9 +1091,7 @@ installed, and the old behaviour stays elsewhere.
   TeXmacs (structured:cmd with the arrows, home, page up and down) go from
   node to node, to the node around and into it, and from definition to
   definition (`syntax-region-node-move`); the Focus menu has Previous and
-  Next definition and Select definition. Folding is not done: it would
-  move lines into a fold tag inside a code block, which the regions, the
-  editing of programs and the export of code do not expect.
+  Next definition and Select definition.
 - **Balanced brackets** (same day): with the automatic brackets of
   programs (preference `prog:automatic brackets`, still off by default), the
   brackets and quotes of code with a syntax tree stay balanced: an opening
@@ -1108,6 +1106,29 @@ installed, and the old behaviour stays elsewhere.
   `bracket-close` of `prog-edit.scm` redefined when there is a tree, and
   generic keys for the languages without keys of their own); pasted text
   is left as it is.
+- **Unmatched brackets** (same day): the brackets which error recovery
+  leaves unmatched have the colour of errors (those directly in an ERROR
+  node, and the opening bracket of a node whose closing one is MISSING).
+- **Structural edits** (same day): delete the node at the cursor or the one
+  which ends there, swap it with its neighbour, raise it, remove the
+  brackets around the cursor (splice), wrap it in brackets
+  (`syntax-region-node-info` gives the ranges). The structured removals of
+  TeXmacs do these in program code (structured:cmd with Backspace or Delete
+  removes the brackets around the cursor, structured:insert with Delete or
+  Backspace the node), and the Focus menu has a Structure submenu.
+- **Folds** (same day), a state of the view and not markup (the question
+  was whether code should become structured documents; the decision: the
+  text stays the document, the structure comes from the tree, and the
+  editing keeps what must stay, as the brackets). A fold hides the lines of
+  a node after its first one, but its last line when that is only its
+  closing token; the hidden lines carry a highlight of a code of their own
+  (`tree-sitter-set-fold-state`), which the typesetter reads
+  (`bridge_rep::fold_line`): their page items take no room and are clipped
+  away (their boxes stay, for the cursor), and the line before them ends
+  with a grey mark. Editing the first line keeps the fold; the cursor
+  arriving in a hidden line unfolds it (`edit_cursor.cpp`); saving,
+  copying, exporting see all the lines; printing shows what the screen
+  shows. Focus > Folds: Fold or unfold, Fold all definitions, Unfold all.
 - A pitfall of the tests: the suites run in one TeXmacs, and a key typed
   in program code loads the keyboard of programs and its modules, which
   changed the highlighting of Fortran and the entering of mathematics in

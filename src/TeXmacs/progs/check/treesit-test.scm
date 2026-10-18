@@ -823,6 +823,31 @@
           (check-true (syntax-swap-node #t))
           (check= (list (line 3) (line 4)) '("(m r" "   (p q))"))
           (check= (cursor-path) (at 4 3)))))
+    ;; folds: a state of the lines, not of the document; the cursor arriving
+    ;; in a hidden line unfolds
+    (with-test-buffer '(document (scm-code (document "(define (f x)" "  (let ((y x))"
+                                                     "    y))" "(define (g) 1)")))
+      (lambda (u b)
+        (update-forced)
+        (let* ((code (tree-ref b 0 0))
+               (at (lambda (row col) (rcons (tree->path (tree-ref code row)) col)))
+               (states (lambda () (map (lambda (i) (tree-sitter-fold-state (tree-ref code i)))
+                                       (iota 4)))))
+          (go-to (at 1 3))
+          (check-true (syntax-toggle-fold))
+          (check= (states) '(0 0 1 0))
+          (check= (cursor-path) (at 1 2))
+          (check-true (syntax-toggle-fold))
+          (check= (states) '(0 0 0 0))
+          (check-true (syntax-fold-definitions))
+          (check= (states) '(0 1 1 0))
+          (check= (tree->stree code)
+                  '(document "(define (f x)" "  (let ((y x))" "    y))" "(define (g) 1)"))
+          (go-to (at 2 1))
+          (check= (states) '(0 0 0 0))
+          (syntax-fold-definitions)
+          (check-true (syntax-unfold-all))
+          (check= (states) '(0 0 0 0)))))
         ;; structured moves: from node to node, around, inside, and from
     ;; definition to definition
     (with-test-buffer '(document (scm-code (document "(define (f x) x)"

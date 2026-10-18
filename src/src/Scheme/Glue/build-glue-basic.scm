@@ -757,6 +757,8 @@
   (tree-sitter-set-injections tree_sitter_set_injections (void string int))
   (tree-sitter-set-injection-name tree_sitter_set_injection_name (void string string))
   (tree-sitter-reset-highlights tree_sitter_reset_highlights (void))
+  (tree-sitter-fold-state tree_sitter_fold_state (int tree))
+  (tree-sitter-set-fold-state tree_sitter_set_fold_state (void tree int))
   (tree-sitter-pending-updates tree_sitter_pending_updates (array_tree))
   (tree-sitter-line-colors tree_sitter_line_colors (object string tree))
   (tree-sitter-set-highlighting tree_sitter_set_highlighting (void bool))

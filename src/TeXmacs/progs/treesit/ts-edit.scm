@@ -405,6 +405,110 @@
                #t))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Folds
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; A fold hides the lines of a syntax node after its first one, which gets
+;; a mark; the last line stays when it is only the closing token of the
+;; node (}, end...). Folds are a state of the view, kept on the hidden lines
+;; (see tree_sitter_set_fold_state in Plugins/TreeSitter/ts_highlight.cpp),
+;; not markup: the document, its export and the editing of programs do not
+;; see them. The line before hidden lines gets the mark (Typeset/Bridge/
+;; bridge.cpp). Modifying a hidden line forgets its state, and the cursor
+;; arriving in a hidden line unfolds its fold (Edit/Interface/edit_cursor.cpp).
+
+(define (hidden? root row)
+  (and (>= row 0) (< row (tree-arity root))
+       (== (tree-sitter-fold-state (tree-ref root row)) 1)))
+
+(define (set-hidden! root row on)
+  (let ((line (tree-ref root row)))
+    (when (!= (hidden? root row) on)
+      (tree-sitter-set-fold-state line (if on 1 0))
+      (update-path (tree->path line)))))
+
+(define (fold-rows root lan n)
+  ;; the rows which a fold of the node n hides
+  (let* ((s (car (node-start n))) (e (car (node-end n)))
+         (c (first-non-space (line-string root e)))
+         (leaf (and c (syntax-region-node-at root lan e c)))
+         (closing? (and (pair? leaf) (pair? (cdr leaf))
+                        (not (node-named? (car leaf)))
+                        (== (node-start (cadr leaf)) (node-start n))
+                        (== (node-end (cadr leaf)) (node-end n))))
+         (last (if closing? (- e 1) e)))
+    (if (< last (+ s 1)) '() (map (lambda (i) (+ s 1 i)) (iota (- last s))))))
+
+(define (fold-node! root lan n)
+  ;; fold the node n (not when its first line is hidden by another fold);
+  ;; whether there was something to hide
+  (let ((rows (fold-rows root lan n)) (s (car (node-start n))))
+    (and (pair? rows) (not (hidden? root s))
+         (begin
+           (for-each (lambda (r) (set-hidden! root r #t)) rows)
+           (update-path (tree->path (tree-ref root s)))   ; its mark
+           #t))))
+
+(define (unfold-at! root row)
+  ;; unfold the fold after row; whether there was one
+  (and (not (hidden? root row)) (hidden? root (+ row 1))
+       (begin
+         (let loop ((r (+ row 1)))
+           (when (hidden? root r)
+             (set-hidden! root r #f)
+             (loop (+ r 1))))
+         (update-path (tree->path (tree-ref root row)))
+         #t)))
+
+(define-public (syntax-toggle-fold)
+  ;; unfold the fold which starts at the line of the cursor, or fold the
+  ;; innermost node of several lines around the cursor; #f when there is
+  ;; nothing to do
+  (let ((c (cursor-code)))
+    (and c (tree-is? (cadr (car c)) 'document)
+         (let* ((ctx (car c)) (lan (cadr c)) (root (cadr ctx)) (p (cddr ctx)))
+           (or (unfold-at! root (car p))
+               (let ((n (list-find (syntax-region-node-range root lan (car p) (cadr p)
+                                                             (car p) (cadr p))
+                                   (lambda (n) (< (car (node-start n))
+                                                  (car (node-end n)))))))
+                 (and n (begin
+                          (fold-node! root lan n)
+                          (move-to ctx (node-start n))
+                          #t))))))))
+
+(define-public (syntax-fold-definitions)
+  ;; fold all the definitions of several lines of the code at the cursor
+  (let ((o (cursor-outline)))
+    (and o
+         (let* ((ctx (car o)) (lan (cadr o)) (root (cadr ctx)))
+           (for-each (lambda (d)
+                       (let ((n (list "" #t (list-ref d 4) (cadddr d))))
+                         (when (< (car (node-start n)) (car (node-end n)))
+                           (fold-node! root lan n))))
+                     (caddr o))
+           #t))))
+
+(define-public (syntax-unfold-all)
+  ;; unfold all the folds of the code at the cursor
+  (let ((c (cursor-code)))
+    (and c (tree-is? (cadr (car c)) 'document)
+         (let ((root (cadr (car c))))
+           (for-each (lambda (r) (when (hidden? root r) (unfold-at! root (- r 1))))
+                     (iota (tree-arity root)))
+           #t))))
+
+(define-public (syntax-unfold-at-cursor)
+  ;; the cursor is in a hidden line: unfold its fold (called by C++)
+  (let* ((p (cursor-path))
+         (line (and (pair? p) (path->tree (cDr p))))
+         (root (and line (pair? (cDr p)) (path->tree (cDDr p)))))
+    (when (and root (tree-is? root 'document))
+      (let loop ((r (cAr (cDr p))))
+        (when (>= r 0)
+          (if (hidden? root r) (loop (- r 1)) (unfold-at! root r)))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Inputs of sessions
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -791,6 +895,10 @@
   ("Previous definition" (syntax-move-definition -1))
   ("Next definition" (syntax-move-definition 1))
   ("Select definition" (syntax-select-definition))
+  (-> "Folds"
+      ("Fold or unfold" (syntax-toggle-fold))
+      ("Fold all definitions" (syntax-fold-definitions))
+      ("Unfold all" (syntax-unfold-all)))
   (-> "Structure"
       ("Delete node" (syntax-delete-node #t))
       ("Swap with next" (syntax-swap-node #t))
