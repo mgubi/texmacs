@@ -227,6 +227,14 @@
 
   The additions to <TeXmacs> <name|Vue>, the newest first.
 
+  <paragraph|18 October 2026>
+
+  <\itemize>
+    <item><verbatim|?gpu=0> in the address of the page draws with
+    <name|MuPDF> again, as it says (it drew with <name|WebGL2>); so does a
+    browser without <name|WebGL2>.
+  </itemize>
+
   <paragraph|17 October 2026>
 
   <\itemize>

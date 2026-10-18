@@ -77,8 +77,14 @@ Module['preRun'].push(function () {
       webgl2 = !!(probe.getContext && probe.getContext ('webgl2'));
     } catch (e) {}
     if (webgl2) ENV['TEXMACS_VUE_GPU'] = '1';
-    else console.warn ('TeXmacs: no WebGL2, drawing with MuPDF');
+    else {
+      console.warn ('TeXmacs: no WebGL2, drawing with MuPDF');
+      ENV['TEXMACS_VUE_GPU'] = '0';
+    }
   }
+  // (said, not left unset: unset, TeXmacs draws with the GPU, its default
+  // since the GPU renderer is on by default on the desktop)
+  else ENV['TEXMACS_VUE_GPU'] = '0';
   // ?bars=top: the main and mode icon bars above the document, rather than
   // in a column at its left (TEXMACS_VUE_BARS, see in_side_bar in
   // vue_widget.cpp)
