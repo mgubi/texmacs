@@ -16,6 +16,10 @@
 ;; its functions, classes, variables..., nested as in the file. A click on
 ;; a line goes to its place. The outline follows the file while its page
 ;; is open (it is asked for again when the server has seen a change).
+;; std P lists the symbols of the project whose names match (workspace/
+;; symbol), std H the callers and the callees of the function at the
+;; cursor (the call hierarchy); and the uses of the symbol at the cursor
+;; are highlighted when it rests (textDocument/documentHighlight).
 
 (texmacs-module (lsp lsp-navigate)
   (:use (lsp lsp-base)
@@ -284,3 +288,242 @@
     (delayed
       (:pause 300)
       (lsp-outline-refresh))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; The uses of the symbol at the cursor, highlighted
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; When the cursor rests in a name, the server is asked where the same
+;; symbol is in the file (textDocument/documentHighlight), and those places
+;; are highlighted as the matches of a search (the alternative selection
+;; lsp-highlights). The highlights go when the cursor leaves them and when
+;; the text changes. NOTE: no mode predicates in notify-cursor-moved (see
+;; lsp-edit).
+
+(define (highlight-on?) (!= (get-preference "lsp:highlight") "off"))
+
+(define hl-ranges '())         ; (line offset line offset) highlighted
+(define hl-buffer #f)
+(define hl-scheduled? #f)
+(define hl-request #f)         ; (client . id) awaited
+
+(define (cursor-lo)
+  ;; the line and offset of the cursor in a source file, or #f
+  (let* ((p (cursor-path))
+         (b (buffer-path)))
+    (and (list-starts? p b)
+         (with r (list-tail p (length b))
+           (and (= (length r) 2) r)))))
+
+(define (in-range? lo r)
+  (let ((l (car lo)) (o (cadr lo)))
+    (and (or (> l (car r)) (and (== l (car r)) (>= o (cadr r))))
+         (or (< l (caddr r)) (and (== l (caddr r)) (<= o (cadddr r)))))))
+
+(define (in-highlights? lo)
+  (and lo (== hl-buffer (current-buffer))
+       (list-or (map (lambda (r) (in-range? lo r)) hl-ranges))))
+
+(define (clear-highlights)
+  (when (and hl-buffer (== hl-buffer (current-buffer)))
+    (cancel-alt-selection "lsp-highlights"))
+  (set! hl-ranges '())
+  (set! hl-buffer #f))
+
+(tm-define (lsp-highlight-ranges r)
+  (:synopsis "The DocumentHighlights @r as (line offset line offset)")
+  (map (lambda (h)
+         (append (lsp-buffer-line+offset (lsp-ref h "range" "start"))
+                 (lsp-buffer-line+offset (lsp-ref h "range" "end"))))
+       (lsp-items r)))
+
+(tm-define (lsp-highlights)
+  (:synopsis "The ranges highlighted, as (line offset line offset)")
+  hl-ranges)
+
+(define (show-highlights ranges)
+  (with b (buffer-path)
+    (set! hl-ranges ranges)
+    (set! hl-buffer (current-buffer))
+    (if (null? ranges) (cancel-alt-selection "lsp-highlights")
+        (set-alt-selection
+         "lsp-highlights"
+         (append-map (lambda (r)
+                       (list (append b (list (car r) (cadr r)))
+                             (append b (list (caddr r) (cadddr r)))))
+                     ranges)))))
+
+(tm-define (lsp-highlight-at-cursor)
+  (:synopsis "Highlights the uses of the symbol at the cursor")
+  (set! hl-scheduled? #f)
+  (let* ((c (lsp-buffer-client*))
+         (uri (lsp-buffer-uri))
+         (lo (cursor-lo))
+         (u (current-buffer)))
+    (when (and c uri lo (lsp-client-running? c) (lsp-buffer-followed?)
+               (not (in-highlights? lo))
+               (not (lsp-null? (lsp-ref (lsp-client-capabilities c)
+                                        "documentHighlightProvider"))))
+      ;; (the server must have the text: the changes which wait are sent)
+      (lsp-sync-pending)
+      (when hl-request
+        (lsp-cancel (car hl-request) (cdr hl-request)))
+      (set! hl-request
+        (cons c
+          (lsp-request
+           c "textDocument/documentHighlight"
+           (lsp-object "textDocument" (lsp-object "uri" uri)
+                       "position" (lsp-buffer-position (car lo) (cadr lo)))
+           (lambda (r e)
+             (set! hl-request #f)
+             ;; (only if the cursor is still there)
+             (when (and (== (current-buffer) u) (== (cursor-lo) lo))
+               (show-highlights
+                (if (or e (not r) (lsp-null? r)) '()
+                    (lsp-highlight-ranges r)))))))))))
+
+(tm-define (notify-cursor-moved status)
+  (former status)
+  (when (and (lsp-on?) (highlight-on?) (lsp-buffer-followed?))
+    (when (and (nnull? hl-ranges) (not (in-highlights? (cursor-lo))))
+      (clear-highlights))
+    (when (not hl-scheduled?)
+      (set! hl-scheduled? #t)
+      (delayed
+        (:idle 300)
+        (lsp-highlight-at-cursor)))))
+
+(tm-define (notify-buffer-changed name)
+  ;; (an edit removes the highlights: they are asked for again)
+  (former name)
+  (when (nnull? hl-ranges)
+    (set! hl-ranges '())
+    (set! hl-buffer #f)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; The symbols of the project
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define lsp-max-symbols 500)
+
+(tm-define (lsp-symbols-body query root syms)
+  (:synopsis "The page of the symbols @syms of the project which match @query")
+  ;; SymbolInformations or WorkspaceSymbols (whose location may have no
+  ;; range: the start of the file then)
+  (let* ((n (length syms)))
+    `(document
+      (strong (concat "Symbols matching " (verbatim ,query) ": "
+                      ,(string-append (number->string n)
+                                      (if (== n 1) " symbol" " symbols"))))
+      ,@(if (null? syms) '("No symbols")
+            (map (lambda (s)
+                   (let* ((uri (or (lsp-ref s "location" "uri") ""))
+                          (p (position-of
+                              (lsp-ref s "location" "range" "start")))
+                          (kind (lsp-symbol-kind-name
+                                 (lsp-number-value (lsp-ref s "kind"))))
+                          (cont (lsp-ref s "containerName")))
+                     `(action (concat
+                               (with "color" "#606060" ,kind) " "
+                               (strong (verbatim ,(utf8->cork
+                                                   (or (lsp-ref s "name") ""))))
+                               ,@(if (and (string? cont) (!= cont ""))
+                                     (list " " `(with "color" "#606060"
+                                                  (verbatim ,(utf8->cork cont))))
+                                     '())
+                               "  "
+                               (em ,(file-label uri root)) ":"
+                               ,(number->string (+ (car p) 1)))
+                              ,(goto-command uri (car p) (cadr p)))))
+                 syms)))))
+
+(tm-define (lsp-find-symbol query)
+  (:synopsis "Lists the symbols of the project whose names match @query")
+  (:argument query "Symbol")
+  (let ((c (lsp-buffer-client*)))
+    (cond ((not c) (set-message "No language server for this buffer" ""))
+          ((lsp-null? (lsp-ref (lsp-client-capabilities c)
+                               "workspaceSymbolProvider"))
+           (set-message "The language server cannot do this" ""))
+          (else
+           (with a (lsp-request-wait c "workspace/symbol"
+                                     (lsp-object "query" query) 10000)
+             (if (!= (car a) 'result)
+                 (set-message "The language server does not answer" "")
+                 (let* ((all (lsp-items (cadr a)))
+                        (syms (if (> (length all) lsp-max-symbols)
+                                  (sublist all 0 lsp-max-symbols)
+                                  all)))
+                   (open-auxiliary
+                    "Symbols"
+                    `(document (style (tuple "generic"))
+                               (body ,(lsp-symbols-body
+                                       query (lsp-client-ref c 'root)
+                                       syms)))))))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Calls
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (call-line item where uri root)
+  ;; a line of the page of the calls: the function @item, at @where (a
+  ;; Position) in @uri
+  (let ((p (position-of where))
+        (kind (lsp-symbol-kind-name (lsp-number-value (lsp-ref item "kind")))))
+    `(action (concat (with "color" "#606060" ,kind) " "
+                     (strong (verbatim ,(utf8->cork
+                                         (or (lsp-ref item "name") ""))))
+                     "  " (em ,(file-label uri root)) ":"
+                     ,(number->string (+ (car p) 1)))
+             ,(goto-command uri (car p) (cadr p)))))
+
+(tm-define (lsp-calls-body item incoming outgoing root)
+  (:synopsis "The page of the calls of @item")
+  ;; a caller goes to its first call of @item; a callee to its definition
+  `(document
+    (strong (concat "Calls of " (verbatim ,(utf8->cork
+                                            (or (lsp-ref item "name") "")))))
+    (em "Called by")
+    ,@(if (null? incoming) '("No callers")
+          (map (lambda (x)
+                 (let ((from (lsp-ref x "from"))
+                       (r (and (nnull? (lsp-items (lsp-ref x "fromRanges")))
+                               (car (lsp-items (lsp-ref x "fromRanges"))))))
+                   (call-line from
+                              (if r (lsp-ref r "start")
+                                  (lsp-ref from "selectionRange" "start"))
+                              (lsp-ref from "uri") root)))
+               incoming))
+    (em "Calls")
+    ,@(if (null? outgoing) '("No calls")
+          (map (lambda (x)
+                 (with to (lsp-ref x "to")
+                   (call-line to (lsp-ref to "selectionRange" "start")
+                              (lsp-ref to "uri") root)))
+               outgoing))))
+
+(tm-define (lsp-call-hierarchy)
+  (:synopsis "Shows the callers and the callees of the function at the cursor")
+  (let* ((c (lsp-buffer-client*))
+         (r (lsp-request-at-cursor-with
+             "textDocument/prepareCallHierarchy" "callHierarchyProvider"
+             (lambda (params) params)))
+         (item (and r (nnull? (lsp-items r)) (car (lsp-items r)))))
+    (cond ((not r) (noop))
+          ((not item) (set-message "No function here" ""))
+          (else
+           (let* ((in (lsp-request-wait c "callHierarchy/incomingCalls"
+                                        (lsp-object "item" item) 10000))
+                  (out (lsp-request-wait c "callHierarchy/outgoingCalls"
+                                         (lsp-object "item" item) 10000))
+                  (items (lambda (a)
+                           (if (== (car a) 'result) (lsp-items (cadr a)) '()))))
+             (open-auxiliary
+              "Calls"
+              `(document (style (tuple "generic"))
+                         (body ,(lsp-calls-body item (items in) (items out)
+                                                (lsp-client-ref c 'root))))))))))
+
+(define-preferences
+  ("lsp:highlight" "on" (lambda (pref val)
+                          (when (== val "off") (clear-highlights)))))

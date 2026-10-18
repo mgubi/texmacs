@@ -69,8 +69,9 @@
 
   The setting is the preference <verbatim|lsp> (<verbatim|on> or
   <verbatim|off>). Only files on disk are followed. The other preferences of
-  the servers are <verbatim|lsp:mouse hover>, <verbatim|lsp:semantic
-  colors> and <verbatim|lsp:inlay hints> (see below).
+  the servers are <verbatim|lsp:mouse hover>, <verbatim|lsp:highlight>,
+  <verbatim|lsp:semantic colors> and <verbatim|lsp:inlay hints> (see
+  below).
 
   <paragraph*|Projects>
 
@@ -189,8 +190,9 @@
     <item*|<menu|Follow source files>>Whether the servers follow the source
     files (see above).
 
-    <item*|<menu|Find references>, <menu|Outline>>As <key|std U> and
-    <key|std O> (see below).
+    <item*|<menu|Find references>, <menu|Outline>, <menu|Find symbol in
+    project...>, <menu|Calls>>As <key|std U>, <key|std O>, <key|std P> and
+    <key|std H> (see below).
 
     <item*|<menu|Go to definition>, <menu|Information at cursor>,
     <menu|Complete>>As <key|F12>, <key|S-F12> and <key|tab>.
@@ -205,6 +207,9 @@
 
     <item*|<menu|Information on mouse rest>>Whether the information about a
     symbol is shown when the mouse rests on it (see below).
+
+    <item*|<menu|Highlight the symbol at the cursor>>Whether the uses of
+    the symbol at the cursor are highlighted (see below).
 
     <item*|<menu|Colours of the server>, <menu|Inlay hints>>Whether the
     names are coloured by their kinds, and whether the hints are shown (see
@@ -296,6 +301,18 @@
   kind and its signature. On both pages, a click on a line goes to its
   place. The outline follows the file as long as its page stays open: it
   is made again each time the server has seen a change.
+
+  <key|std P> asks for a name and lists the symbols of the whole project
+  whose names match it (functions, types, variables...), with their files
+  and lines. <key|std H> shows the calls of the function at the cursor:
+  the functions which call it (a click goes to the call) and the
+  functions which it calls (a click goes to their definitions).
+
+  When the cursor rests in a name, the other places of the file where the
+  same symbol is used are highlighted, as the matches of a search. The
+  highlights go when the cursor leaves them or when you edit. This can be
+  turned off in <menu|Tools|Language servers> (the preference
+  <verbatim|lsp:highlight>).
 
   <paragraph*|Colours and inlay hints>
 

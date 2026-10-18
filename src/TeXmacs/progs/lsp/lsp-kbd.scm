@@ -14,7 +14,8 @@
 ;; for the definition, F8 for the diagnostics; tab completes (lsp-edit,
 ;; kbd-variant); std . proposes the fixes, std F formats, std E renames,
 ;; std M lists the diagnostics (F2, the key of renames elsewhere, is taken),
-;; std U the references of a symbol, std O the outline of the file.
+;; std U the references of a symbol, std O the outline of the file, std P
+;; the symbols of the project, std H the calls of a function.
 ;; NOTE: no A- keys: on macOS option composes a character (option q is
 ;; a ligature), and the key never reaches the editor.
 
@@ -46,7 +47,9 @@
   ("std ." (lsp-quick-fix))
   ("std M" (lsp-show-diagnostics-list))
   ("std U" (lsp-references))
-  ("std O" (lsp-outline)))
+  ("std O" (lsp-outline))
+  ("std P" (interactive lsp-find-symbol))
+  ("std H" (lsp-call-hierarchy)))
 
 (menu-bind lsp-menu
   ((check "Follow source files" "v" (lsp-on?))
@@ -55,6 +58,8 @@
   ("Go to definition" (lsp-goto-definition))
   ("Find references" (lsp-references))
   ("Outline" (lsp-outline))
+  ("Find symbol in project..." (interactive lsp-find-symbol))
+  ("Calls" (lsp-call-hierarchy))
   ("Information at cursor" (lsp-hover))
   ("Complete" (lsp-complete))
   ("Next diagnostic" (lsp-next-diagnostic #t))
@@ -67,6 +72,9 @@
   ---
   ((check "Information on mouse rest" "v" (lsp-mouse-hover-on?))
    (toggle-preference "lsp:mouse hover"))
+  ((check "Highlight the symbol at the cursor" "v"
+          (!= (get-preference "lsp:highlight") "off"))
+   (toggle-preference "lsp:highlight"))
   ((check "Colours of the server" "v"
           (!= (get-preference "lsp:semantic colors") "off"))
    (toggle-preference "lsp:semantic colors"))

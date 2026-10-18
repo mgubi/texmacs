@@ -224,6 +224,8 @@
                                                (lsp-boolean #f)))
     "definition" (lsp-object)
     "references" (lsp-object)
+    "documentHighlight" (lsp-object)
+    "callHierarchy" (lsp-object)
     "documentSymbol" (lsp-object "hierarchicalDocumentSymbolSupport"
                                  (lsp-boolean #t))
     "semanticTokens"
@@ -257,6 +259,7 @@
                                                    "source"
                                                    "source.organizeImports")))))
    "workspace" (lsp-object "configuration" (lsp-boolean #t)
+                           "symbol" (lsp-object)
                            "workspaceFolders" (lsp-boolean #t)
                            "applyEdit" (lsp-boolean #t)
                            "workspaceEdit" (lsp-object "documentChanges"

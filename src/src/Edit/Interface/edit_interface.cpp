@@ -998,8 +998,9 @@ edit_interface_rep::apply_changes () {
       rectangles visible (rectangle (vx1, vy1, vx2, vy2));
       for (int i=0; i<N(alt_selection_rects); i++)
         invalidate (alt_selection_rects[i] & visible);
-      range_set alt_sel= append (get_alt_selection ("alternate"),
-                                 get_alt_selection ("brackets"));
+      range_set alt_sel= append (append (get_alt_selection ("alternate"),
+                                         get_alt_selection ("brackets")),
+                                 get_alt_selection ("lsp-highlights"));
       if (is_empty (alt_sel))
         alt_selection_rects= array<rectangles> ();
     }
@@ -1253,8 +1254,11 @@ edit_interface_rep::apply_changes () {
 
   // cout << "Handling alternative selection\n";
   if ((env_change & THE_SELECTION) || new_visible != last_visible) {
-    range_set alt_sel= append (get_alt_selection ("alternate"),
-                               get_alt_selection ("brackets"));
+    range_set alt_sel= append (append (get_alt_selection ("alternate"),
+                                       get_alt_selection ("brackets")),
+                               // (the uses of the symbol at the cursor,
+                               // from a language server)
+                               get_alt_selection ("lsp-highlights"));
     if (!is_empty (alt_sel)) {
       alt_selection_rects= array<rectangles> (); int b= 0, e= N(alt_sel);
       if (e - b >= 200) {

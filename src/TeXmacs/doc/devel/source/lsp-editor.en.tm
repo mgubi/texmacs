@@ -251,6 +251,28 @@
   position. The page is asked for again (asynchronously) when the server
   publishes the diagnostics of its file, as long as it is open.
 
+  <scm|lsp-find-symbol> (<key|std P>) asks for
+  <verbatim|workspace/symbol> with the name which it is given and lists at
+  most 500 SymbolInformations or WorkspaceSymbols (a location without a
+  range goes to the start of its file). <scm|lsp-call-hierarchy> (<key|std
+  H>) asks for <verbatim|textDocument/prepareCallHierarchy> at the cursor,
+  then for the <verbatim|callHierarchy/incomingCalls> and
+  <verbatim|outgoingCalls> of the first item: a caller goes to its first
+  call (<verbatim|fromRanges>), a callee to its definition
+  (<verbatim|selectionRange>).
+
+  When the cursor rests (<scm|notify-cursor-moved>, then <scm|delayed> with
+  <scm|:idle 300>), <scm|lsp-highlight-at-cursor> sends the changes which
+  wait (<scm|lsp-sync-pending>), asks for
+  <verbatim|textDocument/documentHighlight> (the previous request is
+  cancelled) and, if the cursor has not moved, sets the alternative
+  selection <verbatim|lsp-highlights>, which
+  <source-link|edit_interface.cpp|src/Edit/Interface/edit_interface.cpp>
+  draws as the matches of a search (with <verbatim|alternate> and
+  <verbatim|brackets>). The highlights are cleared when the cursor leaves
+  them; an edit removes all the alternative selections, and
+  <scm|notify-buffer-changed> forgets them.
+
   <section|Colours and inlay hints>
 
   <source-link|lsp-decorate.scm|TeXmacs/progs/lsp/lsp-decorate.scm> asks the
