@@ -10,14 +10,22 @@
 // /workspace/home in the sandbox (in memory: lost with the page).
 
 import { Wasmer } from "./sdk/dist/index.js";
+import { WebGPUHost } from "./webgpu-host.js";
 
 const canvas = document.getElementById ("screen");
-const ctx = canvas.getContext ("2d");
+// the context of the canvas: 2d for the pixels of TeXmacs (RECT), webgpu
+// for a program which draws with WebGPU (GPU, webgpu_wire.cpp); the first
+// message which draws chooses
+let ctx = null;
+let gpu = null;
+// ?program=<file.wasm>: another program than TeXmacs, without its files
+// (the tests of the WebGPU of WASIX: hello-triangle.wasm)
+const program = new URLSearchParams (location.search).get ("program");
 const status = s => { document.getElementById ("status").textContent = s; };
 
 const IN = { RESIZE: 1, MOTION: 2, BUTTON: 3, WHEEL: 4, KEY: 5, TEXT: 6,
              FOCUS: 7, LEAVE: 8, QUIT: 9 };
-const OUT = { HELLO: 1, RECT: 2, FRAME: 3, CURSOR: 4, TITLE: 5 };
+const OUT = { HELLO: 1, RECT: 2, FRAME: 3, CURSOR: 4, TITLE: 5, GPU: 6 };
 
 /******************************************************************************
 * Loading
@@ -88,6 +96,7 @@ function message (type, p, dv) {
     const x = dv.getUint32 (0, true), y = dv.getUint32 (4, true);
     const w = dv.getUint32 (8, true), h = dv.getUint32 (12, true);
     if (w === 0 || h === 0) return;
+    if (!ctx) ctx = canvas.getContext ("2d");
     const img = new ImageData (w, h);
     const d = img.data;
     for (let i = 0, s = 20; i < 4 * w * h; i += 4, s += 4) {
@@ -98,6 +107,10 @@ function message (type, p, dv) {
   else if (type === OUT.FRAME) {
     frames++;
     if (frames === 1) document.getElementById ("loading").classList.add ("gone");
+  }
+  else if (type === OUT.GPU) {
+    gpu.run (p);
+    if (gpu.frames > 0) document.getElementById ("loading").classList.add ("gone");
   }
   else if (type === OUT.CURSOR) canvas.style.cursor = CURSORS[dv.getUint32 (0, true)] || "default";
   else if (type === OUT.TITLE) document.title = new TextDecoder ().decode (p) || "TeXmacs";
@@ -241,13 +254,23 @@ function resize () {
 async function main () {
   if (!crossOriginIsolated)
     throw new Error ("the page is not cross-origin isolated (COOP/COEP): the SDK needs it");
-  const [wasm, blob, index] = await Promise.all ([
-    fetchBytes ("texmacs.wasm", "wasm"), fetchBytes ("texmacs-fs.bin", "fs"),
-    fetch ("texmacs-fs.json").then (r => r.json ())]);
-  status ("starting the runtime");
+  // the WebGPU of the page, for the programs which draw with it
+  if (navigator.gpu) {
+    gpu = new WebGPUHost (canvas);
+    await gpu.ready.catch (e => { console.warn (e); gpu = null; });
+  }
   const files = {};
-  for (const [path, offset, size] of index)
-    files[path] = blob.subarray (offset, offset + size);
+  let wasm;
+  if (program) wasm = await fetchBytes (program, "wasm");
+  else {
+    let blob, index;
+    [wasm, blob, index] = await Promise.all ([
+      fetchBytes ("texmacs.wasm", "wasm"), fetchBytes ("texmacs-fs.bin", "fs"),
+      fetch ("texmacs-fs.json").then (r => r.json ())]);
+    for (const [path, offset, size] of index)
+      files[path] = blob.subarray (offset, offset + size);
+  }
+  status ("starting the runtime");
   const wasmer = new Wasmer ();
   await wasmer.ready ();
   const pkg = await wasmer.packages.create ({
@@ -268,7 +291,9 @@ async function main () {
   listen ();
   canvas.focus ();
   send (IN.FOCUS, words (1));
-  window.tmWasix = { get frames () { return frames; }, proc };
+  window.tmWasix = { get frames () { return frames; }, proc,
+                     get gpu () { return gpu && { frames: gpu.frames, calls: gpu.calls,
+                                                  errors: gpu.errors }; } };
   for await (const chunk of proc.stdout) receive (chunk);
   const out = await proc.wait ();
   status (`TeXmacs has ended (exit ${out.exitCode})`);

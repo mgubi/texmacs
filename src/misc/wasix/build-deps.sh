@@ -80,3 +80,15 @@ if [ ! -f sdl3/lib/libSDL3.a ]; then
 fi
 
 sh "$TM/misc/wasm/get-hunspell.sh" "$B"
+
+# webgpu.h (webgpu-native/webgpu-headers, BSD 3), the version of wgpu-native
+# 29.0.1.1, which ThorVG's WebGPU engine is written for: the API of the
+# WebGPU of WASIX (misc/wasix/webgpu)
+WH=673658bc2bd70ec39fc55ebe6bb0173cf6d0a603
+if [ ! -f webgpu-headers/webgpu/webgpu.h ]; then
+  mkdir -p webgpu-headers/webgpu
+  curl -fsSL -o webgpu-headers/webgpu/webgpu.h \
+    https://raw.githubusercontent.com/webgpu-native/webgpu-headers/$WH/webgpu.h
+  curl -fsSL -o webgpu-headers/LICENSE \
+    https://raw.githubusercontent.com/webgpu-native/webgpu-headers/$WH/LICENSE
+fi

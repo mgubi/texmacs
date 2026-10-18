@@ -90,7 +90,26 @@ $(OUT)/texmacs.wasm: $(OBJECTS) $(LIBDEPS)
 SDK_VERSION ?= 0.19.1
 SDK := $(CURDIR)/sdk/node_modules/@wasmer/sdk
 web: $(OUT)/web/texmacs.wasm $(OUT)/web/texmacs-fs.json $(OUT)/web/sdk/dist/index.js \
-  $(OUT)/web/index.html $(OUT)/web/texmacs-gui.js $(OUT)/web/pdf.html $(OUT)/web/pdf.js
+  $(OUT)/web/index.html $(OUT)/web/texmacs-gui.js $(OUT)/web/pdf.html $(OUT)/web/pdf.js \
+  $(OUT)/web/webgpu-host.js $(OUT)/web/webgpu-enums.js $(OUT)/web/hello-triangle.wasm
+
+# WebGPU (misc/wasix/webgpu): webgpu.h, that of wgpu-native 29 (fetched by
+# build-deps.sh), sent to the page by webgpu_wire.cpp; the page has the
+# strings of its enumerated values (gen-enums.mjs) and a test program
+WEBGPU_H := $(CURDIR)/webgpu-headers
+WEBGPU   := $(X)/webgpu
+$(OUT)/web/webgpu-enums.js: $(WEBGPU_H)/webgpu/webgpu.h $(WEBGPU)/gen-enums.mjs
+	@mkdir -p $(OUT)/web
+	node $(WEBGPU)/gen-enums.mjs $< $@
+
+$(OBJ)/webgpu/webgpu_wire.o: $(WEBGPU)/webgpu_wire.cpp $(WEBGPU)/webgpu_wire.h
+	@mkdir -p $(dir $@)
+	$(CXX) -I$(WEBGPU_H) -I$(WEBGPU) $(DEPFLAGS) $(CXXFLAGS) -c $< -o $@
+
+$(OUT)/web/hello-triangle.wasm: $(WEBGPU)/test/hello-triangle.c $(OBJ)/webgpu/webgpu_wire.o
+	@mkdir -p $(OUT)/web
+	$(CXX) -O2 -x c -I$(WEBGPU_H) -I$(WEBGPU) -c $< -o $(OBJ)/webgpu/hello-triangle.o
+	$(CXX) -O2 $(OBJ)/webgpu/hello-triangle.o $(OBJ)/webgpu/webgpu_wire.o -o $@
 
 $(OUT)/web/texmacs.wasm: $(OUT)/texmacs.wasm
 	@mkdir -p $(OUT)/web
