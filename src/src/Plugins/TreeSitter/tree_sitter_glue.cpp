@@ -22,6 +22,8 @@
 #include "scheme.hpp"
 #include "tree-sitter/include/tree_sitter/api.h"
 #include "tree-sitter/src/parser.h"
+#include "ts_captures.hpp"
+#include <ctype.h>
 #include <stdlib.h>
 #include <string.h>
 #include <regex>
@@ -35,6 +37,45 @@ struct ts_query_entry {
   TSQuery* query;
   std::vector<std::regex*> regexes;   // one per #match? step, in order
 };
+
+static bool
+is_regex_predicate (const std::string& name) {
+  return name == "match?" || name == "not-match?" ||
+         name == "lua-match?" || name == "not-lua-match?";
+}
+
+static std::string
+lua_pattern_to_regex (const std::string& p) {
+  // the patterns of Lua which the queries of Neovim use (#lua-match?): %x
+  // escapes and classes, - as a lazy repetition outside of classes, the
+  // rest as in a regular expression
+  std::string r;
+  bool in_class= false;
+  for (size_t i= 0; i < p.size (); i++) {
+    char c= p[i];
+    if (c == '%' && i + 1 < p.size ()) {
+      char d= p[++i];
+      switch (d) {
+      case 's': r += "\\s"; break;
+      case 'S': r += "\\S"; break;
+      case 'd': r += "\\d"; break;
+      case 'D': r += "\\D"; break;
+      case 'w': r += in_class? "A-Za-z0-9": "[A-Za-z0-9]"; break;
+      case 'a': r += in_class? "A-Za-z": "[A-Za-z]"; break;
+      case 'l': r += in_class? "a-z": "[a-z]"; break;
+      case 'u': r += in_class? "A-Z": "[A-Z]"; break;
+      default:
+        if (isalnum ((unsigned char) d)) r += d;
+        else { r += '\\'; r += d; }
+      }
+    }
+    else if (c == '[' && !in_class) { in_class= true; r += c; }
+    else if (c == ']' && in_class) { in_class= false; r += c; }
+    else if (c == '-' && !in_class) r += "*?";
+    else r += c;
+  }
+  return r;
+}
 static array<ts_query_entry*> ts_queries;
 
 const TSLanguage*
@@ -114,11 +155,14 @@ tree_sitter_query_new (int language, string source) {
       uint32_t len;
       const char* op= ts_query_string_value_for_id (q, steps[i].value_id, &len);
       std::string name (op, len);
-      if ((name == "match?" || name == "not-match?") &&
+      if (is_regex_predicate (name) &&
           steps[i+2].type == TSQueryPredicateStepTypeString) {
         const char* re= ts_query_string_value_for_id (q, steps[i+2].value_id, &len);
+        std::string source (re, len);
+        if (name.find ("lua-") != std::string::npos)
+          source= lua_pattern_to_regex (source);
         std::regex* r= NULL;
-        try { r= new std::regex (std::string (re, len)); }
+        try { r= new std::regex (source); }
         catch (...) { r= NULL; }
         e->regexes.push_back (r);
       }
@@ -153,10 +197,19 @@ capture_text (const TSQueryMatch& m, uint32_t capture, const char* text) {
 }
 
 static bool
+capture_node (const TSQueryMatch& m, uint32_t capture, TSNode& node) {
+  for (uint16_t i= 0; i < m.capture_count; i++)
+    if (m.captures[i].index == capture) { node= m.captures[i].node; return true; }
+  return false;
+}
+
+static bool
 satisfies_predicates (ts_query_entry* e, const TSQueryMatch& m, const char* text,
                       const std::vector<int>& regex_base) {
-  // the text predicates #eq? #match? #any-of? and their negations; the other
-  // predicates (#set!, #is?...) are directives which do not filter
+  // the text predicates #eq? #match? #any-of? and their negations, and
+  // those of the queries of Neovim: #lua-match?, #kind-eq? (the type of the
+  // node is one of the strings), #has-parent? (that of its parent); the
+  // other predicates (#set!, #is?...) are directives which do not filter
   TSQuery* q= e->query;
   uint32_t n;
   const TSQueryPredicateStep* steps= ts_query_predicates_for_pattern (q, m.pattern_index, &n);
@@ -184,7 +237,21 @@ satisfies_predicates (ts_query_entry* e, const TSQueryMatch& m, const char* text
           }
           ok= (left == right);
         }
-        else if (base == "match?") {
+        else if (base == "kind-eq?" || base == "has-parent?") {
+          TSNode node;
+          ok= false;
+          if (capture_node (m, steps[i+1].value_id, node)) {
+            if (base == "has-parent?") node= ts_node_parent (node);
+            if (!ts_node_is_null (node)) {
+              std::string type (ts_node_type (node));
+              for (uint32_t k= i + 2; k < j; k++) {
+                const char* v= ts_query_string_value_for_id (q, steps[k].value_id, &len);
+                if (type == std::string (v, len)) ok= true;
+              }
+            }
+          }
+        }
+        else if (base == "match?" || base == "lua-match?") {
           std::regex* r= e->regexes[regex++];
           ok= (r != NULL) && std::regex_search (left, *r);
         }
@@ -218,7 +285,7 @@ regex_bases (TSQuery* q) {
       uint32_t len;
       const char* op= ts_query_string_value_for_id (q, steps[i].value_id, &len);
       std::string name (op, len);
-      if ((name == "match?" || name == "not-match?") &&
+      if (is_regex_predicate (name) &&
           steps[i+2].type == TSQueryPredicateStepTypeString) count++;
     }
   }
@@ -308,6 +375,69 @@ tree_sitter_query_injections (int query, TSNode root, const char* text,
                << (int) ts_node_end_byte (m.captures[i].node);
         languages << string (lan.c_str (), (int) lan.size ());
       }
+  }
+  ts_query_cursor_delete (c);
+}
+
+static void
+pattern_properties (TSQuery* q, uint32_t pattern, ts_properties& props) {
+  // the properties which #set! key value gives to a pattern (the form with
+  // a capture first is read the same; a key alone is set to "")
+  uint32_t n, len;
+  const TSQueryPredicateStep* steps= ts_query_predicates_for_pattern (q, pattern, &n);
+  uint32_t i= 0;
+  while (i < n) {
+    uint32_t j= i;
+    while (j < n && steps[j].type != TSQueryPredicateStepTypeDone) j++;
+    if (j > i && steps[i].type == TSQueryPredicateStepTypeString) {
+      const char* op= ts_query_string_value_for_id (q, steps[i].value_id, &len);
+      if (std::string (op, len) == "set!") {
+        uint32_t k= i + 1;
+        if (k < j && steps[k].type == TSQueryPredicateStepTypeCapture) k++;
+        if (k < j && steps[k].type == TSQueryPredicateStepTypeString) {
+          const char* key= ts_query_string_value_for_id (q, steps[k].value_id, &len);
+          std::string skey (key, len), value;
+          if (k + 1 < j && steps[k+1].type == TSQueryPredicateStepTypeString) {
+            const char* v= ts_query_string_value_for_id (q, steps[k+1].value_id, &len);
+            value= std::string (v, len);
+          }
+          props[skey]= value;
+        }
+      }
+    }
+    i= j + 1;
+  }
+}
+
+void
+tree_sitter_query_node_captures (int query, TSNode root, const char* text,
+                                 ts_node_captures& r) {
+  // the nodes of each capture of the query under root (but those whose
+  // name starts with _), after the predicates, with the properties of their
+  // patterns: r[capture name][node id]
+  if (query < 0 || query >= N(ts_queries)) return;
+  ts_query_entry* e= ts_queries[query];
+  TSQuery* q= e->query;
+  std::vector<std::string> names;
+  for (uint32_t i= 0; i < ts_query_capture_count (q); i++) {
+    uint32_t len;
+    const char* name= ts_query_capture_name_for_id (q, i, &len);
+    names.push_back (std::string (name, len));
+  }
+  std::vector<int> regex_base= regex_bases (q);
+  TSQueryCursor* c= ts_query_cursor_new ();
+  ts_query_cursor_exec (c, q, root);
+  TSQueryMatch m;
+  while (ts_query_cursor_next_match (c, &m)) {
+    if (!satisfies_predicates (e, m, text, regex_base)) continue;
+    ts_properties props;
+    pattern_properties (q, m.pattern_index, props);
+    for (uint16_t i= 0; i < m.capture_count; i++) {
+      const std::string& name= names[m.captures[i].index];
+      if (name.size () > 0 && name[0] == '_') continue;
+      ts_properties& p= r[name][m.captures[i].node.id];
+      for (auto& kv: props) p[kv.first]= kv.second;
+    }
   }
   ts_query_cursor_delete (c);
 }

@@ -28,6 +28,7 @@ object syntax_region_last_nodes (tree region, int language);
 object syntax_region_captures (tree region, int language, int query);
 array<int> syntax_region_statistics (tree region, int language);
 void syntax_region_forget (tree region);
+int syntax_region_indent (tree region, int language, int query, int row, int tab);
 // the highlight query and colours of a language named in an injection
 typedef bool (*ts_injection_resolver) (string name, int& language, int& query,
                                        array<int>& colors);

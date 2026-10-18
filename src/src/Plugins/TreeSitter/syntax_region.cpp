@@ -9,6 +9,7 @@
 ******************************************************************************/
 
 #include "syntax_region.hpp"
+#include "ts_captures.hpp"
 #include "converter.hpp"
 #include "hashmap.hpp"
 #include "tree-sitter/include/tree_sitter/api.h"
@@ -23,6 +24,8 @@ void tree_sitter_query_run (int query, TSNode root, const char* text,
 void tree_sitter_query_injections (int query, TSNode root, const char* text,
                                    array<int>& ranges, array<string>& languages,
                                    int from= 0, int to= -1);
+void tree_sitter_query_node_captures (int query, TSNode root, const char* text,
+                                      ts_node_captures& r);
 
 /******************************************************************************
 * Decoding the TeXmacs encoding
@@ -106,6 +109,8 @@ struct syntax_region_rep {
   int hl_query, hl_injections, hl_epoch;  // the colours below are for these
   array<array<int> > hl_cols;  // colour per position, per line (or empty)
   array<bool> hl_dirty;        // the lines whose colours are out of date
+  int ind_query, ind_version;  // the captures below are for these
+  ts_node_captures ind_caps;   // of the query of indentation
 };
 
 static array<syntax_region_rep*> regions;
@@ -292,6 +297,8 @@ get_region (tree root, int language) {
   r->incremental_parses= 0;
   r->version= 0;
   r->hl_query= -1;
+  r->ind_query= -1;
+  r->ind_version= -1;
   r->hl_injections= -1;
   r->hl_epoch= -1;
   ts_parser_set_language (r->parser, lang);
@@ -589,4 +596,208 @@ syntax_region_highlight (tree root, int language, int query, array<int> colors,
     if (recoloured != NULL) (*recoloured) << i;
   }
   return r->hl_cols;
+}
+
+/******************************************************************************
+* Indentation by the queries of Neovim (indents.scm)
+******************************************************************************/
+
+/* A port of get_indent of nvim-treesitter (lua/nvim-treesitter/indent.lua):
+   the captures @indent.begin, .end, .branch, .dedent, .align, .auto,
+   .ignore and .zero of the query, with the properties indent.immediate,
+   indent.start_at_same_line, indent.open_delimiter, indent.close_delimiter,
+   indent.increment and indent.avoid_last_matching_next. Rows and columns
+   are those of the lines of the region (positions in the TeXmacs strings). */
+
+static int
+indent_columns (string s) {
+  int i= 0;
+  while (i < N(s) && (s[i] == ' ' || s[i] == '\t')) i++;
+  return i;
+}
+
+static string
+trimmed (string s) {
+  int a= 0, b= N(s);
+  while (a < b && (s[a] == ' ' || s[a] == '\t')) a++;
+  while (b > a && (s[b-1] == ' ' || s[b-1] == '\t')) b--;
+  return s (a, b);
+}
+
+static TSNode
+node_at (TSNode root, int row, int col) {
+  TSPoint a= { (uint32_t) row, (uint32_t) max (col, 0) };
+  TSPoint b= { (uint32_t) row, (uint32_t) max (col, 0) + 1 };
+  return ts_node_descendant_for_point_range (root, a, b);
+}
+
+static ts_properties*
+captured (ts_node_captures& q, const char* name, TSNode n) {
+  // the properties of n as a node of the capture name, or NULL
+  if (ts_node_is_null (n)) return NULL;
+  auto it= q.find (name);
+  if (it == q.end ()) return NULL;
+  auto jt= it->second.find (n.id);
+  return jt == it->second.end ()? NULL: &(jt->second);
+}
+
+static bool
+find_delimiter (array<string>& lines, TSNode node, const std::string& delim,
+                TSNode& child, bool& is_end) {
+  // the child of type delim, and whether only spaces and delim follow it on
+  // its line
+  uint32_t n= ts_node_child_count (node);
+  for (uint32_t i= 0; i < n; i++) {
+    TSNode c= ts_node_child (node, i);
+    if (std::string (ts_node_type (c)) != delim) continue;
+    child= c;
+    TSPoint e= ts_node_end_point (c);
+    int row= (int) ts_node_start_point (c).row;
+    string line= row < N(lines)? lines[row]: string ("");
+    is_end= true;
+    for (int k= (int) e.column; k < N(line); k++)
+      if (line[k] != ' ' && line[k] != '\t' && delim.find (line[k]) == std::string::npos)
+        is_end= false;
+    return true;
+  }
+  return false;
+}
+
+int
+syntax_region_indent (tree root, int language, int query, int row, int tab) {
+  // the indentation of the line row by the query (indents.scm); -1 when
+  // the line keeps the indentation it would have without the query
+  // (@indent.auto), -2 without a syntax tree
+  syntax_region_rep* r= get_region (root, language);
+  if (r == NULL) return -2;
+  array<string>& lines= r->lines;
+  if (row < 0 || row >= N(lines)) return -2;
+  TSNode top= ts_tree_root_node (r->tree);
+  if (r->ind_query != query || r->ind_version != r->version) {
+    string text;
+    for (int i= 0; i < N(lines); i++) {
+      if (i > 0) text << "\n";
+      text << lines[i];
+    }
+    c_string ctext (text);
+    r->ind_caps.clear ();
+    tree_sitter_query_node_captures (query, top, ctext, r->ind_caps);
+    r->ind_query= query;
+    r->ind_version= r->version;
+  }
+  ts_node_captures& q= r->ind_caps;
+  TSNode node= { { 0, 0, 0, 0 }, NULL, NULL };
+  bool found= false;
+  if (indent_columns (lines[row]) == N(lines[row])) {
+    // a blank line: the node at the end of the previous line
+    int prev= row - 1;
+    while (prev >= 0 && indent_columns (lines[prev]) == N(lines[prev])) prev--;
+    if (prev >= 0) {
+      int ic= indent_columns (lines[prev]);
+      string pl= trimmed (lines[prev]);
+      node= node_at (top, prev, ic + N(pl) - 1);
+      found= true;
+      if (std::string (ts_node_type (node)).find ("comment") != std::string::npos) {
+        // a comment at the end of the line does not count
+        TSNode first= node_at (top, prev, ic);
+        if (first.id != node.id) {
+          int scol= (int) ts_node_start_point (node).column;
+          pl= trimmed (lines[prev] (ic, max (scol, ic)));
+          node= node_at (top, prev, ic + N(pl) - 1);
+        }
+      }
+      if (captured (q, "indent.end", node) != NULL)
+        node= node_at (top, row, indent_columns (lines[row]));
+    }
+  }
+  else {
+    node= node_at (top, row, indent_columns (lines[row]));
+    found= true;
+  }
+  if (!found || ts_node_is_null (node)) return 0;
+  if (captured (q, "indent.zero", node) != NULL) return 0;
+  int indent= 0;
+  std::unordered_map<int,bool> processed;
+  while (!ts_node_is_null (node)) {
+    ts_properties* begin= captured (q, "indent.begin", node);
+    ts_properties* align= captured (q, "indent.align", node);
+    int srow= (int) ts_node_start_point (node).row;
+    int erow= (int) ts_node_end_point (node).row;
+    if (begin == NULL && align == NULL && captured (q, "indent.auto", node) != NULL &&
+        srow < row && row <= erow)
+      return -1;
+    if (begin == NULL && captured (q, "indent.ignore", node) != NULL &&
+        srow < row && row <= erow)
+      return 0;
+    bool is_processed= false;
+    bool done_row= processed[srow];
+    if (!done_row &&
+        ((captured (q, "indent.branch", node) != NULL && srow == row) ||
+         (captured (q, "indent.dedent", node) != NULL && srow != row))) {
+      indent -= tab;
+      is_processed= true;
+    }
+    bool should= !done_row;
+    bool in_err= false;
+    if (should) {
+      TSNode parent= ts_node_parent (node);
+      in_err= !ts_node_is_null (parent) && ts_node_has_error (parent);
+    }
+    if (should && begin != NULL &&
+        (srow != erow || in_err || begin->count ("indent.immediate")) &&
+        (srow != row || begin->count ("indent.start_at_same_line"))) {
+      indent += tab;
+      is_processed= true;
+    }
+    if (in_err && align == NULL) {
+      // the aligned indent of the first child, for an error node
+      uint32_t n= ts_node_child_count (node);
+      for (uint32_t i= 0; i < n; i++) {
+        ts_properties* a= captured (q, "indent.align", ts_node_child (node, i));
+        if (a != NULL) {
+          q["indent.align"][node.id]= *a;
+          align= captured (q, "indent.align", node);
+          break;
+        }
+      }
+    }
+    if (should && align != NULL && (srow != erow || in_err) && srow != row) {
+      ts_properties meta= *align;
+      TSNode o_delim= node, c_delim= node;
+      bool o_found= true, c_found= true, o_last= false, c_last= false;
+      if (meta.count ("indent.open_delimiter"))
+        o_found= find_delimiter (lines, node, meta["indent.open_delimiter"], o_delim, o_last);
+      if (meta.count ("indent.close_delimiter"))
+        c_found= find_delimiter (lines, node, meta["indent.close_delimiter"], c_delim, c_last);
+      if (o_found) {
+        int o_srow= (int) ts_node_start_point (o_delim).row;
+        int o_scol= (int) ts_node_start_point (o_delim).column;
+        int c_srow= c_found? (int) ts_node_start_point (c_delim).row: -1;
+        bool absolute= false;
+        if (o_last) {
+          // a hanging indent (the line ends with the opening delimiter)
+          indent += tab;
+          if (c_last && c_srow >= 0 && c_srow < row) indent= max (indent - tab, 0);
+        }
+        else if (c_last && c_srow >= 0 && o_srow != c_srow && c_srow < row)
+          indent= max (indent - tab, 0);
+        else {
+          int increment= 1;
+          if (meta.count ("indent.increment"))
+            increment= atoi (meta["indent.increment"].c_str ());
+          indent= o_scol + increment;
+          absolute= true;
+        }
+        if (c_srow >= 0 && c_srow != o_srow && c_srow == row &&
+            meta.count ("indent.avoid_last_matching_next") &&
+            indent <= indent_columns (lines[o_srow]) + tab)
+          indent += tab;
+        is_processed= true;
+        if (absolute) return indent;
+      }
+    }
+    processed[srow]= done_row || is_processed;
+    node= ts_node_parent (node);
+  }
+  return indent;
 }

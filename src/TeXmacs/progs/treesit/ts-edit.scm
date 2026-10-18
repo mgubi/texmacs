@@ -197,100 +197,24 @@
 ;; Indentation
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;; A line is indented one step more than the line where the innermost node
-;; of an indenting type which is still open around it starts; as much as that
-;; line when it starts with the token which closes that node (}, ), end) or
-;; with a branch (else, except...). For each program language: the indenting
-;; types, the branches, and for an offside language (Python, whose blocks
-;; end where the indentation goes back) the types of its brackets: only
-;; those are closed before a line; optionally, the named types which close
-;; a node (as the end tags of HTML), besides its last token, and whether a
-;; blank line after a named token stays at the indentation of the indenting
-;; node around it (YAML: after key: value, but not after key: or [1,).
-
-(define c-indenting
-  '("compound_statement" "field_declaration_list" "declaration_list"
-    "enumerator_list" "initializer_list" "argument_list" "parameter_list"
-    "case_statement" "if_statement" "for_statement" "while_statement"
-    "do_statement" "else_clause" "parenthesized_expression"))
+;; The indentation of a line comes from the query indents.scm of the grammar
+;; (those of nvim-treesitter, see syntax_region_indent in
+;; Plugins/TreeSitter/syntax_region.cpp), or else from rules: a line is
+;; indented one step more than the line where the innermost node of an
+;; indenting type which is still open around it starts; as much as that line
+;; when it starts with the token which closes that node (}, ), end) or with a
+;; branch (else...). The rules of a program language: the indenting types,
+;; the branches, and for an offside language (whose blocks end where the
+;; indentation goes back) the types of its brackets: only those are closed
+;; before a line; optionally, whether a blank line after a named token stays
+;; at the indentation of the indenting node around it (YAML: after key:
+;; value, but not after key: or [1,).
 
 (define syntax-indent-rules
-  `(("c" ,c-indenting ("else_clause") #f)
-    ("cpp" ,(append c-indenting '("lambda_expression" "try_statement"))
-     ("else_clause") #f)
-    ("python"
-     ("function_definition" "class_definition" "if_statement" "for_statement"
-      "while_statement" "with_statement" "try_statement" "match_statement"
-      "case_clause" "elif_clause" "else_clause" "except_clause"
-      "finally_clause" "argument_list" "parameters" "list" "dictionary" "set"
-      "tuple" "parenthesized_expression")
-     ("elif_clause" "else_clause" "except_clause" "finally_clause")
-     ("argument_list" "parameters" "list" "dictionary" "set" "tuple"
-      "parenthesized_expression"))
-    ("java"
-     ("block" "class_body" "interface_body" "enum_body" "argument_list"
-      "formal_parameters" "array_initializer" "switch_block"
-      "switch_block_statement_group" "if_statement" "for_statement"
-      "while_statement" "do_statement" "parenthesized_expression")
-     () #f)
-    ("javascript"
-     ("statement_block" "object" "array" "arguments" "formal_parameters"
-      "class_body" "switch_body" "switch_case" "switch_default"
-      "template_substitution" "parenthesized_expression" "if_statement"
-      "for_statement" "while_statement" "do_statement" "else_clause")
-     ("else_clause") #f)
-    ("json" ("object" "array") () #f)
-    ("r"
-     ("braced_expression" "call_arguments" "parameters"
-      "parenthesized_expression" "if_statement" "for_statement"
-      "while_statement" "repeat_statement" "function_definition")
-     () #f)
-    ("julia"
-     ("function_definition" "macro_definition" "module_definition"
-      "struct_definition" "if_statement" "for_statement" "while_statement"
-      "let_statement" "try_statement" "do_clause" "compound_statement"
-      "quote_statement" "else_clause" "elseif_clause" "catch_clause"
-      "finally_clause" "vector_expression" "tuple_expression"
-      "parenthesized_expression" "call_expression")
-     ("else_clause" "elseif_clause" "catch_clause" "finally_clause") #f)
-    ("shell"
-     ("compound_statement" "do_group" "if_statement" "elif_clause"
-      "else_clause" "case_statement" "case_item" "subshell" "array"
-      "command_substitution")
-     ("elif_clause" "else_clause") #f)
-    ("typescript"
-     ("statement_block" "object" "array" "arguments" "formal_parameters"
-      "class_body" "interface_body" "object_type" "enum_body" "switch_body"
-      "switch_case" "switch_default" "template_substitution"
-      "parenthesized_expression" "type_arguments" "type_parameters"
-      "if_statement" "for_statement" "while_statement" "do_statement"
-      "else_clause")
-     ("else_clause") #f)
-    ("css" ("block" "arguments") () #f)
-    ("toml" ("array" "inline_table") () #f)
-    ("yaml" ("block_mapping_pair" "block_sequence_item" "flow_mapping" "flow_sequence")
-     () ("flow_mapping" "flow_sequence") () #t)
-    ("html" ("element" "script_element" "style_element") () #f ("end_tag"))
-    ("go"
-     ("block" "literal_value" "argument_list" "parameter_list"
-      "expression_switch_statement" "type_switch_statement" "select_statement"
-      "expression_case" "default_case" "type_case" "communication_case"
-      "field_declaration_list" "interface_type" "import_spec_list"
-      "const_declaration" "var_declaration" "parenthesized_expression")
-     ;; gofmt writes case at the indentation of switch
-     ("expression_case" "default_case" "type_case" "communication_case") #f)
-    ("rust"
-     ("block" "declaration_list" "field_declaration_list" "enum_variant_list"
-      "match_block" "match_arm" "arguments" "parameters" "array_expression"
-      "tuple_expression" "field_initializer_list" "use_list" "token_tree"
-      "ordered_field_declaration_list" "where_clause")
-     () #f)
-    ("lua"
-     ("function_declaration" "function_definition" "if_statement"
-      "elseif_statement" "else_statement" "while_statement" "repeat_statement"
-      "for_statement" "do_statement" "table_constructor" "arguments"
-      "parameters" "parenthesized_expression")
-     ("elseif_statement" "else_statement") #f)
+  ;; the languages whose grammars have no query indents.scm (or a weaker
+  ;; one: that of Neovim for YAML only indents after a block)
+  `(("yaml" ("block_mapping_pair" "block_sequence_item" "flow_mapping" "flow_sequence")
+     () ("flow_mapping" "flow_sequence") #t)
     ("lean"
      ("def" "theorem" "instance" "abbrev" "example" "structure" "inductive"
       "by" "do_block" "match" "match_alt" "fun" "have" "let" "where_decls"
@@ -326,15 +250,31 @@
                         n))))
           (if (> n 0) (list r n) (loop (- r 1)))))))
 
+;; The queries of the grammars (misc/tree-sitter/<grammar>/<file>), compiled
+;; once for each language of tree-sitter
+
+(define grammar-queries '())  ; (((id . file) . query or #f) ...)
+
+(define (grammar-query lan id file)
+  ;; the query file of the grammar of the program language lan, or #f
+  (let ((known (assoc (cons id file) grammar-queries)))
+    (if known (cdr known)
+        (let* ((g (or (program-language-grammar lan) lan))
+               (u (url-concretize
+                   (string-append "$TEXMACS_PATH/misc/tree-sitter/" g "/" file)))
+               (q (and (url-exists? u)
+                       (tree-sitter-query-new id (string-load u))))
+               (r (and q (>= q 0) q)))
+          (set! grammar-queries (cons (cons (cons id file) r) grammar-queries))
+          r))))
+
 (define-public (syntax-indentation doc row lan rules tab)
   ;; the indentation of the line row of doc (a document of lines), by the
   ;; rules of its language (an entry of syntax-indent-rules)
   (let* ((indenting (cadr rules))
          (branches (caddr rules))
          (brackets (cadddr rules))
-         (closers (let ((l (list-tail rules 4))) (if (pair? l) (car l) '())))
-         (complete-stays? (let ((l (list-tail rules 4)))
-                            (and (pair? l) (pair? (cdr l)) (cadr l))))
+         (complete-stays? (let ((l (list-tail rules 4))) (and (pair? l) (car l))))
          (s (line-string doc row))
          (c0 (first-non-space s))
          (prev (and (not c0) (previous-text-end doc row)))
@@ -374,23 +314,28 @@
                               (if (and (pair? l) (== (node-start (car l)) p))
                                   (loop (cdr l) (car l))
                                   best)))
-                     ;; a named closer (</div>) which ends a, its parent
-                     (closer? (and c0 first (in? (node-type first) closers)
-                                   (let ((up (memq first nodes)))
-                                     (and (pair? (cdr up)) (== (cadr up) a)))
-                                   (== (node-end first) (node-end a))))
                      (branch? (and c0 first (in? (node-type first) branches)))
                      ;; a blank line after a which has its last part
                      (complete? (and prev complete-stays? (node-named? n0))))
                 (+ (line-indent doc (car (node-start a)))
-                   (if (or closing? closer? branch? complete?) 0 tab))))))))
+                   (if (or closing? branch? complete?) 0 tab))))))))
 
 (define-public (syntax-language-indentation doc row lan id tab)
   ;; the same for the program language lan, whose language of tree-sitter
-  ;; is id; #f without rules for lan
-  (let ((rules (assoc lan syntax-indent-rules)))
-    (and rules (tree-is? doc 'document)
-         (syntax-indentation doc row id rules tab))))
+  ;; is id: by the query indents.scm of its grammar (those of Neovim, see
+  ;; syntax_region_indent in Plugins/TreeSitter/syntax_region.cpp) or by its
+  ;; rules; #f without either
+  (and (tree-is? doc 'document)
+       (let ((q (grammar-query lan id "indents.scm")))
+         (if q
+             (let ((r (syntax-region-indent doc id q row tab)))
+               (cond ((>= r 0) r)
+                     ((= r -1)   ; @indent.auto: as the previous line
+                      (let ((p (previous-text-end doc row)))
+                        (if p (line-indent doc (car p)) 0)))
+                     (else #f)))
+             (let ((rules (assoc lan syntax-indent-rules)))
+               (and rules (syntax-indentation doc row id rules tab)))))))
 
 (define-public (syntax-compute-indentation doc row tab)
   ;; the indentation of a line of the program at the cursor, or #f when
@@ -407,20 +352,9 @@
 ;; misc/tree-sitter/<language>/tags.scm, as in tree-sitter-tags, each with
 ;; the first capture @name inside it.
 
-(define tags-queries '())  ; ((id . query or #f) ...)
-
 (define (tags-query lan id)
   ;; the query of the definitions of the program language lan, or #f
-  (let ((known (assoc id tags-queries)))
-    (if known (cdr known)
-        (let* ((g (or (program-language-grammar lan) lan))
-               (u (url-concretize
-                   (string-append "$TEXMACS_PATH/misc/tree-sitter/" g "/tags.scm")))
-               (q (and (url-exists? u)
-                       (tree-sitter-query-new id (string-load u))))
-               (r (and q (>= q 0) q)))
-          (set! tags-queries (cons (cons id r) tags-queries))
-          r))))
+  (grammar-query lan id "tags.scm"))
 
 (define (region-text root start end)
   ;; the text between two points of the same line

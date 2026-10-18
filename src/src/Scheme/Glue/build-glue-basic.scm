@@ -750,6 +750,7 @@
   (syntax-region-captures syntax_region_captures (object tree int int))
   (syntax-region-statistics syntax_region_statistics (array_int tree int))
   (syntax-region-forget syntax_region_forget (void tree))
+  (syntax-region-indent syntax_region_indent (int tree int int int int))
   (tree-sitter-set-highlighter tree_sitter_set_highlighter (void string int array_string))
   (tree-sitter-set-injections tree_sitter_set_injections (void string int))
   (tree-sitter-set-injection-name tree_sitter_set_injection_name (void string string))

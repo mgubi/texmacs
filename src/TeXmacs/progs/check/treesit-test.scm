@@ -586,10 +586,19 @@
       ;; (the lines are indented as computed, except the blank ones)
       (check= (indents "python" '("def f(x):" "" "    if x:" "        y = [1]" ""
                                   "    else:" "        return g(1," ""))
-              '(0 4 4 8 8 4 8 12))
+              ;; (aligned with the open bracket, by the query of Neovim)
+              '(0 4 4 8 8 4 8 17))
       (check= (indents "c" '("int f(int x) {" "" "    if (x)" ""
                              "        return 1;" "}" "" "int g();"))
               '(0 4 4 8 8 0 0 0))
+      ;; by the queries of Neovim: else, case, the closing brace; in a string
+      ;; of Python, the indentation of the previous line (@indent.auto)
+      (check= (indents "c" '("int f(int x) {" "    if (x)" "        g();" "    else"
+                             "        h();" "    switch (x) {" "    case 1:" "        k();"
+                             "    }" "}" ""))
+              '(0 4 8 4 8 4 8 12 4 0 0))
+      (check= (indents "python" '("s = \"\"\"a" "  b" "\"\"\"" "def f():" "    return 1"))
+              '(0 0 2 0 4))
       (check= (indents "javascript" '("function f() {" "    x = [1," "        2];" "}" ""))
               '(0 4 8 0 0))
       (check= (indents "julia" '("function f(x)" "    if x" "        1" "    else"

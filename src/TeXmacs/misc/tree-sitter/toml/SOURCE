@@ -1,2 +1,4 @@
 src/grammar.json of https://github.com/tree-sitter-grammars/tree-sitter-toml.git
 (commit 64b56832c2cffe41758f28e05c756a3a98d16f41), with its LICENSE; highlights.scm is queries/highlights.scm.
+indents.scm is runtime/queries/toml/indents.scm of https://github.com/nvim-treesitter/nvim-treesitter
+(commit d3e4a28b63961ba972b0945d66c73b6eec969953, Apache-2.0, see ../nvim-treesitter-LICENSE).

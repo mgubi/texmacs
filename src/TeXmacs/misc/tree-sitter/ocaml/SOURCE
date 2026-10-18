@@ -1,2 +1,4 @@
 grammars/ocaml/src/grammar.json of https://github.com/tree-sitter/tree-sitter-ocaml.git
 (commit 3b2e14e0697d405c9aa0beddfa09b71f45abc504), with its LICENSE; highlights.scm is queries/highlights.scm, tags.scm queries/tags.scm.
+indents.scm is runtime/queries/ocaml/indents.scm of https://github.com/nvim-treesitter/nvim-treesitter
+(commit d3e4a28b63961ba972b0945d66c73b6eec969953, Apache-2.0, see ../nvim-treesitter-LICENSE).
