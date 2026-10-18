@@ -454,6 +454,16 @@
       (check= (tree-sitter-line-colors "c" (tree-ref d 2))
               '((0 4 "comment") (5 11 "keyword") (12 13 "constant_number")
                 (13 14 "operator_field"))))
+    ;; the typesetting cuts the lines at the tokens of the tree, and at the
+    ;; spaces (also in comments); the cuts are not colours
+    (let ((d (stree->tree '(document "int xy = f(10, \"a b\"); // c d" "/* a" "b */ return 0;"))))
+      (tree-sitter-line-colors "c" d)
+      (check= (tree-sitter-line-tokens "c" (tree-ref d 0))
+              '("int" " " "xy" " " "=" " " "f" "(" "10" "," " " "\"" "a" " " "b"
+                "\"" ")" ";" " " "//" " " "c" " " "d"))
+      (check= (tree-sitter-line-tokens "c" (tree-ref d 2))
+              '("b" " " "*/" " " "return" " " "0" ";"))
+      (check= (tree-sitter-line-colors "c" (tree-ref d 1)) '((0 4 "comment"))))
     ;; unmatched brackets have the colour of errors
     (let ((colors (lambda (lan line)
                     (let ((d (stree->tree (list 'document line))))

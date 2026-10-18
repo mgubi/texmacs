@@ -26,5 +26,6 @@ array<tree> tree_sitter_pending_updates ();
 void tree_sitter_set_highlighting (bool on);
 int tree_sitter_program_language (string lan);
 object tree_sitter_line_colors (string lan, tree t);
+array<string> tree_sitter_line_tokens (string lan, tree t);
 
 #endif // TS_HIGHLIGHT_H

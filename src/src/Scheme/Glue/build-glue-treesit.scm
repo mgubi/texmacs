@@ -46,6 +46,7 @@
   (tree-sitter-set-fold-state tree_sitter_set_fold_state (void tree int))
   (tree-sitter-pending-updates tree_sitter_pending_updates (array_tree))
   (tree-sitter-line-colors tree_sitter_line_colors (object string tree))
+  (tree-sitter-line-tokens tree_sitter_line_tokens (array_string string tree))
   (tree-sitter-set-highlighting tree_sitter_set_highlighting (void bool))
   (tree-sitter-wrap-language tree_sitter_wrap_language (void string))
   (tree-sitter-program-language tree_sitter_program_language (int string))

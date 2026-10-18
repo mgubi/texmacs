@@ -1293,6 +1293,7 @@
 "tree-sitter-set-fold-state"
 "tree-sitter-pending-updates"
 "tree-sitter-line-colors"
+"tree-sitter-line-tokens"
 "tree-sitter-set-highlighting"
 "tree-sitter-wrap-language"
 "tree-sitter-program-language"

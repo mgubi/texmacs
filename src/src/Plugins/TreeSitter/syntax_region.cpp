@@ -751,6 +751,28 @@ paint_unmatched (TSNode n, array<int>& paint, int from, int to, int code) {
   }
 }
 
+static void
+mark_tokens (TSNode top, array<int>& paint, int from, int to) {
+  // the starts of the leaves of the tree between from and to (bytes of the
+  // text), as TS_TOKEN_START in paint (which starts at from); the nodes
+  // before from are skipped, the walk ends at the first node after to
+  TSTreeCursor c= ts_tree_cursor_new (top);
+  bool done= false;
+  while (!done) {
+    TSNode n= ts_tree_cursor_current_node (&c);
+    int a= (int) ts_node_start_byte (n), b= (int) ts_node_end_byte (n);
+    if (a >= to) break;
+    if (b > from) {
+      if (ts_tree_cursor_goto_first_child_for_byte (&c, (uint32_t) from) >= 0)
+        continue;
+      if (a >= from && b > a) paint[a - from] |= TS_TOKEN_START;
+    }
+    while (!ts_tree_cursor_goto_next_sibling (&c))
+      if (!ts_tree_cursor_goto_parent (&c)) { done= true; break; }
+  }
+  ts_tree_cursor_delete (&c);
+}
+
 array<array<int> >
 syntax_region_highlight (tree root, int language, int query, array<int> colors,
                          int injections, ts_injection_resolver resolve,
@@ -761,6 +783,7 @@ syntax_region_highlight (tree root, int language, int query, array<int> colors,
   // gives in other languages, coloured by the highlighters of these
   // languages (resolve, which epoch changes) over the colours of the region,
   // and the injections in those (see paint_injection).
+  // The starts of the tokens of the tree are marked (TS_TOKEN_START).
   // After an edit, only the lines whose colours are out of date are
   // coloured again (the query runs on their bytes); their rows are appended
   // to recoloured, when given.
@@ -808,6 +831,7 @@ syntax_region_highlight (tree root, int language, int query, array<int> colors,
     }
   }
   paint_unmatched (top, paint, from, to, encode_color ("error"));
+  mark_tokens (top, paint, from, to);
   for (int i= first; i <= last; i++) {
     int m= N(r->lines[i]), o= r->offsets[i] - from;
     array<int> c (m);

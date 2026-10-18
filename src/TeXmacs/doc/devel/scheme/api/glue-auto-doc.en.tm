@@ -10147,6 +10147,14 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(tree-sitter-line-tokens <scm-arg|string> <scm-arg|tree>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|tree_sitter_line_tokens> which returns
+    <scm|array_string>.
+  </explain>
+
+  <\explain>
     <scm|(tree-sitter-set-highlighting <scm-arg|bool>)>
 <explain-synopsis|no synopsis>
   <|explain>

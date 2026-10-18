@@ -349,6 +349,20 @@ server of each language (`(server "clangd")`), replacing the defaults of
    - A block is identified by its tree (tree-eq?); when it is removed, or
      the document closed, its virtual document is closed on the server.
 
+8. The tokens of the typesetting from the syntax tree.
+   - Done: where tree-sitter colours a line, the typesetting cuts it at the
+     starts of the leaves of the tree (marked in the colour codes of the
+     line by `TS_TOKEN_START`, syntax_region.cpp), at the changes of colour
+     (the injected code, whose own trees are not walked) and at the spaces
+     (where the lines may break, also in comments and strings); the
+     tokenizer of the language of TeXmacs is no longer called for those
+     lines. A line without the colours of tree-sitter (a language without a
+     grammar, a build without tree-sitter, `tree-sitter-set-highlighting`
+     off) is cut by that tokenizer, as before. `tree-sitter-line-tokens`
+     gives the cuts (suite treesit). The printed pages of a C++ file of 678
+     lines are the same as before but for one place: a word of a comment
+     is now one box, so that the kerning of its letters applies (`'))`).
+
 Each phase keeps the suites passing and the two feature branches unchanged:
 what is shared is written here, then given back to the branches (or the
 branches rebased on it) only when the user decides it.
