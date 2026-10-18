@@ -235,6 +235,10 @@
     <verbatim|?gpu=webgpu> to the address of the page (a test for now;
     without <name|WebGPU> the page draws with <name|WebGL2> as before). The
     menu <with|font-series|bold|TeXmacs <name|Vue>> says which one draws.
+
+    <item><verbatim|?gpu=0> in the address of the page draws with
+    <name|MuPDF> again, as it says (it drew with <name|WebGL2>); so does a
+    browser without <name|WebGL2>.
   </itemize>
 
   <paragraph|17 October 2026>

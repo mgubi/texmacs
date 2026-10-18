@@ -329,10 +329,31 @@ draws with WebGL2. The canvas and the targets are BGRA8, the format the
 browsers prefer (another costs them a copy at each frame). Nothing is read
 back from the GPU (asynchronous in WebGPU). Tested in headless Chrome 154
 (`browser-run.mjs --browser <Chrome> --query '?gpu=webgpu'`): menus,
-editing, no error of WebGPU; on a light test (wheel over the welcome
-document) the three renderers draw at the rate of the display with less
-than 1 ms of CPU a frame. To do: a heavier comparison with WebGL2, then
-WebGPU by default where the browser has it.
+editing, no error of WebGPU. Firefox (147, headless) has `navigator.gpu`
+but gives no adapter: the page draws with WebGL2, as it should.
+
+`misc/wasm/test/gpu-bench.mjs` compares the three renderers on a long
+document (`bench-paper.tm`: 564 KB, 180 formulas; each run a fresh browser,
+the times of TeXmacs from `?profile=1`, the CPU, not the GPU, which WebGPU
+cannot wait for). Headless Chrome 154, Apple M4 (WebGL2 and WebGPU both on
+Metal), 1280x800 at scale 2, medians of 3 runs, the time of the frames in
+ms (repaint of the editor, redraw of the window in parentheses):
+
+| | WebGPU | WebGL2 | MuPDF |
+|---|---|---|---|
+| 20 full repaints | 76 (40, 10) | 68 (35, 14) | 1863 (1752, 99) |
+| 60 pages scrolled | 337 (94, 21) | 330 (70, 30) | 5510 (5032, 321) |
+| 12 zooms | 142 (43, 42) | 344 (34, 240) | 1251 (733, 488) |
+
+The two GPU renderers keep the pace of the display (the same wall time,
+paced by the frames of the page), MuPDF takes 1.4 to 2.3 times longer. The
+repaints cost WebGPU a little more CPU (the bind groups and uniforms of
+each draw), the zooms much less: the redraws which make the glyphs at a
+new size take 42 ms against 240 with WebGL2.
+
+`?gpu=0` drew with WebGL2 since the GPU renderer became the default of the
+desktop (an unset `TEXMACS_VUE_GPU` means the GPU): `web-pre.js` now says
+`0` when the page draws with MuPDF (`?gpu=0`, no WebGL2).
 
 ## Optimization
 
