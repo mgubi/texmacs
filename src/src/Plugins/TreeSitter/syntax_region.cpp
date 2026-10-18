@@ -115,7 +115,16 @@ struct syntax_region_rep {
 };
 
 static array<syntax_region_rep*> regions;
-static const int max_regions= 32;
+// the regions kept, the most recently used first: at most max_regions, of
+// max_region_bytes of text in all (a document with many blocks of code
+// would else parse them again at each edit, going round them)
+static const int max_regions= 256;
+static const int max_region_bytes= 32 * 1024 * 1024;
+
+static int
+region_bytes (syntax_region_rep* r) {
+  return N(r->offsets) == 0? 0: r->offsets[N(r->offsets) - 1];
+}
 
 static void
 flatten (tree t, string& r) {
@@ -304,7 +313,11 @@ get_region (tree root, int language) {
   r->hl_epoch= -1;
   ts_parser_set_language (r->parser, lang);
   region_parse (r, NULL);
-  if (N(regions) >= max_regions) {
+  int total= region_bytes (r);
+  for (int i= 0; i < N(regions); i++) total += region_bytes (regions[i]);
+  while (N(regions) > 0 &&
+         (N(regions) >= max_regions || total > max_region_bytes)) {
+    total -= region_bytes (regions[N(regions) - 1]);
     region_delete (regions[N(regions) - 1]);
     regions->resize (N(regions) - 1);
   }
