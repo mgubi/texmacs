@@ -8,7 +8,10 @@
 * in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
 ******************************************************************************/
 
-#include <QtTest/QtTest>
+#include "tm_test.hpp"
+#include <unistd.h>
+#include "tm_timer.hpp"
+#include "sys_utils.hpp"
 #include "convert.hpp"
 #include "analyze.hpp"
 
@@ -17,18 +20,6 @@
 // UTF-8) to ai_stream_feed, which parses each line once, gives what the
 // whole stream gives to ai_stream_text, at the end and on the way.
 
-class TestAiStream: public QObject {
-  Q_OBJECT
-
-private slots:
-  void test_openai ();
-  void test_openrouter ();
-  void test_claude ();
-  void test_gemini ();
-  void test_error ();
-  void test_new_answer ();
-  void test_time ();
-};
 
 static string
 piece (int k) {
@@ -91,88 +82,93 @@ check_pieces (string s, string model) {
     if (k % 97 == 0) {
       string err2, reasoning2;
       string r2= ai_stream_text (s (0, i), model, err2, reasoning2);
-      QVERIFY (r == r2);
-      QVERIFY (reasoning == reasoning2);
-      QVERIFY (err == err2);
+      CHECK (r == r2);
+      CHECK (reasoning == reasoning2);
+      CHECK (err == err2);
     }
     k++;
   }
   string err2, reasoning2;
   string r2= ai_stream_text (s, model, err2, reasoning2);
-  QVERIFY (r == r2);
-  QVERIFY (reasoning == reasoning2);
-  QVERIFY (err == err2);
-  QVERIFY (N(r) > 0);
+  CHECK (r == r2);
+  CHECK (reasoning == reasoning2);
+  CHECK (err == err2);
+  CHECK (N(r) > 0);
 }
 
-void TestAiStream::test_openai () {
+static void
+test_openai () {
   string s= openai_stream (2000, false);
   check_pieces (s, "chatgpt");
   string err, reasoning;
-  QVERIFY (starts (ai_stream_text (s, "chatgpt", err, reasoning),
+  CHECK (starts (ai_stream_text (s, "chatgpt", err, reasoning),
                    "w0\xc3\xa9\nw1 w2 "));
 }
 
-void TestAiStream::test_openrouter () {
+static void
+test_openrouter () {
   string s= openai_stream (2000, true);
   check_pieces (s, "openrouter");
   string err, reasoning;
   (void) ai_stream_text (s, "openrouter", err, reasoning);
-  QVERIFY (N(reasoning) == 20);
+  CHECK (N(reasoning) == 20);
 }
 
-void TestAiStream::test_claude () {
+static void
+test_claude () {
   check_pieces (claude_stream (2000), "claude");
   string err, reasoning;
   string r= ai_stream_text (claude_stream (3), "claude", err, reasoning);
-  QVERIFY (r == "w0\xc3\xa9\nw1 w2 ");
-  QVERIFY (starts (reasoning, "t0 t1 "));
+  CHECK (r == "w0\xc3\xa9\nw1 w2 ");
+  CHECK (starts (reasoning, "t0 t1 "));
 }
 
-void TestAiStream::test_gemini () {
+static void
+test_gemini () {
   check_pieces (gemini_stream (2000), "gemini");
 }
 
-void TestAiStream::test_error () {
+static void
+test_error () {
   string s= openai_stream (30, true);
   s << "data: {\"error\": {\"message\": \"Provider returned error\"}}\n\n";
   check_pieces (s, "openrouter");
   ai_stream_state st;
   string err, reasoning;
   (void) ai_stream_feed (st, s, "openrouter", err, reasoning);
-  QVERIFY (err == "Provider returned error");
+  CHECK (err == "Provider returned error");
 }
 
 // another answer in the same state (the link resets it, but an output
 // which is not the continuation is parsed again from its beginning)
-void TestAiStream::test_new_answer () {
+static void
+test_new_answer () {
   ai_stream_state st;
   string err, reasoning;
   string a= openai_stream (10, false), b= gemini_stream (3);
   (void) ai_stream_feed (st, a, "chatgpt", err, reasoning);
   string r= ai_stream_feed (st, b, "gemini", err, reasoning);
   string r2= ai_stream_text (b, "gemini", err, reasoning);
-  QVERIFY (r == r2);
+  CHECK (r == r2);
 }
 
 // the time of 2000 pieces: each prefix parsed again (as before), and fed
 static void
 time_both (string s, string model, const char* name) {
   int n= 2000, step= max (1, N(s) / n);
-  QElapsedTimer t;
-  t.start ();
+  time_t t0= texmacs_time ();
   long long scanned= 0;
   string err, reasoning;
   for (int i= step; i <= N(s); i += step) {
     (void) ai_stream_text (s (0, i), model, err, reasoning);
     scanned += i;
   }
-  qint64 old_ms= t.elapsed ();
-  t.restart ();
+  long long old_ms= (texmacs_time () - t0);
+  t0= texmacs_time ();
   ai_stream_state st;
   for (int i= step; i <= N(s); i += step)
     (void) ai_stream_feed (st, s (0, i), model, err, reasoning);
-  qint64 new_ms= t.elapsed ();
+  long long new_ms= (texmacs_time () - t0);
   printf ("ai_stream %s: %d bytes in 2000 pieces: each prefix parsed "
           "again %lld ms (%lld bytes scanned), fed %lld ms (%d bytes)\n",
           name, N(s), (long long) old_ms, scanned, (long long) new_ms, N(s));
@@ -180,13 +176,23 @@ time_both (string s, string model, const char* name) {
 }
 
 // (only with TM_AI_STREAM_TIME set: parsing each prefix again takes long)
-void TestAiStream::test_time () {
-  if (qgetenv ("TM_AI_STREAM_TIME").isEmpty ())
-    QSKIP ("set TM_AI_STREAM_TIME to measure");
+static void
+test_time () {
+  if (get_env ("TM_AI_STREAM_TIME") == "")
+    SKIP ("set TM_AI_STREAM_TIME to measure");
   time_both (openai_stream (2000, true), "openrouter", "OpenRouter");
   time_both (claude_stream (2000), "claude", "Claude");
   time_both (gemini_stream (2000), "gemini", "Gemini");
 }
 
-QTEST_MAIN(TestAiStream)
-#include "ai_stream_test.moc"
+int
+main () {
+  RUN (test_openai);
+  RUN (test_openrouter);
+  RUN (test_claude);
+  RUN (test_gemini);
+  RUN (test_error);
+  RUN (test_new_answer);
+  RUN (test_time);
+  return test_report ();
+}

@@ -9,7 +9,10 @@
 * in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
 ******************************************************************************/
 
-#include <QtTest/QtTest>
+#include "tm_test.hpp"
+#include <unistd.h>
+#include "tm_timer.hpp"
+#include "sys_utils.hpp"
 #include "sys_utils.hpp"
 #include "analyze.hpp"
 
@@ -20,20 +23,14 @@
 // the slow command below stands for the interrupted curl, which goes on
 // writing for a while; nothing of it may reach the next answer.
 
-class TestAsyncEval: public QObject {
-  Q_OBJECT
-
-private slots:
-  void test_interrupted_answer ();
-};
 
 static bool
 pump_until (bool (*ok) (int&, string&), int& status, string& out, int msecs) {
-  QElapsedTimer t; t.start ();
-  while (t.elapsed () < msecs) {
+  time_t t0= texmacs_time ();
+  while ((texmacs_time () - t0) < msecs) {
     async_eval_pending ();
     if (ok (status, out)) return true;
-    QTest::qWait (20);
+    usleep (20000);
   }
   return false;
 }
@@ -46,28 +43,31 @@ static bool
 ended (int& status, string& out) {
   (void) out; return status == 0; }
 
-void
-TestAsyncEval::test_interrupted_answer () {
+static void
+test_interrupted_answer () {
   int status= 1;
   string outbuf, errbuf;
   bool kill= false;
-  QVERIFY (!async_eval_system ("sh -c 'printf OLD1; sleep 1; printf OLD2'",
+  CHECK (!async_eval_system ("sh -c 'printf OLD1; sleep 1; printf OLD2'",
                                status, outbuf, errbuf, kill));
-  QVERIFY (pump_until (started, status, outbuf, 3000));
+  CHECK (pump_until (started, status, outbuf, 3000));
   // interrupted, as request_link_rep::interrupt does it
   kill= true;
   async_eval_cancel (&outbuf);
   // the next question, in the same buffers, as request_link_rep::write
   status= 1; outbuf= ""; errbuf= ""; kill= false;
-  QVERIFY (!async_eval_system ("printf NEW", status, outbuf, errbuf, kill));
-  QVERIFY (pump_until (ended, status, outbuf, 3000));
-  QVERIFY2 (outbuf == "NEW", as_charp (outbuf));
+  CHECK (!async_eval_system ("printf NEW", status, outbuf, errbuf, kill));
+  CHECK (pump_until (ended, status, outbuf, 3000));
+  CHECK_MSG (outbuf == "NEW", outbuf);
   // the interrupted command ends meanwhile: its output is dropped
-  QElapsedTimer t; t.start ();
-  while (t.elapsed () < 1500) { async_eval_pending (); QTest::qWait (20); }
-  QVERIFY2 (outbuf == "NEW", as_charp (outbuf));
-  QCOMPARE (status, 0);
+  time_t t0= texmacs_time ();
+  while ((texmacs_time () - t0) < 1500) { async_eval_pending (); usleep (20000); }
+  CHECK_MSG (outbuf == "NEW", outbuf);
+  CHECK_EQ (status, 0);
 }
 
-QTEST_MAIN(TestAsyncEval)
-#include "async_eval_test.moc"
+int
+main () {
+  RUN (test_interrupted_answer);
+  return test_report ();
+}

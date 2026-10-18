@@ -8,16 +8,36 @@
 * in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
 ******************************************************************************/
 
-#include <QtTest/QtTest>
+#include "tm_test.hpp"
+
+// (a test of the Qt 6 builds only: the others have no Qt)
+#if defined(QTTEXMACS) && AC_QT_MAJOR_VERSION >= 6
+
 #include "tree.hpp"
 #include "analyze.hpp"
 #include "web_files.hpp"
 
+#include <QCoreApplication>
+#include <QElapsedTimer>
+#include <QThread>
 #include <QTcpServer>
 #include <QTcpSocket>
 #include <QTimer>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <functional>
+
+// the events of Qt handled until ok holds, at most msecs (QTRY_VERIFY)
+static bool
+wait_until (std::function<bool ()> ok, int msecs) {
+  QElapsedTimer t; t.start ();
+  while (t.elapsed () < msecs) {
+    if (ok ()) return true;
+    QCoreApplication::processEvents (QEventLoop::AllEvents, 20);
+    QThread::msleep (5);
+  }
+  return ok ();
+}
 
 // A server on 127.0.0.1 (a port which the system chooses): POST /fast is
 // answered "NEW" at once; POST /slow is answered "OLD1", then "OLD2" a
@@ -71,13 +91,6 @@ private:
   }
 };
 
-class TestQtHttp: public QObject {
-  Q_OBJECT
-
-private slots:
-  void test_json_strings ();
-  void test_interrupted_answer ();
-};
 
 static array<string>
 json_headers () {
@@ -94,11 +107,11 @@ as_tm (QString s) {
 
 // the strings of a request stay strings ("42", "true"); the numbers and the
 // booleans of the request are marked (json-number, json-boolean)
-void
-TestQtHttp::test_json_strings () {
+static void
+test_json_strings () {
 #if defined(QTTEXMACS) && AC_QT_MAJOR_VERSION >= 6
   MockServer m;
-  QVERIFY (m.server.isListening ());
+  CHECK (m.server.isListening ());
   tree data (ATTR);
   data << tree ("content") << tree ("42")
        << tree ("again") << tree ("true")
@@ -107,54 +120,74 @@ TestQtHttp::test_json_strings () {
   int status= 1;
   string outbuf, errbuf;
   bool kill= false;
-  QVERIFY (!qt_async_http_post (as_tm (m.url ("/fast")), json_headers (),
+  CHECK (!qt_async_http_post (as_tm (m.url ("/fast")), json_headers (),
                                 data, status, outbuf, errbuf, kill));
-  QTRY_VERIFY_WITH_TIMEOUT (status == 0, 3000);
+  CHECK (wait_until ([&] () { return status == 0; }, 3000));
   QJsonObject o= QJsonDocument::fromJson (m.last_body).object ();
-  QVERIFY2 (o["content"].isString (), m.last_body.constData ());
-  QCOMPARE (o["content"].toString (), QString ("42"));
-  QVERIFY2 (o["again"].isString (), m.last_body.constData ());
-  QCOMPARE (o["again"].toString (), QString ("true"));
-  QVERIFY2 (o["max_tokens"].isDouble (), m.last_body.constData ());
-  QCOMPARE (o["max_tokens"].toInt (), 64);
-  QVERIFY2 (o["stream"].isBool (), m.last_body.constData ());
-  QVERIFY (o["stream"].toBool ());
+  CHECK_MSG (o["content"].isString (), m.last_body.constData ());
+  CHECK (o["content"].toString () == QString ("42"));
+  CHECK_MSG (o["again"].isString (), m.last_body.constData ());
+  CHECK (o["again"].toString () == QString ("true"));
+  CHECK_MSG (o["max_tokens"].isDouble (), m.last_body.constData ());
+  CHECK_EQ (o["max_tokens"].toInt (), 64);
+  CHECK_MSG (o["stream"].isBool (), m.last_body.constData ());
+  CHECK (o["stream"].toBool ());
 #else
-  QSKIP ("the requests are made by Qt with Qt 6 only");
+  SKIP ("the requests are made by Qt with Qt 6 only");
 #endif
 }
 
 // an interrupted answer (request_link_rep::interrupt: kill, then
 // http_async_cancel), then the next question in the same buffers
 // (request_link_rep::write): nothing of the first reaches the second
-void
-TestQtHttp::test_interrupted_answer () {
+static void
+test_interrupted_answer () {
 #if defined(QTTEXMACS) && AC_QT_MAJOR_VERSION >= 6
   MockServer m;
-  QVERIFY (m.server.isListening ());
+  CHECK (m.server.isListening ());
   tree data (ATTR);
   data << tree ("q") << tree ("x");
   int status= 1;
   string outbuf, errbuf;
   bool kill= false;
-  QVERIFY (!qt_async_http_post (as_tm (m.url ("/slow")), json_headers (),
+  CHECK (!qt_async_http_post (as_tm (m.url ("/slow")), json_headers (),
                                 data, status, outbuf, errbuf, kill));
-  QTRY_VERIFY_WITH_TIMEOUT (occurs ("OLD1", outbuf), 3000);
+  CHECK (wait_until ([&] () { return occurs ("OLD1", outbuf); }, 3000));
   kill= true;
   http_async_cancel (&outbuf);
   status= 1; outbuf= ""; errbuf= ""; kill= false;
-  QVERIFY (!qt_async_http_post (as_tm (m.url ("/fast")), json_headers (),
+  CHECK (!qt_async_http_post (as_tm (m.url ("/fast")), json_headers (),
                                 data, status, outbuf, errbuf, kill));
-  QTRY_VERIFY_WITH_TIMEOUT (status == 0, 3000);
-  QVERIFY2 (outbuf == "NEW", as_charp (outbuf));
+  CHECK (wait_until ([&] () { return status == 0; }, 3000));
+  CHECK_MSG (outbuf == "NEW", outbuf);
   // the time for the first answer to go on (OLD2), had it not been stopped
-  QTest::qWait (1200);
-  QVERIFY2 (outbuf == "NEW", as_charp (outbuf));
-  QCOMPARE (status, 0);
+  (void) wait_until ([] () { return false; }, 1200);
+  CHECK_MSG (outbuf == "NEW", outbuf);
+  CHECK_EQ (status, 0);
 #else
-  QSKIP ("the requests are made by Qt with Qt 6 only");
+  SKIP ("the requests are made by Qt with Qt 6 only");
 #endif
 }
 
-QTEST_MAIN(TestQtHttp)
-#include "qt_http_test.moc"
+int
+main (int argc, char** argv) {
+  QCoreApplication app (argc, argv);
+  RUN (test_json_strings);
+  RUN (test_interrupted_answer);
+  return test_report ();
+}
+
+#else
+
+static void
+test_qt6 () {
+  SKIP ("the requests are made by Qt with Qt 6 only");
+}
+
+int
+main () {
+  RUN (test_qt6);
+  return test_report ();
+}
+
+#endif
