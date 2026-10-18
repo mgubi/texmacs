@@ -1047,9 +1047,14 @@
          (deep (parse-xml (string-append (rep 3000 "<a>") "x" (rep 3000 "</a>")))))
     (check-true (<= (depth deep) 1001))
     ;; (the text is still there; searched in the tree, as the printer of
-    ;; s7 shortens long lists)
-    (check-true (let find ((t deep))
-                  (or (== t "x") (and (pair? t) (list-or (map find t))))))
+    ;; s7 shortens long lists, with a list of the subtrees still to search,
+    ;; as a recursion 1000 levels deep overflows the stack of femtolisp)
+    (check-true (let find ((todo (list deep)))
+                  (and (pair? todo)
+                       (let ((t (car todo)))
+                         (or (== t "x")
+                             (find (if (pair? t) (append t (cdr todo))
+                                       (cdr todo))))))))
     ;; ten levels of entities of ten each: 10^10 characters
     (let* ((names '("a" "b" "c" "d" "e" "f" "g" "h" "i" "j"))
            (decl (apply string-append

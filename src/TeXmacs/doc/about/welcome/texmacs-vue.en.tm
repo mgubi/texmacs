@@ -247,6 +247,13 @@
     (<shortcut|(program-fold)> and <shortcut|(program-unfold)>); the lines
     are indented by the structure of the code.
 
+    <item>Folds nest, and are not printed; the code inside the scripts of
+    HTML is colored again only where it changes; the <menu|Definitions> of
+    <LaTeX> (sections, labels, macros), CSS, TOML, YAML, JSON and HTML;
+    indentation of <LaTeX> and Haskell; <menu|Toggle comment> in HTML, CSS
+    and <name|OCaml>. The help on program code is the section Editing program code
+    of <menu|Help|Manual|Editing tools>.
+
     <item>The windows are drawn with <name|WebGPU>, the newer graphics
     interface of the browsers, in <name|Chrome> and the other browsers of
     <name|Chromium> (<name|Edge>...): as fast as with <name|WebGL2>, and

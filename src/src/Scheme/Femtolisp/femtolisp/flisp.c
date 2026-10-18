@@ -136,7 +136,7 @@ value_t fl_lasterror;
   fl_exception_context_t _ctx; int l__tr, l__ca; \
   _ctx.sp=SP; _ctx.frame=curr_frame; _ctx.rdst=readstate; _ctx.prev=fl_ctx; \
   _ctx.ngchnd = N_GCHND; fl_ctx = &_ctx;                                    \
-  if (!setjmp(_ctx.buf)) \
+  if (!fl_setjmp(_ctx.buf)) \
     for (l__tr=1; l__tr; l__tr=0, (void)(fl_ctx=fl_ctx->prev))
 
 #define FL_CATCH \
@@ -175,7 +175,7 @@ void fl_raise(value_t e)
     fl_exception_context_t *thisctx = fl_ctx;
     if (fl_ctx->prev)   // don't throw past toplevel
         fl_ctx = fl_ctx->prev;
-    longjmp(thisctx->buf, 1);
+    fl_longjmp(thisctx->buf, 1);
 }
 
 static value_t make_error_msg(char *format, va_list args)

@@ -1209,9 +1209,27 @@ installed, and the old behaviour stays elsewhere.
   call, about 10% of the scans) and the collections of the large TeXmacs
   heap (a quarter of the Haskell scans). Saving no mask in `set_jump_info`
   of s7.c measured 7 to 10% faster (Haskell 161 to 148 ms, Bash 193 to 178,
-  YAML 303 to 282), a 4 times larger heap 6%. Not done: the first is a
-  local patch of s7 for all of TeXmacs (a signal handler jumping out of
-  Scheme would no longer restore the mask), the second costs memory.
+  YAML 303 to 282), a 4 times larger heap 6% (not done: memory). The
+  first is s7 patch 0007 (user decision, same day): those jumps never
+  leave a signal handler, the only one which does (`siglet`, SIGSEGV in
+  `s7_is_valid`) keeps its mask. femtolisp had the same cost, larger
+  (`setjmp`/`longjmp` of macOS save and restore the mask: a fifth of the
+  scans): femtolisp patch 0024 uses `_setjmp`/`_longjmp` on macOS,
+  Bash 219 to 183 ms, YAML 457 to 394, Haskell 189 to 175, Python 47
+  to 40. femtolisp is then about as fast as s7 but on YAML (394 against
+  282 ms).
+  On YAML, femtolisp spends about 13% writing the state of the scanner
+  after each token (`object->string`). Keeping the last state and its
+  text in `scanner_serialize`, and skipping the write when the new state
+  is `equal?` to it, measured 3% on s7 and a loss on femtolisp (Bash 177
+  to 205 ms): its `equal?` called from C goes through the slow compare
+  with cycle checks. Not kept.
+- **femtolisp full suite** (same day): it never ended, because Markdown
+  keyed a table by the identity of list tails and femtolisp's tables
+  compare with `equal?` (fixed in `markdownin.scm`: keyed by the length of
+  the tail there); the test xml limits of office-test.scm overflowed its
+  stack (a search without recursion now). All the suites of femtolisp
+  pass.
 - **The old highlighters stay** (decided after a look, same day): a
   language of tree-sitter wraps the usual language of TeXmacs and still
   calls its `advance` for every token typeset (the cut of the text into
