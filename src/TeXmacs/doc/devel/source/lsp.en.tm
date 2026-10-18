@@ -12,7 +12,11 @@
   servers which other editors use (<verbatim|clangd>, <verbatim|pylsp>,
   <verbatim|jdtls>...), gives them the text of the files, underlines the
   diagnostics which they publish, and asks them for completions,
-  information at the cursor and definitions. The user level description is
+  information at the cursor and definitions. It also asks them for the
+  signatures of functions, references, the outline of a file, the symbols
+  of a project, call hierarchies, highlights of a symbol, folding ranges,
+  semantic colours and inlay hints, and applies their edits (formatting,
+  renames, quick fixes). The user level description is
   <hlink|language servers for source
   code|../../main/editing/man-language-servers.en.tm>.
 
@@ -108,7 +112,16 @@
     edits of the servers: formatting, renames, quick fixes.
 
     <item*|<source-link|lsp-navigate.scm|TeXmacs/progs/lsp/lsp-navigate.scm>>The
-    pages of the references of a symbol and of the outline of a file.
+    pages of the references of a symbol and of the outline of a file, the
+    symbols of a project (<verbatim|workspace/symbol>, <key|std P>), the call
+    hierarchy (<key|std H>), and the highlights of the symbol at the cursor
+    (<verbatim|textDocument/documentHighlight>, the alternative selection
+    <verbatim|lsp-highlights>).
+
+    <item*|<source-link|lsp-fold.scm|TeXmacs/progs/lsp/lsp-fold.scm>>The
+    folding of blocks (<key|std (> and <key|std )>): the folds are kept as
+    the trees of their lines, and given to <c++> with <scm|lsp-fold-line>
+    and <scm|lsp-fold-marker>.
 
     <item*|<source-link|lsp-decorate.scm|TeXmacs/progs/lsp/lsp-decorate.scm>,
     <source-link|lsp_decorations.cpp|src/System/Language/lsp_decorations.cpp>,
@@ -129,6 +142,20 @@
     <source-link|edit_repaint.cpp|src/Edit/Interface/edit_repaint.cpp>>The
     hook <scm|notify-buffer-changed> and the underlines of the
     diagnostics.
+
+    <item*|<source-link|typesetter.cpp|src/Typeset/Bridge/typesetter.cpp>>
+    <cpp|insert_paragraph> skips the folded lines.
+
+    <item*|<source-link|edit_cursor.cpp|src/Edit/Interface/edit_cursor.cpp>>
+    <scm|lsp-cursor-in-fold> is called when the cursor has no box (it is in
+    a folded line).
+
+    <item*|<source-link|edit_mouse.cpp|src/Edit/Interface/edit_mouse.cpp>>The
+    point under the mouse as a cursor position (<scm|xy-\<gtr\>path>), for
+    the hovers at the mouse.
+
+    <item*|<source-link|json.cpp|src/Data/Convert/AI/json.cpp>>The
+    <name|JSON> converter which reads and writes the messages.
 
     <item*|<source-link|new_buffer.cpp|src/Texmacs/Data/new_buffer.cpp>>The
     hook <scm|notify-buffer-closed>, and the font of a source file which is

@@ -25,35 +25,61 @@
     must not block <scm|lsp-send>). These tests are skipped on
     <name|Windows>;
 
-    <item>the messages, texts, positions and <abbr|URI>s of
-    <verbatim|lsp-base>;
+    <item>the messages, the texts and the <name|UTF-16> offsets (lines of
+    one byte per character, which take a shorter path, and the others), and
+    the <abbr|URI>s of <verbatim|lsp-base> (drive letters, <verbatim|file:/x>,
+    a <verbatim|%> without hexadecimal digits);
 
     <item>the clients, on procedures which record what is sent and are given
-    the answers (initialization, a server which is slow to start or never
-    answers <verbatim|initialize>, requests, requests of the servers, the
-    end of a server), the documents, the options of
-    <verbatim|textDocumentSync> and the diagnostics;
+    the answers: initialization, a server which is slow to start or never
+    answers <verbatim|initialize>, the state of the diagnostics of the
+    servers, the options of <verbatim|textDocumentSync>;
+
+    <item>the reading of answers: the entries of an outline, folding
+    ranges, the decoding of semantic tokens and their colours, the labels
+    of inlay hints and their lines in Cork offsets;
+
+    <item>points of the protocol: capabilities given as <verbatim|false>, a
+    request cancelled during the initialization (never sent), diagnostics
+    of an older version (ignored), stale workspace edits
+    (<scm|lsp-workspace-edit-stale?>);
+
+    <item>requests, requests of the servers, the end of a server;
 
     <item>the edits of the servers (<scm|lsp-apply-to-lines>,
     <scm|lsp-move-through-edits>): edits with the same start, overlapping
-    or beyond the text, the cursor after a longer line;
+    or beyond the text, the cursor after a longer line, incremental changes
+    and the lines which they change, workspace edits; the parts of a
+    signature (with offsets in <name|UTF-16> units, and a parameter looked
+    for after the name of the function), the progress of a server, the
+    point under the mouse;
+
+    <item>the documents and the diagnostics;
 
     <item>a server which ends at once (<verbatim|sh -c 'exit 0'>) is not
     started again until it is forgotten;
 
     <item>a C file of a throwaway project (with a
     <verbatim|compile_flags.txt>) in the temporary directory: its format,
-    language, project, lines and cursor position.
+    language, project, lines and cursor position (the group
+    <verbatim|buffer>), and the decorations and folds of its lines, without
+    a server (<verbatim|test-lines-of-buffer>: a line which is edited, moved
+    or removed; a fold in a fold which stays folded when the outer one
+    goes).
   </itemize>
 
   When <verbatim|clangd> is installed, the suite also runs it on that
-  project and tests the editor on a <c++> file: the buffer followed, the
-  diagnostics underlined (the alternative selection
-  <verbatim|lsp-errors>), <key|F8>, the definition, the completion
-  (synchronous and asynchronous), the log page and its refresh, the hover
-  balloon, the <verbatim|didChange>, <verbatim|didSave> and
-  <verbatim|didClose> sent when the buffer is saved and closed, and the
-  servers stopped by <scm|lsp-stop-servers>.
+  project (hover, diagnostics, the client of a buffer) and tests the editor
+  on a <c++> file: the buffer followed, the diagnostics underlined (the
+  alternative selection <verbatim|lsp-errors>), <key|F8>, the definition,
+  the completion (synchronous and asynchronous), the log page and its
+  refresh, the hover balloon, the <verbatim|didChange>, <verbatim|didSave>
+  and <verbatim|didClose> sent when the buffer is saved and closed, and the
+  servers stopped by <scm|lsp-stop-servers>. On a third file, it tests the
+  actions: the page of the diagnostics, the focus bar, a quick fix, the
+  signature, the references and the outline, the highlights, folding and
+  unfolding a block, the symbols of the project and the calls, the
+  colours and hints, a rename and the formatting.
 
   The suite runs <em|after> <verbatim|kbd-menu> in <scm|check-master>:
   editing a <c++> buffer loads the keyboard maps of programs, and the
@@ -79,6 +105,31 @@
     (<scm|lsp-completion-here?>, <scm|lsp-cursor-moved>). The mode
     <scm|in-lsp%> of the keys is another matter: as any mode, it is
     evaluated when a key is looked up.
+
+    <item><em|Hooks with <scm|:require> or <scm|:mode> must call
+    <scm|former>.> A hook such as <scm|notify-cursor-moved> is redefined by
+    several modules: the language servers (<verbatim|lsp-edit>,
+    <verbatim|lsp-navigate>, <verbatim|lsp-fold>) call <scm|former> and have
+    no condition, but a definition with a <scm|:require> or a <scm|:mode>
+    which holds replaces the definitions loaded before it. If it does not
+    call <scm|former>, those are skipped: without it, the highlights of
+    brackets of <source-link|cpp-edit.scm|TeXmacs/progs/prog/cpp-edit.scm>
+    keep the language servers from seeing the moves of the cursor in a
+    <c++> file (when they were loaded before it). The definitions of
+    <scm|notify-cursor-moved> in <verbatim|prog/*-edit.scm> now call
+    <scm|(former status)> first.
+
+    <item><em|Strings compared with <scm|eq?> under <name|S7>.> A cache
+    which remembers the last string by <scm|eq?> is only safe while it
+    keeps a reference to that string: a string which is freed may have its
+    address taken by a new one, which would then be taken for it. The
+    cache <verbatim|plain?> of
+    <source-link|lsp-base.scm|TeXmacs/progs/lsp/lsp-base.scm> (whether a
+    line has one byte and one <name|UTF-16> unit per character) therefore
+    keeps the line which it was asked about in <verbatim|plain-line>. The
+    same holds for the trees of the lines which the typesetter knows by
+    their addresses: <verbatim|lsp-decorate> and <verbatim|lsp-fold> keep
+    them while they are decorated or folded.
 
     <item><em|<scm|tree-bounding-rectangle> needs an up-to-date
     typesetting.> <scm|show-tooltip> places the balloon of a hover with the

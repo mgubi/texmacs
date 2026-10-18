@@ -271,7 +271,9 @@
   <paragraph*|The list of diagnostics>
 
   <key|std M> opens a page with all the diagnostics of the current file, one
-  per line, with its line, its column, its severity and its message.
+  per line, with its line, its column (as the server counts it: a
+  character beyond U+FFFF, such as an emoji, counts twice), its severity
+  and its message.
   Clicking on a line goes to the place of the diagnostic. The page is
   updated while it stays open, each time the server publishes new
   diagnostics. At most 1000 diagnostics are underlined in a file.
@@ -293,7 +295,9 @@
   applied at once; when there are several, they are listed on a page, from
   which one is applied by clicking on it. If the file has been edited
   since the page was opened, the change is not applied (it was made for
-  the former text): ask for the corrections again.
+  the former text): ask for the corrections again. Some changes are sent
+  by the server later, after a command; they are refused too when the file
+  has changed meanwhile.
 
   <paragraph*|References and outline>
 
@@ -304,13 +308,17 @@
   variables..., indented as they are nested in the file, each with its
   kind and its signature. On both pages, a click on a line goes to its
   place. The outline follows the file as long as its page stays open: it
-  is made again each time the server has seen a change.
+  is made again each time the server has seen a change. At most 2000
+  references are listed.
 
   <key|std P> asks for a name and lists the symbols of the whole project
   whose names match it (functions, types, variables...), with their files
   and lines. <key|std H> shows the calls of the function at the cursor:
   the functions which call it (a click goes to the call) and the
-  functions which it calls (a click goes to their definitions).
+  functions which it calls (a click goes to their definitions). At most
+  500 symbols are listed; a server which has not answered after 10
+  seconds is given up (5 seconds for the requests at the cursor, such as
+  the definitions and the references).
 
   When the cursor rests in a name, the other places of the file where the
   same symbol is used are highlighted, as the matches of a search. The
@@ -328,17 +336,20 @@
 
   Folding changes only what is shown: the lines stay in the file, which is
   saved, searched, undone and given to the server as usual. The cursor
-  does not stay in a folded block: moving right at the end of its first
-  line goes after it, moving left at the start of the line after it goes
-  back to its first line, and a block where the cursor comes otherwise (a
-  search, a definition, a diagnostic) opens. A block whose lines are
-  removed or moved by an edit opens too.
+  does not stay in a folded block: moving from its first line into it
+  (right at the end of the line, or down) goes to the line after it,
+  moving back from the line after it (left at its start, or up) goes to
+  its first line, and a block where the cursor comes otherwise (a search,
+  a definition, a diagnostic) opens. A block whose first line is replaced
+  or whose lines are removed or moved by an edit opens too (the blocks
+  folded in it stay folded). The blocks open when the file is saved under
+  another name and when the language servers are turned off.
 
   <paragraph*|Colours and inlay hints>
 
   When the server can tell the kinds of the names (<em|semantic tokens>,
-  as <verbatim|clangd> does), the names of functions, of types and of
-  macros get colours of their own, also those which <TeXmacs> could not
+  as <verbatim|clangd> does), the names of functions, of types, of macros
+  and of the members of enumerations get colours of their own, also those which <TeXmacs> could not
   recognize by itself (the types and the macros which the program defines).
   The colours of the types and of the macros are those of the preferences
   of the syntax of the language; keywords, comments, strings and numbers
@@ -352,10 +363,12 @@
 
   The colours and the hints are those of the text which the server was
   last given: a line which you edit loses them until the server has
-  answered again, a moment after you have paused. Both can be turned off
-  in <menu|Tools|Language servers> (the preferences
-  <verbatim|lsp:semantic colors> and <verbatim|lsp:inlay hints>). Files of
-  more than 20000 lines are left as they are.
+  answered again, a moment after you have paused. They are asked for once
+  the server has published the diagnostics of the text (a server which
+  publishes none gets no colours and no hints). Both can be turned off in
+  <menu|Tools|Language servers> (the preferences
+  <verbatim|lsp:semantic colors> and <verbatim|lsp:inlay hints>). They are
+  not asked for in files of more than 20000 lines.
 
   <paragraph*|Incremental synchronization>
 

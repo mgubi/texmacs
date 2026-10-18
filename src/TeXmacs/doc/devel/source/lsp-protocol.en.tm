@@ -66,7 +66,10 @@
   Cork string of the line. <scm|lsp-offset-\<gtr\>character> and
   <scm|lsp-character-\<gtr\>offset> convert between them (a character in
   the middle of a Cork character goes to its start, one beyond the end of
-  the line to its end), and <scm|lsp-position> and
+  the line to its end; in a line whose characters are all of one byte and
+  one unit, without the <verbatim|\<less\>> of the special characters of
+  Cork, <scm|lsp-character-\<gtr\>offset> gives the character itself, and the last line asked about is remembered, since
+  the tokens of a line come together), and <scm|lsp-position> and
   <scm|lsp-position-\<gtr\>line+offset> convert whole positions.
 
   <paragraph*|URIs>
@@ -75,7 +78,12 @@
   <verbatim|file://> <abbr|URI>, encoding with <verbatim|%XX> every byte
   which is not a letter, a digit or one of <verbatim|-._~/:>; backslashes
   become slashes. <scm|lsp-uri-\<gtr\>path> decodes, and removes the slash
-  before a drive letter (<verbatim|file:///c:/x> on <name|Windows>).
+  before a drive letter (<verbatim|file:///c:/x> on <name|Windows>), which
+  it writes in capitals (<verbatim|c:> and <verbatim|C:> are the same
+  drive, and servers write either). It also accepts <verbatim|file:/x>,
+  without the authority, as the same file as <verbatim|file:///x>, and
+  keeps a <verbatim|%> which is not followed by two hexadecimal digits as
+  it is.
 
   <section|Clients>
 
@@ -105,12 +113,30 @@
   The states are:
 
   <\description>
+    <item*|<verbatim|new>>The client has been made (<scm|lsp-client-make>),
+    and nothing has been sent yet.
+
     <item*|<verbatim|initializing>>The request <verbatim|initialize> has
     been sent (<scm|lsp-client-initialize>), with the root as
     <verbatim|rootUri> and as the only workspace folder, and the
-    capabilities of the client: <name|UTF-16> positions, <verbatim|didSave>,
-    hovers in plain text or markdown, completion without snippets,
-    definitions, configuration, workspace folders and progress. The
+    capabilities of the client (<verbatim|client-capabilities>):
+    <name|UTF-16> positions; <verbatim|didSave>; diagnostics with
+    <verbatim|versionSupport>; hovers in plain text or markdown; completion
+    without snippets; definitions, <verbatim|references>,
+    <verbatim|documentHighlight> and <verbatim|callHierarchy>;
+    <verbatim|foldingRange> with <verbatim|lineFoldingOnly>;
+    <verbatim|documentSymbol> with
+    <verbatim|hierarchicalDocumentSymbolSupport>;
+    <verbatim|semanticTokens> (<verbatim|full> requests, relative format,
+    the standard token types); <verbatim|inlayHint>;
+    <verbatim|formatting> and <verbatim|rangeFormatting>;
+    <verbatim|rename> (without <verbatim|prepareSupport>);
+    <verbatim|signatureHelp> with <verbatim|labelOffsetSupport>;
+    <verbatim|codeAction> with code action literals (quick fixes,
+    refactorings, sources); and, for the workspace, configuration,
+    <verbatim|symbol>, workspace folders, <verbatim|applyEdit>,
+    <verbatim|workspaceEdit> with <verbatim|documentChanges> and
+    <verbatim|executeCommand>; progress (<verbatim|workDoneProgress>). The
     answers to the requests of the server are sent at once (a server may
     ask before it answers); every other message waits in the queue, where
     a <verbatim|didChange> with the whole text of a document replaces those
@@ -122,6 +148,9 @@
     <item*|<verbatim|running>>The answer has come: its capabilities are
     kept, <verbatim|initialized> is sent and then the queue. An error
     answer to <verbatim|initialize> kills the client.
+    <scm|(lsp-client-capable? c name)> tells whether the server has a
+    capability (a <verbatim|...Provider>): a capability which is absent,
+    null or given as <verbatim|false> counts as absent.
 
     <item*|<verbatim|stopping>><scm|lsp-client-stop> has sent
     <verbatim|shutdown> (waited for at most 2 s) and <verbatim|exit>; the
@@ -142,7 +171,9 @@
   <scm|handler> is called with the result and the error of the answer, one
   of them <scm|#f>. <scm|lsp-notify> sends a notification,
   <scm|lsp-cancel> forgets the handler of a request and sends
-  <verbatim|$/cancelRequest>. <scm|lsp-wait> listens until a condition
+  <verbatim|$/cancelRequest>; a request which still waits in the queue (the
+  server is initializing) is removed from it instead, and never sent.
+  <scm|lsp-wait> listens until a condition
   holds or a delay has passed, and <scm|lsp-request-wait> sends a request
   and waits for its answer, which is <scm|(result <em|r>)>,
   <scm|(error <em|e>)> or <scm|(timeout)> (the request is then
@@ -168,6 +199,14 @@
   <verbatim|client/registerCapability>, <verbatim|client/unregisterCapability>
   and <verbatim|window/showMessageRequest>, and logs
   <verbatim|window/logMessage> and <verbatim|window/showMessage>.
+  <source-link|lsp-actions.scm|TeXmacs/progs/lsp/lsp-actions.scm> answers
+  <verbatim|workspace/applyEdit>: the edit is refused (<verbatim|applied>
+  <verbatim|false>, <verbatim|failureReason> <verbatim|the file has
+  changed>) when <scm|lsp-workspace-edit-stale?> holds, that is when the
+  <verbatim|version> of one of its <verbatim|TextDocumentEdit>s differs
+  from the version of the document which the client gave
+  (<scm|lsp-document-version>), or when the buffer of that document has
+  changed since its text was given (<scm|lsp-document-sent-text>).
 
   The log of a client keeps its last 200 entries, each with a kind
   (<verbatim|error>, <verbatim|stderr>, <verbatim|log>,
@@ -179,7 +218,8 @@
   The clients are kept in a table under their language and root.
   <scm|lsp-client-for> returns the client of a language and root, and
   starts one if there is none; <scm|lsp-client-find> returns the client
-  only if it is alive (starting, initializing or running) and never starts
+  only if it is alive (in the state <verbatim|new>, <verbatim|initializing>
+  or <verbatim|running>, see <scm|lsp-client-alive?>) and never starts
   one. A client is kept in the table once its server has ended (stopped,
   crashed, or which could not start), and <scm|lsp-client-for> then gives
   <scm|#f>: a server is <em|not started again> until its entry is
@@ -233,7 +273,10 @@
 
   The notification <verbatim|textDocument/publishDiagnostics> replaces the
   diagnostics kept for its <abbr|URI> and calls the hook
-  <scm|lsp-diagnostics-changed>. The <abbr|URI>s are kept as <TeXmacs>
+  <scm|lsp-diagnostics-changed>, unless it has a <verbatim|version> older
+  than the one of the document which the client has given: those
+  diagnostics are for an older text, and the ones of the present text come
+  after them, so they are ignored. The <abbr|URI>s are kept as <TeXmacs>
   writes them (<verbatim|uri-key>: decoded and encoded again), since a
   server may write the same file otherwise (<verbatim|%c3%a9> for
   <verbatim|%C3%A9>, <verbatim|%3A> for <verbatim|:>).

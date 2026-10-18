@@ -49,7 +49,10 @@
 
   <cpp|write (s, LINK_IN)> sends <cpp|lsp_frame (s)>, that is
   <verbatim|Content-Length: <em|n>\\r\\n\\r\\n> followed by <cpp|s>, to
-  the transport.
+  the transport, and then drains it: what the server sent while it was
+  written to (<cpp|flush_input> reads the output of the child meanwhile)
+  is in the buffers of the pipe, whose notifier will not tell it again,
+  and would otherwise wait for the next notification.
   <cpp|drain> reads what the transport has received on <cpp|LINK_OUT> and
   <cpp|LINK_ERR>, and <cpp|parse> moves the whole messages from <cpp|buf>
   to <cpp|msgs>. Some servers print lines on their standard output by
@@ -58,7 +61,11 @@
   <verbatim|Name: value> to <cpp|errbuf> (<verbatim|lsp: skipped '...'>),
   and a block without <verbatim|Content-Length> is skipped with an error
   (<verbatim|lsp: no Content-Length in '...'>) instead of blocking the
-  link.
+  link. The end of a header is the first <verbatim|CR LF CR LF>, or an
+  <verbatim|LF LF> before it; once a <verbatim|CR LF CR LF> has been found,
+  the <verbatim|LF LF> is only looked for in the header before it, so that
+  the body of a long message which comes in many parts is not searched
+  again at each part.
 
   <cpp|read (LINK_OUT)> returns the next whole message (or the empty
   string), <cpp|read (LINK_ERR)> returns and empties <cpp|errbuf>. <cpp|listen
@@ -83,8 +90,15 @@
   appends to <cpp|inbuf> (from <cpp|inpos> on) what the child has not
   taken yet. <cpp|flush_input (msecs)> writes what the child takes, for at
   most <cpp|msecs>, and reads its output meanwhile; <cpp|write> calls it
-  for 100 ms, and <cpp|listen> writes what is left whenever the pipe can
-  take more, so that the rest goes at the next turns of the event loop.
+  with 0, that is it tries once without waiting, so that a child which
+  reads no more costs no wait at each write. What is left is written by
+  <cpp|listen>, whenever the pipe can take more: the virtual
+  <cpp|tm_link_rep::pending_write> tells that some input is not written
+  yet, and <cpp|lsp_dispatch> calls <cpp|listen (0)> on the transport of
+  each client which has some, then drains it, so that the rest goes at
+  the next turns of the event loop. Once 64 KB of <cpp|inbuf> have been
+  written, the part which is written is cut off, so that a long queue of
+  messages to a slow server does not keep growing.
   The blocking writes of the plug-ins also retry a partial or interrupted
   write instead of losing the rest. With <name|Qt>, the pipe is a
   <cpp|QProcess> (<source-link|QTMPipeLink.cpp|src/Plugins/Qt/QTMPipeLink.cpp>),
@@ -151,7 +165,10 @@
     <item><cpp|lsp_listen>, after waiting.
   </itemize>
 
-  <cpp|lsp_dispatch> goes over the clients which have <cpp|news> (or whose
+  <cpp|lsp_dispatch> first writes the rest of the messages which the
+  servers have not taken yet (the clients whose link has a
+  <cpp|pending_write>, see above). It then goes over the clients which
+  have <cpp|news> (or whose
   link has ended) and gives each one first its errors, then <em|one>
   message; it sets <cpp|news> again for a client which gave a message, and
   loops until no call back was called, or for about 100 ms at most: a

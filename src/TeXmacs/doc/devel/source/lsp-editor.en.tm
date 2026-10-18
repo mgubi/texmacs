@@ -290,18 +290,28 @@
   (lines only, <scm|lsp-folding-ranges-of>); <scm|lsp-fold> folds the
   innermost block at the cursor which is not folded yet
   (<scm|lsp-innermost-range>), <scm|lsp-unfold> the innermost fold at the
-  cursor. After each change of the buffer (<scm|notify-buffer-changed>), a
-  fold whose lines are no longer next to its first line in the document
-  is dropped, and the lines whose texts have changed are marked again and
-  typeset again.
+  cursor. A server may give the same block twice, or two blocks with the
+  same first line: when all the blocks are folded, those with the same
+  first line are reduced to the larger one. After each change of the
+  buffer (<scm|notify-buffer-changed>), a fold whose lines are no longer
+  next to its first line in the document is dropped, and the lines whose
+  texts have changed are marked again and typeset again. When a fold is
+  dropped, the folds which stay are given to the typesetter again: the
+  lines of a fold nested in the one which went stay hidden.
 
   A cursor in a folded line has no box: <cpp|edit_cursor_rep> does not call
   <scm|notify-cursor-moved> then, but <scm|lsp-cursor-in-fold> (<source-link|edit_cursor.cpp|src/Edit/Interface/edit_cursor.cpp>).
   Both schedule a check (<scm|delayed>: the path of the cursor is not the
   new one yet in <scm|notify-cursor-moved>), which keeps the last place of
-  the cursor outside the folds, and moves a cursor in a fold after it
-  (from the end of its first line), to the end of its first line (from the
-  start of the line after it), or opens the fold.
+  the cursor outside the folds. A cursor in a hidden line belongs to the
+  outermost fold which hides it (<verbatim|hiding-fold>, whose first line
+  is shown). It skips the fold only when it comes from its first line into
+  its first hidden line (it goes to the line after the fold, in the same
+  column if it can) or from the line after the fold into its last hidden
+  line (it goes to the first line of the fold, at its end if it came from
+  the start of the line). Any other move into the fold (a search, a jump to
+  a definition or a diagnostic) opens it, with the folds in it which hide
+  the line.
 
   <section|Colours and inlay hints>
 
@@ -311,18 +321,33 @@
   server has published diagnostics for it (it has seen the text then), if
   the buffer has at most 20000 lines and the preferences
   <verbatim|lsp:semantic colors> and <verbatim|lsp:inlay hints> are on. The
-  answers are used only if the buffer still has the text they were asked
-  for. <scm|lsp-decode-tokens> decodes the tokens (relative lines and
-  starts, the types of the legend of the server); <scm|lsp-token-color>
-  gives colours to functions, methods, types and macros only (those of the
-  preferences of the syntax for types and macros), the rest keeps the
+  changes which wait are sent first (<scm|lsp-sync-pending>), so that the
+  server answers for the text of the buffer, and the inlay hints are asked
+  for up to the end of the last line (not beyond it, which a server may
+  refuse). The answers are used only if the buffer still has the text they
+  were asked for, and only if it is the buffer which is shown (the lines
+  which change are typeset again). <scm|lsp-decode-tokens> decodes the
+  tokens (relative lines and starts, the types of the legend of the
+  server); <scm|lsp-token-color> gives colours to functions, methods,
+  types, macros and enum members only (those of the preferences of the
+  syntax for types, macros and numbers), the rest keeps the
   colours of the language of <TeXmacs>; <scm|lsp-line-decorations> gives,
   line by line, the coloured pieces and the hints in Cork offsets.
 
   <scm|lsp-apply-decorations> gives them to the typesetter with
   <scm|lsp-decorate-line> (glue), for the lines whose decorations change,
   and typesets those lines again (<scm|update-path>; the whole buffer
-  beyond 2000 lines). <source-link|lsp_decorations.cpp|src/System/Language/lsp_decorations.cpp>
+  beyond 2000 lines). Its table <verbatim|decorated> keeps, for each
+  decorated line of a buffer, the tree of the line, its text then and its
+  decorations. A line which has moved (a line was inserted or removed
+  above it) and keeps its tree, its text and its decorations is not given
+  again nor typeset again; a line which was edited (the same tree, another
+  text) is given again. The lines which have no decorations any more, and
+  those which were removed from the document, lose theirs. Keeping the
+  trees also keeps the lines which were removed from being freed while
+  they are decorated: the typesetter knows them by their addresses, which
+  a line made later could otherwise take.
+  <source-link|lsp_decorations.cpp|src/System/Language/lsp_decorations.cpp>
   keeps them for the tree of each line, with its text then:
   <cpp|lsp_line_decorations_of> gives none for a line whose text has
   changed, so that an edited line is typeset as usual until the next
@@ -330,7 +355,8 @@
   calls <cpp|typeset_lsp_string> for a decorated line: the pieces of a token
   with colours of their own are typeset apart, and the hints come before
   the tokens where they are, as grey text boxes with decorated paths (the
-  cursor does not go into them), their paddings as spaces. The lines of a
+  cursor does not go into them), their spaces and paddings as empty boxes
+  of the width of a space (printed spaces would be merged). The lines of a
   closed buffer, and all of them when the servers are turned off, lose
   their decorations.
 
@@ -399,7 +425,13 @@
   (<verbatim|workspace/applyEdit>, applied by
   <scm|lsp-apply-workspace-edit>, which returns the number of files
   changed; the answer is <verbatim|applied> <verbatim|false>, with a
-  <verbatim|failureReason>, when a file could not be opened). The client
+  <verbatim|failureReason>, when a file could not be opened). Such an edit
+  comes later than the answer to a request, and the buffer may have
+  changed meanwhile: it is refused (<verbatim|applied> <verbatim|false>,
+  with a message) when <scm|lsp-workspace-edit-stale?> holds, that is when
+  a <verbatim|TextDocumentEdit> is for another version of its document than
+  the one which the client gave, or when the buffer of that document has
+  changed since its text was given to the server. The client
   declares these abilities in
   <verbatim|initialize> (code action literals, label offsets of the
   parameters, <verbatim|applyEdit>, document changes), else
@@ -417,7 +449,10 @@
   <scm|lsp-next-diagnostic>, <key|std F> to <scm|lsp-format>, <key|std E> to
   the rename, <key|std .> to <scm|lsp-quick-fix>, <key|std M> to
   <scm|lsp-show-diagnostics-list> (<key|F2>, the key of renames in other
-  editors, is taken), and defines <scm|lsp-menu>.
+  editors, is taken), <key|std U> to <scm|lsp-references>, <key|std O> to
+  <scm|lsp-outline>, <key|std P> to <scm|lsp-find-symbol> (interactive),
+  <key|std H> to <scm|lsp-call-hierarchy>, <key|std (> to <scm|lsp-fold>
+  and <key|std )> to <scm|lsp-unfold>, and defines <scm|lsp-menu>.
 
   <section|The status bar and the font of source files>
 
