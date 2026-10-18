@@ -309,6 +309,12 @@ line_string (tree t) {
   string s; flatten (t, s); return s;
 }
 
+static bool
+unchanged_line (string& old, tree t) {
+  if (is_atomic (t)) return same_line (old, t->label);
+  return old == line_string (t);
+}
+
 static const std::string&
 region_text (syntax_region_rep* r) {
   // the text of the lines, made again only after a parse which did not
@@ -427,12 +433,12 @@ region_update (syntax_region_rep* r) {
   if (is_document (root) && N(root) == n0) {
     // (a keystroke: the lines which changed, without a list of all of
     // them)
+    // (a line with markup is compared by its text)
     int a= 0;
-    while (a < n0 && is_atomic (root[a]) && same_line (r->lines[a], root[a]->label)) a++;
+    while (a < n0 && unchanged_line (r->lines[a], root[a])) a++;
     if (a == n0) return;
     int b= 0;
-    while (b < n0 - a && is_atomic (root[n0-1-b]) &&
-           same_line (r->lines[n0-1-b], root[n0-1-b]->label)) b++;
+    while (b < n0 - a && unchanged_line (r->lines[n0-1-b], root[n0-1-b])) b++;
     array<string> mid;
     for (int i= a; i < n0 - b; i++) mid << line_string (root[i]);
     update_lines (r, a, b, mid);
@@ -802,38 +808,61 @@ paint_node (TSNode n, array<int>& paint, int from, int to, int code) {
 }
 
 static void
+paint_missing (TSNode ch, TSNode* open, array<int>& paint, int from, int to,
+               int code) {
+  // ch is a MISSING closing bracket: the opening one before it is painted
+  // (open: the last opening bracket of each kind seen, ( [ {)
+  const char* type= ts_node_type (ch);
+  char o= opening_bracket (type[0]);
+  int k= (o == '(')? 0: (o == '['? 1: 2);
+  if (o != '\0' && !ts_node_is_null (open[k]))
+    paint_node (open[k], paint, from, to, code);
+}
+
+static void
 paint_unmatched (TSNode n, array<int>& paint, int from, int to, int code) {
   // paint in the colour code the brackets which error recovery left
   // unmatched: those directly in an ERROR node, and the opening bracket of
   // a node where a closing one is MISSING (only the nodes with errors are
   // visited, and of their children those from the bytes from to to: a
-  // cursor goes to the first one, ts_node_child would count them all)
+  // cursor goes to the first one, ts_node_child would count them all; the
+  // opening brackets are remembered on the way, ts_node_prev_sibling would
+  // look for each one from the root)
   if (!ts_node_has_error (n)) return;
   if ((int) ts_node_end_byte (n) < from || (int) ts_node_start_byte (n) > to) return;
   bool err= ts_node_is_error (n);
+  TSNode open[3]= { TSNode (), TSNode (), TSNode () };
+  for (int k= 0; k < 3; k++) open[k].id= NULL;
+  bool past= false;
   TSTreeCursor c= ts_tree_cursor_new (n);
   // (a MISSING node has no width: one which ends at from is there too)
   if (ts_tree_cursor_goto_first_child_for_byte (&c, (uint32_t) max (from - 1, 0)) >= 0)
     do {
       TSNode ch= ts_tree_cursor_current_node (&c);
-      if ((int) ts_node_start_byte (ch) > to) break;
+      if ((int) ts_node_start_byte (ch) > to) { past= true; break; }
       const char* type= ts_node_type (ch);
-      if (ts_node_is_missing (ch) && bracket_type (type)) {
-        char open= opening_bracket (type[0]);
-        for (TSNode o= ts_node_prev_sibling (ch);
-             open != '\0' && !ts_node_is_null (o); o= ts_node_prev_sibling (o)) {
-          const char* t= ts_node_type (o);
-          if (!ts_node_is_named (o) && t[0] == open && t[1] == '\0') {
-            paint_node (o, paint, from, to, code);
-            break;
-          }
-        }
+      if (!ts_node_is_named (ch) && bracket_type (type) &&
+          opening_bracket (type[0]) == '\0') {
+        int k= (type[0] == '(')? 0: (type[0] == '['? 1: 2);
+        if (!ts_node_is_missing (ch)) open[k]= ch;
       }
+      if (ts_node_is_missing (ch) && bracket_type (type))
+        paint_missing (ch, open, paint, from, to, code);
       else if (err && !ts_node_is_named (ch) && bracket_type (type))
         paint_node (ch, paint, from, to, code);
       else paint_unmatched (ch, paint, from, to, code);
     } while (ts_tree_cursor_goto_next_sibling (&c));
   ts_tree_cursor_delete (&c);
+  // (the walk stopped after the bytes: a MISSING closing bracket is the last
+  // child, as error recovery puts it, whose opening one may be in them)
+  if (past) {
+    uint32_t k= ts_node_child_count (n);
+    if (k > 0) {
+      TSNode last= ts_node_child (n, k - 1);
+      if (ts_node_is_missing (last) && bracket_type (ts_node_type (last)))
+        paint_missing (last, open, paint, from, to, code);
+    }
+  }
 }
 
 static void

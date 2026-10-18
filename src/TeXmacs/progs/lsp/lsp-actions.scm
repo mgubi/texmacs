@@ -188,14 +188,25 @@
   ;; change the number of the lines of one block only
   (in-buffer u
     (lambda ()
+      ;; (the lines of the unit as its blocks are now, which the edits are
+      ;; for; the cursor follows the text, as in a block)
+      (lsp-unit-set-roots! un (lsp-unit-roots un))
       (let* ((old (lsp-lines (lsp-unit-lines un)))
-             (lines (lsp-apply-to-lines old edits)))
+             (lines (lsp-apply-to-lines old edits))
+             (lo (lsp-unit-lo-of un (cursor-path))))
         (if (not (lsp-unit-write-back! un lines))
             (begin
               (set-message "The edits join or split code blocks: not applied" "")
               #f)
             (begin
               (lsp-unit-set-roots! un (lsp-unit-roots un))
+              (when lo
+                (let* ((lo2 (lsp-move-through-edits old edits lo))
+                       (n (length lines))
+                       (l (max 0 (min (car lo2) (- n 1))))
+                       (o (max 0 (min (cadr lo2) (string-length (lsp-line lines l)))))
+                       (p (lsp-unit-path-of un l o)))
+                  (when p (go-to p))))
               (max 1 (abs (- (length lines) (length old))))))))))
 
 (tm-define (lsp-apply-buffer-edits u edits . opt)

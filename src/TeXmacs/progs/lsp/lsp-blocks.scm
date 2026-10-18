@@ -159,7 +159,9 @@
 ;; The units: the blocks of a language in a document, as one file
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;; doc path + language -> unit, a vector #(doc lan path lines roots counts):
+;; doc path + language -> unit, a vector #(doc lan path lines roots counts
+;; synced): synced is (roots counts) as the server was last given them,
+;; with which its diagnostics are placed until the next sync;
 ;; lines is a document of the lines of the blocks (a tree of its own, which
 ;; the server is given: its snapshots compare its lines), roots the blocks
 ;; in the order of the document, counts their numbers of lines
@@ -178,15 +180,19 @@
                            (string-append "." (url->string (url-tail (system->url doc)))
                                           "-blocks." (lan-suffix lan)))))
 
+(define (line-text l)
+  ;; the text of a line (one with markup: as the server sees it)
+  (if (tree-atomic? l) (tree->string l) (car (lsp-lines l))))
+
 (define (block-lines root)
   (if (tree-is? root 'document)
-      (map (lambda (l) (if (tree-atomic? l) (tree->string l) (car (lsp-lines l))))
-           (tree-children root))
+      (map line-text (tree-children root))
       (lsp-lines root)))
 
 (define (set-lines! body lines)
-  ;; the document @body gets the lines @lines (those which differ)
-  (let* ((old (map tree->string (tree-children body)))
+  ;; the document @body gets the lines @lines (those which differ: a line
+  ;; with markup whose text is the same stays as it is)
+  (let* ((old (map line-text (tree-children body)))
          (n (length old)) (m (length lines)))
     (let loop ((i 0) (o old) (l lines))
       (when (and (< i n) (< i m))
@@ -208,7 +214,12 @@
   (:synopsis "The blocks of the unit @u are @roots; its lines follow them")
   ;; (the roots which are no longer in a document are left out; in the
   ;; order of the document)
-  (let* ((in (list-filter roots (lambda (r) (tree->path r))))
+  (let* ((in (list-filter roots
+                          (lambda (r)
+                            ;; (still in the document, a block of the language)
+                            (and (tree->path r) (tree-up r)
+                                 (== (lsp-block-language (tree-up r))
+                                     (vector-ref u 1))))))
          (sorted (sort in (lambda (a b) (path<? (tree->path a) (tree->path b)))))
          (ls (map block-lines sorted)))
     (vector-set! u 4 sorted)
@@ -221,16 +232,38 @@
   (with key (unit-key doc lan)
     (or (ahash-ref units key)
         (with u (vector doc lan (unit-path doc lan)
-                        (stree->tree '(document)) '() '())
+                        (stree->tree '(document)) '() '() (list '() '()))
           (ahash-set! units key u)
           u))))
+
+(define (refresh-block! u root)
+  ;; the lines of the unit @u which are those of its block @root, when its
+  ;; blocks and their numbers of lines are the same; whether they were
+  ;; (a query at the cursor, at each key: not all the blocks again)
+  (let loop ((rs (vector-ref u 4)) (cs (vector-ref u 5)) (start 0) (ok #t))
+    (cond ((null? rs) ok)
+          ((not (and (tree->path (car rs)) (tree-up (car rs))
+                     (tree-is? (car rs) 'document)
+                     (== (lsp-block-language (tree-up (car rs))) (vector-ref u 1))
+                     (== (tree-arity (car rs)) (car cs))))
+           #f)
+          ((tree-eq? (car rs) root)
+           (let ((lines (vector-ref u 3)) (new (block-lines root)))
+             (for (i (iota (car cs)))
+               (with l (list-ref new i)
+                 (when (!= (tree->string (tree-ref lines (+ start i))) l)
+                   (tree-remove! lines (+ start i) 1)
+                   (tree-insert! lines (+ start i) (list l)))))
+             (loop (cdr rs) (cdr cs) (+ start (car cs)) ok)))
+          (else (loop (cdr rs) (cdr cs) (+ start (car cs)) ok)))))
 
 (tm-define (lsp-unit-at doc root lan)
   (:synopsis "The unit of the block @root, with it among its blocks")
   (let ((u (lsp-unit doc lan)))
-    (if (list-find (lsp-unit-roots u) (lambda (r) (tree-eq? r root)))
-        (lsp-unit-set-roots! u (lsp-unit-roots u))
-        (lsp-unit-set-roots! u (cons root (lsp-unit-roots u))))))
+    (cond ((not (list-find (lsp-unit-roots u) (lambda (r) (tree-eq? r root))))
+           (lsp-unit-set-roots! u (cons root (lsp-unit-roots u))))
+          ((refresh-block! u root) u)
+          (else (lsp-unit-set-roots! u (lsp-unit-roots u))))))
 
 (tm-define (lsp-units-of doc)
   (:synopsis "The units of the document @doc")
@@ -245,10 +278,17 @@
   (list-find (map cdr (ahash-table->list units))
              (lambda (u) (== (lsp-unit-path u) path))))
 
-(tm-define (lsp-unit-path-of u l o)
+(tm-define (lsp-unit-synced! u)
+  (:synopsis "The server has the lines of @u as they are now")
+  (vector-set! u 6 (list (vector-ref u 4) (vector-ref u 5))))
+
+(tm-define (lsp-unit-path-of u l o . opt)
   (:synopsis "The path in the document of the offset @o of the line @l of @u")
-  ;; (#f beyond its blocks)
-  (let loop ((rs (vector-ref u 4)) (cs (vector-ref u 5)) (l l))
+  ;; (#f beyond its blocks; with 'synced in @opt, as the blocks were when
+  ;; the server was last given them: for its diagnostics)
+  (let loop ((rs (if (pair? opt) (car (vector-ref u 6)) (vector-ref u 4)))
+             (cs (if (pair? opt) (cadr (vector-ref u 6)) (vector-ref u 5)))
+             (l l))
     (cond ((null? rs) #f)
           ((< l (car cs))
            (with p (tree->path (car rs)) (and p (append p (list l o)))))
@@ -290,7 +330,8 @@
                   ((and (<= start p) (<= (- n s) (+ start (car cs))))
                    (let* ((delta (- m n))
                           (new (sublist lines start (+ start (car cs) delta))))
-                     (set-lines! (car rs) new)
+                     ;; (a block keeps a line)
+                     (set-lines! (car rs) (if (null? new) (list "") new))
                      #t))
                   (else (loop (cdr rs) (cdr cs) (+ start (car cs))))))))))
 

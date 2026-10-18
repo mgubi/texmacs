@@ -83,7 +83,10 @@
       (program-go-to (program-row-number) i))))
 
 (tm-define (kbd-variant t forward?)
-  (:require (and (in-prog-r?) (not (inside? 'session))))
+  ;; (not in the field of a search: tab inserts a tab there)
+  (:require (and (in-prog-r?) (not (inside? 'session))
+                 (not (and (defined? 'inside-search-or-replace-buffer?)
+                           (inside-search-or-replace-buffer?)))))
   (r-indent))
 
 (tm-define (insert-return)
