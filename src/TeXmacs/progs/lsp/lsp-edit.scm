@@ -164,16 +164,31 @@
             (list-filter ds (lambda (d) (== (sev d) 2)))
             (list-filter ds (lambda (d) (> (sev d) 2))))))
 
+(define (lines-path root)
+  ;; the place of an offset of a line of the document of lines @root
+  (lambda (l o) (with b (tree->path root) (and b (append b (list l o))))))
+
 (define (buffer-uris)
-  ;; (uri . root) of the code of the current buffer which servers see: the
-  ;; buffer of a source file, or the code blocks of a document
+  ;; (uri root path-of) of the code of the current buffer which servers
+  ;; see, its lines and the place in the buffer of an offset of a line: the
+  ;; buffer of a source file, or the code blocks of a document (each one,
+  ;; or those of a language together, a unit)
   (if (lsp-source-buffer?)
       (with uri (lsp-buffer-uri (current-buffer))
-        (if uri (list (cons uri (buffer-get-body (current-buffer)))) '()))
+        (if uri (list (list uri (buffer-get-body (current-buffer))
+                            (lines-path (buffer-get-body (current-buffer)))))
+            '()))
       (with doc (lsp-buffer-path (current-buffer))
         (if (not doc) '()
-            (map (lambda (e) (cons (lsp-path->uri (caddr e)) (car e)))
-                 (lsp-block-entries doc))))))
+            (append
+             (map (lambda (un)
+                    (list (lsp-path->uri (lsp-unit-path un)) (lsp-unit-lines un)
+                          (lambda (l o) (lsp-unit-path-of un l o))))
+                  (lsp-units-of doc))
+             (map (lambda (e) (list (lsp-path->uri (caddr e)) (car e)
+                                    (lines-path (car e))))
+                  (list-filter (lsp-block-entries doc)
+                               (lambda (e) (not (lsp-unit-of-path (caddr e)))))))))))
 
 (define (in-current-buffer? uri)
   (and (lsp-on?) uri (assoc uri (buffer-uris)) #t))
@@ -195,7 +210,7 @@
 (tm-define (lsp-show-diagnostics)
   (:synopsis "Shows the diagnostics of the current buffer")
   ;; (of its code blocks, in a document)
-  (for (x (buffer-uris)) (show-uri (car x) (cdr x)))
+  (for (x (buffer-uris)) (show-uri (car x) (cadr x)))
   (draw-diagnostics))
 
 (define (draw-diagnostics)
@@ -206,15 +221,16 @@
    'server
    (append-map
     (lambda (x)
-      (let ((b (tree->path (cdr x)))
+      (let ((path-of (caddr x))
             (l (or (ahash-ref shown (car x)) '())))
-        (if (not b) '()
-            (map (lambda (x)
-                   (list (car x)
-                         (append b (list (list-ref x 1) (list-ref x 2)))
-                         (append b (list (list-ref x 3) (list-ref x 4)))
-                         (list-ref x 5)))
-                 l))))
+        (list-filter
+         (map (lambda (x)
+                (let ((p1 (path-of (list-ref x 1) (list-ref x 2)))
+                      (p2 (path-of (list-ref x 3) (list-ref x 4))))
+                  ;; (in a unit, a diagnostic over two blocks at its start)
+                  (and p1 (list (car x) p1 (or p2 p1) (list-ref x 5)))))
+              l)
+         identity)))
     (buffer-uris))))
 
 (tm-define (lsp-document-lines-changed uri first last added)
@@ -324,11 +340,7 @@
 
 (define (cursor-line+offset)
   ;; the line and offset of the cursor in a source file, or #f
-  (let* ((p (cursor-path))
-         (b (lsp-target-base)))
-    (and (list-starts? p b)
-         (with r (list-tail p (length b))
-           (and (= (length r) 2) r)))))
+  (lsp-target-lo (cursor-path)))
 
 (define (before-or-at? l1 o1 l2 o2)
   (or (< l1 l2) (and (== l1 l2) (<= o1 o2))))
@@ -416,7 +428,7 @@
                (l (max 0 (min (list-ref x 1) (- n 1))))
                (o (max 0 (min (list-ref x 2)
                               (string-length (lsp-buffer-line l))))))
-          (go-to-path (append (lsp-target-base) (list l o)))))))
+          (with p (lsp-target-path l o) (when p (go-to-path p)))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Requests at the cursor
@@ -692,14 +704,13 @@
 
 (define (mouse-hover x y)
   (let* ((p (xy->path x y))
-         (b (lsp-target-base))
-         (r (and (list-starts? p b) (list-tail p (length b))))
+         (r (lsp-target-lo p))
          (c (lsp-buffer-client*))
          (uri (lsp-buffer-uri))
          (u (current-buffer)))
     ;; (a place which the mouse has left is asked again when it comes back)
     (when (!= p mouse-at) (set! mouse-at #f))
-    (when (and r (= (length r) 2) (not mouse-at) c uri
+    (when (and r (not mouse-at) c uri
                (capable? c "hoverProvider") (mouse-word? p))
       (set! mouse-at p)
       (when mouse-request
@@ -895,12 +906,25 @@
                           (lsp-buffer-line+offset (lsp-ref range "start")
                                                   (cadr b)))))))
 
+(define (goto-unit un range)
+  ;; a place of the unit @un, the blocks of a language of a document
+  (with u (system->url (lsp-unit-doc un))
+    (when (!= u (current-buffer)) (switch-to-buffer u))
+    (when (== (current-buffer) u)
+      (let* ((lo (lsp-buffer-line+offset (lsp-ref range "start")
+                                          (lsp-unit-lines un)))
+             (p (lsp-unit-path-of un (car lo) (cadr lo))))
+        (when p (go-to-path p))))))
+
 (tm-define (lsp-goto-location uri range)
   (:synopsis "Opens the file of @uri at the start of @range")
   ;; (or the document of the code block whose virtual file it is)
   (let* ((path (lsp-uri->path uri))
-         (b (and path (lsp-block-of-path path))))
-    (cond ((and b (buffer-exists? (system->url (car b))))
+         (un (and path (lsp-unit-of-path path)))
+         (b (and path (not un) (lsp-block-of-path path))))
+    (cond ((and un (buffer-exists? (system->url (lsp-unit-doc un))))
+           (goto-unit un range))
+          ((and b (buffer-exists? (system->url (car b))))
            (goto-block b range))
           ((or (not path) (lsp-virtual-block-path? path))
            ;; (a code block of a document which is closed)
@@ -913,7 +937,8 @@
                    (else (load-buffer u)))
              (when (== (current-buffer) u)
                (with lo (lsp-buffer-line+offset (lsp-ref range "start"))
-                 (go-to-path (append (lsp-target-base) lo)))))))))
+                 (with p (lsp-target-path (car lo) (cadr lo))
+                   (when p (go-to-path p))))))))))
 
 (tm-define (lsp-definition-at-cursor)
   (:synopsis "Goes to the definition of the symbol at the cursor, #t if it did")
@@ -1144,6 +1169,9 @@
                 (if (== val "off") (lsp-turn-off) (follow-all))))
   ("lsp:code blocks" "off" (lambda (pref val)
                              (if (== val "on") (follow-all) (unfollow-blocks))))
+  ;; (the blocks of a language in a document as one file, lsp-blocks.scm)
+  ("lsp:join code blocks" "on" (lambda (pref val)
+                                 (when (lsp-blocks-on?) (follow-all))))
   ("lsp:mouse hover" "on" (lambda (pref val) (noop))))
 
 ;; the buffers which were loaded before this module

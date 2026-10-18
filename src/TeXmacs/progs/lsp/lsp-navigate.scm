@@ -226,12 +226,12 @@
                          (list (car e) (cadr e)
                                (utf8->cork (caddr e))
                                (utf8->cork (first-line* (cadddr e)))
-                               (append (lsp-target-base)
-                                       (lsp-buffer-line+offset
-                                        (lsp-object
-                                         "line" (lsp-number (list-ref e 4))
-                                         "character"
-                                         (lsp-number (list-ref e 5)))))))
+                               (apply lsp-target-path
+                                      (lsp-buffer-line+offset
+                                       (lsp-object
+                                        "line" (lsp-number (list-ref e 4))
+                                        "character"
+                                        (lsp-number (list-ref e 5)))))))
                        (lsp-outline-entries (cadr a)))))))))
 
 (define (first-line* s)
@@ -264,11 +264,7 @@
 
 (define (cursor-lo)
   ;; the line and offset of the cursor in a source file, or #f
-  (let* ((p (cursor-path))
-         (b (lsp-target-base)))
-    (and (list-starts? p b)
-         (with r (list-tail p (length b))
-           (and (= (length r) 2) r)))))
+  (lsp-target-lo (cursor-path)))
 
 (define (in-range? lo r)
   (let ((l (car lo)) (o (cadr lo)))
@@ -276,7 +272,7 @@
          (or (< l (caddr r)) (and (== l (caddr r)) (<= o (cadddr r)))))))
 
 (define (in-highlights? lo)
-  (and lo (== hl-buffer (current-buffer)) (== hl-base (lsp-target-base))
+  (and lo (== hl-buffer (current-buffer)) (== hl-base (lsp-target-key))
        (list-or (map (lambda (r) (in-range? lo r)) hl-ranges))))
 
 (define (clear-highlights)
@@ -301,7 +297,7 @@
 (define hl-edits-asked 0)
 
 (define (show-highlights ranges)
-  (with b (lsp-target-base)
+  (with b (lsp-target-key)
     (set! hl-ranges ranges)
     (set! hl-buffer (current-buffer))
     (set! hl-base b)
@@ -309,8 +305,10 @@
         (set-alt-selection
          "lsp-highlights"
          (append-map (lambda (r)
-                       (list (append b (list (car r) (cadr r)))
-                             (append b (list (caddr r) (cadddr r)))))
+                       ;; (both ends in the code: in a unit, in a block)
+                       (let ((p1 (lsp-target-path (car r) (cadr r)))
+                             (p2 (lsp-target-path (caddr r) (cadddr r))))
+                         (if (and p1 p2) (list p1 p2) '())))
                      ranges)))))
 
 (tm-define (lsp-highlight-at-cursor)
@@ -319,7 +317,7 @@
   (let* ((c (lsp-buffer-client*))
          (uri (lsp-buffer-uri))
          (lo (cursor-lo))
-         (base (lsp-target-base))
+         (base (lsp-target-key))
          (u (current-buffer)))
     (when (and c uri lo (lsp-client-running? c) (lsp-buffer-followed?)
                (not (in-highlights? lo))
@@ -339,7 +337,7 @@
              (set! hl-request #f)
              ;; (only if the cursor is still there, and the text has not
              ;; changed: an edit may leave the cursor in place)
-             (when (and (== (current-buffer) u) (== (lsp-target-base) base)
+             (when (and (== (current-buffer) u) (== (lsp-target-key) base)
                         (== (cursor-lo) lo) (== hl-edits hl-edits-asked))
                (show-highlights
                 (if (or e (not r) (lsp-null? r)) '()

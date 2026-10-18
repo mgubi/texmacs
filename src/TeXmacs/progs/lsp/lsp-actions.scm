@@ -182,10 +182,32 @@
         (switch-to-buffer old))
       r)))
 
+(define (apply-unit-edits u un edits)
+  ;; the edits of the virtual file of the unit @un (the blocks of a
+  ;; language of the document @u): written back to the blocks, if they
+  ;; change the number of the lines of one block only
+  (in-buffer u
+    (lambda ()
+      (let* ((old (lsp-lines (lsp-unit-lines un)))
+             (lines (lsp-apply-to-lines old edits)))
+        (if (not (lsp-unit-write-back! un lines))
+            (begin
+              (set-message "The edits join or split code blocks: not applied" "")
+              #f)
+            (begin
+              (lsp-unit-set-roots! un (lsp-unit-roots un))
+              (max 1 (abs (- (length lines) (length old))))))))))
+
 (tm-define (lsp-apply-buffer-edits u edits . opt)
   (:synopsis "Applies the TextEdits @edits to the buffer @u")
   ;; the number of lines which have changed, or #f; in the lines of the
-  ;; buffer, or in those in @opt (a code block of the buffer)
+  ;; buffer, or in those in @opt (a code block of the buffer, or the lines
+  ;; of a unit of blocks)
+  (if (and (pair? opt) (nnull? edits) (lsp-unit-of-lines (car opt)))
+      (apply-unit-edits u (lsp-unit-of-lines (car opt)) edits)
+      (apply-buffer-edits u edits opt)))
+
+(define (apply-buffer-edits u edits opt)
   (and (nnull? edits)
        (in-buffer u
          (lambda ()
@@ -211,12 +233,16 @@
   ;; (buffer root) of @uri: root is #f for the buffer of a file, the lines
   ;; of the code block for the virtual file of a block (lsp-blocks.scm)
   (let* ((p (lsp-uri->path uri))
-         (b (and p (lsp-block-of-path p))))
-    (if (and b (buffer-exists? (system->url (car b)))
-             (tree->path (cadr b)))
-        (list (system->url (car b)) (cadr b))
-        (with u (and (not (and p (lsp-virtual-block-path? p))) (uri->buffer uri))
-          (and u (list u #f))))))
+         (un (and p (lsp-unit-of-path p)))
+         (b (and p (not un) (lsp-block-of-path p))))
+    (cond ((and un (buffer-exists? (system->url (lsp-unit-doc un))))
+           (list (system->url (lsp-unit-doc un)) (lsp-unit-lines un)))
+          ((and b (buffer-exists? (system->url (car b)))
+                (tree->path (cadr b)))
+           (list (system->url (car b)) (cadr b)))
+          (else
+           (with u (and (not (and p (lsp-virtual-block-path? p))) (uri->buffer uri))
+             (and u (list u #f)))))))
 
 (define (uri->buffer uri)
   ;; the buffer of @uri: the open one whose uri is the same (its path may be
@@ -330,12 +356,9 @@
 (define (selection-range)
   ;; the range of the selection in the current buffer, or #f
   (and (selection-active-any?)
-       (let* ((b (lsp-target-base))
-              (p1 (selection-get-start))
-              (p2 (selection-get-end))
-              (r1 (and (list-starts? p1 b) (list-tail p1 (length b))))
-              (r2 (and (list-starts? p2 b) (list-tail p2 (length b)))))
-         (and r1 r2 (= (length r1) 2) (= (length r2) 2)
+       (let* ((r1 (lsp-target-lo (selection-get-start)))
+              (r2 (lsp-target-lo (selection-get-end))))
+         (and r1 r2
               (lsp-object "start" (lsp-buffer-position (car r1) (cadr r1))
                           "end" (lsp-buffer-position (car r2) (cadr r2)))))))
 
