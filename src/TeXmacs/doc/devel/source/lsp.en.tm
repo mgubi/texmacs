@@ -102,7 +102,14 @@
 
     <item*|<source-link|lsp-documents.scm|TeXmacs/progs/lsp/lsp-documents.scm>>The
     documents of the servers, the diagnostics, the buffers and their
-    projects.
+    projects; the target of the commands, the code at the cursor (the
+    lines of a source file, or of a code block: <scm|lsp-target-root>,
+    <scm|lsp-target-base>).
+
+    <item*|<source-link|lsp-blocks.scm|TeXmacs/progs/lsp/lsp-blocks.scm>>The
+    code blocks of documents as documents of the servers (preference
+    <verbatim|lsp:code blocks>): the blocks of a body, the block at the
+    cursor, their virtual files, which are never written.
 
     <item*|<source-link|lsp-edit.scm|TeXmacs/progs/lsp/lsp-edit.scm>>The
     servers in the editor: following the buffers, showing the diagnostics,

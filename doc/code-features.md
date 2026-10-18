@@ -312,6 +312,43 @@ server of each language (`(server "clangd")`), replacing the defaults of
      developer page "The features of program code" (devel/source/code-features.en.tm)
      describes the core; the pages of the LSP point to it.
 
+7. Servers for the code blocks of documents (virtual documents).
+   - What: in a TeXmacs document saved as a file, a code block of a
+     language with a server (`cpp-code`, `python-code`... whose body is a
+     document of lines) is a document of that server: a virtual file next
+     to the document, `<dir>/.<name>.tm-block<k>.<ext>`, never written; the
+     server reads its text from didOpen and didChange. The project root is
+     that of the document.
+   - One block, one virtual document: the positions of the block are those
+     of a source file (line, offset of its lines), so that all of the
+     buffer layer of the LSP works on a "target" (uri, language, lines,
+     base path) rather than on the buffer: a source file is the target of
+     its body, a block the target of its own lines. Blocks of the same
+     language are not concatenated (the names of one block are not known
+     in the next): later, if wanted, by a map of lines.
+   - Opt-in: the preference `lsp:code blocks` (off by default; starting a
+     server for a document with a small block costs a process), in the
+     menu Tools > Language servers.
+   - Features in a block: the diagnostics (those of all the blocks of the
+     buffer are its items of the source 'server of code-diagnostics.scm,
+     each at the place of its block), completion, hover, definitions and
+     references (a location in the virtual file of a block goes to the
+     block), outline, folds, highlights, formatting (of the block), renames
+     and quick fixes (the edits of a virtual file are applied to its
+     block). Not yet: semantic colours and inlay hints (source files only),
+     the status of the server in the focus bar.
+   - Done: `progs/lsp/lsp-blocks.scm` (the blocks of a body, the block at
+     the cursor, the virtual files, `lsp-blocks-force!` for the tests);
+     in lsp-documents.scm, the functions of the buffer without a buffer
+     argument are those of the "target", the code at the cursor
+     (`lsp-target-root`, `lsp-target-base`: the lines and their path), and
+     syncing a document gives its blocks to their servers and closes those
+     which are gone. Tested with clangd (suite lsp, group code blocks) and
+     in a window (the undeclared name of a block underlined, its message
+     in the footer).
+   - A block is identified by its tree (tree-eq?); when it is removed, or
+     the document closed, its virtual document is closed on the server.
+
 Each phase keeps the suites passing and the two feature branches unchanged:
 what is shared is written here, then given back to the branches (or the
 branches rebased on it) only when the user decides it.

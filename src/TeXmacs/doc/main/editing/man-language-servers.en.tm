@@ -73,6 +73,21 @@
   <verbatim|lsp:semantic colors> and <verbatim|lsp:inlay hints> (see
   below).
 
+  <paragraph*|Code blocks in documents>
+
+  When <menu|Tools|Language servers|Follow the code blocks of documents>
+  is checked (preference <verbatim|lsp:code blocks>, off by default), the
+  code blocks of a document saved on disk (<menu|Insert|Program|Block of
+  code>, in a language which has a server) are followed too, each block as
+  a file of its own: the server sees a file next to the document, named
+  after it (<verbatim|.notes-block1.cpp> for the first block of
+  <verbatim|notes.tm>), which is never written, in the project of the
+  document. In a block, the diagnostics, the completion, the information
+  at the cursor, the definitions, the references, the outline, the folds,
+  formatting, renaming and quick fixes work as in a source file; the names
+  of one block are not known in the others. The colours and inlay hints of
+  the servers are for source files only.
+
   <paragraph*|Projects>
 
   A server is started for a language and a <em|project>, the directory of
