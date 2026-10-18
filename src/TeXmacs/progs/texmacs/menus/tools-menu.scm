@@ -64,8 +64,9 @@
           (link tmtex-menu)))
   (-> "References"
       (link ref-menu))
-  (-> "Language servers"
-      (link lsp-menu))
+  (if (defined? 'lsp-start)
+      (-> "Language servers"
+          (link lsp-menu)))
   (if supports-email?
       (-> "Email"
           ("Open mailbox" (email-open-mailbox))

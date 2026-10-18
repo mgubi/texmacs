@@ -14,8 +14,13 @@
 (texmacs-module (prog prog-edit)
   (:use (utils library tree)
         (utils library cursor)
-        (treesit ts-edit)
         (code code-menu)))
+
+;; the syntax trees of tree-sitter, when it is part of the build (its glue);
+;; else their functions answer that the code has none
+(if (defined? 'tree-sitter-program-language)
+    (use-modules (treesit ts-edit))
+    (use-modules (code code-syntax-none)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Basic routines for textual programs

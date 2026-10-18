@@ -626,6 +626,7 @@ enable_option_checking=no
 ac_subst_vars='subdirs_extra
 LTLIBOBJS
 LIBOBJS
+CONFIG_TREE_SITTER
 SIGNID
 tm_windows_release
 tm_underscore_stable
@@ -977,6 +978,8 @@ enable_preproc
 enable_sanitizers
 enable_optimize
 enable_sign
+enable_tree_sitter
+enable_lsp
 '
       ac_precious_vars='build_alias
 host_alias
@@ -1649,6 +1652,9 @@ if test -n "$ac_init_help"; then
                           [-fsanitize=address,undefined,...]
   --enable-optimize[=ARG] compile with optimizations [guessed]
   --enable-sign[=ARG]     Code signing ID
+  --disable-tree-sitter   without the syntax trees of tree-sitter for program
+                          code
+  --disable-lsp           without the language servers for program code
 
 Optional Packages:
   --with-PACKAGE[=ARG]    use PACKAGE [ARG=yes]
@@ -38285,6 +38291,51 @@ printf '%s\n' "signing disabled" >&6; }
     (*) { printf '%s\n' "$as_me:${as_lineno-$LINENO}: result: no code signing available yet" >&5
 printf '%s\n' "no code signing available yet" >&6; };;
     esac
+  fi
+
+
+  # Check whether --enable-tree-sitter was given.
+if test ${enable_tree_sitter+y}
+then :
+  enableval=$enable_tree_sitter;
+else case e in #(
+  e) enable_tree_sitter="yes" ;;
+esac
+fi
+
+  if test "$enable_tree_sitter" = "no"; then
+    { printf '%s\n' "$as_me:${as_lineno-$LINENO}: result: disabling tree-sitter" >&5
+printf '%s\n' "disabling tree-sitter" >&6; }
+    CONFIG_TREE_SITTER=""
+
+  else
+    { printf '%s\n' "$as_me:${as_lineno-$LINENO}: result: enabling tree-sitter" >&5
+printf '%s\n' "enabling tree-sitter" >&6; }
+
+printf '%s\n' "#define USE_TREE_SITTER 1" >>confdefs.h
+
+    CONFIG_TREE_SITTER="TreeSitter"
+
+  fi
+
+  # Check whether --enable-lsp was given.
+if test ${enable_lsp+y}
+then :
+  enableval=$enable_lsp;
+else case e in #(
+  e) enable_lsp="yes" ;;
+esac
+fi
+
+  if test "$enable_lsp" = "no"; then
+    { printf '%s\n' "$as_me:${as_lineno-$LINENO}: result: disabling language servers" >&5
+printf '%s\n' "disabling language servers" >&6; }
+  else
+    { printf '%s\n' "$as_me:${as_lineno-$LINENO}: result: enabling language servers" >&5
+printf '%s\n' "enabling language servers" >&6; }
+
+printf '%s\n' "#define USE_LSP 1" >>confdefs.h
+
   fi
 
 

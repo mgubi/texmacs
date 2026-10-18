@@ -16,6 +16,9 @@
 // (requests, answers, notifications, the documents) is done in Scheme
 // (progs/lsp), which gets the messages one by one through a call back.
 
+#include "config.h"
+#ifdef USE_LSP
+
 #include "lsp_link.hpp"
 #include "analyze.hpp"
 #include "convert.hpp"
@@ -327,7 +330,9 @@ process_all_lsp () {
 object
 lsp_start (string cmd, object call_back) {
   // (a server which does not read its input does not freeze the editor:
-  // what it does not take yet is written at the next turns)
+  // what it does not take yet is written at the next turns; the messages
+  // are dispatched by the loop of the server, process_all_lsp)
+  add_link_processor (process_all_lsp);
   tm_link tr= make_pipe_link (cmd);
   tr->set_blocking_write (false);
   tm_link ln= make_lsp_link (tr);
@@ -413,3 +418,5 @@ lsp_document_text (tree t) {
   }
   return r;
 }
+
+#endif // USE_LSP

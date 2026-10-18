@@ -52,7 +52,6 @@
         (check opentype-typeset-test)
         (check bibtex-test)
         (check csl-test)
-        (check treesit-test)
         (check zotero-test)
         (check database-test)
         (check math-edit-test)
@@ -61,7 +60,6 @@
         (check graphics-edit-test)
         (check version-test)
         (check git-test)
-        (check lsp-test)
         (check links-test)
         (check misc-modules-test)
         (check remote-test)
@@ -214,7 +212,28 @@
 
 ;; the number of failures of a suite; an error which escapes the suite
 ;; counts as one, and does not stop the suites after it
+;; the suites of the features of program code which a build may leave out
+;; (doc/code-features.md): run when the feature is there (its glue); their
+;; modules are loaded then (those of tree-sitter call its glue when they
+;; are loaded)
+(define feature-suites
+  '(("treesit" tree-sitter-program-language (check treesit-test))
+    ("lsp" lsp-start (check lsp-test))))
+
+(define (suite-built? suite)
+  (with f (assoc (car suite) feature-suites)
+    (or (not f) (defined? (cadr f)))))
+
 (define (suite-failures suite)
+  (cond ((not (suite-built? suite))
+         (display* "Suite " (car suite) ": not in this build\n")
+         0)
+        ((assoc (car suite) feature-suites)
+         (module-provide (caddr (assoc (car suite) feature-suites)))
+         (suite-failures* suite))
+        (else (suite-failures* suite))))
+
+(define (suite-failures* suite)
   (let ((f (eval (cadr suite)))
         (kind (caddr suite)))
     (set! integration-failure-total 0)

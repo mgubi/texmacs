@@ -16,7 +16,6 @@
 #include "scheme.hpp"
 #include "tree.hpp"
 #include "iterator.hpp"
-#include "../../Plugins/TreeSitter/ts_highlight.hpp"
 
 prog_language_rep::prog_language_rep (string name):
   abstract_language_rep (name), multi_line_comments (false),
@@ -344,11 +343,21 @@ prog_language_base (string s) {
   return tm_new<verb_language_rep> (s);
 }
 
+static prog_language_wrapper the_wrapper= NULL;
+
+void
+set_prog_language_wrapper (prog_language_wrapper w) {
+  the_wrapper= w;
+}
+
 language
 prog_language (string s) {
   if (language::instances -> contains (s)) return language (s);
   // (the constructor of a language registers it under its name)
   language_rep* base= prog_language_base (s);
-  if (tree_sitter_wraps (s)) return language (tree_sitter_language (s, base));
+  if (the_wrapper != NULL) {
+    language_rep* r= the_wrapper (s, base);
+    if (r != NULL) return language (r);
+  }
   return language (base);
 }

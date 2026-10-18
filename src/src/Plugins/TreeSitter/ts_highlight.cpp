@@ -302,11 +302,19 @@ tree_sitter_set_fold_state (tree t, int state) {
 
 static hashset<string> wrapped_languages;
 
+static language_rep*
+wrap_language (string lan, language_rep* base) {
+  // (the wrapper of the program languages, see prog_language)
+  if (!wrapped_languages->contains (lan)) return NULL;
+  return tm_new<treesit_language_rep> (lan, base);
+}
+
 void
 tree_sitter_wrap_language (string lan) {
   // lan may be highlighted by tree-sitter (called at the start for the
   // program languages with a grammar, see tm-program-languages.scm)
   wrapped_languages->insert (lan);
+  set_prog_language_wrapper (wrap_language);
 }
 
 bool

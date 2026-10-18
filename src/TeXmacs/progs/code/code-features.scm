@@ -23,10 +23,11 @@
 
 (texmacs-module (code code-features))
 
-;; the adapters of the providers, loaded when a feature is first asked for
+;; the adapters of the providers, loaded when a feature is first asked for,
+;; when the feature is part of the build (its glue, and its programs)
 (define code-adapters
-  '(("treesit/ts-code.scm" (treesit ts-code))
-    ("lsp/lsp-code.scm" (lsp lsp-code))))
+  '((tree-sitter-program-language "treesit/ts-code.scm" (treesit ts-code))
+    (lsp-start "lsp/lsp-code.scm" (lsp lsp-code))))
 
 (define adapters-loaded? #f)
 
@@ -34,8 +35,9 @@
   (when (not adapters-loaded?)
     (set! adapters-loaded? #t)
     (for (a code-adapters)
-      (when (url-exists? (url-append "$TEXMACS_PATH/progs" (car a)))
-        (module-provide (cadr a))))))
+      (when (and (defined? (car a))
+                 (url-exists? (url-append "$TEXMACS_PATH/progs" (cadr a))))
+        (module-provide (caddr a))))))
 
 ;; feature -> list of (name rank available? procedure), by rank
 (define providers (make-ahash-table))

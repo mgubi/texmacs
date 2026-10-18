@@ -526,6 +526,11 @@ if (USE_GNUTLS)
   endif ()
 endif ()
 
+# the features of program code which a build may leave out (see
+# doc/code-features.md and misc/m4/tm_code.m4)
+option (USE_TREE_SITTER "Use the syntax trees of tree-sitter" ON)
+option (USE_LSP "Use language servers" ON)
+
 # SQLite3
 option (USE_SQLITE3 "Use SQLite3" ON)
 if (USE_SQLITE3)
@@ -682,14 +687,16 @@ list (APPEND TeXmacs_Std_Plugins_SRCS ${TeXmacs_Sqlite_SRCS})
 # tree-sitter: the vendored runtime (one unit, tree_sitter_lib.c) and the
 # languages made from the tables of progs/treesit (as in src/makefile.in)
 set (TeXmacs_TreeSitter_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/TreeSitter")
-list (APPEND TeXmacs_Std_Plugins_SRCS
-  "${TeXmacs_TreeSitter_DIR}/tree_sitter_glue.cpp"
-  "${TeXmacs_TreeSitter_DIR}/syntax_region.cpp"
-  "${TeXmacs_TreeSitter_DIR}/ts_highlight.cpp"
-  "${TeXmacs_TreeSitter_DIR}/ts_tables.cpp"
-  "${TeXmacs_TreeSitter_DIR}/tree_sitter_lib.c"
-  "${TeXmacs_TreeSitter_DIR}/ts_dynamic.c"
-  "${TeXmacs_TreeSitter_DIR}/ts_xz.c")
+if (USE_TREE_SITTER)
+  list (APPEND TeXmacs_Std_Plugins_SRCS
+    "${TeXmacs_TreeSitter_DIR}/tree_sitter_glue.cpp"
+    "${TeXmacs_TreeSitter_DIR}/syntax_region.cpp"
+    "${TeXmacs_TreeSitter_DIR}/ts_highlight.cpp"
+    "${TeXmacs_TreeSitter_DIR}/ts_tables.cpp"
+    "${TeXmacs_TreeSitter_DIR}/tree_sitter_lib.c"
+    "${TeXmacs_TreeSitter_DIR}/ts_dynamic.c"
+    "${TeXmacs_TreeSitter_DIR}/ts_xz.c")
+endif ()
 # (their include directories are set in src/CMakeLists.txt, where the
 # target is)
 

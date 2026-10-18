@@ -20,7 +20,9 @@
 ;; column being the position in the TeXmacs string of the line. This module
 ;; only uses the glue, so that loading it does not load the generator.
 
-(texmacs-module (treesit ts-edit))
+(texmacs-module (treesit ts-edit)
+  ;; (the master of code-syntax-menu, which this module refines)
+  (:use (code code-menu)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Points and nodes

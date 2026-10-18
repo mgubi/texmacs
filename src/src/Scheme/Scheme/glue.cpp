@@ -33,9 +33,11 @@ typedef unsigned int uint;
 #include "Freetype/tt_tools.hpp"
 #include "Database/database.hpp"
 #include "Sqlite3/sqlite3.hpp"
+#ifdef USE_TREE_SITTER
 #include "TreeSitter/tree_sitter_glue.hpp"
 #include "TreeSitter/syntax_region.hpp"
 #include "TreeSitter/ts_highlight.hpp"
+#endif
 #include "Updater/tm_updater.hpp"
 
 tmscm 
@@ -1289,7 +1291,9 @@ tmscm_to_list_tree (tmscm p) {
 #include "tm_window.hpp"
 #include "boot.hpp"
 #include "connect.hpp"
+#ifdef USE_LSP
 #include "lsp_link.hpp"
+#endif
 #include "code_lines.hpp"
 #include "code_regions.hpp"
 #include "convert.hpp"
@@ -1330,6 +1334,14 @@ tmscm_to_list_tree (tmscm p) {
 #include "../Glue/glue_basic.cpp"
 #include "../Glue/glue_editor.cpp"
 #include "../Glue/glue_server.cpp"
+// (the features of program code which a build may leave out, see
+// doc/code-features.md and misc/m4/tm_code.m4)
+#ifdef USE_TREE_SITTER
+#include "../Glue/glue_treesit.cpp"
+#endif
+#ifdef USE_LSP
+#include "../Glue/glue_lsp.cpp"
+#endif
 
 void
 initialize_glue () {
@@ -1344,4 +1356,10 @@ initialize_glue () {
   initialize_glue_basic ();
   initialize_glue_editor ();
   initialize_glue_server ();
+#ifdef USE_TREE_SITTER
+  initialize_glue_treesit ();
+#endif
+#ifdef USE_LSP
+  initialize_glue_lsp ();
+#endif
 }
