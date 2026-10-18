@@ -56,10 +56,22 @@
           ((== s "pdf") "application/pdf")
           (else "text/plain"))))
 
-;; the largest files sent: those of the engines (Claude takes 32 MB a
-;; request, Gemini 20 MB of parts inline; a text as the document is)
+;; the largest files sent, as the engines take them (in base64, a third
+;; more): Claude 32 MB a request and 5 MB an image, Gemini 20 MB of parts
+;; inline; the others are given 20 MB. The images and PDF files of all
+;; the questions of a request count (the context sends them again).
 (define ai-binary-max (* 20 1024 1024))
-(define ai-text-max 400000) ; characters
+(define (ai-request-max name)
+  (cond ((== name "gemini") (* 14 1024 1024))
+        ((== name "claude") (* 23 1024 1024))
+        (else ai-binary-max)))
+(define (ai-image-max name)
+  (if (== name "claude") (* 5 1024 1024) ai-binary-max))
+(define ai-text-max 400000) ; bytes of a text file, cut between characters
+
+;; the separator of the fields of an attachment for ai.cpp (a character
+;; which no file name holds, as a tab could)
+(tm-define (ai-attachment-separator) (string (integer->char 1)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The attachments of a question
@@ -81,15 +93,31 @@
         ((ai-attachment-stree? x) "")
         (else (cons (car x) (map ai-strip-attachments (cdr x))))))
 
+;; the text of a text file (a TeXmacs document as LaTeX), #f if it is not
+;; text (a NUL byte: a binary file with a suffix of text) or cannot be
+;; converted; ai.cpp makes it valid UTF-8 (a file in Latin-1)
 (define (ai-file-text file)
   (with u (system->url file)
     (if (== (ai-attachment-kind file) "texmacs")
         (catch #t
           (lambda ()
-            (convert (string-load u) "texmacs-document" "latex-document"
-                     (cons "texmacs->latex:encoding" "utf-8")))
-          (lambda args ""))
-        (string-load u))))
+            (with r (convert (string-load u) "texmacs-document" "latex-document"
+                             (cons "texmacs->latex:encoding" "utf-8"))
+              (and (string? r) (!= r "") r)))
+          (lambda args #f))
+        (with s (string-load u)
+          (and (< (string-search-forwards (string (integer->char 0)) 0 s) 0)
+               s)))))
+
+;; s cut to n bytes at most, between two characters of UTF-8
+(define (ai-cut-text s n)
+  (if (<= (string-length s) n) s
+      (let loop ((i n))
+        (if (and (> i 0)
+                 (with c (char->integer (string-ref s i))
+                   (and (>= c 128) (< c 192))))
+            (loop (- i 1))
+            (string-append (substring s 0 i) "\n[...]")))))
 
 ;; the text files of a question, as they come after its text
 (tm-define (ai-attachments-text l)
@@ -97,58 +125,92 @@
          (map (lambda (a)
                 (let* ((name (car a)) (file (cadr a))
                        (kind (ai-attachment-kind file)))
-                  (if (and (in? kind '("text" "texmacs"))
-                           (url-exists? (system->url file)))
-                      (with s (ai-file-text file)
+                  (with s (and (in? kind '("text" "texmacs"))
+                               (url-exists? (system->url file))
+                               (ai-file-text file))
+                    (if (not s) ""
                         (string-append
                          "\n\nThe attached file " name
                          (if (== kind "texmacs")
                              " (a TeXmacs document, as LaTeX)" "")
-                         ":\n\n```\n"
-                         (if (> (string-length s) ai-text-max)
-                             (string-append (substring s 0 ai-text-max)
-                                            "\n[...]")
-                             s)
-                         "\n```"))
-                      "")))
+                         ":\n\n```\n" (ai-cut-text s ai-text-max) "\n```")))))
               l)))
 
 ;; the files of a question which ai.cpp sends as parts of its message, as
-;; "mime<tab>name<tab>file"
-(tm-define (ai-binary-attachments l)
-  (with bin (list-filter l (lambda (a)
-                             (in? (ai-attachment-kind (cadr a)) '("image" "pdf"))))
-    (map (lambda (a)
-           (string-append (ai-attachment-mime (cadr a)) "\t" (car a)
-                          "\t" (cadr a)))
-         bin)))
+;; mime, name and file separated by ai-attachment-separator
+(define (ai-binary? a)
+  (in? (ai-attachment-kind (cadr a)) '("image" "pdf")))
 
-;; what keeps the files of a question from being sent to an engine, or #f
-(tm-define (ai-attachments-problem name l)
-  (list-or
-   (map (lambda (a)
-          (let* ((n (car a)) (file (cadr a))
-                 (kind (ai-attachment-kind file))
-                 (u (system->url file)))
-            (cond ((not (url-exists? u))
-                   (string-append "the attached file " n " is not there any more ("
-                                  file ")"))
-                  ((not kind)
-                   (string-append "the attached file " n
-                                  " is neither a text, an image nor a PDF file"))
-                  ((and (in? kind '("image" "pdf"))
-                        (> (url-size u) ai-binary-max))
-                   (string-append "the attached file " n " is larger than 20 MB"))
+(tm-define (ai-binary-attachments l)
+  (with sep (ai-attachment-separator)
+    (map (lambda (a)
+           (string-append (ai-attachment-mime (cadr a)) sep (car a) sep (cadr a)))
+         (list-filter l ai-binary?))))
+
+;; whether the model of the request draws pictures (ai_image_model in
+;; ai.cpp): the images/generations of OpenAI take the prompt alone
+(define (ai-drawing-model? name model)
+  (and (== name "chatgpt")
+       (or (>= (string-search-forwards "image" 0 model) 0)
+           (string-starts? model "dall-e"))))
+
+(define (ai-megabytes n)
+  (number->string (inexact->exact (round (/ n (* 1024 1024))))))
+
+;; what keeps the files of a request (those of its question and of the
+;; questions of its context: l) from being sent to an engine, or #f; model
+;; is the model which is asked
+(tm-define (ai-attachments-problem name l . opt-model)
+  (let* ((model (if (and (pair? opt-model) (string? (car opt-model)))
+                    (car opt-model) ""))
+         (bin (list-filter l (lambda (a)
+                               (and (ai-binary? a)
+                                    (url-exists? (system->url (cadr a)))))))
+         (total (apply + (map (lambda (a) (url-size (system->url (cadr a))))
+                              bin))))
+    (or
+     (list-or
+      (map (lambda (a)
+             (let* ((n (car a)) (file (cadr a))
+                    (kind (ai-attachment-kind file))
+                    (u (system->url file)))
+               (cond ((not (url-exists? u))
+                      (string-append "the attached file " n " is not there any more ("
+                                     file ")"))
+                     ((not kind)
+                      (string-append "the attached file " n
+                                     " is neither a text, an image nor a PDF file"))
+                     ((and (in? kind '("text" "texmacs")) (not (ai-file-text file)))
+                      (string-append "the attached file " n
+                                     (if (== kind "texmacs")
+                                         " could not be converted to LaTeX"
+                                         " is not a text file")))
+                     ((and (== kind "image") (> (url-size u) (ai-image-max name)))
+                      (string-append "the attached image " n " is larger than "
+                                     (ai-megabytes (ai-image-max name))
+                                     " MB, which this engine takes at most"))
+                     ((and (== kind "pdf") (> (url-size u) ai-binary-max))
+                      (string-append "the attached file " n " is larger than 20 MB"))
                   ((and (== kind "pdf")
                         (in? name '("open-mistral-7b" "ollama" "albert")))
                    (string-append "the attached file " n
                                   " is a PDF file, which this engine does not take"
                                   " (attach its text, or ask another engine)"))
-                  ((and (== kind "image") (== name "albert"))
-                   (string-append "the attached file " n
-                                  " is an image, which this engine does not take"))
-                  (else #f))))
-        l)))
+                     ((and (== kind "image") (== name "albert"))
+                      (string-append "the attached file " n
+                                     " is an image, which this engine does not take"))
+                     ((and (in? kind '("image" "pdf"))
+                           (ai-drawing-model? name model))
+                      (string-append "the attached file " n " cannot be sent to "
+                                     model ", which draws from the text alone"))
+                     (else #f))))
+           l))
+     (and (> total (ai-request-max name))
+          (string-append "the images and PDF files of the question and of the "
+                         "questions above it make "
+                         (ai-megabytes total) " MB, more than the "
+                         (ai-megabytes (ai-request-max name))
+                         " MB which this engine takes in a request")))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The files which may be sent
@@ -174,11 +236,15 @@
 ;; Attaching a file
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;; a field of a session of a chatbot (not of another plug-in: its files
+;; would be inserted as an attachment, which it does not know)
 (define (ai-input-field? t)
   (and (tree-in? t '(input input-text input-math unfolded-io folded-io
                      unfolded-io-text folded-io-text unfolded-io-math
                      folded-io-math))
-       (> (tree-arity t) 1)))
+       (> (tree-arity t) 1)
+       (defined? 'ai-models)
+       (in? (get-env "prog-language") (ai-models))))
 
 ;; the question of an executable fold of a chatbot (script-input lan session
 ;; question answer, ai-folds.scm)
@@ -225,25 +291,30 @@
 ;; kbd-handlers.scm); what is dropped elsewhere, or is not all files which
 ;; can be attached, is inserted as before. (The question is the one of the
 ;; cursor, as the editor puts a drop at the cursor.)
-(define (ai-dropped-files x)
+(tm-define (ai-dropped-files x)
   ;; the files of what is dropped, or #f
   (let* ((l (cond ((string? x) (list x))
                   ((tm-func? x 'concat) (cdr x))
                   ((tm-func? x 'document) (cdr x))
                   (else (list x))))
-         (files (map (lambda (y)
+         ;; (Qt separates the names of several files by spaces; the names
+         ;; of the files of the directory of the document are relative)
+         (names (map (lambda (y)
                        (cond ((string? y) (cork->utf8 y))
                              ((and (tm-func? y 'image) (string? (cadr y)))
                               (cork->utf8 (cadr y)))
                              (else #f)))
-                     (list-filter l (lambda (y) (!= y ""))))))
+                     (list-filter l (lambda (y)
+                                      (not (and (string? y)
+                                                (== (tm-string-trim-both y) "")))))))
+         (files (map (lambda (f)
+                       (and f
+                            (with u (url-relative (current-buffer) (system->url f))
+                              (and (url-exists? u) (not (url-directory? u))
+                                   (url->system u)))))
+                     names)))
     (and (nnull? files)
-         (list-and (map (lambda (f)
-                          (and f (string-starts? f "/")
-                               (url-exists? (system->url f))
-                               (not (url-directory? (system->url f)))
-                               (ai-attachment-kind f)))
-                        files))
+         (list-and (map (lambda (f) (and f (ai-attachment-kind f))) files))
          files)))
 
 (tm-define (mouse-drop-event x y obj)

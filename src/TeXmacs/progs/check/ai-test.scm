@@ -318,11 +318,14 @@
   attach-files)
 
 ;; the JSON of the request of an engine for the question "Describe"
-(define (attach-request engine)
+(define (attach-request engine . opt-question)
   (set! attach-session? #t)
   (with r (catch #t
             (lambda ()
-              (with x (string->object (cpp-ai-latex-request "Describe" engine "check"))
+              (with x (string->object
+                       (cpp-ai-latex-request (if (pair? opt-question)
+                                                 (car opt-question) "Describe")
+                                             engine "check"))
                 (tree->json (stree->tree (cAr x)))))
             (lambda args (object->string args)))
     (set! attach-session? #f)
@@ -350,7 +353,40 @@
     (check= (ai-binary-attachments
              (ai-stree-attachments `(concat "a" (ai-attachment "t" ,txt)
                                             (ai-attachment "p.png" ,png))))
-            (list (string-append "image/png\tp.png\t" png)))
+            (with sep (ai-attachment-separator)
+              (list (string-append "image/png" sep "p.png" sep png))))
+    ;; a question which is only files has a text (else it would be left
+    ;; out of the context of the next questions, with its files)
+    (check= (ai-serialize "claude" (stree->tree `(ai-attachment "p.png" ,png)))
+            "(see the attached files)")
+    ;; what is not text, the sizes which the engines take, the models which
+    ;; take no files
+    (string-save (string-append "abc" (string (integer->char 0)) "def")
+                 (url-append attach-dir "bin.txt"))
+    (check-true (has? "not a text file"
+                      (ai-attachments-problem "claude"
+                        (list (list "bin.txt" (attach-file "bin.txt"))))))
+    (string-save (make-string (* 6 1024 1024) #\x) (url-append attach-dir "big.png"))
+    (let ((big (list "big.png" (attach-file "big.png")))
+          (doc (list "u.pdf" pdf)))
+      (check-true (has? "5 MB" (ai-attachments-problem "claude" (list big))))
+      (check= (ai-attachments-problem "openrouter" (list big)) #f)
+      (string-save (make-string (* 9 1024 1024) #\x) (url-append attach-dir "big.pdf"))
+      (check-true (has? "in a request"
+                        (ai-attachments-problem
+                         "gemini" (list big (list "big.pdf" (attach-file "big.pdf"))))))
+      (check-true (has? "draws from the text"
+                        (ai-attachments-problem "chatgpt" (list doc) "gpt-image-1")))
+      (check= (ai-attachments-problem "chatgpt" (list doc) "gpt-5-mini") #f))
+    ;; a text file cut between two characters of UTF-8
+    (let ((e (string (integer->char 195) (integer->char 169))))
+      (string-save (string-append (make-string 399999 #\a) e "tail")
+                   (url-append attach-dir "long.txt"))
+      (with t (ai-attachments-text (list (list "long.txt" (attach-file "long.txt"))))
+        (check-true (has? (string-append (make-string 20 #\a) "\n[...]") t))))
+    ;; the files of a drop of Qt, separated by a space
+    (check= (ai-dropped-files `(concat ,png " " ,pdf)) (list png pdf))
+    (check= (ai-dropped-files `(concat ,png " " "not a file")) #f)
     ;; a file which came with a document is sent once it is allowed (the
     ;; files attached here are allowed by ai-insert-attachment)
     (with l (list (list "keys.json" (attach-file "keys.json")))
@@ -368,8 +404,9 @@
     ;; with the one asked, each as its API takes it
     (lazy-plugin-force)
     (set! attach-files
-          (list (string-append "0\tapplication/pdf\tunknown.pdf\t" pdf)
-                (string-append "1\timage/png\ttexmacs-20.png\t" png)))
+          (with sep (ai-attachment-separator)
+            (list (string-append "0" sep "application/pdf" sep "unknown.pdf" sep pdf)
+                  (string-append "1" sep "image/png" sep "texmacs-20.png" sep png))))
     (with c (attach-request "claude")
       (check= (has? "\"type\": \"document\"" c) #t)
       (check= (has? "\"media_type\": \"application/pdf\"" c) #t)
@@ -389,11 +426,20 @@
     (with c (attach-request "gemini")
       (check= (has? "\"mimeType\": \"application/pdf\"" c) #t)
       (check= (has? "\"mimeType\": \"image/png\"" c) #t))
+    ;; a question which is not UTF-8 (Latin-1) is sent as UTF-8
+    (set! attach-files '())
+    (with c (attach-request "claude"
+                            (string-append "caf" (string (integer->char 233))))
+      (check-true (has? (string-append "caf" (string (integer->char 195)
+                                                     (integer->char 169)))
+                        c)))
     ;; without files: the messages as before
     (set! attach-files '())
     (with c (attach-request "claude")
       (check= (has? "\"content\": \"Describe\"" c) #t)
       (check= (not (has? "iVBORw0KGgo" c)) #t)))
+  (for-each (lambda (f) (system-remove (url-append attach-dir f)))
+            '("bin.txt" "big.png" "big.pdf" "long.txt"))
   (system-remove (url-append attach-dir "notes.txt"))
   (system-remove (url-append attach-dir "n.zip")))
 
