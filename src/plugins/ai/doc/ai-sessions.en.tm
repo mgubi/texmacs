@@ -84,9 +84,11 @@
 
   <subsection*|Attached files>
 
-  <with|font-series|bold|Attach> in the focus bar of a session attaches a
-  file to the question at the cursor; it shows as its name in a frame,
-  which is deleted as a character. A question may have several. The text
+  <with|font-series|bold|Attach> in the focus bar of a session, or of an
+  executable fold, attaches a file to the question at the cursor; so does
+  a file dropped while the cursor is in the question. The file shows as
+  its name in a frame, which is deleted as a character. A question may
+  have several. The text
   files (LaTeX, Markdown, BibTeX, the sources of programs, plain text) are
   sent after the text of the question, a <TeXmacs> document as LaTeX; the
   images (PNG, JPEG, GIF, WebP) and the PDF files are sent as such, to

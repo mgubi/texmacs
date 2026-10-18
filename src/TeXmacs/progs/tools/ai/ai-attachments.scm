@@ -155,12 +155,20 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define (ai-input-field? t)
-  (and (tree-in? t '(input unfolded-io folded-io unfolded-io-text
-                     folded-io-text unfolded-io-math folded-io-math))
+  (and (tree-in? t '(input input-text input-math unfolded-io folded-io
+                     unfolded-io-text folded-io-text unfolded-io-math
+                     folded-io-math))
        (> (tree-arity t) 1)))
 
-;; the input of the field of the cursor, if the cursor is in it
-(define (ai-cursor-input)
+;; the question of an executable fold of a chatbot (script-input lan session
+;; question answer, ai-folds.scm)
+(define (ai-fold-question? t)
+  (and (tree-up t) (== (tree-index t) 2)
+       (defined? 'ai-fold?) (ai-fold? (tree-up t))))
+
+;; the input of the field of the cursor (or the question of its fold), if
+;; the cursor is in it
+(tm-define (ai-cursor-input)
   (let* ((p (cursor-path))
          (t (path->tree (cDr p))))
     (let loop ((t t))
@@ -168,6 +176,7 @@
             ((and (tree-up t) (ai-input-field? (tree-up t))
                   (== (tree-index t) 1))
              t)
+            ((ai-fold-question? t) t)
             ((tree-up t) (loop (tree-up t)))
             (else #f)))))
 
@@ -189,3 +198,34 @@
       (set-message "Put the cursor in a question of the session first"
                    "Attach a file")
       (choose-file ai-insert-attachment "Attach a file" "generic")))
+
+;; Files dropped while the cursor is in a question are attached to it, as
+;; Attach does, instead of their names being inserted (the default of
+;; kbd-handlers.scm); what is dropped elsewhere, or is not all files which
+;; can be attached, is inserted as before. (The question is the one of the
+;; cursor, as the editor puts a drop at the cursor.)
+(define (ai-dropped-files x)
+  ;; the files of what is dropped, or #f
+  (let* ((l (cond ((string? x) (list x))
+                  ((tm-func? x 'concat) (cdr x))
+                  ((tm-func? x 'document) (cdr x))
+                  (else (list x))))
+         (files (map (lambda (y)
+                       (cond ((string? y) (cork->utf8 y))
+                             ((and (tm-func? y 'image) (string? (cadr y)))
+                              (cork->utf8 (cadr y)))
+                             (else #f)))
+                     (list-filter l (lambda (y) (!= y ""))))))
+    (and (nnull? files)
+         (list-and (map (lambda (f)
+                          (and f (string-starts? f "/")
+                               (url-exists? (system->url f))
+                               (not (url-directory? (system->url f)))
+                               (ai-attachment-kind f)))
+                        files))
+         files)))
+
+(tm-define (mouse-drop-event x y obj)
+  (:require (and (ai-cursor-input) (ai-dropped-files (tm->stree obj))))
+  (for-each (lambda (f) (ai-insert-attachment (system->url f)))
+            (ai-dropped-files (tm->stree obj))))
