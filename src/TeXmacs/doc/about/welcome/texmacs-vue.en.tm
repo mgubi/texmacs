@@ -230,6 +230,23 @@
   <paragraph|18 October 2026>
 
   <\itemize>
+    <item>Program code is colored by its syntax tree, in 22 languages (C,
+    C++, Python, Scheme, Java, <name|JavaScript>, <name|TypeScript>, R,
+    Julia, Shell, Go, Rust, Lua, Lean, Haskell, <name|OCaml>, HTML, CSS,
+    TOML, YAML, JSON and <LaTeX>), also inside the scripts and styles of
+    HTML; a bracket without its partner is shown in red.
+
+    <item>In program code, brackets and quotes stay balanced as they are
+    typed and deleted, Return closes a block with its keyword (<verbatim|end>,
+    <verbatim|fi>...) or an environment of <LaTeX>, and the end tag of HTML
+    comes with its start tag.
+
+    <item>The menu <menu|Focus> of program code goes from definition to
+    definition, selects, deletes, swaps and comments whole parts of the
+    code, removes or adds brackets, and folds blocks
+    (<shortcut|(program-fold)> and <shortcut|(program-unfold)>); the lines
+    are indented by the structure of the code.
+
     <item>The windows are drawn with <name|WebGPU>, the newer graphics
     interface of the browsers, in <name|Chrome> and the other browsers of
     <name|Chromium> (<name|Edge>...): as fast as with <name|WebGL2>, and

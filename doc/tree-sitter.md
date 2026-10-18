@@ -359,7 +359,7 @@ split into lazily loaded modules.
 
 ## 6. Experiment: tree-sitter in Scheme
 
-Branch `wip_ts_experiment` (from `maxs_texmacs` 1fcf4aaf39), started
+Branch `wip_ts` (first named `wip_ts_experiment`; from `maxs_texmacs` 1fcf4aaf39), started
 2026-10-16. A grammar is data (`src/grammar.json`, written by `tree-sitter
 generate` from `grammar.js` and committed in every grammar repository), so
 the generator can be ported to Scheme and its tables run by a Scheme port
@@ -1157,6 +1157,31 @@ installed, and the old behaviour stays elsewhere.
   also got two changes for the Scheme of TeXmacs: hexadecimal escapes
   without semicolon (`"\x10"`, which made ERROR nodes in 30 files) and `|`
   as a character of symbols (no `|...|` symbols of R7RS).
+- **Closing keywords, tags and comments of nodes** (same day). After Return,
+  a block which the line before opens and nothing closes gets its closing
+  keyword on the next line: the keywords which close blocks in the grammar
+  (`closers.scm`, made by `misc/tree-sitter/gen-closers.py`: the last
+  keyword of a sequence which a keyword opens, with more than tokens
+  between them; bash done fi esac, julia and lua end, ocaml end done) and,
+  in LaTeX, the `\end` of the last `\begin` of the line are tried in turn
+  on a copy of the tree (`syntax-region-errors-with`: the edit and an
+  incremental parse of a copy), and the first which leaves fewer errors is
+  inserted. Error recovery alone does not tell (bash, ocaml and C get a
+  MISSING closer, lua, julia and rust an ERROR). In HTML, the `>` of a
+  start tag inserts its end tag (not for void elements, nor when the
+  element has its end tag). Comment or uncomment node (Focus > Structure):
+  line comments for a node of whole lines, else a block comment (the
+  delimiters are a new property `block-comment` of
+  `tm-program-languages.scm`); in a comment, the same command removes the
+  block comment or the line comments of the lines around. Folds also have
+  keys: std ( and std ), as the folds of the LSP client of `wip_lsp`.
+- **In the browser** (same day): the sources of `Plugins/TreeSitter` are
+  in `misc/wasm/sources.txt` (the C runtime with the include paths of its
+  vendored copy); the shipped tables, queries and grammars come with the
+  package misc of the page, and are unpacked into the home directory of
+  the page at the first use of a language (about 100 ms). Under node, 100
+  KB of Python parse in 55 ms (42 on the desktop); in the page (headless
+  Firefox) the parses and colors are those of the desktop.
 - A pitfall of the tests: the suites run in one TeXmacs, and a key typed
   in program code loads the keyboard of programs and its modules, which
   changed the highlighting of Fortran and the entering of mathematics in
@@ -1175,5 +1200,5 @@ installed, and the old behaviour stays elsewhere.
    generator should get faster (the 3x of module code under S7, section 6,
    is the first thing to look at). No build-time target.
 3. Decided (2026-10-17): the work is based on `maxs_texmacs`
-   (`wip_ts_experiment` started from it). The desktop builds come first;
+   (`wip_ts`, first named `wip_ts_experiment`, started from it). The desktop builds come first;
    the browser build later.

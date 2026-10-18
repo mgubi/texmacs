@@ -250,6 +250,13 @@ Plugins/MuPDF/mupdf_writet1.c
 Plugins/Openssl/openssl.cpp
 Plugins/Resvg/resvg.cpp
 Plugins/Sqlite3/sqlite3.cpp
+Plugins/TreeSitter/syntax_region.cpp
+Plugins/TreeSitter/tree_sitter_glue.cpp
+Plugins/TreeSitter/tree_sitter_lib.c
+Plugins/TreeSitter/ts_dynamic.c
+Plugins/TreeSitter/ts_highlight.cpp
+Plugins/TreeSitter/ts_tables.cpp
+Plugins/TreeSitter/ts_xz.c
 Plugins/Unix/unix_entrypoint.cpp
 Plugins/Unix/unix_server_log.cpp
 Plugins/Unix/unix_stacktrace.cpp
