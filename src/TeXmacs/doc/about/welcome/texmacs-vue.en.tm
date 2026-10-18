@@ -45,6 +45,38 @@
   and <menu|Remove from this browser...>. Its panel also has more
   information and the options of the address of the page (see below).
 
+  <section|What works in the page>
+
+  Editing and typesetting work as in the desktop program, with the menus,
+  the dialogs and the side tools, and also:
+
+  <\itemize>
+    <item>Drawing: by the <name|GPU> with <name|WebGPU> in the browsers of
+    <name|Chromium>, with <name|WebGL2> elsewhere, or by <name|MuPDF>.
+    <verbatim|?gpu=webgpu>, <verbatim|?gpu=webgl> or <verbatim|?gpu=0> at
+    the end of the address of the page chooses, and <verbatim|?scale=>
+    changes the size of the interface.
+
+    <item>Spell checking (<name|Hunspell>), with the dictionaries fetched
+    from the network the first time a language needs them.
+
+    <item>The converters of <name|Markdown>, <name|Word> and
+    <name|OpenDocument> (<menu|File|Import>, <menu|File|Export>), the font
+    design page (the last entry of the font menu of <menu|Document>), and
+    citations from <name|Zotero> through <verbatim|zotero.org>, with an API
+    key kept in the wallet.
+
+    <item>Program code colored by its syntax tree (22 languages), with
+    folds, an outline and the moves by structure.
+
+    <item>The sessions of the plug-ins whose program runs in the page, and
+    of the chatbots, with files attached to the questions (the others are in
+    <with|font-series|bold|What does not work> below).
+  </itemize>
+
+  <menu|Help|Max's TeXmacs features> describes what this version of
+  <TeXmacs> adds to the official one, in the browser and on the desktop.
+
   <section|Your files>
 
   Your documents are kept in the storage of the browser, for this site
@@ -68,6 +100,12 @@
     <item>The dialogs <menu|File|Load> and <menu|File|Save as> are this same
     panel.
 
+    <item><with|font-series|bold|Your <TeXmacs> folder> shows your
+    <verbatim|.TeXmacs> folder: the preferences, and the styles, packages,
+    fonts and <name|Scheme> code you added. Its files are opened, renamed,
+    deleted and saved as copies as your other files, and
+    <with|font-series|bold|New folder> makes a folder in either place.
+
     <item><with|font-series|bold|Files of <TeXmacs>> shows the files of
     <TeXmacs> itself (its styles, packages and documentation). They cannot be
     changed, but <with|font-series|bold|customize> copies one into your own
@@ -83,6 +121,9 @@
   <verbatim|.TeXmacs> folder, with your preferences, your own styles and
   the wallet (which stays encrypted: its passphrase opens it). A document
   which is not saved is not in it: save your documents first.
+
+  <with|font-series|bold|Save a backup> and <with|font-series|bold|Restore a
+  backup...> are buttons of <menu|File|Files in this browser...> too.
 
   <menu|Restore a backup...>, in the same menu, takes such an archive, in
   this browser or in another one: after a confirmation, its files replace
@@ -162,10 +203,13 @@
 
   <section|Loading and fonts>
 
-  The first visit loads some 9<nbsp>MB before <TeXmacs> starts, and 8<nbsp>MB
-  more in the background while you work. The fonts which come with
-  <TeXmacs> are loaded one by one, the first time a document uses them. All
-  of it is kept by the browser: the next visits load nothing.
+  The first visit loads about 11<nbsp>MB before <TeXmacs> starts, and about
+  9<nbsp>MB more in the background while you work (the section
+  <with|font-series|bold|This build> below gives the size of each part). The fonts of the
+  first screen come with the files needed to start; the other fonts which
+  come with <TeXmacs> are loaded one by one, the first time a document uses
+  them, and a font which failed to load is tried again in the background.
+  All of it is kept by the browser: the next visits load nothing.
 
   Only the fonts which come with <TeXmacs> are available: a web page cannot
   see the fonts installed on your computer.
@@ -199,12 +243,18 @@
     <name|JavaScript>, <name|TikZ> and <name|Asymptote> (see the help of
     their plug-ins, in <menu|Help|Plug-ins>), and those of the chatbots
     which the page asks through the web: <name|ChatGPT>, <name|Claude>,
-    <name|Gemini>, <name|Mistral> with a key, and <name|Ollama> on your
-    computer if it allows the page. <name|Albert> does not answer web pages.
+    <name|Gemini>, <name|Mistral> and <name|OpenRouter> with a key, and
+    <name|Ollama> on your computer if it allows the page. <name|Albert> does not answer web pages.
 
     <item>The <menu|Remote> menu connects to a <TeXmacs> server over
-    WebSocket: a server of <TeXmacs> <name|Vue> on the same computer, or
-    one on another computer which is open to browsers.
+    WebSocket, which a page has only: a server of this version of
+    <TeXmacs> (<name|Vue> or <name|Qt>), which serves browsers at the port
+    after its usual one (the preference <verbatim|server websocket>: those
+    of the same computer by default), in clear text on the same computer
+    and encrypted with another one. The servers of other versions, such as
+    <verbatim|cloud.texmacs.org>, are reached through a bridge (see 9
+    October 2026 below). The language servers of program code, which are
+    programs, do not work either.
 
     <item><TeXmacs> <name|Vue> types, scrolls and typesets as fast as the
     desktop program, but its <name|Scheme> runs two to three times slower,
@@ -230,6 +280,10 @@
   <paragraph|18 October 2026>
 
   <\itemize>
+    <item><menu|Help|Max's TeXmacs features>, a new page, says what this
+    version of <TeXmacs> adds to the official one; this page has a section
+    <with|font-series|bold|What works in the page>.
+
     <item>Program code is colored by its syntax tree, in 22 languages (C,
     C++, Python, Scheme, Java, <name|JavaScript>, <name|TypeScript>, R,
     Julia, Shell, Go, Rust, Lua, Lean, Haskell, <name|OCaml>, HTML, CSS,
@@ -411,7 +465,7 @@
     numbers, and is saved as it was read: its <name|YAML> header, its
     formulas, tables and <name|Html> keep their text, and so do the levels
     of its headings, its lists, its code, images and footnotes, as long
-    as you do not edit them. See <menu|Help|Manual|Compatibility with
+    as you do not edit them. See <menu|Help|Reference guide|Compatibility with
     other formats>.
 
     <item>A <TeXmacs> server now answers the browsers at a port of its
@@ -528,7 +582,7 @@
     the browser and open it, or use <menu|File|Export|Word> and
     <menu|File|Export|OpenDocument> and save the result on the computer.
     Formulas, tables, images, footnotes, the numbers and the references
-    are kept in both directions; see <menu|Help|Manual|Compatibility with
+    are kept in both directions; see <menu|Help|Reference guide|Compatibility with
     other formats>. <name|Markdown> files (<verbatim|.md>) are read and
     written in the same way.
 
@@ -671,7 +725,7 @@
     above).
 
     <item>The plots of the examples of <name|R> and <name|Python> and the
-    figure of the page layout (<menu|Help|Developer's guide>) are shown: they
+    figure of the page layout (<menu|Help|Developer documentation>) are shown: they
     were
     <name|PostScript>, which the browser cannot draw, and are now <name|PDF>.
 
