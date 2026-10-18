@@ -788,9 +788,15 @@
 
 (define syntax-indent-rules
   ;; the languages whose grammars have no query indents.scm (or a weaker
-  ;; one: that of Neovim for YAML only indents after a block)
+  ;; one: that of Neovim for YAML only indents after a block); for Haskell,
+  ;; a rule of layout (see layout-indentation)
   `(("yaml" ("block_mapping_pair" "block_sequence_item" "flow_mapping" "flow_sequence")
      () ("flow_mapping" "flow_sequence") #t)
+    ("latex"
+     ("generic_environment" "math_environment" "curly_group" "brack_group")
+     ("end") #f)
+    ("haskell" layout
+     ("where" "do" "of" "let" "=" "->" "then" "else" "(" "[" "{" "," "|"))
     ("lean"
      ("def" "theorem" "instance" "abbrev" "example" "structure" "inductive"
       "by" "do_block" "match" "match_alt" "fun" "have" "let" "where_decls"
@@ -911,7 +917,41 @@
                         (if p (line-indent doc (car p)) 0)))
                      (else #f)))
              (let ((rules (assoc lan syntax-indent-rules)))
-               (and rules (syntax-indentation doc row id rules tab)))))))
+               (cond ((not rules) #f)
+                     ((== (cadr rules) 'layout)
+                      (layout-indentation doc row id (caddr rules) tab))
+                     (else (syntax-indentation doc row id rules tab))))))))
+
+(define (layout-indentation doc row lan openers tab)
+  ;; for a language of layout (Haskell): one step more than the line before
+  ;; when that line ends with an opener (where, do, =, an open bracket...),
+  ;; else as much as it (a comment which ends the line does not count)
+  (let ((p (previous-text-end doc row)))
+    (if (not p) 0
+        (let* ((r (car p))
+               (s (line-string doc r))
+               (end (let ((l (syntax-region-node-at doc lan r (- (cadr p) 1))))
+                      ;; before a comment at the end of the line
+                      (if (and (pair? l) (string-contains? (node-type (car l)) "comment")
+                               (== (car (node-start (car l))) r)
+                               (> (cadr (node-start (car l))) 0))
+                          (cadr (node-start (car l)))
+                          (cadr p))))
+               (text (let trim ((n end))
+                       (if (and (> n 0) (char-whitespace? (string-ref s (- n 1))))
+                           (trim (- n 1))
+                           (substring s 0 n))))
+               (opens? (list-or
+                        (map (lambda (o)
+                               (and (string-ends? text o)
+                                    ;; a word ends there, not a part of one
+                                    (let ((k (- (string-length text) (string-length o))))
+                                      (or (= k 0)
+                                          (not (char-alphabetic? (string-ref o 0)))
+                                          (not (char-alphabetic?
+                                                (string-ref text (- k 1))))))))
+                             openers))))
+          (+ (line-indent doc r) (if opens? tab 0))))))
 
 (define-public (syntax-compute-indentation doc row tab)
   ;; the indentation of a line of the program at the cursor, or #f when

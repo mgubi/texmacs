@@ -636,6 +636,15 @@
 ;; Scheme as prog/scheme-edit.scm indents it (the keywords of tm-mode.el
       ;; and their arity, the alignment with the arguments), on the tree: a
       ;; character #\) or a quote in a string does not count
+;; LaTeX: environments and groups indent, \end goes back; Haskell: one
+      ;; step after a line which ends with where, do, = ..., else as the line
+      ;; before (a comment at its end does not count)
+      (check= (indents "latex" '("\\begin{itemize}" "  \\item a" "  \\begin{equation}"
+                                 "    x" "  \\end{equation}" "\\end{itemize}"))
+              '(0 4 4 6 2 0))
+      (check= (indents "haskell" '("f x = do" "    let y = 1" "    print y" "  where"
+                                   "    z = 3 -- where" ""))
+              '(0 4 4 4 6 4))
       ;; (a symbol may start with digits, as 2d-list in TeXmacs)
       (check= (indents "scheme" '("(define 2d-list" "  (list 1))")) '(0 2))
       (check= (indents "scheme" '("(define (f x)" "  (let ((y x)" "        (z 1))"
