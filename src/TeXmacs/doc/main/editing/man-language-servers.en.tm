@@ -68,8 +68,9 @@
   presentations).
 
   The setting is the preference <verbatim|lsp> (<verbatim|on> or
-  <verbatim|off>). Only files on disk are followed. The other preference of
-  the servers is <verbatim|lsp:mouse hover> (see below).
+  <verbatim|off>). Only files on disk are followed. The other preferences of
+  the servers are <verbatim|lsp:mouse hover>, <verbatim|lsp:semantic
+  colors> and <verbatim|lsp:inlay hints> (see below).
 
   <paragraph*|Projects>
 
@@ -188,6 +189,9 @@
     <item*|<menu|Follow source files>>Whether the servers follow the source
     files (see above).
 
+    <item*|<menu|Find references>, <menu|Outline>>As <key|std U> and
+    <key|std O> (see below).
+
     <item*|<menu|Go to definition>, <menu|Information at cursor>,
     <menu|Complete>>As <key|F12>, <key|S-F12> and <key|tab>.
 
@@ -201,6 +205,10 @@
 
     <item*|<menu|Information on mouse rest>>Whether the information about a
     symbol is shown when the mouse rests on it (see below).
+
+    <item*|<menu|Colours of the server>, <menu|Inlay hints>>Whether the
+    names are coloured by their kinds, and whether the hints are shown (see
+    below).
 
     <item*|<menu|Restart server>>Stops the server of the current file (if it
     runs) and starts it again; the files which are open are given to it
@@ -277,6 +285,40 @@
   which one is applied by clicking on it. If the file has been edited
   since the page was opened, the change is not applied (it was made for
   the former text): ask for the corrections again.
+
+  <paragraph*|References and outline>
+
+  <key|std U> lists on a page all the places where the symbol at the
+  cursor is used, in the current file and in the other files of the
+  project, by file, each with its line number and its line. <key|std O>
+  shows the outline of the current file: its functions, classes, types,
+  variables..., indented as they are nested in the file, each with its
+  kind and its signature. On both pages, a click on a line goes to its
+  place. The outline follows the file as long as its page stays open: it
+  is made again each time the server has seen a change.
+
+  <paragraph*|Colours and inlay hints>
+
+  When the server can tell the kinds of the names (<em|semantic tokens>,
+  as <verbatim|clangd> does), the names of functions, of types and of
+  macros get colours of their own, also those which <TeXmacs> could not
+  recognize by itself (the types and the macros which the program defines).
+  The colours of the types and of the macros are those of the preferences
+  of the syntax of the language; keywords, comments, strings and numbers
+  keep the colours of <TeXmacs>.
+
+  When the server gives <em|inlay hints>, they are shown in grey in the
+  code: the names of the parameters before the arguments of a call
+  (<verbatim|answer (x: 1)>), the types which the compiler deduces... They
+  are not part of the text: the cursor goes over them, and they are not
+  saved.
+
+  The colours and the hints are those of the text which the server was
+  last given: a line which you edit loses them until the server has
+  answered again, a moment after you have paused. Both can be turned off
+  in <menu|Tools|Language servers> (the preferences
+  <verbatim|lsp:semantic colors> and <verbatim|lsp:inlay hints>). Files of
+  more than 20000 lines are left as they are.
 
   <paragraph*|Incremental synchronization>
 

@@ -107,6 +107,16 @@
     <item*|<source-link|lsp-actions.scm|TeXmacs/progs/lsp/lsp-actions.scm>>The
     edits of the servers: formatting, renames, quick fixes.
 
+    <item*|<source-link|lsp-navigate.scm|TeXmacs/progs/lsp/lsp-navigate.scm>>The
+    pages of the references of a symbol and of the outline of a file.
+
+    <item*|<source-link|lsp-decorate.scm|TeXmacs/progs/lsp/lsp-decorate.scm>,
+    <source-link|lsp_decorations.cpp|src/System/Language/lsp_decorations.cpp>,
+    <source-link|concat_text.cpp|src/Typeset/Concat/concat_text.cpp>>The
+    colours of semantic tokens and the inlay hints: asked for in
+    <scheme>, kept for the lines in <c++>, typeset by
+    <cpp|typeset_lsp_string>.
+
     <item*|<source-link|lsp-kbd.scm|TeXmacs/progs/lsp/lsp-kbd.scm>>The mode
     <scm|in-lsp%>, the keys, the menu <scm|lsp-menu> and the focus bar.
 

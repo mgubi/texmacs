@@ -233,6 +233,55 @@
   <scm|lsp-goto-location>, which switches to the buffer of the file (or
   loads it) and moves the cursor to the start of the range.
 
+  <section|References and outline>
+
+  <source-link|lsp-navigate.scm|TeXmacs/progs/lsp/lsp-navigate.scm> makes
+  two pages, as the one of the diagnostics. <scm|lsp-references> (<key|std
+  U>) asks for <verbatim|textDocument/references> at the cursor, with
+  <verbatim|includeDeclaration> (<scm|lsp-request-at-cursor-with> adds the
+  context to the parameters of the cursor), groups the Locations by file
+  (in the order of their first reference, then by position) and shows each
+  one with its line: that of the buffer of the file if it is open, else of
+  the file on disk. At most 2000 references are shown.
+
+  <scm|lsp-outline> (<key|std O>) asks for
+  <verbatim|textDocument/documentSymbol>; <scm|lsp-outline-entries> turns
+  the answer into lines (depth, kind, name, detail, position): nested
+  DocumentSymbols in their order, or flat SymbolInformations sorted by
+  position. The page is asked for again (asynchronously) when the server
+  publishes the diagnostics of its file, as long as it is open.
+
+  <section|Colours and inlay hints>
+
+  <source-link|lsp-decorate.scm|TeXmacs/progs/lsp/lsp-decorate.scm> asks the
+  server of the current buffer for <verbatim|textDocument/semanticTokens/full>
+  and <verbatim|textDocument/inlayHint> (the whole file), 200 ms after the
+  server has published diagnostics for it (it has seen the text then), if
+  the buffer has at most 20000 lines and the preferences
+  <verbatim|lsp:semantic colors> and <verbatim|lsp:inlay hints> are on. The
+  answers are used only if the buffer still has the text they were asked
+  for. <scm|lsp-decode-tokens> decodes the tokens (relative lines and
+  starts, the types of the legend of the server); <scm|lsp-token-color>
+  gives colours to functions, methods, types and macros only (those of the
+  preferences of the syntax for types and macros), the rest keeps the
+  colours of the language of <TeXmacs>; <scm|lsp-line-decorations> gives,
+  line by line, the coloured pieces and the hints in Cork offsets.
+
+  <scm|lsp-apply-decorations> gives them to the typesetter with
+  <scm|lsp-decorate-line> (glue), for the lines whose decorations change,
+  and typesets those lines again (<scm|update-path>; the whole buffer
+  beyond 2000 lines). <source-link|lsp_decorations.cpp|src/System/Language/lsp_decorations.cpp>
+  keeps them for the tree of each line, with its text then:
+  <cpp|lsp_line_decorations_of> gives none for a line whose text has
+  changed, so that an edited line is typeset as usual until the next
+  answer. <cpp|concater_rep::typeset_prog_string> (<source-link|concat_text.cpp|src/Typeset/Concat/concat_text.cpp>)
+  calls <cpp|typeset_lsp_string> for a decorated line: the pieces of a token
+  with colours of their own are typeset apart, and the hints come before
+  the tokens where they are, as grey text boxes with decorated paths (the
+  cursor does not go into them), their paddings as spaces. The lines of a
+  closed buffer, and all of them when the servers are turned off, lose
+  their decorations.
+
   <section|Servers and their log>
 
   <scm|lsp-client-ended> is redefined to say on the status bar that the
