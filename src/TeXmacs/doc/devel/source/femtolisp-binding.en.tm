@@ -164,10 +164,9 @@
   into the other; a half is doubled when more than 80% of it is still in use
   after a collection. Each half starts with 48 MB, about the heap which S7 has
   in <TeXmacs>. The environment variable <verbatim|TEXMACS_FL_HEAP> gives
-  another size, in MB (it is not checked: keep it well below 512). The size of
-  a half is a 32-bit number in femtolisp, so a half which has reached 512 MB
-  is not doubled any more, and an out of memory error is raised (patch 0012):
-  starting with 48 MB, a half ends at 768 MB, the heap at 1.5 GB.
+  another size, in MB (it is not checked). The heap stops growing at 8 GB,
+  with an out of memory error (patches 0012 and 0023), which also prints the
+  functions of the stack.
 
   <tmdoc-copyright|2026|Massimiliano Gubinelli>
 
