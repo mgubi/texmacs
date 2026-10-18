@@ -142,6 +142,7 @@
 
       <item>constructs a <cpp|smart_font_rep>.
     </enumerate>
+
     All other routines in <source-link|smart_font.cpp|src/Graphics/Fonts/smart_font.cpp> which need a font with a
     different family, variant, series or shape call <cpp|smart_font_bis>
     again, so subfonts are often smart fonts themselves.
