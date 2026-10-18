@@ -133,7 +133,7 @@ data_src     := $(call findsrc,Data)
 graphics_src := $(call findsrc,Graphics)
 plugins_src  := $(call findsrc_in,Plugins,Bibtex Cairo Imlib2 Sqlite3 \
                                           Ispell Metafont Openssl Updater \
-                                          LaTeX_Preview Database)
+                                          LaTeX_Preview Database TreeSitter)
 x11_src      := $(call findsrc_in,Plugins,@CONFIG_X11@)
 cocoa_m_src  := $(call findm_in,Plugins,@CONFIG_COCOA@ @CONFIG_MACOS@)
 cocoa_mm_src := $(call findmm_in,Plugins,@CONFIG_COCOA@ @CONFIG_MACOS@ @CONFIG_SPARKLE@)
@@ -177,6 +177,9 @@ vue_c_src    := $(if $(strip @CONFIG_VUE@),clay.c,)
 make_c_deps = $(patsubst %.c,Objects/%.o,$(notdir $(1)))
 
 texmacs_c_deps := $(call make_c_deps, $(call findc_in,System,Misc))
+# the runtime of tree-sitter (vendored in Plugins/TreeSitter/tree-sitter, one
+# unit) and the languages made from the tables of progs/treesit
+treesitter_c_deps := Objects/tree_sitter_lib.o Objects/ts_dynamic.o Objects/ts_xz.o
 texmacs_c_deps += $(call make_c_deps, $(pdf_c_src))
 # all dependency files; the "deps" target below and the include of the
 # dependency files rely on this variable
@@ -434,6 +437,8 @@ $(gnutls_obj): Objects/%.o: %.cpp
 	$(call cxx_incl,$(gnutls_incl) $(CXXGNUTLS) $(CXXQT))
 $(texmacs_c_deps):   Objects/%.o: %.c
 	$(call cc_flags, $(CFLAGS))
+$(treesitter_c_deps): Objects/%.o: %.c
+	$(call cc_flags, $(CFLAGS) $(CXXOPTIMIZE) -IPlugins/TreeSitter/tree-sitter/include -IPlugins/TreeSitter/tree-sitter/src)
 
 ###############################################################################
 # Make editor
@@ -504,7 +509,7 @@ uses_vue      := $(vue_obj) $(vue_mm_obj) $(vue_c_obj)
 
 TEXMACS_objects := $(strip $(call uses,system kernel data graphics\
  plugins x11 os qt qtwk gs resvg cocoa style typeset edit scheme texmacs pdf\
- freetype gnutls mupdf sdl vue windowsres)) $(texmacs_c_deps)
+ freetype gnutls mupdf sdl vue windowsres)) $(texmacs_c_deps) $(treesitter_c_deps)
 
 TEXMACS_OPEN_objects := $(texmacs_open_obj) Objects/tm_ostream.o Objects/fast_alloc.o Objects/tree.o \
 	$(filter-out Objects/windows64_entrypoint.o Objects/Plugins/Windows64/windows64_entrypoint.o,$(TEXMACS_objects))

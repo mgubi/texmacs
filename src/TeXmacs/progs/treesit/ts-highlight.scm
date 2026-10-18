@@ -1,0 +1,150 @@
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; MODULE      : ts-highlight.scm
+;; DESCRIPTION : syntax highlighting of programs by tree-sitter
+;; COPYRIGHT   : (C) 2026  Massimiliano Gubinelli
+;;
+;; This software falls under the GNU general public license version 3 or later.
+;; It comes WITHOUT ANY WARRANTY WHATSOEVER. For details, see the file LICENSE
+;; in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
+;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; The program languages of TeXmacs which tree-sitter highlights
+;; (Plugins/TreeSitter/ts_highlight.cpp) ask for their highlighter at their
+;; first use; it is made here, once the tables of the language are ready:
+;; the query misc/tree-sitter/<lan>/highlights.scm and the colour class of
+;; each of its captures, and the query injections.scm, which gives the
+;; parts written in other languages (the scripts of HTML...), coloured by
+;; the highlighters of these languages.
+
+(texmacs-module (treesit ts-highlight)
+  (:use (treesit ts-registry)))
+
+(define-preferences
+  ("tree-sitter highlighting" "on" noop))
+
+;; program language of TeXmacs -> language of tree-sitter
+;; (from the list of the program languages, tm-program-languages.scm)
+(define-public treesit-highlight-languages
+  (list-filter (map (lambda (lan)
+                      (let ((g (program-language-grammar lan)))
+                        (and g (cons lan g))))
+                    (program-languages))
+               identity))
+
+;; capture name -> colour class (initialize_color_encodings in
+;; System/Language/language.cpp); the longest prefix of the name decides,
+;; names without class (@variable...) keep the colour of the text
+(define-public treesit-capture-classes
+  '(("comment" . "comment")
+    ("string" . "constant_string")
+    ("string.escape" . "constant_char")
+    ("string.special.key" . "declare_identifier")
+    ("escape" . "constant_char")
+    ("character" . "constant_char")
+    ("number" . "constant_number")
+    ("float" . "constant_number")
+    ("boolean" . "constant")
+    ("constant" . "constant")
+    ("keyword" . "keyword")
+    ("keyword.control" . "keyword_control")
+    ("keyword.conditional" . "keyword_conditional")
+    ("keyword.directive" . "preprocessor_directive")
+    ("preproc" . "preprocessor_directive")
+    ("function" . "variable_function")
+    ("function.builtin" . "constant_function")
+    ("function.special" . "preprocessor")
+    ("function.macro" . "preprocessor")
+    ("type" . "declare_type")
+    ("label" . "declare_identifier")
+    ("property" . "variable_identifier")
+    ("module" . "declare_module")
+    ("operator" . "operator")
+    ("punctuation.bracket" . "operator_openclose")
+    ("punctuation.delimiter" . "operator_field")
+    ("delimiter" . "operator_field")
+    ("error" . "error")))
+
+(define-public (treesit-capture-class name)
+  ;; the colour class of a capture name, or ""
+  (let loop ((l treesit-capture-classes) (best "") (len -1))
+    (if (null? l) best
+        (let* ((p (caar l)) (n (string-length p)))
+          (if (and (> n len)
+                   (or (== name p)
+                       (and (> (string-length name) n)
+                            (string-starts? name p)
+                            (== (string-ref name n) #\.))))
+              (loop (cdr l) (cdar l) n)
+              (loop (cdr l) best len))))))
+
+(define (query-url ts . file)
+  (url-concretize
+   (string-append "$TEXMACS_PATH/misc/tree-sitter/" ts "/"
+                  (if (pair? file) (car file) "highlights.scm"))))
+
+;; the names of the languages in the injections: those of the program
+;; languages, then their other names (tm-program-languages.scm)
+(let ((langs (map car treesit-highlight-languages)))
+  (for (lan (reverse langs))
+    (for (name (reverse (program-language-names lan)))
+      (tree-sitter-set-injection-name name lan)))
+  (for (lan langs)
+    (tree-sitter-set-injection-name lan lan)))
+
+(define-public (treesit-query-source ts)
+  ;; the highlight query of ts, after those it inherits (a first line
+  ;; "; inherits: a,b", as in tree-sitter-cpp)
+  (let* ((s (string-load (query-url ts)))
+         (first (car (string-decompose s "\n")))
+         (pre "; inherits: "))
+    (if (not (string-starts? first pre)) s
+        (apply string-append
+               (append (map (lambda (x) (string-append (treesit-query-source x) "\n"))
+                            (string-decompose (string-drop first (string-length pre)) ","))
+                       (list s))))))
+
+(define-public (treesit-install-highlighter lan id)
+  ;; give the highlighter of lan to the C++ side, if its query compiles
+  (let* ((ts (assoc-ref treesit-highlight-languages lan))
+         (file (and ts (query-url ts)))
+         (q (and id file (url-exists? file)
+                 (tree-sitter-query-new id (treesit-query-source ts)))))
+    (and q (>= q 0)
+         (let* ((inj (query-url ts "injections.scm"))
+                (qi (and (url-exists? inj)
+                         (tree-sitter-query-new id (string-load inj)))))
+           (tree-sitter-set-highlighter
+            lan q (map treesit-capture-class (tree-sitter-query-capture-names q)))
+           (when (and qi (>= qi 0)) (tree-sitter-set-injections lan qi))
+           #t))))
+
+(define (refresh-buffers)
+  ;; typeset again the open buffers: their lines were coloured before
+  (for (b (buffer-list))
+    (when (nnull? (buffer->views b))
+      (with-buffer b (update-current-buffer)))))
+
+(tm-define (treesit-highlighter-request lan)
+  ;; called by C++ at the first use of lan; when the tables are cached the
+  ;; highlighter is installed at once, else after their generation
+  (let ((ts (assoc-ref treesit-highlight-languages lan)))
+    (when (and ts (== (get-preference "tree-sitter highlighting") "on")
+               (treesit-supported? ts))
+      (let ((id (treesit-language ts)))
+        (if id (treesit-install-highlighter lan id)
+            (treesit-prepare ts (lambda (id)
+                                  (when (and id (treesit-install-highlighter lan id))
+                                    ;; the languages injecting lan too
+                                    (tree-sitter-reset-highlights)
+                                    (refresh-buffers)))))))))
+
+(tm-define (treesit-schedule-updates)
+  ;; called by C++ when lines changed colour without being modified
+  (delayed
+    (:idle 1)
+    (for (t (tree-sitter-pending-updates))
+      (let ((p (tree->path t)))
+        (when p (update-path p))))))

@@ -20,7 +20,8 @@
 ;; (tmoffice.scm) knows them, and their expansion is layout which an office tree
 ;; cannot express. The same is done for Html, see tmhtml-expand.scm.
 
-(texmacs-module (convert office tmoffice-expand))
+(texmacs-module (convert office tmoffice-expand)
+  (:use (convert tools code-languages)))
 
 (define (tmoffice-env-macro name)
   `(associate ,(symbol->string name)
@@ -36,7 +37,8 @@
 (tm-define (tmoffice-env-patch)
   `(collection
     ,@(map tmoffice-env-macro
-           '(TeXmacs TeX LaTeX hrule item nbsp
+           (append
+            '(TeXmacs TeX LaTeX hrule item nbsp
              ;; the titles of the sections, with their numbers
              part-title part-numbered-title chapter-title section-title
              subsection-title
@@ -65,11 +67,7 @@
              render-big-algorithm render-small-algorithm
              footnote render-bibitem
              quotation quote-env verse
-             ;; code
-             verbatim-code cpp-code python-code scm-code shell-code
-             java-code javascript-code json-code julia-code r-code
-             scala-code fortran-code octave-code scilab-code dot-code
-             mmx-code pseudo-code render-code
+             ;; (the blocks of code are added after this list)
              ;; mathematics: the equations, and the fractions and the
              ;; binomials, whose expansion is layout from which the
              ;; converter could not tell what they are
@@ -86,7 +84,8 @@
              ;; the macros of the style office
              office-par office-span office-field office-comment office-commented office-ins
              office-del office-columns office-columns* office-underline office-strike
-             office-letters office-font office-capitalize office-float office-box office-shape))
+             office-letters office-font office-capitalize office-float office-box office-shape)
+            (code-block-tags)))
     ;; the screens of a presentation and the folds: all of them, not
     ;; only what is shown
     ,@(map tmoffice-env-macro

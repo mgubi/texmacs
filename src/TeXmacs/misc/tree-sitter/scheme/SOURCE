@@ -1,0 +1,6 @@
+src/grammar.json of https://github.com/6cdh/tree-sitter-scheme.git
+(commit 45c72463ac4260ef6e07d1c0642ed43d4e9957b4), with its LICENSE.
+tags.scm is written for TeXmacs.
+In the grammar, for the Scheme of TeXmacs (S7, Guile): the hexadecimal escapes
+of strings need no final semicolon (\x10), and | is a character of symbols (no
+|...| symbols of R7RS).

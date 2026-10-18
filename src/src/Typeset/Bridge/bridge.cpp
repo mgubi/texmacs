@@ -10,6 +10,8 @@
 ******************************************************************************/
 
 #include "bridge.hpp"
+#include "../../Plugins/TreeSitter/ts_highlight.hpp"
+#include "iterator.hpp"
 #include "sys_utils.hpp" // get_env
 #include "Boxes/construct.hpp"
 #include "Stack/stacker.hpp"
@@ -935,6 +937,42 @@ bridge_rep::typeset_by_inputs (int desired_status) {
 }
 
 void
+bridge_rep::fold_line (tree t, array<page_item>& items) {
+  // a folded line of program code (see Plugins/TreeSitter/ts_highlight.cpp)
+  // takes no room and is not drawn (its boxes stay, for the cursor), and
+  // the line before folded lines ends with a mark
+  bool before_fold= false;
+  if (tree_sitter_fold_state (t) == 0 && !is_nil (ip) && !is_nil (ip->next) &&
+      is_accessible (ip)) {
+    tree parent= subtree (the_et, reverse (ip->next));
+    int k= ip->item;
+    before_fold= is_document (parent) && k + 1 < N(parent) &&
+                 tree_sitter_fold_state (parent[k+1]) == 1;
+  }
+  if (tree_sitter_fold_state (t) == 1) {
+    for (int i=0; i<N(items); i++)
+      if (items[i]->type != PAGE_CONTROL_ITEM) {
+        box b= items[i]->b;
+        items[i]->type= PAGE_HIDDEN_ITEM;
+        items[i]->b   = clip_box (ip, b, b->x1, 0, b->x1, 0);
+        items[i]->spc = space (0, 0, 0);
+      }
+  }
+  else if (before_fold) {
+    for (int i=N(items)-1; i>=0; i--)
+      if (items[i]->type == PAGE_LINE_ITEM) {
+        pencil pen (named_color ("dark grey"), env->pen->get_width ());
+        box gap = empty_box (decorate_right (ip), 0, 0, env->fn->spc->def, 0);
+        box mark= text_box (decorate_right (ip), 0, "...", env->fn, pen);
+        array<box> bs;
+        bs << items[i]->b << gap << mark;
+        items[i]->b= concat_box (items[i]->b->ip, bs);
+        break;
+      }
+  }
+}
+
+void
 bridge_rep::my_resync () {
   // FIXME: this dirty hack ensures a perfect coherence between
   // the bridge and the edit tree at the typesetting stage.
@@ -952,7 +990,13 @@ bridge_rep::my_resync () {
 bool bridge_rep::my_reusable () { return true; }
 bool bridge_rep::my_check_cache () { return false; }
 void bridge_rep::my_stack_start () { ttt->local_start (l, sb); }
-void bridge_rep::my_stack_end () { ttt->local_end (l, sb); }
+void
+bridge_rep::my_stack_end () {
+  ttt->local_end (l, sb);
+  // (a folded line of program code, also when it is typeset again by its
+  // inputs)
+  if (is_atomic (st)) fold_line (st, l);
+}
 
 void
 bridge_rep::typeset (int desired_status) {

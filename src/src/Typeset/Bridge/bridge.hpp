@@ -102,6 +102,7 @@ public:
   bool same_inputs ();
   void give_record ();
   bool typeset_by_inputs (int desired_status); // (made again?)
+  void fold_line (tree t, array<page_item>& items);
 };
 
 

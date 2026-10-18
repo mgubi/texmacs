@@ -13,241 +13,46 @@
 
 (texmacs-module (code-format))
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; C++ source files
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; The formats of source code: as plain lines of code, in the encoding
+;; SourceCode, their documents and snippets are converted in both directions
+;; by the same functions. The program language of a format is in
+;; kernel/texmacs/tm-program-languages.scm.
 
-(define-format cpp
-  (:name "C++ source code")
-  (:suffix "cpp" "cc" "hpp" "hh"))
-
-(define (texmacs->cpp x . opts)
+(define (texmacs->source-code x . opts)
   (texmacs->verbatim x (acons "texmacs->verbatim:encoding" "SourceCode" '())))
 
-(define (cpp->texmacs x . opts)
-  (code->texmacs x))
-
-(define (cpp-snippet->texmacs x . opts)
-  (code-snippet->texmacs x))
-
-(converter texmacs-tree cpp-document
-  (:function texmacs->cpp))
-
-(converter cpp-document texmacs-tree
-  (:function cpp->texmacs))
-  
-(converter texmacs-tree cpp-snippet
-  (:function texmacs->cpp))
-
-(converter cpp-snippet texmacs-tree
-  (:function cpp-snippet->texmacs))
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Julia source files
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(define-format julia
-  (:name "Julia source code")
-  (:suffix "jl"))
-  
-(define (texmacs->julia x . opts)
-  (texmacs->verbatim x (acons "texmacs->verbatim:encoding" "SourceCode" '())))
-
-(define (julia->texmacs x . opts)
-  (code->texmacs x))
-
-(define (julia-snippet->texmacs x . opts)
-  (code-snippet->texmacs x))
-
-(converter texmacs-tree julia-document
-  (:function texmacs->julia))
-
-(converter julia-document texmacs-tree
-  (:function julia->texmacs))
-  
-(converter texmacs-tree julia-snippet
-  (:function texmacs->julia))
-
-(converter julia-snippet texmacs-tree
-  (:function julia-snippet->texmacs))
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Java source files
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(define-format java
-  (:name "Java source code")
-  (:suffix "java"))
-
-(define (texmacs->java x . opts)
-  (texmacs->verbatim x (acons "texmacs->verbatim:encoding" "SourceCode" '())))
-
-(define (java->texmacs x . opts)
-  (code->texmacs x))
-
-(define (java-snippet->texmacs x . opts)
-  (code-snippet->texmacs x))
-
-(converter texmacs-tree java-document
-  (:function texmacs->java))
-
-(converter java-document texmacs-tree
-  (:function java->texmacs))
-  
-(converter texmacs-tree java-snippet
-  (:function texmacs->java))
-
-(converter java-snippet texmacs-tree
-  (:function java-snippet->texmacs))
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Scala source files
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(define-format scala
-  (:name "Scala source code")
-  (:suffix "scala" "sc" "sbt"))
-
-(define (texmacs->scala x . opts)
-  (texmacs->verbatim x (acons "texmacs->verbatim:encoding" "SourceCode" '())))
-
-(define (scala->texmacs x . opts)
-  (code->texmacs x))
-
-(define (scala-snippet->texmacs x . opts)
-  (code-snippet->texmacs x))
-
-(converter texmacs-tree scala-document
-  (:function texmacs->scala))
-
-(converter scala-document texmacs-tree
-  (:function scala->texmacs))
-  
-(converter texmacs-tree scala-snippet
-  (:function texmacs->scala))
-
-(converter scala-snippet texmacs-tree
-  (:function scala-snippet->texmacs))
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; JavaScript source files
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(define-format javascript
-  (:name "JavaScript source code")
-  (:suffix "js"))
-
-(define (texmacs->javascript x . opts)
-  (texmacs->verbatim x (acons "texmacs->verbatim:encoding" "SourceCode" '())))
-
-(define (javascript->texmacs x . opts)
-  (code->texmacs x))
-
-(define (javascript-snippet->texmacs x . opts)
-  (code-snippet->texmacs x))
-
-(converter texmacs-tree javascript-document
-  (:function texmacs->javascript))
-
-(converter javascript-document texmacs-tree
-  (:function javascript->texmacs))
-  
-(converter texmacs-tree javascript-snippet
-  (:function texmacs->javascript))
-
-(converter javascript-snippet texmacs-tree
-  (:function javascript-snippet->texmacs))
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Graphviz dot source files
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(define-format dot
-  (:name "Graphviz dot source code")
-  (:suffix "dot" "gv"))
-
-(define (texmacs->dot x . opts)
-  (texmacs->verbatim x (acons "texmacs->verbatim:encoding" "SourceCode" '())))
-
-(define (dot->texmacs x . opts)
-  (code->texmacs x))
-
-(define (dot-snippet->texmacs x . opts)
-  (code-snippet->texmacs x))
-
-(converter texmacs-tree dot-document
-  (:function texmacs->dot))
-
-(converter dot-document texmacs-tree
-  (:function dot->texmacs))
-  
-(converter texmacs-tree dot-snippet
-  (:function texmacs->dot))
-
-(converter dot-snippet texmacs-tree
-  (:function dot-snippet->texmacs))
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; JSON source files
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(define-format json
-  (:name "JSON")
-  (:suffix "json"))
-
-(define (texmacs->json x . opts)
-  (texmacs->verbatim x (acons "texmacs->verbatim:encoding" "SourceCode" '())))
-
-(define (json->texmacs x . opts)
-  (code->texmacs x))
-
-(define (json-snippet->texmacs x . opts)
-  (code-snippet->texmacs x))
-
-(converter texmacs-tree json-document
-  (:function texmacs->json))
-
-(converter json-document texmacs-tree
-  (:function json->texmacs))
-  
-(converter texmacs-tree json-snippet
-  (:function texmacs->json))
-
-(converter json-snippet texmacs-tree
-  (:function json-snippet->texmacs))
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; CSV source files
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(define-format csv
-  (:name "CSV")
-  (:suffix "csv"))
-
-(define (texmacs->csv x . opts)
-  (texmacs->verbatim x (acons "texmacs->verbatim:encoding" "SourceCode" '())))
-
-(define (csv->texmacs x . opts)
-  (code->texmacs x))
-
-(define (csv-snippet->texmacs x . opts)
-  (code-snippet->texmacs x))
-
-(converter texmacs-tree csv-document
-  (:function texmacs->csv))
-
-(converter csv-document texmacs-tree
-  (:function csv->texmacs))
-  
-(converter texmacs-tree csv-snippet
-  (:function texmacs->csv))
-
-(converter csv-snippet texmacs-tree
-  (:function csv-snippet->texmacs))
+(define-macro (define-code-format name title . suffixes)
+  ;; the format name of source code, with its converters
+  (let ((doc (string->symbol (string-append (symbol->string name) "-document")))
+        (snippet (string->symbol (string-append (symbol->string name) "-snippet"))))
+    `(begin
+       (define-format ,name
+         (:name ,title)
+         (:suffix ,@suffixes))
+       (converter texmacs-tree ,doc
+         (:function texmacs->source-code))
+       (converter ,doc texmacs-tree
+         (:function code->texmacs))
+       (converter texmacs-tree ,snippet
+         (:function texmacs->source-code))
+       (converter ,snippet texmacs-tree
+         (:function code-snippet->texmacs)))))
+
+(define-code-format cpp "C++ source code" "cpp" "cc" "hpp" "hh")
+(define-code-format julia "Julia source code" "jl")
+(define-code-format java "Java source code" "java")
+(define-code-format scala "Scala source code" "scala" "sc" "sbt")
+(define-code-format javascript "JavaScript source code" "js")
+(define-code-format dot "Graphviz dot source code" "dot" "gv")
+(define-code-format json "JSON" "json")
+(define-code-format csv "CSV" "csv")
+(define-code-format go "Go source code" "go")
+(define-code-format lean "Lean source code" "lean")
+(define-code-format lua "Lua source code" "lua")
+(define-code-format rust "Rust source code" "rs")
+(define-code-format typescript "TypeScript source code" "tsx" "mts" "cts")
+(define-code-format css "CSS style sheet" "css")
+(define-code-format toml "TOML" "toml")
+(define-code-format yaml "YAML" "yaml" "yml")
+(define-code-format haskell "Haskell source code" "hs")
+(define-code-format ocaml "OCaml source code" "ml" "mli")

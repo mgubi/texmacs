@@ -50,6 +50,7 @@
         (check opentype-typeset-test)
         (check bibtex-test)
         (check csl-test)
+        (check treesit-test)
         (check zotero-test)
         (check database-test)
         (check math-edit-test)
@@ -153,6 +154,8 @@
     ;; views which editing closed (#174)
     ("bibtex" bibtex-test-failures count)
     ("csl" csl-test-failures count)
+    ;; generates the tables of the JSON grammar of misc/tree-sitter
+    ("treesit" treesit-test-failures count)
     ;; generates the auxiliary data of documents in the temporary directory
     ("links" links-test-failures count)
     ("structures" structures-test-failures count)

@@ -1,0 +1,5 @@
+src/grammar.json, queries/highlights.scm and queries/tags.scm of https://github.com/tree-sitter/tree-sitter-python.git
+(commit 26855eabccb19c6abf499fbc5b8dc7cc9ab8bc64), with its LICENSE.
+indents.scm is runtime/queries/python/indents.scm of https://github.com/nvim-treesitter/nvim-treesitter
+(commit d3e4a28b63961ba972b0945d66c73b6eec969953, Apache-2.0, see ../nvim-treesitter-LICENSE); without its pattern of an except in an ERROR, which
+this version of the grammar makes impossible (tree-sitter query refuses it too).

@@ -32,6 +32,10 @@
 
 (tm-define (program-compute-indentation doc row col)
   (:mode in-prog-python?)
+  (or (syntax-compute-indentation doc row (get-tabstop))
+      (python-indentation-by-lines doc row)))
+
+(define (python-indentation-by-lines doc row)
   (if (<= row 0) 0
       (let* ((r (program-row (- row 1)))
              (s (string-strip-right (strip-comment-buggy (if r r ""))))

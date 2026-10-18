@@ -1,0 +1,5 @@
+The xz decoder of XZ Embedded (https://github.com/tukaani-project/xz-embedded,
+commit ae63ae3a36ed01724674e8f3d750dc47bf125410, 0BSD, see COPYING): the files
+of linux/lib/xz, linux/include/linux/xz.h and userspace/xz_config.h, unchanged.
+TeXmacs uses it to unpack the tables of tree-sitter which it ships
+(TeXmacs/misc/tree-sitter/<language>/*.tsdyn.xz), through ../ts_xz.c.

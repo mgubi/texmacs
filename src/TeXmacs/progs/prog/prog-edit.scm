@@ -13,7 +13,8 @@
 
 (texmacs-module (prog prog-edit)
   (:use (utils library tree)
-        (utils library cursor)))
+        (utils library cursor)
+        (treesit ts-edit)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Basic routines for textual programs
@@ -62,11 +63,14 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (tm-define prog-auto-close-brackets? #f)
+(tm-define prog-balanced-brackets? #t)   ; in code with a syntax tree
 (tm-define prog-highlight-brackets? #f)
 (tm-define prog-select-brackets? #f)
 
 (define (notify-auto-close-brackets var val)
   (set! prog-auto-close-brackets? (== val "on")))
+(define (notify-balanced-brackets var val)
+  (set! prog-balanced-brackets? (== val "on")))
 (define (notify-highlight-brackets var val)
   (set! prog-highlight-brackets? (== val "on")))
 (define (notify-select-brackets var val)
@@ -74,6 +78,7 @@
 
 (define-preferences
   ("prog:automatic brackets" "off" notify-auto-close-brackets)
+  ("prog:balanced brackets" "on" notify-balanced-brackets)
   ("prog:highlight brackets" "off" notify-highlight-brackets)
   ("prog:select brackets" "off" notify-select-brackets))
 
@@ -157,6 +162,11 @@
 
 (tm-define (select-brackets-after-movement lbs rbs esc)
   (:synopsis "Highlight any of @lbs (matching @rbs) after a cursor movement")
+  ;; by the syntax tree when there is one (see treesit/ts-edit.scm)
+  (or (syntax-select-brackets)
+      (select-brackets-by-characters lbs rbs esc)))
+
+(define (select-brackets-by-characters lbs rbs esc)
   (let* ((p (cursor-path))
          (p* (path-- p))
          (ch (program-character p))
@@ -191,12 +201,107 @@
     (insert rb)
     (if prog-highlight-brackets? (select-brackets p lb rb))))
 
+;; in code with a syntax tree, the brackets stay balanced (see "Balanced
+;; brackets" in treesit/ts-edit.scm), unless the preference "prog:balanced
+;; brackets" is off; "prog:automatic brackets" is for the other code
+(tm-define (bracket-open lb rb esc)
+  (:require (and prog-balanced-brackets? (syntax-cursor-language)))
+  (syntax-bracket-open lb rb)
+  (if prog-highlight-brackets? (syntax-select-brackets)))
+
+(tm-define (bracket-close lb rb esc)
+  (:require (and prog-balanced-brackets? (syntax-cursor-language)))
+  (syntax-bracket-close lb rb)
+  (if prog-highlight-brackets? (syntax-select-brackets)))
+
+(tm-define (kbd-backspace)
+  (:mode in-prog?)
+  (:require (and prog-balanced-brackets? (syntax-cursor-language)))
+  (when (not (syntax-delete-bracket #f)) (former)))
+
+(tm-define (kbd-delete)
+  (:mode in-prog?)
+  (:require (and prog-balanced-brackets? (syntax-cursor-language)))
+  (when (not (syntax-delete-bracket #t)) (former)))
+
+;; the brackets of the program languages without keys of their own
+(tm-define (program-bracket-open lb rb) (insert lb))
+(tm-define (program-bracket-close lb rb) (insert rb))
+
+(tm-define (program-bracket-open lb rb)
+  (:require (syntax-cursor-language))
+  (bracket-open lb rb "\\"))
+
+(tm-define (program-bracket-close lb rb)
+  (:require (syntax-cursor-language))
+  (bracket-close lb rb "\\"))
+
 ; HACK! I'd like to use selection-active-enlarging? But current C++ code
 ; doesn't mix well with this selection mechanism. Also: if mouse selections
 ; ever use program-select-enlarge, this has to be disabled.
 (define kbd-select-enlarging 0) ; 0=no, 1=started, 2=selecting
 
 (tm-define (program-select-enlarge lb rb)
+  ;; by the syntax tree when there is one (see treesit/ts-edit.scm)
+  (or (syntax-select-enlarge)
+      (program-select-enlarge-by-brackets lb rb)))
+
+(tm-define (kbd-select-enlarge)
+  (:mode in-prog?)
+  (:require (syntax-cursor-language))
+  (syntax-select-enlarge))
+
+;; the structured moves, by the syntax tree (see treesit/ts-edit.scm)
+(tm-define (traverse-right)
+  (:mode in-prog?)
+  (:require (syntax-cursor-language))
+  (syntax-move-node 1))
+
+(tm-define (traverse-left)
+  (:mode in-prog?)
+  (:require (syntax-cursor-language))
+  (syntax-move-node -1))
+
+(tm-define (traverse-up)
+  (:mode in-prog?)
+  (:require (syntax-cursor-language))
+  (syntax-move-node 2))
+
+(tm-define (traverse-down)
+  (:mode in-prog?)
+  (:require (syntax-cursor-language))
+  (syntax-move-node -2))
+
+(tm-define (traverse-next)
+  (:mode in-prog?)
+  (:require (syntax-cursor-language))
+  (syntax-move-definition 1))
+
+(tm-define (traverse-previous)
+  (:mode in-prog?)
+  (:require (syntax-cursor-language))
+  (syntax-move-definition -1))
+
+;; the structured removals, by the syntax tree: the brackets around the
+;; cursor (keeping what is between them), the node at the cursor or before
+(tm-define (program-remove-structure)
+  (remove-structure-upwards))
+
+(tm-define (program-remove-structure)
+  (:require (syntax-cursor-language))
+  (syntax-splice-brackets))
+
+(tm-define (structured-remove-right)
+  (:mode in-prog?)
+  (:require (syntax-cursor-language))
+  (syntax-delete-node #t))
+
+(tm-define (structured-remove-left)
+  (:mode in-prog?)
+  (:require (syntax-cursor-language))
+  (syntax-delete-node #f))
+
+(define (program-select-enlarge-by-brackets lb rb)
   (if (== 0 kbd-select-enlarging)
       (set! kbd-select-enlarging 1)
       (if (and (not (selection-active-any?)) (== 2 kbd-select-enlarging))
@@ -285,9 +390,10 @@
     (with t (cursor-tree)
       (tree-set t (string-set-indent (tree->string t) i)))))
 
-; Redefine this for specific languages
+; Redefine this for specific languages (by default, by the syntax tree
+; when there is one, see treesit/ts-edit.scm)
 (tm-define (program-compute-indentation doc row col)
-  0)
+  (or (syntax-compute-indentation doc row (get-tabstop)) 0))
 
 (tm-define (program-indent-line doc row unindent?)
   ; TODO: implement unindent for general languages

@@ -30,6 +30,8 @@
   ("cmd tab" (program-indent #f))
   ("cmd S-tab" (program-indent #t)) ; TODO
   ("cmd A-tab" (program-indent-all #f))
+  ("structured:cmd delete" (program-remove-structure))
+  ("structured:cmd backspace" (program-remove-structure))
 
   ;; override some text mode shortcuts
   ("space var" (insert-tabstop))
@@ -38,7 +40,13 @@
   ("$ var" (make 'math))
   ("\\" "\\")
   ("\\ var" (make 'hybrid))
-  ("\"" "\"")
+  ("(" (program-bracket-open "(" ")"))
+  (")" (program-bracket-close "(" ")"))
+  ("[" (program-bracket-open "[" "]"))
+  ("]" (program-bracket-close "[" "]"))
+  ("{" (program-bracket-open "{" "}"))
+  ("}" (program-bracket-close "{" "}"))
+  ("\"" (program-bracket-open "\"" "\""))
   ("`" "`")
   ("` var" "<#2018>")
   ("'" "'")

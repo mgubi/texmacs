@@ -23,7 +23,8 @@
 ;; document becomes paragraphs. The mathematics is converted to LaTeX by the
 ;; converter for LaTeX.
 
-(texmacs-module (convert markdown tmmarkdown))
+(texmacs-module (convert markdown tmmarkdown)
+  (:use (convert tools code-languages)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; State
@@ -556,7 +557,7 @@
 
 (tm-define (tmmd-language-name tag)
   (:synopsis "The language which is written after the fence of the code @tag")
-  (or (assoc-ref tmmd-languages tag) ""))
+  (or (code-language-name tag) ""))
 
 (define (tmmd-md-source* kind l)
   (cond ((null? l) '())
@@ -995,35 +996,12 @@
 (define (tmmd-big-figure l) (tmmd-figure "Figure" l))
 (define (tmmd-big-table l) (tmmd-figure "Table" l))
 
-(define tmmd-languages
-  '((cpp-code . "cpp") (python-code . "python") (scm-code . "scheme")
-    (shell-code . "sh") (java-code . "java") (javascript-code . "javascript")
-    (json-code . "json") (julia-code . "julia") (r-code . "r")
-    (scala-code . "scala") (fortran-code . "fortran") (octave-code . "octave")
-    (scilab-code . "scilab") (dot-code . "dot") (mmx-code . "mathemagix")
-    (verbatim-code . "") (pseudo-code . "") (render-code . "") (code . "")))
-
-(define tmmd-language-tags
-  ;; the tags of the code in the languages written after a fence
-  '(("c" . cpp-code) ("cpp" . cpp-code) ("c++" . cpp-code) ("cc" . cpp-code)
-    ("h" . cpp-code) ("hpp" . cpp-code)
-    ("python" . python-code) ("py" . python-code) ("python3" . python-code)
-    ("scheme" . scm-code) ("scm" . scm-code) ("lisp" . scm-code)
-    ("guile" . scm-code)
-    ("sh" . shell-code) ("bash" . shell-code) ("shell" . shell-code)
-    ("zsh" . shell-code) ("console" . shell-code)
-    ("java" . java-code) ("javascript" . javascript-code)
-    ("js" . javascript-code) ("json" . json-code) ("julia" . julia-code)
-    ("r" . r-code) ("scala" . scala-code) ("fortran" . fortran-code)
-    ("octave" . octave-code) ("matlab" . octave-code) ("dot" . dot-code)
-    ("scilab" . scilab-code) ("mathemagix" . mmx-code) ("mmx" . mmx-code)))
-
 (tm-define (tmmd-language-tag name)
   (:synopsis "The tag of code in the language @name, written after a fence")
-  (or (assoc-ref tmmd-language-tags (locase-all name)) 'verbatim-code))
+  (or (code-language-tag (locase-all name)) 'verbatim-code))
 
 (define (tmmd-code-block tag l)
-  (let* ((lang (assoc-ref tmmd-languages tag))
+  (let* ((lang (code-language-name tag))
          (s (apply string-append (map tmmd-plain l))))
     `((pre ,@(if (== lang "") '() `((@ (lang ,lang)))) ,s))))
 
@@ -1210,7 +1188,7 @@
         ((not (pair? x)) '())
         ((not (symbol? (car x))) '())
         ((tmmd-dispatch 'tmmarkdown-methods% x) => identity)
-        ((assoc (car x) tmmd-languages) (tmmd-code-block (car x) (cdr x)))
+        ((code-language-name (car x)) (tmmd-code-block (car x) (cdr x)))
         ((in? (car x) '(tabular tabular* block block* wide-tabular wide-block
                         tformat table))
          (tmmd-table (car x) (cdr x)))
