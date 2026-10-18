@@ -337,8 +337,9 @@ server of each language (`(server "clangd")`), replacing the defaults of
      references (a location in the virtual file of a block goes to the
      block), outline, folds, highlights, formatting (of the block), renames
      and quick fixes (the edits of a virtual file are applied to its
-     block). Not yet: semantic colours and inlay hints (source files only),
-     the status of the server in the focus bar.
+     block). Not yet at first: semantic colours and inlay hints (source
+     files only), the status of the server in the focus bar (both done
+     since, see below).
    - Done: `progs/lsp/lsp-blocks.scm` (the blocks of a body, the block at
      the cursor, the virtual files, `lsp-blocks-force!` for the tests);
      in lsp-documents.scm, the functions of the buffer without a buffer
@@ -364,6 +365,33 @@ server of each language (`(server "clangd")`), replacing the defaults of
      gives the cuts (suite treesit). The printed pages of a C++ file of 678
      lines are the same as before but for one place: a word of a comment
      is now one box, so that the kerning of its letters applies (`'))`).
+
+9. The blocks of a language together; a keystroke in a long file.
+   - Units (lsp-blocks.scm): with `lsp:join code blocks` (on by default),
+     the blocks of a language of a document are one virtual file,
+     `.<name>-blocks.<suffix>`, whose lines are a document of their own made
+     again from the blocks; the target at the cursor is an object (its
+     lines, `lsp-target-path` and `lsp-target-lo` between them and the
+     places of the document, `lsp-target-key`), so that the requests, the
+     diagnostics, the highlights, the jumps and the edits go through the
+     mapping; an edit of a unit is written back to its blocks when it
+     changes the lines of one block only. The colours and the inlay hints
+     of the servers are given to the lines of blocks and units too. The
+     outline and the folds of a unit are those of tree-sitter. Suite lsp,
+     group "code blocks together" (with clangd: a name of a block known in
+     the next one, a definition and a rename across them); in a window.
+   - Tree-sitter, a keystroke: the region is changed in place (lines,
+     offsets, text, colours), the unchanged lines are compared by address,
+     the text is kept and given to the queries without a copy, the
+     unmatched brackets are looked for from the changed bytes, and all the
+     lines are coloured only when the region coloured them all. A C file of
+     100000 lines: 72 ms per key before, 21 ms now (13000 lines: 10.6 to
+     2.7); the rest is the reparse of tree-sitter (the flat translation
+     unit of C) and the edit of TeXmacs itself. A bug shown by a new test:
+     a coloured line did not look at its region again after another line
+     was removed.
+   - The leftovers of the tabs: a tab in search, its name in the footer,
+     the tab width of open files, the indenters of R and Mathemagix.
 
 Audit (2026-10-18), after phase 8; the fixes:
 - Without tree-sitter, the modules of sessions and programs loaded ts-edit.scm

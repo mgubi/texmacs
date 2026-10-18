@@ -114,7 +114,9 @@
     <item*|<source-link|lsp-blocks.scm|TeXmacs/progs/lsp/lsp-blocks.scm>>The
     code blocks of documents as documents of the servers (preference
     <verbatim|lsp:code blocks>): the blocks of a body, the block at the
-    cursor, their virtual files, which are never written.
+    cursor, their virtual files, which are never written, and the units
+    (the blocks of a language as one file, <verbatim|lsp:join code
+    blocks>).
 
     <item*|<source-link|lsp-edit.scm|TeXmacs/progs/lsp/lsp-edit.scm>>The
     servers in the editor: following the buffers, showing the diagnostics,

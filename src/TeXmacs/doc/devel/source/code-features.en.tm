@@ -119,14 +119,17 @@
 
   <section|The code blocks of documents>
 
-  The language servers see a code block of a document (when the
-  preference <verbatim|lsp:code blocks> is on) as a file of its own, which
-  is never written: <source-link|lsp-blocks.scm|TeXmacs/progs/lsp/lsp-blocks.scm>.
+  The language servers see the code blocks of a document (when the
+  preference <verbatim|lsp:code blocks> is on) as files which are never
+  written, each block one file, or the blocks of a language together (a
+  unit, the default):
+  <source-link|lsp-blocks.scm|TeXmacs/progs/lsp/lsp-blocks.scm>.
   The functions of the buffer of the servers, called without a buffer,
   are those of the <em|target>, the code at the cursor: the lines of a
-  source file, or of the block (<scm|lsp-target-root>, and
-  <scm|lsp-target-base>, the path of its lines); the features of program
-  code are given at the cursor in the same way in both. The diagnostics of
+  source file, of the block or of its unit (<scm|lsp-target-root>, and
+  <scm|lsp-target-path>, <scm|lsp-target-lo>, between the lines and the
+  places of the document); the features of program code are given at the
+  cursor in the same way in all. The diagnostics of
   all the blocks of a document are those of the source <scm|'server> of
   <source-link|code-diagnostics.scm|TeXmacs/progs/code/code-diagnostics.scm>, each at the place of its block.
 

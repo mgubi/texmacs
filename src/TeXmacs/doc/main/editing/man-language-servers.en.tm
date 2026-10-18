@@ -72,15 +72,21 @@
   When <menu|Tools|Language servers|Follow the code blocks of documents>
   is checked (preference <verbatim|lsp:code blocks>, off by default), the
   code blocks of a document saved on disk (<menu|Insert|Program|Block of
-  code>, in a language which has a server) are followed too, each block as
-  a file of its own: the server sees a file next to the document, named
-  after it (<verbatim|.notes.tm-block1.cpp> for the first block of
-  <verbatim|notes.tm> given to a server; a block keeps its number), which is never written, in the project of the
-  document. In a block, the diagnostics, the completion, the information
-  at the cursor, the definitions, the references, the outline, the folds,
-  formatting, renaming and quick fixes work as in a source file; the names
-  of one block are not known in the others. The colours and inlay hints of
-  the servers are for source files only.
+  code>, in a language which has a server) are followed too. The server
+  sees a file next to the document, named after it, which is never
+  written, in the project of the document: with <menu|One file for the
+  blocks of a language> (preference <verbatim|lsp:join code blocks>, on
+  by default), the blocks of a language are one file, their lines one
+  after the other in the order of the document
+  (<verbatim|.notes.tm-blocks.cpp> for the <c++> blocks of
+  <verbatim|notes.tm>), so that the names defined in a block are known in
+  the next ones; else each block is a file of its own
+  (<verbatim|.notes.tm-block1.cpp>...). In a block, the diagnostics, the
+  completion, the information at the cursor, the definitions, the
+  references, the colours and inlay hints of the server, formatting,
+  renaming and quick fixes work as in a source file; an edit of the server
+  which would join or split blocks is not applied. The outline and the
+  folds of joined blocks are those of the syntax tree, block by block.
 
   <paragraph*|Projects>
 

@@ -104,8 +104,17 @@
     it is done at the first sync of a document and at each save; the other
     syncs look at the known blocks and the one at the cursor.
 
-    <item>The tests turn the code blocks on with <scm|lsp-blocks-force!>,
-    not with the preference.
+    <item>The lines of a unit are made again from its blocks at each use
+    at the cursor (<scm|lsp-unit-set-roots!>), which costs the lines of
+    all the blocks of the language: fine for the documents with code which
+    people write, not for one with thousands of lines of code in blocks.
+    A line of a unit is a line of a block: a range of the server over two
+    blocks is drawn from its start, and an edit which would join or split
+    blocks is not applied.
+
+    <item>The tests turn the code blocks on with <scm|lsp-blocks-force!>
+    and choose the units with <scm|lsp-blocks-join-force!>, not with the
+    preferences.
   </itemize>
 
   <section|In a window>
