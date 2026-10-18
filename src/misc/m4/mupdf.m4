@@ -69,14 +69,16 @@ AC_DEFUN([LC_MUPDF], [
   LC_SUBST(MUPDF)
 ])
 
-# Whether MuPDF is used depends on the GUI (TM_GUI must have run): the Qt,
-# SDL and Vue ports draw their pictures with it (MUPDF_RENDERER), while the
-# X11 and Cocoa ports have pictures of their own, which would clash with
-# those of MuPDF at link time.
+# Whether MuPDF is used depends on the GUI (TM_GUI must have run): the SDL
+# and Vue ports draw their pictures with it (MUPDF_RENDERER), while the X11,
+# Cocoa and Qt ports (Qtwk too) have pictures of their own: with those of
+# MuPDF, the Qt renderer was given pictures which it took for its own (a
+# crash at the first image drawn), and X11 and Cocoa clash with them at
+# link time. MuPDF is therefore not used with them, also when it is found.
 AC_DEFUN([TM_MUPDF_FOR_GUI], [
   CONFIG_MUPDF=""
   case "$CONFIG_GUI" in
-    X11 | COCOA)
+    X11 | COCOA | QT | QTWK)
       if test "$mupdf_usable" = yes; then
         if test "x$with_mupdf" != x -a "x$with_mupdf" != xno; then
           AC_MSG_ERROR([--with-gui=$gui_selector cannot draw with MuPDF: configure it without --with-mupdf])

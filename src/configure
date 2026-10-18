@@ -36945,7 +36945,7 @@ printf '%s\n' "#define VUETEXMACS 1" >>confdefs.h
 
   CONFIG_MUPDF=""
   case "$CONFIG_GUI" in
-    X11 | COCOA)
+    X11 | COCOA | QT | QTWK)
       if test "$mupdf_usable" = yes; then
         if test "x$with_mupdf" != x -a "x$with_mupdf" != xno; then
           as_fn_error $? "--with-gui=$gui_selector cannot draw with MuPDF: configure it without --with-mupdf" "$LINENO" 5

@@ -354,9 +354,8 @@ elseif (TEXMACS_GUI STREQUAL "X11")
 endif ()
 
 ### --------------------------------------------------------------------
-### MuPDF: the pictures and the PDF of the Vue and SDL ports, and of the
-### Qt port on demand (in place of Hummus); the X11 port has pictures of
-### its own, which clash with it
+### MuPDF: the pictures and the PDF of the Vue and SDL ports; the Qt and
+### X11 ports have pictures of their own, which clash with it
 ### --------------------------------------------------------------------
 
 set (MUPDF_DIR "" CACHE PATH "Prefix of the MuPDF installation (optional)")
@@ -366,7 +365,9 @@ else ()
   set (_mupdf_default OFF)
 endif ()
 option (USE_MUPDF "Use MuPDF (required by the Vue and SDL GUIs)" ${_mupdf_default})
-if (TEXMACS_GUI STREQUAL "X11")
+# never with X11 nor Qt, also on demand: the Qt renderer took the pictures
+# of MuPDF for its own, and crashed at the first image drawn
+if (TEXMACS_GUI STREQUAL "X11" OR TEXMACS_GUI MATCHES "^Qt")
   set (USE_MUPDF OFF)
 endif ()
 if (USE_MUPDF)
