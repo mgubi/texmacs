@@ -6,7 +6,9 @@
 # group title (d8), each time after it was opened again (d6b, d7b); a
 # press on the title of the open menu closes it (d9).
 # A drag from the first title over the second opens the second menu (d10),
-# and the release on Epsilon chooses it ("SUB epsilon").
+# and the release on Epsilon chooses it ("SUB epsilon"). With a menu open,
+# the pointer going over Second to the plain button Third closes the menu
+# (d12), and going back over the titles opens none (d13).
 wait 6000
 window Menu drag
 resize 400 300
@@ -59,3 +61,15 @@ wait 300
 release 110 44
 wait 500
 snapshot d11
+click 30 16
+wait 500
+move 60 16
+move 120 16
+wait 300
+move 165 16
+wait 500
+snapshot d12
+move 120 16
+move 40 16
+wait 500
+snapshot d13

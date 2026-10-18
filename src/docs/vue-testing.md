@@ -185,7 +185,7 @@ callback output.
 | `responsive-tabs` | run with `TEXMACS_VUE_TAB_MODE=side`, `mobile`, `grid`: the column of tabs, the list with its pages and Back, the grid of pages |
 | `wheel-graphics` | in a graphics with `wheel-capture?`, the wheel goes to the editor and does not scroll |
 | `enums` | an editable enum (typed and picked values), an enum as wide as its widest value, a long list near the bottom opening above and scrolling, a choice list which scrolls |
-| `menu-drag` | a menu title opens on press and a drag-release chooses an item, also after dragging to another title; resting on a disabled item, a separator or a group title closes a submenu. Give it 40 s under load |
+| `menu-drag` | a menu title opens on press and a drag-release chooses an item, also after dragging to another title; resting on a disabled item, a separator or a group title closes a submenu; with a menu open, the pointer on a plain button of the bar closes it (d12) and going back over the titles opens none (d13). Give it 40 s under load |
 | `sockets` | the TeXmacs server and an anonymous legacy client in the same instance (see below) |
 
 One more is not run this way. `sockets-tls` repeats the `sockets` exchange

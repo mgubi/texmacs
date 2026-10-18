@@ -1,7 +1,8 @@
 ;; a menu bar whose first menu has a submenu, followed by a rule, a disabled
 ;; item and the title of a group: pressing a title opens its menu, dragging
 ;; to an item and releasing there chooses it; the pointer resting on the
-;; rule, the disabled item or the group title closes the open submenu
+;; rule, the disabled item or the group title closes the open submenu; a
+;; plain button of the bar (Third), hovered, closes the open menu
 (tm-widget (menu-drag-test)
   (padded
     (hlist
@@ -17,6 +18,8 @@
       // //
       (=> "Second"
           ("Epsilon" (display* "SUB epsilon\n")))
+      // //
+      ("Third" (display* "SUB third\n"))
       >>)))
 
 (delayed (:pause 2500) (top-window menu-drag-test "Menu drag"))

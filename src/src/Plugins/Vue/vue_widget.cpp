@@ -424,6 +424,10 @@ bool current_popup; // is there an active popup?
 bool cancel_popup;  // should we cancel popups?
 uint32_t open_pull_id= 0; // the pull button whose menu is open (0: none)
 uint32_t open_pull_bar= 0; // the bar of that button
+// the pull button whose menu is to close: a plain button of its bar is
+// hovered (0: none)
+uint32_t pull_closed_by= 0;
+int pull_float_depth= 0;  // how deep in the menus of pull buttons the layout is
 uint32_t current_bar= 0;  // the horizontal menu being laid out
 uint32_t current_menu= 0; // the open menu being laid out (its float)
 bool menu_press= false;   // the pass has a press, maybe taken by the menus
@@ -652,6 +656,7 @@ gui_init_context() {
   pointer_on_enum_list= false;
   menu_hovered= false;
   current_bar= current_menu= 0;
+  pull_float_depth= 0;
   
   // the refresh messages which came since the last pass: they are numbered
   // (refresh_stale), so that a widget which is not laid out now sees them
@@ -2038,6 +2043,11 @@ layout_pull_button (vue_ui_rep *w) {
       // some other popup is active, we should be inactive
       close_menu ();
     }
+    else if (down && is_open && pull_closed_by == button_id.id) {
+      // a plain button of the bar is hovered (layout of menu_button)
+      pull_closed_by= 0;
+      close_menu ();
+    }
     else if (down && is_open &&
              open_pull_id != 0 && open_pull_id != button_id.id) {
       // another button of the bar opened its menu (it may have been laid
@@ -2127,7 +2137,9 @@ layout_pull_button (vue_ui_rep *w) {
         uint32_t save_menu= current_menu, save_bar= current_bar;
         current_menu= float_id.id;
         current_bar= 0;
+        pull_float_depth++;
         concrete (d.cw)->do_layout ();
+        pull_float_depth--;
         current_menu= save_menu;
         current_bar= save_bar;
         // a press outside the chain: its last menu closes first, then the
@@ -2959,6 +2971,15 @@ vue_ui_rep::do_layout () {
     Clay_ElementId button_id= CLAY_IDI ("menu_button", id);
     ui_signal sig { .clicked= 0 };
     if (!inert) sig= button_logic (button_id);
+    // a menu of the bar is open and the pointer is on this button: the
+    // menu closes, as it gives way to another menu of the bar hovered
+    // (layout_pull_button; not for the items of the open menus)
+    if (!inert && pull_float_depth == 0 && open_pull_id != 0 &&
+        open_pull_bar == current_bar && active_id == 0 &&
+        Clay_PointerOver (button_id)) {
+      pull_closed_by= open_pull_id;
+      layout_again= true;
+    }
     // push buttons (dialogs) are framed, the flat buttons of menus and tool
     // bars are only highlighted when hovered or pressed
     bool push= (d.style & WIDGET_STYLE_BUTTON) != 0;
