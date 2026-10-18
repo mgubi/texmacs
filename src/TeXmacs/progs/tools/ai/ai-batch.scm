@@ -35,6 +35,10 @@
                     (convert x "texmacs-stree" "latex-snippet"
                              (cons "texmacs->latex:encoding" "utf-8")))))
         ;;(display* "s = " s "\n")
+        ;; (a question which is only files has a text, else it would be left
+        ;; out of the context of the next ones, with its files)
+        (when (and (nnull? files) (== (tm-string-trim-both s) ""))
+          (set! s "(see the attached files)"))
         (string-append s (ai-attachments-text files)))))
 
 (tm-define (ai-cmdline name chat cmd)

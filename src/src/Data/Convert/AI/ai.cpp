@@ -514,7 +514,9 @@ ai_read_attachments (string model, string chat) {
   if (!is_array_string (o)) return;
   array<string> a= as_array_string (o);
   for (int k= 0; k < N(a); k++) {
-    array<string> f= tokenize (a[k], "\t");
+    // (the fields separated by a character which no file name holds,
+    // ai-attachment-separator in ai-attachments.scm)
+    array<string> f= tokenize (a[k], string ((char) 1));
     if (N(f) != 4 || !is_int (f[0])) continue;
     int i= as_int (f[0]);
     while (N(ai_files) <= i) ai_files << array<string> ();
@@ -584,6 +586,39 @@ gemini_parts (string text, array<string> f) {
   return json_array (v);
 }
 
+// s as valid UTF-8: the JSON of a request must be, and a text may not be
+// (an attached file in Latin-1, a text cut by bytes): a byte which does not
+// start a character of UTF-8 is taken as a character of Latin-1
+static string
+ai_valid_utf8 (string s) {
+  int i= 0, n= N(s);
+  string r;
+  bool changed= false;
+  while (i < n) {
+    unsigned char c= (unsigned char) s[i];
+    if (c < 0x80) { r << s[i]; i++; continue; }
+    int len= (c >= 0xC2 && c <= 0xDF)? 2:
+             (c >= 0xE0 && c <= 0xEF)? 3:
+             (c >= 0xF0 && c <= 0xF4)? 4: 0;
+    bool ok= len > 0 && i + len <= n;
+    for (int k= 1; ok && k < len; k++)
+      ok= (((unsigned char) s[i+k]) & 0xC0) == 0x80;
+    if (ok) { r << s (i, i + len); i += len; }
+    else {
+      r << ((char) (0xC0 | (c >> 6))) << ((char) (0x80 | (c & 0x3F)));
+      i++;
+      changed= true;
+    }
+  }
+  return changed? r: s;
+}
+
+static array<string>
+ai_valid_utf8 (array<string> v) {
+  for (int i= 0; i < N(v); i++) v[i]= ai_valid_utf8 (v[i]);
+  return v;
+}
+
 // the conversation: (role, text) pairs, the last one the prompt. In a
 // session it is the one of the session (ai-session-context in init-ai.scm:
 // the questions and the answers of the fields above, as LaTeX), else the
@@ -601,7 +636,7 @@ ai_conversation (string s, string model, string chat, bool history) {
       for (int i= 0; i+1 < N(a); i += 2)
         v << string ("user") << a[i] << string ("assistant") << a[i+1];
       v << string ("user") << s;
-      return v;
+      return ai_valid_utf8 (v);
     }
     list<string> last_prompts= reverse (ai_get_last_prompts (model, chat));
     list<string> last_answers= reverse (ai_get_last_answers (model, chat));
@@ -613,7 +648,7 @@ ai_conversation (string s, string model, string chat, bool history) {
     }
   }
   v << string ("user") << s;
-  return v;
+  return ai_valid_utf8 (v);
 }
 
 // the messages of the APIs of OpenAI (also those of Mistral, Albert, Ollama)
@@ -842,7 +877,7 @@ claude_command (string s, string model, string agent,
     << tree ("max_tokens")
     // (without streaming, Anthropic refuses the requests which may be long)
     << compound ("json-number", ai_stream? string ("32000"): string ("16000"));
-  string doc= ai_stream? ai_session_document (): string ("");
+  string doc= ai_stream? ai_valid_utf8 (ai_session_document ()): string ("");
   if (doc != "") {
     // the document as a second block of the system prompt, which Anthropic
     // caches: the next questions about it cost less
@@ -914,7 +949,7 @@ ai_latex_agent_description (string model) {
   string doc= ai_session_document ();
   if (doc != "" && engine != "claude")
     r << "\n\n" << ai_document_intro () << doc;
-  return r;
+  return ai_valid_utf8 (r);
 }
 
 string

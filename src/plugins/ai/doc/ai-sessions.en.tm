@@ -106,13 +106,18 @@
   <name|ChatGPT>, <name|Claude>, <name|Gemini> and <name|OpenRouter>
   (<name|Mistral> and <name|Ollama> take the images but not the PDF files,
   with the models which see images, and <name|Albert> the text files only).
-  A file larger than 20 MB is not sent.
+  The images and the <name|PDF> files of a question and of the questions
+  above it, which go with it, may make 20 MB at most (14 MB for
+  <name|Gemini>, 23 MB for <name|Claude>, which also takes images of 5 MB
+  at most); the models of <name|ChatGPT> which draw take no file.
 
   The document keeps the name of each file and where it is, not the file
-  itself: a file which was moved or deleted is said to be missing when its
-  question is asked. The files stay with their question: the questions
-  above the one which is asked, sent as its context, go with their files,
-  whose tokens are then counted again.
+  itself: a file which was moved or deleted is said to be missing when a
+  question would send it. The files stay with their question: the
+  questions above the one which is asked, sent as its context, go with
+  their files, whose tokens are then counted again. A file which came with
+  a document, rather than being attached in this <TeXmacs>, is sent only
+  once allowed: the question then asks, and says where the file is.
 
   <subsection*|Reasoning, tokens and costs>
 

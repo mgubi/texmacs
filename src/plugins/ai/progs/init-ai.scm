@@ -673,7 +673,8 @@
                      (with q (ai-asked-question name chat)
                        (if q (list q) '())))))
     (append-map (lambda (i)
-                  (map (lambda (a) (string-append (number->string i) "\t" a))
+                  (map (lambda (a) (string-append (number->string i)
+                                                  (ai-attachment-separator) a))
                        (ai-binary-attachments
                         (ai-question-files (list-ref qs i)))))
                 (.. 0 (length qs)))))
@@ -693,10 +694,10 @@
 
 ;; why the files of the question cannot be sent, or #f (ai-request): files
 ;; which came with the document and were not allowed yet (a dialog asks),
-;; else what keeps the files of the question itself from being sent
+;; else what keeps the files of the request (those of the question and of
+;; its context) from being sent
 (tm-define (ai-request-attachment-problem name chat)
-  (let* ((q (ai-asked-question name chat))
-         (new (ai-files-not-allowed (ai-sent-files name chat))))
+  (let* ((new (ai-files-not-allowed (ai-sent-files name chat))))
     (cond ((nnull? new)
            (delayed
              (:idle 10)
@@ -714,9 +715,13 @@
             "The question would send files which came with the document, "
             "not attached here: " (ai-file-list new)
             ". Allow them in the dialog, then ask again."))
-          ((not q) #f)
           (else
-           (with p (ai-attachments-problem name (ai-question-files q))
+           ;; (the files of the questions of the context are sent again:
+           ;; checked as those of the question)
+           (let* ((model (if (!= ai-model-of-request "") ai-model-of-request
+                             (get-preference (string-append name " model"))))
+                  (p (ai-attachments-problem name (ai-sent-files name chat)
+                                             (if (string? model) model ""))))
              (and p (string-append (upcase-first p) ".")))))))
 
 ;; the first line of a session: the engine and its model
