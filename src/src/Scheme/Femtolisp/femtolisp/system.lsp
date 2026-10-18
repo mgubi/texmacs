@@ -149,10 +149,10 @@
 
 (define (>  a b) (< b a))
 (define (nan? x) (or (equal? x +nan.0) (equal? x -nan.0)))
-(define (<= a b) (not (or (< b a)
-                          (and (nan? a) (nan? b)))))
-(define (>= a b) (not (or (< a b)
-                          (and (nan? a) (nan? b)))))
+; TeXmacs: the order of < (any values), but false when a number is a NaN
+; ((<= 1 +nan.0) was true); compile-app compiles them so
+(define (<= a b) (if (< b a) #f (if (number? a) (if (< a b) #t (= a b)) #t)))
+(define (>= a b) (<= b a))
 (define (negative? x) (< x 0))
 (define (zero? x)     (= x 0))
 (define (positive? x) (> x 0))
@@ -546,17 +546,7 @@
 
 (define (iota n) (map-int identity n))
 
-(define (for-each f l . lsts)
-  (define (for-each-n f lsts)
-    (if (pair? (car lsts))
-	(begin (apply f (map car lsts))
-	       (for-each-n f (map cdr lsts)))))
-  (if (null? lsts)
-      (while (pair? l)
-	     (begin (f (car l))
-		    (set! l (cdr l))))
-      (for-each-n f (cons l lsts)))
-  #t)
+; TeXmacs: for-each is a builtin (flisp.c, fl_foreach)
 
 (define-macro (with-bindings binds . body)
   (let ((vars (map car binds))

@@ -1,4 +1,11 @@
 #define BOUNDED_COMPARE_BOUND 128
+// TeXmacs: the bound above is the depth (in the cars), and the pairs which
+// bounded_compare visits, along the lists too, are limited by this budget,
+// set by compare_: lists longer than 128 were all compared by cyc_compare,
+// which hashes each pair (20 times slower); only structures with cycles or
+// with more pairs than this get there now
+#define BOUNDED_COMPARE_STEPS 65536
+static int bounded_compare_steps;
 #define BOUNDED_HASH_BOUND    16384
 
 // comparable tag
@@ -120,10 +127,10 @@ static value_t bounded_compare(value_t a, value_t b, int bound, int eq)
         break;
     case TAG_CONS:
         if (tagb < TAG_CONS) return fixnum(1);
+        if (--bounded_compare_steps <= 0) return NIL;
         d = bounded_compare(car_(a), car_(b), bound-1, eq);
         if (d==NIL || numval(d) != 0) return d;
         a = cdr_(a); b = cdr_(b);
-        bound--;
         goto compare_top;
     }
     return (taga < tagb) ? fixnum(-1) : fixnum(1);
@@ -255,6 +262,7 @@ void comparehash_init(void)
 // 'eq' means unordered comparison is sufficient
 static value_t compare_(value_t a, value_t b, int eq)
 {
+    bounded_compare_steps = BOUNDED_COMPARE_STEPS;
     value_t guess = bounded_compare(a, b, BOUNDED_COMPARE_BOUND, eq);
     if (guess == NIL) {
         guess = cyc_compare(a, b, &equal_eq_hashtable, eq);

@@ -1,0 +1,69 @@
+From 3571858aebf1b184b64b221099a08ccf971a62e4 Mon Sep 17 00:00:00 2001
+From: tm <tm@x>
+Date: Sun, 18 Oct 2026 19:56:13 +0100
+Subject: [PATCH 36/36] GC: relocate is not called for the values which are not
+ in the heap
+
+From Julia's femtolisp (f522f8f139): when it copies the cars of a list
+and the elements of a vector, relocate tests first whether the value is
+a pointer into the heap (fixnums, builtins, symbols... are not), and
+calls itself only for those; the two tests at its start are one. The
+boot image does not change.
+---
+ flisp.c | 19 +++++++++++++------
+ 1 file changed, 13 insertions(+), 6 deletions(-)
+
+diff --git a/flisp.c b/flisp.c
+index 8cc2829..114b558 100644
+--- a/flisp.c
++++ b/flisp.c
+@@ -277,7 +277,7 @@ static symbol_t **symtab_lookup(symbol_t **ptree, char *str)
+ {
+     int x;
+ 
+-    while(*ptree != NULL) {
++    while (*ptree != NULL) {
+         x = strcmp(str, (*ptree)->name);
+         if (x == 0)
+             return ptree;
+@@ -445,7 +445,10 @@ static value_t relocate(value_t v)
+             curheap += sizeof(cons_t);
+             d = cdr_(v);
+             car_(v) = TAG_FWD; cdr_(v) = nc;
+-            car_(nc) = relocate(a);
++            if ((tag(a)&3) == 0 || !ismanaged(a))
++                car_(nc) = a;
++            else
++                car_(nc) = relocate(a);
+             pcdr = &cdr_(nc);
+             v = d;
+         } while (iscons(v));
+@@ -453,8 +456,7 @@ static value_t relocate(value_t v)
+         return first;
+     }
+ 
+-    if ((t&3) == 0) return v;
+-    if (!ismanaged(v)) return v;
++    if ((t&3) == 0 || !ismanaged(v)) return v;
+     if (isforwarded(v)) return forwardloc(v);
+ 
+     if (t == TAG_VECTOR) {
+@@ -472,8 +474,13 @@ static value_t relocate(value_t v)
+             forward(v, nc);
+             if (sz > 0) {
+                 vector_elt(nc,0) = relocate(a);
+-                for(i=1; i < sz; i++)
+-                    vector_elt(nc,i) = relocate(vector_elt(v,i));
++                for(i=1; i < sz; i++) {
++                    a = vector_elt(v,i);
++                    if ((tag(a)&3) == 0 || !ismanaged(a))
++                        vector_elt(nc,i) = a;
++                    else
++                        vector_elt(nc,i) = relocate(a);
++                }
+             }
+         }
+         return nc;
+-- 
+2.50.1 (Apple Git-155)
+

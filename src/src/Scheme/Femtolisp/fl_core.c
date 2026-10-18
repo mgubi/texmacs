@@ -462,8 +462,9 @@ fltm_print_frames (void) {
   fprintf (stderr, "femtolisp: out of memory in\n");
   ios_flush (ios_stderr);
   while (top > 0 && n < 60) {
-    uint32_t sz= Stack[top-3]+1;
-    uint32_t bp= top-5-sz;
+    /* a frame of 4 slots since the flat closures (patch 0034) */
+    uint32_t sz= Stack[top-2]+1;
+    uint32_t bp= top-4-sz;
     value_t f= Stack[bp];
     const char* name= "?";
     if (isfunction (f) && issymbol (fn_name (f)))
@@ -492,15 +493,29 @@ fltm_print_frames (void) {
       set (printlengthsym, fixnum (6));
       set (printlevelsym, fixnum (4));
       fprintf (stderr, " ARG ");
-      fl_print (ios_stderr, Stack[top-1]? FL_NIL: Stack[bp+1]);
+      fl_print (ios_stderr, Stack[bp+1]);
       set (printlengthsym, pl);
       set (printlevelsym, pv);
     }
     fprintf (stderr, "\n");
     ios_flush (ios_stderr);
-    top= Stack[top-4];
+    top= Stack[top-3];
     n++;
   }
+}
+
+/* the procedures of R7RS which are builtins of femtolisp under another
+   name: constants bound to the builtins, which the compiler makes
+   instructions (they were functions calling the builtins,
+   r5rs-femtolisp.scm) */
+static void
+fltm_alias_builtins () {
+  static const char* aliases[][2]= {
+    { "vector-ref", "aref" }, { "vector-set!", "aset!" },
+    { "vector-length", "length" }, { "char->integer", "fixnum" },
+    { "integer->char", "wchar" } };
+  for (size_t i= 0; i < sizeof (aliases) / sizeof (aliases[0]); i++)
+    setc (symbol (aliases[i][0]), symbol_value (symbol (aliases[i][1])));
 }
 
 int
@@ -520,8 +535,10 @@ fltm_init (size_t heap_size, const char* boot, size_t boot_length) {
       ios_write (s, (char*) boot, boot_length);
       ios_seek (s, 0);
       failed= fl_load_system_image (f);
-      if (!failed)
+      if (!failed) {
+        fltm_alias_builtins ();
         (void) fl_applyn (0, symbol_value (symbol ("__init_globals")));
+      }
     }
     FL_CATCH_EXTERN {
       ios_puts ("femtolisp: fatal error during the initialization:\n",
