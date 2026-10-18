@@ -49,8 +49,15 @@
   source file is a document with one line per paragraph, so that
   <scm|lsp-lines> gives the lines of a body (markup inside a line is
   converted with <scm|texmacs-\<gtr\>verbatim>). The server gets the text
-  in <name|UTF-8>: <scm|lsp-lines-\<gtr\>text> joins converted lines, and
-  <scm|lsp-text-\<gtr\>lines> splits a text of a server. The text of a
+  of the file, in <name|UTF-8>, as it is saved: <scm|lsp-lines-\<gtr\>text>
+  joins lines converted with <scm|cork-\<gtr\>sourcecode> (not
+  <scm|cork-\<gtr\>utf8>, which gives the typographic forms of some
+  characters: a backquote as an opening quote, three dots as an ellipsis),
+  and <scm|lsp-text-\<gtr\>lines> splits a text of a server and converts it
+  as a file is loaded (<scm|source-\<gtr\>cork>: a tab is the character
+  <verbatim|\<less\>#9\<gtr\>> of a line, one <name|UTF-16> unit for the
+  server; see <hlink|source files|convert-source-files.en.tm>); so are the
+  texts of the edits and of the completions. The text of a
   buffer, though, is built in <c++> (<scm|lsp-document-text>, see
   <hlink|the link|lsp-link.en.tm>), without a <scheme> list of its lines:
   for a long file, such lists at each pause of the typing filled the heap.

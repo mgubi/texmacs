@@ -285,7 +285,9 @@
 
   <key|std F> formats the selection, or the whole file if nothing is
   selected, as the server does it (for instance with <verbatim|clang-format>
-  for <name|clangd>).
+  for <name|clangd>). The server is told to indent as the file is indented
+  (by tabs, at its tab stops, or by spaces), see <hlink|editing source
+  files|man-source-files.en.tm>.
 
   <key|std E> asks for a new name and renames the symbol at the cursor
   wherever the server finds it: in the current file and in the other files
