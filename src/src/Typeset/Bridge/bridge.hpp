@@ -102,6 +102,7 @@ public:
   bool same_inputs ();
   void give_record ();
   bool typeset_by_inputs (int desired_status); // (made again?)
+  void fold_line (tree t, array<page_item>& items);
 };
 
 
@@ -132,5 +133,7 @@ extern bridge nil_bridge;
 tree substitute (tree t, path p, tree u);
 
 #include "impl_typesetter.hpp"
+
+extern bool typeset_folds;
 
 #endif // defined BRIDGE_H

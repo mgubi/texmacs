@@ -17,7 +17,8 @@
 	(utils plugins plugin-cmd)
 	(dynamic program-drd)
 	(dynamic program-menu)
-	(dynamic fold-edit)))
+	(dynamic fold-edit)
+	(code code-syntax)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Switches
@@ -582,6 +583,9 @@
 (tm-define (kbd-enter t shift?)
   (:require (prog-field-input-context? t))
   (cond ((xor (program-multiline-input?) shift?)
+         (insert-return))
+        ((syntax-input-incomplete? (tree-ref t 1))
+         ;; an open bracket or block (by the syntax tree, see ts-edit.scm)
          (insert-return))
         ((program-supports-input-done?)
          (let* ((lan (get-env "prog-language"))

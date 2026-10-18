@@ -209,9 +209,12 @@
 (define-public (string-recompose l sep)
   "Turn list @l of strings into one string using @sep as separator."
   (if (char? sep) (set! sep (list->string (list sep))))
-  (cond ((null? l) "")
-	((null? (cdr l)) (car l))
-	(else (string-append (car l) sep (string-recompose (cdr l) sep)))))
+  ;; one string-append for the whole list: appending piece by piece would
+  ;; take a time quadratic in the length (a source file of 100000 lines)
+  (if (null? l) ""
+      (let loop ((r (cdr l)) (acc (list (car l))))
+        (if (null? r) (apply string-append (reverse acc))
+            (loop (cdr r) (cons (car r) (cons sep acc)))))))
 
 (define-public (string-tokenize-comma s)
   "Cut string @s into pieces using comma as a separator and remove whitespace."

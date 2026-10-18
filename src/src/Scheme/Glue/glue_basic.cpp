@@ -6759,6 +6759,45 @@ tmg_cpp_verbatim_2texmacs (tmscm arg1, tmscm arg2, tmscm arg3) {
 }
 
 tmscm
+tmg_cpp_source_2texmacs (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "cpp-source->texmacs");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  tree out= source_document_to_tree (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return tree_to_tmscm (out);
+}
+
+tmscm
+tmg_cpp_source_snippet_2texmacs (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "cpp-source-snippet->texmacs");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  tree out= source_snippet_to_tree (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return tree_to_tmscm (out);
+}
+
+tmscm
+tmg_source_2cork (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "source->cork");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  string out= source_text_to_cork (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return string_to_tmscm (out);
+}
+
+tmscm
 tmg_parse_latex (tmscm arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "parse-latex");
 
@@ -7466,6 +7505,32 @@ tmg_tree_2json (tmscm arg1) {
 
   // TMSCM_DEFER_INTS;
   string out= tree_to_json (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return string_to_tmscm (out);
+}
+
+tmscm
+tmg_json_2typed_tree (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "json->typed-tree");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  tree out= json_to_typed_tree (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return tree_to_tmscm (out);
+}
+
+tmscm
+tmg_typed_tree_2json (tmscm arg1) {
+  TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "typed-tree->json");
+
+  content in1= tmscm_to_content (arg1);
+
+  // TMSCM_DEFER_INTS;
+  string out= typed_tree_to_json (in1);
   // TMSCM_ALLOW_INTS;
 
   return string_to_tmscm (out);
@@ -9385,6 +9450,206 @@ tmg_connection_stop (tmscm arg1, tmscm arg2) {
   // TMSCM_ALLOW_INTS;
 
   return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_code_set_line_layers (tmscm arg1, tmscm arg2, tmscm arg3) {
+  TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "code-set-line-layers");
+  TMSCM_ASSERT_TREE (arg2, TMSCM_ARG2, "code-set-line-layers");
+  TMSCM_ASSERT_TREE (arg3, TMSCM_ARG3, "code-set-line-layers");
+
+  tree in1= tmscm_to_tree (arg1);
+  tree in2= tmscm_to_tree (arg2);
+  tree in3= tmscm_to_tree (arg3);
+
+  // TMSCM_DEFER_INTS;
+  code_set_line_layers (in1, in2, in3);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_code_clear_line_layers (tmscm arg1) {
+  TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "code-clear-line-layers");
+
+  tree in1= tmscm_to_tree (arg1);
+
+  // TMSCM_DEFER_INTS;
+  code_clear_line_layers (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_code_line_layers (tmscm arg1) {
+  TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "code-line-layers");
+
+  tree in1= tmscm_to_tree (arg1);
+
+  // TMSCM_DEFER_INTS;
+  tree out= code_line_layers_tree (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return tree_to_tmscm (out);
+}
+
+tmscm
+tmg_code_snapshot_new (tmscm arg1) {
+  TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "code-snapshot-new");
+
+  tree in1= tmscm_to_tree (arg1);
+
+  // TMSCM_DEFER_INTS;
+  int out= code_snapshot_new (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return int_to_tmscm (out);
+}
+
+tmscm
+tmg_code_snapshot_delete (tmscm arg1) {
+  TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "code-snapshot-delete");
+
+  int in1= tmscm_to_int (arg1);
+
+  // TMSCM_DEFER_INTS;
+  code_snapshot_delete (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_code_snapshot_change (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "code-snapshot-change");
+  TMSCM_ASSERT_TREE (arg2, TMSCM_ARG2, "code-snapshot-change");
+
+  int in1= tmscm_to_int (arg1);
+  tree in2= tmscm_to_tree (arg2);
+
+  // TMSCM_DEFER_INTS;
+  tree out= code_snapshot_change (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return tree_to_tmscm (out);
+}
+
+tmscm
+tmg_code_snapshot_changedP (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "code-snapshot-changed?");
+  TMSCM_ASSERT_TREE (arg2, TMSCM_ARG2, "code-snapshot-changed?");
+
+  int in1= tmscm_to_int (arg1);
+  tree in2= tmscm_to_tree (arg2);
+
+  // TMSCM_DEFER_INTS;
+  bool out= code_snapshot_changed (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return bool_to_tmscm (out);
+}
+
+tmscm
+tmg_code_snapshot_text (tmscm arg1) {
+  TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "code-snapshot-text");
+
+  int in1= tmscm_to_int (arg1);
+
+  // TMSCM_DEFER_INTS;
+  string out= code_snapshot_text (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return string_to_tmscm (out);
+}
+
+tmscm
+tmg_code_line_fold_state (tmscm arg1) {
+  TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "code-line-fold-state");
+
+  tree in1= tmscm_to_tree (arg1);
+
+  // TMSCM_DEFER_INTS;
+  int out= code_line_fold_state (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return int_to_tmscm (out);
+}
+
+tmscm
+tmg_code_set_line_fold_state (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "code-set-line-fold-state");
+  TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "code-set-line-fold-state");
+
+  tree in1= tmscm_to_tree (arg1);
+  int in2= tmscm_to_int (arg2);
+
+  // TMSCM_DEFER_INTS;
+  code_set_line_fold_state (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_code_column (tmscm arg1, tmscm arg2, tmscm arg3) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "code-column");
+  TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "code-column");
+  TMSCM_ASSERT_INT (arg3, TMSCM_ARG3, "code-column");
+
+  string in1= tmscm_to_string (arg1);
+  int in2= tmscm_to_int (arg2);
+  int in3= tmscm_to_int (arg3);
+
+  // TMSCM_DEFER_INTS;
+  int out= code_column (in1, in2, in3);
+  // TMSCM_ALLOW_INTS;
+
+  return int_to_tmscm (out);
+}
+
+tmscm
+tmg_code_utf16_column (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "code-utf16-column");
+  TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "code-utf16-column");
+
+  string in1= tmscm_to_string (arg1);
+  int in2= tmscm_to_int (arg2);
+
+  // TMSCM_DEFER_INTS;
+  int out= code_utf16_column (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return int_to_tmscm (out);
+}
+
+tmscm
+tmg_code_utf16_offset (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "code-utf16-offset");
+  TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "code-utf16-offset");
+
+  string in1= tmscm_to_string (arg1);
+  int in2= tmscm_to_int (arg2);
+
+  // TMSCM_DEFER_INTS;
+  int out= code_utf16_offset (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return int_to_tmscm (out);
+}
+
+tmscm
+tmg_code_indent_end (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "code-indent-end");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  int out= code_indent_end (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return int_to_tmscm (out);
 }
 
 tmscm
@@ -12205,6 +12470,9 @@ initialize_glue_basic () {
   tmscm_install_procedure ("cpp-texmacs->verbatim",  tmg_cpp_texmacs_2verbatim, 3, 0, 0);
   tmscm_install_procedure ("cpp-verbatim-snippet->texmacs",  tmg_cpp_verbatim_snippet_2texmacs, 3, 0, 0);
   tmscm_install_procedure ("cpp-verbatim->texmacs",  tmg_cpp_verbatim_2texmacs, 3, 0, 0);
+  tmscm_install_procedure ("cpp-source->texmacs",  tmg_cpp_source_2texmacs, 1, 0, 0);
+  tmscm_install_procedure ("cpp-source-snippet->texmacs",  tmg_cpp_source_snippet_2texmacs, 1, 0, 0);
+  tmscm_install_procedure ("source->cork",  tmg_source_2cork, 1, 0, 0);
   tmscm_install_procedure ("parse-latex",  tmg_parse_latex, 1, 0, 0);
   tmscm_install_procedure ("parse-latex-document",  tmg_parse_latex_document, 1, 0, 0);
   tmscm_install_procedure ("latex->texmacs",  tmg_latex_2texmacs, 1, 0, 0);
@@ -12254,6 +12522,8 @@ initialize_glue_basic () {
   tmscm_install_procedure ("cpp-ai-translate",  tmg_cpp_ai_translate, 4, 0, 0);
   tmscm_install_procedure ("json->tree",  tmg_json_2tree, 1, 0, 0);
   tmscm_install_procedure ("tree->json",  tmg_tree_2json, 1, 0, 0);
+  tmscm_install_procedure ("json->typed-tree",  tmg_json_2typed_tree, 1, 0, 0);
+  tmscm_install_procedure ("typed-tree->json",  tmg_typed_tree_2json, 1, 0, 0);
   tmscm_install_procedure ("lantool-correct",  tmg_lantool_correct, 2, 0, 0);
   tmscm_install_procedure ("url->url",  tmg_url_2url, 1, 0, 0);
   tmscm_install_procedure ("root->url",  tmg_root_2url, 1, 0, 0);
@@ -12394,6 +12664,20 @@ initialize_glue_basic () {
   tmscm_install_procedure ("connection-eval",  tmg_connection_eval, 3, 0, 0);
   tmscm_install_procedure ("connection-interrupt",  tmg_connection_interrupt, 2, 0, 0);
   tmscm_install_procedure ("connection-stop",  tmg_connection_stop, 2, 0, 0);
+  tmscm_install_procedure ("code-set-line-layers",  tmg_code_set_line_layers, 3, 0, 0);
+  tmscm_install_procedure ("code-clear-line-layers",  tmg_code_clear_line_layers, 1, 0, 0);
+  tmscm_install_procedure ("code-line-layers",  tmg_code_line_layers, 1, 0, 0);
+  tmscm_install_procedure ("code-snapshot-new",  tmg_code_snapshot_new, 1, 0, 0);
+  tmscm_install_procedure ("code-snapshot-delete",  tmg_code_snapshot_delete, 1, 0, 0);
+  tmscm_install_procedure ("code-snapshot-change",  tmg_code_snapshot_change, 2, 0, 0);
+  tmscm_install_procedure ("code-snapshot-changed?",  tmg_code_snapshot_changedP, 2, 0, 0);
+  tmscm_install_procedure ("code-snapshot-text",  tmg_code_snapshot_text, 1, 0, 0);
+  tmscm_install_procedure ("code-line-fold-state",  tmg_code_line_fold_state, 1, 0, 0);
+  tmscm_install_procedure ("code-set-line-fold-state",  tmg_code_set_line_fold_state, 2, 0, 0);
+  tmscm_install_procedure ("code-column",  tmg_code_column, 3, 0, 0);
+  tmscm_install_procedure ("code-utf16-column",  tmg_code_utf16_column, 2, 0, 0);
+  tmscm_install_procedure ("code-utf16-offset",  tmg_code_utf16_offset, 2, 0, 0);
+  tmscm_install_procedure ("code-indent-end",  tmg_code_indent_end, 1, 0, 0);
   tmscm_install_procedure ("widget-printer",  tmg_widget_printer, 2, 0, 0);
   tmscm_install_procedure ("widget-color-picker",  tmg_widget_color_picker, 3, 0, 0);
   tmscm_install_procedure ("widget-extend",  tmg_widget_extend, 2, 0, 0);

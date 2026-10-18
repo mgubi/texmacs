@@ -65,7 +65,8 @@ The patches
       (mkboot1.lsp compiles them twice)
 0010  compile-unknown-call: hook for the calls of names not yet defined
 0011  *keep-source*: compiled functions keep their source (procedure-source)
-0012  the heap stops growing at 1 Gb, with an out of memory error
+0012  the heap stops growing at 1 Gb, with an out of memory error (8 Gb
+      since 0023)
 0013  *defer-macro-errors*
 0014  a datum at the very end of the input is read (eof only when nothing is left)
 0015  [ and ] are symbol characters, as in Guile (vectors are #(...))
@@ -82,6 +83,33 @@ The patches
 0022  a function with its source (*keep-source*) hashes as its source, which
       stays the same when the stub of a lazy function becomes the compiled
       function (boot-femtolisp.scm)
+0023  the size of the heap has 64 bits: it stops growing at 8 Gb instead of
+      1 Gb (0012)
+0024  on macOS the jumps of the errors save and restore no signal mask
+      (_setjmp, _longjmp): a system call less at each call from C, a fifth
+      of the time of the scanners of tree-sitter
+0025  the GC handles grow (1024 before: a recursion through map failed past
+      500 levels), and a call from C within 512 KB of the end of the stack
+      of C is a stack overflow error rather than a crash
+0026  > <= >= of two variables or constants are compiled as the
+      instructions < = number? (they were calls); <= and >= are false when
+      a number is a NaN
+0027  equal? of long lists without hashing their pairs (only structures
+      with cycles or more than 65536 pairs get to cyc_compare)
+0028  hash tables: a key is not inserted twice after a deletion (deleted
+      keys came back, get gave wrong values)
+0029  a closure is not allocated past the end of the heap
+0030  tables: the finalizers of small tables are neither lost nor missing
+      (a leak at each table made during a collection)
+      (0028-0030 come from Julia's femtolisp, src/flisp of JuliaLang/julia)
+0031  undefined behaviour (from Julia's femtolisp): symbol names as flexible
+      arrays (_FORTIFY_SOURCE), unaligned bytecode operands read with
+      memcpy, unsigned shift in fixnum, keyword test of an empty name
+0032  for-each is a builtin in C (several lists stop at the shortest)
+
+fl_core.c also binds vector-ref, vector-set!, vector-length, char->integer
+and integer->char as constants to the builtins aref, aset!, length, fixnum
+and wchar, which the compiler makes instructions.
 
 The patches which change system.lsp or compiler.lsp regenerate flisp.boot.
 

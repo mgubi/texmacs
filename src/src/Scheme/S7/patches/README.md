@@ -13,6 +13,7 @@ marked `TeXmacs:` in `s7.c`.
 | `0004-string-ref-p0-signature-for-webassembly.patch` | `(string-ref s 0)` on a parameter no longer traps in WebAssembly; upstream since s7 5-Oct-2026, drop it then |
 | `0005-cache-macro-expansions.patch` | `(*s7* 'cache-macro-expansions?)`: a macro call evaluated again reuses its expansion, as in Guile (TeXmacs sets it in `start_scheme`) |
 | `0006-unshadow-global.patch` | `s7_unshadow_global`: `define-public` removes the module's binding of a public name, so lookups from other modules go straight to the rootlet (also changes `s7.h`) |
+| `0007-no-signal-mask-in-set-jump-info.patch` | `set_jump_info` saves no signal mask (`sigsetjmp (buf, 0)`): a system call less at each `s7_call`, 7 to 10% faster parses with a Scheme scanner of tree-sitter; these jumps never leave a signal handler |
 
 To upgrade s7, from `src/src/Scheme/S7`:
 

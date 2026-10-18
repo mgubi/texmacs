@@ -106,6 +106,14 @@ string tm_recompose (array<string> a);
 int    tm_search_forwards (string s, int pos, string in);
 int    tm_search_backwards (string s, int pos, string in);
 
+// a tab of a source file: the character <#9> of Cork (byte 9 is a macron),
+// at @pos of @s
+inline bool
+is_source_tab (string s, int pos) {
+  return pos + 3 < N(s) && s[pos] == '<' && s[pos+1] == '#' &&
+         s[pos+2] == '9' && s[pos+3] == '>';
+}
+
 string scm_quote (string s);
 string scm_unquote (string s);
 string raw_quote (string s);

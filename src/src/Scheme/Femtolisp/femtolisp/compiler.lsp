@@ -401,7 +401,40 @@
 		    (emit g (if tail? 'tapply 'apply) nargs)))
       (else      (emit g b)))))
 
+; TeXmacs: > <= >= of two arguments which are variables or constants, as
+; the instructions < = number? (see also compile-app), as system.lsp
+; defines them; they were calls of functions, at each step of the loops
+; which compare characters. The arguments are evaluated in any order then,
+; and the function stays for the other calls and as a value.
+(define (simple-compare x env)
+  (let ((head (car x)))
+    (and (memq head '(> <= >=))
+	 (length= x 3)
+	 (not (in-env? head env))
+	 (eq? (resolve-global head) head)
+	 (let loop ((l '(< = number?)))
+	   (or (null? l)
+	       (and (not (in-env? (car l) env))
+		    (eq? (resolve-global (car l)) (car l))
+		    (loop (cdr l)))))
+	 (let ((simple? (lambda (a) (or (atom? a) (eq? (car a) 'quote))))
+	       (a (cadr x)) (b (caddr x)))
+	   (and (simple? a) (simple? b)
+		(case head
+		  ((>)  (list '< b a))
+		  ((<=) (compare<= a b))
+		  (else (compare<= b a))))))))
+
+; (<= a b): the order of < (any values), but false with a NaN
+(define (compare<= a b)
+  `(if (< ,b ,a) #f (if (number? ,a) (if (< ,a ,b) #t (= ,a ,b)) #t)))
+
 (define (compile-app g env tail? x)
+  (let ((c (simple-compare x env)))
+    (if c (compile-in g env tail? c)
+	(compile-app* g env tail? x))))
+
+(define (compile-app* g env tail? x)
   (let* ((head  (car x))
 	 (ghead (if (and (symbol? head) (not (in-env? head env)))
 		    (resolve-global head)

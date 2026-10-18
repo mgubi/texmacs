@@ -1,0 +1,4 @@
+src/grammar.json of https://github.com/tree-sitter-grammars/tree-sitter-yaml.git
+(commit a1c4812a73ec5e089de8e441fdea3a921e8d5079), with its LICENSE; highlights.scm is queries/highlights.scm.
+The scanner (progs/treesit/ts-scanner-yaml.scm) follows src/scanner.c with the core schema (src/schema.core.c).
+tags.scm is ours.

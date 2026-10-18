@@ -43,6 +43,8 @@
         (check define-test)
         (check latex-test)
         (check formats-test)
+        (check source-files-test)
+        (check code-test)
         (check markdown-test)
         (check office-test)
         (check editing-test)
@@ -142,6 +144,8 @@
     ("trees" trees-test-failures count)
     ("latex" latex-test-failures count)
     ("formats" formats-test-failures count)
+    ("source-files" source-files-test-failures count)
+    ("code" code-test-failures count)
     ("markdown" markdown-test-failures count)
     ("office" office-test-failures count)
     ;; opens buffers and edits them
@@ -153,6 +157,8 @@
     ;; views which editing closed (#174)
     ("bibtex" bibtex-test-failures count)
     ("csl" csl-test-failures count)
+    ;; generates the tables of the JSON grammar of misc/tree-sitter
+    ("treesit" treesit-test-failures count)
     ;; generates the auxiliary data of documents in the temporary directory
     ("links" links-test-failures count)
     ("structures" structures-test-failures count)
@@ -184,6 +190,10 @@
     ("plugins" plugins-test-failures count)
     ;; loads every lazy menu, and maps and unmaps test keys
     ("kbd-menu" kbd-menu-test-failures count)
+    ;; starts sh, cat and printf as language servers, and stops them; with
+    ;; clangd, edits a C++ buffer, which loads the keyboard maps of programs:
+    ;; after kbd-menu, whose math checks must come before (see there)
+    ("lsp" lsp-test-failures count)
     ;; loads every style package, and with them the Scheme modules they use
     ("macro-drd" macro-drd-test-failures count)
     ("tm-define-regression" regtest-tm-define error)
@@ -202,7 +212,28 @@
 
 ;; the number of failures of a suite; an error which escapes the suite
 ;; counts as one, and does not stop the suites after it
+;; the suites of the features of program code which a build may leave out
+;; (doc/code-features.md): run when the feature is there (its glue); their
+;; modules are loaded then (those of tree-sitter call its glue when they
+;; are loaded)
+(define feature-suites
+  '(("treesit" tree-sitter-program-language (check treesit-test))
+    ("lsp" lsp-start (check lsp-test))))
+
+(define (suite-built? suite)
+  (with f (assoc (car suite) feature-suites)
+    (or (not f) (defined? (cadr f)))))
+
 (define (suite-failures suite)
+  (cond ((not (suite-built? suite))
+         (display* "Suite " (car suite) ": not in this build\n")
+         0)
+        ((assoc (car suite) feature-suites)
+         (module-provide (caddr (assoc (car suite) feature-suites)))
+         (suite-failures* suite))
+        (else (suite-failures* suite))))
+
+(define (suite-failures* suite)
   (let ((f (eval (cadr suite)))
         (kind (caddr suite)))
     (set! integration-failure-total 0)

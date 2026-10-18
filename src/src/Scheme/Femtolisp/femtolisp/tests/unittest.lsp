@@ -95,6 +95,20 @@
 (assert (equal? (< 3 +nan.0) (> +nan.0 (double 3))))
 (assert (equal? (> 3 +nan.0) (> (double 3) +nan.0)))
 (assert (not (>= +nan.0 +nan.0)))
+; TeXmacs: a key put after the deletion of another key of its chain is
+; not added twice (the old entry came back in table.keys)
+(let ((h (table)))
+  (for 0 39 (lambda (i) (put! h i i)))
+  (for 0 39 (lambda (i) (del! h i) (put! h (+ i 1) 'x)))
+  (assert (equal? (table.keys h) '(40)))
+  (assert (equal? (table.foldl (lambda (k v n) (+ n 1)) 0 h) 1)))
+; TeXmacs: false with one NaN too, also when compiled as instructions
+(assert (not (<= 1 +nan.0)))
+(assert (not (<= +nan.0 1)))
+(assert (not (>= 1 +nan.0)))
+(assert (not ((lambda (a b) (<= a b)) 1 +nan.0)))
+(assert ((lambda (a b) (and (<= a b) (>= b a) (> b a) (<= a a))) 1 2))
+(assert ((lambda (a b) (<= a b)) "a" "a"))
 
 ; comparing strings
 (assert (< "a" "b"))

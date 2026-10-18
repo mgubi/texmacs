@@ -38,6 +38,7 @@ public:
 
   bool launchCmd ();
   int  writeStdin (string s);
+  bool blocking= true; // writeStdin waits until all is written
   void feedBuf (ProcessChannel);
   bool listenChannel (ProcessChannel, int msecs);
   void killProcess (int msecs);

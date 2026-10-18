@@ -49,6 +49,16 @@
     considerations and known pitfalls.
   </itemize>
 
+  The languages which have a grammar of tree-sitter (most of them, see the
+  field <verbatim|grammar> of
+  <source-link|tm-program-languages.scm|TeXmacs/progs/kernel/texmacs/tm-program-languages.scm>)
+  are coloured, cut into tokens and indented by their syntax trees instead,
+  in a build with tree-sitter: their language objects are wrapped by those
+  of tree-sitter, which use the ones described here for the lines which the
+  syntax tree does not colour (<hlink|syntax trees of program
+  code|treesit.en.tm>). What this chapter describes is what the other
+  languages, and all of them in a build without tree-sitter, do.
+
   All C++ file names below are relative to <source-link|src/src/|src>, and all
   <scheme> file names are relative to <source-link|src/TeXmacs/progs/|TeXmacs/progs>, unless
   stated otherwise. The language definitions which live in plugins are found

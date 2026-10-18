@@ -9,6 +9,14 @@ target_include_directories (texmacs_body PUBLIC
   ${TeXmacs_Include_Dirs}
 )
 
+# the C units of tree-sitter (see CMakeLists.txt)
+set_source_files_properties (
+  "${TEXMACS_SOURCE_DIR}/src/Plugins/TreeSitter/tree_sitter_lib.c"
+  "${TEXMACS_SOURCE_DIR}/src/Plugins/TreeSitter/ts_dynamic.c"
+  "${TEXMACS_SOURCE_DIR}/src/Plugins/TreeSitter/ts_xz.c"
+  PROPERTIES INCLUDE_DIRECTORIES
+  "${TEXMACS_SOURCE_DIR}/src/Plugins/TreeSitter/tree-sitter/include;${TEXMACS_SOURCE_DIR}/src/Plugins/TreeSitter/tree-sitter/src")
+
 target_compile_options (texmacs_body PRIVATE
   $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:-include>
   $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:${CMAKE_BINARY_DIR}/src/System/config.h>

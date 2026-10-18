@@ -229,14 +229,16 @@
 (define-group code-tag
   (inline-code-tag) (block-code-tag))
 
-(define-group inline-code-tag
-  verbatim scm cpp dot-lang mmx r fortran octave-lang
-  python julia java javascript-lang json-lang scala scilab shell)
+(define-group inline-code-tag verbatim)
+(define-group block-code-tag verbatim-code)
 
-(define-group block-code-tag
-  verbatim-code scm-code cpp-code dot-code mmx-code r-code fortran-code
-  octave-code python-code julia-code java-code javascript-code json-code scala-code
-  scilab-code shell-code)
+;; and the tags of the program languages (tm-program-languages.scm)
+(group-extend! 'inline-code-tag
+               (list-filter (map program-language-inline-tag (program-languages))
+                            identity))
+(group-extend! 'block-code-tag
+               (list-filter (map program-language-block-tag (program-languages))
+                            identity))
 
 ;; ornaments
 

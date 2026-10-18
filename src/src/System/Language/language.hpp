@@ -150,6 +150,11 @@ array<string> get_supported_languages ();
 language text_language (string s);
 language math_language (string s);
 language prog_language (string s);
+// a feature which highlights program languages (tree-sitter, which is not
+// part of all builds, see doc/code-features.md) registers itself: it gives
+// the language made over the language @base of @lan, or NULL for @base
+typedef language_rep* (*prog_language_wrapper) (string lan, language_rep* base);
+void set_prog_language_wrapper (prog_language_wrapper w);
 bool prog_lang_exists (string s);
 language hyphenless_language (language base);
 language ad_hoc_language (language base, tree hyphs);

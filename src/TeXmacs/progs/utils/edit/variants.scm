@@ -45,6 +45,11 @@
 	   (tm-define (,(symbol-append 'inside- group '?))
 	     (not (not (inside-which (group-resolve ',group)))))))))
 
+(tm-define (group-extend! group l)
+  (:synopsis "Add the members @l to the group @group, already defined")
+  (set! group-resolve-table (make-ahash-table))
+  (ahash-set! group-table group (append (or (ahash-ref group-table group) '()) l)))
+
 (tm-define (group-find which group)
   (:synopsis "Find subgroup of @group which contains @which")
   (with l (ahash-ref group-table group)

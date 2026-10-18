@@ -322,25 +322,42 @@ bool prog_lang_exists (string s) {
 /******************************************************************************
 * Interface
 ******************************************************************************/
+static language_rep*
+prog_language_base (string s) {
+  if (s == "scheme")
+    return tm_new<scheme_language_rep> (s);
+  if (s == "mathemagix" || s == "mmi" || s == "caas" || s == "mmshell")
+    return tm_new<mathemagix_language_rep> (s);
+  if (s == "cpp")
+    return tm_new<cpp_language_rep> (s);
+  if (s == "scilab")
+    return tm_new<scilab_language_rep> (s);
+  if (s == "r")
+    return tm_new<r_language_rep> (s);
+  if (s == "fortran")
+    return tm_new<fortran_language_rep> (s);
+
+  if (format_exists (s) && prog_lang_exists (s))
+    return tm_new<prog_language_rep> (s);
+
+  return tm_new<verb_language_rep> (s);
+}
+
+static prog_language_wrapper the_wrapper= NULL;
+
+void
+set_prog_language_wrapper (prog_language_wrapper w) {
+  the_wrapper= w;
+}
+
 language
 prog_language (string s) {
   if (language::instances -> contains (s)) return language (s);
-  
-  if (s == "scheme")
-    return make (language, s, tm_new<scheme_language_rep> (s));
-  if (s == "mathemagix" || s == "mmi" || s == "caas" || s == "mmshell")
-    return make (language, s, tm_new<mathemagix_language_rep> (s));
-  if (s == "cpp")
-    return make (language, s, tm_new<cpp_language_rep> (s));
-  if (s == "scilab")
-    return make (language, s, tm_new<scilab_language_rep> (s));
-  if (s == "r")
-    return make (language, s, tm_new<r_language_rep> (s));
-  if (s == "fortran")
-    return make (language, s, tm_new<fortran_language_rep> (s));
-
-  if (format_exists (s) && prog_lang_exists (s))
-    return make (language, s, tm_new<prog_language_rep> (s));
-
-  return make (language, s, tm_new<verb_language_rep> (s));
+  // (the constructor of a language registers it under its name)
+  language_rep* base= prog_language_base (s);
+  if (the_wrapper != NULL) {
+    language_rep* r= the_wrapper (s, base);
+    if (r != NULL) return language (r);
+  }
+  return language (base);
 }

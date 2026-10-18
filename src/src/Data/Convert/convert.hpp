@@ -68,6 +68,9 @@ tree   scheme_document_to_tree (string s);
 string tree_to_verbatim (tree t, bool wrap= false, string enc= "default");
 tree   verbatim_to_tree (string s, bool wrap= false, string enc= "default");
 tree   verbatim_document_to_tree (string s, bool w= false, string e= "default");
+tree   source_document_to_tree (string s);
+tree   source_snippet_to_tree (string s);
+string source_text_to_cork (string s);
 
 /*** Latex ***/
 tree   parse_latex (string s, bool change= false, bool as_pic= false);
@@ -140,6 +143,8 @@ tree decompress_html (string s, int mode= 0);
 tree json_to_tree (string s, int mode= 0);
 string tree_to_json (tree t, int mode= 0);
 tree json_get (tree t, tree key, int mode= 0);
+tree json_to_typed_tree (string s);
+string typed_tree_to_json (tree t);
 string lantool_correct (string s, string out);
 tree ai_command (string s, string model, string agent,
 		 string chat= "", bool history= false);

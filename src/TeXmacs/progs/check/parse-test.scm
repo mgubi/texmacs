@@ -1000,9 +1000,10 @@
 (define (test-tables)
   ;; every table module loads, and its features are lists headed by the key
   (for (m '((python-lang) (java-lang) (scala-lang) (julia-lang) (json-lang)
-            (csv-lang) (cpp-lang) (dot-lang) (javascript-lang) (octave-lang)))
+            (csv-lang) (c-lang) (cpp-lang) (dot-lang) (javascript-lang)
+            (octave-lang)))
     (check= (begin (module-provide m) (module-available? m)) #t))
-  (for (lan '("python" "java" "scala" "julia" "json" "csv" "cpp" "dot"
+  (for (lan '("python" "java" "scala" "julia" "json" "csv" "c" "cpp" "dot"
               "javascript" "octave"))
     (for (key '("keyword" "operator" "number" "string" "comment"))
       (check= (car (feature lan key)) (string->symbol key))))
@@ -1141,6 +1142,9 @@
   (run-group "incorrect formulas" test-math-incorrect)
   (run-group "precedence" test-math-precedence)
   (run-group "symbols" test-symbols)
+  ;; the highlighters of TeXmacs, not those of tree-sitter (treesit suite)
+  (when (defined? 'tree-sitter-set-highlighting)
+    (tree-sitter-set-highlighting #f))
   (run-group "highlight cpp" test-cpp)
   (run-group "highlight scheme" test-scheme)
   (run-group "highlight mathemagix" test-mathemagix)
@@ -1157,5 +1161,7 @@
   (run-group "no highlighting" test-no-highlighting)
   (run-group "language tables" test-tables)
   (run-group "classes" test-classes)
+  (when (defined? 'tree-sitter-set-highlighting)
+    (tree-sitter-set-highlighting #t))
   (when (url-exists? parse-dir) (system-rmdir-recursive parse-dir))
   (check-end))

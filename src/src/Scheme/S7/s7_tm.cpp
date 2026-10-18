@@ -44,6 +44,12 @@ start_scheme (int argc, char** argv, void (*call_back) (int, char**)) {
   // instead of growing it step by step, with fewer collections meanwhile
   s7_eval_c_string (tm_s7, "(set! (*s7* 'heap-size) 1024000)");
 
+  // grow the heap four times (instead of twice) only when less than half of
+  // it is free after a collection, not 2/3: with a long file (s7.c, 100000
+  // lines) about 1.5M cells live, a heap of 4M was then often quadrupled,
+  // and a heap never shrinks (16M cells, 400 MB more than 8M)
+  s7_eval_c_string (tm_s7, "(set! (*s7* 'gc-resize-heap-by-4-fraction) 0.5)");
+
   // expand each macro call once and keep its expansion, as Guile does,
   // instead of expanding it at each evaluation (local patch 0005)
   s7_eval_c_string (tm_s7, "(set! (*s7* 'cache-macro-expansions?) #t)");

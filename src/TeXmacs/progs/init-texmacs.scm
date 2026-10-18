@@ -21,6 +21,19 @@
 ;(display "Booting utilities\n")
 (use-modules (utils library cpp-wrap))
 (lazy-define (utils library cursor) notify-cursor-moved)
+(lazy-define (treesit ts-highlight)
+             treesit-highlighter-request treesit-schedule-updates)
+(lazy-define (utils library cursor) notify-buffer-changed)
+;; the features of program code (doc/code-features.md): the folds
+(lazy-define (code code-fold) code-cursor-in-fold code-fold code-unfold
+             code-fold-all code-unfold-all code-folds code-fold-lines
+             code-unfold-lines code-hidden? code-can-fold? code-cursor-lines)
+(lazy-define (code code-navigate) code-go-to-definition code-outline
+             code-outline-entries code-go-to)
+(lazy-menu (code code-navigate) code-definitions-menu)
+(lazy-define (code code-diagnostics) code-next-diagnostic code-set-diagnostics
+             code-clear-diagnostics code-diagnostics code-check-syntax)
+(lazy-define (utils library cursor) notify-buffer-closed)
 (lazy-define (utils edit variants) make-inline-tag-list make-wrapped-tag-list)
 (lazy-define (utils cas cas-out) cas->stree)
 (lazy-define (utils plugins plugin-cmd) pre-serialize verbatim-serialize)
@@ -193,13 +206,21 @@
 
 ;(display "Booting programming modes\n")
 (lazy-format (prog prog-format) scheme)
-(lazy-format (code-format) cpp julia scala java javascript dot json csv)
+(lazy-format (code-format) c cpp julia scala java javascript dot json csv
+             go lean lua rust typescript css toml yaml ocaml haskell)
 (lazy-format (mathemagix-format) mathemagix)
 (lazy-format (caas-format) caas)
 (lazy-format (python-format) python)
 (lazy-format (octave-format) octave)
 (lazy-format (scilab-format) scilab)
 (lazy-keyboard (prog prog-kbd) in-prog?)
+;; the language servers follow the source files (preference "lsp"), when
+;; they are part of the build (their glue)
+(when (defined? 'lsp-start)
+  (lazy-keyboard (lsp lsp-kbd) in-prog?)
+  (lazy-menu (lsp lsp-kbd) lsp-menu)
+  (when (!= (get-preference "lsp") "off")
+    (delayed (:idle 1000) (module-provide '(lsp lsp-kbd)))))
 (lazy-menu (prog prog-menu) prog-format-menu prog-format-icons prog-icons)
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
 ;(display* "memory: " (texmacs-memory) " bytes\n")

@@ -32131,11 +32131,14 @@ static s7_pointer g_read_string(s7_scheme *sc, s7_pointer args)
       LongJmp(*(Sc->Goto_Start), Error_Jump);	\
   } while (0)
 
+/* TeXmacs: no signal mask saved (savemask 0): these jumps never leave a
+ *   signal handler, and saving the mask is a system call at each s7_call
+ */
 #define set_jump_info(Sc, Tag)			\
   do {						\
     Sc->longjmp_ok = true;			\
     Sc->setjmp_loc = Tag;			\
-    jump_loc = (jump_loc_t)SetJmp(new_goto_start, 1);	\
+    jump_loc = (jump_loc_t)SetJmp(new_goto_start, 0);	\
     Sc->Goto_Start = &new_goto_start;		\
   } while (0)
 

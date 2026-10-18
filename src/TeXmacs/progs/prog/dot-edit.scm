@@ -20,7 +20,7 @@
 
 (tm-define (program-compute-indentation doc row col)
   (:mode in-prog-dot?)
-  (get-tabstop))
+  (program-indent-step))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Automatic insertion, highlighting and selection of brackets and quotes
@@ -35,6 +35,8 @@
 (tm-define (notify-cursor-moved status)
   (:require prog-highlight-brackets?)
   (:mode in-prog-dot?)
+  ;; (the other hooks run too: language servers)
+  (former status)
   (select-brackets-after-movement "([{" ")]}" "\\"))
 
 (kbd-map

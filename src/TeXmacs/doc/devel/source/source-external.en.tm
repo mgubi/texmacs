@@ -7,7 +7,8 @@
 
   These chapters describe how <TeXmacs> talks to other programs and to other
   <TeXmacs> instances: the sessions, pipes and dynamic libraries through
-  which plug-ins are connected, and the client/server system used for
+  which plug-ins are connected, the language servers which analyze source
+  files, and the client/server system used for
   shared documents, live collaborative editing, remote file systems and
   versioning.
 
@@ -19,6 +20,11 @@
 
   <\traverse>
     <branch|The plug-in machinery|plugin-machinery.en.tm>
+
+    <branch|The features of program code: syntax trees and language
+    servers|code-features.en.tm>
+
+    <branch|The client of language servers|lsp.en.tm>
 
     <branch|Collaboration, remote servers and versioning|collaboration.en.tm>
 

@@ -120,7 +120,8 @@ QTMPipeLink::writeStdin (string s) {
   c_string _s (s);
   if (DEBUG_IO) debug_io << "[INPUT]" << debug_io_string ((char*)_s);
   int written= QIODevice::write (_s, N(s));
-  if (written == -1 || !waitForBytesWritten (-1)) return -1;
+  // (not blocking: QProcess keeps the rest and writes it from its loop)
+  if (written == -1 || (blocking && !waitForBytesWritten (-1))) return -1;
   return written;
 }
 
