@@ -80,7 +80,7 @@
   code blocks of a document saved on disk (<menu|Insert|Program|Block of
   code>, in a language which has a server) are followed too, each block as
   a file of its own: the server sees a file next to the document, named
-  after it (<verbatim|.notes-block1.cpp> for the first block of
+  after it (<verbatim|.notes.tm-block1.cpp> for the first block of
   <verbatim|notes.tm>), which is never written, in the project of the
   document. In a block, the diagnostics, the completion, the information
   at the cursor, the definitions, the references, the outline, the folds,

@@ -112,8 +112,9 @@
   <cpp|lsp_client> records: an integer <cpp|id>, the link, a <scheme> call
   back, and two flags, <cpp|exited> (the call back got its
   <verbatim|"exit">) and <cpp|removed> (stopped by <cpp|lsp_stop>). The glue
-  routines of <source-link|build-glue-basic.scm|src/Scheme/Glue/build-glue-basic.scm>
-  give them to <scheme>:
+  routines of <source-link|build-glue-lsp.scm|src/Scheme/Glue/build-glue-lsp.scm>
+  (compiled only in a build with the servers, <verbatim|USE_LSP>) give them
+  to <scheme>:
 
   <\description>
     <item*|<scm|(lsp-start cmd call-back)>>Starts the program <scm|cmd> on a
@@ -161,7 +162,11 @@
     <item><cpp|process_all_lsp>, which the interpose handler of the server
     (<cpp|tm_server_rep::interpose_handler> in
     <source-link|tm_server.cpp|src/Texmacs/Server/tm_server.cpp>) calls at
-    each turn of the event loop, with all the GUIs;
+    each turn of the event loop, with all the GUIs: it is one of the
+    processors of the links (<cpp|add_link_processor>,
+    <source-link|tm_link.hpp|src/System/Link/tm_link.hpp>), which
+    <cpp|lsp_start> registers the first time, so that the server does not
+    name the language servers;
 
     <item><cpp|lsp_listen>, after waiting.
   </itemize>

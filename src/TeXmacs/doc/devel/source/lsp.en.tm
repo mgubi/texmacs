@@ -59,7 +59,7 @@
 
     \ \ --\<gtr\> lsp-send \ --\<gtr\> "Content-Length: n\\r\\n\\r\\n{...}" on the pipe
 
-    server --\<gtr\> pipe --\<gtr\> lsp_link_rep::drain \ --\<gtr\> process_all_lsp
+    server --\<gtr\> pipe --\<gtr\> lsp_link_rep::drain \ --\<gtr\> process_all_lsp (a link processor)
 
     \ \ --\<gtr\> call back "message" \ --\<gtr\> lsp-client-receive
 
@@ -86,12 +86,15 @@
     writes which do not block (<cpp|set_blocking_write>), for the pipes of
     the servers.
 
-    <item*|<source-link|build-glue-basic.scm|src/Scheme/Glue/build-glue-basic.scm>>The
+    <item*|<source-link|build-glue-lsp.scm|src/Scheme/Glue/build-glue-lsp.scm>>The
     glue routines <scm|lsp-start>, <scm|lsp-send>, <scm|lsp-listen>,
-    <scm|lsp-alive?>, <scm|lsp-stop> and <scm|lsp-document-text>.
+    <scm|lsp-alive?>, <scm|lsp-stop> and <scm|lsp-document-text> (in a
+    build with the servers only).
 
-    <item*|<source-link|tm_server.cpp|src/Texmacs/Server/tm_server.cpp>>The
-    interpose handler, which calls <cpp|process_all_lsp>.
+    <item*|<source-link|tm_server.cpp|src/Texmacs/Server/tm_server.cpp>,
+    <source-link|tm_link.cpp|src/System/Link/tm_link.cpp>>The interpose
+    handler, which calls the processors of the links
+    (<cpp|process_all_link_processors>), <cpp|process_all_lsp> among them.
 
     <item*|<source-link|lsp-base.scm|TeXmacs/progs/lsp/lsp-base.scm>>Messages
     as <scheme> trees, texts and positions, <abbr|URI>s of files.

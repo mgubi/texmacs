@@ -363,6 +363,37 @@ server of each language (`(server "clangd")`), replacing the defaults of
      lines are the same as before but for one place: a word of a comment
      is now one box, so that the kerning of its letters applies (`'))`).
 
+Audit (2026-10-18), after phase 8; the fixes:
+- Without tree-sitter, the modules of sessions and programs loaded ts-edit.scm
+  (whose public functions replaced the stubs): all go through
+  `progs/code/code-syntax.scm`, which loads it or code-syntax-none.scm.
+- `code-ask` asks the next provider when one answers `'()` (a server without
+  a block at the cursor lets tree-sitter fold); Fold all folds the blocks at
+  the top level where there are no definitions; of two blocks with the same
+  first line the larger one first; folds deeper than 9 are refused; hidden
+  lines with no first line before them (it was deleted) are shown by Unfold
+  all and by the cursor.
+- The mark `...` of a new fold was typeset but not drawn (the part drawn
+  again was that of the line without it): the window is drawn again.
+- Tab completes with the names of the code only when some continue the word,
+  and not in a session which completes itself; the menu Focus of code keeps
+  the entries of sessions and programs (`former`); the syntax errors are
+  cleared when the cursor leaves the code.
+- Code blocks: the virtual files are named after the document with its
+  suffix; a block whose language changes closes its former file; the
+  underlines follow the blocks when the text before them changes; the
+  diagnostics which came while the document was not shown are drawn; the
+  focus bar and the highlights are those of the block at the cursor; the
+  quick fixes of a block compare the lines of the block; a place in a block
+  of a closed document opens nothing; the blocks are looked for in the whole
+  document at the first sync and at each save, else the known ones and the
+  one at the cursor.
+- The colours and hints of a server came back after an undo (an edit removes
+  them, the line keeps its tree); two hints at a place are both shown; the
+  lists of observers of a line no longer grow with folds and layers; the
+  last place outside of the folds is that of each editor; the glue suite
+  checks the glue of the features; dead functions of ts_highlight removed.
+
 Each phase keeps the suites passing and the two feature branches unchanged:
 what is shared is written here, then given back to the branches (or the
 branches rebased on it) only when the user decides it.
