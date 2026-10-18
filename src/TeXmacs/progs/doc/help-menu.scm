@@ -33,9 +33,9 @@
   (when (url-exists-in-help? "about/welcome/new-welcome.en.tm")
 	("Welcome" (load-help-article "about/welcome/new-welcome"))
 	("Getting started" (load-help-article "about/welcome/start"))
-	(when (url-exists-in-help? "about/welcome/maxs-texmacs.en.tm")
-	  ("Max's TeXmacs features"
-	   (load-help-article "about/welcome/maxs-texmacs")))
+	(when (url-exists-in-help? "about/welcome/upsilon-texmacs.en.tm")
+	  ("TeXmacs Upsilon features"
+	   (load-help-article "about/welcome/upsilon-texmacs")))
 	;; the browser build (web-files is defined by the Vue plugin there)
 	(if (defined? 'web-files)
 	    ("TeXmacs in the browser"

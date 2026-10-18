@@ -3,7 +3,7 @@
 Date: 2026-10-13. Audited: branch `wip_opentype` at `3c4f178718`, the 137
 commits on top of `wip_fixes` (`f3d66a71eb`): about 20,000 lines in 115 code
 files, 257 new font files, tests and documentation. The audited code files are
-the same in `maxs_texmacs`, so the findings hold there too.
+the same in `upsilon_texmacs`, so the findings hold there too.
 
 Method: five reviewers, one area each, read-only on the worktree, with the
 Qt/Guile build of the branch. A finding marked *run* was reproduced (a
@@ -103,7 +103,7 @@ What is left:
   `latex` (import of `eqnarray` and `align`) which fail on the first run
   with a new home directory and pass afterwards. (Traced on 2026-10-18:
   `wip_opentype` lacks 2ffd02fbcc, PR #259, where `is_equation_env` makes
-  its labels with `make_tree_label`; `maxs_texmacs` has it and passes with
+  its labels with `make_tree_label`; `upsilon_texmacs` has it and passes with
   a new home, Vue and Qt.)
 
 Also fixed on the way: `rhd`, `shortleftarrow` and `shortrightarrow` had two

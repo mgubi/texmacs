@@ -1,4 +1,4 @@
-# Open work on maxs_texmacs
+# Open work on upsilon_texmacs
 
 The things known to be left to do, gathered on 2026-10-07 from the audits
 and fixes of the past days. Remove an item when it is done (or say where it
@@ -9,7 +9,7 @@ went); add what you find. Paths are relative to the repository root.
 - **Merge PR #215 into `wip_fixes`.** It fixes the keyboard maps
   (`kbd-unmap` rewrites keys, reverse bindings, `:require` conditions,
   graphics menus, a bare predicate in `kbd-unmap`). Then merge `wip_fixes`
-  into `maxs_texmacs` again. (#311, `delayed (:refresh ms)`, was merged on
+  into `upsilon_texmacs` again. (#311, `delayed (:refresh ms)`, was merged on
   2026-10-14 and is here; the developer manual says how `:refresh` works.)
 
 ## Bugs found, not fixed
@@ -32,7 +32,7 @@ went); add what you find. Paths are relative to the repository root.
 None left from the list of 2026-10-07. The fixes are in e6c092506c (ports,
 build, docs, fonts), in the commit "Qt pipes: commands run by sh, in a
 process group stopped as a whole" and in the merge of `wip_fixes`
-b6cd741771 (Windows). The CI of `maxs_ci` passes on b6cd741771: macOS
+b6cd741771 (Windows). The CI of `upsilon_ci` passes on b6cd741771: macOS
 (Cocoa and Vue, arm64 and x86_64), Linux and Windows (Qt 6 and Vue, with
 the 48 regression suites on Qt). Still only compiled, never run: the X11,
 SDL and Qtwk changes, the Qt 5 branch of the Qt pipes

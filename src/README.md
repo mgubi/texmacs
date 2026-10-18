@@ -7,11 +7,11 @@
 >
 > Work in progress: TeXmacs compiled to WebAssembly and running in a web
 > page, an experimental port called TeXmacs Vue, with OpenType fonts
-> (OpenType mathematics included). It is developed in `maxs_texmacs` (it was the
+> (OpenType mathematics included). It is developed in `upsilon_texmacs` (it was the
 > branch `wip_wasm_vue`, merged there and retired on 7 October 2026). The CI
 > of the page runs on the branch `wasm_ci` only, which is moved to
-> `maxs_texmacs` when a state is worth building and publishing:
-> `git push origin maxs_texmacs:wasm_ci`. Nothing is installed and
+> `upsilon_texmacs` when a state is worth building and publishing:
+> `git push origin upsilon_texmacs:wasm_ci`. Nothing is installed and
 > nothing leaves the browser unless it is downloaded.
 >
 > ![TeXmacs Vue in the browser: tabs for the documents, the tool bars, a formula](docs/wasm/texmacs-in-the-browser.png)

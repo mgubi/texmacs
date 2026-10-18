@@ -90,7 +90,7 @@ var tmProgress = (function () {
       '<div class="tm-version"></div></div></div>' +
       '<div class="tm-about">A free editor for scientific documents, running ' +
       'entirely in your browser. Its source is on <a ' +
-      'href="https://github.com/mgubi/texmacs/tree/maxs_texmacs" ' +
+      'href="https://github.com/mgubi/texmacs/tree/upsilon_texmacs" ' +
       'target="_blank" rel="noopener">GitHub</a>.</div>' +
       '<div class="tm-bar"><div class="tm-fill"></div></div><div class="tm-detail"></div>';
     panel.querySelector ('.tm-version').textContent =

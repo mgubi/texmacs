@@ -74,7 +74,7 @@
     <with|font-series|bold|What does not work> below).
   </itemize>
 
-  <menu|Help|Max's TeXmacs features> describes what this version of
+  <menu|Help|TeXmacs Upsilon features> describes what this version of
   <TeXmacs> adds to the official one, in the browser and on the desktop.
 
   <section|Your files>
@@ -269,7 +269,7 @@
   report it on the <hlink|issue page of the
   port|https://github.com/mgubi/texmacs/issues>, not to the <TeXmacs>
   project. The sources and the notes of the port are on
-  <hlink|GitHub|https://github.com/mgubi/texmacs/tree/maxs_texmacs>.
+  <hlink|GitHub|https://github.com/mgubi/texmacs/tree/upsilon_texmacs>.
 
   <include|texmacs-vue-build.en.tm>
 
@@ -280,7 +280,10 @@
   <paragraph|18 October 2026>
 
   <\itemize>
-    <item><menu|Help|Max's TeXmacs features>, a new page, says what this
+    <item>This version of <TeXmacs> is now called <TeXmacs> Upsilon (it was
+    Max's <TeXmacs>), and its branch <verbatim|upsilon_texmacs>.
+
+    <item><menu|Help|TeXmacs Upsilon features>, a new page, says what this
     version of <TeXmacs> adds to the official one; this page has a section
     <with|font-series|bold|What works in the page>.
 
@@ -691,12 +694,12 @@
     keep the documents they save (only the preferences are kept by one tab),
     and each tab sees the documents the others saved.
 
-    <item>The page is built from the branch <verbatim|maxs_texmacs>, which
+    <item>The page is built from the branch <verbatim|upsilon_texmacs>, which
     gathers the other lines of work of the repository: it has their newest
     state (the <name|OpenType> mathematics, the citations from
     <name|Zotero>, the icon sets) and the whole developer documentation
     (<menu|Help|Developer documentation>). Its sources are on
-    <hlink|GitHub|https://github.com/mgubi/texmacs/tree/maxs_texmacs>.
+    <hlink|GitHub|https://github.com/mgubi/texmacs/tree/upsilon_texmacs>.
 
     <item>More fonts for text and mathematics come with the page: Garamond,
     Old Standard, <name|IBM> Plex, Noto Sans, Lete Sans, <name|GFS>

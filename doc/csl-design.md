@@ -1,6 +1,6 @@
 # CSL bibliography styles in TeXmacs
 
-Branch `wip_csl` (from `maxs_texmacs`). A processor of the Citation Style
+Branch `wip_csl` (from `upsilon_texmacs`). A processor of the Citation Style
 Language (CSL 1.0.2) written in Scheme, so that TeXmacs can use the styles
 of <https://github.com/citation-style-language/styles> (2864 independent
 styles, 8001 journal aliases) for bibliographies and citations.
@@ -141,7 +141,7 @@ capital lose it, braces protect), as CSL styles expect.
 
 ## Open points
 
-As of 2026-10-12, with the processor merged into `maxs_texmacs`.
+As of 2026-10-12, with the processor merged into `upsilon_texmacs`.
 
 ### What gives a wrong result today
 
@@ -211,7 +211,7 @@ As of 2026-10-12, with the processor merged into `maxs_texmacs`.
 - A chapter in the developer documentation of TeXmacs (there is this file
   and the section of the manual).
 - A pull request to `wip_fixes`: the work is on `wip_csl` and in
-  `maxs_texmacs` only.
+  `upsilon_texmacs` only.
 
 ## Next steps
 

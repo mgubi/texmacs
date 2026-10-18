@@ -1,6 +1,6 @@
 # Tree-sitter in TeXmacs: survey and design
 
-Branch `wip_tree_sitter` (from `maxs_texmacs`). Status: design, nothing
+Branch `wip_tree_sitter` (from `upsilon_texmacs`). Status: design, nothing
 implemented yet. Measurements below were made on 2026-10-09 on an Apple
 Silicon Mac with `cc -O2`.
 
@@ -367,7 +367,7 @@ split into lazily loaded modules.
 
 ## 6. Experiment: tree-sitter in Scheme
 
-Branch `wip_ts` (first named `wip_ts_experiment`; from `maxs_texmacs` 1fcf4aaf39), started
+Branch `wip_ts` (first named `wip_ts_experiment`; from `upsilon_texmacs` 1fcf4aaf39), started
 2026-10-16. A grammar is data (`src/grammar.json`, written by `tree-sitter
 generate` from `grammar.js` and committed in every grammar repository), so
 the generator can be ported to Scheme and its tables run by a Scheme port
@@ -1282,6 +1282,6 @@ installed, and the old behaviour stays elsewhere.
    colours the file until the tables are ready, with a message, and the
    generator should get faster (the 3x of module code under S7, section 6,
    is the first thing to look at). No build-time target.
-3. Decided (2026-10-17): the work is based on `maxs_texmacs`
+3. Decided (2026-10-17): the work is based on `upsilon_texmacs`
    (`wip_ts`, first named `wip_ts_experiment`, started from it). The desktop builds come first;
    the browser build later.

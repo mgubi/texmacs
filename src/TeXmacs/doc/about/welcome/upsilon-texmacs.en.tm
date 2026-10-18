@@ -3,13 +3,14 @@
 <style|<tuple|tmdoc|old-dots|old-lengths>>
 
 <\body>
-  <tmdoc-title|Max's <TeXmacs> features>
+  <tmdoc-title|<TeXmacs> Upsilon features>
 
-  This <TeXmacs> is <em|Max's <TeXmacs>>: the <TeXmacs> of the official
-  releases together with several lines of work which are not (yet) part of
-  them, gathered in one tree so that they can be built, used and tested
-  together. Its sources are the branch <verbatim|maxs_texmacs> on
-  <hlink|GitHub|https://github.com/mgubi/texmacs/tree/maxs_texmacs>, whose
+  This <TeXmacs> is <em|<TeXmacs> Upsilon>, an enhanced and bleeding-edge
+  version of <TeXmacs> with experimental features: the <TeXmacs> of the
+  official releases together with several lines of work which are not (yet)
+  part of them, gathered in one tree so that they can be built, used and
+  tested together. Its sources are the branch <verbatim|upsilon_texmacs> on
+  <hlink|GitHub|https://github.com/mgubi/texmacs/tree/upsilon_texmacs>, whose
   <verbatim|README.md> lists the branches it is made of. This page says
   what they bring, and where to find it in the menus.
 
@@ -164,7 +165,7 @@
   <name|Windows> (<name|Qt> and <name|Vue>) are made by the continuous
   integration of the repository; the <name|macOS> applications are in the
   pre-release
-  <hlink|maxs-latest|https://github.com/mgubi/texmacs/releases/tag/maxs-latest>.
+  <hlink|upsilon-latest|https://github.com/mgubi/texmacs/releases/tag/upsilon-latest>.
   Problems are reported in the
   <hlink|issues|https://github.com/mgubi/texmacs/issues> of the
   repository, not to the official <TeXmacs>.

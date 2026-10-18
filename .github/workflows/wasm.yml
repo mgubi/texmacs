@@ -5,10 +5,10 @@
 # it and serve it (node src/misc/wasm/serve.mjs <dir>), and publishes it on
 # GitHub Pages (the job pages).
 #
-# It runs on the branch wasm_ci only: the work goes on in maxs_texmacs, which
+# It runs on the branch wasm_ci only: the work goes on in upsilon_texmacs, which
 # triggers nothing, and a state is built, tested and published by moving
 # wasm_ci to it,
-#   git push origin maxs_texmacs:wasm_ci
+#   git push origin upsilon_texmacs:wasm_ci
 # (or by hand, from the Actions tab, on the branch wasm_ci)
 
 name: WebAssembly

@@ -1,6 +1,6 @@
 # Code features: tree-sitter and language servers together
 
-Branch `wip_code` (from `maxs_texmacs`) integrates two features which stay
+Branch `wip_code` (from `upsilon_texmacs`) integrates two features which stay
 developed on their own branches:
 
 - `wip_ts`: tree-sitter (a grammar per language, the generator in Scheme and
@@ -15,7 +15,7 @@ developed on their own branches:
 Both are merged here as they are (b465277952, 773de385bc). This document is
 the design of the mechanism they are to share, so that each of them is an
 optional provider: a build (or a run) without one of them keeps working with
-the other, and one without both is the TeXmacs of `maxs_texmacs`.
+the other, and one without both is the TeXmacs of `upsilon_texmacs`.
 
 ## 1. What each one brings
 

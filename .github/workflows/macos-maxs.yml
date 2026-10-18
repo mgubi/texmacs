@@ -1,4 +1,4 @@
-# TeXmacs of the branch maxs_texmacs for macOS 13 and later, with S7, as
+# TeXmacs of the branch upsilon_texmacs for macOS 13 and later, with S7, as
 # two disk images for Apple silicon and Intel: the native interface of
 # macOS (Cocoa, doc/ns-port.md) and the Vue port (SDL3 and Clay, drawn by
 # the GPU with OpenGL and ThorVG, src/docs/vue-graphics-stack.md):
@@ -15,10 +15,10 @@
 #     command line with each architecture and shows its colors
 #     (packages/macos/ci-colors.tm, png-has-red.py). The disk images and
 #     the snapshots of the windows are artifacts of the run;
-#   * release (on maxs_ci only): both disk images published as the
-#     pre-release maxs-latest of the repository, replaced at each build
+#   * release (on upsilon_ci only): both disk images published as the
+#     pre-release upsilon-latest of the repository, replaced at each build
 #     (its tag moved to the commit built):
-#     https://github.com/<owner>/<repo>/releases/tag/maxs-latest
+#     https://github.com/<owner>/<repo>/releases/tag/upsilon-latest
 #   * qt: the Qt 6 interface, with S7, for Apple silicon and the libraries
 #     of Homebrew (the job of ci.yml): built, the regression suites run,
 #     and TeXmacs.app (deployed with macdeployqt) kept as an artifact of
@@ -28,16 +28,16 @@
 # them on another machine until the quarantine is removed,
 #   xattr -dr com.apple.quarantine /Applications/TeXmacs.app
 #
-# It runs on the branch maxs_ci only: a state of maxs_texmacs is built by
-# moving maxs_ci to it,
-#   git push -f origin maxs_texmacs:maxs_ci
+# It runs on the branch upsilon_ci only: a state of upsilon_texmacs is built by
+# moving upsilon_ci to it,
+#   git push -f origin upsilon_texmacs:upsilon_ci
 # (or by hand, from the Actions tab, on any branch)
 
-name: macOS (maxs_texmacs, Cocoa, Vue and Qt)
+name: macOS (upsilon_texmacs, Cocoa, Vue and Qt)
 
 on:
   push:
-    branches: [maxs_ci]
+    branches: [upsilon_ci, maxs_ci]
   workflow_dispatch:
 
 env:
@@ -254,7 +254,7 @@ jobs:
 
   release:
     needs: dmg
-    if: github.ref == 'refs/heads/maxs_ci'
+    if: github.ref == 'refs/heads/upsilon_ci'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -266,18 +266,18 @@ jobs:
           path: dist
           merge-multiple: true
 
-      - name: The pre-release maxs-latest
+      - name: The pre-release upsilon-latest
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
           ls dist/*-cocoa-universal.dmg dist/*-vue-universal.dmg || { echo "error: a disk image is missing"; exit 1; }
-          tag=maxs-latest
+          tag=upsilon-latest
           cat > notes.md << EOF
-          The latest build of GNU TeXmacs from the branch \`maxs_texmacs\`
+          The latest build of GNU TeXmacs from the branch \`upsilon_texmacs\`
           (commit ${GITHUB_SHA:0:10}, $(date -u +%Y-%m-%d)), with the S7
           Scheme interpreter; it is replaced at each build. The tag
-          \`maxs-latest\` does not follow the builds: the commit built is
+          \`upsilon-latest\` does not follow the builds: the commit built is
           the one named here.
 
           * \`TeXmacs-*-cocoa-universal.dmg\`: the native interface of macOS
@@ -306,6 +306,6 @@ jobs:
             gh release edit "$tag" --notes-file notes.md
           else
             gh release create "$tag" dist/*.dmg --target "$GITHUB_SHA" --prerelease \
-              --title "TeXmacs maxs_texmacs for macOS (Cocoa and Vue), latest build" --notes-file notes.md ||
+              --title "TeXmacs upsilon_texmacs for macOS (Cocoa and Vue), latest build" --notes-file notes.md ||
               { echo "error: create the release $tag once by hand (gh release create with the scope workflow)"; exit 1; }
           fi

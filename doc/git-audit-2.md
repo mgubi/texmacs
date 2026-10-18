@@ -3,7 +3,7 @@
 Four independent reviews of `origin/wip_fixes..e39dc3086b`, after the fixes
 of the first audit ([git-audit.md](git-audit.md)), the rebase on `wip_fixes`,
 the move of the tests into the test harness, and the merge into
-`maxs_texmacs` (S7, Vue GUI):
+`upsilon_texmacs` (S7, Vue GUI):
 
 1. core logic, security and data loss (the review stopped early; its
    scripts were re-run and its findings re-verified by hand, see the note
@@ -109,11 +109,11 @@ non-ASCII paths (they work in a spot check), the review bar.
 
 ## Checked and found correct
 
-* **S7 (maxs_texmacs):** every Git menu, in nine situations, expands to
+* **S7 (upsilon_texmacs):** every Git menu, in nine situations, expands to
   the same entries as under Guile; all widgets expand; page actions with
   non-ASCII paths work; no procedure used by the Git modules is
   Guile-only. The headless suites pass there. (`version-tool` in
-  maxs_texmacs requires `git` in `PATH`, ignoring the *Git executable*
+  upsilon_texmacs requires `git` in `PATH`, ignoring the *Git executable*
   preference.)
 * **Glue:** regenerating `glue_basic.cpp` gives the committed file.
 * **Process layer:** 5 MB of output and 3 MB of input without deadlock; a

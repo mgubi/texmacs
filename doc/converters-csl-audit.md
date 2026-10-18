@@ -1,6 +1,6 @@
 # Audit of the Scheme code of the converters and of the CSL processor
 
-Made on 2026-10-12 on `maxs_texmacs` (ca9fa71343): about 14,400 lines of
+Made on 2026-10-12 on `upsilon_texmacs` (ca9fa71343): about 14,400 lines of
 Scheme in `src/TeXmacs/progs/convert/markdown`, `progs/convert/office` and
 `progs/csl`, with the citation macros of `packages/standard/std-automatic.ts`.
 

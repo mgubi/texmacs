@@ -48,11 +48,11 @@
   universal one, and <source-link|check-app.sh|packages/macos/check-app.sh> checks the signature and
   that only system libraries and those of the bundle are used. The
   continuous integration workflow <verbatim|.github/workflows/macos-maxs.yml>
-  does all this on the branch <verbatim|maxs_ci>, for the <name|Cocoa> and
+  does all this on the branch <verbatim|upsilon_ci>, for the <name|Cocoa> and
   the <name|Vue> ports and both architectures, and publishes the two disk
-  images as the pre-release <verbatim|maxs-latest>; a state of
-  <verbatim|maxs_texmacs> is built by moving <verbatim|maxs_ci> to it
-  (<verbatim|git push -f origin maxs_texmacs:maxs_ci>). The older workflow
+  images as the pre-release <verbatim|upsilon-latest>; a state of
+  <verbatim|upsilon_texmacs> is built by moving <verbatim|upsilon_ci> to it
+  (<verbatim|git push -f origin upsilon_texmacs:upsilon_ci>). The older workflow
   <verbatim|macos-ns.yml>, for the branch <verbatim|ns_ci>, has been
   removed from this branch (it is kept on <verbatim|wip_other_guis>).
 

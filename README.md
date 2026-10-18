@@ -1,11 +1,11 @@
-# Max's TeXmacs — branch `maxs_texmacs`
+# TeXmacs Upsilon — branch `upsilon_texmacs`
 
-This is **Max's TeXmacs**, an integration branch of
-[GNU TeXmacs](https://texmacs.org): it gathers in one tree several lines
-of work which are not (yet) in the official TeXmacs, so that they can be
-built, used and tested together. It is stock TeXmacs (the `svn_sync`
-branch, the mirror of the SVN trunk) plus the following branches, merged
-in:
+This is **TeXmacs Upsilon**, an enhanced and bleeding-edge version of
+[GNU TeXmacs](https://texmacs.org) with experimental features: it gathers
+in one tree several lines of work which are not (yet) in the official
+TeXmacs, so that they can be built, used and tested together. It is stock
+TeXmacs (the `svn_sync` branch, the mirror of the SVN trunk) plus the
+following branches, merged in:
 
 | Branch | What it brings |
 |---|---|
@@ -26,6 +26,10 @@ in:
 | `wip_dev_docs` | **Extensive developer documentation**, inside TeXmacs (Help ▸ Developer documentation): some 400 pages, about 250 of them on the internals of the source code — the data types, the typesetter, fonts and OpenType, the Scheme interpreters, the server, buffers, views and windows, the editor, the GUI ports, converters, plug-ins, collaboration — which compile into a book of more than a thousand pages ([`src/TeXmacs/doc/devel/`](src/TeXmacs/doc/devel/)) |
 | (tests, with `wip_fixes`) | **More tests**: unit tests of the kernel in C++ (which run without Qt too), nearly sixty Scheme test suites for editing, conversions, the typesetter, menus, links and more, regression tests on documents, a headless typesetting of the whole documentation, and the OpenType renders — see [src/tests/README.md](src/tests/README.md) |
 
+Until 18 October 2026 it was called *Max's TeXmacs*, on the branch
+`maxs_texmacs` (with the CI branch `maxs_ci` and the pre-release
+`maxs-latest`), which stay on GitHub as they were then.
+
 The branches are merged, not rebased, so each one can still be followed,
 updated and proposed upstream on its own; fixes found while integrating
 them go back to the branch they belong to.
@@ -39,12 +43,12 @@ below.
 
 ## Builds to download
 
-The CI of the branch `maxs_ci` (`git push -f origin maxs_texmacs:maxs_ci`)
+The CI of the branch `upsilon_ci` (`git push -f origin upsilon_texmacs:upsilon_ci`)
 builds and tests every platform:
 
 * **macOS** (Apple silicon and Intel, macOS 13 or later, s7): the Cocoa and
   the Vue applications as universal disk images, in the pre-release
-  [`maxs-latest`](https://github.com/mgubi/texmacs/releases/tag/maxs-latest),
+  [`upsilon-latest`](https://github.com/mgubi/texmacs/releases/tag/upsilon-latest),
   replaced at each build (its notes name the commit built). They are signed
   ad hoc and not notarized: open the application from its context menu the
   first time, or run
@@ -53,7 +57,7 @@ builds and tests every platform:
   (`.github/workflows/macos-maxs.yml`).
 * **Linux** (Ubuntu 24.04, x86_64) and **Windows** (MSYS2 MinGW-w64,
   x86_64), with Qt 6 or with Vue: artifacts of the workflow *Linux and
-  Windows (maxs_texmacs, Qt and Vue)*
+  Windows (upsilon_texmacs, Qt and Vue)*
   (`.github/workflows/maxs-linux-windows.yml`) on the
   [Actions page](https://github.com/mgubi/texmacs/actions); downloading
   them needs a GitHub login, and they expire after some weeks.
@@ -68,7 +72,7 @@ Problems are reported in the
 
 The same tree builds TeXmacs for a web page (it was the branch
 `wip_wasm_vue`, merged here and retired: the browser version is developed
-in `maxs_texmacs` now): the Vue interface draws everything in a canvas,
+in `upsilon_texmacs` now): the Vue interface draws everything in a canvas,
 s7 (or femtolisp) runs the Scheme code, and the files of TeXmacs come in
 packages which the browser keeps.
 Editing and typesetting, the menus and dialogs, a tab per document, the
@@ -90,7 +94,7 @@ It is built apart from `configure`, with Emscripten, by
 `misc/wasm/sources.txt`): see [`src/docs/wasm/`](src/docs/wasm/README.md)
 for the build, the design and the tests. The browser version is
 published at <https://mgubi.github.io/texmacs/> by the CI of the branch
-`wasm_ci` (`git push origin maxs_texmacs:wasm_ci`).
+`wasm_ci` (`git push origin upsilon_texmacs:wasm_ci`).
 
 ## The graphical interfaces
 
@@ -212,9 +216,9 @@ editor windows).
 
 ## Documentation
 
-* Help ▸ Max's TeXmacs features, in TeXmacs: what this branch brings, for
+* Help ▸ TeXmacs Upsilon features, in TeXmacs: what this branch brings, for
   its users, with links to the pages of the manual
-  ([`src/TeXmacs/doc/about/welcome/maxs-texmacs.en.tm`](src/TeXmacs/doc/about/welcome/maxs-texmacs.en.tm))
+  ([`src/TeXmacs/doc/about/welcome/upsilon-texmacs.en.tm`](src/TeXmacs/doc/about/welcome/upsilon-texmacs.en.tm))
 * [src/TeXmacs/doc/devel/](src/TeXmacs/doc/devel/): the developer
   documentation, read in TeXmacs with Help ▸ Developer documentation, or
   compiled into a book with Help ▸ Full manuals ▸ Developer documentation

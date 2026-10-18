@@ -1,4 +1,4 @@
-# TeXmacs in the browser (branch `maxs_texmacs`)
+# TeXmacs in the browser (branch `upsilon_texmacs`)
 
 Goal: a WebAssembly build of TeXmacs which runs in a web page, on the Vue GUI
 (Clay for the layout, MuPDF for the pixels) and SDL3, with the S7 Scheme
@@ -152,11 +152,11 @@ looks as before; the scripted tests have `tab <id>` to show a tab.
 
 The CI of GitHub (`.github/workflows/wasm.yml`, at the top of the
 repository) runs on the branch `wasm_ci` only: the work goes on in
-`maxs_texmacs` (until 7 October 2026 in `wip_wasm_vue`, now retired), which
+`upsilon_texmacs` (until 7 October 2026 in `wip_wasm_vue`, now retired), which
 triggers nothing, and a state is built, tested and published by moving
 `wasm_ci` to it,
 
-    git push origin maxs_texmacs:wasm_ci
+    git push origin upsilon_texmacs:wasm_ci
 
 (or by hand, from the Actions tab). It builds with Emscripten 6.0.10
 (`emsdk`) the slim MuPDF with its patches (cached), the page and the node
@@ -859,7 +859,7 @@ preference gives another port; the message of a login when nothing
 answers at the port; and the bridge (`ws-bridge.mjs` in front of the port
 of the test server, with `NODE_TLS_REJECT_UNAUTHORIZED=0` for its
 self-signed certificate), from `client.mjs` and from the page. In
-maxs_texmacs the Qt port was only compiled.
+upsilon_texmacs the Qt port was only compiled.
 
 The remote tools as a whole (2026-10-08): `remote-check.scm`, loaded by a
 desktop client (`-tls-no-verify -x`) or by the page (written to its file
