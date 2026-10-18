@@ -829,9 +829,19 @@
     (treesit-generate-cache "lua")
     (check= (tree-sitter-parse-sexp (treesit-language "lua") "local s = [[a]] --[[ c ]]\nprint(s)\n")
             "(chunk local_declaration: (variable_declaration (assignment_statement (variable_list name: (identifier)) (expression_list value: (string content: (string_content))))) (comment content: (comment_content)) (function_call name: (identifier) arguments: (arguments (identifier))))")
-    ;; Lean: its tables are shipped (making them takes a minute and
-    ;; gigabytes); those of the present grammar and generator must be there
-    (check-true (url-exists? (treesit-shipped-url "lean")))
+    ;; the tables of all the grammars are shipped (making them all takes more
+    ;; than a minute, Lean alone a minute and gigabytes); those of the
+    ;; present grammars and generator must be there (ship-tables.sh)
+    (check= (list-filter treesit-languages
+                         (lambda (lan) (not (url-exists? (treesit-shipped-url lan)))))
+            '())
+    ;; and they are those which the generator makes
+    (for (lan '("json" "toml"))
+      (let ((tmp (url-temp)))
+        (treesit-generate-cache lan)
+        (check-true (tree-sitter-unpack (treesit-shipped-url lan) tmp))
+        (check-true (== (string-load tmp) (string-load (treesit-cache-url lan))))
+        (system-remove tmp)))
     (when (url-exists? (treesit-shipped-url "lean"))
       (let ((tmp (url-temp)))
         (check-true (tree-sitter-unpack (treesit-shipped-url "lean") tmp))

@@ -97,11 +97,12 @@
 ;; Shipped tables
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;; The tables of the grammars which take too long to generate (Lean: a
-;; minute and gigabytes) are shipped, compressed by xz, as
-;; misc/tree-sitter/<lan>/<name of the cache file>.xz: the name holds the
-;; hash of the grammar and of the generator, so tables which do not match
-;; them are not used (the language is then generated). They are made by
+;; The tables of the grammars are shipped (1.4 MB; generating them all takes
+;; more than a minute at the first start, Lean alone a minute and gigabytes),
+;; compressed by xz, as misc/tree-sitter/<lan>/<name of the cache file>.xz:
+;; the name holds the hash of the grammar and of the generator, so tables
+;; which do not match them are not used (the language is then generated, as
+;; a grammar without shipped tables). They are made by
 ;; misc/tree-sitter/ship-tables.sh.
 
 (define-public (treesit-shipped-url lan)
