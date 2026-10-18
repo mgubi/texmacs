@@ -21,7 +21,8 @@
         (code code-fold)
         (code code-navigate)
         (code code-diagnostics)
-        (code code-complete)))
+        (code code-complete)
+        (code code-menu)))
 
 (define (test-providers)
   (check-group "providers")
@@ -224,6 +225,11 @@
         (check= (length (code-diagnostics)) 2)
         (check= (get-alt-selection "code-errors") (list (at 1 2) (at 1 7)))
         (check= (get-alt-selection "code-warnings") (list (at 0 4) (at 0 5)))
+        ;; the menu Focus visits them
+        ;; the menu Focus visits them (greyed without diagnostics)
+        (with m (menu-expand '(vertical (dynamic (code-diagnostics-menu))))
+          (check= (car (car (cadr m))) 'when)
+          (check-true (cadr (car (cadr m)))))
         ;; from one to the next, and back to the first
         (go-to (at 0 0))
         (code-next-diagnostic #t)
@@ -239,7 +245,9 @@
                 (list (list 'error (at 1 2) (at 1 7) "unknown")))
         (check= (get-alt-selection "code-warnings") '())
         (code-clear-diagnostics 'server)
-        (check= (get-alt-selection "code-errors") '())))))
+        (check= (get-alt-selection "code-errors") '())
+        (with m (menu-expand '(vertical (dynamic (code-diagnostics-menu))))
+          (check-false (cadr (car (cadr m)))))))))
 
 (define (test-completion)
   (check-group "completion")

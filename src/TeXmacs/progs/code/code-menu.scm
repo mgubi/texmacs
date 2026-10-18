@@ -13,8 +13,10 @@
 
 ;; The entries of the menu Focus in program code: those of the features
 ;; which a provider can serve at the cursor (code-features.scm), whichever
-;; it is, then those of the syntax tree (code-syntax-menu, which tree-sitter
-;; gives: progs/treesit/ts-edit.scm).
+;; it is, then those of a server only (code-server-menu, which the adapter
+;; of the servers gives: progs/lsp/lsp-code.scm), then those of the syntax
+;; tree (code-syntax-menu, which tree-sitter gives: progs/treesit/ts-edit.scm).
+;; Without one of them, its entries are not there.
 
 (texmacs-module (code code-menu)
   (:use (code code-features)
@@ -23,7 +25,13 @@
         (code code-diagnostics)
         (code code-complete)))
 
+(tm-menu (code-server-menu))
 (tm-menu (code-syntax-menu))
+
+(tm-menu (code-diagnostics-menu)
+  (when (nnull? (code-diagnostics))
+    ("Next diagnostic" (code-next-diagnostic #t))
+    ("Previous diagnostic" (code-next-diagnostic #f))))
 
 (tm-menu (focus-extra-menu t)
   (:require (and (in-prog?) (code-cursor-lines)))
@@ -38,4 +46,6 @@
         ("Unfold block" (code-unfold))
         ("Fold all blocks" (code-fold-all))
         ("Unfold all" (code-unfold-all))))
+  (dynamic (code-diagnostics-menu))
+  (dynamic (code-server-menu))
   (dynamic (code-syntax-menu)))

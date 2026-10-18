@@ -19,8 +19,10 @@
 
 (texmacs-module (lsp lsp-code)
   (:use (code code-features)
+        (code code-menu)
         (lsp lsp-fold)
         (lsp lsp-edit)
+        (lsp lsp-actions)
         (lsp lsp-navigate)))
 
 (code-provider-set! 'fold-ranges 'server 10 lsp-can-fold? lsp-fold-ranges)
@@ -34,3 +36,13 @@
 (code-provider-set! 'server-diagnostics 'server 10
                     (lambda () (and (lsp-on?) (lsp-buffer-followed?)))
                     (lambda () #t))
+;; the entries of the menu Focus which only a server gives (after those of
+;; the features, code-menu.scm)
+(tm-menu (code-server-menu)
+  (:require (and (in-prog?) (lsp-on?) (lsp-buffer-followed?)))
+  ("Find references" (lsp-references))
+  ("Calls" (lsp-call-hierarchy))
+  ("Information at cursor" (lsp-hover))
+  ("Rename symbol..." (interactive lsp-rename))
+  ("Quick fix" (lsp-quick-fix))
+  ("Format" (lsp-format)))

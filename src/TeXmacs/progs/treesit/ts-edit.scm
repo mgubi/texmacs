@@ -603,21 +603,12 @@
 ;; Modifying a hidden line forgets its state, and the cursor arriving in a
 ;; hidden line unfolds the folds around it (Edit/Interface/edit_cursor.cpp).
 
-(define (depth root row)
-  (if (and (>= row 0) (< row (tree-arity root)))
-      (tree-sitter-fold-state (tree-ref root row))
-      0))
-
-(define (hidden? root row) (> (depth root row) 0))
-
-(define (set-depth! root row d)
-  (let ((line (tree-ref root row)))
-    (when (!= (depth root row) d)
-      (tree-sitter-set-fold-state line (max d 0))
-      (update-path (tree->path line)))))
-
+;; (the folds of the core, progs/code/code-fold.scm, which the language
+;; servers fold too: the number of the folds which hide a line, a fold
+;; starting at a line when the next one is deeper)
+(define (depth root row) (code-fold-depth root row))
+(define (hidden? root row) (code-hidden? root row))
 (define (fold-starts? root row)
-  ;; does a fold start at row (hide the lines after it)?
   (> (depth root (+ row 1)) (depth root row)))
 
 (define (fold-rows root lan n)
@@ -636,22 +627,11 @@
   ;; fold the node n (not when a fold starts already at its first line);
   ;; whether there was something to hide
   (let ((rows (fold-rows root lan n)) (s (car (node-start n))))
-    (and (pair? rows) (not (fold-starts? root s))
-         (begin
-           (for-each (lambda (r) (set-depth! root r (+ (depth root r) 1))) rows)
-           (update-path (tree->path (tree-ref root s)))   ; its mark
-           #t))))
+    (and (pair? rows) (code-fold-lines root s (cAr rows)))))
 
 (define (unfold-at! root row)
   ;; unfold the fold which starts at row; whether there was one
-  (and (fold-starts? root row)
-       (let ((d0 (depth root row)))
-         (let loop ((r (+ row 1)))
-           (when (> (depth root r) d0)
-             (set-depth! root r (- (depth root r) 1))
-             (loop (+ r 1))))
-         (update-path (tree->path (tree-ref root row)))
-         #t)))
+  (code-unfold-lines root row))
 
 (define (rows->range s rows)
   (and (pair? rows) (list s (cAr rows))))
@@ -745,27 +725,15 @@
   (let ((c (cursor-code)))
     (and c (tree-is? (cadr (car c)) 'document)
          (let ((root (cadr (car c))))
-           (for-each (lambda (r) (set-depth! root r 0)) (iota (tree-arity root)))
-           (for-each (lambda (r) (update-path (tree->path (tree-ref root r))))
-                     (iota (tree-arity root)))
+           (let loop ()
+             (with fs (code-folds root)
+               (when (nnull? fs)
+                 (for-each (lambda (f) (unfold-at! root (car f))) fs)
+                 (loop))))
            #t))))
 
-(define-public (syntax-unfold-at-cursor)
-  ;; the cursor is in a hidden line: unfold its fold (called by C++)
-  (let* ((p (cursor-path))
-         (line (and (pair? p) (path->tree (cDr p))))
-         (root (and line (pair? (cDr p)) (path->tree (cDDr p)))))
-    (when (and root (tree-is? root 'document))
-      ;; the folds around the line, from the innermost
-      (let ((row (cAr (cDr p))))
-        (let unfold ()
-          (when (hidden? root row)
-            (let find ((r (- row 1)))
-              (cond ((< r 0) (noop))
-                    ((< (depth root r) (depth root row))
-                     (unfold-at! root r)
-                     (unfold))
-                    (else (find (- r 1)))))))))))
+;; (the cursor which comes into a hidden line: code-cursor-in-fold of the
+;; core, called by Edit/Interface/edit_cursor.cpp)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Inputs of sessions
