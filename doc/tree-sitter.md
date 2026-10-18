@@ -1218,6 +1218,18 @@ installed, and the old behaviour stays elsewhere.
   Bash 219 to 183 ms, YAML 457 to 394, Haskell 189 to 175, Python 47
   to 40. femtolisp is then about as fast as s7 but on YAML (394 against
   282 ms).
+  On YAML, femtolisp spends about 13% writing the state of the scanner
+  after each token (`object->string`). Keeping the last state and its
+  text in `scanner_serialize`, and skipping the write when the new state
+  is `equal?` to it, measured 3% on s7 and a loss on femtolisp (Bash 177
+  to 205 ms): its `equal?` called from C goes through the slow compare
+  with cycle checks. Not kept.
+- **femtolisp full suite** (same day): it never ended, because Markdown
+  keyed a table by the identity of list tails and femtolisp's tables
+  compare with `equal?` (fixed in `markdownin.scm`: keyed by the length of
+  the tail there); the test xml limits of office-test.scm overflowed its
+  stack (a search without recursion now). All the suites of femtolisp
+  pass.
 - **The old highlighters stay** (decided after a look, same day): a
   language of tree-sitter wraps the usual language of TeXmacs and still
   calls its `advance` for every token typeset (the cut of the text into
