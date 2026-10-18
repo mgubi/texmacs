@@ -21,6 +21,11 @@
 #include <unistd.h>
 #include <signal.h>
 #include <errno.h>
+#include <stdio.h>
+#include <string.h>
+#ifdef __linux__
+#include <dirent.h>
+#endif
 #endif
 
 static string
@@ -136,6 +141,42 @@ QTMPipeLink::listenChannel (ProcessChannel channel, int msecs) {
   return waitForReadyRead (msecs);
 }
 
+#if !defined (OS_MINGW) && !defined (OS_ANDROID)
+static bool
+group_alive (pid_t pg) {
+  // whether a process of the group pg is left (EPERM: a member which we may
+  // not signal). On Linux, Qt reaps the program only when it waits for it:
+  // until then the program is a zombie of the group, which is not counted
+#ifdef __linux__
+  DIR* dir= opendir ("/proc");
+  if (dir != NULL) {
+    bool found= false;
+    while (!found) {
+      struct dirent* e= readdir (dir);
+      if (e == NULL) break;
+      if (e->d_name[0] < '0' || e->d_name[0] > '9') continue;
+      char path[64], buf[512];
+      snprintf (path, sizeof (path), "/proc/%s/stat", e->d_name);
+      FILE* f= fopen (path, "r");
+      if (f == NULL) continue;
+      size_t n= fread (buf, 1, sizeof (buf) - 1, f);
+      fclose (f);
+      buf[n]= '\0';
+      // pid (command) state ppid pgrp ...: the command may hold parentheses
+      char* p= strrchr (buf, ')');
+      char state;
+      int ppid, pgrp;
+      if (p != NULL && sscanf (p + 1, " %c %d %d", &state, &ppid, &pgrp) == 3)
+        found= (pgrp == pg && state != 'Z' && state != 'X');
+    }
+    closedir (dir);
+    return found;
+  }
+#endif
+  return ::killpg (pg, 0) == 0 || errno == EPERM;
+}
+#endif
+
 void
 QTMPipeLink::killProcess (int msecs) {
   disconnect (SIGNAL(readyReadStandardOutput ()), this, SLOT(readErrOut ()));
@@ -154,13 +195,16 @@ QTMPipeLink::killProcess (int msecs) {
   int limit= (msecs > 0? msecs: 2000);
   qint64 pid= processId ();
   if (pid > 0 && ::killpg ((pid_t) pid, SIGTERM) == 0) {
-    waitForFinished (limit);
+    // The group is waited for before any wait of Qt: once Qt sees that
+    // the program has finished, it closes the pipes, and what is left of
+    // the group then dies of SIGPIPE when it writes (as a shell reporting
+    // that its child was terminated) instead of cleaning up
     for (int waited= 0; waited < limit; waited += 10) {
-      if (::killpg ((pid_t) pid, 0) == -1 && errno != EPERM) break;
+      if (!group_alive ((pid_t) pid)) break;
       ::usleep (10000);
     }
-    if (::killpg ((pid_t) pid, 0) == 0 || errno == EPERM)
-      ::killpg ((pid_t) pid, SIGKILL);
+    if (group_alive ((pid_t) pid)) ::killpg ((pid_t) pid, SIGKILL);
+    waitForFinished (1000);
   }
   if (state () != QProcess::NotRunning) {
     kill ();
