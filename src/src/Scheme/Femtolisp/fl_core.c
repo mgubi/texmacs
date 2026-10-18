@@ -462,8 +462,9 @@ fltm_print_frames (void) {
   fprintf (stderr, "femtolisp: out of memory in\n");
   ios_flush (ios_stderr);
   while (top > 0 && n < 60) {
-    uint32_t sz= Stack[top-3]+1;
-    uint32_t bp= top-5-sz;
+    /* a frame of 4 slots since the flat closures (patch 0034) */
+    uint32_t sz= Stack[top-2]+1;
+    uint32_t bp= top-4-sz;
     value_t f= Stack[bp];
     const char* name= "?";
     if (isfunction (f) && issymbol (fn_name (f)))
@@ -492,13 +493,13 @@ fltm_print_frames (void) {
       set (printlengthsym, fixnum (6));
       set (printlevelsym, fixnum (4));
       fprintf (stderr, " ARG ");
-      fl_print (ios_stderr, Stack[top-1]? FL_NIL: Stack[bp+1]);
+      fl_print (ios_stderr, Stack[bp+1]);
       set (printlengthsym, pl);
       set (printlevelsym, pv);
     }
     fprintf (stderr, "\n");
     ios_flush (ios_stderr);
-    top= Stack[top-4];
+    top= Stack[top-3];
     n++;
   }
 }
