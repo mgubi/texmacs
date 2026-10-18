@@ -106,6 +106,17 @@ The patches
       arrays (_FORTIFY_SOURCE), unaligned bytecode operands read with
       memcpy, unsigned shift in fixnum, keyword test of an empty name
 0032  for-each is a builtin in C (several lists stop at the shortest)
+0033  the compiler lowers the internal defines once, before compiling
+      (lower-define); mkboot0.lsp --compiler loads a new compiler first
+0034  flat closures: a closure keeps a vector of the values of the
+      variables it uses, the variables captured and set! are boxed;
+      frames of 4 slots (fltm_print_frames in fl_core.c reads them)
+0035  a lambda called at the head of a form (let) is compiled in the
+      frame of the function (instruction shift)
+0036  the collector does not relocate the values outside the heap
+      (0033-0036 are Julia's rewrite of 2014: 0c4abb27f3, f21780ccb0,
+      d323f404c9, 5e949d7915, f522f8f139, with fixes of its handling of
+      optional arguments, trycatch and default values)
 
 fl_core.c also binds vector-ref, vector-set!, vector-length, char->integer
 and integer->char as constants to the builtins aref, aset!, length, fixnum
@@ -133,8 +144,11 @@ until it no longer changes, and regenerate fl_boot.h:
 
   cd femtolisp-clone && make -C llt && make release
   ./flisp mkboot0.lsp system.lsp compiler.lsp > flisp.boot.new
+      (when the bytecode changes: the old flisp with its old flisp.boot
+       compiles with the new compiler,
+       old/flisp mkboot0.lsp --compiler compiler.lsp system.lsp compiler.lsp)
   mv flisp.boot.new flisp.boot
-  ./flisp mkboot1.lsp && ./flisp mkboot1.lsp   # twice: a fixed point
+  ./flisp mkboot1.lsp   # until flisp.boot no longer changes (2 or 3 times)
   make test
   cp flisp.boot <here>/femtolisp/ && <here>/make-boot-header.sh
 
