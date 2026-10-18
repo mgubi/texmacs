@@ -124,6 +124,16 @@ tm_sleep () {
 * Constructor and geometry
 ******************************************************************************/
 
+void
+qt_flush_deferred_deletes () {
+  // (an exit of a script, (exit), from the event loop: the widgets which
+  // were to be deleted later, as the prompt of an interactive command, are
+  // deleted now, before the static objects of Qt go; else Qt deletes them
+  // while it ends its threads, after those, and crashes)
+  if (QCoreApplication::instance () != NULL)
+    QCoreApplication::sendPostedEvents (NULL, QEvent::DeferredDelete);
+}
+
 qt_gui_rep::qt_gui_rep (int &argc, char **argv):
 interrupted (false), waitWindow (NULL), popup_wid_time (0), q_translator (0),
 time_credit (100), do_check_events (false), updating (false), 

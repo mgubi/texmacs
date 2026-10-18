@@ -460,6 +460,15 @@
         (switch-to-buffer v)
         (check= now (colors (buffer-get-body v)))
         (buffer-close v)))
+    ;; an opening bracket whose closing one is MISSING at the end stays in
+    ;; the colour of errors after an edit of its line
+    (buffer-set-body u (stree->tree '(document "int main () {" "  return 0;")))
+    (switch-to-buffer u)
+    (let ((d (buffer-get-body u))
+          (errors (lambda (l) (list-filter l (lambda (r) (== (caddr r) "error"))))))
+      (check= (errors (tree-sitter-line-colors "c" (tree-ref d 0))) '((12 13 "error")))
+      (tree-insert! (tree-ref d 0) 6 "x")
+      (check= (errors (tree-sitter-line-colors "c" (tree-ref d 0))) '((13 14 "error"))))
     (buffer-close u)
     (when (buffer-exists? old) (switch-to-buffer old))))
 

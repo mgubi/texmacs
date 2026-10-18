@@ -182,8 +182,9 @@
         (if (not doc) '()
             (append
              (map (lambda (un)
+                    ;; (the diagnostics: placed as the server saw the blocks)
                     (list (lsp-path->uri (lsp-unit-path un)) (lsp-unit-lines un)
-                          (lambda (l o) (lsp-unit-path-of un l o))))
+                          (lambda (l o) (lsp-unit-path-of un l o 'synced))))
                   (lsp-units-of doc))
              (map (lambda (e) (list (lsp-path->uri (caddr e)) (car e)
                                     (lines-path (car e))))

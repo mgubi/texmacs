@@ -336,9 +336,20 @@
   (with old (ahash-ref decorated uri)
     (when old
       (for (x (ahash-table->list old))
-        (code-clear-line-layers (cadr x))))
+        (code-clear-line-layers (cadr x))
+        ;; (a line which is still in a document is typeset again)
+        (with p (tree->path (cadr x))
+          (when p (update-path p)))))
     (ahash-remove! decorated uri)
     (ahash-remove! decorated-buffers uri)))
+
+(tm-define (lsp-document-close c uri)
+  ;; (a document closed on its server, also a code block or a unit of a
+  ;; document which is closed or no longer followed: its lines lose their
+  ;; decorations)
+  (former c uri)
+  (when (ahash-ref decorated uri)
+    (lsp-forget-decorations uri)))
 
 (tm-define (notify-buffer-closed name)
   ;; (before the buffer goes: its lines lose their decorations)
