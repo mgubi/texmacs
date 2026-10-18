@@ -793,6 +793,9 @@
   (lsp-document-text lsp_document_text (string tree))
   (lsp-decorate-line lsp_decorate_line (void tree tree tree))
   (lsp-undecorate-line lsp_undecorate_line (void tree))
+  (lsp-fold-line lsp_fold_line (void tree bool))
+  (lsp-line-folded? lsp_line_folded (bool tree))
+  (lsp-fold-marker lsp_fold_marker (void tree string))
 
   ;; widgets
   (widget-printer printer_widget (widget command url))

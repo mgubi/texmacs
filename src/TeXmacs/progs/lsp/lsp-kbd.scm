@@ -15,7 +15,8 @@
 ;; kbd-variant); std . proposes the fixes, std F formats, std E renames,
 ;; std M lists the diagnostics (F2, the key of renames elsewhere, is taken),
 ;; std U the references of a symbol, std O the outline of the file, std P
-;; the symbols of the project, std H the calls of a function.
+;; the symbols of the project, std H the calls of a function, std ( and std )
+;; fold and unfold the block at the cursor.
 ;; NOTE: no A- keys: on macOS option composes a character (option q is
 ;; a ligature), and the key never reaches the editor.
 
@@ -25,7 +26,8 @@
         (lsp lsp-edit)
         (lsp lsp-actions)
         (lsp lsp-navigate)
-        (lsp lsp-decorate)))
+        (lsp lsp-decorate)
+        (lsp lsp-fold)))
 
 (tm-define (lsp-followed?)
   (:synopsis "Does a language server follow the current buffer?")
@@ -49,7 +51,9 @@
   ("std U" (lsp-references))
   ("std O" (lsp-outline))
   ("std P" (interactive lsp-find-symbol))
-  ("std H" (lsp-call-hierarchy)))
+  ("std H" (lsp-call-hierarchy))
+  ("std (" (lsp-fold))
+  ("std )" (lsp-unfold)))
 
 (menu-bind lsp-menu
   ((check "Follow source files" "v" (lsp-on?))
@@ -60,6 +64,11 @@
   ("Outline" (lsp-outline))
   ("Find symbol in project..." (interactive lsp-find-symbol))
   ("Calls" (lsp-call-hierarchy))
+  ---
+  ("Fold block" (lsp-fold))
+  ("Unfold block" (lsp-unfold))
+  ("Fold all" (lsp-fold-all))
+  ("Unfold all" (lsp-unfold-all))
   ("Information at cursor" (lsp-hover))
   ("Complete" (lsp-complete))
   ("Next diagnostic" (lsp-next-diagnostic #t))

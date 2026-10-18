@@ -66,3 +66,55 @@ lsp_line_decorations_of (tree line) {
   if (d == NULL || d->label != line->label) return NULL;
   return d;
 }
+
+/******************************************************************************
+* Folded lines
+******************************************************************************/
+
+// line -> its text when it was folded
+static hashmap<pointer,pointer> lsp_folded (NULL);
+
+void
+lsp_fold_line (tree line, bool folded) {
+  pointer key= (pointer) inside (line);
+  if (lsp_folded->contains (key)) {
+    tm_delete<string> ((string*) lsp_folded [key]);
+    lsp_folded->reset (key);
+  }
+  if (folded && is_atomic (line))
+    lsp_folded (key)= (pointer) tm_new<string> (line->label);
+}
+
+bool
+lsp_line_folded (tree line) {
+  if (N(lsp_folded) == 0 || !is_atomic (line)) return false;
+  pointer key= (pointer) inside (line);
+  if (!lsp_folded->contains (key)) return false;
+  return *((string*) lsp_folded [key]) == line->label;
+}
+
+// line -> (its text, its marker)
+static hashmap<pointer,pointer> lsp_markers (NULL);
+
+void
+lsp_fold_marker (tree line, string text) {
+  pointer key= (pointer) inside (line);
+  if (lsp_markers->contains (key)) {
+    tm_delete<array<string> > ((array<string>*) lsp_markers [key]);
+    lsp_markers->reset (key);
+  }
+  if (text != "" && is_atomic (line)) {
+    array<string>* m= tm_new<array<string> > ();
+    *m << line->label << text;
+    lsp_markers (key)= (pointer) m;
+  }
+}
+
+string
+lsp_fold_marker_of (tree line) {
+  if (N(lsp_markers) == 0 || !is_atomic (line)) return "";
+  pointer key= (pointer) inside (line);
+  if (!lsp_markers->contains (key)) return "";
+  array<string>& m= *((array<string>*) lsp_markers [key]);
+  return m[0] == line->label? m[1]: string ("");
+}

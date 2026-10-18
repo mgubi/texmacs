@@ -9515,6 +9515,49 @@ tmg_lsp_undecorate_line (tmscm arg1) {
 }
 
 tmscm
+tmg_lsp_fold_line (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "lsp-fold-line");
+  TMSCM_ASSERT_BOOL (arg2, TMSCM_ARG2, "lsp-fold-line");
+
+  tree in1= tmscm_to_tree (arg1);
+  bool in2= tmscm_to_bool (arg2);
+
+  // TMSCM_DEFER_INTS;
+  lsp_fold_line (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_lsp_line_foldedP (tmscm arg1) {
+  TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "lsp-line-folded?");
+
+  tree in1= tmscm_to_tree (arg1);
+
+  // TMSCM_DEFER_INTS;
+  bool out= lsp_line_folded (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return bool_to_tmscm (out);
+}
+
+tmscm
+tmg_lsp_fold_marker (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "lsp-fold-marker");
+  TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "lsp-fold-marker");
+
+  tree in1= tmscm_to_tree (arg1);
+  string in2= tmscm_to_string (arg2);
+
+  // TMSCM_DEFER_INTS;
+  lsp_fold_marker (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
 tmg_widget_printer (tmscm arg1, tmscm arg2) {
   TMSCM_ASSERT_COMMAND (arg1, TMSCM_ARG1, "widget-printer");
   TMSCM_ASSERT_URL (arg2, TMSCM_ARG2, "widget-printer");
@@ -12530,6 +12573,9 @@ initialize_glue_basic () {
   tmscm_install_procedure ("lsp-document-text",  tmg_lsp_document_text, 1, 0, 0);
   tmscm_install_procedure ("lsp-decorate-line",  tmg_lsp_decorate_line, 3, 0, 0);
   tmscm_install_procedure ("lsp-undecorate-line",  tmg_lsp_undecorate_line, 1, 0, 0);
+  tmscm_install_procedure ("lsp-fold-line",  tmg_lsp_fold_line, 2, 0, 0);
+  tmscm_install_procedure ("lsp-line-folded?",  tmg_lsp_line_foldedP, 1, 0, 0);
+  tmscm_install_procedure ("lsp-fold-marker",  tmg_lsp_fold_marker, 2, 0, 0);
   tmscm_install_procedure ("widget-printer",  tmg_widget_printer, 2, 0, 0);
   tmscm_install_procedure ("widget-color-picker",  tmg_widget_color_picker, 3, 0, 0);
   tmscm_install_procedure ("widget-extend",  tmg_widget_extend, 2, 0, 0);

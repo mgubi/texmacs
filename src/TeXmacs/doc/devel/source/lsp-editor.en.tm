@@ -273,6 +273,36 @@
   them; an edit removes all the alternative selections, and
   <scm|notify-buffer-changed> forgets them.
 
+  <section|Folding>
+
+  A fold changes what is shown, not the document.
+  <source-link|lsp-fold.scm|TeXmacs/progs/lsp/lsp-fold.scm> keeps the folds of
+  each buffer: the tree of the first line, the trees of the hidden lines,
+  and their texts. <scm|lsp-fold-line> (glue, <source-link|lsp_decorations.cpp|src/System/Language/lsp_decorations.cpp>)
+  marks a line as folded, with its text then; <cpp|typesetter_rep::insert_paragraph>
+  (<source-link|typesetter.cpp|src/Typeset/Bridge/typesetter.cpp>) does not
+  typeset a folded line whose text is still that one, so that its paragraph
+  is not in the page. <scm|lsp-fold-marker> gives the first line its marker,
+  typeset after the end of the line as the inlay hints
+  (<cpp|typeset_lsp_text>).
+
+  The blocks are the <verbatim|textDocument/foldingRange> of the server
+  (lines only, <scm|lsp-folding-ranges-of>); <scm|lsp-fold> folds the
+  innermost block at the cursor which is not folded yet
+  (<scm|lsp-innermost-range>), <scm|lsp-unfold> the innermost fold at the
+  cursor. After each change of the buffer (<scm|notify-buffer-changed>), a
+  fold whose lines are no longer next to its first line in the document
+  is dropped, and the lines whose texts have changed are marked again and
+  typeset again.
+
+  A cursor in a folded line has no box: <cpp|edit_cursor_rep> does not call
+  <scm|notify-cursor-moved> then, but <scm|lsp-cursor-in-fold> (<source-link|edit_cursor.cpp|src/Edit/Interface/edit_cursor.cpp>).
+  Both schedule a check (<scm|delayed>: the path of the cursor is not the
+  new one yet in <scm|notify-cursor-moved>), which keeps the last place of
+  the cursor outside the folds, and moves a cursor in a fold after it
+  (from the end of its first line), to the end of its first line (from the
+  start of the line after it), or opens the fold.
+
   <section|Colours and inlay hints>
 
   <source-link|lsp-decorate.scm|TeXmacs/progs/lsp/lsp-decorate.scm> asks the

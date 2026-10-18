@@ -226,6 +226,7 @@
     "references" (lsp-object)
     "documentHighlight" (lsp-object)
     "callHierarchy" (lsp-object)
+    "foldingRange" (lsp-object "lineFoldingOnly" (lsp-boolean #t))
     "documentSymbol" (lsp-object "hierarchicalDocumentSymbolSupport"
                                  (lsp-boolean #t))
     "semanticTokens"

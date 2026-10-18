@@ -54,6 +54,7 @@ class concater_rep {
                            struct lsp_line_decorations* d);
   void typeset_lsp_hints (struct lsp_line_decorations* d, path ip,
                           int from, int to);
+  void typeset_lsp_text (string text, path ip);
   void typeset_document (tree t, path ip);
   void typeset_paragraph (tree t, path ip);
   void typeset_surround (tree t, path ip);

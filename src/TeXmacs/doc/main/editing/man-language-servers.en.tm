@@ -208,6 +208,10 @@
     <item*|<menu|Information on mouse rest>>Whether the information about a
     symbol is shown when the mouse rests on it (see below).
 
+    <item*|<menu|Fold block>, <menu|Unfold block>, <menu|Fold all>,
+    <menu|Unfold all>>See \Pfolding\Q below; the first two are as
+    <key|std (> and <key|std )>.
+
     <item*|<menu|Highlight the symbol at the cursor>>Whether the uses of
     the symbol at the cursor are highlighted (see below).
 
@@ -313,6 +317,22 @@
   highlights go when the cursor leaves them or when you edit. This can be
   turned off in <menu|Tools|Language servers> (the preference
   <verbatim|lsp:highlight>).
+
+  <paragraph*|Folding>
+
+  <key|std (> folds the block at the cursor (the body of a function, a
+  class, a loop...: the blocks are those of the server): its first line
+  stays, ended by an ellipsis, and its other lines are no longer shown.
+  <key|std )> unfolds it; <menu|Tools|Language servers|Fold all> folds all
+  the blocks, and <menu|Unfold all> shows them again.
+
+  Folding changes only what is shown: the lines stay in the file, which is
+  saved, searched, undone and given to the server as usual. The cursor
+  does not stay in a folded block: moving right at the end of its first
+  line goes after it, moving left at the start of the line after it goes
+  back to its first line, and a block where the cursor comes otherwise (a
+  search, a definition, a diagnostic) opens. A block whose lines are
+  removed or moved by an edit opens too.
 
   <paragraph*|Colours and inlay hints>
 

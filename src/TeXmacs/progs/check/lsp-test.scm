@@ -33,7 +33,8 @@
         (lsp lsp-actions)
         (lsp lsp-kbd)
         (lsp lsp-navigate)
-        (lsp lsp-decorate)))
+        (lsp lsp-decorate)
+        (lsp lsp-fold)))
 
 (define events '())
 
@@ -428,6 +429,16 @@
                                   "end" (lsp-object "line" (lsp-number line)
                                                     "character" (lsp-number 9)))
               "children" (lsp-list->array children)))
+
+(define (test-folding-ranges)
+  (check-group "folding ranges")
+  (with fr (lambda (a b) (lsp-object "startLine" (lsp-number a)
+                                     "endLine" (lsp-number b)))
+    (check= (lsp-folding-ranges-of (lsp-array (fr 0 4) (fr 2 2) (fr 1 3)))
+            '((0 4) (1 3))))
+  (check= (lsp-innermost-range '((0 9) (2 5) (3 4)) 4) '(3 4))
+  (check= (lsp-innermost-range '((0 9) (2 5)) 6) '(0 9))
+  (check= (lsp-innermost-range '((2 5)) 7) #f))
 
 (define (test-outline)
   (check-group "outline")
@@ -1097,6 +1108,19 @@
       (lsp-wait c (lambda () (nnull? (lsp-highlights))) 10000)
       (check= (length (lsp-highlights)) 3)
       (check= (car (lsp-highlights)) '(0 6 0 11))
+      ;; folding the block of main: its lines stay in the document, but
+      ;; are not shown; the cursor which comes in opens it
+      (with text (lsp-buffer-text)
+        (go-to-path (append (buffer-path) '(2 2)))
+        (lsp-fold)
+        (check= (lsp-folds) '((1 3)))
+        (check-true (lsp-line-folded? (tree-ref (buffer-tree) 2)))
+        (check-false (lsp-line-folded? (tree-ref (buffer-tree) 1)))
+        (check= (cursor-rel) '(1 13))
+        (check= (lsp-buffer-text) text)
+        (lsp-unfold)
+        (check= (lsp-folds) '())
+        (check-false (lsp-line-folded? (tree-ref (buffer-tree) 2))))
       ;; the symbols of the project, the calls of twice
       (lsp-find-symbol "twice")
       (with page (current-buffer)
@@ -1188,6 +1212,7 @@
   (test-diagnostics-state)
   (test-sync-options)
   (test-outline)
+  (test-folding-ranges)
   (test-decorations)
   (test-requests)
   (test-server-requests)

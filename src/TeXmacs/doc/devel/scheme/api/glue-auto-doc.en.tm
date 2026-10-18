@@ -5611,6 +5611,30 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(lsp-fold-line <scm-arg|tree> <scm-arg|bool>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|lsp_fold_line> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(lsp-line-folded? <scm-arg|tree>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|lsp_line_folded> which returns
+    <scm|bool>.
+  </explain>
+
+  <\explain>
+    <scm|(lsp-fold-marker <scm-arg|tree> <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|lsp_fold_marker> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
     <scm|(widget-printer <scm-arg|command> <scm-arg|url>)>
 <explain-synopsis|no synopsis>
   <|explain>

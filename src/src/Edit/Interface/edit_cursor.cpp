@@ -10,11 +10,22 @@
 ******************************************************************************/
 
 #include "edit_cursor.hpp"
+#include "lsp_decorations.hpp"
 #include "iterator.hpp"
 #include "tm_buffer.hpp"
 #include "tree_traverse.hpp"
 #include "drd_mode.hpp"
 #include "analyze.hpp"
+
+static void
+notify_cursor_in_fold (tree et, path tp) {
+  // the cursor has no box: if it is in a line which a language server has
+  // folded, the fold is told (it moves the cursor, or opens)
+  if (is_nil (tp) || is_nil (path_up (tp)) || !has_subtree (et, path_up (tp)))
+    return;
+  if (lsp_line_folded (subtree (et, path_up (tp))))
+    call ("lsp-cursor-in-fold");
+}
 
 /******************************************************************************
 * Constructor and destructor
@@ -221,6 +232,7 @@ edit_cursor_rep::notify_cursor_moved (int status) {
   cu= eb->find_check_cursor (tp);
   notify_change (THE_CURSOR);
   if (cu->valid) call ("notify-cursor-moved", object (status));
+  else notify_cursor_in_fold (et, tp);
 }
 
 void
@@ -441,6 +453,7 @@ edit_cursor_rep::go_to_here () {
   }
   notify_change (THE_CURSOR);
   if (cu->valid) call ("notify-cursor-moved", object (DIRECT));
+  else notify_cursor_in_fold (et, tp);
 }
 
 void
@@ -465,6 +478,7 @@ edit_cursor_rep::go_to (path p) {
     else
       notify_change (THE_CURSOR);
     if (cu->valid) call ("notify-cursor-moved", object (DIRECT));
+    else notify_cursor_in_fold (et, tp);
   }
 }
 

@@ -180,7 +180,8 @@ void
 concater_rep::typeset_prog_string (tree t, path ip, int pos, int end) {
   // (a line which a language server has decorated: see below)
   lsp_line_decorations* d= lsp_line_decorations_of (t);
-  if (d != NULL) { typeset_lsp_string (t, ip, pos, end, d); return; }
+  if (d != NULL || lsp_fold_marker_of (t) != "") {
+    typeset_lsp_string (t, ip, pos, end, d); return; }
   array<space> spc_tab= env->fn->get_normal_spacing (env->spacing_policy);
   string s= t->label;
   int    start;
@@ -219,25 +220,30 @@ concater_rep::typeset_prog_string (tree t, path ip, int pos, int end) {
 ******************************************************************************/
 
 void
+concater_rep::typeset_lsp_text (string h, path ip) {
+  // a text which is not part of the document, in grey; its spaces are
+  // spaces (a space of the text of a program would be shown as a visible
+  // space)
+  color c= named_color ("#909090", env->alpha);
+  int i= 0, n= N(h);
+  while (i < n) {
+    if (h[i] == ' ') { print (env->fn->spc); i++; continue; }
+    int j= i;
+    while (j < n && h[j] != ' ') j++;
+    box b= text_box (decorate (ip), 0, h (i, j), env->fn, c);
+    a << line_item (STRING_ITEM, OP_SKIP, b, HYPH_INVALID, env->lan);
+    i= j;
+  }
+}
+
+void
 concater_rep::typeset_lsp_hints (lsp_line_decorations* d, path ip,
                                  int from, int to) {
   // the hints before the characters from to to (excluded)
+  if (d == NULL) return;
   for (int i=0; i<N(d->hint_pos); i++)
-    if (d->hint_pos[i] >= from && d->hint_pos[i] < to) {
-      // (the spaces around a hint, its paddings, are spaces: a space of
-      // the text of a program would be shown as a visible space)
-      string h= d->hint_text[i];
-      int b0= 0, e0= N(h);
-      while (b0 < e0 && h[b0] == ' ') b0++;
-      while (e0 > b0 && h[e0-1] == ' ') e0--;
-      if (b0 > 0) print (env->fn->spc);
-      if (b0 < e0) {
-        color c= named_color ("#909090", env->alpha);
-        box b= text_box (decorate (ip), 0, h (b0, e0), env->fn, c);
-        a << line_item (STRING_ITEM, OP_SKIP, b, HYPH_INVALID, env->lan);
-      }
-      if (e0 < N(h)) print (env->fn->spc);
-    }
+    if (d->hint_pos[i] >= from && d->hint_pos[i] < to)
+      typeset_lsp_text (d->hint_text[i], ip);
 }
 
 void
@@ -267,6 +273,10 @@ concater_rep::typeset_lsp_string (tree t, path ip, int pos, int end,
       PRINT_SPACE (tp->spc_before)
       string color= env->lan->get_color (t, start, pos);
       int i= start;
+      if (d == NULL) {  // (a marker of a fold only)
+        typeset_colored_substring (s (start, pos), ip, start, color);
+        i= pos;
+      }
       while (i < pos) {
         // the piece from i: up to the next start or end of a coloured
         // piece, with its colour if one covers i
@@ -284,8 +294,12 @@ concater_rep::typeset_lsp_string (tree t, path ip, int pos, int end,
       PRINT_SPACE (tp->spc_after)
     }
   } while (pos<end);
-  // the hints at the end of the line
-  if (end == N(s)) typeset_lsp_hints (d, ip, N(s), N(s) + 1);
+  // the hints at the end of the line, then the marker of a fold
+  if (end == N(s)) {
+    typeset_lsp_hints (d, ip, N(s), N(s) + 1);
+    string m= lsp_fold_marker_of (t);
+    if (m != "") typeset_lsp_text (m, ip);
+  }
 }
 
 /******************************************************************************
