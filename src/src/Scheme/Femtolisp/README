@@ -88,6 +88,9 @@ The patches
 0024  on macOS the jumps of the errors save and restore no signal mask
       (_setjmp, _longjmp): a system call less at each call from C, a fifth
       of the time of the scanners of tree-sitter
+0025  the GC handles grow (1024 before: a recursion through map failed past
+      500 levels), and a call from C within 512 KB of the end of the stack
+      of C is a stack overflow error rather than a crash
 
 The patches which change system.lsp or compiler.lsp regenerate flisp.boot.
 
