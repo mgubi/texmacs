@@ -22,6 +22,7 @@ int    tree_sitter_query_new (int language, string source);
 array<string> tree_sitter_query_capture_names (int query);
 array<int>    tree_sitter_query_captures (int query, string text);
 bool tree_sitter_set_scanner (int language, object scanner);
+bool tree_sitter_unpack (url from, url to);
 int  tree_sitter_lexer_lookahead ();
 void tree_sitter_lexer_advance (bool skip);
 void tree_sitter_lexer_mark_end ();

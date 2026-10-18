@@ -9264,6 +9264,21 @@ tmg_tree_sitter_set_scanner (tmscm arg1, tmscm arg2) {
 }
 
 tmscm
+tmg_tree_sitter_unpack (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "tree-sitter-unpack");
+  TMSCM_ASSERT_URL (arg2, TMSCM_ARG2, "tree-sitter-unpack");
+
+  url in1= tmscm_to_url (arg1);
+  url in2= tmscm_to_url (arg2);
+
+  // TMSCM_DEFER_INTS;
+  bool out= tree_sitter_unpack (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return bool_to_tmscm (out);
+}
+
+tmscm
 tmg_tree_sitter_lexer_lookahead () {
   // TMSCM_DEFER_INTS;
   int out= tree_sitter_lexer_lookahead ();
@@ -12830,6 +12845,7 @@ initialize_glue_basic () {
   tmscm_install_procedure ("tree-sitter-wrap-language",  tmg_tree_sitter_wrap_language, 1, 0, 0);
   tmscm_install_procedure ("tree-sitter-program-language",  tmg_tree_sitter_program_language, 1, 0, 0);
   tmscm_install_procedure ("tree-sitter-set-scanner",  tmg_tree_sitter_set_scanner, 2, 0, 0);
+  tmscm_install_procedure ("tree-sitter-unpack",  tmg_tree_sitter_unpack, 2, 0, 0);
   tmscm_install_procedure ("tree-sitter-lexer-lookahead",  tmg_tree_sitter_lexer_lookahead, 0, 0, 0);
   tmscm_install_procedure ("tree-sitter-lexer-advance",  tmg_tree_sitter_lexer_advance, 1, 0, 0);
   tmscm_install_procedure ("tree-sitter-lexer-mark-end",  tmg_tree_sitter_lexer_mark_end, 0, 0, 0);

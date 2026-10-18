@@ -88,6 +88,38 @@
     file))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Shipped tables
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; The tables of the grammars which take too long to generate (Lean: a
+;; minute and gigabytes) are shipped, compressed by xz, as
+;; misc/tree-sitter/<lan>/<name of the cache file>.xz: the name holds the
+;; hash of the grammar and of the generator, so tables which do not match
+;; them are not used (the language is then generated). They are made by
+;; misc/tree-sitter/ship-tables.sh.
+
+(define-public (treesit-shipped-url lan)
+  (url-append (url-concretize (string-append "$TEXMACS_PATH/misc/tree-sitter/" lan))
+              (string-append (url->string (url-tail (treesit-cache-url lan))) ".xz")))
+
+(define (unpack-shipped lan)
+  ;; the shipped tables of lan into the cache; whether there were some
+  (let ((from (treesit-shipped-url lan)))
+    (and (url-exists? from)
+         (defined? 'tree-sitter-unpack)
+         (let* ((file (treesit-cache-url lan))
+                (tmp (url-glue file ".part")))
+           (system-mkdir (cache-dir))
+           (and (tree-sitter-unpack from tmp)
+                (begin (system-move tmp file) #t))))))
+
+(define-public (treesit-cached? lan)
+  ;; whether the tables of lan are in the cache, after unpacking the
+  ;; shipped ones if needed
+  (or (url-exists? (treesit-cache-url lan))
+      (unpack-shipped lan)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Loaded languages
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -99,7 +131,7 @@
   ;; when they are not in the cache, they start to be generated
   (cond ((ahash-ref loaded lan) => identity)
         ((not (treesit-supported? lan)) #f)
-        ((url-exists? (treesit-cache-url lan))
+        ((treesit-cached? lan)
          (let ((id (tree-sitter-language-load (treesit-cache-url lan)))
                (scanner (assoc-ref treesit-scanners lan)))
            (and (>= id 0)
@@ -125,7 +157,7 @@
   ;; index of the language (or #f if the generation failed)
   (cond ((treesit-language-loaded lan) => cont)
         ((not (treesit-supported? lan)) (cont #f))
-        ((url-exists? (treesit-cache-url lan)) (cont (treesit-language lan)))
+        ((treesit-cached? lan) (cont (treesit-language lan)))
         ((ahash-ref generating lan)
          (ahash-set! generating lan (cons cont (ahash-ref generating lan))))
         (else

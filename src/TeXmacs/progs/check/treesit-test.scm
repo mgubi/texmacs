@@ -534,7 +534,7 @@
     ;; indentation: the indentation of each line of a program, computed
     (let ((indents
            (lambda (lan lines)
-             (treesit-generate-cache lan)
+             (unless (treesit-cached? lan) (treesit-generate-cache lan))
              (let ((id (treesit-language lan))
                    (d (stree->tree (cons 'document lines))))
                (map (lambda (row) (syntax-language-indentation d row lan id 4))
@@ -569,7 +569,7 @@
       (check= (indents "lua" '("function f(x)" "    if x then" "        g()" "    else"
                                "        h()" "    end" "end"))
               '(0 4 8 4 8 4 0))
-      (when (url-exists? (treesit-cache-url "lean"))
+      (when (treesit-cached? "lean")
         (check= (indents "lean" '("def f (x : Nat) : Nat := by" "  simp" ""))
                 '(0 4 4)))
       (let ((outline (lambda (lan lines)
@@ -582,7 +582,7 @@
                 '(("class" "S") ("function" "f")))
         (check= (outline "lua" '("function f() end" "local function g() end"))
                 '(("function" "f") ("function" "g")))
-        (when (url-exists? (treesit-cache-url "lean"))
+        (when (treesit-cached? "lean")
           (check= (outline "lean" '("theorem t : True := trivial" "def f := 1"))
                   '(("theorem" "t") ("function" "f"))))))
     ;; the formats of the source files
@@ -602,7 +602,7 @@
                     '(0 4 0))))))
     ;; the definitions (tags.scm)
     (let ((outline (lambda (lan lines)
-                     (treesit-generate-cache lan)
+                     (unless (treesit-cached? lan) (treesit-generate-cache lan))
                      (map (lambda (d) (list (car d) (cadr d) (caddr d)))
                           (syntax-outline (stree->tree (cons 'document lines)) lan
                                           (treesit-language lan))))))
@@ -766,9 +766,18 @@
     (treesit-generate-cache "lua")
     (check= (tree-sitter-parse-sexp (treesit-language "lua") "local s = [[a]] --[[ c ]]\nprint(s)\n")
             "(chunk local_declaration: (variable_declaration (assignment_statement (variable_list name: (identifier)) (expression_list value: (string content: (string_content))))) (comment content: (comment_content)) (function_call name: (identifier) arguments: (arguments (identifier))))")
-    ;; (Lean only when its tables are there: making them takes a minute and
-    ;; gigabytes, see doc/tree-sitter.md)
-    (when (url-exists? (treesit-cache-url "lean"))
+    ;; Lean: its tables are shipped (making them takes a minute and
+    ;; gigabytes); those of the present grammar and generator must be there
+    (check-true (url-exists? (treesit-shipped-url "lean")))
+    (when (url-exists? (treesit-shipped-url "lean"))
+      (let ((tmp (url-temp)))
+        (check-true (tree-sitter-unpack (treesit-shipped-url "lean") tmp))
+        (check-true (string-starts? (string-load tmp) "tsdyn1"))
+        (system-remove tmp)))
+    ;; and a file which is not compressed by xz is refused
+    (let ((tmp (url-temp)))
+      (check-false (tree-sitter-unpack (treesit-grammar-url "lean") tmp)))
+    (when (treesit-cached? "lean")
       (check= (tree-sitter-parse-sexp (treesit-language "lean") "def f (x : Nat) : Nat := by\n  simp\n")
               "(module (declaration (def name: (identifier) (binders (explicit_binder name: (identifier) type: (identifier))) type: (identifier) body: (by stmt: (identifier)))))"))
     ;; Java, without scanner

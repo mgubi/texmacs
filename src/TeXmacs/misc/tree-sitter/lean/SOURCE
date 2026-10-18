@@ -1,3 +1,4 @@
 src/grammar.json and queries/highlights.scm of https://github.com/Julian/tree-sitter-lean.git
 (commit 916c44f4d89c970f66dd34a49e7ce848f4d29e72), with its LICENSE.
 tags.scm is written for TeXmacs.
+lean-<hash>.tsdyn.xz: its tables, made by misc/tree-sitter/ship-tables.sh.

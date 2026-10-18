@@ -757,6 +757,7 @@
   (tree-sitter-wrap-language tree_sitter_wrap_language (void string))
   (tree-sitter-program-language tree_sitter_program_language (int string))
   (tree-sitter-set-scanner tree_sitter_set_scanner (bool int object))
+  (tree-sitter-unpack tree_sitter_unpack (bool url url))
   (tree-sitter-lexer-lookahead tree_sitter_lexer_lookahead (int))
   (tree-sitter-lexer-advance tree_sitter_lexer_advance (void bool))
   (tree-sitter-lexer-mark-end tree_sitter_lexer_mark_end (void))

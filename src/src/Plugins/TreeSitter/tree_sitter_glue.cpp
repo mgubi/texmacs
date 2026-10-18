@@ -388,6 +388,21 @@ scanner_deserialize (void* payload, const char* buffer, unsigned length) {
 }
 
 bool
+tree_sitter_unpack (url from, url to) {
+  // write to the content of the xz file from (the tables shipped with
+  // TeXmacs, see progs/treesit/ts-registry.scm)
+  string s;
+  if (load_string (from, s, false)) return false;
+  c_string cs (s);
+  unsigned char* out= NULL;
+  long n= ts_xz_decompress ((const unsigned char*) (const char*) cs, (size_t) N(s), &out);
+  if (n < 0) return false;
+  string r ((char*) out, (int) n);
+  free (out);
+  return !save_string (to, r, false);
+}
+
+bool
 tree_sitter_set_scanner (int language, object scanner) {
   // give a Scheme scanner to a language (before its first parse)
   if (language < 0 || language >= N(ts_languages)) return false;

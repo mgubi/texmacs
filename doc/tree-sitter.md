@@ -844,6 +844,29 @@ Done in part (2026-10-17):
   6.9), 68 s; the tables of the 14 grammars are byte-identical. With
   `TS_PROFILE`, each stage also prints the peak resident memory and the
   memory in use.
+- **Shipped tables for Lean** (same day). Generating all the tables at the
+  first start would take 77 s (S7) or 83 s (femtolisp) and 4.8 GB, of which
+  Lean 65-70 s; the 13 others take 12 s together. The tables of Lean are
+  therefore shipped: `misc/tree-sitter/lean/<name of the cache file>.xz`,
+  214 KB (10 MB uncompressed; gzip would give 1.8 MB). When the cache lacks
+  a language, `treesit-cached?` unpacks its shipped tables into the cache
+  (glue `tree-sitter-unpack`, through the xz decoder of XZ Embedded, 0BSD,
+  vendored in `Plugins/TreeSitter/xz` and compiled as `ts_xz.c`): Lean is
+  ready in 140 ms instead of a minute. The name holds the hash of the
+  grammar and of the generator, so tables which no longer match are not
+  used and the language is generated as before;
+  `misc/tree-sitter/ship-tables.sh LANGUAGE...` makes them again, and the
+  treesit suite fails while they are missing. All the 14 grammars would
+  take 1.0 MB with xz (31.7 MB uncompressed).
+- Tried and dropped (same day): merging the states of the same core while
+  they are built (Pager's weak compatibility). Lean then took 2 s and 290 MB,
+  but the tables were nearly LALR (one state per core, 2399 for Lean against
+  10243) and the corpora failed (bash 66 of 100, javascript 42, julia 30,
+  lean 13...): a merged state accepts the tokens of all its parts, which
+  changes the lexing and what the external scanners see, and takes the
+  resolution of the conflicts of either part. tree-sitter refuses such
+  merges after the construction, when the states are complete; doing it
+  during the construction would need an IELR(1)-like analysis.
 - **One list of the program languages** (2026-10-18):
   `kernel/texmacs/tm-program-languages.scm` lists each program language with
   its menu label, its inline and block tags, its grammar, its line comment

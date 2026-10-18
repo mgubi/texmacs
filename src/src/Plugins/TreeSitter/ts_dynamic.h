@@ -27,6 +27,10 @@ void tsdyn_language_delete (const TSLanguage *language);
 
 #define TSDYN_MAX_LANGUAGES 32
 
+/* The content of an xz stream (ts_xz.c): its length and the bytes in *out,
+   allocated with malloc, or -1 when the stream is not valid. */
+long ts_xz_decompress (const unsigned char *in, size_t n, unsigned char **out);
+
 #ifdef __cplusplus
 }
 #endif

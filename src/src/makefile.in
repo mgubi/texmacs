@@ -179,7 +179,7 @@ make_c_deps = $(patsubst %.c,Objects/%.o,$(notdir $(1)))
 texmacs_c_deps := $(call make_c_deps, $(call findc_in,System,Misc))
 # the runtime of tree-sitter (vendored in Plugins/TreeSitter/tree-sitter, one
 # unit) and the languages made from the tables of progs/treesit
-treesitter_c_deps := Objects/tree_sitter_lib.o Objects/ts_dynamic.o
+treesitter_c_deps := Objects/tree_sitter_lib.o Objects/ts_dynamic.o Objects/ts_xz.o
 texmacs_c_deps += $(call make_c_deps, $(pdf_c_src))
 # all dependency files; the "deps" target below and the include of the
 # dependency files rely on this variable
