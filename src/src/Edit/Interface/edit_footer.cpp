@@ -117,6 +117,7 @@ edit_interface_rep::compute_text_footer (tree st) {
   r= st->label (start, end);
   if (r == "") r= "start";
   if (r == " ") r= "space";
+  if (r == "<#9>") r= "tab";   // (a tab of a source file)
   if (r == "space" && get_env_string (MODE) == "math") r= "apply";
   if (starts (r, "<") && !starts (r, "<#"))
     if (cork_to_utf8 (r) != r)

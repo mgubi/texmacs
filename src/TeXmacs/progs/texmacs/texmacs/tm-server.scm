@@ -136,14 +136,25 @@
             (init-env "prog-font" font)
             (when (not modified?) (buffer-pretend-saved u))))))))
 
+(define (notify-code-tab-width var val)
+  ;; (the open source files take the new width, as the font)
+  (with w (if (string->number val) val "8")
+    (for (u (buffer-list))
+      (with-buffer u
+        (when (and (== (get-style-list) '("code"))
+                   (!= (get-init "prog-tab-width") w))
+          (with modified? (buffer-modified? u)
+            (init-env "prog-tab-width" w)
+            (when (not modified?) (buffer-pretend-saved u))))))))
+
 (define-preferences
   ("profile" "beginner" (lambda args (noop)))
   ("editor:code font" "Inconsolatazi4" notify-code-font)
-  ;; the columns between the tab stops of source files, when they are
-  ;; opened (prog-tab-width), and the indentation of the new lines of the
+  ;; the columns between the tab stops of source files (prog-tab-width,
+  ;; also those which are open), and the indentation of the new lines of the
   ;; files which have none yet (a file indented by tabs or by spaces keeps
   ;; its own, source-indent: prog-edit.scm)
-  ("editor:code tab width" "8" noop)
+  ("editor:code tab width" "8" notify-code-tab-width)
   ("editor:code indent" "spaces" noop)
   ("look and feel" "default" notify-look-and-feel)
   ("case sensitive shortcuts" "default" noop)

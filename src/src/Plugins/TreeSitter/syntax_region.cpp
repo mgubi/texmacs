@@ -20,6 +20,7 @@
 #include <string.h>
 #include <algorithm>
 #include <vector>
+#include <string>
 
 const TSLanguage* tree_sitter_get_language (int language);
 void tree_sitter_query_run (int query, TSNode root, const char* text,
@@ -115,6 +116,8 @@ struct syntax_region_rep {
   int ind_query, ind_version;  // the captures below are for these
   ts_node_captures ind_caps;   // of the query of indentation
   std::vector<struct injected_tree> injected;   // see below
+  std::string text;            // the lines with their newlines, when
+  int text_version;            // it is that of this version (else -1)
 };
 
 // the tree of a part of a region in another language (an injection), kept
@@ -293,23 +296,52 @@ segment (array<string>& lines, int a, int b) {
   return s;
 }
 
+static inline bool
+same_line (string& x, string& y) {
+  // (the strings of the lines which did not change are those of the
+  // document: compared by their address first)
+  return x.operator-> () == y.operator-> () || x == y;
+}
+
+static string
+line_string (tree t) {
+  if (is_atomic (t)) return t->label;
+  string s; flatten (t, s); return s;
+}
+
+static const std::string&
+region_text (syntax_region_rep* r) {
+  // the text of the lines, made again only after a parse which did not
+  // keep it up to date (a keystroke changes it in place: update_lines; it
+  // is given to the queries as it is, without a copy)
+  if (r->text_version != r->version) {
+    std::string text;
+    text.reserve (max (r->offsets[N(r->lines)], 0));
+    for (int i= 0; i < N(r->lines); i++) {
+      if (i > 0) text += '\n';
+      text.append (&(r->lines[i][0]), N(r->lines[i]));
+    }
+    r->text.swap (text);
+    r->text_version= r->version;
+  }
+  return r->text;
+}
+
 static void
-region_update (syntax_region_rep* r) {
-  array<string> cur= region_lines (r->root);
+update_lines (syntax_region_rep* r, int a, int b, array<string> mid) {
+  // the lines a..n0-b-1 of the region are now mid: the tree is edited and
+  // parsed again; the lines, their offsets, the text and the colours are
+  // changed in place when the number of the lines stays (a keystroke),
+  // else made again
   array<string>& old= r->lines;
-  int n0= N(old), n1= N(cur);
-  // (the common first and last lines, as for the language servers, see
-  // System/Language/code_regions.cpp)
-  int a, b;
-  if (!code_lines_common (old, cur, a, b)) return;
+  int n0= N(old), m= N(mid), n1= a + m + b;
   // the changed lines, with the newlines which follow them (a virtual
   // newline after the last line, the same in both texts)
-  string os= segment (old, a, n0 - b), ns= segment (cur, a, n1 - b);
+  string os= segment (old, a, n0 - b), ns= segment (mid, 0, m);
   int p= 0;
   while (p < N(os) && p < N(ns) && os[p] == ns[p]) p++;
   int s= 0;
   while (s < N(os) - p && s < N(ns) - p && os[N(os)-1-s] == ns[N(ns)-1-s]) s++;
-  array<int> new_offsets= line_offsets (cur);
   int base= r->offsets[a];
   int start= base + p, old_end= base + N(os) - s, new_end= base + N(ns) - s;
   TSInputEdit e;
@@ -318,25 +350,51 @@ region_update (syntax_region_rep* r) {
   e.new_end_byte= (uint32_t) new_end;
   e.start_point= point_of (r->offsets, start);
   e.old_end_point= point_of (r->offsets, old_end);
-  e.new_end_point= point_of (new_offsets, new_end);
+  bool text_ok= r->text_version == r->version && old_end <= (int) r->text.size ();
+  string mid_text= ns (p, N(ns) - s);
+  if (n1 == n0) {
+    int delta= N(ns) - N(os);
+    for (int i= 0; i < m; i++) old[a + i]= mid[i];
+    for (int i= a; i < a + m; i++) r->offsets[i+1]= r->offsets[i] + N(old[i]) + 1;
+    for (int i= a + m + 1; i <= n0; i++) r->offsets[i] += delta;
+  }
+  else {
+    array<string> cur;
+    for (int i= 0; i < a; i++) cur << old[i];
+    for (int i= 0; i < m; i++) cur << mid[i];
+    for (int i= n0 - b; i < n0; i++) cur << old[i];
+    r->lines= cur;
+    r->offsets= line_offsets (cur);
+  }
+  e.new_end_point= point_of (r->offsets, new_end);
   ts_tree_edit (r->tree, &e);
   array<int> inj_changed, inj_parts;
-  edit_injected (r, start, old_end, new_end, ns (p, N(ns) - s),
-                 inj_changed, inj_parts);
-  r->lines= cur;
-  r->offsets= new_offsets;
+  edit_injected (r, start, old_end, new_end, mid_text, inj_changed, inj_parts);
+  if (text_ok)
+    r->text.replace (start, old_end - start, &(mid_text[0]), N(mid_text));
   TSTree* old_tree= ts_tree_copy (r->tree);
   region_parse (r, r->tree);
+  if (text_ok) r->text_version= r->version;
   r->incremental_parses++;
   // the colours: those of the unchanged lines are kept, the changed lines
   // and those where the syntax changed (a comment opened above them...)
   // are out of date
   if (N(r->hl_cols) == n0) {
-    array<array<int> > cols;
-    array<bool> dirty;
-    for (int i= 0; i < a; i++) { cols << r->hl_cols[i]; dirty << r->hl_dirty[i]; }
-    for (int i= a; i < n1 - b; i++) { cols << array<int> (); dirty << true; }
-    for (int i= n0 - b; i < n0; i++) { cols << r->hl_cols[i]; dirty << r->hl_dirty[i]; }
+    if (n1 == n0)
+      for (int i= a; i < a + m; i++) {
+        r->hl_cols[i]= array<int> ();
+        r->hl_dirty[i]= true;
+      }
+    else {
+      array<array<int> > cols;
+      array<bool> dirty;
+      for (int i= 0; i < a; i++) { cols << r->hl_cols[i]; dirty << r->hl_dirty[i]; }
+      for (int i= 0; i < m; i++) { cols << array<int> (); dirty << true; }
+      for (int i= n0 - b; i < n0; i++) { cols << r->hl_cols[i]; dirty << r->hl_dirty[i]; }
+      r->hl_cols= cols;
+      r->hl_dirty= dirty;
+    }
+    array<bool>& dirty= r->hl_dirty;
     uint32_t count;
     TSRange* ranges= ts_tree_get_changed_ranges (old_tree, r->tree, &count);
     for (uint32_t k= 0; k < count; k++) {
@@ -354,14 +412,39 @@ region_update (syntax_region_rep* r) {
     }
     free (ranges);
     for (int j= 0; j + 1 < N(inj_changed); j += 2) {
-      int r1= (int) point_of (new_offsets, inj_changed[j]).row;
-      int r2= min ((int) point_of (new_offsets, inj_changed[j+1]).row, n1 - 1);
+      int r1= (int) point_of (r->offsets, inj_changed[j]).row;
+      int r2= min ((int) point_of (r->offsets, inj_changed[j+1]).row, n1 - 1);
       for (int i= max (r1, 0); i <= r2; i++) dirty[i]= true;
     }
-    r->hl_cols= cols;
-    r->hl_dirty= dirty;
   }
   ts_tree_delete (old_tree);
+}
+
+static void
+region_update (syntax_region_rep* r) {
+  tree root= r->root;
+  int n0= N(r->lines);
+  if (is_document (root) && N(root) == n0) {
+    // (a keystroke: the lines which changed, without a list of all of
+    // them)
+    int a= 0;
+    while (a < n0 && is_atomic (root[a]) && same_line (r->lines[a], root[a]->label)) a++;
+    if (a == n0) return;
+    int b= 0;
+    while (b < n0 - a && is_atomic (root[n0-1-b]) &&
+           same_line (r->lines[n0-1-b], root[n0-1-b]->label)) b++;
+    array<string> mid;
+    for (int i= a; i < n0 - b; i++) mid << line_string (root[i]);
+    update_lines (r, a, b, mid);
+    return;
+  }
+  array<string> cur= region_lines (root);
+  int n1= N(cur);
+  // (the common first and last lines, as for the language servers, see
+  // System/Language/code_regions.cpp)
+  int a, b;
+  if (!code_lines_common (r->lines, cur, a, b)) return;
+  update_lines (r, a, b, range (cur, a, n1 - b));
 }
 
 static void
@@ -414,6 +497,7 @@ get_region (tree root, int language) {
   r->ind_version= -1;
   r->hl_injections= -1;
   r->hl_epoch= -1;
+  r->text_version= -1;
   ts_parser_set_language (r->parser, lang);
   region_parse (r, NULL);
   int total= region_bytes (r);
@@ -573,13 +657,9 @@ syntax_region_captures (tree root, int language, int query) {
   syntax_region_rep* r= get_region (root, language);
   array<object> l;
   if (r == NULL) return as_list_object (l);
-  string text;
-  for (int i= 0; i < N(r->lines); i++) {
-    if (i > 0) text << "\n";
-    text << r->lines[i];
-  }
+  const std::string& text= region_text (r);
   array<int> caps;
-  c_string ctext (text);
+  const char* ctext= text.c_str ();
   tree_sitter_query_run (query, ts_tree_root_node (r->tree), ctext, caps);
   for (int i= 0; i + 2 < N(caps); i += 3)
     l << list_object (object (caps[i+2]),
@@ -726,29 +806,34 @@ paint_unmatched (TSNode n, array<int>& paint, int from, int to, int code) {
   // paint in the colour code the brackets which error recovery left
   // unmatched: those directly in an ERROR node, and the opening bracket of
   // a node where a closing one is MISSING (only the nodes with errors are
-  // visited)
+  // visited, and of their children those from the bytes from to to: a
+  // cursor goes to the first one, ts_node_child would count them all)
   if (!ts_node_has_error (n)) return;
   if ((int) ts_node_end_byte (n) < from || (int) ts_node_start_byte (n) > to) return;
   bool err= ts_node_is_error (n);
-  uint32_t k= ts_node_child_count (n);
-  for (uint32_t i= 0; i < k; i++) {
-    TSNode c= ts_node_child (n, i);
-    const char* type= ts_node_type (c);
-    if (ts_node_is_missing (c) && bracket_type (type)) {
-      char open= opening_bracket (type[0]);
-      for (uint32_t j= 0; j < i && open != '\0'; j++) {
-        TSNode o= ts_node_child (n, j);
-        const char* t= ts_node_type (o);
-        if (!ts_node_is_named (o) && t[0] == open && t[1] == '\0') {
-          paint_node (o, paint, from, to, code);
-          break;
+  TSTreeCursor c= ts_tree_cursor_new (n);
+  // (a MISSING node has no width: one which ends at from is there too)
+  if (ts_tree_cursor_goto_first_child_for_byte (&c, (uint32_t) max (from - 1, 0)) >= 0)
+    do {
+      TSNode ch= ts_tree_cursor_current_node (&c);
+      if ((int) ts_node_start_byte (ch) > to) break;
+      const char* type= ts_node_type (ch);
+      if (ts_node_is_missing (ch) && bracket_type (type)) {
+        char open= opening_bracket (type[0]);
+        for (TSNode o= ts_node_prev_sibling (ch);
+             open != '\0' && !ts_node_is_null (o); o= ts_node_prev_sibling (o)) {
+          const char* t= ts_node_type (o);
+          if (!ts_node_is_named (o) && t[0] == open && t[1] == '\0') {
+            paint_node (o, paint, from, to, code);
+            break;
+          }
         }
       }
-    }
-    else if (err && !ts_node_is_named (c) && bracket_type (type))
-      paint_node (c, paint, from, to, code);
-    else paint_unmatched (c, paint, from, to, code);
-  }
+      else if (err && !ts_node_is_named (ch) && bracket_type (type))
+        paint_node (ch, paint, from, to, code);
+      else paint_unmatched (ch, paint, from, to, code);
+    } while (ts_tree_cursor_goto_next_sibling (&c));
+  ts_tree_cursor_delete (&c);
 }
 
 static void
@@ -776,7 +861,7 @@ mark_tokens (TSNode top, array<int>& paint, int from, int to) {
 array<array<int> >
 syntax_region_highlight (tree root, int language, int query, array<int> colors,
                          int injections, ts_injection_resolver resolve,
-                         int epoch, array<int>* recoloured) {
+                         int epoch, array<int>* recoloured, bool* all) {
   // the colour codes of each position of each line, for the query with the
   // colour code of each capture (0: no colour; see paint_captures); then
   // the injections (a query of injections.scm, or -1): the ranges which it
@@ -786,7 +871,8 @@ syntax_region_highlight (tree root, int language, int query, array<int> colors,
   // The starts of the tokens of the tree are marked (TS_TOKEN_START).
   // After an edit, only the lines whose colours are out of date are
   // coloured again (the query runs on their bytes); their rows are appended
-  // to recoloured, when given.
+  // to recoloured, when given, and all is set when they are all of them
+  // (the region is new, or its query, its injections or its epoch).
   syntax_region_rep* r= get_region (root, language);
   if (r == NULL) return array<array<int> > ();
   int n= N(r->lines);
@@ -798,20 +884,17 @@ syntax_region_highlight (tree root, int language, int query, array<int> colors,
     r->hl_query= query;
     r->hl_injections= injections;
     r->hl_epoch= epoch;
+    if (all != NULL) *all= true;
   }
   int first= 0, last= n - 1;
   while (first < n && !r->hl_dirty[first]) first++;
   while (last >= first && !r->hl_dirty[last]) last--;
   if (first > last) return r->hl_cols;
-  string text;
-  for (int i= 0; i < n; i++) {
-    if (i > 0) text << "\n";
-    text << r->lines[i];
-  }
+  const std::string& text= region_text (r);
   int from= r->offsets[first];
   int to= r->offsets[last] + N(r->lines[last]);
   array<int> caps;
-  c_string ctext (text);
+  const char* ctext= text.c_str ();
   TSNode top= ts_tree_root_node (r->tree);
   tree_sitter_query_run (query, top, ctext, caps, from, to);
   array<int> paint (to - from);
@@ -825,7 +908,7 @@ syntax_region_highlight (tree root, int language, int query, array<int> colors,
       int lan2, query2, injections2;
       array<int> colors2;
       if (resolve (names[k], lan2, query2, colors2, injections2))
-        paint_injection (r, ctext, ranges[2*k], min (ranges[2*k+1], N(text)),
+        paint_injection (r, ctext, ranges[2*k], min (ranges[2*k+1], (int) text.size ()),
                          lan2, query2, injections2, colors2, paint, from, to,
                          resolve, 1);
     }
@@ -865,11 +948,8 @@ syntax_region_errors_with (tree root, int language, int row, int col, string ins
   if (r == NULL || row < 0 || row >= N(r->lines)) return -1;
   if (N(ins) == 0) return count_errors (ts_tree_root_node (r->tree));
   int pos= r->offsets[row] + min (max (col, 0), N(r->lines[row]));
-  string text;
-  for (int i= 0; i < N(r->lines); i++) {
-    if (i > 0) text << "\n";
-    text << r->lines[i];
-  }
+  const std::string& rt= region_text (r);
+  string text (rt.c_str (), (int) rt.size ());
   text= text (0, pos) * ins * text (pos, N(text));
   array<string> new_lines;
   int last= 0;
@@ -1198,12 +1278,8 @@ syntax_region_indent (tree root, int language, int query, int row, int tab) {
   if (row < 0 || row >= N(lines)) return -2;
   TSNode top= ts_tree_root_node (r->tree);
   if (r->ind_query != query || r->ind_version != r->version) {
-    string text;
-    for (int i= 0; i < N(lines); i++) {
-      if (i > 0) text << "\n";
-      text << lines[i];
-    }
-    c_string ctext (text);
+    const std::string& text= region_text (r);
+    const char* ctext= text.c_str ();
     r->ind_caps.clear ();
     tree_sitter_query_node_captures (query, top, ctext, r->ind_caps);
     r->ind_query= query;

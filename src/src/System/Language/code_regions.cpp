@@ -15,14 +15,21 @@
 #include "convert.hpp"
 #include "hashmap.hpp"
 
+static inline bool
+same_line (string& x, string& y) {
+  // (the strings of the lines which did not change are those of the
+  // document: compared by their address first)
+  return x.operator-> () == y.operator-> () || x == y;
+}
+
 bool
 code_lines_common (array<string> old, array<string> cur, int& a, int& b) {
   int n0= N(old), n1= N(cur);
   a= 0;
-  while (a < n0 && a < n1 && old[a] == cur[a]) a++;
+  while (a < n0 && a < n1 && same_line (old[a], cur[a])) a++;
   b= 0;
   if (a == n0 && a == n1) return false;
-  while (b < n0 - a && b < n1 - a && old[n0-1-b] == cur[n1-1-b]) b++;
+  while (b < n0 - a && b < n1 - a && same_line (old[n0-1-b], cur[n1-1-b])) b++;
   return true;
 }
 

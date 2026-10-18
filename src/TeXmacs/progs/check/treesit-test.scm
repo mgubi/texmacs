@@ -425,6 +425,44 @@
     (buffer-close u)
     (when (buffer-exists? old) (switch-to-buffer old))))
 
+;; the colours of the lines of a buffer after edits (the text, the offsets
+;; and the colours of the region are changed in place by a keystroke, made
+;; again when lines come or go) are those of a fresh copy of its lines
+(define (test-highlight-edits)
+  (check-group "colours after edits")
+  (let* ((lines '("int f (int n) {" "  /* a comment */" "  return n + 1;" "}"
+                  "char *s = \"text\";" "int g;"))
+         (u (string->url "tmfs://aux/treesit-edits"))
+         (v (string->url "tmfs://aux/treesit-edits-copy"))
+         (old (current-buffer))
+         (colors (lambda (d) (map (lambda (i) (tree-sitter-line-colors "c" (tree-ref d i)))
+                                  (iota (tree-arity d))))))
+    (buffer-set-body u (stree->tree `(document ,@lines)))
+    (switch-to-buffer u)
+    (let ((d (buffer-get-body u)))
+      (tree-sitter-line-colors "c" (tree-ref d 0))
+      ;; keystrokes in a comment, in a name, a string opened and closed
+      (tree-insert! (tree-ref d 1) 5 "x")
+      (tree-sitter-line-colors "c" (tree-ref d 1))
+      (tree-insert! (tree-ref d 2) 9 "m")
+      (tree-sitter-line-colors "c" (tree-ref d 2))
+      (tree-insert! (tree-ref d 5) 4 "\"")
+      (tree-sitter-line-colors "c" (tree-ref d 5))
+      (tree-remove! (tree-ref d 5) 4 1)
+      (tree-sitter-line-colors "c" (tree-ref d 5))
+      ;; lines which come and go
+      (tree-insert! d 2 '("  int k = 0;" "  /* b"))
+      (tree-sitter-line-colors "c" (tree-ref d 2))
+      (tree-remove! d 3 1)
+      (tree-sitter-line-colors "c" (tree-ref d 3))
+      (let ((now (colors d)))
+        (buffer-set-body v (stree->tree (tree->stree d)))
+        (switch-to-buffer v)
+        (check= now (colors (buffer-get-body v)))
+        (buffer-close v)))
+    (buffer-close u)
+    (when (buffer-exists? old) (switch-to-buffer old))))
+
 (define (test-highlight)
   (check= (treesit-capture-class "keyword") "keyword")
   (check= (treesit-capture-class "keyword.control.return") "keyword_control")
@@ -1273,6 +1311,7 @@
   (test-registry)
   (test-regions)
   (test-highlight)
+  (test-highlight-edits)
   (test-scan)
   (test-edit)
   (test-scanners)
