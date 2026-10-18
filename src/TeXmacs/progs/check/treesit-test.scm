@@ -765,6 +765,11 @@
     (check= (toggle-line-comments '("  a" "" "    b") "#") '("  # a" "" "  #   b"))
     (check= (toggle-line-comments '("  # a" "" "  #   b") "#") '("  a" "" "    b"))
     (check= (toggle-line-comments '("// a" "b") "//") '("// // a" "// b"))
+    ;; with block comments, for the languages which have no line comments
+    (check= (toggle-block-comments '("a {" "" "  b;") '("/*" . "*/"))
+            '("/* a { */" "" "  /* b; */"))
+    (check= (toggle-block-comments '("/* a { */" "" "  /* b; */") '("/*" . "*/"))
+            '("a {" "" "  b;"))
     ;; at the cursor, in the code of a buffer
     (with-test-buffer '(document (scm-code (document "(define x 1)" "(if x \"(\" 'b)")))
       (lambda (u b)
