@@ -1,0 +1,4 @@
+src/grammar.json, queries/highlights.scm and queries/injections.scm of
+https://github.com/tree-sitter/tree-sitter-haskell.git (commit 97288e585b0bd44199720280d067fa35bacd81ff),
+with its LICENSE. The scanner (progs/treesit/ts-scanner-haskell.scm) follows src/scanner.c.
+tags.scm is ours.

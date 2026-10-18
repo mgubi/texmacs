@@ -386,9 +386,16 @@
                        (item (and n (list (string-drop (cap-name d) 11)
                                           (region-text root (cadr n) (caddr n))
                                           (cadr n) (caddr d) (cadr d)))))
+                  ;; (not twice the same name, nor a definition of the same
+                  ;; kind and name just after itself: the equations of a
+                  ;; function of Haskell are definitions of their own)
                   (loop (cdr l)
-                        (if (and item (not (list-find acc (lambda (x)
-                                                            (== (caddr x) (caddr item))))))
+                        (if (and item
+                                 (not (list-find acc (lambda (x)
+                                                       (== (caddr x) (caddr item)))))
+                                 (not (and (pair? acc)
+                                           (== (car (car acc)) (car item))
+                                           (== (cadr (car acc)) (cadr item)))))
                             (cons item acc)
                             acc)))))))))
 

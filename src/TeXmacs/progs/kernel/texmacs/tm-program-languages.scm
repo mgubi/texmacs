@@ -75,6 +75,8 @@
      (names "toml"))
     ("yaml" (label "YAML") (tags yaml-lang yaml-code) (grammar "yaml") (comment "#")
      (names "yaml" "yml"))
+    ("haskell" (label "Haskell") (tags haskell-lang haskell-code) (grammar "haskell") (comment "--")
+     (names "haskell" "hs"))
     ("ocaml" (label "OCaml") (tags ocaml-lang ocaml-code) (grammar "ocaml")
      (names "ocaml" "ml"))
     ("latex" (label "LaTeX") (tags latex-lang latex-code) (grammar "latex") (comment "%")

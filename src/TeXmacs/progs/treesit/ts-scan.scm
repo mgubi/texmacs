@@ -104,6 +104,21 @@
               (begin (lexer-advance! lx skip?) (loop (+ k 1)))
               k)))))
 
+(define-public (char-ranges . bounds)
+  ;; a class of characters: the inclusive ranges first last..., for
+  ;; char-in-ranges?
+  (list->vector bounds))
+
+(define-public (char-in-ranges? v c)
+  ;; is c in the class v (made by char-ranges, or a vector of bounds in
+  ;; order)? By bisection: the classes of Unicode have thousands of ranges
+  (let loop ((lo 0) (hi (- (quotient (vector-length v) 2) 1)))
+    (and (<= lo hi)
+         (let ((mid (quotient (+ lo hi) 2)))
+           (cond ((< c (vector-ref v (* 2 mid))) (loop lo (- mid 1)))
+                 ((> c (vector-ref v (+ (* 2 mid) 1))) (loop (+ mid 1) hi))
+                 (else #t))))))
+
 (define-public (scan-word! lx s)
   ;; advance over the characters of the string s as long as they match;
   ;; whether they all did

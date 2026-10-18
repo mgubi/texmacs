@@ -195,7 +195,7 @@
 ;(display "Booting programming modes\n")
 (lazy-format (prog prog-format) scheme)
 (lazy-format (code-format) cpp julia scala java javascript dot json csv
-             go lean lua rust typescript css toml yaml ocaml)
+             go lean lua rust typescript css toml yaml ocaml haskell)
 (lazy-format (mathemagix-format) mathemagix)
 (lazy-format (caas-format) caas)
 (lazy-format (python-format) python)

@@ -54,4 +54,5 @@
 (define-code-format css "CSS style sheet" "css")
 (define-code-format toml "TOML" "toml")
 (define-code-format yaml "YAML" "yaml" "yml")
+(define-code-format haskell "Haskell source code" "hs")
 (define-code-format ocaml "OCaml source code" "ml" "mli")

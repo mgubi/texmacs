@@ -211,6 +211,8 @@
 
   <assign|yaml-lang|<macro|body|<with|mode|prog|prog-language|yaml|font-family|rm|<arg|body>>>>
 
+  <assign|haskell-lang|<macro|body|<with|mode|prog|prog-language|haskell|font-family|rm|<arg|body>>>>
+
   <assign|ocaml-lang|<macro|body|<with|mode|prog|prog-language|ocaml|font-family|rm|<arg|body>>>>
 
   <assign|latex-lang|<macro|body|<with|mode|prog|prog-language|latex|font-family|rm|<arg|body>>>>
@@ -328,6 +330,12 @@
   <assign|yaml-code|<\macro|body>
     <\pseudo-code>
       <yaml-lang|<arg|body>>
+    </pseudo-code>
+  </macro>>
+
+  <assign|haskell-code|<\macro|body>
+    <\pseudo-code>
+      <haskell-lang|<arg|body>>
     </pseudo-code>
   </macro>>
 

@@ -31,7 +31,8 @@
         (treesit ts-scanner-lean) (treesit ts-scanner-toml)
         (treesit ts-scanner-css) (treesit ts-scanner-latex)
         (treesit ts-scanner-html) (treesit ts-scanner-typescript)
-        (treesit ts-scanner-ocaml) (treesit ts-scanner-yaml)))
+        (treesit ts-scanner-ocaml) (treesit ts-scanner-yaml)
+        (treesit ts-scanner-haskell)))
 
 ;; to be changed when the generator or the exported data change
 (define-public treesit-generator-version "2")
@@ -48,7 +49,8 @@
         (cons "lean" ts-lean-scanner) (cons "toml" ts-toml-scanner)
         (cons "css" ts-css-scanner) (cons "latex" ts-latex-scanner)
         (cons "html" ts-html-scanner) (cons "typescript" ts-typescript-scanner)
-        (cons "ocaml" ts-ocaml-scanner) (cons "yaml" ts-yaml-scanner)))
+        (cons "ocaml" ts-ocaml-scanner) (cons "yaml" ts-yaml-scanner)
+        (cons "haskell" ts-haskell-scanner)))
 
 (define-public (treesit-supported? lan)
   (and (defined? 'tree-sitter-language-load)

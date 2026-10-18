@@ -885,12 +885,13 @@
   (check= (md-body "- a\n\n- b\n")
           '((md-loose (itemize-minus (document (concat (item) "a")
                                                (concat (item) "b"))))))
-  ;; code: the words after the fence, when the tag does not say them (haskell
+  ;; code: the words after the fence, when the tag does not say them (elixir
   ;; is a language without a tag of its own)
-  (check= (md-body "```python\nx\n```\n\n```py\nx\n```\n\n```haskell\nx\n```\n")
+  (check= (md-body "```python\nx\n```\n\n```py\nx\n```\n\n```elixir\nx\n```\n")
           '((python-code (document "x"))
             (md-fence "py" (python-code (document "x")))
-            (md-fence "haskell" (verbatim-code (document "x")))))
+            (md-fence "elixir" (verbatim-code (document "x")))))
+  (check= (md-body "```haskell\nx\n```\n") '((haskell-code (document "x"))))
   (check= (md-body "```rust\nx\n```\n\n```lean\ny\n```\n")
           '((rust-code (document "x")) (lean-code (document "y"))))
   ;; the table of the languages shared with docx/odt (code-languages.scm)
@@ -1017,9 +1018,9 @@
   ;; the words after the fence are for the language they name
   (check= (tm->md (in-style '(md-fence "c" (python-code (document "x")))))
           "```python\nx\n```\n")
-  (check= (tm->md (in-style '(md-fence "haskell ignore"
+  (check= (tm->md (in-style '(md-fence "elixir ignore"
                                        (verbatim-code (document "x")))))
-          "```haskell ignore\nx\n```\n")
+          "```elixir ignore\nx\n```\n")
   ;; a kept block which was moved into a heading or a cell
   (check= (tm->md (in-style '(section (concat "T " (md-block-source
                                                      (equation* (document "x"))
