@@ -95,13 +95,9 @@
 (tm-define (pdf-file->gs-raster x opts)
   (let* ((dest (assoc-ref opts 'dest))
          (res (get-raster-resolution opts))
-         (suf (locase-all (url-suffix dest)))
-         (dev (cond ((in? suf '("jpg" "jpeg")) "jpeg")
-                    ((in? suf '("tif" "tiff")) "tiff24nc")
-                    (else "pngalpha")))
 	 (gs (gs-binary)))
     (evaluate-system (list gs "-dBATCH" "-dNOPAUSE" "-dQUIET" "-dSAFER"
-                           "-dNOPROMPT" (string-append "-sDEVICE=" dev)
+                           "-dNOPROMPT" "-sDEVICE=pngalpha"
                            (string-append "-r" res)
                            (string-append "-sOutputFile="
                                           (url-concretize dest))
@@ -153,16 +149,16 @@
 
 (converter svg-file postscript-file
   (:require (url-exists-in-path? "inkscape"))
-  (:shell "inkscape" from "--export-type=ps" "--export-filename=" to))
+  (:shell "inkscape" "--export-overwrite" "--export-filename=" to from))
 
 (converter svg-file pdf-file
   (:require (url-exists-in-path? "inkscape"))
-  (:shell "inkscape" from "--export-type=pdf" "--export-filename=" to))
+  (:shell "inkscape" "--export-overwrite" "--export-filename=" to from))
 
 (converter svg-file png-file
   (:require (url-exists-in-path? "inkscape"))
-  (:shell "inkscape" from "--export-type=png" "--export-dpi=600"
-          "--export-filename=" to))
+  (:shell "inkscape" "-d" "600" "--export-overwrite"
+	  "--export-filename=" to from))
 
 (converter svg-file png-file
   (:require (and (url-exists-in-path? "rsvg-convert")
