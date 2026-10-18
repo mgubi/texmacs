@@ -177,7 +177,9 @@
   ;; a model which thinks in its text (<think>, with Ollama)
   (check= (answer (openai "<think>Hmm.</think>\n\nAnswer.") "ollama")
           `(document ,(reasoning-fold "Hmm.") (with "mode" "text" "Answer.")))
-  (check= (ai-reasoning "claude") "default")
+  ;; (an unknown level is the default, whatever the preferences of the home)
+  (with-preference "claude reasoning" "unknown"
+    (lambda () (check= (ai-reasoning "claude") "default")))
   ;; the executable folds of the chatbots (tools/ai/ai-folds.scm)
   (check-true (ai-fold? (stree->tree '(script-input "claude" "default" "" ""))))
   (check-false (ai-fold? (stree->tree '(script-input "scheme" "default" "" "")))))
@@ -433,6 +435,18 @@
       (check-true (has? (string-append "caf" (string (integer->char 195)
                                                      (integer->char 169)))
                         c)))
+    ;; each file in the message of its question, before its text (Claude):
+    ;; the PDF of the first question, the PNG of the asked one
+    (set! attach-files
+          (with sep (ai-attachment-separator)
+            (list (string-append "0" sep "application/pdf" sep "unknown.pdf" sep pdf)
+                  (string-append "1" sep "image/png" sep "texmacs-20.png" sep png))))
+    (with c (attach-request "claude")
+      ;; (in the messages: the instructions before them name such types)
+      (let* ((start (max 0 (string-search-forwards "\"messages\"" 0 c)))
+             (at (lambda (what) (string-search-forwards what start c))))
+        (check-true (< -1 (at "application/pdf") (at "\"Q1\"") (at "\"A1\"")
+                       (at "image/png") (at "\"Describe\"")))))
     ;; without files: the messages as before
     (set! attach-files '())
     (with c (attach-request "claude")
@@ -442,6 +456,44 @@
             '("bin.txt" "big.png" "big.pdf" "long.txt"))
   (system-remove (url-append attach-dir "notes.txt"))
   (system-remove (url-append attach-dir "n.zip")))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; The requests: the reasoning asked of a model, the key which is given
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (request-with prefs engine)
+  ;; the request of engine with the preferences prefs ((name value) ...)
+  (if (null? prefs) (attach-request engine)
+      (with-preference (caar prefs) (cadar prefs)
+        (lambda () (request-with (cdr prefs) engine)))))
+
+(define (test-requests)
+  (check-group "requests")
+  (set! attach-files '())
+  ;; Claude: adaptive thinking with an effort from 4.7 on, a budget before
+  (with c (request-with '(("claude reasoning" "high")
+                          ("claude model" "claude-opus-5-5")) "claude")
+    (check-true (has? "\"type\": \"adaptive\"" c))
+    (check-true (has? "\"effort\": \"high\"" c)))
+  (with c (request-with '(("claude reasoning" "low")
+                          ("claude model" "claude-sonnet-4-5")) "claude")
+    (check-true (has? "\"budget_tokens\": 2048" c))
+    (check-true (not (has? "adaptive" c))))
+  (with c (request-with '(("claude reasoning" "default")) "claude")
+    (check-true (not (has? "\"thinking\"" c))))
+  ;; Gemini: a budget of tokens for 2.5, a level after
+  (with c (request-with '(("gemini reasoning" "medium")
+                          ("gemini model" "gemini-2.5-flash")) "gemini")
+    (check-true (has? "\"thinkingBudget\": 8192" c)))
+  (with c (request-with '(("gemini reasoning" "high")
+                          ("gemini model" "gemini-3-pro-preview")) "gemini")
+    (check-true (has? "\"thinkingLevel\": \"high\"" c)))
+  ;; the key: that of the preferences before the environment (the wallet,
+  ;; closed here, comes first)
+  (with-preference "claude api key" "test-key-not-real"
+    (lambda () (check= (ai-api-key "claude" "HOME") "test-key-not-real")))
+  (with-preference "claude api key" ""
+    (lambda () (check= (ai-api-key "claude" "HOME") (getenv "HOME")))))
 
 (tm-define (ai-test-failures)
   (check-suite "ai")
@@ -459,6 +511,7 @@
   (test-raw-fold)
   (test-attachments)
   (test-answer-files)
+  (test-requests)
   ;; the prices are read again from the home when they are needed
   (cpp-ai-set-prices "")
   (check-end))
