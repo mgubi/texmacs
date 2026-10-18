@@ -8,23 +8,24 @@
 * in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
 ******************************************************************************/
 
-#include <QtTest/QtTest>
-#include "Qt/qt_utilities.hpp"
-
-
-class TestQtUtilities: public QObject {
-  Q_OBJECT
-
-private slots:
-  void test_qt_supports();
-};
-
-void TestQtUtilities::test_qt_supports () {
+#include "tm_test.hpp"
+#include "url.hpp"
 #ifdef QTTEXMACS
-  QVERIFY (qt_supports (url ("x.svg")));
-  QVERIFY (qt_supports (url ("x.png")));
+#include "Qt/qt_utilities.hpp"
+#endif
+
+static void
+test_qt_supports () {
+#ifdef QTTEXMACS
+  CHECK (qt_supports (url ("x.svg")));
+  CHECK (qt_supports (url ("x.png")));
+#else
+  SKIP ("no Qt in this build");
 #endif
 }
 
-QTEST_MAIN(TestQtUtilities)
-#include "qt_utilities_test.moc"
+int
+main () {
+  RUN (test_qt_supports);
+  return test_report ();
+}

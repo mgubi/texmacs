@@ -24,11 +24,6 @@ went); add what you find. Paths are relative to the repository root.
   on Linux). Seen and not traced: a bus error at startup (three times, never
   reproduced), four import checks of the suite `latex` which fail on the
   first run with a new home directory only.
-- **The QtTest unit tests run on a Qt build only.** Without Qt (Vue,
-  Cocoa) `make -C tests` builds the 17 tests over `tests/tm_test.hpp` and
-  leaves out the 18 written against QtTest; porting those to `tm_test.hpp`
-  would let every build run them. The CI of `maxs_ci` runs the unit tests
-  on Linux (Qt 6 and Vue) since 2026-10-18.
 - **Cursor history.** PR #337 on `wip_fixes` holds the fix which is already
   here (278d12fc27): a saved position whose buffer was closed was read
   after its tree was freed.

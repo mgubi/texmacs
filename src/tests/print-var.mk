@@ -24,6 +24,3 @@ print-flags:
 	@echo 'TM_LDFLAGS := $(LDFLAGS)'
 	@echo 'TM_LIBS := $(LIBS)'
 	@echo 'TM_LINK_OPTIONS := $(link_options)'
-	@echo 'TM_MOC := $(MOC)'
-	@echo 'TM_MOCFLAGS := $(MOCFLAGS)'
-	@echo 'TM_QTLIBS := $(LDQT)'

@@ -57,6 +57,17 @@ inline string test_show (double x) { return as_string (x); }
 inline string test_show (string x) { return x; }
 inline string test_show (const char* x) { return string (x); }
 
+// any other value, as a tm_ostream prints it: lists, arrays, hashmaps...
+// (the overloads above are preferred, being no templates)
+template<class T> inline string
+test_show (const T& x) {
+  string s;
+  tm_ostream out= string_ostream (s);
+  out << x;
+  out.flush ();
+  return s;
+}
+
 template<class T, class U> inline void
 test_check_eq (T x, U y, string xs, string ys, const char* file, int line) {
   if (!(x == y))

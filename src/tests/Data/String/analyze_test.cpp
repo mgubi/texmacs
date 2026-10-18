@@ -10,154 +10,150 @@
 ******************************************************************************/
 
 
-#include <QtTest/QtTest>
+#include "tm_test.hpp"
 #include "analyze.hpp"
 
-class TestAnalyze: public QObject {
-  Q_OBJECT
-
-private slots:
-  void test_is_alpha ();
-  void test_locase_all ();
-  void test_upcase_all ();
-  void test_string_minus ();
-  void test_string_union ();
-  void test_scm_quote ();
-  void test_scm_unquote ();
-  void test_raw_quote ();
-  void test_raw_unquote ();
-  void test_unescape_guile ();
-  void test_starts ();
-  void test_ends ();
-  void test_read_word ();
-  void test_as_hexadecimal ();
-};
-
-void
-TestAnalyze::test_is_alpha () {
+static void
+test_is_alpha () {
   for (unsigned char c=0; c<255; c++) {
     if ((c>=65 && c<=90) || (c>=97 && c<=122)) {
-      QVERIFY (is_alpha (c));
+      CHECK (is_alpha (c));
     } else {
-      QVERIFY (!is_alpha (c));
+      CHECK (!is_alpha (c));
     }
   }
 }
 
-void
-TestAnalyze::test_locase_all () {
-  QVERIFY (locase_all (string ("true")) == string ("true"));
-  QVERIFY (locase_all (string ("TRue")) == string ("true"));
-  QVERIFY (locase_all (string ("TRUE")) == string ("true"));
-  QVERIFY (locase_all (string ("123TRUE")) == string ("123true"));
+static void
+test_locase_all () {
+  CHECK (locase_all (string ("true")) == string ("true"));
+  CHECK (locase_all (string ("TRue")) == string ("true"));
+  CHECK (locase_all (string ("TRUE")) == string ("true"));
+  CHECK (locase_all (string ("123TRUE")) == string ("123true"));
 }
 
-void
-TestAnalyze::test_upcase_all () {
-  QVERIFY (upcase_all (string ("true")) == string ("TRUE"));
-  QVERIFY (upcase_all (string ("TRue")) == string ("TRUE"));
-  QVERIFY (upcase_all (string ("TRUE")) == string ("TRUE"));
-  QVERIFY (upcase_all (string ("123true")) == string ("123TRUE"));
+static void
+test_upcase_all () {
+  CHECK (upcase_all (string ("true")) == string ("TRUE"));
+  CHECK (upcase_all (string ("TRue")) == string ("TRUE"));
+  CHECK (upcase_all (string ("TRUE")) == string ("TRUE"));
+  CHECK (upcase_all (string ("123true")) == string ("123TRUE"));
 }
 
-void
-TestAnalyze::test_string_minus () {
-  QVERIFY (string_minus ("Hello World", "eo") == string ("Hll Wrld"));
-  QVERIFY (string_minus ("", "abc") == string (""));
-  QVERIFY (string_minus ("abc", "") == string ("abc"));
+static void
+test_string_minus () {
+  CHECK (string_minus ("Hello World", "eo") == string ("Hll Wrld"));
+  CHECK (string_minus ("", "abc") == string (""));
+  CHECK (string_minus ("abc", "") == string ("abc"));
 }
 
-void
-TestAnalyze::test_string_union () {
-  QVERIFY (string_union ("abc", "") == string("abc"));
-  QVERIFY (string_union ("", "abc") == string("abc"));
-  QVERIFY (string_union ("Hello World", "eo") == string ("Hll Wrldeo"));
+static void
+test_string_union () {
+  CHECK (string_union ("abc", "") == string("abc"));
+  CHECK (string_union ("", "abc") == string("abc"));
+  CHECK (string_union ("Hello World", "eo") == string ("Hll Wrldeo"));
 }
 
-void
-TestAnalyze::test_scm_quote () {
-  QCOMPARE (as_charp (scm_quote ("a")), "\"a\"");
-  QCOMPARE (as_charp (scm_quote ("")), "\"\"");
-  QCOMPARE (as_charp (scm_quote ("\\")), "\"\\\\\"");
+static void
+test_scm_quote () {
+  CHECK_EQ (scm_quote ("a"), string ("\"a\""));
+  CHECK_EQ (scm_quote (""), string ("\"\""));
+  CHECK_EQ (scm_quote ("\\"), string ("\"\\\\\""));
 }
 
-void
-TestAnalyze::test_scm_unquote() {
-  QCOMPARE (as_charp (scm_unquote("\"\"")), "");
-  QCOMPARE (as_charp (scm_unquote("\"abc\"")), "abc");
-  QCOMPARE (as_charp (scm_unquote("abc")), "abc");
-  QCOMPARE (as_charp (scm_unquote("")), "");
-  QCOMPARE (as_charp (scm_unquote("\"\\\\\"")), "\\");
+static void
+test_scm_unquote () {
+  CHECK_EQ (scm_unquote("\"\""), string (""));
+  CHECK_EQ (scm_unquote("\"abc\""), string ("abc"));
+  CHECK_EQ (scm_unquote("abc"), string ("abc"));
+  CHECK_EQ (scm_unquote(""), string (""));
+  CHECK_EQ (scm_unquote("\"\\\\\""), string ("\\"));
 }
 
-void
-TestAnalyze::test_raw_quote () {
-  QCOMPARE (as_charp (raw_quote ("a")), "\"a\"");
-  QCOMPARE (as_charp (raw_quote ("")), "\"\"");
+static void
+test_raw_quote () {
+  CHECK_EQ (raw_quote ("a"), string ("\"a\""));
+  CHECK_EQ (raw_quote (""), string ("\"\""));
 }
 
-void
-TestAnalyze::test_raw_unquote () {
-  QCOMPARE (as_charp (raw_unquote ("\"a\"")), "a");
-  QCOMPARE (as_charp (raw_unquote ("\"a")), "\"a");
-  QCOMPARE (as_charp (raw_unquote ("a\"")), "a\"");
-  QCOMPARE (as_charp (raw_unquote ("")), "");
-  QCOMPARE (as_charp (raw_unquote ("a")), "a");
+static void
+test_raw_unquote () {
+  CHECK_EQ (raw_unquote ("\"a\""), string ("a"));
+  CHECK_EQ (raw_unquote ("\"a"), string ("\"a"));
+  CHECK_EQ (raw_unquote ("a\""), string ("a\""));
+  CHECK_EQ (raw_unquote (""), string (""));
+  CHECK_EQ (raw_unquote ("a"), string ("a"));
 }
 
-void
-TestAnalyze::test_unescape_guile () {
+static void
+test_unescape_guile () {
   // unescape_guile turns \\xHH into the byte HH and leaves everything else
   // alone; the expectation of four backslashes here was never true
-  QCOMPARE (as_charp (unescape_guile ("\\\\")), "\\\\");
-  QCOMPARE (as_charp (unescape_guile ("a\\x41b")), "aAb");
-  QCOMPARE (as_charp (unescape_guile ("\\xzz")), "\\xzz");
-  QCOMPARE (as_charp (unescape_guile ("abc")), "abc");
+  CHECK_EQ (unescape_guile ("\\\\"), string ("\\\\"));
+  CHECK_EQ (unescape_guile ("a\\x41b"), string ("aAb"));
+  CHECK_EQ (unescape_guile ("\\xzz"), string ("\\xzz"));
+  CHECK_EQ (unescape_guile ("abc"), string ("abc"));
 }
 
-void
-TestAnalyze::test_starts () {
-  QVERIFY (starts ("abc_def", "abc"));
-  QVERIFY (!starts ("abc_def", "def"));
-  QVERIFY (starts ("abc", ""));
-  QVERIFY (starts ("", ""));
+static void
+test_starts () {
+  CHECK (starts ("abc_def", "abc"));
+  CHECK (!starts ("abc_def", "def"));
+  CHECK (starts ("abc", ""));
+  CHECK (starts ("", ""));
 }
 
-void
-TestAnalyze::test_ends () {
-  QVERIFY (ends ("abc_def", "def"));
-  QVERIFY (ends ("abc_def", ""));
-  QVERIFY (!ends ("abc_def", "de"));
+static void
+test_ends () {
+  CHECK (ends ("abc_def", "def"));
+  CHECK (ends ("abc_def", ""));
+  CHECK (!ends ("abc_def", "de"));
 }
 
-void
-TestAnalyze::test_read_word () {
+static void
+test_read_word () {
   string word;
   int i=0;
-  QVERIFY (read_word ("hello123", i, word));
-  QCOMPARE (as_charp (word), "hello");
-  QCOMPARE (i, 5);
+  CHECK (read_word ("hello123", i, word));
+  CHECK_EQ (word, string ("hello"));
+  CHECK_EQ (i, 5);
 
   i=0;
   word= "";
-  QVERIFY (!read_word ("123", i, word));
-  QVERIFY (is_empty (word));
-  QCOMPARE (i, 0);
+  CHECK (!read_word ("123", i, word));
+  CHECK (is_empty (word));
+  CHECK_EQ (i, 0);
 }
 
-void
-TestAnalyze::test_as_hexadecimal () {
-  QCOMPARE (as_charp (as_hexadecimal (0)), "0");
-  QCOMPARE (as_charp (as_hexadecimal (255)), "FF");
-  QCOMPARE (as_charp (as_hexadecimal (-255)), "-FF");
-  QCOMPARE (as_charp (as_hexadecimal (2147483647)), "7FFFFFFF");
+static void
+test_as_hexadecimal () {
+  CHECK_EQ (as_hexadecimal (0), string ("0"));
+  CHECK_EQ (as_hexadecimal (255), string ("FF"));
+  CHECK_EQ (as_hexadecimal (-255), string ("-FF"));
+  CHECK_EQ (as_hexadecimal (2147483647), string ("7FFFFFFF"));
   // the negation of the smallest int overflows, which used to make the
   // conversion recurse forever
-  QCOMPARE (as_charp (as_hexadecimal ((int) -2147483647 - 1)), "-80000000");
-  QCOMPARE (from_hexadecimal (as_hexadecimal ((int) -2147483647 - 1)),
+  CHECK_EQ (as_hexadecimal ((int) -2147483647 - 1), string ("-80000000"));
+  CHECK_EQ (from_hexadecimal (as_hexadecimal ((int) -2147483647 - 1)),
             (int) -2147483647 - 1);
-  QCOMPARE (as_charp (as_hexadecimal (0x1234, 6)), "001234");
+  CHECK_EQ (as_hexadecimal (0x1234, 6), string ("001234"));
 }
 
-QTEST_MAIN(TestAnalyze)
-#include "analyze_test.moc"
+int
+main () {
+  RUN (test_is_alpha);
+  RUN (test_locase_all);
+  RUN (test_upcase_all);
+  RUN (test_string_minus);
+  RUN (test_string_union);
+  RUN (test_scm_quote);
+  RUN (test_scm_unquote);
+  RUN (test_raw_quote);
+  RUN (test_raw_unquote);
+  RUN (test_unescape_guile);
+  RUN (test_starts);
+  RUN (test_ends);
+  RUN (test_read_word);
+  RUN (test_as_hexadecimal);
+  return test_report ();
+}

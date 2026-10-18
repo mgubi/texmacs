@@ -9,8 +9,9 @@ or launch a Scheme session and then run `(run-all-tests)`.
 ## Guide to Run Unit Tests for cpp
 
 First, compile the whole project with the tests enabled. That harness
-links `Qt5::Test` (`tests/CMakeLists.txt`), so it needs a Qt 5
-configuration; with Qt 6 use the autotools harness described below. At
+links `Qt5::Test` (`tests/CMakeLists.txt`), which the tests no longer use
+(they are plain C++ since 2026-10-18), so it needs a Qt 5 configuration;
+use the autotools harness described below otherwise. At
 present the top-level `CMakeLists.txt` neither adds the `tests` directory
 nor defines `BUILD_TESTS`, so the recipe below needs that wiring first;
 the autotools harness works as it is.
@@ -55,17 +56,14 @@ make -C tests                      # build and run all tests
 make -C tests run-path_test        # one test, with its own output
 ```
 
-The tests inherited from the CMake harness are written against QtTest, which
-is what `tests/CMakeLists.txt` expects of them. New tests are written in
-ordinary TeXmacs C++ over `tests/tm_test.hpp`, which brings `CHECK`,
-`CHECK_MSG`, `CHECK_EQ` and `SKIP`, and a `main` which lists its tests with
-`RUN` and returns `test_report ()`: a test then needs no QtTest idiom (the
-Makefile still links QtTest into every binary of a Qt build, as the build
-links the other modules of Qt: `-framework QtTest` on macOS, `-lQt6Test`
-on Linux and Windows). `tests/Makefile` builds both kinds, and runs `moc` only
-on the sources which declare a `Q_OBJECT`. A build without Qt (Vue, Cocoa:
-no `moc`) builds and runs only the tests over `tm_test.hpp`, and links no
-QtTest; it says how many QtTest tests it leaves out.
+The tests are written in ordinary TeXmacs C++ over `tests/tm_test.hpp`,
+which brings `CHECK`, `CHECK_MSG`, `CHECK_EQ` (any two values which `==`
+compares and a `tm_ostream` prints) and `SKIP`, and a `main` which lists its
+tests with `RUN` and returns `test_report ()`. They need no Qt, so every
+build runs all of them (Qt, Vue, Cocoa); a test of Qt code skips its checks
+in a build without Qt (`qt_utilities_test`). The tests inherited from the
+CMake harness were written against QtTest and were ported on 2026-10-18,
+with the same checks.
 
 The OpenType tests use the fonts shipped in `TeXmacs/fonts/truetype`, so a
 plain `make -C tests` runs them. `make -C tests TM_TEST_FONT_DIR=/path/to/fonts`
@@ -82,9 +80,9 @@ profile's name.
 The tests run with `TEXMACS_PATH` set to the source tree and a scratch
 `TEXMACS_HOME_PATH` under `tests/build`, so they never touch `~/.TeXmacs`.
 
-Two test sources are left out of this harness: `xml_test`, which includes a
-source file that is already part of the main build, and `mac_images_test`,
-whose functions `mac_images.h` does not declare in a Qt 6 build.
+`xml_test` includes `Xml/xml.cpp`, which is also part of the main build,
+for its static `is_xml_name`: it renames the public functions of that copy
+with macros, so that they do not clash with those of the build.
 
 The renders and the pixel diffs depend on the PDF writer of the build. With
 the native (Hummus) PDF renderer the exported fonts are real subsets, and

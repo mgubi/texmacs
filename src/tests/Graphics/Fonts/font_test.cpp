@@ -9,21 +9,20 @@
 * in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
 ******************************************************************************/
 
-#include <QtTest/QtTest>
+#include "tm_test.hpp"
 #include "font.hpp"
 
-class TestFont: public QObject {
-  Q_OBJECT
-
-private slots:
-  void test_default_chinese_font_name();
-};
-
-void TestFont::test_default_chinese_font_name() {
+static void
+test_default_chinese_font_name () {
 #ifdef OS_MACOS
-  QCOMPARE (default_chinese_font_name (), string ("Songti SC"));
+  CHECK_EQ (default_chinese_font_name (), string ("Songti SC"));
+#else
+  SKIP ("the default Chinese font is checked on macOS only");
 #endif
 }
 
-QTEST_MAIN(TestFont)
-#include "font_test.moc"
+int
+main () {
+  RUN (test_default_chinese_font_name);
+  return test_report ();
+}

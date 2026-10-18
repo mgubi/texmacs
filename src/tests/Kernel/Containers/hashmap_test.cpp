@@ -9,60 +9,39 @@
 * in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
 ******************************************************************************/
 
-#include <QtTest/QtTest>
+#include "tm_test.hpp"
 #include "hashmap.hpp"
-
-class TestHashmap: public QObject {
-  Q_OBJECT
-
-private slots:
-  void test_resize ();
-  void test_reset ();
-  void test_generate ();
-  void test_contains ();
-  void test_empty ();
-  void test_join ();
-  void test_write_back ();
-  void test_pre_patch ();
-  void test_post_patch ();
-  void test_copy ();
-  void test_equality ();
-  void test_changes ();
-  void test_invert ();
-  void test_size ();
-};
-
 
 /******************************************************************************
 * tests on resize
 ******************************************************************************/
-void
-TestHashmap::test_resize () {
+static void
+test_resize () {
   auto hm = hashmap<int, int>(0, 10);
   hm(1) = 10;
   hm(2) = 20;
 
   hm->resize(1);
-  QCOMPARE (hm[1] == 10, true);
-  QCOMPARE (hm[2] == 20, true);
+  CHECK_EQ (hm[1] == 10, true);
+  CHECK_EQ (hm[2] == 20, true);
 
   hm->resize(20);
-  QCOMPARE (hm[1] == 10, true);
-  QCOMPARE (hm[2] == 20, true);
+  CHECK_EQ (hm[1] == 10, true);
+  CHECK_EQ (hm[2] == 20, true);
 }
 
 /******************************************************************************
 * tests on reset 
 ******************************************************************************/
-void
-TestHashmap::test_reset () {
+static void
+test_reset () {
   auto hm = hashmap<int, int>(0, 10);
   hm(1) = 10;
   hm(11) = 20;
   hm->reset(1);
 
-  QCOMPARE (hm->contains(1), false);
-  QCOMPARE (hm->contains(11), true);
+  CHECK_EQ (hm->contains(1), false);
+  CHECK_EQ (hm->contains(11), true);
 }
 
 /******************************************************************************
@@ -70,11 +49,11 @@ TestHashmap::test_reset () {
 ******************************************************************************/
 auto hm_generate = hashmap<int, int>(0, 10);
 void routine(int key) {
-    QCOMPARE (hm_generate->contains(key), true);
+    CHECK_EQ (hm_generate->contains(key), true);
 }
 
-void
-TestHashmap::test_generate () {
+static void
+test_generate () {
     hm_generate(1) = 10;
     hm_generate(2) = 20;
     hm_generate->generate(routine);
@@ -83,32 +62,31 @@ TestHashmap::test_generate () {
 /******************************************************************************
 * tests on contains 
 ******************************************************************************/
-void
-TestHashmap::test_contains () {
+static void
+test_contains () {
   auto hm = hashmap<int, void*>(nullptr, 2, 2);
   hm(1) = nullptr;
-  QCOMPARE (hm->contains(1), true);
-  QCOMPARE (hm->contains(3), false);
+  CHECK_EQ (hm->contains(1), true);
+  CHECK_EQ (hm->contains(3), false);
 } 
-
 
 /******************************************************************************
 * tests on empty 
 ******************************************************************************/
-void
-TestHashmap::test_empty () {
+static void
+test_empty () {
   auto hm = hashmap<int, int>();
-  QCOMPARE (hm->empty(), true);
+  CHECK_EQ (hm->empty(), true);
   
   hm(1);
-  QCOMPARE (hm->empty(), false);
+  CHECK_EQ (hm->empty(), false);
 }
 
 /******************************************************************************
 * tests on join 
 ******************************************************************************/
-void
-TestHashmap::test_join () {
+static void
+test_join () {
   auto hm1 = hashmap<int, int>();
   auto hm2 = hashmap<int, int>();
   hm1(1) = 10;
@@ -117,16 +95,16 @@ TestHashmap::test_join () {
   hm2(3) = -30;
   hm1->join(hm2);
 
-  QCOMPARE (hm1[1] == 10, true);
-  QCOMPARE (hm1[2] == -20, true);
-  QCOMPARE (hm1[3] == -30, true);
+  CHECK_EQ (hm1[1] == 10, true);
+  CHECK_EQ (hm1[2] == -20, true);
+  CHECK_EQ (hm1[3] == -30, true);
 }
 
 /******************************************************************************
 * tests on write_back 
 ******************************************************************************/
-void
-TestHashmap::test_write_back () {
+static void
+test_write_back () {
   auto hm1 = hashmap<int, int>(0, 10);
   auto hm2 = hashmap<int, int>(0, 10);
   hm1(1) = 10;
@@ -134,21 +112,21 @@ TestHashmap::test_write_back () {
   hm2(2) = -20;
 
   hm1->write_back(2, hm2);
-  QCOMPARE (hm1[2] == 20, true);
+  CHECK_EQ (hm1[2] == 20, true);
 
   hm1->write_back(3, hm2);
-  QCOMPARE (hm1[3] == 0, true);
+  CHECK_EQ (hm1[3] == 0, true);
 
   hm2(4) = -40;
   hm1->write_back(4, hm2);
-  QCOMPARE (hm2[4] == -40, true);
+  CHECK_EQ (hm2[4] == -40, true);
 }
 
 /******************************************************************************
 * tests on pre_patch 
 ******************************************************************************/
-void
-TestHashmap::test_pre_patch () {
+static void
+test_pre_patch () {
   auto hm = hashmap<int, int>();
   auto hm_patch = hashmap<int, int>();
   auto hm_base = hashmap<int, int>();
@@ -156,24 +134,24 @@ TestHashmap::test_pre_patch () {
   hm(1) = 10;
   hm_patch(1);
   hm->pre_patch(hm_patch, hm_base);
-  QCOMPARE (hm[1] == 10, true);
+  CHECK_EQ (hm[1] == 10, true);
 
   hm(2) = 20;
   hm_patch(2) = -20;
   hm_base(2) = 20;
   hm->pre_patch(hm_patch, hm_base);
-  QCOMPARE (hm[2] == 0, true);
+  CHECK_EQ (hm[2] == 0, true);
 
   hm_patch(3) = -30;
   hm->pre_patch(hm_patch, hm_base);
-  QCOMPARE (hm[3] == -30, true);
+  CHECK_EQ (hm[3] == -30, true);
 }
 
 /******************************************************************************
 * tests on post_patch 
 ******************************************************************************/
-void
-TestHashmap::test_post_patch () {
+static void
+test_post_patch () {
   auto hm = hashmap<int, int>();
   auto hm_patch = hashmap<int, int>();
   auto hm_base = hashmap<int, int>();
@@ -181,18 +159,18 @@ TestHashmap::test_post_patch () {
   hm(1) = 10;
   hm_patch(1);
   hm->post_patch(hm_patch, hm_base);
-  QCOMPARE (hm[1] == 0, true);
+  CHECK_EQ (hm[1] == 0, true);
 
   hm_patch(2) = -20;
   hm->pre_patch(hm_patch, hm_base);
-  QCOMPARE (hm[2] == -20, true);
+  CHECK_EQ (hm[2] == -20, true);
 }
 
 /******************************************************************************
 * tests on copy 
 ******************************************************************************/
-void
-TestHashmap::test_copy () {
+static void
+test_copy () {
   auto hm = hashmap<int, int>();
   auto hm_c = hashmap<int, int>(0, 10, 2);
   hm_c(1) = 10;
@@ -200,31 +178,31 @@ TestHashmap::test_copy () {
   hm_c(2) = 20;
 
   auto res_hm = copy(hm_c);
-  QCOMPARE (res_hm[1] == 10, true);
-  QCOMPARE (res_hm[11] == 110, true);
-  QCOMPARE (res_hm[2] == 20, true);
+  CHECK_EQ (res_hm[1] == 10, true);
+  CHECK_EQ (res_hm[11] == 110, true);
+  CHECK_EQ (res_hm[2] == 20, true);
 }
 
 /******************************************************************************
 * tests on equality 
 ******************************************************************************/
-void
-TestHashmap::test_equality () {
+static void
+test_equality () {
     auto hm1 = hashmap<int, int>(0, 10, 3);
     auto hm2 = hashmap<int, int>(0, 100, 30);
     hm1(1) = 10;
     hm2(1) = 10;
-    QCOMPARE (hm1 == hm2, true);
+    CHECK_EQ (hm1 == hm2, true);
 
     hm2(2) = 20;
-    QCOMPARE (hm1 != hm2, true);
+    CHECK_EQ (hm1 != hm2, true);
 }
 
 /******************************************************************************
 * tests on changes 
 ******************************************************************************/
-void
-TestHashmap::test_changes() {
+static void
+test_changes () {
   auto base_m = hashmap<int, int>();
   auto patch_m = hashmap<int, int>();
   base_m(1) = 10;
@@ -232,17 +210,16 @@ TestHashmap::test_changes() {
   patch_m(2) = -20;
   patch_m(3) = -30;
   auto res = changes(patch_m, base_m);
-  QCOMPARE (N(res) == 2, true);
-  QCOMPARE (res[2] == -20, true);
-  QCOMPARE (res[3] == -30, true);
+  CHECK_EQ (N(res) == 2, true);
+  CHECK_EQ (res[2] == -20, true);
+  CHECK_EQ (res[3] == -30, true);
 }
-
 
 /******************************************************************************
 * tests on invert 
 ******************************************************************************/
-void
-TestHashmap::test_invert() {
+static void
+test_invert () {
   auto base_m= hashmap<int, int>();
   auto patch_m= hashmap<int, int>();
   base_m(1) = 10;
@@ -250,24 +227,39 @@ TestHashmap::test_invert() {
   patch_m(2) = -20;
   patch_m(3) = -30;
   auto res= invert(patch_m, base_m);
-  QCOMPARE (N(res) == 2, true);
-  QCOMPARE (res[2] == 20, true);
-  QCOMPARE (res[3] == 0, true);
+  CHECK_EQ (N(res) == 2, true);
+  CHECK_EQ (res[2] == 20, true);
+  CHECK_EQ (res[3] == 0, true);
 }
-
 
 /******************************************************************************
 * tests on N 
 ******************************************************************************/
-void
-TestHashmap::test_size () {
+static void
+test_size () {
   auto empty_hm = hashmap<int, void*>();
-  QCOMPARE (N(empty_hm) == 0, true);
+  CHECK_EQ (N(empty_hm) == 0, true);
 
   auto non_empty_hm = hashmap<int, void*>();
   non_empty_hm(1) = nullptr;
-  QCOMPARE (N(non_empty_hm) == 1, true);
+  CHECK_EQ (N(non_empty_hm) == 1, true);
 }
 
-QTEST_MAIN(TestHashmap)
-#include "hashmap_test.moc"
+int
+main () {
+  RUN (test_resize);
+  RUN (test_reset);
+  RUN (test_generate);
+  RUN (test_contains);
+  RUN (test_empty);
+  RUN (test_join);
+  RUN (test_write_back);
+  RUN (test_pre_patch);
+  RUN (test_post_patch);
+  RUN (test_copy);
+  RUN (test_equality);
+  RUN (test_changes);
+  RUN (test_invert);
+  RUN (test_size);
+  return test_report ();
+}

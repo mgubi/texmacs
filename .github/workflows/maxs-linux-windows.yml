@@ -59,7 +59,7 @@ jobs:
       - name: Build
         run: make -j"$(nproc)"
 
-      # the C++ unit tests (tests/Makefile), QtTest ones included
+      # the C++ unit tests (tests/Makefile)
       - name: Unit tests
         run: make -C tests
 
@@ -211,7 +211,7 @@ jobs:
           echo "${cmd:0:200}..."
           eval "$cmd -Wl,--trace-symbol=TTF_OpenFont -Wl,--trace" 2>&1 | grep -i "sdl\|TTF_OpenFont\|vue-deps" | head -40 || true
 
-      # the C++ unit tests without Qt (those over tests/tm_test.hpp)
+      # the C++ unit tests (tests/Makefile), as with Qt
       - name: Unit tests
         run: LD_LIBRARY_PATH="$DEPS/lib" make -C tests
 
