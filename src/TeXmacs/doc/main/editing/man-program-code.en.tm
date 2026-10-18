@@ -61,11 +61,10 @@
   <paragraph*|Structural edits>
 
   <menu|Focus|Structure> edits whole parts of the code, which keeps it well
-  formed: <menu|Delete node> (also <shortcut|(structured-remove-right)>,
-  and <shortcut|(structured-remove-left)> for the part before the cursor),
-  <menu|Swap with next> and <menu|Swap with previous>, <menu|Raise node>
-  (replace the part around by the one at the cursor), <menu|Remove
-  brackets> (also <shortcut|(program-remove-structure)>), <menu|Wrap in
+  formed: <menu|Delete node>, <menu|Swap with next> and <menu|Swap with
+  previous>, <menu|Raise node> (replace the part around by the one at the
+  cursor), <menu|Remove brackets> (also <key|structured:cmd backspace> or
+  <key|structured:cmd delete>), <menu|Wrap in
   parentheses> and the like, and <menu|Comment or uncomment node>.
   <menu|Focus|Toggle comment> comments or uncomments the lines of the
   selection.
