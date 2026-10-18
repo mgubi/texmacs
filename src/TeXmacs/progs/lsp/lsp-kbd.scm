@@ -41,8 +41,6 @@
 (kbd-map
   (:mode in-lsp?)
   ("S-F12" (lsp-hover))
-  ("F8" (lsp-next-diagnostic #t))
-  ("S-F8" (lsp-next-diagnostic #f))
   ("std F" (lsp-format))
   ("std E" (interactive lsp-rename))
   ("std ." (lsp-quick-fix))

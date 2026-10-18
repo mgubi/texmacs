@@ -811,7 +811,7 @@ valid_cursor_path (tree t, path p) {
 
 void
 edit_interface_rep::update_diagnostic_rects (rectangle new_visible) {
-  static const char* names[]= { "lsp-errors", "lsp-warnings", "lsp-infos" };
+  static const char* names[]= { "code-errors", "code-warnings", "code-infos" };
   static const char* colors[]= { "#e02020", "#e09000", "#2080e0" };
   rectangles visible (new_visible);
   for (int i=0; i<N(diagnostic_rects); i++)

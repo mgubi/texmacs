@@ -897,7 +897,7 @@
       (when c
         (lsp-wait c (lambda () (nnull? (lsp-diagnostics uri))) 20000)
         (lsp-show-diagnostics)
-        (with errs (get-alt-selection "lsp-errors")
+        (with errs (get-alt-selection "code-errors")
           (check-true (>= (length errs) 2))
           (check-true (in? (append (buffer-path) '(2 9)) errs)))
         ;; from the start to the first error
@@ -948,7 +948,7 @@
           (buffer-close aux))
         (check= (current-buffer) u)
         (lsp-hide-diagnostics)
-        (check= (get-alt-selection "lsp-errors") '())
+        (check= (get-alt-selection "code-errors") '())
         ;; information at the cursor, in a balloon at the line, which must
         ;; be typeset (the event loop does it before each key)
         (go-to-path (append (buffer-path) '(2 16)))

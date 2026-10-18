@@ -31,6 +31,8 @@
 (lazy-define (code code-navigate) code-go-to-definition code-outline
              code-outline-entries code-go-to)
 (lazy-menu (code code-navigate) code-definitions-menu)
+(lazy-define (code code-diagnostics) code-next-diagnostic code-set-diagnostics
+             code-clear-diagnostics code-diagnostics code-check-syntax)
 (lazy-define (utils library cursor) notify-buffer-closed)
 (lazy-define (utils edit variants) make-inline-tag-list make-wrapped-tag-list)
 (lazy-define (utils cas cas-out) cas->stree)

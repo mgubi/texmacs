@@ -984,6 +984,44 @@
          (ctx (and id (path-context (cursor-path) id))))
     (and ctx (list ctx id (syntax-outline (cadr ctx) lan id)))))
 
+(define-public (syntax-errors-at-cursor)
+  ;; the errors and the missing nodes of the code at the cursor, as items
+  ;; (error start end message) of progs/code/code-diagnostics.scm (an
+  ;; empty node covers a character); #f without a syntax tree
+  (let ((c (cursor-code)))
+    (and c (tree-is? (cadr (car c)) 'document)
+         (let* ((ctx (car c)) (lan (cadr c)) (root (cadr ctx)))
+           (map (lambda (e)
+                  (let* ((s (cadr e)) (en (caddr e))
+                         (len (string-length (line-string root (car en))))
+                         (en* (if (and (== s en) (< (cadr en) len))
+                                  (list (car en) (+ (cadr en) 1))
+                                  en)))
+                    (list 'error (context-path ctx s) (context-path ctx en*)
+                          (if (== (car e) "missing") "Missing in the syntax"
+                              "Syntax error"))))
+                (syntax-region-errors root lan))))))
+
+(define-public (syntax-context-at-cursor)
+  ;; where the cursor is in the code: string, comment or code (the node of
+  ;; the character before it); #f without a syntax tree
+  (let ((c (cursor-code)))
+    (and c
+         (let* ((ctx (car c)) (lan (cadr c)) (root (cadr ctx)) (p (cddr ctx))
+                (col (max 0 (- (cadr p) 1)))
+                (l (syntax-region-node-at root lan (car p) col))
+                (types (if (pair? l) (map node-type l) '()))
+                (has? (lambda (w) (list-find types (lambda (t) (string-contains? t w))))))
+           (cond ((has? "comment") 'comment)
+                 ((has? "string") 'string)
+                 (else 'code))))))
+
+(define-public (syntax-local-names)
+  ;; the names of the definitions of the code at the cursor; #f without a
+  ;; syntax tree
+  (let ((o (cursor-outline)))
+    (and o (map cadr (caddr o)))))
+
 (define-public (syntax-outline-at-cursor)
   ;; the definitions of the code at the cursor as entries of an outline
   ;; (level kind name detail path), for progs/code/code-navigate.scm; #f

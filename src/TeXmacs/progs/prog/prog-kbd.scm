@@ -35,6 +35,8 @@
   ;; (from the server which follows the file, else from the syntax tree)
   ("F12" (code-go-to-definition))
   ("std O" (code-outline))
+  ("F8" (code-next-diagnostic #t))
+  ("S-F8" (code-next-diagnostic #f))
   ("structured:cmd delete" (program-remove-structure))
   ("structured:cmd backspace" (program-remove-structure))
 

@@ -271,6 +271,26 @@ server of each language (`(server "clangd")`), replacing the defaults of
 5. Fallbacks across: syntax errors of tree-sitter as diagnostics without a
    server; LSP selectionRange and documentSymbol without a grammar; later,
    servers for code blocks of documents (virtual documents).
+   - Diagnostics (done): `progs/code/code-diagnostics.scm` keeps the items
+     (severity start end message, paths) of each source of a buffer: the
+     server (the diagnostics of the LSP, `draw-diagnostics`) and the syntax
+     (the error and missing nodes of the code at the cursor, feature
+     `syntax-errors` of tree-sitter, after a pause, where no server follows
+     the code: feature `server-diagnostics`); all are underlined (the
+     selections are now code-errors, code-warnings and code-infos, drawn by
+     edit_interface.cpp), F8 and S-F8 go through them in all program code.
+     The unmatched brackets stay red at once (the colours of tree-sitter).
+     In a window: a Python file without a server has its syntax error
+     underlined, F8 goes to it.
+   - Completion (done): `progs/code/code-complete.scm`, the feature
+     `completion-context` (string, comment or code, by the syntax tree):
+     the LSP does not complete in a string or a comment; the feature
+     `local-names` (the names of the definitions of the code, tree-sitter):
+     tab completes with them where no server follows the code. In a window:
+     in Python without a server, cou + tab gives counter; not in "cou".
+   - Not done: selectionRange and documentSymbol of a server for code
+     without a grammar (every language with a server has a grammar now);
+     servers for the code blocks of documents.
 6. Builds without each feature (configure options), the suite `code`, docs:
    a developer chapter on the code features and one user page per feature.
 

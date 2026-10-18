@@ -73,7 +73,7 @@ protected:
   array<string>     user_cursor_colors;
   array<string>     user_cursor_names;
   array<rectangles> spell_error_rects;
-  // the diagnostics of language servers (alt selections lsp-errors...),
+  // the diagnostics of program code (alt selections code-errors...),
   // underlined in their colors
   array<rectangles> diagnostic_rects;
   array<color>      diagnostic_colors;

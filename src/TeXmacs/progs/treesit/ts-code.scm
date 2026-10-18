@@ -36,3 +36,15 @@
 (code-provider-set! 'definition 'syntax 20
                     (lambda () (and (syntax-cursor-language) #t))
                     syntax-go-to-definition)
+
+(code-provider-set! 'syntax-errors 'syntax 20
+                    (lambda () (and (syntax-cursor-language) #t))
+                    syntax-errors-at-cursor)
+
+(code-provider-set! 'completion-context 'syntax 20
+                    (lambda () (and (syntax-cursor-language) #t))
+                    syntax-context-at-cursor)
+
+(code-provider-set! 'local-names 'syntax 20
+                    (lambda () (and (syntax-cursor-language) #t))
+                    syntax-local-names)

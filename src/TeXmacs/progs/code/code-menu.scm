@@ -19,7 +19,9 @@
 (texmacs-module (code code-menu)
   (:use (code code-features)
         (code code-fold)
-        (code code-navigate)))
+        (code code-navigate)
+        (code code-diagnostics)
+        (code code-complete)))
 
 (tm-menu (code-syntax-menu))
 

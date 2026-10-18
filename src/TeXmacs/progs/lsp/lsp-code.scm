@@ -28,3 +28,9 @@
 (code-provider-set! 'outline 'server 10 lsp-can-outline? lsp-outline-at-cursor)
 (code-provider-set! 'definition 'server 10 lsp-can-find-definitions?
                     lsp-definition-at-cursor)
+
+;; (the diagnostics of the server: the syntax errors of tree-sitter are not
+;; shown where it gives them, code-diagnostics.scm)
+(code-provider-set! 'server-diagnostics 'server 10
+                    (lambda () (and (lsp-on?) (lsp-buffer-followed?)))
+                    (lambda () #t))

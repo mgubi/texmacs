@@ -15,7 +15,7 @@
 ;; the changes of a buffer (notify-buffer-changed, after the typesetting),
 ;; and its text is given to the server once the user has paused (and when
 ;; it is loaded, the first notification). The diagnostics of the server are
-;; underlined (the alt selections lsp-errors, lsp-warnings and lsp-infos,
+;; underlined (the alt selections code-errors, code-warnings and code-infos,
 ;; drawn by the editor), the message of the one at the cursor is shown on
 ;; the status bar. Completion (tab after a word, or a . -> ::), information
 ;; at the cursor (hover), definitions and the diagnostics are reached by the
@@ -29,7 +29,9 @@
   (:use (lsp lsp-base)
         (lsp lsp-client)
         (lsp lsp-documents)
-        (code code-navigate)))
+        (code code-navigate)
+        (code code-diagnostics)
+        (code code-complete)))
 
 (tm-define (lsp-on?)
   (:synopsis "Do language servers follow the source files?")
@@ -180,9 +182,17 @@
     (draw-diagnostics l)))
 
 (define (draw-diagnostics l)
-  (set-alt-selection "lsp-errors" (severity-paths l 'error))
-  (set-alt-selection "lsp-warnings" (severity-paths l 'warning))
-  (set-alt-selection "lsp-infos" (severity-paths l 'info)))
+  ;; (as the diagnostics of the source server of the core, with those of
+  ;; the other sources: progs/code/code-diagnostics.scm)
+  (with b (buffer-path)
+    (code-set-diagnostics
+     'server
+     (map (lambda (x)
+            (list (car x)
+                  (append b (list (list-ref x 1) (list-ref x 2)))
+                  (append b (list (list-ref x 3) (list-ref x 4)))
+                  (list-ref x 5)))
+          l))))
 
 (tm-define (lsp-document-lines-changed uri first last added)
   ;; the diagnostics shown follow the lines, until the server sends new
@@ -206,9 +216,7 @@
         (when (== (current-uri) uri) (draw-diagnostics l2))))))
 
 (tm-define (lsp-hide-diagnostics)
-  (cancel-alt-selection "lsp-errors")
-  (cancel-alt-selection "lsp-warnings")
-  (cancel-alt-selection "lsp-infos"))
+  (code-clear-diagnostics 'server))
 
 (tm-define (lsp-diagnostics-changed uri)
   (former uri)
@@ -537,6 +545,8 @@
                        (or (word-char? c) (in? c '(#\. #\> #\:))))))))
        (with c (lsp-buffer-client*)
          (and c (capable? c "completionProvider")))
+       ;; (not in a string or a comment, as the syntax tree says)
+       (not (code-in-text?))
        #t))
 
 (tm-define (kbd-variant t forwards?)
