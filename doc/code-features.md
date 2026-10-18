@@ -228,6 +228,23 @@ server of each language (`(server "clangd")`), replacing the defaults of
      feature, to be turned into registrations.
 3. Source regions (3.1): the diff out of `syntax_region.cpp`; tree-sitter and
    the LSP as listeners; per-edit timings on large files (s7.c, parser.c).
+   - Done: `System/Language/code_regions.cpp`. `code_lines_common` (the
+     common first and last lines), which `region_update` of tree-sitter
+     uses; snapshots of the lines of a region as a file has them
+     (`code-snapshot-new`, `-change`, `-changed?`, `-text`, `-delete`): the
+     change since the snapshot as a range of positions (lines, UTF-16 units)
+     and its text, by lines, or by characters when one line changed (as by
+     typing). Each feature keeps its own snapshot, at its own pace: what is
+     shared is the computation, not the moment (tree-sitter follows the
+     region at each highlight, a server after a pause). The LSP gives a
+     buffer to its server through a snapshot (`lsp-document-open-lines`,
+     `lsp-document-change-lines`): the text is no longer made again at each
+     sync; it is made for a server which takes whole texts only, and when
+     it is asked for (`lsp-document-sent-text`). The stale checks (edits of
+     a server for an older text, the page of the fixes, the answers for the
+     colours) compare snapshots. s7.c (104848 lines): a sync after an edit
+     8 ms, the text 129 ms (what each sync cost before). Documents given as
+     texts (the tests of the protocol) keep the former path.
 4. Providers (3.5): the `code-*` commands, the preferences, the menu and keys;
    the commands of both moved behind them; the language table with servers.
 5. Fallbacks across: syntax errors of tree-sitter as diagnostics without a

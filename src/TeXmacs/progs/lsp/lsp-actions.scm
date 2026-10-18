@@ -267,8 +267,8 @@
                    (and v mine
                         (or (!= v mine)
                             (and u (buffer-exists? u)
-                                 (!= (lsp-buffer-text u)
-                                     (lsp-document-sent-text c key)))))))
+                                 (lsp-document-changed-since?
+                                  c key (buffer-get-body u)))))))
                (cdr dc))))))
 
 ;; the edits which servers asked for (workspace/applyEdit), since the start:
@@ -442,7 +442,7 @@
           (buffer-close u)))
       (cond ((not (and fixes-buffer (buffer-exists? fixes-buffer)))
              (set-message "The file of the fixes has been closed" ""))
-            ((!= (lsp-buffer-text fixes-buffer) fixes-text)
+            ((code-snapshot-changed? fixes-text (buffer-get-body fixes-buffer))
              ;; (its ranges would no longer be those of the text)
              (switch-to-buffer fixes-buffer)
              (set-message "The file has changed: ask for the fixes again"
@@ -498,7 +498,9 @@
            (set! fixes-client (car r))
            (set! fixes (cadr r))
            (set! fixes-buffer (current-buffer))
-           (set! fixes-text (lsp-buffer-text))
+           ;; (a snapshot of the lines, see code_regions.cpp)
+           (when fixes-text (code-snapshot-delete fixes-text))
+           (set! fixes-text (code-snapshot-new (buffer-get-body (current-buffer))))
            (open-auxiliary
             "Quick fixes"
             `(document

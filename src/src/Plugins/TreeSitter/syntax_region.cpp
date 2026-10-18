@@ -9,6 +9,7 @@
 ******************************************************************************/
 
 #include "code_lines.hpp"
+#include "code_regions.hpp"
 #include "syntax_region.hpp"
 #include "ts_captures.hpp"
 #include "language.hpp"
@@ -204,11 +205,10 @@ region_update (syntax_region_rep* r) {
   array<string> cur= region_lines (r->root);
   array<string>& old= r->lines;
   int n0= N(old), n1= N(cur);
-  int a= 0;
-  while (a < n0 && a < n1 && old[a] == cur[a]) a++;
-  if (a == n0 && a == n1) return;
-  int b= 0;
-  while (b < n0 - a && b < n1 - a && old[n0-1-b] == cur[n1-1-b]) b++;
+  // (the common first and last lines, as for the language servers, see
+  // System/Language/code_regions.cpp)
+  int a, b;
+  if (!code_lines_common (old, cur, a, b)) return;
   // the changed lines, with the newlines which follow them (a virtual
   // newline after the last line, the same in both texts)
   string os= segment (old, a, n0 - b), ns= segment (cur, a, n1 - b);

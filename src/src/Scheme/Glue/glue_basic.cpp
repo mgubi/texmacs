@@ -10192,6 +10192,75 @@ tmg_code_line_layers (tmscm arg1) {
 }
 
 tmscm
+tmg_code_snapshot_new (tmscm arg1) {
+  TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "code-snapshot-new");
+
+  tree in1= tmscm_to_tree (arg1);
+
+  // TMSCM_DEFER_INTS;
+  int out= code_snapshot_new (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return int_to_tmscm (out);
+}
+
+tmscm
+tmg_code_snapshot_delete (tmscm arg1) {
+  TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "code-snapshot-delete");
+
+  int in1= tmscm_to_int (arg1);
+
+  // TMSCM_DEFER_INTS;
+  code_snapshot_delete (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_code_snapshot_change (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "code-snapshot-change");
+  TMSCM_ASSERT_TREE (arg2, TMSCM_ARG2, "code-snapshot-change");
+
+  int in1= tmscm_to_int (arg1);
+  tree in2= tmscm_to_tree (arg2);
+
+  // TMSCM_DEFER_INTS;
+  tree out= code_snapshot_change (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return tree_to_tmscm (out);
+}
+
+tmscm
+tmg_code_snapshot_changedP (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "code-snapshot-changed?");
+  TMSCM_ASSERT_TREE (arg2, TMSCM_ARG2, "code-snapshot-changed?");
+
+  int in1= tmscm_to_int (arg1);
+  tree in2= tmscm_to_tree (arg2);
+
+  // TMSCM_DEFER_INTS;
+  bool out= code_snapshot_changed (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return bool_to_tmscm (out);
+}
+
+tmscm
+tmg_code_snapshot_text (tmscm arg1) {
+  TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "code-snapshot-text");
+
+  int in1= tmscm_to_int (arg1);
+
+  // TMSCM_DEFER_INTS;
+  string out= code_snapshot_text (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return string_to_tmscm (out);
+}
+
+tmscm
 tmg_code_line_fold_state (tmscm arg1) {
   TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "code-line-fold-state");
 
@@ -13342,6 +13411,11 @@ initialize_glue_basic () {
   tmscm_install_procedure ("code-set-line-layers",  tmg_code_set_line_layers, 3, 0, 0);
   tmscm_install_procedure ("code-clear-line-layers",  tmg_code_clear_line_layers, 1, 0, 0);
   tmscm_install_procedure ("code-line-layers",  tmg_code_line_layers, 1, 0, 0);
+  tmscm_install_procedure ("code-snapshot-new",  tmg_code_snapshot_new, 1, 0, 0);
+  tmscm_install_procedure ("code-snapshot-delete",  tmg_code_snapshot_delete, 1, 0, 0);
+  tmscm_install_procedure ("code-snapshot-change",  tmg_code_snapshot_change, 2, 0, 0);
+  tmscm_install_procedure ("code-snapshot-changed?",  tmg_code_snapshot_changedP, 2, 0, 0);
+  tmscm_install_procedure ("code-snapshot-text",  tmg_code_snapshot_text, 1, 0, 0);
   tmscm_install_procedure ("code-line-fold-state",  tmg_code_line_fold_state, 1, 0, 0);
   tmscm_install_procedure ("code-set-line-fold-state",  tmg_code_set_line_fold_state, 2, 0, 0);
   tmscm_install_procedure ("code-column",  tmg_code_column, 3, 0, 0);

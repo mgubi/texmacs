@@ -5987,6 +5987,46 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(code-snapshot-new <scm-arg|tree>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|code_snapshot_new> which returns
+    <scm|int>.
+  </explain>
+
+  <\explain>
+    <scm|(code-snapshot-delete <scm-arg|int>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|code_snapshot_delete> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(code-snapshot-change <scm-arg|int> <scm-arg|tree>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|code_snapshot_change> which returns
+    <scm|tree>.
+  </explain>
+
+  <\explain>
+    <scm|(code-snapshot-changed? <scm-arg|int> <scm-arg|tree>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|code_snapshot_changed> which returns
+    <scm|bool>.
+  </explain>
+
+  <\explain>
+    <scm|(code-snapshot-text <scm-arg|int>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|code_snapshot_text> which returns
+    <scm|string>.
+  </explain>
+
+  <\explain>
     <scm|(code-line-fold-state <scm-arg|tree>)>
 <explain-synopsis|no synopsis>
   <|explain>

@@ -64,8 +64,20 @@
 
 (tm-define (lsp-document-sent-text c uri)
   (:synopsis "The text of @uri which @c was given last, or #f")
+  ;; (a document of a buffer keeps a snapshot of its lines instead)
   (with d (ahash-ref (lsp-client-ref c 'documents) uri)
-    (and d (cadr d))))
+    (and d (or (cadr d) (and (snapshot d) (code-snapshot-text (snapshot d)))))))
+
+(define (snapshot d)
+  ;; the snapshot of the lines of a document of a buffer, or #f
+  (and (pair? (cdddr d)) (cadddr d)))
+
+(tm-define (lsp-document-changed-since? c uri root)
+  (:synopsis "Have the lines @root changed since @c was given them?")
+  (with d (ahash-ref (lsp-client-ref c 'documents) uri)
+    (cond ((not d) #t)
+          ((snapshot d) (code-snapshot-changed? (snapshot d) root))
+          (else (!= (cadr d) (lsp-document-text root))))))
 
 (tm-define (lsp-document-open c uri lan-id text)
   (:synopsis "Opens the document @uri, in the language @lan-id, with @text")
@@ -74,6 +86,24 @@
       (lsp-document-change c uri text)
       (begin
         (ahash-set! (lsp-client-ref c 'documents) uri (list 1 text lan-id))
+        (when (open-close? c)
+          (lsp-notify c "textDocument/didOpen"
+                      (lsp-object "textDocument"
+                                  (lsp-object "uri" uri
+                                              "languageId" lan-id
+                                              "version" (lsp-number 1)
+                                              "text" text)))))))
+
+(tm-define (lsp-document-open-lines c uri lan-id root)
+  (:synopsis "Opens the document @uri of the lines @root, in @lan-id")
+  ;; (as lsp-document-open; the changes of the lines are then those of a
+  ;; snapshot of them, System/Language/code_regions.cpp: the text is not
+  ;; made again at each change)
+  (if (lsp-document-open? c uri)
+      (lsp-document-change-lines c uri root)
+      (let* ((snap (code-snapshot-new root))
+             (text (code-snapshot-text snap)))
+        (ahash-set! (lsp-client-ref c 'documents) uri (list 1 #f lan-id snap))
         (when (open-close? c)
           (lsp-notify c "textDocument/didOpen"
                       (lsp-object "textDocument"
@@ -201,6 +231,48 @@
                                      (lsp-text-change (cadr d) text)
                                      (lsp-object "text" text)))))))))
 
+(define (count-newlines s)
+  (let loop ((n 0) (start 0))
+    (with j (string-search-forwards "\n" start s)
+      (if (< j 0) n (loop (+ n 1) (+ j 1))))))
+
+(tm-define (lsp-document-change-lines c uri root)
+  (:synopsis "The lines @root of the document @uri: sent if they changed")
+  ;; (the change of the snapshot of the lines; the text, when the server
+  ;; takes whole texts only)
+  (with d (ahash-ref (lsp-client-ref c 'documents) uri)
+    (cond ((not d) (noop))
+          ((not (snapshot d)) (lsp-document-change c uri (lsp-document-text root)))
+          ((> (sync-kind c) 0)
+           (with ch (tree->stree (code-snapshot-change (snapshot d) root))
+             (when (and (pair? ch) (= (length ch) 6))
+               (let* ((n (lambda (x) (string->number x)))
+                      (sl (n (list-ref ch 1))) (sc (n (list-ref ch 2)))
+                      (el (n (list-ref ch 3))) (ec (n (list-ref ch 4)))
+                      (text (list-ref ch 5))
+                      (v (+ (car d) 1)))
+                 (lsp-document-lines-changed uri sl el (count-newlines text))
+                 (ahash-set! (lsp-client-ref c 'documents) uri
+                             (list v #f (caddr d) (snapshot d)))
+                 (lsp-notify c "textDocument/didChange"
+                             (lsp-object "textDocument"
+                                         (lsp-object "uri" uri
+                                                     "version" (lsp-number v))
+                                         "contentChanges"
+                                         (lsp-array
+                                          (if (== (sync-kind c) 2)
+                                              (lsp-object
+                                               "range"
+                                               (lsp-object
+                                                "start" (lsp-object "line" (lsp-number sl)
+                                                                    "character" (lsp-number sc))
+                                                "end" (lsp-object "line" (lsp-number el)
+                                                                  "character" (lsp-number ec)))
+                                               "text" text)
+                                              (lsp-object
+                                               "text" (code-snapshot-text
+                                                       (snapshot d))))))))))))))
+
 (tm-define (lsp-document-save c uri)
   (:synopsis "The document @uri has been saved")
   (let* ((d (ahash-ref (lsp-client-ref c 'documents) uri))
@@ -210,12 +282,14 @@
       (lsp-notify c "textDocument/didSave"
                   (if (lsp-true? (lsp-ref save "includeText"))
                       (lsp-object "textDocument" (text-document uri)
-                                  "text" (cadr d))
+                                  "text" (lsp-document-sent-text c uri))
                       (lsp-object "textDocument" (text-document uri)))))))
 
 (tm-define (lsp-document-close c uri)
   (:synopsis "Closes the document @uri")
   (when (lsp-document-open? c uri)
+    (with d (ahash-ref (lsp-client-ref c 'documents) uri)
+      (when (snapshot d) (code-snapshot-delete (snapshot d))))
     (ahash-remove! (lsp-client-ref c 'documents) uri)
     (lsp-forget-diagnostics uri)
     (when (open-close? c)
@@ -255,8 +329,14 @@
   ;; would stay underlined, also after a restart)
   (former c)
   (when (== (lsp-client-state c) 'dead)
-    (for (uri (map car (ahash-table->list (lsp-client-ref c 'documents))))
-      (lsp-forget-diagnostics uri))))
+    (for (x (ahash-table->list (lsp-client-ref c 'documents)))
+      (lsp-forget-diagnostics (car x))
+      ;; (and the snapshots of its documents)
+      (with d (cdr x)
+        (when (snapshot d)
+          (code-snapshot-delete (snapshot d))
+          (ahash-set! (lsp-client-ref c 'documents) (car x)
+                      (list (car d) "" (caddr d) #f)))))))
 
 (tm-define (lsp-diagnostics-changed uri)
   (:synopsis "Called when the diagnostics of @uri have been published")
@@ -394,10 +474,10 @@
   ;; the client, or #f when there is none
   (with c (apply lsp-buffer-client opt)
     (when (and c (lsp-client-alive? c))
-      (lsp-document-open c (apply lsp-buffer-uri opt)
-                         (lsp-language-id (apply lsp-buffer-language opt)
-                                          (apply lsp-buffer-path opt))
-                         (apply lsp-buffer-text opt)))
+      (lsp-document-open-lines c (apply lsp-buffer-uri opt)
+                               (lsp-language-id (apply lsp-buffer-language opt)
+                                                (apply lsp-buffer-path opt))
+                               (buffer-get-body (the-buffer opt))))
     c))
 
 (tm-define (lsp-buffer-sync . opt)
@@ -406,8 +486,7 @@
         (uri (apply lsp-buffer-uri opt)))
     (when (and c uri (lsp-client-alive? c))
       (if (lsp-document-open? c uri)
-          (lsp-document-change c uri
-                               (apply lsp-buffer-text opt))
+          (lsp-document-change-lines c uri (buffer-get-body (the-buffer opt)))
           (apply lsp-buffer-open opt)))
     c))
 

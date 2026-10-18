@@ -232,19 +232,22 @@
   (let* ((lines (list->vector (lsp-buffer-lines u)))
          (n (vector-length lines))
          (lan (or (lsp-buffer-language u) ""))
-         (text (lsp-buffer-text u))
+         ;; (a snapshot of the lines, see code_regions.cpp)
+         (snap (code-snapshot-new (buffer-get-body u)))
          (tokens #f) (hints #f) (left 2))
     (define (done)
       (set! left (- left 1))
-      (when (and (== left 0) (buffer-exists? u)
-                 ;; (only for the text which was asked about, and in the
-                 ;; buffer which is shown: the lines which change are
-                 ;; typeset again)
-                 (== (current-buffer) u)
-                 (== (lsp-buffer-text u) text))
-        (lsp-apply-decorations u uri (lsp-line-decorations
-                                      lines lan (or tokens '())
-                                      (or hints '())))))
+      (when (== left 0)
+        (when (and (buffer-exists? u)
+                   ;; (only for the text which was asked about, and in the
+                   ;; buffer which is shown: the lines which change are
+                   ;; typeset again)
+                   (== (current-buffer) u)
+                   (not (code-snapshot-changed? snap (buffer-get-body u))))
+          (lsp-apply-decorations u uri (lsp-line-decorations
+                                        lines lan (or tokens '())
+                                        (or hints '()))))
+        (code-snapshot-delete snap)))
     (if (and (colors-on?)
              (lsp-client-capable? c "semanticTokensProvider"))
         (lsp-request c "textDocument/semanticTokens/full"
