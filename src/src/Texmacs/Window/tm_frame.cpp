@@ -214,6 +214,25 @@ tm_frame_rep::set_window_zoom_factor (double zoom) {
   if (!has_current_window ()) return;
   if (zoom >= 25.0 ) zoom= 25.0;
   if (zoom <=  0.04) zoom=  0.04;
+  // The coordinates of the window are those of the document times the
+  // magnification, in 32 bits: in a long document (a full manual), a
+  // large zoom made them overflow far from its start, and the view, the
+  // scrolls and the drawing went wrong. The extents of the window grow as
+  // the zoom: they stay below 2^30 (half of the limit, for the sums of
+  // two coordinates)
+  double old_zoom= concrete_window () -> get_window_zoom_factor ();
+  SI x1, y1, x2, y2;
+  concrete_window () -> get_extents (x1, y1, x2, y2);
+  double far= 0.0;
+  SI ext[4]= { x1, y1, x2, y2 };
+  for (int i=0; i<4; i++) {
+    double d= ext[i] < 0? -((double) ext[i]): (double) ext[i];
+    if (d > far) far= d;
+  }
+  if (old_zoom > 0.0 && far > 0.0) {
+    double most= old_zoom * 1073741824.0 / far;
+    if (zoom > most) zoom= most;
+  }
   zoom= normal_zoom (zoom);
   concrete_window () -> set_window_zoom_factor (zoom);
 }

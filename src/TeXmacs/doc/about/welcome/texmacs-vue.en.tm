@@ -280,6 +280,13 @@
   <paragraph|18 October 2026>
 
   <\itemize>
+    <item>A large zoom in a long document (a full manual, far from its
+    start) no longer breaks the view: the page went off the screen, and
+    scrolling left smeared copies of the text. The coordinates of the
+    window, those of the document times the zoom, overflowed; the zoom now
+    stops before (in the full manuals, at about 800% far down; a short
+    document still goes to 2500%).
+
     <item>A page of the site,
     <hlink|downloads.html|https://mgubi.github.io/texmacs/downloads.html>,
     lists the builds of <TeXmacs> Upsilon for <name|macOS>, <name|Linux> and
