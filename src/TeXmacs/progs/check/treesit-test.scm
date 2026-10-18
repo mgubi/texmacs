@@ -725,7 +725,44 @@
           (check-true (syntax-toggle-comment))
           (check= (tree->string (tree-ref code 1)) "; (if x \"(\" 'b)")
           (syntax-toggle-comment)
-          (check= (tree->string (tree-ref code 1)) "(if x \"(\" 'b)"))))))
+          (check= (tree->string (tree-ref code 1)) "(if x \"(\" 'b)"))))
+    ;; structured moves: from node to node, around, inside, and from
+    ;; definition to definition
+    (with-test-buffer '(document (scm-code (document "(define (f x) x)"
+                                                     "(define (g y) (f y))"
+                                                     "(display 1)")))
+      (lambda (u b)
+        (update-forced)
+        (let* ((code (tree-ref b 0 0))
+               (at (lambda (row col) (rcons (tree->path (tree-ref code row)) col))))
+          (go-to (at 0 0))
+          (check-true (syntax-move-node 1))
+          (check= (cursor-path) (at 1 0))
+          (check-true (syntax-move-node 1))
+          (check= (cursor-path) (at 2 0))
+          (check-false (syntax-move-node 1))
+          (check-true (syntax-move-node -1))
+          (check= (cursor-path) (at 1 0))
+          (go-to (at 1 5))
+          (check-true (syntax-move-node -1))   ; the start of define
+          (check= (cursor-path) (at 1 1))
+          (check-true (syntax-move-node 2))
+          (check= (cursor-path) (at 1 0))
+          (check-true (syntax-move-node -2))
+          (check= (cursor-path) (at 1 1))
+          (go-to (at 0 0))
+          (check-true (syntax-move-definition 1))
+          (check= (cursor-path) (at 0 9))
+          (check-true (syntax-move-definition 1))
+          (check= (cursor-path) (at 1 9))
+          (check-false (syntax-move-definition 1))
+          (check-true (syntax-move-definition -1))
+          (check= (cursor-path) (at 0 9))
+          (go-to (at 1 16))
+          (check-true (syntax-select-definition))
+          (check= (list (selection-get-start) (selection-get-end))
+                  (list (at 1 0) (at 1 20)))
+          (selection-cancel))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; External scanners in the C runtime

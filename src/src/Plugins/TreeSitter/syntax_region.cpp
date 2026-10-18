@@ -599,6 +599,78 @@ syntax_region_highlight (tree root, int language, int query, array<int> colors,
 }
 
 /******************************************************************************
+* Moves between the nodes
+******************************************************************************/
+
+static bool
+point_before (TSPoint a, TSPoint b) {
+  return a.row < b.row || (a.row == b.row && a.column < b.column);
+}
+
+static bool
+point_equal (TSPoint a, TSPoint b) {
+  return a.row == b.row && a.column == b.column;
+}
+
+array<int>
+syntax_region_node_move (tree root, int language, int row, int col, int dir) {
+  // the start (row column) of the node where a structured move goes from
+  // the point: the next (dir 1) or previous (-1) named sibling of the
+  // largest named node which starts at the point (or of an ancestor, when
+  // there is none; the previous of a point inside a node is its start), the
+  // first ancestor which starts before the point (2), the first named
+  // descendant which starts after it (-2); empty when there is none
+  array<int> r;
+  syntax_region_rep* reg= get_region (root, language);
+  if (reg == NULL) return r;
+  TSNode top= ts_tree_root_node (reg->tree);
+  TSPoint p= { (uint32_t) row, (uint32_t) col };
+  TSNode node= ts_node_named_descendant_for_point_range (top, p, p);
+  if (ts_node_is_null (node)) return r;
+  TSNode target= { { 0, 0, 0, 0 }, NULL, NULL };
+  if (dir == 1 || dir == -1) {
+    if (point_equal (ts_node_start_point (node), p))
+      while (true) {
+        TSNode up= ts_node_parent (node);
+        if (ts_node_is_null (up) || ts_node_is_null (ts_node_parent (up)) ||
+            !point_equal (ts_node_start_point (up), p)) break;
+        node= up;
+      }
+    if (dir == -1 && point_before (ts_node_start_point (node), p))
+      target= node;
+    else
+      for (TSNode n= node; !ts_node_is_null (n); n= ts_node_parent (n)) {
+        TSNode s= dir == 1? ts_node_next_named_sibling (n):
+                            ts_node_prev_named_sibling (n);
+        if (!ts_node_is_null (s)) { target= s; break; }
+      }
+  }
+  else if (dir == 2) {
+    for (TSNode n= ts_node_parent (node); !ts_node_is_null (n); n= ts_node_parent (n))
+      if (point_before (ts_node_start_point (n), p)) { target= n; break; }
+  }
+  else if (dir == -2) {
+    // the first named node after the point, inside the node at the point
+    TSNode n= node;
+    while (!ts_node_is_null (n) && ts_node_is_null (target)) {
+      uint32_t k= ts_node_named_child_count (n);
+      TSNode next= { { 0, 0, 0, 0 }, NULL, NULL };
+      for (uint32_t i= 0; i < k; i++) {
+        TSNode c= ts_node_named_child (n, i);
+        if (point_before (p, ts_node_start_point (c))) { target= c; break; }
+        if (!point_before (ts_node_end_point (c), p) &&
+            point_before (p, ts_node_end_point (c))) { next= c; break; }
+      }
+      n= next;
+    }
+  }
+  if (ts_node_is_null (target)) return r;
+  TSPoint s= ts_node_start_point (target);
+  r << (int) s.row << (int) s.column;
+  return r;
+}
+
+/******************************************************************************
 * Indentation by the queries of Neovim (indents.scm)
 ******************************************************************************/
 

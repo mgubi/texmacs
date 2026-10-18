@@ -367,8 +367,9 @@
 
 (define-public (syntax-outline root lan id)
   ;; the definitions of a region of the program language lan (language id
-  ;; of tree-sitter): (kind name start end) in the order of the text, kind
-  ;; being "function", "class"... and start the position of the name
+  ;; of tree-sitter): (kind name start end def-start) in the order of the
+  ;; text, kind being "function", "class"..., start the position of the name
+  ;; and def-start..end the range of the definition
   (let ((q (tags-query lan id)))
     (if (not q) '()
         (let* ((names (tree-sitter-query-capture-names q))
@@ -384,7 +385,7 @@
                                                           (point<=? (caddr n) (caddr d))))))
                        (item (and n (list (string-drop (cap-name d) 11)
                                           (region-text root (cadr n) (caddr n))
-                                          (cadr n) (caddr d)))))
+                                          (cadr n) (caddr d) (cadr d)))))
                   (loop (cdr l)
                         (if (and item (not (list-find acc (lambda (x)
                                                             (== (caddr x) (caddr item))))))
@@ -419,6 +420,53 @@
                 (name (and n (region-text (cadr ctx) (node-start n) (node-end n))))
                 (d (and name (list-find (caddr o) (lambda (d) (== (cadr d) name))))))
            (and d (begin (go-to (context-path ctx (caddr d))) #t))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Structured moves
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; The structured moves of TeXmacs (traverse-left... in prog-edit.scm) go
+;; through the syntax tree: to the next or previous node, to the node around,
+;; into it, and from definition to definition.
+
+(define-public (syntax-move-node dir)
+  ;; go to the next node (dir 1), the previous one (-1), the node around
+  ;; (2) or the first one inside (-2), see syntax_region_node_move; #f when
+  ;; the code has no syntax tree or there is no such node
+  (let* ((lan (syntax-cursor-language))
+         (ctx (and lan (path-context (cursor-path) lan)))
+         (r (and ctx (syntax-region-node-move (cadr ctx) lan (caddr ctx) (cadddr ctx) dir))))
+    (and (pair? r)
+         (begin (go-to (context-path ctx r)) #t))))
+
+(define-public (syntax-move-definition dir)
+  ;; go to the name of the next (dir 1) or previous (-1) definition; #f
+  ;; when there is none
+  (let* ((o (cursor-outline))
+         (ctx (and o (car o)))
+         (p (and ctx (cddr ctx)))
+         (defs (if o (map caddr (caddr o)) '()))
+         (d (if (> dir 0)
+                (list-find defs (lambda (q) (point<? p q)))
+                (let ((before (list-filter defs (lambda (q) (point<? q p)))))
+                  (and (pair? before) (cAr before))))))
+    (and d (begin (go-to (context-path ctx d)) #t))))
+
+(define-public (syntax-select-definition)
+  ;; select the innermost definition around the cursor; #f when there is
+  ;; none
+  (let* ((o (cursor-outline))
+         (ctx (and o (car o)))
+         (p (and ctx (cddr ctx)))
+         (around (if o (list-filter (caddr o)
+                                    (lambda (d) (and (point<=? (list-ref d 4) p)
+                                                     (point<=? p (cadddr d)))))
+                     '())))
+    (and (pair? around)
+         (let ((d (cAr around)))   ; the innermost starts last
+           (selection-set (context-path ctx (list-ref d 4))
+                          (context-path ctx (cadddr d)))
+           #t))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Comments
@@ -484,5 +532,8 @@
   (:require (and (in-prog?) (syntax-cursor-language)))
   (-> "Definitions" (dynamic (syntax-definitions-menu)))
   ("Go to definition" (syntax-go-to-definition))
+  ("Previous definition" (syntax-move-definition -1))
+  ("Next definition" (syntax-move-definition 1))
+  ("Select definition" (syntax-select-definition))
   (assuming (syntax-comment-prefix (get-env "prog-language"))
     ("Toggle comment" (syntax-toggle-comment))))

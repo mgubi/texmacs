@@ -212,6 +212,37 @@
   (:require (syntax-cursor-language))
   (syntax-select-enlarge))
 
+;; the structured moves, by the syntax tree (see treesit/ts-edit.scm)
+(tm-define (traverse-right)
+  (:mode in-prog?)
+  (:require (syntax-cursor-language))
+  (syntax-move-node 1))
+
+(tm-define (traverse-left)
+  (:mode in-prog?)
+  (:require (syntax-cursor-language))
+  (syntax-move-node -1))
+
+(tm-define (traverse-up)
+  (:mode in-prog?)
+  (:require (syntax-cursor-language))
+  (syntax-move-node 2))
+
+(tm-define (traverse-down)
+  (:mode in-prog?)
+  (:require (syntax-cursor-language))
+  (syntax-move-node -2))
+
+(tm-define (traverse-next)
+  (:mode in-prog?)
+  (:require (syntax-cursor-language))
+  (syntax-move-definition 1))
+
+(tm-define (traverse-previous)
+  (:mode in-prog?)
+  (:require (syntax-cursor-language))
+  (syntax-move-definition -1))
+
 (define (program-select-enlarge-by-brackets lb rb)
   (if (== 0 kbd-select-enlarging)
       (set! kbd-select-enlarging 1)

@@ -9190,6 +9190,27 @@ tmg_syntax_region_indent (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4, tmscm 
 }
 
 tmscm
+tmg_syntax_region_node_move (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4, tmscm arg5) {
+  TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "syntax-region-node-move");
+  TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "syntax-region-node-move");
+  TMSCM_ASSERT_INT (arg3, TMSCM_ARG3, "syntax-region-node-move");
+  TMSCM_ASSERT_INT (arg4, TMSCM_ARG4, "syntax-region-node-move");
+  TMSCM_ASSERT_INT (arg5, TMSCM_ARG5, "syntax-region-node-move");
+
+  tree in1= tmscm_to_tree (arg1);
+  int in2= tmscm_to_int (arg2);
+  int in3= tmscm_to_int (arg3);
+  int in4= tmscm_to_int (arg4);
+  int in5= tmscm_to_int (arg5);
+
+  // TMSCM_DEFER_INTS;
+  array_int out= syntax_region_node_move (in1, in2, in3, in4, in5);
+  // TMSCM_ALLOW_INTS;
+
+  return array_int_to_tmscm (out);
+}
+
+tmscm
 tmg_tree_sitter_set_highlighter (tmscm arg1, tmscm arg2, tmscm arg3) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "tree-sitter-set-highlighter");
   TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "tree-sitter-set-highlighter");
@@ -12899,6 +12920,7 @@ initialize_glue_basic () {
   tmscm_install_procedure ("syntax-region-statistics",  tmg_syntax_region_statistics, 2, 0, 0);
   tmscm_install_procedure ("syntax-region-forget",  tmg_syntax_region_forget, 1, 0, 0);
   tmscm_install_procedure ("syntax-region-indent",  tmg_syntax_region_indent, 5, 0, 0);
+  tmscm_install_procedure ("syntax-region-node-move",  tmg_syntax_region_node_move, 5, 0, 0);
   tmscm_install_procedure ("tree-sitter-set-highlighter",  tmg_tree_sitter_set_highlighter, 3, 0, 0);
   tmscm_install_procedure ("tree-sitter-set-injections",  tmg_tree_sitter_set_injections, 2, 0, 0);
   tmscm_install_procedure ("tree-sitter-set-injection-name",  tmg_tree_sitter_set_injection_name, 2, 0, 0);
