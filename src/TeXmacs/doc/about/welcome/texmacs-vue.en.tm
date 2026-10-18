@@ -280,6 +280,11 @@
   <paragraph|18 October 2026>
 
   <\itemize>
+    <item>The table at the cursor shows the lines between its rows and its
+    columns, as in the <name|Qt> version (<with|font-series|bold|Show table
+    cells> in the preferences, now on by default with <name|Vue> and
+    <name|Cocoa> too).
+
     <item>A large zoom in a long document (a full manual, far from its
     start) no longer breaks the view: the page went off the screen, and
     scrolling left smeared copies of the text. The coordinates of the

@@ -32,7 +32,9 @@
     (reset-preference "buffer management")))
 
 (define (get-default-show-table-cells)
-  (if (qt-gui?) "on" "off"))
+  ;; (the lines between the cells of the table at the cursor: the Vue and
+  ;; Cocoa ports, the browser included, show them as Qt does)
+  (if (or (qt-gui?) (vue-gui?) (ns-gui?)) "on" "off"))
 
 (define (get-default-gui-density)
   (if (os-android?) "large" "normal"))
