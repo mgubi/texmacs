@@ -539,6 +539,10 @@
                       (lambda args #f))))
            (and (tree? out) (tree-up out))))))
 
+;; The fold which asks (ai-request-prepare), #f for a field of a session:
+;; the files attached to its question go with it
+(define ai-fold-of-request #f)
+
 ;; The model of a request: that of the session of the field which is
 ;; evaluated (ai-request sets it while ai.cpp makes the request, and
 ;; ai_model_name asks it), else the one of the preferences
@@ -559,12 +563,14 @@
                 (and (defined? 'ai-fold-pop) (ai-fold-pop name)))))
     (when (and (not field) (defined? 'ai-fold-result-push))
       (ai-fold-result-push name s))
+    (set! ai-fold-of-request (and (not field) s))
     (set! ai-model-of-request (or (and s (ai-session-var s "ai-model")) ""))
     (set! ai-document-of-request
           (if (and s (== (ai-session-var s "ai-document") "true"))
               (ai-document-latex s) ""))))
 
 (tm-define (ai-request-done)
+  (set! ai-fold-of-request #f)
   (set! ai-model-of-request "")
   (set! ai-document-of-request ""))
 
@@ -648,24 +654,35 @@
 ;; which ai.cpp sends as parts of their messages: "i<tab>mime<tab>name<tab>
 ;; file", i the question (0 the first of the context, the last the one
 ;; which is asked)
-(define (ai-field-attachments f)
-  (ai-binary-attachments (ai-stree-attachments (tree->stree (tree-ref f 1)))))
+(define (ai-question-files q)
+  (ai-stree-attachments (tree->stree q)))
+
+;; the question which is asked: the input of the field of the session, or
+;; the question of the fold (ai-fold-of-request)
+(define (ai-asked-question name chat)
+  (with field (ai-pending-field name chat)
+    (cond (field (tree-ref field 1))
+          ((and ai-fold-of-request (tree? ai-fold-of-request))
+           (tree-ref ai-fold-of-request 2))
+          (else #f))))
 
 (tm-define (ai-session-attachments name chat)
   (let* ((field (ai-pending-field name chat))
          (l (or (ai-context-fields name chat field) '()))
-         (fs (append (map car l) (if field (list field) '()))))
+         (qs (append (map (lambda (x) (tree-ref (car x) 1)) l)
+                     (with q (ai-asked-question name chat)
+                       (if q (list q) '())))))
     (append-map (lambda (i)
                   (map (lambda (a) (string-append (number->string i) "\t" a))
-                       (ai-field-attachments (list-ref fs i))))
-                (.. 0 (length fs)))))
+                       (ai-binary-attachments
+                        (ai-question-files (list-ref qs i)))))
+                (.. 0 (length qs)))))
 
 ;; why the files of the question cannot be sent, or #f (ai-request)
 (tm-define (ai-request-attachment-problem name chat)
-  (with field (ai-pending-field name chat)
-    (and field
-         (with p (ai-attachments-problem
-                  name (ai-stree-attachments (tree->stree (tree-ref field 1))))
+  (with q (ai-asked-question name chat)
+    (and q
+         (with p (ai-attachments-problem name (ai-question-files q))
            (and p (string-append (upcase-first p) "."))))))
 
 ;; the first line of a session: the engine and its model
@@ -1327,6 +1344,9 @@
     //
     (=> (balloon (eval (ai-session-model lan)) "Model of the fold")
         (dynamic (focus-ai-model-menu lan)))
+    //
+    ((balloon "Attach" "Attach a file to the question: a text, an image or a PDF file")
+     (ai-attach-file))
     (if (in? lan ai-reasoning-engines)
         //
         (=> (balloon (eval (ai-reasoning-label lan))
