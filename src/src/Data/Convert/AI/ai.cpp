@@ -411,10 +411,10 @@ ai_async_eval_command (tree t, object callback) {
 // a web page (CORS) but Albert; Ollama does when the page is among its
 // OLLAMA_ORIGINS.
 
-// In a web browser the answer of a session (ai_latex_request) is streamed
-// (server-sent events, see ai_stream_text): the request link shows it as it
-// comes (request_link_rep::partial). The other requests (translate,
-// correct), and those of the desktop, have the answer at once.
+// The answer of a session (ai_latex_request) is streamed, on the desktop as
+// in a web browser (server-sent events, see ai_stream_text): the request
+// link shows it as it comes (request_link_rep::partial). The other requests
+// (translate, correct) have the answer at once.
 static bool ai_stream= false;
 
 static string
