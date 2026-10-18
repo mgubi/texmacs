@@ -618,7 +618,10 @@
             ;; load the keyboard of programs, which changes the suites run
             ;; afterwards in the same TeXmacs)
             (kbd-enter in #f)
-            (check= (tree->stree (tree-ref in 1)) '(document "def f(x):" ""))))))
+            ;; (the new line is indented after the colon once the module
+            ;; prog-edit is loaded, as it is by any file of a program)
+            (check= (tree->stree (tree-ref in 1 0)) "def f(x):")
+            (check-true (in? (tree->stree (tree-ref in 1 1)) '("" "    ")))))))
     ;; indentation: the indentation of each line of a program, computed
     (let ((indents
            (lambda (lan lines)

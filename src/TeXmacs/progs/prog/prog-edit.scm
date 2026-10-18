@@ -335,12 +335,16 @@
 
 ; Cancel any active selection when we leave a code fragment
 (tm-define (notify-cursor-moved status)
-  (:require prog-highlight-brackets?)
-  (:require (not (in-prog?)))
-  ;; (the other hooks run too: language servers)
+  ;; NOTE: no mode predicates in the conditions: the editor calls this while
+  ;; it applies its changes, and in-prog? would compute the modes for an
+  ;; environment which is not up to date (in-math? was then wrong after
+  ;; (make 'math), in any document once this module was loaded); the mode
+  ;; is asked last, and only when there are brackets to cancel
   (former status)
-  (if (nnull? (get-alt-selection "brackets"))
-      (cancel-alt-selection "brackets")))
+  (when (and prog-highlight-brackets?
+             (nnull? (get-alt-selection "brackets"))
+             (not (in-prog?)))
+    (cancel-alt-selection "brackets")))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Whitespace handling
