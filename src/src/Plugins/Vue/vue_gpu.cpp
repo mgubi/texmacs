@@ -49,6 +49,7 @@ bool vue_gpu_follow_glyph_settings () { return false; }
 bool vue_gpu_attach (SDL_Window* w) { (void) w; return false; }
 bool vue_gpu_ready (SDL_Window* w) { (void) w; return false; }
 void vue_gpu_present (SDL_Window* w) { (void) w; }
+void vue_gpu_skip (SDL_Window* w) { (void) w; }
 picture  gpu_backing_picture (int w, int h, bool t) { (void) w; (void) h; (void) t; return picture (); }
 bool     is_gpu_picture (picture p) { (void) p; return false; }
 bool     gpu_picture_ready (picture p) { (void) p; return false; }
