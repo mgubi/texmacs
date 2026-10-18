@@ -48,6 +48,7 @@ public:
   void    interrupt ();
   void    stop ();
 
+  bool    pending_write ();
   void    drain ();
   bool    parse ();
 };
@@ -96,6 +97,14 @@ void
 lsp_link_rep::write (string s, int channel) {
   if (!alive || channel != LINK_IN) return;
   ln->write (lsp_frame (s), LINK_IN);
+  // (what the server has sent while it was written to is in the buffers of
+  // the pipe, whose notifier will not tell it again)
+  drain ();
+}
+
+bool
+lsp_link_rep::pending_write () {
+  return alive && ln->pending_write ();
 }
 
 bool
@@ -107,7 +116,11 @@ lsp_link_rep::parse () {
   // are passed on as errors. A server which ends the lines of its headers
   // by LF alone (against the protocol) is understood too.
   int end= search_forwards ("\r\n\r\n", pos, buf), sep= 4;
-  int lf= search_forwards ("\n\n", pos, buf);
+  // (an LF LF before it, in its header only: the body of a long message
+  // which comes in many parts is not searched again at each part)
+  int lf= (end < 0? search_forwards ("\n\n", pos, buf):
+           search_forwards ("\n\n", buf (pos, end + 2)));
+  if (lf >= 0 && end >= 0) lf += pos;
   if (lf >= 0 && (end < 0 || lf < end)) { end= lf; sep= 2; }
   if (end < 0) return false;
   int len= -1, i= pos;
@@ -254,6 +267,13 @@ lsp_dispatch () {
   lsp_dispatching++;
   time_t start= texmacs_time ();
   bool busy= true;
+  for (int i=0; i<N(lsp_clients); i++) {
+    // (the rest of the messages which the servers did not take at once)
+    lsp_client* c= lsp_clients[i];
+    if (c->removed || c->exited || !c->rep->pending_write ()) continue;
+    c->rep->ln->listen (0);
+    c->rep->drain ();
+  }
   while (busy && texmacs_time () - start < 100) {
     busy= false;
     for (int i=0; i<N(lsp_clients); i++) {

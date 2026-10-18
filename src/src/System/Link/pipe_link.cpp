@@ -83,6 +83,7 @@ public:
   void    interrupt ();
   void    stop ();
   void    set_blocking_write (bool b);
+  bool    pending_write ();
 
   void    feed (int channel);
   void    flush_input (int msecs);
@@ -327,8 +328,11 @@ pipe_link_rep::write (string s, int channel) {
   if ((!alive) || (channel != LINK_IN)) return;
   if (DEBUG_IO) debug_io << "[INPUT]" << debug_io_string (s);
   if (!blocking) {
+    // (what the child does not take at once is written at the next turns
+    // of the loop: see pending_write; a child which reads no more costs
+    // no wait at each write)
     inbuf << s;
-    flush_input (100);
+    flush_input (0);
     return;
   }
   // (a write may take a part only, or be interrupted by a signal)
@@ -393,9 +397,15 @@ pipe_link_rep::flush_input (int msecs) {
       feed (LINK_ERR);
   }
   if (inpos >= N(inbuf)) { inbuf= ""; inpos= 0; }
+  else if (inpos >= 65536) { inbuf= inbuf (inpos, N(inbuf)); inpos= 0; }
 #else
   (void) msecs;
 #endif
+}
+
+bool
+pipe_link_rep::pending_write () {
+  return alive && inpos < N(inbuf);
 }
 
 void
