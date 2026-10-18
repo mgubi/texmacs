@@ -15,7 +15,9 @@
 ;; (Plugins/TreeSitter/ts_highlight.cpp) ask for their highlighter at their
 ;; first use; it is made here, once the tables of the language are ready:
 ;; the query misc/tree-sitter/<lan>/highlights.scm and the colour class of
-;; each of its captures.
+;; each of its captures, and the query injections.scm, which gives the
+;; parts written in other languages (the scripts of HTML...), coloured by
+;; the highlighters of these languages.
 
 (texmacs-module (treesit ts-highlight)
   (:use (treesit ts-registry)))
@@ -78,9 +80,19 @@
               (loop (cdr l) (cdar l) n)
               (loop (cdr l) best len))))))
 
-(define (query-url ts)
+(define (query-url ts . file)
   (url-concretize
-   (string-append "$TEXMACS_PATH/misc/tree-sitter/" ts "/highlights.scm")))
+   (string-append "$TEXMACS_PATH/misc/tree-sitter/" ts "/"
+                  (if (pair? file) (car file) "highlights.scm"))))
+
+;; the names of the languages in the injections: those of the program
+;; languages, then their other names (tm-program-languages.scm)
+(let ((langs (map car treesit-highlight-languages)))
+  (for (lan (reverse langs))
+    (for (name (reverse (program-language-names lan)))
+      (tree-sitter-set-injection-name name lan)))
+  (for (lan langs)
+    (tree-sitter-set-injection-name lan lan)))
 
 (define-public (treesit-query-source ts)
   ;; the highlight query of ts, after those it inherits (a first line
@@ -101,9 +113,12 @@
          (q (and id file (url-exists? file)
                  (tree-sitter-query-new id (treesit-query-source ts)))))
     (and q (>= q 0)
-         (begin
+         (let* ((inj (query-url ts "injections.scm"))
+                (qi (and (url-exists? inj)
+                         (tree-sitter-query-new id (string-load inj)))))
            (tree-sitter-set-highlighter
             lan q (map treesit-capture-class (tree-sitter-query-capture-names q)))
+           (when (and qi (>= qi 0)) (tree-sitter-set-injections lan qi))
            #t))))
 
 (define (refresh-buffers)
@@ -122,6 +137,8 @@
         (if id (treesit-install-highlighter lan id)
             (treesit-prepare ts (lambda (id)
                                   (when (and id (treesit-install-highlighter lan id))
+                                    ;; the languages injecting lan too
+                                    (tree-sitter-reset-highlights)
                                     (refresh-buffers)))))))))
 
 (tm-define (treesit-schedule-updates)

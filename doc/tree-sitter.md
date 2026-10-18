@@ -622,7 +622,8 @@ Done in part (2026-10-17):
 
 - Scanners stay in Scheme and serve both parsers:
   `tree_sitter_set_scanner` installs C trampolines (one create function
-  per language, 16 slots) which call the Scheme `create`/`scan`/
+  per language, 32 slots; a language given its scanner again keeps its
+  slot) which call the Scheme `create`/`scan`/
   `serialize`/`deserialize`; the public lexer functions of `ts-parse.scm`
   act on the current `TSLexer` when given something else than a Scheme
   lexer; the state goes into tree-sitter's buffer as the text of the value.
@@ -926,6 +927,56 @@ Done in part (2026-10-17):
     corpora pass, and the trees of the benchmark files are unchanged. (A
     macro naming the tokens was tried and dropped: under femtolisp, the
     definitions made by a macro are not private to their module.)
+- **TypeScript, HTML, CSS, TOML, OCaml and LaTeX** (2026-10-18): one entry
+  each in `tm-program-languages.scm` with its tags (`typescript-lang`,
+  `typescript-code`...). TypeScript (`.tsx` `.mts` `.cts`: `.ts` are style
+  files), CSS, TOML and OCaml (`.ml` `.mli`) also have a format and a
+  `-lang.scm`; HTML and LaTeX have none, as they stay formats of documents
+  (a `.html` or `.tex` file is imported, not opened as code). The highlight
+  query of TypeScript is its own followed by that of JavaScript, as its
+  `tree-sitter.json` lists them; that of LaTeX is ours (the grammar has
+  none, nor a committed `parser.c`: the comparison with `tree-sitter query`
+  needs `tree-sitter generate` in a copy). Scanners: toml (multi-line
+  strings, line ends), css (the descendant operator, the colon of pseudo
+  classes), latex (raw environments), html (the stack of open tags,
+  implicit end tags, raw text of script and style), typescript (as
+  javascript, with function signatures and the `?` of optional arguments),
+  ocaml (nested comments with their strings and characters, quoted strings
+  `{id|...|id}`, line directives). `corpus.py` skips the tests marked
+  `:language(other)`, as `tree-sitter test` does. Corpora: toml 17, css 40,
+  latex 104, html 20, typescript 111, ocaml 92, all passing under S7 and
+  femtolisp; highlight captures equal. Tables: 0.5 to 2 s, OCaml 6.7 s.
+- **YAML** (same day): `ts-scanner-yaml.scm` ports the scanner of
+  tree-sitter-yaml (1417 lines of C, 113 external tokens: directives, block
+  and flow structures with a stack of indentations, quoted strings and
+  their escapes, block scalars, plain scalars, tags, anchors, aliases,
+  comments) with its core schema: the state machine of `schema.core.c`,
+  which tells null, bool, int, float and string scalars apart, is a table
+  made from the C source. The C code is followed closely, quirks included
+  (`]` and `}` at the indentation give the symbol of the other context).
+  Corpus 131 tests pass (S7 and femtolisp), captures equal; tables 0.4 s;
+  180 KB parse in 339 ms (the scanner reads nearly every character).
+  Adding it made 16 languages with a scanner, and the 16 slots of the
+  trampolines ran out (one more load took a slot): there are now 32, and a
+  language keeps its slot. For indentation YAML needed a new option of the
+  rules: a blank line after a named token (`key: value`) keeps the
+  indentation of the node around it, after `key:` or `[1,` it is indented.
+- **Injections** (same day): `misc/tree-sitter/<lan>/injections.scm`, the
+  queries of the grammars (html: script and style in JavaScript and CSS;
+  javascript and typescript: tagged templates such as `` css`...` ``; rust:
+  the arguments of macros; lua: `ffi.cdef` in C; cpp: raw strings by their
+  delimiter). The highlighter of a language (`treesit-install-highlighter`)
+  also compiles its injections; when a region is highlighted
+  (`syntax_region_highlight`), each `@injection.content` of the query is
+  parsed with the grammar of its language (from `#set!
+  injection.language` or the text of `@injection.language`, mapped to a
+  program language through the names of `tm-program-languages.scm`) and
+  painted with its highlight query over the colours of the region. The
+  injected parts are parsed again whenever the region changes (not
+  incrementally), and injections do not nest. An injected language whose
+  tables are not ready is asked for at its first use; when its highlighter
+  arrives, `tree-sitter-reset-highlights` makes the highlighted languages
+  take a new highlight code, so that the lines are coloured again.
 
 As planned initially:
 

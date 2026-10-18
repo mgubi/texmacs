@@ -9186,6 +9186,45 @@ tmg_tree_sitter_set_highlighter (tmscm arg1, tmscm arg2, tmscm arg3) {
 }
 
 tmscm
+tmg_tree_sitter_set_injections (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "tree-sitter-set-injections");
+  TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "tree-sitter-set-injections");
+
+  string in1= tmscm_to_string (arg1);
+  int in2= tmscm_to_int (arg2);
+
+  // TMSCM_DEFER_INTS;
+  tree_sitter_set_injections (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_tree_sitter_set_injection_name (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "tree-sitter-set-injection-name");
+  TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "tree-sitter-set-injection-name");
+
+  string in1= tmscm_to_string (arg1);
+  string in2= tmscm_to_string (arg2);
+
+  // TMSCM_DEFER_INTS;
+  tree_sitter_set_injection_name (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_tree_sitter_reset_highlights () {
+  // TMSCM_DEFER_INTS;
+  tree_sitter_reset_highlights ();
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
 tmg_tree_sitter_pending_updates () {
   // TMSCM_DEFER_INTS;
   array_tree out= tree_sitter_pending_updates ();
@@ -12839,6 +12878,9 @@ initialize_glue_basic () {
   tmscm_install_procedure ("syntax-region-statistics",  tmg_syntax_region_statistics, 2, 0, 0);
   tmscm_install_procedure ("syntax-region-forget",  tmg_syntax_region_forget, 1, 0, 0);
   tmscm_install_procedure ("tree-sitter-set-highlighter",  tmg_tree_sitter_set_highlighter, 3, 0, 0);
+  tmscm_install_procedure ("tree-sitter-set-injections",  tmg_tree_sitter_set_injections, 2, 0, 0);
+  tmscm_install_procedure ("tree-sitter-set-injection-name",  tmg_tree_sitter_set_injection_name, 2, 0, 0);
+  tmscm_install_procedure ("tree-sitter-reset-highlights",  tmg_tree_sitter_reset_highlights, 0, 0, 0);
   tmscm_install_procedure ("tree-sitter-pending-updates",  tmg_tree_sitter_pending_updates, 0, 0, 0);
   tmscm_install_procedure ("tree-sitter-line-colors",  tmg_tree_sitter_line_colors, 2, 0, 0);
   tmscm_install_procedure ("tree-sitter-set-highlighting",  tmg_tree_sitter_set_highlighting, 1, 0, 0);

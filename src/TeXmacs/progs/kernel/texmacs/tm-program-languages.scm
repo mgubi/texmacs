@@ -73,6 +73,8 @@
      (names "css"))
     ("toml" (label "TOML") (tags toml-lang toml-code) (grammar "toml") (comment "#")
      (names "toml"))
+    ("yaml" (label "YAML") (tags yaml-lang yaml-code) (grammar "yaml") (comment "#")
+     (names "yaml" "yml"))
     ("ocaml" (label "OCaml") (tags ocaml-lang ocaml-code) (grammar "ocaml")
      (names "ocaml" "ml"))
     ("latex" (label "LaTeX") (tags latex-lang latex-code) (grammar "latex") (comment "%")

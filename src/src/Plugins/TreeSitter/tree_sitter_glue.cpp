@@ -249,6 +249,64 @@ tree_sitter_query_run (int query, TSNode root, const char* text, array<int>& r) 
   ts_query_cursor_delete (c);
 }
 
+static std::string
+injection_property (TSQuery* q, uint32_t pattern) {
+  // the language which #set! injection.language gives to a pattern, or ""
+  uint32_t n, len;
+  const TSQueryPredicateStep* steps= ts_query_predicates_for_pattern (q, pattern, &n);
+  for (uint32_t i= 0; i + 2 < n; i++) {
+    if (steps[i].type != TSQueryPredicateStepTypeString ||
+        steps[i+1].type != TSQueryPredicateStepTypeString ||
+        steps[i+2].type != TSQueryPredicateStepTypeString) continue;
+    const char* op= ts_query_string_value_for_id (q, steps[i].value_id, &len);
+    if (std::string (op, len) != "set!") continue;
+    const char* key= ts_query_string_value_for_id (q, steps[i+1].value_id, &len);
+    if (std::string (key, len) != "injection.language") continue;
+    const char* v= ts_query_string_value_for_id (q, steps[i+2].value_id, &len);
+    return std::string (v, len);
+  }
+  return std::string ();
+}
+
+void
+tree_sitter_query_injections (int query, TSNode root, const char* text,
+                              array<int>& ranges, array<string>& languages) {
+  // the injections of a query (injections.scm) under root, after the
+  // predicates: the start and end (in bytes) of each @injection.content,
+  // and its language, the text of @injection.language or the value of
+  // #set! injection.language
+  if (query < 0 || query >= N(ts_queries)) return;
+  ts_query_entry* e= ts_queries[query];
+  TSQuery* q= e->query;
+  int content= -1, language= -1;
+  for (uint32_t i= 0; i < ts_query_capture_count (q); i++) {
+    uint32_t len;
+    const char* name= ts_query_capture_name_for_id (q, i, &len);
+    std::string s (name, len);
+    if (s == "injection.content") content= (int) i;
+    if (s == "injection.language") language= (int) i;
+  }
+  if (content < 0) return;
+  std::vector<int> regex_base= regex_bases (q);
+  TSQueryCursor* c= ts_query_cursor_new ();
+  ts_query_cursor_exec (c, q, root);
+  TSQueryMatch m;
+  while (ts_query_cursor_next_match (c, &m)) {
+    if (!satisfies_predicates (e, m, text, regex_base)) continue;
+    std::string lan= language < 0? std::string ():
+                     capture_text (m, (uint32_t) language, text);
+    if (lan.empty ()) lan= injection_property (q, m.pattern_index);
+    if (lan.empty ()) continue;
+    for (uint16_t i= 0; i < m.capture_count; i++)
+      if ((int) m.captures[i].index == content) {
+        ranges << (int) ts_node_start_byte (m.captures[i].node)
+               << (int) ts_node_end_byte (m.captures[i].node);
+        languages << string (lan.c_str (), (int) lan.size ());
+      }
+  }
+  ts_query_cursor_delete (c);
+}
+
 array<int>
 tree_sitter_query_captures (int query, string text) {
   // the captures of the query in the tree of text (see tree_sitter_query_run)
@@ -333,11 +391,22 @@ SCANNER_SLOT(0) SCANNER_SLOT(1) SCANNER_SLOT(2) SCANNER_SLOT(3)
 SCANNER_SLOT(4) SCANNER_SLOT(5) SCANNER_SLOT(6) SCANNER_SLOT(7)
 SCANNER_SLOT(8) SCANNER_SLOT(9) SCANNER_SLOT(10) SCANNER_SLOT(11)
 SCANNER_SLOT(12) SCANNER_SLOT(13) SCANNER_SLOT(14) SCANNER_SLOT(15)
-static void* (*scanner_creates[16]) (void)= {
+SCANNER_SLOT(16) SCANNER_SLOT(17) SCANNER_SLOT(18) SCANNER_SLOT(19)
+SCANNER_SLOT(20) SCANNER_SLOT(21) SCANNER_SLOT(22) SCANNER_SLOT(23)
+SCANNER_SLOT(24) SCANNER_SLOT(25) SCANNER_SLOT(26) SCANNER_SLOT(27)
+SCANNER_SLOT(28) SCANNER_SLOT(29) SCANNER_SLOT(30) SCANNER_SLOT(31)
+#define SCANNER_SLOTS 32
+static void* (*scanner_creates[SCANNER_SLOTS]) (void)= {
   scanner_create_0, scanner_create_1, scanner_create_2, scanner_create_3,
   scanner_create_4, scanner_create_5, scanner_create_6, scanner_create_7,
   scanner_create_8, scanner_create_9, scanner_create_10, scanner_create_11,
-  scanner_create_12, scanner_create_13, scanner_create_14, scanner_create_15 };
+  scanner_create_12, scanner_create_13, scanner_create_14, scanner_create_15,
+  scanner_create_16, scanner_create_17, scanner_create_18, scanner_create_19,
+  scanner_create_20, scanner_create_21, scanner_create_22, scanner_create_23,
+  scanner_create_24, scanner_create_25, scanner_create_26, scanner_create_27,
+  scanner_create_28, scanner_create_29, scanner_create_30, scanner_create_31 };
+// the slot of each language with a scanner, by its index
+static hashmap<int,int> scanner_slots (-1);
 
 static void
 scanner_destroy (void* payload) {
@@ -421,7 +490,9 @@ bool
 tree_sitter_set_scanner (int language, object scanner) {
   // give a Scheme scanner to a language (before its first parse)
   if (language < 0 || language >= N(ts_languages)) return false;
-  if (N(ts_scanners) >= 16) return false;
+  // a language which is given a scanner again keeps its slot
+  int slot= scanner_slots[language];
+  if (slot < 0 && N(ts_scanners) >= SCANNER_SLOTS) return false;
   TSLanguage* l= (TSLanguage*) ts_languages[language];
   ts_scanner_entry* e= new ts_scanner_entry;
   e->create= call ("vector-ref", scanner, object (0));
@@ -430,12 +501,17 @@ tree_sitter_set_scanner (int language, object scanner) {
   e->serialize= call ("vector-ref", scanner, object (3));
   e->external_count= (int) l->external_token_count;
   e->states= l->external_scanner.states;
-  l->external_scanner.create= scanner_creates[N(ts_scanners)];
+  if (slot < 0) {
+    slot= N(ts_scanners);
+    ts_scanners << e;
+    scanner_slots (language)= slot;
+  }
+  else ts_scanners[slot]= e;
+  l->external_scanner.create= scanner_creates[slot];
   l->external_scanner.destroy= scanner_destroy;
   l->external_scanner.scan= scanner_scan;
   l->external_scanner.serialize= scanner_serialize;
   l->external_scanner.deserialize= scanner_deserialize;
-  ts_scanners << e;
   return true;
 }
 

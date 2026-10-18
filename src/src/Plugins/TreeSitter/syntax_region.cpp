@@ -20,6 +20,8 @@
 const TSLanguage* tree_sitter_get_language (int language);
 void tree_sitter_query_run (int query, TSNode root, const char* text,
                             array<int>& r);
+void tree_sitter_query_injections (int query, TSNode root, const char* text,
+                                   array<int>& ranges, array<string>& languages);
 
 /******************************************************************************
 * Decoding the TeXmacs encoding
@@ -101,6 +103,7 @@ struct syntax_region_rep {
   int full_parses, incremental_parses;
   int version;                 // changes at each parse
   int hl_query, hl_version;    // the colours below are for these
+  int hl_injections, hl_epoch;
   array<array<int> > hl_cols;  // colour per position, per line
 };
 
@@ -266,6 +269,8 @@ get_region (tree root, int language) {
   r->version= 0;
   r->hl_query= -1;
   r->hl_version= -1;
+  r->hl_injections= -1;
+  r->hl_epoch= -1;
   ts_parser_set_language (r->parser, lang);
   region_parse (r, NULL);
   if (N(regions) >= max_regions) {
@@ -436,16 +441,79 @@ syntax_region_captures (tree root, int language, int query) {
   return as_list_object (l);
 }
 
+static void
+paint_captures (array<int>& caps, array<int>& colors, array<int>& paint,
+                int offset, int end) {
+  // paint the captures (start, end, capture index) of a query, shifted by
+  // offset, up to end. As in tree-sitter-highlight, the last pattern which
+  // captures a node gives its colour (none when its capture has no colour),
+  // and an inner node is painted over an outer one. Nodes are told apart
+  // by their ranges.
+  std::vector<ts_capture> v;
+  for (int i= 0; i + 2 < N(caps); i += 3) {
+    int c= caps[i+2];
+    int col= (c >= 0 && c < N(colors))? colors[c]: 0;
+    v.push_back (ts_capture { caps[i] + offset, caps[i+1] + offset, col });
+  }
+  std::stable_sort (v.begin (), v.end (), capture_less);
+  for (size_t k= 0; k < v.size (); k++) {
+    if (k + 1 < v.size () && v[k].start == v[k+1].start && v[k].end == v[k+1].end)
+      continue;
+    if (v[k].color == 0) continue;
+    int a= max (v[k].start, offset), b= min (v[k].end, end);
+    for (int i= a; i < b; i++) paint[i]= v[k].color;
+  }
+}
+
+struct text_input { const char* s; uint32_t n; };
+
+static const char*
+text_read (void* payload, uint32_t byte, TSPoint p, uint32_t* bytes_read) {
+  (void) p;
+  text_input* t= (text_input*) payload;
+  if (byte >= t->n) { *bytes_read= 0; return ""; }
+  *bytes_read= t->n - byte;
+  return t->s + byte;
+}
+
+static void
+paint_injection (const char* text, int start, int end, int language,
+                 int query, array<int>& colors, array<int>& paint) {
+  // the text start..end parsed in another language and painted with its
+  // highlight query
+  const TSLanguage* lang= tree_sitter_get_language (language);
+  if (lang == NULL || start >= end) return;
+  TSParser* p= ts_parser_new ();
+  if (!ts_parser_set_language (p, lang)) { ts_parser_delete (p); return; }
+  text_input in= { text + start, (uint32_t) (end - start) };
+  TSInput input= { &in, text_read, TSInputEncodingCustom, texmacs_decode };
+  TSTree* t= ts_parser_parse (p, NULL, input);
+  if (t != NULL) {
+    // the predicates read the text of the injection, from its start
+    string sub (text + start, end - start);
+    c_string csub (sub);
+    array<int> caps;
+    tree_sitter_query_run (query, ts_tree_root_node (t), csub, caps);
+    paint_captures (caps, colors, paint, start, end);
+    ts_tree_delete (t);
+  }
+  ts_parser_delete (p);
+}
+
 array<array<int> >
-syntax_region_highlight (tree root, int language, int query, array<int> colors) {
+syntax_region_highlight (tree root, int language, int query, array<int> colors,
+                         int injections, ts_injection_resolver resolve,
+                         int epoch) {
   // the colour codes of each position of each line, for the query with the
-  // colour code of each capture (0: no colour). As in tree-sitter-highlight,
-  // the last pattern which captures a node gives its colour (none when its
-  // capture has no colour), and an inner node is painted over an outer one.
-  // Nodes are told apart by their ranges.
+  // colour code of each capture (0: no colour; see paint_captures); then
+  // the injections (a query of injections.scm, or -1): the ranges which it
+  // gives in other languages, coloured by the highlighters of these
+  // languages (resolve, which epoch changes) over the colours of the region
   syntax_region_rep* r= get_region (root, language);
   if (r == NULL) return array<array<int> > ();
-  if (r->hl_query == query && r->hl_version == r->version) return r->hl_cols;
+  if (r->hl_query == query && r->hl_version == r->version &&
+      r->hl_injections == injections && r->hl_epoch == epoch)
+    return r->hl_cols;
   string text;
   for (int i= 0; i < N(r->lines); i++) {
     if (i > 0) text << "\n";
@@ -453,22 +521,22 @@ syntax_region_highlight (tree root, int language, int query, array<int> colors) 
   }
   array<int> caps;
   c_string ctext (text);
-  tree_sitter_query_run (query, ts_tree_root_node (r->tree), ctext, caps);
-  std::vector<ts_capture> v;
-  for (int i= 0; i + 2 < N(caps); i += 3) {
-    int c= caps[i+2];
-    int col= (c >= 0 && c < N(colors))? colors[c]: 0;
-    v.push_back (ts_capture { caps[i], caps[i+1], col });
-  }
-  std::stable_sort (v.begin (), v.end (), capture_less);
+  TSNode top= ts_tree_root_node (r->tree);
+  tree_sitter_query_run (query, top, ctext, caps);
   array<int> paint (N(text));
   for (int i= 0; i < N(text); i++) paint[i]= 0;
-  for (size_t k= 0; k < v.size (); k++) {
-    if (k + 1 < v.size () && v[k].start == v[k+1].start && v[k].end == v[k+1].end)
-      continue;
-    if (v[k].color == 0) continue;
-    int a= max (v[k].start, 0), b= min (v[k].end, N(text));
-    for (int i= a; i < b; i++) paint[i]= v[k].color;
+  paint_captures (caps, colors, paint, 0, N(text));
+  if (injections >= 0 && resolve != NULL) {
+    array<int> ranges;
+    array<string> names;
+    tree_sitter_query_injections (injections, top, ctext, ranges, names);
+    for (int k= 0; k < N(names); k++) {
+      int lan2, query2;
+      array<int> colors2;
+      if (resolve (names[k], lan2, query2, colors2))
+        paint_injection (ctext, ranges[2*k], min (ranges[2*k+1], N(text)),
+                         lan2, query2, colors2, paint);
+    }
   }
   array<array<int> > cols;
   for (int i= 0; i < N(r->lines); i++) {
@@ -479,6 +547,8 @@ syntax_region_highlight (tree root, int language, int query, array<int> colors) 
   }
   r->hl_query= query;
   r->hl_version= r->version;
+  r->hl_injections= injections;
+  r->hl_epoch= epoch;
   r->hl_cols= cols;
   return cols;
 }

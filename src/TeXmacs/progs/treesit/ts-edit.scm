@@ -204,7 +204,9 @@
 ;; types, the branches, and for an offside language (Python, whose blocks
 ;; end where the indentation goes back) the types of its brackets: only
 ;; those are closed before a line; optionally, the named types which close
-;; a node (as the end tags of HTML), besides its last token.
+;; a node (as the end tags of HTML), besides its last token, and whether a
+;; blank line after a named token stays at the indentation of the indenting
+;; node around it (YAML: after key: value, but not after key: or [1,).
 
 (define c-indenting
   '("compound_statement" "field_declaration_list" "declaration_list"
@@ -266,6 +268,8 @@
      ("else_clause") #f)
     ("css" ("block" "arguments") () #f)
     ("toml" ("array" "inline_table") () #f)
+    ("yaml" ("block_mapping_pair" "block_sequence_item" "flow_mapping" "flow_sequence")
+     () ("flow_mapping" "flow_sequence") () #t)
     ("html" ("element" "script_element" "style_element") () #f ("end_tag"))
     ("go"
      ("block" "literal_value" "argument_list" "parameter_list"
@@ -329,6 +333,8 @@
          (branches (caddr rules))
          (brackets (cadddr rules))
          (closers (let ((l (list-tail rules 4))) (if (pair? l) (car l) '())))
+         (complete-stays? (let ((l (list-tail rules 4)))
+                            (and (pair? l) (pair? (cdr l)) (cadr l))))
          (s (line-string doc row))
          (c0 (first-non-space s))
          (prev (and (not c0) (previous-text-end doc row)))
@@ -373,9 +379,11 @@
                                    (let ((up (memq first nodes)))
                                      (and (pair? (cdr up)) (== (cadr up) a)))
                                    (== (node-end first) (node-end a))))
-                     (branch? (and c0 first (in? (node-type first) branches))))
+                     (branch? (and c0 first (in? (node-type first) branches)))
+                     ;; a blank line after a which has its last part
+                     (complete? (and prev complete-stays? (node-named? n0))))
                 (+ (line-indent doc (car (node-start a)))
-                   (if (or closing? closer? branch?) 0 tab))))))))
+                   (if (or closing? closer? branch? complete?) 0 tab))))))))
 
 (define-public (syntax-language-indentation doc row lan id tab)
   ;; the same for the program language lan, whose language of tree-sitter

@@ -1,2 +1,3 @@
 src/grammar.json, queries/highlights.scm and queries/tags.scm of https://github.com/tree-sitter/tree-sitter-rust.git
 (commit 77a3747266f4d621d0757825e6b11edcbf991ca5), with its LICENSE.
+injections.scm is queries/injections.scm of the same commit.

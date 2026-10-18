@@ -209,6 +209,8 @@
 
   <assign|toml-lang|<macro|body|<with|mode|prog|prog-language|toml|font-family|rm|<arg|body>>>>
 
+  <assign|yaml-lang|<macro|body|<with|mode|prog|prog-language|yaml|font-family|rm|<arg|body>>>>
+
   <assign|ocaml-lang|<macro|body|<with|mode|prog|prog-language|ocaml|font-family|rm|<arg|body>>>>
 
   <assign|latex-lang|<macro|body|<with|mode|prog|prog-language|latex|font-family|rm|<arg|body>>>>
@@ -320,6 +322,12 @@
   <assign|toml-code|<\macro|body>
     <\pseudo-code>
       <toml-lang|<arg|body>>
+    </pseudo-code>
+  </macro>>
+
+  <assign|yaml-code|<\macro|body>
+    <\pseudo-code>
+      <yaml-lang|<arg|body>>
     </pseudo-code>
   </macro>>
 

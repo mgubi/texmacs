@@ -454,6 +454,30 @@
       (check= (tree-sitter-line-colors "c" (tree-ref d 2))
               '((0 4 "comment") (5 11 "keyword") (12 13 "constant_number")
                 (13 14 "operator_field"))))
+    ;; injections: the script and the style of HTML in JavaScript and CSS,
+    ;; the arguments of a macro of Rust in Rust
+    ;; (another suite may have asked for a highlighter before its tables
+    ;; existed: it is installed here, the tables being made)
+    (for-each (lambda (lan) (treesit-generate-cache lan) (treesit-highlighter-request lan))
+              '("html" "javascript" "css" "rust"))
+    (let ((d (stree->tree '(document "<less>script<gtr>var x = 1;<less>/script<gtr>"
+                                     "<less>style<gtr>a { color: red }<less>/style<gtr>"))))
+      (tree-sitter-line-colors "html" d)
+      (check= (tree-sitter-line-colors "html" (tree-ref d 0))
+              '((0 6 "operator_openclose") (12 17 "operator_openclose") (17 20 "keyword")
+                (23 24 "operator") (25 26 "constant_number") (26 27 "operator_field")
+                (27 34 "operator_openclose") (40 45 "operator_openclose")))
+      (check= (tree-sitter-line-colors "html" (tree-ref d 1))
+              '((0 6 "operator_openclose") (11 16 "operator_openclose")
+                (18 19 "operator_openclose") (20 25 "variable_identifier")
+                (25 26 "operator_field") (31 39 "operator_openclose")
+                (44 49 "operator_openclose"))))
+    (let ((d (stree->tree '(document "println!(\"{}\", x + 1);"))))
+      (tree-sitter-line-colors "rust" d)
+      (check= (tree-sitter-line-colors "rust" (tree-ref d 0))
+              '((0 8 "preprocessor") (8 9 "operator_openclose") (9 13 "constant_string")
+                (13 14 "operator_field") (19 20 "constant") (20 21 "operator_openclose")
+                (21 22 "operator_field"))))
     ;; in a buffer, a modified line is highlighted with its region (found by
     ;; its ip), and the other lines whose colours change are to be typeset
     ;; again
@@ -572,7 +596,20 @@
       (when (treesit-cached? "lean")
         (check= (indents "lean" '("def f (x : Nat) : Nat := by" "  simp" ""))
                 '(0 4 4)))
+      ;; TypeScript, CSS, TOML, HTML (an end tag closes) and YAML (a blank
+      ;; line after key: value stays, after key: it is indented)
+      (check= (indents "typescript" '("function f(x: number) {" "    return x;" "}"))
+              '(0 4 0))
+      (check= (indents "css" '("a {" "    color: red;" "}")) '(0 4 0))
+      (check= (indents "toml" '("x = [" "    1," "]")) '(0 4 0))
+      (check= (indents "html" '("<less>div<gtr>" "    <less>p<gtr>a<less>/p<gtr>"
+                                "<less>/div<gtr>"))
+              '(0 4 0))
+      (check= (indents "yaml" '("a:" "" "    b: 1" "" "    c:" "        - x" ""
+                                "d: [1," ""))
+              '(0 4 4 4 4 8 8 0 4))
       (let ((outline (lambda (lan lines)
+                       (unless (treesit-cached? lan) (treesit-generate-cache lan))
                        (map (lambda (d) (list (car d) (cadr d)))
                             (syntax-outline (stree->tree (cons 'document lines)) lan
                                             (treesit-language lan))))))
@@ -584,10 +621,16 @@
                 '(("function" "f") ("function" "g")))
         (when (treesit-cached? "lean")
           (check= (outline "lean" '("theorem t : True := trivial" "def f := 1"))
-                  '(("theorem" "t") ("function" "f"))))))
+                  '(("theorem" "t") ("function" "f"))))
+        (check= (outline "typescript" '("interface I {}" "function f(): void {}"))
+                '(("interface" "I") ("function" "f")))
+        (check= (outline "ocaml" '("let f x = x" "module M = struct end"))
+                '(("function" "f") ("module" "M")))))
     ;; the formats of the source files
     (check= (map format-from-suffix '("go" "rs" "lua" "lean"))
             '("go" "rust" "lua" "lean"))
+    (check= (map format-from-suffix '("tsx" "mts" "css" "toml" "yaml" "yml" "ml" "mli"))
+            '("typescript" "typescript" "css" "toml" "yaml" "yaml" "ocaml" "ocaml"))
     ;; the indentation at the cursor, in C++ code (as Return asks it)
     (treesit-generate-cache "cpp")
     (with-test-buffer '(document (cpp-code (document "int f() {" "return 0;" "}")))
@@ -799,6 +842,10 @@
     (treesit-generate-cache "latex")
     (check= (tree-sitter-parse-sexp (treesit-language "latex") "\\begin{verbatim}\\x\\end{verbatim}\n")
             "(source_file (verbatim_environment begin: (begin name: (curly_group_text text: (text word: (word)))) verbatim: (comment) end: (end name: (curly_group_text text: (text word: (word))))))")
+    ;; YAML (its scanner does almost everything)
+    (treesit-generate-cache "yaml")
+    (check= (tree-sitter-parse-sexp (treesit-language "yaml") "a: 1\nb:\n  - x\n  - 'y'\n")
+            "(stream (document (block_node (block_mapping (block_mapping_pair key: (flow_node (plain_scalar (string_scalar))) value: (flow_node (plain_scalar (integer_scalar)))) (block_mapping_pair key: (flow_node (plain_scalar (string_scalar))) value: (block_node (block_sequence (block_sequence_item (flow_node (plain_scalar (string_scalar)))) (block_sequence_item (flow_node (single_quote_scalar))))))))))")
     ;; Java, without scanner
     (treesit-generate-cache "java")
     (check= (tree-sitter-parse-sexp (treesit-language "java") "class A { int f() { return 1; } }")

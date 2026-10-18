@@ -35,9 +35,17 @@ struct ts_highlighter {
   int language;
   int query;
   array<int> colors;   // colour code of each capture
+  int injections;      // the query of injections.scm, or -1
 };
 
 static hashmap<string,ts_highlighter*> highlighters (NULL);
+// the names of the languages in the injections -> program languages
+static hashmap<string,string> injection_names ("");
+static hashset<string> injection_requests;
+// changes when highlighters arrive after their tables were generated: the
+// lines are coloured again (see treesit_language_rep::highlight)
+static int highlight_epoch= 0;
+static int highlight_codes= 1000000;
 static array<tree> pending_updates;
 static bool updates_scheduled= false;
 static bool highlighting_on= true;
@@ -58,9 +66,49 @@ tree_sitter_set_highlighter (string lan, int query, array<string> classes) {
   ts_highlighter* h= tm_new<ts_highlighter> ();
   h->language= language;
   h->query= query;
+  h->injections= -1;
   for (int i= 0; i < N(classes); i++)
     h->colors << (classes[i] == ""? 0: max (encode_color (classes[i]), 0));
   highlighters (lan)= h;
+}
+
+void
+tree_sitter_set_injections (string lan, int query) {
+  // the query of the injections of lan (after its highlighter is set)
+  ts_highlighter* h= highlighters[lan];
+  if (h != NULL && tree_sitter_query_language (query) == h->language)
+    h->injections= query;
+}
+
+void
+tree_sitter_set_injection_name (string name, string lan) {
+  // name (in an injection) stands for the program language lan
+  injection_names (name)= lan;
+}
+
+void
+tree_sitter_reset_highlights () {
+  // highlighters were installed late: colour the lines again
+  highlight_epoch++;
+}
+
+static bool
+resolve_injection (string name, int& language, int& query, array<int>& colors) {
+  // the highlighter of the program language which name stands for; its
+  // first use asks for it (it may arrive later, see the epoch)
+  string lan= injection_names[name];
+  if (lan == "") return false;
+  ts_highlighter* h= highlighters[lan];
+  if (h == NULL && !injection_requests->contains (lan)) {
+    injection_requests->insert (lan);
+    call ("treesit-highlighter-request", lan);
+    h= highlighters[lan];
+  }
+  if (h == NULL) return false;
+  language= h->language;
+  query= h->query;
+  colors= h->colors;
+  return true;
 }
 
 int
@@ -87,6 +135,7 @@ tree_sitter_pending_updates () {
 struct treesit_language_rep: language_rep {
   language_rep* base;
   bool requested;
+  int epoch;
   treesit_language_rep (string s, language_rep* base2);
   text_property advance (tree t, int& pos);
   array<int> get_hyphens (string s) { return base->get_hyphens (s); }
@@ -100,11 +149,10 @@ struct treesit_language_rep: language_rep {
 };
 
 treesit_language_rep::treesit_language_rep (string s, language_rep* base2):
-  language_rep (s), base (base2), requested (false)
+  language_rep (s), base (base2), requested (false), epoch (highlight_epoch)
 {
   // a code of its own for the highlight observers, far from those of packrat
-  static int nr= 1000000;
-  hl_lan= nr++;
+  hl_lan= highlight_codes++;
 }
 
 ts_highlighter*
@@ -148,6 +196,11 @@ void
 treesit_language_rep::highlight (tree t) {
   ts_highlighter* h= get_highlighter ();
   if (h == NULL) { base->highlight (t); return; }
+  if (epoch != highlight_epoch) {
+    // the colours of the lines are forgotten: a new code
+    epoch= highlight_epoch;
+    hl_lan= highlight_codes++;
+  }
   if (has_highlight (t, hl_lan)) return;
   tree region;
   int row= -1;
@@ -169,7 +222,8 @@ treesit_language_rep::highlight (tree t) {
     }
   }
   array<array<int> > cols=
-    syntax_region_highlight (region, h->language, h->query, h->colors);
+    syntax_region_highlight (region, h->language, h->query, h->colors,
+                             h->injections, resolve_injection, highlight_epoch);
   if (is_atomic (region)) {
     if (N(cols) == 1) set_line_colors (region, hl_lan, cols[0], false);
     return;
