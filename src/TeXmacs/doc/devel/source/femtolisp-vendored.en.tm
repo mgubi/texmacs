@@ -57,9 +57,9 @@
     <verbatim|system.lsp> and <verbatim|compiler.lsp> call each other through
     private names. 0010: <verbatim|compile-unknown-call>. 0011:
     <verbatim|*keep-source*>, the compiled functions keep their source. 0012:
-    the heap stops growing at 1 GB with an error. 0013:
-    <verbatim|*defer-macro-errors*>. 0022: a function with its source hashes
-    as its source.
+    the heap stops growing with an error, at 8 GB since 0023, which makes its
+    size a 64-bit number. 0013: <verbatim|*defer-macro-errors*>. 0022: a
+    function with its source hashes as its source.
 
     <item*|To read and write as Guile>0004: <verbatim|\|> and <verbatim|\\> in
     symbols, <verbatim|#{...}#>, long tokens, integers too large read as
@@ -79,12 +79,36 @@
     variable does not hide a special form at the head of a form (a parameter
     named <verbatim|begin> captured the <verbatim|begin> which <verbatim|cond>
     expands to). 0017: <verbatim|\<less\>> and <verbatim|=> with any number of
-    arguments. 0020: <verbatim|*arith-fallback*>.
+    arguments. 0020: <verbatim|*arith-fallback*>. 0026:
+    <verbatim|\<less\>=> and <verbatim|\<gtr\>=> are false when a number is
+    a NaN.
 
     <item*|Fixes>0001: <verbatim|llt> builds on any architecture (arm64,
     WebAssembly). 0021: the reader makes a vector without a label once its
-    elements are read (growing it called the collector at each step).
+    elements are read (growing it called the collector at each step). 0025:
+    the handles of the collector grow (a recursion through <verbatim|map>
+    failed past 500 levels), and a call from C near the end of the stack of C
+    is a stack overflow error, not a crash. 0028: a hash table no longer
+    inserts a key twice after a deletion (<verbatim|get> gave wrong values,
+    and the traversals listed deleted keys). 0029: a closure is no longer
+    written past the end of the heap. 0030: no table loses its finalizer.
+    0031: undefined behaviour (names of symbols, operands of the bytecode,
+    fixnums, keywords).
+
+    <item*|For speed>0024: the jumps of the errors save no signal mask on
+    macOS. 0026: <verbatim|\<gtr\>>, <verbatim|\<less\>=>,
+    <verbatim|\<gtr\>=> of two variables or constants are compiled as the
+    instructions <verbatim|\<less\>>, <verbatim|=>, <verbatim|number?>.
+    0027: <verbatim|equal?> of long lists without hashing their pairs. 0032:
+    <verbatim|for-each> is a builtin. 0033--0036: flat closures, which keep
+    the values of the variables they use (the variables captured and
+    assigned are boxed), and a <verbatim|let> compiled in the frame of its
+    function, without a closure.
   </description-long>
+
+  Patches 0028--0031 and 0033--0036 come from the femtolisp of Julia
+  (<verbatim|src/flisp> of <hlink|JuliaLang/julia|https://github.com/JuliaLang/julia>), with the hashes
+  of its commits in their messages.
 
   <section|Changing femtolisp>
 
@@ -110,7 +134,7 @@
 
     mv flisp.boot.new flisp.boot
 
-    ./flisp mkboot1.lsp && ./flisp mkboot1.lsp
+    ./flisp mkboot1.lsp # again, until flisp.boot no longer changes
 
     make test
 
@@ -121,7 +145,16 @@
 
   Here <verbatim|\<less\>tree\<gtr\>> is the directory <verbatim|src> of
   <TeXmacs>, which holds <verbatim|configure>. <verbatim|mkboot1.lsp> is run
-  twice to reach a fixed point. <verbatim|make-boot-header.sh> writes
+  until the image no longer changes, two or three times. When the bytecode
+  changes (new instructions, another layout of the frames), the old
+  femtolisp cannot run the new image: keep a copy of the old
+  <verbatim|flisp> with its old <verbatim|flisp.boot>, and make the first
+  image with it and the new compiler,
+  <verbatim|old/flisp mkboot0.lsp --compiler compiler.lsp system.lsp compiler.lsp>.
+  The <verbatim|Makefile> of femtolisp does not know which headers a file
+  includes: remove the objects (<verbatim|*.o>, <verbatim|llt/*.o>) after a
+  change of a header or of <verbatim|llt/htable.inc>, and in <TeXmacs>
+  <verbatim|fl_core.o> and <verbatim|fl_llt.o>. <verbatim|make-boot-header.sh> writes
   <verbatim|fl_boot.h>, the image as a C array. When <TeXmacs> starts,
   <verbatim|initialize_scheme> computes a checksum of the image and defines it
   as <verbatim|*fl-boot-id*>, which is part of the key of the caches of
@@ -130,7 +163,9 @@
   <em|A new version of femtolisp>: apply the patches to it, in order, fix what
   no longer applies, copy the sources, make the boot image as above. Then
   check the two places which depend on the insides of femtolisp:
-  <verbatim|fl_core.c>, which uses its stack and its types, and the lazy
+  <verbatim|fl_core.c>, which uses its stack and its types
+  (<verbatim|fltm_print_frames> reads the frames, of 4 slots since patch
+  0034) and binds some builtins under the names of R7RS, and the lazy
   function bodies (<verbatim|%expand-top> follows <verbatim|expand>, and the
   stubs depend on the code which the compiler makes for them, see
   <hlink|the lazy bodies|femtolisp-lazy.en.tm>).

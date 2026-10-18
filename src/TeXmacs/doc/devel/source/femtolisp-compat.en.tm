@@ -38,7 +38,19 @@
     <verbatim|quotient>, <verbatim|remainder> and <verbatim|modulo> have the
     signs of R5RS; <verbatim|\<gtr\>>, <verbatim|\<less\>=>,
     <verbatim|\<gtr\>=> take any number of arguments (<verbatim|\<less\>> and
-    <verbatim|=> do in femtolisp, patch 0017).
+    <verbatim|=> do in femtolisp, patch 0017). With two arguments which are
+    variables or constants, they are compiled as instructions (patch 0026),
+    and a comparison with a NaN is false.
+
+    <item*|Builtins under other names><verbatim|vector-ref>,
+    <verbatim|vector-set!>, <verbatim|vector-length>,
+    <verbatim|char-\<gtr\>integer>, <verbatim|integer-\<gtr\>char> are the
+    builtins <verbatim|aref>, <verbatim|aset!>, <verbatim|length>,
+    <verbatim|fixnum>, <verbatim|wchar>, bound by
+    <verbatim|fl_core.c> as constants (so that the compiler makes them
+    instructions): an error names the builtin, and a redefinition needs
+    <verbatim|define-override>. <verbatim|for-each> is a builtin too; with
+    several lists, it stops at the end of the shortest.
 
     <item*|Complex numbers>A complex number is the vector
     <verbatim|#(%complex re im)>. <verbatim|+ - * / => stay the fast

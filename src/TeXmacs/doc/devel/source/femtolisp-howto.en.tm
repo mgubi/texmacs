@@ -44,9 +44,11 @@
   The stack printed with <verbatim|TEXMACS_FL_TRACE> lists the calls with
   their arguments, the innermost first: at most 20 frames, with long arguments
   cut. A function which was left by a tail call does not appear. A frame
-  <verbatim|(lambda ...)> is a function without a name: a <verbatim|let> is
-  one, since it expands to a call of a lambda, and so is a function made by
-  <verbatim|tm-define>. A private function shows under its plain name
+  <verbatim|(lambda ...)> is a function without a name, such as a function
+  made by <verbatim|tm-define>. A <verbatim|let> has no frame: its variables
+  are in the frame of its function (patch 0035), and do not appear. An
+  argument which a closure captures and which is assigned shows as its box,
+  a list of one element (patch 0034). A private function shows under its plain name
   <verbatim|f>, not <verbatim|f@a/b>: only the global variable which holds it
   is renamed. A frame <verbatim|(%lazy-compile (lambda ...) ...)> means that
   the error came while a body was being compiled at its first call: the error
