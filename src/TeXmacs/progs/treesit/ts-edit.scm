@@ -159,8 +159,8 @@
 ;; Balanced brackets
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;; With the automatic brackets of programs (preference), the brackets and
-;; the quotes of code stay balanced as they are typed and deleted (see
+;; The brackets and the quotes of code stay balanced as they are typed and
+;; deleted (preference "prog:balanced brackets", on by default; see
 ;; bracket-open... in prog/prog-edit.scm): an opening bracket comes with its
 ;; closing one, a closing bracket is typed over the one which is there, and
 ;; deleting one of an empty pair deletes both, while deleting a bracket of a

@@ -1092,9 +1092,10 @@ installed, and the old behaviour stays elsewhere.
   node to node, to the node around and into it, and from definition to
   definition (`syntax-region-node-move`); the Focus menu has Previous and
   Next definition and Select definition.
-- **Balanced brackets** (same day): with the automatic brackets of
-  programs (preference `prog:automatic brackets`, still off by default), the
-  brackets and quotes of code with a syntax tree stay balanced: an opening
+- **Balanced brackets** (same day): the brackets and quotes of code with a
+  syntax tree stay balanced (preference `prog:balanced brackets`, on by
+  default, with its own checkbox; `prog:automatic brackets`, off by default,
+  stays for the code without a tree): an opening
   bracket or quote comes with its closing one (alone before a word, as in
   VS Code; around the selection when there is one), a closing bracket is
   typed over the matching one in front of it, Backspace or Delete on one of

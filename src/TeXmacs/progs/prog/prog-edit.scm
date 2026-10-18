@@ -63,11 +63,14 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (tm-define prog-auto-close-brackets? #f)
+(tm-define prog-balanced-brackets? #t)   ; in code with a syntax tree
 (tm-define prog-highlight-brackets? #f)
 (tm-define prog-select-brackets? #f)
 
 (define (notify-auto-close-brackets var val)
   (set! prog-auto-close-brackets? (== val "on")))
+(define (notify-balanced-brackets var val)
+  (set! prog-balanced-brackets? (== val "on")))
 (define (notify-highlight-brackets var val)
   (set! prog-highlight-brackets? (== val "on")))
 (define (notify-select-brackets var val)
@@ -75,6 +78,7 @@
 
 (define-preferences
   ("prog:automatic brackets" "off" notify-auto-close-brackets)
+  ("prog:balanced brackets" "on" notify-balanced-brackets)
   ("prog:highlight brackets" "off" notify-highlight-brackets)
   ("prog:select brackets" "off" notify-select-brackets))
 
@@ -198,25 +202,26 @@
     (if prog-highlight-brackets? (select-brackets p lb rb))))
 
 ;; in code with a syntax tree, the brackets stay balanced (see "Balanced
-;; brackets" in treesit/ts-edit.scm)
+;; brackets" in treesit/ts-edit.scm), unless the preference "prog:balanced
+;; brackets" is off; "prog:automatic brackets" is for the other code
 (tm-define (bracket-open lb rb esc)
-  (:require (and prog-auto-close-brackets? (syntax-cursor-language)))
+  (:require (and prog-balanced-brackets? (syntax-cursor-language)))
   (syntax-bracket-open lb rb)
   (if prog-highlight-brackets? (syntax-select-brackets)))
 
 (tm-define (bracket-close lb rb esc)
-  (:require (and prog-auto-close-brackets? (syntax-cursor-language)))
+  (:require (and prog-balanced-brackets? (syntax-cursor-language)))
   (syntax-bracket-close lb rb)
   (if prog-highlight-brackets? (syntax-select-brackets)))
 
 (tm-define (kbd-backspace)
   (:mode in-prog?)
-  (:require (and prog-auto-close-brackets? (syntax-cursor-language)))
+  (:require (and prog-balanced-brackets? (syntax-cursor-language)))
   (when (not (syntax-delete-bracket #f)) (former)))
 
 (tm-define (kbd-delete)
   (:mode in-prog?)
-  (:require (and prog-auto-close-brackets? (syntax-cursor-language)))
+  (:require (and prog-balanced-brackets? (syntax-cursor-language)))
   (when (not (syntax-delete-bracket #t)) (former)))
 
 ;; the brackets of the program languages without keys of their own
