@@ -1175,6 +1175,13 @@ installed, and the old behaviour stays elsewhere.
   `tm-program-languages.scm`); in a comment, the same command removes the
   block comment or the line comments of the lines around. Folds also have
   keys: std ( and std ), as the folds of the LSP client of `wip_lsp`.
+- **In the browser** (same day): the sources of `Plugins/TreeSitter` are
+  in `misc/wasm/sources.txt` (the C runtime with the include paths of its
+  vendored copy); the shipped tables, queries and grammars come with the
+  package misc of the page, and are unpacked into the home directory of
+  the page at the first use of a language (about 100 ms). Under node, 100
+  KB of Python parse in 55 ms (42 on the desktop); in the page (headless
+  Firefox) the parses and colors are those of the desktop.
 - A pitfall of the tests: the suites run in one TeXmacs, and a key typed
   in program code loads the keyboard of programs and its modules, which
   changed the highlighting of Fortran and the entering of mathematics in
