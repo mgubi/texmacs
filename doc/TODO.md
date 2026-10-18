@@ -38,6 +38,18 @@ SDL and Qtwk changes, the Qt 5 branch of the Qt pipes
 (`setupChildProcess`), and headless mode of X11, SDL and Cocoa. Qtwk has
 no headless mode. The Widkit duplicates are fixed on `wip_other_guis` too.
 
+- **Qt pipes: the stop of a program run by a wrapper** (check "pipes:
+  processes" of the suite `plugins`, which failed now and then). Fixed in
+  54dcfc0cd0: the group of the program is waited for before Qt closes the
+  pipes. Checked 160 times on macOS (Qt reaps the program from its SIGCHLD
+  handler). The Linux branch, which skips the zombie of the program by
+  reading `/proc`, passed one CI run only: watch the next runs of the
+  Linux Qt job (a regression would show as a stop of 2 s each, the suites
+  much slower than 5 minutes, rather than as a failure).
+- **Docs check** (`src/tests/docs/check.sh`): ended its TeXmacs with
+  `(quit)`, which S7 does not have, so every book waited for the timeout;
+  fixed in 6415686958 (the English books take 2 minutes).
+
 - **Remote tools: what the check of 2026-10-08 left** (issues of
   mgubi/texmacs). #319: the backups of the server are never registered,
   `server-backup.scm` is not loaded (where to hook it is to decide). #322:
