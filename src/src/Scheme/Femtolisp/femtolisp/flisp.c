@@ -46,6 +46,11 @@
 #include "llt.h"
 #include "flisp.h"
 #include "opcodes.h"
+#if defined(__EMSCRIPTEN__)
+#include <emscripten/stack.h>
+#elif defined(__APPLE__) || defined(__linux__)
+#include <pthread.h>
+#endif
 
 static char *builtin_names[] =
     { NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
@@ -86,8 +91,10 @@ static uint32_t curr_frame = 0;
 #define POP()   (Stack[--SP])
 #define POPN(n) (SP-=(n))
 
-#define N_GC_HANDLES 1024
-static value_t *GCHandleStack[N_GC_HANDLES];
+// TeXmacs: the handles grow as the stack does (there were 1024: a recursion
+// through map, which takes two, failed past 500 levels)
+static value_t **GCHandleStack = NULL;
+static uint32_t N_GC_HANDLES = 0;
 static uint32_t N_GCHND = 0;
 
 value_t FL_NIL, FL_T, FL_F, FL_EOF, QUOTE, FL_UNSPECIFIED;
@@ -402,8 +409,14 @@ static inline int symchar(char c);
 
 void fl_gc_handle(value_t *pv)
 {
-    if (N_GCHND >= N_GC_HANDLES)
-        lerror(MemoryError, "out of gc handles");
+    if (N_GCHND >= N_GC_HANDLES) {
+        uint32_t newsz = N_GC_HANDLES ? N_GC_HANDLES*2 : 1024;
+        value_t **ns = realloc(GCHandleStack, newsz*sizeof(value_t*));
+        if (ns == NULL)
+            lerror(MemoryError, "out of gc handles");
+        GCHandleStack = ns;
+        N_GC_HANDLES = newsz;
+    }
     GCHandleStack[N_GCHND++] = pv;
 }
 
@@ -629,8 +642,38 @@ static void grow_stack(void)
 // utils ----------------------------------------------------------------------
 
 // apply function with n args on the stack
+// TeXmacs: the builtins which call functions (map, for-each, apply, sort...)
+// do it on the stack of C, and a deep recursion through them overflowed it
+// (a crash): below this address (the stacks grow down), a call from C is a
+// stack overflow error. Set by fl_init for the thread which runs femtolisp;
+// none on the other systems.
+static char *c_stack_limit = NULL;
+#define C_STACK_MARGIN (512*1024)
+
+static void set_c_stack_limit(void)
+{
+#if defined(__EMSCRIPTEN__)
+    c_stack_limit = (char*)emscripten_stack_get_end() + C_STACK_MARGIN/4;
+#elif defined(__APPLE__)
+    pthread_t t = pthread_self();
+    char *top = (char*)pthread_get_stackaddr_np(t);
+    c_stack_limit = top - pthread_get_stacksize_np(t) + C_STACK_MARGIN;
+#elif defined(__linux__)
+    pthread_attr_t attr;
+    void *addr; size_t size;
+    if (pthread_getattr_np(pthread_self(), &attr) == 0) {
+        if (pthread_attr_getstack(&attr, &addr, &size) == 0)
+            c_stack_limit = (char*)addr + C_STACK_MARGIN;
+        pthread_attr_destroy(&attr);
+    }
+#endif
+}
+
 static value_t _applyn(uint32_t n)
 {
+    char here;
+    if (&here < c_stack_limit)
+        lerror(MemoryError, "stack overflow");
     value_t f = Stack[SP-n-1];
     uint32_t saveSP = SP;
     value_t v;
@@ -2372,6 +2415,7 @@ void fl_init(size_t initial_heapsize)
 #ifdef BOEHM_GC
     GC_init();
 #endif
+    set_c_stack_limit();
     lisp_init(initial_heapsize);
 }
 

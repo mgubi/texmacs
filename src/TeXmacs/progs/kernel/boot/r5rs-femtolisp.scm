@@ -235,8 +235,8 @@
 ;; Characters (bytes)
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define (char->integer c) (fixnum c))
-(define (integer->char i) (wchar i))
+;; char->integer and integer->char are the builtins fixnum and wchar
+;; (fltm_alias_builtins in fl_core.c)
 
 (define (%char-compare cmp)
   (lambda (a b . rest)
@@ -334,22 +334,24 @@
 (define (string-for-each f s . range)
   (for-each f (apply string->list s range)))
 
-;; > <= >= with any number of arguments, as < and = (patch 0017). They are
-;; not instructions as < and = are, and loops call them at each step: with
-;; two arguments, nothing is allocated and no other function is called.
+;; > <= >= with any number of arguments, as < and = (patch 0017). With two
+;; arguments which are variables or constants, the compiler makes them the
+;; instructions < and = (patch 0026); the functions are for the other
+;; calls. Comparisons with a NaN are false.
 (define %no-arg (list 'no-arg))
+(define (%<= a b) (if (< b a) #f (if (number? a) (if (< a b) #t (= a b)) #t)))
 (define-override (> (a %no-arg) (b %no-arg) . l)
   (if (null? l)
       (or (eq? b %no-arg) (< b a))
       (apply nary< (reverse (cons a (cons b l))))))
 (define-override (<= (a %no-arg) (b %no-arg) . l)
   (if (null? l)
-      (or (eq? b %no-arg) (not (< b a)))
-      (nary-compare (lambda (x y) (not (< y x))) (cons a (cons b l)))))
+      (or (eq? b %no-arg) (%<= a b))
+      (nary-compare %<= (cons a (cons b l)))))
 (define-override (>= (a %no-arg) (b %no-arg) . l)
   (if (null? l)
-      (or (eq? b %no-arg) (not (< a b)))
-      (nary-compare (lambda (x y) (not (< x y))) (cons a (cons b l)))))
+      (or (eq? b %no-arg) (%<= b a))
+      (nary-compare (lambda (x y) (%<= y x)) (cons a (cons b l)))))
 
 ;; max and min of two numbers without a fold
 (define-override (max a . l)
@@ -421,9 +423,9 @@
 
 (define (acons key datum alist) (cons (cons key datum) alist))
 
-(define (vector-ref v i) (aref v i))
-(define (vector-set! v i x) (aset! v i x))
-(define (vector-length v) (length v))
+;; vector-ref, vector-set! and vector-length are the builtins aref, aset!
+;; and length, which the compiler makes instructions (fltm_alias_builtins in
+;; fl_core.c)
 (define (make-vector n . fill)
   (if (pair? fill) (vector.alloc n (car fill)) (vector.alloc n #f)))
 (define (vector-fill! v x)

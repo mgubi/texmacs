@@ -95,6 +95,13 @@
 (assert (equal? (< 3 +nan.0) (> +nan.0 (double 3))))
 (assert (equal? (> 3 +nan.0) (> (double 3) +nan.0)))
 (assert (not (>= +nan.0 +nan.0)))
+; TeXmacs: false with one NaN too, also when compiled as instructions
+(assert (not (<= 1 +nan.0)))
+(assert (not (<= +nan.0 1)))
+(assert (not (>= 1 +nan.0)))
+(assert (not ((lambda (a b) (<= a b)) 1 +nan.0)))
+(assert ((lambda (a b) (and (<= a b) (>= b a) (> b a) (<= a a))) 1 2))
+(assert ((lambda (a b) (<= a b)) "a" "a"))
 
 ; comparing strings
 (assert (< "a" "b"))

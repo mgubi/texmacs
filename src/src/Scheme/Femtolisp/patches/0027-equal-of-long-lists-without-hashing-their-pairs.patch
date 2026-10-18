@@ -1,0 +1,55 @@
+From dc3844144c41120688ec79c1bd697f7e506fa1d5 Mon Sep 17 00:00:00 2001
+From: tm <tm@x>
+Date: Sun, 18 Oct 2026 18:55:46 +0100
+Subject: [PATCH] equal? of long lists without hashing their pairs
+
+bounded_compare gave up after 128 pairs along a path, the length of a
+list included, and cyc_compare then hashed every pair to find cycles:
+equal? of lists of 1000 elements was 2.5 times slower than in s7, of
+10000 elements 6 times. The bound is now the depth in the cars only, and
+the pairs visited are limited by a budget of 65536 for each comparison:
+only structures with cycles, or with more pairs, get to cyc_compare (a
+comparison of cyclic lists costs the budget first, 0.1 ms).
+---
+ equal.c | 10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
+
+diff --git a/equal.c b/equal.c
+index a6613e3..513415b 100644
+--- a/equal.c
++++ b/equal.c
+@@ -1,4 +1,11 @@
+ #define BOUNDED_COMPARE_BOUND 128
++// TeXmacs: the bound above is the depth (in the cars), and the pairs which
++// bounded_compare visits, along the lists too, are limited by this budget,
++// set by compare_: lists longer than 128 were all compared by cyc_compare,
++// which hashes each pair (20 times slower); only structures with cycles or
++// with more pairs than this get there now
++#define BOUNDED_COMPARE_STEPS 65536
++static int bounded_compare_steps;
+ #define BOUNDED_HASH_BOUND    16384
+ 
+ // comparable tag
+@@ -120,10 +127,10 @@ static value_t bounded_compare(value_t a, value_t b, int bound, int eq)
+         break;
+     case TAG_CONS:
+         if (tagb < TAG_CONS) return fixnum(1);
++        if (--bounded_compare_steps <= 0) return NIL;
+         d = bounded_compare(car_(a), car_(b), bound-1, eq);
+         if (d==NIL || numval(d) != 0) return d;
+         a = cdr_(a); b = cdr_(b);
+-        bound--;
+         goto compare_top;
+     }
+     return (taga < tagb) ? fixnum(-1) : fixnum(1);
+@@ -255,6 +262,7 @@ void comparehash_init(void)
+ // 'eq' means unordered comparison is sufficient
+ static value_t compare_(value_t a, value_t b, int eq)
+ {
++    bounded_compare_steps = BOUNDED_COMPARE_STEPS;
+     value_t guess = bounded_compare(a, b, BOUNDED_COMPARE_BOUND, eq);
+     if (guess == NIL) {
+         guess = cyc_compare(a, b, &equal_eq_hashtable, eq);
+-- 
+2.50.1 (Apple Git-155)
+
