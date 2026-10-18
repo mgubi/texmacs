@@ -354,6 +354,7 @@ extern fltype_t *stringtype, *wcstringtype;
 extern fltype_t *builtintype;
 
 value_t cvalue(fltype_t *type, size_t sz);
+value_t cvalue_no_finalizer(fltype_t *type, size_t sz);
 void add_finalizer(cvalue_t *cv);
 void cv_autorelease(cvalue_t *cv);
 void cv_pin(cvalue_t *cv);

@@ -625,7 +625,10 @@ void gc(int mustgrow)
         }
         grew = !grew;
     }
-    if (curheap > lim)  // all data was live
+    // all data was live: gc again and grow the heap, but always leave 4
+    // words, so that a closure is allocated without another check (TeXmacs,
+    // from Julia's femtolisp: lim-2 was 2 bytes, not 2 words)
+    if ((value_t*)curheap > ((value_t*)lim)-2)
         gc(0);
 }
 
@@ -1794,7 +1797,7 @@ static value_t apply_cl(uint32_t nargs)
             else {
                 PUSH(Stack[bp]); // env has already been captured; share
             }
-            if (curheap > lim-2)
+            if ((value_t*)curheap > ((value_t*)lim)-2)
                 gc(0);
             pv = (value_t*)curheap;
             curheap += (4*sizeof(value_t));

@@ -96,6 +96,12 @@ The patches
       a number is a NaN
 0027  equal? of long lists without hashing their pairs (only structures
       with cycles or more than 65536 pairs get to cyc_compare)
+0028  hash tables: a key is not inserted twice after a deletion (deleted
+      keys came back, get gave wrong values)
+0029  a closure is not allocated past the end of the heap
+0030  tables: the finalizers of small tables are neither lost nor missing
+      (a leak at each table made during a collection)
+      (0028-0030 come from Julia's femtolisp, src/flisp of JuliaLang/julia)
 
 fl_core.c also binds vector-ref, vector-set!, vector-length, char->integer
 and integer->char as constants to the builtins aref, aset!, length, fixnum
