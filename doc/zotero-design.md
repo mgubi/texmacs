@@ -519,6 +519,34 @@ follow in any order.
     in the footer, and *Check against Zotero...* gives the details. The
     database preferences do not link to the Zotero settings.
 
+  - **After the review of PR #279 (2026-10-14):**
+    - *Users without Zotero* pay nothing: the hooks of the core
+      (generation in database mode, *Document -> Update*, completion,
+      the Zotero part of the search window of the database, the focus
+      menus of citations) neither load the modules of Zotero nor ask it
+      until Zotero is used on this computer (`zotero-used?`, in
+      `bibtex/bib-utils.scm`): until it answered once (a command of
+      Zotero, its search window without the database, the test of the
+      settings), a key of zotero.org was given (preference "zotero used",
+      set then), or the database was synced with it (an existing "zotero
+      sync version"). The commands of *Document -> Bibliography* always
+      ask Zotero. A source `:zotero` with no key left asks nothing.
+    - *An unknown answer never removes a reference:* the managed file is
+      not written when Zotero failed during the export or its answers are
+      awaited (`zotero-write-bibliography` returns `#f`), and the entries
+      of the cited keys which Zotero does not give now are kept; a
+      reference is not added to the file of the user then. The sync
+      changes nothing, and keeps the version of the last sync, when the
+      versions of the items are not known (`zotero-item-versions` returns
+      `#f`); an item which is in Zotero again loses `zotero-deleted`.
+      A 404 (an item which is gone) is an answer, not a failure of Zotero.
+    - *Update from Zotero* adds a bibliography at most once, to the master
+      document (only when it is open: a project loads it), or gives its
+      file to a bibliography without file; otherwise it says what to do.
+    - `zotero-before-update` waits (`wait`) only for the answers which it
+      asked itself, and the update runs again when they come; an error in
+      it is reported in the footer and does not stop *Document -> Update*.
+
 Implementation notes:
 - Zotero's marks (`zotero-*`) are meta attributes of the database
   (`db-meta-attributes`). Two versions of an entry then compare equal when
@@ -527,7 +555,8 @@ Implementation notes:
   the old one explicitly. Saving through `bib-save` would let the
   versioning compare dates, with one-second resolution.
 - `update-document` calls `zotero-before-update`, a lazy definition, so that
-  a managed file is refreshed even before the Zotero modules are loaded.
+  a managed file is refreshed even before the Zotero modules are loaded
+  (once Zotero is used, see above).
 - The local API returns, for `itemKey=`, the children of the items too
   (attachments, notes); they are ignored.
 - The status request also notes the library version, so that the keys

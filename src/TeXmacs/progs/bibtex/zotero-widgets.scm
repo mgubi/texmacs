@@ -91,11 +91,18 @@
       (set-message (zotero-status-message (zotero-status)) "Zotero")
       (with r (zotero-sync-database #t)
         ;; NOTE: in a web browser, once all the answers have come
-        (when (not (zotero-asking?))
-          (set-message (or (zotero-sync-message r)
-                           "The references from Zotero are up to date")
-                       "Zotero")
-          (resolve-conflicts (cadddr r))))))
+        (cond ((zotero-asking?) (noop))
+              ((not r)
+               ;; Zotero failed: nothing was changed
+               (set-message (zotero-status-message
+                             (with st (zotero-status)
+                               (if (== st 'ready) 'error st)))
+                            "Zotero"))
+              (else
+                (set-message (or (zotero-sync-message r)
+                                 "The references from Zotero are up to date")
+                             "Zotero")
+                (resolve-conflicts (cadddr r)))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Checking the citations against Zotero

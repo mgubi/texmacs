@@ -174,9 +174,14 @@
 (tm-define (zotero-request path interactive?)
   (:require fake?)
   (set! fake-requests (cons path fake-requests))
-  (if (== fake-status 200)
-      (list 200 (fake-answer path) fake-version)
-      (list fake-status "" #f)))
+  (cond ((and fake-fail (string-contains? path fake-fail))
+         (list 500 "" #f))
+        ((== fake-status 200)
+         (list 200 (fake-answer path) fake-version))
+        (else (list fake-status "" #f))))
+
+;; the requests whose path contains it fail (when it is a string)
+(define fake-fail #f)
 
 ;; NOTE: update-document schedules work on the document for later, which
 ;; would run once the test has closed it
@@ -187,6 +192,7 @@
 (define (with-fake thunk)
   (set! fake? #t)
   (set! fake-status 200)
+  (set! fake-fail #f)
   (set! fake-requests '())
   (set! fake-version 7)
   (set! fake-library (default-library))
@@ -195,6 +201,7 @@
   (zotero-forget-keys)
   (with r (check-run thunk)
     (set! fake? #f)
+    (set! fake-fail #f)
     (zotero-forget-state)
     (when (and (pair? r) (== (car r) 'error))
       (check-report #f "the group" (object->string r)))))
@@ -284,9 +291,9 @@
       (check= (zotero-completion-suffixes "smith2020") '("" "a"))
       ;; one letter is not enough
       (check= (zotero-complete "s") '())
-      (set-preference "zotero completion" "off")
-      (check= (zotero-completion-suffixes "smith") '())
-      (set-preference "zotero completion" "on")
+      (with-preferences '(("zotero completion" . "off"))
+        (lambda ()
+          (check= (zotero-completion-suffixes "smith") '())))
       (set-status! 0)
       (check= (zotero-completion-suffixes "smith") '())))
   (check-group "completion cache")
@@ -499,11 +506,10 @@
         (with-document "b2.tm"
             (doc-tm "  <\\bibliography|bib|tm-plain|own2>\n  </bibliography>\n")
           (lambda ()
-            (with old (get-preference "zotero add to bib file")
-              (set-preference "zotero add to bib file" "off")
-              (zotero-before-update "bibliography")
-              (check= (string-load f) "@article{other, title={Other}}")
-              (set-preference "zotero add to bib file" old))
+            (with-preferences '(("zotero add to bib file" . "off"))
+              (lambda ()
+                (zotero-before-update "bibliography")
+                (check= (string-load f) "@article{other, title={Other}}")))
             (zotero-before-update "bibliography")
             (check= (map car (zotero-bib-chunks-of (string-load f)))
                     '("other" "smith2020" "zotero:EEEE5555"))
@@ -560,23 +566,18 @@
     (in-module '(tm-define (bib-database)
                   (:require test-db?)
                   test-db-file)))
-  (let ((old (get-preference "database tool")))
-    ;; NOTE: a new file each time, since a database stays in memory
-    (set! test-db-count (+ test-db-count 1))
-    (set! test-db-file (tmp (string-append "test-" (number->string
-                                                    test-db-count)
-                                           ".tmdb")))
-    (system-remove test-db-file)
-    (set! test-db? #t)
-    (set-preference "database tool" "on")
-    (set-preference "zotero sync version" "")
-    (with r (check-run thunk)
-      (set! test-db? #f)
-      (set-preference "database tool" old)
-      (reset-preference "zotero sync version")
-      (system-remove test-db-file)
-      (when (and (pair? r) (== (car r) 'error))
-        (check-report #f "the group" (object->string r))))))
+  ;; NOTE: a new file each time, since a database stays in memory
+  (set! test-db-count (+ test-db-count 1))
+  (set! test-db-file (tmp (string-append "test-" (number->string
+                                                  test-db-count)
+                                         ".tmdb")))
+  (system-remove test-db-file)
+  (set! test-db? #t)
+  (with-preferences '(("database tool" . "on")
+                      ("zotero sync version" . ""))
+    thunk)
+  (set! test-db? #f)
+  (system-remove test-db-file))
 
 (define (db-ids name)
   (in-module `(with-database (bib-database)
@@ -698,12 +699,7 @@
 
 (define (with-libraries val thunk)
   ;; Run @thunk with the preference "zotero libraries" set to @val
-  (with old (get-preference "zotero libraries")
-    (set-preference "zotero libraries" val)
-    (with r (check-run thunk)
-      (set-preference "zotero libraries" old)
-      (when (and (pair? r) (== (car r) 'error))
-        (check-report #f "the group" (object->string r))))))
+  (with-preferences (list (cons "zotero libraries" val)) thunk))
 
 (define (test-groups)
   (check-group "groups")
@@ -941,10 +937,18 @@
 
 (define (with-preferences l thunk)
   ;; Run @thunk with the preferences of the pairs @l, set back afterwards
-  (let ((old (map (lambda (p) (cons (car p) (get-preference (car p)))) l)))
+  ;; as they were, also when a check fails: the tests never change the
+  ;; preferences of the user (a preference which was not set is reset)
+  (let ((old (map (lambda (p)
+                    (list (car p) (cpp-has-preference? (car p))
+                          (get-preference (car p))))
+                  l)))
     (for (p l) (set-preference (car p) (cdr p)))
     (with r (check-run thunk)
-      (for (p old) (set-preference (car p) (cdr p)))
+      (for (p old)
+        (if (cadr p)
+            (set-preference (car p) (caddr p))
+            (reset-preference (car p))))
       (when (and (pair? r) (== (car r) 'error))
         (check-report #f "the group" (object->string r))))))
 
@@ -1526,11 +1530,10 @@
                       ("smith2020" "Database, from Zotero")
                       ("smith2020a" "Zotero")))
             ;; Zotero is searched only when the preference says so
-            (with old (get-preference "zotero in database search")
-              (set-preference "zotero in database search" "off")
-              (check= (map car (result-sources (search "gravity")))
-                      '("mine2020" "smith2020"))
-              (set-preference "zotero in database search" old)))
+            (with-preferences '(("zotero in database search" . "off"))
+              (lambda ()
+                (check= (map car (result-sources (search "gravity")))
+                        '("mine2020" "smith2020")))))
           (with-libraries "all"
             (lambda ()
               (with e (cdar (zotero-db-entries '("group2021")))
@@ -1561,12 +1564,11 @@
             (lambda ()
               (check= (zotero-search-sources-text :bib-file)
                       "Sources: own.bib; Zotero (My Library and 1 group)")))
-          (with old (get-preference "zotero in database search")
-            (set-preference "zotero in database search" "off")
-            (check= (zotero-search-sources-text :bib-file)
-                    (string-append "Sources: own.bib; Zotero is left out "
-                                   "(see the Zotero settings)"))
-            (set-preference "zotero in database search" old))
+          (with-preferences '(("zotero in database search" . "off"))
+            (lambda ()
+              (check= (zotero-search-sources-text :bib-file)
+                      (string-append "Sources: own.bib; Zotero is left out "
+                                     "(see the Zotero settings)"))))
           (check= (result-sources (zotero-file-search-results "dark"))
                   '(("jones2021" "own.bib")))
           (check= (zotero-file-search-results "nothing like this")
@@ -1825,11 +1827,263 @@
           (check= (zotero-citation-entry (citation-at-cursor)) #f))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Robustness: failures of Zotero, projects, users without Zotero
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (bibliographies doc)
+  (length (select doc '(:* bibliography))))
+
+(define (with-chapter master chapter thunk)
+  ;; Run @thunk in the chapter @chapter (a file name) of the project whose
+  ;; master is @master (also a file name); the master is then a buffer
+  (with-document chapter chapter-doc
+    (lambda ()
+      (project-attach master)
+      (with r (check-run thunk)
+        (project-attach "")
+        (with m (tmp master)
+          (when (buffer-exists? m)
+            (buffer-pretend-saved m)
+            (buffer-close m)))
+        (when (and (pair? r) (== (car r) 'error))
+          (check-report #f "the group" (object->string r)))))))
+
+(define (test-add-bibliography)
+  (check-group "add bibliography")
+  (with-fake
+    (lambda ()
+      (eval-system (string-append "mkdir -p '" zotero-dir "'"))
+      ;; a bibliography without file gets the managed file, once
+      (with-document "eb.tm"
+          (doc-tm "  <\\bibliography|bib|tm-plain|>\n  </bibliography>\n")
+        (lambda ()
+          (zotero-update-bibliography)
+          (check= (bibliographies (body)) 1)
+          (check= (zotero-master-bibliography-file) (tmp "eb-zotero.bib"))
+          (check-true (zotero-managed-file? (tmp "eb-zotero.bib")))
+          (system-remove (tmp "eb-zotero.bib"))))
+      ;; a bibliography whose file is not a name is left alone
+      (with-document "ob.tm"
+          (doc-tm (string-append "  <\\bibliography|bib|tm-plain|<em|x>>\n"
+                                 "  </bibliography>\n"))
+        (lambda ()
+          (zotero-update-bibliography)
+          (check= (bibliographies (body)) 1)
+          (check-false (url-exists? (tmp "ob-zotero.bib")))))
+      ;; in a chapter, the bibliography goes into the master, once
+      (string-save (doc-tm "") (tmp "pm.tm"))
+      (with-chapter "pm.tm" "pc.tm"
+        (lambda ()
+          (zotero-update-bibliography)
+          (check= (bibliographies (body)) 0)
+          (check= (bibliographies (tree->stree (buffer-get (tmp "pm.tm")))) 1)
+          (with f (tmp "pm-zotero.bib")
+            (check-true (zotero-managed-file? f))
+            (check-true (string-contains? (string-load f)
+                                          "@article{smith2020,"))
+            (system-remove f))))
+      (system-remove (tmp "pm.tm"))))
+  (check-group "add bibliography database")
+  (with-fake
+    (lambda ()
+      (with-test-database
+        (lambda ()
+          (string-save (doc-tm "") (tmp "dm.tm"))
+          (with-chapter "dm.tm" "dc.tm"
+            (lambda ()
+              (zotero-update-bibliography)
+              (zotero-update-bibliography)
+              (check= (bibliographies (body)) 0)
+              (check= (bibliographies (tree->stree (buffer-get (tmp "dm.tm"))))
+                      1)))
+          (system-remove (tmp "dm.tm")))))))
+
+(define (test-failures)
+  (check-group "failures")
+  (with-fake
+    (lambda ()
+      (eval-system (string-append "mkdir -p '" zotero-dir "'"))
+      (with f (tmp "keep.bib")
+        (check= (zotero-write-bibliography '("smith2020" "muller2019") f) '())
+        (with s (string-load f)
+          ;; Zotero fails during the lookups: the file is kept
+          (zotero-forget-keys)
+          (set! fake-status 500)
+          (check-false (zotero-write-bibliography
+                        '("smith2020" "muller2019") f))
+          (check= (string-load f) s)
+          ;; or during the export
+          (set-status! 200)
+          (check= (length (zotero-resolve '("smith2020" "muller2019"))) 2)
+          (set! fake-fail "format=bibtex")
+          (check-false (zotero-write-bibliography
+                        '("smith2020" "muller2019") f))
+          (check= (string-load f) s)
+          (set! fake-fail #f)
+          (set-status! 200))
+        ;; a key which Zotero does not give keeps its entry
+        (string-save (string-append "% Exported from Zotero by TeXmacs on "
+                                    "2026-01-01; replaced\n"
+                                    "@article{gone2000,\n\ttitle = {Gone},\n}\n")
+                     f)
+        (check= (zotero-write-bibliography '("gone2000" "smith2020") f) '())
+        (with s (string-load f)
+          (check-true (string-contains? s "@article{gone2000,"))
+          (check-true (string-contains? s "@article{smith2020,")))
+        ;; and a key no longer cited leaves the file
+        (zotero-write-bibliography '("smith2020") f)
+        (check-false (string-contains? (string-load f) "gone2000"))
+        (system-remove f))
+      ;; nor is a reference added to a file of the user when Zotero fails
+      (with f (tmp "own-fail.bib")
+        (string-save "@article{other, title={Other}}\n" f)
+        (zotero-forget-keys)
+        (set! fake-fail "format=bibtex")
+        (check= (zotero-add-to-bib-file f '("smith2020")) '(() ()))
+        (check= (string-load f) "@article{other, title={Other}}\n")
+        (set! fake-fail #f)
+        (set-status! 200)
+        (system-remove f))))
+  (check-group "failures database")
+  (with-fake
+    (lambda ()
+      (with-test-database
+        (lambda ()
+          (zotero-import-items
+           (map zotero-find-key '("smith2020" "zotero:EEEE5555")))
+          (check= (zotero-sync-database) '(() () () ()))
+          (with v (get-preference "zotero sync version")
+            ;; the versions of the items are not known: nothing is changed,
+            ;; and the version of the sync is not saved
+            (set! fake-version 8)
+            (set! fake-fail "format=versions")
+            (check-false (zotero-sync-database #t))
+            (check= (db-field "smith2020" "zotero-deleted") '())
+            (check= (get-preference "zotero sync version") v)
+            ;; Synchronize says so
+            (check-true (catch #t (lambda () (zotero-synchronize) #t)
+                          (lambda args #f)))
+            (set! fake-fail #f)
+            (set-status! 200))
+          ;; an item deleted, then in Zotero again
+          (set! fake-library (list-filter fake-library
+                                          (lambda (x)
+                                            (!= (car x) "EEEE5555"))))
+          (set! fake-version 9)
+          (check= (zotero-sync-database) '(() () ("zotero:EEEE5555") ()))
+          (check= (db-field "zotero:EEEE5555" "zotero-deleted") '("yes"))
+          (set! fake-library (default-library))
+          (set! fake-version 10)
+          (check= (zotero-sync-database) '(() () () ()))
+          (check= (db-field "zotero:EEEE5555" "zotero-deleted") '()))))))
+
+(define (test-first-library)
+  (check-group "first library")
+  ;; a key is not searched in the libraries after the first which has it
+  (with-fake
+    (lambda ()
+      (with-buffer-body '(document "")
+        (lambda ()
+          (with-libraries "all"
+            (lambda ()
+              (zotero-forget-keys)
+              (check= (length (zotero-libraries)) 2)
+              (set! fake-requests '())
+              (check= (zotero-entry-library (zotero-find-key "smith2020a"))
+                      "users/0")
+              (check-false (list-find fake-requests
+                                      (cut string-starts? <> "groups/")))
+              ;; the other libraries are searched when it lacks the key
+              (check= (zotero-entry-library (zotero-find-key "group2021"))
+                      "groups/42"))))))))
+
+(define (test-async-wait)
+  (check-group "async wait")
+  ;; an update waits for its own answers only
+  (with-sim-browser
+    (lambda ()
+      (with-document "aw.tm" (doc-tm "")
+        (lambda ()
+          (zotero-with-retry noop zotero-status)
+          (sim-answer! "format=keys" 200 7 "AAAA1111\n")
+          ;; another operation waits for zotero.org
+          (zotero-with-retry noop (lambda () (zotero-search "gravity")))
+          (check-true (zotero-asking?))
+          ;; the update needs nothing from Zotero: it is made
+          (check= (zotero-before-update "bibliography") 'done)
+          (set! sim-requests '())
+          (zotero-forget-keys))))))
+
+(define (document-edit-private name)
+  (eval name (resolve-module '(generic document-edit))))
+
+(define (bib-manage-private name)
+  (eval name (resolve-module '(database bib-manage))))
+
+(define fake-error? #f)
+
+(tm-define (zotero-before-update what)
+  (:require fake-error?)
+  (error "zotero-test: failure of the hook"))
+
+(define (test-unused)
+  (check-group "unused")
+  ;; without Zotero, the hooks of the bibliographies ask nothing
+  (with-fake
+    (lambda ()
+      ;; nothing to look up: no request
+      (zotero-forget-state)
+      (set! fake-requests '())
+      (check= (zotero-db-entries '()) '())
+      (check= fake-requests '())
+      (with-preferences '(("zotero used" . "off"))
+        (lambda ()
+          (check-false (zotero-used?))
+          (check= ((bib-manage-private 'bib-sources) '())
+                  '(:local :default :attached))
+          (eval-system (string-append "mkdir -p '" zotero-dir "'"))
+          (with f (tmp "un-refs.bib")
+            (string-save "% Exported from Zotero by TeXmacs on 2026-01-01\n" f)
+            (with-document "un.tm"
+                (doc-tm (string-append "  <\\bibliography|bib|tm-plain|"
+                                       "un-refs>\n  </bibliography>\n"))
+              (lambda ()
+                (zotero-forget-state)
+                (set! fake-requests '())
+                (check= ((document-edit-private 'zotero-update)
+                         "bibliography")
+                        'done)
+                (check= fake-requests '())
+                (check= (string-load f)
+                        "% Exported from Zotero by TeXmacs on 2026-01-01\n")))
+            (system-remove f))
+          ;; once Zotero answered, it is used
+          (zotero-forget-state)
+          (zotero-status)
+          (check-true (zotero-used?))))
+      (check= ((bib-manage-private 'bib-sources) '())
+              '(:local :default :zotero :attached))))
+  (check-group "update hook")
+  ;; an error of Zotero does not stop Document -> Update
+  (set! fake-error? #t)
+  (check= ((document-edit-private 'zotero-update) "bibliography") 'done)
+  (check-true (catch #t
+                (lambda () (update-document "zotero-test-nothing") #t)
+                (lambda args #f)))
+  (set! fake-error? #f))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Main
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (tm-define (zotero-test-failures)
   (check-suite "zotero")
+  ;; NOTE: Zotero is used, and the preferences of the user stay as they are
+  (with-preferences '(("zotero used" . "on"))
+    run-tests)
+  (check-end))
+
+(define (run-tests)
   (eval-system (string-append "mkdir -p '" zotero-dir "'"))
   (test-requests)
   (test-search)
@@ -1855,5 +2109,9 @@
   (test-copies)
   (test-project)
   (test-focus)
-  (eval-system (string-append "rm -rf '" zotero-dir "'"))
-  (check-end))
+  (test-add-bibliography)
+  (test-failures)
+  (test-first-library)
+  (test-async-wait)
+  (test-unused)
+  (eval-system (string-append "rm -rf '" zotero-dir "'")))

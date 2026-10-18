@@ -117,6 +117,7 @@
         (set-preference "zotero api key" ""))
       (set-preference "zotero api key" key))
   (set-preference "zotero user" "")
+  (when (!= key "") (zotero-mark-used!))
   (zotero-forget-state)
   (zotero-forget-keys)
   ;; the search window of references shows its sources and results again
@@ -619,7 +620,14 @@
 
 (define (remember-state! st)
   (set! last-state st)
-  (set! last-state-time (texmacs-time)))
+  (set! last-state-time (texmacs-time))
+  ;; from then on, the hooks of the bibliographies use Zotero
+  ;; (zotero-used?, in bibtex/bib-utils.scm)
+  (when (== st 'ready) (zotero-mark-used!)))
+
+(tm-define (zotero-mark-used!)
+  (:synopsis "Zotero is used on this computer")
+  (set-preference "zotero used" "on"))
 
 (tm-define (zotero-forget-state)
   (:synopsis "Ask Zotero again at the next request")
@@ -694,6 +702,8 @@
            (cond ((== st 200) body)
                  ;; the answer is awaited: not a failure
                  ((== st 'pending) #f)
+                 ;; no such item (deleted): Zotero itself answered
+                 ((== st 404) #f)
                  (else (remember-state! (status->state st)) #f))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1180,8 +1190,12 @@
                         (and-with e (list-find (items-entries lib s) identity)
                           (and (== (zotero-entry-key e) key) e))))
                     (or (find-by-item key)
-                        (list-or (map (cut find-in-library <> key)
-                                      (zotero-libraries)))))
+                        ;; NOTE: the libraries after the first which has
+                        ;; it are not asked
+                        (let loop ((libs (zotero-libraries)))
+                          (and (pair? libs)
+                               (or (find-in-library (car libs) key)
+                                   (loop (cdr libs)))))))
           ;; NOTE: not while an answer is awaited, which is no answer
           (when (and (zotero-ready?) (not (zotero-asking?)))
             (ahash-set! resolved key (or e 'none)))
@@ -1403,25 +1417,32 @@
 
 (tm-define (zotero-item-versions items . opt-lib)
   (:synopsis "The (item . version) of the @items which Zotero still has")
-  ;; in the library of the user, or the library given as option
+  ;; in the library of the user, or the library given as option; #f when
+  ;; Zotero did not answer (or its answer is awaited), which says nothing
+  ;; of the items
   ;; NOTE: the local API has no list of deleted items: an item which is
   ;; not returned has been deleted (or moved to the trash). It also returns
   ;; the children (attachments, notes) of the items, which are not asked for
   (with lib (if (null? opt-lib) user-library (car opt-lib))
-    (append-map
-     (lambda (l)
-       (with t (zotero-json (zotero-get lib (string-append
-                                             "items?format=versions&itemKey="
-                                             (string-recompose l ","))))
-         (if (not (tm-func? t 'attr)) '()
-             (let loop ((r (cdr t)) (acc '()))
-               (if (or (null? r) (null? (cdr r))) (reverse acc)
-                   (loop (cddr r)
-                         (cons (cons (car r)
-                                     (or (string->number (json-string (cadr r)))
-                                         0))
-                               acc)))))))
-     (if (null? items) '() (chunks items 50)))))
+    (let loop ((l (if (null? items) '() (chunks items 50))) (acc '()))
+      (if (null? l) acc
+          (let* ((s (zotero-get lib (string-append
+                                     "items?format=versions&itemKey="
+                                     (string-recompose (car l) ","))))
+                 (t (and s (zotero-json s))))
+            (and (tm-func? t 'attr)
+                 (loop (cdr l)
+                       (append acc
+                               (let pairs ((r (cdr t)) (acc '()))
+                                 (if (or (null? r) (null? (cdr r)))
+                                     (reverse acc)
+                                     (pairs (cddr r)
+                                            (cons (cons (car r)
+                                                        (or (string->number
+                                                             (json-string
+                                                              (cadr r)))
+                                                            0))
+                                                  acc))))))))))))
 
 (tm-define (zotero-libraries-versions libs)
   (:synopsis "The versions of the libraries @libs, as a string")
@@ -1714,8 +1735,11 @@
   ;; Only the items which TeXmacs asks Zotero for go into the file: the
   ;; @keys which no source before Zotero provides. A key renamed in Zotero
   ;; is exported under its old key, and the entry of a deleted item is
-  ;; kept, until the citations are updated. Returns the keys which are
-  ;; not in the library of Zotero
+  ;; kept, until the citations are updated; so is the entry of a key which
+  ;; Zotero does not give now. Returns the keys which are not in the
+  ;; library of Zotero, or #f when the file was not written: when Zotero
+  ;; failed meanwhile, or its answers are awaited (an answer which is not
+  ;; known never removes a reference)
   (let* ((asked (list-filter keys (negate zotero-resolved-elsewhere?)))
          (found (zotero-resolve asked))
          (missing (list-difference asked (map car found)))
@@ -1723,22 +1747,27 @@
          (renamed (car check))
          (deleted (cadr check))
          (old (if (url-exists? file) (bib-chunks (string-load file)) '()))
-         (kept (list-filter old (lambda (x) (in? (car x) deleted))))
+         (kept (list-filter old (lambda (x)
+                                  (and (in? (car x) missing)
+                                       (not (assoc (car x) renamed))))))
          (bib (string-append
                (zotero-export (map cdr found))
                (apply string-append
                       (map (lambda (p) (zotero-export-as (cdr p) (car p)))
                            renamed))
                (apply string-append (map cdr kept)))))
-    (string-save (string-append
-                  managed-marker " on "
-                  (zotero-today)
-                  "; replaced by Document -> Update -> Bibliography\n"
-                  bib)
-                 file)
-    (zotero-record-items (map cdr found))
-    (set! last-check (list renamed deleted))
-    (list-difference missing (append (map car renamed) (map car kept)))))
+    (and (zotero-ready?) (not (zotero-waiting?))
+         (begin
+           (string-save (string-append
+                         managed-marker " on "
+                         (zotero-today)
+                         "; replaced by Document -> Update -> Bibliography\n"
+                         bib)
+                        file)
+           (zotero-record-items (map cdr found))
+           (set! last-check (list renamed deleted))
+           (list-difference missing
+                            (append (map car renamed) (map car kept)))))))
 
 ;; References of Zotero added to the BibTeX file of the user: each one is
 ;; preceded by a comment which names its item, as a link which shows it in
@@ -1785,7 +1814,8 @@
   (:synopsis "Add to the BibTeX file @f the references of Zotero it lacks")
   ;; Of the @keys, those which no source before Zotero provides and which
   ;; Zotero has; returns (added missing), lists of keys
-  (let* ((s (string-load f))
+  (let* ((saved? #f)
+         (s (string-load f))
          (have (map car (bib-chunks s)))
          (asked (list-filter keys
                              (lambda (k)
@@ -1804,9 +1834,13 @@
                             "\n"))
                          found))
              (sep (if (or (== s "") (string-ends? s "\n")) "" "\n")))
-        (string-save (apply string-append s sep texts) f)
-        (zotero-record-items (map cdr found))))
-    (list (map car found) missing)))
+        ;; NOTE: not when Zotero failed meanwhile (the references would
+        ;; be empty), or its answers are awaited
+        (when (and (zotero-ready?) (not (zotero-waiting?)))
+          (string-save (apply string-append s sep texts) f)
+          (zotero-record-items (map cdr found))
+          (set! saved? #t))))
+    (list (if saved? (map car found) '()) missing)))
 
 (tm-define (zotero-add-message added missing f)
   (:synopsis "The message after the references @added to the file @f")
@@ -1880,23 +1914,37 @@
     (cond ((or (not file) (url-rooted-tmfs? file)) #f)
           ((and (url-exists? file) (not (zotero-managed-file? file))) #f)
           ((not (zotero-ready?))
-           (when (url-exists? file)
-             (set-message
-              (string-append (zotero-status-message (zotero-status)) ": "
-                             (zotero-tr (string-append
-                                         "the bibliography uses the "
-                                         "references exported on %1")
-                                        (or (zotero-managed-date file) "?")))
-              "Zotero"))
+           (exported-file-message file)
            #f)
           (else
             (with missing (zotero-write-bibliography
                            (zotero-project-citations) file)
-              ;; NOTE: the generation reports the missing keys; the keys
-              ;; renamed in Zotero are always reported
-              (and-with msg (export-message (if quiet? '() missing))
-                (set-message msg "Zotero"))
-              #t)))))
+              (cond ((list? missing)
+                     ;; NOTE: the generation reports the missing keys; the
+                     ;; keys renamed in Zotero are always reported
+                     (and-with msg (export-message (if quiet? '() missing))
+                       (set-message msg "Zotero"))
+                     #t)
+                    ;; (the answers are awaited: it is made again then)
+                    ((zotero-waiting?) #f)
+                    (else (exported-file-message file) #f)))))))
+
+(define (exported-file-text file)
+  ;; Zotero failed: the existing managed @file is used as it is
+  (string-append (zotero-status-message (failed-status)) ": "
+                 (zotero-tr (string-append
+                             "the bibliography uses the "
+                             "references exported on %1")
+                            (or (zotero-managed-date file) "?"))))
+
+(define (exported-file-message file)
+  (when (url-exists? file)
+    (set-message (exported-file-text file) "Zotero")))
+
+(define (failed-status)
+  ;; the state of Zotero after a failure (an error if it says ready)
+  (with st (zotero-status)
+    (if (== st 'ready) 'error st)))
 
 (define (export-message missing)
   ;; The message after an export, for the keys @missing in Zotero
@@ -1907,23 +1955,60 @@
                                        (string-recompose missing ", ")))))
     (and (nnull? l) (string-recompose l ". "))))
 
-(define (insert-managed-bibliography)
-  ;; A bibliography with a managed file named after the document; with the
-  ;; database, a bibliography without file, whose references are kept in
-  ;; the document
-  (with name (if (supports-db?) ""
-                 (string-append (url-basename (current-buffer)) "-zotero"))
-    (with body (buffer-get-body (current-buffer))
-      (tree-insert! body (tree-arity body)
-                    (list (stree->tree
-                           `(bibliography "bib" "tm-plain" ,name
-                                          (document ""))))))))
+(define (add-managed-bibliography! u)
+  ;; Give the master document @u a bibliography with a managed file named
+  ;; after it; with the database, a bibliography without file, whose
+  ;; references are kept in the document. Without the database, a
+  ;; bibliography without file gets that file. Only in an open buffer (the
+  ;; master of a chapter may only be read); #t when it was done
+  (and (buffer-exists? u)
+       (let* ((body (buffer-get-body u))
+              (db? (supports-db?))
+              (name (if db? ""
+                        (string-append (url-basename u) "-zotero")))
+              (t (and (not db?) (empty-bibliography body))))
+         (cond (t (tree-set! t 2 name) #t)
+               ;; (a bibliography whose file is not a name is left alone)
+               ((bibliography-tag (tree->stree body)) #f)
+               (else
+                 (tree-insert! body (tree-arity body)
+                               (list (stree->tree
+                                      `(bibliography "bib" "tm-plain" ,name
+                                                     (document "")))))
+                 #t)))))
+
+(define (no-bibliography-message u)
+  (set-message (zotero-tr "Add a bibliography with a BibTeX file to %1"
+                          (url->system (url-tail u)))
+               "Zotero"))
 
 (tm-define (zotero-update-bibliography)
   (:synopsis "Export the cited items from Zotero and update the bibliography")
   (zotero-command zotero-update-bibliography update-bibliography))
 
+(define (export-message* file missing)
+  ;; the message after the export of the citations to the managed @file,
+  ;; or #f when it was not written
+  (cond ((list? missing)
+         (or (export-message missing)
+             (zotero-tr "Exported the citations to %1"
+                        (url->system (url-tail file)))))
+        ;; (the answers are awaited: it is made again then)
+        ((zotero-waiting?) #f)
+        ((url-exists? file) (exported-file-text file))
+        (else (zotero-status-message (failed-status)))))
+
+(define (export-to-managed-file file)
+  ;; export the citations to the managed @file, and update
+  (let* ((keys (zotero-project-citations))
+         (missing (zotero-write-bibliography keys file)))
+    (when (list? missing) (update-document "bibliography"))
+    (and-with msg (export-message* file missing)
+      (set-message msg "Zotero"))))
+
 (define (update-bibliography)
+  ;; NOTE: a bibliography is added at most once, to the master document,
+  ;; and its file is then exported without calling this again
   (let* ((u (zotero-master))
          (file (zotero-master-bibliography-file)))
     (zotero-forget-state)
@@ -1931,24 +2016,28 @@
                 (not (and file (url-exists? file)
                           (zotero-managed-file? file))))
            ;; Zotero is a source of the database: no file is needed
-           (when (not (bibliography-tag (zotero-file-stree u)))
-             (insert-managed-bibliography))
-           (update-document "bibliography")
-           (set-message
-            (if (zotero-ready?)
-                (zotero-tr "Updated the bibliography from the database and Zotero")
-                (string-append (zotero-status-message (zotero-status)) ": "
-                               (zotero-tr (string-append
-                                           "the bibliography uses the "
-                                           "references kept in the document"))))
-            "Zotero"))
+           (if (and (not (bibliography-tag (zotero-file-stree u)))
+                    (not (add-managed-bibliography! u)))
+               (no-bibliography-message u)
+               (begin
+                 (update-document "bibliography")
+                 (set-message
+                  (if (zotero-ready?)
+                      (zotero-tr "Updated the bibliography from the database and Zotero")
+                      (string-append (zotero-status-message (zotero-status)) ": "
+                                     (zotero-tr (string-append
+                                                 "the bibliography uses the "
+                                                 "references kept in the document"))))
+                  "Zotero"))))
           ((url-rooted-tmfs? u)
            (set-message "Save the document first" "Zotero"))
           ((not (zotero-ready?))
            (set-message (zotero-status-message (zotero-status)) "Zotero"))
           ((not file)
-           (insert-managed-bibliography)
-           (zotero-update-bibliography))
+           (with f (and (add-managed-bibliography! u)
+                        (zotero-master-bibliography-file))
+             (if f (export-to-managed-file f)
+                 (no-bibliography-message u))))
           ((and (url-exists? file) (not (zotero-managed-file? file)))
            (if (!= (get-preference "zotero add to bib file") "on")
                (set-message (zotero-tr (string-append
@@ -1964,15 +2053,7 @@
                       (zotero-tr "%1 has the references of the citations"
                                  (url->system (url-tail file))))
                   "Zotero"))))
-          (else
-            (let* ((keys (zotero-project-citations))
-                   (missing (zotero-write-bibliography keys file)))
-              (update-document "bibliography")
-              (set-message
-               (or (export-message missing)
-                   (zotero-tr "Exported the citations to %1"
-                              (url->system (url-tail file))))
-               "Zotero"))))))
+          (else (export-to-managed-file file)))))
 
 (tm-define (zotero-citation-renames)
   (:synopsis "The (old . new) citation keys of the document renamed in Zotero")
@@ -2074,15 +2155,21 @@
   ;; NOTE: called by update-document (Document -> Update). In a web browser
   ;; the answers of zotero.org may be awaited: then it says wait, and the
   ;; update is made again when they have come
+  ;; NOTE: only for the answers which it waits for itself (its retry runs
+  ;; the update again when they come), not those of other operations
   (zotero-forget-key-wanted)
-  (zotero-with-retry (lambda () (update-document what))
-                     (lambda () (before-update what)))
-  (zotero-key-wanted (lambda () (update-document what)))
-  (if (zotero-asking?)
-      (begin
-        (show-progress)
-        'wait)
-      'done))
+  (let* ((wait? #f)
+         (again (lambda () (update-document what))))
+    (zotero-with-retry again
+                       (lambda ()
+                         (before-update what)
+                         (set! wait? (zotero-waiting?))))
+    (zotero-key-wanted again)
+    (if wait?
+        (begin
+          (show-progress)
+          'wait)
+        'done)))
 
 ;; Without the database, a bibliography without file, or whose file does
 ;; not exist yet, has no references: when Zotero has references which the

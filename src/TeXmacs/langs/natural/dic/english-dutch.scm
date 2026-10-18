@@ -33,6 +33,7 @@
 ("abbreviated authors" "afgekorte auteurs")
 ("abbreviation" "afkorting")
 ("about" "over")
+("add a bibliography with a BibTeX file to %1" "Voeg aan %1 een bibliografie met een BibTeX-bestand toe")
 ("add the references of Zotero to the BibTeX file" "de referenties van Zotero aan het BibTeX-bestand toevoegen")
 ("added %1 reference from Zotero to %2" "%1 referentie uit Zotero aan %2 toegevoegd")
 ("added %1 references from Zotero to %2" "%1 referenties uit Zotero aan %2 toegevoegd")

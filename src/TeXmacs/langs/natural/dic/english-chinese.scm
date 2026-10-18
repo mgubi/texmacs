@@ -25,6 +25,7 @@
 ("a series" "A 系列")
 ("abbreviation" "缩写")
 ("about" "关于")
+("add a bibliography with a BibTeX file to %1" "请在 %1 中添加带有 BibTeX 文件的参考文献表")
 ("add the references of Zotero to the BibTeX file" "将 Zotero 的参考文献添加到 BibTeX 文件")
 ("added %1 reference from Zotero to %2" "已从 Zotero 向 %2 添加 %1 条参考文献")
 ("added %1 references from Zotero to %2" "已从 Zotero 向 %2 添加 %1 条参考文献")
