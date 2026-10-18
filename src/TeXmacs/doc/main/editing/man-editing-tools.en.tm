@@ -33,6 +33,8 @@
 
     <branch|Positioning and resizing objects|man-structured-geometry.en.tm>
 
+    <branch|Editing program code|man-program-code.en.tm>
+
     <branch|Versioning tools|man-versioning.en.tm>
 
     <branch|Working with Git|man-git.en.tm>

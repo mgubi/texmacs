@@ -1182,6 +1182,18 @@ installed, and the old behaviour stays elsewhere.
   the page at the first use of a language (about 100 ms). Under node, 100
   KB of Python parse in 55 ms (42 on the desktop); in the page (headless
   Firefox) the parses and colors are those of the desktop.
+- **The old highlighters stay** (decided after a look, same day): a
+  language of tree-sitter wraps the usual language of TeXmacs and still
+  calls its `advance` for every token typeset (the cut of the text into
+  tokens and their properties for the typesetting: spaces, breaks), as
+  well as its hyphenation and groups; only the colors come from the tree.
+  The usual languages also color the code when the preference
+  `tree-sitter highlighting` is off. Removing them would need a cut into
+  tokens made from the tree first. The bracket functions of
+  `prog/*-edit.scm` are redefined, not removed (`wip_lsp` changes them).
+- User documentation: `doc/main/editing/man-program-code.en.tm` (Editing
+  program code, in Editing tools), and Program coloring by syntax trees in
+  the preferences (Other).
 - A pitfall of the tests: the suites run in one TeXmacs, and a key typed
   in program code loads the keyboard of programs and its modules, which
   changed the highlighting of Fortran and the entering of mathematics in
