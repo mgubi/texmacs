@@ -671,6 +671,10 @@
   ("iso-8859-2" "Iso-8859-2")
   ("utf-8" "Utf-8"))
 
+(define-preference-names "editor:code indent"
+  ("spaces" "Spaces")
+  ("tabs" "Tabs"))
+
 (tm-widget (verbatim-preferences-widget)
   ======
   (bold (text "TeXmacs -> Verbatim"))
@@ -699,6 +703,20 @@
       (enum (set-pretty-preference "verbatim->texmacs:encoding" answer)
             '("Automatic" "Cork" "Iso-8859-1" "Iso-8859-2" "Utf-8")
             (get-pretty-preference "verbatim->texmacs:encoding")
+            "12em")))
+  ====== ======
+  (bold (text "Source code"))
+  ===
+  (aligned
+    (item (text "Columns between tab stops:")
+      (enum (set-preference "editor:code tab width" answer)
+            '("2" "4" "8" "")
+            (get-preference "editor:code tab width")
+            "12em"))
+    (item (text "Indent new files with:")
+      (enum (set-pretty-preference "editor:code indent" answer)
+            '("Spaces" "Tabs")
+            (get-pretty-preference "editor:code indent")
             "12em"))))
 
 ;; Pdf ----------

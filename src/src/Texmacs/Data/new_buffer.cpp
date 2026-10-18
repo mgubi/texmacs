@@ -18,6 +18,7 @@
 #include "dictionary.hpp"
 #include "new_document.hpp"
 #include "merge_sort.hpp"
+#include "scheme.hpp"
 
 array<tm_buffer> bufs;
 
@@ -438,6 +439,8 @@ attach_subformat (tree t, url u, string fm) {
   h (PROG_LANGUAGE)= fm;
   // the font of source files, a preference (tm-server.scm)
   h (PROG_FONT)= get_preference ("editor:code font", "Inconsolatazi4");
+  // the columns between the tab stops of source files (a preference)
+  h (PROG_TAB_WIDTH)= get_preference ("editor:code tab width", "8");
   tree t2= change_doc_attr (t, "initial", make_collection (h));
   return change_doc_attr (t2, "style", tree ("code"));
 }

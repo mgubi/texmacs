@@ -420,7 +420,9 @@ verbatim_document_to_tree (string s, bool wrap, string enc) {
 // written with; a file whose line ends are mixed keeps its CR as <#D>.
 // The encoding and the line ends are in the initial environment of the
 // document (source-encoding, source-line-ends), which tree_to_verbatim
-// follows with the encoding SourceCode.
+// follows with the encoding SourceCode, and so is the indentation of its
+// lines (source-indent: tabs, spaces, or "" if none), which the new lines
+// follow (prog-edit.scm).
 
 static bool
 valid_utf8 (string s) {
@@ -480,6 +482,15 @@ source_document_to_tree (string s) {
   else if (cr > 0 && lf == 0 && crlf == 0) {
     ends= "mac"; s= replace (s, "\r", "\n"); }
   // (else a CR which is left is a character of its line)
+  // the indentation of its lines: by tabs, by spaces, or none
+  int by_tabs= 0, by_spaces= 0;
+  for (int i=0; i<N(s); i++)
+    if (i == 0 || s[i-1] == '\n') {
+      if (s[i] == '\t') by_tabs++;
+      else if (s[i] == ' ' && i+1 < N(s) && s[i+1] == ' ') by_spaces++;
+    }
+  string indent= (by_tabs > by_spaces? string ("tabs"):
+                  by_spaces > 0? string ("spaces"): string (""));
   tree body;
   if (search_forwards ("\n", s) < 0) body= source_line_to_cork (s);
   else {
@@ -496,6 +507,29 @@ source_document_to_tree (string s) {
                     tree (ASSOCIATE, FONT_FAMILY, "tt"),
                     tree (ASSOCIATE, PAR_FIRST, "0cm"),
                     tree (ASSOCIATE, "source-encoding", enc),
-                    tree (ASSOCIATE, "source-line-ends", ends));
+                    tree (ASSOCIATE, "source-line-ends", ends),
+                    tree (ASSOCIATE, "source-indent", indent));
   return tree (DOCUMENT, compound ("body", body), compound ("initial", init));
+}
+
+tree
+source_snippet_to_tree (string s) {
+  // a piece of source code (pasted in a program): its tabs and control
+  // characters kept as in source_document_to_tree, its line ends LF
+  if (!valid_utf8 (s)) {
+    string u;
+    for (int i=0; i<N(s); i++)
+      u << encode_as_utf8 ((unsigned int) (unsigned char) s[i]);
+    s= u;
+  }
+  s= mac_to_unix (dos_to_unix (s));
+  if (search_forwards ("\n", s) < 0) return source_line_to_cork (s);
+  tree t (DOCUMENT);
+  int j= 0;
+  for (int i=0; i<=N(s); i++)
+    if (i == N(s) || s[i] == '\n') {
+      t << tree (source_line_to_cork (s (j, i)));
+      j= i+1;
+    }
+  return t;
 }

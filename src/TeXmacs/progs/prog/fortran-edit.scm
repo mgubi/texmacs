@@ -42,7 +42,7 @@
                  (string-prefix? "for " tr)
                  (string-prefix? "contains" tr)
                  (string-prefix? "module" tr))
-           (+ i (get-tabstop)) i))))
+           (+ i (program-indent-step)) i))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
