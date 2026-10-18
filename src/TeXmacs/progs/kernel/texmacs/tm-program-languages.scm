@@ -26,6 +26,7 @@
 ;;   (tags inline block)  the tags of inline code and of blocks of code
 ;;   (grammar "cpp")      its grammar of tree-sitter, in misc/tree-sitter
 ;;   (comment "//")       the start of a line comment
+;;   (block-comment "/*" "*/")  the delimiters of a block comment
 ;;   (names "cpp" ...)    its names in other formats (the fences of Markdown,
 ;;                        docx/odt): the first is written, all are read
 ;; The order is that of the groups of the code tags.
@@ -34,8 +35,10 @@
 
 (define program-language-table
   '(("scheme" (label "Scheme") (tags scm scm-code) (grammar "scheme")
-     (comment ";") (names "scheme" "scm" "lisp" "guile"))
+     (comment ";") (block-comment "#|" "|#")
+     (names "scheme" "scm" "lisp" "guile"))
     ("cpp" (label "C++") (tags cpp cpp-code) (grammar "cpp") (comment "//")
+     (block-comment "/*" "*/")
      (names "cpp" "c" "c++" "cc" "h" "hpp"))
     ("dot" (tags dot-lang dot-code) (names "dot"))
     ("mathemagix" (label "Mathemagix") (tags mmx mmx-code)
@@ -47,37 +50,50 @@
     ("python" (label "Python") (tags python python-code) (grammar "python")
      (comment "#") (names "python" "py" "python3"))
     ("julia" (label "Julia") (tags julia julia-code) (grammar "julia")
-     (comment "#") (names "julia"))
+     (comment "#") (block-comment "#=" "=#")
+     (names "julia"))
     ("java" (label "Java") (tags java java-code) (grammar "java")
-     (comment "//") (names "java"))
+     (comment "//") (block-comment "/*" "*/")
+     (names "java"))
     ("javascript" (label "JavaScript") (tags javascript-lang javascript-code)
-     (grammar "javascript") (comment "//") (names "javascript" "js"))
+     (grammar "javascript") (comment "//") (block-comment "/*" "*/")
+     (names "javascript" "js"))
     ("json" (tags json-lang json-code) (grammar "json") (names "json"))
-    ("scala" (label "Scala") (tags scala scala-code) (names "scala"))
+    ("scala" (label "Scala") (tags scala scala-code) (block-comment "/*" "*/")
+     (names "scala"))
     ("scilab" (label "Scilab") (tags scilab scilab-code) (names "scilab"))
     ("shell" (label "Shell") (tags shell shell-code) (grammar "bash")
      (comment "#") (names "sh" "bash" "shell" "zsh" "console"))
     ("go" (label "Go") (tags go-lang go-code) (grammar "go") (comment "//")
+     (block-comment "/*" "*/")
      (names "go" "golang"))
     ("lean" (label "Lean") (tags lean lean-code) (grammar "lean")
-     (comment "--") (names "lean" "lean4"))
+     (comment "--") (block-comment "/-" "-/")
+     (names "lean" "lean4"))
     ("lua" (label "Lua") (tags lua lua-code) (grammar "lua") (comment "--")
+     (block-comment "--[[" "]]")
      (names "lua"))
     ("rust" (label "Rust") (tags rust rust-code) (grammar "rust")
-     (comment "//") (names "rust" "rs"))
+     (comment "//") (block-comment "/*" "*/")
+     (names "rust" "rs"))
     ("typescript" (label "TypeScript") (tags typescript-lang typescript-code) (grammar "typescript") (comment "//")
+     (block-comment "/*" "*/")
      (names "typescript" "ts" "tsx"))
     ("html" (label "HTML") (tags html-lang html-code) (grammar "html")
+     (block-comment "<less>!--" "--<gtr>")
      (names "html" "xhtml"))
     ("css" (label "CSS") (tags css-lang css-code) (grammar "css")
+     (block-comment "/*" "*/")
      (names "css"))
     ("toml" (label "TOML") (tags toml-lang toml-code) (grammar "toml") (comment "#")
      (names "toml"))
     ("yaml" (label "YAML") (tags yaml-lang yaml-code) (grammar "yaml") (comment "#")
      (names "yaml" "yml"))
     ("haskell" (label "Haskell") (tags haskell-lang haskell-code) (grammar "haskell") (comment "--")
+     (block-comment "{-" "-}")
      (names "haskell" "hs"))
     ("ocaml" (label "OCaml") (tags ocaml-lang ocaml-code) (grammar "ocaml")
+     (block-comment "(*" "*)")
      (names "ocaml" "ml"))
     ("latex" (label "LaTeX") (tags latex-lang latex-code) (grammar "latex") (comment "%")
      (names "latex" "tex"))
@@ -108,6 +124,11 @@
 
 (define-public (program-language-comment name)
   (let ((v (program-language-ref name 'comment))) (and v (car v))))
+
+(define-public (program-language-block-comment name)
+  ;; the delimiters of a block comment, as a pair, or #f
+  (let ((v (program-language-ref name 'block-comment)))
+    (and v (pair? v) (pair? (cdr v)) (cons (car v) (cadr v)))))
 
 (define-public (program-language-names name)
   (or (program-language-ref name 'names) '()))

@@ -276,6 +276,112 @@
                 (delete-pair ctx root lan q))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Keywords and tags which close blocks
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; After Return, a block which the line before opens and nothing closes gets
+;; its closing keyword on the next line: the keywords of the grammar which
+;; close blocks (misc/tree-sitter/<grammar>/closers.scm, made by
+;; gen-closers.py: end, fi, done...) and, in LaTeX, the \end of the last
+;; \begin of the line are tried in turn on a copy of the tree, and the first
+;; one which leaves fewer errors in the code is inserted. In HTML, the >
+;; which ends a start tag inserts its end tag.
+
+(define grammar-closers '())   ; ((grammar . keywords) ...)
+
+(define (closers-of lan)
+  (let* ((g (or (program-language-grammar lan) lan))
+         (known (assoc g grammar-closers)))
+    (if known (cdr known)
+        (let* ((u (url-concretize
+                   (string-append "$TEXMACS_PATH/misc/tree-sitter/" g "/closers.scm")))
+               (l (if (url-exists? u) (string->object (string-load u)) '())))
+          (set! grammar-closers (cons (cons g l) grammar-closers))
+          l))))
+
+(define (latex-closer line)
+  ;; \end{name} for the last \begin{name} of the line, or #f
+  (let ((i (string-search-backwards "\\begin{" (string-length line) line)))
+    (and (>= i 0)
+         (let ((j (string-index line #\} (+ i 7))))
+           (and j (string-append "\\end{" (substring line (+ i 7) j) "}"))))))
+
+(define-public (syntax-close-block)
+  ;; insert the line which closes the block opened by the line before the
+  ;; cursor, when there is a closing keyword which makes fewer errors; #f
+  ;; when nothing was inserted
+  (let ((c (cursor-code)))
+    (and c (tree-is? (cadr (car c)) 'document)
+         (let* ((ctx (car c)) (id (cadr c)) (root (cadr ctx)) (p (cddr ctx))
+                (lan (get-env "prog-language"))
+                (row (car p)) (line (line-string root row))
+                (prev (and (> row 0) (line-string root (- row 1))))
+                (latex (and prev (== (or (program-language-grammar lan) lan) "latex")
+                            (latex-closer prev)))
+                (candidates (append (if latex (list latex) '()) (closers-of lan))))
+           (and prev (pair? candidates)
+                ;; at the end of the line
+                (not (first-non-space (string-drop line (min (cadr p) (string-length line)))))
+                (let* ((spaces (make-string (line-indent root (- row 1)) #\space))
+                       (e0 (syntax-region-errors-with root id row (cadr p) "")))
+                  (and (> e0 0)
+                       (let loop ((l candidates))
+                         (and (pair? l)
+                              (let ((n (syntax-region-errors-with
+                                        root id row (cadr p)
+                                        (string-append "\n" spaces (car l)))))
+                                (if (and (>= n 0) (< n e0))
+                                    (begin
+                                      (tree-insert! root (+ row 1)
+                                                    (list (string-append spaces (car l))))
+                                      #t)
+                                    (loop (cdr l)))))))))))))
+
+(define-public (syntax-close-tag)
+  ;; after the > of a start tag of HTML, insert its end tag; #f when there
+  ;; is none to insert
+  (let ((c (cursor-code)))
+    (and c
+         (let* ((ctx (car c)) (id (cadr c)) (root (cadr ctx)) (p (cddr ctx))
+                (q (list (car p) (- (cadr p) 1)))
+                (nodes (and (>= (cadr q) 0)
+                            (syntax-region-node-range root id (car q) (cadr q)
+                                                      (car q) (cadr q))))
+                (tag (and nodes (list-find nodes (lambda (n) (== (node-type n) "start_tag")))))
+                (elem (and tag (list-find nodes (lambda (n) (== (node-type n) "element"))))))
+           (and tag (== (node-end tag) p)
+                (let* ((nm (tag-name (region-text root (node-start tag) (node-end tag))))
+                       ;; does the element end with an end tag of its own?
+                       (e (and elem (node-end elem)))
+                       (closed? (and e (> (cadr e) 0)
+                                     (let* ((l (syntax-region-node-range
+                                                root id (car e) (- (cadr e) 1)
+                                                (car e) (- (cadr e) 1)))
+                                            (et (memq (list-find l (lambda (n) (== (node-type n) "end_tag")))
+                                                      l)))
+                                       (and et (pair? (cdr et))
+                                            (== (node-start (cadr et)) (node-start elem))
+                                            (== (node-end (cadr et)) e))))))
+                  (and nm (not closed?)
+                       (not (in? (locase-all nm) html-void-elements))
+                       (begin (insert-go-to (string-append "<less>/" nm "<gtr>") '(0))
+                              #t))))))))
+
+(define (tag-name text)
+  ;; the name of a start tag (in a TeXmacs string: <less>name ...<gtr>)
+  (and (string-starts? text "<less>")
+       (let* ((s (string-drop text 6))
+              (n (string-length s))
+              (end (let loop ((i 0))
+                     (if (or (= i n) (in? (string-ref s i) '(#\space #\< #\/ #\tab)))
+                         i (loop (+ i 1))))))
+         (and (> end 0) (substring s 0 end)))))
+
+(define html-void-elements
+  '("area" "base" "br" "col" "embed" "hr" "img" "input" "link" "meta"
+    "param" "source" "track" "wbr"))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Structural edits
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -392,6 +498,82 @@
                (move-to ctx (if (== (car p) (car a)) (list (car p) (- (cadr p) 1)) p))
                #t))))))
 
+(define (comment-rows! root rows prefix)
+  ;; toggle the line comments of the rows
+  (let* ((lines (map (lambda (r) (line-string root r)) rows))
+         (new (toggle-line-comments lines prefix)))
+    (for-each (lambda (r s) (when (!= s (line-string root r))
+                              (tree-set (tree-ref root r) s)))
+              rows new)))
+
+(define (whole-lines? root a b)
+  ;; does the range a..b cover whole lines (but their indentation)?
+  (and (== (first-non-space (line-string root (car a))) (cadr a))
+       (not (first-non-space (string-drop (line-string root (car b))
+                                          (min (cadr b)
+                                               (string-length
+                                                (line-string root (car b)))))))))
+
+(define-public (syntax-toggle-comment-node)
+  ;; comment the node at the cursor: with line comments when it has whole
+  ;; lines, else with a block comment; or uncomment the comment around the
+  ;; cursor
+  (with-structure
+    (lambda (ctx root info)
+      (let* ((lan (get-env "prog-language")) (id (syntax-cursor-language))
+             (p (cddr ctx))
+             (prefix (syntax-comment-prefix lan))
+             (block (program-language-block-comment lan))
+             (around (list-find (syntax-region-node-range root id (car p) (cadr p)
+                                                          (car p) (cadr p))
+                                (lambda (n) (string-contains? (node-type n) "comment"))))
+             (rows (lambda (a b) (map (lambda (i) (+ (car a) i))
+                                      (iota (+ (- (car b) (car a)) 1))))))
+        (cond
+         (around
+          (let* ((a (node-start around)) (b (node-end around))
+                 (text (range-text root a b)))
+            (cond ((and block (string-starts? text (car block))
+                        (string-ends? text (cdr block)))
+                   (let* ((inner (substring text (string-length (car block))
+                                            (- (string-length text)
+                                               (string-length (cdr block)))))
+                          (inner (if (string-starts? inner " ") (string-drop inner 1) inner))
+                          (inner (if (string-ends? inner " ") (string-drop-right inner 1) inner)))
+                     (replace-range! root a b inner)
+                     (move-to ctx a)
+                     #t))
+                  (prefix
+                   ;; the lines commented around it
+                   (let* ((commented? (lambda (r)
+                                        (and (>= r 0) (< r (tree-arity root))
+                                             (string-starts?
+                                              (string-drop (line-string root r)
+                                                           (or (first-non-space
+                                                                (line-string root r)) 0))
+                                              prefix))))
+                          (first (let up ((r (car a)))
+                                   (if (commented? (- r 1)) (up (- r 1)) r)))
+                          (last (let down ((r (car b)))
+                                  (if (commented? (+ r 1)) (down (+ r 1)) r))))
+                     (comment-rows! root (rows (list first 0) (list last 0)) prefix)
+                     #t))
+                  (else #f))))
+         ((list-ref info 0)
+          => (lambda (n)
+               (let ((a (car n)) (b (cadr n)))
+                 (cond ((and prefix (or (whole-lines? root a b) (not block)))
+                        (comment-rows! root (rows a b) prefix) #t)
+                       (block
+                        (replace-range! root a b
+                                        (string-append (car block) " "
+                                                       (range-text root a b)
+                                                       " " (cdr block)))
+                        (move-to ctx a)
+                        #t)
+                       (else #f)))))
+         (else #f))))))
+
 (define-public (syntax-wrap-node lb rb)
   ;; put the node at the cursor between the brackets lb and rb
   (with-structure
@@ -460,22 +642,31 @@
          (update-path (tree->path (tree-ref root row)))
          #t)))
 
-(define-public (syntax-toggle-fold)
-  ;; unfold the fold which starts at the line of the cursor, or fold the
-  ;; innermost node of several lines around the cursor; #f when there is
-  ;; nothing to do
+(define-public (syntax-fold-block)
+  ;; fold the innermost node of several lines around the cursor; #f when
+  ;; there is none
   (let ((c (cursor-code)))
     (and c (tree-is? (cadr (car c)) 'document)
-         (let* ((ctx (car c)) (lan (cadr c)) (root (cadr ctx)) (p (cddr ctx)))
-           (or (unfold-at! root (car p))
-               (let ((n (list-find (syntax-region-node-range root lan (car p) (cadr p)
-                                                             (car p) (cadr p))
-                                   (lambda (n) (< (car (node-start n))
-                                                  (car (node-end n)))))))
-                 (and n (begin
-                          (fold-node! root lan n)
-                          (move-to ctx (node-start n))
-                          #t))))))))
+         (let* ((ctx (car c)) (lan (cadr c)) (root (cadr ctx)) (p (cddr ctx))
+                (n (list-find (syntax-region-node-range root lan (car p) (cadr p)
+                                                        (car p) (cadr p))
+                              (lambda (n) (and (< (car (node-start n))
+                                                  (car (node-end n)))
+                                               (pair? (fold-rows root lan n)))))))
+           (and n (fold-node! root lan n)
+                (begin (move-to ctx (node-start n)) #t))))))
+
+(define-public (syntax-unfold-block)
+  ;; unfold the fold which starts at the line of the cursor; #f when there
+  ;; is none
+  (let ((c (cursor-code)))
+    (and c (tree-is? (cadr (car c)) 'document)
+         (unfold-at! (cadr (car c)) (car (cddr (car c)))))))
+
+(define-public (syntax-toggle-fold)
+  ;; unfold the fold which starts at the line of the cursor, or fold the
+  ;; innermost node of several lines around the cursor
+  (or (syntax-unfold-block) (syntax-fold-block)))
 
 (define-public (syntax-fold-definitions)
   ;; fold all the definitions of several lines of the code at the cursor
@@ -896,7 +1087,8 @@
   ("Next definition" (syntax-move-definition 1))
   ("Select definition" (syntax-select-definition))
   (-> "Folds"
-      ("Fold or unfold" (syntax-toggle-fold))
+      ("Fold block" (syntax-fold-block))
+      ("Unfold block" (syntax-unfold-block))
       ("Fold all definitions" (syntax-fold-definitions))
       ("Unfold all" (syntax-unfold-all)))
   (-> "Structure"
@@ -905,6 +1097,7 @@
       ("Swap with previous" (syntax-swap-node #f))
       ("Raise node" (syntax-raise-node))
       ("Remove brackets" (syntax-splice-brackets))
+      ("Comment or uncomment node" (syntax-toggle-comment-node))
       ("Wrap in parentheses" (syntax-wrap-node "(" ")"))
       ("Wrap in brackets" (syntax-wrap-node "[" "]"))
       ("Wrap in braces" (syntax-wrap-node "{" "}")))

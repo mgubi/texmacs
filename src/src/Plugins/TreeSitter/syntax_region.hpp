@@ -29,6 +29,7 @@ object syntax_region_captures (tree region, int language, int query);
 array<int> syntax_region_statistics (tree region, int language);
 void syntax_region_forget (tree region);
 int syntax_region_indent (tree region, int language, int query, int row, int tab);
+int syntax_region_errors_with (tree region, int language, int row, int col, string ins);
 array<int> syntax_region_node_move (tree region, int language,
                                    int row, int col, int dir);
 array<int> syntax_region_node_info (tree region, int language, int row, int col);

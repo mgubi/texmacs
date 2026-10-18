@@ -30,6 +30,8 @@
   ("cmd tab" (program-indent #f))
   ("cmd S-tab" (program-indent #t)) ; TODO
   ("cmd A-tab" (program-indent-all #f))
+  ("std (" (program-fold))
+  ("std )" (program-unfold))
   ("structured:cmd delete" (program-remove-structure))
   ("structured:cmd backspace" (program-remove-structure))
 
@@ -106,6 +108,10 @@
   ("]" (python-bracket-close "[" "]" ))
   ("\"" (python-bracket-open "\"" "\"" ))
   ("'" (python-bracket-open "'" "'" )))
+
+(kbd-map
+  (:mode in-prog-html?)
+  (">" (program-greater)))
 
 (kbd-map
   (:mode in-prog-fortran?)

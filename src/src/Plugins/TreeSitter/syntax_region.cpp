@@ -648,6 +648,59 @@ syntax_region_highlight (tree root, int language, int query, array<int> colors,
 }
 
 /******************************************************************************
+* Errors after an insertion
+******************************************************************************/
+
+static int
+count_errors (TSNode n) {
+  if (!ts_node_has_error (n)) return 0;
+  int r= (ts_node_is_error (n) || ts_node_is_missing (n))? 1: 0;
+  uint32_t k= ts_node_child_count (n);
+  for (uint32_t i= 0; i < k; i++) r += count_errors (ts_node_child (n, i));
+  return r;
+}
+
+int
+syntax_region_errors_with (tree root, int language, int row, int col, string ins) {
+  // the number of ERROR and MISSING nodes of the region if ins were
+  // inserted at the point (the tree of the region is reparsed in a copy,
+  // incrementally); -1 without a tree
+  syntax_region_rep* r= get_region (root, language);
+  if (r == NULL || row < 0 || row >= N(r->lines)) return -1;
+  if (N(ins) == 0) return count_errors (ts_tree_root_node (r->tree));
+  int pos= r->offsets[row] + min (max (col, 0), N(r->lines[row]));
+  string text;
+  for (int i= 0; i < N(r->lines); i++) {
+    if (i > 0) text << "\n";
+    text << r->lines[i];
+  }
+  text= text (0, pos) * ins * text (pos, N(text));
+  array<string> new_lines;
+  int last= 0;
+  for (int i= 0; i <= N(text); i++)
+    if (i == N(text) || text[i] == '\n') { new_lines << text (last, i); last= i + 1; }
+  array<int> new_offsets= line_offsets (new_lines);
+  TSTree* t= ts_tree_copy (r->tree);
+  TSInputEdit e;
+  e.start_byte= e.old_end_byte= (uint32_t) pos;
+  e.new_end_byte= (uint32_t) (pos + N(ins));
+  e.start_point= e.old_end_point= point_of (r->offsets, pos);
+  e.new_end_point= point_of (new_offsets, pos + N(ins));
+  ts_tree_edit (t, &e);
+  TSParser* p= ts_parser_new ();
+  ts_parser_set_language (p, tree_sitter_get_language (language));
+  c_string ctext (text);
+  text_input in= { (const char*) ctext, (uint32_t) N(text) };
+  TSInput input= { &in, text_read, TSInputEncodingCustom, texmacs_decode };
+  TSTree* t2= ts_parser_parse (p, t, input);
+  int n= t2 == NULL? -1: count_errors (ts_tree_root_node (t2));
+  if (t2 != NULL) ts_tree_delete (t2);
+  ts_tree_delete (t);
+  ts_parser_delete (p);
+  return n;
+}
+
+/******************************************************************************
 * Moves between the nodes
 ******************************************************************************/
 

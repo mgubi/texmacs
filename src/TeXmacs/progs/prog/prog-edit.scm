@@ -291,6 +291,24 @@
   (:require (syntax-cursor-language))
   (syntax-splice-brackets))
 
+;; the end tag of HTML after the > of a start tag
+(tm-define (program-greater)
+  (insert "<gtr>")
+  (when (and prog-balanced-brackets? (syntax-cursor-language))
+    (syntax-close-tag)))
+
+;; folds (std ( and std ), as for the folds of language servers)
+(tm-define (program-fold) (noop))
+(tm-define (program-unfold) (noop))
+
+(tm-define (program-fold)
+  (:require (syntax-cursor-language))
+  (syntax-fold-block))
+
+(tm-define (program-unfold)
+  (:require (syntax-cursor-language))
+  (syntax-unfold-block))
+
 (tm-define (structured-remove-right)
   (:mode in-prog?)
   (:require (syntax-cursor-language))
@@ -418,7 +436,10 @@
 (tm-define (insert-return)
   (:mode in-prog?)
   (insert-raw-return)
-  (program-indent #f))
+  (program-indent #f)
+  ;; a block which Return opens gets its closing keyword (end, fi...)
+  (when (and prog-balanced-brackets? (syntax-cursor-language))
+    (syntax-close-block)))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

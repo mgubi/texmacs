@@ -751,6 +751,7 @@
   (syntax-region-statistics syntax_region_statistics (array_int tree int))
   (syntax-region-forget syntax_region_forget (void tree))
   (syntax-region-indent syntax_region_indent (int tree int int int int))
+  (syntax-region-errors-with syntax_region_errors_with (int tree int int int string))
   (syntax-region-node-move syntax_region_node_move (array_int tree int int int int))
   (syntax-region-node-info syntax_region_node_info (array_int tree int int int))
   (tree-sitter-set-highlighter tree_sitter_set_highlighter (void string int array_string))
