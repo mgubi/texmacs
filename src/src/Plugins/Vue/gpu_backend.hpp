@@ -104,6 +104,12 @@ public:
   // waiting for the screen (false: the compositor still holds the frames
   // presented before, and the window is better drawn a little later)
   virtual bool ready_to_present () { return true; }
+  // true when the backend wakes the loop up (with an event) once a window
+  // which was not ready to present is: the loop then waits for that rather
+  // than coming back after a short pause
+  virtual bool wakes_when_ready () { return false; }
+  // the window is about to be destroyed: forget what is kept for it
+  virtual void detach (SDL_Window* w) { (void) w; }
 
   // textures: data has rows from the top, without padding (or is NULL: zeros)
   virtual gpu_texture new_texture (int w, int h, gpu_format f, bool linear,

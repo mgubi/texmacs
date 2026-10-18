@@ -88,10 +88,11 @@ no headless mode. The Widkit duplicates are fixed on `wip_other_guis` too.
   emdawnwebgpu), instead of `gpu_backend_gl.cpp` and
   `gpu_backend_metal.mm`; surveyed on 2026-10-15 (WebGPU is not in every
   browser yet, so WebGL2 has to stay).
-- The windows of the Vue port presented by a display link, as the canvases
-  of the Cocoa port (`TMGpuPresenter`), instead of the pacing of the loop;
-  and the vector shapes of the Metal backend drawn by the GPU (Core
-  Graphics rasterizes them on the CPU now, over their box).
+- The vector shapes of the Metal backend drawn by the GPU (Core Graphics
+  rasterizes them on the CPU now, over their box). (The windows of the Vue
+  port are paced by a display link since 2026-10-18; what is left of the
+  wait in nextDrawable is the latency of the GPU and of the compositor,
+  see `src/docs/vue-graphics-stack.md`.)
 
 - Invalidate the style cache automatically when a style or package
   changes (it is now stale until cleared by hand).

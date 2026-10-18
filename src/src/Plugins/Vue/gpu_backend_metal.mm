@@ -37,11 +37,15 @@ gpu_backend* gpu_metal_backend () { return NULL; }
 #include <SDL3/SDL_metal.h>
 #endif
 #import <Metal/Metal.h>
-#import <QuartzCore/CAMetalLayer.h>
+#import <QuartzCore/QuartzCore.h>
+#import <AppKit/AppKit.h>
 #import <CoreGraphics/CoreGraphics.h>
 #include <unordered_map>
 #include <cmath>
 #include <time.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 struct gpu_texture_rep {
   id<MTLTexture> tex;
@@ -176,6 +180,28 @@ struct quad_uniforms { float size[2]; float porig[2]; float ptile[2]; int mode; 
 * The backend
 ******************************************************************************/
 
+class metal_backend;
+static void metal_refresh (metal_backend* b, void* layer);
+
+/* The display link of the window of a layer (macOS 14): its ticks are the
+ refreshes of the screen of the window, wherever the window is. */
+@interface TMVueRefresh : NSObject
+{
+@public
+  metal_backend* backend;
+  void* layer;
+}
+- (void) tick: (id) sender;
+@end
+
+@implementation TMVueRefresh
+- (void) tick: (id) sender
+{
+  (void) sender;
+  if (backend != NULL) metal_refresh (backend, layer);
+}
+@end
+
 class metal_backend: public gpu_backend {
   id<MTLDevice> device= nil;
   id<MTLCommandQueue> queue= nil;
@@ -196,9 +222,21 @@ class metal_backend: public gpu_backend {
   id<CAMetalDrawable> drawable= nil;     // of this frame, once drawn into
   // the presents into each layer: when the last one was made, and the
   // refresh period of its screen (0: not paced, as the layers of Cocoa,
-  // presented by a display link)
-  struct pacing { double last; double period; };
+  // presented by a display link of their own). The layer of a window has
+  // a display link (macOS 14): a window is presented once a refresh, at
+  // the first turn of the loop after it (refreshed), the tick waking the
+  // loop up when a window was found not ready (waiting); the link pauses
+  // when nothing was presented for two refreshes (idle). Without one, no
+  // two presents within half a period
+  struct pacing {
+    double last= 0, period= 0;
+    CADisplayLink* link= nil;      // (macOS 14), or nil
+    TMVueRefresh* target= nil;
+    bool refreshed= true, waiting= false;
+    int idle= 0;
+  };
   std::unordered_map<void*, pacing> pacings;
+  unsigned refresh_event= 0;       // the SDL event of a tick
   // the commands being encoded
   id<MTLCommandBuffer> cmd= nil;
   id<MTLCommandBuffer> last= nil;        // committed last (finish waits)
@@ -231,6 +269,9 @@ public:
   void begin_screen (int dw, int dh);
   void present (SDL_Window* w);
   bool ready_to_present ();
+  bool wakes_when_ready ();
+  void detach (SDL_Window* w);
+  void refresh (void* layer);
 
   gpu_texture new_texture (int w, int h, gpu_format f, bool linear, bool repeat,
                            const void* data);
@@ -398,6 +439,23 @@ metal_backend::attach (SDL_Window* w) {
     CAMetalLayer* l= (__bridge CAMetalLayer*) SDL_Metal_GetLayer (v);
     layers[id]= l;
     it= layers.find (id);
+    // (TEXMACS_VUE_DISPLAY_LINK=0: no display link, as before macOS 14)
+    static bool no_link= (getenv ("TEXMACS_VUE_DISPLAY_LINK") != NULL &&
+                          strcmp (getenv ("TEXMACS_VUE_DISPLAY_LINK"), "0") == 0);
+    if (no_link) {}
+    else if (@available (macOS 14.0, *)) {
+      // (the view is an NSView of SDL, whose display link follows the
+      // screen of its window)
+      pacing& p= pacings[(__bridge void*) l];
+      p.target= [[TMVueRefresh alloc] init];
+      p.target->backend= this;
+      p.target->layer= (__bridge void*) l;
+      NSView* view= (__bridge NSView*) v;
+      p.link= [view displayLinkWithTarget: p.target selector: @selector(tick:)];
+      [p.link addToRunLoop: [NSRunLoop mainRunLoop]
+                   forMode: NSRunLoopCommonModes];
+      if (refresh_event == 0) refresh_event= SDL_RegisterEvents (1);
+    }
   }
   if (!attach_layer ((__bridge void*) it->second)) return false;
   // the refresh period of the screen of the window (it may move)
@@ -420,6 +478,29 @@ metal_backend::begin_screen (int dw, int dh) {
   drawable= nil;  // taken when first drawn into
 }
 
+static double now_ms ();
+
+// TEXMACS_VUE_DEBUG_PRESENT: each present (PRESENT: the time since the last
+// one of its layer, the wait in nextDrawable; GPU: when the GPU was done
+// with the frame, SHOWN: when the screen showed it, both in ms after the
+// present), each window not presented yet (DEFER), and the ticks of the
+// display links which wake the loop up (WAKE) or pause the link (PAUSE)
+static bool
+debug_present () {
+  static int on= -1;
+  if (on < 0) on= (getenv ("TEXMACS_VUE_DEBUG_PRESENT") != NULL);
+  return on != 0;
+}
+static double drawable_wait= 0;
+
+// whether some of the window of the layer can be seen
+static bool
+debug_visible (CAMetalLayer* l) {
+  NSView* v= (NSView*) l.delegate;
+  if (![v isKindOfClass: [NSView class]] || v.window == nil) return true;
+  return (v.window.occlusionState & NSWindowOcclusionStateVisible) != 0;
+}
+
 static double
 now_ms () {
   struct timespec ts;
@@ -432,7 +513,34 @@ metal_backend::present (SDL_Window* w) {
   (void) w;
   end_encoder ();
   if (drawable != nil) {
-    if (layer != nil) pacings[(__bridge void*) layer].last= now_ms ();
+    if (layer != nil) {
+      double t= now_ms ();
+      pacing& p= pacings[(__bridge void*) layer];
+      if (debug_present ())
+        fprintf (stderr, "PRESENT %.3f dt %.2f wait %.2f layer %p%s\n",
+                 t, t - p.last, drawable_wait, (__bridge void*) layer,
+                 debug_visible (layer) ? "" : " occluded");
+      p.last= t;
+      p.refreshed= false;
+      p.idle= 0;
+      if (p.link != nil) [p.link setPaused: NO];
+    }
+    drawable_wait= 0;
+    if (debug_present ()) {
+      // (the times of the command buffer and of the drawable are those of
+      // CACurrentMediaTime; the command buffer of the present holds no
+      // drawing, its end is when the GPU was done with the frame)
+      double t0= now_ms ();
+      double m0= CACurrentMediaTime () * 1000.0;
+      [commands () addCompletedHandler: ^(id<MTLCommandBuffer> cb) {
+        fprintf (stderr, "GPU %.3f done +%.2f\n", t0,
+                 cb.GPUEndTime * 1000.0 - m0);
+      }];
+      [drawable addPresentedHandler: ^(id<MTLDrawable> d) {
+        fprintf (stderr, "SHOWN %.3f +%.2f\n", t0,
+                 d.presentedTime > 0 ? d.presentedTime * 1000.0 - m0 : -1.0);
+      }];
+    }
     [commands () presentDrawable: drawable];
     drawable= nil;
   }
@@ -451,11 +559,88 @@ metal_backend::ready_to_present () {
   // period skipped a turn of the loop each time (presents 15 ms apart).
   // (Counting the frames not shown yet with presented handlers did not
   // work: a frame replaced before a refresh is not reported, and the count
-  // stuck.)
+  // stuck.) With a display link (macOS 14) a window is presented once a
+  // refresh of its screen instead, the loop waiting for the tick rather
+  // than coming back every 2 ms: on an M4 at 120 Hz, the time spent in
+  // nextDrawable while scrolling was about halved, and no two presents
+  // came within a refresh (TEXMACS_VUE_DEBUG_PRESENT prints the presents;
+  // TEXMACS_VUE_DISPLAY_LINK=0 goes back to half a period). What is left
+  // of the wait is the latency of the GPU and of the compositor (a frame
+  // is shown 25 to 35 ms after it was presented), which no pacing removes.
   if (layer == nil) return true;
   auto it= pacings.find ((__bridge void*) layer);
   if (it == pacings.end () || it->second.period <= 0) return true;
-  return now_ms () - it->second.last >= 0.5 * it->second.period;
+  pacing& p= it->second;
+  bool ready;
+  if (p.link != nil)
+    // a refresh since the last present; or three periods without one (a
+    // link which does not tick, its window covered, say: drawn anyway, as
+    // the windows without a link)
+    ready= p.refreshed || now_ms () - p.last >= 3 * p.period;
+  else ready= (now_ms () - p.last >= 0.5 * p.period);
+  if (!ready) {
+    p.waiting= true;
+    if (debug_present ()) fprintf (stderr, "DEFER %.3f\n", now_ms ());
+  }
+  return ready;
+}
+
+bool
+metal_backend::wakes_when_ready () {
+  return refresh_event != 0;
+}
+
+void
+metal_backend::refresh (void* l) {
+  // a tick of the display link of the layer l
+  auto it= pacings.find (l);
+  if (it == pacings.end ()) return;
+  pacing& p= it->second;
+  p.refreshed= true;
+  if (p.waiting) {
+    // a window of this layer is waiting for this refresh: wake the loop up
+    p.waiting= false;
+    if (debug_present ()) fprintf (stderr, "WAKE %.3f\n", now_ms ());
+#ifdef VUETEXMACS
+    SDL_Event ev;
+    SDL_zero (ev);
+    ev.type= refresh_event;
+    SDL_PushEvent (&ev);
+#endif
+  }
+  else if (++p.idle >= 2 && p.link != nil && !p.link.paused) {
+    if (debug_present ()) fprintf (stderr, "PAUSE %.3f\n", now_ms ());
+    [p.link setPaused: YES];
+  }
+}
+
+static void
+metal_refresh (metal_backend* b, void* layer) {
+  b->refresh (layer);
+}
+
+void
+metal_backend::detach (SDL_Window* w) {
+#ifdef VUETEXMACS
+  if (w == NULL) return;
+  auto it= layers.find ((unsigned) SDL_GetWindowID (w));
+  if (it == layers.end ()) return;
+  void* l= (__bridge void*) it->second;
+  auto pit= pacings.find (l);
+  if (pit != pacings.end ()) {
+    if (pit->second.link != nil) [pit->second.link invalidate];
+    if (pit->second.target != nil) pit->second.target->backend= NULL;
+    pacings.erase (pit);
+  }
+  if (layer == it->second) {
+    end_encoder ();
+    drawable= nil;
+    layer= nil;
+  }
+  layers.erase (it);
+#else
+  (void) w;
+#endif
 }
 
 /******************************************************************************
@@ -488,7 +673,11 @@ metal_backend::finish () {
 id<MTLTexture>
 metal_backend::texture_of (gpu_texture t) {
   if (t != NULL) return t->tex;
-  if (drawable == nil && layer != nil) drawable= [layer nextDrawable];
+  if (drawable == nil && layer != nil) {
+    double t= debug_present () ? now_ms () : 0;
+    drawable= [layer nextDrawable];
+    if (debug_present ()) drawable_wait += now_ms () - t;
+  }
   return drawable == nil ? nil : drawable.texture;
 }
 

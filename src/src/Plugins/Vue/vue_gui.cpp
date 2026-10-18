@@ -495,6 +495,7 @@ vue_sdl_base_window_rep::~vue_sdl_base_window_rep () {
   if (sdl_win == NULL) return;
   Window_to_window->reset (sdl_win);
   SDL_StopTextInput (sdl_win);
+  vue_gpu_detach (sdl_win);
   SDL_DestroyWindow (sdl_win);
 }
 
@@ -4173,11 +4174,13 @@ loop_iteration_body () {
     if (!loop_poll (NULL)) loop_wait (8);
   }
   if (vue_gpu_deferred) {
-    // a window to draw as soon as its screen takes a frame again (paced at
-    // 2 ms, woken up by any event)
+    // a window to draw as soon as its screen takes a frame again: at the
+    // next refresh, whose display link wakes the loop up (Metal), else
+    // after a pause of 2 ms; any event wakes it up too (the 20 ms are in
+    // case no refresh comes)
     vue_gpu_deferred= false;
     gui_needs_update= true;
-    if (!loop_poll (NULL)) loop_wait (2);
+    if (!loop_poll (NULL)) loop_wait (vue_gpu_wakes_when_ready () ? 20 : 2);
   }
   if (wheel_step ()) {
     // keep the frames coming while the view moves by itself (or while a

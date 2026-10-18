@@ -1006,6 +1006,25 @@ before (until 2026-10-05 the desktop needed `TEXMACS_VUE_GPU=1`).
   frame while scrolling (presents 10 ms apart); now 6 to 7 ms apart at
   120 Hz, with no wait. Presented handlers, which would count the frames
   not shown yet, are not called for a frame replaced before a refresh.
+  On macOS 14 and later the layer of each window has a display link
+  instead (`CADisplayLink` of the view of SDL, which follows the screen of
+  the window): a window is presented at most once a refresh, and one found
+  not ready marks its layer as waiting, whose next tick pushes an event
+  (`refresh`) that wakes the loop up, the loop waiting up to 20 ms for it
+  (`vue_gpu_wakes_when_ready`) rather than coming back every 2 ms; a link
+  pauses after two refreshes without a present, and a window with no tick
+  for three periods (covered) is drawn anyway. The window detaches from
+  the backend before it is destroyed (`vue_gpu_detach`), which
+  invalidates its link. Scrolling on an M4 at 120 Hz (three runs each, a
+  wheel stream every 8 ms and single notches): the time spent in
+  `nextDrawable` about halved (stream 0.5 s instead of 1.0 to 1.2 s in two
+  of three runs), and the notches no longer presented faster than the
+  screen (5 to 65 presents less than 7.5 ms apart, against 28 to 195).
+  What is left of the wait is the latency of the GPU and of the
+  compositor: a frame is shown 25 to 35 ms after it is presented
+  (`TEXMACS_VUE_DEBUG_PRESENT` prints the presents, the time of the GPU
+  and when a frame was shown; `TEXMACS_VUE_DISPLAY_LINK=0` goes back to
+  half a period).
   Compared with OpenGL on an Apple M4
   (the math font catalogue, `TEXMACS_VUE_GPU_SYNC=1`): a forced repaint
   of the editor takes the same time (1.4 ms), a repaint after a zoom 2.0

@@ -43,6 +43,11 @@ void vue_gpu_skip (SDL_Window* w);    // a frame drawn and not presented
 // (Metal: the compositor does not hold too many of its frames); else the
 // window is drawn at a later turn of the loop
 bool vue_gpu_ready (SDL_Window* w);
+// whether a window found not ready is drawn when an event wakes the loop
+// up (Metal: the next refresh of its screen), rather than after a pause
+bool vue_gpu_wakes_when_ready ();
+// the window is about to be destroyed
+void vue_gpu_detach (SDL_Window* w);
 
 // the backing store of an editor: an opaque texture, white at first
 // (transparent: the canvases of Cocoa, transparent where not painted, as
