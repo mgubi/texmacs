@@ -708,6 +708,21 @@
                 '(("interface" "I") ("function" "f")))
         (check= (outline "ocaml" '("let f x = x" "module M = struct end"))
                 '(("function" "f") ("module" "M")))
+;; outlines of ours for CSS, TOML, YAML, JSON, HTML and LaTeX
+        (for-each treesit-generate-cache '("css" "toml" "yaml" "json" "html" "latex"))
+        (check= (outline "css" '("a, b:hover { color: red }" "@keyframes spin { }"))
+                '(("rule" "a, b:hover") ("keyframes" "spin")))
+        (check= (outline "toml" '("x = 1" "[server]" "host = 1" "[[items]]"))
+                '(("table" "server") ("table" "items")))
+        (check= (outline "yaml" '("name: x" "jobs:" "  build: y"))
+                '(("key" "name") ("key" "jobs") ("key" "build")))
+        (check= (outline "json" '("{\"a\": 1, \"b\": {\"c\": 2}}"))
+                '(("key" "a") ("key" "b") ("key" "c")))
+        (check= (outline "html" '("<less>h1<gtr>Title<less>/h1<gtr>"
+                                  "<less>div id=\"main\"<gtr><less>/div<gtr>"))
+                '(("heading" "Title") ("element" "main")))
+        (check= (outline "latex" '("\\section{Intro}\\label{sec:i}" "\\newcommand{\\foo}{x}"))
+                '(("section" "Intro") ("label" "sec:i") ("macro" "\\foo")))
         ;; the two equations of f are one definition
         (check= (outline "haskell" '("f 0 = 1" "f n = n" "data D = D" "class C a where"))
                 '(("function" "f") ("class" "D") ("interface" "C")))))
