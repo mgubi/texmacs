@@ -595,49 +595,58 @@
 ;; node (}, end...). Folds are a state of the view, kept on the hidden lines
 ;; (see tree_sitter_set_fold_state in Plugins/TreeSitter/ts_highlight.cpp),
 ;; not markup: the document, its export and the editing of programs do not
-;; see them. The line before hidden lines gets the mark (Typeset/Bridge/
-;; bridge.cpp). Modifying a hidden line forgets its state, and the cursor
-;; arriving in a hidden line unfolds its fold (Edit/Interface/edit_cursor.cpp).
+;; see them, nor what is printed. The state of a line is the number of the
+;; folds which hide it: folds nest, and unfolding one keeps those inside it.
+;; The line before hidden lines gets the mark (Typeset/Bridge/bridge.cpp).
+;; Modifying a hidden line forgets its state, and the cursor arriving in a
+;; hidden line unfolds the folds around it (Edit/Interface/edit_cursor.cpp).
 
-(define (hidden? root row)
-  (and (>= row 0) (< row (tree-arity root))
-       (== (tree-sitter-fold-state (tree-ref root row)) 1)))
+(define (depth root row)
+  (if (and (>= row 0) (< row (tree-arity root)))
+      (tree-sitter-fold-state (tree-ref root row))
+      0))
 
-(define (set-hidden! root row on)
+(define (hidden? root row) (> (depth root row) 0))
+
+(define (set-depth! root row d)
   (let ((line (tree-ref root row)))
-    (when (!= (hidden? root row) on)
-      (tree-sitter-set-fold-state line (if on 1 0))
+    (when (!= (depth root row) d)
+      (tree-sitter-set-fold-state line (max d 0))
       (update-path (tree->path line)))))
+
+(define (fold-starts? root row)
+  ;; does a fold start at row (hide the lines after it)?
+  (> (depth root (+ row 1)) (depth root row)))
 
 (define (fold-rows root lan n)
   ;; the rows which a fold of the node n hides
   (let* ((s (car (node-start n))) (e (car (node-end n)))
          (c (first-non-space (line-string root e)))
          (leaf (and c (syntax-region-node-at root lan e c)))
-         (closing? (and (pair? leaf) (pair? (cdr leaf))
+         ;; the line is only the token which ends the node (}, end...)
+         (closing? (and (pair? leaf)
                         (not (node-named? (car leaf)))
-                        (== (node-start (cadr leaf)) (node-start n))
-                        (== (node-end (cadr leaf)) (node-end n))))
+                        (== (node-end (car leaf)) (node-end n))))
          (last (if closing? (- e 1) e)))
     (if (< last (+ s 1)) '() (map (lambda (i) (+ s 1 i)) (iota (- last s))))))
 
 (define (fold-node! root lan n)
-  ;; fold the node n (not when its first line is hidden by another fold);
+  ;; fold the node n (not when a fold starts already at its first line);
   ;; whether there was something to hide
   (let ((rows (fold-rows root lan n)) (s (car (node-start n))))
-    (and (pair? rows) (not (hidden? root s))
+    (and (pair? rows) (not (fold-starts? root s))
          (begin
-           (for-each (lambda (r) (set-hidden! root r #t)) rows)
+           (for-each (lambda (r) (set-depth! root r (+ (depth root r) 1))) rows)
            (update-path (tree->path (tree-ref root s)))   ; its mark
            #t))))
 
 (define (unfold-at! root row)
-  ;; unfold the fold after row; whether there was one
-  (and (not (hidden? root row)) (hidden? root (+ row 1))
-       (begin
+  ;; unfold the fold which starts at row; whether there was one
+  (and (fold-starts? root row)
+       (let ((d0 (depth root row)))
          (let loop ((r (+ row 1)))
-           (when (hidden? root r)
-             (set-hidden! root r #f)
+           (when (> (depth root r) d0)
+             (set-depth! root r (- (depth root r) 1))
              (loop (+ r 1))))
          (update-path (tree->path (tree-ref root row)))
          #t)))
@@ -669,15 +678,30 @@
   (or (syntax-unfold-block) (syntax-fold-block)))
 
 (define-public (syntax-fold-definitions)
-  ;; fold all the definitions of several lines of the code at the cursor
+  ;; fold all the definitions of several lines of the code at the cursor,
+  ;; or, in a language without definitions (tags.scm), its blocks at the
+  ;; top level
   (let ((o (cursor-outline)))
     (and o
          (let* ((ctx (car o)) (lan (cadr o)) (root (cadr ctx)))
-           (for-each (lambda (d)
-                       (let ((n (list "" #t (list-ref d 4) (cadddr d))))
-                         (when (< (car (node-start n)) (car (node-end n)))
-                           (fold-node! root lan n))))
-                     (caddr o))
+           (if (pair? (caddr o))
+               (for-each (lambda (d)
+                           (let ((n (list "" #t (list-ref d 4) (cadddr d))))
+                             (when (< (car (node-start n)) (car (node-end n)))
+                               (fold-node! root lan n))))
+                         (caddr o))
+               (for-each
+                (lambda (row)
+                  (let* ((c (first-non-space (line-string root row)))
+                         (info (and c (not (hidden? root row))
+                                    (node-info (list (car ctx) root row c) lan))))
+                    ;; the node which starts the line, whose parent is the root
+                    (when (and info (list-ref info 0) (not (list-ref info 3))
+                               (< (car (car (list-ref info 0)))
+                                  (car (cadr (list-ref info 0)))))
+                      (let ((n (list-ref info 0)))
+                        (fold-node! root lan (list "" #t (car n) (cadr n)))))))
+                (iota (tree-arity root))))
            #t))))
 
 (define-public (syntax-unfold-all)
@@ -685,7 +709,8 @@
   (let ((c (cursor-code)))
     (and c (tree-is? (cadr (car c)) 'document)
          (let ((root (cadr (car c))))
-           (for-each (lambda (r) (when (hidden? root r) (unfold-at! root (- r 1))))
+           (for-each (lambda (r) (set-depth! root r 0)) (iota (tree-arity root)))
+           (for-each (lambda (r) (update-path (tree->path (tree-ref root r))))
                      (iota (tree-arity root)))
            #t))))
 
@@ -695,9 +720,16 @@
          (line (and (pair? p) (path->tree (cDr p))))
          (root (and line (pair? (cDr p)) (path->tree (cDDr p)))))
     (when (and root (tree-is? root 'document))
-      (let loop ((r (cAr (cDr p))))
-        (when (>= r 0)
-          (if (hidden? root r) (loop (- r 1)) (unfold-at! root r)))))))
+      ;; the folds around the line, from the innermost
+      (let ((row (cAr (cDr p))))
+        (let unfold ()
+          (when (hidden? root row)
+            (let find ((r (- row 1)))
+              (cond ((< r 0) (noop))
+                    ((< (depth root r) (depth root row))
+                     (unfold-at! root r)
+                     (unfold))
+                    (else (find (- r 1)))))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Inputs of sessions

@@ -223,7 +223,7 @@ unfold_at_cursor (tree et, path tp) {
   if (is_nil (tp) || is_nil (tp->next)) return;
   path p= path_up (tp);
   if (!has_subtree (et, p)) return;
-  if (tree_sitter_fold_state (subtree (et, p)) == 1)
+  if (tree_sitter_fold_state (subtree (et, p)) > 0)
     call ("syntax-unfold-at-cursor");
 }
 

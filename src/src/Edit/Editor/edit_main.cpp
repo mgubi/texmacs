@@ -17,6 +17,8 @@
 #include "convert.hpp"
 #include "connect.hpp"
 #include "typesetter.hpp"
+
+extern bool typeset_folds;   // Typeset/Bridge/bridge.cpp
 #include "drd_std.hpp"
 #include "message.hpp"
 #include <setjmp.h>
@@ -252,7 +254,9 @@ edit_main_rep::nr_pages () {
   if (medium == "paper") return N (eb[0]);
   typeset_prepare ();
   env->write (PAGE_MEDIUM, "paper");
+  typeset_folds= false;
   box the_box= typeset_as_document (env, subtree (et, rp), reverse (rp));
+  typeset_folds= true;
   env->write (PAGE_MEDIUM, medium);
   return N (the_box[0]);
 }
@@ -301,7 +305,9 @@ edit_main_rep::print_doc (url name, bool conform, int first, int last) {
   env->style_init_env ();
   env->update ();
   typesetter ttt= new_typesetter (env, subtree (et, rp), reverse (rp));
+  typeset_folds= false;   // all the lines of program code are printed
   box the_box= ::typeset (ttt);
+  typeset_folds= true;
 
   // Determine parameters for printer
 
@@ -439,7 +445,9 @@ edit_main_rep::print_snippet (url name, tree t, bool conserve_preamble) {
     env->write (INFO_FLAG, "none");
   env->style_init_env ();
   env->update ();
+  typeset_folds= false;
   box b= typeset_as_box (env, t, path ());
+  typeset_folds= true;
   env->write (DPI, old_dpi);
   env->write (INFO_FLAG, old_info_flag);
   env->style_init_env ();

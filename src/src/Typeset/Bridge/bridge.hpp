@@ -95,4 +95,6 @@ tree substitute (tree t, path p, tree u);
 
 #include "impl_typesetter.hpp"
 
+extern bool typeset_folds;
+
 #endif // defined BRIDGE_H

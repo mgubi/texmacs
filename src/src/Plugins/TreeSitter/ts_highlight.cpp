@@ -280,27 +280,32 @@ treesit_language_rep::get_color (tree t, int start, int end) {
 ******************************************************************************/
 
 /* A folded line of program code is hidden by the typesetter, and the line
-   before folded lines gets a mark (Typeset/Bridge/bridge.cpp). The state
-   is kept on the hidden lines as a highlight of a code of its own: it is
-   not in the document, and a modification of a line forgets it. */
+   before folded lines gets a mark (Typeset/Bridge/bridge.cpp). The state of
+   a line is the number of the folds which hide it (folds nest), kept as a
+   highlight of a code of its own for each number: it is not in the
+   document, and a modification of a line forgets it. */
 
-#define FOLD_HIDDEN 999998
+#define FOLD_CODES 999990   // the codes FOLD_CODES + 1 ... FOLD_CODES + 9
+#define FOLD_MAX 9
 
 void remove_highlight (observer& obs, int lan);
 
 int
 tree_sitter_fold_state (tree t) {
-  // 1 for a hidden line, else 0
-  if (!is_atomic (t)) return 0;
-  return has_highlight (t, FOLD_HIDDEN)? 1: 0;
+  // the number of the folds which hide the line
+  if (!is_atomic (t) || is_nil (t->obs)) return 0;
+  for (int d= 1; d <= FOLD_MAX; d++)
+    if (has_highlight (t, FOLD_CODES + d)) return d;
+  return 0;
 }
 
 void
 tree_sitter_set_fold_state (tree t, int state) {
   // the lines are then to be typeset again (update-path)
   if (!is_atomic (t)) return;
-  if (!is_nil (t->obs)) remove_highlight (t->obs, FOLD_HIDDEN);
-  if (state == 1) attach_highlight (t, FOLD_HIDDEN, 0, 0, 0);
+  if (!is_nil (t->obs))
+    for (int d= 1; d <= FOLD_MAX; d++) remove_highlight (t->obs, FOLD_CODES + d);
+  if (state > 0) attach_highlight (t, FOLD_CODES + min (state, FOLD_MAX), 0, 0, 0);
 }
 
 /******************************************************************************

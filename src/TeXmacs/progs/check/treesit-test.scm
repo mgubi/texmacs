@@ -856,6 +856,39 @@
           (syntax-fold-definitions)
           (check-true (syntax-unfold-all))
           (check= (states) '(0 0 0 0)))))
+    ;; folds nest: unfolding the outer one keeps the inner one
+    (for-each (lambda (l) (treesit-generate-cache l) (treesit-highlighter-request l))
+              '("cpp" "css"))
+    (with-test-buffer '(document (cpp-code (document "int f () {" "  if (x) {" "    a ();"
+                                                     "  }" "}")))
+      (lambda (u b)
+        (update-forced)
+        (let* ((code (tree-ref b 0 0))
+               (at (lambda (row col) (rcons (tree->path (tree-ref code row)) col)))
+               (states (lambda () (map (lambda (i) (tree-sitter-fold-state (tree-ref code i)))
+                                       (iota 5)))))
+          (go-to (at 2 4))
+          (check-true (syntax-fold-block))
+          (check= (states) '(0 0 1 0 0))
+          (go-to (at 0 0))
+          (check-true (syntax-fold-block))
+          (check= (states) '(0 1 2 1 0))
+          (check-false (syntax-fold-block))   ; folded already
+          (check-true (syntax-unfold-block))
+          (check= (states) '(0 0 1 0 0))
+          (syntax-fold-block)
+          (go-to (at 2 2))                   ; into both folds
+          (check= (states) '(0 0 0 0 0)))))
+    ;; without definitions (CSS has no tags.scm), the blocks at the top level
+    (with-test-buffer '(document (css-code (document "a {" "  color: red;" "}" "b {"
+                                                     "  x: y;" "}")))
+      (lambda (u b)
+        (update-forced)
+        (let ((code (tree-ref b 0 0)))
+          (go-to (rcons (tree->path (tree-ref code 0)) 0))
+          (check-true (syntax-fold-definitions))
+          (check= (map (lambda (i) (tree-sitter-fold-state (tree-ref code i))) (iota 6))
+                  '(0 1 0 0 1 0)))))
     ;; closing keywords and tags: after Return, the keyword which closes the
     ;; block opened by the line before (the first of the grammar which makes
     ;; fewer errors), the \end of a \begin; the end tag of HTML after the >
