@@ -326,6 +326,10 @@ concater_rep::typeset_lsp_string (tree t, path ip, int pos, int end,
   array<space> spc_tab= env->fn->get_normal_spacing (env->spacing_policy);
   string s= t->label;
   int    start;
+  // (the tabs at their stops, as in typeset_prog_string)
+  bool tabs  = search_forwards ("<#9>", s) >= 0;
+  int  tw    = (tabs? max (1, env->get_int (PROG_TAB_WIDTH)): 8);
+  int  column= (tabs? prog_column (s, 0, pos, 0, tw): 0);
   do {
     start= pos;
     text_property tp= env->lan->advance (t, pos);
@@ -338,14 +342,18 @@ concater_rep::typeset_lsp_string (tree t, path ip, int pos, int end,
       PRINT_SPACE (tp->spc_after);
       if ((pos==end) || (s[pos]==' '))
         typeset_substring ("", ip, pos);
+      column++;
     }
+    else if (tabs && pos-start == 4 && is_source_tab (s, start)) // a tab
+      typeset_prog_tab (ip, start, column, tw);
     else { // strings
       penalty_max (tp->pen_before);
       PRINT_SPACE (tp->spc_before)
       string color= env->lan->get_color (t, start, pos);
       int i= start;
       if (d == NULL) {  // (a marker of a fold only)
-        typeset_colored_substring (s (start, pos), ip, start, color);
+        if (tabs) typeset_prog_piece (s, ip, start, pos, color, column, tw);
+        else typeset_colored_substring (s (start, pos), ip, start, color);
         i= pos;
       }
       while (i < pos) {
@@ -358,7 +366,8 @@ concater_rep::typeset_lsp_string (tree t, path ip, int pos, int end,
           if (a0 <= i && i < a1) { col= d->col_color[k]; j= min (j, a1); }
           else if (a0 > i && a0 < j) j= a0;
         }
-        typeset_colored_substring (s (i, j), ip, i, col);
+        if (tabs) typeset_prog_piece (s, ip, i, j, col, column, tw);
+        else typeset_colored_substring (s (i, j), ip, i, col);
         i= j;
       }
       penalty_min (tp->pen_after);

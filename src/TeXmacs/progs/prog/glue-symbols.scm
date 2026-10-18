@@ -530,6 +530,7 @@
 "cpp-verbatim->texmacs"
 "cpp-source->texmacs"
 "cpp-source-snippet->texmacs"
+"source->cork"
 "parse-latex"
 "parse-latex-document"
 "latex->texmacs"

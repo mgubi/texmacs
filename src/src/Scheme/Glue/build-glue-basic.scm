@@ -570,6 +570,7 @@
   (cpp-verbatim->texmacs verbatim_document_to_tree (tree string bool string))
   (cpp-source->texmacs source_document_to_tree (tree string))
   (cpp-source-snippet->texmacs source_snippet_to_tree (tree string))
+  (source->cork source_text_to_cork (string string))
   (parse-latex parse_latex (tree string))
   (parse-latex-document parse_latex_document (tree string))
   (latex->texmacs latex_to_tree (tree tree))

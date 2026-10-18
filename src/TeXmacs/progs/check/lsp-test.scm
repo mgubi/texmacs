@@ -281,6 +281,15 @@
           "a`b...c\n")
   (check= (lsp-text->lines "x`y...\n") '("x`y..." ""))
   (check= (lsp-offset->character "a`b...c" 7) 7)
+  ;; a tab is the character <#9> of a line (a byte 9 of Cork is a macron),
+  ;; and one UTF-16 unit for the servers
+  (check= (lsp-lines->text '("<#9>x")) (string-append (string #\tab) "x"))
+  (check= (lsp-document-text (stree->tree '(document "<#9>x" "")))
+          (string-append (string #\tab) "x\n"))
+  (check= (lsp-text->lines (string-append (string #\tab) "y\n"))
+          '("<#9>y" ""))
+  (check= (lsp-character->offset "<#9>x" 1) 4)
+  (check= (lsp-offset->character "<#9>x" 4) 1)
   (with lines (list "x" (string-append e-acute smiley "y"))
     (check= (lsp-position lines 1 9)
             '(attr "line" (json-number "1") "character" (json-number "3")))
@@ -1018,6 +1027,12 @@
           '("int yy = 1;" "bar" "baz"))
   (check= (lsp-apply-to-lines '("a" "b" "c") (list (text-edit 0 1 2 0 "")))
           '("ac"))
+  ;; a tab of a server (a formatter which indents by tabs), after a tab
+  (check= (lsp-apply-to-lines '("<#9>x" "y")
+                              (list (text-edit 1 0 1 0 (string #\tab))))
+          '("<#9>x" "<#9>y"))
+  (check= (lsp-apply-to-lines '("<#9>x") (list (text-edit 0 1 0 2 "z")))
+          '("<#9>z"))
   (check= (lsp-apply-to-lines '("ab") (list (text-edit 0 1 0 1 "1")
                                            (text-edit 0 2 0 2 "2")))
           '("a1b2"))

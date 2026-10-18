@@ -57,7 +57,7 @@
   ;; server is its index: the sort of S7 is not stable.)
   (let* ((rs (map (lambda (e i)
                     (list (edit-range lines e)
-                          (sourcecode->cork (or (lsp-ref e "newText") ""))
+                          (source->cork (or (lsp-ref e "newText") ""))
                           i))
                   edits (.. 0 (length edits)))))
     (sort rs (lambda (a b)
@@ -299,10 +299,16 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define (formatting-options)
-  (with n (get-preference "editor:verbatim:tabstop")
-    (lsp-object "tabSize" (lsp-number (or (and (string? n) (string->number n))
-                                          (and (number? n) n) 4))
-                "insertSpaces" (lsp-boolean #t))))
+  ;; (as the buffer is indented: by tabs, at its tab stops, or by spaces,
+  ;; prog-edit.scm, which the editing of programs loads: it is not loaded
+  ;; with this module, whose tests are loaded in all the suites)
+  (if (and (defined? 'program-indent-tabs?) (program-indent-tabs?))
+      (lsp-object "tabSize" (lsp-number (program-tab-width))
+                  "insertSpaces" (lsp-boolean #f))
+      (with n (get-preference "editor:verbatim:tabstop")
+        (lsp-object "tabSize" (lsp-number (or (and (string? n) (string->number n))
+                                              (and (number? n) n) 4))
+                    "insertSpaces" (lsp-boolean #t)))))
 
 (define (selection-range)
   ;; the range of the selection in the current buffer, or #f

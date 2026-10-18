@@ -533,3 +533,19 @@ source_snippet_to_tree (string s) {
     }
   return t;
 }
+
+string
+source_text_to_cork (string s) {
+  // a text of source code (utf8) in Cork, as its lines are loaded: tabs and
+  // control characters as <#..>, the newlines kept (as for the texts which
+  // language servers give)
+  string r;
+  int j= 0;
+  for (int i=0; i<=N(s); i++)
+    if (i == N(s) || s[i] == '\n') {
+      if (j > 0) r << "\n";
+      r << source_line_to_cork (s (j, i));
+      j= i+1;
+    }
+  return r;
+}

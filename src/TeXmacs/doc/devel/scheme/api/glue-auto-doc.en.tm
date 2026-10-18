@@ -4043,6 +4043,14 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(source-\<gtr\>cork <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|source_text_to_cork> which returns
+    <scm|string>.
+  </explain>
+
+  <\explain>
     <scm|(parse-latex <scm-arg|string>)>
 <explain-synopsis|no synopsis>
   <|explain>

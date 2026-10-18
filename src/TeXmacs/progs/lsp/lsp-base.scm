@@ -94,7 +94,9 @@
 ;; The texts of the servers are those of the files (cork->sourcecode and
 ;; sourcecode->cork, as when they are saved and loaded): cork->utf8 would
 ;; give the typographic forms of some characters (a backquote as an opening
-;; quote, three dots as an ellipsis), which are not in the files
+;; quote, three dots as an ellipsis), which are not in the files; a tab
+;; of a server is the character <#9> of a line (source->cork), as when a
+;; file is loaded (a byte 9 of Cork is a macron)
 
 (tm-define (lsp-utf16-length s)
   (:synopsis "The length of the utf8 string @s in UTF-16 units")
@@ -164,7 +166,7 @@
 (tm-define (lsp-text->lines text)
   (:synopsis "The lines of the utf8 @text of a server, in Cork")
   (map (lambda (l)
-         (sourcecode->cork (if (string-ends? l "\r")
+         (source->cork (if (string-ends? l "\r")
                          (substring l 0 (- (string-length l) 1))
                          l)))
        (string-decompose text "\n")))

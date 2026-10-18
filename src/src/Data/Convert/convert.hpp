@@ -70,6 +70,7 @@ tree   verbatim_to_tree (string s, bool wrap= false, string enc= "default");
 tree   verbatim_document_to_tree (string s, bool w= false, string e= "default");
 tree   source_document_to_tree (string s);
 tree   source_snippet_to_tree (string s);
+string source_text_to_cork (string s);
 
 /*** Latex ***/
 tree   parse_latex (string s, bool change= false, bool as_pic= false);

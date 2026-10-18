@@ -6785,6 +6785,19 @@ tmg_cpp_source_snippet_2texmacs (tmscm arg1) {
 }
 
 tmscm
+tmg_source_2cork (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "source->cork");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  string out= source_text_to_cork (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return string_to_tmscm (out);
+}
+
+tmscm
 tmg_parse_latex (tmscm arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "parse-latex");
 
@@ -12403,6 +12416,7 @@ initialize_glue_basic () {
   tmscm_install_procedure ("cpp-verbatim->texmacs",  tmg_cpp_verbatim_2texmacs, 3, 0, 0);
   tmscm_install_procedure ("cpp-source->texmacs",  tmg_cpp_source_2texmacs, 1, 0, 0);
   tmscm_install_procedure ("cpp-source-snippet->texmacs",  tmg_cpp_source_snippet_2texmacs, 1, 0, 0);
+  tmscm_install_procedure ("source->cork",  tmg_source_2cork, 1, 0, 0);
   tmscm_install_procedure ("parse-latex",  tmg_parse_latex, 1, 0, 0);
   tmscm_install_procedure ("parse-latex-document",  tmg_parse_latex_document, 1, 0, 0);
   tmscm_install_procedure ("latex->texmacs",  tmg_latex_2texmacs, 1, 0, 0);
