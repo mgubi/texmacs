@@ -63,10 +63,17 @@
   (load-adapters)
   (map car (or (ahash-ref providers feature) '())))
 
+(define prefs-ignored? #f)
+
+(tm-define (code-ignore-preferences! on)
+  (:synopsis "The providers by rank only, whatever the preferences say (tests)")
+  (set! prefs-ignored? on))
+
 (define (chosen feature)
   ;; the providers of @feature which may serve, by rank
   (load-adapters)
-  (let ((pref (get-preference (string-append "code:" (symbol->string feature))))
+  (let ((pref (if prefs-ignored? "auto"
+                  (get-preference (string-append "code:" (symbol->string feature)))))
         (l (or (ahash-ref providers feature) '())))
     (cond ((== pref "off") '())
           ((and (string? pref) (!= pref "auto") (!= pref "default")
@@ -84,9 +91,10 @@
 
 (tm-define (code-ask feature . args)
   (:synopsis "The answer of the first available provider of @feature")
-  ;; (the next ones are asked when one answers #f)
+  ;; (the next ones are asked when one answers #f or nothing, '(): a
+  ;; server which has no block at the cursor lets tree-sitter look)
   (let loop ((l (chosen feature)))
     (cond ((null? l) #f)
           ((not ((caddr (car l)))) (loop (cdr l)))
-          ((apply (cadddr (car l)) args) => identity)
+          ((with r (apply (cadddr (car l)) args) (and (nnull? r) r)) => identity)
           (else (loop (cdr l))))))

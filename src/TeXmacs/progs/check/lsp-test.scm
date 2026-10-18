@@ -898,16 +898,16 @@
         (check-true (and (lsp-cursor-block) #t))
         (check-false (lsp-source-buffer?))
         (check= (lsp-buffer-language) "cpp")
-        (check= (lsp-buffer-path) (lsp-file "proj/src/.notes-block1.cpp"))
+        (check= (lsp-buffer-path) (lsp-file "proj/src/.notes.tm-block1.cpp"))
         (check= (lsp-buffer-lines) block-lines)
         (check= (lsp-buffer-line 1) (cadr block-lines))
         (check= (lsp-cursor-position) (lsp-buffer-position 1 4))
         (check= (lsp-target-base) b1)
         (go-to-path (append b2 '(0 0)))
-        (check= (lsp-buffer-path) (lsp-file "proj/src/.notes-block2.cpp"))
+        (check= (lsp-buffer-path) (lsp-file "proj/src/.notes.tm-block2.cpp"))
         (go-to-path (append b1 '(0 0)))
-        (check= (lsp-buffer-path) (lsp-file "proj/src/.notes-block1.cpp"))
-        (check= (lsp-block-of-path (lsp-file "proj/src/.notes-block2.cpp"))
+        (check= (lsp-buffer-path) (lsp-file "proj/src/.notes.tm-block1.cpp"))
+        (check= (lsp-block-of-path (lsp-file "proj/src/.notes.tm-block2.cpp"))
                 (list path (car (cadr bs)) "cpp"))
         ;; outside of the blocks, the document is not code
         (go-to-path (append (buffer-path) '(0 0)))
@@ -925,8 +925,8 @@
     (buffer-close u)))
 
 (define (test-blocks-clangd u b1 b2)
-  (let ((uri1 (lsp-path->uri (lsp-file "proj/src/.notes-block1.cpp")))
-        (uri2 (lsp-path->uri (lsp-file "proj/src/.notes-block2.cpp"))))
+  (let ((uri1 (lsp-path->uri (lsp-file "proj/src/.notes.tm-block1.cpp")))
+        (uri2 (lsp-path->uri (lsp-file "proj/src/.notes.tm-block2.cpp"))))
     ;; the blocks are given to the server after a change
     (notify-buffer-changed (url->string u))
     (lsp-sync-pending)
@@ -948,15 +948,40 @@
         (lsp-goto-definition)
         (check= (current-buffer) u)
         (check= (cursor-path) (append b1 '(0 4)))
-        ;; a block which is removed is closed on the server
-        (tree-remove! (buffer-get-body u) 3 1)
-        (notify-buffer-changed (url->string u))
-        (lsp-sync-pending)
-        (check-false (lsp-document-open? c uri2))
-        (check-true (lsp-document-open? c uri1))
-        ;; and the document closes the others
+        ;; a paragraph before the blocks moves their underlines
+        (let* ((body (buffer-get-body u))
+               (r1 (path->tree b1))
+               (r2 (path->tree b2)))
+          (tree-insert! body 0 '("New."))
+          (notify-buffer-changed (url->string u))
+          (check-true (in? (append (tree->path r1) '(1 25))
+                           (get-alt-selection "code-errors")))
+          ;; a block which is removed is closed on the server (the next
+          ;; syncs look at the blocks which are known)
+          (tree-remove! body (cAr (tree->path (tree-up r2))) 1)
+          (notify-buffer-changed (url->string u))
+          (lsp-sync-pending)
+          (check-false (lsp-document-open? c uri2))
+          (check-true (lsp-document-open? c uri1))
+          ;; a block whose language changes leaves its former file
+          (tree-assign-node! (tree-up r1) 'python-code)
+          (notify-buffer-changed (url->string u))
+          (lsp-sync-pending)
+          (check-false (lsp-document-open? c uri1))
+          (tree-assign-node! (tree-up r1) 'cpp-code)
+          (notify-buffer-changed (url->string u))
+          (lsp-sync-pending)
+          (check-true (lsp-document-open?
+                       c (lsp-path->uri (lsp-block-path (lsp-file "proj/src/notes.tm")
+                                                        r1 "cpp")))))
+        ;; and the document closes the others; a place in the virtual file
+        ;; of a block of a closed document opens nothing
         (lsp-buffer-close u)
-        (check-false (lsp-document-open? c uri1))))))
+        (check-false (lsp-document-open? c uri1))
+        (with n (length (buffer-list))
+          (lsp-goto-location uri1 (lsp-object "start" (lsp-object "line" (lsp-number 0)
+                                                                    "character" (lsp-number 0))))
+          (check= (length (buffer-list)) n))))))
 
 ;; the editor, on a second file of the project
 

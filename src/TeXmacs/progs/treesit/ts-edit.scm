@@ -652,20 +652,37 @@
                                            (car p) (cadr p)))
             identity)))))
 
+(define (node-range root lan n)
+  ;; the block (first last) of the node n of several lines, or #f
+  (and (< (car (node-start n)) (car (node-end n)))
+       (rows->range (car (node-start n)) (fold-rows root lan n))))
+
+(define (top-level-nodes ctx root lan)
+  ;; the nodes of several lines which start a line, at the top level
+  (list-filter
+   (map (lambda (row)
+          (let* ((c (first-non-space (line-string root row)))
+                 (info (and c (node-info (list (car ctx) root row c) lan))))
+            (and info (list-ref info 0) (not (list-ref info 3))
+                 (< (car (car (list-ref info 0))) (car (cadr (list-ref info 0))))
+                 (let ((n (list-ref info 0)))
+                   (list "" #t (car n) (cadr n))))))
+        (iota (tree-arity root)))
+   identity))
+
 (define-public (syntax-fold-all-ranges)
   ;; the definitions of several lines of the code at the cursor, as blocks
-  ;; (first last); #f without a tree
+  ;; (first last), or, in a language without definitions (tags.scm), its
+  ;; blocks at the top level; #f without a tree
   (let ((o (cursor-outline)))
     (and o
-         (let* ((ctx (car o)) (lan (cadr o)) (root (cadr ctx)))
-           (list-filter
-            (map (lambda (d)
-                   (let ((n (list "" #t (list-ref d 4) (cadddr d))))
-                     (and (< (car (node-start n)) (car (node-end n)))
-                          (rows->range (car (node-start n))
-                                       (fold-rows root lan n)))))
-                 (caddr o))
-            identity)))))
+         (let* ((ctx (car o)) (lan (cadr o)) (root (cadr ctx))
+                (nodes (if (pair? (caddr o))
+                           (map (lambda (d) (list "" #t (list-ref d 4) (cadddr d)))
+                                (caddr o))
+                           (top-level-nodes ctx root lan))))
+           (list-filter (map (lambda (n) (node-range root lan n)) nodes)
+                        identity)))))
 
 (define-public (syntax-fold-block)
   ;; fold the innermost node of several lines around the cursor; #f when

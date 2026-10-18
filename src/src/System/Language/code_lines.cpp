@@ -26,6 +26,18 @@
 
 void remove_highlight (observer& obs, int lan);
 
+static void
+prune_observers (observer& o) {
+  // the lists of observers whose highlights were removed (remove_highlight
+  // leaves nil in their places), made shorter: a line folded and unfolded
+  // many times would else have a long list
+  if (is_nil (o) || o->get_type () != OBSERVER_LIST) return;
+  prune_observers (o->get_child (0));
+  prune_observers (o->get_child (1));
+  if (is_nil (o->get_child (0))) o= o->get_child (1);
+  else if (is_nil (o->get_child (1))) o= o->get_child (0);
+}
+
 int
 code_line_fold_state (tree t) {
   if (!is_atomic (t) || is_nil (t->obs)) return 0;
@@ -37,9 +49,11 @@ code_line_fold_state (tree t) {
 void
 code_set_line_fold_state (tree t, int state) {
   if (!is_atomic (t)) return;
-  if (!is_nil (t->obs))
+  if (!is_nil (t->obs)) {
     for (int d= 1; d <= CODE_FOLD_MAX; d++)
       remove_highlight (t->obs, CODE_FOLD_CODES + d);
+    prune_observers (t->obs);
+  }
   if (state > 0)
     attach_highlight (t, CODE_FOLD_CODES + min (state, CODE_FOLD_MAX), 0, 0, 0);
 }
@@ -74,6 +88,7 @@ code_clear_line_layers (tree t) {
   if (!is_atomic (t) || is_nil (t->obs)) return;
   remove_highlight (t->obs, CODE_LAYER_COLORS);
   remove_highlight (t->obs, CODE_LAYER_HINTS);
+  prune_observers (t->obs);
 }
 
 void
@@ -98,7 +113,11 @@ code_set_line_layers (tree t, tree colors, tree hints) {
         is_int (hints[i][0]) && is_atomic (hints[i][1])) {
       int p= as_int (hints[i][0]);
       if (p >= 0 && p <= n) {
-        hs[p]= layer_number (hints[i][1]->label) + 1;
+        // (two hints at the same place, as a name and a type, are shown
+        // one after the other)
+        string h= hints[i][1]->label;
+        if (hs[p] > 0) h= layer_names[hs[p] - 1] * " " * h;
+        hs[p]= layer_number (h) + 1;
         some_hint= true;
       }
     }

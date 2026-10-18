@@ -48,4 +48,6 @@
         ("Unfold all" (code-unfold-all))))
   (dynamic (code-diagnostics-menu))
   (dynamic (code-server-menu))
-  (dynamic (code-syntax-menu)))
+  (dynamic (code-syntax-menu))
+  ;; (the entries of a session or a program input, whose code this is)
+  (dynamic (former t)))

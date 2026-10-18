@@ -258,6 +258,7 @@
 
 (define hl-ranges '())         ; (line offset line offset) highlighted
 (define hl-buffer #f)
+(define hl-base #f)            ; the path of their lines (a code block's)
 (define hl-scheduled? #f)
 (define hl-request #f)         ; (client . id) awaited
 
@@ -275,7 +276,7 @@
          (or (< l (caddr r)) (and (== l (caddr r)) (<= o (cadddr r)))))))
 
 (define (in-highlights? lo)
-  (and lo (== hl-buffer (current-buffer))
+  (and lo (== hl-buffer (current-buffer)) (== hl-base (lsp-target-base))
        (list-or (map (lambda (r) (in-range? lo r)) hl-ranges))))
 
 (define (clear-highlights)
@@ -303,6 +304,7 @@
   (with b (lsp-target-base)
     (set! hl-ranges ranges)
     (set! hl-buffer (current-buffer))
+    (set! hl-base b)
     (if (null? ranges) (cancel-alt-selection "lsp-highlights")
         (set-alt-selection
          "lsp-highlights"
@@ -317,6 +319,7 @@
   (let* ((c (lsp-buffer-client*))
          (uri (lsp-buffer-uri))
          (lo (cursor-lo))
+         (base (lsp-target-base))
          (u (current-buffer)))
     (when (and c uri lo (lsp-client-running? c) (lsp-buffer-followed?)
                (not (in-highlights? lo))
@@ -336,8 +339,8 @@
              (set! hl-request #f)
              ;; (only if the cursor is still there, and the text has not
              ;; changed: an edit may leave the cursor in place)
-             (when (and (== (current-buffer) u) (== (cursor-lo) lo)
-                        (== hl-edits hl-edits-asked))
+             (when (and (== (current-buffer) u) (== (lsp-target-base) base)
+                        (== (cursor-lo) lo) (== hl-edits hl-edits-asked))
                (show-highlights
                 (if (or e (not r) (lsp-null? r)) '()
                     (lsp-highlight-ranges r)))))))))))

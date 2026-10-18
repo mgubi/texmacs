@@ -14,7 +14,8 @@
 ;; A code block of a document (cpp-code, python-code... whose body is a
 ;; document of lines) of a language with a server is, when the preference
 ;; "lsp:code blocks" is on, a document of that server of its own: a virtual
-;; file next to the document, .<name>-block<k>.<suffix>, which is never
+;; file next to the document, .<name>-block<k>.<suffix> (name with its
+;; suffix: notes.tm and notes.html have blocks of their own), which is never
 ;; written (the server has its text from didOpen and didChange), in the
 ;; project of the document. Its positions are those of its lines, as in a
 ;; source file, see doc/code-features.md (phase 7). A block is known by its
@@ -90,7 +91,7 @@
 
 (define (new-block-path doc lan)
   ;; doc: the system path of the document
-  (let* ((base (url-basename (system->url doc)))
+  (let* ((base (url->string (url-tail (system->url doc))))
          (k (or (ahash-ref block-counts doc) 1)))
     (ahash-set! block-counts doc (+ k 1))
     (url->system (url-append (url-head (system->url doc))
@@ -98,20 +99,19 @@
                                             (number->string k) "."
                                             (lan-suffix lan))))))
 
-(define (entry-of entries root)
-  (list-find entries (lambda (e) (tree-eq? (car e) root))))
+(define (entry-of entries root lan)
+  (list-find entries (lambda (e) (and (tree-eq? (car e) root) (== (cadr e) lan)))))
 
 (tm-define (lsp-block-path doc root lan)
   (:synopsis "The virtual file of the block @root of the document @doc")
-  ;; (doc: the system path of the document; given once, then kept)
+  ;; (doc: the system path of the document; given once, then kept; a block
+  ;; whose language changes gets another one, and the former one is closed
+  ;; by the next sync, lsp-documents.scm)
   (let* ((entries (or (ahash-ref block-files doc) '()))
-         (e (entry-of entries root)))
-    (if (and e (== (cadr e) lan)) (caddr e)
+         (e (entry-of entries root lan)))
+    (if e (caddr e)
         (with p (new-block-path doc lan)
-          (ahash-set! block-files doc
-                      (cons (list root lan p)
-                            (list-filter entries
-                                         (lambda (x) (not (tree-eq? (car x) root))))))
+          (ahash-set! block-files doc (cons (list root lan p) entries))
           p))))
 
 (tm-define (lsp-block-entries doc)
@@ -128,3 +128,10 @@
     (and (nnull? l)
          (with e (list-find (cdar l) (lambda (e) (== (caddr e) path)))
            (if e (list (caar l) (car e) (cadr e)) (loop (cdr l)))))))
+
+(tm-define (lsp-virtual-block-path? path)
+  (:synopsis "Is @path the name of the virtual file of a code block?")
+  ;; (also of a block of a document which is closed: it is not on disk)
+  (let ((name (url->string (url-tail (system->url path)))))
+    (and (string-starts? name ".") (string-contains? name "-block")
+         (not (url-exists? (system->url path))))))

@@ -51,7 +51,11 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define glue-spec-files
-  '("build-glue-basic.scm" "build-glue-editor.scm" "build-glue-server.scm"))
+  ;; (and those of the features which the build has, doc/code-features.md)
+  (append
+   '("build-glue-basic.scm" "build-glue-editor.scm" "build-glue-server.scm")
+   (if (defined? 'tree-sitter-program-language) '("build-glue-treesit.scm") '())
+   (if (defined? 'lsp-start) '("build-glue-lsp.scm") '())))
 
 (define (glue-spec-dir)
   (url-append (url-head (system->url "$TEXMACS_PATH"))

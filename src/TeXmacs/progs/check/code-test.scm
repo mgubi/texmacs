@@ -98,6 +98,21 @@
       (check= (code-folds b) '((0 1)))
       (code-unfold-all)
       (check= (code-folds b) '())
+      ;; a provider which has no block lets the next one answer
+      (code-provider-set! 'fold-ranges 'none -1 (lambda () #t) (lambda () '()))
+      (check= (code-ask 'fold-ranges) '((0 3) (0 2)))
+      (code-provider-remove! 'fold-ranges 'none)
+      ;; hidden lines whose first line was deleted are shown by unfold all
+      ;; (the cursor away from them: a cursor which comes into them opens
+      ;; them, unfold-around!)
+      (check-true (code-fold-lines b 0 2))
+      (go-to-path (append (buffer-path) '(3 0)))
+      (tree-remove! b 0 1)
+      (check-true (code-hidden? b 0))
+      (check= (code-folds b) '())
+      (code-unfold-all)
+      (check-false (code-hidden? b 0))
+      (check-false (code-hidden? b 1))
       ;; a jump into a hidden line opens the folds around it, from the
       ;; innermost
       (code-fold-lines b 1 2)
@@ -271,6 +286,9 @@
 
 (tm-define (code-test-failures)
   (check-suite "code")
+  ;; (the providers by rank, whatever the preferences code:<feature> of
+  ;; the user say)
+  (code-ignore-preferences! #t)
   (test-completion)
   (test-diagnostics)
   (test-navigation)
@@ -279,4 +297,5 @@
   (test-positions)
   (test-providers)
   (test-folds)
+  (code-ignore-preferences! #f)
   (check-end))

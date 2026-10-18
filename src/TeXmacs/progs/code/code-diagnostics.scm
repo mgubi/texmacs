@@ -110,11 +110,14 @@
 (tm-define (code-check-syntax)
   (:synopsis "Shows the syntax errors of the code at the cursor")
   ;; (where no server follows the code)
+  ;; (those of the code at the cursor: none elsewhere, where their places
+  ;; would no longer be those of the code after an edit around it)
   (set! syntax-scheduled? #f)
-  (when (and (in-prog?) (code-cursor-lines))
-    (if (server-diagnostics?) (code-clear-diagnostics 'syntax)
-        (with items (code-ask 'syntax-errors)
-          (code-set-diagnostics 'syntax (or items '()))))))
+  (if (and (in-prog?) (code-cursor-lines) (not (server-diagnostics?)))
+      (with items (code-ask 'syntax-errors)
+        (code-set-diagnostics 'syntax (or items '())))
+      (when (nnull? (code-diagnostics 'syntax))
+        (code-clear-diagnostics 'syntax))))
 
 (define (schedule-check)
   (when (not syntax-scheduled?)

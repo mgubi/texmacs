@@ -61,6 +61,25 @@
     (if p (update-path p)
         (delayed (with p (tree->path line) (when p (update-path p)))))))
 
+;; the deepest folds which the lines keep (CODE_FOLD_MAX of
+;; System/Language/code_lines.hpp)
+(define code-fold-max 9)
+
+(define mark-refresh? #f)
+
+(define (refresh-mark line)
+  ;; the first line of a fold gets or loses its mark (...), after its end:
+  ;; it is typeset again, and the window is drawn again, once for many
+  ;; folds (the part drawn again after a change is that of the line as it
+  ;; was, without the mark)
+  (update-line line)
+  (when (not mark-refresh?)
+    (set! mark-refresh? #t)
+    (delayed
+      (:idle 1)
+      (set! mark-refresh? #f)
+      (refresh-window))))
+
 (define (set-depth! root row d)
   (let ((line (tree-ref root row)))
     (when (!= (code-fold-depth root row) d)
@@ -72,14 +91,18 @@
 
 (tm-define (code-fold-lines root first last)
   (:synopsis "Hides the lines after @first up to @last of @root")
-  ;; (not when a fold starts already at the first line); whether there was
-  ;; something to hide
+  ;; (not when a fold starts already at the first line, nor deeper than
+  ;; the folds which the lines can keep); whether there was something to
+  ;; hide
   (and (tree-is? root 'document) (< first last) (< last (tree-arity root))
        (not (fold-starts? root first))
+       (< (apply max (map (lambda (r) (code-fold-depth root r))
+                          (.. (+ first 1) (+ last 1))))
+          code-fold-max)
        (begin
          (for (r (.. (+ first 1) (+ last 1)))
            (set-depth! root r (+ (code-fold-depth root r) 1)))
-         (update-line (tree-ref root first))   ; its mark
+         (refresh-mark (tree-ref root first))
          #t)))
 
 (tm-define (code-unfold-lines root row)
@@ -91,7 +114,19 @@
            (when (> (code-fold-depth root r) d0)
              (set-depth! root r (- (code-fold-depth root r) 1))
              (loop (+ r 1))))
-         (update-line (tree-ref root row))
+         (refresh-mark (tree-ref root row))
+         #t)))
+
+(define (unfold-leading! root)
+  ;; the hidden lines at the start, which no shown line comes before (the
+  ;; first line of their fold was deleted), are shown by one level;
+  ;; whether there were some
+  (and (tree-is? root 'document) (> (tree-arity root) 0)
+       (> (code-fold-depth root 0) 0)
+       (let loop ((r 0))
+         (when (and (< r (tree-arity root)) (> (code-fold-depth root r) 0))
+           (set-depth! root r (- (code-fold-depth root r) 1))
+           (loop (+ r 1)))
          #t)))
 
 (tm-define (code-folds root)
@@ -174,8 +209,12 @@
         (ranges (code-ask 'fold-all-ranges)))
     (if (not (and c ranges)) (set-message "No block to fold" "")
         (let* ((root (car c))
-               ;; (the outer ones first: the inner ones are then hidden)
-               (l (sort ranges (lambda (x y) (< (car x) (car y))))))
+               ;; (the outer ones first: the inner ones are then hidden; of
+               ;; two with the same first line, the larger one)
+               (l (sort ranges (lambda (x y)
+                                 (or (< (car x) (car y))
+                                     (and (== (car x) (car y))
+                                          (> (cadr x) (cadr y))))))))
           (for (r l) (code-fold-lines root (car r) (cadr r)))
           (when (code-hidden? root (cadr c))
             ;; (the cursor goes to the first line of its fold)
@@ -192,7 +231,8 @@
         (with fs (code-folds (car c))
           (when (nnull? fs)
             (for (f fs) (code-unfold-lines (car c) (car f)))
-            (loop)))))))
+            (loop))))
+      (let again () (when (unfold-leading! (car c)) (again))))))
 
 (tm-define (code-can-fold?)
   (:synopsis "Can the blocks of the code at the cursor be folded?")
@@ -213,7 +253,8 @@
   ;; the folds which hide @row open, from the innermost
   (when (code-hidden? root row)
     (let find ((r (- row 1)))
-      (cond ((< r 0) (noop))
+      (cond ((< r 0)
+             (when (unfold-leading! root) (unfold-around! root row)))
             ((< (code-fold-depth root r) (code-fold-depth root row))
              (code-unfold-lines root r)
              (unfold-around! root row))

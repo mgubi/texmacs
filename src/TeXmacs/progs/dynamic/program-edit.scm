@@ -18,7 +18,7 @@
 	(dynamic program-drd)
 	(dynamic program-menu)
 	(dynamic fold-edit)
-	(treesit ts-edit)))
+	(code code-syntax)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Switches

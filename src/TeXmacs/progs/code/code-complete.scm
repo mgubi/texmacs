@@ -62,13 +62,17 @@
 
 (tm-define (code-local-completion-here?)
   (:synopsis "Does tab complete with the names of the code at the cursor?")
-  ;; (where no server follows the code, after a name, not in a string or a
-  ;; comment)
+  ;; (where no server follows the code, nor a session which completes
+  ;; itself, after a name which some names of the code continue, not in a
+  ;; string or a comment; else tab keeps its meaning)
   (and (in-prog?) (code-cursor-lines)
+       (not (and (in-session?) (defined? 'session-supports-completions?)
+                 (session-supports-completions?)))
        (not (code-available? 'server-diagnostics))
        (code-available? 'local-names)
        (!= (cursor-word) "")
-       (not (code-in-text?))))
+       (not (code-in-text?))
+       (nnull? (code-local-completions (cursor-word)))))
 
 (tm-define (code-complete-locally)
   (:synopsis "Completes the name at the cursor with the names of the code")

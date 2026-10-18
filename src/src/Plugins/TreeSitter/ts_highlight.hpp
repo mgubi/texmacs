@@ -13,9 +13,7 @@
 #include "language.hpp"
 #include "scheme.hpp"
 
-bool tree_sitter_wraps (string lan);
 void tree_sitter_wrap_language (string lan);
-language_rep* tree_sitter_language (string lan, language_rep* base);
 void tree_sitter_set_highlighter (string lan, int query, array<string> classes);
 void tree_sitter_set_injections (string lan, int query);
 void tree_sitter_set_injection_name (string name, string lan);

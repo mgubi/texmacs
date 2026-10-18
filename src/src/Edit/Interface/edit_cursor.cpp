@@ -16,14 +16,21 @@
 #include "tree_traverse.hpp"
 #include "drd_mode.hpp"
 #include "analyze.hpp"
+#include "hashmap.hpp"
 
 /******************************************************************************
 * Constructor and destructor
 ******************************************************************************/
 
+// the last place of the cursor of each editor outside of the folds (two
+// views of a buffer have cursors of their own)
+static hashmap<pointer,path> last_outside_folds= hashmap<pointer,path> (path ());
+
 edit_cursor_rep::edit_cursor_rep ():
   cu (0, 0), mv (0, 0), mv_status (0) {}
-edit_cursor_rep::~edit_cursor_rep () {}
+edit_cursor_rep::~edit_cursor_rep () {
+  last_outside_folds->reset ((pointer) this);
+}
 cursor& edit_cursor_rep::the_cursor () { return cu; }
 cursor& edit_cursor_rep::the_ghost_cursor () { return mv; }
 
@@ -216,10 +223,8 @@ edit_cursor_rep::adjust_ghost_cursor (int status) {
   }
 }
 
-static path last_outside_folds;
-
 static void
-unfold_at_cursor (tree et, path tp) {
+unfold_at_cursor (pointer ed, tree et, path tp) {
   // the cursor arrives in a hidden line of program code (a fold): it goes
   // over the fold, or the fold opens (progs/code/code-fold.scm), which is
   // told where the cursor was before, outside of the folds
@@ -227,8 +232,8 @@ unfold_at_cursor (tree et, path tp) {
   path p= path_up (tp);
   if (!has_subtree (et, p)) return;
   if (code_line_fold_state (subtree (et, p)) > 0)
-    call ("code-cursor-in-fold", object (last_outside_folds), object (tp));
-  else last_outside_folds= tp;
+    call ("code-cursor-in-fold", object (last_outside_folds[ed]), object (tp));
+  else last_outside_folds (ed)= tp;
 }
 
 void
@@ -236,7 +241,7 @@ edit_cursor_rep::notify_cursor_moved (int status) {
   mv_status= status;
   cu= eb->find_check_cursor (tp);
   notify_change (THE_CURSOR);
-  unfold_at_cursor (et, tp);
+  unfold_at_cursor ((pointer) this, et, tp);
   if (cu->valid) call ("notify-cursor-moved", object (status));
 }
 
@@ -457,7 +462,7 @@ edit_cursor_rep::go_to_here () {
     }
   }
   notify_change (THE_CURSOR);
-  unfold_at_cursor (et, tp);
+  unfold_at_cursor ((pointer) this, et, tp);
   if (cu->valid) call ("notify-cursor-moved", object (DIRECT));
 }
 
@@ -482,7 +487,7 @@ edit_cursor_rep::go_to (path p) {
       notify_change (THE_CURSOR, THE_FREEZE);
     else
       notify_change (THE_CURSOR);
-    unfold_at_cursor (et, tp);
+    unfold_at_cursor ((pointer) this, et, tp);
     if (cu->valid) call ("notify-cursor-moved", object (DIRECT));
   }
 }

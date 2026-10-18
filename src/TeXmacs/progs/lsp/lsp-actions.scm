@@ -215,7 +215,7 @@
     (if (and b (buffer-exists? (system->url (car b)))
              (tree->path (cadr b)))
         (list (system->url (car b)) (cadr b))
-        (with u (uri->buffer uri)
+        (with u (and (not (and p (lsp-virtual-block-path? p))) (uri->buffer uri))
           (and u (list u #f))))))
 
 (define (uri->buffer uri)
@@ -432,6 +432,7 @@
 (define fixes '())
 (define fixes-buffer #f)
 (define fixes-text #f)
+(define fixes-root #f)   ; the lines of the fixes (of a source file or a block)
 
 (tm-define (lsp-run-action c a)
   (:synopsis "Runs the code action (or command) @a of the server of @c")
@@ -460,7 +461,8 @@
           (buffer-close u)))
       (cond ((not (and fixes-buffer (buffer-exists? fixes-buffer)))
              (set-message "The file of the fixes has been closed" ""))
-            ((code-snapshot-changed? fixes-text (buffer-get-body fixes-buffer))
+            ((or (not (tree->path fixes-root))
+                 (code-snapshot-changed? fixes-text fixes-root))
              ;; (its ranges would no longer be those of the text)
              (switch-to-buffer fixes-buffer)
              (set-message "The file has changed: ask for the fixes again"
@@ -518,7 +520,8 @@
            (set! fixes-buffer (current-buffer))
            ;; (a snapshot of the lines, see code_regions.cpp)
            (when fixes-text (code-snapshot-delete fixes-text))
-           (set! fixes-text (code-snapshot-new (lsp-target-root)))
+           (set! fixes-root (lsp-target-root))
+           (set! fixes-text (code-snapshot-new fixes-root))
            (open-auxiliary
             "Quick fixes"
             `(document

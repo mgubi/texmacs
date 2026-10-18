@@ -524,14 +524,45 @@
                                (apply lsp-target-root opt)))
     c))
 
+(define scanned (make-ahash-table))   ; doc -> #t once all its blocks were found
+
+(tm-define (lsp-blocks-rescan u)
+  (:synopsis "The next sync of the document @u looks for all its code blocks")
+  (with doc (file-path u)
+    (when doc (ahash-remove! scanned doc))))
+
+(define (blocks-of u doc)
+  ;; the code blocks of the document @u: all of them the first time (and
+  ;; after lsp-blocks-rescan, at each save), else those which were given
+  ;; to the servers and are still there with their language, and the one
+  ;; at the cursor (a walk of a long document at each pause would be slow;
+  ;; a block which is pasted away from the cursor comes with the save)
+  (if (not (ahash-ref scanned doc))
+      (begin
+        (ahash-set! scanned doc #t)
+        (lsp-document-blocks (buffer-get-body u)))
+      (let* ((known (list-filter
+                     (map (lambda (e)
+                            (let* ((p (tree->path (car e)))
+                                   (up (and p (tree-up (car e)))))
+                              (and up (== (lsp-block-language up) (cadr e))
+                                   (list (car e) (cadr e)))))
+                          (lsp-block-entries doc))
+                     identity))
+             (here (and (== u (current-buffer)) (lsp-block-at (cursor-path)))))
+        (if (and here (not (list-find known (lambda (b) (same-block? b here)))))
+            (append known (list here))
+            known))))
+
+(define (same-block? b e)
+  ;; b: (root lan), e: (root lan ...)
+  (and (tree-eq? (car b) (car e)) (== (cadr b) (cadr e))))
+
 (define (sync-blocks u)
   ;; the code blocks of the document @u, given to their servers; those
-  ;; which are no longer there are closed
+  ;; which are no longer there (or whose language has changed) are closed
   (let* ((doc (file-path u))
-         (blocks (if (and doc (lsp-blocks-on?))
-                     (lsp-document-blocks (buffer-get-body u))
-                     '()))
-         (old (if doc (lsp-block-entries doc) '())))
+         (blocks (if (and doc (lsp-blocks-on?)) (blocks-of u doc) '())))
     (for (b blocks)
       (let* ((path (lsp-block-path doc (car b) (cadr b)))
              (c (lsp-client-for (cadr b) (lsp-project-root path)))
@@ -541,14 +572,14 @@
               (lsp-document-change-lines c uri (car b))
               (lsp-document-open-lines c uri (lsp-language-id (cadr b) path)
                                        (car b))))))
-    (for (e old)
-      (when (not (list-find blocks (lambda (b) (tree-eq? (car b) (car e)))))
-        (close-block e)))
     (when doc
-      (lsp-block-entries-set!
-       doc (list-filter (lsp-block-entries doc)
-                        (lambda (e) (list-find blocks
-                                               (lambda (b) (tree-eq? (car b) (car e))))))))
+      (with old (lsp-block-entries doc)
+        (for (e old)
+          (when (not (list-find blocks (lambda (b) (same-block? b e))))
+            (close-block e)))
+        (lsp-block-entries-set!
+         doc (list-filter old (lambda (e) (list-find blocks
+                                                     (lambda (b) (same-block? b e))))))))
     #f))
 
 (define (close-block e)
@@ -576,7 +607,8 @@
       (with doc (file-path (car opt))
         (when doc
           (for (e (lsp-block-entries doc)) (close-block e))
-          (lsp-block-entries-set! doc '())))
+          (lsp-block-entries-set! doc '())
+          (ahash-remove! scanned doc)))
       (let ((c (apply lsp-buffer-client* opt))
             (uri (apply lsp-buffer-uri opt)))
         (when (and c uri) (lsp-document-close c uri)))))

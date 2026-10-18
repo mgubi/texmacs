@@ -17,7 +17,7 @@
 	(utils plugins plugin-cmd)
 	(dynamic session-drd)
 	(dynamic fold-edit)
-	(treesit ts-edit)))
+	(code code-syntax)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Where to find plug-in binaries

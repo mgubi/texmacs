@@ -329,17 +329,6 @@ tree_sitter_wrap_language (string lan) {
   set_prog_language_wrapper (wrap_language);
 }
 
-bool
-tree_sitter_wraps (string lan) {
-  // the program languages which tree-sitter may highlight
-  return wrapped_languages->contains (lan);
-}
-
-language_rep*
-tree_sitter_language (string lan, language_rep* base) {
-  return tm_new<treesit_language_rep> (lan, base);
-}
-
 object
 tree_sitter_line_colors (string lan, tree t) {
   // the coloured runs of a line, as (start end class), after highlighting it

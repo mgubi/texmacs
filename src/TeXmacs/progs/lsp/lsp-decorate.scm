@@ -182,7 +182,11 @@
       ;; for its present @text then, or #f
       (let* ((j (ahash-ref now i))
              (o (and j (ahash-ref old j))))
-        (and o (tree-eq? (car o) t) (== (cadr o) text) (== (cddr o) ds) j)))
+        ;; (and if it still has them: an edit of the line removes them, and
+        ;; an undo may give it back its text)
+        (and o (tree-eq? (car o) t) (== (cadr o) text) (== (cddr o) ds)
+             (!= (tree->stree (code-line-layers t)) '(tuple (tuple) (tuple)))
+             j)))
     (for (d decos)
       (with i (car d)
         (when (< i n)

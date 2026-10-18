@@ -92,7 +92,13 @@
   (former name)
   (when (lsp-on?)
     (with u (name->buffer name)
-      (when u (lsp-follow-buffer u)))))
+      (when u (lsp-follow-buffer u))
+      ;; (the underlines of the code blocks are drawn at their places: a
+      ;; change outside of them moves them)
+      (when (and u (== u (current-buffer)) (not (lsp-source-buffer? u))
+                 (== (ahash-ref followed name) #t)
+                 (nnull? (buffer-uris)))
+        (draw-diagnostics)))))
 
 (tm-define (notify-buffer-closed name)
   ;; the buffer is closed, or renamed (save as): its document is closed on
@@ -110,6 +116,8 @@
     (with key (url->string name)
       (when (and (buffer-exists? name) (follow? key name))
         (ahash-remove! pending key)
+        ;; (a document: all its code blocks are looked for again)
+        (lsp-blocks-rescan name)
         (with c (lsp-buffer-sync name)
           (when (and c (lsp-client-alive? c))
             (lsp-document-save c (lsp-buffer-uri name))))))))
@@ -251,8 +259,13 @@
 (define refresh-scheduled? #f)
 
 (define (buffer-server u)
+  ;; (in a document, the server of the code block at the cursor)
   (with name (url->string u)
-    (or (ahash-ref buffer-servers name)
+    (or (and (lsp-source-buffer? u) (ahash-ref buffer-servers name))
+        (and (not (lsp-source-buffer? u))
+             (let* ((lan (lsp-buffer-language))
+                    (p (lsp-buffer-path)))
+               (list lan (and lan p (lsp-project-root p)))))
         (let* ((lan (lsp-buffer-language u))
                (p (lsp-buffer-path u))
                (r (list lan (and lan p (lsp-project-root p)))))
@@ -365,8 +378,16 @@
   ;; environment which is not up to date (in-math? was then wrong after
   ;; (make 'math)); the buffers which a server follows are known instead
   (former status)
-  (when (and (lsp-on?) (followed-buffer?))
-    (lsp-cursor-moved)))
+  (when (lsp-on?)
+    ;; (in a document, the diagnostics of the code blocks which came while
+    ;; it was not the current buffer, wherever the cursor is)
+    (when (and (== (ahash-ref followed (url->string (current-buffer))) #t)
+               (not (lsp-source-buffer?))
+               (list-or (map (lambda (x) (ahash-ref stale (car x)))
+                             (buffer-uris))))
+      (lsp-show-diagnostics))
+    (when (followed-buffer?)
+      (lsp-cursor-moved))))
 
 (tm-define (lsp-next-diagnostic forward?)
   (:synopsis "Goes to the next diagnostic (or the previous one)")
@@ -881,7 +902,9 @@
          (b (and path (lsp-block-of-path path))))
     (cond ((and b (buffer-exists? (system->url (car b))))
            (goto-block b range))
-          ((not path) (set-message "Cannot open this location" ""))
+          ((or (not path) (lsp-virtual-block-path? path))
+           ;; (a code block of a document which is closed)
+           (set-message "Cannot open this location" ""))
           (else
            (with u (system->url path)
              ;; (switching to the current buffer would make a second view)
