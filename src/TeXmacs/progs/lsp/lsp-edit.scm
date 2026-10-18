@@ -460,7 +460,7 @@
   (:synopsis "The suffixes of the completions @r of @prefix (Cork)")
   (let loop ((l (completion-items r)) (acc '()) (n 0))
     (if (or (null? l) (>= n 100)) (reverse acc)
-        (with t (utf8->cork (completion-text (car l)))
+        (with t (sourcecode->cork (completion-text (car l)))
           (if (and (string-starts? t prefix)
                    (> (string-length t) (string-length prefix)))
               (with s (substring t (string-length prefix) (string-length t))

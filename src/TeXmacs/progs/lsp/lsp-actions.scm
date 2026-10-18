@@ -57,7 +57,7 @@
   ;; server is its index: the sort of S7 is not stable.)
   (let* ((rs (map (lambda (e i)
                     (list (edit-range lines e)
-                          (utf8->cork (or (lsp-ref e "newText") ""))
+                          (sourcecode->cork (or (lsp-ref e "newText") ""))
                           i))
                   edits (.. 0 (length edits)))))
     (sort rs (lambda (a b)
@@ -376,7 +376,7 @@
                     c "textDocument/rename"
                     (lsp-object "textDocument" (lsp-object "uri" uri)
                                 "position" pos
-                                "newName" (cork->utf8 new-name))
+                                "newName" (cork->sourcecode new-name))
                     10000)))
              (cond ((== (car a) 'error)
                     (set-message (utf8->cork (or (lsp-ref (cadr a) "message")

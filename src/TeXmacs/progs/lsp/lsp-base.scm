@@ -91,6 +91,11 @@
 ;; Texts and positions
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;; The texts of the servers are those of the files (cork->sourcecode and
+;; sourcecode->cork, as when they are saved and loaded): cork->utf8 would
+;; give the typographic forms of some characters (a backquote as an opening
+;; quote, three dots as an ellipsis), which are not in the files
+
 (tm-define (lsp-utf16-length s)
   (:synopsis "The length of the utf8 string @s in UTF-16 units")
   (let ((n (string-length s)))
@@ -105,7 +110,7 @@
 
 (tm-define (lsp-offset->character line offset)
   (:synopsis "The character of a position at @offset of the Cork @line")
-  (lsp-utf16-length (cork->utf8 (substring line 0 (min offset
+  (lsp-utf16-length (cork->sourcecode (substring line 0 (min offset
                                                        (string-length line))))))
 
 (define plain-line #f)
@@ -133,15 +138,15 @@
   (if (plain? line) (max 0 (min ch (string-length line)))
   (let loop ((l (tmstring->list line)) (pos 0) (n 0))
     (if (or (null? l) (>= n ch)) pos
-        (with m (+ n (lsp-utf16-length (cork->utf8 (car l))))
+        (with m (+ n (lsp-utf16-length (cork->sourcecode (car l))))
           (if (> m ch) pos
               (loop (cdr l) (+ pos (string-length (car l))) m)))))))
 
 (define (verbatim-line t)
   ;; a line which is not a string (markup in a source file), as a string
   (let* ((opts (acons "texmacs->verbatim:encoding" "SourceCode" '()))
-         (s (utf8->cork (texmacs->verbatim t opts))))
-    (string-replace s "\n" " ")))
+         (s (texmacs->verbatim t opts)))
+    (sourcecode->cork (string-replace s "\n" " "))))
 
 (tm-define (lsp-lines t)
   (:synopsis "The lines of the document @t (a tree or an stree), in Cork")
@@ -154,12 +159,12 @@
 
 (tm-define (lsp-lines->text lines)
   (:synopsis "The text of the Cork @lines, in utf8, for a server")
-  (string-recompose (map cork->utf8 lines) "\n"))
+  (string-recompose (map cork->sourcecode lines) "\n"))
 
 (tm-define (lsp-text->lines text)
   (:synopsis "The lines of the utf8 @text of a server, in Cork")
   (map (lambda (l)
-         (utf8->cork (if (string-ends? l "\r")
+         (sourcecode->cork (if (string-ends? l "\r")
                          (substring l 0 (- (string-length l) 1))
                          l)))
        (string-decompose text "\n")))

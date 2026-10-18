@@ -19,6 +19,7 @@
 #include "lsp_link.hpp"
 #include "analyze.hpp"
 #include "convert.hpp"
+#include "converter.hpp"
 #include "scheme.hpp"
 #include "tm_timer.hpp"
 
@@ -383,10 +384,11 @@ lsp_stop (int id) {
 
 static string
 lsp_line_text (tree t) {
-  // a line which is not a string, on one line
-  if (is_atomic (t)) return cork_to_utf8 (t->label);
-  string s= utf8_to_cork (tree_to_verbatim (t, false, "SourceCode"));
-  return cork_to_utf8 (replace (s, "\n", " "));
+  // a line which is not a string, on one line. The text is that of the
+  // file, as it is saved (SourceCode): cork_to_utf8 gives the typographic
+  // forms of some characters (a backquote, ...), which are not in the file
+  if (is_atomic (t)) return cork_to_sourcecode (t->label);
+  return replace (tree_to_verbatim (t, false, "SourceCode"), "\n", " ");
 }
 
 string
@@ -399,7 +401,7 @@ lsp_document_text (tree t) {
     string r;
     for (int i=0; i<N(a); i++) {
       if (i > 0) r << "\n";
-      r << cork_to_utf8 (a[i]);
+      r << cork_to_sourcecode (a[i]);
     }
     return r;
   }

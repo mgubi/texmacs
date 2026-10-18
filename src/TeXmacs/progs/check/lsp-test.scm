@@ -275,6 +275,12 @@
     (with t (stree->tree d)
       (check= (lsp-document-text t) (lsp-lines->text (lsp-lines t)))))
   (check= (lsp-text->lines "a\r\nb\n") '("a" "b" ""))
+  ;; the text of the file: a backquote and three dots are what they are
+  (check= (lsp-lines->text '("a`b...c")) "a`b...c")
+  (check= (lsp-document-text (stree->tree '(document "a`b...c" "")))
+          "a`b...c\n")
+  (check= (lsp-text->lines "x`y...\n") '("x`y..." ""))
+  (check= (lsp-offset->character "a`b...c" 7) 7)
   (with lines (list "x" (string-append e-acute smiley "y"))
     (check= (lsp-position lines 1 9)
             '(attr "line" (json-number "1") "character" (json-number "3")))
