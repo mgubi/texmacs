@@ -91,7 +91,8 @@ SDK_VERSION ?= 0.19.1
 SDK := $(CURDIR)/sdk/node_modules/@wasmer/sdk
 web: $(OUT)/web/texmacs.wasm $(OUT)/web/texmacs-fs.json $(OUT)/web/sdk/dist/index.js \
   $(OUT)/web/index.html $(OUT)/web/texmacs-gui.js $(OUT)/web/pdf.html $(OUT)/web/pdf.js \
-  $(OUT)/web/webgpu-host.js $(OUT)/web/webgpu-enums.js $(OUT)/web/hello-triangle.wasm
+  $(OUT)/web/webgpu-host.js $(OUT)/web/webgpu-enums.js $(OUT)/web/hello-triangle.wasm \
+  $(OUT)/web/thorvg-shapes.wasm
 
 # WebGPU (misc/wasix/webgpu): webgpu.h, that of wgpu-native 29 (fetched by
 # build-deps.sh), sent to the page by webgpu_wire.cpp; the page has the
@@ -110,6 +111,13 @@ $(OUT)/web/hello-triangle.wasm: $(WEBGPU)/test/hello-triangle.c $(OBJ)/webgpu/we
 	@mkdir -p $(OUT)/web
 	$(CXX) -O2 -x c -I$(WEBGPU_H) -I$(WEBGPU) -c $< -o $(OBJ)/webgpu/hello-triangle.o
 	$(CXX) -O2 $(OBJ)/webgpu/hello-triangle.o $(OBJ)/webgpu/webgpu_wire.o -o $@
+
+# ThorVG's WebGPU engine on it (build-thorvg.sh ... wasix, THORVG_WG)
+THORVG_WG ?= $(CURDIR)/thorvg/wasix
+$(OUT)/web/thorvg-shapes.wasm: $(WEBGPU)/test/thorvg-shapes.cpp $(OBJ)/webgpu/webgpu_wire.o $(THORVG_WG)/lib/libthorvg-1.a
+	@mkdir -p $(OUT)/web
+	$(CXX) -O2 -std=c++17 -I$(WEBGPU_H) -I$(WEBGPU) -I$(THORVG_WG)/include/thorvg-1 -DTVG_STATIC \
+	  $< $(OBJ)/webgpu/webgpu_wire.o $(THORVG_WG)/lib/libthorvg-1.a -o $@
 
 $(OUT)/web/texmacs.wasm: $(OUT)/texmacs.wasm
 	@mkdir -p $(OUT)/web

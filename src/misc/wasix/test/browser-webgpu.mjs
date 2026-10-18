@@ -1,15 +1,18 @@
 // The WebGPU of WASIX (misc/wasix/webgpu) in a headless Chrome: the page
-// runs hello-triangle.wasm, whose calls of webgpu.h are made on the WebGPU
-// of the page; the canvas is saved as a PNG image.
+// runs a test program (hello-triangle.wasm, thorvg-shapes.wasm), whose calls
+// of webgpu.h are made on the WebGPU of the page, until it has presented
+// that many frames; the page is saved as <program>.png.
 //
-//   node misc/wasix/test/browser-webgpu.mjs <tools dir> <output dir> [web dir]
+//   node misc/wasix/test/browser-webgpu.mjs <tools dir> <output dir>
+//        [program [frames [web dir]]]
 
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { serve } from '../serve.mjs';
 
-const [tools, outDir, webArg] = process.argv.slice (2);
+const [tools, outDir, prog = 'hello-triangle.wasm', nframes = '120', webArg] =
+  process.argv.slice (2);
 if (!outDir) { console.error ('usage: browser-webgpu.mjs <tools dir> <output dir> [web dir]'); process.exit (2); }
 fs.mkdirSync (outDir, { recursive: true });
 const web = path.resolve (webArg || 'build-wasix/out/web');
@@ -38,14 +41,14 @@ try {
   page.on ('console', m => console.log ('[page]', m.text ()));
   page.on ('pageerror', e => console.log ('[page error]', e.message));
   const t0 = Date.now ();
-  await page.goto (`http://127.0.0.1:${port}/?program=hello-triangle.wasm`);
-  await page.waitForFunction (() => window.tmWasix && window.tmWasix.gpu &&
-                              window.tmWasix.gpu.frames >= 120,
-                              { timeout: 120000, polling: 100 });
+  await page.goto (`http://127.0.0.1:${port}/?program=${prog}`);
+  await page.waitForFunction (n => window.tmWasix && window.tmWasix.gpu &&
+                              window.tmWasix.gpu.frames >= n,
+                              { timeout: 120000, polling: 100 }, Number (nframes));
   const g = await page.evaluate (() => window.tmWasix.gpu);
   console.log (`frames ${g.frames}, calls ${g.calls}, errors ${g.errors.length}, ${Date.now () - t0} ms`);
   for (const e of g.errors) console.log ('  ' + e);
-  await page.screenshot ({ path: path.join (outDir, 'triangle.png') });
+  await page.screenshot ({ path: path.join (outDir, prog.replace (/\.wasm$/, '.png')) });
   ok = g.errors.length === 0;
 } finally {
   await browser.close ();

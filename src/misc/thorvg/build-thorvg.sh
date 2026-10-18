@@ -13,6 +13,11 @@
 # ninja come from a Python venv in <prefix>/venv. Then configure with
 # --with-thorvg=<prefix> (or let configure find it through pkg-config:
 # PKG_CONFIG_PATH=<prefix>/lib/pkgconfig).
+#
+# With "wasix" it is built with wasixcc (in ~/.wasixcc/bin, or WASIXCC) for
+# the WASIX build (misc/wasix), with its WebGPU engine instead: webgpu.h is
+# that of WEBGPU_HEADERS (build-wasix/webgpu-headers), whose functions the
+# WebGPU of WASIX gives (misc/wasix/webgpu/webgpu_wire.cpp).
 
 set -e
 PREFIX=${1:?usage: build-thorvg.sh <prefix> [wasm]}
@@ -34,7 +39,9 @@ fi
 [ -d "$PREFIX/src" ] ||
   git clone -q --depth 1 --branch "$THORVG_VERSION" https://github.com/thorvg/thorvg.git "$PREFIX/src"
 
-OPTS="-Dengines=gl -Dloaders= -Dthreads=false -Dfile=false -Dextra= -Dstatic=true
+ENGINES=gl
+[ "$TARGET" = wasix ] && ENGINES=wg
+OPTS="-Dengines=$ENGINES -Dloaders= -Dthreads=false -Dfile=false -Dextra= -Dstatic=true
       -Ddefault_library=static -Dbuildtype=release --libdir=lib"
 BUILD="$PREFIX/build-$TARGET"
 if [ ! -f "$BUILD/build.ninja" ]; then
@@ -59,9 +66,44 @@ endian = 'little'
 EOT
     (cd "$PREFIX/src" && PATH="$PREFIX/venv/bin:$PATH" meson setup "$BUILD" \
        --cross-file "$PREFIX/wasm32.txt" $OPTS --prefix="$PREFIX/wasm")
+  elif [ "$TARGET" = wasix ]; then
+    W=${WASIXCC:-$HOME/.wasixcc/bin}
+    WH=${WEBGPU_HEADERS:?WEBGPU_HEADERS: the directory of webgpu/webgpu.h}
+    WH=$(cd "$WH" && pwd)
+    # the dependency wgpu_native of the WebGPU engine: the headers only
+    mkdir -p "$PREFIX/wasix-pc"
+    printf 'Name: wgpu_native\nDescription: webgpu.h of the WebGPU of WASIX\nVersion: 29.0.1.1\nCflags: -I%s\nLibs:\n' \
+      "$WH" > "$PREFIX/wasix-pc/wgpu_native.pc"
+    # the exceptions of WebAssembly, as the WASIX build (misc/wasix/Makefile)
+    cat > "$PREFIX/wasix.txt" <<EOT
+[binaries]
+c = '$W/wasixcc'
+cpp = '$W/wasix++'
+ar = '$W/wasixar'
+pkg-config = 'pkg-config'
+
+[properties]
+pkg_config_libdir = '$PREFIX/wasix-pc'
+
+[built-in options]
+c_args = ['-O2', '-sWASM_EXCEPTIONS=yes']
+cpp_args = ['-O2', '-sWASM_EXCEPTIONS=yes']
+
+[host_machine]
+system = 'wasi'
+cpu_family = 'wasm32'
+cpu = 'wasm32'
+endian = 'little'
+EOT
+    (cd "$PREFIX/src" && WASIXCC_WASM_EXCEPTIONS=yes WASIXCC_RUN_WASM_OPT=no \
+       PATH="$PREFIX/venv/bin:$PATH" meson setup "$BUILD" \
+       --cross-file "$PREFIX/wasix.txt" $OPTS -Db_staticpic=false --prefix="$PREFIX/wasix")
   else
     (cd "$PREFIX/src" && PATH="$PREFIX/venv/bin:$PATH" meson setup "$BUILD" $OPTS --prefix="$PREFIX")
   fi
 fi
-PATH="$PREFIX/venv/bin:$PATH" ninja -C "$BUILD" install > /dev/null
-echo "ThorVG ($TARGET) installed in $( [ "$TARGET" = wasm ] && echo "$PREFIX/wasm" || echo "$PREFIX" )"
+WASIXCC_WASM_EXCEPTIONS=yes PATH="$PREFIX/venv/bin:$PATH" ninja -C "$BUILD" install > /dev/null
+case "$TARGET" in
+  wasm|wasix) echo "ThorVG ($TARGET) installed in $PREFIX/$TARGET";;
+  *) echo "ThorVG ($TARGET) installed in $PREFIX";;
+esac
