@@ -46,6 +46,11 @@ if (NOT WIN32)
   set(MAN_SECTION "1")
   foreach(TOOL ${TOOLS})
     set(TOOL_MANFILE ${CMAKE_CURRENT_SOURCE_DIR}/man/${TOOL}.${MAN_SECTION})
+    # (texmacs.1 is made from texmacs.1.in, in the build directory when it
+    # is not that of the sources)
+    if (TOOL STREQUAL "texmacs")
+      set(TOOL_MANFILE ${MAN_TARGET_FILE})
+    endif ()
     set(TOOL_MANFILE_GZ ${CMAKE_CURRENT_BINARY_DIR}/${TOOL}.${MAN_SECTION}.gz)
     add_custom_command(
       OUTPUT ${TOOL_MANFILE_GZ}

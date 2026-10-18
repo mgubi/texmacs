@@ -204,7 +204,8 @@ treesit_language_rep::highlight (tree t) {
     epoch= highlight_epoch;
     hl_lan= highlight_codes++;
   }
-  if (has_highlight (t, hl_lan)) return;
+  bool coloured= has_highlight (t, hl_lan);
+  if (coloured && is_document (t)) return;
   tree region;
   int row= -1;
   if (is_document (t)) region= t;
@@ -220,25 +221,35 @@ treesit_language_rep::highlight (tree t) {
       }
     }
     if (row < 0) {
+      if (coloured) return;
       if (!is_atomic (t)) { attach_highlight (t, hl_lan); return; }
       region= t;
     }
+    // (a line which has its colours keeps them while its document of lines
+    // is not changed; a change of the document, also of another line or a
+    // line removed, takes the highlight of the document away: the region is
+    // brought up to date, and the lines whose colours change are typeset
+    // again)
+    if (coloured && has_highlight (region, hl_lan)) return;
   }
   array<int> recoloured;
+  bool all= false;
   array<array<int> > cols=
     syntax_region_highlight (region, h->language, h->query, h->colors,
                              h->injections, resolve_injection, highlight_epoch,
-                             &recoloured);
+                             &recoloured, &all);
   if (is_atomic (region)) {
     if (N(cols) == 1) set_line_colors (region, hl_lan, cols[0], false);
     return;
   }
   if (N(cols) != N(region)) return;
-  if (!has_highlight (region, hl_lan)) {
-    // the first time: all the lines
+  if (all) {
+    // the first time (the region coloured all its lines): all the lines.
+    // (Not a highlight of the document of the lines, which an edit of one
+    // of them removes: each keystroke would then give all the lines their
+    // colours again.)
     for (int i= 0; i < N(region); i++)
       set_line_colors (region[i], hl_lan, cols[i], i != row);
-    attach_highlight (region, hl_lan, 0, 0, 1);
   }
   else {
     // the lines coloured again, and the line asked for (a line without
@@ -248,6 +259,8 @@ treesit_language_rep::highlight (tree t) {
         set_line_colors (region[recoloured[k]], hl_lan, cols[recoloured[k]], true);
     if (row >= 0) set_line_colors (region[row], hl_lan, cols[row], false);
   }
+  // (the document of the lines is coloured, until one of them changes)
+  if (!has_highlight (region, hl_lan)) attach_highlight (region, hl_lan, 0, 0, 1);
   if (N(pending_updates) > 0 && !updates_scheduled) {
     updates_scheduled= true;
     call ("treesit-schedule-updates");

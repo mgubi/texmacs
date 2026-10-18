@@ -82,14 +82,25 @@
   <verbatim|lsp:code blocks> on, the code blocks are followed
   (<source-link|lsp-blocks.scm|TeXmacs/progs/lsp/lsp-blocks.scm>): the
   document is in <verbatim|followed>, and <scm|lsp-buffer-sync> of it gives
-  each block to its server as a virtual file. The functions of the buffer
-  without a buffer argument are those of the <em|target>, the code at the
-  cursor: a block, or the lines of a source file (<scm|lsp-target-root>,
-  <scm|lsp-target-base>, in
-  <source-link|lsp-documents.scm|TeXmacs/progs/lsp/lsp-documents.scm>), so
-  that the requests at the cursor go to the server of the block; a buffer
-  is followed at the cursor (<scm|lsp-buffer-followed?>) when it is a
-  source file or the cursor is in one of its blocks.
+  the blocks to their servers as virtual files: each block one file, or,
+  with <verbatim|lsp:join code blocks> (the default), the blocks of a
+  language one file, a <em|unit>, whose lines are a document of their own
+  (<scm|lsp-unit-lines>), made again from those of its blocks
+  (<scm|lsp-unit-set-roots!>) when it is given to the server or used at
+  the cursor. The functions of the buffer without a buffer argument are
+  those of the <em|target>, the code at the cursor: a source file, a
+  block, or a unit (in
+  <source-link|lsp-documents.scm|TeXmacs/progs/lsp/lsp-documents.scm>):
+  <scm|lsp-target-root> gives its lines, <scm|lsp-target-path> the place in
+  the document of an offset of one of them, <scm|lsp-target-lo> the line
+  and offset of a place (a line of a unit is a line of one of its
+  blocks), <scm|lsp-target-key> its file. The requests at the cursor go to
+  the server of the target, and their answers come back to the places of
+  the document; an edit of the virtual file of a unit is written back to
+  its blocks (<scm|lsp-unit-write-back!>), when it changes the number of
+  the lines of one block only. A buffer is followed at the cursor
+  (<scm|lsp-buffer-followed?>) when it is a source file or the cursor is in
+  one of its blocks.
 
   <section|Diagnostics>
 

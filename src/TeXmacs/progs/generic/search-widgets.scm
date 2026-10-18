@@ -476,6 +476,20 @@
   (set! search-kbd-intercepted? #t)
   (search-extreme-match forwards?))
 
+(define (master-in-code?)
+  ;; is the buffer which is searched program code (a source file)?
+  (with mas (and (buffer-exists? (search-buffer))
+                 (buffer-get-master (search-buffer)))
+    (and mas (buffer-exists? mas)
+         (with-buffer mas (== (get-init "mode") "prog")))))
+
+(tm-define (kbd-variant t forwards?)
+  ;; (tab searches and replaces a tab, the character <#9> of the lines of a
+  ;; source file, there)
+  (:require (and forwards? (inside-search-or-replace-buffer?)
+                 (master-in-code?)))
+  (insert "<#9>"))
+
 (kbd-map
   (:require (inside-search-or-replace-buffer?))
   ("std ?" (make 'select-region))

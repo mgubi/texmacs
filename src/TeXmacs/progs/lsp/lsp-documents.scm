@@ -461,32 +461,75 @@
        (file-path (current-buffer))
        (lsp-block-at (cursor-path))))
 
+;; The target of the commands at the cursor, in a document: a list (path
+;; root lan unit), the virtual file, the lines which the server sees, the
+;; language and, when the blocks are joined, the unit (lsp-blocks.scm), else
+;; #f (the lines are those of the block)
+
+(define (block-target b)
+  ;; b: (root lan), the block at the cursor
+  (with doc (file-path (current-buffer))
+    (if (lsp-blocks-joined?)
+        (let ((u (lsp-unit doc (cadr b))))
+          ;; (a new unit: the blocks of its language, once, before the
+          ;; first sync)
+          (when (null? (lsp-unit-roots u))
+            (lsp-unit-set-roots!
+             u (map car (list-filter (lsp-document-blocks
+                                      (buffer-get-body (current-buffer)))
+                                     (lambda (x) (== (cadr x) (cadr b)))))))
+          (set! u (lsp-unit-at doc (car b) (cadr b)))
+          (list (lsp-unit-path u) (lsp-unit-lines u) (cadr b) u))
+        (list (lsp-block-path doc (car b) (cadr b)) (car b) (cadr b) #f))))
+
 (define (target-block opt)
-  (and (null? opt) (lsp-cursor-block)))
+  (and (null? opt)
+       (with b (lsp-cursor-block) (and b (block-target b)))))
 
 (tm-define (lsp-target-root . opt)
-  (:synopsis "The lines of the buffer, or of the code block at the cursor")
-  (with b (target-block opt)
-    (if b (car b) (buffer-get-body (the-buffer opt)))))
+  (:synopsis "The lines of the buffer, or of the code at the cursor")
+  ;; (a code block, or its unit)
+  (with t (target-block opt)
+    (if t (cadr t) (buffer-get-body (the-buffer opt)))))
 
-(tm-define (lsp-target-base)
-  (:synopsis "The path of the lines of the code at the cursor")
-  ;; (the place of the line l, offset o is (append base (list l o)))
-  (with b (target-block '())
-    (if b (tree->path (car b)) (buffer-path))))
+(tm-define (lsp-target-path l o)
+  (:synopsis "The path of the offset @o of the line @l of the code at the cursor")
+  ;; (#f for a line beyond the blocks of a unit)
+  (with t (target-block '())
+    (cond ((not t) (append (buffer-path) (list l o)))
+          ((cadddr t) (lsp-unit-path-of (cadddr t) l o))
+          (else (with p (tree->path (cadr t)) (and p (append p (list l o))))))))
+
+(tm-define (lsp-target-lo p)
+  (:synopsis "The line and offset in the code at the cursor of the path @p, or #f")
+  (with t (target-block '())
+    (if (and t (cadddr t)) (lsp-unit-lo-of (cadddr t) p)
+        (let* ((b (if t (tree->path (cadr t)) (buffer-path)))
+               (r (and b (list-starts? p b) (list-tail p (length b)))))
+          (and r (= (length r) 2) r)))))
+
+(tm-define (lsp-target-key)
+  (:synopsis "What tells the code at the cursor apart (its file)")
+  (with t (target-block '())
+    (if t (car t) (url->string (current-buffer)))))
+
+(tm-define (lsp-cursor-in-target?)
+  (:synopsis "Is the cursor in the lines of the code which the server sees?")
+  ;; (not in a line of markup; in a unit, in one of its blocks)
+  (and (lsp-target-lo (cursor-path)) #t))
 
 (tm-define (lsp-buffer-language . opt)
   (:synopsis "The language of the buffer (current by default), if it is code")
   ;; (or of the code block at the cursor)
   (or (source-language (the-buffer opt))
-      (with b (target-block opt) (and b (cadr b)))))
+      (with t (target-block opt) (and t (caddr t)))))
 
 (tm-define (lsp-buffer-path . opt)
   (:synopsis "The system path of the file of the buffer, or #f")
   ;; (or of the virtual file of the code block at the cursor)
   (let ((p (file-path (the-buffer opt)))
-        (b (target-block opt)))
-    (if (and p b) (lsp-block-path p (car b) (cadr b)) p)))
+        (t (target-block opt)))
+    (if (and p t) (car t) p)))
 
 (tm-define (lsp-buffer-uri . opt)
   (with p (apply lsp-buffer-path opt)
@@ -558,34 +601,69 @@
   ;; b: (root lan), e: (root lan ...)
   (and (tree-eq? (car b) (car e)) (== (cadr b) (cadr e))))
 
-(define (sync-blocks u)
-  ;; the code blocks of the document @u, given to their servers; those
-  ;; which are no longer there (or whose language has changed) are closed
-  (let* ((doc (file-path u))
-         (blocks (if (and doc (lsp-blocks-on?)) (blocks-of u doc) '())))
-    (for (b blocks)
-      (let* ((path (lsp-block-path doc (car b) (cadr b)))
-             (c (lsp-client-for (cadr b) (lsp-project-root path)))
-             (uri (lsp-path->uri path)))
-        (when (and c (lsp-client-alive? c))
-          (if (lsp-document-open? c uri)
-              (lsp-document-change-lines c uri (car b))
-              (lsp-document-open-lines c uri (lsp-language-id (cadr b) path)
-                                       (car b))))))
-    (when doc
-      (with old (lsp-block-entries doc)
-        (for (e old)
-          (when (not (list-find blocks (lambda (b) (same-block? b e))))
-            (close-block e)))
-        (lsp-block-entries-set!
-         doc (list-filter old (lambda (e) (list-find blocks
-                                                     (lambda (b) (same-block? b e))))))))
-    #f))
+(define (sync-file lan path root)
+  ;; the lines @root as the file @path of the server of @lan
+  (let* ((c (lsp-client-for lan (lsp-project-root path)))
+         (uri (lsp-path->uri path)))
+    (when (and c (lsp-client-alive? c))
+      (if (lsp-document-open? c uri)
+          (lsp-document-change-lines c uri root)
+          (lsp-document-open-lines c uri (lsp-language-id lan path) root)))))
+
+(define (close-file lan path)
+  (with c (lsp-client-find lan (lsp-project-root path))
+    (when c (lsp-document-close c (lsp-path->uri path)))))
 
 (define (close-block e)
   ;; e: (root lan path)
-  (with c (lsp-client-find (cadr e) (lsp-project-root (caddr e)))
-    (when c (lsp-document-close c (lsp-path->uri (caddr e))))))
+  (close-file (cadr e) (caddr e)))
+
+(define (close-units doc keep)
+  ;; the units of @doc but those of the languages @keep are closed
+  (for (u (lsp-units-of doc))
+    (when (not (in? (lsp-unit-language u) keep))
+      (close-file (lsp-unit-language u) (lsp-unit-path u))
+      (lsp-unit-forget u))))
+
+(define (sync-blocks u)
+  ;; the code blocks of the document @u, given to their servers: each one
+  ;; as a file, or those of a language together (the unit, when the blocks
+  ;; are joined); those which are no longer there (or whose language has
+  ;; changed) are closed
+  (let* ((doc (file-path u))
+         (blocks (if (and doc (lsp-blocks-on?)) (blocks-of u doc) '()))
+         (joined? (lsp-blocks-joined?))
+         (lans (list-remove-duplicates (map cadr blocks))))
+    (when (and doc (not joined?))
+      ;; (the blocks were joined: their entries are those of the units)
+      (lsp-block-entries-set!
+       doc (list-filter (lsp-block-entries doc)
+                        (lambda (e) (not (lsp-unit-of-path (caddr e))))))
+      (close-units doc '()))
+    (when doc
+      (if joined?
+          (for (lan lans)
+            (let* ((roots (map car (list-filter blocks (lambda (b) (== (cadr b) lan)))))
+                   (un (lsp-unit-set-roots! (lsp-unit doc lan) roots)))
+              (sync-file lan (lsp-unit-path un) (lsp-unit-lines un))))
+          (for (b blocks)
+            (sync-file (cadr b) (lsp-block-path doc (car b) (cadr b)) (car b))))
+      (close-units doc (if joined? lans '()))
+      (with old (lsp-block-entries doc)
+        ;; (the files of single blocks: closed when the block goes, or when
+        ;; the blocks are joined)
+        (for (e old)
+          (when (or joined? (not (list-find blocks (lambda (b) (same-block? b e)))))
+            (when (not (lsp-unit-of-path (caddr e))) (close-block e))))
+        (lsp-block-entries-set!
+         doc (if joined?
+                 (map (lambda (b) (list (car b) (cadr b)
+                                        (lsp-unit-path (lsp-unit doc (cadr b)))))
+                      blocks)
+                 (list-filter (lsp-block-entries doc)
+                              (lambda (e) (list-find blocks
+                                                     (lambda (b) (same-block? b e)))))))))
+    #f))
 
 (tm-define (lsp-buffer-sync . opt)
   (:synopsis "Gives the text of the buffer to its server (opened if needed)")
@@ -606,7 +684,9 @@
   (if (and (pair? opt) (not (source-language (car opt))))
       (with doc (file-path (car opt))
         (when doc
-          (for (e (lsp-block-entries doc)) (close-block e))
+          (for (e (lsp-block-entries doc))
+            (when (not (lsp-unit-of-path (caddr e))) (close-block e)))
+          (close-units doc '())
           (lsp-block-entries-set! doc '())
           (ahash-remove! scanned doc)))
       (let ((c (apply lsp-buffer-client* opt))
@@ -616,10 +696,8 @@
 (tm-define (lsp-cursor-position)
   (:synopsis "The position of the cursor in the current buffer, or #f")
   ;; in a source file, the cursor is at an offset of a line (paragraph)
-  (let* ((p (cursor-path))
-         (b (lsp-target-base))
-         (r (and (list-starts? p b) (list-tail p (length b)))))
-    (and r (= (length r) 2) (lsp-buffer-position (car r) (cadr r)))))
+  (with r (lsp-target-lo (cursor-path))
+    (and r (lsp-buffer-position (car r) (cadr r)))))
 
 ;; (the line of a position only: all the lines of a long file, at each
 ;; request, would make a list as long as the file)

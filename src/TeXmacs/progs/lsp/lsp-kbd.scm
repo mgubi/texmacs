@@ -56,6 +56,8 @@
    (toggle-preference "lsp"))
   ((check "Follow the code blocks of documents" "v" (lsp-blocks-on?))
    (toggle-preference "lsp:code blocks"))
+  ((check "One file for the blocks of a language" "v" (lsp-blocks-joined?))
+   (toggle-preference "lsp:join code blocks"))
   ---
   ("Go to definition" (lsp-goto-definition))
   ("Find references" (lsp-references))

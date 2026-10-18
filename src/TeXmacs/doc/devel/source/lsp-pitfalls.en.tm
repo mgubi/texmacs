@@ -85,7 +85,11 @@
   virtual files, the target at the cursor, their diagnostics at their
   places, the definition in a block, a paragraph inserted above them, a
   block removed and one whose language changes, and a place in a block of
-  a closed document.
+  a closed document; then the blocks of a language as one file (the group
+  <verbatim|code blocks together>): the lines of the unit and their
+  places, a name of a block known in the next one (its only error), the
+  definition in the other block, the colours of the server on the lines
+  of the blocks, and a rename which changes both blocks.
 
   The suite runs <em|after> <verbatim|kbd-menu> in <scm|check-master>:
   editing a <c++> buffer loads the keyboard maps of programs, and the
