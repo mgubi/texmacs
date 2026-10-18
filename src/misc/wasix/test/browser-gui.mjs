@@ -2,7 +2,9 @@
 // headless Chrome: it starts, the File menu is opened by a click, a new
 // document is made and text typed in it with the keyboard of the page.
 //
-//   node misc/wasix/test/browser-gui.mjs <tools dir> <output dir> [web dir]
+//   node misc/wasix/test/browser-gui.mjs <tools dir> <output dir> [web dir] [query]
+//
+// query: that of the page (gpu=0: the pixels of MuPDF instead of WebGPU)
 //
 // <tools dir>: puppeteer-core and Chrome for Testing (see browser-pdf.mjs).
 // Screenshots go to <output dir>.
@@ -12,7 +14,7 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { serve } from '../serve.mjs';
 
-const [tools, outDir, webArg] = process.argv.slice (2);
+const [tools, outDir, webArg, query = ''] = process.argv.slice (2);
 if (!outDir) { console.error ('usage: browser-gui.mjs <tools dir> <output dir> [web dir]'); process.exit (2); }
 fs.mkdirSync (outDir, { recursive: true });
 const web = path.resolve (webArg || 'build-wasix/out/web');
@@ -43,7 +45,7 @@ try {
   page.on ('console', m => log.write (m.text () + '\n'));
   page.on ('pageerror', e => console.log ('[page error]', e.message));
   const t0 = Date.now ();
-  await page.goto (`http://127.0.0.1:${port}/`);
+  await page.goto (`http://127.0.0.1:${port}/${query ? '?' + query : ''}`);
   const frames = () => page.evaluate (() => window.tmWasix ? window.tmWasix.frames : 0);
   // until the frames stop coming for a while
   async function settle (name, quiet = 1500, max = 180000) {
@@ -56,7 +58,8 @@ try {
       else if (m > 0 && Date.now () - last > quiet) break;
     }
     await page.screenshot ({ path: path.join (outDir, name + '.png') });
-    console.log (`${name}: ${n} frames, "${await page.title ()}", ${Date.now () - t0} ms`);
+    const mb = (await page.evaluate (() => window.tmWasix.bytes) / 1e6).toFixed (1);
+    console.log (`${name}: ${n} frames, ${mb} MB, "${await page.title ()}", ${Date.now () - t0} ms`);
     return n;
   }
   await settle ('start', 3000);
@@ -69,7 +72,10 @@ try {
   await page.keyboard.type ('a^2+b^2');
   await page.keyboard.press ('ArrowRight');
   await settle ('typed');
-  ok = (await page.title ()).includes ('*');
+  const g = await page.evaluate (() => window.tmWasix.gpu);
+  if (g) console.log (`WebGPU: ${g.frames} frames, ${g.calls} calls, ${g.errors.length} errors`);
+  for (const e of (g ? g.errors : [])) console.log ('  ' + e.split ('\n')[0]);
+  ok = (await page.title ()).includes ('*') && !(g && g.errors.length);
 } finally {
   await browser.close ();
   server.close ();

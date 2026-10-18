@@ -20,7 +20,8 @@ let ctx = null;
 let gpu = null;
 // ?program=<file.wasm>: another program than TeXmacs, without its files
 // (the tests of the WebGPU of WASIX: hello-triangle.wasm)
-const program = new URLSearchParams (location.search).get ("program");
+const params = new URLSearchParams (location.search);
+const program = params.get ("program");
 const status = s => { document.getElementById ("status").textContent = s; };
 
 const IN = { RESIZE: 1, MOTION: 2, BUTTON: 3, WHEEL: 4, KEY: 5, TEXT: 6,
@@ -66,7 +67,9 @@ function showProgress () {
 let pending = new Uint8Array (0);
 let started = false;
 
+let received = 0; // the bytes of the stream (for the tests)
 function receive (chunk) {
+  received += chunk.length;
   let buf = chunk;
   if (pending.length) {
     buf = new Uint8Array (pending.length + chunk.length);
@@ -279,7 +282,10 @@ async function main () {
   const sandbox = await wasmer.sandboxes.create ({
     packages: [pkg],
     env: { TEXMACS_PATH: "/texmacs", TEXMACS_HOME_PATH: "/workspace/home",
-           HOME: "/workspace/home", TEXMACS_DISPLAY: "stream" } });
+           HOME: "/workspace/home", TEXMACS_DISPLAY: "stream",
+           // TeXmacs draws with the WebGPU of the page (its GPU renderer),
+           // unless ?gpu=0 (the pixels which MuPDF draws)
+           ...(gpu && params.get ("gpu") !== "0" ? { TEXMACS_VUE_GPU: "webgpu" } : {}) } });
   const proc = await sandbox.command (pkg, [], { cwd: "/workspace" })
     .spawn ({ stdin: "pipe", stdout: "pipe", stderr: "pipe" });
   stdin = proc.stdin;
@@ -291,9 +297,12 @@ async function main () {
   listen ();
   canvas.focus ();
   send (IN.FOCUS, words (1));
-  window.tmWasix = { get frames () { return frames; }, proc,
+  // (the frames of the pixels, or of WebGPU)
+  window.tmWasix = { get frames () { return frames + (gpu ? gpu.frames : 0); }, proc,
+                     get bytes () { return received; },
                      get gpu () { return gpu && { frames: gpu.frames, calls: gpu.calls,
-                                                  errors: gpu.errors }; } };
+                                                  errors: gpu.errors, methods: gpu.methods,
+                                                  bytes: gpu.bytes }; } };
   for await (const chunk of proc.stdout) receive (chunk);
   const out = await proc.wait ();
   status (`TeXmacs has ended (exit ${out.exitCode})`);

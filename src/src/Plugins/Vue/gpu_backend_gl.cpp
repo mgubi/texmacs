@@ -22,7 +22,8 @@
 
 #include "gpu_backend.hpp"
 
-#ifndef USE_THORVG
+// (WASIX: ThorVG has its WebGPU engine, see gpu_backend_wg.cpp)
+#if !defined (USE_THORVG) || defined (__wasi__)
 
 gpu_backend* gpu_gl_backend () { return NULL; }
 
@@ -856,4 +857,4 @@ gpu_gl_backend () {
   return b;
 }
 
-#endif // USE_THORVG
+#endif // USE_THORVG && !__wasi__

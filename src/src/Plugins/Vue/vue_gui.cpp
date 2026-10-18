@@ -1332,6 +1332,9 @@ vue_sdl_gpu_window_rep::process_redraw () {
   follow_app_focus ();
 #endif
   with_window frame (this);
+#ifdef __wasi__
+  vue_stream_track (sdl_win); // (the host's size, drawn by the host's GPU)
+#endif
   // (not while the screen still holds the frames presented before: the
   // loop draws the window again at its next turn, with what came meanwhile)
   if (!vue_gpu_ready (sdl_win)) { vue_gpu_deferred= true; return; }
@@ -1400,7 +1403,7 @@ vue_sdl_gpu_window_rep::process_redraw () {
       }
     }
   }
-  if (same) return;
+  if (same) { vue_gpu_skip (sdl_win); return; }
   presented= h;
   t_ns= vue_profile_on ? SDL_GetTicksNS () : 0;
   vue_gpu_present (sdl_win);

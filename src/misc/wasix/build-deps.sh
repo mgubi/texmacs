@@ -92,3 +92,7 @@ if [ ! -f webgpu-headers/webgpu/webgpu.h ]; then
   curl -fsSL -o webgpu-headers/LICENSE \
     https://raw.githubusercontent.com/webgpu-native/webgpu-headers/$WH/LICENSE
 fi
+
+# ThorVG with its WebGPU engine, for the GPU renderer (misc/thorvg)
+[ -f thorvg/wasix/lib/libthorvg-1.a ] ||
+  WEBGPU_HEADERS="$B/webgpu-headers" sh "$TM/misc/thorvg/build-thorvg.sh" "$B/thorvg" wasix

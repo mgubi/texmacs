@@ -108,6 +108,48 @@ new document, text and a formula typed with the keyboard of the page; the
 first frame 7.5 s after the page is opened, from a local server) and
 `node misc/wasix/test/browser-pdf.mjs <tools>`.
 
+## WebGPU
+
+WASIX gives a program no GPU, the Wasmer SDK no way to add imports, and
+Wasmer runs no components (so no `wasi:webgpu` of wasi-gfx either). The
+WebGPU of WASIX goes over the stream instead:
+
+- `misc/wasix/webgpu/webgpu_wire.cpp` implements `webgpu.h` (that of
+  wgpu-native 29, `webgpu-native/webgpu-headers` 673658bc, fetched by
+  `build-deps.sh`): each call becomes `[method, target, arguments, result]`
+  in messages GPU (6) of the stream. The program numbers the objects and
+  keeps what it may ask of them (sizes, formats); the adapter and the device
+  are those of the host. Nothing comes back, so the calls flow one way (as
+  Chrome sends a page's calls to its GPU process). Not done: mapping buffers
+  (reading the GPU), errors back to the program.
+- `misc/wasix/web/webgpu-host.js` makes the calls on the WebGPU of the page
+  (the strings of the enumerated values made from `webgpu.h` by
+  `gen-enums.mjs`). The program draws into a texture of its own, copied
+  into the canvas when it presents (a frame comes in several tasks of the
+  page, and the texture of a canvas is gone at the end of one).
+- ThorVG's WebGPU engine builds for WASIX unchanged
+  (`build-thorvg.sh <prefix> wasix`, against this `webgpu.h`).
+- `src/Plugins/Vue/gpu_backend_wg.cpp`: a backend of the GPU renderer of
+  the Vue port (beside OpenGL and Metal): the shaders of the GL backend in
+  WGSL, the canvas RGBA8 as the targets, one render pass per run of draws
+  into a target, the vertices and uniforms of a submission written at once,
+  ThorVG for the shapes (its targets BGRA8, the format of its last blit).
+  The page asks for it (`TEXMACS_VUE_GPU=webgpu` when it has WebGPU;
+  `?gpu=0` for the pixels of MuPDF).
+- The loop draws every window at every turn and presents a frame only when
+  it differs from the last one: the calls of a frame are held
+  (`wgpuWireHold`) and dropped when it is not presented and drew nothing
+  but the screen; the shapes which ThorVG drew in a box are kept (by a hash
+  of the shapes), so that the frames of an idle window draw no new shape.
+  Idle: 0.15 MB in 5 s (the cursor) instead of 3.2 MB.
+
+Tests (headless Chrome, which has WebGPU on Metal here):
+`node misc/wasix/test/browser-webgpu.mjs <tools> <out> [hello-triangle.wasm|thorvg-shapes.wasm] [frames]`
+(test programs: a triangle; ThorVG's shapes, gradients, strokes) and
+`browser-gui.mjs` (TeXmacs: 59 frames, 49k calls, no WebGPU error; 15 MB
+for the session against 13.5 MB of pixels, most of it the first uploads of
+the atlas and the icons).
+
 ## Changes to the sources (all under `__wasi__`)
 
 - `pipe_link`, `cmdline_link`: the programs of the plugins started by
@@ -118,6 +160,10 @@ first frame 7.5 s after the page is opened, from a local server) and
   (otherwise TeXmacs found none of its files).
 - `use_mupdf_pdf`: the MuPDF writer, as in the browser (no Ghostscript).
 - `VUE_SDL_RENDERER` (SDL3_ttf) left out, as in the browser.
+- The GPU renderer: `gpu_backend_wg.cpp` (WebGPU, chosen by
+  `TEXMACS_VUE_GPU=webgpu`), the GL backend left out (`USE_THORVG` means
+  ThorVG's WebGPU engine here); `begin_frame`/`skip_frame` of the backends
+  (nothing for GL and Metal), `vue_gpu_skip` for a frame not presented.
 - `misc/wasix/include/wasix-compat.h`, included before each source:
   `sigsetjmp`/`siglongjmp` as `setjmp`/`longjmp`, the only names LLVM turns
   into exceptions (the errors of S7 were uncaught).
@@ -129,10 +175,12 @@ first frame 7.5 s after the page is opened, from a local server) and
 | desktop, headless (`wasmer run`) | converts documents to PDF |
 | browser and node (`@wasmer/sdk`) | converts documents to PDF |
 | GUI on the desktop (`texmacs-wasix`) | runs: menus, editing |
-| GUI in the browser (`index.html`) | runs: menus, editing |
+| GUI in the browser (`index.html`) | runs: menus, editing; drawn by the page's WebGPU (or pixels, `?gpu=0`) |
 
 Not yet: a pixel density above 1 (blurry on HiDPI displays); compression
-of the stream (raw pixels: 6 MB for the first frames at 1000x700); the
+of the stream (raw pixels: 6 MB for the first frames at 1000x700; the
+batches of WebGPU too); WebGPU on the desktop host (native wgpu or Dawn
+making the calls); reading the GPU back (snapshots of the GPU renderer); the
 home of the page in the browser's storage (it lives in the memory of the
 sandbox); the clipboard, files from and to the page; the browser's
 keyboard layouts beyond the text they type; the plugins' programs (WASIX

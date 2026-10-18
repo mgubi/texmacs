@@ -38,6 +38,7 @@ void vue_gpu_prepare ();
 // context or Metal device with the first window); false when it cannot
 bool vue_gpu_attach (SDL_Window* w);
 void vue_gpu_present (SDL_Window* w);
+void vue_gpu_skip (SDL_Window* w);    // a frame drawn and not presented
 // attached, and presenting into the window would not wait for the screen
 // (Metal: the compositor does not hold too many of its frames); else the
 // window is drawn at a later turn of the loop

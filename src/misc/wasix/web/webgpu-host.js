@@ -14,6 +14,8 @@ export class WebGPUHost {
     this.objects = new Map ();
     this.frames = 0;
     this.calls = 0;
+    this.methods = {};   // the number of calls of each method (for the tests)
+    this.bytes = {};     // and their bytes
     this.errors = [];
     this.ready = this.init ();
   }
@@ -39,7 +41,9 @@ export class WebGPUHost {
   run (bytes) {
     const r = { bytes, dv: new DataView (bytes.buffer, bytes.byteOffset, bytes.byteLength), pos: 0 };
     while (r.pos < bytes.length) {
+      const at = r.pos;
       const c = this.value (r);
+      this.bytes[c[0]] = (this.bytes[c[0]] || 0) + (r.pos - at);
       this.call (c[0], c[1], c[2], c[3]);
     }
   }
@@ -95,23 +99,46 @@ export class WebGPUHost {
 
   call (method, target, args, result) {
     this.calls++;
+    this.methods[method] = (this.methods[method] || 0) + 1;
     let v;
     switch (method) {
     case "release": // (those of the host stay)
       if (args[0] > ID_QUEUE) this.objects.delete (args[0]);
       return;
+    // The surface: the program draws a frame in several messages, which
+    // come in several tasks of the page, and the texture of the canvas is
+    // presented (and gone) at the end of a task. So the program draws into
+    // a texture of its own (getCurrentTexture), copied into the canvas at
+    // once when it presents (which also keeps the frame for the next one)
     case "createSurface":
-      v = this.canvas.getContext ("webgpu");
+      v = { context: this.canvas.getContext ("webgpu"), texture: null };
       break;
     case "configure": {
-      // the canvas has the size the page gives it
       const { width, height, ...c } = args[0];
-      target.configure (c);
+      target.context.configure ({ ...c, usage: (c.usage || GPUTextureUsage.RENDER_ATTACHMENT) |
+                                                GPUTextureUsage.COPY_DST });
+      if (target.texture) target.texture.destroy ();
+      target.texture = this.device.createTexture ({
+        size: [width, height], format: c.format,
+        usage: (c.usage || GPUTextureUsage.RENDER_ATTACHMENT) | GPUTextureUsage.COPY_SRC });
       return;
     }
-    case "present":
+    case "unconfigure":
+      target.context.unconfigure ();
+      return;
+    case "getCurrentTexture":
+      v = target.texture;
+      break;
+    case "present": {
+      const out = target.context.getCurrentTexture ();
+      const w = Math.min (out.width, target.texture.width);
+      const h = Math.min (out.height, target.texture.height);
+      const e = this.device.createCommandEncoder ();
+      e.copyTextureToTexture ({ texture: target.texture }, { texture: out }, [w, h]);
+      this.device.queue.submit ([e.finish ()]);
       this.frames++;
       return;
+    }
     default:
       v = target[method] (...args);
     }

@@ -36,8 +36,10 @@ export WASIXCC_WASM_EXCEPTIONS := yes
 CC       := $(WASIXCC)/wasixcc
 CXX      := $(WASIXCC)/wasix++
 
-# (and the stream of the display, which only WASIX has: vue_stream.hpp)
-SOURCES  := $(shell cat $(W)/sources.txt) Plugins/Vue/vue_stream.cpp
+# (and the stream of the display, which only WASIX has: vue_stream.hpp, and
+# the WebGPU backend of the GPU renderer, on the WebGPU of the host)
+SOURCES  := $(shell cat $(W)/sources.txt) Plugins/Vue/vue_stream.cpp \
+  Plugins/Vue/gpu_backend_wg.cpp
 OBJECTS  := $(patsubst %,$(OBJ)/%.o,$(basename $(SOURCES)))
 HUNSPELL := hunspell-1.7.2
 HUNSPELL_SRC := affentry affixmgr csutil filemgr hashmgr hunspell hunzip \
@@ -64,6 +66,16 @@ CPPFLAGS := -I$(X) -I$(X)/include -I$(W) -include $(W)/config.h \
   -I$(TM)/TeXmacs/include -I$(MUPDF)/include \
   -I$(MUPDF)/thirdparty/freetype/include -I$(SDL3)/include \
   -I$(CURDIR)/$(HUNSPELL)/src -DHUNSPELL_STATIC
+# the GPU renderer (vue_gpu.cpp) with ThorVG's WebGPU engine (built by
+# build-deps.sh: thorvg/wasix) and webgpu_wire (misc/wasix/webgpu); the host
+# of the stream chooses it (TEXMACS_VUE_GPU=webgpu, the page with WebGPU).
+# THORVG_WG=none: MuPDF only
+THORVG_WG ?= $(CURDIR)/thorvg/wasix
+WEBGPU_H := $(CURDIR)/webgpu-headers
+WEBGPU   := $(X)/webgpu
+ifneq ($(THORVG_WG),none)
+CPPFLAGS += -DUSE_THORVG -DTVG_STATIC -I$(THORVG_WG)/include/thorvg-1 -I$(WEBGPU_H) -I$(WEBGPU)
+endif
 OPT      ?= -O2
 CFLAGS   := $(OPT) -w
 CXXFLAGS := $(OPT) -w -std=c++17
@@ -74,6 +86,10 @@ DEPFLAGS := -MMD -MP
 LDFLAGS  := $(OPT) -Wl,-z,stack-size=16777216
 LIBS     := $(MUPDF_LIB)/libmupdf.a $(MUPDF_LIB)/libmupdf-third.a \
   $(SDL3)/lib/libSDL3.a -lm
+ifneq ($(THORVG_WG),none)
+OBJECTS  += $(OBJ)/webgpu/webgpu_wire.o
+LIBS     += $(THORVG_WG)/lib/libthorvg-1.a
+endif
 LIBDEPS  := $(MUPDF_LIB)/libmupdf.a $(MUPDF_LIB)/libmupdf-third.a \
   $(SDL3)/lib/libSDL3.a
 
@@ -97,8 +113,6 @@ web: $(OUT)/web/texmacs.wasm $(OUT)/web/texmacs-fs.json $(OUT)/web/sdk/dist/inde
 # WebGPU (misc/wasix/webgpu): webgpu.h, that of wgpu-native 29 (fetched by
 # build-deps.sh), sent to the page by webgpu_wire.cpp; the page has the
 # strings of its enumerated values (gen-enums.mjs) and a test program
-WEBGPU_H := $(CURDIR)/webgpu-headers
-WEBGPU   := $(X)/webgpu
 $(OUT)/web/webgpu-enums.js: $(WEBGPU_H)/webgpu/webgpu.h $(WEBGPU)/gen-enums.mjs
 	@mkdir -p $(OUT)/web
 	node $(WEBGPU)/gen-enums.mjs $< $@
@@ -113,7 +127,6 @@ $(OUT)/web/hello-triangle.wasm: $(WEBGPU)/test/hello-triangle.c $(OBJ)/webgpu/we
 	$(CXX) -O2 $(OBJ)/webgpu/hello-triangle.o $(OBJ)/webgpu/webgpu_wire.o -o $@
 
 # ThorVG's WebGPU engine on it (build-thorvg.sh ... wasix, THORVG_WG)
-THORVG_WG ?= $(CURDIR)/thorvg/wasix
 $(OUT)/web/thorvg-shapes.wasm: $(WEBGPU)/test/thorvg-shapes.cpp $(OBJ)/webgpu/webgpu_wire.o $(THORVG_WG)/lib/libthorvg-1.a
 	@mkdir -p $(OUT)/web
 	$(CXX) -O2 -std=c++17 -I$(WEBGPU_H) -I$(WEBGPU) -I$(THORVG_WG)/include/thorvg-1 -DTVG_STATIC \

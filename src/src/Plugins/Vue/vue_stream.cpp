@@ -17,6 +17,9 @@
 #include <unistd.h>
 #include <poll.h>
 #include <errno.h>
+#ifdef USE_THORVG
+#include "webgpu_wire.h" // the calls of WebGPU go in the stream
+#endif
 
 /******************************************************************************
 * The protocol
@@ -35,6 +38,9 @@
 *              that size, to be shown
 *   4 CURSOR   u32 SDL_SystemCursor
 *   5 TITLE    the title of the window (utf8)
+*   6 GPU      calls of WebGPU, made by the host on its own WebGPU instead of
+*              RECT and FRAME, when the host gave TEXMACS_VUE_GPU=webgpu
+*              (misc/wasix/webgpu/webgpu_wire.cpp, gpu_backend_wg.cpp)
 *
 * From the host (the standard input of TeXmacs):
 *   1 RESIZE   i32 w, h: the size of the display (points)
@@ -51,7 +57,7 @@
 
 #ifdef __wasi__
 
-enum { OUT_HELLO= 1, OUT_RECT, OUT_FRAME, OUT_CURSOR, OUT_TITLE };
+enum { OUT_HELLO= 1, OUT_RECT, OUT_FRAME, OUT_CURSOR, OUT_TITLE, OUT_GPU };
 enum { IN_RESIZE= 1, IN_MOTION, IN_BUTTON, IN_WHEEL, IN_KEY, IN_TEXT,
        IN_FOCUS, IN_LEAVE, IN_QUIT };
 
@@ -119,11 +125,25 @@ vue_stream_redirect () {
   send (OUT_HELLO, p);
 }
 
+#ifdef USE_THORVG
+static void
+gpu_sink (const void* data, size_t n) {
+  unsigned char h[8];
+  uint32_t t= OUT_GPU, len= (uint32_t) n;
+  for (int i= 0; i < 4; i++) { h[i]= (t >> (8*i)) & 255; h[4+i]= (len >> (8*i)) & 255; }
+  write_all (h, 8);
+  write_all (data, n);
+}
+#endif
+
 void
 vue_stream_open () {
   if (!vue_stream_on ()) return;
   vue_stream_redirect ();
   SDL_SetHint (SDL_HINT_VIDEO_DRIVER, "dummy");
+#ifdef USE_THORVG
+  wgpuWireSetSink (gpu_sink);
+#endif
 }
 
 // the window is cut in tiles; the tiles which changed since the last frame
@@ -142,20 +162,24 @@ send_rect (const unsigned char* pix, int pitch, int x, int y, int w, int h) {
   send (OUT_RECT, p);
 }
 
-void
-vue_stream_present (SDL_Window* win, SDL_Surface* surf) {
-  if (!vue_stream_on () || surf == NULL) return;
-  if (streamed == NULL) {
-    streamed= win;
-    if (want_w > 0 && want_h > 0) SDL_SetWindowSize (win, want_w, want_h);
-  }
-  if (win != streamed) return;
+bool
+vue_stream_track (SDL_Window* win) {
+  if (!vue_stream_on ()) return false;
+  if (streamed == NULL) streamed= win;
+  if (win != streamed) return false;
   // the host decides of the size: a size TeXmacs gave the window is undone
-  if (want_w > 0 && want_h > 0 && (surf->w != want_w || surf->h != want_h)) {
+  if (want_w > 0 && want_h > 0) {
     int w, h;
     SDL_GetWindowSize (win, &w, &h);
     if (w != want_w || h != want_h) SDL_SetWindowSize (win, want_w, want_h);
   }
+  return true;
+}
+
+void
+vue_stream_present (SDL_Window* win, SDL_Surface* surf) {
+  if (!vue_stream_on () || surf == NULL) return;
+  if (!vue_stream_track (win)) return;
   if (!SDL_LockSurface (surf)) return;
   int w= surf->w, h= surf->h, pitch= surf->pitch;
   const unsigned char* pix= (const unsigned char*) surf->pixels;

@@ -141,11 +141,18 @@ public:
   // RGBA, rows from the top
   virtual bool read (gpu_texture src, int sw, int sh,
                      int x, int y, int w, int h, unsigned char* rgba) = 0;
+  // the frames of the windows: one begins (gpu_begin_screen), and is
+  // presented or not (the same as the last one, vue_gpu_skip); a backend
+  // which pays for each call (WebGPU over the stream of WASIX) drops a
+  // frame which is not shown
+  virtual void begin_frame () {}
+  virtual void skip_frame () {}
   virtual void flush () = 0;    // what was drawn goes to the GPU
   virtual void finish () = 0;   // and is done
 };
 
 gpu_backend* gpu_gl_backend ();     // NULL when not compiled (USE_THORVG)
 gpu_backend* gpu_metal_backend ();  // NULL when not compiled (USE_METAL)
+gpu_backend* gpu_webgpu_backend (); // WASIX only (gpu_backend_wg.cpp)
 
 #endif // defined GPU_BACKEND_HPP

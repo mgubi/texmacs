@@ -225,11 +225,15 @@ gpu_backend* gpu_metal_backend () { return NULL; }
 
 // The backend: TEXMACS_VUE_GPU=0 draws with MuPDF, =gl or =metal chooses
 // the API; by default Metal on macOS when it is compiled (USE_METAL), else
-// OpenGL (USE_THORVG). Decided once.
+// OpenGL (USE_THORVG). Decided once. WASIX: WebGPU, that of the host of the
+// stream, when it says it has one (TEXMACS_VUE_GPU=webgpu), else MuPDF
 static gpu_backend*
 choose_backend () {
   string v= get_env ("TEXMACS_VUE_GPU");
   if (v == "0") return NULL;
+#ifdef __wasi__
+  return (v == "webgpu") ? gpu_webgpu_backend () : NULL;
+#endif
   gpu_backend* gl= gpu_gl_backend ();
   gpu_backend* mtl= gpu_metal_backend ();
   if (v == "gl" || v == "opengl") return gl;
@@ -298,6 +302,13 @@ void
 vue_gpu_present (SDL_Window* w) {
   gpu_flush_all ();
   G.B->present (w);
+}
+
+void
+vue_gpu_skip (SDL_Window* w) {
+  (void) w;
+  gpu_flush_all ();
+  G.B->skip_frame ();
 }
 
 static bool
@@ -1651,6 +1662,7 @@ gpu_screen_renderer (double zoom) {
 void
 gpu_begin_screen (renderer ren, int w, int h, int dw, int dh) {
   gpu_flush_all ();
+  G.B->begin_frame ();
   G.screen.w= w; G.screen.h= h;
   G.screen.dw= dw; G.screen.dh= dh;
   G.frame_hash= 14695981039346656037ULL;

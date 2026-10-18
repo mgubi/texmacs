@@ -196,11 +196,28 @@ wgpuWireSetSink (wgpu_wire_sink sink) {
   the_sink= sink;
 }
 
+static bool holding= false;
+
 extern "C" void
 wgpuWireFlush () {
-  if (batch.empty ()) return;
+  if (holding || batch.empty ()) return;
   (the_sink ? the_sink : default_sink) (batch.data (), batch.size ());
   batch.clear ();
+}
+
+extern "C" void
+wgpuWireHold () {
+  if (holding) return;
+  wgpuWireFlush ();
+  holding= true;
+}
+
+extern "C" void
+wgpuWireRelease (int keep) {
+  if (!holding) return;
+  holding= false;
+  if (!keep) batch.clear (); // (everything since the hold: the flush before)
+  wgpuWireFlush ();
 }
 
 // a call: [method, target, arguments (n of them, written next), result]
@@ -216,6 +233,7 @@ call (const char* method, const wire_object* target, uint32_t nargs) {
 static void result (const wire_object* r) { v_u32 (r ? r->id : 0); }
 static void no_result () { v_u32 (0); }
 static void maybe_flush () { if (batch.size () > (1 << 20)) wgpuWireFlush (); }
+// (holding: kept until released, whatever the size)
 
 static void
 release (wire_object* o, const char* what) {

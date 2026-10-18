@@ -26,6 +26,7 @@ bool vue_stream_on ();
 void vue_stream_redirect (); // at the start: the standard output is the stream
 void vue_stream_open ();     // before SDL_Init (the dummy driver)
 void vue_stream_present (SDL_Window* win, SDL_Surface* surf);
+bool vue_stream_track (SDL_Window* win); // the window shown, at the host's size
 void vue_stream_pump ();     // the events of the host, as SDL events
 void vue_stream_wait (int ms);
 Uint32 vue_stream_buttons ();

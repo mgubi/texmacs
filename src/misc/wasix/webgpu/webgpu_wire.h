@@ -30,6 +30,13 @@ void wgpuWireSetSink (wgpu_wire_sink sink);
 // wgpuSurfacePresent and when a batch is large)
 void wgpuWireFlush (void);
 
+// a frame which may not be shown: its calls are held from wgpuWireHold
+// (flushes do nothing meanwhile) until wgpuWireRelease, which sends them,
+// or drops them (keep 0): then they must have made nothing which the
+// program uses afterwards (it drew into the screen only)
+void wgpuWireHold (void);
+void wgpuWireRelease (int keep);
+
 #ifdef __cplusplus
 }
 #endif
