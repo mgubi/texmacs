@@ -250,7 +250,8 @@
     dropped on the page while the cursor is in a question is attached to
     it. Text files go after the question, images and <name|PDF> files as
     such (to <name|ChatGPT>, <name|Claude>, <name|Gemini> and
-    <name|OpenRouter>).
+    <name|OpenRouter>; <name|Mistral> and <name|Ollama> take the images
+    only).
   </itemize>
 
   <paragraph|17 October 2026>

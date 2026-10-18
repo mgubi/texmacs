@@ -27,9 +27,9 @@
   language into which it is translated (from the language of the text), or
   <menu|Tools|Correct> to correct its spelling and grammar. The selection
   is replaced by the answer once it has come; an error, or a missing key,
-  is said on the status bar, and the selection is kept. On the desktop,
-  <TeXmacs> waits for the answer, which takes some time for a large
-  selection; in a web browser, it comes in the background.
+  is said on the status bar, and the selection is kept. <TeXmacs> waits
+  for the answer, which takes some time for a large selection (in a web
+  browser too, where the page does not respond meanwhile).
 
   Two preferences in <menu|Edit|Preferences|Convert|AI> change the
   corrections: <with|font-series|bold|Show differences after text
