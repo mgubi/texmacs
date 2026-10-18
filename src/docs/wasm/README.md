@@ -315,8 +315,13 @@ repaints at zoom 2, where the bitmaps of the glyphs are made, cost 0.4 ms
 of CPU a frame instead of 1.2 ms, and the other phases are the same or a
 little faster.
 
-`?gpu=webgpu` (2026-10-18, a test for now) draws with WebGPU instead of
-WebGL2: the backend `src/Plugins/Vue/gpu_backend_wg.cpp` (the shaders of
+WebGPU (2026-10-18): the page draws with WebGPU instead of WebGL2 by
+default in the browsers of Chromium (Chrome, Edge...), where it was tested,
+and with WebGL2 in the others for now; `?gpu=webgpu` asks for WebGPU in any
+browser, `?gpu=webgl` for WebGL2, `?gpu=0` for MuPDF (`web-pre.js`). Safari
+26 has WebGPU only on macOS Tahoe 26 (and iOS 26), not on macOS 15, where it
+was tried (`misc/wasm/test/safari-webgpu.mjs`, through its WebDriver: the
+fallback to WebGL2, menus and typing). The renderer: the backend `src/Plugins/Vue/gpu_backend_wg.cpp` (the shaders of
 the GL backend in WGSL), ThorVG's WebGPU engine for the shapes (ThorVG is
 built with both engines, `build-thorvg.sh`), and Dawn's `webgpu.h` for
 Emscripten (the port emdawnwebgpu, `--use-port=emdawnwebgpu`). The same
