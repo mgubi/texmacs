@@ -337,7 +337,7 @@ evaluate_impl (tree t) {
 
   /* Linking primitives */
   case HARD_ID:
-    return evaluate_hard_id (t[0]);
+    return evaluate_hard_id (t);
   case SCRIPT:
     return evaluate_script (t);
   case HLINK:

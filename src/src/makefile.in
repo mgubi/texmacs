@@ -215,7 +215,8 @@ qt_incl       := $(system_incl) \
 	$(call incl_flags,Texmacs Texmacs/Data Edit Typeset Plugins/Gnutls)
 gs_incl       := $(system_incl)
 style_incl    := $(system_incl) \
-  $(call incl_flags,Style/Memorizer Style/Environment Style/Evaluate)
+  $(call incl_flags,Style/Memorizer Style/Environment Style/Evaluate \
+  Texmacs/Data)
 typeset_incl  := $(system_incl) \
   $(call incl_flags,Typeset Typeset/Bridge Typeset/Concat Typeset/Page Edit)
 scheme_incl    := $(typeset_incl) $(call incl_flags,Plugins Texmacs)

@@ -13,6 +13,7 @@
 #include "memorizer.hpp"
 #include "std_environment.hpp"
 #include "vars.hpp"
+#include "drd_std.hpp"
 
 /******************************************************************************
 * Some trees need to be defined only once (ensuring a fixed address)
@@ -31,7 +32,23 @@ static tree surround2 (VSPACE, "0.5fn");
 
 bool is_long_arg (tree t, int i);
 bool is_long (tree t);
-string arg_type (tree t, int i);
+
+static string
+arg_type (tree t, int i) {
+  // the typesetter dropped its own arg_type for the DRD types in 2010
+  switch (the_drd->get_type_child (t, i)) {
+  case TYPE_VARIABLE:   return "var";
+  case TYPE_ARGUMENT:   return "arg";
+  case TYPE_BOOLEAN:
+  case TYPE_INTEGER:
+  case TYPE_NUMERIC:    return "integer";
+  case TYPE_LENGTH:     return "length";
+  case TYPE_CODE:
+  case TYPE_IDENTIFIER:
+  case TYPE_URL:        return "tt";
+  default:              return "";
+  }
+}
 
 tree
 highlight (tree t, string kind) {

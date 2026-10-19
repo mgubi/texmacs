@@ -68,6 +68,7 @@ say otherwise; C++ is under `src/src/`, Scheme under `src/TeXmacs/progs/`.
 | [zotero-design.md](zotero-design.md) | Zotero as a source of references: design |
 | [csl-design.md](csl-design.md) | The CSL processor: design and status |
 | [converters-csl-audit.md](converters-csl-audit.md) | Audit of the Scheme code of the converters and of the CSL processor |
+| [pure-style.md](pure-style.md) | The experimental style rewriter (`--enable-experimental`): style markup evaluated as a pure, memorized function; design, hooks, state, open questions |
 
 ## Program code
 

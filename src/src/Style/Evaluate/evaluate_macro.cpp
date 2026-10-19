@@ -225,7 +225,7 @@ expand (tree t, assoc_environment env) {
     case XMACRO:
       {
 	assoc_environment local= copy (env);
-	if (is_atomic (t[i])) {
+	if (is_atomic (t[0])) {
 	  int key= make_tree_label (t[0]->label);
 	  local->remove (key);
 	}
