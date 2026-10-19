@@ -1,0 +1,28 @@
+# needs footer-menus.scm: the menus of the interactive footer
+# (coordinates for the default window, 800x600)
+wait 12000
+window #2
+focus
+key Left
+wait 300
+key Right
+wait 1000
+snapshot fm1
+# the menu of the theorem (the outer tag), then its variants, then Lemma
+click 627 586
+wait 800
+snapshot fm2
+click 642 226
+wait 800
+snapshot fm3
+click 531 281
+wait 1000
+# the cursor did not move: the letter goes into the strong, after the x
+text y
+wait 800
+snapshot fm4
+# the Document menu
+click 52 586
+wait 800
+snapshot fm5
+key Escape

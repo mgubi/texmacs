@@ -12,11 +12,14 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;; The status bar, when the preference "interactive footer" is on, shows as
-;; menus what it otherwise shows as text (the GUI draws them: Vue only for
-;; now). On the left, the properties of the text at the cursor, each a menu
-;; to change it (the language, the font, its size, its series and shape,
-;; the colour); on the right, the tags around the cursor, from the outermost
-;; to the innermost, each a button which selects it (as the context tool).
+;; menus what it otherwise shows as text (the GUI draws them: Vue and
+;; Cocoa). On the left, a menu of the document (its style, paper, fonts,
+;; language: what the focus bar shows only at the top of the document),
+;; then the properties of the text at the cursor, each a menu to change it
+;; (the language, the font, its size, its series and shape, the colour); on
+;; the right, the tags around the cursor, from the outermost to the
+;; innermost, each a menu which selects it or changes it where it is,
+;; without moving the cursor (its Focus menu).
 ;; While the editor shows a message on the status bar ((footer-environment?)
 ;; is false), the GUI shows the text of the message instead.
 
@@ -182,7 +185,19 @@
 (tm-define (footer-in-source?)
   (and (in-prog?) (== (get-init "mode") "prog")))
 
+(tm-menu (footer-document-menu)
+  ;; the focus menu of the document (as at its top level), wherever the
+  ;; cursor is
+  (with t (buffer-tree)
+    (dynamic (focus-style-menu t))
+    ---
+    (dynamic (focus-document-menu t))))
+
 (menu-bind texmacs-footer-environment
+  ;; (a promise: made when it is opened, not at each key)
+  (=> (balloon "Document" "The style, paper, fonts and language of the document")
+      (promise (menu-dynamic (dynamic (footer-document-menu)))))
+  (text "|")
   (if (in-text?)
       (=> (balloon (eval (footer-language-label)) "Language")
           (link text-language-menu)))
@@ -205,9 +220,10 @@
 ;; The tags around the cursor
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;; A click on a tag selects it; a right click selects it and opens the
-;; context menu of the editor on it, its Focus menu (the GUI does that:
-;; vue_widget.cpp, menu_button in the footer). When the tags do not fit in
+;; A click on a tag opens its menu: Select, then its Focus menu (the one
+;; of the focus bar and of the Focus menu when the cursor is in it), whose
+;; commands change that tag where it is, without moving the cursor. When the
+;; tags do not fit in
 ;; footer-path-budget characters, the outer ones fold into a menu (the
 ;; innermost tags, the ones near the cursor, stay in view). The GUI sets
 ;; the budget from the room the tags have (footer-set-budget).
@@ -284,9 +300,22 @@
 ;; The right side of the footer
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(tm-menu (footer-tag-menu t)
+  ;; a tag around the cursor: select it, or change it in place
+  ("Select" (tree-select t))
+  ---
+  (dynamic (standard-focus-menu t)))
+
 (menu-bind footer-folded-menu
   (for (t (footer-folded-trees))
-    ((eval (footer-tag-name t)) (tree-select t))))
+    (-> (eval (footer-tag-name t))
+        (promise (menu-dynamic (dynamic (footer-tag-menu t)))))))
+
+(tm-define (footer-menu-key)
+  ;; the menus of the tags hold the trees, which their expansion does not
+  ;; show (a procedure is expanded to its source): the GUI makes the menus
+  ;; again when this changes too, the buffer and the places of the tags
+  (cons (current-buffer-url) (map tree->path (footer-context-trees))))
 
 (menu-bind texmacs-footer-path
   (with ts (footer-shown-trees)
@@ -297,13 +326,13 @@
       (if (!= t (car ts)) (text "<#203A>"))  ; a single right angle quote
       ;; the innermost tag, the one of the cursor, in bold
       (if (!= t (cAr ts))
-          ((balloon (eval (footer-tag-name t))
-                    "Select this tag (right click: its menu)")
-           (tree-select t)))
+          (=> (balloon (eval (footer-tag-name t))
+                       "Select this tag, or change it where it is")
+              (promise (menu-dynamic (dynamic (footer-tag-menu t))))))
       (if (== t (cAr ts))
-          (bold ((balloon (eval (footer-tag-name t))
-                          "Select this tag (right click: its menu)")
-                 (tree-select t)))))
+          (bold (=> (balloon (eval (footer-tag-name t))
+                             "Select this tag, or change it where it is")
+                    (promise (menu-dynamic (dynamic (footer-tag-menu t))))))))
     (if (!= (footer-char-info) "")
         (glue #f #f 12 0)
         (text (footer-char-info)))))

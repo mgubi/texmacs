@@ -328,11 +328,14 @@ tool_size (NSView* v) {
 }
 @end
 
-// the row of a menu of the footer, made again when its expansion changed
+// the row of a menu of the footer, made again when its expansion changed,
+// or the key: the expansion shows a procedure as its source, not the trees
+// it holds (footer-menu-key)
 static void
-footer_row (TMButtonsController* fc, object& current, NSView*& row, string menu) {
+footer_row (TMButtonsController* fc, object& current, NSView*& row, string menu,
+            object key) {
   object m= eval ("'" * menu);
-  object x= call ("menu-expand", m);
+  object x= cons (call ("menu-expand", m), key);
   if (row != nil && x == current) return;
   current= x;
   NSView* r= [fc rowForMenu: to_nsmenu (make_menu_widget (m))];
@@ -349,10 +352,11 @@ ns_tm_widget_rep::update_footer_menus () {
   CGFloat room= [footer_clip frame].size.width;
   if (room > 0)
     call ("footer-set-budget", object (max ((int) (room / 7.0), 12)));
+  object key= call ("footer-menu-key");
   footer_row (fc, footer_env_menu, footer_env,
-              "(horizontal (link texmacs-footer-environment))");
+              "(horizontal (link texmacs-footer-environment))", key);
   footer_row (fc, footer_path_menu, footer_path,
-              "(horizontal (link texmacs-footer-path))");
+              "(horizontal (link texmacs-footer-path))", key);
 }
 
 // The main and mode icons at the left of the document (the preference "icon

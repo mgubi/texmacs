@@ -6048,9 +6048,11 @@ layout_tool_panel (Clay_ElementId id, vue_widget tools, bool side, float win_w, 
 #define bar_footer_h ui_pxf (56)
 
 static void
-footer_menu (object& current, vue_widget& w, string menu) {
+footer_menu (object& current, vue_widget& w, string menu, object key) {
+  // made again when the expansion changes, or the key: the expansion shows
+  // a procedure as its source, not the trees it holds (footer-menu-key)
   object m= eval ("'" * menu);
-  object x= call ("menu-expand", m);
+  object x= cons (call ("menu-expand", m), key);
   if (!is_nil (w) && x == current) return;
   current= x;
   w= concrete (make_menu_widget (m));
@@ -6063,10 +6065,11 @@ vue_texmacs_widget_rep::update_footer_menus () {
   // folded into a menu, see (texmacs menus footer-menu)
   if (footer_room > 0)
     call ("footer-set-budget", object (max ((int) (footer_room / 7.0f), 12)));
+  object key= call ("footer-menu-key");
   footer_menu (footer_env_menu, footer_env,
-               "(horizontal (link texmacs-footer-environment))");
+               "(horizontal (link texmacs-footer-environment))", key);
   footer_menu (footer_path_menu, footer_path,
-               "(horizontal (link texmacs-footer-path))");
+               "(horizontal (link texmacs-footer-path))", key);
 }
 
 // The contents of a bar of the main window, clipped to its width: when

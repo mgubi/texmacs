@@ -75,3 +75,15 @@ say otherwise; C++ is under `src/src/`, Scheme under `src/TeXmacs/progs/`.
 |---|---|
 | [code-features.md](code-features.md) | Tree-sitter and language servers together: the common mechanism, and how a build degrades without either |
 | [tree-sitter.md](tree-sitter.md) | Tree-sitter in TeXmacs: survey and design |
+
+## Plans
+
+Reports written before the work, on items of [`src/TODO.md`](../TODO.md):
+what exists, the options, a plan in phases and the questions to decide.
+
+| File | Contents |
+|---|---|
+| [plans/plan-lean-lsp.md](plans/plan-lean-lsp.md) | Lean 4 through its language server: what works already, the goal view, Unicode input, project setup |
+| [plans/plan-tmu-tmx.md](plans/plan-tmu-tmx.md) | TMU (Mogan's Unicode `.tm`) and TMX, a documented Unicode format of our own |
+| [plans/plan-navigation-history.md](plans/plan-navigation-history.md) | Back and forward with a history, as in a browser |
+| [plans/plan-gui-scripting.md](plans/plan-gui-scripting.md) | Scripting every interface (Qt, Cocoa, Vue) for tests and automation |

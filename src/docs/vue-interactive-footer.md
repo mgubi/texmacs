@@ -5,18 +5,24 @@ window) shows as menus and buttons what it otherwise shows as text.
 
 ![The interactive status bar: the properties at the cursor as menus, the tags around it as a path, the outer tags folded into a menu, the character before the cursor](wasm/interactive-footer.png)
 
-* **On the left, the properties of the text at the cursor**, each a menu
+* **First on the left, a Document menu**: the style of the document (its
+  base style, theme, style packages) and its paper, font size, orientation,
+  columns, layout, language and fonts, the menu which the focus bar shows
+  only when the cursor is at the top of the document, here wherever it is.
+* **Then the properties of the text at the cursor**, each a menu
   which changes it: the language (text mode), the font (the math font in
   a formula), the size, the series and shape when they are not those of
   the document, the colour (a swatch and its name). A small chevron says
   that each is a menu; the menus open upwards, as there is no room below
   the footer.
 * **On the right, the tags around the cursor**, from the outermost to the
-  innermost (in bold), separated by `›`. A click on one selects it, as a
-  click in the context tool (Tools › Context tool) does; a **right click**
-  (or, on a Mac, Control+click or Option+click) selects it and opens the
-  context menu of the editor on it, its Focus menu (rename, remove,
-  variants, preferences of the tag...), at the pointer. `document` and `concat`, which say nothing, are left out.
+  innermost (in bold), separated by `›`. Each is a menu: **Select**, which
+  selects it as a click in the context tool (Tools › Context tool) does,
+  then its **Focus menu** (variants, numbering, preferences, rendering,
+  removal, moves between similar tags...), whose commands change that tag
+  **where it is, without moving the cursor**: from inside a strong, the
+  theorem around it becomes a lemma, and the typing goes on in the strong.
+  `document` and `concat`, which say nothing, are left out.
 * **Folding.** The outer tags which do not fit in the room of the path
   fold into a `…` menu (a click on one of them selects it); the innermost
   tags stay in view. If the path is still too wide (a narrow window) it is
@@ -33,15 +39,19 @@ It is off by default: **View › Interactive status bar** (Vue and Cocoa,
 `(or (vue-gui?) (ns-gui?))`, shown while the status bar is), the preference `interactive footer` (`on` or
 `off`).
 
+The test `tests/Plugins/Vue/footer-menus` opens the menu of a theorem from
+inside a strong, makes it a lemma, types a letter, which must land in the
+strong, and opens the Document menu.
+
 ## How it works
 
 | Where | What |
 |---|---|
-| `TeXmacs/progs/texmacs/menus/footer-menu.scm` | The two menus, `texmacs-footer-environment` and `texmacs-footer-path` (lazy menus, declared in `init-texmacs.scm`). They reuse the menus of the Format menu (`text-font-menu`, `math-font-menu`, `font-size-menu`, `text-font-effects-menu`, `color-menu`) and `text-language-menu`; the tags are those of `upward-context-trees` (`main-menu.scm`, the context tool). The folding: `footer-split-path` keeps the innermost tags which fit in `footer-path-budget` characters (the character after the path and the `…` menu count too); the GUI sets the budget (`footer-set-budget`). The character: `footer-char-info`, as `compute_text_footer` |
+| `TeXmacs/progs/texmacs/menus/footer-menu.scm` | The two menus, `texmacs-footer-environment` and `texmacs-footer-path` (lazy menus, declared in `init-texmacs.scm`). The Document menu is `footer-document-menu` (`focus-style-menu` and `focus-document-menu` of the buffer tree), the menu of a tag `footer-tag-menu` (Select, then `standard-focus-menu` of that tree); both are in `promise`s, so that they are made when they are opened and not at each key (the footer is expanded at every key: 0.5 ms for the path, as before). `footer-menu-key`, the buffer and the paths of the tags, makes the GUI build the menus again when they hold other trees: the expansion of a menu shows a procedure as its source, the same for two theorems with the same path of tags. They reuse the menus of the Format menu (`text-font-menu`, `math-font-menu`, `font-size-menu`, `text-font-effects-menu`, `color-menu`) and `text-language-menu`; the tags are those of `upward-context-trees` (`main-menu.scm`, the context tool). The folding: `footer-split-path` keeps the innermost tags which fit in `footer-path-budget` characters (the character after the path and the `…` menu count too); the GUI sets the budget (`footer-set-budget`). The character: `footer-char-info`, as `compute_text_footer` |
 | `src/Edit/Interface/edit_footer.cpp` | `edit_interface_rep::set_footer` says, before it sends the footer, whether it is the environment at the cursor or a message: `(footer-environment-notify #t/#f)` |
 | `TeXmacs/progs/kernel/texmacs/tm-dialogue.scm` | `(footer-environment?)`, that state. A function and not an exported variable: an exported variable is a copy of the binding of the module, which a `set!` in the module does not change |
-| `src/Plugins/Vue/vue_widget.cpp`, `vue_texmacs_widget_rep` | At `SLOT_LEFT_FOOTER` (sent first) it reads the preference and `(footer-environment?)`; at `SLOT_RIGHT_FOOTER` it expands the two menus and rebuilds the widget of each only when its expansion changed (`update_footer_menus`, as `tm_window_rep::get_menu_widget` does for the tool bars). The footer then lays out the environment menu on the left and the path on the right, right-aligned; when the path is wider than its room it is shifted left by the difference measured in the last pass, so that its end stays in view. The width of the path in the last layout (`footer_room`, points, at some 7 points a character) is the budget given to Scheme before the menus are expanded |
-| `vue_widget.cpp`, `in_footer` | Set while the footer is laid out: the buttons are flatter (the footer is lower than the tool bars), the pull-down buttons get a chevron (`layout_arrow`), and a right click on a button (a tag) runs its command, then `footer_popup_command_rep`, which opens `texmacs-popup-menu` (the Focus menu of the selection) in a popup window at the pointer, as `edit_interface_rep::mouse_adjust` does for a right click in the document |
+| `src/Plugins/Vue/vue_widget.cpp`, `vue_texmacs_widget_rep` | At `SLOT_LEFT_FOOTER` (sent first) it reads the preference and `(footer-environment?)`; at `SLOT_RIGHT_FOOTER` it expands the two menus and rebuilds the widget of each only when its expansion or `(footer-menu-key)` changed (`update_footer_menus`, as `tm_window_rep::get_menu_widget` does for the tool bars). The footer then lays out the environment menu on the left and the path on the right, right-aligned; when the path is wider than its room it is shifted left by the difference measured in the last pass, so that its end stays in view. The width of the path in the last layout (`footer_room`, points, at some 7 points a character) is the budget given to Scheme before the menus are expanded |
+| `vue_widget.cpp`, `in_footer` | Set while the footer is laid out: the buttons are flatter (the footer is lower than the tool bars), the pull-down buttons get a chevron (`layout_arrow`), and a right click on a button runs its command, then `footer_popup_command_rep`, which opens `texmacs-popup-menu` (the Focus menu of the selection) in a popup window at the pointer, as `edit_interface_rep::mouse_adjust` does for a right click in the document. The tags are pull-downs now, whose menu has their Focus menu: a right click on one does nothing more |
 | `misc/wasm/clipboard.js`, `vue_gui.cpp` (the mouse buttons) | Control+click on a Mac in a browser: the browser sends a `mousedown` of the right button but no `pointerdown`, then a `pointerup` of the left button, so that SDL (which listens to the pointer events) saw no click at all. The page gives SDL a `pointerdown` and a `pointerup` of the right button; and Vue takes a left release which ends a right press made with Control as a right release (a browser which sends that `pointerdown` but the left `pointerup`). This is for every click of the page, not only the footer |
 | `misc/wasm/browser-run.mjs` | `rclick x y`, a right click, and `hold key` / `release key`, a modifier held over clicks, for the tests |
 
@@ -82,10 +92,12 @@ the NSMenus of the menus (`to_nsmenu`): the pull-down buttons have a
 chevron, and their menus open upwards (`upward`). The properties are on
 the left of the footer; the tags are on the right, in a view which clips
 them on their left (`footer_clip`), whose width, at 7 points a character,
-is the budget of the folding. A right click on a tag, or a click with
-Control or Option (`contextTarget` of the controller, `footerContext:` of
-`TMWidgetHelper`), runs its command, then opens `texmacs-popup-menu` at the
-pointer once the event is over. The swatch of the colour is the image of
+is the budget of the folding. The tags are pull-downs, as in Vue (a right
+click on a button, or a click with Control or Option, runs its command and
+opens `texmacs-popup-menu` at the pointer once the event is over:
+`contextTarget` of the controller, `footerContext:` of `TMWidgetHelper`).
+The rows are made again when their expansion or `(footer-menu-key)`
+changed. The swatch of the colour is the image of
 its menu item, and the bold of the innermost tag the attributed title of
 its item (`text_widget` in `ns_ui_element.mm`).
 * **Performance.** The two menus are expanded at every update of the
