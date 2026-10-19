@@ -84,7 +84,7 @@ The constants at the top of the script (`STROKE`, `SCALE`, `OUTLINE`,
 
 writes `doc/icons/<set>.pdf`, the specimen sheets (vector: the SVG files of
 the icons are nested as they are, their ids and style classes prefixed), and
-`doc/icons/<set>-toolbars.png`, the main, text and focus toolbars on light and
+`docs/icons/<set>-toolbars.png`, the main, text and focus toolbars on light and
 dark, as shown in the README. It needs `rsvg-convert`; the generators need
 Python 3, and `rsvg-convert` for PNG output.
 
