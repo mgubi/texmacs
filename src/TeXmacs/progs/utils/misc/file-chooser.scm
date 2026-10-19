@@ -22,8 +22,7 @@
 ;;   highlights an entry (a file goes into File), a click on the
 ;;   highlighted entry enters the directory or chooses the file;
 ;; - for an image, its width, height and position, and a preview;
-;; - the type of the file chosen, after its name, when TeXmacs knows its
-;;   format;
+;; - the type of the file chosen, when TeXmacs knows its format;
 ;; - the button Up beside Directory (as ..), and Home, Texts
 ;;   (~/.TeXmacs_Upsilon/texts), Ok and Cancel.
 ;; The dialog may be resized: the lists take the room.
@@ -231,17 +230,15 @@
 
           (assuming (not dirs-only?)
             (item (text "File:")
-              (hlist
-                (refreshable "file-chooser-file"
-                  (form-input "file" "string" (list name) "1w"))
-                ;; the type of the file, after its name (a text which
-                ;; changes in a refreshable is a promise: a refreshable
-                ;; evaluates its contents when the dialog is made)
-                //
-                (refreshable "file-chooser-type"
-                  (promise (list 'text (file-chooser-type
-                                         (and (!= name "")
-                                              (file-chooser-path dir name))))))))
+              (refreshable "file-chooser-file"
+                (form-input "file" "string" (list name) "1w")))
+            (item (text "Type:")
+              ;; (a text in a refreshable is evaluated when the dialog is
+              ;; made: a promise makes it again at each refresh)
+              (refreshable "file-chooser-type"
+                (promise (list 'text (file-chooser-type
+                                       (and (!= name "")
+                                            (file-chooser-path dir name)))))))
 
             (item (text "Suffixes:")
               (input (when answer

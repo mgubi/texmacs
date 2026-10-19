@@ -39,8 +39,8 @@ have the details, and the problems go to the
   files, a name, the files of the format or all of them
   ([#374](https://github.com/mgubi/texmacs/issues/374));
   `TEXMACS_VUE_NO_FILE_DIALOG=1` asks for it everywhere. Its window can be
-  resized, **Up** goes to the folder above, the format of the chosen file
-  shows beside its name, and the pointer over a file shows its format, its
+  resized, **Up** goes to the folder above, a line shows the format of the
+  chosen file, and the pointer over a file shows its format, its
   size and its date. The wheel scrolls the list under the pointer.
 - With the Vue interface, Escape closes a dialog, as its close
   box does.
