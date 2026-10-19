@@ -51,7 +51,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define glue-spec-files
-  ;; (and those of the features which the build has, doc/code-features.md)
+  ;; (and those of the features which the build has, src/docs/code-features.md)
   (append
    '("build-glue-basic.scm" "build-glue-editor.scm" "build-glue-server.scm")
    (if (defined? 'tree-sitter-program-language) '("build-glue-treesit.scm") '())

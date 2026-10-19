@@ -154,7 +154,7 @@
   <section|Orders of magnitude>
 
   Measured on an Apple M-series machine and recorded in
-  <verbatim|doc/tree-sitter.md>: generating the tables takes 0.2 s for
+  <source-link|src/docs/tree-sitter.md|docs/tree-sitter.md>: generating the tables takes 0.2 s for
   <scheme>, 0.5 s for Python, 0.7 s for C and 6.5 s for C++ under S7 in
   <TeXmacs>, and Lean about a minute and gigabytes, hence the shipped
   tables (unpacked in about 0.1 s). A file of 100 KB of Python parses in

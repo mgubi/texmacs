@@ -503,7 +503,7 @@
   (check= (typed-prog "' '") "''")
   (check= (typed-prog "` `") "``")
   ;; (in code with a syntax tree, the brackets and quotes stay balanced: a
-  ;; build may leave out tree-sitter, see doc/code-features.md)
+  ;; build may leave out tree-sitter, see src/docs/code-features.md)
   (check= (typed-prog "\"")
           (if (defined? 'tree-sitter-program-language) "\"\"" "\""))
   (check= (typed-prog "< <") "<less><less>")

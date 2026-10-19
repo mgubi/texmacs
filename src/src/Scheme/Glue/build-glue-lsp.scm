@@ -12,7 +12,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;; (compiled only when the feature is part of the build, see
-;; doc/code-features.md and glue.cpp)
+;; src/docs/code-features.md and glue.cpp)
 
 (output-copyright "build-glue-lsp.scm")
 

@@ -22,8 +22,7 @@
   removed.
 
   The status of the port, its test aids and its packaging are described in
-  <verbatim|doc/ns-port.md> at the top of the repository (outside the
-  <verbatim|src> directory); this page summarizes it.
+  <source-link|src/docs/ns-port.md|docs/ns-port.md>; this page summarizes it.
 
   <section|Building>
 
@@ -173,7 +172,7 @@
   <section|Test aids>
 
   Other programs may not capture or drive the windows of <TeXmacs>, so the
-  port reads environment variables (see <verbatim|doc/ns-port.md> and
+  port reads environment variables (see <source-link|src/docs/ns-port.md|docs/ns-port.md> and
   <source-link|ns_gui.mm|src/Plugins/NS/ns_gui.mm>). With them, <TeXmacs> becomes the active
   application.
 

@@ -14,7 +14,7 @@ went); add what you find. Paths are relative to the repository root.
 
 ## Bugs found, not fixed
 
-- **OpenType work, after the audit of 2026-10-13** (`src/doc/opentype-audit.md`,
+- **OpenType work, after the audit of 2026-10-13** (`src/docs/opentype-audit.md`,
   section "State after the fixes", has the full list). Tried in a window on
   2026-10-18, all as they should be: the cursor in a formula with primes,
   accents and negations (Vue test `math-cursor`), the font design page with
@@ -63,12 +63,12 @@ no headless mode. The Widkit duplicates are fixed on `wip_other_guis` too.
   which are evaluated without being typeset, the rules of
   `subsequent-author-substitute` which work name by name, names in other
   scripts, the corners of the LaTeX export in note styles) are in
-  `doc/csl-design.md`. The LaTeX export uses the package
+  `src/docs/csl-design.md`. The LaTeX export uses the package
   `citation-style-language` since 2026-10-18.
 
 - **GPU renderer, after the work of 2026-10-15** (Metal backend, the
   canvases of the Cocoa port on the GPU; `src/docs/vue-graphics-stack.md`,
-  "The GPU renderer", and `doc/ns-port.md`, "Drawn by the GPU"):
+  "The GPU renderer", and `src/docs/ns-port.md`, "Drawn by the GPU"):
   - One launch of the Cocoa test build quit by itself before its first
     snapshot (no crash report, nothing in the log); four launches after it
     did not.
@@ -101,4 +101,4 @@ no headless mode. The Widkit duplicates are fixed on `wip_other_guis` too.
   (GUI through markup).
 - CSL: download a style by its name from the repository of styles, attach
   the style to the document so that it travels with it, and read CSL-JSON
-  from Zotero for the fields which BibTeX does not have (`doc/csl-design.md`).
+  from Zotero for the fields which BibTeX does not have (`src/docs/csl-design.md`).

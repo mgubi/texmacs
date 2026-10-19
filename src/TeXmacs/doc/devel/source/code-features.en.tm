@@ -15,7 +15,7 @@
   <source-link|tm_code.m4|misc/m4/tm_code.m4>; <verbatim|USE_TREE_SITTER>,
   <verbatim|USE_LSP> in CMake). What both use is in the core, which names
   neither: the features register themselves. The design, its phases and
-  the comparison of the two are in <verbatim|doc/code-features.md>.
+  the comparison of the two are in <source-link|src/docs/code-features.md|docs/code-features.md>.
 
   <section|The lines of program code>
 

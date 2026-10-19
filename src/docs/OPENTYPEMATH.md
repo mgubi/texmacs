@@ -17,9 +17,77 @@ table fills what they leave open. A switch turns the tuning off for
 comparison, from Scheme with `(set-hand-tuned-math-fonts #f)` or from the
 sample script with `TM_HAND_TUNED=off`.
 
-Two companion documents go deeper: `doc/font-system-review.md` reviews the
-font system as a whole, and `doc/opentype-math-design.md` is the design and
+Two companion documents go deeper: `docs/font-system-review.md` reviews the
+font system as a whole, and `docs/opentype-math-design.md` is the design and
 status log of this work, including everything that is still missing.
+
+## In short
+
+This work teaches TeXmacs to typeset mathematics with the fonts that
+LaTeX users know from `unicode-math`, and to offer them the way LaTeX
+packages do: a text font and its mathematics chosen together.
+
+![Latin Modern Math](opentype-math/latin-modern-math.png)
+
+![Libertinus Math](opentype-math/libertinus-math.png)
+
+![Fira Math](opentype-math/fira-math.png)
+
+**Formulas laid out from the `MATH` table.** An OpenType math font says how
+its formulas are to be built: the position of scripts and limits, fractions
+and radicals, italic corrections and the kerning of scripts into the corners
+of a letter, the placement of accents, the size variants of every delimiter
+and how to assemble one of any size. TeXmacs now reads all of it and follows
+it, with script-size alternates, dotless letters, flattened accents and pair
+kerning from the `GSUB` and `GPOS` tables. The hand-tuned customizations
+TeXmacs already had for STIX and the TeX Gyre fonts keep precedence, and
+the experimental preference "Hand tuned math fonts" switches them off for
+comparison.
+
+**Fonts that come with TeXmacs.** Latin Modern, New Computer Modern, STIX
+Two, Libertinus, Kp Fonts (serif and sans), Erewhon (Utopia), XCharter
+(Charter), Euler, Concrete and Fira, each with its text faces (Euler with
+TeX Gyre Pagella, Concrete with the Concrete faces of CM Unicode) and,
+where the family has them, its sans serif and typewriter companions and a
+bold math font, next to the TeX Gyre fonts already shipped. They are
+registered in the shipped font database, so a fresh installation uses them
+without a scan, and a home directory written by an older version is brought
+up to date at the next start, instead of hiding the new fonts (a symbol only
+they draw used to come out as its name in red). Fonts are found in their
+OpenType form before their Type 1 form, and a rescan of the fonts on disk
+takes seconds instead of minutes.
+
+**Fonts TeXmacs knows.** Twenty-five math fonts have a profile that says
+what the `MATH` table cannot: which text, sans serif and typewriter fonts go
+with them, where their letters come from, and where they belong in the
+menus. XITS, Asana, IBM Plex, Garamond, Old Standard, DejaVu, Lete Sans,
+New Computer Modern Sans and GFS Neohellenic are used as soon as they are
+installed, in the font directories of the system or of TeXmacs, or from TeX
+Live (of any year, on macOS and Linux, or through
+`TEXMACS_FONT_PATH`). Any other font with a `MATH`
+table works too, without a profile and outside the menus, named in the
+document as `math=Cambria Math,Cambria`.
+
+**Choosing them.** The font button of the focus toolbar offers the
+installed pairs under the names LaTeX users know: Times, Palatino, Utopia,
+Charter, Euler, Concrete, Libertinus, Kp Fonts and the others in a serif
+section, Fira, Kp Sans, Computer Modern Sans and Lete Sans in a sans serif
+section, the less common fonts in a submenu, and the text fonts alone in a
+last section. The OpenType features of a font, such as old style figures,
+small capitals and stylistic sets, are offered by the font browser, and,
+when complex actions go through the menus, in `Document > Font > Features`
+and `Format > Font features`.
+
+**Symbols.** Two hundred mathematical symbols which TeXmacs could draw but
+not name have names, LaTeX equivalents and classes now. In a formula, a
+window and a side tool show all the symbols, group by group, with their
+markup in a balloon, to insert them with a click.
+
+In TeXmacs, `Help > Manual > Fonts` covers choosing fonts and the
+mathematical fonts, with a sample of every font that comes with TeXmacs and
+a list of the others, and the reference chapter *Fonts, from selection to
+glyph*. [`tests/README.md`](../tests/README.md) describes the unit tests, the
+sample renders and the comparison with LuaLaTeX.
 
 ## What is implemented
 
@@ -149,7 +217,7 @@ and from a side tool (Insert ▸ Symbols in a side tool), whose groups are
 declared once with `define-math-symbols-group` and laid out for the width of
 each. Every symbol button draws with the smart font, so a palette can show a
 symbol which lives in no TeX font, and says its markup in a balloon.
-`doc/math-symbol-coverage.md` counts what is still unnamed.
+`docs/math-symbol-coverage.md` counts what is still unnamed.
 
 **OpenType features of text** (`Graphics/Fonts/feature_font.cpp`,
 `TeXmacs/progs/fonts/font-features.scm`). The GSUB reader serves ordinary
@@ -340,7 +408,7 @@ Old Standard Math are profiled too, with no specimen here.
 ## What is not done
 
 The short version, with the details in section 7 of
-`doc/opentype-math-design.md`:
+`docs/opentype-math-design.md`:
 
 - Alphabets a font provides only in part (script and double-struck in most
   fonts) are silently mixed with the emulated ones; no profile key declares

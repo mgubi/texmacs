@@ -53,7 +53,7 @@
 // the spell checker in the program (src/Plugins/Ispell/ispell_hunspell.cpp)
 #define USE_HUNSPELL 1
 /* the syntax trees of tree-sitter run in the browser; the language servers,
-   which are programs that TeXmacs starts, do not (doc/code-features.md) */
+   which are programs that TeXmacs starts, do not (src/docs/code-features.md) */
 #define USE_TREE_SITTER 1
 #define VUETEXMACS 1
 #define WORD_LENGTH 4

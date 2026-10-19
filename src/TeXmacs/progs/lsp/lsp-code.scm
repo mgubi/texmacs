@@ -12,7 +12,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;; The adapter of the language servers for the features of program code
-;; (progs/code/code-features.scm, doc/code-features.md): loaded by them when
+;; (progs/code/code-features.scm, src/docs/code-features.md): loaded by them when
 ;; it is there. Its rank, 10, comes first for the features which tree-sitter
 ;; gives too (a server sees the other files of a project); it serves in the
 ;; source files which a server follows.

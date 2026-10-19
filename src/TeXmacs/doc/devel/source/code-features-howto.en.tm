@@ -105,7 +105,7 @@
     every build. It ignores the preferences of the user
     (<scm|code-ignore-preferences!>); a test never writes them.
 
-    <item><verbatim|doc/code-features.md> and the pages of this chapter
+    <item><source-link|src/docs/code-features.md|docs/code-features.md> and the pages of this chapter
     say what the feature is, and the manual what the user sees
     (<hlink|editing program code|../../main/editing/man-program-code.en.tm>).
   </enumerate>

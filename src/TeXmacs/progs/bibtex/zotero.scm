@@ -22,7 +22,7 @@
 ;;
 ;; The citations use the citation keys of Zotero (the "citationKey" field,
 ;; which Zotero fills since version 7, or Better BibTeX); an item without
-;; one is cited as zotero:<item key>. See doc/zotero-design.md for the
+;; one is cited as zotero:<item key>. See src/docs/zotero-design.md for the
 ;; precedence of the sources of references and the other situations.
 
 (texmacs-module (bibtex zotero)

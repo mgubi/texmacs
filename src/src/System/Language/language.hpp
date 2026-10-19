@@ -151,7 +151,7 @@ language text_language (string s);
 language math_language (string s);
 language prog_language (string s);
 // a feature which highlights program languages (tree-sitter, which is not
-// part of all builds, see doc/code-features.md) registers itself: it gives
+// part of all builds, see src/docs/code-features.md) registers itself: it gives
 // the language made over the language @base of @lan, or NULL for @base
 typedef language_rep* (*prog_language_wrapper) (string lan, language_rep* base);
 void set_prog_language_wrapper (prog_language_wrapper w);

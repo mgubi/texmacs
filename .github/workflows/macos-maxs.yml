@@ -1,6 +1,6 @@
 # TeXmacs of the branch upsilon_texmacs for macOS 13 and later, with S7, as
 # two disk images for Apple silicon and Intel: the native interface of
-# macOS (Cocoa, doc/ns-port.md) and the Vue port (SDL3 and Clay, drawn by
+# macOS (Cocoa, src/docs/ns-port.md) and the Vue port (SDL3 and Clay, drawn by
 # the GPU with OpenGL and ThorVG, src/docs/vue-graphics-stack.md):
 #   * deps (for arm64 and x86_64, the latter under Rosetta): the libraries
 #     which do not come with macOS (libpng, FreeType, SDL3, SDL3_ttf,
@@ -294,7 +294,7 @@ jobs:
 
           * macOS (Apple silicon and Intel, macOS 13 or later):
             \`TeXmacs-*-cocoa-universal.dmg\`, the native interface (Cocoa),
-            see [doc/ns-port.md](https://github.com/${GH_REPO}/blob/${GITHUB_SHA}/doc/ns-port.md);
+            see [src/docs/ns-port.md](https://github.com/${GH_REPO}/blob/${GITHUB_SHA}/src/docs/ns-port.md);
             \`TeXmacs-*-vue-universal.dmg\`, the Vue interface, drawn by the
             GPU, see [vue-graphics-stack.md](https://github.com/${GH_REPO}/blob/${GITHUB_SHA}/src/docs/vue-graphics-stack.md);
             \`texmacs-qt-macos-arm64.zip\`, Qt 6, Apple silicon only.

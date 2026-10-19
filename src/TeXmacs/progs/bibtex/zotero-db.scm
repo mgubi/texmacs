@@ -13,7 +13,7 @@
 
 ;; With the database tool, Zotero is one of the sources of the references
 ;; of a bibliography (bib-retrieve-entries, in database/bib-manage.scm),
-;; after the database of the user, which wins (see doc/zotero-design.md).
+;; after the database of the user, which wins (see src/docs/zotero-design.md).
 ;; The search window of references (open-db-chooser) lists the references
 ;; of Zotero after those of the database, or, without the database tool,
 ;; after those of the BibTeX file of the bibliography.

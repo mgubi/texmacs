@@ -12,7 +12,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;; The outline of the code at the cursor and the definition of the name at
-;; the cursor, from the providers (code-features.scm, doc/code-features.md):
+;; the cursor, from the providers (code-features.scm, src/docs/code-features.md):
 ;;   outline     (procedure) the entries (level kind name detail path) of the
 ;;               code at the cursor, in its order: path is where the cursor
 ;;               goes (a server: its symbols, which it sees in the file;

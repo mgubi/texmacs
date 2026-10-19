@@ -313,7 +313,7 @@
   ;; The sources of references, in their order of precedence: the entries
   ;; of the document, the BibTeX files of the user, the database, the files
   ;; managed by Zotero, Zotero itself and the attached entries
-  ;; (see doc/zotero-design.md); Zotero only when it is used
+  ;; (see src/docs/zotero-design.md); Zotero only when it is used
   (if (not (zotero-used?))
       `(:local ,@bib-files :default :attached)
       (receive (managed own)

@@ -11,7 +11,7 @@
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;; In a build without tree-sitter (doc/code-features.md), the functions of
+;; In a build without tree-sitter (src/docs/code-features.md), the functions of
 ;; its syntax trees which the editing of programs calls (prog-edit.scm, the
 ;; indentation of some languages, the inputs of sessions) answer that the
 ;; code has no syntax tree: the editing of programs is then that of

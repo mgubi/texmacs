@@ -5,7 +5,7 @@ This is **TeXmacs Upsilon**, an enhanced and bleeding-edge version of
 in one tree several lines of work which are not (yet) in the official
 TeXmacs, so that they can be built, used and tested together.
 
-**See it in pictures: [doc/upsilon-screenshots.md](doc/upsilon-screenshots.md)**
+**See it in pictures: [src/docs/upsilon-screenshots.md](src/docs/upsilon-screenshots.md)**
 (also on the site, <https://mgubi.github.io/texmacs/features.html>, next to
 the [latest builds](https://mgubi.github.io/texmacs/downloads.html)).
 
@@ -15,17 +15,17 @@ plus the following branches, merged in:
 | Branch | What it brings |
 |---|---|
 | `wip_fixes` | **Fixes of TeXmacs which are not upstreamed**: bugs reported on Savannah and in the issues of this repository (the Scheme bridge, LaTeX import and export, BibTeX, the Qt list views, the editing modes, the keyboard maps, Windows paths, ...), **incremental typesetting** (only what an edit changed is typeset again, with caches of the typing), caches of styles and files which follow the files on disk, header dependencies in the autotools build, and the test suites below |
-| `wip_opentype` | **OpenType mathematics**: formulas laid out from the `MATH` table of any OpenType math font, stretchable delimiters and accents from the font's own variants and assemblies, the OpenType features of text fonts, profiles which pair two dozen math fonts with their text companions (most of them shipped), a font inspector, and the weights and variants of a family (Format ▸ Weight) — see [OPENTYPEMATH.md](src/doc/OPENTYPEMATH.md) |
+| `wip_opentype` | **OpenType mathematics**: formulas laid out from the `MATH` table of any OpenType math font, stretchable delimiters and accents from the font's own variants and assemblies, the OpenType features of text fonts, profiles which pair two dozen math fonts with their text companions (most of them shipped), a font inspector, and the weights and variants of a family (Format ▸ Weight) — see [OPENTYPEMATH.md](src/docs/OPENTYPEMATH.md) |
 | `wip_more_fonts`, `wip_font_design` | **More fonts and a font design page**: the fonts of the ConTeXt distribution which were missing (DejaVu, Gentium Plus, the Antykwas, Iwona, Kurier, the weights of IBM Plex...), a font menu by design, and a page with a tab for each part of a document (text, mathematics, sans serif, typewriter, blackboard bold, calligraphic, fraktur) which shows samples of the fonts, applies the choice to the document and saves named choices |
 | `wip_other_guis` | **Other graphical interfaces and GUI improvements**: Vue (a toolkit of its own, on Clay and SDL3, drawn by the GPU or by MuPDF), a native Cocoa interface for macOS, SDL and Qtwk, fixes to X11, and changes which serve every interface (the MuPDF renderer, windows which stay above the editor windows, ...) — see [the graphical interfaces](#the-graphical-interfaces) below |
-| `wip_icons` | **Icon sets**: besides the original icons (classical), a monochrome set in the manner of the macOS symbols and a neo-classical set, the classical compositions modernized, which is the default, and the [Lucide](https://lucide.dev) icons; chosen in Preferences ▸ General ▸ Icon set — see [src/doc/icons/README.md](src/doc/icons/README.md) |
+| `wip_icons` | **Icon sets**: besides the original icons (classical), a monochrome set in the manner of the macOS symbols and a neo-classical set, the classical compositions modernized, which is the default, and the [Lucide](https://lucide.dev) icons; chosen in Preferences ▸ General ▸ Icon set — see [src/docs/icons/README.md](src/docs/icons/README.md) |
 | `wip_s7` | **TeXmacs on [s7](https://ccrma.stanford.edu/software/snd/snd/s7.html)** instead of Guile 1.8: the interpreter is a build option (`./configure --with-scheme=s7\|femtolisp\|guile`), s7 (vendored, 11.9) is the default and needs no Guile at all; one Scheme code base serves all of them, and with s7 the first window is ready in about 0.7 s instead of 1.9 s — see [src/docs/s7/](src/docs/s7/README.md) |
 | `wip_other_schemes` | **TeXmacs on [femtolisp](https://github.com/JeffBezanson/femtolisp)**, a third interpreter, experimental (`./configure --with-scheme=femtolisp`, and `SCHEME=femtolisp` for the browser): a small vendored Scheme which works on the byte strings of TeXmacs directly, with modules made of renamed global names, compiled files kept in a cache and function bodies compiled when first called; it starts about as fast as s7 and is faster on conversions such as the LaTeX export — see [src/docs/femtolisp/](src/docs/femtolisp/README.md) and the developer chapter *The femtolisp Scheme interpreter* |
-| `wip-git-versioning` | **Git support**: Version ▸ Git with a side panel, a commit dialog, clickable status, log and branch pages, branches, tags and stashes, fetch, pull, push and clone in the background, comparison with any revision, a simple mode of snapshots, and **structured three-way merges of TeXmacs documents** (also as a git merge driver), with Git never run in a folder until it is trusted — see the manual chapter *Working with Git* and [doc/git-features.md](doc/git-features.md) |
-| `wip_zotero` | **Citations from [Zotero](https://www.zotero.org)**, read from the Zotero desktop application (its local API): the search window of citations lists the references of Zotero after those of the `.bib` file or of the database, with their sources; keys completed from Zotero; a bibliography file written from Zotero, or Zotero as a source of the database, whose copies of Zotero items follow Zotero (with a field-by-field choice when both sides changed); keys renamed in Zotero followed in the citations; group libraries — see the manual page *Citations from Zotero* and [doc/zotero-design.md](doc/zotero-design.md) |
-| `wip_csl` | **Bibliography styles of the [Citation Style Language](https://citationstyles.org)** (the styles of Zotero, Mendeley and Pandoc), processed by TeXmacs itself in Scheme: a bibliography whose style is `csl-apa`, `csl-ieee`, `csl-chicago-notes-bibliography`... is formatted by the `.csl` file, and so are the citations: numbers, authors and years with their disambiguation (2001a, 2001b) and grouping, or footnotes with the short forms of later citations; 13 styles come along, any other one is put next to the document — see the manual page *Compiling a bibliography* and [doc/csl-design.md](doc/csl-design.md) |
+| `wip-git-versioning` | **Git support**: Version ▸ Git with a side panel, a commit dialog, clickable status, log and branch pages, branches, tags and stashes, fetch, pull, push and clone in the background, comparison with any revision, a simple mode of snapshots, and **structured three-way merges of TeXmacs documents** (also as a git merge driver), with Git never run in a folder until it is trusted — see the manual chapter *Working with Git* and [src/docs/git-features.md](src/docs/git-features.md) |
+| `wip_zotero` | **Citations from [Zotero](https://www.zotero.org)**, read from the Zotero desktop application (its local API): the search window of citations lists the references of Zotero after those of the `.bib` file or of the database, with their sources; keys completed from Zotero; a bibliography file written from Zotero, or Zotero as a source of the database, whose copies of Zotero items follow Zotero (with a field-by-field choice when both sides changed); keys renamed in Zotero followed in the citations; group libraries — see the manual page *Citations from Zotero* and [src/docs/zotero-design.md](src/docs/zotero-design.md) |
+| `wip_csl` | **Bibliography styles of the [Citation Style Language](https://citationstyles.org)** (the styles of Zotero, Mendeley and Pandoc), processed by TeXmacs itself in Scheme: a bibliography whose style is `csl-apa`, `csl-ieee`, `csl-chicago-notes-bibliography`... is formatted by the `.csl` file, and so are the citations: numbers, authors and years with their disambiguation (2001a, 2001b) and grouping, or footnotes with the short forms of later citations; 13 styles come along, any other one is put next to the document — see the manual page *Compiling a bibliography* and [src/docs/csl-design.md](src/docs/csl-design.md) |
 | `wip_markdown`, `wip_office` | **New converters**: import and export of **Markdown** (CommonMark and GitHub flavoured, formulas, tables, footnotes) and of the documents of **Word** (`.docx`) and **OpenDocument** (`.odt`): structure, tables, formulas through MathML and the formulas of Word, images and drawings, numbers and references, theorems, bibliography, and the formatting by hand, kept by a style `office` — see the manual pages *Converters for Markdown* and *Converters for Word and OpenDocument* |
-| `wip_ts`, `wip_lsp` (through `wip_code`) | **Program code**: the syntax of 22 languages by **[tree-sitter](https://tree-sitter.github.io)** (its runtime vendored, its generator brought to Scheme), for source files, the code blocks of documents and the inputs of sessions: colours, folds, an outline, structural selection and moves, brackets, indentation, comments; and a client of **language servers** (LSP) for source files, opened in tabs of their own: diagnostics, completion, hover, signatures, references, renaming, fixes, formatting and symbols, a code block of a document being a document of its server too. Each works without the other, and a build without either is the TeXmacs above — see the manual pages *Editing program code*, *Editing source files* and *Language servers for source code*, [doc/code-features.md](doc/code-features.md) and [doc/tree-sitter.md](doc/tree-sitter.md) |
+| `wip_ts`, `wip_lsp` (through `wip_code`) | **Program code**: the syntax of 22 languages by **[tree-sitter](https://tree-sitter.github.io)** (its runtime vendored, its generator brought to Scheme), for source files, the code blocks of documents and the inputs of sessions: colours, folds, an outline, structural selection and moves, brackets, indentation, comments; and a client of **language servers** (LSP) for source files, opened in tabs of their own: diagnostics, completion, hover, signatures, references, renaming, fixes, formatting and symbols, a code block of a document being a document of its server too. Each works without the other, and a build without either is the TeXmacs above — see the manual pages *Editing program code*, *Editing source files* and *Language servers for source code*, [src/docs/code-features.md](src/docs/code-features.md) and [src/docs/tree-sitter.md](src/docs/tree-sitter.md) |
 | `ai-sessions-port` | **AI sessions**: chats with ChatGPT, Claude, Gemini, Mistral, Ollama, OpenRouter and Albert inside a document, with streamed answers, files attached to the questions, the costs, and the keys kept in an encrypted wallet — see the help of the AI plug-in |
 | `wip_wasm_vue` | **TeXmacs in the browser**: the same TeXmacs compiled to WebAssembly with Emscripten, on the Vue interface and s7, drawn by the GPU (WebGPU, by default in the browsers of Chromium, or WebGL2, with ThorVG) or by MuPDF; the files kept in the browser, and plug-ins whose programs run in the page too (Python by Pyodide, R by webR, TikZ by TikZJax, Asymptote, JavaScript, AI) — see [TeXmacs in the browser](#texmacs-in-the-browser) below |
 | `wip_dev_docs` | **Extensive developer documentation**, inside TeXmacs (Help ▸ Developer documentation): some 400 pages, about 250 of them on the internals of the source code — the data types, the typesetter, fonts and OpenType, the Scheme interpreters, the server, buffers, views and windows, the editor, the GUI ports, converters, plug-ins, collaboration — which compile into a book of more than a thousand pages ([`src/TeXmacs/doc/devel/`](src/TeXmacs/doc/devel/)) |
@@ -166,7 +166,7 @@ bars at the left, the responsive tabs, the smooth zoom, the typographic
 palettes), with the Dock and the Finder (opening files, quitting). A
 universal application (arm64 and x86_64) for macOS 13 and later is built
 as a DMG by the CI (see [Builds to download](#builds-to-download)). Status,
-known gaps and testing aids: [doc/ns-port.md](doc/ns-port.md).
+known gaps and testing aids: [src/docs/ns-port.md](src/docs/ns-port.md).
 
 #### Vue — a toolkit of its own
 
@@ -227,15 +227,17 @@ editor windows).
 * [src/TeXmacs/doc/devel/](src/TeXmacs/doc/devel/): the developer
   documentation, read in TeXmacs with Help ▸ Developer documentation, or
   compiled into a book with Help ▸ Full manuals ▸ Developer documentation
-* [src/doc/OPENTYPEMATH.md](src/doc/OPENTYPEMATH.md) and
-  [src/doc/opentype-math-design.md](src/doc/opentype-math-design.md): the
+* [src/docs/OPENTYPEMATH.md](src/docs/OPENTYPEMATH.md) and
+  [src/docs/opentype-math-design.md](src/docs/opentype-math-design.md): the
   OpenType mathematics, its status and its design
 * [src/tests/README.md](src/tests/README.md): the tests and how to run
   them
-* [src/docs/](src/docs/README.md): the Vue plugin, how the core talks to a
-  GUI plugin, building and debugging, the PDF output with MuPDF, a design
-  for separating the editor from its front end
-* [doc/ns-port.md](doc/ns-port.md): the Cocoa interface;
+* [src/docs/](src/docs/README.md): the developer notes on all the
+  additions, by subject (the list below picks the main ones); also the Vue
+  plugin, how the core talks to a GUI plugin, building and debugging, the
+  PDF output with MuPDF, a design for separating the editor from its front
+  end
+* [src/docs/ns-port.md](src/docs/ns-port.md): the Cocoa interface;
   [src/docs/typographic-palettes.md](src/docs/typographic-palettes.md) and
   [src/docs/vue-interactive-footer.md](src/docs/vue-interactive-footer.md):
   the palettes of the colour menus and the interactive status bar of Vue
@@ -247,16 +249,16 @@ editor windows).
   build and the benchmarks
 * [src/docs/wasm/](src/docs/wasm/README.md): TeXmacs in the browser, its
   build, design and tests
-* [doc/README.md](doc/README.md): the Git support, its features, design,
+* [src/docs/git.md](src/docs/git.md): the Git support, its features, design,
   implementation and audits; the user manual has a chapter *Working with
   Git* (Help ▸ Manual, in the chapter *Editing tools*)
-* [doc/zotero-design.md](doc/zotero-design.md): the design of the Zotero
+* [src/docs/zotero-design.md](src/docs/zotero-design.md): the design of the Zotero
   integration; the user manual page *Citations from Zotero* (in the
   chapter on links and bibliographies) and the developer chapter
   *Citations from Zotero* (with the database and bibliographies)
-* [doc/csl-design.md](doc/csl-design.md): the CSL processor
-* [doc/code-features.md](doc/code-features.md) and
-  [doc/tree-sitter.md](doc/tree-sitter.md): program code, its features
+* [src/docs/csl-design.md](src/docs/csl-design.md): the CSL processor
+* [src/docs/code-features.md](src/docs/code-features.md) and
+  [src/docs/tree-sitter.md](src/docs/tree-sitter.md): program code, its features
   from tree-sitter and from the language servers, and their design; the
   user manual pages *Editing program code*, *Editing source files* and
   *Language servers for source code* (chapter *Editing tools*), and the
@@ -265,17 +267,17 @@ editor windows).
 * the Markdown and the office converters: the user manual pages
   *Converters for Markdown* and *Converters for Word and OpenDocument*, and
   the developer pages of the same subjects (chapter on converters)
-* [doc/TODO.md](doc/TODO.md): the open work on this branch
+* [src/docs/TODO.md](src/docs/TODO.md): the open work on this branch
 
 ## This repository
 
 The layout is the one of the TeXmacs SVN trunk, which this is a mirror of,
-with `doc/` and `.github/` added:
+with `.github/` added and the developer notes in `src/docs/`:
 
 | Directory | Contents |
 |---|---|
-| [`src/`](src/README.md) | the editor: sources, Scheme, styles, documentation, packaging. **Its [`README.md`](src/README.md) is the README of the project** |
-| `doc/` | notes on the Cocoa interface, the Git support, the Zotero integration, CSL, tree-sitter and the features of program code, and the open work (`TODO.md`) |
+| [`src/`](src/README.md) | the editor: sources, Scheme, styles, documentation, packaging; its [`README.md`](src/README.md) is the README of GNU TeXmacs |
+| [`src/docs/`](src/docs/README.md) | the developer notes on the additions: designs, status, audits, plans, and the open work (`TODO.md`) |
 | `misc/` | artwork, benchmarks, plugins and other odds and ends (the build tooling of Vue, the browser, ThorVG and tree-sitter is in `src/misc/`) |
 | `.github/` | the workflows of the CI (`macos-maxs.yml`, `maxs-linux-windows.yml`, `wasm.yml` for the browser) |
 | `web/` | the sources of the web site |

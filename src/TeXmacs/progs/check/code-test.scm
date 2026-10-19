@@ -12,7 +12,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;; The mechanism which tree-sitter and the language servers share
-;; (doc/code-features.md), tested with providers of its own: it does not
+;; (src/docs/code-features.md), tested with providers of its own: it does not
 ;; need either of them, so that it runs in every build.
 
 (texmacs-module (check code-test)

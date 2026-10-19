@@ -23,7 +23,7 @@ TM       := $(abspath $(dir $(lastword $(MAKEFILE_LIST)))/../..)
 S        := $(TM)/src
 W        := $(TM)/misc/wasm
 # the screenshots of the features of TeXmacs Upsilon (features.html, and
-# doc/upsilon-screenshots.md on GitHub)
+# src/docs/upsilon-screenshots.md on GitHub)
 SHOTS    := $(TM)/misc/upsilon/screenshots
 SCREENSHOTS  = $(patsubst $(SHOTS)/%,$(OUT)/web/screenshots/%,$(wildcard $(SHOTS)/*.webp))
 MUPDF    ?= $(CURDIR)/mupdf-1.28.5-source

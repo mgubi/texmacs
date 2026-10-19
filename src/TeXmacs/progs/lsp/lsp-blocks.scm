@@ -18,7 +18,7 @@
 ;; suffix: notes.tm and notes.html have blocks of their own), which is never
 ;; written (the server has its text from didOpen and didChange), in the
 ;; project of the document. Its positions are those of its lines, as in a
-;; source file, see doc/code-features.md (phase 7). A block is known by its
+;; source file, see src/docs/code-features.md (phase 7). A block is known by its
 ;; tree; when it is removed, or its document closed, its virtual document
 ;; is closed on the server.
 ;;

@@ -1,96 +1,18 @@
-> ## <img src="TeXmacs/misc/images/texmacs-vue-256.png" alt="The logo of TeXmacs Vue" width="36" align="top"> TeXmacs in the browser (TeXmacs Vue)
+> **TeXmacs Upsilon.** This directory is the source tree of GNU TeXmacs (the
+> SVN trunk) with the additions of TeXmacs Upsilon, an enhanced and
+> bleeding-edge version with experimental features. What it adds, its
+> builds and the branches it is made of are in the
+> [README at the root of the repository](../README.md); the builds are on
+> the [downloads page](https://mgubi.github.io/texmacs/downloads.html).
+> Problems with these builds go to the
+> [issues of this repository](https://github.com/mgubi/texmacs/issues), not
+> to the TeXmacs project.
 >
-> **Try it: <https://mgubi.github.io/texmacs/>** (experimental). Issues
-> of this port which cannot be reproduced in the official TeXmacs
-> distribution go to the [issue page](https://github.com/mgubi/texmacs/issues)
-> of this repository, not to the TeXmacs project.
->
-> Work in progress: TeXmacs compiled to WebAssembly and running in a web
-> page, an experimental port called TeXmacs Vue, with OpenType fonts
-> (OpenType mathematics included). It is developed in `upsilon_texmacs` (it was the
-> branch `wip_wasm_vue`, merged there and retired on 7 October 2026). The CI
-> of the page runs on the branch `wasm_ci` only, which is moved to
-> `upsilon_texmacs` when a state is worth building and publishing:
-> `git push origin upsilon_texmacs:wasm_ci`. Nothing is installed and
-> nothing leaves the browser unless it is downloaded.
->
-> ![TeXmacs Vue in the browser: tabs for the documents, the tool bars, a formula](docs/wasm/texmacs-in-the-browser.png)
->
-> It is stock TeXmacs on
->
-> * the Vue GUI (below) and SDL3, with Emscripten's SDL3 port;
-> * the [S7](https://ccrma.stanford.edu/software/snd/snd/s7.html) Scheme
->   interpreter in place of Guile, merged from `wip_s7` of texmacs/texmacs
->   (notes in [`docs/s7/`](docs/s7/README.md)); S7 is also the default of the
->   desktop build on this branch (`--with-scheme=s7|guile`);
-> * a slim MuPDF 1.28.5 for the pixels and the PDF output (no fonts of its
->   own but the standard 14, no document formats but PDF, SVG and images).
->
-> What the page does:
->
-> * **One canvas, many windows.** The browser gives one window, so the
->   windows of TeXmacs become virtual ones: each document is a tab of the
->   frame above the canvas (its name, a dot when modified, × to close, + for
->   a new one, a ribbon which scrolls with the wheel or a drag), and the
->   dialogs float over it with a title bar and a frame which resizes them
-  (their contents scroll when they do not fit). The same mode runs on the desktop
->   with `TEXMACS_VUE_SINGLE_WINDOW=1`, which is how it is tested.
-> * **The TeXmacs menu** of the page: the version, the state of the files,
->   the storage used, the Files panel, reload and reset.
-> * **Files.** *Files in this browser…* (also in the File menu) shows the
->   files kept in the browser, on the user's computer (nothing is sent
->   anywhere); files and whole projects (folders, zip archives, with their
->   images) are added from the computer or dropped on the page, and a copy
->   of one is saved back on the computer (a folder as a zip). The open and save dialogs of
->   TeXmacs are this panel. The home directory, with the preferences and the
->   documents, is kept in IndexedDB.
-> * **Loading in pieces.** The program is 5.2 MB (brotli) and the files of
->   TeXmacs are packages: 4 MB are needed to start, 8.5 MB more come in
->   the background once TeXmacs runs; a file needed before its package is
->   fetched alone (a byte range). The fonts (28 MB) come one by one, the
->   first time a document uses them. Everything is kept in the cache of the
->   browser: a second visit loads nothing.
->
-> * **The clipboard of the system**: copy, cut and paste with the other
->   programs (text, and HTML when TeXmacs has it); TeXmacs' own format is
->   kept when a copy is pasted back. On a Mac the shortcuts are Cmd+..., as
->   the browser's.
->
-> * **The TeXmacs server**: the Remote menu logs in to a TeXmacs server over
->   WebSocket (the servers of this branch serve WebSocket clients on their
->   usual port), for remote files and shared documents.
->
-> Not there yet: plugins and external converters (no processes in a page),
-> `wss` for servers elsewhere than on the same machine.
->
-> Build and try it (Emscripten, tested with 6.0; Python ≥ 3.10; Node):
->
->     . misc/wasm/emenv.sh build-wasm     # the Emscripten environment
->     sh misc/wasm/build-mupdf.sh         # the slim MuPDF, once
->     make -C build-wasm -f ../misc/wasm/Makefile -j8 web
->     node misc/wasm/serve.mjs            # http://localhost:8080/texmacs.html
->
-> (`make ... node` builds a headless TeXmacs for node, which converts
-> documents to PDF.) Any web server does, but the page loads faster from one
-> which sends the brotli copies and answers range requests, as `serve.mjs`
-> does. Details, the design and the plan: [`docs/wasm/`](docs/wasm/README.md).
->
-> ## Branch `wip_vue` — the Vue GUI
->
-> Work in progress: a graphical back end for TeXmacs which owes nothing to a
-> widget toolkit. It draws the editor, the bars, the menus, the dialogs and
-> the tools itself, on three libraries — [Clay](https://github.com/nicbarker/clay)
-> for the layout, SDL3 for the windows, the input and the clipboard, and
-> MuPDF for the pixels.
->
-> * Code: [`src/Plugins/Vue/`](src/Plugins/Vue/), with its `TODO` and its `tests/`
-> * Developer notes: [`docs/`](docs/README.md) — the graphics stack, the
->   widgets, the test harness, how the TeXmacs core talks to a GUI plugin,
->   and how to build and debug it
-> * Build: `./configure --with-gui=vue --with-sdl3 --with-mupdf=<prefix>`
->
-> Everything outside `src/Plugins/Vue/` and `docs/` is stock TeXmacs, save
-> for the few places which had to learn that the GUI is neither Qt nor X11.
+> For developers: the notes on the additions (design, status, audits) are
+> in [`docs/`](docs/README.md), the tests in [`tests/`](tests/README.md),
+> and the developer documentation inside TeXmacs (Help ▸ Developer
+> documentation) in [`TeXmacs/doc/devel/`](TeXmacs/doc/devel/). The
+> section below is the README of GNU TeXmacs.
 
 # GNU TeXmacs
 [![Join the chat at https://gitter.im/texmacs/Lobby](https://badges.gitter.im/texmacs/Lobby.svg)](https://gitter.im/texmacs/Lobby?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
@@ -100,132 +22,6 @@
 The software includes a text editor with support for mathematical formulas, a small technical picture editor and a tool for making presentations from a laptop. Moreover, TeXmacs can be used as an interface for many external systems for computer algebra, numerical analysis, statistics, etc. New presentation styles can be written by the user and new features can be added to the editor using the Scheme extension language. A native spreadsheet and tools for collaborative authoring are planned for later.
 
 TeXmacs runs on all major Unix platforms and Windows. Documents can be saved in TeXmacs, Xml or Scheme format and printed as Postscript or Pdf files. Converters exist for TeX/LaTeX and Html/Mathml. 
-
-## This branch: OpenType mathematical fonts (`wip_opentype`)
-
-This branch teaches TeXmacs to typeset mathematics with the fonts that
-LaTeX users know from `unicode-math`, and to offer them the way LaTeX
-packages do: a text font and its mathematics chosen together.
-
-![Latin Modern Math](doc/opentype-math/latin-modern-math.png)
-
-![Libertinus Math](doc/opentype-math/libertinus-math.png)
-
-![Fira Math](doc/opentype-math/fira-math.png)
-
-**Formulas laid out from the `MATH` table.** An OpenType math font says how
-its formulas are to be built: the position of scripts and limits, fractions
-and radicals, italic corrections and the kerning of scripts into the corners
-of a letter, the placement of accents, the size variants of every delimiter
-and how to assemble one of any size. TeXmacs now reads all of it and follows
-it, with script-size alternates, dotless letters, flattened accents and pair
-kerning from the `GSUB` and `GPOS` tables. The hand-tuned customizations
-TeXmacs already had for STIX and the TeX Gyre fonts keep precedence, and
-the experimental preference "Hand tuned math fonts" switches them off for
-comparison.
-
-**Fonts that come with TeXmacs.** Latin Modern, New Computer Modern, STIX
-Two, Libertinus, Kp Fonts (serif and sans), Erewhon (Utopia), XCharter
-(Charter), Euler, Concrete and Fira, each with its text faces (Euler with
-TeX Gyre Pagella, Concrete with the Concrete faces of CM Unicode) and,
-where the family has them, its sans serif and typewriter companions and a
-bold math font, next to the TeX Gyre fonts already shipped. They are
-registered in the shipped font database, so a fresh installation uses them
-without a scan, and a home directory written by an older version is brought
-up to date at the next start, instead of hiding the new fonts (a symbol only
-they draw used to come out as its name in red). Fonts are found in their
-OpenType form before their Type 1 form, and a rescan of the fonts on disk
-takes seconds instead of minutes.
-
-**Fonts TeXmacs knows.** Twenty-five math fonts have a profile that says
-what the `MATH` table cannot: which text, sans serif and typewriter fonts go
-with them, where their letters come from, and where they belong in the
-menus. XITS, Asana, IBM Plex, Garamond, Old Standard, DejaVu, Lete Sans,
-New Computer Modern Sans and GFS Neohellenic are used as soon as they are
-installed, in the font directories of the system or of TeXmacs, or from TeX
-Live (of any year, on macOS and Linux, or through
-`TEXMACS_FONT_PATH`). Any other font with a `MATH`
-table works too, without a profile and outside the menus, named in the
-document as `math=Cambria Math,Cambria`.
-
-**Choosing them.** The font button of the focus toolbar offers the
-installed pairs under the names LaTeX users know: Times, Palatino, Utopia,
-Charter, Euler, Concrete, Libertinus, Kp Fonts and the others in a serif
-section, Fira, Kp Sans, Computer Modern Sans and Lete Sans in a sans serif
-section, the less common fonts in a submenu, and the text fonts alone in a
-last section. The OpenType features of a font, such as old style figures,
-small capitals and stylistic sets, are offered by the font browser, and,
-when complex actions go through the menus, in `Document > Font > Features`
-and `Format > Font features`.
-
-**Symbols.** Two hundred mathematical symbols which TeXmacs could draw but
-not name have names, LaTeX equivalents and classes now. In a formula, a
-window and a side tool show all the symbols, group by group, with their
-markup in a balloon, to insert them with a click.
-
-**Where to read more.**
-
-- `Help > Manual > Fonts` in TeXmacs: choosing fonts, the mathematical
-  fonts, with a sample of every font that comes with TeXmacs and a list of
-  the others, and the reference chapter *Fonts, from selection to glyph*.
-- [`doc/OPENTYPEMATH.md`](doc/OPENTYPEMATH.md): what the branch implements,
-  how to build and test it, and a specimen of every profiled font.
-- [`doc/opentype-math-design.md`](doc/opentype-math-design.md): the design,
-  the status log and everything that is still missing.
-- [`doc/opentype-math-fonts-survey.md`](doc/opentype-math-fonts-survey.md):
-  the fonts, measured one by one, and why these are shipped.
-- [`doc/font-system-review.md`](doc/font-system-review.md): the TeXmacs
-  font system as a whole.
-- [`doc/math-symbol-coverage.md`](doc/math-symbol-coverage.md): which
-  mathematical symbols TeXmacs can name.
-- [`tests/README.md`](tests/README.md): the unit tests, the sample renders
-  and the comparison with LuaLaTeX.
-
-The work started from the partial support written by Ke Shi for Mogan
-(OSPP 2024), itself built on a `MATH` table reader from 2021.
-
-## Icon sets (branch `wip_icons`)
-
-This branch gives TeXmacs a choice of three icon sets, in
-**Preferences › General › Icon set** (after a restart). The original icons
-and the original code that finds them are unchanged; the new sets are added
-on top of them.
-
-**Classical.** The original TeXmacs icons.
-
-![Classical icons](doc/icons/classical-toolbars.png)
-
-**Monochrome.** The classical ideas drawn in the manner of the macOS symbols:
-filled objects with an outline, in one graphite tint and its light tones, red
-kept for errors and removals, letters in Latin Modern.
-
-![Monochrome icons](doc/icons/monochrome-toolbars.png)
-
-**Neo-classical.** The compositions and colours of the classical icons,
-modernized: a soft palette, light gradients, dark grey outlines, rounded
-corners; flat in the focus bar. This is the default set, when the
-preference has not been set.
-
-![Neo-classical icons](doc/icons/neoclassical-toolbars.png)
-
-The pictures show the main, text and focus toolbars on the light and dark
-themes. Every icon of each set, with its name, is in the specimen sheets
-[classical.pdf](doc/icons/classical.pdf),
-[monochrome.pdf](doc/icons/monochrome.pdf) and
-[neoclassical.pdf](doc/icons/neoclassical.pdf).
-[doc/icons/README.md](doc/icons/README.md) describes how the sets are chosen
-and the scripts that generate them (`misc/icons/`).
-
-## S7 Scheme (branch `wip_s7`)
-
-TeXmacs can run its Scheme code on [s7](https://ccrma.stanford.edu/software/snd/snd/s7.html)
-instead of Guile 1.8. The interpreter is a build option, `./configure
---with-scheme=s7|guile` (CMake: `-DSCHEME_IMPL=...`); an s7 build needs no
-Guile at all, not even to regenerate the glue. s7 is vendored unmodified,
-the C++ side talks to it through the usual `tmscm` layer, and the modules
-are s7 environments. The notes in [`docs/s7/`](docs/s7/README.md) describe
-the binding, the boot and the module system, the compatibility layer, the
-build, the open issues and the performance against Guile.
 
 ## Documentation
 GNU TeXmacs is self-documented. You may browse the manual in the `Help` menu or browse the online [one](https://www.texmacs.org/tmweb/manual/web-manual.en.html).

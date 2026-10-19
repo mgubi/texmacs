@@ -326,7 +326,7 @@
 
     <item>Six symbols which only <TeXmacs> defines (<verbatim|triangleup>,
     <verbatim|blacktriangleup> and four negated black triangles) are listed
-    in <source-link|src/doc/OPENTYPEMATH.md|doc/OPENTYPEMATH.md> as still exporting as small
+    in <source-link|src/docs/OPENTYPEMATH.md|docs/OPENTYPEMATH.md> as still exporting as small
     bitmaps when the math font lacks them.
 
     <item>Delimiters for which the table has variants but no assembly stop

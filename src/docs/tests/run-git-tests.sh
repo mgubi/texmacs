@@ -1,6 +1,6 @@
 #!/bin/sh
 # Run the Git tests against the TeXmacs built in this checkout.
-# Usage: doc/tests/run-git-tests.sh [--gui] [scratch-dir]
+# Usage: src/docs/tests/run-git-tests.sh [--gui] [scratch-dir]
 #   without --gui: the suites git and version of tests/scheme/check.sh
 #                  (TeXmacs/progs/check/git-test.scm and version-test.scm)
 #   with --gui:    tests needing the event loop (git-gui-test.scm), run with
@@ -13,7 +13,7 @@
 gui=no
 if test "$1" = "--gui"; then gui=yes; shift; fi
 here=$(cd "$(dirname "$0")" && pwd)
-src=$(cd "$here/../../src" && pwd)
+src=$(cd "$here/../.." && pwd)
 if test -n "$1"; then
   dir=$1 temporary=no
   mkdir -p "$dir" || exit 1

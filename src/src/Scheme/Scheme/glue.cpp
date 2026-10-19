@@ -1335,7 +1335,7 @@ tmscm_to_list_tree (tmscm p) {
 #include "../Glue/glue_editor.cpp"
 #include "../Glue/glue_server.cpp"
 // (the features of program code which a build may leave out, see
-// doc/code-features.md and misc/m4/tm_code.m4)
+// src/docs/code-features.md and misc/m4/tm_code.m4)
 #ifdef USE_TREE_SITTER
 #include "../Glue/glue_treesit.cpp"
 #endif

@@ -13,7 +13,7 @@
 
 # tree-sitter (Plugins/TreeSitter, progs/treesit) and the language servers
 # (System/Link/lsp_link.cpp, progs/lsp) are optional providers of the
-# features of program code (doc/code-features.md): TeXmacs works without
+# features of program code (src/docs/code-features.md): TeXmacs works without
 # one of them, or both.
 
 AC_DEFUN([TM_CODE_FEATURES],[
