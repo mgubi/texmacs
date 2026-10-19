@@ -55,7 +55,7 @@ say otherwise; C++ is under `src/src/`, Scheme under `src/TeXmacs/progs/`.
 
 | File | Contents |
 |---|---|
-| [git.md](git.md) | **The Git support**: index of its notes, and the state of the branch `wip-git-versioning` |
+| [git.md](git.md) | **The Git support**: index of its notes, and the state of the branch `wip_git` |
 | [git-features.md](git-features.md) | What the Git support adds: the features by menu, structured merges, safety, APIs, tests, limitations |
 | [git-implementation.md](git-implementation.md) | How the Git support is organised: modules, data formats, conventions |
 | [git-ui-design.md](git-ui-design.md) | UI design proposal for the Git support |

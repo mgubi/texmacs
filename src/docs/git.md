@@ -1,4 +1,4 @@
-# Developer notes: git versioning branch (`wip-git-versioning`)
+# Developer notes: the Git support (branch `wip_git`, formerly `wip-git-versioning`)
 
 Working notes for improving TeXmacs's git support. These files are for
 developers, not the user manual (the manual lives in
@@ -19,7 +19,7 @@ chapter `man-git*.en.tm`).
 Paths are relative to the repository root. Scheme code is under
 `src/TeXmacs/progs/`, C++ under `src/src/`.
 
-**Branch state.** Since 2026-10-04 `wip-git-versioning` is based on
+**Branch state.** Since 2026-10-04 `wip_git` is based on
 `wip_fixes` (the upstream mirror `svn_sync` with fixes and the test
 harness); from 2026-09-24 it was based on `svn_sync`. The original
 2020 WIP commit is kept as the branch `wip-git-versioning-2020`; its intent

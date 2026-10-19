@@ -1,7 +1,7 @@
 # Git support: UI design proposal
 
 This proposes improvements to the user interface of the git support on
-the `wip-git-versioning` branch. The features themselves are in
+the `wip_git` branch. The features themselves are in
 [git-features.md](git-features.md); this document is only about how they
 are presented. Everything proposed here uses mechanisms TeXmacs already
 has (section 6), so no new C++ widgets are needed.
