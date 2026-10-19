@@ -85,8 +85,8 @@
   completion, the information at the cursor, the definitions, the
   references, the colours and inlay hints of the server, formatting,
   renaming and quick fixes work as in a source file; an edit of the server
-  which would join or split blocks is not applied. The outline and the
-  folds of joined blocks are those of the syntax tree, block by block.
+  which would join or split blocks is not applied. The outline of joined blocks is that of all of them, and a fold
+  of the server is one inside a block.
 
   <paragraph*|Projects>
 

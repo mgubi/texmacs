@@ -430,6 +430,65 @@
     (buffer-close u)
     (when (buffer-exists? old) (switch-to-buffer old))))
 
+;; a long region is parsed by parts (syntax_region.cpp): its colours after
+;; edits are those of a fresh copy, and the answers have the rows of the
+;; whole region
+(define (long-c-lines n)
+  (append-map (lambda (i)
+                (let ((f (string-append "f" (number->string i))))
+                  (list (string-append "int " f " (int x) {")
+                        (string-append "  return x + " (number->string i) ";")
+                        "}")))
+              (iota n)))
+
+(define (test-long-regions)
+  (check-group "long regions")
+  (let* ((u (string->url "tmfs://aux/treesit-long"))
+         (v (string->url "tmfs://aux/treesit-long-copy"))
+         (old (current-buffer))
+         (lan (tree-sitter-program-language "c"))
+         (colors (lambda (d rows)
+                   (map (lambda (i) (tree-sitter-line-colors "c" (tree-ref d i)))
+                        rows)))
+         (rows '(0 1 2 2999 3000 3001 4500 4501 6000 8997 8998 8999))
+         (fresh (lambda (d)
+                  (buffer-set-body v (stree->tree (tree->stree d)))
+                  (switch-to-buffer v)
+                  (let ((r (colors (buffer-get-body v) rows)))
+                    (switch-to-buffer u)
+                    (buffer-close v)
+                    r))))
+    (buffer-set-body u (stree->tree `(document ,@(long-c-lines 3000))))
+    (switch-to-buffer u)
+    (let ((d (buffer-get-body u)))
+      (tree-sitter-line-colors "c" (tree-ref d 0))
+      (check-true (> (length (syntax-region-statistics d lan)) 2))
+      ;; the rows of the answers are those of the whole region
+      (with n (syntax-region-node-at d lan 4501 3)
+        (check-true (and (pair? n) (== (car (list-ref (car n) 2)) 4501))))
+      ;; a key in a name, lines inserted, an unclosed comment, closed
+      (tree-insert! (tree-ref d 4501) 9 "y")
+      (tree-sitter-line-colors "c" (tree-ref d 4501))
+      (tree-insert! d 3000 '("int k;" "int m;"))
+      (tree-sitter-line-colors "c" (tree-ref d 3000))
+      (tree-remove! d 3000 2)
+      (tree-insert! d 2999 '("/* open"))
+      (tree-sitter-line-colors "c" (tree-ref d 2999))
+      (tree-remove! d 2999 1)
+      (tree-sitter-line-colors "c" (tree-ref d 2999))
+      ;; an edit over a cut: several lines removed around the middle
+      (tree-remove! d 4400 300)
+      (tree-insert! d 4400 (sublist (long-c-lines 3000) 4400 4700))
+      (tree-sitter-line-colors "c" (tree-ref d 4400))
+      (check= (colors d rows) (fresh d))
+      ;; an error, at its row in the region
+      (tree-insert! (tree-ref d 6001) 2 "@")
+      (tree-sitter-line-colors "c" (tree-ref d 6001))
+      (check-true (in? 6001 (map (lambda (e) (car (cadr e)))
+                                 (syntax-region-errors d lan)))))
+    (buffer-close u)
+    (when (buffer-exists? old) (switch-to-buffer old))))
+
 ;; the colours of the lines of a buffer after edits (the text, the offsets
 ;; and the colours of the region are changed in place by a keystroke, made
 ;; again when lines come or go) are those of a fresh copy of its lines
@@ -1329,6 +1388,7 @@
   (test-regions)
   (test-highlight)
   (test-highlight-edits)
+  (test-long-regions)
   (test-scan)
   (test-edit)
   (test-scanners)

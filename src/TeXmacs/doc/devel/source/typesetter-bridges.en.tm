@@ -787,32 +787,32 @@
   <subsection|Tracking the modified regions>
 
   After a pass, only the parts of the screen which actually changed need to
-  be repainted. This is achieved without comparing box trees, using the
-  following trick. Every line of text in a paragraph is a
-  <cpp|phrase_box> (<source-link|Typeset/Boxes/Composite/concat_boxes.cpp|src/Typeset/Boxes/Composite/concat_boxes.cpp>),
-  a concatenation box with two extra fields: a pointer <cpp|logs_ptr> to a
-  change log and the absolute position <cpp|ox>, <cpp|oy> at which it was
-  last placed.
+  be repainted. This is achieved without comparing box trees. The lines of
+  the paragraphs (<cpp|phrase_box>,
+  <source-link|concat_boxes.cpp|src/Typeset/Boxes/Composite/concat_boxes.cpp>)
+  and the remember boxes log where they are placed: each has a
+  <cpp|placed_box> (<source-link|boxes.hpp|src/Typeset/boxes.hpp>), the
+  log, the pass and the origin at which it was placed last.
 
   <\itemize>
     <item>At the end of each pass, <cpp|typesetter_rep::typeset (SI& x1,
     SI& y1, SI& x2, SI& y2)> calls <cpp|b-\<gtr\>position_at (0, 0,
-    change_log)> on the new document box. The default implementation in
-    <source-link|Typeset/Boxes/Basic/boxes.cpp|src/Typeset/Boxes/Basic/boxes.cpp> just recurses into the
-    subboxes with updated offsets. When a <cpp|phrase_box> is reached, it
-    prepends a pair to the log: its old rectangle (or the empty rectangle
-    if the box is new) and its new rectangle.
+    repaint)> on the new document box, between <cpp|start_pass> and
+    <cpp|end_pass> of its <cpp|repaint_log>. The default implementation
+    in <source-link|boxes.cpp|src/Typeset/Boxes/Basic/boxes.cpp> recurses
+    into the subboxes with updated offsets. A box which logs adds a pair
+    (new rectangle, old rectangle) to the log when it is new (an empty old
+    rectangle) or moved, nothing when it is where it was, and is kept in
+    the list of the boxes placed in the pass.
 
-    <item>When a line disappears (because its paragraph was re-typeset and
-    the old boxes are no longer referenced), the destructor
-    <cpp|phrase_box_rep::~phrase_box_rep> prepends the pair (empty
-    rectangle, old rectangle) to the same log.
+    <item><cpp|end_pass> unplaces the boxes placed in the previous pass and
+    not in this one: each adds the pair (empty rectangle, old rectangle).
+    The log keeps these boxes until then, so when a box is destroyed does
+    not matter.
 
     <item>The static function <cpp|requires_update> in
-    <source-link|typesetter.cpp|src/Typeset/Bridge/typesetter.cpp> scans these pairs: it keeps the new rectangle
-    of new lines, the old rectangle of deleted lines, and both rectangles
-    for lines that moved. Lines that were cached and did not move produce
-    two equal rectangles and are ignored.
+    <source-link|typesetter.cpp|src/Typeset/Bridge/typesetter.cpp> turns
+    the pairs into the rectangles to repaint.
   </itemize>
 
   The least upper bound of the remaining rectangles is returned in the
@@ -822,15 +822,22 @@
   paragraph usually only invalidates that paragraph, plus the following
   ones if its height changed.
 
-  A line keeps the address of the change log, which is a member of the
-  typesetter, and writes to it when it is destroyed: the lines must not
-  outlive the typesetter. The editor therefore releases its box
-  <cpp|eb> before it deletes the typesetter
-  (<cpp|edit_typeset_rep::~edit_typeset_rep>), and the destructor of the
-  typesetter releases the bridges, the lines and the pages it keeps
-  before the log. In the other order, which was the one of the members,
-  the lines of a view which was closed wrote into memory which was
-  already free.
+  Placing every line at every pass costs as many lines as the document has
+  (6.6 ms for 50000 lines). The chunks of lines of a long document
+  (<cpp|chunk_lines> in
+  <source-link|bridge.cpp|src/Typeset/Bridge/bridge.cpp>) are therefore
+  group boxes (<cpp|group_box>,
+  <source-link|change_boxes.cpp|src/Typeset/Boxes/Modifier/change_boxes.cpp>):
+  a group which is placed where it was in the previous pass does not place
+  its lines again, since a box does not change and a chunk which is kept
+  is the same box. A box which logs is therefore placed until it is
+  unplaced (not only when it was placed in the previous pass). The lines
+  which a group places are kept by the group, not by the log: the log
+  would else unplace them at the next pass, in which the group does not
+  place them. A group which is gone unplaces the lines in it which were
+  not placed again (<cpp|box_rep::unplace> recurses). With
+  <verbatim|TEXMACS_TYPESET_CACHES=check>, <cpp|check_repaint> compares
+  the rectangles to repaint with all the boxes placed, before and after.
 
   <subsection|The editor side>
 

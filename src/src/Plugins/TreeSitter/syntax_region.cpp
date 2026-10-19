@@ -118,6 +118,7 @@ struct syntax_region_rep {
   std::vector<struct injected_tree> injected;   // see below
   std::string text;            // the lines with their newlines, when
   int text_version;            // it is that of this version (else -1)
+  int first;                   // the first line of the root (a part)
 };
 
 // the tree of a part of a region in another language (an injection), kept
@@ -461,6 +462,9 @@ region_delete (syntax_region_rep* r) {
   tm_delete (r);
 }
 
+static syntax_region_rep* new_region (tree root, int language,
+                                      array<string> lines, int first);
+
 static syntax_region_rep*
 get_region (tree root, int language) {
   // the region of root, parsed and up to date, or NULL
@@ -488,24 +492,7 @@ get_region (tree root, int language) {
       else region_update (r);
       return r;
     }
-  syntax_region_rep* r= tm_new<syntax_region_rep> ();
-  r->root= root;
-  r->language= language;
-  r->lines= region_lines (root);
-  r->offsets= line_offsets (r->lines);
-  r->parser= ts_parser_new ();
-  r->tree= NULL;
-  r->full_parses= 1;
-  r->incremental_parses= 0;
-  r->version= 0;
-  r->hl_query= -1;
-  r->ind_query= -1;
-  r->ind_version= -1;
-  r->hl_injections= -1;
-  r->hl_epoch= -1;
-  r->text_version= -1;
-  ts_parser_set_language (r->parser, lang);
-  region_parse (r, NULL);
+  syntax_region_rep* r= new_region (root, language, region_lines (root), 0);
   int total= region_bytes (r);
   for (int i= 0; i < N(regions); i++) total += region_bytes (regions[i]);
   while (N(regions) > 0 &&
@@ -520,8 +507,285 @@ get_region (tree root, int language) {
   return r;
 }
 
+static syntax_region_rep*
+new_region (tree root, int language, array<string> lines, int first) {
+  // a region of the lines of root (from the line first: a part), parsed
+  const TSLanguage* lang= tree_sitter_get_language (language);
+  syntax_region_rep* r= tm_new<syntax_region_rep> ();
+  r->root= root;
+  r->language= language;
+  r->first= first;
+  r->lines= lines;
+  r->offsets= line_offsets (r->lines);
+  r->parser= ts_parser_new ();
+  r->tree= NULL;
+  r->full_parses= 1;
+  r->incremental_parses= 0;
+  r->version= 0;
+  r->hl_query= -1;
+  r->ind_query= -1;
+  r->ind_version= -1;
+  r->hl_injections= -1;
+  r->hl_epoch= -1;
+  r->text_version= -1;
+  ts_parser_set_language (r->parser, lang);
+  region_parse (r, NULL);
+  return r;
+}
+
+/******************************************************************************
+* Long regions: groups of parts
+******************************************************************************/
+
+/* A region of many lines (a long source file) is cut into parts, each a
+   region of its own over a slice of the lines (from its first line), cut
+   where a node at the top level of the syntax tree starts: an edit
+   reparses its part only (the cost of an incremental parse of tree-sitter
+   grows with the nodes at the top level: 13 ms for 100000 lines of C).
+   A part is joined to the next when an edit leaves an error in its last
+   node at the top level (an unclosed comment: the next part may be in it),
+   and split when it is too long (where no error comes before the cut). The
+   requests go to the part of their line, their lines made local to it and
+   those of their answers global again (row_base); those about the whole
+   region gather the answers of all the parts. */
+
+#define GROUP_MIN_ROWS 6000
+#define PART_ROWS 2000
+
+struct syntax_group_rep {
+  tree root;
+  int language;
+  array<syntax_region_rep*> parts;
+};
+
+static array<syntax_group_rep*> groups;
+static const int max_groups= 8;
+
+static int row_base= 0;   // added to the rows of the answers (of a part)
+
+static array<string>
+slice_lines (tree root, int first, int count) {
+  array<string> r;
+  for (int i= first; i < first + count; i++) r << line_string (root[i]);
+  return r;
+}
+
+static bool
+tail_has_error (syntax_region_rep* r) {
+  // is there an error in the last node at the top level of r?
+  TSNode top= ts_tree_root_node (r->tree);
+  uint32_t k= ts_node_child_count (top);
+  if (!ts_node_has_error (top) || k == 0) return false;
+  TSNode last= ts_node_child (top, k - 1);
+  return ts_node_has_error (last) || ts_node_is_error (top);
+}
+
+static array<int>
+cut_rows (syntax_region_rep* r, int target) {
+  // the lines (local) where r may be cut into parts of some target lines:
+  // the starts of nodes at the top level, after a node without error
+  array<int> cuts;
+  TSNode top= ts_tree_root_node (r->tree);
+  TSTreeCursor c= ts_tree_cursor_new (top);
+  int n= N(r->lines), last= 0;
+  bool error= false;
+  if (ts_tree_cursor_goto_first_child (&c))
+    do {
+      TSNode ch= ts_tree_cursor_current_node (&c);
+      int row= (int) ts_node_start_point (ch).row;
+      if (!error && row >= last + target && row <= n - target / 2 &&
+          ts_node_start_point (ch).column == 0) {
+        cuts << row;
+        last= row;
+      }
+      error= ts_node_has_error (ch) || ts_node_is_error (ch);
+    } while (ts_tree_cursor_goto_next_sibling (&c));
+  ts_tree_cursor_delete (&c);
+  return cuts;
+}
+
+static array<syntax_region_rep*>
+cut_region (syntax_region_rep* r) {
+  // the parts of the lines of r (from its first line), at its cuts
+  array<syntax_region_rep*> parts;
+  array<int> cuts= cut_rows (r, PART_ROWS);
+  int start= 0, n= N(r->lines);
+  cuts << n;
+  for (int i= 0; i < N(cuts); i++) {
+    parts << new_region (r->root, r->language, range (r->lines, start, cuts[i]),
+                         r->first + start);
+    start= cuts[i];
+  }
+  return parts;
+}
+
+static void
+group_delete (syntax_group_rep* g) {
+  for (int i= 0; i < N(g->parts); i++) region_delete (g->parts[i]);
+  tm_delete (g);
+}
+
+static int
+group_rows (syntax_group_rep* g) {
+  int n= 0;
+  for (int i= 0; i < N(g->parts); i++) n += N(g->parts[i]->lines);
+  return n;
+}
+
+static void
+group_replace (syntax_group_rep* g, int k1, int k2,
+               array<syntax_region_rep*> news) {
+  // the parts k1..k2 become news
+  array<syntax_region_rep*> parts;
+  for (int i= 0; i < k1; i++) parts << g->parts[i];
+  parts << news;
+  for (int i= k2 + 1; i < N(g->parts); i++) parts << g->parts[i];
+  for (int i= k1; i <= k2; i++) region_delete (g->parts[i]);
+  g->parts= parts;
+}
+
+static void
+group_join (syntax_group_rep* g, int k1, int k2, int delta) {
+  // the parts k1..k2 as one, parsed again (delta: the lines which an edit
+  // in them inserted, or removed when negative)
+  int first= g->parts[k1]->first;
+  int count= g->parts[k2]->first + N(g->parts[k2]->lines) - first + delta;
+  array<syntax_region_rep*> news;
+  news << new_region (g->root, g->language,
+                      slice_lines (g->root, first, count), first);
+  group_replace (g, k1, k2, news);
+}
+
+static void
+group_update (syntax_group_rep* g) {
+  // the parts after an edit of the lines: the part of the edit is parsed
+  // again incrementally (the parts of an edit over several are joined);
+  // those after it are moved by the number of lines inserted or removed
+  tree root= g->root;
+  int np= N(g->parts);
+  int n0= group_rows (g), n1= N(root);
+  // the first line which changed, and the number of those at the end
+  // which did not (in the old lines)
+  int a= 0, ka= np - 1;
+  bool found= false;
+  for (int k= 0; k < np && !found; k++) {
+    syntax_region_rep* p= g->parts[k];
+    for (int i= 0; i < N(p->lines); i++, a++)
+      if (a >= n1 || !unchanged_line (p->lines[i], root[a])) {
+        found= true; ka= k; break; }
+  }
+  if (!found && n0 == n1) return;
+  int b= 0, kb= ka;
+  bool stop= false;
+  for (int k= np - 1; k >= 0 && !stop; k--) {
+    syntax_region_rep* p= g->parts[k];
+    for (int i= N(p->lines) - 1; i >= 0; i--) {
+      if (b >= n0 - a || b >= n1 - a ||
+          !unchanged_line (p->lines[i], root[n1 - 1 - b])) {
+        stop= true; kb= k; break; }
+      b++;
+    }
+  }
+  if (kb < ka) kb= ka;
+  int delta= n1 - n0;
+  syntax_region_rep* pa= g->parts[ka];
+  bool tail_error= tail_has_error (g->parts[kb]);
+  if (ka == kb) {
+    int al= a - pa->first;
+    int bl= max (0, pa->first + N(pa->lines) - (n0 - b));
+    int count= N(pa->lines) + delta;
+    update_lines (pa, al, bl,
+                  slice_lines (root, pa->first + al, count - al - bl));
+  }
+  else group_join (g, ka, kb, delta);
+  for (int k= ka + 1; k < N(g->parts); k++) g->parts[k]->first += delta;
+  // an error which an edit left at the end of the part: the next one goes
+  // with it (it may be in a comment which does not end any more)
+  while (ka + 1 < N(g->parts) && !tail_error && tail_has_error (g->parts[ka]))
+    group_join (g, ka, ka + 1, 0);
+  // a part which is too long is cut again (when it is no longer in error)
+  if (N(g->parts[ka]->lines) > 3 * PART_ROWS && !tail_has_error (g->parts[ka])) {
+    array<syntax_region_rep*> news= cut_region (g->parts[ka]);
+    if (N(news) > 1) group_replace (g, ka, ka, news);
+    else for (int i= 0; i < N(news); i++) region_delete (news[i]);
+  }
+}
+
+static syntax_group_rep*
+get_group (tree root, int language) {
+  // the group of the parts of a long region, up to date, or NULL (the
+  // region is not long)
+  if (!is_document (root)) return NULL;
+  for (int i= 0; i < N(groups); i++)
+    if (strong_equal (groups[i]->root, root)) {
+      syntax_group_rep* g= groups[i];
+      for (int j= i; j > 0; j--) groups[j]= groups[j-1];
+      groups[0]= g;
+      if (g->language != language) {
+        group_delete (g);
+        groups= range (groups, 1, N(groups));
+        break;
+      }
+      group_update (g);
+      return g;
+    }
+  if (N(root) < GROUP_MIN_ROWS) return NULL;
+  if (tree_sitter_get_language (language) == NULL) return NULL;
+  if (!cork_table_ready) init_cork_table ();
+  syntax_region_forget (root);
+  // (cut where the parse of the whole region has nodes at the top level)
+  syntax_region_rep* whole= new_region (root, language, region_lines (root), 0);
+  syntax_group_rep* g= tm_new<syntax_group_rep> ();
+  g->root= root;
+  g->language= language;
+  g->parts= cut_region (whole);
+  region_delete (whole);
+  if (N(groups) >= max_groups) {
+    group_delete (groups[N(groups) - 1]);
+    groups->resize (N(groups) - 1);
+  }
+  groups << g;
+  for (int j= N(groups) - 1; j > 0; j--) groups[j]= groups[j-1];
+  groups[0]= g;
+  return g;
+}
+
+static syntax_region_rep*
+region_at (tree root, int language, int& row) {
+  // the region of the line row, or of its part in a long region (row is
+  // then local to it, and row_base set for the answers)
+  row_base= 0;
+  syntax_group_rep* g= get_group (root, language);
+  if (g == NULL) return get_region (root, language);
+  int k= N(g->parts) - 1;
+  while (k > 0 && row < g->parts[k]->first) k--;
+  syntax_region_rep* p= g->parts[k];
+  row -= p->first;
+  row_base= p->first;
+  return p;
+}
+
+static array<syntax_region_rep*>
+regions_of (tree root, int language) {
+  // the region, or the parts of a long region
+  row_base= 0;
+  syntax_group_rep* g= get_group (root, language);
+  if (g != NULL) return g->parts;
+  array<syntax_region_rep*> r;
+  syntax_region_rep* x= get_region (root, language);
+  if (x != NULL) r << x;
+  return r;
+}
+
 void
 syntax_region_forget (tree root) {
+  for (int i= 0; i < N(groups); i++)
+    if (strong_equal (groups[i]->root, root)) {
+      group_delete (groups[i]);
+      for (int j= i; j + 1 < N(groups); j++) groups[j]= groups[j+1];
+      groups->resize (N(groups) - 1);
+      break;
+    }
   for (int i= 0; i < N(regions); i++)
     if (strong_equal (regions[i]->root, root)) {
       region_delete (regions[i]);
@@ -537,17 +801,21 @@ syntax_region_forget (tree root) {
 
 string
 syntax_region_sexp (tree root, int language) {
-  syntax_region_rep* r= get_region (root, language);
-  if (r == NULL) return "";
-  char* s= ts_node_string (ts_tree_root_node (r->tree));
-  string result (s);
-  free (s);
+  // (of the parts one after the other, in a long region)
+  array<syntax_region_rep*> rs= regions_of (root, language);
+  string result;
+  for (int i= 0; i < N(rs); i++) {
+    char* s= ts_node_string (ts_tree_root_node (rs[i]->tree));
+    result << string (s);
+    free (s);
+  }
   return result;
 }
 
 static object
 point_object (TSPoint p) {
-  return list_object (object ((int) p.row), object ((int) p.column));
+  // (the line in the root: that of a part plus its first line)
+  return list_object (object ((int) p.row + row_base), object ((int) p.column));
 }
 
 static object
@@ -571,8 +839,11 @@ syntax_region_node_at (tree root, int language, int row, int column) {
 object
 syntax_region_node_range (tree root, int language,
                           int row1, int col1, int row2, int col2) {
-  // the nodes which contain a range, innermost first
-  syntax_region_rep* r= get_region (root, language);
+  // the nodes which contain a range, innermost first (in the part of its
+  // start, in a long region)
+  int base= row1;
+  syntax_region_rep* r= region_at (root, language, row1);
+  row2= max (0, row2 - (base - row1));
   array<object> l;
   if (r == NULL) return as_list_object (l);
   TSPoint p1= { (uint32_t) row1, (uint32_t) col1 };
@@ -599,9 +870,11 @@ object
 syntax_region_last_nodes (tree root, int language) {
   // the root, its last child, the last child of that one..., outermost
   // first: where the text ends (an empty block of Python is found there)
-  syntax_region_rep* r= get_region (root, language);
+  array<syntax_region_rep*> rs= regions_of (root, language);
   array<object> l;
-  if (r == NULL) return as_list_object (l);
+  if (N(rs) == 0) return as_list_object (l);
+  syntax_region_rep* r= rs[N(rs) - 1];
+  row_base= r->first;
   TSNode n= ts_tree_root_node (r->tree);
   while (!ts_node_is_null (n)) {
     l << node_object (n, NULL);
@@ -628,18 +901,28 @@ collect_errors (TSNode n, array<object>& l) {
 object
 syntax_region_errors (tree root, int language) {
   // (kind (row column) (row column)) for each error and missing node
-  syntax_region_rep* r= get_region (root, language);
+  array<syntax_region_rep*> rs= regions_of (root, language);
   array<object> l;
-  if (r != NULL) collect_errors (ts_tree_root_node (r->tree), l);
+  for (int i= 0; i < N(rs); i++) {
+    row_base= rs[i]->first;
+    collect_errors (ts_tree_root_node (rs[i]->tree), l);
+  }
+  row_base= 0;
   return as_list_object (l);
 }
 
 array<int>
 syntax_region_statistics (tree root, int language) {
-  // the number of full and of incremental parses of the region
+  // the number of full and of incremental parses of the region (of its
+  // parts), and of its parts when it has some
   array<int> a;
-  syntax_region_rep* r= get_region (root, language);
-  if (r != NULL) a << r->full_parses << r->incremental_parses;
+  array<syntax_region_rep*> rs= regions_of (root, language);
+  if (N(rs) == 0) return a;
+  int full= 0, incr= 0;
+  for (int i= 0; i < N(rs); i++) {
+    full += rs[i]->full_parses; incr += rs[i]->incremental_parses; }
+  a << full << incr;
+  if (N(rs) > 1) a << N(rs);
   return a;
 }
 
@@ -660,17 +943,21 @@ object
 syntax_region_captures (tree root, int language, int query) {
   // the captures of a query in the region, in the order of the text, after
   // the predicates: (capture (row column) (row column))
-  syntax_region_rep* r= get_region (root, language);
+  array<syntax_region_rep*> rs= regions_of (root, language);
   array<object> l;
-  if (r == NULL) return as_list_object (l);
-  const std::string& text= region_text (r);
-  array<int> caps;
-  const char* ctext= text.c_str ();
-  tree_sitter_query_run (query, ts_tree_root_node (r->tree), ctext, caps);
-  for (int i= 0; i + 2 < N(caps); i += 3)
-    l << list_object (object (caps[i+2]),
-                      point_object (point_of (r->offsets, caps[i])),
-                      point_object (point_of (r->offsets, caps[i+1])));
+  for (int k= 0; k < N(rs); k++) {
+    syntax_region_rep* r= rs[k];
+    row_base= r->first;
+    const std::string& text= region_text (r);
+    array<int> caps;
+    const char* ctext= text.c_str ();
+    tree_sitter_query_run (query, ts_tree_root_node (r->tree), ctext, caps);
+    for (int i= 0; i + 2 < N(caps); i += 3)
+      l << list_object (object (caps[i+2]),
+                        point_object (point_of (r->offsets, caps[i])),
+                        point_object (point_of (r->offsets, caps[i+1])));
+  }
+  row_base= 0;
   return as_list_object (l);
 }
 
@@ -887,10 +1174,10 @@ mark_tokens (TSNode top, array<int>& paint, int from, int to) {
   ts_tree_cursor_delete (&c);
 }
 
-array<array<int> >
-syntax_region_highlight (tree root, int language, int query, array<int> colors,
-                         int injections, ts_injection_resolver resolve,
-                         int epoch, array<int>* recoloured, bool* all) {
+static array<array<int> >
+highlight_region (syntax_region_rep* r, int query, array<int> colors,
+                  int injections, ts_injection_resolver resolve,
+                  int epoch, array<int>* recoloured, bool* all) {
   // the colour codes of each position of each line, for the query with the
   // colour code of each capture (0: no colour; see paint_captures); then
   // the injections (a query of injections.scm, or -1): the ranges which it
@@ -902,8 +1189,8 @@ syntax_region_highlight (tree root, int language, int query, array<int> colors,
   // coloured again (the query runs on their bytes); their rows are appended
   // to recoloured, when given, and all is set when they are all of them
   // (the region is new, or its query, its injections or its epoch).
-  syntax_region_rep* r= get_region (root, language);
-  if (r == NULL) return array<array<int> > ();
+  int base= r->first;   // (the rows of recoloured are those of the root)
+
   int n= N(r->lines);
   if (r->hl_query != query || r->hl_injections != injections ||
       r->hl_epoch != epoch || N(r->hl_cols) != n) {
@@ -950,9 +1237,26 @@ syntax_region_highlight (tree root, int language, int query, array<int> colors,
     for (int j= 0; j < m; j++) c[j]= paint[o + j];
     r->hl_cols[i]= c;
     r->hl_dirty[i]= false;
-    if (recoloured != NULL) (*recoloured) << i;
+    if (recoloured != NULL) (*recoloured) << i + base;
   }
   return r->hl_cols;
+}
+
+array<array<int> >
+syntax_region_highlight (tree root, int language, int query, array<int> colors,
+                         int injections, ts_injection_resolver resolve,
+                         int epoch, array<int>* recoloured, bool* all) {
+  // (see highlight_region; in a long region, the colours of its parts one
+  // after the other: each part colours the lines of its edits)
+  array<syntax_region_rep*> rs= regions_of (root, language);
+  if (N(rs) == 1)
+    return highlight_region (rs[0], query, colors, injections, resolve,
+                             epoch, recoloured, all);
+  array<array<int> > cols;
+  for (int k= 0; k < N(rs); k++)
+    cols << highlight_region (rs[k], query, colors, injections, resolve,
+                              epoch, recoloured, all);
+  return cols;
 }
 
 /******************************************************************************
@@ -972,8 +1276,9 @@ int
 syntax_region_errors_with (tree root, int language, int row, int col, string ins) {
   // the number of ERROR and MISSING nodes of the region if ins were
   // inserted at the point (the tree of the region is reparsed in a copy,
-  // incrementally); -1 without a tree
-  syntax_region_rep* r= get_region (root, language);
+  // incrementally); -1 without a tree (of the part of the point, in a
+  // long region)
+  syntax_region_rep* r= region_at (root, language, row);
   if (r == NULL || row < 0 || row >= N(r->lines)) return -1;
   if (N(ins) == 0) return count_errors (ts_tree_root_node (r->tree));
   int pos= r->offsets[row] + min (max (col, 0), N(r->lines[row]));
@@ -1028,7 +1333,7 @@ syntax_region_node_move (tree root, int language, int row, int col, int dir) {
   // first ancestor which starts before the point (2), the first named
   // descendant which starts after it (-2); empty when there is none
   array<int> r;
-  syntax_region_rep* reg= get_region (root, language);
+  syntax_region_rep* reg= region_at (root, language, row);
   if (reg == NULL) return r;
   TSNode top= ts_tree_root_node (reg->tree);
   TSPoint p= { (uint32_t) row, (uint32_t) col };
@@ -1073,7 +1378,7 @@ syntax_region_node_move (tree root, int language, int row, int col, int dir) {
   }
   if (ts_node_is_null (target)) return r;
   TSPoint s= ts_node_start_point (target);
-  r << (int) s.row << (int) s.column;
+  r << (int) s.row + row_base << (int) s.column;
   return r;
 }
 
@@ -1082,7 +1387,8 @@ push_range (array<int>& r, TSNode n) {
   // the start and end (row column row column) of n, or -1 four times
   if (ts_node_is_null (n)) { r << -1 << -1 << -1 << -1; return; }
   TSPoint a= ts_node_start_point (n), b= ts_node_end_point (n);
-  r << (int) a.row << (int) a.column << (int) b.row << (int) b.column;
+  r << (int) a.row + row_base << (int) a.column
+    << (int) b.row + row_base << (int) b.column;
 }
 
 static bool
@@ -1106,7 +1412,7 @@ syntax_region_node_info (tree root, int language, int row, int col) {
   // is a pair of brackets, and the largest named node which ends at the
   // point; empty without a tree
   array<int> r;
-  syntax_region_rep* reg= get_region (root, language);
+  syntax_region_rep* reg= region_at (root, language, row);
   if (reg == NULL) return r;
   TSNode top= ts_tree_root_node (reg->tree);
   TSPoint p= { (uint32_t) row, (uint32_t) col };
@@ -1301,7 +1607,7 @@ syntax_region_indent (tree root, int language, int query, int row, int tab) {
   // the indentation of the line row by the query (indents.scm); -1 when
   // the line keeps the indentation it would have without the query
   // (@indent.auto), -2 without a syntax tree
-  syntax_region_rep* r= get_region (root, language);
+  syntax_region_rep* r= region_at (root, language, row);
   if (r == NULL) return -2;
   array<string>& lines= r->lines;
   if (row < 0 || row >= N(lines)) return -2;
