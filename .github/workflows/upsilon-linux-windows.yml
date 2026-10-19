@@ -12,7 +12,11 @@
 #     (OpenGL of Mesa, on the CPU); the snapshots are artifacts too;
 #   * linux-appimage, appimage-check: AppImages of the Qt and the Vue builds,
 #     made on Ubuntu 22.04 (packages/appimage/build-appimage.sh) and run on
-#     Ubuntu 24.04 and Debian 12 without packages of development.
+#     Ubuntu 24.04 and Debian 12 without packages of development;
+#   * windows, windows-vue also make an installer each (Inno Setup,
+#     packages/windows/TeXmacs-Upsilon.iss, .github/scripts/windows-installer.sh),
+#     installed, run and uninstalled: beside the stock TeXmacs, it has its
+#     own folder and identity and writes no TEXMACS_PATH.
 # A state of upsilon_texmacs is built by moving upsilon_ci to it,
 #   git push -f origin upsilon_texmacs:upsilon_ci
 # NOTE: keep the jobs linux and windows as in ci.yml, which comes from wip_s7
@@ -144,10 +148,16 @@ jobs:
           ls ../distr/TeXmacs-Windows/bin/platforms
           (cd ../distr && zip -qr "$GITHUB_WORKSPACE/texmacs-windows-x86_64.zip" TeXmacs-Windows)
 
+      # the installer (Inno Setup): made, installed, run and uninstalled
+      - name: Installer
+        run: ../.github/scripts/windows-installer.sh qt
+
       - uses: actions/upload-artifact@v4
         with:
           name: texmacs-windows-x86_64
-          path: texmacs-windows-x86_64.zip
+          path: |
+            texmacs-windows-x86_64.zip
+            texmacs-upsilon-qt-x86_64-setup.exe
           retention-days: 14
 
   linux-vue:
@@ -490,6 +500,10 @@ jobs:
           ls ../distr/TeXmacs-Windows/bin
           (cd ../distr && zip -qr "$(cygpath -u "$GITHUB_WORKSPACE")/texmacs-vue-windows-x86_64.zip" TeXmacs-Windows)
 
+      # the installer (Inno Setup): made, installed, run and uninstalled
+      - name: Installer
+        run: ../.github/scripts/windows-installer.sh vue
+
       # the bundle (its DLLs); the runners have no OpenGL 3 (MuPDF draws)
       - name: Smoke test (TeXmacs shows a document)
         run: |
@@ -553,7 +567,10 @@ jobs:
         if: always()
         with:
           name: texmacs-vue-windows-x86_64
-          path: texmacs-vue-windows-x86_64.zip
+          path: |
+            texmacs-vue-windows-x86_64.zip
+            texmacs-upsilon-vue-x86_64-setup.exe
+          if-no-files-found: warn
           retention-days: 14
 
       - uses: actions/upload-artifact@v4
@@ -619,6 +636,8 @@ jobs:
               texmacs-windows-*)     l="Windows, Qt 6, x86_64" ;;
               texmacs-vue-windows-*) l="Windows, Vue, x86_64" ;;
               texmacs-upsilon-qt-*.AppImage)  l="Linux AppImage, Qt 6, x86_64" ;;
+              texmacs-upsilon-qt-*-setup.exe)  l="Windows installer, Qt 6, x86_64" ;;
+              texmacs-upsilon-vue-*-setup.exe) l="Windows installer, Vue, x86_64" ;;
               texmacs-upsilon-vue-*.AppImage) l="Linux AppImage, Vue, x86_64" ;;
               *) continue ;;
             esac

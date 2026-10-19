@@ -375,8 +375,13 @@ make</code></pre>
         { test: /^texmacs-upsilon-vue-.*\.AppImage$/, name: 'Vue, AppImage', desc: 'The interface drawn by TeXmacs itself (SDL3, OpenGL), in one file.' },
         { test: /^texmacs-linux-/, name: 'Qt 6', desc: 'The interface of the official TeXmacs releases.' },
         { test: /^texmacs-vue-linux-/, name: 'Vue', desc: 'The interface drawn by TeXmacs itself (SDL3, OpenGL).' } ] },
-    { title: 'Windows', note: 'For x86_64: unpack, and run <code>TeXmacs-Windows\\bin\\texmacs.exe</code>.',
+    { title: 'Windows', note: 'For x86_64. The installers put TeXmacs Upsilon in its own folder, with its entries in ' +
+        'the Start menu and an uninstaller, beside the stock TeXmacs, which they leave alone (opening .tm files with ' +
+        'Upsilon is an option of the installer); no administrator rights are needed. The archives: unpack, and run ' +
+        '<code>TeXmacs-Windows\\bin\\texmacs.exe</code>.',
       kinds: [
+        { test: /^texmacs-upsilon-qt-.*-setup\.exe$/, name: 'Qt 6, installer', desc: 'The interface of the official TeXmacs releases.' },
+        { test: /^texmacs-upsilon-vue-.*-setup\.exe$/, name: 'Vue, installer', desc: 'The interface drawn by TeXmacs itself (SDL3, OpenGL).' },
         { test: /^texmacs-windows-/, name: 'Qt 6', desc: 'The interface of the official TeXmacs releases.' },
         { test: /^texmacs-vue-windows-/, name: 'Vue', desc: 'The interface drawn by TeXmacs itself (SDL3, OpenGL).' } ] } ];
 

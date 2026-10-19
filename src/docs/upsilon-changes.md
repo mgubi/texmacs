@@ -22,7 +22,11 @@ have the details, and the problems go to the
   identity of the stock one). With Qt, a TeXmacs Upsilon and a stock
   TeXmacs running together no longer pass their files to each other.
   On Linux there are AppImages of the Qt and the Vue builds, one file each
-  for most distributions, with menu entries and icons of their own.
+  for most distributions, with menu entries and icons of their own. On
+  Windows there are installers of the Qt and the Vue builds, with folders,
+  Start menu entries and uninstallers of their own, which no longer write
+  `TEXMACS_PATH` into the environment; TeXmacs Upsilon uses the files it
+  is installed with even when the stock TeXmacs has set `TEXMACS_PATH`.
 - **Browser**: on a touch screen, a finger put down on the handle of a
   scroll bar drags it: it moved the view the other way.
 - **Desktop**: with the Vue interface on Linux, the windows are drawn by

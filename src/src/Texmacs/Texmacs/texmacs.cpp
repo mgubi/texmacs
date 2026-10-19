@@ -209,7 +209,16 @@ TeXmacs_init_paths (int& argc, char** argv) {
   // PWD is set to HOME
   // if PWD is lacking, then the path resolution machinery may not work
   
-  if (is_empty (current_texmacs_path))
+  // An executable in a TeXmacs tree (TeXmacs/bin, as in a bundle, an
+  // installation or a build) uses that tree, even when TEXMACS_PATH is set:
+  // the installer of the stock TeXmacs writes it into the environment of
+  // the user, and TeXmacs Upsilon, installed beside it, then ran with the
+  // files of the stock one. TEXMACS_PATH still counts for an executable
+  // which is not in a tree.
+  url own_tree= exedir * "..";
+  if (exists (own_tree * "progs/init-texmacs.scm"))
+    set_env ("TEXMACS_PATH", as_string (own_tree));
+  else if (is_empty (current_texmacs_path))
     set_env ("TEXMACS_PATH", as_string (exedir * ".."));
   // if (get_env ("HOME") == "") //now set in immediate_options otherwise --setup option fails
   //   set_env ("HOME", get_env("USERPROFILE"));
