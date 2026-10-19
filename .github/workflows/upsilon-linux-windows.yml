@@ -53,8 +53,12 @@ jobs:
           sudo sed -i -E 's/rights="none" pattern="(PS|PS2|PS3|EPS|PDF|XPS)"/rights="read|write" pattern="\1"/' \
             /etc/ImageMagick-6/policy.xml
 
+      # NOTE: GCC, which configure would not take where clang is installed
+      # (as on the runners): the Qt build of Linux is the one users make
+      # with the compiler of their system, and GCC rejects code which clang
+      # accepts (a member named as a type used before it in its class)
       - name: Configure
-        run: ./configure --with-scheme=s7 --with-gnutls QMAKE=/usr/lib/qt6/bin/qmake
+        run: ./configure --with-scheme=s7 --with-gnutls QMAKE=/usr/lib/qt6/bin/qmake CC=gcc CXX=g++
 
       - name: Build
         run: make -j"$(nproc)"
