@@ -4,6 +4,9 @@ The things known to be left to do, gathered on 2026-10-07 from the audits
 and fixes of the past days. Remove an item when it is done (or say where it
 went); add what you find. Paths are relative to the repository root.
 
+The directions of the project, wished for and not yet begun, are in
+[`src/TODO.md`](../TODO.md).
+
 ## Waiting for a decision
 
 - **Merge PR #215 into `wip_fixes`.** It fixes the keyboard maps

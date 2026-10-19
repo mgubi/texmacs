@@ -214,7 +214,7 @@ of the vector icons.
 Developer notes: [the graphics stack](src/docs/vue-graphics-stack.md),
 [the widgets](src/docs/vue-widgets.md), [the test harness](src/docs/vue-testing.md)
 (scripted events and snapshots, some sixty tests in
-`src/src/Plugins/Vue/tests/`).
+`src/tests/Plugins/Vue/`).
 
 #### SDL — the Widkit widgets on SDL3
 

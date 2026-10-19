@@ -103,7 +103,7 @@ What was added to upstream's file, and why:
   through `cmake/FindIconv.cmake` (which names its results `ICONV_...`),
   `CMAKE_DL_LIBS`, SDL3 and SDL3_ttf by pkg-config.
 
-`src/Plugins/Vue/tests/run.sh` runs another build with
+`tests/Plugins/Vue/run.sh` runs another build with
 `BIN=build/TeXmacs/bin/texmacs.bin`. Checked on 2026-09-27 (macOS, clean
 builds, S7): Qt (Qt 6.9, run), Vue (the `font` test), SDL (run) and X11
 (built, not run: no X server) build.

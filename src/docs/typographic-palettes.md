@@ -58,5 +58,5 @@ grid has eight colours a line: the rows of a set of eight columns are its
 lines (other widths wrap).
 
 Code: `TeXmacs/progs/kernel/gui/menu-define.scm` (the sets, the menu);
-tests: `src/Plugins/Vue/tests/typographic-palette.*` (a popup) and
+tests: `tests/Plugins/Vue/typographic-palette.*` (a popup) and
 `typographic-palette-bar.*` (Format › Colour from the menu bar).

@@ -11,8 +11,8 @@ Run from the source directory, e.g.
 
   export TEXMACS_PATH=$PWD/TeXmacs
   export TEXMACS_VUE_SNAPSHOT=/tmp/vue-snapshots      # PNG of every window redraw
-  export TEXMACS_VUE_SCRIPT=src/Plugins/Vue/tests/widgets.script
-  TeXmacs/bin/texmacs.bin -x '(load "src/Plugins/Vue/tests/widgets.scm")'
+  export TEXMACS_VUE_SCRIPT=tests/Plugins/Vue/widgets.script
+  TeXmacs/bin/texmacs.bin -x '(load "tests/Plugins/Vue/widgets.scm")'
 
 and check the standard output for the callbacks (choice:, enum:, got: ...)
 and the named snapshots (t0.png, t1-enum-open.png, ...). The catalogue of

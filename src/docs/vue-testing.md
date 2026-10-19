@@ -76,14 +76,14 @@ tests after a change to the sizing of the widgets.
 
 ## Running the tests
 
-`src/Plugins/Vue/tests/` holds Scheme files building test widgets (loaded with
+`tests/Plugins/Vue/` holds Scheme files building test widgets (loaded with
 `-x`) and the scripts driving them (`README` there). Run one with
 `run.sh`, from the top of the source tree:
 
 ```sh
-sh src/Plugins/Vue/tests/run.sh widgets 25        # widgets.scm + widgets.script
+sh tests/Plugins/Vue/run.sh widgets 25        # widgets.scm + widgets.script
 SCM=wheel-travel.scm SCRIPT=scroll-shift.script \
-  sh src/Plugins/Vue/tests/run.sh scroll-shift 28  # a script with another .scm
+  sh tests/Plugins/Vue/run.sh scroll-shift 28  # a script with another .scm
 ```
 
 It prints what the test prints (`choice:`, `got:`...), the errors and the
@@ -195,7 +195,7 @@ over TLS and is run by hand:
 ```sh
 TEXMACS_SERVER_CERT_DIR=<scratch dir> \
   TeXmacs/bin/texmacs.bin -tls-no-verify \
-  -x '(load "src/Plugins/Vue/tests/sockets-tls.scm")'
+  -x '(load "tests/Plugins/Vue/sockets-tls.scm")'
 ```
 
 It generates a self-signed certificate there and expects `SOCKETS-TLS

@@ -1,13 +1,14 @@
 # Upsilon to dos
 
 This is a list of desiderata for Upsilon TeXmacs. 
-See also the file [./TeXmacs/doc/about/projects/todo.en.tm]() for general TeXmacs to dos.
+See also the file [TeXmacs/doc/about/projects/todo.en.tm](TeXmacs/doc/about/projects/todo.en.tm) for general TeXmacs to dos,
+and [docs/TODO.md](docs/TODO.md) for the open work of the moment: bugs found
+and not fixed, pull requests waiting, decisions to take.
 
 ## To do
 
 - GUI scripting: Investigate extending the scripting capabilities of Vue to the other UIs via a general mechanism
 - GUI scripting: Investigate GUI scripting via Scheme or via a specific scripting language like the current implementation?
-- move src/Plugins/Vue/test to tests/Plugins/Vue
 - keep track of contributors: code, bug reports, etc.. to Upsilon (and then to TeXmacs in the usual place)
 - (?) work on the style rewriter
 - make the interactive footbar more useful: add a top level to change properties of the document that are not visible in the current focus bar
@@ -24,4 +25,4 @@ See also the file [./TeXmacs/doc/about/projects/todo.en.tm]() for general TeXmac
 
 ## Done
 
-- ...
+- move src/Plugins/Vue/tests to tests/Plugins/Vue

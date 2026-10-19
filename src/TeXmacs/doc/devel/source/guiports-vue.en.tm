@@ -224,9 +224,9 @@
   <verbatim|commit>, <verbatim|drop>, <verbatim|resize>,
   <verbatim|scheme>, <verbatim|snapshot>, <verbatim|close>, ...; see
   <cpp|script_step> in <source-link|vue_gui.cpp|src/Plugins/Vue/vue_gui.cpp>). The directory
-  <source-link|Plugins/Vue/tests|src/Plugins/Vue/tests> holds about 57 scripts, most with a
+  <source-link|tests/Plugins/Vue|tests/Plugins/Vue> holds about 57 scripts, most with a
   <scheme> file which builds the widget they drive, and
-  <source-link|run.sh|src/Plugins/Vue/tests/run.sh>, which runs one of them in a copy of the
+  <source-link|run.sh|tests/Plugins/Vue/run.sh>, which runs one of them in a copy of the
   home directory (a test must never change the preferences of the user)
   and checks what the callbacks print. The catalogue of the tests is in
   <source-link|docs/vue-testing.md|docs/vue-testing.md>.

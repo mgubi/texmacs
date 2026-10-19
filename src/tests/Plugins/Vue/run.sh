@@ -2,7 +2,7 @@
 #
 # Run one scripted test of the Vue GUI:
 #
-#   src/Plugins/Vue/tests/run.sh <test> [seconds]
+#   tests/Plugins/Vue/run.sh <test> [seconds]
 #
 # from the top of the source tree. It loads <test>.scm and replays
 # <test>.script, and prints what the test prints (choice:, got:, ...), the
@@ -19,7 +19,7 @@
 # (KEEP=1 keeps it).
 
 set -u
-T=src/Plugins/Vue/tests
+T=tests/Plugins/Vue
 test=${1:?usage: run.sh <test> [seconds]}
 secs=${2:-25}
 OUT=${OUT:-/tmp/vue-tests/$test}

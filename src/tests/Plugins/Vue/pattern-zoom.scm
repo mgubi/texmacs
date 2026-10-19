@@ -6,7 +6,7 @@
 ;; which may save it as a preference: a test must not change the settings.
 (delayed (:pause 2000)
   (set-window-zoom-factor 1.0)
-  (with tile (url->string (url-append (url-pwd) "src/Plugins/Vue/tests/stripes.png"))
+  (with tile (url->string (url-append (url-pwd) "tests/Plugins/Vue/stripes.png"))
     (insert (stree->tree
       `(document
          (with "font-size" "2" "font-series" "bold"
