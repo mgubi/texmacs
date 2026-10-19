@@ -18,9 +18,10 @@
 ;; made of the widgets of TeXmacs:
 ;; - the fields Directory (Return goes there), File and Suffixes (the
 ;;   suffixes of the files shown, Return shows them);
-;; - the directories (with ..) and the files, side by side: a click
-;;   highlights an entry (a file goes into File), a click on the
-;;   highlighted entry enters the directory or chooses the file;
+;; - the directories (with ..) and the files, side by side, with the
+;;   type, size and date of an entry in its balloon: a click enters a
+;;   directory, a click on a file puts it into File, a second click
+;;   chooses it;
 ;; - for an image, its width, height and position, and a preview;
 ;; - the type of the file chosen, when TeXmacs knows its format;
 ;; - the button Up beside Directory (as ..), and Home, Texts
@@ -118,27 +119,32 @@
                              " MB"))))
 
 (define (file-chooser-info path)
-  ;; the balloon of a file: its type, its size and when it was modified
+  ;; the balloon of an entry: its type, its size and when it was modified
   (let* ((u (system->url path))
+         (dir? (url-directory? u))
          (type (file-chooser-type path))
-         (size (url-size u))
+         (size (and (not dir?) (url-size u)))
          (time (url-last-modified u))
-         (l (list (if (!= type "") type "File")
+         (l (list (cond (dir? "Folder") ((!= type "") type) (else "File"))
                   (if (and (number? size) (>= size 0))
                       (file-chooser-size size) "")
                   (if (and (number? time) (> time 0))
                       (string-append "modified " (pretty-time time)) ""))))
     (string-recompose (list-filter l (cut != <> "")) ", ")))
 
-(define (file-chooser-file-menu dir files click)
-  ;; the files as buttons, each with its balloon (a list of choice has
-  ;; none); made again at each refresh of the lists (a promise)
-  (cons 'vertical
-        (map (lambda (f)
-               (list (list 'balloon f
-                           (file-chooser-info (file-chooser-path dir f)))
-                     (lambda () (click f))))
-             files)))
+(define (file-chooser-menu dir entries click)
+  ;; the entries of a list as buttons, each with its balloon (a list of
+  ;; choice has none); made again at each refresh of the lists (a promise,
+  ;; which must yield an item: a glue when there are no entries)
+  (if (null? entries) '(glue #f #f 0 0)
+      (cons 'vertical
+            (map (lambda (f)
+                   (list (list 'balloon f
+                               (if (== f "..") "The folder above"
+                                   (file-chooser-info
+                                     (file-chooser-path dir f))))
+                         (lambda () (click f))))
+                 entries))))
 
 (define (file-chooser-preview path)
   ;; the image @path, as a document
@@ -159,7 +165,7 @@
          (dir dir0)
          (suffixes (file-chooser-suffixes type))
          (name name0)
-         (hilight "")       ; "d:name" or "f:name"
+         (hilight "")       ; the file clicked last
          (refresh
           (lambda ()
             (set! hilight "")
@@ -205,20 +211,15 @@
                     ((== type "image") (finish (image-answer path)) (quit))
                     (else (finish path) (quit))))))
          (click-directory
-          ;; a click highlights, a click on the highlighted entry enters it
+          ;; a click enters the directory
           (lambda (s)
-            (with key (string-append "d:" s)
-              (cond ((!= hilight key) (set! hilight key))
-                    ((== s "..") (up))
-                    (else (go (file-chooser-path dir s)))))))
+            (if (== s "..") (up) (go (file-chooser-path dir s)))))
          (click-file
-          ;; a click highlights and fills File, a click on the highlighted
-          ;; file chooses it
+          ;; a click fills File, a second click on the file chooses it
           (lambda (s)
-            (with key (string-append "f:" s)
-              (if (!= hilight key)
-                  (begin (set! hilight key) (set-name s))
-                  (ok s))))))
+            (if (!= hilight s)
+                (begin (set! hilight s) (set-name s))
+                (ok s)))))
     (padded
       (form id
         (aligned
@@ -236,9 +237,12 @@
               ;; (a text in a refreshable is evaluated when the dialog is
               ;; made: a promise makes it again at each refresh)
               (refreshable "file-chooser-type"
-                (promise (list 'text (file-chooser-type
-                                       (and (!= name "")
-                                            (file-chooser-path dir name)))))))
+                ;; (in a row: a text alone in the menu of the refreshable
+                ;; would be one of its labels, with their margin)
+                (promise (list 'hlist
+                               (list 'text (file-chooser-type
+                                             (and (!= name "")
+                                                  (file-chooser-path dir name))))))))
 
             (item (text "Suffixes:")
               (input (when answer
@@ -249,15 +253,17 @@
         (refreshable "file-chooser-lists"
           (hlist
             (resize '("200px" "250px" "9999px") '("150px" "280px" "9999px")
-              (choice (click-directory answer)
-                      (car (file-chooser-entries dir suffixes dirs-only?))
-                      ""))
+              (scrollable
+                (promise
+                  (file-chooser-menu
+                    dir (car (file-chooser-entries dir suffixes dirs-only?))
+                    click-directory))))
             (assuming (not dirs-only?)
               //
               (resize '("200px" "250px" "9999px") '("150px" "280px" "9999px")
                 (scrollable
                   (promise
-                    (file-chooser-file-menu
+                    (file-chooser-menu
                       dir (cdr (file-chooser-entries dir suffixes dirs-only?))
                       click-file)))))))
         (assuming (== type "image")
