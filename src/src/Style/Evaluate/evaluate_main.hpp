@@ -25,6 +25,9 @@ memorizer evaluate (environment env, tree t);
 array<int> evaluate_statistics ();
 tree expand (tree t, bool flag);
 
+/* Partial evaluation */
+bool is_residual (tree t, bool as_length= false);
+
 /* Tree rewriting */
 #define INACTIVE_INLINE_RECURSE  0
 #define INACTIVE_INLINE_ONCE     1
@@ -155,7 +158,6 @@ tree evaluate_hr_length ();
 
 /* Miscellaneous primitives */
 tree evaluate_formatting (tree t, string v);
-tree evaluate_box_extents (tree t);
 tree evaluate_table (tree t);
 tree evaluate_hard_id (tree t);
 tree evaluate_script (tree t);

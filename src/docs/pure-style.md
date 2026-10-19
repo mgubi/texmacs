@@ -193,10 +193,9 @@ the typesetter on this branch:
 - `or` and `and` with the typesetter's meaning (the first value which is not
   `false`, resp. `false` or the last value), not strict booleans:
   `tmdoc-file` relies on it;
-- `move`, `shift`, `resize`, `clipped`: only the body is evaluated. Their
-  lengths may use the extents of the box (`1r`, `1w`, ...), which the
-  typesetter binds while it lays the box out (`local_begin_extents`), so
-  they are left to it.
+- `move`, `shift`, `resize`, `clipped`: their lengths may use the extents
+  of the box (`1r`, `1w`, ...), which the typesetter binds while it lays the
+  box out (`local_begin_extents`); they are evaluated partially (below).
 
 Still missing, because they are not pure functions of the environment and
 the markup: `auto-id` and `get-attachment` (counters and data stored on the
@@ -205,14 +204,51 @@ buffer), `find-accessible`, the themes (`new-theme`, `copy-theme`,
 on the ornament being typeset (`guipx`, `lcorner`, `bcorner`, `rcorner`,
 `tcorner`).
 
-With these changes, *About* evaluates without errors. The welcome page, the
-*style* page and the conventions page keep one `bad merge` in their result
-(from `auto-id` in `the-auto`). The graphics of the conventions page also
-compute garbage: `look-up (box-info (..., wh), 1)` picks apart the residual
-`box-info` and the arithmetic above it fails (`bad plus/minus`,
-`bad times/over`), but in a value which does not reach the result. (The
-first stress runs counted the errors in the whole trace, intermediate values
-included; the suite below counts those of the result.)
+With these changes and partial evaluation (below), *About* evaluates
+without errors. The welcome page, the *style* page and the conventions page
+keep one `bad merge` (from `auto-id` in `the-auto`); it is the only error
+computed anywhere in their evaluation, intermediate values included.
+
+### Partial evaluation
+
+Some values are only known to the typesetter: the size of a typeset box
+(`box-info`, `frame-direct`, `frame-inverse`), lengths which depend on the
+screen or on the ornament being typeset (`guipx`, the corner lengths), and
+lengths in units of the extents of a box (`w`, `h`, `l`, `b`, `r`, `t`).
+Before, the rewriter kept such tags as they were, and a computation applied
+to them computed garbage: in the graphics of the conventions page,
+`look-up (box-info (..., wh), 1)` picked apart the tag itself (giving `wh`)
+and the arithmetic above failed, in values which happened not to reach the
+result.
+
+Now such a value is a *residual* (`is_residual` in `evaluate_main.cpp`), and
+a computation on a residual is a residual too:
+
+- a strict computation (`plus`, `look-up`, `merge`, the comparisons, ...)
+  first evaluates its arguments; when one is a residual it returns itself
+  with the evaluated arguments, else it computes as before, its second
+  evaluation of the arguments being found in the memorizers. Lengths in box
+  units count as residuals only in computations on lengths (`merge` of
+  `1` and `r` is the string `1r`);
+- `if`, `case`, `or`, `and` whose condition is a residual keep the remaining
+  branches, evaluated;
+- the lengths of `move`, `shift`, `resize`, `clipped` are evaluated like
+  any other argument, which leaves `minus (1r, 1.5fn)` where the document
+  had `minus (1r, item-hsep ())`.
+
+A residual is closed: macro arguments, values and macros in it are
+substituted, so that the typesetter can finish it without the definitions
+of the document (which the rewriter consumes). The suite checks these cases
+(group *partial evaluation*). The cost on *About*: 609 evaluations instead
+of 489, 96 of them found in the memorizers (the second evaluations of the
+arguments).
+
+Not residuals yet: `px` lengths and the other values which depend on the
+zoom are computed with the current zoom; the typesetter caches treat the
+zoom as an input (#333), and so should the rewriter once its result is
+typeset (step 4). The branches kept by a residual condition are evaluated
+although the typesetter may not take them, which matters only for side
+effects (step 3).
 
 ## Relation to the typesetter caches
 
@@ -263,16 +299,9 @@ Two consequences:
   the memorizers. Uses on the way there: the expanded document for
   converters, checking styles, or a cache key for incremental typesetting
   (compare the typing caches of PR #250/#333).
-- **Layout-dependent values: partial evaluation.** Some markup needs
-  information that only the typesetter has: the box extents in `move` and
-  the like (handled above by not evaluating those arguments), `box-info`,
-  `frame-direct`, `frame-inverse`, the screen and ornament lengths. The
-  rewriter keeps such tags as they are, but an operation applied to a
-  residual tag (`look-up`, `plus`, `merge`) then computes garbage. A sound
-  rule is partial evaluation: a value that depends on a residual stays a
-  residual expression, to be finished by the typesetter. That residual must
-  then still find the definitions it uses (macros and variables assigned in
-  the document are consumed by the rewriter today).
+- **Layout-dependent values.** Handled by partial evaluation (above), except
+  the zoom. Whether the typesetter finishes the residuals correctly is only
+  tested once it consumes the result (step 4).
 - **Side effects.** `extern` calls Scheme with a re-entrancy hack
   (`reenter_rewrite_env`); `set-binding`, `write`, counters, labels and
   `auto-id` (which numbers the automatic labels from data stored on the
@@ -291,7 +320,7 @@ Two consequences:
    2010 to 2026 without anyone noticing. `(style-rewrite-buffer)` runs the
    rewriter headless. The contact point with the typesetter caches
    (`environment_update`) is checked with their check modes: no mismatch.
-2. **Partial evaluation.** Values that need layout (`box-info`,
+2. **Partial evaluation** (done, see above). Values that need layout (`box-info`,
    `frame-direct`, `frame-inverse`, `guipx`, the corner lengths, the box
    lengths of `move` and the like) become residuals; an operation on a
    residual gives a residual. A residual is closed: the known `value`s and

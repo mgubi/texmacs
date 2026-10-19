@@ -125,6 +125,49 @@
           "true"))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Partial evaluation
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; What only the typesetter knows (box-info, lengths in units of a box) is a
+;; residual; a computation on a residual stays as it is, with its arguments
+;; evaluated, so that it holds no value, arg or macro of the document.
+(define (test-partial-evaluation)
+  (check-group "partial evaluation")
+  (check= (value-of '(plus "1r" "1pt")) '(plus "1r" "1pt"))
+  (check= (value-of '(plus "2" "3")) "5")
+  (check= (rewrite-last '(document (assign "v" "2pt")
+                                   (resize "x" "" "" (minus "1r" (value "v")) "")))
+          '(resize "x" "" "" (minus "1r" "2pt") ""))
+  ;; the argument of a macro inside a residual is substituted
+  (check= (rewrite-last '(document (assign "f" (macro "x" (move "y" (plus "1w" (arg "x")) "")))
+                                   (f "3pt")))
+          '(move "y" (plus "1w" "3pt") ""))
+  (check= (value-of '(look-up (box-info "x" "wh") "1"))
+          '(look-up (box-info "x" "wh") "1"))
+  ;; the graphics of the conventions page: no error computed from box-info
+  (with r (rewrite-last
+           '(document
+             (with "dims" (box-info "x" "wh")
+               (with "ww" (look-up (value "dims") "0")
+                     "hh" (look-up (value "dims") "1")
+                 (tuple (plus (value "ww") "1pt")
+                        (times (value "hh") "2"))))))
+    (check= (stree-errors r) '())
+    (check= (cAr (cAr r))
+            '(tuple (plus (look-up (box-info "x" "wh") "0") "1pt")
+                    (times (look-up (box-info "x" "wh") "1") "2"))))
+  ;; conditionals on a residual keep their branches, evaluated
+  (check= (rewrite-last '(document (assign "a" "A")
+                                   (if (less "1r" "2pt") (value "a") "b")))
+          '(if (less "1r" "2pt") "A" "b"))
+  (check= (value-of '(if (less "1pt" "2pt") "yes" "no")) "yes")
+  (check= (value-of '(or "false" (equal "1h" "0pt") "z"))
+          '(or (equal "1h" "0pt") "z"))
+  ;; a box length is only a residual in a computation on lengths
+  (check= (value-of '(merge "1" "r")) "1r")
+  (check= (value-of '(length "1r")) "2"))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Memorization
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -245,6 +288,7 @@
       (begin
         (test-macros)
         (test-primitives)
+        (test-partial-evaluation)
         (test-memorization)
         (test-manual)
         (test-typesetter-caches)))

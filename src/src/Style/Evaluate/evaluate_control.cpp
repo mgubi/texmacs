@@ -26,6 +26,13 @@ tree
 evaluate_if (tree t) {
   if (N(t) != 2 && N(t) != 3) return evaluate_error ("bad if");
   tree u= evaluate (t[0]);
+  if (is_residual (u)) {
+    // the condition is left to the typesetter, with both branches
+    tree r (t, N(t));
+    r[0]= u;
+    for (int i=1; i<N(t); i++) r[i]= evaluate (t[i]);
+    return r;
+  }
   if (!is_bool (u)) return evaluate_error ("bad if");
   if (as_bool (u)) return evaluate (t[1]);
   if (N(t)==3) return evaluate (t[2]);
@@ -38,6 +45,13 @@ evaluate_case (tree t) {
   int i, n= N(t);
   for (i=0; i<(n-1); i+=2) {
     tree u= evaluate (t[i]);
+    if (is_residual (u)) {
+      // the rest of the cases is left to the typesetter
+      tree r (CASE);
+      r << u;
+      for (int j=i+1; j<n; j++) r << evaluate (t[j]);
+      return r;
+    }
     if (!is_bool (u)) return evaluate_error ("bad case");
     if (as_bool (u)) return evaluate (t[i+1]);
   }

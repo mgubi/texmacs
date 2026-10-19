@@ -50,18 +50,6 @@ evaluate_table (tree t) {
 }
 
 tree
-evaluate_box_extents (tree t) {
-  // the lengths may use the extents of the box (w, h, l, b, r, t), which
-  // only the typesetter knows: they are left to it
-  int i, n= N(t);
-  tree r (t, n);
-  if (n > 0) r[0]= evaluate (t[0]);
-  for (i=1; i<n; i++) r[i]= t[i];
-  transfer_ip (t, r);
-  return r;
-}
-
-tree
 evaluate_hard_id (tree t) {
   if (N(t) == 0) {
     pointer ptr= (pointer) std_env.operator -> ();

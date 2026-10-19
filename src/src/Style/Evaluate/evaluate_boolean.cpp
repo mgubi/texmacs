@@ -22,6 +22,13 @@ evaluate_or (tree t) {
   if (N(t)<2) return evaluate_error ("bad or");
   for (int i=0; i<N(t); i++) {
     tree u= evaluate (t[i]);
+    if (is_residual (u) && i < N(t)-1) {
+      // (the arguments before were false)
+      tree r (OR);
+      r << u;
+      for (int j=i+1; j<N(t); j++) r << evaluate (t[j]);
+      return r;
+    }
     if (u != "false") return u;
   }
   return as_string_bool (false);
@@ -43,6 +50,13 @@ evaluate_and (tree t) {
   if (N(t)<2) return evaluate_error ("bad and");
   for (int i=0; i<N(t)-1; i++) {
     tree u= evaluate (t[i]);
+    if (is_residual (u)) {
+      // (the arguments before were not false)
+      tree r (AND);
+      r << u;
+      for (int j=i+1; j<N(t); j++) r << evaluate (t[j]);
+      return r;
+    }
     if (u == "false") return u;
   }
   return evaluate (t[N(t)-1]);

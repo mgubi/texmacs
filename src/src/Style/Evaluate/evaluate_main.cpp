@@ -89,12 +89,113 @@ decorate_ip (tree src, tree dest) {
 }
 
 /******************************************************************************
+* Partial evaluation
+*
+* Some values are only known to the typesetter: the size of a typeset box
+* (box-info, frame-direct, frame-inverse), lengths which depend on the screen
+* or on the ornament being typeset (guipx, the corner lengths), and lengths in
+* units of the extents of a box (w, h, l, b, r, t), which the typesetter binds
+* while it lays out move, shift, resize and clipped. Such a value is a
+* residual, and a computation on a residual is a residual too: the computation
+* with its evaluated arguments, which the typesetter can finish since the
+* macro arguments, values and macros in it have been substituted.
+******************************************************************************/
+
+static bool
+is_box_length (string s) {
+  // a length in units of the extents of a box, such as 1r or -0.5w
+  int start= 0, i, n= N(s);
+  while ((start+1<n) && (s[start]=='-') && (s[start+1]=='-')) start += 2;
+  for (i=start; i<n && !is_locase (s[i]); i++) {}
+  if (i == start || i+1 != n || !is_double (s (start, i))) return false;
+  char c= s[i];
+  return c == 'w' || c == 'h' || c == 'l' || c == 'b' || c == 'r' || c == 't';
+}
+
+static bool
+is_layout_value (tree_label l) {
+  switch (l) {
+  case BOX_INFO:
+  case FRAME_DIRECT:
+  case FRAME_INVERSE:
+  case GUIPX_LENGTH:
+  case LCORNER_LENGTH:
+  case BCORNER_LENGTH:
+  case RCORNER_LENGTH:
+  case TCORNER_LENGTH:
+    return true;
+  default:
+    return false;
+  }
+}
+
+static bool
+is_length_computation (tree_label l) {
+  // computations whose atomic arguments are read as lengths
+  switch (l) {
+  case PLUS: case MINUS: case TIMES: case OVER: case DIV: case MOD:
+  case MINIMUM: case MAXIMUM:
+  case EQUAL: case UNEQUAL: case LESS: case LESSEQ:
+  case GREATER: case GREATEREQ:
+    return true;
+  default:
+    return false;
+  }
+}
+
+static bool
+is_strict_computation (tree_label l) {
+  // computations which evaluate all their arguments
+  if (is_length_computation (l)) return true;
+  switch (l) {
+  case MATH_SQRT: case EXP: case LOG: case POW: case COS: case SIN: case TAN:
+  case MERGE: case LENGTH: case RANGE: case NUMBER: case TRANSLATE:
+  case CHANGE_CASE: case IS_TUPLE: case LOOK_UP: case NOT: case XOR:
+  case BLEND: case RGB_COLOR: case RGB_ACCESS:
+    return true;
+  default:
+    return false;
+  }
+}
+
+bool
+is_residual (tree t, bool as_length) {
+  if (is_atomic (t)) return as_length && is_box_length (t->label);
+  tree_label l= L(t);
+  return is_layout_value (l) || is_strict_computation (l) ||
+         l == IF || l == VAR_IF || l == CASE || l == OR || l == AND;
+}
+
+static tree
+evaluate_partially (tree t) {
+  // the arguments of a strict computation, evaluated; the computation
+  // itself when one of them is a residual, else UNINIT
+  static tree uninit (UNINIT);
+  int i, n= N(t);
+  bool len= is_length_computation (L(t)), residual= false;
+  tree r (t, n);
+  for (i=0; i<n; i++) {
+    r[i]= evaluate (t[i]);
+    if (is_residual (r[i], len)) residual= true;
+  }
+  if (!residual) return uninit;
+  transfer_ip (t, r);
+  return r;
+}
+
+/******************************************************************************
 * Main dispatching
 ******************************************************************************/
 
 tree
 evaluate_impl (tree t) {
   //cout << "Really evaluate " << t << LF;
+  if (is_strict_computation (L(t))) {
+    // (when no argument is a residual, the computation below evaluates the
+    // arguments again, which the memorizers give at once)
+    tree r= evaluate_partially (t);
+    if (L(r) != UNINIT) return r;
+  }
   switch (L(t)) {
   /* Typesetting primitives with side effects */
   case DATOMS:
@@ -107,12 +208,6 @@ evaluate_impl (tree t) {
     return evaluate_formatting (t, CELL_FORMAT);
   case TABLE:
     return evaluate_table (t);
-  case MOVE:
-  case SHIFT:
-  case RESIZE:
-  case CLIPPED:
-    return evaluate_box_extents (t);
-
   /* Primitives for macro expansion */
   case ASSIGN:
     return evaluate_assign (t);
