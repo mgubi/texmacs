@@ -93,9 +93,12 @@ no headless mode. The Widkit duplicates are fixed on `wip_other_guis` too.
   `~/.TeXmacs`, which TeXmacs Upsilon no longer reads since it has its own
   home (`~/.TeXmacs_Upsilon`, 12255954f8). If it is not, alias
   `get-environment-variable` to `getenv` under S7. #376 (a malformed
-  question dialog): with the other session. #377 (the browser version on an
-  iPad needs a keyboard): b6d461ef0d adds a button which opens the keyboard
-  of the system on tablets; to be tried on an iPad before closing.
+  question dialog on Linux): 3d3491a8cf waits for the size of a window
+  (`SDL_SyncWindow` in `set_size`), not tried on Linux yet: to be checked
+  with a Linux build (CI, or a Lima VM with a window manager) before
+  closing. #377 (the browser version on an iPad) is closed: the keyboard
+  button (b6d461ef0d) and the thumbs of the scroll bars dragged by a finger
+  (b543f74430) were tried in the iPad simulator of Xcode.
 
 ## Kept on purpose
 
