@@ -14,6 +14,15 @@ have the details, and the problems go to the
 
 ## 19 October 2026
 
+- TeXmacs Upsilon installs beside the stock TeXmacs without touching it.
+  **Desktop**: on macOS the applications are "TeXmacs Upsilon" (Cocoa),
+  "TeXmacs Upsilon Vue" and "TeXmacs Upsilon Qt", each with preferences of
+  its own, and they open `.tm` files only when the stock TeXmacs is not
+  there or when they are chosen (all three were `TeXmacs.app`, with the
+  identity of the stock one). With Qt, a TeXmacs Upsilon and a stock
+  TeXmacs running together no longer pass their files to each other.
+  On Linux there are AppImages of the Qt and the Vue builds, one file each
+  for most distributions, with menu entries and icons of their own.
 - **Browser**: on a touch screen, a finger put down on the handle of a
   scroll bar drags it: it moved the view the other way.
 - **Desktop**: with the Vue interface on Linux, the windows are drawn by

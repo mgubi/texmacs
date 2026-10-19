@@ -39,7 +39,7 @@ if [ -n "$dmg" ]; then
   # finds the files busy ("Resource busy"), being scanned
   for i in 1 2 3 4 5; do
     rm -f "$dmg"
-    hdiutil create -volname TeXmacs -srcfolder "$out" -format ULMO "$dmg" && break
+    hdiutil create -volname "$(basename "$out" .app)" -srcfolder "$out" -format ULMO "$dmg" && break
     [ $i = 5 ] && exit 1
     echo "== hdiutil failed, again in $((i * 10)) seconds"
     sleep $((i * 10))
