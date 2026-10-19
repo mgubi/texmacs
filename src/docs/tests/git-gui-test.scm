@@ -1,6 +1,6 @@
 
 ;; Tests of the Git support which need the event loop (asynchronous commands)
-;; or open documents.  Run with doc/tests/run-git-tests.sh --gui, which uses
+;; or open documents.  Run with src/docs/tests/run-git-tests.sh --gui, which uses
 ;; the offscreen Qt platform, so that no windows are shown.
 
 (use-modules (version version-menu))

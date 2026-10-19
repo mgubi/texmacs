@@ -346,8 +346,8 @@ any git revision (`HEAD`, a branch), `INDEX`, and `BASE`, `OURS` and
 
 ```sh
 src/tests/scheme/check.sh git version            # headless: 400 + 224 checks
-doc/tests/run-git-tests.sh <scratch-dir>         # the same, in a fresh home
-doc/tests/run-git-tests.sh --gui <scratch-dir>   # Qt offscreen: 56 checks
+src/docs/tests/run-git-tests.sh <scratch-dir>         # the same, in a fresh home
+src/docs/tests/run-git-tests.sh --gui <scratch-dir>   # Qt offscreen: 56 checks
 ```
 
 The tests create scratch repositories (with spaces and accents in paths, a
@@ -377,7 +377,7 @@ the git group of the suite `version`, which checks the dispatch of the
 * restoring, snapshots, blame, projects, signing;
 * documents which cannot be saved, the shortcuts, the menus without Git.
 
-The **offscreen GUI** test (`doc/tests/git-gui-test.scm`) covers push,
+The **offscreen GUI** test (`src/docs/tests/git-gui-test.scm`) covers push,
 fetch, pull, clone and cancel, the reloading of open documents, the save
 hook, the panel (no Git command while typing, updated after actions,
 following the document), the menus and the dialogs being built, and
