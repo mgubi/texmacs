@@ -29,8 +29,18 @@ tmg_style_rewrite_statistics () {
   return array_int_to_tmscm (out);
 }
 
+tmscm
+tmg_style_environment_update () {
+  // TMSCM_DEFER_INTS;
+  get_current_editor()->environment_update ();
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
 void
 initialize_glue_style () {
   tmscm_install_procedure ("style-rewrite-buffer",  tmg_style_rewrite_buffer, 0, 0, 0);
   tmscm_install_procedure ("style-rewrite-statistics",  tmg_style_rewrite_statistics, 0, 0, 0);
+  tmscm_install_procedure ("style-environment-update",  tmg_style_environment_update, 0, 0, 0);
 }

@@ -228,7 +228,10 @@ point is `environment_update`, which calls `typeset_prepare` and writes
 `base-file-name`, `cur-file-name` and `secure` into the typesetter's
 environment outside a typesetting pass. Since #250, `typeset_prepare` writes
 back the variables changed since the prepared table, so this should be
-harmless; it is not verified, and at worst it costs reuse in the next pass.
+harmless, and the check modes of the caches confirm it: the group
+*typesetter caches* of the suite calls `environment_update` between edits
+and incremental passes of the welcome page, with every reused bridge
+typeset again and compared, and finds no mismatch.
 
 **They solve the same problem differently:**
 
@@ -282,13 +285,12 @@ Two consequences:
 
 ## Plan
 
-1. **Keep it building, make it testable** (done, except the check of the
-   contact point). No CI job: the build with `--enable-experimental` and the
+1. **Keep it building, make it testable** (done). No CI job: the build with `--enable-experimental` and the
    suite `style-rewrite-test.scm` are run locally (see *Testing*) after a
    change of the typesetter or of the rewriter; the link was broken from
    2010 to 2026 without anyone noticing. `(style-rewrite-buffer)` runs the
-   rewriter headless. Still to do: verify the contact point with the
-   typesetter caches (`environment_update`) with their check mode.
+   rewriter headless. The contact point with the typesetter caches
+   (`environment_update`) is checked with their check modes: no mismatch.
 2. **Partial evaluation.** Values that need layout (`box-info`,
    `frame-direct`, `frame-inverse`, `guipx`, the corner lengths, the box
    lengths of `move` and the like) become residuals; an operation on a
@@ -337,13 +339,24 @@ runs headless through two commands of the experimental build
   (`edit_typeset_rep::style_rewrite`, which `apply_changes` also does with
   a window);
 - `(style-rewrite-statistics)`: evaluations, memorized ones and size of the
-  memorizer table, for the last evaluation of a document.
+  memorizer table, for the last evaluation of a document;
+- `(style-environment-update)`: `environment_update`, which `apply_changes`
+  calls when the environment changed.
 
 The groups: macro expansion and the ported primitives on small documents;
 the memorization (numbers of evaluations after loading, without a change,
 after an edit of one paragraph); pages of the manual, whose errors in the
 result are compared with the known ones (a new error and a fixed one both
-fail: update `manual-pages` when the rewriter improves). The log
+fail: update `manual-pages` when the rewriter improves); the typesetter
+caches, which `environment_update` must not disturb. That last group counts
+mismatches only in the check modes of the caches:
+
+    TEXMACS_TYPESET_READS=check TEXMACS_TYPESET_CACHES=check \
+    TEXMACS_PAGE_REUSE=check TEXMACS_PAGE_BREAK_FAST=check \
+    TEXMACS_PAGE_BREAK_CACHE=check \
+    tests/scheme/check.sh TeXmacs/progs/check/style-rewrite-test.scm
+
+Run the suite both ways. The log
 (`tests/build/scheme/style-rewrite-test.log`) gives the evaluations and the
 time of each page.
 

@@ -188,6 +188,51 @@
     (check= (rewrite-file (car p)) (cadr p))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; The caches of the typesetter
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; environment_update (style-environment-update) prepares the typesetter's
+;; environment and writes base-file-name, cur-file-name and secure into it
+;; outside a typesetting pass, as apply_changes does with a window. The
+;; caches of the typesetter (PR #333, #250) must not be disturbed by it: in
+;; their check modes, each reused result is made again and compared.
+;; Run with
+;;
+;;   TEXMACS_TYPESET_READS=check TEXMACS_TYPESET_CACHES=check \
+;;   TEXMACS_PAGE_REUSE=check TEXMACS_PAGE_BREAK_FAST=check \
+;;   TEXMACS_PAGE_BREAK_CACHE=check tests/scheme/check.sh \
+;;   TeXmacs/progs/check/style-rewrite-test.scm
+;;
+;; (without them the mismatches are not counted, and the group only checks
+;; that the steps run).
+(define (typeset-check-mode?)
+  (== (getenv "TEXMACS_TYPESET_READS") "check"))
+
+(define (test-typesetter-caches)
+  (check-group "typesetter caches")
+  (when (not (typeset-check-mode?))
+    (display* "  (not in the check modes of the typesetter: "
+              "mismatches not counted)\n"))
+  (let* ((u (string->url "$TEXMACS_PATH/doc/about/welcome/welcome.en.tm"))
+         (old (current-buffer))
+         (before (typeset-check-mismatches)))
+    (load-buffer u)
+    (update-forced)
+    (style-rewrite-buffer)
+    (for (i (iota 6))
+      (style-environment-update)
+      (tree-insert (buffer-tree) 1 (list (string-append "added " (number->string i))))
+      (update-forced)
+      (style-rewrite-buffer))
+    (style-environment-update)
+    (update-forced)
+    (check= (- (typeset-check-mismatches) before) 0)
+    ;; the rewriter follows the edits too
+    (check= (list-ref (tree->stree (style-rewrite-buffer)) 2) "added 5")
+    (buffer-close u)
+    (when (buffer-exists? old) (switch-to-buffer* old))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The suite
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -201,5 +246,6 @@
         (test-macros)
         (test-primitives)
         (test-memorization)
-        (test-manual)))
+        (test-manual)
+        (test-typesetter-caches)))
   (check-end))
