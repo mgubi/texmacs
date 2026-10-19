@@ -9,7 +9,7 @@ Status: proposal, 2026-10-19. Based on a read-only checkout of
 Today there are four separate ways to drive a TeXmacs GUI from a test:
 
 1. the Vue `.script` line language, interpreted in C++ (`script_step`), which
-   pushes synthetic SDL events, with 58 scripted tests;
+   pushes synthetic SDL events, with 60 scripted tests;
 2. the Cocoa port's `TEXMACS_NS_*` environment variables (one-shot type,
    click, press-by-label, window steps, benchmarks);
 3. the Qt `gui-test-*` Scheme primitives (`qt_test.cpp`): click by label,
@@ -27,7 +27,7 @@ and an exit status. Under it sits a **small C++ backend interface**
 (`gui_test_*`) that each port implements: inspect the widget tree, trigger a
 widget by label or name, inject raw events, report idle, take a snapshot.
 Scheme is the canonical test language. The existing line language stays as
-sugar: it is parsed in Scheme into the same steps, so the 58 Vue tests keep
+sugar: it is parsed in Scheme into the same steps, so the 60 Vue tests keep
 working and can be rewritten piece by piece. Effort: about 5 to 7 weeks for
 Vue, Qt and Cocoa with CI. Widkit/X11 and accessibility come later.
 
@@ -100,7 +100,7 @@ Diagnostics: `TEXMACS_VUE_DUMP` prints every Clay render command, with its
 type, id, box and widget kind (vue_gui.cpp:1413). This is the closest thing
 Vue has to a widget-tree inspector.
 
-**Tests** (`src/Plugins/Vue/tests/`). There are 58 `.script` files and 57
+**Tests** (`tests/Plugins/Vue/`). There are 60 `.script` files and 59
 `.scm` files. Each `.scm` builds a widget with
 `(delayed (:pause 1500) (top-window ...))`, and its callbacks
 `display* "got: ..."`. The runner `run.sh` copies `~/.TeXmacs_Upsilon` into
@@ -331,7 +331,7 @@ port. Run tests with the language forced to English as a fallback.
 
 ```scheme
 (gui-test "dialog"
-  (gt-load "src/Plugins/Vue/tests/dialog.scm")         ; or inline tm-widget
+  (gt-load "tests/Plugins/Vue/dialog.scm")            ; or inline tm-widget
   (gt-window "Enter data")                              ; waits until shown (timeout)
   (gt-set-text "label:Name" "Bob")
   (gt-key "Tab") (gt-type "42")
@@ -362,7 +362,7 @@ port. Run tests with the language forced to English as a fallback.
 ### 5.4 The line language: keep it as sugar, compiled to Scheme
 
 The line format is good for quick, recorded, coordinate-level reproductions,
-and 58 tests depend on it. Recommendation: **one parser, in Scheme**
+and 60 tests depend on it. Recommendation: **one parser, in Scheme**
 (`check/gui-script.scm`), mapping each line to a step. For example,
 `click x y [b] [n]` becomes `(gt-raw '(click x y b n))`, `scheme <e>`
 becomes `(gt-eval '<e>)`, and `snapshot n` becomes `(gt-snapshot n)`. Add
@@ -382,7 +382,7 @@ already escape to Scheme.
 ## 6. Migration of the Vue tests
 
 1. Land the Scheme parser and make `run.sh` a wrapper around
-   `gui-test-run`, keeping the snapshot directory layout. All 58 scripts
+   `gui-test-run`, keeping the snapshot directory layout. All 60 scripts
    must run unchanged, which is the acceptance test of phase 2.
 2. Replace the grep-on-log with an `expect` line per test, taking the
    expected output from the table in vue-testing.md. This gives the first
@@ -436,7 +436,7 @@ already escape to Scheme.
   and menu fades. Never call `change-zoom-factor`. Respect the boot lock:
   one instance at a time per home.
 * **Duration.** Boot plus idle-driven steps should bring a Vue test from
-  about 25 s (fixed sleep) to 6 to 10 s. That is about 8 minutes for 58
+  about 25 s (fixed sleep) to 6 to 10 s. That is about 8 minutes for 60
   tests, which fits as a separate job, sharded by `ls | split`.
 
 ## 8. Phased plan
@@ -445,7 +445,7 @@ already escape to Scheme.
 |---|---|---|---|
 | 0 | Spec and selector grammar; the `gui_test.hpp` interface; stubs moved out of `sys_utils.cpp`; glue entries | `Graphics/Gui/gui_test.hpp`, `System/Misc/sys_utils.cpp`, `Scheme/Glue/build-glue-basic.scm`, `docs/gui-scripting.md` | 2 d |
 | 1 | Scheme driver: step runner, idle wait, timeouts, `gt-*` API, check-lib reporting, exit codes; L0 semantic backend; a headless smoke suite in `check.sh` | `progs/check/gui-driver.scm`, `progs/check/gui-script.scm`, `tests/scheme/check.sh` | 5 d |
-| 2 | Vue backend: `script_step` internals moved to `vue_test.cpp` behind `gui_test_raw`; `inspect`, `idle`, pump; `TEXMACS_VUE_SCRIPT` routed to the Scheme parser; `run.sh` with an exit status; all 58 tests pass unchanged, then `expect` lines added | `Plugins/Vue/vue_gui.cpp`, `Plugins/Vue/vue_test.cpp`, `Plugins/Vue/tests/*`, `docs/vue-testing.md`, `misc/wasm/sources.txt` | 7 d |
+| 2 | Vue backend: `script_step` internals moved to `vue_test.cpp` behind `gui_test_raw`; `inspect`, `idle`, pump; `TEXMACS_VUE_SCRIPT` routed to the Scheme parser; `run.sh` with an exit status; all 60 tests pass unchanged, then `expect` lines added | `Plugins/Vue/vue_gui.cpp`, `Plugins/Vue/vue_test.cpp`, `tests/Plugins/Vue/*`, `docs/vue-testing.md`, `misc/wasm/sources.txt` | 7 d |
 | 3 | `named` markup plus native names in Vue, Qt and NS | `kernel/gui/menu-define.scm`, `menu-widget.scm`, `Graphics/Gui/widget.hpp`, port widget files | 3 d |
 | 4 | Qt backend: one `qt_test.cpp` for Qt5 and Qt6, raw events, inspect, idle, modal-safe pump; port `git-gui-test.scm`; fix the D8 leak | `Plugins/Qt/qt_test.cpp`, `Plugins/Qt6/qt_test.cpp`, `docs/tests/git-gui-test.scm` | 5 d |
 | 5 | Cocoa backend: `ns_test.mm` gathering the `TEXMACS_NS_*` helpers, env vars as wrappers | `Plugins/NS/ns_gui.mm`, `ns_tm_widget.mm`, `ns_test.mm`, `docs/ns-port.md` | 5 d |
