@@ -42,7 +42,7 @@ eval $tmp
 PLUGIN_DIR=$TEXMACS_PATH/plugins/feynmf
 
 # Defining temporary files directory and make it if it doesn't exist
-TEMP_DIR=~/.TeXmacs/system/tmp
+TEMP_DIR=${TEXMACS_HOME_PATH:-$HOME/.TeXmacs_Upsilon}/system/tmp
 if [ -d $TEMP_DIR ]
 then
 	cd $TEMP_DIR

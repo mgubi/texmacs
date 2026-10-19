@@ -22,7 +22,7 @@
 ;;   highlights an entry (a file goes into File), a click on the
 ;;   highlighted entry enters the directory or chooses the file;
 ;; - for an image, its width, height and position, and a preview;
-;; - the buttons Home, Texts (~/.TeXmacs/texts), Ok and Cancel.
+;; - the buttons Home, Texts (~/.TeXmacs_Upsilon/texts), Ok and Cancel.
 ;; The field File is a field of a form: Ok reads what was typed in it.
 ;; The state of a chooser is local to its widget (as select-remote-plugin-
 ;; widget in dynamic/session-menu.scm), and its form has a name of its

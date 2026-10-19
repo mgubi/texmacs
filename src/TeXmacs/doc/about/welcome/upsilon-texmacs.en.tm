@@ -170,6 +170,18 @@
   <hlink|issues|https://github.com/mgubi/texmacs/issues> of the
   repository, not to the official <TeXmacs>.
 
+  <TeXmacs> Upsilon keeps its preferences, its caches and the files of the
+  user (<verbatim|progs>, <verbatim|styles>, <verbatim|packages>,
+  <verbatim|plugins>...) in a folder of its own,
+  <verbatim|~/.TeXmacs_Upsilon> (on <name|Windows>,
+  <verbatim|%APPDATA%\\TeXmacs_Upsilon>), and not in the
+  <verbatim|~/.TeXmacs> of the official <TeXmacs>: neither changes the
+  settings of the other, and <TeXmacs> Upsilon does not load what was made
+  for another version. To use your own files of <verbatim|~/.TeXmacs> with
+  <TeXmacs> Upsilon too, copy them into the same places of
+  <verbatim|~/.TeXmacs_Upsilon>. The environment variable
+  <verbatim|TEXMACS_HOME_PATH> chooses another folder.
+
   <tmdoc-copyright|2026|Massimiliano Gubinelli>
 
   <tmdoc-license|Permission is granted to copy, distribute and/or modify this

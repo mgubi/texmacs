@@ -14,6 +14,16 @@ have the details, and the problems go to the
 
 ## 19 October 2026
 
+- **Desktop**: TeXmacs Upsilon has a home of its own, `~/.TeXmacs_Upsilon`
+  (on Windows `%APPDATA%\TeXmacs_Upsilon`), for its preferences, caches and
+  the files of the user, instead of the `~/.TeXmacs` of the official
+  TeXmacs. Neither changes the settings of the other, and TeXmacs Upsilon
+  no longer loads what was made for another version, such as plugins and
+  Scheme code in `~/.TeXmacs`; nor does it look for plugins in
+  `/usr/share/TeXmacs` and `/etc/TeXmacs` any more. Nothing is copied: to
+  use your own files of `~/.TeXmacs` with it, copy them into the same places
+  of `~/.TeXmacs_Upsilon`. The handwriting examples follow
+  `TEXMACS_HOME_PATH` too.
 - **Browser**: after a turn of the wheel of a mouse the page no longer goes
   on moving for two seconds (the wheel was taken for a trackpad, after which
   the page glided); the page glides only after a finger, the browsers and

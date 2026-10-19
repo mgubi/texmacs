@@ -636,7 +636,7 @@
 ;;
 ;; The sets are defined with define-typographic-palette, or computed from a
 ;; colour per column with define-typographic-palette-from-colors; a user
-;; adds or replaces sets in the same way, from ~/.TeXmacs/progs/
+;; adds or replaces sets in the same way, from ~/.TeXmacs_Upsilon/progs/
 ;; my-init-texmacs.scm (see src/docs/typographic-palettes.md).
 
 (define typographic-palettes (list)) ; (name ink deep medium soft tint)

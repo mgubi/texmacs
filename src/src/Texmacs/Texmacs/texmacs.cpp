@@ -685,17 +685,20 @@ boot_hacks () {
 
 void
 immediate_options (int argc, char** argv) {
+  // TeXmacs Upsilon has a home of its own (TeXmacs_Upsilon), so that it
+  // neither loads what another TeXmacs keeps in ~/.TeXmacs (plugins,
+  // progs) nor changes its preferences and caches
   if (get_env ("TEXMACS_HOME_PATH") == "")
 #ifdef OS_MINGW
   {
     if (get_env ("HOME") == "")
         set_env ("HOME", get_env("USERPROFILE"));
-    set_env ("TEXMACS_HOME_PATH", get_env ("APPDATA") * "\\TeXmacs");
+    set_env ("TEXMACS_HOME_PATH", get_env ("APPDATA") * "\\TeXmacs_Upsilon");
 	}
 #elif defined(OS_HAIKU)
-    set_env ("TEXMACS_HOME_PATH", get_env ("HOME") * "/config/settings/TeXmacs");
+    set_env ("TEXMACS_HOME_PATH", get_env ("HOME") * "/config/settings/TeXmacs_Upsilon");
 #else
-    set_env ("TEXMACS_HOME_PATH", get_env ("HOME") * "/.TeXmacs");
+    set_env ("TEXMACS_HOME_PATH", get_env ("HOME") * "/.TeXmacs_Upsilon");
 #endif
   if (get_env ("TEXMACS_HOME_PATH") == "") return;
   if (get_env ("TEXMACS_SERVER_CERT_DIR") == "")

@@ -72,6 +72,17 @@ the commit it was built from.
   the Qt 6 of the system.
 * **The browser**: <https://mgubi.github.io/texmacs/texmacs.html>, see below.
 
+TeXmacs Upsilon keeps its preferences, caches and the files of the user
+(`progs`, `styles`, `packages`, `plugins`...) in a home of its own,
+`~/.TeXmacs_Upsilon` (on Windows `%APPDATA%\TeXmacs_Upsilon`), not in the
+`~/.TeXmacs` of the official TeXmacs: neither changes the settings of the
+other, and TeXmacs Upsilon does not load what was made for another version.
+To use your own files of `~/.TeXmacs` with it too, copy them into the same
+places of `~/.TeXmacs_Upsilon`; `TEXMACS_HOME_PATH` chooses another folder.
+It also no longer looks for plugins in `/usr/share/TeXmacs` and
+`/etc/TeXmacs`, where an official TeXmacs installed on the system keeps
+them.
+
 Problems are reported in the
 [issues of this repository](https://github.com/mgubi/texmacs/issues).
 

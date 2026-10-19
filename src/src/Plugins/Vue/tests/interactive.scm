@@ -4,7 +4,7 @@
 ;; implemented and the fallback query returned nothing.
 ;;
 ;; The preference is set and put back in the same turn: set-preference
-;; writes to ~/.TeXmacs, and a test must not leave the settings changed.
+;; writes to ~/.TeXmacs_Upsilon, and a test must not leave the settings changed.
 ;; It is only read while (interactive ...) decides which form to use.
 (delayed (:pause 3500)
   (set-preference "interactive questions" "footer")

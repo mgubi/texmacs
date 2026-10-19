@@ -14,7 +14,7 @@ if test -z "$TEXMACS_PATH"; then
   export TEXMACS_PATH
 fi
 if test -z "$TEXMACS_HOME_PATH"; then
-  TEXMACS_HOME_PATH="$HOME/.TeXmacs"
+  TEXMACS_HOME_PATH="$HOME/.TeXmacs_Upsilon"
   export TEXMACS_HOME_PATH
 fi
 cp "$1" "$TEXMACS_HOME_PATH/system/pre.fig"

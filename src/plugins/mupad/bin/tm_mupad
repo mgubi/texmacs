@@ -59,7 +59,7 @@ my $log = new IO::File ">> $logfile" if $verbose;
 
 # presets
 my $tmhome = $ENV{'TEXMACS_HOME_PATH'} || 
-    ($ENV{'HOME'}.'/.TeXmacs/');
+    ($ENV{'HOME'}.'/.TeXmacs_Upsilon/');
 my $uinitdir = $tmhome.'/tmp/mupad/link.'.$$;
 mkdir $tmhome.'/tmp';
 mkdir $tmhome.'/tmp/mupad';

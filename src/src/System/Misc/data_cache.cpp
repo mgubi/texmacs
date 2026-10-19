@@ -267,7 +267,7 @@ void
 cache_initialize () {
   texmacs_path= url_system ("$TEXMACS_PATH");
   if (get_env ("TEXMACS_HOME_PATH") == "")
-    texmacs_home_path= url_system ("$HOME/.TeXmacs");
+    texmacs_home_path= url_system ("$HOME/.TeXmacs_Upsilon");
   else texmacs_home_path= url_system ("$TEXMACS_HOME_PATH");
   if (get_env ("TEXMACS_DOC_PATH") == "")
     texmacs_doc_path= url_system ("$TEXMACS_PATH/doc");

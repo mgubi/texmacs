@@ -88,7 +88,9 @@ apply_icon_set () {
 
 static url
 plugin_path (string which) {
-  url base= "$TEXMACS_HOME_PATH:/etc/TeXmacs:$TEXMACS_PATH:/usr/share/TeXmacs";
+  // TeXmacs Upsilon: not /etc/TeXmacs and /usr/share/TeXmacs, which hold the
+  // plugins of an official TeXmacs installed on the system
+  url base= "$TEXMACS_HOME_PATH:$TEXMACS_PATH";
   url search= base * "plugins" * url_wildcard ("*") * which;
   return expand (complete (search, "r"));
 }
@@ -97,9 +99,7 @@ scheme_tree
 plugin_list () {
   bool flag;
   array<string> a= read_directory ("$TEXMACS_PATH/plugins", flag);
-  a << read_directory ("/etc/TeXmacs/plugins", flag);
   a << read_directory ("$TEXMACS_HOME_PATH/plugins", flag);
-  a << read_directory ("/usr/share/TeXmacs/plugins", flag);
   merge_sort (a);
   int i, n= N(a);
   tree t (TUPLE);
@@ -121,13 +121,13 @@ plugin_list () {
 static void
 init_main_paths () {
 #ifdef OS_MINGW
-  if (is_none (get_env_path ("TEXMACS_HOME_PATH", get_env ("APPDATA") * "/TeXmacs"))) {
+  if (is_none (get_env_path ("TEXMACS_HOME_PATH", get_env ("APPDATA") * "/TeXmacs_Upsilon"))) {
 #else
-  if (is_none (get_env_path ("TEXMACS_HOME_PATH", "~/.TeXmacs"))) {
+  if (is_none (get_env_path ("TEXMACS_HOME_PATH", "~/.TeXmacs_Upsilon"))) {
 #endif
     boot_error << "\n";
     boot_error << "Installation problem: please send a bug report.\n";
-    boot_error << "'TEXMACS_HOME_PATH' could not be set to '~/.TeXmacs'.\n";
+    boot_error << "'TEXMACS_HOME_PATH' could not be set to '~/.TeXmacs_Upsilon'.\n";
     boot_error << "You may try to set this environment variable manually\n";
     boot_error << "\n";
     FAILED ("installation problem");

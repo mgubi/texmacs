@@ -24,7 +24,7 @@
 # trip of a PDF with its document embedded (embed-roundtrip.sh) and a PDF
 # with a password (encrypt-check.sh) are run as well.
 #
-# Every TeXmacs it starts has a home of its own, a copy of ~/.TeXmacs made
+# Every TeXmacs it starts has a home of its own, a copy of ~/.TeXmacs_Upsilon made
 # for it (copy on write where the file system can): a test must not change
 # the preferences, the list of recent files or anything else of the user's,
 # and the runs side by side must not share their caches.
@@ -67,8 +67,8 @@ mkdir -p "$OUT/homes"
 # (instant on APFS), or a plain copy where that cannot be done
 new_home () { # <dir>
   rm -rf "${1:?}"
-  if [ -d "$HOME/.TeXmacs" ]; then
-    cp -Rc "$HOME/.TeXmacs" "$1" 2>/dev/null || cp -R "$HOME/.TeXmacs" "$1" || {
+  if [ -d "$HOME/.TeXmacs_Upsilon" ]; then
+    cp -Rc "$HOME/.TeXmacs_Upsilon" "$1" 2>/dev/null || cp -R "$HOME/.TeXmacs_Upsilon" "$1" || {
       echo "cannot make a home for TeXmacs in $1" >&2; exit 2; }
   else mkdir -p "$1"; fi
 }

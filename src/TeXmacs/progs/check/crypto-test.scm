@@ -38,7 +38,7 @@
 ;; that a passphrase which gpg would ask for makes the command fail instead
 ;; of hanging. The functions of gpg-edit.scm use the GnuPG directory of the
 ;; TeXmacs home (TEXMACS_HOME_PATH/users/<user>/gnupg), which the checks
-;; use only when the TeXmacs home is not ~/.TeXmacs (tests/scheme/check.sh
+;; use only when the TeXmacs home is not ~/.TeXmacs_Upsilon (tests/scheme/check.sh
 ;; gives a scratch home), with the same gpg-agent.conf.
 ;;
 ;; Left out because they need a dialog: the decryption of key encrypted
@@ -753,7 +753,7 @@
   ;; the GnuPG home of TeXmacs may be used: TeXmacs does not run with the
   ;; home of the user
   (let ((home (url->system (url-concretize "$TEXMACS_HOME_PATH")))
-        (user (url->system (url-concretize "~/.TeXmacs"))))
+        (user (url->system (url-concretize "~/.TeXmacs_Upsilon"))))
     (!= home user)))
 
 (define (test-gpg)

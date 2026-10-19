@@ -127,7 +127,7 @@ url
 get_texmacs_home_path () {
   url path= get_env ("TEXMACS_HOME_PATH");
   if (path == "")
-    path= url_system ("$HOME/.TeXmacs");
+    path= url_system ("$HOME/.TeXmacs_Upsilon");
   return path;
 }
 

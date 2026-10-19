@@ -2,7 +2,7 @@ Checking the PDF the MuPDF renderer writes.
 
     src/Plugins/MuPDF/tests/pdf-compare.sh [document.tm ...]
 
-Every TeXmacs it starts has a home of its own (a copy of ~/.TeXmacs, copy
+Every TeXmacs it starts has a home of its own (a copy of ~/.TeXmacs_Upsilon, copy
 on write), so that nothing of the user's is changed and the runs side by
 side share nothing; JOBS (4) of them run at a time, first the exports and
 then the checks, which takes some 40 s for the whole set. REF=1 exports

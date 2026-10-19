@@ -4,7 +4,7 @@
 (use-modules (kernel gui menu-test))
 (set-preference "typographic palette set" "Muted")
 ;; a set of the user, computed from a colour per column, as it would be
-;; defined in ~/.TeXmacs/progs/my-init-texmacs.scm
+;; defined in ~/.TeXmacs_Upsilon/progs/my-init-texmacs.scm
 (define-typographic-palette-from-colors "Sea"
   (list "#5f6b73" "#c0504d" "#b07a45" "#c9a44a"
         "#4f8a6b" "#2f8f9d" "#3b6ea8" "#6c5fa8"))

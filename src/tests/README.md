@@ -78,7 +78,7 @@ installed math font is an OpenType math font known to the database under the
 profile's name.
 
 The tests run with `TEXMACS_PATH` set to the source tree and a scratch
-`TEXMACS_HOME_PATH` under `tests/build`, so they never touch `~/.TeXmacs`.
+`TEXMACS_HOME_PATH` under `tests/build`, so they never touch `~/.TeXmacs_Upsilon`.
 
 `xml_test` includes `Xml/xml.cpp`, which is also part of the main build,
 for its static `is_xml_name`: it renames the public functions of that copy

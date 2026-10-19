@@ -11,7 +11,7 @@
 # which share one (SCM=wheel-travel.scm SCRIPT=scroll-shift.script), in the
 # directory of the tests or by an absolute path.
 #
-# TeXmacs runs with a home of its own, a copy of ~/.TeXmacs made for the
+# TeXmacs runs with a home of its own, a copy of ~/.TeXmacs_Upsilon made for the
 # run (copy on write where the file system can): a test must not change
 # the preferences, the recent files or anything else of the user's -- a
 # command like change-zoom-factor saves the zoom as a preference, and
@@ -31,8 +31,8 @@ BIN=${BIN:-TeXmacs/bin/texmacs.bin} # BIN=<path>: another build (CMake)
 
 rm -rf "${OUT:?}"; mkdir -p "$OUT"
 HOMEDIR="$OUT/home"
-if [ -d "$HOME/.TeXmacs" ]; then
-  cp -Rc "$HOME/.TeXmacs" "$HOMEDIR" 2>/dev/null || cp -R "$HOME/.TeXmacs" "$HOMEDIR" || {
+if [ -d "$HOME/.TeXmacs_Upsilon" ]; then
+  cp -Rc "$HOME/.TeXmacs_Upsilon" "$HOMEDIR" 2>/dev/null || cp -R "$HOME/.TeXmacs_Upsilon" "$HOMEDIR" || {
     echo "cannot make a home for TeXmacs in $HOMEDIR"; exit 2; }
 else mkdir -p "$HOMEDIR"; fi
 
