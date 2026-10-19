@@ -284,9 +284,59 @@ fault of the rewriter:
   in the pager. The values are protected: `quote` of the value, or
   `quasiquote` with the residuals in `unquote`.
 
-With these fixes, the list document of the tests, *About*, the welcome page,
-the *style* page and the conventions page of the manual are identical, pixel
-for pixel.
+- **labels and references**: `get-binding` was answered from the
+  rewriter's own label table, empty, so references printed `?`. The label
+  tables are filled by the typesetter while it typesets (`set-binding`, as
+  Joris's FIXME in `evaluate_set_binding` said): `set-binding` stays in the
+  result, `get-binding` and `has-binding` are residuals;
+- **inactive markup**: the rewriter's own rendering of 2007
+  (`evaluate_inactive.cpp`) has drifted from the typesetter's (DRD types of
+  the arguments, `src-*` classes, the DRD of the document). `inactive` and
+  `inactive*` stay in the result, their source unevaluated, and a
+  `rewrite-inactive` inside another macro is given its source through a
+  macro applied on the spot (the typesetter's `rewrite-inactive` only takes
+  a macro argument). The tags are kept rather than that macro form, since
+  the concater lays out their children by their DRD (block sources);
+- **patterns**: their size was computed by the rewriter, at its scale; a
+  `pattern` is a residual, so that the `with` which binds it lets the
+  typesetter evaluate it.
+
+The harness had faults of its own, found on the way: the copy kept the
+version of old documents and was upgraded a second time when loaded (a
+`--` became a dash); written as text, adjacent strings of a `concat` were
+read back as one string, which kerns otherwise; relative images were
+resolved from the directory of the copy. `tests/style/compare.sh` avoids
+them (current version, the rewritten body set as a tree, the master of the
+copy set to the document).
+
+**Result: of the 696 English pages of the documentation, 692 are identical
+to the pixel.** Left:
+
+- `main/beamer/man-animations`: an animation, which differs between two
+  printings of the document itself;
+- `main/styles/std/std-utils-dtd`: an example renders a `quote` returned by
+  an `extern` (`map`). The typesetter typesets the result of a rewrite as
+  markup, where `quote` is shown (`typeset_inactive`), while the rewriter
+  evaluates it as a value (`quote` gives its argument). The concater and
+  `exec` differ on a few tags (`quote`, `quote-value`, `quote-arg`, `if*`,
+  which is handled); a rewriter faithful on all of them has to know whether
+  it evaluates markup or a value, and memorize the two apart. Also a
+  slightly different spacing of an inactive `map`, which the DRD of the
+  copy may explain (the DRD completes the tags from their uses in the
+  document, and the active uses are expanded in the copy; typesetting the
+  copy once with the original body first did not change it);
+- `main/automated/tag-help` and `main/automated/top-help`, generated pages
+  which show Scheme templates as inactive markup: small differences of
+  spacing and indentation, not explained yet.
+
+The syntax highlighting of programs is left out of the comparison
+(`tree-sitter-set-highlighting #f`). The tree-sitter highlighter
+(`treesit_language_rep::highlight`) takes a compound subtree which is not a
+line of a program as coloured, with no colour: a `with` around inline code
+written in the document swallows the colours of its text, while the same
+`with` coming from a macro body (here `cpp`) does not. The rewriter writes
+macro bodies into the document, so the code of 215 pages lost its colours.
+It is a property of the highlighter, to be decided there.
 
 ## Relation to the typesetter caches
 
@@ -418,6 +468,14 @@ The check is local, not in CI. Build with the usual configure line plus
 `--enable-experimental`, then run the suite:
 
     tests/scheme/check.sh TeXmacs/progs/check/style-rewrite-test.scm
+
+and the comparison by typesetting (about 12 minutes for the whole
+documentation, or give some documents):
+
+    tests/style/compare.sh [document.tm...]
+
+which prints the documents whose rewriting does not typeset like them
+(four known ones, above), and exits with 1 if there is any.
 
 It is not listed in `check-master.scm`, since the rewriter exists only in
 the experimental build (elsewhere the suite fails at once, saying so). It
