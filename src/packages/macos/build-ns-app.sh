@@ -138,6 +138,6 @@ if [ $dmg = yes ]; then
   mkdir -p ../distr/macos
   dmg=../distr/macos/TeXmacs-$version.dmg
   rm -f "$dmg"
-  hdiutil create -volname TeXmacs -srcfolder "$app" -format UDZO "$dmg"
+  hdiutil create -volname TeXmacs -srcfolder "$app" -format ULMO "$dmg"
   ls "$dmg"
 fi
