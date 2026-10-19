@@ -329,10 +329,15 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define (split-lines s)
+  ;; the lines without their ends, also "\r\n" (checkouts on Windows)
+  (define (line start i)
+    (if (and (> i start) (char=? (string-ref s (- i 1)) #\return))
+        (substring s start (- i 1))
+        (substring s start i)))
   (let loop ((i 0) (start 0) (acc '()))
-    (cond ((= i (string-length s)) (reverse (cons (substring s start i) acc)))
+    (cond ((= i (string-length s)) (reverse (cons (line start i) acc)))
           ((char=? (string-ref s i) #\newline)
-           (loop (+ i 1) (+ i 1) (cons (substring s start i) acc)))
+           (loop (+ i 1) (+ i 1) (cons (line start i) acc)))
           (else (loop (+ i 1) start acc)))))
 
 (define (join-lines l)
