@@ -281,6 +281,7 @@ public:
   friend struct lazy_paragraph_rep;
   friend class  phrase_box_rep;
   friend class  remember_box_rep;
+  friend class  group_box_rep;
   friend struct effect_box_rep;
   friend void make_eps (url dest, box b, int dpi);
   friend void make_raster_image (url dest, box b, double zoom);
@@ -299,6 +300,12 @@ rectangle anim_everywhere (); // for anim_next and anim_invalid: no culling
 * area they leave.  The log keeps the boxes it placed until the next pass:
 * when a box is destroyed does not matter, so that the caches of the
 * typesetter may keep lines as long as they like.
+*
+* A group box (group_box: a chunk of the lines of a long document) which is
+* placed where it was in the previous pass does not place the boxes in it
+* again: they are where they were, since a box does not change. The boxes
+* which log stay placed until they are unplaced (by the end of a pass in
+* which they were not placed, or when their group is gone).
 ******************************************************************************/
 
 struct repaint_log {
