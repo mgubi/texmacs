@@ -306,10 +306,35 @@
   ---
   (dynamic (standard-focus-menu t)))
 
+(define (footer-run-in t cmd)
+  ;; many commands of the Focus menu act on the innermost tag of their kind
+  ;; around the cursor, whatever tag they are given (variant-formula on an
+  ;; equation with an inline formula inside a text of it, for instance):
+  ;; they run with the cursor at the start of the first child of t, which goes back where it
+  ;; was afterwards, unless the command moved it or selected something
+  (with p (and (> (tree-arity t) 0) (tree->path t 0 :start))
+    (if (not p) (cmd)
+        (let ((back (position-new))
+              (here (position-new)))
+          (position-set back (cursor-path))
+          (go-to p)
+          (position-set here (cursor-path))
+          (cmd)
+          (when (and (== (cursor-path) (position-get here))
+                     (not (selection-active-any?)))
+            (go-to (position-get back)))
+          (position-delete here)
+          (position-delete back)))))
+
+(tm-define (footer-tag-items t)
+  ;; the menu of the tag t, whose commands act on t (footer-run-in)
+  (menu-wrap-commands (lambda (cmd) (footer-run-in t cmd)))
+  (menu-dynamic (dynamic (footer-tag-menu t))))
+
 (menu-bind footer-folded-menu
   (for (t (footer-folded-trees))
     (-> (eval (footer-tag-name t))
-        (promise (menu-dynamic (dynamic (footer-tag-menu t)))))))
+        (promise (footer-tag-items t)))))
 
 (tm-define (footer-menu-key)
   ;; the menus of the tags hold the trees, which their expansion does not
@@ -328,11 +353,11 @@
       (if (!= t (cAr ts))
           (=> (balloon (eval (footer-tag-name t))
                        "Select this tag, or change it where it is")
-              (promise (menu-dynamic (dynamic (footer-tag-menu t))))))
+              (promise (footer-tag-items t))))
       (if (== t (cAr ts))
           (bold (=> (balloon (eval (footer-tag-name t))
                              "Select this tag, or change it where it is")
-                    (promise (menu-dynamic (dynamic (footer-tag-menu t))))))))
+                    (promise (footer-tag-items t))))))
     (if (!= (footer-char-info) "")
         (glue #f #f 12 0)
         (text (footer-char-info)))))

@@ -113,6 +113,15 @@
 
 (define (make-menu-empty) (widget-hmenu '()))
 
+;; A procedure through which the menu buttons run their commands (it gets
+;; the command as a procedure without arguments), or #f. A promise sets it
+;; for the items it yields, their submenus included (menu-wrap-commands):
+;; the menus of the tags of the footer run them with the cursor in the tag
+(define menu-command-wrapper #f)
+
+(tm-define (menu-wrap-commands wrap)
+  (set! menu-command-wrapper wrap))
+
 (define (delay-command cmd)
   (object->command (lambda () (exec-delayed cmd))))
 
@@ -390,7 +399,10 @@
 	  (widget-balloon but bal)))))
 
 (define (make-menu-entry-button style bar? bal? check label short action)
-  (let* ((command (make-menu-command (if (active? style) (apply action '()))))
+  (let* ((wrap menu-command-wrapper)
+         (command (make-menu-command
+                   (when (active? style)
+                     (if wrap (wrap action) (apply action '())))))
          (l (make-menu-label label style))
          (pressed? (and bar? (!= check "")))
          (new-style (logior style (if pressed? widget-style-pressed 0))))
@@ -663,8 +675,11 @@
            ((cond ((== tag '=>) widget-pulldown-button)
                   ((== tag '->) widget-pullright-button))
             (make-menu-label label style)
-            (object->promise-widget
-             (lambda () (make-menu-widget (list 'vertical items) style))))))
+            (with wrap menu-command-wrapper
+              (object->promise-widget
+               (lambda ()
+                 (with-global menu-command-wrapper wrap
+                   (make-menu-widget (list 'vertical items) style))))))))
       (if (tuple? label 'balloon 2)
           (let* ((text (caddr label))
                  (ftxt (translate text))
@@ -768,10 +783,12 @@
 
 (define (make-menu-promise p style bar?)
   "Make @(promise :%1) menu items."
-  (with value ((cadr p))
-    ;;(make-menu-items value style bar?)
-    (if (match? value ':menu-item) (make-menu-items value style bar?)
-        (make-menu-error "promise did not yield a menu: " value))))
+  ;; the promise may set menu-command-wrapper for the items it yields
+  (with-global menu-command-wrapper menu-command-wrapper
+    (with value ((cadr p))
+      ;;(make-menu-items value style bar?)
+      (if (match? value ':menu-item) (make-menu-items value style bar?)
+          (make-menu-error "promise did not yield a menu: " value)))))
 
 (define (make-refresh p style bar?)
   "Make @(refresh :%1 :string?) widget."

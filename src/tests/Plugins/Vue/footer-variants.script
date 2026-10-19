@@ -1,0 +1,23 @@
+# needs footer-variants.scm: a command of the menu of an outer tag of the
+# footer (coordinates for the default window, 800x600)
+wait 12000
+window #2
+focus
+key Escape
+key Left
+wait 300
+key Right
+wait 1000
+snapshot fv1
+# the menu of the displayed formula, its variants, then Inline formula
+click 572 586
+wait 800
+click 615 281
+wait 800
+snapshot fv2
+click 440 286
+wait 1000
+# the cursor went back into the inner formula
+text y
+wait 800
+snapshot fv3

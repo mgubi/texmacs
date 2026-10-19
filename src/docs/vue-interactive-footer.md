@@ -22,6 +22,10 @@ window) shows as menus and buttons what it otherwise shows as text.
   removal, moves between similar tags...), whose commands change that tag
   **where it is, without moving the cursor**: from inside a strong, the
   theorem around it becomes a lemma, and the typing goes on in the strong.
+  Many of these commands act on the innermost tag of their kind around the
+  cursor, whatever tag they are given: they run with the cursor inside the
+  tag of the menu (at the start of its first child), which goes back where
+  it was afterwards, unless the command moved it or selected something.
   `document` and `concat`, which say nothing, are left out.
 * **Folding.** The outer tags which do not fit in the room of the path
   fold into a `…` menu (a click on one of them selects it); the innermost
@@ -41,13 +45,15 @@ It is off by default: **View › Interactive status bar** (Vue and Cocoa,
 
 The test `tests/Plugins/Vue/footer-menus` opens the menu of a theorem from
 inside a strong, makes it a lemma, types a letter, which must land in the
-strong, and opens the Document menu.
+strong, and opens the Document menu. `tests/Plugins/Vue/footer-variants`
+makes a displayed formula inline from its menu while the cursor is in an
+inline formula inside it.
 
 ## How it works
 
 | Where | What |
 |---|---|
-| `TeXmacs/progs/texmacs/menus/footer-menu.scm` | The two menus, `texmacs-footer-environment` and `texmacs-footer-path` (lazy menus, declared in `init-texmacs.scm`). The Document menu is `footer-document-menu` (`focus-style-menu` and `focus-document-menu` of the buffer tree), the menu of a tag `footer-tag-menu` (Select, then `standard-focus-menu` of that tree); both are in `promise`s, so that they are made when they are opened and not at each key (the footer is expanded at every key: 0.5 ms for the path, as before). `footer-menu-key`, the buffer and the paths of the tags, makes the GUI build the menus again when they hold other trees: the expansion of a menu shows a procedure as its source, the same for two theorems with the same path of tags. They reuse the menus of the Format menu (`text-font-menu`, `math-font-menu`, `font-size-menu`, `text-font-effects-menu`, `color-menu`) and `text-language-menu`; the tags are those of `upward-context-trees` (`main-menu.scm`, the context tool). The folding: `footer-split-path` keeps the innermost tags which fit in `footer-path-budget` characters (the character after the path and the `…` menu count too); the GUI sets the budget (`footer-set-budget`). The character: `footer-char-info`, as `compute_text_footer` |
+| `TeXmacs/progs/texmacs/menus/footer-menu.scm` | The two menus, `texmacs-footer-environment` and `texmacs-footer-path` (lazy menus, declared in `init-texmacs.scm`). The Document menu is `footer-document-menu` (`focus-style-menu` and `focus-document-menu` of the buffer tree), the menu of a tag `footer-tag-menu` (Select, then `standard-focus-menu` of that tree); both are in `promise`s, so that they are made when they are opened and not at each key; the promise of a tag, `footer-tag-items`, sets `menu-wrap-commands` (`menu-widget.scm`: the buttons of the items of a promise and of their submenus run their commands through it), so that they run in the tag (`footer-run-in`) (the footer is expanded at every key: 0.5 ms for the path, as before). `footer-menu-key`, the buffer and the paths of the tags, makes the GUI build the menus again when they hold other trees: the expansion of a menu shows a procedure as its source, the same for two theorems with the same path of tags. They reuse the menus of the Format menu (`text-font-menu`, `math-font-menu`, `font-size-menu`, `text-font-effects-menu`, `color-menu`) and `text-language-menu`; the tags are those of `upward-context-trees` (`main-menu.scm`, the context tool). The folding: `footer-split-path` keeps the innermost tags which fit in `footer-path-budget` characters (the character after the path and the `…` menu count too); the GUI sets the budget (`footer-set-budget`). The character: `footer-char-info`, as `compute_text_footer` |
 | `src/Edit/Interface/edit_footer.cpp` | `edit_interface_rep::set_footer` says, before it sends the footer, whether it is the environment at the cursor or a message: `(footer-environment-notify #t/#f)` |
 | `TeXmacs/progs/kernel/texmacs/tm-dialogue.scm` | `(footer-environment?)`, that state. A function and not an exported variable: an exported variable is a copy of the binding of the module, which a `set!` in the module does not change |
 | `src/Plugins/Vue/vue_widget.cpp`, `vue_texmacs_widget_rep` | At `SLOT_LEFT_FOOTER` (sent first) it reads the preference and `(footer-environment?)`; at `SLOT_RIGHT_FOOTER` it expands the two menus and rebuilds the widget of each only when its expansion or `(footer-menu-key)` changed (`update_footer_menus`, as `tm_window_rep::get_menu_widget` does for the tool bars). The footer then lays out the environment menu on the left and the path on the right, right-aligned; when the path is wider than its room it is shifted left by the difference measured in the last pass, so that its end stays in view. The width of the path in the last layout (`footer_room`, points, at some 7 points a character) is the budget given to Scheme before the menus are expanded |

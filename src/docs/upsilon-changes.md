@@ -24,6 +24,14 @@ have the details, and the problems go to the
   use your own files of `~/.TeXmacs` with it, copy them into the same places
   of `~/.TeXmacs_Upsilon`. The handwriting examples follow
   `TEXMACS_HOME_PATH` too.
+- The interactive status bar (View → Interactive status bar, in Vue and
+  Cocoa) has a **Document** menu on its left: the style, paper, fonts and
+  language of the document, wherever the cursor is. Each tag around the
+  cursor on its right is a menu: Select, then its Focus menu, whose
+  commands change that tag where it is, without moving the cursor (from
+  inside a strong, the theorem around it becomes a lemma). They act on that
+  tag also when one of its kind is inside it: a displayed formula with an
+  inline formula in it becomes inline from its own menu.
 - **Browser**: after a turn of the wheel of a mouse the page no longer goes
   on moving for two seconds (the wheel was taken for a trackpad, after which
   the page glided); the page glides only after a finger, the browsers and
