@@ -1,4 +1,4 @@
-# Git support in TeXmacs: features of the `wip-git-versioning` branch
+# Git support in TeXmacs: features of the `wip_git` branch
 
 This page lists what the branch adds to TeXmacs. It is the changelog for
 reviewers and testers. For how the code is organised, see
