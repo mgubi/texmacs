@@ -280,6 +280,11 @@
   <paragraph|19 October 2026>
 
   <\itemize>
+    <item>On a tablet (an <name|iPad>), a keyboard button at the bottom
+    right of the page opens the keyboard of the system, and closes it: no
+    keyboard came without an external one. <verbatim|?keyboard> in the
+    address shows the button anywhere, <verbatim|?keyboard=0> hides it.
+
     <item>After a turn of the wheel of a mouse the page no longer goes on
     moving for two seconds (the wheel was taken for a trackpad, after which
     the page glided): the page glides only after a finger, since the

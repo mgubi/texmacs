@@ -1,0 +1,18 @@
+# The keyboard button of a tablet (misc/wasm/ime.js), run in the page with
+# the button forced on:
+#   node misc/wasm/browser-run.mjs --query '?keyboard' --script misc/wasm/test/keyboard.script
+# Expected, in this order:
+#   1. "ready" (TeXmacs has started) and "ok" (the helpers);
+#   2. the button is there ("button":true), and a click on it gives the
+#      focus to the text area of the keyboard ("focused":true, "opened":true);
+#   3. a text which comes into the text area, as from a virtual keyboard, is
+#      typed into the document ("typed":true);
+#   4. a second click closes the keyboard ("focused":false).
+# Without ?keyboard, on a computer, there is no button (eval document.
+# getElementById('tm-keyboard') is null).
+wait 15000
+eval (async()=>{for(let i=0;i<120&&!(typeof _malloc=='function'&&typeof _vue_web_scheme_eval=='function');i++)await new Promise(r=>setTimeout(r,1000));await new Promise(r=>setTimeout(r,3000));return 'ready'})()
+eval window.tmS=(c)=>{const n=lengthBytesUTF8(c)+1,p=_malloc(n);stringToUTF8(c,p,n);const r=UTF8ToString(_vue_web_scheme_eval(p));_free(p);return r}; window.pause=(ms)=>new Promise(r=>setTimeout(r,ms)); window.kb=()=>document.getElementById('tm-keyboard'); window.area=()=>document.querySelector('textarea[data-tm-input]'); 'ok'
+eval (async()=>{const b=kb();if(!b)return JSON.stringify({button:false});b.click();await pause(300);return JSON.stringify({button:true,focused:document.activeElement===area(),opened:b.style.background.indexOf('11, 92, 173')>=0})})()
+eval (async()=>{const a=area();a.value='kbd';a.dispatchEvent(new InputEvent('input',{data:'kbd',inputType:'insertText',bubbles:true}));await pause(1500);return JSON.stringify({typed:tmS('(if (string-search-forwards "kbd" 0 (tree->string (buffer-tree))) "yes" "no")')=='yes'||tmS('(tree->string (cursor-tree))').indexOf('kbd')>=0})})()
+eval (async()=>{kb().click();await pause(300);return JSON.stringify({focused:document.activeElement===area()})})()

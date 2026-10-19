@@ -14,6 +14,12 @@ have the details, and the problems go to the
 
 ## 19 October 2026
 
+- **Browser**: on a tablet (an iPad), a keyboard button at the bottom right
+  of the page opens the keyboard of the system, and closes it: no keyboard
+  came without an external one
+  ([#377](https://github.com/mgubi/texmacs/issues/377)).
+  `?keyboard` in the address shows the button anywhere, `?keyboard=0` hides
+  it.
 - **Desktop**: TeXmacs Upsilon has a home of its own, `~/.TeXmacs_Upsilon`
   (on Windows `%APPDATA%\TeXmacs_Upsilon`), for its preferences, caches and
   the files of the user, instead of the `~/.TeXmacs` of the official
