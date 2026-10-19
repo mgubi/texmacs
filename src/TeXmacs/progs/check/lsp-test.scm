@@ -730,10 +730,12 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define lsp-dir
-  (string-append (url->system (url-temp-dir)) "/lsp-tmp"))
+  (url->system (url-append (url-temp-dir) "lsp-tmp")))
 
 (define (lsp-file name)
-  (string-append lsp-dir "/" name))
+  ;; a system path, with the separators of the system (as those of the
+  ;; buffers, "\\" on Windows)
+  (url->system (url-append (url-temp-dir) (string-append "lsp-tmp/" name))))
 
 (define (setup-project)
   ;; lsp-tmp/proj, a project (compile_flags.txt) with a C file in src
