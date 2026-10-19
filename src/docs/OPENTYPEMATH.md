@@ -17,8 +17,8 @@ table fills what they leave open. A switch turns the tuning off for
 comparison, from Scheme with `(set-hand-tuned-math-fonts #f)` or from the
 sample script with `TM_HAND_TUNED=off`.
 
-Two companion documents go deeper: `doc/font-system-review.md` reviews the
-font system as a whole, and `doc/opentype-math-design.md` is the design and
+Two companion documents go deeper: `docs/font-system-review.md` reviews the
+font system as a whole, and `docs/opentype-math-design.md` is the design and
 status log of this work, including everything that is still missing.
 
 ## What is implemented
@@ -145,7 +145,7 @@ and from a side tool (Insert ▸ Symbols in a side tool), whose groups are
 declared once with `define-math-symbols-group` and laid out for the width of
 each. Every symbol button draws with the smart font, so a palette can show a
 symbol which lives in no TeX font, and says its markup in a balloon.
-`doc/math-symbol-coverage.md` counts what is still unnamed.
+`docs/math-symbol-coverage.md` counts what is still unnamed.
 
 **OpenType features of text** (`Graphics/Fonts/feature_font.cpp`,
 `TeXmacs/progs/fonts/font-features.scm`). The GSUB reader serves ordinary
@@ -332,7 +332,7 @@ Old Standard Math are profiled too, with no specimen here.
 ## What is not done
 
 The short version, with the details in section 7 of
-`doc/opentype-math-design.md`:
+`docs/opentype-math-design.md`:
 
 - Alphabets a font provides only in part (script and double-struck in most
   fonts) are silently mixed with the emulated ones; no profile key declares
