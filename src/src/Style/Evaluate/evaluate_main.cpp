@@ -137,6 +137,7 @@ is_layout_value (tree_label l) {
   case GET_ATTACHMENT:
   case GET_BINDING:
   case HAS_BINDING:
+  case _PATTERN:
     return true;
   default:
     return false;
@@ -529,7 +530,9 @@ evaluate_impl (tree t) {
 
   /* Graphical primitives */
   case _PATTERN:
-    return evaluate_pattern (t);
+    // (the size of a pattern is converted by the typesetter, at its scale,
+    // like the lengths; evaluate_pattern computed it here)
+    return evaluate_compound_children (t);
   case _POINT:
     return evaluate_point (t);
     /*
