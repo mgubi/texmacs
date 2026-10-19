@@ -124,7 +124,7 @@
 
     <item*|<markup|help-link>>(<source-link|tmdoc-markup.ts|TeXmacs/packages/documentation/standard/tmdoc-markup.ts>) builds the
     <abbr|URL> <verbatim|tmfs://help/article/tm/doc/<em|name>.<em|xx>.tm>
-    from a path relative to <source-link|doc/|doc> and opens it as an article. Unlike
+    from a path relative to <source-link|doc/|TeXmacs/doc> and opens it as an article. Unlike
     <markup|tmdoc-file>, it does not fall back to English; see the pitfalls
     on <hlink|the last page|docsys-writing.en.tm>.
 

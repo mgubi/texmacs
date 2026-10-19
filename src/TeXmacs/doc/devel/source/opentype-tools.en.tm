@@ -167,7 +167,7 @@
     exports with <verbatim|\\usepackage{unicode-math}>.
   </itemize>
 
-  <source-link|src/doc/math-symbol-coverage.md|doc/math-symbol-coverage.md> counts the symbols which are
+  <source-link|src/docs/math-symbol-coverage.md|docs/math-symbol-coverage.md> counts the symbols which are
   still unnamed, block by block.
 
   <source-link|TeXmacs/progs/math/math-symbol-tools.scm|TeXmacs/progs/math/math-symbol-tools.scm> arranges the symbols
@@ -252,7 +252,7 @@
   <section|Open problems>
 
   The list below was checked against the code; the design log
-  <source-link|src/doc/opentype-math-design.md|doc/opentype-math-design.md> (sections 6 and 7) has the
+  <source-link|src/docs/opentype-math-design.md|docs/opentype-math-design.md> (sections 6 and 7) has the
   details and the history.
 
   <\itemize>
