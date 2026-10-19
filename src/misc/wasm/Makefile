@@ -22,6 +22,10 @@ SCHEME   ?= s7
 TM       := $(abspath $(dir $(lastword $(MAKEFILE_LIST)))/../..)
 S        := $(TM)/src
 W        := $(TM)/misc/wasm
+# the screenshots of the features of TeXmacs Upsilon (features.html, and
+# doc/upsilon-screenshots.md on GitHub)
+SHOTS    := $(TM)/misc/upsilon/screenshots
+SCREENSHOTS  = $(patsubst $(SHOTS)/%,$(OUT)/web/screenshots/%,$(wildcard $(SHOTS)/*.webp))
 MUPDF    ?= $(CURDIR)/mupdf-1.28.5-source
 # the slim build of MuPDF (misc/wasm/build-mupdf.sh): no fonts of its own
 # but the standard 14, no document formats but PDF, SVG and the images
@@ -125,7 +129,7 @@ all: $(OUT)/texmacs.js
 # declared in shell.html
 WEB_ICONS := $(foreach n,16 32 48 64 128 192,$(OUT)/web/texmacs-vue-$(n).png) $(OUT)/web/favicon.ico
 
-web: $(OUT)/web/texmacs.html $(OUT)/web/texmacs-files.json $(WEB_ICONS) $(OUT)/web/downloads.html tikzjax asymptote python r
+web: $(OUT)/web/texmacs.html $(OUT)/web/texmacs-files.json $(WEB_ICONS) $(OUT)/web/downloads.html $(OUT)/web/features.html $(SCREENSHOTS) tikzjax asymptote python r
 
 # the TeX of the TikZ plugin (plugins/tikz, src/docs/wasm/tikzjax.md):
 # TikZJax, fetched by get-tikzjax.sh, without its fonts and the part of its
@@ -206,6 +210,15 @@ $(OUT)/web/favicon.ico: $(TM)/TeXmacs/misc/images/texmacs-vue.ico
 # listed from the API of GitHub)
 $(OUT)/web/downloads.html: $(W)/downloads.html
 	@mkdir -p $(OUT)/web
+	cp $< $@
+
+# the page of screenshots of the features, and its pictures
+$(OUT)/web/features.html: $(W)/features.html
+	@mkdir -p $(OUT)/web
+	cp $< $@
+
+$(OUT)/web/screenshots/%.webp: $(SHOTS)/%.webp
+	@mkdir -p $(OUT)/web/screenshots
 	cp $< $@
 
 $(OUT)/web/texmacs.html: $(OBJECTS) $(LIBDEPS) $(W)/progress.js $(W)/packages.js $(W)/web-pre.js $(W)/files.js $(W)/frame.js $(W)/clipboard.js $(W)/print.js $(W)/workers.js $(W)/javascript.js $(W)/ime.js $(W)/wallet.js $(W)/shell.html

@@ -3,9 +3,14 @@
 This is **TeXmacs Upsilon**, an enhanced and bleeding-edge version of
 [GNU TeXmacs](https://texmacs.org) with experimental features: it gathers
 in one tree several lines of work which are not (yet) in the official
-TeXmacs, so that they can be built, used and tested together. It is stock
-TeXmacs (the `svn_sync` branch, the mirror of the SVN trunk) plus the
-following branches, merged in:
+TeXmacs, so that they can be built, used and tested together.
+
+**See it in pictures: [doc/upsilon-screenshots.md](doc/upsilon-screenshots.md)**
+(also on the site, <https://mgubi.github.io/texmacs/features.html>, next to
+the [latest builds](https://mgubi.github.io/texmacs/downloads.html)).
+
+It is stock TeXmacs (the `svn_sync` branch, the mirror of the SVN trunk)
+plus the following branches, merged in:
 
 | Branch | What it brings |
 |---|---|
