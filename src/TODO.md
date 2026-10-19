@@ -28,4 +28,6 @@ and not fixed, pull requests waiting, decisions to take.
 ## Done
 
 - move src/Plugins/Vue/tests to tests/Plugins/Vue
+- the commands of the menu of a tag of the interactive footer act on that tag, also when a tag of the same kind is inside it (a displayed formula with an inline formula in it becomes inline from its menu; test `tests/Plugins/Vue/footer-variants`)
+- plans for GUI scripting, the history of the back and forward buttons, TMU/TMX and Lean/LSP (in [docs/plans](docs/plans))
 - interactive footer: a Document menu (the properties of the document, wherever the cursor is), and the tags around the cursor as menus with their Focus menu, which change them without moving the cursor (see [docs/vue-interactive-footer.md](docs/vue-interactive-footer.md))

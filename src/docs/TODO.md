@@ -76,6 +76,27 @@ no headless mode. The Widkit duplicates are fixed on `wip_other_guis` too.
     snapshot (no crash report, nothing in the log); four launches after it
     did not.
 
+- **Interactive footer, after the work of 2026-10-19**
+  (`src/docs/vue-interactive-footer.md`): the menus of the tags were tried
+  in Vue only (tests `footer-menus` and `footer-variants`); the Cocoa build
+  compiles but its footer was not tried by hand. A right click on a tag of
+  the footer does nothing now (the left click gives its menu, Focus menu
+  included). At start-up the log says `warning: conditional master routine
+  focus-extra-menu` (the code menu of `wip_code` hooks into the Focus menu
+  of every tag): harmless, not traced.
+- **Windows: a typesetting crash when a highlighter is installed late**
+  (a tree-sitter or LSP highlighter which starts after the document was
+  typeset). Seen on the Windows CI only; not reproduced elsewhere.
+- **Issues of 2026-10-19 still open.** #379 (`get-environment-variable`
+  undefined when plugins start): not reproduced, the reporter was asked
+  where the code comes from; probably Scheme of another TeXmacs in
+  `~/.TeXmacs`, which TeXmacs Upsilon no longer reads since it has its own
+  home (`~/.TeXmacs_Upsilon`, 12255954f8). If it is not, alias
+  `get-environment-variable` to `getenv` under S7. #376 (a malformed
+  question dialog): with the other session. #377 (the browser version on an
+  iPad needs a keyboard): b6d461ef0d adds a button which opens the keyboard
+  of the system on tablets; to be tried on an iPad before closing.
+
 ## Kept on purpose
 
 - `smart_font_rep::adjusted_dpi` in `src/src/Graphics/Fonts/smart_font.cpp`
