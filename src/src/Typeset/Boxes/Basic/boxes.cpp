@@ -892,7 +892,13 @@ box_rep::all_placed (SI x, SI y, array<box>& bs, array<rectangle>& rs) {
   x += x0; y += y0;
   for (i=0; i<n; i++) subbox (i)->all_placed (x, y, bs, rs);
 }
-void box_rep::unplace (repaint_log& log) { (void) log; }
+void
+box_rep::unplace (repaint_log& log) {
+  // (reached from a group which is gone: the boxes in it which log, and
+  // were not placed again, leave their areas)
+  int i, n= subnr ();
+  for (i=0; i<n; i++) subbox (i)->unplace (log);
+}
 
 /******************************************************************************
 * The areas to repaint (see boxes.hpp)
@@ -927,7 +933,9 @@ placed_box::place (box_rep* b, SI x, SI y, repaint_log& log) {
       log.rects= rectangles (now, rectangles (zero, log.rects));
     return;
   }
-  bool was= (id == log.id && pass == log.pass - 1);
+  // (a box which was placed and not unplaced since is where it was: in a
+  // group which was not moved, it is not placed again at each pass)
+  bool was= (id == log.id);
   // (an unchanged area would be discarded by requires_update)
   if (!was || ox != x || oy != y || typeset_caches_mode () == 0) {
     rectangle old= (was? rectangle (ox + b->x3, oy + b->y3,

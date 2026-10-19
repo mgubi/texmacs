@@ -1034,6 +1034,54 @@ remember_box (path ip, box b) {
   return tm_new<remember_box_rep> (ip, b);
 }
 
+/******************************************************************************
+* Group boxes (see boxes.hpp)
+******************************************************************************/
+
+int typeset_caches_mode (); // see typesetter.hpp
+
+class group_box_rep: public change_box_rep {
+public:
+  placed_box place;  // where the group was placed last
+public:
+  inline group_box_rep (path ip, box b):
+    change_box_rep (ip, true)
+  {
+    insert (b, 0, 0);
+    position ();
+    finalize ();
+  }
+  void position_at (SI x, SI y, repaint_log& log);
+  inline void unplace (repaint_log& log) {
+    if (place.id == log.id && place.pass != log.pass) {
+      place.id= -1;
+      box_rep::unplace (log);
+    }
+  }
+};
+
+void
+group_box_rep::position_at (SI x, SI y, repaint_log& log) {
+  x += x0; y += y0;
+  bool was= place.id == log.id && place.pass == log.pass - 1;
+  bool same= was && place.ox == x && place.oy == y;
+  place.id= log.id; place.pass= log.pass; place.ox= x; place.oy= y;
+  // (the boxes inside it are where they were, since it does not change;
+  // when it places them, they are not kept by the log, which would unplace
+  // them at the next pass, but by the group, in the log)
+  if (!same || typeset_caches_mode () == 0) {
+    int n= N(log.placed);
+    box_rep::position_at (x - x0, y - y0, log);
+    log.placed->resize (n);
+  }
+  log.placed << box (this);
+}
+
+box
+group_box (path ip, box b) {
+  return tm_new<group_box_rep> (ip, b);
+}
+
 box
 locus_box (path ip, box b, list<string> ids) {
   return tm_new<locus_box_rep> (ip, b, ids);

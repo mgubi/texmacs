@@ -381,6 +381,7 @@ merge_line_run (path ip, array<page_item>& l, int i1, int i2) {
   }
   box lb= stack_box (path (ip), bs, spc);
   lb= move_box (path (ip), lb, 0, bs[0]->y2);
+  lb= group_box (path (ip), lb);
   page_item it (lb);
   it->spc= l[i2-1]->spc;
   it->penalty= l[i2-1]->penalty;
