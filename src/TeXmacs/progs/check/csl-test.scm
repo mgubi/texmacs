@@ -971,7 +971,39 @@
                           "  </bibliography>\n"))
     (check= (flat (first-of 'bib-list b))
             (string-append "Knuth, D. E. 1986. The TeXbook. "
-                           "Addison-Wesley. Reading, MA."))))
+                           "Addison-Wesley. Reading, MA.")))
+  ;; the titles of a .bib file keep the capitals of their braces, and those
+  ;; of another language stay as written, also with the database tool (the
+  ;; database lowercases the titles of articles and drops the braces: the
+  ;; file is read itself); the preference is set in memory only
+  (string-save (string-append
+                "@book{steinweiss,\n"
+                " author={Stein, Elias M. and Weiss, Guido},\n"
+                " title={Introduction to {Fourier} Analysis on"
+                " {Euclidean} Spaces},\n"
+                " publisher={Princeton University Press}, year=1971}\n"
+                "@article{riemann,\n author={Riemann, Bernhard},\n"
+                " title={Ueber die Anzahl der Primzahlen unter einer"
+                " gegebenen Grosse},\n"
+                " journal={Monatsberichte der Berliner Akademie},\n"
+                " pages={671--680}, year=1859, language={german}}\n")
+               (tmp-file "case.bib"))
+  (let* ((which "database tool")
+         (had? (cpp-has-preference? which))
+         (old (get-preference which))
+         (b (begin
+              (cpp-set-preference which "on")
+              (generated-bibliography
+               "case.tm"
+               (string-append "  See <cite|steinweiss> and <cite|riemann>.\n\n"
+                              "  <\\bibliography|bib|csl-apa|case>\n"
+                              "  </bibliography>\n"))))
+         (s (flat (first-of 'bib-list b))))
+    (if had? (cpp-set-preference which old) (cpp-reset-preference which))
+    (check-true (string-contains?
+                 s "Introduction to Fourier analysis on Euclidean spaces"))
+    (check-true (string-contains?
+                 s "Ueber die Anzahl der Primzahlen unter einer gegebenen Grosse"))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The LaTeX export, for the package citation-style-language
