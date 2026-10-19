@@ -41,6 +41,10 @@
             background: var(--accent-bg); color: var(--accent); text-decoration: none; font-weight: 600; }
   .button:hover { text-decoration: underline; }
   figure { margin: 56px 0 0; }
+  figure { scroll-margin-top: 16px; }
+  .toc { margin: 20px 0 0; padding: 14px 18px; background: var(--card); border: 1px solid var(--line); border-radius: 10px; }
+  .toc ol { margin: 0; padding-left: 22px; columns: 2 260px; column-gap: 32px; }
+  .toc li { margin: 0 0 6px; break-inside: avoid; }
   figure a.shot { display: block; border-radius: 10px; overflow: hidden;
                   border: 1px solid var(--line); box-shadow: 0 6px 24px var(--shadow); background: var(--card); }
   figure img { display: block; width: 100%; height: auto; }
@@ -68,7 +72,21 @@
     <a class="button" href="changes.html">Recent changes</a>
   </div>
 
-  <figure>
+  <nav class="toc" aria-label="Sections">
+    <ol>
+      <li><a href="#opentype-mathematics">OpenType mathematics</a></li>
+      <li><a href="#interfaces-themes-and-icons">Interfaces, themes and icons</a></li>
+      <li><a href="#font-design">Font design</a></li>
+      <li><a href="#program-code-with-tree-sitter">Program code with tree-sitter</a></li>
+      <li><a href="#language-servers">Language servers</a></li>
+      <li><a href="#git">Git</a></li>
+      <li><a href="#citation-styles-and-zotero">Citation styles and Zotero</a></li>
+      <li><a href="#ai-sessions">AI sessions</a></li>
+      <li><a href="#in-the-browser">In the browser</a></li>
+    </ol>
+  </nav>
+
+  <figure id="opentype-mathematics">
     <figcaption>
       <h2>OpenType mathematics</h2>
       <p>Formulas are laid out from the <code>MATH</code> table of any OpenType
@@ -79,7 +97,7 @@
     <a class="shot" href="screenshots/math-libertinus.webp"><img src="screenshots/math-libertinus.webp" width="1600" height="1025" alt="A page of formulas typeset in Libertinus Math: integrals, sums, a matrix, a system of equations and a theorem"></a>
   </figure>
 
-  <figure>
+  <figure id="interfaces-themes-and-icons">
     <figcaption>
       <h2>Interfaces, themes and icons</h2>
       <p>The same page in STIX Two, in the Vue interface with its dark theme
@@ -90,7 +108,7 @@
     <a class="shot" href="screenshots/math-stix-dark-lucide.webp"><img src="screenshots/math-stix-dark-lucide.webp" width="1600" height="1025" loading="lazy" alt="The same page in STIX Two, in a window with the dark theme and the Lucide icons"></a>
   </figure>
 
-  <figure>
+  <figure id="font-design">
     <figcaption>
       <h2>Font design</h2>
       <p>A page with a tab for each part of a document (text, mathematics,
@@ -102,7 +120,7 @@
     <a class="shot" href="screenshots/font-design.webp"><img src="screenshots/font-design.webp" width="1600" height="1126" loading="lazy" alt="The font design page: tabs for text, mathematics, sans serif and other parts, samples of the chosen fonts, and a list of fonts with descriptions"></a>
   </figure>
 
-  <figure>
+  <figure id="program-code-with-tree-sitter">
     <figcaption>
       <h2>Program code with tree-sitter</h2>
       <p>The syntax of 22 languages, by tree-sitter, in source files, in the
@@ -113,7 +131,7 @@
     <a class="shot" href="screenshots/tree-sitter-python.webp"><img src="screenshots/tree-sitter-python.webp" width="1600" height="1025" loading="lazy" alt="A Python source file coloured by its syntax"></a>
   </figure>
 
-  <figure>
+  <figure id="language-servers">
     <figcaption>
       <h2>Language servers</h2>
       <p>Source files are followed by the language server of their language
@@ -124,7 +142,7 @@
     <a class="shot" href="screenshots/language-server-clangd.webp"><img src="screenshots/language-server-clangd.webp" width="1600" height="1025" loading="lazy" alt="A C file with a misspelled variable underlined as an error, the names of parameters shown in grey, and clangd 1 error in the bar"></a>
   </figure>
 
-  <figure>
+  <figure id="git">
     <figcaption>
       <h2>Git</h2>
       <p>The Version menu works with Git: a side panel, commits, the history,
@@ -135,7 +153,7 @@
     <a class="shot" href="screenshots/git-compare.webp"><img src="screenshots/git-compare.webp" width="1600" height="1025" loading="lazy" alt="A document compared with its last commit: the changed words marked in the typeset text, the Git panel at the right and the review bar at the bottom"></a>
   </figure>
 
-  <figure>
+  <figure id="citation-styles-and-zotero">
     <figcaption>
       <h2>Citation styles and Zotero</h2>
       <p>The styles of the Citation Style Language (those of Zotero, Mendeley
@@ -146,7 +164,7 @@
     <a class="shot" href="screenshots/csl-apa-bibliography.webp"><img src="screenshots/csl-apa-bibliography.webp" width="1600" height="1025" loading="lazy" alt="A text with citations and a bibliography in APA style"></a>
   </figure>
 
-  <figure>
+  <figure id="ai-sessions">
     <figcaption>
       <h2>AI sessions</h2>
       <p>Chats with ChatGPT, Claude, Gemini, Mistral, OpenRouter, Albert or a
@@ -157,7 +175,7 @@
     <a class="shot" href="screenshots/ai-session-ollama.webp"><img src="screenshots/ai-session-ollama.webp" width="1600" height="1025" loading="lazy" alt="An AI session in a document: a question and the answer of a local model with typeset formulas"></a>
   </figure>
 
-  <figure>
+  <figure id="in-the-browser">
     <figcaption>
       <h2>In the browser</h2>
       <p>The same TeXmacs, compiled to WebAssembly, runs in a web page with

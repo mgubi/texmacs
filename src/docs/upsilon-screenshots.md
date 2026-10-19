@@ -11,6 +11,16 @@ The pictures are in [`src/misc/upsilon/screenshots`](../misc/upsilon/screenshots
 (WebP, 1600 pixels wide); they were taken in the Vue interface on macOS
 and in Firefox.
 
+1. [OpenType mathematics](#opentype-mathematics)
+2. [Interfaces, themes and icons](#interfaces-themes-and-icons)
+3. [Font design](#font-design)
+4. [Program code with tree-sitter](#program-code-with-tree-sitter)
+5. [Language servers](#language-servers)
+6. [Git](#git)
+7. [Citation styles and Zotero](#citation-styles-and-zotero)
+8. [AI sessions](#ai-sessions)
+9. [In the browser](#in-the-browser)
+
 ## OpenType mathematics
 
 Formulas are laid out from the `MATH` table of any OpenType math font,
