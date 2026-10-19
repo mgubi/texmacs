@@ -6,7 +6,7 @@ developed on their own branches:
 - `wip_ts`: tree-sitter (a grammar per language, the generator in Scheme and
   C++, a vendored C runtime in `Plugins/TreeSitter`, clients in
   `progs/treesit`). Syntax of one piece of code, synchronous, also for code
-  blocks of documents and session inputs. See `doc/tree-sitter.md`.
+  blocks of documents and session inputs. See `src/docs/tree-sitter.md`.
 - `wip_lsp`: a client of language servers (C++ link in
   `System/Link/lsp_link.cpp`, protocol and clients in `progs/lsp`). Meaning
   over a project, asynchronous, for source files only. See the developer

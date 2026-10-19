@@ -13,7 +13,7 @@
 #include "tree.hpp"
 
 // The state of a line of program code which is a state of the view, not of
-// the document (see doc/code-features.md): it is kept on the highlight
+// the document (see src/docs/code-features.md): it is kept on the highlight
 // observer of the line, which a modification of the line detaches, so that
 // an edited line forgets it. The features of programs (tree-sitter, the
 // language servers) set it; the typesetter and the editor read it.
@@ -46,7 +46,7 @@ void code_clear_line_layers (tree line);
 bool code_line_layers_of (tree line, code_line_layers& l);
 tree code_line_layers_tree (tree line);
 
-// positions in a line of program code (a Cork string, see doc/code-features.md):
+// positions in a line of program code (a Cork string, see src/docs/code-features.md):
 // offsets are those of the string; a character of Cork (a byte, or <...>)
 // is one column, a tab (<#9>, see source_document_to_tree) goes to the next
 // stop of every tw columns; UTF-16 units are those of the text of the file

@@ -14,7 +14,7 @@
 
 // A region of program code is a document of lines (a source file, a code
 // block, a session input). The features of program code follow its changes
-// (see doc/code-features.md): each keeps a snapshot of the lines, at its
+// (see src/docs/code-features.md): each keeps a snapshot of the lines, at its
 // own pace, and asks for the change since (tree-sitter at each highlight,
 // for ts_tree_edit; a language server after a pause, for didChange).
 

@@ -24,7 +24,7 @@
 (lazy-define (treesit ts-highlight)
              treesit-highlighter-request treesit-schedule-updates)
 (lazy-define (utils library cursor) notify-buffer-changed)
-;; the features of program code (doc/code-features.md): the folds
+;; the features of program code (src/docs/code-features.md): the folds
 (lazy-define (code code-fold) code-cursor-in-fold code-fold code-unfold
              code-fold-all code-unfold-all code-folds code-fold-lines
              code-unfold-lines code-hidden? code-can-fold? code-cursor-lines)

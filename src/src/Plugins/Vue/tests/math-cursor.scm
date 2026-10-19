@@ -1,6 +1,6 @@
 ;; The cursor in a formula with primes, wide accents and negations, which the
 ;; OpenType math fonts put in boxes of their own (C5 of
-;; src/doc/opentype-audit.md): the box-to-tree direction, which needs a
+;; src/docs/opentype-audit.md): the box-to-tree direction, which needs a
 ;; window. math-cursor.script (made by math-cursor.py) presses Right through
 ;; the formula and records each step (path, position), then clicks at each
 ;; position: the click gives back the path of the step, except where two

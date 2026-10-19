@@ -213,7 +213,7 @@
 ;; the number of failures of a suite; an error which escapes the suite
 ;; counts as one, and does not stop the suites after it
 ;; the suites of the features of program code which a build may leave out
-;; (doc/code-features.md): run when the feature is there (its glue); their
+;; (src/docs/code-features.md): run when the feature is there (its glue); their
 ;; modules are loaded then (those of tree-sitter call its glue when they
 ;; are loaded)
 (define feature-suites

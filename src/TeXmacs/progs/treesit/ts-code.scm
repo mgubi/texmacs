@@ -12,7 +12,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;; The adapter of tree-sitter for the features of program code
-;; (progs/code/code-features.scm, doc/code-features.md): loaded by them when
+;; (progs/code/code-features.scm, src/docs/code-features.md): loaded by them when
 ;; it is there. Its rank, 20, comes after the servers (10) for the features
 ;; which both give (a server sees the other files); it serves where the code
 ;; has a syntax tree (syntax-cursor-language), also in code blocks.

@@ -13,7 +13,7 @@
 
 ;; A feature of program code (the blocks to fold, the outline...) is given by
 ;; providers: tree-sitter (the syntax of the code, at once) and the language
-;; servers (the meaning, over a project), see doc/code-features.md. Each
+;; servers (the meaning, over a project), see src/docs/code-features.md. Each
 ;; registers itself from its adapter (code-provider-set!), which is loaded
 ;; only if it is there: TeXmacs without one of them, or both, keeps working.
 ;; The commands of the features (code-fold...) ask the providers of a

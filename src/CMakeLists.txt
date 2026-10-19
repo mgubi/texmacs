@@ -527,7 +527,7 @@ if (USE_GNUTLS)
 endif ()
 
 # the features of program code which a build may leave out (see
-# doc/code-features.md and misc/m4/tm_code.m4)
+# src/docs/code-features.md and misc/m4/tm_code.m4)
 option (USE_TREE_SITTER "Use the syntax trees of tree-sitter" ON)
 option (USE_LSP "Use language servers" ON)
 

@@ -98,7 +98,7 @@ tm_link find_socket_link (int fd);
 void close_all_pipes ();
 void process_all_pipes ();
 // the processing of the messages of a kind of links which is not part of
-// all builds (the language servers, see doc/code-features.md): it registers
+// all builds (the language servers, see src/docs/code-features.md): it registers
 // itself when it is used, the server calls it at each turn of its loop
 void add_link_processor (void (*process) ());
 void process_all_link_processors ();
