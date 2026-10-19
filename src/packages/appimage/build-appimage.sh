@@ -47,6 +47,8 @@ cp packages/appimage/AppRun "$APPDIR/AppRun"
 chmod 755 "$APPDIR/AppRun"
 cp TeXmacs/bin/texmacs.bin TeXmacs/bin/tm_gs "$APPDIR/usr/bin/"
 for f in TeXmacs/plugins/*/bin/*; do [ -f "$f" ] && cp "$f" "$APPDIR/usr/bin/"; done
+# the command of the desktop entry (below), through AppRun
+printf '#!/bin/sh\nexec "$(dirname "$(readlink -f "$0")")/../../AppRun" "$@"\n' > "$APPDIR/usr/bin/texmacs-upsilon"
 chmod 755 "$APPDIR"/usr/bin/*
 # the data, without the programs (in usr/bin) and the libraries (usr/lib)
 mkdir -p "$APPDIR/usr/share/TeXmacs"
@@ -55,10 +57,17 @@ mkdir -p "$APPDIR/usr/share/TeXmacs"
 mkdir -p "$APPDIR/usr/share/TeXmacs/bin"
 cp TeXmacs/bin/texmacs TeXmacs/bin/fig2ps "$APPDIR/usr/share/TeXmacs/bin/" 2>/dev/null || :
 
-# the entry of the menus and the icon (named as the desktop file says)
-DESKTOP="$WORK/org.texmacs.texmacs.desktop"
-sed 's/^Name=.*/Name=TeXmacs Upsilon/' packages/appimage/org.texmacs.texmacs.desktop > "$DESKTOP"
-ICON="$WORK/texmacs.png"
+# the entry of the menus and the icon, with names of their own: an AppImage
+# put in the menus (AppImageLauncher, Gear Lever...) must not replace the
+# entry, the icon or the command of a TeXmacs installed beside it; .tm and
+# .tex files only (not every text file)
+DESKTOP="$WORK/org.texmacs.upsilon.desktop"
+sed -e 's/^Name=.*/Name=TeXmacs Upsilon/' \
+    -e 's/^Icon=.*/Icon=texmacs-upsilon/' \
+    -e 's/^Exec=texmacs /Exec=texmacs-upsilon /' \
+    -e 's|^MimeType=.*|MimeType=text/x-texmacs;text/x-tex;|' \
+    packages/appimage/org.texmacs.texmacs.desktop > "$DESKTOP"
+ICON="$WORK/texmacs-upsilon.png"
 if [ "$GUI" = vue ]; then cp TeXmacs/misc/images/texmacs-vue-256.png "$ICON"
 else cp TeXmacs/misc/images/texmacs-256.png "$ICON"; fi
 

@@ -311,7 +311,9 @@ jobs:
             apt-get install -y --no-install-recommends \
               qt6-base-dev qt6-base-dev-tools libqt6svg6-dev qt6-wayland
           else
-            apt-get install -y --no-install-recommends cmake ninja-build \
+            # (clang, as linux-vue: the Vue code has designated initializers
+            # out of the order of their fields, which GCC refuses)
+            apt-get install -y --no-install-recommends cmake ninja-build clang \
               libegl-dev libx11-dev libxext-dev libxrandr-dev \
               libxcursor-dev libxi-dev libxss-dev libxfixes-dev libxtst-dev \
               libxkbcommon-dev libdrm-dev libgbm-dev libgles-dev \
@@ -344,7 +346,7 @@ jobs:
           else
             ./configure --with-gui=vue --with-scheme=s7 --with-sdl3 \
               --with-mupdf="$DEPS" --with-thorvg="$DEPS" --with-gnutls \
-              PKG_CONFIG_PATH="$DEPS/lib/pkgconfig" CC=gcc CXX=g++
+              PKG_CONFIG_PATH="$DEPS/lib/pkgconfig" CC=clang CXX=clang++
           fi
 
       - name: Build
