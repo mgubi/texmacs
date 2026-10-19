@@ -214,7 +214,7 @@ get_cork_hyphens (string s,
     array<int> T (N(w)+1);
     for (i=0; i<N(T); i++) T[i]= 0;
     for (len=1; len < MAX_SEARCH; len++)
-      for (i=0; i < N(w) - len; i++) {
+      for (i=0; i <= N(w) - len; i++) {
         string key;
         for (j=0; j<len; j++) key << w[i+j];
         string r= patterns [key];
@@ -315,7 +315,7 @@ get_hyphens (string s,
     array<int> T (N(s)+1);
     for (i=0; i<N(T); i++) T[i]=0;
     for (len=1; len < MAX_SEARCH; len++)
-      for (i=0, l=0; i<N(s) - len; goto_next_char (s, i, utf8), l++) {
+      for (i=0, l=0; i <= N(s) - len; goto_next_char (s, i, utf8), l++) {
         string r= patterns [s (i, i+len)];
         if (!(r == "?")) {
           // cout << "  " << s (i, i+len) << " => " << r << "\n";

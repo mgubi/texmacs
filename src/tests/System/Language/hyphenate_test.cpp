@@ -23,6 +23,8 @@ test_patterns () {
   hashmap<string,string> patterns ("?");
   patterns ("ab")= "a1b";
   patterns ("<#3B1>b")= "<#3B1>1b";
+  // a pattern which ends with the end of the word
+  patterns ("cdxxx.")= "c1dxxx.";
   return patterns;
 }
 
@@ -68,6 +70,31 @@ test_characters () {
 }
 
 static void
+test_word_end () {
+  // xxc-dxxx: the pattern ends with the final dot of the word
+  CHECK_EQ (breaks ("xxcdxxx"), "2");
+  // ... and only matches at the end
+  CHECK_EQ (breaks ("xxcdxxxx"), "");
+  // the same in a word with a character <...>
+  CHECK_EQ (breaks ("x<#3B1>cdxxx"), "7");
+  CHECK_EQ (breaks ("x<#3B1>cdxxxx"), "");
+}
+
+static void
+test_english () {
+  // the American English patterns of $TEXMACS_PATH, where the breaks of
+  // these words come from the patterns 3side., 5lene. and 5stat.
+  hashmap<string,string> patterns ("?"), hyphenations ("?");
+  load_hyphen_tables ("us", patterns, hyphenations, true);
+  array<int> a= get_hyphens ("alongside", patterns, hyphenations, false);
+  CHECK_EQ (a[4] == HYPH_STD, true);  // along-side
+  a= get_hyphens ("acetylene", patterns, hyphenations, false);
+  CHECK_EQ (a[4] == HYPH_STD, true);  // acety-lene
+  a= get_hyphens ("aerostat", patterns, hyphenations, false);
+  CHECK_EQ (a[3] == HYPH_STD, true);  // aero-stat
+}
+
+static void
 test_exceptions () {
   hashmap<string,string> hyphenations;
   hyphenations ("xabx")= "xa-bx";
@@ -80,6 +107,8 @@ int
 main () {
   RUN (test_bytes);
   RUN (test_characters);
+  RUN (test_word_end);
+  RUN (test_english);
   RUN (test_exceptions);
   return test_report ();
 }
