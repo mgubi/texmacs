@@ -27,7 +27,8 @@ the path to the change are recomputed.
 ## What Joris wanted
 
 Joris did not write a design document for the rewriter; his intentions are
-in a few places of the documentation and in the code itself.
+in a few places of the documentation and in the code itself (summary with
+the sources in [pure-style-goals.md](pure-style-goals.md)).
 
 - **Separate evaluation from typesetting.** *The typesetting process*
   (`TeXmacs/doc/devel/format/basics/typesetting.en.tm`, 2004): typesetting
