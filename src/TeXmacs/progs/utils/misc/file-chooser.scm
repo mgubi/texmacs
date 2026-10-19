@@ -22,7 +22,9 @@
 ;;   highlights an entry (a file goes into File), a click on the
 ;;   highlighted entry enters the directory or chooses the file;
 ;; - for an image, its width, height and position, and a preview;
-;; - the buttons Home, Texts (~/.TeXmacs_Upsilon/texts), Ok and Cancel.
+;; - the type of the file chosen, when TeXmacs knows its format;
+;; - the buttons Up, Home, Texts (~/.TeXmacs_Upsilon/texts), Ok and Cancel.
+;; The dialog may be resized: the lists take the room.
 ;; The field File is a field of a form: Ok reads what was typed in it.
 ;; The state of a chooser is local to its widget (as select-remote-plugin-
 ;; widget in dynamic/session-menu.scm), and its form has a name of its
@@ -98,6 +100,14 @@
          (u* (if (url-rooted? u) u (url-append (system->url from) u))))
     (and (url-directory? u*) (url->system u*))))
 
+(define (file-chooser-type path)
+  ;; the name of the format of the file @path, or "" (not recognized)
+  (if (or (not path) (url-directory? (system->url path))) ""
+      (with fm (url-format (system->url path))
+        (or (and (string? fm) (!= fm "") (!= fm "generic")
+                 (format-get-name fm))
+            ""))))
+
 (define (file-chooser-preview path)
   ;; the image @path, as a document
   (if (and path (url-exists? (system->url path))
@@ -138,6 +148,7 @@
             (set! name s)
             (form-named-set id "file" s)
             (refresh-now "file-chooser-file")
+            (refresh-now "file-chooser-type")
             (when (== type "image") (refresh-now "file-chooser-preview"))))
          (image-answer
           ;; with the width, height and position typed, as in Widkit;
@@ -181,26 +192,35 @@
         (aligned
           (item (text "Directory:")
             (refreshable "file-chooser-directory"
-              (input (when answer (go answer)) "string" (list dir) "460px")))
+              (input (when answer (go answer)) "string" (list dir) "1w")))
+
           (assuming (not dirs-only?)
             (item (text "File:")
               (refreshable "file-chooser-file"
-                (form-input "file" "string" (list name) "460px")))
+                (form-input "file" "string" (list name) "1w")))
+            (item (text "Type:")
+              ;; (a text in a refreshable is evaluated when the dialog is
+              ;; made: a promise makes it again at each refresh)
+              (refreshable "file-chooser-type"
+                (promise (list 'text (file-chooser-type
+                                       (and (!= name "")
+                                            (file-chooser-path dir name)))))))
+
             (item (text "Suffixes:")
               (input (when answer
                        (set! suffixes (string->suffixes answer))
                        (refresh))
-                     "string" (list (suffixes->string suffixes)) "460px"))))
+                     "string" (list (suffixes->string suffixes)) "1w"))))
         ===
         (refreshable "file-chooser-lists"
           (hlist
-            (resize '("250px" "250px" "250px") '("280px" "280px" "280px")
+            (resize '("200px" "250px" "9999px") '("150px" "280px" "9999px")
               (choice (click-directory answer)
                       (car (file-chooser-entries dir suffixes dirs-only?))
                       ""))
             (assuming (not dirs-only?)
               //
-              (resize '("250px" "250px" "250px") '("280px" "280px" "280px")
+              (resize '("200px" "250px" "9999px") '("150px" "280px" "9999px")
                 (choice (click-file answer)
                         (cdr (file-chooser-entries dir suffixes dirs-only?))
                         "")))))
@@ -226,6 +246,7 @@
         ===
         (explicit-buttons
           (hlist
+            ("Up" (up)) //
             ("Home" (go (file-chooser-home))) //
             ("Texts" (go (file-chooser-texts)))
             >>>

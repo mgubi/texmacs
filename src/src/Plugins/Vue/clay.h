@@ -4291,8 +4291,18 @@ void Clay_UpdateScrollContainers(bool enableDragScrolling, Clay_Vector2 scrollDe
         }
         scrollData->scrollPosition.y = CLAY__MIN(CLAY__MAX(scrollData->scrollPosition.y, -(CLAY__MAX(scrollData->contentSize.height - scrollData->layoutElement->dimensions.height, 0))), 0);
 
+        // TeXmacs: the innermost container under the pointer which can
+        // scroll (the deepest in pointerOverIds, which goes from the root
+        // inwards), whatever the order of scrollContainerDatas: a removal
+        // swaps the last entry in, and an outer container which came after
+        // took the wheel from a list inside it, which then never scrolled
+        bool canScroll = (scrollData->layoutElement->config.clip.vertical &&
+                          scrollData->contentSize.height > scrollData->layoutElement->dimensions.height) ||
+                         (scrollData->layoutElement->config.clip.horizontal &&
+                          scrollData->contentSize.width > scrollData->layoutElement->dimensions.width);
         for (int32_t j = 0; j < context->pointerOverIds.length; ++j) { // TODO n & m are small here but this being n*m gives me the creeps
-            if (scrollData->layoutElement->id == Clay_ElementIdArray_Get(&context->pointerOverIds, j)->id) {
+            if (scrollData->layoutElement->id == Clay_ElementIdArray_Get(&context->pointerOverIds, j)->id &&
+                canScroll && j > highestPriorityElementIndex) {
                 highestPriorityElementIndex = j;
                 highestPriorityScrollData = scrollData;
             }
