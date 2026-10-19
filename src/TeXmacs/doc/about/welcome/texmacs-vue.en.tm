@@ -292,6 +292,8 @@
     text, and a document could not be scrolled without a mouse or a
     trackpad), and a finger which rests a moment before it moves selects,
     as a mouse does.
+
+    <item>Escape closes a dialog, as its close box does.
   </itemize>
 
   <paragraph|18 October 2026>

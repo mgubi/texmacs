@@ -5079,7 +5079,9 @@ vue_input_text_widget_rep::do_layout () {
   }
   if ((N(key_event) > 0) && (is_focused)) {
     process_key (key_event);
-    key_event= "";
+    // escape also closes the dialog around the field (see
+    // vue_plain_window_widget_rep::do_layout), as in the dialogs of Qt
+    if (key_event != "escape") key_event= "";
   }
 }
 
@@ -5465,6 +5467,12 @@ vue_plain_window_widget_rep::do_layout () {
   refit_window= false;
   // popup menus are dismissed once one of their buttons has been activated
   if (popup && cancel_popup && win) win->set_visibility (false);
+  // escape which no widget of a dialog took closes it, as its close box
+  if (!popup && key_event == "escape" && win && !is_nil (quit) &&
+      concrete (wid)->type != "vue_texmacs_widget_rep") {
+    key_event= "";
+    win->destroy_event ();
+  }
 }
 
 // the resize_widget which determines the size limits of a window, if any:

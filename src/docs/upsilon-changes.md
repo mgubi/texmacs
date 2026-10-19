@@ -38,7 +38,12 @@ have the details, and the problems go to the
   Scheme, as the one of the X11 version: a folder, its folders and its
   files, a name, the files of the format or all of them
   ([#374](https://github.com/mgubi/texmacs/issues/374));
-  `TEXMACS_VUE_NO_FILE_DIALOG=1` asks for it everywhere.
+  `TEXMACS_VUE_NO_FILE_DIALOG=1` asks for it everywhere. Its window can be
+  resized, **Up** goes to the folder above, the format of the chosen file
+  shows beside its name, and the pointer over a file shows its format, its
+  size and its date. The wheel scrolls the list under the pointer.
+- With the Vue interface, Escape closes a dialog, as its close
+  box does.
 - **Browser**: touch screens (an iPad, a phone). A tap on an item of a menu
   chooses it: nothing happened, the items of the menus only worked with a
   mouse or a trackpad. A finger dragged over a document scrolls it, and goes

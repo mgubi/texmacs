@@ -22,8 +22,10 @@
 ;;   highlights an entry (a file goes into File), a click on the
 ;;   highlighted entry enters the directory or chooses the file;
 ;; - for an image, its width, height and position, and a preview;
-;; - the type of the file chosen, when TeXmacs knows its format;
-;; - the buttons Up, Home, Texts (~/.TeXmacs_Upsilon/texts), Ok and Cancel.
+;; - the type of the file chosen, after its name, when TeXmacs knows its
+;;   format;
+;; - the button Up beside Directory (as ..), and Home, Texts
+;;   (~/.TeXmacs_Upsilon/texts), Ok and Cancel.
 ;; The dialog may be resized: the lists take the room.
 ;; The field File is a field of a form: Ok reads what was typed in it.
 ;; The state of a chooser is local to its widget (as select-remote-plugin-
@@ -108,6 +110,37 @@
                  (format-get-name fm))
             ""))))
 
+(define (file-chooser-size n)
+  (cond ((< n 1024) (string-append (number->string n) " bytes"))
+        ((< n (* 1024 1024))
+         (string-append (number->string (quotient (+ n 512) 1024)) " KB"))
+        (else (string-append (number->string
+                              (quotient (+ n (* 512 1024)) (* 1024 1024)))
+                             " MB"))))
+
+(define (file-chooser-info path)
+  ;; the balloon of a file: its type, its size and when it was modified
+  (let* ((u (system->url path))
+         (type (file-chooser-type path))
+         (size (url-size u))
+         (time (url-last-modified u))
+         (l (list (if (!= type "") type "File")
+                  (if (and (number? size) (>= size 0))
+                      (file-chooser-size size) "")
+                  (if (and (number? time) (> time 0))
+                      (string-append "modified " (pretty-time time)) ""))))
+    (string-recompose (list-filter l (cut != <> "")) ", ")))
+
+(define (file-chooser-file-menu dir files click)
+  ;; the files as buttons, each with its balloon (a list of choice has
+  ;; none); made again at each refresh of the lists (a promise)
+  (cons 'vertical
+        (map (lambda (f)
+               (list (list 'balloon f
+                           (file-chooser-info (file-chooser-path dir f)))
+                     (lambda () (click f))))
+             files)))
+
 (define (file-chooser-preview path)
   ;; the image @path, as a document
   (if (and path (url-exists? (system->url path))
@@ -191,20 +224,24 @@
       (form id
         (aligned
           (item (text "Directory:")
-            (refreshable "file-chooser-directory"
-              (input (when answer (go answer)) "string" (list dir) "1w")))
+            (hlist
+              (refreshable "file-chooser-directory"
+                (input (when answer (go answer)) "string" (list dir) "1w"))
+              // (explicit-buttons ("Up" (up)))))
 
           (assuming (not dirs-only?)
             (item (text "File:")
-              (refreshable "file-chooser-file"
-                (form-input "file" "string" (list name) "1w")))
-            (item (text "Type:")
-              ;; (a text in a refreshable is evaluated when the dialog is
-              ;; made: a promise makes it again at each refresh)
-              (refreshable "file-chooser-type"
-                (promise (list 'text (file-chooser-type
-                                       (and (!= name "")
-                                            (file-chooser-path dir name)))))))
+              (hlist
+                (refreshable "file-chooser-file"
+                  (form-input "file" "string" (list name) "1w"))
+                ;; the type of the file, after its name (a text which
+                ;; changes in a refreshable is a promise: a refreshable
+                ;; evaluates its contents when the dialog is made)
+                //
+                (refreshable "file-chooser-type"
+                  (promise (list 'text (file-chooser-type
+                                         (and (!= name "")
+                                              (file-chooser-path dir name))))))))
 
             (item (text "Suffixes:")
               (input (when answer
@@ -221,9 +258,11 @@
             (assuming (not dirs-only?)
               //
               (resize '("200px" "250px" "9999px") '("150px" "280px" "9999px")
-                (choice (click-file answer)
-                        (cdr (file-chooser-entries dir suffixes dirs-only?))
-                        "")))))
+                (scrollable
+                  (promise
+                    (file-chooser-file-menu
+                      dir (cdr (file-chooser-entries dir suffixes dirs-only?))
+                      click-file)))))))
         (assuming (== type "image")
           ===
           (hlist
@@ -243,10 +282,9 @@
                   (file-chooser-preview
                     (and (!= name "") (file-chooser-path dir name)))
                   '(style "generic"))))))
-        ===
+        ======
         (explicit-buttons
           (hlist
-            ("Up" (up)) //
             ("Home" (go (file-chooser-home))) //
             ("Texts" (go (file-chooser-texts)))
             >>>
