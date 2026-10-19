@@ -8256,6 +8256,15 @@ tmg_picture_cache_reset () {
 }
 
 tmscm
+tmg_remote_files_refresh () {
+  // TMSCM_DEFER_INTS;
+  remote_files_refresh ();
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
 tmg_set_file_focus (tmscm arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "set-file-focus");
 
@@ -11896,6 +11905,7 @@ initialize_glue_basic () {
   tmscm_install_procedure ("url-grep",  tmg_url_grep, 2, 0, 0);
   tmscm_install_procedure ("url-search-upwards",  tmg_url_search_upwards, 3, 0, 0);
   tmscm_install_procedure ("picture-cache-reset",  tmg_picture_cache_reset, 0, 0, 0);
+  tmscm_install_procedure ("remote-files-refresh",  tmg_remote_files_refresh, 0, 0, 0);
   tmscm_install_procedure ("set-file-focus",  tmg_set_file_focus, 1, 0, 0);
   tmscm_install_procedure ("get-file-focus",  tmg_get_file_focus, 0, 0, 0);
   tmscm_install_procedure ("persistent-set",  tmg_persistent_set, 3, 0, 0);

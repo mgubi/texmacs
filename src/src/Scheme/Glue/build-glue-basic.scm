@@ -677,6 +677,7 @@
   (url-grep grep (url string url))
   (url-search-upwards search_file_upwards (url url string array_string))
   (picture-cache-reset picture_cache_reset (void))
+  (remote-files-refresh remote_files_refresh (void))
   (set-file-focus set_file_focus (void url))
   (get-file-focus get_file_focus (url))
 

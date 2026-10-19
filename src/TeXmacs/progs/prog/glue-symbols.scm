@@ -635,6 +635,7 @@
 "url-grep"
 "url-search-upwards"
 "picture-cache-reset"
+"remote-files-refresh"
 "set-file-focus"
 "get-file-focus"
 "persistent-set"
