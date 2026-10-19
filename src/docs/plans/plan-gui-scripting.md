@@ -1,6 +1,9 @@
 # Plan: GUI scripting for every interface
 
-Status: proposal, 2026-10-19. Based on a read-only checkout of
+Status: phases 0 to 2 under way on the branch `wip_gui_scripting`
+(2026-10-19), with the answers of section 10 as suggested there; the
+reference of what is done is [../gui-scripting.md](../gui-scripting.md).
+Proposal of 2026-10-19. Based on a read-only checkout of
 `upsilon_texmacs` (`~/t/lab/fix/plan-ref`). Paths below are relative to
 `src/` of that tree unless they start with `.github/`.
 

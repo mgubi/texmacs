@@ -25,6 +25,7 @@ say otherwise; C++ is under `src/src/`, Scheme under `src/TeXmacs/progs/`.
 | [vue-interactive-footer.md](vue-interactive-footer.md) | The interactive status bar (View › Interactive status bar): the properties at the cursor as menus, the tags around it as buttons which select them |
 | [typographic-palettes.md](typographic-palettes.md) | The typographic palettes of the colour menus (Vue): the sets, and how to define your own |
 | [vue-testing.md](vue-testing.md) | Snapshot and scripted-event harness of Vue, how to run and write tests |
+| [gui-scripting.md](gui-scripting.md) | The driver of the scripted tests of the interface (Scheme, every port), the hooks of a port, the line language, PASS or FAIL |
 | [build-and-debug.md](build-and-debug.md) | Configuring, building, dependency tracking, crash reports, pitfalls met along the way (Vue) |
 | [ns-port.md](ns-port.md) | The native Cocoa interface: status of the port, test aids, packaging |
 | [editor-frontend-separation.md](editor-frontend-separation.md) | Design, not implemented: how the editor depends on the GUI and the window layer, and how to separate them in stages; draft headers in [editor-frontend-separation/](editor-frontend-separation/) |

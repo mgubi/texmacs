@@ -297,6 +297,72 @@ tmg_gui_test_click_later (tmscm arg1, tmscm arg2, tmscm arg3) {
 }
 
 tmscm
+tmg_gui_test_port () {
+  // TMSCM_DEFER_INTS;
+  string out= gui_test_port ();
+  // TMSCM_ALLOW_INTS;
+
+  return string_to_tmscm (out);
+}
+
+tmscm
+tmg_gui_test_raw (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "gui-test-raw");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  int out= gui_test_raw (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return int_to_tmscm (out);
+}
+
+tmscm
+tmg_gui_test_busyP () {
+  // TMSCM_DEFER_INTS;
+  bool out= gui_test_busy ();
+  // TMSCM_ALLOW_INTS;
+
+  return bool_to_tmscm (out);
+}
+
+tmscm
+tmg_gui_test_texts () {
+  // TMSCM_DEFER_INTS;
+  array_string out= gui_test_texts ();
+  // TMSCM_ALLOW_INTS;
+
+  return array_string_to_tmscm (out);
+}
+
+tmscm
+tmg_gui_test_set_pump (tmscm arg1) {
+  TMSCM_ASSERT_BOOL (arg1, TMSCM_ARG1, "gui-test-set-pump");
+
+  bool in1= tmscm_to_bool (arg1);
+
+  // TMSCM_DEFER_INTS;
+  gui_test_pump (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_gui_test_eval_later (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "gui-test-eval-later");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  gui_test_eval_later (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
 tmg_support_functionalityP (tmscm arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "support-functionality?");
 
@@ -11996,6 +12062,12 @@ initialize_glue_basic () {
   tmscm_install_procedure ("gui-test-menu-entries",  tmg_gui_test_menu_entries, 1, 0, 0);
   tmscm_install_procedure ("gui-test-type",  tmg_gui_test_type, 1, 0, 0);
   tmscm_install_procedure ("gui-test-click-later",  tmg_gui_test_click_later, 3, 0, 0);
+  tmscm_install_procedure ("gui-test-port",  tmg_gui_test_port, 0, 0, 0);
+  tmscm_install_procedure ("gui-test-raw",  tmg_gui_test_raw, 1, 0, 0);
+  tmscm_install_procedure ("gui-test-busy?",  tmg_gui_test_busyP, 0, 0, 0);
+  tmscm_install_procedure ("gui-test-texts",  tmg_gui_test_texts, 0, 0, 0);
+  tmscm_install_procedure ("gui-test-set-pump",  tmg_gui_test_set_pump, 1, 0, 0);
+  tmscm_install_procedure ("gui-test-eval-later",  tmg_gui_test_eval_later, 1, 0, 0);
   tmscm_install_procedure ("support-functionality?",  tmg_support_functionalityP, 1, 0, 0);
   tmscm_install_procedure ("gui-version",  tmg_gui_version, 0, 0, 0);
   tmscm_install_procedure ("default-look-and-feel",  tmg_default_look_and_feel, 0, 0, 0);

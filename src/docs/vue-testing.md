@@ -18,14 +18,23 @@ target window as `<dir>/<name>.png`.
 
 ## Scripted events
 
-`TEXMACS_VUE_SCRIPT=<file>`: the event loop replays the file line by line
-(`script_step` in `vue_gui.cpp`), one command per iteration and only when no
-SDL event is pending, by pushing synthetic SDL events. Coordinates are window
-*points* relative to the content area of the target window.
+`TEXMACS_VUE_SCRIPT=<file>`: the event loop replays the file line by line,
+one command per iteration and only when no SDL event is pending, by pushing
+synthetic SDL events. The driver is the one of every port, in Scheme
+(`check/gui-driver.scm` and `check/gui-script.scm`, see
+[gui-scripting.md](gui-scripting.md)), and Vue runs the commands of its own
+(`script_exec` in `vue_gui.cpp`). Coordinates are window *points* relative to
+the content area of the target window.
 
 ```
 # comment
 wait <ms>
+idle                        wait until no event came for a few turns of the loop
+activate <text>             click the text of the window drawn last with that
+                            text (or starting with it): a label, an item of an
+                            open menu, a tag of the footer
+expect <text>               a line which the output must have (run.sh checks it)
+exit                        quit at the end, with the status of the checks
 window <substring of title> | window #<id>    (default: the last created window;
                             prints its position and size on the screen)
 move x y
@@ -87,7 +96,14 @@ SCM=wheel-travel.scm SCRIPT=scroll-shift.script \
 ```
 
 It prints what the test prints (`choice:`, `got:`...), the errors and the
-end of the script, and leaves the snapshots in `/tmp/vue-tests/<test>`.
+end of the script, and leaves the snapshots in `/tmp/vue-tests/<test>`. Its
+last line is `PASS <test>` or `FAIL <test>: <why>`, and so is its status: a
+crash, a script which did not end, a failed check (`FAILED`), an exit status
+other than 0, or a line asked for by an `expect` of the script which is
+missing from the output. With `expect` lines the run stops as soon as the
+script ended and they all showed. A test may also be steps of the driver
+in its `.scm` alone, without a script, which quit by themselves with
+`gt-exit` (`footer-activate.scm`).
 **TeXmacs runs with a home of its own**, a copy of `~/.TeXmacs` made for
 the run (`cp -Rc`, copy on write, instant on APFS) and removed afterwards:
 a test must never change the user's settings, and it did when it ran in
@@ -188,6 +204,9 @@ callback output.
 | `enums` | an editable enum (typed and picked values), an enum as wide as its widest value, a long list near the bottom opening above and scrolling, a choice list which scrolls |
 | `menu-drag` | a menu title opens on press and a drag-release chooses an item, also after dragging to another title; resting on a disabled item, a separator or a group title closes a submenu; with a menu open, the pointer on a plain button of the bar closes it (d12) and going back over the titles opens none (d13). Give it 40 s under load |
 | `sockets` | the TeXmacs server and an anonymous legacy client in the same instance (see below) |
+| `footer-menus` | the interactive footer: the menu of a theorem from inside a strong makes it a lemma, the letter typed then lands in the strong; the Document menu (`got: (lemma strong) (0 0 0 0 1 0 2)`) |
+| `footer-variants` | the menu of a displayed formula in the footer makes it inline while the cursor is in an inline formula inside it, and the cursor goes back there (`got: (math text math) ...`) |
+| `footer-activate` | `footer-variants` written as steps of the driver in its `.scm`, without a script: the menus are found by their texts (`gt-activate`), the result is checked (`gt-check`) and TeXmacs quits with the status |
 
 One more is not run this way. `sockets-tls` repeats the `sockets` exchange
 over TLS and is run by hand:

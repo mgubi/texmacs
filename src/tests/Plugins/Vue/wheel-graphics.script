@@ -12,3 +12,5 @@ wheel 300 200 0 -2
 wait 800
 key F12
 snapshot graphics
+# the output, which run.sh checks
+expect got: wheel 

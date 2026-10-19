@@ -11,6 +11,13 @@
 # which share one (SCM=wheel-travel.scm SCRIPT=scroll-shift.script), in the
 # directory of the tests or by an absolute path.
 #
+# The last line says PASS or FAIL, and so does the status: a test fails
+# when TeXmacs crashed, when its script did not end, when a check of the
+# script failed, or when a line which an "expect" line of the script asks
+# for is missing from the output. A script with "expect" lines stops as
+# soon as it ended and they all showed; the others run for the given time
+# (docs/gui-scripting.md).
+#
 # TeXmacs runs with a home of its own, a copy of ~/.TeXmacs_Upsilon made for the
 # run (copy on write where the file system can): a test must not change
 # the preferences, the recent files or anything else of the user's -- a
@@ -48,10 +55,45 @@ TEXMACS_PATH="$PWD/TeXmacs" TEXMACS_HOME_PATH="$HOMEDIR" \
 TEXMACS_VUE_SNAPSHOT="$OUT" TEXMACS_VUE_SCRIPT="$script" \
   "$BIN" ${TM_ARGS:-} ${load:+-x "$load"} > "$OUT/run.log" 2>&1 &
 p=$!
-sleep "$secs"
-kill -9 $p 2>/dev/null
-wait $p 2>/dev/null
 
-grep -E "choice:|got:|enum:|answer:|Error message|Invalid situation|vue script: done" "$OUT/run.log"
+# the lines the output must have (expect <text>), and whether they are all
+# there; the lines of the script itself (vue script: ...) do not count
+expects="$OUT/expects"
+: > "$expects"
+[ -n "$script" ] && tr -d '\r' < "$script" |
+  sed -n 's/^[[:space:]]*expect[[:space:]][[:space:]]*//p' > "$expects"
+missing () {
+  grep -av "^vue script:" "$OUT/run.log" > "$OUT/output"
+  while IFS= read -r e; do
+    grep -qaF -- "$e" "$OUT/output" || printf '%s\n' "$e"
+  done < "$expects"
+}
+
+ended=0 # TeXmacs ended by itself
+t=0
+while [ $t -lt $((secs * 2)) ]; do
+  sleep 0.5
+  t=$((t + 1))
+  if ! kill -0 $p 2>/dev/null; then ended=1; break; fi
+  if [ -s "$expects" ] && grep -aq "vue script: done" "$OUT/run.log" &&
+     [ -z "$(missing)" ]; then sleep 1; break; fi # (the last snapshot)
+done
+status=0
+if [ $ended = 1 ]; then wait $p 2>/dev/null; status=$?
+else kill -9 $p 2>/dev/null; wait $p 2>/dev/null; fi
+
+grep -aE "choice:|got:|enum:|answer:|Error message|Invalid situation|FAILED|vue script: done" "$OUT/run.log"
 ls "$OUT"/*.png 2>/dev/null | sed "s|^|snapshot: |"
 [ "${KEEP:-0}" = 1 ] || rm -rf "${HOMEDIR:?}"
+
+why=""
+grep -aq "Error message" "$OUT/run.log" && why="$why; crashed"
+[ -n "$script" ] && ! grep -aq "vue script: done" "$OUT/run.log" &&
+  why="$why; the script did not end"
+grep -aq "FAILED \[" "$OUT/run.log" && why="$why; a check failed"
+[ $ended = 1 ] && [ $status != 0 ] && why="$why; exit status $status"
+m=$(missing)
+[ -n "$m" ] && why="$why; missing: $(printf '%s' "$m" | tr '\n' '|')"
+if [ -z "$why" ]; then echo "PASS $test"; exit 0; fi
+echo "FAIL $test:${why#;}"
+exit 1

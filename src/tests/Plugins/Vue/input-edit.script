@@ -30,3 +30,5 @@ text 42
 wait 300
 key Return
 wait 800
+# the output, which run.sh checks
+expect got: Bob Smith / 42

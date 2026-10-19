@@ -26,6 +26,7 @@
 #include "convert.hpp"
 #include "converter.hpp"
 #include "scheme.hpp"
+#include "gui_test.hpp"
 #include "../../Scheme/Scheme/object.hpp" // blackbox_to_tmscm: a command given to Scheme (the file chooser)
 #include "dictionary.hpp"
 #include "locale.hpp"
@@ -145,7 +146,13 @@ static vue_window script_win= NULL;     // target window of the script
 static vue_window snapshot_win= NULL;   // window whose next redraw is saved as
 static string snapshot_name;            // <snapshot dir>/<snapshot_name>.png
 static void script_init ();
-static void script_step ();
+static int script_exec (string line);
+static bool script_pump= false; // call (gui-test-pump) at each turn of the loop
+// while a script runs, the texts drawn in each window at its last frame
+// (gui_test_texts): the window being drawn, and its texts
+static vue_window gt_render_win= NULL;
+static hashmap<int,array<string> > gt_texts ((array<string> ()));
+static void gt_frame_start (vue_window win);
 
 
 extern bool debug_clay;
@@ -1204,11 +1211,17 @@ vue_sdl_mupdf_window_rep::process_redraw () {
     Clay_RenderCommandArray below= render_commands, above= render_commands;
     below.length= k;
     above.internalArray += k; above.length -= k; above.capacity -= k;
+    gt_frame_start (this);
     render_clay_commands (ren, &below);
     composite_virtual_windows (this, ren);
+    gt_render_win= this;
     render_clay_commands (ren, &above);
   }
-  else render_clay_commands (ren, &render_commands);
+  else {
+    gt_frame_start (this);
+    render_clay_commands (ren, &render_commands);
+  }
+  gt_render_win= NULL;
 
     static_cast<mupdf_renderer_rep*>(ren)->end ();
 
@@ -1361,11 +1374,17 @@ vue_sdl_gpu_window_rep::process_redraw () {
     Clay_RenderCommandArray below= render_commands, above= render_commands;
     below.length= k;
     above.internalArray += k; above.length -= k; above.capacity -= k;
+    gt_frame_start (this);
     render_clay_commands (ren, &below);
     composite_virtual_windows (this, ren);
+    gt_render_win= this;
     render_clay_commands (ren, &above);
   }
-  else render_clay_commands (ren, &render_commands);
+  else {
+    gt_frame_start (this);
+    render_clay_commands (ren, &render_commands);
+  }
+  gt_render_win= NULL;
   if (vue_profile_on) gpu_finish (); // with the time the GPU took
   else gpu_flush ();
   if (vue_profile_on) vue_clay_ns += SDL_GetTicksNS () - t_ns;
@@ -1614,6 +1633,19 @@ render_clay_commands (renderer ren, Clay_RenderCommandArray *rcommands)
       case CLAY_RENDER_COMMAND_TYPE_CUSTOM: {
         render_fn fn= (render_fn)rcmd->renderData.custom.customData;
         fn (ren, rcmd->userData, r);
+        if (script_pump && gt_render_win != NULL &&
+            rcmd->renderData.custom.customData == vue_render_text) {
+          // a text, which a script may look for (gui_test_texts), in the
+          // points of the window, those of the scripts (the layout is in
+          // pixels, density of them per point)
+          styled_string ss= (styled_string_rep*) rcmd->userData;
+          float d= gt_render_win->density > 0 ? gt_render_win->density : 1.0f;
+          gt_texts (gt_render_win->id)
+            << (as_string ((int) (bounding_box.x / d)) * "\t" *
+                as_string ((int) (bounding_box.y / d)) * "\t" *
+                as_string ((int) (bounding_box.width / d)) * "\t" *
+                as_string ((int) (bounding_box.height / d)) * "\t" * ss->s);
+        }
         break;
       }
       default:
@@ -2661,6 +2693,7 @@ composite_virtual_windows (vue_window host, renderer ren) {
     }
     {
       with_window frame (v);
+      gt_frame_start (v);
       render_clay_commands (ren, &v->render_commands);
     }
     ren->unclip ();
@@ -4237,7 +4270,7 @@ loop_iteration_body () {
   bool active= false; // an event, or something moving by itself
 
   // 1. process events
-  script_step (); // may push synthetic events
+  if (script_pump) call ("gui-test-pump"); // may push synthetic events
   if (take_event ()) {
     active= true;
 #ifdef __EMSCRIPTEN__
@@ -4481,8 +4514,12 @@ get_window_from_ID (Uint32 ID) {
 * Scripted events (development aid)
 *
 * When TEXMACS_VUE_SCRIPT names a file, its lines are executed one by one
-* (a line is executed only when no SDL event is pending). Coordinates are in
-* window points, relative to the content area of the target window:
+* (a line is executed only when no SDL event is pending). The driver is in
+* Scheme, (check gui-script), which reads the file and runs the commands
+* below through gui_test_raw (script_exec here), at each turn of the loop
+* (gui_test_pump); it adds wait, scheme, expect, idle and activate, see
+* docs/gui-scripting.md. Coordinates are in window points, relative to the
+* content area of the target window:
 *
 *   # comment
 *   wait <ms>                       pause
@@ -4513,22 +4550,12 @@ get_window_from_ID (Uint32 ID) {
 *   tab <id>                        show the tab #id (single-window mode)
 ******************************************************************************/
 
-static array<string> script_lines;
-static int script_pos= 0;
-static time_t script_next= 0;
-
 static void
 script_init () {
   string file= get_env ("TEXMACS_VUE_SCRIPT");
   if (N(file) == 0) return;
-  string s;
-  if (load_string (url_system (file), s, false)) {
-    cout << "vue script: cannot read " << file << LF;
-    return;
-  }
-  script_lines= tokenize (s, "\n");
-  script_active= true;
-  cout << "vue script: " << N(script_lines) << " lines" << LF;
+  exec_delayed (scheme_cmd ("(begin (use-modules (check gui-script)) "
+                            "(gui-script-start " * scm_quote (file) * "))"));
 }
 
 static bool script_no_target= false; // the last "window" command matched nothing
@@ -4601,246 +4628,272 @@ script_push_motion (vue_window win, float x, float y) {
   SDL_PushEvent (&ev);
 }
 
-static void
-script_step () {
-  if (!script_active) return;
-  if (SDL_PollEvent (NULL)) return; // let pending events be processed first
-  time_t now= texmacs_time ();
-  if (now < script_next) return;
-  while (script_pos < N(script_lines)) {
-    string line= trim_spaces (script_lines[script_pos++]);
-    if (N(line) == 0 || line[0] == '#') continue;
-    array<string> a= tokenize (line, " ");
-    string cmd= a[0];
-    vue_window win= script_target ();
-    cout << "vue script: " << line << LF;
-    if (cmd == "wait" && N(a) > 1) {
-      script_next= now + as_int (a[1]);
-      return;
+// one command of a script: 0 run, 1 run and the next one may follow in
+// the same turn of the loop, 2 unknown (see gui_test_raw)
+static int
+script_exec (string line) {
+  array<string> a= tokenize (line, " ");
+  string cmd= a[0];
+  vue_window win= script_target ();
+  if (cmd == "window" && N(a) > 1) {
+    string title= line (N(cmd)+1, N(line));
+    // no match: the following commands are skipped rather than sent to
+    // the previous target (e.g. closing the main window by mistake)
+    script_win= NULL;
+    iterator<int> it= iterate (id_to_window);
+    while (it->busy ()) {
+      vue_window w= (vue_window) id_to_window [it->next ()];
+      if (title == "#" * as_string (w->id) ||
+          occurs (title, w->name) || occurs (title, w->get_name ())) script_win= w;
     }
-    else if (cmd == "window" && N(a) > 1) {
-      string title= line (N(cmd)+1, N(line));
-      // no match: the following commands are skipped rather than sent to
-      // the previous target (e.g. closing the main window by mistake)
-      script_win= NULL;
-      iterator<int> it= iterate (id_to_window);
-      while (it->busy ()) {
-        vue_window w= (vue_window) id_to_window [it->next ()];
-        if (title == "#" * as_string (w->id) ||
-            occurs (title, w->name) || occurs (title, w->get_name ())) script_win= w;
-      }
-      script_no_target= (script_win == NULL);
-      if (script_win == NULL) cout << "vue script: no window matches " << title << LF;
-      else {
-        SI wx, wy, ww, wh;
-        script_win->get_position (wx, wy);
-        script_win->get_size (ww, wh);
-        cout << "vue script: window at " << wx/PIXEL << "," << -wy/PIXEL
-             << " size " << ww/PIXEL << "x" << wh/PIXEL
-             << (script_win->platform_window () == NULL ? " (virtual)" : "") << LF;
-      }
-      continue;
+    script_no_target= (script_win == NULL);
+    if (script_win == NULL) cout << "vue script: no window matches " << title << LF;
+    else {
+      SI wx, wy, ww, wh;
+      script_win->get_position (wx, wy);
+      script_win->get_size (ww, wh);
+      cout << "vue script: window at " << wx/PIXEL << "," << -wy/PIXEL
+           << " size " << ww/PIXEL << "x" << wh/PIXEL
+           << (script_win->platform_window () == NULL ? " (virtual)" : "") << LF;
     }
-    if (win == NULL) continue;
-    if (cmd == "move" && N(a) > 2)
-      script_push_motion (win, as_double (a[1]), as_double (a[2]));
-    else if (cmd == "press" && N(a) > 2)
-      script_push_button (win, as_double (a[1]), as_double (a[2]), script_button (a, 3), true);
-    else if (cmd == "release" && N(a) > 2)
-      script_push_button (win, as_double (a[1]), as_double (a[2]), script_button (a, 3), false);
-    else if (cmd == "click" && N(a) > 2) {
-      // the count of a double or triple click, as SDL gives it (the
-      // presses before it are the script's own clicks)
-      int clicks= (N(a) > 4 && is_int (a[4])) ? max (1, as_int (a[4])) : 1;
-      script_push_motion (win, as_double (a[1]), as_double (a[2]));
-      script_push_button (win, as_double (a[1]), as_double (a[2]), script_button (a, 3), true, clicks);
-      script_push_button (win, as_double (a[1]), as_double (a[2]), script_button (a, 3), false, clicks);
+    return 1;
+  }
+  if (win == NULL) return 1;
+  if (cmd == "move" && N(a) > 2)
+    script_push_motion (win, as_double (a[1]), as_double (a[2]));
+  else if (cmd == "press" && N(a) > 2)
+    script_push_button (win, as_double (a[1]), as_double (a[2]), script_button (a, 3), true);
+  else if (cmd == "release" && N(a) > 2)
+    script_push_button (win, as_double (a[1]), as_double (a[2]), script_button (a, 3), false);
+  else if (cmd == "click" && N(a) > 2) {
+    // the count of a double or triple click, as SDL gives it (the
+    // presses before it are the script's own clicks)
+    int clicks= (N(a) > 4 && is_int (a[4])) ? max (1, as_int (a[4])) : 1;
+    script_push_motion (win, as_double (a[1]), as_double (a[2]));
+    script_push_button (win, as_double (a[1]), as_double (a[2]), script_button (a, 3), true, clicks);
+    script_push_button (win, as_double (a[1]), as_double (a[2]), script_button (a, 3), false, clicks);
+  }
+  else if (cmd == "wheel" && N(a) > 4) {
+    SDL_Event ev;
+    SDL_zero (ev);
+    ev.type= SDL_EVENT_MOUSE_WHEEL;
+    ev.wheel.timestamp= SDL_GetTicksNS ();
+    float wx= as_double (a[1]), wy= as_double (a[2]);
+    ev.wheel.windowID= script_window_id (win, wx, wy);
+    ev.wheel.mouse_x= wx;
+    ev.wheel.mouse_y= wy;
+    ev.wheel.x= as_double (a[3]);
+    ev.wheel.y= as_double (a[4]);
+    SDL_PushEvent (&ev);
+  }
+  else if (cmd == "key" && N(a) > 1) {
+    // "key [S-][C-][A-][M-]<SDL key name>": the prefixes are the shift,
+    // control, option and command modifiers
+    SDL_Event ev;
+    SDL_zero (ev);
+    string kn= a[1];
+    SDL_Keymod mod= SDL_KMOD_NONE;
+    while (N(kn) > 2 && kn[1] == '-') {
+      if (kn[0] == 'S') mod |= SDL_KMOD_LSHIFT;
+      else if (kn[0] == 'C') mod |= SDL_KMOD_LCTRL;
+      else if (kn[0] == 'A') mod |= SDL_KMOD_LALT;
+      else if (kn[0] == 'M') mod |= SDL_KMOD_LGUI;
+      else break;
+      kn= kn (2, N(kn));
     }
-    else if (cmd == "wheel" && N(a) > 4) {
-      SDL_Event ev;
+    // the names with spaces ("Keypad 1") are written with underscores
+    c_string name (replace (kn, "_", " "));
+    ev.type= SDL_EVENT_KEY_DOWN;
+    ev.key.timestamp= SDL_GetTicksNS ();
+    ev.key.windowID= script_window_id (win);
+    ev.key.scancode= SDL_GetScancodeFromName (name);
+    ev.key.key= SDL_GetKeyFromScancode (ev.key.scancode, SDL_KMOD_NONE, false);
+    ev.key.mod= mod;
+    ev.key.down= true;
+    SDL_PushEvent (&ev);
+    if (N(a) > 2) {
+      // "key <name> <text>": the text which the system sends with the
+      // key, at once (a digit of the keypad)
+      static c_string ktext ("");
+      ktext= c_string (a[2]);
       SDL_zero (ev);
-      ev.type= SDL_EVENT_MOUSE_WHEEL;
-      ev.wheel.timestamp= SDL_GetTicksNS ();
-      float wx= as_double (a[1]), wy= as_double (a[2]);
-      ev.wheel.windowID= script_window_id (win, wx, wy);
-      ev.wheel.mouse_x= wx;
-      ev.wheel.mouse_y= wy;
-      ev.wheel.x= as_double (a[3]);
-      ev.wheel.y= as_double (a[4]);
+      ev.type= SDL_EVENT_TEXT_INPUT;
+      ev.text.timestamp= SDL_GetTicksNS ();
+      ev.text.windowID= script_window_id (win);
+      ev.text.text= ktext;
       SDL_PushEvent (&ev);
     }
-    else if (cmd == "key" && N(a) > 1) {
-      // "key [S-][C-][A-][M-]<SDL key name>": the prefixes are the shift,
-      // control, option and command modifiers
-      SDL_Event ev;
-      SDL_zero (ev);
-      string kn= a[1];
-      SDL_Keymod mod= SDL_KMOD_NONE;
-      while (N(kn) > 2 && kn[1] == '-') {
-        if (kn[0] == 'S') mod |= SDL_KMOD_LSHIFT;
-        else if (kn[0] == 'C') mod |= SDL_KMOD_LCTRL;
-        else if (kn[0] == 'A') mod |= SDL_KMOD_LALT;
-        else if (kn[0] == 'M') mod |= SDL_KMOD_LGUI;
-        else break;
-        kn= kn (2, N(kn));
-      }
-      // the names with spaces ("Keypad 1") are written with underscores
-      c_string name (replace (kn, "_", " "));
-      ev.type= SDL_EVENT_KEY_DOWN;
-      ev.key.timestamp= SDL_GetTicksNS ();
-      ev.key.windowID= script_window_id (win);
-      ev.key.scancode= SDL_GetScancodeFromName (name);
-      ev.key.key= SDL_GetKeyFromScancode (ev.key.scancode, SDL_KMOD_NONE, false);
-      ev.key.mod= mod;
-      ev.key.down= true;
-      SDL_PushEvent (&ev);
-      if (N(a) > 2) {
-        // "key <name> <text>": the text which the system sends with the
-        // key, at once (a digit of the keypad)
-        static c_string ktext ("");
-        ktext= c_string (a[2]);
-        SDL_zero (ev);
-        ev.type= SDL_EVENT_TEXT_INPUT;
-        ev.text.timestamp= SDL_GetTicksNS ();
-        ev.text.windowID= script_window_id (win);
-        ev.text.text= ktext;
-        SDL_PushEvent (&ev);
-      }
-    }
-    else if (cmd == "text" && N(a) > 1) {
-      // one text input event per (utf8) character, as SDL does. The events
-      // keep pointers to the text: the characters of the line are kept
-      // until the next "text" command, which comes once these events have
-      // all been handled (script_step waits for an empty queue); a ring of
-      // 64 slots was overwritten by a longer line before it was read
-      static array<c_string> buffers;
-      buffers= array<c_string> ();
-      string txt= line (N(cmd)+1, N(line));
-      int i= 0;
-      while (i < N(txt)) {
-        int start= i;
-        // the length of the utf8 sequence from its lead byte
-        unsigned char c= (unsigned char) txt[i];
-        int len= (c < 0x80) ? 1 : (c >= 0xF0) ? 4 : (c >= 0xE0) ? 3 : (c >= 0xC0) ? 2 : 1;
-        i= min (N(txt), start + len);
-        buffers << c_string (txt (start, i));
-        SDL_Event ev;
-        SDL_zero (ev);
-        ev.type= SDL_EVENT_TEXT_INPUT;
-        ev.text.timestamp= SDL_GetTicksNS ();
-        ev.text.windowID= script_window_id (win);
-        ev.text.text= buffers[N(buffers) - 1];
-        SDL_PushEvent (&ev);
-      }
-    }
-    else if (cmd == "snapshot" && N(a) > 1) {
-      snapshot_win= win;
-      snapshot_name= a[1];
-    }
-    else if (cmd == "resize" && N(a) > 2)
-      win->set_size (as_int (a[1]) * PIXEL, as_int (a[2]) * PIXEL);
-    else if (cmd == "repaint") // every editor from scratch (checks the incremental paths)
-      vue_simple_widget_rep::invalidate_all_editors ();
-    else if (cmd == "scheme" && N(line) > 7)
-      exec_delayed (scheme_cmd (line (7, N(line))));
-    else if (cmd == "focus") {
-      // pretend the window got the keyboard focus (a test instance launched
-      // while another application is in use never gets it)
-      // (a virtual window: the host gets it, and that window the keys)
-      vue_virtual_window_rep* v= dynamic_cast<vue_virtual_window_rep*> (win);
-      if (v != NULL) { v->raise (); focus_virtual (v); }
-      SDL_Event ev;
-      SDL_zero (ev);
-      ev.type= SDL_EVENT_WINDOW_FOCUS_GAINED;
-      ev.window.timestamp= SDL_GetTicksNS ();
-      ev.window.windowID= script_window_id (win);
-      SDL_PushEvent (&ev);
-    }
-    else if (cmd == "commit" && N(a) > 1) {
-      // the text committed by an input method: several characters in one
-      // text input event
-      static c_string ctext ("");
-      ctext= c_string (line (N(cmd)+1, N(line)));
+  }
+  else if (cmd == "text" && N(a) > 1) {
+    // one text input event per (utf8) character, as SDL does. The events
+    // keep pointers to the text: the characters of the line are kept
+    // until the next "text" command, which comes once these events have
+    // all been handled (the driver waits for an empty queue); a ring of
+    // 64 slots was overwritten by a longer line before it was read
+    static array<c_string> buffers;
+    buffers= array<c_string> ();
+    string txt= line (N(cmd)+1, N(line));
+    int i= 0;
+    while (i < N(txt)) {
+      int start= i;
+      // the length of the utf8 sequence from its lead byte
+      unsigned char c= (unsigned char) txt[i];
+      int len= (c < 0x80) ? 1 : (c >= 0xF0) ? 4 : (c >= 0xE0) ? 3 : (c >= 0xC0) ? 2 : 1;
+      i= min (N(txt), start + len);
+      buffers << c_string (txt (start, i));
       SDL_Event ev;
       SDL_zero (ev);
       ev.type= SDL_EVENT_TEXT_INPUT;
       ev.text.timestamp= SDL_GetTicksNS ();
       ev.text.windowID= script_window_id (win);
-      ev.text.text= ctext;
+      ev.text.text= buffers[N(buffers) - 1];
       SDL_PushEvent (&ev);
     }
-    else if (cmd == "compose") {
-      // the composition of an input method: "compose <text>" (no text ends it)
-      static string composed; // SDL keeps the pointer: the string must live on
-      composed= (N(a) > 1) ? line (N(cmd)+1, N(line)) : string ("");
-      static c_string ctext ("");
-      ctext= c_string (composed);
-      SDL_Event ev;
-      SDL_zero (ev);
-      ev.type= SDL_EVENT_TEXT_EDITING;
-      ev.edit.timestamp= SDL_GetTicksNS ();
-      ev.edit.windowID= script_window_id (win);
-      ev.edit.text= ctext;
-      ev.edit.start= N(composed);
-      ev.edit.length= 0;
-      SDL_PushEvent (&ev);
-    }
-    else if (cmd == "drop" && N(a) > 3) {
-      // "drop x y <path>" or "drop x y text:<text>": a synthetic drop of
-      // one item, as the system sends it (begin, item, complete)
-      static char buf[1024];
-      string item= line (N(cmd) + N(a[1]) + N(a[2]) + 3, N(line));
-      bool is_text= starts (item, "text:");
-      if (is_text) item= item (5, N(item));
-      c_string citem (item);
-      int n= min ((int) strlen (citem), 1023);
-      for (int i= 0; i < n; i++) buf[i]= ((char*) citem)[i];
-      buf[n]= 0;
-      float dx= as_double (a[1]), dy= as_double (a[2]);
-      Uint32 wid= script_window_id (win, dx, dy);
-      SDL_Event ev;
-      SDL_zero (ev);
-      ev.type= SDL_EVENT_DROP_BEGIN;
-      ev.drop.timestamp= SDL_GetTicksNS ();
-      ev.drop.windowID= wid;
-      SDL_PushEvent (&ev);
-      SDL_zero (ev);
-      ev.type= is_text ? SDL_EVENT_DROP_TEXT : SDL_EVENT_DROP_FILE;
-      ev.drop.timestamp= SDL_GetTicksNS ();
-      ev.drop.windowID= wid;
-      ev.drop.x= dx;
-      ev.drop.y= dy;
-      ev.drop.data= buf;
-      SDL_PushEvent (&ev);
-      SDL_zero (ev);
-      ev.type= SDL_EVENT_DROP_COMPLETE;
-      ev.drop.timestamp= SDL_GetTicksNS ();
-      ev.drop.windowID= wid;
-      ev.drop.x= dx;
-      ev.drop.y= dy;
-      SDL_PushEvent (&ev);
-    }
-    else if (cmd == "tab" && N(a) > 1) {
-      // show the tab (a window of an editor in single-window mode) #id
-      vue_virtual_window_rep* t= find_tab (as_int (a[1]));
-      if (t != NULL && t->shown) activate_tab (t);
-      else cout << "vue script: no tab " << a[1] << LF;
-    }
-    else if (cmd == "close" && win->platform_window () == NULL)
-      win->destroy_event (); // a virtual window: as its close box does
-    else if (cmd == "close") {
-      SDL_Event ev;
-      SDL_zero (ev);
-      ev.type= SDL_EVENT_WINDOW_CLOSE_REQUESTED;
-      ev.window.timestamp= SDL_GetTicksNS ();
-      ev.window.windowID= SDL_GetWindowID ((SDL_Window*) win->platform_window ());
-      SDL_PushEvent (&ev);
-    }
-    else cout << "vue script: unknown command " << line << LF;
-    return; // one command per loop iteration
   }
-  cout << "vue script: done" << LF;
-  script_active= false;
+  else if (cmd == "snapshot" && N(a) > 1) {
+    snapshot_win= win;
+    snapshot_name= a[1];
+  }
+  else if (cmd == "resize" && N(a) > 2)
+    win->set_size (as_int (a[1]) * PIXEL, as_int (a[2]) * PIXEL);
+  else if (cmd == "repaint") // every editor from scratch (checks the incremental paths)
+    vue_simple_widget_rep::invalidate_all_editors ();
+  else if (cmd == "focus") {
+    // pretend the window got the keyboard focus (a test instance launched
+    // while another application is in use never gets it)
+    // (a virtual window: the host gets it, and that window the keys)
+    vue_virtual_window_rep* v= dynamic_cast<vue_virtual_window_rep*> (win);
+    if (v != NULL) { v->raise (); focus_virtual (v); }
+    SDL_Event ev;
+    SDL_zero (ev);
+    ev.type= SDL_EVENT_WINDOW_FOCUS_GAINED;
+    ev.window.timestamp= SDL_GetTicksNS ();
+    ev.window.windowID= script_window_id (win);
+    SDL_PushEvent (&ev);
+  }
+  else if (cmd == "commit" && N(a) > 1) {
+    // the text committed by an input method: several characters in one
+    // text input event
+    static c_string ctext ("");
+    ctext= c_string (line (N(cmd)+1, N(line)));
+    SDL_Event ev;
+    SDL_zero (ev);
+    ev.type= SDL_EVENT_TEXT_INPUT;
+    ev.text.timestamp= SDL_GetTicksNS ();
+    ev.text.windowID= script_window_id (win);
+    ev.text.text= ctext;
+    SDL_PushEvent (&ev);
+  }
+  else if (cmd == "compose") {
+    // the composition of an input method: "compose <text>" (no text ends it)
+    static string composed; // SDL keeps the pointer: the string must live on
+    composed= (N(a) > 1) ? line (N(cmd)+1, N(line)) : string ("");
+    static c_string ctext ("");
+    ctext= c_string (composed);
+    SDL_Event ev;
+    SDL_zero (ev);
+    ev.type= SDL_EVENT_TEXT_EDITING;
+    ev.edit.timestamp= SDL_GetTicksNS ();
+    ev.edit.windowID= script_window_id (win);
+    ev.edit.text= ctext;
+    ev.edit.start= N(composed);
+    ev.edit.length= 0;
+    SDL_PushEvent (&ev);
+  }
+  else if (cmd == "drop" && N(a) > 3) {
+    // "drop x y <path>" or "drop x y text:<text>": a synthetic drop of
+    // one item, as the system sends it (begin, item, complete)
+    static char buf[1024];
+    string item= line (N(cmd) + N(a[1]) + N(a[2]) + 3, N(line));
+    bool is_text= starts (item, "text:");
+    if (is_text) item= item (5, N(item));
+    c_string citem (item);
+    int n= min ((int) strlen (citem), 1023);
+    for (int i= 0; i < n; i++) buf[i]= ((char*) citem)[i];
+    buf[n]= 0;
+    float dx= as_double (a[1]), dy= as_double (a[2]);
+    Uint32 wid= script_window_id (win, dx, dy);
+    SDL_Event ev;
+    SDL_zero (ev);
+    ev.type= SDL_EVENT_DROP_BEGIN;
+    ev.drop.timestamp= SDL_GetTicksNS ();
+    ev.drop.windowID= wid;
+    SDL_PushEvent (&ev);
+    SDL_zero (ev);
+    ev.type= is_text ? SDL_EVENT_DROP_TEXT : SDL_EVENT_DROP_FILE;
+    ev.drop.timestamp= SDL_GetTicksNS ();
+    ev.drop.windowID= wid;
+    ev.drop.x= dx;
+    ev.drop.y= dy;
+    ev.drop.data= buf;
+    SDL_PushEvent (&ev);
+    SDL_zero (ev);
+    ev.type= SDL_EVENT_DROP_COMPLETE;
+    ev.drop.timestamp= SDL_GetTicksNS ();
+    ev.drop.windowID= wid;
+    ev.drop.x= dx;
+    ev.drop.y= dy;
+    SDL_PushEvent (&ev);
+  }
+  else if (cmd == "tab" && N(a) > 1) {
+    // show the tab (a window of an editor in single-window mode) #id
+    vue_virtual_window_rep* t= find_tab (as_int (a[1]));
+    if (t != NULL && t->shown) activate_tab (t);
+    else cout << "vue script: no tab " << a[1] << LF;
+  }
+  else if (cmd == "close" && win->platform_window () == NULL)
+    win->destroy_event (); // a virtual window: as its close box does
+  else if (cmd == "close") {
+    SDL_Event ev;
+    SDL_zero (ev);
+    ev.type= SDL_EVENT_WINDOW_CLOSE_REQUESTED;
+    ev.window.timestamp= SDL_GetTicksNS ();
+    ev.window.windowID= SDL_GetWindowID ((SDL_Window*) win->platform_window ());
+    SDL_PushEvent (&ev);
+  }
+  else {
+    cout << "vue script: unknown command " << line << LF;
+    return 2;
+  }
+  return 0; // one command per loop iteration
+}
+
+/******************************************************************************
+* The hooks of the tests (gui_test.hpp)
+******************************************************************************/
+
+static void
+gt_frame_start (vue_window win) {
+  gt_render_win= win;
+  if (script_pump && win != NULL) gt_texts (win->id)= array<string> ();
+}
+
+string gui_test_port () { return "vue"; }
+
+int
+gui_test_raw (string line) {
+  line= trim_spaces (line);
+  if (N(line) == 0) return 1;
+  return script_exec (line);
+}
+
+bool
+gui_test_busy () {
+  return SDL_PollEvent (NULL);
+}
+
+array<string>
+gui_test_texts () {
+  vue_window win= script_target ();
+  if (win == NULL || !gt_texts->contains (win->id)) return array<string> ();
+  return gt_texts [win->id];
+}
+
+void
+gui_test_pump (bool on) {
+  script_pump= on;
+  script_active= on; // the buttons are those the script holds (mouse_buttons)
+  if (!on) gt_texts= hashmap<int,array<string> > (array<string> ());
 }
 
 // the state of the buttons and of the modifiers, as TeXmacs encodes it

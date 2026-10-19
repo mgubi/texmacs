@@ -14,3 +14,5 @@ wait 800
 move 120 160
 wait 800
 snapshot earth
+# the output, which run.sh checks
+expect got: ("Classical" "Muted" "Classic print" "Earth" "Nordic" "Pastel" "Solarized" "Sea")

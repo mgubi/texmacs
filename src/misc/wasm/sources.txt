@@ -148,6 +148,7 @@ Graphics/Fonts/superposed_font.cpp
 Graphics/Fonts/translator.cpp
 Graphics/Fonts/virtual_enhance.cpp
 Graphics/Fonts/virtual_font.cpp
+Graphics/Gui/gui_test.cpp
 Graphics/Gui/widget.cpp
 Graphics/Handwriting/learn_handwriting.cpp
 Graphics/Handwriting/poly_line.cpp

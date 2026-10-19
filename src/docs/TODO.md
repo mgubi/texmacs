@@ -97,6 +97,16 @@ no headless mode. The Widkit duplicates are fixed on `wip_other_guis` too.
   iPad needs a keyboard): b6d461ef0d adds a button which opens the keyboard
   of the system on tablets; to be tried on an iPad before closing.
 
+- **Vue tests which fail on their own expectation** (found on 2026-10-19
+  when the tests got `expect` lines, branch `wip_gui_scripting`; the same
+  before the new driver): `input-edit` prints `got: JoeJoe / 42`, `got: Bob
+  Joe / 42` or the expected `got: Bob Smith / 42` from one run to the next,
+  and `input-mouse` `got: Joe / 42` instead of `got: Smith / 42` (the cut
+  and paste go through the clipboard of the system, which the user's
+  session shares); `wheel-graphics` never prints `got: wheel`: the wheel
+  over a graphics does not reach `wheel-event`, though the view does not
+  scroll either.
+
 ## Kept on purpose
 
 - `smart_font_rep::adjusted_dpi` in `src/src/Graphics/Fonts/smart_font.cpp`

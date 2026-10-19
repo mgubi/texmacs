@@ -11,6 +11,7 @@
 
 #include "qt_utilities.hpp"
 #include "sys_utils.hpp"
+#include "gui_test.hpp"
 #include "analyze.hpp"
 
 #include <QApplication>
