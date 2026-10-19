@@ -3474,6 +3474,7 @@ wheel_event (vue_window win, double x, double y, time_t now, uint64_t stamp) {
              : (time_t) ((stamp - in.wheel_stamp) / 1000000);
   in.wheel_stamp= stamp;
   bool fresh= (dt >= wheel_slow_dt); // a new stream of events
+  in.wheel_touch= false;
   if (fresh) {
     in.wheel_precise= false;
     in.wheel_over_x= in.wheel_over_y= 0;
@@ -3506,6 +3507,40 @@ wheel_event (vue_window win, double x, double y, time_t now, uint64_t stamp) {
     in.wheel_over_x= in.wheel_ambiguous ? x * over : 0.0;
     in.wheel_over_y= in.wheel_ambiguous ? y * over : 0.0;
   }
+}
+
+// a finger dragged on a touch screen by (fx, fy) points: the view follows
+// it as it follows the fingers on a trackpad, and glides when the finger
+// is lifted while it moves (see touch_filter); also where the system
+// glides after a trackpad (an iPad passes as a Mac), since nobody glides
+// after a finger
+static void
+touch_scroll (vue_window win, double fx, double fy, uint64_t stamp) {
+  vue_input_state& in= win->input;
+  in.wheel_vx= in.wheel_vy= 0;
+  time_t dt= (in.wheel_stamp == 0 || stamp <= in.wheel_stamp) ? wheel_slow_dt
+             : (time_t) ((stamp - in.wheel_stamp) / 1000000);
+  in.wheel_stamp= stamp;
+  in.wheel_precise= true;
+  in.wheel_touch= true;
+  in.wheel_ambiguous= false;
+  in.wheel_pend_x= in.wheel_pend_y= 0;
+  in.wheel_over_x= in.wheel_over_y= 0;
+  double dx= fx * win->density, dy= fy * win->density; // device pixels
+  dt= max ((time_t) 8, min (dt, wheel_slow_dt));
+  in.wheel_est_x= 0.5 * (in.wheel_est_x + dx / dt);
+  in.wheel_est_y= 0.5 * (in.wheel_est_y + dy / dt);
+  in.wheel_event_time= texmacs_time ();
+  push_wheel (win, dx, dy);
+}
+
+// a finger put down on the screen stops the glide, as on a phone
+static void
+touch_stop_glide (vue_window win) {
+  vue_input_state& in= win->input;
+  in.wheel_vx= in.wheel_vy= 0;
+  in.wheel_est_x= in.wheel_est_y= 0;
+  in.wheel_pend_x= in.wheel_pend_y= 0;
 }
 
 // advance the scrolling of all windows; returns true if the loop must come
@@ -3560,7 +3595,7 @@ wheel_step () {
       // a notch travels by itself and the system glides for a trackpad
       // where it does the momentum: neither wants a glide of ours
       if (hypot (in.wheel_est_x, in.wheel_est_y) >= wheel_launch_speed &&
-          in.wheel_precise && !wheel_system_momentum) {
+          in.wheel_precise && (!wheel_system_momentum || in.wheel_touch)) {
         in.wheel_vx= in.wheel_est_x;
         in.wheel_vy= in.wheel_est_y;
         in.wheel_time= now;
@@ -3860,6 +3895,10 @@ static const time_t vue_idle_frame_dt= 250;
 // One event into the input of its window (or the next key of a text
 // committed at once); the wheel and motion events queued behind a wheel or
 // a motion come with it. False when there was none
+// the event just handled must be alone in its pass: a finger which turned
+// into a pressed mouse (touch_filter) gave its press in place of a move
+static bool touch_unbatch= false;
+
 static bool
 take_event () {
   if (deliver_pending_key ()) return true;
@@ -3867,7 +3906,9 @@ take_event () {
   if (!loop_poll (&event)) return false;
   bool batchable= (event.type == SDL_EVENT_MOUSE_WHEEL ||
                    event.type == SDL_EVENT_MOUSE_MOTION);
+  touch_unbatch= false;
   process_event (&event);
+  if (touch_unbatch) batchable= false;
   gui_needs_update= true;
   // A frame costs more than the interval between the events of a
   // trackpad or of a fast pointer: handle the wheel and motion events
@@ -4799,7 +4840,17 @@ mouse_bits (Uint32 buttons, SDL_Keymod mods) {
 static Uint32
 mouse_buttons () {
   float x, y;
+#ifdef __EMSCRIPTEN__
+  // in a browser the "global" state of SDL follows the mouse events of the
+  // page, which a touch screen sends only once the finger is lifted (an
+  // iPad): a tap was then a press with the buttons up, taken for a press
+  // whose release went elsewhere (gui_init_context), and no menu item was
+  // ever clicked. The state of the events SDL got counts the fingers, and
+  // SDL gets the releases outside the canvas itself
+  Uint32 buttons= SDL_GetMouseState (&x, &y);
+#else
   Uint32 buttons= SDL_GetGlobalMouseState (&x, &y);
+#endif
   if (script_active) buttons= script_buttons; // synthetic events
   return buttons;
 }
@@ -5154,11 +5205,132 @@ wheel_zooms (vue_window win, double y) {
   return true;
 }
 
+/******************************************************************************
+* Touch screens
+*
+* SDL makes a mouse of the first finger (SDL_TOUCH_MOUSEID): its press, its
+* moves and its release. As such a dragged finger selected text, and no
+* document could be scrolled without a mouse or a trackpad (an iPad). Here
+* the press of a finger is kept until it is known what the finger does:
+* - lifted where it was put down, it is a click: the press and the release
+*   are queued again, one after the other, for the widgets (each one has a
+*   pass of its own, see take_event);
+* - moved by more than touch_slop first, it drags the view under it, as two
+*   fingers on a trackpad do, and glides when it is lifted while moving
+*   (touch_scroll); the press and the release never reach the widgets;
+* - resting touch_hold first and then moved, it is a mouse with its button
+*   pressed: it selects, or drags a scroll bar.
+******************************************************************************/
+
+static const float touch_slop= 8.0;   // points: still a tap
+static const Uint64 touch_hold= 400;  // ms: a press which then drags
+static const Uint64 touch_rest= 60;   // ms: a finger lifted after resting does not glide
+
+static struct {
+  bool down= false;     // a finger is on the screen
+  bool scrolling= false;
+  bool dragging= false; // the press has been given to the widgets
+  int  replays= 0;      // button events queued again, which pass the filter
+  float x0= 0, y0= 0, lx= 0, ly= 0;
+  Uint64 t0= 0, tlast= 0;
+  SDL_Event press;
+} finger;
+
+static bool
+is_touch_mouse (SDL_Event* event) {
+  switch (event->type) {
+    case SDL_EVENT_MOUSE_BUTTON_DOWN:
+    case SDL_EVENT_MOUSE_BUTTON_UP:
+      return event->button.which == SDL_TOUCH_MOUSEID;
+    case SDL_EVENT_MOUSE_MOTION:
+      return event->motion.which == SDL_TOUCH_MOUSEID;
+    default:
+      return false;
+  }
+}
+
+// true when the event has been taken (process_event does nothing more)
+static bool
+touch_filter (SDL_Event* event) {
+  if (!is_touch_mouse (event)) return false;
+  bool button= (event->type != SDL_EVENT_MOUSE_MOTION);
+  if (button && finger.replays > 0) { finger.replays--; return false; }
+  if (event->type == SDL_EVENT_MOUSE_BUTTON_DOWN) {
+    if (event->button.button != SDL_BUTTON_LEFT) return false;
+    finger.down= true;
+    finger.scrolling= finger.dragging= false;
+    finger.x0= finger.lx= event->button.x;
+    finger.y0= finger.ly= event->button.y;
+    finger.t0= finger.tlast= SDL_NS_TO_MS (event->button.timestamp);
+    finger.press= *event;
+    vue_window win= get_window_from_ID (event->button.windowID);
+    float x= event->button.x, y= event->button.y;
+    win= route_pointer (win, x, y, 3);
+    if (win) touch_stop_glide (win);
+    return true;
+  }
+  if (!finger.down || finger.dragging) {
+    if (event->type == SDL_EVENT_MOUSE_BUTTON_UP) finger.down= false;
+    return false;
+  }
+  Uint64 now= SDL_NS_TO_MS (button ? event->button.timestamp
+                                   : event->motion.timestamp);
+  if (event->type == SDL_EVENT_MOUSE_MOTION) {
+    float x= event->motion.x, y= event->motion.y;
+    if (!finger.scrolling) {
+      if (hypot (x - finger.x0, y - finger.y0) < touch_slop) return true;
+      if (now - finger.t0 >= touch_hold) {
+        // a press, then a drag: the press now, in this pass, before the
+        // moves already queued (the editor drags only after a press), and
+        // alone in it (touch_unbatch); the moves which follow are the drag
+        finger.dragging= true;
+        finger.replays++;
+        SDL_Event press= finger.press;
+        process_event (&press);
+        touch_unbatch= true;
+        return true;
+      }
+      finger.scrolling= true;
+    }
+    vue_window win= get_window_from_ID (event->motion.windowID);
+    float wx= finger.x0, wy= finger.y0; // the view under the finger scrolls
+    win= route_pointer (win, wx, wy, 3);
+    if (win) {
+      vue_input_state& in= win->input;
+      in.mouse_x= (int) (wx * win->density);
+      in.mouse_y= (int) (wy * win->density);
+      touch_scroll (win, x - finger.lx, y - finger.ly, event->motion.timestamp);
+    }
+    finger.lx= x; finger.ly= y;
+    finger.tlast= now;
+    return true;
+  }
+  // the release
+  finger.down= false;
+  if (finger.scrolling) {
+    // a finger which rested before it was lifted does not glide
+    if (now - finger.tlast > touch_rest) {
+      vue_window win= get_window_from_ID (event->button.windowID);
+      float wx= finger.x0, wy= finger.y0;
+      win= route_pointer (win, wx, wy, 3);
+      if (win) win->input.wheel_est_x= win->input.wheel_est_y= 0;
+    }
+    return true;
+  }
+  // a tap: the press and the release, each in a pass of its own
+  finger.replays += 2;
+  SDL_PushEvent (&finger.press);
+  SDL_Event release= *event;
+  SDL_PushEvent (&release);
+  return true;
+}
+
 void
 process_event (SDL_Event *event) {
   // note: events are stored in the input state of their window and cleared
   // once that window has been laid out (see gui_finalize_context)
   vue_window win;
+  if (touch_filter (event)) return;
   if (DEBUG_VUE_EVENTS && event->type != SDL_EVENT_MOUSE_MOTION)
     sdl_log_event (event);
   if (vue_dialog_event != 0 && event->type == vue_dialog_event) {
@@ -5300,6 +5472,12 @@ process_event (SDL_Event *event) {
     {
       close_help_balloon (); // it lives until the pointer or a key moves
       update_mouse_state ();
+      // a finger sends a last move with its release: handled after it, the
+      // move would find the button up, which the editor takes for the end
+      // of the drag, and the release which follows for a click, which
+      // dropped the selection just made; the move has its own state
+      if (event->motion.which == SDL_TOUCH_MOUSEID)
+        mouse_state= mouse_bits (event->motion.state, SDL_GetModState ());
       win= get_window_from_ID (event->motion.windowID);
       float mx= event->motion.x, my= event->motion.y;
       win= route_pointer (win, mx, my, 0);

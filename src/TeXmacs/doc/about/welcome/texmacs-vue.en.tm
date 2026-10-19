@@ -277,6 +277,18 @@
 
   The additions to <TeXmacs> Upsilon, the newest first.
 
+  <paragraph|19 October 2026>
+
+  <\itemize>
+    <item>Touch screens (an <name|iPad>, a phone): a tap on an item of a
+    menu chooses it (nothing happened: the items of the menus only worked
+    with a mouse or a trackpad), a finger dragged over a document scrolls
+    it, and goes on gliding when it is lifted while it moves (it selected
+    text, and a document could not be scrolled without a mouse or a
+    trackpad), and a finger which rests a moment before it moves selects,
+    as a mouse does.
+  </itemize>
+
   <paragraph|18 October 2026>
 
   <\itemize>

@@ -101,6 +101,7 @@ struct vue_input_state {
                            // events of a frame are handled together, so the
                            // clock does not tell them apart (see wheel_event)
   bool   wheel_precise;    // the stream has fractional deltas (a trackpad)
+  bool   wheel_touch;      // the stream is a finger dragged on a touch screen
   bool   wheel_ambiguous;  // the stream opened with whole deltas: a notch?
   // the distance a wheel notch has still to travel (device pixels), the
   // time of the last step of that travel, and the excess which an opening
@@ -138,7 +139,7 @@ struct vue_input_state {
       mouse_ticket (0), mouse_clicks (1),
       wheel_est_x (0), wheel_est_y (0), wheel_vx (0), wheel_vy (0),
       wheel_time (0), wheel_event_time (0), wheel_stamp (0),
-      wheel_precise (false),
+      wheel_precise (false), wheel_touch (false),
       wheel_ambiguous (false), wheel_pend_x (0), wheel_pend_y (0),
       wheel_over_x (0), wheel_over_y (0), wheel_smooth_time (0),
       clay_wheel_x (0), clay_wheel_y (0), wheel_taken (false),
