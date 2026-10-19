@@ -211,6 +211,44 @@ conventions page also fails in its graphics, where
 `look-up (box-info (..., wh), 1)` picks apart the residual `box-info` and the
 arithmetic above it fails (`bad plus/minus`, `bad times/over`).
 
+## Relation to the typesetter caches
+
+PR #333 (incremental typesetting) and PR #250 (typing caches), merged in
+October 2026, made the typesetter reuse its work after an edit. The rewriter
+is meant to do the same one level up, so the two are worth comparing.
+
+**In the code they do not interact.** Without `EXPERIMENTAL` the rewriter
+is not compiled. With it, the typesetter makes its usual pass with its caches
+and, separately, the rewriter evaluates its clean copy with its memorizers;
+nothing is shared and the rewriter's result is dropped. The one contact
+point is `environment_update`, which calls `typeset_prepare` and writes
+`base-file-name`, `cur-file-name` and `secure` into the typesetter's
+environment outside a typesetting pass. Since #250, `typeset_prepare` writes
+back the variables changed since the prepared table, so this should be
+harmless; it is not verified, and at worst it costs reuse in the next pass.
+
+**They solve the same problem differently:**
+
+| | Rewriter (2007) | Typesetter caches (#333, #250) |
+|---|---|---|
+| Unit of reuse | one evaluation, (environment, tree) → result | one bridge (paragraph, tag, …) |
+| Cache key | the **addresses** of the environment and of the tree | the **inputs actually read**: variables read before written, with their values, folded into a 64-bit hash; an environment fingerprint |
+| Side effects | not handled (Joris's "implicitly changed variables") | outputs recorded per bridge (label bindings, `out_bindings`) and replayed on reuse; label tables carry stamps |
+| `auto-id` | stateful, breaks the memorization | automatic labels numbered by the tag that produces them, stored as `ADDENDUM_AUTO_ID` on the tree node |
+| Zoom, pixel lengths | evaluated with the current zoom | the zoom is a recorded input; a zoom does not retypeset |
+
+Two consequences:
+
+- **The address key is Joris's worry.** Any change of the environment (a
+  counter, a label) makes a new environment object, and every evaluation
+  after it misses its memorizer, even when it never reads the changed
+  variable. Substituting macro arguments removes one instance of this;
+  recording what is actually read, as #333 does, removes it in general.
+- **#333 already does part of Joris's plan, in the typesetter.** Automatic
+  labels attached to tree nodes are a form of his "auxiliary data on tree
+  nodes", and the recorded label outputs handle side effects without giving
+  up reuse.
+
 ## Open questions for the review
 
 - **What the result is for.** The output is never typeset. Joris's goal
@@ -233,11 +271,49 @@ arithmetic above it fails (`bad plus/minus`, `bad times/over`).
   (`reenter_rewrite_env`); `set-binding`, `write`, counters, labels and
   `auto-id` (which numbers the automatic labels from data stored on the
   buffer) depend on document order. Memorizing them by address is only
-  correct if they are pure; they need either an explicit state threaded
-  through the evaluation (as the environment already is) or to be left as
-  residuals.
+  correct if they are pure. #333 shows a working answer in the typesetter:
+  record what each unit reads and writes, replay the writes on reuse, and
+  number the automatic labels by the tag that produces them (see the plan).
 - **Memory.** Memorizers are released by reference counts; the global table
   grows with the document and the edits. Nothing measures it yet.
+
+## Plan
+
+1. **Keep it building, make it testable.** Add a CI job that compiles and
+   links with `--enable-experimental` (the link was broken from 2010 to 2026
+   without anyone noticing). Add a Scheme command that runs the rewriter on
+   a buffer and returns the result, so that it runs headless, and turn the
+   stress runs into a suite under `tests/` (errors, evaluations, memorizer
+   hits after an edit, time, memory). Verify the contact point with the
+   typesetter caches (`environment_update`) with their check mode.
+2. **Partial evaluation.** Values that need layout (`box-info`,
+   `frame-direct`, `frame-inverse`, `guipx`, the corner lengths, the box
+   lengths of `move` and the like) become residuals; an operation on a
+   residual gives a residual. A residual is closed: the known `value`s and
+   macros inside it are substituted, so that only the unknown leaves remain
+   and the typesetter can finish it without the document's definitions.
+   Target: the conventions page, graphics included, without errors.
+3. **State and keys, ported from #333.** Key the memorizers by the inputs
+   they read (the environment input hash of #333) instead of by addresses;
+   record the outputs (bindings, `write`, counters) and replay them on
+   reuse; number `auto-id` as the typesetter does. Measure first how far
+   one label invalidates the memorizers today.
+4. **The typesetter consumes the result.** Split the work instead of
+   stacking two caches: the rewriter evaluates the macros and memorizes by
+   what it reads; the typesetter's recording shrinks to what needs layout
+   (zoom, pixel lengths, box extents, residuals). The interface is a patch:
+   unchanged subtrees of the result keep their addresses, so the changed
+   part is cheap to find and is handed to the typesetter as modifications,
+   as edits are now. Proof of concept on a simple document behind a flag,
+   compared pixel for pixel with the Vue snapshot harness, cursor movement
+   through the ips included.
+5. **Laziness.** Connect the memorizers to the typesetter's invalidation, so
+   that an edit only retypesets what the evaluation changed; benchmark
+   against the current typesetter with the #333 scripts; bound the memory
+   of the global memorizer table.
+
+On the way, the #333 check modes and fuzzer can compare the rewriter's
+expansion with what `exec` computes for the same document.
 
 ## Testing
 
