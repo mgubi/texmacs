@@ -4694,10 +4694,17 @@ struct clipboard_data {
   clipboard_data (): format_type ("default") {}
 };
 
+// the data of the latest selection put on the clipboard; macOS may still
+// ask for the formats of a former one (a request of another program made
+// before the next copy), whose userdata SDL has freed meanwhile: the
+// callback reads only this one, which TeXmacs owns
+static clipboard_data* clipboard_current= NULL;
+
 // Clipboard data callback - called when the OS requests clipboard data
 static const void* SDLCALL
 clipboard_data_callback (void *userdata, const char *mime_type, size_t *size) {
-  clipboard_data* data = static_cast<clipboard_data*>(userdata);
+  (void) userdata;
+  clipboard_data* data = clipboard_current;
   if (!data || !mime_type) {
     *size = 0;
     return NULL;
@@ -4734,12 +4741,10 @@ clipboard_data_callback (void *userdata, const char *mime_type, size_t *size) {
 }
 
 // Clipboard cleanup callback - called when clipboard is cleared or replaced
+// (the data stays: it is freed when the next selection replaces it)
 static void SDLCALL
 clipboard_cleanup_callback (void *userdata) {
-  clipboard_data* data = static_cast<clipboard_data*>(userdata);
-  if (data) {
-    delete data;
-  }
+  (void) userdata;
 }
 
 // a text in Latin-1 as UTF-8 (the clipboard of SDL is in UTF-8)
@@ -4849,15 +4854,19 @@ bool set_selection (string key, tree t,
   mime_types[num_mime_types++] = "text/plain";
 
   // Set clipboard data with callbacks
+  clipboard_data* former= clipboard_current;
+  clipboard_current= clip_data;
   if (!SDL_SetClipboardData (clipboard_data_callback,
                               clipboard_cleanup_callback,
                               clip_data,
                               mime_types,
                               num_mime_types)) {
     SDL_Log ("Failed to set clipboard data: %s", SDL_GetError ());
+    clipboard_current= former;
     delete clip_data;
     return false;
   }
+  if (former) delete former;
 
   return true;
 }
@@ -4870,9 +4879,13 @@ struct image_clipboard {
   string mime, bytes;
 };
 
+// (the latest one, as clipboard_current)
+static image_clipboard* image_current= NULL;
+
 static const void* SDLCALL
 image_clipboard_callback (void *userdata, const char *mime_type, size_t *size) {
-  image_clipboard* img= static_cast<image_clipboard*> (userdata);
+  (void) userdata;
+  image_clipboard* img= image_current;
   if (img == NULL || mime_type == NULL || img->mime != string (mime_type)) {
     *size= 0;
     return NULL;
@@ -4883,7 +4896,7 @@ image_clipboard_callback (void *userdata, const char *mime_type, size_t *size) {
 
 static void SDLCALL
 image_clipboard_cleanup (void *userdata) {
-  tm_delete (static_cast<image_clipboard*> (userdata));
+  (void) userdata;
 }
 
 bool
@@ -4906,12 +4919,16 @@ vue_put_graphics_on_clipboard (url file) {
   }
   c_string cmime (mime);
   const char* mime_types[1]= { (const char*) cmime };
+  image_clipboard* former= image_current;
+  image_current= img;
   if (!SDL_SetClipboardData (image_clipboard_callback, image_clipboard_cleanup,
                              img, mime_types, 1)) {
     SDL_Log ("Failed to set clipboard data: %s", SDL_GetError ());
+    image_current= former;
     tm_delete (img);
     return false;
   }
+  if (former) tm_delete (former);
   return true;
 }
 
