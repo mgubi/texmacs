@@ -8,6 +8,9 @@ TeXmacs, so that they can be built, used and tested together.
 **See it in pictures: [src/docs/upsilon-screenshots.md](src/docs/upsilon-screenshots.md)**
 (also on the site, <https://mgubi.github.io/texmacs/features.html>, next to
 the [latest builds](https://mgubi.github.io/texmacs/downloads.html)).
+What changed lately, the newest first:
+**[src/docs/upsilon-changes.md](src/docs/upsilon-changes.md)** (also on the
+site, <https://mgubi.github.io/texmacs/changes.html>).
 
 It is stock TeXmacs (the `svn_sync` branch, the mirror of the SVN trunk)
 plus the following branches, merged in:

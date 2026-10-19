@@ -129,7 +129,7 @@ all: $(OUT)/texmacs.js
 # declared in shell.html
 WEB_ICONS := $(foreach n,16 32 48 64 128 192,$(OUT)/web/texmacs-vue-$(n).png) $(OUT)/web/favicon.ico
 
-web: $(OUT)/web/texmacs.html $(OUT)/web/texmacs-files.json $(WEB_ICONS) $(OUT)/web/downloads.html $(OUT)/web/features.html $(SCREENSHOTS) tikzjax asymptote python r
+web: $(OUT)/web/texmacs.html $(OUT)/web/texmacs-files.json $(WEB_ICONS) $(OUT)/web/downloads.html $(OUT)/web/features.html $(SCREENSHOTS) $(OUT)/web/changes.html $(OUT)/web/changes.md tikzjax asymptote python r
 
 # the TeX of the TikZ plugin (plugins/tikz, src/docs/wasm/tikzjax.md):
 # TikZJax, fetched by get-tikzjax.sh, without its fonts and the part of its
@@ -214,6 +214,16 @@ $(OUT)/web/downloads.html: $(W)/downloads.html
 
 # the page of screenshots of the features, and its pictures
 $(OUT)/web/features.html: $(W)/features.html
+	@mkdir -p $(OUT)/web
+	cp $< $@
+
+# the page of the changes, and the list it shows: written once, in
+# Markdown, and shown by GitHub too
+$(OUT)/web/changes.html: $(W)/changes.html
+	@mkdir -p $(OUT)/web
+	cp $< $@
+
+$(OUT)/web/changes.md: $(TM)/docs/upsilon-changes.md
 	@mkdir -p $(OUT)/web
 	cp $< $@
 

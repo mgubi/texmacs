@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TeXmacs Upsilon changes</title>
+<meta name="description" content="The recent changes and revisions of TeXmacs Upsilon, an enhanced and bleeding-edge version of GNU TeXmacs, for the desktop applications and the browser version.">
+<!-- The page shows changes.md, a copy of src/docs/upsilon-changes.md made by
+     misc/wasm/Makefile: the list is written once, in Markdown, and GitHub
+     shows the same file. Its links are relative to src/docs; they are
+     pointed here to the pages of the site or to GitHub -->
+<link rel="icon" href="favicon.ico" sizes="16x16 32x32 48x48">
+<link rel="icon" type="image/png" sizes="32x32" href="texmacs-vue-32.png">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
+<style>
+  :root {
+    --bg: #f6f6f4; --card: #ffffff; --text: #1d1d1f; --muted: #5d5d63;
+    --line: #dcdcd8; --accent: #0b5cad; --accent-bg: #e8f0fa; --code-bg: #efefeb;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #18181a; --card: #222225; --text: #ececee; --muted: #a2a2aa;
+      --line: #38383d; --accent: #7db4ff; --accent-bg: #1f2c3d; --code-bg: #2c2c30;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #18181a; --card: #222225; --text: #ececee; --muted: #a2a2aa;
+    --line: #38383d; --accent: #7db4ff; --accent-bg: #1f2c3d; --code-bg: #2c2c30;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 16px/1.55 -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif; }
+  main { max-width: 860px; margin: 0 auto; padding: 32px 16px 48px; }
+  header { display: flex; align-items: center; gap: 16px; margin-bottom: 8px; }
+  header img { width: 56px; height: 56px; }
+  h1 { font-size: 28px; line-height: 1.2; margin: 0; }
+  #text h1 { display: none; } /* the title of the file: the header has it */
+  #text h2 { font-size: 21px; margin: 40px 0 10px; padding-bottom: 6px; border-bottom: 1px solid var(--line); }
+  #text h3 { font-size: 17px; margin: 28px 0 8px; color: var(--muted); }
+  #text ul { padding-left: 22px; }
+  #text li { margin: 7px 0; }
+  #text p:first-of-type { color: var(--muted); }
+  a { color: var(--accent); }
+  code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 14px;
+         background: var(--code-bg); padding: 1px 4px; border-radius: 4px; overflow-wrap: anywhere; }
+  .links { display: flex; gap: 10px; flex-wrap: wrap; margin: 16px 0 8px; }
+  .button { display: inline-block; padding: 8px 14px; border-radius: 8px; white-space: nowrap;
+            background: var(--accent-bg); color: var(--accent); text-decoration: none; font-weight: 600; }
+  .button:hover { text-decoration: underline; }
+  .lead { color: var(--muted); }
+  footer { margin-top: 48px; color: var(--muted); font-size: 14px; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <img src="texmacs-vue-64.png" alt="">
+    <h1>TeXmacs Upsilon changes</h1>
+  </header>
+  <div class="links">
+    <a class="button" href="downloads.html">Download</a>
+    <a class="button" href="features.html">Features</a>
+    <a class="button" href="./">Try it in the browser</a>
+  </div>
+  <div id="text"><p class="lead">Loading the list of the changes&hellip;</p></div>
+  <footer>
+    The same list is on GitHub:
+    <a href="https://github.com/mgubi/texmacs/blob/upsilon_texmacs/src/docs/upsilon-changes.md"><code>src/docs/upsilon-changes.md</code></a>.
+  </footer>
+</main>
+<script>
+(function () {
+  var GITHUB = 'https://github.com/mgubi/texmacs/blob/upsilon_texmacs/src/docs/';
+  // the relative links of the file (to src/docs, and the README above it)
+  var PAGES = { 'upsilon-screenshots.md': 'features.html',
+                'upsilon-changes.md': 'changes.html',
+                '../../README.md': 'https://github.com/mgubi/texmacs/tree/upsilon_texmacs#readme' };
+  function relink (box) {
+    box.querySelectorAll ('a[href]').forEach (function (a) {
+      var h = a.getAttribute ('href');
+      if (/^([a-z]+:|#)/i.test (h)) return;
+      a.setAttribute ('href', PAGES[h] || new URL (h, GITHUB).href);
+    });
+  }
+  function failed () {
+    document.getElementById ('text').innerHTML =
+      '<p>The list could not be loaded. It is on GitHub: <a href="' + GITHUB +
+      'upsilon-changes.md">src/docs/upsilon-changes.md</a>.</p>';
+  }
+  fetch ('changes.md', { cache: 'no-cache' })
+    .then (function (r) { if (!r.ok) throw new Error (r.status); return r.text (); })
+    .then (function (md) {
+      if (typeof marked === 'undefined') throw new Error ('no marked');
+      var box = document.getElementById ('text');
+      box.innerHTML = marked.parse (md);
+      relink (box);
+    })
+    .catch (failed);
+}) ();
+</script>
+</body>
+</html>
