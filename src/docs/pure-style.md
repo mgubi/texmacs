@@ -24,6 +24,68 @@ therefore identified by the pair of addresses (environment, tree), compared
 by pointer (`weak_hash`, `weak_equal`), and after an edit only the calls on
 the path to the change are recomputed.
 
+## What Joris wanted
+
+Joris did not write a design document for the rewriter; his intentions are
+in a few places of the documentation and in the code itself.
+
+- **Separate evaluation from typesetting.** *The typesetting process*
+  (`TeXmacs/doc/devel/format/basics/typesetting.en.tm`, 2004): typesetting
+  "can be subdivided into two major parts (which are currently done at the
+  same stage, but this may change in the future): evaluation of the
+  TeXmacs tree using the stylesheet language, and the actual typesetting."
+  The rewriter is the first of the two parts on its own.
+- **To make the typesetter lazy.** *To do list for improving the current
+  implementation* (`TeXmacs/doc/about/projects/todo.en.tm`), under
+  *Improving the speed*: "Increased laziness. The typesetter should be made
+  lazy in a more fundamental way (see upcoming style rewriting tool)", next
+  to "Better caching mechanism: optimize performance as a function of cost
+  of recomputation and storage requirement" (which is what the memorizers
+  are for). So the result is meant to **feed the typesetter**, which then
+  only deals with primitives and is redone only where the evaluation
+  changed.
+- **The section *Upcoming style rewriting tool*** of the same list
+  (reminders for himself):
+  - "Attention to implicitly changed variables, such as `the-tags`,
+    `the-label`, etc., which may cause the entire document to be
+    retypeset": the variables that markup changes as a side effect break
+    the locality of the memorization (a label changes the environment of
+    everything after it).
+  - "Attention to `base-file-name`, `cur-file-name`, `current-part`. Also
+    put these variables in `vars.hpp`" (they are set by hand in
+    `environment_update`).
+  - "Replace `arg` primitive by quasi-quoting mechanism. This seems to be
+    quite necessary: consider `<assign|foo|<macro|body|...>>` and a document
+    piece `<\foo> ... </foo>` with a large body. When making changes to the
+    body, the environment for typesetting the body also changes, because we
+    need to store the body in the foo environment argument variable. For
+    this reason, we implemented an alternative mechanism, which is enabled
+    using `#define ALTERNATIVE_MACRO_EXPANSION`." This is why the
+    substitution of arguments is the default: with arguments in the
+    environment, an edit inside a long macro argument would change the
+    environment, hence the memorization key, of everything inside it.
+  - "More systematic usage of symbols instead of strings" (the
+    environments are keyed by tree labels).
+  - Hyperlinks and multiple views: which locus to prefer when one is
+    ambiguous (the rewriter's `hard-id` combines the addresses of the
+    environment and the tree).
+  - **Auxiliary data in hidden markup** (labels, loci, links, indexes):
+    "We might want to associate auxiliary data to tree nodes instead of
+    files", distinguishing contents that are not evaluated when hidden but
+    whose auxiliary data must be kept (a hidden chapter), contents that are
+    "evaluated but not typeset: auxiliary data may be kept in macro
+    expander" (a fold), and contents that are ignored altogether (a
+    comment). The middle case only exists once evaluation and typesetting
+    are separate.
+- **Macro semantics.** *Macro expansion* (`devel/style/design/style-eval`)
+  explains that a macro argument is bound to the *unevaluated* expression and
+  evaluated at each use, like a Scheme macro wrapping the argument in a
+  thunk; substitution (the alternative expansion) keeps that meaning.
+- **He kept the code alive.** Long after 2007 he added the new primitives to
+  the rewriter as well: `blend` (2015), `with-package` (2017), `provide` and
+  `or-value` (2019, marked "provisory"), the `paw` unit (2020). The project
+  was paused, not abandoned.
+
 ## Code
 
 All of it is in `src/src/Style/` (about 4800 lines), compiled only with
@@ -150,12 +212,12 @@ arithmetic above it fails (`bad plus/minus`, `bad times/over`).
 
 ## Open questions for the review
 
-- **What the result is for.** The output is never typeset. Continuing means
-  either making the typesetter consume the rewritten tree (boxes from
-  primitives only, with `exec` reduced to the primitives that need layout
-  information), or using it elsewhere first: as the expanded document for
-  converters, for checking styles, or as a cache key for incremental
-  typesetting (compare the typing caches of PR #250/#333).
+- **What the result is for.** The output is never typeset. Joris's goal
+  (above) is that the typesetter consumes it: boxes from primitives only,
+  with `exec` reduced to what needs layout information, and laziness from
+  the memorizers. Uses on the way there: the expanded document for
+  converters, checking styles, or a cache key for incremental typesetting
+  (compare the typing caches of PR #250/#333).
 - **Layout-dependent values: partial evaluation.** Some markup needs
   information that only the typesetter has: the box extents in `move` and
   the like (handled above by not evaluating those arguments), `box-info`,
