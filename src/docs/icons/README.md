@@ -13,6 +13,28 @@ Specimen sheets, with every icon of a set and its name on light and dark
 pages: [classical.pdf](classical.pdf), [monochrome.pdf](monochrome.pdf),
 [neoclassical.pdf](neoclassical.pdf).
 
+## The sets
+
+**Classical.** The original TeXmacs icons.
+
+![Classical icons](classical-toolbars.png)
+
+**Monochrome.** The classical ideas drawn in the manner of the macOS symbols:
+filled objects with an outline, in one graphite tint and its light tones, red
+kept for errors and removals, letters in Latin Modern.
+
+![Monochrome icons](monochrome-toolbars.png)
+
+**Neo-classical.** The compositions and colours of the classical icons,
+modernized: a soft palette, light gradients, dark grey outlines, rounded
+corners; flat in the focus bar. This is the default set, when the
+preference has not been set.
+
+![Neo-classical icons](neoclassical-toolbars.png)
+
+The pictures show the main, text and focus toolbars on the light and dark
+themes.
+
 ## How a set is chosen
 
 The icons are looked up in `TEXMACS_PIXMAP_PATH`: first in the `light` or
@@ -84,7 +106,7 @@ The constants at the top of the script (`STROKE`, `SCALE`, `OUTLINE`,
 
 writes `doc/icons/<set>.pdf`, the specimen sheets (vector: the SVG files of
 the icons are nested as they are, their ids and style classes prefixed), and
-`doc/icons/<set>-toolbars.png`, the main, text and focus toolbars on light and
+`docs/icons/<set>-toolbars.png`, the main, text and focus toolbars on light and
 dark, as shown in the README. It needs `rsvg-convert`; the generators need
 Python 3, and `rsvg-convert` for PNG output.
 

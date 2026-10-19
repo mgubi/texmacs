@@ -334,10 +334,10 @@ engine and the merge driver, names which could be taken for options,
 restoring, new repositories, signing (with a fake GnuPG), blame, projects
 and snapshots. The git group of the suite `version` (`version-test.scm`)
 checks that `version-tmfs.scm` dispatches the `version-*` interface to the
-Git support. `doc/tests/run-git-tests.sh [dir]` runs both suites in a fresh
+Git support. `src/docs/tests/run-git-tests.sh [dir]` runs both suites in a fresh
 `TEXMACS_HOME_PATH`.
 
-`doc/tests/run-git-tests.sh --gui [dir]` runs `git-gui-test.scm` in the
+`src/docs/tests/run-git-tests.sh --gui [dir]` runs `git-gui-test.scm` in the
 Qt GUI with `QT_QPA_PLATFORM=offscreen`, so that the event loop runs but
 no window appears. It creates a bare remote with two clones and a
 conflicting merge, and tests push (including upstream setup), fetch and
