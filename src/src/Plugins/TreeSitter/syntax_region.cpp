@@ -104,7 +104,7 @@ struct syntax_region_rep {
   array<string> lines;
   array<int> offsets;   // start of each line, and the total length + 1
   TSParser* parser;
-  TSTree* tree;
+  TSTree* ts_tree;
   int full_parses, incremental_parses;
   int version;                 // changes at each parse
   int hl_query, hl_injections, hl_epoch;  // the colours below are for these
@@ -279,7 +279,7 @@ region_parse (syntax_region_rep* r, TSTree* old) {
   TSInput input= { r, region_read, TSInputEncodingCustom, texmacs_decode };
   TSTree* t= ts_parser_parse (r->parser, old, input);
   if (old != NULL) ts_tree_delete (old);
-  r->tree= t;
+  r->ts_tree= t;
   r->version++;
 }
 
@@ -318,14 +318,14 @@ region_update (syntax_region_rep* r) {
   e.start_point= point_of (r->offsets, start);
   e.old_end_point= point_of (r->offsets, old_end);
   e.new_end_point= point_of (new_offsets, new_end);
-  ts_tree_edit (r->tree, &e);
+  ts_tree_edit (r->ts_tree, &e);
   array<int> inj_changed, inj_parts;
   edit_injected (r, start, old_end, new_end, ns (p, N(ns) - s),
                  inj_changed, inj_parts);
   r->lines= cur;
   r->offsets= new_offsets;
-  TSTree* old_tree= ts_tree_copy (r->tree);
-  region_parse (r, r->tree);
+  TSTree* old_tree= ts_tree_copy (r->ts_tree);
+  region_parse (r, r->ts_tree);
   r->incremental_parses++;
   // the colours: those of the unchanged lines are kept, the changed lines
   // and those where the syntax changed (a comment opened above them...)
@@ -337,7 +337,7 @@ region_update (syntax_region_rep* r) {
     for (int i= a; i < n1 - b; i++) { cols << array<int> (); dirty << true; }
     for (int i= n0 - b; i < n0; i++) { cols << r->hl_cols[i]; dirty << r->hl_dirty[i]; }
     uint32_t count;
-    TSRange* ranges= ts_tree_get_changed_ranges (old_tree, r->tree, &count);
+    TSRange* ranges= ts_tree_get_changed_ranges (old_tree, r->ts_tree, &count);
     for (uint32_t k= 0; k < count; k++) {
       // (not the changes inside the parts in other languages which were
       // parsed again: a script of HTML is one token; their own changes are
@@ -366,7 +366,7 @@ region_update (syntax_region_rep* r) {
 static void
 region_delete (syntax_region_rep* r) {
   clear_injected (r);
-  if (r->tree != NULL) ts_tree_delete (r->tree);
+  if (r->ts_tree != NULL) ts_tree_delete (r->ts_tree);
   ts_parser_delete (r->parser);
   tm_delete (r);
 }
@@ -385,11 +385,11 @@ get_region (tree root, int language) {
       regions[0]= r;
       if (r->language != language) {
         ts_parser_set_language (r->parser, lang);
-        ts_tree_delete (r->tree);
+        ts_tree_delete (r->ts_tree);
         r->language= language;
         r->lines= region_lines (root);
         r->offsets= line_offsets (r->lines);
-        r->tree= NULL;
+        r->ts_tree= NULL;
         clear_injected (r);
         region_parse (r, NULL);
         r->full_parses++;
@@ -404,7 +404,7 @@ get_region (tree root, int language) {
   r->lines= region_lines (root);
   r->offsets= line_offsets (r->lines);
   r->parser= ts_parser_new ();
-  r->tree= NULL;
+  r->ts_tree= NULL;
   r->full_parses= 1;
   r->incremental_parses= 0;
   r->version= 0;
@@ -448,7 +448,7 @@ string
 syntax_region_sexp (tree root, int language) {
   syntax_region_rep* r= get_region (root, language);
   if (r == NULL) return "";
-  char* s= ts_node_string (ts_tree_root_node (r->tree));
+  char* s= ts_node_string (ts_tree_root_node (r->ts_tree));
   string result (s);
   free (s);
   return result;
@@ -486,7 +486,7 @@ syntax_region_node_range (tree root, int language,
   if (r == NULL) return as_list_object (l);
   TSPoint p1= { (uint32_t) row1, (uint32_t) col1 };
   TSPoint p2= { (uint32_t) row2, (uint32_t) col2 };
-  TSNode top= ts_tree_root_node (r->tree);
+  TSNode top= ts_tree_root_node (r->ts_tree);
   TSNode n= ts_node_descendant_for_point_range (top, p1, p2);
   while (!ts_node_is_null (n)) {
     TSNode parent= ts_node_parent (n);
@@ -511,7 +511,7 @@ syntax_region_last_nodes (tree root, int language) {
   syntax_region_rep* r= get_region (root, language);
   array<object> l;
   if (r == NULL) return as_list_object (l);
-  TSNode n= ts_tree_root_node (r->tree);
+  TSNode n= ts_tree_root_node (r->ts_tree);
   while (!ts_node_is_null (n)) {
     l << node_object (n, NULL);
     uint32_t k= ts_node_child_count (n);
@@ -539,7 +539,7 @@ syntax_region_errors (tree root, int language) {
   // (kind (row column) (row column)) for each error and missing node
   syntax_region_rep* r= get_region (root, language);
   array<object> l;
-  if (r != NULL) collect_errors (ts_tree_root_node (r->tree), l);
+  if (r != NULL) collect_errors (ts_tree_root_node (r->ts_tree), l);
   return as_list_object (l);
 }
 
@@ -579,7 +579,7 @@ syntax_region_captures (tree root, int language, int query) {
   }
   array<int> caps;
   c_string ctext (text);
-  tree_sitter_query_run (query, ts_tree_root_node (r->tree), ctext, caps);
+  tree_sitter_query_run (query, ts_tree_root_node (r->ts_tree), ctext, caps);
   for (int i= 0; i + 2 < N(caps); i += 3)
     l << list_object (object (caps[i+2]),
                       point_object (point_of (r->offsets, caps[i])),
@@ -811,7 +811,7 @@ syntax_region_highlight (tree root, int language, int query, array<int> colors,
   int to= r->offsets[last] + N(r->lines[last]);
   array<int> caps;
   c_string ctext (text);
-  TSNode top= ts_tree_root_node (r->tree);
+  TSNode top= ts_tree_root_node (r->ts_tree);
   tree_sitter_query_run (query, top, ctext, caps, from, to);
   array<int> paint (to - from);
   for (int i= 0; i < to - from; i++) paint[i]= 0;
@@ -862,7 +862,7 @@ syntax_region_errors_with (tree root, int language, int row, int col, string ins
   // incrementally); -1 without a tree
   syntax_region_rep* r= get_region (root, language);
   if (r == NULL || row < 0 || row >= N(r->lines)) return -1;
-  if (N(ins) == 0) return count_errors (ts_tree_root_node (r->tree));
+  if (N(ins) == 0) return count_errors (ts_tree_root_node (r->ts_tree));
   int pos= r->offsets[row] + min (max (col, 0), N(r->lines[row]));
   string text;
   for (int i= 0; i < N(r->lines); i++) {
@@ -875,7 +875,7 @@ syntax_region_errors_with (tree root, int language, int row, int col, string ins
   for (int i= 0; i <= N(text); i++)
     if (i == N(text) || text[i] == '\n') { new_lines << text (last, i); last= i + 1; }
   array<int> new_offsets= line_offsets (new_lines);
-  TSTree* t= ts_tree_copy (r->tree);
+  TSTree* t= ts_tree_copy (r->ts_tree);
   TSInputEdit e;
   e.start_byte= e.old_end_byte= (uint32_t) pos;
   e.new_end_byte= (uint32_t) (pos + N(ins));
@@ -920,7 +920,7 @@ syntax_region_node_move (tree root, int language, int row, int col, int dir) {
   array<int> r;
   syntax_region_rep* reg= get_region (root, language);
   if (reg == NULL) return r;
-  TSNode top= ts_tree_root_node (reg->tree);
+  TSNode top= ts_tree_root_node (reg->ts_tree);
   TSPoint p= { (uint32_t) row, (uint32_t) col };
   TSNode node= ts_node_named_descendant_for_point_range (top, p, p);
   if (ts_node_is_null (node)) return r;
@@ -998,7 +998,7 @@ syntax_region_node_info (tree root, int language, int row, int col) {
   array<int> r;
   syntax_region_rep* reg= get_region (root, language);
   if (reg == NULL) return r;
-  TSNode top= ts_tree_root_node (reg->tree);
+  TSNode top= ts_tree_root_node (reg->ts_tree);
   TSPoint p= { (uint32_t) row, (uint32_t) col };
   TSNode none= { { 0, 0, 0, 0 }, NULL, NULL };
   TSNode node= ts_node_named_descendant_for_point_range (top, p, p);
@@ -1184,7 +1184,7 @@ syntax_region_indent (tree root, int language, int query, int row, int tab) {
   if (r == NULL) return -2;
   array<string>& lines= r->lines;
   if (row < 0 || row >= N(lines)) return -2;
-  TSNode top= ts_tree_root_node (r->tree);
+  TSNode top= ts_tree_root_node (r->ts_tree);
   if (r->ind_query != query || r->ind_version != r->version) {
     string text;
     for (int i= 0; i < N(lines); i++) {
