@@ -254,7 +254,7 @@ jobs:
 
   release:
     # the files of macOS in the pre-release upsilon-latest; the Linux and
-    # Windows packages are added to it by maxs-linux-windows.yml. Each
+    # Windows packages are added to it by upsilon-linux-windows.yml. Each
     # workflow replaces and removes only its own files
     needs: [dmg, qt]
     if: always() && github.ref == 'refs/heads/upsilon_ci' && needs.dmg.result == 'success'

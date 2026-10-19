@@ -1,5 +1,5 @@
 # TeXmacs of the branch upsilon_texmacs on Linux and Windows, with S7, on the
-# branch upsilon_ci (macOS: macos-maxs.yml, the Cocoa and Vue ports):
+# branch upsilon_ci (macOS: upsilon-macos.yml, the Cocoa and Vue ports):
 #   * linux, windows: Qt 6, the jobs of ci.yml (the CI of wip_s7): each
 #     builds TeXmacs, runs the regression suites headless (.github/scripts)
 #     and keeps a runnable bundle as an artifact;
@@ -22,7 +22,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: maxs-linux-windows-${{ github.ref }}
+  group: upsilon-linux-windows-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -411,7 +411,7 @@ jobs:
 
   release:
     # the packages of the jobs which passed, in the pre-release
-    # upsilon-latest (made by macos-maxs.yml, which writes its notes): each
+    # upsilon-latest (made by upsilon-macos.yml, which writes its notes): each
     # file replaces the one of the former build, with a label naming the
     # commit; the files of macOS are not touched
     needs: [linux, windows, linux-vue, windows-vue]

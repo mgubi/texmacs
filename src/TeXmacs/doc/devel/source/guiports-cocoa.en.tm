@@ -46,7 +46,7 @@
   <source-link|merge-universal.sh|packages/macos/merge-universal.sh> merges two applications into a
   universal one, and <source-link|check-app.sh|packages/macos/check-app.sh> checks the signature and
   that only system libraries and those of the bundle are used. The
-  continuous integration workflow <verbatim|.github/workflows/macos-maxs.yml>
+  continuous integration workflow <verbatim|.github/workflows/upsilon-macos.yml>
   does all this on the branch <verbatim|upsilon_ci>, for the <name|Cocoa> and
   the <name|Vue> ports and both architectures, and publishes the two disk
   images as the pre-release <verbatim|upsilon-latest>; a state of

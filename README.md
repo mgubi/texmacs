@@ -63,12 +63,12 @@ the commit it was built from.
 
 * **macOS** (Apple silicon and Intel, macOS 13 or later): the Cocoa and
   the Vue applications as universal disk images, and Qt 6 for Apple
-  silicon (`.github/workflows/macos-maxs.yml`). They are signed ad hoc and
+  silicon (`.github/workflows/upsilon-macos.yml`). They are signed ad hoc and
   not notarized: open the application from its context menu the first
   time, or run `xattr -dr com.apple.quarantine /Applications/TeXmacs.app`.
 * **Linux** (built on Ubuntu 24.04, x86_64) and **Windows** (MSYS2
   MinGW-w64, x86_64), with Qt 6 or with Vue
-  (`.github/workflows/maxs-linux-windows.yml`). The Linux Qt build uses
+  (`.github/workflows/upsilon-linux-windows.yml`). The Linux Qt build uses
   the Qt 6 of the system.
 * **The browser**: <https://mgubi.github.io/texmacs/texmacs.html>, see below.
 
@@ -283,6 +283,6 @@ with `.github/` added and the developer notes in `src/docs/`:
 | [`src/`](src/README.md) | the editor: sources, Scheme, styles, documentation, packaging; its [`README.md`](src/README.md) is the README of GNU TeXmacs |
 | [`src/docs/`](src/docs/README.md) | the developer notes on the additions: designs, status, audits, plans, and the open work (`TODO.md`) |
 | `misc/` | artwork, benchmarks, plugins and other odds and ends (the build tooling of Vue, the browser, ThorVG and tree-sitter is in `src/misc/`) |
-| `.github/` | the workflows of the CI (`macos-maxs.yml`, `maxs-linux-windows.yml`, `wasm.yml` for the browser) |
+| `.github/` | the workflows of the CI (`upsilon-macos.yml`, `upsilon-linux-windows.yml`, `wasm.yml` for the browser) |
 | `web/` | the sources of the web site |
 | `guile-texmacs/` | the vendored Guile 1.8 |
