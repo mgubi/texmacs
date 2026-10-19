@@ -92,39 +92,46 @@ decorate_ip (tree src, tree dest) {
 * Partial evaluation
 *
 * Some values are only known to the typesetter: the size of a typeset box
-* (box-info, frame-direct, frame-inverse), lengths which depend on the screen
-* or on the ornament being typeset (guipx, the corner lengths), lengths in
-* units of the extents of a box (w, h, l, b, r, t), which the typesetter binds
-* while it lays out move, shift, resize and clipped, and what depends on the
-* order of the document and on data kept with the buffer (auto-id, which
-* numbers the automatic labels, and get-attachment). Such a value is a
+* (box-info, frame-direct, frame-inverse), what depends on the order of the
+* document and on data kept with the buffer (auto-id, which numbers the
+* automatic labels, and get-attachment), and the lengths. A length in a unit
+* (3fn, 1cm, 1r) is converted by the typesetter at the place where it is
+* used: with the scale at which it lays out the document (a typesetting at
+* twice the size doubles every unit, but not an absolute tmlen computed
+* outside), and for some units with the font, the paragraph, the box (w, h,
+* l, b, r, t, which move, shift, resize and clipped bind) or the ornament
+* being typeset. So the rewriter does not convert lengths: in a computation
+* on lengths, a length with a unit is a residual, and so are the units
+* themselves (fn-length and the like). Such a value is a
 * residual, and a computation on a residual is a residual too: the computation
 * with its evaluated arguments, which the typesetter can finish since the
 * macro arguments, values and macros in it have been substituted.
 ******************************************************************************/
 
 static bool
-is_box_length (string s) {
-  // a length in units of the extents of a box, such as 1r or -0.5w
+is_unit_length (string s) {
+  // a number followed by a unit, such as 3fn, -0.5w or 1r
   int start= 0, i, n= N(s);
   while ((start+1<n) && (s[start]=='-') && (s[start+1]=='-')) start += 2;
   for (i=start; i<n && !is_locase (s[i]); i++) {}
-  if (i == start || i+1 != n || !is_double (s (start, i))) return false;
-  char c= s[i];
-  return c == 'w' || c == 'h' || c == 'l' || c == 'b' || c == 'r' || c == 't';
+  if (i == start || i == n || !is_double (s (start, i))) return false;
+  for (int j=i; j<n; j++)
+    if (!is_locase (s[j])) return false;
+  return true;
+}
+
+static bool
+is_length_unit (tree_label l) {
+  return l >= CM_LENGTH && l <= HR_LENGTH;
 }
 
 static bool
 is_layout_value (tree_label l) {
+  if (is_length_unit (l)) return true;
   switch (l) {
   case BOX_INFO:
   case FRAME_DIRECT:
   case FRAME_INVERSE:
-  case GUIPX_LENGTH:
-  case LCORNER_LENGTH:
-  case BCORNER_LENGTH:
-  case RCORNER_LENGTH:
-  case TCORNER_LENGTH:
   case AUTO_ID:
   case GET_ATTACHMENT:
     return true;
@@ -164,10 +171,30 @@ is_strict_computation (tree_label l) {
 
 bool
 is_residual (tree t, bool as_length) {
-  if (is_atomic (t)) return as_length && is_box_length (t->label);
+  if (is_atomic (t)) return as_length && is_unit_length (t->label);
   tree_label l= L(t);
   return is_layout_value (l) || is_strict_computation (l) ||
-         l == IF || l == VAR_IF || l == CASE || l == OR || l == AND;
+         l == IF || l == VAR_IF || l == CASE || l == OR || l == AND ||
+         l == VALUE;
+}
+
+bool
+contains_residual (tree t) {
+  // (a macro is code, not a value which was computed)
+  if (is_residual (t)) return true;
+  if (is_atomic (t) || L(t) == MACRO || L(t) == XMACRO) return false;
+  for (int i=0; i<N(t); i++)
+    if (contains_residual (t[i])) return true;
+  return false;
+}
+
+static tree
+evaluate_compound_children (tree t) {
+  int i, n= N(t);
+  tree r (t, n);
+  for (i=0; i<n; i++) r[i]= evaluate (t[i]);
+  transfer_ip (t, r);
+  return r;
 }
 
 static tree
@@ -194,6 +221,7 @@ evaluate_partially (tree t) {
 tree
 evaluate_impl (tree t) {
   //cout << "Really evaluate " << t << LF;
+  if (is_length_unit (L(t))) return copy (t);
   if (is_strict_computation (L(t))) {
     // (when no argument is a residual, the computation below evaluates the
     // arguments again, which the memorizers give at once)
@@ -273,8 +301,11 @@ evaluate_impl (tree t) {
 
   /* Control structures */
   case IF:
-  case VAR_IF:
     return evaluate_if (t);
+  case VAR_IF:
+    // (if* is typeset as its body, invisible when the condition is false:
+    // a phantom, concater_rep::typeset_var_if; it stays, evaluated)
+    return evaluate_compound_children (t);
   case CASE:
     return evaluate_case (t);
   case WHILE:

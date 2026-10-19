@@ -216,50 +216,77 @@ takes 2.06 million evaluations, 5.2 s (about 2.5 µs per evaluation).
 
 ### Partial evaluation
 
-Some values are only known to the typesetter: the size of a typeset box
-(`box-info`, `frame-direct`, `frame-inverse`), lengths which depend on the
-screen or on the ornament being typeset (`guipx`, the corner lengths), and
-lengths in units of the extents of a box (`w`, `h`, `l`, `b`, `r`, `t`).
-Before, the rewriter kept such tags as they were, and a computation applied
-to them computed garbage: in the graphics of the conventions page,
-`look-up (box-info (..., wh), 1)` picked apart the tag itself (giving `wh`)
-and the arithmetic above failed, in values which happened not to reach the
-result.
+Some values are only known to the typesetter:
 
-Now such a value is a *residual* (`is_residual` in `evaluate_main.cpp`), and
-a computation on a residual is a residual too:
+- the size of a typeset box (`box-info`, `frame-direct`, `frame-inverse`);
+- what depends on the order of the document and on data kept with the
+  buffer: `auto-id`, which numbers the automatic labels (the typesetter does
+  it itself since #333), and `get-attachment`;
+- **every length in a unit**. The typesetter converts `3fn`, `1cm` or `1r`
+  where the length is used, with the scale at which it lays the document
+  out and, for some units, with the font, the paragraph, the box (`w`, `h`,
+  `l`, `b`, `r`, `t`, which `move`, `shift`, `resize` and `clipped` bind)
+  or the ornament being typeset. An absolute length computed outside (a
+  `tmlen`) misses that scale: in a headless typesetting at twice the size,
+  every unit is doubled but a `tmlen` is not, and the lists of the rewritten
+  documents lost half of their indentation. So the rewriter converts no
+  length; the units themselves (`fn-length` and the like) stay too.
+
+Such a value is a *residual* (`is_residual` in `evaluate_main.cpp`), and a
+computation on a residual is a residual too:
 
 - a strict computation (`plus`, `look-up`, `merge`, the comparisons, ...)
   first evaluates its arguments; when one is a residual it returns itself
   with the evaluated arguments, else it computes as before, its second
-  evaluation of the arguments being found in the memorizers. Lengths in box
-  units count as residuals only in computations on lengths (`merge` of
-  `1` and `r` is the string `1r`);
+  evaluation of the arguments being found in the memorizers. A length in a
+  unit counts as a residual only in a computation on lengths (`merge` of
+  `1` and `r` is the string `1r`, `plus (2, 3)` is `5`);
 - `if`, `case`, `or`, `and` whose condition is a residual keep the remaining
   branches, evaluated;
-- the lengths of `move`, `shift`, `resize`, `clipped` are evaluated like
-  any other argument, which leaves `minus (1r, 1.5fn)` where the document
-  had `minus (1r, item-hsep ())`.
+- **a value which holds a residual is referred to, not copied**: `value (x)`
+  stays `value (x)`, and the `with` or `assign` which binds `x` stays in the
+  result, so that the typesetter computes the value where it was bound. A
+  copy would be computed elsewhere, in another environment: `box-info`
+  typesets its argument again, a length is converted with another font.
 
-A residual is closed: macro arguments, values and macros in it are
-substituted, so that the typesetter can finish it without the definitions
-of the document (which the rewriter consumes). The suite checks these cases
-(group *partial evaluation*). The cost on *About*: 609 evaluations instead
-of 489, 96 of them found in the memorizers (the second evaluations of the
-arguments).
-
-`auto-id` (which numbers the automatic labels) and `get-attachment` are
-residuals too: they depend on the order of the document and on data kept
-with the buffer, and the typesetter numbers the automatic labels itself
-since #333. `the-auto` is then the residual `merge (auto, …, auto-id (last))`
-instead of `error (bad merge)`.
-
-Not residuals yet: `px` lengths and the other values which depend on the
-zoom are computed with the current zoom; the typesetter caches treat the
-zoom as an input (#333), and so should the rewriter once its result is
-typeset (step 4). The branches kept by a residual condition are evaluated
+Macro arguments, values and macros in a residual are substituted, so that
+the typesetter can finish it without the definitions of the document; the
+variables it refers to are bound in the result. The suite checks these
+cases (group *partial evaluation*). The cost on *About*: 609 evaluations
+instead of 489, 96 of them found in the memorizers (the second evaluations
+of the arguments). The branches kept by a residual condition are evaluated
 although the typesetter may not take them, which matters only for side
 effects (step 3).
+
+### Typesetting the result
+
+The first stage of step 4 checks the meaning of the result without changing
+the typesetter: for a document D, a copy of D whose body is the rewritten
+body (same style, same initial environment) is typeset and printed, and its
+pages are compared with those of D, rasterized (`mutool`). If the rewriter
+is right, they are identical, since the result only holds typesetting
+primitives, residuals and the bindings they need. Each difference was a
+fault of the rewriter:
+
+- **lengths** were converted to absolute `tmlen` (above);
+- **copied residuals**: `box-info` measured its argument again deep inside
+  a graphics, at another size (above);
+- **`if*`** was evaluated like `if`. For the typesetter of markup it is a
+  phantom (`concater_rep::typeset_var_if`: the body typeset invisibly, with
+  its size), which `exec` treats like `if`; the result is markup, so `if*`
+  stays, evaluated (`phantom` is `if* (false, …)`);
+- **assignments** were consumed. The typesetter reads variables of its own
+  (`page-odd-header`, `page-this-header` for the pager), so an assignment
+  stays in the result unless it defines a macro (macro calls are expanded);
+- **values evaluated twice**: the typesetter evaluates the values of the
+  `assign` and `with` of the result again, which expanded the quoted
+  `page-the-page` of a running header at the assignment (page 0) instead of
+  in the pager. The values are protected: `quote` of the value, or
+  `quasiquote` with the residuals in `unquote`.
+
+With these fixes, the list document of the tests, *About*, the welcome page,
+the *style* page and the conventions page of the manual are identical, pixel
+for pixel.
 
 ## Relation to the typesetter caches
 
@@ -373,9 +400,10 @@ Two consequences:
    (zoom, pixel lengths, box extents, residuals). The interface is a patch:
    unchanged subtrees of the result keep their addresses, so the changed
    part is cheap to find and is handed to the typesetter as modifications,
-   as edits are now. Proof of concept on a simple document behind a flag,
-   compared pixel for pixel with the Vue snapshot harness, cursor movement
-   through the ips included.
+   as edits are now. First stage (above, *Typesetting the result*): the
+   result typeset in a copy of the document, compared pixel for pixel with
+   the document. Then the editor: typeset the result behind a flag, with
+   the cursor movement through the ips.
 5. **Laziness.** Connect the memorizers to the typesetter's invalidation, so
    that an edit only retypesets what the evaluation changed; benchmark
    against the current typesetter with the #333 scripts; bound the memory

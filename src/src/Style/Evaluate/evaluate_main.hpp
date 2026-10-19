@@ -27,6 +27,7 @@ tree expand (tree t, bool flag);
 
 /* Partial evaluation */
 bool is_residual (tree t, bool as_length= false);
+bool contains_residual (tree t);
 
 /* Tree rewriting */
 #define INACTIVE_INLINE_RECURSE  0

@@ -18,17 +18,48 @@
 * Environment changes
 ******************************************************************************/
 
+static tree
+protect_parts (tree t) {
+  // the residuals in t unquoted, the rest as it is (inside a quasiquote)
+  if (is_residual (t)) return tree (UNQUOTE, t);
+  if (is_atomic (t) || !contains_residual (t)) return t;
+  int i, n= N(t);
+  tree r (t, n);
+  for (i=0; i<n; i++) r[i]= protect_parts (t[i]);
+  return r;
+}
+
+static tree
+protect_value (tree val) {
+  // the value of an assign or a with of the result: the typesetter
+  // evaluates it again, which must give the value computed here (a quoted
+  // <page-the-page> must stay unexpanded, for the pager), except for the
+  // residuals, which the typesetter is to compute
+  if (is_atomic (val) || is_residual (val)) return val;
+  if (!contains_residual (val)) return tree (QUOTE, val);
+  return tree (QUASIQUOTE, protect_parts (val));
+}
+
 tree
 evaluate_assign (tree t) {
+  // an assignment stays in the result unless it defines a macro (the
+  // calls of macros are expanded here): the typesetter reads variables of
+  // its own (page-odd-header, for the pager), and a value which holds a
+  // residual is computed by the typesetter at this place (evaluate_value)
   int i, n=N(t), k=n>>1;
   assoc_environment local (k);
+  tree kept (CONCAT);
   for (i=0; i<k; i++) {
     string var= as_string (evaluate (t[i<<1]));
     tree   val= evaluate (t[(i<<1)+1]);
     local->raw_write (i, var, val);
+    if (!is_func (val, MACRO) && !is_func (val, XMACRO))
+      kept << tree (ASSIGN, var, protect_value (val));
   }
   assign (std_env, local);
-  return "";
+  if (N(kept) == 0) return "";
+  if (N(kept) == 1) return kept[0];
+  return kept;
 }
 
 tree
@@ -40,7 +71,8 @@ evaluate_with (tree t) {
     string var= as_string (evaluate (t[i<<1]));
     tree   val= evaluate (t[(i<<1)+1]);
     local->raw_write (i, var, val);
-    w << var << val; // FIXME: don't add non-typesetter variables (?)
+    w << var << protect_value (val);
+    // FIXME: don't add non-typesetter variables (?)
   }
   begin_with (std_env, local);
   tree r= evaluate (t[n-1]);
@@ -62,6 +94,11 @@ evaluate_value (tree t) {
   if (is_compound (r)) return evaluate_error ("bad value");
   int key= make_tree_label (r->label);
   if (!std_env->contains (key)) return evaluate_error ("undefined", r);
+  // a value which holds a residual is left to the typesetter, which
+  // computed it where it was bound (a with or a kept assign): a copy of the
+  // residual would be computed here, in another environment (box-info
+  // typesets its argument again, lengths are converted with other fonts)
+  if (contains_residual (std_env[key])) return tree (VALUE, r);
   return evaluate (std_env[key]);
 }
 

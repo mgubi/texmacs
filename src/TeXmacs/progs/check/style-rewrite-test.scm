@@ -146,7 +146,9 @@
           '(move "y" (plus "1w" "3pt") ""))
   (check= (value-of '(look-up (box-info "x" "wh") "1"))
           '(look-up (box-info "x" "wh") "1"))
-  ;; the graphics of the conventions page: no error computed from box-info
+  ;; the graphics of the conventions page: no error computed from box-info,
+  ;; and the values which hold a residual are referred to, not copied (the
+  ;; typesetter computes box-info where dims is bound)
   (with r (rewrite-last
            '(document
              (with "dims" (box-info "x" "wh")
@@ -156,13 +158,29 @@
                         (times (value "hh") "2"))))))
     (check= (stree-errors r) '())
     (check= (cAr (cAr r))
-            '(tuple (plus (look-up (box-info "x" "wh") "0") "1pt")
-                    (times (look-up (box-info "x" "wh") "1") "2"))))
+            '(tuple (plus (value "ww") "1pt") (times (value "hh") "2")))
+    (check= (list-head r 3) '(with "dims" (box-info "x" "wh"))))
+  ;; an assignment stays unless it defines a macro (the typesetter reads
+  ;; variables of its own), with a value which is not evaluated again
+  (check= (rewrite '(document (assign "page-odd-header" (concat "a" (quote (page-the-page))))
+                              (assign "m" (macro "x"))
+                              "b"))
+          '(document (assign "page-odd-header" (quote (concat "a" (page-the-page))))
+                     "" "b"))
+  ;; if* is a phantom: typeset invisibly, it keeps its body
+  (check= (value-of '(if* "false" "body")) '(if* "false" "body"))
   ;; conditionals on a residual keep their branches, evaluated
   (check= (rewrite-last '(document (assign "a" "A")
                                    (if (less "1r" "2pt") (value "a") "b")))
           '(if (less "1r" "2pt") "A" "b"))
-  (check= (value-of '(if (less "1pt" "2pt") "yes" "no")) "yes")
+  (check= (value-of '(if (less "1" "2") "yes" "no")) "yes")
+  ;; lengths in units are converted by the typesetter, where they are used
+  (check= (value-of '(if (less "1pt" "2pt") "yes" "no"))
+          '(if (less "1pt" "2pt") "yes" "no"))
+  (check= (rewrite-last '(document (assign "h" (macro "3fn"))
+                                   (plus "0cm" (h))))
+          '(plus "0cm" "3fn"))
+  (check= (value-of '(fn-length)) '(fn-length))
   (check= (value-of '(or "false" (equal "1h" "0pt") "z"))
           '(or (equal "1h" "0pt") "z"))
   ;; the automatic labels are numbered by the typesetter (the-auto)
