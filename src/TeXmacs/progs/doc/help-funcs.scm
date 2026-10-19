@@ -40,7 +40,57 @@
           (ahash-set! help-titles u (parse-title u))))
     (ahash-ref help-titles u)))
 
+;; The lists of files of the documentation which are kept for the session
+;; (help-url-cache, the search lists of docgrep.scm) are valid as long as
+;; help-dirs-generation is unchanged. It changes when one of the folders of
+;; the documentation path changes, which is checked from the times of the
+;; folders at most once every help-dirs-check-interval milliseconds.
+
+(define help-dirs-times (make-ahash-table)) ; folder -> its time
+(define help-dirs-checked #f)
+(define help-dirs-check-interval 1000)
+(define help-dirs-generation 0)
+
+(define (help-dirs)
+  ;; the folders of the documentation path, existing or not, and their
+  ;; subfolders
+  (let* ((p (string->url help-file-path))
+         (subs (url-expand (url-complete (url-append p (url-any)) "dr"))))
+    (append (url->list p) (url->list subs))))
+
+(define (help-dir-refresh d)
+  ;; the time of d, read again; a folder which changed since its recorded
+  ;; time is declared out of date, so that the caches of the files of
+  ;; TeXmacs (dir_cache, stat_cache, doc_cache) read it again too
+  (let* ((key (url->system d))
+         (old (or (ahash-ref help-dirs-times key) 0))
+         (new (url-refresh-directory-cache d old)))
+    (ahash-set! help-dirs-times key new)
+    (!= new old)))
+
+(define (help-dirs-check)
+  (with changed? (== (ahash-size help-dirs-times) 0)
+    (for (key (map car (ahash-table->list help-dirs-times)))
+      (when (help-dir-refresh (system->url key))
+        (set! changed? #t)))
+    (when changed?
+      ;; new folders are found in the folders which changed
+      (set! help-dirs-times (make-ahash-table))
+      (for-each help-dir-refresh (help-dirs))
+      (set! help-dirs-generation (+ help-dirs-generation 1))
+      (set! help-url-cache (make-ahash-table)))))
+
+(tm-define (help-dirs-generation-get)
+  (:synopsis "A number which changes when the documentation folders change")
+  (with now (texmacs-time)
+    (when (or (not help-dirs-checked)
+              (>= (- now help-dirs-checked) help-dirs-check-interval))
+      (help-dirs-check)
+      (set! help-dirs-checked (texmacs-time))))
+  help-dirs-generation)
+
 (tm-define (url-exists-in-help? s)
+  (help-dirs-generation-get)
   (with entry (ahash-ref help-url-cache s)
     (if (list? entry)
       (car entry)

@@ -102,6 +102,25 @@ declare_out_of_date (url dir) {
   // FIXME: see 'FIXME' in 'is_up_to_date'.
 }
 
+int
+refresh_directory_cache (url dir, int time) {
+  // The time of modification of dir, read again and not from the caches.
+  // is_up_to_date compares this time with the one of validate_cache.scm
+  // only once per session; a caller which keeps data about the files of
+  // dir passes the time it recorded for dir (0 when it has none): if dir
+  // was changed since, or since its time in validate_cache.scm, it is
+  // declared out of date, so that the cached listing and attributes of
+  // its files are read again
+  string name_dir= concretize (dir);
+  int l= last_modified (dir, false);
+  bool changed= (time != 0 && l != time);
+  if (is_cached ("validate_cache.scm", name_dir) &&
+      as_int (cache_get ("validate_cache.scm", name_dir) -> label) != l)
+    changed= true;
+  if (changed) declare_out_of_date (dir);
+  return l;
+}
+
 /******************************************************************************
 * Which files should be stored in the cache?
 ******************************************************************************/

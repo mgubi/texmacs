@@ -101,10 +101,16 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define url-collect-cache (make-ahash-table))
+(define url-collect-generation 0)
 
 (define path-separator (if (or (os-mingw?) (os-win32?)) #\; #\:))
 
 (define (url-collect path pattern)
+  ;; the lists are made again when the documentation folders change
+  (with gen (help-dirs-generation-get)
+    (when (!= gen url-collect-generation)
+      (set! url-collect-cache (make-ahash-table))
+      (set! url-collect-generation gen)))
   (or (ahash-ref url-collect-cache (string-append path pattern))
       (ahash-set! url-collect-cache (string-append path pattern)
                   (let* ((u (url-append (unix->url path) (url-any)))

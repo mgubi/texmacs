@@ -4691,6 +4691,14 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(url-refresh-directory-cache <scm-arg|url> <scm-arg|int>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|refresh_directory_cache> which returns
+    <scm|int>.
+  </explain>
+
+  <\explain>
     <scm|(url-temp)>
 <explain-synopsis|no synopsis>
   <|explain>

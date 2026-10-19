@@ -246,6 +246,45 @@
               (url-concretize "$TEXMACS_PATH/doc/about/about.en.tm")))
             '(concat "About GNU " (TeXmacs) "-" (TeXmacs-version)))))
 
+;; The answers of url-exists-in-help? and the lists of files of the
+;; documentation search are kept, but made again when the documentation
+;; folders change: a page is added to the documentation of the (scratch)
+;; home, then removed. The times of folders are in seconds, and they are
+;; read again at most once a second: the checks wait for the next second.
+(define (wait-next-second)
+  (with t0 (texmacs-time)
+    (let loop () (when (< (- (texmacs-time) t0) 1100) (loop)))))
+
+(define (test-help-refresh)
+  (check-group "help caches follow the documentation folders")
+  (let* ((home-doc (url-append (string->url "$TEXMACS_HOME_PATH") "doc"))
+         (dir (url-append home-doc "check-help-refresh"))
+         (page (url-append dir "new-page.en.tm"))
+         (name "check-help-refresh/new-page.en.tm")
+         (files (priv '(doc docgrep) 'docgrep-files))
+         (listed? (lambda ()
+                    (in? (url->system page)
+                         (files "$TEXMACS_DOC_PATH" "*.en.tm"))))
+         (clean (lambda ()
+                  (when (url-exists? page) (system-remove page))
+                  (when (url-exists? dir) (system-rmdir dir)))))
+    (clean)
+    (when (not (url-exists? home-doc)) (system-mkdir home-doc))
+    (check-false (url-exists-in-help? name))
+    (check-false (listed?))
+    ;; a new folder with a new page
+    (wait-next-second)
+    (system-mkdir dir)
+    (string-save "<TeXmacs|2.1>\n\n<style|tmdoc>\n\n<body|x>\n" page)
+    (check-true (url-exists-in-help? name))
+    (check-true (listed?))
+    ;; the page is removed
+    (wait-next-second)
+    (system-remove page)
+    (check-false (url-exists-in-help? name))
+    (check-false (listed?))
+    (clean)))
+
 ;; Every .tm file of the manual parses to a document with a TeXmacs version
 ;; and a body.
 (define (test-doc-parse)
@@ -1601,7 +1640,8 @@
   (clear-misc-dir)
   (system-mkdir (system->url misc-dir))
   (for-each run-group
-            (list test-help-files test-doc-parse test-tmdoc-expand
+            (list test-help-files test-help-refresh test-doc-parse
+                  test-tmdoc-expand
                   test-tmdoc-books
                   test-tmdoc-rewrite test-doc-search test-tmdoc-edit
                   test-font-database test-logical-fonts

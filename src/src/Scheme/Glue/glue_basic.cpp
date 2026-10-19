@@ -7928,6 +7928,21 @@ tmg_url_last_modified (tmscm arg1) {
 }
 
 tmscm
+tmg_url_refresh_directory_cache (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "url-refresh-directory-cache");
+  TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "url-refresh-directory-cache");
+
+  url in1= tmscm_to_url (arg1);
+  int in2= tmscm_to_int (arg2);
+
+  // TMSCM_DEFER_INTS;
+  int out= refresh_directory_cache (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return int_to_tmscm (out);
+}
+
+tmscm
 tmg_url_temp () {
   // TMSCM_DEFER_INTS;
   url out= url_temp ();
@@ -11872,6 +11887,7 @@ initialize_glue_basic () {
   tmscm_install_procedure ("url-newer?",  tmg_url_newerP, 2, 0, 0);
   tmscm_install_procedure ("url-size",  tmg_url_size, 1, 0, 0);
   tmscm_install_procedure ("url-last-modified",  tmg_url_last_modified, 1, 0, 0);
+  tmscm_install_procedure ("url-refresh-directory-cache",  tmg_url_refresh_directory_cache, 2, 0, 0);
   tmscm_install_procedure ("url-temp",  tmg_url_temp, 0, 0, 0);
   tmscm_install_procedure ("url-temp-dir",  tmg_url_temp_dir, 0, 0, 0);
   tmscm_install_procedure ("url-scratch",  tmg_url_scratch, 3, 0, 0);
