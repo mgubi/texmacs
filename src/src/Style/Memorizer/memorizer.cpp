@@ -268,6 +268,11 @@ bigmem_insert (memorizer_ptr ptr) {
   return ptr;
 }
 
+int
+memorizer_table_size () {
+  return bigmem_size;
+}
+
 static void
 bigmem_remove (memorizer_ptr ptr) {
   int h= ptr->hash () & bigmem_bags_mask;

@@ -1342,6 +1342,10 @@ tmscm_to_list_tree (tmscm p) {
 #ifdef USE_LSP
 #include "../Glue/glue_lsp.cpp"
 #endif
+// (the experimental style rewriter, see src/docs/pure-style.md)
+#ifdef EXPERIMENTAL
+#include "../Glue/glue_style.cpp"
+#endif
 
 void
 initialize_glue () {
@@ -1361,5 +1365,8 @@ initialize_glue () {
 #endif
 #ifdef USE_LSP
   initialize_glue_lsp ();
+#endif
+#ifdef EXPERIMENTAL
+  initialize_glue_style ();
 #endif
 }

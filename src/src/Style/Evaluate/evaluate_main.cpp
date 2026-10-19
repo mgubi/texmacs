@@ -16,6 +16,8 @@
 #include "analyze.hpp"
 
 environment std_env;
+static int evaluate_calls= 0; // evaluations of compound trees
+static int evaluate_hits= 0;  // of which found in a memorizer
 
 /******************************************************************************
 * Memorizing evaluations
@@ -444,8 +446,10 @@ evaluate (tree t) {
        << "[" << as_hexadecimal ((pointer) t.operator -> ())
        << ", " << as_hexadecimal ((pointer) std_env.operator -> ()) << "] "
        << t << INDENT << LF;
+  evaluate_calls++;
   memorizer mem= evaluate_memorizer (std_env, t);
   if (is_memorized (mem)) {
+    evaluate_hits++;
     if (style_trace) cout << UNINDENT << "Memorized " << mem->get_tree () << LF;
     std_env= mem->get_environment ();
     return mem->get_tree ();
@@ -465,9 +469,19 @@ evaluate (tree t) {
 memorizer
 evaluate (environment env, tree t) {
   environment old_env= std_env;
+  evaluate_calls= evaluate_hits= 0;
   memorize_initialize ();
   std_env= env;
   (void) evaluate (t);
   std_env= old_env;
   return memorize_finalize ();
+}
+
+array<int>
+evaluate_statistics () {
+  // of the last evaluation of a document: evaluations, memorized ones,
+  // size of the table of memorizers
+  array<int> r;
+  r << evaluate_calls << evaluate_hits << memorizer_table_size ();
+  return r;
 }

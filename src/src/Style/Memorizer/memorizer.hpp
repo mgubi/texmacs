@@ -99,6 +99,7 @@ void print_tree (memorizer mem);
 ******************************************************************************/
 
 void memorize_initialize ();
+int  memorizer_table_size ();
 memorizer memorize_finalize ();
 void memorize_start ();
 void memorize_end ();

@@ -1,0 +1,205 @@
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; MODULE      : style-rewrite-test.scm
+;; DESCRIPTION : tests of the experimental style rewriter
+;; COPYRIGHT   : (C) 2026  Massimiliano Gubinelli
+;;
+;; This software falls under the GNU general public license version 3 or later.
+;; It comes WITHOUT ANY WARRANTY WHATSOEVER. For details, see the file LICENSE
+;; in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
+;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; The style rewriter (src/src/Style, see src/docs/pure-style.md) exists only
+;; in builds configured with --enable-experimental, so this suite is not
+;; listed in check-master.scm; run it with
+;;
+;;   tests/scheme/check.sh TeXmacs/progs/check/style-rewrite-test.scm
+;;
+;; In other builds it reports that the rewriter is missing and fails.
+;;
+;; The tests cover
+;;
+;;   - macro expansion and the primitives ported to the rewriter, on small
+;;     documents whose rewritten form is known;
+;;   - the memorization: the numbers of evaluations after loading, after an
+;;     edit and without a change (style-rewrite-statistics);
+;;   - pages of the manual: the evaluation errors left in the result are
+;;     compared with the ones known, so that a new error and a fixed one both
+;;     show up (update the lists below when the rewriter improves).
+
+(texmacs-module (check style-rewrite-test)
+  (:use (check check-lib)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Helpers
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (with-scratch-body body thunk)
+  ;; (thunk) in a new buffer with the given body, closed afterwards
+  (let* ((old (current-buffer))
+         (u (new-buffer)))
+    (dynamic-wind
+      (lambda () (noop))
+      (lambda ()
+        (switch-to-buffer* u)
+        (buffer-set-body u (stree->tree body))
+        (thunk))
+      (lambda ()
+        (buffer-close u)
+        (when (buffer-exists? old) (switch-to-buffer* old))))))
+
+(define (rewrite body)
+  ;; the rewritten body as a scheme tree
+  (with-scratch-body body (lambda () (tree->stree (style-rewrite-buffer)))))
+
+(define (rewrite-last body)
+  ;; the rewriting of the last paragraph of a document
+  (with r (rewrite body)
+    (and (pair? r) (cAr r))))
+
+(define (stree-errors t)
+  ;; the messages of the error markup in a scheme tree, sorted, each once
+  (define (collect t acc)
+    (cond ((and (pair? t) (== (car t) 'error) (pair? (cdr t))
+                (string? (cadr t)))
+           (cons (cadr t) acc))
+          ((pair? t)
+           (let loop ((l (cdr t)) (acc acc))
+             (if (pair? l) (loop (cdr l) (collect (car l) acc)) acc)))
+          (else acc)))
+  (sort (list-remove-duplicates (collect t '())) string<=?))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Macro expansion
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; A macro call becomes its body with the arguments substituted (the
+;; alternative expansion); the assignment itself disappears; with stays.
+(define (test-macros)
+  (check-group "macros")
+  (check= (rewrite-last '(document (assign "foo" (macro "x" (concat "[" (arg "x") "]")))
+                                   (foo "world")))
+          '(concat "[" "world" "]"))
+  (check= (rewrite-last '(document (assign "twice" (macro "x" (concat (arg "x") (arg "x"))))
+                                   (twice "ab")))
+          '(concat "ab" "ab"))
+  (check= (rewrite-last '(document (assign "v" "3") (value "v")))
+          "3")
+  (check= (rewrite-last '(document (with "font-series" "bold" "b")))
+          '(with "font-series" "bold" "b"))
+  ;; the argument of a macro used inside another macro
+  (check= (rewrite-last '(document (assign "in" (macro "y" (concat "<" (arg "y") ">")))
+                                   (assign "out" (macro "x" (in (arg "x"))))
+                                   (out "z")))
+          '(concat "<" "z" ">")))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Primitives
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (value-of expr)
+  (rewrite-last `(document ,expr)))
+
+(define (test-primitives)
+  (check-group "primitives")
+  (check= (value-of '(plus "1" "2")) "3")
+  (check= (value-of '(minimum "3" "4" "2")) "2")
+  (check= (value-of '(maximum "3" "4" "2")) "4")
+  (check= (value-of '(mod (minus "5" "1") (minimum "3" "4"))) "1")
+  ;; or and and as in the typesetter: values, not only booleans
+  (check= (value-of '(or "false" "x" "y")) "x")
+  (check= (value-of '(or "false" "false")) "false")
+  (check= (value-of '(and "true" "y")) "y")
+  (check= (value-of '(and "false" "y")) "false")
+  (check= (value-of '(rgb-access "red" "r")) "255")
+  (check= (value-of '(rgb-color "255" "0" "0")) "#FF0000")
+  (check= (value-of '(equal (merge "a" "b") "ab")) "true")
+  ;; the lengths of resize may use the extents of the box: left as they are
+  (check= (value-of '(resize "x" "" "" (minus "1r" "1pt") ""))
+          '(resize "x" "" "" (minus "1r" "1pt") ""))
+  ;; occurs-inside sees the argument as given
+  (check= (rewrite-last '(document (assign "f" (macro "x" (occurs-inside "a" (arg "x"))))
+                                   (f (concat "b" "a"))))
+          "true"))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Memorization
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; style-rewrite-statistics: (evaluations memorized table-size) of the last
+;; evaluation of the document.
+(define (test-memorization)
+  (check-group "memorization")
+  (with-scratch-body
+   '(document (assign "foo" (macro "x" (concat "[" (arg "x") "]")))
+              (concat "a " (foo "b"))
+              (concat "c " (foo "d"))
+              "e")
+   (lambda ()
+     (style-rewrite-buffer)
+     (with s (style-rewrite-statistics)
+       (check-true (> (car s) 5))
+       (check= (cadr s) 0))
+     ;; nothing changed: the document is found at once
+     (style-rewrite-buffer)
+     (check= (list-head (style-rewrite-statistics) 2) '(1 1))
+     ;; an edit in the last paragraph: the path to it is evaluated again,
+     ;; its siblings are found in the memorizers
+     (tree-set (buffer-tree) 3 "f")
+     (style-rewrite-buffer)
+     (with s (style-rewrite-statistics)
+       (check-true (<= (car s) 4))
+       (check-true (>= (cadr s) 2)))
+     (check= (cAr (tree->stree (style-rewrite-buffer))) "f"))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Pages of the manual
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; (page errors): the errors left by the rewriter in October 2026, explained
+;; in src/docs/pure-style.md (auto-id and box-info are not handled yet)
+(define manual-pages
+  '(("doc/about/about.en.tm" ())
+    ("doc/about/welcome/welcome.en.tm" ("bad merge"))
+    ("doc/devel/style/style.en.tm" ("bad merge"))
+    ;; (the box-info arithmetic of its graphics fails too, but in a value
+    ;; which does not reach the result)
+    ("doc/main/start/man-conventions.en.tm" ("bad merge"))))
+
+(define (rewrite-file name)
+  ;; the errors of the rewriting of a file of the distribution and the time
+  (let* ((u (string->url (string-append "$TEXMACS_PATH/" name)))
+         (old (current-buffer)))
+    (load-buffer u)
+    (let* ((start (texmacs-time))
+           (r (tree->stree (style-rewrite-buffer)))
+           (time (- (texmacs-time) start))
+           (stats (style-rewrite-statistics)))
+      (display* "  " name ": " (car stats) " evaluations, " time " ms\n")
+      (buffer-close u)
+      (when (buffer-exists? old) (switch-to-buffer* old))
+      (stree-errors r))))
+
+(define (test-manual)
+  (check-group "manual")
+  (for (p manual-pages)
+    (check= (rewrite-file (car p)) (cadr p))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; The suite
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(tm-define (style-rewrite-test-failures)
+  (check-suite "style-rewrite")
+  (if (not (defined? 'style-rewrite-buffer))
+      (begin
+        (check-group "build")
+        (check-true (defined? 'style-rewrite-buffer)))
+      (begin
+        (test-macros)
+        (test-primitives)
+        (test-memorization)
+        (test-manual)))
+  (check-end))

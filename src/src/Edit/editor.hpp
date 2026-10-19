@@ -298,6 +298,8 @@ public:
   virtual void     drd_update () = 0;
 #ifdef EXPERIMENTAL
   virtual void     environment_update () = 0;
+  virtual tree     style_rewrite () = 0;
+  virtual array<int> style_rewrite_statistics () = 0;
 #endif
   virtual tree     get_full_env () = 0;
   virtual bool     defined_at_cursor (string var_name) = 0;

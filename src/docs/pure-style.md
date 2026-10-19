@@ -205,11 +205,14 @@ buffer), `find-accessible`, the themes (`new-theme`, `copy-theme`,
 on the ornament being typeset (`guipx`, `lcorner`, `bcorner`, `rcorner`,
 `tcorner`).
 
-With these changes, *About* evaluates without errors. The welcome page and
-the *style* page keep one `bad merge` (from `auto-id` in `the-auto`); the
-conventions page also fails in its graphics, where
-`look-up (box-info (..., wh), 1)` picks apart the residual `box-info` and the
-arithmetic above it fails (`bad plus/minus`, `bad times/over`).
+With these changes, *About* evaluates without errors. The welcome page, the
+*style* page and the conventions page keep one `bad merge` in their result
+(from `auto-id` in `the-auto`). The graphics of the conventions page also
+compute garbage: `look-up (box-info (..., wh), 1)` picks apart the residual
+`box-info` and the arithmetic above it fails (`bad plus/minus`,
+`bad times/over`), but in a value which does not reach the result. (The
+first stress runs counted the errors in the whole trace, intermediate values
+included; the suite below counts those of the result.)
 
 ## Relation to the typesetter caches
 
@@ -279,12 +282,12 @@ Two consequences:
 
 ## Plan
 
-1. **Keep it building, make it testable.** Add a CI job that compiles and
-   links with `--enable-experimental` (the link was broken from 2010 to 2026
-   without anyone noticing). Add a Scheme command that runs the rewriter on
-   a buffer and returns the result, so that it runs headless, and turn the
-   stress runs into a suite under `tests/` (errors, evaluations, memorizer
-   hits after an edit, time, memory). Verify the contact point with the
+1. **Keep it building, make it testable** (done, except the check of the
+   contact point). No CI job: the build with `--enable-experimental` and the
+   suite `style-rewrite-test.scm` are run locally (see *Testing*) after a
+   change of the typesetter or of the rewriter; the link was broken from
+   2010 to 2026 without anyone noticing. `(style-rewrite-buffer)` runs the
+   rewriter headless. Still to do: verify the contact point with the
    typesetter caches (`environment_update`) with their check mode.
 2. **Partial evaluation.** Values that need layout (`box-info`,
    `frame-direct`, `frame-inverse`, `guipx`, the corner lengths, the box
@@ -292,7 +295,9 @@ Two consequences:
    residual gives a residual. A residual is closed: the known `value`s and
    macros inside it are substituted, so that only the unknown leaves remain
    and the typesetter can finish it without the document's definitions.
-   Target: the conventions page, graphics included, without errors.
+   Target: a `look-up` or `plus` of a `box-info` gives a residual (a check
+   in the suite), and the graphics of the conventions page compute no
+   errors, not even in values which are dropped.
 3. **State and keys, ported from #333.** Key the memorizers by the inputs
    they read (the environment input hash of #333) instead of by addresses;
    record the outputs (bindings, `write`, counters) and replay them on
@@ -317,9 +322,32 @@ expansion with what `exec` computes for the same document.
 
 ## Testing
 
-Build: the usual configure line plus `--enable-experimental`. Run TeXmacs
-with a window, switch on Debug ▸ style and look at the terminal; for a
-scripted run, `(debug-set "style" #t)`, load a file with `-x`, edit after a
-pause (`delayed (:pause 4000) ...`) and quit. Counting
-`Evaluate`, `Memorized` and `error (` in the output gives a quick measure.
-Use a separate `TEXMACS_HOME_PATH` so the runs write no preferences.
+The check is local, not in CI. Build with the usual configure line plus
+`--enable-experimental`, then run the suite:
+
+    tests/scheme/check.sh TeXmacs/progs/check/style-rewrite-test.scm
+
+It is not listed in `check-master.scm`, since the rewriter exists only in
+the experimental build (elsewhere the suite fails at once, saying so). It
+runs headless through two commands of the experimental build
+(`build-glue-style.scm`, `glue_style.cpp`, included by `glue.cpp` under
+`EXPERIMENTAL`):
+
+- `(style-rewrite-buffer)`: the rewritten document of the current buffer
+  (`edit_typeset_rep::style_rewrite`, which `apply_changes` also does with
+  a window);
+- `(style-rewrite-statistics)`: evaluations, memorized ones and size of the
+  memorizer table, for the last evaluation of a document.
+
+The groups: macro expansion and the ported primitives on small documents;
+the memorization (numbers of evaluations after loading, without a change,
+after an edit of one paragraph); pages of the manual, whose errors in the
+result are compared with the known ones (a new error and a fixed one both
+fail: update `manual-pages` when the rewriter improves). The log
+(`tests/build/scheme/style-rewrite-test.log`) gives the evaluations and the
+time of each page.
+
+To look at the evaluation itself, run TeXmacs with a window, switch on
+Debug ▸ style and watch the terminal, or `(debug-set "style" #t)` in a `-x`
+script. Use a separate `TEXMACS_HOME_PATH` so the runs write no
+preferences.

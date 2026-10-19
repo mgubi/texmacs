@@ -565,16 +565,17 @@ Objects/s7-run: Scheme/Glue/s7-run.c Scheme/S7/s7.c Scheme/S7/s7.h
 	$(CC) -O1 -DWITH_C_LOADER=0 -IScheme/S7 Scheme/Glue/s7-run.c Scheme/S7/s7.c -lm -o $@
 
 GLUE: $(gluesrc)/glue_basic.cpp $(gluesrc)/glue_editor.cpp $(gluesrc)/glue_server.cpp \
-      $(gluesrc)/glue_treesit.cpp $(gluesrc)/glue_lsp.cpp
+      $(gluesrc)/glue_treesit.cpp $(gluesrc)/glue_lsp.cpp $(gluesrc)/glue_style.cpp
 	$(RM) Objects/glue.o
 
-.PHONY: GLUE Scheme/Glue/glue_%.cpp $(gluesrc)/glue_basic.cpp $(gluesrc)/glue_editor.cpp $(gluesrc)/glue_server.cpp $(gluesrc)/glue_treesit.cpp $(gluesrc)/glue_lsp.cpp
+.PHONY: GLUE Scheme/Glue/glue_%.cpp $(gluesrc)/glue_basic.cpp $(gluesrc)/glue_editor.cpp $(gluesrc)/glue_server.cpp $(gluesrc)/glue_treesit.cpp $(gluesrc)/glue_lsp.cpp $(gluesrc)/glue_style.cpp
 
 $(gluesrc)/glue_basic.cpp: $(gluesrc)/build-glue.scm
 $(gluesrc)/glue_editor.cpp: $(gluesrc)/build-glue.scm 
 $(gluesrc)/glue_server.cpp: $(gluesrc)/build-glue.scm
 $(gluesrc)/glue_treesit.cpp: $(gluesrc)/build-glue.scm
 $(gluesrc)/glue_lsp.cpp: $(gluesrc)/build-glue.scm
+$(gluesrc)/glue_style.cpp: $(gluesrc)/build-glue.scm
 
 $(gluesrc)/glue_basic.cpp: $(gluesrc)/build-glue-basic.scm $(GLUE_DEPS)
 	$(GLUE) build-glue-basic.scm glue_basic.cpp "$(GLUE_BIN)"
@@ -590,6 +591,9 @@ $(gluesrc)/glue_treesit.cpp: $(gluesrc)/build-glue-treesit.scm $(GLUE_DEPS)
 
 $(gluesrc)/glue_lsp.cpp: $(gluesrc)/build-glue-lsp.scm $(GLUE_DEPS)
 	$(GLUE) build-glue-lsp.scm glue_lsp.cpp "$(GLUE_BIN)"
+
+$(gluesrc)/glue_style.cpp: $(gluesrc)/build-glue-style.scm $(GLUE_DEPS)
+	$(GLUE) build-glue-style.scm glue_style.cpp "$(GLUE_BIN)"
 
 ###############################################################################
 # Cleaning and backup

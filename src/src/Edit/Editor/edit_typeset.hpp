@@ -70,6 +70,8 @@ public:
   void     drd_update ();
 #ifdef EXPERIMENTAL
   void     environment_update ();
+  tree     style_rewrite ();
+  array<int> style_rewrite_statistics ();
 #endif
   tree     get_full_env ();
   bool     defined_at_cursor (string var_name);

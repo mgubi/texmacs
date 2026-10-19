@@ -23,6 +23,7 @@
 #include "merge_sort.hpp"
 #ifdef EXPERIMENTAL
 #include "../../Style/Environment/std_environment.hpp"
+#include "../../Style/Evaluate/evaluate_main.hpp"
 #endif // EXPERIMENTAL
 
 //box empty_box (path ip, int x1=0, int y1=0, int x2=0, int y2=0);
@@ -419,6 +420,19 @@ edit_typeset_rep::environment_update () {
   env->assign ("secure", bool_as_tree (env->secure));
   env->read_env (h);
   ::primitive (ste, h);
+}
+
+tree
+edit_typeset_rep::style_rewrite () {
+  // as apply_changes does, but also headless (for the tests)
+  if (is_nil (ste)) environment_update ();
+  mem= evaluate (ste, cct);
+  return mem->get_tree ();
+}
+
+array<int>
+edit_typeset_rep::style_rewrite_statistics () {
+  return evaluate_statistics ();
 }
 #endif
 

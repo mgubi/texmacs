@@ -22,6 +22,7 @@ tree evaluate_error (string message, tree a1);
 tree evaluate_error (string message, array<tree> args);
 string evaluate_string (tree t);
 memorizer evaluate (environment env, tree t);
+array<int> evaluate_statistics ();
 tree expand (tree t, bool flag);
 
 /* Tree rewriting */
