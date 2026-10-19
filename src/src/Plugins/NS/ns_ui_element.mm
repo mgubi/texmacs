@@ -878,29 +878,51 @@ choice_list (command cmd, array<string> vals, array<string> chosen, bool multipl
  * Tree views (see QTMTreeView)
  ******************************************************************************/
 
+/*! A node of the tree of a tree view. The roles say which children of a
+ node are its data rather than other nodes, as in the Qt interface
+ (QTMTreeModel): (item "DisplayRole") makes the first child of a node
+ tagged item its text, and the children after it its rows. */
 @interface TMTreeNode : NSObject
 {
 @public
   tree t;
+  tree roles;
   NSMutableArray* kids;
 }
 @end
+
+static tree
+node_roles (tree roles, tree t) {
+  // the declaration of the roles of the nodes with the tag of t, or ""
+  if (is_compound (roles) && is_compound (t))
+    for (int i=0; i<N(roles); i++)
+      if (is_compound (roles[i]) && L(roles[i]) == L(t)) return roles[i];
+  return "";
+}
 
 @implementation TMTreeNode
 - (void) dealloc { [kids release]; [super dealloc]; }
 - (NSString*) label
 {
   if (is_atomic (t)) return to_label (t->label);
+  tree r= node_roles (roles, t);
+  if (is_compound (r))
+    for (int j=0; j<N(r) && j<N(t); j++)
+      if (is_atomic (r[j]) && r[j]->label == "DisplayRole" && is_atomic (t[j]))
+        return to_label (t[j]->label);
   return to_label (as_string (L(t)));
 }
 - (NSArray*) children
 {
   if (!kids) {
     kids= [[NSMutableArray alloc] init];
+    tree r= node_roles (roles, t);
+    int from= is_compound (r)? N(r): 0; // the data of the node come first
     if (is_compound (t))
-      for (int i=0; i<N(t); i++) {
+      for (int i=from; i<N(t); i++) {
         TMTreeNode* n= [[[TMTreeNode alloc] init] autorelease];
         n->t= t[i];
+        n->roles= roles;
         [kids addObject: n];
       }
   }
@@ -942,7 +964,7 @@ choice_list (command cmd, array<string> vals, array<string> chosen, bool multipl
 }
 - (void) outlineViewSelectionDidChange: (NSNotification*) n
 {
-  // the command gets the subtree (there are no roles yet) and -1, as in Qt
+  // the command gets the subtree and -1, as in Qt
   (void) n;
   id item= [view itemAtRow: [view selectedRow]];
   if (!cmd || !item) return;
@@ -952,7 +974,7 @@ choice_list (command cmd, array<string> vals, array<string> chosen, bool multipl
 @end
 
 static NSView*
-tree_view (command cmd, tree data) {
+tree_view (command cmd, tree data, tree roles) {
   NSOutlineView* ov= [[[NSOutlineView alloc] init] autorelease];
   NSTableColumn* col= [[[NSTableColumn alloc] initWithIdentifier: @"t"] autorelease];
   [col setWidth: 250];
@@ -963,6 +985,7 @@ tree_view (command cmd, tree data) {
   ds->cmd= cmd.rep; INC_COUNT_NULL (ds->cmd);
   ds->root= [[TMTreeNode alloc] init];
   ds->root->t= data;
+  ds->root->roles= roles;
   ds->view= ov;
   // NOTE: the data source lives as long as the view
   objc_setAssociatedObject (ov, "TMTreeList", ds, OBJC_ASSOCIATION_RETAIN);
@@ -1688,7 +1711,7 @@ ns_ui_element_rep::make_nsview () {
     {
       typedef triple<command, tree, tree> T;
       T x= open_box<T> (load);
-      return tree_view (x.x1, x.x2);
+      return tree_view (x.x1, x.x2, x.x3);
     }
 
     default:

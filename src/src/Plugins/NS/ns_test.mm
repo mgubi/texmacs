@@ -41,6 +41,7 @@ static NSMutableArray* open_menus= nil;   // the menus listed
 static array<string> open_paths;          // and their paths
 static NSMenu* tracked_menu= nil;         // the menu of a button, while open
 static NSMutableArray* listed_items= nil; // the items of the last list
+static bool menu_closing= false;          // a menu was cancelled, not ended
 
 string gui_test_port () { return "cocoa"; }
 
@@ -152,9 +153,55 @@ script_rect (NSWindow* win, NSView* v, NSRect r) {
   return NSMakeRect (w.origin.x, h - NSMaxY (w), w.size.width, w.size.height);
 }
 
+static NSString*
+row_text (NSTableView* t, NSInteger row) {
+  // the text of a row of a list or of a tree (TMChoiceList, the tree view)
+  NSTableColumn* col= [[t tableColumns] firstObject];
+  id ds= [t dataSource];
+  id v= nil;
+  // what the row shows (a view-based table), else what its data source has
+  NSView* cv= [t viewAtColumn: 0 row: row makeIfNecessary: NO];
+  if ([cv isKindOfClass: [NSTableCellView class]])
+    v= [[(NSTableCellView*) cv textField] stringValue];
+  else if ([cv isKindOfClass: [NSTextField class]])
+    v= [(NSTextField*) cv stringValue];
+  if (v) ;
+  else if ([t isKindOfClass: [NSOutlineView class]]) {
+    id item= [(NSOutlineView*) t itemAtRow: row];
+    if ([ds respondsToSelector: @selector(outlineView:objectValueForTableColumn:byItem:)])
+      v= [ds outlineView: (NSOutlineView*) t objectValueForTableColumn: col
+                  byItem: item];
+  }
+  else if ([ds respondsToSelector: @selector(tableView:objectValueForTableColumn:row:)])
+    v= [ds tableView: t objectValueForTableColumn: col row: row];
+  if ([v isKindOfClass: [NSAttributedString class]]) v= [v string];
+  return [v isKindOfClass: [NSString class]]? (NSString*) v: nil;
+}
+
 static void
 collect_texts (NSWindow* win, NSView* v, array<string>& r) {
   if ([v isHidden]) return;
+  if ([v isKindOfClass: [NSTableView class]]) {
+    // the rows in view, in their places (not the views of their cells)
+    NSTableView* t= (NSTableView*) v;
+    NSRange rows= [t rowsInRect: [t visibleRect]];
+    for (NSUInteger i= rows.location; i < NSMaxRange (rows) && i < rows.location + 1000; i++) {
+      NSString* txt= row_text (t, i);
+      if (txt)
+        add_text (r, script_rect (win, t, [t frameOfCellAtColumn: 0 row: i]),
+                  view_path (t), normalize (from_nsstring (txt)));
+    }
+    return;
+  }
+  if ([v isKindOfClass: [NSTabView class]]) {
+    // the tabs, without a box (their places are not told): chosen by the
+    // port (choose), as the items of the native menus
+    for (NSTabViewItem* it in [(NSTabView*) v tabViewItems]) {
+      r << (as_string ((int) [listed_items count]) * "\t0\t0\t0\t" *
+            view_path (v) * "\t" * normalize (from_nsstring ([it label])));
+      [listed_items addObject: it];
+    }
+  }
   if ([v isKindOfClass: [NSSegmentedControl class]]) {
     NSSegmentedControl* sc= (NSSegmentedControl*) v;
     NSInteger n= [sc segmentCount];
@@ -195,6 +242,14 @@ list_menu (NSMenu* m, string path, array<string>& r) {
           join_path (path, named_of ([mi identifier])) * "\t" * t);
     [listed_items addObject: mi];
   }
+}
+
+array<string>
+gui_test_windows () {
+  array<string> r;
+  for (NSWindow* w in [NSApp orderedWindows])
+    if (alive (w)) r << from_nsstring ([w title]);
+  return r;
 }
 
 array<string>
@@ -249,7 +304,10 @@ choose (NSMenuItem* mi) {
   if (i < 0) return;
   [m performActionForItemAtIndex: i];
   // the menus close, as after a choice
-  if (tracked_menu) [tracked_menu cancelTracking];
+  if (tracked_menu) {
+    [tracked_menu cancelTracking];
+    menu_closing= true; // the end comes later: the script waits for it
+  }
   if (open_menus) [open_menus removeAllObjects];
   open_paths= array<string> ();
 }
@@ -290,6 +348,7 @@ choose (NSMenuItem* mi) {
 {
   if ([n object] != tracked_menu) return;
   tracked_menu= nil;
+  menu_closing= false;
   if (open_menus) [open_menus removeAllObjects];
   open_paths= array<string> ();
 }
@@ -325,6 +384,23 @@ note_click (NSWindow* win, NSPoint p) {
   while (v && N(view_label (v)) == 0 && ![v isKindOfClass: [NSControl class]])
     v= [v superview];
   popup_path= v? join_path (view_path (v), view_label (v)): string ("");
+}
+
+static bool
+select_row (NSWindow* win, NSPoint p) {
+  // a click on a row of a list or of a tree: the row is selected, as with
+  // the keyboard (a table takes no click in a window which is not the
+  // active one, which a test does not make it); the selection runs the
+  // command of the list
+  NSView* v= [[[win contentView] superview] hitTest: p];
+  while (v && ![v isKindOfClass: [NSTableView class]]) v= [v superview];
+  if (!v) return false;
+  NSTableView* t= (NSTableView*) v;
+  NSInteger row= [t rowAtPoint: [t convertPoint: p fromView: nil]];
+  if (row < 0) return false;
+  [t selectRowIndexes: [NSIndexSet indexSetWithIndex: row]
+       byExtendingSelection: NO];
+  return true;
 }
 
 static void
@@ -442,10 +518,14 @@ gui_test_raw (string line) {
     return 1;
   }
   if (cmd == "choose" && N(a) > 1) {
-    // an item of a menu, by its place in the last list of the texts
+    // an item of a menu or a tab, by its place in the last list of the texts
     int i= as_int (a[1]);
-    if (listed_items && i >= 0 && i < (int) [listed_items count])
-      choose ([listed_items objectAtIndex: i]);
+    id obj= (listed_items && i >= 0 && i < (int) [listed_items count])?
+            [listed_items objectAtIndex: i]: nil;
+    if ([obj isKindOfClass: [NSTabViewItem class]])
+      [[(NSTabViewItem*) obj tabView] selectTabViewItem: obj];
+    else if (obj)
+      choose ((NSMenuItem*) obj);
     else cout << "cocoa script: no item " << a[1] << LF;
     return 0;
   }
@@ -458,6 +538,7 @@ gui_test_raw (string line) {
     bool right= N(a) > 3 && a[3] == "right";
     int clicks= (N(a) > 4 && is_int (a[4]))? max (1, as_int (a[4])): 1;
     if (cmd != "release") note_click (win, p);
+    if (cmd == "click" && !right && select_row (win, p)) return 0;
     if (cmd != "release")
       post_mouse (win, right? NSEventTypeRightMouseDown: NSEventTypeLeftMouseDown,
                   p, clicks);
@@ -497,6 +578,7 @@ bool
 gui_test_busy () {
   // events of the system or of TeXmacs, delayed commands which are due, an
   // update
+  if (menu_closing) return true;
   if (the_gui && the_gui->test_busy ()) return true;
   return [NSApp nextEventMatchingMask: NSEventMaskAny
                             untilDate: [NSDate distantPast]

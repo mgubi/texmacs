@@ -270,6 +270,42 @@
                         'next)
                        (else 'retry)))))))
 
+(tm-define (gt-see selector . opt)
+  (:synopsis "Wait until the text or icon named by @selector is drawn")
+  ;; within opt ms (3 s by default), else a failure
+  (with limit (if (nnull? opt) (car opt) 3000)
+    (gt-step (string-append "see " selector)
+             (lambda ()
+               (cond ((gt-find-text selector) 'next)
+                     ((> (gt-retried-for) limit)
+                      (check-report #f (string-append "see " selector)
+                                    (string-append
+                                     "no such text in the window, which has "
+                                     (gt-texts-summary)))
+                      'next)
+                     (else 'retry))))))
+
+(tm-define (gt-document-has? s)
+  (:synopsis "Does the document of the current buffer have the text @s?")
+  (string-contains? (object->string (tree->stree (buffer-tree))) s))
+
+(tm-define (gt-window? title)
+  (:synopsis "Is a window whose title has @title shown?")
+  (list-or (map (lambda (t) (string-contains? t title)) (gui-test-windows))))
+
+;; what the callbacks of a test record, to be checked at the end
+(define gt-records '())
+
+(tm-define (gt-record . l)
+  (:synopsis "Record the strings of @l, written together, and log them")
+  (with s (apply string-append l)
+    (set! gt-records (append gt-records (list s)))
+    (display* "got: " s "\n")))
+
+(tm-define (gt-recorded)
+  (:synopsis "What the callbacks recorded, in order")
+  gt-records)
+
 (tm-define (gt-port name)
   (:synopsis "The steps which follow are for the port @name only")
   (gt-step #f

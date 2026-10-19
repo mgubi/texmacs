@@ -115,6 +115,13 @@ no headless mode. The Widkit duplicates are fixed on `wip_other_guis` too.
   30 ms in which Vue drops the text of a key just handled, and the
   clipboard of a script is its own.)
 
+- **Qt: a rare empty answer in the footer** (test `tests/gui/interactive`,
+  branch `wip_gui_scripting`, 2026-10-20): once in some twenty runs on
+  macOS the question is answered empty as it opens, before any key. The
+  cause found and fixed (the input ended when the window lost the focus to
+  another application, `QTMInputTextWidgetHelper::leave`) left this one,
+  not caught with a trace in ten runs.
+
 ## Kept on purpose
 
 - `smart_font_rep::adjusted_dpi` in `src/src/Graphics/Fonts/smart_font.cpp`

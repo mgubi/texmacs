@@ -48,6 +48,7 @@
   (gui-test-raw gui_test_raw (int string))
   (gui-test-busy? gui_test_busy (bool))
   (gui-test-texts gui_test_texts (array_string))
+  (gui-test-windows gui_test_windows (array_string))
   (gui-test-set-pump gui_test_pump (void bool))
   (gui-test-eval-later gui_test_eval_later (void string))
   (support-functionality? support_functionality (bool string))

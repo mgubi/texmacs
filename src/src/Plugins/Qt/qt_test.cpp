@@ -38,6 +38,9 @@
 #include <QGuiApplication>
 #include <QPointer>
 #include <QKeySequence>
+#include <QComboBox>
+#include <QAbstractItemView>
+#include <QTreeView>
 
 /******************************************************************************
 * Snapshots of the windows
@@ -457,8 +460,41 @@ global_rect (QWidget* w) {
 }
 
 static void
+collect_rows (QAbstractItemView* v, QModelIndex parent, QPoint origin,
+              string path, array<string>& r, int& n) {
+  // the rows of a list or a tree which are in view (the children of the
+  // expanded ones of a tree)
+  QAbstractItemModel* m= v->model ();
+  if (m == NULL) return;
+  QTreeView* tv= qobject_cast<QTreeView*> (v);
+  QRect view= v->viewport ()->rect ();
+  for (int i= 0; i < m->rowCount (parent) && n < 1000; i++) {
+    QModelIndex idx= m->index (i, 0, parent);
+    QRect rect= v->visualRect (idx);
+    if (!rect.isEmpty () && rect.intersects (view)) {
+      n++;
+      add_text (r, origin,
+                QRect (v->viewport ()->mapToGlobal (rect.topLeft ()), rect.size ()),
+                path, normalize (m->data (idx).toString ()));
+    }
+    if (tv != NULL && tv->isExpanded (idx))
+      collect_rows (v, idx, origin, path, r, n);
+  }
+}
+
+static void
 collect_texts (QWidget* w, QPoint origin, array<string>& r) {
   if (!w->isVisible ()) return;
+  QComboBox* cb= qobject_cast<QComboBox*> (w);
+  QAbstractItemView* iv= qobject_cast<QAbstractItemView*> (w);
+  if (cb != NULL)
+    add_text (r, origin, global_rect (w), widget_path (w, 0),
+              normalize (cb->currentText ()));
+  if (iv != NULL) {
+    int n= 0;
+    collect_rows (iv, QModelIndex (), origin, widget_path (w, 0), r, n);
+    return;
+  }
   QAbstractButton* b= qobject_cast<QAbstractButton*> (w);
   QLabel* l= qobject_cast<QLabel*> (w);
   QTabBar* t= qobject_cast<QTabBar*> (w);
@@ -488,6 +524,14 @@ collect_texts (QWidget* w, QPoint origin, array<string>& r) {
 }
 
 array<string>
+gui_test_windows () {
+  array<string> r;
+  foreach (QWidget* top, QApplication::topLevelWidgets ())
+    if (is_script_window (top)) r << from_qstring (top->windowTitle ());
+  return r;
+}
+
+array<string>
 gui_test_texts () {
   // the texts and icons of the window of the script, then those of the
   // open menus, the deepest last (the topmost)
@@ -496,6 +540,11 @@ gui_test_texts () {
   if (win == NULL) return r;
   QPoint origin= script_origin (win);
   collect_texts (win, origin, r);
+  // the popups which are not menus (the list of a combo box)
+  foreach (QWidget* top, QApplication::topLevelWidgets ())
+    if (top->isVisible () && top->windowType () == Qt::Popup &&
+        qobject_cast<QMenu*> (top) == NULL)
+      collect_texts (top, origin, r);
   // the menus of the same depth in any order, the deeper ones after
   array<array<string> > by_depth;
   foreach (QWidget* top, QApplication::topLevelWidgets ()) {
@@ -713,10 +762,13 @@ gui_test_raw (string line) {
     post_key (win, a[1], N(a) > 2 ? a[2] : string (""));
   else if (cmd == "text" && N(a) > 1)
     post_text (win, rest);
-  else if (cmd == "focus") {
+  else if (cmd == "focus")
+    // the keys of a script go to the focus widget of its window, which
+    // needs not be active; an activation by the script would not last
+    // either (TeXmacs is not the active application of a test), and the
+    // window which loses it takes the focus from its widget: a question in
+    // the footer is then answered (QTMLineEdit::focusOutEvent)
     win->raise ();
-    win->activateWindow ();
-  }
   else if (cmd == "snapshot" && N(a) > 1) {
     string dir= snapshot_dir ();
     if (N(dir) > 0) {

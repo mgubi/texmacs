@@ -337,6 +337,15 @@ tmg_gui_test_texts () {
 }
 
 tmscm
+tmg_gui_test_windows () {
+  // TMSCM_DEFER_INTS;
+  array_string out= gui_test_windows ();
+  // TMSCM_ALLOW_INTS;
+
+  return array_string_to_tmscm (out);
+}
+
+tmscm
 tmg_gui_test_set_pump (tmscm arg1) {
   TMSCM_ASSERT_BOOL (arg1, TMSCM_ARG1, "gui-test-set-pump");
 
@@ -12066,6 +12075,7 @@ initialize_glue_basic () {
   tmscm_install_procedure ("gui-test-raw",  tmg_gui_test_raw, 1, 0, 0);
   tmscm_install_procedure ("gui-test-busy?",  tmg_gui_test_busyP, 0, 0, 0);
   tmscm_install_procedure ("gui-test-texts",  tmg_gui_test_texts, 0, 0, 0);
+  tmscm_install_procedure ("gui-test-windows",  tmg_gui_test_windows, 0, 0, 0);
   tmscm_install_procedure ("gui-test-set-pump",  tmg_gui_test_set_pump, 1, 0, 0);
   tmscm_install_procedure ("gui-test-eval-later",  tmg_gui_test_eval_later, 1, 0, 0);
   tmscm_install_procedure ("support-functionality?",  tmg_support_functionalityP, 1, 0, 0);

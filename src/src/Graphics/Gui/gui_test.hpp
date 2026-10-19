@@ -32,6 +32,8 @@ bool gui_test_busy ();
 // "x\ty\tw\th\tpath\ttext" (window points, from the top left of its
 // content; the path of the bars and menus it is in, see gui-driver.scm)
 array<string> gui_test_texts ();
+// the titles of the windows shown
+array<string> gui_test_windows ();
 // call (gui-test-pump) at each turn of the event loop, while on; also
 // tells the port that the script holds the state of the mouse buttons
 void gui_test_pump (bool on);

@@ -4933,7 +4933,20 @@ gui_test_raw (string line) {
 
 bool
 gui_test_busy () {
-  return SDL_PollEvent (NULL);
+  // events, or an animation (a menu which slides in: the places of its
+  // items change until it ends)
+  return SDL_PollEvent (NULL) || transitions_running ();
+}
+
+array<string>
+gui_test_windows () {
+  array<string> r;
+  iterator<int> it= iterate (id_to_window);
+  while (it->busy ()) {
+    vue_window w= (vue_window) id_to_window [it->next ()];
+    r << w->get_name ();
+  }
+  return r;
 }
 
 array<string>

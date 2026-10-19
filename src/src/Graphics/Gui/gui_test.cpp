@@ -38,6 +38,7 @@ string gui_test_port () { return ""; }
 int gui_test_raw (string line) { (void) line; return 2; }
 bool gui_test_busy () { return false; }
 array<string> gui_test_texts () { return array<string> (); }
+array<string> gui_test_windows () { return array<string> (); }
 void gui_test_pump (bool on) { (void) on; }
 #endif
 

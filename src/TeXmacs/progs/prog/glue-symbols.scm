@@ -58,6 +58,7 @@
 "gui-test-raw"
 "gui-test-busy?"
 "gui-test-texts"
+"gui-test-windows"
 "gui-test-set-pump"
 "gui-test-eval-later"
 "support-functionality?"

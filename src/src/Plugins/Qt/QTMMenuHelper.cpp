@@ -446,6 +446,11 @@ void
 QTMInputTextWidgetHelper::leave (Qt::FocusReason reason) {
 BEGIN_SLOT
   if (sender() != wid()->qwid) return;
+  // the window loses the focus to another one, or a popup opens: the input
+  // goes on (a question in the footer was answered, empty, when the user
+  // went to another application)
+  if (reason == Qt::ActiveWindowFocusReason || reason == Qt::PopupFocusReason)
+    return;
   wid()->commit((reason != Qt::OtherFocusReason && can_autocommit &&
                  get_preference ("gui:line-input:autocommit") == "on"));
 END_SLOT

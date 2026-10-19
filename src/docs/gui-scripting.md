@@ -26,7 +26,7 @@ follow at once.
 | `src/Plugins/Qt6/qt_test.cpp` (the same in `Qt/`) | The hooks of Qt, beside its older commands by label |
 | `src/Plugins/NS/ns_test.mm` | The hooks of Cocoa |
 | `tests/Plugins/Vue/run.sh` | Runs a test with a home of its own, and says PASS or FAIL (any port: run it from the top of the source tree of a build) |
-| `tests/gui/` | The tests which run on every port |
+| `tests/gui/` | The tests which run on every port, and `run.sh` which runs them all on a build |
 
 `TEXMACS_TEST_SCRIPT=<file>` runs a script, on every port
 (`TEXMACS_VUE_SCRIPT`, its former name, in Vue too): the port calls
@@ -57,11 +57,12 @@ How each port does it:
 |---|---|---|---|
 | Pump | at each turn of its loop | a timer of 10 ms (also in menus and modal dialogs) | a timer of 10 ms in the common modes of the run loop (also while a menu is tracked) |
 | Busy | SDL events waiting | events of TeXmacs, delayed commands which are due, an update | the same, and the events of the system |
-| Texts | drawn at the last frame (Clay) | the widgets of the window and the items of the open menus | the views of the window, and the items of the native menus, without a box |
+| Texts | drawn at the last frame (Clay) | the widgets of the window (buttons, labels, tabs, combo boxes, the rows of lists and trees in view), the popups (the list of a combo box) and the items of the open menus | the views of the window (buttons, labels, the rows of tables and outlines in view), the tabs and the items of the native menus, without a box |
 | Bars | the layout notes them | the titles of the tool bars, the status bar (footer) | the identifiers of the rows (`TMButtonsController`) |
 | Icons | the file of the picture widget | the property `tmIcon` (`qt_ui_element.cpp`) | the accessibility description of the image (`to_nsimage`) |
 | Input | SDL events pushed | Qt events posted to the widget at the place (a menu is a window of its own) | Cocoa events posted to the window |
 | Menus | drawn in the window, clicked | an item is chosen with the keyboard of its menu | items without a box, chosen by the port (`choose`) |
+| Lists, tabs | clicked | clicked | a click on a row selects it (a table takes no click in a window which is not active, and a test does not make TeXmacs active); a tab is chosen by the port |
 | Clipboard | of the script | of the system (offscreen, of the process) | of the system |
 
 The menus of Cocoa are native: neither the menu bar nor the menus of the
@@ -100,8 +101,35 @@ active one and sends Return to the menu, as the keyboard would.
 | `(gt-check what thunk)` | A check: `thunk` must return true; a failure is written `FAILED [] what: ...` |
 | `(gt-idle [ms])` | Wait until the port has had nothing to do (`gui-test-busy?`) for 200 ms and five turns (at most 10 s): Qt on macOS flashes a chosen item of a menu before it runs it |
 | `(gt-activate selector [ms])` | Click the middle of the text or icon of the window of the script which the selector names (below). Waits for it 3 s at most, then fails, with the texts it saw in the log |
+| `(gt-see selector [ms])` | Wait until the text or icon is there (3 s at most, then fail) |
 | `(gt-port name)` | The steps after it are for that port only; elsewhere the test stops there |
 | `(gt-exit)` | At the end, quit TeXmacs with the status 1 if a check failed, else 0 |
+
+For the checks: `(gt-record . strings)` is what a callback of the test
+calls (it also writes `got: ...` to the log), `(gt-recorded)` the list of
+what was recorded, in order; `(gt-document-has? text)` looks in the
+document of the current buffer, `(gt-window? title)` in the titles of the
+windows (`gui-test-windows`), and `(gt-find-text selector)` gives the box
+of a text or `#f`. A dialog or a popup is opened with `gt-eval-later`, from
+the loop of TeXmacs: a modal dialog opened by a step would hold it.
+
+### The tests of every port
+
+`tests/gui/run.sh [test...]`, from the top of the source tree of a build,
+runs them all (or those named) and counts the failures:
+
+| Test | What |
+|---|---|
+| `menu-formula` | Insert > Mathematics > Displayed formula from the menu bar, a letter typed in the formula |
+| `dialog` | the fields of an interactive prompt, Tab and Return, then the keys go back to the editor |
+| `submenu` | pull-down menus of a window, the first with a submenu |
+| `tabs` | a tab widget shows the page of its tab, and only it |
+| `font` | the font selector in a window, which opens and closes |
+| `interactive` | the question in the footer, and its answer |
+| `widgets` | a choice list, an enum, a filtered choice and a tree, two lists with the same items told apart by `named` |
+
+They replace nothing: the tests of Vue with the same names check the
+drawing too, by their snapshots.
 
 ### Selectors
 
@@ -186,8 +214,10 @@ of the test never go through the clipboard of the system, which the
 session of the user shares (and the other tests running at the same time).
 `clipboard <text>` puts a text on it, as if the system had it.
 
-Qt and Cocoa have `window main` (the editor), `window <part of the
-title>`, `move`, `press`, `release`, `click`, `key`, `text`, `focus`,
+In Qt, `focus` only brings the window to the front: the keys of a script
+go to the focus widget of its window anyway, and an activation would not
+last (TeXmacs is not the active application of a test). Qt and Cocoa have
+`window main` (the editor), `window <part of the title>`, `move`, `press`, `release`, `click`, `key`, `text`, `focus`,
 `snapshot`, `resize`, `repaint` and `close`; Qt `wheel` and `clipboard`
 too, Cocoa `choose`. `window main` is the first window with an editor on
 every port, the way to write a test which runs on all of them; a `window`

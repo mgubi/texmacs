@@ -12,6 +12,21 @@ branch [`upsilon_texmacs`](https://github.com/mgubi/texmacs/commits/upsilon_texm
 have the details, and the problems go to the
 [issues of the repository](https://github.com/mgubi/texmacs/issues).
 
+## 20 October 2026
+
+- **Desktop (Qt)**: a question asked in the footer, or a field of a dialog,
+  is no longer answered (empty) or cancelled when you go to another
+  application, or when a popup opens: the input goes on when you come back.
+- **Desktop (Cocoa)**: the tree views of the dialogs show the text of each
+  item, as in Qt, instead of the name of its tag (`item`), and the data of
+  an item are no longer shown as rows under it.
+- The tests of the interface can drive TeXmacs on Vue, Qt and Cocoa alike,
+  through one driver in Scheme: they click the texts and icons they name
+  by the bars and menus they are in (`Format > Font > Bold`, `footer >
+  equation*`, `mainbar > icon:tm_save`), in English whatever the language
+  of the interface, and check what came out (`src/docs/gui-scripting.md`).
+  Seven tests run on all three (`tests/gui`).
+
 ## 19 October 2026
 
 - **Browser**: on a tablet (an iPad), a keyboard button at the bottom right
