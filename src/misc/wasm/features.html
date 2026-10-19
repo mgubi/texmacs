@@ -42,6 +42,12 @@
   .button:hover { text-decoration: underline; }
   figure { margin: 56px 0 0; }
   figure { scroll-margin-top: 16px; }
+  .numbers { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; overflow-x: auto; }
+  .numbers table { border-collapse: collapse; width: 100%; font-size: 15px; }
+  .numbers th, .numbers td { padding: 6px 10px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; }
+  .numbers th:first-child, .numbers td:first-child { text-align: left; white-space: normal; }
+  .numbers tr:last-child td { border-bottom: none; }
+  .numbers .note { color: var(--muted); font-size: 14px; margin: 10px 0 0; }
   .toc { margin: 20px 0 0; padding: 14px 18px; background: var(--card); border: 1px solid var(--line); border-radius: 10px; }
   .toc ol { margin: 0; padding-left: 22px; columns: 2 260px; column-gap: 32px; }
   .toc li { margin: 0 0 6px; break-inside: avoid; }
@@ -67,8 +73,8 @@
   and <em>Help &gt; Upsilon features</em> list everything. Click a picture for
   its full size.</p>
   <div class="links">
-    <a class="button" href="downloads.html">Download</a>
-    <a class="button" href="./">Try it in the browser</a>
+    <a class="button" href="./#downloads">Download</a>
+    <a class="button" href="texmacs.html">Try it in the browser</a>
     <a class="button" href="changes.html">Recent changes</a>
   </div>
 
@@ -76,7 +82,10 @@
     <ol>
       <li><a href="#opentype-mathematics">OpenType mathematics</a></li>
       <li><a href="#interfaces-themes-and-icons">Interfaces, themes and icons</a></li>
+      <li><a href="#cocoa">A native Cocoa interface</a></li>
       <li><a href="#font-design">Font design</a></li>
+      <li><a href="#typesetting">Faster typesetting</a></li>
+      <li><a href="#scheme">Three Scheme interpreters</a></li>
       <li><a href="#program-code-with-tree-sitter">Program code with tree-sitter</a></li>
       <li><a href="#language-servers">Language servers</a></li>
       <li><a href="#git">Git</a></li>
@@ -108,6 +117,17 @@
     <a class="shot" href="screenshots/math-stix-dark-lucide.webp"><img src="screenshots/math-stix-dark-lucide.webp" width="1600" height="1025" loading="lazy" alt="The same page in STIX Two, in a window with the dark theme and the Lucide icons"></a>
   </figure>
 
+  <figure id="cocoa">
+    <figcaption>
+      <h2>A native Cocoa interface</h2>
+      <p>On macOS, TeXmacs Upsilon also comes as a native Cocoa application:
+      the menus in the menu bar of the Mac, the bars and the dialogs of
+      macOS, the documents drawn by the GPU (Metal). Here with the dark
+      theme and TeX Gyre Pagella.</p>
+    </figcaption>
+    <a class="shot" href="screenshots/cocoa-dark.webp"><img src="screenshots/cocoa-dark.webp" width="1600" height="1169" loading="lazy" alt="TeXmacs as a native macOS application, with the dark theme, a page of formulas in TeX Gyre Pagella"></a>
+  </figure>
+
   <figure id="font-design">
     <figcaption>
       <h2>Font design</h2>
@@ -118,6 +138,73 @@
       Iwona, the weights of IBM Plex&hellip;</p>
     </figcaption>
     <a class="shot" href="screenshots/font-design.webp"><img src="screenshots/font-design.webp" width="1600" height="1126" loading="lazy" alt="The font design page: tabs for text, mathematics, sans serif and other parts, samples of the chosen fonts, and a list of fonts with descriptions"></a>
+  </figure>
+
+  <figure id="typesetting">
+    <figcaption>
+      <h2>Faster typesetting</h2>
+      <p>An edit in a long document costs about as much as the paragraph it
+      touches: what an edit did not change is used again (the reuse follows
+      what each part of the document read from its environment), the page
+      breaks are not searched again when the sizes stay, and the labels of
+      the table of contents and of the index no longer renumber everything
+      after them. What is typeset is the same, byte for byte. The time of
+      one edit in the middle of the user manual (Help &gt; Manual, 290
+      pages):</p>
+    </figcaption>
+    <div class="numbers">
+      <table>
+        <thead><tr><th>Edit</th><th>Standard TeXmacs</th><th>TeXmacs Upsilon</th></tr></thead>
+        <tbody>
+          <tr><td>type a letter</td><td>283 ms</td><td>17 ms</td></tr>
+          <tr><td>Return (a new paragraph)</td><td>306 ms</td><td>39 ms</td></tr>
+          <tr><td>Backspace (two paragraphs joined)</td><td>854 ms</td><td>16 ms</td></tr>
+          <tr><td>a new section</td><td>1355 ms</td><td>62 ms</td></tr>
+          <tr><td>a new numbered equation</td><td>872 ms</td><td>44 ms</td></tr>
+          <tr><td>type in the equation</td><td>317 ms</td><td>36 ms</td></tr>
+        </tbody>
+      </table>
+      <p class="note">The typesetting time of each edit, without the
+      repaint, from <code>TEXMACS_EDIT_PROFILE</code>; Qt and Guile 1.8 on
+      both sides, macOS on an Apple M4, medians of 3 runs. Standard TeXmacs
+      is the official sources with the bug fixes of this repository, which
+      do not change the typesetting. Typing 30 letters in the middle of the
+      reference of the Scheme functions takes 39 ms instead of 257. Details:
+      <a href="https://github.com/mgubi/texmacs/pull/333">pull request
+      #333</a>.</p>
+    </div>
+  </figure>
+
+  <figure id="scheme">
+    <figcaption>
+      <h2>Three Scheme interpreters</h2>
+      <p>TeXmacs is programmed in Scheme, on Guile 1.8. TeXmacs Upsilon runs
+      on <a href="https://ccrma.stanford.edu/software/snd/snd/s7.html">S7</a>
+      (the default, and the one of the browser) and on
+      <a href="https://github.com/JeffBezanson/femtolisp">femtolisp</a> too,
+      chosen when TeXmacs is built
+      (<code>./configure --with-scheme=s7|femtolisp|guile</code>); one Scheme
+      code base serves the three. Where Scheme does the work, S7 and
+      femtolisp are several times faster; in the interactive work the time
+      is that of the C++ of TeXmacs, the same with all three.</p>
+    </figcaption>
+    <div class="numbers">
+      <table>
+        <thead><tr><th></th><th>Guile 1.8</th><th>S7</th><th>femtolisp</th></tr></thead>
+        <tbody>
+          <tr><td>a bibliography of 300 references in a style of CSL, three times</td><td>6.3 s</td><td>3.6 s</td><td>1.75 s</td></tr>
+          <tr><td>a document to LaTeX</td><td>2.4&ndash;3.9 s</td><td>0.70 s</td><td>0.55 s</td></tr>
+          <tr><td>a document to Markdown</td><td>0.7&ndash;1.1 s</td><td>0.07 s</td><td>0.18 s</td></tr>
+          <tr><td>a Word document (.docx) read</td><td>0.47&ndash;0.64 s</td><td>0.19 s</td><td>0.16 s</td></tr>
+        </tbody>
+      </table>
+      <p class="note">macOS on an Apple M4, the three on the same machine
+      and the same documents. The first window is ready after about 0.7 s
+      with S7 against 1.9 s with Guile (femtolisp: about 0.1 s more than
+      S7). Details: <a href="https://github.com/mgubi/texmacs/blob/upsilon_texmacs/src/docs/femtolisp/11-benchmarks-csl-converters.md">the
+      benchmarks of the converters and of CSL</a> and
+      <a href="https://github.com/mgubi/texmacs/blob/upsilon_texmacs/src/docs/s7/07-performance.md">S7 against Guile</a>.</p>
+    </div>
   </figure>
 
   <figure id="program-code-with-tree-sitter">
@@ -181,7 +268,7 @@
       <p>The same TeXmacs, compiled to WebAssembly, runs in a web page with
       nothing to install; documents stay in the browser, and Python, R, TikZ
       and Asymptote run in the page too.
-      <a href="./">Open it</a>.</p>
+      <a href="texmacs.html">Open it</a>.</p>
     </figcaption>
     <a class="shot" href="screenshots/browser.webp"><img src="screenshots/browser.webp" width="1600" height="1000" loading="lazy" alt="TeXmacs in a web browser, with a panel of open documents at the left"></a>
   </figure>
@@ -189,7 +276,7 @@
   <footer>
     The sources are the branch
     <a href="https://github.com/mgubi/texmacs/tree/upsilon_texmacs"><code>upsilon_texmacs</code></a>;
-    the latest builds are on the <a href="downloads.html">downloads page</a>.
+    the latest builds are on the <a href="./#downloads">main page</a>.
   </footer>
 </main>
 </body>

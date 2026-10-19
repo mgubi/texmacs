@@ -466,7 +466,7 @@ jobs:
             # (the macOS workflow makes it, with its notes; it may not have yet)
             gh release create "$tag" --target "$GITHUB_SHA" --prerelease \
               --title "TeXmacs Upsilon, latest builds" \
-              --notes "The latest builds of TeXmacs Upsilon: https://mgubi.github.io/texmacs/downloads.html" ||
+              --notes "The latest builds of TeXmacs Upsilon: https://mgubi.github.io/texmacs/" ||
               gh release view "$tag" > /dev/null ||
               { echo "error: create the release $tag once by hand (gh release create with the scope workflow)"; exit 1; }
           fi

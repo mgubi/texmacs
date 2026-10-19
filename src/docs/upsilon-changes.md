@@ -5,9 +5,9 @@ first: what was added, what was fixed, and what changed in the builds. Items
 which concern only the desktop applications or only the browser version say
 so; the others concern both. This page is also on the site, at
 **<https://mgubi.github.io/texmacs/changes.html>**, next to the
-[latest builds](https://mgubi.github.io/texmacs/downloads.html), the
+[latest builds](https://mgubi.github.io/texmacs/), the
 [features in pictures](https://mgubi.github.io/texmacs/features.html) and
-[TeXmacs in the browser](https://mgubi.github.io/texmacs/). The commits of the
+[TeXmacs in the browser](https://mgubi.github.io/texmacs/texmacs.html). The commits of the
 branch [`upsilon_texmacs`](https://github.com/mgubi/texmacs/commits/upsilon_texmacs)
 have the details, and the problems go to the
 [issues of the repository](https://github.com/mgubi/texmacs/issues).
@@ -34,6 +34,13 @@ have the details, and the problems go to the
 - Program code: a long region of code is parsed by parts, and a long document
   without pages is typeset by chunks of lines, so that typing in a long file
   stays fast; the footer names the tab of a source file.
+- The main page of the site, <https://mgubi.github.io/texmacs/>, is now
+  TeXmacs Upsilon and its builds (it was TeXmacs in the browser, which is at
+  [texmacs.html](https://mgubi.github.io/texmacs/texmacs.html); the links
+  with options, such as `?open=`, still open it), with a picture of OpenType
+  mathematics. The features page shows the Cocoa interface too, and has the
+  Scheme interpreters and the typesetting with their measures against the
+  standard TeXmacs.
 - Two new pages on the site: the
   [features in pictures](https://mgubi.github.io/texmacs/features.html)
   (also [on GitHub](upsilon-screenshots.md)) and this list of changes.

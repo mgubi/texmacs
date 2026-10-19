@@ -220,7 +220,7 @@
   the page a viewer of <TeXmacs> documents:
 
   <\verbatim-code>
-    https://mgubi.github.io/texmacs/?open=https://example.org/paper.tm
+    https://mgubi.github.io/texmacs/texmacs.html?open=https://example.org/paper.tm
   </verbatim-code>
 
   Any format <TeXmacs> opens will do (<verbatim|.tm>, <verbatim|.tex>,
@@ -305,7 +305,7 @@
     document still goes to 2500%).
 
     <item>A page of the site,
-    <hlink|downloads.html|https://mgubi.github.io/texmacs/downloads.html>,
+    <hlink|the main page of the site|https://mgubi.github.io/texmacs/>,
     lists the builds of <TeXmacs> Upsilon for <name|macOS>, <name|Linux> and
     <name|Windows>, which anyone can download; the menu of
     <with|font-series|bold|Upsilon> links to it.

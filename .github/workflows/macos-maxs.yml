@@ -290,7 +290,7 @@ jobs:
           replaced at each build of its platform, and its label names the
           commit it was built from (the macOS files: ${built}). The tag
           \`upsilon-latest\` does not follow the builds. The list of the
-          files, with what each one is: https://mgubi.github.io/texmacs/downloads.html
+          files, with what each one is: https://mgubi.github.io/texmacs/
 
           * macOS (Apple silicon and Intel, macOS 13 or later):
             \`TeXmacs-*-cocoa-universal.dmg\`, the native interface (Cocoa),

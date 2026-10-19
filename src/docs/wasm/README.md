@@ -163,9 +163,17 @@ triggers nothing, and a state is built, tested and published by moving
 build, runs a smoke test (the node build turns the Welcome document into a
 PDF), keeps the page as an artifact of the run (`texmacs-wasm-web`: unzip
 it and serve it with `node misc/wasm/serve.mjs <dir>`), and publishes it at
-https://mgubi.github.io/texmacs/ (GitHub Pages, source "GitHub Actions";
+https://mgubi.github.io/texmacs/texmacs.html (GitHub Pages, source "GitHub Actions";
 the environment `github-pages` allows the branch `wasm_ci`). With emsdk,
 `emenv.sh` keeps the configuration of emsdk.
+
+The site has other pages around the page of TeXmacs: its main page,
+`index.html`, is TeXmacs Upsilon and its builds (`misc/wasm/index.html`;
+an address with options, `?open=` and the others, goes on to `texmacs.html`,
+which was the main page until 19 October 2026, and `downloads.html`, its old
+address, comes back to it), `features.html` (the screenshots of
+`misc/upsilon/screenshots`) and `changes.html` (which shows
+`src/docs/upsilon-changes.md`).
 
 Pages has no brotli: the build also writes gzip copies of `texmacs.wasm`
 and of the packages, which the page decompresses itself

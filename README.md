@@ -7,7 +7,7 @@ TeXmacs, so that they can be built, used and tested together.
 
 **See it in pictures: [src/docs/upsilon-screenshots.md](src/docs/upsilon-screenshots.md)**
 (also on the site, <https://mgubi.github.io/texmacs/features.html>, next to
-the [latest builds](https://mgubi.github.io/texmacs/downloads.html)).
+the [latest builds](https://mgubi.github.io/texmacs/)).
 What changed lately, the newest first:
 **[src/docs/upsilon-changes.md](src/docs/upsilon-changes.md)** (also on the
 site, <https://mgubi.github.io/texmacs/changes.html>).
@@ -51,7 +51,7 @@ below.
 
 ## Builds to download
 
-**<https://mgubi.github.io/texmacs/downloads.html>** lists the latest
+**<https://mgubi.github.io/texmacs/>**, the main page of the site, lists the latest
 builds of every platform, which anyone can download, without a GitHub
 login. They are made and tested by the CI of the branch `upsilon_ci`
 (`git push -f origin upsilon_texmacs:upsilon_ci`), with s7, and are the
@@ -69,7 +69,7 @@ the commit it was built from.
   MinGW-w64, x86_64), with Qt 6 or with Vue
   (`.github/workflows/maxs-linux-windows.yml`). The Linux Qt build uses
   the Qt 6 of the system.
-* **The browser**: <https://mgubi.github.io/texmacs/>, see below.
+* **The browser**: <https://mgubi.github.io/texmacs/texmacs.html>, see below.
 
 Problems are reported in the
 [issues of this repository](https://github.com/mgubi/texmacs/issues).
@@ -101,7 +101,7 @@ It is built apart from `configure`, with Emscripten, by
 [`src/misc/wasm/Makefile`](src/misc/wasm/Makefile) (the sources are those of
 `misc/wasm/sources.txt`): see [`src/docs/wasm/`](src/docs/wasm/README.md)
 for the build, the design and the tests. The browser version is
-published at <https://mgubi.github.io/texmacs/> by the CI of the branch
+published at <https://mgubi.github.io/texmacs/texmacs.html> by the CI of the branch
 `wasm_ci` (`git push origin upsilon_texmacs:wasm_ci`).
 
 ## The graphical interfaces

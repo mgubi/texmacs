@@ -76,7 +76,7 @@
     colours.
 
     <item>The same <TeXmacs> runs in a web browser:
-    <hlink|mgubi.github.io/texmacs|https://mgubi.github.io/texmacs/>, see
+    <hlink|mgubi.github.io/texmacs/texmacs.html|https://mgubi.github.io/texmacs/texmacs.html>, see
     <hlink|<TeXmacs> in the browser|texmacs-vue.en.tm>.
   </itemize>
 
@@ -165,7 +165,7 @@
   <name|Linux> and <name|Windows> (<name|Qt> and <name|Vue>) are made by the
   continuous integration of the repository at each change, and can be
   downloaded from
-  <hlink|mgubi.github.io/texmacs/downloads.html|https://mgubi.github.io/texmacs/downloads.html>.
+  <hlink|mgubi.github.io/texmacs|https://mgubi.github.io/texmacs/>.
   Problems are reported in the
   <hlink|issues|https://github.com/mgubi/texmacs/issues> of the
   repository, not to the official <TeXmacs>.

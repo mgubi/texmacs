@@ -3,7 +3,7 @@
 > bleeding-edge version with experimental features. What it adds, its
 > builds and the branches it is made of are in the
 > [README at the root of the repository](../README.md); the builds are on
-> the [downloads page](https://mgubi.github.io/texmacs/downloads.html).
+> the [main page of the site](https://mgubi.github.io/texmacs/).
 > Problems with these builds go to the
 > [issues of this repository](https://github.com/mgubi/texmacs/issues), not
 > to the TeXmacs project.

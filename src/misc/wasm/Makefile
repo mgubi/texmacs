@@ -129,7 +129,7 @@ all: $(OUT)/texmacs.js
 # declared in shell.html
 WEB_ICONS := $(foreach n,16 32 48 64 128 192,$(OUT)/web/texmacs-vue-$(n).png) $(OUT)/web/favicon.ico
 
-web: $(OUT)/web/texmacs.html $(OUT)/web/texmacs-files.json $(WEB_ICONS) $(OUT)/web/downloads.html $(OUT)/web/features.html $(SCREENSHOTS) $(OUT)/web/changes.html $(OUT)/web/changes.md tikzjax asymptote python r
+web: $(OUT)/web/texmacs.html $(OUT)/web/texmacs-files.json $(WEB_ICONS) $(OUT)/web/index.html $(OUT)/web/downloads.html $(OUT)/web/features.html $(SCREENSHOTS) $(OUT)/web/changes.html $(OUT)/web/changes.md tikzjax asymptote python r
 
 # the TeX of the TikZ plugin (plugins/tikz, src/docs/wasm/tikzjax.md):
 # TikZJax, fetched by get-tikzjax.sh, without its fonts and the part of its
@@ -206,8 +206,13 @@ $(OUT)/web/favicon.ico: $(TM)/TeXmacs/misc/images/texmacs-vue.ico
 	@mkdir -p $(OUT)/web
 	cp $< $@
 
-# the page of the desktop builds (the files of the pre-release upsilon-latest,
-# listed from the API of GitHub)
+# the main page of the site: TeXmacs Upsilon and its builds (the files of
+# the pre-release upsilon-latest, listed from the API of GitHub); TeXmacs in
+# the browser is texmacs.html. downloads.html, its old address, goes there
+$(OUT)/web/index.html: $(W)/index.html
+	@mkdir -p $(OUT)/web
+	cp $< $@
+
 $(OUT)/web/downloads.html: $(W)/downloads.html
 	@mkdir -p $(OUT)/web
 	cp $< $@
@@ -238,7 +243,6 @@ $(OUT)/web/texmacs.html: $(OBJECTS) $(LIBDEPS) $(W)/progress.js $(W)/packages.js
 	  $(OBJECTS) $(LIBS) -o $@
 	perl -pi -e "s/\@TM_WASM_SIZE\@/$$(wc -c < $(OUT)/web/texmacs.wasm | tr -d ' ')/" $@
 	perl -pi -e "s/\@TM_VERSION\@/$$(sed -n 's/^#define TEXMACS_VERSION \"\(.*\)\"/\1/p' $(W)/tm_configure.hpp)/" $@
-	cp $@ $(OUT)/web/index.html
 	-command -v brotli > /dev/null && brotli -f -q 9 -k $(OUT)/web/texmacs.wasm $(OUT)/web/texmacs.js
 	gzip -9 -n -k -f $(OUT)/web/texmacs.wasm
 
