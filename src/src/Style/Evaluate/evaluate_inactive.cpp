@@ -42,7 +42,7 @@ arg_type (tree t, int i) {
   case TYPE_ARGUMENT:   return "arg";
   case TYPE_BOOLEAN:
   case TYPE_INTEGER:
-  case TYPE_NUMERIC:    return "integer";
+  case TYPE_NUMERIC:    return "numeric";
   case TYPE_LENGTH:     return "length";
   case TYPE_CODE:
   case TYPE_IDENTIFIER:
@@ -59,7 +59,7 @@ highlight (tree t, string kind) {
   else if (kind == "var")     return compound ("src-var", t);
   else if (kind == "arg")     return compound ("src-arg", t);
   else if (kind == "tt")      return compound ("src-tt", t);
-  else if (kind == "integer") return compound ("src-integer", t);
+  else if (kind == "numeric") return compound ("src-numeric", t);
   else if (kind == "length")  return compound ("src-length", t);
   else if (kind == "error")   return compound ("src-error", t);
   return t;

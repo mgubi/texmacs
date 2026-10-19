@@ -27,7 +27,9 @@
 ;;     edit and without a change (style-rewrite-statistics);
 ;;   - pages of the manual: the evaluation errors left in the result are
 ;;     compared with the ones known, so that a new error and a fixed one both
-;;     show up (update the lists below when the rewriter improves).
+;;     show up (update the lists below when the rewriter improves);
+;;   - the whole documentation: no page may leave an error in its result;
+;;   - the caches of the typesetter, which the rewriter must not disturb.
 
 (texmacs-module (check style-rewrite-test)
   (:use (check check-lib)))
@@ -163,6 +165,9 @@
   (check= (value-of '(if (less "1pt" "2pt") "yes" "no")) "yes")
   (check= (value-of '(or "false" (equal "1h" "0pt") "z"))
           '(or (equal "1h" "0pt") "z"))
+  ;; the automatic labels are numbered by the typesetter (the-auto)
+  (check= (value-of '(merge "auto" "-" (auto-id "last")))
+          '(merge "auto" "-" (auto-id "last")))
   ;; a box length is only a residual in a computation on lengths
   (check= (value-of '(merge "1" "r")) "1r")
   (check= (value-of '(length "1r")) "2"))
@@ -201,15 +206,13 @@
 ;; Pages of the manual
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;; (page errors): the errors left by the rewriter in October 2026, explained
-;; in src/docs/pure-style.md (auto-id and box-info are not handled yet)
+;; (page errors): the errors left by the rewriter (none since auto-id is
+;; left to the typesetter, October 2026; see src/docs/pure-style.md)
 (define manual-pages
   '(("doc/about/about.en.tm" ())
-    ("doc/about/welcome/welcome.en.tm" ("bad merge"))
-    ("doc/devel/style/style.en.tm" ("bad merge"))
-    ;; (the box-info arithmetic of its graphics fails too, but in a value
-    ;; which does not reach the result)
-    ("doc/main/start/man-conventions.en.tm" ("bad merge"))))
+    ("doc/about/welcome/welcome.en.tm" ())
+    ("doc/devel/style/style.en.tm" ())
+    ("doc/main/start/man-conventions.en.tm" ())))
 
 (define (rewrite-file name)
   ;; the errors of the rewriting of a file of the distribution and the time
@@ -229,6 +232,36 @@
   (check-group "manual")
   (for (p manual-pages)
     (check= (rewrite-file (car p)) (cadr p))))
+
+;; Every English page of the documentation (about 700, 25 seconds): none
+;; may leave an error in its result. A new primitive of the typesetter, or a
+;; changed one, shows up here first.
+(define (doc-pages dir)
+  (append-map
+   (lambda (u)
+     (with name (url->string (url-tail u))
+       (cond ((in? name '("." "..")) '())
+             ((url-directory? u) (doc-pages u))
+             ((string-ends? name ".en.tm") (list u))
+             (else '()))))
+   (url-read-directory dir "*")))
+
+(define (test-documentation)
+  (check-group "documentation")
+  (let* ((pages (sort (doc-pages (url-expand "$TEXMACS_PATH/doc"))
+                      (lambda (u v) (string<=? (url->string u) (url->string v)))))
+         (old (current-buffer))
+         (failed '()))
+    (for (u pages)
+      (load-buffer u)
+      (with errs (stree-errors (tree->stree (style-rewrite-buffer)))
+        (when (nnull? errs)
+          (set! failed (cons (list (url->string u) errs) failed))))
+      (buffer-close u))
+    (when (buffer-exists? old) (switch-to-buffer* old))
+    (display* "  " (length pages) " pages\n")
+    (check-true (> (length pages) 600))
+    (check= (reverse failed) '())))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The caches of the typesetter
@@ -291,5 +324,6 @@
         (test-partial-evaluation)
         (test-memorization)
         (test-manual)
+        (test-documentation)
         (test-typesetter-caches)))
   (check-end))

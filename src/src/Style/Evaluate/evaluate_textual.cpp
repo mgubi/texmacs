@@ -135,8 +135,8 @@ evaluate_translate (tree t) {
   tree t1= evaluate (t[0]);
   tree t2= evaluate (t[1]);
   tree t3= evaluate (t[2]);
-  if (is_compound (t1) || is_compound (t2) || is_compound (t3))
-    return evaluate_error ("bad translate");
+  // (as the typesetter: markup is not translated)
+  if (is_compound (t1) || is_compound (t2) || is_compound (t3)) return t1;
   return translate (t1->label, t2->label, t3->label);
 }
 

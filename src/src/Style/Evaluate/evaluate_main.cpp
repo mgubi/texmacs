@@ -93,9 +93,11 @@ decorate_ip (tree src, tree dest) {
 *
 * Some values are only known to the typesetter: the size of a typeset box
 * (box-info, frame-direct, frame-inverse), lengths which depend on the screen
-* or on the ornament being typeset (guipx, the corner lengths), and lengths in
+* or on the ornament being typeset (guipx, the corner lengths), lengths in
 * units of the extents of a box (w, h, l, b, r, t), which the typesetter binds
-* while it lays out move, shift, resize and clipped. Such a value is a
+* while it lays out move, shift, resize and clipped, and what depends on the
+* order of the document and on data kept with the buffer (auto-id, which
+* numbers the automatic labels, and get-attachment). Such a value is a
 * residual, and a computation on a residual is a residual too: the computation
 * with its evaluated arguments, which the typesetter can finish since the
 * macro arguments, values and macros in it have been substituted.
@@ -123,6 +125,8 @@ is_layout_value (tree_label l) {
   case BCORNER_LENGTH:
   case RCORNER_LENGTH:
   case TCORNER_LENGTH:
+  case AUTO_ID:
+  case GET_ATTACHMENT:
     return true;
   default:
     return false;

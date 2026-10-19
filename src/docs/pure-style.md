@@ -204,10 +204,15 @@ buffer), `find-accessible`, the themes (`new-theme`, `copy-theme`,
 on the ornament being typeset (`guipx`, `lcorner`, `bcorner`, `rcorner`,
 `tcorner`).
 
-With these changes and partial evaluation (below), *About* evaluates
-without errors. The welcome page, the *style* page and the conventions page
-keep one `bad merge` (from `auto-id` in `the-auto`); it is the only error
-computed anywhere in their evaluation, intermediate values included.
+With these changes and partial evaluation (below), **every English page of
+the documentation (696) is rewritten without an error in its result**, and
+on the pages traced (*About*, the welcome page, the *style* page, the
+conventions, structure and mathematics pages of the manual) no error is
+computed at all, intermediate values included. The last fixes found by
+rewriting the whole documentation: `translate` of markup gives the markup,
+as in the typesetter; the rendering of inactive markup used `src-integer`,
+which the typesetter renamed `src-numeric` in 2010. The whole documentation
+takes 2.06 million evaluations, 5.2 s (about 2.5 µs per evaluation).
 
 ### Partial evaluation
 
@@ -242,6 +247,12 @@ of the document (which the rewriter consumes). The suite checks these cases
 (group *partial evaluation*). The cost on *About*: 609 evaluations instead
 of 489, 96 of them found in the memorizers (the second evaluations of the
 arguments).
+
+`auto-id` (which numbers the automatic labels) and `get-attachment` are
+residuals too: they depend on the order of the document and on data kept
+with the buffer, and the typesetter numbers the automatic labels itself
+since #333. `the-auto` is then the residual `merge (auto, …, auto-id (last))`
+instead of `error (bad merge)`.
 
 Not residuals yet: `px` lengths and the other values which depend on the
 zoom are computed with the current zoom; the typesetter caches treat the
@@ -329,11 +340,33 @@ Two consequences:
    Target: a `look-up` or `plus` of a `box-info` gives a residual (a check
    in the suite), and the graphics of the conventions page compute no
    errors, not even in values which are dropped.
-3. **State and keys, ported from #333.** Key the memorizers by the inputs
-   they read (the environment input hash of #333) instead of by addresses;
-   record the outputs (bindings, `write`, counters) and replay them on
-   reuse; number `auto-id` as the typesetter does. Measure first how far
-   one label invalidates the memorizers today.
+3. **State and keys.** Measured first (a document of 50 sections, each
+   followed by a paragraph, `style-rewrite-statistics`):
+
+   | Edit | Evaluations | Memorized |
+   |---|---|---|
+   | first evaluation | 9701 | 350 |
+   | text of paragraph 20 | 51 | 50 |
+   | title of section 20 | 181 | 86 |
+   | a section inserted at 10 | 5445 | 1497 |
+
+   Edits are local, also in a section whose macros assign counters: after
+   the substitution of the arguments, only the parts of the expansion which
+   hold the edited argument are new trees, the rest is shared code of the
+   macros, evaluated in the same environment; and a value computed again is
+   the memorized tree itself, so an assignment of the same value finds its
+   memorizer and gives the same environment (comparing atomic values by
+   content in the keys, tried, changed nothing). Only a real change of a
+   counter (a section inserted) evaluates everything after it again, 56 % of
+   a first evaluation, though most of that work does not read the counter.
+   - *Done:* `auto-id` and `get-attachment` are left to the typesetter
+     (above), which removed the last errors.
+   - *Left:* keys made of the inputs actually read (the environment input
+     hash of #333) instead of addresses would save most of the 56 %; it is
+     an optimisation, worth doing with step 4, when the cost of the
+     rewriter adds to the typesetter's. The side effects of `write`,
+     `set-binding` and counters in the branches kept by a residual condition
+     are not handled.
 4. **The typesetter consumes the result.** Split the work instead of
    stacking two caches: the rewriter evaluates the macros and memorizes by
    what it reads; the typesetter's recording shrinks to what needs layout
@@ -376,7 +409,8 @@ The groups: macro expansion and the ported primitives on small documents;
 the memorization (numbers of evaluations after loading, without a change,
 after an edit of one paragraph); pages of the manual, whose errors in the
 result are compared with the known ones (a new error and a fixed one both
-fail: update `manual-pages` when the rewriter improves); the typesetter
+fail: update `manual-pages` when the rewriter improves); every English page
+of the documentation, none of which may leave an error (25 s); the typesetter
 caches, which `environment_update` must not disturb. That last group counts
 mismatches only in the check modes of the caches:
 
