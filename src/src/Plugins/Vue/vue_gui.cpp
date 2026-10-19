@@ -561,6 +561,12 @@ void
 vue_sdl_base_window_rep::set_size (SI w, SI h) {
   w= sdl_points (w); h= sdl_points (h);
   SDL_SetWindowSize (sdl_win, w, h);
+  // the change is asynchronous on X11 and Wayland: a dialog sized to its
+  // contents was then laid out, shown and drawn at its former size, in a
+  // window which got its new size later (the black window with the dialog
+  // squeezed at its bottom of #376, legible once resized by hand); so wait
+  // for the size, as in set_full_screen (immediate on macOS)
+  SDL_SyncWindow (sdl_win);
 }
 
 void

@@ -14,6 +14,11 @@ have the details, and the problems go to the
 
 ## 19 October 2026
 
+- **Desktop**: with the Vue interface on Linux, a dialog (as the question
+  before closing a document with unsaved changes) no longer opens too
+  small, black with its contents squeezed at its bottom: its window gets
+  its size before it is drawn
+  ([#376](https://github.com/mgubi/texmacs/issues/376)).
 - **Browser**: on a tablet (an iPad), a keyboard button at the bottom right
   of the page opens the keyboard of the system, and closes it: no keyboard
   came without an external one
