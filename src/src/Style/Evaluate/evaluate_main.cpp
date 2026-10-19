@@ -201,6 +201,22 @@ evaluate_compound_children (tree t) {
 }
 
 static tree
+evaluate_rewrite_inactive (tree t) {
+  // inactive markup (the source shown by inactive, inactive*, error...) is
+  // rendered by the typesetter, which reads the types of the arguments in
+  // the DRD of the document and the src-* macros of the style
+  // (edit_env_rep::rewrite_inactive); its rewrite-inactive only accepts a
+  // macro argument, so the source is given to it through a macro applied on
+  // the spot, unevaluated (the alternative expansion has substituted it
+  // for the arg); evaluate_inactive.cpp, the rewriter's own rendering of
+  // 2007, is not used
+  if (N(t) < 2) return evaluate_error ("invalid rewrite-inactive");
+  tree inner (REWRITE_INACTIVE, tree (ARG, "src-body"), copy (t[1]));
+  tree fun (MACRO, "src-body", inner);
+  return tree (COMPOUND, fun, t[0]);
+}
+
+static tree
 evaluate_partially (tree t) {
   // the arguments of a strict computation, evaluated; the computation
   // itself when one of them is a residual, else UNINIT
@@ -487,11 +503,14 @@ evaluate_impl (tree t) {
   case VAR_STYLE_ONLY:
   case ACTIVE:
   case VAR_ACTIVE:
+    return evaluate_compound (t);
   case INACTIVE:
   case VAR_INACTIVE:
-    return evaluate_compound (t);
+    // (source shown by the typesetter, with the layout which the DRD gives
+    // to these tags; see evaluate_rewrite_inactive)
+    return copy (t);
   case REWRITE_INACTIVE:
-    return evaluate_rewrite (t);
+    return evaluate_rewrite_inactive (t);
 
   /* Linking primitives */
   case HARD_ID:

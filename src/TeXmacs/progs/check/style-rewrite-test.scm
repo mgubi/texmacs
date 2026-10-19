@@ -171,6 +171,10 @@
   ;; get-binding is a residual
   (check= (value-of '(set-binding "lab" "3")) '(set-binding "lab" "3"))
   (check= (value-of '(get-binding "lab")) '(get-binding "lab"))
+  ;; inactive markup is shown by the typesetter: the tags stay, the
+  ;; source unevaluated
+  (check= (value-of '(inactive* (assign "x" (plus "1" "2"))))
+          '(inactive* (assign "x" (plus "1" "2"))))
   ;; if* is a phantom: typeset invisibly, it keeps its body
   (check= (value-of '(if* "false" "body")) '(if* "false" "body"))
   ;; conditionals on a residual keep their branches, evaluated
