@@ -157,33 +157,77 @@
                       'next)
                      (else 'retry))))))
 
+;; The texts and icons of the window of the script (gui-test-texts), each
+;; (x y w h path text): the path is where the layout put it, a list such as
+;; ("menubar" "Format" "Font") (the bar, then the labels of the buttons
+;; whose menus it is in); an icon is "icon:<name of its file>".
 (define (gt-text-entry s)
-  ;; "x\ty\tw\th\ttext" -> (x y w h text)
+  ;; "x\ty\tw\th\tpath\ttext" -> (x y w h path text)
   (with l (string-tokenize-by-char s #\tab)
-    (and (>= (length l) 5)
+    (and (>= (length l) 6)
          (append (map string->number (sublist l 0 4))
-                 (list (apply string-append
-                              (list-intersperse (list-tail l 4) "\t")))))))
+                 (list (if (== (list-ref l 4) "") '()
+                           (string-decompose (list-ref l 4) " > "))
+                       (apply string-append
+                              (list-intersperse (list-tail l 5) "\t")))))))
 
-(tm-define (gt-find-text label)
-  (:synopsis "The box (x y w h) of the text @label drawn last, or #f")
-  ;; the last one drawn, the topmost (a menu is drawn over the window); a
-  ;; text equal to the label, else one which starts with it
-  (let* ((l (list-filter (map gt-text-entry (gui-test-texts)) identity))
-         (same (list-filter l (lambda (e) (== (list-ref e 4) label))))
-         (starts (list-filter l (lambda (e)
-                                  (string-starts? (list-ref e 4) label))))
+(define (gt-entries)
+  (list-filter (map gt-text-entry (gui-test-texts)) identity))
+
+(define (gt-same? name text)
+  ;; a name of a script for a text of the interface, in English or in the
+  ;; language of the interface; the dots of an item which opens a dialog
+  ;; may be left out ("Font" for "Font...")
+  (or (== text name)
+      (== text (string-append name "..."))
+      (and (not (string-starts? name "icon:"))
+           (with tr (translate name)
+             (or (== text tr) (== text (string-append tr "...")))))))
+
+(define (gt-starts? name text)
+  (or (string-starts? text name)
+      (and (not (string-starts? name "icon:"))
+           (string-starts? text (translate name)))))
+
+(define (gt-in-path? names path)
+  ;; the names, in this order, among the components of the path
+  (cond ((null? names) #t)
+        ((null? path) #f)
+        ((gt-same? (car names) (car path)) (gt-in-path? (cdr names) (cdr path)))
+        (else (gt-in-path? names (cdr path)))))
+
+(tm-define (gt-find-text selector)
+  (:synopsis "The box (x y w h) of the text named by @selector, or #f")
+  ;; "Format > Font > Bold": the text Bold, in the path of which come Format
+  ;; and Font (the bars are menubar, mainbar, modebar, focusbar, userbar,
+  ;; footer, prompt, lefttools, sidetools, bottomtools, extratools); an
+  ;; icon is icon:<name>. The text equal to the last name, else one which
+  ;; starts with it; the last one drawn, the topmost (a menu is drawn over
+  ;; the window)
+  (let* ((names (string-decompose selector " > "))
+         (label (cAr names))
+         (above (cDr names))
+         (l (list-filter (gt-entries)
+                         (lambda (e) (gt-in-path? above (list-ref e 4)))))
+         (same (list-filter l (lambda (e) (gt-same? label (list-ref e 5)))))
+         (starts (list-filter l (lambda (e) (gt-starts? label (list-ref e 5)))))
          (found (if (nnull? same) same starts)))
     (and (nnull? found) (sublist (cAr found) 0 4))))
 
 (define (gt-texts-summary)
   ;; the texts of the window, for the log of a failure
-  (with l (list-filter (map gt-text-entry (gui-test-texts)) identity)
+  (with l (gt-entries)
     (if (null? l) "none"
         (apply string-append
-               (list-intersperse (map (lambda (e) (object->string (list-ref e 4)))
-                                      l)
-                                 " ")))))
+               (list-intersperse
+                (map (lambda (e)
+                       (object->string
+                        (apply string-append
+                               (list-intersperse
+                                (append (list-ref e 4) (list (list-ref e 5)))
+                                " > "))))
+                     l)
+                " ")))))
 
 (tm-define (gt-activate label . opt)
   (:synopsis "Click the text @label of the window of the script")

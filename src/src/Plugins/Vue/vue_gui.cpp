@@ -153,6 +153,7 @@ static bool script_pump= false; // call (gui-test-pump) at each turn of the loop
 static vue_window gt_render_win= NULL;
 static hashmap<int,array<string> > gt_texts ((array<string> ()));
 static void gt_frame_start (vue_window win);
+static void gt_record (Clay_BoundingBox b, string e);
 static void script_clipboard (string txt);
 
 
@@ -1640,12 +1641,13 @@ render_clay_commands (renderer ren, Clay_RenderCommandArray *rcommands)
           // points of the window, those of the scripts (the layout is in
           // pixels, density of them per point)
           styled_string ss= (styled_string_rep*) rcmd->userData;
-          float d= gt_render_win->density > 0 ? gt_render_win->density : 1.0f;
-          gt_texts (gt_render_win->id)
-            << (as_string ((int) (bounding_box.x / d)) * "\t" *
-                as_string ((int) (bounding_box.y / d)) * "\t" *
-                as_string ((int) (bounding_box.width / d)) * "\t" *
-                as_string ((int) (bounding_box.height / d)) * "\t" * ss->s);
+          gt_record (bounding_box, ss->ctx * "\t" * ss->s);
+        }
+        else if (script_pump && gt_render_win != NULL &&
+                 rcmd->renderData.custom.customData == vue_render_widget) {
+          // an icon (a picture widget): its place and its name
+          string e= vue_test_icon (rcmd->userData);
+          if (N(e) > 0) gt_record (bounding_box, e);
         }
         break;
       }
@@ -1734,6 +1736,7 @@ layout_text_box (string s, int style, color c, font fn) {
     cache.w << w; cache.h << h;
   }
   styled_string ss= tm_new<styled_string_rep> (s, fn, c);
+  if (vue_testing) { ss->ctx= vue_test_context; vue_test_note_label (s); }
   styled_strings << ss;
   CLAY_AUTO_ID({
     .layout= {
@@ -4872,6 +4875,36 @@ script_exec (string line) {
 * The hooks of the tests (gui_test.hpp)
 ******************************************************************************/
 
+// a text or an icon at the box b of the window being drawn, in the points
+// of the window, those of the scripts (the layout is in pixels, density of
+// them per point): "x\ty\tw\th\t<path>\t<text>"
+static void
+gt_record (Clay_BoundingBox b, string e) {
+  float d= gt_render_win->density > 0 ? gt_render_win->density : 1.0f;
+  gt_texts (gt_render_win->id)
+    << (as_string ((int) (b.x / d)) * "\t" * as_string ((int) (b.y / d)) *
+        "\t" * as_string ((int) (b.width / d)) * "\t" *
+        as_string ((int) (b.height / d)) * "\t" * e);
+}
+
+bool   vue_testing= false;
+string vue_test_context;
+string vue_test_label;
+
+void
+vue_test_note_label (string s) {
+  if (N(vue_test_label) == 0) vue_test_label= s;
+}
+
+with_test_context::with_test_context (string name): saved (vue_test_context) {
+  if (vue_testing && N(name) > 0)
+    vue_test_context= N(saved) == 0 ? name : saved * " > " * name;
+}
+
+with_test_context::~with_test_context () {
+  vue_test_context= saved;
+}
+
 static void
 gt_frame_start (vue_window win) {
   gt_render_win= win;
@@ -4902,6 +4935,7 @@ gui_test_texts () {
 void
 gui_test_pump (bool on) {
   script_pump= on;
+  vue_testing= on;
   script_active= on; // the buttons are those the script holds (mouse_buttons)
   if (!on) gt_texts= hashmap<int,array<string> > (array<string> ());
 }

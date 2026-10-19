@@ -257,8 +257,25 @@ struct styled_string_rep : public concrete_struct {
   string s;
   color c;
   font fn;
+  string ctx; // where it is, for the scripted tests (vue_test_context)
   styled_string_rep (string _s, font _fn, color _c)
   : s (_s), c (_c), fn (_fn) {};
+};
+
+// The scripted tests (gui_test.hpp): while a script runs, the layout notes
+// where each text and icon is, the bar and the menus it hangs from, as a
+// path "menubar > Format > Font", by which a script can name it
+// (gui_test_texts, gt-activate)
+extern bool   vue_testing;           // a script runs
+extern string vue_test_context;      // the path of what is being laid out
+extern string vue_test_label;        // the first text or icon laid out since
+                                     // it was emptied (the label of a button)
+void   vue_test_note_label (string s);
+string vue_test_icon (void* ref);    // "<path>\ticon:<name>" of a picture
+struct with_test_context {
+  string saved;
+  with_test_context (string name);
+  ~with_test_context ();
 };
 
 class styled_string {

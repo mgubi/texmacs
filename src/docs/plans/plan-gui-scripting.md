@@ -321,6 +321,12 @@ Per-port mapping:
 
 ### 5.2 Widget names
 
+(Not done: the user would not add names to the Scheme code of the menus.
+The names are inferred instead, see "Selectors" in
+[../gui-scripting.md](../gui-scripting.md): the path of bars and menus
+which leads to a text, the files of the icons, and the translation of the
+English names. What follows was the proposal.)
+
 Labels are translated and sometimes duplicated, so add an optional
 **`(named "id" widget)`** form to the markup (`menu-define.scm` grammar,
 `menu-widget.scm` builds a `named_widget` wrapper). Each port stores the
@@ -449,7 +455,7 @@ already escape to Scheme.
 | 0 | Spec and selector grammar; the `gui_test.hpp` interface; stubs moved out of `sys_utils.cpp`; glue entries | `Graphics/Gui/gui_test.hpp`, `System/Misc/sys_utils.cpp`, `Scheme/Glue/build-glue-basic.scm`, `docs/gui-scripting.md` | 2 d |
 | 1 | Scheme driver: step runner, idle wait, timeouts, `gt-*` API, check-lib reporting, exit codes; L0 semantic backend; a headless smoke suite in `check.sh` | `progs/check/gui-driver.scm`, `progs/check/gui-script.scm`, `tests/scheme/check.sh` | 5 d |
 | 2 | Vue backend: `script_step` internals moved to `vue_test.cpp` behind `gui_test_raw`; `inspect`, `idle`, pump; `TEXMACS_VUE_SCRIPT` routed to the Scheme parser; `run.sh` with an exit status; all 60 tests pass unchanged, then `expect` lines added | `Plugins/Vue/vue_gui.cpp`, `Plugins/Vue/vue_test.cpp`, `tests/Plugins/Vue/*`, `docs/vue-testing.md`, `misc/wasm/sources.txt` | 7 d |
-| 3 | `named` markup plus native names in Vue, Qt and NS | `kernel/gui/menu-define.scm`, `menu-widget.scm`, `Graphics/Gui/widget.hpp`, port widget files | 3 d |
+| 3 | (replaced by inferred names, see 5.2) `named` markup plus native names in Vue, Qt and NS | `kernel/gui/menu-define.scm`, `menu-widget.scm`, `Graphics/Gui/widget.hpp`, port widget files | 3 d |
 | 4 | Qt backend: one `qt_test.cpp` for Qt5 and Qt6, raw events, inspect, idle, modal-safe pump; port `git-gui-test.scm`; fix the D8 leak | `Plugins/Qt/qt_test.cpp`, `Plugins/Qt6/qt_test.cpp`, `docs/tests/git-gui-test.scm` | 5 d |
 | 5 | Cocoa backend: `ns_test.mm` gathering the `TEXMACS_NS_*` helpers, env vars as wrappers | `Plugins/NS/ns_gui.mm`, `ns_tm_widget.mm`, `ns_test.mm`, `docs/ns-port.md` | 5 d |
 | 6 | L1 rewrite of about 12 Vue tests into port-neutral Scheme tests under `tests/gui/`; run them on all three ports | `tests/gui/*.scm` | 4 d |

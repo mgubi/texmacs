@@ -1,9 +1,10 @@
 ;; footer-variants written as steps of the driver (check gui-driver), which
-;; find the menus by their texts rather than by positions, and check the
-;; result: with the cursor in an inline formula inside a text of a
-;; displayed formula, the displayed formula becomes inline from its menu in
-;; the footer (Displayed formula > Inline formula), and a letter typed then
-;; lands in the inner formula. No script: run it with
+;; find the menus by their texts and where they are ("footer > equation*",
+;; the menu of the tag equation* of the footer) rather than by positions,
+;; and check the result: with the cursor in an inline formula inside a text
+;; of a displayed formula, the displayed formula becomes inline from its
+;; menu in the footer (Displayed formula > Inline formula), and a letter
+;; typed then lands in the inner formula. No script: run it with
 ;;   sh tests/Plugins/Vue/run.sh footer-activate 40
 ;; it quits by itself, with the status 1 if a check failed.
 ;;
@@ -29,11 +30,11 @@
        (gt-wait 300)
        (gt-raw "key Right")
        (gt-idle)
-       (gt-activate "equation*")
+       (gt-activate "footer > equation*")
        (gt-idle)
-       (gt-activate "Displayed formula")
+       (gt-activate "equation* > Displayed formula")
        (gt-idle)
-       (gt-activate "Inline formula")
+       (gt-activate "Displayed formula > Inline formula")
        (gt-idle)
        (gt-raw "text y")
        (gt-idle)

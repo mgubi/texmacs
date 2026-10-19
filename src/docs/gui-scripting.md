@@ -36,7 +36,7 @@ of its loop.
 | `gui_test_port ()` | `gui-test-port` | The name of the port for its scripts (`vue`); `""` when it has no hooks |
 | `gui_test_raw (line)` | `gui-test-raw` | A command of the port, as a line of a script; 0 run, 1 run (the next may follow in the same turn), 2 unknown |
 | `gui_test_busy ()` | `gui-test-busy?` | Events are waiting |
-| `gui_test_texts ()` | `gui-test-texts` | The texts drawn last in the window of the script, as `x\ty\tw\th\ttext` (window points) |
+| `gui_test_texts ()` | `gui-test-texts` | The texts and icons drawn last in the window of the script, as `x\ty\tw\th\tpath\ttext` (window points; the path below) |
 | `gui_test_pump (on)` | `gui-test-set-pump` | Call `gui-test-pump` at each turn, while on; the script holds the mouse buttons meanwhile |
 | `gui_test_eval_later (cmd)` | `gui-test-eval-later` | A Scheme command at the next turn, as `-x` (the same for all ports) |
 
@@ -51,9 +51,9 @@ Qt keeps its own commands, which find its widgets by their labels
   (list (gt-wait 12000)                  ; ms
         (gt-raw "window #2")             ; a command of the port
         (gt-raw "focus")
-        (gt-activate "equation*")        ; click a text of the window
-        (gt-activate "Displayed formula")
-        (gt-activate "Inline formula")
+        (gt-activate "footer > equation*")   ; click a text of the window
+        (gt-activate "equation* > Displayed formula")
+        (gt-activate "Displayed formula > Inline formula")
         (gt-idle)                        ; until nothing happens for a while
         (gt-check "inline" (lambda () (tree-is? (cursor-tree) :up 'math)))
         (gt-exit)))                      ; quit, with status 1 if a check failed
@@ -67,13 +67,37 @@ Qt keeps its own commands, which find its widgets by their labels
 | `(gt-eval thunk)` | Run `thunk` now |
 | `(gt-check what thunk)` | A check: `thunk` must return true; a failure is written `FAILED [] what: ...` |
 | `(gt-idle [ms])` | Wait until the port has had no event for five turns (at most 10 s) |
-| `(gt-activate text [ms])` | Click the middle of the text drawn last in the window of the script which is `text`, or starts with it; the last one drawn is the topmost (a menu). Waits for it 3 s at most, then fails |
+| `(gt-activate selector [ms])` | Click the middle of the text or icon of the window of the script which the selector names (below). Waits for it 3 s at most, then fails, with the texts it saw in the log |
 | `(gt-port name)` | The steps after it are for that port only; elsewhere the test stops there |
 | `(gt-exit)` | At the end, quit TeXmacs with the status 1 if a check failed, else 0 |
 
-`gt-activate` finds what is drawn, in the language of the interface: a test
-which uses it runs in English (the copy of the home which `run.sh` makes
-has the language of the user; a test may set it).
+### Selectors
+
+A test names what it clicks as the user sees it, with nothing added to the
+menus or the widgets: while a script runs, the layout notes where each text
+and icon is, a path made of the bar it is in and of the labels of the
+buttons whose menus it is in.
+
+| Selector | Names |
+|---|---|
+| `Bold` | the text Bold, wherever it is |
+| `menubar > Format` | the Format of the menu bar (not the one of a footer or a menu) |
+| `Format > Font effects > Embold` | Embold in the submenu Font effects of the menu Format |
+| `footer > equation*` | the tag equation* of the interactive footer |
+| `mainbar > icon:tm_save` | the icon of the file `tm_save.svg` (or `.xpm`, `.png`...) in the main tool bar |
+
+The names before the last need not be the whole path, only some of it in
+order: `Font effects > Embold` is enough. The bars are `menubar`,
+`mainbar`, `modebar`, `focusbar`, `userbar`, `footer` (with its menus),
+`prompt` (the question in the footer), `lefttools`, `sidetools`,
+`bottomtools` and `extratools`. A name is the text itself, or the text
+without the dots of an item which opens a dialog (`Font` for `Font...`),
+or, for want of one, the beginning of a text. When several texts match,
+the last one drawn is taken, the topmost (an open menu).
+
+The names are written in English: a name is also taken in the language of
+the interface (`translate`), so that `menubar > Insert` opens Insérer in a
+French interface. The icons are named by their files, in every language.
 
 ## The line language (`gui-script.scm`)
 
@@ -84,7 +108,7 @@ Each line is a step:
 wait <ms>
 scheme <expression>
 idle [ms]
-activate <text>
+activate <selector>
 expect <text>          # the output must have this line (the runner checks it)
 port <name>
 exit

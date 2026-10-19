@@ -17,7 +17,9 @@
 ;;   wait <ms>              pause
 ;;   scheme <expression>    run a Scheme command at the next turn of the loop
 ;;   idle                   wait until the port has had no event for a while
-;;   activate <text>        click the text drawn last in the window (a label)
+;;   activate <selector>    click a text or an icon of the window, named by
+;;                          the bars and menus it is in: "Format > Font",
+;;                          "footer > equation*", "mainbar > icon:tm_save"
 ;;   expect <text>          a line which the output must have (the runner,
 ;;                          tests/Plugins/Vue/run.sh, looks for it)
 ;;   port <name>            the rest is for that port only ("vue")

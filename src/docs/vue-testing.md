@@ -30,9 +30,10 @@ the content area of the target window.
 # comment
 wait <ms>
 idle                        wait until no event came for a few turns of the loop
-activate <text>             click the text of the window drawn last with that
-                            text (or starting with it): a label, an item of an
-                            open menu, a tag of the footer
+activate <selector>         click a text or an icon of the window, by the bars
+                            and menus it is in ("Format > Font", "footer >
+                            equation*", "mainbar > icon:tm_save"; see
+                            gui-scripting.md)
 expect <text>               a line which the output must have (run.sh checks it)
 exit                        quit at the end, with the status of the checks
 window <substring of title> | window #<id>    (default: the last created window;

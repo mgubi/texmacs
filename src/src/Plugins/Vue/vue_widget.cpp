@@ -1350,6 +1350,15 @@ VUE_WIDGET_DATA(picture_widget, picture, p, url, file_name, int, stamp);
 static int
 icon_stamp () { return 8 * icon_generation + retina_factor; }
 
+// the pictures laid out while a script runs, by their element (render_ref):
+// "<path>\ticon:<name>" (see vue_test_context)
+static hashmap<pointer,string> vue_test_icons ("");
+
+string
+vue_test_icon (void* ref) {
+  return vue_test_icons [(pointer) ref];
+}
+
 static picture
 icon_picture (blackbox& data) {
   vue_picture_widget d= open_box<vue_picture_widget> (data);
@@ -2134,6 +2143,7 @@ layout_pull_button (vue_ui_rep *w) {
   bool opens_down= down && !in_side_bar;
   Clay_ElementId button_id= CLAY_SIDI(CLAY_TM_STRING(w->type), w->id);
   Clay_ElementId float_id=  CLAY_IDI("pull_button_float", w->id);
+  string test_label; // the label of the button, for the scripts
   Clay_Sizing s= layoutExpand;
   if (down) s= { CLAY_SIZING_FIT(.min=ui_pxf (20)) };
   ui_signal sig= button_logic (button_id);
@@ -2170,7 +2180,9 @@ layout_pull_button (vue_ui_rep *w) {
   {
     // items of vertical menus have the column of the check marks
     if (!down && button_grow) layout_mark_column ();
+    vue_test_label= "";
     concrete(d.w)->do_layout ();
+    test_label= vue_test_label; // the context of its menu
     // the menus of the interactive footer say that they are menus
     if (down && in_footer) layout_arrow ("<#25BE>", 3, dark_grey);
     if (!down) {
@@ -2328,6 +2340,7 @@ layout_pull_button (vue_ui_rep *w) {
         current_menu= float_id.id;
         current_bar= 0;
         pull_float_depth++;
+        with_test_context c (test_label);
         concrete (d.cw)->do_layout ();
         pull_float_depth--;
         current_menu= save_menu;
@@ -3492,6 +3505,12 @@ vue_ui_rep::do_layout () {
   if (type == "picture_widget") {
     //VUE_WIDGET(xpm_widget, url, file_name);
     picture p= icon_picture (data);
+    if (vue_testing) {
+      // a script names an icon by its file, without the suffix
+      string name= "icon:" * basename (open_box<vue_picture_widget> (data).file_name);
+      vue_test_icons (render_ref ())= vue_test_context * "\t" * name;
+      vue_test_note_label (name);
+    }
     SI w= p->get_width ();
     SI h= p->get_height ();
     // no background: Clay draws it after the custom command (the picture)
@@ -6077,8 +6096,16 @@ vue_texmacs_widget_rep::update_footer_menus () {
 // brings the rest into view. A scroll bar is not an option here: a bar
 // which is too narrow for its buttons has no room to spare for one, and it
 // would cover them. The key is unique per bar and per editor widget.
+// the name of a bar of the editor for the scripts (vue_test_context)
+static string
+bar_test_name (int key) {
+  const char* names[]= { "menubar", "mainbar", "modebar", "focusbar", "userbar" };
+  return (key % 8) < 5 ? string (names[key % 8]) : string ("");
+}
+
 static void
 layout_bar_content (int key, vue_widget content, Clay_Color bg) {
+  with_test_context c (bar_test_name (key));
   Clay_ElementId clip_id= CLAY_IDI ("bar_clip", key);
   CLAY(clip_id, {
     .layout= {
@@ -6097,6 +6124,7 @@ layout_bar_content (int key, vue_widget content, Clay_Color bg) {
 // height of the editor, which it scrolls when its icons do not fit
 static void
 layout_side_bar_content (int key, vue_widget content, Clay_Color bg) {
+  with_test_context c (bar_test_name (key));
   Clay_ElementId clip_id= CLAY_IDI ("side_bar_clip", key);
   CLAY(clip_id, {
     .layout= {
@@ -6257,19 +6285,23 @@ void vue_texmacs_widget_rep::do_layout () {
           .sizing= layoutExpand }})
       {
         if (visibility[7] && !is_nil (left_tools))
-          layout_tool_panel (CLAY_ID_LOCAL("LeftTools"), left_tools, true,
-                             win->layout_w, win->layout_h, 1);
+          { with_test_context c ("lefttools");
+            layout_tool_panel (CLAY_ID_LOCAL("LeftTools"), left_tools, true,
+                             win->layout_w, win->layout_h, 1); }
         if (!is_nil (main_widget)) main_widget->do_layout ();
         if (visibility[6] && !is_nil (side_tools))
-          layout_tool_panel (CLAY_ID_LOCAL("SideTools"), side_tools, true,
-                             win->layout_w, win->layout_h);
+          { with_test_context c ("sidetools");
+            layout_tool_panel (CLAY_ID_LOCAL("SideTools"), side_tools, true,
+                             win->layout_w, win->layout_h); }
       }
       if (visibility[8] && !is_nil (bottom_tools))
-        layout_tool_panel (CLAY_ID_LOCAL("BottomTools"), bottom_tools, false,
-                           win->layout_w, win->layout_h, 2);
+        { with_test_context c ("bottomtools");
+          layout_tool_panel (CLAY_ID_LOCAL("BottomTools"), bottom_tools, false,
+                           win->layout_w, win->layout_h, 2); }
       if (visibility[9] && !is_nil (extra_tools))
-        layout_tool_panel (CLAY_ID_LOCAL("ExtraTools"), extra_tools, false,
-                           win->layout_w, win->layout_h, 2);
+        { with_test_context c ("extratools");
+          layout_tool_panel (CLAY_ID_LOCAL("ExtraTools"), extra_tools, false,
+                           win->layout_w, win->layout_h, 2); }
     };
     if (main_side || mode_side)
       CLAY(CLAY_ID_LOCAL("Body"), {
@@ -6300,6 +6332,7 @@ void vue_texmacs_widget_rep::do_layout () {
       if (interactive_mode && !is_nil (interactive_input)) {
         // the query line: the footer becomes a prompt and a field, as it
         // does under Qt when "interactive questions" is set to "footer"
+        with_test_context c ("prompt");
         if (!is_nil (interactive_prompt)) interactive_prompt->do_layout ();
         CLAY_AUTO_ID({ .layout= { .sizing= { CLAY_SIZING_FIXED(ui_pxf (8)) }}}) {}
         CLAY_AUTO_ID({
@@ -6314,6 +6347,7 @@ void vue_texmacs_widget_rep::do_layout () {
         // the right, which give way to the properties when space is short
         // (clipped on their left: the innermost tags stay in view)
         in_footer= true;
+        with_test_context c ("footer");
         footer_env->do_layout ();
         // when the tags are wider than their room, they are shifted left by
         // the difference (as measured in the last pass): the end of the
@@ -6336,6 +6370,7 @@ void vue_texmacs_widget_rep::do_layout () {
       }
       else {
         // the left text takes the remaining space and is clipped
+        with_test_context c ("footer");
         CLAY_AUTO_ID({
           .layout= { .sizing= { .width= CLAY_SIZING_GROW(0) } },
           .clip= { .horizontal= true }})
