@@ -94,7 +94,8 @@ decorate_ip (tree src, tree dest) {
 * Some values are only known to the typesetter: the size of a typeset box
 * (box-info, frame-direct, frame-inverse), what depends on the order of the
 * document and on data kept with the buffer (auto-id, which numbers the
-* automatic labels, and get-attachment), and the lengths. A length in a unit
+* automatic labels, get-attachment, and the label tables of get-binding and
+* has-binding, which set-binding fills while typesetting), and the lengths. A length in a unit
 * (3fn, 1cm, 1r) is converted by the typesetter at the place where it is
 * used: with the scale at which it lays out the document (a typesetting at
 * twice the size doubles every unit, but not an absolute tmlen computed
@@ -134,6 +135,8 @@ is_layout_value (tree_label l) {
   case FRAME_INVERSE:
   case AUTO_ID:
   case GET_ATTACHMENT:
+  case GET_BINDING:
+  case HAS_BINDING:
     return true;
   default:
     return false;
@@ -501,9 +504,9 @@ evaluate_impl (tree t) {
   case SET_BINDING:
     return evaluate_set_binding (t);
   case GET_BINDING:
-    return evaluate_get_binding (t);
   case HAS_BINDING:
-    return evaluate_has_binding (t);
+    // (the label tables are filled by the typesetter, see set-binding)
+    return evaluate_compound_children (t);
 
   /* Graphical primitives */
   case _PATTERN:

@@ -124,7 +124,16 @@ evaluate_set_binding (tree t) {
     */
   }
 
-  return ""; // FIXME: do stuff from concater_rep::typeset_set_binding instead
+  // the binding is made by the typesetter (concater_rep::typeset_set_binding,
+  // which also makes the locus of the label): it stays, evaluated
+  tree r (t, N(t));
+  if (N(t) == 1) r[0]= value;
+  else {
+    r[0]= keys[0];
+    r[1]= value;
+    for (int i=2; i<N(t); i++) r[i]= evaluate (t[i]);
+  }
+  return r;
 }
 
 tree
