@@ -866,6 +866,76 @@
       (check-true (< -1 (pos "\\begin{document}") (pos "\\section{A}")
                      (pos "\\end{document}"))))))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Source tracking: the TeXmacs source attached to the LaTeX file
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; The C++ converters (tracked_totex.cpp, conservative_*tex.cpp) read their
+;; options from the preferences, not from the options of convert: they are
+;; set in memory only, restored afterwards, and never saved.
+(define (with-preferences l thunk)
+  (let* ((olds (map (lambda (p)
+                      (list (car p) (cpp-has-preference? (car p))
+                            (get-preference (car p))))
+                    l)))
+    (for-each (lambda (p) (cpp-set-preference (car p) (cdr p))) l)
+    (with r (check-run thunk)
+      (for-each (lambda (o)
+                  (if (cadr o)
+                      (cpp-set-preference (car o) (caddr o))
+                      (cpp-reset-preference (car o))))
+                olds)
+      (when (and (pair? r) (== (car r) 'error))
+        (check-report #f "the group" (object->string r))))))
+
+(define tracked-doc
+  '(document (TeXmacs "2.1.5") (style (tuple "article"))
+             (body (document (section "A") "Some text."))))
+
+(define tracked-begin "%%%%%%%%%% Begin TeXmacs source")
+(define tracked-end "%%%%%%%%%% End TeXmacs source")
+
+;; the export of tracked-doc with source tracking and the given value of
+;; "texmacs->latex:attach-tracking-info"
+(define (tracked-export attach)
+  (with r #f
+    (with-preferences
+     `(("texmacs->latex:source-tracking" . "on")
+       ("texmacs->latex:attach-tracking-info" . ,attach))
+     (lambda () (set! r (convert tracked-doc "texmacs-stree" "latex-document"))))
+    r))
+
+;; import with conservative source tracking
+(define (tracked-import s)
+  (with r #f
+    (with-preferences
+     '(("latex->texmacs:source-tracking" . "on")
+       ("latex->texmacs:conservative" . "on"))
+     (lambda () (set! r (ld s))))
+    r))
+
+(define (test-source-tracking)
+  (check-group "source tracking: attached TeXmacs source")
+  ;; NOTE: string-contains is Guile only
+  (let* ((pos (lambda (x s) (string-search-forwards x 0 s)))
+         (on (tracked-export "on"))
+         (off (tracked-export "off")))
+    (check-true (string? on))
+    (check-true (string? off))
+    ;; "on" (the default) keeps the block of TeXmacs source at the end
+    (check-true (>= (pos tracked-begin on) 0))
+    (check-true (>= (pos tracked-end on) 0))
+    ;; "off" leaves it out; the LaTeX itself is the same
+    (check= (pos tracked-begin off) -1)
+    (check= (pos tracked-end off) -1)
+    (check-true (>= (pos "\\section{A}" off) 0))
+    (check= off (substring on 0 (pos (string-append "\n" tracked-begin) on)))
+    ;; both import again, with or without the block
+    (check= (body-of (tracked-import on)) '(document (section "A") "Some text."))
+    (check= (body-of (tracked-import off))
+            '(document (section "A") "Some text."))
+    (check= (body-of (ld off)) '(document (section "A") "Some text."))))
+
 (tm-define (latex-test-failures)
   (check-suite "latex")
   (test-export-special)
@@ -900,6 +970,7 @@
   (test-import-unknown)
   (test-import-parse)
   (test-import-documents)
+  (test-source-tracking)
   (test-round-trips)
   (test-export-without-view)
   (check-end))
