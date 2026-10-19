@@ -23,11 +23,17 @@ follow at once.
 | `TeXmacs/progs/check/gui-script.scm` | The line language of the scripts, parsed into steps; `gui-script-start` runs a file |
 | `src/Graphics/Gui/gui_test.hpp` | The hooks of a port, with the defaults in `gui_test.cpp` for a port without them |
 | `src/Plugins/Vue/vue_gui.cpp` | The hooks of Vue (`script_exec`, the commands of its scripts, and the texts of the last frame) |
-| `tests/Plugins/Vue/run.sh` | Runs a test of Vue with a home of its own, and says PASS or FAIL |
+| `src/Plugins/Qt6/qt_test.cpp` (the same in `Qt/`) | The hooks of Qt, beside its older commands by label |
+| `src/Plugins/NS/ns_test.mm` | The hooks of Cocoa |
+| `tests/Plugins/Vue/run.sh` | Runs a test with a home of its own, and says PASS or FAIL (any port: run it from the top of the source tree of a build) |
+| `tests/gui/` | The tests which run on every port |
 
-`TEXMACS_VUE_SCRIPT=<file>` runs a script in Vue, as before: the port
-loads `(check gui-script)` and calls `gui-script-start` at the first turn
-of its loop.
+`TEXMACS_TEST_SCRIPT=<file>` runs a script, on every port
+(`TEXMACS_VUE_SCRIPT`, its former name, in Vue too): the port calls
+`gui_test_start` as its event loop starts, which loads `(check gui-script)`
+and calls `gui-script-start` at the first turn of the loop. The snapshots
+go to `TEXMACS_TEST_SNAPSHOT` (or `TEXMACS_VUE_SNAPSHOT`); `run.sh` sets
+both.
 
 ## The hooks of a port (`gui_test.hpp`)
 
@@ -40,9 +46,35 @@ of its loop.
 | `gui_test_pump (on)` | `gui-test-set-pump` | Call `gui-test-pump` at each turn, while on; the script holds the mouse buttons meanwhile |
 | `gui_test_eval_later (cmd)` | `gui-test-eval-later` | A Scheme command at the next turn, as `-x` (the same for all ports) |
 
-Vue has them all. The other ports have the defaults, which do nothing;
-Qt keeps its own commands, which find its widgets by their labels
-(`gui-test-click`, `gui-test-menu`, `gui-test-type`...; `qt_test.cpp`).
+Vue, Qt and Cocoa have them all; the other ports (X11, SDL, Qtwk) have
+the defaults, which do nothing. Qt keeps its older commands too, which
+find its widgets by their labels (`gui-test-click`, `gui-test-menu`,
+`gui-test-type`...).
+
+How each port does it:
+
+| | Vue | Qt | Cocoa |
+|---|---|---|---|
+| Pump | at each turn of its loop | a timer of 10 ms (also in menus and modal dialogs) | a timer of 10 ms in the common modes of the run loop (also while a menu is tracked) |
+| Busy | SDL events waiting | events of TeXmacs, delayed commands which are due, an update | the same, and the events of the system |
+| Texts | drawn at the last frame (Clay) | the widgets of the window and the items of the open menus | the views of the window, and the items of the native menus, without a box |
+| Bars | the layout notes them | the titles of the tool bars, the status bar (footer) | the identifiers of the rows (`TMButtonsController`) |
+| Icons | the file of the picture widget | the property `tmIcon` (`qt_ui_element.cpp`) | the accessibility description of the image (`to_nsimage`) |
+| Input | SDL events pushed | Qt events posted to the widget at the place (a menu is a window of its own) | Cocoa events posted to the window |
+| Menus | drawn in the window, clicked | an item is chosen with the keyboard of its menu | items without a box, chosen by the port (`choose`) |
+| Clipboard | of the script | of the system (offscreen, of the process) | of the system |
+
+The menus of Cocoa are native: neither the menu bar nor the menus of the
+buttons tell where their items are. Their items come last in the texts,
+with no box (`0 0` for the size); `gt-activate` then asks the port to choose
+the item (`choose <n>`, its place in the list): a submenu is listed from
+then on, under the path of its item, and an item runs while the menus
+close. The menus listed are those of the menu bar (`menubar > Insert >
+...`), the one a button has open (its path is that of the button) and the
+submenus chosen in them. A menu of Qt triggers an item at the release of
+the button only when the window system said that the pointer moved onto
+it, which posted events do not: a click on an item of a menu makes it the
+active one and sends Return to the menu, as the keyboard would.
 
 ## The steps (`gui-driver.scm`)
 
@@ -66,7 +98,7 @@ Qt keeps its own commands, which find its widgets by their labels
 | `(gt-eval-later "expr")` | A Scheme command at the next turn |
 | `(gt-eval thunk)` | Run `thunk` now |
 | `(gt-check what thunk)` | A check: `thunk` must return true; a failure is written `FAILED [] what: ...` |
-| `(gt-idle [ms])` | Wait until the port has had no event for five turns (at most 10 s) |
+| `(gt-idle [ms])` | Wait until the port has had nothing to do (`gui-test-busy?`) for 200 ms and five turns (at most 10 s): Qt on macOS flashes a chosen item of a menu before it runs it |
 | `(gt-activate selector [ms])` | Click the middle of the text or icon of the window of the script which the selector names (below). Waits for it 3 s at most, then fails, with the texts it saw in the log |
 | `(gt-port name)` | The steps after it are for that port only; elsewhere the test stops there |
 | `(gt-exit)` | At the end, quit TeXmacs with the status 1 if a check failed, else 0 |
@@ -136,7 +168,7 @@ in window points from the top left of the content of the window of the
 script:
 
 ```
-window <part of the title> | window #<id>
+window main | window <part of the title> | window #<id>
 move x y
 press x y [left|right|middle]       release x y [...]
 click x y [left|right|middle] [n]   (n: a double or triple click)
@@ -154,12 +186,25 @@ of the test never go through the clipboard of the system, which the
 session of the user shares (and the other tests running at the same time).
 `clipboard <text>` puts a text on it, as if the system had it.
 
-The lines of the log are those of the old player: `vue script: <line>` for
-each step, `vue script: done` at the end.
+Qt and Cocoa have `window main` (the editor), `window <part of the
+title>`, `move`, `press`, `release`, `click`, `key`, `text`, `focus`,
+`snapshot`, `resize`, `repaint` and `close`; Qt `wheel` and `clipboard`
+too, Cocoa `choose`. `window main` is the first window with an editor on
+every port, the way to write a test which runs on all of them; a `window`
+which matches nothing lists the windows there are. Their keys use the names
+of Vue (SDL): Return, Escape, Tab, Backspace, Delete, Left, Up, Home,
+PageUp, F1...
+
+The lines of the log are those of the old player: `<port> script: <line>`
+for each step (`vue script:`, `qt script:`, `cocoa script:`), and `<port>
+script: done` at the end.
 
 ## Pass or fail
 
-`tests/Plugins/Vue/run.sh <test> [seconds]` says PASS or FAIL on its last
+`tests/Plugins/Vue/run.sh <test> [seconds]` runs a test of `tests/Plugins/Vue`
+(`SCM=` and `SCRIPT=` give other files, by an absolute path, such as those
+of `tests/gui`), from the top of the source tree of the build to test, Vue,
+Qt or Cocoa. It says PASS or FAIL on its last
 line, and so does its status. A test fails when TeXmacs crashed (`Error
 message`), when its script did not end, when a check failed (`FAILED`), when
 TeXmacs ended with a status other than 0, or when a line which an `expect`

@@ -4559,10 +4559,7 @@ get_window_from_ID (Uint32 ID) {
 
 static void
 script_init () {
-  string file= get_env ("TEXMACS_VUE_SCRIPT");
-  if (N(file) == 0) return;
-  exec_delayed (scheme_cmd ("(begin (use-modules (check gui-script)) "
-                            "(gui-script-start " * scm_quote (file) * "))"));
+  gui_test_start (); // TEXMACS_TEST_SCRIPT, or TEXMACS_VUE_SCRIPT
 }
 
 static bool script_no_target= false; // the last "window" command matched nothing
@@ -4650,11 +4647,25 @@ script_exec (string line) {
     iterator<int> it= iterate (id_to_window);
     while (it->busy ()) {
       vue_window w= (vue_window) id_to_window [it->next ()];
-      if (title == "#" * as_string (w->id) ||
+      if (title == "main") {
+        // the editor (the first window which holds one), on every port
+        if (vue_is_editor_window (w->content) &&
+            (script_win == NULL || w->id < script_win->id)) script_win= w;
+      }
+      else if (title == "#" * as_string (w->id) ||
           occurs (title, w->name) || occurs (title, w->get_name ())) script_win= w;
     }
     script_no_target= (script_win == NULL);
-    if (script_win == NULL) cout << "vue script: no window matches " << title << LF;
+    if (script_win == NULL) {
+      cout << "vue script: no window matches " << title << "; there are";
+      iterator<int> it2= iterate (id_to_window);
+      while (it2->busy ()) {
+        vue_window w= (vue_window) id_to_window [it2->next ()];
+        cout << " #" << w->id << " [" << w->get_name () << "]"
+             << (is_nil (w->content) ? string ("") : " " * w->content->type);
+      }
+      cout << LF;
+    }
     else {
       SI wx, wy, ww, wh;
       script_win->get_position (wx, wy);

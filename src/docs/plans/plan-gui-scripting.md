@@ -1,8 +1,10 @@
 # Plan: GUI scripting for every interface
 
-Status: phases 0 to 2 under way on the branch `wip_gui_scripting`
-(2026-10-19), with the answers of section 10 as suggested there; the
-reference of what is done is [../gui-scripting.md](../gui-scripting.md).
+Status: on the branch `wip_gui_scripting` (2026-10-19/20), phases 0 to 2,
+the names of section 5.2 (inferred, with an optional `named`), and the
+hooks of Qt and Cocoa (phases 4 and 5, without the CI); the answers of
+section 10 as suggested there. The reference of what is done is
+[../gui-scripting.md](../gui-scripting.md).
 Proposal of 2026-10-19. Based on a read-only checkout of
 `upsilon_texmacs` (`~/t/lab/fix/plan-ref`). Paths below are relative to
 `src/` of that tree unless they start with `.github/`.

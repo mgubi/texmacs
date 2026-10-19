@@ -44,6 +44,8 @@ to_nsimage (url u) {
     return YES;
   }];
   [img setCacheMode: NSImageCacheNever];
+  // the name of its file, by which the scripted tests name it (ns_test.mm)
+  [img setAccessibilityDescription: to_nsstring ("icon:" * basename (u))];
   return img;
 }
 
@@ -1132,6 +1134,20 @@ submenu_item (array<widget> a) {
 
 TMMenuItem*
 ns_ui_element_rep::as_menuitem () {
+  TMMenuItem* mi= make_menuitem ();
+  if (N(test_name) > 0 && mi) [mi setIdentifier: to_nsstring (test_name)];
+  return mi;
+}
+
+NSView*
+ns_ui_element_rep::as_nsview () {
+  NSView* v= make_nsview ();
+  if (N(test_name) > 0 && v) [v setIdentifier: to_nsstring (test_name)];
+  return v;
+}
+
+TMMenuItem*
+ns_ui_element_rep::make_menuitem () {
   switch (type) {
     case horizontal_menu: case vertical_menu: case horizontal_list:
     case vertical_list:   case minibar_menu:
@@ -1253,7 +1269,7 @@ ns_ui_element_rep::as_menuitem () {
  ******************************************************************************/
 
 NSView*
-ns_ui_element_rep::as_nsview () {
+ns_ui_element_rep::make_nsview () {
   switch (type) {
     case horizontal_menu: case horizontal_list: case minibar_menu:
       return stack_of (open_box<array<widget> > (load), false);

@@ -10,9 +10,12 @@
 ******************************************************************************/
 
 #include "qt_utilities.hpp"
+#include "qt_gui.hpp"
 #include "sys_utils.hpp"
 #include "gui_test.hpp"
 #include "analyze.hpp"
+#include "scheme.hpp"
+#include "url.hpp"
 
 #include <QApplication>
 #include <QWidget>
@@ -27,6 +30,14 @@
 #include <QToolBar>
 #include <QTimer>
 #include <QTabBar>
+#include <QStatusBar>
+#include <QLabel>
+#include <QPushButton>
+#include <QWheelEvent>
+#include <QClipboard>
+#include <QGuiApplication>
+#include <QPointer>
+#include <QKeySequence>
 
 /******************************************************************************
 * Snapshots of the windows
@@ -55,7 +66,10 @@ static string
 normalize (QString s) {
   // Labels as written in the menus and widgets of TeXmacs
   s.remove ('&');
-  return replace (from_qstring (s.trimmed ()), "<ldots>", "...");
+  // (the menus View and Help are written with a Cyrillic e on macOS, so
+  // that the system does not add its items to them)
+  return replace (replace (from_qstring (s.trimmed ()), "<ldots>", "..."),
+                  "<#435>", "e");
 }
 
 static string
@@ -280,4 +294,473 @@ gui_test_click_later (int ms, string dir, string label) {
   // allows to answer them.
   QTimer::singleShot (ms, [dir, label] () {
       click_when_present (dir, label, 40); });
+}
+
+/******************************************************************************
+* The hooks of the scripted tests (gui_test.hpp, docs/gui-scripting.md)
+*
+* The driver (check gui-driver) runs its steps from a timer (gui_test_pump),
+* which Qt also fires in the loops of the menus and of the modal dialogs.
+* The input is posted, not sent: a press which opens a menu runs the loop
+* of the menu, and a sent event would only come back once the menu closed.
+* Positions are in points from the top left of the window of the script;
+* a press goes to the topmost widget at its place on the screen, which may
+* be a menu (a window of its own in Qt).
+******************************************************************************/
+
+static QPointer<QWidget> script_win;     // the window of the script
+static bool script_no_target= false;     // the last "window" matched nothing
+static Qt::MouseButtons script_buttons= Qt::NoButton;
+static QPoint script_pointer;            // the last position, global
+
+string gui_test_port () { return "qt"; }
+
+static bool
+is_script_window (QWidget* w) {
+  // the windows a script may choose: not the menus, balloons and such
+  return w != NULL && w->isVisible () && w->isWindow () &&
+         qobject_cast<QMenu*> (w) == NULL &&
+         w->windowType () != Qt::ToolTip && w->windowType () != Qt::Popup;
+}
+
+static QWidget*
+main_window () {
+  // the editor window (a QMainWindow), the active one when there are several
+  QWidget* active= QApplication::activeWindow ();
+  if (qobject_cast<QMainWindow*> (active) != NULL) return active;
+  foreach (QWidget* top, QApplication::topLevelWidgets ())
+    if (qobject_cast<QMainWindow*> (top) != NULL && top->isVisible ())
+      return top;
+  return NULL;
+}
+
+static QWidget*
+script_target () {
+  if (script_no_target) return NULL;
+  if (!script_win.isNull () && script_win->isVisible ()) return script_win;
+  QWidget* w= QApplication::activeModalWidget ();
+  if (w == NULL) w= QApplication::activeWindow ();
+  if (!is_script_window (w)) w= main_window ();
+  return w;
+}
+
+static QPoint
+script_origin (QWidget* win) {
+  return win->mapToGlobal (QPoint (0, 0));
+}
+
+/******************************************************************************
+* Where the texts and icons are: the path of the bars and menus
+******************************************************************************/
+
+static string
+icon_name (QObject* o) {
+  // the name of the file of the icon of a widget or an action (qt_ui_element
+  // sets it, see "tmIcon"), as "icon:<name>"
+  if (o == NULL) return "";
+  QVariant v= o->property ("tmIcon");
+  if (!v.isValid ()) return "";
+  return "icon:" * from_qstring (v.toString ());
+}
+
+static string
+bar_name (QWidget* w) {
+  // the name of a bar of the editor, for the scripts
+  QToolBar* tb= qobject_cast<QToolBar*> (w);
+  if (tb != NULL) {
+    string t= from_qstring (tb->windowTitle ());
+    if (t == "menu toolbar") return "menubar";
+    if (t == "main toolbar") return "mainbar";
+    if (t == "mode toolbar") return "modebar";
+    if (t == "focus toolbar") return "focusbar";
+    if (t == "user toolbar") return "userbar";
+    return "";
+  }
+  if (qobject_cast<QStatusBar*> (w) != NULL) return "footer";
+  if (qobject_cast<QMenuBar*> (w) != NULL) return "menubar";
+  return "";
+}
+
+static string
+named_of (QObject* o) {
+  // the name of a (named ...) of the menus: the division puts it in the
+  // objectName of its widget or action
+  if (o == NULL) return "";
+  string s= from_qstring (o->objectName ());
+  return starts (s, "named:") ? string ("#" * s (6, N(s))) : string ("");
+}
+
+static string join_path (string a, string b) {
+  if (N(a) == 0) return b;
+  if (N(b) == 0) return a;
+  return a * " > " * b;
+}
+
+static string menu_path (QMenu* m, int depth);
+
+static string
+widget_path (QWidget* w, int depth) {
+  // the bars, menus and names a widget is in (its own name included)
+  string r= named_of (w);
+  for (QWidget* p= w->parentWidget (); p != NULL; p= p->parentWidget ()) {
+    QMenu* m= qobject_cast<QMenu*> (p);
+    if (m != NULL) return join_path (menu_path (m, depth), r);
+    r= join_path (join_path (bar_name (p), named_of (p)), r);
+    if (p->isWindow ()) break;
+  }
+  return r;
+}
+
+static string
+menu_path (QMenu* m, int depth) {
+  // the path of the items of a menu: that of what opened it, and its label
+  if (depth > 12) return "";
+  foreach (QWidget* w, QApplication::allWidgets ()) {
+    if (!w->isVisible ()) continue;
+    QToolButton* tb= qobject_cast<QToolButton*> (w);
+    QPushButton* pb= qobject_cast<QPushButton*> (w);
+    QMenu* om= qobject_cast<QMenu*> (w);
+    if ((tb != NULL && (tb->menu () == m || (tb->defaultAction () != NULL &&
+                                             tb->defaultAction ()->menu () == m))) ||
+        (pb != NULL && pb->menu () == m)) {
+      QAbstractButton* b= (QAbstractButton*) w;
+      string label= button_label (b);
+      if (N(label) == 0) label= icon_name (b);
+      if (N(label) == 0 && tb != NULL) label= icon_name (tb->defaultAction ());
+      return join_path (widget_path (w, depth + 1), label);
+    }
+    if (om != NULL && om != m)
+      foreach (QAction* a, om->actions ())
+        if (a->menu () == m) {
+          string label= action_label (a);
+          if (N(label) == 0) label= icon_name (a);
+          return join_path (join_path (menu_path (om, depth + 1),
+                                       named_of (a)), label);
+        }
+  }
+  return "";
+}
+
+static void
+add_text (array<string>& r, QPoint origin, QRect global, string path,
+          string text) {
+  if (N(text) == 0) return;
+  QPoint p= global.topLeft () - origin;
+  r << (as_string (p.x ()) * "\t" * as_string (p.y ()) * "\t" *
+        as_string (global.width ()) * "\t" * as_string (global.height ()) *
+        "\t" * path * "\t" * text);
+}
+
+static QRect
+global_rect (QWidget* w) {
+  return QRect (w->mapToGlobal (QPoint (0, 0)), w->size ());
+}
+
+static void
+collect_texts (QWidget* w, QPoint origin, array<string>& r) {
+  if (!w->isVisible ()) return;
+  QAbstractButton* b= qobject_cast<QAbstractButton*> (w);
+  QLabel* l= qobject_cast<QLabel*> (w);
+  QTabBar* t= qobject_cast<QTabBar*> (w);
+  if (b != NULL) {
+    string label= normalize (b->text ());
+    if (N(label) == 0) label= icon_name (b);
+    QToolButton* tb= qobject_cast<QToolButton*> (w);
+    if (N(label) == 0 && tb != NULL) label= icon_name (tb->defaultAction ());
+    if (N(label) == 0) label= button_label (b);
+    add_text (r, origin, global_rect (w), widget_path (w, 0), label);
+  }
+  else if (l != NULL) {
+    string label= normalize (l->text ());
+    if (N(label) == 0) label= icon_name (l);
+    add_text (r, origin, global_rect (w), widget_path (w, 0), label);
+  }
+  else if (t != NULL)
+    for (int i=0; i<t->count (); i++)
+      add_text (r, origin,
+                QRect (t->mapToGlobal (t->tabRect (i).topLeft ()),
+                       t->tabRect (i).size ()),
+                widget_path (w, 0), normalize (t->tabText (i)));
+  foreach (QObject* c, w->children ()) {
+    QWidget* cw= qobject_cast<QWidget*> (c);
+    if (cw != NULL && !cw->isWindow ()) collect_texts (cw, origin, r);
+  }
+}
+
+array<string>
+gui_test_texts () {
+  // the texts and icons of the window of the script, then those of the
+  // open menus, the deepest last (the topmost)
+  array<string> r;
+  QWidget* win= script_target ();
+  if (win == NULL) return r;
+  QPoint origin= script_origin (win);
+  collect_texts (win, origin, r);
+  // the menus of the same depth in any order, the deeper ones after
+  array<array<string> > by_depth;
+  foreach (QWidget* top, QApplication::topLevelWidgets ()) {
+    QMenu* m= qobject_cast<QMenu*> (top);
+    if (m == NULL || !m->isVisible ()) continue;
+    string path= menu_path (m, 0);
+    int depth= min (N(tokenize (path, " > ")), 15);
+    while (N(by_depth) <= depth) by_depth << array<string> ();
+    foreach (QAction* a, m->actions ())
+      if (a->isVisible () && !a->isSeparator ()) {
+        string label= action_label (a);
+        if (N(label) == 0) label= icon_name (a);
+        QRect g= m->actionGeometry (a);
+        add_text (by_depth[depth], origin,
+                  QRect (m->mapToGlobal (g.topLeft ()), g.size ()),
+                  join_path (path, named_of (a)), label);
+      }
+  }
+  for (int i= 0; i < N(by_depth); i++) r << by_depth[i];
+  return r;
+}
+
+/******************************************************************************
+* The commands of the scripts
+******************************************************************************/
+
+static Qt::MouseButton
+script_button (array<string> a, int i) {
+  if (N(a) > i && a[i] == "right") return Qt::RightButton;
+  if (N(a) > i && a[i] == "middle") return Qt::MiddleButton;
+  return Qt::LeftButton;
+}
+
+static void
+post_mouse (QEvent::Type type, QPoint g, Qt::MouseButton button) {
+  // a mouse event at the global position g, to the topmost widget there
+  QWidget* w= QApplication::widgetAt (g);
+  if (w == NULL) w= script_target ();
+  if (w == NULL) return;
+  QPoint p= w->mapFromGlobal (g);
+  script_pointer= g;
+  if (type == QEvent::MouseButtonPress || type == QEvent::MouseButtonDblClick)
+    script_buttons |= button;
+  QMouseEvent* ev= new QMouseEvent (type, QPointF (p), QPointF (g), button,
+                                    script_buttons, Qt::NoModifier);
+  if (type == QEvent::MouseButtonRelease) script_buttons &= ~button;
+  QApplication::postEvent (w, ev);
+}
+
+static QPoint
+script_point (QWidget* win, array<string> a) {
+  return script_origin (win) +
+         QPoint ((int) as_double (a[1]), (int) as_double (a[2]));
+}
+
+static QWidget*
+key_target (QWidget* win) {
+  QWidget* f= QApplication::focusWidget ();
+  if (f != NULL && f->window () == win->window ()) return f;
+  if (win->focusWidget () != NULL) return win->focusWidget ();
+  return win;
+}
+
+static void
+post_key (QWidget* win, string name, string text) {
+  // "[S-][C-][A-][M-]<name>": shift, control, option, command (as Vue);
+  // on macOS Qt calls the command key Control and the control key Meta
+  Qt::KeyboardModifiers mods= Qt::NoModifier;
+#ifdef Q_OS_MACOS
+  const Qt::KeyboardModifier ctrl= Qt::MetaModifier, cmd= Qt::ControlModifier;
+#else
+  const Qt::KeyboardModifier ctrl= Qt::ControlModifier, cmd= Qt::MetaModifier;
+#endif
+  while (N(name) > 2 && name[1] == '-') {
+    if (name[0] == 'S') mods |= Qt::ShiftModifier;
+    else if (name[0] == 'C') mods |= ctrl;
+    else if (name[0] == 'A') mods |= Qt::AltModifier;
+    else if (name[0] == 'M') mods |= cmd;
+    else break;
+    name= name (2, N(name));
+  }
+  // the names of SDL, which the scripts of Vue use, where Qt has others
+  if (name == "Escape") name= "Esc";
+  else if (name == "Delete") name= "Del";
+  else if (name == "PageUp") name= "PgUp";
+  else if (name == "PageDown") name= "PgDown";
+  else if (name == "Return") name= "Return";
+  QKeySequence seq (to_qstring (name));
+  if (seq.count () == 0) {
+    cout << "qt script: unknown key " << name << LF;
+    return;
+  }
+#if QT_VERSION >= 0x060000
+  int key= seq[0].key ();
+#else
+  int key= seq[0] & ~Qt::KeyboardModifierMask;
+#endif
+  QString t;
+  if (N(text) > 0) t= to_qstring (text);
+  else if (N(name) == 1 && (mods & ~Qt::ShiftModifier) == 0)
+    t= (mods & Qt::ShiftModifier) ? to_qstring (name).toUpper ()
+                                  : to_qstring (name).toLower ();
+  else if (name == "Return") t= "\r";
+  else if (name == "Tab") t= "\t";
+  else if (name == "Space") t= " ";
+  QWidget* w= key_target (win);
+  QApplication::postEvent (w, new QKeyEvent (QEvent::KeyPress, key, mods, t));
+  QApplication::postEvent (w, new QKeyEvent (QEvent::KeyRelease, key, mods, t));
+}
+
+static void
+post_text (QWidget* win, string text) {
+  QWidget* w= key_target (win);
+  c_string _text (text);
+  QString s= QString::fromUtf8 ((char*) _text);
+  for (int i=0; i<s.size (); i++) {
+    QString c (s[i]);
+    QApplication::postEvent (w, new QKeyEvent (QEvent::KeyPress, 0,
+                                               Qt::NoModifier, c));
+    QApplication::postEvent (w, new QKeyEvent (QEvent::KeyRelease, 0,
+                                               Qt::NoModifier, c));
+  }
+}
+
+static string
+snapshot_dir () {
+  string d= get_env ("TEXMACS_TEST_SNAPSHOT");
+  if (N(d) == 0) d= get_env ("TEXMACS_VUE_SNAPSHOT");
+  return d;
+}
+
+int
+gui_test_raw (string line) {
+  line= trim_spaces (line);
+  if (N(line) == 0) return 1;
+  array<string> a= tokenize (line, " ");
+  string cmd= a[0];
+  string rest= N(line) > N(cmd) ? line (N(cmd) + 1, N(line)) : string ("");
+  if (cmd == "window" && N(a) > 1) {
+    // "window main" (the editor), or a part of the title of a window
+    script_win= NULL;
+    if (rest == "main") script_win= main_window ();
+    else
+      foreach (QWidget* top, QApplication::topLevelWidgets ())
+        if (is_script_window (top) &&
+            occurs (rest, from_qstring (top->windowTitle ())))
+          script_win= top;
+    script_no_target= script_win.isNull ();
+    if (script_no_target) {
+      cout << "qt script: no window matches " << rest << "; there are";
+      foreach (QWidget* top, QApplication::topLevelWidgets ())
+        if (top->isVisible ())
+          cout << " [" << from_qstring (top->windowTitle ()) << "]"
+               << (is_script_window (top) ? "" : "(not a window)");
+      cout << LF;
+    }
+    else {
+      QRect g= script_win->geometry ();
+      cout << "qt script: window at " << g.x () << "," << g.y ()
+           << " size " << g.width () << "x" << g.height () << LF;
+    }
+    return 1;
+  }
+  if (cmd == "clipboard") {
+    // the clipboard of the system: offscreen, that of the process
+    c_string _t (rest);
+    QGuiApplication::clipboard ()->setText (QString::fromUtf8 ((char*) _t));
+    return 1;
+  }
+  QWidget* win= script_target ();
+  if (win == NULL) return 1;
+  if (cmd == "move" && N(a) > 2)
+    post_mouse (QEvent::MouseMove, script_point (win, a), Qt::NoButton);
+  else if (cmd == "press" && N(a) > 2)
+    post_mouse (QEvent::MouseButtonPress, script_point (win, a),
+                script_button (a, 3));
+  else if (cmd == "release" && N(a) > 2)
+    post_mouse (QEvent::MouseButtonRelease, script_point (win, a),
+                script_button (a, 3));
+  else if (cmd == "click" && N(a) > 2) {
+    QPoint g= script_point (win, a);
+    Qt::MouseButton b= script_button (a, 3);
+    QMenu* m= qobject_cast<QMenu*> (QApplication::widgetAt (g));
+    QAction* act= (m == NULL) ? NULL : m->actionAt (m->mapFromGlobal (g));
+    if (act != NULL && b == Qt::LeftButton) {
+      // an item of a menu: a menu triggers an item at the release of the
+      // button only when the pointer moved onto it before, as the window
+      // system tells it, which posted events do not: it is chosen as with
+      // the keyboard instead (it opens its submenu, or it runs and the
+      // menus close)
+      m->setActiveAction (act);
+      QApplication::postEvent (m, new QKeyEvent (QEvent::KeyPress,
+                                                 Qt::Key_Return, Qt::NoModifier));
+      QApplication::postEvent (m, new QKeyEvent (QEvent::KeyRelease,
+                                                 Qt::Key_Return, Qt::NoModifier));
+      return 0;
+    }
+    int clicks= (N(a) > 4 && is_int (a[4])) ? max (1, as_int (a[4])) : 1;
+    post_mouse (QEvent::MouseMove, g, Qt::NoButton);
+    post_mouse (clicks >= 2 ? QEvent::MouseButtonDblClick
+                            : QEvent::MouseButtonPress, g, b);
+    post_mouse (QEvent::MouseButtonRelease, g, b);
+  }
+  else if (cmd == "wheel" && N(a) > 4) {
+    QPoint g= script_point (win, a);
+    QWidget* w= QApplication::widgetAt (g);
+    if (w == NULL) w= win;
+    QPoint angle ((int) (120 * as_double (a[3])), (int) (120 * as_double (a[4])));
+    QApplication::postEvent (w, new QWheelEvent (QPointF (w->mapFromGlobal (g)),
+                                                QPointF (g), QPoint (), angle,
+                                                script_buttons, Qt::NoModifier,
+                                                Qt::NoScrollPhase, false));
+  }
+  else if (cmd == "key" && N(a) > 1)
+    post_key (win, a[1], N(a) > 2 ? a[2] : string (""));
+  else if (cmd == "text" && N(a) > 1)
+    post_text (win, rest);
+  else if (cmd == "focus") {
+    win->raise ();
+    win->activateWindow ();
+  }
+  else if (cmd == "snapshot" && N(a) > 1) {
+    string dir= snapshot_dir ();
+    if (N(dir) > 0) {
+      QApplication::processEvents ();
+      win->grab ().save (to_qstring (dir * "/" * a[1] * ".png"));
+    }
+  }
+  else if (cmd == "resize" && N(a) > 2)
+    win->resize (as_int (a[1]), as_int (a[2]));
+  else if (cmd == "repaint")
+    win->update ();
+  else if (cmd == "close")
+    win->close ();
+  else {
+    cout << "qt script: unknown command " << line << LF;
+    return 2;
+  }
+  return 0;
+}
+
+bool
+gui_test_busy () {
+  // the events of TeXmacs, its delayed commands which are due, an update
+  // (the events posted by the script are handled before the timer of the
+  // pump fires again)
+  return the_gui->test_busy ();
+}
+
+void
+gui_test_pump (bool on) {
+  static QTimer* timer= NULL;
+  static bool running= false; // not again while a step runs (a nested loop)
+  if (timer == NULL) {
+    timer= new QTimer ();
+    timer->setInterval (10);
+    QObject::connect (timer, &QTimer::timeout, [] () {
+        if (running) return;
+        running= true;
+        call ("gui-test-pump");
+        running= false; });
+  }
+  if (on) timer->start ();
+  else {
+    timer->stop ();
+    script_buttons= Qt::NoButton;
+  }
 }

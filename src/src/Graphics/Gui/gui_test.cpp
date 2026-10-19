@@ -10,17 +10,30 @@
 
 #include "gui_test.hpp"
 #include "scheme.hpp"
+#include "analyze.hpp"
+#include "sys_utils.hpp"
 
 void
 gui_test_eval_later (string cmd) {
   exec_delayed (scheme_cmd (cmd));
 }
 
+void
+gui_test_start () {
+  // TEXMACS_TEST_SCRIPT=<file> (TEXMACS_VUE_SCRIPT, its former name, in
+  // Vue) runs a script once the event loop runs
+  string file= get_env ("TEXMACS_TEST_SCRIPT");
+  if (N(file) == 0) file= get_env ("TEXMACS_VUE_SCRIPT");
+  if (N(file) == 0) return;
+  exec_delayed (scheme_cmd ("(begin (use-modules (check gui-script)) "
+                            "(gui-script-start " * scm_quote (file) * "))"));
+}
+
 /******************************************************************************
 * The defaults, for the ports which do not implement the hooks
 ******************************************************************************/
 
-#ifndef VUETEXMACS
+#if !defined (VUETEXMACS) && !defined (QTTEXMACS) && !defined (AQUATEXMACS)
 string gui_test_port () { return ""; }
 int gui_test_raw (string line) { (void) line; return 2; }
 bool gui_test_busy () { return false; }

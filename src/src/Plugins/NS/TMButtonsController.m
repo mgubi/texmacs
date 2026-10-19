@@ -281,6 +281,9 @@
     [b setImage: small];
     [b setImagePosition: NSImageOnly];
     [b setTitle: @""];
+    // "icon:<name of its file>", for the scripted tests (ns_test.mm)
+    if ([img accessibilityDescription])
+      [b setIdentifier: [img accessibilityDescription]];
   }
   else {
     // bold if the title of the item is (the innermost tag of the footer)
@@ -412,6 +415,9 @@
   [self ensureRow: idx];
   [[rowArray objectAtIndex:idx] removeFromSuperview];
   NSView *row = menu? [self rowFor: menu]: [[[NSView alloc] init] autorelease];
+  // the name of the bar for the scripted tests (ns_test.mm)
+  NSArray *names = @[@"mainbar", @"modebar", @"focusbar", @"userbar"];
+  if (idx < [names count]) [row setIdentifier: [names objectAtIndex: idx]];
   if ([self isSideRow: idx]) [self orient: row vertical: YES];
   [rowArray replaceObjectAtIndex:idx withObject:row];
   if (menu) [menuArray replaceObjectAtIndex:idx withObject:menu];
@@ -530,7 +536,9 @@
   // NOTE: the items are retained by the buttons, the menu by the controller
   if (menu) [menuArray addObject: menu];
   if ([menuArray count] > 8) [menuArray removeObjectAtIndex: 0];
-  return [self rowFor: menu];
+  NSView *row = [self rowFor: menu];
+  [row setIdentifier: @"footer"]; // for the scripted tests (ns_test.mm)
+  return row;
 }
 
 - (BOOL) contextClick:(id) button event:(NSEvent*) e

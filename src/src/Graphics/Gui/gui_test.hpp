@@ -29,7 +29,8 @@ int gui_test_raw (string line);
 // events are waiting: the driver waits for them to be handled
 bool gui_test_busy ();
 // the texts drawn last in the window of the script, as
-// "x\ty\tw\th\ttext" (window points, from the top left of its content)
+// "x\ty\tw\th\tpath\ttext" (window points, from the top left of its
+// content; the path of the bars and menus it is in, see gui-driver.scm)
 array<string> gui_test_texts ();
 // call (gui-test-pump) at each turn of the event loop, while on; also
 // tells the port that the script holds the state of the mouse buttons
@@ -37,6 +38,9 @@ void gui_test_pump (bool on);
 // run a Scheme command at the next turn of the loop, as -x does
 // (the same on all ports)
 void gui_test_eval_later (string cmd);
+// the port calls it as its event loop starts: TEXMACS_TEST_SCRIPT=<file>
+// runs the script (the same on all ports)
+void gui_test_start ();
 
 // driving the Qt interface by the labels of its widgets (qt_test.cpp)
 int gui_test_snapshot (string dir);

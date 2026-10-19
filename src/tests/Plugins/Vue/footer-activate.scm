@@ -6,7 +6,9 @@
 ;; menu in the footer (Displayed formula > Inline formula), and a letter
 ;; typed then lands in the inner formula. No script: run it with
 ;;   sh tests/Plugins/Vue/run.sh footer-activate 40
-;; it quits by itself, with the status 1 if a check failed.
+;; it quits by itself, with the status 1 if a check failed. It runs in Vue
+;; and in Cocoa, which have the interactive footer (from the top of the
+;; source tree of either build).
 ;;
 ;; The preference is set in the home of the run (run.sh makes a copy of
 ;; the home for it and removes it afterwards).
@@ -23,7 +25,7 @@
                   (make 'math)
                   (insert "x")))
        (gt-wait 5000)
-       (gt-raw "window #2")
+       (gt-raw "window main")
        (gt-raw "focus")
        (gt-raw "key Escape")
        (gt-raw "key Left")

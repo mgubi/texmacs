@@ -80,6 +80,9 @@ public:
   } ;
   
   types type;
+  // the name of a (named ...) of the menus, "named:<name>", which its view
+  // or its menu item gets as identifier, for the scripted tests (ns_test.mm)
+  string test_name;
   
   ns_widget_rep (types _type=none);
   virtual ~ns_widget_rep ();

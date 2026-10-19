@@ -44,6 +44,7 @@
 (define gt-next-time 0)          ; no step before this time (gt-wait)
 (define gt-retrying #f)          ; the time at which the retried step began
 (define gt-quiet 0)              ; the turns in a row without waiting events
+(define gt-busy-time 0)          ; the last time the port was busy
 (define gt-exit? #f)             ; exit at the end, with the status
 (define gt-on-end #f)
 
@@ -90,7 +91,7 @@
 (tm-define (gui-test-pump)
   (:synopsis "Run the next step, if it is time (the port calls it)")
   (cond ((not gt-running?) (noop))
-        ((gui-test-busy?) (set! gt-quiet 0))
+        ((gui-test-busy?) (set! gt-quiet 0) (set! gt-busy-time (texmacs-time)))
         ((< (texmacs-time) gt-next-time) (set! gt-quiet (+ gt-quiet 1)))
         (else
           (set! gt-quiet (+ gt-quiet 1))
@@ -146,12 +147,17 @@
              'next)))
 
 (tm-define (gt-idle . opt)
-  (:synopsis "Wait until the port has had no event for a few turns")
-  ;; at most opt (ms, 10 s by default)
+  (:synopsis "Wait until the port has had nothing to do for a while")
+  ;; for 200 ms since the step began and since the port was last busy (Qt
+  ;; on macOS flashes a chosen menu item before running it), and five turns
+  ;; of the loop; at most opt ms (10 s by default)
   (with limit (if (nnull? opt) (car opt) 10000)
     (gt-step "idle"
              (lambda ()
-               (cond ((>= gt-quiet 5) 'next)
+               (cond ((and (>= gt-quiet 5)
+                           (>= (gt-retried-for) 200)
+                           (>= (- (texmacs-time) gt-busy-time) 200))
+                      'next)
                      ((> (gt-retried-for) limit)
                       (check-report #f "idle" "the port stayed busy")
                       'next)
@@ -242,7 +248,13 @@
     (gt-step (string-append "activate " label)
              (lambda ()
                (with box (gt-find-text label)
-                 (cond (box
+                 (cond ((and box (== (caddr box) 0) (== (cadddr box) 0))
+                        ;; an item without a box, of a native menu (Cocoa):
+                        ;; the port chooses it, by its place in the list
+                        (gui-test-raw (string-append "choose "
+                                                     (number->string (car box))))
+                        'next)
+                       (box
                         (with (x y w h) box
                           (gui-test-raw
                            (string-append "click "

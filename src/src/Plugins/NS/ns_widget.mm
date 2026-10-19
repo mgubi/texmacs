@@ -1205,6 +1205,12 @@ collect_tab_buttons (NSView* v, NSMutableArray* bs, int& active, bool in_active)
 widget division_widget (string name, widget w) {
   // NOTE: the other divisions only matter for the style of the Qt widgets
   if (is_nil (w)) return w;
+  if (starts (name, "named:")) {
+    // a (named ...) of the menus: its view or its menu item is marked
+    // (ns_ui_element_rep::as_nsview), for the scripted tests
+    concrete (w)->test_name= name;
+    return w;
+  }
   if (name == "section-active-tab") {
     // the button of the active tab (see TMSectionTabsView), marked in a
     // view which is kept (the widgets make a new view each time)

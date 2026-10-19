@@ -1,6 +1,7 @@
 #!/bin/sh
 #
-# Run one scripted test of the Vue GUI:
+# Run one scripted test of the Vue GUI (or of another port, with BIN= the
+# texmacs.bin of its build, run from the top of its source tree):
 #
 #   tests/Plugins/Vue/run.sh <test> [seconds]
 #
@@ -53,17 +54,19 @@ script=""
 
 TEXMACS_PATH="$PWD/TeXmacs" TEXMACS_HOME_PATH="$HOMEDIR" \
 TEXMACS_VUE_SNAPSHOT="$OUT" TEXMACS_VUE_SCRIPT="$script" \
+TEXMACS_TEST_SNAPSHOT="$OUT" TEXMACS_TEST_SCRIPT="$script" \
   "$BIN" ${TM_ARGS:-} ${load:+-x "$load"} > "$OUT/run.log" 2>&1 &
 p=$!
 
 # the lines the output must have (expect <text>), and whether they are all
-# there; the lines of the script itself (vue script: ...) do not count
+# there; the lines of the script itself (vue script: ..., qt script: ...)
+# do not count
 expects="$OUT/expects"
 : > "$expects"
 [ -n "$script" ] && tr -d '\r' < "$script" |
   sed -n 's/^[[:space:]]*expect[[:space:]][[:space:]]*//p' > "$expects"
 missing () {
-  grep -av "^vue script:" "$OUT/run.log" > "$OUT/output"
+  grep -avE "^[a-z]+ script:" "$OUT/run.log" > "$OUT/output"
   while IFS= read -r e; do
     grep -qaF -- "$e" "$OUT/output" || printf '%s\n' "$e"
   done < "$expects"
@@ -75,21 +78,21 @@ while [ $t -lt $((secs * 2)) ]; do
   sleep 0.5
   t=$((t + 1))
   if ! kill -0 $p 2>/dev/null; then ended=1; break; fi
-  if [ -s "$expects" ] && grep -aq "vue script: done" "$OUT/run.log" &&
+  if [ -s "$expects" ] && grep -aqE "^[a-z]+ script: done" "$OUT/run.log" &&
      [ -z "$(missing)" ]; then sleep 1; break; fi # (the last snapshot)
 done
 status=0
 if [ $ended = 1 ]; then wait $p 2>/dev/null; status=$?
 else kill -9 $p 2>/dev/null; wait $p 2>/dev/null; fi
 
-grep -av "^vue script: expect" "$OUT/run.log" |
-  grep -aE "choice:|got:|enum:|answer:|Error message|Invalid situation|FAILED|vue script: done"
+grep -avE "^[a-z]+ script: expect" "$OUT/run.log" |
+  grep -aE "choice:|got:|enum:|answer:|Error message|Invalid situation|FAILED|^[a-z]+ script: done"
 ls "$OUT"/*.png 2>/dev/null | sed "s|^|snapshot: |"
 [ "${KEEP:-0}" = 1 ] || rm -rf "${HOMEDIR:?}"
 
 why=""
 grep -aq "Error message" "$OUT/run.log" && why="$why; crashed"
-[ -n "$script" ] && ! grep -aq "vue script: done" "$OUT/run.log" &&
+[ -n "$script" ] && ! grep -aqE "^[a-z]+ script: done" "$OUT/run.log" &&
   why="$why; the script did not end"
 grep -aq "FAILED \[" "$OUT/run.log" && why="$why; a check failed"
 [ $ended = 1 ] && [ $status != 0 ] && why="$why; exit status $status"

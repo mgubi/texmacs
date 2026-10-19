@@ -271,6 +271,7 @@ extern string vue_test_context;      // the path of what is being laid out
 extern string vue_test_label;        // the first text or icon laid out since
                                      // it was emptied (the label of a button)
 void   vue_test_note_label (string s);
+bool   vue_is_editor_window (vue_widget content); // window main
 string vue_test_icon (void* ref);    // "<path>\ticon:<name>" of a picture
 struct with_test_context {
   string saved;

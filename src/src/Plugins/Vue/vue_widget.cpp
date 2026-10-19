@@ -5728,6 +5728,16 @@ vue_texmacs_widget_rep::vue_texmacs_widget_rep (int _mask, command _quit)
   right_footer= translate ("Booting");
 };
 
+// a window of an editor (window main of the scripts, vue_gui.cpp): its
+// content is the editor, not a dialog or a popup
+bool
+vue_is_editor_window (vue_widget content) {
+  if (is_nil (content) || content->type != "vue_plain_window_widget") return false;
+  vue_plain_window_widget_rep* p=
+    static_cast<vue_plain_window_widget_rep*> (content.rep);
+  return !is_nil (p->wid) && concrete (p->wid)->type == "vue_texmacs_widget_rep";
+}
+
 
 void
 vue_texmacs_widget_rep::send (slot s, blackbox val) {

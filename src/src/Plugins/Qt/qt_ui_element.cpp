@@ -613,11 +613,25 @@ qt_ui_element_rep::as_qaction () {
     {
       url    image = open_box<url>(load);
       act = new QTMAction (NULL);
+      // the name of its file, by which the scripted tests name it
+      act->setProperty ("tmIcon", to_qstring (basename (image)));
 #if QT_VERSION >= 0x060000
       act->setIcon(tmapp()->icon_manager().getIcon(image));
 #else
       act->setIcon (QIcon (as_pixmap (*xpm_image (image))));
 #endif
+    }
+      break;
+
+    case division_widget:
+    {
+      // a division in a menu: the action of what it holds, which keeps the
+      // name of the division (a (named ...) of the menus, which the
+      // scripted tests read, see qt_test.cpp)
+      typedef pair<string, widget> T;
+      T x = open_box<T>(load);
+      act = concrete (x.x2)->as_qaction ();
+      if (act != NULL) act->setObjectName (to_qstring (x.x1));
     }
       break;
 
@@ -952,6 +966,7 @@ qt_ui_element_rep::as_qwidget (QWidget* parent_widget) {
         b->setPopupMode (QToolButton::InstantPopup);
         b->setAutoRaise (true);
         b->setMenu (lm);
+        b->setProperty ("tmIcon", to_qstring (basename (image)));
         qwid = b;
       } else if (qtw->type == text_widget) {
         typedef quartet<string, int, color, bool> T1;
@@ -1078,6 +1093,7 @@ qt_ui_element_rep::as_qwidget (QWidget* parent_widget) {
     {
       url image = open_box<url>(load);
       QLabel* l = new QLabel (parent_widget);
+      l->setProperty ("tmIcon", to_qstring (basename (image)));
 #if QT_VERSION >= 0x060000
       QIcon tmp= tmapp()->icon_manager().getIcon(image);
       l->setPixmap (tmp.pixmap(tmp.availableSizes().last()));
