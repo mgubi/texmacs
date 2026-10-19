@@ -201,7 +201,9 @@
   ;; "Format > Font > Bold": the text Bold, in the path of which come Format
   ;; and Font (the bars are menubar, mainbar, modebar, focusbar, userbar,
   ;; footer, prompt, lefttools, sidetools, bottomtools, extratools); an
-  ;; icon is icon:<name>. The text equal to the last name, else one which
+  ;; icon is icon:<name>; #name is what a (named "name" ...) of the menus
+;; holds (in the path, or as the last name, the text or icon in
+;; it). The text equal to the last name, else one which
   ;; starts with it; the last one drawn, the topmost (a menu is drawn over
   ;; the window)
   (let* ((names (string-decompose selector " > "))
@@ -211,7 +213,11 @@
                          (lambda (e) (gt-in-path? above (list-ref e 4)))))
          (same (list-filter l (lambda (e) (gt-same? label (list-ref e 5)))))
          (starts (list-filter l (lambda (e) (gt-starts? label (list-ref e 5)))))
-         (found (if (nnull? same) same starts)))
+         ;; #name, a (named "name" ...) of the menus: what it holds
+         (named (list-filter l (lambda (e) (in? label (list-ref e 4)))))
+         (found (cond ((string-starts? label "#") named)
+                      ((nnull? same) same)
+                      (else starts))))
     (and (nnull? found) (sublist (cAr found) 0 4))))
 
 (define (gt-texts-summary)

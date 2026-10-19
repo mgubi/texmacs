@@ -85,6 +85,7 @@ buttons whose menus it is in.
 | `Format > Font effects > Embold` | Embold in the submenu Font effects of the menu Format |
 | `footer > equation*` | the tag equation* of the interactive footer |
 | `mainbar > icon:tm_save` | the icon of the file `tm_save.svg` (or `.xpm`, `.png`...) in the main tool bar |
+| `#second` | what a `(named "second" ...)` of the menus holds (below) |
 
 The names before the last need not be the whole path, only some of it in
 order: `Font effects > Embold` is enough. The bars are `menubar`,
@@ -94,6 +95,22 @@ order: `Font effects > Embold` is enough. The bars are `menubar`,
 without the dots of an item which opens a dialog (`Font` for `Font...`),
 or, for want of one, the beginning of a text. When several texts match,
 the last one drawn is taken, the topmost (an open menu).
+
+For the corner cases which the place does not settle (two buttons with the
+same label side by side, an icon used twice in a bar), the menus may give
+items a name, with nothing else changed:
+
+```scheme
+(named "first"  ("Same" (do-one)))
+(named "second" ("Same" (do-other)))
+```
+
+The items are laid out as without it, and in Vue their path gets `#first`:
+`#first > Same` names the button, and `#second` alone the text or icon in
+`second` (the last drawn). On the ports without the hooks of the tests,
+`named` is its items as they are. Use it only when a test needs it: the
+places of the bars and menus are enough otherwise. The test `named` tries
+it.
 
 The names are written in English: a name is also taken in the language of
 the interface (`translate`), so that `menubar > Insert` opens Insérer in a

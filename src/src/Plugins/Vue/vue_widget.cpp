@@ -2709,6 +2709,13 @@ vue_ui_rep::do_layout () {
     // misc/themes): title and subtitle bars of the tools, discrete texts,
     // section bars; "plain" and unknown names are transparent containers
     vue_division_widget d= open_box<vue_division_widget> (data);
+    if (starts (d.name, "named:")) {
+      // a (named ...) of the menus: no element, a name in the path of what
+      // it holds, for the scripted tests (with_test_context)
+      with_test_context c ("#" * d.name (6, N(d.name)));
+      concrete (d.w)->do_layout ();
+      return;
+    }
     Clay_ElementId div_id= CLAY_SIDI (CLAY_TM_STRING (type), id);
     int saved_style= context_style;
     bool saved_title= in_title_bar;

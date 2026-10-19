@@ -67,6 +67,7 @@
     (vlist :menu-item-list)
     (division :%1 :menu-item-list)
     (class :%1 :menu-item-list)
+    (named :string? :menu-item-list)
     (aligned :menu-item-list)
     (aligned-item :%2)
     (tabs :menu-item-list)
@@ -575,6 +576,18 @@
     (with inner (make-menu-items (list (cons 'vertical items)) style #f)
       (widget-division (name) (car inner)))))
 
+(define (make-menu-named p style bar?)
+  "Make @(named :string? :menu-item-list) items."
+  ;; for the scripted tests (docs/gui-scripting.md): the items are those of
+  ;; the menu, which a test can name by #name, where they are in a division
+  ;; "named:name" (Vue puts the name in their path); not on the ports
+  ;; without the hooks of the tests, where a division would change them
+  (with (tag name . items) p
+    (with l (make-menu-items items style bar?)
+      (if (== (gui-test-port) "") l
+          (map (lambda (w) (widget-division (string-append "named:" name) w))
+               l)))))
+
 (define (make-menu-class p style)
   "Make @(class :%1 :menu-item-list) item."
   (with (tag name . items) p
@@ -909,6 +922,8 @@
             ,(lambda (p style bar?) (list (make-menu-division p style))))
   (class (:%1 :*)
             ,(lambda (p style bar?) (list (make-menu-class p style))))
+  (named (:string? :*)
+         ,(lambda (p style bar?) (make-menu-named p style bar?)))
   (aligned (:*)
          ,(lambda (p style bar?) (list (make-aligned p style))))
   (aligned-item (:%2)
@@ -1172,6 +1187,7 @@
   (vlist ,(lambda (p) `(vlist ,@(menu-expand-list (cdr p)))))
   (division ,(lambda (p) `(division ,((cadr p)) ,@(menu-expand-list (cddr p)))))
   (class ,(lambda (p) `(class ,(cadr p) ,@(menu-expand-list (cddr p)))))
+  (named ,(lambda (p) `(named ,(cadr p) ,@(menu-expand-list (cddr p)))))
   (aligned ,(lambda (p) `(aligned ,@(menu-expand-list (cdr p)))))
   (aligned-item ,(lambda (p) `(aligned-item ,@(menu-expand-list (cdr p)))))
   (tabs ,(lambda (p) `(tabs ,@(menu-expand-list (cdr p)))))

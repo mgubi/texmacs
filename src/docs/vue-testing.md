@@ -209,6 +209,7 @@ callback output.
 | `sockets` | the TeXmacs server and an anonymous legacy client in the same instance (see below) |
 | `footer-menus` | the interactive footer: the menu of a theorem from inside a strong makes it a lemma, the letter typed then lands in the strong; the Document menu (`got: (lemma strong) (0 0 0 0 1 0 2)`) |
 | `footer-variants` | the menu of a displayed formula in the footer makes it inline while the cursor is in an inline formula inside it, and the cursor goes back there (`got: (math text math) ...`) |
+| `named` | `(named "name" ...)` in the menus: two buttons with the same label told apart by the names of their groups (`#second`, `#first > Same`); steps of the driver in its `.scm`, without a script |
 | `footer-activate` | `footer-variants` written as steps of the driver in its `.scm`, without a script: the menus are found by their texts (`gt-activate`), the result is checked (`gt-check`) and TeXmacs quits with the status |
 
 One more is not run this way. `sockets-tls` repeats the `sockets` exchange
