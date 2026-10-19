@@ -36,7 +36,8 @@ plus the following branches, merged in:
 
 Until 18 October 2026 it was called *Max's TeXmacs*, on the branch
 `maxs_texmacs` (with the CI branch `maxs_ci` and the pre-release
-`maxs-latest`), which stay on GitHub as they were then.
+`maxs-latest`); these were removed on 19 October 2026, their history being
+that of `upsilon_texmacs`.
 
 The branches are merged, not rebased, so each one can still be followed,
 updated and proposed upstream on its own; fixes found while integrating

@@ -18,7 +18,7 @@ name: Linux and Windows (upsilon_texmacs, Qt and Vue)
 
 on:
   push:
-    branches: [upsilon_ci, maxs_ci]
+    branches: [upsilon_ci]
   workflow_dispatch:
 
 concurrency:

@@ -37,7 +37,7 @@ name: macOS (upsilon_texmacs, Cocoa, Vue and Qt)
 
 on:
   push:
-    branches: [upsilon_ci, maxs_ci]
+    branches: [upsilon_ci]
   workflow_dispatch:
 
 env:
