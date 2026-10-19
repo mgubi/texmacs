@@ -280,6 +280,11 @@
   <paragraph|19 October 2026>
 
   <\itemize>
+    <item>After a turn of the wheel of a mouse the page no longer goes on
+    moving for two seconds (the wheel was taken for a trackpad, after which
+    the page glided): the page glides only after a finger, since the
+    browsers and the systems glide after a trackpad themselves.
+
     <item>Touch screens (an <name|iPad>, a phone): a tap on an item of a
     menu chooses it (nothing happened: the items of the menus only worked
     with a mouse or a trackpad), a finger dragged over a document scrolls

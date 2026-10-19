@@ -14,6 +14,18 @@ have the details, and the problems go to the
 
 ## 19 October 2026
 
+- **Browser**: after a turn of the wheel of a mouse the page no longer goes
+  on moving for two seconds (the wheel was taken for a trackpad, after which
+  the page glided); the page glides only after a finger, the browsers and
+  the systems glide after a trackpad themselves
+  ([#375](https://github.com/mgubi/texmacs/issues/375)).
+- **Desktop**: with the Vue interface on Linux, a wheel turned fast scrolls
+  as far as one turned slowly (the notches which came fast were taken for a
+  trackpad, and scrolled 10 points instead of 80;
+  [#373](https://github.com/mgubi/texmacs/issues/373)); where no file
+  dialog can be shown (neither zenity nor the desktop portal), a window says
+  what to install, instead of a line on the terminal
+  ([#374](https://github.com/mgubi/texmacs/issues/374)).
 - **Browser**: touch screens (an iPad, a phone). A tap on an item of a menu
   chooses it: nothing happened, the items of the menus only worked with a
   mouse or a trackpad. A finger dragged over a document scrolls it, and goes

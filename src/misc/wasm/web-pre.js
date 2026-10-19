@@ -51,18 +51,19 @@ Module['preRun'].push(function () {
   // the windows of TeXmacs are the tabs of the page (vue_gui.cpp, where
   // this is always so in the browser): for Scheme (tm-view.scm)
   ENV['TEXMACS_VUE_SINGLE_WINDOW'] = '1';
-  // ?env=NAME=VALUE (several may be given): a variable of the environment
-  // of TeXmacs, for debugging (TEXMACS_FL_TRACE=catch, say)
-  for (const e of tmAddress.getAll ('env')) {
-    const i = e.indexOf ('=');
-    if (i > 0) ENV[e.slice (0, i)] = e.slice (i + 1);
-  }
   // the look and feel of TeXmacs follows the platform of the browser, whose
   // shortcuts are Cmd+... on a Mac (src/Kernel/Abstractions/basic.cpp)
   var platform = (typeof navigator === 'undefined') ? '' :
     (navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || '';
   ENV['TEXMACS_WEB_PLATFORM'] = /mac|iphone|ipad/i.test (platform) ? 'macos' :
                                 /win/i.test (platform) ? 'windows' : 'other';
+  // ?env=NAME=VALUE (several may be given): a variable of the environment
+  // of TeXmacs, for debugging (TEXMACS_FL_TRACE=catch, or
+  // TEXMACS_WEB_PLATFORM=other for the behaviour of the page on Linux)
+  for (const e of tmAddress.getAll ('env')) {
+    const i = e.indexOf ('=');
+    if (i > 0) ENV[e.slice (0, i)] = e.slice (i + 1);
+  }
   // texmacs.html?profile=<n>: the profile of the loop, every n frames, in
   // the console (TEXMACS_VUE_PROFILE, see vue_profile_frame in vue_gui.cpp)
   var prof = /^\d+$/.exec (tmAddress.get ('profile') || '');

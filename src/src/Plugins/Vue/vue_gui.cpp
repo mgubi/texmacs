@@ -3334,7 +3334,7 @@ vue_pretty_image_size (url image, string& w, string& h) {
   vue_pretty_image_size (pic->get_width (), pic->get_height (), w, h);
 }
 struct vue_dialog_result;
-static void vue_dialog_finish (vue_dialog_result* res, char* file, bool chosen);
+static void vue_dialog_finish (vue_dialog_result* res, char* file, int code);
 extern Uint32 vue_dialog_event;
 void process_messages ();
 void process_layout ();
@@ -3414,6 +3414,36 @@ static const bool wheel_system_momentum= true; // the system glides for us
 static const bool wheel_system_momentum= false;
 #endif
 
+// does a whole step which follows the first one of a stream within
+// wheel_burst_dt come from a trackpad (see above)? On the Mac, where a fast
+// swipe of a trackpad may open with whole steps; elsewhere the steps of a
+// trackpad have fractions, and whole steps which come fast are a wheel
+// spun fast (taken for a trackpad, a notch scrolled 10 points instead of
+// 80 on Linux, issue #373)
+#if defined(__EMSCRIPTEN__)
+#define wheel_bursts_are_swipes (wheel_system_momentum_of ())
+#elif defined(OS_MACOS)
+static const bool wheel_bursts_are_swipes= true;
+#else
+static const bool wheel_bursts_are_swipes= false;
+#endif
+
+// does the view glide when the events of a trackpad stop? Not where the
+// system glides itself (macOS), and not in a browser at all: there a mouse
+// wheel may come as deltas in pixels, which are taken for a trackpad, and
+// the page went on moving for two seconds after the wheel (issue #375); the
+// browsers and the systems glide after a trackpad themselves. A finger
+// dragged on a touch screen glides everywhere (touch_scroll)
+static bool
+wheel_glides (const vue_input_state& in) {
+  if (in.wheel_touch) return true;
+#ifdef __EMSCRIPTEN__
+  return false;
+#else
+  return !wheel_system_momentum;
+#endif
+}
+
 // deliver a wheel delta (device pixels) to the window: to the widgets
 // (mouse_action) and to the Clay scroll container under the pointer
 static void
@@ -3482,8 +3512,9 @@ wheel_event (vue_window win, double x, double y, time_t now, uint64_t stamp) {
   // fractional deltas are a trackpad; so is a second event which follows
   // the opening one too soon for a wheel to have turned twice (see above)
   bool precise= (x != floor (x) || y != floor (y)) ||
-                (in.wheel_ambiguous && !fresh && dt <= wheel_burst_dt);
-  in.wheel_ambiguous= fresh && !precise;
+                (wheel_bursts_are_swipes &&
+                 in.wheel_ambiguous && !fresh && dt <= wheel_burst_dt);
+  in.wheel_ambiguous= wheel_bursts_are_swipes && fresh && !precise;
   if (precise && !in.wheel_precise) {
     in.wheel_precise= true;
     // the stream opened with whole deltas and was taken for a notch: take
@@ -3595,7 +3626,7 @@ wheel_step () {
       // a notch travels by itself and the system glides for a trackpad
       // where it does the momentum: neither wants a glide of ours
       if (hypot (in.wheel_est_x, in.wheel_est_y) >= wheel_launch_speed &&
-          in.wheel_precise && (!wheel_system_momentum || in.wheel_touch)) {
+          in.wheel_precise && wheel_glides (in)) {
         in.wheel_vx= in.wheel_est_x;
         in.wheel_vy= in.wheel_est_y;
         in.wheel_time= now;
@@ -5337,7 +5368,7 @@ process_event (SDL_Event *event) {
     // the result of a file dialog, pushed by its callback (which may run
     // on another thread): the command runs here, on the main thread
     vue_dialog_finish ((vue_dialog_result*) event->user.data1,
-                       (char*) event->user.data2, event->user.code != 0);
+                       (char*) event->user.data2, event->user.code);
     return;
   }
   switch (event->type) {
@@ -6601,17 +6632,20 @@ file_dialog_callback (void* userdata, const char* const* filelist,
   // filled and freed by vue_dialog_finish, on the main thread
   (void) filter_index;
   char* file= NULL;
-  bool chosen= false;
-  if (filelist == NULL)
+  int code= 0; // 0 cancelled, 1 chosen, 2 no dialog (file: the error)
+  if (filelist == NULL) {
     SDL_Log ("File dialog error: %s", SDL_GetError ());
+    file= SDL_strdup (SDL_GetError ());
+    code= 2;
+  }
   else if (*filelist != NULL) { // NULL: cancelled
     file= SDL_strdup (*filelist);
-    chosen= (file != NULL);
+    code= (file != NULL) ? 1 : 0;
   }
   SDL_Event ev;
   SDL_zero (ev);
   ev.type= vue_dialog_event;
-  ev.user.code= chosen ? 1 : 0;
+  ev.user.code= code;
   ev.user.data1= userdata;
   ev.user.data2= file;
   if (!SDL_PushEvent (&ev)) {
@@ -6623,8 +6657,26 @@ file_dialog_callback (void* userdata, const char* const* filelist,
 
 // called from the main loop when the event pushed above arrives
 static void
-vue_dialog_finish (vue_dialog_result* res, char* file, bool chosen) {
+vue_dialog_finish (vue_dialog_result* res, char* file, int code) {
+  if (code == 2) {
+    // no dialog could be shown: on Linux, SDL shows those of the desktop
+    // portal or of the program zenity, and the system may have neither
+    // (issue #374); said in a window, not only on the terminal
+    string err= (file != NULL) ? string (file, (int) strlen (file)) : string ("");
+    SDL_free (file);
+    file= NULL;
+    // (the message is one line: short; SDL's error is on the terminal)
+#if defined(OS_GNU_LINUX) || defined(__linux__)
+    string msg= "No file dialog: install zenity, or xdg-desktop-portal "
+                "with a backend (-gtk, -kde)";
+#else
+    string msg= "The file dialog of the system could not be shown";
+    if (N(err) > 0) msg << ": " << err;
+#endif
+    call ("show-message", object (msg), object ("File dialog"));
+  }
   if (res == NULL) { SDL_free (file); return; }
+  bool chosen= (code == 1);
   res->chosen= chosen && file != NULL;
   if (res->chosen) res->file= string (file, (int) strlen (file));
   SDL_free (file);
