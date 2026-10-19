@@ -131,6 +131,41 @@ evaluate_modulo (tree t) {
   return evaluate_error ("bad modulo");
 }
 
+tree
+evaluate_min_max (tree t) {
+  int i, n= N(t);
+  if (n==0) return evaluate_error ("bad min/max");
+  tree first= evaluate (t[0]);
+  if (is_double (first)) {
+    double ret= as_double (first);
+    for (i=1; i<n; i++) {
+      tree next= evaluate (t[i]);
+      if (!is_double (next))
+	return evaluate_error ("bad min/max");
+      if (is_func (t, MINIMUM))
+	ret= min (ret, as_double (next));
+      else
+	ret= max (ret, as_double (next));
+    }
+    return as_string (ret);
+  }
+  else if (is_anylen (first)) {
+    tree ret= as_tmlen (first);
+    for (i=1; i<n; i++) {
+      tree next= evaluate (t[i]);
+      if (!is_anylen (next))
+	return evaluate_error ("bad min/max");
+      next= as_tmlen (next);
+      if (is_func (t, MINIMUM))
+	ret= tmlen_min (ret, next);
+      else
+	ret= tmlen_max (ret, next);
+    }
+    return ret;
+  }
+  else return evaluate_error ("bad min/max");
+}
+
 /******************************************************************************
 * Elementary functions
 ******************************************************************************/
@@ -218,4 +253,36 @@ evaluate_blend (tree t) {
     return get_hex_color (blend_colors (c1, c2));
   }
   return evaluate_error ("bad blend");
+}
+
+tree
+evaluate_rgb_color (tree t) {
+  if (N(t)!=3 && N(t)!=4) return evaluate_error ("bad rgb-color");
+  tree t1= evaluate (t[0]);
+  tree t2= evaluate (t[1]);
+  tree t3= evaluate (t[2]);
+  tree t4= (N(t)==4? evaluate (t[3]): tree ("255"));
+  if (!(is_int (t1) && is_int (t2) && is_int (t3) && is_int (t4)))
+    return evaluate_error ("bad rgb-color");
+  color c= rgb_color (as_int (t1), as_int (t2), as_int (t3), as_int (t4));
+  return get_hex_color (c);
+}
+
+tree
+evaluate_rgb_access (tree t) {
+  if (N(t)!=2) return evaluate_error ("bad rgb-access");
+  tree t1= evaluate (t[0]);
+  tree t2= evaluate (t[1]);
+  if (is_compound (t1) || is_compound (t2))
+    return evaluate_error ("bad rgb-access");
+  string s1= t1->label;
+  if (!(is_color_name (s1))) return evaluate_error ("bad rgb-access");
+  color c= named_color (s1);
+  int r, g, b, a;
+  get_rgb_color (c, r, g, b, a);
+  if (starts (t2->label, "r") || t2->label == "0") return as_string (r);
+  if (starts (t2->label, "g") || t2->label == "1") return as_string (g);
+  if (starts (t2->label, "b") || t2->label == "2") return as_string (b);
+  if (starts (t2->label, "a") || t2->label == "3") return as_string (a);
+  return evaluate_error ("bad rgb-access");
 }

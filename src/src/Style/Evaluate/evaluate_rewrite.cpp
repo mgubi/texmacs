@@ -184,13 +184,13 @@ rewrite_impl (tree t) {
 
 tree
 rewrite (tree t) {
-  cout << "Rewrite "
+  if (style_trace) cout << "Rewrite "
     //<< "[" << (t.operator -> ())
     //<< ", " << (std_env.operator -> ()) << "] "
        << t << INDENT << LF;
   memorizer mem= rewrite_memorizer (std_env, t);
   if (is_memorized (mem)) {
-    cout << UNINDENT << "Memorized " << mem->get_tree () << LF;
+    if (style_trace) cout << UNINDENT << "Memorized " << mem->get_tree () << LF;
     std_env= mem->get_environment ();
     return mem->get_tree ();
   }
@@ -200,7 +200,7 @@ rewrite (tree t) {
   mem->set_tree (r);
   mem->set_environment (std_env);
   memorize_end ();
-  cout << UNINDENT << "Rewritten as " << mem->get_tree () << LF;
+  if (style_trace) cout << UNINDENT << "Rewritten as " << mem->get_tree () << LF;
   return mem->get_tree ();
 }
 

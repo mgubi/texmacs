@@ -17,11 +17,12 @@
 
 tree
 evaluate_or (tree t) {
+  // as the typesetter: the first value which is not false (tmdoc-file
+  // uses it to return the first file found)
   if (N(t)<2) return evaluate_error ("bad or");
   for (int i=0; i<N(t); i++) {
     tree u= evaluate (t[i]);
-    if (!is_bool (u)) return evaluate_error ("bad or");
-    if (as_bool (u)) return as_string_bool (true);
+    if (u != "false") return u;
   }
   return as_string_bool (false);
 }
@@ -38,13 +39,13 @@ evaluate_xor (tree t) {
 
 tree
 evaluate_and (tree t) {
+  // as the typesetter: false, or else the last value
   if (N(t)<2) return evaluate_error ("bad and");
-  for (int i=0; i<N(t); i++) {
+  for (int i=0; i<N(t)-1; i++) {
     tree u= evaluate (t[i]);
-    if (!is_bool (u)) return evaluate_error ("bad and");
-    if (!as_bool (u)) return as_string_bool (false);
+    if (u == "false") return u;
   }
-  return as_string_bool (true);
+  return evaluate (t[N(t)-1]);
 }
 
 tree

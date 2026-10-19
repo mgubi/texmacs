@@ -31,6 +31,7 @@ class environment;
 ******************************************************************************/
 
 extern int memorizer_count;
+extern bool style_trace; // trace the evaluations (debug flag "style")
 class memorizer;
 class memorizer_rep: public abstract_struct {
 public:

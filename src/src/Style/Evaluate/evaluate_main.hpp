@@ -46,6 +46,8 @@ tree as_tmlen (tree t);
 tree tmlen_plus (tree t1, tree t2);
 tree tmlen_times (double sc, tree t);
 tree tmlen_over (tree t1, tree t2);
+tree tmlen_min (tree t1, tree t2);
+tree tmlen_max (tree t1, tree t2);
 
 /* Macro expansion */
 tree evaluate_assign (tree t);
@@ -82,6 +84,7 @@ tree evaluate_plus_minus (tree t);
 tree evaluate_times_over (tree t);
 tree evaluate_divide (tree t);
 tree evaluate_modulo (tree t);
+tree evaluate_min_max (tree t);
 tree evaluate_math_sqrt (tree t);
 tree evaluate_exp (tree t);
 tree evaluate_log (tree t);
@@ -97,8 +100,10 @@ tree evaluate_date (tree t);
 tree evaluate_translate (tree t);
 tree evaluate_change_case (tree t);
 tree evaluate_find_file (tree t);
+tree evaluate_find_file_upwards (tree t);
 tree evaluate_is_tuple (tree t);
 tree evaluate_lookup (tree t);
+tree evaluate_occurs_inside (tree t);
 tree evaluate_equal (tree t);
 tree evaluate_unequal (tree t);
 tree evaluate_less (tree t);
@@ -106,6 +111,8 @@ tree evaluate_lesseq (tree t);
 tree evaluate_greater (tree t);
 tree evaluate_greatereq (tree t);
 tree evaluate_blend (tree t);
+tree evaluate_rgb_color (tree t);
+tree evaluate_rgb_access (tree t);
 
 /* Length units */
 tree evaluate_cm_length ();
@@ -138,6 +145,8 @@ tree evaluate_gh_length ();
 tree evaluate_gu_length ();
 tree evaluate_tmpt_length ();
 tree evaluate_px_length ();
+tree evaluate_ms_length ();
+tree evaluate_s_length ();
 tree evaluate_msec_length ();
 tree evaluate_sec_length ();
 tree evaluate_min_length ();
@@ -145,11 +154,13 @@ tree evaluate_hr_length ();
 
 /* Miscellaneous primitives */
 tree evaluate_formatting (tree t, string v);
+tree evaluate_box_extents (tree t);
 tree evaluate_table (tree t);
 tree evaluate_hard_id (tree t);
 tree evaluate_script (tree t);
 tree evaluate_set_binding (tree t);
 tree evaluate_get_binding (tree t);
+tree evaluate_has_binding (tree t);
 tree evaluate_pattern (tree t);
 tree evaluate_point (tree t);
 //tree evaluate_box_info (tree t);

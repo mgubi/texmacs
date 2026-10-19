@@ -14,6 +14,7 @@
 #include "std_environment.hpp"
 #include "vars.hpp"
 #include "drd_std.hpp"
+#include "analyze.hpp"
 
 /******************************************************************************
 * Some trees need to be defined only once (ensuring a fixed address)
@@ -492,13 +493,13 @@ rewrite_inactive (tree t, inactive_style sty) {
       return tree (CONCAT, quote1, t, quote2);
     return t;
   }
-  cout << "Inactive "
-       << "[" << (t.operator -> ())
-       << ", " << (std_env.operator -> ()) << "] "
+  if (style_trace) cout << "Inactive "
+       << "[" << as_hexadecimal ((pointer) t.operator -> ())
+       << ", " << as_hexadecimal ((pointer) std_env.operator -> ()) << "] "
        << t << INDENT << LF;
   memorizer mem= inactive_memorizer (std_env, t, sty);
   if (is_memorized (mem)) {
-    cout << UNINDENT << "Memorized " << mem->get_tree () << LF;
+    if (style_trace) cout << UNINDENT << "Memorized " << mem->get_tree () << LF;
     std_env= mem->get_environment ();
     return mem->get_tree ();
   }
@@ -507,7 +508,7 @@ rewrite_inactive (tree t, inactive_style sty) {
   mem->set_tree (r);
   mem->set_environment (std_env);
   memorize_end ();
-  cout << UNINDENT << "Rewritten as " << mem->get_tree () << LF;
+  if (style_trace) cout << UNINDENT << "Rewritten as " << mem->get_tree () << LF;
   return mem->get_tree ();
 }
 

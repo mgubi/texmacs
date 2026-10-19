@@ -1104,11 +1104,13 @@ edit_interface_rep::apply_changes () {
   if (env_change & THE_ENVIRONMENT)
     environment_update ();
   if (env_change & THE_TREE) {
-    cout << HRULE;
+    if (DEBUG_STYLE) cout << HRULE;
     mem= evaluate (ste, cct);
     tree rew= mem->get_tree ();
-    cout << HRULE;
-    cout << tree_to_texmacs (rew) << LF;
+    if (DEBUG_STYLE) {
+      cout << HRULE;
+      cout << tree_to_texmacs (rew) << LF;
+    }
     //print_tree (rew);
   }
 #endif

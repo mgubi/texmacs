@@ -107,7 +107,7 @@ enum { DEBUG_FLAG_AUTO, DEBUG_FLAG_VERBOSE, DEBUG_FLAG_EVENTS,
        DEBUG_FLAG_QT_WIDGETS, DEBUG_FLAG_KEYBOARD, DEBUG_FLAG_PACKRAT,
        DEBUG_FLAG_FLATTEN, DEBUG_FLAG_PARSER, DEBUG_FLAG_CORRECT,
        DEBUG_FLAG_CONVERT, DEBUG_FLAG_REMOTE, DEBUG_FLAG_LIVE,
-       DEBUG_FLAG_FONTS };
+       DEBUG_FLAG_FONTS, DEBUG_FLAG_STYLE };
 bool debug (int which, bool write_flag= false);
 int  debug_off ();
 void debug_on (int status);
@@ -134,6 +134,7 @@ bool debug_get (string s);
 #define DEBUG_REMOTE (debug (DEBUG_FLAG_REMOTE))
 #define DEBUG_LIVE (debug (DEBUG_FLAG_LIVE))
 #define DEBUG_FONTS (debug (DEBUG_FLAG_FONTS))
+#define DEBUG_STYLE (debug (DEBUG_FLAG_STYLE))
 #define DEBUG_AQUA (debug (DEBUG_FLAG_QT))
 #define DEBUG_AQUA_WIDGETS (debug (DEBUG_FLAG_QT_WIDGETS))
 

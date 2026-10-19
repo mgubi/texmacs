@@ -207,6 +207,28 @@ evaluate_find_file (tree t) {
   return "false";
 }
 
+tree
+evaluate_find_file_upwards (tree t) {
+  if (N(t) < 1) return evaluate_error ("bad find file upwards");
+  tree name= evaluate (t[0]);
+  array<string> roots;
+  for (int i=1; i<N(t); i++) {
+    tree root= evaluate (t[i]);
+    if (!is_atomic (name) || !is_atomic (root))
+      return evaluate_error ("bad find file upwards");
+    roots << root->label;
+  }
+  if (!is_atomic (name)) return evaluate_error ("bad find file upwards");
+  url base_file_name (as_string (std_env["base-file-name"]));
+  url u= search_file_upwards (base_file_name, name->label, roots);
+  if (!is_none (u)) {
+    url d= delta (base_file_name, u);
+    if (!is_rooted (d)) return as_string (d);
+    return as_string (u);
+  }
+  return "false";
+}
+
 /******************************************************************************
 * Routines on tuples
 ******************************************************************************/
@@ -228,4 +250,22 @@ evaluate_lookup (tree t) {
   if (i < 0 || i >= N(t1))
     return evaluate_error ("index out of range in look up");
   return t1[i];
+}
+
+static bool
+occurs_inside (tree w, tree t) {
+  if (t == w) return true;
+  if (is_atomic (t)) return false;
+  for (int i=0; i<N(t); i++)
+    if (occurs_inside (w, t[i])) return true;
+  return false;
+}
+
+tree
+evaluate_occurs_inside (tree t) {
+  // with the alternative macro expansion, the second argument (an <arg>
+  // in the typesetter) has already been substituted by its value
+  if (N(t)!=2) return evaluate_error ("bad look up");
+  tree t1= evaluate (t[0]);
+  return as_string_bool (occurs_inside (t1, t[1]));
 }

@@ -110,4 +110,5 @@
   ("correct" (debug-toggle "correct"))
   ("convert" (debug-toggle "convert"))
   ("remote" (debug-toggle "remote"))
-  ("fonts" (debug-toggle "fonts")))
+  ("fonts" (debug-toggle "fonts"))
+  ("style" (debug-toggle "style")))

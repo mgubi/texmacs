@@ -73,6 +73,7 @@ debug_set (string s, bool on) {
   else if (s == "remote") debug_set (DEBUG_FLAG_REMOTE, on);
   else if (s == "live") debug_set (DEBUG_FLAG_LIVE, on);
   else if (s == "fonts") debug_set (DEBUG_FLAG_FONTS, on);
+  else if (s == "style") debug_set (DEBUG_FLAG_STYLE, on);
 }
 
 static bool
@@ -101,6 +102,7 @@ debug_get (string s) {
   else if (s == "remote") return debug_get (DEBUG_FLAG_REMOTE);
   else if (s == "live") return debug_get (DEBUG_FLAG_LIVE);
   else if (s == "fonts") return debug_get (DEBUG_FLAG_FONTS);
+  else if (s == "style") return debug_get (DEBUG_FLAG_STYLE);
   else return false;
 }
 

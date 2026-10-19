@@ -84,8 +84,12 @@ Only with `EXPERIMENTAL`:
   still does its own evaluation. `apply_changes` does nothing headless, so
   the rewriter runs only with a window.
 
-The evaluator traces every call to `cout` (`Evaluate`, `Memorized`,
-`Computed`), which makes the build unusable for anything but this test.
+With the debug flag `style` (Debug ▸ style, or `(debug-set "style" #t)`)
+the evaluator traces every call to `cout` (`Evaluate`, `Memorized`,
+`Computed`, with the addresses of the tree and the environment), and the
+editor prints the rewritten document after each change. The flag is read
+once per evaluation of the document (`memorize_initialize`), so the
+indentation stays balanced.
 
 ## State (2026-10-19)
 
@@ -108,24 +112,41 @@ conventions and style pages of the manual). On an edit, only the path to the
 change is evaluated again and the siblings come from the memorizers, as
 designed.
 
-### Primitives the rewriter lacks
+### Primitives
 
-`evaluate_impl` handles 130 tags; `edit_env_rep::exec` 177. The rewriter
-keeps the tags it does not know and evaluates their children, which is right
-for the typesetting primitives (`move`, `resize`, `clipped`, `shift`,
-`eff-*`, `anim-*`, `morph`, `filter-style`) but wrong for those that compute
-a value:
+`evaluate_impl` handled 130 tags against 177 in `edit_env_rep::exec`. The
+rewriter keeps the tags it does not know and evaluates their children, which
+is right for the typesetting primitives (`eff-*`, `anim-*`, `morph`,
+`filter-style`) but was wrong for those that compute a value. Ported from
+the typesetter on this branch:
 
-- `minimum`, `maximum`: this is what breaks every real document now (the
-  `itemize` counters compute `mod (..., minimum (...))`, which gives
-  `error (bad modulo)` and then `bad plus/minus`, `bad merge`,
-  `bad times/over` above it);
-- `rgb-color`, `rgb-access`;
-- `has-binding`, `get-attachment`, `auto-id`, `find-accessible`,
-  `occurs-inside`, `find-file-upwards`, `var-mark`;
-- `new-theme`, `copy-theme`, `apply-theme`, `select-theme`;
-- the length units `ms`, `s`, `guipx` and the corner lengths (`lcorner`,
-  `bcorner`, `rcorner`, `tcorner`).
+- `minimum`, `maximum` (with `tmlen_min`, `tmlen_max`): their absence broke
+  every real document (the `itemize` counters compute
+  `mod (..., minimum (...))`);
+- `rgb-color`, `rgb-access`, `has-binding`, `occurs-inside` (its second
+  argument is taken as it stands, since the alternative expansion has
+  already substituted the `arg`), `find-file-upwards`, `var-mark`, the
+  units `ms` and `s`;
+- `or` and `and` with the typesetter's meaning (the first value which is not
+  `false`, resp. `false` or the last value), not strict booleans:
+  `tmdoc-file` relies on it;
+- `move`, `shift`, `resize`, `clipped`: only the body is evaluated. Their
+  lengths may use the extents of the box (`1r`, `1w`, ...), which the
+  typesetter binds while it lays the box out (`local_begin_extents`), so
+  they are left to it.
+
+Still missing, because they are not pure functions of the environment and
+the markup: `auto-id` and `get-attachment` (counters and data stored on the
+buffer), `find-accessible`, the themes (`new-theme`, `copy-theme`,
+`apply-theme`, `select-theme`), and the lengths that depend on the screen or
+on the ornament being typeset (`guipx`, `lcorner`, `bcorner`, `rcorner`,
+`tcorner`).
+
+With these changes, *About* evaluates without errors. The welcome page and
+the *style* page keep one `bad merge` (from `auto-id` in `the-auto`); the
+conventions page also fails in its graphics, where
+`look-up (box-info (..., wh), 1)` picks apart the residual `box-info` and the
+arithmetic above it fails (`bad plus/minus`, `bad times/over`).
 
 ## Open questions for the review
 
@@ -135,24 +156,31 @@ a value:
   information), or using it elsewhere first: as the expanded document for
   converters, for checking styles, or as a cache key for incremental
   typesetting (compare the typing caches of PR #250/#333).
-- **Layout-dependent values.** Some markup needs information that only the
-  typesetter has (`box-info`, `frame-direct`, `frame-inverse` are commented
-  out; page and font lengths read the environment). Which values the pure
-  pass may compute and which it has to leave to the typesetter needs a
-  clear rule.
+- **Layout-dependent values: partial evaluation.** Some markup needs
+  information that only the typesetter has: the box extents in `move` and
+  the like (handled above by not evaluating those arguments), `box-info`,
+  `frame-direct`, `frame-inverse`, the screen and ornament lengths. The
+  rewriter keeps such tags as they are, but an operation applied to a
+  residual tag (`look-up`, `plus`, `merge`) then computes garbage. A sound
+  rule is partial evaluation: a value that depends on a residual stays a
+  residual expression, to be finished by the typesetter. That residual must
+  then still find the definitions it uses (macros and variables assigned in
+  the document are consumed by the rewriter today).
 - **Side effects.** `extern` calls Scheme with a re-entrancy hack
-  (`reenter_rewrite_env`); `set-binding`, `write`, counters and labels
-  depend on document order. Memorizing them by address is only correct if
-  they are pure.
+  (`reenter_rewrite_env`); `set-binding`, `write`, counters, labels and
+  `auto-id` (which numbers the automatic labels from data stored on the
+  buffer) depend on document order. Memorizing them by address is only
+  correct if they are pure; they need either an explicit state threaded
+  through the evaluation (as the environment already is) or to be left as
+  residuals.
 - **Memory.** Memorizers are released by reference counts; the global table
   grows with the document and the edits. Nothing measures it yet.
-- **Tracing.** The `cout` traces should go behind a debug flag before any
-  further testing.
 
 ## Testing
 
 Build: the usual configure line plus `--enable-experimental`. Run TeXmacs
-with a window and look at the terminal; for a scripted run, load a file with
-`-x`, edit after a pause (`delayed (:pause 4000) ...`) and quit. Counting
+with a window, switch on Debug ▸ style and look at the terminal; for a
+scripted run, `(debug-set "style" #t)`, load a file with `-x`, edit after a
+pause (`delayed (:pause 4000) ...`) and quit. Counting
 `Evaluate`, `Memorized` and `error (` in the output gives a quick measure.
 Use a separate `TEXMACS_HOME_PATH` so the runs write no preferences.

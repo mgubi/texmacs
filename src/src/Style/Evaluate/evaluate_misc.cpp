@@ -50,6 +50,18 @@ evaluate_table (tree t) {
 }
 
 tree
+evaluate_box_extents (tree t) {
+  // the lengths may use the extents of the box (w, h, l, b, r, t), which
+  // only the typesetter knows: they are left to it
+  int i, n= N(t);
+  tree r (t, n);
+  if (n > 0) r[0]= evaluate (t[0]);
+  for (i=1; i<n; i++) r[i]= t[i];
+  transfer_ip (t, r);
+  return r;
+}
+
+tree
 evaluate_hard_id (tree t) {
   if (N(t) == 0) {
     pointer ptr= (pointer) std_env.operator -> ();
@@ -141,6 +153,20 @@ evaluate_get_binding (tree t) {
     typeset_warning << "Undefined reference " << key << LF;
   */
   return value;
+}
+
+tree
+evaluate_has_binding (tree t) {
+  if (N(t) != 1 && N(t) != 2) return tree (_ERROR, "bad get binding");
+  string key= evaluate_string (t[0]);
+  if (!local_ref->contains (key) && !global_ref->contains (key))
+    return "false";
+  tree value= local_ref->contains (key)? local_ref [key]: global_ref [key];
+  int type= (N(t) == 1? 0: as_int (evaluate_string (t[1])));
+  if (type != 0 && type != 1) type= 0;
+  if (is_func (value, TUPLE) && (N(value) >= 2)) value= value[type];
+  else if (type == 1) value= tree (UNINIT);
+  return as_string_bool (value != tree (UNINIT));
 }
 
 tree

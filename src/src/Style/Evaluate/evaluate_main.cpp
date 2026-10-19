@@ -13,6 +13,7 @@
 #include "memorizer.hpp"
 #include "vars.hpp"
 #include "path.hpp"
+#include "analyze.hpp"
 
 environment std_env;
 
@@ -104,6 +105,11 @@ evaluate_impl (tree t) {
     return evaluate_formatting (t, CELL_FORMAT);
   case TABLE:
     return evaluate_table (t);
+  case MOVE:
+  case SHIFT:
+  case RESIZE:
+  case CLIPPED:
+    return evaluate_box_extents (t);
 
   /* Primitives for macro expansion */
   case ASSIGN:
@@ -146,6 +152,8 @@ evaluate_impl (tree t) {
     return evaluate_eval_args (t);
   case MARK:
     return tree (MARK, copy (t[0]), evaluate (t[1]));
+  case VAR_MARK:
+    return tree (VAR_MARK, copy (t[0]), evaluate (t[1]));
   case EXPAND_AS:
     return evaluate (t[1]);
   case EVAL:
@@ -202,6 +210,9 @@ evaluate_impl (tree t) {
     return evaluate_divide (t);
   case MOD:
     return evaluate_modulo (t);
+  case MINIMUM:
+  case MAXIMUM:
+    return evaluate_min_max (t);
   case MATH_SQRT:
     return evaluate_math_sqrt (t);
   case EXP:
@@ -232,10 +243,14 @@ evaluate_impl (tree t) {
     return evaluate_change_case (t);
   case FIND_FILE:
     return evaluate_find_file (t);
+  case FIND_FILE_UPWARDS:
+    return evaluate_find_file_upwards (t);
   case IS_TUPLE:
     return evaluate_is_tuple (t);
   case LOOK_UP:
     return evaluate_lookup (t);
+  case OCCURS_INSIDE:
+    return evaluate_occurs_inside (t);
   case EQUAL:
     return evaluate_equal (t);
   case UNEQUAL:
@@ -250,6 +265,10 @@ evaluate_impl (tree t) {
     return evaluate_greatereq (t);
   case BLEND:
     return evaluate_blend (t);
+  case RGB_COLOR:
+    return evaluate_rgb_color (t);
+  case RGB_ACCESS:
+    return evaluate_rgb_access (t);
 
   /* Length units */
   case CM_LENGTH:
@@ -312,6 +331,10 @@ evaluate_impl (tree t) {
     return evaluate_tmpt_length ();
   case PX_LENGTH:
     return evaluate_px_length ();
+  case MS_LENGTH:
+    return evaluate_ms_length ();
+  case S_LENGTH:
+    return evaluate_s_length ();
   case MSEC_LENGTH:
     return evaluate_msec_length ();
   case SEC_LENGTH:
@@ -347,6 +370,8 @@ evaluate_impl (tree t) {
     return evaluate_set_binding (t);
   case GET_BINDING:
     return evaluate_get_binding (t);
+  case HAS_BINDING:
+    return evaluate_has_binding (t);
 
   /* Graphical primitives */
   case _PATTERN:
@@ -414,14 +439,14 @@ evaluate_string (tree t) {
 tree
 evaluate (tree t) {
   if (is_atomic (t)) return t;
-  cout << "Evaluate "
+  if (style_trace) cout << "Evaluate "
     // << obtain_ip (t) << " "
-       << "[" << (t.operator -> ())
-       << ", " << (std_env.operator -> ()) << "] "
+       << "[" << as_hexadecimal ((pointer) t.operator -> ())
+       << ", " << as_hexadecimal ((pointer) std_env.operator -> ()) << "] "
        << t << INDENT << LF;
   memorizer mem= evaluate_memorizer (std_env, t);
   if (is_memorized (mem)) {
-    cout << UNINDENT << "Memorized " << mem->get_tree () << LF;
+    if (style_trace) cout << UNINDENT << "Memorized " << mem->get_tree () << LF;
     std_env= mem->get_environment ();
     return mem->get_tree ();
   }
@@ -431,7 +456,7 @@ evaluate (tree t) {
   mem->set_tree (r);
   mem->set_environment (std_env);
   memorize_end ();
-  cout << UNINDENT << "Computed " << mem->get_tree ()
+  if (style_trace) cout << UNINDENT << "Computed " << mem->get_tree ()
     // << " at " << obtain_ip (r);
        << LF;
   return mem->get_tree ();

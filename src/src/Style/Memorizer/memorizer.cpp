@@ -17,6 +17,7 @@
 ******************************************************************************/
 
 int memorizer_count= 0;
+bool style_trace= false;
 
 void
 memorizer_rep::compute () {
@@ -120,7 +121,8 @@ double_size (T*& in, int& size) {
 
 void
 memorize_initialize () {
-  cout << "Memorize initialize" << INDENT << LF;
+  style_trace= DEBUG_STYLE;
+  if (style_trace) cout << "Memorize initialize" << INDENT << LF;
   mem_max_pos  = 16;
   mem_pos      = tm_new_array<int> (mem_max_pos);
   mem_max_stack= 16;
@@ -131,7 +133,7 @@ memorize_initialize () {
 
 memorizer
 memorize_finalize () {
-  cout << UNINDENT << "Memorize finalize" << LF;
+  if (style_trace) cout << UNINDENT << "Memorize finalize" << LF;
   memorizer mem= mem_stack[0];
   tm_delete_array (mem_pos);
   tm_delete_array (mem_stack);
