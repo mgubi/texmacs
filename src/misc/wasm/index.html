@@ -362,10 +362,15 @@ make</code></pre>
         { test: /-cocoa-universal\.dmg$/, name: 'Cocoa (native interface)', desc: 'The menus, bars and dialogs of macOS; documents drawn by the GPU.' },
         { test: /-vue-universal\.dmg$/, name: 'Vue', desc: 'The interface drawn by TeXmacs itself, by the GPU; the same as in the browser.' },
         { test: /^texmacs-qt-macos-/, name: 'Qt 6', desc: 'The interface of the official TeXmacs releases. Apple silicon.' } ] },
-    { title: 'Linux', note: 'For x86_64, built on Ubuntu 24.04. Unpack, and run, in the folder of the archive, ' +
-        '<code>TEXMACS_PATH=$PWD/TeXmacs TeXmacs/bin/texmacs</code>. The Qt build uses the Qt 6 of the system ' +
-        '(on Ubuntu: <code>sudo apt install libqt6svg6 qt6-qpa-plugins</code>); the Vue build brings its libraries.',
+    { title: 'Linux', note: 'For x86_64. The AppImages are one file each, with their libraries, for most ' +
+        'distributions (Ubuntu 22.04, Debian 12, Fedora 36 or later): make it executable and run it, ' +
+        '<code>chmod +x texmacs-upsilon-vue-x86_64.AppImage; ./texmacs-upsilon-vue-x86_64.AppImage</code>. ' +
+        'The archives are built on Ubuntu 24.04: unpack, and run, in the folder of the archive, ' +
+        '<code>TEXMACS_PATH=$PWD/TeXmacs TeXmacs/bin/texmacs</code>; the Qt one uses the Qt 6 of the system ' +
+        '(on Ubuntu: <code>sudo apt install libqt6svg6 qt6-qpa-plugins</code>).',
       kinds: [
+        { test: /^texmacs-upsilon-qt-.*\.AppImage$/, name: 'Qt 6, AppImage', desc: 'The interface of the official TeXmacs releases, in one file.' },
+        { test: /^texmacs-upsilon-vue-.*\.AppImage$/, name: 'Vue, AppImage', desc: 'The interface drawn by TeXmacs itself (SDL3, OpenGL), in one file.' },
         { test: /^texmacs-linux-/, name: 'Qt 6', desc: 'The interface of the official TeXmacs releases.' },
         { test: /^texmacs-vue-linux-/, name: 'Vue', desc: 'The interface drawn by TeXmacs itself (SDL3, OpenGL).' } ] },
     { title: 'Windows', note: 'For x86_64: unpack, and run <code>TeXmacs-Windows\\bin\\texmacs.exe</code>.',
