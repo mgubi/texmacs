@@ -97,7 +97,9 @@
 (define-public (treesit-query-source ts)
   ;; the highlight query of ts, after those it inherits (a first line
   ;; "; inherits: a,b", as in tree-sitter-cpp)
-  (let* ((s (string-load (query-url ts)))
+  ;; (the carriage returns of a file with CRLF line ends are left out, else
+  ;; "c\r" would be the name of the inherited language)
+  (let* ((s (string-replace (string-load (query-url ts)) "\r" ""))
          (first (car (string-decompose s "\n")))
          (pre "; inherits: "))
     (if (not (string-starts? first pre)) s
