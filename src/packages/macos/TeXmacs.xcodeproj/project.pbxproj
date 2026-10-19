@@ -2074,7 +2074,6 @@
 		49A513E719426DD70017E373 /* colors.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = colors.cpp; sourceTree = "<group>"; };
 		49A513E819426DD70017E373 /* colors.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = colors.hpp; sourceTree = "<group>"; };
 		49A513E919426DD70017E373 /* dvips_colors.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = dvips_colors.hpp; sourceTree = "<group>"; };
-		49A513EA19426DD70017E373 /* named_colors.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = named_colors.hpp; sourceTree = "<group>"; };
 		49A513EB19426DD70017E373 /* svg_colors.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = svg_colors.hpp; sourceTree = "<group>"; };
 		49A513EC19426DD70017E373 /* tm_colors.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = tm_colors.hpp; sourceTree = "<group>"; };
 		49A513ED19426DD70017E373 /* true_color.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = true_color.cpp; sourceTree = "<group>"; };
@@ -3398,7 +3397,6 @@
 				49A513E719426DD70017E373 /* colors.cpp */,
 				49A513E819426DD70017E373 /* colors.hpp */,
 				49A513E919426DD70017E373 /* dvips_colors.hpp */,
-				49A513EA19426DD70017E373 /* named_colors.hpp */,
 				49A513EB19426DD70017E373 /* svg_colors.hpp */,
 				49A513EC19426DD70017E373 /* tm_colors.hpp */,
 				49A513ED19426DD70017E373 /* true_color.cpp */,
