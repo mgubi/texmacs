@@ -17,6 +17,24 @@ The directions of the project, wished for and not yet begun, are in
 
 ## Bugs found, not fixed
 
+- **Decided on 2026-10-20, to do here** (maintainer decisions on issues of
+  `wip_fixes`):
+  - #78 item 11: a CMake rule which regenerates the Scheme glue, with the
+    S7 generator of this branch (95e403928a).
+  - #69 item 7: Cork languages split text so that a `<...>` character is an
+    item of its own, so Greek words are never hyphenated (#351 made the
+    hyphenation itself handle them). Keep such characters inside words,
+    try it on Greek documents, then bring it to `wip_fixes`.
+  - #80 item 9: the joining of the pieces of big TeX delimiters is compiled
+    out under Qt (`glyph_shrink.cpp`). Turn it on and compare screenshots of
+    big delimiters before deciding.
+  - #64 item 7: `new_buffer_rep::read_only` is the start of an unfinished
+    feature (read-only buffers: help pages, files without write
+    permission). It is read by `needs_to_be_saved` and the typesetter, and
+    set by nothing. Finish it here if wanted; it stays on `wip_fixes`.
+  - #380: the error recovery after a segmentation fault (a C++ exception
+    thrown from the signal handler), to investigate before deciding.
+
 - **OpenType work, after the audit of 2026-10-13** (`src/docs/opentype-audit.md`,
   section "State after the fixes", has the full list). Tried in a window on
   2026-10-18, all as they should be: the cursor in a formula with primes,
