@@ -14,6 +14,8 @@ have the details, and the problems go to the
 
 ## 19 October 2026
 
+- **Browser**: on a touch screen, a finger put down on the handle of a
+  scroll bar drags it: it moved the view the other way.
 - **Desktop**: with the Vue interface on Linux, a dialog (as the question
   before closing a document with unsaved changes) no longer opens too
   small, black with its contents squeezed at its bottom: its window gets

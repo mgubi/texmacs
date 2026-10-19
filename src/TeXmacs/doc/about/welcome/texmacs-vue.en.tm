@@ -280,6 +280,9 @@
   <paragraph|19 October 2026>
 
   <\itemize>
+    <item>On a touch screen, a finger put down on the handle of a scroll
+    bar drags it (it moved the view the other way).
+
     <item>On a tablet (an <name|iPad>), a keyboard button at the bottom
     right of the page opens the keyboard of the system, and closes it: no
     keyboard came without an external one. <verbatim|?keyboard> in the

@@ -544,6 +544,7 @@ uint32_t current_menu= 0; // the open menu being laid out (its float)
 bool menu_press= false;   // the pass has a press, maybe taken by the menus
 bool menu_hovered= false; // an item of an open menu is under the pointer
 array<uint32_t> menu_zones_now; // the open menus and their buttons
+array<uint32_t> bar_zones_now;  // the thumbs of the scroll bars
 // the pointer is over the open list of an enum (it floats above the menu
 // which has the enum, where Clay does not see the pointer over the menu)
 static bool pointer_on_enum_list= false;
@@ -765,6 +766,7 @@ gui_init_context() {
     }
   }
   menu_zones_now= array<uint32_t> ();
+  bar_zones_now= array<uint32_t> ();
   pointer_on_enum_list= false;
   menu_hovered= false;
   current_bar= current_menu= 0;
@@ -793,6 +795,7 @@ gui_finalize_context() {
   wheel_pending= false;
   // the menus open in this pass; the pointer left their items
   current_window->input.menu_zones= menu_zones_now;
+  current_window->input.bar_zones= bar_zones_now;
   if (!menu_hovered) current_window->input.hover_item= 0;
   // events live for exactly one layout pass of their window
   mouse_action= "";
@@ -2584,6 +2587,7 @@ scroll_bar (Clay_ElementId &my_id, Clay_ScrollContainerData &scrollData, int16_t
         .backgroundColor= Clay_PointerOver (vsb_id)
           ? the_theme.scrollbar_hover : the_theme.scrollbar,
       .cornerRadius= CLAY_CORNER_RADIUS(ui_pxf (12)) }){};
+    bar_zones_now << vsb_id.id;
     ui_signal vsig= button_logic (vsb_id);
     if (vsig.pressed == 1) {
       mouse_action= ""; // the press is ours, not the container's
@@ -2615,6 +2619,7 @@ scroll_bar (Clay_ElementId &my_id, Clay_ScrollContainerData &scrollData, int16_t
         .backgroundColor= Clay_PointerOver (hsb_id)
           ? the_theme.scrollbar_hover : the_theme.scrollbar,
       .cornerRadius= CLAY_CORNER_RADIUS(ui_pxf (12)) }){};
+    bar_zones_now << hsb_id.id;
     ui_signal hsig= button_logic (hsb_id);
     if (hsig.pressed == 1) {
       mouse_action= "";

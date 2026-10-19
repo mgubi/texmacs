@@ -124,6 +124,9 @@ struct vue_input_state {
   uint32_t hover_item, hover_menu;
   time_t hover_since;
   array<uint32_t> menu_zones;
+  // the thumbs of the scroll bars in the last pass: a finger put down on
+  // one drags it at once (touch_filter in vue_gui.cpp)
+  array<uint32_t> bar_zones;
   bool swallow_mouse;
   uint32_t current_balloon;
   time_t balloon_time;

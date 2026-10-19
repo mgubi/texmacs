@@ -5257,7 +5257,9 @@ wheel_zooms (vue_window win, double y) {
 *   fingers on a trackpad do, and glides when it is lifted while moving
 *   (touch_scroll); the press and the release never reach the widgets;
 * - resting touch_hold first and then moved, it is a mouse with its button
-*   pressed: it selects, or drags a scroll bar.
+*   pressed: it selects, or drags a scroll bar;
+* - put down on the thumb of a scroll bar, it is a mouse at once: it drags
+*   the thumb (it panned the view, in the opposite direction).
 ******************************************************************************/
 
 static const float touch_slop= 8.0;   // points: still a tap
@@ -5287,6 +5289,22 @@ is_touch_mouse (SDL_Event* event) {
   }
 }
 
+// is the point (x, y) of the window (points) on the thumb of a scroll bar
+// of its last layout?
+static bool
+touch_on_bar (vue_window win, float x, float y) {
+  if (N(win->input.bar_zones) == 0) return false;
+  with_window frame (win);
+  float px= x * win->density, py= y * win->density;
+  for (int i=0; i<N(win->input.bar_zones); i++) {
+    Clay_ElementData d= Clay_GetElementData ((Clay_ElementId) { .id= win->input.bar_zones[i] });
+    Clay_BoundingBox b= d.boundingBox;
+    if (d.found && px >= b.x && px < b.x + b.width && py >= b.y && py < b.y + b.height)
+      return true;
+  }
+  return false;
+}
+
 // true when the event has been taken (process_event does nothing more)
 static bool
 touch_filter (SDL_Event* event) {
@@ -5305,6 +5323,10 @@ touch_filter (SDL_Event* event) {
     float x= event->button.x, y= event->button.y;
     win= route_pointer (win, x, y, 3);
     if (win) touch_stop_glide (win);
+    if (win && touch_on_bar (win, x, y)) {
+      finger.dragging= true; // the moves and the release go through too
+      return false;
+    }
     return true;
   }
   if (!finger.down || finger.dragging) {
