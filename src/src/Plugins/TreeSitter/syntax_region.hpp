@@ -36,6 +36,10 @@ array<int> syntax_region_node_info (tree region, int language, int row, int col)
 // the highlight query and colours of a language named in an injection
 typedef bool (*ts_injection_resolver) (string name, int& language, int& query,
                                        array<int>& colors, int& injections);
+// the bit of the colour code of a position where a token of the syntax tree
+// (a leaf) starts: the typesetting cuts the lines there (ts_highlight.cpp)
+#define TS_TOKEN_START (1 << 24)
+#define TS_COLOR_MASK (TS_TOKEN_START - 1)
 array<array<int> > syntax_region_highlight (tree region, int language,
                                             int query, array<int> colors,
                                             int injections= -1,

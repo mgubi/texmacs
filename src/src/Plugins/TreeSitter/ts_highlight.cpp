@@ -27,6 +27,7 @@
 #include "path.hpp"
 #include "hashmap.hpp"
 #include "hashset.hpp"
+#include "analyze.hpp"
 
 extern tree the_et;
 int tree_sitter_query_language (int query);
@@ -255,15 +256,26 @@ treesit_language_rep::highlight (tree t) {
 
 text_property
 treesit_language_rep::advance (tree t, int& pos) {
-  // the token of the usual language, cut where the colour changes
-  int start= pos;
-  text_property tp= base->advance (t, pos);
-  if (!highlighting_on || highlighters [lan_name] == NULL) return tp;
+  // the tokens of the syntax tree (its leaves, TS_TOKEN_START), also cut
+  // where the colour changes (the injected code) and at the spaces (where
+  // the lines may break, also in comments and strings); the tokens of the
+  // usual language for a line without the colours of tree-sitter
+  if (!highlighting_on || highlighters [lan_name] == NULL)
+    return base->advance (t, pos);
   array<int> cols= obtain_highlight (t, hl_lan);
-  if (N(cols) == 0 || start >= N(cols)) return tp;
-  for (int i= start + 1; i < pos && i < N(cols); i++)
-    if (cols[i] != cols[start]) { pos= i; break; }
-  return tp;
+  string s= t->label;
+  int n= N(s);
+  if (N(cols) != n) return base->advance (t, pos);
+  if (pos >= n) return &tp_normal_rep;
+  if (s[pos] == ' ') { pos++; return &tp_space_rep; }
+  int start= pos;
+  int col= cols[start] & TS_COLOR_MASK;
+  tm_char_forwards (s, pos);
+  while (pos < n && s[pos] != ' ' &&
+         (cols[pos] & TS_TOKEN_START) == 0 &&
+         (cols[pos] & TS_COLOR_MASK) == col)
+    tm_char_forwards (s, pos);
+  return &tp_normal_rep;
 }
 
 string
@@ -272,8 +284,8 @@ treesit_language_rep::get_color (tree t, int start, int end) {
     return base->get_color (t, start, end);
   if (start >= end) return "";
   array<int> cols= obtain_highlight (t, hl_lan);
-  if (start < N(cols) && cols[start] != 0)
-    return decode_color (lan_name, cols[start]);
+  if (start < N(cols) && (cols[start] & TS_COLOR_MASK) != 0)
+    return decode_color (lan_name, cols[start] & TS_COLOR_MASK);
   return "";
 }
 
@@ -348,6 +360,7 @@ tree_sitter_line_colors (string lan, tree t) {
   if (!is_atomic (t)) return as_list_object (r);
   array<int> cols= obtain_highlight (t, l->hl_lan);
   int i= 0, n= N(cols);
+  for (int k= 0; k < n; k++) cols[k] &= TS_COLOR_MASK;
   while (i < n) {
     int j= i + 1;
     while (j < n && cols[j] == cols[i]) j++;
@@ -356,4 +369,21 @@ tree_sitter_line_colors (string lan, tree t) {
     i= j;
   }
   return as_list_object (r);
+}
+
+array<string>
+tree_sitter_line_tokens (string lan, tree t) {
+  // the tokens of a line, as the typesetting cuts it, after highlighting it
+  language l= prog_language (lan);
+  l->highlight (t);
+  array<string> r;
+  if (!is_atomic (t)) return r;
+  int pos= 0, n= N(t->label);
+  while (pos < n) {
+    int start= pos;
+    (void) l->advance (t, pos);
+    if (pos <= start) pos= start + 1;
+    r << t->label (start, pos);
+  }
+  return r;
 }
