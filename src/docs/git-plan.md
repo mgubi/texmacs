@@ -112,7 +112,7 @@ others. Until it exists, network commands run synchronously behind a
 * Write a test document and a scripted test (`texmacs -x '(load ...)'`) that
   builds a temporary repository in the scratch directory and runs the git
   layer headlessly. (Done: the suite `git` of the test harness, and
-  `doc/tests/` for the offscreen GUI tests.)
+  `src/docs/tests/` for the offscreen GUI tests.)
 
 ### Phase 1: a solid core (fix what exists)
 

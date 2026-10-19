@@ -167,7 +167,7 @@
     exports with <verbatim|\\usepackage{unicode-math}>.
   </itemize>
 
-  <source-link|src/doc/math-symbol-coverage.md|doc/math-symbol-coverage.md> counts the symbols which are
+  <source-link|src/docs/math-symbol-coverage.md|docs/math-symbol-coverage.md> counts the symbols which are
   still unnamed, block by block.
 
   <source-link|TeXmacs/progs/math/math-symbol-tools.scm|TeXmacs/progs/math/math-symbol-tools.scm> arranges the symbols
@@ -238,7 +238,7 @@
 
     <item*|<source-link|font-gallery.sh|tests/opentype/font-gallery.sh>>One specimen per installed profiled
     math font (asked from <TeXmacs> with <scm|opentype-math-font-list>), the
-    images of <source-link|doc/OPENTYPEMATH.md|doc/OPENTYPEMATH.md>.
+    images of <source-link|docs/OPENTYPEMATH.md|docs/OPENTYPEMATH.md>.
 
     <item*|<source-link|missing-symbols.py|tests/opentype/missing-symbols.py>, <source-link|survey-math-fonts.py|tests/opentype/survey-math-fonts.py>,
     <source-link|assembly-report.py|tests/opentype/assembly-report.py>>Tools which generated the symbol tables,
@@ -252,7 +252,7 @@
   <section|Open problems>
 
   The list below was checked against the code; the design log
-  <source-link|src/doc/opentype-math-design.md|doc/opentype-math-design.md> (sections 6 and 7) has the
+  <source-link|src/docs/opentype-math-design.md|docs/opentype-math-design.md> (sections 6 and 7) has the
   details and the history.
 
   <\itemize>

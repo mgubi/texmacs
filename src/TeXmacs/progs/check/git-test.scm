@@ -29,7 +29,7 @@
 ;; (commit.gpgsign, hooks...) do not matter. The preferences which the
 ;; suite changes are put back at the end.
 ;; The asynchronous commands (fetch, pull, push, clone) need the event loop,
-;; and are checked by doc/tests/git-gui-test.scm instead.
+;; and are checked by src/docs/tests/git-gui-test.scm instead.
 
 (texmacs-module (check git-test)
   (:use (check check-lib)
