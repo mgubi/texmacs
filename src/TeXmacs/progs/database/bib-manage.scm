@@ -310,6 +310,46 @@
 (define (bib-warning msg)
   (debug-message "bibtex-warning" msg))
 
+;; A style of the Citation Style Language changes the case of the titles
+;; itself (they become sentences for APA), and needs to know which words
+;; keep their capitals: the braces of the .bib file. The database has lost
+;; them (and lowercased the titles of articles, whatever their language),
+;; so the entries of a .bib file are read from the file itself, the other
+;; sources (the document, the database) from the database, in the
+;; same order of precedence.
+
+(define bib-raw-cache (make-ahash-table))
+
+(define (bib-file-raw-entries f)
+  ;; the entries of the .bib file @f as parsed: (bib-entry type key fields)
+  (let* ((key (url->system f))
+         (stamp (url-last-modified f))
+         (old (ahash-ref bib-raw-cache key)))
+    (if (and old (== (car old) stamp)) (cdr old)
+        (let* ((d (convert (string-load f) "bibtex-document" "bibtex-stree"))
+               (doc (and (tm-func? d '!file 1) (tm-ref d 0)))
+               (body (and doc (tmfile-extract doc 'body)))
+               (l (if (tm-func? body 'document)
+                      (list-filter (tm-children body)
+                                   (cut tm-func? <> 'bib-entry 3))
+                      '())))
+          (ahash-set! bib-raw-cache key (cons stamp l))
+          l))))
+
+(tm-define (bib-retrieve-raw-entries names sources)
+  (:synopsis "The entries @names from @sources, those of .bib files as written")
+  (set! names (list-remove-duplicates names))
+  (if (or (null? names) (null? sources)) '()
+      (let* ((f (car sources))
+             (r (if (and (bib-file? f) (url-exists? f))
+                    (with h (list->ahash-set names)
+                      (list-filter (bib-file-raw-entries f)
+                                   (lambda (e) (ahash-ref h (tm-ref e 1)))))
+                    (map db->bib (map cdr (bib-retrieve-entries names f)))))
+             (done (map (lambda (e) (tm->string (tm-ref e 1))) r)))
+        (append r (bib-retrieve-raw-entries (list-difference names done)
+                                            (cdr sources))))))
+
 (define (bib-compile-sub prefix style names . bib-files)
   (set! names (list-remove-duplicates names))
   (when (and (not (supports-bibtex?))
@@ -323,8 +363,10 @@
       (set! style "tm-plain")))      
   (if (or (in? style (bib-standard-styles)) (csl-style-name? style))
       (let* ((all-files `(:local ,@bib-files :default :attached))
-             (l (apply bib-retrieve-entries (cons names all-files)))
-             (bl (map db->bib (map cdr l)))
+             (bl (if (csl-style-name? style)
+                     (bib-retrieve-raw-entries names all-files)
+                     (map db->bib (map cdr (apply bib-retrieve-entries
+                                                  (cons names all-files))))))
              (doc `(document ,@bl)))
         (if (csl-style-name? style)
             (csl-bib-process prefix style doc names)

@@ -142,7 +142,12 @@ changes of case skip `nocase` and `raw`.
 - `generate_bibliography` (`src/Edit/Process/edit_process.cpp`) treats a
   style `csl-*` like a `tm-*` style and calls `csl-bib-process`;
   `bib-compile-sub` (`progs/database/bib-manage.scm`) does the same with
-  the database tool.
+  the database tool. For a CSL style it takes the entries of `.bib` files
+  from the files themselves (`bib-retrieve-raw-entries`), and only the
+  other sources (the document, the database) from the database:
+  the database drops the braces of the titles and lowercases the titles of
+  articles, whatever their language, while a CSL style changes their case
+  itself and needs the braces (`{Fourier}`) and the `language` field.
 - The result keeps the shape of the other bibliographies,
   `(bib-list largest (document (concat (bibitem* text) (label key) ...)))`,
   inside a `with` which redefines `transform-bibitem` (the label as the
@@ -236,8 +241,9 @@ As of 2026-10-14.
   entries of the style chooser were never seen in a window.
 - **The browser build** was neither built nor run with this code.
 - **The database tool**: `doi`, `url`, `language` and `isbn` are not among
-  its declared fields; they are mapped from `.bib` files, and whether they
-  survive the database was not checked.
+  its declared fields; the entries of `.bib` files no longer go through it
+  (see above), but those of the database itself still do,
+  and titles stored there lose their braces.
 
 ### Not started
 
