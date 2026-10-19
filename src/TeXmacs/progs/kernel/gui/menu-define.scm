@@ -386,8 +386,10 @@
   `($ink ,(cadr x)))
 
 (define (gui-make-form x)
+  ;; the name of the form is an expression, as the kind of a refreshable:
+  ;; one form per dialog (a file chooser, utils/misc/file-chooser.scm)
   (require-format x '(form :%1 :*))
-  `($form ,@(map gui-make (cdr x))))
+  `($form ,(cadr x) ,@(map gui-make (cddr x))))
 
 (define (gui-make-form-input x)
   (require-format x '(form-input :%4))

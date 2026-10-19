@@ -2448,6 +2448,12 @@ widget_grows (widget w, bool horizontal) {
   // containers around it give it that room (in a refreshable of a row
   // without glue, "Rename as:" of the remote files, it kept its minimum)
   if (t == "input_text_widget") return horizontal && input_text_widget_fills (w);
+  // a choice list in a resize fills it (the lists of the file chooser of
+  // utils/misc/file-chooser.scm, the suggestions of the spell checker): the
+  // resize lays out a vertical menu around it, which only fits its items
+  // when none of them grows, and the white of the list kept the width of
+  // its longest item. Elsewhere a list keeps the size of its items
+  if (t == "choice_widget") return fill_parent;
   if (t == "simple_widget" || t == "user_canvas_widget" ||
       t == "hsplit_widget" || t == "vsplit_widget" ||
       t == "tabs_widget" || t == "icon_tabs_widget" ||

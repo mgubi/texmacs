@@ -6671,6 +6671,16 @@ public:
       c_string name (as_string (args));
       w->callback ((char*) name);
     }
+    else if (is_list (args) && !is_null (args) && is_string (car (args))) {
+      // an image with the width, height and position typed: as Widkit's
+      // chooser gives it, (list url "w" "h" "x" "y")
+      string r= "(list (system->url " * scm_quote (as_string (car (args))) * ")";
+      for (object l= cdr (args); is_list (l) && !is_null (l); l= cdr (l))
+        r << " " << scm_quote (is_string (car (l)) ? as_string (car (l)) : string (""));
+      w->file= r * ")";
+      w->cmd ();
+      if (!is_nil (w->quit)) w->quit ();
+    }
     else w->callback (NULL);
   }
   void apply () { answer (object (false)); }
