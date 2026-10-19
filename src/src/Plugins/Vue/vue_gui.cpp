@@ -26,6 +26,7 @@
 #include "convert.hpp"
 #include "converter.hpp"
 #include "scheme.hpp"
+#include "../../Scheme/Scheme/object.hpp" // blackbox_to_tmscm: a command given to Scheme (the file chooser)
 #include "dictionary.hpp"
 #include "locale.hpp"
 #include "editor.hpp"
@@ -6655,25 +6656,49 @@ file_dialog_callback (void* userdata, const char* const* filelist,
   }
 }
 
+// The answer of the file chooser of TeXmacs (progs/utils/misc/file-
+// chooser.scm), given to the chooser widget as that of a dialog of SDL:
+// the system path chosen, or anything else when it was cancelled
+class vue_chooser_answer_rep: public command_rep {
+  widget wid;
+public:
+  vue_chooser_answer_rep (widget w): wid (w) {}
+  void answer (object args) {
+    vue_chooser_widget_rep* w=
+      dynamic_cast<vue_chooser_widget_rep*> (wid.rep);
+    if (w == NULL) return;
+    if (is_string (args)) {
+      c_string name (as_string (args));
+      w->callback ((char*) name);
+    }
+    else w->callback (NULL);
+  }
+  void apply () { answer (object (false)); }
+  void apply (object args) { answer (args); }
+  tm_ostream& print (tm_ostream& out) { return out << "<file chooser answer>"; }
+};
+
 // called from the main loop when the event pushed above arrives
 static void
 vue_dialog_finish (vue_dialog_result* res, char* file, int code) {
-  if (code == 2) {
-    // no dialog could be shown: on Linux, SDL shows those of the desktop
-    // portal or of the program zenity, and the system may have neither
-    // (issue #374); said in a window, not only on the terminal
-    string err= (file != NULL) ? string (file, (int) strlen (file)) : string ("");
+  if (code == 2 && res != NULL &&
+      dynamic_cast<vue_chooser_widget_rep*> (res->wid.rep) != NULL) {
+    // no dialog of the system could be shown: on Linux, SDL shows those of
+    // the desktop portal or of the program zenity, and the system may have
+    // neither (issue #374): the file chooser of TeXmacs, made of its
+    // widgets, comes instead (SDL's error is on the terminal)
     SDL_free (file);
-    file= NULL;
-    // (the message is one line: short; SDL's error is on the terminal)
-#if defined(OS_GNU_LINUX) || defined(__linux__)
-    string msg= "No file dialog: install zenity, or xdg-desktop-portal "
-                "with a backend (-gtk, -kde)";
-#else
-    string msg= "The file dialog of the system could not be shown";
-    if (N(err) > 0) msg << ": " << err;
-#endif
-    call ("show-message", object (msg), object ("File dialog"));
+    vue_chooser_widget_rep* w=
+      dynamic_cast<vue_chooser_widget_rep*> (res->wid.rep);
+    command c= tm_new<vue_chooser_answer_rep> (res->wid);
+    object done= tmscm_to_object (blackbox_to_tmscm (close_box<command> (c)));
+    array<object> args;
+    args << done << object (w->win_title) << object (w->file_type)
+         << object (w->prompt != "") << object (w->directory)
+         << object (w->file);
+    call ("open-file-chooser", args);
+    tm_delete (res);
+    return;
   }
   if (res == NULL) { SDL_free (file); return; }
   bool chosen= (code == 1);
@@ -6848,10 +6873,18 @@ vue_chooser_widget_rep::perform_dialog (vue_window win) {
   vue_dialog_result* res= tm_new<vue_dialog_result> ();
   res->wid= abstract (this);
   res->chosen= false;
-  SDL_ShowFileDialogWithProperties (sdl_type,
-                                    file_dialog_callback,
-                                    (void*) res,
-                                    props);
+  // TEXMACS_VUE_NO_FILE_DIALOG=1: the file chooser of TeXmacs, as where the
+  // system has no dialog (also for tests, on systems which always have one)
+  static bool no_dialog= (get_env ("TEXMACS_VUE_NO_FILE_DIALOG") == "1");
+  if (no_dialog) {
+    SDL_SetError ("TEXMACS_VUE_NO_FILE_DIALOG is set");
+    file_dialog_callback ((void*) res, NULL, 0);
+  }
+  else
+    SDL_ShowFileDialogWithProperties (sdl_type,
+                                      file_dialog_callback,
+                                      (void*) res,
+                                      props);
   SDL_DestroyProperties(props);
 }
 

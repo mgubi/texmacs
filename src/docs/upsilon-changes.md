@@ -23,9 +23,12 @@ have the details, and the problems go to the
   as far as one turned slowly (the notches which came fast were taken for a
   trackpad, and scrolled 10 points instead of 80;
   [#373](https://github.com/mgubi/texmacs/issues/373)); where no file
-  dialog can be shown (neither zenity nor the desktop portal), a window says
-  what to install, instead of a line on the terminal
-  ([#374](https://github.com/mgubi/texmacs/issues/374)).
+  dialog of the system can be shown (neither zenity nor the desktop
+  portal), TeXmacs shows a file chooser of its own, made of its widgets in
+  Scheme, as the one of the X11 version: a folder, its folders and its
+  files, a name, the files of the format or all of them
+  ([#374](https://github.com/mgubi/texmacs/issues/374));
+  `TEXMACS_VUE_NO_FILE_DIALOG=1` asks for it everywhere.
 - **Browser**: touch screens (an iPad, a phone). A tap on an item of a menu
   chooses it: nothing happened, the items of the menus only worked with a
   mouse or a trackpad. A finger dragged over a document scrolls it, and goes
