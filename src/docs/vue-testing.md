@@ -58,6 +58,8 @@ commit <text>               an input method commits a text (one key per characte
 drop x y <path>|text:<text> a drag and drop of one item at that position
 focus                       pretend the target window got the keyboard focus
 snapshot <name>             save the next redraw of the target window
+clipboard <text>            the text on the clipboard of the script, which is
+                            not the system's while a script runs
 close                       close request on the target window
 ```
 

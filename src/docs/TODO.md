@@ -97,15 +97,23 @@ no headless mode. The Widkit duplicates are fixed on `wip_other_guis` too.
   iPad needs a keyboard): b6d461ef0d adds a button which opens the keyboard
   of the system on tablets; to be tried on an iPad before closing.
 
-- **Vue tests which fail on their own expectation** (found on 2026-10-19
-  when the tests got `expect` lines, branch `wip_gui_scripting`; the same
-  before the new driver): `input-edit` prints `got: JoeJoe / 42`, `got: Bob
-  Joe / 42` or the expected `got: Bob Smith / 42` from one run to the next,
-  and `input-mouse` `got: Joe / 42` instead of `got: Smith / 42` (the cut
-  and paste go through the clipboard of the system, which the user's
-  session shares); `wheel-graphics` never prints `got: wheel`: the wheel
-  over a graphics does not reach `wheel-event`, though the view does not
-  scroll either.
+- **Vue: the wheel over a graphics barely moves it** (found on 2026-10-19
+  with the test `wheel-graphics`). In a graphics the editor takes the
+  wheel and moves the origin of the graphics (`graphics-wheel`, from
+  `edit_graphics_rep::mouse_graphics`). Qt and Cocoa give it the deltas in
+  the units of TeXmacs, 256 per point, the vertical one negated
+  (`from_qpoint`, `from_nspoint`); Vue gives them in points with the sign of
+  SDL (`vue_widget.cpp`, "the editor wants the wheel"): two notches move the
+  origin by 0.0003 of the height of the graphics, and probably the wrong
+  way. To fix with a real mouse and trackpad at hand (the signs of SDL
+  depend on natural scrolling). The test only checks that the wheel reaches
+  `graphics-wheel` and that the view does not scroll: it failed before
+  because its own `graphics-wheel` was replaced by the lazily loaded
+  `graphics-kbd` (now loaded first), and it looked for `wheel-event`, which
+  a graphics never reaches. (`input-edit` and `input-mouse`, which failed
+  now and then, are fixed on `wip_gui_scripting`: their text came within the
+  30 ms in which Vue drops the text of a key just handled, and the
+  clipboard of a script is its own.)
 
 ## Kept on purpose
 

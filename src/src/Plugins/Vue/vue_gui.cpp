@@ -153,6 +153,7 @@ static bool script_pump= false; // call (gui-test-pump) at each turn of the loop
 static vue_window gt_render_win= NULL;
 static hashmap<int,array<string> > gt_texts ((array<string> ()));
 static void gt_frame_start (vue_window win);
+static void script_clipboard (string txt);
 
 
 extern bool debug_clay;
@@ -4548,6 +4549,9 @@ get_window_from_ID (Uint32 ID) {
 *   resize w h                      resize the target window (points)
 *   close                           ask to close the target window
 *   tab <id>                        show the tab #id (single-window mode)
+*   clipboard <text>                put the text on the clipboard of the script
+*                                   (while a script runs, the clipboard is its
+*                                   own, not the system's)
 ******************************************************************************/
 
 static void
@@ -4834,6 +4838,12 @@ script_exec (string line) {
     ev.drop.x= dx;
     ev.drop.y= dy;
     SDL_PushEvent (&ev);
+  }
+  else if (cmd == "clipboard") {
+    // the clipboard of the script, as if the system had this text on it
+    // (a script never reads or writes the clipboard of the system)
+    script_clipboard (line (min (N(line), N(cmd)+1), N(line)));
+    return 1;
   }
   else if (cmd == "tab" && N(a) > 1) {
     // show the tab (a window of an editor in single-window mode) #id
@@ -5914,6 +5924,14 @@ void load_system_font (string family, int size, int dpi,
 static hashmap<string,tree> selection_t ("none");
 static hashmap<string,string> selection_s ("");
 
+// the clipboard of a script (its command "clipboard"): the text as a paste
+// from the system gives it
+static void
+script_clipboard (string txt) {
+  selection_t ("primary")= tuple ("extern", txt);
+  selection_s ("primary")= txt;
+}
+
 #ifdef __EMSCRIPTEN__
 // In the browser, SDL has no clipboard of the system: the page keeps what
 // it knows of it (tmClipboard in misc/wasm/clipboard.js: what TeXmacs
@@ -6112,8 +6130,10 @@ bool set_selection (string key, tree t,
   selection_s (key)= copy (s);
 
   // SDL3 only supports the system clipboard, not primary/mouse selections
-  // So we only set the system clipboard for "primary" key
-  if (key != "primary") return true;
+  // So we only set the system clipboard for "primary" key; while a script
+  // runs, not even that one: the tests do not share the clipboard of the
+  // system with the user's session or with each other (gui_test_pump)
+  if (key != "primary" || script_pump) return true;
 
   // Prepare clipboard data structure
   clipboard_data* clip_data = new clipboard_data();
@@ -6287,7 +6307,7 @@ bool get_selection (string key, tree& t, string& s, string format) {
   // ("secondary", "ternary", "temp", "wrapbuf", the registers): they live
   // in our own storage, which set_selection fills. This used to sit after
   // a "return false" for every such key, so nothing was ever read back.
-  if (key != "primary") {
+  if (key != "primary" || script_pump) {
     if (!selection_t->contains (key)) return false;
     t = copy (selection_t [key]);
     s = copy (selection_s [key]);
@@ -6436,7 +6456,7 @@ void clear_selection (string key) {
   selection_s->reset (key);
 
   // SDL3 only supports system clipboard, not primary/mouse selections
-  if (key != "primary") return;
+  if (key != "primary" || script_pump) return;
 
 #ifdef __EMSCRIPTEN__
   web_clip_texmacs= ""; // the clipboard of the system stays as it is

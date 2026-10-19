@@ -105,7 +105,13 @@ text <string>    commit <string>    compose [<text>]
 focus    repaint    resize w h    close    tab <id>
 drop x y <path> | drop x y text:<text>
 snapshot <name>                     (in TEXMACS_VUE_SNAPSHOT)
+clipboard <text>                    the text on the clipboard of the script
 ```
+
+While a script runs, Vue keeps the clipboard to itself: a cut and a paste
+of the test never go through the clipboard of the system, which the
+session of the user shares (and the other tests running at the same time).
+`clipboard <text>` puts a text on it, as if the system had it.
 
 The lines of the log are those of the old player: `vue script: <line>` for
 each step, `vue script: done` at the end.

@@ -82,7 +82,8 @@ status=0
 if [ $ended = 1 ]; then wait $p 2>/dev/null; status=$?
 else kill -9 $p 2>/dev/null; wait $p 2>/dev/null; fi
 
-grep -aE "choice:|got:|enum:|answer:|Error message|Invalid situation|FAILED|vue script: done" "$OUT/run.log"
+grep -av "^vue script: expect" "$OUT/run.log" |
+  grep -aE "choice:|got:|enum:|answer:|Error message|Invalid situation|FAILED|vue script: done"
 ls "$OUT"/*.png 2>/dev/null | sed "s|^|snapshot: |"
 [ "${KEEP:-0}" = 1 ] || rm -rf "${HOMEDIR:?}"
 

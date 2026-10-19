@@ -1,6 +1,6 @@
 # needs wheel-graphics.scm: the cursor is in a graphics, where the wheel
-# goes to the editor ("got: wheel dx dy"), and the view does not scroll
-# (the scroll printed by F12 stays 0)
+# goes to the editor, which moves the graphics ("got: graphics-wheel dx
+# dy"), and the view does not scroll (the scroll printed by F12 stays 0)
 wait 9000
 window #2
 focus
@@ -13,4 +13,5 @@ wait 800
 key F12
 snapshot graphics
 # the output, which run.sh checks
-expect got: wheel 
+expect got: graphics-wheel 
+expect got: scroll 0 graphics #t capture #t
