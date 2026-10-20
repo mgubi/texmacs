@@ -292,10 +292,19 @@ test_case_cork () {
   CHECK_EQ (uni_locase_char ("Z"), string ("z"));
   CHECK_EQ (uni_upcase_char ("1"), string ("1"));
   CHECK_EQ (uni_locase_char ("<"), string ("<"));
-  for (int c=0x80; c<0xA0; c++) {
+  for (int c=0x80; c<0x9D; c++) {
     CHECK_BYTES (uni_locase_char (cork_byte (c)), cork_byte (c+0x20));
     CHECK_BYTES (uni_upcase_char (cork_byte (c+0x20)), cork_byte (c));
   }
+  // the exceptions, 0x20 apart from 0xBD-0xBF (inverted marks and pound,
+  // which have no case): 0x9D is the dotted capital I, whose lower case is
+  // i; 0x9E is the lower case d with stroke (its capital is 0xD0); 0x9F is
+  // the section sign, without case
+  CHECK_BYTES (uni_locase_char (cork_byte (0x9D)), string ("i"));
+  for (int c=0x9E; c<0xA0; c++)
+    CHECK_BYTES (uni_locase_char (cork_byte (c)), cork_byte (c));
+  for (int c=0xBD; c<0xC0; c++)
+    CHECK_BYTES (uni_upcase_char (cork_byte (c)), cork_byte (c));
   for (int c=0xC0; c<0xE0; c++) {
     CHECK_BYTES (uni_locase_char (cork_byte (c)), cork_byte (c+0x20));
     CHECK_BYTES (uni_upcase_char (cork_byte (c+0x20)), cork_byte (c));

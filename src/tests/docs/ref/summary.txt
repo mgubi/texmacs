@@ -1,7 +1,5 @@
 book	main/man-user-manual.de.tm	log	warning, missing font, loading global substitution list
-book	main/man-user-manual.de.tm	undefined-reference	auto-* (123 page numbers of the table of contents or the index are ?)
-book	main/man-user-manual.en.tm	log	typeset-warning, Redefined sec-man-preferences as A.1
-book	main/man-user-manual.en.tm	log	typeset-warning, Redefined sec-man-preferences as E.3
+book	main/man-user-manual.de.tm	undefined-reference	auto-* (7 page numbers of the table of contents or the index are ?)
 book	main/man-user-manual.pt.tm	log	bad link or file <url main/styles/std-dtds/number-env-dtd.en.tm>
 book	main/man-user-manual.zh.tm	log	warning, missing font, loading global substitution list
 file	about/welcome/first.de.tm	language	english in a .de.tm file
@@ -31,7 +29,7 @@ stat	devel/source/source.fr.tm	toc	88
 stat	main/man-user-manual.de.tm	idx	1061
 stat	main/man-user-manual.de.tm	pages	234
 stat	main/man-user-manual.de.tm	toc	297
-stat	main/man-user-manual.en.tm	idx	1251
+stat	main/man-user-manual.en.tm	idx	1252
 stat	main/man-user-manual.en.tm	pages	290
 stat	main/man-user-manual.en.tm	toc	398
 stat	main/man-user-manual.es.tm	idx	248
@@ -48,7 +46,7 @@ stat	main/man-user-manual.pl.tm	pages	38
 stat	main/man-user-manual.pl.tm	toc	55
 stat	main/man-user-manual.pt.tm	idx	215
 stat	main/man-user-manual.pt.tm	pages	81
-stat	main/man-user-manual.pt.tm	toc	124
-stat	main/man-user-manual.zh.tm	idx	1158
+stat	main/man-user-manual.pt.tm	toc	125
+stat	main/man-user-manual.zh.tm	idx	1159
 stat	main/man-user-manual.zh.tm	pages	238
 stat	main/man-user-manual.zh.tm	toc	323
