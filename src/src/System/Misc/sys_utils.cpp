@@ -580,22 +580,6 @@ string get_user_name () {
 #endif
 }
 
-/******************************************************************************
-* Driving the graphical interface from scripts (implemented for Qt)
-******************************************************************************/
-
-#ifndef QTTEXMACS
-int gui_test_snapshot (string dir) { (void) dir; return 0; }
-array<string> gui_test_buttons () { return array<string> (); }
-bool gui_test_click (string label) { (void) label; return false; }
-bool gui_test_menu (string path) { (void) path; return false; }
-array<string> gui_test_menu_entries (string path) {
-  (void) path; return array<string> (); }
-void gui_test_type (string text) { (void) text; }
-void gui_test_click_later (int ms, string dir, string label) {
-  (void) ms; (void) dir; (void) label; }
-#endif
-
 // The commands of a request link (the curl program, see web_files.cpp)
 // which write into outbuf are no longer wanted: an interrupted answer, or
 // a link which asks again or is destroyed. They write nothing more into the

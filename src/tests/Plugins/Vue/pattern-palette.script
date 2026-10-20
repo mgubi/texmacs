@@ -11,3 +11,5 @@ click 100 200
 wait 3500
 window #2
 snapshot doc
+# the output, which run.sh checks
+expect vintage/granite-medium.png" "" "") "Hello patterns"))

@@ -5,7 +5,13 @@
 wait 5000
 window Enter data
 focus
+# the clipboard of the test, whatever the system has: a paste of this
+# text means that the cut did not reach the clipboard
+clipboard Preloaded
 key M-a
+# Vue takes a text within 30 ms of a key delivered as a key for the text
+# of that key, and drops it (SDL_EVENT_TEXT_INPUT in vue_gui.cpp)
+wait 100
 text Bob Smith Jr
 wait 200
 click 100 17
@@ -35,3 +41,5 @@ text 42
 wait 300
 key Return
 wait 800
+# the output, which run.sh checks
+expect got: Smith / 42

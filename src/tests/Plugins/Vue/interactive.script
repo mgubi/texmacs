@@ -10,3 +10,5 @@ snapshot ia2
 key Return
 wait 800
 snapshot ia3
+# the output, which run.sh checks
+expect answer: Bob

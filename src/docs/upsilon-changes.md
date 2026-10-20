@@ -18,6 +18,18 @@ have the details, and the problems go to the
   22.04 and of the distributions of its age), which failed at the link
   (#389); with Qt 5 the requests to web services (the AI sessions, Zotero
   on the web) are not available. The CI now builds it with Qt 5 and GCC.
+- **Desktop (Qt)**: a question asked in the footer is no longer answered
+  (empty) when you go to another application: you answer it when you come
+  back.
+- **Desktop (Cocoa)**: the tree views of the dialogs show the text of each
+  item, as in Qt, instead of the name of its tag (`item`), and the data of
+  an item are no longer shown as rows under it.
+- The tests of the interface can drive TeXmacs on Vue, Qt and Cocoa alike,
+  through one driver in Scheme: they click the texts and icons they name
+  by the bars and menus they are in (`Format > Font > Bold`, `footer >
+  equation*`, `mainbar > icon:tm_save`), in English whatever the language
+  of the interface, and check what came out (`src/docs/gui-scripting.md`).
+  Seven tests run on all three (`tests/gui`).
 
 ## 19 October 2026
 

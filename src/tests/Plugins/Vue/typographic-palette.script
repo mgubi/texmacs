@@ -14,3 +14,9 @@ wait 800
 move 120 160
 wait 800
 snapshot earth
+scheme (display* "palette: " (get-preference "typographic palette set") "\n")
+wait 300
+# the output, which run.sh checks: the palettes (printed when the test
+# starts), and the one chosen in the menu
+expect got: ("Classical" "Muted" "Classic print" "Earth" "Nordic" "Pastel" "Solarized" "Sea")
+expect palette: Earth

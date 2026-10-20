@@ -9,6 +9,7 @@
 * in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
 ******************************************************************************/
 
+#include "gui_test.hpp"
 #include <locale.h>
 
 #include "iterator.hpp"
@@ -1516,6 +1517,7 @@ ns_gui_rep::event_loop () {
                                       userInfo: nil repeats: YES];
     [[NSRunLoop currentRunLoop] addTimer: t forMode: NSRunLoopCommonModes];
   }
+  gui_test_start (); // TEXMACS_TEST_SCRIPT=<file>: a scripted test
   [NSApp run];
 }
 
@@ -1920,6 +1922,19 @@ command_queue::exec_pending () {
     }
   } else
     wait = false;
+}
+
+bool
+command_queue::has_due (time_t now) {
+  for (int i= 0; i < N(start_times); i++)
+    if (now - start_times[i] >= 0) return true;
+  return false;
+}
+
+bool
+ns_gui_rep::test_busy () {
+  return !waiting_events.is_empty () || needing_update ||
+         delayed_commands.has_due (texmacs_time ());
 }
 
 void

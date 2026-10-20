@@ -10,6 +10,7 @@
 ******************************************************************************/
 
 #include "glue.hpp"
+#include "gui_test.hpp"
 
 // the glue type uint (see build-glue): the C library of macOS declares it,
 // that of the browser build does not (a typedef may be repeated in C++)

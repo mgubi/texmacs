@@ -15,3 +15,5 @@ wait 800
 key F12
 wait 500
 snapshot after
+# the output, which run.sh checks
+expect got: (document "xyz")

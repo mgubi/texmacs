@@ -235,6 +235,54 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(gui-test-port)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|gui_test_port> which returns
+    <scm|string>.
+  </explain>
+
+  <\explain>
+    <scm|(gui-test-raw <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|gui_test_raw> which returns
+    <scm|int>.
+  </explain>
+
+  <\explain>
+    <scm|(gui-test-busy?)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|gui_test_busy> which returns
+    <scm|bool>.
+  </explain>
+
+  <\explain>
+    <scm|(gui-test-texts)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|gui_test_texts> which returns
+    <scm|array_string>.
+  </explain>
+
+  <\explain>
+    <scm|(gui-test-set-pump <scm-arg|bool>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|gui_test_pump> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(gui-test-eval-later <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|gui_test_eval_later> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
     <scm|(support-functionality? <scm-arg|string>)>
 <explain-synopsis|no synopsis>
   <|explain>
@@ -4392,6 +4440,14 @@ source code.
   <|explain>
     Calls the <c++> function <cpp|ai_latex_output> which returns
     <scm|tree>.
+  </explain>
+
+  <\explain>
+    <scm|(cpp-ai-set-prices <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|ai_set_prices> which returns
+    <scm|void>.
   </explain>
 
   <\explain>

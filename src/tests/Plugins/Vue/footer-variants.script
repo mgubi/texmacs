@@ -21,3 +21,5 @@ wait 1000
 text y
 wait 800
 snapshot fv3
+# the output, which run.sh checks
+expect got: (math text math) (document (concat "Some text " (math (concat "a+" (text (concat "if " (math "xy"))))))) (0 0 1 0 1 0 1 0 2)
