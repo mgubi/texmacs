@@ -451,21 +451,67 @@ same_rewritten (tree old_t, tree new_t) {
          old_t->label == new_t->label;
 }
 
+static bool
+same_rewritten_whole (tree old_t, tree new_t) {
+  // the same content with the same places (a tree made again by the
+  // rewriter, for instance after a new environment, is not a change)
+  if (same_rewritten (old_t, new_t)) return true;
+  if (is_atomic (old_t) || is_atomic (new_t) ||
+      L(old_t) != L(new_t) || N(old_t) != N(new_t) ||
+      obtain_ip (old_t) != obtain_ip (new_t)) return false;
+  for (int i=0; i<N(new_t); i++)
+    if (!same_rewritten_whole (old_t[i], new_t[i])) return false;
+  return true;
+}
+
+static bool
+rewritten_bridged (tree t, int i) {
+  // whether the bridge of t (make_bridge) gives the changes in its child i
+  // to a bridge of that child; the other bridges substitute the change in
+  // their tree, which rebuilds the nodes above it without the places which
+  // the rewriter attached to them (rewritten_place)
+  switch (L(t)) {
+  case DOCUMENT:
+    return true;
+  case WITH:
+  case DATOMS:
+  case DLINES:
+  case DPAGES:
+  case TFORMAT:
+  case LOCUS:
+    return i == N(t) - 1;
+  case MARK:
+  case VAR_MARK:
+  case EXPAND_AS:
+    return i == 1;
+  case SURROUND:
+    return i == 2;
+  default:
+    return false;
+  }
+}
+
 void
 edit_typeset_rep::typeset_rewritten_changes (path rp, tree old_t, tree new_t) {
   // the typesetter is told about the smallest subtrees of the rewritten
-  // tree which changed (rp is the path, reversed, as an ip). A node whose
-  // number of children changed is replaced as a whole: the insertions and
-  // removals of the bridges move the places of the bridges which follow,
-  // which are here the places of the document, moved by the document.
+  // tree which changed (rp is the path, reversed, as an ip), down to the
+  // trees which a bridge typesets as a whole: below, the new tree is given
+  // whole, with its places. A node whose number of children changed is
+  // replaced as a whole too: the insertions and removals of the bridges
+  // move the places of the bridges which follow, which are here the places
+  // of the document, moved by the document.
   if (is_atomic (old_t) || is_atomic (new_t) ||
       L(old_t) != L(new_t) || N(old_t) != N(new_t)) {
     ::notify_assign (ttt, reverse (rp), new_t);
     return;
   }
   for (int i=0; i<N(new_t); i++)
-    if (!same_rewritten (old_t[i], new_t[i]))
-      typeset_rewritten_changes (path (i, rp), old_t[i], new_t[i]);
+    if (!same_rewritten (old_t[i], new_t[i])) {
+      if (rewritten_bridged (new_t, i))
+        typeset_rewritten_changes (path (i, rp), old_t[i], new_t[i]);
+      else if (!same_rewritten_whole (old_t[i], new_t[i]))
+        ::notify_assign (ttt, reverse (path (i, rp)), new_t[i]);
+    }
 }
 
 tree

@@ -827,6 +827,23 @@ public:
       env.log_back (s); val= t; update (s); } }
   inline bool provides (string s) { return env.contains (s); }
   inline tree read (string s) { return env [s]; }
+  // (a level of macro_src for the call of the document whose expansion the
+  // style rewriter kept in an expand-as: auto_label_tag finds the tag of
+  // the call there, as when the typesetter expands the call itself; as
+  // there, the level is empty for a macro without arguments, and the tag is
+  // then looked for further out)
+  inline void macro_begin_call (path ip, tree name) {
+    macro_arg= list<hashmap<string,tree> > (
+      hashmap<string,tree> (UNINIT), macro_arg);
+    hashmap<string,path> h (path (DECORATION));
+    tree f= (is_atomic (name) && provides (name->label)?
+             read (name->label): tree (UNINIT));
+    if ((is_func (f, MACRO) && N(f) > 1) || is_func (f, XMACRO))
+      h ("\1call")= descend (ip, 0);
+    macro_src= list<hashmap<string,path> > (h, macro_src); }
+  inline void macro_end_call () {
+    macro_arg= macro_arg->next;
+    macro_src= macro_src->next; }
   tree local_begin_extents (box b);
   void local_end_extents (tree t);
 

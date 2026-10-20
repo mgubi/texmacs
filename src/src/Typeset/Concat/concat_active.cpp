@@ -292,7 +292,9 @@ concater_rep::typeset_set_binding (tree t, path ip) {
     flag ("set binding", ip, blue);
     if (N(keys) > 0) {
       path sip= ip;
-      if (N(t) >= 3 && (!is_nil (env->macro_src))) {
+      // (in the rewritten tree, the argument named by t[2] was substituted:
+      // the scope of the expand-as of a call has the call only)
+      if (N(t) >= 3 && (!is_nil (env->macro_src)) && !env->rewritten_tree) {
 	tree body= env->expand (tree (ARG, t[2]), true);
 	sip= obtain_ip (body);
       }
@@ -415,7 +417,8 @@ concater_rep::typeset_flag (tree t, path ip) {
   string name= env->exec_string (t[0]);
   string col = env->exec_string (t[1]);
   path sip= ip;
-  if ((N(t) >= 3) && (!is_nil (env->macro_src))) {
+  // (see typeset_set_binding)
+  if ((N(t) >= 3) && (!is_nil (env->macro_src)) && !env->rewritten_tree) {
     string var= env->exec_string (t[2]);
     sip= env->macro_src->item [var];
   }

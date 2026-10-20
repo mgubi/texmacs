@@ -147,5 +147,8 @@ bridge_expand_as_rep::my_typeset_will_be_complete () {
 void
 bridge_expand_as_rep::my_typeset (int desired_status) {
   ttt->insert_marker (st, ip);
+  // (the call, for the automatic labels: see concater_rep::typeset_expand_as)
+  if (ttt->rewritten) env->macro_begin_call (ip, st[0]);
   body->typeset (desired_status);
+  if (ttt->rewritten) env->macro_end_call ();
 }

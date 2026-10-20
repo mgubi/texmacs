@@ -335,10 +335,13 @@ concater_rep::typeset_expand_as (tree t, path ip) {
   // cout << "Mark: " << t << ", " << ip << "\n\n";
   if (N(t) != 2) { typeset_error (t, ip); return; }
   marker (descend (ip, 0));
-  if (env->rewritten_tree)
+  if (env->rewritten_tree) {
     // the expansion of a macro call, kept by the style rewriter with the
     // place of the call: typeset as the body of the call (typeset_compound)
+    env->macro_begin_call (ip, t[0]);
     typeset (attach_right (t[1], ip));
+    env->macro_end_call ();
+  }
   else typeset (t[1], descend (ip, 1));
   marker (descend (ip, 1));
 }

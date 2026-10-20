@@ -1,5 +1,8 @@
 # The experimental style rewriter
 
+(The decisions taken, with their alternatives, are summed up in
+[pure-style-decisions.md](pure-style-decisions.md).)
+
 Branch `wip_pure_style` (from `upsilon_texmacs`, 2026-10-19) reviews the
 style rewriter that Joris van der Hoeven started in January 2007 (commits
 e8e500db55 to be7a72a74b, "use --enable-experimental to test") and never
@@ -428,7 +431,10 @@ rewritten tree and tells the typesetter about the smallest subtrees which
 changed. The subtrees which did not change are the same trees (the
 rewriter memorizes its results), so the comparison is by address and
 cheap; atoms made again, such as the names in the `expand-as` of the macro
-calls, are compared by their strings (else every paragraph changed). A node
+calls, are compared by their strings (else every paragraph changed). It
+goes down only through the trees whose bridges give the change to a child
+bridge; below, a tree typeset as a whole by its bridge is given whole, with
+the places the rewriter attached to it (see "Analysis of a keystroke"). A node
 whose number of children changed (a new paragraph) is replaced as a whole:
 the insertions and removals of the bridges move the places of the bridges
 which follow in place (`ip->item += nr`), and these places are here the
@@ -524,7 +530,11 @@ list document of the tests, *About*, the welcome, *style*, conventions,
 structure and mathematics pages, and a paragraph with three identical
 macro calls, all the points find the same paths, but 2 on the conventions
 page, at the start of a key in a table, which find the same place one
-level deeper (in the `small` inside a `with`).
+level deeper (in the `small` inside a `with`). On `env-par` (192 points)
+and the environments document of the tests (36) some points differ: at
+the right of the end of lines, where the usual typesetting finds, for
+instance, the value of a `with` (`font-series` `bold`) and the rewritten
+tree the formula at the end of its body; not looked into further.
 
 ### Analysis of a keystroke (October 20)
 
@@ -624,12 +634,40 @@ The stable numbering of the automatic labels is #333's, after Joris; it
 realizes his "associate auxiliary data to tree nodes", on the tags of the
 document, which the typesetter no longer sees with the flag.
 
-**What would fix them** (not done):
+**What would fix them:**
 
-1. Automatic labels: find the tag from the place carried by the enclosing
-   `expand-as` when typesetting a rewritten tree. Small, and needed for
-   correctness anyway.
-2. New environments: make the values which do not change the same trees
+1. Automatic labels (done, decision 3.1 of
+   [pure-style-decisions.md](pure-style-decisions.md)): when the typesetter
+   typesets the `expand-as` of a call of the document (concater,
+   `bridge_expand_as`, `make_lazy_expand_as`), it opens a level of
+   `macro_src` with the place of the call (`edit_env_rep::macro_begin_call`,
+   `macro_end_call`), so that `auto_label_tag` finds the tag as when the
+   call is expanded. `set-binding` and `flag` with a third argument (the
+   name of a macro argument, substituted in the rewritten tree) keep their
+   own place in a rewritten tree. Two more things were needed, found on the
+   welcome page, where the labels of the menus were numbered again after a
+   keystroke in a menu: the diff (`typeset_rewritten_changes`) went down to
+   the string which changed, and the bridge of the paragraph substituted it
+   in its tree (`substitute`), which rebuilt the paragraph and the
+   `expand-as` of the menu without the places the rewriter had attached to
+   them; every box of the edited paragraph then had a decoration as its
+   place until the next full typesetting, and the label no tag. The diff
+   now goes down only through the trees whose bridge gives a change to the
+   bridge of a child (document, `with`, `expand-as`, `surround`, `mark`,
+   `locus`, the formattings, at that child), and below gives the new tree
+   whole, with its places, when its content or its places changed
+   (`same_rewritten_whole`, so that the trees which the rewriter made again
+   with the same content, after a new environment, are not sent). The
+   bridge of a paragraph typesets it whole after any change, so this costs
+   nothing. With these, the labels made, before and after five keystrokes,
+   are the same with and without the flag on the conventions, structure,
+   mathematics, `env-par`, welcome pages and the environments document of
+   the tests; the click maps after the keystrokes are those without the
+   flag. Per keystroke on the conventions page: typesetting the bridges
+   1.53 ms with the flag, 1.74 ms without; 9 bridges typeset again instead
+   of 14; 2 lines logged. The keystroke is still 3.35 to 3.75 ms against
+   2.2 to 2.35: the rewriting, cause 2.
+2. New environments (decision 3.2, open): make the values which do not change the same trees
    (the cell format of `evaluate_formatting` made once per inputs; partial
    expansions memorized, Joris's FIXME), or key the memorizers of `with`,
    `assign` and the evaluations by the values actually read (the inputs of
