@@ -9,11 +9,8 @@ The directions of the project, wished for and not yet begun, are in
 
 ## Next
 
-- **Merge `wip_fixes` into `upsilon_texmacs` again.** After the merge of
-  2026-10-20 (6dcee0776a) `wip_fixes` took some forty more PRs the same
-  evening (95 commits ahead at 22:00 on 2026-10-20): among them #215 (keyboard
-  maps), #345 (the server backups are registered, #319), #347, #382,
-  #383, #387 (help caches), #390 and #410. (#311, `delayed (:refresh ms)`,
+- (`wip_fixes` is merged here up to the evening of 2026-10-20, with its
+  forty PRs of that day, since 2026-10-21. `delayed (:refresh ms)`, #311,
   is here since 2026-10-14; the developer manual says how `:refresh`
   works.)
 
@@ -80,10 +77,21 @@ no headless mode. The Widkit duplicates are fixed on `wip_other_guis` too.
   locales of the manuals (de, es, fr, it, pl, pt, zh) every book adds
   "locale ... not found" warnings, counted as new problems.
 
+- **The PDF export of Vue (MuPDF) lacks the fixes of #341 and #249**
+  (merged here on 2026-10-21): they are in the native renderer of the Qt
+  and Cocoa builds (`pdf_hummus_renderer.cpp`): bookmarks without
+  backslashes, the symbols of the TeX math fonts in the text layer, escaped
+  URIs, embedded videos. To check in `Plugins/MuPDF/mupdf_pdf_renderer.cpp`
+  and port what applies; `tests/documents/ref` keeps the output of Vue
+  (the references of `wip_fixes` for article, math, slides and tables are
+  those of the Qt renderer). The merged Hummus code was only compiled
+  (syntax check), not run. Likewise #356 reloads a changed picture file in
+  the picture cache of Qt only (`qt_picture.cpp`).
+
 - **Remote tools: what the check of 2026-10-08 left** (issues of
   mgubi/texmacs). #319: the backups of the server are never registered,
-  `server-backup.scm` was loaded before the server existed: fixed by #345
-  on `wip_fixes`, here with the next merge. #322: the page cannot fetch the
+  `server-backup.scm` was loaded before the server existed: fixed by #345,
+  here since the merge of 2026-10-21. #322: the page cannot fetch the
   artwork of texmacs.org (CORS) and falls back to the thumbnails. The fixes
   of #315 to #318 went to `wip_fixes` within #330 (PRs #323 to #326 were
   folded into it), which is here. The rename dialog (#318) was tried in Vue

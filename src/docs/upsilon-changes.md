@@ -12,6 +12,86 @@ branch [`upsilon_texmacs`](https://github.com/mgubi/texmacs/commits/upsilon_texm
 have the details, and the problems go to the
 [issues of the repository](https://github.com/mgubi/texmacs/issues).
 
+## 21 October 2026
+
+- The fixes of the branch `wip_fixes` (fixes of the official TeXmacs)
+  merged there on the evening of 20 October, in the items which follow.
+- Keyboard shortcuts: removing a shortcut (also one of your own, in Tools →
+  Keyboard) removes it whatever the way its keys are written (`S-C-`,
+  `var`), which removed nothing before; redefining or removing the key of a
+  command keeps the other keys of that command in the menus; the shortcuts
+  made under a condition (`:require`) can be removed again.
+- **Desktop**: a TeXmacs server makes its periodic backups (preferences
+  Server backup, Rsync destination directory, Backup interval), which it
+  never did, and a change of these preferences takes effect without a
+  restart of the server; the users who may write in the database of a
+  server may also set its fields and entries.
+- Projects: after Document → Project → Attach master, the open views of a
+  file find the references of the master at once (they needed a new view),
+  and a renamed document is trusted or not according to its new name.
+- Hyphenation: the patterns which end with the end of a word are used
+  (`along-side`, `acety-lene`, `aero-stat` in English, which had no break),
+  so the line breaks of some documents change slightly.
+- Encodings: a file with a character which cannot be converted (a wrong
+  byte, or a character the target encoding has not) is converted with a
+  replacement character in its place; the whole file was left undecoded.
+- Help: Tools → Update → Help reads again the folders of the documentation,
+  so that a help page added or removed while TeXmacs runs is found by the
+  search and the links (only a restart did it).
+- Document parts: Save in a part view (Document → Part) writes the
+  included files changed in it, which were dropped; a file open elsewhere
+  with other unsaved changes is refused, and the footer names the files
+  written.
+- Security: the checker of the scripts of documents (`secure?`) refuses
+  the expressions which could reach functions which are not secure (calls
+  through variables, `set!`, renamed special forms...).
+- Multi-file documents and links: `<shared>` works, an included file is read
+  again after it is saved, a cycle of inclusions is reported instead of
+  hanging, and several fixes of the parts and of the links.
+- TeX fonts: the kerning at the end of a word is used for the positions of
+  the cursor too, the ligatures of the Greek TeX fonts (final sigma before a
+  punctuation) keep the punctuation, and some PK fonts load.
+- HTML export: the files included with `<include>` are exported with their
+  formulas, sections and numbers.
+- PDF export: a hyperlink which starts a paragraph of an included file can
+  be clicked.
+- **Desktop (Qt, Cocoa)**: in the PDF export (the native renderer of the
+  Qt and Cocoa builds; Vue exports with MuPDF, which these fixes do not
+  concern), the bookmarks
+  have no backslashes, the symbols of the TeX math fonts are in the text
+  layer (copy and search), the web addresses are escaped, and a `<video>`
+  is embedded as a video (with ImageMagick and ffmpeg), not as its current
+  picture.
+- Comments: a pasted copy of a comment is a comment of its own, not a clone
+  which edits the other.
+- Tables: a tall cell which spans several rows no longer sticks out above
+  the table; decorations of cells no longer corrupt the memory (crashes at
+  exit), and the structured moves keep the joined cells.
+- Undo: undoing one step after a removal and an insertion at the same place
+  takes back that step only.
+- Macros: an `<arg>` error names the argument (garbage before), and the
+  structured cursor moves (path-next, path-previous) follow the
+  accessibility of the tags.
+- An index entry in a section title no longer turns the page numbers of the
+  table of contents and of the index into `?`.
+- **Desktop (Qt)**: raster images (GIF, BMP, WebP...) are exported to PDF
+  by Qt again, without ImageMagick; a picture whose file changed is loaded
+  again; with Qt 5, the style sheet of a theme is scaled for screens of
+  high resolution.
+- AI sessions: LaTeX commands which begin with `\n` (`\nu`, `\ni`,
+  `\nonumber`...) are kept in the answers, each session of an engine has
+  its own history, the newlines of the input are kept, and a prompt with a
+  control character is no longer refused.
+- **Desktop**: the wallet (GnuPG 2.1 and later) can be opened, and a wrong
+  passphrase is refused also after the right one.
+- Colors and graphics: the reversed colors of the dark mode near grey are
+  right, and frame and curve operations which stopped with "not yet
+  implemented" work.
+- Pictures: the size of an SVG no longer depends on the converter, and the
+  PostScript printing of pictures with effects works.
+- Long documents shown without pages (source files): typing is about a
+  third faster in a file of 50000 lines.
+
 ## 20 October 2026
 
 - **Desktop**: the balloons of a language server under the mouse stay

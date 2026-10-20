@@ -301,6 +301,28 @@
 
   The additions to <TeXmacs> Upsilon, the newest first.
 
+  <paragraph|21 October 2026>
+
+  <\itemize>
+    <item>Hyphenation uses the patterns which end with the end of a word
+    (<verbatim|along-side>, which had no break), so the lines of some
+    documents break a little differently.
+
+    <item><menu|Tools|Update|Help> reads the documentation again, and Save
+    in a part view (<menu|Document|Part>) writes the included files changed
+    in it, which were dropped.
+
+    <item>Removing a keyboard shortcut works whatever the way its keys are
+    written, and keeps the other keys of its command in the menus.
+
+    <item>The export to HTML includes the files of <markup|include> with
+    their formulas and numbers; a pasted comment is a comment of its own; an
+    index entry in a section title no longer turns the page numbers of the
+    table of contents into question marks; tall cells which span several
+    rows stay inside their table; and typing in a long document without
+    pages (a source file) is faster.
+  </itemize>
+
   <paragraph|20 October 2026>
 
   <\itemize>
