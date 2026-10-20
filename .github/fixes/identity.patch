@@ -1,0 +1,82 @@
+TeXmacs Fixes: what the packages of wip_fixes change in the sources, so
+that they install beside a stock TeXmacs without taking it over; applied by
+.github/workflows/fixes.yml before the build, never committed to the sources
+(wip_fixes stays the stock TeXmacs with fixes, for upstream):
+- the name of the local server of Qt (a second TeXmacs gives its files to
+  the first one running): its own, or the stock TeXmacs and TeXmacs Fixes
+  open each other's files;
+- on Windows, the files of its own tree, even when TEXMACS_PATH is set (the
+  installer of the stock TeXmacs sets it for the whole machine).
+
+diff --git a/src/src/Plugins/Qt/QTMApplication.cpp b/src/src/Plugins/Qt/QTMApplication.cpp
+index 50566fcfa6..b188d05c48 100644
+--- a/src/src/Plugins/Qt/QTMApplication.cpp
++++ b/src/src/Plugins/Qt/QTMApplication.cpp
+@@ -146,11 +146,11 @@ QTMLocalServer::QTMLocalServer (): QObject (NULL) {
+   server= new QLocalServer (this);
+   connect (server, &QLocalServer::newConnection, this,
+ 	   &QTMLocalServer::onNewConnection);
+-  if (!QLocalServer::removeServer ("org.texmacs.local")) {
++  if (!QLocalServer::removeServer ("org.texmacs.fixes.local")) {
+     //qCritical () << "QTMLocalServer failed to grab org.texmacs.local";
+     return;
+   }      
+-  if (!server->listen ("org.texmacs.local")) {
++  if (!server->listen ("org.texmacs.fixes.local")) {
+     //qCritical () << "QTMLocalServer failed to start: "
+     //             << server->errorString ();
+     return;
+@@ -242,7 +242,7 @@ QTMLocalServer::onClientDisconnected () {
+ bool
+ send_to_single_instance (string s) {
+   QLocalSocket socket;
+-  socket.connectToServer ("org.texmacs.local");
++  socket.connectToServer ("org.texmacs.fixes.local");
+   if (!socket.waitForConnected (1000)) // 1s
+     return false;
+   string msg= (as_string (N (s)) * "\n") * s; // same as tm_link
+diff --git a/src/src/Plugins/Qt6/QTMApplication.cpp b/src/src/Plugins/Qt6/QTMApplication.cpp
+index 61b3610f0d..051e72f956 100644
+--- a/src/src/Plugins/Qt6/QTMApplication.cpp
++++ b/src/src/Plugins/Qt6/QTMApplication.cpp
+@@ -148,11 +148,11 @@ QTMLocalServer::QTMLocalServer (): QObject (NULL) {
+   server= new QLocalServer (this);
+   connect (server, &QLocalServer::newConnection, this,
+ 	   &QTMLocalServer::onNewConnection);
+-  if (!QLocalServer::removeServer ("org.texmacs.local")) {
++  if (!QLocalServer::removeServer ("org.texmacs.fixes.local")) {
+     //qCritical () << "QTMLocalServer failed to grab org.texmacs.local";
+     return;
+   }      
+-  if (!server->listen ("org.texmacs.local")) {
++  if (!server->listen ("org.texmacs.fixes.local")) {
+     //qCritical () << "QTMLocalServer failed to start: "
+     //             << server->errorString ();
+     return;
+@@ -244,7 +244,7 @@ QTMLocalServer::onClientDisconnected () {
+ bool
+ send_to_single_instance (string s) {
+   QLocalSocket socket;
+-  socket.connectToServer ("org.texmacs.local");
++  socket.connectToServer ("org.texmacs.fixes.local");
+   if (!socket.waitForConnected (1000)) // 1s
+     return false;
+   string msg= (as_string (N (s)) * "\n") * s; // same as tm_link
+diff --git a/src/src/Texmacs/Texmacs/texmacs.cpp b/src/src/Texmacs/Texmacs/texmacs.cpp
+index 0eae025535..35f3674942 100644
+--- a/src/src/Texmacs/Texmacs/texmacs.cpp
++++ b/src/src/Texmacs/Texmacs/texmacs.cpp
+@@ -204,7 +204,12 @@ TeXmacs_init_paths (int& argc, char** argv) {
+   // PWD is set to HOME
+   // if PWD is lacking, then the path resolution machinery may not work
+   
+-  if (is_empty (current_texmacs_path))
++  // TeXmacs Fixes: the files of its own tree, even when TEXMACS_PATH is
++  // set (by the installer of the stock TeXmacs, for the whole machine)
++  url own_tree= exedir * "..";
++  if (exists (own_tree * "progs/init-texmacs.scm"))
++    set_env ("TEXMACS_PATH", as_string (own_tree));
++  else if (is_empty (current_texmacs_path))
+     set_env ("TEXMACS_PATH", as_string (exedir * ".."));
+   // if (get_env ("HOME") == "") //now set in immediate_options otherwise --setup option fails
+   //   set_env ("HOME", get_env("USERPROFILE"));
