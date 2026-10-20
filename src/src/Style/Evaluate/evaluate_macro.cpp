@@ -251,7 +251,10 @@ expand (tree t, assoc_environment env) {
     case MACRO:
       {
 	assoc_environment local= copy (env);
-	for (i=0; i+1<n; i+=2)
+	// (all the children but the body are parameters, which shadow the
+	// arguments of the same names: amsart's subsection-title binds a
+	// macro with a parameter name inside its own macro with one)
+	for (i=0; i+1<n; i++)
 	  if (is_atomic (t[i])) {
 	    int key= make_tree_label (t[i]->label);
 	    local->remove (key);

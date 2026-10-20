@@ -105,6 +105,14 @@
                                    (assign "out" (macro "x" (in (arg "x"))))
                                    (out "z")))
           '(concat "<" "z" ">"))
+  ;; a macro inside a macro: its parameters shadow the arguments of the
+  ;; same names (all of them, not every other one: amsart's subsections)
+  (check= (rewrite-last '(document (assign "out" (macro "name"
+                                     (with "in" (macro "p" "name" (concat (arg "p") (arg "name")))
+                                       (in "A" "B"))))
+                                   (out "X")))
+          '(with "in" (quote (macro "p" "name" (concat (arg "p") (arg "name"))))
+             (concat "A" "B")))
   ;; a macro defined in the preamble of the document (filter-style)
   (check= (rewrite-last '(document (hide-preamble (document (assign "B" (macro "[b]"))))
                                    (B)))
