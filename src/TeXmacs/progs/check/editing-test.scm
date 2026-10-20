@@ -642,6 +642,37 @@
         (edit (redo 0))
         (check-false (buffer-modified? f))))))
 
+;; Each view has its own author, and undo takes back the last step of the
+;; author of the view. After an edit in another buffer, the cursor which
+;; archive-state records before start-editing still belongs to the author of
+;; that buffer; the step which follows belongs to the author of the view all
+;; the same. Before, it kept the owner of the cursor: undo then took back the
+;; step before it (or, in a buffer whose body a script had set, everything).
+(define (test-undo-authors)
+  (check-group "undo after editing another buffer")
+  (with-buffer-body '(document "")
+    (lambda ()
+      (let ((a (current-buffer)))
+        (edit (insert "a"))
+        ;; the body of the new buffer is set under the author of a
+        (with-buffer-body '(document "x")
+          (lambda ()
+            (let ((b (current-buffer)))
+              (edit (go-end) (insert '(strong "S")))
+              (edit (undo 0))
+              (check= (body) '(document "x"))
+              (edit (go-end) (insert '(strong "S")))
+              (with s (body)
+                (switch-to-buffer* a)
+                (edit (insert "a"))
+                (switch-to-buffer* b)
+                (edit (go-end) (insert '(em "W")))
+                (check-true (!= (body) s))
+                (edit (undo 0))
+                (check= (body) s)
+                (edit (undo 0))
+                (check= (body) '(document "x"))))))))))
+
 ;; Clearing the undo history concerns the current buffer only, and a buffer
 ;; which was saved remains unmodified.
 (define (test-undo-clear)
@@ -898,6 +929,7 @@
   (test-environment)
   (test-undo)
   (test-undo-save)
+  (test-undo-authors)
   (test-undo-clear)
   (test-undo-markers)
   (test-save)
