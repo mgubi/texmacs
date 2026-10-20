@@ -821,6 +821,51 @@
         (user (url->system (url-concretize "~/.TeXmacs"))))
     (!= home user)))
 
+;; The passphrase of a secret key, as the wallet checks it
+;; (wallet-correct-passphrase?, gpg-wallet.scm) and opens it (gpg-decrypt):
+;; in a GnuPG home whose gpg-agent keeps the passphrases in its cache, as by
+;; default (no gpg-agent.conf), a wrong passphrase is refused also after the
+;; right one was given (once a key is unlocked, the agent would decrypt
+;; whatever passphrase is given, if its cache were not cleared:
+;; gpg-forget-passphrases)
+(define (gpg-short-home name)
+  ;; in the temporary directory of TeXmacs when its name is short enough
+  ;; for the sockets of gpg-agent, else in /tmp
+  (with u (url-append (url-temp-dir) name)
+    (if (< (string-length (url->system u)) gpg-socket-max) u (gpg-tmp name))))
+
+(define (test-gpg-key-passphrase)
+  (check-group "gpg passphrase of a key")
+  (let ((dir (gpg-short-home "gnupg-pw")))
+    (dynamic-wind
+      (lambda ()
+        (when (not (url-exists? dir)) (system-mkdir dir))
+        (when (not (or (os-mingw?) (os-win32?)))
+          (system-1 "chmod 700" dir)))
+      (lambda ()
+        (with r (gpg-run "--homedir" (url->system dir) "--batch" "--no-tty"
+                         "--pinentry-mode" "loopback" "--passphrase" "pw-one"
+                         "--quick-gen-key"
+                         "TeXmacs Test <texmacs-test@example.invalid>"
+                         "default" "default" "never")
+          (if (!= (car r) "0")
+              (skip "gpg passphrase of a key" (caddr r))
+              (let* ((fpr (car (gpg-secret-key-fingerprints dir)))
+                     (enc (gpg-encrypt secret-text (list fpr) dir)))
+                (check-true (string? enc))
+                (check-false (gpg-correct-passphrase? fpr "pw-two" dir))
+                (check-true (gpg-correct-passphrase? fpr "pw-one" dir))
+                ;; the key was unlocked: still refused
+                (check-false (gpg-correct-passphrase? fpr "pw-two" dir))
+                (check-false (gpg-decryptable? enc "pw-two" dir))
+                (check-true (gpg-decryptable? enc "pw-one" dir))
+                (check-false (gpg-decryptable? enc "" dir))
+                (check= (gpg-decrypt enc "pw-one" dir) secret-text)
+                (check-false (gpg-correct-passphrase? fpr "pw-two" dir))))))
+      (lambda ()
+        (gpg-kill-agent dir)
+        (system-rmdir-recursive dir)))))
+
 (define (test-gpg)
   (with ok (gpg-available)
     (if (!= ok #t)
@@ -845,6 +890,8 @@
                                (lambda () (test-gpg-keys dir other fpr)))
                       (guarded "gpg passphrase"
                                (lambda () (test-gpg-passphrase dir)))
+                      (guarded "gpg passphrase of a key"
+                               test-gpg-key-passphrase)
                       (cond
                         ((not (scratch-home?))
                          (skip "GnuPG in documents"
