@@ -14,6 +14,15 @@ have the details, and the problems go to the
 
 ## 20 October 2026
 
+- A book made of included files loads and updates faster: an included
+  file keeps its layout from one typesetting to the next when its document
+  is the same (each pass typeset again every chapter), and the attributes
+  of the hyperlinks are no longer link vertices (each hyperlink was removed
+  from one list of all of them, a quadratic time to close a document or to
+  typeset again a part with many links). The load of a book of about 2000
+  pages in 17 files went from about 52 s to 22 s, an insertion at the start
+  of a chapter opened through the master from 15 s to 2 s
+  ([#408](https://github.com/mgubi/texmacs/issues/408)).
 - **Desktop**: the language servers of Julia: TeXmacs uses `jetls serve`
   (JETLS.jl), `fatou lsp`, or the package LanguageServer.jl run by `julia`,
   the first which is installed; it looked for a program
