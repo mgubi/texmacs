@@ -181,6 +181,7 @@ double as_percentage (tree t);
 bool is_magnification (string s);
 double get_magnification (string s);
 void transfer_ip (tree src, tree dest);
+tree intern_tree (tree t);
 void decorate_ip (tree src, tree dest);
 
 #endif // defined EVLUATE_MAIN_H

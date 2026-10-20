@@ -258,7 +258,33 @@
      (with s (style-rewrite-statistics)
        (check-true (<= (car s) 4))
        (check-true (>= (cadr s) 2)))
-     (check= (cAr (tree->stree (style-rewrite-buffer))) "f"))))
+     (check= (cAr (tree->stree (style-rewrite-buffer))) "f")))
+  ;; an edit in a list or in a table with a caption: the paragraphs after
+  ;; them are found in the memorizers, the environment after the edited
+  ;; tag being the same as before (the parts of the macro bodies which hold
+  ;; arguments and the cell formats are interned, see intern_tree)
+  (let ((after (map (lambda (i) `(concat (strong ,(number->string i)) " p"))
+                    (iota 30))))
+    (for (body (list `(itemize (document (concat (item) "a")))
+                     `(big-table (tabular (tformat (table (row (cell "a")))))
+                                 "caption")))
+      (with-scratch-body
+       `(document ,body ,@after)
+       (lambda ()
+         (style-rewrite-buffer)
+         (let ((first (car (style-rewrite-statistics)))
+               (u (tree-ref (buffer-tree) 0)))
+           (tree-set u (stree->tree
+                        (if (tree-is? u 'itemize)
+                            `(itemize (document (concat (item) "ab")))
+                            `(big-table (tabular (tformat (table (row (cell "ab")))))
+                                        "caption"))))
+           (style-rewrite-buffer)
+           ;; (the tag itself is evaluated again; before, the 30 paragraphs
+           ;; too, with a new environment)
+           (with s (style-rewrite-statistics)
+             (check-true (< (* 2 (car s)) first))
+             (check-true (>= (cadr s) 30)))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Pages of the manual

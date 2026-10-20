@@ -18,6 +18,7 @@ class environment;
 #define MEMORIZE_EVALUATE      0
 #define MEMORIZE_REWRITE       1
 #define MEMORIZE_INACTIVE      2
+#define MEMORIZE_INTERN        3
 
 #define MEMORIZE_ASSIGN        10
 #define MEMORIZE_BEGIN_WITH    11

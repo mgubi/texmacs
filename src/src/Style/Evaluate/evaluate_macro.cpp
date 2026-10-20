@@ -325,7 +325,9 @@ expand (tree t, assoc_environment env) {
 	  flag= flag && weak_equal (r[i], t[i]);
 	}
 	if (flag) return t;
-	return r;
+	// (the same expansion as before when the arguments it holds did not
+	// change: see evaluate_compound)
+	return intern_tree (r);
       }
     }
   }
@@ -362,10 +364,14 @@ evaluate_compound (tree t) {
 	local->raw_write (i, as_string (f[i]), i<m? t[i+d]: uninit);
       //local->print ("");
     }
+    // the parts of the body which hold arguments are made again at each
+    // expansion; they are interned (expand), so that a part whose
+    // arguments did not change is the same tree as at the last expansion,
+    // and its evaluation is found in its memorizer (Joris's "FIXME: should
+    // we remember partial expansions?")
     tree e= expand (f[n], local);
     decorate_ip (t, e);
     return evaluate (e);
-    // FIXME: should we remember partial expansions?
   }
   else return evaluate (f);
 }

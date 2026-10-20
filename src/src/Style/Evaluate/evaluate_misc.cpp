@@ -27,7 +27,7 @@ evaluate_formatting (tree t, string v) {
   tree r (t, n-1);
   for (i=0; i<n-1; i++) r[i]= evaluate (t[i]);
   tree oldv= std_env [v];
-  tree newv= oldv * r;
+  tree newv= intern_tree (oldv * r);
   assoc_environment local (1);
   local->raw_write (0, v, newv);
   begin_with (std_env, local);
@@ -39,8 +39,11 @@ evaluate_formatting (tree t, string v) {
 tree
 evaluate_table (tree t) {
   // FIXME: we should execute values in old cell format
+  // (the same empty format each time: a new one would be a new key for
+  // begin_with, and a new environment inside the table)
+  static tree empty_format (TFORMAT);
   assoc_environment local (1);
-  local->raw_write (0, CELL_FORMAT, tree (TFORMAT));
+  local->raw_write (0, CELL_FORMAT, empty_format);
   begin_with (std_env, local);
   int i, n= N(t);
   tree r (t, n);

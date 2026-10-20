@@ -89,6 +89,62 @@ decorate_ip (tree src, tree dest) {
 }
 
 /******************************************************************************
+* Interned trees
+******************************************************************************/
+
+static inline bool
+same_child (tree t1, tree t2) {
+  // (an atom of the document, with its place, is only the same as itself:
+  // a macro argument substituted in another call, with the same text,
+  // would carry the place of the first)
+  return weak_equal (t1, t2) ||
+         (is_atomic (t1) && is_atomic (t2) && t1->label == t2->label &&
+          obtain_ip (t1) == path (DETACHED) &&
+          obtain_ip (t2) == path (DETACHED));
+}
+
+class intern_memorizer_rep: public memorizer_rep {
+  tree t;
+  int  h;
+
+public:
+  inline intern_memorizer_rep (tree t2): t (t2) {
+    // (as same_child: an atom of the document by its address; mixed,
+    // since the table of the memorizers uses the low bits)
+    unsigned int u= (unsigned int) L(t2);
+    for (int i=0; i<N(t); i++) {
+      bool text= is_atomic (t[i]) && obtain_ip (t[i]) == path (DETACHED);
+      u= u * 1000003u ^ (unsigned int)
+        (text? ::hash (t[i]->label): weak_hash (t[i]));
+    }
+    h= (int) (u ^ (u >> 16)); }
+  void print (tm_ostream& out) { out << "intern_memorizer (" << t << ")"; }
+
+  int type () { return MEMORIZE_INTERN; }
+  int hash () { return h; }
+  bool equal (memorizer_rep* mem) {
+    intern_memorizer_rep* rep= (intern_memorizer_rep*) mem;
+    if (L(t) != L(rep->t) || N(t) != N(rep->t)) return false;
+    for (int i=0; i<N(t); i++)
+      if (!same_child (t[i], rep->t[i])) return false;
+    return true; }
+  tree get_tree () { return t; }
+};
+
+tree
+intern_tree (tree t) {
+  // the tree made before with the same label and the same children (atoms
+  // compared by their strings, the others by address), if there is one,
+  // else t: a value which is made again although its parts did not change
+  // (the cell format of a tformat, the parts of a macro body in which the
+  // arguments are substituted, for instance) is then the same tree, and
+  // the memorizers keyed by it (begin_with, evaluate) find their results
+  if (is_atomic (t)) return t;
+  memorizer mem= (memorizer_rep*) tm_new<intern_memorizer_rep> (t);
+  return mem->get_tree ();
+}
+
+/******************************************************************************
 * Partial evaluation
 *
 * Some values are only known to the typesetter: the size of a typeset box

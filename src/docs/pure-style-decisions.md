@@ -140,7 +140,8 @@ Both caches rely on identities: the rewriter's memorizers on the addresses
 of trees and environments, the typesetter's (#333) on the tags of the
 document for the automatic labels and on the fingerprint of the environment.
 The analysis of a keystroke (pure-style.md) found that each extra
-millisecond with the flag came from an identity lost.
+millisecond with the flag came from an identity lost; with 3.1 and 3.2 a
+keystroke with the flag costs what it costs without it.
 
 **3.1 The automatic labels find their tag from the `expand-as` of the call.**
 The typesetter numbers the automatic labels stably with the tag of the
@@ -166,23 +167,33 @@ mathematics, `env-par`, welcome, the environments of the tests); the
 counters of the typesetter on the conventions page (9 bridges typeset again
 instead of 21, 1.53 ms instead of 2.82).
 
-**3.2 New environments in the rewriter (open).** A value which is made again
-as a new tree although it did not change (the cell format of a `tformat`,
-a macro body with its arguments substituted) gives a new key, a new
-environment, and every evaluation after it misses its memorizer; Joris's
-reminder about `the-tags` and `the-label` and his `FIXME: should we remember
-partial expansions?` are this case. Two ways, not exclusive:
-
-- *Stable values:* make what does not change the same trees: memorize the
-  expansion of each part of a macro body by the arguments it holds (Joris's
-  FIXME), make the cell format once per inputs. Local changes, keep the
-  design (keys by address), but every place which makes a new tree from
-  unchanged parts must be found.
-- *Keys made of the inputs:* key the memorizers by the values actually read
-  (the input hashes of #333) instead of the addresses of the environments.
-  General (an unchanged label no longer makes a new environment for the rest
-  of the document, whatever made the new object), but replaces the core of
-  the memorizers and costs the recording of the reads.
-
-Recommendation: stable values first, measured with the trace and the
-statistics, then the keys made of inputs if new environments remain.
+**3.2 New environments in the rewriter: stable values.** A value which is
+made again as a new tree although it did not change (the cell format of a
+`tformat`, a macro body with its arguments substituted) gave a new key, a
+new environment, and every evaluation after it missed its memorizer;
+Joris's reminder about `the-tags` and `the-label` and his `FIXME: should we
+remember partial expansions?` are this case. Decision: such values are
+interned (`intern_tree`): a tree with the same label and the same children
+is the tree made before. The children are compared by address, atoms by
+their strings unless they carry a place of the document (an argument of
+one call with the same text as one of another call would bring its place).
+Interned: the cell formats (`evaluate_formatting`) and the parts of macro
+bodies which hold arguments (`expand`, bottom up); the empty cell format of
+a `table` is one static tree. The interned trees are memorizers, in the
+same table and with the same lifetime as the others.
+*Alternatives:* keys made of the inputs: key the memorizers by the values
+actually read (the input hashes of #333) instead of the addresses of the
+environments. General (an unchanged label no longer makes a new environment
+for the rest of the document, whatever made the new object), but replaces
+the core of the memorizers and costs the recording of the reads; not
+needed after the interning, kept for a case it does not cover. Memorizing
+the expansion of each call by its arguments: covers the bodies, not the
+cell formats, and a call with one changed argument is expanded again whole.
+Comparing values by content in the keys (tried at step 3): a deep
+comparison at each lookup, and no gain then.
+*Decided by:* the trace of the evaluations which leave with another
+environment than before (none left on the conventions, mathematics and
+welcome pages); the evaluations per keystroke (1660 to 93 on the
+conventions page, 1.4 to 0.5 ms); the keystroke as fast as without the
+flag; the first rewriting of the glue reference 58 ms instead of 51, with
+more memorizers (120000 instead of 68000).

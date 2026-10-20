@@ -313,7 +313,9 @@ them (current version, the rewritten body set as a tree, the master of the
 copy set to the document).
 
 **Result: of the 696 English pages of the documentation, 692 are identical
-to the pixel.** Left:
+to the pixel** (688 on October 20, after the interning of 3.2: four pages
+of `devel/source` gained a sub-pixel difference in an earlier step, see
+"Analysis of a keystroke"). Left:
 
 - `main/beamer/man-animations`: an animation, which differs between two
   printings of the document itself;
@@ -667,13 +669,47 @@ document, which the typesetter no longer sees with the flag.
    1.53 ms with the flag, 1.74 ms without; 9 bridges typeset again instead
    of 14; 2 lines logged. The keystroke is still 3.35 to 3.75 ms against
    2.2 to 2.35: the rewriting, cause 2.
-2. New environments (decision 3.2, open): make the values which do not change the same trees
-   (the cell format of `evaluate_formatting` made once per inputs; partial
-   expansions memorized, Joris's FIXME), or key the memorizers of `with`,
-   `assign` and the evaluations by the values actually read (the inputs of
-   #333, step 3) instead of addresses. Either way, an unchanged label in a
-   table would no longer make a new environment for the rest of the
-   document.
+2. New environments (done, decision 3.2): the values made again from
+   unchanged parts are *interned* (`intern_tree`, a memorizer of its own,
+   `MEMORIZE_INTERN`): a tree with the same label and the same children
+   (by address; atoms by their strings when they carry no place of the
+   document) is the tree made before, found in the table of the memorizers
+   and kept alive by the memorizer tree of the last pass, like the others.
+   Interned: the cell format of `evaluate_formatting` (`oldv * r`), and,
+   bottom up, the parts of a macro body in which `expand` substitutes the
+   arguments (Joris's "FIXME: should we remember partial expansions?"); the
+   empty format of `evaluate_table` is one static tree. On the conventions
+   page the first fix alone moved the chain two levels down, to the
+   `table`; with the static format it was gone. The math and welcome pages
+   had another chain, ending in the `with` of `indent-left` in the lists:
+   `plus (value (par-left), item-hsep())` is a part of the body of
+   `indent-left` holding an argument, made again because the call's other
+   argument (the list) changed; interning the expansions removed it.
+
+   | per keystroke, rewriting | evaluations | time |
+   |---|---|---|
+   | conventions | 1660 -> 93 | 1.4 -> 0.5 ms |
+   | mathematics | 1221 -> 62 | 1.1 -> 0.45 ms |
+   | welcome | 1491 -> 75 | 1.05 -> 0.45 ms |
+
+   A keystroke with the flag now costs what it costs without it (typing
+   benchmark: conventions 2.15 ms against 2.3, welcome 1.1 against 1.15,
+   mathematics 0.8 against 0.8). The first rewriting of a document has
+   nothing to find: the glue reference (82000 evaluations) takes 58 ms
+   instead of 51 and keeps 120000 memorizers instead of 68000; the change
+   log and the help page of the browser version do not change. Pitfall
+   met: the hash of an interned tree must follow its equality; hashing the
+   atoms of the document by their strings put the thousands of calls of
+   the glue reference with the same argument text in one bucket (1.7
+   million comparisons, 175 ms). Checked by the suite (the paragraphs after
+   an edited list and after an edited table with a caption are found in
+   the memorizers; without the interning these checks fail), the
+   comparison of the documentation (688 of 696 identical: the four known
+   pages, and four pages of `devel/source` with a sub-pixel difference in
+   a hyphen of a bold `scm` label, the same with the interning off and
+   with the `expand-as` removed, so from an earlier step, not yet looked
+   into), and the comparisons in the editor (edits, labels, places,
+   environments, click maps after keystrokes: unchanged).
 
 ## Relation to the typesetter caches
 
