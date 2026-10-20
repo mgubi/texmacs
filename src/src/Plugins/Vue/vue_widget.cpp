@@ -28,6 +28,8 @@
 #include "tm_window.hpp"
 #include "sys_utils.hpp" // for system (printer widget)
 #include "analyze.hpp"   // for occurs (filtered choice)
+#include "converter.hpp" // cork_to_utf8 (the clipboard of the input fields)
+#include "locale.hpp"    // get_locale_charset
 #include "boot.hpp"      // for get_user_preference (the icon bars)
 #include "poly_line.hpp" // for ink widget
 
@@ -4656,11 +4658,26 @@ vue_input_text_widget_rep::insert (string ins) {
   pos += N(ins);
 }
 
+// The text of an input field is in the Cork encoding of TeXmacs (the keys
+// typed go through utf8_to_cork), the clipboard has it in the encoding of
+// the verbatim format, UTF-8 nearly always (see set_selection in vue_gui.cpp)
+static bool
+verbatim_in_utf8 (bool paste) {
+  string enc= get_preference (paste ? "verbatim->texmacs:encoding"
+                                    : "texmacs->verbatim:encoding");
+  // (a paste takes the text of the system, in UTF-8, for "auto")
+  if (enc == "auto" || enc == "default")
+    enc= paste ? string ("utf-8") : get_locale_charset ();
+  return locase_all (enc) == "utf-8";
+}
+
 void
 vue_input_text_widget_rep::copy_selection (bool cut) {
   int b, e;
   if (!selection (b, e)) return;
-  string t= tm_decode (s (b, e));
+  // a symbol (<alpha>) becomes its character, not its name
+  string t= verbatim_in_utf8 (false)
+            ? cork_to_utf8 (s (b, e)) : tm_decode (s (b, e));
   // "primary" is the system clipboard of the Vue GUI (see vue_gui.cpp)
   set_selection ("primary", tuple ("extern", t), t, t, "", "verbatim");
   if (cut) delete_selection ();
@@ -4687,8 +4704,9 @@ vue_input_text_widget_rep::paste () {
   tree t; string str;
   (void) get_selection ("primary", t, str, "verbatim");
   string ins;
-  if (is_tuple (t, "extern", 1)) ins= tm_encode (as_string (t[1]));
-  else if (N(str) > 0) ins= tm_encode (str);
+  bool utf8= verbatim_in_utf8 (true);
+  if (is_tuple (t, "extern", 1)) str= as_string (t[1]);
+  if (N(str) > 0) ins= utf8 ? utf8_to_cork (str) : tm_encode (str);
   if (N(ins) == 0) return;
   // a single line: the newlines of the clipboard become spaces
   ins= replace (ins, "\n", " ");
