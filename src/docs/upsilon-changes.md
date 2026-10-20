@@ -14,6 +14,11 @@ have the details, and the problems go to the
 
 ## 20 October 2026
 
+- **Desktop**: the language servers of Julia: TeXmacs uses `jetls serve`
+  (JETLS.jl), `fatou lsp`, or the package LanguageServer.jl run by `julia`,
+  the first which is installed; it looked for a program
+  `julia-language-server`, which is not a usual one
+  ([#409](https://github.com/mgubi/texmacs/issues/409)).
 - **Desktop**: the mathematical symbols of the TeX fonts (binary operators
   and relations such as ∘ and ·, Greek letters) were drawn as squares, in
   the document, in the PDF and in the menus, on a system with TrueType

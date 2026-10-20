@@ -55,7 +55,11 @@
     ("python" (servers "pylsp" "pyright-langserver --stdio" "basedpyright-langserver --stdio")
      (label "Python") (tags python python-code) (grammar "python")
      (comment "#") (names "python" "py" "python3"))
-    ("julia" (servers "julia-language-server")
+    ;; (JETLS.jl and fatou are programs of their own; LanguageServer.jl is
+    ;; a package which julia runs, and comes last, since julia is there
+    ;; without it too)
+    ("julia" (servers "jetls serve" "fatou lsp"
+                      "julia --startup-file=no --history-file=no -e \"using LanguageServer; runserver()\"")
      (label "Julia") (tags julia julia-code) (grammar "julia")
      (comment "#") (block-comment "#=" "=#")
      (names "julia"))
