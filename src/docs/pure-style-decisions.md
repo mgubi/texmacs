@@ -91,6 +91,25 @@ before or after a tag (typing at the start of a list item went after the
 bullet).
 *Decided by:* the comparison of cursor moves.
 
+**1.7 The branches of a condition left to the typesetter.** When the
+typesetter decides a condition (`if` or `case` on a residual, such as
+`has-binding "bib-csl"` in the `cite` of Upsilon), it takes one branch, but
+the rewriter evaluates them all. Each branch is evaluated from the
+environment before the condition, which is the environment after it; a
+variable which a branch assigns (the footnote counter, when a citation may
+be a note) becomes a reference to it (`value`), since only the typesetter
+knows which branch it took. The assignments stay in the branches. A
+computation with an argument which holds a residual is a residual (`merge`
+of `"footnote-"` and the counter), and so is `set-binding` with such a name
+(`evaluate_branches`, `evaluate_partially`, `evaluate_set_binding`).
+*Alternatives:* the environment of the last branch for what follows (the
+rewriter of 2007): the counter went up once per branch and per copy of the
+note in `hard-id` and `write` (8 notes instead of 2, and references to notes
+which did not exist); a value per branch, merged after (`if` of the values):
+exact, but turns every later counter into a condition.
+*Decided by:* a chapter of the corpus (baltakatei, `c9-problems`): the link
+of a note reference which pointed nowhere; the suite.
+
 ## 2. How the editor typesets the rewritten tree
 
 **2.1 Behind a flag, in the experimental build.** `TEXMACS_STYLE_TYPESET=1`;
@@ -178,7 +197,11 @@ with the place of the call, so that `auto_label_tag` finds the tag as when
 the call is expanded.
 The level holds the call only: `set-binding` and `flag` with a third
 argument, the name of a macro argument (substituted in the rewritten tree),
-keep their own place there, as before.
+keep their own place there, as before; in the macros which the typesetter
+still expands itself in the rewritten tree (`label`, whose arguments the
+level holds), they take the place of the argument as usual (at first they
+took their own place there too, and the labels lost their flag on the
+screen, and a second destination in the PostScript).
 *Alternatives:* number the labels in the rewriter (they depend on the order
 of the document and on data kept with the buffer: the rewriter would need
 that state, and its memorization would break); look for the tag from the

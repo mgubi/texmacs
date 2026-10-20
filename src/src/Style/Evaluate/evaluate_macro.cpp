@@ -40,6 +40,10 @@ protect_value (tree val) {
   return tree (QUASIQUOTE, protect_parts (val));
 }
 
+// the variables assigned in the branches of a residual if or case
+// (evaluate_branches)
+array<string>* residual_assigned= NULL;
+
 tree
 evaluate_assign (tree t) {
   // an assignment stays in the result, with the place of the assignment of
@@ -56,6 +60,7 @@ evaluate_assign (tree t) {
     tree   val= evaluate (t[(i<<1)+1]);
     local->raw_write (i, var, val);
     kept << tree (ASSIGN, var, protect_value (val));
+    if (residual_assigned != NULL) (*residual_assigned) << var;
   }
   assign (std_env, local);
   tree r= (N(kept) == 1? kept[0]: kept);

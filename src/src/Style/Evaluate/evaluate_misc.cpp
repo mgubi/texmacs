@@ -78,6 +78,8 @@ evaluate_set_binding (tree t) {
   tree keys, value;
   if (N(t) == 1) {
     keys= std_env ["the-tags"];
+    // (tags known to the typesetter only: it makes the bindings)
+    if (contains_residual (keys)) keys= tuple ();
     if (!is_tuple (keys))
       return tree (_ERROR, "bad set binding");
     for (int i=0; i<N(keys); i++)
@@ -96,6 +98,15 @@ evaluate_set_binding (tree t) {
   }
   else if (N(t) >= 2) {
     tree key= evaluate (t[0]);
+    if (contains_residual (key)) {
+      // (a name known to the typesetter only, a counter which a residual
+      // branch assigned: the typesetter makes the binding)
+      tree r (t, N(t));
+      r[0]= key;
+      for (int i=1; i<N(t); i++) r[i]= evaluate (t[i]);
+      transfer_ip (t, r);
+      return r;
+    }
     if (!is_atomic (key)) 
       return tree (_ERROR, "bad set binding");
     keys= tuple (key);

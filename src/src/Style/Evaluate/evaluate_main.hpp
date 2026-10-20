@@ -82,6 +82,7 @@ tree evaluate_while (tree t);
 tree evaluate_for_each (tree t);
 tree evaluate_include (tree t);
 tree evaluate_filter_style (tree t);
+extern array<string>* residual_assigned;
 tree evaluate_use_package (tree t);
 tree evaluate_use_module (tree t);
 

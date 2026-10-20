@@ -341,7 +341,10 @@ evaluate_partially (tree t) {
   tree r (t, n);
   for (i=0; i<n; i++) {
     r[i]= evaluate (t[i]);
-    if (is_residual (r[i], len)) residual= true;
+    // (also an argument which holds one: merge "footnote-" with the
+    // concat of a counter which a residual branch assigned)
+    if (is_residual (r[i], len) ||
+        (is_compound (r[i]) && contains_residual (r[i]))) residual= true;
   }
   if (!residual) return uninit;
   transfer_ip (t, r);

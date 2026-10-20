@@ -22,6 +22,35 @@ tree load_inclusion (url u); // implemented in tm_file.cpp
 * Classical control structures
 ******************************************************************************/
 
+static void
+evaluate_branches (tree t, tree& r, array<int> branches) {
+  // the branches of a residual if or case: the typesetter takes one of
+  // them, so each is evaluated from the environment before them, which
+  // stays the one after them; a variable which one of them assigns (a
+  // counter incremented in one branch) is known to the typesetter only,
+  // and becomes a reference to it (its assignments stay in the branches)
+  environment before= std_env;
+  array<string>* outer= residual_assigned;
+  array<string> vars;
+  residual_assigned= &vars;
+  for (int k=0; k<N(branches); k++) {
+    std_env= before;
+    r[branches[k]]= evaluate_result (t[branches[k]]);
+  }
+  std_env= before;
+  residual_assigned= outer;
+  if (N(vars) == 0) return;
+  hashset<string> done;
+  array<string> uniq;
+  for (int k=0; k<N(vars); k++)
+    if (!done->contains (vars[k])) { done->insert (vars[k]); uniq << vars[k]; }
+  if (outer != NULL) for (int k=0; k<N(uniq); k++) (*outer) << uniq[k];
+  assoc_environment local (N(uniq));
+  for (int k=0; k<N(uniq); k++)
+    local->raw_write (k, uniq[k], tree (VALUE, uniq[k]));
+  assign (std_env, local);
+}
+
 tree
 evaluate_if (tree t) {
   if (N(t) != 2 && N(t) != 3) return evaluate_error ("bad if");
@@ -30,7 +59,9 @@ evaluate_if (tree t) {
     // the condition is left to the typesetter, with both branches
     tree r (t, N(t));
     r[0]= u;
-    for (int i=1; i<N(t); i++) r[i]= evaluate_result (t[i]);
+    array<int> branches;
+    for (int i=1; i<N(t); i++) branches << i;
+    evaluate_branches (t, r, branches);
     return r;
   }
   if (!is_bool (u)) return evaluate_error ("bad if");
@@ -51,10 +82,16 @@ evaluate_case (tree t) {
       r << u;
       // (the branches, and the last tree when it is the default branch,
       // in the mode of the case; the conditions as values)
+      array<int> branches;
       for (int j=i+1; j<n; j++) {
         bool branch= (j-i) % 2 == 1 || j == n-1;
-        r << (branch? evaluate_result (t[j]): evaluate (t[j]));
+        if (branch) { r << tree (""); branches << N(r)-1; }
+        else r << evaluate (t[j]);
       }
+      tree src (CASE);
+      src << u;
+      for (int j=i+1; j<n; j++) src << t[j];
+      evaluate_branches (src, r, branches);
       return r;
     }
     if (!is_bool (u)) return evaluate_error ("bad case");

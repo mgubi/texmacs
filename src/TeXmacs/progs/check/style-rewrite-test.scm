@@ -259,6 +259,25 @@
           '(concat "a" "b"))
   (check= (rewrite-last '(document (if (equal (quote "b") "b") "yes" "no")))
           "yes")
+  ;; a variable assigned in a branch of a condition which the typesetter
+  ;; decides (has-binding) is known to the typesetter only after it: a
+  ;; reference, also in the computations and the label names made from it
+  (check= (rewrite-last '(document (assign "n" "1")
+                                   (if (has-binding "x") (assign "n" "2") "")
+                                   (value "n")))
+          '(value "n"))
+  (check= (rewrite-last '(document (assign "n" "1")
+                                   (if (has-binding "x") (assign "n" "2") "")
+                                   (merge "a-" (concat "" (value "n")))))
+          '(merge "a-" (concat "" (value "n"))))
+  (check= (rewrite-last '(document (assign "n" "1")
+                                   (if (has-binding "x") (assign "n" "2") "")
+                                   (set-binding (merge "a-" (value "n")) "v")))
+          '(set-binding (merge "a-" (value "n")) "v"))
+  ;; the branches are evaluated from the same environment
+  (check= (rewrite-last '(document (assign "n" "1")
+                                   (if (has-binding "x") (assign "n" "2") (value "n"))))
+          '(if (has-binding "x") (assign "n" "2") "1"))
   ;; the typesetter typesets the body of an ornament with margins of its
   ;; own (bridge_ornamented_rep): there they stay references
   (check= (rewrite-last '(document
