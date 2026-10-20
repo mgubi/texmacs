@@ -1181,6 +1181,48 @@
      (update-forced)
      (check= (auto-names) '("auto-1" "auto-2" "auto-3")))))
 
+;; A tag which is inserted, removed by an undo and put back by a redo
+;; gives its labels the names it had (the redo puts back the tree which the
+;; undo removed, with their numbers: invert_for_redo in archiver.cpp), each
+;; time.
+(define (test-labels-after-redo)
+  (check-group "labels after redo")
+  (with-typeset-body
+   '(document (section "A") "a" (section "B") "b")
+   (lambda ()
+     (renumber-auto-labels)
+     (update-forced)
+     (dynamic-wind start-editing
+                   (lambda () (tree-insert (buffer-tree) 2
+                                           '((section "D") "d")))
+                   end-editing)
+     (update-forced)
+     (check= (auto-names) '("auto-1" "auto-2" "auto-3"))
+     ;; (the labels of a removed tag stay in the list of references, so
+     ;; the names are compared after each redo)
+     (with names (lambda ()
+                   (map (lambda (k)
+                          (undo 0) (update-forced)
+                          (redo 0) (update-forced)
+                          (auto-names))
+                        '(1 2 3)))
+       (check= (names)
+               '(("auto-1" "auto-2" "auto-3")
+                 ("auto-1" "auto-2" "auto-3")
+                 ("auto-1" "auto-2" "auto-3"))))
+     ;; the same for a tag put around a text (insert_node)
+     (dynamic-wind start-editing
+                   (lambda () (tree-insert-node (tree-ref (buffer-tree) 1)
+                                                0 '(section)))
+                   end-editing)
+     (update-forced)
+     (let ((n1 (auto-names)))
+       (undo 0) (update-forced)
+       (redo 0) (update-forced)
+       (undo 0) (update-forced)
+       (redo 0) (update-forced)
+       (check= (auto-names) n1)))))
+
 ;; Paragraphs removed one after the other in a document with numbered
 ;; equations: the paragraphs are kept in blocks (bridge_document.cpp), and
 ;; the removal of the first paragraph of a block changes the range of the
@@ -1685,6 +1727,7 @@
   (test-loci-of-surround-parts)
   (test-bindings-written-again)
   (test-labels-after-undo)
+  (test-labels-after-redo)
   (test-incremental-against-scratch)
   (test-random-documents)
   (test-block-replay)

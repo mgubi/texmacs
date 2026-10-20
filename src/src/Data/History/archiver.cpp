@@ -211,6 +211,40 @@ copy_for_apply (patch p) {
   return p;
 }
 
+static patch
+invert_for_redo (patch p, tree t) {
+  // the inverse of the patch p of an undo, before p is applied to t: as
+  // invert (patch.cpp), but the modifications of the inverse are made again
+  // from t (invert in commute.cpp) instead of being those which the archive
+  // stored when the change was made. They are copies of the trees which the
+  // undo removes, with the numbers of the automatic labels of their tags,
+  // so that a tag which a redo puts back gives its labels the names they
+  // had (the copies which add stores have no numbers)
+  switch (get_type (p)) {
+  case PATCH_MODIFICATION:
+    return patch (invert (get_modification (p), t), get_modification (p));
+  case PATCH_BRANCH:
+    ASSERT (N(p) <= 1, "ambiguous application");
+  case PATCH_COMPOUND:
+    {
+      int i, n= N(p);
+      array<patch> r (n);
+      for (i=0; i<n; i++) {
+        r[n-1-i]= invert_for_redo (p[i], t);
+        t= clean_apply (p[i], t);
+      }
+      return patch (get_type (p) == PATCH_BRANCH, r);
+    }
+  case PATCH_BIRTH:
+    return patch (get_author (p), !get_birth (p));
+  case PATCH_AUTHOR:
+    return patch (get_author (p), invert_for_redo (p[0], t));
+  default:
+    FAILED ("unsupported patch type");
+  }
+  return p;
+}
+
 void
 archiver_rep::apply (patch p) {
   // apply a patch, while disabling versioning during the modifications
@@ -396,7 +430,7 @@ archiver_rep::retract () {
   else current= un;
   the_owner= the_author;
   if (nr_branches (re) != 0) {
-    patch q= invert (current, the_et);
+    patch q= invert_for_redo (current, the_et);
     re= patch (q, re);
   }
   if (nr_branches (nx) != 0) nx= get_undo (nx);
@@ -474,7 +508,7 @@ archiver_rep::undo_one (int i) {
     ASSERT (i == 0, "index out of range");
     patch p= car (get_undo (archive));
     ASSERT (is_applicable (p, the_et), "history corrupted");
-    patch q= invert (p, the_et);
+    patch q= invert_for_redo (p, the_et);
     apply (p);
     patch re1= patch (q, get_redo (archive));
     patch nx = cdr (get_undo (archive));
