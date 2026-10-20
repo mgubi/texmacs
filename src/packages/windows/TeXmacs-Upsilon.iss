@@ -2,7 +2,8 @@
 ; Inno Setup script of the installers of TeXmacs Upsilon (Qt and Vue), made
 ; from TeXmacs.iss (the installer of the stock TeXmacs) so that Upsilon
 ; installs beside it without touching it:
-; - its own AppId, folder, group and uninstaller, one for each interface;
+; - its own AppId, folder, group and uninstaller, one for each interface,
+;   and its own icon (TeXmacs-Upsilon.ico, the flat chip of texmacs-vue-*.png);
 ; - no TEXMACS_PATH in the environment of the user (texmacs.exe uses the
 ;   tree it is in, see TeXmacs_init_paths in src/Texmacs/Texmacs/texmacs.cpp);
 ; - .tm files opened by Upsilon only when asked (a task, off by default),
@@ -31,13 +32,14 @@
 #endif
 
 #if Gui == "Vue"
-  #define AppName "TeXmacs Upsilon Vue"
+  #define AppName "GNU TeXmacs Upsilon Vue"
   #define AppGuid "{{163A2D93-F063-409A-87C8-16BD85C9A623}"
 #else
-  #define AppName "TeXmacs Upsilon"
+  #define AppName "GNU TeXmacs Upsilon"
   #define AppGuid "{{6298E18B-B111-48B7-BA8F-A89B3C450771}"
 #endif
-#define ProgId StringChange(AppName, " ", "") + ".tm"
+; (TeXmacsUpsilon.tm, TeXmacsUpsilonVue.tm: without the GNU of the name)
+#define ProgId StringChange(StringChange(AppName, "GNU ", ""), " ", "") + ".tm"
 
 [Setup]
 AppId={#AppGuid}
@@ -51,7 +53,7 @@ AppSupportURL=https://github.com/mgubi/texmacs/issues
 DefaultDirName={autopf}\{#AppName}
 DefaultGroupName={#AppName}
 LicenseFile={#Bundle}\LICENSE
-UninstallDisplayIcon={app}\TeXmacs.ico
+UninstallDisplayIcon={app}\TeXmacs-Upsilon.ico
 UninstallDisplayName={#AppName}
 OutputDir={#OutputDir}
 OutputBaseFilename={#OutputName}
@@ -64,6 +66,7 @@ ArchitecturesInstallIn64BitMode=x64os
 Compression=lzma2/max
 SolidCompression=yes
 WizardStyle=modern
+SetupIconFile=TeXmacs-Upsilon.ico
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
@@ -83,18 +86,18 @@ Name: "associate"; Description: "Open .tm files with {#AppName}"; GroupDescripti
 Root: HKA; Subkey: "Software\Classes\.tm"; ValueType: string; ValueName: ""; ValueData: "{#ProgId}"; Flags: uninsdeletevalue; Tasks: associate
 Root: HKA; Subkey: "Software\Classes\.tm\OpenWithProgids"; ValueType: string; ValueName: "{#ProgId}"; ValueData: ""; Flags: uninsdeletevalue
 Root: HKA; Subkey: "Software\Classes\{#ProgId}"; ValueType: string; ValueName: ""; ValueData: "TeXmacs document"; Flags: uninsdeletekey
-Root: HKA; Subkey: "Software\Classes\{#ProgId}\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\TeXmacs.ico"
+Root: HKA; Subkey: "Software\Classes\{#ProgId}\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\TeXmacs-Upsilon.ico"
 Root: HKA; Subkey: "Software\Classes\{#ProgId}\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\bin\texmacs.exe"" ""%1"""
 
 [Files]
 Source: {#Bundle}\*; DestDir: {app}; Flags: recursesubdirs createallsubdirs ignoreversion
-Source: TeXmacs.ico; DestDir: {app}
+Source: TeXmacs-Upsilon.ico; DestDir: {app}
 Source: topbanner.bmp; Flags: dontcopy
 
 [Icons]
-Name: "{group}\{#AppName}"; Filename: "{app}\bin\texmacs.exe"; IconFilename: "{app}\TeXmacs.ico"
+Name: "{group}\{#AppName}"; Filename: "{app}\bin\texmacs.exe"; IconFilename: "{app}\TeXmacs-Upsilon.ico"
 Name: "{group}\Uninstall {#AppName}"; Filename: "{uninstallexe}"
-Name: "{autodesktop}\{#AppName}"; Filename: "{app}\bin\texmacs.exe"; IconFilename: "{app}\TeXmacs.ico"; Tasks: desktopicon
+Name: "{autodesktop}\{#AppName}"; Filename: "{app}\bin\texmacs.exe"; IconFilename: "{app}\TeXmacs-Upsilon.ico"; Tasks: desktopicon
 
 [UninstallDelete]
 Type: files; Name: "{app}\*"
