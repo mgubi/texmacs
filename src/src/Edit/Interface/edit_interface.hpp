@@ -66,6 +66,7 @@ protected:
   array<path>       user_cursor_paths;
   array<string>     user_cursor_colors;
   array<string>     user_cursor_names;
+  array<rectangle>  user_cursor_rects; // where each was drawn last, if it was
   array<rectangles> spell_error_rects;
   rectangle     last_visible;
   rectangles    env_rects;
@@ -129,6 +130,9 @@ public:
   void draw_context (renderer ren, rectangle r);
   void draw_env (renderer ren);
   void draw_cursor (renderer ren);
+  bool user_cursor_shape (int i, font& fn, string& name, SI& x1, SI& y1,
+                          SI& x2, SI& y2, SI& fw, SI& fh);
+  void invalidate_user_cursor (int i);
   void draw_user_cursors (renderer ren);
   void set_user_cursor (string id, path p, string col, string name);
   void cancel_user_cursor (string id);

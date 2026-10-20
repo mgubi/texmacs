@@ -138,6 +138,62 @@ edit_interface_rep::draw_cursor (renderer ren) {
 * typesetting.
 ******************************************************************************/
 
+// The bar of the cursor of the other user i, from (x1, y1) to (x2, y2), and
+// its flag, of fw by fh above the bar, with the name to write in it (fn is
+// the font of the flags, made when it is first needed); false when the
+// position of the cursor is not in the document as it is now (it changed
+// since the position was given) and nothing is drawn
+bool
+edit_interface_rep::user_cursor_shape (int i, font& fn, string& name,
+                                       SI& x1, SI& y1, SI& x2, SI& y2,
+                                       SI& fw, SI& fh) {
+  if (is_nil (eb)) return false;
+  path p= user_cursor_paths[i];
+  if (is_nil (p) || !(rp <= p) || !has_subtree (et, path_up (p))) return false;
+  cursor cu= eb->find_check_cursor (p);
+  if (!cu->valid) return false;
+  SI cy1= cu->y1 - 2*zpixel, cy2= cu->y2 + 2*zpixel;
+  x1= cu->ox + ((SI) (cy1 * cu->slope)); y1= cu->oy + cy1;
+  x2= cu->ox + ((SI) (cy2 * cu->slope)); y2= cu->oy + cy2;
+  name= user_cursor_names[i];
+  fw= fh= 0;
+  if (N(name) == 0) return true;
+  // a long name would cover the text: its first characters only
+  int pos= 0, nr= 0;
+  while (pos < N(name) && nr < 24) { tm_char_forwards (name, pos); nr++; }
+  if (pos < N(name)) name= name (0, pos) * "...";
+  if (is_nil (fn)) {
+    tree t= use_macos_fonts () ? tuple ("apple-lucida", "ss", "medium", "right")
+                               : tuple ("pagella", "rm", "medium", "right");
+    t << tree ("7") << tree ("600");
+    fn= find_font (t);
+  }
+  metric ex;
+  fn->get_extents (name, ex);
+  SI pad= 2*zpixel;
+  fw= ex->x2 - ex->x1 + 2*pad; fh= fn->y2 - fn->y1 + pad;
+  return true;
+}
+
+// what the cursor of the other user i covers on the screen, where it was
+// drawn last and where it goes now: only that is drawn again when the
+// cursor moves (a whole repaint at every move of every user was the cost
+// of a live document)
+void
+edit_interface_rep::invalidate_user_cursor (int i) {
+  if (i < N(user_cursor_rects)) {
+    rectangle r= user_cursor_rects[i]; // empty when it was not drawn
+    if (r->x1 < r->x2) invalidate (r->x1, r->y1, r->x2, r->y2);
+  }
+  font fn;
+  string name;
+  SI x1, y1, x2, y2, fw, fh;
+  if (user_cursor_shape (i, fn, name, x1, y1, x2, y2, fw, fh)) {
+    SI m= 3*zpixel;
+    invalidate (min (x1, x2) - m, y1 - m, max (x2 + fw, x1) + m, y2 + fh + m);
+  }
+}
+
 void
 edit_interface_rep::set_user_cursor (string id, path p, string col, string name) {
   int i;
@@ -148,44 +204,50 @@ edit_interface_rep::set_user_cursor (string id, path p, string col, string name)
     user_cursor_paths << p;
     user_cursor_colors << col;
     user_cursor_names << name;
+    user_cursor_rects << rectangle ();
   }
   else {
     if (user_cursor_paths[i] == p && user_cursor_colors[i] == col &&
         user_cursor_names[i] == name) return;
+    invalidate_user_cursor (i); // where it was
     user_cursor_paths[i]= p;
     user_cursor_colors[i]= col;
     user_cursor_names[i]= name;
   }
-  invalidate_all ();
+  invalidate_user_cursor (i);   // where it goes
 }
 
 void
 edit_interface_rep::cancel_user_cursor (string id) {
   array<string> ids, cols, names;
   array<path> paths;
+  array<rectangle> rects;
   for (int i=0; i<N(user_cursor_ids); i++)
     if (user_cursor_ids[i] != id) {
       ids << user_cursor_ids[i];
       paths << user_cursor_paths[i];
       cols << user_cursor_colors[i];
       names << user_cursor_names[i];
+      rects << user_cursor_rects[i];
     }
+    else invalidate_user_cursor (i);
   if (N(ids) == N(user_cursor_ids)) return;
   user_cursor_ids= ids;
   user_cursor_paths= paths;
   user_cursor_colors= cols;
   user_cursor_names= names;
-  invalidate_all ();
+  user_cursor_rects= rects;
 }
 
 void
 edit_interface_rep::cancel_user_cursors () {
   if (N(user_cursor_ids) == 0) return;
+  for (int i=0; i<N(user_cursor_ids); i++) invalidate_user_cursor (i);
   user_cursor_ids= array<string> ();
   user_cursor_paths= array<path> ();
   user_cursor_colors= array<string> ();
   user_cursor_names= array<string> ();
-  invalidate_all ();
+  user_cursor_rects= array<rectangle> ();
 }
 
 void
@@ -193,35 +255,23 @@ edit_interface_rep::draw_user_cursors (renderer ren) {
   if (N(user_cursor_ids) == 0 || is_nil (eb)) return;
   font fn;
   for (int i=0; i<N(user_cursor_ids); i++) {
-    path p= user_cursor_paths[i];
-    // a position which the document no longer has (it changed since the
-    // position was given) is not shown
-    if (is_nil (p) || !(rp <= p) || !has_subtree (et, path_up (p))) continue;
-    cursor cu= eb->find_check_cursor (p);
-    if (!cu->valid) continue;
+    string name;
+    SI x1, y1, x2, y2, fw, fh;
+    if (!user_cursor_shape (i, fn, name, x1, y1, x2, y2, fw, fh)) {
+      user_cursor_rects[i]= rectangle ();
+      continue;
+    }
+    SI m= 3*zpixel;
+    user_cursor_rects[i]= rectangle (min (x1, x2) - m, y1 - m,
+                                     max (x2 + fw, x1) + m, y2 + fh + m);
     color col= named_color (user_cursor_colors[i]);
-    SI cy1= cu->y1 - 2*zpixel, cy2= cu->y2 + 2*zpixel;
-    SI x1= cu->ox + ((SI) (cy1 * cu->slope)), y1= cu->oy + cy1;
-    SI x2= cu->ox + ((SI) (cy2 * cu->slope)), y2= cu->oy + cy2;
     ren->set_pencil (pencil (col, 2*zpixel));
     ren->line (x1, y1, x2, y2);
-    string name= user_cursor_names[i];
     if (N(name) == 0) continue;
-    // a long name would cover the text: its first characters only
-    int pos= 0, nr= 0;
-    while (pos < N(name) && nr < 24) { tm_char_forwards (name, pos); nr++; }
-    if (pos < N(name)) name= name (0, pos) * "...";
     // the name of the user, in a flag of the colour above the bar
-    if (is_nil (fn)) {
-      tree t= use_macos_fonts () ? tuple ("apple-lucida", "ss", "medium", "right")
-                                 : tuple ("pagella", "rm", "medium", "right");
-      t << tree ("7") << tree ("600");
-      fn= find_font (t);
-    }
     metric ex;
     fn->get_extents (name, ex);
     SI pad= 2*zpixel;
-    SI fw= ex->x2 - ex->x1 + 2*pad, fh= fn->y2 - fn->y1 + pad;
     ren->set_background (col);
     ren->clear (x2 - zpixel, y2, x2 - zpixel + fw, y2 + fh);
     ren->set_pencil (pencil (white));

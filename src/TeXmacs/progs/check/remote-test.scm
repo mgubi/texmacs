@@ -162,6 +162,7 @@
 (define loop-queue '())
 (define loop-log '())
 (define loop-blocked '())
+(define loop-old-clients '()) ;; clients which do not know of cursors
 (define loop-active? #f)
 
 ;; NOTE: the messages are intercepted where they are sent, in client-send
@@ -208,6 +209,11 @@
                  (server-eval (list (loop-client-of fd) msg-id) cmd))
                 ((and (pair? cmd) (in? (car cmd) loop-blocked))
                  (noop))
+                ((and (pair? cmd) (== (car cmd) 'live-cursor)
+                      (in? fd loop-old-clients))
+                 ;; as a TeXmacs without the cursors of the others answers
+                 (client-error (list (loop-server-of fd) msg-id)
+                               "invalid command"))
                 (else
                   (client-eval (list (loop-server-of fd) msg-id) cmd)))))
       (loop (+ n 1)))))
@@ -1391,6 +1397,7 @@
   (check-group "cursors of the users of a live document")
   (let* ((clid "tmfs://live/loophost/rt-cursors")
          (lids (priv '(client client-live) 'live-cursor-lids))
+         (servers (priv '(client client-live) 'live-cursor-servers))
          (cursors (priv '(client client-live) 'live-cursors))
          (table (priv '(server server-live) 'live-cursor-table))
          (told (lambda (client)
@@ -1399,6 +1406,7 @@
                    (and (nnull? l) (cddr (cAr l)))))))
     (set! loop-blocked '(live-modify))
     (ahash-set! lids clid 9102)
+    (ahash-set! servers clid 9102)
     (ralice `(live-open ,clid))
     (rbob `(live-open ,clid))
     (check= (live-participants clid) '())
@@ -1487,7 +1495,34 @@
     ;; the colours of the users of two servers are not shared
     (with color (priv '(client client-live) 'live-cursor-color)
       (check-false (== (color 9102 7001) (color 9105 7001))))
+    ;; a client which does not know of cursors (a stock TeXmacs) is told
+    ;; once, and refuses: it is not told again
+    (set! loop-old-clients '(9002))
+    (with n (lambda () (length (list-filter (loop-received 'client 9002 'live-cursor)
+                                            (lambda (c) (== (cadr c) clid)))))
+      (with before (n)
+        (check= (ralice `(live-cursor ,clid (0 4))) #t)
+        (check= (n) (+ before 1))
+        (check= (ralice `(live-cursor ,clid (0 5))) #t)
+        (check= (n) (+ before 1))))
+    (set! loop-old-clients '())
+    (ahash-remove! (priv '(server server-live) 'live-cursor-refused) 9002)
+    ;; a live document of which no view is left is no longer followed (the
+    ;; poll stops with the last one), and the others are told that we left
+    (with gone "tmfs://live/loophost/rt-cursors-gone"
+      (let ((sent (priv '(client client-live) 'live-cursor-sent))
+            (poll (priv '(client client-live) 'live-cursor-poll)))
+        (ahash-set! lids gone 9102)
+        (ahash-set! servers gone 9102)
+        (ahash-set! sent gone '(0 1))
+        (poll)
+        (loop-pump)
+        (check-false (ahash-ref lids gone))
+        (check-false (ahash-ref sent gone))
+        (check= (ahash-ref servers gone) 9102)
+        (ahash-remove! servers gone)))
     (ahash-remove! lids clid)
+    (ahash-remove! servers clid)
     (set! loop-blocked '())))
 
 (define (test-live)
