@@ -16,6 +16,9 @@
 # patch .github/fixes/identity.patch (applied here, never committed to the
 # sources: the local server of Qt, the tree of texmacs.exe); it shares the
 # home of the stock TeXmacs (~/.TeXmacs).
+# With GnuTLS (configure leaves it out unless asked), as the packages of the
+# stock TeXmacs (misc/builder: Windows, macOS Qt 6, AppImage): TLS for the
+# remote tools, and the random numbers of passwords and salts (#66).
 # A state of wip_fixes is built and published by moving fixes_ci to it,
 #   git push -f origin wip_fixes:fixes_ci
 # The regression suites of wip_fixes run on the branch wip_fixes_ci.
@@ -68,7 +71,7 @@ jobs:
       - name: Configure
         run: |
           cp -R ../guile-texmacs tm-guile188
-          ./configure --with-guile=embedded18 QMAKE=/usr/lib/qt6/bin/qmake
+          ./configure --with-guile=embedded18 --with-gnutls QMAKE=/usr/lib/qt6/bin/qmake
 
       - name: Build
         run: make -j"$(nproc)"
@@ -166,7 +169,7 @@ jobs:
         run: |
           cp -R ../guile-texmacs tm-guile188
           B=$(brew --prefix)
-          ./configure --with-guile=embedded18 \
+          ./configure --with-guile=embedded18 --with-gnutls \
             QMAKE="$(brew --prefix qt)/bin/qmake" \
             CPPFLAGS="-I$(brew --prefix libpng)/include/libpng16 -I$B/include" \
             LDFLAGS="-L$(brew --prefix libpng)/lib -L$B/lib"
@@ -259,7 +262,7 @@ jobs:
           # qmake, Qt defines QT_NEEDS_QMAIN and replaces main; with
           # pkg-config, Qt's flags no longer bring in Winsock (ws2_32)
           ./configure --with-guile=embedded18 --with-qt-find-method=pkgconfig \
-            QMAKE=/mingw64/bin/qmake6 LIBS=-lws2_32
+            --with-gnutls QMAKE=/mingw64/bin/qmake6 LIBS=-lws2_32
 
       - name: Build
         run: |
