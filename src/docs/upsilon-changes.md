@@ -14,6 +14,13 @@ have the details, and the problems go to the
 
 ## 20 October 2026
 
+- **Desktop**: the balloons of a language server under the mouse stay
+  while the mouse rests on the word, and go when it rests elsewhere: they
+  were closed at the next small move of the hand (the cursor was said to
+  have changed after each layout), and in Vue and Qt they took the pointer,
+  so that a balloon over the next lines stayed there, and the words under
+  it had none. The balloons of TeXmacs let the pointer through to the
+  document ([#399](https://github.com/mgubi/texmacs/issues/399)).
 - A book made of included files loads and updates faster: an included
   file keeps its layout from one typesetting to the next when its document
   is the same (each pass typeset again every chapter), and the attributes

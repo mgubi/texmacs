@@ -665,8 +665,10 @@
 
 (define (show-hover r p anchor type . opt)
   ;; the hover @r in a balloon at the tree @anchor (of the path @p): type
-  ;; "keyboard" (closed when the cursor moves) or "mouse" (when the mouse
-  ;; leaves it); #f if it says nothing. The diagnostic of the place, opt (of
+  ;; "keyboard" (closed when the cursor moves) or "mouse*" (when the mouse
+  ;; leaves the anchor, a line: not after a move of 10 pixels, as "mouse",
+  ;; which closed it when the hand moved a little, #399); #f if it says
+  ;; nothing. The diagnostic of the place, opt (of
   ;; diagnostic-at), comes first: the server's hover of an error (an unknown
   ;; name) often says nothing, and its message is what is looked for (#399)
   (let* ((h (if (and r (not (lsp-null? r))) (hover-text r) (list "" #f)))
@@ -716,25 +718,36 @@
 (tm-define (lsp-mouse-hover-on?)
   (!= (get-preference "lsp:mouse hover") "off"))
 
-(define (mouse-word? p)
-  ;; is the position @p (in a line) on a word?
+(define (mouse-word p)
+  ;; the path of the start of the word at the position @p (in a line), or #f
+  ;; if it is not on a word: the places of a word are one for the hovers, so
+  ;; that the hand moving a little in it does not ask again, nor drop the
+  ;; answer which comes (#399)
   (with t (path->tree (cDr p))
     (and (tree-atomic? t)
          (let ((s (tree->string t)) (o (cAr p)))
            (and (< o (string-length s))
-                (word-char? (string-ref s o)))))))
+                (word-char? (string-ref s o))
+                (let loop ((o o))
+                  (if (and (> o 0) (word-char? (string-ref s (- o 1))))
+                      (loop (- o 1))
+                      (rcons (cDr p) o))))))))
 
 (define (mouse-hover x y)
   (let* ((p (xy->path x y))
+         (w (mouse-word p))
          (r (lsp-target-lo p))
          (c (lsp-buffer-client*))
          (uri (lsp-buffer-uri))
          (u (current-buffer)))
-    ;; (a place which the mouse has left is asked again when it comes back)
-    (when (!= p mouse-at) (set! mouse-at #f))
-    (when (and r (not mouse-at) c uri
-               (capable? c "hoverProvider") (mouse-word? p))
-      (set! mouse-at p)
+    ;; (a word which the mouse has left is asked again when it comes back)
+    (when (!= w mouse-at) (set! mouse-at #f))
+    ;; (the balloon of a word is closed when the mouse rests elsewhere)
+    (when (and hover-id
+               (!= hover-id (string-append "lsp-hover:" (object->string w))))
+      (lsp-hover-close))
+    (when (and r w (not mouse-at) c uri (capable? c "hoverProvider"))
+      (set! mouse-at w)
       (when mouse-request
         (lsp-cancel (car mouse-request) (cdr mouse-request)))
       (lsp-buffer-sync)
@@ -747,10 +760,11 @@
                    (set! mouse-request #f)
                    ;; (only if the mouse is still on the same word)
                    (when (and (not e) mouse-last (== (current-buffer) u)
-                              (== (xy->path (car mouse-last) (cadr mouse-last))
-                                  p))
+                              (== (mouse-word (xy->path (car mouse-last)
+                                                        (cadr mouse-last)))
+                                  w))
                      (lsp-hover-close)
-                     (show-hover res p (path->tree (cDr p)) "mouse"
+                     (show-hover res w (path->tree (cDr p)) "mouse*"
                                  (diagnostic-at uri r))))))))))
 
 (define (mouse-check)

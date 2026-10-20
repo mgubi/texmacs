@@ -590,10 +590,25 @@ script_button (array<string> a, int i) {
   return Qt::LeftButton;
 }
 
+// the widget which gets the pointer at the global position g: the topmost
+// one, but not of a window which takes no input (the balloons of TeXmacs),
+// as the window system does: the widget of the window of the script there
+static QWidget*
+pointer_widget (QPoint g) {
+  QWidget* w= QApplication::widgetAt (g);
+  if (w != NULL &&
+      (w->window ()->windowFlags () & Qt::WindowTransparentForInput)) {
+    QWidget* win= script_target ();
+    w= (win == NULL? NULL: win->childAt (win->mapFromGlobal (g)));
+    if (w == NULL) w= win;
+  }
+  return w;
+}
+
 static void
 post_mouse (QEvent::Type type, QPoint g, Qt::MouseButton button) {
   // a mouse event at the global position g, to the topmost widget there
-  QWidget* w= QApplication::widgetAt (g);
+  QWidget* w= pointer_widget (g);
   if (w == NULL) w= script_target ();
   if (w == NULL) return;
   QPoint p= w->mapFromGlobal (g);
@@ -779,7 +794,7 @@ gui_test_raw (string line) {
   }
   else if (cmd == "wheel" && N(a) > 4) {
     QPoint g= script_point (win, a);
-    QWidget* w= QApplication::widgetAt (g);
+    QWidget* w= pointer_widget (g);
     if (w == NULL) w= win;
     QPoint angle ((int) (120 * as_double (a[3])), (int) (120 * as_double (a[4])));
     QApplication::postEvent (w, new QWheelEvent (QPointF (w->mapFromGlobal (g)),

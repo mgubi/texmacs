@@ -2764,6 +2764,7 @@ static void
 pointer_left (vue_window w) {
   if (w == NULL) return;
   vue_virtual_window_rep* v= dynamic_cast<vue_virtual_window_rep*> (w);
+  if (v != NULL && v->tooltip) return; // (see SDL_EVENT_WINDOW_MOUSE_LEAVE)
   if (v != NULL && v->popup) { v->set_visibility (false); return; }
   with_window frame (w);
   Clay_SetPointerState ((Clay_Vector2) { -1, -1 }, false);
@@ -2807,7 +2808,7 @@ route_pointer (vue_window win, float& x, float& y, int kind) {
   else if (!host_overlay_at (x, y)) {
     for (int i= N(virtual_windows) - 1; i >= 0; i--) {
       vue_virtual_window_rep* v= virtual_windows[i];
-      if (!v->shown || v->tab) continue;
+      if (!v->shown || v->tab || v->tooltip) continue; // (see under_tooltip)
       if (v->contains (sx, sy)) { target= v; break; }
       if (v->in_title_bar (sx, sy)) { target= v; title= true; break; }
       if ((edges= v->frame_edges (sx, sy)) != 0) { target= v; title= true; break; }
@@ -2820,7 +2821,8 @@ route_pointer (vue_window win, float& x, float& y, int kind) {
     // a press outside the popups dismisses them, and reaches its target
     for (int i= N(virtual_windows) - 1; i >= 0; i--) {
       vue_virtual_window_rep* v= virtual_windows[i];
-      if (v->shown && v->popup && v != target) v->set_visibility (false);
+      if (v->shown && v->popup && !v->tooltip && v != target)
+        v->set_visibility (false);
     }
     if (target != NULL) {
       if (!target->tab) target->raise ();
@@ -5201,7 +5203,8 @@ visible_popup () {
   while (it->busy ()) {
     SDL_Window* sw= it->next ();
     vue_window w= (vue_window) Window_to_window [sw];
-    if (w->popup && !(SDL_GetWindowFlags (sw) & SDL_WINDOW_HIDDEN)) return w;
+    if (w->popup && !w->tooltip &&
+        !(SDL_GetWindowFlags (sw) & SDL_WINDOW_HIDDEN)) return w;
   }
   return NULL;
 }
@@ -5225,6 +5228,37 @@ popup_grab (vue_window& win, float& x, float& y, bool press) {
   // a press outside dismisses the popup and reaches its target
   pop->set_visibility (false);
   return true;
+}
+
+// The pointer over a tooltip (a balloon of TeXmacs) is over the window under
+// it, to which its events go, with (x, y) made relative to it: else the
+// editor did not see the pointer go, and the balloon stayed, over the words
+// which the pointer was then on (#399). win itself if it is no tooltip.
+static vue_window
+under_tooltip (vue_window win, float& x, float& y) {
+  if (win == NULL || !win->tooltip) return win;
+  int tx, ty;
+  SDL_GetWindowPosition ((SDL_Window*) win->platform_window (), &tx, &ty);
+  float sx= tx + x, sy= ty + y; // screen coordinates
+  SDL_Window* focus= SDL_GetKeyboardFocus ();
+  SDL_Window* best= NULL;
+  iterator<SDL_Window*> it= iterate (Window_to_window);
+  while (it->busy ()) {
+    SDL_Window* sw= it->next ();
+    vue_window w= (vue_window) Window_to_window [sw];
+    if (w->popup || (SDL_GetWindowFlags (sw) & SDL_WINDOW_HIDDEN)) continue;
+    int wx, wy, ww, wh;
+    SDL_GetWindowPosition (sw, &wx, &wy);
+    SDL_GetWindowSize (sw, &ww, &wh);
+    if (sx >= wx && sx < wx + ww && sy >= wy && sy < wy + wh &&
+        (best == NULL || sw == focus)) best= sw;
+  }
+  if (best == NULL) return NULL;
+  int bx, by;
+  SDL_GetWindowPosition (best, &bx, &by);
+  x= sx - bx;
+  y= sy - by;
+  return (vue_window) Window_to_window [best];
 }
 
 // a file of a drop: images are inserted as such, everything else by name
@@ -5635,8 +5669,11 @@ process_event (SDL_Event *event) {
       if (win) win->destroy_event();
       break;
     case SDL_EVENT_WINDOW_MOUSE_LEAVE:
-      // popup menus are dismissed as soon as the pointer leaves them
+      // popup menus are dismissed as soon as the pointer leaves them (not
+      // the tooltips, which TeXmacs closes: one hidden here stayed open
+      // for it, and was not shown again)
       win= get_window_from_ID (event->window.windowID);
+      if (win && win->tooltip) break;
       if (win && win->popup) win->set_visibility (false);
       else if (win) {
         // no element is under the pointer any more (no hovered button left
@@ -5706,6 +5743,7 @@ process_event (SDL_Event *event) {
       update_mouse_state ();
       win= get_window_from_ID (event->button.windowID);
       float bx= event->button.x, by= event->button.y;
+      win= under_tooltip (win, bx, by);
       bool down= (event->button.type == SDL_EVENT_MOUSE_BUTTON_DOWN);
       if (down) mouse_presses++;
       if (down) dismiss_wait_indicator ();
@@ -5739,6 +5777,7 @@ process_event (SDL_Event *event) {
                  (int) ((SDL_GetTicksNS () - event->wheel.timestamp) / 1000000));
       win= get_window_from_ID (event->wheel.windowID);
       float wx= event->wheel.mouse_x, wy= event->wheel.mouse_y;
+      win= under_tooltip (win, wx, wy);
       win= route_pointer (win, wx, wy, 3);
       if (win && wheel_zooms (win, event->wheel.y)) break;
       if (win) {
@@ -5763,6 +5802,7 @@ process_event (SDL_Event *event) {
         mouse_state= mouse_bits (event->motion.state, SDL_GetModState ());
       win= get_window_from_ID (event->motion.windowID);
       float mx= event->motion.x, my= event->motion.y;
+      win= under_tooltip (win, mx, my);
       win= route_pointer (win, mx, my, 0);
       if (win && popup_grab (win, mx, my, false)) {
         with_window frame (win);

@@ -8383,7 +8383,13 @@ popup_window_widget (widget w, string s) {
 
 widget
 tooltip_window_widget (widget w, string s) {
-  return popup_window_widget (w, s);
+  // (a popup which leaves the pointer to the windows under it, see the
+  // field tooltip of vue_window_rep)
+  vue_plain_window_widget_rep *wwid=
+    tm_new<vue_plain_window_widget_rep> (w, s, command (), true);
+  vue_window win= plain_window (wwid, s, true);
+  if (win != NULL) win->tooltip= true;
+  return abstract (wwid);
 }
 
 void destroy_window_widget (widget w) {

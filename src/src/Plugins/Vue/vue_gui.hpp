@@ -179,6 +179,10 @@ public:
   
   bool clay_debug;
   bool popup; // undecorated popup/tooltip window
+  // a tooltip (the balloons of TeXmacs, tooltip.scm): a popup which does not
+  // grab the pointer, which goes to the window under it, nor goes away when
+  // the pointer leaves it; TeXmacs closes it (#399)
+  bool tooltip= false;
   vue_input_state input; // pending events and interaction state
   float layout_w, layout_h; // size of the layout area (pixels)
   // Pixels of the layout per point of the display this window is on
