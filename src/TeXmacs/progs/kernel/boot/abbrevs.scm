@@ -124,23 +124,21 @@
 
 ;; handle multiple values in a way compatible with s7 (and backcompatible with guile)
 (define-public-macro (with-global var val . body)
-  (let ((old (gensym)) (new (gensym)))
+  ;; the variable is restored after an error too; lazy-catch rethrows from
+  ;; where the error happened, so that backtraces still point there
+  (let ((old (gensym)) (args (gensym)))
     `(let ((,old ,var))
        (set! ,var ,val)
-       (call-with-values 
-          (lambda () ,@body) 
-          (lambda vals 
-            (set! ,var ,old) 
+       (call-with-values
+          (lambda ()
+            (lazy-catch #t
+                        (lambda () ,@body)
+                        (lambda ,args
+                          (set! ,var ,old)
+                          (apply throw ,args))))
+          (lambda vals
+            (set! ,var ,old)
             (apply values vals))))))
- 
-;; old code
-;(define-public-macro (with-global var val . body)
-;  (let ((old (gensym)) (new (gensym)))
-;    `(let ((,old ,var))
-;       (set! ,var ,val)
-;       (let ((,new (begin ,@body))) ;; handle multiple values in s7
-;         (set! ,var ,old)
-;         ,new))))
 
 (define-public-macro (and-with var val . body)
   `(with ,var ,val

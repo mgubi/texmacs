@@ -88,5 +88,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (tm-define (picture-gc)
+  ;; the pictures are loaded again, and the remote ones downloaded again
+  (remote-files-refresh)
   (picture-cache-reset)
   (update-all-buffers))

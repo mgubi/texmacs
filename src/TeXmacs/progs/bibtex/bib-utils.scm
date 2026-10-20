@@ -183,6 +183,19 @@
 
 (tm-define (bib-translate s) `(localize ,s))
 
+(tm-define (bib-single-page? p)
+  ;; (bib-pages a) with one page, not pages kept as written ("12, 15--17"),
+  ;; as multi.page.check of BibTeX: no "-", "," or "+" in it
+  (and (== (length p) 2)
+       (or (nstring? (cadr p))
+           (list-and (map (lambda (c) (< (string-search-forwards c 0 (cadr p)) 0))
+                          (list "-" "," "+" (string (integer->char 21))))))))
+
+(tm-define (bib-page-range p)
+  ;; the text of (bib-pages a) or (bib-pages a b)
+  (if (== (length p) 2) (cadr p)
+      `(concat ,(cadr p) ,bib-range-symbol ,(caddr p))))
+
 (tm-define bib-range-symbol "")
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

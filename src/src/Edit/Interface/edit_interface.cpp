@@ -856,6 +856,7 @@ edit_interface_rep::apply_changes () {
     applying () { applying_changes++; }
     ~applying () { applying_changes--; } } busy;
   //cout << "Apply changes\n";
+  flush_cursor_hook ();
   //cout << "et= " << et << "\n";
   //cout << "tp= " << tp << "\n";
   //cout << HRULE << "\n";

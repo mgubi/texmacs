@@ -241,7 +241,16 @@
                                                (cons "texmacs->html:mathml" "off"))))
   (with s (export (tmfile '(document (with "mode" "math" (frac "a" "b"))))
                   "html-document" (cons "texmacs->html:mathml" "on"))
-    (check-true (string-occurs? (ms "<mfrac><mi>a</mi><mi>b</mi></mfrac>") s))))
+    (check-true (string-occurs? (ms "<mfrac><mi>a</mi><mi>b</mi></mfrac>") s)))
+  (check-group "raw html")
+  ;; the html tag keeps its markup (written <less>, <gtr>) and gives its
+  ;; characters in UTF-8, <alpha> and Cork ones included
+  (check= (export '(specific "html" "<less>b<gtr>x<alpha><less>/b<gtr>")
+                  "html-snippet")
+          (string-append "<b>x" (u8 #x3B1) "</b>"))
+  (check= (export `(specific "html" ,(string-append "a" (cork 233) "<less>br/<gtr>"))
+                  "html-snippet")
+          (string-append "a" (u8 #xE9) "<br/>")))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; MathML import

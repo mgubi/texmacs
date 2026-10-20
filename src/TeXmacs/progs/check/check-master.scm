@@ -63,6 +63,7 @@
         (check links-test)
         (check misc-modules-test)
         (check remote-test)
+        (check web-files-test)
         (check kbd-menu-test)
         (check structures-test)
         (check convert-more-test)
@@ -186,6 +187,9 @@
     ;; server and clients in this process, with databases in the temporary
     ;; directory and the server files of the (scratch) home, which it cleans
     ("remote" remote-test-failures count)
+    ;; a local web server (python3) in the temporary directory, stopped at
+    ;; the end, and a buffer printed to PDF
+    ("web-files" web-files-test-failures count)
     ;; starts plugin processes (shell, python when present) and stops them
     ("plugins" plugins-test-failures count)
     ;; loads every lazy menu, and maps and unmaps test keys

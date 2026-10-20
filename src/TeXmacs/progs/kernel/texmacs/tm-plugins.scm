@@ -712,6 +712,9 @@
   (when (ahash-ref plugin-initialize-todo name*)
     (let* ((name (symbol->string name*))
            (file (string-append "plugins/" name "/progs/init-" name ".scm"))
+           ;; (the directories in which plugin-list finds the plugins; in
+           ;; TeXmacs Upsilon not /etc/TeXmacs and /usr/share/TeXmacs, which
+           ;; hold the plugins of an official TeXmacs: see plugin_path)
            (u (url-unix "$TEXMACS_HOME_PATH:$TEXMACS_PATH" file)))
       (ahash-remove! plugin-initialize-todo name*)
       (if (url-exists? u)

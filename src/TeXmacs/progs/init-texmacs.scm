@@ -20,7 +20,7 @@
 
 ;(display "Booting utilities\n")
 (use-modules (utils library cpp-wrap))
-(lazy-define (utils library cursor) notify-cursor-moved)
+(lazy-define (utils library cursor) notify-cursor-moved notify-undo-redo)
 (lazy-define (treesit ts-highlight)
              treesit-highlighter-request treesit-schedule-updates)
 (lazy-define (utils library cursor) notify-buffer-changed)

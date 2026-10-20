@@ -30,6 +30,7 @@ public:
   void notify_assign      (tree& ref, tree t);
   void notify_var_split   (tree& ref, tree t1, tree t2);
   void notify_var_join    (tree& ref, tree t, int offset);
+  void notify_insert_node (tree& ref, int pos);
   void notify_remove_node (tree& ref, int pos);
   void notify_detach      (tree& ref, tree closest, bool right);
 };
@@ -74,6 +75,12 @@ void
 undo_observer_rep::notify_var_join (tree& ref, tree t, int offset) {
   (void) ref; (void) offset;
   reattach (ref, t);
+}
+
+void
+undo_observer_rep::notify_insert_node (tree& ref, int pos) {
+  // the observed tree became child pos of the new tree ref
+  reattach (ref[pos], ref);
 }
 
 void

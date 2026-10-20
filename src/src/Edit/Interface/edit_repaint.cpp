@@ -11,6 +11,7 @@
 
 #include "Interface/edit_interface.hpp"
 #include "message.hpp"
+#include "analyze.hpp"
 #include "gui.hpp" // for gui_interrupted
 
 extern int nr_painted;

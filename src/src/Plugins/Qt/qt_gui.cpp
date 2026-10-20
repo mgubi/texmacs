@@ -1196,6 +1196,14 @@ beep () {
   QApplication::beep();
 }
 
+void
+image_gc (string name) {
+    // Garbage collect images of a given name; the Qt port keeps no image
+    // cache of its own (qt_pic_cache lives as long as the session), so
+    // there is nothing to collect
+  (void) name;
+}
+
 bool
 check_event (int type) {
     // Check whether an event of one of the above types has occurred;

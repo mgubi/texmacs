@@ -27,7 +27,8 @@
 static hashmap<pointer,path> last_outside_folds= hashmap<pointer,path> (path ());
 
 edit_cursor_rep::edit_cursor_rep ():
-  cu (0, 0), mv (0, 0), mv_status (0) {}
+  cu (0, 0), mv (0, 0), mv_status (0),
+  nr_changed (0), hook_defer (false), hook_wait (false) {}
 edit_cursor_rep::~edit_cursor_rep () {
   last_outside_folds->reset ((pointer) this);
 }
@@ -488,7 +489,10 @@ edit_cursor_rep::go_to (path p) {
     else
       notify_change (THE_CURSOR);
     unfold_at_cursor ((pointer) this, et, tp);
-    if (cu->valid) call ("notify-cursor-moved", object (DIRECT));
+    if (cu->valid) {
+      if (hook_defer) hook_wait= true;
+      else call ("notify-cursor-moved", object (DIRECT));
+    }
   }
 }
 
@@ -496,6 +500,32 @@ void
 edit_cursor_rep::go_to_correct (path p) {
   p= correct_cursor (et, p);
   go_to (p);
+}
+
+void
+edit_cursor_rep::go_to_after_change (path p) {
+  // the cursor follows a change of the document; when a command makes many
+  // changes, notify-cursor-moved, which may look up the environment and
+  // thus typeset, is called for the first one and once more at the end of
+  // the command (flush_cursor_hook), not after each of them
+  p= correct_cursor (et, p);
+  nr_changed++;
+  if (nr_changed == 1) go_to (p);
+  else {
+    hook_defer= true;
+    go_to (p);
+    hook_defer= false;
+  }
+}
+
+void
+edit_cursor_rep::flush_cursor_hook () {
+  nr_changed= 0;
+  hook_defer= false; // also after an exception in go_to_after_change
+  if (hook_wait) {
+    hook_wait= false;
+    if (cu->valid) call ("notify-cursor-moved", object (DIRECT));
+  }
 }
 
 void

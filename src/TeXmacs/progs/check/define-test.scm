@@ -464,6 +464,11 @@
 ;; and idle time do not advance: the test calls the command which delayed
 ;; schedules itself, with its own change and idle times. The command
 ;; returns the delay before it is called again, or #t when it is done.
+;;
+;; exec-delayed-pause, change-time and idle-time are glue functions, which
+;; with-global replaces. With S7 a function which calls a glue function keeps
+;; calling the C++ function after such a replacement, but not the code which
+;; comes from a macro (here delayed), which S7 expands when it runs it.
 
 (define delayed-change 0)
 (define delayed-idle 0)
@@ -491,6 +496,36 @@
         (check= (cmd) #t)
         (check= delayed-runs 1)))))
 
+;; lazy-initialize registers the module in the pending list of tm-modes, and
+;; the delayed command which loads it removes it from there: the macro expands
+;; in other modules, which set! the variables of tm-modes (with S7, before its
+;; patch 0006, the command removed it from another variable of the same name)
+(define (lazy-pending)
+  (length (eval 'lazy-initialize-pending
+                (resolve-module '(kernel texmacs tm-modes)))))
+
+(define (test-lazy-initialize)
+  (check-group "lazy-initialize")
+  (let ((cmd #f)
+        (n (lazy-pending)))
+    (with-global exec-delayed-pause (lambda (c) (set! cmd c))
+      (with-global idle-time (lambda () 10000)
+        (lazy-initialize (check check-lib) #f)
+        (check= (lazy-pending) (+ n 1))
+        (check-true (procedure? cmd))
+        (check= (and (procedure? cmd) (cmd)) #t)
+        (check= (lazy-pending) n)))))
+
+;; the remote control mode is toggled with a set! from another module than the
+;; one of its flag
+(define (test-remote-control-mode)
+  (check-group "remote control mode")
+  (let ((old (remote-control-mode?)))
+    (toggle-remote-control-mode)
+    (check= (remote-control-mode?) (not old))
+    (toggle-remote-control-mode)
+    (check= (remote-control-mode?) old)))
+
 (tm-define (define-test-failures)
   (check-suite "tm-define")
   (test-overloading)
@@ -503,4 +538,6 @@
   (test-lazy)
   (test-modules)
   (test-delayed)
+  (test-lazy-initialize)
+  (test-remote-control-mode)
   (check-end))

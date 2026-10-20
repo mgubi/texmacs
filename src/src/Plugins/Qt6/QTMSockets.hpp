@@ -108,6 +108,7 @@ protected:
   string host;
   unsigned short port;
   int socket_id;
+  bool socket_closed; // socket_id is kept after the socket is closed
   tm_contact contact;
   string input_buffer;
   string output_buffer;

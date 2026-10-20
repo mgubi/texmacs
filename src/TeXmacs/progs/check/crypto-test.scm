@@ -474,6 +474,45 @@
     (check-false (gpg-get-buffer-passphrase (url-autosave w "#")))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Temporary files are not trusted
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; The scripts of a document under $TEXMACS_HOME_PATH may call any function,
+;; except when the document is in system/tmp (downloads, documents extracted
+;; from PDF files...) or system/cache. New documents (texts/scratch) stay
+;; trusted.
+(tm-define (crypto-test-tmp-script) "done")
+
+(define (test-untrusted-tmp)
+  (check-group "untrusted temporary files")
+  (let* ((old (current-buffer))
+         (f (tmp "untrusted.tm"))
+         (run (lambda ()
+                (tree->stree
+                 (texmacs-exec '(extern "crypto-test-tmp-script"))))))
+    (check-false (secure? '(crypto-test-tmp-script)))
+    ;; a new document
+    (with u (new-buffer)
+      (switch-to-buffer* u)
+      (update-forced)
+      (check= (run) "done")
+      (buffer-pretend-saved u)
+      (buffer-close u))
+    ;; a document in system/tmp
+    (string-save (string-append "<TeXmacs|2.1>\n\n<style|generic>\n\n"
+                                "<\\body>\n  x\n</body>\n")
+                 f)
+    (load-buffer f)
+    (switch-to-buffer* f)
+    (update-forced)
+    (check= (current-buffer) f)
+    (check= (run) '(error "insecure script"))
+    (buffer-pretend-saved f)
+    (buffer-close f)
+    (url-remove f)
+    (when (buffer-exists? old) (switch-to-buffer old))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Untrusted documents
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -825,6 +864,7 @@
       (guarded "generate-password" test-generate-password)
       (guarded "server passwords" test-server-passwords)
       (guarded "format" test-format)
+      (guarded "untrusted temporary files" test-untrusted-tmp)
       (guarded "document passphrases" test-buffer-passphrases)
       (guarded "secure gpg functions" test-secure)
       (guarded "gpg" test-gpg))

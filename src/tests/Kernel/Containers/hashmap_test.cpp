@@ -245,6 +245,27 @@ test_size () {
   CHECK_EQ (N(non_empty_hm) == 1, true);
 }
 
+/******************************************************************************
+* tests on clear
+******************************************************************************/
+
+static void
+test_clear () {
+  auto hm = hashmap<int, int>(0, 10);
+  hm(1) = 10;
+  hm(2) = 20;
+  hm->clear ();
+  CHECK_EQ (N(hm), 0);
+  CHECK_EQ (hm->empty (), true);
+  CHECK_EQ (hm->contains (1), false);
+  auto empty_hm = hashmap<int, int>(0, 10);
+  CHECK_EQ (hm == empty_hm, true);
+
+  hm(3) = 30;
+  CHECK_EQ (N(hm), 1);
+  CHECK_EQ (hm[3], 30);
+}
+
 int
 main () {
   RUN (test_resize);
@@ -261,5 +282,6 @@ main () {
   RUN (test_changes);
   RUN (test_invert);
   RUN (test_size);
+  RUN (test_clear);
   return test_report ();
 }

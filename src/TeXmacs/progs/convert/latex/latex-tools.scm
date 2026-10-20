@@ -573,13 +573,17 @@
       (string-replace x " " "")))
 
 (define (latex-colors-defs colors)
-  (apply string-append
-         (map (lambda (x)
-                (string-append
-                  "\\definecolor{" (latex-color-name x) "}{HTML}{"
-                  (html-color->latex-xcolor
-                    (if (string-starts? x "#") x (get-hex-color x))) "}\n"))
-              colors)))
+  (let* ((l (map (lambda (x) (cons (latex-color-name x) x)) colors))
+         (u (list-remove-duplicates (map car l))))
+    (apply string-append
+           (map (lambda (name)
+                  (with x (cdr (assoc name l))
+                    (string-append
+                      "\\definecolor{" name "}{HTML}{"
+                      (html-color->latex-xcolor
+                        (if (string-starts? x "#") x (get-hex-color x)))
+                      "}\n")))
+                u))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Building the preamble

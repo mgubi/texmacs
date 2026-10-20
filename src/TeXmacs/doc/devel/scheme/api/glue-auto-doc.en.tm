@@ -5203,6 +5203,14 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(remote-files-refresh)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|remote_files_refresh> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
     <scm|(set-file-focus <scm-arg|url>)>
 <explain-synopsis|no synopsis>
   <|explain>
@@ -6984,6 +6992,14 @@ source code.
   <|explain>
     Calls the <c++> function <cpp|bib_text_length> which returns
     <scm|int>.
+  </explain>
+
+  <\explain>
+    <scm|(bib-field-pages <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|bib_field_pages> which returns
+    <scm|tree>.
   </explain>
 
   <\explain>

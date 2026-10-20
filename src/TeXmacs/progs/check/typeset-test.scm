@@ -1187,7 +1187,8 @@
              (references-from-scratch '("ch" "th"))))))
 
 ;; A tag which is removed and put back by an undo gives its labels the
-;; names they had (the undo puts back a copy with their numbers).
+;; names they had (the undo puts back a copy with their numbers:
+;; copy_for_apply in archiver.cpp).
 (define (test-labels-after-undo)
   (check-group "labels after undo")
   (with-typeset-body
@@ -1202,6 +1203,12 @@
      (undo 0)
      (update-forced)
      (check= (auto-names) '("auto-1" "auto-2" "auto-3"))
+     ;; and again after a redo and an undo (the history keeps the numbers)
+     (redo 0)
+     (update-forced)
+     (undo 0)
+     (update-forced)
+     (check= (auto-names) '("auto-1" "auto-2" "auto-3"))
      ;; the same when only the node of the tag is removed (its text is
      ;; kept, as by a backspace at the start of the title)
      (dynamic-wind start-editing
@@ -1211,6 +1218,63 @@
      (undo 0)
      (update-forced)
      (check= (auto-names) '("auto-1" "auto-2" "auto-3")))))
+
+;; A tag which is inserted, removed by an undo and put back by a redo
+;; gives its labels the names it had (the redo puts back the tree which the
+;; undo removed, with their numbers: apply_for_undo in archiver.cpp), each
+;; time.
+(define (test-labels-after-redo)
+  (check-group "labels after redo")
+  (with-typeset-body
+   '(document (section "A") "a" (section "B") "b")
+   (lambda ()
+     (renumber-auto-labels)
+     (update-forced)
+     (dynamic-wind start-editing
+                   (lambda () (tree-insert (buffer-tree) 2
+                                           '((section "D") "d")))
+                   end-editing)
+     (update-forced)
+     (check= (auto-names) '("auto-1" "auto-2" "auto-3"))
+     ;; (the labels of a removed tag stay in the list of references, so
+     ;; the names are compared after each redo)
+     (with names (lambda ()
+                   (map (lambda (k)
+                          (undo 0) (update-forced)
+                          (redo 0) (update-forced)
+                          (auto-names))
+                        '(1 2 3)))
+       (check= (names)
+               '(("auto-1" "auto-2" "auto-3")
+                 ("auto-1" "auto-2" "auto-3")
+                 ("auto-1" "auto-2" "auto-3"))))
+     ;; the same for a tag inserted and changed in the same step (the
+     ;; undo changes the tag before it removes it)
+     (dynamic-wind start-editing
+                   (lambda ()
+                     (tree-insert (buffer-tree) 4 '((section "E") "e"))
+                     (tree-assign (tree-ref (buffer-tree) 4 0) "F"))
+                   end-editing)
+     (update-forced)
+     (let ((n1 (auto-names)))
+       (undo 0) (update-forced)
+       (redo 0) (update-forced)
+       (undo 0) (update-forced)
+       (redo 0) (update-forced)
+       (check= (tree->stree (tree-ref (buffer-tree) 4)) '(section "F"))
+       (check= (auto-names) n1))
+     ;; the same for a tag put around a text (insert_node)
+     (dynamic-wind start-editing
+                   (lambda () (tree-insert-node (tree-ref (buffer-tree) 1)
+                                                0 '(section)))
+                   end-editing)
+     (update-forced)
+     (let ((n1 (auto-names)))
+       (undo 0) (update-forced)
+       (redo 0) (update-forced)
+       (undo 0) (update-forced)
+       (redo 0) (update-forced)
+       (check= (auto-names) n1)))))
 
 ;; Paragraphs removed one after the other in a document with numbered
 ;; equations: the paragraphs are kept in blocks (bridge_document.cpp), and
@@ -1717,6 +1781,7 @@
   (test-loci-of-surround-parts)
   (test-bindings-written-again)
   (test-labels-after-undo)
+  (test-labels-after-redo)
   (test-incremental-against-scratch)
   (test-random-documents)
   (test-block-replay)

@@ -8760,6 +8760,15 @@ tmg_picture_cache_reset () {
 }
 
 tmscm
+tmg_remote_files_refresh () {
+  // TMSCM_DEFER_INTS;
+  remote_files_refresh ();
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
 tmg_set_file_focus (tmscm arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "set-file-focus");
 
@@ -11893,6 +11902,19 @@ tmg_bib_text_length (tmscm arg1) {
 }
 
 tmscm
+tmg_bib_field_pages (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "bib-field-pages");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  tree out= bib_field_pages (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return tree_to_tmscm (out);
+}
+
+tmscm
 tmg_bib_prefix (tmscm arg1, tmscm arg2) {
   TMSCM_ASSERT_SCHEME_TREE (arg1, TMSCM_ARG1, "bib-prefix");
   TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "bib-prefix");
@@ -12692,6 +12714,7 @@ initialize_glue_basic () {
   tmscm_install_procedure ("url-grep",  tmg_url_grep, 2, 0, 0);
   tmscm_install_procedure ("url-search-upwards",  tmg_url_search_upwards, 3, 0, 0);
   tmscm_install_procedure ("picture-cache-reset",  tmg_picture_cache_reset, 0, 0, 0);
+  tmscm_install_procedure ("remote-files-refresh",  tmg_remote_files_refresh, 0, 0, 0);
   tmscm_install_procedure ("set-file-focus",  tmg_set_file_focus, 1, 0, 0);
   tmscm_install_procedure ("get-file-focus",  tmg_get_file_focus, 0, 0, 0);
   tmscm_install_procedure ("persistent-set",  tmg_persistent_set, 3, 0, 0);
@@ -12915,6 +12938,7 @@ initialize_glue_basic () {
   tmscm_install_procedure ("bib-default-upcase-first",  tmg_bib_default_upcase_first, 1, 0, 0);
   tmscm_install_procedure ("bib-purify",  tmg_bib_purify, 1, 0, 0);
   tmscm_install_procedure ("bib-text-length",  tmg_bib_text_length, 1, 0, 0);
+  tmscm_install_procedure ("bib-field-pages",  tmg_bib_field_pages, 1, 0, 0);
   tmscm_install_procedure ("bib-prefix",  tmg_bib_prefix, 2, 0, 0);
   tmscm_install_procedure ("bib-empty?",  tmg_bib_emptyP, 2, 0, 0);
   tmscm_install_procedure ("bib-field",  tmg_bib_field, 2, 0, 0);

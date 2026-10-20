@@ -127,7 +127,7 @@ edit_modify_rep::post_notify (path p) {
   tp= position_get (cur_pos);
   position_delete (cur_pos);
   cur_pos= nil_observer;
-  go_to_correct (tp);
+  go_to_after_change (tp);
   /*
   cout << "et= " << et << "\n";
   cout << "tp= " << tp << "\n\n";
@@ -268,7 +268,7 @@ edit_touch (editor_rep* ed, path p) {
 
 void
 edit_modify_rep::clear_undo_history () {
-  global_clear_history ();
+  arch->clear ();
 }
 
 double
@@ -292,6 +292,7 @@ edit_modify_rep::archive_state () {
 void
 edit_modify_rep::start_editing () {
   //cout << "Start editing" << LF << INDENT;
+  flush_cursor_hook ();
   set_author (this_author ());
 }
 
@@ -299,6 +300,7 @@ void
 edit_modify_rep::end_editing () {
   //cout << UNINDENT << "End editing" << LF;
   global_confirm ();
+  flush_cursor_hook ();
 }
 
 void
@@ -358,6 +360,7 @@ edit_modify_rep::undo (bool redoable) {
   if (redoable) {
     path p= arch->undo ();
     if (!is_nil (p)) go_to (p);
+    call ("notify-undo-redo");
   }
   else arch->forget ();
   if (arch->conform_save ()) {
@@ -391,6 +394,7 @@ edit_modify_rep::redo (int i) {
     set_message ("No more redo information available", "redo"); return; }
   path p= arch->redo (i);
   if (!is_nil (p)) go_to (p);
+  call ("notify-undo-redo");
   if (arch->conform_save ()) {
     set_message ("Your document is back in its original state", "undo");
     beep (); }
