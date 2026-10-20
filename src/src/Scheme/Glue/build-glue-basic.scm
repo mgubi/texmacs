@@ -730,6 +730,7 @@
   ;; TeXmacs secure clients
   (supports-gnutls? gnutls_present (bool))
   (gnutls-random-number gnutls_random_int (int uint))
+  (secure-random-number secure_random_int (int uint))
   (tls-client-start tls_client_start (int string int scheme_tree))
   (gnutls-generate-salt gnutls_generate_salt (string))
   (hash-password-pbkdf2 hash_password_pbkdf2 (string string string))
