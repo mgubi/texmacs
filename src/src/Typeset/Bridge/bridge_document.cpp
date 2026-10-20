@@ -302,9 +302,11 @@ bridge_document_rep::notify_insert (path p, tree u) {
     if (pos<n) brs[pos  ]->notify_change (); // touch in case of surroundings
     for (i=0; i<pos; i++) brs2[i]= brs[i];
     for (j=0; j<nr ; j++) brs2[i+j]= make_bridge (ttt, u[j], descend (ip,i+j));
+    // (with the rewritten tree, the places of the paragraphs are those of
+    // the document, the same paths, which the document already moved)
     for (; i<n; i++) {
       brs2[i+nr]= brs[i];
-      brs2[i+nr]->ip->item += nr;
+      if (!ttt->rewritten) brs2[i+nr]->ip->item += nr;
     }
     brs= brs2;
     st = (st (0, p->item) * u) * st (p->item, N(st));
@@ -329,7 +331,7 @@ bridge_document_rep::notify_remove (path p, int nr) {
     for (i=0; i<pos ; i++) brs2[i]= brs[i];
     for (; i<n-nr; i++) {
       brs2[i]= brs[i+nr];
-      brs2[i]->ip->item -= nr;
+      if (!ttt->rewritten) brs2[i]->ip->item -= nr;
     }
     bool change_flag= false;
     for (i=pos; i<pos+nr; i++)

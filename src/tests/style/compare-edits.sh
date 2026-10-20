@@ -1,7 +1,8 @@
 #!/bin/sh
 # Check the incremental typesetting of the rewritten tree: the same edits
 # are made in each document (at six places: typing, a new paragraph, typing,
-# a backspace, the document being typeset after each), by a TeXmacs which
+# a backspace, a second new paragraph joined again to the one before it, the
+# document being typeset after each), by a TeXmacs which
 # typesets the document as usual and by one which typesets the result of the
 # style rewriter (TEXMACS_STYLE_TYPESET=1); the printed pages are compared
 # pixel by pixel.
@@ -44,7 +45,9 @@ cat > "$out/edit.scm" << 'EOF'
         (insert "Edit") (update-forced)
         (insert-return) (update-forced)
         (insert "More") (update-forced)
-        (kbd-backspace) (update-forced))))
+        (kbd-backspace) (update-forced)
+        (insert-return) (update-forced)
+        (go-start-paragraph) (kbd-backspace) (update-forced))))
   (update-current-buffer)
   (update-forced)
   (print-to-file (system->url out)))

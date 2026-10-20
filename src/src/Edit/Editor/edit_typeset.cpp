@@ -496,10 +496,33 @@ edit_typeset_rep::typeset_rewritten_changes (path rp, tree old_t, tree new_t) {
   // the typesetter is told about the smallest subtrees of the rewritten
   // tree which changed (rp is the path, reversed, as an ip), down to the
   // trees which a bridge typesets as a whole: below, the new tree is given
-  // whole, with its places. A node whose number of children changed is
-  // replaced as a whole too: the insertions and removals of the bridges
-  // move the places of the bridges which follow, which are here the places
-  // of the document, moved by the document.
+  // whole, with its places. In a document whose number of paragraphs
+  // changed, the paragraphs before and after the change are kept, and the
+  // others are inserted or removed (bridge_document_rep::notify_insert,
+  // which leaves the places of the paragraphs which follow to the
+  // document); another node whose number of children changed is replaced.
+  if (is_compound (old_t) && is_compound (new_t) &&
+      L(old_t) == DOCUMENT && L(new_t) == DOCUMENT && N(old_t) != N(new_t)) {
+    int n1= N(old_t), n2= N(new_t), pre= 0, suf= 0;
+    // (the expand-as of the calls are made again at each pass: compared
+    // down to their bodies, the same trees)
+    while (pre < n1 && pre < n2 &&
+           same_rewritten_whole (old_t[pre], new_t[pre]))
+      pre++;
+    while (suf < n1 - pre && suf < n2 - pre &&
+           same_rewritten_whole (old_t[n1-1-suf], new_t[n2-1-suf]))
+      suf++;
+    int a= n1 - pre - suf, b= n2 - pre - suf, k= min (a, b);
+    for (int i=pre; i<pre+k; i++)
+      if (!same_rewritten (old_t[i], new_t[i]))
+        typeset_rewritten_changes (path (i, rp), old_t[i], new_t[i]);
+    if (b > k)
+      ::notify_insert (ttt, reverse (path (pre+k, rp)),
+                       new_t (pre+k, pre+b));
+    if (a > k)
+      ::notify_remove (ttt, reverse (path (pre+k, rp)), a-k);
+    return;
+  }
   if (is_atomic (old_t) || is_atomic (new_t) ||
       L(old_t) != L(new_t) || N(old_t) != N(new_t)) {
     ::notify_assign (ttt, reverse (rp), new_t);

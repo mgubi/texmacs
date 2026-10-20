@@ -104,8 +104,12 @@ calls and carry the place of only one).
 **2.4 Incremental: the changes of the rewritten tree.** The old and the new
 rewritten trees are compared (`typeset_rewritten_changes`), by address since
 the unchanged subtrees are the same trees, atoms by their strings; the
-typesetter is told about the smallest subtrees which changed; a node whose
-number of children changed is replaced. It goes down only through the
+typesetter is told about the smallest subtrees which changed. In a
+`document` whose number of paragraphs changed, the paragraphs before and
+after the change are kept and the others inserted or removed;
+`bridge_document` then leaves the places of the following paragraphs alone,
+since they are the document's own `path` cells, which the document moves in
+place. Another node whose number of children changed is replaced. It goes down only through the
 trees whose bridge gives the change to the bridge of a child (document,
 `with`, `expand-as`, `surround`, `mark`, `locus`, the formattings, at that
 child); below, the new tree is given whole when its content or its places
@@ -113,13 +117,16 @@ changed, since the other bridges substitute the change in their tree
 (`substitute`), which rebuilds the trees above it without the places which
 the rewriter attached (2.2), and typeset that tree whole anyway.
 *Alternatives:* the whole tree at each change (half a second per keystroke
-on 77 pages); insertions and removals for the new children: the bridges then
-move the places of the following bridges in place, which are here places of
-the document, moved by the document too (not done until that is solved).
+on 77 pages); a node whose number of children changed replaced whole, also
+a document (done first: a new paragraph typeset the whole document again,
+6.1 ms instead of 0.9 on the structure page); places of the rewritten trees
+copied instead of shared (the bridges could then move them as usual, but
+every place would have to be updated by the rewriter after each change).
 *Alternatives for the places below:* a `substitute` which keeps the places
 (in the kernel, used everywhere, or in the 48 places of the bridges which
 call it).
-*Decided by:* `tests/style/bench-typing.sh`, `tests/style/compare-edits.sh`;
+*Decided by:* `tests/style/bench-typing.sh`, `tests/style/compare-edits.sh`
+(which joins paragraphs too), the click maps after new and joined paragraphs;
 the places below by the labels of the welcome page and the click maps
 after keystrokes.
 

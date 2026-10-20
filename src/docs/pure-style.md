@@ -436,11 +436,20 @@ cheap; atoms made again, such as the names in the `expand-as` of the macro
 calls, are compared by their strings (else every paragraph changed). It
 goes down only through the trees whose bridges give the change to a child
 bridge; below, a tree typeset as a whole by its bridge is given whole, with
-the places the rewriter attached to it (see "Analysis of a keystroke"). A node
-whose number of children changed (a new paragraph) is replaced as a whole:
-the insertions and removals of the bridges move the places of the bridges
-which follow in place (`ip->item += nr`), and these places are here the
-places of the document, which the document already moves.
+the places the rewriter attached to it (see "Analysis of a keystroke"). In a
+`document` whose number of paragraphs changed (a new paragraph, two
+paragraphs joined), the paragraphs before and after the change are kept
+(compared down to the bodies of their `expand-as`, which are made again at
+each pass), the others are compared pair by pair, and the rest is inserted
+(`notify_insert`) or removed (`notify_remove`). `bridge_document` moves the
+places of the bridges which follow in place (`ip->item += nr`); with the
+rewritten tree these are the places of the document, the same `path` cells
+(`copy_ip` and `transfer_ip` attach the document's own paths, which
+`set_ip` updates in place), already moved by the document, so it does not
+move them then (`ttt->rewritten`). Another node whose number of children
+changed is replaced as a whole. (At first every such node was replaced:
+6.1 ms per new paragraph on the structure page, the whole document typeset
+again; now 0.9 ms, against 0.6 without the flag.)
 
 The loci (`build_locus`: hyperlinks, labels, the observers of comments) are
 registered on the trees of the document at the places of the bodies, not on
@@ -459,8 +468,10 @@ typed and 5 new paragraphs in the middle of the document):
 | conventions page | 2.3 ms | 4.85 ms (5.9 before the fixes below) | | |
 
 The rewriter itself takes 0.55 ms per keystroke on the glue reference and
-about 1.2 ms on the conventions page. A new paragraph replaces its whole
-document, hence the 6.2 ms of the structure page.
+about 1.2 ms on the conventions page. A new paragraph replaced its whole
+document, hence the 6.2 ms of the structure page (0.9 ms since the
+insertions above; the keystrokes since the interning of decision 3.2, see
+"Analysis of a keystroke").
 
 **The conventions page, investigated.** Its keystroke falls in the table of
 the keyboard modifiers, a `big-table`.
@@ -495,14 +506,16 @@ rewriter. The typesetting itself is about 1 ms slower than without the
 flag on this page (2.85 against 1.85 ms), not investigated further.
 
 `tests/style/compare-edits.sh` makes the same edits (typing, a new
-paragraph, typing, a backspace, at six places, typesetting after each) with
-and without the flag and compares the printed pages: identical on the list
-document of the tests, *About*, the welcome page, the structure,
-conventions and mathematics pages, and `tests/style/environments.tm`.
+paragraph, typing, a backspace, a second new paragraph joined again to the
+one before, at six places, typesetting after each) with and without the
+flag and compares the printed pages: identical on the list document of the
+tests, *About*, the welcome page, the structure, conventions and
+mathematics pages, and `tests/style/environments.tm`. The click maps after
+three new paragraphs and two joins are those without the flag too.
 
-Open: the new paragraphs (the insertion and removal of bridges without
-moving the places of the document twice); the rewriter's own time where a
-change reaches a large evaluation (keys on inputs, step 3).
+Open: the rewriter's own time where a change reaches a large evaluation,
+for instance a counter changed by a new section (keys on inputs, see
+decision 3.2 of [pure-style-decisions.md](pure-style-decisions.md)).
 
 **The places, precisely** (`tests/style/compare-places.sh`, which compares
 the paths of the document found at 5000 points of the boxes, what a click
