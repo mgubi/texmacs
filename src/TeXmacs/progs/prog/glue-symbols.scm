@@ -611,7 +611,7 @@
 "url-newer?"
 "url-size"
 "url-last-modified"
-"url-refresh-directory-cache"
+"url-declare-out-of-date"
 "url-temp"
 "url-temp-dir"
 "url-scratch"

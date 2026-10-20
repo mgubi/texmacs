@@ -247,16 +247,11 @@
             '(concat "About GNU " (TeXmacs) "-" (TeXmacs-version)))))
 
 ;; The answers of url-exists-in-help? and the lists of files of the
-;; documentation search are kept, but made again when the documentation
-;; folders change: a page is added to the documentation of the (scratch)
-;; home, then removed. The times of folders are in seconds, and they are
-;; read again at most once a second: the checks wait for the next second.
-(define (wait-next-second)
-  (with t0 (texmacs-time)
-    (let loop () (when (< (- (texmacs-time) t0) 1100) (loop)))))
-
+;; documentation search are kept for the session, and made again by
+;; help-caches-update (Tools -> Update -> Help): a page is added to the
+;; documentation of the (scratch) home, then removed.
 (define (test-help-refresh)
-  (check-group "help caches follow the documentation folders")
+  (check-group "help caches: kept for the session, updated on demand")
   (let* ((home-doc (url-append (string->url "$TEXMACS_HOME_PATH") "doc"))
          (dir (url-append home-doc "check-help-refresh"))
          (page (url-append dir "new-page.en.tm"))
@@ -270,17 +265,21 @@
                   (when (url-exists? dir) (system-rmdir dir)))))
     (clean)
     (when (not (url-exists? home-doc)) (system-mkdir home-doc))
+    (help-caches-update)
     (check-false (url-exists-in-help? name))
     (check-false (listed?))
-    ;; a new folder with a new page
-    (wait-next-second)
+    ;; a new folder with a new page: unseen until the update
     (system-mkdir dir)
     (string-save "<TeXmacs|2.1>\n\n<style|tmdoc>\n\n<body|x>\n" page)
+    (check-false (url-exists-in-help? name))
+    (check-false (listed?))
+    (help-caches-update)
     (check-true (url-exists-in-help? name))
     (check-true (listed?))
-    ;; the page is removed
-    (wait-next-second)
+    ;; the page is removed: still known until the update
     (system-remove page)
+    (check-true (url-exists-in-help? name))
+    (help-caches-update)
     (check-false (url-exists-in-help? name))
     (check-false (listed?))
     (clean)))

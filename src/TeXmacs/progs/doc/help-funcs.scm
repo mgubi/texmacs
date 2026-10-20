@@ -40,16 +40,14 @@
           (ahash-set! help-titles u (parse-title u))))
     (ahash-ref help-titles u)))
 
-;; The lists of files of the documentation which are kept for the session
-;; (help-url-cache, the search lists of docgrep.scm) are valid as long as
-;; help-dirs-generation is unchanged. It changes when one of the folders of
-;; the documentation path changes, which is checked from the times of the
-;; folders at most once every help-dirs-check-interval milliseconds.
+;; The answers of url-exists-in-help? and the lists of files of the
+;; documentation search (docgrep.scm) are kept for the session. Tools ->
+;; Update -> Help (help-caches-update) makes them again, for pages added or
+;; removed while TeXmacs runs: the documentation folders are declared out of
+;; date, so that the caches of the files of TeXmacs (dir_cache, stat_cache,
+;; doc_cache) read them again too.
 
-(define help-dirs-times (make-ahash-table)) ; folder -> its time
-(define help-dirs-checked #f)
-(define help-dirs-check-interval 1000)
-(define help-dirs-generation 0)
+(define help-caches-generation 0)
 
 (define (help-dirs)
   ;; the folders of the documentation path, existing or not, and their
@@ -58,39 +56,26 @@
          (subs (url-expand (url-complete (url-append p (url-any)) "dr"))))
     (append (url->list p) (url->list subs))))
 
-(define (help-dir-refresh d)
-  ;; the time of d, read again; a folder which changed since its recorded
-  ;; time is declared out of date, so that the caches of the files of
-  ;; TeXmacs (dir_cache, stat_cache, doc_cache) read it again too
-  (let* ((key (url->system d))
-         (old (or (ahash-ref help-dirs-times key) 0))
-         (new (url-refresh-directory-cache d old)))
-    (ahash-set! help-dirs-times key new)
-    (!= new old)))
+(tm-define (help-caches-generation-get)
+  (:synopsis "A number which changes at each update of the help caches")
+  help-caches-generation)
 
-(define (help-dirs-check)
-  (with changed? (== (ahash-size help-dirs-times) 0)
-    (for (key (map car (ahash-table->list help-dirs-times)))
-      (when (help-dir-refresh (system->url key))
-        (set! changed? #t)))
-    (when changed?
-      ;; new folders are found in the folders which changed
-      (set! help-dirs-times (make-ahash-table))
-      (for-each help-dir-refresh (help-dirs))
-      (set! help-dirs-generation (+ help-dirs-generation 1))
-      (set! help-url-cache (make-ahash-table)))))
-
-(tm-define (help-dirs-generation-get)
-  (:synopsis "A number which changes when the documentation folders change")
-  (with now (texmacs-time)
-    (when (or (not help-dirs-checked)
-              (>= (- now help-dirs-checked) help-dirs-check-interval))
-      (help-dirs-check)
-      (set! help-dirs-checked (texmacs-time))))
-  help-dirs-generation)
+(tm-define (help-caches-update)
+  (:synopsis "Read the documentation folders again")
+  ;; the folders found depend on the listings of their parents, read again
+  ;; once these are declared out of date: repeated until no new folder
+  (let loop ((done (make-ahash-table)))
+    (with new (list-filter (help-dirs)
+                           (lambda (d) (not (ahash-ref done (url->system d)))))
+      (when (nnull? new)
+        (for (d new)
+          (url-declare-out-of-date d)
+          (ahash-set! done (url->system d) #t))
+        (loop done))))
+  (set! help-url-cache (make-ahash-table))
+  (set! help-caches-generation (+ help-caches-generation 1)))
 
 (tm-define (url-exists-in-help? s)
-  (help-dirs-generation-get)
   (with entry (ahash-ref help-url-cache s)
     (if (list? entry)
       (car entry)

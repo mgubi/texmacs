@@ -4691,11 +4691,11 @@ source code.
   </explain>
 
   <\explain>
-    <scm|(url-refresh-directory-cache <scm-arg|url> <scm-arg|int>)>
+    <scm|(url-declare-out-of-date <scm-arg|url>)>
 <explain-synopsis|no synopsis>
   <|explain>
-    Calls the <c++> function <cpp|refresh_directory_cache> which returns
-    <scm|int>.
+    Calls the <c++> function <cpp|declare_out_of_date> which returns
+    <scm|void>.
   </explain>
 
   <\explain>
