@@ -31,10 +31,6 @@
 #include "tm_window.hpp"
 #include "client_server.hpp"
 
-#ifdef AQUATEXMACS
-void mac_fix_paths ();
-#endif
-
 #ifdef QTTEXMACS
 #include "Qt/QTMApplication.hpp"
 #include "Qt/qt_utilities.hpp"
