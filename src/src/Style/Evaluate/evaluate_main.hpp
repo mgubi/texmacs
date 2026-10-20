@@ -17,7 +17,10 @@
 extern environment std_env;
 
 tree evaluate (tree t);
+tree evaluate_in (tree t, bool markup);
+tree evaluate_result (tree t);
 tree evaluate_markup (tree t);
+tree evaluate_part (tree t);
 tree evaluate_error (string message);
 tree evaluate_error (string message, tree a1);
 tree evaluate_error (string message, array<tree> args);

@@ -76,7 +76,7 @@ evaluate_with (tree t) {
     // FIXME: don't add non-typesetter variables (?)
   }
   begin_with (std_env, local);
-  tree r= evaluate_markup (t[n-1]);
+  tree r= evaluate_part (t[n-1]);
   end_with (std_env);
   w << r;
   return w;
@@ -100,7 +100,7 @@ evaluate_value (tree t) {
   // residual would be computed here, in another environment (box-info
   // typesets its argument again, lengths are converted with other fonts)
   if (contains_residual (std_env[key])) return tree (VALUE, r);
-  return evaluate (std_env[key]);
+  return evaluate_result (std_env[key]);
 }
 
 tree
@@ -371,9 +371,9 @@ evaluate_compound (tree t) {
     // we remember partial expansions?")
     tree e= expand (f[n], local);
     decorate_ip (t, e);
-    return evaluate (e);
+    return evaluate_result (e);
   }
-  else return evaluate (f);
+  else return evaluate_result (f);
 }
 
 #endif // ALTERNATIVE_MACRO_EXPANSION

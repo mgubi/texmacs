@@ -31,7 +31,7 @@ evaluate_formatting (tree t, string v) {
   assoc_environment local (1);
   local->raw_write (0, v, newv);
   begin_with (std_env, local);
-  tree b= evaluate (t[n-1]);
+  tree b= evaluate_part (t[n-1]);
   end_with (std_env);
   return r * tree (TFORMAT, b);
 }
@@ -47,7 +47,7 @@ evaluate_table (tree t) {
   begin_with (std_env, local);
   int i, n= N(t);
   tree r (t, n);
-  for (i=0; i<n; i++) r[i]= evaluate (t[i]);
+  for (i=0; i<n; i++) r[i]= evaluate_part (t[i]);
   end_with (std_env);
   return r;
 }

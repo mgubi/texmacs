@@ -16,6 +16,7 @@
 #include "analyze.hpp"
 
 environment std_env;
+static bool markup_mode= false; // see evaluate_markup
 static int evaluate_calls= 0; // evaluations of compound trees
 static int evaluate_hits= 0;  // of which found in a memorizer
 
@@ -29,20 +30,22 @@ class memorizer;
 class evaluate_memorizer_rep: public compound_memorizer_rep {
   environment env_in;
   tree t_in;
+  bool markup; // evaluated as markup or as a value (see evaluate_markup)
   environment env_out;
   tree t_out;
 
 public:
-  inline evaluate_memorizer_rep (environment env, tree t):
-    env_in (env), t_in (t), env_out (), t_out (no_tree) {}
+  inline evaluate_memorizer_rep (environment env, tree t, bool m):
+    env_in (env), t_in (t), markup (m), env_out (), t_out (no_tree) {}
   void print (tm_ostream& out) {
     out << "evaluate_memorizer (" << t_in << ")"; }
 
   int type () { return MEMORIZE_EVALUATE; }
-  int hash () { return weak_hash (env_in) ^ weak_hash (t_in); }
+  int hash () { return weak_hash (env_in) ^ weak_hash (t_in) ^ (int) markup; }
   bool equal (memorizer_rep* mem) {
     evaluate_memorizer_rep* rep= (evaluate_memorizer_rep*) mem;
-    return weak_equal (env_in, rep->env_in) && weak_equal (t_in, rep->t_in); }
+    return weak_equal (env_in, rep->env_in) && weak_equal (t_in, rep->t_in) &&
+           markup == rep->markup; }
 
   void set_environment (environment env) { env_out= env; }
   environment get_environment () { return env_out; }
@@ -51,8 +54,8 @@ public:
 };
 
 inline memorizer
-evaluate_memorizer (environment env, tree t) {
-  return (memorizer_rep*) tm_new<evaluate_memorizer_rep> (env, t);
+evaluate_memorizer (environment env, tree t, bool markup) {
+  return (memorizer_rep*) tm_new<evaluate_memorizer_rep> (env, t, markup);
 }
 
 /******************************************************************************
@@ -258,7 +261,11 @@ evaluate_markup (tree t) {
   // cursor is put before and after the tag, as when it typesets the call
   // (typeset_compound). (Not in the values: the computations of the
   // rewriter would see the expand-as; exec of an expand-as gives its body.)
-  tree r= evaluate (t);
+  // It is evaluated as markup: the typesetter typesets some tags otherwise
+  // than it executes them (exec), quote and quote-value, which are shown
+  // as their source; a macro call, a value, an extern, an eval, the
+  // branches of an if, give their result in the same mode (evaluate_result)
+  tree r= evaluate_in (t, true);
   if (is_atomic (t) || (L(t) != COMPOUND && L(t) < START_EXTENSIONS)) return r;
   path ip= obtain_ip (t);
   if (ip == path (DETACHED) || is_nil (ip) || ip->item < 0) return r;
@@ -267,11 +274,19 @@ evaluate_markup (tree t) {
   return w;
 }
 
+tree
+evaluate_part (tree t) {
+  // a part of a typesetting primitive, or the body of a with: markup when
+  // the primitive is evaluated as markup, a value otherwise (exec of a
+  // primitive executes its parts)
+  return markup_mode? evaluate_markup (t): evaluate (t);
+}
+
 static tree
 evaluate_compound_children (tree t) {
   int i, n= N(t);
   tree r (t, n);
-  for (i=0; i<n; i++) r[i]= evaluate_markup (t[i]);
+  for (i=0; i<n; i++) r[i]= evaluate_part (t[i]);
   transfer_ip (t, r);
   return r;
 }
@@ -347,6 +362,7 @@ evaluate_impl (tree t) {
   case VALUE:
     return evaluate_value (t);
   case QUOTE_VALUE:
+    if (markup_mode) return t;
     return evaluate_quote_value (t);
   case OR_VALUE:
     return evaluate_value (t); // FIXME: provisory
@@ -375,17 +391,18 @@ evaluate_impl (tree t) {
   case EVAL_ARGS:
     return evaluate_eval_args (t);
   case MARK:
-    return tree (MARK, copy (t[0]), evaluate (t[1]));
+    return tree (MARK, copy (t[0]), evaluate_part (t[1]));
   case VAR_MARK:
-    return tree (VAR_MARK, copy (t[0]), evaluate (t[1]));
+    return tree (VAR_MARK, copy (t[0]), evaluate_part (t[1]));
   case EXPAND_AS:
-    return evaluate (t[1]);
+    return evaluate_result (t[1]);
   case EVAL:
-    return evaluate (evaluate (t[0]));
+    return evaluate_result (evaluate (t[0]));
   case QUOTE:
+    if (markup_mode) return t;
     return t[0];
   case QUASI:
-    return evaluate (evaluate_quasiquote (t[0]));
+    return evaluate_result (evaluate_quasiquote (t[0]));
   case QUASIQUOTE:
     return evaluate_quasiquote (t[0]);
   case UNQUOTE:
@@ -574,7 +591,7 @@ evaluate_impl (tree t) {
   /* Primitives for stylesheet editing */
   case STYLE_WITH:
   case VAR_STYLE_WITH:
-    return evaluate (t[N(t)-1]);
+    return evaluate_result (t[N(t)-1]);
   case STYLE_ONLY:
   case VAR_STYLE_ONLY:
   case ACTIVE:
@@ -632,7 +649,7 @@ evaluate_impl (tree t) {
                  is_func (t, COLLECTION) || is_func (t, ASSOCIATE) ||
                  is_func (t, TMLEN);
       for (i=0; i<n; i++)
-	r[i]= data? evaluate (t[i]): evaluate_markup (t[i]);
+	r[i]= data? evaluate (t[i]): evaluate_part (t[i]);
       transfer_ip (t, r);
       return r;
     }
@@ -676,7 +693,7 @@ evaluate_string (tree t) {
 }
 
 tree
-evaluate (tree t) {
+evaluate_in (tree t, bool markup) {
   if (is_atomic (t)) return t;
   if (style_trace) cout << "Evaluate "
     // << obtain_ip (t) << " "
@@ -684,7 +701,7 @@ evaluate (tree t) {
        << ", " << as_hexadecimal ((pointer) std_env.operator -> ()) << "] "
        << t << INDENT << LF;
   evaluate_calls++;
-  memorizer mem= evaluate_memorizer (std_env, t);
+  memorizer mem= evaluate_memorizer (std_env, t, markup);
   if (is_memorized (mem)) {
     evaluate_hits++;
     std_env= mem->get_environment ();
@@ -695,7 +712,10 @@ evaluate (tree t) {
     return mem->get_tree ();
   }
   memorize_start ();
+  bool old_mode= markup_mode;
+  markup_mode= markup;
   tree r= evaluate_impl (t);
+  markup_mode= old_mode;
   decorate_ip (t, r);
   mem->set_tree (r);
   mem->set_environment (std_env);
@@ -711,13 +731,25 @@ evaluate (tree t) {
   return mem->get_tree ();
 }
 
+tree
+evaluate (tree t) {
+  return evaluate_in (t, false);
+}
+
+tree
+evaluate_result (tree t) {
+  // the tree whose result is the result of the tree being evaluated (the
+  // body of a macro call, a value...), in the same mode
+  return evaluate_in (t, markup_mode);
+}
+
 memorizer
 evaluate (environment env, tree t) {
   environment old_env= std_env;
   evaluate_calls= evaluate_hits= 0;
   memorize_initialize ();
   std_env= env;
-  (void) evaluate (t);
+  (void) evaluate_in (t, true); // (the document is markup)
   std_env= old_env;
   return memorize_finalize ();
 }

@@ -30,12 +30,12 @@ evaluate_if (tree t) {
     // the condition is left to the typesetter, with both branches
     tree r (t, N(t));
     r[0]= u;
-    for (int i=1; i<N(t); i++) r[i]= evaluate (t[i]);
+    for (int i=1; i<N(t); i++) r[i]= evaluate_result (t[i]);
     return r;
   }
   if (!is_bool (u)) return evaluate_error ("bad if");
-  if (as_bool (u)) return evaluate (t[1]);
-  if (N(t)==3) return evaluate (t[2]);
+  if (as_bool (u)) return evaluate_result (t[1]);
+  if (N(t)==3) return evaluate_result (t[2]);
   return "";
 }
 
@@ -49,13 +49,18 @@ evaluate_case (tree t) {
       // the rest of the cases is left to the typesetter
       tree r (CASE);
       r << u;
-      for (int j=i+1; j<n; j++) r << evaluate (t[j]);
+      // (the branches, and the last tree when it is the default branch,
+      // in the mode of the case; the conditions as values)
+      for (int j=i+1; j<n; j++) {
+        bool branch= (j-i) % 2 == 1 || j == n-1;
+        r << (branch? evaluate_result (t[j]): evaluate (t[j]));
+      }
       return r;
     }
     if (!is_bool (u)) return evaluate_error ("bad case");
-    if (as_bool (u)) return evaluate (t[i+1]);
+    if (as_bool (u)) return evaluate_result (t[i+1]);
   }
-  if (i<n) return evaluate (t[i]);
+  if (i<n) return evaluate_result (t[i]);
   return "";
 }
 

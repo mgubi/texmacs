@@ -52,10 +52,24 @@ non-macro assignments: same loss of place.
 differ on a few tags: `if*` is a phantom for the concater (kept), `quote` is
 shown by the concater; the expansions of macro calls are wrapped (1.6) in
 markup positions only, not in values.
-*Alternative:* one evaluation for both (the rewriter of 2007): `phantom`
-lost its body; `plus ((two), 1)` would see a wrapper.
-*Open:* `quote` returned by an `extern` in markup (one documentation page);
-a rewriter faithful on all such tags needs a markup/value mode in its keys.
+The two are evaluated apart, with the mode in the key of the memorizers
+(`evaluate_markup`, `evaluate`): the document is markup; the parts of a
+typesetting primitive have the mode of the primitive (`exec` executes the
+parts of a primitive as values); the data, the conditions, the values bound
+by `with` and `assign` are values; the tags whose result is that of another
+tree (a macro call, `value`, `extern`, `eval`, the branch of an `if`) give
+it in their own mode (`evaluate_result`). In markup, `quote` and
+`quote-value` stay.
+*Alternatives:* one evaluation for both (the rewriter of 2007): `phantom`
+lost its body, `plus ((two), 1)` would see a wrapper, and a `quote` returned
+by an `extern` in markup was evaluated (`std-utils-dtd`); the mode for the
+`quote` tags only, without it in the keys: the same tree would get the
+result of the other mode from the memorizers.
+*Decided by:* the comparison of the printed pages (`std-utils-dtd`
+identical, no other page changed); the click maps of 30 pages, the same
+with and without the mode; a first version which evaluated the bodies of
+tables as values lost the boundaries of the calls in them (680 points of
+5000 with another place on the conventions page).
 
 **1.5 What the typesetter does better is left to it.** Inactive markup
 (`inactive`, `inactive*` stay unevaluated; `rewrite-inactive` inside other

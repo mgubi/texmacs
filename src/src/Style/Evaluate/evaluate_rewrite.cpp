@@ -206,5 +206,5 @@ rewrite (tree t) {
 
 tree
 evaluate_rewrite (tree t) {
-  return evaluate (rewrite (t));
+  return evaluate_result (rewrite (t));
 }

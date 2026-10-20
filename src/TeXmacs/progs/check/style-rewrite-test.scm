@@ -231,6 +231,32 @@
           '(expand-as "out" (concat "<" "z" ">"))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Markup and values
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; The typesetter shows quote and quote-value in the markup (as their
+;; source), while exec gives the quoted tree: the rewriter evaluates the
+;; markup and the values apart (evaluate_markup, evaluate_result).
+(define (test-markup-and-values)
+  (check-group "markup and values")
+  ;; in the markup, kept
+  (check= (rewrite-last '(document (quote (strong "x"))))
+          '(quote (strong "x")))
+  (check= (rewrite-last '(document (assign "q" (macro (quote "y"))) (q)))
+          '(quote "y"))
+  ;; the result of an extern in the markup (map, std-utils-dtd)
+  (check= (rewrite-last '(document (map (macro "x" (em (arg "x")))
+                                        (tuple "1" "2"))))
+          '(quote (tuple (compound (macro "x" (em (arg "x"))) "1")
+                         (compound (macro "x" (em (arg "x"))) "2"))))
+  ;; in a value, the quoted tree
+  (check= (rewrite-last '(document (assign "v" (concat "a" (quote "b")))
+                                   (value "v")))
+          '(concat "a" "b"))
+  (check= (rewrite-last '(document (if (equal (quote "b") "b") "yes" "no")))
+          "yes"))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Memorization
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -407,6 +433,7 @@
         (test-primitives)
         (test-partial-evaluation)
         (test-boundaries)
+        (test-markup-and-values)
         (test-memorization)
         (test-manual)
         (test-documentation)

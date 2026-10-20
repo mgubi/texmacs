@@ -313,23 +313,31 @@ them (current version, the rewritten body set as a tree, the master of the
 copy set to the document).
 
 **Result: of the 696 English pages of the documentation, 692 are identical
-to the pixel** (688 on October 20, after the interning of 3.2: four pages
-of `devel/source` gained a sub-pixel difference in an earlier step, see
-"Analysis of a keystroke"). Left:
+to the pixel** (689 on October 20, after the interning of 3.2 and the
+markup and value modes: four pages of `devel/source` gained a sub-pixel
+difference in an earlier step, see "Analysis of a keystroke";
+`std-utils-dtd` became identical). Left:
 
 - `main/beamer/man-animations`: an animation, which differs between two
   printings of the document itself;
-- `main/styles/std/std-utils-dtd`: an example renders a `quote` returned by
-  an `extern` (`map`). The typesetter typesets the result of a rewrite as
-  markup, where `quote` is shown (`typeset_inactive`), while the rewriter
-  evaluates it as a value (`quote` gives its argument). The concater and
-  `exec` differ on a few tags (`quote`, `quote-value`, `quote-arg`, `if*`,
-  which is handled); a rewriter faithful on all of them has to know whether
-  it evaluates markup or a value, and memorize the two apart. Also a
-  slightly different spacing of an inactive `map`, which the DRD of the
-  copy may explain (the DRD completes the tags from their uses in the
-  document, and the active uses are expanded in the copy; typesetting the
-  copy once with the original body first did not change it);
+- `main/styles/std/std-utils-dtd` (identical since the markup and value
+  modes, October 20): an example renders a `quote` returned by an `extern`
+  (`map`). The typesetter typesets the result of a rewrite as markup, where
+  `quote` is shown (`typeset_inactive`), while the rewriter evaluated it as
+  a value (`quote` gives its argument). The rewriter now evaluates markup
+  and values apart, with the mode in the key of its memorizers:
+  `evaluate_markup` (the document, and the parts of a typesetting primitive
+  evaluated as markup: `evaluate_part`, also the bodies of `with`, of the
+  formats, of `table`, of `mark`) and `evaluate` (values: the parts of a
+  primitive evaluated as a value, since `exec` executes them, and the data,
+  the conditions, the values of `with` and `assign`); the tags whose result
+  is that of another tree give it in their own mode (`evaluate_result`:
+  macro calls, `value`, `extern` and `map-args`, `eval`, `quasi`,
+  `expand-as`, `style-with`, the branches of `if` and `case`). In markup,
+  `quote` and `quote-value` stay, as the typesetter shows them. Left: a
+  `quote-arg` in markup, which the substitution of the arguments makes a
+  `quote` of the argument (shown as such, where the typesetter shows the
+  `quote-arg`); none in the documentation;
 - `main/automated/tag-help` and `main/automated/top-help`, generated pages
   which show Scheme templates as inactive markup: small differences of
   spacing and indentation, not explained yet.
