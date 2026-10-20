@@ -404,13 +404,22 @@ document of the tests, *About*, the welcome, *style*, conventions,
 structure and mathematics pages give the same cursor paths and the same
 document with and without the flag, at every step. (Headless, the cursor
 does not move: the moves need a window, `(apply-changes)` after each.)
-Also open:
+**The environment at the cursor** (what the menus and the keyboard read:
+the mode, the fonts, the language) is computed by running the typesetter's
+tree until the cursor (`typeset_exec_until`, `exec_until` of the bridges),
+along a path of the document, which with the flag is not a path of the
+typesetter's tree. With the flag, the document itself is executed until the
+cursor instead (`edit_env_rep::exec_until`), as the bridges do when they
+have not been typeset yet. `tests/style/compare-environments.sh` puts the
+cursor at the start of the strings of a document and compares some
+variables of the environment there: on `tests/style/environments.tm` (math,
+code, a list, a table, a theorem, a user macro) and five pages of the
+manual (up to 378 positions each), none differs. (Putting the cursor in a
+macro definition of the document hangs, also without the flag: the tool
+leaves them out.)
 
-- the environment at the cursor (`edit_typeset_rep::get_env_value`, which
-  runs `exec_until` along a path of the document in the typesetter) walks
-  the rewritten tree with a path of the document;
-- everything is typeset again at each change (the modifications of the
-  rewritten tree are step 5).
+Still open: everything is typeset again at each change (the modifications
+of the rewritten tree are step 5).
 
 **The places, precisely** (`tests/style/compare-places.sh`, which compares
 the paths of the document found at 5000 points of the boxes, what a click
@@ -558,8 +567,9 @@ Two consequences:
    result typeset in a copy of the document, compared pixel for pixel with
    the document. Second stage (*Typesetting in the editor*): the editor
    typesets the result, behind `TEXMACS_STYLE_TYPESET=1`, the boxes carrying
-   the places of the document. Left: the boundaries of macro calls for the
-   cursor, the environment at the cursor, shared subtrees.
+   the places of the document; the boundaries of macro calls, the places
+   of the boxes and the environment at the cursor are those of the usual
+   typesetting (*Typesetting in the editor*).
 5. **Laziness.** Connect the memorizers to the typesetter's invalidation, so
    that an edit only retypesets what the evaluation changed; benchmark
    against the current typesetter with the #333 scripts; bound the memory
@@ -590,6 +600,10 @@ editor*):
 and the places of the boxes in the editor (*Typesetting in the editor*):
 
     tests/style/compare-places.sh document.tm...
+
+and the environment at the cursor:
+
+    tests/style/compare-environments.sh document.tm...
 
 It is not listed in `check-master.scm`, since the rewriter exists only in
 the experimental build (elsewhere the suite fails at once, saying so). It

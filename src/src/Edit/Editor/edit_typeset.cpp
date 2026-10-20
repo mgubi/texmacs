@@ -592,6 +592,13 @@ edit_typeset_rep::typeset_exec_until (path p) {
     if (env->read (PREAMBLE) == "true")
       env->write (MODE, "src");
   }
+#ifdef EXPERIMENTAL
+  else if (rewrite_typeset)
+    // the typesetter has the rewritten tree, the path is one of the
+    // document: the document is executed until the path, as the bridges do
+    // when they have not been typeset yet (bridge_rep::exec_until)
+    env->exec_until (subtree (et, rp), p / rp);
+#endif
   else exec_until (ttt, p / rp);
   if (env->read (MODE) == "src" && env->read (PREAMBLE) != "true")
     define_style_macros (env, subtree (et, rp));
