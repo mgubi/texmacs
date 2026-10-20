@@ -201,11 +201,14 @@ copy_for_apply (patch p) {
       for (i=0; i<n; i++) r[i]= copy_for_apply (p[i]);
       return patch (get_type (p) == PATCH_BRANCH, r);
     }
+  case PATCH_BIRTH:
+    return p;
   case PATCH_AUTHOR:
     return patch (get_author (p), copy_for_apply (p[0]));
   default:
-    return p;
+    FAILED ("unsupported patch type");
   }
+  return p;
 }
 
 void
