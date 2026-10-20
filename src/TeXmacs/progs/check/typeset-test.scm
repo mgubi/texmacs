@@ -777,6 +777,44 @@
            (check= (rect 50) r2)
            (check= (get-page-count) n)))))))
 
+;; A long document outside paper mode (as a source file): its lines are one
+;; item made of chunks of them, and a letter changes one chunk; the lines
+;; keep their places, and are where a typesetting of the whole document
+;; puts them.
+(define (test-long-document-without-pages)
+  (check-group "long document without pages")
+  (with-typeset-body
+   `(document ,@(map (lambda (i) (string-append "line " (number->string i)))
+                     (iota 1500)))
+   (lambda ()
+     (init-env "page-medium" "automatic")
+     (update-current-buffer)
+     (update-forced)
+     (let ((r10 (rect 10)) (r700 (rect 700)) (r1399 (rect 1399))
+           (r1400 (rect 1400)))
+       (check-true (> (rect-y1 r10) (rect-y1 r700)))
+       (check-true (> (rect-y1 r700) (rect-y1 r1400)))
+       ;; a letter in the middle: the lines keep their places
+       (tree-set (tree-ref (buffer-tree) 700) "line 700 x")
+       (update-forced)
+       (check= (rect 10) r10)
+       (check= (rect 1400) r1400)
+       (check= (rect-y1 (rect 700)) (rect-y1 r700))
+       (check-true (> (rect-x2 (rect 700)) (rect-x2 r700)))
+       ;; a line removed: those after it go up by one line (the line at
+       ;; 1400 takes the place of the one at 1399)
+       (tree-remove (buffer-tree) 600 1)
+       (update-forced)
+       (check= (rect 10) r10)
+       (check= (rect-y1 (rect 1399)) (rect-y1 r1399))
+       ;; as after a typesetting of the whole document
+       (let ((a (rect 5)) (b (rect 699)) (c (rect 1398)))
+         (update-current-buffer)
+         (update-forced)
+         (check= (rect 5) a)
+         (check= (rect 699) b)
+         (check= (rect 1398) c))))))
+
 ;; A document whose typesetting fails is replaced by an empty one, and the
 ;; typesetting goes on, in it and in the other buffers (the bridges which
 ;; were recording what they read when it failed do not record any more).
@@ -1733,6 +1771,7 @@
   (test-paragraphs)
   (test-pages)
   (test-pages-kept)
+  (test-long-document-without-pages)
   (test-typesetting-failure)
   (test-derived-state)
   (test-renumbering-labels)

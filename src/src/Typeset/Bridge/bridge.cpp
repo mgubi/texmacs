@@ -293,6 +293,9 @@ bridge_rep::my_typeset (int desired_status) {
 
 #define CHUNK_MIN 16
 #define CHUNK_MAX 256
+// the number of lines from which the lines of a bridge are merged by chunks
+// outside paper mode too (merged_lines)
+#define MERGE_CHUNKED_MIN 512
 
 struct line_chunk {
   array<page_item> src;  // the merged lines
@@ -378,6 +381,7 @@ merge_line_run (path ip, array<page_item>& l, int i1, int i2) {
   }
   box lb= stack_box (path (ip), bs, spc);
   lb= move_box (path (ip), lb, 0, bs[0]->y2);
+  lb= group_box (path (ip), lb);
   page_item it (lb);
   it->spc= l[i2-1]->spc;
   it->penalty= l[i2-1]->penalty;
@@ -451,7 +455,6 @@ merged_lines (bridge_rep* br) {
   // before the chunks)
   if (flag && typeset_caches_mode () == 0) { drop_chunks (br); return l; }
   if (flag) return chunk_lines (br, l);
-  drop_chunks (br);
   // the item made before when l is the same: a block of paragraphs which
   // follows finds the item before it (bridge_block_rep::my_reusable), also
   // outside paper mode (TEXMACS_TYPESET_CACHES "off": made again; "check":
@@ -460,27 +463,35 @@ merged_lines (bridge_rep* br) {
   bool kept= mode != 0 && br->merged_version == br->version &&
              N(br->merged) != 0 && strong_equal (br->merged_ip, br->ip);
   if (kept && mode == 1) return br->merged;
+  // (a long document, as a source file outside paper mode: the item is a
+  // stack of chunks of its lines, made by chunk_lines, which keeps those
+  // which did not change; a stack of all its lines, made again at each
+  // keystroke, cost the whole document)
+  array<page_item> parts= l;
+  if (n >= MERGE_CHUNKED_MIN && mode != 0) parts= chunk_lines (br, l);
+  else drop_chunks (br);
+  int m= N(parts);
   int first=-1, last=-1;
   array<box> bs;
   array<SI>  spc;
   array<page_item> special_l;
-  for (i=0; i<n; i++)
-    if (l[i]->type != PAGE_CONTROL_ITEM) {
-      if (first == -1 && l[i]->type == PAGE_LINE_ITEM) first= N(bs);
-      bs  << l[i]->b;
-      spc << l[i]->spc->def;
+  for (i=0; i<m; i++)
+    if (parts[i]->type != PAGE_CONTROL_ITEM) {
+      if (first == -1 && parts[i]->type == PAGE_LINE_ITEM) first= N(bs);
+      bs  << parts[i]->b;
+      spc << parts[i]->spc->def;
       last= i;
     }
-    else if (is_tuple (l[i]->t, "env_page") &&
-             (l[i]->t[1] == PAGE_THIS_TOP ||
-              l[i]->t[1] == PAGE_THIS_BOT ||
-              l[i]->t[1] == PAGE_THIS_BG_COLOR))
-      special_l << l[i];
+    else if (is_tuple (parts[i]->t, "env_page") &&
+             (parts[i]->t[1] == PAGE_THIS_TOP ||
+              parts[i]->t[1] == PAGE_THIS_BOT ||
+              parts[i]->t[1] == PAGE_THIS_BG_COLOR))
+      special_l << parts[i];
   box lb= stack_box (path (ip), bs, spc);
   if (first != -1) lb= move_box (path (ip), lb, 0, bs[first]->y2);
   array<page_item> new_l (1);
   new_l[0]= page_item (lb);
-  new_l[0]->spc= l[last]->spc;
+  new_l[0]->spc= parts[last]->spc;
   new_l << special_l;
   if (kept) {
     // (the check mode: the item kept is used, as with the cache on)
