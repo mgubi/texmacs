@@ -40,6 +40,9 @@ have the details, and the problems go to the
   X11 they have the type of a dialog, and on Linux and Windows the document
   window as their parent, so that the tiling window managers (i3, sway,
   Hyprland, bspwm) float them instead of tiling them (#391).
+- **Desktop (Vue)**: on X11 the text copied from TeXmacs can be pasted in
+  every application: it is also offered in the formats of X11 (`UTF8_STRING`,
+  `STRING`), which `xclip`, `xterm` and the older toolkits ask for.
 - **Desktop**: TeXmacs Upsilon builds again with Qt 5 (the Qt of Ubuntu
   22.04 and of the distributions of its age), which failed at the link
   (#389); with Qt 5 the requests to web services (the AI sessions, Zotero

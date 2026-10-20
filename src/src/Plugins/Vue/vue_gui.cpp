@@ -6269,7 +6269,8 @@ clipboard_data_callback (void *userdata, const char *mime_type, size_t *size) {
     }
   }
   // Plain text (UTF-8)
-  else if (mime_str == "text/plain" || mime_str == "text/plain;charset=utf-8") {
+  else if (mime_str == "text/plain" || mime_str == "text/plain;charset=utf-8" ||
+           mime_str == "UTF8_STRING" || mime_str == "STRING" || mime_str == "TEXT") {
     if (N(data->plain_text) > 0) {
       *size = N(data->plain_text);
       return (const void*) data->c_plain_text;
@@ -6384,7 +6385,7 @@ bool set_selection (string key, tree t,
   }
 
   // Build list of MIME types to offer
-  const char* mime_types[4];
+  const char* mime_types[8];
   size_t num_mime_types = 0;
 
   // Always offer TeXmacs native format
@@ -6398,6 +6399,15 @@ bool set_selection (string key, tree t,
   // Always offer plain text (UTF-8)
   mime_types[num_mime_types++] = "text/plain;charset=utf-8";
   mime_types[num_mime_types++] = "text/plain";
+  // and as the X11 applications ask for text (xclip, xterm, the older
+  // toolkits): SDL offers the types of data it is given, and only
+  // SDL_SetClipboardText adds these (the text copied from TeXmacs could
+  // not be pasted there, issue #391)
+  if (strcmp (SDL_GetCurrentVideoDriver () ? SDL_GetCurrentVideoDriver () : "", "x11") == 0) {
+    mime_types[num_mime_types++] = "UTF8_STRING";
+    mime_types[num_mime_types++] = "STRING";
+    mime_types[num_mime_types++] = "TEXT";
+  }
 
 #ifdef __EMSCRIPTEN__
   string plain= N(clip_data->plain_text) > 0 ? clip_data->plain_text
