@@ -28,7 +28,12 @@
     (load-buffer u)
     (switch-to-buffer u)
     (update-forced)
-    (let ((r (tree-copy (style-rewrite-buffer)))
+    ;; (a copy which keeps the subtrees shared in the rewritten tree
+    ;; shared: the typesetter makes a hard-id from the address of its
+    ;; argument, which the locus and the link of a hyperlink share; with
+    ;; tree-copy the links were lost, and the PostScript, which Ghostscript
+    ;; turns into the PDF, was otherwise cut into text runs)
+    (let ((r (style-rewrite-copy))
           (doc (tree->stree (tree-import u "texmacs"))))
       (print-buffer u (string-append dir "/orig.pdf"))
       ;; the copy is written with the body of the document, and its body is

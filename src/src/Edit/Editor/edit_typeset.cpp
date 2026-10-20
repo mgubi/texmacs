@@ -545,6 +545,30 @@ edit_typeset_rep::style_rewrite () {
   return mem->get_tree ();
 }
 
+static tree
+copy_shared (tree t, hashmap<pointer,tree>& done) {
+  // a copy in which the subtrees shared in t are shared too: the typesetter
+  // computes a hard-id from the address of its argument, and the locus and
+  // the link of a hyperlink hold the same argument (see style_rewrite_copy)
+  if (is_atomic (t)) return copy (t);
+  pointer ptr= (pointer) t.operator -> ();
+  if (done->contains (ptr)) return done[ptr];
+  int i, n= N(t);
+  tree r (t, n);
+  for (i=0; i<n; i++) r[i]= copy_shared (t[i], done);
+  done (ptr)= r;
+  return r;
+}
+
+tree
+edit_typeset_rep::style_rewrite_copy () {
+  // the rewritten tree, copied (for a document made of it, as the tests
+  // make: the trees of the rewriter are its memorized results)
+  tree uninit (UNINIT);
+  hashmap<pointer,tree> done (uninit);
+  return copy_shared (style_rewrite (), done);
+}
+
 array<int>
 edit_typeset_rep::style_rewrite_statistics () {
   return evaluate_statistics ();

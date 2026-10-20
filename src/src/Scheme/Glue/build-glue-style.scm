@@ -21,5 +21,6 @@
   "initialize_glue_style"
 
   (style-rewrite-buffer style_rewrite (tree))
+  (style-rewrite-copy style_rewrite_copy (tree))
   (style-rewrite-statistics style_rewrite_statistics (array_int))
   (style-environment-update environment_update (void)))

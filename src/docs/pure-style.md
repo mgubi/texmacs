@@ -312,11 +312,22 @@ resolved from the directory of the copy. `tests/style/compare.sh` avoids
 them (current version, the rewritten body set as a tree, the master of the
 copy set to the document).
 
-**Result: of the 696 English pages of the documentation, 692 are identical
-to the pixel** (689 on October 20, after the interning of 3.2 and the
-markup and value modes: four pages of `devel/source` gained a sub-pixel
-difference in an earlier step, see "Analysis of a keystroke";
-`std-utils-dtd` became identical). Left:
+**Result: of the 696 English pages of the documentation, 693 are identical
+to the pixel** (October 20, after the markup and value modes, which made
+`std-utils-dtd` identical, and the copy below). The copy of the rewritten
+body must keep its shared subtrees shared (`style-rewrite-copy`, not
+`tree-copy`): the typesetter makes a `hard-id` from the address of its
+argument (a residual since the analysis of a keystroke), and the locus and
+the link of a hyperlink hold the same argument. With `tree-copy` the two
+identifiers differed and the printed copy had no link annotations; four
+pages of `devel/source` then differed by a few pixels, through the printing
+path of this build: TeXmacs writes PostScript (`ps_renderer`; no
+PDF-Hummus, the MuPDF writer is off by default) and Ghostscript makes the
+PDF. Without the link annotations the PostScript cut some words into other
+text runs (`(exa)` and `(e) (xa)`), which Ghostscript placed with other
+roundings, up to 0.0007 pt, enough to change an anti-aliased pixel at
+72 dpi; the boxes of the typesetter were identical (the same 1609 text
+boxes at the same places in both prints). Left:
 
 - `main/beamer/man-animations`: an animation, which differs between two
   printings of the document itself;
@@ -725,12 +736,12 @@ document, which the typesetter no longer sees with the flag.
    million comparisons, 175 ms). Checked by the suite (the paragraphs after
    an edited list and after an edited table with a caption are found in
    the memorizers; without the interning these checks fail), the
-   comparison of the documentation (688 of 696 identical: the four known
-   pages, and four pages of `devel/source` with a sub-pixel difference in
-   a hyphen of a bold `scm` label, the same with the interning off and
-   with the `expand-as` removed, so from an earlier step, not yet looked
-   into), and the comparisons in the editor (edits, labels, places,
-   environments, click maps after keystrokes: unchanged).
+   comparison of the documentation (688 of 696 identical then: the four
+   known pages, and four pages of `devel/source` with a sub-pixel
+   difference, the same with the interning off; found later to come from
+   the copy made by the comparison, see "Typesetting the result"), and
+   the comparisons in the editor (edits, labels, places, environments,
+   click maps after keystrokes: unchanged).
 
 ## Relation to the typesetter caches
 
@@ -902,6 +913,8 @@ runs headless through two commands of the experimental build
 - `(style-rewrite-buffer)`: the rewritten document of the current buffer
   (`edit_typeset_rep::style_rewrite`, which `apply_changes` also does with
   a window);
+- `(style-rewrite-copy)`: the same, copied with its shared subtrees kept
+  shared, for a document made of it (`tests/style/compare.scm`);
 - `(style-rewrite-statistics)`: evaluations, memorized ones and size of the
   memorizer table, for the last evaluation of a document;
 - `(style-environment-update)`: `environment_update`, which `apply_changes`
