@@ -27,6 +27,7 @@
         <true/>
       </dict>
     </array>
+    <key>CFBundleURLTypes</key>
     <array>
       <dict>
         <key>CFBundleTypeRole</key>
