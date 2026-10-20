@@ -1149,7 +1149,8 @@
              (references-from-scratch '("ch" "th"))))))
 
 ;; A tag which is removed and put back by an undo gives its labels the
-;; names they had (the undo puts back a copy with their numbers).
+;; names they had (the undo puts back a copy with their numbers:
+;; copy_for_apply in archiver.cpp).
 (define (test-labels-after-undo)
   (check-group "labels after undo")
   (with-typeset-body
@@ -1160,6 +1161,12 @@
      (dynamic-wind start-editing
                    (lambda () (tree-remove (buffer-tree) 2 2))
                    end-editing)
+     (update-forced)
+     (undo 0)
+     (update-forced)
+     (check= (auto-names) '("auto-1" "auto-2" "auto-3"))
+     ;; and again after a redo and an undo (the history keeps the numbers)
+     (redo 0)
      (update-forced)
      (undo 0)
      (update-forced)

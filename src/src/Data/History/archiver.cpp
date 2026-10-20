@@ -183,6 +183,31 @@ cdr (patch p) {
 * Internal subroutines
 ******************************************************************************/
 
+static patch
+copy_for_apply (patch p) {
+  // the copy of the trees which a patch puts into the document (its
+  // modifications; its inverses, which ::apply does not use, are shared),
+  // with the numbers of the automatic labels of their tags: a tag which an
+  // undo or a redo brings back gives its labels the names they had (see
+  // copy_for_undo in commute.cpp)
+  switch (get_type (p)) {
+  case PATCH_MODIFICATION:
+    return patch (copy_for_undo (get_modification (p)), get_inverse (p));
+  case PATCH_COMPOUND:
+  case PATCH_BRANCH:
+    {
+      int i, n= N(p);
+      array<patch> r (n);
+      for (i=0; i<n; i++) r[i]= copy_for_apply (p[i]);
+      return patch (get_type (p) == PATCH_BRANCH, r);
+    }
+  case PATCH_AUTHOR:
+    return patch (get_author (p), copy_for_apply (p[0]));
+  default:
+    return p;
+  }
+}
+
 void
 archiver_rep::apply (patch p) {
   // apply a patch, while disabling versioning during the modifications
@@ -193,8 +218,9 @@ archiver_rep::apply (patch p) {
   versioning= true;
   busy_versioning= true;
   // the trees of the patch become part of the document: apply a copy, or
-  // later changes of the document in place would change the archive
-  ::apply (copy (p), the_et);
+  // later changes of the document in place would change the archive; the
+  // copy keeps the numbers of the automatic labels
+  ::apply (copy_for_apply (p), the_et);
   versioning= old;
   busy_versioning= global_old;
 }
