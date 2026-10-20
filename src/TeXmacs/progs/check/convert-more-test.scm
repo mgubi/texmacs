@@ -707,6 +707,19 @@
   (check= (string-convert (string-append "caf" (u8 #xE9)) "UTF-8" "ISO-8859-1") "caf\xe9")
   (check= (string-convert "\xe9" "Cork" "ISO-8859-1") "\xe9")
   (check= (string-convert (u8 #x416) "UTF-8" "KOI8-R") (cork #xf6))
+  ;; a character which cannot be converted is replaced by U+FFFD, or by ?
+  ;; when the target encoding has no U+FFFD, and the conversion goes on
+  (check= (string-convert "caf\xe9 x" "UTF-8" "ISO-8859-1") "caf? x")
+  (check= (string-convert (string-append "a" (u8 #x20AC) "b") "UTF-8" "ISO-8859-1")
+          "a?b")
+  (check= (string-convert (string-append (u8 #x3B1) (u8 #x416)) "UTF-8" "KOI8-R")
+          (string-append "?" (cork #xf6)))
+  (check= (string-convert "ab\xc3" "UTF-8" "ISO-8859-1") "ab?")
+  ;; (no hexadecimal digit after \xe9: S7 would read it in the escape)
+  (check= (string-convert (string-append "a\xe9" "b\xe9") "ASCII" "UTF-8")
+          (string-append "a" (u8 #xFFFD) "b" (u8 #xFFFD)))
+  (check= (string-convert (string-append "a\xe9" "b") "ASCII" "Cork")
+          "a<#FFFD>b")
   ;; the guess of the encoding of a text
   (check= (guess-wencoding "abc") "ASCII")
   (check= (guess-wencoding (string-append "caf" (u8 #xE9))) "UTF-8")
@@ -816,10 +829,20 @@
           (check= (bounding-box (image->psdoc gif)) '(0 0 40 10))
           (check= (bounding-box (image->psdoc jpg)) '(0 0 16 24))
           (check= (bounding-box (image->psdoc pnm)) '(0 0 3 2))
-          ;; FIXME (#297): the size of an SVG depends on the converter
-          ;; (67 x 34 with the ImageMagick 6 of Ubuntu, which renders it at
-          ;; 96 dpi through rsvg-convert)
-          (display "  SKIP size of an SVG: depends on the converter (#297)\n")
+          ;; an SVG has the size it declares, whatever the resolution at
+          ;; which ImageMagick renders it (72 dpi for its own renderer, 96
+          ;; dpi through rsvg-convert): 50 x 25 pt, and 100 x 40 px, which
+          ;; are 75 x 30 pt
+          (check= (bounding-box (image->psdoc svg)) '(0 0 50 25))
+          (with svg-px (url-append dir "b.svg")
+            (string-save (string-append
+                          "<?xml version=\"1.0\"?>\n<svg "
+                          "xmlns=\"http://www.w3.org/2000/svg\" "
+                          "width=\"100px\" height=\"40px\">"
+                          "<rect width=\"100\" height=\"40\" fill=\"red\"/>"
+                          "</svg>\n")
+                         svg-px)
+            (check= (bounding-box (image->psdoc svg-px)) '(0 0 75 30)))
           ;; image->postscript goes through the converters of the format
           (check= (bounding-box (image->postscript png)) '(0 0 30 20))))
     (check= (bounding-box (image->postscript eps)) '(10 20 110 70))
@@ -1010,6 +1033,30 @@
 
 ;; JSON: objects are attr, arrays tuple, the other values strings (null
 ;; the empty string); the printer writes the trees back.
+;; the answers of the chatbots, as LaTeX documents (ai.cpp): ChatGPT gives
+;; its text as it is, Gemini in JSON; the commands of LaTeX which begin
+;; with \n are not newlines
+(define ai-answer-doc
+  (string-append "\\documentclass{article}\n\\begin{document}\n"
+                 "$\\nu \\ni x$, $a\\nonumber$ \\noindent b\n"
+                 "\\end{document}"))
+
+(define (gemini-answer latex)
+  (string-append "{\"candidates\": [{\"content\": {\"parts\": [{\"text\": "
+                 (tree->json latex) "\n}]}}]}"))
+
+(define (test-ai-answers)
+  (check-group "ai answers")
+  (with r '(with "mode" "text"
+             (concat (math "<nu><ni>x") ", " (math (concat "a" (no-number)))
+                     (no-indent) "b "))
+    (check= (st (cpp-ai-latex-output ai-answer-doc "chatgpt" "check")) r)
+    ;; (Upsilon adds the answer as it came, folded, after the answer of an
+    ;; engine which gives it in JSON)
+    (with g (st (cpp-ai-latex-output (gemini-answer ai-answer-doc)
+                                     "gemini" "check"))
+      (check= (if (func? g 'document) (cadr g) g) r))))
+
 (define (test-json)
   (check-group "json")
   (check= (st (json->tree "{\"a\": [1, 2.5, \"x\"], \"b\": null, \"c\": true}"))
@@ -1020,6 +1067,9 @@
   (check= (st (json->tree "{}")) '(attr))
   (check= (tree->json "x\"y") "\"x\\\"y\"")
   (check= (tree->json "a\nb\tc\\") "\"a\\nb\\tc\\\\\"")
+  ;; the other control characters as \u00XX (JSON does not allow them raw)
+  (check= (tree->json (string #\a (integer->char 1) #\b (integer->char 27)))
+          "\"a\\u0001b\\u001b\"")
   (check= (tree->json (stree->tree '(tuple "a"))) "[ \"a\" ]")
   (check= (tree->json (stree->tree '(attr "a" "b"))) "{ \"a\": \"b\" }")
   (check= (tree->json (stree->tree '(attr "a" (tuple "1" "2") "b" (attr "c" "d"))))
@@ -1068,7 +1118,16 @@
     (check= (st (decompress-tree (compress-tree t))) '(document "a" (frac "x" "y")))
     (check= (compress-html t 0)
             (string-append "<body><p>a</p><p><div id=\"x0\">x</div>"
-                           "<div id=\"cont-x0\">y</div></p></body>"))))
+                           "<div id=\"cont-x0\">y</div></p></body>")))
+  ;; a code which is not known (of another session of TeXmacs, or garbled
+  ;; in the answer) loses its markup, and keeps its text
+  (check= (st (decompress-tree
+               (stree->tree '(concat "a " (compressed "x999999" "b") " c"))))
+          '(concat "a " "b" " c"))
+  (check= (st (decompress-html
+               "<body><p>a <div id=\"x999999\">b</div> c</p></body>" 0))
+          '(document (concat "a " "b" " c")))
+  (check= (st (decompress-tree (stree->tree '(compressed "x999999")))) ""))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Serializations of special characters
@@ -1202,6 +1261,41 @@
     (check= (length (cdr (import (export body "html-snippet") "html-snippet"))) 4000)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; The export to PDF
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; The native PDF writer does not compress the objects of the outline and
+;; of the links, which are read in the file. The buffer is exported as soon
+;; as it is loaded, as texmacs -c does: its hyperlinks are in the PDF. The
+;; title of a bookmark is a hexadecimal string (UTF-16BE) without escapes,
+;; and a URI a literal string in which ( ) and \ are escaped.
+(define (test-pdf-export)
+  (check-group "pdf export")
+  (if (not (and (supports-native-pdf?) (get-boolean-preference "native pdf")))
+      (images-skip "pdf export" "no native PDF writer")
+      (let* ((tm (url-append (temp-dir) "links.tm"))
+             (pdf (url-append (temp-dir) "links.pdf"))
+             (old (current-buffer))
+             (before (buffer-list))
+             (body `(document
+                      (section "f(x)")
+                      (concat "See " (hlink "one" "https://example.org/a)b")
+                              " and " (hlink "two" "https://example.org/a\\b")
+                              "."))))
+        (string-save (serialize-texmacs (stree->tree (tmfile body))) tm)
+        (load-buffer tm :strict)
+        (export-buffer pdf)
+        (for (b (buffer-list))
+          (when (nin? b before) (buffer-close b)))
+        (when (buffer-exists? old) (switch-to-buffer old))
+        (with s (if (url-exists? pdf) (string-load pdf) "")
+          (define (has? what) (>= (string-search-forwards what 0 s) 0))
+          (check-true (string-starts? s "%PDF-"))
+          (check-true (has? "/Title <FEFF003100200066002800780029>"))
+          (check-true (has? "/URI (https://example.org/a\\)b)"))
+          (check-true (has? "/URI (https://example.org/a\\\\b)"))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The suite
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -1215,7 +1309,8 @@
                   test-tmml-special test-cork-table test-extra-symbols test-cork-symbols
                   test-cork-bytes test-cork-unicode test-other-encodings
                   test-images test-image-formats test-code-formats
-                  test-format-registry test-vernac test-json test-compress
-                  test-serialize-special test-big-document))
+                  test-format-registry test-vernac test-json test-ai-answers
+                  test-compress
+                  test-serialize-special test-big-document test-pdf-export))
   (when (url-exists? (temp-dir)) (system-rmdir-recursive (temp-dir)))
   (check-end))

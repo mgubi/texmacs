@@ -23,7 +23,9 @@
 (tm-define (include-list base t)
   (cond ((tree-is? t 'document)
          (apply append (map (cut include-list base <>) (tree-children t))))
-        ((and (tree-is? t 'include) (tree-atomic? (tree-ref t 0)))
+        ((tree-is? t 'with)
+         (include-list base (cAr (tree-children t))))
+        ((and (tree-in? t '(include include*)) (tree-atomic? (tree-ref t 0)))
          (list (url-relative base (tree->string (tree-ref t 0)))))
         (else (list))))
 

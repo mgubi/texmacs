@@ -699,6 +699,7 @@
   (url-newer? is_newer (bool url url))
   (url-size file_size (int url))
   (url-last-modified last_modified (int url))
+  (url-declare-out-of-date declare_out_of_date (void url))
   (url-temp url_temp (url))
   (url-temp-dir url_temp_dir (url))
   (url-scratch url_scratch (url string string int))

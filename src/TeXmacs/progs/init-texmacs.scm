@@ -266,6 +266,8 @@
            graphics-focus-icons)
 (lazy-define (graphics graphics-object)
              graphics-reset-state graphics-decorations-update)
+(lazy-menu (graphics graphics-menu) graphics-insert-menu graphics-focus-menu)
+(lazy-define (graphics graphics-group) graphics-selection-active?)
 (lazy-define (graphics graphics-utils) make-graphics)
 (lazy-define (graphics graphics-edit)
              graphics-busy?
@@ -323,6 +325,7 @@
              tmdoc-expand-this tmdoc-include)
 (lazy-define (doc docgrep) docgrep-in-doc docgrep-in-src
              docgrep-in-texts docgrep-in-recent)
+(lazy-define (doc help-funcs) help-caches-update)
 (lazy-define (doc tmdoc-search) tmdoc-search-style tmdoc-search-tag
              tmdoc-search-parameter tmdoc-search-scheme)
 (lazy-define (doc tmweb) youtube-select
@@ -392,6 +395,7 @@
 (lazy-define (database ai-agents-menu) open-ai-agents in-ai-agents?)
 (lazy-menu (database db-menu) db-menu db-toolbar)
 (lazy-tmfs-handler (database db-tmfs) db)
+(lazy-tmfs-handler (database bib-local) biblio)
 (lazy-keyboard (database bib-kbd) in-bib?)
 (tm-property (open-biblio) (:interactive #t))
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")

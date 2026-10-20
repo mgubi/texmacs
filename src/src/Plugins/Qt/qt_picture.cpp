@@ -317,14 +317,24 @@ get_image_for_real (url u, int w, int h, tree eff, SI pixel) {
 }
 
 static hashmap<tree,QImage*> qt_pic_cache;
+static hashmap<tree,int> qt_pic_stamp (0);
 
 QImage*
 get_image (url u, int w, int h, tree eff, SI pixel) {
   // TODO: we may wish to flush the cache from time to time...
   tree key= tuple (as_tree (u), as_tree (w), as_tree (h));
   if (eff != "") key << eff << as_tree (pixel);
-  if (!qt_pic_cache->contains (key))
+  // an image whose file changed since it was loaded is loaded again
+  int stamp= last_modified (u, false);
+  if (qt_pic_cache->contains (key) && qt_pic_stamp [key] < stamp) {
+    QImage* old= qt_pic_cache [key];
+    if (old != NULL) delete old;
+    qt_pic_cache->reset (key);
+  }
+  if (!qt_pic_cache->contains (key)) {
     qt_pic_cache (key)= get_image_for_real (u, w, h, eff, pixel);
+    qt_pic_stamp (key)= stamp;
+  }
   return qt_pic_cache[key];
 }
 
@@ -338,6 +348,7 @@ qt_clean_picture_cache () {
     qt_pic_cache (key)= (QImage*) NULL;
   }
   qt_pic_cache= hashmap<tree,QImage*> ();
+  qt_pic_stamp= hashmap<tree,int> (0);
 }
 
 #ifndef MUPDF_RENDERER

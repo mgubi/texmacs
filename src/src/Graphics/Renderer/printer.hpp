@@ -51,6 +51,7 @@ class printer_rep: public renderer_rep {
   hashmap<string,string> tex_fonts;
   hashmap<string,array<int> > tex_font_chars;
   hashmap<string,string> metadata;
+  hashmap<string,string> ps_images;
 
 public:
   printer_rep (url ps_file_name, int dpi, int nr_pages,

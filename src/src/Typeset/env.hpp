@@ -332,11 +332,11 @@ public:
   url                          cur_file_name;
   bool                         secure;
   hashmap<string,tree>&        local_ref;
-  hashmap<string,tree>&        global_ref;
+  hashmap<string,tree>*        global_ref;  // the tables of the project,
   hashmap<string,tree>&        local_aux;
-  hashmap<string,tree>&        global_aux;
+  hashmap<string,tree>*        global_aux;  // which may change
   hashmap<string,tree>&        local_att;
-  hashmap<string,tree>&        global_att;
+  hashmap<string,tree>*        global_att;
   bool                         complete;    // typeset complete document ?
   bool                         read_only;   // write-protected ?
   hashmap<string,tree>         missing;     // missing refs
@@ -603,6 +603,7 @@ private:
   tree exec_frame_inverse (tree t);
 
   tree exec_rewrite (tree t);
+  tree exec_include (tree t);
   bool exec_until_rewrite (tree t, path p, string var, int level);
   tree rewrite_inactive_arg (tree t, tree var, int i, bool bl, bool fl);
   tree rewrite_inactive_raw_data (tree t, tree var, bool block, bool flush);
@@ -981,6 +982,16 @@ CONCRETE_NULL_CODE(edit_env);
 tm_ostream& operator << (tm_ostream& out, edit_env env);
 tree texmacs_exec (edit_env env, tree cmd);
 tree load_inclusion (url u); // implemented in tm_file.cpp
+bool inclusion_busy (url u);
+void inclusion_enter (url u);
+void inclusion_leave (url u);
+void reset_inclusion (url u);
+struct inclusion_guard {
+  // Marks u as being included during the guard's lifetime (exception-safe)
+  url u;
+  inclusion_guard (url u2): u (u2) { inclusion_enter (u); }
+  ~inclusion_guard () { inclusion_leave (u); }
+};
 tree tree_extents (tree t);
 bool is_percentage (tree t, string s);
 bool is_percentage (tree t);

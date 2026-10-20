@@ -331,8 +331,23 @@ int typeset_caches_mode (); // see typesetter.hpp
 void typeset_cache_mismatch (string what);
 
 void
+edit_typeset_rep::typeset_bind_project () {
+  // the tables of the project to which the buffer is attached now
+  bool prj= buf->prj != NULL;
+  env->global_ref= &(prj? buf->prj->data->ref: grefs);
+  env->global_aux= &(prj? buf->prj->data->aux: buf->data->aux);
+  env->global_att= &(prj? buf->prj->data->att: buf->data->att);
+}
+
+void
 edit_typeset_rep::typeset_prepare () {
-  env->base_file_name= buf->buf->master;
+  if (env->base_file_name != buf->buf->master) {
+    // the buffer was renamed: its trust is the one of its new name
+    env->base_file_name= buf->buf->master;
+    env->cur_file_name = buf->buf->master;
+    env->secure= is_secure (env->cur_file_name);
+  }
+  typeset_bind_project ();
   env->read_only= buf->buf->read_only;
   // pre is the complete environment after the style and the initial
   // settings, so patching the default environment with it rewrites thousands
@@ -374,22 +389,28 @@ edit_typeset_rep::typeset_prepare () {
 
 void
 edit_typeset_rep::init_update () {
+  typeset_bind_project ();
   if (buf->prj != NULL) {
     string id= as_string (delta (buf->prj->buf->name, buf->buf->name));
     string lab= "part:" * id;
-    hashmap<string,tree> aux= env->global_aux;
-    hashmap<string,tree> ref= env->global_ref;
+    hashmap<string,tree> aux= *env->global_aux;
+    hashmap<string,tree> ref= *env->global_ref;
     if (aux->contains ("parts")) {
       tree parts= aux ["parts"];
       if (is_func (parts, DOCUMENT))
         for (int i=0; i<N(parts); i++)
-          if (is_tuple (parts[i]) && N(parts[i]) >= 1)
-            if (parts[i][0] == id)
+          if (is_tuple (parts[i]) && N(parts[i]) >= 1 &&
+              is_atomic (parts[i][0]))
+            if (parts[i][0] == id ||
+                relative (buf->prj->buf->name,
+                          url_unix (parts[i][0]->label)) == buf->buf->name) {
+              lab= "part:" * parts[i][0]->label;
               for (int j=1; j+1 < N(parts[i]); j+=2)
                 if (is_atomic (parts[i][j])) {
                   buf->data->init (parts[i][j]->label)= copy (parts[i][j+1]);
                   init (parts[i][j]->label)= copy (parts[i][j+1]);
-                }      
+                }
+            }
     }
     if (ref->contains (lab)) {
       tree val= ref [lab];
@@ -790,7 +811,7 @@ edit_typeset_rep::exec (tree t, hashmap<string,tree> H, bool expand_refs) {
   env->write_env (H);
   t= env->exec (t);
   if (expand_refs)
-    t= expand_references (t, buf->data->ref, env->global_ref);
+    t= expand_references (t, buf->data->ref, *env->global_ref);
   t= simplify_execed (t);
   t= simplify_correct (t);
   env->write_env (H2);
@@ -837,9 +858,38 @@ search_doc_title (tree t) {
   }
 }
 
+static tree
+expand_includes (tree t) {
+  // replace include by include* so that the included files are
+  // expanded in the environment of the main document.
+  // Only do this for files in the directory of the main document:
+  // the relative urls inside other included files would be resolved
+  // against the wrong directory; tmhtml-include handles those.
+  if (is_atomic (t)) return t;
+  else if (is_func (t, INCLUDE, 1) && is_atomic (t[0]) &&
+           is_atomic (url_unix (t[0]->label)))
+    return tree (VAR_INCLUDE, t[0]);
+  else {
+    // only copy the tree if some include was actually rewritten
+    int i, n= N(t);
+    for (i=0; i<n; i++) {
+      tree c= expand_includes (t[i]);
+      if (!strong_equal (c, t[i])) {
+        tree r (t, n);
+        for (int j=0; j<i; j++) r[j]= t[j];
+        r[i]= c;
+        for (i++; i<n; i++) r[i]= expand_includes (t[i]);
+        return r;
+      }
+    }
+    return t;
+  }
+}
+
 tree
 edit_typeset_rep::exec_html (tree t, path p) {
   t= convert_OTS1_symbols_to_universal_encoding (t);
+  t= expand_includes (t);
   if (p == (rp * 0)) typeset_preamble ();
   typeset_exec_until (p);
   hashmap<string,tree> H= copy (cur[p]);

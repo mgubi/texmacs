@@ -930,13 +930,17 @@ printer_rep::draw_picture (picture p, SI x, SI y, int alpha) {
 
 void
 printer_rep::draw_scalable (scalable im, SI x, SI y, int alpha) {
-  if (im->get_type () != scalable_image)
+  // an image with an effect is drawn as the picture of the effect
+  if (im->get_type () != scalable_image || im->get_effect () != tree (""))
     renderer_rep::draw_scalable (im, x, y, alpha);
   else {
     url u= im->get_name ();
     rectangle r= im->get_logical_extents ();
     SI w= r->x2, h= r->y2;
-    string ps_image= ps_load (u);
+    // an image which is not PostScript is converted once for the document
+    string key= as_string (u);
+    if (!ps_images->contains (key)) ps_images (key)= ps_load (u);
+    string ps_image= ps_images [key];
     string imtext= is_ramdisc (u)? "inline image": as_string (u);
     int x1, y1, x2, y2;
     if (suffix(u)=="eps") ps_bounding_box (u, x1, y1, x2, y2); //get cached value

@@ -572,7 +572,59 @@ iconv_adaptor(size_t(*iconv_func)(iconv_t, T, size_t *, char**, size_t*),
                      outbuf, outbytesleft);
 }
 
+static int
+iconv_convert_all (iconv_t cd, char* in, size_t in_left, string& out) {
+  // convert all of in with cd, from its initial state; 0 or the error
+  char buf[64];
+  iconv (cd, NULL, NULL, NULL, NULL);
+  while (in_left > 0) {
+    char* out_cursor= buf;
+    size_t out_left= sizeof (buf);
+    size_t r= iconv_adaptor (iconv, cd, &in, &in_left, &out_cursor, &out_left);
+    int err= errno;
+    out << string (buf, out_cursor - buf);
+    if (r == (size_t) -1 && err != E2BIG) return err;
+  }
+  return 0;
+}
+
+static string
+iconv_replacement (string to) {
+  // the character which replaces those which cannot be converted: U+FFFD
+  // in the target encoding, or '?' if it has no U+FFFD (Latin-1, ASCII...)
+  c_string to_cp (to);
+  iconv_t cd= iconv_open (to_cp, "UTF-8");
+  if (cd == (iconv_t) -1) return "?";
+  string r;
+  char fffd[]= "\xEF\xBF\xBD";
+  char qm[]= "?";
+  if (iconv_convert_all (cd, fffd, 3, r) != 0) {
+    r= "";
+    if (iconv_convert_all (cd, qm, 1, r) != 0) r= "?";
+  }
+  iconv_close (cd);
+  return r;
+}
+
+static size_t
+iconv_char_length (iconv_t cd, char* in, size_t in_left) {
+  // the number of bytes of the character at in, if it is a character of
+  // the source encoding (which the target encoding does not have), and 1
+  // if it is not; cd converts from the source encoding to UTF-8
+  if (cd == (iconv_t) -1) return 1;
+  for (size_t k=1; k <= 8 && k <= in_left; k++) {
+    string out;
+    int err= iconv_convert_all (cd, in, k, out);
+    if (err == 0) return k;
+    if (err != EINVAL) break; // not an incomplete character
+  }
+  return 1;
+}
+
 string apply (iconv_converter &conv, string input) {
+  // A character which cannot be converted, because it is not one of the
+  // source encoding or the target encoding does not have it, is replaced
+  // by iconv_replacement and the conversion goes on after it.
   if (! conv.is_valid()) {
     conv.successful= false;
     convert_error << "Conversion cancelled\n";
@@ -584,26 +636,40 @@ string apply (iconv_converter &conv, string input) {
   size_t in_left= N(input);
   double expansion= 1.1;
   size_t out_counter= 0;
+  bool failed= false;
+  string replacement;
+  iconv_t probe= (iconv_t) -1;
   while (in_left > 0) {
     size_t out_left= max (int (in_left * expansion), 1024);
     c_string out_cp (out_left);
     char* out_cursor= out_cp;
     size_t r = iconv_adaptor(iconv, conv.cd,
                              &in_cursor, &in_left, &out_cursor, &out_left);
-    if(r == (size_t)-1 && errno != E2BIG) {
-      if (conv.show_errors) {
-        convert_error << "Iconv conversion from " << conv.from
-                      << " to " << conv.to << " failed\n";
-      }
-      conv.successful= false;
-      return input;
-    }
+    int err= errno;
     size_t used_out= out_cursor - out_cp;
     result << string(out_cp, used_out);
     out_counter += used_out;
+    if (r == (size_t)-1 && err != E2BIG) {
+      if (!failed) {
+        if (conv.show_errors)
+          convert_error << "Iconv conversion from " << conv.from
+                        << " to " << conv.to << " failed\n";
+        replacement= iconv_replacement (conv.to);
+        c_string from_cp (conv.from);
+        probe= iconv_open ("UTF-8", from_cp);
+        failed= true;
+      }
+      // an incomplete character at the end (EINVAL) is replaced as a whole
+      size_t skip= (err == EINVAL)? in_left:
+                   iconv_char_length (probe, in_cursor, in_left);
+      result << replacement;
+      in_cursor += skip;
+      in_left   -= skip;
+    }
     expansion= max ((double) out_counter / (in_cursor - in_cp), 1.0) + 0.1;
   }
-  conv.successful= true;
+  if (probe != (iconv_t) -1) iconv_close (probe);
+  conv.successful= !failed;
   return result;
 }
 

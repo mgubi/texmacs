@@ -113,8 +113,14 @@
 
 (tm-define (link-item-id item) (car item))
 (tm-define (link-item-type item) (cadr item))
-(tm-define (link-item-attributes item) (caddr item))
-(tm-define (link-item-vertices item) (cdddr item))
+(define (link-item-has-attributes? item)
+  (and (pair? (cddr item)) (link-attributes? (caddr item))))
+
+(tm-define (link-item-attributes item)
+  (if (link-item-has-attributes? item) (caddr item) '()))
+
+(tm-define (link-item-vertices item)
+  (if (link-item-has-attributes? item) (cdddr item) (cddr item)))
 
 (define (id->link-list id)
   (let* ((lns (vertex->links `(id ,id)))
@@ -299,7 +305,7 @@
   (let* ((inverse? (string-ends? xtype "*"))
          (type (if inverse? (string-drop-right xtype 1) xtype))
          (fl (navigation-list-filter l type (if inverse? 0 1) #t)))
-    (and (nnull? fl) (navigation-type fl))))
+    (and (nnull? fl) (car fl))))
 
 (define (resolve-navigation-list l fun)
   (if (null? l) (fun)
@@ -538,10 +544,10 @@
 (tm-define (old-execute-script s secure-origin? opt-location)
   ;; NOTE: this code is deprecated; we should remove the old support
   ;; when we will be sure that nobody uses it anymore.
-  (let* ((secure-s (string-append "(secure? '" s ")"))
-         (ok? (or secure-origin? (eval (string->object secure-s))))
-         (cmd-s (string-append "(lambda () " s ")"))
-         (cmd (eval (string->object cmd-s))))
+  (let* ((cmd-s (string-append "(lambda () " s ")"))
+         (cmd-o (string->object cmd-s))
+         (ok? (or secure-origin? (secure? cmd-o)))
+         (cmd (eval cmd-o)))
     (cond ((or ok? (== (get-preference "security") "accept all scripts"))
            (execute-at cmd opt-location))
           ((== (get-preference "security") "prompt on scripts")

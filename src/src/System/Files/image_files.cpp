@@ -462,12 +462,8 @@ svg_image_size (url image, int& w, int& h) {
     if (w > 0 && h > 0) return;
   }
 #endif
-#if QTTEXMACS
-  if (qt_supports (image)) {
-    qt_image_size (image, w, h);
-    return;
-  }
-#endif
+  // the size which the SVG declares, before the one of Qt, which renders
+  // a length in points as pixels and then counts 96 pixels in an inch
   string content;
   bool err= load_string (image, content, false);
   if (!err) {
@@ -477,9 +473,17 @@ svg_image_size (url image, int& w, int& h) {
     string height= get_attr_from_element (result, "height", "");
     int try_width= parse_xml_length (width);
     int try_height= parse_xml_length (height);
-    if (try_width > 0) w= try_width;
-    if (try_height > 0) h= try_height;
+    if (try_width > 0 && try_height > 0) {
+      w= try_width; h= try_height;
+      return;
+    }
   }
+#if QTTEXMACS
+  if (qt_supports (image)) {
+    qt_image_size (image, w, h);
+    return;
+  }
+#endif
 }
  
 /******************************************************************************
@@ -583,7 +587,9 @@ image_to_pdf (url image, url pdf, int w_pt, int h_pt, int dpi,
 #endif
   //converters below will yield only raster images.
 #ifdef QTTEXMACS
-  if (qt_supports (image) && qt_supports (pdf)) {
+  // not qt_supports (pdf), which is always false: Qt writes PDF files;
+  // not svg either, which qt_image_to_pdf would only read as a raster QImage
+  if (qt_supports (image) && s != "svg") {
     if (DEBUG_CONVERT)
       debug_convert << "image_to_pdf, using qt_image_to_pdf"<< LF;
     qt_image_to_pdf (image, pdf, w_pt, h_pt, dpi);
@@ -702,7 +708,18 @@ call_imagemagick_convert (url image, url dest, int w_pt, int h_pt, int dpi) {
   if (has_image_magick ()) { 
     string cmd= imagemagick_cmd ();
     string s= suffix (image);
-    if (s != "pdf" && s != "ps" && s != "eps" &&
+    string d= suffix (dest);
+    if (s == "svg" && (d == "eps" || d == "ps") && w_pt <= 0 && h_pt <= 0) {
+      // ImageMagick takes the pixels of its rendering of an SVG for points,
+      // and that rendering is not at the same resolution for every version
+      // (72 dpi for its own renderer, 96 dpi through rsvg-convert): the
+      // result gets the size which the SVG has for TeXmacs
+      int w, h;
+      image_size (image, w, h);
+      if (w > 0 && h > 0)
+        cmd << " -resize " * as_string (w) * "x" * as_string (h) * "!";
+    }
+    else if (s != "pdf" && s != "ps" && s != "eps" &&
         dpi > 0 && w_pt > 0 && h_pt > 0) {
       int ww= w_pt * dpi / 72; //number of pixels @dpi to make w_pt
       int hh= h_pt * dpi / 72;

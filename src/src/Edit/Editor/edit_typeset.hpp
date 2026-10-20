@@ -138,6 +138,7 @@ public:
   void     set_pre (hashmap<string,tree> h);
   void     set_pre (string var, tree val);
   void     typeset_preamble ();
+  void     typeset_bind_project ();
   void     typeset_prepare ();
   void     typeset_invalidate_env ();
   void     typeset_exec_until (path p);

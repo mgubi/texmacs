@@ -47,6 +47,7 @@ texmacs_input_rep::texmacs_input_rep (string type2):
   buf (""),
   format ("verbatim"),
   mode (get_mode (format)),
+  chat ("default"),
   channel (type),
   stack (""),
   ignore_verb (false),
@@ -482,7 +483,7 @@ void
 texmacs_input_rep::cmdline_flush (bool force) {
   if (force) {
     string name= format (8, N(format));
-    tree r= as_tree (call ("connection-result", name, "default", buf));
+    tree r= as_tree (call ("connection-result", name, chat, buf));
     write (r);
     buf= "";
   }

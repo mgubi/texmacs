@@ -71,7 +71,8 @@
         (check macro-drd-test)
         (check crypto-test)
         (check plugins-test)
-        (check ai-test)))
+        (check ai-test)
+        (kernel texmacs tm-secure-test)))
 
 ;; test suites which only make sense with S7
 (if (s7-scheme?)
@@ -139,6 +140,7 @@
     ("tm-convert" regtest-tm-convert error)
     ("regexp" regtest-regexp error)
     ("logic-query" regtest-logic-queries error)
+    ("secure" regtest-secure error)
     ("glue" glue-test-failures count)
     ("lists" lists-test-failures count)
     ("base" base-test-failures count)
