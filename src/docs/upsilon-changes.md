@@ -14,6 +14,94 @@ have the details, and the problems go to the
 
 ## 20 October 2026
 
+- **Vue**: the input fields of the dialogs copy and paste the accented
+  letters and the symbols as they are, in UTF-8: an alpha copied became
+  the text `<alpha>` (before, nothing), and an accented letter pasted from
+  another application became garbage.
+- The fixes of the branch `wip_fixes` (fixes of the official TeXmacs)
+  merged on 20 October, in the items which follow.
+- Undo: Tools → Miscellaneous → Clear undo history clears the history of
+  the current document only, and a saved document stays saved: it cleared
+  the history of every open document and marked them all as modified.
+  Undoing back to the saved state makes a document unmodified again after
+  several changes inside one command. An undo after a menu action, in a
+  document where another author (or a script) changed something before,
+  takes back the menu action, not the step before it or the whole history.
+- Undo and redo keep the numbers of the automatic labels: a section
+  removed and put back by an undo, or inserted, undone and redone, keeps
+  its number, where it took a new one each time.
+- A cancelled change (after an error in a key press or in a menu action)
+  no longer puts a document which was closed back in the place of another
+  document, which then showed the closed one.
+- Document parts: undo and redo put the cursor where it can be seen, not
+  in a part which is hidden or in the preamble which is not shown, where
+  typing went unseen.
+- **Desktop**: on the command line, `-q` quits after the files and the
+  commands of `-x`, `-c`, `-W` and `-U`, which it dropped when they came
+  after it, and the headless mode (`-headless`) loads the files and runs
+  `-test-suite` before it quits; the files and the commands of `-x` are
+  run in the order of the command line (`texmacs file.tm -x cmd` runs `cmd`
+  in `file.tm`). `-build-manual`, `-reference-suite` and `-test-suite`
+  without their argument no longer keep TeXmacs running for ever.
+- Security: `<use-module|...>` in a document only takes the names of
+  Scheme modules (`(utils misc doxygen)`) and of plugins; anything else is
+  ignored with a message: a document could close the expression and add
+  its own code, which ran when the document was typeset. The documents in
+  `system/tmp` and `system/cache` of the home folder (downloads, documents
+  taken out of PDF files) are no longer trusted: their scripts ask before
+  they run.
+- Pictures given by a web address are downloaded again by Tools → Update →
+  Pictures, and once in each session (with an effect, such as in the art
+  boxes, they were made once and never fetched again); offline, the copy of
+  before is kept.
+- **Desktop**: a download from the web gives up when the server does not
+  answer for the time of the preference `http request timeout` (10 s): a
+  picture or a file from a server which never answered held TeXmacs for
+  ever. A download which fails, or a page of error, no longer replaces the
+  copy of before.
+- LaTeX export: struck-through text is `\sout` of `ulem` and highlighted
+  text `\tmmarked` (they were `\strikethrough` and `\marked`, which LaTeX
+  does not know, so that `pdflatex` stopped), with lines which break with
+  the text, also around formulas, inside groups and in titles; columns load
+  `multicol`, and the colours given by value (`#ff8800`) are defined under
+  a name, as `xcolor` wants them. The preference "Store tracking
+  information in LaTeX files" works: when it is off, the export with source
+  tracking no longer adds the TeXmacs source at the end of the file.
+- Bibliographies with BibTeX: many fixes of the BibTeX engine of TeXmacs
+  and of the bibliography databases. Pages are one page or one range (`12--34`,
+  `e1002-e1010`, `xii-xv`, also with an en dash), other pages are kept as
+  written; `crossref` and `xref` are kept as keys; the months `jan` to
+  `dec` are defined as in BibTeX; an undefined `@string` gives nothing,
+  with a warning; a field whose LaTeX gives nothing (`\relax`) is empty;
+  the external `bibtex` runs in a folder of its own and its errors are
+  shown. In Document → Bibliography, the preview shows the first ten
+  entries (with those they cross-reference) and Modify keeps the name of
+  the file in the document. The databases keep their history across
+  synchronisations and reloads, apply the offset and limit of a query to
+  its results, and keep new local entries.
+- `<symbol|945>` gives an alpha: a code above 255 is a Unicode code point,
+  it lost its upper bits.
+- A Scheme expression evaluated with M-x, such as `(insert "<alpha>")`,
+  inserts an alpha again: the names of the symbols were dropped. The
+  raw HTML of the HTML export is in UTF-8, as the rest of the page.
+- Version control: Version → First difference and Last difference find a
+  difference at the very start or end of the document; the block grain
+  compares whole paragraphs.
+- A table macro in source mode (a `tformat` without a table) no longer
+  crashes or hangs TeXmacs on Shift+Up (savannah #62850).
+- Graphics: ungrouping or removing a group just after making it works
+  (it removed the object and stopped with an error).
+- The side tools of a window (search and replace, the format tools) no
+  longer close another window when their document is closed.
+- Source → Quasiquote inserts the quasiquote tag; closing a document
+  closes all of its views (every other one stayed, pointing to the
+  closed document).
+- A file of preferences with a single preference is read: that preference
+  was lost at the next start.
+- **Desktop (Qt)**: the TeXmacs server closes the socket of a client once,
+  not a second time when it may already be the socket of another client.
+  **Desktop (Windows)**: the programs run by TeXmacs close each of their
+  pipes once.
 - A document saved under a name without a suffix is saved as a TeXmacs
   file, with `.tm` added: it was saved as plain text. A source file keeps
   the name it is given (a `Makefile`). **Desktop (Vue)**: the dialog of the

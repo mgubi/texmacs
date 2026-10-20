@@ -285,6 +285,23 @@
     a, z and shift-z copy, cut, paste, select all, undo and redo. Elsewhere
     than on a <name|Mac>, control-v did nothing and control-c cancelled the
     field. The menu of the right button has Undo and Redo too.
+
+    <item>The input fields copy and paste the accented letters and the
+    symbols as they are: an alpha copied was lost, and an accented letter
+    pasted from another application became garbage.
+
+    <item>Undo and redo keep the numbers of the sections and of the other
+    automatic labels; <menu|Tools|Miscellaneous|Clear undo history> clears
+    the history of the current document only, which stays saved if it was.
+
+    <item>The export to <LaTeX> of struck-through and highlighted text, of
+    columns and of the colors given by value compiles (it stopped
+    <name|pdflatex>), and many fixes of the bibliographies made with
+    <name|BibTeX>.
+
+    <item>A document can no longer run its own code through
+    <markup|use-module>, which now only takes the names of modules and of
+    plugins.
   </itemize>
 
   <paragraph|19 October 2026>
