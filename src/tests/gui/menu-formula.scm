@@ -7,7 +7,7 @@
 (use-modules (check gui-driver))
 (gui-test-run
  (list (gt-wait 8000)
-       (gt-raw "window main")
+       (gt-window "main")
        (gt-raw "focus")
        (gt-idle)
        (gt-activate "menubar > Insert")

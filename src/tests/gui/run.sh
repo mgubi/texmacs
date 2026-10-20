@@ -9,7 +9,8 @@
 # tests/Plugins/Vue/run.sh (a home of its own, PASS or FAIL), without a
 # script (they are steps of the driver in their .scm, and some have the
 # name of a script of Vue); the last line counts the failures, and so does
-# the status. SECS= gives the time of a test at most (40 s).
+# the status. SECS= gives the time of a test at most (40 s); the logs and
+# snapshots go to OUTDIR/<test> (/tmp/gui-tests).
 
 set -u
 D=tests/gui
@@ -19,6 +20,7 @@ tests="$*"
 failed=0
 for t in $tests; do
   r=$(SCM="$PWD/$D/$t.scm" SCRIPT="$PWD/$D/no-script" \
+      OUT="${OUTDIR:-/tmp/gui-tests}/$t" \
       sh tests/Plugins/Vue/run.sh "$t" "${SECS:-40}" | grep -aE "^(PASS|FAIL) ")
   [ -n "$r" ] || r="FAIL $t: no result"
   echo "$r"

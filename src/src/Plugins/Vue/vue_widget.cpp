@@ -1350,13 +1350,25 @@ VUE_WIDGET_DATA(picture_widget, picture, p, url, file_name, int, stamp);
 static int
 icon_stamp () { return 8 * icon_generation + retina_factor; }
 
-// the pictures laid out while a script runs, by their element (render_ref):
-// "<path>\ticon:<name>" (see vue_test_context)
+// the paths of the pictures laid out while a script runs, by their widget
+// (render_ref, see vue_test_context); emptied when a script starts or ends
 static hashmap<pointer,string> vue_test_icons ("");
 
 string
 vue_test_icon (void* ref) {
-  return vue_test_icons [(pointer) ref];
+  // "<path>\ticon:<name>": the widget is drawn, hence alive (render_ref);
+  // it may have taken the place of another (the paths are kept by address),
+  // so the name is taken from it, and only for a picture
+  if (ref == NULL || !vue_test_icons->contains ((pointer) ref)) return "";
+  vue_ui_rep* w= dynamic_cast<vue_ui_rep*> ((vue_widget_rep*) ref);
+  if (w == NULL || w->type != "picture_widget") return "";
+  url f= open_box<vue_picture_widget> (w->data).file_name;
+  return vue_test_icons [(pointer) ref] * "\ticon:" * basename (f);
+}
+
+void
+vue_test_forget_icons () {
+  vue_test_icons= hashmap<pointer,string> ("");
 }
 
 static picture
@@ -1372,8 +1384,10 @@ icon_picture (blackbox& data) {
 
 VUE_WIDGET_DATA(cached_pull_button, widget, w, promise<widget>, pw, widget, cw,
                 bool, placed, bool, flip, float, shift_x, float, shift_y,
-                float, win_w, float, win_h, float, menu_w, float, menu_h);
+                float, win_w, float, win_h, float, menu_w, float, menu_h,
+                string, test_label);
 // placed: the position of the open menu has been decided (see layout_pull_button)
+// test_label: the label of the button, the path of its menu (vue_test_context)
 // flip: the menu is opened on the other side of the button to stay in the window
 // shift_x, shift_y: shift of the menu to keep it inside the window
 // win_w, win_h, menu_w, menu_h: the window and the menu the decision was
@@ -2143,7 +2157,6 @@ layout_pull_button (vue_ui_rep *w) {
   bool opens_down= down && !in_side_bar;
   Clay_ElementId button_id= CLAY_SIDI(CLAY_TM_STRING(w->type), w->id);
   Clay_ElementId float_id=  CLAY_IDI("pull_button_float", w->id);
-  string test_label; // the label of the button, for the scripts
   Clay_Sizing s= layoutExpand;
   if (down) s= { CLAY_SIZING_FIT(.min=ui_pxf (20)) };
   ui_signal sig= button_logic (button_id);
@@ -2180,9 +2193,9 @@ layout_pull_button (vue_ui_rep *w) {
   {
     // items of vertical menus have the column of the check marks
     if (!down && button_grow) layout_mark_column ();
-    vue_test_label= "";
+    if (vue_testing) vue_test_label= "";
     concrete(d.w)->do_layout ();
-    test_label= vue_test_label; // the context of its menu
+    if (vue_testing) d.test_label= vue_test_label; // the path of its menu
     // the menus of the interactive footer say that they are menus
     if (down && in_footer) layout_arrow ("<#25BE>", 3, dark_grey);
     if (!down) {
@@ -2340,7 +2353,7 @@ layout_pull_button (vue_ui_rep *w) {
         current_menu= float_id.id;
         current_bar= 0;
         pull_float_depth++;
-        with_test_context c (test_label);
+        with_test_context c (d.test_label);
         concrete (d.cw)->do_layout ();
         pull_float_depth--;
         current_menu= save_menu;
@@ -3515,7 +3528,8 @@ vue_ui_rep::do_layout () {
     if (vue_testing) {
       // a script names an icon by its file, without the suffix
       string name= "icon:" * basename (open_box<vue_picture_widget> (data).file_name);
-      vue_test_icons (render_ref ())= vue_test_context * "\t" * name;
+      if (N(vue_test_icons) > 10000) vue_test_forget_icons (); // (a long run)
+      vue_test_icons (render_ref ())= vue_test_context;
       vue_test_note_label (name);
     }
     SI w= p->get_width ();
@@ -6114,10 +6128,10 @@ vue_texmacs_widget_rep::update_footer_menus () {
 // which is too narrow for its buttons has no room to spare for one, and it
 // would cover them. The key is unique per bar and per editor widget.
 // the name of a bar of the editor for the scripts (vue_test_context)
-static string
+static const char*
 bar_test_name (int key) {
   const char* names[]= { "menubar", "mainbar", "modebar", "focusbar", "userbar" };
-  return (key % 8) < 5 ? string (names[key % 8]) : string ("");
+  return (key % 8) < 5 ? names[key % 8] : "";
 }
 
 static void

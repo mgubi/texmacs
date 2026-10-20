@@ -32,8 +32,9 @@ follow at once.
 (`TEXMACS_VUE_SCRIPT`, its former name, in Vue too): the port calls
 `gui_test_start` as its event loop starts, which loads `(check gui-script)`
 and calls `gui-script-start` at the first turn of the loop. The snapshots
-go to `TEXMACS_TEST_SNAPSHOT` (or `TEXMACS_VUE_SNAPSHOT`); `run.sh` sets
-both.
+go to `TEXMACS_VUE_SNAPSHOT` in Vue, to `TEXMACS_TEST_SNAPSHOT` in Qt (or
+`TEXMACS_VUE_SNAPSHOT`) and in Cocoa (or `TEXMACS_NS_SNAPSHOT`); `run.sh`
+sets the first two.
 
 ## The hooks of a port (`gui_test.hpp`)
 
@@ -56,10 +57,10 @@ How each port does it:
 | | Vue | Qt | Cocoa |
 |---|---|---|---|
 | Pump | at each turn of its loop | a timer of 10 ms (also in menus and modal dialogs) | a timer of 10 ms in the common modes of the run loop (also while a menu is tracked) |
-| Busy | SDL events waiting | events of TeXmacs, delayed commands which are due, an update | the same, and the events of the system |
+| Busy | SDL events, keys still to be given, a transition | events of TeXmacs, delayed commands which are due, an update; not while a dialog is modal (they wait for it to close, which the script does) | the same, and a menu which is closing |
 | Texts | drawn at the last frame (Clay) | the widgets of the window (buttons, labels, tabs, combo boxes, the rows of lists and trees in view), the popups (the list of a combo box) and the items of the open menus | the views of the window (buttons, labels, the rows of tables and outlines in view), the tabs and the items of the native menus, without a box |
 | Bars | the layout notes them | the titles of the tool bars, the status bar (footer) | the identifiers of the rows (`TMButtonsController`) |
-| Icons | the file of the picture widget | the property `tmIcon` (`qt_ui_element.cpp`) | the accessibility description of the image (`to_nsimage`) |
+| Icons | the file of the picture widget | the property `tmIcon` (`qt_ui_element.cpp`) | an associated object of the image, `tmIconName` (`to_nsimage`) |
 | Input | SDL events pushed | Qt events posted to the widget at the place (a menu is a window of its own) | Cocoa events posted to the window |
 | Menus | drawn in the window, clicked | an item is chosen with the keyboard of its menu | items without a box, chosen by the port (`choose`) |
 | Lists, tabs | clicked | clicked | a click on a row selects it (a table takes no click in a window which is not active, and a test does not make TeXmacs active); a tab is chosen by the port |
@@ -99,9 +100,10 @@ active one and sends Return to the menu, as the keyboard would.
 | `(gt-eval-later "expr")` | A Scheme command at the next turn |
 | `(gt-eval thunk)` | Run `thunk` now |
 | `(gt-check what thunk)` | A check: `thunk` must return true; a failure is written `FAILED [] what: ...` |
-| `(gt-idle [ms])` | Wait until the port has had nothing to do (`gui-test-busy?`) for 200 ms and five turns (at most 10 s): Qt on macOS flashes a chosen item of a menu before it runs it |
+| `(gt-idle [ms])` | Wait until the port has had nothing to do (`gui-test-busy?`) for 200 ms and five turns (at most 10 s): Qt on macOS flashes a chosen item of a menu before it runs it. (No step runs while the port is busy; after 20 s of it, which is a failure, the steps go on.) |
 | `(gt-activate selector [ms])` | Click the middle of the text or icon of the window of the script which the selector names (below). Waits for it 3 s at most, then fails, with the texts it saw in the log |
 | `(gt-see selector [ms])` | Wait until the text or icon is there (3 s at most, then fail) |
+| `(gt-window title [ms])` | Wait until a window whose title has `title` is shown, and make it the window of the script (5 s at most, then fail); `main` is the editor. A test opens its windows with `gt-eval-later`, then this |
 | `(gt-port name)` | The steps after it are for that port only; elsewhere the test stops there |
 | `(gt-exit)` | At the end, quit TeXmacs with the status 1 if a check failed, else 0 |
 
@@ -149,12 +151,13 @@ buttons whose menus it is in.
 
 The names before the last need not be the whole path, only some of it in
 order: `Font effects > Embold` is enough. The bars are `menubar`,
-`mainbar`, `modebar`, `focusbar`, `userbar`, `footer` (with its menus),
-`prompt` (the question in the footer), `lefttools`, `sidetools`,
-`bottomtools` and `extratools`. A name is the text itself, or the text
-without the dots of an item which opens a dialog (`Font` for `Font...`),
-or, for want of one, the beginning of a text. When several texts match,
-the last one drawn is taken, the topmost (an open menu).
+`mainbar`, `modebar`, `focusbar`, `userbar` and `footer` (with its menus)
+on every port, and in Vue also `prompt` (the question in the footer),
+`lefttools`, `sidetools`, `bottomtools` and `extratools`. A name is the
+text itself, or the text without the dots of an item which opens a dialog
+(`Font` for `Font...`), or, after a second without such a text (it may
+be on its way), the beginning of a text, never of an icon. When several
+texts match, the last one drawn is taken, the topmost (an open menu).
 
 For the corner cases which the place does not settle (two buttons with the
 same label side by side, an icon used twice in a bar), the menus may give
@@ -165,12 +168,16 @@ items a name, with nothing else changed:
 (named "second" ("Same" (do-other)))
 ```
 
-The items are laid out as without it, and in Vue their path gets `#first`:
+The items are laid out as without it, and their path gets `#first`:
 `#first > Same` names the button, and `#second` alone the text or icon in
-`second` (the last drawn). On the ports without the hooks of the tests,
-`named` is its items as they are. Use it only when a test needs it: the
-places of the bars and menus are enough otherwise. The test `named` tries
-it.
+`second` (the last drawn). The name stays with the items, test or not,
+changing nothing on the screen: in Vue a division without an element, in
+Qt the property `tmNamed` of the widget or the action, in Cocoa an
+associated object of the view or the menu item (of the widgets of
+`ns_ui_element`: buttons, texts, lists...; the buttons of the bars get it
+from their items). On the ports without the hooks of the tests, `named` is
+its items as they are. Use it only when a test needs it: the places of the
+bars and menus are enough otherwise. The test `named` tries it.
 
 The names are written in English: a name is also taken in the language of
 the interface (`translate`), so that `menubar > Insert` opens Insérer in a
@@ -186,7 +193,7 @@ wait <ms>
 scheme <expression>
 idle [ms]
 activate <selector>
-expect <text>          # the output must have this line (the runner checks it)
+expect <text>          # a line of the output must have this text (the runner checks it)
 port <name>
 exit
 ```
@@ -216,14 +223,25 @@ session of the user shares (and the other tests running at the same time).
 
 In Qt, `focus` only brings the window to the front: the keys of a script
 go to the focus widget of its window anyway, and an activation would not
-last (TeXmacs is not the active application of a test). Qt and Cocoa have
+last (TeXmacs is not the active application of a test); in a window which
+has no focus widget yet (a dialog gets it a moment after it shows), they go
+to its first input field. In Cocoa, the keys of a modal window or of a
+panel without an editor (the alert of an `interactive` dialog) are done
+directly, since posted keys reach only the key window, which it is not
+while TeXmacs is not active: the text goes into the field being edited,
+Backspace deletes, Tab goes to the next field, Return presses the default
+button, Escape cancels. A window without a title is named by its first
+label (an alert by its message, `Enter data`). Qt and Cocoa have
 `window main` (the editor), `window <part of the title>`, `move`, `press`, `release`, `click`, `key`, `text`, `focus`,
 `snapshot`, `resize`, `repaint` and `close`; Qt `wheel` and `clipboard`
-too, Cocoa `choose`. `window main` is the first window with an editor on
-every port, the way to write a test which runs on all of them; a `window`
-which matches nothing lists the windows there are. Their keys use the names
-of Vue (SDL): Return, Escape, Tab, Backspace, Delete, Left, Up, Home,
-PageUp, F1...
+too, Cocoa `choose`; `window #<id>` is Vue's only. `window main` is the
+first window with an editor on every port, the way to write a test which
+runs on all of them; a `window` which matches nothing lists the windows
+there are, and the commands after it are skipped (each says so in the
+log) until a `window` matches. Their keys use the names of Vue (SDL):
+Return, Escape, Tab, Backspace, Delete, Insert, Left, Up, Home, PageUp,
+F1..., and Keypad_1 in Qt. A command which the port does not know is a
+failure of the test.
 
 The lines of the log are those of the old player: `<port> script: <line>`
 for each step (`vue script:`, `qt script:`, `cocoa script:`), and `<port>

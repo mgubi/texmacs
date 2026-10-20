@@ -39,6 +39,7 @@
 #include <QPointer>
 #include <QKeySequence>
 #include <QComboBox>
+#include <QLineEdit>
 #include <QAbstractItemView>
 #include <QTreeView>
 
@@ -387,9 +388,11 @@ bar_name (QWidget* w) {
 static string
 named_of (QObject* o) {
   // the name of a (named ...) of the menus: the division puts it in the
-  // objectName of its widget or action
+  // property tmNamed of its widget or action (qt_ui_element.cpp)
   if (o == NULL) return "";
-  string s= from_qstring (o->objectName ());
+  QVariant v= o->property ("tmNamed");
+  if (!v.isValid ()) return "";
+  string s= from_qstring (v.toString ());
   return starts (s, "named:") ? string ("#" * s (6, N(s))) : string ("");
 }
 
@@ -432,6 +435,10 @@ menu_path (QMenu* m, int depth) {
       if (N(label) == 0 && tb != NULL) label= icon_name (tb->defaultAction ());
       return join_path (widget_path (w, depth + 1), label);
     }
+    QMenuBar* mb= qobject_cast<QMenuBar*> (w);
+    if (mb != NULL)
+      foreach (QAction* a, mb->actions ())
+        if (a->menu () == m) return join_path ("menubar", action_label (a));
     if (om != NULL && om != m)
       foreach (QAction* a, om->actions ())
         if (a->menu () == m) {
@@ -605,6 +612,13 @@ key_target (QWidget* win) {
   QWidget* f= QApplication::focusWidget ();
   if (f != NULL && f->window () == win->window ()) return f;
   if (win->focusWidget () != NULL) return win->focusWidget ();
+  // no focus yet (a dialog gets it a moment after it shows): its first
+  // input field, as the dialog will give it
+  QLineEdit* le= win->findChild<QLineEdit*> ();
+  if (le != NULL && le->isVisible ()) {
+    le->setFocus ();
+    return le;
+  }
   return win;
 }
 
@@ -631,20 +645,26 @@ post_key (QWidget* win, string name, string text) {
   else if (name == "Delete") name= "Del";
   else if (name == "PageUp") name= "PgUp";
   else if (name == "PageDown") name= "PgDown";
-  else if (name == "Return") name= "Return";
+  else if (name == "Insert") name= "Ins";
+  else if (starts (name, "Keypad_") && N(name) == 8) {
+    // a key of the keypad: Keypad_1, Keypad_Plus is not known here
+    mods |= Qt::KeypadModifier;
+    name= name (7, 8);
+  }
   QKeySequence seq (to_qstring (name));
-  if (seq.count () == 0) {
+#if QT_VERSION >= 0x060000
+  int key= seq.count () == 0? 0: (int) seq[0].key ();
+#else
+  int key= seq.count () == 0? 0: (int) (seq[0] & ~Qt::KeyboardModifierMask);
+#endif
+  if (key == 0 || key == Qt::Key_unknown) {
     cout << "qt script: unknown key " << name << LF;
     return;
   }
-#if QT_VERSION >= 0x060000
-  int key= seq[0].key ();
-#else
-  int key= seq[0] & ~Qt::KeyboardModifierMask;
-#endif
   QString t;
   if (N(text) > 0) t= to_qstring (text);
-  else if (N(name) == 1 && (mods & ~Qt::ShiftModifier) == 0)
+  else if (N(name) == 1 &&
+           (mods & ~(Qt::ShiftModifier | Qt::KeypadModifier)) == 0)
     t= (mods & Qt::ShiftModifier) ? to_qstring (name).toUpper ()
                                   : to_qstring (name).toLower ();
   else if (name == "Return") t= "\r";
@@ -715,7 +735,11 @@ gui_test_raw (string line) {
     return 1;
   }
   QWidget* win= script_target ();
-  if (win == NULL) return 1;
+  if (win == NULL) {
+    // after a "window" which matched nothing: skipped, until one matches
+    cout << "qt script: no window, skipped: " << line << LF;
+    return 1;
+  }
   if (cmd == "move" && N(a) > 2)
     post_mouse (QEvent::MouseMove, script_point (win, a), Qt::NoButton);
   else if (cmd == "press" && N(a) > 2)
@@ -765,16 +789,12 @@ gui_test_raw (string line) {
   else if (cmd == "focus")
     // the keys of a script go to the focus widget of its window, which
     // needs not be active; an activation by the script would not last
-    // either (TeXmacs is not the active application of a test), and the
-    // window which loses it takes the focus from its widget: a question in
-    // the footer is then answered (QTMLineEdit::focusOutEvent)
+    // either (TeXmacs is not the active application of a test)
     win->raise ();
   else if (cmd == "snapshot" && N(a) > 1) {
     string dir= snapshot_dir ();
-    if (N(dir) > 0) {
-      QApplication::processEvents ();
-      win->grab ().save (to_qstring (dir * "/" * a[1] * ".png"));
-    }
+    // (grab paints the window itself: no events are handled within a step)
+    if (N(dir) > 0) win->grab ().save (to_qstring (dir * "/" * a[1] * ".png"));
   }
   else if (cmd == "resize" && N(a) > 2)
     win->resize (as_int (a[1]), as_int (a[2]));
@@ -794,6 +814,9 @@ gui_test_busy () {
   // the events of TeXmacs, its delayed commands which are due, an update
   // (the events posted by the script are handled before the timer of the
   // pump fires again)
+  // while a dialog is modal, the delayed commands and the updates wait for
+  // it to close, which the script does: they are not counted
+  if (QApplication::activeModalWidget () != NULL) return false;
   return the_gui->test_busy ();
 }
 

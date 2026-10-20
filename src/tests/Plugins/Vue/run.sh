@@ -40,7 +40,8 @@ BIN=${BIN:-TeXmacs/bin/texmacs.bin} # BIN=<path>: another build (CMake)
 rm -rf "${OUT:?}"; mkdir -p "$OUT"
 HOMEDIR="$OUT/home"
 if [ -d "$HOME/.TeXmacs_Upsilon" ]; then
-  cp -Rc "$HOME/.TeXmacs_Upsilon" "$HOMEDIR" 2>/dev/null || cp -R "$HOME/.TeXmacs_Upsilon" "$HOMEDIR" || {
+  cp -Rc "$HOME/.TeXmacs_Upsilon" "$HOMEDIR" 2>/dev/null ||
+  { rm -rf "${HOMEDIR:?}"; cp -R "$HOME/.TeXmacs_Upsilon" "$HOMEDIR"; } || {
     echo "cannot make a home for TeXmacs in $HOMEDIR"; exit 2; }
 else mkdir -p "$HOMEDIR"; fi
 
@@ -49,6 +50,10 @@ case "$SCM" in /*) ;; *) SCM="$PWD/$T/$SCM" ;; esac
 case "$SCRIPT" in /*) ;; *) SCRIPT="$PWD/$T/$SCRIPT" ;; esac
 load=""
 [ -f "$SCM" ] && load="(load \"$SCM\")"
+# a test made of steps of the driver in its .scm (gui-test-run) must reach
+# their end as a script must
+driver=0
+[ -f "$SCM" ] && grep -q "gui-test-run" "$SCM" && driver=1
 script=""
 [ -f "$SCRIPT" ] && script="$SCRIPT"
 
@@ -66,6 +71,13 @@ expects="$OUT/expects"
 [ -n "$script" ] && tr -d '\r' < "$script" |
   sed -n 's/^[[:space:]]*expect[[:space:]][[:space:]]*//p' > "$expects"
 missing () {
+  # (on another port than that of a "port" line, the lines after it are
+  # skipped: their expect lines too)
+  if [ -n "$script" ] && grep -aq "script: skipped: for the port" "$OUT/run.log"
+  then tr -d '\r' < "$script" |
+    sed -n -e '/^[[:space:]]*port[[:space:]]/q' \
+           -e 's/^[[:space:]]*expect[[:space:]][[:space:]]*//p' > "$expects"
+  fi
   grep -avE "^[a-z]+ script:" "$OUT/run.log" > "$OUT/output"
   while IFS= read -r e; do
     grep -qaF -- "$e" "$OUT/output" || printf '%s\n' "$e"
@@ -92,7 +104,8 @@ ls "$OUT"/*.png 2>/dev/null | sed "s|^|snapshot: |"
 
 why=""
 grep -aq "Error message" "$OUT/run.log" && why="$why; crashed"
-[ -n "$script" ] && ! grep -aqE "^[a-z]+ script: done" "$OUT/run.log" &&
+{ [ -n "$script" ] || [ $driver = 1 ]; } &&
+  ! grep -aqE "^[a-z]+ script: done" "$OUT/run.log" &&
   why="$why; the script did not end"
 grep -aq "FAILED \[" "$OUT/run.log" && why="$why; a check failed"
 [ $ended = 1 ] && [ $status != 0 ] && why="$why; exit status $status"

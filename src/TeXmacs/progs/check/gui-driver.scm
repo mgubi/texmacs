@@ -45,6 +45,8 @@
 (define gt-retrying #f)          ; the time at which the retried step began
 (define gt-quiet 0)              ; the turns in a row without waiting events
 (define gt-busy-time 0)          ; the last time the port was busy
+(define gt-busy-since #f)        ; since when it is busy without a break
+(define gt-busy-limit 20000)     ; then the steps go on anyway (ms)
 (define gt-exit? #f)             ; exit at the end, with the status
 (define gt-on-end #f)
 
@@ -62,6 +64,9 @@
 (tm-define (gui-test-run steps . opt-on-end)
   (:synopsis "Run the steps @steps from the event loop of the port")
   (set! gt-steps steps)
+  (set! gt-records '())
+  (set! gt-exit? #f)
+  (set! gt-busy-since #f)
   (set! gt-on-end (and (nnull? opt-on-end) (car opt-on-end)))
   (set! gt-running? #t)
   (set! gt-next-time 0)
@@ -91,9 +96,14 @@
 (tm-define (gui-test-pump)
   (:synopsis "Run the next step, if it is time (the port calls it)")
   (cond ((not gt-running?) (noop))
-        ((gui-test-busy?) (set! gt-quiet 0) (set! gt-busy-time (texmacs-time)))
-        ((< (texmacs-time) gt-next-time) (set! gt-quiet (+ gt-quiet 1)))
+        ((and (gui-test-busy?) (gt-still-busy?))
+         (set! gt-quiet 0)
+         (set! gt-busy-time (texmacs-time)))
+        ((< (texmacs-time) gt-next-time)
+         (set! gt-busy-since #f)
+         (set! gt-quiet (+ gt-quiet 1)))
         (else
+          (set! gt-busy-since #f)
           (set! gt-quiet (+ gt-quiet 1))
           (let loop ()
             (if (null? gt-steps) (gt-finish)
@@ -104,6 +114,18 @@
                         (set! gt-steps (cdr gt-steps))
                         (set! gt-retrying #f)
                         (when (== r 'continue) (loop))))))))))
+
+(define (gt-still-busy?)
+  ;; the port is busy: no step now, unless it has been for too long (a
+  ;; command which keeps coming back, an animation without end), which is
+  ;; a failure, and the steps go on
+  (when (not gt-busy-since) (set! gt-busy-since (texmacs-time)))
+  (if (< (- (texmacs-time) gt-busy-since) gt-busy-limit) #t
+      (begin
+        (check-report #f "busy" "the port stayed busy for 20 s")
+        (set! gt-busy-since #f)
+        (set! gt-busy-limit 1000000000) ; (said once)
+        #f)))
 
 (define (gt-retried-for)
   ;; how long the step being retried has been tried, in ms
@@ -125,7 +147,10 @@
   (:synopsis "The command @line of the port (click, key, window...)")
   (gt-step line
            (lambda ()
-             (if (== (gui-test-raw line) 1) 'continue 'next))))
+             (with r (gui-test-raw line)
+               (when (== r 2)
+                 (check-report #f line "unknown command of the port"))
+               (if (== r 1) 'continue 'next)))))
 
 (tm-define (gt-eval-later cmd . opt-echo)
   (:synopsis "Run the Scheme command @cmd (a string) at the next turn")
@@ -218,7 +243,13 @@
          (l (list-filter (gt-entries)
                          (lambda (e) (gt-in-path? above (list-ref e 4)))))
          (same (list-filter l (lambda (e) (gt-same? label (list-ref e 5)))))
-         (starts (list-filter l (lambda (e) (gt-starts? label (list-ref e 5)))))
+         ;; a text which starts with the name, only once the exact one had
+         ;; time to come (it may be on its way), never an icon
+         (starts (if (or (string-starts? label "icon:")
+                         (< (gt-retried-for) 1000))
+                     '()
+                     (list-filter l (lambda (e)
+                                      (gt-starts? label (list-ref e 5))))))
          ;; #name, a (named "name" ...) of the menus: what it holds
          (named (list-filter l (lambda (e) (in? label (list-ref e 4)))))
          (found (cond ((string-starts? label "#") named)
@@ -285,6 +316,22 @@
                       'next)
                      (else 'retry))))))
 
+(tm-define (gt-window title . opt)
+  (:synopsis "Wait until a window whose title has @title is shown, choose it")
+  ;; within opt ms (5 s by default), else a failure; "main" is the editor
+  (with limit (if (nnull? opt) (car opt) 5000)
+    (gt-step (string-append "window " title)
+             (lambda ()
+               (cond ((or (== title "main") (gt-window? title))
+                      (gui-test-raw (string-append "window " title))
+                      'continue)
+                     ((> (gt-retried-for) limit)
+                      (check-report #f (string-append "window " title)
+                                    "no such window")
+                      (gui-test-raw (string-append "window " title))
+                      'continue)
+                     (else 'retry))))))
+
 (tm-define (gt-document-has? s)
   (:synopsis "Does the document of the current buffer have the text @s?")
   (string-contains? (object->string (tree->stree (buffer-tree))) s))
@@ -312,9 +359,15 @@
            (lambda ()
              (when (!= (gui-test-port) name)
                (gt-log "skipped: for the port " name)
+               ;; the rest goes, but an exit asked for after it
+               (when (list-find (cdr gt-steps)
+                                (lambda (s) (eq? (cdr s) gt-exit-thunk)))
+                 (set! gt-exit? #t))
                (set! gt-steps (list (car gt-steps))))
              'continue)))
 
+(define (gt-exit-thunk) (set! gt-exit? #t) 'continue)
+
 (tm-define (gt-exit)
   (:synopsis "At the end, quit TeXmacs with the status 1 if a check failed")
-  (gt-step #f (lambda () (set! gt-exit? #t) 'continue)))
+  (gt-step #f gt-exit-thunk))

@@ -33,7 +33,10 @@ gui_test_start () {
 * The defaults, for the ports which do not implement the hooks
 ******************************************************************************/
 
-#if !defined (VUETEXMACS) && !defined (QTTEXMACS) && !defined (AQUATEXMACS)
+// (the Qt port with Widkit, QTWKTEXMACS, also defines QTTEXMACS but has
+// none of qt_test.cpp)
+#if !defined (VUETEXMACS) && !(defined (QTTEXMACS) && !defined (QTWKTEXMACS)) && \
+    !defined (AQUATEXMACS)
 string gui_test_port () { return ""; }
 int gui_test_raw (string line) { (void) line; return 2; }
 bool gui_test_busy () { return false; }
@@ -42,7 +45,7 @@ array<string> gui_test_windows () { return array<string> (); }
 void gui_test_pump (bool on) { (void) on; }
 #endif
 
-#ifndef QTTEXMACS
+#if !defined (QTTEXMACS) || defined (QTWKTEXMACS)
 int gui_test_snapshot (string dir) { (void) dir; return 0; }
 array<string> gui_test_buttons () { return array<string> (); }
 bool gui_test_click (string label) { (void) label; return false; }

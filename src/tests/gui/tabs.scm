@@ -15,8 +15,7 @@
 (gui-test-run
  (list (gt-wait 6000)
        (gt-eval-later "(top-window gui-tabs-test \"Tabs test\")")
-       (gt-wait 1500)
-       (gt-raw "window Tabs test")
+       (gt-window "Tabs test")
        (gt-idle)
        (gt-see "A small page")
        (gt-check "the other pages are hidden"

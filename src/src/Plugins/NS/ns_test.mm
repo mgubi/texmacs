@@ -16,6 +16,7 @@
 #include "analyze.hpp"
 #include "sys_utils.hpp"
 #import "TMView.h"
+#import <objc/runtime.h>
 
 /******************************************************************************
 * The driver (check gui-driver) runs its steps from a timer (gui_test_pump),
@@ -40,6 +41,7 @@ static string popup_path;                 // the path of the last click
 static NSMutableArray* open_menus= nil;   // the menus listed
 static array<string> open_paths;          // and their paths
 static NSMenu* tracked_menu= nil;         // the menu of a button, while open
+                                          // (retained)
 static NSMutableArray* listed_items= nil; // the items of the last list
 static bool menu_closing= false;          // a menu was cancelled, not ended
 
@@ -65,6 +67,28 @@ find_canvas (NSView* v) {
     if (r) return r;
   }
   return nil;
+}
+
+static NSString*
+first_label (NSView* v) {
+  if ([v isKindOfClass: [NSTextField class]] && ![(NSTextField*) v isEditable] &&
+      [[(NSTextField*) v stringValue] length] > 0)
+    return [(NSTextField*) v stringValue];
+  for (NSView* sub in [v subviews]) {
+    NSString* s= first_label (sub);
+    if (s) return s;
+  }
+  return nil;
+}
+
+static string
+window_title (NSWindow* w) {
+  // its title, or for a window without one (an alert, whose message says
+  // what it is: "Enter data" of the inputs of ns_dialogues.mm) its first
+  // label
+  NSString* t= [w title];
+  if ([t length] == 0) t= first_label ([w contentView]);
+  return t? from_nsstring (t): string ("");
 }
 
 static NSWindow*
@@ -98,24 +122,33 @@ static string join_path (string a, string b) {
 }
 
 static string
-named_of (NSString* id) {
-  // the name of a (named ...) of the menus (ns_ui_element_rep::as_nsview)
-  if (!id || ![id hasPrefix: @"named:"]) return "";
-  return "#" * from_nsstring ([id substringFromIndex: 6]);
+named_of (id obj) {
+  // the name of a (named ...) of the menus, which ns_ui_element_rep gives
+  // its view or menu item (and TMButtonsController its buttons)
+  NSString* s= obj? objc_getAssociatedObject (obj, @selector(tmNamed)): nil;
+  if (!s || ![s hasPrefix: @"named:"]) return "";
+  return "#" * from_nsstring ([s substringFromIndex: 6]);
+}
+
+static string
+icon_of (id obj) {
+  // "icon:<name of its file>" of an image or a button (to_nsimage)
+  NSString* s= obj? objc_getAssociatedObject (obj, @selector(tmIconName)): nil;
+  return s? from_nsstring (s): string ("");
 }
 
 static string
 view_path (NSView* v) {
   // the bars (the identifiers which TMButtonsController gives its rows)
   // and the names of the (named ...) of the menus, its own included
-  string r= named_of ([v identifier]);
+  string r= named_of (v);
   for (NSView* p= [v superview]; p != nil; p= [p superview]) {
     NSString* id= [p identifier];
     if (id && ([id isEqualToString: @"mainbar"] || [id isEqualToString: @"modebar"] ||
                [id isEqualToString: @"focusbar"] || [id isEqualToString: @"userbar"] ||
                [id isEqualToString: @"footer"]))
       r= join_path (from_nsstring (id), r);
-    else r= join_path (named_of (id), r);
+    else r= join_path (named_of (p), r);
   }
   return r;
 }
@@ -124,13 +157,10 @@ static string
 view_label (NSView* v) {
   if ([v isKindOfClass: [NSButton class]]) {
     NSButton* b= (NSButton*) v;
-    NSString* id= [b identifier];
-    if (id && [id hasPrefix: @"icon:"]) return from_nsstring (id);
+    if (N(icon_of (b)) > 0) return icon_of (b);
     string t= normalize (from_nsstring ([b title]));
     if (N(t) > 0) return t;
-    if ([[b image] accessibilityDescription])
-      return from_nsstring ([[b image] accessibilityDescription]);
-    return "";
+    return icon_of ([b image]);
   }
   if ([v isKindOfClass: [NSTextField class]])
     return normalize (from_nsstring ([(NSTextField*) v stringValue]));
@@ -235,11 +265,10 @@ list_menu (NSMenu* m, string path, array<string>& r) {
   for (NSMenuItem* mi in [m itemArray]) {
     if ([mi isSeparatorItem] || [mi isHidden]) continue;
     string t= normalize (from_nsstring ([mi title]));
-    if (N(t) == 0 && [[mi image] accessibilityDescription])
-      t= from_nsstring ([[mi image] accessibilityDescription]);
+    if (N(t) == 0) t= icon_of ([mi image]);
     if (N(t) == 0) continue;
     r << (as_string ((int) [listed_items count]) * "\t0\t0\t0\t" *
-          join_path (path, named_of ([mi identifier])) * "\t" * t);
+          join_path (path, named_of (mi)) * "\t" * t);
     [listed_items addObject: mi];
   }
 }
@@ -247,8 +276,8 @@ list_menu (NSMenu* m, string path, array<string>& r) {
 array<string>
 gui_test_windows () {
   array<string> r;
-  for (NSWindow* w in [NSApp orderedWindows])
-    if (alive (w)) r << from_nsstring ([w title]);
+  for (NSWindow* w in [NSApp windows])
+    if (alive (w)) r << window_title (w);
   return r;
 }
 
@@ -291,25 +320,36 @@ menu_path (NSMenu* m) {
   return "";
 }
 
-static void
+static int
 choose (NSMenuItem* mi) {
   NSMenu* m= [mi menu];
+  if (!m) {
+    // the menu was made again since the list: the item is no longer there
+    cout << "cocoa script: the item is no longer in its menu" << LF;
+    return 2;
+  }
+  if (![mi isEnabled]) {
+    cout << "cocoa script: the item " << from_nsstring ([mi title])
+         << " is disabled" << LF;
+    return 2;
+  }
   if ([mi hasSubmenu]) {
     string t= normalize (from_nsstring ([mi title]));
     open_menu ([mi submenu], join_path (join_path (menu_path (m),
-                                                   named_of ([mi identifier])), t), m);
-    return;
+                                                   named_of (mi)), t), m);
+    return 0;
   }
   NSInteger i= [m indexOfItem: mi];
-  if (i < 0) return;
+  if (i < 0) return 2;
   [m performActionForItemAtIndex: i];
   // the menus close, as after a choice
   if (tracked_menu) {
-    [tracked_menu cancelTracking];
     menu_closing= true; // the end comes later: the script waits for it
+    [tracked_menu cancelTracking];
   }
   if (open_menus) [open_menus removeAllObjects];
   open_paths= array<string> ();
+  return 0;
 }
 
 @interface TMTestHelper : NSObject
@@ -337,6 +377,8 @@ choose (NSMenuItem* mi) {
   // the item of its row, which is not in the menu bar)
   for (NSMenu* p= m; p != nil; p= [p supermenu])
     if (p == [NSApp mainMenu]) return;
+  [m retain];
+  [tracked_menu release];
   tracked_menu= m;
   if (!open_menus) open_menus= [[NSMutableArray alloc] init];
   [open_menus removeAllObjects];
@@ -347,6 +389,7 @@ choose (NSMenuItem* mi) {
 - (void) endTracking: (NSNotification*) n
 {
   if ([n object] != tracked_menu) return;
+  [tracked_menu release];
   tracked_menu= nil;
   menu_closing= false;
   if (open_menus) [open_menus removeAllObjects];
@@ -403,9 +446,86 @@ select_row (NSWindow* win, NSPoint p) {
   return true;
 }
 
+static bool
+unkeyed_modal (NSWindow* win) {
+  // a modal window or a panel without an editor (an alert, also before its
+  // modal session began): its keys are done directly (modal_key). Posted,
+  // they reach it only if it is the key window, which it is not while
+  // TeXmacs is not the active application (a test does not make it), and
+  // they did not always do their work when it was
+  return [NSApp modalWindow] == win ||
+         ([win isKindOfClass: [NSPanel class]] && !find_canvas ([win contentView]));
+}
+
+static NSArray*
+editable_fields (NSWindow* win) {
+  // the editable text fields of the window, in the order of the views
+  NSMutableArray* fields= [NSMutableArray array];
+  NSMutableArray* todo= [NSMutableArray arrayWithObject: [win contentView]];
+  while ([todo count] > 0) {
+    NSView* x= [todo objectAtIndex: 0];
+    [todo removeObjectAtIndex: 0];
+    if ([x isKindOfClass: [NSTextField class]] && [(NSTextField*) x isEditable])
+      [fields addObject: x];
+    [todo addObjectsFromArray: [x subviews]];
+  }
+  return fields;
+}
+
+static NSText*
+field_editor (NSWindow* win) {
+  // the editor of the text field of the window being edited, the first
+  // editable one if none is
+  id r= [win firstResponder];
+  if ([r isKindOfClass: [NSText class]]) return (NSText*) r;
+  NSArray* fields= editable_fields (win);
+  if ([fields count] == 0) return nil;
+  NSTextField* f= [r isKindOfClass: [NSTextField class]] && [fields containsObject: r]?
+                  (NSTextField*) r: [fields objectAtIndex: 0];
+  [win makeFirstResponder: f];
+  [f selectText: nil];
+  r= [win firstResponder];
+  return [r isKindOfClass: [NSText class]]? (NSText*) r: nil;
+}
+
+static void
+next_field (NSWindow* win) {
+  // Tab: the field after the one being edited
+  NSArray* fields= editable_fields (win);
+  id r= [win firstResponder];
+  id cur= [r isKindOfClass: [NSText class]]? [(NSText*) r delegate]: r;
+  NSUInteger i= [fields indexOfObject: cur];
+  if ([fields count] == 0) return;
+  NSTextField* f= [fields objectAtIndex:
+                    (i == NSNotFound)? 0: (i + 1) % [fields count]];
+  [win makeFirstResponder: f];
+  [f selectText: nil];
+}
+
+static bool
+modal_key (NSWindow* win, string name, NSString* text) {
+  // the keys of an unkeyed modal window, done as they would be: the text
+  // in the field being edited, Backspace, Tab to the next field, Return
+  // presses the default button, Escape cancels
+  NSText* ed= field_editor (win);
+  if (text != nil) { if (ed) [ed insertText: text]; return ed != nil; }
+  if (name == "Backspace" && ed) { [ed deleteBackward: nil]; return true; }
+  if (name == "Tab") { next_field (win); return true; }
+  if (name == "Return") {
+    if (ed) [[win firstResponder] doCommandBySelector: @selector(insertNewline:)];
+    NSButtonCell* d= [win defaultButtonCell];
+    if (d) [d performClick: nil];
+    return true;
+  }
+  if (name == "Escape") { [NSApp abortModal]; return true; }
+  return false;
+}
+
 static void
 post_key (NSWindow* win, string name, string text) {
   // "[S-][C-][A-][M-]<name>": shift, control, option, command (as Vue)
+  if (unkeyed_modal (win) &&
+      modal_key (win, name, N(text) > 0? to_nsstring (text): nil)) return;
   NSEventModifierFlags mods= 0;
   while (N(name) > 2 && name[1] == '-') {
     if (name[0] == 'S') mods |= NSEventModifierFlagShift;
@@ -431,9 +551,13 @@ post_key (NSWindow* win, string name, string text) {
   else if (name == "End") { c= NSEndFunctionKey; code= 119; }
   else if (name == "PageUp") { c= NSPageUpFunctionKey; code= 116; }
   else if (name == "PageDown") { c= NSPageDownFunctionKey; code= 121; }
-  else if (N(name) > 1 && name[0] == 'F' && is_int (name (1, N(name))))
+  else if (N(name) > 1 && name[0] == 'F' && is_int (name (1, N(name))) &&
+           as_int (name (1, N(name))) >= 1 && as_int (name (1, N(name))) <= 35)
     c= NSF1FunctionKey + as_int (name (1, N(name))) - 1;
-  else if (N(name) == 1) c= (unichar) (unsigned char) name[0];
+  else if (N(name) == 1) {
+    c= (unichar) (unsigned char) name[0];
+    if ((mods & NSEventModifierFlagShift) && c >= 'a' && c <= 'z') c += 'A' - 'a';
+  }
   else {
     cout << "cocoa script: unknown key " << name << LF;
     return;
@@ -455,8 +579,12 @@ post_key (NSWindow* win, string name, string text) {
 static void
 post_text (NSWindow* win, string text) {
   NSString* all= to_nsstring (text);
-  for (NSUInteger i=0; i<[all length]; i++) {
-    NSString* c= [all substringWithRange: NSMakeRange (i, 1)];
+  if (unkeyed_modal (win) && modal_key (win, "", all)) return;
+  for (NSUInteger i=0; i<[all length]; ) {
+    // a character as the user sees it (a pair of UTF-16 units, an accent)
+    NSRange r= [all rangeOfComposedCharacterSequenceAtIndex: i];
+    NSString* c= [all substringWithRange: r];
+    i= NSMaxRange (r);
     for (int up=0; up<2; up++) {
       NSEvent* e= [NSEvent keyEventWithType: up? NSEventTypeKeyUp: NSEventTypeKeyDown
                                    location: NSZeroPoint modifierFlags: 0
@@ -497,16 +625,19 @@ gui_test_raw (string line) {
     script_win= nil;
     if (rest == "main") script_win= main_window ();
     else
-      for (NSWindow* w in [NSApp orderedWindows])
-        if (alive (w) && occurs (rest, from_nsstring ([w title]))) {
+      // (all the windows: a modal alert is not among the ordered ones)
+      for (NSWindow* w in [NSApp windows])
+        if (alive (w) && occurs (rest, window_title (w))) {
           script_win= w;
           break;
         }
     script_no_target= (script_win == nil);
     if (script_no_target) {
       cout << "cocoa script: no window matches " << rest << "; there are";
-      for (NSWindow* w in [NSApp orderedWindows])
-        if ([w isVisible]) cout << " [" << from_nsstring ([w title]) << "]";
+      for (NSWindow* w in [NSApp windows])
+        cout << " [" << window_title (w) << "]"
+             << ([w isVisible]? "": "(hidden)")
+             << ([NSApp modalWindow] == w? "(modal)": "");
       cout << LF;
     }
     else {
@@ -525,12 +656,19 @@ gui_test_raw (string line) {
     if ([obj isKindOfClass: [NSTabViewItem class]])
       [[(NSTabViewItem*) obj tabView] selectTabViewItem: obj];
     else if (obj)
-      choose ((NSMenuItem*) obj);
-    else cout << "cocoa script: no item " << a[1] << LF;
+      return choose ((NSMenuItem*) obj);
+    else {
+      cout << "cocoa script: no item " << a[1] << LF;
+      return 2;
+    }
     return 0;
   }
   NSWindow* win= script_target ();
-  if (!win) return 1;
+  if (!win) {
+    // after a "window" which matched nothing: skipped, until one matches
+    cout << "cocoa script: no window, skipped: " << line << LF;
+    return 1;
+  }
   if (cmd == "move" && N(a) > 2)
     post_mouse (win, NSEventTypeMouseMoved, window_point (win, a), 0);
   else if ((cmd == "press" || cmd == "release" || cmd == "click") && N(a) > 2) {
@@ -576,14 +714,15 @@ gui_test_raw (string line) {
 
 bool
 gui_test_busy () {
-  // events of the system or of TeXmacs, delayed commands which are due, an
+  // a menu closing, events of TeXmacs, delayed commands which are due, an
   // update
+  // (not the events of the system: to look at them runs the run loop,
+  // within a step; the driver waits for some quiet time anyway, gt-idle)
+  // While a dialog is modal, the delayed commands and the updates of TeXmacs
+  // wait for it to close, which the script does: they are not counted
   if (menu_closing) return true;
-  if (the_gui && the_gui->test_busy ()) return true;
-  return [NSApp nextEventMatchingMask: NSEventMaskAny
-                            untilDate: [NSDate distantPast]
-                               inMode: NSDefaultRunLoopMode
-                              dequeue: NO] != nil;
+  if ([NSApp modalWindow] != nil) return false;
+  return the_gui && the_gui->test_busy ();
 }
 
 void

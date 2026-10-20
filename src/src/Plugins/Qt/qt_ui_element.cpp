@@ -631,7 +631,7 @@ qt_ui_element_rep::as_qaction () {
       typedef pair<string, widget> T;
       T x = open_box<T>(load);
       act = concrete (x.x2)->as_qaction ();
-      if (act != NULL) act->setObjectName (to_qstring (x.x1));
+      if (act != NULL) act->setProperty ("tmNamed", to_qstring (x.x1));
     }
       break;
 
@@ -1368,7 +1368,10 @@ qt_ui_element_rep::as_qwidget (QWidget* parent_widget) {
 
       QWidget* qw = w->as_qwidget(parent_widget);
       qwid = qw;
-      qwid->setObjectName (to_qstring (name));
+      // a (named ...) of the menus keeps the name of the widget (its
+      // objectName, which other code sets): the scripted tests read it
+      if (starts (name, "named:")) qwid->setProperty ("tmNamed", to_qstring (name));
+      else qwid->setObjectName (to_qstring (name));
     }
       break;
       

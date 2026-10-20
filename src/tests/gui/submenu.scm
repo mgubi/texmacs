@@ -19,8 +19,7 @@
 (gui-test-run
  (list (gt-wait 6000)
        (gt-eval-later "(top-window gui-submenu-test \"Submenus\")")
-       (gt-wait 1500)
-       (gt-raw "window Submenus")
+       (gt-window "Submenus")
        ;; (Vue draws the menus in their window, which is sized to its
        ;; buttons: room for them)
        (gt-raw "resize 400 260")

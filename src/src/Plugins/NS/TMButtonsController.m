@@ -10,6 +10,7 @@
 ******************************************************************************/
 
 #import "TMButtonsController.h"
+#import <objc/runtime.h>
 
 @protocol TMMenuItemDoit
 - (void) doit;
@@ -281,9 +282,11 @@
     [b setImage: small];
     [b setImagePosition: NSImageOnly];
     [b setTitle: @""];
-    // "icon:<name of its file>", for the scripted tests (ns_test.mm)
-    if ([img accessibilityDescription])
-      [b setIdentifier: [img accessibilityDescription]];
+    // "icon:<name of its file>", for the scripted tests (ns_test.mm; the
+    // copy of the image does not keep it)
+    id name = objc_getAssociatedObject (img, @selector(tmIconName));
+    if (name) objc_setAssociatedObject (b, @selector(tmIconName), name,
+                                        OBJC_ASSOCIATION_RETAIN);
   }
   else {
     // bold if the title of the item is (the innermost tag of the footer)
@@ -305,6 +308,10 @@
                              autorelease]];
     [b setImagePosition: NSNoImage];
   }
+  // the name of a (named ...) of its item, for the scripted tests
+  id named = objc_getAssociatedObject (mi, @selector(tmNamed));
+  if (named) objc_setAssociatedObject (b, @selector(tmNamed), named,
+                                       OBJC_ASSOCIATION_RETAIN);
   [b setEnabled: [mi isEnabled]];
   [b setToolTip: [mi toolTip]];
   [b setTarget: self];

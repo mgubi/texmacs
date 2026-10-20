@@ -107,7 +107,7 @@ missing from the output. With `expect` lines the run stops as soon as the
 script ended and they all showed. A test may also be steps of the driver
 in its `.scm` alone, without a script, which quit by themselves with
 `gt-exit` (`footer-activate.scm`).
-**TeXmacs runs with a home of its own**, a copy of `~/.TeXmacs` made for
+**TeXmacs runs with a home of its own**, a copy of `~/.TeXmacs_Upsilon` made for
 the run (`cp -Rc`, copy on write, instant on APFS) and removed afterwards:
 a test must never change the user's settings, and it did when it ran in
 the real home -- `change-zoom-factor` saves the zoom as a preference,

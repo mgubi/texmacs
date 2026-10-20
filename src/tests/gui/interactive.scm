@@ -9,7 +9,7 @@
 (use-modules (check gui-driver))
 (gui-test-run
  (list (gt-wait 6000)
-       (gt-raw "window main")
+       (gt-window "main")
        (gt-raw "focus")
        (gt-idle)
        (gt-eval-later "(begin (set-preference \"interactive questions\" \"footer\") (interactive (lambda (answer) (gt-record answer)) \"Your name\") (reset-preference \"interactive questions\"))")

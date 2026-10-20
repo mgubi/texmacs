@@ -32,11 +32,11 @@
                  (stree->tree '(root (item "one") (item "two")))
                  (stree->tree '(tuple (item "DisplayRole")))))))
 (define (got? s) (in? s (gt-recorded)))
+(define before-tree 0) ; what was recorded before the click on the tree
 (gui-test-run
  (list (gt-wait 6000)
        (gt-eval-later "(top-window gui-widgets-test \"Widgets test\")")
-       (gt-wait 1500)
-       (gt-raw "window Widgets test")
+       (gt-window "Widgets test")
        (gt-raw "focus")
        (gt-idle)
        (gt-activate "#single > Second")
@@ -50,7 +50,9 @@
        (gt-activate "banana")
        (gt-idle)
        (gt-check "the filtered choice" (lambda () (got? "filtered: banana")))
+       (gt-eval (lambda () (set! before-tree (length (gt-recorded)))))
        (gt-activate "two")
        (gt-idle)
-       (gt-check "the tree" (lambda () (got? "tree")))
+       (gt-check "the tree"
+                 (lambda () (in? "tree" (list-tail (gt-recorded) before-tree))))
        (gt-exit)))

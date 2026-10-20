@@ -14,9 +14,9 @@ have the details, and the problems go to the
 
 ## 20 October 2026
 
-- **Desktop (Qt)**: a question asked in the footer, or a field of a dialog,
-  is no longer answered (empty) or cancelled when you go to another
-  application, or when a popup opens: the input goes on when you come back.
+- **Desktop (Qt)**: a question asked in the footer is no longer answered
+  (empty) when you go to another application: you answer it when you come
+  back.
 - **Desktop (Cocoa)**: the tree views of the dialogs show the text of each
   item, as in Qt, instead of the name of its tag (`item`), and the data of
   an item are no longer shown as rows under it.

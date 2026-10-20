@@ -44,8 +44,11 @@ to_nsimage (url u) {
     return YES;
   }];
   [img setCacheMode: NSImageCacheNever];
-  // the name of its file, by which the scripted tests name it (ns_test.mm)
-  [img setAccessibilityDescription: to_nsstring ("icon:" * basename (u))];
+  // the name of its file, by which the scripted tests name it (ns_test.mm;
+  // not in its accessibility description, which VoiceOver would read)
+  objc_setAssociatedObject (img, @selector(tmIconName),
+                            to_nsstring ("icon:" * basename (u)),
+                            OBJC_ASSOCIATION_RETAIN);
   return img;
 }
 
@@ -964,7 +967,8 @@ node_roles (tree roles, tree t) {
 }
 - (void) outlineViewSelectionDidChange: (NSNotification*) n
 {
-  // the command gets the subtree and -1, as in Qt
+  // the command gets the subtree and -1 (Qt gives the command and user
+  // roles when the tree declares them, QTMTreeView::callOnChange)
   (void) n;
   id item= [view itemAtRow: [view selectedRow]];
   if (!cmd || !item) return;
@@ -1158,14 +1162,20 @@ submenu_item (array<widget> a) {
 TMMenuItem*
 ns_ui_element_rep::as_menuitem () {
   TMMenuItem* mi= make_menuitem ();
-  if (N(test_name) > 0 && mi) [mi setIdentifier: to_nsstring (test_name)];
+  // the name of a (named ...), for the scripted tests (ns_test.mm; not in
+  // the identifier, by which other views are found)
+  if (N(test_name) > 0 && mi)
+    objc_setAssociatedObject (mi, @selector(tmNamed), to_nsstring (test_name),
+                              OBJC_ASSOCIATION_RETAIN);
   return mi;
 }
 
 NSView*
 ns_ui_element_rep::as_nsview () {
   NSView* v= make_nsview ();
-  if (N(test_name) > 0 && v) [v setIdentifier: to_nsstring (test_name)];
+  if (N(test_name) > 0 && v)
+    objc_setAssociatedObject (v, @selector(tmNamed), to_nsstring (test_name),
+                              OBJC_ASSOCIATION_RETAIN);
   return v;
 }
 

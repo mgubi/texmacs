@@ -257,9 +257,10 @@ struct styled_string_rep : public concrete_struct {
   string s;
   color c;
   font fn;
-  string ctx; // where it is, for the scripted tests (vue_test_context)
+  string* ctx; // where it is, while a script runs (vue_test_context)
   styled_string_rep (string _s, font _fn, color _c)
-  : s (_s), c (_c), fn (_fn) {};
+  : s (_s), c (_c), fn (_fn), ctx (NULL) {};
+  ~styled_string_rep () { if (ctx != NULL) tm_delete (ctx); }
 };
 
 // The scripted tests (gui_test.hpp): while a script runs, the layout notes
@@ -273,10 +274,13 @@ extern string vue_test_label;        // the first text or icon laid out since
 void   vue_test_note_label (string s);
 bool   vue_is_editor_window (vue_widget content); // window main
 string vue_test_icon (void* ref);    // "<path>\ticon:<name>" of a picture
+void   vue_test_forget_icons ();
 struct with_test_context {
-  string saved;
-  with_test_context (string name);
+  string* saved; // the path outside, only while a script runs
+  with_test_context (const char* name);
+  with_test_context (const string& name);
   ~with_test_context ();
+  void enter (const string& name);
 };
 
 class styled_string {

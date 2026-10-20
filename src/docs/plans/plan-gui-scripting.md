@@ -323,11 +323,12 @@ Per-port mapping:
 
 ### 5.2 Widget names
 
-(Not done: the user would not add names to the Scheme code of the menus.
-The names are inferred instead, see "Selectors" in
+(Done otherwise: the user would not add names to the Scheme code of the
+menus as a rule. The names are inferred, see "Selectors" in
 [../gui-scripting.md](../gui-scripting.md): the path of bars and menus
 which leads to a text, the files of the icons, and the translation of the
-English names. What follows was the proposal.)
+English names; an optional `(named "id" ...)` is there for the corner
+cases. What follows was the proposal.)
 
 Labels are translated and sometimes duplicated, so add an optional
 **`(named "id" widget)`** form to the markup (`menu-define.scm` grammar,

@@ -23,10 +23,12 @@
 // the name of the port for its scripts ("vue"), "" if it has no hooks
 string gui_test_port ();
 // run a raw command of the port (click, key, window...), as a line of a
-// script: 0 done, 1 done and the next command may follow in the same turn
-// of the event loop (a choice of window), 2 unknown or not run
+// script: 0 done, 1 done or skipped (no window), and the next command may
+// follow in the same turn of the event loop (a choice of window), 2 unknown
+// or impossible (the driver counts it as a failure)
 int gui_test_raw (string line);
-// events are waiting: the driver waits for them to be handled
+// the port has something to do (events, a transition, delayed commands
+// which are due...): the driver waits for it
 bool gui_test_busy ();
 // the texts drawn last in the window of the script, as
 // "x\ty\tw\th\tpath\ttext" (window points, from the top left of its

@@ -1641,7 +1641,8 @@ render_clay_commands (renderer ren, Clay_RenderCommandArray *rcommands)
           // points of the window, those of the scripts (the layout is in
           // pixels, density of them per point)
           styled_string ss= (styled_string_rep*) rcmd->userData;
-          gt_record (bounding_box, ss->ctx * "\t" * ss->s);
+          gt_record (bounding_box,
+                     (ss->ctx != NULL ? *ss->ctx : string ("")) * "\t" * ss->s);
         }
         else if (script_pump && gt_render_win != NULL &&
                  rcmd->renderData.custom.customData == vue_render_widget) {
@@ -1736,7 +1737,10 @@ layout_text_box (string s, int style, color c, font fn) {
     cache.w << w; cache.h << h;
   }
   styled_string ss= tm_new<styled_string_rep> (s, fn, c);
-  if (vue_testing) { ss->ctx= vue_test_context; vue_test_note_label (s); }
+  if (vue_testing) {
+    ss->ctx= tm_new<string> (vue_test_context);
+    vue_test_note_label (s);
+  }
   styled_strings << ss;
   CLAY_AUTO_ID({
     .layout= {
@@ -4517,16 +4521,15 @@ get_window_from_ID (Uint32 ID) {
 /******************************************************************************
 * Scripted events (development aid)
 *
-* When TEXMACS_VUE_SCRIPT names a file, its lines are executed one by one
-* (a line is executed only when no SDL event is pending). The driver is in
-* Scheme, (check gui-script), which reads the file and runs the commands
-* below through gui_test_raw (script_exec here), at each turn of the loop
-* (gui_test_pump); it adds wait, scheme, expect, idle and activate, see
-* docs/gui-scripting.md. Coordinates are in window points, relative to the
-* content area of the target window:
+* When TEXMACS_TEST_SCRIPT (or TEXMACS_VUE_SCRIPT) names a file, its lines
+* are executed one by one (a line is executed only when no SDL event is
+* pending). The driver is in Scheme, (check gui-script), which reads the
+* file, runs its own commands (wait, scheme, idle, activate, expect, port,
+* exit) and those below through gui_test_raw (script_exec here), at each
+* turn of the loop (gui_test_pump); see docs/gui-scripting.md. Coordinates
+* are in window points, relative to the content area of the target window:
 *
-*   # comment
-*   wait <ms>                       pause
+*   window main                     the first window with an editor
 *   window <substring of title>     select the target window (default: last created)
 *   window #<id>                    select the target window by its id
 *   move x y                        pointer motion
@@ -4545,16 +4548,13 @@ get_window_from_ID (Uint32 ID) {
 *   focus                           pretend the target window got the keyboard focus
 *   drop x y <path>|text:<text>     drag and drop of one item at that position
 *   repaint                         invalidate every editor (repaint from scratch)
-*   scheme <expression>             run a Scheme command, as -x does (at the
-*                                   next turn of the loop): a zoom, a marker
-*                                   which (display) prints in the log...
 *   snapshot <name>                 save the target window as <TEXMACS_VUE_SNAPSHOT>/<name>.png
 *   resize w h                      resize the target window (points)
 *   close                           ask to close the target window
 *   tab <id>                        show the tab #id (single-window mode)
-*   clipboard <text>                put the text on the clipboard of the script
-*                                   (while a script runs, the clipboard is its
-*                                   own, not the system's)
+*   clipboard <text>                put the text (as TeXmacs text) on the
+*                                   clipboard of the script (while a script
+*                                   runs, the clipboard is its own)
 ******************************************************************************/
 
 static void
@@ -4676,7 +4676,18 @@ script_exec (string line) {
     }
     return 1;
   }
-  if (win == NULL) return 1;
+  if (cmd == "clipboard") {
+    // the clipboard of the script (a script never reads or writes the
+    // clipboard of the system): the text, as TeXmacs text (a paste from
+    // the system gives it converted from plain text)
+    script_clipboard (line (min (N(line), N(cmd)+1), N(line)));
+    return 1;
+  }
+  if (win == NULL) {
+    // after a "window" which matched nothing: skipped, until one matches
+    cout << "vue script: no window, skipped: " << line << LF;
+    return 1;
+  }
   if (cmd == "move" && N(a) > 2)
     script_push_motion (win, as_double (a[1]), as_double (a[2]));
   else if (cmd == "press" && N(a) > 2)
@@ -4853,12 +4864,7 @@ script_exec (string line) {
     ev.drop.y= dy;
     SDL_PushEvent (&ev);
   }
-  else if (cmd == "clipboard") {
-    // the clipboard of the script, as if the system had this text on it
-    // (a script never reads or writes the clipboard of the system)
-    script_clipboard (line (min (N(line), N(cmd)+1), N(line)));
-    return 1;
-  }
+
   else if (cmd == "tab" && N(a) > 1) {
     // show the tab (a window of an editor in single-window mode) #id
     vue_virtual_window_rep* t= find_tab (as_int (a[1]));
@@ -4907,13 +4913,26 @@ vue_test_note_label (string s) {
   if (N(vue_test_label) == 0) vue_test_label= s;
 }
 
-with_test_context::with_test_context (string name): saved (vue_test_context) {
-  if (vue_testing && N(name) > 0)
-    vue_test_context= N(saved) == 0 ? name : saved * " > " * name;
+// (nothing is made unless a script runs: the layout goes through it often)
+with_test_context::with_test_context (const char* name): saved (NULL) {
+  if (vue_testing) enter (string (name));
+}
+
+with_test_context::with_test_context (const string& name): saved (NULL) {
+  if (vue_testing) enter (name);
+}
+
+void
+with_test_context::enter (const string& name) {
+  saved= tm_new<string> (vue_test_context);
+  if (N(name) > 0)
+    vue_test_context= N(*saved) == 0 ? name : *saved * " > " * name;
 }
 
 with_test_context::~with_test_context () {
-  vue_test_context= saved;
+  if (saved == NULL) return;
+  vue_test_context= *saved;
+  tm_delete (saved);
 }
 
 static void
@@ -4933,9 +4952,10 @@ gui_test_raw (string line) {
 
 bool
 gui_test_busy () {
-  // events, or an animation (a menu which slides in: the places of its
-  // items change until it ends)
-  return SDL_PollEvent (NULL) || transitions_running ();
+  // events, keys still to be given one per turn (a text committed at once),
+  // or an animation (a menu which slides in: the places of its items change
+  // until it ends)
+  return SDL_PollEvent (NULL) || N(pending_keys) > 0 || transitions_running ();
 }
 
 array<string>
@@ -4960,6 +4980,11 @@ void
 gui_test_pump (bool on) {
   script_pump= on;
   vue_testing= on;
+  // a script starts afresh, and leaves nothing behind
+  script_win= NULL;
+  script_no_target= false;
+  script_buttons= 0;
+  vue_test_forget_icons ();
   script_active= on; // the buttons are those the script holds (mouse_buttons)
   if (!on) gt_texts= hashmap<int,array<string> > (array<string> ());
 }
