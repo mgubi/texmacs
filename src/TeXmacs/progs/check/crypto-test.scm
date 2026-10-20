@@ -507,7 +507,10 @@
   (let* ((old (current-buffer))
          (u (new-buffer))
          (out (system->url "/tm-crypto-test-untrusted/doc.tm"))
-         (in (tmp "trusted.tm"))
+         ;; the home directory is trusted, but not its system/tmp, where
+         ;; tmp puts the files of this suite (is_secure, url.cpp)
+         (in (url-append (url-concretize "$TEXMACS_HOME_PATH")
+                         "crypto-test-trusted/doc.tm"))
          (run (lambda ()
                 (tree->stree (texmacs-exec '(extern "crypto-test-script"))))))
     (check-false (secure? '(crypto-test-script)))
