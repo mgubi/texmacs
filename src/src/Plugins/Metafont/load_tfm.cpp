@@ -78,8 +78,12 @@ Z32 tex_font_metric_rep::d (N8 c) {
 Z32 tex_font_metric_rep::i (N8 c) {
   if ((c<bc) || (c>ec)) return 0;
   return italic [byte2x (char_info[c-bc])]; }
-Z32 tex_font_metric_rep::tag (N8 c) { return (char_info [c-bc]>>8)&3; }
-Z32 tex_font_metric_rep::rem (N8 c) { return char_info  [c-bc] & 255; }
+Z32 tex_font_metric_rep::tag (N8 c) {
+  if ((c<bc) || (c>ec)) return 0;
+  return (char_info [c-bc]>>8)&3; }
+Z32 tex_font_metric_rep::rem (N8 c) {
+  if ((c<bc) || (c>ec)) return 0;
+  return char_info  [c-bc] & 255; }
 N8  tex_font_metric_rep::top (N8 c) { return (N8) byte0 (exten [rem (c)]); }
 N8  tex_font_metric_rep::mid (N8 c) { return (N8) byte1 (exten [rem (c)]); }
 N8  tex_font_metric_rep::bot (N8 c) { return (N8) byte2 (exten [rem (c)]); }
@@ -175,8 +179,8 @@ tex_font_metric_rep::execute (Z32* s, int n, Z32* buf, Z32* ker, int& m) {
           // cout << "Ligature ";
           int code= byte2 (instr);
           int a   = code>>2;
-          int b   = (code>>1)&1;
-          int c   = code&1;
+          int b   = code&1;        // keep next character
+          int c   = (code>>1)&1;   // keep current character
             // cout << "(" << a << "," << b << "," << c << ")\n";
           if (b==0) sp--;
           stack [sp++]= byte3 (instr);
@@ -261,14 +265,17 @@ tex_font_metric_rep::get_xpositions (int* s, int n, double unit,
 
       while (true) {
 	int instr= lig_kern [pc];
-	if (byte0 (instr) >= 128) { ADVANCE (0); break; }
-	if (byte1 (instr) != next_char) { pc += byte0 (instr)+1; continue; }
+	if (byte1 (instr) != next_char) {
+	  if (byte0 (instr) >= 128) { ADVANCE (0); break; }
+	  pc += byte0 (instr)+1;
+	  continue;
+	}
 	if (byte2 (instr) < 128) {
           if (!ligf) { ADVANCE (0); break; }
 	  int code= byte2 (instr);
 	  int a   = code>>2;
-	  int b   = (code>>1)&1;
-	  int c   = code&1;
+	  int b   = code&1;        // keep next character
+	  int c   = (code>>1)&1;   // keep current character
 	  if (b==0) {
       SKIP;
     }
@@ -373,6 +380,54 @@ print (tex_font_metric tfm) {
 }
 
 /******************************************************************************
+* Validation of the loaded data
+******************************************************************************/
+
+static bool
+valid_lig_kern (tex_font_metric tfm, int pc) {
+  if (pc >= ((int) tfm->nl)) return false;
+  if (byte0 (tfm->lig_kern [pc]) > 128) pc= word1 (tfm->lig_kern [pc]);
+  while (true) {
+    if (pc >= ((int) tfm->nl)) return false;
+    int instr= tfm->lig_kern [pc];
+    if (byte2 (instr) >= 128) {
+      if (word1x (instr) >= ((int) tfm->nk)) return false;
+    }
+    else {
+      int op= byte2 (instr);
+      if ((op > 7) && (op != 11)) return false;
+      if (op == 4) return false;
+    }
+    if (byte0 (instr) >= 128) return true;
+    pc += byte0 (instr) + 1;
+  }
+}
+
+static bool
+valid_tfm (tex_font_metric tfm) {
+  int c;
+  for (c= tfm->bc; c <= ((int) tfm->ec); c++) {
+    int ci= tfm->char_info [c - tfm->bc];
+    if ((byte0 (ci) >= ((int) tfm->nw)) || (byte1a (ci) >= ((int) tfm->nh)) ||
+        (byte1b (ci) >= ((int) tfm->nd)) || (byte2x (ci) >= ((int) tfm->ni)))
+      return false;
+    int tg= (ci>>8)&3, rm= ci&255;
+    if ((tg == 1) && !valid_lig_kern (tfm, rm)) return false;
+    if ((tg == 2) && ((rm < ((int) tfm->bc)) || (rm > ((int) tfm->ec))))
+      return false;
+    if ((tg == 3) && (rm >= ((int) tfm->ne))) return false;
+  }
+  return true;
+}
+
+static tex_font_metric
+invalid_tfm (tex_font_metric tfm, url file_name) {
+  std_warning << "Invalid tfm file " << file_name << LF;
+  tm_delete (tfm.rep);
+  return tex_font_metric ();
+}
+
+/******************************************************************************
 * Main program for loading
 ******************************************************************************/
 
@@ -383,7 +438,8 @@ load_tfm (url file_name, string family, int size) {
 
   int i= 0;
   string s;
-  (void) load_string (file_name, s, true);
+  if (load_string (file_name, s, false) || (N(s) < 24))
+    return invalid_tfm (tfm, file_name);
   bench_start ("decode tfm");
 
   parse (s, i, tfm->lf);
@@ -402,9 +458,11 @@ load_tfm (url file_name, string family, int size) {
   if ((tfm->lf-6) !=
       (tfm->lh + (tfm->ec + 1 - tfm->bc) +
        tfm->nw + tfm->nh + tfm->nd + tfm->ni +
-       tfm->nl + tfm->nk + tfm->ne + tfm->np)) {
-    cout << "invalid tfm file\n";
-    FAILED ("invalid tfm file");
+       tfm->nl + tfm->nk + tfm->ne + tfm->np) ||
+      (4 * ((int) tfm->lf) > N(s)) || (tfm->lh < 2) ||
+      (tfm->bc > tfm->ec + 1) || (tfm->ec > 255)) {
+    bench_cumul ("decode tfm");
+    return invalid_tfm (tfm, file_name);
   }
   
   parse (s, i, tfm->header, tfm->lh);
@@ -417,6 +475,10 @@ load_tfm (url file_name, string family, int size) {
   parse (s, i, tfm->kern, tfm->nk);
   parse (s, i, tfm->exten, tfm->ne);
   parse (s, i, tfm->param, tfm->np);
+  if (!valid_tfm (tfm)) {
+    bench_cumul ("decode tfm");
+    return invalid_tfm (tfm, file_name);
+  }
   
   tfm->left= tfm->right= tfm->left_prog= tfm->right_prog= -1;
   if (tfm->nl > 0) {

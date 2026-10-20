@@ -80,7 +80,7 @@ tex_rubber_font_rep::tex_rubber_font_rep (string name,
   spc->max     = spc->def + conv (tfm->spc_stretch ());
   extra        = conv (tfm->spc_extra ());
   extra->min   = extra->min >> 1;
-  extra->max   = extra->min << 1;
+  extra->max   = extra->def << 1;
   mspc         = spc;
   sep          = ((((dpi*PIXEL)/72)*design_size) >> 8) / 10;
 
@@ -105,7 +105,8 @@ tex_rubber_font_rep::tex_rubber_font_rep (string name,
 font
 tex_rubber_font (string trl_name,
 		 string family, int size, int dpi, int dsize) {
-  string name= "tex-rubber:"*family * as_string (size) * "@" * as_string(dpi);
+  string name= "tex-rubber:" * trl_name * ":" * family * as_string (size) *
+    "@" * as_string(dpi) * ":" * as_string (dsize);
   return make (font, name,
     tm_new<tex_rubber_font_rep> (name, trl_name, family, size, dpi, dsize));
 }
