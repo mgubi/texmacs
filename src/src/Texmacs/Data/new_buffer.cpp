@@ -73,8 +73,9 @@ remove_buffer (tm_buffer buf) {
   int nr, n= N(bufs);
   for (nr=0; nr<n; nr++)
     if (bufs[nr] == buf) {
-      for (int i=0; i<N(buf->vws); i++)
-        delete_view (abstract_view (buf->vws[i]));
+      array<tm_view> vws= copy (buf->vws);
+      for (int i=0; i<N(vws); i++)
+        delete_view (abstract_view (vws[i]));
       if (n == 1 && number_of_servers () == 0)
         get_server () -> quit ();
       for (int i=nr; i<n-1; i++)
@@ -286,7 +287,14 @@ get_buffer_tree (url name) {
   tm_buffer buf= concrete_buffer (name);
   if (is_nil (buf)) return "";
   tree body= subtree (the_et, buf->rp);
-  return attach_data (body, buf->data, true);
+  if (N(buf->vws) == 0) return attach_data (body, buf->data, true);
+  // the editor keeps its own copies of the style and initial environment
+  tm_view vw= concrete_view (get_recent_view (name));
+  if (vw == NULL) return attach_data (body, buf->data, true);
+  new_data data;
+  data->project= buf->data->project;
+  vw->ed->get_data (data);
+  return attach_data (body, data, true);
 }
 
 void
@@ -553,6 +561,7 @@ export_tree (tree doc, url u, string fm) {
 
 bool
 buffer_export (url name, url dest, string fm) {
+  if (is_nil (concrete_buffer (name))) return true;
   tm_view vw= concrete_view (get_recent_view (name));
   ASSERT (vw != NULL, "view expected");
 

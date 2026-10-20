@@ -455,7 +455,7 @@ set_global_options  (int argc, char** argv)  {
         if (i+1<argc) exec_exit= false;
         if ((++i)<argc)
           extra_init_cmd << "(run-test-suite "
-                         << scm_quote (argv[i]) << "delayed-quit)";
+                         << scm_quote (argv[i]) << " delayed-quit)";
       }
       else if (starts (s, "-psn"));
       else {
