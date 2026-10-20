@@ -1187,6 +1187,180 @@
     (check-true (in? (cons c2 "the file is not writable") part-save-refused))
     (buffer-pretend-saved p)))
 
+;; The identifiers of the parts (#77, item 8): a part which starts with an
+;; included file is known by the name of that file, relative to the master,
+;; the other ones by their numbers; parts with the same title are told
+;; apart, in a document and in the part view of a master. Saving a part
+;; view shown in parts writes the inclusions of the master, not its parts.
+(define (part-shown)
+  ;; the identifiers of the parts shown, read from the tree
+  (map cadr (list-filter (cdr (tree->stree (buffer-tree)))
+                         (lambda (x) (func? x 'show-part)))))
+
+(define (test-part-ids)
+  (check-group "part identifiers")
+  (write-doc "same.tm" '("article") '()
+             '("intro" (section "Same") "a" (section "Same") "b"))
+  (open "same.tm")
+  (check= (buffer-parts-list #t) '("1" "2" "3"))
+  (check= (map buffer-part-label (buffer-parts-list #t))
+          '("front matter" "Same" "Same"))
+  (buffer-set-part-mode :one)
+  (buffer-show-part "3")
+  (check= (buffer-parts-list #f) '("3"))
+  (check= (part-shown) '("3"))
+  (check= (st 2 1) '(document (section "Same") "b"))
+  (check-true (show-hidden-part "2"))
+  (check= (part-shown) '("2"))
+  (buffer-set-part-mode :all)
+  ;; the part view of a master whose chapters have the same title
+  (write-doc "pa.tm" '("book") '() '((chapter "Same") "a"))
+  (write-doc "pb.tm" '("book") '() '((chapter "Same") "b"))
+  (write-doc "pi.tm" '("book") '() '((include "pa.tm") (include "pb.tm")))
+  (let* ((m (tmp "pi.tm"))
+         (p (system->url (part-url m m))))
+    (load-buffer p)
+    (update-forced)
+    (check= (buffer-parts-list #t) '("pa.tm" "pb.tm"))
+    (buffer-set-part-mode :one)
+    (check= (buffer-parts-list #t) '("pa.tm" "pb.tm"))
+    (check= (map buffer-part-label (buffer-parts-list #t))
+            '("Same (pa.tm)" "Same (pb.tm)"))
+    (check= (part-shown) '("pa.tm"))
+    (buffer-show-part "pb.tm")
+    (check= (part-shown) '("pb.tm"))
+    ;; a hidden part evaluates the chapter of its file, not a second copy
+    (check= (st 0 2) '(document (chapter "Same")))
+    (check= (buffer-parts-list #f) '("pb.tm"))
+    (check= (car (st 1 1 0)) 'shared)
+    (check= (caddr (st 1 1 0)) (url->unix (tmp "pb.tm")))
+    (check-true (show-hidden-part "pa.tm"))
+    (check= (part-shown) '("pa.tm"))
+    ;; an edit in a shown part; the master keeps its inclusions
+    (edit (tree-set (bt 0 1 0 2 1) "a edited"))
+    (save-buffer p)
+    (check= (file-body "pa.tm") '(document (chapter "Same") "a edited"))
+    (check= (file-body "pb.tm") '(document (chapter "Same") "b"))
+    (check= (file-body "pi.tm")
+            '(document (include "pa.tm") (include "pb.tm")))
+    (check-false (buffer-modified? p))
+    (buffer-set-part-mode :all)
+    (buffer-pretend-saved p)))
+
+;; The style of a part view (#77, item 11) is the style of its master: a
+;; change of style in the view gives the master the new style when the view
+;; is saved, through the buffer of the master when it is open (saved, or
+;; left modified when it has other unsaved changes of its own). The
+;; references and the auxiliary data of the view are not saved.
+(define (file-style name)
+  (tmfile-extract (tree-import (tmp name) "texmacs") 'style))
+
+(define (file-part name what)
+  (tmfile-extract (tree-import (tmp name) "texmacs") what))
+
+(define (set-view-style p style)
+  (switch-to-buffer p)
+  (edit (set-style-tree (stree->tree style))))
+
+(define (test-part-style)
+  (check-group "part view style")
+  (write-doc "sc1.tm" '("book") '() '((chapter (concat "One" (label "x1"))) "a"))
+  (write-doc "sc2.tm" '("book") '() '((chapter "Two") "b"))
+  (write-doc "sm.tm" '("book") '() '((include "sc1.tm") (include "sc2.tm")))
+  (let* ((m (tmp "sm.tm"))
+         (p (system->url (part-url m (tmp "sc1.tm"))))
+         (q (system->url (part-url m m)))
+         (eu '(tuple "book" "number-europe"))
+         (us '(tuple "book" "number-us"))
+         (la '(tuple "book" "number-long-article"))
+         (incl '(document (include "sc1.tm") (include "sc2.tm"))))
+    ;; the master is not open: its file gets the style
+    (load-buffer p)
+    (update-forced)
+    (check-false (buffer-modified? p))
+    (check= (part-view-unsaved-files p) '())
+    (set-view-style p eu)
+    (check-true (buffer-modified? p))
+    (check= (part-view-unsaved-files p) (list m))
+    (check= (part-labels m) '("sm.tm *" "sc1.tm" "sc2.tm"))
+    (check= (part-master-style-plan p) (list m 'write #f))
+    (save-buffer p)
+    (check= (file-style "sm.tm") eu)
+    (check= (file-style "sc1.tm") "book")
+    (check= (file-body "sm.tm") incl)
+    (check= (part-save-message) "Saved sc1.tm, sm.tm")
+    (check-false (buffer-modified? p))
+    (check= (part-view-unsaved-files p) '())
+    ;; the references of the view are not saved: neither into the part
+    ;; file nor into the master
+    (check-false (file-part "sm.tm" 'references))
+    (check= (file-part "sc1.tm" 'references) '(collection))
+    ;; the master changed on disk since the view was loaded: refused
+    (write-doc "sm.tm" '("book" "number-long-article") '() (cdr incl))
+    (set-view-style p us)
+    (check= (part-master-style-plan p) (list m 'write #t))
+    (buffer-save p)
+    (check= (file-style "sm.tm") la)
+    (check= (part-save-message)
+            "Saved sc1.tm; not saved: sm.tm (the file changed on disk)")
+    (buffer-pretend-saved p)
+    (buffer-close p)
+    ;; the master is open without changes: its buffer gets the style and
+    ;; is saved
+    (load-buffer m)
+    (load-buffer p)
+    (update-forced)
+    (check= (tmfile-extract (buffer-get p) 'style) la)
+    (set-view-style p eu)
+    (check= (part-master-style-plan p) (list m 'buffer #f))
+    (save-buffer p)
+    (check= (file-style "sm.tm") eu)
+    (check= (tmfile-extract (buffer-get m) 'style) eu)
+    (check-false (buffer-modified? m))
+    (check= (part-save-message) "Saved sc1.tm, sm.tm")
+    ;; the master is open with changes of its own: its buffer gets the
+    ;; style, and is not saved
+    (buffer-pretend-modified m)
+    (set-view-style p us)
+    (check= (part-master-style-plan p) (list m 'pending #f))
+    (save-buffer p)
+    (check= (tmfile-extract (buffer-get m) 'style) us)
+    (check-true (buffer-modified? m))
+    (check= (file-style "sm.tm") eu)
+    (check= (part-save-message)
+            (string-append "Saved sc1.tm; new style in sm.tm "
+                           "(open with other unsaved changes, not saved)"))
+    (check-false (buffer-modified? p))
+    (check= (part-view-unsaved-files p) (list m))
+    (buffer-pretend-saved m)
+    (buffer-close m)
+    (buffer-pretend-saved p)
+    (buffer-close p)
+    ;; the part view of the master itself
+    (load-buffer q)
+    (update-forced)
+    (set-view-style q us)
+    (check= (part-view-unsaved-files q) (list m))
+    (save-buffer q)
+    (check= (file-style "sm.tm") us)
+    (check= (file-body "sm.tm") incl)
+    (check= (part-save-message) "Saved sm.tm")
+    (check-false (buffer-modified? q))
+    (buffer-close q)
+    ;; the master is open without a view (as when it is loaded for the
+    ;; references of a chapter): its data gets the style, and it is saved
+    (buffer-load m)
+    (check= (buffer->views m) '())
+    (load-buffer p)
+    (update-forced)
+    (set-view-style p eu)
+    (check= (part-master-style-plan p) (list m 'buffer #f))
+    (save-buffer p)
+    (check= (file-style "sm.tm") eu)
+    (check= (tmfile-extract (buffer-get m) 'style) eu)
+    (check= (file-body "sm.tm") incl)
+    (check= (part-save-message) "Saved sc1.tm, sm.tm")))
+
 ;; The part tmfs opens a file of a project as a document of its own: its
 ;; url names the master and the file, its body is shared with the file and
 ;; its environment marks it as a part.
@@ -1224,37 +1398,45 @@
     (check= (buffer-get-title p) "master - ch1")))
 
 ;; The parts of a document: one or several of its principal sections are
-;; shown, or all of them; the preamble is shown instead of the body.
+;; shown, or all of them; the preamble is shown instead of the body. The
+;; parts are known by their numbers (#77, item 8: a part which starts with
+;; an included file is known by its file, see test-part-ids); the menus show
+;; their titles, and their titles are still accepted.
 (define (test-document-parts)
   (check-group "document parts")
   (write-doc "parts.tm" '("article") '()
              '((section "One") "a" (section "Two") "b" (section "Three") "c"))
   (open "parts.tm")
   (check= (buffer-get-part-mode) :all)
-  (check= (buffer-parts-list #t) '("One" "Two" "Three"))
+  (check= (buffer-parts-list #t) '("1" "2" "3"))
+  (check= (map buffer-part-label (buffer-parts-list #t)) '("One" "Two" "Three"))
   (check-false (buffer-has-preamble?))
   (buffer-set-part-mode :one)
   (check= (buffer-get-part-mode) :one)
-  (check= (buffer-parts-list #f) '("One"))
-  (check= (buffer-parts-list #t) '("One" "Two" "Three"))
+  (check= (buffer-parts-list #f) '("1"))
+  (check= (buffer-parts-list #t) '("1" "2" "3"))
+  (check= (map buffer-part-label (buffer-parts-list #t)) '("One" "Two" "Three"))
   (check= (st 1)
           '(hide-part "2" (document (section "Two") "b")
                       (document (section "Two"))))
-  (buffer-show-part "Two")
-  (check= (buffer-parts-list #f) '("Two"))
+  (buffer-show-part "2")
+  (check= (buffer-parts-list #f) '("2"))
   (check= (car (st 0)) 'hide-part)
   (check= (car (st 1)) 'show-part)
   (check= (cursor) '(1 1 0 0))
   (check-true (show-hidden-part "3"))
-  (check= (buffer-parts-list #f) '("Three"))
+  (check= (buffer-parts-list #f) '("3"))
+  ;; a title is still accepted
+  (buffer-show-part "Two")
+  (check= (buffer-parts-list #f) '("2"))
   (buffer-set-part-mode :several)
-  (buffer-toggle-part "One")
-  (check= (buffer-parts-list #f) '("One" "Three"))
-  (buffer-toggle-part "Three")
-  (check= (buffer-parts-list #f) '("One"))
+  (buffer-toggle-part "1")
+  (check= (buffer-parts-list #f) '("1" "2"))
+  (buffer-toggle-part "Two")
+  (check= (buffer-parts-list #f) '("1"))
   ;; the last part shown stays
-  (buffer-toggle-part "One")
-  (check= (buffer-parts-list #f) '("One"))
+  (buffer-toggle-part "1")
+  (check= (buffer-parts-list #f) '("1"))
   (buffer-set-part-mode :all)
   (check= (tree->stree (buffer-tree))
           '(document (section "One") "a" (section "Two") "b"
@@ -1675,6 +1857,8 @@
   (run-group test-chapter)
   (run-group test-attach)
   (run-group test-part-save)
+  (run-group test-part-ids)
+  (run-group test-part-style)
   (run-group test-parts-tmfs)
   (run-group test-document-parts)
   (run-group test-document-parts-undo)
