@@ -66,6 +66,8 @@
         (link ref-markup)
         (generic document-part)
         (part part-tmfs)
+        (part part-shared)
+        (part part-menu)
         (texmacs texmacs tm-files)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1074,6 +1076,112 @@
       (check= (get-init "project-flag") "false")
       (check-false (project-attached?)))))
 
+;; Saving a part view (#77, item 2): the view shows each included file in
+;; a shared copy; saving writes the part file and the included files whose
+;; copies changed, and only those; an included file open as a buffer is
+;; saved through the buffer, which keeps its own unsaved changes; a file
+;; which changed on disk since it was loaded or which cannot be written is
+;; refused and the view stays modified. Document > Part stars the files
+;; with unsaved changes, and the question when closing the view names them.
+(define (write-part-project)
+  (write-doc "pc1.tm" '("book") '() '("one"))
+  (write-doc "pc2.tm" '("book") '() '("two"))
+  (write-doc "pc3.tm" '("book") '() '("three"))
+  (write-doc "pm.tm" '("book") '()
+             '((include "pc1.tm") (include "pc2.tm") (include "pc3.tm"))))
+
+(define (file-body name)
+  (tmfile-extract (tree-import (tmp name) "texmacs") 'body))
+
+(define (buffer-body u)
+  (tree->stree (buffer-get-body u)))
+
+(define (part-labels m)
+  (map car (part-menu-entries m)))
+
+(define (test-part-save)
+  (check-group "part view save")
+  (write-part-project)
+  (let* ((m (tmp "pm.tm"))
+         (c2 (tmp "pc2.tm"))
+         (c3 (tmp "pc3.tm"))
+         (p (system->url (part-url m m)))
+         (edit-copy (lambda (i s)
+                      (switch-to-buffer p)
+                      (edit (tree-set (bt i 2 0) s)))))
+    (load-buffer p)
+    (update-forced)
+    (check= (car (st 1)) 'shared)
+    (check= (part-labels m) '("pm.tm" "pc1.tm" "pc2.tm" "pc3.tm"))
+    ;; an edit in the copy of pc1.tm is written into pc1.tm, and only there
+    (edit-copy 0 "one edited")
+    (check= (part-labels m) '("pm.tm" "pc1.tm *" "pc2.tm" "pc3.tm"))
+    (check= (buffer-close-question p)
+            "The document has not been saved (changes in pc1.tm). Really close it?")
+    (save-buffer p)
+    (check= (file-body "pc1.tm") '(document "one edited"))
+    (check= (file-body "pc2.tm") '(document "two"))
+    (check= (file-body "pc3.tm") '(document "three"))
+    (check= (file-body "pm.tm")
+            '(document (include "pc1.tm") (include "pc2.tm")
+                       (include "pc3.tm")))
+    (check= (part-save-message) "Saved pm.tm, pc1.tm")
+    (check-false (buffer-modified? p))
+    (check= (part-labels m) '("pm.tm" "pc1.tm" "pc2.tm" "pc3.tm"))
+    (check= (buffer-close-question p)
+            "The document has not been saved. Really close it?")
+    ;; pc2.tm is open: it is saved through its buffer
+    (load-buffer c2)
+    (edit-copy 1 "two edited")
+    (save-buffer p)
+    (check= (file-body "pc2.tm") '(document "two edited"))
+    (check= (buffer-body c2) '(document "two edited"))
+    (check-false (buffer-modified? c2))
+    (check= (part-save-message) "Saved pm.tm, pc2.tm")
+    (check= (file-body "pc1.tm") '(document "one edited"))
+    ;; pc3.tm is open with unsaved changes of its own when its copy is
+    ;; changed: they are kept, and pc3.tm is not saved
+    (load-buffer c3)
+    (edit (tree-set (bt 0) "three mine"))
+    (edit-copy 2 "three view")
+    (buffer-shared-flush)
+    (check= (buffer-body c3) '(document "three mine"))
+    (check-true (buffer-modified? c3))
+    (save-buffer p)
+    (check= (buffer-body c3) '(document "three mine"))
+    (check= (file-body "pc3.tm") '(document "three"))
+    (check= (part-save-message)
+            (string-append "Saved pm.tm; not saved: pc3.tm "
+                           "(it is open with other unsaved changes)"))
+    (check-true (buffer-modified? p))
+    (check= (part-labels m) '("pm.tm" "pc1.tm" "pc2.tm" "pc3.tm *"))
+    (check= (buffer-close-question p)
+            "The document has not been saved (changes in pc3.tm). Really close it?")
+    ;; pc1.tm changed on disk since it was loaded: the save asks first, and
+    ;; without the answer pc1.tm is not written
+    (buffer-pretend-saved c3)
+    (buffer-close c3)
+    (write-doc "pc1.tm" '("book") '() '("one external"))
+    (edit-copy 0 "one again")
+    (check= (map cdr (part-save-plan p))
+            '((write #t) (same #f) (write #f)))
+    (buffer-save p)
+    (check= (file-body "pc1.tm") '(document "one external"))
+    (check= (file-body "pc3.tm") '(document "three view"))
+    (check= (part-save-message)
+            (string-append "Saved pm.tm, pc3.tm; not saved: pc1.tm "
+                           "(the file changed on disk)"))
+    ;; a file which cannot be written
+    (buffer-pretend-saved c2)
+    (buffer-close c2)
+    (system (string-append "chmod a-w " (url->system c2)))
+    (edit-copy 1 "two again")
+    (buffer-save p)
+    (system (string-append "chmod u+w " (url->system c2)))
+    (check= (file-body "pc2.tm") '(document "two edited"))
+    (check-true (in? (cons c2 "the file is not writable") part-save-refused))
+    (buffer-pretend-saved p)))
+
 ;; The part tmfs opens a file of a project as a document of its own: its
 ;; url names the master and the file, its body is shared with the file and
 ;; its environment marks it as a part.
@@ -1561,6 +1669,7 @@
   (run-group test-master)
   (run-group test-chapter)
   (run-group test-attach)
+  (run-group test-part-save)
   (run-group test-parts-tmfs)
   (run-group test-document-parts)
   (run-group test-document-parts-undo)
