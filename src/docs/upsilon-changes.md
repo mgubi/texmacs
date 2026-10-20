@@ -132,6 +132,20 @@ have the details, and the problems go to the
   system for saving a document the first time proposes `untitled.tm` in the
   folder; it proposed the name of the folder, on Linux the name of the user
   ([#400](https://github.com/mgubi/texmacs/issues/400)).
+- **Desktop (macOS, Cocoa and Vue)**: the dialog to save a document adds
+  `.tm` to a name typed without a suffix before it asks about replacing a
+  file: it asked about the file of that name without the suffix (saving as
+  `test` warned about a file `test`), and then replaced an existing
+  `test.tm` without a question. **Cocoa**: the dialogs to open and save
+  files show those of the type (TeXmacs documents, images...), with a menu
+  for all the files, as in Qt; they showed every file. **Vue**: the filter
+  of the type in the dialogs of the system has the suffixes of the type
+  (it took every file). Where a dialog still gives a name without a suffix,
+  TeXmacs asks before replacing the `.tm` it saves to
+  ([#400](https://github.com/mgubi/texmacs/issues/400)).
+- Tests: the dialogs of the system to open and save files, on macOS with
+  the three interfaces (`tests/gui/save-dialog`, `open-dialog`;
+  `docs/gui-scripting.md`).
 - In a source file which a language server follows, the mouse resting on
   an error shows its message (and then what the server says of the word):
   the balloon showed only the latter, which for an unknown name is

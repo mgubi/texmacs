@@ -372,6 +372,28 @@ tmg_gui_test_eval_later (tmscm arg1) {
 }
 
 tmscm
+tmg_gui_test_file_dialog () {
+  // TMSCM_DEFER_INTS;
+  array_string out= gui_test_file_dialog ();
+  // TMSCM_ALLOW_INTS;
+
+  return array_string_to_tmscm (out);
+}
+
+tmscm
+tmg_gui_test_file_dialog_do (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "gui-test-file-dialog-do");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  int out= gui_test_file_dialog_do (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return int_to_tmscm (out);
+}
+
+tmscm
 tmg_support_functionalityP (tmscm arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "support-functionality?");
 
@@ -12100,6 +12122,8 @@ initialize_glue_basic () {
   tmscm_install_procedure ("gui-test-windows",  tmg_gui_test_windows, 0, 0, 0);
   tmscm_install_procedure ("gui-test-set-pump",  tmg_gui_test_set_pump, 1, 0, 0);
   tmscm_install_procedure ("gui-test-eval-later",  tmg_gui_test_eval_later, 1, 0, 0);
+  tmscm_install_procedure ("gui-test-file-dialog",  tmg_gui_test_file_dialog, 0, 0, 0);
+  tmscm_install_procedure ("gui-test-file-dialog-do",  tmg_gui_test_file_dialog_do, 1, 0, 0);
   tmscm_install_procedure ("support-functionality?",  tmg_support_functionalityP, 1, 0, 0);
   tmscm_install_procedure ("gui-version",  tmg_gui_version, 0, 0, 0);
   tmscm_install_procedure ("default-look-and-feel",  tmg_default_look_and_feel, 0, 0, 0);

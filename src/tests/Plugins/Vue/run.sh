@@ -57,7 +57,7 @@ driver=0
 script=""
 [ -f "$SCRIPT" ] && script="$SCRIPT"
 
-TEXMACS_PATH="$PWD/TeXmacs" TEXMACS_HOME_PATH="$HOMEDIR" \
+TEXMACS_TEST=1 TEXMACS_PATH="$PWD/TeXmacs" TEXMACS_HOME_PATH="$HOMEDIR" \
 TEXMACS_VUE_SNAPSHOT="$OUT" TEXMACS_VUE_SCRIPT="$script" \
 TEXMACS_TEST_SNAPSHOT="$OUT" TEXMACS_TEST_SCRIPT="$script" \
   "$BIN" ${TM_ARGS:-} ${load:+-x "$load"} > "$OUT/run.log" 2>&1 &

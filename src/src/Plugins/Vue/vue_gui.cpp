@@ -7118,13 +7118,15 @@ vue_chooser_widget_rep::perform_dialog (vue_window win) {
     // the name of the format and the suffixes it is known by, e.g.
     // "TeXmacs document" and "tm;ts;tp", plus a catch-all
     filter= as_string (call ("format-get-name", file_type));
-    tree sufs= as_tree (call ("format-get-suffixes*", file_type));
+    // (tuple "tm" "ts" "tp"), a list of Scheme: read as a tree, it gave no
+    // suffix, and the filter took every file
+    array<object> sufs= as_array_object (call ("format-get-suffixes*",
+                                               file_type));
     string pat;
-    if (is_tuple (sufs))
-      for (int i= 0; i < N(sufs); i++) {
-        if (N(pat) > 0) pat << ";";
-        pat << as_string (sufs[i]);
-      }
+    for (int i= 1; i < N(sufs); i++) {
+      if (N(pat) > 0) pat << ";";
+      pat << as_string (sufs[i]);
+    }
     if (N(pat) == 0) pat= "*";
     filter_name= c_string (filter);
     filter_pattern= c_string (pat);
@@ -7134,6 +7136,13 @@ vue_chooser_widget_rep::perform_dialog (vue_window win) {
     type_filters[1].pattern= "*";
     sdl_filters= (void*) type_filters;
     sdl_n_filters= 2;
+#ifdef OS_MACOS
+    // a catch-all filter makes SDL give the panel of macOS no types at all:
+    // a name typed without a suffix then got none, and the panel asked
+    // about replacing the file of that name rather than the one saved
+    // (#400); the panel takes other suffixes anyway (SDL allows them)
+    if (sdl_type == SDL_FILEDIALOG_SAVEFILE) sdl_n_filters= 1;
+#endif
   }
  
   // Create and set dialog properties

@@ -51,6 +51,8 @@
   (gui-test-windows gui_test_windows (array_string))
   (gui-test-set-pump gui_test_pump (void bool))
   (gui-test-eval-later gui_test_eval_later (void string))
+  (gui-test-file-dialog gui_test_file_dialog (array_string))
+  (gui-test-file-dialog-do gui_test_file_dialog_do (int string))
   (support-functionality? support_functionality (bool string))
   (gui-version gui_version (string))
   (default-look-and-feel default_look_and_feel (string))

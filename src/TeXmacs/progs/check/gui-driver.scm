@@ -332,6 +332,102 @@
                       'continue)
                      (else 'retry))))))
 
+;; The file dialog of the system (to open or save a file), where the port
+;; reaches it (macOS): what it shows (gui-test-file-dialog), each (kind
+;; text), the kind title, label, field (the name), button, disabled (a
+;; button), popup, or alert-... for those of the alert over it (to replace
+;; a file); and what a test does in it (gui-test-file-dialog-do). A test
+;; opens it with gt-eval-later, as a menu would ("(choose-file ...)").
+(define (gt-file-dialog-entries)
+  (map (lambda (s)
+         (with l (string-tokenize-by-char s #\tab)
+           (list (car l)
+                 (apply string-append (list-intersperse (cdr l) "\t")))))
+       (gui-test-file-dialog)))
+
+(tm-define (gt-file-dialog-shown?)
+  (:synopsis "Is a file dialog of the system shown?")
+  (nnull? (gui-test-file-dialog)))
+
+(tm-define (gt-file-dialog-has? text . opt-kind)
+  (:synopsis "Does the file dialog show a text which has @text?")
+  ;; of the kind opt-kind ("alert-label"...), if given
+  (list-or (map (lambda (e)
+                  (and (or (null? opt-kind) (== (car e) (car opt-kind)))
+                       (string-contains? (cadr e) text)))
+                (gt-file-dialog-entries))))
+
+(define (gt-file-dialog-summary)
+  (with l (gt-file-dialog-entries)
+    (if (null? l) "none"
+        (apply string-append
+               (list-intersperse
+                (map (lambda (e) (object->string (string-append (car e) " "
+                                                                (cadr e))))
+                     l)
+                " ")))))
+
+(tm-define (gt-file-dialogs)
+  (:synopsis "The steps which follow need the file dialogs of the system")
+  ;; elsewhere (a port or a system without the hooks) the test stops there
+  (gt-step #f
+           (lambda ()
+             (when (!= (gui-test-file-dialog-do "supported") 0)
+               (gt-log "skipped: no file dialogs of the system here")
+               (when (list-find (cdr gt-steps)
+                                (lambda (s) (eq? (cdr s) gt-exit-thunk)))
+                 (set! gt-exit? #t))
+               (set! gt-steps (list (car gt-steps))))
+             'continue)))
+
+(tm-define (gt-file-dialog line . opt)
+  (:synopsis "Do @line in the file dialog of the system")
+  ;; "folder <path>", "name <text>", "type <text>", "press <title>"; once
+  ;; the dialog is shown and the button enabled, within opt ms (5 s by
+  ;; default), else a failure
+  (with limit (if (nnull? opt) (car opt) 5000)
+    (gt-step (string-append "file dialog: " line)
+             (lambda ()
+               (with r (gui-test-file-dialog-do line)
+                 (cond ((== r 0) 'next)
+                       ((and (== r 1) (<= (gt-retried-for) limit)) 'retry)
+                       (else
+                        (check-report #f (string-append "file dialog: " line)
+                                      (string-append
+                                       (if (== r 1) "not possible yet"
+                                           "impossible")
+                                       "; the dialog has "
+                                       (gt-file-dialog-summary)))
+                        'next)))))))
+
+(tm-define (gt-file-dialog-see text . opt)
+  (:synopsis "Wait until the file dialog shows a text which has @text")
+  ;; within opt ms (3 s by default), else a failure
+  (with limit (if (nnull? opt) (car opt) 3000)
+    (gt-step (string-append "file dialog: see " text)
+             (lambda ()
+               (cond ((gt-file-dialog-has? text) 'next)
+                     ((> (gt-retried-for) limit)
+                      (check-report #f (string-append "file dialog: see " text)
+                                    (string-append "not there; the dialog has "
+                                                   (gt-file-dialog-summary)))
+                      'next)
+                     (else 'retry))))))
+
+(tm-define (gt-file-dialog-closed . opt)
+  (:synopsis "Wait until no file dialog of the system is shown")
+  ;; within opt ms (3 s by default), else a failure
+  (with limit (if (nnull? opt) (car opt) 3000)
+    (gt-step "file dialog: closed"
+             (lambda ()
+               (cond ((not (gt-file-dialog-shown?)) 'next)
+                     ((> (gt-retried-for) limit)
+                      (check-report #f "file dialog: closed"
+                                    (string-append "still shown, with "
+                                                   (gt-file-dialog-summary)))
+                      'next)
+                     (else 'retry))))))
+
 (tm-define (gt-document-has? s)
   (:synopsis "Does the document of the current buffer have the text @s?")
   (string-contains? (object->string (tree->stree (buffer-tree))) s))

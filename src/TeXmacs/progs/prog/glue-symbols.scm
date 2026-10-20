@@ -61,6 +61,8 @@
 "gui-test-windows"
 "gui-test-set-pump"
 "gui-test-eval-later"
+"gui-test-file-dialog"
+"gui-test-file-dialog-do"
 "support-functionality?"
 "gui-version"
 "default-look-and-feel"

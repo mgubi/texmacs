@@ -40,7 +40,14 @@
 ns_chooser_widget_rep::ns_chooser_widget_rep (command _cmd, string _type,
                                               string _prompt):
   ns_widget_rep (file_chooser), cmd (_cmd), type (_type), prompt (_prompt),
-  position (coord2 (0, 0)), size (coord2 (100, 100)), file ("") {}
+  position (coord2 (0, 0)), size (coord2 (100, 100)), file ("")
+{
+  // the filter and the default suffix of the type (as qt_chooser_widget_rep):
+  // without them, a name saved without a suffix was given none by the panel,
+  // which asked about replacing the file of that name rather than the one
+  // saved (#400)
+  if (!set_type (_type)) set_type ("generic");
+}
 
 /*! The filter of the file type (see qt_chooser_widget_rep::set_type). */
 bool
@@ -149,12 +156,13 @@ ns_chooser_widget_rep::plain_window_widget (string s, command q) {
   return this;
 }
 
-/*! The pop-up menu of the filters of a file panel. */
-@interface TMChooserFilter : NSObject
+/*! The pop-up menu of the filters of a file panel, and its delegate. */
+@interface TMChooserFilter : NSObject <NSOpenSavePanelDelegate>
 {
 @public
   NSSavePanel* panel;
   NSArray* types;
+  NSString* suffix; // the default suffix of a name saved without one
 }
 - (void) choose: (NSPopUpButton*) sender;
 @end
@@ -167,9 +175,22 @@ ns_chooser_widget_rep::plain_window_widget (string s, command q) {
   [panel setAllowedFileTypes: [sender indexOfSelectedItem] == 0? types: nil];
 #pragma clang diagnostic pop
 }
+/*! A name typed without a suffix gets the default one before the panel
+    asks whether to replace a file, also with the filter of all files: the
+    suffix added after the panel closed (below) made its question about
+    another file than the one saved (#400). */
+- (NSString*) panel: (id) sender userEnteredFilename: (NSString*) name
+          confirmed: (BOOL) ok
+{
+  (void) sender; (void) ok;
+  if (suffix && [[name pathExtension] length] == 0)
+    return [name stringByAppendingPathExtension: suffix];
+  return name;
+}
 - (void) dealloc
 {
   [types release];
+  [suffix release];
   [super dealloc];
 }
 @end
@@ -211,6 +232,10 @@ ns_chooser_widget_rep::perform_dialog () {
     filter= [[[TMChooserFilter alloc] init] autorelease];
     filter->panel= panel;
     filter->types= [types retain];
+    if (save) {
+      filter->suffix= [to_nsstring (suffixes[0]) retain];
+      [panel setDelegate: filter];
+    }
     NSPopUpButton* pop= [[[NSPopUpButton alloc] init] autorelease];
     [pop addItemWithTitle: to_label (filter_name * " (" * desc * ")")];
     [pop addItemWithTitle: to_label (translate ("All files (*)"))];
@@ -231,7 +256,9 @@ ns_chooser_widget_rep::perform_dialog () {
   }
 
   file= "#f";
-  if ([panel runModal] == NSModalResponseOK) {
+  NSInteger answer= [panel runModal];
+  [panel setDelegate: nil];
+  if (answer == NSModalResponseOK) {
     string name= from_nsstring_utf8 ([[panel URL] path]); // not cork
     // the default suffix, when there is none (see qt_chooser_widget_rep)
     if (save && N(suffixes) > 0 && suffix (url_system (name)) == "")

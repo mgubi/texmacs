@@ -46,6 +46,8 @@ sets the first two.
 | `gui_test_texts ()` | `gui-test-texts` | The texts and icons drawn last in the window of the script, as `x\ty\tw\th\tpath\ttext` (window points; the path below) |
 | `gui_test_pump (on)` | `gui-test-set-pump` | Call `gui-test-pump` at each turn, while on; the script holds the mouse buttons meanwhile |
 | `gui_test_eval_later (cmd)` | `gui-test-eval-later` | A Scheme command at the next turn, as `-x` (the same for all ports) |
+| `gui_test_file_dialog ()` | `gui-test-file-dialog` | The file dialog of the system which is shown, as `kind\ttext`; none without one (below) |
+| `gui_test_file_dialog_do (line)` | `gui-test-file-dialog-do` | Act in it (below); 0 done, 1 not yet, 2 impossible |
 
 Vue, Qt and Cocoa have them all; the other ports (X11, SDL, Qtwk) have
 the defaults, which do nothing. Qt keeps its older commands too, which
@@ -78,6 +80,35 @@ the button only when the window system said that the pointer moved onto
 it, which posted events do not: a click on an item of a menu makes it the
 active one and sends Return to the menu, as the keyboard would.
 
+### The file dialogs of the system
+
+On macOS the three ports show the same panels to open and save a file
+(Cocoa its own, Qt by `QFileDialog`, Vue by SDL), and the two hooks of the
+file dialogs are the same for all, in `src/Plugins/MacOS/mac_test_panel.mm`
+(elsewhere they have none: a test of them is skipped there). The panels of
+the system are drawn by a service, out of the process, where no event of a
+test reaches them; a test (`TEXMACS_TEST=1`, which `run.sh` sets) asks
+AppKit for its panels of the process instead (`NSUseRemoteSavePanel`), its
+other implementation, with the same name field, buttons and alert to
+replace a file, and `texmacs.bin` run outside of an application gets an
+identifier of its own for them (`org.texmacs.upsilon.test`), without which
+they throw. The texts are the controls shown, by kind: `title`, `label`,
+`field` (the name), `button`, `disabled` (a button), `popup`, and
+`alert-label`, `alert-button` for the alert over the panel. The panel
+disables its buttons while it is not the key window, as when TeXmacs is
+not the active application, which a test does not make it: those are
+taken as enabled then, and pressed by their action. What a test does:
+
+| Line | What |
+|---|---|
+| `folder <path>` | the folder the panel shows (set, not chosen as a user would: it is not what the tests test) |
+| `name <text>` | the name typed in its field, by key events, instead of the name there |
+| `type <text>` | keys typed to the focus (in the list of an open panel, they select a file) |
+| `press <title>` | the button of the alert over the panel, else of the panel; not yet while it is disabled (the panel checks a name typed a moment later) |
+
+The buttons are pressed by their titles, which are those of the language
+of the system: the tests use the English ones.
+
 ## The steps (`gui-driver.scm`)
 
 ```scheme
@@ -105,6 +136,10 @@ active one and sends Return to the menu, as the keyboard would.
 | `(gt-see selector [ms])` | Wait until the text or icon is there (3 s at most, then fail) |
 | `(gt-window title [ms])` | Wait until a window whose title has `title` is shown, and make it the window of the script (5 s at most, then fail); `main` is the editor. A test opens its windows with `gt-eval-later`, then this |
 | `(gt-port name)` | The steps after it are for that port only; elsewhere the test stops there |
+| `(gt-file-dialogs)` | The steps after it need the file dialogs of the system; where the port does not reach them, the test stops there |
+| `(gt-file-dialog line [ms])` | Do `line` in the file dialog (above), once it is shown and the button enabled (5 s at most, then fail) |
+| `(gt-file-dialog-see text [ms])` | Wait until the file dialog shows a text which has `text` (3 s at most) |
+| `(gt-file-dialog-closed [ms])` | Wait until no file dialog is shown (3 s at most) |
 | `(gt-exit)` | At the end, quit TeXmacs with the status 1 if a check failed, else 0 |
 
 For the checks: `(gt-record . strings)` is what a callback of the test
@@ -112,8 +147,10 @@ calls (it also writes `got: ...` to the log), `(gt-recorded)` the list of
 what was recorded, in order; `(gt-document-has? text)` looks in the
 document of the current buffer, `(gt-window? title)` in the titles of the
 windows (`gui-test-windows`), and `(gt-find-text selector)` gives the box
-of a text or `#f`. A dialog or a popup is opened with `gt-eval-later`, from
-the loop of TeXmacs: a modal dialog opened by a step would hold it.
+of a text or `#f`; `(gt-file-dialog-shown?)` and `(gt-file-dialog-has? text
+[kind])` look at the file dialog. A dialog or a popup is opened with
+`gt-eval-later`, from the loop of TeXmacs: a modal dialog opened by a step
+would hold it (a file dialog with `"(choose-file ...)"`, as its menu does).
 
 ### The tests of every port
 
@@ -129,6 +166,8 @@ runs them all (or those named) and counts the failures:
 | `font` | the font selector in a window, which opens and closes |
 | `interactive` | the question in the footer, and its answer |
 | `widgets` | a choice list, an enum, a filtered choice and a tree, two lists with the same items told apart by `named` |
+| `save-dialog` | Save as in the file dialog of the system: a name without a suffix is saved as a `.tm` beside a file of that name, with no question about that file (#400); the alert to replace an existing `.tm`, its Cancel and its Replace |
+| `open-dialog` | Load in the file dialog of the system: Cancel loads nothing; a document chosen in the list by its name, then Open, is loaded |
 
 They replace nothing: the tests of Vue with the same names check the
 drawing too, by their snapshots.

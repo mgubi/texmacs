@@ -18,8 +18,17 @@ gui_test_eval_later (string cmd) {
   exec_delayed (scheme_cmd (cmd));
 }
 
+#ifdef OS_MACOS
+void mac_test_panel_init (); // MacOS/mac_test_panel.mm
+#endif
+
 void
 gui_test_start () {
+#ifdef OS_MACOS
+  // a test (TEXMACS_TEST=1, from tests/Plugins/Vue/run.sh) gets the file
+  // panels of the process, which its events reach
+  if (get_env ("TEXMACS_TEST") == "1") mac_test_panel_init ();
+#endif
   // TEXMACS_TEST_SCRIPT=<file> (TEXMACS_VUE_SCRIPT, its former name, in
   // Vue) runs a script once the event loop runs
   string file= get_env ("TEXMACS_TEST_SCRIPT");
@@ -43,6 +52,11 @@ bool gui_test_busy () { return false; }
 array<string> gui_test_texts () { return array<string> (); }
 array<string> gui_test_windows () { return array<string> (); }
 void gui_test_pump (bool on) { (void) on; }
+#endif
+
+#ifndef OS_MACOS
+array<string> gui_test_file_dialog () { return array<string> (); }
+int gui_test_file_dialog_do (string line) { (void) line; return 2; }
 #endif
 
 #if !defined (QTTEXMACS) || defined (QTWKTEXMACS)

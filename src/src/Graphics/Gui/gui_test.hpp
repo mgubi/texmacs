@@ -46,6 +46,17 @@ void gui_test_eval_later (string cmd);
 // runs the script (the same on all ports)
 void gui_test_start ();
 
+// the file dialog of the system (to open or save a file) which is shown,
+// as "kind\ttext" (title, label, field, button, disabled (a button),
+// popup, and alert-... for those of the alert over it); none when there
+// is none
+array<string> gui_test_file_dialog ();
+// act in it: "folder <path>", "name <text>", "type <text>", "press
+// <title>"; 0 done, 1 not yet (no dialog is shown, or the button is
+// disabled), 2 impossible; "supported" is 0 where the hooks are (on
+// macOS, MacOS/mac_test_panel.mm)
+int gui_test_file_dialog_do (string line);
+
 // driving the Qt interface by the labels of its widgets (qt_test.cpp)
 int gui_test_snapshot (string dir);
 array<string> gui_test_buttons ();

@@ -295,15 +295,18 @@
         (url-glue u ".tm")
         new-name)))
 
+(define (save-as-check-suffixed new-name name opts)
+  ;; the file dialog asked about replacing the file it gave (:overwrite),
+  ;; not the one with the suffix added: that one is asked about here
+  (with u (save-name-with-suffix new-name name)
+    (save-buffer-as-check-permissions
+     u name (if (== u new-name) opts (list-difference opts (list :overwrite))))))
+
 (tm-define (save-buffer-as-main new-name . args)
   ;;(display* "save-buffer-as-main " new-name "\n")
   (if (or (null? args) (not (url? (car args))))
-      (save-buffer-as-check-permissions
-       (save-name-with-suffix new-name (current-buffer))
-       (current-buffer) args)
-      (save-buffer-as-check-permissions
-       (save-name-with-suffix new-name (car args))
-       (car args) (cdr args))))
+      (save-as-check-suffixed new-name (current-buffer) args)
+      (save-as-check-suffixed new-name (car args) (cdr args))))
 
 (tm-define (save-buffer-as new-name . args)
   (:argument new-name texmacs-file "Save as")
