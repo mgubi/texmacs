@@ -14,6 +14,17 @@ have the details, and the problems go to the
 
 ## 20 October 2026
 
+- **Browser**: the page says how long the browser keeps your files. At the
+  first save of a file it asks the browser to keep them
+  (`navigator.storage.persist()`: Firefox asks the user, Chrome decides
+  by itself, Safari grants it mostly to Home Screen web apps); the top of
+  File → Files in this browser says "Kept until you clear the data of this
+  site" or "The browser may delete these files", with the date of the last
+  backup and a Back up button; and a short reminder at the bottom of the
+  page, at most once a day, when there are documents and no backup for
+  seven days. The help page and the limitations in the About text say
+  the same, with what Safari does
+  ([#406](https://github.com/mgubi/texmacs/issues/406)).
 - **Vue, Cocoa**: the main and mode icon bars can be put at the right of the
   document (Preferences → General → Main and mode icon bars: At the right
   of the document; `?bars=right` in the browser), in two columns mirrored

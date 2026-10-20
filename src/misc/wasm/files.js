@@ -258,11 +258,153 @@ var tmFiles = (function () {
   function backup () {
     return makeBackup ().then (function (b) {
       download (backupName (), b.blob);
+      setLocal (LAST_BACKUP, String (Date.now ()));
       toast ('Backup: ' + b.files + ' files, ' + humanSize (b.blob.size) +
              '. Documents which are not saved are not in it.');
+      if (current && current.safety) current.safety ();
       return b;
     }, function (err) { toast ('The backup could not be made: ' + err.message); });
   }
+  /****************************************************************************
+  * How safe the files are: persistent storage, the last backup, a reminder
+  ****************************************************************************/
+
+  // The browser may delete what a site keeps (best-effort storage): when it
+  // needs space, and Safari after seven days of its use without a visit to
+  // the site (Intelligent Tracking Prevention). navigator.storage.persist ()
+  // asks it to keep the data until the user clears them: asked at the first
+  // save of a file into the home in a visit (web-pre.js calls wrote), not at
+  // the load of the page, which saved nothing yet. Chrome answers from its
+  // heuristics (a bookmark, an installed app...) without a question, Firefox
+  // asks the user, Safari grants it to a web app of the Home Screen.
+  //
+  // The time of the last backup and of the last reminder are in
+  // localStorage, not in the home: they are about the storage of this
+  // browser, so they must not go into the backups and come back with a
+  // restore in another browser; they go away with the files when the data
+  // of the site are cleared; and a tab which does not keep the TeXmacs
+  // folder (web-pre.js) has them too. Without localStorage (blocked, a
+  // private window), they last for the visit.
+  var LAST_BACKUP = 'tm-last-backup', REMINDED = 'tm-backup-reminded',
+      PERSIST = 'tm-storage-persist', DAY = 86400000;
+  var local = {};
+  function getLocal (k) {
+    try { return localStorage.getItem (k); }
+    catch (e) { return local.hasOwnProperty (k) ? local[k] : null; }
+  }
+  function setLocal (k, v) {
+    local[k] = v;
+    try { localStorage.setItem (k, v); } catch (e) {}
+  }
+  function storageApi () {
+    return typeof navigator !== 'undefined' && navigator.storage &&
+           typeof navigator.storage.persisted === 'function' ? navigator.storage : null;
+  }
+  var persisted = null; // what the browser said: true, false, or null (not known)
+  var askedPersist = false;
+  // -> a promise of true or false
+  function checkPersisted () {
+    var st = storageApi ();
+    if (!st) return Promise.resolve (false);
+    return st.persisted ().then (function (p) { persisted = !!p; return persisted; },
+                                 function () { return false; });
+  }
+  // files of the home were written to the database (web-pre.js): at the
+  // first file of the visit, the browser is asked to keep them
+  function wrote (paths) {
+    if (askedPersist) return;
+    var files = (paths || []).filter (function (p) {
+      try { return FS.isFile (FS.stat (p).mode); } catch (e) { return false; }
+    });
+    if (files.length === 0) return;
+    askedPersist = true;
+    var st = storageApi ();
+    if (!st || typeof st.persist !== 'function') return;
+    checkPersisted ().then (function (p) {
+      if (p) return;
+      return st.persist ().then (function (granted) {
+        persisted = !!granted;
+        setLocal (PERSIST, JSON.stringify ({ time: Date.now (), granted: persisted }));
+        console.log ('TeXmacs: persistent storage ' + (persisted ? 'granted' : 'not granted'));
+        if (current && current.safety) current.safety ();
+      });
+    }).catch (function (e) { console.warn ('TeXmacs: persistent storage: ' + e); });
+  }
+  function lastBackup () {
+    var t = Number (getLocal (LAST_BACKUP));
+    return t > 0 ? t : null;
+  }
+  function sameDay (a, b) { return new Date (a).toDateString () === new Date (b).toDateString (); }
+  function backupDate (t) {
+    if (!t) return 'never';
+    if (sameDay (t, Date.now ())) return 'today';
+    if (sameDay (t, Date.now () - DAY)) return 'yesterday';
+    return new Date (t).toLocaleDateString (undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+  }
+  var SAFE_KEPT = 'Kept until you clear the data of this site.';
+  var SAFE_MAYBE = 'The browser may delete these files (Safari: 7 days unvisited, ' +
+                   'or history cleared).';
+  var SAFE_TIP = 'The browser keeps these files for this site only. Unless it agreed to ' +
+                 'keep them (persistent storage, asked at the first save), it may delete ' +
+                 'them when it needs space, and Safari deletes them after seven days of its ' +
+                 'use without a visit to this site. Clearing the data of the site, or the ' +
+                 'history of Safari, deletes them. A backup is a zip of all of them on ' +
+                 'your computer.';
+  // the line at the top of the panel: how safe the files are, the last
+  // backup and a button for one
+  function safetyLine () {
+    var line = el ('div', 'padding:6px 14px;border-bottom:1px solid #ddd;font-size:92%;' +
+                          'display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;color:#555');
+    line.id = 'tm-files-safety';
+    line.title = SAFE_TIP;
+    var state = el ('span', ''), when = el ('span', 'white-space:nowrap');
+    state.id = 'tm-files-safety-state'; when.id = 'tm-files-last-backup';
+    var b = button ('Back up', function () { backup (); });
+    b.id = 'tm-files-backup-now';
+    b.style.cssText += ';margin:0;padding:0 8px;font-size:92%';
+    b.title = 'Save a zip of all your files and of your TeXmacs folder on your computer';
+    line.appendChild (state); line.appendChild (when); line.appendChild (b);
+    function show () {
+      state.textContent = persisted ? SAFE_KEPT : SAFE_MAYBE;
+      state.style.color = persisted ? '#2b6a2b' : '#8a5700';
+      state.dataset.persisted = persisted ? 'yes' : 'no';
+      var t = lastBackup ();
+      when.textContent = 'Last backup: ' + backupDate (t) + '.';
+      when.title = t ? new Date (t).toLocaleString () : '';
+    }
+    show ();
+    checkPersisted ().then (show);
+    return { node: line, update: show };
+  }
+  // the documents of the user (not the TeXmacs folder): is there one?
+  function hasDocuments () {
+    function any (dir) {
+      return list (dir).some (function (e) {
+        if (e.path === USER_TM) return false;
+        return e.dir ? any (e.path) : true;
+      });
+    }
+    try { return any (HOME); } catch (e) { return false; }
+  }
+  // a reminder, once a day at most, when there are documents and no backup
+  // for seven days (or none)
+  var reminded = false;
+  function remind () {
+    if (reminded || (typeof tmStorageRemoved !== 'undefined' && tmStorageRemoved)) return;
+    var now = Date.now (), t = lastBackup (), last = Number (getLocal (REMINDED));
+    if (t && now - t < 7 * DAY) return;
+    if (last > 0 && sameDay (last, now)) return;
+    if (!hasDocuments ()) return;
+    reminded = true;
+    setLocal (REMINDED, String (now));
+    var days = t ? Math.floor ((now - t) / DAY) : 0;
+    toast (t ? 'Your last backup of the files kept in this browser is ' + days + ' days old.'
+             : 'The files kept in this browser have no backup yet.',
+           { ms: 12000, id: 'tm-backup-reminder', button: ['Back up', function () { backup (); }] });
+  }
+  if (typeof window !== 'undefined' && typeof tmProgress !== 'undefined')
+    tmProgress.running (function () { setTimeout (remind, 8000); });
+
   // the bytes of a backup -> { note, entries: [{ rel (in the home), bytes }] };
   // an error when they are not a backup
   async function readBackup (bytes) {
@@ -397,14 +539,26 @@ var tmFiles = (function () {
     return out;
   }
 
-  function toast (text) {
+  // opts: { ms (how long it stays), id, button: [text, onclick] }
+  function toast (text, opts) {
+    opts = opts || {};
     var t = document.createElement ('div');
     t.textContent = text;
+    if (opts.id) t.id = opts.id;
     t.style.cssText = 'position:fixed;left:50%;bottom:48px;transform:translateX(-50%);' +
       'background:#333;color:#fff;padding:8px 14px;border-radius:5px;z-index:20;' +
-      'font:13px -apple-system,Helvetica,sans-serif;opacity:.92';
+      'font:13px -apple-system,Helvetica,sans-serif;opacity:.92;' +
+      'max-width:calc(100vw - 32px);box-sizing:border-box';
+    if (opts.button) {
+      var b = document.createElement ('button');
+      b.textContent = opts.button[0];
+      b.style.cssText = 'margin-left:12px;padding:1px 9px;border:1px solid #aaa;border-radius:4px;' +
+        'background:#555;color:#fff;cursor:pointer;font:inherit';
+      b.onclick = function () { t.remove (); opts.button[1] (); };
+      t.appendChild (b);
+    }
     document.body.appendChild (t);
-    setTimeout (function () { t.remove (); }, 3500);
+    setTimeout (function () { t.remove (); }, opts.ms || 3500);
   }
 
   // ask TeXmacs to open a document (see vue_web_open_document)
@@ -490,11 +644,12 @@ var tmFiles = (function () {
     // the files are the user's, on this computer: nothing goes to a server
     var stored = el ('span', 'margin-left:auto;color:#777;font-size:90%',
                      'Stored in this browser only; nothing is sent anywhere.');
+    var safety = safetyLine ();
     var crumbs = el ('div', 'padding:6px 14px;color:#444');
     var tools = el ('div', 'padding:4px 14px 8px');
     var listing = el ('div', 'flex:1;overflow:auto;background:#fff;margin:0 14px;border:1px solid #ccc');
     var foot = el ('div', 'padding:10px 14px;display:flex;gap:8px;align-items:center');
-    box.appendChild (head); box.appendChild (places); box.appendChild (crumbs);
+    box.appendChild (head); box.appendChild (safety.node); box.appendChild (places); box.appendChild (crumbs);
     box.appendChild (tools);
     box.appendChild (listing); box.appendChild (foot);
 
@@ -734,7 +889,7 @@ var tmFiles = (function () {
       document.addEventListener (t, onkey, true);
     });
     document.body.appendChild (root);
-    current = { close: close };
+    current = { close: close, safety: safety.update };
     render ();
     if (nameInput) { nameInput.focus (); nameInput.select (); }
   }
@@ -893,6 +1048,14 @@ var tmFiles = (function () {
     zip: zip, unzip: unzip,
     backup: backup, restore: restore,
     // (for the tests: the backup without the download, a restore of bytes)
-    makeBackup: makeBackup, restoreBackup: restoreBackup
+    makeBackup: makeBackup, restoreBackup: restoreBackup,
+    // (web-pre.js: files of the home were saved)
+    wrote: wrote,
+    // (for the tests: the reminder now, the state of the storage)
+    remind: function () { reminded = false; remind (); },
+    storage: function () {
+      return { persisted: persisted, asked: askedPersist, lastBackup: lastBackup (),
+               record: getLocal (PERSIST), reminded: getLocal (REMINDED) };
+    }
   };
 })();

@@ -132,11 +132,35 @@
   the wallet opens it everywhere; a passkey added to it may not be there in
   another browser.
 
+  <paragraph|How long the browser keeps them>
+
+  At the first save of a file, <TeXmacs> asks the browser to keep the files
+  of the site (<em|persistent storage>). <name|Firefox> asks you,
+  <name|Chrome> decides by itself (from how you use the site: a bookmark, an
+  installed application...), and <name|Safari> grants it mostly to a web
+  application added to the Home Screen. When the browser agrees, it keeps
+  the files until you clear the data of the site; otherwise it may delete
+  them when it needs space.
+
+  The line at the top of <menu|File|Files in this browser...> says which:
+  <with|font-series|bold|Kept until you clear the data of this site>, or
+  <with|font-series|bold|The browser may delete these files>. It gives the
+  date of your last backup (or <with|font-series|bold|never>), with a
+  <with|font-series|bold|Back up> button. When your files have had no
+  backup for seven days (or none at all), a short reminder at the bottom of
+  the page says so, at most once a day, with the same button; there is none
+  while you have no documents.
+
   <\warning*>
-    Clearing the data of the site deletes your files, and Safari deletes the
-    data of a site which was not visited for seven days. Save a copy of the
-    documents you want to keep, or download a backup now and then.
+    Clearing the data of the site deletes your files, and so does clearing
+    the history of <name|Safari> by hand, which removes the data of the
+    sites too. <name|Safari> also deletes the data of a site after seven
+    days of its use without a visit to the site (a web application added to
+    the Home Screen counts only the days it is used). Save a copy of the documents you want to keep, or save a backup
+    now and then: the date of the last one is in the Files panel.
   </warning*>
+
+  <paragraph|Several tabs>
 
   <TeXmacs> Upsilon may be open in several tabs of the browser: each of
   them keeps the documents it saves, and the others see the new version.
@@ -280,6 +304,13 @@
   <paragraph|20 October 2026>
 
   <\itemize>
+    <item>Your files are safer: at the first save, <TeXmacs> asks the
+    browser to keep them (persistent storage); the top of
+    <menu|File|Files in this browser...> says whether it agreed, with the
+    date of your last backup and a <with|font-series|bold|Back up> button;
+    and a short reminder comes when your documents had no backup for seven
+    days.
+
     <item>The main and mode icon bars can be at the right of the document:
     <menu|Edit|Preferences|General|Main and mode icon bars|At the right of
     the document>, or <verbatim|?bars=right> in the address.

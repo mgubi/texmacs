@@ -341,6 +341,9 @@ var tmHome = (function () {
         busy = false;
         var docs = paths.filter (function (p) { return !inPrefs (p); });
         if (channel && docs.length > 0) channel.postMessage ({ type: 'wrote', paths: docs });
+        // (the first file saved asks the browser to keep the files: files.js)
+        if (docs.length > 0 && typeof tmFiles !== 'undefined' && tmFiles.wrote)
+          try { tmFiles.wrote (docs); } catch (e) {}
         if (again) { again = false; flush (); }
         if (done) done ();
       };
