@@ -134,14 +134,22 @@ get_from_web (url name) {
   string tmp_s= escape_sh (concretize (tmp));
   string cmd= "";
   
+  // give up when nothing is received for a while, as qt_download_file does;
+  // a page of error (404...) is not a copy of the file
+  string s= get_preference ("http request timeout");
+  string timeout= "10";
+  if (is_int (s) && as_int (s) > 0) timeout= s;
+
   if (tool == "wget") {
     cmd= "wget --header='User-Agent: TeXmacs-" TEXMACS_VERSION "' -q";
-    cmd << " --tries=1";
+    cmd << " --tries=1 --timeout=" << timeout;
     cmd << " -O " << tmp_s << " " << escape_sh (web_encode (as_string (name)));
   }
   
   if (tool == "curl") {
     cmd= "curl --user-agent TeXmacs-" TEXMACS_VERSION;
+    cmd << " --fail --silent --connect-timeout " << timeout;
+    cmd << " --speed-limit 1 --speed-time " << timeout;
     cmd << " " << escape_sh (web_encode (as_string (name)));
     cmd << " --output " << tmp_s;
   }
