@@ -14,6 +14,11 @@ have the details, and the problems go to the
 
 ## 20 October 2026
 
+- **Vue**: an icon of one's own in SVG (`(icon "pen.svg")` in a
+  `menu-bind`) is drawn at the size of the icons of the bars when its file
+  declares no size (only a `viewBox`) or one too large for a bar, as Qt
+  does: it was drawn at the size of its `viewBox`, 1000 points, and took
+  the whole bar (#394).
 - **Desktop (Vue)**: the wheel over a graphics moves the graphics as with
   Qt: it moved it 256 times too little, and the other way.
 - A list of thanks to the people who reported problems or sent code: in

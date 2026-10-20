@@ -28,4 +28,4 @@ named differently, open an issue or say so in your report.
 - **Marc Mertens** (on the texmacs-users list): the builds with GCC and with
   Qt 5 (#389), and tests on a document of 2000 pages.
 - **medwatt**: Vue under Wayland and tiling window managers: the interface
-  font, pasting in the fields, scrolling, dialogs (#391).
+  font, pasting in the fields, scrolling, dialogs (#391), the size of SVG icons (#394).

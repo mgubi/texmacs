@@ -975,8 +975,48 @@ mupdf_icon_at_resolution (picture p, int f) {
   return q;
 }
 
+// does the svg element of an SVG file declare a width and a height which
+// make sense for an icon (at most 64 points)? Many SVG files only give a
+// viewBox, which is then their size (1000 points for a viewBox of 1000)
+static bool
+svg_declares_icon_size (url u) {
+  string s;
+  if (load_string (u, s, false)) return false;
+  int b= search_forwards ("<svg", 0, s);
+  if (b < 0) return false;
+  int e= search_forwards (">", b, s);
+  if (e < 0) return false;
+  string tag= s (b, e);
+  for (int k= 0; k < 2; k++) {
+    string key= (k == 0 ? string (" width=") : string (" height="));
+    int i= search_forwards (key, 0, tag);
+    if (i < 0) return false;
+    i += N(key) + 1; // after the quote
+    int j= i;
+    while (j < N(tag) && (is_digit (tag[j]) || tag[j] == '.')) j++;
+    if (j == i || !is_double (tag (i, j))) return false;
+    if (as_double (tag (i, j)) > 64.0) return false;
+  }
+  return true;
+}
+
 picture 
 mupdf_load_xpm (url file_name) {
+  if (suffix (file_name) == "svg") {
+    // an icon of one's own in SVG ((icon "pen.svg") in a menu-bind): Qt
+    // draws the icons at the size of its bars, whatever their files say;
+    // here at the size of the icons of the mode bar (20 points high, the
+    // width in proportion) when the file declares none, or one too large
+    // for a bar (issue #394); in a folder named after a size (24x24) at
+    // that size, as the icons of TeXmacs
+    int w= 0, h= 0;
+    icon_box_size (head (file_name), w, h);
+    if (w == 0 && h == 0 && !svg_declares_icon_size (file_name)) h= 20;
+    if (w != 0 || h != 0) {
+      picture pic= mupdf_load_svg (file_name, w, h);
+      if (!is_nil (pic)) return pic;
+    }
+  }
   if (suffix (file_name) != "xpm") return mupdf_load_picture (file_name);
   url base= unglue (file_name, 4); // without ".xpm"
   url svg= resolve (url ("$TEXMACS_PIXMAP_PATH") * url (mupdf_icon_theme) *
