@@ -24,7 +24,8 @@ named differently, open an issue or say so in your report.
   server on hover (#399).
 - **Pierre-Henri Jondot** (phjo33): TeXmacs in the browser on an iPad
   without a keyboard (#377), the name proposed and the format of a document
-  saved the first time (#400).
+  saved the first time (#400), the menus of macOS
+  (#405).
 - **hammerfunctor**: the build with GCC 16 (#378), plug-ins and
   `get-environment-variable` (#379).
 - **Marc Mertens** (on the texmacs-users list): the builds with GCC and with
