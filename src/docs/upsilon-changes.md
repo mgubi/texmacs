@@ -14,6 +14,11 @@ have the details, and the problems go to the
 
 ## 21 October 2026
 
+- A large delimiter of a negative size (`<left|[|-5>`, a bracket made
+  smaller than its content) no longer crashes TeXmacs in the fonts which
+  assemble their delimiters, such as Fira in a beamer presentation
+  (`beamer` with `fira-font`): it has the size of the font
+  ([#411](https://github.com/mgubi/texmacs/pull/411)).
 - Part views: Document → Part also offers Show one part, Show several
   parts and Show all parts for the view itself, and in the modes one and
   several the list of its parts, as in an ordinary document

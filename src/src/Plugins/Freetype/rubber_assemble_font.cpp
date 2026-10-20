@@ -82,6 +82,9 @@ rubber_assemble_font_rep::search_font (string s, string& r) {
       if (s[pos-1] == '-') pos--;
       r= s (6, pos);
       int num= as_int (s (pos+1, N(s)-1));
+      // (a delimiter of a negative size, <left|[|-5>, has the base size,
+      // as in rubber_stix_font; get_font would read before larger)
+      if (num < 0) num= 0;
       int nr= num - 5;
       int code;
       if (num <= MAGNIFIED_NUMBER) return num;
