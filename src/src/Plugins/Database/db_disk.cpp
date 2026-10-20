@@ -99,6 +99,7 @@ void
 database_rep::notify_removed_field (db_line_nr nr) {
   db_line& l= db[nr];
   pending << (char) ((unsigned char) DB_REMOVE_FIELD);
+  if (nr < start_pending) removed_pending << nr;
   marshall_number (pending, nr);
   marshall_number (pending, (unsigned long int) l->expires);
   //cout << "Notify removed " << as_atom (l->id)
@@ -162,10 +163,36 @@ database_rep::replay (database clone, int start, bool all) {
       clone->notify_extended_field (cnr);
       //cout << "  Add " << from_atom (l->id) << ", " << from_atom (l->attr) << ", " << from_atom (l->val) << LF;
       if (l->expires != DB_MAX_TIME) {
-        clone->db[cnr]->expires= t;
+        clone->db[cnr]->expires= l->expires;
         clone->notify_removed_field (cnr);
         clone->outdated++;
         //cout << "  Removed " << from_atom (l->id) << ", " << from_atom (l->attr) << ", " << from_atom (l->val) << LF;
+      }
+    }
+  }
+}
+
+void
+database_rep::replay_removals (database clone) {
+  // the removals of saved lines which are not saved yet: the lines are
+  // found in the clone by their contents, since its numbering may differ
+  for (int i=0; i<N(removed_pending); i++) {
+    db_line& l= db[removed_pending[i]];
+    string id= from_atom (l->id), attr= from_atom (l->attr);
+    string val= from_atom (l->val);
+    if (!clone->atom_exists (id) || !clone->atom_exists (attr) ||
+        !clone->atom_exists (val)) continue;
+    db_atom cid= clone->as_atom (id), cattr= clone->as_atom (attr);
+    db_atom cval= clone->as_atom (val);
+    db_line_nrs nrs= clone->id_lines[cid];
+    for (int j=0; j<N(nrs); j++) {
+      db_line& cl= clone->db[nrs[j]];
+      if (cl->attr == cattr && cl->val == cval &&
+          cl->created == l->created && cl->expires == DB_MAX_TIME) {
+        cl->expires= l->expires;
+        clone->notify_removed_field (nrs[j]);
+        clone->outdated++;
+        break;
       }
     }
   }
@@ -204,6 +231,7 @@ database_rep::initialize () {
                 << as_string (db_name) << LF;
       error_flag= true;
     }
+    else time_stamp= last_modified (db_name);
   }
 }
 
@@ -229,6 +257,7 @@ database_rep::purge () {
       loaded << pending;
       pending= "";
       start_pending= N(db);
+      removed_pending= db_line_nrs ();
       time_stamp= last_modified (db_name);
       return;
     }
@@ -251,6 +280,7 @@ database_rep::purge () {
       loaded << pending;
       pending= "";
       start_pending= N(db);
+      removed_pending= db_line_nrs ();
       time_stamp= last_modified (db_name);
       return;
     }
@@ -305,6 +335,7 @@ check_for_updates () {
       database db (dbs[i]->db_name);
       // FIXME: a more incremental form of updating would be better
       //if (dbs[i]->pending != "") cout << "Replay pending";
+      dbs[i]->replay_removals (db);
       dbs[i]->replay (db, dbs[i]->start_pending, true);
       db->purge ();
       dbs[i]= db;

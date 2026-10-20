@@ -841,6 +841,7 @@
 "bib-default-upcase-first"
 "bib-purify"
 "bib-text-length"
+"bib-field-pages"
 "bib-prefix"
 "bib-empty?"
 "bib-field"

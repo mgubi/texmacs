@@ -152,11 +152,10 @@
     (cond
       ((or (bib-null? p) (nlist? p)) "")
       ((== (length p) 1) "")
-      ((== (length p) 2)
+      ((bib-single-page? p)
        `(concat ,(bib-translate "page ") ,(list-ref p 1)))
       (else
-	`(concat ,(bib-translate "pages ")
-		 ,(list-ref p 1) ,bib-range-symbol ,(list-ref p 2))))))
+	`(concat ,(bib-translate "pages ") ,(bib-page-range p))))))
 
 (tm-define (bib-format-chapter-pages x)
   ;; (:mode bib-plain?)
