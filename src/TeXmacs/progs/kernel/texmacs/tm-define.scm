@@ -348,6 +348,15 @@
 (define-public (not-define-option? item)
   (not (and (pair? item) (keyword? (car item)))))
 
+;; the stub of each name of lazy-define, as it was defined
+(define lazy-stub-table (make-ahash-table))
+
+(define-public (lazy-define-stub-set! name stub)
+  (ahash-set! lazy-stub-table name stub))
+
+(define-public (lazy-define-stub? name f)
+  (eq? f (ahash-ref lazy-stub-table name)))
+
 (define-public (lazy-define-one module opts name)
   (let* ((old (ahash-ref lazy-define-table name))
          (new (if old (cons module old) (list module))))
@@ -357,16 +366,20 @@
        (tm-define (,name . args)
          ,@opts
          ;; loading the module redefines the name; if it does not, the name
-         ;; is still bound to this stub, which must not call itself again
+         ;; is still bound to this stub, which must not call itself again.
+         ;; The stub is compared with the one which was defined, not with
+         ;; the binding when it is called: a stub which was kept as a value
+         ;; (the :function of a converter) may be called after the module
+         ;; was loaded, and then calls the definition of the module.
          (let* ((p (module-ref texmacs-user '%module-public-interface))
-                (self (module-ref p ',name #f))
                 (m (resolve-module ',module))
                 (r (module-ref p ',name #f)))
-           (if (or (not r) (eq? r self))
+           (if (or (not r) (lazy-define-stub? ',name r))
                (texmacs-error "lazy-define"
                               ,(string-append "Could not retrieve "
                                               (symbol->string name))))
-           (apply r args))))))
+           (apply r args)))
+       (lazy-define-stub-set! ',name ,name))))
 
 (define-public-macro (lazy-define module . names)
   (receive (opts real-names) (list-break names not-define-option?)

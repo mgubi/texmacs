@@ -385,6 +385,14 @@
   ;; than calling itself again
   (eval '(lazy-define (check check-lib) define-test-missing) (current-module))
   (check-error (define-test-missing) 'texmacs-error)
+  ;; a stub kept as a value (as the :function of a converter) and called
+  ;; after the name was defined calls the definition
+  (eval '(lazy-define (check check-lib) define-test-saved) (current-module))
+  (let ((saved (eval 'define-test-saved (current-module))))
+    (eval '(tm-define (define-test-saved x) (list 'saved x)) (current-module))
+    (check-false (eq? saved (eval 'define-test-saved (current-module))))
+    (check= (saved 1) '(saved 1))
+    (check= ((eval 'define-test-saved (current-module)) 2) '(saved 2)))
   ;; options apply to the stubs
   (eval '(lazy-define (check define-test-nowhere)
            (:interactive #t) define-test-lazy-opt)
