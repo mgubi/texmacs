@@ -21,7 +21,8 @@ named differently, open an issue or say so in your report.
 - **woutersj**: slow wheel scrolling on Linux (#373), the file dialogs of
   Vue on Linux (#374), too much momentum in the browser (#375), the
   malformed question dialog on Linux (#376), the messages of a language
-  server on hover (#399).
+  server on hover and its balloons (#399), the language servers of Julia
+  (#409).
 - **Pierre-Henri Jondot** (phjo33): TeXmacs in the browser on an iPad
   without a keyboard (#377), the name proposed and the format of a document
   saved the first time (#400), the menus of macOS
