@@ -293,8 +293,11 @@ concater_rep::typeset_set_binding (tree t, path ip) {
     if (N(keys) > 0) {
       path sip= ip;
       // (in the rewritten tree, the argument named by t[2] was substituted:
-      // the scope of the expand-as of a call has the call only)
-      if (N(t) >= 3 && (!is_nil (env->macro_src)) && !env->rewritten_tree) {
+      // the scope of the expand-as of a call has the call only; the macros
+      // which the typesetter expands itself there, like label, have theirs)
+      if (N(t) >= 3 && (!is_nil (env->macro_src)) &&
+          (!env->rewritten_tree ||
+           (is_atomic (t[2]) && env->macro_src->item->contains (t[2]->label)))) {
 	tree body= env->expand (tree (ARG, t[2]), true);
 	sip= obtain_ip (body);
       }
@@ -418,9 +421,10 @@ concater_rep::typeset_flag (tree t, path ip) {
   string col = env->exec_string (t[1]);
   path sip= ip;
   // (see typeset_set_binding)
-  if ((N(t) >= 3) && (!is_nil (env->macro_src)) && !env->rewritten_tree) {
+  if ((N(t) >= 3) && (!is_nil (env->macro_src))) {
     string var= env->exec_string (t[2]);
-    sip= env->macro_src->item [var];
+    if (!env->rewritten_tree || env->macro_src->item->contains (var))
+      sip= env->macro_src->item [var];
   }
   if (((N(t) == 2) || is_accessible (sip)) && (!env->read_only)) {
     marker (descend (ip, 0));
