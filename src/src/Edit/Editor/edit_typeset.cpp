@@ -441,26 +441,31 @@ edit_typeset_rep::environment_update () {
   ::primitive (ste, h);
 }
 
-void
-edit_typeset_rep::typeset_rewritten_changes (path p, tree old_t, tree new_t) {
+static inline bool
+same_rewritten (tree old_t, tree new_t) {
   // the subtrees of the rewritten tree which did not change are the same
-  // trees (the rewriter memorizes its results): the typesetter is told
-  // about the others only, the smallest which changed. A node whose
+  // trees (the rewriter memorizes its results); atoms made again, such as
+  // the names in the expand-as of the macro calls, have the same strings
+  if (weak_equal (old_t, new_t)) return true;
+  return is_atomic (old_t) && is_atomic (new_t) &&
+         old_t->label == new_t->label;
+}
+
+void
+edit_typeset_rep::typeset_rewritten_changes (path rp, tree old_t, tree new_t) {
+  // the typesetter is told about the smallest subtrees of the rewritten
+  // tree which changed (rp is the path, reversed, as an ip). A node whose
   // number of children changed is replaced as a whole: the insertions and
   // removals of the bridges move the places of the bridges which follow,
   // which are here the places of the document, moved by the document.
-  if (weak_equal (old_t, new_t)) return;
-  // (atoms made again, such as the names in the expand-as of the macro
-  // calls, are compared by their strings)
-  if (is_atomic (old_t) && is_atomic (new_t) && old_t->label == new_t->label)
-    return;
   if (is_atomic (old_t) || is_atomic (new_t) ||
       L(old_t) != L(new_t) || N(old_t) != N(new_t)) {
-    ::notify_assign (ttt, p, new_t);
+    ::notify_assign (ttt, reverse (rp), new_t);
     return;
   }
   for (int i=0; i<N(new_t); i++)
-    typeset_rewritten_changes (p * i, old_t[i], new_t[i]);
+    if (!same_rewritten (old_t[i], new_t[i]))
+      typeset_rewritten_changes (path (i, rp), old_t[i], new_t[i]);
 }
 
 tree

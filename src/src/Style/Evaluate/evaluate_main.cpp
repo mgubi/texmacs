@@ -138,6 +138,7 @@ is_layout_value (tree_label l) {
   case GET_BINDING:
   case HAS_BINDING:
   case _PATTERN:
+  case HARD_ID:
     return true;
   default:
     return false;
@@ -533,7 +534,10 @@ evaluate_impl (tree t) {
 
   /* Linking primitives */
   case HARD_ID:
-    return evaluate_hard_id (t);
+    // (the identifier is made by the typesetter, from its environment and
+    // the address of the tree: the rewriter's would change with the address
+    // of its environment, at each change before it)
+    return evaluate_compound_children (t);
   case SCRIPT:
     return evaluate_script (t);
   case HLINK:

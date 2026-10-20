@@ -81,9 +81,14 @@ evaluate_set_binding (tree t) {
       if (!is_atomic (keys[i]))
 	return tree (_ERROR, "bad set binding");
     value= evaluate (t[0]);
+    // (the same trees when nothing changed: the assignment then finds its
+    // memorizer and gives the same environment, and the evaluations which
+    // follow are found in theirs; a copy, or a new empty tuple, would give
+    // a new environment at each evaluation)
+    static tree no_tags (TUPLE);
     assoc_environment local (2);
-    local->raw_write (0, string ("the-tags"), tree (TUPLE));
-    local->raw_write (1, string ("the-label"), copy (value));
+    local->raw_write (0, string ("the-tags"), no_tags);
+    local->raw_write (1, string ("the-label"), value);
     assign (std_env, local);
   }
   else if (N(t) >= 2) {

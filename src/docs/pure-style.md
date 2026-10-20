@@ -448,12 +448,43 @@ typed and 5 new paragraphs in the middle of the document):
 |---|---|---|---|---|
 | glue reference (77 pages) | 0.8 ms | 1.2 ms (501 ms before) | 1.8 ms | 2.2 ms |
 | structure page of the manual | 0.45 ms | 0.55 ms | 0.8 ms | 6.2 ms |
-| conventions page | 2.4 ms | 5.9 ms | | |
+| conventions page | 2.3 ms | 4.85 ms (5.9 before the fixes below) | | |
 
 The rewriter itself takes 0.55 ms per keystroke on the glue reference and
-1.6 ms on the conventions page, whose keystroke falls in a table which is
-evaluated again (1660 evaluations). A new paragraph replaces its whole
+about 1.2 ms on the conventions page. A new paragraph replaces its whole
 document, hence the 6.2 ms of the structure page.
+
+**The conventions page, investigated.** Its keystroke falls in the table of
+the keyboard modifiers, a `big-table`.
+
+- Each keystroke also changed 4 strings in a later paragraph: the
+  `hard-id` of its two hyperlinks, which the rewriter made from the address
+  of its environment and of the tree (`%<env>-<tree>`); the environment
+  being a new object after the edit, the identifiers changed and the
+  typesetter typeset the hyperlinks again. `hard-id` is now left to the
+  typesetter (a residual), which makes the identifier from its own
+  environment, constant, and the address of the tree, memorized.
+- The comparison of the rewritten trees made the path of every child of
+  the nodes on the changed branch (`p * i`, a copy of the path each) before
+  comparing it: it now compares first, and carries the path reversed.
+- `set-binding` gave `the-tags` a new empty tuple and `the-label` a copy of
+  its value at each evaluation (now the same trees); this made no
+  measurable difference here.
+
+What remains is the rewriter's own time, 1660 evaluations of which 129 are
+found in the memorizers: everything after the table is evaluated again,
+because the environment after the table is a new object. The cause is the
+substitution of the arguments of a macro (`expand`): the parts of the body
+which hold an argument are new trees whenever the macro is expanded, even
+those which hold only arguments which did not change (here, the paddings of
+`padded-normal` around the `fig` argument of `render-big-figure`, which is
+the edited table). Their values, computed again as new trees, give new keys
+and a new environment. Memorizing the expansion of each part of a body by
+the arguments which it holds (their addresses) would keep those parts, and
+what is computed from them, the same trees; together with the keys made of
+the inputs actually read (step 3) this is the next optimisation of the
+rewriter. The typesetting itself is about 1 ms slower than without the
+flag on this page (2.85 against 1.85 ms), not investigated further.
 
 `tests/style/compare-edits.sh` makes the same edits (typing, a new
 paragraph, typing, a backspace, at six places, typesetting after each) with
