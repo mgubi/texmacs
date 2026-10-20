@@ -4883,6 +4883,14 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(remote-files-refresh)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|remote_files_refresh> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
     <scm|(set-file-focus <scm-arg|url>)>
 <explain-synopsis|no synopsis>
   <|explain>
