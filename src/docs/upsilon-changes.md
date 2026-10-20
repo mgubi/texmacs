@@ -14,6 +14,13 @@ have the details, and the problems go to the
 
 ## 20 October 2026
 
+- **Site**: a page for [TeXmacs Fixes](https://mgubi.github.io/texmacs/fixes.html),
+  the conservative version: the stock TeXmacs (Guile 1.8, Qt 6) with the
+  bug fixes of `wip_fixes` and nothing else, for macOS (Apple silicon and
+  Intel), Linux (an AppImage) and Windows (an installer and a zip), built
+  by the CI of `wip_fixes` (`fixes_ci`) into the pre-release `fixes-latest`.
+  It installs beside the stock TeXmacs and TeXmacs Upsilon, and shares the
+  home of the stock TeXmacs.
 - **Vue**: the input fields of the dialogs copy and paste the accented
   letters and the symbols as they are, in UTF-8: an alpha copied became
   the text `<alpha>` (before, nothing), and an accented letter pasted from

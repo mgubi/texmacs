@@ -129,7 +129,7 @@ all: $(OUT)/texmacs.js
 # declared in shell.html
 WEB_ICONS := $(foreach n,16 32 48 64 128 192,$(OUT)/web/texmacs-vue-$(n).png) $(OUT)/web/favicon.ico
 
-web: $(OUT)/web/texmacs.html $(OUT)/web/texmacs-files.json $(WEB_ICONS) $(OUT)/web/index.html $(OUT)/web/downloads.html $(OUT)/web/features.html $(SCREENSHOTS) $(OUT)/web/changes.html $(OUT)/web/changes.md $(OUT)/web/thanks.html $(OUT)/web/thanks.md tikzjax asymptote python r
+web: $(OUT)/web/texmacs.html $(OUT)/web/texmacs-files.json $(WEB_ICONS) $(OUT)/web/index.html $(OUT)/web/downloads.html $(OUT)/web/features.html $(SCREENSHOTS) $(OUT)/web/changes.html $(OUT)/web/changes.md $(OUT)/web/thanks.html $(OUT)/web/thanks.md $(OUT)/web/fixes.html $(OUT)/web/texmacs-64.png tikzjax asymptote python r
 
 # the TeX of the TikZ plugin (plugins/tikz, src/docs/wasm/tikzjax.md):
 # TikZJax, fetched by get-tikzjax.sh, without its fonts and the part of its
@@ -214,6 +214,16 @@ $(OUT)/web/index.html: $(W)/index.html
 	cp $< $@
 
 $(OUT)/web/downloads.html: $(W)/downloads.html
+	@mkdir -p $(OUT)/web
+	cp $< $@
+
+# the page of TeXmacs Fixes (the packages of wip_fixes, fixes-latest), with
+# the icon of the stock TeXmacs
+$(OUT)/web/fixes.html: $(W)/fixes.html
+	@mkdir -p $(OUT)/web
+	cp $< $@
+
+$(OUT)/web/texmacs-64.png: $(TM)/TeXmacs/misc/images/texmacs-64.png
 	@mkdir -p $(OUT)/web
 	cp $< $@
 
