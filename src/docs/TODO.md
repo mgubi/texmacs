@@ -7,13 +7,15 @@ went); add what you find. Paths are relative to the repository root.
 The directions of the project, wished for and not yet begun, are in
 [`src/TODO.md`](../TODO.md).
 
-## Waiting for a decision
+## Next
 
-- **Merge PR #215 into `wip_fixes`.** It fixes the keyboard maps
-  (`kbd-unmap` rewrites keys, reverse bindings, `:require` conditions,
-  graphics menus, a bare predicate in `kbd-unmap`). Then merge `wip_fixes`
-  into `upsilon_texmacs` again. (#311, `delayed (:refresh ms)`, was merged on
-  2026-10-14 and is here; the developer manual says how `:refresh` works.)
+- **Merge `wip_fixes` into `upsilon_texmacs` again.** After the merge of
+  2026-10-20 (6dcee0776a) `wip_fixes` took some forty more PRs the same
+  evening (95 commits ahead at 22:00 on 2026-10-20): among them #215 (keyboard
+  maps), #345 (the server backups are registered, #319), #347, #382,
+  #383, #387 (help caches), #390 and #410. (#311, `delayed (:refresh ms)`,
+  is here since 2026-10-14; the developer manual says how `:refresh`
+  works.)
 
 ## Bugs found, not fixed
 
@@ -40,16 +42,13 @@ The directions of the project, wished for and not yet begun, are in
   2026-10-18, all as they should be: the cursor in a formula with primes,
   accents and negations (Vue test `math-cursor`), the font design page with
   its row of variants (IBM Plex), Format > Font > Weight (with "complex
-  actions" set to menus; the eight weights of IBM Plex, Light applied). Not
-  compiled anywhere yet: the Linux and Windows branches of the
-  font path in `src/src/Plugins/Freetype/tt_file.cpp` (TeX Live of any year
-  on Linux). Seen and not traced: a bus error at startup (three times, never
-  reproduced). (The four import checks of the suite `latex` which failed on
+  actions" set to menus; the eight weights of IBM Plex, Light applied). The
+  Linux and Windows branches of the font path in
+  `src/src/Plugins/Freetype/tt_file.cpp` (TeX Live of any year on Linux)
+  are compiled by the CI, never run against a TeX Live on Linux. Seen and
+  not traced: a bus error at startup (three times, never reproduced). (The four import checks of the suite `latex` which failed on
   the first run with a new home directory: the branch of the audit lacked
   2ffd02fbcc, PR #259, which is here; checked on 2026-10-18.)
-- **Cursor history.** PR #337 on `wip_fixes` holds the fix which is already
-  here (278d12fc27): a saved position whose buffer was closed was read
-  after its tree was freed.
 None left from the list of 2026-10-07. The fixes are in e6c092506c (ports,
 build, docs, fonts), in the commit "Qt pipes: commands run by sh, in a
 process group stopped as a whole" and in the merge of `wip_fixes`
@@ -65,20 +64,30 @@ no headless mode. The Widkit duplicates are fixed on `wip_other_guis` too.
   54dcfc0cd0: the group of the program is waited for before Qt closes the
   pipes. Checked 160 times on macOS (Qt reaps the program from its SIGCHLD
   handler). The Linux branch, which skips the zombie of the program by
-  reading `/proc`, passed one CI run only: watch the next runs of the
-  Linux Qt job (a regression would show as a stop of 2 s each, the suites
-  much slower than 5 minutes, rather than as a failure).
+  reading `/proc`, passed every run of the Linux Qt job since (five on
+  2026-10-20, the suites in 5 to 8 minutes, for 57 suites where there were
+  48); a regression would show as a stop of 2 s each rather than as a
+  failure.
 - **Docs check** (`src/tests/docs/check.sh`): ended its TeXmacs with
   `(quit)`, which S7 does not have, so every book waited for the timeout;
-  fixed in 6415686958 (the English books take 2 minutes).
+  fixed in 6415686958 (the English books take 2 minutes). The statistics of
+  the books in `src/tests/docs/ref/summary.txt` are stale for es, it, pt
+  and zh (set on 2026-10-04) and for the table of contents of en: the
+  manual grew since (converters, Zotero, Git, bibliography, code
+  features), and the other languages take the new pages in English. A
+  full run on Linux on 2026-10-20 (38c6b79047) found nothing else; refresh
+  with `tests/docs/check.sh -b -u` on macOS. On a machine without the
+  locales of the manuals (de, es, fr, it, pl, pt, zh) every book adds
+  "locale ... not found" warnings, counted as new problems.
 
 - **Remote tools: what the check of 2026-10-08 left** (issues of
   mgubi/texmacs). #319: the backups of the server are never registered,
-  `server-backup.scm` is not loaded (where to hook it is to decide). #322:
-  the page cannot fetch the artwork of texmacs.org (CORS) and falls back
-  to the thumbnails. The fixes of #315, #316, #317 and #318 are here and
-  proposed for `wip_fixes` (PRs #323 to #326): the same changes, which
-  merge without conflict. The rename dialog (#318) was tried in Vue only.
+  `server-backup.scm` was loaded before the server existed: fixed by #345
+  on `wip_fixes`, here with the next merge. #322: the page cannot fetch the
+  artwork of texmacs.org (CORS) and falls back to the thumbnails. The fixes
+  of #315 to #318 went to `wip_fixes` within #330 (PRs #323 to #326 were
+  folded into it), which is here. The rename dialog (#318) was tried in Vue
+  only.
 
 - **CSL: the open points of the processor** (the later forms of citations
   which are evaluated without being typeset, the rules of
@@ -104,19 +113,27 @@ no headless mode. The Widkit duplicates are fixed on `wip_other_guis` too.
   of every tag): harmless, not traced.
 - **Windows: a typesetting crash when a highlighter is installed late**
   (a tree-sitter or LSP highlighter which starts after the document was
-  typeset). Seen on the Windows CI only; not reproduced elsewhere.
-- **Issues of 2026-10-19 still open.** #379 (`get-environment-variable`
-  undefined when plugins start): not reproduced, the reporter was asked
-  where the code comes from; probably Scheme of another TeXmacs in
-  `~/.TeXmacs`, which TeXmacs Upsilon no longer reads since it has its own
-  home (`~/.TeXmacs_Upsilon`, 12255954f8). If it is not, alias
-  `get-environment-variable` to `getenv` under S7. #376 (a malformed
-  question dialog on Linux): 3d3491a8cf waits for the size of a window
-  (`SDL_SyncWindow` in `set_size`), not tried on Linux yet: to be checked
-  with a Linux build (CI, or a Lima VM with a window manager) before
-  closing. #377 (the browser version on an iPad) is closed: the keyboard
-  button (b6d461ef0d) and the thumbs of the scroll bars dragged by a finger
-  (b543f74430) were tried in the iPad simulator of Xcode.
+  typeset). Seen on the Windows CI only; not reproduced elsewhere, and not
+  in the five Windows runs of 2026-10-20.
+- **#376, the question dialog of Vue on Linux: not fixed for its
+  reporter.** Closed on 2026-10-20 after the ThorVG fix (the dialog comes
+  out right on the Azure VM, Xfce and X11), but the reporter still sees it
+  now and then on GNOME with Wayland, and TeXmacs crashed (segmentation
+  fault) on Ctrl+Q with unsaved changes, then Esc in the question dialog.
+  To reopen, and to try on GNOME/Wayland (the VM has Xfce only).
+- **Fixed, waiting for the reporter** (issues open on mgubi/texmacs): #399
+  (hover balloons of the language servers, which still vanished at times:
+  d2165b5b31), #400 (Save as of Cocoa and the `.tm` suffix: a494889452),
+  #407 (TeX symbols as squares with `fonts-lyx` installed: 0774d20ef0),
+  #408 (a book of 2000 pages 4x slower than stock: 842ee19180,
+  786f99eae3), #409 (the language servers of Julia: 068f74706f).
+- **GCC.** The Vue port builds with GCC since 6c494fbbaf, and the Linux Vue
+  job and AppImage use it (515da759d8); the Windows Vue job stays on
+  clang (MinGW GCC not tried). Two suites fail on a plain Ubuntu 24.04
+  (Azure VM, with GCC and with clang alike) and pass on the CI: `git`
+  (`git-remote-branches` lists no `origin` with Git 2.43) and
+  `misc-modules` (spell checking of the language "klingon" answers no
+  error with aspell installed): assumptions of the tests to fix.
 
 - **Qt: a rare empty answer in the footer** (test `tests/gui/interactive`,
   branch `wip_gui_scripting`, 2026-10-20): once in some twenty runs on
