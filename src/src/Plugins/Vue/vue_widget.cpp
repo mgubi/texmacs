@@ -6957,14 +6957,18 @@ vue_simple_widget_rep::do_layout () {
     if (mouse_action == "wheel" && is_editor_widget () &&
         as_bool (call ("wheel-capture?"))) {
       // the editor wants the wheel (in graphics mode, see QTMWidget::
-      // wheelEvent): it gets it as a "wheel" event, deltas in points
-      // (the displacement of a trackpad, as Qt's pixelDelta), instead of
-      // the view being scrolled
-      // (mouse_data is in SI here, ren->pixel per device pixel)
+      // wheelEvent): it gets it as a "wheel" event instead of the view
+      // being scrolled, with the deltas of Qt: the pixelDelta of the event
+      // in the units of TeXmacs (from_qpoint: PIXEL per point, the vertical
+      // one negated), whose positive values move the contents down and
+      // right, where those of mouse_data move the view up and right
+      // (mouse_data is in SI here, ren->pixel per device pixel). They were
+      // in points, with the signs of the view: 256 times too small, and a
+      // graphics barely moved
       array<double> data;
       if (N(mouse_data) == 2) {
         double f= (double) ren->pixel * (win ? win->density : 1.0f);
-        data << mouse_data[0] / f << mouse_data[1] / f;
+        data << (-mouse_data[0] / f) * PIXEL << (-mouse_data[1] / f) * PIXEL;
       }
       handle_mouse ("wheel", x, y, (int) mouse_state, mouse_time, data);
     }

@@ -14,6 +14,8 @@ have the details, and the problems go to the
 
 ## 20 October 2026
 
+- **Desktop (Vue)**: the wheel over a graphics moves the graphics as with
+  Qt: it moved it 256 times too little, and the other way.
 - A list of thanks to the people who reported problems or sent code: in
   Help > TeXmacs Upsilon features (section Thanks), on the site
   ([thanks](https://mgubi.github.io/texmacs/thanks.html)) and on GitHub,

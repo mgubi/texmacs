@@ -267,6 +267,14 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(gui-test-windows)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|gui_test_windows> which returns
+    <scm|array_string>.
+  </explain>
+
+  <\explain>
     <scm|(gui-test-set-pump <scm-arg|bool>)>
 <explain-synopsis|no synopsis>
   <|explain>
