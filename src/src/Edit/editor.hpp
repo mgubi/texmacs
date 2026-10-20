@@ -237,6 +237,8 @@ public:
   virtual void go_page_down () = 0;
   virtual void go_to (path p) = 0;
   virtual void go_to_correct (path p) = 0;
+  virtual void go_to_after_change (path p) = 0;
+  virtual void flush_cursor_hook () = 0;
   virtual void go_to_start (path p) = 0;
   virtual void go_to_end (path p) = 0;
   virtual void go_to_border (path p, bool at_start) = 0;

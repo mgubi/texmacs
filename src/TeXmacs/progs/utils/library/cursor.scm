@@ -155,6 +155,10 @@
 (tm-define (notify-cursor-moved status)
   (noop))
 
+; Hook called after undo and redo have put the cursor at the change
+(tm-define (notify-undo-redo)
+  (noop))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Predicates
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

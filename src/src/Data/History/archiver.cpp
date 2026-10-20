@@ -192,7 +192,9 @@ archiver_rep::apply (patch p) {
   bool global_old= busy_versioning;
   versioning= true;
   busy_versioning= true;
-  ::apply (p, the_et);
+  // the trees of the patch become part of the document: apply a copy, or
+  // later changes of the document in place would change the archive
+  ::apply (copy (p), the_et);
   versioning= old;
   busy_versioning= global_old;
 }
@@ -285,7 +287,8 @@ archiver_rep::add (modification m) {
     //cout << "Change " << the_owner << " -> " << get_author () << "\n";
     confirm ();
   }
-  else the_owner= get_author ();
+  // also after a confirmation, which leaves no owner
+  the_owner= get_author ();
   modification i= invert (m, the_et);
   patch q (i, m);
   //cout << "Add [" << the_owner << "] " << q << "\n";
@@ -298,7 +301,8 @@ archiver_rep::start_slave (double a) {
     //cout << "Change " << the_owner << " -> " << get_author () << "\n";
     confirm ();
   }
-  else the_owner= get_author ();
+  // also after a confirmation, which leaves no owner
+  the_owner= get_author ();
   patch q (a, false);
   //cout << "Add [" << the_owner << "] " << q << "\n";
   current= patch (q, current);
@@ -328,8 +332,13 @@ void
 archiver_rep::confirm () {
   if (active ()) {
     current= patch (the_owner, compactify (current));
-    if (nr_children (remove_set_cursor (current)) == 0)
+    if (nr_children (remove_set_cursor (current)) == 0) {
+      // only cursor positions: nothing to archive, and no owner either, or
+      // the first change of the next step would be confirmed on its own,
+      // as a change of this owner
       current= make_compound (0);
+      the_owner= 0;
+    }
     if (active ()) {
       //cout << "Confirm " << current << "\n";
       archive= patch (current, archive);
