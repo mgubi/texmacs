@@ -20,7 +20,8 @@ named differently, open an issue or say so in your report.
 - **Yuan Fu** (casouri): building on macOS with MacPorts (#4).
 - **woutersj**: slow wheel scrolling on Linux (#373), the file dialogs of
   Vue on Linux (#374), too much momentum in the browser (#375), the
-  malformed question dialog on Linux (#376).
+  malformed question dialog on Linux (#376), the messages of a language
+  server on hover (#399).
 - **Pierre-Henri Jondot** (phjo33): TeXmacs in the browser on an iPad
   without a keyboard (#377).
 - **hammerfunctor**: the build with GCC 16 (#378), plug-ins and
@@ -29,3 +30,5 @@ named differently, open an issue or say so in your report.
   Qt 5 (#389), and tests on a document of 2000 pages.
 - **medwatt**: Vue under Wayland and tiling window managers: the interface
   font, pasting in the fields, scrolling, dialogs (#391), the size of SVG icons (#394).
+- **mlalaude**: the preferences of the AI sessions, and a session asked a
+  question without an API key (#398).

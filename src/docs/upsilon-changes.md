@@ -14,6 +14,14 @@ have the details, and the problems go to the
 
 ## 20 October 2026
 
+- In a source file which a language server follows, the mouse resting on
+  an error shows its message (and then what the server says of the word):
+  the balloon showed only the latter, which for an unknown name is
+  nothing, and each one gave warnings, "The required path does not exist",
+  which Qt showed in a window
+  ([#399](https://github.com/mgubi/texmacs/issues/399)). The same with
+  Shift+F12 at the cursor. The lines of the balloon are no longer
+  justified.
 - **Remote tools**: in Remote > Client preferences, three switches, all on
   by default: the heartbeat which watches a connection, the window opened
   when a connection is lost (now once for connections lost together, not
