@@ -631,8 +631,11 @@ evaluate (tree t) {
   memorizer mem= evaluate_memorizer (std_env, t);
   if (is_memorized (mem)) {
     evaluate_hits++;
-    if (style_trace) cout << UNINDENT << "Memorized " << mem->get_tree () << LF;
     std_env= mem->get_environment ();
+    if (style_trace) cout << UNINDENT << "Memorized "
+         << "[" << as_hexadecimal ((pointer) mem->get_tree ().operator -> ())
+         << ", " << as_hexadecimal ((pointer) std_env.operator -> ()) << "] "
+         << mem->get_tree () << LF;
     return mem->get_tree ();
   }
   memorize_start ();
@@ -641,7 +644,12 @@ evaluate (tree t) {
   mem->set_tree (r);
   mem->set_environment (std_env);
   memorize_end ();
-  if (style_trace) cout << UNINDENT << "Computed " << mem->get_tree ()
+  // (the trace gives the addresses of the tree and of the environment after
+  // the evaluation, as those before it in "Evaluate")
+  if (style_trace) cout << UNINDENT << "Computed "
+       << "[" << as_hexadecimal ((pointer) mem->get_tree ().operator -> ())
+       << ", " << as_hexadecimal ((pointer) std_env.operator -> ()) << "] "
+       << mem->get_tree ()
     // << " at " << obtain_ip (r);
        << LF;
   return mem->get_tree ();

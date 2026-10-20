@@ -526,6 +526,117 @@ macro calls, all the points find the same paths, but 2 on the conventions
 page, at the start of a key in a table, which find the same place one
 level deeper (in the `small` inside a `with`).
 
+### Analysis of a keystroke (October 20)
+
+A keystroke in the table of the keyboard modifiers of the conventions page
+(`main/start/man-conventions`), the case where the flag cost most, studied
+until every millisecond had a cause. Tools: the `style` trace, which gives
+the addresses of the tree and of the environment before (`Evaluate`) and
+after (`Computed`, `Memorized`) each evaluation; the counters of the
+typesetter (`edit_profile`: bridges typeset again or used again, lines
+logged), printed for the occasion without a window.
+
+**What happens.** Without the flag: the keystroke modifies the document
+(`edit_modify_rep::notify_insert`), the typesetter's bridges along the path
+are marked as changed, and the typesetting pass typesets again the bridges
+of that path (14) and uses the others again (17), most of them through the
+fingerprint of the environment (`bridge_rep::same_inputs`: the whole
+environment as it was). With the flag: the modification only updates the
+clean copy (`copy_announce`) and marks the tree as changed; the typesetting
+pass first rewrites the document (`style_rewrite`, memorized), compares the
+new rewritten tree with the old one (`typeset_rewritten_changes`), tells
+the typesetter about the subtrees which changed, and then the typesetter
+works as without the flag on that tree.
+
+| per keystroke | without the flag | with the flag |
+|---|---|---|
+| keystroke | 2.25 ms | 4.65 ms |
+| typesetting the bridges | 1.71 ms | 2.82 ms |
+| bridges typeset again / used again | 14 / 17 | 21 / 14 |
+| lines logged for repainting | 2 | 8 |
+| rewriting | | about 1.2 ms (1660 evaluations, 129 memorized) |
+
+Two independent causes, both of the same kind: an identity which the
+caches rely on is lost.
+
+**1. The typesetter: the automatic labels.** With the flag, the paragraphs
+after the table were checked again and three of them typeset again, while
+the rewritten tree they get had not changed. Their fingerprint differed,
+because one variable did: `auto-last`, the last automatic label, 14 then 18
+then ... at each keystroke. Since #333 the automatic labels are numbered
+stably: a label keeps its number from one pass to the next, kept with the
+tag of the document which makes it (`exec_auto_id`, `ADDENDUM_AUTO_ID`).
+The tag is found through the macro calls which the typesetter is expanding
+(`auto_label_tag`, `macro_src`: the places of the arguments of the calls).
+With the flag the typesetter expands no macro (the rewriter did), finds no
+tag, and gives a new number at each pass. So the labels are not stable with
+the flag (a correctness problem as well, for what refers to them), and the
+change of `auto-last` makes everything after the table be checked again.
+With `TEXMACS_STABLE_LABELS=off` (the counter of TeXmacs before #333):
+
+| per keystroke | without the flag | with the flag |
+|---|---|---|
+| keystroke | 2.35 ms | 3.35 ms |
+| typesetting the bridges | 1.77 ms | 1.47 ms |
+| bridges typeset again / used again | 14 / 17 | 9 / 17 |
+| lines logged | 2 | 2 |
+
+The typesetting is then faster with the flag than without: the macros are
+expanded already, and fewer bridges are typeset again. The flag's whole
+extra cost in the typesetter came from the labels. The rewritten tree has
+what is needed to find the tag: the `expand-as` of a call of the document
+carries the place of the call, which `auto_label_tag` could use where it
+uses `macro_src`.
+
+**2. The rewriter: a new environment after the table.** The remaining
+milliseconds are the rewriting: everything after the table is evaluated
+again (1660 evaluations, of which 129 found in the memorizers), because the
+environment after the table is a new object. The chain (from the trace, the
+first evaluation which enters with the same environment as before the
+keystroke and leaves with another one, at each level): `big-table`,
+`render-big-figure`, `padded-normal`, `tabular*`, and the `tformat` of the
+table:
+
+- `tformat` is evaluated as a scope (`evaluate_formatting`): its cell format,
+  `oldv * r`, is put in the environment by `begin_with`. That value is made
+  again, as a new tree, at each evaluation of the table, whose content
+  changed: a new key for `begin_with`, a new environment inside the table.
+- Inside the table, the caption makes its label: two `set-binding`, which
+  assign `the-label` and `the-tags`. In that new environment their
+  memorizers are not found, and the scope of the `tformat` becomes "impure"
+  (it holds assignments).
+- `end_with` gives the outer environment back with the assignments made in
+  the scope (`end_with_environment`, `assign_environment`): a new object,
+  since its key is the address of the environment inside the scope.
+- Every evaluation after the table then has a new environment and misses
+  its memorizer.
+
+**What Joris foresaw.** This is the first of his reminders for the rewriting
+tool: "attention to implicitly changed variables, such as `the-tags`,
+`the-label`, etc., which may cause the entire document to be retypeset". The
+memorizers are keyed by addresses, which is cheap and exact as long as what
+did not change is the same tree; the environment is threaded through the
+whole document, so one new object propagates to the end. He also left
+`// FIXME: should we remember partial expansions?` in `evaluate_compound`:
+a macro body whose arguments are substituted is a new tree at each call, so
+nothing computed from it is found again unless the expansion is memorized.
+The stable numbering of the automatic labels is #333's, after Joris; it
+realizes his "associate auxiliary data to tree nodes", on the tags of the
+document, which the typesetter no longer sees with the flag.
+
+**What would fix them** (not done):
+
+1. Automatic labels: find the tag from the place carried by the enclosing
+   `expand-as` when typesetting a rewritten tree. Small, and needed for
+   correctness anyway.
+2. New environments: make the values which do not change the same trees
+   (the cell format of `evaluate_formatting` made once per inputs; partial
+   expansions memorized, Joris's FIXME), or key the memorizers of `with`,
+   `assign` and the evaluations by the values actually read (the inputs of
+   #333, step 3) instead of addresses. Either way, an unchanged label in a
+   table would no longer make a new environment for the rest of the
+   document.
+
 ## Relation to the typesetter caches
 
 PR #333 (incremental typesetting) and PR #250 (typing caches), merged in
