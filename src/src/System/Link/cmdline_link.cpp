@@ -61,6 +61,7 @@ extern char **environ;
 
 struct cmdline_link_rep: tm_link_rep {
   string name;          // name of the plugin
+  string session;       // name of the session
   int    pid;           // process identifier of the child
   int    pp_in [2];     // for data going to the child
   int    pp_out[2];     // for data coming from the child
@@ -75,7 +76,7 @@ struct cmdline_link_rep: tm_link_rep {
   socket_notifier snout, snerr;
   
 public:
-  cmdline_link_rep (string name);
+  cmdline_link_rep (string name, string session);
   ~cmdline_link_rep ();
 
   string  start ();
@@ -90,7 +91,9 @@ public:
   void    close_fds ();
 };
 
-cmdline_link_rep::cmdline_link_rep (string name2): name (name2) {
+cmdline_link_rep::cmdline_link_rep (string name2, string session2):
+  name (name2), session (session2)
+{
   cmdline_link_set->insert ((pointer) this);
   in     = pp_in [0]= pp_in [1]= -1;
   out    = pp_out[0]= pp_out[1]= -1;
@@ -107,8 +110,8 @@ cmdline_link_rep::~cmdline_link_rep () {
 }
 
 tm_link
-make_cmdline_link (string name) {
-  return tm_new<cmdline_link_rep> (name);
+make_cmdline_link (string name, string session) {
+  return tm_new<cmdline_link_rep> (name, session);
 }
 
 #ifndef OS_MINGW
@@ -225,13 +228,12 @@ debug_io_string (string s) {
 void
 cmdline_link_rep::write (string s, int channel) {
   while (ends (s, "\n")) s= s (0, N(s)-1);
-  s= replace (s, "\n", " ");
   //cout << "Write[" << name << "] " << s << "\n";
 #ifdef OS_MINGW
   (void) channel;
 #else
   if (alive || (channel != LINK_IN)) return;
-  string cmd= as_string (call ("connection-cmdline", name, "default", s));
+  string cmd= as_string (call ("connection-cmdline", name, session, s));
   if (cmd == "") return;
   cmd= cmd * " 2> /dev/null";
   //cout << "Command[" << name << "," << s << "] = " << cmd << "\n";

@@ -1048,7 +1048,16 @@
     (check= (st (decompress-tree (compress-tree t))) '(document "a" (frac "x" "y")))
     (check= (compress-html t 0)
             (string-append "<body><p>a</p><p><div id=\"x0\">x</div>"
-                           "<div id=\"cont-x0\">y</div></p></body>"))))
+                           "<div id=\"cont-x0\">y</div></p></body>")))
+  ;; a code which is not known (of another session of TeXmacs, or garbled
+  ;; in the answer) loses its markup, and keeps its text
+  (check= (st (decompress-tree
+               (stree->tree '(concat "a " (compressed "x999999" "b") " c"))))
+          '(concat "a " "b" " c"))
+  (check= (st (decompress-html
+               "<body><p>a <div id=\"x999999\">b</div> c</p></body>" 0))
+          '(document (concat "a " "b" " c")))
+  (check= (st (decompress-tree (stree->tree '(compressed "x999999")))) ""))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Serializations of special characters

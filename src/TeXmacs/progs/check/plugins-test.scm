@@ -149,6 +149,26 @@
             ,(lambda (name chat res) (tm->tree (string-append "res=" res))))
   (:session "Cmdline test"))
 
+;; a command line plugin which records the session and the input it gets
+(define chat-seen '())
+
+(plugin-configure tmtestchat
+  (:cmdline ,(lambda (name chat cmd)
+               (set! chat-seen (list chat cmd))
+               "trap '' INT; echo ok")
+            ,(lambda (name chat res) (tm->tree (string-append chat "=" res))))
+  (:serializer ,(lambda (lan t) (string-append (texmacs->code t) "\n")))
+  (:session "Chat test"))
+
+;; a request plugin which records the same, and makes no request
+(plugin-configure tmtestrequest
+  (:request ,(lambda (name chat cmd)
+               (set! chat-seen (list chat cmd))
+               "")
+            ,(lambda (name chat res) (tm->tree res)))
+  (:serializer ,(lambda (lan t) (string-append (texmacs->code t) "\n")))
+  (:session "Request test"))
+
 (plugin-reconfigure-set! saved-reconfigure-flag)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -385,7 +405,28 @@
           "res=out")
   ;; the other plugins have no command line
   (check= (connection-cmdline "tmtestecho" "default" "x") "")
-  (check= (tree->stree (connection-result "tmtestecho" "default" "x")) ""))
+  (check= (tree->stree (connection-result "tmtestecho" "default" "x")) "")
+  ;; the plugin gets the name of the session and the lines of the input,
+  ;; and the name of the session again with the output of the command.
+  ;; Only the name is checked in the result: with Qt pipes, the output of
+  ;; the command is read by the socket notifiers of the event loop, which
+  ;; does not run here, so that the result may come without it.
+  (set! chat-seen '())
+  (set! notified '())
+  (check= (start* "tmtestchat" "plugins-test-chat") "cmdline")
+  (connection-write "tmtestchat" "plugins-test-chat" '(document "a b" "c"))
+  (check= chat-seen '("plugins-test-chat" "a b\nc"))
+  (check-true (poll "tmtestchat" "plugins-test-chat"
+                    (lambda () (nnull? (notified-on "output")))))
+  (check-true (contains? (notified-on "output") "\"plugins-test-chat="))
+  (check-false (contains? (notified-on "output") "\"default="))
+  (check= (start* "tmtestchat" "plugins-test-other") "cmdline")
+  (connection-write "tmtestchat" "plugins-test-other" "d")
+  (check= chat-seen '("plugins-test-other" "d"))
+  (check-true (connection-request? "tmtestrequest"))
+  (check= (start* "tmtestrequest" "plugins-test-request") "request")
+  (connection-write "tmtestrequest" "plugins-test-request" "e")
+  (check= chat-seen '("plugins-test-request" "e\n")))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Serialization
