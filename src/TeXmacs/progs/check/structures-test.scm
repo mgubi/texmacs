@@ -249,6 +249,13 @@
   ;; the characters written <#...> are kept, whatever their number of digits
   (check= (tmstring->string "a<#E9>b<#2200>c<#1D54F>d")
           "a<#E9>b<#2200>c<#1D54F>d")
+  ;; and so are the other character names, an unterminated < and a bare >
+  (check= (tmstring->string "x<alpha>y") "x<alpha>y")
+  (check= (tmstring->string "a<b") "a<b")
+  (check= (tmstring->string "a>b") "a>b")
+  (check= (tmstring->string "a<b<alpha>c") "a<b<alpha>c")
+  (for (s (list "a<b" ">" "<<>>" "<less>" "<alpha>"))
+    (check= (tmstring->string (string->tmstring s)) s))
   ;; object->tmstring writes an object as a string
   (check= (object->tmstring "x") "\"x\"")
   (check= (object->tmstring '(a "b" 1)) "(a \"b\" 1)"))
