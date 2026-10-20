@@ -1702,6 +1702,227 @@
               '(1.0 2.0 1.0)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Included files
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; A master which includes files: the included documents come from the
+;; cache of the inclusions (load_inclusion, Texmacs/Data/new_buffer.cpp),
+;; the same tree at each pass, and their typesetting is kept from one pass
+;; to the next (Typeset/Bridge/bridge_rewrite.cpp); what changes around
+;; them is seen through the inputs of their paragraphs. After each change,
+;; the rectangles of the paragraphs of the master (those of an include are
+;; found through the paths of the boxes of the included document) are those
+;; of a typesetting of the same master from scratch.
+(define incl-dir
+  (string-append (url->system (url-temp-dir)) "/typeset-test"))
+
+(define (incl-file name)
+  (system->url (string-append incl-dir "/" name)))
+
+(define (incl-clear-dir)
+  (with d (system->url incl-dir)
+    (when (url-exists? d)
+      (for (u (url-read-directory d "*"))
+        (system-remove u))
+      (system-rmdir d))))
+
+(define (incl-write name body)
+  (tree-export (stree->tree `(document (TeXmacs "2.1")
+                                       (style (tuple "article"))
+                                       (body (document ,@body))))
+               (incl-file name) "texmacs"))
+
+(define (incl-update)
+  ;; Document > Update > All, without the inclusions-gc
+  (update-forced)
+  (generate-all-aux)
+  (update-current-buffer)
+  (update-forced))
+
+(define (incl-places)
+  (map (lambda (i) (rect i)) (iota (tree-arity (buffer-tree)))))
+
+(define (incl-height i)
+  (with r (rect i) (- (rect-y2 r) (rect-y1 r))))
+
+(define (incl-num l)
+  (tree->stree (texmacs-expand `(get-binding ,l))))
+
+(define incl-fresh-count 0)
+
+(define (incl-fresh-places)
+  ;; the rectangles of the paragraphs of the current master, typeset from
+  ;; scratch in a buffer of its own (a new file each time, so that each
+  ;; typesetting starts from a new buffer)
+  (set! incl-fresh-count (+ incl-fresh-count 1))
+  (let* ((old (current-buffer))
+         (name (string-append "fresh-" (number->string incl-fresh-count)
+                              ".tm"))
+         (u (incl-file name)))
+    (incl-write name (cdr (tree->stree (buffer-tree))))
+    (dynamic-wind
+      (lambda () (noop))
+      (lambda ()
+        (load-buffer u)
+        (switch-to-buffer* u)
+        (incl-update)
+        (incl-update)
+        (incl-places))
+      (lambda ()
+        (when (buffer-exists? u) (buffer-close u))
+        (switch-to-buffer* old)))))
+
+(define (incl-same-as-fresh?)
+  (== (incl-places) (incl-fresh-places)))
+
+(define (incl-groups)
+  (incl-write "one.tm"
+              '((section (concat "One" (label "s1")))
+                (concat "a" (foo) "b")
+                ;; the number of the section of two.tm, as a height
+                (concat "See " (reference "s2")
+                        (vspace (merge (get-binding "s2") "cm")))
+                "The end of one."))
+  (incl-write "two.tm"
+              '((section (concat "Two" (label "s2")))
+                "Text of two."))
+  ;; (with the label of two.tm: the references to a label which is gone
+  ;; keep its value in the master)
+  (incl-write "three.tm"
+              '((section (concat "Three" (label "s2")))
+                "Text of three."
+                (concat "More" (vspace "2cm"))
+                "The end of three."))
+  (incl-write "master.tm"
+              '((assign "foo" (macro (vspace "1cm")))
+                (include "one.tm")
+                (include "two.tm")
+                "The end."))
+  (with m (incl-file "master.tm")
+    (load-buffer m)
+    (switch-to-buffer* m)
+    (incl-update)
+    (incl-update)
+    (check= (incl-num "s1") "1")
+    (check= (incl-num "s2") "2")
+    (check-true (incl-same-as-fresh?))
+    (with t (buffer-tree)
+      ;; a macro of the master, used in one.tm, is redefined
+      (with h (incl-height 1)
+        (tree-set (tree-ref t 0) '(assign "foo" (macro (vspace "3cm"))))
+        (update-forced)
+        (check-true (> (incl-height 1) h))
+        (check-true (incl-same-as-fresh?)))
+      ;; a section before the includes: the number of the label of two.tm
+      ;; which one.tm references changes
+      (with h (incl-height 1)
+        (tree-insert t 1 (list (stree->tree '(section "Zero"))))
+        (incl-update)
+        (check= (incl-num "s1") "2")
+        (check= (incl-num "s2") "3")
+        (check-true (> (incl-height 2) h))
+        (check-true (incl-same-as-fresh?)))
+      ;; a paragraph before the includes: the includes are further down
+      (with r (rect 2)
+        (tree-insert t 1 (list (stree->tree "An inserted paragraph.")))
+        (update-forced)
+        (check-true (< (rect-y2 (rect 3)) (rect-y2 r)))
+        (check-true (incl-same-as-fresh?)))
+      ;; two.tm moved before one.tm
+      (tree-remove t 4 1)
+      (tree-insert t 3 (list (stree->tree '(include "two.tm"))))
+      (incl-update)
+      (check= (tree->stree (tree-ref t 3)) '(include "two.tm"))
+      (check-true (> (rect-y2 (rect 3)) (rect-y2 (rect 4))))
+      (check= (incl-num "s2") "2")
+      (check= (incl-num "s1") "3")
+      (check-true (incl-same-as-fresh?))
+      ;; and back
+      (tree-remove t 3 1)
+      (tree-insert t 4 (list (stree->tree '(include "two.tm"))))
+      (incl-update)
+      (check= (incl-num "s1") "2")
+      (check= (incl-num "s2") "3")
+      (check-true (incl-same-as-fresh?))
+      ;; the name of an included file changed, and back
+      (with h (incl-height 4)
+        (tree-set (tree-ref t 4 0) "three.tm")
+        (incl-update)
+        (check= (incl-num "s2") "3")
+        (check-true (> (incl-height 4) h))
+        (check-true (incl-same-as-fresh?))
+        (tree-set (tree-ref t 4 0) "two.tm")
+        (incl-update)
+        (check= (incl-num "s2") "3")
+        (check= (incl-height 4) h)
+        (check-true (incl-same-as-fresh?))))
+    ;; two.tm edited in a buffer of its own and saved: the master shows
+    ;; it after Update > All (which empties the cache of the inclusions)
+    (with h (incl-height 4)
+      (with u (incl-file "two.tm")
+        (load-buffer u)
+        (switch-to-buffer* u)
+        (update-forced)
+        ;; (as an action of the user: the buffer is modified)
+        (archive-state)
+        (start-editing)
+        (tree-insert (buffer-tree) 2
+                     (list (stree->tree '(concat "New" (vspace "2cm")))))
+        (end-editing)
+        (check-true (buffer-modified? u))
+        (save-buffer)
+        (check-false (buffer-modified? u))
+        (switch-to-buffer* m)
+        (buffer-close u))
+      (inclusions-gc)
+      (incl-update)
+      (check= (tree->stree (tree-load-inclusion (incl-file "two.tm")))
+              '(document (section (concat "Two" (label "s2")))
+                         "Text of two."
+                         (concat "New" (vspace "2cm"))))
+      (check-true (> (incl-height 4) h))
+      (check-true (incl-same-as-fresh?)))
+    (buffer-pretend-saved m)
+    (buffer-close m)))
+
+(define (incl-extern)
+  ;; another rewriting, which gives a new tree at each pass: its body is
+  ;; made again when what it reads changes
+  (with-typeset-body
+   '(document (assign "len" "1cm")
+              (extern "(lambda (x) `(concat \"a\" (vspace ,(tree->string x))))"
+                      (value "len"))
+              "After.")
+   (lambda ()
+     (with r (rect 2)
+       (tree-set (tree-ref (buffer-tree) 0 1) "3cm")
+       (update-forced)
+       (check-true (< (rect-y2 (rect 2)) (rect-y2 r)))
+       (check= (map (lambda (i) (rect i)) (iota 3))
+               (places-from-scratch (buffer-tree) 3))))))
+
+(define (test-included-files)
+  (check-group "included files")
+  (let ((old (current-buffer))
+        (before (buffer-list))
+        (mismatches (typeset-check-mismatches)))
+    (incl-clear-dir)
+    (system-mkdir (system->url incl-dir))
+    (incl-extern)
+    (with r (check-run incl-groups)
+      (when (and (pair? r) (== (car r) 'error))
+        (check-report #f "the group" (object->string r)))
+      (for (b (buffer-list))
+        (when (nin? b before)
+          (buffer-pretend-saved b)
+          (buffer-close b)))
+      (when (buffer-exists? old) (switch-to-buffer* old))
+      (incl-clear-dir)
+      ;; (in the check modes, the bridges used again made what a
+      ;; typesetting again makes)
+      (check= (typeset-check-mismatches) mismatches))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The suite
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -1750,4 +1971,5 @@
   (test-assignments-in-blocks)
   (test-unknown-inputs-in-blocks)
   (test-zoom)
+  (test-included-files)
   (check-end))
