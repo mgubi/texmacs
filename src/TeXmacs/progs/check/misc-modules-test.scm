@@ -137,6 +137,56 @@
       (buffer-close u)
       (when (buffer-exists? old) (switch-to-buffer old)))))
 
+;; A position of the cursor history whose buffer was closed is forgotten,
+;; not read
+(define (cursor-history-drain)
+  ;; the history of this window starts empty, whatever earlier groups did
+  (with-buffer-doc '(document "drain") '("generic")
+    (lambda ()
+      (cursor-history-add (cursor-path))
+      (let loop ((i 0))
+        (when (and (< i 1000) (cursor-has-history?))
+          (cursor-history-backward)
+          (loop (+ i 1)))))))
+
+(define (test-cursor-history)
+  (check-group "cursor history")
+  (cursor-history-drain)
+  ;; going forward over an entry of a closed buffer
+  (with-buffer-doc '(document "five" "six") '("generic")
+    (lambda ()
+      (cursor-history-add (cursor-path))
+      (go-end)
+      (cursor-history-add (cursor-path))
+      (cursor-history-backward)))
+  (with-buffer-doc '(document "seven" "eight") '("generic")
+    (lambda ()
+      (with p (cursor-path)
+        (check-true (cursor-has-future?))
+        (check= (check-run (lambda () (cursor-history-forward) 'done)) 'done)
+        (check= (cursor-path) p))))
+  (cursor-history-drain)
+  ;; adding a position after a buffer with an entry was closed
+  (with-buffer-doc '(document "one" "two") '("generic")
+    (lambda ()
+      (go-end)
+      (cursor-history-add (cursor-path))))
+  (with-buffer-doc '(document "three" "four") '("generic")
+    (lambda ()
+      (with start (cursor-path)
+        (cursor-history-add start)
+        (check-true (cursor-has-history?))
+        (go-end)
+        (with end (cursor-path)
+          (cursor-history-add end)
+          (cursor-history-backward)
+          (check= (cursor-path) start)
+          (cursor-history-backward)
+          (check= (cursor-path) start)
+          (check-false (cursor-has-history?))
+          (cursor-history-forward)
+          (check= (cursor-path) end))))))
+
 (define (run-group thunk)
   ;; an error in a group counts as one failure
   (with r (check-run thunk)
@@ -1604,6 +1654,7 @@
             (list test-help-files test-doc-parse test-tmdoc-expand
                   test-tmdoc-books
                   test-tmdoc-rewrite test-doc-search test-tmdoc-edit
+                  test-cursor-history
                   test-font-database test-logical-fonts
                   test-font-typesetting test-init-font
                   test-language-names test-translations test-hyphenation
