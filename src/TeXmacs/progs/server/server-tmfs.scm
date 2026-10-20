@@ -356,9 +356,15 @@
                        (list :order "version-nr" #t))))))
 
 (define ((readable-by? uid) info)
+  ;; the permissions of a version are asked 5 seconds after its date, when
+  ;; they are all set. A version replaced before that is no longer there
+  ;; then (it was left out of the history of its file): for it, whether it
+  ;; ever was readable.
   (with (rid date name by msg) info
-    (with-time (+ (string->number date) 5)
-      (db-allow? rid uid "readable"))))
+    (with t (+ (string->number date) 5)
+      (if (with-time t (nnull? (db-get-field rid "type")))
+          (with-time t (db-allow? rid uid "readable"))
+          (with-time :always (db-allow? rid uid "readable"))))))
 
 (tm-service (remote-get-versions rname)
   ;;(display* "remote-get-versions " rname "\n")

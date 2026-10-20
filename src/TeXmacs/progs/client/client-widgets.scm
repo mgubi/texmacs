@@ -958,6 +958,21 @@
           (lambda (e)
             (with (short-name full-name dir? props) e
               (if dir-flag? dir? #t))))
+         (save-as
+          ;; the file or the directory named name in dir (dir itself is
+          ;; always the name of a directory: a file renamed got one too,
+          ;; and its buffer was then read as a directory)
+          (lambda (name)
+            (with full (url-append dir name)
+              (if dir-flag? full
+                  (string->url (string-append "tmfs://remote-file/"
+                                              (remote-file-name full)))))))
+         (ok
+          ;; "Ok", and return in the field: the name as typed
+          (lambda ()
+            (with name (form-named-ref "remote-save-as" "name")
+              (when (and (string? name) (!= name ""))
+                (quit (save-as name))))))
          (dummy (select-dir dir)))
     (padded
       (refreshable "remote-file-browser"
@@ -973,14 +988,26 @@
                   ""))
         (assuming save-flag?
           ===
-          (hlist
-            (text (cadr type)) //
-            (refreshable "remote-save-as"
-              (input (when answer (quit (url-append dir answer)))
-                     "string" (list file) "1w"))
-            // // //
-            (explicit-buttons
-              ("Ok" (quit (url-append dir file)))))    )
+          ;; a field of a form, so that "Ok" takes the name as typed (it
+          ;; took the name of the entry selected last, whatever was typed
+          ;; after); written out as form-input expands, so that return in
+          ;; the field does what "Ok" does: a field of a form is told of
+          ;; every key, with the text, and return closed nothing
+          (form "remote-save-as"
+            (hlist
+              (text (cadr type)) //
+              (refreshable "remote-save-as"
+                (input (begin
+                         (form-named-set "remote-save-as" "name" answer)
+                         (when (and (pair? answer) (pair? (cdr answer))
+                                    (== (cadr answer) "return"))
+                           (ok)))
+                       "name#form-remote-save-as-1:string"
+                       (form-proposals "remote-save-as" "name" (list file))
+                       "1w"))
+              // // //
+              (explicit-buttons
+                ("Ok" (ok))))))
         (assuming (and dir-flag? (not save-flag?))
           (bottom-buttons
             >>

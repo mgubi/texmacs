@@ -190,6 +190,9 @@
     `(document
        (dir-list ,(live-table "Live documents" sname server entries)))))
 
+(tmfs-title-handler (live-list sname doc)
+  (string-append "Live documents - " sname))
+
 (tmfs-load-handler (live-list sname)
   (let* ((u (string-append "tmfs://live-list/" sname))
          (server (client-find-server sname)))

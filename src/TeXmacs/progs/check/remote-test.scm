@@ -418,6 +418,27 @@
   (check= ((priv '(client client-chat) 'chat-room-name) "tmfs://chat/h/room")
           "room")
 
+  (check-group "titles of remote documents")
+  (check= (tmfs-title "tmfs://remote-dir/h/~u/d" '(document ""))
+          "Remote directory - d")
+  (check= (tmfs-title "tmfs://remote-dir/h/~u" '(document ""))
+          "Remote directory - ~u")
+  (check= (tmfs-title "tmfs://chat-rooms/h" '(document "")) "Chat rooms - h")
+  (check= (tmfs-title "tmfs://shared/h" '(document "")) "Shared resources - h")
+  (check= (tmfs-title "tmfs://live-list/h" '(document ""))
+          "Live documents - h")
+  (check= (tmfs-title "tmfs://chat/h/room" '(document "")) "Chat room - room")
+  (check= (tmfs-title "tmfs://live/h/doc" '(document "")) "Live - doc")
+  ;; the path shown above the listing of a directory comes from the name
+  ;; of the directory (it came from the title of its buffer, which was its
+  ;; name before it had a title: the listing then failed)
+  (with crumbs (priv '(client client-tmfs) 'build-dir-breadcrumbs)
+    (check= (map (lambda (x) (if (pair? x) (cadr x) x))
+                 (crumbs "tmfs://remote-dir/h/~u/d"))
+            (list "Home" 'color "d"))
+    (check= (crumbs "Remote directory - d") '())
+    (check= (crumbs "tmfs://chat-rooms/h") '()))
+
   (check-group "names of live documents")
   (check= (live-get-name "tmfs://live/h/doc") "doc")
   (check= (live-get-name "tmfs://live/h/live/doc") "doc")
@@ -947,12 +968,18 @@
             '(:error "Error: cannot modify past")))
   (with l (ralice '(remote-get-versions "loophost/~rt-alice/s.tm"))
     (check-true (list? l))
+    ;; both versions, though the first one was replaced at once (a version
+    ;; replaced within 5 seconds was left out)
+    (check= (length l) 2)
+    (check= (map fifth l) '(#f "m"))
     (check-true (list-and (map (lambda (v) (== (third v) "~rt-alice/s.tm")) l)))
     (check-true (list-and (map (lambda (v) (== (fourth v) "rt-alice")) l))))
   (check= (ralice '(remote-get-versions "loophost/~rt-alice/none.tm"))
           '(:error "Error: file does not exist"))
   (check= (ranon '(remote-get-versions "loophost/~rt-alice/s.tm"))
           '(:error "Error: not logged in"))
+  ;; and none of them for who cannot read the file
+  (check= (rbob '(remote-get-versions "loophost/~rt-alice/s.tm")) '())
   (check= (ralice '(remote-file-remove "loophost/~rt-alice/s.tm")) "removed")
   (check= (ralice '(remote-file-load "loophost/~rt-alice/s.tm"))
           '(:error "Error: file does not exist"))
@@ -1945,6 +1972,20 @@
                        (form-checkbox "tls-server" "true")
                        (form-text-area "other" "a" "b" "c" "x")
                        "text")))
+  ;; whether there is an rsync is answered by the server, in the form it
+  ;; sends: the client which shows the form has no has-rsync-ext?
+  (with load-prefs (priv '(server server-base) 'load-preferences-in-stree)
+    (with form (load-prefs
+                (tree->stree
+                 (stree->tree
+                  '(document (freeze (if (extern "has-rsync-ext?") "yes" "no"))
+                             (if (extern "other") "a" "b"))))
+                '())
+      (check-true (in? (cadr (cadr (cadr form))) '("true" "false")))
+      (check= (caddr form) '(if (extern "other") "a" "b"))))
+  (with form ((priv '(server server-base) 'generate-preferences-form)
+              (server-admin-preferences))
+    (check-false (string-occurs? "has-rsync-ext?" (object->string form))))
   (check= ((priv '(server server-base) 'server-mailer-instantiate)
            "u" "User" "u@test" "123"
            "To: $USER_EMAIL\n$USER_NAME ($USER_PSEUDO), code $USER_CODE")
