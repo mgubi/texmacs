@@ -212,33 +212,36 @@ copy_for_apply (patch p) {
 }
 
 static patch
-invert_for_redo (patch p, tree t) {
-  // the inverse of the patch p of an undo, before p is applied to t: as
-  // invert (patch.cpp), but the modifications of the inverse are made again
-  // from t (invert in commute.cpp) instead of being those which the archive
-  // stored when the change was made. They are copies of the trees which the
-  // undo removes, with the numbers of the automatic labels of their tags,
-  // so that a tag which a redo puts back gives its labels the names they
-  // had (the copies which add stores have no numbers)
+apply_for_undo (patch p) {
+  // apply the patch p of an undo to the document, as copy_for_apply, and
+  // return its inverse, the patch of the redo. As invert (patch.cpp), but
+  // each modification of the inverse is made from the document just before
+  // the modification of p which it inverts is applied (invert in
+  // commute.cpp), instead of being the one which add stored: it holds copies
+  // of the trees which the undo removes, with the numbers of the automatic
+  // labels of their tags, so that a tag which a redo puts back gives its
+  // labels the names they had (the copies which add stores have none)
   switch (get_type (p)) {
   case PATCH_MODIFICATION:
-    return patch (invert (get_modification (p), t), get_modification (p));
+    {
+      modification m= get_modification (p);
+      modification i= invert (m, the_et);
+      ::apply (the_et, copy_for_undo (m));
+      return patch (i, m);
+    }
   case PATCH_BRANCH:
     ASSERT (N(p) <= 1, "ambiguous application");
   case PATCH_COMPOUND:
     {
       int i, n= N(p);
       array<patch> r (n);
-      for (i=0; i<n; i++) {
-        r[n-1-i]= invert_for_redo (p[i], t);
-        t= clean_apply (p[i], t);
-      }
+      for (i=0; i<n; i++) r[n-1-i]= apply_for_undo (p[i]);
       return patch (get_type (p) == PATCH_BRANCH, r);
     }
   case PATCH_BIRTH:
     return patch (get_author (p), !get_birth (p));
   case PATCH_AUTHOR:
-    return patch (get_author (p), invert_for_redo (p[0], t));
+    return patch (get_author (p), apply_for_undo (p[0]));
   default:
     FAILED ("unsupported patch type");
   }
@@ -260,6 +263,21 @@ archiver_rep::apply (patch p) {
   ::apply (copy_for_apply (p), the_et);
   versioning= old;
   busy_versioning= global_old;
+}
+
+patch
+archiver_rep::apply_undo (patch p) {
+  // apply the patch of an undo, as apply, and return the patch of its redo
+  // (see apply_for_undo)
+  ASSERT (is_applicable (p, the_et), "invalid history");
+  bool old= versioning;
+  bool global_old= busy_versioning;
+  versioning= true;
+  busy_versioning= true;
+  patch q= apply_for_undo (p);
+  versioning= old;
+  busy_versioning= global_old;
+  return q;
 }
 
 void
@@ -430,7 +448,7 @@ archiver_rep::retract () {
   else current= un;
   the_owner= the_author;
   if (nr_branches (re) != 0) {
-    patch q= invert_for_redo (current, the_et);
+    patch q= invert (current, the_et);
     re= patch (q, re);
   }
   if (nr_branches (nx) != 0) nx= get_undo (nx);
@@ -508,8 +526,7 @@ archiver_rep::undo_one (int i) {
     ASSERT (i == 0, "index out of range");
     patch p= car (get_undo (archive));
     ASSERT (is_applicable (p, the_et), "history corrupted");
-    patch q= invert_for_redo (p, the_et);
-    apply (p);
+    patch q= apply_undo (p);
     patch re1= patch (q, get_redo (archive));
     patch nx = cdr (get_undo (archive));
     patch re2= get_redo (nx);

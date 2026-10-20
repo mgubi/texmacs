@@ -1183,7 +1183,7 @@
 
 ;; A tag which is inserted, removed by an undo and put back by a redo
 ;; gives its labels the names it had (the redo puts back the tree which the
-;; undo removed, with their numbers: invert_for_redo in archiver.cpp), each
+;; undo removed, with their numbers: apply_for_undo in archiver.cpp), each
 ;; time.
 (define (test-labels-after-redo)
   (check-group "labels after redo")
@@ -1210,6 +1210,21 @@
                '(("auto-1" "auto-2" "auto-3")
                  ("auto-1" "auto-2" "auto-3")
                  ("auto-1" "auto-2" "auto-3"))))
+     ;; the same for a tag inserted and changed in the same step (the
+     ;; undo changes the tag before it removes it)
+     (dynamic-wind start-editing
+                   (lambda ()
+                     (tree-insert (buffer-tree) 4 '((section "E") "e"))
+                     (tree-assign (tree-ref (buffer-tree) 4 0) "F"))
+                   end-editing)
+     (update-forced)
+     (let ((n1 (auto-names)))
+       (undo 0) (update-forced)
+       (redo 0) (update-forced)
+       (undo 0) (update-forced)
+       (redo 0) (update-forced)
+       (check= (tree->stree (tree-ref (buffer-tree) 4)) '(section "F"))
+       (check= (auto-names) n1))
      ;; the same for a tag put around a text (insert_node)
      (dynamic-wind start-editing
                    (lambda () (tree-insert-node (tree-ref (buffer-tree) 1)
