@@ -183,6 +183,71 @@ cdr (patch p) {
 * Internal subroutines
 ******************************************************************************/
 
+static patch
+copy_for_apply (patch p) {
+  // the copy of the trees which a patch puts into the document (its
+  // modifications; its inverses, which ::apply does not use, are shared),
+  // with the numbers of the automatic labels of their tags: a tag which an
+  // undo or a redo brings back gives its labels the names they had (see
+  // copy_for_undo in commute.cpp)
+  switch (get_type (p)) {
+  case PATCH_MODIFICATION:
+    return patch (copy_for_undo (get_modification (p)), get_inverse (p));
+  case PATCH_COMPOUND:
+  case PATCH_BRANCH:
+    {
+      int i, n= N(p);
+      array<patch> r (n);
+      for (i=0; i<n; i++) r[i]= copy_for_apply (p[i]);
+      return patch (get_type (p) == PATCH_BRANCH, r);
+    }
+  case PATCH_BIRTH:
+    return p;
+  case PATCH_AUTHOR:
+    return patch (get_author (p), copy_for_apply (p[0]));
+  default:
+    FAILED ("unsupported patch type");
+  }
+  return p;
+}
+
+static patch
+apply_for_undo (patch p) {
+  // apply the patch p of an undo to the document, as copy_for_apply, and
+  // return its inverse, the patch of the redo. As invert (patch.cpp), but
+  // each modification of the inverse is made from the document just before
+  // the modification of p which it inverts is applied (invert in
+  // commute.cpp), instead of being the one which add stored: it holds copies
+  // of the trees which the undo removes, with the numbers of the automatic
+  // labels of their tags, so that a tag which a redo puts back gives its
+  // labels the names they had (the copies which add stores have none)
+  switch (get_type (p)) {
+  case PATCH_MODIFICATION:
+    {
+      modification m= get_modification (p);
+      modification i= invert (m, the_et);
+      ::apply (the_et, copy_for_undo (m));
+      return patch (i, m);
+    }
+  case PATCH_BRANCH:
+    ASSERT (N(p) <= 1, "ambiguous application");
+  case PATCH_COMPOUND:
+    {
+      int i, n= N(p);
+      array<patch> r (n);
+      for (i=0; i<n; i++) r[n-1-i]= apply_for_undo (p[i]);
+      return patch (get_type (p) == PATCH_BRANCH, r);
+    }
+  case PATCH_BIRTH:
+    return patch (get_author (p), !get_birth (p));
+  case PATCH_AUTHOR:
+    return patch (get_author (p), apply_for_undo (p[0]));
+  default:
+    FAILED ("unsupported patch type");
+  }
+  return p;
+}
+
 void
 archiver_rep::apply (patch p) {
   // apply a patch, while disabling versioning during the modifications
@@ -193,10 +258,26 @@ archiver_rep::apply (patch p) {
   versioning= true;
   busy_versioning= true;
   // the trees of the patch become part of the document: apply a copy, or
-  // later changes of the document in place would change the archive
-  ::apply (copy (p), the_et);
+  // later changes of the document in place would change the archive; the
+  // copy keeps the numbers of the automatic labels
+  ::apply (copy_for_apply (p), the_et);
   versioning= old;
   busy_versioning= global_old;
+}
+
+patch
+archiver_rep::apply_undo (patch p) {
+  // apply the patch of an undo, as apply, and return the patch of its redo
+  // (see apply_for_undo)
+  ASSERT (is_applicable (p, the_et), "invalid history");
+  bool old= versioning;
+  bool global_old= busy_versioning;
+  versioning= true;
+  busy_versioning= true;
+  patch q= apply_for_undo (p);
+  versioning= old;
+  busy_versioning= global_old;
+  return q;
 }
 
 void
@@ -445,8 +526,7 @@ archiver_rep::undo_one (int i) {
     ASSERT (i == 0, "index out of range");
     patch p= car (get_undo (archive));
     ASSERT (is_applicable (p, the_et), "history corrupted");
-    patch q= invert (p, the_et);
-    apply (p);
+    patch q= apply_undo (p);
     patch re1= patch (q, get_redo (archive));
     patch nx = cdr (get_undo (archive));
     patch re2= get_redo (nx);

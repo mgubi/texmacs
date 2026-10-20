@@ -31,6 +31,7 @@ class archiver_rep: public concrete_struct {
 
 protected:
   void apply (patch p);
+  patch apply_undo (patch p);
   void split (patch p1, patch p2, patch& re1, patch& re2);
   patch make_future (patch p1, patch p2);
   patch expose (patch archive);

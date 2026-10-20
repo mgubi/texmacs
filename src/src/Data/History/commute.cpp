@@ -45,7 +45,7 @@ dup (modification m) {
 // takes new numbers). The copy shares the numbers with the tag (the same
 // blackbox, which exec_auto_id changes in place): only one of them is in
 // the document at a time
-static tree
+tree
 copy_for_undo (tree t) {
   tree c;
   if (is_atomic (t)) c= copy (t);
@@ -57,6 +57,14 @@ copy_for_undo (tree t) {
   if (!is_nil (t->obs) && t->obs->get_contents (ADDENDUM_AUTO_ID, bb))
     (void) tree_addendum_new (c, ADDENDUM_AUTO_ID, bb, false);
   return c;
+}
+
+// The same for the tree which a modification puts into the document (the
+// undo and redo of archiver_rep::apply put back a copy of the archived
+// modification, with the numbers of the automatic labels of its tags)
+modification
+copy_for_undo (modification m) {
+  return modification (m->k, copy (m->p), copy_for_undo (m->t));
 }
 
 modification
