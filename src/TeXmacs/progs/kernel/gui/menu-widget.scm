@@ -594,10 +594,20 @@
     (with inner (make-menu-items (list (cons 'horizontal items)) style #f)
       (widget-division (name) (car inner)))))
 
+(define (make-aligned-cell x style)
+  ;; one widget for a cell: the cells of the two columns go by pairs, and a
+  ;; cell which makes several widgets (buttons with glue between them) or
+  ;; none put the columns out of step (Qt stopped on it: "aligned_widget:
+  ;; N(lhs) != N(rhs)", the preferences of the AI sessions, #398)
+  (with l (make-menu-items x style #f)
+    (cond ((null? l) (widget-hmenu '()))
+          ((null? (cdr l)) (car l))
+          (else (widget-hlist l)))))
+
 (define (make-aligned p style)
   "Make @(aligned :menu-item-list) item."
-  (widget-aligned (make-menu-items (map cadr (cdr p)) style #f)
-                  (make-menu-items (map caddr (cdr p)) style #f)))
+  (widget-aligned (map (lambda (x) (make-aligned-cell x style)) (map cadr (cdr p)))
+                  (map (lambda (x) (make-aligned-cell x style)) (map caddr (cdr p)))))
 
 (define (make-aligned-item p style)
   "Make @(aligned-item :%2) item."

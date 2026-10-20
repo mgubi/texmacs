@@ -14,6 +14,12 @@ have the details, and the problems go to the
 
 ## 20 October 2026
 
+- **Desktop (Qt)**: Insert → Session → Preferences opens the preferences of
+  the AI sessions, where the API key is given: it stopped on an error, and
+  a session asked a question without a key hung, since it opened them to
+  ask for the key ([#398](https://github.com/mgubi/texmacs/issues/398)).
+  A row of a dialog with two buttons, such as Edit and Default of the
+  instructions, threw its columns out of step.
 - **Vue**: an icon of one's own in SVG (`(icon "pen.svg")` in a
   `menu-bind`) is drawn at the size of the icons of the bars when its file
   declares no size (only a `viewBox`) or one too large for a bar, as Qt
