@@ -19,24 +19,24 @@ among the screens at the right.
 
 • The pages are as large as the screens.
 
-◦Nested items have their own bullets.
+∘Nested items have their own bullets.
 
 
 --- page 3
 Mathematics
 3/4
 
-Theorem 1. For all n > 1, P
+Theorem 1. For all n ⩾1, ∑
 
 k=1
 n
-k3 = (P
+k3 = (∑
 
 k=1
 n
 k)2.
 
-Z
+∫
 
 0
 

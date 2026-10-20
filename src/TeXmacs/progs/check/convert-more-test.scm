@@ -1161,6 +1161,41 @@
     (check= (length (cdr (import (export body "html-snippet") "html-snippet"))) 4000)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; The export to PDF
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; The native PDF writer does not compress the objects of the outline and
+;; of the links, which are read in the file. The buffer is exported as soon
+;; as it is loaded, as texmacs -c does: its hyperlinks are in the PDF. The
+;; title of a bookmark is a hexadecimal string (UTF-16BE) without escapes,
+;; and a URI a literal string in which ( ) and \ are escaped.
+(define (test-pdf-export)
+  (check-group "pdf export")
+  (if (not (and (supports-native-pdf?) (get-boolean-preference "native pdf")))
+      (images-skip "pdf export" "no native PDF writer")
+      (let* ((tm (url-append (temp-dir) "links.tm"))
+             (pdf (url-append (temp-dir) "links.pdf"))
+             (old (current-buffer))
+             (before (buffer-list))
+             (body `(document
+                      (section "f(x)")
+                      (concat "See " (hlink "one" "https://example.org/a)b")
+                              " and " (hlink "two" "https://example.org/a\\b")
+                              "."))))
+        (string-save (serialize-texmacs (stree->tree (tmfile body))) tm)
+        (load-buffer tm :strict)
+        (export-buffer pdf)
+        (for (b (buffer-list))
+          (when (nin? b before) (buffer-close b)))
+        (when (buffer-exists? old) (switch-to-buffer old))
+        (with s (if (url-exists? pdf) (string-load pdf) "")
+          (define (has? what) (>= (string-search-forwards what 0 s) 0))
+          (check-true (string-starts? s "%PDF-"))
+          (check-true (has? "/Title <FEFF003100200066002800780029>"))
+          (check-true (has? "/URI (https://example.org/a\\)b)"))
+          (check-true (has? "/URI (https://example.org/a\\\\b)"))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The suite
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -1175,6 +1210,6 @@
                   test-cork-bytes test-cork-unicode test-other-encodings
                   test-images test-image-formats test-code-formats
                   test-format-registry test-vernac test-json test-compress
-                  test-serialize-special test-big-document))
+                  test-serialize-special test-big-document test-pdf-export))
   (when (url-exists? (temp-dir)) (system-rmdir-recursive (temp-dir)))
   (check-end))
