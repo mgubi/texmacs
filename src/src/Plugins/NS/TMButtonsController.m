@@ -254,8 +254,15 @@
     NSView *row = [b superview];
     if ([row isKindOfClass: [NSStackView class]] &&
         [(NSStackView*) row orientation] == NSUserInterfaceLayoutOrientationVertical)
-      // in a column at the left: to the right of the button
-      at= NSMakePoint (NSMaxX ([b bounds]) + 3, 0);
+    {
+      // in a column at the left: to the right of the button; in a column
+      // at the right: to its left
+      if (right) {
+        [sm update];
+        at= NSMakePoint (- [sm size].width - 3, 0);
+      }
+      else at= NSMakePoint (NSMaxX ([b bounds]) + 3, 0);
+    }
     else if (upward) {
       [sm update];
       at= NSMakePoint (0, - [sm size].height - 3);
@@ -492,6 +499,11 @@
   [self layout];
 }
 
+- (void) setRight:(BOOL) flag
+{
+  right = flag;
+}
+
 - (NSView*) sideBar
 {
   return sidePane;
@@ -515,11 +527,15 @@
 
 - (void) layoutSide
 {
-  // the columns from left to right, from the top of the pane, which is
-  // placed by the window (ns_tm_widget_rep::layout)
+  // the columns from left to right (main, then mode; mirrored at the right
+  // of the document), from the top of the pane, which is placed by the
+  // window (ns_tm_widget_rep::layout); the hairline is on the side of the
+  // document
   NSRect pr = [sidePane frame];
   CGFloat x = 0, h = 0;
-  for (NSUInteger i = 0; i < 2 && i < [rowArray count]; i++) {
+  NSUInteger n = MIN ((NSUInteger) 2, [rowArray count]);
+  for (NSUInteger k = 0; k < n; k++) {
+    NSUInteger i = right? n - 1 - k: k;
     NSView *row = [rowArray objectAtIndex: i];
     if (![self sideShown: i]) {
       if ([row superview] == sideView) [row removeFromSuperview];
@@ -532,9 +548,9 @@
     h = MAX (h, sz.height);
   }
   CGFloat w = MAX (0, pr.size.width - 1);
-  [sideScroll setFrame: NSMakeRect (0, 0, w, pr.size.height)];
+  [sideScroll setFrame: NSMakeRect (right? 1: 0, 0, w, pr.size.height)];
   [sideView setFrame: NSMakeRect (0, 0, w, MAX (h, pr.size.height))];
-  [sideLine setFrame: NSMakeRect (w, 0, 1, pr.size.height)];
+  [sideLine setFrame: NSMakeRect (right? 0: w, 0, 1, pr.size.height)];
   [sidePane setHidden: x == 0];
 }
 

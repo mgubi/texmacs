@@ -359,15 +359,17 @@ ns_tm_widget_rep::update_footer_menus () {
               "(horizontal (link texmacs-footer-path))", key);
 }
 
-// The main and mode icons at the left of the document (the preference "icon
-// bars" of the General tab, read at each layout, so that a change shows at
-// once, see ns_follow_icon_bars); TEXMACS_NS_BARS=top or left overrides it
-bool
-ns_icon_bars_on_side () {
+// The main and mode icons above the document (0), at its left (1) or at its
+// right (2): the preference "icon bars" of the General tab, read at each
+// layout, so that a change shows at once (see ns_follow_icon_bars);
+// TEXMACS_NS_BARS=top, left or right overrides it
+int
+ns_icon_bars_place () {
   static string forced= get_env ("TEXMACS_NS_BARS");
-  if (forced == "top") return false;
-  if (forced == "left") return true;
-  return get_user_preference ("icon bars", "top") == "left";
+  string place= forced != ""? forced: get_user_preference ("icon bars", "top");
+  if (place == "left") return 1;
+  if (place == "right") return 2;
+  return 0;
 }
 
 void ns_tm_widget_rep::layout()
@@ -384,16 +386,19 @@ void ns_tm_widget_rep::layout()
   CGFloat foot_h= visibility[5]? fs.height: 0;
   if (prompt_view)
     foot_h= max (fs.height, [prompt_view fittingSize].height + 2*vpad);
-  // the main and mode icons in columns at the left of the document, from
-  // the top to the footer, or in the header (the preference "icon bars",
-  // as in the Vue interface)
-  [bc setSide: ns_icon_bars_on_side ()];
+  // the main and mode icons in columns at the left or the right of the
+  // document, from the top to the footer, or in the header (the preference
+  // "icon bars", as in the Vue interface)
+  int place= ns_icon_bars_place ();
+  [bc setSide: place != 0];
+  [bc setRight: place == 2];
   CGFloat bars_w= visibility[0]? [bc sideWidth]: 0;
-  [[bc sideBar] setFrame: NSMakeRect (0, foot_h, bars_w,
+  CGFloat bars_x= place == 2? r.size.width - bars_w: 0;
+  [[bc sideBar] setFrame: NSMakeRect (bars_x, foot_h, bars_w,
                                       max (0.0, r.size.height - foot_h))];
   [[bc sideBar] setHidden: bars_w == 0];
   [bc layoutSide];
-  r.origin.x += bars_w;
+  if (place != 2) r.origin.x += bars_w;
   r.size.width -= bars_w;
   // NOTE: the header contains the rows of icons, which are shown or hidden
   // one by one (see updateVisibility)

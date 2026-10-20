@@ -162,25 +162,28 @@ static bool in_tool_bar= false;
 #define tool_button_pad 4
 #define tool_button_gap 4
 
-// The main and mode icon bars in columns at the left of the editor, rather
-// than in rows above it: the preference "icon bars" (left or top, in the
-// General tab of the preferences), read at each layout, so that a change
-// shows at once; TEXMACS_VUE_BARS=top or left (?bars=top in the browser)
-// overrides it. While they are laid out, the rows of a bar (its horizontal
-// menus and lists) go from top to bottom, its separators are horizontal and
-// its pull-down menus open to the right
+// The main and mode icon bars in columns at the left or at the right of the
+// editor, rather than in rows above it: the preference "icon bars" (top,
+// left or right, in the General tab of the preferences), read at each
+// layout, so that a change shows at once; TEXMACS_VUE_BARS=top, left or
+// right (?bars=top or ?bars=right in the browser) overrides it. While they
+// are laid out, the rows of a bar (its horizontal menus and lists) go from
+// top to bottom, its separators are horizontal and its pull-down menus open
+// to the side of the editor
 static bool in_side_bar= false;
-static bool
-bars_on_side () {
+static bool side_bar_right= false; // the columns are at the right
+static string
+icon_bars_place () {
   static string forced= get_env ("TEXMACS_VUE_BARS");
-  if (forced == "top") return false;
-  if (forced == "left") return true;
+  if (forced == "top" || forced == "left" || forced == "right") return forced;
   // (above the document by default on the desktop, as before the columns)
 #ifdef __EMSCRIPTEN__
-  return get_user_preference ("icon bars", "left") != "top";
+  string place= get_user_preference ("icon bars", "left");
 #else
-  return get_user_preference ("icon bars", "top") == "left";
+  string place= get_user_preference ("icon bars", "top");
 #endif
+  if (place != "left" && place != "right") place= "top";
+  return place;
 }
 
 // The context menu of the editor (texmacs-popup-menu, the Focus menu) at a
@@ -2157,8 +2160,8 @@ void
 layout_pull_button (vue_ui_rep *w) {
   vue_cached_pull_button d= open_box<vue_cached_pull_button> (w->data);
   bool down= w->type == "pulldown_button";
-  // where the menu opens: below the button, or at its right in the column
-  // of the bars at the left of the editor
+  // where the menu opens: below the button, or at its side in the column
+  // of the bars at the left (or the right) of the editor
   bool opens_down= down && !in_side_bar;
   Clay_ElementId button_id= CLAY_SIDI(CLAY_TM_STRING(w->type), w->id);
   Clay_ElementId float_id=  CLAY_IDI("pull_button_float", w->id);
@@ -2211,7 +2214,8 @@ layout_pull_button (vue_ui_rep *w) {
       // evaluate the promise
       d.cw= d.pw->eval ();
       d.placed= false;
-      d.flip= false;
+      // in the column at the right, the menu opens at the left of the button
+      d.flip= down && in_side_bar && side_bar_right;
       d.shift_x= d.shift_y= 0;
       d.win_w= d.win_h= 0;
       d.menu_w= d.menu_h= 0;
@@ -6242,10 +6246,12 @@ layout_bar_content (int key, vue_widget content, Clay_Color bg) {
   if (sd.found) scroll_markers (clip_id, sd, bg, true, 2);
 }
 
-// a bar as a column at the left of the editor (see in_side_bar): the
-// height of the editor, which it scrolls when its icons do not fit
+// a bar as a column at the left or the right of the editor (see
+// in_side_bar): the height of the editor, which it scrolls when its icons
+// do not fit; the rule is on the side of the editor
 static void
-layout_side_bar_content (int key, vue_widget content, Clay_Color bg) {
+layout_side_bar_content (int key, vue_widget content, Clay_Color bg,
+                         bool right) {
   with_test_context c (bar_test_name (key));
   Clay_ElementId clip_id= CLAY_IDI ("side_bar_clip", key);
   CLAY(clip_id, {
@@ -6254,13 +6260,15 @@ layout_side_bar_content (int key, vue_widget content, Clay_Color bg) {
       .sizing= { CLAY_SIZING_FIT(0), CLAY_SIZING_GROW(0) },
       .childAlignment= { .x= CLAY_ALIGN_X_CENTER }},
     .backgroundColor= bg,
-    .border= { .width= { .right= 2 }, .color= the_theme.bar_line },
+    .border= { .width= { .left= (uint16_t) (right? 2: 0),
+                         .right= (uint16_t) (right? 0: 2) },
+               .color= the_theme.bar_line },
     .clip= { .vertical= true, .childOffset= Clay_GetScrollOffset () }})
   {
     with_behind b (bg);
-    in_tool_bar= true; in_side_bar= true;
+    in_tool_bar= true; in_side_bar= true; side_bar_right= right;
     content->do_layout ();
-    in_tool_bar= false; in_side_bar= false;
+    in_tool_bar= false; in_side_bar= false; side_bar_right= false;
   }
   Clay_ScrollContainerData sd= Clay_GetScrollContainerData (clip_id);
   if (sd.found) scroll_markers (clip_id, sd, bg, false, 2);
@@ -6328,7 +6336,8 @@ void vue_texmacs_widget_rep::do_layout () {
       if (!is_nil (main_menu))
         layout_bar_content (8*id + 0, main_menu, color_background);
     }
-    bool side= bars_on_side ();
+    string place= icon_bars_place ();
+    bool side= place != "top", right= place == "right";
     if (visibility[0] && visibility[1] && !side) CLAY(CLAY_ID_LOCAL("MainToolbar"), {
       .layout= {
          .padding= { bar_hpad, bar_hpad, 0, 0 },
@@ -6363,7 +6372,8 @@ void vue_texmacs_widget_rep::do_layout () {
     }
     // the main and mode bars as two columns at the left, side by side (see
     // in_side_bar), from the menu bar down to the footer; the focus bar,
-    // the user bar and the editor with its tools at their right
+    // the user bar and the editor with its tools at their right. At the
+    // right, the columns are in the mirrored order: the main bar outside
     bool main_side= side && visibility[0] && visibility[1] && !is_nil (main_icons);
     bool mode_side= side && visibility[0] && visibility[2] && !is_nil (mode_icons);
     auto body= [&] () {
@@ -6431,8 +6441,10 @@ void vue_texmacs_widget_rep::do_layout () {
           .layoutDirection= CLAY_LEFT_TO_RIGHT,
           .sizing= layoutExpand }})
       {
-        if (main_side) layout_side_bar_content (8*id + 1, main_icons, color_background);
-        if (mode_side) layout_side_bar_content (8*id + 2, mode_icons, the_theme.bar_mode);
+        if (main_side && !right)
+          layout_side_bar_content (8*id + 1, main_icons, color_background, false);
+        if (mode_side && !right)
+          layout_side_bar_content (8*id + 2, mode_icons, the_theme.bar_mode, false);
         CLAY(CLAY_ID_LOCAL("BodyRight"), {
           .layout= {
             .layoutDirection= CLAY_TOP_TO_BOTTOM,
@@ -6440,6 +6452,10 @@ void vue_texmacs_widget_rep::do_layout () {
         {
           body ();
         }
+        if (mode_side && right)
+          layout_side_bar_content (8*id + 2, mode_icons, the_theme.bar_mode, true);
+        if (main_side && right)
+          layout_side_bar_content (8*id + 1, main_icons, color_background, true);
       }
     else body ();
     if (visibility[5]) CLAY(CLAY_ID_LOCAL("Footer"), {

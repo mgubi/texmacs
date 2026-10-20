@@ -14,6 +14,12 @@ have the details, and the problems go to the
 
 ## 20 October 2026
 
+- **Vue, Cocoa**: the main and mode icon bars can be put at the right of the
+  document (Preferences → General → Main and mode icon bars: At the right
+  of the document; `?bars=right` in the browser), in two columns mirrored
+  from those at the left: the main bar along the edge of the window, and
+  the menus of the buttons opening to their left
+  ([#404](https://github.com/mgubi/texmacs/issues/404)).
 - **Site**: a page for [TeXmacs Fixes](https://mgubi.github.io/texmacs/fixes.html),
   the conservative version: the stock TeXmacs (Guile 1.8, Qt 6) with the
   bug fixes of `wip_fixes` and nothing else, for macOS (Apple silicon and

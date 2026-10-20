@@ -635,12 +635,12 @@ ns_follow_theme () {
 }
 
 // The place of the icon bars (the preference "icon bars"): the windows are
-// laid out again when it changes (they read it, see ns_icon_bars_on_side)
-bool ns_icon_bars_on_side (); // ns_tm_widget.mm
+// laid out again when it changes (they read it, see ns_icon_bars_place)
+int ns_icon_bars_place (); // ns_tm_widget.mm
 static void
 ns_follow_icon_bars () {
   static int current= -1;
-  int now= ns_icon_bars_on_side ()? 1: 0;
+  int now= ns_icon_bars_place ();
   if (now == current) return;
   bool first= current < 0;
   current= now;

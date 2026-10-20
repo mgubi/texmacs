@@ -265,7 +265,7 @@
 (validate-enum-preference "updater:interval" '("0" "24" "168" "720"))
 (validate-enum-preference "gui theme" '("default" "light" "dark" ""))
 (validate-enum-preference "icon set" '("classical" "monochrome" "neo-classical" "lucide"))
-(validate-enum-preference "icon bars" '("top" "left"))
+(validate-enum-preference "icon bars" '("top" "left" "right"))
 (validate-enum-preference "window tabs" '("top" "left"))
 (validate-enum-preference "gui density" '("compact" "normal" "large"))
 (validate-enum-preference "gui:responsive tab mode" '("top" "side" "mobile" "grid"))

@@ -280,6 +280,10 @@
   <paragraph|20 October 2026>
 
   <\itemize>
+    <item>The main and mode icon bars can be at the right of the document:
+    <menu|Edit|Preferences|General|Main and mode icon bars|At the right of
+    the document>, or <verbatim|?bars=right> in the address.
+
     <item>The input fields of the dialogs take the keys of the fields of
     the other applications: control (command on a <name|Mac>) with c, x, v,
     a, z and shift-z copy, cut, paste, select all, undo and redo. Elsewhere
