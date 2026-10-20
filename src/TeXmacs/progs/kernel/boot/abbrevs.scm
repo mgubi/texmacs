@@ -71,15 +71,17 @@
 
 (if (guile-c?)
     (define-public (save-object file value)
-      (pretty-print value (open-file (url-materialize file "") OPEN_WRITE))
-      (flush-all-ports))
+      (call-with-output-file (url-materialize file "")
+        (lambda (port) (pretty-print value port))))
     (define-public (save-object file value)
-      (write value (open-file (url-materialize file "") OPEN_WRITE))
-      (flush-all-ports)))
+      (call-with-output-file (url-materialize file "")
+        (lambda (port) (write value port)))))
 
 (define-public (load-object file)
   (let ((r (catch #t
-    (lambda () (read (open-file (url-materialize file "r") OPEN_READ)))
+    (lambda ()
+      (call-with-input-file (url-materialize file "r")
+        (lambda (port) (read port))))
     (lambda (key msg . err-msg)
       (let* ((msg (car err-msg))
 	     (args (cadr err-msg))
