@@ -618,6 +618,8 @@ evaluate_impl (tree t) {
     return evaluate_hr_length ();
 
   /* Primitives for stylesheet editing */
+  case FILTER_STYLE:
+    return evaluate_filter_style (t);
   case STYLE_WITH:
   case VAR_STYLE_WITH:
     return evaluate_result (t[N(t)-1]);

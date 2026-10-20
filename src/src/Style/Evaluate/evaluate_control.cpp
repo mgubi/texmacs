@@ -142,6 +142,14 @@ filter_style (tree t) {
 }
 
 tree
+evaluate_filter_style (tree t) {
+  // (as exec: the style definitions of a document, in hide-preamble,
+  // are its value without the style markup, evaluated in its turn)
+  if (N(t) < 1) return evaluate_error ("invalid filter-style");
+  return evaluate_result (filter_style (evaluate (t[0])));
+}
+
+tree
 evaluate_use_package (tree t) {
   int i, n= N(t);
   for (i=0; i<n; i++) {

@@ -104,7 +104,11 @@
   (check= (rewrite-last '(document (assign "in" (macro "y" (concat "<" (arg "y") ">")))
                                    (assign "out" (macro "x" (in (arg "x"))))
                                    (out "z")))
-          '(concat "<" "z" ">")))
+          '(concat "<" "z" ">"))
+  ;; a macro defined in the preamble of the document (filter-style)
+  (check= (rewrite-last '(document (hide-preamble (document (assign "B" (macro "[b]"))))
+                                   (B)))
+          "[b]"))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Primitives
