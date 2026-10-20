@@ -661,6 +661,11 @@
       (check= (map tree->stree (vertex->links '(id "#s1")))
               '((link "anchor" (attr "secure" "true") (id "#s1"))))
       (check= (vertex->links '(url "http://nowhere.org")) '())
+      ;; the attributes of a link are not vertices: (attr "secure" ...),
+      ;; which every hyperlink has, held all the links of all the buffers,
+      ;; and each link which went was looked for in it
+      (check= (vertex->links '(attr "secure" "true")) '())
+      (check= (vertex->links '(attr "secure" "false")) '())
       ;; following them moves the cursor to the label
       (go-to (at 4 0))
       (go-to-label "s1")
