@@ -53,6 +53,15 @@ chmod 755 "$APPDIR"/usr/bin/*
 mkdir -p "$APPDIR/usr/share/TeXmacs"
 (cd TeXmacs && tar cf - --exclude=./bin --exclude=./lib .) |
   (cd "$APPDIR/usr/share/TeXmacs" && tar xf -)
+# the Scheme files of Guile 1.8 (ice-9/boot-9.scm...), which the embedded
+# Guile loads from TeXmacs/progs once installed: make does not copy them for
+# it (GUILE_DATA_PATH is empty), and without them Guile stops at its start,
+# silently (scm_load_startup_files, then pthread_exit in the main thread)
+if [ ! -d "$APPDIR/usr/share/TeXmacs/progs/ice-9" ] && [ -d tm-guile188/ice-9 ]; then
+  cp -R tm-guile188/ice-9 "$APPDIR/usr/share/TeXmacs/progs/"
+fi
+[ -f "$APPDIR/usr/share/TeXmacs/progs/ice-9/boot-9.scm" ] ||
+  { echo "build-appimage.sh: no ice-9/boot-9.scm for Guile" >&2; exit 1; }
 mkdir -p "$APPDIR/usr/share/TeXmacs/bin"
 cp TeXmacs/bin/texmacs TeXmacs/bin/fig2ps "$APPDIR/usr/share/TeXmacs/bin/" 2>/dev/null || :
 
