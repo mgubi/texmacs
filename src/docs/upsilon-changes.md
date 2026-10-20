@@ -12,6 +12,13 @@ branch [`upsilon_texmacs`](https://github.com/mgubi/texmacs/commits/upsilon_texm
 have the details, and the problems go to the
 [issues of the repository](https://github.com/mgubi/texmacs/issues).
 
+## 20 October 2026
+
+- **Desktop**: TeXmacs Upsilon builds again with Qt 5 (the Qt of Ubuntu
+  22.04 and of the distributions of its age), which failed at the link
+  (#389); with Qt 5 the requests to web services (the AI sessions, Zotero
+  on the web) are not available. The CI now builds it with Qt 5 and GCC.
+
 ## 19 October 2026
 
 - TeXmacs Upsilon installs beside the stock TeXmacs without touching it.

@@ -503,8 +503,8 @@ qt_async_http_post (string url, array<string> headers_attr,
 
 #else // QT_VERSION < 0x060000
 tree
-qt_http_from_json (string s, int mode) {
-  (void) s; (void) mode;
+qt_http_from_json (string s) {
+  (void) s;
   return tree (); }
 
 int
@@ -545,6 +545,28 @@ qt_async_http_post (string url, array<string> headers_attr,
   (void) url; (void) headers_attr; (void) attr; (void) callback;
   return true; }
 
+bool
+qt_async_http_post (string url, array<string> headers_attr, tree data,
+		    int& status, string& outbuf, string& errbuf, bool& kill) {
+  (void) url; (void) headers_attr; (void) data;
+  (void) status; (void) outbuf; (void) kill;
+  errbuf << "HTTP requests need Qt 6" << LF;
+  return true; }
+
+void
+qt_http_async_cancel (string* outbuf) {
+  (void) outbuf; }
+
+int
+qt_http_get (string& ret, string url, array<string> headers_attr) {
+  (void) url; (void) headers_attr;
+  ret= "";
+  return -1; }
+
+void
+QTMHTTPHandler::cancel () {}
+void
+QTMHTTPHandler::onReadyRead () {}
 void
 QTMHTTPHandler::onFinished () {}
 void

@@ -3,6 +3,8 @@
 #   * linux, windows: Qt 6, the jobs of ci.yml (the CI of wip_s7): each
 #     builds TeXmacs, runs the regression suites headless (.github/scripts)
 #     and keeps a runnable bundle as an artifact;
+#   * linux-qt5: that the Qt 5 build of Ubuntu 22.04 (GCC 11) compiles and
+#     starts, as users build it from source;
 #   * linux-vue, windows-vue: the Vue port (SDL3 and Clay, drawn by the
 #     GPU with OpenGL and ThorVG, or by MuPDF without OpenGL 3): the
 #     libraries the distributions lack (misc/vue/build-deps.sh, cached),
@@ -85,6 +87,43 @@ jobs:
           name: texmacs-linux-x86_64
           path: src/texmacs-linux-x86_64.tar.gz
           retention-days: 14
+
+  # Qt 5, as users build it on Ubuntu 22.04 and the distributions of its age
+  # (GCC 11): only that it builds and starts (#389); nothing is published
+  linux-qt5:
+    name: Linux (Ubuntu 22.04, Qt 5, GCC)
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: src
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential pkg-config \
+            qtbase5-dev qtbase5-dev-tools libqt5svg5-dev libgl-dev \
+            libfreetype-dev libpng-dev zlib1g-dev libjpeg-dev \
+            libgnutls28-dev libsqlite3-dev ghostscript
+
+      - name: Configure
+        run: ./configure --with-scheme=s7 --with-gnutls QMAKE=/usr/lib/qt5/bin/qmake CC=gcc CXX=g++
+
+      - name: Build
+        run: make -j"$(nproc)"
+
+      - name: TeXmacs starts
+        run: |
+          home=$(mktemp -d)
+          TEXMACS_HOME_PATH="$home" QT_QPA_PLATFORM=offscreen timeout 300 \
+            TeXmacs/bin/texmacs.bin \
+            -x "(begin (string-save \"ok\" \"$home/ok\") (quit-TeXmacs))" \
+            > "$home/log.txt" 2>&1 || true
+          tail -20 "$home/log.txt"
+          [ -f "$home/ok" ] || { echo "error: TeXmacs did not run the command"; exit 1; }
 
   windows:
     name: Windows (MSYS2 MinGW-w64, Qt 6)
