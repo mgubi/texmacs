@@ -19,6 +19,8 @@ bin="$top/TeXmacs/bin/texmacs.bin"
 [ $# -gt 0 ] || { echo "usage: $0 document.tm..." >&2; exit 1; }
 export TEXMACS_PATH="$top/TeXmacs"
 export TEXMACS_HOME_PATH="${TM_TEST_HOME:-$out/home}"
+# (the animations show the frame at a fixed time, the same in both prints)
+export TEXMACS_ANIMATION_TIME="${TEXMACS_ANIMATION_TIME:-0}"
 mkdir -p "$out" "$TEXMACS_HOME_PATH"
 
 cat > "$out/map.scm" << 'EOF'

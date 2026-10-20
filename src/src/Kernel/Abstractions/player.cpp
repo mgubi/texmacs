@@ -11,6 +11,24 @@
 
 #include "player.hpp"
 #include "tm_timer.hpp"
+#include <stdlib.h>
+
+/******************************************************************************
+* A fixed time for the tests (TEXMACS_ANIMATION_TIME, in milliseconds): the
+* animations then show the same frame at each typesetting and printing
+******************************************************************************/
+
+static double
+fixed_elapsed () {
+  static bool   done = false;
+  static double fixed= -1.0;
+  if (!done) {
+    const char* s= getenv ("TEXMACS_ANIMATION_TIME");
+    if (s != NULL && *s != '\0') fixed= atof (s);
+    done= true;
+  }
+  return fixed;
+}
 
 /******************************************************************************
 * Basic players
@@ -92,6 +110,7 @@ basic_player_rep::set_elapsed (double t) {
 
 double
 basic_player_rep::get_elapsed () {
+  if (fixed_elapsed () >= 0.0) return fixed_elapsed ();
   return (((double) texmacs_time ()) - started) * speed;
 }
 

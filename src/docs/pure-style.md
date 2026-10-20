@@ -331,8 +331,12 @@ roundings, up to 0.0007 pt, enough to change an anti-aliased pixel at
 72 dpi; the boxes of the typesetter were identical (the same 1609 text
 boxes at the same places in both prints). Left:
 
-- `main/beamer/man-animations`: an animation, which differs between two
-  printings of the document itself;
+- `main/beamer/man-animations` (identical since October 20): an animation
+  shows the frame of the time at which it is printed, and differed between
+  two printings of the document itself. The test scripts now set
+  `TEXMACS_ANIMATION_TIME=0` (milliseconds; `basic_player_rep::get_elapsed`
+  in `player.cpp` then gives that time), so that both prints show the first
+  frame; the animated logo of Joris's presentations was the same case;
 - `main/styles/std/std-utils-dtd` (identical since the markup and value
   modes, October 20): an example renders a `quote` returned by an `extern`
   (`map`). The typesetter typesets the result of a rewrite as markup, where

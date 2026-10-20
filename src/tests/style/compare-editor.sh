@@ -21,6 +21,8 @@ bin="$top/TeXmacs/bin/texmacs.bin"
 command -v mutool > /dev/null || { echo "mutool is needed" >&2; exit 1; }
 export TEXMACS_PATH="$top/TeXmacs"
 export TEXMACS_HOME_PATH="${TM_TEST_HOME:-$out/home}"
+# (the animations show the frame at a fixed time, the same in both prints)
+export TEXMACS_ANIMATION_TIME="${TEXMACS_ANIMATION_TIME:-0}"
 rm -rf "$out/jobs" "$out/summary.txt"
 mkdir -p "$out/jobs" "$TEXMACS_HOME_PATH"
 
