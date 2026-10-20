@@ -68,8 +68,9 @@ sed -e 's/^Name=.*/Name=TeXmacs Upsilon/' \
     -e 's|^MimeType=.*|MimeType=text/x-texmacs;text/x-tex;|' \
     packages/appimage/org.texmacs.texmacs.desktop > "$DESKTOP"
 ICON="$WORK/texmacs-upsilon.png"
-if [ "$GUI" = vue ]; then cp TeXmacs/misc/images/texmacs-vue-256.png "$ICON"
-else cp TeXmacs/misc/images/texmacs-256.png "$ICON"; fi
+# (the flat icon of TeXmacs Upsilon, for Qt and Vue: not the chip of the
+# stock TeXmacs)
+cp TeXmacs/misc/images/texmacs-vue-256.png "$ICON"
 
 # the libraries
 [ -n "$LIBDIR" ] && export LD_LIBRARY_PATH="$LIBDIR${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"

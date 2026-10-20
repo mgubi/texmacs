@@ -877,10 +877,11 @@ texmacs_entrypoint (int argc, char** argv) {
   if (!headless_mode) {
 #  if QT_VERSION >= 0x060000
 #    ifndef OS_MACOS
-    tmapp()->set_window_icon("/misc/images/texmacs.svg");
+    // (the flat icon of TeXmacs Upsilon, not the chip of the stock TeXmacs)
+    tmapp()->set_window_icon("/misc/images/texmacs-vue.svg");
 #    endif
 #  else
-    tmapp()->set_window_icon("/misc/images/texmacs-512.png");
+    tmapp()->set_window_icon("/misc/images/texmacs-vue-512.png");
 #  endif
   }
 #endif
