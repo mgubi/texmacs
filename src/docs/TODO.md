@@ -123,7 +123,9 @@ no headless mode. The Widkit duplicates are fixed on `wip_other_guis` too.
   macOS the question is answered empty as it opens, before any key. The
   cause found and fixed (the input ended when the window lost the focus to
   another application, `QTMInputTextWidgetHelper::leave`) left this one,
-  not caught with a trace in ten runs.
+  not caught with a trace in ten runs. `tests/gui/menu-formula` fails as
+  rarely on Qt (the formula not there when the letter is typed); both pass
+  when run again.
 
 ## Kept on purpose
 

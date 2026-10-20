@@ -387,13 +387,18 @@ bar_name (QWidget* w) {
 
 static string
 named_of (QObject* o) {
-  // the name of a (named ...) of the menus: the division puts it in the
-  // property tmNamed of its widget or action (qt_ui_element.cpp)
+  // the names of the (named ...) of the menus around a widget or an action:
+  // the divisions put them in its property tmNamed (qt_ui_element.cpp), the
+  // outer first, as "#outer > #inner"
   if (o == NULL) return "";
   QVariant v= o->property ("tmNamed");
   if (!v.isValid ()) return "";
-  string s= from_qstring (v.toString ());
-  return starts (s, "named:") ? string ("#" * s (6, N(s))) : string ("");
+  array<string> l= tokenize (from_qstring (v.toString ()), "\t");
+  string r;
+  for (int i= 0; i < N(l); i++)
+    if (starts (l[i], "named:"))
+      r= (N(r) == 0 ? r : r * " > ") * "#" * l[i] (6, N(l[i]));
+  return r;
 }
 
 static string join_path (string a, string b) {

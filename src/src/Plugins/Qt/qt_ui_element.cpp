@@ -328,6 +328,18 @@ qt_ui_element_rep::operator tree () {
   }
 }
 
+static void
+add_test_name (QObject* o, string name) {
+  // the name of a (named ...) of the menus, for the scripted tests
+  // (qt_test.cpp): kept in the property tmNamed, the names of nested ones
+  // one after the other, the outer first (it is given last)
+  if (!starts (name, "named:")) return;
+  QVariant v= o->property ("tmNamed");
+  QString n= to_qstring (name);
+  if (v.isValid ()) n= n + "\t" + v.toString ();
+  o->setProperty ("tmNamed", n);
+}
+
 QAction* 
 qt_ui_element_rep::as_qaction () {
   //if (DEBUG_QT_WIDGETS)
@@ -631,7 +643,7 @@ qt_ui_element_rep::as_qaction () {
       typedef pair<string, widget> T;
       T x = open_box<T>(load);
       act = concrete (x.x2)->as_qaction ();
-      if (act != NULL) act->setProperty ("tmNamed", to_qstring (x.x1));
+      if (act != NULL) add_test_name (act, x.x1);
     }
       break;
 
@@ -1370,7 +1382,7 @@ qt_ui_element_rep::as_qwidget (QWidget* parent_widget) {
       qwid = qw;
       // a (named ...) of the menus keeps the name of the widget (its
       // objectName, which other code sets): the scripted tests read it
-      if (starts (name, "named:")) qwid->setProperty ("tmNamed", to_qstring (name));
+      if (starts (name, "named:")) add_test_name (qwid, name);
       else qwid->setObjectName (to_qstring (name));
     }
       break;

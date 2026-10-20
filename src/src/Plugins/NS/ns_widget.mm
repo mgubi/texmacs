@@ -1208,7 +1208,10 @@ widget division_widget (string name, widget w) {
   if (starts (name, "named:")) {
     // a (named ...) of the menus: its view or its menu item is marked
     // (ns_ui_element_rep::as_nsview), for the scripted tests
-    concrete (w)->test_name= name;
+    // (nested: the names one after the other, the outer first, as it is
+    // given last)
+    string old= concrete (w)->test_name;
+    concrete (w)->test_name= N(old) == 0 ? name : name * "\t" * old;
     return w;
   }
   if (name == "section-active-tab") {

@@ -123,11 +123,17 @@ static string join_path (string a, string b) {
 
 static string
 named_of (id obj) {
-  // the name of a (named ...) of the menus, which ns_ui_element_rep gives
-  // its view or menu item (and TMButtonsController its buttons)
+  // the names of the (named ...) of the menus around a view or a menu item,
+  // which ns_ui_element_rep gives it (and TMButtonsController its buttons):
+  // the outer first, as "#outer > #inner"
   NSString* s= obj? objc_getAssociatedObject (obj, @selector(tmNamed)): nil;
-  if (!s || ![s hasPrefix: @"named:"]) return "";
-  return "#" * from_nsstring ([s substringFromIndex: 6]);
+  if (!s) return "";
+  array<string> l= tokenize (from_nsstring (s), "\t");
+  string r;
+  for (int i= 0; i < N(l); i++)
+    if (starts (l[i], "named:"))
+      r= (N(r) == 0 ? r : r * " > ") * "#" * l[i] (6, N(l[i]));
+  return r;
 }
 
 static string
