@@ -312,9 +312,11 @@ resolved from the directory of the copy. `tests/style/compare.sh` avoids
 them (current version, the rewritten body set as a tree, the master of the
 copy set to the document).
 
-**Result: of the 696 English pages of the documentation, 693 are identical
+**Result: of the 696 English pages of the documentation, 695 are identical
 to the pixel** (October 20, after the markup and value modes, which made
-`std-utils-dtd` identical, and the copy below). The copy of the rewritten
+`std-utils-dtd` identical, the copy below, and the margins in ornaments,
+which made `tag-help` and `top-help` identical; the one left is the
+animation page, which differs between two printings of itself). The copy of the rewritten
 body must keep its shared subtrees shared (`style-rewrite-copy`, not
 `tree-copy`): the typesetter makes a `hard-id` from the address of its
 argument (a residual since the analysis of a keystroke), and the locus and
@@ -349,9 +351,18 @@ boxes at the same places in both prints). Left:
   `quote-arg` in markup, which the substitution of the arguments makes a
   `quote` of the argument (shown as such, where the typesetter shows the
   `quote-arg`); none in the documentation;
-- `main/automated/tag-help` and `main/automated/top-help`, generated pages
-  which show Scheme templates as inactive markup: small differences of
-  spacing and indentation, not explained yet.
+- `main/automated/tag-help` and `main/automated/top-help` (identical since
+  October 20): generated pages which draw Scheme programs as nested blocks
+  (`block-if`, `block-for` of the `automate` package, drawn with
+  `ornament`), with `explain` inside. The typesetter typesets the body of
+  an ornament, a canvas or an art box with margins of its own
+  (`bridge_ornamented_rep`: `par-left` and `par-right` from the margins
+  outside and the paddings), and `explain-body` widens `par-left` from
+  `(value par-left)`: the rewriter computed it from the margins outside the
+  ornament. In those bodies the margins are now left to the typesetter
+  (`evaluate_ornamented` binds them to references). Found by cutting the
+  page down: the last block alone differed, then a `block-if` holding an
+  `explain`, while each alone was identical.
 
 The syntax highlighting of programs is left out of the comparison
 (`tree-sitter-set-highlighting #f`). The tree-sitter highlighter
@@ -402,9 +413,10 @@ any two printings; 9 developer pages differ in the colours of their
 program code, or not, from one run to the next: the older highlighter
 depends on the documents printed before in the same process (printed
 alone, they are identical). The pages which differed in the comparison
-of the copies because of their DRD (`tag-help`, `top-help`, the `map`
-example of `std-utils-dtd`) are identical here, where the DRD is the
-document's. The 10 left: the animation page, and 9 developer pages whose
+of the copies (`tag-help`, `top-help`, the `map` example of
+`std-utils-dtd`) were identical here; the DRD of the copies, given then as
+the reason, was not it (see "Typesetting the result" for their causes,
+found later). The 10 left: the animation page, and 9 developer pages whose
 program code is coloured otherwise by the older highlighter, which depends
 on the documents printed before in the same process (printed alone, they
 are identical).

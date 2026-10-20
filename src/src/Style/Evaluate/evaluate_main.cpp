@@ -10,6 +10,7 @@
 ******************************************************************************/
 
 #include "evaluate_main.hpp"
+#include "std_environment.hpp"
 #include "memorizer.hpp"
 #include "vars.hpp"
 #include "path.hpp"
@@ -283,6 +284,29 @@ evaluate_part (tree t) {
 }
 
 static tree
+evaluate_ornamented (tree t, int body) {
+  // the typesetter typesets the body of an ornament, a canvas or an art
+  // box with margins of its own (bridge_ornamented_rep: par-left and
+  // par-right, from the margins outside and the paddings): in the body
+  // they are left to it, as references (evaluate_value)
+  static tree left (VALUE, PAR_LEFT), right (VALUE, PAR_RIGHT);
+  int i, n= N(t);
+  tree r (t, n);
+  for (i=0; i<n; i++)
+    if (i != body) r[i]= evaluate_part (t[i]);
+  if (body >= 0 && body < n) {
+    assoc_environment local (2);
+    local->raw_write (0, PAR_LEFT, left);
+    local->raw_write (1, PAR_RIGHT, right);
+    begin_with (std_env, local);
+    r[body]= evaluate_part (t[body]);
+    end_with (std_env);
+  }
+  transfer_ip (t, r);
+  return r;
+}
+
+static tree
 evaluate_compound_children (tree t) {
   int i, n= N(t);
   tree r (t, n);
@@ -350,6 +374,11 @@ evaluate_impl (tree t) {
     return evaluate_formatting (t, CELL_FORMAT);
   case TABLE:
     return evaluate_table (t);
+  case ORNAMENT:
+  case ART_BOX:
+    return evaluate_ornamented (t, 0);
+  case CANVAS:
+    return evaluate_ornamented (t, N(t) - 1);
   /* Primitives for macro expansion */
   case ASSIGN:
     return evaluate_assign (t);

@@ -254,7 +254,18 @@
                                    (value "v")))
           '(concat "a" "b"))
   (check= (rewrite-last '(document (if (equal (quote "b") "b") "yes" "no")))
-          "yes"))
+          "yes")
+  ;; the typesetter typesets the body of an ornament with margins of its
+  ;; own (bridge_ornamented_rep): there they stay references
+  (check= (rewrite-last '(document
+                          (with "par-left" "2cm"
+                            (document
+                              (ornament (with "par-left" (plus (value "par-left") "1fn") "x"))
+                              (with "par-left" (plus (value "par-left") "1fn") "y")))))
+          '(with "par-left" "2cm"
+             (document
+               (ornament (with "par-left" (plus (value "par-left") "1fn") "x"))
+               (with "par-left" (plus "2cm" "1fn") "y")))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Memorization

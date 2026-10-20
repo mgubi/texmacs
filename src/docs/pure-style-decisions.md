@@ -20,14 +20,17 @@ layout, and the rule for both is the same: leave them to the typesetter.
 computation with its arguments evaluated): the size of boxes (`box-info`,
 `frame-direct`, `frame-inverse`), the lengths in units, the automatic
 labels and the label tables (`auto-id`, `get-binding`, `has-binding`,
-`get-attachment`), patterns, `hard-id`.
+`get-attachment`), patterns, `hard-id`; and the margins (`par-left`,
+`par-right`) in the body of an ornament, a canvas or an art box, which the
+typesetter sets itself there (`evaluate_ornamented`).
 *Alternatives:* compute an approximation (lengths in absolute units, as the
 rewriter of 2007 did): wrong, the typesetter converts units at the scale at
 which it lays out (twice the size headless), with the font, the paragraph,
 the box at the place of use; evaluate `box-info` by typesetting in the
 rewriter: duplicates the typesetter.
 *Decided by:* the comparison of the printed pages (`tests/style/compare.sh`),
-which showed each of these as a difference.
+which showed each of these as a difference (the margins in ornaments on the
+two generated help pages, `tag-help` and `top-help`).
 
 **1.2 References, not copies.** A value which holds a residual is referred to
 (`value (x)` stays, with the `with` or `assign` which binds `x`), so that the
