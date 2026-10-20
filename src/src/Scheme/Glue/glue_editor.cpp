@@ -3524,6 +3524,19 @@ tmg_markdown_expand (tmscm arg1) {
 }
 
 tmscm
+tmg_office_expand (tmscm arg1) {
+  TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "office-expand");
+
+  content in1= tmscm_to_content (arg1);
+
+  // TMSCM_DEFER_INTS;
+  tree out= get_current_editor()->exec_office (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return tree_to_tmscm (out);
+}
+
+tmscm
 tmg_animate_checkout (tmscm arg1) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "animate-checkout");
 
@@ -3977,6 +3990,7 @@ initialize_glue_editor () {
   tmscm_install_procedure ("latex-expand",  tmg_latex_expand, 1, 0, 0);
   tmscm_install_procedure ("html-expand",  tmg_html_expand, 1, 0, 0);
   tmscm_install_procedure ("markdown-expand",  tmg_markdown_expand, 1, 0, 0);
+  tmscm_install_procedure ("office-expand",  tmg_office_expand, 1, 0, 0);
   tmscm_install_procedure ("animate-checkout",  tmg_animate_checkout, 1, 0, 0);
   tmscm_install_procedure ("animate-commit",  tmg_animate_commit, 1, 0, 0);
   tmscm_install_procedure ("idle-time",  tmg_idle_time, 0, 0, 0);

@@ -61,6 +61,23 @@
 #endif
 
 
+#ifdef MUPDF_RENDERER
+// in Plugins/MuPDF/mupdf_pdf_renderer.cpp
+bool mupdf_pdf_to_svg (url pdf, url svg);
+#endif
+
+// The first page of a PDF as an SVG, without another program: true if it
+// was written. Only the builds with MuPDF can do it.
+bool
+native_pdf_to_svg (url pdf, url svg) {
+#ifdef MUPDF_RENDERER
+  return mupdf_pdf_to_svg (pdf, svg);
+#else
+  (void) pdf; (void) svg;
+  return false;
+#endif
+}
+
 /******************************************************************************
 * Inform about missing dependencies
 ******************************************************************************/

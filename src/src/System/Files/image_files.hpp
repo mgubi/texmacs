@@ -26,6 +26,7 @@ string 	      ps_load (url image, bool conv=true);
 void          image_size (url image, int& w, int& h);
 void          pdf_image_size (url image, int& w, int& h);
 void          svg_image_size (url image, int& w, int& h);
+bool          native_pdf_to_svg (url pdf, url svg);
 void          image_to_eps (url image, url eps, int w_pt= 0, int h_pt= 0, int dpi= 0);
 void          image_to_pdf (url image, url eps, int w_pt= 0, int h_pt= 0, int dpi= 0,
                             bool placeholder= true);

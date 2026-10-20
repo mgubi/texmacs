@@ -98,6 +98,8 @@ public:
   tree     exec_html (tree t);
   tree     exec_markdown (tree t, path p);
   tree     exec_markdown (tree t);
+  tree     exec_office (tree t, path p);
+  tree     exec_office (tree t);
   tree     exec_latex (tree t, path p);
   tree     exec_latex (tree t);
   tree     texmacs_exec (tree t);

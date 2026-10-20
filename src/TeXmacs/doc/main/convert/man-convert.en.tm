@@ -9,7 +9,8 @@
   formats: the native <TeXmacs> format (file extension <verbatim|.tm>),
   <name|Xml> (<verbatim|.tmml>) and as a <name|Scheme> expression
   (<verbatim|.stm>). <TeXmacs> also provides bi-directional converters for
-  <LaTeX>, <name|Html>, <name|MathML> and <name|Markdown>.
+  <LaTeX>, <name|Html>, <name|MathML>, <name|Markdown>, and for the
+  documents of <name|Word> and <name|OpenDocument>.
 
   In addition to the above textual formats,<TeXmacs> documents can be
   exported in a <em|wysiwyg> (what-you-see-is-what-you-get) way to either
@@ -32,6 +33,8 @@
     <branch|<name|Html> and <name|MathML>|html/man-html.en.tm>
 
     <branch|<name|Markdown>|markdown/man-markdown.en.tm>
+
+    <branch|<name|Word> and <name|OpenDocument>|office/man-office.en.tm>
 
     <branch|Exporting to image formats|man-graphics-export.en.tm>
 
