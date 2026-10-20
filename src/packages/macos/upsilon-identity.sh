@@ -1,7 +1,7 @@
 #!/bin/bash
 #
-# Gives an application of TeXmacs Upsilon a name and an identity of its own,
-# so that it can be installed beside the stock TeXmacs, and its three
+# Gives an application of TeXmacs Upsilon a name, an icon and an identity of
+# its own, so that it can be installed beside the stock TeXmacs, and its three
 # interfaces beside each other: macOS keeps the preferences of an
 # application (NSUserDefaults) and chooses the one which opens a document or
 # a tmfs: link by the bundle identifier, which was org.texmacs.TeXmacs as in
@@ -38,5 +38,13 @@ n=$(plutil -extract CFBundleDocumentTypes raw "$plist" 2> /dev/null || echo 0)
 for ((i= 0; i < n; i++)); do
   plutil -replace CFBundleDocumentTypes.$i.LSHandlerRank -string Alternate "$plist"
 done
+# the flat icon of TeXmacs Upsilon (TeXmacs-Upsilon.icns, made from
+# TeXmacs/misc/images/texmacs-vue.svg with iconutil), instead of the chip of
+# the stock TeXmacs in Assets.car, which holds only that icon
+res="$app/Contents/Resources"
+cp "$(dirname "$0")/TeXmacs-Upsilon.icns" "$res/AppIcon.icns"
+rm -f "$res/Assets.car"
+plutil -replace CFBundleIconFile -string AppIcon "$plist"
+plutil -remove CFBundleIconName "$plist" > /dev/null 2>&1 || true
 plutil -lint "$plist" > /dev/null
 echo "$name"

@@ -32,14 +32,13 @@
 #endif
 
 #if Gui == "Vue"
-  #define AppName "GNU TeXmacs Upsilon Vue"
+  #define AppName "TeXmacs Upsilon Vue"
   #define AppGuid "{{163A2D93-F063-409A-87C8-16BD85C9A623}"
 #else
-  #define AppName "GNU TeXmacs Upsilon"
+  #define AppName "TeXmacs Upsilon"
   #define AppGuid "{{6298E18B-B111-48B7-BA8F-A89B3C450771}"
 #endif
-; (TeXmacsUpsilon.tm, TeXmacsUpsilonVue.tm: without the GNU of the name)
-#define ProgId StringChange(StringChange(AppName, "GNU ", ""), " ", "") + ".tm"
+#define ProgId StringChange(AppName, " ", "") + ".tm"
 
 [Setup]
 AppId={#AppGuid}
