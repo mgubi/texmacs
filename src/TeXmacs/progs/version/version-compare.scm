@@ -242,8 +242,10 @@
 	((and (== version-grain "block")
 	      (not (tree-multi-paragraph? (tm->tree t1)))
 	      (not (tree-multi-paragraph? (tm->tree t2))))
-	 (diff (if (tree-multi-paragraph? (tm->tree t1)) t1 `(document ,t1))
-	       (if (tree-multi-paragraph? (tm->tree t2)) t2 `(document ,t2))))
+	 ;; t1 and t2 may come from denormalize, with their words split
+	 (let ((n1 (normalize t1)) (n2 (normalize t2)))
+	   (diff (if (tree-multi-paragraph? (tm->tree n1)) n1 `(document ,n1))
+		 (if (tree-multi-paragraph? (tm->tree n2)) n2 `(document ,n2)))))
 	((and (string? t1) (string? t2))
 	 (compare-versions `(concat ,t1) `(concat ,t2)))
 	((and (not (tm-is? t1 'concat)) (tm-is? t2 'concat))
