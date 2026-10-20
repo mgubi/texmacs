@@ -33,12 +33,7 @@
 		       "(" (number->string server) ")"))
       "Inactive connection"))
 
-(define (account->string server-name port pseudo)
-  (if (== server-name "")
-      (account->string "localhost" port pseudo)
-      (with x (string-append pseudo "@" server-name)
-	(if (== port "6561") x
-	    (string-append x ":" port)))))
+; (account->string: client-base.scm)
 
 (define-macro (with-post-reload . body) `(begin ,@body (revert-buffer-revert)))
 
@@ -115,7 +110,7 @@
 (tm-menu (remote-live-menu server)
   ;; who else is in the live document (their cursors are shown in it)
   (for (name (live-participants (current-buffer)))
-    (group (eval (string-append "Also here: " name))))
+    (group (eval (client-sentence "Also here: %1" name))))
   ("Permissions" (open-permissions-editor server (current-buffer)))
   ("Share" (open-share-document-widget server (current-buffer))))
 
@@ -177,9 +172,9 @@
   (invisible (client-active-servers))
   ;; the connections which were lost, until the user logs in again
   (for (x (client-lost-connections))
-    (group (eval (string-append "Connection lost: "
-                                (account->string (first x) (second x)
-                                                 (third x))))))
+    (group (eval (client-sentence "Connection lost: %1"
+                                  (account->string (first x) (second x)
+                                                   (third x))))))
   (link client-start-menu)
   (with l (client-active-servers)
     ---
@@ -226,9 +221,8 @@
 
 (define (lost-connection-balloon)
   (with x (car (client-lost-connections))
-    (string-append "Connection lost: "
-                   (account->string (first x) (second x) (third x))
-                   "; log in again")))
+    (client-sentence "Connection lost: %1; log in again"
+                     (account->string (first x) (second x) (third x)))))
 
 (define current-server #f)
 

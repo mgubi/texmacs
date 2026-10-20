@@ -42,7 +42,19 @@
     (input (when answer (client-set-connection-timeout answer))
           "string"
           (list (number->string (client-get-connection-timeout)))
-          "7em"))))))
+          "7em")))
+   (item
+    (text "Watch the connection (heartbeat):")
+    (toggle (set-boolean-preference "client heartbeat" answer)
+            (get-boolean-preference "client heartbeat")))
+   (item
+    (text "A window when a connection is lost:")
+    (toggle (set-boolean-preference "client lost window" answer)
+            (get-boolean-preference "client lost window")))
+   (item
+    (text "Show the cursors of the others in live documents:")
+    (toggle (set-boolean-preference "client user cursors" answer)
+            (get-boolean-preference "client user cursors"))))))
 ;; todo << prevent from setting timeouts to 0
 
 (tm-define (open-client-preferences)
@@ -398,14 +410,14 @@
 
 (tm-define (client-login-home server-name port pseudo credential cb-done)
   (client-notify :connecting
-                 (string-append "connecting to " server-name "..."))
+                 (client-sentence "connecting to %1..." server-name))
   (client-login-then server-name port pseudo credential
     (lambda (server ret)
       (cond ((== ret "ready")
              (add-active-connection server server-name port pseudo)
              (client-notify :connected
-                            (string-append "connected to " server-name
-                                           " as " pseudo))
+                            (client-sentence "connected to %1 as %2"
+                                             server-name pseudo))
              (client-send-version server server-name port
                                   pseudo credential cb-done))
             ((== ret "pending")
@@ -420,8 +432,8 @@
                 (client-stop server))
               (with msg (if (string? ret) ret "no connection")
                 (client-notify :failed
-                               (string-append "no connection with "
-                                              server-name ": " msg))
+                               (client-sentence "no connection with %1: %2"
+                                                server-name (translate msg)))
                 (client-open-error
                   (string-append "Remote login error, " msg))))))))
 
@@ -978,6 +990,12 @@
               (if dir-flag? full
                   (string->url (string-append "tmfs://remote-file/"
                                               (remote-file-name full)))))))
+         (ok
+          ;; "Ok", and return in the field: the name as typed
+          (lambda ()
+            (with name (form-named-ref "remote-save-as" "name")
+              (when (and (string? name) (!= name ""))
+                (quit (save-as name))))))
          (dummy (select-dir dir)))
     (padded
       (refreshable "remote-file-browser"
@@ -993,18 +1011,26 @@
                   ""))
         (assuming save-flag?
           ===
-          ;; a form, so that "Ok" takes the name as typed (it took the
-          ;; name of the entry selected last, whatever was typed after)
+          ;; a field of a form, so that "Ok" takes the name as typed (it
+          ;; took the name of the entry selected last, whatever was typed
+          ;; after); written out as form-input expands, so that return in
+          ;; the field does what "Ok" does: a field of a form is told of
+          ;; every key, with the text, and return closed nothing
           (form "remote-save-as"
             (hlist
               (text (cadr type)) //
               (refreshable "remote-save-as"
-                (form-input "name" "string" (list file) "1w"))
+                (input (begin
+                         (form-named-set "remote-save-as" "name" answer)
+                         (when (and (pair? answer) (pair? (cdr answer))
+                                    (== (cadr answer) "return"))
+                           (ok)))
+                       "name#form-remote-save-as-1:string"
+                       (form-proposals "remote-save-as" "name" (list file))
+                       "1w"))
               // // //
               (explicit-buttons
-                ("Ok" (with name (form-ref "name")
-                        (when (and (string? name) (!= name ""))
-                          (quit (save-as name)))))))))
+                ("Ok" (ok))))))
         (assuming (and dir-flag? (not save-flag?))
           (bottom-buttons
             >>

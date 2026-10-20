@@ -14,6 +14,15 @@ have the details, and the problems go to the
 
 ## 20 October 2026
 
+- **Remote tools**: in Remote > Client preferences, three switches, all on
+  by default: the heartbeat which watches a connection, the window opened
+  when a connection is lost (now once for connections lost together, not
+  one per server), and the cursors of the others in live documents. A live
+  document closed is no longer followed every 300 ms, and the cursors of the
+  others are drawn again only when its views change; the server no longer
+  sends cursors to a TeXmacs which does not know of them, nor keeps those of
+  a client which left. The sentences of the connections are translatable,
+  and Return in the field of Remote > Rename renames, as "Ok" does.
 - In a live document, a move of the cursor of another user repaints the
   places where it was and where it goes, not the whole window, which every
   move of every user did.
