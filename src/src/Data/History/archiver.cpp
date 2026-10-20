@@ -116,6 +116,23 @@ global_cancel () {
   pending_archs= hashset<pointer> ();
 }
 
+void
+global_forget_document (path rp) {
+  // The document at rp has been deleted (its buffer was closed): the
+  // archivers of its views must neither keep that deletion as a pending
+  // change, which a later global_cancel would undo by writing the closed
+  // document into a slot of the_et that a new buffer may use by then,
+  // nor keep a history for a document which no longer exists.
+  iterator<pointer> it = iterate (archs);
+  while (it->busy()) {
+    archiver_rep* arch= (archiver_rep*) it->next();
+    if (rp <= arch->rp) {
+      arch->clear ();
+      pending_archs->remove ((pointer) arch);
+    }
+  }
+}
+
 /******************************************************************************
 * Useful subroutines
 ******************************************************************************/

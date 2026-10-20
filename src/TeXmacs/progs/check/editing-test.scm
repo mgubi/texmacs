@@ -712,6 +712,37 @@
         (check-true (buffer-modified? b1))
         (buffer-pretend-saved b1)))))
 
+;; Closing a buffer empties its place in the root tree, and that change
+;; belongs to no history: a cancel-editing in another buffer (as after an
+;; error in a key press or a menu action) leaves that place as it is,
+;; whether it is still free or already holds the body of a newer buffer,
+;; here one without a view. It used to put the closed body back there.
+(define (test-cancel-closed)
+  (check-group "cancel after closing a buffer")
+  (with-buffer-body '(document "here")
+    (lambda ()
+      (let* ((b (current-buffer))
+             (a (new-buffer))
+             (x (string->url "tmfs://aux/editing-test-cancel-closed"))
+             (i #f))
+        (switch-to-buffer* a)
+        (buffer-set-body a (stree->tree '(document "closed")))
+        (update-forced)
+        (clear-undo-history)
+        (set! i (car (buffer-path)))
+        (switch-to-buffer* b)
+        (buffer-close a)
+        (check= (tree-label (tree-ref (root-tree) i)) 'uninit)
+        (buffer-set-body x (stree->tree '(document "newer")))
+        (with before (tree->stree (tree-ref (root-tree) i))
+          (start-editing)
+          (cancel-editing)
+          (end-editing)
+          (check= (tree->stree (tree-ref (root-tree) i)) before))
+        (check= (tree->stree (buffer-get-body x)) '(document "newer"))
+        (check= (body) '(document "here"))
+        (buffer-close x)))))
+
 ;; The changes between mark-start and mark-end are one step of the history;
 ;; mark-cancel undoes those made since mark-start. A marker which is not in
 ;; the history, or which cannot be removed, leaves the history and the
@@ -932,6 +963,7 @@
   (test-undo-authors)
   (test-undo-clear)
   (test-undo-markers)
+  (test-cancel-closed)
   (test-save)
   (test-export)
   (test-copy-as-text)
