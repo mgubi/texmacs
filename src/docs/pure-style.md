@@ -372,8 +372,10 @@ of the document.
   tree: the lookup is skipped then (`has_subtree`).
 
 Result (`tests/style/compare-editor.sh`, both printings in the same
-process each): **686 of the 696 pages print identically with and without
-the flag**, with no fallback. The pages which differed in the comparison
+process each): **695 of the 696 pages print identically with and without
+the flag** (the animation page differs between any two printings), with no
+fallback; before the boundaries of macro calls (below), 686, the 9 others
+differing in the colours of program code. The pages which differed in the comparison
 of the copies because of their DRD (`tag-help`, `top-help`, the `map`
 example of `std-utils-dtd`) are identical here, where the DRD is the
 document's. The 10 left: the animation page, and 9 developer pages whose
@@ -381,14 +383,26 @@ program code is coloured otherwise by the older highlighter, which depends
 on the documents printed before in the same process (printed alone, they
 are identical).
 
-Moving the cursor (`go-down`, `go-up`, `go-right`, the starts and ends of
-lines) and typing work, on the documents tried with a window, and the
-typed text goes into the document. The cursor does not always stop at the
-same places: around a macro call (an `item`), the editor can put it before
-or after the tag, which the concater marks with the boundaries of the call;
-in the rewritten tree the call is expanded and its boundaries have no
-boxes, so the cursor goes to the nearest place inside (`XYZ` typed at the
-start of a list item goes after the bullet, not before). Also open:
+**Boundaries of macro calls.** Around a macro call (an `item`), the editor
+can put the cursor before or after the tag: the concater marks the
+boundaries of the call (`typeset_compound`, `marker (descend (ip, 0))` and
+`(ip, 1)`). In the rewritten tree the call is expanded, and at first the
+cursor went to the nearest place inside (`XYZ` typed at the start of a list
+item went after the bullet, not before). The rewriter now keeps the
+expansion of a macro call of the document (a node with a place in the
+document) in an `expand-as` with the place of the call, whose boundaries
+the concater marks (`typeset_expand_as`); `exec` of an `expand-as` gives its
+body. This is done where markup is assembled (`evaluate_markup`: the
+children of the typesetting primitives other than data such as `tuple`,
+the body of a `with`), not in the values, on which the rewriter computes.
+
+With it, the same moves (`go-down` and `go-up` 25 times, `go-right` 40
+times, ends of lines, typing `XYZ`, more moves) from the start of the list
+document of the tests, *About*, the welcome, *style*, conventions,
+structure and mathematics pages give the same cursor paths and the same
+document with and without the flag, at every step. (Headless, the cursor
+does not move: the moves need a window, `(apply-changes)` after each.)
+Also open:
 
 - the environment at the cursor (`edit_typeset_rep::get_env_value`, which
   runs `exec_until` along a path of the document in the typesetter) walks

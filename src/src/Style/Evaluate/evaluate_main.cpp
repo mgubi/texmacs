@@ -192,11 +192,29 @@ contains_residual (tree t) {
   return false;
 }
 
+tree
+evaluate_markup (tree t) {
+  // the evaluation of t as a part of the markup of the result (a child of
+  // a typesetting primitive, the body of a with): the expansion of a macro
+  // call of the document is kept in an expand-as with the place of the
+  // call, whose boundaries the concater marks (typeset_expand_as), where the
+  // cursor is put before and after the tag, as when it typesets the call
+  // (typeset_compound). (Not in the values: the computations of the
+  // rewriter would see the expand-as; exec of an expand-as gives its body.)
+  tree r= evaluate (t);
+  if (is_atomic (t) || (L(t) != COMPOUND && L(t) < START_EXTENSIONS)) return r;
+  path ip= obtain_ip (t);
+  if (ip == path (DETACHED) || is_nil (ip) || ip->item < 0) return r;
+  tree w (EXPAND_AS, as_string (L(t)), r);
+  transfer_ip (t, w);
+  return w;
+}
+
 static tree
 evaluate_compound_children (tree t) {
   int i, n= N(t);
   tree r (t, n);
-  for (i=0; i<n; i++) r[i]= evaluate (t[i]);
+  for (i=0; i<n; i++) r[i]= evaluate_markup (t[i]);
   transfer_ip (t, r);
   return r;
 }
@@ -549,8 +567,12 @@ evaluate_impl (tree t) {
     if (L(t) < START_EXTENSIONS) {
       int i, n= N(t);
       tree r (t, n);
+      // (data, on which the rewriter computes, holds no expand-as)
+      bool data= is_func (t, TUPLE) || is_func (t, ATTR) ||
+                 is_func (t, COLLECTION) || is_func (t, ASSOCIATE) ||
+                 is_func (t, TMLEN);
       for (i=0; i<n; i++)
-	r[i]= evaluate (t[i]);
+	r[i]= data? evaluate (t[i]): evaluate_markup (t[i]);
       transfer_ip (t, r);
       return r;
     }

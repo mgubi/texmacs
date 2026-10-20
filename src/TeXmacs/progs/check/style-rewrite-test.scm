@@ -56,10 +56,19 @@
   ;; the rewritten body as a scheme tree
   (with-scratch-body body (lambda () (tree->stree (style-rewrite-buffer)))))
 
+(define (unmark t)
+  ;; t without the expand-as which keep the boundaries of the macro calls
+  ;; of the document (see test-boundaries)
+  (cond ((and (pair? t) (== (car t) 'expand-as) (= (length t) 3))
+         (unmark (caddr t)))
+        ((pair? t) (cons (car t) (map unmark (cdr t))))
+        (else t)))
+
 (define (rewrite-last body)
-  ;; the rewriting of the last paragraph of a document
+  ;; the rewriting of the last paragraph of a document (without the
+  ;; boundaries of the macro calls)
   (with r (rewrite body)
-    (and (pair? r) (cAr r))))
+    (and (pair? r) (unmark (cAr r)))))
 
 (define (stree-errors t)
   ;; the messages of the error markup in a scheme tree, sorted, each once
@@ -197,6 +206,27 @@
   ;; a box length is only a residual in a computation on lengths
   (check= (value-of '(merge "1" "r")) "1r")
   (check= (value-of '(length "1r")) "2"))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Boundaries of macro calls
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; The expansion of a macro call of the document is kept in an expand-as,
+;; whose boundaries the typesetter marks (the cursor goes before and after
+;; the tag); not in a value, on which the rewriter computes.
+(define (test-boundaries)
+  (check-group "boundaries")
+  (check= (cAr (rewrite '(document (assign "foo" (macro "x" (concat "[" (arg "x") "]")))
+                                   (foo "world"))))
+          '(expand-as "foo" (concat "[" "world" "]")))
+  (check= (cAr (rewrite '(document (assign "two" (macro "2"))
+                                   (plus (two) "1"))))
+          "3")
+  ;; (a call inside a macro body is not in the document)
+  (check= (cAr (rewrite '(document (assign "in" (macro "y" (concat "<" (arg "y") ">")))
+                                   (assign "out" (macro "x" (in (arg "x"))))
+                                   (out "z"))))
+          '(expand-as "out" (concat "<" "z" ">"))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Memorization
@@ -348,6 +378,7 @@
         (test-macros)
         (test-primitives)
         (test-partial-evaluation)
+        (test-boundaries)
         (test-memorization)
         (test-manual)
         (test-documentation)

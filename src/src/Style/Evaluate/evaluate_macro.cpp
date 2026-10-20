@@ -75,7 +75,7 @@ evaluate_with (tree t) {
     // FIXME: don't add non-typesetter variables (?)
   }
   begin_with (std_env, local);
-  tree r= evaluate (t[n-1]);
+  tree r= evaluate_markup (t[n-1]);
   end_with (std_env);
   w << r;
   return w;
