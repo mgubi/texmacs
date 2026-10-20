@@ -967,6 +967,12 @@
               (if dir-flag? full
                   (string->url (string-append "tmfs://remote-file/"
                                               (remote-file-name full)))))))
+         (ok
+          ;; "Ok", and return in the field: the name as typed
+          (lambda ()
+            (with name (form-named-ref "remote-save-as" "name")
+              (when (and (string? name) (!= name ""))
+                (quit (save-as name))))))
          (dummy (select-dir dir)))
     (padded
       (refreshable "remote-file-browser"
@@ -982,18 +988,26 @@
                   ""))
         (assuming save-flag?
           ===
-          ;; a form, so that "Ok" takes the name as typed (it took the
-          ;; name of the entry selected last, whatever was typed after)
+          ;; a field of a form, so that "Ok" takes the name as typed (it
+          ;; took the name of the entry selected last, whatever was typed
+          ;; after); written out as form-input expands, so that return in
+          ;; the field does what "Ok" does: a field of a form is told of
+          ;; every key, with the text, and return closed nothing
           (form "remote-save-as"
             (hlist
               (text (cadr type)) //
               (refreshable "remote-save-as"
-                (form-input "name" "string" (list file) "1w"))
+                (input (begin
+                         (form-named-set "remote-save-as" "name" answer)
+                         (when (and (pair? answer) (pair? (cdr answer))
+                                    (== (cadr answer) "return"))
+                           (ok)))
+                       "name#form-remote-save-as-1:string"
+                       (form-proposals "remote-save-as" "name" (list file))
+                       "1w"))
               // // //
               (explicit-buttons
-                ("Ok" (with name (form-ref "name")
-                        (when (and (string? name) (!= name ""))
-                          (quit (save-as name)))))))))
+                ("Ok" (ok))))))
         (assuming (and dir-flag? (not save-flag?))
           (bottom-buttons
             >>
