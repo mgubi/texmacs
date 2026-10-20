@@ -672,6 +672,16 @@
     "  \\tikz[baseline=(X.base)]\n"
     "  \\node[draw=black,semithick,rectangle,inner sep=2pt,rounded corners=2pt]\n"
     "  (X) {#1};}\n"))
+  ;; highlighted text, which breaks across lines: ulem draws the color
+  ;; under the text (\protected keeps it whole in the table of contents;
+  ;; in the PDF bookmarks of hyperref, only the text is kept)
+  (tmmarked
+   (!append
+    (!ignore (sout) (textcolor))
+    "\\protected\\long\\def\\tmmarked#1#2{\\bgroup\\markoverwith{%\n"
+    "  \\textcolor{#1}{\\rule[-0.5ex]{2pt}{2.5ex}}}\\ULon{#2}}\n"
+    "\\ifdefined\\pdfstringdefDisableCommands\n"
+    "  \\pdfstringdefDisableCommands{\\def\\tmmarked#1#2{#2}}\\fi\n"))
   (nonconverted
    (!append "\\newcommand{\\nonconverted}[1]{\\mbox{}}\n"))
   (tmkeywords

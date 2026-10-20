@@ -25,6 +25,10 @@
 ;; and opens all the submenus. It checks that each button has an action
 ;; which can be called without arguments, but never runs it. Each error,
 ;; with the path of submenus which leads to it, is written to the log.
+;;
+;; The last groups are about preferences of the interface, which are set in
+;; memory for the time of a check and never saved, and about closing the
+;; window.
 
 (texmacs-module (check kbd-menu-test)
   (:use (check check-lib)))
@@ -1051,18 +1055,6 @@
   (with f (catch #t (lambda () (eval name)) (lambda args #f))
     (and (procedure? f) (not (lazy-stub? f)))))
 
-;; FIXME: these menus are declared by lazy-menu in init-texmacs.scm, but
-;; their modules do not define them: graphics-menu (init-texmacs.scm:323,
-;; (graphics graphics-menu)), prog-menu (init-texmacs.scm:283, (prog
-;; prog-menu)), plugin-eval-menu, plugin-eval-toggle-menu and
-;; plugin-plot-menu (init-texmacs.scm:363, (dynamic scripts-menu)). Once
-;; the module is loaded, the stub of lazy-define finds itself in the public
-;; interface and calls itself for ever: (prog-menu) hangs TeXmacs,
-;; expected the menu, or an error. Nothing calls them in TeXmacs itself.
-(define stale-lazy-menus
-  '(graphics-menu prog-menu plugin-eval-menu plugin-eval-toggle-menu
-    plugin-plot-menu))
-
 ;; Each menu which init-texmacs.scm declares with lazy-menu is a function
 ;; which loads its module and is then replaced by the function of the
 ;; module. The GUI loads these modules when it is idle (and the suite does
@@ -1077,8 +1069,7 @@
         (let* ((module (car decl))
                (names (cdr decl))
                (loaded (check-run (lambda () (module-provide module) #t)))
-               (names* (list-difference names stale-lazy-menus))
-               (missing (list-filter names*
+               (missing (list-filter names
                                      (lambda (n) (not (defined-by-module? n))))))
           (check-report (and (== loaded #t) (null? missing))
                         (string-append "the menus of " (object->string module)
@@ -1128,8 +1119,7 @@
         (lambda (decl)
           (let* ((names (list-filter (cdr decl)
                           (lambda (n)
-                            (and (nin? n stale-lazy-menus)
-                                 (menu-name? n)
+                            (and (menu-name? n)
                                  (defined-by-module? n)
                                  (arity-ok? (eval n) 0)))))
                  (menus (lambda ()
@@ -1152,6 +1142,84 @@
                                          (object->string (car decl)))
                           menus))))
         (lazy-declarations 'lazy-menu)))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Preferences of the interface and closing windows
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (with-preference-value which val thunk)
+  ;; run thunk with the preference set in memory only: nothing is saved
+  (let* ((had? (cpp-has-preference? which))
+         (old (get-preference which)))
+    (cpp-set-preference which val)
+    (with r (check-run thunk)
+      (if had?
+          (cpp-set-preference which old)
+          (cpp-reset-preference which))
+      (when (and (pair? r) (== (car r) 'error))
+        (check-report #f "the group" (object->string r))))))
+
+(define (test-preferences)
+  (check-group "preferences")
+  ;; the two modes of the buffer management follow the preference
+  (with-preference-value "buffer management" "shared"
+    (lambda ()
+      (check-true (buffers-share-window?))
+      (check-false (window-per-buffer?))))
+  (with-preference-value "buffer management" "separate"
+    (lambda ()
+      (check-false (buffers-share-window?))
+      (check-true (window-per-buffer?))))
+  ;; the name of a value in the preferences widget is the one which sets
+  ;; this value
+  (module-provide '(texmacs menus preferences-widgets))
+  (check-true (> (ahash-size preference-decode-table) 50))
+  (for (e (ahash-table->list preference-decode-table))
+    (let* ((which (caar e))
+           (name (cdar e))
+           (val (cdr e)))
+      (check= (list which val
+                    (ahash-ref preference-encode-table (cons which val)))
+              (list which val name))))
+  (with-preference-value "updater:interval" "0"
+    (lambda ()
+      (check= (get-pretty-preference "updater:interval") "Never"))))
+
+(define kbd-menu-test-closing? #f)
+(define kbd-menu-test-closed '())
+
+(tm-define (safely-quit-TeXmacs)
+  (:require kbd-menu-test-closing?)
+  (set! kbd-menu-test-closed (rcons kbd-menu-test-closed 'quit)))
+
+;; Closing the only window of documents is quitting TeXmacs, which asks
+;; about all the documents which are not saved, also when dialogs are open:
+;; windows-number counts their windows too. No dialog is opened and nothing
+;; is closed here: windows-number and kill-window are replaced for the time
+;; of the check. (With S7 the replacement does not reach safely-kill-window,
+;; which was read before it and keeps calling the glue functions: the check
+;; then only sees that the only window quits, through safely-quit-TeXmacs
+;; above. These glue functions have no Scheme wrapper to redefine instead.)
+(define (test-close-window)
+  (check-group "closing windows")
+  (in-buffer '(document "text") '(0 0)
+    (lambda ()
+      (let* ((kill kill-window)
+             (number windows-number))
+        (check= (length (window-list)) 1)
+        (set! kbd-menu-test-closed '())
+        (set! kbd-menu-test-closing? #t)
+        (set! windows-number (lambda () 2))
+        (set! kill-window
+              (lambda (win)
+                (set! kbd-menu-test-closed
+                      (rcons kbd-menu-test-closed 'kill))))
+        (with r (check-run safely-kill-window)
+          (set! kill-window kill)
+          (set! windows-number number)
+          (set! kbd-menu-test-closing? #f)
+          (check-true (not (and (pair? r) (== (car r) 'error)))))
+        (check= kbd-menu-test-closed '(quit))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Defining menus
@@ -1271,6 +1339,8 @@
   (test-menus-prog)
   (test-menus-graphics)
   (test-lazy-menus)
+  (test-preferences)
+  (test-close-window)
   (check-group "menu items")
   ;; all the menus above, each time they were expanded
   (check-true (> menu-buttons 10000))

@@ -145,7 +145,7 @@
                (git-command name) " log --follow --pretty=%ai%n%an%n%s%n%H --name-only"
                NR_LOG_OPTION
                (url->system name)))
-         (root (current-git-root))
+         (root (git-root name))
          (ret1 (eval-system cmd))
          (ret2 (string-decompose ret1 "\n")))
 

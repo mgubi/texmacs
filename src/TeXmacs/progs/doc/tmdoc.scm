@@ -29,6 +29,35 @@
 	((== level 'subsubsection) 'paragraph)
 	(else 'subparagraph)))
 
+;; Sectioning commands inside a page are relative to the level of the page:
+;; a section of a page which becomes a chapter is a section, a section of a
+;; page which becomes a section is a subsection, and so on.
+
+(define tmdoc-sectioning
+  '(section subsection subsubsection paragraph subparagraph))
+
+(define tmdoc-sectioning*
+  '(section* subsection* subsubsection* paragraph* subparagraph*))
+
+(define tmdoc-starred
+  '(part chapter section subsection subsubsection paragraph subparagraph))
+
+(define (tmdoc-sectioning? x)
+  (and (pair? x) (or (in? (car x) tmdoc-sectioning)
+                     (in? (car x) tmdoc-sectioning*))))
+
+(define (tmdoc-demote-level level n)
+  (if (<= n 0) level (tmdoc-demote-level (tmdoc-down level) (- n 1))))
+
+(define (tmdoc-demote tag level)
+  (let* ((star? (in? tag tmdoc-sectioning*))
+         (l (if star? tmdoc-sectioning* tmdoc-sectioning))
+         (n (- (length l) (length (memq tag l))))
+         (new (tmdoc-demote-level level (+ n 1))))
+    (if (and star? (in? new tmdoc-starred))
+        (string->symbol (string-append (symbol->string new) "*"))
+        new)))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Main expansions routines
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -46,10 +75,19 @@
                                                 (list "doc" "web" "texmacs"))))
                 (if (not (url-none? efile)) efile rel)))))))
 
+(define (tmdoc-missing x file level)
+  ;; what stands for the branch x when its file is missing
+  (display* "TeXmacs] bad link or file " file "\n")
+  `(document
+     ,@(if (list? level) '() (list (list level (cadr x))))
+     (concat "Broken link. File " (tt ,(url->unix file)) " does not exist")))
+
 (define (tmdoc-branch x root cur level done)
   (let* ((name (caddr x))
 	 (rel-name (tmdoc-relative cur name)))
-    (tmdoc-expand root rel-name level done)))
+    (if (url-exists? rel-name)
+        (tmdoc-expand root rel-name level done)
+        (tmdoc-missing x rel-name level))))
 
 (define (tmdoc-substitute-sub l root cur)
   (if (null? l) l
@@ -100,9 +138,13 @@
                      `(concat ,(cons level (cdr x)) (label ,lab))))))
           ((and (func? x 'concat)
                 (or (func? (tm-ref x 0) 'tmdoc-title)
-                    (func? (tm-ref x 0) 'tmdoc-title*)))
+                    (func? (tm-ref x 0) 'tmdoc-title*)
+                    (tmdoc-sectioning? (tm-ref x 0))))
            `(concat ,@(map (cut tmdoc-rewrite-one <> root cur the-level done)
                            (tm-children x))))
+          ((tmdoc-sectioning? x)
+           (cons (tmdoc-demote (car x) level)
+                 (tmdoc-substitute-sub (cdr x) root cur)))
 	  ((func? x 'tmdoc-license)
 	   '(document))
 	  ((func? x 'traverse)
@@ -163,12 +205,19 @@
     (and (ahash-ref t lab)
          (string-append "#" lab))))
 
+(define (tmdoc-web-link? dest)
+  (and (string? dest)
+       (or (string-starts? dest "http://") (string-starts? dest "https://")
+           (string-starts? dest "ftp://") (string-starts? dest "mailto:"))))
+
 (define (tmdoc-internalize* doc t)
   (cond ((tm-atomic? doc) doc)
         ((or (tm-func? doc 'hlink 2) (tm-func? doc 'hyper-link 2))
          (let* ((text (tm-ref doc 0))
                 (dest (tmdoc-internal-link (tm-ref doc 1) t)))
-           (if dest `(hlink ,text ,dest) text)))
+           (cond (dest `(hlink ,text ,dest))
+                 ((tmdoc-web-link? (tm-ref doc 1)) doc)
+                 (else text))))
         ((tm-compound? doc)
          (cons (tm-label doc)
                (map (cut tmdoc-internalize* <> t) (tm-children doc))))

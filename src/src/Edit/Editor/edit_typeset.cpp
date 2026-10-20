@@ -12,6 +12,7 @@
 #include <climits>
 #include "edit_typeset.hpp"
 #include "tm_buffer.hpp"
+#include "tm_window.hpp" // tm_view_rep (the other views of the buffer)
 #include "convert.hpp"
 #include "file.hpp"
 #include "analyze.hpp"
@@ -35,7 +36,8 @@ edit_typeset_rep::edit_typeset_rep ():
   editor_rep (), // NOTE: ignored by the compiler, but suppresses warning
   the_style (TUPLE),
   cur (hashmap<string,tree> (UNINIT)),
-  stydef (UNINIT), pre (UNINIT), init (UNINIT), fin (UNINIT), grefs (UNINIT),
+  stydef (UNINIT), pre (UNINIT), pre_version (0), prep_version (-1),
+  prep_env (UNINIT), init (UNINIT), fin (UNINIT), grefs (UNINIT),
   env (drd, buf->buf->master,
        buf->data->ref, (buf->prj==NULL? grefs: buf->prj->data->ref),
        buf->data->aux, (buf->prj==NULL? buf->data->aux: buf->prj->data->aux),
@@ -44,7 +46,12 @@ edit_typeset_rep::edit_typeset_rep ():
     init_update ();
 }
 
-edit_typeset_rep::~edit_typeset_rep () { delete_typesetter (ttt); }
+edit_typeset_rep::~edit_typeset_rep () {
+  // the boxes of the document go first; those which the typesetter keeps
+  // (pages, shoves, the repaint log) go with it, in delete_typesetter
+  eb= box ();
+  delete_typesetter (ttt);
+}
 
 void
 edit_typeset_rep::set_data (new_data data) {
@@ -258,9 +265,9 @@ void
 use_modules (tree t) {
   if (is_tuple (t))
     for (int i=0; i<N(t); i++) {
-      string s= as_string (t[i]);
-      if (starts (s, "(")) eval ("(use-modules " * s * ")");
-      else if (s != "") eval ("(plugin-initialize '" * s * ")");
+      // style caches written before the names were checked can hold
+      // anything, so they are checked again here
+      use_module (as_string (t[i]));
     }
 }
 
@@ -297,16 +304,70 @@ edit_typeset_rep::typeset_preamble () {
   env->read_env (stydef);
   env->patch_env (init);
   env->update ();
-  env->read_env (pre);
+  hashmap<string,tree> h (UNINIT);
+  env->read_env (h);
+  set_pre (h);
   drd->heuristic_init (pre);
 }
+
+// pre is only changed by these, which tell typeset_prepare that what it
+// kept is not the environment for it any more
+void
+edit_typeset_rep::set_pre (hashmap<string,tree> h) {
+  pre= h;
+  pre_version++;
+}
+
+void
+edit_typeset_rep::set_pre (string var, tree val) {
+  // (val uninit: reset; pre is not changed in place: see write_prepared_env)
+  pre= copy (pre);
+  if (val == tree (UNINIT)) pre->reset (var);
+  else pre (var)= val;
+  pre_version++;
+}
+
+int typeset_caches_mode (); // see typesetter.hpp
+void typeset_cache_mismatch (string what);
 
 void
 edit_typeset_rep::typeset_prepare () {
   env->base_file_name= buf->buf->master;
   env->read_only= buf->buf->read_only;
-  env->write_default_env ();
-  env->patch_env (pre);
+  // pre is the complete environment after the style and the initial
+  // settings, so patching the default environment with it rewrites thousands
+  // of variables; this happens at every typesetting pass and every get-env.
+  // Keep the patched environment and only redo the updates of the variables
+  // whose assignment has side effects on the edit_env state (which are not
+  // made again by style_init_env and update: active_vars). The table is
+  // made the kept one again by writing back the variables written since
+  // (edit_env_rep::write_prepared_env).
+  // TEXMACS_TYPESET_CACHES "off" patches it all the same, and "check"
+  // does both and compares.
+  int mode= typeset_caches_mode ();
+  if (prep_version != pre_version || mode == 0) {
+    env->write_prepared_env (pre);
+    env->read_env (prep_env);
+    prep_active= array<string> ();
+    env->active_vars (pre, prep_active);
+    prep_version= pre_version;
+  }
+  else {
+    env->write_prepared_env (pre, prep_env);
+    for (int i=0; i<N(prep_active); i++) env->update (prep_active[i]);
+    if (mode == 2) {
+      // (and the table written back is used again afterwards, so that it
+      // is what is checked at the next pass)
+      hashmap<string,tree> table= env->prepared_table ();
+      hashmap<string,tree> kept (UNINIT), made (UNINIT);
+      env->read_env (kept);
+      env->write_default_env ();
+      env->patch_env (pre);
+      env->read_env (made);
+      if (kept != made) typeset_cache_mismatch ("initial environment");
+      env->put_back_table (table);
+    }
+  }
   env->style_init_env ();
   env->update ();
 }
@@ -956,12 +1017,27 @@ edit_typeset_rep::init_env (string var, tree by) {
   notify_change (THE_ENVIRONMENT);
 }
 
+// A change of the zoom: only the size of a pixel depends on it (get_pixel
+// in edit_env_rep), so with the inputs of the bridges the document is not
+// typeset from scratch, and what does not read it is used again. The
+// classic cache (TEXMACS_TYPESET_READS=off) typesets it all again.
+void
+edit_typeset_rep::set_zoom (tree z) {
+  if (init (ZOOM_FACTOR) == z) return;
+  if (typeset_inputs_mode () == 0) {
+    init_env (ZOOM_FACTOR, z);
+    return;
+  }
+  init (ZOOM_FACTOR)= z;
+  set_pre (ZOOM_FACTOR, z);
+  notify_change (THE_TREE);
+}
+
 void
 edit_typeset_rep::init_default (string var) {
   if (!init->contains (var)) return;
   init->reset (var);
-  if (stydef->contains (var)) pre(var)= stydef[var];
-  else pre->reset (var);
+  set_pre (var, stydef->contains (var)? stydef[var]: tree (UNINIT));
   notify_change (THE_ENVIRONMENT);
 }
 
@@ -974,7 +1050,7 @@ edit_typeset_rep::typeset_sub (SI& x1, SI& y1, SI& x2, SI& y2) {
   //time_t t1= texmacs_time ();
   typeset_prepare ();
   eb= empty_box (reverse (rp));
-  // saves memory, also necessary for change_log update
+  // saves memory
   bench_start ("typeset");
 #ifdef USE_EXCEPTIONS
   try {
@@ -1078,6 +1154,30 @@ edit_typeset_rep::typeset_invalidate_all () {
   notify_change (THE_ENVIRONMENT);
   typeset_preamble ();
   ::notify_assign (ttt, path(), subtree (et, rp));
+}
+
+// The automatic labels are numbered again, in the order of the document
+// (exec_auto_id in env_exec.cpp), which is to be done before the tables
+// of contents and the indexes are made again: these hold the names of
+// the labels. All the views of the buffer have the same labels. Tells
+// whether a name changed.
+bool
+edit_typeset_rep::typeset_renumber_labels () {
+  // (the tree which holds the numbers to come: see exec_auto_id)
+  tree root= is_nil (rp) ? et : et[rp->item];
+  array<int> before= auto_labels_numbers (root);
+  if (!auto_labels_renumber (root)) return false;
+  for (int i=0; i<N(buf->vws); i++)
+    ((tm_view) buf->vws[i])->ed->typeset_invalidate_all ();
+  // one pass, for the names: the references are not yet those of the
+  // tables to come, and the document is typeset again after them
+  SI x1, y1, x2, y2;
+  typeset_sub (x1, y1, x2, y2);
+  if (env->complete) {
+    env->complete= false;
+    clean_unused (env->local_ref, env->touched);
+  }
+  return auto_labels_numbers (root) != before;
 }
 
 void

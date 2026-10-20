@@ -688,6 +688,7 @@ concater_rep::typeset (tree t, path ip) {
     break;
   case GET_BINDING:
   case HAS_BINDING:
+  case AUTO_ID:
     typeset_executable (t, ip);
     break;
   case HIDDEN_BINDING:

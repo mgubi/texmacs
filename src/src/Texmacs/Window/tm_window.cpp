@@ -26,7 +26,7 @@ widget make_menu_widget (object menu);
 widget make_menu_widget (object menu, int w, int h);
 void refresh_size (widget wid, bool exact);
 
-static int last_window_handle= 0;
+static int pending_window_handle= 0; // window under construction, 0 if none
 static hashmap<int,widget> window_table (NULL);
 static hashmap<tree,path> window_by_name;
 static time_t refresh_time= 0;
@@ -223,7 +223,8 @@ class close_embedded_command_rep: public command_rep {
 public:
   close_embedded_command_rep (tm_view vw2, url n2, int win2):
     vw (vw2), name (n2), win_id (win2) {
-      window_by_name(name->t)= path (win_id, window_by_name[name->t]); }
+      if (win_id != 0)
+        window_by_name(name->t)= path (win_id, window_by_name[name->t]); }
   void apply ();
   tm_ostream& print (tm_ostream& out) {
     return out << "<command close_embedded>"; }
@@ -335,7 +336,10 @@ texmacs_input_widget (tree doc, tree style, url wname) {
   set_scrollable (win->wid, vw->ed);
   vw->ed->cvw= win->wid.rep;
   vw->ed->mvw= curvw;
-  command close_cmd= close_embedded_command (vw, name, last_window_handle);
+  // NOTE: the widget is in an alternative window only when it is made while
+  // that window is being built (between window_handle and window_create);
+  // the widgets of the side tools of a main window are in none
+  command close_cmd= close_embedded_command (vw, name, pending_window_handle);
   return wrapped_widget (win->wid, close_cmd);
 }
 
@@ -637,36 +641,42 @@ tm_window_rep::interactive_return () {
 int
 window_handle () {
   static int window_next= 1;
-  last_window_handle= window_next;
+  pending_window_handle= window_next;
   return window_next++;
+}
+
+static void
+window_register (int win, widget pww) {
+  window_table (win)= pww;
+  if (win == pending_window_handle) pending_window_handle= 0;
 }
 
 void
 window_create (int win, widget wid, string name, command quit) {
   widget pww;
   pww= plain_window_widget (wid, name, quit);
-  window_table (win)= pww;
+  window_register (win, pww);
 }
 
 void
 window_create_plain (int win, widget wid, string name) {
   widget pww;
   pww= plain_window_widget (wid, name);
-  window_table (win)= pww;
+  window_register (win, pww);
 }
 
 void
 window_create_popup (int win, widget wid, string name) {
   widget pww;
   pww= popup_window_widget (wid, name);
-  window_table (win)= pww;
+  window_register (win, pww);
 }
 
 void
 window_create_tooltip (int win, widget wid, string name) {
   widget pww;
   pww= tooltip_window_widget (wid, name);
-  window_table (win)= pww;
+  window_register (win, pww);
 }
 
 /*

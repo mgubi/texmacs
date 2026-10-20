@@ -311,7 +311,8 @@ checkout (socket_link_rep* s) {
 // to be created by the server
 socket_link_rep::socket_link_rep (int fd, SOCKADDR_STORAGE* addr,
     tm_contact contact2):
-  host (""), port (0), socket_id (fd), contact (contact2),
+  host (""), port (0), socket_id (fd), socket_closed (false),
+    contact (contact2),
     read_notifier_ptr (NULL), write_notifier_ptr (NULL) {
   alive= false;
   memcpy (&address, addr, sizeof(address));
@@ -321,15 +322,19 @@ socket_link_rep::socket_link_rep (int fd, SOCKADDR_STORAGE* addr,
 // to be created by clients
 socket_link_rep::socket_link_rep (string host2, unsigned short port2,
     tm_contact contact2):
-  host (host2), port (port2), socket_id (-1), contact (contact2),
+  host (host2), port (port2), socket_id (-1), socket_closed (false),
+    contact (contact2),
     read_notifier_ptr (NULL), write_notifier_ptr (NULL) {
   alive= false;
 }
 
 socket_link_rep::~socket_link_rep () {
-  DEBUG_SOCKET("'~socket_link_rep' is closing socket " << socket_id);
-  if (socket_id >= 0)
+  // the link of a client of the server keeps the number of its socket
+  // after 'stop' has closed it: by now it may be the socket of someone else
+  if (socket_id >= 0 && !socket_closed) {
+    DEBUG_SOCKET("'~socket_link_rep' is closing socket " << socket_id);
     CLOSE(socket_id);
+  }
   input_buffer= "";
   output_buffer= "";
 }
@@ -356,6 +361,7 @@ socket_link_rep::start () {
     char errbuf[256];
 
     socket_id= try_connect (_host, _port, 5000, errbuf, sizeof (errbuf));
+    socket_closed= false;
     if (socket_id < 0) {
       if (errbuf[0] != '\0')
         return string ("'getaddrinfo' error: ") * string (errbuf);
@@ -460,6 +466,7 @@ socket_link_rep::stop () {
   if (socket_id >= 0) {
     if (CLOSE(socket_id) && used_by_server ())
       SLOGE ("cannot close socket " * as_string (socket_id));
+    socket_closed= true;
   }
   if (used_by_server ()) // socket created by the server
     emit disconnection (this);

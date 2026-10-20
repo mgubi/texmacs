@@ -9,6 +9,12 @@
 * in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
 ******************************************************************************/
 
+// winsock's select takes at most FD_SETSIZE sockets, 64 unless the size is
+// set before its first include
+#if defined(_WIN32) && !defined(FD_SETSIZE)
+#define FD_SETSIZE 1024
+#endif
+
 #include "sys_utils.hpp"
 #include "file.hpp"
 #include "tree.hpp"
@@ -17,6 +23,7 @@
 
 #ifndef OS_MINGW
 #include <poll.h>
+#include <stdlib.h>
 #else
 #include <winsock2.h>
 #endif
@@ -189,8 +196,13 @@ has_printing_cmd () {
 int
 tm_poll (struct tm_pollfd* fds, int nfds, int timeout_ms) {
 #ifndef OS_MINGW
-  struct pollfd pfds[64];
-  if (nfds > 64) nfds= 64;
+  // (on the stack for the usual few descriptors, else on the heap)
+  struct pollfd few[64];
+  struct pollfd* pfds= few;
+  if (nfds > 64) {
+    pfds= (struct pollfd*) malloc (nfds * sizeof (struct pollfd));
+    if (pfds == NULL) { pfds= few; nfds= 64; }
+  }
   for (int i= 0; i < nfds; i++) {
     pfds[i].fd= fds[i].fd;
     pfds[i].events= 0;
@@ -208,6 +220,7 @@ tm_poll (struct tm_pollfd* fds, int nfds, int timeout_ms) {
     if (pfds[i].revents & (POLLERR | POLLHUP | POLLNVAL))
       fds[i].revents |= TM_POLL_ERROR;
   }
+  if (pfds != few) free (pfds);
   return ret;
 #else
   // Windows select() only supports sockets, not pipes or file handles

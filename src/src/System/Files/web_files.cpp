@@ -14,6 +14,7 @@
 #include "sys_utils.hpp"
 #include "analyze.hpp"
 #include "hashmap.hpp"
+#include "iterator.hpp"
 #include "scheme.hpp"
 
 #ifdef QTTEXMACS
@@ -29,6 +30,7 @@
 static int web_nr=0;
 static array<tree> web_cache (MAX_CACHED);
 static hashmap<tree,tree> web_cache_resolve ("");
+static hashmap<tree,bool> web_cache_stale (false);
 
 /******************************************************************************
 * Caching
@@ -55,10 +57,19 @@ get_cache (url name) {
 static url
 set_cache (url name, url tmp) {
   web_cache_resolve->reset (web_cache [web_nr]);
+  web_cache_stale->reset (web_cache [web_nr]);
   web_cache [web_nr]= name->t;
   web_cache_resolve (name->t)= tmp->t;
   web_nr= (web_nr+1) % MAX_CACHED;
   return tmp;
+}
+
+void
+web_cache_refresh () {
+  // the files in the cache are downloaded again when they are next needed;
+  // a file which cannot be downloaded keeps the copy of before
+  iterator<tree> it= iterate (web_cache_resolve);
+  while (it->busy ()) web_cache_stale (it->next ())= true;
 }
 
 void
@@ -67,6 +78,7 @@ web_cache_invalidate (url name) {
     if (web_cache[i] == name->t) {
       web_cache[i]= tree ("");
       web_cache_resolve->reset (name->t);
+      web_cache_stale->reset (name->t);
     }
 }
 
@@ -100,8 +112,11 @@ get_from_web (url name) {
     url u= url_root ("https") * (url ("www.doi.org") * name[2]);
     return get_from_web (u);
   }
-  url res= get_cache (name);
-  if (!is_none (res)) return res;
+  url old= get_cache (name);
+  if (!is_none (old)) {
+    if (!web_cache_stale[name->t]) return old;
+    web_cache_stale->reset (name->t);
+  }
 
 #if defined(QTTEXMACS) && QT_VERSION >= 0x060000
   url tmp= url_temp ();
@@ -113,7 +128,7 @@ get_from_web (url name) {
   qt_download_file (name_s, tmp_s);
 #else
   string tool= fetch_tool ();
-  if (tool == "") return url_none ();
+  if (tool == "") return old;
   
   url tmp= url_temp ();
   string tmp_s= escape_sh (concretize (tmp));
@@ -121,7 +136,7 @@ get_from_web (url name) {
   
   if (tool == "wget") {
     cmd= "wget --header='User-Agent: TeXmacs-" TEXMACS_VERSION "' -q";
-    cmd << " --no-check-certificate --tries=1";
+    cmd << " --tries=1";
     cmd << " -O " << tmp_s << " " << escape_sh (web_encode (as_string (name)));
   }
   
@@ -137,10 +152,16 @@ get_from_web (url name) {
 #endif // QTTEXMACS, Qt >= 6.0
 
   if (file_size (tmp) <= 0) {
+    // not downloaded (offline...): the copy of before, if any
     remove (tmp);
-    return url_none ();
+    return old;
   }
-  else return set_cache (name, tmp);
+  if (!is_none (old)) {
+    // downloaded again: the new copy replaces the old one in the cache
+    web_cache_resolve (name->t)= tmp->t;
+    return tmp;
+  }
+  return set_cache (name, tmp);
 }
 
 /******************************************************************************

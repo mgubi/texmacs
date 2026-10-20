@@ -23,6 +23,11 @@ protected:
   hashmap<path,hashmap<string,tree> > cur; // environment at different paths
   hashmap<string,tree> stydef;            // environment after styles
   hashmap<string,tree> pre;               // environment after styles and init
+  int                  pre_version;       // incremented whenever pre changes
+                                          // (only through set_pre)
+  int                  prep_version;      // pre_version of prep_env
+  hashmap<string,tree> prep_env;          // default env patched with pre
+  array<string>        prep_active;       // active variables of pre
   hashmap<string,tree> init;              // environment changes w.r.t. style
   hashmap<string,tree> fin;               // environment changes w.r.t. doc
   hashmap<string,tree> grefs;             // global references
@@ -108,6 +113,7 @@ public:
   tree     get_init_all ();
   void     init_env (string var, tree by);
   void     init_default (string var);
+  void     set_zoom (tree z);
   void     init_style ();
   void     init_style (string style);
   tree     get_ref (string key);
@@ -125,12 +131,15 @@ public:
   array<string> list_atts (bool global);
 
   void     typeset_style_use_cache (tree style);
+  void     set_pre (hashmap<string,tree> h);
+  void     set_pre (string var, tree val);
   void     typeset_preamble ();
   void     typeset_prepare ();
   void     typeset_invalidate_env ();
   void     typeset_exec_until (path p);
   void     typeset_invalidate (path p);
   void     typeset_invalidate_all ();
+  bool     typeset_renumber_labels ();
   void     typeset_invalidate_players (path p, bool reattach);
   void     typeset_sub (SI& x1, SI& y1, SI& x2, SI& y2);
   void     typeset (SI& x1, SI& y1, SI& x2, SI& y2);

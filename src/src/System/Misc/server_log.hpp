@@ -53,6 +53,7 @@ inline tm_ostream& server_get_stream (int level) {
     case log_info:
       return io_info;
     case log_debug:
+    default:
       return debug_io;
   }
 }

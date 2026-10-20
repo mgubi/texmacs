@@ -392,6 +392,11 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define-public reconfigure-flag? #t)
+
+;; Other modules read and set the flag with these accessors.
+(define-public (plugin-reconfigure?) reconfigure-flag?)
+(define-public (plugin-reconfigure-set! flag) (set! reconfigure-flag? flag))
+
 (define plugin-loaded-setup? #f)
 (define plugin-cache "$TEXMACS_HOME_PATH/system/cache/plugin_cache.scm")
 
@@ -645,7 +650,10 @@
   (when (ahash-ref plugin-initialize-todo name*)
     (let* ((name (symbol->string name*))
            (file (string-append "plugins/" name "/progs/init-" name ".scm"))
-           (u (url-unix "$TEXMACS_HOME_PATH:$TEXMACS_PATH" file)))
+           ;; (the directories in which plugin-list finds the plugins)
+           (u (url-unix (string-append "$TEXMACS_HOME_PATH:/etc/TeXmacs:"
+                                       "$TEXMACS_PATH:/usr/share/TeXmacs")
+                        file)))
       (ahash-remove! plugin-initialize-todo name*)
       (if (url-exists? u)
           (with fname (url-materialize u "r")

@@ -137,7 +137,7 @@
   ("line-width" . "1ln")
   ("line-join" . "normal")
   ("line-caps" . "normal")
-  ("line-effects" . "normal")
+  ("line-effects" . "none")
   ("line-portion" . "1")
   ("dash-style" . "none")
   ("dash-style-unit" . "5ln")

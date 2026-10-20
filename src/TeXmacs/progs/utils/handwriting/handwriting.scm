@@ -27,8 +27,8 @@
 (define (load-glyphs)
   (when (not glyphs-loaded?)
     (set! glyphs-loaded? #t)
-    (with l (if (url-exists? "~/.TeXmacs/system/glyphs.scm")
-                (load-object "~/.TeXmacs/system/glyphs.scm")
+    (with l (if (url-exists? "$TEXMACS_HOME_PATH/system/glyphs.scm")
+                (load-object "$TEXMACS_HOME_PATH/system/glyphs.scm")
                 '())
       (set! glyph-table (list->ahash-table l))
       (for (x l)
@@ -38,7 +38,7 @@
             (glyph-register key y)))))))
 
 (define (save-glyphs)
-  (save-object "~/.TeXmacs/system/glyphs.scm"
+  (save-object "$TEXMACS_HOME_PATH/system/glyphs.scm"
                (ahash-table->list glyph-table)))
 
 (tm-define (learn-glyph name)

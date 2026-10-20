@@ -22,6 +22,7 @@
 (define bibwid-use-relative? #t)
 (define bibwid-update-buffer? #t)
 (define bibwid-buffer (string->url ""))
+(define bibwid-opened-url #f)
 
 (define (bibwid-set-url u)
   (cond ((and (== bibwid-use-relative? #t) (url-rooted? u))
@@ -34,19 +35,53 @@
   (set! bibwid-style answer)
   (refresh-now "bibwid-preview"))
 
+(define bibwid-preview-max 10)
+
+(define (bibwid-crossref e)
+  ;; the key cross-referenced by the entry @e, or #f
+  (with l (list-filter (cdr (list-ref e 3))
+                       (lambda (f) (and (func? f 'bib-field 2)
+                                        (== (cadr f) "crossref"))))
+    (and (nnull? l) (string? (caddr (car l))) (locase-all (caddr (car l))))))
+
+(define (bibwid-preview-entries t)
+  ;; the first entries of @t with the entries which they cross-reference,
+  ;; and what is not an entry (@preamble), without the comments
+  (if (not (func? t 'document)) t
+      (let* ((all (list-filter (cdr t) (lambda (x) (func? x 'bib-entry 3))))
+             (shown (if (> (length all) bibwid-preview-max)
+                        (sublist all 0 bibwid-preview-max)
+                        all))
+             (refs (list-filter (map bibwid-crossref shown) (lambda (x) x)))
+             (keep? (lambda (x)
+                      (cond ((func? x 'bib-comment) #f)
+                            ((func? x 'bib-entry 3)
+                             (or (in? x shown)
+                                 (and (string? (caddr x))
+                                      (in? (locase-all (caddr x)) refs))))
+                            (else #t)))))
+        (cons 'document (list-filter (cdr t) keep?)))))
+
 (define (bibwid-output-content t style)
-  (if (tree-is? t 'string) 
-      '(with "bg-color" "white"
-         (mini-paragraph "480guipx"
-           (document (concat "Please choose a valid " (BibTeX) " file"))))
-      `(with "bg-color" "#ffffff"
-         (mini-paragraph "480px" ,(bib-process "bib" style (tree->stree t))))))
+  (cond ((tree-is? t 'string)
+         '(with "bg-color" "white"
+            (mini-paragraph "480guipx"
+              (document (concat "Please choose a valid " (BibTeX) " file")))))
+        ((not style)
+         '(with "bg-color" "white"
+            (mini-paragraph "480guipx"
+              (document (concat "No preview for external " (BibTeX)
+                                " styles")))))
+        (else
+         `(with "bg-color" "#ffffff"
+            (mini-paragraph "480px"
+              ,(bib-process "bib" style
+                            (bibwid-preview-entries (tree->stree t))))))))
 
 (define (bibwid-output)
-  (with style (if (== "tm-" (string-take bibwid-style 3))
-                  (string-drop bibwid-style 3)
-                  bibwid-style)
-    (eval `(use-modules (bibtex ,(string->symbol style))))
+  (with style (and (string-starts? bibwid-style "tm-")
+                   (string-drop bibwid-style 3))
+    (if style (eval `(use-modules (bibtex ,(string->symbol style)))))
     (with u (if (and bibwid-use-relative? (not (url-rooted? bibwid-url)))
                 (url-append (url-head bibwid-buffer) bibwid-url)
                 bibwid-url)
@@ -69,7 +104,10 @@
       (when (> (length l) 0)
         (with t (car l)
           (tree-set! t 1 bibwid-style)
-          (tree-set! t 2 (url->string bibwid-url))
+          ;; the file found for the name in the document is shown, but the
+          ;; name is only replaced when another file or path was chosen
+          (if (!= (url->string bibwid-url) bibwid-opened-url)
+              (tree-set! t 2 (url->string bibwid-url)))
           (if bibwid-update-buffer? (update-document "bibliography")))))))
 
 (define (bibwid-set-filename u)
@@ -138,11 +176,13 @@
     (if (and (not (url-none? u)) (!= s ""))
         (with msg (replace "Modifying bibliography for %1" name)
           (bibwid-set-url u)
+          (set! bibwid-opened-url (url->string bibwid-url))
           (set! bibwid-style s)
           (dialogue-window (bibliography-widget #t msg)
                            bibwid-modify "Modify bibliography"))
         (with msg (replace "Inserting bibliography in %1" name)
           (bibwid-set-url (string->url ""))
+          (set! bibwid-opened-url #f)
           (set! bibwid-style "tm-plain")
           (dialogue-window (bibliography-widget #f msg)
                            bibwid-insert "Insert bibliography")))))

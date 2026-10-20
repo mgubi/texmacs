@@ -246,6 +246,16 @@
   (check= (string->tmstring "") "")
   (check= (tmstring->string "a<less>b<gtr>c") "a<b>c")
   (check= (tmstring->string (string->tmstring "<x> < y >")) "<x> < y >")
+  ;; the characters written <#...> are kept, whatever their number of digits
+  (check= (tmstring->string "a<#E9>b<#2200>c<#1D54F>d")
+          "a<#E9>b<#2200>c<#1D54F>d")
+  ;; and so are the other character names, an unterminated < and a bare >
+  (check= (tmstring->string "x<alpha>y") "x<alpha>y")
+  (check= (tmstring->string "a<b") "a<b")
+  (check= (tmstring->string "a>b") "a>b")
+  (check= (tmstring->string "a<b<alpha>c") "a<b<alpha>c")
+  (for (s (list "a<b" ">" "<<>>" "<less>" "<alpha>"))
+    (check= (tmstring->string (string->tmstring s)) s))
   ;; object->tmstring writes an object as a string
   (check= (object->tmstring "x") "\"x\"")
   (check= (object->tmstring '(a "b" 1)) "(a \"b\" 1)"))
@@ -396,6 +406,15 @@
   ;; on Windows, /a is the drive a: (as in MSYS)
   (check= (us (url-unix "/a" "b")) (if win? "a:/b" "/a/b"))
   (check= (url-secure? "/a/b") #f)
+  ;; the home directory is trusted, but not its temporary files and caches
+  (with home (lambda (x) (url-append (get-texmacs-home-path) x))
+    (check= (url-secure? (url-append (get-texmacs-path) "doc/a.tm")) #t)
+    (check= (url-secure? (home "texts/scratch/a.tm")) #t)
+    (check= (url-secure? (home "styles/a.ts")) #t)
+    (check= (url-secure? (home "system/tmpx/a.tm")) #t)
+    (check= (url-secure? (home "system/tmp/a.tm")) #f)
+    (check= (url-secure? (url-append (url-temp-dir) "a.tm")) #f)
+    (check= (url-secure? (home "system/cache/a.tm")) #f))
   (check= (url-scratch? (url-scratch "a" ".tm" 3)) #t)
   (check= (us (url-tail (url-scratch "a" ".tm" 3))) "a3.tm")
   (check= (url-scratch? "/a/b.tm") #f))

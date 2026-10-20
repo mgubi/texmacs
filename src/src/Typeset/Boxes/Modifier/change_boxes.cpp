@@ -302,6 +302,13 @@ public:
   operator tree () { return tree (TUPLE, "transform", (tree) bs[0]); }
   void pre_display (renderer &ren);
   void post_display (renderer &ren);
+  // the child is transformed: no culling of its animations by position
+  double anim_next (rectangle vis) {
+    return anim_visible (vis)?
+      box_rep::anim_next (anim_everywhere ()): 1.0e12; }
+  rectangles anim_invalid (rectangle vis) {
+    return anim_visible (vis)?
+      box_rep::anim_invalid (anim_everywhere ()): rectangles (); }
   //cursor find_cursor (path bp);
   //selection find_selection (path lbp, path rbp);
   void get_bracket_extents (SI& lo, SI& hi) { lo= y1; hi= y2; }
@@ -344,6 +351,14 @@ public:
   box adjust_kerning (int mode, double factor);
   box expand_glyphs (int mode, double factor);
   void redraw (renderer ren, path p, rectangles& l);
+  // effects may draw outside the extents of the children: no culling of
+  // their animations by position
+  double anim_next (rectangle vis) {
+    return anim_visible (vis)?
+      box_rep::anim_next (anim_everywhere ()): 1.0e12; }
+  rectangles anim_invalid (rectangle vis) {
+    return anim_visible (vis)?
+      box_rep::anim_invalid (anim_everywhere ()): rectangles (); }
   void get_bracket_extents (SI& lo, SI& hi) { lo= y1; hi= y2; }
 };
 
@@ -645,32 +660,21 @@ cell_box_rep::post_display (renderer& ren) {
 
 class remember_box_rep: public change_box_rep {
 public:
-  rectangles* logs_ptr;
-  SI          ox, oy;
+  placed_box place;  // (it logs the areas to repaint: see boxes.hpp)
 public:
   inline remember_box_rep (path ip, box b):
-    change_box_rep (ip, true), logs_ptr (NULL)
+    change_box_rep (ip, true)
   {
     insert (b, 0, 0);
     position ();
     finalize ();
   }
-  inline ~remember_box_rep () {
-    if (logs_ptr != NULL) {
-      rectangles& logs= *logs_ptr;
-      logs= rectangles (rectangle (ox+x3, oy+y3, ox+x4, oy+y4), logs);
-      logs= rectangles (rectangle (0, 0, 0, 0), logs);
-      // cout << "  8=X " << rectangle (ox+x3, oy+y3, ox+x4, oy+y4) << "\n";
-    }
-  }
-  inline void position_at (SI x, SI y, rectangles& logs) {
+  inline void position_at (SI x, SI y, repaint_log& log) {
+    place.place (this, x + x0, y + y0, log); }
+  inline void unplace (repaint_log& log) { place.unplace (this, log); }
+  inline void all_placed (SI x, SI y, array<box>& bs, array<rectangle>& rs) {
     x += x0; y += y0;
-    if (logs_ptr == NULL) logs= rectangles (rectangle (0, 0, 0, 0), logs);
-    else logs= rectangles (rectangle (ox+x3, oy+y3, ox+x4, oy+y4), logs);
-    ox= x; oy= y;
-    logs= rectangles (rectangle (ox+x3, oy+y3, ox+x4, oy+y4), logs);
-    logs_ptr= &logs;
-  }
+    bs << box (this); rs << rectangle (x + x3, y + y3, x + x4, y + y4); }
   inline void display (renderer ren) {
     ren->apply_shadow (x1, y1, x2, y2);
   }
@@ -682,11 +686,10 @@ public:
 
 struct locus_box_rep: public change_box_rep {
   list<string> ids;
-  SI pixel;
   string ref;
   string anchor;
-  locus_box_rep (path ip, box b, list<string> ids, SI pixel);
-  locus_box_rep (path ip, box b, list<string> ids, SI pixel, string _rep, string _anchor);
+  locus_box_rep (path ip, box b, list<string> ids);
+  locus_box_rep (path ip, box b, list<string> ids, string _rep, string _anchor);
   operator tree () { return tree (TUPLE, "locus"); }
   box adjust_kerning (int mode, double factor);
   box expand_glyphs (int mode, double factor);
@@ -694,8 +697,8 @@ struct locus_box_rep: public change_box_rep {
   void post_display (renderer &ren);
 };
 
-locus_box_rep::locus_box_rep (path ip, box b, list<string> ids2, SI pixel2):
-  change_box_rep (ip, true), ids (ids2), pixel (pixel2)
+locus_box_rep::locus_box_rep (path ip, box b, list<string> ids2):
+  change_box_rep (ip, true), ids (ids2)
 {
   ref = "";
   anchor = "";
@@ -705,8 +708,8 @@ locus_box_rep::locus_box_rep (path ip, box b, list<string> ids2, SI pixel2):
   finalize ();
 }
 
-locus_box_rep::locus_box_rep (path ip, box b, list<string> ids2, SI pixel2, string _ref, string _anchor):
-  change_box_rep (ip, true), ids (ids2), pixel (pixel2)
+locus_box_rep::locus_box_rep (path ip, box b, list<string> ids2, string _ref, string _anchor):
+  change_box_rep (ip, true), ids (ids2)
 {
   ref = _ref;
   anchor = _anchor;
@@ -719,20 +722,22 @@ locus_box_rep::locus_box_rep (path ip, box b, list<string> ids2, SI pixel2, stri
 box
 locus_box_rep::adjust_kerning (int mode, double factor) {
   box body= bs[0]->adjust_kerning (mode, factor);
-  return locus_box (ip, body, ids, pixel, ref, anchor);
+  return locus_box (ip, body, ids, ref, anchor);
 }
 
 box
 locus_box_rep::expand_glyphs (int mode, double factor) {
   box body= bs[0]->expand_glyphs (mode, factor);
-  return locus_box (ip, body, ids, pixel, ref, anchor);
+  return locus_box (ip, body, ids, ref, anchor);
 }
 
 void
 locus_box_rep::loci (SI x, SI y, SI delta, list<string>& l, rectangles& rs) {
   bs[0]->loci (x, y, delta, l, rs);
   l = l * ids;
-  rs= rs * outlines (rectangles (rectangle (x1, y1, x2, y2)), pixel);
+  // (the editor draws their outlines, with the size of a pixel at the
+  // zoom of its window: edit_interface_rep::update_mouse_loci)
+  rs= rs * rectangles (rectangle (x1, y1, x2, y2));
 }
 
 void
@@ -1030,13 +1035,13 @@ remember_box (path ip, box b) {
 }
 
 box
-locus_box (path ip, box b, list<string> ids, SI pixel) {
-  return tm_new<locus_box_rep> (ip, b, ids, pixel);
+locus_box (path ip, box b, list<string> ids) {
+  return tm_new<locus_box_rep> (ip, b, ids);
 }
 
 box
-locus_box (path ip, box b, list<string> ids, SI pixel, string ref, string anchor) {
-  return tm_new<locus_box_rep> (ip, b, ids, pixel, ref, anchor);
+locus_box (path ip, box b, list<string> ids, string ref, string anchor) {
+  return tm_new<locus_box_rep> (ip, b, ids, ref, anchor);
 }
 
 box

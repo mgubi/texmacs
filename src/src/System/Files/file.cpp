@@ -66,10 +66,25 @@ load_string (url u, string& s, bool fatal, bool lock) {
     string cache_type= doc_flag? string ("doc_cache"): string ("file_cache");
     if (doc_flag) cache_load ("doc_cache");
     bool currently_cached= is_cached (cache_type, name);
+    // The cached content is that of the file as long as its directory is
+    // unchanged (is_up_to_date) and the file itself too: a file edited in
+    // place leaves the time of its directory as it was, and its old
+    // content was given until the cache was cleared (the time of the file
+    // is kept with its content, under the name followed by "#time")
+    string time_key= name * "#time";
+    int file_time= 0;
     if (currently_cached && is_up_to_date (url_parent (r))) {
-      s= cache_get (cache_type, name) -> label;
-      return false;
+      file_time= last_modified (r, false);
+      if (is_cached (cache_type, time_key) &&
+          cache_get (cache_type, time_key)->label == as_string (file_time)) {
+        s= cache_get (cache_type, name) -> label;
+        return false;
+      }
     }
+    // (the time before the file is read: a change while it is read is seen
+    // at the next load)
+    if ((file_flag || doc_flag) && file_time == 0)
+      file_time= last_modified (r, false);
     // End caching
 
     bench_start ("load file");
@@ -104,8 +119,10 @@ load_string (url u, string& s, bool fatal, bool lock) {
 
     // Cache file contents
     if (!err && (N(s) <= 10000 || currently_cached))
-      if (file_flag || doc_flag)
+      if (file_flag || doc_flag) {
         cache_set (cache_type, name, s);
+        cache_set (cache_type, time_key, as_string (file_time));
+      }
     // End caching
   }
   if (err) {
@@ -160,8 +177,12 @@ save_string (url u, string s, bool fatal) {
     bool doc_flag= do_cache_doc (name);
     string cache_type= doc_flag? string ("doc_cache"): string ("file_cache");
     if (!err && N(s) <= 10000)
-      if (file_flag || doc_flag)
+      if (file_flag || doc_flag) {
         cache_set (cache_type, name, s);
+        // (the time of the file with its content, see load_string)
+        cache_set (cache_type, name * "#time",
+                   as_string (last_modified (r, false)));
+      }
     declare_out_of_date (url_parent (r));
     // End caching
   }
