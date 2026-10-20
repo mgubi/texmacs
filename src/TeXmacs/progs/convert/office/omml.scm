@@ -266,14 +266,22 @@
                   (ox-childs x 'm:mr)))))
 
 (define (omml-array x)
-  ;; equations one above the other: the & of Word marks where they align
+  ;; equations one above the other: the & of Word marks where they align,
+  ;; the cells of a table
   (list `(m:mtable
+           ;; (lines of equations: see oftm-eqarray)
+           (@ (class "tm-eqarray"))
            ,@(map (lambda (e)
-                    `(m:mtr (m:mtd ,(omml-row
-                                      (list-filter
-                                        (omml-list (ox-children e))
-                                        (lambda (t) (!= t '(m:mo "&"))))))))
+                    `(m:mtr ,@(map (lambda (cell) `(m:mtd ,(omml-row cell)))
+                                   (omml-split-amps (omml-list (ox-children e))))))
                   (ox-childs x 'm:e)))))
+
+(define (omml-split-amps l)
+  ;; the nodes l cut at their marks &
+  (let loop ((l l) (cur '()) (acc '()))
+    (cond ((null? l) (reverse (cons (reverse cur) acc)))
+          ((== (car l) '(m:mo "&")) (loop (cdr l) '() (cons (reverse cur) acc)))
+          (else (loop (cdr l) (cons (car l) cur) acc)))))
 
 (define (omml-node x)
   ;; the nodes of MathML for a node of OMML
@@ -315,9 +323,11 @@
                                       (or (omml-property x 'm:accPr 'm:chr)
                                           (omml-utf8 #x302)))))))
             ((m:bar)
-             (if (== (omml-property x 'm:barPr 'm:pos) "bot")
-                 (list `(m:munder ,(omml-arg x 'm:e) (m:mo "_")))
-                 (list `(m:mover (@ (accent "true")) ,(omml-arg x 'm:e) (m:mo ,(omml-utf8 #xaf))))))
+             ;; (below its formula when it says nothing, as ECMA-376 and
+             ;; the converter of Word to MathML have it)
+             (if (== (omml-property x 'm:barPr 'm:pos) "top")
+                 (list `(m:mover (@ (accent "true")) ,(omml-arg x 'm:e) (m:mo ,(omml-utf8 #xaf))))
+                 (list `(m:munder ,(omml-arg x 'm:e) (m:mo "_")))))
             ((m:limLow) (list `(m:munder ,(omml-arg x 'm:e) ,(omml-arg x 'm:lim))))
             ((m:limUpp) (list `(m:mover ,(omml-arg x 'm:e) ,(omml-arg x 'm:lim))))
             ((m:groupChr)
@@ -329,15 +339,30 @@
             ((m:m) (omml-matrix x))
             ((m:eqArr) (omml-array x))
             ;; what only holds a formula
-            ((m:box m:borderBox m:phant)
+            ((m:box m:borderBox)
              (with y (ox-child x 'm:e)
                (if y (omml-list (ox-children y)) '())))
+            ;; a formula which takes its place, but is not shown
+            ((m:phant)
+             (let ((y (ox-child x 'm:e))
+                   (show (omml-property x 'm:phantPr 'm:show)))
+               (cond ((not y) '())
+                     ((in? show '("0" "false" "off"))
+                      (list `(m:mphantom ,(omml-row (omml-list (ox-children y))))))
+                     (else (omml-list (ox-children y))))))
             ((m:oMath m:e m:num m:den m:sub m:sup m:deg m:lim m:fName)
              (omml-list (ox-children x)))
-            ;; a run of the text of Word inside a formula
+            ;; a run of the text of Word inside a formula: its text only
             ((w:r)
-             (with s (ox-text x)
+             (with s (apply string-append (map ox-text (ox-childs x 'w:t)))
                (if (== s "") '() (list `(m:mtext ,(omml-text s))))))
+            ;; the changes which are tracked: what was inserted is there,
+            ;; what was deleted is not
+            ((w:ins w:moveTo w:customXml w:smartTag) (omml-list (ox-children x)))
+            ((w:sdt)
+             (with c (ox-child x 'w:sdtContent)
+               (if c (omml-list (ox-children c)) '())))
+            ((w:del w:moveFrom) '())
             (else '())))))
 
 (define (omml-list l)
@@ -566,14 +591,44 @@
                (list `(m:d (m:dPr (m:begChr (@ (m:val ,(or (ox-attr x 'open) "("))))
                                   (m:endChr (@ (m:val ,(or (ox-attr x 'close) ")")))))
                            ,@(map (lambda (y) (mmlo-arg 'm:e y)) c))))
+              ;; the lines of several equations: an array of equations of
+              ;; Word, whose & mark where its lines align
               ((mtable)
-               (list `(m:m ,@(map (lambda (r)
-                                    `(m:mr ,@(map (lambda (d)
-                                                    `(m:e ,@(mmlo-row (ox-children d))))
-                                                  (list-filter (ox-elements r)
-                                                               (lambda (d) (mmlo-is? d 'mtd))))))
-                                  (list-filter c (lambda (r) (or (mmlo-is? r 'mtr)
-                                                                 (mmlo-is? r 'mlabeledtr))))))))
+               (if mmlo-eqarray?
+                   (begin
+                     (set! mmlo-eqarray? #f)
+                     (with r
+                         (list `(m:eqArr
+                                  ,@(map (lambda (r)
+                                           ;; (one mark, before the second
+                                           ;; cell: the relation of the line)
+                                           (let ((cells (map (lambda (d) (mmlo-row (ox-children d)))
+                                                             (list-filter (ox-elements r)
+                                                                          (lambda (d) (mmlo-is? d 'mtd))))))
+                                             `(m:e ,@(if (null? cells) '()
+                                                         (append (car cells)
+                                                                 (if (null? (cdr cells)) '()
+                                                                     '((m:r (m:t "&"))))
+                                                                 (apply append (cdr cells)))))))
+                                         (list-filter c (lambda (r) (or (mmlo-is? r 'mtr)
+                                                                        (mmlo-is? r 'mlabeledtr)))))))
+                       (set! mmlo-eqarray? #t)
+                       r))
+               ;; (Word wants as many cells in each row: short rows are
+               ;; completed with empty cells)
+               (let* ((rows (map (lambda (r)
+                                   (map (lambda (d)
+                                          `(m:e ,@(mmlo-row (ox-children d))))
+                                        (list-filter (ox-elements r)
+                                                     (lambda (d) (mmlo-is? d 'mtd)))))
+                                 (list-filter c (lambda (r) (or (mmlo-is? r 'mtr)
+                                                                (mmlo-is? r 'mlabeledtr))))))
+                      (n (apply max (cons 1 (map length rows)))))
+                 (list `(m:m ,@(map (lambda (cells)
+                                      `(m:mr ,@cells
+                                             ,@(map (lambda (i) '(m:e))
+                                                    (iota (- n (length cells))))))
+                                    rows))))))
               ((mmultiscripts)
                ;; the base with the scripts after it, and the scripts
                ;; before it around them, when there are some
@@ -593,10 +648,43 @@
                         (mmlo-scripts (car c) (car after) (cadr after)))
                        (else (mmlo-row c)))))
               ((menclose)
-               (list `(m:borderBox (m:e ,@(mmlo-row c)))))
+               (list `(m:borderBox ,@(mmlo-enclose-properties (ox-attr x 'notation))
+                                   (m:e ,@(mmlo-row c)))))
               ((none mprescripts annotation annotation-xml) '())
               (else (mmlo-row (ox-children x))))))))
 
+(define (mmlo-enclose-properties notation)
+  ;; the element m:borderBoxPr for the notation of menclose: the sides of
+  ;; the box which are not drawn, and the lines through (a box when there
+  ;; is no notation)
+  (let* ((l (if (string? notation) (string-tokenize-by-char notation #\space) '()))
+         (l (list-filter l (lambda (s) (!= s ""))))
+         (has? (lambda (k) (in? k l)))
+         (box? (or (null? l) (has? "box") (has? "roundedbox") (has? "circle")))
+         (side? (lambda (k) (or box? (has? k)
+                                (and (in? k '("left" "top")) (has? "longdiv"))
+                                (and (== k "right") (or (has? "actuarial") (has? "madruwb")))
+                                (and (== k "top") (has? "actuarial"))
+                                (and (== k "bottom") (has? "madruwb")))))
+         (on (lambda (tag) `(,tag (@ (m:val "1")))))
+         (props (append
+                  (if (side? "top") '() (list (on 'm:hideTop)))
+                  (if (side? "bottom") '() (list (on 'm:hideBot)))
+                  (if (side? "left") '() (list (on 'm:hideLeft)))
+                  (if (side? "right") '() (list (on 'm:hideRight)))
+                  (if (has? "horizontalstrike") (list (on 'm:strikeH)) '())
+                  (if (has? "verticalstrike") (list (on 'm:strikeV)) '())
+                  (if (has? "updiagonalstrike") (list (on 'm:strikeBLTR)) '())
+                  (if (has? "downdiagonalstrike") (list (on 'm:strikeTLBR)) '()))))
+    (if (null? props) '() (list `(m:borderBoxPr ,@props)))))
+
+(define mmlo-eqarray? #f)  ; the table of the formula is lines of equations
+
 (tm-define (mathml->omml x)
   (:synopsis "The tree of MathML @x as a formula of Word, an element m:oMath")
-  (cons 'm:oMath (mmlo-node x)))
+  ;; (the class tm-eqarray of the formula says that its table is lines of
+  ;; equations, see tmof-equations)
+  (set! mmlo-eqarray? (== (ox-attr x 'class) "tm-eqarray"))
+  (with r (cons 'm:oMath (mmlo-node x))
+    (set! mmlo-eqarray? #f)
+    r))

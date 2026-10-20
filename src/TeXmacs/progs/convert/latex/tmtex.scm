@@ -2195,6 +2195,43 @@
                 (tmtex `(concat (strong ,key) " " ,(cadr l)))))))
 (define (tmtex-md-nothing s l) "")
 
+;; The macros of the style office (styles/office.ts): what they display,
+;; without what they keep of the Word or OpenDocument file
+(define (tmtex-office-last s l) (if (null? l) "" (tmtex (cAr l))))
+(define (tmtex-office-font s l)
+  (if (< (length l) 3) (tmtex-office-last s l)
+      (tmtex `(with "font-family" ,(cadr l) ,(caddr l)))))
+(define (tmtex-office-underline s l)
+  (cond ((< (length l) 2) (tmtex-office-last s l))
+        ((== (car l) "double") (tmtex `(underline (underline ,(cadr l)))))
+        (else (tmtex `(underline ,(cadr l))))))
+(define (tmtex-office-strike s l)
+  (if (null? l) "" (tmtex `(strike-through ,(cAr l)))))
+(define (tmtex-office-columns s l)
+  (if (< (length l) 2) (tmtex-office-last s l)
+      (tmtex `(with "par-columns" ,(car l) ,(cAr l)))))
+(define (tmtex-office-inline t)
+  ;; the paragraphs of a comment or a change, in one line
+  (if (tm-func? t 'document)
+      `(concat ,@(list-intersperse (tm-children t) " "))
+      t))
+(define (tmtex-office-comment s l)
+  (if (< (length l) 3) ""
+      (tmtex `(with "color" "dark magenta"
+                (concat (rsup (math "<ast>"))
+                        (with "font-size" "0.71"
+                          (concat "[" (strong ,(car l)) ": "
+                                  ,(tmtex-office-inline (caddr l)) "]")))))))
+(define (tmtex-office-commented s l)
+  (if (< (length l) 4) (tmtex-office-last s l)
+      (tmtex `(concat ,(car l) (office-comment ,@(cdr l))))))
+(define (tmtex-office-change s l)
+  (cond ((< (length l) 3) "")
+        ((== s "office-ins")
+         (tmtex `(with "color" "dark green" (underline ,(tmtex-office-inline (caddr l))))))
+        (else
+         (tmtex `(with "color" "dark red" (strike-through ,(tmtex-office-inline (caddr l))))))))
+
 (define (filter-enunciation-due-to l)
   (cond ((func? l 'dueto) (list l))
         ((nlist>0? l) '())
@@ -3195,6 +3232,16 @@
   (md-footnote-text (,tmtex-md-nothing -1))
   (md-meta (,tmtex-md-meta -1))
   (md-h6 (,tmtex-md-h6 -1))
+  ((:or office-par office-span office-plain office-letters office-capitalize
+        office-float office-box office-shape office-field)
+   (,tmtex-office-last -1))
+  (office-font (,tmtex-office-font -1))
+  (office-underline (,tmtex-office-underline -1))
+  (office-strike (,tmtex-office-strike -1))
+  ((:or office-columns office-columns*) (,tmtex-office-columns -1))
+  (office-comment (,tmtex-office-comment -1))
+  (office-commented (,tmtex-office-commented -1))
+  ((:or office-ins office-del) (,tmtex-office-change -1))
   (footnotemark (,tmtex-default 0))
   (footnotemark* (,tmtex-footnotemark 1))
   ((:or description description-compact description-aligned
