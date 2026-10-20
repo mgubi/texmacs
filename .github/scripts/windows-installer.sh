@@ -15,8 +15,8 @@
 set -e
 gui="$1"
 case "$gui" in
-  qt)  Gui=Qt;  name="TeXmacs Upsilon" ;;
-  vue) Gui=Vue; name="TeXmacs Upsilon Vue" ;;
+  qt)  Gui=Qt;  name="GNU TeXmacs Upsilon" ;;
+  vue) Gui=Vue; name="GNU TeXmacs Upsilon Vue" ;;
   *) echo "usage: $0 qt|vue" >&2; exit 1 ;;
 esac
 out="texmacs-upsilon-$gui-x86_64-setup"

@@ -18,6 +18,10 @@ have the details, and the problems go to the
   22.04 and of the distributions of its age), which failed at the link
   (#389); with Qt 5 the requests to web services (the AI sessions, Zotero
   on the web) are not available. The CI now builds it with Qt 5 and GCC.
+- **Desktop**: on Windows the installers, the Start menu, the uninstaller
+  and `texmacs.exe` itself are now "GNU TeXmacs Upsilon" (and "GNU TeXmacs
+  Upsilon Vue"), with the flat icon of TeXmacs Upsilon instead of the one of
+  the stock TeXmacs, so that the two are told apart at a glance.
 
 ## 19 October 2026
 
