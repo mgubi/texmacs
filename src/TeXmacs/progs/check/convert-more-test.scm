@@ -989,14 +989,25 @@
           "[\n  [],\n  {},\n  [ \"1\" ]\n]")
   (with s "{\"a\": [], \"b\": {}}"
     (check= (st (json->tree (tree->json (json->tree s)))) (st (json->tree s))))
-  ;; FIXME (fixed by the open PR #107): the parser of numbers knows neither the sign nor the exponent
-  ;; (json_parse_number in json.cpp only reads digits and points, json_skip
-  ;; skips the minus): (json->tree "[-1, 2e3, -0.5]") gives (tuple "1" "2"),
-  ;; expected (tuple "-1" "2e3" "-0.5").
-  ;; FIXME (fixed by the open PR #107): \f is read as a backspace (json_parse_string, json.cpp:89), and
-  ;; \u is not read: (json->tree "\"a\\fb\"") gives "a\bb", expected "a\fb";
-  ;; (json->tree "\"\\u00e9\"") gives "u00e9", expected e acute.
-  )
+  ;; numbers with a sign and an exponent, kept as they are written
+  (check= (st (json->tree "[-1, 2e3, -0.5, 1.5E-2, 6e+1]"))
+          '(tuple "-1" "2e3" "-0.5" "1.5E-2" "6e+1"))
+  ;; the escapes of strings: \f is a form feed, \/ a slash, \u a code
+  ;; point in utf8, a surrogate pair one character, an unpaired surrogate
+  ;; the replacement character
+  (check= (st (json->tree "\"a\\fb\"")) (string-append "a" (string (integer->char 12)) "b"))
+  (check= (st (json->tree "\"a\\/b\"")) "a/b")
+  (check= (st (json->tree "\"\\u00e9\\u00C9\"")) (u8 #xE9 #xC9))
+  (check= (st (json->tree "\"\\ud83d\\ude00\"")) (u8 #x1F600))
+  (check= (st (json->tree "\"\\ud83dx\"")) (string-append (u8 #xFFFD) "x"))
+  ;; the parser does not fail on what is not JSON: what it can read is kept,
+  ;; an unclosed array or object ends with the input, a key without a value
+  ;; has the empty string, and what cannot begin a value is skipped
+  (check= (st (json->tree "[1, [2")) '(tuple "1" (tuple "2")))
+  (check= (st (json->tree "{\"a\": {\"b\": 1")) '(attr "a" (attr "b" "1")))
+  (check= (st (json->tree "{\"a\" 1}")) '(attr "a" "" "1" ""))
+  (check= (st (json->tree "garbage [1]")) '(tuple "1"))
+  (check= (st (json->tree "")) ""))
 
 ;; The compressed trees (for the AI tools): the tags become compressed
 ;; nodes with an identifier, which decompress-tree undoes.
