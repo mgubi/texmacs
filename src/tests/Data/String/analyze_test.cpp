@@ -31,6 +31,7 @@ private slots:
   void test_ends ();
   void test_read_word ();
   void test_as_hexadecimal ();
+  void test_tm_decode ();
 };
 
 void
@@ -157,6 +158,24 @@ TestAnalyze::test_as_hexadecimal () {
   QCOMPARE (from_hexadecimal (as_hexadecimal ((int) -2147483647 - 1)),
             (int) -2147483647 - 1);
   QCOMPARE (as_charp (as_hexadecimal (0x1234, 6)), "001234");
+}
+
+void
+TestAnalyze::test_tm_decode () {
+  QCOMPARE (as_charp (tm_decode ("a<less>b<gtr>c")), "a<b>c");
+  // a character name and a <#hex> character are kept as written
+  QCOMPARE (as_charp (tm_decode ("<alpha>")), "<alpha>");
+  QCOMPARE (as_charp (tm_decode ("x<alpha>y<#3B1>z")), "x<alpha>y<#3B1>z");
+  // an unterminated < and a bare > are kept, with the rest of the string
+  QCOMPARE (as_charp (tm_decode ("a<b")), "a<b");
+  QCOMPARE (as_charp (tm_decode ("a>b")), "a>b");
+  QCOMPARE (as_charp (tm_decode ("a<b<alpha>c")), "a<b<alpha>c");
+  QCOMPARE (as_charp (tm_decode ("<")), "<");
+  QCOMPARE (as_charp (tm_decode ("")), "");
+  // tm_decode undoes tm_encode
+  const char* samples[]= { "<x> < y >", "a<b", ">", "<<>>", "<less>", "" };
+  for (const char* y : samples)
+    QCOMPARE (as_charp (tm_decode (tm_encode (y))), y);
 }
 
 QTEST_MAIN(TestAnalyze)
