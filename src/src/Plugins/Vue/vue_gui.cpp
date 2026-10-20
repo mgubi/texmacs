@@ -177,6 +177,21 @@ hashmap<int, pointer> id_to_window;
 
 static bool single_window_mode ();
 
+// Dialogs (the windows which are neither documents nor popups, see
+// plain_window) are told to the window manager as dialogs, as the Qt port
+// does with Qt::Dialog, so that the tiling ones (i3, sway, Hyprland,
+// bspwm...) float them (issue #391): on X11 the type of window DIALOG (the
+// hint SDL_HINT_X11_WINDOW_TYPE, read when the window is made) and
+// everywhere but macOS the document window of the moment as their parent
+// (WM_TRANSIENT_FOR on X11, xdg_toplevel.set_parent on Wayland, the owner
+// on Windows). Not SDL_WINDOW_UTILITY, which makes a palette without an
+// entry in the task bar on X11 and drops the parent on Windows. On macOS a
+// child window (addChildWindow) moves with its parent, which the dialogs
+// of TeXmacs do not. SDL destroys the children of a window with it: a
+// document window lets its dialogs go first (see the destructor).
+static bool making_dialog= false;
+static SDL_Window* last_document_sdl= NULL; // the last document window made
+
 class vue_sdl_base_window_rep : public vue_window_rep {
 public:
   SDL_Window *sdl_win;
@@ -398,7 +413,11 @@ vue_sdl_base_window_rep::vue_sdl_base_window_rep (vue_widget _content, string _n
   the_name= name;
   mod_name= name;
   c_string buf (cork_to_utf8 (name));
+  bool x11_dialog= making_dialog && !popup &&
+                   strcmp (SDL_GetCurrentVideoDriver () ? SDL_GetCurrentVideoDriver () : "", "x11") == 0;
+  if (x11_dialog) SDL_SetHint (SDL_HINT_X11_WINDOW_TYPE, "_NET_WM_WINDOW_TYPE_DIALOG");
   sdl_win= SDL_CreateWindow (buf, win_w, win_h, flags);
+  if (x11_dialog) SDL_ResetHint (SDL_HINT_X11_WINDOW_TYPE);
   if (!sdl_win) {
     // nothing sensible can be done without a window
     SDL_LogError (SDL_LOG_CATEGORY_APPLICATION, "Couldn't create window: %s", SDL_GetError ());
@@ -417,6 +436,19 @@ vue_sdl_base_window_rep::vue_sdl_base_window_rep (vue_widget _content, string _n
   }
 #endif
   SDL_SetWindowPosition (sdl_win, win_x, win_y);
+#if !defined(OS_MACOS) && !defined(__EMSCRIPTEN__)
+  if (making_dialog && !popup) {
+    // the parent: the document window with the keyboard, else the last one
+    // made (a dialog opened at the start, before any window has the focus)
+    SDL_Window* parent= NULL;
+    SDL_Window* focus= SDL_GetKeyboardFocus ();
+    if (focus != NULL && Window_to_window->contains (focus) &&
+        ((vue_sdl_base_window_rep*) Window_to_window[focus])->document)
+      parent= focus;
+    if (parent == NULL) parent= last_document_sdl;
+    if (parent != NULL) SDL_SetWindowParent (sdl_win, parent);
+  }
+#endif
   Window_to_window (sdl_win)= (void*) this;
   id= serial++;
   id_to_window (id)= this;
@@ -504,6 +536,17 @@ vue_sdl_base_window_rep::~vue_sdl_base_window_rep () {
   // NULL: the SDL window went to another one (see forget_host)
   if (sdl_win == NULL) return;
   Window_to_window->reset (sdl_win);
+  if (last_document_sdl == sdl_win) last_document_sdl= NULL;
+  // the dialogs of this window outlive it (see making_dialog): SDL would
+  // destroy them with it, under the widgets which own them
+  int n= 0;
+  SDL_Window** all= SDL_GetWindows (&n);
+  if (all != NULL) {
+    for (int i= 0; i < n; i++)
+      if (SDL_GetWindowParent (all[i]) == sdl_win)
+        SDL_SetWindowParent (all[i], NULL);
+    SDL_free (all);
+  }
   SDL_StopTextInput (sdl_win);
   vue_gpu_detach (sdl_win);
   SDL_DestroyWindow (sdl_win);
@@ -3006,13 +3049,13 @@ plain_window (vue_widget wwid, string name, bool popup, bool document) {
     if (the_host == NULL) make_host ();
     return tm_new<vue_virtual_window_rep> (wwid, name, popup, document && !popup);
   }
-  if (vue_gpu_windows ()) {
-    vue_sdl_gpu_window_rep* g= tm_new<vue_sdl_gpu_window_rep> (wwid, name, popup);
-    g->document= document && !popup;
-    return g;
-  }
-  vue_sdl_mupdf_window_rep* w= tm_new<vue_sdl_mupdf_window_rep> (wwid, name, popup);
+  making_dialog= !document && !popup;
+  vue_sdl_base_window_rep* w;
+  if (vue_gpu_windows ()) w= tm_new<vue_sdl_gpu_window_rep> (wwid, name, popup);
+  else w= tm_new<vue_sdl_mupdf_window_rep> (wwid, name, popup);
+  making_dialog= false;
   w->document= document && !popup;
+  if (w->document) last_document_sdl= w->sdl_win;
   return w;
 }
 
@@ -3446,7 +3489,39 @@ static const double wheel_precise_step= 100.0; // points per unit
 #else
 static const double wheel_precise_step= 10.0;  // points per unit
 #endif
-static const double wheel_notch_step= 80.0;    // points per notch
+static const double wheel_notch_step= 80.0;    // points per notch (macOS)
+
+// the distance of a notch: on macOS a fixed one, elsewhere that of the Qt
+// port (issue #391), where a notch scrolls three lines (the default of
+// QApplication::wheelScrollLines) of a sixteenth of the height of the view
+// plus a pixel (the single step of QTMScrollView); the height of the view
+// is taken as the one of the window less its bars
+static double
+wheel_notch_step_of (vue_window win) {
+#if defined(OS_MACOS) || defined(__EMSCRIPTEN__)
+  (void) win;
+  return wheel_notch_step;
+#else
+  SI w, h;
+  win->get_size (w, h);
+  double view= max (100.0, ((double) h) / PIXEL - 120.0);
+  return 3.0 * (floor (view / 16.0) + 1.0);
+#endif
+}
+
+// a whole number of eighths: the deltas of a wheel with fine steps (Wayland
+// gives the wheel in 120ths of a notch, mostly by 15), not of a trackpad.
+// Not on macOS, where SDL gives the trackpad in lines and a wheel by notches
+static bool
+wheel_in_eighths (double d) {
+#if defined(OS_MACOS) || defined(__EMSCRIPTEN__)
+  (void) d;
+  return false;
+#else
+  double e= d * 8.0;
+  return fabs (e - floor (e + 0.5)) < 1e-4;
+#endif
+}
 // does the system glide after the fingers are lifted (see above)? macOS
 // does, also in a browser, which passes its momentum on as wheel events
 #if defined(__EMSCRIPTEN__)
@@ -3559,7 +3634,8 @@ wheel_event (vue_window win, double x, double y, time_t now, uint64_t stamp) {
   }
   // fractional deltas are a trackpad; so is a second event which follows
   // the opening one too soon for a wheel to have turned twice (see above)
-  bool precise= (x != floor (x) || y != floor (y)) ||
+  bool precise= ((x != floor (x) && !wheel_in_eighths (x)) ||
+                 (y != floor (y) && !wheel_in_eighths (y))) ||
                 (wheel_bursts_are_swipes &&
                  in.wheel_ambiguous && !fresh && dt <= wheel_burst_dt);
   in.wheel_ambiguous= wheel_bursts_are_swipes && fresh && !precise;
@@ -3571,7 +3647,8 @@ wheel_event (vue_window win, double x, double y, time_t now, uint64_t stamp) {
     in.wheel_pend_y -= in.wheel_over_y;
     in.wheel_over_x= in.wheel_over_y= 0;
   }
-  double step= win->density * (in.wheel_precise ? wheel_precise_step : wheel_notch_step);
+  double step= win->density * (in.wheel_precise ? wheel_precise_step
+                                                : wheel_notch_step_of (win));
   double dx= x * step, dy= y * step; // device pixels
   dt= max ((time_t) 8, min (dt, wheel_slow_dt));
   in.wheel_est_x= 0.5 * (in.wheel_est_x + dx / dt);
@@ -5984,6 +6061,15 @@ font get_default_font (bool tt, bool mini, bool bold) {
     return find_font ("Lucida Grande", "ss", series, "right",
                       sz, (int) (0.95 * dpi));
   }
+  // elsewhere a sans serif too, as the system font of the Qt port: Fira,
+  // which comes with TeXmacs, as in the browser. The TeX fonts below were
+  // the look of the X11 port (issue #391); they stay for the languages
+  // which Fira does not write
+  string lan= get_output_language ();
+  if (lan != "chinese" && lan != "taiwanese" &&
+      lan != "japanese" && lan != "korean")
+    return unicode_font (bold ? "FiraSans-Bold" : "FiraSans-Regular",
+                         sz, (int) (0.95 * dpi));
   if (N(fam) >= 2) {
     string ff= fam (0, 2);
     string out_lan= get_output_language ();

@@ -14,6 +14,26 @@ have the details, and the problems go to the
 
 ## 20 October 2026
 
+- **Desktop (Vue)**: on Linux and Windows the interface is written in Fira
+  Sans, a sans serif as the system font of the Qt port, instead of Computer
+  Modern, the look of the old X11 interface (#391); macOS keeps Lucida
+  Grande.
+- **Vue**: the input fields of the dialogs take the keys of the fields of
+  Qt: on Linux and Windows control-c, control-x, control-v, control-a,
+  control-z and control-shift-z (or control-y) copy, cut, paste, select all,
+  undo and redo, as do shift-insert, control-insert and shift-delete; on a
+  Mac the same with command. Control-v did nothing, so a path could not be
+  pasted in the file chooser, and control-c cancelled the field (#391).
+  The menu of the right button has Undo and Redo too.
+- **Desktop (Vue)**: on Linux and Windows a notch of the mouse wheel
+  scrolls as far as in the Qt port, three lines of a sixteenth of the
+  window, and the wheels with fine steps (which Wayland gives in eighths of
+  a notch) are no longer taken for a trackpad, which scrolled them eight
+  times slower (#391).
+- **Desktop (Vue)**: the dialogs are dialogs for the window manager: on
+  X11 they have the type of a dialog, and on Linux and Windows the document
+  window as their parent, so that the tiling window managers (i3, sway,
+  Hyprland, bspwm) float them instead of tiling them (#391).
 - **Desktop**: TeXmacs Upsilon builds again with Qt 5 (the Qt of Ubuntu
   22.04 and of the distributions of its age), which failed at the link
   (#389); with Qt 5 the requests to web services (the AI sessions, Zotero

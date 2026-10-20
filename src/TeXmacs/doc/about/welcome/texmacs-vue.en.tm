@@ -277,6 +277,16 @@
 
   The additions to <TeXmacs> Upsilon, the newest first.
 
+  <paragraph|20 October 2026>
+
+  <\itemize>
+    <item>The input fields of the dialogs take the keys of the fields of
+    the other applications: control (command on a <name|Mac>) with c, x, v,
+    a, z and shift-z copy, cut, paste, select all, undo and redo. Elsewhere
+    than on a <name|Mac>, control-v did nothing and control-c cancelled the
+    field. The menu of the right button has Undo and Redo too.
+  </itemize>
+
   <paragraph|19 October 2026>
 
   <\itemize>

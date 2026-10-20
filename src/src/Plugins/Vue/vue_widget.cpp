@@ -4501,6 +4501,10 @@ public:
   int     pre_edit_pos; // the cursor inside it (a byte offset)
   array<string> tabs;  // tab completions
   int     tab_nr;      // currently visible tab-completion
+  array<string> undo_s; // the former strings, for undo, and their cursors
+  array<int>    undo_pos;
+  array<string> redo_s; // the strings undone, for redo
+  array<int>    redo_pos;
   int     tab_pos;     // cursor position where tab was pressed
 
   command tab_cb; // called with #t/#f on tab/shift-tab (moves the focus in dialogs)
@@ -4520,6 +4524,7 @@ public:
   void  insert (string ins);
   void  copy_selection (bool cut);
   void  paste ();
+  bool  undo (bool redo);
   void  word_left ();
   void  word_right ();
   void  select_word (int p);
@@ -4531,9 +4536,10 @@ public:
 
 // The input field of the dialogs (as the Widkit one): a lowered box, pastel
 // when it has the focus, with the text scrolled so that the red cursor stays
-// visible, a selection (shift+arrows, the mouse), the clipboard (M-c/M-x/M-v
-// or C-y), word moves (A-/C- arrows, A-backspace), the history of the
-// proposals (up/down), tab completion, return commits and escape cancels.
+// visible, a selection (shift+arrows, the mouse), the clipboard and undo with
+// the keys of the line edits of Qt (see process_key), word moves (A-/C-
+// arrows, A-backspace), the history of the proposals (up/down), tab
+// completion, return commits and escape cancels.
 // It is drawn by render (a Clay custom element).
 
 // in device pixels, at 2x (scaled to the density: ui_px)
@@ -4660,6 +4666,22 @@ vue_input_text_widget_rep::copy_selection (bool cut) {
   if (cut) delete_selection ();
 }
 
+// undo (or redo) the last change of the string; false if there is none
+bool
+vue_input_text_widget_rep::undo (bool redo) {
+  array<string>& from_s= redo ? redo_s : undo_s;
+  array<int>& from_pos= redo ? redo_pos : undo_pos;
+  array<string>& to_s= redo ? undo_s : redo_s;
+  array<int>& to_pos= redo ? undo_pos : redo_pos;
+  int n= N(from_s);
+  if (n == 0) return false;
+  to_s << s; to_pos << pos;
+  s= from_s[n-1]; pos= min (from_pos[n-1], N(s));
+  from_s= range (from_s, 0, n-1); from_pos= range (from_pos, 0, n-1);
+  sel= -1;
+  return true;
+}
+
 void
 vue_input_text_widget_rep::paste () {
   tree t; string str;
@@ -4730,6 +4752,21 @@ public:
   tm_ostream& print (tm_ostream& out) { return out << "<input_menu " << key << ">"; }
 };
 
+// the key of the system for a command of the fields (k is "a", "c", "z"...):
+// command on macOS, control elsewhere (see process_key)
+static string
+input_std_key (string k) {
+#if defined(OS_MACOS)
+  return "M-" * k;
+#elif defined(__EMSCRIPTEN__)
+  // the browser: command on a Mac (misc/wasm sets TEXMACS_WEB_PLATFORM)
+  static bool mac= (get_env ("TEXMACS_WEB_PLATFORM") == "macos");
+  return (mac ? "M-" : "C-") * k;
+#else
+  return "C-" * k;
+#endif
+}
+
 widget
 vue_input_text_widget_rep::input_context_menu () {
   int b, e;
@@ -4744,11 +4781,14 @@ vue_input_text_widget_rep::input_context_menu () {
                         tm_new<input_menu_command_rep> (me, key), "", ks, st);
   };
   array<widget> items;
-  items << item ("Cut", "M-x", some && editable)
-        << item ("Copy", "M-c", some)
-        << item ("Paste", "M-v", editable)
+  items << item ("Undo", input_std_key ("z"), editable && N(undo_s) > 0)
+        << item ("Redo", input_std_key ("S-z"), editable && N(redo_s) > 0)
         << menu_separator (false)
-        << item ("Select all", "M-a", N(s) > 0);
+        << item ("Cut", input_std_key ("x"), some && editable)
+        << item ("Copy", input_std_key ("c"), some)
+        << item ("Paste", input_std_key ("v"), editable)
+        << menu_separator (false)
+        << item ("Select all", input_std_key ("a"), N(s) > 0);
   return vertical_menu (items);
 }
 
@@ -4780,6 +4820,8 @@ vue_input_text_widget_rep::process_key (string key) {
     return true;
   }
   pre_edit= ""; pre_edit_pos= 0; // any other key ends a composition
+  string old= s, std;
+  int old_pos= pos;
 
   while ((N(key) >= 5) && (key(0,3) == "Mod") && (key[4] == '-') &&
          (key[3] >= '1') && (key[3] <= '5')) key= key (5, N(key));
@@ -4815,11 +4857,31 @@ vue_input_text_widget_rep::process_key (string key) {
     tab_nr= 0;
     tab_pos= 0;
   }
-  // the clipboard and the selection
-  if (key == "M-a") { sel= 0; pos= N(s); return true; }
-  if (key == "M-c") { copy_selection (false); return true; }
-  if (key == "M-x") { copy_selection (true); goto changed; }
-  if (key == "M-v" || key == "C-y") { paste (); goto changed; }
+  // the clipboard, the selection and undo, with the keys of the line edits
+  // of Qt (QKeySequence): command on macOS, control elsewhere, where
+  // control-a selects all and control-c copies instead of the Emacs keys
+  // which follow (issue #391), and shift-insert, control-insert and
+  // shift-delete; C-y pastes on macOS (Emacs) and redoes elsewhere
+  std= input_std_key ("");
+  if (std == "M-") {
+    if (key == "C-y") key= "M-v";
+  }
+  else {
+    if (key == "S-insert") key= "C-v";
+    else if (key == "C-insert") key= "C-c";
+    else if (key == "S-delete") key= "C-x";
+    else if (key == "C-y") key= "C-S-z";
+  }
+  if (key == std * "Z") key= std * "S-z";
+  if (key == std * "a") { sel= 0; pos= N(s); return true; }
+  if (key == std * "c") { copy_selection (false); return true; }
+  if (key == std * "x") { copy_selection (true); goto changed; }
+  if (key == std * "v") { paste (); goto changed; }
+  if (key == std * "z" || key == std * "S-z") {
+    if (!undo (key != std * "z")) return true;
+    old= s; // (not a change to undo)
+    goto changed;
+  }
   if (key == "A-backspace" || key == "C-w") {
     int b, e;
     if (selection (b, e)) delete_selection ();
@@ -4962,6 +5024,12 @@ vue_input_text_widget_rep::process_key (string key) {
     insert (key);
   }
 changed:
+  if (s != old) {
+    undo_s << old; undo_pos << old_pos;
+    if (N(undo_s) > 100) {
+      undo_s= range (undo_s, 1, N(undo_s)); undo_pos= range (undo_pos, 1, N(undo_pos)); }
+    redo_s= array<string> (); redo_pos= array<int> ();
+  }
   if (continuous ()) {
     command cmd= tm_new<applied_command_rep>(call_back,
                       list_object (list_object (object (s), object (key))));
