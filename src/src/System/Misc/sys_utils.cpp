@@ -125,10 +125,11 @@ get_texmacs_path () {
 
 url
 get_texmacs_home_path () {
-  url path= get_env ("TEXMACS_HOME_PATH");
-  if (path == "")
-    path= url_system ("$HOME/.TeXmacs");
-  return path;
+  // a path of the system, as for get_texmacs_path: with the standard syntax
+  // the ':' of a Windows drive (C:\...) separates two paths
+  string home= get_env ("TEXMACS_HOME_PATH");
+  if (home == "") return url_system ("$HOME/.TeXmacs");
+  return url_system (home);
 }
 
 array<string>
