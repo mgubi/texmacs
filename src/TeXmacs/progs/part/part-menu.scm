@@ -22,6 +22,19 @@
 (define (goto-include buf incl)
   (load-document (part-url buf (url-relative buf incl))))
 
+(tm-define (part-menu-entries m)
+  ;; the (label file) of the master @m and its included files in the menu
+  ;; Document > Part; a star marks the files with unsaved changes
+  (let* ((t (tree-import m "texmacs"))
+         (b (tmfile-get t 'body))
+         (l (tm-get-includes b))
+         (label (lambda (s u)
+                  (if (part-file-unsaved? m u) (string-append s " *") s))))
+    (cons (list (label (url->string (url-tail m)) m) #f)
+          (map (lambda (incl)
+                 (list (label incl (url-relative m incl)) incl))
+               l))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The dynamic document part menu
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -36,11 +49,8 @@
   (:require (url-rooted-tmfs-protocol? (current-buffer) "part"))
   (let* ((name (part-open-name (current-buffer)))
          (m (part-master name))
-         (f (part-file name))
-         (t (tree-import m "texmacs"))
-	 (b (tmfile-get t 'body))
-	 (l (tm-get-includes b)))
-    ((eval (url->string (url-tail m))) (load-document m))
+         (l (part-menu-entries m)))
+    ((eval (car (car l))) (load-document m))
     ---
-    (for (incl l)
-      ((eval incl) (goto-include m incl)))))
+    (for (e (cdr l))
+      ((eval (car e)) (goto-include m (cadr e))))))

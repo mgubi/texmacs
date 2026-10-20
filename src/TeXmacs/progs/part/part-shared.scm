@@ -192,7 +192,7 @@
     ;;(modification->scheme mod) "\n")
     (and-with p (tree-up t)
       (when (tree-func? p 'shared)
-        (buffer-initialize-shared (mirror-id p))
+        (buffer-initialize-shared (mirror-id p) t)
         (buffer-notify-shared (mirror-id p) mod)))
     (with l (mirror-list t)
       (mirror-list-notify l mod))))
@@ -201,9 +201,20 @@
 ;; Sharing entire buffers
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;; A buffer of an included file which is also shown in a part view
+;; (part-tmfs.scm) is kept in sync with the copy of the part view: its
+;; changes are applied to the copy, those of the copy to it. The copy is
+;; made from the buffer when the part view is loaded; if the two differ
+;; when the copy is changed for the first time and the buffer has unsaved
+;; changes, the buffer is not synchronized ("diverged", until it is closed
+;; or the part view is saved): copying one over the other would lose
+;; changes. Saving the part view then refuses to write that file while the
+;; buffer has unsaved changes.
+
 (define buffer-shared-list (make-ahash-table))
 (define buffer-pending (make-ahash-table))
 (define buffer-black-list (make-ahash-table))
+(define buffer-diverged (make-ahash-table))
 
 (tm-define (buffer-initialize id t buf)
   (ahash-set! buffer-shared-list id #t))
@@ -220,7 +231,8 @@
                (l (list-filter (id->trees (car ids)) other?)))
           (mirror-list-notify l mod))))))
 
-(tm-define (buffer-initialize-shared id)
+(tm-define (buffer-initialize-shared id . opt-copy)
+  ;; @opt-copy: the copy of the part view, before its first change
   (with buf id
     ;;(when (not (buffer-exists? buf))
     ;;  (delayed
@@ -228,11 +240,21 @@
     ;;    (load-buffer buf :background)))
     (if (not (ahash-ref buffer-shared-list id))
         (when (buffer-exists? buf)
-          (buffer-attach-notifier buf)
-          (ahash-set! buffer-shared-list id #t)
-          (ahash-set! buffer-black-list id #t))
+          (if (and (nnull? opt-copy)
+                   (or (buffer-modified? buf)
+                       (ahash-ref buffer-diverged id))
+                   (!= (tm->stree (buffer-get-body buf))
+                       (tm->stree (car opt-copy))))
+              (ahash-set! buffer-diverged id #t)
+              (begin
+                (buffer-attach-notifier buf)
+                (ahash-remove! buffer-diverged id)
+                (ahash-set! buffer-shared-list id #t)
+                (ahash-set! buffer-black-list id #t))))
         (when (not (buffer-exists? buf))
-          (ahash-remove! buffer-shared-list id)))))
+          (ahash-remove! buffer-shared-list id)))
+    (when (not (buffer-exists? buf))
+      (ahash-remove! buffer-diverged id))))
 
 (define (buffer-restore buf)
   (with-author mirror-author
@@ -262,6 +284,21 @@
           (when (and t (not ok?))
             (buffer-restore id))))
       (set! buffer-pending (make-ahash-table)))))
+
+;; Saving a part view: the pending changes are applied first, and the
+;; body of a buffer which was not synchronized is replaced by the copy.
+
+(tm-define (buffer-shared-flush)
+  (when (> (ahash-size buffer-pending) 0)
+    (buffer-treat-pending)))
+
+(tm-define (buffer-shared-set-body buf body)
+  (with-author mirror-author
+    (with-global mirror-idle? #f
+      (tree-set! (buffer-get-body buf) (tm->tree body))))
+  (ahash-remove! buffer-diverged buf)
+  (ahash-remove! buffer-pending buf)
+  (ahash-remove! buffer-black-list buf))
 
 (tm-define (buffer-notify-shared id mod)
   (when (ahash-ref buffer-shared-list id)
