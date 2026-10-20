@@ -7928,6 +7928,19 @@ tmg_url_last_modified (tmscm arg1) {
 }
 
 tmscm
+tmg_url_declare_out_of_date (tmscm arg1) {
+  TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "url-declare-out-of-date");
+
+  url in1= tmscm_to_url (arg1);
+
+  // TMSCM_DEFER_INTS;
+  declare_out_of_date (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
 tmg_url_temp () {
   // TMSCM_DEFER_INTS;
   url out= url_temp ();
@@ -11894,6 +11907,7 @@ initialize_glue_basic () {
   tmscm_install_procedure ("url-newer?",  tmg_url_newerP, 2, 0, 0);
   tmscm_install_procedure ("url-size",  tmg_url_size, 1, 0, 0);
   tmscm_install_procedure ("url-last-modified",  tmg_url_last_modified, 1, 0, 0);
+  tmscm_install_procedure ("url-declare-out-of-date",  tmg_url_declare_out_of_date, 1, 0, 0);
   tmscm_install_procedure ("url-temp",  tmg_url_temp, 0, 0, 0);
   tmscm_install_procedure ("url-temp-dir",  tmg_url_temp_dir, 0, 0, 0);
   tmscm_install_procedure ("url-scratch",  tmg_url_scratch, 3, 0, 0);

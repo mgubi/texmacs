@@ -4691,6 +4691,14 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(url-declare-out-of-date <scm-arg|url>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|declare_out_of_date> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
     <scm|(url-temp)>
 <explain-synopsis|no synopsis>
   <|explain>
