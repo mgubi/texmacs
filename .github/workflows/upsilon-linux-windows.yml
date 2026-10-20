@@ -244,11 +244,14 @@ jobs:
           path: ~/vue-deps
           key: ${{ steps.deps-cache.outputs.cache-primary-key }}
 
+      # NOTE: GCC, as the job linux: configure would take clang, which
+      # accepts what GCC refuses (designated initializers out of the order
+      # of their fields, in the calls of Clay)
       - name: Configure
         run: |
           ./configure --with-gui=vue --with-scheme=s7 --with-sdl3 \
             --with-mupdf="$DEPS" --with-thorvg="$DEPS" --with-gnutls \
-            PKG_CONFIG_PATH="$DEPS/lib/pkgconfig"
+            PKG_CONFIG_PATH="$DEPS/lib/pkgconfig" CC=gcc CXX=g++
 
       # NOTE: -k, so that a run shows all the files which do not compile
       - name: Build
@@ -361,9 +364,7 @@ jobs:
             apt-get install -y --no-install-recommends \
               qt6-base-dev qt6-base-dev-tools libqt6svg6-dev qt6-wayland
           else
-            # (clang, as linux-vue: the Vue code has designated initializers
-            # out of the order of their fields, which GCC refuses)
-            apt-get install -y --no-install-recommends cmake ninja-build clang \
+            apt-get install -y --no-install-recommends cmake ninja-build \
               libegl-dev libx11-dev libxext-dev libxrandr-dev \
               libxcursor-dev libxi-dev libxss-dev libxfixes-dev libxtst-dev \
               libxkbcommon-dev libdrm-dev libgbm-dev libgles-dev \
@@ -396,7 +397,7 @@ jobs:
           else
             ./configure --with-gui=vue --with-scheme=s7 --with-sdl3 \
               --with-mupdf="$DEPS" --with-thorvg="$DEPS" --with-gnutls \
-              PKG_CONFIG_PATH="$DEPS/lib/pkgconfig" CC=clang CXX=clang++
+              PKG_CONFIG_PATH="$DEPS/lib/pkgconfig" CC=gcc CXX=g++
           fi
 
       - name: Build
@@ -528,8 +529,8 @@ jobs:
           path: ${{ runner.temp }}\vue-deps
           key: ${{ steps.deps-cache.outputs.cache-primary-key }}
 
-      # NOTE: clang, as on Linux and macOS: gcc does not take the designated
-      # initializers of Clay in C++ (out of the order of the fields)
+      # NOTE: clang (MinGW GCC builds the Vue port too since the calls of
+      # Clay give their fields in order, 6c494fbbaf; not tried here)
       - name: Configure
         run: |
           ./configure --with-gui=vue --with-scheme=s7 --with-sdl3 \
