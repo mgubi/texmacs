@@ -24,6 +24,7 @@ typesetter_rep::typesetter_rep (edit_env& env2, tree et, path ip):
   env (env2), old_patch (UNINIT)
 {
   paper= (env->get_string (PAGE_MEDIUM) == "paper");
+  rewritten= false;
   br= make_bridge (this, et, ip);
   x1= y1= x2= y2=0;
   kept_pages= tm_new<page_memo> ();
@@ -290,6 +291,13 @@ notify_assign (typesetter ttt, path p, tree u) {
     *ttt->kept_pages= page_memo ();
   }
   else ttt->br->notify_assign (p, u);
+}
+
+bool
+typesetter_rewritten (typesetter ttt) {
+  // (the typesetter typesets a tree of the style rewriter: the changes of
+  // the document do not apply to it, see edit_modify_rep::notify_assign)
+  return ttt->rewritten;
 }
 
 void

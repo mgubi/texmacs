@@ -74,6 +74,11 @@ bridge
 make_bridge (typesetter ttt, tree st, path ip) {
   // cout << "Make bridge " << st << ", " << ip << LF;
   // cout << "Preamble mode= " << ttt->env->preamble << LF;
+  if (ttt->rewritten) {
+    // (a tree of the style rewriter: the place which it attached)
+    path ip2= obtain_ip (st);
+    if (ip2 != path (DETACHED)) ip= ip2;
+  }
   if (ttt->env->preamble)
     return make_inactive_bridge (ttt, st, ip);
   switch (L(st)) {
@@ -993,6 +998,10 @@ bridge_rep::my_resync () {
   // the bridge and the edit tree at the typesetting stage.
   // This should not be necessary, but we use because the ip_observers
   // may become wrong otherwise.
+  // (Not for a tree of the style rewriter, which is not a subtree of the
+  // edit tree: its bridges keep their trees, and the boxes take the places
+  // which the rewriter attached to the trees, see concater_rep::typeset.)
+  if (ttt->rewritten) return;
   if (is_accessible (ip))
     st= subtree (the_et, reverse (ip));
   if (!is_accessible (ip)) {

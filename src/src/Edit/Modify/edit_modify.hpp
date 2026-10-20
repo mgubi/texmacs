@@ -27,6 +27,7 @@ public:
   ~edit_modify_rep ();
   double this_author ();
 
+  bool rewritten_document ();
   void notify_assign      (path p, tree u);
   void notify_insert      (path p, tree u);
   void notify_remove      (path p, int nr);

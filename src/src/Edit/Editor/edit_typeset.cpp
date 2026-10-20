@@ -43,7 +43,22 @@ edit_typeset_rep::edit_typeset_rep ():
        buf->data->ref, (buf->prj==NULL? grefs: buf->prj->data->ref),
        buf->data->aux, (buf->prj==NULL? buf->data->aux: buf->prj->data->aux),
        buf->data->att, (buf->prj==NULL? buf->data->att: buf->prj->data->att)),
+#ifdef EXPERIMENTAL
+  // (with TEXMACS_STYLE_TYPESET=1, the typesetter typesets the result of the
+  // style rewriter; its root has no place in the document, so that the
+  // boxes take the places which the rewriter attached to its trees, those
+  // of the document, see concater_rep::typeset and decorate_ip)
+  rewrite_typeset (get_env ("TEXMACS_STYLE_TYPESET") == "1"),
+  rewrite_root (UNINIT),
+  ttt (new_typesetter (env, subtree (et, rp),
+                       rewrite_typeset? path (DECORATION): reverse (rp))) {
+#else
   ttt (new_typesetter (env, subtree (et, rp), reverse (rp))) {
+#endif
+#ifdef EXPERIMENTAL
+    ttt->rewritten= rewrite_typeset;
+    env->rewritten_tree= rewrite_typeset;
+#endif
     init_update ();
 }
 
@@ -212,6 +227,10 @@ edit_typeset_rep::set_init (hashmap<string,tree> H) {
 void
 edit_typeset_rep::add_init (hashmap<string,tree> H) {
   init->join (H);
+#ifdef EXPERIMENTAL
+  if (rewrite_typeset) rewrite_root= tree (UNINIT);
+  else
+#endif
   ::notify_assign (ttt, path(), subtree (et, rp));
   notify_change (THE_ENVIRONMENT);
 }
@@ -1124,6 +1143,18 @@ void
 edit_typeset_rep::typeset_sub (SI& x1, SI& y1, SI& x2, SI& y2) {
   //time_t t1= texmacs_time ();
   typeset_prepare ();
+#ifdef EXPERIMENTAL
+  if (rewrite_typeset) {
+    // the whole rewritten tree when it changed (for now: the typesetter
+    // does not yet get the changes as modifications)
+    tree r= style_rewrite ();
+    if (!weak_equal (r, rewrite_root)) {
+      rewrite_root= r;
+      ::notify_assign (ttt, path(), r);
+    }
+    typeset_prepare ();
+  }
+#endif
   eb= empty_box (reverse (rp));
   // saves memory
   bench_start ("typeset");
@@ -1135,6 +1166,24 @@ edit_typeset_rep::typeset_sub (SI& x1, SI& y1, SI& x2, SI& y2) {
   }
   catch (string msg) {
     the_exception= msg;
+#ifdef EXPERIMENTAL
+    if (rewrite_typeset) {
+      // a fault of the rewriter must not cost the document: the document
+      // is typeset as usual from now on
+      std_error << "Typesetting of the rewritten tree failed, "
+                << "typesetting the document instead\n";
+      rewrite_typeset= false;
+      env->rewritten_tree= false;
+      eb= box ();
+      delete_typesetter (ttt);
+      ttt= new_typesetter (env, subtree (et, rp), reverse (rp));
+      eb= ::typeset (ttt, x1, y1, x2, y2);
+      handle_exceptions ();
+      bench_end ("typeset");
+      picture_cache_clean ();
+      return;
+    }
+#endif
     std_error << "Typesetting failure, resetting to empty document\n";
     assign (rp, tree (DOCUMENT, ""));
     ::notify_assign (ttt, path(), subtree (et, rp));
@@ -1219,6 +1268,10 @@ edit_typeset_rep::typeset_invalidate (path p) {
   if (rp <= p) {
     //cout << "Invalidate " << p << "\n";
     notify_change (THE_TREE);
+#ifdef EXPERIMENTAL
+    // (the rewritten tree is brought up to date in typeset_sub)
+    if (rewrite_typeset) return;
+#endif
     ::notify_assign (ttt, p / rp, subtree (et, p));
   }
 }
@@ -1228,6 +1281,13 @@ edit_typeset_rep::typeset_invalidate_all () {
   //cout << "Invalidate all\n";
   notify_change (THE_ENVIRONMENT);
   typeset_preamble ();
+#ifdef EXPERIMENTAL
+  if (rewrite_typeset) {
+    environment_update ();
+    rewrite_root= tree (UNINIT);
+    return;
+  }
+#endif
   ::notify_assign (ttt, path(), subtree (et, rp));
 }
 

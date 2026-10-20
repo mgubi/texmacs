@@ -373,6 +373,9 @@ public:
   pencil       pen;
   bool         no_patterns;
   bool         preamble;
+  bool         rewritten_tree; // the tree typeset comes from the style
+                               // rewriter: the places are those which it
+                               // attached to the trees (concater_rep::typeset)
   int          spacing_policy;
   tree         math_font_sizes;
   int          nesting_level;

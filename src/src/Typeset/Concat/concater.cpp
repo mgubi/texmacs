@@ -176,7 +176,9 @@ concater_rep::typeset_main (tree t, path ip) {
 	 << "       ] " << obtain_ip (t) << " -> " << ip << "\n";
   */
 
-  if (!is_accessible (ip)) {
+  if (!is_accessible (ip) || env->rewritten_tree) {
+    // (a tree of the style rewriter carries the places of the document:
+    // the place derived from the parent is a place in that tree)
     path ip2= obtain_ip (t);
     //if (ip2 != ip) cout << t << ", " << ip << " -> " << ip2 << "\n";
     if (ip2 != path (DETACHED))

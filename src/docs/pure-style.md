@@ -338,6 +338,67 @@ written in the document swallows the colours of its text, while the same
 macro bodies into the document, so the code of 215 pages lost its colours.
 It is a property of the highlighter, to be decided there.
 
+### Typesetting in the editor
+
+The second stage of step 4: with `TEXMACS_STYLE_TYPESET=1` (in the
+experimental build), the editor typesets the result of the rewriter instead
+of the document.
+
+- **The tree.** Before each typesetting pass (`edit_typeset_rep::
+  typeset_sub`) the document is rewritten, and when the result changed the
+  typesetter gets the whole result (`notify_assign` at the root): for now
+  every change typesets everything again; the modifications of the
+  document no longer reach the typesetter (`edit_modify_rep::
+  rewritten_document`), they only mark the tree as changed.
+- **The places.** The boxes must carry places of the document, for the
+  cursor and the selections. The rewriter attaches them to its trees
+  (`transfer_ip`, `decorate_ip` for what comes from macro bodies). The
+  typesetter normally derives the place of a child from that of its parent
+  (`descend`); with a rewritten tree, the bridges (`make_bridge`) and the
+  concater (`concater_rep::typeset`) take the place attached to the tree
+  instead (`typesetter_rep::rewritten`, `edit_env_rep::rewritten_tree`), and
+  the root has no place in the document. A derived place would look
+  accessible (only its first item is tested) while holding the negative item
+  of the root: the cursor followed paths which do not exist.
+- **`bridge_rep::my_resync`**, "a dirty hack [which] ensures a perfect
+  coherence between the bridge and the edit tree", replaces the tree of a
+  bridge by the subtree of the document at its place. On a rewritten tree it
+  gave a `with` bridge a paragraph of the document: it is skipped.
+- **Safety.** When typesetting fails, the editor resets the document to an
+  empty one (`assign (rp, tree (DOCUMENT, ""))`); with the rewritten tree it
+  goes back to typesetting the document instead, which is left intact.
+- `build_locus` looked up the subtree of the document at the place of a
+  locus body coming from a macro; that place may not exist with a rewritten
+  tree: the lookup is skipped then (`has_subtree`).
+
+Result (`tests/style/compare-editor.sh`, both printings in the same
+process each): **686 of the 696 pages print identically with and without
+the flag**, with no fallback. The pages which differed in the comparison
+of the copies because of their DRD (`tag-help`, `top-help`, the `map`
+example of `std-utils-dtd`) are identical here, where the DRD is the
+document's. The 10 left: the animation page, and 9 developer pages whose
+program code is coloured otherwise by the older highlighter, which depends
+on the documents printed before in the same process (printed alone, they
+are identical).
+
+Moving the cursor (`go-down`, `go-up`, `go-right`, the starts and ends of
+lines) and typing work, on the documents tried with a window, and the
+typed text goes into the document. The cursor does not always stop at the
+same places: around a macro call (an `item`), the editor can put it before
+or after the tag, which the concater marks with the boundaries of the call;
+in the rewritten tree the call is expanded and its boundaries have no
+boxes, so the cursor goes to the nearest place inside (`XYZ` typed at the
+start of a list item goes after the bullet, not before). Also open:
+
+- the environment at the cursor (`edit_typeset_rep::get_env_value`, which
+  runs `exec_until` along a path of the document in the typesetter) walks
+  the rewritten tree with a path of the document;
+- a subtree which the rewriter shares between several places (the same
+  expansion of a macro body, memorized) carries the place of only one of
+  them;
+- everything is typeset again at each change (the modifications of the
+  rewritten tree are step 5).
+
 ## Relation to the typesetter caches
 
 PR #333 (incremental typesetting) and PR #250 (typing caches), merged in
@@ -452,8 +513,10 @@ Two consequences:
    part is cheap to find and is handed to the typesetter as modifications,
    as edits are now. First stage (above, *Typesetting the result*): the
    result typeset in a copy of the document, compared pixel for pixel with
-   the document. Then the editor: typeset the result behind a flag, with
-   the cursor movement through the ips.
+   the document. Second stage (*Typesetting in the editor*): the editor
+   typesets the result, behind `TEXMACS_STYLE_TYPESET=1`, the boxes carrying
+   the places of the document. Left: the boundaries of macro calls for the
+   cursor, the environment at the cursor, shared subtrees.
 5. **Laziness.** Connect the memorizers to the typesetter's invalidation, so
    that an edit only retypesets what the evaluation changed; benchmark
    against the current typesetter with the #333 scripts; bound the memory
@@ -475,7 +538,11 @@ documentation, or give some documents):
     tests/style/compare.sh [document.tm...]
 
 which prints the documents whose rewriting does not typeset like them
-(four known ones, above), and exits with 1 if there is any.
+(four known ones, above), and exits with 1 if there is any; and the
+typesetting of the rewritten tree by the editor itself (*Typesetting in the
+editor*):
+
+    tests/style/compare-editor.sh [document.tm...]
 
 It is not listed in `check-master.scm`, since the rewriter exists only in
 the experimental build (elsewhere the suite fails at once, saying so). It

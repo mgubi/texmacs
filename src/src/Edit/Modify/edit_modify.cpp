@@ -30,11 +30,22 @@ edit_modify_rep::~edit_modify_rep () {}
 * Notification of changes in document
 ******************************************************************************/
 
+bool
+edit_modify_rep::rewritten_document () {
+  // the typesetter typesets the tree of the style rewriter (experimental,
+  // TEXMACS_STYLE_TYPESET): it is brought up to date before typesetting
+  // (edit_typeset_rep::typeset_sub), not by the modifications
+  if (!typesetter_rewritten (get_typesetter ())) return false;
+  notify_change (THE_TREE);
+  return true;
+}
+
 void
 edit_modify_rep::notify_assign (path p, tree u) {
   (void) u;
   if (!(rp <= p)) return;
   cur_pos= position_new (tp);
+  if (rewritten_document ()) return;
   ::notify_assign (get_typesetter (), p / rp, u);
 }
 
@@ -42,6 +53,7 @@ void
 edit_modify_rep::notify_insert (path p, tree u) {
   if (!(rp <= p)) return;
   cur_pos= position_new (tp);
+  if (rewritten_document ()) return;
   ::notify_insert (get_typesetter (), p / rp, u);
 }
 
@@ -49,6 +61,7 @@ void
 edit_modify_rep::notify_remove (path p, int nr) {
   if (!(rp <= p)) return;
   cur_pos= position_new (tp);
+  if (rewritten_document ()) return;
   ::notify_remove (get_typesetter (), p / rp, nr);
 }
 
@@ -56,6 +69,7 @@ void
 edit_modify_rep::notify_split (path p) {
   if (!(rp <= p)) return;
   cur_pos= position_new (tp);
+  if (rewritten_document ()) return;
   ::notify_split (get_typesetter (), p / rp);
 }
 
@@ -63,6 +77,7 @@ void
 edit_modify_rep::notify_join (path p) {
   if (!(rp <= p)) return;
   cur_pos= position_new (tp);
+  if (rewritten_document ()) return;
   ::notify_join (get_typesetter (), p / rp);
 }
 
@@ -70,6 +85,7 @@ void
 edit_modify_rep::notify_assign_node (path p, tree_label op) {
   if (!(rp <= p)) return;
   cur_pos= position_new (tp);
+  if (rewritten_document ()) return;
   ::notify_assign_node (get_typesetter (), p / rp, op);
 }
 
@@ -77,6 +93,7 @@ void
 edit_modify_rep::notify_insert_node (path p, tree t) {
   if (!(rp <= p)) return;
   cur_pos= position_new (tp);
+  if (rewritten_document ()) return;
   ::notify_insert_node (get_typesetter (), p / rp, t);
 }
 
@@ -84,6 +101,7 @@ void
 edit_modify_rep::notify_remove_node (path p) {
   if (!(rp <= p)) return;
   cur_pos= position_new (tp);
+  if (rewritten_document ()) return;
   ::notify_remove_node (get_typesetter (), p / rp);
 }
 

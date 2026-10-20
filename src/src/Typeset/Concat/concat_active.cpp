@@ -125,8 +125,12 @@ build_locus (edit_env env, tree t, list<string>& ids, string& col, string &ref, 
         if (accessible) env->link_env->insert_locus (id, body);
         else if (N (obtain_ip (body)) > 1) {
           extern tree get_subtree (path p);
+          extern tree the_et;
           path p= path_up (reverse (descend_decode (obtain_ip (body), 1)));
-          env->link_env->insert_locus ("&" * id, get_subtree (p));
+          // (the place may not be in the edit tree: a tree of the style
+          // rewriter carries places of macro bodies and decorations)
+          if (has_subtree (the_et, p))
+            env->link_env->insert_locus ("&" * id, get_subtree (p));
         }
         ids= list<string> (id, ids);
         visited= visited || has_been_visited ("id:" * id);

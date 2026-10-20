@@ -48,6 +48,7 @@ edit_env_rep::edit_env_rep (drd_info& drd2,
   files_h (0), prep_pre (UNINIT), prep_made (UNINIT), prep_fp (0), prep_sfp (0),
   prep_sfp_version (-1)
 {
+  rewritten_tree= false;
   env.back_log= &back;
   initialize_default_env ();
   initialize_default_var_type ();

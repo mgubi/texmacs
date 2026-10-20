@@ -33,6 +33,10 @@ protected:
   hashmap<string,tree> grefs;             // global references
   edit_env env;                           // the environment for typesetting
   typesetter ttt;                         // the (not) yet typesetted document
+#ifdef EXPERIMENTAL
+  bool rewrite_typeset;                   // ttt typesets the rewritten tree
+  tree rewrite_root;                      // which ttt has (TEXMACS_STYLE_TYPESET)
+#endif
 
 protected:
   typesetter           get_typesetter ();

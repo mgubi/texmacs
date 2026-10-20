@@ -31,6 +31,8 @@ public:
   SI x1, y1, x2, y2;
   hashmap<string,tree> old_patch;
   bool paper;
+  bool rewritten;          // typesets a tree of the style rewriter, not a
+                           // subtree of the edit tree (bridge_rep::my_resync)
   page_memo* kept_pages;   // the pages of the last pass (pager.hpp)
 
   shove_memo shoves;        // memoized shoves
