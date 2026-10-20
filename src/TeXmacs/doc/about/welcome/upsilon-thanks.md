@@ -34,3 +34,4 @@ named differently, open an issue or say so in your report.
   font, pasting in the fields, scrolling, dialogs (#391), the size of SVG icons (#394).
 - **mlalaude**: the preferences of the AI sessions, and a session asked a
   question without an API key (#398).
+- **amichail**: the icon bars at the right of the document (#404).
