@@ -14,6 +14,9 @@ have the details, and the problems go to the
 
 ## 20 October 2026
 
+- **Windows**: the documents in the TeXmacs folder of the user were not
+  trusted (their scripts asked first): the folder, whose path begins with
+  a drive such as `C:`, was read as two paths.
 - **Browser**: the page says how long the browser keeps your files. At the
   first save of a file it asks the browser to keep them
   (`navigator.storage.persist()`: Firefox asks the user, Chrome decides
