@@ -42,7 +42,19 @@
     (input (when answer (client-set-connection-timeout answer))
           "string"
           (list (number->string (client-get-connection-timeout)))
-          "7em"))))))
+          "7em")))
+   (item
+    (text "Watch the connection (heartbeat):")
+    (toggle (set-boolean-preference "client heartbeat" answer)
+            (get-boolean-preference "client heartbeat")))
+   (item
+    (text "A window when a connection is lost:")
+    (toggle (set-boolean-preference "client lost window" answer)
+            (get-boolean-preference "client lost window")))
+   (item
+    (text "Show the cursors of the others in live documents:")
+    (toggle (set-boolean-preference "client user cursors" answer)
+            (get-boolean-preference "client user cursors"))))))
 ;; todo << prevent from setting timeouts to 0
 
 (tm-define (open-client-preferences)
@@ -397,11 +409,15 @@
                                  pseudo credential cb-done))))
 
 (tm-define (client-login-home server-name port pseudo credential cb-done)
+  (client-notify :connecting
+                 (client-sentence "connecting to %1..." server-name))
   (client-login-then server-name port pseudo credential
     (lambda (server ret)
       (cond ((== ret "ready")
              (add-active-connection server server-name port pseudo)
-             (set! remote-client-list (client-active-servers))
+             (client-notify :connected
+                            (client-sentence "connected to %1 as %2"
+                                             server-name pseudo))
              (client-send-version server server-name port
                                   pseudo credential cb-done))
             ((== ret "pending")
@@ -410,9 +426,16 @@
              (open-remote-pending-login
                server server-name port pseudo credential))
             (else
-              (when server (client-logout server))
-              (client-open-error
-                (string-append "Remote login error, " ret)))))))
+              ;; the connection is of no use: closed, if it still is open
+              (when (and (integer? server) (>= server 0)
+                         (in? server (active-servers)))
+                (client-stop server))
+              (with msg (if (string? ret) ret "no connection")
+                (client-notify :failed
+                               (client-sentence "no connection with %1: %2"
+                                                server-name (translate msg)))
+                (client-open-error
+                  (string-append "Remote login error, " msg))))))))
 
 (tm-widget ((remote-login-widget server-name port pseudo authentication cb)
 	    quit)

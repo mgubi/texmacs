@@ -11,6 +11,7 @@
 
 #include "Interface/edit_interface.hpp"
 #include "message.hpp"
+#include "analyze.hpp"
 #include "gui.hpp" // for gui_interrupted
 
 extern int nr_painted;
@@ -122,6 +123,159 @@ edit_interface_rep::draw_cursor (renderer ren) {
         ren->line (x2-lserif, y2-zpixel, x2+rserif, y2-zpixel);
       }
     }
+  }
+}
+
+/******************************************************************************
+* The cursors of other users
+*
+* In a live document, which several users edit at once, each of them sees
+* where the others are: a bar of the colour of the user at the position of
+* the cursor of that user, with the name of the user in a flag above it.
+* The positions are paths in the document, given from Scheme
+* (set-user-cursor: client/client-live.scm, which gets them from the
+* server); they are looked up at each repaint, so that the bars follow the
+* typesetting.
+******************************************************************************/
+
+// The bar of the cursor of the other user i, from (x1, y1) to (x2, y2), and
+// its flag, of fw by fh above the bar, with the name to write in it (fn is
+// the font of the flags, made when it is first needed); false when the
+// position of the cursor is not in the document as it is now (it changed
+// since the position was given) and nothing is drawn
+bool
+edit_interface_rep::user_cursor_shape (int i, font& fn, string& name,
+                                       SI& x1, SI& y1, SI& x2, SI& y2,
+                                       SI& fw, SI& fh) {
+  if (is_nil (eb)) return false;
+  path p= user_cursor_paths[i];
+  if (is_nil (p) || !(rp <= p) || !has_subtree (et, path_up (p))) return false;
+  cursor cu= eb->find_check_cursor (p);
+  if (!cu->valid) return false;
+  SI cy1= cu->y1 - 2*zpixel, cy2= cu->y2 + 2*zpixel;
+  x1= cu->ox + ((SI) (cy1 * cu->slope)); y1= cu->oy + cy1;
+  x2= cu->ox + ((SI) (cy2 * cu->slope)); y2= cu->oy + cy2;
+  name= user_cursor_names[i];
+  fw= fh= 0;
+  if (N(name) == 0) return true;
+  // a long name would cover the text: its first characters only
+  int pos= 0, nr= 0;
+  while (pos < N(name) && nr < 24) { tm_char_forwards (name, pos); nr++; }
+  if (pos < N(name)) name= name (0, pos) * "...";
+  if (is_nil (fn)) {
+    tree t= use_macos_fonts () ? tuple ("apple-lucida", "ss", "medium", "right")
+                               : tuple ("pagella", "rm", "medium", "right");
+    t << tree ("7") << tree ("600");
+    fn= find_font (t);
+  }
+  metric ex;
+  fn->get_extents (name, ex);
+  SI pad= 2*zpixel;
+  fw= ex->x2 - ex->x1 + 2*pad; fh= fn->y2 - fn->y1 + pad;
+  return true;
+}
+
+// what the cursor of the other user i covers on the screen, where it was
+// drawn last and where it goes now: only that is drawn again when the
+// cursor moves (a whole repaint at every move of every user was the cost
+// of a live document)
+void
+edit_interface_rep::invalidate_user_cursor (int i) {
+  if (i < N(user_cursor_rects)) {
+    rectangle r= user_cursor_rects[i]; // empty when it was not drawn
+    if (r->x1 < r->x2) invalidate (r->x1, r->y1, r->x2, r->y2);
+  }
+  font fn;
+  string name;
+  SI x1, y1, x2, y2, fw, fh;
+  if (user_cursor_shape (i, fn, name, x1, y1, x2, y2, fw, fh)) {
+    SI m= 3*zpixel;
+    invalidate (min (x1, x2) - m, y1 - m, max (x2 + fw, x1) + m, y2 + fh + m);
+  }
+}
+
+void
+edit_interface_rep::set_user_cursor (string id, path p, string col, string name) {
+  int i;
+  for (i=0; i<N(user_cursor_ids); i++)
+    if (user_cursor_ids[i] == id) break;
+  if (i == N(user_cursor_ids)) {
+    user_cursor_ids << id;
+    user_cursor_paths << p;
+    user_cursor_colors << col;
+    user_cursor_names << name;
+    user_cursor_rects << rectangle ();
+  }
+  else {
+    if (user_cursor_paths[i] == p && user_cursor_colors[i] == col &&
+        user_cursor_names[i] == name) return;
+    invalidate_user_cursor (i); // where it was
+    user_cursor_paths[i]= p;
+    user_cursor_colors[i]= col;
+    user_cursor_names[i]= name;
+  }
+  invalidate_user_cursor (i);   // where it goes
+}
+
+void
+edit_interface_rep::cancel_user_cursor (string id) {
+  array<string> ids, cols, names;
+  array<path> paths;
+  array<rectangle> rects;
+  for (int i=0; i<N(user_cursor_ids); i++)
+    if (user_cursor_ids[i] != id) {
+      ids << user_cursor_ids[i];
+      paths << user_cursor_paths[i];
+      cols << user_cursor_colors[i];
+      names << user_cursor_names[i];
+      rects << user_cursor_rects[i];
+    }
+    else invalidate_user_cursor (i);
+  if (N(ids) == N(user_cursor_ids)) return;
+  user_cursor_ids= ids;
+  user_cursor_paths= paths;
+  user_cursor_colors= cols;
+  user_cursor_names= names;
+  user_cursor_rects= rects;
+}
+
+void
+edit_interface_rep::cancel_user_cursors () {
+  if (N(user_cursor_ids) == 0) return;
+  for (int i=0; i<N(user_cursor_ids); i++) invalidate_user_cursor (i);
+  user_cursor_ids= array<string> ();
+  user_cursor_paths= array<path> ();
+  user_cursor_colors= array<string> ();
+  user_cursor_names= array<string> ();
+  user_cursor_rects= array<rectangle> ();
+}
+
+void
+edit_interface_rep::draw_user_cursors (renderer ren) {
+  if (N(user_cursor_ids) == 0 || is_nil (eb)) return;
+  font fn;
+  for (int i=0; i<N(user_cursor_ids); i++) {
+    string name;
+    SI x1, y1, x2, y2, fw, fh;
+    if (!user_cursor_shape (i, fn, name, x1, y1, x2, y2, fw, fh)) {
+      user_cursor_rects[i]= rectangle ();
+      continue;
+    }
+    SI m= 3*zpixel;
+    user_cursor_rects[i]= rectangle (min (x1, x2) - m, y1 - m,
+                                     max (x2 + fw, x1) + m, y2 + fh + m);
+    color col= named_color (user_cursor_colors[i]);
+    ren->set_pencil (pencil (col, 2*zpixel));
+    ren->line (x1, y1, x2, y2);
+    if (N(name) == 0) continue;
+    // the name of the user, in a flag of the colour above the bar
+    metric ex;
+    fn->get_extents (name, ex);
+    SI pad= 2*zpixel;
+    ren->set_background (col);
+    ren->clear (x2 - zpixel, y2, x2 - zpixel + fw, y2 + fh);
+    ren->set_pencil (pencil (white));
+    fn->draw (ren, name, x2 - zpixel + pad - ex->x1, y2 + pad/2 - fn->y1);
   }
 }
 
@@ -288,6 +442,7 @@ edit_interface_rep::draw_post (renderer win, renderer ren, rectangle r) {
   draw_selection (ren, r);
   draw_graphics (ren);
   draw_cursor (ren); // the text cursor must be drawn over the graphical object
+  draw_user_cursors (ren);
   draw_keys (ren);
   ren->reset_zoom_factor ();
   win->reset_zoom_factor ();
