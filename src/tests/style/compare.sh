@@ -17,10 +17,13 @@
 # differences were and the known ones left. To find where two pages differ:
 # python3 -I tests/style/pnmdiff.py tests/build/style/jobs/<n>/o001.pnm
 # tests/build/style/jobs/<n>/r001.pnm (the box around the differing pixels).
+#
+# TM_STYLE_OUT chooses another folder than tests/build/style for the results
+# (to run several comparisons at once).
 
 here=$(cd "$(dirname "$0")" && pwd)
 top=$(cd "$here/../.." && pwd)
-out="$top/tests/build/style"
+out="${TM_STYLE_OUT:-$top/tests/build/style}"
 bin="$top/TeXmacs/bin/texmacs.bin"
 [ -x "$bin" ] || { echo "no $bin, build TeXmacs first" >&2; exit 1; }
 command -v mutool > /dev/null || { echo "mutool is needed" >&2; exit 1; }

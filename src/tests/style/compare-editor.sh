@@ -12,10 +12,13 @@
 # printings run in parallel, each in one TeXmacs; the summary is
 # tests/build/style-editor/summary.txt. The syntax highlighting of programs
 # is switched off (see src/docs/pure-style.md).
+#
+# TM_STYLE_OUT chooses another folder than tests/build/style-editor for the results
+# (to run several comparisons at once).
 
 here=$(cd "$(dirname "$0")" && pwd)
 top=$(cd "$here/../.." && pwd)
-out="$top/tests/build/style-editor"
+out="${TM_STYLE_OUT:-$top/tests/build/style-editor}"
 bin="$top/TeXmacs/bin/texmacs.bin"
 [ -x "$bin" ] || { echo "no $bin, build TeXmacs first" >&2; exit 1; }
 command -v mutool > /dev/null || { echo "mutool is needed" >&2; exit 1; }
