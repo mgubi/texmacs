@@ -1,5 +1,5 @@
 book	main/man-user-manual.de.tm	log	warning, missing font, loading global substitution list
-book	main/man-user-manual.de.tm	undefined-reference	auto-* (7 page numbers of the table of contents or the index are ?)
+book	main/man-user-manual.de.tm	undefined-reference	auto-* (1 page numbers of the table of contents or the index are ?)
 book	main/man-user-manual.pt.tm	log	bad link or file <url main/styles/std-dtds/number-env-dtd.en.tm>
 book	main/man-user-manual.zh.tm	log	warning, missing font, loading global substitution list
 file	about/welcome/first.de.tm	language	english in a .de.tm file
@@ -26,7 +26,7 @@ stat	devel/source/source.en.tm	toc	88
 stat	devel/source/source.fr.tm	idx	2
 stat	devel/source/source.fr.tm	pages	47
 stat	devel/source/source.fr.tm	toc	88
-stat	main/man-user-manual.de.tm	idx	1061
+stat	main/man-user-manual.de.tm	idx	1058
 stat	main/man-user-manual.de.tm	pages	234
 stat	main/man-user-manual.de.tm	toc	297
 stat	main/man-user-manual.en.tm	idx	1252
