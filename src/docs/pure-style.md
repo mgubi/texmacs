@@ -418,8 +418,52 @@ manual (up to 378 positions each), none differs. (Putting the cursor in a
 macro definition of the document hangs, also without the flag: the tool
 leaves them out.)
 
-Still open: everything is typeset again at each change (the modifications
-of the rewritten tree are step 5).
+### Incremental typesetting (step 5)
+
+At first, every change of the rewritten tree gave the typesetter the whole
+tree (`notify_assign` at the root), which typesets everything again: half
+a second per keystroke on the 77 pages of the glue reference. Now
+`edit_typeset_rep::typeset_rewritten_changes` compares the old and the new
+rewritten tree and tells the typesetter about the smallest subtrees which
+changed. The subtrees which did not change are the same trees (the
+rewriter memorizes its results), so the comparison is by address and
+cheap; atoms made again, such as the names in the `expand-as` of the macro
+calls, are compared by their strings (else every paragraph changed). A node
+whose number of children changed (a new paragraph) is replaced as a whole:
+the insertions and removals of the bridges move the places of the bridges
+which follow in place (`ip->item += nr`), and these places are here the
+places of the document, which the document already moves.
+
+The loci (`build_locus`: hyperlinks, labels, the observers of comments) are
+registered on the trees of the document at the places of the bodies, not on
+the trees of the rewriter: those are replaced without the modifications of
+the document being told, and the link repositories then detached their
+observers from freed trees (a double free when a paragraph with a hyperlink
+was typeset again).
+
+Timings (`tests/style/bench-typing.sh`, without a window, 20 characters
+typed and 5 new paragraphs in the middle of the document):
+
+| Document | keystroke, usual | keystroke, rewritten | paragraph, usual | paragraph, rewritten |
+|---|---|---|---|---|
+| glue reference (77 pages) | 0.8 ms | 1.2 ms (501 ms before) | 1.8 ms | 2.2 ms |
+| structure page of the manual | 0.45 ms | 0.55 ms | 0.8 ms | 6.2 ms |
+| conventions page | 2.4 ms | 5.9 ms | | |
+
+The rewriter itself takes 0.55 ms per keystroke on the glue reference and
+1.6 ms on the conventions page, whose keystroke falls in a table which is
+evaluated again (1660 evaluations). A new paragraph replaces its whole
+document, hence the 6.2 ms of the structure page.
+
+`tests/style/compare-edits.sh` makes the same edits (typing, a new
+paragraph, typing, a backspace, at six places, typesetting after each) with
+and without the flag and compares the printed pages: identical on the list
+document of the tests, *About*, the welcome page, the structure,
+conventions and mathematics pages, and `tests/style/environments.tm`.
+
+Open: the new paragraphs (the insertion and removal of bridges without
+moving the places of the document twice); the rewriter's own time where a
+change reaches a large evaluation (keys on inputs, step 3).
 
 **The places, precisely** (`tests/style/compare-places.sh`, which compares
 the paths of the document found at 5000 points of the boxes, what a click
@@ -570,7 +614,8 @@ Two consequences:
    the places of the document; the boundaries of macro calls, the places
    of the boxes and the environment at the cursor are those of the usual
    typesetting (*Typesetting in the editor*).
-5. **Laziness.** Connect the memorizers to the typesetter's invalidation, so
+5. **Laziness** (first stage done, see *Incremental typesetting*).
+   Connect the memorizers to the typesetter's invalidation, so
    that an edit only retypesets what the evaluation changed; benchmark
    against the current typesetter with the #333 scripts; bound the memory
    of the global memorizer table.
@@ -604,6 +649,12 @@ and the places of the boxes in the editor (*Typesetting in the editor*):
 and the environment at the cursor:
 
     tests/style/compare-environments.sh document.tm...
+
+and, for the incremental typesetting, the same edits with and without the
+flag, and the time of typing:
+
+    tests/style/compare-edits.sh document.tm...
+    tests/style/bench-typing.sh document.tm...
 
 It is not listed in `check-master.scm`, since the rewriter exists only in
 the experimental build (elsewhere the suite fails at once, saying so). It

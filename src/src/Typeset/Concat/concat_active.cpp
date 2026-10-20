@@ -122,10 +122,23 @@ build_locus (edit_env env, tree t, list<string>& ids, string& col, string &ref, 
       tree arg= env->exec (t[i]);
       if (is_compound (arg, "id", 1)) {
         string id= as_string (arg[0]);
-        if (accessible) env->link_env->insert_locus (id, body);
+        extern tree the_et;
+        if (env->rewritten_tree) {
+          // the locus is a place of the document, whose tree its observer
+          // follows: not the tree of the style rewriter, which is replaced
+          // without the modifications of the document being told
+          path bip= obtain_ip (body);
+          if (is_document_place (bip) && has_subtree (the_et, reverse (bip)))
+            env->link_env->insert_locus (id, subtree (the_et, reverse (bip)));
+          else if (N (bip) > 1) {
+            path p= path_up (reverse (descend_decode (bip, 1)));
+            if (has_subtree (the_et, p))
+              env->link_env->insert_locus ("&" * id, subtree (the_et, p));
+          }
+        }
+        else if (accessible) env->link_env->insert_locus (id, body);
         else if (N (obtain_ip (body)) > 1) {
           extern tree get_subtree (path p);
-          extern tree the_et;
           path p= path_up (reverse (descend_decode (obtain_ip (body), 1)));
           // (the place may not be in the edit tree: a tree of the style
           // rewriter carries places of macro bodies and decorations)
@@ -155,10 +168,19 @@ build_locus (edit_env env, tree t, list<string>& ids, string& col, string &ref, 
       else if (is_compound (arg, "observer", 2)) {
         string id= as_string (arg[0]);
         string cb= cork_to_utf8 (as_string (arg[1]));
-        if (accessible) {
+        tree target= body;
+        bool ok= accessible;
+        if (env->rewritten_tree) {
+          // (the tree of the document, see above)
+          extern tree the_et;
+          path bip= obtain_ip (body);
+          ok= is_document_place (bip) && has_subtree (the_et, reverse (bip));
+          if (ok) target= subtree (the_et, reverse (bip));
+        }
+        if (ok) {
           if (env->secure ||
               as_bool (eval ("(secure? '(" * cb * " #f #f #f))")))
-            env->link_env->insert_locus (id, body, cb);
+            env->link_env->insert_locus (id, target, cb);
         }
         ids= list<string> (id, ids);
         visited= visited || has_been_visited ("id:" * id);

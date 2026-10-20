@@ -441,6 +441,28 @@ edit_typeset_rep::environment_update () {
   ::primitive (ste, h);
 }
 
+void
+edit_typeset_rep::typeset_rewritten_changes (path p, tree old_t, tree new_t) {
+  // the subtrees of the rewritten tree which did not change are the same
+  // trees (the rewriter memorizes its results): the typesetter is told
+  // about the others only, the smallest which changed. A node whose
+  // number of children changed is replaced as a whole: the insertions and
+  // removals of the bridges move the places of the bridges which follow,
+  // which are here the places of the document, moved by the document.
+  if (weak_equal (old_t, new_t)) return;
+  // (atoms made again, such as the names in the expand-as of the macro
+  // calls, are compared by their strings)
+  if (is_atomic (old_t) && is_atomic (new_t) && old_t->label == new_t->label)
+    return;
+  if (is_atomic (old_t) || is_atomic (new_t) ||
+      L(old_t) != L(new_t) || N(old_t) != N(new_t)) {
+    ::notify_assign (ttt, p, new_t);
+    return;
+  }
+  for (int i=0; i<N(new_t); i++)
+    typeset_rewritten_changes (p * i, old_t[i], new_t[i]);
+}
+
 tree
 edit_typeset_rep::style_rewrite () {
   // as apply_changes does, but also headless (for the tests)
@@ -1152,12 +1174,13 @@ edit_typeset_rep::typeset_sub (SI& x1, SI& y1, SI& x2, SI& y2) {
   typeset_prepare ();
 #ifdef EXPERIMENTAL
   if (rewrite_typeset) {
-    // the whole rewritten tree when it changed (for now: the typesetter
-    // does not yet get the changes as modifications)
+    // the changes of the rewritten tree are given to the typesetter as
+    // modifications (typeset_rewritten_changes); the whole tree at first
     tree r= style_rewrite ();
     if (!weak_equal (r, rewrite_root)) {
+      if (L(rewrite_root) == UNINIT) ::notify_assign (ttt, path(), r);
+      else typeset_rewritten_changes (path (), rewrite_root, r);
       rewrite_root= r;
-      ::notify_assign (ttt, path(), r);
     }
     typeset_prepare ();
   }

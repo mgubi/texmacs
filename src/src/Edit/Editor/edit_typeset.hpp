@@ -75,6 +75,7 @@ public:
 #ifdef EXPERIMENTAL
   void     environment_update ();
   tree     style_rewrite ();
+  void     typeset_rewritten_changes (path p, tree old_t, tree new_t);
   array<int> style_rewrite_statistics ();
 #endif
   tree     get_full_env ();
