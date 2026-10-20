@@ -1056,6 +1056,67 @@
   )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; The processes and the pipes of the plugins
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; Once a plugin has ended, TeXmacs has reaped its process and closed its
+;; ends of the three pipes: when the plugin exits by itself, and after each
+;; command of a command line plugin (which is one process per command). The
+;; descriptors are those open in TeXmacs itself (/dev/fd), and the processes
+;; which are not reaped are the zombies among the children of TeXmacs.
+;; (A stopped plugin is not checked: Qt pipes release its process and its
+;; pipes in the event loop, which does not run here.)
+
+(define (open-descriptors)
+  (length (url-read-directory (system->url "/dev/fd") "*")))
+
+(define (zombies)
+  (string->number
+   (var-eval-system
+    (string-append "ps -axo ppid=,stat= | "
+                   "awk -v p=$PPID '$1 == p && $2 ~ /^Z/ {n++} "
+                   "END {print n+0}'"))))
+
+(define (cmdline-run ses cmd)
+  ;; run one command of the command line plugin until its process has ended
+  (when (nin? (list "tmtestcmdline" ses) started)
+    (set! started (cons (list "tmtestcmdline" ses) started)))
+  (connection-write-string "tmtestcmdline" ses cmd)
+  (wait-until (lambda ()
+                (connection-interrupt "tmtestcmdline" ses)
+                (== (connection-status "tmtestcmdline" ses) 0))
+              5000))
+
+(define (test-processes)
+  (check-group "processes: plugins which exit")
+  ;; (the first session opens what is opened once)
+  (check= (start* "tmtestonce" "plugins-test-once0") "ok")
+  (check= (eval* "tmtestonce" "plugins-test-once0" "x\n") '(document "bye"))
+  (check-true (poll "tmtestonce" "plugins-test-once0"
+                    (lambda ()
+                      (== (connection-status "tmtestonce" "plugins-test-once0")
+                          0))))
+  (let ((fds (open-descriptors)))
+    (for (i (.. 1 6))
+      (with ses (string-append "plugins-test-once" (number->string i))
+        (check= (start* "tmtestonce" ses) "ok")
+        (check= (eval* "tmtestonce" ses "x\n") '(document "bye"))
+        (check-true (poll "tmtestonce" ses
+                          (lambda ()
+                            (== (connection-status "tmtestonce" ses) 0))))))
+    (check= (open-descriptors) fds)
+    (check= (zombies) 0))
+
+  (check-group "processes: command lines")
+  (check= (connection-start "tmtestcmdline" "plugins-test-cmd") "cmdline")
+  (check-true (cmdline-run "plugins-test-cmd" "c0"))
+  (let ((fds (open-descriptors)))
+    (for (i (.. 1 6))
+      (check-true (cmdline-run "plugins-test-cmd" "c")))
+    (check= (open-descriptors) fds)
+    (check= (zombies) 0)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The suite
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -1074,6 +1135,11 @@
       (run-group test-python)
       (skip "python" "python3 or tmpy is missing"))
   (stop-all)
+  ;; (Windows: no /dev/fd, and no command lines)
+  (if (and (not (os-mingw?)) (url-exists-in-path? "sh")
+           (url-exists? (system->url "/dev/fd")))
+      (run-group test-processes)
+      (skip "processes" "no sh or no /dev/fd"))
   (run-group test-scheme-session)
   (run-group test-external)
   (check-end))
