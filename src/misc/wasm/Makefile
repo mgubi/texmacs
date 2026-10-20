@@ -129,7 +129,7 @@ all: $(OUT)/texmacs.js
 # declared in shell.html
 WEB_ICONS := $(foreach n,16 32 48 64 128 192,$(OUT)/web/texmacs-vue-$(n).png) $(OUT)/web/favicon.ico
 
-web: $(OUT)/web/texmacs.html $(OUT)/web/texmacs-files.json $(WEB_ICONS) $(OUT)/web/index.html $(OUT)/web/downloads.html $(OUT)/web/features.html $(SCREENSHOTS) $(OUT)/web/changes.html $(OUT)/web/changes.md tikzjax asymptote python r
+web: $(OUT)/web/texmacs.html $(OUT)/web/texmacs-files.json $(WEB_ICONS) $(OUT)/web/index.html $(OUT)/web/downloads.html $(OUT)/web/features.html $(SCREENSHOTS) $(OUT)/web/changes.html $(OUT)/web/changes.md $(OUT)/web/thanks.html $(OUT)/web/thanks.md tikzjax asymptote python r
 
 # the TeX of the TikZ plugin (plugins/tikz, src/docs/wasm/tikzjax.md):
 # TikZJax, fetched by get-tikzjax.sh, without its fonts and the part of its
@@ -229,6 +229,21 @@ $(OUT)/web/changes.html: $(W)/changes.html
 	cp $< $@
 
 $(OUT)/web/changes.md: $(TM)/docs/upsilon-changes.md
+	@mkdir -p $(OUT)/web
+	cp $< $@
+
+# the page of thanks, the same page on the list of thanks, which the help
+# of TeXmacs Upsilon shows too (About > Upsilon features > Thanks)
+$(OUT)/web/thanks.html: $(W)/changes.html
+	@mkdir -p $(OUT)/web
+	sed -e 's/TeXmacs Upsilon changes/TeXmacs Upsilon thanks/' \
+	    -e 's/The recent changes and revisions of TeXmacs Upsilon/The people who reported problems in TeXmacs Upsilon or sent code/' \
+	    -e 's/the list of the changes/the list of thanks/' \
+	    -e 's|href="thanks.html">Thanks<|href="changes.html">Recent changes<|' \
+	    -e "s|^  var SOURCE = 'src/docs/upsilon-changes.md';|  var SOURCE = 'src/TeXmacs/doc/about/welcome/upsilon-thanks.md';|" \
+	    -e "s|^  var LIST = 'changes.md';|  var LIST = 'thanks.md';|" $< > $@
+
+$(OUT)/web/thanks.md: $(TM)/TeXmacs/doc/about/welcome/upsilon-thanks.md
 	@mkdir -p $(OUT)/web
 	cp $< $@
 

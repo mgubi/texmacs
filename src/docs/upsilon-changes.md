@@ -14,6 +14,10 @@ have the details, and the problems go to the
 
 ## 20 October 2026
 
+- A list of thanks to the people who reported problems or sent code: in
+  Help > TeXmacs Upsilon features (section Thanks), on the site
+  ([thanks](https://mgubi.github.io/texmacs/thanks.html)) and on GitHub,
+  all from one file, `TeXmacs/doc/about/welcome/upsilon-thanks.md`.
 - **Desktop (Vue)**: on Linux and Windows the interface is written in Fira
   Sans, a sans serif as the system font of the Qt port, instead of Computer
   Modern, the look of the old X11 interface (#391); macOS keeps Lucida

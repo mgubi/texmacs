@@ -11,7 +11,7 @@ the [latest builds](https://mgubi.github.io/texmacs/)).
 What changed lately, the newest first:
 **[src/docs/upsilon-changes.md](src/docs/upsilon-changes.md)** (also on the
 site, <https://mgubi.github.io/texmacs/changes.html>). The people who
-reported problems or sent code: **[src/docs/upsilon-thanks.md](src/docs/upsilon-thanks.md)**.
+reported problems or sent code: **[src/TeXmacs/doc/about/welcome/upsilon-thanks.md](src/TeXmacs/doc/about/welcome/upsilon-thanks.md)**.
 
 It is stock TeXmacs (the `svn_sync` branch, the mirror of the SVN trunk)
 plus the following branches, merged in:

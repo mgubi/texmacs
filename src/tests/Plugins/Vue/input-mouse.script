@@ -30,8 +30,8 @@ click 80 17 right
 wait 500
 window Popup
 snapshot im3
-# Paste, the third item of the menu
-click 40 59
+# Paste, after Undo, Redo, a separator, Cut and Copy (the order of Qt)
+click 40 114
 wait 300
 window Enter data
 snapshot im4

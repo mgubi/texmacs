@@ -182,6 +182,13 @@
   <verbatim|~/.TeXmacs_Upsilon>. The environment variable
   <verbatim|TEXMACS_HOME_PATH> chooses another folder.
 
+  <section|Thanks>
+
+  <TeXmacs> Upsilon is better for the people who tried it and reported what
+  broke, and for those who sent code: see the
+  <hlink|list of thanks|upsilon-thanks.md>, which is also on
+  <hlink|the site|https://mgubi.github.io/texmacs/thanks.html>.
+
   <tmdoc-copyright|2026|Massimiliano Gubinelli>
 
   <tmdoc-license|Permission is granted to copy, distribute and/or modify this

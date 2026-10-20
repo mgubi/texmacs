@@ -8,7 +8,11 @@
 <!-- The page shows changes.md, a copy of src/docs/upsilon-changes.md made by
      misc/wasm/Makefile: the list is written once, in Markdown, and GitHub
      shows the same file. Its links are relative to src/docs; they are
-     pointed here to the pages of the site or to GitHub -->
+     pointed here to the pages of the site or to GitHub. The Makefile makes
+     thanks.html from this page too (the list of thanks, from
+     TeXmacs/doc/about/welcome/upsilon-thanks.md, which the help shows):
+     keep the strings it replaces ("TeXmacs Upsilon changes", "the list of
+     the changes", the button of thanks, SOURCE and LIST below) -->
 <link rel="icon" href="favicon.ico" sizes="16x16 32x32 48x48">
 <link rel="icon" type="image/png" sizes="32x32" href="texmacs-vue-32.png">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
@@ -61,16 +65,22 @@
     <a class="button" href="./#downloads">Download</a>
     <a class="button" href="features.html">Features</a>
     <a class="button" href="texmacs.html">Try it in the browser</a>
+    <a class="button" href="thanks.html">Thanks</a>
   </div>
   <div id="text"><p class="lead">Loading the list of the changes&hellip;</p></div>
   <footer>
-    The same list is on GitHub:
-    <a href="https://github.com/mgubi/texmacs/blob/upsilon_texmacs/src/docs/upsilon-changes.md"><code>src/docs/upsilon-changes.md</code></a>.
+    The same list is on GitHub: <a id="source"></a>.
   </footer>
 </main>
 <script>
 (function () {
-  var GITHUB = 'https://github.com/mgubi/texmacs/blob/upsilon_texmacs/src/docs/';
+  var SOURCE = 'src/docs/upsilon-changes.md'; // the file in the repository
+  var LIST = 'changes.md';                     // its copy next to the page
+  var BLOB = 'https://github.com/mgubi/texmacs/blob/upsilon_texmacs/';
+  var GITHUB = BLOB + 'src/docs/';
+  var src = document.getElementById ('source');
+  src.href = BLOB + SOURCE;
+  src.innerHTML = '<code>' + SOURCE + '</code>';
   // the relative links of the file (to src/docs, and the README above it)
   var PAGES = { 'upsilon-screenshots.md': 'features.html',
                 'upsilon-changes.md': 'changes.html',
@@ -84,10 +94,10 @@
   }
   function failed () {
     document.getElementById ('text').innerHTML =
-      '<p>The list could not be loaded. It is on GitHub: <a href="' + GITHUB +
-      'upsilon-changes.md">src/docs/upsilon-changes.md</a>.</p>';
+      '<p>The list could not be loaded. It is on GitHub: <a href="' + BLOB +
+      SOURCE + '">' + SOURCE + '</a>.</p>';
   }
-  fetch ('changes.md', { cache: 'no-cache' })
+  fetch (LIST, { cache: 'no-cache' })
     .then (function (r) { if (!r.ok) throw new Error (r.status); return r.text (); })
     .then (function (md) {
       if (typeof marked === 'undefined') throw new Error ('no marked');
