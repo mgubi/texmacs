@@ -672,6 +672,17 @@
   (check= (string-convert (string-append "caf" (u8 #xE9)) "UTF-8" "ISO-8859-1") "caf\xe9")
   (check= (string-convert "\xe9" "Cork" "ISO-8859-1") "\xe9")
   (check= (string-convert (u8 #x416) "UTF-8" "KOI8-R") (cork #xf6))
+  ;; a character which cannot be converted is replaced by U+FFFD, or by ?
+  ;; when the target encoding has no U+FFFD, and the conversion goes on
+  (check= (string-convert "caf\xe9 x" "UTF-8" "ISO-8859-1") "caf? x")
+  (check= (string-convert (string-append "a" (u8 #x20AC) "b") "UTF-8" "ISO-8859-1")
+          "a?b")
+  (check= (string-convert (string-append (u8 #x3B1) (u8 #x416)) "UTF-8" "KOI8-R")
+          (string-append "?" (cork #xf6)))
+  (check= (string-convert "ab\xc3" "UTF-8" "ISO-8859-1") "ab?")
+  (check= (string-convert "a\xe9b\xe9" "ASCII" "UTF-8")
+          (string-append "a" (u8 #xFFFD) "b" (u8 #xFFFD)))
+  (check= (string-convert "a\xe9b" "ASCII" "Cork") "a<#FFFD>b")
   ;; the guess of the encoding of a text
   (check= (guess-wencoding "abc") "ASCII")
   (check= (guess-wencoding (string-append "caf" (u8 #xE9))) "UTF-8")
