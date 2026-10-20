@@ -55,7 +55,7 @@
 ;; Scripting
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define-public auto-safe-mode? #f)
+(tm-define auto-safe-mode? #f)
 (define current-variables (list))
 
 (define (build-variable t)

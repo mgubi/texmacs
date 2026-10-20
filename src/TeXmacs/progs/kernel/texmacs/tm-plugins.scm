@@ -392,6 +392,11 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define-public reconfigure-flag? #t)
+
+;; Other modules read and set the flag with these accessors.
+(define-public (plugin-reconfigure?) reconfigure-flag?)
+(define-public (plugin-reconfigure-set! flag) (set! reconfigure-flag? flag))
+
 (define plugin-loaded-setup? #f)
 (define plugin-cache "$TEXMACS_HOME_PATH/system/cache/plugin_cache.scm")
 
