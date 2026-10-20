@@ -155,7 +155,12 @@ get_from_web (url name) {
   }
 
   //cout << cmd << LF;
-  system (cmd);
+  if (system (cmd) != 0) {
+    // a transfer which failed or was given up (timeout) may have left a
+    // part of the file: it is not a copy of the file
+    remove (tmp);
+    return old;
+  }
   //cout << "got " << name << " as " << tmp << LF;
 #endif // QTTEXMACS, Qt >= 6.0
 
