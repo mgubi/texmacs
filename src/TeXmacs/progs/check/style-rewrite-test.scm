@@ -169,13 +169,15 @@
     (check= (cAr (cAr r))
             '(tuple (plus (value "ww") "1pt") (times (value "hh") "2")))
     (check= (list-head r 3) '(with "dims" (box-info "x" "wh"))))
-  ;; an assignment stays unless it defines a macro (the typesetter reads
-  ;; variables of its own), with a value which is not evaluated again
+  ;; an assignment stays (the typesetter reads variables of its own, and
+  ;; the assignment keeps its place for the cursor), with a value which is
+  ;; not evaluated again
   (check= (rewrite '(document (assign "page-odd-header" (concat "a" (quote (page-the-page))))
                               (assign "m" (macro "x"))
                               "b"))
           '(document (assign "page-odd-header" (quote (concat "a" (page-the-page))))
-                     "" "b"))
+                     (assign "m" (quote (macro "x")))
+                     "b"))
   ;; the label tables are filled by the typesetter: set-binding stays,
   ;; get-binding is a residual
   (check= (value-of '(set-binding "lab" "3")) '(set-binding "lab" "3"))

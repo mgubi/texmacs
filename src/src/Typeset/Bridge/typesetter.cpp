@@ -24,7 +24,9 @@ typesetter_rep::typesetter_rep (edit_env& env2, tree et, path ip):
   env (env2), old_patch (UNINIT)
 {
   paper= (env->get_string (PAGE_MEDIUM) == "paper");
-  rewritten= false;
+  // (the typesetters made while typesetting, for the cells of tables and
+  // the like, typeset parts of the same tree)
+  rewritten= env->rewritten_tree;
   br= make_bridge (this, et, ip);
   x1= y1= x2= y2=0;
   kept_pages= tm_new<page_memo> ();

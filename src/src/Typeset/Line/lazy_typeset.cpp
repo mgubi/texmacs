@@ -519,7 +519,11 @@ lazy
 make_lazy_expand_as (edit_env env, tree t, path ip) {
   array<line_item> a= typeset_marker (env, descend (ip, 0));
   array<line_item> b= typeset_marker (env, descend (ip, 1));
-  lazy par= make_lazy (env, t[1], descend (ip, 1));
+  // (the expansion of a macro call kept by the style rewriter: typeset as
+  // the body of the call, see concater_rep::typeset_expand_as)
+  lazy par= (env->rewritten_tree?
+             make_lazy (env, attach_right (t[1], ip)):
+             make_lazy (env, t[1], descend (ip, 1)));
   return lazy_surround (a, b, par, ip);
 }
 
@@ -668,7 +672,9 @@ make_lazy (edit_env env, tree t, path ip) {
   }
   */
 
-  if (!is_accessible (ip)) {
+  // (a tree of the style rewriter: see concater_rep::typeset)
+  if (env->rewritten_tree) ip= rewritten_place (ip, obtain_ip (t));
+  else if (!is_accessible (ip)) {
     path ip2= obtain_ip (t);
     if (ip2 != path (DETACHED))
       ip= ip2;

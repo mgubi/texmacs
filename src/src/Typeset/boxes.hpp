@@ -372,6 +372,13 @@ void find_canvas_info (box b, path sp, SI& x, SI& y, SI& sx, SI& sy,
 #define DETACHED          (-5)
 #define is_accessible(p) ((is_nil (p)) || ((p)->item >= 0))
 #define is_decoration(p) ((!is_nil (p)) && ((p)->item < 0))
+inline bool is_document_place (path ip) {
+  // a place in the edit tree (not a decoration, nor below one)
+  if (is_nil (ip)) return false;
+  for (path p= ip; !is_nil (p); p= p->next)
+    if (p->item < 0) return false;
+  return true; }
+path rewritten_place (path ip, path attached);
 inline path descend (path ip, int i) {
   return (is_nil (ip) || (ip->item >= 0))? path (i, ip): ip; }
 inline path decorate () {

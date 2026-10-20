@@ -70,14 +70,31 @@ make_inactive_bridge (typesetter ttt, tree st, path ip) {
   else return bridge_auto (ttt, st, ip, inactive_auto, false);
 }
 
+path
+rewritten_place (path ip, path attached) {
+  // the place of a tree of the style rewriter, given the place derived from
+  // its parent and the place which the rewriter attached to it: its place
+  // in the document when it comes from there; otherwise, below a tree of
+  // the document (a value, a tag which the rewriter keeps), the derived
+  // place is not its place in the document: its own decoration, or one at
+  // the right of the parent; within the expansion of a macro call, the
+  // place derived from the call, as when the call is typeset
+  if (is_document_place (attached)) return attached;
+  if (is_document_place (ip)) {
+    if (attached != path (DETACHED)) return attached;
+    return decorate_right (ip->next);
+  }
+  return ip;
+}
+
 bridge
 make_bridge (typesetter ttt, tree st, path ip) {
   // cout << "Make bridge " << st << ", " << ip << LF;
   // cout << "Preamble mode= " << ttt->env->preamble << LF;
   if (ttt->rewritten) {
-    // (a tree of the style rewriter: the place which it attached)
-    path ip2= obtain_ip (st);
-    if (ip2 != path (DETACHED)) ip= ip2;
+    // (a tree of the style rewriter: the place of the document which it
+    // attached, see concater_rep::typeset)
+    ip= rewritten_place (ip, obtain_ip (st));
   }
   if (ttt->env->preamble)
     return make_inactive_bridge (ttt, st, ip);

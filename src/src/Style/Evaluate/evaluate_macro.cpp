@@ -42,10 +42,12 @@ protect_value (tree val) {
 
 tree
 evaluate_assign (tree t) {
-  // an assignment stays in the result unless it defines a macro (the
-  // calls of macros are expanded here): the typesetter reads variables of
-  // its own (page-odd-header, for the pager), and a value which holds a
-  // residual is computed by the typesetter at this place (evaluate_value)
+  // an assignment stays in the result, with the place of the assignment of
+  // the document: the typesetter reads variables of its own
+  // (page-odd-header, for the pager), a value which holds a residual is
+  // computed by the typesetter at this place (evaluate_value), and the
+  // assignment, typeset invisibly as in the document, keeps its place for
+  // the cursor (also when it defines a macro, whose calls are expanded)
   int i, n=N(t), k=n>>1;
   assoc_environment local (k);
   tree kept (CONCAT);
@@ -53,13 +55,12 @@ evaluate_assign (tree t) {
     string var= as_string (evaluate (t[i<<1]));
     tree   val= evaluate (t[(i<<1)+1]);
     local->raw_write (i, var, val);
-    if (!is_func (val, MACRO) && !is_func (val, XMACRO))
-      kept << tree (ASSIGN, var, protect_value (val));
+    kept << tree (ASSIGN, var, protect_value (val));
   }
   assign (std_env, local);
-  if (N(kept) == 0) return "";
-  if (N(kept) == 1) return kept[0];
-  return kept;
+  tree r= (N(kept) == 1? kept[0]: kept);
+  transfer_ip (t, r);
+  return r;
 }
 
 tree

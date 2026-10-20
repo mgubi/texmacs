@@ -38,8 +38,12 @@ bridge_expand_as_rep::bridge_expand_as_rep (typesetter ttt, tree st, path ip):
 
 void
 bridge_expand_as_rep::initialize () {
-  if (is_nil (body)) body= make_bridge (ttt, st[1], descend (ip, 1));
-  else replace_bridge (body, st[1], descend (ip, 1));
+  // (with a tree of the style rewriter, the expansion of a macro call kept
+  // with the place of the call: its body has the place of the body of the
+  // call, as in concater_rep::typeset_expand_as)
+  path bip= (ttt->rewritten? decorate_right (ip): descend (ip, 1));
+  if (is_nil (body)) body= make_bridge (ttt, st[1], bip);
+  else replace_bridge (body, st[1], bip);
 }
 
 bridge

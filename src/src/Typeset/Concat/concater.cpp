@@ -176,9 +176,16 @@ concater_rep::typeset_main (tree t, path ip) {
 	 << "       ] " << obtain_ip (t) << " -> " << ip << "\n";
   */
 
-  if (!is_accessible (ip) || env->rewritten_tree) {
-    // (a tree of the style rewriter carries the places of the document:
-    // the place derived from the parent is a place in that tree)
+  if (env->rewritten_tree) {
+    // a tree of the style rewriter carries the places of the document
+    // where it comes from the document (the place derived from the parent
+    // is a place in that tree); elsewhere it comes from a macro body, and
+    // the place is derived from the call, as when the call is typeset
+    // (the places which the rewriter attached to the expansions of macro
+    // bodies, memorized and shared between calls, are left aside)
+    ip= rewritten_place (ip, obtain_ip (t));
+  }
+  else if (!is_accessible (ip)) {
     path ip2= obtain_ip (t);
     //if (ip2 != ip) cout << t << ", " << ip << " -> " << ip2 << "\n";
     if (ip2 != path (DETACHED))

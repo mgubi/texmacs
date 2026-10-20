@@ -372,10 +372,12 @@ of the document.
   tree: the lookup is skipped then (`has_subtree`).
 
 Result (`tests/style/compare-editor.sh`, both printings in the same
-process each): **695 of the 696 pages print identically with and without
-the flag** (the animation page differs between any two printings), with no
-fallback; before the boundaries of macro calls (below), 686, the 9 others
-differing in the colours of program code. The pages which differed in the comparison
+process each): **686 to 695 of the 696 pages print identically with and
+without the flag**, with no fallback. The animation page differs between
+any two printings; 9 developer pages differ in the colours of their
+program code, or not, from one run to the next: the older highlighter
+depends on the documents printed before in the same process (printed
+alone, they are identical). The pages which differed in the comparison
 of the copies because of their DRD (`tag-help`, `top-help`, the `map`
 example of `std-utils-dtd`) are identical here, where the DRD is the
 document's. The 10 left: the animation page, and 9 developer pages whose
@@ -407,11 +409,38 @@ Also open:
 - the environment at the cursor (`edit_typeset_rep::get_env_value`, which
   runs `exec_until` along a path of the document in the typesetter) walks
   the rewritten tree with a path of the document;
-- a subtree which the rewriter shares between several places (the same
-  expansion of a macro body, memorized) carries the place of only one of
-  them;
 - everything is typeset again at each change (the modifications of the
   rewritten tree are step 5).
+
+**The places, precisely** (`tests/style/compare-places.sh`, which compares
+the paths of the document found at 5000 points of the boxes, what a click
+finds, with and without the flag). The rule, in `rewritten_place`
+(`bridge.cpp`), used by the bridges, the concater and the lazy typesetting
+of paragraphs (`make_lazy`, for the cells of tables):
+
+- a tree which comes from the document (its attached place is a place of
+  the document, `is_document_place`) has that place;
+- below a tree of the document, a tree which does not come from there (a
+  value, a tag which the rewriter keeps) has its own decoration, or one at
+  the right of the parent: the place derived from the parent would be a
+  path of the document which is not this tree's;
+- within the expansion of a macro call, the place is derived from the
+  call, as when the call is typeset: the `expand-as` of a call typesets its
+  body as the body of a macro (`attach_right`), in the concater, in
+  `bridge_expand_as` and in `make_lazy_expand_as`. The places which the
+  rewriter attached to the expansions of macro bodies are left aside: the
+  same expansion, memorized, is shared between the calls with the same
+  environment and carries the place of only one of them.
+
+The typesetters made while typesetting (for the cells of tables) inherit
+the mode from the environment. An assignment stays in the result also when
+it defines a macro, with the place of the assignment: it is typeset
+invisibly, as in the document, and a click on its line finds it. On the
+list document of the tests, *About*, the welcome, *style*, conventions,
+structure and mathematics pages, and a paragraph with three identical
+macro calls, all the points find the same paths, but 2 on the conventions
+page, at the start of a key in a table, which find the same place one
+level deeper (in the `small` inside a `with`).
 
 ## Relation to the typesetter caches
 
@@ -557,6 +586,10 @@ typesetting of the rewritten tree by the editor itself (*Typesetting in the
 editor*):
 
     tests/style/compare-editor.sh [document.tm...]
+
+and the places of the boxes in the editor (*Typesetting in the editor*):
+
+    tests/style/compare-places.sh document.tm...
 
 It is not listed in `check-master.scm`, since the rewriter exists only in
 the experimental build (elsewhere the suite fails at once, saying so). It
