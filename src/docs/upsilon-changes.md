@@ -14,6 +14,9 @@ have the details, and the problems go to the
 
 ## 20 October 2026
 
+- In a live document, a move of the cursor of another user repaints the
+  places where it was and where it goes, not the whole window, which every
+  move of every user did.
 - **Desktop (Qt)**: Insert → Session → Preferences opens the preferences of
   the AI sessions, where the API key is given: it stopped on an error, and
   a session asked a question without a key hung, since it opened them to
