@@ -404,7 +404,7 @@ object eval (string expr) {
 object eval (object expr) {
   return call ("eval", expr); }
 object eval_secure (string expr) {
-  return eval ("(wrap-eval-secure " * expr * ")"); }
+  return call ("secure-eval", string_to_object (expr)); }
 
 // A name in a module or a plugin, as a document gives it: what it says is
 // put into Scheme which is evaluated, so it is checked to be a name and no
