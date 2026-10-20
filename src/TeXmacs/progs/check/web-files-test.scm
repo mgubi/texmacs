@@ -21,8 +21,13 @@
 ;;
 ;; There is no internet: the files are served by a small HTTP server on
 ;; 127.0.0.1, a python3 script which this suite starts in the temporary
-;; directory, logs the paths asked to it, and stops at the end. Without
-;; python3, or on Windows, the suite is skipped. The time of make_file
+;; directory, logs the paths asked to it, and stops at the end (or after
+;; ten minutes, if TeXmacs does not stop it). The script also listens on a
+;; second port, where it takes the connections and never answers: a
+;; download from there gives up after the network timeout (10s by
+;; default, the preference "http request timeout"). Without python3, on
+;; Windows, or without a way to download (Qt 6, wget or curl), the suite
+;; is skipped. The time of make_file
 ;; (a result kept from a session before) is the same as after
 ;; remote-files-refresh, which the checks use: they run in one session.
 
@@ -50,9 +55,15 @@
 
 (define server-script
   (string-append
-   "import http.server, os, sys\n"
+   "import http.server, os, socket, sys, threading\n"
    "d, portfile, logfile = sys.argv[1:4]\n"
    "os.chdir(d)\n"
+   "threading.Timer(600, os._exit, (0,)).start()\n"
+   "silent = socket.socket()\n"
+   "silent.bind(('127.0.0.1', 0))\n"
+   "silent.listen(5)\n"
+   "with open(portfile + '-silent', 'w') as f:\n"
+   "    f.write(str(silent.getsockname()[1]))\n"
    "class H(http.server.SimpleHTTPRequestHandler):\n"
    "    def log_message(self, fmt, *args):\n"
    "        with open(logfile, 'a') as f: f.write(self.path + '\\n')\n"
@@ -87,8 +98,13 @@
   server-port)
 
 (define (server-stop)
+  ;; kill does not wait: a request made just after it could still be taken
+  ;; by the server, which dies before it answers
   (when server-pid
-    (system (string-append "kill " server-pid))
+    (system (string-append "kill " server-pid
+                           "; i=0; while kill -0 " server-pid
+                           " 2> /dev/null && [ $i -lt 100 ];"
+                           " do sleep 0.1; i=$((i+1)); done"))
     (set! server-pid #f)))
 
 (define (web-dir-file name)
@@ -196,6 +212,18 @@
                                   (string-load (web-file "out.pdf")))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; A server which does not answer
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (test-silent-server)
+  ;; the download gives up (it used to wait for ever, qt_download_file)
+  (check-group "a server which does not answer")
+  (with silent (string-load (web-file "port-silent"))
+    (check= (url-concretize
+             (string-append "http://127.0.0.1:" silent "/b.txt"))
+            "")))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The suite
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -214,12 +242,17 @@
          (display "  skipped on Windows\n"))
         ((not (url-exists-in-path? "python3"))
          (display "  skipped: no python3\n"))
+        ((not (or (qt6-or-later-gui?)
+                  (url-exists-in-path? "wget")
+                  (url-exists-in-path? "curl")))
+         (display "  skipped: no way to download (Qt 6, wget or curl)\n"))
         ((not (server-start))
          (server-stop)
          (check-report #f "the server" "python3 did not start"))
         (else
          (for-each run-group
-                   (list test-web-cache test-remote-pictures test-offline))
+                   (list test-web-cache test-remote-pictures
+                         test-silent-server test-offline))
          (server-stop)))
   (clear-web-dir)
   (check-end))
