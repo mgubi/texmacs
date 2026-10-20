@@ -166,10 +166,11 @@
   <\cpp-code>
     cout \<less\>\<less\> DATA_BEGIN \<less\>\<less\> "verbatim:";
 
-    cout \<less\>\<less\> DATA_BEGIN \<less\>\<less\>
-    "command:(session-use-math-input #t)"
+    cout \<less\>\<less\> DATA_BEGIN \<less\>\<less\> "command:(if (not
+    (session-math-input?)) "
 
-    \ \ \ \ \ \<less\>\<less\> DATA_END;
+    \ \ \ \ \ \<less\>\<less\> "(toggle-session-math-input))"
+    \<less\>\<less\> DATA_END;
 
     cout \<less\>\<less\> "Convert mathematical input into plain text";
 

@@ -21,6 +21,12 @@ public:
   string name;
   rel_hashmap<tree_label,tag_info> info;
   hashmap<string,tree> env;
+  // counts the changes of the properties (every access to change one), and
+  // the environment and the count at the end of the last heuristic_init
+  unsigned long version;
+  hashmap<string,tree> heuristic_env;
+  unsigned long heuristic_version;
+  bool heuristic_valid;
 
 public:
   drd_info_rep (string name);

@@ -204,6 +204,8 @@ try_pk (string family, int size, int dpi, int dsize,
   int tt_dpi = size<333? dpi : (size * dpi) / (100 * tt_size);
   string tt_name= tt_find_name (family, tt_size);
   if (tt_name != "") {
+    // FIXME: never true, tt_font_glyphs registers its glyphs under another
+    // name; harmless, since tt_font_glyphs finds its instance itself (#80)
     if (font_glyphs::instances -> contains (tt_name))
       pk= font_glyphs (tt_name);
     else pk= tt_font_glyphs (tt_name, tt_size, tt_dpi, tt_dpi);

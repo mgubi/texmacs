@@ -35,7 +35,8 @@
 ;;     edu-markup.scm;
 ;;   - tools: comments (comment-edit.scm), poster blocks and themes
 ;;     (poster-edit.scm, theme-edit.scm), the end of a spell check
-;;     (spell-edit.scm) and the serialization for AI requests (ai-batch.scm).
+;;     (spell-edit.scm), the serialization for AI requests (ai-batch.scm)
+;;     and the file of the examples of the handwriting recognizer.
 ;;     There is no word counting or statistics tool in progs/tools.
 ;;
 ;; Without a window the initial environment of a buffer is not updated
@@ -136,6 +137,56 @@
         (check-report #f "the group" (object->string r)))
       (buffer-close u)
       (when (buffer-exists? old) (switch-to-buffer old)))))
+
+;; A position of the cursor history whose buffer was closed is forgotten,
+;; not read
+(define (cursor-history-drain)
+  ;; the history of this window starts empty, whatever earlier groups did
+  (with-buffer-doc '(document "drain") '("generic")
+    (lambda ()
+      (cursor-history-add (cursor-path))
+      (let loop ((i 0))
+        (when (and (< i 1000) (cursor-has-history?))
+          (cursor-history-backward)
+          (loop (+ i 1)))))))
+
+(define (test-cursor-history)
+  (check-group "cursor history")
+  (cursor-history-drain)
+  ;; going forward over an entry of a closed buffer
+  (with-buffer-doc '(document "five" "six") '("generic")
+    (lambda ()
+      (cursor-history-add (cursor-path))
+      (go-end)
+      (cursor-history-add (cursor-path))
+      (cursor-history-backward)))
+  (with-buffer-doc '(document "seven" "eight") '("generic")
+    (lambda ()
+      (with p (cursor-path)
+        (check-true (cursor-has-future?))
+        (check= (check-run (lambda () (cursor-history-forward) 'done)) 'done)
+        (check= (cursor-path) p))))
+  (cursor-history-drain)
+  ;; adding a position after a buffer with an entry was closed
+  (with-buffer-doc '(document "one" "two") '("generic")
+    (lambda ()
+      (go-end)
+      (cursor-history-add (cursor-path))))
+  (with-buffer-doc '(document "three" "four") '("generic")
+    (lambda ()
+      (with start (cursor-path)
+        (cursor-history-add start)
+        (check-true (cursor-has-history?))
+        (go-end)
+        (with end (cursor-path)
+          (cursor-history-add end)
+          (cursor-history-backward)
+          (check= (cursor-path) start)
+          (cursor-history-backward)
+          (check= (cursor-path) start)
+          (check-false (cursor-has-history?))
+          (cursor-history-forward)
+          (check= (cursor-path) end))))))
 
 (define (run-group thunk)
   ;; an error in a group counts as one failure
@@ -1591,6 +1642,21 @@
   (check= (ai-serialize "english" '(with "mode" "math" (frac "a" "b")))
           "$\\frac{a}{b}$"))
 
+;; The examples of the handwriting recognizer are saved in the home of
+;; TeXmacs (TEXMACS_HOME_PATH), which need not be ~/.TeXmacs. A home which
+;; already has learned glyphs is left alone.
+(define (test-handwriting)
+  (check-group "handwriting")
+  (with f (string->url "$TEXMACS_HOME_PATH/system/glyphs.scm")
+    (when (not (url-exists? f))
+      (set! last-glyph '(((0.0 0.0) (1.0 1.0)) ((0.0 1.0) (1.0 0.0))))
+      (learn-glyph "x")
+      (set! last-glyph '())
+      (check-true (url-exists? f))
+      (check= (load-object f)
+              '(("x" (((0.0 0.0) (1.0 1.0)) ((0.0 1.0) (1.0 0.0))))))
+      (system-remove f))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The suite
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1604,12 +1670,13 @@
             (list test-help-files test-doc-parse test-tmdoc-expand
                   test-tmdoc-books
                   test-tmdoc-rewrite test-doc-search test-tmdoc-edit
+                  test-cursor-history
                   test-font-database test-logical-fonts
                   test-font-typesetting test-init-font
                   test-language-names test-translations test-hyphenation
                   test-spelling
                   test-edu-contexts test-edu-macros test-edu-modes test-mc
                   test-comments test-posters-themes test-spell-edit
-                  test-ai-serialize))
+                  test-ai-serialize test-handwriting))
   (clear-misc-dir)
   (check-end))

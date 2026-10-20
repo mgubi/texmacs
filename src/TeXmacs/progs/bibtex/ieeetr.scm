@@ -108,10 +108,9 @@
     (cond
       ((or (bib-null? p) (nlist? p)) "")
       ((== (length p) 1) "")
-      ((== (length p) 2) `(concat "p." (nbsp) ,(list-ref p 1)))
+      ((bib-single-page? p) `(concat "p." (nbsp) ,(list-ref p 1)))
       (else
-       `(concat "pp." (nbsp)
-                ,(list-ref p 1) ,bib-range-symbol ,(list-ref p 2))))))
+       `(concat "pp." (nbsp) ,(bib-page-range p))))))
 
 (tm-define (bib-format-article n x)
   (:mode bib-ieeetr?)

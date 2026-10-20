@@ -17,6 +17,7 @@
   ""
   "initialize_glue_basic"
 
+  (typeset-check-mismatches get_typeset_check_mismatches (int))
   (texmacs-version-release texmacs_version (string string))
   (version-before? version_inf (bool string string))
   (updater-supported? updater_supported (bool))
@@ -676,6 +677,7 @@
   (url-grep grep (url string url))
   (url-search-upwards search_file_upwards (url url string array_string))
   (picture-cache-reset picture_cache_reset (void))
+  (remote-files-refresh remote_files_refresh (void))
   (set-file-focus set_file_focus (void url))
   (get-file-focus get_file_focus (url))
 
@@ -918,6 +920,7 @@
   (bib-default-upcase-first bib_default_upcase_first (scheme_tree scheme_tree))
   (bib-purify bib_purify (string scheme_tree))
   (bib-text-length bib_text_length (int scheme_tree))
+  (bib-field-pages bib_field_pages (tree string))
   (bib-prefix bib_prefix (string scheme_tree int))
   (bib-empty? bib_empty (bool scheme_tree string))
   (bib-field bib_field (scheme_tree scheme_tree string))

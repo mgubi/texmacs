@@ -104,6 +104,7 @@ tree as_tree (gr_selections sels);
 
 class box_rep;
 struct lazy;
+struct repaint_log;
 typedef array<double> point;
 
 class box {
@@ -147,7 +148,9 @@ public:
   virtual tree message (tree t, SI x, SI y, rectangles& rs);
   virtual void loci (SI x, SI y, SI d, list<string>& ids, rectangles& rs);
   virtual void display_links (renderer ren);
-  virtual void position_at (SI x, SI y, rectangles& change_log);
+  virtual void position_at (SI x, SI y, repaint_log& log);
+  virtual void unplace (repaint_log& log);
+  virtual void all_placed (SI x, SI y, array<box>& bs, array<rectangle>& rs);
   virtual void collect_page_numbers (hashmap<string,tree>& h, tree page);
   virtual void collect_page_colors (array<brush>& bs, array<rectangle>& rs);
   virtual path find_tag (string name);
@@ -255,8 +258,11 @@ public:
   virtual double     anim_delay ();
   virtual double     anim_duration ();
   virtual void       anim_position (double delay);
-  virtual double     anim_next ();
-  virtual rectangles anim_invalid ();
+  // the animations which intersect vis (in the coordinates of the box):
+  // the time of their next change, the areas to repaint
+  virtual double     anim_next (rectangle vis);
+  virtual rectangles anim_invalid (rectangle vis);
+  bool               anim_visible (rectangle vis);
 
   /********************************* obsolete ********************************/
 
@@ -269,6 +275,45 @@ public:
   friend void make_raster_image (url dest, box b, double zoom);
 };
 ABSTRACT_NULL_CODE(box);
+
+rectangle anim_everywhere (); // for anim_next and anim_invalid: no culling
+
+/******************************************************************************
+* The areas to repaint after a typesetting pass
+*
+* They are logged by the boxes which are placed on the pages and log (the
+* lines of the paragraphs, which are phrase boxes, and remember boxes):
+* position_at places them and logs where they went when they moved, and the
+* boxes which were placed in the previous pass and not in this one log the
+* area they leave.  The log keeps the boxes it placed until the next pass:
+* when a box is destroyed does not matter, so that the caches of the
+* typesetter may keep lines as long as they like.
+******************************************************************************/
+
+struct repaint_log {
+  int        id;      // the number of the log (never the one of another)
+  int        pass;    // the number of the pass
+  rectangles rects;   // pairs of areas, (new, old), (new, 0) or (0, old)
+  array<box> placed;  // the boxes placed in this pass
+  array<box> before;  // the boxes placed in the previous pass
+  repaint_log ();
+  void start_pass ();  // before position_at
+  void end_pass ();    // after it: what was not placed again logs
+};
+
+// the state of a box which logs
+struct placed_box {
+  int id, pass;  // the log and the pass in which it was placed last,
+  SI  ox, oy;    // at this origin
+  inline placed_box (): id (-1), pass (0), ox (0), oy (0) {}
+  void place (box_rep* b, SI x, SI y, repaint_log& log);
+  void unplace (box_rep* b, repaint_log& log);
+};
+
+// the check mode of TEXMACS_TYPESET_CACHES: are the boxes which logged in
+// the previous pass and those which log now, at their places, where the
+// areas to repaint r of the pass say?
+void check_repaint (box b, rectangle r, array<box>& bs, array<rectangle>& rs);
 
 extern int box_count;
 inline box_rep::box_rep (path ip2):

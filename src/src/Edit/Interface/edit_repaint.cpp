@@ -50,7 +50,8 @@ edit_interface_rep::draw_text (renderer ren, rectangles& l) {
   if (animated_flag) anim_next= 1.0e12;
   eb->redraw (ren, eb->find_box_path (tp, tp_found), l);
   if (animated_flag) {
-    double t= max (((double) texmacs_time ()) + 25.0, eb->anim_next ());
+    double t= max (((double) texmacs_time ()) + 25.0,
+                   eb->anim_next (visible_part ()));
     anim_next= min (anim_next, t);
   }
 }
@@ -413,7 +414,12 @@ edit_interface_rep::handle_repaint (renderer win, SI x1, SI y1, SI x2, SI y2) {
   */
 
   // cout << "Repainting\n";
+  double prof_t= edit_profile.on ? edit_profile_now () : 0;
   draw_with_stored (win, rectangle (x1, y1, x2, y2) /magf);
+  if (edit_profile.on)
+    cout << "edit-profile repaint: " << (x2 - x1) / PIXEL << " x " << (y2 - y1) / PIXEL
+         << " in " << edit_profile_now () - prof_t << " ms"
+         << (gui_interrupted () ? " (interrupted)" : "") << LF;
   if (last_change-last_update > 0)
     last_change = texmacs_time ();
   // cout << "Repainted\n";

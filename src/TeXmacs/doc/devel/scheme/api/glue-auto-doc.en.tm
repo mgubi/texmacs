@@ -19,6 +19,14 @@ source code.
 \;
 
   <\explain>
+    <scm|(typeset-check-mismatches)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|get_typeset_check_mismatches> which returns
+    <scm|int>.
+  </explain>
+
+  <\explain>
     <scm|(texmacs-version-release <scm-arg|string>)>
 <explain-synopsis|no synopsis>
   <|explain>
@@ -4875,6 +4883,14 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(remote-files-refresh)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|remote_files_refresh> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
     <scm|(set-file-focus <scm-arg|url>)>
 <explain-synopsis|no synopsis>
   <|explain>
@@ -9139,6 +9155,14 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(apply-changes)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|apply_pending_changes> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
     <scm|(update-path <scm-arg|path>)>
 <explain-synopsis|no synopsis>
   <|explain>
@@ -9152,6 +9176,14 @@ source code.
   <|explain>
     Calls the <c++> function <cpp|typeset_invalidate_all> which returns
     <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(renumber-auto-labels)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|typeset_renumber_labels> which returns
+    <scm|bool>.
   </explain>
 
   <\explain>

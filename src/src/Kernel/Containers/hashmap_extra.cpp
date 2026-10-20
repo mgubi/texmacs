@@ -24,6 +24,7 @@ hashmap_rep<T,U>::write_back (T x, hashmap<T,U> base) {
       return;
     l= l->next;
   }
+  st= new_hashmap_stamp ();
   if (size >= n*max) resize (n<<1);
   list<hashentry<T,U> >& rl= a[hv & (n-1)];
   rl= list<hashentry<T,U> > (H (hv, x, init), rl);

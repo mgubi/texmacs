@@ -27,6 +27,7 @@
 (texmacs-module (prog glue-symbols))
 
 (tm-define (all-glued-symbols) '( 
+"typeset-check-mismatches"
 "texmacs-version-release"
 "version-before?"
 "updater-supported?"
@@ -634,6 +635,7 @@
 "url-grep"
 "url-search-upwards"
 "picture-cache-reset"
+"remote-files-refresh"
 "set-file-focus"
 "get-file-focus"
 "persistent-set"
@@ -839,6 +841,7 @@
 "bib-default-upcase-first"
 "bib-purify"
 "bib-text-length"
+"bib-field-pages"
 "bib-prefix"
 "bib-empty?"
 "bib-field"
@@ -1167,8 +1170,10 @@
 "clear-local-info"
 "refresh-window"
 "update-forced"
+"apply-changes"
 "update-path"
 "update-current-buffer"
+"renumber-auto-labels"
 "update-players"
 "generate-all-aux"
 "generate-aux"
