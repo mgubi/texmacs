@@ -332,11 +332,11 @@ public:
   url                          cur_file_name;
   bool                         secure;
   hashmap<string,tree>&        local_ref;
-  hashmap<string,tree>&        global_ref;
+  hashmap<string,tree>*        global_ref;  // the tables of the project,
   hashmap<string,tree>&        local_aux;
-  hashmap<string,tree>&        global_aux;
+  hashmap<string,tree>*        global_aux;  // which may change
   hashmap<string,tree>&        local_att;
-  hashmap<string,tree>&        global_att;
+  hashmap<string,tree>*        global_att;
   bool                         complete;    // typeset complete document ?
   bool                         read_only;   // write-protected ?
   hashmap<string,tree>         missing;     // missing refs

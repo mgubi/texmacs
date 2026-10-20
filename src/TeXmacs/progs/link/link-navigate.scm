@@ -305,7 +305,7 @@
   (let* ((inverse? (string-ends? xtype "*"))
          (type (if inverse? (string-drop-right xtype 1) xtype))
          (fl (navigation-list-filter l type (if inverse? 0 1) #t)))
-    (and (nnull? fl) (navigation-type fl))))
+    (and (nnull? fl) (car fl))))
 
 (define (resolve-navigation-list l fun)
   (if (null? l) (fun)

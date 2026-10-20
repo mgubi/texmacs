@@ -534,6 +534,37 @@
   ;; '(tm-gpg-collect-public-keys-from-buffer)) are #t.
   )
 
+;; The scripts of a document whose name is in the directories of TeXmacs
+;; (TEXMACS_SECURE_PATH) are trusted: they may call any function. The trust
+;; is the one of the current name of the buffer: it is lost when the
+;; document gets a name outside these directories (Save as), and found
+;; again with a name inside them. No file is written.
+(tm-define (crypto-test-script) "done")
+
+(define (test-trust)
+  (check-group "trust of renamed documents")
+  (let* ((old (current-buffer))
+         (u (new-buffer))
+         (out (system->url "/tm-crypto-test-untrusted/doc.tm"))
+         ;; the home directory is trusted, but not its system/tmp, where
+         ;; tmp puts the files of this suite (is_secure, url.cpp)
+         (in (url-append (url-concretize "$TEXMACS_HOME_PATH")
+                         "crypto-test-trusted/doc.tm"))
+         (run (lambda ()
+                (tree->stree (texmacs-exec '(extern "crypto-test-script"))))))
+    (check-false (secure? '(crypto-test-script)))
+    (update-forced)
+    (check= (run) "done")
+    (buffer-rename u out)
+    (update-forced)
+    (check= (run) '(error "insecure script"))
+    (buffer-rename out in)
+    (update-forced)
+    (check= (run) "done")
+    (buffer-pretend-saved in)
+    (buffer-close in)
+    (when (buffer-exists? old) (switch-to-buffer old))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Without GnuPG
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -862,6 +893,7 @@
       (guarded "untrusted temporary files" test-untrusted-tmp)
       (guarded "document passphrases" test-buffer-passphrases)
       (guarded "secure gpg functions" test-secure)
+      (guarded "trust of renamed documents" test-trust)
       (guarded "gpg" test-gpg))
     (lambda ()
       (system-rmdir-recursive crypto-dir)))
