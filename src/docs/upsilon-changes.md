@@ -14,6 +14,11 @@ have the details, and the problems go to the
 
 ## 20 October 2026
 
+- **Builds, Linux**: the Vue interface compiles with GCC (it needed clang):
+  the fields of the Clay layouts are given in the order of their
+  declaration, as C++20 requires, and the font writer of the PDF export is
+  split so that GCC 13 no longer stops with an internal error. A Vue build
+  of GCC also no longer aborts when it quits ("free(): invalid pointer").
 - **Windows**: the documents in the TeXmacs folder of the user were not
   trusted (their scripts asked first): the folder, whose path begins with
   a drive such as `C:`, was read as two paths.

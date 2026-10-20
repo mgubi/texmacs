@@ -314,8 +314,8 @@ init_window_clay (vue_window_rep* w, int win_w, int win_h) {
   static bool reported= false;
   if (!reported) { cout << "Vue: Clay arena " << (totalMemorySize >> 20) << " MB per window" << LF; reported= true; }
   w->clay_arena= (Clay_Arena) {
-      .memory=  (char*) SDL_malloc (totalMemorySize),
-      .capacity= (size_t) totalMemorySize
+      .capacity= (size_t) totalMemorySize,
+      .memory=  (char*) SDL_malloc (totalMemorySize)
   };
   if (w->clay_arena.memory == NULL) FAILED ("Vue: cannot allocate the layout arena");
   w->clay_ctx= Clay_Initialize (w->clay_arena, (Clay_Dimensions) { (float) win_w, (float) win_h }, (Clay_ErrorHandler) { HandleClayErrors });

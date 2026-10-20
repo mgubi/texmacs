@@ -231,6 +231,10 @@ class mupdf_pdf_renderer_rep : public renderer_rep {
   string glyph_name (pdf_font_item& it, int key, int fallback, int& gid);
   void write_type3 (pdf_font_item& it);
   void write_fonts ();
+  void write_encoding (pdf_font_item& it, int first, int last,
+                       array<string>& gname);
+  void write_widths (pdf_font_item& it, int first, int last,
+                     array<int>& ftgid);
   void subset_type1 (pdf_font_item& it, array<string> keep);
   void write_outline ();
   void write_dests ();
@@ -1001,8 +1005,9 @@ mupdf_pdf_renderer_rep::write_fonts () {
       if (it.gid[c] >= 0) { if (c < first) first= c; last= c; }
     if (last < 0) continue;
     // The names of the glyphs the codes select, asked of the font itself
-    // (see glyph_name), first: the fz_try below must create nothing with a
-    // destructor. They end with a 0, to be C strings as they are.
+    // (see glyph_name), first: the fz_try of write_encoding must create
+    // nothing with a destructor. They end with a 0, to be C strings as
+    // they are.
     array<int> ftgid;    // what FreeType calls the glyph of each code
     array<string> gname; // its name, "" if it has none
     array<string> keep;  // the names, for the subsetter
@@ -1017,51 +1022,65 @@ mupdf_pdf_renderer_rep::write_fonts () {
       gname[c]= nm * string ((char) 0);
       keep << nm;
     }
-    // /Encoding: the glyph names of the codes which are used
-    pdf_obj* enc= NULL;
-    fz_var (enc);
-    fz_try (ctx) {
-      enc= pdf_new_dict (ctx, doc, 2);
-      pdf_dict_put (ctx, enc, PDF_NAME(Type), PDF_NAME(Encoding));
-      pdf_obj* diff= pdf_dict_put_array (ctx, enc, PDF_NAME(Differences), 16);
-      int prev= -2;
-      for (int c=first; c<=last; c++) {
-        if (N(gname[c]) == 0) continue;
-        if (c != prev + 1) pdf_array_push_int (ctx, diff, c);
-        pdf_array_push_name (ctx, diff, &gname[c][0]);
-        prev= c;
-      }
-      pdf_obj* e= enc; enc= NULL;   // pdf_add_object_drop drops it, error or not
-      pdf_dict_put_drop (ctx, it.obj, PDF_NAME(Encoding),
-                         pdf_add_object_drop (ctx, doc, e));
-    }
-    fz_catch (ctx) {
-      pdf_drop_obj (ctx, enc);
-      convert_warning << "MuPDF could not write the encoding of "
-                      << it.path << ": " << fz_caught_message (ctx) << LF;
-    }
+    write_encoding (it, first, last, gname);
     // The font program, cut down to the glyphs which are used. MuPDF
     // subsets TrueType and CFF only, so a Type 1 would go in whole -- some
     // eighty kilobytes for a handful of letters; mupdf_t1_subset is
     // pdfTeX's writet1.c, which knows how to do it.
     if (N(keep) > 0) subset_type1 (it, keep);
-    // /Widths, in thousandths of the size
-    fz_try (ctx) {
-      pdf_dict_put_int (ctx, it.obj, PDF_NAME(FirstChar), first);
-      pdf_dict_put_int (ctx, it.obj, PDF_NAME(LastChar), last);
-      pdf_obj* w= pdf_dict_put_array (ctx, it.obj, PDF_NAME(Widths),
-                                      last - first + 1);
-      for (int c=first; c<=last; c++) {
-        double adv= 0;
-        if (ftgid[c] >= 0)
-          adv= fz_advance_glyph (ctx, it.font, ftgid[c], 0) * 1000.0;
-        pdf_array_push_real (ctx, w, adv);
-      }
+    write_widths (it, first, last, ftgid);
+  }
+}
+
+// The /Encoding of a simple font: the glyph names of the codes in use.
+// (Apart from write_fonts, whose loop GCC 13 could not compile with them:
+// an internal error of its -Wmaybe-uninitialized analysis.)
+void
+mupdf_pdf_renderer_rep::write_encoding (pdf_font_item& it, int first,
+                                        int last, array<string>& gname) {
+  pdf_obj* enc= NULL;
+  fz_var (enc);
+  fz_try (ctx) {
+    enc= pdf_new_dict (ctx, doc, 2);
+    pdf_dict_put (ctx, enc, PDF_NAME(Type), PDF_NAME(Encoding));
+    pdf_obj* diff= pdf_dict_put_array (ctx, enc, PDF_NAME(Differences), 16);
+    int prev= -2;
+    for (int c=first; c<=last; c++) {
+      if (N(gname[c]) == 0) continue;
+      if (c != prev + 1) pdf_array_push_int (ctx, diff, c);
+      pdf_array_push_name (ctx, diff, &gname[c][0]);
+      prev= c;
     }
-    fz_catch (ctx) {
-      convert_warning << "MuPDF could not write the widths of "
-                      << it.path << ": " << fz_caught_message (ctx) << LF;
+    pdf_obj* e= enc; enc= NULL;   // pdf_add_object_drop drops it, error or not
+    pdf_dict_put_drop (ctx, it.obj, PDF_NAME(Encoding),
+                       pdf_add_object_drop (ctx, doc, e));
+  }
+  fz_catch (ctx) {
+    pdf_drop_obj (ctx, enc);
+    convert_warning << "MuPDF could not write the encoding of "
+                    << it.path << ": " << fz_caught_message (ctx) << LF;
+  }
+}
+
+// The /Widths of a simple font, in thousandths of the size
+void
+mupdf_pdf_renderer_rep::write_widths (pdf_font_item& it, int first, int last,
+                                      array<int>& ftgid) {
+  fz_try (ctx) {
+    pdf_dict_put_int (ctx, it.obj, PDF_NAME(FirstChar), first);
+    pdf_dict_put_int (ctx, it.obj, PDF_NAME(LastChar), last);
+    pdf_obj* w= pdf_dict_put_array (ctx, it.obj, PDF_NAME(Widths),
+                                    last - first + 1);
+    for (int c=first; c<=last; c++) {
+      double adv= 0;
+      if (ftgid[c] >= 0)
+        adv= fz_advance_glyph (ctx, it.font, ftgid[c], 0) * 1000.0;
+      pdf_array_push_real (ctx, w, adv);
     }
+  }
+  fz_catch (ctx) {
+    convert_warning << "MuPDF could not write the widths of "
+                    << it.path << ": " << fz_caught_message (ctx) << LF;
   }
 }
 
