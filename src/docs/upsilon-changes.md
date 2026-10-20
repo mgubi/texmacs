@@ -14,6 +14,15 @@ have the details, and the problems go to the
 
 ## 20 October 2026
 
+- **Desktop**: the mathematical symbols of the TeX fonts (binary operators
+  and relations such as ∘ and ·, Greek letters) were drawn as squares, in
+  the document, in the PDF and in the menus, on a system with TrueType
+  copies of these fonts, such as the fonts of LyX which matplotlib
+  installs on Linux (`fonts-lyx`): TeXmacs took those copies, whose
+  characters are at other places, rather than its own Type 1 fonts. A TeX
+  font (one with a TFM of its name: `cmsy10`, `msam10`...) comes again from
+  its Type 1 file; the other families keep their OpenType or TrueType file
+  ([#407](https://github.com/mgubi/texmacs/issues/407)).
 - **Builds, Linux**: the Vue interface compiles with GCC (it needed clang):
   the fields of the Clay layouts are given in the order of their
   declaration, as C++20 requires, and the font writer of the PDF export is
