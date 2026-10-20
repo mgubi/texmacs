@@ -645,7 +645,10 @@
   (when (ahash-ref plugin-initialize-todo name*)
     (let* ((name (symbol->string name*))
            (file (string-append "plugins/" name "/progs/init-" name ".scm"))
-           (u (url-unix "$TEXMACS_HOME_PATH:$TEXMACS_PATH" file)))
+           ;; (the directories in which plugin-list finds the plugins)
+           (u (url-unix (string-append "$TEXMACS_HOME_PATH:/etc/TeXmacs:"
+                                       "$TEXMACS_PATH:/usr/share/TeXmacs")
+                        file)))
       (ahash-remove! plugin-initialize-todo name*)
       (if (url-exists? u)
           (with fname (url-materialize u "r")
