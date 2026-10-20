@@ -14,6 +14,12 @@ have the details, and the problems go to the
 
 ## 20 October 2026
 
+- A document saved under a name without a suffix is saved as a TeXmacs
+  file, with `.tm` added: it was saved as plain text. A source file keeps
+  the name it is given (a `Makefile`). **Desktop (Vue)**: the dialog of the
+  system for saving a document the first time proposes `untitled.tm` in the
+  folder; it proposed the name of the folder, on Linux the name of the user
+  ([#400](https://github.com/mgubi/texmacs/issues/400)).
 - In a source file which a language server follows, the mouse resting on
   an error shows its message (and then what the server says of the word):
   the balloon showed only the latter, which for an unknown name is

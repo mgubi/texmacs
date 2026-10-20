@@ -23,7 +23,8 @@ named differently, open an issue or say so in your report.
   malformed question dialog on Linux (#376), the messages of a language
   server on hover (#399).
 - **Pierre-Henri Jondot** (phjo33): TeXmacs in the browser on an iPad
-  without a keyboard (#377).
+  without a keyboard (#377), the name proposed and the format of a document
+  saved the first time (#400).
 - **hammerfunctor**: the build with GCC 16 (#378), plug-ins and
   `get-environment-variable` (#379).
 - **Marc Mertens** (on the texmacs-users list): the builds with GCC and with

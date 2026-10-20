@@ -285,11 +285,25 @@
              (when answ (save-buffer-as-check-other new-name name opts)))))
         (else (save-buffer-as-check-other new-name name opts))))
 
+(define (save-name-with-suffix new-name name)
+  ;; a document of TeXmacs saved under a name without a suffix is given .tm:
+  ;; it was saved as plain text, the format which a name without a suffix
+  ;; has (#400); a source file keeps the name it is given (a Makefile)
+  (let ((u (if (url? new-name) new-name (system->url new-name))))
+    (if (and (== (url-suffix u) "") (== (url-format name) "texmacs")
+             (not (url-directory? u)))
+        (url-glue u ".tm")
+        new-name)))
+
 (tm-define (save-buffer-as-main new-name . args)
   ;;(display* "save-buffer-as-main " new-name "\n")
   (if (or (null? args) (not (url? (car args))))
-      (save-buffer-as-check-permissions new-name (current-buffer) args)
-      (save-buffer-as-check-permissions new-name (car args) (cdr args))))
+      (save-buffer-as-check-permissions
+       (save-name-with-suffix new-name (current-buffer))
+       (current-buffer) args)
+      (save-buffer-as-check-permissions
+       (save-name-with-suffix new-name (car args))
+       (car args) (cdr args))))
 
 (tm-define (save-buffer-as new-name . args)
   (:argument new-name texmacs-file "Save as")

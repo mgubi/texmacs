@@ -7152,9 +7152,17 @@ vue_chooser_widget_rep::perform_dialog (vue_window win) {
   // the folder (or file, for the save dialogs) the dialog starts at;
   // SDL_GetPrefPath was used here by mistake: it creates a preferences
   // folder named after its arguments under Application Support
+  // A save dialog takes the location for the file proposed: without a file,
+  // the directory was taken for one, and the dialogs of Linux proposed its
+  // name (the home: the name of the user, #400); a document of TeXmacs is
+  // proposed as untitled.tm there
   string location= directory;
-  if (N(file) > 0 && sdl_type == SDL_FILEDIALOG_SAVEFILE)
-    location= as_string (url_system (directory) * url_system (file));
+  string proposed= file;
+  if (N(proposed) == 0 && N(directory) > 0 &&
+      sdl_type == SDL_FILEDIALOG_SAVEFILE && file_type == "texmacs")
+    proposed= "untitled.tm";
+  if (N(proposed) > 0 && sdl_type == SDL_FILEDIALOG_SAVEFILE)
+    location= as_string (url_system (directory) * url_system (proposed));
   c_string tmp3 (location);
   if (N(location) > 0)
     SDL_SetStringProperty(props, SDL_PROP_FILE_DIALOG_LOCATION_STRING, tmp3);
