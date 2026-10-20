@@ -107,7 +107,7 @@ jobs:
             build-essential pkg-config \
             qtbase5-dev qtbase5-dev-tools libqt5svg5-dev libgl-dev \
             libfreetype-dev libpng-dev zlib1g-dev libjpeg-dev \
-            libgnutls28-dev libsqlite3-dev ghostscript
+            libgnutls28-dev libsqlite3-dev ghostscript xvfb xauth
 
       - name: Configure
         run: ./configure --with-scheme=s7 --with-gnutls QMAKE=/usr/lib/qt5/bin/qmake CC=gcc CXX=g++
@@ -118,7 +118,8 @@ jobs:
       - name: TeXmacs starts
         run: |
           home=$(mktemp -d)
-          TEXMACS_HOME_PATH="$home" QT_QPA_PLATFORM=offscreen timeout 300 \
+          # (TeXmacs asks Qt for xcb, whatever QT_QPA_PLATFORM says)
+          TEXMACS_HOME_PATH="$home" timeout 300 xvfb-run -a \
             TeXmacs/bin/texmacs.bin \
             -x "(begin (string-save \"ok\" \"$home/ok\") (quit-TeXmacs))" \
             > "$home/log.txt" 2>&1 || true
