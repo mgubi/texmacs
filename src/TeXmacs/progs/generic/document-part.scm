@@ -355,7 +355,10 @@
          (url->unix (url-delta (buffer-master)
                                (unix->url (tm->string (tm-ref t 1))))))
         ((and (tm-in? t '(include include*)) (tm-atomic? (tm-ref t 0)))
-         (tm->string (tm-ref t 0)))
+         ;; (an include of the master is relative to it: ./pb.tm is pb.tm)
+         (with u (url-relative (buffer-master)
+                               (unix->url (tm->string (tm-ref t 0))))
+           (url->unix (url-delta (buffer-master) u))))
         (else #f)))
 
 (define (part-body-file b)

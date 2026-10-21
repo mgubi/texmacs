@@ -532,15 +532,15 @@
     (cond ((== action 'same)
            (when style (part-remember-style name style)))
           ((== action 'remote)
-           (part-save-refuse m "remote files are not saved from a part view"))
+           (part-save-refuse m "style: remote files are not saved from a part view"))
           ((== action 'unwritable)
-           (part-save-refuse m "the file is not writable"))
+           (part-save-refuse m "style: the file is not writable"))
           ((and (part-style-changed-on-disk? name m action)
                 (nin? (url->unix m) part-save-overwrite))
-           (part-save-refuse m "the file changed on disk"))
+           (part-save-refuse m "style: the file changed on disk"))
           ((== action 'write)
            (if (part-write-style m style)
-               (part-save-refuse m "the file could not be written")
+               (part-save-refuse m "style: the file could not be written")
                (begin
                  (part-remember-style name style)
                  (part-save-wrote m))))
@@ -552,7 +552,7 @@
           (else
            (part-set-buffer-style m style)
            (if (buffer-save m)
-               (part-save-refuse m "the file could not be written")
+               (part-save-refuse m "style: the file could not be written")
                (begin
                  (part-remember-style name style)
                  (part-save-wrote m)))))))
@@ -600,8 +600,8 @@
                (part-style-changed-on-disk? name m 'write)
                (nin? (url->unix m) part-save-overwrite))
       ;; the view of the master, whose style changed on disk: the file
-      ;; keeps the style on disk
-      (part-save-refuse m "the file changed on disk")
+      ;; keeps the style on disk (its body is written)
+      (part-save-refuse m "style: the file changed on disk")
       (set! master-style? #f))
     (when master-style?
       ;; the view of the master: its file is written with the new style

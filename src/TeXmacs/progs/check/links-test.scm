@@ -1213,6 +1213,12 @@
   (check-true (show-hidden-part "2"))
   (check= (part-shown) '("2"))
   (buffer-set-part-mode :all)
+  ;; an include written ./pa.tm is named pa.tm, relative to the master
+  (write-doc "pa.tm" '("book") '() '((chapter "Same") "a"))
+  (write-doc "dot.tm" '("article") '()
+             '((include "./pa.tm") (section "S") "x"))
+  (open "dot.tm")
+  (check= (map buffer-part-label (buffer-parts-list #t)) '("pa.tm" "S"))
   ;; the part view of a master whose chapters have the same title
   (write-doc "pa.tm" '("book") '() '((chapter "Same") "a"))
   (write-doc "pb.tm" '("book") '() '((chapter "same") "b"))
@@ -1355,7 +1361,7 @@
     (buffer-save p)
     (check= (file-style "sm.tm") la)
     (check= (part-save-message)
-            "Saved sc1.tm; not saved: sm.tm (the file changed on disk)")
+            "Saved sc1.tm; not saved: sm.tm (style: the file changed on disk)")
     (buffer-pretend-saved p)
     (buffer-close p)
     ;; the master is open without changes: its buffer gets the style and
@@ -1436,7 +1442,7 @@
     (check= (file-style "sm.tm") la)
     (check= (file-body "sm.tm") incl)
     (check= (part-save-message)
-            "Saved sm.tm; not saved: sm.tm (the file changed on disk)")
+            "Saved sm.tm; not saved: sm.tm (style: the file changed on disk)")
     (buffer-pretend-saved q)))
 
 ;; The part tmfs opens a file of a project as a document of its own: its
