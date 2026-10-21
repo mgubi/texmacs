@@ -847,6 +847,22 @@
     (check-true (tree? (car l)))
     (check= (tree->stree (car l)) "a")
     (check-true (tree-eq? (car l) (tree-ref t 0 0))))
+  ;; a document of 100,000 paragraphs: the children are gone through
+  ;; without a recursion per child, which overflowed the Guile stack (#418)
+  (let* ((n 100000)
+         (t (stree->tree
+             `(document ,@(map (lambda (i)
+                                 (if (= (modulo i 1000) 999)
+                                     `(strong ,(number->string i))
+                                     (number->string i)))
+                               (iota n))))))
+    (check= (tm-select t '(:* gpg-passphrase-encrypted-buffer)) '())
+    (check= (length (tm-select t '(:%1))) n)
+    (check= (map tree->stree (tm-select t '(:* strong 0)))
+            (map (lambda (i) (number->string (+ (* 1000 i) 999))) (iota 100)))
+    (check= (length (tm-select t '((:exclude em)))) 100)
+    (check= (map tree->stree (tm-select t '((:range 99997 100005))))
+            '("99997" "99998" (strong "99999"))))
   ;; select with two arguments is tm-select
   (check= (select '(document (strong "a")) '(strong 0)) '("a"))
   (check= (tm-ref '(document (strong "a") "b") 0 0) "a")

@@ -433,6 +433,17 @@
                 (stree->tree '(document (TeXmacs "2.1")
                                 (body (document "a"))))))
   (check-false (encrypted-buffer? (stree->tree '(document (TeXmacs "2.1")))))
+  ;; the same test on the body, made by load-buffer-open (texmacs/texmacs/
+  ;; tm-files.scm), which triggers the dialogue of the passphrase
+  (with enc '(gpg-passphrase-encrypted-buffer "m")
+    (check-true (encrypted-buffer-body? (stree->tree `(document ,enc))))
+    (check-true (encrypted-buffer-body? (stree->tree `(document ,enc "a"))))
+    (check-false (encrypted-buffer-body? (stree->tree `(document "a" ,enc))))
+    (check-false (encrypted-buffer-body?
+                  (stree->tree `(document (with "a" "b" ,enc))))))
+  (check-false (encrypted-buffer-body? (stree->tree '(document))))
+  (check-false (encrypted-buffer-body? (stree->tree '(document "a"))))
+  (check-false (encrypted-buffer-body? (stree->tree "a")))
   ;; FIXME (#66, item 5): tm-gpg-dialogue-passphrase-decrypt, the decryption
   ;; of a passphrase encrypted block, calls gpg-ask-ask-standalone-passphrase
   ;; (security/gpg/gpg-edit.scm:362), which is not defined: it raises
@@ -809,6 +820,7 @@
       (check-true (contains? s "gpg-passphrase-encrypted-buffer")))
     (with t (tree-import u "texmacs")
       (check-true (encrypted-buffer? t))
+      (check-true (encrypted-buffer-body? (tmfile-get t 'body)))
       (with enc (tree->string (tree-ref (tmfile-get t 'body) 0 0))
         (check-false (gpg-passphrase-decrypt enc "wrong-pass"))
         (with dec (gpg-passphrase-decrypt enc "doc-pass")
