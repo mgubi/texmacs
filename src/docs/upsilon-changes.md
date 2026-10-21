@@ -19,6 +19,11 @@ have the details, and the problems go to the
   of its content it kept part of the widening (up to 0.6pt with
   TeX Gyre Termes math)
   ([#426](https://github.com/mgubi/texmacs/pull/426)).
+- **Windows**: the plugins which run one command per input (`:cmdline`)
+  did nothing: their command is now run by the command interpreter
+  (`cmd /c`), with its output read in the background, and stopping or
+  interrupting it ends it and all it started
+  ([#443](https://github.com/mgubi/texmacs/pull/443)).
 
 ## 21 October 2026
 
