@@ -473,6 +473,18 @@
 ;; Loading buffers
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(tm-define (encrypted-buffer-body? b)
+  (:synopsis "Is @b the body of a document encrypted with a passphrase?")
+  ;; the body is (document (gpg-passphrase-encrypted-buffer enc)), see
+  ;; tree-export-encrypted and encrypted-buffer? in security/gpg/gpg-edit.scm
+  ;; (a lazy module, not loaded here). Only the first child is tested: a
+  ;; search of the whole document took seconds on long documents, and its
+  ;; recursion overflowed the Guile stack (#418).
+  (and (tree? b)
+       (== (tree-label b) 'document)
+       (> (tree-arity b) 0)
+       (== (tree-label (tree-ref b 0)) 'gpg-passphrase-encrypted-buffer)))
+
 (define (load-buffer-open name opts)
   ;;(display* "load-buffer-open " name ", " opts "\n")
   (cond ((in? :background opts) (noop))
@@ -481,8 +493,7 @@
         (else
           (switch-to-buffer name)))
   (buffer-notify-recent name)
-  (when (nnull? (select (buffer-get name)
-                        '(:* gpg-passphrase-encrypted-buffer)))
+  (when (encrypted-buffer-body? (buffer-get-body name))
     (tm-gpg-dialogue-passphrase-decrypt-buffer name))
   (and-with master (and (url-rooted-tmfs? name) (tmfs-master name))
     (when (!= master name)
