@@ -212,6 +212,14 @@
 ;; changes. Saving the part view then refuses to write that file while the
 ;; buffer has unsaved changes.
 
+;; The tables are keyed by the identifiers of the buffers, the url->unix of
+;; their names (attach_notifier, new_buffer.cpp), which are also those of
+;; the copies (make-shared, part-tmfs.scm). An identifier is turned back
+;; into the name of its buffer with unix->url: given as a string where a
+;; url is expected, it would be read as a path of the system, and on
+;; Windows "/C/dir/a.tm" is then the relative "C/dir/a.tm", the name of no
+;; buffer.
+
 (define buffer-shared-list (make-ahash-table))
 (define buffer-pending (make-ahash-table))
 (define buffer-black-list (make-ahash-table))
@@ -234,7 +242,7 @@
 
 (tm-define (buffer-initialize-shared id . opt-copy)
   ;; @opt-copy: the copy of the part view, before its first change
-  (with buf id
+  (with buf (unix->url id)
     ;;(when (not (buffer-exists? buf))
     ;;  (delayed
     ;;    (:idle 1)
@@ -257,15 +265,15 @@
     (when (not (buffer-exists? buf))
       (ahash-remove! buffer-diverged id))))
 
-(define (buffer-restore buf)
+(define (buffer-restore id)
   (with-author mirror-author
     (with-global mirror-idle? #f
-      (let* ((t (buffer-get-body buf))
+      (let* ((t (buffer-get-body (unix->url id)))
              (other? (lambda (u) (!= (tree->path t) (tree->path u))))
-             (l (list-filter (id->trees buf) other?)))
+             (l (list-filter (id->trees id) other?)))
         (when (nnull? l)
           (tree-set! t (tree-copy (car l))))
-        (ahash-remove! buffer-black-list buf)))))
+        (ahash-remove! buffer-black-list id)))))
 
 (define (buffer-treat-pending)
   (with-author mirror-author
@@ -273,7 +281,7 @@
       (for (key-im (ahash-table->list buffer-pending))
         (let* ((id (car key-im))
                (ok? (not (ahash-ref buffer-black-list id)))
-               (t (buffer-get-body id)))
+               (t (buffer-get-body (unix->url id))))
           (for (mod (reverse (cdr key-im)))
             (when ok?
               (if (modification-applicable? t mod)
@@ -298,9 +306,10 @@
     (with-global mirror-idle? #f
       ;; (tree-set, not the macro tree-set!, which needs a variable)
       (tree-set (buffer-get-body buf) (tm->tree body))))
-  (ahash-remove! buffer-diverged buf)
-  (ahash-remove! buffer-pending buf)
-  (ahash-remove! buffer-black-list buf))
+  (with id (url->unix buf)
+    (ahash-remove! buffer-diverged id)
+    (ahash-remove! buffer-pending id)
+    (ahash-remove! buffer-black-list id)))
 
 (tm-define (buffer-notify-shared id mod)
   (when (ahash-ref buffer-shared-list id)

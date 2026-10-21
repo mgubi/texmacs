@@ -246,7 +246,11 @@
            ,(part-compress-body (tm-ref doc 1) u)
            ,(part-compress-body (tm-ref doc 2) u)))
         ((tm-func? doc 'shared 3)
-         (let* ((name  (tm->string (tm-ref doc 1)))
+         ;; (the file of a copy is the url->unix of its url, which is read
+         ;; back with unix->url: given as a string where a url is expected,
+         ;; it would be read as a path of the system, and on Windows
+         ;; "/C/dir/a.tm" is then the relative "C/dir/a.tm")
+         (let* ((name  (unix->url (tm->string (tm-ref doc 1))))
                 (delta (url-delta u name)))
            `(include ,(url->unix delta))))
         (else doc)))
@@ -293,8 +297,9 @@
                       (list f) (list))))
            (incl (list-filter
                   (map (lambda (c)
-                         (with start (part-loaded-start name (car c))
-                           (and start (!= (cdr c) start) (unix->url (car c)))))
+                         (let* ((u (unix->url (car c)))
+                                (start (part-loaded-start name u)))
+                           (and start (!= (cdr c) start) u)))
                        copies)
                   (lambda (x) x)))
            (m (part-master name))
