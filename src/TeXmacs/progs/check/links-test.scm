@@ -1452,6 +1452,10 @@
 ;; changes of its own, the file is not written (as an included file, #390)
 ;; and the buffer keeps its changes and stays modified; without changes
 ;; of its own, the buffer gets what was written and is saved.
+(define (file-init name)
+  (sort (collection->assoc (file-part name 'initial))
+        (lambda (x y) (string<? (car x) (car y)))))
+
 (define (part-buffer-style-of u)
   (tm->stree (buffer-get-style u)))
 
@@ -1566,10 +1570,13 @@
     (load-buffer p)
     (update-forced)
     (edit (tree-set (bt 0 2 1) "a alone"))
+    (edit (init-env "font-base-size" "11"))
     (check= (part-own-plan p) (list a 'none #f))
     (save-buffer p)
     (check= (part-save-message) "Saved oa.tm")
     (check= (file-body "oa.tm") '(document (chapter "A") "a alone"))
+    (check= (file-init "oa.tm")
+            '(("font-base-size" . "11") ("page-medium" . "paper")))
     (check-false (buffer-modified? p))
     (buffer-close p)
     ;; an included file open without changes is kept in sync with the view
@@ -1596,6 +1603,23 @@
     (check= (part-save-message) "Saved oa.tm")
     (check= (file-body "oa.tm") '(document (chapter "A") "a again"))
     (check= (file-style "oa.tm") eu)
+    (check-false (buffer-modified? a))
+    (check-false (buffer-modified? p))
+    ;; ... and a change of the initial environment in the view, which the
+    ;; buffer gets before it is saved (the file has what it gets without
+    ;; an open buffer, above)
+    (set-view-style a la)
+    (switch-to-buffer p)
+    (edit (tree-set (bt 0 2 1) "a third"))
+    (edit (init-env "font-base-size" "12"))
+    (buffer-shared-flush)
+    (check= (part-own-plan p) (list a 'buffer #f))
+    (save-buffer p)
+    (check= (part-save-message) "Saved oa.tm")
+    (check= (file-body "oa.tm") '(document (chapter "A") "a third"))
+    (check= (file-style "oa.tm") la)
+    (check= (file-init "oa.tm")
+            '(("font-base-size" . "12") ("page-medium" . "paper")))
     (check-false (buffer-modified? a))
     (check-false (buffer-modified? p))
     (buffer-close p)
@@ -1628,7 +1652,23 @@
     (buffer-pretend-saved p)
     (buffer-close p)
     (buffer-pretend-saved a)
-    (buffer-close a)))
+    (buffer-close a)
+    ;; the view of the master, whose file (body and style) changed on disk:
+    ;; the question names it once
+    (write-doc "om.tm" '("book") '() '("intro" (include "oa.tm")))
+    (load-buffer m)
+    (load-buffer q)
+    (update-forced)
+    (edit (tree-set (bt 0) "intro again"))
+    (set-view-style q us)
+    (write-doc "om.tm" '("book" "number-long-article") '()
+               '("intro disk" (include "oa.tm")))
+    (check= (part-own-plan q) (list m 'sync #t))
+    (check= (part-master-style-plan q) (list m 'write #t))
+    (check= (part-save-changed q) (list m))
+    (buffer-pretend-saved q)
+    (buffer-close q)
+    (buffer-close m)))
 
 ;; The part tmfs opens a file of a project as a document of its own: its
 ;; url names the master and the file, its body is shared with the file and

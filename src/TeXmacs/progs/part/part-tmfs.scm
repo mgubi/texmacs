@@ -13,7 +13,8 @@
 
 (texmacs-module (part part-tmfs)
   (:use (part part-shared)
-        (texmacs texmacs tm-files)))
+        (texmacs texmacs tm-files)
+        (utils library cursor)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Useful subroutines
@@ -613,6 +614,40 @@
         ((buffer-modified? f) 'buffer)
         (else 'same)))
 
+;; The initial environment of the own file: when the open buffer of the
+;; file is saved itself, it first gets the entries which the view changed
+;; (those which the file would get from the view and which it does not
+;; have on disk), the view winning as for the style.
+
+(define (part-init-entries c)
+  ;; the (var val) of the collection @c
+  (if (not (and c (tm-func? c 'collection))) (list)
+      (map (lambda (a) (list (tm->string (tm-ref a 0)) (tm->stree (tm-ref a 1))))
+           (list-filter (tm-children c)
+                        (lambda (a) (and (tm-func? a 'associate 2)
+                                         (tm-atomic? (tm-ref a 0))))))))
+
+(define (part-view-init-changes f com ori)
+  ;; the entries of the initial environment which the file @f gets from
+  ;; the view (in @com), which it does not have on disk (in @ori), and
+  ;; which its open buffer does not have
+  (let* ((new (part-init-entries (tmfile-extract com 'initial)))
+         (old (part-init-entries (tmfile-extract ori 'initial)))
+         (own (part-init-entries (tmfile-extract (buffer-get f) 'initial))))
+    (list-filter new (lambda (x) (and (nin? x old) (nin? x own))))))
+
+(define (part-buffer-set-init f l)
+  ;; give the open buffer @f the entries @l of the initial environment
+  (when (nnull? l)
+    (if (nnull? (buffer->views f))
+        (with-buffer f
+          (for (x l) (init-env-tree (car x) (cadr x))))
+        (with doc (tm->stree (buffer-get f))
+          (with init (or (tmfile-extract doc 'initial) '(collection))
+            (for (x l) (set! init (collection-set init (car x) (cadr x))))
+            (buffer-set f (tmfile-assign doc 'initial init))
+            (buffer-pretend-modified f))))))
+
 (define (part-own-body-set f body)
   ;; give the open buffer of @f the body @body, unless it has it already
   ;; (it may have copies of the included files instead of inclusions)
@@ -673,6 +708,7 @@
              (part-own-body-set f b)
              (when master-style?
                (part-set-buffer-style f style))
+             (part-buffer-set-init f (part-view-init-changes f com ori))
              (if (buffer-save f)
                  (part-save-refuse f "the file could not be written")
                  (begin
@@ -749,12 +785,19 @@
           (buffer-pretend-modified buf)
           (show-message (utf8->cork msg) "Save file")))))
 
-(tm-define (save-buffer-main . args)
-  (:require (part-view? (if (and (nnull? args) (url? (car args)))
-                            (car args) (current-buffer))))
-  (let* ((buf (if (and (nnull? args) (url? (car args)))
-                  (car args) (current-buffer)))
-         (name (part-open-name buf))
+(define (part-urls-unique l)
+  ;; the urls @l, each once
+  (if (null? l) l
+      (with u (url->unix (car l))
+        (cons (car l)
+              (part-urls-unique
+               (list-filter (cdr l) (lambda (v) (!= (url->unix v) u))))))))
+
+(tm-define (part-save-changed buf)
+  ;; the files which saving the part view @buf would write, and which
+  ;; changed on disk since they were loaded (each once: for the view of
+  ;; the master, its own file and the style of the master are one file)
+  (let* ((name (part-open-name buf))
          (f (part-file name))
          (changed (map car (list-filter
                             (cons* (part-own-plan buf)
@@ -762,9 +805,17 @@
                                    (part-save-plan buf))
                             caddr)))
          (disk (part-loaded-disk name f)))
-    (when (and disk (!= (part-file-body f) disk)
-               (nin? (url->unix f) (map url->unix changed)))
-      (set! changed (cons f changed)))
+    (part-urls-unique
+     (if (and disk (!= (part-file-body f) disk))
+         (cons f changed)
+         changed))))
+
+(tm-define (save-buffer-main . args)
+  (:require (part-view? (if (and (nnull? args) (url? (car args)))
+                            (car args) (current-buffer))))
+  (let* ((buf (if (and (nnull? args) (url? (car args)))
+                  (car args) (current-buffer)))
+         (changed (part-save-changed buf)))
     (cond ((not (buffer-modified? buf))
            (set-message "No changes need to be saved" "Save file"))
           ((nnull? changed)
