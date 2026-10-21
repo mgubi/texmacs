@@ -14,6 +14,14 @@ have the details, and the problems go to the
 
 ## 21 October 2026
 
+- Opening a large document is much faster: TeXmacs looked through the whole
+  document for an encrypted part, which took seconds for a chapter of a few
+  MB (and overflowed the stack of Guile with some thousands of paragraphs);
+  it now looks only where an encrypted document keeps it
+  ([#418](https://github.com/mgubi/texmacs/issues/418)).
+- A reference to a label which was removed shows `?` after the update
+  which removes it, instead of the old number until a second update
+  ([#417](https://github.com/mgubi/texmacs/issues/417)).
 - The fixes of the branch `wip_fixes` (fixes of the official TeXmacs)
   merged there on the evening of 20 October, in the items which follow.
 - Keyboard shortcuts: removing a shortcut (also one of your own, in Tools →
