@@ -149,7 +149,30 @@
   ;; occurs-inside sees the argument as given
   (check= (rewrite-last '(document (assign "f" (macro "x" (occurs-inside "a" (arg "x"))))
                                    (f (concat "b" "a"))))
-          "true"))
+          "true")
+  ;; also when it is given by its name, as in render-proof
+  (check= (rewrite-last '(document (assign "f" (macro "body"
+                                     (occurs-inside (quote (my-qed)) "body")))
+                                   (f (concat "b" (my-qed)))))
+          "true")
+  ;; a resize in a value keeps its lengths, which the typesetter reads in
+  ;; the box where the value is used (a transpose sign in shape.tm)
+  (check= (cadr (rewrite '(document (assign "T" (resize "x" (plus "1l" "0.3ex") "" "" ""))
+                                    (value "T"))))
+          '(assign "T" (quasiquote (resize "x" (plus "1l" "0.3ex") "" "" ""))))
+  ;; the call of a variable whose value is a pattern gives the value which
+  ;; the typesetter computed at the assign (the title-color of the
+  ;; rough-paper theme; it was a quoted call)
+  (check= (rewrite-last '(document (assign "c" (pattern "p.png" "1" "1"))
+                                   (with "color" (c) "x")))
+          '(with "color" (value "c") "x"))
+  ;; in source mode (show-preamble) the markup is shown, not executed
+  (check= (rewrite-last '(document (with "preamble" "true" (assign "a" "b"))))
+          '(with "preamble" "true" (assign "a" "b")))
+  ;; a sum of tmlen in units is the typesetter's, as a sum of lengths
+  ;; (elsarticle's display skips; it was 0)
+  (check= (value-of '(plus (tmlen "1pt" "2pt" "3pt") (tmlen "1pt" "2pt" "3pt")))
+          '(plus (tmlen "1pt" "2pt" "3pt") (tmlen "1pt" "2pt" "3pt"))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Partial evaluation

@@ -26,6 +26,13 @@ protect_parts (tree t) {
   if (is_atomic (t) || !contains_residual (t)) return t;
   int i, n= N(t);
   tree r (t, n);
+  // (the lengths of a resize are read by the typesetter where it typesets
+  // the box: they stay as they are)
+  if (is_box_with_lengths (L(t))) {
+    r[0]= protect_parts (t[0]);
+    for (i=1; i<n; i++) r[i]= t[i];
+    return r;
+  }
   for (i=0; i<n; i++) r[i]= protect_parts (t[i]);
   return r;
 }
@@ -130,6 +137,7 @@ evaluate_with (tree t) {
   int i, n=N(t), k=(n-1)>>1;
   assoc_environment local (k);
   tree w (WITH);
+  bool source= false;
   for (i=0; i<k; i++) {
     tree name= evaluate (t[i<<1]);
     // (a variable which the typesetter alone knows: the with is its)
@@ -138,8 +146,17 @@ evaluate_with (tree t) {
     tree   val= evaluate (t[(i<<1)+1]);
     local->raw_write (i, var, val);
     w << var << protect_value (val);
+    if (var == "preamble" && val == "true") source= true;
+    // (whether it is the source mode, the typesetter alone knows)
+    if (var == "preamble" && is_residual (val)) {
+      (void) evaluate_left (t);
+      return t;
+    }
     // FIXME: don't add non-typesetter variables (?)
   }
+  // (in source mode, the body of show-preamble, the typesetter shows the
+  // markup as it is, without executing it: see make_bridge)
+  if (source) { w << t[n-1]; return w; }
   begin_with (std_env, local);
   tree r= evaluate_part (t[n-1]);
   end_with (std_env);
@@ -393,6 +410,16 @@ expand (tree t, assoc_environment env) {
       }
     case EVAL_ARGS:
       return tree (EVAL_ARGS, expand (tree (ARG, t[0]), env));
+    case OCCURS_INSIDE:
+      // (the second child is the name of an argument, as for eval-args:
+      // render-proof looks for a <qed> in its body)
+      if (n == 2 && is_atomic (t[1])) {
+	int key= make_tree_label (t[1]->label);
+	if (env->contains (key))
+	  return intern_tree (tree (OCCURS_INSIDE, expand (t[0], env),
+				    env[key]));
+      }
+      // fall through
     default:
       {
 	bool flag= true;
@@ -412,13 +439,13 @@ expand (tree t, assoc_environment env) {
 
 tree
 evaluate_compound (tree t) {
-  int d; tree f;
+  int d; tree f; string var;
   if (L(t) == COMPOUND) {
     d= 1;
     f= t[0];
     if (is_compound (f)) f= evaluate (f);
     if (is_atomic (f)) {
-      string var= f->label;
+      var= f->label;
       // (an undefined macro is the typesetter's: it shows the call, with
       // its arguments, whose labels it makes; see evaluate_left)
       if (!std_env->contains (var)) { (void) evaluate_left (t, 1); return t; }
@@ -426,7 +453,7 @@ evaluate_compound (tree t) {
     }
   }
   else {
-    string var= as_string (L(t));
+    var= as_string (L(t));
     if (!std_env->contains (var)) { (void) evaluate_left (t); return t; }
     d= 0;
     f= std_env [var];
@@ -452,9 +479,16 @@ evaluate_compound (tree t) {
     decorate_ip (t, e);
     return evaluate_result (e);
   }
+  // (a layout value, like the pattern of a theme's title-color, is no
+  // macro: the call gives the value which the typesetter computed where it
+  // was bound, as evaluate_value)
+  else if (is_layout_value (L(f)) && var != "") return tree (VALUE, var);
   // (a macro known to the typesetter only, defined in a branch which it
   // decides: the call is its, with its arguments)
-  else if (is_residual (f)) { (void) evaluate_left (t, d); return t; }
+  else if (is_residual (f)) {
+    (void) evaluate_left (t, d);
+    return t;
+  }
   else return evaluate_result (f);
 }
 

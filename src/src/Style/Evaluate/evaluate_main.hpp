@@ -32,6 +32,8 @@ tree expand (tree t, bool flag);
 
 /* Partial evaluation */
 bool is_residual (tree t, bool as_length= false);
+bool is_layout_value (tree_label l);
+bool is_box_with_lengths (tree_label l);
 bool contains_residual (tree t);
 
 /* Tree rewriting */

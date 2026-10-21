@@ -820,6 +820,15 @@ Two consequences:
   number the automatic labels by the tag that produces them (see the plan).
 - **Memory.** Memorizers are released by reference counts; the global table
   grows with the document and the edits. Nothing measures it yet.
+- **A difference which is the typesetter's.** A table whose width is in
+  `par`, laid out lazily, takes its width again from the cell only when
+  `table-width` is written as an atom (`table.cpp`, `lazy_table_rep::produce`
+  reads `var[TABLE_WIDTH]` without `exec`, unlike `table_rep::format_table`).
+  The figures of the standard styles give `<value|figure-width>`, so a
+  figure in a table cell keeps the width of the page (Joris's `issac12`:
+  two figures side by side overlap); the rewriter gives `1par`, and the
+  figure fits its cell. Fixing the typesetter (an `exec`) would change the
+  layout of such documents without the rewriter too: to decide.
 
 ## Plan
 

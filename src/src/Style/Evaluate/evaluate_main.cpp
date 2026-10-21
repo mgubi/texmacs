@@ -211,7 +211,13 @@ is_length_unit (tree_label l) {
   return l >= CM_LENGTH && l <= HR_LENGTH;
 }
 
-static bool
+bool
+is_box_with_lengths (tree_label l) {
+  // the primitives whose lengths stay unevaluated in a value (exec)
+  return l == MOVE || l == SHIFT || l == RESIZE || l == CLIPPED;
+}
+
+bool
 is_layout_value (tree_label l) {
   if (is_length_unit (l)) return true;
   switch (l) {
@@ -390,6 +396,16 @@ holds_residual_value (tree t) {
   return is_compound (t) && value_kind (t) == 1;
 }
 
+static bool
+is_residual_tmlen (tree t) {
+  // a tmlen whose bounds are lengths in units (the typesetter converts
+  // them, as the lengths themselves: see is_residual)
+  if (!is_func (t, TMLEN)) return false;
+  for (int i=0; i<N(t); i++)
+    if (is_residual (t[i], true)) return true;
+  return false;
+}
+
 static tree
 evaluate_partially (tree t) {
   // the arguments of a strict computation, evaluated; the computation
@@ -403,7 +419,8 @@ evaluate_partially (tree t) {
     // (also a value made of atoms and residuals: merge "footnote-" with
     // the concat of a counter which a residual branch assigned; not any
     // markup which holds one, whose comparisons the rewriter can decide)
-    if (is_residual (r[i], len) || holds_residual_value (r[i]))
+    if (is_residual (r[i], len) || holds_residual_value (r[i]) ||
+        (len && is_residual_tmlen (r[i])))
       residual= true;
   }
   if (!residual) return uninit;
@@ -724,6 +741,21 @@ evaluate_impl (tree t) {
     return evaluate_compound_children (t);
   case _POINT:
     return evaluate_point (t);
+  case MOVE:
+  case SHIFT:
+  case RESIZE:
+  case CLIPPED:
+    // (as a value, the typesetter executes the body only: the lengths are
+    // read where the box is typeset, 1l and 1r of its body; see
+    // is_box_with_lengths)
+    if (!markup_mode && N(t) > 0) {
+      tree r (t, N(t));
+      r[0]= evaluate (t[0]);
+      for (int i=1; i<N(t); i++) r[i]= t[i];
+      transfer_ip (t, r);
+      return r;
+    }
+    return evaluate_compound_children (t);
     /*
   case BOX_INFO:
     return evaluate_box_info (t);

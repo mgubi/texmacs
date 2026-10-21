@@ -22,7 +22,8 @@ computation with its arguments evaluated): the size of boxes (`box-info`,
 labels and the label tables (`auto-id`, `get-binding`, `has-binding`,
 `get-attachment`), patterns, `hard-id`; and the margins (`par-left`,
 `par-right`) in the body of an ornament, a canvas or an art box, which the
-typesetter sets itself there (`evaluate_ornamented`).
+typesetter sets itself there (`evaluate_ornamented`). A `tmlen` whose
+bounds are lengths in units is one too, in a computation on lengths.
 *Alternatives:* compute an approximation (lengths in absolute units, as the
 rewriter of 2007 did): wrong, the typesetter converts units at the scale at
 which it lays out (twice the size headless), with the font, the paragraph,
@@ -30,26 +31,43 @@ the box at the place of use; evaluate `box-info` by typesetting in the
 rewriter: duplicates the typesetter.
 *Decided by:* the comparison of the printed pages (`tests/style/compare.sh`),
 which showed each of these as a difference (the margins in ornaments on the
-two generated help pages, `tag-help` and `top-help`).
+two generated help pages, `tag-help` and `top-help`); a sum of `tmlen` in
+`pt` which the rewriter computed as 0 (`elsarticle`'s display skips: the
+equations of Joris's `galois` got the short skips).
 
 **1.2 References, not copies.** A value which holds a residual is referred to
 (`value (x)` stays, with the `with` or `assign` which binds `x`), so that the
-typesetter computes it where it is bound.
+typesetter computes it where it is bound. So is the call of a variable
+whose value is such a value and no macro (`<title-color>` of the
+`rough-paper` theme is a pattern): `value (title-color)`, while the call
+of a macro which only the typesetter knows (1.7) stays a call.
 *Alternative:* substitute the residual expression at each use (the obvious
 partial evaluation): computed elsewhere, in another environment
 (`box-info` typesets its argument again at another size).
-*Decided by:* the graphics of the conventions page.
+*Decided by:* the graphics of the conventions page; the slide titles of
+a `rough-paper` deck in the corpus, which were grey (the call, kept and
+then quoted, gave the typesetter the tree `(title-color)` as a colour).
 
 **1.3 Assignments stay; their values are protected.** Every `assign` stays in
 the result with its place, also those which define macros, and the values of
 `assign` and `with` are quoted (`quote`, or `quasiquote` with the residuals
-unquoted) because the typesetter evaluates them again.
+unquoted) because the typesetter evaluates them again. As `exec` does, a
+`move`, `shift`, `resize` or `clipped` in a value has its body evaluated
+and its lengths as they are (also inside a `quasiquote`): they are read
+where the box is typeset (`1l`, `1r` of its body).
+*Limit:* a call which comes back as it is (a macro which only the
+typesetter knows, 1.7; an undefined macro) is quoted in such a value like
+any markup, so the typesetter gets the call, not its result: a quoted
+call cannot be told from it (`<quote|<page-the-page>>` must stay
+unexpanded).
 *Alternatives:* drop the assignments (the rewriter consumed them): the
 typesetter reads variables of its own (the pager's `page-odd-header`), and
 the line of a macro definition lost its place for the cursor; keep only
 non-macro assignments: same loss of place.
 *Decided by:* the running headers (page number `0` instead of `1`, a quoted
-`page-the-page` expanded at the assignment) and the click maps.
+`page-the-page` expanded at the assignment) and the click maps; a transpose
+sign of Joris's `shape` (`<assign|T|<resize|...|<plus|1l|0.3ex>|...>>`),
+whose lengths were computed at the assignment, outside any box.
 
 **1.4 Markup and values are not the same evaluation.** The concater and `exec`
 differ on a few tags: `if*` is a phantom for the concater (kept), `quote` is
@@ -79,7 +97,10 @@ tables as values lost the boundaries of the calls in them (680 points of
 macros goes through a macro made on the spot), `set-binding` (the
 typesetter makes the binding and the locus), the calls of undefined macros
 (the typesetter shows the call with its arguments, and makes the labels in
-them: an error in their place lost them, "Table ?" in the corpus).
+them: an error in their place lost them, "Table ?" in the corpus), the
+body of a `with` in source mode (`preamble` true, the body of
+`show-preamble`), which the typesetter shows as its source without
+executing it.
 *Alternative:* keep the rewriter's own rendering of inactive markup (2007):
 it had drifted from the typesetter's (DRD types, `src-*` classes, the DRD of
 the document).
@@ -139,6 +160,15 @@ which did not exist); a value per branch, merged after (`if` of the values):
 exact, but turns every later counter into a condition.
 *Decided by:* a chapter of the corpus (baltakatei, `c9-problems`): the link
 of a note reference which pointed nowhere; the suite.
+
+**1.8 Arguments named by a primitive.** `occurs-inside` takes the name of
+an argument, not `<arg|...>` (`render-proof`: `<occurs-inside|<quote|<qed>>|body>`):
+`expand` substitutes it, as it does for `map-args` and `eval-args`.
+*Limit:* the substitution is deeper than the typesetter's
+(`exec_arg_recursive` follows a bare `<arg|y>` only): a `<qed>` inside an
+argument of an argument is seen by the rewriter only.
+*Decided by:* a second QED box under the last equation of proofs (Joris's
+`dcl`, `biamp`).
 
 ## 2. How the editor typesets the rewritten tree
 
@@ -231,11 +261,31 @@ an anchor more); the bridge of the expand-as puts no markers when the tag
 of the call enforces the borders of its children (`hide-preamble`, whose
 markers took a line before the document), as the bridge of the call does
 (`bridge_compound`). In the source mode (`preamble` true), which shows
-the tree as its source, the typesetter gets the document itself.
+the tree as its source, the typesetter gets the document itself and
+typesets it as usual (`env->rewritten_tree` off, on the screen and in
+print: the headers of the pages stay active); a part
+in source mode (the body of `show-preamble`, 1.5) is shown as the
+inactive bridges show it, by the concater and the lazy typesetting
+(`make_lazy`), outside the rules of the rewritten tree.
+*Limit:* the source shown there is not laid out as by the bridges (the
+indentation of its lines; tm-forge's `resume-template`).
 *Decided by:* the editor's prints of the documentation pages
 (`env-misc`, `env-font`, `font-selection`, `man-convert`) and of the
 corpus (the notes of baltakatei), once the prints typeset the rewritten
 tree (2.7).
+
+**2.9 Not decided: the markers of the arguments.** The typesetter puts a
+marker before and after the value of an argument (`typeset_argument`);
+the rewriter substitutes the value, and the markers are missing. They are
+invisible, except where they change a layout: a subscript given as an
+argument (`<rsub|<arg|const>>`, the partial derivatives of baltakatei's
+notes, 0.3pt) and a page of Joris's `galois`.
+*Tried:* the typesetter takes a tree of the document under a place derived
+in a macro body for an argument (`rewritten_place`): the trees which the
+rewriter rebuilds without their place (`with`, `tformat`, `table`, the
+marks) look the same, and the cells of tables got markers (a paper of the
+corpus differed on 22 pages instead of 13). The rewriter knows where it
+substitutes; it would have to say it in the tree.
 
 ## 3. The identities which the caches rely on
 
