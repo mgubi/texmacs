@@ -2159,11 +2159,7 @@ edit_env_rep::exec_has_binding (tree t) {
 * This is what a document gets when it is loaded, and again when it is
 * updated (typeset_renumber_labels in edit_typeset.cpp): the epoch of the
 * buffer changes, the numbers of another epoch are not used, and a
-* typesetting of the whole document numbers the labels again. Each label
-* reads the variable auto-epoch, which the update changes: with the inputs
-* of the bridges (typeset_inputs_mode), the bridges which make labels are
-* typeset again, in the order of the document, and the others are used
-* again when the names of the labels did not change. Between two
+* typesetting of the whole document numbers the labels again. Between two
 * updates the names of the labels already made stay. Outside of a
 * typesetting pass (a converter which expands the macros of a copy of the
 * document) the counter names the labels, which gives the same names in a
@@ -2284,10 +2280,6 @@ edit_env_rep::exec_auto_id (tree t) {
     if (fresh) { (void) exec (compound ("inc-auto")); return ""; }
     return exec (tree (VALUE, "auto-nr"));
   }
-  // (the epoch of the numbering, which changes when the labels are
-  // numbered again: the bridges which make labels read it, so that only
-  // they are typeset again then)
-  if (fresh) (void) provides ("auto-epoch");
   string last= "";
   if (provides ("auto-last")) last= as_string (read ("auto-last"));
   if (!fresh) {

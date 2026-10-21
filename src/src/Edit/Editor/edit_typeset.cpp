@@ -1275,22 +1275,6 @@ edit_typeset_rep::typeset_invalidate_all () {
   ::notify_assign (ttt, path(), subtree (et, rp));
 }
 
-// The labels are to be numbered again. With the inputs of the bridges,
-// only the bridges which make labels are typeset again (and those whose
-// environment changes in consequence): they read auto-epoch (exec_auto_id
-// in env_exec.cpp), which is changed. The classic cache typesets it all
-// again.
-void
-edit_typeset_rep::typeset_invalidate_labels () {
-  static int epoch= 0;
-  if (typeset_inputs_mode () == 0) {
-    typeset_invalidate_all ();
-    return;
-  }
-  set_pre ("auto-epoch", as_string (++epoch));
-  notify_change (THE_TREE);
-}
-
 // The automatic labels are numbered again, in the order of the document
 // (exec_auto_id in env_exec.cpp), which is to be done before the tables
 // of contents and the indexes are made again: these hold the names of
@@ -1303,15 +1287,11 @@ edit_typeset_rep::typeset_renumber_labels () {
   array<int> before= auto_labels_numbers (root);
   if (!auto_labels_renumber (root)) return false;
   for (int i=0; i<N(buf->vws); i++)
-    ((tm_view) buf->vws[i])->ed->typeset_invalidate_labels ();
+    ((tm_view) buf->vws[i])->ed->typeset_invalidate_all ();
   // one pass, for the names: the references are not yet those of the
-  // tables to come, and the document is typeset again after them. It is a
-  // complete pass, which makes the auxiliary tables (generate_aux uses
-  // them), also when the bridges which make no labels are used again
+  // tables to come, and the document is typeset again after them
   SI x1, y1, x2, y2;
-  ttt->collect= (typeset_inputs_mode () != 0);
   typeset_sub (x1, y1, x2, y2);
-  ttt->collect= false;
   if (env->complete) {
     env->complete= false;
     // the references to a removed label are typeset again by the

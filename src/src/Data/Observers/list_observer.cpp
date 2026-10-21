@@ -68,21 +68,18 @@ public:
 
 void
 list_observer_rep::announce (tree& ref, modification mod) {
-  observer keep (this);  // (an observer may remove itself)
   if (!is_nil (o1)) o1->announce (ref, mod);
   if (!is_nil (o2)) o2->announce (ref, mod);
 }
 
 void
 list_observer_rep::done (tree& ref, modification mod) {
-  observer keep (this);  // (an observer may remove itself)
   if (!is_nil (o1)) o1->done (ref, mod);
   if (!is_nil (o2)) o2->done (ref, mod);
 }
 
 void
 list_observer_rep::touched (tree& ref, path p) {
-  observer keep (this);  // (an observer may remove itself)
   if (!is_nil (o1)) o1->touched (ref, p);
   if (!is_nil (o2)) o2->touched (ref, p);
 }
@@ -93,84 +90,72 @@ list_observer_rep::touched (tree& ref, path p) {
 
 void
 list_observer_rep::notify_assign (tree& ref, tree t) {
-  observer keep (this);  // (an observer may remove itself)
   if (!is_nil (o1)) o1->notify_assign (ref, t);
   if (!is_nil (o2)) o2->notify_assign (ref, t);
 }
 
 void
 list_observer_rep::notify_insert (tree& ref, int pos, int nr) {
-  observer keep (this);  // (an observer may remove itself)
   if (!is_nil (o1)) o1->notify_insert (ref, pos, nr);
   if (!is_nil (o2)) o2->notify_insert (ref, pos, nr);
 }
 
 void
 list_observer_rep::notify_remove (tree& ref, int pos, int nr) {
-  observer keep (this);  // (an observer may remove itself)
   if (!is_nil (o1)) o1->notify_remove (ref, pos, nr);
   if (!is_nil (o2)) o2->notify_remove (ref, pos, nr);
 }
 
 void
 list_observer_rep::notify_split (tree& ref, int pos, tree prev) {
-  observer keep (this);  // (an observer may remove itself)
   if (!is_nil (o1)) o1->notify_split (ref, pos, prev);
   if (!is_nil (o2)) o2->notify_split (ref, pos, prev);
 }
 
 void
 list_observer_rep::notify_var_split (tree& ref, tree t1, tree t2) {
-  observer keep (this);  // (an observer may remove itself)
   if (!is_nil (o1)) o1->notify_var_split (ref, t1, t2);
   if (!is_nil (o2)) o2->notify_var_split (ref, t1, t2);
 }
 
 void
 list_observer_rep::notify_join (tree& ref, int pos, tree next) {
-  observer keep (this);  // (an observer may remove itself)
   if (!is_nil (o1)) o1->notify_join (ref, pos, next);
   if (!is_nil (o2)) o2->notify_join (ref, pos, next);
 }
 
 void
 list_observer_rep::notify_var_join (tree& ref, tree t, int offset) {
-  observer keep (this);  // (an observer may remove itself)
   if (!is_nil (o1)) o1->notify_var_join (ref, t, offset);
   if (!is_nil (o2)) o2->notify_var_join (ref, t, offset);
 }
 
 void
 list_observer_rep::notify_assign_node (tree& ref, tree_label op) {
-  observer keep (this);  // (an observer may remove itself)
   if (!is_nil (o1)) o1->notify_assign_node (ref, op);
   if (!is_nil (o2)) o2->notify_assign_node (ref, op);
 }
 
 void
 list_observer_rep::notify_insert_node (tree& ref, int pos) {
-  observer keep (this);  // (an observer may remove itself)
   if (!is_nil (o1)) o1->notify_insert_node (ref, pos);
   if (!is_nil (o2)) o2->notify_insert_node (ref, pos);
 }
 
 void
 list_observer_rep::notify_remove_node (tree& ref, int pos) {
-  observer keep (this);  // (an observer may remove itself)
   if (!is_nil (o1)) o1->notify_remove_node (ref, pos);
   if (!is_nil (o2)) o2->notify_remove_node (ref, pos);
 }
 
 void
 list_observer_rep::notify_set_cursor (tree& ref, int pos, tree data) {
-  observer keep (this);  // (an observer may remove itself)
   if (!is_nil (o1)) o1->notify_set_cursor (ref, pos, data);
   if (!is_nil (o2)) o2->notify_set_cursor (ref, pos, data);
 }
 
 void
 list_observer_rep::notify_detach (tree& ref, tree closest, bool right) {
-  observer keep (this);  // (an observer may remove itself)
   if (!is_nil (o1)) o1->notify_detach (ref, closest, right);
   if (!is_nil (o2)) o2->notify_detach (ref, closest, right);
 }
@@ -261,14 +246,9 @@ void
 remove_observer (observer& o, observer what) {
   if (is_nil (o)) return;
   else if (o == what) o= nil_observer;
-  else if (o->get_type () == OBSERVER_LIST) {
+  else {
     remove_observer (o->get_child (0), what);
     remove_observer (o->get_child (1), what);
-    // a list with an empty side is replaced by its other side: the list of
-    // a tree which many observers come to and leave (an include, which
-    // holds the loci of the included file) grew at every typesetting
-    if (is_nil (o->get_child (0))) { observer r= o->get_child (1); o= r; }
-    else if (is_nil (o->get_child (1))) { observer l= o->get_child (0); o= l; }
   }
 }
 

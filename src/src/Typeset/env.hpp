@@ -689,17 +689,6 @@ public:
     (*rec_merged) (a.operator-> ())= true; (*rec_held) << a; }
   void write_binding (string key, tree value, string extra);
   tree store_binding (string key, tree value, string extra);
-  // An entry of an auxiliary table (<write|toc|...>: the table of contents,
-  // the index...), which a complete pass makes: it is recorded with the
-  // bindings, as <write|key|value>, so that a bridge used again writes it
-  // again, and a complete pass need not typeset all again
-  inline void store_aux (string key, tree value) {
-    if (!complete) return;
-    if (!local_aux->contains (key)) local_aux (key)= tree (DOCUMENT);
-    local_aux (key) << value; }
-  inline void write_aux (string key, tree value) {
-    if (rec_bindings != NULL) (*rec_bindings) << tree (WRITE, key, value);
-    store_aux (key, value); }
   inline void write_bindings (array<tree> l) {
     // (those of a bridge used again: the record above gets the same tuples,
     // which take the value stored when it is a new one, so that the next
@@ -707,7 +696,6 @@ public:
     if (rec_bindings != NULL) (*rec_bindings) << l;
     for (int i=0; i<N(l); i++) {
       tree t= l[i];
-      if (is_func (t, WRITE, 2)) { store_aux (t[0]->label, t[1]); continue; }
       tree stored= store_binding (t[0]->label, t[1], t[2]->label);
       if (stored.operator-> () != t[1].operator-> ()) t[1]= stored; } }
   // a record of the bindings written for the time of one typesetting,
