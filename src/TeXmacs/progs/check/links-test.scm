@@ -1445,6 +1445,85 @@
             "Saved sm.tm; not saved: sm.tm (style: the file changed on disk)")
     (buffer-pretend-saved q)))
 
+;; Saving a part view whose own file is also open as an ordinary buffer:
+;; the view of the master is not shared with the buffer of the master, and
+;; the buffer of an included file diverges from the view of that file when
+;; both have changes (part-shared.scm). When that buffer has unsaved
+;; changes of its own, the file is not written (as an included file, #390)
+;; and the buffer keeps its changes and stays modified; without changes
+;; of its own, the buffer gets what was written and is saved.
+(define (test-part-open-own-file)
+  (check-group "part view of an open file")
+  (write-doc "oa.tm" '("book") '() '((chapter "A") "a"))
+  (write-doc "om.tm" '("book") '() '("intro" (include "oa.tm")))
+  (let* ((m (tmp "om.tm"))
+         (a (tmp "oa.tm"))
+         (q (system->url (part-url m m)))
+         (p (system->url (part-url m a))))
+    ;; the master is open with unsaved changes of its own
+    (load-buffer m)
+    (edit (tree-set (bt 0) "intro mine"))
+    (check-true (buffer-modified? m))
+    (load-buffer q)
+    (update-forced)
+    (check= (st 0) "intro")
+    (edit (tree-set (bt 0) "intro view"))
+    (save-buffer q)
+    (check= (file-body "om.tm") '(document "intro" (include "oa.tm")))
+    (check= (buffer-body m) '(document "intro mine" (include "oa.tm")))
+    (check-true (buffer-modified? m))
+    (check= (part-save-message)
+            "Not saved: om.tm (it is open with other unsaved changes)")
+    (check-true (buffer-modified? q))
+    (check= (part-view-unsaved-files q) (list m))
+    ;; the master is open without changes of its own: it gets the body
+    ;; written and is saved
+    (switch-to-buffer m)
+    (edit (tree-set (bt 0) "intro"))
+    (buffer-pretend-saved m)
+    (save-buffer q)
+    (check= (file-body "om.tm") '(document "intro view" (include "oa.tm")))
+    (check= (buffer-body m) '(document "intro view" (include "oa.tm")))
+    (check-false (buffer-modified? m))
+    (check= (part-save-message) "Saved om.tm")
+    (check-false (buffer-modified? q))
+    (buffer-close q)
+    (buffer-close m)
+    ;; an included file opened, without changes, after its copy was
+    ;; changed: its buffer gets the copy and is saved (part-copy-action,
+    ;; sync)
+    (load-buffer q)
+    (update-forced)
+    (edit (tree-set (bt 1 2 1) "a copy"))
+    (load-buffer a)
+    (save-buffer q)
+    (check= (file-body "oa.tm") '(document (chapter "A") "a copy"))
+    (check= (buffer-body a) '(document (chapter "A") "a copy"))
+    (check-false (buffer-modified? a))
+    (check= (part-save-message) "Saved om.tm, oa.tm")
+    (buffer-close a)
+    (buffer-close q)
+    (write-doc "oa.tm" '("book") '() '((chapter "A") "a"))
+    ;; the view of an included file open with unsaved changes of its own
+    (load-buffer a)
+    (edit (tree-set (bt 1) "a mine"))
+    (load-buffer p)
+    (update-forced)
+    (check= (car (st 0)) 'shared)
+    (check= (st 0 2) '(document (chapter "A") "a"))
+    (edit (tree-set (bt 0 2 1) "a view"))
+    (save-buffer p)
+    (check= (file-body "oa.tm") '(document (chapter "A") "a"))
+    (check= (buffer-body a) '(document (chapter "A") "a mine"))
+    (check-true (buffer-modified? a))
+    (check= (part-save-message)
+            "Not saved: oa.tm (it is open with other unsaved changes)")
+    (check-true (buffer-modified? p))
+    (buffer-pretend-saved p)
+    (buffer-close p)
+    (buffer-pretend-saved a)
+    (buffer-close a)))
+
 ;; The part tmfs opens a file of a project as a document of its own: its
 ;; url names the master and the file, its body is shared with the file and
 ;; its environment marks it as a part.
@@ -1944,6 +2023,7 @@
   (run-group test-part-ids)
   (run-group test-part-label-jump)
   (run-group test-part-style)
+  (run-group test-part-open-own-file)
   (run-group test-parts-tmfs)
   (run-group test-document-parts)
   (run-group test-document-parts-undo)

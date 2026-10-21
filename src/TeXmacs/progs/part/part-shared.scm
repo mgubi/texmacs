@@ -295,7 +295,8 @@
 (tm-define (buffer-shared-set-body buf body)
   (with-author mirror-author
     (with-global mirror-idle? #f
-      (tree-set! (buffer-get-body buf) (tm->tree body))))
+      ;; (tree-set, not the macro tree-set!, which needs a variable)
+      (tree-set (buffer-get-body buf) (tm->tree body))))
   (ahash-remove! buffer-diverged buf)
   (ahash-remove! buffer-pending buf)
   (ahash-remove! buffer-black-list buf))

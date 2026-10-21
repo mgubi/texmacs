@@ -581,6 +581,21 @@
                     (tm-children doc))))
         (else doc)))
 
+(define (part-own-action f body)
+  ;; what saving a part view does with an open buffer of its own file @f,
+  ;; which is written with the body @body. The view of a master is not
+  ;; shared with the buffer of the master, and the buffer of an included
+  ;; file diverges from the view of that file when both have changes
+  ;; (part-shared.scm):
+  ;;   none      no open buffer
+  ;;   same      the buffer has @body
+  ;;   sync      the buffer, without changes of its own, gets @body
+  ;;   conflict  the buffer has other unsaved changes: refused
+  (cond ((not (buffer-exists? f)) 'none)
+        ((== (tm->stree (buffer-get-body f)) (tm->stree body)) 'same)
+        ((buffer-modified? f) 'conflict)
+        (else 'sync)))
+
 (tmfs-save-handler (part name doc)
   (buffer-shared-flush)
   (let* ((m (part-master name))
@@ -606,21 +621,33 @@
     (when master-style?
       ;; the view of the master: its file is written with the new style
       (set! com (tmfile-assign com 'style style)))
-    (if (tree-export (tm->tree com) f "texmacs")
-        (begin
-          (buffer-pretend-modified f)
-          (part-save-refuse f "the file could not be written"))
-        (begin
-          (when master-style?
-            ;; which an open buffer of the master gets too
-            (when (buffer-exists? m)
-              (part-set-buffer-style m style))
-            (part-remember-style name style))
-          (buffer-pretend-saved f)
-          (with b (tmfile-extract com 'body)
-            (part-remember name f b b))
-          (set! own-ok? #t)
-          (set! part-save-written (cons f part-save-written))))
+    (let* ((b (tmfile-extract com 'body))
+           (action (part-own-action f b)))
+      (cond ((== action 'conflict)
+             ;; an open buffer of the file has unsaved changes of its own,
+             ;; which the file would lose (and the buffer would overwrite
+             ;; the view): the file is not written, as an included file
+             ;; (the master does not get the style of the view either)
+             (part-save-refuse f "it is open with other unsaved changes"))
+            ((tree-export (tm->tree com) f "texmacs")
+             (buffer-pretend-modified f)
+             (part-save-refuse f "the file could not be written"))
+            (else
+             (when (== action 'sync)
+               ;; an open buffer without changes of its own gets the body
+               ;; which was written
+               (buffer-shared-set-body f b))
+             (when master-style?
+               ;; which an open buffer of the master gets too
+               (when (buffer-exists? m)
+                 (part-set-buffer-style m style))
+               (part-remember-style name style))
+             ;; (the open buffer has what was written)
+             (when (!= action 'none)
+               (buffer-pretend-saved f))
+             (part-remember name f b b)
+             (set! own-ok? #t)
+             (set! part-save-written (cons f part-save-written)))))
     (part-save-copies name (part-copies body))
     (when (and (!= f m) own-ok?)
       ;; (the master does not get the style of a view whose file could not
