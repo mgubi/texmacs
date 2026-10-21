@@ -411,18 +411,24 @@
   ;; Only the name is checked in the result: with Qt pipes, the output of
   ;; the command is read by the socket notifiers of the event loop, which
   ;; does not run here, so that the result may come without it.
+  ;; On Windows, the command line links run no command: their write, which
+  ;; asks the plugin for the command, does nothing (cmdline_link.cpp, under
+  ;; OS_MINGW), so that the plugin sees no input there.
   (set! chat-seen '())
   (set! notified '())
   (check= (start* "tmtestchat" "plugins-test-chat") "cmdline")
   (connection-write "tmtestchat" "plugins-test-chat" '(document "a b" "c"))
-  (check= chat-seen '("plugins-test-chat" "a b\nc"))
+  (if (os-mingw?)
+      (skip ":cmdline" "command line links run no command on Windows")
+      (check= chat-seen '("plugins-test-chat" "a b\nc")))
   (check-true (poll "tmtestchat" "plugins-test-chat"
                     (lambda () (nnull? (notified-on "output")))))
   (check-true (contains? (notified-on "output") "\"plugins-test-chat="))
   (check-false (contains? (notified-on "output") "\"default="))
   (check= (start* "tmtestchat" "plugins-test-other") "cmdline")
   (connection-write "tmtestchat" "plugins-test-other" "d")
-  (check= chat-seen '("plugins-test-other" "d"))
+  (unless (os-mingw?)
+    (check= chat-seen '("plugins-test-other" "d")))
   (check-true (connection-request? "tmtestrequest"))
   (check= (start* "tmtestrequest" "plugins-test-request") "request")
   (connection-write "tmtestrequest" "plugins-test-request" "e")
