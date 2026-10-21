@@ -32,6 +32,7 @@ public:
   hashmap<string,tree> old_patch;
   bool paper;
   page_memo* kept_pages;   // the pages of the last pass (pager.hpp)
+  bool collect;            // a complete pass with the bridges used again
 
   shove_memo shoves;        // memoized shoves
 
