@@ -1206,7 +1206,11 @@ report_redefined (array<tree> redefined) {
   }
 }
 
-static void
+// Removes the references which the last complete pass did not define, and
+// tells how many were removed. A reference to one of them was typeset with
+// its old value during that pass (lookup_value reads local_ref first), and
+// was not reported as missing: one more pass gives it "?" (#417).
+static int
 clean_unused (hashmap<string,tree>& refs, hashmap<string,bool> used) {
   array<string> a;
   for (iterator<string> it= iterate (refs); it->busy(); ) {
@@ -1215,6 +1219,7 @@ clean_unused (hashmap<string,tree>& refs, hashmap<string,bool> used) {
   }
   for (int i=0; i<N(a); i++)
     refs->reset (a[i]);
+  return N(a);
 }
 
 void
@@ -1229,8 +1234,11 @@ edit_typeset_rep::typeset (SI& x1, SI& y1, SI& x2, SI& y2) {
     x2= max (x2, sx2); y2= max (y2, sy2);
     if (!env->complete) break;
     env->complete= false;
-    clean_unused (env->local_ref, env->touched);
-    if (N(env->missing) == 0 && N(env->redefined) == 0) break;
+    // a removed label is treated like a redefined one: one more pass
+    // (still bounded by the test below, which stops when the counts of
+    // missing and redefined references no longer decrease)
+    int removed= clean_unused (env->local_ref, env->touched);
+    if (N(env->missing) == 0 && N(env->redefined) == 0 && removed == 0) break;
     if ((N(env->missing) == missing_nr && N(env->redefined) == redefined_nr) ||
         (N(env->missing) > missing_nr || N(env->redefined) > redefined_nr)) {
       report_missing (env->missing);
@@ -1286,7 +1294,10 @@ edit_typeset_rep::typeset_renumber_labels () {
   typeset_sub (x1, y1, x2, y2);
   if (env->complete) {
     env->complete= false;
-    clean_unused (env->local_ref, env->touched);
+    // the references to a removed label are typeset again by the
+    // typesetting which follows (see typeset above)
+    if (clean_unused (env->local_ref, env->touched) != 0)
+      ::notify_assign (ttt, path(), ttt->br->st);
   }
   return auto_labels_numbers (root) != before;
 }
