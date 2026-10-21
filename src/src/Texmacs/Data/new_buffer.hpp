@@ -83,6 +83,8 @@ string get_title_buffer (url name);
 void set_buffer_tree (url name, tree doc);
 tree get_buffer_tree (url name);
 void set_buffer_body (url name, tree body);
+tree get_buffer_style (url name);
+void set_buffer_style (url name, tree style);
 tree get_buffer_body (url name);
 url new_buffer_in_new_window (url name, tree t, tree geom= "");
 int  get_last_save_buffer (url name);

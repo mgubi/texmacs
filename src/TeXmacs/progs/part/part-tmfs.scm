@@ -133,6 +133,17 @@
   (and-with p (ahash-ref part-loaded (cons name (url->unix u)))
     (cdr p)))
 
+(define part-loaded-style (make-ahash-table))
+
+(define (part-style s)
+  ;; the style @s as a tuple: a file with one style has it as a string
+  (with s (and s (tm->stree s))
+    (if (string? s) `(tuple ,s) s)))
+
+(define (part-remember-style name style)
+  ;; the style of the master when the part view @name was loaded or saved
+  (ahash-set! part-loaded-style name (part-style style)))
+
 (define (part-file-body u)
   ;; the body of the file @u on disk, or #f
   (and (url-exists? u)
@@ -151,6 +162,11 @@
   (cond ((tm-func? doc 'document)
          (cons (tm-label doc)
                (map (cut part-expand-body <> u name) (tm-children doc))))
+        ((and (tm-in? doc '(show-part hide-part)) (== (tm-arity doc) 3))
+         ;; a document saved with its parts: the body of a part is expanded,
+         ;; its alternative (evaluated when it is hidden) is not
+         `(,(tm-label doc) ,(tm-ref doc 0)
+           ,(part-expand-body (tm-ref doc 1) u name) ,(tm-ref doc 2)))
         ((and (or (tm-func? doc 'include 1)
                   (tm-func? doc 'include* 1))
               (tm-atomic? (tm-ref doc 0)))
@@ -175,6 +191,8 @@
            `(body ,body)))
         ((tm-in? doc '(style references auxiliary))
          (with val (tmfile-extract mas (tm-label doc))
+           (when (tm-is? doc 'style)
+             (part-remember-style name (or val (tm-ref doc 0))))
            (if val `(,(tm-label doc) ,val) doc)))
         ((tm-is? doc 'initial)
          (let* ((mt (master-inits mas u m))
@@ -205,10 +223,27 @@
 ;; The copies of the included files in a part view
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(define (part-paragraphs-flat l)
+  ;; the paragraphs @l, with the paragraphs of the bodies of the parts
+  ;; (show-part, hide-part) in place of the parts
+  (append-map (lambda (x)
+                (if (and (tm-in? x '(show-part hide-part)) (== (tm-arity x) 3))
+                    (with b (tm-ref x 1)
+                      (part-paragraphs-flat
+                       (if (tm-func? b 'document) (tm-children b) (list b))))
+                    (list x)))
+              l))
+
 (define (part-compress-body doc u)
+  ;; the parts (show-part, hide-part) are kept, with the copies in their
+  ;; bodies and alternatives turned back into inclusions
   (cond ((tm-func? doc 'document)
          (cons (tm-label doc)
                (map (cut part-compress-body <> u) (tm-children doc))))
+        ((and (tm-in? doc '(show-part hide-part)) (== (tm-arity doc) 3))
+         `(,(tm-label doc) ,(tm-ref doc 0)
+           ,(part-compress-body (tm-ref doc 1) u)
+           ,(part-compress-body (tm-ref doc 2) u)))
         ((tm-func? doc 'shared 3)
          (let* ((name  (tm->string (tm-ref doc 1)))
                 (delta (url-delta u name)))
@@ -218,6 +253,8 @@
 (define (part-own-body body u m)
   ;; the body of the file @u of a part view of the master @m, without the
   ;; shared copy which holds it when @u is not the master
+  (when (and (!= u m) (tm-func? body 'document))
+    (set! body (cons 'document (part-paragraphs-flat (tm-children body)))))
   (when (and (!= u m) (tm-func? body 'shared))
     (set! body (tm-ref body :last)))
   (when (and (!= u m) (tm-func? body 'document 1)
@@ -228,7 +265,7 @@
 (define (part-copies body)
   ;; the list of (file . body) of the included files in @body
   (cond ((tm-func? body 'document)
-         (append-map part-copies (tm-children body)))
+         (append-map part-copies (part-paragraphs-flat (tm-children body))))
         ((and (tm-func? body 'shared 3) (tm-atomic? (tm-ref body 1)))
          (list (cons (tm->string (tm-ref body 1))
                      (tm->stree (tm-ref body 2)))))
@@ -247,17 +284,24 @@
 
 (tm-define (part-view-unsaved-files buf)
   ;; the files of the part view @buf whose copies changed since they were
-  ;; loaded or saved: its own file first, then the included files
+  ;; loaded or saved: its own file first, then the included files, then the
+  ;; master when the style of the view changed
   (with (name f body copies) (part-view-info buf)
-    (append
-     (with start (part-loaded-start name f)
-       (if (and start (!= (part-compress-body body f) start)) (list f) (list)))
-     (list-filter
-      (map (lambda (c)
-             (with start (part-loaded-start name (car c))
-               (and start (!= (cdr c) start) (unix->url (car c)))))
-           copies)
-      (lambda (x) x)))))
+    (let* ((own (with start (part-loaded-start name f)
+                  (if (and start (!= (part-compress-body body f) start))
+                      (list f) (list))))
+           (incl (list-filter
+                  (map (lambda (c)
+                         (with start (part-loaded-start name (car c))
+                           (and start (!= (cdr c) start) (unix->url (car c)))))
+                       copies)
+                  (lambda (x) x)))
+           (m (part-master name))
+           (l (append own incl)))
+      (if (and (part-style-changed? name (part-buffer-style buf))
+               (nin? (url->unix m) (map url->unix l)))
+          (append l (list m))
+          l))))
 
 (tm-define (part-file-unsaved? m u)
   ;; does the file @u of the master @m have unsaved changes, in a buffer of
@@ -351,14 +395,21 @@
 (define part-save-overwrite (list))
 
 ;; The files written and refused (as (file . reason)) by the last save of a
-;; part view; the part file comes first.
+;; part view; the part file comes first. The pending files are open masters
+;; which got the style of the view but are not saved (they have other
+;; unsaved changes).
 (tm-define part-save-written (list))
 (tm-define part-save-refused (list))
+(tm-define part-save-pending (list))
+
+(define (part-save-refuse u why)
+  (set! part-save-refused (append part-save-refused (list (cons u why)))))
+
+(define (part-save-wrote u)
+  (set! part-save-written (append part-save-written (list u))))
 
 (define (part-save-copies name copies)
-  (with refuse (lambda (u why)
-                 (set! part-save-refused
-                       (append part-save-refused (list (cons u why)))))
+  (with refuse part-save-refuse
     (for (c copies)
       (let* ((u (unix->url (car c)))
              (body (cdr c))
@@ -386,8 +437,125 @@
                      (when (!= action 'write)
                        (part-remember name u (or (part-file-body u) body)
                                       body))
-                     (set! part-save-written
-                           (append part-save-written (list u)))))))))))
+                     (part-save-wrote u)))))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; The style of the master
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; A part view has the style of its master, and a change of style in the
+;; view is a change of the style of the master: saving the view gives the
+;; master the new style. When the master is open, its buffer gets the style
+;; and is saved, unless it has other unsaved changes: then it is only left
+;; modified (part-save-pending). Otherwise the style is written into the
+;; file of the master, whose other contents stay as they are on disk.
+;;
+;; The references and the auxiliary data of a part view are not saved:
+;; they are computed for the part only (labels of the copies, pages which
+;; do not follow those of the master), so that they would replace the
+;; complete ones of the master with partial ones. The file of the part
+;; keeps those on disk, and the master gets its own when it is typeset.
+
+(define (part-file-style u)
+  ;; the style of the file @u on disk, or #f
+  (and (url-exists? u)
+       (part-style (tmfile-extract (tree-import u "texmacs") 'style))))
+
+(define (part-buffer-style buf)
+  ;; the style of the buffer @buf
+  (part-style (buffer-get-style buf)))
+
+(define (part-style-changed? name style)
+  ;; is the style @style of the part view @name not the one of its master
+  ;; when the view was loaded or saved?
+  (with start (ahash-ref part-loaded-style name)
+    (and style start (!= (part-style style) start))))
+
+(define (part-set-buffer-style buf style)
+  ;; give the open buffer @buf the style @style, in all its views (and in
+  ;; its data, for a master loaded without a view for the references of a
+  ;; chapter)
+  (with st (part-style style)
+    (when (!= (part-buffer-style buf) st)
+      (buffer-set-style buf st))))
+
+(define (part-write-style u style)
+  ;; write @style into the file @u, keeping the rest of the file; #t on
+  ;; error
+  (with doc (tmfile-assign (tree-import u "texmacs") 'style style)
+    (or (not doc) (tree-export (tm->tree doc) u "texmacs"))))
+
+(define (part-master-style-action name m style)
+  ;; what saving the part view @name, whose style is @style, does with the
+  ;; style of its master @m (an included file is the part file):
+  ;;   same        the style did not change (or the master has it)
+  ;;   buffer      set the style in the open buffer of the master, save it
+  ;;   pending     set the style in the open buffer of the master, which
+  ;;               has other unsaved changes: it is left modified
+  ;;   write       write the style into the file of the master
+  ;;   remote      refused (remote file, TeXmacs file system)
+  ;;   unwritable  refused
+  (cond ((not (part-style-changed? name style)) 'same)
+        ((or (url-rooted-tmfs? m) (url-rooted-web? m)) 'remote)
+        ((buffer-exists? m)
+         (cond ((buffer-modified? m) 'pending)
+               ((== (part-buffer-style m) (part-style style)) 'same)
+               (else 'buffer)))
+        ((== (part-file-style m) (part-style style)) 'same)
+        ((not (part-writable? m)) 'unwritable)
+        (else 'write)))
+
+(define (part-style-changed-on-disk? name m action)
+  ;; did the master @m change on disk since the part view @name was loaded?
+  (cond ((== action 'buffer)
+         (and-with mod-t (url-last-modified m)
+           (and-with save-t (buffer-last-save m)
+             (> mod-t save-t))))
+        ((== action 'write)
+         (!= (part-file-style m) (ahash-ref part-loaded-style name)))
+        (else #f)))
+
+(tm-define (part-master-style-plan buf)
+  ;; for the part view @buf: (master action changed-on-disk?) for the
+  ;; style of its master
+  (let* ((name (part-open-name buf))
+         (m (part-master name))
+         (f (part-file name))
+         (style (part-buffer-style buf))
+         (action (cond ((!= f m) (part-master-style-action name m style))
+                       ((part-style-changed? name style) 'write)
+                       (else 'same))))
+    (list m action (part-style-changed-on-disk? name m action))))
+
+(define (part-save-master-style name m style)
+  (with action (part-master-style-action name m style)
+    (cond ((== action 'same)
+           (when style (part-remember-style name style)))
+          ((== action 'remote)
+           (part-save-refuse m "style: remote files are not saved from a part view"))
+          ((== action 'unwritable)
+           (part-save-refuse m "style: the file is not writable"))
+          ((and (part-style-changed-on-disk? name m action)
+                (nin? (url->unix m) part-save-overwrite))
+           (part-save-refuse m "style: the file changed on disk"))
+          ((== action 'write)
+           (if (part-write-style m style)
+               (part-save-refuse m "style: the file could not be written")
+               (begin
+                 (part-remember-style name style)
+                 (part-save-wrote m))))
+          ((== action 'pending)
+           ;; (the style is still remembered as the old one: the file of
+           ;; the master does not have the new one yet)
+           (part-set-buffer-style m style)
+           (set! part-save-pending (append part-save-pending (list m))))
+          (else
+           (part-set-buffer-style m style)
+           (if (buffer-save m)
+               (part-save-refuse m "style: the file could not be written")
+               (begin
+                 (part-remember-style name style)
+                 (part-save-wrote m)))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Saving
@@ -420,21 +588,44 @@
          (ori (tree-import f "texmacs"))
          (mas (if (== m f) doc (tree-import m "texmacs")))
          (com (part-compress doc ori mas f m))
-         (body (part-own-body (tmfile-extract doc 'body) f m)))
+         (body (part-own-body (tmfile-extract doc 'body) f m))
+         (style (tmfile-extract doc 'style))
+         (master-style? (and (== f m) (part-style-changed? name style)))
+         (own-ok? #f))
     ;;(display* "com= " (tm->stree com) "\n")
     (set! part-save-written (list))
     (set! part-save-refused (list))
+    (set! part-save-pending (list))
+    (when (and master-style?
+               (part-style-changed-on-disk? name m 'write)
+               (nin? (url->unix m) part-save-overwrite))
+      ;; the view of the master, whose style changed on disk: the file
+      ;; keeps the style on disk (its body is written)
+      (part-save-refuse m "style: the file changed on disk")
+      (set! master-style? #f))
+    (when master-style?
+      ;; the view of the master: its file is written with the new style
+      (set! com (tmfile-assign com 'style style)))
     (if (tree-export (tm->tree com) f "texmacs")
         (begin
           (buffer-pretend-modified f)
-          (set! part-save-refused
-                (list (cons f "the file could not be written"))))
+          (part-save-refuse f "the file could not be written"))
         (begin
+          (when master-style?
+            ;; which an open buffer of the master gets too
+            (when (buffer-exists? m)
+              (part-set-buffer-style m style))
+            (part-remember-style name style))
           (buffer-pretend-saved f)
           (with b (tmfile-extract com 'body)
             (part-remember name f b b))
-          (set! part-save-written (list f))))
-    (part-save-copies name (part-copies body))))
+          (set! own-ok? #t)
+          (set! part-save-written (cons f part-save-written))))
+    (part-save-copies name (part-copies body))
+    (when (and (!= f m) own-ok?)
+      ;; (the master does not get the style of a view whose file could not
+      ;; be written: the view stays modified)
+      (part-save-master-style name m style))))
 
 (tmfs-wrap-handler (part name)
   (part-file name))
@@ -445,17 +636,25 @@
 
 (tm-define (part-save-message)
   ;; the message after the last save of a part view
-  (with refused (map (lambda (r)
-                       (string-append (part-file-names (list (car r)))
-                                      " (" (cdr r) ")"))
-                     part-save-refused)
-    (cond ((null? refused)
-           (string-append "Saved " (part-file-names part-save-written)))
-          ((null? part-save-written)
-           (string-append "Not saved: " (string-recompose refused ", ")))
-          (else
-           (string-append "Saved " (part-file-names part-save-written)
-                          "; not saved: " (string-recompose refused ", "))))))
+  (let* ((refused (map (lambda (r)
+                         (string-append (part-file-names (list (car r)))
+                                        " (" (cdr r) ")"))
+                       part-save-refused))
+         (msg (cond ((null? refused)
+                     (string-append "Saved "
+                                    (part-file-names part-save-written)))
+                    ((null? part-save-written)
+                     (string-append "Not saved: "
+                                    (string-recompose refused ", ")))
+                    (else
+                     (string-append "Saved "
+                                    (part-file-names part-save-written)
+                                    "; not saved: "
+                                    (string-recompose refused ", "))))))
+    (if (null? part-save-pending) msg
+        (string-append msg "; new style in "
+                       (part-file-names part-save-pending)
+                       " (open with other unsaved changes, not saved)"))))
 
 (define (part-save-now buf)
   (if (buffer-save buf)
@@ -478,7 +677,10 @@
                   (car args) (current-buffer)))
          (name (part-open-name buf))
          (f (part-file name))
-         (changed (map car (list-filter (part-save-plan buf) caddr)))
+         (changed (map car (list-filter
+                            (cons (part-master-style-plan buf)
+                                  (part-save-plan buf))
+                            caddr)))
          (disk (part-loaded-disk name f)))
     (when (and disk (!= (part-file-body f) disk))
       (set! changed (cons f changed)))
