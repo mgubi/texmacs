@@ -152,6 +152,7 @@ void remove_observer (observer& o, observer what);
 void attach_observer (tree& ref, observer o);
 void detach_observer (tree& ref, observer o);
 void clean_observers (tree& ref);
+void simplify_observers (tree& ref);
 
 path obtain_ip (tree& ref);
 void attach_ip (tree& ref, path ip);

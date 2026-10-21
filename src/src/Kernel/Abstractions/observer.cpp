@@ -98,6 +98,11 @@ simplify (observer& obs) {
   }
 }
 
+void
+simplify_observers (tree& ref) {
+  simplify (ref->obs);
+}
+
 static void
 detach (tree& ref, tree closest, bool right) {
   if (!is_nil (ref->obs)) {
