@@ -581,20 +581,51 @@
                     (tm-children doc))))
         (else doc)))
 
+;; The own file of a part view may be open as an ordinary buffer. The view
+;; of a master is not shared with the buffer of the master, and the buffer
+;; of an included file diverges from the view of that file when both have
+;; changes (part-shared.scm). That buffer is marked saved only when it has
+;; what is written, and its unsaved changes are never lost: as for an
+;; included file (part-copy-action), a buffer with the body of the view
+;; and changes of its own (outside the body: style, initial environment)
+;; is saved itself, and a buffer with other changes of the body is
+;; refused.
+
+(define (part-buffer-own-body f)
+  ;; the body of the open buffer of the file @f, with inclusions in place
+  ;; of the copies of the included files which it may have received from
+  ;; a part view (buffer-restore in part-shared.scm)
+  (part-compress-body (tm->stree (buffer-get-body f)) f))
+
 (define (part-own-action f body)
   ;; what saving a part view does with an open buffer of its own file @f,
-  ;; which is written with the body @body. The view of a master is not
-  ;; shared with the buffer of the master, and the buffer of an included
-  ;; file diverges from the view of that file when both have changes
-  ;; (part-shared.scm):
-  ;;   none      no open buffer
-  ;;   same      the buffer has @body
-  ;;   sync      the buffer, without changes of its own, gets @body
+  ;; which gets the body @body:
+  ;;   none      no open buffer: the file is written
+  ;;   same      the buffer, without changes, has @body: the file is
+  ;;             written
+  ;;   buffer    the buffer has @body and changes of its own: it is saved
+  ;;   sync      the buffer, without changes of its own, gets @body: the
+  ;;             file is written
   ;;   conflict  the buffer has other unsaved changes: refused
   (cond ((not (buffer-exists? f)) 'none)
-        ((== (tm->stree (buffer-get-body f)) (tm->stree body)) 'same)
-        ((buffer-modified? f) 'conflict)
-        (else 'sync)))
+        ((!= (part-buffer-own-body f) (tm->stree body))
+         (if (buffer-modified? f) 'conflict 'sync))
+        ((buffer-modified? f) 'buffer)
+        (else 'same)))
+
+(define (part-own-body-set f body)
+  ;; give the open buffer of @f the body @body, unless it has it already
+  ;; (it may have copies of the included files instead of inclusions)
+  (when (!= (tm->stree (buffer-get-body f)) (tm->stree body))
+    (buffer-shared-set-body f body)))
+
+(tm-define (part-own-plan buf)
+  ;; for the part view @buf: (file action changed-on-disk?) for its own
+  ;; file
+  (buffer-shared-flush)
+  (with (name f body copies) (part-view-info buf)
+    (with action (part-own-action f (part-compress-body body f))
+      (list f action (part-changed-on-disk? name f action)))))
 
 (tmfs-save-handler (part name doc)
   (buffer-shared-flush)
@@ -624,19 +655,40 @@
     (let* ((b (tmfile-extract com 'body))
            (action (part-own-action f b)))
       (cond ((== action 'conflict)
-             ;; an open buffer of the file has unsaved changes of its own,
-             ;; which the file would lose (and the buffer would overwrite
-             ;; the view): the file is not written, as an included file
-             ;; (the master does not get the style of the view either)
+             ;; an open buffer of the file has unsaved changes of its own
+             ;; in the body, which the file would lose (and the buffer
+             ;; would overwrite the view): the file is not written, as an
+             ;; included file (the master does not get the style of the
+             ;; view either)
              (part-save-refuse f "it is open with other unsaved changes"))
+            ((and (== action 'buffer)
+                  (part-changed-on-disk? name f action)
+                  (nin? (url->unix f) part-save-overwrite))
+             (part-save-refuse f "the file changed on disk"))
+            ((== action 'buffer)
+             ;; an open buffer with the body of the view and changes of its
+             ;; own (style, initial environment) is saved itself; the view
+             ;; of the master gives it its new style first (as an open
+             ;; master gets the style of a view of an included file)
+             (part-own-body-set f b)
+             (when master-style?
+               (part-set-buffer-style f style))
+             (if (buffer-save f)
+                 (part-save-refuse f "the file could not be written")
+                 (begin
+                   (when master-style?
+                     (part-remember-style name style))
+                   (part-remember name f (or (part-file-body f) b) b)
+                   (set! own-ok? #t)
+                   (set! part-save-written (cons f part-save-written)))))
             ((tree-export (tm->tree com) f "texmacs")
              (buffer-pretend-modified f)
              (part-save-refuse f "the file could not be written"))
             (else
-             (when (== action 'sync)
+             (when (in? action '(same sync))
                ;; an open buffer without changes of its own gets the body
                ;; which was written
-               (buffer-shared-set-body f b))
+               (part-own-body-set f b))
              (when master-style?
                ;; which an open buffer of the master gets too
                (when (buffer-exists? m)
@@ -705,11 +757,13 @@
          (name (part-open-name buf))
          (f (part-file name))
          (changed (map car (list-filter
-                            (cons (part-master-style-plan buf)
-                                  (part-save-plan buf))
+                            (cons* (part-own-plan buf)
+                                   (part-master-style-plan buf)
+                                   (part-save-plan buf))
                             caddr)))
          (disk (part-loaded-disk name f)))
-    (when (and disk (!= (part-file-body f) disk))
+    (when (and disk (!= (part-file-body f) disk)
+               (nin? (url->unix f) (map url->unix changed)))
       (set! changed (cons f changed)))
     (cond ((not (buffer-modified? buf))
            (set-message "No changes need to be saved" "Save file"))
