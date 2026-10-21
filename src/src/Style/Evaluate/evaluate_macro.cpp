@@ -13,6 +13,7 @@
 #include "std_environment.hpp"
 #include "drd_mode.hpp"
 #include "drd_std.hpp"
+#include "hashset.hpp"
 
 /******************************************************************************
 * Environment changes
@@ -40,9 +41,48 @@ protect_value (tree val) {
   return tree (QUASIQUOTE, protect_parts (val));
 }
 
-// the variables assigned in the branches of a residual if or case
-// (evaluate_branches)
-array<string>* residual_assigned= NULL;
+list<string>* residual_assigned= NULL;
+
+int scratch_depth= 0;
+int branch_depth= 0;
+
+static void
+assigned_in (tree t, list<string>& r, hashset<string>& seen) {
+  // the variables which t assigns by name, also through the macros which
+  // it calls (each followed once); a name computed by the macro is not
+  // known (see the limits of decision 1.7)
+  if (is_atomic (t)) return;
+  if (is_func (t, ASSIGN) && N(t) >= 1 && is_atomic (t[0]))
+    r= list<string> (t[0]->label, r);
+  string tag= "";
+  if (L(t) >= START_EXTENSIONS) tag= as_string (L(t));
+  else if (is_func (t, COMPOUND) && N(t) >= 1 && is_atomic (t[0]))
+    tag= t[0]->label;
+  if (N(tag) != 0 && !seen->contains (tag)) {
+    seen->insert (tag);
+    if (std_env->contains (tag)) {
+      tree f= std_env [tag];
+      if (is_func (f, MACRO) || is_func (f, XMACRO)) assigned_in (f, r, seen);
+    }
+  }
+  for (int i=0; i<N(t); i++) assigned_in (t[i], r, seen);
+}
+
+list<string>
+assigned_in_value (tree val) {
+  // the variables which a value assigns when it is executed: the calls of
+  // a macro, a macro chosen by a condition, a function of for-each
+  list<string> r;
+  hashset<string> seen;
+  assigned_in (val, r, seen);
+  return unique_names (r);
+}
+
+list<string>
+assigned_in_macro (tree f) {
+  if (is_atomic (f) && std_env->contains (f->label)) f= std_env [f->label];
+  return assigned_in_value (f);
+}
 
 tree
 evaluate_assign (tree t) {
@@ -53,16 +93,33 @@ evaluate_assign (tree t) {
   // assignment, typeset invisibly as in the document, keeps its place for
   // the cursor (also when it defines a macro, whose calls are expanded)
   int i, n=N(t), k=n>>1;
-  assoc_environment local (k);
+  array<string> vars;
+  array<tree>   vals;
   tree kept (CONCAT);
   for (i=0; i<k; i++) {
-    string var= as_string (evaluate (t[i<<1]));
-    tree   val= evaluate (t[(i<<1)+1]);
-    local->raw_write (i, var, val);
+    tree name= evaluate (t[i<<1]);
+    tree val = evaluate (t[(i<<1)+1]);
+    if (contains_residual (name)) {
+      // (a variable which the typesetter alone knows: its assignment;
+      // which variable changes, the rewriter does not know)
+      kept << tree (ASSIGN, name, protect_value (val));
+      continue;
+    }
+    string var= as_string (name);
+    vars << var;
+    vals << val;
     kept << tree (ASSIGN, var, protect_value (val));
-    if (residual_assigned != NULL) (*residual_assigned) << var;
+    note_assigned (var);
+    // (in a branch which the typesetter decides, a macro: the variables
+    // which its calls assign, for those which the typesetter alone expands)
+    if (branch_depth > 0 && !is_atomic (val))
+      note_assigned (assigned_in_value (val));
   }
-  assign (std_env, local);
+  if (N(vars) > 0) {
+    assoc_environment local (N(vars));
+    for (i=0; i<N(vars); i++) local->raw_write (i, vars[i], vals[i]);
+    assign (std_env, local);
+  }
   tree r= (N(kept) == 1? kept[0]: kept);
   transfer_ip (t, r);
   return r;
@@ -74,7 +131,10 @@ evaluate_with (tree t) {
   assoc_environment local (k);
   tree w (WITH);
   for (i=0; i<k; i++) {
-    string var= as_string (evaluate (t[i<<1]));
+    tree name= evaluate (t[i<<1]);
+    // (a variable which the typesetter alone knows: the with is its)
+    if (contains_residual (name)) { (void) evaluate_left (t); return t; }
+    string var= as_string (name);
     tree   val= evaluate (t[(i<<1)+1]);
     local->raw_write (i, var, val);
     w << var << protect_value (val);
@@ -91,12 +151,19 @@ tree
 evaluate_provides (tree t) {
   tree r= evaluate (t[0]);
   if (is_compound (r)) return evaluate_error ("bad provides");
-  if (std_env->contains (r->label)) return "true"; else return "false";  
+  if (!std_env->contains (r->label)) return "false";
+  // (a variable which a branch decided by the typesetter assigns: whether
+  // it is defined, the typesetter knows)
+  tree v= std_env [r->label];
+  if (is_func (v, VALUE, 1) && v[0] == r) return tree (PROVIDES, r);
+  return "true";
 }
 
 tree
 evaluate_value (tree t) {
   tree r= evaluate (t[0]);
+  // (a name which the typesetter alone knows: the value is its)
+  if (is_compound (r) && contains_residual (r)) return tree (VALUE, r);
   if (is_compound (r)) return evaluate_error ("bad value");
   int key= make_tree_label (r->label);
   if (!std_env->contains (key)) return evaluate_error ("undefined", r);
@@ -114,6 +181,8 @@ evaluate_quote_value (tree t) {
   if (is_compound (r)) return evaluate_error ("bad quoted value");
   int key= make_tree_label (r->label);
   if (!std_env->contains (key)) return evaluate_error ("undefined", r);
+  // (a value which the typesetter alone knows: the quoted value is its)
+  if (contains_residual (std_env[key])) return t;
   return std_env[key];
 }
 
@@ -350,13 +419,15 @@ evaluate_compound (tree t) {
     if (is_compound (f)) f= evaluate (f);
     if (is_atomic (f)) {
       string var= f->label;
-      if (!std_env->contains (var)) return evaluate_error ("undefined", var);
+      // (an undefined macro is the typesetter's: it shows the call, with
+      // its arguments, whose labels it makes; see evaluate_left)
+      if (!std_env->contains (var)) { (void) evaluate_left (t, 1); return t; }
       f= std_env [var];
     }
   }
   else {
     string var= as_string (L(t));
-    if (!std_env->contains (var)) return evaluate_error ("undefined", var);
+    if (!std_env->contains (var)) { (void) evaluate_left (t); return t; }
     d= 0;
     f= std_env [var];
   }
@@ -381,6 +452,9 @@ evaluate_compound (tree t) {
     decorate_ip (t, e);
     return evaluate_result (e);
   }
+  // (a macro known to the typesetter only, defined in a branch which it
+  // decides: the call is its, with its arguments)
+  else if (is_residual (f)) { (void) evaluate_left (t, d); return t; }
   else return evaluate_result (f);
 }
 

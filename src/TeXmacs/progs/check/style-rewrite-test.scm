@@ -113,6 +113,10 @@
                                    (out "X")))
           '(with "in" (quote (macro "p" "name" (concat (arg "p") (arg "name"))))
              (concat "A" "B")))
+  ;; a call of an undefined macro is the typesetter's, which shows it with
+  ;; its arguments (and makes their labels)
+  (check= (rewrite-last '(document (no-such-macro "a" (label "x"))))
+          '(no-such-macro "a" (label "x")))
   ;; a macro defined in the preamble of the document (filter-style)
   (check= (rewrite-last '(document (hide-preamble (document (assign "B" (macro "[b]"))))
                                    (B)))
@@ -282,6 +286,44 @@
                                    (if (has-binding "x") (assign "n" "2") "")
                                    (set-binding (merge "a-" (value "n")) "v")))
           '(set-binding (merge "a-" (value "n")) "v"))
+  ;; a macro defined in such a branch: its calls are the typesetter's
+  (check= (rewrite-last '(document (if (has-binding "x")
+                                       (assign "m" (macro "a" (strong (arg "a"))))
+                                       "")
+                                   (m "hi")))
+          '(m "hi"))
+  ;; a loop on such a variable is the typesetter's too
+  (check= (rewrite-last '(document (assign "n" "1")
+                                   (if (has-binding "x") (assign "n" "2") "")
+                                   (while (less (value "n") "3")
+                                     (assign "n" (plus (value "n") "1")))))
+          '(while (less (value "n") "3") (assign "n" (plus (value "n") "1"))))
+  ;; an assignment to a variable whose name the typesetter alone knows
+  (check= (rewrite-last '(document (assign "c" "a")
+                                   (if (has-binding "x") (assign "c" "b") "")
+                                   (assign (merge (value "c") "-nr") "1")))
+          '(assign (merge (value "c") "-nr") "1"))
+  ;; a comparison of markup which holds such a reference is decided
+  (check= (rewrite-last '(document (assign "n" "1")
+                                   (if (has-binding "x") (assign "n" "2") "")
+                                   (if (equal (strong (value "n")) "") "a" "b")))
+          "b")
+  ;; a test on a call which the typesetter alone expands is its
+  (check= (rewrite-last '(document (if (has-binding "x") (assign "m" (macro "true")) "")
+                                   (if (m) "a" "b")))
+          '(if (m) "a" "b"))
+  ;; whether a variable assigned in such a branch is defined
+  (check= (rewrite-last '(document (if (has-binding "x") (assign "foo" "1") "")
+                                   (if (provides "foo") "a" "b")))
+          '(if (provides "foo") "a" "b"))
+  ;; a macro redefined in such a branch: what its former definition
+  ;; assigns is the typesetter's too
+  (check= (rewrite-last '(document (assign "n" "1")
+                                   (assign "inc" (macro (assign "n" (plus (value "n") "1"))))
+                                   (if (has-binding "x") (assign "inc" (macro "")) "")
+                                   (inc)
+                                   (value "n")))
+          '(value "n"))
   ;; the branches are evaluated from the same environment
   (check= (rewrite-last '(document (assign "n" "1")
                                    (if (has-binding "x") (assign "n" "2") (value "n"))))

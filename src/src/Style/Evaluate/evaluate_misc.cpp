@@ -95,6 +95,8 @@ evaluate_set_binding (tree t) {
     local->raw_write (0, string ("the-tags"), no_tags);
     local->raw_write (1, string ("the-label"), value);
     assign (std_env, local);
+    note_assigned (string ("the-tags"));
+    note_assigned (string ("the-label"));
   }
   else if (N(t) >= 2) {
     tree key= evaluate (t[0]);

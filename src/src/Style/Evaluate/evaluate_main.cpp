@@ -15,6 +15,7 @@
 #include "vars.hpp"
 #include "path.hpp"
 #include "analyze.hpp"
+#include "merge_sort.hpp"
 
 environment std_env;
 static bool markup_mode= false; // see evaluate_markup
@@ -32,21 +33,26 @@ class evaluate_memorizer_rep: public compound_memorizer_rep {
   environment env_in;
   tree t_in;
   bool markup; // evaluated as markup or as a value (see evaluate_markup)
+  bool scratch; // a scratch evaluation (see evaluate_left): scripts not run
   environment env_out;
   tree t_out;
 
 public:
-  inline evaluate_memorizer_rep (environment env, tree t, bool m):
-    env_in (env), t_in (t), markup (m), env_out (), t_out (no_tree) {}
+  list<string> assigned; // the variables which the evaluation assigned
+
+  inline evaluate_memorizer_rep (environment env, tree t, bool m, bool s):
+    env_in (env), t_in (t), markup (m), scratch (s), env_out (),
+    t_out (no_tree) {}
   void print (tm_ostream& out) {
     out << "evaluate_memorizer (" << t_in << ")"; }
 
   int type () { return MEMORIZE_EVALUATE; }
-  int hash () { return weak_hash (env_in) ^ weak_hash (t_in) ^ (int) markup; }
+  int hash () { return weak_hash (env_in) ^ weak_hash (t_in) ^
+                      (int) markup ^ (((int) scratch) << 1); }
   bool equal (memorizer_rep* mem) {
     evaluate_memorizer_rep* rep= (evaluate_memorizer_rep*) mem;
     return weak_equal (env_in, rep->env_in) && weak_equal (t_in, rep->t_in) &&
-           markup == rep->markup; }
+           markup == rep->markup && scratch == rep->scratch; }
 
   void set_environment (environment env) { env_out= env; }
   environment get_environment () { return env_out; }
@@ -56,7 +62,26 @@ public:
 
 inline memorizer
 evaluate_memorizer (environment env, tree t, bool markup) {
-  return (memorizer_rep*) tm_new<evaluate_memorizer_rep> (env, t, markup);
+  return (memorizer_rep*)
+    tm_new<evaluate_memorizer_rep> (env, t, markup, scratch_depth > 0);
+}
+
+list<string>
+unique_names (list<string> l) {
+  // the names of l, each once, sorted (the references made from them
+  // are then the same environment, whatever the order of the assignments)
+  if (is_nil (l) || is_nil (l->next)) return l;
+  hashset<string> done;
+  array<string> a;
+  for (; !is_nil (l); l= l->next)
+    if (!done->contains (l->item)) {
+      done->insert (l->item);
+      a << l->item;
+    }
+  merge_sort (a);
+  list<string> r;
+  for (int i=N(a)-1; i>=0; i--) r= list<string> (a[i], r);
+  return r;
 }
 
 /******************************************************************************
@@ -238,9 +263,20 @@ bool
 is_residual (tree t, bool as_length) {
   if (is_atomic (t)) return as_length && is_unit_length (t->label);
   tree_label l= L(t);
+  // (also the trees which the rewriter leaves to the typesetter as they
+  // are: a script, a loop, a quoted value, a test of a variable which it
+  // alone knows; see evaluate_left)
   return is_layout_value (l) || is_strict_computation (l) ||
          l == IF || l == VAR_IF || l == CASE || l == OR || l == AND ||
-         l == VALUE;
+         l == VALUE || l == EXTERN || l == QUOTE_VALUE || l == WHILE ||
+         l == FOR_EACH || l == PROVIDES;
+}
+
+bool
+is_left_call (tree t) {
+  // a macro call which comes back from an evaluation as it is: one which
+  // the typesetter alone expands (an evaluated value has no other)
+  return is_compound (t) && (L(t) == COMPOUND || L(t) >= START_EXTENSIONS);
 }
 
 bool
@@ -268,6 +304,8 @@ evaluate_markup (tree t) {
   // branches of an if, give their result in the same mode (evaluate_result)
   tree r= evaluate_in (t, true);
   if (is_atomic (t) || (L(t) != COMPOUND && L(t) < START_EXTENSIONS)) return r;
+  // (a call left to the typesetter: it marks the boundaries itself)
+  if (weak_equal (r, t)) return r;
   path ip= obtain_ip (t);
   if (ip == path (DETACHED) || is_nil (ip) || ip->item < 0) return r;
   tree w (EXPAND_AS, as_string (L(t)), r);
@@ -331,6 +369,27 @@ evaluate_rewrite_inactive (tree t) {
   return tree (COMPOUND, fun, t[0]);
 }
 
+static int
+value_kind (tree t) {
+  // 0 for a value made of atoms (concats and tuples of atoms), 1 for such
+  // a value with residuals among the atoms, -1 for other markup
+  if (is_atomic (t)) return 0;
+  if (is_residual (t) || is_left_call (t)) return 1;
+  if (!is_func (t, CONCAT) && !is_func (t, TUPLE)) return -1;
+  int k= 0;
+  for (int i=0; i<N(t); i++) {
+    int c= value_kind (t[i]);
+    if (c < 0) return -1;
+    if (c > k) k= c;
+  }
+  return k;
+}
+
+static inline bool
+holds_residual_value (tree t) {
+  return is_compound (t) && value_kind (t) == 1;
+}
+
 static tree
 evaluate_partially (tree t) {
   // the arguments of a strict computation, evaluated; the computation
@@ -341,10 +400,11 @@ evaluate_partially (tree t) {
   tree r (t, n);
   for (i=0; i<n; i++) {
     r[i]= evaluate (t[i]);
-    // (also an argument which holds one: merge "footnote-" with the
-    // concat of a counter which a residual branch assigned)
-    if (is_residual (r[i], len) ||
-        (is_compound (r[i]) && contains_residual (r[i]))) residual= true;
+    // (also a value made of atoms and residuals: merge "footnote-" with
+    // the concat of a counter which a residual branch assigned; not any
+    // markup which holds one, whose comparisons the rewriter can decide)
+    if (is_residual (r[i], len) || holds_residual_value (r[i]))
+      residual= true;
   }
   if (!residual) return uninit;
   transfer_ip (t, r);
@@ -739,6 +799,9 @@ evaluate_in (tree t, bool markup) {
   if (is_memorized (mem)) {
     evaluate_hits++;
     std_env= mem->get_environment ();
+    // (the variables which it assigned, for a residual branch around it,
+    // see evaluate_branches)
+    note_assigned (((evaluate_memorizer_rep*) mem.operator -> ())->assigned);
     if (style_trace) cout << UNINDENT << "Memorized "
          << "[" << as_hexadecimal ((pointer) mem->get_tree ().operator -> ())
          << ", " << as_hexadecimal ((pointer) std_env.operator -> ()) << "] "
@@ -748,11 +811,23 @@ evaluate_in (tree t, bool markup) {
   memorize_start ();
   bool old_mode= markup_mode;
   markup_mode= markup;
-  tree r= evaluate_impl (t);
+  list<string> assigned;
+  tree r;
+  {
+    assigned_collector collect;
+    r= evaluate_impl (t);
+    // (each name once: the counters of a long document are assigned in
+    // every section, and the lists go up to the memorizers of the document)
+    assigned= unique_names (collect.names);
+  }
+  note_assigned (assigned);
   markup_mode= old_mode;
-  decorate_ip (t, r);
+  // (a tree left as it is to the typesetter is not decorated: it may be a
+  // tree of the style, shared by all its uses)
+  if (!weak_equal (r, t)) decorate_ip (t, r);
   mem->set_tree (r);
   mem->set_environment (std_env);
+  ((evaluate_memorizer_rep*) mem.operator -> ())->assigned= assigned;
   memorize_end ();
   // (the trace gives the addresses of the tree and of the environment after
   // the evaluation, as those before it in "Evaluate")
@@ -782,6 +857,9 @@ evaluate (environment env, tree t) {
   environment old_env= std_env;
   evaluate_calls= evaluate_hits= 0;
   memorize_initialize ();
+  // (the state of an evaluation which an exception interrupted)
+  residual_assigned= NULL;
+  markup_mode= false;
   std_env= env;
   (void) evaluate_in (t, true); // (the document is markup)
   std_env= old_env;

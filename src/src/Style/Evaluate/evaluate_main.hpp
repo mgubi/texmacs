@@ -13,6 +13,7 @@
 #define EVALUATE_MAIN_H
 #include "../Environment/environment.hpp"
 #include "../Memorizer/memorizer.hpp"
+#include "list.hpp"
 
 extern environment std_env;
 
@@ -82,7 +83,39 @@ tree evaluate_while (tree t);
 tree evaluate_for_each (tree t);
 tree evaluate_include (tree t);
 tree evaluate_filter_style (tree t);
-extern array<string>* residual_assigned;
+
+// The variables which the evaluations assign, for the branches which the
+// typesetter decides (evaluate_branches): each evaluation collects them,
+// its memorizer keeps them, and they are given again when it is found
+extern list<string>* residual_assigned;
+struct assigned_collector {
+  list<string>* outer;
+  list<string> names;
+  inline assigned_collector (): outer (residual_assigned) {
+    residual_assigned= &names; }
+  inline ~assigned_collector () { residual_assigned= outer; }
+};
+inline void note_assigned (string var) {
+  if (residual_assigned != NULL)
+    *residual_assigned= list<string> (var, *residual_assigned); }
+inline void note_assigned (list<string> vars) {
+  if (residual_assigned != NULL && !is_nil (vars))
+    *residual_assigned= vars * (*residual_assigned); }
+list<string> unique_names (list<string> l);
+list<string> assigned_in_macro (tree f);
+list<string> assigned_in_value (tree val);
+extern int scratch_depth;
+extern int branch_depth;
+bool is_left_call (tree t);
+struct depth_guard {
+  int& depth;
+  inline depth_guard (int& d): depth (d) { depth++; }
+  inline ~depth_guard () { depth--; }
+};
+void make_references (list<string> names);
+list<string> evaluate_branches (tree t, tree& r, array<int> branches,
+                                bool markup= true);
+list<string> evaluate_left (tree t, int from= 0);
 tree evaluate_use_package (tree t);
 tree evaluate_use_module (tree t);
 

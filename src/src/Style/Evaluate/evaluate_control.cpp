@@ -22,46 +22,86 @@ tree load_inclusion (url u); // implemented in tm_file.cpp
 * Classical control structures
 ******************************************************************************/
 
-static void
-evaluate_branches (tree t, tree& r, array<int> branches) {
+void
+make_references (list<string> names) {
+  // the variables which only the typesetter knows from now on: references
+  // to them (one tree per name, so that the same environment before gives
+  // the same environment after, and what follows finds its memorizers)
+  static tree uninit (UNINIT);
+  static hashmap<string,tree> refs (uninit);
+  names= unique_names (names);
+  if (is_nil (names)) return;
+  assoc_environment local (N(names));
+  int k= 0;
+  for (list<string> l= names; !is_nil (l); l= l->next, k++) {
+    if (!refs->contains (l->item)) refs (l->item)= tree (VALUE, l->item);
+    local->raw_write (k, l->item, refs [l->item]);
+  }
+  assign (std_env, local);
+  note_assigned (names);
+}
+
+list<string>
+evaluate_branches (tree t, tree& r, array<int> branches, bool markup) {
   // the branches of a residual if or case: the typesetter takes one of
   // them, so each is evaluated from the environment before them, which
   // stays the one after them; a variable which one of them assigns (a
   // counter incremented in one branch) is known to the typesetter only,
   // and becomes a reference to it (its assignments stay in the branches)
   environment before= std_env;
-  array<string>* outer= residual_assigned;
-  array<string> vars;
-  residual_assigned= &vars;
-  for (int k=0; k<N(branches); k++) {
-    std_env= before;
-    r[branches[k]]= evaluate_result (t[branches[k]]);
+  list<string> names;
+  {
+    assigned_collector collect;
+    depth_guard guard (branch_depth);
+    for (int k=0; k<N(branches); k++) {
+      std_env= before;
+      tree u= t[branches[k]];
+      r[branches[k]]= (markup? evaluate_result (u): evaluate (u));
+    }
+    names= collect.names;
   }
   std_env= before;
-  residual_assigned= outer;
-  if (N(vars) == 0) return;
-  hashset<string> done;
-  array<string> uniq;
-  for (int k=0; k<N(vars); k++)
-    if (!done->contains (vars[k])) { done->insert (vars[k]); uniq << vars[k]; }
-  if (outer != NULL) for (int k=0; k<N(uniq); k++) (*outer) << uniq[k];
-  assoc_environment local (N(uniq));
-  for (int k=0; k<N(uniq); k++)
-    local->raw_write (k, uniq[k], tree (VALUE, uniq[k]));
-  assign (std_env, local);
+  // (a macro which a branch redefines: the typesetter may expand the
+  // former one, whose assignments become references too)
+  list<string> more;
+  for (list<string> l= names; !is_nil (l); l= l->next)
+    if (std_env->contains (l->item)) {
+      tree f= std_env [l->item];
+      if (is_func (f, MACRO) || is_func (f, XMACRO))
+        more= assigned_in_value (f) * more;
+    }
+  names= unique_names (names * more);
+  make_references (names);
+  return names;
+}
+
+list<string>
+evaluate_left (tree t, int from) {
+  // a tree left as it is to the typesetter, which evaluates it (a call of
+  // an undefined macro or of one which it alone knows, a script with such
+  // an argument): the variables which its parts assign become references,
+  // as in a branch which it decides
+  if (is_atomic (t) || N(t) <= from) return list<string> ();
+  tree scratch (t, N(t));
+  array<int> parts;
+  for (int i=from; i<N(t); i++) parts << i;
+  // (a scratch evaluation: its results, kept apart in the memorizers, are
+  // not used, and the scripts in it are not run, see evaluate_rewrite)
+  depth_guard guard (scratch_depth);
+  return evaluate_branches (t, scratch, parts);
 }
 
 tree
 evaluate_if (tree t) {
   if (N(t) != 2 && N(t) != 3) return evaluate_error ("bad if");
   tree u= evaluate (t[0]);
-  if (is_residual (u)) {
+  if (is_residual (u) || is_left_call (u)) {
     // the condition is left to the typesetter, with both branches
     tree r (t, N(t));
     r[0]= u;
     array<int> branches;
     for (int i=1; i<N(t); i++) branches << i;
-    evaluate_branches (t, r, branches);
+    (void) evaluate_branches (t, r, branches);
     return r;
   }
   if (!is_bool (u)) return evaluate_error ("bad if");
@@ -76,7 +116,7 @@ evaluate_case (tree t) {
   int i, n= N(t);
   for (i=0; i<(n-1); i+=2) {
     tree u= evaluate (t[i]);
-    if (is_residual (u)) {
+    if (is_residual (u) || is_left_call (u)) {
       // the rest of the cases is left to the typesetter
       tree r (CASE);
       r << u;
@@ -91,7 +131,7 @@ evaluate_case (tree t) {
       tree src (CASE);
       src << u;
       for (int j=i+1; j<n; j++) src << t[j];
-      evaluate_branches (src, r, branches);
+      (void) evaluate_branches (src, r, branches);
       return r;
     }
     if (!is_bool (u)) return evaluate_error ("bad case");
@@ -107,6 +147,26 @@ evaluate_while (tree t) {
   tree r (CONCAT);
   while (true) {
     tree u= evaluate (t[0]);
+    if (is_residual (u) || is_left_call (u)) {
+      // the rest of the loop is the typesetter's (a counter which it alone
+      // knows); the variables which the body assigns become references,
+      // as in a branch which it decides, until the body assigns no other
+      // (a pass with the references may take other branches of it)
+      tree scratch (t, N(t));
+      array<int> body;
+      body << 1;
+      int known= -1;
+      list<string> names;
+      depth_guard guard (scratch_depth);
+      for (int pass=0; pass<4 && N(names) != known; pass++) {
+        known= N(names);
+        names= unique_names (evaluate_branches (t, scratch, body, false) *
+                             names);
+      }
+      if (N(r) == 0) return t;
+      r << t;
+      break;
+    }
     if (!is_bool (u)) return evaluate_error ("bad while");
     if (!as_bool (u)) break;
     r << evaluate (t[1]);
@@ -121,6 +181,12 @@ evaluate_for_each (tree t) {
   if (N(t) != 2) return evaluate_error ("bad for-each");
   tree fun = evaluate (t[0]);
   tree args= evaluate (t[1]);
+  // (a list or a function which the typesetter alone knows: its loop, and
+  // the variables which the function assigns become references)
+  if (is_residual (fun) || is_residual (args) || is_left_call (args)) {
+    make_references (assigned_in_macro (fun));
+    return t;
+  }
   if (!is_tuple (args)) return evaluate_error ("bad for-each");
   int i, n= N(args);
   for (i=0; i<n; i++)
@@ -160,7 +226,7 @@ filter_style (tree t) {
     return filter_style (t[N(t)-1]);
   case STYLE_ONLY:
   case VAR_STYLE_ONLY:
-    if (is_atomic (t[0])) return "";
+    if (is_atomic (t[0]) || N(t[0]) == 0) return "";
     else return filter_style (t[0][N(t[0])-1]);
   case ACTIVE:
   case VAR_ACTIVE:
@@ -173,6 +239,8 @@ filter_style (tree t) {
       tree r (t, n);
       for (i=0; i<n; i++)
 	r[i]= filter_style (t[i]);
+      // (the assignments of the preamble keep their places)
+      transfer_ip (t, r);
       return r;
     }
   }

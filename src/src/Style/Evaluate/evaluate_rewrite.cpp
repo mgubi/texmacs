@@ -206,5 +206,24 @@ rewrite (tree t) {
 
 tree
 evaluate_rewrite (tree t) {
+  if (is_func (t, EXTERN) && scratch_depth > 0) {
+    // (a scratch evaluation, see evaluate_left: the script is not run, its
+    // arguments are evaluated for what they assign)
+    (void) evaluate_left (t, 1);
+    return t;
+  }
+  if (is_func (t, EXTERN)) {
+    // (an argument which the typesetter alone knows, a counter assigned in
+    // a branch which it decides: the call to the script is its, with the
+    // value; the arguments are evaluated again by it, as in the document)
+    // (from the environment before: the arguments are evaluated again by
+    // rewrite, whose assignments would otherwise be made twice)
+    environment before= std_env;
+    bool residual= false;
+    for (int i=0; i<N(t) && !residual; i++)
+      residual= contains_residual (evaluate (t[i]));
+    std_env= before;
+    if (residual) { (void) evaluate_left (t, 1); return t; }
+  }
   return evaluate_result (rewrite (t));
 }
