@@ -19,11 +19,17 @@
 * Miscellaneous routines
 ******************************************************************************/
 
-inline void left_italic_correct (box b) { b->x1 -= b->left_correction (); }
-inline void left_italic_restore (box b) { b->x1 += b->left_correction (); }
-inline void right_italic_correct (box b, SI& rc) {
-  rc= b->right_correction (); b->x2 += rc; } // see italic_correct
-inline void right_italic_restore (box b, SI rc) { b->x2 -= rc; }
+inline void
+right_italic_correct (box b, SI& rc) {
+  // the correction is kept for right_italic_restore (see italic_correct)
+  rc= b->right_correction ();
+  b->x2 += rc;
+}
+
+inline void
+right_italic_restore (box b, SI rc) {
+  b->x2 -= rc;
+}
 
 SI
 italic_correction (box L, box R) {

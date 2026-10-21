@@ -620,6 +620,8 @@
                                                          (rsub (arg "c"))))
                               (concat (f "p") "q"))))
             (width (termes '(concat (around* "(" "x" ")") (rsub "p") "q"))))
+    ;; (fractions do not read the extents of their children again after
+    ;; positioning them: this only checks that they are unchanged)
     (check= (width (termes '(with "f" (macro "c" (frac (arg "c") "2"))
                               (concat (f "p") "q"))))
             (width (termes '(concat (frac "p" "2") "q"))))))
