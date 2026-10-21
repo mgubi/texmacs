@@ -215,6 +215,7 @@ tm_server_rep::interpose_handler () {
   process_all_pipes ();
 #else
   perform_select ();
+  reap_pipe_children ();
   exec_pending_commands ();
 #endif
   async_eval_pending ();

@@ -125,6 +125,12 @@
   (:launch "sh -c \"read x; printf '\\002verbatim:cut'\"")
   (:serializer ,raw-serialize))
 
+;; ignores SIGTERM: stopping it does not wait until it is killed (it waits
+;; with the argument 4711, by which the test finds its process)
+(plugin-configure tmtestterm
+  (:launch "sh -c \"trap '' INT TERM; exec sleep 4711\"")
+  (:serializer ,raw-serialize))
+
 ;; two variants, the session name chooses the variant
 (plugin-configure tmtestvariants
   (:launch "v1" "cat")
@@ -1125,6 +1131,14 @@
    (var-eval-system
     (string-append "ps -axo command= | grep -c '^sleep " secs "$'"))))
 
+(define (term-pid)
+  ;; the process of tmtestterm, a child of TeXmacs, or #f
+  (with s (var-eval-system
+           (string-append "ps -axo pid=,ppid=,command= | "
+                          "awk -v p=$PPID '$2 == p && $3 == \"sleep\" && "
+                          "$4 == \"4711\" {print $1}'"))
+    (and (!= s "") s)))
+
 (define (cmdline-run ses cmd)
   ;; run one command of the command line plugin until its process has ended
   (when (nin? (list "tmtestcmdline" ses) started)
@@ -1194,7 +1208,26 @@
   (check= (sleepers "617") 0)
   (check-true (cmdline-run "plugins-test-cmd"
                            "z; sleep 617 > /dev/null & sleep 617"))
-  (check= (sleepers "617") 0))
+  (check= (sleepers "617") 0)
+
+  (check-group "processes: a plugin which ignores SIGTERM")
+  (check= (start* "tmtestterm" "plugins-test-term") "ok")
+  (let ((pid #f))
+    (wait-until (lambda () (set! pid (term-pid)) pid) 5000)
+    (check-true pid)
+    (with start (texmacs-time)
+      (connection-stop "tmtestterm" "plugins-test-term")
+      ;; the interface is not blocked until the process is killed (2 s)
+      (check-true (< (- (texmacs-time) start) 1000)))
+    (check= (connection-status "tmtestterm" "plugins-test-term") 0)
+    ;; it is killed after 2 s, and reaped, by the event loop in TeXmacs;
+    ;; here (no event loop), by the next start or stop of a plugin
+    (pause "2.2")
+    (check= (start* "tmtestecho" "plugins-test-term2") "ok")
+    (connection-stop "tmtestecho" "plugins-test-term2")
+    (when pid
+      (check-true (wait-until (lambda () (not (pid-alive? pid))) 3000)))
+    (check= (zombies) 0)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The suite
