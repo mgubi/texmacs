@@ -1462,7 +1462,7 @@ source code.
     <scm|(tree-children <scm-arg|tree>)>
 <explain-synopsis|no synopsis>
   <|explain>
-    Calls the <c++> function <cpp|A> which returns
+    Calls the <c++> function <cpp|tree_children> which returns
     <scm|array_tree>.
   </explain>
 
@@ -5211,6 +5211,14 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(secure-random-number <scm-arg|uint>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|secure_random_int> which returns
+    <scm|int>.
+  </explain>
+
+  <\explain>
     <scm|(tls-client-start <scm-arg|string> <scm-arg|int> <scm-arg|scheme_tree>)>
 <explain-synopsis|no synopsis>
   <|explain>
@@ -6536,6 +6544,14 @@ source code.
   <|explain>
     Calls the <c++> function <cpp|bib_text_length> which returns
     <scm|int>.
+  </explain>
+
+  <\explain>
+    <scm|(bib-field-pages <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|bib_field_pages> which returns
+    <scm|tree>.
   </explain>
 
   <\explain>

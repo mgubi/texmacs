@@ -676,6 +676,7 @@
 "server-log-write-int"
 "supports-gnutls?"
 "gnutls-random-number"
+"secure-random-number"
 "tls-client-start"
 "gnutls-generate-salt"
 "hash-password-pbkdf2"
