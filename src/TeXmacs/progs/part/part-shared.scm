@@ -88,7 +88,8 @@
   ;;(display* "Invalidate " (mirror-id t) ", " (mirror-unique-id t)
   ;;", " (tm->stree t) "\n")
   (when (and (tree->path t) (mirror-body? t) (mirror-unique-id t))
-    (when (== (ahash-size mirror-black-list))
+    ;; the first invalidation since the last synchronization schedules one
+    (when (== (ahash-size mirror-black-list) 0)
       (delayed
         (:idle 1)
         (mirror-separate)
