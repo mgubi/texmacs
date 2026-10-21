@@ -21,8 +21,9 @@
 
 inline void left_italic_correct (box b) { b->x1 -= b->left_correction (); }
 inline void left_italic_restore (box b) { b->x1 += b->left_correction (); }
-inline void right_italic_correct (box b) { b->x2 += b->right_correction (); }
-inline void right_italic_restore (box b) { b->x2 -= b->right_correction (); }
+inline void right_italic_correct (box b, SI& rc) {
+  rc= b->right_correction (); b->x2 += rc; } // see italic_correct
+inline void right_italic_restore (box b, SI rc) { b->x2 -= rc; }
 
 SI
 italic_correction (box L, box R) {
@@ -107,11 +108,12 @@ frac_box_rep::frac_box_rep (
     insert (line_box (decorate_middle (ip), d, 0, w - d, 0, bar_pen), 0, bar_y);
   }
 
-  italic_correct (b1);
-  italic_correct (b2);
+  SI b1_lc, b1_rc, b2_lc, b2_rc;
+  italic_correct (b1, b1_lc, b1_rc);
+  italic_correct (b2, b2_lc, b2_rc);
   position ();
-  italic_restore (b1);
-  italic_restore (b2);
+  italic_restore (b1, b1_lc, b1_rc);
+  italic_restore (b2, b2_lc, b2_rc);
   x1= min (x1, 0);
   x2= max (x2, w);
   left_justify ();
@@ -163,7 +165,8 @@ sqrt_box_rep::sqrt_box_rep (
   path ip, box b1, box b2, box sqrtb, font fn2, pencil pen2):
     composite_box_rep (ip), fn (fn2), pen (pen2)
 {
-  right_italic_correct (b1);
+  SI b1_rc;
+  right_italic_correct (b1, b1_rc);
 
   SI sep  = fn->sep;
   SI rsep = fn->sep;
@@ -223,7 +226,7 @@ sqrt_box_rep::sqrt_box_rep (
   y2+= use_open_type ? fn->sqrt_extra_ascender : wline;
   x2 += rsep >> 1;
 
-  right_italic_restore (b1);
+  right_italic_restore (b1, b1_rc);
   finalize ();
 }
 
@@ -292,9 +295,10 @@ neg_box_rep::neg_box_rep (path ip, box b, font fn2, pencil pen2):
   }
   insert (line_box (decorate_middle (ip), X+DX, Y+DY, X-DX, Y-DY, npen), 0, 0);
   
-  italic_correct (b);
+  SI b_lc, b_rc;
+  italic_correct (b, b_lc, b_rc);
   position ();
-  italic_restore (b);
+  italic_restore (b, b_lc, b_rc);
   finalize ();
 }
 

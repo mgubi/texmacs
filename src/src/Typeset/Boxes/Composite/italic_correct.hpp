@@ -13,15 +13,21 @@
 #include "boxes.hpp"
 
 inline void
-italic_correct (box b) {
-  b->x1 -= b->left_correction ();
-  b->x2 += b->right_correction ();
+italic_correct (box b, SI& lc, SI& rc) {
+  // the corrections are kept for italic_restore, which undoes them: those
+  // of a concatenation depend on its extents, which this changes (the
+  // markers around a macro argument, of width zero, would then count as its
+  // first and last boxes, without corrections)
+  lc= b->left_correction ();
+  rc= b->right_correction ();
+  b->x1 -= lc;
+  b->x2 += rc;
 }
 
 inline void
-italic_restore (box b) {
-  b->x1 += b->left_correction ();
-  b->x2 -= b->right_correction ();
+italic_restore (box b, SI lc, SI rc) {
+  b->x1 += lc;
+  b->x2 -= rc;
 }
 
 #endif // defined ITALIC_CORRECT_H
