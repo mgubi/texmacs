@@ -14,6 +14,11 @@ have the details, and the problems go to the
 
 ## 21 October 2026
 
+- Mirrored texts and the part views of a master are synchronized again
+  after an edit which their incremental update could not apply: the
+  synchronization was never scheduled with S7 (a test of the code of 2015
+  which Guile answered and S7 refused,
+  [#431](https://github.com/mgubi/texmacs/pull/431)).
 - Document parts (Document → Part): the parts are told apart by their
   number, so that parts with the same title are different entries, and the
   menu shows the file of a part which starts with an included file
