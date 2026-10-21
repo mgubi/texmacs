@@ -5867,6 +5867,22 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(buffer-get-style <scm-arg|url>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|get_buffer_style> which returns
+    <scm|tree>.
+  </explain>
+
+  <\explain>
+    <scm|(buffer-set-style <scm-arg|url> <scm-arg|content>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|set_buffer_style> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
     <scm|(buffer-set-master <scm-arg|url> <scm-arg|url>)>
 <explain-synopsis|no synopsis>
   <|explain>

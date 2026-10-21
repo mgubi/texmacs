@@ -758,6 +758,8 @@
 "buffer-get"
 "buffer-set-body"
 "buffer-get-body"
+"buffer-get-style"
+"buffer-set-style"
 "buffer-set-master"
 "buffer-get-master"
 "buffer-set-title"

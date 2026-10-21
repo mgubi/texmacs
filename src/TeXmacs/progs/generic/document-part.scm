@@ -323,13 +323,13 @@
 ;; Listing the document parts
 ;;
 ;; A part is known by its identifier, the first argument of show-part and
-;; hide-part. A part which starts with an included file (the shared copy of
-;; a part view, or an include) is identified by the name of that file,
-;; relative to the master of the buffer ("ch1.tm"); the other parts, which
-;; have no file of their own, by their number ("1", "2", ...). The title of
-;; a part is only shown: two parts may have the same title. For
-;; compatibility, buffer-show-part, buffer-toggle-part and buffer-go-to-part
-;; also accept the title of a part when no part has it as identifier.
+;; hide-part: its number ("1", "2", ...), which is also what the references
+;; to the labels of a hidden part name (#2, see go_to_label in
+;; edit_cursor.cpp). The title of a part is only shown, with the name of
+;; its file when it starts with an included file: two parts may have the
+;; same title. For compatibility, buffer-show-part, buffer-toggle-part and
+;; buffer-go-to-part also accept the title of a part when no part has it as
+;; identifier.
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (tm-define (document-has-preamble? t)
@@ -358,28 +358,14 @@
          (tm->string (tm-ref t 0)))
         (else #f)))
 
-(define (part-form-first p)
-  ;; the first paragraph of the part @p made by
-  ;; principal-sections-to-document-parts, or #f
-  (with b (caddr p)
-    (and (tm-func? b 'document) (> (tm-arity b) 0) (tm-ref b 0))))
-
-(define (parts-with-file-ids parts)
-  ;; the parts @p made by principal-sections-to-document-parts, with the
-  ;; name of their file as identifier when they start with an included file
-  ;; (each file once: a file included twice keeps the number)
-  (with used (map cadr parts)
-    (map (lambda (p)
-           (with f (and-with first (part-form-first p) (paragraph-file first))
-             (if (or (not f) (in? f used)) p
-                 (begin
-                   (set! used (cons f used))
-                   `(,(car p) ,f ,@(cddr p))))))
-         parts)))
+(define (part-body-file b)
+  ;; the file with which the body @b of a part starts, or #f
+  (and (tm-func? b 'document) (> (tm-arity b) 0)
+       (paragraph-file (tm-ref b 0))))
 
 (define (buffer-new-parts l)
   ;; the parts which buffer-make-parts makes of the paragraphs @l
-  (parts-with-file-ids (principal-sections-to-document-parts l)))
+  (principal-sections-to-document-parts l))
 
 (define (part-id t)
   ;; the identifier of the part @t
@@ -456,25 +442,31 @@
 	(else (for-each (lambda (x) (document-select-part x p))
 			(tree-children t)))))
 
-(tm-define (buffer-part-title id)
-  (:synopsis "The title of the document part with identifier @id")
+(define (buffer-part-body id)
+  ;; the body of the document part @id
   (with l (buffer-content-paragraphs)
     (if (document-part? (car l))
         (and-with t (document-find-part (buffer-tree) id)
-          (part-title t))
+          (tree-ref t 1))
         (and-with p (list-find (buffer-new-parts l)
                                (lambda (p) (== (cadr p) id)))
-          (principal-section-title (caddr p))))))
+          (caddr p)))))
+
+(tm-define (buffer-part-title id)
+  (:synopsis "The title of the document part with identifier @id")
+  (and-with b (buffer-part-body id)
+    (if (tm-atomic? b) "no title" (principal-section-title b))))
 
 (tm-define (buffer-part-label id)
   (:synopsis "The label of the document part @id in the menus")
-  ;; its title, followed by its file when it has one
+  ;; its title, followed by its file when it starts with an included file
   (let* ((title (or (buffer-part-title id) "no title"))
-         (file? (not (string-number? id))))
-    (cond ((and file? (== title "no title")) id)
-          (file? (string-append title " (" id ")"))
-          ((and (== title "no title") (== id "1")) "front matter")
-          (else title))))
+         (file (and-with b (buffer-part-body id) (part-body-file b)))
+         (first? (== id (car (buffer-parts-list #t)))))
+    (cond ((and file (== title "no title")) file)
+          (file (string-append (upcase-first title) " (" file ")"))
+          ((and (== title "no title") first?) "front matter")
+          (else (upcase-first title)))))
 
 (tm-define (buffer-go-to-part id)
   (:synopsis "Go to the part with identifier @id")
@@ -635,7 +627,7 @@
   (let* ((all (buffer-parts-list #t))
 	 (active (buffer-parts-list #f)))
     (for (id all)
-      ((check (eval (upcase-first (buffer-part-label id))) "v" (in? id active))
+      ((check (eval (buffer-part-label id)) "v" (in? id active))
        (if (== (buffer-get-part-mode) :one)
            (buffer-show-part id)
            (buffer-toggle-part id))))))

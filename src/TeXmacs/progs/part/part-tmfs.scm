@@ -13,7 +13,6 @@
 
 (texmacs-module (part part-tmfs)
   (:use (part part-shared)
-        (utils library cursor)
         (texmacs texmacs tm-files)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -236,11 +235,15 @@
               l))
 
 (define (part-compress-body doc u)
-  ;; the parts of the view are not written: the file gets its paragraphs
+  ;; the parts (show-part, hide-part) are kept, with the copies in their
+  ;; bodies and alternatives turned back into inclusions
   (cond ((tm-func? doc 'document)
          (cons (tm-label doc)
-               (map (cut part-compress-body <> u)
-                    (part-paragraphs-flat (tm-children doc)))))
+               (map (cut part-compress-body <> u) (tm-children doc))))
+        ((and (tm-in? doc '(show-part hide-part)) (== (tm-arity doc) 3))
+         `(,(tm-label doc) ,(tm-ref doc 0)
+           ,(part-compress-body (tm-ref doc 1) u)
+           ,(part-compress-body (tm-ref doc 2) u)))
         ((tm-func? doc 'shared 3)
          (let* ((name  (tm->string (tm-ref doc 1)))
                 (delta (url-delta u name)))
@@ -406,9 +409,7 @@
   (set! part-save-written (append part-save-written (list u))))
 
 (define (part-save-copies name copies)
-  (with refuse (lambda (u why)
-                 (set! part-save-refused
-                       (append part-save-refused (list (cons u why)))))
+  (with refuse part-save-refuse
     (for (c copies)
       (let* ((u (unix->url (car c)))
              (body (cdr c))
@@ -436,8 +437,7 @@
                      (when (!= action 'write)
                        (part-remember name u (or (part-file-body u) body)
                                       body))
-                     (set! part-save-written
-                           (append part-save-written (list u)))))))))))
+                     (part-save-wrote u)))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The style of the master
@@ -463,7 +463,7 @@
 
 (define (part-buffer-style buf)
   ;; the style of the buffer @buf
-  (part-style (tmfile-extract (buffer-get buf) 'style)))
+  (part-style (buffer-get-style buf)))
 
 (define (part-style-changed? name style)
   ;; is the style @style of the part view @name not the one of its master
@@ -472,15 +472,12 @@
     (and style start (!= (part-style style) start))))
 
 (define (part-set-buffer-style buf style)
-  ;; give the open buffer @buf the style @style: in its editor, or in its
-  ;; data when it has no view (a master loaded for the references of a
+  ;; give the open buffer @buf the style @style, in all its views (and in
+  ;; its data, for a master loaded without a view for the references of a
   ;; chapter)
   (with st (part-style style)
     (when (!= (part-buffer-style buf) st)
-      (if (null? (buffer->views buf))
-          (buffer-set buf (tmfile-assign (buffer-get buf) 'style st))
-          (with-buffer buf
-            (set-style-tree (tm->tree st)))))))
+      (buffer-set-style buf st))))
 
 (define (part-write-style u style)
   ;; write @style into the file @u, keeping the rest of the file; #t on
@@ -525,8 +522,9 @@
          (m (part-master name))
          (f (part-file name))
          (style (part-buffer-style buf))
-         (action (if (== f m) 'same
-                     (part-master-style-action name m style))))
+         (action (cond ((!= f m) (part-master-style-action name m style))
+                       ((part-style-changed? name style) 'write)
+                       (else 'same))))
     (list m action (part-style-changed-on-disk? name m action))))
 
 (define (part-save-master-style name m style)
@@ -591,31 +589,42 @@
          (mas (if (== m f) doc (tree-import m "texmacs")))
          (com (part-compress doc ori mas f m))
          (body (part-own-body (tmfile-extract doc 'body) f m))
-         (style (tmfile-extract doc 'style)))
+         (style (tmfile-extract doc 'style))
+         (master-style? (and (== f m) (part-style-changed? name style)))
+         (own-ok? #f))
     ;;(display* "com= " (tm->stree com) "\n")
     (set! part-save-written (list))
     (set! part-save-refused (list))
     (set! part-save-pending (list))
-    (when (and (== f m) (part-style-changed? name style))
-      ;; the view of the master: its file is written with the new style,
-      ;; which an open buffer of the master gets too
-      (set! com (tmfile-assign com 'style style))
-      (when (buffer-exists? m)
-        (part-set-buffer-style m style)))
+    (when (and master-style?
+               (part-style-changed-on-disk? name m 'write)
+               (nin? (url->unix m) part-save-overwrite))
+      ;; the view of the master, whose style changed on disk: the file
+      ;; keeps the style on disk
+      (part-save-refuse m "the file changed on disk")
+      (set! master-style? #f))
+    (when master-style?
+      ;; the view of the master: its file is written with the new style
+      (set! com (tmfile-assign com 'style style)))
     (if (tree-export (tm->tree com) f "texmacs")
         (begin
           (buffer-pretend-modified f)
-          (set! part-save-refused
-                (list (cons f "the file could not be written"))))
+          (part-save-refuse f "the file could not be written"))
         (begin
-          (when (== f m)
-            (part-remember-style name (tmfile-extract com 'style)))
+          (when master-style?
+            ;; which an open buffer of the master gets too
+            (when (buffer-exists? m)
+              (part-set-buffer-style m style))
+            (part-remember-style name style))
           (buffer-pretend-saved f)
           (with b (tmfile-extract com 'body)
             (part-remember name f b b))
-          (set! part-save-written (list f))))
+          (set! own-ok? #t)
+          (set! part-save-written (cons f part-save-written))))
     (part-save-copies name (part-copies body))
-    (when (!= f m)
+    (when (and (!= f m) own-ok?)
+      ;; (the master does not get the style of a view whose file could not
+      ;; be written: the view stays modified)
       (part-save-master-style name m style))))
 
 (tmfs-wrap-handler (part name)
