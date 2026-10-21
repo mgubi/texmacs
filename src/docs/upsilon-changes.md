@@ -14,6 +14,11 @@ have the details, and the problems go to the
 
 ## 21 October 2026
 
+- **Windows**: saving a part view (Document > Part) wrote the included
+  files as `D/dir/a.tm` (the full path without the colon of the drive) in
+  place of `a.tm`, and an included file open in its own buffer was not kept
+  in step with its copy in the part view; both work as on the other
+  systems.
 - Mirrored texts and the part views of a master are synchronized again
   after an edit which their incremental update could not apply: the
   synchronization was never scheduled with S7 (a test of the code of 2015
