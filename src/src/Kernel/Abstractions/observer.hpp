@@ -152,18 +152,7 @@ void remove_observer (observer& o, observer what);
 void attach_observer (tree& ref, observer o);
 void detach_observer (tree& ref, observer o);
 void clean_observers (tree& ref);
-
-// The modifications of trees which notify observers (observer.cpp) count
-// how deep they are: the lists of observers from which an observer is
-// removed meanwhile are compacted when the outermost one returns, since a
-// list may be running one of its methods (detach_observer, list_observer.cpp)
-extern int observer_notification_depth;
-void compact_pending_observers ();
-struct observer_notification {
-  inline observer_notification () { observer_notification_depth++; }
-  inline ~observer_notification () {
-    if (--observer_notification_depth == 0) compact_pending_observers (); }
-};
+void simplify_observers (tree& ref);
 
 path obtain_ip (tree& ref);
 void attach_ip (tree& ref, path ip);

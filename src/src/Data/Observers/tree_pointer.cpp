@@ -101,9 +101,9 @@ bool
 tree_pointer_rep::set_tree (tree t) {
   if (ptr != t.rep) {
     tree ref (ptr);
-    detach_observer (ref, observer (this));
+    remove_observer (ref->obs, observer (this));
     ptr= t.rep;
-    attach_observer (t, observer (this));
+    insert_observer (t->obs, observer (this));
   }
   return true;
 }
@@ -171,9 +171,9 @@ tree_pointer_rep::notify_insert_node (tree& ref, int pos) {
   //cout << "Notify insert node " << ref << ", " << pos << "\n";
   (void) ref; (void) pos;
   if (flag) {
-    detach_observer (ref[pos], observer (this));
+    remove_observer (ref[pos]->obs, observer (this));
     ptr= ref.rep;
-    attach_observer (ref, observer (this));    
+    insert_observer (ref->obs, observer (this));    
   }
   //cout << "position -> " << obtain_position (observer (this)) << "\n";
 }

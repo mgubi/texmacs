@@ -14,7 +14,6 @@
 
 #include "modification.hpp"
 #include "blackbox.hpp"
-#include "hashset.hpp"
 
 #define DETACHED (-5)
 
@@ -271,55 +270,9 @@ attach_observer (tree& ref, observer o) {
   insert_observer (ref->obs, o);
 }
 
-/******************************************************************************
-* Compaction of the lists of observers
-*
-* remove_observer only empties the slot of the observer which it removes,
-* and the node of the list stays. The modifications of a tree simplify its
-* list (observer.cpp), but the list of a tree whose observers come and go
-* while it is not modified grew all the time: the include of a master, to
-* which the loci of the included document are attached, got all of them
-* again at each typesetting of the document, and each removal walks the
-* whole list (#408). The list of the tree is therefore compacted after a
-* removal: right away, or, during a notification (a list may be running
-* one of its methods, which a removal must not free), when the outermost
-* modification returns (observer_notification in observer.hpp).
-******************************************************************************/
-
-int observer_notification_depth= 0;
-static array<tree> pending_trees;
-static hashset<pointer> pending_set;
-
-static void
-compact_observers (observer& o) {
-  // the empty slots out, in order; the observers which are there stay
-  if (is_nil (o) || o->get_type () != OBSERVER_LIST) return;
-  observer& o1= o->get_child (0);
-  observer& o2= o->get_child (1);
-  compact_observers (o1);
-  compact_observers (o2);
-  if (is_nil (o1)) { observer r= o2; o= r; }
-  else if (is_nil (o2)) { observer r= o1; o= r; }
-}
-
-void
-compact_pending_observers () {
-  // (a compaction notifies nothing, so no tree is added meanwhile)
-  array<tree> a= pending_trees;
-  pending_trees= array<tree> ();
-  pending_set= hashset<pointer> ();
-  for (int i=0; i<N(a); i++)
-    compact_observers (a[i]->obs);
-}
-
 void
 detach_observer (tree& ref, observer o) {
   remove_observer (ref->obs, o);
-  if (observer_notification_depth == 0) compact_observers (ref->obs);
-  else if (!pending_set->contains ((pointer) ref.operator-> ())) {
-    pending_set->insert ((pointer) ref.operator-> ());
-    pending_trees << ref;
-  }
 }
 
 void

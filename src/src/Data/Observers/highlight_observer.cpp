@@ -40,7 +40,7 @@ public:
 void
 highlight_observer_rep::announce (tree& ref, modification mod) {
   (void) mod;
-  detach_observer (ref, observer (this));
+  remove_observer (ref->obs, observer (this));
 }
 
 bool
