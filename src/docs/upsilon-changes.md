@@ -14,6 +14,10 @@ have the details, and the problems go to the
 
 ## 21 October 2026
 
+- Part views: Document → Part also offers Show one part, Show several
+  parts and Show all parts for the view itself, and in the modes one and
+  several the list of its parts, as in an ordinary document
+  ([#434](https://github.com/mgubi/texmacs/pull/434)).
 - **Windows**: saving a part view (Document > Part) wrote the included
   files as `D/dir/a.tm` (the full path without the colon of the drive) in
   place of `a.tm`, and an included file open in its own buffer was not kept
