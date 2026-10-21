@@ -642,7 +642,36 @@
        (check-true (> (rect-x1 ra) (rect-x1 rc)))
        ;; the rows go downwards
        (check-true (< (rect-y2 rb) (rect-y1 ra)))
-       (check-true (< (rect-y2 rw) (rect-y1 rc)))))))
+       (check-true (< (rect-y2 rw) (rect-y1 rc))))))
+  ;; a table whose width is in par takes it from the paragraph where it is
+  ;; laid out (a cell whose lines are broken, the body of a frame), also when
+  ;; the width is given by a value (<value|figure-width> of the figures):
+  ;; its cell aligned on the right ends at the same place
+  (let* ((inner (lambda (w)
+                  `(tformat (twith "table-width" ,w) (twith "table-hmode" "exact")
+                            (cwith "1" "1" "1" "1" "cell-halign" "r")
+                            (table (row (cell "a"))))))
+         (in-cell (lambda (w)
+                    `(document
+                       (assign "w" "1par")
+                       (tformat (twith "table-width" "1par")
+                                (twith "table-hmode" "exact")
+                                (cwith "1" "1" "1" "1" "cell-hyphen" "t")
+                                (cwith "1" "1" "1" "-1" "cell-hpart" "1")
+                                (table (row (cell (document ,(inner w)))
+                                            (cell "b")))))))
+         (in-frame (lambda (w)
+                     `(document (assign "w" "1par")
+                                (framed (document ,(inner w))))))
+         (x-of (lambda (doc . p)
+                 (let ((x #f))
+                   (with-typeset-body doc
+                     (lambda () (set! x (rect-x1 (apply rect p)))))
+                   x))))
+    (check= (x-of (in-cell '(value "w")) 1 4 0 0 0 0 3 0 0 0)
+            (x-of (in-cell "1par") 1 4 0 0 0 0 3 0 0 0))
+    (check= (x-of (in-frame '(value "w")) 1 0 0 3 0 0 0)
+            (x-of (in-frame "1par") 1 0 0 3 0 0 0))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Line breaking
