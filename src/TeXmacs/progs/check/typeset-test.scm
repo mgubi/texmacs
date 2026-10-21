@@ -370,6 +370,45 @@
        (check= (nr "s1") "1")
        (check= (nr "s2") "2")))))
 
+;; A label which is removed: the references to it show "?" after the
+;; update which removes it, Update > All in the order of 2.1.4 (complete
+;; typesetting, without renumbering the automatic labels). The table of
+;; the references is cleaned at the end of a complete pass, and one more
+;; pass typesets what read the removed label (#417).
+(define (test-removed-label)
+  (check-group "removed label")
+  (with-typeset-body
+   '(document (section (concat "A" (label "s1")))
+              (concat "See " (reference "s2")
+                      (if (equal (get-binding "s2") "2") (vspace "5cm") ""))
+              "After."
+              (section (concat "B" (label "s2")))
+              "Text.")
+   (lambda ()
+     (let* ((update (lambda ()
+                      (update-forced)
+                      (generate-all-aux)
+                      (update-current-buffer)
+                      (update-forced)))
+            (nr (lambda (l) (cadr (tree->stree (get-reference l)))))
+            ;; the height of the paragraph of the reference, with its space
+            (height (lambda () (- (rect-y2 (rect 0)) (rect-y2 (rect 2))))))
+       (update)
+       (update)
+       (check= (nr "s2") "2")
+       (with h (height)
+         (tree-set (tree-ref (buffer-tree) 3) '(section "B"))
+         (update)
+         (check= (tree->stree (get-reference "s2")) '(uninit))
+         (check= (tree->stree (texmacs-expand '(get-binding "s2"))) '(uninit))
+         (check-true (< (height) h))
+         ;; and back
+         (tree-set (tree-ref (buffer-tree) 3)
+                   '(section (concat "B" (label "s2"))))
+         (update)
+         (check= (nr "s2") "2")
+         (check= (height) h))))))
+
 ;; The entries of the table of contents and of the index put a label where
 ;; they stand, auto-n. The number is that of the tag which makes the label
 ;; (Typeset/Env/env_exec.cpp, exec_auto_id): it follows the order of the
@@ -1824,10 +1863,10 @@
   (incl-write "two.tm"
               '((section (concat "Two" (label "s2")))
                 "Text of two."))
-  ;; (with the label of two.tm: the references to a label which is gone
-  ;; keep its value in the master)
+  ;; (without the label of two.tm: the references to it show "?" in the
+  ;; master once two.tm is replaced by three.tm, #417)
   (incl-write "three.tm"
-              '((section (concat "Three" (label "s2")))
+              '((section "Three")
                 "Text of three."
                 (concat "More" (vspace "2cm"))
                 "The end of three."))
@@ -1886,7 +1925,8 @@
       (with h (incl-height 4)
         (tree-set (tree-ref t 4 0) "three.tm")
         (incl-update)
-        (check= (incl-num "s2") "3")
+        (check= (incl-num "s2") '(uninit))
+        (check= (tree->stree (get-reference "s2")) '(uninit))
         (check-true (> (incl-height 4) h))
         (check-true (incl-same-as-fresh?))
         (tree-set (tree-ref t 4 0) "two.tm")
@@ -1984,6 +2024,7 @@
   (test-environment)
   (test-numbering)
   (test-renumbering)
+  (test-removed-label)
   (test-automatic-labels)
   (test-labels-of-nested-tags)
   (test-reuse-below-bindings)
