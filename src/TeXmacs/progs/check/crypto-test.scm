@@ -575,9 +575,12 @@
   (check-group "trust of renamed documents")
   (let* ((old (current-buffer))
          (u (new-buffer))
-         (out (system->url "/tm-crypto-test-untrusted/doc.tm"))
          ;; the home directory is trusted, but not its system/tmp, where
-         ;; tmp puts the files of this suite (is_secure, url.cpp)
+         ;; tmp puts the files of this suite (is_secure, url.cpp). (A name
+         ;; of the system such as "/tm-crypto-test-untrusted/doc.tm" is
+         ;; relative on Windows, and renaming a buffer which has a view to
+         ;; a relative name overflows the stack there.)
+         (out (tmp "untrusted/doc.tm"))
          (in (url-append (url-concretize "$TEXMACS_HOME_PATH")
                          "crypto-test-trusted/doc.tm"))
          (run (lambda ()
