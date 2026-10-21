@@ -989,6 +989,84 @@
      ;; and nothing to do the next time
      (check-false (renumber-auto-labels)))))
 
+;; When the labels are numbered again (Document > Update > All), only the
+;; bridges which make labels are typeset again, since they read the
+;; variable auto-epoch which the update changes (exec_auto_id in
+;; Typeset/Env/env_exec.cpp), and the others are used again (#408). The
+;; document is then the one of a typesetting from scratch: the same labels
+;; with the same values, the same tables, the paragraphs at the same places.
+(define (labels-state)
+  (list (map (lambda (l) (list l (tree->stree (get-reference l))))
+             (auto-names))
+        (map (lambda (a) (list a (tree->stree (get-auxiliary a))))
+             (sort (list-auxiliaries) string<?))
+        ;; (the places from the first paragraph: the margins of a new
+        ;; buffer and of a loaded file may differ)
+        (let* ((l (map (lambda (i) (rect i)) (iota (tree-arity (buffer-tree)))))
+               (x (rect-x1 (car l))) (y (rect-y1 (car l))))
+          (map (lambda (r)
+                 (list (- (rect-x1 r) x) (- (rect-y1 r) y)
+                       (- (rect-x2 r) x) (- (rect-y2 r) y)))
+               l))))
+
+(define (update-all-labels)
+  ;; Document > Update > All, without the inclusions-gc
+  (renumber-auto-labels)
+  (generate-all-aux)
+  (update-current-buffer)
+  (update-forced))
+
+(define (labels-state-from-scratch body)
+  (with-scratch-buffer
+   (lambda (u)
+     (buffer-set-body u (tree-copy body))
+     (update-forced)
+     (update-all-labels)
+     (update-all-labels)
+     (labels-state))))
+
+(define (test-renumbering-against-scratch)
+  (check-group "labels numbered again, against scratch")
+  (with-typeset-body
+   '(document (table-of-contents "toc" (document ""))
+              (assign "two" (macro "x" (concat (index (arg "x"))
+                                               (index (arg "x")))))
+              (section "A")
+              (concat "a" (two "first"))
+              (section "B")
+              (concat "b" (index "second"))
+              (section "C")
+              "c"
+              (the-index "idx" (document "")))
+   (lambda ()
+     (update-all-labels)
+     (update-all-labels)
+     (check= (labels-state) (labels-state-from-scratch (buffer-tree)))
+     ;; sections and an index entry added before the others: their labels
+     ;; take new numbers, until the update
+     (tree-insert (buffer-tree) 4 '((section "N") (concat "n" (index "new"))))
+     (update-forced)
+     (tree-insert (buffer-tree) 2 '((section "M")))
+     (update-forced)
+     (check-true (renumber-auto-labels))
+     (generate-all-aux)
+     (update-current-buffer)
+     (update-forced)
+     (with names (auto-names)
+       (check= names (auto-range (length names))))
+     (check= (labels-state) (labels-state-from-scratch (buffer-tree)))
+     ;; nothing to do the next time
+     (check-false (renumber-auto-labels))
+     (update-forced)
+     (check= (labels-state) (labels-state-from-scratch (buffer-tree)))
+     ;; a section removed
+     (tree-remove (buffer-tree) 2 1)
+     (update-forced)
+     (update-all-labels)
+     (with names (auto-names)
+       (check= names (auto-range (length names))))
+     (check= (labels-state) (labels-state-from-scratch (buffer-tree))))))
+
 ;; A binding which is the same as in the previous pass: below it, the
 ;; variable has the value of the previous pass, whatever it had outside;
 ;; a variable which a with binds and which was not there before is there
@@ -1979,6 +2057,70 @@
        (check= (map (lambda (i) (rect i)) (iota 3))
                (places-from-scratch (buffer-tree) 3))))))
 
+(define (incl-labels-fresh)
+  ;; the labels, tables and places of the current master, updated in a
+  ;; buffer of its own
+  (set! incl-fresh-count (+ incl-fresh-count 1))
+  (let* ((old (current-buffer))
+         (name (string-append "fresh-" (number->string incl-fresh-count)
+                              ".tm"))
+         (u (incl-file name)))
+    (incl-write name (cdr (tree->stree (buffer-tree))))
+    (dynamic-wind
+      (lambda () (noop))
+      (lambda ()
+        (load-buffer u)
+        (switch-to-buffer* u)
+        (update-forced)
+        (update-all-labels)
+        (update-all-labels)
+        (labels-state))
+      (lambda ()
+        (when (buffer-exists? u) (buffer-close u))
+        (switch-to-buffer* old)))))
+
+(define (incl-renumbering)
+  ;; the labels of the sections and of the index entries of the included
+  ;; files, numbered again in a master (#408): only the bridges which make
+  ;; labels are typeset again, and the includes are used again
+  (incl-write "four.tm"
+              '((section "Four")
+                (concat "a" (index "four"))
+                (section "Four again")))
+  (incl-write "five.tm"
+              '((section "Five")
+                (concat "b" (index "five"))))
+  (incl-write "labels.tm"
+              '((table-of-contents "toc" (document ""))
+                (include "four.tm")
+                (section "Between")
+                (include "five.tm")
+                (the-index "idx" (document ""))))
+  (with m (incl-file "labels.tm")
+    (load-buffer m)
+    (switch-to-buffer* m)
+    (update-forced)
+    (update-all-labels)
+    (update-all-labels)
+    (with names (auto-names)
+      (check= names (auto-range (length names)))
+      (check-true (>= (length names) 7)))
+    (check= (labels-state) (incl-labels-fresh))
+    ;; sections of the master before and between the includes
+    (tree-insert (buffer-tree) 1 '((section "Zero")))
+    (update-forced)
+    (tree-insert (buffer-tree) 4 '((concat "z" (index "zero"))))
+    (update-forced)
+    (check-true (renumber-auto-labels))
+    (generate-all-aux)
+    (update-current-buffer)
+    (update-forced)
+    (with names (auto-names)
+      (check= names (auto-range (length names))))
+    (check= (labels-state) (incl-labels-fresh))
+    (buffer-pretend-saved m)
+    (buffer-close m)))
+
 (define (test-included-files)
   (check-group "included files")
   (let ((old (current-buffer))
@@ -1987,6 +2129,9 @@
     (incl-clear-dir)
     (system-mkdir (system->url incl-dir))
     (incl-extern)
+    (with r (check-run incl-renumbering)
+      (when (and (pair? r) (== (car r) 'error))
+        (check-report #f "the group" (object->string r))))
     (with r (check-run incl-groups)
       (when (and (pair? r) (== (car r) 'error))
         (check-report #f "the group" (object->string r)))
@@ -2038,6 +2183,7 @@
   (test-derived-state)
   (test-renumbering-labels)
   (test-label-names)
+  (test-renumbering-against-scratch)
   (test-bindings-against-scratch)
   (test-labels-of-parts)
   (test-loci-of-surround-parts)

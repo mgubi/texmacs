@@ -315,11 +315,7 @@ concater_rep::typeset_write (tree t, path ip) {
   if (N(t) != 2) { typeset_error (t, ip); return; }
   string s= env->exec_string (t[0]);
   tree   r= remove_labels (env->exec (t[1]));
-  if (env->complete) {
-    if (!env->local_aux->contains (s))
-      env->local_aux (s)= tree (DOCUMENT);
-    env->local_aux (s) << r;
-  } 
+  env->write_aux (s, r);
   control ("write", ip);
 }
 
