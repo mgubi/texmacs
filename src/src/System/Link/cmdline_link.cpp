@@ -11,7 +11,9 @@
 
 #include "basic.hpp"
 
-//#if !(defined (QTTEXMACS) && (defined (OS_MINGW) || defined (QTPIPES)))
+// NOTE: with Qt pipes, the command line links are those of
+// Plugins/Qt/qt_cmdline_link.cpp (QProcess), as the pipe links
+#if !(defined (QTTEXMACS) && (defined (OS_MINGW) || defined (QTPIPES)))
 
 #include "tm_link.hpp"
 #include "socket_notifier.hpp"
@@ -450,4 +452,4 @@ void cmdline_callback (void *obj, void *info) {
 #endif
 }
 
-//#endif // !(defined (QTTEXMACS) && defined (OS_MINGW))
+#endif // !(defined (QTTEXMACS) && (defined (OS_MINGW) || defined (QTPIPES)))
