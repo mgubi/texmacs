@@ -1673,6 +1673,45 @@
 ;; The part tmfs opens a file of a project as a document of its own: its
 ;; url names the master and the file, its body is shared with the file and
 ;; its environment marks it as a part.
+;; Document > Part in a part view lists the files of the master, then the
+;; part modes of the view itself and, in the modes :one and :several, its
+;; parts, as in an ordinary document
+(define (menu-labels r)
+  ;; the strings of the expanded menu @r: the labels of its items, also
+  ;; those of the check items, (check label "v" checked?)
+  (cond ((string? r) (list r))
+        ((pair? r) (append (menu-labels (car r)) (menu-labels (cdr r))))
+        (else (list))))
+
+(define (part-menu-labels)
+  (menu-labels (menu-expand '(vertical (link document-part-menu)))))
+
+(define (test-part-view-menu)
+  (check-group "part view menu")
+  (write-doc "va.tm" '("book") '() '((chapter "Alpha") "a"))
+  (write-doc "vb.tm" '("book") '() '((chapter "Beta") "b"))
+  (write-doc "vm.tm" '("book") '() '((include "va.tm") (include "vb.tm")))
+  (let* ((m (tmp "vm.tm"))
+         (p (system->url (part-url m m))))
+    (load-buffer p)
+    (update-forced)
+    (buffer-set-part-mode :all)
+    (with l (part-menu-labels)
+      (check-true (in? "vm.tm" l))
+      (check-true (in? "va.tm" l))
+      (check-true (in? "Show one part" l))
+      (check-true (in? "Show several parts" l))
+      (check-true (in? "Show all parts" l))
+      ;; (no list of the parts when they are all shown)
+      (check-false (in? "Alpha (va.tm)" l)))
+    (buffer-set-part-mode :one)
+    (with l (part-menu-labels)
+      (check-true (in? "Alpha (va.tm)" l))
+      (check-true (in? "Beta (vb.tm)" l)))
+    (buffer-set-part-mode :all)
+    (buffer-pretend-saved p)
+    (buffer-close p)))
+
 (define (test-parts-tmfs)
   (check-group "part tmfs")
   (write-project)
@@ -2170,6 +2209,7 @@
   (run-group test-part-label-jump)
   (run-group test-part-style)
   (run-group test-part-open-own-file)
+  (run-group test-part-view-menu)
   (run-group test-parts-tmfs)
   (run-group test-document-parts)
   (run-group test-document-parts-undo)

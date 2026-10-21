@@ -53,4 +53,12 @@
     ((eval (car (car l))) (load-document m))
     ---
     (for (e (cdr l))
-      ((eval (car e)) (goto-include m (cadr e))))))
+      ((eval (car e)) (goto-include m (cadr e))))
+    ;; the parts of the view itself, as in an ordinary document
+    ---
+    ("Show one part" (buffer-set-part-mode :one))
+    ("Show several parts" (buffer-set-part-mode :several))
+    ("Show all parts" (buffer-set-part-mode :all))
+    (if (in? (buffer-get-part-mode) '(:one :several))
+        ---
+        (link document-parts-menu))))
