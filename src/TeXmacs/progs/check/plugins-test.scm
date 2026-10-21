@@ -411,24 +411,18 @@
   ;; Only the name is checked in the result: with Qt pipes, the output of
   ;; the command is read by the socket notifiers of the event loop, which
   ;; does not run here, so that the result may come without it.
-  ;; On Windows, the command line links run no command: their write, which
-  ;; asks the plugin for the command, does nothing (cmdline_link.cpp, under
-  ;; OS_MINGW), so that the plugin sees no input there.
   (set! chat-seen '())
   (set! notified '())
   (check= (start* "tmtestchat" "plugins-test-chat") "cmdline")
   (connection-write "tmtestchat" "plugins-test-chat" '(document "a b" "c"))
-  (if (os-mingw?)
-      (skip ":cmdline" "command line links run no command on Windows")
-      (check= chat-seen '("plugins-test-chat" "a b\nc")))
+  (check= chat-seen '("plugins-test-chat" "a b\nc"))
   (check-true (poll "tmtestchat" "plugins-test-chat"
                     (lambda () (nnull? (notified-on "output")))))
   (check-true (contains? (notified-on "output") "\"plugins-test-chat="))
   (check-false (contains? (notified-on "output") "\"default="))
   (check= (start* "tmtestchat" "plugins-test-other") "cmdline")
   (connection-write "tmtestchat" "plugins-test-other" "d")
-  (unless (os-mingw?)
-    (check= chat-seen '("plugins-test-other" "d")))
+  (check= chat-seen '("plugins-test-other" "d"))
   (check-true (connection-request? "tmtestrequest"))
   (check= (start* "tmtestrequest" "plugins-test-request") "request")
   (connection-write "tmtestrequest" "plugins-test-request" "e")
@@ -1134,6 +1128,27 @@
                 (== (connection-status "tmtestcmdline" ses) 0))
               5000))
 
+(define (has-return? t)
+  ;; whether a string of the tree @t in scheme format has a carriage return
+  (cond ((string? t) (in? #\return (string->list t)))
+        ((pair? t) (or (has-return? (car t)) (has-return? (cdr t))))
+        (else #f)))
+
+;; Windows: the command is a line of the command interpreter (cmd /c, see
+;; cmdline_link.cpp), whose ends of lines are those of Unix in the output;
+;; an interrupt ends the command and all it started (its job)
+(define (test-windows-cmdline)
+  (check-group "processes: command lines (Windows)")
+  (check= (start* "tmtestcmdline" "plugins-test-win") "cmdline")
+  ;; (connection-eval reads the link, which takes the output of its
+  ;; command there: with Qt pipes on Unix, only the event loop reads it)
+  (with r (eval* "tmtestcmdline" "plugins-test-win" "x y")
+    (check-true (contains? r "res=x y"))
+    (check-false (has-return? r)))
+  (check-true (cmdline-run "plugins-test-win" "z & ping -n 60 127.0.0.1"))
+  (for (i (.. 1 6))
+    (check-true (cmdline-run "plugins-test-win" "c"))))
+
 (define (test-processes)
   (check-group "processes: plugins which exit")
   ;; (the first session opens what is opened once)
@@ -1296,11 +1311,13 @@
   (if (url-exists-in-path? "sh")
       (run-group test-pipes)
       (skip "pipes" "sh is not in the path"))
-  ;; (Windows: no /dev/fd, and no command lines)
+  ;; (Windows: no /dev/fd, and no ps)
   (if (and (not (os-mingw?)) (url-exists-in-path? "sh")
            (url-exists? (system->url "/dev/fd")))
       (run-group test-processes)
       (skip "processes" "no sh or no /dev/fd"))
+  (if (os-mingw?)
+      (run-group test-windows-cmdline))
   (run-group test-scheme-session)
   (run-group test-external)
   (check-end))
