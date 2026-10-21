@@ -608,7 +608,23 @@
   (check-true (> (height (math '(frac (frac "a" "b") "c")))
                  (height (math '(frac "a" "c")))))
   (check-true (< (width (math '(frac "a" "b")))
-                 (width (math '(frac "aaa" "b"))))))
+                 (width (math '(frac "aaa" "b")))))
+  ;; a script given as the argument of a macro is placed as the same script
+  ;; written out: its box is narrowed back by the italic corrections by
+  ;; which it was widened, although the markers of width zero around the
+  ;; argument are then inside it (with an OpenType math font, the subscript
+  ;; was further away)
+  (let ((termes (lambda (t) `(with "font" "termes" "math-font" "math-termes"
+                               ,(math t)))))
+    (check= (width (termes '(with "f" (macro "c" (concat (around* "(" "x" ")")
+                                                         (rsub (arg "c"))))
+                              (concat (f "p") "q"))))
+            (width (termes '(concat (around* "(" "x" ")") (rsub "p") "q"))))
+    ;; (fractions do not read the extents of their children again after
+    ;; positioning them: this only checks that they are unchanged)
+    (check= (width (termes '(with "f" (macro "c" (frac (arg "c") "2"))
+                              (concat (f "p") "q"))))
+            (width (termes '(concat (frac "p" "2") "q"))))))
 
 ;; Tables: a table is at least as wide as its widest cells in each column
 ;; and grows with its rows; in a typeset buffer, the alignment of a cell

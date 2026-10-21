@@ -12,6 +12,14 @@ branch [`upsilon_texmacs`](https://github.com/mgubi/texmacs/commits/upsilon_texm
 have the details, and the problems go to the
 [issues of the repository](https://github.com/mgubi/texmacs/issues).
 
+## 22 October 2026
+
+- A subscript or superscript whose content comes from a macro argument
+  is placed as the same script written out: after the italic correction
+  of its content it kept part of the widening (up to 0.6pt with
+  TeX Gyre Termes math)
+  ([#426](https://github.com/mgubi/texmacs/pull/426)).
+
 ## 21 October 2026
 
 - A large delimiter of a negative size (`<left|[|-5>`, a bracket made
