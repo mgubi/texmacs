@@ -51,6 +51,8 @@ evaluate_eval_args (tree t) {
 * Quasiquote
 ******************************************************************************/
 
+static bool quasi_left= false;
+
 tree
 evaluate_quasiquote (tree t) {
   if (is_atomic (t)) return t;
@@ -61,11 +63,32 @@ evaluate_quasiquote (tree t) {
     for (i=0; i<n; i++) {
       if (is_func (t[i], VAR_UNQUOTE, 1)) {
 	tree ins= evaluate (t[i]);
-	if (is_compound (ins)) r << A(ins);
+	// (what only the typesetter computes, an extern left to it: it
+	// splices the result, see evaluate_quasi)
+	if (is_residual (ins) || is_left_call (ins)) {
+	  quasi_left= true;
+	  r << t[i];
+	}
+	else if (is_compound (ins)) r << A(ins);
 	else r << evaluate_error ("bad unquote*");
       }
       else r << evaluate_quasiquote (t[i]);
     }
     return r;
   }
+}
+
+tree
+evaluate_quasi (tree t) {
+  // quasi and quasiquote: the typesetter's when a part to splice is its
+  // (the map of the title of an article: an extern whose arguments hold
+  // labels); its children would be spliced instead of its result
+  bool old= quasi_left;
+  quasi_left= false;
+  tree r= evaluate_quasiquote (t[0]);
+  bool left= quasi_left;
+  quasi_left= old;
+  if (left) { (void) evaluate_left (t); return t; }
+  if (is_func (t, QUASI)) return evaluate_result (r);
+  return r;
 }

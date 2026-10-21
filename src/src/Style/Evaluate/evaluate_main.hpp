@@ -77,6 +77,7 @@ tree evaluate_get_arity (tree t);
 /* Quoting and evaluation */
 tree evaluate_eval_args (tree t);
 tree evaluate_quasiquote (tree t);
+tree evaluate_quasi (tree t);
 
 /* Control structures */
 tree evaluate_if (tree t);

@@ -21,8 +21,10 @@ computation with its arguments evaluated): the size of boxes (`box-info`,
 `frame-direct`, `frame-inverse`), the lengths in units, the automatic
 labels and the label tables (`auto-id`, `get-binding`, `has-binding`,
 `get-attachment`), patterns, `hard-id`; and the margins (`par-left`,
-`par-right`) in the body of an ornament, a canvas or an art box, which the
-typesetter sets itself there (`evaluate_ornamented`). A `tmlen` whose
+`par-right`) in the body of an ornament, a canvas or an art box, and in
+the cells of a table, which the typesetter sets itself there
+(`evaluate_ornamented`, `evaluate_table`: a cell whose lines are broken
+has margins at zero). A `tmlen` whose
 bounds are lengths in units is one too, in a computation on lengths.
 *Alternatives:* compute an approximation (lengths in absolute units, as the
 rewriter of 2007 did): wrong, the typesetter converts units at the scale at
@@ -31,7 +33,8 @@ the box at the place of use; evaluate `box-info` by typesetting in the
 rewriter: duplicates the typesetter.
 *Decided by:* the comparison of the printed pages (`tests/style/compare.sh`),
 which showed each of these as a difference (the margins in ornaments on the
-two generated help pages, `tag-help` and `top-help`); a sum of `tmlen` in
+two generated help pages, `tag-help` and `top-help`; a list in a cell of
+a box with negative margins, in a draft of the corpus); a sum of `tmlen` in
 `pt` which the rewriter computed as 0 (`elsarticle`'s display skips: the
 equations of Joris's `galois` got the short skips).
 
@@ -101,6 +104,13 @@ them: an error in their place lost them, "Table ?" in the corpus), the
 body of a `with` in source mode (`preamble` true, the body of
 `show-preamble`), which the typesetter shows as its source without
 executing it.
+*Limit:* what the rewriter computes in a loop (`for-each`: the counters
+which `reset-std-env` resets at a section) is not seen by the typesetter;
+a footnote inside the call of an undefined macro, which the typesetter
+numbers itself, continues the numbering of the previous section
+(baltakatei's `minor`). Keeping the calls of the loop in the result was
+tried: the typesetter then saw the inner loops and assignments to names
+computed empty, and shows other errors than on the document.
 *Alternative:* keep the rewriter's own rendering of inactive markup (2007):
 it had drifted from the typesetter's (DRD types, `src-*` classes, the DRD of
 the document).
@@ -169,6 +179,22 @@ an argument, not `<arg|...>` (`render-proof`: `<occurs-inside|<quote|<qed>>|body
 argument of an argument is seen by the rewriter only.
 *Decided by:* a second QED box under the last equation of proofs (Joris's
 `dcl`, `biamp`).
+
+**1.9 What the typesetter does not execute is not executed for what
+follows.** The argument of `hard-id` is evaluated (it is the tree which
+the typesetter finds and hashes) from the environment before it, which is
+restored after: the typesetter does not execute it, and what it assigns
+does not count after it.
+*Decided by:* the footnotes of baltakatei's appendices, whose number
+became the key of an index entry in their body (`the-label`, `Metre`
+instead of 3).
+
+**1.10 A splice which the typesetter computes.** When a part spliced by
+`unquote*` comes back as it is (an `extern` whose arguments hold
+residuals), the `quasi` or `quasiquote` is the typesetter's: the
+children of the call would be spliced instead of its result.
+*Decided by:* the authors of Joris's articles (`<map|padded-author|...>`
+in the title: "ext-map padded-author" was shown).
 
 ## 2. How the editor typesets the rewritten tree
 

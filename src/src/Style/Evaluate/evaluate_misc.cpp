@@ -42,8 +42,16 @@ evaluate_table (tree t) {
   // (the same empty format each time: a new one would be a new key for
   // begin_with, and a new environment inside the table)
   static tree empty_format (TFORMAT);
-  assoc_environment local (1);
+  // (the typesetter typesets the cells whose lines are broken with margins
+  // of their own, par-left and par-right at zero (cell_rep::typeset): in
+  // the cells they are left to it, as references, as in the body of an
+  // ornament (evaluate_ornamented); a list in a cell of a box with negative
+  // margins was placed with the margins outside the table)
+  static tree left (VALUE, PAR_LEFT), right (VALUE, PAR_RIGHT);
+  assoc_environment local (3);
   local->raw_write (0, CELL_FORMAT, empty_format);
+  local->raw_write (1, PAR_LEFT, left);
+  local->raw_write (2, PAR_RIGHT, right);
   begin_with (std_env, local);
   int i, n= N(t);
   tree r (t, n);

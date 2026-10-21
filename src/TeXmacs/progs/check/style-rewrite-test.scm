@@ -172,7 +172,20 @@
   ;; a sum of tmlen in units is the typesetter's, as a sum of lengths
   ;; (elsarticle's display skips; it was 0)
   (check= (value-of '(plus (tmlen "1pt" "2pt" "3pt") (tmlen "1pt" "2pt" "3pt")))
-          '(plus (tmlen "1pt" "2pt" "3pt") (tmlen "1pt" "2pt" "3pt"))))
+          '(plus (tmlen "1pt" "2pt" "3pt") (tmlen "1pt" "2pt" "3pt")))
+  ;; what the argument of hard-id assigns does not count after it (the
+  ;; typesetter does not execute it)
+  (check= (rewrite-last '(document (assign "x" "1") (hard-id (assign "x" "2"))
+                                   (value "x")))
+          "1")
+  ;; in the cells of a table the margins are the typesetter's
+  (check= (rewrite-last '(document (with "par-left" "1cm"
+                                     (tformat (table (row (cell (value "par-left"))))))))
+          '(with "par-left" "1cm"
+             (tformat (table (row (cell (value "par-left")))))))
+  ;; a splice which the typesetter computes: the quasi is its
+  (check= (rewrite-last '(document (quasi (concat "a" (unquote* (extern "list" (box-info "x" "w")))))))
+          '(quasi (concat "a" (unquote* (extern "list" (box-info "x" "w")))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Partial evaluation

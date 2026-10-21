@@ -511,9 +511,8 @@ evaluate_impl (tree t) {
     if (markup_mode) return t;
     return t[0];
   case QUASI:
-    return evaluate_result (evaluate_quasiquote (t[0]));
   case QUASIQUOTE:
-    return evaluate_quasiquote (t[0]);
+    return evaluate_quasi (t);
   case UNQUOTE:
   case VAR_UNQUOTE:
     return evaluate (t[0]);
@@ -718,10 +717,18 @@ evaluate_impl (tree t) {
 
   /* Linking primitives */
   case HARD_ID:
-    // (the identifier is made by the typesetter, from its environment and
-    // the address of the tree: the rewriter's would change with the address
-    // of its environment, at each change before it)
-    return evaluate_compound_children (t);
+    {
+      // (the identifier is made by the typesetter, from its environment and
+      // the address of the tree: the rewriter's would change with the
+      // address of its environment, at each change before it; the
+      // typesetter does not execute the argument, it only finds it: what
+      // the argument assigns does not count after it, the-label of an
+      // index in the body of a footnote, whose number became the key)
+      environment before= std_env;
+      tree r= evaluate_compound_children (t);
+      std_env= before;
+      return r;
+    }
   case SCRIPT:
     return evaluate_script (t);
   case HLINK:
