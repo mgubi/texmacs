@@ -22,6 +22,10 @@ have the details, and the problems go to the
 - A reference to a label which was removed shows `?` after the update
   which removes it, instead of the old number until a second update
   ([#417](https://github.com/mgubi/texmacs/issues/417)).
+- Update All no longer gets slower at each use in a master document: the
+  lists of observers of its included files no longer keep the empty
+  places of the observers which left
+  ([#408](https://github.com/mgubi/texmacs/issues/408)).
 - The fixes of the branch `wip_fixes` (fixes of the official TeXmacs)
   merged there on the evening of 20 October, in the items which follow.
 - Keyboard shortcuts: removing a shortcut (also one of your own, in Tools →

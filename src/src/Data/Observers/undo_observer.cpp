@@ -55,8 +55,8 @@ undo_observer_rep::announce (tree& ref, modification mod) {
 void
 undo_observer_rep::reattach (tree& ref, tree t) {
   if (ref.rep != t.rep) {
-    remove_observer (ref->obs, observer (this));
-    insert_observer (t->obs, observer (this));
+    detach_observer (ref, observer (this));
+    attach_observer (t, observer (this));
   }
 }
 

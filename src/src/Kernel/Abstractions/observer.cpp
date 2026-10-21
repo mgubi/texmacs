@@ -100,6 +100,7 @@ simplify (observer& obs) {
 
 static void
 detach (tree& ref, tree closest, bool right) {
+  observer_notification guard;
   if (!is_nil (ref->obs)) {
     ref->obs->notify_detach (ref, closest, right);
     simplify (ref->obs);
@@ -113,6 +114,7 @@ detach (tree& ref, tree closest, bool right) {
 
 void
 raw_assign (tree& ref, tree t) {
+  observer_notification guard;
   // cout << "Assign " << ref << " := " << t << "\n";
   modification mod= mod_assign (path (), t);
   if (!is_nil (ref->obs)) {
@@ -133,6 +135,7 @@ raw_assign (tree& ref, tree t) {
 
 void
 raw_insert (tree& ref, int pos, tree t) {
+  observer_notification guard;
   // cout << "Insert " << ref << " += " << t << " at " << pos << "\n";
   modification mod= mod_insert (path (), pos, t);
   if (!is_nil (ref->obs))
@@ -158,6 +161,7 @@ raw_insert (tree& ref, int pos, tree t) {
 
 void
 raw_remove (tree& ref, int pos, int nr) {
+  observer_notification guard;
   // cout << "Remove " << ref << " -= " << nr << " at " << pos << "\n";
   modification mod= mod_remove (path (), pos, nr);
   if (nr == 0) return;
@@ -191,6 +195,7 @@ raw_remove (tree& ref, int pos, int nr) {
 
 void
 raw_split (tree& ref, int pos, int at) {
+  observer_notification guard;
   // cout << "Split " << ref << " at " << pos << ", " << at << "\n";
   modification mod= mod_split (path (), pos, at);
   if (!is_nil (ref->obs))
@@ -226,6 +231,7 @@ raw_split (tree& ref, int pos, int at) {
 
 void
 raw_join (tree& ref, int pos) {
+  observer_notification guard;
   // cout << "Join " << ref << " at " << pos << "\n";
   // the following code is added for security
   if (is_atomic (ref[pos]) && (!is_atomic (ref[pos+1])))
@@ -262,6 +268,7 @@ raw_join (tree& ref, int pos) {
 
 void
 raw_assign_node (tree& ref, tree_label op) {
+  observer_notification guard;
   // cout << "Assign node " << ref << " : " << tree (op) << "\n";
   modification mod= mod_assign_node (path (), op);
   if (!is_nil (ref->obs)) {
@@ -277,6 +284,7 @@ raw_assign_node (tree& ref, tree_label op) {
 
 void
 raw_insert_node (tree& ref, int pos, tree t) {
+  observer_notification guard;
   // cout << "Insert node " << ref << " : " << t << " at " << pos << "\n";
   modification mod= mod_insert_node (path (), pos, t);
   if (!is_nil (ref->obs)) ref->obs->announce (ref, mod);
@@ -302,6 +310,7 @@ raw_insert_node (tree& ref, int pos, tree t) {
 
 void
 raw_remove_node (tree& ref, int pos) {
+  observer_notification guard;
   // cout << "Remove node " << ref << " : " << pos << "\n";
   modification mod= mod_remove_node (path (), pos);
   if (!is_nil (ref->obs)) {
@@ -320,6 +329,7 @@ raw_remove_node (tree& ref, int pos) {
 
 void
 raw_set_cursor (tree& ref, int pos, tree data) {
+  observer_notification guard;
   // cout << "Set cursor " << ref << " : " << pos << ", " << data << "\n";
   modification mod= mod_set_cursor (path (), pos, data);
   if (!is_nil (ref->obs)) {
@@ -476,6 +486,7 @@ set_cursor (tree& ref, int pos, tree data) {
 
 void
 touch (tree& ref) {
+  observer_notification guard;
   //cout << "Touch " << ref << "\n";
   if (!is_nil (ref->obs))
     ref->obs->touched (ref, path ());
