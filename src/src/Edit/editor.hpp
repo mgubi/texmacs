@@ -300,6 +300,7 @@ public:
   virtual void     environment_update () = 0;
   virtual tree     style_rewrite () = 0;
   virtual tree     style_rewrite_copy () = 0;
+  virtual tree     style_rewrite_printed () = 0;
   virtual array<int> style_rewrite_statistics () = 0;
 #endif
   virtual tree     get_full_env () = 0;

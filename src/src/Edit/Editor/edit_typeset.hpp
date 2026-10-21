@@ -76,6 +76,7 @@ public:
   void     environment_update ();
   tree     style_rewrite ();
   tree     style_rewrite_copy ();
+  tree     style_rewrite_printed ();
   void     typeset_rewritten_changes (path p, tree old_t, tree new_t);
   array<int> style_rewrite_statistics ();
 #endif

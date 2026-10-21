@@ -255,7 +255,19 @@ edit_main_rep::nr_pages () {
   typeset_prepare ();
   env->write (PAGE_MEDIUM, "paper");
   typeset_folds= false;
-  box the_box= typeset_as_document (env, subtree (et, rp), reverse (rp));
+  box the_box;
+#ifdef EXPERIMENTAL
+  // (with TEXMACS_STYLE_TYPESET=1, the pages of the rewritten tree, which
+  // print_doc prints)
+  tree printed= style_rewrite_printed ();
+  if (L(printed) != UNINIT)
+    the_box= typeset_as_document (env, printed, path (DECORATION));
+  else
+#endif
+  {
+    document_typesetting doc (env);
+    the_box= typeset_as_document (env, subtree (et, rp), reverse (rp));
+  }
   typeset_folds= true;
   env->write (PAGE_MEDIUM, medium);
   return N (the_box[0]);
@@ -304,7 +316,19 @@ edit_main_rep::print_doc (url name, bool conform, int first, int last) {
 
   env->style_init_env ();
   env->update ();
+#ifdef EXPERIMENTAL
+  // with TEXMACS_STYLE_TYPESET=1, the rewritten tree, as on the screen (the
+  // document itself, typeset with env->rewritten_tree, took the expand-as
+  // of the macros of the style for those of the rewriter: the comments
+  // lost the arguments of their macros); the typesetter takes
+  // env->rewritten_tree, which the flag sets
+  tree printed= style_rewrite_printed ();
+  typesetter ttt= (L(printed) != UNINIT?
+                   new_typesetter (env, printed, path (DECORATION)):
+                   new_typesetter (env, subtree (et, rp), reverse (rp)));
+#else
   typesetter ttt= new_typesetter (env, subtree (et, rp), reverse (rp));
+#endif
   typeset_folds= false;   // all the lines of program code are printed
   box the_box= ::typeset (ttt);
   typeset_folds= true;
@@ -446,7 +470,11 @@ edit_main_rep::print_snippet (url name, tree t, bool conserve_preamble) {
   env->style_init_env ();
   env->update ();
   typeset_folds= false;
-  box b= typeset_as_box (env, t, path ());
+  box b;
+  {
+    document_typesetting doc (env);
+    b= typeset_as_box (env, t, path ());
+  }
   typeset_folds= true;
   env->write (DPI, old_dpi);
   env->write (INFO_FLAG, old_info_flag);

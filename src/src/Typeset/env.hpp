@@ -998,6 +998,18 @@ class edit_env {
 };
 CONCRETE_NULL_CODE(edit_env);
 
+struct document_typesetting {
+  // the document itself typeset with the environment of an editor which
+  // typesets the rewritten tree (TEXMACS_STYLE_TYPESET=1): not as a tree of
+  // the style rewriter (the number of pages, an exported selection, the
+  // graphical object being edited)
+  edit_env env;
+  bool old;
+  inline document_typesetting (edit_env env2):
+    env (env2), old (env2->rewritten_tree) { env->rewritten_tree= false; }
+  inline ~document_typesetting () { env->rewritten_tree= old; }
+};
+
 tm_ostream& operator << (tm_ostream& out, edit_env env);
 tree texmacs_exec (edit_env env, tree cmd);
 tree load_inclusion (url u); // implemented in tm_file.cpp

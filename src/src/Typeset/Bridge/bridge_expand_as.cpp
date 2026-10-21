@@ -10,6 +10,7 @@
 ******************************************************************************/
 
 #include "bridge.hpp"
+#include "drd_std.hpp"
 
 class bridge_expand_as_rep: public bridge_rep {
 protected:
@@ -146,7 +147,15 @@ bridge_expand_as_rep::my_typeset_will_be_complete () {
 
 void
 bridge_expand_as_rep::my_typeset (int desired_status) {
-  ttt->insert_marker (st, ip);
+  // (the expand-as of a call of the rewritten tree: as bridge_compound for
+  // the call, no marker when the tag's children enforce its borders, as
+  // hide-preamble, whose markers would take a line before the document)
+  bool enforcing= false;
+  if (ttt->rewritten && is_atomic (st[0]) && N(st[0]->label) != 0) {
+    tree call (make_tree_label (st[0]->label), 1);
+    enforcing= the_drd->is_child_enforcing (call);
+  }
+  if (!enforcing) ttt->insert_marker (st, ip);
   // (the call, for the automatic labels: see concater_rep::typeset_expand_as)
   if (ttt->rewritten) env->macro_begin_call (ip, st[0]);
   body->typeset (desired_status);

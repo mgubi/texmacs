@@ -77,7 +77,9 @@ tables as values lost the boundaries of the calls in them (680 points of
 **1.5 What the typesetter does better is left to it.** Inactive markup
 (`inactive`, `inactive*` stay unevaluated; `rewrite-inactive` inside other
 macros goes through a macro made on the spot), `set-binding` (the
-typesetter makes the binding and the locus).
+typesetter makes the binding and the locus), the calls of undefined macros
+(the typesetter shows the call with its arguments, and makes the labels in
+them: an error in their place lost them, "Table ?" in the corpus).
 *Alternative:* keep the rewriter's own rendering of inactive markup (2007):
 it had drifted from the typesetter's (DRD types, `src-*` classes, the DRD of
 the document).
@@ -102,6 +104,34 @@ knows which branch it took. The assignments stay in the branches. A
 computation with an argument which holds a residual is a residual (`merge`
 of `"footnote-"` and the counter), and so is `set-binding` with such a name
 (`evaluate_branches`, `evaluate_partially`, `evaluate_set_binding`).
+The variables which an evaluation assigns are kept in its memorizer and
+given again when it is found there, since a branch evaluated from the
+memorizers runs no assignment (`set-binding` counts for `the-tags` and
+`the-label`). A macro defined in such a branch is the typesetter's too:
+its calls stay as they are, with their arguments, and so do the loops on
+such a variable (`while`, whose body counts as a branch until it assigns
+no other variable, and `for-each`), a script (`extern`) with such an
+argument, `value`, `quote-value`, `assign` and `with` with such a name. A
+tree left to the typesetter is evaluated once as a branch, so that what
+it assigns becomes a reference too, and a macro records the variables its
+body assigns, for the calls which the typesetter alone expands
+(`evaluate_left`, `assigned_in_macro`). The references are one tree per
+name, so that the same environment before a branch gives the same after
+it, and what follows finds its memorizers (`make_references`). Only a
+value made of atoms and residuals makes a computation residual: a
+comparison of markup which holds a reference stays the rewriter's.
+Such trees count as residuals for what follows (a script, a loop, a
+quoted value, `provides` of a variable which such a branch assigns, a
+call which comes back as it is: a test on them is the typesetter's). The
+scratch evaluations which find what they assign (`evaluate_left`, the
+passes of a `while`) are kept apart in the memorizers and do not run the
+scripts. Inside such a branch, a macro definition gives the variables
+which its calls assign, following the macros which it calls; and so does
+the former definition of a macro which the branch redefines.
+*Limits:* a variable whose name a macro computes (`assign` of a `merge`)
+is not found; the passes of a `while` stop after four; a variable which
+the rewriter reads itself (`secure`, `language`) and which such a branch
+assigns is read as it was before.
 *Alternatives:* the environment of the last branch for what follows (the
 rewriter of 2007): the counter went up once per branch and per copy of the
 note in `hard-id` and `write` (8 notes instead of 2, and references to notes
@@ -176,6 +206,36 @@ again.
 **2.6 A failure falls back to the document.** When typesetting the rewritten
 tree fails, the editor typesets the document instead; it never resets the
 document to an empty one (what it does otherwise on a typesetting failure).
+
+**2.7 Printing typesets the rewritten tree too.** `print_doc` typesets
+the document rewritten with the variables of printing (paper, printed
+pages, the resolution: `style_rewrite_printed`), with the same rules as on
+the screen. The other typesettings of trees of the document with the
+environment of the editor (the number of pages, an exported selection)
+turn `env->rewritten_tree` off while they typeset
+(`document_typesetting`).
+*Alternative:* the document itself, as before: with the flag on, it was
+typeset with the switches for a rewritten tree, which took the `expand-as`
+of the macros of the style for the boundaries of the rewriter (the
+comments lost the arguments of their macros), and the comparison of the
+editor's prints (`compare-editor.sh`) did not compare the rewritten tree
+at all.
+*Decided by:* a comment of Joris's `exphyp` in the corpus.
+
+**2.8 The typesetter's own rules for calls apply to their expand-as.**
+The expand-as of a call (1.6) has the macro's name as its first child, not
+the source of the call, and the place of the call. `expand` (which finds
+the accessible tree of a locus, of a `hard-id`) takes the expand-as
+itself then, not its name (a link inside a macro call had a locus box and
+an anchor more); the bridge of the expand-as puts no markers when the tag
+of the call enforces the borders of its children (`hide-preamble`, whose
+markers took a line before the document), as the bridge of the call does
+(`bridge_compound`). In the source mode (`preamble` true), which shows
+the tree as its source, the typesetter gets the document itself.
+*Decided by:* the editor's prints of the documentation pages
+(`env-misc`, `env-font`, `font-selection`, `man-convert`) and of the
+corpus (the notes of baltakatei), once the prints typeset the rewritten
+tree (2.7).
 
 ## 3. The identities which the caches rely on
 

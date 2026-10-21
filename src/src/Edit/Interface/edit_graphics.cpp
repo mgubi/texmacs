@@ -409,7 +409,11 @@ edit_graphics_rep::set_graphical_object (tree t) {
   env->fr= find_frame ();
   if (!is_nil (env->fr)) {
     int i,n=0;
-    go_box= typeset_as_concat (env, t, path (0));
+    {
+      // (the object, not a tree of the style rewriter)
+      document_typesetting doc (env);
+      go_box= typeset_as_concat (env, t, path (0));
+    }
     for (i=0; i<N(go_box); i++)
       if (go_box[i]!="") n++;
     if (n) {

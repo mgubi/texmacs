@@ -3170,6 +3170,12 @@ edit_env_rep::expand (tree t, bool search_accessible) {
   else if (is_func (t, EXPAND_AS, 2)) {
     if (N(t) < 1)
       return tree (_ERROR, "bad argument application");
+    // (in a tree of the style rewriter, the expand-as of a call has the
+    // place of the call, and the name of the macro as its first child)
+    if (rewritten_tree && is_atomic (t[0])) {
+      if (search_accessible && is_accessible (obtain_ip (t))) return t;
+      return expand (t[1], search_accessible);
+    }
     return expand (t[0], search_accessible);
   } else if (search_accessible && is_accessible (obtain_ip (t)))
     return t;

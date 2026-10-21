@@ -15,7 +15,9 @@
 
 /******************************************************************************
 * A fixed time for the tests (TEXMACS_ANIMATION_TIME, in milliseconds): the
-* animations then show the same frame at each typesetting and printing
+* animations then show the same frame at each typesetting and printing.
+* Only for tests: set_elapsed has no effect then, and get_refresh_time
+* still asks for the next frame, which is drawn the same.
 ******************************************************************************/
 
 static double

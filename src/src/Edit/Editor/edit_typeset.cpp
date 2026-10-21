@@ -541,6 +541,9 @@ tree
 edit_typeset_rep::style_rewrite () {
   // as apply_changes does, but also headless (for the tests)
   if (is_nil (ste)) environment_update ();
+  // (in the source mode, preamble=true, the typesetter shows the document
+  // as its source: the document itself, not the rewritten tree)
+  if (env->read (PREAMBLE) == "true") return subtree (et, rp);
   mem= evaluate (ste, cct);
   return mem->get_tree ();
 }
@@ -567,6 +570,25 @@ edit_typeset_rep::style_rewrite_copy () {
   tree uninit (UNINIT);
   hashmap<pointer,tree> done (uninit);
   return copy_shared (style_rewrite (), done);
+}
+
+tree
+edit_typeset_rep::style_rewrite_printed () {
+  // with TEXMACS_STYLE_TYPESET=1, the rewritten tree which print_doc
+  // typesets: the document rewritten with the environment of printing
+  // (paper, printed pages, the resolution), which print_doc has set, since
+  // the rewriter evaluates these variables as any other; UNINIT otherwise
+  if (!rewrite_typeset) return tree (UNINIT);
+  if (env->read (PREAMBLE) == "true") return subtree (et, rp);
+  hashmap<string,tree> h;
+  env->assign ("base-file-name", as_string (env->base_file_name));
+  env->assign ("cur-file-name", as_string (env->cur_file_name));
+  env->assign ("secure", bool_as_tree (env->secure));
+  env->read_env (h);
+  environment printed;
+  ::primitive (printed, h);
+  memorizer m= evaluate (printed, cct);
+  return m->get_tree ();
 }
 
 array<int>
