@@ -247,7 +247,14 @@ table_rep::format_table (tree fm) {
     format_item (fm[i]);
 
   if (var->contains (TABLE_WIDTH)) {
-    width= env->as_length (env->exec (var[TABLE_WIDTH]));
+    // The width is kept executed: a width in par is taken again from the
+    // paragraph where the table is placed (lazy_table_rep::produce), which
+    // runs later, when the environment of the table (local variables,
+    // macro arguments) is no longer there; a width given by a value, as
+    // <value|figure-width> in the figures, is then known to be in par too.
+    tree w= env->exec (var[TABLE_WIDTH]);
+    var (TABLE_WIDTH)= w;
+    width= env->as_length (w);
     if (var->contains (TABLE_HMODE))
       hmode= as_string (env->exec (var[TABLE_HMODE]));
     else hmode= "exact";
@@ -1021,10 +1028,7 @@ lazy_table_rep::produce (lazy_type request, format fm) {
   if (request == LAZY_VSTREAM) {
     if (fm->type == FORMAT_VSTREAM) {
       format_vstream fs= (format_vstream) fm;
-      // (the width as table_rep::format_table reads it, executed: a width
-      // given by a value, <value|figure-width>, is also taken again from
-      // the width of the paragraph where the table is placed)
-      string s= as_string (T->env->exec (T->var[TABLE_WIDTH]));
+      string s= as_string (T->var[TABLE_WIDTH]);  // executed by format_table
       if (ends (s, "par"))
         T->width= max ((SI) (as_double (s (0, N(s)-3)) * fs->width), 1);
     }
