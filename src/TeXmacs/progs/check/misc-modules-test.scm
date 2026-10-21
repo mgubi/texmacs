@@ -68,6 +68,7 @@
         (education edu-edit)
         (education edu-markup)
         (tools comment comment-edit)
+        (part part-shared)
         (tools poster poster-edit)
         (tools theme theme-edit)
         (tools spell spell-edit)
@@ -2372,6 +2373,35 @@
 (define (comment lab id type by body)
   `(,lab ,id ,(string-append "m" id) ,type ,by "1" "" ,body))
 
+;; Mirrors and comments share their body through an identifier: a copy which
+;; is not in sync is put on the list of the copies to separate, and the first
+;; one schedules the separation (part-shared.scm, mirror-invalidate, whose
+;; test of an empty list lacked its 0: under Guile every copy scheduled one,
+;; under S7 it was an error at every comment)
+(define (test-mirrors)
+  (check-group "mirrors")
+  (with-buffer-doc '(document (mirror "mt-u" "mt-m" "a")
+                              (mirror "mt-v" "mt-n" "b"))
+                   '("generic")
+    (lambda ()
+      (let* ((m (resolve-module '(part part-shared)))
+             (invalidate (eval 'mirror-invalidate m))
+             (black-list (eval 'mirror-black-list m))
+             (scheduled 0))
+        (with-global exec-delayed-pause
+            (lambda (c) (set! scheduled (+ scheduled 1)))
+          (check= (catch #t (lambda () (invalidate (bt 0 2)) "ok")
+                    (lambda args (car args)))
+                  "ok")
+          (check= (catch #t (lambda () (invalidate (bt 1 2)) "ok")
+                    (lambda args (car args)))
+                  "ok"))
+        (check-true (ahash-ref black-list "mt-u"))
+        (check-true (ahash-ref black-list "mt-v"))
+        (check= scheduled 1)
+        (ahash-remove! black-list "mt-u")
+        (ahash-remove! black-list "mt-v")))))
+
 (define (test-comments)
   (check-group "comments")
   (let ((c (T (comment 'folded-comment "2" "remark" "Bob" "c2"))))
@@ -2606,7 +2636,7 @@
                   test-language-names test-translations test-hyphenation
                   test-spelling
                   test-edu-contexts test-edu-macros test-edu-modes test-mc
-                  test-comments test-posters-themes test-spell-edit
+                  test-mirrors test-comments test-posters-themes test-spell-edit
                   test-ai-serialize))
   (clear-misc-dir)
   (check-end))
