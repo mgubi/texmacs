@@ -245,6 +245,36 @@
     (check= (cursor) '(0 0 0))
     (buffer-close f)
     (check-false (buffer-exists? f))
+    (when (buffer-exists? old) (switch-to-buffer old)))
+  ;; a long document: loading it does not go through all its subtrees (the
+  ;; test for an encrypted document, in load-buffer-open, overflowed the
+  ;; Guile stack from a few thousand paragraphs on, #418)
+  (let ((f (tmp-file* "load-long.tm"))
+        (old (current-buffer))
+        (n 20000))
+    (string-save
+     (apply string-append
+            "<TeXmacs|2.1>\n\n<style|generic>\n\n<\\body>\n"
+            (append
+             (map (lambda (i)
+                    (string-append "  Paragraph " (number->string i)
+                                   " with <hlink|a link|https://example.org/"
+                                   (number->string i) ">.\n\n"))
+                  (iota n))
+             (list "</body>\n")))
+     (url->system f))
+    (load-buffer f)
+    (check= (current-buffer) f)
+    (check= (tree-arity (buffer-get-body f)) n)
+    (check= (tree->stree (tree-ref (buffer-get-body f) (- n 1)))
+            `(concat ,(string-append "Paragraph " (number->string (- n 1))
+                                     " with ")
+                     (hlink "a link" ,(string-append "https://example.org/"
+                                                     (number->string (- n 1))))
+                     "."))
+    (check-false (buffer-modified? f))
+    (buffer-close f)
+    (check-false (buffer-exists? f))
     (when (buffer-exists? old) (switch-to-buffer old))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

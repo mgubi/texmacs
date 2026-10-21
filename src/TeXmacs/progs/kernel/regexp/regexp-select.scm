@@ -44,21 +44,25 @@
 ;; Special patterns
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;; NOTE: the selections below loop over the children of a node; they are
+;; written iteratively, since documents may have thousands of children
+;; (for instance a book expanded from the documentation)
+
 (define (select-symbol l nr sym bl)
   "Select symbols"
-  (cond ((null? l) l)
-	((and (tm-compound? (car l)) (== (tm-car (car l)) sym))
-	 (cons (cons* (list nr) (car l) bl)
-	       (select-symbol (cdr l) (+ nr 1) sym bl)))
-	(else (select-symbol (cdr l) (+ nr 1) sym bl))))
+  (let loop ((l l) (nr nr) (r '()))
+    (cond ((null? l) (reverse! r))
+	  ((and (tm-compound? (car l)) (== (tm-car (car l)) sym))
+	   (loop (cdr l) (+ nr 1) (cons (cons* (list nr) (car l) bl) r)))
+	  (else (loop (cdr l) (+ nr 1) r)))))
 
 (define (select-exclude-symbols l nr syms bl)
   "Select all except symbols in a given list"
-  (cond ((null? l) l)
-	((and (tm-compound? (car l)) (nin? (tm-car (car l)) syms))
-	 (cons (cons* (list nr) (car l) bl)
-	       (select-exclude-symbols (cdr l) (+ nr 1) syms bl)))
-	(else (select-exclude-symbols (cdr l) (+ nr 1) syms bl))))
+  (let loop ((l l) (nr nr) (r '()))
+    (cond ((null? l) (reverse! r))
+	  ((and (tm-compound? (car l)) (nin? (tm-car (car l)) syms))
+	   (loop (cdr l) (+ nr 1) (cons (cons* (list nr) (car l) bl) r)))
+	  (else (loop (cdr l) (+ nr 1) r)))))
 
 (define (select-exclude x args bl)
   "Select :exclude patterns"
@@ -66,10 +70,10 @@
 
 (define (select-range l nr begin end bl)
   "Select ranges"
-  (cond ((or (null? l) (>= nr end)) '())
-	((< nr begin) (select-range (cdr l) (+ nr 1) begin end bl))
-	(else (cons (cons* (list nr) (car l) bl)
-		    (select-range (cdr l) (+ nr 1) begin end bl)))))
+  (let loop ((l l) (nr nr) (r '()))
+    (cond ((or (null? l) (>= nr end)) (reverse! r))
+	  ((< nr begin) (loop (cdr l) (+ nr 1) r))
+	  (else (loop (cdr l) (+ nr 1) (cons (cons* (list nr) (car l) bl) r))))))
 
 (define (select-range* x args bl)
   "Select :range patterns"
