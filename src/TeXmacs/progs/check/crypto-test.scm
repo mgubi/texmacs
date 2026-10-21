@@ -242,6 +242,28 @@
           (check-false (== s1 s2))
           (check-false (== (generate-salt) (generate-salt)))))))
 
+;; secure-random-number n: uniform in [0, n) with or without GnuTLS (from
+;; the system without it, rand_s on Windows and /dev/urandom elsewhere, so
+;; -1 only on a system with neither); the same checks as above.
+(define (secure-draws n limit)
+  (map (lambda (i) (secure-random-number limit)) (iota n)))
+
+(define (test-secure-random)
+  (check-group "secure random numbers")
+  (check= (secure-random-number 0) 0)
+  (check= (list-remove-duplicates (secure-draws 50 1)) '(0))
+  (for (limit '(2 3 10 1000 1000000 2147483647))
+    (check-true (list-and (map (lambda (x) (and (>= x 0) (< x limit)))
+                               (secure-draws 200 limit)))))
+  (check= (sort (list-remove-duplicates (secure-draws 200 2)) <) '(0 1))
+  (check-true (> (length (list-remove-duplicates (secure-draws 100 1000000)))
+                 90))
+  (let* ((l (secure-draws 6000 6))
+         (counts (map (lambda (k) (length (filter (cut == <> k) l)))
+                      (iota 6))))
+    (check-true (list-and (map (lambda (c) (and (> c 800) (< c 1200)))
+                               counts)))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Generated passwords
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -272,14 +294,11 @@
                       l)))
     (check-true (list-and (map server-strong-password? l)))
     (check= (length (list-remove-duplicates l)) 30))
-  (check= (string-length (generate-password 4)) 4)
-  ;; FIXME (#66, item 10): the characters come from the ordinary random
-  ;; without GnuTLS (security/password.scm:26) and are always shuffled with
-  ;; it (:33). *random-state* is seeded only when server-base.scm is loaded
-  ;; (with the time in seconds), so that without GnuTLS (generate-password
-  ;; 16) gives the same password in every new session ("%YUN}-t4.h*[PXmT"
-  ;; on macOS); generate-password should use a cryptographic source or fail.
-  )
+  ;; the characters and their shuffle come from secure-random-number (see
+  ;; test-secure-random), not from the random of Scheme, which was seeded
+  ;; with the time in seconds and gave the same password in every new
+  ;; session without GnuTLS (#66, item 10)
+  (check= (string-length (generate-password 4)) 4))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Server passwords
@@ -951,6 +970,7 @@
       (guarded "base64" test-base64)
       (guarded "tree-hash" test-tree-hash)
       (guarded "random numbers" test-random)
+      (guarded "secure random numbers" test-secure-random)
       (guarded "generate-password" test-generate-password)
       (guarded "server passwords" test-server-passwords)
       (guarded "format" test-format)

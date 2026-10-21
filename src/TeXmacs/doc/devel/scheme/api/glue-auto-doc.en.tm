@@ -291,6 +291,22 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(gui-test-file-dialog)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|gui_test_file_dialog> which returns
+    <scm|array_string>.
+  </explain>
+
+  <\explain>
+    <scm|(gui-test-file-dialog-do <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|gui_test_file_dialog_do> which returns
+    <scm|int>.
+  </explain>
+
+  <\explain>
     <scm|(support-functionality? <scm-arg|string>)>
 <explain-synopsis|no synopsis>
   <|explain>
@@ -5531,6 +5547,14 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(secure-random-number <scm-arg|uint>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|secure_random_int> which returns
+    <scm|int>.
+  </explain>
+
+  <\explain>
     <scm|(tls-client-start <scm-arg|string> <scm-arg|int> <scm-arg|scheme_tree>)>
 <explain-synopsis|no synopsis>
   <|explain>
@@ -6296,6 +6320,22 @@ source code.
   <|explain>
     Calls the <c++> function <cpp|get_buffer_body> which returns
     <scm|tree>.
+  </explain>
+
+  <\explain>
+    <scm|(buffer-get-style <scm-arg|url>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|get_buffer_style> which returns
+    <scm|tree>.
+  </explain>
+
+  <\explain>
+    <scm|(buffer-set-style <scm-arg|url> <scm-arg|content>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|set_buffer_style> which returns
+    <scm|void>.
   </explain>
 
   <\explain>

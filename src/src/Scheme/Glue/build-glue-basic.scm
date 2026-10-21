@@ -776,6 +776,7 @@
   ;; TeXmacs secure clients
   (supports-gnutls? gnutls_present (bool))
   (gnutls-random-number gnutls_random_int (int uint))
+  (secure-random-number secure_random_int (int uint))
   (tls-client-start tls_client_start (int string int scheme_tree))
   (gnutls-generate-salt gnutls_generate_salt (string))
   (hash-password-pbkdf2 hash_password_pbkdf2 (string string string))
@@ -889,6 +890,8 @@
   (buffer-get get_buffer_tree (tree url))
   (buffer-set-body set_buffer_body (void url content))
   (buffer-get-body get_buffer_body (tree url))
+  (buffer-get-style get_buffer_style (tree url))
+  (buffer-set-style set_buffer_style (void url content))
   (buffer-set-master set_master_buffer (void url url))
   (buffer-get-master get_master_buffer (url url))
   (buffer-set-title set_title_buffer (void url string))

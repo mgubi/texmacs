@@ -261,7 +261,7 @@
   (when (not (document-part? (car (buffer-body-paragraphs))))
     (let* ((t (buffer-tree))
 	   (l (buffer-body-paragraphs))
-	   (parts (principal-sections-to-document-parts l))
+	   (parts (buffer-new-parts l))
 	   (preamble? (tree-in? (tree-ref t 0) '(show-preamble hide-preamble))))
       (if (or (list-find parts (lambda (p) (not (part-form? p))))
 	      (!= (apply + (map part-size parts)) (length l)))
@@ -321,6 +321,15 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Listing the document parts
+;;
+;; A part is known by its identifier, the first argument of show-part and
+;; hide-part: its number ("1", "2", ...), which is also what the references
+;; to the labels of a hidden part name (#2, see go_to_label in
+;; edit_cursor.cpp). The title of a part is only shown, with the name of
+;; its file when it starts with an included file: two parts may have the
+;; same title. For compatibility, buffer-show-part, buffer-toggle-part and
+;; buffer-go-to-part also accept the title of a part when no part has it as
+;; identifier.
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (tm-define (document-has-preamble? t)
@@ -331,22 +340,6 @@
   (:synopsis "Obtain the preamble of the document tree @t")
   (if (document-has-preamble? t) (tree-ref t 0 0) `(document "")))
 
-(define (document-part-name t)
-  (if (== (tree-ref t 1) (string->tree ""))
-      (string->tree "no title")
-      (principal-section-title (tree-ref t 1))))
-
-(define (document-get-parts t all?)
-  (cond ((tree-atomic? t) '())
-	((or (tree-is? t 'show-part) (and all? (tree-is? t 'hide-part)))
-	 (list (document-part-name t)))
-	((principal-section? t)
-	 (list (tm/section-get-title-string t #f)))
-	((not (tree-in? t '(document ignore))) '())
-	(else (with ls (map (lambda (x) (document-get-parts x all?))
-			    (tree-children t))
-		(apply append ls)))))
-
 (tm-define (buffer-has-preamble?)
   (:synopsis "Does the current buffer contain a preamble?")
   (document-has-preamble? (buffer-tree)))
@@ -355,65 +348,153 @@
   (:synopsis "Obtain the preamble of the current buffer")
   (document-get-preamble (buffer-tree)))
 
-(tm-define (buffer-parts-list all?)
-  (:synopsis "Get the list of all document parts of the current buffer")
+(define (paragraph-file t)
+  ;; the name of the file included by the paragraph @t, relative to the
+  ;; master of the buffer, or #f
+  (cond ((and (tm-func? t 'shared 3) (tm-atomic? (tm-ref t 1)))
+         (url->unix (url-delta (buffer-master)
+                               (unix->url (tm->string (tm-ref t 1))))))
+        ((and (tm-in? t '(include include*)) (tm-atomic? (tm-ref t 0)))
+         ;; (an include of the master is relative to it: ./pb.tm is pb.tm)
+         (with u (url-relative (buffer-master)
+                               (unix->url (tm->string (tm-ref t 0))))
+           (url->unix (url-delta (buffer-master) u))))
+        (else #f)))
+
+(define (part-body-file b)
+  ;; the file with which the body @b of a part starts, or #f
+  (and (tm-func? b 'document) (> (tm-arity b) 0)
+       (paragraph-file (tm-ref b 0))))
+
+(define (buffer-new-parts l)
+  ;; the parts which buffer-make-parts makes of the paragraphs @l
+  (principal-sections-to-document-parts l))
+
+(define (part-id t)
+  ;; the identifier of the part @t
+  (if (tree-atomic? (tree-ref t 0)) (tree->string (tree-ref t 0)) ""))
+
+(define (document-part-name t)
+  (if (== (tree-ref t 1) (string->tree ""))
+      (string->tree "no title")
+      (principal-section-title (tree-ref t 1))))
+
+(define (part-title t)
+  ;; the title of the part @t, as a string
+  (with s (document-part-name t)
+    (if (tree? s) (tree->string s) s)))
+
+(define (document-get-part-ids l all?)
+  ;; the identifiers of the parts among the paragraphs @l: the parts shown,
+  ;; or all of them when @all?
+  (append-map (lambda (t)
+                (cond ((tree-atomic? t) '())
+                      ((or (tree-is? t 'show-part)
+                           (and all? (tree-is? t 'hide-part)))
+                       (list (part-id t)))
+                      ((tree-in? t '(document ignore))
+                       (document-get-part-ids (tree-children t) all?))
+                      (else '())))
+              l))
+
+(define (buffer-content-paragraphs)
+  ;; the paragraphs of the body, also when the preamble is shown
   (with l (buffer-body-paragraphs)
     (if (match? l '((ignore (document :*))))
-	(set! l (tree-children (tree-ref (car l) 0))))
-    (with parts (document-get-parts (tm->tree `(document ,@l)) all?)
-      (if (and (not (tree-in? (car l) '(show-part hide-part)))
-	       (not (principal-section? (car l)))
-	       (or all? (== (buffer-get-part-mode) :all)))
-	  (cons "front matter" parts)
-	  parts))))
+        (tree-children (tree-ref (car l) 0))
+        l)))
+
+(tm-define (buffer-parts-list all?)
+  (:synopsis "Get the identifiers of the document parts of the current buffer")
+  ;; when the buffer is not shown in parts: the identifiers of the parts
+  ;; which it would have
+  (with l (buffer-content-paragraphs)
+    (if (document-part? (car l))
+        (document-get-part-ids l all?)
+        (map cadr (buffer-new-parts l)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Selection of specific document parts
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define (document-find-part t id)
+(define (document-find-part-such t pred?)
+  ;; the first part in @t which satisfies @pred?
   (cond ((tree-atomic? t) #f)
 	((tree-in? t '(show-part hide-part))
-	 (and (== id (document-part-name t)) t))
+	 (and (pred? t) t))
 	((not (tree-in? t '(document ignore))) #f)
-	(else (list-find (tree-children t)
-			 (lambda (x) (document-find-part x id))))))
+	(else (list-any (lambda (x) (document-find-part-such x pred?))
+                        (tree-children t)))))
 
-(define (document-select-part t id)
+(define (document-find-part t id)
+  ;; the part of @t with the identifier @id, else the first one with the
+  ;; title @id
+  (or (document-find-part-such t (lambda (x) (== (part-id x) id)))
+      (document-find-part-such t (lambda (x) (== (part-title x) id)))))
+
+(define (document-select-part t p)
+  ;; show the part @p of @t and hide the others
   (cond ((tree-atomic? t) (noop))
 	((tree-in? t '(show-part hide-part))
-	 (with show? (== id (document-part-name t))
+	 (with show? (== (tree->path t) (tree->path p))
 	   (if (and show? (tree-is? t 'hide-part))
 	       (tree-assign-node! t 'show-part))
 	   (if (and (not show?) (tree-is? t 'show-part))
 	       (tree-assign-node! t 'hide-part))))
 	((not (tree-is? t 'document)) (noop))
-	(else (for-each (lambda (x) (document-select-part x id))
+	(else (for-each (lambda (x) (document-select-part x p))
 			(tree-children t)))))
 
+(define (buffer-part-body id)
+  ;; the body of the document part @id
+  (with l (buffer-content-paragraphs)
+    (if (document-part? (car l))
+        (and-with t (document-find-part (buffer-tree) id)
+          (tree-ref t 1))
+        (and-with p (list-find (buffer-new-parts l)
+                               (lambda (p) (== (cadr p) id)))
+          (caddr p)))))
+
+(tm-define (buffer-part-title id)
+  (:synopsis "The title of the document part with identifier @id")
+  (and-with b (buffer-part-body id)
+    (if (tm-atomic? b) "no title" (principal-section-title b))))
+
+(tm-define (buffer-part-label id)
+  (:synopsis "The label of the document part @id in the menus")
+  ;; its title, followed by its file when it starts with an included file
+  (let* ((title (or (buffer-part-title id) "no title"))
+         (file (and-with b (buffer-part-body id) (part-body-file b)))
+         (first? (== id (car (buffer-parts-list #t)))))
+    (cond ((and file (== title "no title")) file)
+          (file (string-append (upcase-first title) " (" file ")"))
+          ((and (== title "no title") first?) "front matter")
+          (else (upcase-first title)))))
+
 (tm-define (buffer-go-to-part id)
-  (:synopsis "Go to the part with name @id")
+  (:synopsis "Go to the part with identifier @id")
   (with t (document-find-part (buffer-tree) id)
     (and t (tree-go-to t 1 :start))))
 
 (tm-define (buffer-show-part id)
-  (:synopsis "Show the document part with name @id")
+  (:synopsis "Show the document part with identifier @id")
   (when (== (buffer-get-part-mode) :one)
-    (document-select-part (buffer-tree) id)
-    (buffer-go-to-part id)))
+    (and-with t (document-find-part (buffer-tree) id)
+      (document-select-part (buffer-tree) t)
+      (tree-go-to t 1 :start))))
 
 (tm-define (buffer-toggle-part id)
-  (:synopsis "Toggle the visibility of the document part with name @id")
-  (when (and (== (buffer-get-part-mode) :several)
-	     (list-find (buffer-parts-list #f) (lambda (x) (!= x id))))
-    (with t (document-find-part (buffer-tree) id)
-      (cond ((not t) (noop))
-	    ((tree-is? t 'show-part)
+  (:synopsis "Toggle the visibility of the document part with identifier @id")
+  (with t (and (== (buffer-get-part-mode) :several)
+               (document-find-part (buffer-tree) id))
+    (when (and t (list-find (buffer-parts-list #f)
+                            (lambda (x) (!= x (part-id t)))))
+      (cond ((tree-is? t 'show-part)
 	     (tree-assign-node! t 'hide-part)
 	     (buffer-go-to-part (car (buffer-parts-list #f))))
 	    ((tree-is? t 'hide-part)
 	     (tree-assign-node! t 'show-part)
-	     (buffer-go-to-part id))))))
+	     (tree-go-to t 1 :start))))))
 
 (tm-define (buffer-make-preamble)
   (:synopsis "Create a preamble for the current document")
@@ -504,8 +585,8 @@
 (tm-define (tree-show-hidden t)
   (:require (and (tree-is? t 'hide-part) (== (tree-up t) (buffer-tree))))
   (if (== (buffer-get-part-mode) :one)
-      (with id (document-part-name t)
-	(document-select-part (tree-up t) id)
+      (begin
+	(document-select-part (tree-up t) t)
 	;; only this part is shown now: a cursor outside it is hidden
 	(when (not (list-starts? (cursor-path) (tree->path t)))
 	  (tree-go-to t 1 :start)))
@@ -547,10 +628,9 @@
 
 (tm-menu (document-parts-menu)
   (let* ((all (buffer-parts-list #t))
-	 (active (buffer-parts-list #f))
-	 (make (lambda (id) (document-parts-menu-entry id (in? id active)))))
+	 (active (buffer-parts-list #f)))
     (for (id all)
-      ((check (eval (upcase-first id)) "v" (in? id active))
+      ((check (eval (buffer-part-label id)) "v" (in? id active))
        (if (== (buffer-get-part-mode) :one)
            (buffer-show-part id)
            (buffer-toggle-part id))))))

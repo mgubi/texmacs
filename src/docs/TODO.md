@@ -9,8 +9,7 @@ The directions of the project, wished for and not yet begun, are in
 
 ## Next
 
-- (`wip_fixes` is merged here up to the evening of 2026-10-20, with its
-  forty PRs of that day, since 2026-10-21. `delayed (:refresh ms)`, #311,
+- (`wip_fixes` is merged here up to #420, 2026-10-21. `delayed (:refresh ms)`, #311,
   is here since 2026-10-14; the developer manual says how `:refresh`
   works.)
 

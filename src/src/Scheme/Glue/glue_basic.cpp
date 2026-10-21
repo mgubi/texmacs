@@ -9351,6 +9351,19 @@ tmg_gnutls_random_number (tmscm arg1) {
 }
 
 tmscm
+tmg_secure_random_number (tmscm arg1) {
+  TMSCM_ASSERT_UINT (arg1, TMSCM_ARG1, "secure-random-number");
+
+  uint in1= tmscm_to_uint (arg1);
+
+  // TMSCM_DEFER_INTS;
+  int out= secure_random_int (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return int_to_tmscm (out);
+}
+
+tmscm
 tmg_tls_client_start (tmscm arg1, tmscm arg2, tmscm arg3) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "tls-client-start");
   TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "tls-client-start");
@@ -10780,6 +10793,34 @@ tmg_buffer_get_body (tmscm arg1) {
   // TMSCM_ALLOW_INTS;
 
   return tree_to_tmscm (out);
+}
+
+tmscm
+tmg_buffer_get_style (tmscm arg1) {
+  TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "buffer-get-style");
+
+  url in1= tmscm_to_url (arg1);
+
+  // TMSCM_DEFER_INTS;
+  tree out= get_buffer_style (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return tree_to_tmscm (out);
+}
+
+tmscm
+tmg_buffer_set_style (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "buffer-set-style");
+  TMSCM_ASSERT_CONTENT (arg2, TMSCM_ARG2, "buffer-set-style");
+
+  url in1= tmscm_to_url (arg1);
+  content in2= tmscm_to_content (arg2);
+
+  // TMSCM_DEFER_INTS;
+  set_buffer_style (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
 }
 
 tmscm
@@ -12792,6 +12833,7 @@ initialize_glue_basic () {
   tmscm_install_procedure ("server-log-write-int",  tmg_server_log_write_int, 2, 0, 0);
   tmscm_install_procedure ("supports-gnutls?",  tmg_supports_gnutlsP, 0, 0, 0);
   tmscm_install_procedure ("gnutls-random-number",  tmg_gnutls_random_number, 1, 0, 0);
+  tmscm_install_procedure ("secure-random-number",  tmg_secure_random_number, 1, 0, 0);
   tmscm_install_procedure ("tls-client-start",  tmg_tls_client_start, 3, 0, 0);
   tmscm_install_procedure ("gnutls-generate-salt",  tmg_gnutls_generate_salt, 0, 0, 0);
   tmscm_install_procedure ("hash-password-pbkdf2",  tmg_hash_password_pbkdf2, 2, 0, 0);
@@ -12888,6 +12930,8 @@ initialize_glue_basic () {
   tmscm_install_procedure ("buffer-get",  tmg_buffer_get, 1, 0, 0);
   tmscm_install_procedure ("buffer-set-body",  tmg_buffer_set_body, 2, 0, 0);
   tmscm_install_procedure ("buffer-get-body",  tmg_buffer_get_body, 1, 0, 0);
+  tmscm_install_procedure ("buffer-get-style",  tmg_buffer_get_style, 1, 0, 0);
+  tmscm_install_procedure ("buffer-set-style",  tmg_buffer_set_style, 2, 0, 0);
   tmscm_install_procedure ("buffer-set-master",  tmg_buffer_set_master, 2, 0, 0);
   tmscm_install_procedure ("buffer-get-master",  tmg_buffer_get_master, 1, 0, 0);
   tmscm_install_procedure ("buffer-set-title",  tmg_buffer_set_title, 2, 0, 0);

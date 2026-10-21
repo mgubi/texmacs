@@ -301,6 +301,28 @@ get_buffer_tree (url name) {
   return attach_data (body, data, true);
 }
 
+tree
+get_buffer_style (url name) {
+  // the style of the buffer, in its most recent view (each editor keeps a
+  // copy of its own)
+  tm_buffer buf= concrete_buffer (name);
+  if (is_nil (buf)) return "";
+  if (N(buf->vws) == 0) return copy (buf->data->style);
+  tm_view vw= concrete_view (get_recent_view (name));
+  if (vw == NULL) return copy (buf->data->style);
+  return copy (vw->ed->get_style ());
+}
+
+void
+set_buffer_style (url name, tree style) {
+  // the style of the buffer, in its data and in all its views
+  tm_buffer buf= concrete_buffer (name);
+  if (is_nil (buf)) return;
+  buf->data->style= copy (style);
+  for (int i=0; i<N(buf->vws); i++)
+    buf->vws[i]->ed->change_style (style);
+}
+
 void
 set_buffer_body (url name, tree body) {
   tm_buffer buf= concrete_buffer (name);

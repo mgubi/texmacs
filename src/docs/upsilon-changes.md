@@ -14,6 +14,23 @@ have the details, and the problems go to the
 
 ## 21 October 2026
 
+- Document parts (Document → Part): the parts are told apart by their
+  number, so that parts with the same title are different entries, and the
+  menu shows the file of a part which starts with an included file
+  (`Same (pa.tm)`); saving a part view keeps the parts and the inclusions
+  of the master, which got inline copies instead; a change of style in a
+  part view goes to the master when the view is saved (also to the master
+  open in another window, which is left unsaved when it has changes of its
+  own); a hidden part which starts with an included file no longer holds a
+  second copy of it ([#77](https://github.com/mgubi/texmacs/issues/77)).
+- Document parts: saving a part view no longer marks as saved the same
+  file open in another window with unsaved changes of its own (they were
+  lost on closing): the file is saved from that window when its changes
+  are outside the text, else the save is refused with a message.
+- Generated passwords take their randomness from GnuTLS at the level of
+  keys, else from the system (`/dev/urandom`, `rand_s` on Windows), never
+  from the random numbers of Scheme seeded by the time
+  ([#66](https://github.com/mgubi/texmacs/issues/66)).
 - Opening a large document is much faster: TeXmacs looked through the whole
   document for an encrypted part, which took seconds for a chapter of a few
   MB (and overflowed the stack of Guile with some thousands of paragraphs);
