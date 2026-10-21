@@ -579,7 +579,8 @@ edit_typeset_rep::style_rewrite_printed () {
   // (paper, printed pages, the resolution), which print_doc has set, since
   // the rewriter evaluates these variables as any other; UNINIT otherwise
   if (!rewrite_typeset) return tree (UNINIT);
-  if (env->read (PREAMBLE) == "true") return subtree (et, rp);
+  // (in the source mode, the document itself, typeset as usual)
+  if (env->read (PREAMBLE) == "true") return tree (UNINIT);
   hashmap<string,tree> h;
   env->assign ("base-file-name", as_string (env->base_file_name));
   env->assign ("cur-file-name", as_string (env->cur_file_name));
@@ -1303,6 +1304,10 @@ edit_typeset_rep::typeset_sub (SI& x1, SI& y1, SI& x2, SI& y2) {
       rewrite_root= r;
     }
     typeset_prepare ();
+    // (in the source mode the typesetter has the document itself, which
+    // it typesets as usual: the headers of the pages are not shown as
+    // their source, see concater_rep::typeset)
+    env->rewritten_tree= (env->read (PREAMBLE) != "true");
   }
 #endif
   eb= empty_box (reverse (rp));

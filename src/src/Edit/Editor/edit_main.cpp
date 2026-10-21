@@ -326,12 +326,17 @@ edit_main_rep::print_doc (url name, bool conform, int first, int last) {
   typesetter ttt= (L(printed) != UNINIT?
                    new_typesetter (env, printed, path (DECORATION)):
                    new_typesetter (env, subtree (et, rp), reverse (rp)));
+  bool old_rewritten= env->rewritten_tree;
+  if (L(printed) == UNINIT) env->rewritten_tree= false;
 #else
   typesetter ttt= new_typesetter (env, subtree (et, rp), reverse (rp));
 #endif
   typeset_folds= false;   // all the lines of program code are printed
   box the_box= ::typeset (ttt);
   typeset_folds= true;
+#ifdef EXPERIMENTAL
+  env->rewritten_tree= old_rewritten;
+#endif
 
   // Determine parameters for printer
 

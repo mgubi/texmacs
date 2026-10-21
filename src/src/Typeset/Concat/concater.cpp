@@ -184,6 +184,19 @@ concater_rep::typeset_main (tree t, path ip) {
     // (the places which the rewriter attached to the expansions of macro
     // bodies, memorized and shared between calls, are left aside)
     ip= rewritten_place (ip, obtain_ip (t));
+    if (env->preamble && !is_document (t)) {
+      // (source mode, the body of show-preamble: the markup is shown as it
+      // is, as by the inactive bridges, see make_inactive_bridge; the
+      // rendering of the source is not a tree of the rewriter)
+      document_typesetting guard (env);
+      static tree inactive_auto
+        (MACRO, "x", tree (REWRITE_INACTIVE, tree (ARG, "x"), "recurse*"));
+      tree oldv= env->read (PREAMBLE);
+      env->write_update (PREAMBLE, "false");
+      typeset_auto (t, ip, inactive_auto);
+      env->write_update (PREAMBLE, oldv);
+      return;
+    }
   }
   else if (!is_accessible (ip)) {
     path ip2= obtain_ip (t);

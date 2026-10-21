@@ -677,7 +677,28 @@ make_lazy (edit_env env, tree t, path ip) {
   */
 
   // (a tree of the style rewriter: see concater_rep::typeset)
-  if (env->rewritten_tree) ip= rewritten_place (ip, obtain_ip (t));
+  if (env->rewritten_tree) {
+    ip= rewritten_place (ip, obtain_ip (t));
+    if (env->preamble && !is_document (t)) {
+      // (source mode: see concater_rep::typeset)
+      document_typesetting guard (env);
+      static tree inactive_auto
+        (MACRO, "x", tree (REWRITE_INACTIVE, tree (ARG, "x"), "recurse*"));
+      tree oldv= env->read (PREAMBLE);
+      env->write_update (PREAMBLE, "false");
+      env->macro_arg= list<hashmap<string,tree> > (
+        hashmap<string,tree> (UNINIT), env->macro_arg);
+      env->macro_src= list<hashmap<string,path> > (
+        hashmap<string,path> (path (DECORATION)), env->macro_src);
+      env->macro_arg->item ("x")= t;
+      env->macro_src->item ("x")= ip;
+      lazy par= make_lazy (env, attach_right (inactive_auto[1], ip));
+      env->macro_arg= env->macro_arg->next;
+      env->macro_src= env->macro_src->next;
+      env->write_update (PREAMBLE, oldv);
+      return par;
+    }
+  }
   else if (!is_accessible (ip)) {
     path ip2= obtain_ip (t);
     if (ip2 != path (DETACHED))
