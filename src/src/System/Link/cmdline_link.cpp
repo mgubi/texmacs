@@ -270,6 +270,10 @@ cmdline_link_rep::write (string s, int channel) {
   }
   if (pid==0) { // the child
     setsid();
+    // an interrupt is not ignored there (a TeXmacs started with
+    // SIGINT ignored, as by `sh ... &', passes that on)
+    signal (SIGINT, SIG_DFL);
+    signal (SIGQUIT, SIG_DFL);
     close (pp_in  [CMDOUT]);
     close (pp_out [CMDIN ]);
     close (pp_err [CMDIN ]);

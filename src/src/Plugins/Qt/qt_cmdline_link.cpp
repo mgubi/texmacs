@@ -47,18 +47,29 @@ hashset<pointer> cmdline_link_set;
 * The process of a command, and its group
 ******************************************************************************/
 
+#ifndef OS_MINGW
+// in the child: a group of its own, where an interrupt is not ignored (a
+// TeXmacs started with SIGINT ignored, as by `sh ... &', passes that on)
+static void
+new_group () {
+  ::setsid ();
+  ::signal (SIGINT, SIG_DFL);
+  ::signal (SIGQUIT, SIG_DFL);
+}
+#endif
+
 class qt_cmdline_process: public QProcess {
 public:
   qt_cmdline_process () {
 #ifndef OS_MINGW
 #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
-    setChildProcessModifier ([] () { ::setsid (); });
+    setChildProcessModifier ([] () { new_group (); });
 #endif
 #endif
   }
 #if !defined (OS_MINGW) && QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
 protected:
-  void setupChildProcess () override { ::setsid (); }
+  void setupChildProcess () override { new_group (); }
 #endif
 };
 
