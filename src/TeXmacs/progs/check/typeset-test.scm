@@ -721,7 +721,8 @@
 ;; written out gives it; their height does not count. The cursor at the
 ;; start and at the end of a with is next to its content: the space after an
 ;; operator goes after the markers which end a macro, inside a fraction as in
-;; a paragraph.
+;; a paragraph. At the end of a line, the space before markers does not
+;; count, also before those of the macros of a style.
 (define (test-markers)
   (check-group "markers")
   (let ((same (lambda (t1 t2)
@@ -744,7 +745,19 @@
        (let ((w (apply rect l))
              (a (apply rect (append l '(2)))))
          (check= (rect-x1 w) (rect-x1 a))
-         (check= (rect-x2 w) (rect-x2 a)))))))
+         (check= (rect-x2 w) (rect-x2 a))))))
+  (with-typeset-body
+   '(document
+     (with "ff" (macro "a" (arg "a"))
+       (with "gg" (macro (with "mode" "math" (concat "x" (ff "+"))))
+         (with "par-mode" "right"
+           (document (gg)
+                     (with "mode" "math" (concat "x" (ff "+")))
+                     (with "mode" "math" "x+"))))))
+   (lambda ()
+     (with x1 (lambda (i) (rect-x1 (rect 0 2 2 2 i)))
+       (check= (x1 0) (x1 2))
+       (check= (x1 1) (x1 2))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Page breaking

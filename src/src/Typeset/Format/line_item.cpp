@@ -75,8 +75,11 @@ operator << (tm_ostream& out, line_item item) {
 }
 
 bool
-is_end_marker (line_item item) {
-  // the marker after a macro, a macro argument or a with (the marker before
-  // them is at the position 0 of their tree)
-  return item->type == MARKER_ITEM && item->b->get_leaf_left_pos () > 0;
+lets_space_through (line_item item) {
+  // a marker past which goes the space of the item before it: the cursor
+  // after a macro, a macro argument or a with stays next to its content, but
+  // the cursor before them (at the position 0 of their tree) stays after the
+  // space; the markers of the macros of a style are not places for the cursor
+  return item->type == MARKER_ITEM &&
+         (item->b->get_leaf_left_pos () > 0 || item->b->decoration ());
 }

@@ -185,7 +185,7 @@ lazy_paragraph_rep::line_print (line_item item) {
   // them stays next to the item, and at the end of a line the space is left
   // out, as without the marker)
   space carried (0);
-  if (is_end_marker (item) && N(spcs) > cur_start) {
+  if (lets_space_through (item) && N(spcs) > cur_start) {
     carried= spcs[N(spcs)-1];
     spcs[N(spcs)-1]= space (0);
   }
