@@ -740,6 +740,38 @@
        (check-true (> (- (rect-y2 narrow) (rect-y1 narrow))
                       (* 3 (- (rect-y2 full) (rect-y1 full)))))))))
 
+;; Markers: the boundaries of a macro, of its arguments and of a with are
+;; places for the cursor (concater_rep::marker), which do not change the
+;; layout: markup given by a macro or inside a with is typeset as the same
+;; markup written out. A script after them takes the base which the markup
+;; written out gives it; their height does not count. The cursor at the
+;; start and at the end of a with is next to its content: the space after an
+;; operator goes after the markers which end a macro, inside a fraction as in
+;; a paragraph.
+(define (test-markers)
+  (check-group "markers")
+  (let ((same (lambda (t1 t2)
+                (check= (box t1 "lbrtLBRT") (box t2 "lbrtLBRT"))))
+        (with-same-as (lambda (t) `(with "same-as" (macro "x" (arg "x")) ,t))))
+    (same '(concat "T" (with "color" "brown" (rsub "E")))
+          '(concat "T" (rsub "E")))
+    (same (math '(concat "T" (with "color" "brown" (rsub "E"))))
+          (math '(concat "T" (rsub "E"))))
+    (same (math (with-same-as '(concat (same-as "C") (rsub "N") "+1")))
+          (math '(concat "C" (rsub "N") "+1")))
+    (same (with-same-as '(tabular (table (row (cell (same-as (rsup "o")))))))
+          '(tabular (table (row (cell (rsup "o")))))))
+  (with-typeset-body
+   `(document
+     ,(math '(frac (concat "x+" (with "color" "red" "a") "+b") "c"))
+     ,(math '(concat "x+" (with "color" "red" "a") "+b")))
+   (lambda ()
+     (for (l '((0 2 0 1) (1 2 1)))
+       (let ((w (apply rect l))
+             (a (apply rect (append l '(2)))))
+         (check= (rect-x1 w) (rect-x1 a))
+         (check= (rect-x2 w) (rect-x2 a)))))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Page breaking
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -2047,6 +2079,7 @@
   (test-page-breaks-kept)
   (test-tables)
   (test-paragraphs)
+  (test-markers)
   (test-pages)
   (test-pages-kept)
   (test-long-document-without-pages)

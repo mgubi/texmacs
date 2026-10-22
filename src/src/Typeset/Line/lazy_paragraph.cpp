@@ -180,11 +180,12 @@ lazy_paragraph_rep::line_print (line_item item) {
     // REPLACE item by item without lazy attachment !
   }
 
-  // (a marker after an item of the unit, the end of the value of a macro
-  // argument, takes the space after that item: at the end of a line it is
-  // left out, as without the marker)
+  // (a marker after an item of the unit, at the end of a macro, a macro
+  // argument or a with, takes the space after that item: the cursor after
+  // them stays next to the item, and at the end of a line the space is left
+  // out, as without the marker)
   space carried (0);
-  if (item->type == MARKER_ITEM && N(spcs) > cur_start) {
+  if (is_end_marker (item) && N(spcs) > cur_start) {
     carried= spcs[N(spcs)-1];
     spcs[N(spcs)-1]= space (0);
   }
