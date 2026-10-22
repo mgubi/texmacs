@@ -83,3 +83,17 @@ lets_space_through (line_item item) {
   return item->type == MARKER_ITEM &&
          (item->b->get_leaf_left_pos () > 0 || item->b->decoration ());
 }
+
+array<SI>
+carried_spaces (array<line_item> a) {
+  // the spaces after the items of a line, as line_print puts them: the space
+  // of an item goes past the markers which let it through, and the space
+  // after the last item does not count
+  int i, n= N(a);
+  array<SI> sp (n);
+  for (i=0; i<n; i++) sp[i]= a[i]->spc->def;
+  for (i=0; i<n-1; i++)
+    if (lets_space_through (a[i+1])) { sp[i+1] += sp[i]; sp[i]= 0; }
+  if (n > 0) sp[n-1]= 0;
+  return sp;
+}

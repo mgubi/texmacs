@@ -70,5 +70,6 @@ CONCRETE_NULL_CODE(line_item);
 
 tm_ostream& operator << (tm_ostream& out, line_item item);
 bool lets_space_through (line_item item);
+array<SI> carried_spaces (array<line_item> a);
 
 #endif // defined LINE_ITEM_H
