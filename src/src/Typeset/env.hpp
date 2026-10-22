@@ -662,8 +662,8 @@ public:
   inline void read_other () { if (env.rec != NULL) env.all= true; }
   // The references and the attachments which are looked up are recorded
   // too, with the values found: a name ("0" or "1" for the two parts of
-  // a binding, "a" for an attachment, then the key) and a value, which
-  // lookup_value finds again
+  // a binding, "a" for an attachment, "i" for an included document, then
+  // the key or the file) and a value, which lookup_value finds again
   array<string>* rec_keys;
   array<tree>*   rec_values;
   hashmap<string,bool>* rec_key_set; // (the keys of rec_keys, once each)
@@ -997,6 +997,11 @@ bool inclusion_busy (url u);
 void inclusion_enter (url u);
 void inclusion_leave (url u);
 void reset_inclusion (url u);
+// the included document of a file, as the cache of the inclusions has it
+// (by the name of the file: as_string), and a number which changes when
+// the cache changes (the lookups of the inclusions, see same_lookups)
+tree inclusion_value (string name);
+unsigned long long inclusions_stamp ();
 struct inclusion_guard {
   // Marks u as being included during the guard's lifetime (exception-safe)
   url u;

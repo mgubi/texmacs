@@ -1010,12 +1010,24 @@
 ;; variable auto-epoch which the update changes (exec_auto_id in
 ;; Typeset/Env/env_exec.cpp), and the others are used again (#408). The
 ;; document is then the one of a typesetting from scratch: the same labels
-;; with the same values, the same tables, the paragraphs at the same places.
+;; with the same values, the same auxiliary data, the same tables made from
+;; them in the document, the paragraphs at the same places.
+(define table-tags
+  '(table-of-contents the-index the-glossary list-of-figures bibliography))
+
+(define (labels-tables)
+  ;; the tables which generate-all-aux made in the document
+  (with t (buffer-tree)
+    (list-filter (map (lambda (i) (tree->stree (tree-ref t i)))
+                      (iota (tree-arity t)))
+                 (lambda (x) (and (pair? x) (in? (car x) table-tags))))))
+
 (define (labels-state)
   (list (map (lambda (l) (list l (tree->stree (get-reference l))))
              (auto-names))
         (map (lambda (a) (list a (tree->stree (get-auxiliary a))))
              (sort (list-auxiliaries) string<?))
+        (labels-tables)
         ;; (the places from the first paragraph: the margins of a new
         ;; buffer and of a loaded file may differ)
         (let* ((l (map (lambda (i) (rect i)) (iota (tree-arity (buffer-tree)))))
@@ -2137,6 +2149,123 @@
     (buffer-pretend-saved m)
     (buffer-close m)))
 
+(define incl-bib
+  (string-append
+   "@article{knuth, author={Knuth, Donald E.}, title={The Art}, journal={J}, year=1968}\n"
+   "@book{lamport, author={Lamport, Leslie}, title={LaTeX}, publisher={AW}, year=1986}\n"
+   "@misc{doe, author={Doe, J.}, title={Misc}, year=2000}\n"))
+
+(define (incl-table tag)
+  ;; the table @tag made in the document, as a string
+  (with l (list-filter (labels-tables) (lambda (x) (== (car x) tag)))
+    (if (null? l) "" (object->string (car l)))))
+
+(define (incl-state)
+  ;; the labels, tables and places of the current master, and those of a
+  ;; typesetting from scratch (the cursor at the start: a cursor in the
+  ;; bibliography shows its file in an input field of the focus toolbar,
+  ;; whose completer crashes TeXmacs when it exits without a window)
+  (go-start)
+  (list (labels-state) (incl-labels-fresh)))
+
+(define (incl-renumbering-writes)
+  ;; the entries of the tables written by paragraphs which make no label (a
+  ;; citation, a nocite, a write of the user): when the labels are numbered
+  ;; again, these paragraphs are used again and write their entries again
+  ;; (the <write|key|value> of their bindings, edit_env_rep::write_bindings
+  ;; in Typeset/env.hpp), so that the tables made from the renumbering pass
+  ;; hold them (#408)
+  (string-save incl-bib (incl-file "refs.bib"))
+  (incl-write "writes.tm"
+              '((table-of-contents "toc" (document ""))
+                (assign "myw" (macro "x" (write "mine" (tuple (arg "x")))))
+                (section "A")
+                (concat "a" (index "first"))
+                (concat "x" (cite "knuth"))
+                (concat "y" (nocite "lamport"))
+                (concat "w" (myw "w1"))
+                (section "B")
+                (concat "z" (cite "doe") (myw "w2"))
+                (the-index "idx" (document ""))
+                (bibliography "bib" "tm-plain" "refs" (document ""))))
+  (with m (incl-file "writes.tm")
+    (load-buffer m)
+    (switch-to-buffer* m)
+    (update-forced)
+    (update-all-labels)
+    (update-all-labels)
+    (with st (incl-state) (check= (car st) (cadr st)))
+    ;; a section and an index entry before the others: the labels are
+    ;; numbered again, the paragraphs which write without a label are used
+    ;; again
+    (tree-insert (buffer-tree) 2 '((section "Zero")))
+    (update-forced)
+    (tree-insert (buffer-tree) 4 '((concat "n" (index "new"))))
+    (update-forced)
+    (check-true (renumber-auto-labels))
+    (generate-all-aux)
+    (update-current-buffer)
+    (update-forced)
+    (with names (auto-names)
+      (check= names (auto-range (length names))))
+    ;; (the typesetting from scratch is updated as well, its bridges used
+    ;; again: the entries are checked by themselves)
+    (with bib (incl-table 'bibliography)
+      (check-true (string-occurs? "The art" bib))
+      (check-true (string-occurs? "LaTeX" bib))
+      (check-true (string-occurs? "Misc" bib)))
+    (check= (tree->stree (get-auxiliary "mine"))
+            '(document (tuple "w1") (tuple "w2")))
+    (with st (incl-state) (check= (car st) (cadr st)))
+    (buffer-pretend-saved m)
+    (buffer-close m)))
+
+(define (incl-saved-include)
+  ;; an included file changed and saved from its own buffer, then one
+  ;; Update All of the master: saving resets the inclusion (reset_inclusion
+  ;; in Texmacs/Data/new_buffer.cpp), and the include is typeset again
+  ;; although nothing in the master changed and the old content of the file
+  ;; made no label (the included document is an input of the bridge of the
+  ;; include: rewrite_include in Typeset/Env/env_exec.cpp), so that its
+  ;; section, index entry and citation are in the tables (#408)
+  (string-save incl-bib (incl-file "refs.bib"))
+  (incl-write "plain.tm" '((concat "plain text " (cite "knuth"))))
+  (incl-write "saved.tm"
+              '((table-of-contents "toc" (document ""))
+                (section "First")
+                (include "plain.tm")
+                (the-index "idx" (document ""))
+                (bibliography "bib" "tm-plain" "refs" (document ""))))
+  (let ((m (incl-file "saved.tm"))
+        (p (incl-file "plain.tm")))
+    (load-buffer m)
+    (switch-to-buffer* m)
+    (update-forced)
+    (update-all-labels)
+    (update-all-labels)
+    (with st (incl-state) (check= (car st) (cadr st)))
+    (load-buffer p)
+    (switch-to-buffer* p)
+    (update-forced)
+    (with t (buffer-tree)
+      (tree-insert t (tree-arity t)
+                   '((section "Added")
+                     (concat "new " (index "added") (cite "lamport")))))
+    (update-forced)
+    (buffer-save p)
+    (switch-to-buffer* m)
+    (update-forced)
+    (update-all-labels)
+    (check-true (string-occurs? "Added" (incl-table 'table-of-contents)))
+    (check-true (string-occurs? "added" (incl-table 'the-index)))
+    (check-true (string-occurs? "LaTeX" (incl-table 'bibliography)))
+    (with names (auto-names)
+      (check= names (auto-range (length names))))
+    (with st (incl-state) (check= (car st) (cadr st)))
+    (buffer-close p)
+    (buffer-pretend-saved m)
+    (buffer-close m)))
+
 (define (test-included-files)
   (check-group "included files")
   (let ((old (current-buffer))
@@ -2145,9 +2274,11 @@
     (incl-clear-dir)
     (system-mkdir (system->url incl-dir))
     (incl-extern)
-    (with r (check-run incl-renumbering)
-      (when (and (pair? r) (== (car r) 'error))
-        (check-report #f "the group" (object->string r))))
+    (for (f (list incl-renumbering incl-renumbering-writes
+                  incl-saved-include))
+      (with r (check-run f)
+        (when (and (pair? r) (== (car r) 'error))
+          (check-report #f "the group" (object->string r)))))
     (with r (check-run incl-groups)
       (when (and (pair? r) (== (car r) 'error))
         (check-report #f "the group" (object->string r)))

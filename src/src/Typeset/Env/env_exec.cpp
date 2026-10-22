@@ -44,12 +44,19 @@ edit_env_rep::exec_string (tree t) {
 ******************************************************************************/
 
 static tree
-rewrite_include (url base_file_name, url file_rel) {
+rewrite_include (edit_env_rep* env, url base_file_name, url file_rel) {
   if (file_rel == base_file_name)
     return tree (_ERROR, "invalid self include");
   if (inclusion_busy (file_rel))
     return tree (_ERROR, "inclusion cycle");
-  return load_inclusion (file_rel);
+  // the included document, from the cache of the inclusions, is looked up
+  // as a reference is ("i" and the file, see lookup_value): it is an input
+  // of the bridge of the include (bridge_rewrite), which is typeset again
+  // when the file was saved or loaded again (another tree in the cache:
+  // reset_inclusion), also when nothing else changed
+  tree doc= load_inclusion (file_rel);
+  env->record_lookup ("i" * as_string (file_rel), doc);
+  return doc;
 }
 
 // Hack to transmit the current environment back to C++
@@ -122,7 +129,7 @@ edit_env_rep::rewrite (tree t) {
       url file_name= url_unix (exec_string (t[0]));
       url file_rel = relative (base_file_name, file_name);
       //cout << "file_name= " << as_tree (file_name) << LF;
-      return rewrite_include (base_file_name, file_rel);
+      return rewrite_include (this, base_file_name, file_rel);
     }
   case WITH_PACKAGE:
     {
@@ -179,7 +186,7 @@ edit_env_rep::exec_include (tree t) {
   if (N(t) == 0) return exec_rewrite (t);
   url file_name= url_unix (exec_string (t[0]));
   url file_rel = relative (base_file_name, file_name);
-  tree r= rewrite_include (base_file_name, file_rel);
+  tree r= rewrite_include (this, base_file_name, file_rel);
   inclusion_guard guard (file_rel);
   return exec (r);
 }

@@ -575,10 +575,21 @@ shared_ids (array<int> a) {
   return a;
 }
 
-// do the references and attachments looked up still have the values found?
-// Not looked up again when the tables did not change since they last had
-// them (the stamp; in the check mode they are, and it is told if they do
-// not have them)
+// an included document ("i" and the file) is the same when the cache of
+// the inclusions has the same tree (a file saved or loaded again gives
+// another one), a file which is not there when it is still not there
+static inline bool
+same_lookup_value (string key, tree before, tree now) {
+  if (N(key) > 0 && key[0] == 'i')
+    return strong_equal (before, now) ||
+           (is_func (before, _ERROR) && before == now);
+  return before == now;
+}
+
+// do the references, attachments and included documents looked up still
+// have the values found? Not looked up again when the tables and the cache
+// of the inclusions did not change since they last had them (the stamp; in
+// the check mode they are, and it is told if they do not have them)
 bool
 same_lookups (edit_env env, array<string> keys, array<tree> values,
               unsigned long long& stamp) {
@@ -587,7 +598,8 @@ same_lookups (edit_env env, array<string> keys, array<tree> values,
   bool same_stamp= (stamp == now);
   if (same_stamp && typeset_inputs_mode () != 2) return true;
   for (int i=0; i<N(keys); i++)
-    if (env->lookup_value (keys[i]) != values[i]) {
+    if (!same_lookup_value (keys[i], values[i],
+                            env->lookup_value (keys[i]))) {
       if (same_stamp) {
         typeset_check_mismatches++;
         failed_error << "A reference changed while its tables did not: "
@@ -647,8 +659,9 @@ same_page_items (array<page_item> l1, array<page_item> l2) {
 * What a bridge makes is a function of its subtree and of what it was
 * typeset from: the variables which it read before it wrote them, with
 * their values, the state of the environment derived from the variables
-* (the font, the colour...: edit_env_rep::derived_state), the references
-* and attachments which it looked up, and the line items which the bridges
+* (the font, the colour...: edit_env_rep::derived_state), the references,
+* attachments and included documents which it looked up, and the line
+* items which the bridges
 * around it gave it (ttt->a and ttt->b). These are its inputs (the values
 * and the line items are kept as hashes of 64 bits, as the whole environment
 * below: inputs_hash, items_signature). A bridge
@@ -666,8 +679,12 @@ same_page_items (array<page_item> l1, array<page_item> l2) {
 * set-binding): a bridge used again writes again those it wrote, in the
 * same order (out_bindings), since the last binding of a key wins (the
 * running headers kept by the pager do the same, see make_part). The
-* auxiliary data (write) is only written by a complete typesetting, which
-* uses no bridge again, and the loci and links stay with the bridge.
+* entries of the auxiliary tables (<write|toc|...>: the table of contents,
+* the index, the bibliography) are recorded among them, as
+* <write|key|value> (edit_env_rep::write_aux), and a bridge used again
+* writes them again (write_bindings): a complete pass which uses bridges
+* again (the one of the renumbering of the labels: typesetter_rep::collect)
+* makes the whole tables. The loci and links stay with the bridge.
 *
 * TEXMACS_TYPESET_READS may be "off" (the classic cache: a bridge is used
 * again when the bookkeeping of the changes of the environment, old_patch,
