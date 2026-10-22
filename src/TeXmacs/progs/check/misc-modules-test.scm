@@ -2454,7 +2454,11 @@
       (let* ((m (resolve-module '(part part-shared)))
              (invalidate (eval 'mirror-invalidate m))
              (black-list (eval 'mirror-black-list m))
+             ;; copies left by earlier suites (the synchronization never
+             ;; runs headless) are set aside, so that the list starts empty
+             (left (map car (ahash-table->list black-list)))
              (scheduled 0))
+        (for (uid left) (ahash-remove! black-list uid))
         (with-global exec-delayed-pause
             (lambda (c) (set! scheduled (+ scheduled 1)))
           (check= (catch #t (lambda () (invalidate (bt 0 2)) "ok")
@@ -2467,7 +2471,8 @@
         (check-true (ahash-ref black-list "mt-v"))
         (check= scheduled 1)
         (ahash-remove! black-list "mt-u")
-        (ahash-remove! black-list "mt-v")))))
+        (ahash-remove! black-list "mt-v")
+        (for (uid left) (ahash-set! black-list uid #t))))))
 
 (define (test-comments)
   (check-group "comments")

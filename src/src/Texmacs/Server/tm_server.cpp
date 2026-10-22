@@ -237,6 +237,7 @@ tm_server_rep::interpose_handler () {
   process_all_pipes ();
 #else
   perform_select ();
+  reap_pipe_children ();
   exec_pending_commands ();
 #endif
   process_all_workers (); // the plugins which are Web Workers (browser)

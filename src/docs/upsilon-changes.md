@@ -24,6 +24,17 @@ have the details, and the problems go to the
   (`cmd /c`), with its output read in the background, and stopping or
   interrupting it ends it and all it started
   ([#443](https://github.com/mgubi/texmacs/pull/443)).
+- A table whose width in `par` is given by a value (as
+  `<value|figure-width>` in the big figures) takes the width of the
+  paragraph where it is placed, not that of the page: a figure in a
+  frame or in a table cell was as wide as the page and off-centre, and
+  two figures side by side overlapped
+  ([#429](https://github.com/mgubi/texmacs/pull/429)).
+- Stopping a plugin whose program ignores the termination signal no
+  longer blocks the interface for 2 s: the program is killed and reaped
+  later, in the background. Concerns Vue, Cocoa and the Qt builds
+  without Qt pipes
+  ([#419](https://github.com/mgubi/texmacs/pull/419)).
 - **Vue**: the window of the error messages (Debug > Error messages)
   opens at a reasonable size, at most two thirds of the screen, and its
   messages fill it and follow its size, scrolling the long lines: they
