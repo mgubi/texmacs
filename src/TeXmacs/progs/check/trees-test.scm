@@ -200,37 +200,6 @@
     (check= (tree-search-indices t (lambda (x) (tree-is? x 'concat))) '(()))
     (check= (sts (tree-search (stree->tree "x") tree-atomic?)) '("x"))))
 
-;; tree-search-tree finds the matches of a pattern (Edit > Search); a
-;; concat pattern also matches inside nested formulas, and a long formula
-;; without any match is searched in linear time (it took seconds before)
-(define (long-formula n)
-  (stree->tree
-    `(document
-       (concat ,@(append-map
-                   (lambda (k)
-                     (list "x" '(rsub (concat "k" "+" "1")) "+"
-                           '(frac (concat "a" "b") (concat "d" (rsup "e")))
-                           "(" "y" ")"))
-                   (iota n))))))
-
-(define (test-search-tree)
-  (check-group "search-tree")
-  (let* ((t (stree->tree
-              '(document
-                 (concat "B+" "A" (rsub "i") "+C"
-                         (frac "A" (concat "A" (rsub "i") "x")))
-                 (concat "A" (rsub "j") "A" (rsub "i"))))))
-    (check= (tree-search-tree t '(concat "A" (rsub "i")) '() 1000)
-            '((0 1 0) (0 2 1) (0 4 1 0 0) (0 4 1 1 1) (1 2 0) (1 3 1)))
-    (check= (tree-search-tree t '(concat "A" (rsub "k")) '() 1000) '())
-    (check= (tree-search-tree t '(concat (wildcard "x") (rsub "j")) '() 1000)
-            '((1 0 0) (1 1 1))))
-  (let* ((t (long-formula 400))
-         (start (texmacs-time))
-         (r (tree-search-tree t '(concat "A" (rsub "ij")) '() 100)))
-    (check= r '())
-    (check-true (< (- (texmacs-time) start) 500))))
-
 ;; tree-map-children and tree-map-accessible-children build a new tree
 (define (test-map)
   (check-group "map")
@@ -880,7 +849,6 @@
   (test-predicates)
   (test-building)
   (test-search)
-  (test-search-tree)
   (test-map)
   (test-sharing)
   (test-assign)

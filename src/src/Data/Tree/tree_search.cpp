@@ -309,7 +309,7 @@ search_concat (range_set& sel, tree t, tree what, path p) {
     search (inside[pos], t[pos], what, p * pos);
   bool scan= true;
   for (int pos=0; pos<N(t); ) {
-    range_set ssel= inside[pos];
+    range_set ssel= copy (inside[pos]);
     if (N(ssel) != 0) {
       if (is_func (what[0], WILDCARD, 1))
         for (int i=0; i+1<N(ssel); i++)

@@ -34,6 +34,7 @@
         (check lists-test)
         (check base-test)
         (check trees-test)
+        (check search-test)
         (check define-test)
         (check latex-test)
         (check formats-test)
@@ -121,6 +122,7 @@
     ("lists" lists-test-failures count)
     ("base" base-test-failures count)
     ("trees" trees-test-failures count)
+    ("search" search-test-failures count)
     ("latex" latex-test-failures count)
     ("formats" formats-test-failures count)
     ;; opens buffers and edits them
