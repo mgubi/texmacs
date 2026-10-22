@@ -671,6 +671,7 @@ gui_refresh () {
 bool qt_support_functionality (string s) { (void) s; return false; }
 void qt_notify_preference (string var) { (void) var; }
 void gui_set_next_window_as_popup () {}
+void gui_set_next_window_without_focus () {}
 
 string
 gui_version () {

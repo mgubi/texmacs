@@ -168,6 +168,9 @@ public:
   vue_widget kbd_focus;
   vue_widget default_focus; // given the focus before the next interpose, see
                             // apply_default_focus in vue_gui.cpp
+  // shown without the keyboard focus (gui_set_next_window_without_focus):
+  // its focus widget is told it has the focus only once the window gets it
+  bool passive= false;
   hashset<string> refresh_kinds; // refresh cycle
   hashset<string> next_refresh_kinds; // refresh cycle
 

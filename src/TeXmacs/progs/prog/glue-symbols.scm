@@ -47,6 +47,7 @@
 "qt-gui?"
 "vue-gui?"
 "gui-set-next-window-as-popup"
+"gui-set-next-window-without-focus"
 "gui-test-snapshot"
 "gui-test-buttons"
 "gui-test-click"

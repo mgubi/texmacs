@@ -19,6 +19,17 @@ have the details, and the problems go to the
   Return, or when leaving the field), or "removed" when it was emptied:
   nothing showed it, and Return seemed to do nothing
   ([#455](https://github.com/mgubi/texmacs/issues/455)).
+- The messages of the error console (Debug > Error messages, which opens
+  by itself on a warning) and of the debugging console are shown in a
+  read-only editor: they can be selected and copied as in a document,
+  and nothing typed, pasted or undone changes them. A new message is
+  added at the end without losing the selection (a console whose cursor
+  is at the end follows the new messages), the console which opens by
+  itself no longer takes the keyboard from the document being typed in,
+  and closing it leaves no buffer behind.
+- **Vue**: closing a window closes the buffers of the editors inside it
+  (texmacs-input, as in the macro editors): they stayed among the
+  buffers.
 
 ## 22 October 2026
 
@@ -45,9 +56,9 @@ have the details, and the problems go to the
 - **Vue**: the window of the error messages (Debug > Error messages)
   behaves as an editor window: it opens at the size of a new editor
   window whatever the messages are, and they fill it, follow its size and
-  scroll, beginning at the left: they were three lines tall in a grey
-  window as wide as their longest line. The same holds for any window or
-  tab which only shows a typeset document.
+  scroll: they were three lines tall in a grey window as wide as their
+  longest line. The same holds for any window or tab whose page is an
+  editor.
 
 ## 21 October 2026
 

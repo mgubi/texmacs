@@ -206,6 +206,15 @@ tmg_gui_set_next_window_as_popup () {
 }
 
 tmscm
+tmg_gui_set_next_window_without_focus () {
+  // TMSCM_DEFER_INTS;
+  gui_set_next_window_without_focus ();
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
 tmg_gui_test_snapshot (tmscm arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "gui-test-snapshot");
 
@@ -12162,6 +12171,7 @@ initialize_glue_basic () {
   tmscm_install_procedure ("qt-gui?",  tmg_qt_guiP, 0, 0, 0);
   tmscm_install_procedure ("vue-gui?",  tmg_vue_guiP, 0, 0, 0);
   tmscm_install_procedure ("gui-set-next-window-as-popup",  tmg_gui_set_next_window_as_popup, 0, 0, 0);
+  tmscm_install_procedure ("gui-set-next-window-without-focus",  tmg_gui_set_next_window_without_focus, 0, 0, 0);
   tmscm_install_procedure ("gui-test-snapshot",  tmg_gui_test_snapshot, 1, 0, 0);
   tmscm_install_procedure ("gui-test-buttons",  tmg_gui_test_buttons, 0, 0, 0);
   tmscm_install_procedure ("gui-test-click",  tmg_gui_test_click, 1, 0, 0);

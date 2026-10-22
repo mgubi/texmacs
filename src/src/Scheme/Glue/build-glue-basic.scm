@@ -37,6 +37,7 @@
   (qt-gui? gui_is_qt (bool))
   (vue-gui? gui_is_vue (bool))
   (gui-set-next-window-as-popup gui_set_next_window_as_popup (void))
+  (gui-set-next-window-without-focus gui_set_next_window_without_focus (void))
   (gui-test-snapshot gui_test_snapshot (int string))
   (gui-test-buttons gui_test_buttons (array_string))
   (gui-test-click gui_test_click (bool string))

@@ -220,6 +220,7 @@ bool use_macos_fonts ();
 bool use_macos_keys ();
 const char* default_look_and_feel ();
 void gui_set_next_window_as_popup ();
+void gui_set_next_window_without_focus ();
 bool support_functionality (string);
 
 template<typename T>

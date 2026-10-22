@@ -199,6 +199,9 @@ public:
   bool on_top;       // a tool window, above the other windows of TeXmacs
   bool level_raised; // ... and currently at the level of SDL's "on top"
   bool document= false; // the window of an editor (see plain_window)
+  // shown without taking the focus from the window which has it (see
+  // gui_set_next_window_without_focus)
+  bool activate= true;
   // the geometry last seen (see track_geometry), in points; unknown while
   // saved_w < 0
   int  saved_x, saved_y, saved_w, saved_h;
@@ -732,6 +735,25 @@ vue_sdl_base_window_rep::track_geometry () {
   if (resized) notify_window_resize (orig_name, tm_length (w), tm_length (h));
 }
 
+// The next window is shown without taking the keyboard focus (the window of
+// the error messages, which opens by itself on a warning, while one types
+// in a document): SDL then only orders it in front, on the systems which
+// make the difference (SDL_HINT_WINDOW_ACTIVATE_WHEN_SHOWN)
+static bool next_window_without_focus= false;
+
+void
+gui_set_next_window_without_focus () {
+  next_window_without_focus= true;
+}
+
+static void
+show_window (SDL_Window* sdl_win, bool activate) {
+  if (activate) { SDL_ShowWindow (sdl_win); return; }
+  SDL_SetHint (SDL_HINT_WINDOW_ACTIVATE_WHEN_SHOWN, "0");
+  SDL_ShowWindow (sdl_win);
+  SDL_ResetHint (SDL_HINT_WINDOW_ACTIVATE_WHEN_SHOWN);
+}
+
 void
 vue_sdl_base_window_rep::set_visibility (bool flag) {
   visible_requested= flag;
@@ -740,7 +762,7 @@ vue_sdl_base_window_rep::set_visibility (bool flag) {
     shown= false;
   }
   else if (ready_to_show && !shown) {
-    SDL_ShowWindow (sdl_win);
+    show_window (sdl_win, activate);
     shown= true;
   }
   // the window of an editor already shown comes to the front with the
@@ -815,7 +837,7 @@ vue_sdl_base_window_rep::process_layout () {
   // case the contents never settle)
   layout_passes++;
   if (visible_requested && !shown && (ready_to_show || layout_passes > 10)) {
-    SDL_ShowWindow (sdl_win);
+    show_window (sdl_win, activate);
     shown= true;
   }
 }
@@ -3044,6 +3066,8 @@ make_host () {
 
 vue_window
 plain_window (vue_widget wwid, string name, bool popup, bool document) {
+  bool activate= !next_window_without_focus;
+  next_window_without_focus= false;
   // headless: the windows are virtual as well, with no host to be drawn in
   if (is_headless ())
     return tm_new<vue_virtual_window_rep> (wwid, name, popup, false);
@@ -3057,6 +3081,8 @@ plain_window (vue_widget wwid, string name, bool popup, bool document) {
   else w= tm_new<vue_sdl_mupdf_window_rep> (wwid, name, popup);
   making_dialog= false;
   w->document= document && !popup;
+  w->activate= activate;
+  w->passive= !activate;
   if (w->document) last_document_sdl= w->sdl_win;
   return w;
 }

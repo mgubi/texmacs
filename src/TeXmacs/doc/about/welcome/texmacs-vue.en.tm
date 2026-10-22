@@ -301,12 +301,20 @@
 
   The additions to <TeXmacs> Upsilon, the newest first.
 
+  <paragraph|23 October 2026>
+
+  <\itemize>
+    <item>The error messages (their window opens by itself after a warning)
+    can be selected and copied as in a document, but not changed; new
+    messages are added at the end without losing the selection.
+  </itemize>
+
   <paragraph|22 October 2026>
 
   <\itemize>
-    <item>The window of the error messages (it opens by itself after a
-    warning) behaves as an editor window: it opens at the same size whatever
-    the messages are, and they fill it, follow its size and scroll.
+    <item>The window of the error messages behaves as an editor window: it
+    opens at the same size whatever the messages are, and they fill it,
+    follow its size and scroll.
   </itemize>
 
   <paragraph|21 October 2026>

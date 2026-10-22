@@ -419,3 +419,8 @@ support_functionality (string functionality) {
 void
 gui_set_next_window_as_popup () {}
 #endif
+
+#if !defined (QTTEXMACS) && !defined (VUETEXMACS)
+void
+gui_set_next_window_without_focus () {}
+#endif

@@ -179,6 +179,14 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(gui-set-next-window-without-focus)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|gui_set_next_window_without_focus> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
     <scm|(gui-test-snapshot <scm-arg|string>)>
 <explain-synopsis|no synopsis>
   <|explain>

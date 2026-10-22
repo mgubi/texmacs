@@ -109,9 +109,6 @@ public:
   bool scroll_pending;
   // no scroll bars (presentation mode, as the Qt port)
   bool scrollbars_hidden;
-  // a typeset box laid out as the page of a window or of a tab (fill_page
-  // in vue_widget.cpp): narrower than the view, it is not centered in it
-  bool shown_as_page;
   // a button went down on the canvas and is still held: the pointer
   // events go to it wherever the pointer is, even outside the window
   // (the editor extends a selection and scrolls, as with Qt)
