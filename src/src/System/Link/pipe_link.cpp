@@ -133,29 +133,47 @@ kill_child (int pid, bool reaped) {
   if (!reaped) waitpid (pid, NULL, 0);
 }
 
+static pid_t ending_owner= 0;  // the process of TeXmacs (not a fork of it)
+
 static void
-terminate_child (int pid, bool wait= false) {
+kill_ending_children () {
+  // at an exit which skips close_all_pipes (exit from Scheme): what is left
+  // is killed at once, without waiting until its time is up
+  if (getpid () != ending_owner) return;
+  for (int i=0; i<N(ending_pid); i++) {
+    bool reaped= ending_reaped[i];
+    if (!child_ended (ending_pid[i], reaped))
+      kill_child (ending_pid[i], reaped);
+  }
+  ending_pid    = array<int> ();
+  ending_reaped = array<bool> ();
+  ending_kill_at= array<time_t> ();
+}
+
+static void
+terminate_child (int pid) {
   // no process (fork failed, or none was made): killpg (-1, ...) fails, and
   // kill (-1, SIGKILL) below would kill every process of the user
   if (pid <= 0) return;
   // Ask the process group of the child to terminate, give it up to 2 s to
   // do so, and kill what is left of it otherwise. Only the first 50 ms are
-  // waited for here, unless @wait: a program which takes longer (or ignores
-  // SIGTERM) is killed and reaped later by reap_ending_children, so that
-  // the interface is not blocked meanwhile
+  // waited for here: a program which takes longer (or ignores SIGTERM) is
+  // killed and reaped later by reap_ending_children, so that the interface
+  // is not blocked meanwhile
   if (-1 != killpg (pid, SIGTERM)) {
     bool reaped= false;
-    int  polls = (wait? 200: 5);
+    int  polls = 5;
     for (int i=0; i<polls; i++) {
       if (child_ended (pid, reaped)) return;
       usleep (10000);
     }
-    if (wait) kill_child (pid, reaped);
-    else {
-      ending_pid     << pid;
-      ending_reaped  << reaped;
-      ending_kill_at << (texmacs_time () + 2000 - 10 * polls);
+    if (ending_owner == 0) {
+      ending_owner= getpid ();
+      atexit (kill_ending_children);
     }
+    ending_pid     << pid;
+    ending_reaped  << reaped;
+    ending_kill_at << (texmacs_time () + 2000 - 10 * polls);
   }
   else {
     kill (pid, SIGKILL);
@@ -229,7 +247,9 @@ close_all_pipes () {
   while (it->busy()) {
     pipe_link_rep* con= (pipe_link_rep*) it->next();
     if (con->alive) {
-      terminate_child (con->pid, true);
+      // (all are asked to terminate first, then waited for together: at
+      // most about 2 s in all, not 2 s for each)
+      terminate_child (con->pid);
       con->alive= false;
       remove_notifier (con->snout);
       remove_notifier (con->snerr);

@@ -126,9 +126,9 @@
   (:serializer ,raw-serialize))
 
 ;; ignores SIGTERM: stopping it does not wait until it is killed (it waits
-;; with the argument 4711, by which the test finds its process)
+;; with the argument 97, by which the test finds its process)
 (plugin-configure tmtestterm
-  (:launch "sh -c \"trap '' INT TERM; exec sleep 4711\"")
+  (:launch "sh -c \"trap '' INT TERM; exec sleep 97\"")
   (:serializer ,raw-serialize))
 
 ;; two variants, the session name chooses the variant
@@ -1136,7 +1136,7 @@
   (with s (var-eval-system
            (string-append "ps -axo pid=,ppid=,command= | "
                           "awk -v p=$PPID '$2 == p && $3 == \"sleep\" && "
-                          "$4 == \"4711\" {print $1}'"))
+                          "$4 == \"97\" {print $1}'"))
     (and (!= s "") s)))
 
 (define (cmdline-run ses cmd)
@@ -1225,9 +1225,10 @@
     (pause "2.2")
     (check= (start* "tmtestecho" "plugins-test-term2") "ok")
     (connection-stop "tmtestecho" "plugins-test-term2")
+    ;; (pid-alive? counts a zombie as ended: with Qt pipes, the process is
+    ;; killed at once but reaped only in the event loop, see above)
     (when pid
-      (check-true (wait-until (lambda () (not (pid-alive? pid))) 3000)))
-    (check= (zombies) 0)))
+      (check-true (wait-until (lambda () (not (pid-alive? pid))) 3000)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The suite
