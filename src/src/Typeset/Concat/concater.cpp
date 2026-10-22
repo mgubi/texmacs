@@ -938,7 +938,7 @@ concat_of_items (path ip, array<line_item> a) {
   array<SI> sp (n);
   for (i=0; i<n; i++) sp[i]= a[i]->spc->def;
   for (i=0; i<n-1; i++)
-    if (is_end_marker (a[i+1])) { sp[i+1] += sp[i]; sp[i]= 0; }
+    if (lets_space_through (a[i+1])) { sp[i+1] += sp[i]; sp[i]= 0; }
   // (the space after the last item does not count, also when markers follow
   // it, the end of the value of a macro argument)
   int last= n-1;

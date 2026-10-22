@@ -69,6 +69,6 @@ class line_item {
 CONCRETE_NULL_CODE(line_item);
 
 tm_ostream& operator << (tm_ostream& out, line_item item);
-bool is_end_marker (line_item item);
+bool lets_space_through (line_item item);
 
 #endif // defined LINE_ITEM_H
