@@ -722,7 +722,8 @@
 ;; start and at the end of a with is next to its content: the space after an
 ;; operator goes after the markers which end a macro, inside a fraction as in
 ;; a paragraph. At the end of a line, the space before markers does not
-;; count, also before those of the macros of a style.
+;; count, also before those of the macros of a style; a table cell counts the
+;; spaces of its content as the lines of its paragraph do.
 (define (test-markers)
   (check-group "markers")
   (let ((same (lambda (t1 t2)
@@ -757,7 +758,17 @@
    (lambda ()
      (with x1 (lambda (i) (rect-x1 (rect 0 2 2 2 i)))
        (check= (x1 0) (x1 2))
-       (check= (x1 1) (x1 2))))))
+       (check= (x1 1) (x1 2)))))
+  (with-typeset-body
+   (with content (math '(concat "x+" (with "color" "red" (concat))))
+     `(document
+       (tabular (tformat (cwith "1" "1" "1" "1" "cell-hyphen" "t")
+                         (table (row (cell (document ,content))))))
+       (tabular (table (row (cell ,content))))))
+   (lambda ()
+     (with w (lambda (r) (- (rect-x2 r) (rect-x1 r)))
+       (check= (w (rect 0)) (w (rect 1)))
+       (check= (w (rect 0 0 1 0 0 0 0)) (w (rect 1 0 0 0 0)))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Page breaking

@@ -964,23 +964,16 @@ static box
 concat_of_items (path ip, array<line_item> a) {
   int i, n=N(a);
   if (n == 0) return empty_box (ip); // FIXME: n=0 should never happen
-  // (the space of an item goes after the markers at the end of a macro, a
-  // macro argument or a with which follow it, as in line_print: the cursor
-  // after them stays next to the item)
-  array<SI> sp (n);
-  for (i=0; i<n; i++) sp[i]= a[i]->spc->def;
-  for (i=0; i<n-1; i++)
-    if (lets_space_through (a[i+1])) { sp[i+1] += sp[i]; sp[i]= 0; }
-  // (the space after the last item does not count, also when markers follow
-  // it, the end of the value of a macro argument)
-  int last= n-1;
-  while (last > 0 && a[last]->type == MARKER_ITEM) last--;
+  // (the spaces as in a line of a paragraph: the cursor after a macro, a
+  // macro argument or a with stays next to its content, and the space
+  // before the markers at the end does not count)
+  array<SI>  sp= carried_spaces (a);
   array<box> items (n);
   array<SI>  spc (n);
   spc[0]=0;
   for (i=0; i<n-1; i++) {
     items[i]  = a[i]->b;
-    spc  [i+1]= (i < last? sp[i]: 0);
+    spc  [i+1]= sp[i];
   }
   items[i]= a[i]->b;
   return concat_box (ip, items, spc);

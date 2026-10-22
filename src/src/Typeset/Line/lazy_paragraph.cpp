@@ -915,12 +915,11 @@ lazy_paragraph_rep::query (lazy_type request, format fm) {
 
     SI w= left + first;
     int i, n= N(li);
-    // (the space after the last item does not count, also when markers
-    // follow it, see line_print)
-    int last= n-1;
-    while (last > 0 && li[last]->type == MARKER_ITEM) last--;
+    // (the spaces as line_print puts them: the space before the markers at
+    // the end does not count)
+    array<SI> sp= carried_spaces (li);
     for (i=0; i<n-1; i++)
-      w += (i < last? li[i]->spc->def: 0) + li[i]->b->x2;
+      w += sp[i] + li[i]->b->x2;
     if (i<n) w += li[i]->b->x2;
     w= max (w, 1);  // width of a paragraph must be strictly positive for
                     // correct positioning inside tables
