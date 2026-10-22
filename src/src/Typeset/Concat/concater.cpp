@@ -39,10 +39,11 @@ concater_rep::control (tree t, path ip) {
 void
 concater_rep::marker (path ip) {
   if (is_decoration (ip)) ip= path (0, ip);
-  string fn_name= "cmr";
-  int sz= env->get_script_size (env->fn_size, env->index_level);
-  font gfn (tex_font (fn_name, sz, (int) (env->magn*env->dpi)));
-  box b= text_box (ip->next, ip->item, "", gfn, blue);
+  box b= text_box (ip->next, ip->item, "", env->fn, blue);
+  // (a place for the cursor, which takes its height from the current font:
+  // no extents of its own, which would change the boxes and the lines into
+  // which it is put, at the boundaries of a macro argument)
+  b->y1= b->y2= 0;
   a << line_item (MARKER_ITEM, OP_SKIP, b, HYPH_INVALID);
 }
 
@@ -129,9 +130,14 @@ concater_rep::flag (string s, path ip, color col) {
 
 void
 concater_rep::print (space spc) {
+  // (on the last item which is not a marker: the space of an item merges
+  // with the spaces of the items around it (max), that of a marker after
+  // it would be added, after a script given by a macro argument)
   int n= N(a);
   if (n==0) return;
-  a[n-1]->spc= max (spc, a[n-1]->spc);
+  int i= n-1;
+  while (i > 0 && a[i]->type == MARKER_ITEM) i--;
+  a[i]->spc= max (spc, a[i]->spc);
 }
 
 void
@@ -964,13 +970,17 @@ typeset_as_concat (edit_env env, tree t, path ip) {
 
   int i, n=N(a);
   if (n == 0) return empty_box (ip); // FIXME: n=0 should never happen
+  // (the space after the last item does not count, also when markers follow
+  // it, the end of the value of a macro argument)
+  int last= n-1;
+  while (last > 0 && a[last]->type == MARKER_ITEM) last--;
   array<box> items (n);
   array<SI>  spc (n);
   if (n>0) {
     spc[0]=0;
     for (i=0; i<n-1; i++) {
       items[i]  = a[i]->b;
-      spc  [i+1]= a[i]->spc->def;
+      spc  [i+1]= (i < last? a[i]->spc->def: 0);
     }
     items[i]= a[i]->b;
   }
@@ -989,13 +999,17 @@ typeset_as_concat (edit_env env, tree t, path ip, array<line_item>& a) {
 
   int i, n=N(a);
   if (n == 0) return empty_box (ip); // FIXME: n=0 should never happen
+  // (the space after the last item does not count, also when markers follow
+  // it, the end of the value of a macro argument)
+  int last= n-1;
+  while (last > 0 && a[last]->type == MARKER_ITEM) last--;
   array<box> items (n);
   array<SI>  spc (n);
   if (n>0) {
     spc[0]=0;
     for (i=0; i<n-1; i++) {
       items[i]  = a[i]->b;
-      spc  [i+1]= a[i]->spc->def;
+      spc  [i+1]= (i < last? a[i]->spc->def: 0);
     }
     items[i]= a[i]->b;
   }

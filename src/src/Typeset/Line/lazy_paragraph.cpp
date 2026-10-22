@@ -180,9 +180,17 @@ lazy_paragraph_rep::line_print (line_item item) {
     // REPLACE item by item without lazy attachment !
   }
 
+  // (a marker after an item of the unit, the end of the value of a macro
+  // argument, takes the space after that item: at the end of a line it is
+  // left out, as without the marker)
+  space carried (0);
+  if (item->type == MARKER_ITEM && N(spcs) > cur_start) {
+    carried= spcs[N(spcs)-1];
+    spcs[N(spcs)-1]= space (0);
+  }
   if (N(spcs)>0) cur_w = cur_w + spcs[N(spcs)-1];
   items << item->b;
-  spcs  << item->spc;
+  spcs  << (carried + item->spc);
   item->b->x0= cur_w->def;
   item->b->y0= 0;
   cur_w =  cur_w + space (item->b->x2);
@@ -906,8 +914,12 @@ lazy_paragraph_rep::query (lazy_type request, format fm) {
 
     SI w= left + first;
     int i, n= N(li);
+    // (the space after the last item does not count, also when markers
+    // follow it, see line_print)
+    int last= n-1;
+    while (last > 0 && li[last]->type == MARKER_ITEM) last--;
     for (i=0; i<n-1; i++)
-      w += li[i]->spc->def + li[i]->b->x2;
+      w += (i < last? li[i]->spc->def: 0) + li[i]->b->x2;
     if (i<n) w += li[i]->b->x2;
     w= max (w, 1);  // width of a paragraph must be strictly positive for
                     // correct positioning inside tables

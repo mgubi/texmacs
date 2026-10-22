@@ -186,7 +186,11 @@ void
 concater_rep::handle_scripts (int start, int end) {
   int i;
   for (i=start; i<=end; ) {
+    // (a marker, the place of the boundary of a macro or a with, is no
+    // base: a script after it has the base of the same markup written out,
+    // the item before the markers, or none)
     if ((a[i]->type == OBSOLETE_ITEM) ||
+        (a[i]->type == MARKER_ITEM) ||
         (a[i]->type == LSUB_ITEM) ||
         (a[i]->type == LSUP_ITEM) ||
         (a[i]->type == GLUE_LSUBS_ITEM) ||
@@ -278,9 +282,12 @@ concater_rep::clean_and_correct () {
         if (prev != -1) {
           SI cor= ::italic_correction (a[prev]->b, a[i]->b);
           if (cor != 0) {
+            // (on the item before, as without the markers between them)
+            int j= i-1;
+            while (j > prev && a[j]->type == MARKER_ITEM) j--;
             if (a[prev]->b->right_correction () != 0)
               a[prev]->spc += space (cor);
-            else a[i-1]->spc += space (cor);
+            else a[j]->spc += space (cor);
           }
         }
         prev= i;
@@ -431,11 +438,18 @@ concater_rep::handle_brackets () {
 
 void
 concater_rep::kill_spaces () {
+  // (the markers among the control items at the ends count as them: the
+  // space before the controls is cleared, also with markers between them)
   int i;
-  for (i=N(a)-1; (i>0) && (a[i]->type == CONTROL_ITEM); i--)
-    a[i-1]->spc= space (0);
-  for (i=0; (i<N(a)) && (a[i]->type == CONTROL_ITEM); i++)
-    a[i]->spc= space (0);
+  bool control= false;
+  for (i=N(a)-1; (i>0) && (a[i]->type == CONTROL_ITEM ||
+                           a[i]->type == MARKER_ITEM); i--) {
+    control= control || a[i]->type == CONTROL_ITEM;
+    if (control) a[i-1]->spc= space (0);
+  }
+  for (i=0; (i<N(a)) && (a[i]->type == CONTROL_ITEM ||
+                         a[i]->type == MARKER_ITEM); i++)
+    if (a[i]->type == CONTROL_ITEM) a[i]->spc= space (0);
 
   for (i=0; i<N(a); i++)
     if (a[i]->type==CONTROL_ITEM) {

@@ -84,6 +84,12 @@ concat_box_rep::operator tree () {
 * Routines for concatenation boxes
 ******************************************************************************/
 
+static bool
+is_marker_box (box b) {
+  return b->get_type () == TEXT_BOX && b->w () == 0 && b->y1 == b->y2 &&
+         N (b->get_leaf_string ()) == 0;
+}
+
 void
 concat_box_rep::position (array<SI> spc) {
   int i;
@@ -100,8 +106,15 @@ concat_box_rep::position (array<SI> spc) {
   bool ok= !indent;
   x1= y1= x3= y3= MAX_SI;
   x2= y2= x4= y4= -MAX_SI;
+  // (the markers, places for the cursor around the value of a macro
+  // argument, empty and without width or height, are not in the extents,
+  // unless there is nothing else)
+  bool all= true;
   for (i=0; i<N(bs); i++)
-    if (!indent || sx2(i) > sx1(i)) {
+    if (!is_marker_box (bs[i])) all= false;
+  for (i=0; i<N(bs); i++)
+    if (!all && is_marker_box (bs[i])) continue;
+    else if (!indent || sx2(i) > sx1(i)) {
       ok= true;
       x1= min (x1, sx1(i));
       y1= min (y1, sy1(i));
@@ -301,24 +314,49 @@ concat_box_rep::rsup_correction_at (SI h) {
   return 0;
 }
 
+static int
+single_box (array<box> bs) {
+  // the only box of a concatenation which is not a marker, or -1: the
+  // markers around the value of a macro argument do not count
+  int i, n= N(bs), r= -1;
+  for (i=0; i<n; i++)
+    if (!is_marker_box (bs[i]) || n == 1) {
+      if (r >= 0) return -1;
+      r= i;
+    }
+  return r;
+}
+
 bool
 concat_box_rep::extended_shape () {
-  if (N(bs) == 1) return bs[0]->extended_shape ();
+  int i= single_box (bs);
+  if (i >= 0) return bs[i]->extended_shape ();
   return true;
 }
 
 bool
 concat_box_rep::top_accent (SI& x) {
-  if (N(bs) == 1 && bs[0]->top_accent (x)) { x += sx (0); return true; }
+  int i= single_box (bs);
+  if (i >= 0 && bs[i]->top_accent (x)) { x += sx (i); return true; }
   return false;
 }
+
+// The levels of the scripts of a concatenation are those of its boxes
+// which are not markers: the markers around the value of a macro argument,
+// glued to the base of a script, are text boxes in another font, whose
+// levels would place the script elsewhere.
+// A base glued to markers keeps its own levels (and not the bounds of the
+// concatenation, which for a base like "." would put the script on it)
 
 SI
 concat_box_rep::sub_lo_base (int level) {
   int i=0, n=N(bs);
+  int k= single_box (bs);
+  if (k >= 0) return bs[k]->sub_lo_base (level);
   SI  y= y2;
   for (i=0; i<n; i++)
-    y= min (y, bs[i]->sub_lo_base (level));
+    if (!is_marker_box (bs[i]))
+      y= min (y, bs[i]->sub_lo_base (level));
   if (y == y2) y= y1;
   return y;
 }
@@ -326,9 +364,12 @@ concat_box_rep::sub_lo_base (int level) {
 SI
 concat_box_rep::sub_hi_lim  (int level) {
   int i=0, n=N(bs);
+  int k= single_box (bs);
+  if (k >= 0) return bs[k]->sub_hi_lim (level);
   SI  y= y1;
   for (i=0; i<n; i++)
-    y= max (y, bs[i]->sub_hi_lim (level));
+    if (!is_marker_box (bs[i]))
+      y= max (y, bs[i]->sub_hi_lim (level));
   if (y == y1) y= y1 + (y2-y1)/4;
   return y;
 }
@@ -336,9 +377,12 @@ concat_box_rep::sub_hi_lim  (int level) {
 SI
 concat_box_rep::sup_lo_lim  (int level) {
   int i=0, n=N(bs);
+  int k= single_box (bs);
+  if (k >= 0) return bs[k]->sup_lo_lim (level);
   SI  y= y2;
   for (i=0; i<n; i++)
-    y= min (y, bs[i]->sup_lo_lim (level));
+    if (!is_marker_box (bs[i]))
+      y= min (y, bs[i]->sup_lo_lim (level));
   if (y == y2) y= y2 - (y2-y1)/4;
   return y;
 }
@@ -346,9 +390,12 @@ concat_box_rep::sup_lo_lim  (int level) {
 SI
 concat_box_rep::sup_lo_base (int level) {
   int i=0, n=N(bs);
+  int k= single_box (bs);
+  if (k >= 0) return bs[k]->sup_lo_base (level);
   SI  y= y2;
   for (i=0; i<n; i++)
-    y= min (y, bs[i]->sup_lo_base (level));
+    if (!is_marker_box (bs[i]))
+      y= min (y, bs[i]->sup_lo_base (level));
   if (y == y2) y= y2 - (y2-y1)/4;
   return y;
 }
@@ -356,9 +403,12 @@ concat_box_rep::sup_lo_base (int level) {
 SI
 concat_box_rep::sup_hi_lim  (int level) {
   int i=0, n=N(bs);
+  int k= single_box (bs);
+  if (k >= 0) return bs[k]->sup_hi_lim (level);
   SI  y= y1;
   for (i=0; i<n; i++)
-    y= max (y, bs[i]->sup_hi_lim (level));
+    if (!is_marker_box (bs[i]))
+      y= max (y, bs[i]->sup_hi_lim (level));
   if (y == y1) y= y2;
   return y;
 }
