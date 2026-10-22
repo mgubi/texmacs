@@ -301,6 +301,14 @@
 
   The additions to <TeXmacs> Upsilon, the newest first.
 
+  <paragraph|22 October 2026>
+
+  <\itemize>
+    <item>The window of the error messages (it opens by itself after a
+    warning) opens at a reasonable size, and its messages fill it and follow
+    its size, scrolling the long lines.
+  </itemize>
+
   <paragraph|21 October 2026>
 
   <\itemize>

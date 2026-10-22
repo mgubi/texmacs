@@ -24,6 +24,11 @@ have the details, and the problems go to the
   (`cmd /c`), with its output read in the background, and stopping or
   interrupting it ends it and all it started
   ([#443](https://github.com/mgubi/texmacs/pull/443)).
+- **Vue**: the window of the error messages (Debug > Error messages)
+  opens at a reasonable size, at most two thirds of the screen, and its
+  messages fill it and follow its size, scrolling the long lines: they
+  were three lines tall in a grey window as wide as the screen. The same
+  holds for any window or tab which only shows a typeset document.
 
 ## 21 October 2026
 

@@ -595,6 +595,9 @@ string layout_who;
 // set while laying out what a resize widget contains: a widget which would
 // otherwise take the size of its contents fills the box instead
 bool fill_parent= false;
+// set while laying out a typeset box which is the whole page of a window or
+// of a tab (see is_typeset_page)
+static bool fill_page= false;
 
 uint32_t current_balloon;
 time_t balloon_time;
@@ -2541,6 +2544,35 @@ widget_grows (widget w, bool horizontal) {
   return false;
 }
 
+// Is the widget a typeset box (texmacs-output), maybe inside containers
+// which only pass it through? As the whole page of a window or of a tab
+// (the messages of the console), it fills the page and follows the size of
+// the window, as the scroll area of Qt does, instead of keeping its natural
+// size (see vue_simple_widget_rep::do_layout); in a form, a tooltip or a
+// menu it keeps it
+static bool
+is_typeset_page (widget w) {
+  vue_widget_rep* r= concrete (w).rep;
+  if (r == NULL) return false;
+  vue_simple_widget_rep* sw= dynamic_cast<vue_simple_widget_rep*> (r);
+  if (sw != NULL) return sw->is_embedded_widget () && !sw->is_editor_widget ();
+  vue_ui_rep* u= dynamic_cast<vue_ui_rep*> (r);
+  if (u == NULL) return false;
+  string t= u->type;
+  array<widget> a;
+  if (t == "vertical_list")        a= open_box<vue_vertical_list> (u->data).a;
+  else if (t == "horizontal_list") a= open_box<vue_horizontal_list> (u->data).a;
+  // (a top-window puts its contents in a vertical menu)
+  else if (t == "vertical_menu")   a= open_box<vue_vertical_menu> (u->data).a;
+  else if (t == "horizontal_menu") a= open_box<vue_horizontal_menu> (u->data).a;
+  else if (t == "wrapped_widget")  a << open_box<vue_wrapped_widget> (u->data).w;
+  else if (t == "refreshable_widget")
+    a << open_box<vue_refreshable_widget_star> (u->data).current;
+  else if (t == "refresh_widget")
+    a << open_box<vue_refresh_widget_star> (u->data).current;
+  return N(a) == 1 && !is_nil (a[0]) && is_typeset_page (a[0]);
+}
+
 void
 layout_list (unsigned int id, array<widget> a, bool vert) {
   // a vertical list fills the width of its parent; otherwise a list grows
@@ -3020,7 +3052,10 @@ vue_ui_rep::do_layout () {
         CLAY_AUTO_ID({
           .layout= { .sizing= { .width= CLAY_SIZING_GROW(0), .height= CLAY_SIZING_GROW(0) }}})
         {
+          bool save_page= fill_page;
+          fill_page= is_typeset_page (d.bodies[d.current]);
           concrete (d.bodies[d.current])->do_layout ();
+          fill_page= save_page;
         }
       }
     }
@@ -3057,7 +3092,10 @@ vue_ui_rep::do_layout () {
         .border= { .color= color_border, .width= { 1, 1, 1, 1 } }})
       {
         CLAY_AUTO_ID({ .layout= { .sizing= grow }}) {
+          bool save_page= fill_page;
+          fill_page= is_typeset_page (d.bodies[i]);
           concrete (d.bodies[i])->do_layout ();
+          fill_page= save_page;
         }
       }
     };
@@ -5544,6 +5582,10 @@ vue_plain_window_widget_rep::do_layout () {
   bool scrolled= !popup && !autosize &&
                  concrete (wid)->type != "vue_texmacs_widget_rep";
   refit_window= false; // set by a tabs widget which changed tab
+  // a window which only shows a typeset box (not a popup: a tooltip or the
+  // preview of a reference keeps the size of its box)
+  bool save_page= fill_page;
+  fill_page= !popup && is_typeset_page (wid);
   if (scrolled) {
     Clay_ElementId my_id= CLAY_ID("plain_window_widget");
     float ww= (win != NULL) ? win->layout_w : 0, wh= (win != NULL) ? win->layout_h : 0;
@@ -5597,6 +5639,7 @@ vue_plain_window_widget_rep::do_layout () {
      concrete (wid)->do_layout ();
      window_autosizing= false;
   }
+  fill_page= save_page;
   if (refit_window && fits_contents && !autosize) {
     autosize= true; // from the next pass, see post_layout
     last_cw= last_ch= -1;
@@ -6895,6 +6938,20 @@ vue_simple_widget_rep::do_layout () {
     if (fill_parent)
       s= { .width=  CLAY_SIZING_GROW(.min= (float)w/ren->pixel),
            .height= CLAY_SIZING_GROW(.min= (float)h/ren->pixel) };
+    else if (fill_page && window_autosizing)
+      // the whole page of a window: the window opens at the size of the
+      // box, but no larger than 2/3 of the screen, the largest size Qt
+      // gives a window (QWidget::adjustSize); a console of long lines
+      // opened as wide as the screen
+      s= { .width=  CLAY_SIZING_FIXED((float)min (w, 2*sw/3)/ren->pixel),
+           .height= CLAY_SIZING_FIXED((float)min (h, 2*sh/3)/ren->pixel) };
+    else if (fill_page)
+      // then it follows the size of the window, down to a few lines, and
+      // scrolls what does not fit: with its natural size as its minimum,
+      // the window could not be made smaller than the box, and a larger
+      // window was grey around it
+      s= { .width=  CLAY_SIZING_GROW(.min= (float)min (w, sw/8)/ren->pixel),
+           .height= CLAY_SIZING_GROW(.min= (float)min (h, sh/8)/ren->pixel) };
     else
       s= { .width=  CLAY_SIZING_FIT(.min= (float)w/ren->pixel),
            .height= CLAY_SIZING_FIT(.min= (float)h/ren->pixel) };
