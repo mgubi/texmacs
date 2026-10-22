@@ -1132,11 +1132,14 @@
     (string-append "ps -axo command= | grep -c '^sleep " secs "$'"))))
 
 (define (term-pid)
-  ;; the process of tmtestterm, a child of TeXmacs, or #f
+  ;; the process of tmtestterm, a child of TeXmacs, or #f (with Qt pipes,
+  ;; a grandchild: the command is run by sh -c, which dash does not replace)
   (with s (var-eval-system
            (string-append "ps -axo pid=,ppid=,command= | "
-                          "awk -v p=$PPID '$2 == p && $3 == \"sleep\" && "
-                          "$4 == \"97\" {print $1}'"))
+                          "awk -v p=$PPID '{ up[$1]= $2 } "
+                          "$3 == \"sleep\" && $4 == \"97\" { s[$1]= $2 } "
+                          "END { for (k in s) "
+                          "if (s[k] == p || up[s[k]] == p) print k }'"))
     (and (!= s "") s)))
 
 (define (cmdline-run ses cmd)
@@ -1225,8 +1228,7 @@
     (pause "2.2")
     (check= (start* "tmtestecho" "plugins-test-term2") "ok")
     (connection-stop "tmtestecho" "plugins-test-term2")
-    ;; (pid-alive? counts a zombie as ended: with Qt pipes, the process is
-    ;; killed at once but reaped only in the event loop, see above)
+    ;; (pid-alive? counts a zombie as ended)
     (when pid
       (check-true (wait-until (lambda () (not (pid-alive? pid))) 3000)))))
 

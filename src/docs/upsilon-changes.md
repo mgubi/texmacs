@@ -32,8 +32,7 @@ have the details, and the problems go to the
   ([#429](https://github.com/mgubi/texmacs/pull/429)).
 - Stopping a plugin whose program ignores the termination signal no
   longer blocks the interface for 2 s: the program is killed and reaped
-  later, in the background. Concerns Vue, Cocoa and the Qt builds
-  without Qt pipes
+  later, in the background (Linux and macOS, all interfaces)
   ([#419](https://github.com/mgubi/texmacs/pull/419)).
 - **Vue**: the window of the error messages (Debug > Error messages)
   opens at a reasonable size, at most two thirds of the screen, and its
