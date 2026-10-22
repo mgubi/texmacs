@@ -101,13 +101,20 @@ concat_box_rep::position (array<SI> spc) {
   x1= y1= x3= y3= MAX_SI;
   x2= y2= x4= y4= -MAX_SI;
   // (the markers, places for the cursor around the value of a macro
-  // argument, empty and without width or height, are not in the extents,
-  // unless there is nothing else)
+  // argument, empty and without width or height, are in the horizontal
+  // extents, which say where the box begins and ends (a tab at the start of
+  // a line), but not in the heights nor in the ink, unless there is nothing
+  // else)
   bool all= true;
   for (i=0; i<N(bs); i++)
     if (!is_marker_box (bs[i])) all= false;
   for (i=0; i<N(bs); i++)
-    if (!all && is_marker_box (bs[i])) continue;
+    if (!all && is_marker_box (bs[i])) {
+      if (!indent) {
+        x1= min (x1, sx1(i));
+        x2= max (x2, sx2(i));
+      }
+    }
     else if (!indent || sx2(i) > sx1(i)) {
       ok= true;
       x1= min (x1, sx1(i));
