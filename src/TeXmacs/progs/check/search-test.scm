@@ -26,7 +26,8 @@
 ;;
 ;; Wildcards (std 1, std 2, std 3 in the widgets) are (wildcard "x"), ...;
 ;; at the start or at the end of a concat pattern, a wildcard extends the
-;; hit to the start or to the end of the formula.
+;; hit to the start or to the end of the formula (at the end, not always:
+;; #453).
 
 (texmacs-module (check search-test)
   (:use (check check-lib)))
@@ -172,7 +173,11 @@
     (check-both doc '(concat (wildcard "x") (wildcard "y") (rsub "n"))
                 '((0 0 0) (0 1 1)))
     ;; a trailing one to its end
-    (check-both doc '(concat "A" (wildcard "x")) '((0 0 0) (0 7 1))))
+    (check-both doc '(concat "A" (wildcard "x")) '((0 0 0) (0 7 1)))
+    (check-both doc '(concat (rsub "n") (wildcard "y")) '((0 1 0) (0 7 1))))
+  ;; also when only strings follow a string
+  (check-both '(document (concat "A" "+" "B")) '(concat "A" (wildcard "y"))
+              '((0 0 0) (0 2 1)))
   ;; in the middle: any content, one string or a tag
   (check-both '(document (concat "f" "(" "x" ")" "+"
                                  "f" "(" (frac "1" "2") ")"))
@@ -186,11 +191,12 @@
   (check-both '(document (concat "A" (rsub "n") "=" (frac "1" "2")))
               '(concat (rsub (wildcard "x")) "=")
               '((0 1 0) (0 2 1)))
-  ;; FIXME (#453): a trailing wildcard fails when only strings follow the
-  ;; rest of the pattern (tree_search.cpp:190, the loop on j skips the
-  ;; sub-patterns which end with a wildcard, and nothing sets p2 to the
-  ;; end): (concat (wildcard "x") (rsub "n") (wildcard "y")) in
-  ;; (concat "A" (rsub "n") "+" "B") gives (), expected the whole formula.
+  ;; FIXME (#453): a trailing wildcard fails when the rest of the pattern
+  ;; ends at a tag and no tag follows in the formula (tree_search.cpp:190,
+  ;; the loop on j skips the sub-patterns which end with a wildcard, and
+  ;; only a tag sets p2 to the end): (concat (rsub "n") (wildcard "y")) in
+  ;; (concat "A" (rsub "n") "+" "B") or in (concat "A" (rsub "n")) gives (),
+  ;; expected the formula from the subscript to its end.
   ;; FIXME (#452): a concat pattern ending with an empty string never returns
   ;; (tree_search.cpp:264, search_string finds "" at the same position
   ;; forever and appends hits until the memory is exhausted):
@@ -266,9 +272,10 @@
                            (lambda () (tree-search-tree t what '() 100)))))
                   (check= (cdr r) '())
                   (check-true (< (car r) 500))))
+              ;; not a wildcard in the middle which fails late: from each
+              ;; start, it still scans to the end of the formula (98 ms)
               (list '(concat "A" (rsub "ij"))
                     '(concat "x" (rsub "k") "-")
-                    '(concat "y" ")" (wildcard "x") "z")
                     '(concat (wildcard "x") "q" (rsub "k")))))))
       '(search replace))
     ;; with hits all along the formula
