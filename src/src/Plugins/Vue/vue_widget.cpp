@@ -596,8 +596,12 @@ string layout_who;
 // otherwise take the size of its contents fills the box instead
 bool fill_parent= false;
 // set while laying out a typeset box which is the whole page of a window or
-// of a tab (see is_typeset_page)
+// of a tab (see is_typeset_page); page_laid_out tells the window that it
+// has one (see vue_plain_window_widget_rep::post_layout)
 static bool fill_page= false;
+static bool page_laid_out= false;
+// the size of a new editor window (-geometry, see texmacs_window_widget)
+extern int geometry_w, geometry_h;
 
 uint32_t current_balloon;
 time_t balloon_time;
@@ -2546,10 +2550,10 @@ widget_grows (widget w, bool horizontal) {
 
 // Is the widget a typeset box (texmacs-output), maybe inside containers
 // which only pass it through? As the whole page of a window or of a tab
-// (the messages of the console), it fills the page and follows the size of
-// the window, as the scroll area of Qt does, instead of keeping its natural
-// size (see vue_simple_widget_rep::do_layout); in a form, a tooltip or a
-// menu it keeps it
+// (the messages of the console), it behaves as an editor: it fills the
+// page, follows the size of the window and never sizes it, instead of
+// keeping its natural size (see vue_simple_widget_rep::do_layout); in a
+// form, a tooltip or a menu it keeps it
 static bool
 is_typeset_page (widget w) {
   vue_widget_rep* r= concrete (w).rep;
@@ -5351,6 +5355,7 @@ public:
   bool centre_pending;
   SI centre_x, centre_y;
   float min_cw, min_ch; // smallest size of the contents of a dialog (pixels)
+  bool has_page; // it shows a typeset box as a page, as an editor (fill_page)
   string title;
   string refresh_kind;
   
@@ -5385,6 +5390,7 @@ vue_plain_window_widget_rep::vue_plain_window_widget_rep (widget _wid, string _n
   fits_contents= autosize;
   last_cw= last_ch= -1;
   min_cw= min_ch= 0;
+  has_page= false;
   quit_sent= false;
   centre_pending= false;
   centre_x= centre_y= 0;
@@ -5584,8 +5590,9 @@ vue_plain_window_widget_rep::do_layout () {
   refit_window= false; // set by a tabs widget which changed tab
   // a window which only shows a typeset box (not a popup: a tooltip or the
   // preview of a reference keeps the size of its box)
-  bool save_page= fill_page;
+  bool save_page= fill_page, save_laid= page_laid_out;
   fill_page= !popup && is_typeset_page (wid);
+  page_laid_out= false;
   if (scrolled) {
     Clay_ElementId my_id= CLAY_ID("plain_window_widget");
     float ww= (win != NULL) ? win->layout_w : 0, wh= (win != NULL) ? win->layout_h : 0;
@@ -5639,8 +5646,12 @@ vue_plain_window_widget_rep::do_layout () {
      concrete (wid)->do_layout ();
      window_autosizing= false;
   }
+  has_page= page_laid_out;
   fill_page= save_page;
-  if (refit_window && fits_contents && !autosize) {
+  page_laid_out= save_laid;
+  // (a window which shows a typeset box as a page keeps its size when
+  // another tab is chosen, as an editor window)
+  if (refit_window && fits_contents && !autosize && !has_page) {
     autosize= true; // from the next pass, see post_layout
     last_cw= last_ch= -1;
     layout_again= true;
@@ -5738,6 +5749,14 @@ vue_plain_window_widget_rep::post_layout () {
     // leave some room for the window decorations and the screen borders
     SI sw, sh;
     gui_root_extents (sw, sh);
+    // a window with a typeset box as a page (the console) is sized as an
+    // editor window, whatever the box holds: the box itself asked for
+    // little (see vue_simple_widget_rep::do_layout)
+    if (has_page) {
+      int z= (geometry_w == 800 && geometry_h == 600) ? retina_zoom : 1;
+      cw= max (cw, (SI) (z * geometry_w) * PIXEL);
+      ch= max (ch, (SI) (z * geometry_h) * PIXEL);
+    }
     cw= min (cw, sw - 100*PIXEL);
     ch= min (ch, sh - 150*PIXEL);
     autosize= false;
@@ -6634,6 +6653,7 @@ vue_simple_widget_rep::vue_simple_widget_rep ()
   absolute_scroll (false),
   scroll_pending (false),
   scrollbars_hidden (false),
+  shown_as_page (false),
   pointer_captured (false),
   ren (NULL),
   backing_pos (coord2 (0, 0)), origin (coord2 (0, 0)),
@@ -6916,6 +6936,7 @@ vue_simple_widget_rep::do_layout () {
     zoom_now= as_double (call ("get-window-zoom-factor"));
   SI w= 0, h= 0;
   Clay_Sizing s= layoutExpand;
+  shown_as_page= false;
   if (is_embedded_widget () && !is_editor_widget ()) {
     // typeset boxes (texmacs-output) have their natural size; editors,
     // embedded or not, fill their container (their size hint is the screen)
@@ -6938,20 +6959,19 @@ vue_simple_widget_rep::do_layout () {
     if (fill_parent)
       s= { .width=  CLAY_SIZING_GROW(.min= (float)w/ren->pixel),
            .height= CLAY_SIZING_GROW(.min= (float)h/ren->pixel) };
-    else if (fill_page && window_autosizing)
-      // the whole page of a window: the window opens at the size of the
-      // box, but no larger than 2/3 of the screen, the largest size Qt
-      // gives a window (QWidget::adjustSize); a console of long lines
-      // opened as wide as the screen
-      s= { .width=  CLAY_SIZING_FIXED((float)min (w, 2*sw/3)/ren->pixel),
-           .height= CLAY_SIZING_FIXED((float)min (h, 2*sh/3)/ren->pixel) };
-    else if (fill_page)
-      // then it follows the size of the window, down to a few lines, and
-      // scrolls what does not fit: with its natural size as its minimum,
-      // the window could not be made smaller than the box, and a larger
-      // window was grey around it
-      s= { .width=  CLAY_SIZING_GROW(.min= (float)min (w, sw/8)/ren->pixel),
-           .height= CLAY_SIZING_GROW(.min= (float)min (h, sh/8)/ren->pixel) };
+    else if (fill_page) {
+      // the whole page of a window or of a tab behaves as an editor: its
+      // contents never size the window, which opens at the size of an
+      // editor window (post_layout) and which it follows, down to a small
+      // size which does not depend on them, scrolling what does not fit.
+      // With its natural size, the window could not be made smaller than
+      // the box, a larger window was grey around it, and a console of
+      // long lines opened as wide as the screen
+      s= { .width=  CLAY_SIZING_GROW(.min= (float)(sw/8)/ren->pixel),
+           .height= CLAY_SIZING_GROW(.min= (float)(sh/8)/ren->pixel) };
+      page_laid_out= true;
+      shown_as_page= true;
+    }
     else
       s= { .width=  CLAY_SIZING_FIT(.min= (float)w/ren->pixel),
            .height= CLAY_SIZING_FIT(.min= (float)h/ren->pixel) };
@@ -7265,8 +7285,11 @@ vue_simple_widget_rep::repaint_invalid_regions () {
     // in it, as the Qt port centers its canvas: the editor centers it only
     // when it fits with room for a scroll bar, and a page fit to the width
     // does not, by rounding)
+    // (except a typeset box shown as a page: a console of short lines
+    // begins at the left, as a text editor's)
     if (extents->x2 - extents->x1 < sz.x1)
-      scroll_pos.x1= extents->x1 - (sz.x1 - (extents->x2 - extents->x1)) / 2;
+      scroll_pos.x1= shown_as_page ? extents->x1 :
+                     extents->x1 - (sz.x1 - (extents->x2 - extents->x1)) / 2;
     else if (scroll_pos.x1 < extents->x1) scroll_pos.x1= extents->x1;
     else if (scroll_pos.x1 + sz.x1 > extents->x2)
       scroll_pos.x1= max (extents->x2 - sz.x1, extents->x1);

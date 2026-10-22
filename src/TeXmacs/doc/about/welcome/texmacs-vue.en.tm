@@ -305,8 +305,8 @@
 
   <\itemize>
     <item>The window of the error messages (it opens by itself after a
-    warning) opens at a reasonable size, and its messages fill it and follow
-    its size, scrolling the long lines.
+    warning) behaves as an editor window: it opens at the same size whatever
+    the messages are, and they fill it, follow its size and scroll.
   </itemize>
 
   <paragraph|21 October 2026>

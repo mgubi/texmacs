@@ -43,10 +43,11 @@ have the details, and the problems go to the
   later, in the background (Linux and macOS, all interfaces)
   ([#419](https://github.com/mgubi/texmacs/pull/419)).
 - **Vue**: the window of the error messages (Debug > Error messages)
-  opens at a reasonable size, at most two thirds of the screen, and its
-  messages fill it and follow its size, scrolling the long lines: they
-  were three lines tall in a grey window as wide as the screen. The same
-  holds for any window or tab which only shows a typeset document.
+  behaves as an editor window: it opens at the size of a new editor
+  window whatever the messages are, and they fill it, follow its size and
+  scroll, beginning at the left: they were three lines tall in a grey
+  window as wide as their longest line. The same holds for any window or
+  tab which only shows a typeset document.
 
 ## 21 October 2026
 
