@@ -29,7 +29,8 @@
 
 #include "config.h"
 
-#ifdef OS_MINGW
+// (the Qt builds use QProcess: Plugins/Qt/qt_cmdline_link.cpp)
+#if defined (OS_MINGW) && !defined (QTTEXMACS)
 
 #include "windows_process.hpp"
 #include <windows.h>
@@ -438,4 +439,4 @@ windows_process::terminate (int grace) {
   close_handle (rep->job);
 }
 
-#endif // OS_MINGW
+#endif // defined (OS_MINGW) && !defined (QTTEXMACS)

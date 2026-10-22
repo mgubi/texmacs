@@ -408,9 +408,10 @@
   (check= (tree->stree (connection-result "tmtestecho" "default" "x")) "")
   ;; the plugin gets the name of the session and the lines of the input,
   ;; and the name of the session again with the output of the command.
-  ;; Only the name is checked in the result: with Qt pipes, the output of
-  ;; the command is read by the socket notifiers of the event loop, which
-  ;; does not run here, so that the result may come without it.
+  ;; Only the name is checked in the result: the output of the command is
+  ;; read in the event loop (the socket notifiers, or with Qt pipes the
+  ;; links listened to), which does not run here, so that the result may
+  ;; come without it.
   (set! chat-seen '())
   (set! notified '())
   (check= (start* "tmtestchat" "plugins-test-chat") "cmdline")
@@ -1118,6 +1119,12 @@
                    "awk -v p=$PPID '$1 == p && $2 ~ /^Z/ {n++} "
                    "END {print n+0}'"))))
 
+(define (sleepers secs)
+  ;; the number of the processes "sleep @secs"
+  (string->number
+   (var-eval-system
+    (string-append "ps -axo command= | grep -c '^sleep " secs "$'"))))
+
 (define (cmdline-run ses cmd)
   ;; run one command of the command line plugin until its process has ended
   (when (nin? (list "tmtestcmdline" ses) started)
@@ -1141,7 +1148,7 @@
   (check-group "processes: command lines (Windows)")
   (check= (start* "tmtestcmdline" "plugins-test-win") "cmdline")
   ;; (connection-eval reads the link, which takes the output of its
-  ;; command there: with Qt pipes on Unix, only the event loop reads it)
+  ;; command there)
   (with r (eval* "tmtestcmdline" "plugins-test-win" "x y")
     (check-true (contains? r "res=x y"))
     (check-false (has-return? r)))
@@ -1171,12 +1178,23 @@
 
   (check-group "processes: command lines")
   (check= (connection-start "tmtestcmdline" "plugins-test-cmd") "cmdline")
+  ;; connection-eval reads the link, which takes the output of its command
+  ;; there (with Qt pipes, it waited for ever: only the event loop read it)
+  (with r (eval* "tmtestcmdline" "plugins-test-cmd" "x y")
+    (check-true (contains? r "res=x y")))
   (check-true (cmdline-run "plugins-test-cmd" "c0"))
   (let ((fds (open-descriptors)))
     (for (i (.. 1 6))
       (check-true (cmdline-run "plugins-test-cmd" "c")))
     (check= (open-descriptors) fds)
-    (check= (zombies) 0)))
+    (check= (zombies) 0))
+  ;; an interrupt reaches all that the command started (its process group):
+  ;; here a sleep in the background, which ignores SIGINT, as well as the
+  ;; one in the foreground
+  (check= (sleepers "617") 0)
+  (check-true (cmdline-run "plugins-test-cmd"
+                           "z; sleep 617 > /dev/null & sleep 617"))
+  (check= (sleepers "617") 0))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The suite
