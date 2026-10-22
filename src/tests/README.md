@@ -172,8 +172,9 @@ checks which fail because of a bug in the sources are left out with a
 Replace (`src/Data/Tree/tree_search.cpp`) on detached trees: text, tags
 (the examples of the manual), formulas, wildcards, select-region, patterns
 of several paragraphs, the limit on the hits and the search from a
-position, each for the two ways of matching of the search and the replace
-widgets, and the time of a search in a long formula.
+position, case-insensitive matching, each for the two ways of matching of
+Edit > Search and Edit > Replace, and the time of a search in a long
+formula.
 
 Three more test the document level. `latex-test.scm` converts to and from
 LaTeX (special characters, accents, structure, formulas, tables, theorems,

@@ -15,14 +15,17 @@
 ;; tree-search-tree-at on detached trees. A result is the flat list of the
 ;; start and end paths of the hits, in the order of the document.
 ;;
-;; The search widget and the replace widget match differently. The search
-;; widget sets the preference "search-and-replace" to "off", which allows
-;; blank, initial, partial and injective matches: a string of the pattern
-;; may match a part of a string, an empty argument matches any argument,
-;; and a tag matches a tag whose arguments contain those of the pattern.
-;; The replace widget sets it to "on": a string must match a whole string.
-;; Both allow cascaded matches (a pattern inside an argument). The checks
-;; set the preference in memory only, and restore it: nothing is saved.
+;; Searching and replacing match differently. Edit > Search (toolbar or
+;; widget) sets the preference "search-and-replace" to "off": the matching
+;; then follows the preferences allow-blank-match, allow-initial-match,
+;; allow-partial-match and allow-injective-match, all on by default, so
+;; that a string of the pattern may match a part of a string, an empty
+;; argument matches any argument, and a tag matches a tag whose arguments
+;; contain those of the pattern. Edit > Replace sets it to "on": the
+;; matching follows allow-blank-replace, ..., all off by default, and a
+;; string must match a whole string. Both allow cascaded matches (a pattern
+;; inside an argument). The checks set preferences in memory only, and
+;; restore them: nothing is saved.
 ;;
 ;; Wildcards (std 1, std 2, std 3 in the widgets) are (wildcard "x"), ...;
 ;; at the start or at the end of a concat pattern, a wildcard extends the
@@ -32,12 +35,11 @@
 (texmacs-module (check search-test)
   (:use (check check-lib)))
 
-(define (with-search-mode mode thunk)
-  ;; mode is 'search (the search widget) or 'replace (the replace widget)
-  (let* ((which "search-and-replace")
-         (had? (cpp-has-preference? which))
+(define (with-preference which val thunk)
+  ;; run thunk with the preference set in memory only: nothing is saved
+  (let* ((had? (cpp-has-preference? which))
          (old (get-preference which)))
-    (cpp-set-preference which (if (== mode 'search) "off" "on"))
+    (cpp-set-preference which val)
     (with r (check-run thunk)
       (if had?
           (cpp-set-preference which old)
@@ -45,11 +47,16 @@
       (when (and (pair? r) (== (car r) 'error))
         (check-report #f "the group" (object->string r))))))
 
+(define (with-search-mode mode thunk)
+  ;; mode is 'search (Edit > Search) or 'replace (Edit > Replace)
+  (with-preference "search-and-replace" (if (== mode 'search) "off" "on")
+    thunk))
+
 (define (hits doc what)
   (tree-search-tree (stree->tree doc) what '() 1000))
 
 (define (check-both doc what expected)
-  ;; the same hits for the search and for the replace widget
+  ;; the same hits when searching and when replacing
   (with-search-mode 'search (lambda () (check= (hits doc what) expected)))
   (with-search-mode 'replace (lambda () (check= (hits doc what) expected))))
 
@@ -65,8 +72,22 @@
               '((0 4) (0 7) (1 0 2) (1 0 5) (1 1 0 0) (1 1 0 3)
                 (1 2 2) (1 2 5)))
   (check-both '(document "the cat sat") "dog" '())
-  ;; case sensitive by default
-  (check-both '(document "Cat cat CAT") "cat" '((0 4) (0 7))))
+  ;; case sensitive by default; not with case-insensitive-match, also for
+  ;; the strings of a concat pattern
+  (check-both '(document "Cat cat CAT") "cat" '((0 4) (0 7)))
+  ;; FIXME (#460): case-insensitive-match ignores the strings inside the
+  ;; tags of the pattern (match (tree t, tree what), tree_search.cpp:139:
+  ;; its string cases compare with the case): (em "cat") in
+  ;; (concat "a " (em "Cat")), or (concat "x" (rsub "n")) in
+  ;; (concat "X" (rsub "N")), gives (), expected the em or the formula.
+  (with-preference "case-insensitive-match" "on"
+    (lambda ()
+      (check-both '(document "Cat cat CAT") "cat"
+                  '((0 0) (0 3) (0 4) (0 7) (0 8) (0 11)))
+      (check-both '(document (concat "X" "+" "y")) '(concat "x" "+")
+                  '((0 0 0) (0 1 1)))
+      (check-both '(document (concat "X" (rsub "n"))) '(concat "x" (rsub "n"))
+                  '((0 0 0) (0 1 1))))))
 
 ;; a concat of strings and wildcards also matches inside one string: in
 ;; the search widget, each occurrence; in the replace widget, the whole
