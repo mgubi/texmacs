@@ -299,12 +299,12 @@ search_compound (range_set& sel, tree t, tree what, path p) {
 void
 search_concat (range_set& sel, tree t, tree what, path p) {
   // search_concat (t, what, pos, 0, ...) scans forwards from pos for the
-  // start of a match, until it reaches a child which contains a match
-  // (with a leading wildcard, until the end).
-  // When such a scan fails, the scans from the next positions fail too,
-  // up to that child: skip them, instead of scanning again (quadratic in
-  // the length of the concat, and worse for nested concats).
-  // The matches inside each child are searched only once, for both.
+  // start of a match, until it reaches a compound child which contains a
+  // match (with a leading wildcard, until the end or until it fails on
+  // cur). When such a scan fails, the scans from the next positions fail
+  // too (cur only grows), up to that child: skip them, instead of scanning
+  // again (quadratic in the length of the concat, and worse for nested
+  // concats). The matches inside each child are searched only once.
   array<range_set> inside (N(t));
   for (int pos=0; pos<N(t); pos++)
     search (inside[pos], t[pos], what, p * pos);
@@ -319,7 +319,7 @@ search_concat (range_set& sel, tree t, tree what, path p) {
         for (int i=0; i+1<N(ssel); i++)
           ssel[i+1]= (p * (N(t)-1)) * end (t[N(t)-1]);
       merge (sel, ssel);
-      scan= true;
+      if (is_compound (t[pos]) && !is_func (what[0], WILDCARD, 1)) scan= true;
       pos++;
       continue;
     }
