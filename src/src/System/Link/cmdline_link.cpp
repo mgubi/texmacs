@@ -11,7 +11,9 @@
 
 #include "basic.hpp"
 
-//#if !(defined (QTTEXMACS) && (defined (OS_MINGW) || defined (QTPIPES)))
+// NOTE: with Qt pipes, the command line links are those of
+// Plugins/Qt/qt_cmdline_link.cpp (QProcess), as the pipe links
+#if !(defined (QTTEXMACS) && (defined (OS_MINGW) || defined (QTPIPES)))
 
 #include "tm_link.hpp"
 #include "socket_notifier.hpp"
@@ -252,6 +254,10 @@ cmdline_link_rep::write (string s, int channel) {
   }
   if (pid==0) { // the child
     setsid();
+    // an interrupt is not ignored there (a TeXmacs started with
+    // SIGINT ignored, as by `sh ... &', passes that on)
+    signal (SIGINT, SIG_DFL);
+    signal (SIGQUIT, SIG_DFL);
     close (pp_in  [CMDOUT]);
     close (pp_out [CMDIN ]);
     close (pp_err [CMDIN ]);
@@ -450,4 +456,4 @@ void cmdline_callback (void *obj, void *info) {
 #endif
 }
 
-//#endif // !(defined (QTTEXMACS) && defined (OS_MINGW))
+#endif // !(defined (QTTEXMACS) && (defined (OS_MINGW) || defined (QTPIPES)))
