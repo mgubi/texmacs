@@ -48,6 +48,20 @@ have the details, and the problems go to the
   they were never freed, and the memory grew at each typesetting of a
   document with tables
   ([#442](https://github.com/mgubi/texmacs/pull/442)).
+- Markup typesets the same whether written out or produced by a macro or
+  a `with`: the invisible places for the cursor at their edges no longer
+  have a height nor move what is next to them. Scripts sat elsewhere (the
+  E of the TeXmacs logo of beamer slides 3 pt higher, subscripts after a
+  macro up to 2 pt off), a script could attach to such a place, empty
+  macro lines took the height of the font cmr (loaded only for that), a
+  line, a cell or a fraction ending with a macro counted the space after
+  its last item, and an accent over a glyph glued to them lost its place.
+  The cursor at the end of a macro or a `with` stays next to its content,
+  and the slant of an italic letter at its end stays inside it (in
+  `<em|f>)` the cursor was drawn inside the f); a bar over italic content
+  (overline) is placed as the wide accents place it. Most documents move
+  by less than half a point
+  ([#448](https://github.com/mgubi/texmacs/pull/448)).
 
 - Searching for a formula with wildcards or empty parts gives the
   right hits: a pattern with an empty part no longer hangs TeXmacs (its
