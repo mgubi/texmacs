@@ -67,7 +67,9 @@ hooks.
    (`TEXMACS_PDF_MUPDF=1` or the preference `native pdf renderer`, and
    always in the browser), where the font is embedded as a subset, and
    the PostScript export (with its PDF through Ghostscript, where the
-   glyphs become Type 3 fonts). The browser is still to be looked at.
+   glyphs become Type 3 fonts), and the browser (Firefox, through
+   `misc/wasm/browser-run.mjs`: the screen and the PDF of the page; its
+   FreeType, the one of MuPDF, has the layers of COLR).
 
 ## Not done yet
 

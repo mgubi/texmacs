@@ -15,9 +15,9 @@ have the details, and the problems go to the
 ## 23 October 2026
 
 - **Emoji in color**: TeXmacs now comes with an emoji font in color,
-  Twemoji Mozilla, and draws the emoji with it on every platform, in the
-  text, in formulas and at any size, also in the exported PDF (as
-  vectors). They were written out as their codes, like
+  Twemoji Mozilla, and draws the emoji with it on every platform and in
+  the browser, in the text, in formulas and at any size, also in the
+  exported PDF (as vectors). They were written out as their codes, like
   `<#1F600>`. The sequences are one picture each: the families, the
   flags, the skin tones, the keycaps, and a symbol followed by U+FE0F,
   like the red heart. The emoji fonts of the systems (Apple Color Emoji,
