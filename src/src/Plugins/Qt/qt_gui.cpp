@@ -126,13 +126,19 @@ tm_sleep () {
 ******************************************************************************/
 
 void
-qt_flush_deferred_deletes () {
+qt_forget_deferred_deletes () {
   // (an exit of a script, (exit), from the event loop: the widgets which
-  // were to be deleted later, as the prompt of an interactive command, are
-  // deleted now, before the static objects of Qt go; else Qt deletes them
-  // while it ends its threads, after those, and crashes)
+  // were to be deleted later, as the prompt of an interactive command or a
+  // closed window, are forgotten, not deleted; else Qt deletes them while
+  // it ends its threads and crashes. A script given by -x runs before the
+  // event loop of Qt starts, which deletes them only in a nested loop, so
+  // they can wait until the exit. Deleting them here is not safe either:
+  // the thread-local objects of Qt are gone before any exit handler is
+  // called, and so are the static objects made after this handler was
+  // registered, as the list of the active scrollers of QScroller, made by
+  // the first one deleted. The quit of TeXmacs, _exit, deletes nothing)
   if (QCoreApplication::instance () != NULL)
-    QCoreApplication::sendPostedEvents (NULL, QEvent::DeferredDelete);
+    QCoreApplication::removePostedEvents (NULL, QEvent::DeferredDelete);
 }
 
 qt_gui_rep::qt_gui_rep (int &argc, char **argv):
