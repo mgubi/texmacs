@@ -796,7 +796,7 @@
 
 (when (and (os-macos?)
 	   (url-exists? "/Applications/Inkscape.app/Contents/MacOS/inkscape"))
-  (setenv "PATH" (string-append "/Applications/Inkscape.app/Contents/MacOS/:"
+  (system-setenv "PATH" (string-append "/Applications/Inkscape.app/Contents/MacOS/:"
 				(getenv "PATH"))))
 
 (when (os-mingw64?)
@@ -808,7 +808,7 @@
 	  (if (>= pos 1) (set! s (string-drop s (- pos 1))))
 	  (when (string-ends? s "\x0d") (set! s (string-drop-right s 1))))
 	(when (!= s "")
-	  (setenv "PATH" (string-append s ";" (getenv "PATH"))))))))
+	  (system-setenv "PATH" (string-append s ";" (getenv "PATH"))))))))
 
 (define (inkscape-version)
   (with l (string-tokenize-by-char (eval-system "inkscape --version") #\space)
