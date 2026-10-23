@@ -749,7 +749,8 @@
 ;; operator goes after the markers which end a macro, inside a fraction as in
 ;; a paragraph. At the end of a line, the space before markers does not
 ;; count, also before those of the macros of a style; a table cell counts the
-;; spaces of its content as the lines of its paragraph do.
+;; spaces of its content as the lines of its paragraph do. The italic
+;; correction after an italic glyph stays inside the macro which ends with it.
 (define (test-markers)
   (check-group "markers")
   (let ((same (lambda (t1 t2)
@@ -794,7 +795,11 @@
    (lambda ()
      (with w (lambda (r) (- (rect-x2 r) (rect-x1 r)))
        (check= (w (rect 0)) (w (rect 1)))
-       (check= (w (rect 0 0 1 0 0 0 0)) (w (rect 1 0 0 0 0)))))))
+       (check= (w (rect 0 0 1 0 0 0 0)) (w (rect 1 0 0 0 0))))))
+  (with-typeset-body
+   '(document (concat (em "f") ")"))
+   (lambda ()
+     (check-true (> (rect-x2 (rect 0 0)) (rect-x2 (rect 0 0 0)))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Page breaking

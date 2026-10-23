@@ -134,6 +134,7 @@ hyphenate (line_item item, int pos, line_item& item1, line_item& item2) {
                     text_box (ip, x2, s2, fn, pen),
 		    item->penalty, item->lan);
   item2->spc= item->spc;
+  item2->cor= item->cor;
   // cout << s << " ---> " << s1 << " " << s2 << "\n";
 }
 

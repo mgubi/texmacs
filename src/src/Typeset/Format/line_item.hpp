@@ -47,6 +47,7 @@ public:
   int        op_type;   // operator type for mathematical symbols
   box        b;         // the box
   space      spc;       // separation space
+  SI         cor;       // the italic correction included in spc
   int        penalty;   // penalty for a linebreak after this line_item
   bool       limits;    // line items has limits
   language   lan;       // language for hyphenating strings
