@@ -30,8 +30,7 @@ EXTEND_NULL_CODE(format,format_none);
 
 struct format_width_rep: public format_rep {
   SI width;
-  format_width_rep (SI width2): format_rep (FORMAT_WIDTH), width (width2)
-  { ref_count= 1; }
+  format_width_rep (SI width2): format_rep (FORMAT_WIDTH), width (width2) {}
   bool equal (format fm);
   operator tree ();
 };
@@ -48,8 +47,7 @@ struct format_cell_rep: public format_rep {
   SI  height;
   format_cell_rep (SI w2, int v2, SI d2, SI h2):
     format_rep (FORMAT_CELL),
-    width (w2), vpos (v2), depth (d2), height (h2)
-  { ref_count= 1; }
+    width (w2), vpos (v2), depth (d2), height (h2) {}
   bool equal (format fm);
   operator tree ();
 };
@@ -64,8 +62,7 @@ struct format_vstream_rep: public format_rep {
   array<line_item> before;
   array<line_item> after;
   format_vstream_rep (SI w2, array<line_item> bef2, array<line_item> aft2):
-    format_rep (FORMAT_VSTREAM), width (w2), before (bef2), after (aft2)
-  { ref_count= 1; }
+    format_rep (FORMAT_VSTREAM), width (w2), before (bef2), after (aft2) {}
   bool equal (format fm);
   operator tree ();
 };
@@ -79,8 +76,7 @@ struct query_vstream_width_rep: public format_rep {
   array<line_item> before;
   array<line_item> after;
   query_vstream_width_rep (array<line_item> bef2, array<line_item> aft2):
-    format_rep (QUERY_VSTREAM_WIDTH), before (bef2), after (aft2)
-  { ref_count= 1; }
+    format_rep (QUERY_VSTREAM_WIDTH), before (bef2), after (aft2) {}
   bool equal (format fm);
   operator tree ();
 };
