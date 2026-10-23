@@ -188,10 +188,33 @@ evaluate_for_each (tree t) {
     return t;
   }
   if (!is_tuple (args)) return evaluate_error ("bad for-each");
-  int i, n= N(args);
-  for (i=0; i<n; i++)
-    evaluate (tree (COMPOUND, fun, args[i]));
-  return "";
+  // (the loop is the rewriter's, and the typesetter does not see it: what
+  // the loop changes is given to it by assignments of the values after the
+  // loop, for a variable which it alone knew before, and for a counter,
+  // an atom; the counters which reset-std-env resets at a section, whose
+  // increments are the typesetter's in a residual branch, in an inclusion,
+  // in the call of an undefined macro)
+  environment before= std_env;
+  list<string> names;
+  {
+    assigned_collector collect;
+    int i, n= N(args);
+    for (i=0; i<n; i++)
+      evaluate (tree (COMPOUND, fun, args[i]));
+    names= unique_names (collect.names);
+  }
+  note_assigned (names);
+  tree r (CONCAT);
+  for (list<string> l= names; !is_nil (l); l= l->next)
+    if (std_env->contains (l->item) &&
+        (!before->contains (l->item) ||
+         std_env [l->item] != before [l->item]) &&
+        (is_atomic (std_env [l->item]) ||
+         (before->contains (l->item) &&
+          before [l->item] == tree (VALUE, l->item))))
+      r << tree (ASSIGN, l->item, protect_value (std_env [l->item]));
+  if (N(r) == 0) return "";
+  return N(r) == 1? r[0]: r;
 }
 
 /******************************************************************************

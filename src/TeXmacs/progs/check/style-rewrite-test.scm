@@ -376,6 +376,31 @@
                (ornament (with "par-left" (plus (value "par-left") "1fn") "x"))
                (with "par-left" (plus "2cm" "1fn") "y")))))
 
+;; What the rewriter gives the typesetter, which numbers itself what it
+;; expands (the call of an undefined macro, an inclusion).
+(define (test-left-to-typesetter)
+  (check-group "left to the typesetter")
+  ;; the counters which a loop resets: their values after the loop
+  (check= (rewrite-last '(document (assign "c-nr" "5")
+                                   (assign "r" (macro "x" (assign (merge (arg "x") "-nr") "0")))
+                                   (for-each "r" (tuple "c"))))
+          '(assign "c-nr" "0"))
+  ;; an assignment to the call of an undefined macro assigns nothing
+  (check= (rewrite-last '(document (assign (no-such-macro) "0")))
+          '(assign (no-such-macro) "0"))
+  (check= (rewrite-last '(document (assign (no-such-macro) "0")
+                                   (if (provides "") "a" "b")))
+          "b")
+  ;; the value of an undefined variable, in the markup
+  (check= (rewrite-last '(document (value "no-such-variable")))
+          '(value "no-such-variable"))
+  ;; a call in the argument of a macro whose body is the argument keeps
+  ;; its boundaries
+  (check= (with r (rewrite '(document (assign "s" (macro "x" (with "font-series" "bold" (arg "x"))))
+                                      (active (s "y"))))
+            (and (pair? r) (cAr r)))
+          '(expand-as "s" (with "font-series" "bold" "y"))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Memorization
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -582,6 +607,7 @@
         (test-partial-evaluation)
         (test-boundaries)
         (test-markup-and-values)
+        (test-left-to-typesetter)
         (test-memorization)
         (test-memorization-by-reads)
         (test-manual)

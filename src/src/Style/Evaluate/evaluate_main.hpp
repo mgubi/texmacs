@@ -20,6 +20,7 @@ extern environment std_env;
 tree evaluate (tree t);
 tree evaluate_in (tree t, bool markup);
 tree evaluate_result (tree t);
+tree evaluate_argument_result (tree t);
 tree evaluate_markup (tree t);
 tree evaluate_part (tree t);
 tree evaluate_error (string message);
@@ -62,6 +63,7 @@ tree tmlen_min (tree t1, tree t2);
 tree tmlen_max (tree t1, tree t2);
 
 /* Macro expansion */
+tree protect_value (tree val);
 tree evaluate_assign (tree t);
 tree evaluate_with (tree t);
 tree evaluate_provides (tree t);

@@ -103,14 +103,25 @@ typesetter makes the binding and the locus), the calls of undefined macros
 them: an error in their place lost them, "Table ?" in the corpus), the
 body of a `with` in source mode (`preamble` true, the body of
 `show-preamble`), which the typesetter shows as its source without
-executing it.
-*Limit:* what the rewriter computes in a loop (`for-each`: the counters
-which `reset-std-env` resets at a section) is not seen by the typesetter;
-a footnote inside the call of an undefined macro, which the typesetter
-numbers itself, continues the numbering of the previous section
-(baltakatei's `minor`). Keeping the calls of the loop in the result was
-tried: the typesetter then saw the inner loops and assignments to names
-computed empty, and shows other errors than on the document.
+executing it, the `value` of an undefined variable in the markup (shown
+as its tag in error, not as the rewriter's `undefined`), an `assign` to a
+name which is not one, the call of an undefined macro (the typesetter
+assigns nothing: the reset of a group of `std-counter`, whose
+`<merge|counter-|<arg|x>>` is in a macro without an argument `x`, made the
+rewriter assign `""`, and `<>` then showed "0").
+What the rewriter computes in a loop (`for-each`: the counters which
+`reset-std-env` resets at a section) is given to the typesetter after the
+loop, as assignments of the values which the loop changed: of the
+variables which only the typesetter knew (references, 1.7), and of the
+atoms, the counters (`evaluate_for_each`). The typesetter numbers with its
+own counters what it expands itself (the call of an undefined macro, an
+inclusion, a branch which it decides), and they are reset as in the
+document.
+*Tried:* keeping the calls of the loop in the result: the typesetter then
+saw the inner loops and assignments to names computed empty, and shows
+other errors than on the document. Without the values after the loop,
+footnotes continued the numbering of the previous section or chapter
+(baltakatei's book, the theses of tm-forge: 16 documents of the corpus).
 *Alternative:* keep the rewriter's own rendering of inactive markup (2007):
 it had drifted from the typesetter's (DRD types, `src-*` classes, the DRD of
 the document).
@@ -196,6 +207,31 @@ children of the call would be spliced instead of its result.
 *Decided by:* the authors of Joris's articles (`<map|padded-author|...>`
 in the title: "ext-map padded-author" was shown).
 
+**1.11 Inclusions are the typesetter's.** `include` stays as it is: the
+typesetter loads the file, gives its labels the name of the file and
+numbers them (`typeset_include`, `exec_auto_id`). The rewriter evaluates
+the inclusion once as a branch (`evaluate_left`), so that what it
+assigns, the counter of its footnotes, is a reference after it (1.7), and
+its counters are those of the typesetter, reset by the loops (1.5).
+*Alternative:* the inclusion rewritten (`evaluate_compound` of the
+`include` macro): its counters are the rewriter's, but its labels lose the
+name of their file and take other numbers than in the document, whose
+table of contents and index, made earlier, then show "?" (a book of 1983
+pages, 17 inclusions).
+*Decided by:* the footnotes of the biographies which baltakatei's chapters
+include (5.3.2 for 5.3.1), and that book.
+
+**1.12 A macro whose body is an argument.** The call of a macro whose
+body is one of its arguments (`active`, `style-only`,
+`<macro|body|<arg|body>>`) gives in the markup the argument as markup
+(`evaluate_argument_result`): the calls in it keep their `expand-as`, where
+the typesetter finds the tag of an automatic label (1.6).
+*Alternative:* the argument evaluated as the body of a macro, as any other
+body: a section in an `active` had no `expand-as`, its label took the next
+number of the sequence (auto-27 for auto-4), and the table of contents,
+made earlier, showed "?".
+*Decided by:* a paper of the corpus (a subsection in an `active`).
+
 ## 2. How the editor typesets the rewritten tree
 
 **2.1 Behind a flag, in the experimental build.** `TEXMACS_STYLE_TYPESET=1`;
@@ -214,6 +250,10 @@ and the "dirty hack" `bridge_rep::my_resync` is skipped.
 which is not the document: the cursor followed paths which do not exist);
 always take the attached places (the memorized expansions are shared between
 calls and carry the place of only one).
+A tree without a place (in an inclusion) gives none to the trees made from
+it (`transfer_ip`, `decorate_ip`): an observer of no place left them
+without one, each evaluation added another, and the list, thousands long
+in a book with 17 inclusions, overflowed the stack when it was destroyed.
 *Decided by:* the click maps (`tests/style/compare-places.sh`), cursor moves.
 
 **2.3 The environment at the cursor is computed on the document**

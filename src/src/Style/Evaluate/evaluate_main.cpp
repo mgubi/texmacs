@@ -17,6 +17,7 @@
 #include "analyze.hpp"
 #include "merge_sort.hpp"
 #include "iterator.hpp"
+#include "sys_utils.hpp"  // get_env
 
 environment std_env;
 static bool markup_mode= false; // see evaluate_markup
@@ -142,6 +143,10 @@ compact_reads_index () {
 
 static evaluate_memorizer_rep*
 find_by_reads (tree t, bool markup, bool scratch) {
+  // (TEXMACS_STYLE_READS=off: not found, to compare the results with the
+  // evaluations which it replaces)
+  static bool off= (get_env ("TEXMACS_STYLE_READS") == "off");
+  if (off) return NULL;
   pointer key= (pointer) t.operator -> ();
   if (!reads_index->contains (key)) return NULL;
   array<pointer> a= reads_index [key];
@@ -320,11 +325,18 @@ inline path decorate_right (path ip) {
 void
 transfer_ip (tree src, tree dest) {
   ASSERT (obtain_ip (dest) == path (DETACHED), "already has an ip");
-  dest->obs= list_observer (ip_observer (obtain_ip (src)), dest->obs);
+  // (no place, a tree of an inclusion: an observer of no place would leave
+  // the tree without one, and each evaluation would add another to it, a
+  // list which grows until its destruction exhausts the stack)
+  path ip= obtain_ip (src);
+  if (ip == path (DETACHED)) return;
+  dest->obs= list_observer (ip_observer (ip), dest->obs);
 }
 
 void
 decorate_ip (tree ref, path ip) {
+  // (see transfer_ip)
+  if (ip == path (DETACHED)) return;
   if (obtain_ip (ref) == path (DETACHED)) {
     ref->obs= list_observer (ip_observer (ip), ref->obs);
     if (is_compound (ref)) {
@@ -692,7 +704,14 @@ evaluate_impl (tree t) {
   case PROVIDES:
     return evaluate_provides (t);
   case VALUE:
-    return evaluate_value (t);
+    {
+      tree r= evaluate_value (t);
+      // (in the markup, an undefined variable is shown by the typesetter
+      // as its tag in error, typeset_value, not as the rewriter's error)
+      if (markup_mode && is_func (r, _ERROR, 2) && r[0] == "undefined")
+        return tree (VALUE, r[1]);
+      return r;
+    }
   case QUOTE_VALUE:
     if (markup_mode) return t;
     return evaluate_quote_value (t);
@@ -757,6 +776,16 @@ evaluate_impl (tree t) {
     return evaluate_for_each (t);
   case EXTERN:
     return evaluate_rewrite (t);
+  case INCLUDE:
+    // (left to the typesetter, which gives the labels of the inclusion the
+    // name of its file and numbers them, typeset_include, exec_auto_id;
+    // the variables which the inclusion assigns, the counter of its
+    // footnotes, are its own after it, as for a call which it expands)
+    if (N(t) == 1) {
+      (void) evaluate_left (tree (CONCAT, tree (VAR_INCLUDE, t[0])), 0);
+      return t;
+    }
+    return evaluate_compound_children (t);
   case VAR_INCLUDE:
     return evaluate_include (t);
   case WITH_PACKAGE:
@@ -1135,6 +1164,15 @@ evaluate_result (tree t) {
   // the tree whose result is the result of the tree being evaluated (the
   // body of a macro call, a value...), in the same mode
   return evaluate_in (t, markup_mode);
+}
+
+tree
+evaluate_argument_result (tree t) {
+  // the expansion of a call whose body is one of its arguments (active,
+  // style-only, <macro|body|<arg|body>>): in the markup, the argument is
+  // markup, whose calls keep their boundaries, where the typesetter finds
+  // the tag of an automatic label (a section in an active)
+  return markup_mode? evaluate_markup (t): evaluate (t);
 }
 
 memorizer

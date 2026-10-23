@@ -37,7 +37,7 @@ protect_parts (tree t) {
   return r;
 }
 
-static tree
+tree
 protect_value (tree val) {
   // the value of an assign or a with of the result: the typesetter
   // evaluates it again, which must give the value computed here (a quoted
@@ -106,9 +106,12 @@ evaluate_assign (tree t) {
   for (i=0; i<k; i++) {
     tree name= evaluate (t[i<<1]);
     tree val = evaluate (t[(i<<1)+1]);
-    if (contains_residual (name)) {
+    if (contains_residual (name) || is_compound (name)) {
       // (a variable which the typesetter alone knows: its assignment;
-      // which variable changes, the rewriter does not know)
+      // which variable changes, the rewriter does not know; or a name
+      // which is not one, the call of an undefined macro, to which the
+      // typesetter assigns nothing, exec_assign: <compound|counter-x> in
+      // the reset of a group of std-counter, where x is not an argument)
       kept << tree (ASSIGN, name, protect_value (val));
       continue;
     }
@@ -477,6 +480,7 @@ evaluate_compound (tree t) {
     // we remember partial expansions?")
     tree e= expand (f[n], local);
     decorate_ip (t, e);
+    if (is_func (f[n], ARG, 1)) return evaluate_argument_result (e);
     return evaluate_result (e);
   }
   // (a layout value, like the pattern of a theme's title-color, is no

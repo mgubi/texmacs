@@ -899,11 +899,15 @@ Two consequences:
      depend on the evaluations); typing in a paragraph is unchanged (1 ms).
      What is still evaluated again reads the counter: the parts of the
      section macros around the number (title, entry of the table of
-     contents). Checked: the rewritten trees of the 696 pages and of the
-     994 documents of the corpus, each also after a section inserted at
-     the start and removed, are those of the build without it (but for the
+     contents). Checked (`tests/style/compare-reads.sh`, October 24): the
+     rewritten trees of the 696 pages and of the 994 documents of the
+     corpus, each also after a section inserted at the start and removed,
+     are those without the lookup (`TEXMACS_STYLE_READS=off`), but for the
      current date and the identifiers made from addresses, which change
-     from run to run). One of these runs ended in a crash of the garbage
+     from run to run. (A first check, October 23, compared the trees
+     printed by `object->string`, which S7 cuts after a number of elements
+     of each list: of one document in ten, only the start was compared.)
+     One of the runs of October 23 ended in a crash of the garbage
      collector of S7 while a buffer was switched to, not seen again in five
      runs of the same documents. The side effects of `write`, `set-binding` and
      counters in the branches kept by a residual condition are not handled.
@@ -968,6 +972,13 @@ TeXmacs every 100 edits, see *Memory* above):
 
     tests/style/memory-edits.sh document.tm [n [same|para [0|1]]]
 
+and the lookup by the values read (`find_by_reads`, step 3 of the plan):
+the rewritten trees with it and without it (`TEXMACS_STYLE_READS=off`),
+also after a section inserted at the start and removed, must be the same
+(under 2 minutes for the documentation):
+
+    tests/style/compare-reads.sh [document.tm...]
+
 It is not listed in `check-master.scm`, since the rewriter exists only in
 the experimental build (elsewhere the suite fails at once, saying so). It
 runs headless through two commands of the experimental build
@@ -1016,7 +1027,32 @@ from its rewritten tree:
 |---|---|---|
 | October 21 | 852 | 704 |
 | October 23, after the marker fixes and the merge of `upsilon_texmacs` | 945 | 754 |
+| October 24, with `find_by_reads`, the loops, inclusions and `active` (decisions 1.5, 1.11, 1.12) | 968 | 762 |
 
-Of the 49 left with the editor: 18 of Joris's, 20 of baltakatei's book, 6
-private, 5 other. The copy harness gives more differences by construction
-(automatic labels, see *Typesetting the result*).
+The 26 left with the editor, by cause (the text and the places of the
+glyphs of the pages compared, `mutool draw -F stext`):
+- Shifts of a fraction of a point, the same text (13: 7 of baltakatei's
+  chapters, among them subscripts given as arguments, and 6 of Joris's
+  papers): most probably the markers of the arguments (decision 2.9), not
+  confirmed one by one.
+- `riemann`: spaces after some formulas; `zmatmult`: other error messages
+  in a `map` of the title. Not analysed.
+- The current time printed (2, baltakatei's `c0` and `book`): not a
+  difference of the rewriter.
+- `graeffe-cca`: a macro defined in a `hide-preamble` inside the abstract,
+  which the typesetter does not see (`<FF>` shown in error) and the
+  rewriter does (the letter shown).
+- `resume-template`: the source shown by `show-preamble` around a
+  `style-only*` (its argument rendered as the name `body`); reproduced in
+  a small document, not fixed.
+- `book_qft`: a `chapter-prefix` assigned a concatenation which holds a
+  macro (a line break in the source) shows the macro in the rewritten
+  headings only; not reproduced in a small document.
+- `9_3_href_and_anchor`: a `set-binding` with three arguments, whose flag
+  the typesetter shows only on the document.
+- `kucomp`, `stoch-quant` (private): big delimiters of other sizes;
+  `dalg`, `diffalg`: lines or rules only; `phdthesis` (private): a page
+  number "?" in the table of contents. Not analysed.
+
+The copy harness gives more differences by construction (automatic
+labels, see *Typesetting the result*).
