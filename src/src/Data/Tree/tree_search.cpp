@@ -329,7 +329,18 @@ string_occurrence (string s, string w, path q, path cur, bool wildcard) {
   return (at == last && test (s, last, w))? last: -1;
 }
 
-static bool
+// the results of search_concat_sub: besides a match and a failure, the
+// result of search_concat at the next child, with the same i (a scan for
+// the start of a match, or a wildcard which takes this child). Then
+// search_concat goes on in a loop, not by a recursion per child, which
+// overflowed the stack in long formulas (#487). With SC_NEXT_KEEP, p1 keeps
+// the start set here
+#define SC_FAIL 0
+#define SC_FOUND 1
+#define SC_NEXT 2
+#define SC_NEXT_KEEP 3
+
+static int
 search_concat_sub (tree t, tree what, int pos, int i,
                    path p, path cur, path& p1, path& p2,
                    array<range_set>& inside, array<bool>& failed) {
@@ -431,8 +442,7 @@ search_concat_sub (tree t, tree what, int pos, int i,
         }
       }
     }
-    if (i == 0 || is_func (what[i], WILDCARD, 1))
-      return search_concat (t, what, pos+1, i, p, cur, p1, p2, inside, failed);
+    if (i == 0 || is_func (what[i], WILDCARD, 1)) return SC_NEXT;
     return false;
   }
   else if (is_func (what[i], WILDCARD, 1)) {
@@ -448,8 +458,7 @@ search_concat_sub (tree t, tree what, int pos, int i,
     }
     if (search_concat (t, what, pos, i+1, p, cur, p1, p2, inside, failed))
       return true;
-    path dummy;
-    return search_concat (t, what, pos+1, i, p, cur, dummy, p2, inside, failed);
+    return SC_NEXT_KEEP;
   }
   else {
     range_set sel;
@@ -467,7 +476,7 @@ search_concat_sub (tree t, tree what, int pos, int i,
     }
     if (i == 0) {
       if (N(inside[pos]) != 0) return false;
-      return search_concat (t, what, pos+1, i, p, cur, p1, p2, inside, failed);
+      return SC_NEXT;
     }
     return false;
   }
@@ -480,13 +489,23 @@ search_concat (tree t, tree what, int pos, int i,
   // for i > 0, the result depends on pos and i only (cur is only used at
   // i == 0): remember the failures, so that a middle wildcard does not
   // scan the rest of the formula again from each start
-  if (i == 0 || pos >= N(t))
-    return search_concat_sub (t, what, pos, i, p, cur, p1, p2, inside, failed);
-  int k= pos * N(what) + i;
-  if (failed[k]) return false;
-  if (search_concat_sub (t, what, pos, i, p, cur, p1, p2, inside, failed))
+  int from= pos, r= SC_FAIL;
+  bool keep= false;
+  path start1;
+  for (; ; pos++) {
+    if (i > 0 && pos < N(t) && failed[pos * N(what) + i]) break;
+    r= search_concat_sub (t, what, pos, i, p, cur, p1, p2, inside, failed);
+    if (r == SC_NEXT_KEEP && !keep) { keep= true; start1= p1; }
+    if (r != SC_NEXT && r != SC_NEXT_KEEP) break;
+  }
+  if (r == SC_FOUND) {
+    if (keep) p1= start1;
     return true;
-  failed[k]= true;
+  }
+  // the scans from from to pos all fail
+  if (i > 0)
+    for (int q= from; q <= pos && q < N(t); q++)
+      failed[q * N(what) + i]= true;
   return false;
 }
 
