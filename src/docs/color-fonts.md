@@ -124,7 +124,11 @@ MuPDF writes the characters beyond U+FFFF in the character map of a CID
 font as `<1f600>`, one unit, which no reader takes; the writer writes the
 map again, in UTF-16 (`fix_to_unicode` in `mupdf_pdf_renderer.cpp`). The
 mathematical letters of the OpenType fonts (U+1D400 and beyond) copy
-right since then too. PDFHummus writes them in UTF-16 itself.
+right since then too. PDFHummus writes them in UTF-16 itself, but gave a
+glyph of no character the character U+0000, which Preview copies as
+spaces: such a glyph has no entry now (`CIDFontWriter.cpp`, in the
+vendored PDFWriter), and the spans are written also in the PDF 1.4 of
+TeXmacs.
 
 ## Checks
 
