@@ -244,19 +244,30 @@
              (when answ (buffer-close (current-buffer))))))
         (else (buffer-close (current-buffer)))))
 
+(define (close-buffer-if-no-window buf)
+  ;; a buffer may be shown in several windows (clone-window, a file loaded
+  ;; or imported twice): close it with its last window only
+  (when (null? (buffer->windows buf))
+    (buffer-close buf)))
+
+(define (last-window-on-modified-buffer? buf)
+  ;; ask about unsaved changes only when the buffer will be closed
+  (and (buffer-modified? buf)
+       (<= (length (buffer->windows buf)) 1)))
+
 (define (do-kill-window)
   (with buf (current-buffer)
     (kill-window (current-window))
     (delayed
       (:idle 100)
-      (buffer-close buf))))
+      (close-buffer-if-no-window buf))))
 
 (define (do-kill-window* u)
  (with buf (window->buffer u)
    (kill-window u)
    (delayed
      (:idle 100)
-     (buffer-close buf))))
+     (close-buffer-if-no-window buf))))
 
 (tm-define (safely-kill-window . opt-name)
   (cond ((and (buffer-embedded? (current-buffer)) (null? opt-name))
@@ -264,13 +275,13 @@
         ((<= (length (window-list)) 1)
          (safely-quit-TeXmacs))
         ((nnull? opt-name)
-         (if (buffer-modified? (window->buffer (car opt-name)))
+         (if (last-window-on-modified-buffer? (window->buffer (car opt-name)))
              (user-confirm
                  (buffer-close-question (window->buffer (car opt-name))) #f
                (lambda (answ)
                  (when answ (do-kill-window* (car opt-name)))))
              (do-kill-window* (car opt-name))))
-        ((buffer-modified? (current-buffer))
+        ((last-window-on-modified-buffer? (current-buffer))
          (user-confirm (buffer-close-question (current-buffer)) #f
            (lambda (answ)
              (when answ (do-kill-window)))))
