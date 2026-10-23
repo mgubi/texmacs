@@ -61,12 +61,13 @@ hooks.
    draws text, and a PDF keeps it as vectors. Seen so far: the screen of
    Vue (as `TEXMACS_VUE_SNAPSHOT` saves it), the screen of Cocoa (as
    `TEXMACS_NS_SNAPSHOT` saves it), drawn by the GPU and by Core Graphics
-   (`TEXMACS_NS_GPU=0`) in the same colors, the PDF of the MuPDF writer
+   (`TEXMACS_NS_GPU=0`) in the same colors, the screen of Qt 6 (as
+   `gui-test-snapshot` saves it), the PDF of PDFHummus (the Qt builds),
+   where the font is embedded as a subset, the PDF of the MuPDF writer
    (`TEXMACS_PDF_MUPDF=1` or the preference `native pdf renderer`, and
    always in the browser), where the font is embedded as a subset, and
    the PostScript export (with its PDF through Ghostscript, where the
-   glyphs become Type 3 fonts); the screen of Qt and the PDF of PDFHummus
-   are still to be looked at.
+   glyphs become Type 3 fonts). The browser is still to be looked at.
 
 ## Not done yet
 
@@ -89,12 +90,9 @@ hooks.
 - **The cursor** can stand inside a sequence: the characters of a ligature
   are all at the left of its picture (`get_xpositions`), and a key moves
   over them one by one.
-- **The PDF of PDFHummus** (the Qt builds) is not checked yet: the layers
-  are written as text of the font, which should also keep them searchable
-  through the first layer.
 - **Copy from a PDF**: the glyphs of the layers are in no character map
-  of the font, so that the text taken from the PDF of the MuPDF writer has
-  U+FFFD for each emoji; the first layer should carry the characters of
+  of the font, so that the text taken from the PDF (of the MuPDF writer as
+  of PDFHummus) has U+FFFD for each emoji; the first layer should carry the characters of
   the emoji (or of its sequence), and the others none.
 - A choice of another emoji font (a preference): the font is
   `SHIPPED_EMOJI_FONT` in `smart_font.cpp`.
