@@ -234,11 +234,24 @@ edit_cursor_rep::go_to (SI x, SI y, bool absolute) {
   mv->delta= 0;
 }
 
+// Out of an emoji sequence (a family, a flag), which is drawn as one
+// picture: the characters inside it all stand at its left
+static path
+out_of_emoji (tree et, path tp, bool forward) {
+  if (is_nil (tp) || is_nil (path_up (tp))) return tp;
+  tree st= subtree (et, path_up (tp));
+  int start, end;
+  if (!is_atomic (st) ||
+      !tm_grapheme_inside (st->label, last_item (tp), start, end)) return tp;
+  return path_up (tp) * (forward? end: start);
+}
+
 void
 edit_cursor_rep::go_left_physical () {
   if (has_changed (THE_TREE+THE_ENVIRONMENT)) return;
   adjust_ghost_cursor (VERTICAL);
   cursor_move (-1, 0);
+  tp= out_of_emoji (et, tp, false);
   notify_cursor_moved (HORIZONTAL);
   select_from_cursor_if_active ();
 }
@@ -248,6 +261,7 @@ edit_cursor_rep::go_right_physical () {
   if (has_changed (THE_TREE+THE_ENVIRONMENT)) return;
   adjust_ghost_cursor (VERTICAL);
   cursor_move (1, 0);
+  tp= out_of_emoji (et, tp, true);
   notify_cursor_moved (HORIZONTAL);
   select_from_cursor_if_active ();
 }
