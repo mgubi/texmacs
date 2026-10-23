@@ -271,6 +271,7 @@ concater_rep::typeset_locus (tree t, path ip) {
           box lb= locus_box (sip, cc, ids, ref, anchor);
           line_item item (STD_ITEM, a[i]->op_type, lb, a[i]->penalty);
           item->spc= a[i]->spc;
+          item->cor= a[i]->cor;
           new_a << item;
           tmp_a= array<line_item> ();
         }

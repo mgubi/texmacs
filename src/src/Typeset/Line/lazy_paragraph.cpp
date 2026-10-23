@@ -183,15 +183,18 @@ lazy_paragraph_rep::line_print (line_item item) {
   // (a marker after an item of the unit, at the end of a macro, a macro
   // argument or a with, takes the space after that item: the cursor after
   // them stays next to the item, and at the end of a line the space is left
-  // out, as without the marker)
+  // out, as without the marker; not the italic correction of the item, see
+  // carried_spaces)
   space carried (0);
   if (lets_space_through (item) && N(spcs) > cur_start) {
-    carried= spcs[N(spcs)-1];
-    spcs[N(spcs)-1]= space (0);
+    SI cor= max (min (last_cor, spcs[N(spcs)-1]->def), 0);
+    carried= spcs[N(spcs)-1] - space (cor);
+    spcs[N(spcs)-1]= space (cor);
   }
   if (N(spcs)>0) cur_w = cur_w + spcs[N(spcs)-1];
   items << item->b;
   spcs  << (carried + item->spc);
+  last_cor= item->cor;
   item->b->x0= cur_w->def;
   item->b->y0= 0;
   cur_w =  cur_w + space (item->b->x2);
@@ -631,6 +634,7 @@ lazy_paragraph_rep::line_start () {
 
   cur_r    = 0;
   cur_start= 0;
+  last_cor = 0;
 }
 
 void

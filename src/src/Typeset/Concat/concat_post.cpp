@@ -276,6 +276,24 @@ void
 concater_rep::clean_and_correct () {
   array<line_item> new_a;
   int i, prev=-1;
+  // (the space of an item goes past the markers which let it through, so
+  // that the cursor after a macro, a macro argument or a with stays next to
+  // its content; the italic corrections, added afterwards, stay with their
+  // items: carried_spaces and line_print, which also carry the spaces past
+  // the markers that other concaters add around a paragraph, leave them
+  // (cor).
+  // Not after an item where a line may break: the space would begin the
+  // next line; line_print carries it when the line goes on)
+  for (i=0; i<N(a); i++)
+    if (a[i]->type != OBSOLETE_ITEM) {
+      if (prev != -1 && lets_space_through (a[i]) &&
+          a[prev]->penalty >= HYPH_INVALID) {
+        a[i]->spc= a[i]->spc + a[prev]->spc;
+        a[prev]->spc= space (0);
+      }
+      prev= i;
+    }
+  prev= -1;
   for (i=0; i<N(a); i++)
     if (a[i]->type!=OBSOLETE_ITEM) {
       if (a[i]->b->w () != 0) {
@@ -285,8 +303,10 @@ concater_rep::clean_and_correct () {
             // (on the item before, as without the markers between them)
             int j= i-1;
             while (j > prev && a[j]->type == MARKER_ITEM) j--;
-            if (a[prev]->b->right_correction () != 0)
+            if (a[prev]->b->right_correction () != 0) {
               a[prev]->spc += space (cor);
+              a[prev]->cor += cor;
+            }
             else a[j]->spc += space (cor);
           }
         }

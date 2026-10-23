@@ -18,15 +18,15 @@
 
 line_item_rep::line_item_rep (int ty2, int ot2, box b2, int pen2):
   type (ty2), op_type (ot2), b (b2),
-  spc (0), penalty (pen2), limits (false)
+  spc (0), cor (0), penalty (pen2), limits (false)
     { TM_DEBUG(line_item_count++); }
 line_item_rep::line_item_rep (int ty2, int ot2, box b2, int pen2, language l2):
   type (ty2), op_type (ot2), b (b2),
-  spc (0), penalty (pen2), limits (false),
+  spc (0), cor (0), penalty (pen2), limits (false),
   lan (l2) { TM_DEBUG(line_item_count++); }
 line_item_rep::line_item_rep (int ty2, int ot2, box b2, int pen2, tree t2):
   type (ty2), op_type (ot2), b (b2),
-  spc (0), penalty (pen2), limits (false), t (t2)
+  spc (0), cor (0), penalty (pen2), limits (false), t (t2)
     { TM_DEBUG(line_item_count++); }
 line_item_rep::~line_item_rep () {
   TM_DEBUG(line_item_count--); }
@@ -88,12 +88,15 @@ array<SI>
 carried_spaces (array<line_item> a) {
   // the spaces after the items of a line, as line_print puts them: the space
   // of an item goes past the markers which let it through, and the space
-  // after the last item does not count
+  // after the last item does not count; the italic correction in the space
+  // of an item (cor) stays with it
   int i, n= N(a);
   array<SI> sp (n);
   for (i=0; i<n; i++) sp[i]= a[i]->spc->def;
   for (i=0; i<n-1; i++)
-    if (lets_space_through (a[i+1])) { sp[i+1] += sp[i]; sp[i]= 0; }
+    if (lets_space_through (a[i+1])) {
+      SI cor= max (min (a[i]->cor, sp[i]), 0);
+      sp[i+1] += sp[i] - cor; sp[i]= cor; }
   if (n > 0) sp[n-1]= 0;
   return sp;
 }
