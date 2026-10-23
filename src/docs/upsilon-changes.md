@@ -17,6 +17,18 @@ have the details, and the problems go to the
 - **Server log**: the line written at each login check gives the date of
   the user's last failed login, or "none"; it showed the word `iso8601`
   instead of the date. Desktop applications only.
+- **macOS**: Edit → Preferences opened nothing when Inkscape is installed
+  in `/Applications`: the preferences put its folder in the path with a
+  function which the Scheme of Upsilon does not have, and stopped there.
+  The same in the "manual path" of the sessions
+  ([#465](https://github.com/mgubi/texmacs/issues/465)).
+- **Cocoa**: a dialog whose translated title has an accent, like the
+  preferences in French ("Préférences de l'utilisateur"), was not shown, and
+  the application no longer answered afterwards (closing a window, ⌘Q).
+  The texts given to macOS are now converted from the encoding of
+  TeXmacs whenever they are not UTF-8, so labels, menus and messages in
+  other languages can no longer be empty or stop the application
+  ([#468](https://github.com/mgubi/texmacs/issues/468)).
 
 ## 23 October 2026
 

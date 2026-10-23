@@ -269,7 +269,7 @@ ns_window_widget_rep::ns_window_widget_rep (ns_widget wid, string _name,
   // by TeXmacs)
   NSSize fs= v? [v fittingSize]: NSZeroSize;
   if (fs.width > 0 && fs.height > 0) [win setContentSize: fs];
-  [win setTitle: to_nsstring (orig_name)];
+  [win setTitle: to_nsstring_utf8 (orig_name)];
   [win setAcceptsMouseMovedEvents: YES];
   
   wc = [[TMWindowController alloc] initWithWindow: win];
@@ -365,7 +365,7 @@ ns_window_widget_rep::send (slot s, blackbox val) {
       string name = open_box<string> (val);
       NSWindow *win = [wc window];
       if (win) {
-        NSString *title = to_nsstring (name);
+        NSString *title = to_nsstring_utf8 (name);
         [win setTitle: title];
         // FIXME: what about the modified state? (see the Qt code)
       }

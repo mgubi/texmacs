@@ -68,17 +68,23 @@ coord2 from_nssize (NSSize s)
 	return coord2 (c1,c2)	;
 }
 
+/*! UTF-8, or else the cork encoding (as the translations, which are in the
+ cork encoding: see #468); never nil, which AppKit does not take */
 NSString *to_nsstring (string s)
 {
 	c_string p = c_string (s);
 	NSString *nss = [NSString stringWithCString:p encoding:NSUTF8StringEncoding];
-	return nss;
+	if (!nss) {
+	  c_string q = c_string (cork_to_utf8 (s));
+	  nss = [NSString stringWithCString:q encoding:NSUTF8StringEncoding];
+	}
+	return nss? nss: @"";
 }
 
 string from_nsstring(NSString *s)
 {
-	const char *cstr = [s cStringUsingEncoding:NSUTF8StringEncoding];
-	return utf8_to_cork(string((char*)cstr));
+	const char *cstr = s? [s cStringUsingEncoding:NSUTF8StringEncoding]: NULL;
+	return cstr? utf8_to_cork(string((char*)cstr)): string ("");
 }
 
 /*! The UTF-8 bytes, without conversion to the cork encoding: for the names
@@ -99,7 +105,7 @@ NSString *to_nsstring_utf8(string s)
     s = cork_to_utf8 (s);
   c_string p = c_string (s);
   NSString *nss = [NSString stringWithCString:p encoding:NSUTF8StringEncoding];
-  return nss;
+  return nss? nss: @"";
 }
 
 string
