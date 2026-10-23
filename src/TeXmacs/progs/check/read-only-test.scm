@@ -177,6 +177,20 @@
 (define (string-contains? s what)
   (>= (string-search-forwards what 0 s) 0))
 
+(define (console-history u)
+  ;; the number of undo steps of the console @u, once an event of the
+  ;; document confirmed the changes still pending
+  (edit (noop))
+  (with-buffer u (undo-possibilities)))
+
+(define (run-delayed cmds)
+  ;; run the delayed commands @cmds, as if the user had been idle long
+  (with-global idle-time (lambda () 100000)
+    (for (c (reverse cmds))
+      (let loop ((i 0))
+        (when (and (< i 10) (number? (c)))
+          (loop (+ i 1)))))))
+
 (define (console-window u)
   (with l (alt-window-search u)
     (and (pair? l) (car l))))
@@ -223,6 +237,22 @@
                          (tree->stree (buffer-get-body console-all)))
                        "typed"))
         (check-false (buffer-modified? console-all))))
+    ;; the console keeps no history: every message added or removed
+    (check= (console-history console-all) 0)
+    ;; a message which comes during an event of the console itself (one of
+    ;; its keys raised a warning) is cancelled with that event, and shown
+    ;; again once the event is over (a delayed check)
+    (let ((cmds '()))
+      (with-global exec-delayed-pause (lambda (c) (set! cmds (cons c cmds)))
+        (with-buffer console-all
+          (edit (debug-message "std-warning"
+                               "read-only-test: during an event\n"))))
+      (check-false (console-has? console-all "read-only-test: during an event"))
+      (check-true (nnull? cmds))
+      (run-delayed cmds)
+      (check-true (console-has? console-all "read-only-test: during an event"))
+      (check-false (buffer-modified? console-all))
+      (check= (console-history console-all) 0))
     ;; closing the window closes its buffers (the close button of the
     ;; window also calls its quit command, which forgets the console)
     (let* ((consoles (list-filter (buffer-list)

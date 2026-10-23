@@ -137,7 +137,41 @@
         ;; (the messages only: a new body left the cursor of a console
         ;; being used outside of it, and the next change failed on it)
         (if d (tree-assign! d (cAr (cAr doc)))
-            (buffer-set-body u doc))))))
+            (buffer-set-body u doc))
+        (console-forget-history u)))))
+
+;; A read-only buffer has no undo: the history of a console would only keep
+;; every message added or removed, as long as it is open. It is cleared
+;; after the changes, unless the console is the current buffer: an event of
+;; its own may be under way, and clearing first confirms what the event
+;; changed, which the end of the event is to cancel (console-recheck clears
+;; it then, once the event is over)
+(define (console-forget-history u . opt-force?)
+  (when (or (!= (current-buffer) u) (and (nnull? opt-force?) (car opt-force?)))
+    (with-buffer u (clear-undo-history))))
+
+;; The messages shown are those given to the console, one per message,
+;; unless a message came during an event of the console itself (one of its
+;; keys raised a warning): it was added, then cancelled with what the event
+;; changed (read only), with the removal of the first one when the console
+;; was full. The number, the first and the last message tell
+(define (console-shows? d i m)
+  (== (tree->stree (tree-ref d i)) (tree->stree (stree->tree (build-message m)))))
+
+(define (console-consistent? u)
+  (let* ((d (console-messages-tree u))
+         (old (or (ahash-ref console-shown (url->unix u)) '())))
+    (or (null? old)
+        (and d (== (tree-arity d) (length old))
+             (console-shows? d 0 (car old))
+             (console-shows? d (- (tree-arity d) 1) (cAr old))))))
+
+(define (console-recheck u)
+  ;; (delayed: no event is under way)
+  (when (and (buffer-exists? u) (ahash-ref console-buffers (url->unix u)))
+    (when (not (console-consistent? u))
+      (console-reset u))
+    (console-forget-history u #t)))
 
 ;; A change of the document cancels its selection: the selection of a
 ;; console is kept, its paths moved by the number k of messages removed
@@ -171,7 +205,8 @@
          (d (console-messages-tree u))
          (end? (console-at-end? u)))
     (cond ((== old new) (noop))
-          ((or (not k) (not d) (null? old)) (console-reset u))
+          ((or (not k) (not d) (null? old) (not (console-consistent? u)))
+           (console-reset u))
           (else
             (let* ((added (list-tail new (- (length old) k)))
                    (sel (console-selection-paths u d)))
@@ -179,9 +214,16 @@
               (when (nnull? added)
                 (tree-insert! d (tree-arity d) (map build-message added)))
               (ahash-set! console-shown (url->unix u) new)
-              (console-restore-selection-in u sel k))))
+              (console-restore-selection-in u sel k)
+              (console-forget-history u))))
     ;; a console whose cursor is at the end follows it, as a log
-    (when end? (console-go-end u))))
+    (when end? (console-go-end u))
+    ;; (the console in use: what was added may be cancelled with the event
+    ;; under way, see console-consistent?)
+    (when (== (current-buffer) u)
+      (delayed
+        (:idle 10)
+        (console-recheck u)))))
 
 (define (console-at-end? u)
   (with-buffer u
