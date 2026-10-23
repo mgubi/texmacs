@@ -1280,11 +1280,13 @@
       (check= (length l) 3)
       (when (== (length l) 3)
         ;; loading a document which is open goes to its window (#464);
-        ;; headless, the current window does not follow (no focus events)
+        ;; headless, the current window does not follow (no focus events),
+        ;; and with S7 the replacement does not reach tm-files
         (with to #f
           (with-global switch-to-window (lambda (w) (set! to w))
             (load-buffer-in-new-window b))
-          (check-true (in? to l)))
+          (when (or to (string-starts? (scheme-dialect) "guile"))
+            (check-true (in? to l))))
         ;; the other windows keep the document
         (when (kill (caddr l))
           (check-true (buffer-exists? b))
@@ -1297,7 +1299,13 @@
             (check= (buffer->windows b) (list (car l)))
             (when delayed?
               (check-true (buffer-exists? b))))
-          ;; the last window closes it
+          ;; the last window asks, and is kept without an answer (not with
+          ;; S7, where the real question would be asked)
+          (when (string-starts? (scheme-dialect) "guile")
+            (kill (car l))
+            (check= asked 1)
+            (check= (buffer->windows b) (list (car l))))
+          ;; and closes it
           (buffer-pretend-saved b)
           (when (kill (car l))
             (check-false (buffer-exists? b))))))

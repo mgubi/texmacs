@@ -244,10 +244,13 @@
              (when answ (buffer-close (current-buffer))))))
         (else (buffer-close (current-buffer)))))
 
-(define (close-buffer-if-no-window buf)
+(define (close-buffer-if-no-window buf confirmed?)
   ;; a buffer may be shown in several windows (clone-window, a file loaded
-  ;; or imported twice): close it with its last window only
-  (when (null? (buffer->windows buf))
+  ;; or imported twice): close it with its last window only. A modified
+  ;; buffer whose closing was not confirmed (another window showed it, and
+  ;; switched to another buffer in the meantime) stays open, without window
+  (when (and (null? (buffer->windows buf))
+             (or confirmed? (not (buffer-modified? buf))))
     (buffer-close buf)))
 
 (define (last-window-on-modified-buffer? buf)
@@ -255,19 +258,19 @@
   (and (buffer-modified? buf)
        (<= (length (buffer->windows buf)) 1)))
 
-(define (do-kill-window)
+(define (do-kill-window confirmed?)
   (with buf (current-buffer)
     (kill-window (current-window))
     (delayed
       (:idle 100)
-      (close-buffer-if-no-window buf))))
+      (close-buffer-if-no-window buf confirmed?))))
 
-(define (do-kill-window* u)
+(define (do-kill-window* u confirmed?)
  (with buf (window->buffer u)
    (kill-window u)
    (delayed
      (:idle 100)
-     (close-buffer-if-no-window buf))))
+     (close-buffer-if-no-window buf confirmed?))))
 
 (tm-define (safely-kill-window . opt-name)
   (cond ((and (buffer-embedded? (current-buffer)) (null? opt-name))
@@ -279,13 +282,13 @@
              (user-confirm
                  (buffer-close-question (window->buffer (car opt-name))) #f
                (lambda (answ)
-                 (when answ (do-kill-window* (car opt-name)))))
-             (do-kill-window* (car opt-name))))
+                 (when answ (do-kill-window* (car opt-name) #t))))
+             (do-kill-window* (car opt-name) #f)))
         ((last-window-on-modified-buffer? (current-buffer))
          (user-confirm (buffer-close-question (current-buffer)) #f
            (lambda (answ)
-             (when answ (do-kill-window)))))
-        (else (do-kill-window))))
+             (when answ (do-kill-window #t)))))
+        (else (do-kill-window #f))))
 
 (tm-define (safely-quit-TeXmacs)
   (let* ((m (filter buffer-modified? (buffer-list)))
