@@ -233,17 +233,39 @@
   ;; a wildcard alone matches whole formulas and strings
   (check-both '(document (concat "A" (rsub "n")) "text")
               '(concat (wildcard "x"))
-              '((0 0 0) (0 1 1) (1 0) (1 4))))
+              '((0 0 0) (0 1 1) (1 0) (1 4)))
+  ;; a trailing wildcard after a tag, when no tag follows in the formula
+  ;; (only a string, or nothing): from the hit to the end (#453)
+  (check-both '(document (concat "A" (rsub "n") "+B"))
+              '(concat (rsub "n") (wildcard "y"))
+              '((0 1 0) (0 2 2)))
+  (check-both '(document (concat "A" (rsub "n")))
+              '(concat (rsub "n") (wildcard "y"))
+              '((0 1 0) (0 1 1)))
+  (check-both '(document (concat "A" (rsub "n") "+B"))
+              '(concat "A" (rsub "n") (wildcard "y"))
+              '((0 0 0) (0 2 2)))
+  (check-both '(document (concat "a+" (frac "1" "2") "+b"))
+              '(concat (wildcard "x") (frac "1" "2") (wildcard "y"))
+              '((0 0 0) (0 2 2)))
+  ;; an empty string in a concat pattern is left out (it never returned,
+  ;; and the memory grew without bound: #452)
+  (check-both '(document (concat "a" (rsub "b") "c"))
+              '(concat (rsub "b") "")
+              '((0 1 0) (0 1 1)))
+  (check-both '(document (concat "a" (rsub "b") "c"))
+              '(concat "" (rsub "b"))
+              '((0 1 0) (0 1 1)))
+  (check-both '(document (concat "a" (rsub "b") (rsub "c")))
+              '(concat (rsub "b") "" (rsub "c"))
+              '((0 1 0) (0 2 1)))
+  (check-both '(document (concat "a" (rsub "b") "c"))
+              '(concat (wildcard "y") (wildcard "y") (rsub "b") "")
+              '((0 0 0) (0 1 1)))
+  ;; an empty pattern is found nowhere with the matching of Replace
+  (with-search-mode 'replace
+    (lambda () (check= (hits '(document "abc") "") '()))))
 
-;; FIXME (#453): a trailing wildcard fails when the rest of the pattern
-;; contains a tag and no tag follows in the formula (search_concat (t,
-;; what, pos, i, ...), tree_search.cpp:190: the loop on j skips the
-;; sub-patterns which end with a wildcard, and only a tag sets p2 to the
-;; end): (concat (rsub "n") (wildcard "y")) in (concat "A" (rsub "n") "+B")
-;; or in (concat "A" (rsub "n")), and
-;; (concat (wildcard "x") (frac "1" "2") (wildcard "y")) in
-;; (concat "a+" (frac "1" "2") "+b"), give (), expected the formula from
-;; the first element of the hit to its end.
 ;; FIXME (#461): a hit inside a string hides a hit which starts later in
 ;; the same string (the outer search_concat, tree_search.cpp:300: a child
 ;; with a hit inside is never the start of a match across the children):
@@ -255,11 +277,6 @@
 ;; tree_search.cpp:315-320: the loops which extend the hits step by one
 ;; over the pairs): (concat (wildcard "x") "a") in
 ;; (concat "b" (frac "a" "a")) gives ((0 0 0) (0 0 0) (0 0 0) (0 1 1 1)).
-;; FIXME (#452): a concat pattern with an empty string element never
-;; returns (search_string, tree_search.cpp:267: pos= next + N(w) does not
-;; move, and the same empty hit is appended until the memory is
-;; exhausted): (concat (rsub "b") "") or (concat "" (rsub "b")) in
-;; (concat "a" (rsub "b") "c").
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Paragraphs, limits, positions
@@ -359,12 +376,17 @@
                                              '() 10000)))
           (check= (length (cdr r)) 1600)
           (check-true (< (car r) 500))))))
-  ;; a wildcard in the middle which fails late scans from each start to
-  ;; the end of the formula: 4.2 s on 200 terms before #450 (cubic), 14 ms
-  ;; after (quadratic)
-  (with-search-mode 'search
-    (lambda ()
-      (check-fast (long-formula 200) '(concat "y)" (wildcard "x") "z") '()))))
+  ;; a wildcard in the middle which fails late scanned from each start to
+  ;; the end of the formula: 4.2 s on 200 terms before #450 (cubic), then
+  ;; 14 ms on 200 and about 1 s on 1600 terms (quadratic); its failures are
+  ;; remembered now (linear: a few ms)
+  (with t (long-formula 1600)
+    (for-each
+      (lambda (mode)
+        (with-search-mode mode
+          (lambda ()
+            (check-fast t '(concat "y)" (wildcard "x") "z") '()))))
+      '(search replace))))
 
 (tm-define (search-test-failures)
   (check-suite "search")
