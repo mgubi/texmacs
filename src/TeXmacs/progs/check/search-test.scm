@@ -278,12 +278,25 @@
   (with-search-mode 'replace
     (lambda () (check= (hits '(document "abc") "") '()))))
 
-;; FIXME (#461): a hit inside a string hides a hit which starts later in
-;; the same string (the outer search_concat, tree_search.cpp:300: a child
-;; with a hit inside is never the start of a match across the children):
-;; when searching, (concat "f(" (wildcard "x") ")") in
-;; (concat "f(x)+f(" (frac "1" "2") ")") gives ((0 0 0) (0 0 4)), expected
-;; also ((0 0 5) (0 2 1)).
+;; a hit inside a string, then one which starts later in the same string
+;; and goes on in the next children: both (#461). When replacing, the
+;; strings of the pattern must match whole strings, so only the second.
+(define (test-hits-after-a-hit)
+  (check-group "hits after a hit")
+  (let ((doc '(document (concat "f(x)+f(" (frac "1" "2") ")")))
+        (what '(concat "f(" (wildcard "x") ")")))
+    (with-search-mode 'search
+      (lambda ()
+        (check= (hits doc what) '((0 0 0) (0 0 4) (0 0 5) (0 2 1)))))
+    (with-search-mode 'replace
+      (lambda ()
+        (check= (hits doc what) '((0 0 5) (0 2 1))))))
+  (with-search-mode 'search
+    (lambda ()
+      (check= (hits '(document (concat "axb+a" (rsub "1") "b+axb"))
+                    '(concat "a" (wildcard "x") "b"))
+              '((0 0 0) (0 0 3) (0 0 4) (0 2 1) (0 2 2) (0 2 5))))))
+
 ;; FIXME (#454): a leading or trailing wildcard with several hits inside
 ;; one tag gives empty and nested ranges (the outer search_concat,
 ;; tree_search.cpp:315-320: the loops which extend the hits step by one
@@ -407,6 +420,7 @@
   (test-tags)
   (test-formulas)
   (test-formula-wildcards)
+  (test-hits-after-a-hit)
   (test-paragraphs)
   (test-limit-and-position)
   (test-speed)

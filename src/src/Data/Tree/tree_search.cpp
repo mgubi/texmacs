@@ -371,9 +371,13 @@ search_concat (range_set& sel, tree t, tree what, path p) {
         for (int i=0; i+1<N(ssel); i++)
           ssel[i+1]= (p * (N(t)-1)) * end (t[N(t)-1]);
       merge (sel, ssel);
-      if (is_compound (t[pos]) && !is_func (what[0], WILDCARD, 1)) scan= true;
-      pos++;
-      continue;
+      if (is_compound (t[pos])) {
+        if (!is_func (what[0], WILDCARD, 1)) scan= true;
+        pos++;
+        continue;
+      }
+      // a match across the children may still start in this string, after
+      // the hits inside it (#461): scan from here, after cur
     }
     if (!scan) { pos++; continue; }
     path p1, p2, cur= (p * 0) * start (t[0]);
