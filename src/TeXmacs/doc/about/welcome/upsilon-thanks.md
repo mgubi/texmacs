@@ -30,8 +30,8 @@ named differently, open an issue or say so in your report.
 - **hammerfunctor**: the build with GCC 16 (#378), plug-ins and
   `get-environment-variable` (#379).
 - **Marc Mertens** (on the texmacs-users list): the builds with GCC and with
-  Qt 5 (#389), symbols drawn as squares (#407), and the times of a book of
-  2000 pages (#408).
+  Qt 5 (#389), symbols drawn as squares (#407), the times of a book of 2000
+  pages (#408), and the slow search of formulas (#450).
 - **medwatt**: Vue under Wayland and tiling window managers: the interface
   font, pasting in the fields, scrolling, dialogs (#391), the size of SVG icons (#394).
 - **mlalaude**: the preferences of the AI sessions, and a session asked a
