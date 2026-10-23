@@ -33,8 +33,8 @@
 ;;
 ;; Wildcards (std 1, std 2, std 3 in the widgets) are (wildcard "x"), ...;
 ;; at the start or at the end of a concat pattern, a wildcard extends the
-;; hit to the start or to the end of the formula (several hits inside one
-;; tag: #454).
+;; hit to the start or to the end of the formula, from or to its first
+;; hit.
 
 (texmacs-module (check search-test)
   (:use (check check-lib)))
@@ -297,11 +297,23 @@
                     '(concat "a" (wildcard "x") "b"))
               '((0 0 0) (0 0 3) (0 0 4) (0 2 1) (0 2 2) (0 2 5))))))
 
-;; FIXME (#454): a leading or trailing wildcard with several hits inside
-;; one tag gives empty and nested ranges (the outer search_concat,
-;; tree_search.cpp:315-320: the loops which extend the hits step by one
-;; over the pairs): (concat (wildcard "x") "a") in
-;; (concat "b" (frac "a" "a")) gives ((0 0 0) (0 0 0) (0 0 0) (0 1 1 1)).
+;; a leading (trailing) wildcard and several hits inside one tag: one hit,
+;; from the start of the formula to the first of them (from the first of
+;; them to the end), as with one hit; no empty ranges (#454)
+(define (test-wildcards-and-several-hits)
+  (check-group "wildcards and several hits")
+  (check-both '(document (concat "b" (frac "a" "c")))
+              '(concat (wildcard "x") "a")
+              '((0 0 0) (0 1 0 1)))
+  (check-both '(document (concat "b" (frac "a" "a")))
+              '(concat (wildcard "x") "a")
+              '((0 0 0) (0 1 0 1)))
+  (check-both '(document (concat "b+" (frac "a" (concat "a" (rsub "a")))))
+              '(concat (wildcard "x") "a")
+              '((0 0 0) (0 1 0 1)))
+  (check-both '(document (concat (frac "a" "a") "b"))
+              '(concat "a" (wildcard "x"))
+              '((0 0 0 0) (0 1 1))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Paragraphs, limits, positions
@@ -421,6 +433,7 @@
   (test-formulas)
   (test-formula-wildcards)
   (test-hits-after-a-hit)
+  (test-wildcards-and-several-hits)
   (test-paragraphs)
   (test-limit-and-position)
   (test-speed)
