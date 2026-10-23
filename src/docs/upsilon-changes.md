@@ -14,6 +14,13 @@ have the details, and the problems go to the
 
 ## 23 October 2026
 
+- **Vue**: the balloons of a language server under the mouse no longer
+  vanish as soon as they show on Linux under Wayland: a balloon was a
+  window of its own, which the compositor placed where it liked and gave
+  the keyboard to, so that the editor, losing the focus, closed it. The
+  balloons are now tooltips attached to the window of the editor, which
+  never take the keyboard nor the pointer
+  ([#399](https://github.com/mgubi/texmacs/issues/399)).
 - **AI sessions**: the field of the API key in the preferences of an AI
   session says "saved" next to it once the key typed is saved (with
   Return, or when leaving the field), or "removed" when it was emptied:

@@ -184,7 +184,9 @@ public:
   bool popup; // undecorated popup/tooltip window
   // a tooltip (the balloons of TeXmacs, tooltip.scm): a popup which does not
   // grab the pointer, which goes to the window under it, nor goes away when
-  // the pointer leaves it; TeXmacs closes it (#399)
+  // the pointer leaves it; TeXmacs closes it (#399). Outside the browser, a
+  // tooltip window of SDL, child of the window with the keyboard, which
+  // never takes the keyboard (see making_tooltip in vue_gui.cpp)
   bool tooltip= false;
   vue_input_state input; // pending events and interaction state
   float layout_w, layout_h; // size of the layout area (pixels)
@@ -251,9 +253,11 @@ void draw_picture (void *data, picture pic);
 void get_viewport_size (void *data, int& w, int& h);
 // document: the window of an editor (vue_texmacs_widget_rep), which is a
 // tab in single-window mode (see vue_gui.cpp), brought to the front when it
-// is shown again (switch_to_window, to switch to its buffer)
+// is shown again (switch_to_window, to switch to its buffer); tooltip: a
+// balloon, a popup which leaves the pointer and the keyboard to the window
+// under it (see the field tooltip of vue_window_rep)
 vue_window plain_window (vue_widget wwid, string name, bool popup= false,
-                         bool document= false);
+                         bool document= false, bool tooltip= false);
 
 typedef void (*render_fn) (renderer ren, void *data, rectangle rect);
 

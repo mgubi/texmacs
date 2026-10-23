@@ -8499,8 +8499,7 @@ tooltip_window_widget (widget w, string s) {
   // field tooltip of vue_window_rep)
   vue_plain_window_widget_rep *wwid=
     tm_new<vue_plain_window_widget_rep> (w, s, command (), true);
-  vue_window win= plain_window (wwid, s, true);
-  if (win != NULL) win->tooltip= true;
+  plain_window (wwid, s, true, false, true);
   return abstract (wwid);
 }
 

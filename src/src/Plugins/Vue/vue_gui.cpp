@@ -192,6 +192,18 @@ static bool single_window_mode ();
 static bool making_dialog= false;
 static SDL_Window* last_document_sdl= NULL; // the last document window made
 
+// The balloons (tooltip_window_widget) are tooltip windows of SDL, made
+// with SDL_CreatePopupWindow as children of the window of TeXmacs which has
+// the keyboard (#399). They were windows of their own, borderless and "not
+// focusable": on Wayland a window of its own cannot be placed by the
+// application, and the compositor gives it the keyboard when it shows, so
+// that the editor lost the focus and closed the balloon at once (and the
+// window managers of X11 may do the same). A tooltip of SDL is an
+// xdg_popup on Wayland, an override-redirect window on X11 and a child
+// window on macOS, at a place relative to its parent; it never takes the
+// keyboard and the pointer goes through it to the window under it.
+static bool making_tooltip= false;
+
 class vue_sdl_base_window_rep : public vue_window_rep {
 public:
   SDL_Window *sdl_win;
@@ -205,6 +217,9 @@ public:
   // the geometry last seen (see track_geometry), in points; unknown while
   // saved_w < 0
   int  saved_x, saved_y, saved_w, saved_h;
+  // the parent of a balloon which is a tooltip of SDL (see making_tooltip),
+  // whose position is relative to it; NULL for the other windows
+  SDL_Window* tooltip_parent= NULL;
 
   // adopt: an SDL window taken over from a window being destroyed (the
   // host of single-window mode, see forget_host), instead of a new one
@@ -234,6 +249,7 @@ public:
   
   void process_layout ();
   void layout_size (int& w, int& h);
+  void orphan (); // the parent of the tooltip goes (see the destructor)
 };
 
 int vue_window_rep::serial= 1; // serial identifier for windows
@@ -367,6 +383,24 @@ vue_logo_surface () {
 }
 #endif
 
+// The parent of a balloon (see making_tooltip): the window of TeXmacs
+// with the keyboard, else the one under the pointer, else the last
+// document window, if it is shown and is no popup; NULL if there is none
+static SDL_Window*
+tooltip_parent_window () {
+  SDL_Window* l[3]= { SDL_GetKeyboardFocus (), SDL_GetMouseFocus (),
+                      last_document_sdl };
+  for (int i= 0; i < 3; i++) {
+    SDL_Window* w= l[i];
+    if (w == NULL || !Window_to_window->contains (w)) continue;
+    vue_sdl_base_window_rep* v= (vue_sdl_base_window_rep*) Window_to_window[w];
+    if (v->popup || (SDL_GetWindowFlags (w) &
+                     (SDL_WINDOW_HIDDEN | SDL_WINDOW_MINIMIZED))) continue;
+    return w;
+  }
+  return NULL;
+}
+
 vue_sdl_base_window_rep::vue_sdl_base_window_rep (vue_widget _content, string _name, bool _popup,
                                                   SDL_Window* adopt)
 : vue_window_rep (_content, _name, _popup), Min_w (0), Min_h (0), Max_w (0), Max_h (0),
@@ -419,7 +453,22 @@ vue_sdl_base_window_rep::vue_sdl_base_window_rep (vue_widget _content, string _n
   bool x11_dialog= making_dialog && !popup &&
                    strcmp (SDL_GetCurrentVideoDriver () ? SDL_GetCurrentVideoDriver () : "", "x11") == 0;
   if (x11_dialog) SDL_SetHint (SDL_HINT_X11_WINDOW_TYPE, "_NET_WM_WINDOW_TYPE_DIALOG");
-  sdl_win= SDL_CreateWindow (buf, win_w, win_h, flags);
+  sdl_win= NULL;
+#ifndef __EMSCRIPTEN__
+  if (popup && making_tooltip) {
+    // a balloon: a tooltip of SDL, child of the window with the keyboard
+    // (or a window of its own as the other popups if there is none)
+    SDL_Window* parent= tooltip_parent_window ();
+    SDL_WindowFlags tf= (flags & ~(SDL_WINDOW_BORDERLESS |
+                                   SDL_WINDOW_ALWAYS_ON_TOP |
+                                   SDL_WINDOW_NOT_FOCUSABLE)) |
+                        SDL_WINDOW_TOOLTIP;
+    if (parent != NULL)
+      sdl_win= SDL_CreatePopupWindow (parent, win_x, win_y, win_w, win_h, tf);
+    if (sdl_win != NULL) tooltip_parent= parent;
+  }
+#endif
+  if (sdl_win == NULL) sdl_win= SDL_CreateWindow (buf, win_w, win_h, flags);
   if (x11_dialog) SDL_ResetHint (SDL_HINT_X11_WINDOW_TYPE);
   if (!sdl_win) {
     // nothing sensible can be done without a window
@@ -456,7 +505,8 @@ vue_sdl_base_window_rep::vue_sdl_base_window_rep (vue_widget _content, string _n
   id= serial++;
   id_to_window (id)= this;
   
-  SDL_StartTextInput (sdl_win);
+  // (no keys for a balloon, which never has the keyboard)
+  if (tooltip_parent == NULL) SDL_StartTextInput (sdl_win);
   
   // update widget state
   set_identifier (abstract (content), id);
@@ -542,17 +592,38 @@ vue_sdl_base_window_rep::~vue_sdl_base_window_rep () {
   if (last_document_sdl == sdl_win) last_document_sdl= NULL;
   // the dialogs of this window outlive it (see making_dialog): SDL would
   // destroy them with it, under the widgets which own them
+  // (and its balloons, which cannot change their parent, lose their SDL
+  // window: TeXmacs closes them later, see orphan)
   int n= 0;
   SDL_Window** all= SDL_GetWindows (&n);
   if (all != NULL) {
     for (int i= 0; i < n; i++)
-      if (SDL_GetWindowParent (all[i]) == sdl_win)
-        SDL_SetWindowParent (all[i], NULL);
+      if (SDL_GetWindowParent (all[i]) == sdl_win) {
+        if ((SDL_GetWindowFlags (all[i]) & SDL_WINDOW_TOOLTIP) &&
+            Window_to_window->contains (all[i]))
+          ((vue_sdl_base_window_rep*) Window_to_window[all[i]])->orphan ();
+        else SDL_SetWindowParent (all[i], NULL);
+      }
     SDL_free (all);
   }
   SDL_StopTextInput (sdl_win);
   vue_gpu_detach (sdl_win);
   SDL_DestroyWindow (sdl_win);
+}
+
+// The parent of this balloon is destroyed, and SDL would destroy the SDL
+// window of the balloon with it, under the widgets which own it: it goes
+// first, and the balloon is left without a window (sdl_win NULL, as one
+// whose window was adopted, see forget_host) until TeXmacs deletes it.
+void
+vue_sdl_base_window_rep::orphan () {
+  if (sdl_win == NULL) return;
+  Window_to_window->reset (sdl_win);
+  vue_gpu_detach (sdl_win);
+  SDL_DestroyWindow (sdl_win);
+  sdl_win= NULL;
+  tooltip_parent= NULL;
+  shown= visible_requested= ready_to_show= false;
 }
 
 void
@@ -566,15 +637,21 @@ vue_sdl_base_window_rep::destroy_event () {
 
 void
 vue_sdl_base_window_rep::get_position (SI& x, SI& y) {
-  int xx, yy;
+  int xx= 0, yy= 0;
   SDL_GetWindowPosition (sdl_win, &xx, &yy);
+  if (tooltip_parent != NULL) {
+    // (relative to its parent)
+    int px= 0, py= 0;
+    SDL_GetWindowPosition (tooltip_parent, &px, &py);
+    xx += px; yy += py;
+  }
   x= tm_length (xx);
   y= tm_length (-yy);
 }
 
 void
 vue_sdl_base_window_rep::get_size (SI& ww, SI& hh) {
-  int win_w, win_h;
+  int win_w= 0, win_h= 0;
   SDL_GetWindowSize (sdl_win, &win_w, &win_h);
   ww= tm_length (win_w);
   hh= tm_length (win_h);
@@ -592,6 +669,7 @@ vue_sdl_base_window_rep::get_size_limits (SI& min_w, SI& min_h, SI& max_w, SI& m
 // coordinates: those are allowed.
 void
 vue_sdl_base_window_rep::set_position (SI x, SI y) {
+  if (sdl_win == NULL) return; // (see orphan)
   int win_w, win_h;
   SDL_GetWindowSize (sdl_win, &win_w, &win_h);
 
@@ -609,11 +687,18 @@ vue_sdl_base_window_rep::set_position (SI x, SI y) {
     if (win_y < r.y) win_y= r.y;
   }
   if (DEBUG_VUE_EVENTS) SDL_Log ("Window %d set_position %d %d", id, win_x, win_y);
+  if (tooltip_parent != NULL) {
+    // a balloon is placed relative to its parent (see making_tooltip)
+    int px= 0, py= 0;
+    SDL_GetWindowPosition (tooltip_parent, &px, &py);
+    win_x -= px; win_y -= py;
+  }
   SDL_SetWindowPosition (sdl_win, win_x, win_y);
 }
 
 void
 vue_sdl_base_window_rep::set_size (SI w, SI h) {
+  if (sdl_win == NULL) return; // (see orphan)
   w= sdl_points (w); h= sdl_points (h);
   SDL_SetWindowSize (sdl_win, w, h);
   // the change is asynchronous on X11 and Wayland: a dialog sized to its
@@ -756,6 +841,7 @@ show_window (SDL_Window* sdl_win, bool activate) {
 
 void
 vue_sdl_base_window_rep::set_visibility (bool flag) {
+  if (sdl_win == NULL) return; // (see orphan)
   visible_requested= flag;
   if (!flag) {
     if (shown) SDL_HideWindow (sdl_win);
@@ -3065,21 +3151,27 @@ make_host () {
 }
 
 vue_window
-plain_window (vue_widget wwid, string name, bool popup, bool document) {
+plain_window (vue_widget wwid, string name, bool popup, bool document,
+              bool tooltip) {
   bool activate= !next_window_without_focus;
   next_window_without_focus= false;
+  vue_window v= NULL;
   // headless: the windows are virtual as well, with no host to be drawn in
   if (is_headless ())
-    return tm_new<vue_virtual_window_rep> (wwid, name, popup, false);
-  if (single_window_mode ()) {
+    v= tm_new<vue_virtual_window_rep> (wwid, name, popup, false);
+  else if (single_window_mode ()) {
     if (the_host == NULL) make_host ();
-    return tm_new<vue_virtual_window_rep> (wwid, name, popup, document && !popup);
+    v= tm_new<vue_virtual_window_rep> (wwid, name, popup, document && !popup);
   }
+  if (v != NULL) { v->tooltip= tooltip; return v; }
   making_dialog= !document && !popup;
+  making_tooltip= popup && tooltip;
   vue_sdl_base_window_rep* w;
   if (vue_gpu_windows ()) w= tm_new<vue_sdl_gpu_window_rep> (wwid, name, popup);
   else w= tm_new<vue_sdl_mupdf_window_rep> (wwid, name, popup);
   making_dialog= false;
+  making_tooltip= false;
+  w->tooltip= tooltip;
   w->document= document && !popup;
   w->activate= activate;
   w->passive= !activate;
@@ -5263,8 +5355,16 @@ popup_grab (vue_window& win, float& x, float& y, bool press) {
 static vue_window
 under_tooltip (vue_window win, float& x, float& y) {
   if (win == NULL || !win->tooltip) return win;
-  int tx, ty;
-  SDL_GetWindowPosition ((SDL_Window*) win->platform_window (), &tx, &ty);
+  SDL_Window* tw= (SDL_Window*) win->platform_window ();
+  int tx= 0, ty= 0;
+  SDL_GetWindowPosition (tw, &tx, &ty);
+  // a tooltip of SDL (see making_tooltip), which the systems usually let
+  // the pointer go through, is placed relative to its parent
+  SDL_Window* parent= SDL_GetWindowParent (tw);
+  if (parent != NULL && Window_to_window->contains (parent)) {
+    x += tx; y += ty;
+    return (vue_window) Window_to_window [parent];
+  }
   float sx= tx + x, sy= ty + y; // screen coordinates
   SDL_Window* focus= SDL_GetKeyboardFocus ();
   SDL_Window* best= NULL;
