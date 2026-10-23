@@ -1779,12 +1779,12 @@ pdf_hummus_renderer_rep::draw (int ch, font_glyphs fn, SI x, SI y) {
     contentContext->WriteFreeCode (" EMC\r\n");
   }
   else {
-    if (cfid != NULL && ch >= 0xc000000)
+    if (cfid != NULL && ch >= 0xc000000) {
       // a glyph drawn by its number (a layer of an emoji in color, whose
       // characters are written as invisible glyphs) stands for none
       glyphs.push_back (GlyphUnicodeMapping (gl_index, ULongVector ()));
-    if (cfid != NULL && ch >= 0xc000000)
       contentContext->Tj (glyphs);
+    }
     else if (cfid != NULL) {
       int uc= ch;
       if (EuropeanComputerModern_fonts->contains (cfn))
