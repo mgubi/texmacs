@@ -118,6 +118,21 @@
                  (lambda () (and (== (shown-messages) 100) (shows? "message 119"))))
        (gt-check "still no buffer more"
                  (lambda () (== (length (buffer-list)) (+ buffers-before 2))))
+       ;; (the 120 messages would be one step of the history, which an undo
+       ;; with read-only off would take back)
+       (gt-check "the console keeps no history"
+                 (lambda () (== (with-buffer (all-buffer) (undo-possibilities)) 0)))
+       ;; a message which comes during an event of the console itself (a key
+       ;; of it raised a warning) is cancelled with the event, then shown
+       (gt-eval (lambda ()
+                  (with-buffer (all-buffer)
+                    (start-editing)
+                    (warn "during an event")
+                    (end-editing))))
+       (gt-wait 500)
+       (gt-check "a message during an event of the console is shown"
+                 (lambda () (and (shows? "during an event")
+                                 (== (shown-messages) 100))))
        (gt-raw "close")
        (gt-wait 1500)
        (gt-window "main")
