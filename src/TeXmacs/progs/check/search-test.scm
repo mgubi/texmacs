@@ -646,6 +646,25 @@
           (check= (cdr r) '())
           (check-true (< (car r) 500)))))))
 
+;; formulas of 40000 children and more: the scan for the start of a match, and a
+;; wildcard which takes many children, went from one child to the next by
+;; a recursion, which overflowed the stack and crashed TeXmacs (#487)
+(define (repeated n l)
+  (append-map (lambda (k) l) (iota n)))
+
+(define (test-long-concats)
+  (check-group "long formulas")
+  (let ((ab `(concat ,@(repeated 20000 '("ab" (rsub "1")))))
+        (xz `(concat "x" ,@(repeated 20000 '((rsub "1") (rsub "2"))) "z")))
+    (check-both `(document ,ab) '(concat (rsub "1") "ab" (rsub "2")) '())
+    (check-both `(document ,(append ab '("ab" (rsub "2"))))
+                '(concat (rsub "1") "ab" (rsub "2"))
+                '((0 39999 0) (0 40001 1)))
+    (check-both `(document ,ab) '(concat (wildcard "x") (rsub "2")) '())
+    (check-both `(document ,xz) '(concat "x" (wildcard "y") "z")
+                '((0 0 0) (0 40001 1)))
+    (check-both `(document ,xz) '(concat "x" (wildcard "y") "q") '())))
+
 (tm-define (search-test-failures)
   (check-suite "search")
   (test-text)
@@ -664,4 +683,5 @@
   (test-hits-after-a-match)
   (test-speed)
   (test-long-strings)
+  (test-long-concats)
   (check-end))
