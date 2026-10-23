@@ -343,13 +343,15 @@ concat_box_rep::rsup_correction_at (SI h) {
 
 bool
 concat_box_rep::extended_shape () {
-  if (N(bs) == 1) return bs[0]->extended_shape ();
+  int i= single_box (bs);
+  if (i >= 0) return bs[i]->extended_shape ();
   return true;
 }
 
 bool
 concat_box_rep::top_accent (SI& x) {
-  if (N(bs) == 1 && bs[0]->top_accent (x)) { x += sx (0); return true; }
+  int i= single_box (bs);
+  if (i >= 0 && bs[i]->top_accent (x)) { x += sx (i); return true; }
   return false;
 }
 
