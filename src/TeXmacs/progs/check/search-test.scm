@@ -512,6 +512,47 @@
             (check-fast t '(concat "y)" (wildcard "x") "z") '()))))
       '(search replace))))
 
+;; between two elements which are not wildcards, a string of the pattern
+;; matches a whole string of the formula, as one match: aa does not match
+;; aaaa (#480); a part with a wildcard matches when it covers the string
+(define (test-middle-strings)
+  (check-group "middle strings")
+  (check-both '(document (concat "c" (rsub "x") "aaaa" (rsub "y")))
+              '(concat (rsub "x") "aa" (rsub "y"))
+              '())
+  (check-both '(document (concat "c" (rsub "x") "aa" (rsub "y")))
+              '(concat (rsub "x") "aa" (rsub "y"))
+              '((0 1 0) (0 3 1)))
+  (check-both '(document (concat "c" (rsub "x") "AA" (rsub "y")))
+              '(concat (rsub "x") "aa" (rsub "y"))
+              '())
+  (with-preference "case-insensitive-match" "on"
+    (lambda ()
+      (check-both '(document (concat "c" (rsub "x") "AA" (rsub "y")))
+                  '(concat (rsub "x") "aa" (rsub "y"))
+                  '((0 1 0) (0 3 1)))))
+  (check-both '(document (concat "c" (rsub "x") "abaa" (rsub "y")))
+              '(concat (rsub "x") "a" (wildcard "w") "a" (rsub "y"))
+              '((0 1 0) (0 3 1)))
+  (check-both '(document (concat "c" (rsub "x") "abab" (rsub "y")))
+              '(concat (rsub "x") "a" (wildcard "w") "a" (rsub "y"))
+              '())
+  ;; in linear time: a test which tried every place of every string (a
+  ;; first version of #480) took seconds in a string of 60000 characters
+  (let* ((abc (apply string-append (map (lambda (i) "abc") (iota 20000))))
+         (doc `(document
+                 (concat (rsub "1") ,(string-append abc "x") (rsub "2"))))
+         (what '(concat (rsub "1") "a" (wildcard "x") "b" (wildcard "y") "c"
+                        (rsub "2"))))
+    (for-each
+      (lambda (mode)
+        (with-search-mode mode
+          (lambda ()
+            (with r (time-of (lambda () (hits doc what)))
+              (check= (cdr r) '())
+              (check-true (< (car r) 500))))))
+      '(search replace))))
+
 ;; a string of 100000 characters and a pattern of a string and a wildcard,
 ;; with partial matches: the starts were tried by a recursion per character,
 ;; which overflowed the stack and crashed TeXmacs (#479)
@@ -546,6 +587,7 @@
   (test-overlapping-strings)
   (test-paragraphs)
   (test-limit-and-position)
+  (test-middle-strings)
   (test-speed)
   (test-long-strings)
   (check-end))

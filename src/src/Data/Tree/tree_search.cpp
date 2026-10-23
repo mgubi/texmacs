@@ -239,6 +239,46 @@ only_wildcards (tree what, int i) {
   return true;
 }
 
+static bool
+matches_whole (string s, tree w) {
+  // does w, a string or a concat of strings and wildcards, match all of s?
+  // The first string at the start, the last one at the end, the others at
+  // their first place in between: for wildcards which take any run, this is
+  // exact, and linear (a match_atomic anchored at both ends tried every
+  // place of every string)
+  s= case_fold (s);
+  if (is_atomic (w)) return s == case_fold (w->label);
+  array<tree> e;  // the elements, two strings in a row joined
+  for (int i=0; i<N(w); i++) {
+    tree x= is_atomic (w[i])? tree (case_fold (w[i]->label)): w[i];
+    if (is_atomic (x) && N(e) > 0 && is_atomic (e[N(e)-1]))
+      e[N(e)-1]= tree (e[N(e)-1]->label * x->label);
+    else e << x;
+  }
+  int n= N(e), lo= 0, hi= N(s), a= 0, b= n;
+  if (n == 0) return N(s) == 0;
+  if (is_atomic (e[0])) {
+    if (!test (s, 0, e[0]->label)) return false;
+    lo= N(e[0]->label);
+    a= 1;
+  }
+  if (a == n) return lo == N(s);
+  if (is_atomic (e[n-1])) {
+    int at= N(s) - N(e[n-1]->label), c= lo;
+    while (c < at) tm_char_forwards (s, c);
+    if (c != at || !test (s, at, e[n-1]->label)) return false;
+    hi= at;
+    b= n-1;
+  }
+  for (int i=a; i<b; i++)
+    if (is_atomic (e[i])) {
+      int at= tm_search_forwards (e[i]->label, lo, s);
+      if (at < 0 || at + N(e[i]->label) > hi) return false;
+      lo= at + N(e[i]->label);
+    }
+  return true;
+}
+
 static int
 string_occurrence (string s, string w, path q, path cur, bool wildcard) {
   // the start of the occurrence of w in the string s (at the path q) with
@@ -301,6 +341,15 @@ search_concat_sub (tree t, tree what, int pos, int i,
                                    wildcard);
         if (at < 0) continue;
         p1= (p * pos) * at;
+        if (search_concat (t, what, pos+1, j, p, cur, p1, p2, inside, failed))
+          return true;
+        continue;
+      }
+      if (i > 0 && j < N(what) && !is_func (what[j], WILDCARD, 1)) {
+        // between two elements which are not wildcards: the part of the
+        // pattern covers the whole string, as one match (a hit at its start
+        // and another one at its end let aa match aaaa, #480)
+        if (!matches_whole (t[pos]->label, swhat)) continue;
         if (search_concat (t, what, pos+1, j, p, cur, p1, p2, inside, failed))
           return true;
         continue;
