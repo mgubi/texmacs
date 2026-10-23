@@ -74,6 +74,16 @@ hooks.
   would keep as images.
 - **COLR version 1**: its graph turned into an SVG fragment per glyph and
   drawn by the SVG renderer (resvg or ThorVG), or only its solid fills.
+- **MuPDF** (1.28.5) does not draw color fonts itself: it loads every glyph
+  with `FT_LOAD_NO_BITMAP` and fills it in one color, and its fallback for
+  emoji is the black and white Noto Emoji. It draws ours because they come
+  to it as colored text. For the next steps it has what is needed: images
+  for the bitmaps of sbix and CBDT (`fz_fill_image`, and images in its
+  PDF), and linear and radial shadings for the gradients of COLR version 1
+  (`fz_fill_shade`, vectors in its PDF); its SVG reader has no gradients,
+  so the way through SVG does not work there. Cocoa and Qt would do the
+  same with Core Graphics and Qt: one treatment of the layers everywhere,
+  with each renderer drawing images and gradients its own way.
 - **The cursor** can stand inside a sequence: the characters of a ligature
   are all at the left of its picture (`get_xpositions`), and a key moves
   over them one by one.
