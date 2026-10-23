@@ -1600,8 +1600,12 @@ smart_font_rep::emoji_before_selector (string s, int pos, int end,
   int nr= emoji_font ();
   if (nr < 0 || nr == next) return next;
   string c= s (pos, end);
-  // the bases of the keycaps, which the font only draws as ligatures
-  if (N(c) == 1) return (is_digit (c[0]) || c[0] == '#' || c[0] == '*')? nr: next;
+  // the bases of the keycaps, which the font only draws as ligatures (and
+  // a digit followed by U+FE0F alone stays a digit of the text)
+  if (N(c) == 1)
+    return ((is_digit (c[0]) || c[0] == '#' || c[0] == '*') &&
+            locase_all (s (end + 7, min (N(s), end + 14))) == "<#20e3>")?
+           nr: next;
   if (!fn[nr]->supports (c)) return next;
   return nr;
 }

@@ -88,6 +88,9 @@
   ;; a keycap, from a digit or a sign of the text
   (check-true (one-em? (string-append "#" vs16 "<#20E3>")))
   (check-true (one-em? (string-append "1" vs16 "<#20E3>")))
+  ;; a digit followed by U+FE0F alone stays a digit of the text
+  (check-true (near? (width (string-append "1" vs16)) (width "1") 2))
+  (check-true (near? (width (string-append "a1" vs16 "b")) (width "a1b") 2))
   ;; a heart, which is a symbol unless followed by U+FE0F
   (check-true (one-em? (string-append "<#2764>" vs16)))
   ;; in a sentence
