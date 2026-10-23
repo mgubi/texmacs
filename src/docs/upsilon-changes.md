@@ -12,6 +12,12 @@ branch [`upsilon_texmacs`](https://github.com/mgubi/texmacs/commits/upsilon_texm
 have the details, and the problems go to the
 [issues of the repository](https://github.com/mgubi/texmacs/issues).
 
+## 24 October 2026
+
+- **Server log**: the line written at each login check gives the date of
+  the user's last failed login, or "none"; it showed the word `iso8601`
+  instead of the date. Desktop applications only.
+
 ## 23 October 2026
 
 - **Emoji in color**: TeXmacs now comes with an emoji font in color,
