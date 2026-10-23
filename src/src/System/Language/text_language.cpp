@@ -38,6 +38,11 @@ text_language_rep::advance (tree t, int& pos) {
   string s= t->label;
   if (pos >= N(s)) return &tp_normal_rep;
 
+  if (keycap_at (s, pos)) {
+    pos= emoji_sequence_end (s, pos + 1, pos + 1);
+    return &tp_normal_rep;
+  }
+
   if (s[pos]==' ') {
     pos++;
     // while ((pos<N(s)) && (s[pos]==' ')) pos++;
@@ -76,8 +81,10 @@ text_language_rep::advance (tree t, int& pos) {
   }
 
   if (s[pos]=='<') {
+    int start= pos;
     while ((pos<N(s)) && (s[pos]!='>')) pos++;
     if (pos<N(s)) pos++;
+    pos= emoji_sequence_end (s, start, pos);
     return &tp_normal_rep;
   }
 
@@ -125,6 +132,11 @@ text_property
 french_language_rep::advance (tree t, int& pos) {
   string s= t->label;
   if (pos >= N(s)) return &tp_normal_rep;
+
+  if (keycap_at (s, pos)) {
+    pos= emoji_sequence_end (s, pos + 1, pos + 1);
+    return &tp_normal_rep;
+  }
 
   if (s[pos]==' ') {
     pos++;
@@ -174,8 +186,10 @@ french_language_rep::advance (tree t, int& pos) {
   }
 
   if (s[pos]=='<') {
+    int start= pos;
     while ((pos<N(s)) && (s[pos]!='>')) pos++;
     if (pos<N(s)) pos++;
+    pos= emoji_sequence_end (s, start, pos);
     return &tp_normal_rep;
   }
 

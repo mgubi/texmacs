@@ -238,6 +238,11 @@ ot_gsub_map parse_gsub_feature (const string& buf, string feature);
 ot_gsub_map parse_gsub_feature (const char* buf, int n, string feature);
 array<string> parse_gsub_tags (const string& buf);
 array<string> parse_gsub_tags (const char* buf, int n);
+// the ligatures (type 4) of one feature: for the first glyph of each, the
+// ligatures which start with it, in the order of the font (the preferred
+// first), each as the ligature glyph followed by the other components
+typedef hashmap<unsigned int, array<array<unsigned int> > > ot_gsub_ligatures;
+ot_gsub_ligatures parse_gsub_ligatures (const char* buf, int n, string feature);
 
 /******************************************************************************
  * OpenType GPOS: pair kerning

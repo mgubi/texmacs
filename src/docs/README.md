@@ -44,6 +44,7 @@ say otherwise; C++ is under `src/src/`, Scheme under `src/TeXmacs/progs/`.
 | [opentype-audit.md](opentype-audit.md) | Audit of the OpenType work (2026-10-13) |
 | [font-system-review.md](font-system-review.md) | The TeXmacs font system as a whole |
 | [math-symbol-coverage.md](math-symbol-coverage.md) | The mathematical symbols TeXmacs cannot name |
+| [color-fonts.md](color-fonts.md) | Emoji and color fonts: the shipped Twemoji font, the sequences, the layers in color, what is left to do |
 
 ## Scheme interpreters
 

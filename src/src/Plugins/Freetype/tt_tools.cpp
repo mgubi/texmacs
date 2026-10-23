@@ -1084,6 +1084,74 @@ parse_gsub_tags (const string& buf) {
   return parse_gsub_tags (&b[0], N (b));
 }
 
+/******************************************************************************
+ * OpenType GSUB: ligatures (type 4), as the sequences of emoji
+ ******************************************************************************/
+
+static void
+parse_gsub_ligature_subtable (ot_table& t, int type, long long off,
+                              ot_gsub_ligatures& m) {
+  if (type == 7) {
+    int       ext_type= t.u16 (off + 2);
+    long long ext_off = t.u32 (off + 4);
+    if (ext_type == 7) return;
+    parse_gsub_ligature_subtable (t, ext_type, off + ext_off, m);
+    return;
+  }
+  if (type != 4 || t.u16 (off) != 1) return;
+  array<unsigned int> cov= parse_coverage_table (t, off + t.u16 (off + 2));
+  int count= t.count (off + 6, t.u16 (off + 4), 2);
+  for (int i= 0; i < N(cov) && i < count && t.ok; i++) {
+    long long set_off= off + t.u16 (off + 6 + 2*i);
+    int n= t.count (set_off + 2, t.u16 (set_off), 2);
+    array<array<unsigned int> > ligs;
+    if (m->contains (cov[i])) ligs= m[cov[i]];
+    for (int k= 0; k < n && t.ok; k++) {
+      long long lig_off= set_off + t.u16 (set_off + 2 + 2*k);
+      int nc= t.u16 (lig_off + 2);
+      if (nc < 1) continue;
+      array<unsigned int> lig;
+      lig << (unsigned int) t.u16 (lig_off);
+      for (int c= 1; c < nc; c++)
+        lig << (unsigned int) t.u16 (lig_off + 4 + 2*(c-1));
+      ligs << lig;
+    }
+    m (cov[i])= ligs;
+  }
+}
+
+ot_gsub_ligatures
+parse_gsub_ligatures (const char* buf, int n, string feature) {
+  ot_gsub_ligatures m;
+  string gsub= ot_find_table (buf, n, "GSUB");
+  if (N (gsub) < 10) return m;
+  ot_table t (gsub);
+  int feature_list= t.u16 (6);
+  int lookup_list = t.u16 (8);
+  int lookup_count= t.count (lookup_list + 2, t.u16 (lookup_list), 2);
+  array<int> recs= default_feature_records (t, feature);
+  array<int> lookups;
+  for (int i= 0; i < N(recs) && t.ok; i++) {
+    int rec = feature_list + 2 + 6 * recs[i];
+    int feat= feature_list + t.u16 (rec + 4);
+    int nl  = t.count (feat + 4, t.u16 (feat + 2), 2);
+    for (int l= 0; l < nl; l++) {
+      int li= t.u16 (feat + 4 + 2*l);
+      if (li < lookup_count) insert_sorted (lookups, li);
+    }
+  }
+  for (int l= 0; l < N(lookups) && t.ok; l++) {
+    int lookup= lookup_list + t.u16 (lookup_list + 2 + 2 * lookups[l]);
+    int type  = t.u16 (lookup);
+    int nsub  = t.count (lookup + 6, t.u16 (lookup + 4), 2);
+    for (int s= 0; s < nsub && t.ok; s++)
+      parse_gsub_ligature_subtable (t, type, lookup + t.u16 (lookup + 6 + 2*s),
+                                    m);
+  }
+  if (!t.ok) return ot_gsub_ligatures ();
+  return m;
+}
+
 ot_gsub_map
 parse_gsub_feature (const char* buf, int n, string feature) {
   return parse_gsub_feature_table (ot_find_table (buf, n, "GSUB"), feature);

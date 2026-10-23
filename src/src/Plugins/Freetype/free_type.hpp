@@ -52,6 +52,23 @@ extern FT_Error (*ft_get_kerning)    (FT_Face        face,
                                       FT_Vector      *akerning);
 extern FT_Error (*ft_done_face)      (FT_Face        face);
 
+// the layers of a glyph of a color font (COLR version 0) and the colors of
+// its palette (CPAL): NULL when the FreeType of the system has no support
+#if FREETYPE_MAJOR > 2 || (FREETYPE_MAJOR == 2 && FREETYPE_MINOR >= 10)
+#define FT_HAS_COLOR_LAYERS
+#include FT_COLOR_H
+extern FT_Bool  (*ft_get_color_glyph_layer) (FT_Face           face,
+                                             FT_UInt           base_glyph,
+                                             FT_UInt*          aglyph_index,
+                                             FT_UInt*          acolor_index,
+                                             FT_LayerIterator* iterator);
+extern FT_Error (*ft_palette_data_get) (FT_Face          face,
+                                        FT_Palette_Data* apalette);
+extern FT_Error (*ft_palette_select) (FT_Face        face,
+                                      FT_UShort      palette_index,
+                                      FT_Color**     apalette);
+#endif
+
 #endif
 
 #endif // FREE_TYPE_H

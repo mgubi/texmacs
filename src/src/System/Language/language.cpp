@@ -318,6 +318,66 @@ decode_color (string lan_name, int c) {
 }
 
 /******************************************************************************
+* Sequences of emoji
+******************************************************************************/
+
+// the code point of the character <#XXXX> at pos, and its end
+static int
+code_at (string s, int pos, int& end) {
+  if (pos + 3 >= N(s) || s[pos] != '<' || s[pos+1] != '#') return -1;
+  int i= pos + 2;
+  while (i < N(s) && is_hex_digit (s[i])) i++;
+  if (i == pos + 2 || i >= N(s) || s[i] != '>') return -1;
+  end= i + 1;
+  return from_hexadecimal (s (pos + 2, i));
+}
+
+static bool
+is_regional_indicator (int c) {
+  return c >= 0x1f1e6 && c <= 0x1f1ff;
+}
+
+int
+emoji_sequence_end (string s, int pos, int end) {
+  int e;
+  int c= code_at (s, pos, e);
+  if (c < 0x200) return end;
+  if (is_regional_indicator (c)) {
+    // a flag: two regional indicators
+    int f;
+    if (is_regional_indicator (code_at (s, end, f))) return f;
+    return end;
+  }
+  while (end < N(s)) {
+    int d= code_at (s, end, e);
+    if ((d >= 0xfe00 && d <= 0xfe0f) || (d >= 0x1f3fb && d <= 0x1f3ff) ||
+        (d >= 0xe0020 && d <= 0xe007f) || d == 0x20e3)
+      end= e;                           // selectors, skin tones, tags
+    else if (d == 0x200d && e < N(s)) {
+      end= e;                           // a joiner and what it joins
+      if (s[end] == '<') {
+        int f;
+        if (code_at (s, end, f) >= 0) end= f;
+        else break;
+      }
+      else end++;
+    }
+    else break;
+  }
+  return end;
+}
+
+bool
+keycap_at (string s, int pos) {
+  if (pos >= N(s) || !(is_digit (s[pos]) || s[pos] == '#' || s[pos] == '*'))
+    return false;
+  int e;
+  int c= code_at (s, pos + 1, e);
+  if (c == 0xfe0f) c= code_at (s, e, e);
+  return c == 0x20e3;
+}
+
+/******************************************************************************
 * Disable hyphenation
 ******************************************************************************/
 

@@ -50,6 +50,18 @@ FT_Error (*ft_get_kerning)    (FT_Face        face,
                                FT_UInt        kern_mode,
                                FT_Vector      *akerning);
 FT_Error (*ft_done_face)      (FT_Face        face);
+#ifdef FT_HAS_COLOR_LAYERS
+FT_Bool  (*ft_get_color_glyph_layer) (FT_Face           face,
+                                      FT_UInt           base_glyph,
+                                      FT_UInt*          aglyph_index,
+                                      FT_UInt*          acolor_index,
+                                      FT_LayerIterator* iterator)= NULL;
+FT_Error (*ft_palette_data_get) (FT_Face          face,
+                                 FT_Palette_Data* apalette)= NULL;
+FT_Error (*ft_palette_select) (FT_Face        face,
+                               FT_UShort      palette_index,
+                               FT_Color**     apalette)= NULL;
+#endif
 
 typedef FT_Error (*glyph_renderer) (FT_GlyphSlot, FT_Render_Mode);
 
@@ -68,6 +80,11 @@ ft_initialize () {
   ft_render_glyph  = (glyph_renderer) ((void*) FT_Render_Glyph);
   ft_get_kerning   = FT_Get_Kerning;
   ft_done_face     = FT_Done_Face;
+#ifdef FT_HAS_COLOR_LAYERS
+  ft_get_color_glyph_layer= FT_Get_Color_Glyph_Layer;
+  ft_palette_data_get= FT_Palette_Data_Get;
+  ft_palette_select= FT_Palette_Select;
+#endif
   if (ft_init_freetype (&ft_library)) return true;
   if (DEBUG_AUTO) debug_automatic << "With linked TrueType support\n";
 #else
@@ -102,6 +119,17 @@ ft_initialize () {
   (void) symbol_install ("/usr/lib/libfreetype.so", "FT_Done_Face"     ,
        (pointer&) ft_done_face);
   if (ft_done_face == NULL) return true;
+#ifdef FT_HAS_COLOR_LAYERS
+  // optional: without them the color fonts are drawn in one color
+  (void) symbol_install ("/usr/lib/libfreetype.so", "FT_Get_Color_Glyph_Layer",
+       (pointer&) ft_get_color_glyph_layer);
+  (void) symbol_install ("/usr/lib/libfreetype.so", "FT_Palette_Data_Get",
+       (pointer&) ft_palette_data_get);
+  (void) symbol_install ("/usr/lib/libfreetype.so", "FT_Palette_Select",
+       (pointer&) ft_palette_select);
+  if (ft_palette_data_get == NULL || ft_palette_select == NULL)
+    ft_get_color_glyph_layer= NULL;
+#endif
   debug_on (status);
   if (ft_init_freetype (&ft_library)) return true;
   if (DEBUG_AUTO) debug_automatic << "Installed TrueType support\n";

@@ -17,6 +17,7 @@
 #include "Freetype/tt_tools.hpp"
 #include "analyze.hpp"
 #include "converter.hpp"
+#include "colors.hpp"
 
 #ifdef USE_FREETYPE
 
@@ -170,12 +171,16 @@ struct unicode_font_rep: font_rep {
   unsigned int get_glyphID (string s);
   unsigned int read_unicode_char (string s, int& i);
   unsigned int ligature_replace (unsigned int c, string s, int& i);
+  unsigned int read_glyph (string s, int& i, bool ligf);
+  unsigned int color_ligature (unsigned int c, string s, int& i);
   bool   supports (string c);
   void   get_extents (string s, metric& ex);
   void   get_xpositions (string s, SI* xpos, bool ligf);
   void   get_xpositions (string s, SI* xpos);
   void   draw_fixed (renderer ren, string s, SI x, SI y, bool ligf);
   void   draw_fixed (renderer ren, string s, SI x, SI y);
+  bool   color_font; // with glyphs in several colors (COLR)
+  bool   draw_color_glyph (renderer ren, unsigned int uc, SI x, SI y);
   font   magnify (double zoomx, double zoomy);
   void   advance_glyph (string s, int& pos, bool ligf);
   glyph  get_glyph (string s);
@@ -202,12 +207,13 @@ struct unicode_font_rep: font_rep {
 unicode_font_rep::unicode_font_rep (string name,
   string family2, int size2, int hdpi2, int vdpi2):
     font_rep (name), family (family2), hdpi (hdpi2), vdpi (vdpi2), ligs (0),
-    native (0)
+    native (0), color_font (false)
 {
   type= FONT_TYPE_UNICODE;
   size= size2;
   fnm = tt_font_metric (family, size, std_dpi, (std_dpi * vdpi) / hdpi);
   fng = tt_font_glyphs (family, size, hdpi, vdpi);
+  color_font= tt_color_font (fng);
   if (fnm->bad_font_metric || fng->bad_font_glyphs) {
     fnm= std_font_metric (res_name, NULL, 0, -1);
     fng= std_font_glyphs (res_name, NULL, 0, -1);
@@ -764,6 +770,46 @@ unicode_font_rep::read_unicode_char (string s, int& i) {
   }
 }
 
+// The glyph which starts at i, with the ligatures of the font: the usual
+// ones (fi, fl...) and, in a color font, the sequences of emoji (joined by
+// U+200D, with variation selectors, skin tones, flags, keycaps), which are
+// ligatures of its ccmp feature
+unsigned int
+unicode_font_rep::read_glyph (string s, int& i, bool ligf) {
+  unsigned int uc= read_unicode_char (s, i);
+  if (ligs > 0 && ligf && (uc == 'f' || uc == 's'))
+    return ligature_replace (uc, s, i);
+  if (color_font && i < N(s)) return color_ligature (uc, s, i);
+  return uc;
+}
+
+static unsigned int
+glyph_index_of (FT_Face face, unsigned int uc) {
+  if (uc >= 0xc000000) return uc - 0xc000000;
+  return ft_get_char_index (face, uc);
+}
+
+unsigned int
+unicode_font_rep::color_ligature (unsigned int uc, string s, int& i) {
+  if (is_nil (ot_face) || ot_face->bad_face) return uc;
+  FT_Face face= ot_face->ft_face;
+  ot_gsub_ligatures& m= ot_face->gsub_ligatures ("ccmp");
+  unsigned int g= glyph_index_of (face, uc);
+  if (g == 0 || !m->contains (g)) return uc;
+  array<array<unsigned int> >& ligs= m (g);
+  for (int k= 0; k < N(ligs); k++) {
+    array<unsigned int>& lig= ligs[k];
+    int  j = i;
+    bool ok= true;
+    for (int c= 1; c < N(lig) && ok; c++) {
+      if (j >= N(s)) ok= false;
+      else ok= (glyph_index_of (face, read_unicode_char (s, j)) == lig[c]);
+    }
+    if (ok) { i= j; return 0xc000000 + lig[0]; }
+  }
+  return uc;
+}
+
 unsigned int
 unicode_font_rep::ligature_replace (unsigned int uc, string s, int& i) {
   int n= N(s);
@@ -814,9 +860,7 @@ unicode_font_rep::get_extents (string s, metric& ex) {
   }
   else {
     int i= 0, n= N(s);
-    unsigned int uc= read_unicode_char (s, i);
-    if (ligs > 0 && (uc == 'f' || uc == 's'))
-      uc= ligature_replace (uc, s, i);
+    unsigned int uc= read_glyph (s, i, true);
     metric_struct* first= fnm->get (uc);
     ex->x1= ROUND (first->x1);
     ex->y1= ROUND (first->y1);
@@ -830,9 +874,7 @@ unicode_font_rep::get_extents (string s, metric& ex) {
 
     while (i<n) {
       unsigned int pc= uc;
-      uc= read_unicode_char (s, i);
-      if (ligs > 0 && (uc == 'f' || uc == 's'))
-        uc= ligature_replace (uc, s, i);
+      uc= read_glyph (s, i, true);
       x += ROUND (fnm->kerning (pc, uc));
       metric_struct* next= fnm->get (uc);
       ex->x1= min (ex->x1, x+ ROUND (next->x1));
@@ -860,9 +902,7 @@ unicode_font_rep::get_xpositions (string s, SI* xpos, bool ligf) {
   while (i<n) {
     int start= i;
     unsigned int pc= uc;
-    uc= read_unicode_char (s, i);
-    if (ligs > 0 && ligf && (uc == 'f' || uc == 's'))
-      uc= ligature_replace (uc, s, i);
+    uc= read_glyph (s, i, ligf);
     if (pc != 0xffffffff) x += ROUND (fnm->kerning (pc, uc));
     metric_struct* next= fnm->get (uc);
     for (int j= start; j<i; j++) xpos[j]= x;
@@ -878,17 +918,27 @@ unicode_font_rep::get_xpositions (string s, SI* xpos) {
   get_xpositions (s, xpos, true);
 }
 
+// The characters which modify the emoji before them: the variation
+// selectors, the zero width joiner, the keycap and the tags
+static bool
+is_emoji_mark (unsigned int c) {
+  return (c >= 0xfe00 && c <= 0xfe0f) || c == 0x200d || c == 0x20e3 ||
+         (c >= 0xe0020 && c <= 0xe007f);
+}
+
 void
 unicode_font_rep::draw_fixed (renderer ren, string s, SI x, SI y, bool ligf) {
   int i= 0, n= N(s);
   unsigned int uc= 0xffffffff;
   while (i<n) {
     unsigned int pc= uc;
-    uc= read_unicode_char (s, i);
-    if (ligs > 0 && ligf && (uc == 'f' || uc == 's'))
-      uc= ligature_replace (uc, s, i);
+    uc= read_glyph (s, i, ligf);
     if (pc != 0xffffffff) x += ROUND (fnm->kerning (pc, uc));
-    ren->draw (uc, fng, x, y);
+    if (!color_font) ren->draw (uc, fng, x, y);
+    else if (!draw_color_glyph (ren, uc, x, y) && !is_emoji_mark (uc))
+      // (what is left of a sequence of emoji is not drawn: the font may
+      // not even have it, and would draw the box of a missing glyph)
+      ren->draw (uc, fng, x, y);
     metric_struct* ex= fnm->get (uc);
     x += ROUND (ex->x2);
     //if (fnm->kerning (pc, uc) != 0)
@@ -899,6 +949,34 @@ unicode_font_rep::draw_fixed (renderer ren, string s, SI x, SI y, bool ligf) {
 void
 unicode_font_rep::draw_fixed (renderer ren, string s, SI x, SI y) {
   draw_fixed (ren, s, x, y, true);
+}
+
+// A glyph of a color font (COLR): its layers one above the other, each an
+// ordinary glyph in its own color, so that every renderer draws it as it
+// draws text, and a PDF keeps it as vectors
+bool
+unicode_font_rep::draw_color_glyph (renderer ren, unsigned int uc,
+                                    SI x, SI y) {
+  array<int> codes;
+  array<color> colors;
+  array<bool> text;
+  if (!tt_color_layers (fng, uc, codes, colors, text)) return false;
+  pencil pen= ren->get_pencil ();
+  int fr, fg, fb, fa;
+  get_rgb_color (pen->get_color (), fr, fg, fb, fa);
+  for (int k= 0; k < N(codes); k++) {
+    if (text[k]) ren->set_pencil (pen);
+    else {
+      // the opacity of the text applies to the colors of the layers too
+      int r, g, b, a;
+      get_rgb_color (colors[k], r, g, b, a);
+      ren->set_pencil (pencil (rgb_color (r, g, b, (a * fa + 127) / 255),
+                               pen->get_width ()));
+    }
+    ren->draw (codes[k], fng, x, y);
+  }
+  ren->set_pencil (pen);
+  return true;
 }
 
 
@@ -912,18 +990,14 @@ unicode_font_rep::magnify (double zoomx, double zoomy) {
 void
 unicode_font_rep::advance_glyph (string s, int& pos, bool ligf) {
   if (pos >= N(s)) return;
-  unsigned int uc= read_unicode_char (s, pos);
-  if (ligs > 0 && ligf && (uc == 'f' || uc == 's'))
-    uc= ligature_replace (uc, s, pos);
+  (void) read_glyph (s, pos, ligf);
 }
 
 glyph
 unicode_font_rep::get_glyph (string s) {
   int i= 0, n= N(s);
   if (n == 0) return font_rep::get_glyph (s);
-  unsigned int uc= read_unicode_char (s, i);
-  if (ligs > 0 && (uc == 'f' || uc == 's'))
-    uc= ligature_replace (uc, s, i);
+  unsigned int uc= read_glyph (s, i, true);
   if (i != n) return font_rep::get_glyph (s);
   glyph gl= fng->get (uc);
   if (is_nil (gl)) return font_rep::get_glyph (s);
@@ -934,9 +1008,7 @@ int
 unicode_font_rep::index_glyph (string s, font_metric& rm, font_glyphs& rg) {
   int i= 0, n= N(s);
   if (n == 0) return font_rep::index_glyph (s, rm, rg);
-  unsigned int uc= read_unicode_char (s, i);
-  if (ligs > 0 && (uc == 'f' || uc == 's'))
-    uc= ligature_replace (uc, s, i);
+  unsigned int uc= read_glyph (s, i, true);
   if (i != n) return font_rep::index_glyph (s, rm, rg);
   glyph gl= fng->get (uc);
   if (is_nil (gl)) return font_rep::index_glyph (s, rm, rg);

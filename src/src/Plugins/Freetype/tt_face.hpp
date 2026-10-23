@@ -36,6 +36,17 @@ struct tt_face_rep: rep<tt_face> {
   bool         gpos_kern_ready= false;
   // the pair kerning of the GPOS 'kern' feature (cached)
   ot_gpos_kern gpos_kern ();
+  hashmap<string,ot_gsub_ligatures> gsub_ligature_table;
+  // the ligatures of a GSUB feature (cached)
+  ot_gsub_ligatures& gsub_ligatures (string tag);
+  bool         colors_ready= false;
+  array<color> palette;
+  // the layers of a glyph of a color font (COLR version 0), from the
+  // bottom up: the glyph of each layer and the index of its color in the
+  // palette (CPAL), -1 for the color of the text; false for a glyph which
+  // has no layers
+  bool color_layers (unsigned int gid, array<int>& layers,
+                     array<int>& colors);
 
   tt_face_rep (string name);
   ~tt_face_rep () override;
@@ -63,6 +74,7 @@ struct tt_font_glyphs_rep: font_glyphs_rep {
   //bool* done;
   tt_font_glyphs_rep (string name, string family, int size, int hdpi, int vdpi);
   glyph& get (int char_code);
+  glyph color_glyph_union (glyph base, array<int> layers);
 };
 
 tt_face load_tt_face (string name);
@@ -70,6 +82,13 @@ tt_face load_tt_face (string name);
 // get makes its bitmap: false when the font is not a FreeType font (see
 // tt_face.cpp for the commands and the units)
 bool tt_glyph_outline (font_glyphs fng, int i, array<int>& cmds, array<double>& pts);
+// the layers of the glyph of a character of a color font, as characters of
+// the same font (native glyphs), with their colors; text[k] when layer k has
+// the color of the text: false when the glyph has no colors
+bool tt_color_layers (font_glyphs fng, int i, array<int>& codes,
+                      array<color>& colors, array<bool>& text);
+// whether the glyphs of a FreeType font may have colors (COLR, CPAL)
+bool tt_color_font (font_glyphs fng);
 // the glyph of a character of a FreeType font in shades of grey, at shrinkf
 // times less than the resolution of get (see tt_face.cpp): false when the
 // font is not a FreeType font

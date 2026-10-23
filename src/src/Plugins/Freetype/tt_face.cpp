@@ -15,6 +15,7 @@
 #include "tt_file.hpp"
 #include "tm_timer.hpp"
 #include "sys_utils.hpp"
+#include "colors.hpp"
 
 #ifdef USE_FREETYPE
 
@@ -103,6 +104,17 @@ tt_face_rep::gsub_feature (string tag) {
   return gsub_features (tag);
 }
 
+ot_gsub_ligatures&
+tt_face_rep::gsub_ligatures (string tag) {
+  if (!gsub_ligature_table->contains (tag)) {
+    ot_gsub_ligatures m;
+    if (buffer != nullptr)
+      m= parse_gsub_ligatures ((const char*) buffer, buffer_size, tag);
+    gsub_ligature_table (tag)= m;
+  }
+  return gsub_ligature_table (tag);
+}
+
 array<string>
 tt_face_rep::gsub_tags () {
   if (!gsub_tags_ready) {
@@ -125,6 +137,39 @@ tt_face_rep::gpos_kern () {
   return gpos_kern_table;
 }
 
+bool
+tt_face_rep::color_layers (unsigned int gid, array<int>& layers,
+                           array<int>& colors) {
+#ifdef FT_HAS_COLOR_LAYERS
+  if (bad_face || ft_get_color_glyph_layer == NULL) return false;
+  if (!colors_ready) {
+    colors_ready= true;
+    FT_Palette_Data pd;
+    FT_Color* pal= NULL;
+    if (!ft_palette_data_get (ft_face, &pd) && pd.num_palettes > 0 &&
+        !ft_palette_select (ft_face, 0, &pal) && pal != NULL)
+      for (int k= 0; k < (int) pd.num_palette_entries; k++)
+        palette << rgb_color (pal[k].red, pal[k].green, pal[k].blue,
+                              pal[k].alpha);
+  }
+  if (N(palette) == 0) return false;
+  layers= array<int> ();
+  colors= array<int> ();
+  FT_LayerIterator it;
+  it.p= NULL;
+  FT_UInt lg, ci;
+  while (ft_get_color_glyph_layer (ft_face, gid, &lg, &ci, &it)) {
+    layers << (int) lg;
+    // 0xFFFF: the color of the text
+    colors << ((ci >= (FT_UInt) N(palette))? -1: (int) ci);
+  }
+  return N(layers) > 0;
+#else
+  (void) gid; (void) layers; (void) colors;
+  return false;
+#endif
+}
+
 tt_face_rep::~tt_face_rep () {
   std_warning << "tt_face_rep should not be deleted\n";
   if (ft_face) ft_done_face (ft_face);
@@ -142,6 +187,15 @@ load_tt_face (string name) {
 /******************************************************************************
 * Font metrics
 ******************************************************************************/
+
+// The characters which only modify the emoji around them: the variation
+// selectors, the zero width joiner, the keycap and the tags (of the flags
+// of regions)
+static bool
+is_emoji_mark (int c) {
+  return (c >= 0xfe00 && c <= 0xfe0f) || c == 0x200d || c == 0x20e3 ||
+         (c >= 0xe0020 && c <= 0xe007f);
+}
 
 static metric error_metric;
 
@@ -197,6 +251,29 @@ tt_font_metric_rep::get (int i) {
     M->y3= dy - hh;
     M->x4= dx + ww;
     M->y4= dy;
+    array<int> layers, colors;
+    if (face->color_layers (glyph_index, layers, colors)) {
+      // a glyph of a color font, whose own outline is often empty: the
+      // boxes of its layers
+      for (int k= 0; k < N(layers); k++) {
+        metric_struct* L= get (0xc000000 + layers[k]);
+        if (k == 0) {
+          M->y1= L->y1; M->y2= L->y2;
+          M->x3= L->x3; M->y3= L->y3; M->x4= L->x4; M->y4= L->y4;
+        }
+        else {
+          M->y1= min (M->y1, L->y1); M->y2= max (M->y2, L->y2);
+          M->x3= min (M->x3, L->x3); M->y3= min (M->y3, L->y3);
+          M->x4= max (M->x4, L->x4); M->y4= max (M->y4, L->y4);
+        }
+      }
+    }
+    else if (N(face->palette) > 0 && is_emoji_mark (i)) {
+      // in a color font, what is left of a sequence of emoji which is not
+      // one of its ligatures takes no room
+      M->x2= M->x3= M->x4= 0;
+      M->y1= M->y2= M->y3= M->y4= 0;
+    }
     //cout << "Glyph " << i << " of " << res_name << "\n";
     //cout << "Logical : " << M->x1/PIXEL << ", " << M->y1/PIXEL
     //     << "; " << M->x2/PIXEL << ", " << M->y2/PIXEL << "\n";
@@ -269,6 +346,35 @@ tt_font_glyphs_rep::tt_font_glyphs_rep (
 * 4 close, with their points, in pixels of the font (y up, the origin of the
 * glyph at 0)
 ******************************************************************************/
+
+bool
+tt_color_font (font_glyphs fng) {
+  tt_font_glyphs_rep* g= dynamic_cast<tt_font_glyphs_rep*> (fng.operator-> ());
+  if (g == NULL || g->face->bad_face) return false;
+  array<int> layers, cols;
+  (void) g->face->color_layers (0, layers, cols); // reads the palette
+  return N(g->face->palette) > 0;
+}
+
+bool
+tt_color_layers (font_glyphs fng, int i, array<int>& codes,
+                 array<color>& colors, array<bool>& text) {
+  tt_font_glyphs_rep* g= dynamic_cast<tt_font_glyphs_rep*> (fng.operator-> ());
+  if (g == NULL || g->face->bad_face) return false;
+  tt_face face= g->face;
+  array<int> layers, cols;
+  if (!face->color_layers (decode_index (face->ft_face, i), layers, cols))
+    return false;
+  codes= array<int> ();
+  colors= array<color> ();
+  text= array<bool> ();
+  for (int k= 0; k < N(layers); k++) {
+    codes  << (0xc000000 + layers[k]);
+    colors << ((cols[k] < 0)? ((color) 0): face->palette[cols[k]]);
+    text   << (cols[k] < 0);
+  }
+  return true;
+}
 
 bool
 tt_glyph_outline (font_glyphs fng, int i, array<int>& cmds, array<double>& pts) {
@@ -396,6 +502,38 @@ tt_glyph_coverage (font_glyphs fng, int i, int shrinkf, int flags, double bold,
   return true;
 }
 
+glyph
+tt_font_glyphs_rep::color_glyph_union (glyph G, array<int> layers) {
+  array<glyph> gs;
+  int x1= 0, y1= 0, x2= 0, y2= 0;
+  for (int k= 0; k < N(layers); k++) {
+    glyph L= get (0xc000000 + layers[k]);
+    if (is_nil (L) || L->width * L->height == 0) continue;
+    // the pixels of L from -xoff to width - xoff, and from yoff - height
+    // to yoff upwards
+    int lx1= -L->xoff, lx2= L->width - L->xoff;
+    int ly1= L->yoff - L->height, ly2= L->yoff;
+    if (N(gs) == 0) { x1= lx1; x2= lx2; y1= ly1; y2= ly2; }
+    else {
+      x1= min (x1, lx1); x2= max (x2, lx2);
+      y1= min (y1, ly1); y2= max (y2, ly2);
+    }
+    gs << L;
+  }
+  if (N(gs) == 0) return G;
+  glyph U (x2 - x1, y2 - y1, -x1, y2);
+  U->index = G->index;
+  U->lwidth= G->lwidth;
+  for (int k= 0; k < N(gs); k++) {
+    glyph L= gs[k];
+    int dx= -L->xoff - x1, dy= y2 - L->yoff;
+    for (int y= 0; y < L->height; y++)
+      for (int x= 0; x < L->width; x++)
+        if (L->get_1 (x, y)) U->set_1 (x + dx, y + dy, 1);
+  }
+  return U;
+}
+
 glyph&
 tt_font_glyphs_rep::get (int i) {
   if (!face->bad_face && !fng->contains(i)) {
@@ -432,6 +570,11 @@ tt_font_glyphs_rep::get (int i) {
     }
     //cout << "Glyph " << i << " of " << res_name << "\n";
     //cout << G << "\n";
+    array<int> layers, colors;
+    if (face->color_layers (glyph_index, layers, colors))
+      // a glyph of a color font: in one color, the union of its layers (the
+      // renderers draw the layers in their colors, see unicode_font.cpp)
+      G= color_glyph_union (G, layers);
     if (G->width * G->height == 0) G= error_glyph;
     fng(i)= G;
   }
