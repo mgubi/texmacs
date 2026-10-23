@@ -818,8 +818,17 @@ Two consequences:
   correct if they are pure. #333 shows a working answer in the typesetter:
   record what each unit reads and writes, replay the writes on reuse, and
   number the automatic labels by the tag that produces them (see the plan).
-- **Memory.** Memorizers are released by reference counts; the global table
-  grows with the document and the edits. Nothing measures it yet.
+- **Memory.** Memorizers are released by reference counts; each one is held
+  by the slot of the evaluation stack where it was last computed, so the
+  global table holds one evaluation of the document, not the history of
+  the edits. Measured (October 23) on Joris's `effreal` (13 pages), with
+  the editor typesetting the rewritten tree, headless, 3000 edits in the
+  middle of the text (a letter typed, then removed): the table stays at
+  19595 memorizers from the first to the last edit, the same with 600
+  paragraphs made and joined; the process starts 8 MB larger than with the
+  usual typesetting (about 400 bytes per memorizer), and then grows by
+  2293 bytes per edit, against 2243 with the usual typesetting (the undo
+  history of the editor): the rewriter keeps nothing per edit.
 - **A difference which is the typesetter's.** A table whose width is in
   `par`, laid out lazily, takes its width again from the cell only when
   `table-width` is written as an atom (`table.cpp`, `lazy_table_rep::produce`
@@ -891,8 +900,9 @@ Two consequences:
 5. **Laziness** (first stage done, see *Incremental typesetting*).
    Connect the memorizers to the typesetter's invalidation, so
    that an edit only retypesets what the evaluation changed; benchmark
-   against the current typesetter with the #333 scripts; bound the memory
-   of the global memorizer table.
+   against the current typesetter with the #333 scripts. (The memory of
+   the global memorizer table is bounded by the document, see *Open
+   questions*.)
 
 On the way, the #333 check modes and fuzzer can compare the rewriter's
 expansion with what `exec` computes for the same document.
@@ -929,6 +939,11 @@ flag, and the time of typing:
 
     tests/style/compare-edits.sh document.tm...
     tests/style/bench-typing.sh document.tm...
+
+and the memory over many edits (the size of the memorizer table and of
+TeXmacs every 100 edits, see *Memory* above):
+
+    tests/style/memory-edits.sh document.tm [n [same|para [0|1]]]
 
 It is not listed in `check-master.scm`, since the rewriter exists only in
 the experimental build (elsewhere the suite fails at once, saying so). It
