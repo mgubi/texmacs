@@ -6427,6 +6427,22 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(buffer-set-read-only <scm-arg|url> <scm-arg|bool>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|set_buffer_read_only> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(buffer-read-only? <scm-arg|url>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|is_buffer_read_only> which returns
+    <scm|bool>.
+  </explain>
+
+  <\explain>
     <scm|(buffer-pretend-autosaved <scm-arg|url>)>
 <explain-synopsis|no synopsis>
   <|explain>

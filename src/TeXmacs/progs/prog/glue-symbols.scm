@@ -828,6 +828,8 @@
 "buffer-modified-since-autosave?"
 "buffer-pretend-modified"
 "buffer-pretend-saved"
+"buffer-set-read-only"
+"buffer-read-only?"
 "buffer-pretend-autosaved"
 "buffer-attach-notifier"
 "buffer-has-name?"

@@ -22,12 +22,12 @@ have the details, and the problems go to the
 - The messages of the error console (Debug > Error messages, which opens
   by itself on a warning) and of the debugging console are shown in a
   read-only editor: they can be selected and copied as in a document,
-  and nothing typed, pasted or undone changes them. A new message is
-  added at the end without losing the selection; a console opens at its
-  latest messages and follows the new ones while its cursor is at the
-  end, also when it is not the window in use. The console which opens by
-  itself no longer takes the keyboard from the document being typed in,
-  and closing it leaves no buffer behind.
+  and nothing typed, pasted, dropped, undone or done from a menu changes
+  them. A new message is added at the end without losing the selection;
+  a console opens at its latest messages and follows the new ones while
+  its cursor is at the end, also when it is not the window in use. The
+  console which opens by itself no longer takes the keyboard from the
+  document being typed in, and closing it leaves no buffer behind.
 - **Vue**: closing a window closes the buffers of the editors inside it
   (texmacs-input, as in the macro editors), also inside popups, balloons
   and scrolled areas: they stayed among the buffers.

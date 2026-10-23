@@ -91,18 +91,25 @@
                  (lambda () (and (== (shown-messages) 14) (not (shows? "zzz")))))
        (gt-check "read only: nothing to save"
                  (lambda () (not (buffer-modified? (all-buffer)))))
-       ;; (a change made otherwise than by the keys or the mouse, as a
-       ;; command of the menu bar of the Mac, goes with the next message)
+       ;; (a command of a menu, as the menu bar of the Mac, runs between
+       ;; start-editing and end-editing, as before_menu_action and
+       ;; after_menu_action do)
        (gt-eval (lambda ()
                   (with-buffer (all-buffer)
+                    (start-editing)
                     (go-start)
-                    (insert "zzz by a command"))))
+                    (insert "zzz by a command")
+                    (end-editing))))
+       (gt-check "read only: a menu command changes nothing"
+                 (lambda () (and (not (shows? "zzz by a command"))
+                                 (== (shown-messages) 14)
+                                 (not (buffer-modified? (all-buffer))))))
        (gt-eval (lambda () (warn "after a command")))
        (gt-wait 500)
-       (gt-check "read only: a change by a command is undone"
-                 (lambda () (and (not (shows? "zzz by a command"))
-                                 (shows? "after a command")
-                                 (not (buffer-modified? (all-buffer))))))
+       (gt-check "the messages still come"
+                 (lambda () (shows? "after a command")))
+       (gt-check "the console is read only"
+                 (lambda () (buffer-read-only? (all-buffer))))
        (gt-eval (lambda ()
                   (for (i (.. 0 120))
                     (warn (string-append "message " (number->string i))))))

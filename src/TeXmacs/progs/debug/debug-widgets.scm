@@ -136,8 +136,7 @@
         ;; (the messages only: a new body left the cursor of a console
         ;; being used outside of it, and the next change failed on it)
         (if d (tree-assign! d (cAr (cAr doc)))
-            (buffer-set-body u doc))
-        (buffer-pretend-saved u)))))
+            (buffer-set-body u doc))))))
 
 ;; A change of the document cancels its selection: the selection of a
 ;; console is kept, its paths moved by the number k of messages removed
@@ -170,10 +169,7 @@
          (k (list-drop-common old new))
          (d (console-messages-tree u))
          (end? (console-at-end? u)))
-    ;; (a console changed otherwise than by the keys, the mouse or a drop,
-    ;; say by a command of the menu bar of the Mac, gets its messages back)
-    (cond ((buffer-modified? u) (console-reset u))
-          ((== old new) (noop))
+    (cond ((== old new) (noop))
           ((or (not k) (not d) (null? old)) (console-reset u))
           (else
             (let* ((added (list-tail new (- (length old) k)))
@@ -182,7 +178,6 @@
               (when (nnull? added)
                 (tree-insert! d (tree-arity d) (map build-message added)))
               (ahash-set! console-shown (url->unix u) new)
-              (buffer-pretend-saved u)
               (console-restore-selection-in u sel k))))
     ;; a console whose cursor is at the end follows it, as a log
     (when end? (console-go-end u))))
@@ -198,6 +193,11 @@
 (define (console-buffer-list)
   (list-filter (map unix->url (ahash-set->list console-buffers))
                buffer-exists?))
+
+(define (console-buffers-of kind)
+  (list-filter (console-buffer-list)
+               (lambda (u)
+                 (== (car (ahash-ref console-buffers (url->unix u))) kind))))
 
 (define (reset-console-buffers)
   (for (u (console-buffer-list))
@@ -223,35 +223,6 @@
       (when (== (car info) kind)
         (ahash-remove! console-buffers key)
         (ahash-remove! console-shown key)))))
-
-;; Read only: whatever a key, a mouse action or a drop changed in a console
-;; (typing, pasting, deleting, undoing) is replaced by the messages, once
-;; the editor is done with the event (it still corrects the paths of what
-;; it changed). The editing commands go through these handlers, and the
-;; console has no menus of its own; its buffers are never saved
-;; (pretend-saved)
-
-(define (console-protect u)
-  (when (buffer-modified? u)
-    (delayed
-      (:idle 1)
-      (when (buffer-modified? u) (console-reset u)))))
-
-(tm-define (keyboard-press key time)
-  (:require (console-buffer? (current-buffer)))
-  (with u (current-buffer)
-    (former key time)
-    (console-protect u)))
-
-(tm-define (mouse-event key x y mods time data)
-  (:require (console-buffer? (current-buffer)))
-  (with u (current-buffer)
-    (former key x y mods time data)
-    (console-protect u)))
-
-(tm-define (mouse-drop-event x y obj)
-  (:require (console-buffer? (current-buffer)))
-  (noop))
 
 (tm-widget ((console-widget kind))
   (responsive-tabs
@@ -315,12 +286,15 @@
                 (lambda x
                   (ahash-remove! console-active? kind)
                   (forget-console kind)))
+    ;; read only: what one does in a console does not change it (see
+    ;; set_buffer_read_only), the messages are added by the program
+    (for (u (console-buffers-of kind))
+      (buffer-set-read-only u #t))
     ;; the consoles begin at the end, the latest messages, and follow them
     (delayed
       (:idle 1)
-      (for (u (console-buffer-list))
-        (when (== (car (ahash-ref console-buffers (url->unix u))) kind)
-          (console-go-end u))))))
+      (for (u (console-buffers-of kind))
+        (console-go-end u)))))
 
 (tm-define (open-debug-console)
   (open-console "Debugging console"))

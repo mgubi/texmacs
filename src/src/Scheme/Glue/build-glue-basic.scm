@@ -903,6 +903,8 @@
   (buffer-modified-since-autosave? buffer_modified_since_autosave (bool url))
   (buffer-pretend-modified pretend_buffer_modified (void url))
   (buffer-pretend-saved pretend_buffer_saved (void url))
+  (buffer-set-read-only set_buffer_read_only (void url bool))
+  (buffer-read-only? is_buffer_read_only (bool url))
   (buffer-pretend-autosaved pretend_buffer_autosaved (void url))
   (buffer-attach-notifier attach_buffer_notifier (void url))
   (buffer-has-name? buffer_has_name (bool url))
