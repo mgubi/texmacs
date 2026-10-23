@@ -280,6 +280,33 @@ matches_whole (string s, tree w) {
 }
 
 static int
+concat_occurrence (string s, tree w, path q, path cur, bool wildcard) {
+  // idem for a concat w of strings and wildcards which starts with a
+  // string (followed by a wildcard): the start, not before cur, of the
+  // match which ends at the end of s, or of any match before a wildcard;
+  // -1 if none. If a match starts at an occurrence of the first string,
+  // one starts at the first occurrence (its wildcard takes the gap), so
+  // only that one is tried; the hits of search_string, the shortest and
+  // without overlaps, missed it (#481)
+  s= case_fold (s);
+  w= case_fold_pattern (w);
+  if (N(w) == 0 || !is_atomic (w[0]) || N(w[0]->label) == 0) return -1;
+  int from= 0;
+  if (!path_less_eq (cur, q * 0)) {
+    if (!(q <= cur)) return -1;
+    from= (cur / q)->item;
+  }
+  int at= tm_search_forwards (w[0]->label, from, s);
+  if (at < 0) return -1;
+  bool initial= initial_match_flag;
+  initial_match_flag= wildcard;
+  int start, end;
+  bool ok= match_atomic_at (s, w, at, 0, start, end);
+  initial_match_flag= initial;
+  return ok? at: -1;
+}
+
+static int
 string_occurrence (string s, string w, path q, path cur, bool wildcard) {
   // the start of the occurrence of w in the string s (at the path q) with
   // which a match starts, not before cur: the first one when a wildcard
@@ -341,6 +368,31 @@ search_concat_sub (tree t, tree what, int pos, int i,
                                    wildcard);
         if (at < 0) continue;
         p1= (p * pos) * at;
+        if (search_concat (t, what, pos+1, j, p, cur, p1, p2, inside, failed))
+          return true;
+        continue;
+      }
+      if (i == 0 && !is_atomic (swhat) && is_atomic (swhat[0])) {
+        // idem for strings and wildcards which start with a string
+        bool wildcard= is_func (what[j], WILDCARD, 1);
+        int at= concat_occurrence (t[pos]->label, swhat, p * pos, cur,
+                                   wildcard);
+        if (at < 0) continue;
+        p1= (p * pos) * at;
+        if (search_concat (t, what, pos+1, j, p, cur, p1, p2, inside, failed))
+          return true;
+        continue;
+      }
+      if (i == 0 && is_func (what[0], WILDCARD, 1) &&
+          j < N(what) && !is_func (what[j], WILDCARD, 1)) {
+        // a leading wildcard and strings before an element which is not a
+        // wildcard: the string ends as the part does (the wildcard takes
+        // the rest of it), and the match starts at the start of the formula
+        // (the shortest hits of search_string missed bb at the end of bbb,
+        // #489)
+        p1= (p * 0) * start (t[0]);
+        if (!path_less_eq (cur, p1)) return false;
+        if (!matches_whole (t[pos]->label, swhat)) continue;
         if (search_concat (t, what, pos+1, j, p, cur, p1, p2, inside, failed))
           return true;
         continue;
@@ -693,14 +745,22 @@ select (range_set& sel, tree t, tree what, path p) {
 ******************************************************************************/
 
 static tree
-without_empty_strings (tree what) {
+without_empty_strings (tree what, bool join) {
   // an empty string in a concat pattern matches the empty string: it is
-  // left out, also inside the tags of the pattern (#452)
+  // left out, also inside the tags of the pattern (#452); two strings in a
+  // row are joined, as tree-simplify does in the editor (the search of a
+  // part of the pattern which starts with a string assumes it: #481),
+  // unless the pattern selects a region, where each child of a concat is
+  // matched with a child of its own
   if (is_atomic (what)) return what;
   tree r (L(what));
   for (int i=0; i<N(what); i++) {
-    tree w= without_empty_strings (what[i]);
-    if (!is_concat (what) || w != "") r << w;
+    tree w= without_empty_strings (what[i], join);
+    if (is_concat (what) && w == "") continue;
+    if (join && is_concat (what) && is_atomic (w) &&
+        N(r) > 0 && is_atomic (r[N(r)-1]))
+      r[N(r)-1]= tree (r[N(r)-1]->label * w->label);
+    else r << w;
   }
   if (is_concat (what) && N(r) == 0) return "";
   // a concat of one element is that element, as tree-simplify keeps it
@@ -710,9 +770,9 @@ without_empty_strings (tree what) {
 
 range_set
 search (tree t, tree what, path p, int limit) {
-  what= without_empty_strings (what);
   search_max_hits= limit;
-  initialize_search ();
+  initialize_search ();  // also the label select-region, needed just below
+  what= without_empty_strings (what, !contains_select_region (what));
   range_set sel;
   //cout << "Search " << what << ", " << contains_select_region (what) << "\n";
   if (contains_select_region (what)) select (sel, t, what, p);
@@ -724,9 +784,9 @@ search (tree t, tree what, path p, int limit) {
 
 range_set
 search (tree t, tree what, path p, path pos, int limit) {
-  what= without_empty_strings (what);
   search_max_hits= limit;
-  initialize_search ();
+  initialize_search ();  // also the label select-region, needed just below
+  what= without_empty_strings (what, !contains_select_region (what));
   range_set sel;
   //cout << "Search " << what << ", " << contains_select_region (what) << "\n";
   if (contains_select_region (what)) select (sel, t, what, p);

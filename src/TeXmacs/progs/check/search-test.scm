@@ -553,6 +553,58 @@
               (check-true (< (car r) 500))))))
       '(search replace))))
 
+;; a pattern which starts with strings and wildcards: the match starts at
+;; the first place where the rest matches, as for a string (#481); before
+;; a tag, it ends at the end of the string
+(define (test-strings-and-wildcards-first)
+  (check-group "strings and wildcards first")
+  (check-both '(document (concat "aaa" (rsub "y")))
+              '(concat "a" (wildcard "x") "a" (rsub "y"))
+              '((0 0 0) (0 1 1)))
+  (check-both '(document (concat "aaaa" (rsub "y")))
+              '(concat "aa" (wildcard "x") "a" (rsub "y"))
+              '((0 0 0) (0 1 1)))
+  (check-both '(document (concat "xab" (rsub "y")))
+              '(concat "a" (wildcard "x") "b" (rsub "y"))
+              '((0 0 1) (0 1 1)))
+  (check-both '(document (concat "xaa" (rsub "y")))
+              '(concat "a" (wildcard "x") "b" (rsub "y"))
+              '())
+  ;; two strings in a row in a pattern (from Scheme, or left by an empty
+  ;; string between them) are one string
+  (check-both '(document (concat "aab" (rsub "1")))
+              '(concat "a" "b" (rsub "1"))
+              '((0 0 1) (0 1 1)))
+  (check-both '(document (concat "xaab" (rsub "1")))
+              '(concat "a" "" "b" (wildcard "x") (rsub "1"))
+              '((0 0 2) (0 1 1)))
+  ;; but not when the pattern selects a region: each of its children is
+  ;; matched with a child of its own (also in the first search of a session)
+  (check-both '(document (concat "x" (frac "1" "2") "a" (rsub "1") "b"))
+              '(concat (select-region "x") "a" "b")
+              '((0 0 0) (0 0 1)))
+  ;; a leading wildcard and strings before a tag: the string ends as the
+  ;; part does, and the match starts at the start of the formula (#489)
+  (check-both '(document (concat "bbb" (rsub "y")))
+              '(concat (wildcard "x") "bb" (rsub "y"))
+              '((0 0 0) (0 1 1)))
+  (check-both '(document (concat (rsub "z") "cbbb" (rsub "y")))
+              '(concat (wildcard "x") "bb" (rsub "y"))
+              '((0 0 0) (0 2 1)))
+  (check-both '(document (concat "xabb" (rsub "y")))
+              '(concat (wildcard "w") "a" (wildcard "v") "b" (rsub "y"))
+              '((0 0 0) (0 1 1)))
+  (check-both '(document (concat "bbx" (rsub "y")))
+              '(concat (wildcard "x") "bb" (rsub "y"))
+              '())
+  ;; before a wildcard: as the same text as one string, abxyacabxyc
+  (with-search-mode 'search
+    (lambda ()
+      (check= (hits '(document (concat "ab" (frac "x" "y") "acab"
+                                       (frac "x" "y") "c"))
+                    '(concat "a" (wildcard "x") "b" (wildcard "y") "c"))
+              '((0 0 0) (0 2 2) (0 2 2) (0 4 1))))))
+
 ;; a string of 100000 characters and a pattern of a string and a wildcard,
 ;; with partial matches: the starts were tried by a recursion per character,
 ;; which overflowed the stack and crashed TeXmacs (#479)
@@ -588,6 +640,7 @@
   (test-paragraphs)
   (test-limit-and-position)
   (test-middle-strings)
+  (test-strings-and-wildcards-first)
   (test-speed)
   (test-long-strings)
   (check-end))
