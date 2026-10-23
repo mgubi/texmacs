@@ -827,8 +827,9 @@ Two consequences:
   The figures of the standard styles give `<value|figure-width>`, so a
   figure in a table cell keeps the width of the page (Joris's `issac12`:
   two figures side by side overlap); the rewriter gives `1par`, and the
-  figure fits its cell. Fixing the typesetter (an `exec`) would change the
-  layout of such documents without the rewriter too: to decide.
+  figure fits its cell. Settled in the typesetter by #429 (here since the
+  merge of `upsilon_texmacs` of October 23): `format_table` executes the
+  width once and keeps it, and `produce` reads it from there.
 
 ## Plan
 
