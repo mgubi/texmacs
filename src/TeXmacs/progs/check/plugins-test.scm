@@ -1077,6 +1077,14 @@
       (set! python-command saved)
       r)))
 
+(define (commands-run thunk)
+  ;; the commands which @thunk runs with eval-system (none is run)
+  (let ((saved eval-system) (cmds '()))
+    (set! eval-system (lambda (cmd . opt) (set! cmds (cons cmd cmds)) ""))
+    (check-run thunk)
+    (set! eval-system saved)
+    (reverse cmds)))
+
 ;; The availability of plugins rests on looking for programs in the path,
 ;; and the plugins which are not sessions run external commands.
 (define (test-external)
@@ -1101,6 +1109,13 @@
              (list-filter (python-requirements)
                           (lambda (r) (eval r (current-module))))))
           '())
+  ;; nor does the jupyter plugin run its script to list the kernels: the
+  ;; command would be the script alone, which Windows fails to launch at
+  ;; each start of a plugin
+  (when (defined? 'plugin->jupyter)
+    (check= (without-python
+             (lambda () (commands-run (lambda () (plugin->jupyter "python")))))
+            '()))
   )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
