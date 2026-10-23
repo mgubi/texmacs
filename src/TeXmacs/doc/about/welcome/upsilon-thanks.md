@@ -37,3 +37,6 @@ named differently, open an issue or say so in your report.
 - **mlalaude**: the preferences of the AI sessions, and a session asked a
   question without an API key (#398).
 - **amichail**: the icon bars at the right of the document (#404).
+- **baudoly**: two windows on one document (#463, #464), the preferences
+  with Inkscape installed (#465), dialogs with an accented title in Cocoa
+  (#468), each with its cause found and a fix.
