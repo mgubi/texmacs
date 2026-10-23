@@ -171,6 +171,14 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(gui-set-next-window-without-focus)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|gui_set_next_window_without_focus> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
     <scm|(support-functionality? <scm-arg|string>)>
 <explain-synopsis|no synopsis>
   <|explain>
@@ -5968,6 +5976,22 @@ source code.
   <|explain>
     Calls the <c++> function <cpp|pretend_buffer_saved> which returns
     <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(buffer-set-read-only <scm-arg|url> <scm-arg|bool>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|set_buffer_read_only> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(buffer-read-only? <scm-arg|url>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|is_buffer_read_only> which returns
+    <scm|bool>.
   </explain>
 
   <\explain>

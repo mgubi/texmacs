@@ -400,6 +400,23 @@ buffer_modified (url name) {
   return buf->needs_to_be_saved ();
 }
 
+// A read-only buffer can be read, searched, selected and copied, but what
+// one does in its editor does not change it: the changes made by a key, a
+// mouse action, a drop or a menu command are cancelled at the end of the
+// event (edit_modify_rep::end_editing), and there is no undo. The program
+// still changes it (the messages of the console, debug-widgets.scm)
+void
+set_buffer_read_only (url name, bool flag) {
+  tm_buffer buf= concrete_buffer (name);
+  if (!is_nil (buf)) buf->buf->read_only= flag;
+}
+
+bool
+is_buffer_read_only (url name) {
+  tm_buffer buf= concrete_buffer (name);
+  return !is_nil (buf) && buf->buf->read_only;
+}
+
 bool
 buffer_modified_since_autosave (url name) {
   tm_buffer buf= concrete_buffer (name);
