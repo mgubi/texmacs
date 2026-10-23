@@ -438,8 +438,11 @@
                             '(concat "d" (rsup "f"))
                             '(concat (wildcard "x") "q" (rsub "k"))))
             ;; a hit in each string which contains x: the whole formula.
-            ;; The scans are not started again after a hit inside a string
-            ;; (they took 2 s on the dense formula when they were)
+            ;; The skipping of failed scans starts again only after a
+            ;; child where such a scan stops; here the first hit, extended
+            ;; to the end of the formula by the trailing wildcard, leaves
+            ;; none (starting again after every hit took 2 s on the dense
+            ;; formula)
             (check-fast t '(concat "x" (wildcard "y"))
                         '((0 0 0) (0 3200 3)))
             (check-fast (dense-formula 3000) '(concat "x" (wildcard "y"))
