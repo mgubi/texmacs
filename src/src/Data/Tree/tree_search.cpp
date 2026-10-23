@@ -135,24 +135,42 @@ match_cascaded (tree t, tree what) {
   return false;
 }
 
+static string
+case_fold (string s) {
+  // the strings compared, in lower case when the case does not matter
+  return case_insensitive_match_flag? locase_all (s): s;
+}
+
+static tree
+case_fold_pattern (tree what) {
+  // idem for the strings of a concat pattern
+  if (!case_insensitive_match_flag) return what;
+  tree w (L(what), N(what));
+  for (int i=0; i<N(what); i++)
+    w[i]= is_atomic (what[i])? tree (locase_all (what[i]->label)): what[i];
+  return w;
+}
+
 bool
 match (tree t, tree what) {
   if (blank_match_flag && what == "") return true;
   if (is_func (what, WILDCARD, 1)) return true;
   if (is_atomic (t)) {
+    string s= case_fold (t->label);
     if (is_concat (what)) {
       int start, end;
-      return match_atomic (t->label, what, 0, 0, start, end);
+      return match_atomic (s, case_fold_pattern (what), 0, 0, start, end);
     }
     if (!is_atomic (what)) return false;
+    string w= case_fold (what->label);
     if (partial_match_flag) {
       int pos= 0;
-      return tm_search_forwards (what->label, pos, t->label) != -1;
+      return tm_search_forwards (w, pos, s) != -1;
     }
     else if (initial_match_flag)
-      return starts (t->label, what->label);
+      return starts (s, w);
     else
-      return t->label == what->label;
+      return s == w;
   }
   else if (injective_match_flag) {
     if (L(t) != L(what)) return false;
@@ -175,19 +193,47 @@ match (tree t, tree what) {
 * Matching complex patterns inside concat tags
 ******************************************************************************/
 
-bool
+static bool
 search_concat (tree t, tree what, int pos, int i,
                path p, path cur, path& p1, path& p2,
-               array<range_set>& inside) {
+               array<range_set>& inside, array<bool>& failed);
+
+static bool
+only_wildcards (tree what, int i) {
+  for (; i<N(what); i++)
+    if (!is_func (what[i], WILDCARD, 1)) return false;
+  return true;
+}
+
+static bool
+search_concat_sub (tree t, tree what, int pos, int i,
+                   path p, path cur, path& p1, path& p2,
+                   array<range_set>& inside, array<bool>& failed) {
   //cout << "Search " << what << ", " << i
   //     << " in " << t << ", " << pos << "\n";
+  if (i > 0 && only_wildcards (what, i)) {
+    // the rest of the pattern is wildcards: they take the rest of the
+    // formula, also when no tag follows in it, or nothing (#453)
+    p2= (p * (N(t)-1)) * end (t[N(t)-1]);
+    return true;
+  }
   if (pos >= N(t)) return false;
   if (is_atomic (t[pos])) {
+    if (i == 0 && N(inside[pos]) != 0 &&
+        path_less_eq (cur, inside[pos][N(inside[pos])-2]))
+      // this string has matches of its own after cur: the outer loop
+      // takes them (here, p1 and p2 below could come from different
+      // matches and give a wrong range, #473)
+      return false;
     int j, k= i;
     while (k<N(what) &&
            (is_atomic (what[k]) || is_func (what[k], WILDCARD, 1))) k++;
     for (j=k; j>i; j--) {
       if (is_func (what[j-1], WILDCARD, 1)) continue;
+      // the whole pattern inside this string: the matches of the string
+      // itself, which the outer loop takes (here p1 and p2 would come from
+      // different matches when there are several, #473)
+      if (i == 0 && j == N(what)) continue;
       tree swhat= what (i, j);
       if (j == i+1) swhat= swhat[0];
       range_set sel;
@@ -196,19 +242,27 @@ search_concat (tree t, tree what, int pos, int i,
         bool c1= (i == 0 || sel[0] == (p * pos) * start (t[pos]));
         bool c2= (j == N(what) || sel[N(sel)-1] == (p * pos) * end (t[pos]));
         if (j<N(what) && is_func (what[j], WILDCARD, 1)) c2= true;
-        if (i == 0) p1= sel[N(sel)-2];
+        if (i == 0) {
+          p1= sel[N(sel)-2];
+          // only wildcards follow, which take the rest of the formula: the
+          // hit starts at the first occurrence after cur, not the last
+          // (before a middle wildcard, the last gives the shortest match)
+          if (j < N(what) && only_wildcards (what, j))
+            for (int h=0; h+1<N(sel); h+=2)
+              if (path_less_eq (cur, sel[h])) { p1= sel[h]; break; }
+        }
         if (j == N(what)) p2= sel[1];
         if (i == 0 && is_func (what[0], WILDCARD, 1))
           p1= (p * 0) * start (t[0]);
         if (c1 && c2 && (i > 0 || path_less_eq (cur, p1))) {
           if (j >= N(what)) return true;
-          if (search_concat (t, what, pos+1, j, p, cur, p1, p2, inside))
+          if (search_concat (t, what, pos+1, j, p, cur, p1, p2, inside, failed))
             return true;
         }
       }
     }
     if (i == 0 || is_func (what[i], WILDCARD, 1))
-      return search_concat (t, what, pos+1, i, p, cur, p1, p2, inside);
+      return search_concat (t, what, pos+1, i, p, cur, p1, p2, inside, failed);
     return false;
   }
   else if (is_func (what[i], WILDCARD, 1)) {
@@ -217,14 +271,15 @@ search_concat (tree t, tree what, int pos, int i,
       if (!path_less_eq (cur, p1)) return false;
     }
     if (i+1 < N(what) && is_func (what[i+1], WILDCARD, 1))
-      return search_concat (t, what, pos, i+1, p, cur, p1, p2, inside);
+      return search_concat (t, what, pos, i+1, p, cur, p1, p2, inside, failed);
     if (i+1 >= N(what)) {
       p2= (p * (N(t)-1)) * end (t[N(t)-1]);
       return true;
     }
-    if (search_concat (t, what, pos, i+1, p, cur, p1, p2, inside)) return true;
+    if (search_concat (t, what, pos, i+1, p, cur, p1, p2, inside, failed))
+      return true;
     path dummy;
-    return search_concat (t, what, pos+1, i, p, cur, dummy, p2, inside);
+    return search_concat (t, what, pos+1, i, p, cur, dummy, p2, inside, failed);
   }
   else {
     range_set sel;
@@ -236,16 +291,33 @@ search_concat (tree t, tree what, int pos, int i,
       if (i == N(what)-1) p2= sel[1];
       if (c1 && c2 && (i > 0 || path_less_eq (cur, p1))) {
         if (i+1 >= N(what)) return true;
-        if (search_concat (t, what, pos+1, i+1, p, cur, p1, p2, inside))
+        if (search_concat (t, what, pos+1, i+1, p, cur, p1, p2, inside, failed))
           return true;
       }
     }
     if (i == 0) {
       if (N(inside[pos]) != 0) return false;
-      return search_concat (t, what, pos+1, i, p, cur, p1, p2, inside);
+      return search_concat (t, what, pos+1, i, p, cur, p1, p2, inside, failed);
     }
     return false;
   }
+}
+
+static bool
+search_concat (tree t, tree what, int pos, int i,
+               path p, path cur, path& p1, path& p2,
+               array<range_set>& inside, array<bool>& failed) {
+  // for i > 0, the result depends on pos and i only (cur is only used at
+  // i == 0): remember the failures, so that a middle wildcard does not
+  // scan the rest of the formula again from each start
+  if (i == 0 || pos >= N(t))
+    return search_concat_sub (t, what, pos, i, p, cur, p1, p2, inside, failed);
+  int k= pos * N(what) + i;
+  if (failed[k]) return false;
+  if (search_concat_sub (t, what, pos, i, p, cur, p1, p2, inside, failed))
+    return true;
+  failed[k]= true;
+  return false;
 }
 
 /******************************************************************************
@@ -254,11 +326,16 @@ search_concat (tree t, tree what, int pos, int i,
 
 void
 search_string (range_set& sel, string s, tree what, path p) {
-  string source= (case_insensitive_match_flag)? locase_all (s): s;
+  string source= case_fold (s);
 
   if (is_atomic (what)) {
-    string w= what->label;
-    if (case_insensitive_match_flag) w= locase_all (w);
+    string w= case_fold (what->label);
+    if (N(w) == 0) {
+      // an empty string is found in an empty string only, once (the loop
+      // below would not move: #452)
+      if (N(s) == 0) merge (sel, simple_range (p * 0, p * 0));
+      return;
+    }
     int pos= 0;
     while (pos < N(s)) {
       int next= tm_search_forwards (w, pos, source);
@@ -268,12 +345,7 @@ search_string (range_set& sel, string s, tree what, path p) {
     }
   }
   else if (is_concat (what)) {
-    tree w= what;
-    if (case_insensitive_match_flag) {
-      w= tree (L(what), N(what));
-      for (int i=0; i<N(what); i++)
-        w[i]= is_atomic (what[i])? tree (locase_all (what[i]->label)): what[i];
-    }
+    tree w= case_fold_pattern (what);
     for (int pos=0; pos<N(s); ) {
       int start, end;
       if (match_atomic (source, w, pos, 0, start, end)) {
@@ -300,33 +372,50 @@ void
 search_concat (range_set& sel, tree t, tree what, path p) {
   // search_concat (t, what, pos, 0, ...) scans forwards from pos for the
   // start of a match, until it reaches a compound child which contains a
-  // match (with a leading wildcard, until the end or until it fails on
-  // cur). When such a scan fails, the scans from the next positions fail
-  // too (cur only grows), up to that child: skip them, instead of scanning
-  // again (quadratic in the length of the concat, and worse for nested
-  // concats). The matches inside each child are searched only once.
+  // match, or a string with matches after cur (with a leading wildcard,
+  // a compound child only when it fails on cur). When such a scan fails,
+  // the scans from the next positions fail too (cur only grows), up to
+  // that child: skip them, instead of scanning again (quadratic in the
+  // length of the concat, and worse for nested concats). The matches
+  // inside each child are searched only once.
   array<range_set> inside (N(t));
   for (int pos=0; pos<N(t); pos++)
     search (inside[pos], t[pos], what, p * pos);
+  array<bool> failed (N(t) * N(what));
+  for (int k=0; k<N(failed); k++) failed[k]= false;
   bool scan= true;
   for (int pos=0; pos<N(t); ) {
     range_set ssel= copy (inside[pos]);
     if (N(ssel) != 0) {
+      // would a failed scan have stopped here? (cur has not changed since
+      // it failed: the hits merged in between start before cur)
+      path cur= (p * 0) * start (t[0]);
+      if (N(sel) != 0) cur= sel[N(sel)-1];
+      bool stop= is_compound (t[pos])?
+        !is_func (what[0], WILDCARD, 1):
+        path_less_eq (cur, ssel[N(ssel)-2]);
+      // ssel is a list of (start, end) pairs; a leading (trailing) wildcard
+      // extends the hits to the start (end) of the formula. Then they
+      // overlap, and merge keeps the first one (#454)
       if (is_func (what[0], WILDCARD, 1))
-        for (int i=0; i+1<N(ssel); i++)
+        for (int i=0; i+1<N(ssel); i+=2)
           ssel[i]= (p * 0) * start (t[0]);
       if (is_func (what[N(what)-1], WILDCARD, 1))
-        for (int i=0; i+1<N(ssel); i++)
+        for (int i=0; i+1<N(ssel); i+=2)
           ssel[i+1]= (p * (N(t)-1)) * end (t[N(t)-1]);
       merge (sel, ssel);
-      if (is_compound (t[pos]) && !is_func (what[0], WILDCARD, 1)) scan= true;
-      pos++;
-      continue;
+      if (stop) scan= true;
+      if (is_compound (t[pos])) {
+        pos++;
+        continue;
+      }
+      // a match across the children may still start in this string, after
+      // the hits inside it (#461): scan from here, after cur
     }
     if (!scan) { pos++; continue; }
     path p1, p2, cur= (p * 0) * start (t[0]);
     if (N(sel) != 0) cur= sel[N(sel)-1];
-    if (search_concat (t, what, pos, 0, p, cur, p1, p2, inside)) {
+    if (search_concat (t, what, pos, 0, p, cur, p1, p2, inside, failed)) {
       merge (sel, simple_range (p1, p2));
       int next= (p2 / p)->item;
       pos= max (pos+1, next);
@@ -485,8 +574,25 @@ select (range_set& sel, tree t, tree what, path p) {
 * Front end
 ******************************************************************************/
 
+static tree
+without_empty_strings (tree what) {
+  // an empty string in a concat pattern matches the empty string: it is
+  // left out, also inside the tags of the pattern (#452)
+  if (is_atomic (what)) return what;
+  tree r (L(what));
+  for (int i=0; i<N(what); i++) {
+    tree w= without_empty_strings (what[i]);
+    if (!is_concat (what) || w != "") r << w;
+  }
+  if (is_concat (what) && N(r) == 0) return "";
+  // a concat of one element is that element, as tree-simplify keeps it
+  if (is_concat (what) && N(r) == 1 && N(what) > 1) return r[0];
+  return r;
+}
+
 range_set
 search (tree t, tree what, path p, int limit) {
+  what= without_empty_strings (what);
   search_max_hits= limit;
   initialize_search ();
   range_set sel;
@@ -500,6 +606,7 @@ search (tree t, tree what, path p, int limit) {
 
 range_set
 search (tree t, tree what, path p, path pos, int limit) {
+  what= without_empty_strings (what);
   search_max_hits= limit;
   initialize_search ();
   range_set sel;

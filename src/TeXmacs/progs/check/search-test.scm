@@ -33,8 +33,8 @@
 ;;
 ;; Wildcards (std 1, std 2, std 3 in the widgets) are (wildcard "x"), ...;
 ;; at the start or at the end of a concat pattern, a wildcard extends the
-;; hit to the start or to the end of the formula (at the end, not always:
-;; #453; several hits inside one tag: #454).
+;; hit to the start or to the end of the formula, from or to its first
+;; hit.
 
 (texmacs-module (check search-test)
   (:use (check check-lib)))
@@ -77,13 +77,10 @@
                 (1 2 2) (1 2 5)))
   (check-both '(document "the cat sat") "dog" '())
   ;; case sensitive by default; not with case-insensitive-match, also for
-  ;; the strings of a concat pattern
+  ;; the strings of a concat pattern and those inside its tags (#460)
   (check-both '(document "Cat cat CAT") "cat" '((0 4) (0 7)))
-  ;; FIXME (#460): case-insensitive-match ignores the strings inside the
-  ;; tags of the pattern (match (tree t, tree what), tree_search.cpp:139:
-  ;; its string cases compare with the case): (em "cat") in
-  ;; (concat "a " (em "Cat")), or (concat "x" (rsub "n")) in
-  ;; (concat "X" (rsub "N")), gives (), expected the em or the formula.
+  (check-both '(document (concat "a " (em "Cat") " " (em "cat"))) '(em "cat")
+              '((0 3 0) (0 3 1)))
   (with-preference "case-insensitive-match" "on"
     (lambda ()
       (check-both '(document "Cat cat CAT") "cat"
@@ -93,7 +90,19 @@
       (check-both '(document (concat "X+" (rsub "n"))) '(concat "x+" (rsub "n"))
                   '((0 0 0) (0 1 1)))
       (check-both '(document (concat "X" (rsub "n"))) '(concat "x" (rsub "n"))
-                  '((0 0 0) (0 1 1))))))
+                  '((0 0 0) (0 1 1)))
+      (check-both '(document (concat "X" (rsub "N") "+x" (rsub "n")))
+                  '(concat "x" (rsub "n"))
+                  '((0 0 0) (0 1 1) (0 2 1) (0 3 1)))
+      (with-search-mode 'search
+        (lambda ()
+          (check= (hits '(document (concat "a " (em "Cat") " " (em "cAT")))
+                        '(em "cat"))
+                  '((0 1 0) (0 1 1) (0 3 0) (0 3 1)))
+          ;; a concat pattern inside a tag
+          (check= (hits '(document (concat (frac "X+Y" "2") "=z"))
+                        '(frac (concat "x" (wildcard "w") "y") ""))
+                  '((0 0 0) (0 0 1))))))))
 
 ;; a concat of strings and wildcards also matches inside one string: in
 ;; the search widget, each occurrence; in the replace widget, the whole
@@ -233,33 +242,118 @@
   ;; a wildcard alone matches whole formulas and strings
   (check-both '(document (concat "A" (rsub "n")) "text")
               '(concat (wildcard "x"))
-              '((0 0 0) (0 1 1) (1 0) (1 4))))
+              '((0 0 0) (0 1 1) (1 0) (1 4)))
+  ;; a trailing wildcard after a tag, when no tag follows in the formula
+  ;; (only a string, or nothing): from the hit to the end (#453)
+  (check-both '(document (concat "A" (rsub "n") "+B"))
+              '(concat (rsub "n") (wildcard "y"))
+              '((0 1 0) (0 2 2)))
+  (check-both '(document (concat "A" (rsub "n")))
+              '(concat (rsub "n") (wildcard "y"))
+              '((0 1 0) (0 1 1)))
+  (check-both '(document (concat "A" (rsub "n") "+B"))
+              '(concat "A" (rsub "n") (wildcard "y"))
+              '((0 0 0) (0 2 2)))
+  (check-both '(document (concat "a+" (frac "1" "2") "+b"))
+              '(concat (wildcard "x") (frac "1" "2") (wildcard "y"))
+              '((0 0 0) (0 2 2)))
+  ;; an empty string in a concat pattern is left out (it never returned,
+  ;; and the memory grew without bound: #452)
+  (check-both '(document (concat "a" (rsub "b") "c"))
+              '(concat (rsub "b") "")
+              '((0 1 0) (0 1 1)))
+  (check-both '(document (concat "a" (rsub "b") "c"))
+              '(concat "" (rsub "b"))
+              '((0 1 0) (0 1 1)))
+  (check-both '(document (concat "a" (rsub "b") (rsub "c")))
+              '(concat (rsub "b") "" (rsub "c"))
+              '((0 1 0) (0 2 1)))
+  (check-both '(document (concat "a" (rsub "b") "c"))
+              '(concat (wildcard "y") (wildcard "y") (rsub "b") "")
+              '((0 0 0) (0 1 1)))
+  ;; a trailing wildcard after a string with several hits: from the
+  ;; first one (the last one was taken)
+  (check-both '(document (concat "x" (rsub "n") "bb"))
+              '(concat "b" (wildcard "y"))
+              '((0 2 0) (0 2 2)))
+  (check-both '(document (concat "x" (rsub "n") "bab"))
+              '(concat "b" (wildcard "y"))
+              '((0 2 0) (0 2 3)))
+  ;; an empty paragraph of a document pattern matches an empty paragraph
+  ;; (it never returned either)
+  (check-both '(document "" "abc") '(document "" "abc") '((0 0) (1 3)))
+  (check-both '(document "x" "abc") '(document "" "abc") '())
+  ;; an empty pattern is found nowhere with the matching of Replace
+  (with-search-mode 'replace
+    (lambda () (check= (hits '(document "abc") "") '()))))
 
-;; FIXME (#453): a trailing wildcard fails when the rest of the pattern
-;; contains a tag and no tag follows in the formula (search_concat (t,
-;; what, pos, i, ...), tree_search.cpp:190: the loop on j skips the
-;; sub-patterns which end with a wildcard, and only a tag sets p2 to the
-;; end): (concat (rsub "n") (wildcard "y")) in (concat "A" (rsub "n") "+B")
-;; or in (concat "A" (rsub "n")), and
-;; (concat (wildcard "x") (frac "1" "2") (wildcard "y")) in
-;; (concat "a+" (frac "1" "2") "+b"), give (), expected the formula from
-;; the first element of the hit to its end.
-;; FIXME (#461): a hit inside a string hides a hit which starts later in
-;; the same string (the outer search_concat, tree_search.cpp:300: a child
-;; with a hit inside is never the start of a match across the children):
-;; when searching, (concat "f(" (wildcard "x") ")") in
-;; (concat "f(x)+f(" (frac "1" "2") ")") gives ((0 0 0) (0 0 4)), expected
-;; also ((0 0 5) (0 2 1)).
-;; FIXME (#454): a leading or trailing wildcard with several hits inside
-;; one tag gives empty and nested ranges (the outer search_concat,
-;; tree_search.cpp:315-320: the loops which extend the hits step by one
-;; over the pairs): (concat (wildcard "x") "a") in
-;; (concat "b" (frac "a" "a")) gives ((0 0 0) (0 0 0) (0 0 0) (0 1 1 1)).
-;; FIXME (#452): a concat pattern with an empty string element never
-;; returns (search_string, tree_search.cpp:267: pos= next + N(w) does not
-;; move, and the same empty hit is appended until the memory is
-;; exhausted): (concat (rsub "b") "") or (concat "" (rsub "b")) in
-;; (concat "a" (rsub "b") "c").
+;; a hit inside a string, then one which starts later in the same string
+;; and goes on in the next children: both (#461). When replacing, the
+;; strings of the pattern must match whole strings, so only the second.
+(define (test-hits-after-a-hit)
+  (check-group "hits after a hit")
+  (let ((doc '(document (concat "f(x)+f(" (frac "1" "2") ")")))
+        (what '(concat "f(" (wildcard "x") ")")))
+    (with-search-mode 'search
+      (lambda ()
+        (check= (hits doc what) '((0 0 0) (0 0 4) (0 0 5) (0 2 1)))))
+    (with-search-mode 'replace
+      (lambda ()
+        (check= (hits doc what) '((0 0 5) (0 2 1))))))
+  (with-search-mode 'search
+    (lambda ()
+      (check= (hits '(document (concat "axb+a" (rsub "1") "b+axb"))
+                    '(concat "a" (wildcard "x") "b"))
+              '((0 0 0) (0 0 3) (0 0 4) (0 2 1) (0 2 2) (0 2 5))))))
+
+;; a leading (trailing) wildcard and several hits inside one tag: one hit,
+;; from the start of the formula to the first of them (from the first of
+;; them to the end), as with one hit; no empty ranges (#454)
+(define (test-wildcards-and-several-hits)
+  (check-group "wildcards and several hits")
+  (check-both '(document (concat "b" (frac "a" "c")))
+              '(concat (wildcard "x") "a")
+              '((0 0 0) (0 1 0 1)))
+  (check-both '(document (concat "b" (frac "a" "a")))
+              '(concat (wildcard "x") "a")
+              '((0 0 0) (0 1 0 1)))
+  (check-both '(document (concat "b+" (frac "a" (concat "a" (rsub "a")))))
+              '(concat (wildcard "x") "a")
+              '((0 0 0) (0 1 0 1)))
+  (check-both '(document (concat (frac "a" "a") "b"))
+              '(concat "a" (wildcard "x"))
+              '((0 0 0 0) (0 1 1))))
+
+;; a string with several hits of its own, after a tag: the hits of the
+;; string, as when it is alone; no empty or inverted ranges (#473). A
+;; trailing wildcard starts at the first hit of the string.
+(define (test-hits-of-a-string-after-a-tag)
+  (check-group "hits of a string after a tag")
+  (with-search-mode 'search
+    (lambda ()
+      (check= (hits '(document "aba+b") '(concat "a" (wildcard "x") "b"))
+              '((0 0) (0 2) (0 2) (0 5)))
+      (check= (hits '(document (concat "x" (rsub "c") "aba+b"))
+                    '(concat "a" (wildcard "x") "b"))
+              '((0 2 0) (0 2 2) (0 2 2) (0 2 5)))
+      (check= (hits '(document (concat "ab" (rsub "c") "ab+ab"))
+                    '(concat "a" (wildcard "x") "b"))
+              '((0 0 0) (0 0 2) (0 2 0) (0 2 2) (0 2 3) (0 2 5)))
+      (check= (hits '(document (concat "x" (rsub "c") "ba+a" (rsub "d")))
+                    '(concat "a" (wildcard "x")))
+              '((0 2 1) (0 3 1)))))
+  ;; the search goes on after such a string: a scan which stopped there
+  ;; starts again after it
+  (check-both '(document (concat "x" (rsub "c") "ab" (rsub "1") "a" (rsub "2")
+                                 "b"))
+              '(concat "a" (wildcard "x") "b")
+              '((0 2 0) (0 2 2) (0 4 0) (0 6 1)))
+  ;; when replacing, a string of the pattern must match a whole string
+  (with-search-mode 'replace
+    (lambda ()
+      (check= (hits '(document (concat "x" (rsub "c") "aba+b"))
+                    '(concat "a" (wildcard "x") "b"))
+              '((0 2 0) (0 2 5))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Paragraphs, limits, positions
@@ -344,8 +438,11 @@
                             '(concat "d" (rsup "f"))
                             '(concat (wildcard "x") "q" (rsub "k"))))
             ;; a hit in each string which contains x: the whole formula.
-            ;; The scans are not started again after a hit inside a string
-            ;; (they took 2 s on the dense formula when they were)
+            ;; The skipping of failed scans starts again only after a
+            ;; child where such a scan stops; here the first hit, extended
+            ;; to the end of the formula by the trailing wildcard, leaves
+            ;; none (starting again after every hit took 2 s on the dense
+            ;; formula)
             (check-fast t '(concat "x" (wildcard "y"))
                         '((0 0 0) (0 3200 3)))
             (check-fast (dense-formula 3000) '(concat "x" (wildcard "y"))
@@ -359,12 +456,17 @@
                                              '() 10000)))
           (check= (length (cdr r)) 1600)
           (check-true (< (car r) 500))))))
-  ;; a wildcard in the middle which fails late scans from each start to
-  ;; the end of the formula: 4.2 s on 200 terms before #450 (cubic), 14 ms
-  ;; after (quadratic)
-  (with-search-mode 'search
-    (lambda ()
-      (check-fast (long-formula 200) '(concat "y)" (wildcard "x") "z") '()))))
+  ;; a wildcard in the middle which fails late scanned from each start to
+  ;; the end of the formula: 4.2 s on 200 terms before #450 (cubic), then
+  ;; 14 ms on 200 and about 1 s on 1600 terms (quadratic); its failures are
+  ;; remembered now (linear: a few ms)
+  (with t (long-formula 1600)
+    (for-each
+      (lambda (mode)
+        (with-search-mode mode
+          (lambda ()
+            (check-fast t '(concat "y)" (wildcard "x") "z") '()))))
+      '(search replace))))
 
 (tm-define (search-test-failures)
   (check-suite "search")
@@ -373,6 +475,9 @@
   (test-tags)
   (test-formulas)
   (test-formula-wildcards)
+  (test-hits-after-a-hit)
+  (test-wildcards-and-several-hits)
+  (test-hits-of-a-string-after-a-tag)
   (test-paragraphs)
   (test-limit-and-position)
   (test-speed)

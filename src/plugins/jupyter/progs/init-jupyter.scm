@@ -28,11 +28,16 @@
   (:require (check-jupyter?)))
 
 (define (jupyter-find-kernels)
-  (let* ((u "$TEXMACS_PATH/plugins/jupyter/tm_jupyter/kernels.py")
-         (cmd (string-append (python-command) " " (system-url->string u)))
-         (val (eval-system cmd))
-         (l (string-split (string-replace val "\r" "") #\newline)))     
-    (list-filter l (lambda (k) (!= "" k)))))
+  ;; (without python, the command would be the script alone, which Windows
+  ;; fails to launch: a warning, and the window of the error messages at
+  ;; each start; supports-jupyter? comes from the setup cached by an earlier
+  ;; start, so python-command is checked as well)
+  (if (or (== (python-command) "") (not (supports-jupyter?))) '()
+      (let* ((u "$TEXMACS_PATH/plugins/jupyter/tm_jupyter/kernels.py")
+             (cmd (string-append (python-command) " " (system-url->string u)))
+             (val (eval-system cmd))
+             (l (string-split (string-replace val "\r" "") #\newline)))
+        (list-filter l (lambda (k) (!= "" k))))))
 
 (tm-define (jupyter-launcher kernel)
   (let* ((u "$TEXMACS_PATH/plugins/jupyter/tm_jupyter/client.py")

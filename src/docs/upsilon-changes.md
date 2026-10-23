@@ -49,6 +49,24 @@ have the details, and the problems go to the
   document with tables
   ([#442](https://github.com/mgubi/texmacs/pull/442)).
 
+- Searching for a formula with wildcards or empty parts gives the
+  right hits: a pattern with an empty part no longer hangs TeXmacs (its
+  memory grew without bound); a wildcard at the end after a tag, or
+  several hits in one tag or string, give one hit to the end, with no
+  empty or inverted ones; a hit inside a string no longer hides a match
+  which starts later in it; case-insensitive search also applies inside
+  the tags of a pattern; and a wildcard in the middle which fails late
+  is fast on long formulas
+  ([#471](https://github.com/mgubi/texmacs/pull/471),
+  [#472](https://github.com/mgubi/texmacs/pull/472),
+  [#474](https://github.com/mgubi/texmacs/pull/474),
+  [#475](https://github.com/mgubi/texmacs/pull/475),
+  [#476](https://github.com/mgubi/texmacs/pull/476)).
+- **Jupyter**: without Python, no kernels are looked for: on Windows,
+  each start of a plugin showed a warning and opened the window of the
+  error messages
+  ([#467](https://github.com/mgubi/texmacs/pull/467)).
+
 ## 22 October 2026
 
 - A subscript or superscript whose content comes from a macro argument
