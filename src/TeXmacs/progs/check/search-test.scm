@@ -646,7 +646,7 @@
           (check= (cdr r) '())
           (check-true (< (car r) 500)))))))
 
-;; a formula of 40000 children: the scan for the start of a match, and a
+;; formulas of 40000 children and more: the scan for the start of a match, and a
 ;; wildcard which takes many children, went from one child to the next by
 ;; a recursion, which overflowed the stack and crashed TeXmacs (#487)
 (define (repeated n l)

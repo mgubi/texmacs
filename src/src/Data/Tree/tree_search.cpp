@@ -493,7 +493,10 @@ search_concat (tree t, tree what, int pos, int i,
   bool keep= false;
   path start1;
   for (; ; pos++) {
-    if (i > 0 && pos < N(t) && failed[pos * N(what) + i]) break;
+    if (i > 0 && pos < N(t) && failed[pos * N(what) + i]) {
+      r= SC_FAIL;
+      break;
+    }
     r= search_concat_sub (t, what, pos, i, p, cur, p1, p2, inside, failed);
     if (r == SC_NEXT_KEEP && !keep) { keep= true; start1= p1; }
     if (r != SC_NEXT && r != SC_NEXT_KEEP) break;
