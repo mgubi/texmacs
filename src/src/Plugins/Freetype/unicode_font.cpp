@@ -963,7 +963,14 @@ is_emoji_mark (unsigned int c) {
 
 #define SHIPPED_EMOJI_FONT "TwemojiMozilla"
 
-static hashmap<string,picture> color_bitmap_pictures;
+// the bitmaps of the fixed size (FreeType decodes a PNG to give one), with
+// their sizes (w, h, left, top, advance; empty when the glyph has none),
+// and the pictures made of them at the sizes drawn; emptied when they hold
+// too many (a zoom makes pictures of new sizes)
+static hashmap<string,string>     color_bitmap_data;
+static hashmap<string,array<int> > color_bitmap_info;
+static hashmap<string,picture>    color_bitmap_pictures;
+#define COLOR_BITMAP_CACHE 4096
 
 static picture
 color_bitmap_picture (string bgra, int w, int h, int pw, int ph) {
@@ -1000,22 +1007,41 @@ color_bitmap_picture (string bgra, int w, int h, int pw, int ph) {
 bool
 unicode_font_rep::draw_color_bitmap (renderer ren, unsigned int uc, string c,
                                      SI x, SI y) {
-  string bgra;
-  int w, h, left, top, adv;
-  if (!tt_color_bitmap (fng, uc, bgra, w, h, left, top, adv) ||
-      w <= 0 || h <= 0 || adv <= 0) return false;
+  string bkey= fng->res_name * "#" * as_string ((int) uc);
+  if (!color_bitmap_info->contains (bkey)) {
+    if (N(color_bitmap_info) >= COLOR_BITMAP_CACHE) {
+      color_bitmap_data= hashmap<string,string> ();
+      color_bitmap_info= hashmap<string,array<int> > ();
+    }
+    string bgra;
+    int w, h, left, top, adv;
+    array<int> info;
+    if (tt_color_bitmap (fng, uc, bgra, w, h, left, top, adv) &&
+        w > 0 && h > 0 && adv > 0) {
+      info << w << h << left << top << adv;
+      color_bitmap_data (bkey)= bgra;
+    }
+    color_bitmap_info (bkey)= info;
+  }
+  array<int> info= color_bitmap_info [bkey];
+  if (N(info) < 5) return false;
+  int w= info[0], h= info[1], left= info[2], top= info[3], adv= info[4];
   // a pixel of the bitmap, in the units of the renderer, and in its pixels
   SI W= ROUND (fnm->get (uc)->x2);
   double k = ((double) W) / adv;
   double px= k / max (ren->pixel, 1);
   int pw= max (1, (int) (w * px + 0.5)), ph= max (1, (int) (h * px + 0.5));
-  string key= fng->res_name * "#" * as_string ((int) uc) * "@" *
-              as_string (pw) * "x" * as_string (ph);
-  if (!color_bitmap_pictures->contains (key))
-    color_bitmap_pictures (key)= color_bitmap_picture (bgra, w, h, pw, ph);
+  string key= bkey * "@" * as_string (pw) * "x" * as_string (ph);
+  if (!color_bitmap_pictures->contains (key)) {
+    if (N(color_bitmap_pictures) >= COLOR_BITMAP_CACHE)
+      color_bitmap_pictures= hashmap<string,picture> ();
+    color_bitmap_pictures (key)=
+      color_bitmap_picture (color_bitmap_data [bkey], w, h, pw, ph);
+  }
   picture pic= color_bitmap_pictures [key];
-  // the characters, as invisible glyphs of the shipped emoji font
-  if (tt_font_exists (SHIPPED_EMOJI_FONT)) {
+  // the characters, as invisible glyphs of the shipped emoji font (for the
+  // text of a PDF: nothing on a screen)
+  if (ren->is_printer () && tt_font_exists (SHIPPED_EMOJI_FONT)) {
     font_glyphs  tg= tt_font_glyphs (SHIPPED_EMOJI_FONT, size, hdpi, vdpi);
     array<unsigned int> chars;
     for (int i= 0; i < N(c); ) chars << read_unicode_char (c, i);

@@ -1282,7 +1282,9 @@ aat_ligature (ot_table& t, long long body, array<unsigned int>& g,
     int e= t.u16 (sa + 2 * ((long long) state * ncl + klass));
     long long en= et + 6 * (long long) e;
     int new_state= t.u16 (en), flags= t.u16 (en + 2), act= t.u16 (en + 4);
-    if ((flags & 0x8000) && i < N(g)) {
+    // (a glyph which does not advance is not a component twice)
+    if ((flags & 0x8000) && i < N(g) &&
+        (N(stack) == 0 || stack[N(stack) - 1] != i)) {
       if (N(stack) >= 32) {
         for (int k= 1; k < N(stack); k++) stack[k-1]= stack[k];
         stack->resize (N(stack) - 1);

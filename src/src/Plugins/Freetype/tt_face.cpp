@@ -314,15 +314,17 @@ tt_font_metric_rep::exists (int i) {
 // The metrics of a glyph of a font of bitmaps: those of its fixed size,
 // scaled
 static metric_struct*
-strike_metric (tt_face face, FT_UInt glyph_index, int size, int dpi) {
-  if (face->set_size (size, dpi, dpi) ||
+strike_metric (tt_face face, FT_UInt glyph_index, int size, int hdpi,
+               int vdpi) {
+  if (face->set_size (size, hdpi, vdpi) ||
       ft_load_glyph (face->ft_face, glyph_index, FT_LOAD_COLOR)) return NULL;
   FT_Glyph_Metrics& gm= face->ft_face->glyph->metrics;
-  double s= face->strike_scale (size, dpi);
-  SI w = tt_si ((int) (gm.width * s)), h = tt_si ((int) (gm.height * s));
-  SI dx= tt_si ((int) (gm.horiBearingX * s));
-  SI dy= tt_si ((int) (gm.horiBearingY * s));
-  SI ll= tt_si ((int) (gm.horiAdvance * s));
+  double sx= face->strike_scale (size, hdpi);
+  double sy= face->strike_scale (size, vdpi);
+  SI w = tt_si ((int) (gm.width * sx)), h = tt_si ((int) (gm.height * sy));
+  SI dx= tt_si ((int) (gm.horiBearingX * sx));
+  SI dy= tt_si ((int) (gm.horiBearingY * sy));
+  SI ll= tt_si ((int) (gm.horiAdvance * sx));
   metric_struct* M= tm_new<metric_struct> ();
   M->x1= 0;  M->y1= dy - h; M->x2= ll;     M->y2= dy;
   M->x3= dx; M->y3= dy - h; M->x4= dx + w; M->y4= dy;
@@ -333,7 +335,7 @@ metric&
 tt_font_metric_rep::get (int i) {
   if (!face->bad_face && !fnm->contains(i) && face->strike >= 0) {
     FT_UInt glyph_index= decode_index (face->ft_face, i);
-    metric_struct* M= strike_metric (face, glyph_index, size, vdpi);
+    metric_struct* M= strike_metric (face, glyph_index, size, hdpi, vdpi);
     if (M == NULL) return error_metric;
     if (face->color_bitmaps && is_emoji_mark (i)) {
       // what is left of a sequence takes no room (as below)

@@ -25,7 +25,7 @@ have the details, and the problems go to the
 - **Emoji of the system**: the preference "Emoji" (Edit > Preferences >
   General) takes the emoji of the system instead of the shipped Twemoji,
   from the next start: Apple Color Emoji on a Mac, Noto Color Emoji on
-  Linux, Segoe UI Emoji on Windows. They are drawn in color on the
+  Linux, Segoe UI Emoji on Windows (not tried yet there). They are drawn in color on the
   screen and in the PDF (as pictures), the families, the flags, the skin
   tones and the keycaps as one picture each, and they copy out of a PDF
   as their characters. Desktop applications only.
