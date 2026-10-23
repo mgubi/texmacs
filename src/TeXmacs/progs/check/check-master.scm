@@ -39,6 +39,7 @@
         (check latex-test)
         (check formats-test)
         (check editing-test)
+        (check read-only-test)
         (check typeset-test)
         (check bibtex-test)
         (check database-test)
@@ -127,6 +128,8 @@
     ("formats" formats-test-failures count)
     ;; opens buffers and edits them
     ("editing" editing-test-failures count)
+    ;; read-only buffers, and the console of the error messages (a window)
+    ("read-only" read-only-test-failures count)
     ("typeset" typeset-test-failures count)
     ;; after editing: generating a bibliography or the auxiliary data of a
     ;; document processes the pending GUI events, among which those of the

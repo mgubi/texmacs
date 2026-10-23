@@ -11,19 +11,8 @@
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(texmacs-module (debug debug-widgets))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Preferences
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(define (refresh-console . x)
-  (refresh-now "console-widget-categories")
-  (noop))
-
-(define-preferences
-  ("console details" "normal" refresh-console)
-  ("console size" "100" refresh-console))
+(texmacs-module (debug debug-widgets)
+  (:use (utils library cursor)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Message selection
@@ -69,14 +58,16 @@
            `(with "color" "dark blue" ,s))
           (else s))))
 
-(define (messages->document kind selected)
+(define (selected-messages kind selected)
   (let* ((n (or (string->number (get-preference "console size")) 100))
-         (all-ms (tree-children (get-debug-messages kind n)))
-         (sel-ms (list-filter all-ms (cut message-among? <> selected))))
-    `(document
-       (with "language" "verbatim" "font-family" "tt" "par-par-sep" "0fn"
-             (document
-               ,@(map build-message sel-ms))))))
+         (all-ms (tree-children (get-debug-messages kind n))))
+    (map tm->stree (list-filter all-ms (cut message-among? <> selected)))))
+
+(define (messages->document ms)
+  `(document
+     (with "language" "verbatim" "font-family" "tt" "par-par-sep" "0fn"
+           (document
+             ,@(if (null? ms) (list "") (map build-message ms))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The main console widget
@@ -85,18 +76,164 @@
 (tm-define console-active? (make-ahash-table))
 (tm-define console-categories (make-ahash-table))
 
+;; The messages are shown in read-only editors (texmacs-input), so that they
+;; can be selected, copied and searched as in a document: one embedded
+;; buffer per tab, named after the console and the category ("all" for the
+;; tab of all messages), which lives as long as the window (the window
+;; closes it, see texmacs_input_widget). A new message is added to the
+;; buffers which show it, at the end, without typesetting them anew: the
+;; selection and the scrolling position stay as they were.
+
+(define console-buffers (make-ahash-table)) ; buffer -> (kind cat)
+(define console-shown (make-ahash-table))   ; buffer -> messages shown
+
+(define (console-buffer kind cat)
+  (string->url
+    (string-append "tmfs://aux/console-"
+                   (string-replace (string-downcase kind) " " "-")
+                   "-" (or cat "all"))))
+
+(define (console-selection kind cat)
+  (if cat (list cat) (ahash-ref console-categories kind)))
+
+(define (console-buffer? u)
+  (and (url? u) (ahash-ref console-buffers (url->unix u)) #t))
+
+(define (console-document kind cat)
+  (let* ((u (console-buffer kind cat))
+         (ms (selected-messages kind (console-selection kind cat))))
+    (ahash-set! console-buffers (url->unix u) (list kind cat))
+    (ahash-set! console-shown (url->unix u) ms)
+    (messages->document ms)))
+
+(define (console-messages-tree u)
+  ;; the document of the messages, inside the with of messages->document
+  (let* ((body (buffer-get-body u))
+         (w (and (tree-is? body 'document) (> (tree-arity body) 0)
+                 (tree-ref body 0))))
+    (and w (tree-is? w 'with)
+         (with d (tree-ref w (- (tree-arity w) 1))
+           (and (tree-is? d 'document) d)))))
+
+(define (list-drop-common old new)
+  ;; the number k of old messages gone when @new continues @old without
+  ;; its first k elements, or #f
+  (let loop ((k 0) (l old))
+    (cond ((null? l) (and (null? old) 0))
+          ((list-starts? new l) k)
+          (else (loop (+ k 1) (cdr l))))))
+
+(define (list-starts? l prefix)
+  (cond ((null? prefix) #t)
+        ((null? l) #f)
+        ((== (car l) (car prefix)) (list-starts? (cdr l) (cdr prefix)))
+        (else #f)))
+
+(define (console-reset u)
+  (with info (ahash-ref console-buffers (url->unix u))
+    (when (and info (buffer-exists? u))
+      (let* ((doc (console-document (car info) (cadr info)))
+             (d (console-messages-tree u)))
+        ;; (the messages only: a new body left the cursor of a console
+        ;; being used outside of it, and the next change failed on it)
+        (if d (tree-assign! d (cAr (cAr doc)))
+            (buffer-set-body u doc))))))
+
+;; A change of the document cancels its selection: the selection of a
+;; console is kept, its paths moved by the number k of messages removed
+;; before it (with-buffer: the console need not be the current buffer, as
+;; the one which opened by itself, without the focus)
+(define (console-selection-paths u d)
+  (with-buffer u
+    (and (selection-active-any?)
+         (list (tree->path d) (selection-get-start) (selection-get-end)))))
+
+(define (console-restore-selection sel k)
+  (and-with sel sel
+    (let* ((p (car sel)) (n (length p)))
+      (define (move q)
+        (and (list-starts? q p) (> (length q) n)
+             (>= (- (list-ref q n) k) 0)
+             (append p (list (- (list-ref q n) k)) (list-tail q (+ n 1)))))
+      (let* ((s (move (cadr sel))) (e (move (caddr sel))))
+        (when (and s e) (selection-set s e))))))
+
+(define (console-restore-selection-in u sel k)
+  (when sel (with-buffer u (console-restore-selection sel k))))
+
+(define (console-update u)
+  ;; add the new messages at the end and remove those which are gone
+  (let* ((info (ahash-ref console-buffers (url->unix u)))
+         (kind (car info))
+         (old (or (ahash-ref console-shown (url->unix u)) '()))
+         (new (selected-messages kind (console-selection kind (cadr info))))
+         (k (list-drop-common old new))
+         (d (console-messages-tree u))
+         (end? (console-at-end? u)))
+    (cond ((== old new) (noop))
+          ((or (not k) (not d) (null? old)) (console-reset u))
+          (else
+            (let* ((added (list-tail new (- (length old) k)))
+                   (sel (console-selection-paths u d)))
+              (when (> k 0) (tree-remove! d 0 k))
+              (when (nnull? added)
+                (tree-insert! d (tree-arity d) (map build-message added)))
+              (ahash-set! console-shown (url->unix u) new)
+              (console-restore-selection-in u sel k))))
+    ;; a console whose cursor is at the end follows it, as a log
+    (when end? (console-go-end u))))
+
+(define (console-at-end? u)
+  (with-buffer u
+    (and (not (selection-active-any?))
+         (== (cursor-path) (path-end (root-tree) (tree->path (buffer-tree)))))))
+
+(define (console-go-end u)
+  (with-buffer u (go-end)))
+
+(define (console-buffer-list)
+  (list-filter (map unix->url (ahash-set->list console-buffers))
+               buffer-exists?))
+
+(define (console-buffers-of kind)
+  (list-filter (console-buffer-list)
+               (lambda (u)
+                 (== (car (ahash-ref console-buffers (url->unix u))) kind))))
+
+(define (reset-console-buffers)
+  (for (u (console-buffer-list))
+    (console-reset u)))
+
+(define (update-console-buffers)
+  (for (u (console-buffer-list))
+    (console-update u)))
+
+;; the preferences of the consoles show the messages anew
+(define (refresh-console . x)
+  (reset-console-buffers)
+  (noop))
+
+(define-preferences
+  ("console details" "normal" refresh-console)
+  ("console size" "100" refresh-console))
+
+(define (forget-console kind)
+  ;; (the window closes the buffers of its editors)
+  (for (key (ahash-set->list console-buffers))
+    (with info (ahash-ref console-buffers key)
+      (when (== (car info) kind)
+        (ahash-remove! console-buffers key)
+        (ahash-remove! console-shown key)))))
+
 (tm-widget ((console-widget kind))
-  (refreshable "console-widget-categories"
-    (responsive-tabs
-      (responsive-tab (text "All")
-        (texmacs-output
-          (messages->document kind (ahash-ref console-categories kind))
-          '(style "generic")))
-      (loop (cat (ahash-ref console-categories kind))
-        (responsive-tab (text (upcase-first cat))
-          (texmacs-output
-            (messages->document kind (list cat))
-            '(style "generic")))))))
+  (responsive-tabs
+    (responsive-tab (text "All")
+      (texmacs-input (console-document kind #f) '(style "generic")
+                     (console-buffer kind #f)))
+    (loop (cat (ahash-ref console-categories kind))
+      (responsive-tab (text (upcase-first cat))
+        (texmacs-input (console-document kind cat) '(style "generic")
+                       (console-buffer kind cat))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Automatic updates of consoles
@@ -107,19 +244,22 @@
 (tm-define console-warnings? #f)
 
 (tm-define (update-consoles)
+  ;; the new messages are added to the buffers of the tabs (the tabs are
+  ;; those of the categories when the console was opened: the loop of the
+  ;; widget is not done again when it is refreshed, and remaking the
+  ;; editors would only reset them)
   (for (kind (ahash-set->list console-active?))
-    (let* ((new (list-message-types kind)))
-      (ahash-set! console-categories kind new)))
-  (when (nnull? (ahash-set->list console-active?))
-    (refresh-console))
+    (ahash-set! console-categories kind (list-message-types kind)))
+  (update-console-buffers)
   (when (and (or (and console-errors?
                       (get-boolean-preference "open console on errors"))
                  (and console-warnings?
                       (get-boolean-preference "open console on warnings")))
              (not (ahash-ref console-active? "Error messages")))
+    ;; (opened by itself: the keys typed in the document stay there)
     (delayed
       (:idle 1)
-      (open-error-messages)))
+      (open-console "Error messages" #t)))
   (set! console-updating? #f)
   (set! console-errors? #f)
   (set! console-warnings? #f))
@@ -137,12 +277,25 @@
 ;; User interface
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define (open-console kind)
+(define (open-console kind . opt-passive?)
   (when (not (ahash-ref console-active? kind))
     (ahash-set! console-active? kind #t)
     (ahash-set! console-categories kind (list-message-types kind))
+    (when (and (nnull? opt-passive?) (car opt-passive?))
+      (gui-set-next-window-without-focus))
     (top-window (console-widget kind) kind
-                (lambda x (ahash-remove! console-active? kind)))))
+                (lambda x
+                  (ahash-remove! console-active? kind)
+                  (forget-console kind)))
+    ;; read only: what one does in a console does not change it (see
+    ;; set_buffer_read_only), the messages are added by the program
+    (for (u (console-buffers-of kind))
+      (buffer-set-read-only u #t))
+    ;; the consoles begin at the end, the latest messages, and follow them
+    (delayed
+      (:idle 1)
+      (for (u (console-buffers-of kind))
+        (console-go-end u)))))
 
 (tm-define (open-debug-console)
   (open-console "Debugging console"))

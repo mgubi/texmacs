@@ -49,6 +49,7 @@ public:
   void add (modification m);
   void start_slave (double a);
   bool active ();
+  bool modifies ();       // current modifications change the document
   bool has_history ();
   void cancel ();        // cancel current series of modifications
   void confirm ();       // move current modifications to history

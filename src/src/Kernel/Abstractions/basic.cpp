@@ -375,4 +375,7 @@ support_functionality (string functionality) {
 #ifndef QTTEXMACS
 void
 gui_set_next_window_as_popup () {}
+
+void
+gui_set_next_window_without_focus () {}
 #endif

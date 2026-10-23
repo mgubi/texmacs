@@ -197,6 +197,15 @@ tmg_gui_set_next_window_as_popup () {
 }
 
 tmscm
+tmg_gui_set_next_window_without_focus () {
+  // TMSCM_DEFER_INTS;
+  gui_set_next_window_without_focus ();
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
 tmg_support_functionalityP (tmscm arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "support-functionality?");
 
@@ -10232,6 +10241,34 @@ tmg_buffer_pretend_saved (tmscm arg1) {
 }
 
 tmscm
+tmg_buffer_set_read_only (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "buffer-set-read-only");
+  TMSCM_ASSERT_BOOL (arg2, TMSCM_ARG2, "buffer-set-read-only");
+
+  url in1= tmscm_to_url (arg1);
+  bool in2= tmscm_to_bool (arg2);
+
+  // TMSCM_DEFER_INTS;
+  set_buffer_read_only (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_buffer_read_onlyP (tmscm arg1) {
+  TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "buffer-read-only?");
+
+  url in1= tmscm_to_url (arg1);
+
+  // TMSCM_DEFER_INTS;
+  bool out= is_buffer_read_only (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return bool_to_tmscm (out);
+}
+
+tmscm
 tmg_buffer_pretend_autosaved (tmscm arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "buffer-pretend-autosaved");
 
@@ -11383,6 +11420,7 @@ initialize_glue_basic () {
   tmscm_install_procedure ("x-gui?",  tmg_x_guiP, 0, 0, 0);
   tmscm_install_procedure ("qt-gui?",  tmg_qt_guiP, 0, 0, 0);
   tmscm_install_procedure ("gui-set-next-window-as-popup",  tmg_gui_set_next_window_as_popup, 0, 0, 0);
+  tmscm_install_procedure ("gui-set-next-window-without-focus",  tmg_gui_set_next_window_without_focus, 0, 0, 0);
   tmscm_install_procedure ("support-functionality?",  tmg_support_functionalityP, 1, 0, 0);
   tmscm_install_procedure ("gui-version",  tmg_gui_version, 0, 0, 0);
   tmscm_install_procedure ("default-look-and-feel",  tmg_default_look_and_feel, 0, 0, 0);
@@ -12108,6 +12146,8 @@ initialize_glue_basic () {
   tmscm_install_procedure ("buffer-modified-since-autosave?",  tmg_buffer_modified_since_autosaveP, 1, 0, 0);
   tmscm_install_procedure ("buffer-pretend-modified",  tmg_buffer_pretend_modified, 1, 0, 0);
   tmscm_install_procedure ("buffer-pretend-saved",  tmg_buffer_pretend_saved, 1, 0, 0);
+  tmscm_install_procedure ("buffer-set-read-only",  tmg_buffer_set_read_only, 2, 0, 0);
+  tmscm_install_procedure ("buffer-read-only?",  tmg_buffer_read_onlyP, 1, 0, 0);
   tmscm_install_procedure ("buffer-pretend-autosaved",  tmg_buffer_pretend_autosaved, 1, 0, 0);
   tmscm_install_procedure ("buffer-attach-notifier",  tmg_buffer_attach_notifier, 1, 0, 0);
   tmscm_install_procedure ("buffer-has-name?",  tmg_buffer_has_nameP, 1, 0, 0);

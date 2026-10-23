@@ -426,6 +426,12 @@ archiver_rep::cancel () {
   }
 }
 
+bool
+archiver_rep::modifies () {
+  // (not only cursor positions)
+  return active () && nr_children (remove_set_cursor (current)) != 0;
+}
+
 void
 archiver_rep::confirm () {
   if (active ()) {
