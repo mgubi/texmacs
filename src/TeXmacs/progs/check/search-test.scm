@@ -77,13 +77,10 @@
                 (1 2 2) (1 2 5)))
   (check-both '(document "the cat sat") "dog" '())
   ;; case sensitive by default; not with case-insensitive-match, also for
-  ;; the strings of a concat pattern
+  ;; the strings of a concat pattern and those inside its tags (#460)
   (check-both '(document "Cat cat CAT") "cat" '((0 4) (0 7)))
-  ;; FIXME (#460): case-insensitive-match ignores the strings inside the
-  ;; tags of the pattern (match (tree t, tree what), tree_search.cpp:139:
-  ;; its string cases compare with the case): (em "cat") in
-  ;; (concat "a " (em "Cat")), or (concat "x" (rsub "n")) in
-  ;; (concat "X" (rsub "N")), gives (), expected the em or the formula.
+  (check-both '(document (concat "a " (em "Cat") " " (em "cat"))) '(em "cat")
+              '((0 3 0) (0 3 1)))
   (with-preference "case-insensitive-match" "on"
     (lambda ()
       (check-both '(document "Cat cat CAT") "cat"
@@ -93,7 +90,19 @@
       (check-both '(document (concat "X+" (rsub "n"))) '(concat "x+" (rsub "n"))
                   '((0 0 0) (0 1 1)))
       (check-both '(document (concat "X" (rsub "n"))) '(concat "x" (rsub "n"))
-                  '((0 0 0) (0 1 1))))))
+                  '((0 0 0) (0 1 1)))
+      (check-both '(document (concat "X" (rsub "N") "+x" (rsub "n")))
+                  '(concat "x" (rsub "n"))
+                  '((0 0 0) (0 1 1) (0 2 1) (0 3 1)))
+      (with-search-mode 'search
+        (lambda ()
+          (check= (hits '(document (concat "a " (em "Cat") " " (em "cAT")))
+                        '(em "cat"))
+                  '((0 1 0) (0 1 1) (0 3 0) (0 3 1)))
+          ;; a concat pattern inside a tag
+          (check= (hits '(document (concat (frac "X+Y" "2") "=z"))
+                        '(frac (concat "x" (wildcard "w") "y") ""))
+                  '((0 0 0) (0 0 1))))))))
 
 ;; a concat of strings and wildcards also matches inside one string: in
 ;; the search widget, each occurrence; in the replace widget, the whole
