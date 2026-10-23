@@ -82,8 +82,17 @@ is_accessible_for_search (tree t, int i) {
 * Matching complex patterns inside strings
 ******************************************************************************/
 
-bool
-match_atomic (string s, tree what, int pos, int i, int& start, int& end) {
+static bool
+match_atomic_at (string s, tree what, int pos, int i, int& start, int& end,
+                 array<int>& fail) {
+  // match what from its element i at pos (for i == 0: starting at pos).
+  // fail[i], for a wildcard what[i] followed by a string: the smallest
+  // position from which it is known to fail. It then fails from any later
+  // position too (the candidates are fewer), and the result from i > 0 does
+  // not depend on the start: so each wildcard scans the string once, also
+  // over all the starts of match_atomic (quadratic and cubic before). This
+  // assumes Cork strings, in which < and > only enclose symbols (< and >
+  // themselves are <less> and <gtr>): positions then stay on characters
   if (i == 0) start= pos;
   if (i >= N(what)) {
     end= pos;
@@ -91,15 +100,9 @@ match_atomic (string s, tree what, int pos, int i, int& start, int& end) {
     return pos == N(s);
   }
   if (is_atomic (what[i])) {
-    if (test (s, pos, what[i]->label) &&
-        match_atomic (s, what, pos + N(what[i]->label), i+1, start, end))
-      return true;
-    if (i == 0 &&
-        partial_match_flag &&
-        pos < N(s) &&
-        match_atomic (s, what, tm_char_next (s, pos), i, start, end))
-      return true;
-    return false;
+    return test (s, pos, what[i]->label) &&
+           match_atomic_at (s, what, pos + N(what[i]->label), i+1,
+                            start, end, fail);
   }
   else if (is_func (what[i], WILDCARD, 1)) {
     if (i+1 >= N(what)) {
@@ -107,17 +110,48 @@ match_atomic (string s, tree what, int pos, int i, int& start, int& end) {
       return true;
     }
     if (is_func (what[i+1], WILDCARD, 1))
-      return match_atomic (s, what, pos, i+1, start, end);
+      return match_atomic_at (s, what, pos, i+1, start, end, fail);
     if (!is_atomic (what[i+1])) return false;
+    if (pos >= fail[i]) return false;
+    int from= pos;
     while (pos < N(s)) {
       pos= tm_search_forwards (what[i+1]->label, pos, s);
-      if (pos < 0) return false;
-      if (match_atomic (s, what, pos, i+1, start, end)) return true;
+      if (pos < 0) break;
+      if (match_atomic_at (s, what, pos, i+1, start, end, fail)) return true;
       if (pos < N(s)) tm_char_forwards (s, pos);
     }
+    fail[i]= from;
     return false;
   }
   else return false;
+}
+
+static array<int>
+no_failures (tree what, string s) {
+  array<int> fail (N(what));
+  for (int k=0; k<N(what); k++) fail[k]= N(s) + 1;
+  return fail;
+}
+
+static bool
+match_atomic_at (string s, tree what, int pos, int i, int& start, int& end) {
+  array<int> fail= no_failures (what, s);
+  return match_atomic_at (s, what, pos, i, start, end, fail);
+}
+
+bool
+match_atomic (string s, tree what, int pos, int i, int& start, int& end) {
+  array<int> fail= no_failures (what, s);
+  if (i != 0 || !partial_match_flag || N(what) == 0 || !is_atomic (what[0]))
+    return match_atomic_at (s, what, pos, i, start, end, fail);
+  // partial matches: the match may start at pos or after it; the starts are
+  // tried one character after another by a loop (a recursion per character
+  // overflowed the stack on long strings, #479)
+  while (true) {
+    if (match_atomic_at (s, what, pos, 0, start, end, fail)) return true;
+    if (pos >= N(s)) return false;
+    tm_char_forwards (s, pos);
+  }
 }
 
 /******************************************************************************

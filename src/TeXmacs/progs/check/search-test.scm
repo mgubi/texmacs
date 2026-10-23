@@ -512,6 +512,27 @@
             (check-fast t '(concat "y)" (wildcard "x") "z") '()))))
       '(search replace))))
 
+;; a string of 100000 characters and a pattern of a string and a wildcard,
+;; with partial matches: the starts were tried by a recursion per character,
+;; which overflowed the stack and crashed TeXmacs (#479)
+(define (test-long-strings)
+  (check-group "long strings")
+  (let ((doc `(document ,(string-append (make-string 100000 #\a) "bc"))))
+    (with-search-mode 'search
+      (lambda ()
+        (check= (hits doc '(concat "b" (wildcard "x")))
+                '((0 100000) (0 100002)))
+        (check= (hits doc '(concat "q" (wildcard "x"))) '()))))
+  ;; and in linear time: each start rescanned the string after it (10 s
+  ;; for a<wildcard>b in 100000 times a)
+  (let ((doc `(document ,(make-string 100000 #\a))))
+    (with-search-mode 'search
+      (lambda ()
+        (with r (time-of
+                  (lambda () (hits doc '(concat "a" (wildcard "x") "b"))))
+          (check= (cdr r) '())
+          (check-true (< (car r) 500)))))))
+
 (tm-define (search-test-failures)
   (check-suite "search")
   (test-text)
@@ -526,4 +547,5 @@
   (test-paragraphs)
   (test-limit-and-position)
   (test-speed)
+  (test-long-strings)
   (check-end))
