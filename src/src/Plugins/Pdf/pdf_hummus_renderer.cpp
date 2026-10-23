@@ -537,7 +537,8 @@ pdf_hummus_renderer_rep::end_text () {
 // glyphs does not end the text object)
 void
 pdf_hummus_renderer_rep::begin_actual_text (string s) {
-  if (ePDFVersion < ePDFVersion15) return;
+  // (marked content is of PDF 1.2, its ActualText of 1.5, which the
+  // readers take whatever the version of the file)
   begin_text ();
   c_string hex (utf8_to_pdf_hex_string (s));
   contentContext->WriteFreeCode ("/Span << /ActualText " +
@@ -546,7 +547,6 @@ pdf_hummus_renderer_rep::begin_actual_text (string s) {
 
 void
 pdf_hummus_renderer_rep::end_actual_text () {
-  if (ePDFVersion < ePDFVersion15) return;
   contentContext->WriteFreeCode (" EMC\r\n");
 }
 
