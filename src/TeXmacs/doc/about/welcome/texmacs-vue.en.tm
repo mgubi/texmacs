@@ -304,6 +304,9 @@
   <paragraph|23 October 2026>
 
   <\itemize>
+    <item>A family, a flag or another emoji sequence is one character for
+    the cursor keys and for deleting.
+
     <item>The emoji copy out of an exported PDF as their characters, and so
     do the mathematical letters of the OpenType fonts.
 

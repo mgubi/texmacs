@@ -159,13 +159,6 @@ bool prog_lang_exists (string s);
 language hyphenless_language (language base);
 language ad_hoc_language (language base, tree hyphs);
 
-// the end of an emoji sequence (a family, a flag, a skin tone, a keycap)
-// which starts at pos, from end, the end of its first character: one
-// piece of text for the typesetter, which the emoji font draws as one
-// picture
-int  emoji_sequence_end (string s, int pos, int end);
-// whether a keycap (like #, U+FE0F, U+20E3) starts at pos
-bool keycap_at (string s, int pos);
 string math_symbol_group (string s, string lan= "std-math");
 array<string> math_group_members (string s, string lan= "std-math");
 string math_symbol_type (string s, string lan= "std-math");

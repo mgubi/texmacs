@@ -22,6 +22,11 @@ have the details, and the problems go to the
   flags, the skin tones, the keycaps, and a symbol followed by U+FE0F,
   like the red heart. The emoji fonts of the systems (Apple Color Emoji,
   Noto Color Emoji) are not used yet.
+- **Editing emoji**: a sequence (a family, a flag, a skin tone, a keycap)
+  is one character for the editor: the cursor keys step over it at once,
+  and Delete and Backspace remove it whole; the cursor stopped invisibly
+  between its characters, and a deletion took off one person of a family
+  at a time.
 - **PDF**: the emoji copy out of an exported PDF as their characters, a
   sequence whole (a family, a flag), in Preview as in the readers which
   take the text from the ActualText: they came out as U+FFFD, or as

@@ -26,13 +26,13 @@ hooks.
 
 ## How an emoji is typeset
 
-1. **The text.** The typesetter cuts a string into pieces (the `advance`
-   of the languages, `System/Language/text_language.cpp`); a symbol is a
-   piece of its own. `emoji_sequence_end` (`language.cpp`) keeps a
-   sequence in one piece: an emoji with the variation selectors, the skin
-   tones, the tags and the keycap after it, the emoji joined by U+200D, and
-   the two regional indicators of a flag; `keycap_at` does it for a digit,
-   `#` or `*` followed by U+FE0F and U+20E3.
+1. **The text.** What makes a sequence is in `tm_grapheme_end`
+   (`Data/String/analyze.cpp`): an emoji with the variation selectors,
+   the skin tones, the tags and the keycap after it, the emoji joined by
+   U+200D, the two regional indicators of a flag, and a digit, `#` or `*`
+   followed by U+FE0F and U+20E3. The typesetter cuts a string into pieces
+   (the `advance` of the languages, `System/Language/text_language.cpp`),
+   a symbol a piece of its own, and a sequence one piece.
 2. **The font.** `smart_font_rep::resolve` (`Graphics/Fonts/smart_font.cpp`)
    takes the characters which are emoji by default (`is_emoji_presentation`,
    the property Emoji_Presentation of Unicode) and the marks of the
@@ -49,11 +49,17 @@ hooks.
    which is not a ligature of the font (a selector after a letter, a
    joiner between two emoji which make nothing together) is not drawn and
    takes no room (`is_emoji_mark` in `tt_face.cpp` and `unicode_font.cpp`).
-4. **The metrics.** The base glyph of a COLR glyph is often empty: the
+4. **The editor.** A sequence is one character for the editor: Delete
+   and Backspace remove it whole (`tm_grapheme_end`, `tm_grapheme_start`,
+   in `edit_delete.cpp`), and a cursor key which would stop inside it
+   (the characters of a ligature all stand at the left of its picture,
+   `get_xpositions`) goes to its other side (`out_of_emoji` in
+   `edit_cursor.cpp`, with `tm_grapheme_inside`).
+5. **The metrics.** The base glyph of a COLR glyph is often empty: the
    metrics are those of its layers (`tt_font_metric_rep::get`), and its
    bitmap, for whatever asks for one, is their union in one color
    (`color_glyph_union`).
-5. **The drawing.** `unicode_font_rep::draw_color_glyph` draws the layers
+6. **The drawing.** `unicode_font_rep::draw_color_glyph` draws the layers
    from the bottom up, each as an ordinary glyph of the same font (a
    native glyph, `0xc000000` plus its index) with the pen set to its color
    (the color of the text where the palette says so, and the opacity of
@@ -89,9 +95,6 @@ hooks.
   so the way through SVG does not work there. Cocoa and Qt would do the
   same with Core Graphics and Qt: one treatment of the layers everywhere,
   with each renderer drawing images and gradients its own way.
-- **The cursor** can stand inside a sequence: the characters of a ligature
-  are all at the left of its picture (`get_xpositions`), and a key moves
-  over them one by one.
 - **Spaces around emoji in the text of a PDF**: MuPDF leaves out the
   spaces between two emoji (a character it takes from an ActualText has
   no advance, so that the next gap seems too wide for a space), Preview

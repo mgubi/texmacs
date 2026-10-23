@@ -115,6 +115,70 @@
                      (* 2 (em)) (/ (em) 10))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Deleting a sequence
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; A sequence is one character for the editor (tm_grapheme_end and
+;; tm_grapheme_start, analyze.cpp): Delete and Backspace remove it whole.
+;; (The cursor keys step over it whole too, out_of_emoji in edit_cursor.cpp,
+;; but they move through the boxes on the screen, which need a window.)
+
+(define (edit-step thunk)
+  (archive-state)
+  (start-editing)
+  (thunk)
+  (end-editing)
+  (update-forced))
+
+(define (body) (tree->stree (buffer-get-body (current-buffer))))
+
+(define (with-buffer-text s thunk)
+  (let* ((old (current-buffer))
+         (before (buffer-list))
+         (u (new-buffer)))
+    (switch-to-buffer* u)
+    (buffer-set-body u (stree->tree `(document ,s)))
+    (update-forced)
+    (with r (check-run thunk)
+      (when (and (pair? r) (== (car r) 'error))
+        (check-report #f "the group" (object->string r)))
+      (for (b (buffer-list))
+        (when (nin? b before) (buffer-close b)))
+      (when (buffer-exists? old) (switch-to-buffer old)))))
+
+(define (after-key s pos key)
+  ;; the text @s once @key was pressed with the cursor at @pos
+  (let ((r #f))
+    (with-buffer-text s
+      (lambda ()
+        (edit-step (lambda () (go-to (append (buffer-path) (list 0 pos)))))
+        (edit-step key)
+        (set! r (body))))
+    r))
+
+(define (test-deletion)
+  (check-group "deletion")
+  (let* ((fam (string-append man zwj woman zwj girl))
+         (s (string-append "a" fam "b<#1F1EE><#1F1F9>c#" vs16 "<#20E3>d"))
+         (n (string-length s))
+         (a (string-length (string-append "a" fam)))
+         (b (+ a (string-length "b<#1F1EE><#1F1F9>"))))
+    ;; Delete after the a, Backspace after the family: the family goes
+    (check= (after-key s 1 kbd-delete)
+            `(document ,(string-append "ab<#1F1EE><#1F1F9>c#" vs16 "<#20E3>d")))
+    (check= (after-key s a kbd-backspace)
+            `(document ,(string-append "ab<#1F1EE><#1F1F9>c#" vs16 "<#20E3>d")))
+    ;; the flag, the keycap
+    (check= (after-key s b kbd-backspace)
+            `(document ,(string-append "a" fam "bc#" vs16 "<#20E3>d")))
+    (check= (after-key s (- n 1) kbd-backspace)
+            `(document ,(string-append "a" fam "b<#1F1EE><#1F1F9>cd")))
+    ;; a letter stays a letter
+    (check= (after-key s n kbd-backspace)
+            `(document ,(string-append "a" fam "b<#1F1EE><#1F1F9>c#" vs16
+                                       "<#20E3>")))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; All tests
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -129,4 +193,5 @@
   (run-group test-single)
   (run-group test-sequences)
   (run-group test-marks)
+  (run-group test-deletion)
   (check-end))
