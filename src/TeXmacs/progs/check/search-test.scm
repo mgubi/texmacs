@@ -605,6 +605,23 @@
                     '(concat "a" (wildcard "x") "b" (wildcard "y") "c"))
               '((0 0 0) (0 2 2) (0 2 2) (0 4 1))))))
 
+;; a match across the children which ends inside a string: the hits of
+;; the string after it, as in the same text as one string, xa12bababa
+;; (#482); with the replace matching, the own hits of a string cover all
+;; of it, and the match goes on to the last ba
+(define (test-hits-after-a-match)
+  (check-group "hits after a match")
+  (let ((doc '(document (concat "xa" (frac "1" "2") "bababa")))
+        (what '(concat "a" (wildcard "x") "ba")))
+    (with-search-mode 'search
+      (lambda ()
+        (check= (hits '(document "xa12bababa") what)
+                '((0 1) (0 6) (0 7) (0 10)))
+        (check= (hits doc what) '((0 0 1) (0 2 2) (0 2 3) (0 2 6)))))
+    (with-search-mode 'replace
+      (lambda ()
+        (check= (hits doc what) '((0 0 1) (0 2 6)))))))
+
 ;; a string of 100000 characters and a pattern of a string and a wildcard,
 ;; with partial matches: the starts were tried by a recursion per character,
 ;; which overflowed the stack and crashed TeXmacs (#479)
@@ -641,6 +658,7 @@
   (test-limit-and-position)
   (test-middle-strings)
   (test-strings-and-wildcards-first)
+  (test-hits-after-a-match)
   (test-speed)
   (test-long-strings)
   (check-end))
