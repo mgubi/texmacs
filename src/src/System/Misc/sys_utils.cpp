@@ -125,10 +125,11 @@ get_texmacs_path () {
 
 url
 get_texmacs_home_path () {
-  url path= get_env ("TEXMACS_HOME_PATH");
-  if (path == "")
-    path= url_system ("$HOME/.TeXmacs_Upsilon");
-  return path;
+  // a path of the system, as for get_texmacs_path: with the standard syntax
+  // the ':' of a Windows drive (C:\...) separates two paths
+  string home= get_env ("TEXMACS_HOME_PATH");
+  if (home == "") return url_system ("$HOME/.TeXmacs_Upsilon");
+  return url_system (home);
 }
 
 array<string>
@@ -579,22 +580,6 @@ string get_user_name () {
   return unix_get_username ();
 #endif
 }
-
-/******************************************************************************
-* Driving the graphical interface from scripts (implemented for Qt)
-******************************************************************************/
-
-#ifndef QTTEXMACS
-int gui_test_snapshot (string dir) { (void) dir; return 0; }
-array<string> gui_test_buttons () { return array<string> (); }
-bool gui_test_click (string label) { (void) label; return false; }
-bool gui_test_menu (string path) { (void) path; return false; }
-array<string> gui_test_menu_entries (string path) {
-  (void) path; return array<string> (); }
-void gui_test_type (string text) { (void) text; }
-void gui_test_click_later (int ms, string dir, string label) {
-  (void) ms; (void) dir; (void) label; }
-#endif
 
 // The commands of a request link (the curl program, see web_files.cpp)
 // which write into outbuf are no longer wanted: an interrupted answer, or

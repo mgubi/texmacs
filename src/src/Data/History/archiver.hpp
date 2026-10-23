@@ -16,6 +16,7 @@
 void global_clear_history ();
 void global_confirm ();
 void global_cancel ();
+void global_forget_document (path rp);
 
 class archiver_rep: public concrete_struct {
   patch    archive;        // undo and redo archive
@@ -31,6 +32,7 @@ class archiver_rep: public concrete_struct {
 
 protected:
   void apply (patch p);
+  patch apply_undo (patch p);
   void split (patch p1, patch p2, patch& re1, patch& re2);
   patch make_future (patch p1, patch p2);
   patch expose (patch archive);
@@ -47,6 +49,7 @@ public:
   void add (modification m);
   void start_slave (double a);
   bool active ();
+  bool modifies ();       // current modifications change the document
   bool has_history ();
   void cancel ();        // cancel current series of modifications
   void confirm ();       // move current modifications to history
@@ -76,6 +79,7 @@ public:
   friend void global_clear_history ();
   friend void global_confirm ();
   friend void global_cancel ();
+  friend void global_forget_document (path rp);
 };
 
 class archiver {

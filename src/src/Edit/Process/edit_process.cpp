@@ -68,7 +68,9 @@ copy_bst_file (url base, string style) {
   string bst= style * ".bst";
   url u1= url ("$TEXMACS_HOME_PATH/system/bib", bst);
   url u2= relative (base, bst);
-  if (!exists (u1) && exists (u2)) copy (u2, u1);
+  if (exists (u2) &&
+      (!exists (u1) || last_modified (u2, false) > last_modified (u1, false)))
+    copy (u2, u1);
 }
 
 url

@@ -174,7 +174,7 @@
   toc entry>|dark green|what><assign|toc-next|<arg|what>>>>>
 
   <assign|toc-entry|<macro|type|what|<quasi|<style-with|src-compact|none|||<flag|<localize|table
-  of contents>|dark green|what><auto-label><write|<value|toc-prefix>|<compound|<unquote|<arg|type>>|<arg|what>|<pageref|<the-auto>>>><style-with|src-compact|none|<if|<equal|<value|toc-next>|>|<toc-notify|<arg|type>|<arg|what>>|<toc-notify|<arg|type>|<value|toc-next>><assign|toc-next|>>>>>>>
+  of contents>|dark green|what><auto-label><with|auto-written|<the-auto>|<write|<value|toc-prefix>|<compound|<unquote|<arg|type>>|<arg|what>|<pageref|<value|auto-written>>>>><style-with|src-compact|none|<if|<equal|<value|toc-next>|>|<toc-notify|<arg|type>|<arg|what>>|<toc-notify|<arg|type>|<value|toc-next>><assign|toc-next|>>>>>>>
 
   <assign|toc-main-1|<macro|what|<toc-entry|toc-strong-1|<arg|what>>>>
 
@@ -370,7 +370,7 @@
 
   <assign|part-info|<macro|name|<style-with|src-compact|none|<label|<merge|part:|<arg|name>>><write|parts|<tuple|<arg|name>|chapter-nr|<value|chapter-nr>|section-nr|<value|section-nr>|subsection-nr|<value|subsection-nr>>>>>>
 
-  <assign|shared|<macro|unique-id|mirror-id|body|<with|old-color|<value|locus-color>|locus-color|preserve|<locus|<id|<arg|mirror-id>>|<observer|<arg|unique-id>|mirror-notify>|<surround|<hidden|<part-info|<arg|unique-id>><extern|mirror-initialize|<quote-arg|xbody>>>|<right-flush>|<with|locus-color|<value|old-color>|<arg|body>>>>>>>
+  <assign|shared|<macro|unique-id|mirror-id|body|<with|old-color|<value|locus-color>|locus-color|preserve|<locus|<id|<arg|mirror-id>>|<observer|<arg|unique-id>|mirror-notify>|<surround|<hidden|<part-info|<arg|unique-id>><extern|mirror-initialize|<quote-arg|body>>>|<right-flush>|<with|locus-color|<value|old-color>|<arg|body>>>>>>>
 
   <assign|include|<macro|name|<\surround|<part-info|<arg|name>>|>
     <include*|<arg|name>>

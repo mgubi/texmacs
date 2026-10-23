@@ -132,11 +132,35 @@
   the wallet opens it everywhere; a passkey added to it may not be there in
   another browser.
 
+  <paragraph|How long the browser keeps them>
+
+  At the first save of a file, <TeXmacs> asks the browser to keep the files
+  of the site (<em|persistent storage>). <name|Firefox> asks you,
+  <name|Chrome> decides by itself (from how you use the site: a bookmark, an
+  installed application...), and <name|Safari> grants it mostly to a web
+  application added to the Home Screen. When the browser agrees, it keeps
+  the files until you clear the data of the site; otherwise it may delete
+  them when it needs space.
+
+  The line at the top of <menu|File|Files in this browser...> says which:
+  <with|font-series|bold|Kept until you clear the data of this site>, or
+  <with|font-series|bold|The browser may delete these files>. It gives the
+  date of your last backup (or <with|font-series|bold|never>), with a
+  <with|font-series|bold|Back up> button. When your files have had no
+  backup for seven days (or none at all), a short reminder at the bottom of
+  the page says so, at most once a day, with the same button; there is none
+  while you have no documents.
+
   <\warning*>
-    Clearing the data of the site deletes your files, and Safari deletes the
-    data of a site which was not visited for seven days. Save a copy of the
-    documents you want to keep, or download a backup now and then.
+    Clearing the data of the site deletes your files, and so does clearing
+    the history of <name|Safari> by hand, which removes the data of the
+    sites too. <name|Safari> also deletes the data of a site after seven
+    days of its use without a visit to the site (a web application added to
+    the Home Screen counts only the days it is used). Save a copy of the documents you want to keep, or save a backup
+    now and then: the date of the last one is in the Files panel.
   </warning*>
+
+  <paragraph|Several tabs>
 
   <TeXmacs> Upsilon may be open in several tabs of the browser: each of
   them keeps the documents it saves, and the others see the new version.
@@ -277,9 +301,88 @@
 
   The additions to <TeXmacs> Upsilon, the newest first.
 
+  <paragraph|23 October 2026>
+
+  <\itemize>
+    <item>The error messages (their window opens by itself after a warning)
+    can be selected and copied as in a document, but not changed; new
+    messages are added at the end without losing the selection.
+  </itemize>
+
+  <paragraph|22 October 2026>
+
+  <\itemize>
+    <item>The window of the error messages behaves as an editor window: it
+    opens at the same size whatever the messages are, and they fill it,
+    follow its size and scroll.
+  </itemize>
+
+  <paragraph|21 October 2026>
+
+  <\itemize>
+    <item>Hyphenation uses the patterns which end with the end of a word
+    (<verbatim|along-side>, which had no break), so the lines of some
+    documents break a little differently.
+
+    <item><menu|Tools|Update|Help> reads the documentation again, and Save
+    in a part view (<menu|Document|Part>) writes the included files changed
+    in it, which were dropped.
+
+    <item>Removing a keyboard shortcut works whatever the way its keys are
+    written, and keeps the other keys of its command in the menus.
+
+    <item>The export to HTML includes the files of <markup|include> with
+    their formulas and numbers; a pasted comment is a comment of its own; an
+    index entry in a section title no longer turns the page numbers of the
+    table of contents into question marks; tall cells which span several
+    rows stay inside their table; and typing in a long document without
+    pages (a source file) is faster.
+  </itemize>
+
+  <paragraph|20 October 2026>
+
+  <\itemize>
+    <item>Your files are safer: at the first save, <TeXmacs> asks the
+    browser to keep them (persistent storage); the top of
+    <menu|File|Files in this browser...> says whether it agreed, with the
+    date of your last backup and a <with|font-series|bold|Back up> button;
+    and a short reminder comes when your documents had no backup for seven
+    days.
+
+    <item>The main and mode icon bars can be at the right of the document:
+    <menu|Edit|Preferences|General|Main and mode icon bars|At the right of
+    the document>, or <verbatim|?bars=right> in the address.
+
+    <item>The input fields of the dialogs take the keys of the fields of
+    the other applications: control (command on a <name|Mac>) with c, x, v,
+    a, z and shift-z copy, cut, paste, select all, undo and redo. Elsewhere
+    than on a <name|Mac>, control-v did nothing and control-c cancelled the
+    field. The menu of the right button has Undo and Redo too.
+
+    <item>The input fields copy and paste the accented letters and the
+    symbols as they are: an alpha copied was lost, and an accented letter
+    pasted from another application became garbage.
+
+    <item>Undo and redo keep the numbers of the sections and of the other
+    automatic labels; <menu|Tools|Miscellaneous|Clear undo history> clears
+    the history of the current document only, which stays saved if it was.
+
+    <item>The export to <LaTeX> of struck-through and highlighted text, of
+    columns and of the colors given by value compiles (it stopped
+    <name|pdflatex>), and many fixes of the bibliographies made with
+    <name|BibTeX>.
+
+    <item>A document can no longer run its own code through
+    <markup|use-module>, which now only takes the names of modules and of
+    plugins.
+  </itemize>
+
   <paragraph|19 October 2026>
 
   <\itemize>
+    <item>On a touch screen, a finger put down on the handle of a scroll
+    bar drags it (it moved the view the other way).
+
     <item>On a tablet (an <name|iPad>), a keyboard button at the bottom
     right of the page opens the keyboard of the system, and closes it: no
     keyboard came without an external one. <verbatim|?keyboard> in the

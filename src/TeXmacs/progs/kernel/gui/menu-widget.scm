@@ -67,6 +67,7 @@
     (vlist :menu-item-list)
     (division :%1 :menu-item-list)
     (class :%1 :menu-item-list)
+    (named :string? :menu-item-list)
     (aligned :menu-item-list)
     (aligned-item :%2)
     (tabs :menu-item-list)
@@ -575,16 +576,38 @@
     (with inner (make-menu-items (list (cons 'vertical items)) style #f)
       (widget-division (name) (car inner)))))
 
+(define (make-menu-named p style bar?)
+  "Make @(named :string? :menu-item-list) items."
+  ;; for the scripted tests (docs/gui-scripting.md): the items are those of
+  ;; the menu, which a test can name by #name, where they are in a division
+  ;; "named:name" (Vue puts the name in their path); not on the ports
+  ;; without the hooks of the tests, where a division would change them
+  (with (tag name . items) p
+    (with l (make-menu-items items style bar?)
+      (if (== (gui-test-port) "") l
+          (map (lambda (w) (widget-division (string-append "named:" name) w))
+               l)))))
+
 (define (make-menu-class p style)
   "Make @(class :%1 :menu-item-list) item."
   (with (tag name . items) p
     (with inner (make-menu-items (list (cons 'horizontal items)) style #f)
       (widget-division (name) (car inner)))))
 
+(define (make-aligned-cell x style)
+  ;; one widget for a cell: the cells of the two columns go by pairs, and a
+  ;; cell which makes several widgets (buttons with glue between them) or
+  ;; none put the columns out of step (Qt stopped on it: "aligned_widget:
+  ;; N(lhs) != N(rhs)", the preferences of the AI sessions, #398)
+  (with l (make-menu-items x style #f)
+    (cond ((null? l) (widget-hmenu '()))
+          ((null? (cdr l)) (car l))
+          (else (widget-hlist l)))))
+
 (define (make-aligned p style)
   "Make @(aligned :menu-item-list) item."
-  (widget-aligned (make-menu-items (map cadr (cdr p)) style #f)
-                  (make-menu-items (map caddr (cdr p)) style #f)))
+  (widget-aligned (map (lambda (x) (make-aligned-cell x style)) (map cadr (cdr p)))
+                  (map (lambda (x) (make-aligned-cell x style)) (map caddr (cdr p)))))
 
 (define (make-aligned-item p style)
   "Make @(aligned-item :%2) item."
@@ -713,7 +736,7 @@
           (h (h-cmd)))
       (with (w1 w2 w3 hpos) (decode-resize w "left")
         (with (h1 h2 h3 vpos) (decode-resize h "top")
-          (with-global global-resize (list w1 w2 w3 hpos h1 h2 h3 hpos)
+          (with-global global-resize (list w1 w2 w3 hpos h1 h2 h3 vpos)
             (with inner (make-menu-items (list (cons 'vertical items)) style #f)
               (widget-resize (car inner) style
                              w1 h1 w2 h2 w3 h3 hpos vpos))))))))
@@ -909,6 +932,8 @@
             ,(lambda (p style bar?) (list (make-menu-division p style))))
   (class (:%1 :*)
             ,(lambda (p style bar?) (list (make-menu-class p style))))
+  (named (:string? :*)
+         ,(lambda (p style bar?) (make-menu-named p style bar?)))
   (aligned (:*)
          ,(lambda (p style bar?) (list (make-aligned p style))))
   (aligned-item (:%2)
@@ -1172,6 +1197,7 @@
   (vlist ,(lambda (p) `(vlist ,@(menu-expand-list (cdr p)))))
   (division ,(lambda (p) `(division ,((cadr p)) ,@(menu-expand-list (cddr p)))))
   (class ,(lambda (p) `(class ,(cadr p) ,@(menu-expand-list (cddr p)))))
+  (named ,(lambda (p) `(named ,(cadr p) ,@(menu-expand-list (cddr p)))))
   (aligned ,(lambda (p) `(aligned ,@(menu-expand-list (cdr p)))))
   (aligned-item ,(lambda (p) `(aligned-item ,@(menu-expand-list (cdr p)))))
   (tabs ,(lambda (p) `(tabs ,@(menu-expand-list (cdr p)))))

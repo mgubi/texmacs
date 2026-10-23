@@ -224,6 +224,8 @@ tracked_texmacs_to_latex (tree doc, object opts) {
 
   string ms, s;
   if (tracked_tree_to_latex_document (xdoc, opts, s, ms)) return s;
+  if (get_preference ("texmacs->latex:attach-tracking-info", "on") != "on")
+    return s;
 
   string post;
   post << tree_to_scheme (purify (doc));

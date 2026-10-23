@@ -206,6 +206,15 @@ tmg_gui_set_next_window_as_popup () {
 }
 
 tmscm
+tmg_gui_set_next_window_without_focus () {
+  // TMSCM_DEFER_INTS;
+  gui_set_next_window_without_focus ();
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
 tmg_gui_test_snapshot (tmscm arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "gui-test-snapshot");
 
@@ -294,6 +303,103 @@ tmg_gui_test_click_later (tmscm arg1, tmscm arg2, tmscm arg3) {
   // TMSCM_ALLOW_INTS;
 
   return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_gui_test_port () {
+  // TMSCM_DEFER_INTS;
+  string out= gui_test_port ();
+  // TMSCM_ALLOW_INTS;
+
+  return string_to_tmscm (out);
+}
+
+tmscm
+tmg_gui_test_raw (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "gui-test-raw");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  int out= gui_test_raw (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return int_to_tmscm (out);
+}
+
+tmscm
+tmg_gui_test_busyP () {
+  // TMSCM_DEFER_INTS;
+  bool out= gui_test_busy ();
+  // TMSCM_ALLOW_INTS;
+
+  return bool_to_tmscm (out);
+}
+
+tmscm
+tmg_gui_test_texts () {
+  // TMSCM_DEFER_INTS;
+  array_string out= gui_test_texts ();
+  // TMSCM_ALLOW_INTS;
+
+  return array_string_to_tmscm (out);
+}
+
+tmscm
+tmg_gui_test_windows () {
+  // TMSCM_DEFER_INTS;
+  array_string out= gui_test_windows ();
+  // TMSCM_ALLOW_INTS;
+
+  return array_string_to_tmscm (out);
+}
+
+tmscm
+tmg_gui_test_set_pump (tmscm arg1) {
+  TMSCM_ASSERT_BOOL (arg1, TMSCM_ARG1, "gui-test-set-pump");
+
+  bool in1= tmscm_to_bool (arg1);
+
+  // TMSCM_DEFER_INTS;
+  gui_test_pump (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_gui_test_eval_later (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "gui-test-eval-later");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  gui_test_eval_later (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_gui_test_file_dialog () {
+  // TMSCM_DEFER_INTS;
+  array_string out= gui_test_file_dialog ();
+  // TMSCM_ALLOW_INTS;
+
+  return array_string_to_tmscm (out);
+}
+
+tmscm
+tmg_gui_test_file_dialog_do (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "gui-test-file-dialog-do");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  int out= gui_test_file_dialog_do (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return int_to_tmscm (out);
 }
 
 tmscm
@@ -8357,6 +8463,19 @@ tmg_url_last_modified (tmscm arg1) {
 }
 
 tmscm
+tmg_url_declare_out_of_date (tmscm arg1) {
+  TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "url-declare-out-of-date");
+
+  url in1= tmscm_to_url (arg1);
+
+  // TMSCM_DEFER_INTS;
+  declare_out_of_date (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
 tmg_url_temp () {
   // TMSCM_DEFER_INTS;
   url out= url_temp ();
@@ -8679,6 +8798,15 @@ tmscm
 tmg_picture_cache_reset () {
   // TMSCM_DEFER_INTS;
   picture_cache_reset ();
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_remote_files_refresh () {
+  // TMSCM_DEFER_INTS;
+  remote_files_refresh ();
   // TMSCM_ALLOW_INTS;
 
   return TMSCM_UNSPECIFIED;
@@ -9226,6 +9354,19 @@ tmg_gnutls_random_number (tmscm arg1) {
 
   // TMSCM_DEFER_INTS;
   int out= gnutls_random_int (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return int_to_tmscm (out);
+}
+
+tmscm
+tmg_secure_random_number (tmscm arg1) {
+  TMSCM_ASSERT_UINT (arg1, TMSCM_ARG1, "secure-random-number");
+
+  uint in1= tmscm_to_uint (arg1);
+
+  // TMSCM_DEFER_INTS;
+  int out= secure_random_int (in1);
   // TMSCM_ALLOW_INTS;
 
   return int_to_tmscm (out);
@@ -10664,6 +10805,34 @@ tmg_buffer_get_body (tmscm arg1) {
 }
 
 tmscm
+tmg_buffer_get_style (tmscm arg1) {
+  TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "buffer-get-style");
+
+  url in1= tmscm_to_url (arg1);
+
+  // TMSCM_DEFER_INTS;
+  tree out= get_buffer_style (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return tree_to_tmscm (out);
+}
+
+tmscm
+tmg_buffer_set_style (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "buffer-set-style");
+  TMSCM_ASSERT_CONTENT (arg2, TMSCM_ARG2, "buffer-set-style");
+
+  url in1= tmscm_to_url (arg1);
+  content in2= tmscm_to_content (arg2);
+
+  // TMSCM_DEFER_INTS;
+  set_buffer_style (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
 tmg_buffer_set_master (tmscm arg1, tmscm arg2) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "buffer-set-master");
   TMSCM_ASSERT_URL (arg2, TMSCM_ARG2, "buffer-set-master");
@@ -10795,6 +10964,34 @@ tmg_buffer_pretend_saved (tmscm arg1) {
   // TMSCM_ALLOW_INTS;
 
   return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_buffer_set_read_only (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "buffer-set-read-only");
+  TMSCM_ASSERT_BOOL (arg2, TMSCM_ARG2, "buffer-set-read-only");
+
+  url in1= tmscm_to_url (arg1);
+  bool in2= tmscm_to_bool (arg2);
+
+  // TMSCM_DEFER_INTS;
+  set_buffer_read_only (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_buffer_read_onlyP (tmscm arg1) {
+  TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "buffer-read-only?");
+
+  url in1= tmscm_to_url (arg1);
+
+  // TMSCM_DEFER_INTS;
+  bool out= is_buffer_read_only (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return bool_to_tmscm (out);
 }
 
 tmscm
@@ -11818,6 +12015,19 @@ tmg_bib_text_length (tmscm arg1) {
 }
 
 tmscm
+tmg_bib_field_pages (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "bib-field-pages");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  tree out= bib_field_pages (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return tree_to_tmscm (out);
+}
+
+tmscm
 tmg_bib_prefix (tmscm arg1, tmscm arg2) {
   TMSCM_ASSERT_SCHEME_TREE (arg1, TMSCM_ARG1, "bib-prefix");
   TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "bib-prefix");
@@ -11989,6 +12199,7 @@ initialize_glue_basic () {
   tmscm_install_procedure ("qt-gui?",  tmg_qt_guiP, 0, 0, 0);
   tmscm_install_procedure ("vue-gui?",  tmg_vue_guiP, 0, 0, 0);
   tmscm_install_procedure ("gui-set-next-window-as-popup",  tmg_gui_set_next_window_as_popup, 0, 0, 0);
+  tmscm_install_procedure ("gui-set-next-window-without-focus",  tmg_gui_set_next_window_without_focus, 0, 0, 0);
   tmscm_install_procedure ("gui-test-snapshot",  tmg_gui_test_snapshot, 1, 0, 0);
   tmscm_install_procedure ("gui-test-buttons",  tmg_gui_test_buttons, 0, 0, 0);
   tmscm_install_procedure ("gui-test-click",  tmg_gui_test_click, 1, 0, 0);
@@ -11996,6 +12207,15 @@ initialize_glue_basic () {
   tmscm_install_procedure ("gui-test-menu-entries",  tmg_gui_test_menu_entries, 1, 0, 0);
   tmscm_install_procedure ("gui-test-type",  tmg_gui_test_type, 1, 0, 0);
   tmscm_install_procedure ("gui-test-click-later",  tmg_gui_test_click_later, 3, 0, 0);
+  tmscm_install_procedure ("gui-test-port",  tmg_gui_test_port, 0, 0, 0);
+  tmscm_install_procedure ("gui-test-raw",  tmg_gui_test_raw, 1, 0, 0);
+  tmscm_install_procedure ("gui-test-busy?",  tmg_gui_test_busyP, 0, 0, 0);
+  tmscm_install_procedure ("gui-test-texts",  tmg_gui_test_texts, 0, 0, 0);
+  tmscm_install_procedure ("gui-test-windows",  tmg_gui_test_windows, 0, 0, 0);
+  tmscm_install_procedure ("gui-test-set-pump",  tmg_gui_test_set_pump, 1, 0, 0);
+  tmscm_install_procedure ("gui-test-eval-later",  tmg_gui_test_eval_later, 1, 0, 0);
+  tmscm_install_procedure ("gui-test-file-dialog",  tmg_gui_test_file_dialog, 0, 0, 0);
+  tmscm_install_procedure ("gui-test-file-dialog-do",  tmg_gui_test_file_dialog_do, 1, 0, 0);
   tmscm_install_procedure ("support-functionality?",  tmg_support_functionalityP, 1, 0, 0);
   tmscm_install_procedure ("gui-version",  tmg_gui_version, 0, 0, 0);
   tmscm_install_procedure ("default-look-and-feel",  tmg_default_look_and_feel, 0, 0, 0);
@@ -12586,6 +12806,7 @@ initialize_glue_basic () {
   tmscm_install_procedure ("url-newer?",  tmg_url_newerP, 2, 0, 0);
   tmscm_install_procedure ("url-size",  tmg_url_size, 1, 0, 0);
   tmscm_install_procedure ("url-last-modified",  tmg_url_last_modified, 1, 0, 0);
+  tmscm_install_procedure ("url-declare-out-of-date",  tmg_url_declare_out_of_date, 1, 0, 0);
   tmscm_install_procedure ("url-temp",  tmg_url_temp, 0, 0, 0);
   tmscm_install_procedure ("url-temp-dir",  tmg_url_temp_dir, 0, 0, 0);
   tmscm_install_procedure ("url-scratch",  tmg_url_scratch, 3, 0, 0);
@@ -12610,6 +12831,7 @@ initialize_glue_basic () {
   tmscm_install_procedure ("url-grep",  tmg_url_grep, 2, 0, 0);
   tmscm_install_procedure ("url-search-upwards",  tmg_url_search_upwards, 3, 0, 0);
   tmscm_install_procedure ("picture-cache-reset",  tmg_picture_cache_reset, 0, 0, 0);
+  tmscm_install_procedure ("remote-files-refresh",  tmg_remote_files_refresh, 0, 0, 0);
   tmscm_install_procedure ("set-file-focus",  tmg_set_file_focus, 1, 0, 0);
   tmscm_install_procedure ("get-file-focus",  tmg_get_file_focus, 0, 0, 0);
   tmscm_install_procedure ("persistent-set",  tmg_persistent_set, 3, 0, 0);
@@ -12649,6 +12871,7 @@ initialize_glue_basic () {
   tmscm_install_procedure ("server-log-write-int",  tmg_server_log_write_int, 2, 0, 0);
   tmscm_install_procedure ("supports-gnutls?",  tmg_supports_gnutlsP, 0, 0, 0);
   tmscm_install_procedure ("gnutls-random-number",  tmg_gnutls_random_number, 1, 0, 0);
+  tmscm_install_procedure ("secure-random-number",  tmg_secure_random_number, 1, 0, 0);
   tmscm_install_procedure ("tls-client-start",  tmg_tls_client_start, 3, 0, 0);
   tmscm_install_procedure ("gnutls-generate-salt",  tmg_gnutls_generate_salt, 0, 0, 0);
   tmscm_install_procedure ("hash-password-pbkdf2",  tmg_hash_password_pbkdf2, 2, 0, 0);
@@ -12745,6 +12968,8 @@ initialize_glue_basic () {
   tmscm_install_procedure ("buffer-get",  tmg_buffer_get, 1, 0, 0);
   tmscm_install_procedure ("buffer-set-body",  tmg_buffer_set_body, 2, 0, 0);
   tmscm_install_procedure ("buffer-get-body",  tmg_buffer_get_body, 1, 0, 0);
+  tmscm_install_procedure ("buffer-get-style",  tmg_buffer_get_style, 1, 0, 0);
+  tmscm_install_procedure ("buffer-set-style",  tmg_buffer_set_style, 2, 0, 0);
   tmscm_install_procedure ("buffer-set-master",  tmg_buffer_set_master, 2, 0, 0);
   tmscm_install_procedure ("buffer-get-master",  tmg_buffer_get_master, 1, 0, 0);
   tmscm_install_procedure ("buffer-set-title",  tmg_buffer_set_title, 2, 0, 0);
@@ -12755,6 +12980,8 @@ initialize_glue_basic () {
   tmscm_install_procedure ("buffer-modified-since-autosave?",  tmg_buffer_modified_since_autosaveP, 1, 0, 0);
   tmscm_install_procedure ("buffer-pretend-modified",  tmg_buffer_pretend_modified, 1, 0, 0);
   tmscm_install_procedure ("buffer-pretend-saved",  tmg_buffer_pretend_saved, 1, 0, 0);
+  tmscm_install_procedure ("buffer-set-read-only",  tmg_buffer_set_read_only, 2, 0, 0);
+  tmscm_install_procedure ("buffer-read-only?",  tmg_buffer_read_onlyP, 1, 0, 0);
   tmscm_install_procedure ("buffer-pretend-autosaved",  tmg_buffer_pretend_autosaved, 1, 0, 0);
   tmscm_install_procedure ("buffer-attach-notifier",  tmg_buffer_attach_notifier, 1, 0, 0);
   tmscm_install_procedure ("buffer-has-name?",  tmg_buffer_has_nameP, 1, 0, 0);
@@ -12833,6 +13060,7 @@ initialize_glue_basic () {
   tmscm_install_procedure ("bib-default-upcase-first",  tmg_bib_default_upcase_first, 1, 0, 0);
   tmscm_install_procedure ("bib-purify",  tmg_bib_purify, 1, 0, 0);
   tmscm_install_procedure ("bib-text-length",  tmg_bib_text_length, 1, 0, 0);
+  tmscm_install_procedure ("bib-field-pages",  tmg_bib_field_pages, 1, 0, 0);
   tmscm_install_procedure ("bib-prefix",  tmg_bib_prefix, 2, 0, 0);
   tmscm_install_procedure ("bib-empty?",  tmg_bib_emptyP, 2, 0, 0);
   tmscm_install_procedure ("bib-field",  tmg_bib_field, 2, 0, 0);

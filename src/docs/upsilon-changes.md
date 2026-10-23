@@ -12,8 +12,517 @@ branch [`upsilon_texmacs`](https://github.com/mgubi/texmacs/commits/upsilon_texm
 have the details, and the problems go to the
 [issues of the repository](https://github.com/mgubi/texmacs/issues).
 
+## 23 October 2026
+
+- **Vue**: the balloons of a language server under the mouse no longer
+  vanish as soon as they show on Linux under Wayland: a balloon was a
+  window of its own, which the compositor placed where it liked and gave
+  the keyboard to, so that the editor, losing the focus, closed it. The
+  balloons are now tooltips attached to the window of the editor, which
+  never take the keyboard nor the pointer
+  ([#399](https://github.com/mgubi/texmacs/issues/399)).
+- **AI sessions**: the field of the API key in the preferences of an AI
+  session says "saved" next to it once the key typed is saved (with
+  Return, or when leaving the field), or "removed" when it was emptied:
+  nothing showed it, and Return seemed to do nothing
+  ([#455](https://github.com/mgubi/texmacs/issues/455)).
+- The messages of the error console (Debug > Error messages, which opens
+  by itself on a warning) and of the debugging console are shown in a
+  read-only editor: they can be selected and copied as in a document,
+  and nothing typed, pasted, dropped, undone or done from a menu changes
+  them. A new message is added at the end without losing the selection;
+  a console opens at its latest messages and follows the new ones while
+  its cursor is at the end, also when it is not the window in use. The
+  console which opens by itself no longer takes the keyboard from the
+  document being typed in, and closing it leaves no buffer behind.
+- **Vue**: closing a window closes the buffers of the editors inside it
+  (texmacs-input, as in the macro editors), also inside popups, balloons
+  and scrolled areas: they stayed among the buffers.
+- Searching for a formula is much faster in long documents: a pattern was
+  tried again from every position of every formula, so that each keystroke
+  in the search field took seconds in a book of 2000 pages (2.5 s in its
+  longest chapter) and grew with the square of the length of a formula; it
+  now takes about a tenth of a second there, a few milliseconds per formula
+  ([#451](https://github.com/mgubi/texmacs/pull/451)).
+- The layouts of tables and of the streams of a page are freed after use:
+  they were never freed, and the memory grew at each typesetting of a
+  document with tables
+  ([#442](https://github.com/mgubi/texmacs/pull/442)).
+- Markup typesets the same whether written out or produced by a macro or
+  a `with`: the invisible places for the cursor at their edges no longer
+  have a height nor move what is next to them. Scripts sat elsewhere (the
+  E of the TeXmacs logo of beamer slides 3 pt higher, subscripts after a
+  macro up to 2 pt off), a script could attach to such a place, empty
+  macro lines took the height of the font cmr (loaded only for that), a
+  line, a cell or a fraction ending with a macro counted the space after
+  its last item, and an accent over a glyph glued to them lost its place.
+  The cursor at the end of a macro or a `with` stays next to its content,
+  and the slant of an italic letter at its end stays inside it (in
+  `<em|f>)` the cursor was drawn inside the f); a bar over italic content
+  (overline) is placed as the wide accents place it. Most documents move
+  by less than half a point
+  ([#448](https://github.com/mgubi/texmacs/pull/448)).
+
+- Searching for a formula with wildcards or empty parts gives the
+  right hits: a pattern with an empty part no longer hangs TeXmacs (its
+  memory grew without bound); a wildcard at the end after a tag, or
+  several hits in one tag or string, give one hit to the end, with no
+  empty or inverted ones; a hit inside a string no longer hides a match
+  which starts later in it; case-insensitive search also applies inside
+  the tags of a pattern; a pattern which starts with a string that
+  overlaps itself (aa_x in aaa_x) is found, and before a wildcard the
+  match starts at the first occurrence, as for the same text in one
+  string; and a wildcard in the middle which fails late is fast on long
+  formulas
+  ([#471](https://github.com/mgubi/texmacs/pull/471),
+  [#472](https://github.com/mgubi/texmacs/pull/472),
+  [#474](https://github.com/mgubi/texmacs/pull/474),
+  [#475](https://github.com/mgubi/texmacs/pull/475),
+  [#476](https://github.com/mgubi/texmacs/pull/476),
+  [#478](https://github.com/mgubi/texmacs/pull/478)).
+- **Jupyter**: without Python, no kernels are looked for: on Windows,
+  each start of a plugin showed a warning and opened the window of the
+  error messages
+  ([#467](https://github.com/mgubi/texmacs/pull/467)).
+
+## 22 October 2026
+
+- A subscript or superscript whose content comes from a macro argument
+  is placed as the same script written out: after the italic correction
+  of its content it kept part of the widening (up to 0.6pt with
+  TeX Gyre Termes math)
+  ([#426](https://github.com/mgubi/texmacs/pull/426)).
+- **Windows**: the plugins which run one command per input (`:cmdline`)
+  did nothing: their command is now run by the command interpreter
+  (`cmd /c`), with its output read in the background, and stopping or
+  interrupting it ends it and all it started
+  ([#443](https://github.com/mgubi/texmacs/pull/443)).
+- A table whose width in `par` is given by a value (as
+  `<value|figure-width>` in the big figures) takes the width of the
+  paragraph where it is placed, not that of the page: a figure in a
+  frame or in a table cell was as wide as the page and off-centre, and
+  two figures side by side overlapped
+  ([#429](https://github.com/mgubi/texmacs/pull/429)).
+- Stopping a plugin whose program ignores the termination signal no
+  longer blocks the interface for 2 s: the program is killed and reaped
+  later, in the background (Linux and macOS, all interfaces)
+  ([#419](https://github.com/mgubi/texmacs/pull/419)).
+- **Vue**: the window of the error messages (Debug > Error messages)
+  behaves as an editor window: it opens at the size of a new editor
+  window whatever the messages are, and they fill it, follow its size and
+  scroll: they were three lines tall in a grey window as wide as their
+  longest line. The same holds for any window or tab whose page is an
+  editor.
+
+## 21 October 2026
+
+- A large delimiter of a negative size (`<left|[|-5>`, a bracket made
+  smaller than its content) no longer crashes TeXmacs in the fonts which
+  assemble their delimiters, such as Fira in a beamer presentation
+  (`beamer` with `fira-font`): it has the size of the font
+  ([#411](https://github.com/mgubi/texmacs/pull/411)).
+- Part views: Document → Part also offers Show one part, Show several
+  parts and Show all parts for the view itself, and in the modes one and
+  several the list of its parts, as in an ordinary document
+  ([#434](https://github.com/mgubi/texmacs/pull/434)).
+- **Windows**: saving a part view (Document > Part) wrote the included
+  files as `D/dir/a.tm` (the full path without the colon of the drive) in
+  place of `a.tm`, and an included file open in its own buffer was not kept
+  in step with its copy in the part view; both work as on the other
+  systems.
+- Mirrored texts, comments and the part views of a master are
+  synchronized again after an edit which their incremental update could
+  not apply: the synchronization was never scheduled with S7 (a test of
+  the code of 2015 which Guile answered and S7 refused,
+  [#431](https://github.com/mgubi/texmacs/pull/431); comments are
+  mirrors, and every comment of a document showed a "wrong-number-of-args"
+  error; a check, [#428](https://github.com/mgubi/texmacs/pull/428)).
+- Document parts (Document → Part): the parts are told apart by their
+  number, so that parts with the same title are different entries, and the
+  menu shows the file of a part which starts with an included file
+  (`Same (pa.tm)`); saving a part view keeps the parts and the inclusions
+  of the master, which got inline copies instead; a change of style in a
+  part view goes to the master when the view is saved (also to the master
+  open in another window, which is left unsaved when it has changes of its
+  own); a hidden part which starts with an included file no longer holds a
+  second copy of it ([#77](https://github.com/mgubi/texmacs/issues/77)).
+- Document parts: saving a part view no longer marks as saved the same
+  file open in another window with unsaved changes of its own (they were
+  lost on closing): the file is saved from that window when its changes
+  are outside the text, else the save is refused with a message.
+- Generated passwords take their randomness from GnuTLS at the level of
+  keys, else from the system (`/dev/urandom`, `rand_s` on Windows), never
+  from the random numbers of Scheme seeded by the time
+  ([#66](https://github.com/mgubi/texmacs/issues/66)).
+- Opening a large document is much faster: TeXmacs looked through the whole
+  document for an encrypted part, which took seconds for a chapter of a few
+  MB (and overflowed the stack of Guile with some thousands of paragraphs);
+  it now looks only where an encrypted document keeps it
+  ([#418](https://github.com/mgubi/texmacs/issues/418)).
+- A reference to a label which was removed shows `?` after the update
+  which removes it, instead of the old number until a second update
+  ([#417](https://github.com/mgubi/texmacs/issues/417)).
+- Update All no longer gets slower at each use in a master document: the
+  lists of observers of its included files no longer keep the empty
+  places of the observers which left
+  ([#408](https://github.com/mgubi/texmacs/issues/408)).
+- The fixes of the branch `wip_fixes` (fixes of the official TeXmacs)
+  merged there on the evening of 20 October, in the items which follow.
+- Keyboard shortcuts: removing a shortcut (also one of your own, in Tools →
+  Keyboard) removes it whatever the way its keys are written (`S-C-`,
+  `var`), which removed nothing before; redefining or removing the key of a
+  command keeps the other keys of that command in the menus; the shortcuts
+  made under a condition (`:require`) can be removed again.
+- **Desktop**: a TeXmacs server makes its periodic backups (preferences
+  Server backup, Rsync destination directory, Backup interval), which it
+  never did, and a change of these preferences takes effect without a
+  restart of the server; the users who may write in the database of a
+  server may also set its fields and entries.
+- Projects: after Document → Project → Attach master, the open views of a
+  file find the references of the master at once (they needed a new view),
+  and a renamed document is trusted or not according to its new name.
+- Hyphenation: the patterns which end with the end of a word are used
+  (`along-side`, `acety-lene`, `aero-stat` in English, which had no break),
+  so the line breaks of some documents change slightly.
+- Encodings: a file with a character which cannot be converted (a wrong
+  byte, or a character the target encoding has not) is converted with a
+  replacement character in its place; the whole file was left undecoded.
+- Help: Tools → Update → Help reads again the folders of the documentation,
+  so that a help page added or removed while TeXmacs runs is found by the
+  search and the links (only a restart did it).
+- Document parts: Save in a part view (Document → Part) writes the
+  included files changed in it, which were dropped; a file open elsewhere
+  with other unsaved changes is refused, and the footer names the files
+  written.
+- Security: the checker of the scripts of documents (`secure?`) refuses
+  the expressions which could reach functions which are not secure (calls
+  through variables, `set!`, renamed special forms...).
+- Multi-file documents and links: `<shared>` works, an included file is read
+  again after it is saved, a cycle of inclusions is reported instead of
+  hanging, and several fixes of the parts and of the links.
+- TeX fonts: the kerning at the end of a word is used for the positions of
+  the cursor too, the ligatures of the Greek TeX fonts (final sigma before a
+  punctuation) keep the punctuation, and some PK fonts load.
+- HTML export: the files included with `<include>` are exported with their
+  formulas, sections and numbers.
+- PDF export: a hyperlink which starts a paragraph of an included file can
+  be clicked.
+- **Desktop (Qt, Cocoa)**: in the PDF export (the native renderer of the
+  Qt and Cocoa builds; Vue exports with MuPDF, which these fixes do not
+  concern), the bookmarks
+  have no backslashes, the symbols of the TeX math fonts are in the text
+  layer (copy and search), the web addresses are escaped, and a `<video>`
+  is embedded as a video (with ImageMagick and ffmpeg), not as its current
+  picture.
+- Comments: a pasted copy of a comment is a comment of its own, not a clone
+  which edits the other.
+- Tables: a tall cell which spans several rows no longer sticks out above
+  the table; decorations of cells no longer corrupt the memory (crashes at
+  exit), and the structured moves keep the joined cells.
+- Undo: undoing one step after a removal and an insertion at the same place
+  takes back that step only.
+- Macros: an `<arg>` error names the argument (garbage before), and the
+  structured cursor moves (path-next, path-previous) follow the
+  accessibility of the tags.
+- An index entry in a section title no longer turns the page numbers of the
+  table of contents and of the index into `?`.
+- **Desktop (Qt)**: raster images (GIF, BMP, WebP...) are exported to PDF
+  by Qt again, without ImageMagick; a picture whose file changed is loaded
+  again; with Qt 5, the style sheet of a theme is scaled for screens of
+  high resolution.
+- AI sessions: LaTeX commands which begin with `\n` (`\nu`, `\ni`,
+  `\nonumber`...) are kept in the answers, each session of an engine has
+  its own history, the newlines of the input are kept, and a prompt with a
+  control character is no longer refused.
+- **Desktop**: the wallet (GnuPG 2.1 and later) can be opened, and a wrong
+  passphrase is refused also after the right one.
+- Colors and graphics: the reversed colors of the dark mode near grey are
+  right, and frame and curve operations which stopped with "not yet
+  implemented" work.
+- Pictures: the size of an SVG no longer depends on the converter, and the
+  PostScript printing of pictures with effects works.
+- Long documents shown without pages (source files): typing is about a
+  third faster in a file of 50000 lines.
+
+## 20 October 2026
+
+- **Desktop**: the balloons of a language server under the mouse stay
+  while the mouse rests on the word, and go when it rests elsewhere: they
+  were closed at the next small move of the hand (the cursor was said to
+  have changed after each layout), and in Vue and Qt they took the pointer,
+  so that a balloon over the next lines stayed there, and the words under
+  it had none. The balloons of TeXmacs let the pointer through to the
+  document ([#399](https://github.com/mgubi/texmacs/issues/399)).
+- A book made of included files loads and updates faster: an included
+  file keeps its layout from one typesetting to the next when its document
+  is the same (each pass typeset again every chapter), and the attributes
+  of the hyperlinks are no longer link vertices (each hyperlink was removed
+  from one list of all of them, a quadratic time to close a document or to
+  typeset again a part with many links). The load of a book of about 2000
+  pages in 17 files went from about 52 s to 22 s, an insertion at the start
+  of a chapter opened through the master from 15 s to 2 s
+  ([#408](https://github.com/mgubi/texmacs/issues/408)).
+- **Desktop**: the language servers of Julia: TeXmacs uses `jetls serve`
+  (JETLS.jl), `fatou lsp`, or the package LanguageServer.jl run by `julia`,
+  the first which is installed; it looked for a program
+  `julia-language-server`, which is not a usual one
+  ([#409](https://github.com/mgubi/texmacs/issues/409)).
+- **Desktop**: the mathematical symbols of the TeX fonts (binary operators
+  and relations such as ∘ and ·, Greek letters) were drawn as squares, in
+  the document, in the PDF and in the menus, on a system with TrueType
+  copies of these fonts, such as the fonts of LyX which matplotlib
+  installs on Linux (`fonts-lyx`): TeXmacs took those copies, whose
+  characters are at other places, rather than its own Type 1 fonts. A TeX
+  font (one with a TFM of its name: `cmsy10`, `msam10`...) comes again from
+  its Type 1 file; the other families keep their OpenType or TrueType file
+  ([#407](https://github.com/mgubi/texmacs/issues/407)).
+- **Builds, Linux**: the Vue interface compiles with GCC (it needed clang):
+  the fields of the Clay layouts are given in the order of their
+  declaration, as C++20 requires, and the font writer of the PDF export is
+  split so that GCC 13 no longer stops with an internal error. A Vue build
+  of GCC also no longer aborts when it quits ("free(): invalid pointer").
+- **Windows**: the documents in the TeXmacs folder of the user were not
+  trusted (their scripts asked first): the folder, whose path begins with
+  a drive such as `C:`, was read as two paths.
+- **Browser**: the page says how long the browser keeps your files. At the
+  first save of a file it asks the browser to keep them
+  (`navigator.storage.persist()`: Firefox asks the user, Chrome decides
+  by itself, Safari grants it mostly to Home Screen web apps); the top of
+  File → Files in this browser says "Kept until you clear the data of this
+  site" or "The browser may delete these files", with the date of the last
+  backup and a Back up button; and a short reminder at the bottom of the
+  page, at most once a day, when there are documents and no backup for
+  seven days. The help page and the limitations in the About text say
+  the same, with what Safari does
+  ([#406](https://github.com/mgubi/texmacs/issues/406)).
+- **Vue, Cocoa**: the main and mode icon bars can be put at the right of the
+  document (Preferences → General → Main and mode icon bars: At the right
+  of the document; `?bars=right` in the browser), in two columns mirrored
+  from those at the left: the main bar along the edge of the window, and
+  the menus of the buttons opening to their left
+  ([#404](https://github.com/mgubi/texmacs/issues/404)).
+- **Site**: a page for [TeXmacs Fixes](https://mgubi.github.io/texmacs/fixes.html),
+  the conservative version: the stock TeXmacs (Guile 1.8, Qt 6) with the
+  bug fixes of `wip_fixes` and nothing else, for macOS (Apple silicon and
+  Intel), Linux (an AppImage) and Windows (an installer and a zip), built
+  by the CI of `wip_fixes` (`fixes_ci`) into the pre-release `fixes-latest`.
+  It installs beside the stock TeXmacs and TeXmacs Upsilon, and shares the
+  home of the stock TeXmacs.
+- **Vue**: the input fields of the dialogs copy and paste the accented
+  letters and the symbols as they are, in UTF-8: an alpha copied became
+  the text `<alpha>` (before, nothing), and an accented letter pasted from
+  another application became garbage.
+- The fixes of the branch `wip_fixes` (fixes of the official TeXmacs)
+  merged on 20 October, in the items which follow.
+- Undo: Tools → Miscellaneous → Clear undo history clears the history of
+  the current document only, and a saved document stays saved: it cleared
+  the history of every open document and marked them all as modified.
+  Undoing back to the saved state makes a document unmodified again after
+  several changes inside one command. An undo after a menu action, in a
+  document where another author (or a script) changed something before,
+  takes back the menu action, not the step before it or the whole history.
+- Undo and redo keep the numbers of the automatic labels: a section
+  removed and put back by an undo, or inserted, undone and redone, keeps
+  its number, where it took a new one each time.
+- A cancelled change (after an error in a key press or in a menu action)
+  no longer puts a document which was closed back in the place of another
+  document, which then showed the closed one.
+- Document parts: undo and redo put the cursor where it can be seen, not
+  in a part which is hidden or in the preamble which is not shown, where
+  typing went unseen.
+- **Desktop**: on the command line, `-q` quits after the files and the
+  commands of `-x`, `-c`, `-W` and `-U`, which it dropped when they came
+  after it, and the headless mode (`-headless`) loads the files and runs
+  `-test-suite` before it quits; the files and the commands of `-x` are
+  run in the order of the command line (`texmacs file.tm -x cmd` runs `cmd`
+  in `file.tm`). `-build-manual`, `-reference-suite` and `-test-suite`
+  without their argument no longer keep TeXmacs running for ever.
+- Security: `<use-module|...>` in a document only takes the names of
+  Scheme modules (`(utils misc doxygen)`) and of plugins; anything else is
+  ignored with a message: a document could close the expression and add
+  its own code, which ran when the document was typeset. The documents in
+  `system/tmp` and `system/cache` of the home folder (downloads, documents
+  taken out of PDF files) are no longer trusted: their scripts ask before
+  they run.
+- Pictures given by a web address are downloaded again by Tools → Update →
+  Pictures, and once in each session (with an effect, such as in the art
+  boxes, they were made once and never fetched again); offline, the copy of
+  before is kept.
+- **Desktop**: a download from the web gives up when the server does not
+  answer for the time of the preference `http request timeout` (10 s): a
+  picture or a file from a server which never answered held TeXmacs for
+  ever. A download which fails, or a page of error, no longer replaces the
+  copy of before.
+- LaTeX export: struck-through text is `\sout` of `ulem` and highlighted
+  text `\tmmarked` (they were `\strikethrough` and `\marked`, which LaTeX
+  does not know, so that `pdflatex` stopped), with lines which break with
+  the text, also around formulas, inside groups and in titles; columns load
+  `multicol`, and the colours given by value (`#ff8800`) are defined under
+  a name, as `xcolor` wants them. The preference "Store tracking
+  information in LaTeX files" works: when it is off, the export with source
+  tracking no longer adds the TeXmacs source at the end of the file.
+- Bibliographies with BibTeX: many fixes of the BibTeX engine of TeXmacs
+  and of the bibliography databases. Pages are one page or one range (`12--34`,
+  `e1002-e1010`, `xii-xv`, also with an en dash), other pages are kept as
+  written; `crossref` and `xref` are kept as keys; the months `jan` to
+  `dec` are defined as in BibTeX; an undefined `@string` gives nothing,
+  with a warning; a field whose LaTeX gives nothing (`\relax`) is empty;
+  the external `bibtex` runs in a folder of its own and its errors are
+  shown. In Document → Bibliography, the preview shows the first ten
+  entries (with those they cross-reference) and Modify keeps the name of
+  the file in the document. The databases keep their history across
+  synchronisations and reloads, apply the offset and limit of a query to
+  its results, and keep new local entries.
+- `<symbol|945>` gives an alpha: a code above 255 is a Unicode code point,
+  it lost its upper bits.
+- A Scheme expression evaluated with M-x, such as `(insert "<alpha>")`,
+  inserts an alpha again: the names of the symbols were dropped. The
+  raw HTML of the HTML export is in UTF-8, as the rest of the page.
+- Version control: Version → First difference and Last difference find a
+  difference at the very start or end of the document; the block grain
+  compares whole paragraphs.
+- A table macro in source mode (a `tformat` without a table) no longer
+  crashes or hangs TeXmacs on Shift+Up (savannah #62850).
+- Graphics: ungrouping or removing a group just after making it works
+  (it removed the object and stopped with an error).
+- The side tools of a window (search and replace, the format tools) no
+  longer close another window when their document is closed.
+- Source → Quasiquote inserts the quasiquote tag; closing a document
+  closes all of its views (every other one stayed, pointing to the
+  closed document).
+- A file of preferences with a single preference is read: that preference
+  was lost at the next start.
+- **Desktop (Qt)**: the TeXmacs server closes the socket of a client once,
+  not a second time when it may already be the socket of another client.
+  **Desktop (Windows)**: the programs run by TeXmacs close each of their
+  pipes once.
+- A document saved under a name without a suffix is saved as a TeXmacs
+  file, with `.tm` added: it was saved as plain text. A source file keeps
+  the name it is given (a `Makefile`). **Desktop (Vue)**: the dialog of the
+  system for saving a document the first time proposes `untitled.tm` in the
+  folder; it proposed the name of the folder, on Linux the name of the user
+  ([#400](https://github.com/mgubi/texmacs/issues/400)).
+- **Desktop (macOS, Cocoa and Vue)**: the dialog to save a document adds
+  `.tm` to a name typed without a suffix before it asks about replacing a
+  file: it asked about the file of that name without the suffix (saving as
+  `test` warned about a file `test`), and then replaced an existing
+  `test.tm` without a question. **Cocoa**: the dialogs to open and save
+  files show those of the type (TeXmacs documents, images...), with a menu
+  for all the files, as in Qt; they showed every file. **Vue**: the filter
+  of the type in the dialogs of the system has the suffixes of the type
+  (it took every file). Where a dialog still gives a name without a suffix,
+  TeXmacs asks before replacing the `.tm` it saves to
+  ([#400](https://github.com/mgubi/texmacs/issues/400)).
+- Tests: the dialogs of the system to open and save files, on macOS with
+  the three interfaces (`tests/gui/save-dialog`, `open-dialog`;
+  `docs/gui-scripting.md`).
+- In a source file which a language server follows, the mouse resting on
+  an error shows its message (and then what the server says of the word):
+  the balloon showed only the latter, which for an unknown name is
+  nothing, and each one gave warnings, "The required path does not exist",
+  which Qt showed in a window
+  ([#399](https://github.com/mgubi/texmacs/issues/399)). The same with
+  Shift+F12 at the cursor. The lines of the balloon are no longer
+  justified.
+- **Remote tools**: in Remote > Client preferences, three switches, all on
+  by default: the heartbeat which watches a connection, the window opened
+  when a connection is lost (now once for connections lost together, not
+  one per server), and the cursors of the others in live documents. A live
+  document closed is no longer followed every 300 ms, and the cursors of the
+  others are drawn again only when its views change; the server no longer
+  sends cursors to a TeXmacs which does not know of them, nor keeps those of
+  a client which left. The sentences of the connections are translatable,
+  and Return in the field of Remote > Rename renames, as "Ok" does.
+- In a live document, a move of the cursor of another user repaints the
+  places where it was and where it goes, not the whole window, which every
+  move of every user did.
+- **Desktop (Qt)**: Insert → Session → Preferences opens the preferences of
+  the AI sessions, where the API key is given: it stopped on an error, and
+  a session asked a question without a key hung, since it opened them to
+  ask for the key ([#398](https://github.com/mgubi/texmacs/issues/398)).
+  A row of a dialog with two buttons, such as Edit and Default of the
+  instructions, threw its columns out of step.
+- **Vue**: an icon of one's own in SVG (`(icon "pen.svg")` in a
+  `menu-bind`) is drawn at the size of the icons of the bars when its file
+  declares no size (only a `viewBox`) or one too large for a bar, as Qt
+  does: it was drawn at the size of its `viewBox`, 1000 points, and took
+  the whole bar (#394).
+- **Desktop (Vue)**: the wheel over a graphics moves the graphics as with
+  Qt: it moved it 256 times too little, and the other way.
+- A list of thanks to the people who reported problems or sent code: in
+  Help > TeXmacs Upsilon features (section Thanks), on the site
+  ([thanks](https://mgubi.github.io/texmacs/thanks.html)) and on GitHub,
+  all from one file, `TeXmacs/doc/about/welcome/upsilon-thanks.md`.
+- **Desktop (Vue)**: on Linux and Windows the interface is written in Fira
+  Sans, a sans serif as the system font of the Qt port, instead of Computer
+  Modern, the look of the old X11 interface (#391); macOS keeps Lucida
+  Grande.
+- **Vue**: the input fields of the dialogs take the keys of the fields of
+  Qt: on Linux and Windows control-c, control-x, control-v, control-a,
+  control-z and control-shift-z (or control-y) copy, cut, paste, select all,
+  undo and redo, as do shift-insert, control-insert and shift-delete; on a
+  Mac the same with command. Control-v did nothing, so a path could not be
+  pasted in the file chooser, and control-c cancelled the field (#391).
+  The menu of the right button has Undo and Redo too.
+- **Desktop (Vue)**: on Linux and Windows a notch of the mouse wheel
+  scrolls as far as in the Qt port, three lines of a sixteenth of the
+  window, and the wheels with fine steps (which Wayland gives in eighths of
+  a notch) are no longer taken for a trackpad, which scrolled them eight
+  times slower (#391).
+- **Desktop (Vue)**: the dialogs are dialogs for the window manager: on
+  X11 they have the type of a dialog, and on Linux and Windows the document
+  window as their parent, so that the tiling window managers (i3, sway,
+  Hyprland, bspwm) float them instead of tiling them (#391).
+- **Desktop (Vue)**: on X11 the text copied from TeXmacs can be pasted in
+  every application: it is also offered in the formats of X11 (`UTF8_STRING`,
+  `STRING`), which `xclip`, `xterm` and the older toolkits ask for.
+- **Desktop**: TeXmacs Upsilon builds again with Qt 5 (the Qt of Ubuntu
+  22.04 and of the distributions of its age), which failed at the link
+  (#389); with Qt 5 the requests to web services (the AI sessions, Zotero
+  on the web) are not available. The CI now builds it with Qt 5 and GCC.
+- **Desktop**: TeXmacs Upsilon has the flat icon (the one of Vue and of the
+  browser version) on every system and with every interface, instead of the
+  chip of the stock TeXmacs, so that the two are told apart at a glance: the
+  macOS applications, the AppImages, and on Windows `texmacs.exe`, the
+  installers, the Start menu and the uninstaller.
+- **Desktop (Qt)**: a question asked in the footer is no longer answered
+  (empty) when you go to another application: you answer it when you come
+  back.
+- **Desktop (Cocoa)**: the tree views of the dialogs show the text of each
+  item, as in Qt, instead of the name of its tag (`item`), and the data of
+  an item are no longer shown as rows under it.
+- The tests of the interface can drive TeXmacs on Vue, Qt and Cocoa alike,
+  through one driver in Scheme: they click the texts and icons they name
+  by the bars and menus they are in (`Format > Font > Bold`, `footer >
+  equation*`, `mainbar > icon:tm_save`), in English whatever the language
+  of the interface, and check what came out (`src/docs/gui-scripting.md`).
+  Seven tests run on all three (`tests/gui`).
+
 ## 19 October 2026
 
+- TeXmacs Upsilon installs beside the stock TeXmacs without touching it.
+  **Desktop**: on macOS the applications are "TeXmacs Upsilon" (Cocoa),
+  "TeXmacs Upsilon Vue" and "TeXmacs Upsilon Qt", each with preferences of
+  its own, and they open `.tm` files only when the stock TeXmacs is not
+  there or when they are chosen (all three were `TeXmacs.app`, with the
+  identity of the stock one). With Qt, a TeXmacs Upsilon and a stock
+  TeXmacs running together no longer pass their files to each other.
+  On Linux there are AppImages of the Qt and the Vue builds, one file each
+  for most distributions, with menu entries and icons of their own. On
+  Windows there are installers of the Qt and the Vue builds, with folders,
+  Start menu entries and uninstallers of their own, which no longer write
+  `TEXMACS_PATH` into the environment; TeXmacs Upsilon uses the files it
+  is installed with even when the stock TeXmacs has set `TEXMACS_PATH`.
+- **Browser**: on a touch screen, a finger put down on the handle of a
+  scroll bar drags it: it moved the view the other way.
+- **Desktop**: with the Vue interface on Linux, the windows are drawn by
+  the graphics card also on a system without the packages of development
+  of OpenGL: the library which draws the vector graphics (ThorVG) looked
+  for a name of OpenGL which only those packages have, and TeXmacs then
+  drew without the graphics card, which was slow and broken (the main
+  window stayed empty, the dialogs were malformed and slow to resize,
+  [#376](https://github.com/mgubi/texmacs/issues/376)). A dialog also gets
+  its size before it is drawn.
 - **Browser**: on a tablet (an iPad), a keyboard button at the bottom right
   of the page opens the keyboard of the system, and closes it: no keyboard
   came without an external one

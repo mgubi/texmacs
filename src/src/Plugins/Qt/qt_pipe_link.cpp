@@ -75,6 +75,7 @@ qt_pipe_link_rep::~qt_pipe_link_rep () {
 
 string
 qt_pipe_link_rep::start () {
+  reap_ending_pipe_links (false);
   if (alive) return "busy";
   if (DEBUG_AUTO)
     debug_shell << "Launching '" << PipeLink.cmd << "'\n";
@@ -195,6 +196,7 @@ qt_pipe_link_rep::interrupt () {
 
 void
 qt_pipe_link_rep::stop () {
+  reap_ending_pipe_links (false);
   PipeLink.killProcess (0);
   alive= false;
 }
@@ -219,12 +221,14 @@ close_all_pipes () {
     qt_pipe_link_rep* con= (qt_pipe_link_rep*) it->next();
     if (con->alive) con->stop ();
   }
+  reap_ending_pipe_links (true);
   close_all_cmdlines ();
   close_all_requests ();
 }
 
 void
 process_all_pipes () {
+  reap_ending_pipe_links (false);
   iterator<pointer> it= iterate (pipe_link_set);
   while (it->busy()) {
     qt_pipe_link_rep* con= (qt_pipe_link_rep*) it->next();

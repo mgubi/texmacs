@@ -37,6 +37,8 @@ public:
   
   virtual TMMenuItem* as_menuitem ();
   virtual NSView*     as_nsview ();
+  TMMenuItem* make_menuitem ();
+  NSView*     make_nsview ();
   
   operator tree ();
   operator blackbox ();

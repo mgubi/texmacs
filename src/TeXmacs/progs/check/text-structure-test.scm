@@ -706,6 +706,34 @@
       (check= (snode 0 1) '(footnote (document "note"))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Symbols
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; A symbol tag is replaced by its symbol when it is activated: the name of
+;; a symbol, a code of the Cork encoding up to 255, or a Unicode code point
+;; above 255 (which becomes the symbol of TeXmacs for it, when there is one).
+(define (symbol-activated s)
+  (with r #f
+    (with-doc '(document "")
+      (lambda ()
+        (edit (make 'symbol))
+        (edit (insert s))
+        (edit (activate-symbol))
+        (set! r (body))))
+    r))
+
+(define (test-symbols)
+  (check-group "symbols")
+  (check= (symbol-activated "alpha") '(document "<alpha>"))
+  (check= (symbol-activated "65") '(document "A"))
+  (check= (symbol-activated "233") '(document "\xe9"))
+  (check= (symbol-activated "945") '(document "<alpha>"))
+  (check= (symbol-activated "8712") '(document "<in>"))
+  ;; not a code point: the tag stays
+  (check= (symbol-activated "1114112")
+          '(document (inactive (symbol "1114112")))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Textual markup
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -1493,6 +1521,7 @@
   (test-enunciations)
   (test-other-environments)
   (test-footnotes)
+  (test-symbols)
   (test-markup)
   (test-doc-data)
   (test-automatic-sections)

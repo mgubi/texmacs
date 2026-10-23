@@ -856,6 +856,7 @@ edit_interface_rep::apply_changes () {
     applying () { applying_changes++; }
     ~applying () { applying_changes--; } } busy;
   //cout << "Apply changes\n";
+  flush_cursor_hook ();
   //cout << "et= " << et << "\n";
   //cout << "tp= " << tp << "\n";
   //cout << HRULE << "\n";
@@ -1370,7 +1371,16 @@ edit_interface_rep::apply_changes () {
                           THE_LOCUS+THE_TOOLTIP)) ||
            sc_changed) {
     update_focus_loci ();
-    call ("close-tooltips");
+    // the balloons go when the cursor moves, not when it is only said to
+    // have changed: go_to_here says so after each layout, and the balloon
+    // which the mouse had just opened was closed at its next move (#399)
+    static path tooltip_tp;
+    static bool tooltip_focus= false;
+    bool moved= (env_change & (THE_SELECTION+THE_LOCUS+THE_TOOLTIP)) ||
+                sc_changed || tp != tooltip_tp || got_focus != tooltip_focus;
+    tooltip_tp= copy (tp);
+    tooltip_focus= got_focus;
+    if (moved) call ("close-tooltips");
     if (!is_nil (focus_ids) && got_focus)
       call ("link-follow-ids", object (focus_ids), object ("focus"));
   }

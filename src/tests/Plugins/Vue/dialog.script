@@ -18,3 +18,5 @@ window #2
 text xyz
 wait 800
 snapshot main
+# the output, which run.sh checks
+expect got: Bob / 42

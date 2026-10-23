@@ -123,12 +123,14 @@ connection_rep::start (bool again) {
   if (message == "cmdline") {
     tm_out->format= "cmdline-" * name;
     tm_out->mode  = tm_out->get_mode (tm_out->format);
+    tm_out->chat  = session;
     status= WAITING_FOR_INPUT;
     connection_notify_status (this);
   }
   if (message == "request") {
     tm_out->format= "request-" * name;
     tm_out->mode  = tm_out->get_mode (tm_out->format);
+    tm_out->chat  = session;
     status= WAITING_FOR_INPUT;
     connection_notify_status (this);
   }
@@ -284,12 +286,12 @@ connection_start (string name, string session, bool again) {
     if (DEBUG_VERBOSE)
       debug_io << "Starting session '" << session << "'\n";
     if (is_tuple (t, "cmdline")) {
-      tm_link ln= make_cmdline_link (name);
+      tm_link ln= make_cmdline_link (name, session);
       con= tm_new<connection_rep> (name, session, ln);
       con->cmdline_eval= true;
     }
     if (is_tuple (t, "request")) {
-      tm_link ln= make_request_link (name);
+      tm_link ln= make_request_link (name, session);
       con= tm_new<connection_rep> (name, session, ln);
       con->request_eval= true;
     }

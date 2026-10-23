@@ -293,6 +293,26 @@ concat_box_rep::rsup_correction () {
   return 0;
 }
 
+static int
+single_box (array<box> bs) {
+  // the only box of a concatenation which is not a marker, or -1: the
+  // markers around the value of a macro argument do not count
+  int i, n= N(bs), r= -1;
+  for (i=0; i<n; i++)
+    if (!is_marker_box (bs[i]) || n == 1) {
+      if (r >= 0) return -1;
+      r= i;
+    }
+  return r;
+}
+
+// The levels of the scripts of a concatenation are those of its boxes
+// which are not markers: the markers around the value of a macro argument,
+// glued to the base of a script, are text boxes in another font, whose
+// levels would place the script elsewhere.
+// A base glued to markers keeps its own levels (and not the bounds of the
+// concatenation, which for a base like "." would put the script on it)
+
 SI
 concat_box_rep::lsub_correction_at (SI h) {
   int i= get_first ();
@@ -321,19 +341,6 @@ concat_box_rep::rsup_correction_at (SI h) {
   return 0;
 }
 
-static int
-single_box (array<box> bs) {
-  // the only box of a concatenation which is not a marker, or -1: the
-  // markers around the value of a macro argument do not count
-  int i, n= N(bs), r= -1;
-  for (i=0; i<n; i++)
-    if (!is_marker_box (bs[i]) || n == 1) {
-      if (r >= 0) return -1;
-      r= i;
-    }
-  return r;
-}
-
 bool
 concat_box_rep::extended_shape () {
   int i= single_box (bs);
@@ -347,13 +354,6 @@ concat_box_rep::top_accent (SI& x) {
   if (i >= 0 && bs[i]->top_accent (x)) { x += sx (i); return true; }
   return false;
 }
-
-// The levels of the scripts of a concatenation are those of its boxes
-// which are not markers: the markers around the value of a macro argument,
-// glued to the base of a script, are text boxes in another font, whose
-// levels would place the script elsewhere.
-// A base glued to markers keeps its own levels (and not the bounds of the
-// concatenation, which for a base like "." would put the script on it)
 
 SI
 concat_box_rep::sub_lo_base (int level) {

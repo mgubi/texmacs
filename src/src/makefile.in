@@ -149,7 +149,7 @@ ifeq "@CONFIG_QT@" "Qtwk Widkit"
 QT_SRC_DIR   := Qt
 qtwk_src     := $(call findsrc_in,Plugins,Qtwk Widkit)
 qt_src       := qt_font.cpp qt_picture.cpp qt_pipe_link.cpp qt_renderer.cpp qt_utilities.cpp \
-                QTMPipeLink.cpp QTMSockets.cpp qt_http.cpp
+                QTMPipeLink.cpp QTMSockets.cpp qt_http.cpp qt_cmdline_link.cpp
 else
 QT_SRC_DIR   := $(QT_PLUGIN_DIR)
 qtwk_src     :=

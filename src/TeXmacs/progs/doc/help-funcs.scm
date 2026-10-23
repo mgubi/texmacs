@@ -40,6 +40,41 @@
           (ahash-set! help-titles u (parse-title u))))
     (ahash-ref help-titles u)))
 
+;; The answers of url-exists-in-help? and the lists of files of the
+;; documentation search (docgrep.scm) are kept for the session. Tools ->
+;; Update -> Help (help-caches-update) makes them again, for pages added or
+;; removed while TeXmacs runs: the documentation folders are declared out of
+;; date, so that the caches of the files of TeXmacs (dir_cache, stat_cache,
+;; doc_cache) read them again too.
+
+(define help-caches-generation 0)
+
+(define (help-dirs)
+  ;; the folders of the documentation path, existing or not, and their
+  ;; subfolders
+  (let* ((p (string->url help-file-path))
+         (subs (url-expand (url-complete (url-append p (url-any)) "dr"))))
+    (append (url->list p) (url->list subs))))
+
+(tm-define (help-caches-generation-get)
+  (:synopsis "A number which changes at each update of the help caches")
+  help-caches-generation)
+
+(tm-define (help-caches-update)
+  (:synopsis "Read the documentation folders again")
+  ;; the folders found depend on the listings of their parents, read again
+  ;; once these are declared out of date: repeated until no new folder
+  (let loop ((done (make-ahash-table)))
+    (with new (list-filter (help-dirs)
+                           (lambda (d) (not (ahash-ref done (url->system d)))))
+      (when (nnull? new)
+        (for (d new)
+          (url-declare-out-of-date d)
+          (ahash-set! done (url->system d) #t))
+        (loop done))))
+  (set! help-url-cache (make-ahash-table))
+  (set! help-caches-generation (+ help-caches-generation 1)))
+
 (tm-define (url-exists-in-help? s)
   (with entry (ahash-ref help-url-cache s)
     (if (list? entry)

@@ -179,7 +179,11 @@ build_locus (edit_env env, tree t, list<string>& ids, string& col, string &ref, 
         }
         if (ok) {
           if (env->secure ||
-              as_bool (eval ("(secure? '(" * cb * " #f #f #f))")))
+              as_bool (call ("secure?",
+                             cons (symbol_object (cb),
+                                   list_object (object (false),
+                                                object (false),
+                                                object (false))))))
             env->link_env->insert_locus (id, target, cb);
         }
         ids= list<string> (id, ids);
@@ -312,8 +316,15 @@ concater_rep::typeset_set_binding (tree t, path ip) {
 
 static tree
 remove_labels (tree t) {
+  // what is written to an auxiliary part (a table of contents, an index)
+  // is the evaluated text; its labels, and the assignments and writes which
+  // the evaluation has already done (those of an index entry in a section
+  // title: <assign|auto-nr|N>, <write|idx|...>), must not be done again
+  // where the part is typeset: auto-nr would jump and the auto-N labels of
+  // the document would never settle
   if (is_atomic (t)) return copy (t);
-  else if (is_func (t, LABEL)) return "";
+  else if (is_func (t, LABEL) || is_func (t, ASSIGN) || is_func (t, WRITE))
+    return "";
   else if (is_func (t, CONCAT)) {
     tree r (CONCAT);
     for (int i=0; i<N(t); i++)

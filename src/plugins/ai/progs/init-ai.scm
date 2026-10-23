@@ -117,9 +117,25 @@
 (tm-define (ai-api-key-typed engine key)
   (cond ((not (string? key)) (noop))
         ((ai-wallet-key engine)
-         (when (!= key "") (ai-set-api-key engine key)))
+         (when (!= key "")
+           (ai-set-api-key engine key)
+           (ai-key-status-set engine "saved")))
         ((!= key (or (ai-preference-key engine) ""))
-         (ai-set-api-key engine key))))
+         (ai-set-api-key engine key)
+         (ai-key-status-set engine (if (== key "") "removed" "saved")))
+        ((!= key "") (ai-key-status-set engine "saved"))))
+
+;; what became of the key last typed, next to its field: a key is saved as
+;; soon as it is typed (Return, or leaving the field), which nothing else
+;; shows, the window staying as it was (#455). (The table outlives the
+;; loads of this file, as ai-wallet-hook-added? below: a key given loads it
+;; again)
+(define ai-key-status
+  (if (defined? 'ai-key-status) ai-key-status (make-ahash-table)))
+
+(define (ai-key-status-set engine status)
+  (ahash-set! ai-key-status engine status)
+  (refresh-now "ai-key-status"))
 
 (tm-widget (ai-api-key-input engine width)
   (hlist
@@ -129,7 +145,13 @@
                      (or (ai-preference-key engine) "")))
            width)
     (assuming (ai-wallet-key engine)
-      // (text ai-in-wallet))))
+      // (text ai-in-wallet))
+    ;; (if, not assuming: only if is evaluated again at a refresh)
+    (refreshable "ai-key-status"
+      (if (== (ahash-ref ai-key-status engine) "saved")
+          // (text "saved"))
+      (if (== (ahash-ref ai-key-status engine) "removed")
+          // (text "removed")))))
 
 (define (ai-store-api-key engine key)
   (if (and (supports-wallet?) (wallet-on?))

@@ -715,9 +715,10 @@ int windows_system(string cmd, string *cmdout, string *cmderr) {
 
   if (cmdout == nullptr && cmderr == nullptr) {
     // If we are here, we launched a command, and we don't want to read
-    // the output, so we immediately return.
-    CloseHandle(hOutWrite.h);
-    CloseHandle(hErrWrite.h);
+    // the output, so we immediately return (the pipes are closed by
+    // their ScopedHandle, the process and thread handles here).
+    CloseHandle(pi.hProcess);
+    CloseHandle(pi.hThread);
     return 0;
   }
 
@@ -727,9 +728,12 @@ int windows_system(string cmd, string *cmdout, string *cmderr) {
   WaitForSingleObject(pi.hProcess, 30000);
 
   // Close the write pipe handle so the child process stops reading
-  // and we can read the output
+  // and we can read the output (reset, else ScopedHandle closes them
+  // a second time, maybe closing another object which got the value)
   CloseHandle(hOutWrite.h);
+  hOutWrite.h = 0;
   CloseHandle(hErrWrite.h);
+  hErrWrite.h = 0;
 
   DWORD bytesRead;
   CHAR buffer[4096];

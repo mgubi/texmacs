@@ -955,8 +955,13 @@ var tmFrame = (function () {
       'Printing opens the document as a PDF in a new tab, to print from there.']],
     ['Limitations', [
       'Your files are kept in the storage of this browser, for this site only: clearing ' +
-      'the data of the site deletes them, and Safari deletes the data of a site which was ' +
-      'not visited for seven days. Save a copy of the files you want to keep.',
+      'the data of the site (or the history of Safari) deletes them. At the first save, ' +
+      'TeXmacs asks the browser to keep them (persistent storage): Firefox asks you, ' +
+      'Chrome decides by itself, Safari grants it mostly to a web app of the Home Screen. ' +
+      'Without it, the browser may delete them when it needs space, and Safari deletes ' +
+      'the data of a site after seven days of its use without a visit to the site. The ' +
+      'Files panel says which, with the date of your last backup; a reminder comes when ' +
+      'there was none for seven days. Save a backup now and then.',
       'A page cannot run other programs: the sessions are those whose program runs in ' +
       'the page (Python, R, JavaScript, TikZ, Asymptote) and those of the chatbots; there ' +
       'are no sessions of Maxima and the like, no language servers, and the tools which ' +

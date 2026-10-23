@@ -26,3 +26,5 @@ click 52 586
 wait 800
 snapshot fm5
 key Escape
+# the output, which run.sh checks
+expect got: (lemma strong) (0 0 0 0 1 0 2)

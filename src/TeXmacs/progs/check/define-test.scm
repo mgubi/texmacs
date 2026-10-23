@@ -135,6 +135,16 @@
   (define-test-both% #t define-test-on% define-test-flag%)
   (define-test-own% #f define-test-on%))
 
+;; a condition together with a property: the property is stored under the
+;; conditions which do not depend on the arguments (the modes)
+(tm-define (define-test-req x) x)
+(tm-define (define-test-req x) (:require (number? x)) (:synopsis "req") x)
+(tm-define (define-test-in-mode) 1)
+(tm-property (define-test-in-mode) (:mode define-test-on?) (:synopsis "on"))
+(tm-define (define-test-out-mode) 1)
+(tm-property (define-test-out-mode) (:mode define-test-off?)
+  (:synopsis "off"))
+
 ;; overloading by mode
 (tm-define (define-test-m) 'base)
 (tm-define (define-test-m) (:mode define-test-on?) (list 'on (former)))
@@ -233,12 +243,12 @@
   (check= (define-test-later) 1)
   (check= (property 'define-test-redef :synopsis) '("new"))
   (check= (define-test-redef) 'new)
-  ;; FIXME: a tm-define or tm-property which has both a condition (:mode
-  ;; or :require) and a property fails with wrong-type-arg in >=
-  ;; (filter-conds in tm-define.scm expects the conditions as kind/value
-  ;; pairs, but ctx-add-condition only keeps the values), for instance
-  ;;   (tm-define (f x) (:require (number? x)) (:synopsis "s") x)
-  ;; It also leaves the function defined without its property.
+  ;; a property defined under a condition: an argument condition does not
+  ;; apply to properties, a mode does
+  (check= (property 'define-test-req :synopsis) '("req"))
+  (check= (define-test-req 2) 2)
+  (check= (property 'define-test-in-mode :synopsis) '("on"))
+  (check-false (property 'define-test-out-mode :synopsis))
   ;; unknown options are refused when the definition is expanded
   (check-error (eval '(tm-define (define-test-bad) (:no-such-option 1) 1)
                      (current-module))
@@ -373,19 +383,24 @@
   (check-true (procedure? define-test-lazy))
   (check= (length (procedure-sources define-test-lazy)) 1)
   (check= (cadar (procedure-sources define-test-lazy)) 'args)
-  ;; FIXME: calling a stub whose module does not define the name loops
-  ;; forever instead of raising "Could not retrieve": the stub looks the
-  ;; name up in the public interface of texmacs-user, where it finds
-  ;; itself (lazy-define-one in tm-define.scm never uses the module m it
-  ;; resolves), e.g. (lazy-define (check check-lib) foo) (foo) hangs.
-  ;; FIXME: lazy-define with options, such as
-  ;;   (lazy-define (m) (:interactive #t) foo)
-  ;; fails when expanded: it maps lazy-define-one over all the names,
-  ;; options included, instead of over the real names.
-  (check-error (eval '(lazy-define (check define-test-nowhere)
-                        (:interactive #t) define-test-lazy-opt)
-                     (current-module))
-               #t))
+  ;; a stub whose module does not define the name raises an error rather
+  ;; than calling itself again
+  (eval '(lazy-define (check check-lib) define-test-missing) (current-module))
+  (check-error (define-test-missing) 'texmacs-error)
+  ;; a stub kept as a value (as the :function of a converter) and called
+  ;; after the name was defined calls the definition
+  (eval '(lazy-define (check check-lib) define-test-saved) (current-module))
+  (let ((saved (eval 'define-test-saved (current-module))))
+    (eval '(tm-define (define-test-saved x) (list 'saved x)) (current-module))
+    (check-false (eq? saved (eval 'define-test-saved (current-module))))
+    (check= (saved 1) '(saved 1))
+    (check= ((eval 'define-test-saved (current-module)) 2) '(saved 2)))
+  ;; options apply to the stubs
+  (eval '(lazy-define (check define-test-nowhere)
+           (:interactive #t) define-test-lazy-opt)
+        (current-module))
+  (check-true (procedure? define-test-lazy-opt))
+  (check= (property 'define-test-lazy-opt :interactive) '(#t)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Modules
@@ -464,6 +479,11 @@
 ;; and idle time do not advance: the test calls the command which delayed
 ;; schedules itself, with its own change and idle times. The command
 ;; returns the delay before it is called again, or #t when it is done.
+;;
+;; exec-delayed-pause, change-time and idle-time are glue functions, which
+;; with-global replaces. With S7 a function which calls a glue function keeps
+;; calling the C++ function after such a replacement, but not the code which
+;; comes from a macro (here delayed), which S7 expands when it runs it.
 
 (define delayed-change 0)
 (define delayed-idle 0)
@@ -491,6 +511,36 @@
         (check= (cmd) #t)
         (check= delayed-runs 1)))))
 
+;; lazy-initialize registers the module in the pending list of tm-modes, and
+;; the delayed command which loads it removes it from there: the macro expands
+;; in other modules, which set! the variables of tm-modes (with S7, before its
+;; patch 0006, the command removed it from another variable of the same name)
+(define (lazy-pending)
+  (length (eval 'lazy-initialize-pending
+                (resolve-module '(kernel texmacs tm-modes)))))
+
+(define (test-lazy-initialize)
+  (check-group "lazy-initialize")
+  (let ((cmd #f)
+        (n (lazy-pending)))
+    (with-global exec-delayed-pause (lambda (c) (set! cmd c))
+      (with-global idle-time (lambda () 10000)
+        (lazy-initialize (check check-lib) #f)
+        (check= (lazy-pending) (+ n 1))
+        (check-true (procedure? cmd))
+        (check= (and (procedure? cmd) (cmd)) #t)
+        (check= (lazy-pending) n)))))
+
+;; the remote control mode is toggled with a set! from another module than the
+;; one of its flag
+(define (test-remote-control-mode)
+  (check-group "remote control mode")
+  (let ((old (remote-control-mode?)))
+    (toggle-remote-control-mode)
+    (check= (remote-control-mode?) (not old))
+    (toggle-remote-control-mode)
+    (check= (remote-control-mode?) old)))
+
 (tm-define (define-test-failures)
   (check-suite "tm-define")
   (test-overloading)
@@ -503,4 +553,6 @@
   (test-lazy)
   (test-modules)
   (test-delayed)
+  (test-lazy-initialize)
+  (test-remote-control-mode)
   (check-end))

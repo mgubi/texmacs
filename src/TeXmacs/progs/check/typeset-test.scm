@@ -370,6 +370,45 @@
        (check= (nr "s1") "1")
        (check= (nr "s2") "2")))))
 
+;; A label which is removed: the references to it show "?" after the
+;; update which removes it, Update > All in the order of 2.1.4 (complete
+;; typesetting, without renumbering the automatic labels). The table of
+;; the references is cleaned at the end of a complete pass, and one more
+;; pass typesets what read the removed label (#417).
+(define (test-removed-label)
+  (check-group "removed label")
+  (with-typeset-body
+   '(document (section (concat "A" (label "s1")))
+              (concat "See " (reference "s2")
+                      (if (equal (get-binding "s2") "2") (vspace "5cm") ""))
+              "After."
+              (section (concat "B" (label "s2")))
+              "Text.")
+   (lambda ()
+     (let* ((update (lambda ()
+                      (update-forced)
+                      (generate-all-aux)
+                      (update-current-buffer)
+                      (update-forced)))
+            (nr (lambda (l) (cadr (tree->stree (get-reference l)))))
+            ;; the height of the paragraph of the reference, with its space
+            (height (lambda () (- (rect-y2 (rect 0)) (rect-y2 (rect 2))))))
+       (update)
+       (update)
+       (check= (nr "s2") "2")
+       (with h (height)
+         (tree-set (tree-ref (buffer-tree) 3) '(section "B"))
+         (update)
+         (check= (tree->stree (get-reference "s2")) '(uninit))
+         (check= (tree->stree (texmacs-expand '(get-binding "s2"))) '(uninit))
+         (check-true (< (height) h))
+         ;; and back
+         (tree-set (tree-ref (buffer-tree) 3)
+                   '(section (concat "B" (label "s2"))))
+         (update)
+         (check= (nr "s2") "2")
+         (check= (height) h))))))
+
 ;; The entries of the table of contents and of the index put a label where
 ;; they stand, auto-n. The number is that of the tag which makes the label
 ;; (Typeset/Env/env_exec.cpp, exec_auto_id): it follows the order of the
@@ -569,7 +608,23 @@
   (check-true (> (height (math '(frac (frac "a" "b") "c")))
                  (height (math '(frac "a" "c")))))
   (check-true (< (width (math '(frac "a" "b")))
-                 (width (math '(frac "aaa" "b"))))))
+                 (width (math '(frac "aaa" "b")))))
+  ;; a script given as the argument of a macro is placed as the same script
+  ;; written out: its box is narrowed back by the italic corrections by
+  ;; which it was widened, although the markers of width zero around the
+  ;; argument are then inside it (with an OpenType math font, the subscript
+  ;; was further away)
+  (let ((termes (lambda (t) `(with "font" "termes" "math-font" "math-termes"
+                               ,(math t)))))
+    (check= (width (termes '(with "f" (macro "c" (concat (around* "(" "x" ")")
+                                                         (rsub (arg "c"))))
+                              (concat (f "p") "q"))))
+            (width (termes '(concat (around* "(" "x" ")") (rsub "p") "q"))))
+    ;; (fractions do not read the extents of their children again after
+    ;; positioning them: this only checks that they are unchanged)
+    (check= (width (termes '(with "f" (macro "c" (frac (arg "c") "2"))
+                              (concat (f "p") "q"))))
+            (width (termes '(concat (frac "p" "2") "q"))))))
 
 ;; Tables: a table is at least as wide as its widest cells in each column
 ;; and grows with its rows; in a typeset buffer, the alignment of a cell
@@ -606,33 +661,41 @@
        (check-true (< (rect-y2 rw) (rect-y1 rc))))))
   ;; a table whose width is in par takes it from the paragraph where it is
   ;; laid out (a cell whose lines are broken, the body of a frame), also when
-  ;; the width is given by a value (<value|figure-width> of the figures):
+  ;; the width is given by a value (<value|figure-width> of the figures),
+  ;; with the value where the table is, set locally or a macro argument:
   ;; its cell aligned on the right ends at the same place
   (let* ((inner (lambda (w)
                   `(tformat (twith "table-width" ,w) (twith "table-hmode" "exact")
                             (cwith "1" "1" "1" "1" "cell-halign" "r")
                             (table (row (cell "a"))))))
-         (in-cell (lambda (w)
+         (in-cell (lambda (x)
                     `(document
                        (assign "w" "1par")
+                       (assign "mt" (macro "x" ,(inner '(arg "x"))))
+                       (assign "ml" (macro "x" ,(inner "0.5par")))
                        (tformat (twith "table-width" "1par")
                                 (twith "table-hmode" "exact")
                                 (cwith "1" "1" "1" "1" "cell-hyphen" "t")
                                 (cwith "1" "1" "1" "-1" "cell-hpart" "1")
-                                (table (row (cell (document ,(inner w)))
+                                (table (row (cell (document ,x))
                                             (cell "b")))))))
          (in-frame (lambda (w)
                      `(document (assign "w" "1par")
                                 (framed (document ,(inner w))))))
-         (x-of (lambda (doc . p)
-                 (let ((x #f))
-                   (with-typeset-body doc
-                     (lambda () (set! x (rect-x1 (apply rect p)))))
-                   x))))
-    (check= (x-of (in-cell '(value "w")) 1 4 0 0 0 0 3 0 0 0)
-            (x-of (in-cell "1par") 1 4 0 0 0 0 3 0 0 0))
-    (check= (x-of (in-frame '(value "w")) 1 0 0 3 0 0 0)
-            (x-of (in-frame "1par") 1 0 0 3 0 0 0))))
+         (pos-of (lambda (acc doc . p)
+                   (let ((x #f))
+                     (with-typeset-body doc
+                       (lambda () (set! x (acc (apply rect p)))))
+                     x))))
+    (check= (pos-of rect-x1 (in-cell (inner '(value "w"))) 3 4 0 0 0 0 3 0 0 0)
+            (pos-of rect-x1 (in-cell (inner "1par")) 3 4 0 0 0 0 3 0 0 0))
+    (check= (pos-of rect-x1 (in-frame '(value "w")) 1 0 0 3 0 0 0)
+            (pos-of rect-x1 (in-frame "1par") 1 0 0 3 0 0 0))
+    (check= (pos-of rect-x1 (in-cell `(with "w" "0.5par" ,(inner '(value "w"))))
+                    3 4 0 0 0 0 2 3 0 0 0)
+            (pos-of rect-x1 (in-cell (inner "0.5par")) 3 4 0 0 0 0 3 0 0 0))
+    (check= (pos-of rect-x2 (in-cell '(mt "0.5par")) 3 4 0 0 0 0)
+            (pos-of rect-x2 (in-cell '(ml "0.5par")) 3 4 0 0 0 0))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Line breaking
@@ -1277,7 +1340,8 @@
              (references-from-scratch '("ch" "th"))))))
 
 ;; A tag which is removed and put back by an undo gives its labels the
-;; names they had (the undo puts back a copy with their numbers).
+;; names they had (the undo puts back a copy with their numbers:
+;; copy_for_apply in archiver.cpp).
 (define (test-labels-after-undo)
   (check-group "labels after undo")
   (with-typeset-body
@@ -1292,6 +1356,12 @@
      (undo 0)
      (update-forced)
      (check= (auto-names) '("auto-1" "auto-2" "auto-3"))
+     ;; and again after a redo and an undo (the history keeps the numbers)
+     (redo 0)
+     (update-forced)
+     (undo 0)
+     (update-forced)
+     (check= (auto-names) '("auto-1" "auto-2" "auto-3"))
      ;; the same when only the node of the tag is removed (its text is
      ;; kept, as by a backspace at the start of the title)
      (dynamic-wind start-editing
@@ -1301,6 +1371,63 @@
      (undo 0)
      (update-forced)
      (check= (auto-names) '("auto-1" "auto-2" "auto-3")))))
+
+;; A tag which is inserted, removed by an undo and put back by a redo
+;; gives its labels the names it had (the redo puts back the tree which the
+;; undo removed, with their numbers: apply_for_undo in archiver.cpp), each
+;; time.
+(define (test-labels-after-redo)
+  (check-group "labels after redo")
+  (with-typeset-body
+   '(document (section "A") "a" (section "B") "b")
+   (lambda ()
+     (renumber-auto-labels)
+     (update-forced)
+     (dynamic-wind start-editing
+                   (lambda () (tree-insert (buffer-tree) 2
+                                           '((section "D") "d")))
+                   end-editing)
+     (update-forced)
+     (check= (auto-names) '("auto-1" "auto-2" "auto-3"))
+     ;; (the labels of a removed tag stay in the list of references, so
+     ;; the names are compared after each redo)
+     (with names (lambda ()
+                   (map (lambda (k)
+                          (undo 0) (update-forced)
+                          (redo 0) (update-forced)
+                          (auto-names))
+                        '(1 2 3)))
+       (check= (names)
+               '(("auto-1" "auto-2" "auto-3")
+                 ("auto-1" "auto-2" "auto-3")
+                 ("auto-1" "auto-2" "auto-3"))))
+     ;; the same for a tag inserted and changed in the same step (the
+     ;; undo changes the tag before it removes it)
+     (dynamic-wind start-editing
+                   (lambda ()
+                     (tree-insert (buffer-tree) 4 '((section "E") "e"))
+                     (tree-assign (tree-ref (buffer-tree) 4 0) "F"))
+                   end-editing)
+     (update-forced)
+     (let ((n1 (auto-names)))
+       (undo 0) (update-forced)
+       (redo 0) (update-forced)
+       (undo 0) (update-forced)
+       (redo 0) (update-forced)
+       (check= (tree->stree (tree-ref (buffer-tree) 4)) '(section "F"))
+       (check= (auto-names) n1))
+     ;; the same for a tag put around a text (insert_node)
+     (dynamic-wind start-editing
+                   (lambda () (tree-insert-node (tree-ref (buffer-tree) 1)
+                                                0 '(section)))
+                   end-editing)
+     (update-forced)
+     (let ((n1 (auto-names)))
+       (undo 0) (update-forced)
+       (redo 0) (update-forced)
+       (undo 0) (update-forced)
+       (redo 0) (update-forced)
+       (check= (auto-names) n1)))))
 
 ;; Paragraphs removed one after the other in a document with numbered
 ;; equations: the paragraphs are kept in blocks (bridge_document.cpp), and
@@ -1766,6 +1893,228 @@
               '(1.0 2.0 1.0)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Included files
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; A master which includes files: the included documents come from the
+;; cache of the inclusions (load_inclusion, Texmacs/Data/new_buffer.cpp),
+;; the same tree at each pass, and their typesetting is kept from one pass
+;; to the next (Typeset/Bridge/bridge_rewrite.cpp); what changes around
+;; them is seen through the inputs of their paragraphs. After each change,
+;; the rectangles of the paragraphs of the master (those of an include are
+;; found through the paths of the boxes of the included document) are those
+;; of a typesetting of the same master from scratch.
+(define incl-dir
+  (string-append (url->system (url-temp-dir)) "/typeset-test"))
+
+(define (incl-file name)
+  (system->url (string-append incl-dir "/" name)))
+
+(define (incl-clear-dir)
+  (with d (system->url incl-dir)
+    (when (url-exists? d)
+      (for (u (url-read-directory d "*"))
+        (system-remove u))
+      (system-rmdir d))))
+
+(define (incl-write name body)
+  (tree-export (stree->tree `(document (TeXmacs "2.1")
+                                       (style (tuple "article"))
+                                       (body (document ,@body))))
+               (incl-file name) "texmacs"))
+
+(define (incl-update)
+  ;; Document > Update > All, without the inclusions-gc
+  (update-forced)
+  (generate-all-aux)
+  (update-current-buffer)
+  (update-forced))
+
+(define (incl-places)
+  (map (lambda (i) (rect i)) (iota (tree-arity (buffer-tree)))))
+
+(define (incl-height i)
+  (with r (rect i) (- (rect-y2 r) (rect-y1 r))))
+
+(define (incl-num l)
+  (tree->stree (texmacs-expand `(get-binding ,l))))
+
+(define incl-fresh-count 0)
+
+(define (incl-fresh-places)
+  ;; the rectangles of the paragraphs of the current master, typeset from
+  ;; scratch in a buffer of its own (a new file each time, so that each
+  ;; typesetting starts from a new buffer)
+  (set! incl-fresh-count (+ incl-fresh-count 1))
+  (let* ((old (current-buffer))
+         (name (string-append "fresh-" (number->string incl-fresh-count)
+                              ".tm"))
+         (u (incl-file name)))
+    (incl-write name (cdr (tree->stree (buffer-tree))))
+    (dynamic-wind
+      (lambda () (noop))
+      (lambda ()
+        (load-buffer u)
+        (switch-to-buffer* u)
+        (incl-update)
+        (incl-update)
+        (incl-places))
+      (lambda ()
+        (when (buffer-exists? u) (buffer-close u))
+        (switch-to-buffer* old)))))
+
+(define (incl-same-as-fresh?)
+  (== (incl-places) (incl-fresh-places)))
+
+(define (incl-groups)
+  (incl-write "one.tm"
+              '((section (concat "One" (label "s1")))
+                (concat "a" (foo) "b")
+                ;; the number of the section of two.tm, as a height
+                (concat "See " (reference "s2")
+                        (vspace (merge (get-binding "s2") "cm")))
+                "The end of one."))
+  (incl-write "two.tm"
+              '((section (concat "Two" (label "s2")))
+                "Text of two."))
+  ;; (without the label of two.tm: the references to it show "?" in the
+  ;; master once two.tm is replaced by three.tm, #417)
+  (incl-write "three.tm"
+              '((section "Three")
+                "Text of three."
+                (concat "More" (vspace "2cm"))
+                "The end of three."))
+  (incl-write "master.tm"
+              '((assign "foo" (macro (vspace "1cm")))
+                (include "one.tm")
+                (include "two.tm")
+                "The end."))
+  (with m (incl-file "master.tm")
+    (load-buffer m)
+    (switch-to-buffer* m)
+    (incl-update)
+    (incl-update)
+    (check= (incl-num "s1") "1")
+    (check= (incl-num "s2") "2")
+    (check-true (incl-same-as-fresh?))
+    (with t (buffer-tree)
+      ;; a macro of the master, used in one.tm, is redefined
+      (with h (incl-height 1)
+        (tree-set (tree-ref t 0) '(assign "foo" (macro (vspace "3cm"))))
+        (update-forced)
+        (check-true (> (incl-height 1) h))
+        (check-true (incl-same-as-fresh?)))
+      ;; a section before the includes: the number of the label of two.tm
+      ;; which one.tm references changes
+      (with h (incl-height 1)
+        (tree-insert t 1 (list (stree->tree '(section "Zero"))))
+        (incl-update)
+        (check= (incl-num "s1") "2")
+        (check= (incl-num "s2") "3")
+        (check-true (> (incl-height 2) h))
+        (check-true (incl-same-as-fresh?)))
+      ;; a paragraph before the includes: the includes are further down
+      (with r (rect 2)
+        (tree-insert t 1 (list (stree->tree "An inserted paragraph.")))
+        (update-forced)
+        (check-true (< (rect-y2 (rect 3)) (rect-y2 r)))
+        (check-true (incl-same-as-fresh?)))
+      ;; two.tm moved before one.tm
+      (tree-remove t 4 1)
+      (tree-insert t 3 (list (stree->tree '(include "two.tm"))))
+      (incl-update)
+      (check= (tree->stree (tree-ref t 3)) '(include "two.tm"))
+      (check-true (> (rect-y2 (rect 3)) (rect-y2 (rect 4))))
+      (check= (incl-num "s2") "2")
+      (check= (incl-num "s1") "3")
+      (check-true (incl-same-as-fresh?))
+      ;; and back
+      (tree-remove t 3 1)
+      (tree-insert t 4 (list (stree->tree '(include "two.tm"))))
+      (incl-update)
+      (check= (incl-num "s1") "2")
+      (check= (incl-num "s2") "3")
+      (check-true (incl-same-as-fresh?))
+      ;; the name of an included file changed, and back
+      (with h (incl-height 4)
+        (tree-set (tree-ref t 4 0) "three.tm")
+        (incl-update)
+        (check= (incl-num "s2") '(uninit))
+        (check= (tree->stree (get-reference "s2")) '(uninit))
+        (check-true (> (incl-height 4) h))
+        (check-true (incl-same-as-fresh?))
+        (tree-set (tree-ref t 4 0) "two.tm")
+        (incl-update)
+        (check= (incl-num "s2") "3")
+        (check= (incl-height 4) h)
+        (check-true (incl-same-as-fresh?))))
+    ;; two.tm edited in a buffer of its own and saved: the master shows
+    ;; it after Update > All (which empties the cache of the inclusions)
+    (with h (incl-height 4)
+      (with u (incl-file "two.tm")
+        (load-buffer u)
+        (switch-to-buffer* u)
+        (update-forced)
+        ;; (as an action of the user: the buffer is modified)
+        (archive-state)
+        (start-editing)
+        (tree-insert (buffer-tree) 2
+                     (list (stree->tree '(concat "New" (vspace "2cm")))))
+        (end-editing)
+        (check-true (buffer-modified? u))
+        (save-buffer)
+        (check-false (buffer-modified? u))
+        (switch-to-buffer* m)
+        (buffer-close u))
+      (inclusions-gc)
+      (incl-update)
+      (check= (tree->stree (tree-load-inclusion (incl-file "two.tm")))
+              '(document (section (concat "Two" (label "s2")))
+                         "Text of two."
+                         (concat "New" (vspace "2cm"))))
+      (check-true (> (incl-height 4) h))
+      (check-true (incl-same-as-fresh?)))
+    (buffer-pretend-saved m)
+    (buffer-close m)))
+
+(define (incl-extern)
+  ;; another rewriting, which gives a new tree at each pass: its body is
+  ;; made again when what it reads changes
+  (with-typeset-body
+   '(document (assign "len" "1cm")
+              (extern "(lambda (x) `(concat \"a\" (vspace ,(tree->string x))))"
+                      (value "len"))
+              "After.")
+   (lambda ()
+     (with r (rect 2)
+       (tree-set (tree-ref (buffer-tree) 0 1) "3cm")
+       (update-forced)
+       (check-true (< (rect-y2 (rect 2)) (rect-y2 r)))
+       (check= (map (lambda (i) (rect i)) (iota 3))
+               (places-from-scratch (buffer-tree) 3))))))
+
+(define (test-included-files)
+  (check-group "included files")
+  (let ((old (current-buffer))
+        (before (buffer-list))
+        (mismatches (typeset-check-mismatches)))
+    (incl-clear-dir)
+    (system-mkdir (system->url incl-dir))
+    (incl-extern)
+    (with r (check-run incl-groups)
+      (when (and (pair? r) (== (car r) 'error))
+        (check-report #f "the group" (object->string r)))
+      (for (b (buffer-list))
+        (when (nin? b before)
+          (buffer-pretend-saved b)
+          (buffer-close b)))
+      (when (buffer-exists? old) (switch-to-buffer* old))
+      (incl-clear-dir)
+      ;; (in the check modes, the bridges used again made what a
+      ;; typesetting again makes)
+      (check= (typeset-check-mismatches) mismatches))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The suite
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -1789,6 +2138,7 @@
   (test-environment)
   (test-numbering)
   (test-renumbering)
+  (test-removed-label)
   (test-automatic-labels)
   (test-labels-of-nested-tags)
   (test-reuse-below-bindings)
@@ -1808,6 +2158,7 @@
   (test-loci-of-surround-parts)
   (test-bindings-written-again)
   (test-labels-after-undo)
+  (test-labels-after-redo)
   (test-incremental-against-scratch)
   (test-random-documents)
   (test-block-replay)
@@ -1815,4 +2166,5 @@
   (test-assignments-in-blocks)
   (test-unknown-inputs-in-blocks)
   (test-zoom)
+  (test-included-files)
   (check-end))

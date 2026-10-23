@@ -26,6 +26,7 @@
 #include "convert.hpp"
 #include "converter.hpp"
 #include "scheme.hpp"
+#include "gui_test.hpp"
 #include "../../Scheme/Scheme/object.hpp" // blackbox_to_tmscm: a command given to Scheme (the file chooser)
 #include "dictionary.hpp"
 #include "locale.hpp"
@@ -145,7 +146,15 @@ static vue_window script_win= NULL;     // target window of the script
 static vue_window snapshot_win= NULL;   // window whose next redraw is saved as
 static string snapshot_name;            // <snapshot dir>/<snapshot_name>.png
 static void script_init ();
-static void script_step ();
+static int script_exec (string line);
+static bool script_pump= false; // call (gui-test-pump) at each turn of the loop
+// while a script runs, the texts drawn in each window at its last frame
+// (gui_test_texts): the window being drawn, and its texts
+static vue_window gt_render_win= NULL;
+static hashmap<int,array<string> > gt_texts ((array<string> ()));
+static void gt_frame_start (vue_window win);
+static void gt_record (Clay_BoundingBox b, string e);
+static void script_clipboard (string txt);
 
 
 extern bool debug_clay;
@@ -168,6 +177,33 @@ hashmap<int, pointer> id_to_window;
 
 static bool single_window_mode ();
 
+// Dialogs (the windows which are neither documents nor popups, see
+// plain_window) are told to the window manager as dialogs, as the Qt port
+// does with Qt::Dialog, so that the tiling ones (i3, sway, Hyprland,
+// bspwm...) float them (issue #391): on X11 the type of window DIALOG (the
+// hint SDL_HINT_X11_WINDOW_TYPE, read when the window is made) and
+// everywhere but macOS the document window of the moment as their parent
+// (WM_TRANSIENT_FOR on X11, xdg_toplevel.set_parent on Wayland, the owner
+// on Windows). Not SDL_WINDOW_UTILITY, which makes a palette without an
+// entry in the task bar on X11 and drops the parent on Windows. On macOS a
+// child window (addChildWindow) moves with its parent, which the dialogs
+// of TeXmacs do not. SDL destroys the children of a window with it: a
+// document window lets its dialogs go first (see the destructor).
+static bool making_dialog= false;
+static SDL_Window* last_document_sdl= NULL; // the last document window made
+
+// The balloons (tooltip_window_widget) are tooltip windows of SDL, made
+// with SDL_CreatePopupWindow as children of the window of TeXmacs which has
+// the keyboard (#399). They were windows of their own, borderless and "not
+// focusable": on Wayland a window of its own cannot be placed by the
+// application, and the compositor gives it the keyboard when it shows, so
+// that the editor lost the focus and closed the balloon at once (and the
+// window managers of X11 may do the same). A tooltip of SDL is an
+// xdg_popup on Wayland, an override-redirect window on X11 and a child
+// window on macOS, at a place relative to its parent; it never takes the
+// keyboard and the pointer goes through it to the window under it.
+static bool making_tooltip= false;
+
 class vue_sdl_base_window_rep : public vue_window_rep {
 public:
   SDL_Window *sdl_win;
@@ -175,9 +211,15 @@ public:
   bool on_top;       // a tool window, above the other windows of TeXmacs
   bool level_raised; // ... and currently at the level of SDL's "on top"
   bool document= false; // the window of an editor (see plain_window)
+  // shown without taking the focus from the window which has it (see
+  // gui_set_next_window_without_focus)
+  bool activate= true;
   // the geometry last seen (see track_geometry), in points; unknown while
   // saved_w < 0
   int  saved_x, saved_y, saved_w, saved_h;
+  // the parent of a balloon which is a tooltip of SDL (see making_tooltip),
+  // whose position is relative to it; NULL for the other windows
+  SDL_Window* tooltip_parent= NULL;
 
   // adopt: an SDL window taken over from a window being destroyed (the
   // host of single-window mode, see forget_host), instead of a new one
@@ -207,6 +249,7 @@ public:
   
   void process_layout ();
   void layout_size (int& w, int& h);
+  void orphan (); // the parent of the tooltip goes (see the destructor)
 };
 
 int vue_window_rep::serial= 1; // serial identifier for windows
@@ -290,8 +333,8 @@ init_window_clay (vue_window_rep* w, int win_w, int win_h) {
   static bool reported= false;
   if (!reported) { cout << "Vue: Clay arena " << (totalMemorySize >> 20) << " MB per window" << LF; reported= true; }
   w->clay_arena= (Clay_Arena) {
-      .memory=  (char*) SDL_malloc (totalMemorySize),
-      .capacity= (size_t) totalMemorySize
+      .capacity= (size_t) totalMemorySize,
+      .memory=  (char*) SDL_malloc (totalMemorySize)
   };
   if (w->clay_arena.memory == NULL) FAILED ("Vue: cannot allocate the layout arena");
   w->clay_ctx= Clay_Initialize (w->clay_arena, (Clay_Dimensions) { (float) win_w, (float) win_h }, (Clay_ErrorHandler) { HandleClayErrors });
@@ -339,6 +382,24 @@ vue_logo_surface () {
   return icon;
 }
 #endif
+
+// The parent of a balloon (see making_tooltip): the window of TeXmacs
+// with the keyboard, else the one under the pointer, else the last
+// document window, if it is shown and is no popup; NULL if there is none
+static SDL_Window*
+tooltip_parent_window () {
+  SDL_Window* l[3]= { SDL_GetKeyboardFocus (), SDL_GetMouseFocus (),
+                      last_document_sdl };
+  for (int i= 0; i < 3; i++) {
+    SDL_Window* w= l[i];
+    if (w == NULL || !Window_to_window->contains (w)) continue;
+    vue_sdl_base_window_rep* v= (vue_sdl_base_window_rep*) Window_to_window[w];
+    if (v->popup || (SDL_GetWindowFlags (w) &
+                     (SDL_WINDOW_HIDDEN | SDL_WINDOW_MINIMIZED))) continue;
+    return w;
+  }
+  return NULL;
+}
 
 vue_sdl_base_window_rep::vue_sdl_base_window_rep (vue_widget _content, string _name, bool _popup,
                                                   SDL_Window* adopt)
@@ -389,7 +450,26 @@ vue_sdl_base_window_rep::vue_sdl_base_window_rep (vue_widget _content, string _n
   the_name= name;
   mod_name= name;
   c_string buf (cork_to_utf8 (name));
-  sdl_win= SDL_CreateWindow (buf, win_w, win_h, flags);
+  bool x11_dialog= making_dialog && !popup &&
+                   strcmp (SDL_GetCurrentVideoDriver () ? SDL_GetCurrentVideoDriver () : "", "x11") == 0;
+  if (x11_dialog) SDL_SetHint (SDL_HINT_X11_WINDOW_TYPE, "_NET_WM_WINDOW_TYPE_DIALOG");
+  sdl_win= NULL;
+#ifndef __EMSCRIPTEN__
+  if (popup && making_tooltip) {
+    // a balloon: a tooltip of SDL, child of the window with the keyboard
+    // (or a window of its own as the other popups if there is none)
+    SDL_Window* parent= tooltip_parent_window ();
+    SDL_WindowFlags tf= (flags & ~(SDL_WINDOW_BORDERLESS |
+                                   SDL_WINDOW_ALWAYS_ON_TOP |
+                                   SDL_WINDOW_NOT_FOCUSABLE)) |
+                        SDL_WINDOW_TOOLTIP;
+    if (parent != NULL)
+      sdl_win= SDL_CreatePopupWindow (parent, win_x, win_y, win_w, win_h, tf);
+    if (sdl_win != NULL) tooltip_parent= parent;
+  }
+#endif
+  if (sdl_win == NULL) sdl_win= SDL_CreateWindow (buf, win_w, win_h, flags);
+  if (x11_dialog) SDL_ResetHint (SDL_HINT_X11_WINDOW_TYPE);
   if (!sdl_win) {
     // nothing sensible can be done without a window
     SDL_LogError (SDL_LOG_CATEGORY_APPLICATION, "Couldn't create window: %s", SDL_GetError ());
@@ -408,11 +488,25 @@ vue_sdl_base_window_rep::vue_sdl_base_window_rep (vue_widget _content, string _n
   }
 #endif
   SDL_SetWindowPosition (sdl_win, win_x, win_y);
+#if !defined(OS_MACOS) && !defined(__EMSCRIPTEN__)
+  if (making_dialog && !popup) {
+    // the parent: the document window with the keyboard, else the last one
+    // made (a dialog opened at the start, before any window has the focus)
+    SDL_Window* parent= NULL;
+    SDL_Window* focus= SDL_GetKeyboardFocus ();
+    if (focus != NULL && Window_to_window->contains (focus) &&
+        ((vue_sdl_base_window_rep*) Window_to_window[focus])->document)
+      parent= focus;
+    if (parent == NULL) parent= last_document_sdl;
+    if (parent != NULL) SDL_SetWindowParent (sdl_win, parent);
+  }
+#endif
   Window_to_window (sdl_win)= (void*) this;
   id= serial++;
   id_to_window (id)= this;
   
-  SDL_StartTextInput (sdl_win);
+  // (no keys for a balloon, which never has the keyboard)
+  if (tooltip_parent == NULL) SDL_StartTextInput (sdl_win);
   
   // update widget state
   set_identifier (abstract (content), id);
@@ -495,9 +589,41 @@ vue_sdl_base_window_rep::~vue_sdl_base_window_rep () {
   // NULL: the SDL window went to another one (see forget_host)
   if (sdl_win == NULL) return;
   Window_to_window->reset (sdl_win);
+  if (last_document_sdl == sdl_win) last_document_sdl= NULL;
+  // the dialogs of this window outlive it (see making_dialog): SDL would
+  // destroy them with it, under the widgets which own them
+  // (and its balloons, which cannot change their parent, lose their SDL
+  // window: TeXmacs closes them later, see orphan)
+  int n= 0;
+  SDL_Window** all= SDL_GetWindows (&n);
+  if (all != NULL) {
+    for (int i= 0; i < n; i++)
+      if (SDL_GetWindowParent (all[i]) == sdl_win) {
+        if ((SDL_GetWindowFlags (all[i]) & SDL_WINDOW_TOOLTIP) &&
+            Window_to_window->contains (all[i]))
+          ((vue_sdl_base_window_rep*) Window_to_window[all[i]])->orphan ();
+        else SDL_SetWindowParent (all[i], NULL);
+      }
+    SDL_free (all);
+  }
   SDL_StopTextInput (sdl_win);
   vue_gpu_detach (sdl_win);
   SDL_DestroyWindow (sdl_win);
+}
+
+// The parent of this balloon is destroyed, and SDL would destroy the SDL
+// window of the balloon with it, under the widgets which own it: it goes
+// first, and the balloon is left without a window (sdl_win NULL, as one
+// whose window was adopted, see forget_host) until TeXmacs deletes it.
+void
+vue_sdl_base_window_rep::orphan () {
+  if (sdl_win == NULL) return;
+  Window_to_window->reset (sdl_win);
+  vue_gpu_detach (sdl_win);
+  SDL_DestroyWindow (sdl_win);
+  sdl_win= NULL;
+  tooltip_parent= NULL;
+  shown= visible_requested= ready_to_show= false;
 }
 
 void
@@ -511,15 +637,21 @@ vue_sdl_base_window_rep::destroy_event () {
 
 void
 vue_sdl_base_window_rep::get_position (SI& x, SI& y) {
-  int xx, yy;
+  int xx= 0, yy= 0;
   SDL_GetWindowPosition (sdl_win, &xx, &yy);
+  if (tooltip_parent != NULL) {
+    // (relative to its parent)
+    int px= 0, py= 0;
+    SDL_GetWindowPosition (tooltip_parent, &px, &py);
+    xx += px; yy += py;
+  }
   x= tm_length (xx);
   y= tm_length (-yy);
 }
 
 void
 vue_sdl_base_window_rep::get_size (SI& ww, SI& hh) {
-  int win_w, win_h;
+  int win_w= 0, win_h= 0;
   SDL_GetWindowSize (sdl_win, &win_w, &win_h);
   ww= tm_length (win_w);
   hh= tm_length (win_h);
@@ -537,6 +669,7 @@ vue_sdl_base_window_rep::get_size_limits (SI& min_w, SI& min_h, SI& max_w, SI& m
 // coordinates: those are allowed.
 void
 vue_sdl_base_window_rep::set_position (SI x, SI y) {
+  if (sdl_win == NULL) return; // (see orphan)
   int win_w, win_h;
   SDL_GetWindowSize (sdl_win, &win_w, &win_h);
 
@@ -554,13 +687,26 @@ vue_sdl_base_window_rep::set_position (SI x, SI y) {
     if (win_y < r.y) win_y= r.y;
   }
   if (DEBUG_VUE_EVENTS) SDL_Log ("Window %d set_position %d %d", id, win_x, win_y);
+  if (tooltip_parent != NULL) {
+    // a balloon is placed relative to its parent (see making_tooltip)
+    int px= 0, py= 0;
+    SDL_GetWindowPosition (tooltip_parent, &px, &py);
+    win_x -= px; win_y -= py;
+  }
   SDL_SetWindowPosition (sdl_win, win_x, win_y);
 }
 
 void
 vue_sdl_base_window_rep::set_size (SI w, SI h) {
+  if (sdl_win == NULL) return; // (see orphan)
   w= sdl_points (w); h= sdl_points (h);
   SDL_SetWindowSize (sdl_win, w, h);
+  // the change is asynchronous on X11 and Wayland: a dialog sized to its
+  // contents was then laid out, shown and drawn at its former size, in a
+  // window which got its new size later (the black window with the dialog
+  // squeezed at its bottom of #376, legible once resized by hand); so wait
+  // for the size, as in set_full_screen (immediate on macOS)
+  SDL_SyncWindow (sdl_win);
 }
 
 void
@@ -674,15 +820,35 @@ vue_sdl_base_window_rep::track_geometry () {
   if (resized) notify_window_resize (orig_name, tm_length (w), tm_length (h));
 }
 
+// The next window is shown without taking the keyboard focus (the window of
+// the error messages, which opens by itself on a warning, while one types
+// in a document): SDL then only orders it in front, on the systems which
+// make the difference (SDL_HINT_WINDOW_ACTIVATE_WHEN_SHOWN)
+static bool next_window_without_focus= false;
+
+void
+gui_set_next_window_without_focus () {
+  next_window_without_focus= true;
+}
+
+static void
+show_window (SDL_Window* sdl_win, bool activate) {
+  if (activate) { SDL_ShowWindow (sdl_win); return; }
+  SDL_SetHint (SDL_HINT_WINDOW_ACTIVATE_WHEN_SHOWN, "0");
+  SDL_ShowWindow (sdl_win);
+  SDL_ResetHint (SDL_HINT_WINDOW_ACTIVATE_WHEN_SHOWN);
+}
+
 void
 vue_sdl_base_window_rep::set_visibility (bool flag) {
+  if (sdl_win == NULL) return; // (see orphan)
   visible_requested= flag;
   if (!flag) {
     if (shown) SDL_HideWindow (sdl_win);
     shown= false;
   }
   else if (ready_to_show && !shown) {
-    SDL_ShowWindow (sdl_win);
+    show_window (sdl_win, activate);
     shown= true;
   }
   // the window of an editor already shown comes to the front with the
@@ -757,7 +923,7 @@ vue_sdl_base_window_rep::process_layout () {
   // case the contents never settle)
   layout_passes++;
   if (visible_requested && !shown && (ready_to_show || layout_passes > 10)) {
-    SDL_ShowWindow (sdl_win);
+    show_window (sdl_win, activate);
     shown= true;
   }
 }
@@ -1204,11 +1370,17 @@ vue_sdl_mupdf_window_rep::process_redraw () {
     Clay_RenderCommandArray below= render_commands, above= render_commands;
     below.length= k;
     above.internalArray += k; above.length -= k; above.capacity -= k;
+    gt_frame_start (this);
     render_clay_commands (ren, &below);
     composite_virtual_windows (this, ren);
+    gt_render_win= this;
     render_clay_commands (ren, &above);
   }
-  else render_clay_commands (ren, &render_commands);
+  else {
+    gt_frame_start (this);
+    render_clay_commands (ren, &render_commands);
+  }
+  gt_render_win= NULL;
 
     static_cast<mupdf_renderer_rep*>(ren)->end ();
 
@@ -1361,11 +1533,17 @@ vue_sdl_gpu_window_rep::process_redraw () {
     Clay_RenderCommandArray below= render_commands, above= render_commands;
     below.length= k;
     above.internalArray += k; above.length -= k; above.capacity -= k;
+    gt_frame_start (this);
     render_clay_commands (ren, &below);
     composite_virtual_windows (this, ren);
+    gt_render_win= this;
     render_clay_commands (ren, &above);
   }
-  else render_clay_commands (ren, &render_commands);
+  else {
+    gt_frame_start (this);
+    render_clay_commands (ren, &render_commands);
+  }
+  gt_render_win= NULL;
   if (vue_profile_on) gpu_finish (); // with the time the GPU took
   else gpu_flush ();
   if (vue_profile_on) vue_clay_ns += SDL_GetTicksNS () - t_ns;
@@ -1614,6 +1792,21 @@ render_clay_commands (renderer ren, Clay_RenderCommandArray *rcommands)
       case CLAY_RENDER_COMMAND_TYPE_CUSTOM: {
         render_fn fn= (render_fn)rcmd->renderData.custom.customData;
         fn (ren, rcmd->userData, r);
+        if (script_pump && gt_render_win != NULL &&
+            rcmd->renderData.custom.customData == vue_render_text) {
+          // a text, which a script may look for (gui_test_texts), in the
+          // points of the window, those of the scripts (the layout is in
+          // pixels, density of them per point)
+          styled_string ss= (styled_string_rep*) rcmd->userData;
+          gt_record (bounding_box,
+                     (ss->ctx != NULL ? *ss->ctx : string ("")) * "\t" * ss->s);
+        }
+        else if (script_pump && gt_render_win != NULL &&
+                 rcmd->renderData.custom.customData == vue_render_widget) {
+          // an icon (a picture widget): its place and its name
+          string e= vue_test_icon (rcmd->userData);
+          if (N(e) > 0) gt_record (bounding_box, e);
+        }
         break;
       }
       default:
@@ -1701,6 +1894,10 @@ layout_text_box (string s, int style, color c, font fn) {
     cache.w << w; cache.h << h;
   }
   styled_string ss= tm_new<styled_string_rep> (s, fn, c);
+  if (vue_testing) {
+    ss->ctx= tm_new<string> (vue_test_context);
+    vue_test_note_label (s);
+  }
   styled_strings << ss;
   CLAY_AUTO_ID({
     .layout= {
@@ -2661,6 +2858,7 @@ composite_virtual_windows (vue_window host, renderer ren) {
     }
     {
       with_window frame (v);
+      gt_frame_start (v);
       render_clay_commands (ren, &v->render_commands);
     }
     ren->unclip ();
@@ -2674,6 +2872,7 @@ static void
 pointer_left (vue_window w) {
   if (w == NULL) return;
   vue_virtual_window_rep* v= dynamic_cast<vue_virtual_window_rep*> (w);
+  if (v != NULL && v->tooltip) return; // (see SDL_EVENT_WINDOW_MOUSE_LEAVE)
   if (v != NULL && v->popup) { v->set_visibility (false); return; }
   with_window frame (w);
   Clay_SetPointerState ((Clay_Vector2) { -1, -1 }, false);
@@ -2717,7 +2916,7 @@ route_pointer (vue_window win, float& x, float& y, int kind) {
   else if (!host_overlay_at (x, y)) {
     for (int i= N(virtual_windows) - 1; i >= 0; i--) {
       vue_virtual_window_rep* v= virtual_windows[i];
-      if (!v->shown || v->tab) continue;
+      if (!v->shown || v->tab || v->tooltip) continue; // (see under_tooltip)
       if (v->contains (sx, sy)) { target= v; break; }
       if (v->in_title_bar (sx, sy)) { target= v; title= true; break; }
       if ((edges= v->frame_edges (sx, sy)) != 0) { target= v; title= true; break; }
@@ -2730,7 +2929,8 @@ route_pointer (vue_window win, float& x, float& y, int kind) {
     // a press outside the popups dismisses them, and reaches its target
     for (int i= N(virtual_windows) - 1; i >= 0; i--) {
       vue_virtual_window_rep* v= virtual_windows[i];
-      if (v->shown && v->popup && v != target) v->set_visibility (false);
+      if (v->shown && v->popup && !v->tooltip && v != target)
+        v->set_visibility (false);
     }
     if (target != NULL) {
       if (!target->tab) target->raise ();
@@ -2951,21 +3151,31 @@ make_host () {
 }
 
 vue_window
-plain_window (vue_widget wwid, string name, bool popup, bool document) {
+plain_window (vue_widget wwid, string name, bool popup, bool document,
+              bool tooltip) {
+  bool activate= !next_window_without_focus;
+  next_window_without_focus= false;
+  vue_window v= NULL;
   // headless: the windows are virtual as well, with no host to be drawn in
   if (is_headless ())
-    return tm_new<vue_virtual_window_rep> (wwid, name, popup, false);
-  if (single_window_mode ()) {
+    v= tm_new<vue_virtual_window_rep> (wwid, name, popup, false);
+  else if (single_window_mode ()) {
     if (the_host == NULL) make_host ();
-    return tm_new<vue_virtual_window_rep> (wwid, name, popup, document && !popup);
+    v= tm_new<vue_virtual_window_rep> (wwid, name, popup, document && !popup);
   }
-  if (vue_gpu_windows ()) {
-    vue_sdl_gpu_window_rep* g= tm_new<vue_sdl_gpu_window_rep> (wwid, name, popup);
-    g->document= document && !popup;
-    return g;
-  }
-  vue_sdl_mupdf_window_rep* w= tm_new<vue_sdl_mupdf_window_rep> (wwid, name, popup);
+  if (v != NULL) { v->tooltip= tooltip; return v; }
+  making_dialog= !document && !popup;
+  making_tooltip= popup && tooltip;
+  vue_sdl_base_window_rep* w;
+  if (vue_gpu_windows ()) w= tm_new<vue_sdl_gpu_window_rep> (wwid, name, popup);
+  else w= tm_new<vue_sdl_mupdf_window_rep> (wwid, name, popup);
+  making_dialog= false;
+  making_tooltip= false;
+  w->tooltip= tooltip;
   w->document= document && !popup;
+  w->activate= activate;
+  w->passive= !activate;
+  if (w->document) last_document_sdl= w->sdl_win;
   return w;
 }
 
@@ -3399,7 +3609,39 @@ static const double wheel_precise_step= 100.0; // points per unit
 #else
 static const double wheel_precise_step= 10.0;  // points per unit
 #endif
-static const double wheel_notch_step= 80.0;    // points per notch
+static const double wheel_notch_step= 80.0;    // points per notch (macOS)
+
+// the distance of a notch: on macOS a fixed one, elsewhere that of the Qt
+// port (issue #391), where a notch scrolls three lines (the default of
+// QApplication::wheelScrollLines) of a sixteenth of the height of the view
+// plus a pixel (the single step of QTMScrollView); the height of the view
+// is taken as the one of the window less its bars
+static double
+wheel_notch_step_of (vue_window win) {
+#if defined(OS_MACOS) || defined(__EMSCRIPTEN__)
+  (void) win;
+  return wheel_notch_step;
+#else
+  SI w, h;
+  win->get_size (w, h);
+  double view= max (100.0, ((double) h) / PIXEL - 120.0);
+  return 3.0 * (floor (view / 16.0) + 1.0);
+#endif
+}
+
+// a whole number of eighths: the deltas of a wheel with fine steps (Wayland
+// gives the wheel in 120ths of a notch, mostly by 15), not of a trackpad.
+// Not on macOS, where SDL gives the trackpad in lines and a wheel by notches
+static bool
+wheel_in_eighths (double d) {
+#if defined(OS_MACOS) || defined(__EMSCRIPTEN__)
+  (void) d;
+  return false;
+#else
+  double e= d * 8.0;
+  return fabs (e - floor (e + 0.5)) < 1e-4;
+#endif
+}
 // does the system glide after the fingers are lifted (see above)? macOS
 // does, also in a browser, which passes its momentum on as wheel events
 #if defined(__EMSCRIPTEN__)
@@ -3512,7 +3754,8 @@ wheel_event (vue_window win, double x, double y, time_t now, uint64_t stamp) {
   }
   // fractional deltas are a trackpad; so is a second event which follows
   // the opening one too soon for a wheel to have turned twice (see above)
-  bool precise= (x != floor (x) || y != floor (y)) ||
+  bool precise= ((x != floor (x) && !wheel_in_eighths (x)) ||
+                 (y != floor (y) && !wheel_in_eighths (y))) ||
                 (wheel_bursts_are_swipes &&
                  in.wheel_ambiguous && !fresh && dt <= wheel_burst_dt);
   in.wheel_ambiguous= wheel_bursts_are_swipes && fresh && !precise;
@@ -3524,7 +3767,8 @@ wheel_event (vue_window win, double x, double y, time_t now, uint64_t stamp) {
     in.wheel_pend_y -= in.wheel_over_y;
     in.wheel_over_x= in.wheel_over_y= 0;
   }
-  double step= win->density * (in.wheel_precise ? wheel_precise_step : wheel_notch_step);
+  double step= win->density * (in.wheel_precise ? wheel_precise_step
+                                                : wheel_notch_step_of (win));
   double dx= x * step, dy= y * step; // device pixels
   dt= max ((time_t) 8, min (dt, wheel_slow_dt));
   in.wheel_est_x= 0.5 * (in.wheel_est_x + dx / dt);
@@ -4237,7 +4481,7 @@ loop_iteration_body () {
   bool active= false; // an event, or something moving by itself
 
   // 1. process events
-  script_step (); // may push synthetic events
+  if (script_pump) call ("gui-test-pump"); // may push synthetic events
   if (take_event ()) {
     active= true;
 #ifdef __EMSCRIPTEN__
@@ -4480,12 +4724,15 @@ get_window_from_ID (Uint32 ID) {
 /******************************************************************************
 * Scripted events (development aid)
 *
-* When TEXMACS_VUE_SCRIPT names a file, its lines are executed one by one
-* (a line is executed only when no SDL event is pending). Coordinates are in
-* window points, relative to the content area of the target window:
+* When TEXMACS_TEST_SCRIPT (or TEXMACS_VUE_SCRIPT) names a file, its lines
+* are executed one by one (a line is executed only when no SDL event is
+* pending). The driver is in Scheme, (check gui-script), which reads the
+* file, runs its own commands (wait, scheme, idle, activate, expect, port,
+* exit) and those below through gui_test_raw (script_exec here), at each
+* turn of the loop (gui_test_pump); see docs/gui-scripting.md. Coordinates
+* are in window points, relative to the content area of the target window:
 *
-*   # comment
-*   wait <ms>                       pause
+*   window main                     the first window with an editor
 *   window <substring of title>     select the target window (default: last created)
 *   window #<id>                    select the target window by its id
 *   move x y                        pointer motion
@@ -4504,31 +4751,18 @@ get_window_from_ID (Uint32 ID) {
 *   focus                           pretend the target window got the keyboard focus
 *   drop x y <path>|text:<text>     drag and drop of one item at that position
 *   repaint                         invalidate every editor (repaint from scratch)
-*   scheme <expression>             run a Scheme command, as -x does (at the
-*                                   next turn of the loop): a zoom, a marker
-*                                   which (display) prints in the log...
 *   snapshot <name>                 save the target window as <TEXMACS_VUE_SNAPSHOT>/<name>.png
 *   resize w h                      resize the target window (points)
 *   close                           ask to close the target window
 *   tab <id>                        show the tab #id (single-window mode)
+*   clipboard <text>                put the text (as TeXmacs text) on the
+*                                   clipboard of the script (while a script
+*                                   runs, the clipboard is its own)
 ******************************************************************************/
-
-static array<string> script_lines;
-static int script_pos= 0;
-static time_t script_next= 0;
 
 static void
 script_init () {
-  string file= get_env ("TEXMACS_VUE_SCRIPT");
-  if (N(file) == 0) return;
-  string s;
-  if (load_string (url_system (file), s, false)) {
-    cout << "vue script: cannot read " << file << LF;
-    return;
-  }
-  script_lines= tokenize (s, "\n");
-  script_active= true;
-  cout << "vue script: " << N(script_lines) << " lines" << LF;
+  gui_test_start (); // TEXMACS_TEST_SCRIPT, or TEXMACS_VUE_SCRIPT
 }
 
 static bool script_no_target= false; // the last "window" command matched nothing
@@ -4601,246 +4835,361 @@ script_push_motion (vue_window win, float x, float y) {
   SDL_PushEvent (&ev);
 }
 
-static void
-script_step () {
-  if (!script_active) return;
-  if (SDL_PollEvent (NULL)) return; // let pending events be processed first
-  time_t now= texmacs_time ();
-  if (now < script_next) return;
-  while (script_pos < N(script_lines)) {
-    string line= trim_spaces (script_lines[script_pos++]);
-    if (N(line) == 0 || line[0] == '#') continue;
-    array<string> a= tokenize (line, " ");
-    string cmd= a[0];
-    vue_window win= script_target ();
-    cout << "vue script: " << line << LF;
-    if (cmd == "wait" && N(a) > 1) {
-      script_next= now + as_int (a[1]);
-      return;
-    }
-    else if (cmd == "window" && N(a) > 1) {
-      string title= line (N(cmd)+1, N(line));
-      // no match: the following commands are skipped rather than sent to
-      // the previous target (e.g. closing the main window by mistake)
-      script_win= NULL;
-      iterator<int> it= iterate (id_to_window);
-      while (it->busy ()) {
-        vue_window w= (vue_window) id_to_window [it->next ()];
-        if (title == "#" * as_string (w->id) ||
-            occurs (title, w->name) || occurs (title, w->get_name ())) script_win= w;
+// one command of a script: 0 run, 1 run and the next one may follow in
+// the same turn of the loop, 2 unknown (see gui_test_raw)
+static int
+script_exec (string line) {
+  array<string> a= tokenize (line, " ");
+  string cmd= a[0];
+  vue_window win= script_target ();
+  if (cmd == "window" && N(a) > 1) {
+    string title= line (N(cmd)+1, N(line));
+    // no match: the following commands are skipped rather than sent to
+    // the previous target (e.g. closing the main window by mistake)
+    script_win= NULL;
+    iterator<int> it= iterate (id_to_window);
+    while (it->busy ()) {
+      vue_window w= (vue_window) id_to_window [it->next ()];
+      if (title == "main") {
+        // the editor (the first window which holds one), on every port
+        if (vue_is_editor_window (w->content) &&
+            (script_win == NULL || w->id < script_win->id)) script_win= w;
       }
-      script_no_target= (script_win == NULL);
-      if (script_win == NULL) cout << "vue script: no window matches " << title << LF;
-      else {
-        SI wx, wy, ww, wh;
-        script_win->get_position (wx, wy);
-        script_win->get_size (ww, wh);
-        cout << "vue script: window at " << wx/PIXEL << "," << -wy/PIXEL
-             << " size " << ww/PIXEL << "x" << wh/PIXEL
-             << (script_win->platform_window () == NULL ? " (virtual)" : "") << LF;
+      else if (title == "#" * as_string (w->id) ||
+          occurs (title, w->name) || occurs (title, w->get_name ())) script_win= w;
+    }
+    script_no_target= (script_win == NULL);
+    if (script_win == NULL) {
+      cout << "vue script: no window matches " << title << "; there are";
+      iterator<int> it2= iterate (id_to_window);
+      while (it2->busy ()) {
+        vue_window w= (vue_window) id_to_window [it2->next ()];
+        cout << " #" << w->id << " [" << w->get_name () << "]"
+             << (is_nil (w->content) ? string ("") : " " * w->content->type);
       }
-      continue;
+      cout << LF;
     }
-    if (win == NULL) continue;
-    if (cmd == "move" && N(a) > 2)
-      script_push_motion (win, as_double (a[1]), as_double (a[2]));
-    else if (cmd == "press" && N(a) > 2)
-      script_push_button (win, as_double (a[1]), as_double (a[2]), script_button (a, 3), true);
-    else if (cmd == "release" && N(a) > 2)
-      script_push_button (win, as_double (a[1]), as_double (a[2]), script_button (a, 3), false);
-    else if (cmd == "click" && N(a) > 2) {
-      // the count of a double or triple click, as SDL gives it (the
-      // presses before it are the script's own clicks)
-      int clicks= (N(a) > 4 && is_int (a[4])) ? max (1, as_int (a[4])) : 1;
-      script_push_motion (win, as_double (a[1]), as_double (a[2]));
-      script_push_button (win, as_double (a[1]), as_double (a[2]), script_button (a, 3), true, clicks);
-      script_push_button (win, as_double (a[1]), as_double (a[2]), script_button (a, 3), false, clicks);
+    else {
+      SI wx, wy, ww, wh;
+      script_win->get_position (wx, wy);
+      script_win->get_size (ww, wh);
+      cout << "vue script: window at " << wx/PIXEL << "," << -wy/PIXEL
+           << " size " << ww/PIXEL << "x" << wh/PIXEL
+           << (script_win->platform_window () == NULL ? " (virtual)" : "") << LF;
     }
-    else if (cmd == "wheel" && N(a) > 4) {
-      SDL_Event ev;
+    return 1;
+  }
+  if (cmd == "clipboard") {
+    // the clipboard of the script (a script never reads or writes the
+    // clipboard of the system): the text, as TeXmacs text (a paste from
+    // the system gives it converted from plain text)
+    script_clipboard (line (min (N(line), N(cmd)+1), N(line)));
+    return 1;
+  }
+  if (win == NULL) {
+    // after a "window" which matched nothing: skipped, until one matches
+    cout << "vue script: no window, skipped: " << line << LF;
+    return 1;
+  }
+  if (cmd == "move" && N(a) > 2)
+    script_push_motion (win, as_double (a[1]), as_double (a[2]));
+  else if (cmd == "press" && N(a) > 2)
+    script_push_button (win, as_double (a[1]), as_double (a[2]), script_button (a, 3), true);
+  else if (cmd == "release" && N(a) > 2)
+    script_push_button (win, as_double (a[1]), as_double (a[2]), script_button (a, 3), false);
+  else if (cmd == "click" && N(a) > 2) {
+    // the count of a double or triple click, as SDL gives it (the
+    // presses before it are the script's own clicks)
+    int clicks= (N(a) > 4 && is_int (a[4])) ? max (1, as_int (a[4])) : 1;
+    script_push_motion (win, as_double (a[1]), as_double (a[2]));
+    script_push_button (win, as_double (a[1]), as_double (a[2]), script_button (a, 3), true, clicks);
+    script_push_button (win, as_double (a[1]), as_double (a[2]), script_button (a, 3), false, clicks);
+  }
+  else if (cmd == "wheel" && N(a) > 4) {
+    SDL_Event ev;
+    SDL_zero (ev);
+    ev.type= SDL_EVENT_MOUSE_WHEEL;
+    ev.wheel.timestamp= SDL_GetTicksNS ();
+    float wx= as_double (a[1]), wy= as_double (a[2]);
+    ev.wheel.windowID= script_window_id (win, wx, wy);
+    ev.wheel.mouse_x= wx;
+    ev.wheel.mouse_y= wy;
+    ev.wheel.x= as_double (a[3]);
+    ev.wheel.y= as_double (a[4]);
+    SDL_PushEvent (&ev);
+  }
+  else if (cmd == "key" && N(a) > 1) {
+    // "key [S-][C-][A-][M-]<SDL key name>": the prefixes are the shift,
+    // control, option and command modifiers
+    SDL_Event ev;
+    SDL_zero (ev);
+    string kn= a[1];
+    SDL_Keymod mod= SDL_KMOD_NONE;
+    while (N(kn) > 2 && kn[1] == '-') {
+      if (kn[0] == 'S') mod |= SDL_KMOD_LSHIFT;
+      else if (kn[0] == 'C') mod |= SDL_KMOD_LCTRL;
+      else if (kn[0] == 'A') mod |= SDL_KMOD_LALT;
+      else if (kn[0] == 'M') mod |= SDL_KMOD_LGUI;
+      else break;
+      kn= kn (2, N(kn));
+    }
+    // the names with spaces ("Keypad 1") are written with underscores
+    c_string name (replace (kn, "_", " "));
+    ev.type= SDL_EVENT_KEY_DOWN;
+    ev.key.timestamp= SDL_GetTicksNS ();
+    ev.key.windowID= script_window_id (win);
+    ev.key.scancode= SDL_GetScancodeFromName (name);
+    ev.key.key= SDL_GetKeyFromScancode (ev.key.scancode, SDL_KMOD_NONE, false);
+    ev.key.mod= mod;
+    ev.key.down= true;
+    SDL_PushEvent (&ev);
+    if (N(a) > 2) {
+      // "key <name> <text>": the text which the system sends with the
+      // key, at once (a digit of the keypad)
+      static c_string ktext ("");
+      ktext= c_string (a[2]);
       SDL_zero (ev);
-      ev.type= SDL_EVENT_MOUSE_WHEEL;
-      ev.wheel.timestamp= SDL_GetTicksNS ();
-      float wx= as_double (a[1]), wy= as_double (a[2]);
-      ev.wheel.windowID= script_window_id (win, wx, wy);
-      ev.wheel.mouse_x= wx;
-      ev.wheel.mouse_y= wy;
-      ev.wheel.x= as_double (a[3]);
-      ev.wheel.y= as_double (a[4]);
+      ev.type= SDL_EVENT_TEXT_INPUT;
+      ev.text.timestamp= SDL_GetTicksNS ();
+      ev.text.windowID= script_window_id (win);
+      ev.text.text= ktext;
       SDL_PushEvent (&ev);
     }
-    else if (cmd == "key" && N(a) > 1) {
-      // "key [S-][C-][A-][M-]<SDL key name>": the prefixes are the shift,
-      // control, option and command modifiers
-      SDL_Event ev;
-      SDL_zero (ev);
-      string kn= a[1];
-      SDL_Keymod mod= SDL_KMOD_NONE;
-      while (N(kn) > 2 && kn[1] == '-') {
-        if (kn[0] == 'S') mod |= SDL_KMOD_LSHIFT;
-        else if (kn[0] == 'C') mod |= SDL_KMOD_LCTRL;
-        else if (kn[0] == 'A') mod |= SDL_KMOD_LALT;
-        else if (kn[0] == 'M') mod |= SDL_KMOD_LGUI;
-        else break;
-        kn= kn (2, N(kn));
-      }
-      // the names with spaces ("Keypad 1") are written with underscores
-      c_string name (replace (kn, "_", " "));
-      ev.type= SDL_EVENT_KEY_DOWN;
-      ev.key.timestamp= SDL_GetTicksNS ();
-      ev.key.windowID= script_window_id (win);
-      ev.key.scancode= SDL_GetScancodeFromName (name);
-      ev.key.key= SDL_GetKeyFromScancode (ev.key.scancode, SDL_KMOD_NONE, false);
-      ev.key.mod= mod;
-      ev.key.down= true;
-      SDL_PushEvent (&ev);
-      if (N(a) > 2) {
-        // "key <name> <text>": the text which the system sends with the
-        // key, at once (a digit of the keypad)
-        static c_string ktext ("");
-        ktext= c_string (a[2]);
-        SDL_zero (ev);
-        ev.type= SDL_EVENT_TEXT_INPUT;
-        ev.text.timestamp= SDL_GetTicksNS ();
-        ev.text.windowID= script_window_id (win);
-        ev.text.text= ktext;
-        SDL_PushEvent (&ev);
-      }
-    }
-    else if (cmd == "text" && N(a) > 1) {
-      // one text input event per (utf8) character, as SDL does. The events
-      // keep pointers to the text: the characters of the line are kept
-      // until the next "text" command, which comes once these events have
-      // all been handled (script_step waits for an empty queue); a ring of
-      // 64 slots was overwritten by a longer line before it was read
-      static array<c_string> buffers;
-      buffers= array<c_string> ();
-      string txt= line (N(cmd)+1, N(line));
-      int i= 0;
-      while (i < N(txt)) {
-        int start= i;
-        // the length of the utf8 sequence from its lead byte
-        unsigned char c= (unsigned char) txt[i];
-        int len= (c < 0x80) ? 1 : (c >= 0xF0) ? 4 : (c >= 0xE0) ? 3 : (c >= 0xC0) ? 2 : 1;
-        i= min (N(txt), start + len);
-        buffers << c_string (txt (start, i));
-        SDL_Event ev;
-        SDL_zero (ev);
-        ev.type= SDL_EVENT_TEXT_INPUT;
-        ev.text.timestamp= SDL_GetTicksNS ();
-        ev.text.windowID= script_window_id (win);
-        ev.text.text= buffers[N(buffers) - 1];
-        SDL_PushEvent (&ev);
-      }
-    }
-    else if (cmd == "snapshot" && N(a) > 1) {
-      snapshot_win= win;
-      snapshot_name= a[1];
-    }
-    else if (cmd == "resize" && N(a) > 2)
-      win->set_size (as_int (a[1]) * PIXEL, as_int (a[2]) * PIXEL);
-    else if (cmd == "repaint") // every editor from scratch (checks the incremental paths)
-      vue_simple_widget_rep::invalidate_all_editors ();
-    else if (cmd == "scheme" && N(line) > 7)
-      exec_delayed (scheme_cmd (line (7, N(line))));
-    else if (cmd == "focus") {
-      // pretend the window got the keyboard focus (a test instance launched
-      // while another application is in use never gets it)
-      // (a virtual window: the host gets it, and that window the keys)
-      vue_virtual_window_rep* v= dynamic_cast<vue_virtual_window_rep*> (win);
-      if (v != NULL) { v->raise (); focus_virtual (v); }
-      SDL_Event ev;
-      SDL_zero (ev);
-      ev.type= SDL_EVENT_WINDOW_FOCUS_GAINED;
-      ev.window.timestamp= SDL_GetTicksNS ();
-      ev.window.windowID= script_window_id (win);
-      SDL_PushEvent (&ev);
-    }
-    else if (cmd == "commit" && N(a) > 1) {
-      // the text committed by an input method: several characters in one
-      // text input event
-      static c_string ctext ("");
-      ctext= c_string (line (N(cmd)+1, N(line)));
+  }
+  else if (cmd == "text" && N(a) > 1) {
+    // one text input event per (utf8) character, as SDL does. The events
+    // keep pointers to the text: the characters of the line are kept
+    // until the next "text" command, which comes once these events have
+    // all been handled (the driver waits for an empty queue); a ring of
+    // 64 slots was overwritten by a longer line before it was read
+    static array<c_string> buffers;
+    buffers= array<c_string> ();
+    string txt= line (N(cmd)+1, N(line));
+    int i= 0;
+    while (i < N(txt)) {
+      int start= i;
+      // the length of the utf8 sequence from its lead byte
+      unsigned char c= (unsigned char) txt[i];
+      int len= (c < 0x80) ? 1 : (c >= 0xF0) ? 4 : (c >= 0xE0) ? 3 : (c >= 0xC0) ? 2 : 1;
+      i= min (N(txt), start + len);
+      buffers << c_string (txt (start, i));
       SDL_Event ev;
       SDL_zero (ev);
       ev.type= SDL_EVENT_TEXT_INPUT;
       ev.text.timestamp= SDL_GetTicksNS ();
       ev.text.windowID= script_window_id (win);
-      ev.text.text= ctext;
+      ev.text.text= buffers[N(buffers) - 1];
       SDL_PushEvent (&ev);
     }
-    else if (cmd == "compose") {
-      // the composition of an input method: "compose <text>" (no text ends it)
-      static string composed; // SDL keeps the pointer: the string must live on
-      composed= (N(a) > 1) ? line (N(cmd)+1, N(line)) : string ("");
-      static c_string ctext ("");
-      ctext= c_string (composed);
-      SDL_Event ev;
-      SDL_zero (ev);
-      ev.type= SDL_EVENT_TEXT_EDITING;
-      ev.edit.timestamp= SDL_GetTicksNS ();
-      ev.edit.windowID= script_window_id (win);
-      ev.edit.text= ctext;
-      ev.edit.start= N(composed);
-      ev.edit.length= 0;
-      SDL_PushEvent (&ev);
-    }
-    else if (cmd == "drop" && N(a) > 3) {
-      // "drop x y <path>" or "drop x y text:<text>": a synthetic drop of
-      // one item, as the system sends it (begin, item, complete)
-      static char buf[1024];
-      string item= line (N(cmd) + N(a[1]) + N(a[2]) + 3, N(line));
-      bool is_text= starts (item, "text:");
-      if (is_text) item= item (5, N(item));
-      c_string citem (item);
-      int n= min ((int) strlen (citem), 1023);
-      for (int i= 0; i < n; i++) buf[i]= ((char*) citem)[i];
-      buf[n]= 0;
-      float dx= as_double (a[1]), dy= as_double (a[2]);
-      Uint32 wid= script_window_id (win, dx, dy);
-      SDL_Event ev;
-      SDL_zero (ev);
-      ev.type= SDL_EVENT_DROP_BEGIN;
-      ev.drop.timestamp= SDL_GetTicksNS ();
-      ev.drop.windowID= wid;
-      SDL_PushEvent (&ev);
-      SDL_zero (ev);
-      ev.type= is_text ? SDL_EVENT_DROP_TEXT : SDL_EVENT_DROP_FILE;
-      ev.drop.timestamp= SDL_GetTicksNS ();
-      ev.drop.windowID= wid;
-      ev.drop.x= dx;
-      ev.drop.y= dy;
-      ev.drop.data= buf;
-      SDL_PushEvent (&ev);
-      SDL_zero (ev);
-      ev.type= SDL_EVENT_DROP_COMPLETE;
-      ev.drop.timestamp= SDL_GetTicksNS ();
-      ev.drop.windowID= wid;
-      ev.drop.x= dx;
-      ev.drop.y= dy;
-      SDL_PushEvent (&ev);
-    }
-    else if (cmd == "tab" && N(a) > 1) {
-      // show the tab (a window of an editor in single-window mode) #id
-      vue_virtual_window_rep* t= find_tab (as_int (a[1]));
-      if (t != NULL && t->shown) activate_tab (t);
-      else cout << "vue script: no tab " << a[1] << LF;
-    }
-    else if (cmd == "close" && win->platform_window () == NULL)
-      win->destroy_event (); // a virtual window: as its close box does
-    else if (cmd == "close") {
-      SDL_Event ev;
-      SDL_zero (ev);
-      ev.type= SDL_EVENT_WINDOW_CLOSE_REQUESTED;
-      ev.window.timestamp= SDL_GetTicksNS ();
-      ev.window.windowID= SDL_GetWindowID ((SDL_Window*) win->platform_window ());
-      SDL_PushEvent (&ev);
-    }
-    else cout << "vue script: unknown command " << line << LF;
-    return; // one command per loop iteration
   }
-  cout << "vue script: done" << LF;
-  script_active= false;
+  else if (cmd == "snapshot" && N(a) > 1) {
+    snapshot_win= win;
+    snapshot_name= a[1];
+  }
+  else if (cmd == "resize" && N(a) > 2)
+    win->set_size (as_int (a[1]) * PIXEL, as_int (a[2]) * PIXEL);
+  else if (cmd == "repaint") // every editor from scratch (checks the incremental paths)
+    vue_simple_widget_rep::invalidate_all_editors ();
+  else if (cmd == "focus") {
+    // pretend the window got the keyboard focus (a test instance launched
+    // while another application is in use never gets it)
+    // (a virtual window: the host gets it, and that window the keys)
+    vue_virtual_window_rep* v= dynamic_cast<vue_virtual_window_rep*> (win);
+    if (v != NULL) { v->raise (); focus_virtual (v); }
+    SDL_Event ev;
+    SDL_zero (ev);
+    ev.type= SDL_EVENT_WINDOW_FOCUS_GAINED;
+    ev.window.timestamp= SDL_GetTicksNS ();
+    ev.window.windowID= script_window_id (win);
+    SDL_PushEvent (&ev);
+  }
+  else if (cmd == "commit" && N(a) > 1) {
+    // the text committed by an input method: several characters in one
+    // text input event
+    static c_string ctext ("");
+    ctext= c_string (line (N(cmd)+1, N(line)));
+    SDL_Event ev;
+    SDL_zero (ev);
+    ev.type= SDL_EVENT_TEXT_INPUT;
+    ev.text.timestamp= SDL_GetTicksNS ();
+    ev.text.windowID= script_window_id (win);
+    ev.text.text= ctext;
+    SDL_PushEvent (&ev);
+  }
+  else if (cmd == "compose") {
+    // the composition of an input method: "compose <text>" (no text ends it)
+    static string composed; // SDL keeps the pointer: the string must live on
+    composed= (N(a) > 1) ? line (N(cmd)+1, N(line)) : string ("");
+    static c_string ctext ("");
+    ctext= c_string (composed);
+    SDL_Event ev;
+    SDL_zero (ev);
+    ev.type= SDL_EVENT_TEXT_EDITING;
+    ev.edit.timestamp= SDL_GetTicksNS ();
+    ev.edit.windowID= script_window_id (win);
+    ev.edit.text= ctext;
+    ev.edit.start= N(composed);
+    ev.edit.length= 0;
+    SDL_PushEvent (&ev);
+  }
+  else if (cmd == "drop" && N(a) > 3) {
+    // "drop x y <path>" or "drop x y text:<text>": a synthetic drop of
+    // one item, as the system sends it (begin, item, complete)
+    static char buf[1024];
+    string item= line (N(cmd) + N(a[1]) + N(a[2]) + 3, N(line));
+    bool is_text= starts (item, "text:");
+    if (is_text) item= item (5, N(item));
+    c_string citem (item);
+    int n= min ((int) strlen (citem), 1023);
+    for (int i= 0; i < n; i++) buf[i]= ((char*) citem)[i];
+    buf[n]= 0;
+    float dx= as_double (a[1]), dy= as_double (a[2]);
+    Uint32 wid= script_window_id (win, dx, dy);
+    SDL_Event ev;
+    SDL_zero (ev);
+    ev.type= SDL_EVENT_DROP_BEGIN;
+    ev.drop.timestamp= SDL_GetTicksNS ();
+    ev.drop.windowID= wid;
+    SDL_PushEvent (&ev);
+    SDL_zero (ev);
+    ev.type= is_text ? SDL_EVENT_DROP_TEXT : SDL_EVENT_DROP_FILE;
+    ev.drop.timestamp= SDL_GetTicksNS ();
+    ev.drop.windowID= wid;
+    ev.drop.x= dx;
+    ev.drop.y= dy;
+    ev.drop.data= buf;
+    SDL_PushEvent (&ev);
+    SDL_zero (ev);
+    ev.type= SDL_EVENT_DROP_COMPLETE;
+    ev.drop.timestamp= SDL_GetTicksNS ();
+    ev.drop.windowID= wid;
+    ev.drop.x= dx;
+    ev.drop.y= dy;
+    SDL_PushEvent (&ev);
+  }
+
+  else if (cmd == "tab" && N(a) > 1) {
+    // show the tab (a window of an editor in single-window mode) #id
+    vue_virtual_window_rep* t= find_tab (as_int (a[1]));
+    if (t != NULL && t->shown) activate_tab (t);
+    else cout << "vue script: no tab " << a[1] << LF;
+  }
+  else if (cmd == "close" && win->platform_window () == NULL)
+    win->destroy_event (); // a virtual window: as its close box does
+  else if (cmd == "close") {
+    SDL_Event ev;
+    SDL_zero (ev);
+    ev.type= SDL_EVENT_WINDOW_CLOSE_REQUESTED;
+    ev.window.timestamp= SDL_GetTicksNS ();
+    ev.window.windowID= SDL_GetWindowID ((SDL_Window*) win->platform_window ());
+    SDL_PushEvent (&ev);
+  }
+  else {
+    cout << "vue script: unknown command " << line << LF;
+    return 2;
+  }
+  return 0; // one command per loop iteration
+}
+
+/******************************************************************************
+* The hooks of the tests (gui_test.hpp)
+******************************************************************************/
+
+// a text or an icon at the box b of the window being drawn, in the points
+// of the window, those of the scripts (the layout is in pixels, density of
+// them per point): "x\ty\tw\th\t<path>\t<text>"
+static void
+gt_record (Clay_BoundingBox b, string e) {
+  float d= gt_render_win->density > 0 ? gt_render_win->density : 1.0f;
+  gt_texts (gt_render_win->id)
+    << (as_string ((int) (b.x / d)) * "\t" * as_string ((int) (b.y / d)) *
+        "\t" * as_string ((int) (b.width / d)) * "\t" *
+        as_string ((int) (b.height / d)) * "\t" * e);
+}
+
+bool   vue_testing= false;
+string vue_test_context;
+string vue_test_label;
+
+void
+vue_test_note_label (string s) {
+  if (N(vue_test_label) == 0) vue_test_label= s;
+}
+
+// (nothing is made unless a script runs: the layout goes through it often)
+with_test_context::with_test_context (const char* name): saved (NULL) {
+  if (vue_testing) enter (string (name));
+}
+
+with_test_context::with_test_context (const string& name): saved (NULL) {
+  if (vue_testing) enter (name);
+}
+
+void
+with_test_context::enter (const string& name) {
+  saved= tm_new<string> (vue_test_context);
+  if (N(name) > 0)
+    vue_test_context= N(*saved) == 0 ? name : *saved * " > " * name;
+}
+
+with_test_context::~with_test_context () {
+  if (saved == NULL) return;
+  vue_test_context= *saved;
+  tm_delete (saved);
+}
+
+static void
+gt_frame_start (vue_window win) {
+  gt_render_win= win;
+  if (script_pump && win != NULL) gt_texts (win->id)= array<string> ();
+}
+
+string gui_test_port () { return "vue"; }
+
+int
+gui_test_raw (string line) {
+  line= trim_spaces (line);
+  if (N(line) == 0) return 1;
+  return script_exec (line);
+}
+
+bool
+gui_test_busy () {
+  // events, keys still to be given one per turn (a text committed at once),
+  // or an animation (a menu which slides in: the places of its items change
+  // until it ends)
+  return SDL_PollEvent (NULL) || N(pending_keys) > 0 || transitions_running ();
+}
+
+array<string>
+gui_test_windows () {
+  array<string> r;
+  iterator<int> it= iterate (id_to_window);
+  while (it->busy ()) {
+    vue_window w= (vue_window) id_to_window [it->next ()];
+    r << w->get_name ();
+  }
+  return r;
+}
+
+array<string>
+gui_test_texts () {
+  vue_window win= script_target ();
+  if (win == NULL || !gt_texts->contains (win->id)) return array<string> ();
+  return gt_texts [win->id];
+}
+
+void
+gui_test_pump (bool on) {
+  script_pump= on;
+  vue_testing= on;
+  // a script starts afresh, and leaves nothing behind
+  script_win= NULL;
+  script_no_target= false;
+  script_buttons= 0;
+  vue_test_forget_icons ();
+  script_active= on; // the buttons are those the script holds (mouse_buttons)
+  if (!on) gt_texts= hashmap<int,array<string> > (array<string> ());
 }
 
 // the state of the buttons and of the modifiers, as TeXmacs encodes it
@@ -4972,7 +5321,8 @@ visible_popup () {
   while (it->busy ()) {
     SDL_Window* sw= it->next ();
     vue_window w= (vue_window) Window_to_window [sw];
-    if (w->popup && !(SDL_GetWindowFlags (sw) & SDL_WINDOW_HIDDEN)) return w;
+    if (w->popup && !w->tooltip &&
+        !(SDL_GetWindowFlags (sw) & SDL_WINDOW_HIDDEN)) return w;
   }
   return NULL;
 }
@@ -4996,6 +5346,45 @@ popup_grab (vue_window& win, float& x, float& y, bool press) {
   // a press outside dismisses the popup and reaches its target
   pop->set_visibility (false);
   return true;
+}
+
+// The pointer over a tooltip (a balloon of TeXmacs) is over the window under
+// it, to which its events go, with (x, y) made relative to it: else the
+// editor did not see the pointer go, and the balloon stayed, over the words
+// which the pointer was then on (#399). win itself if it is no tooltip.
+static vue_window
+under_tooltip (vue_window win, float& x, float& y) {
+  if (win == NULL || !win->tooltip) return win;
+  SDL_Window* tw= (SDL_Window*) win->platform_window ();
+  int tx= 0, ty= 0;
+  SDL_GetWindowPosition (tw, &tx, &ty);
+  // a tooltip of SDL (see making_tooltip), which the systems usually let
+  // the pointer go through, is placed relative to its parent
+  SDL_Window* parent= SDL_GetWindowParent (tw);
+  if (parent != NULL && Window_to_window->contains (parent)) {
+    x += tx; y += ty;
+    return (vue_window) Window_to_window [parent];
+  }
+  float sx= tx + x, sy= ty + y; // screen coordinates
+  SDL_Window* focus= SDL_GetKeyboardFocus ();
+  SDL_Window* best= NULL;
+  iterator<SDL_Window*> it= iterate (Window_to_window);
+  while (it->busy ()) {
+    SDL_Window* sw= it->next ();
+    vue_window w= (vue_window) Window_to_window [sw];
+    if (w->popup || (SDL_GetWindowFlags (sw) & SDL_WINDOW_HIDDEN)) continue;
+    int wx, wy, ww, wh;
+    SDL_GetWindowPosition (sw, &wx, &wy);
+    SDL_GetWindowSize (sw, &ww, &wh);
+    if (sx >= wx && sx < wx + ww && sy >= wy && sy < wy + wh &&
+        (best == NULL || sw == focus)) best= sw;
+  }
+  if (best == NULL) return NULL;
+  int bx, by;
+  SDL_GetWindowPosition (best, &bx, &by);
+  x= sx - bx;
+  y= sy - by;
+  return (vue_window) Window_to_window [best];
 }
 
 // a file of a drop: images are inserted as such, everything else by name
@@ -5251,7 +5640,9 @@ wheel_zooms (vue_window win, double y) {
 *   fingers on a trackpad do, and glides when it is lifted while moving
 *   (touch_scroll); the press and the release never reach the widgets;
 * - resting touch_hold first and then moved, it is a mouse with its button
-*   pressed: it selects, or drags a scroll bar.
+*   pressed: it selects, or drags a scroll bar;
+* - put down on the thumb of a scroll bar, it is a mouse at once: it drags
+*   the thumb (it panned the view, in the opposite direction).
 ******************************************************************************/
 
 static const float touch_slop= 8.0;   // points: still a tap
@@ -5281,6 +5672,22 @@ is_touch_mouse (SDL_Event* event) {
   }
 }
 
+// is the point (x, y) of the window (points) on the thumb of a scroll bar
+// of its last layout?
+static bool
+touch_on_bar (vue_window win, float x, float y) {
+  if (N(win->input.bar_zones) == 0) return false;
+  with_window frame (win);
+  float px= x * win->density, py= y * win->density;
+  for (int i=0; i<N(win->input.bar_zones); i++) {
+    Clay_ElementData d= Clay_GetElementData ((Clay_ElementId) { .id= win->input.bar_zones[i] });
+    Clay_BoundingBox b= d.boundingBox;
+    if (d.found && px >= b.x && px < b.x + b.width && py >= b.y && py < b.y + b.height)
+      return true;
+  }
+  return false;
+}
+
 // true when the event has been taken (process_event does nothing more)
 static bool
 touch_filter (SDL_Event* event) {
@@ -5299,6 +5706,10 @@ touch_filter (SDL_Event* event) {
     float x= event->button.x, y= event->button.y;
     win= route_pointer (win, x, y, 3);
     if (win) touch_stop_glide (win);
+    if (win && touch_on_bar (win, x, y)) {
+      finger.dragging= true; // the moves and the release go through too
+      return false;
+    }
     return true;
   }
   if (!finger.down || finger.dragging) {
@@ -5384,8 +5795,11 @@ process_event (SDL_Event *event) {
       if (win) win->destroy_event();
       break;
     case SDL_EVENT_WINDOW_MOUSE_LEAVE:
-      // popup menus are dismissed as soon as the pointer leaves them
+      // popup menus are dismissed as soon as the pointer leaves them (not
+      // the tooltips, which TeXmacs closes: one hidden here stayed open
+      // for it, and was not shown again)
       win= get_window_from_ID (event->window.windowID);
+      if (win && win->tooltip) break;
       if (win && win->popup) win->set_visibility (false);
       else if (win) {
         // no element is under the pointer any more (no hovered button left
@@ -5455,6 +5869,7 @@ process_event (SDL_Event *event) {
       update_mouse_state ();
       win= get_window_from_ID (event->button.windowID);
       float bx= event->button.x, by= event->button.y;
+      win= under_tooltip (win, bx, by);
       bool down= (event->button.type == SDL_EVENT_MOUSE_BUTTON_DOWN);
       if (down) mouse_presses++;
       if (down) dismiss_wait_indicator ();
@@ -5488,6 +5903,7 @@ process_event (SDL_Event *event) {
                  (int) ((SDL_GetTicksNS () - event->wheel.timestamp) / 1000000));
       win= get_window_from_ID (event->wheel.windowID);
       float wx= event->wheel.mouse_x, wy= event->wheel.mouse_y;
+      win= under_tooltip (win, wx, wy);
       win= route_pointer (win, wx, wy, 3);
       if (win && wheel_zooms (win, event->wheel.y)) break;
       if (win) {
@@ -5512,6 +5928,7 @@ process_event (SDL_Event *event) {
         mouse_state= mouse_bits (event->motion.state, SDL_GetModState ());
       win= get_window_from_ID (event->motion.windowID);
       float mx= event->motion.x, my= event->motion.y;
+      win= under_tooltip (win, mx, my);
       win= route_pointer (win, mx, my, 0);
       if (win && popup_grab (win, mx, my, false)) {
         with_window frame (win);
@@ -5810,6 +6227,15 @@ font get_default_font (bool tt, bool mini, bool bold) {
     return find_font ("Lucida Grande", "ss", series, "right",
                       sz, (int) (0.95 * dpi));
   }
+  // elsewhere a sans serif too, as the system font of the Qt port: Fira,
+  // which comes with TeXmacs, as in the browser. The TeX fonts below were
+  // the look of the X11 port (issue #391); they stay for the languages
+  // which Fira does not write
+  string lan= get_output_language ();
+  if (lan != "chinese" && lan != "taiwanese" &&
+      lan != "japanese" && lan != "korean")
+    return unicode_font (bold ? "FiraSans-Bold" : "FiraSans-Regular",
+                         sz, (int) (0.95 * dpi));
   if (N(fam) >= 2) {
     string ff= fam (0, 2);
     string out_lan= get_output_language ();
@@ -5860,6 +6286,14 @@ void load_system_font (string family, int size, int dpi,
 // Internal storage for selections (for primary/mouse selections not supported by SDL)
 static hashmap<string,tree> selection_t ("none");
 static hashmap<string,string> selection_s ("");
+
+// the clipboard of a script (its command "clipboard"): the text as a paste
+// from the system gives it
+static void
+script_clipboard (string txt) {
+  selection_t ("primary")= tuple ("extern", txt);
+  selection_s ("primary")= txt;
+}
 
 #ifdef __EMSCRIPTEN__
 // In the browser, SDL has no clipboard of the system: the page keeps what
@@ -6001,7 +6435,8 @@ clipboard_data_callback (void *userdata, const char *mime_type, size_t *size) {
     }
   }
   // Plain text (UTF-8)
-  else if (mime_str == "text/plain" || mime_str == "text/plain;charset=utf-8") {
+  else if (mime_str == "text/plain" || mime_str == "text/plain;charset=utf-8" ||
+           mime_str == "UTF8_STRING" || mime_str == "STRING" || mime_str == "TEXT") {
     if (N(data->plain_text) > 0) {
       *size = N(data->plain_text);
       return (const void*) data->c_plain_text;
@@ -6059,8 +6494,10 @@ bool set_selection (string key, tree t,
   selection_s (key)= copy (s);
 
   // SDL3 only supports the system clipboard, not primary/mouse selections
-  // So we only set the system clipboard for "primary" key
-  if (key != "primary") return true;
+  // So we only set the system clipboard for "primary" key; while a script
+  // runs, not even that one: the tests do not share the clipboard of the
+  // system with the user's session or with each other (gui_test_pump)
+  if (key != "primary" || script_pump) return true;
 
   // Prepare clipboard data structure
   clipboard_data* clip_data = new clipboard_data();
@@ -6114,7 +6551,7 @@ bool set_selection (string key, tree t,
   }
 
   // Build list of MIME types to offer
-  const char* mime_types[4];
+  const char* mime_types[8];
   size_t num_mime_types = 0;
 
   // Always offer TeXmacs native format
@@ -6128,6 +6565,15 @@ bool set_selection (string key, tree t,
   // Always offer plain text (UTF-8)
   mime_types[num_mime_types++] = "text/plain;charset=utf-8";
   mime_types[num_mime_types++] = "text/plain";
+  // and as the X11 applications ask for text (xclip, xterm, the older
+  // toolkits): SDL offers the types of data it is given, and only
+  // SDL_SetClipboardText adds these (the text copied from TeXmacs could
+  // not be pasted there, issue #391)
+  if (strcmp (SDL_GetCurrentVideoDriver () ? SDL_GetCurrentVideoDriver () : "", "x11") == 0) {
+    mime_types[num_mime_types++] = "UTF8_STRING";
+    mime_types[num_mime_types++] = "STRING";
+    mime_types[num_mime_types++] = "TEXT";
+  }
 
 #ifdef __EMSCRIPTEN__
   string plain= N(clip_data->plain_text) > 0 ? clip_data->plain_text
@@ -6234,7 +6680,7 @@ bool get_selection (string key, tree& t, string& s, string format) {
   // ("secondary", "ternary", "temp", "wrapbuf", the registers): they live
   // in our own storage, which set_selection fills. This used to sit after
   // a "return false" for every such key, so nothing was ever read back.
-  if (key != "primary") {
+  if (key != "primary" || script_pump) {
     if (!selection_t->contains (key)) return false;
     t = copy (selection_t [key]);
     s = copy (selection_s [key]);
@@ -6383,7 +6829,7 @@ void clear_selection (string key) {
   selection_s->reset (key);
 
   // SDL3 only supports system clipboard, not primary/mouse selections
-  if (key != "primary") return;
+  if (key != "primary" || script_pump) return;
 
 #ifdef __EMSCRIPTEN__
   web_clip_texmacs= ""; // the clipboard of the system stays as it is
@@ -6838,13 +7284,15 @@ vue_chooser_widget_rep::perform_dialog (vue_window win) {
     // the name of the format and the suffixes it is known by, e.g.
     // "TeXmacs document" and "tm;ts;tp", plus a catch-all
     filter= as_string (call ("format-get-name", file_type));
-    tree sufs= as_tree (call ("format-get-suffixes*", file_type));
+    // (tuple "tm" "ts" "tp"), a list of Scheme: read as a tree, it gave no
+    // suffix, and the filter took every file
+    array<object> sufs= as_array_object (call ("format-get-suffixes*",
+                                               file_type));
     string pat;
-    if (is_tuple (sufs))
-      for (int i= 0; i < N(sufs); i++) {
-        if (N(pat) > 0) pat << ";";
-        pat << as_string (sufs[i]);
-      }
+    for (int i= 1; i < N(sufs); i++) {
+      if (N(pat) > 0) pat << ";";
+      pat << as_string (sufs[i]);
+    }
     if (N(pat) == 0) pat= "*";
     filter_name= c_string (filter);
     filter_pattern= c_string (pat);
@@ -6854,6 +7302,13 @@ vue_chooser_widget_rep::perform_dialog (vue_window win) {
     type_filters[1].pattern= "*";
     sdl_filters= (void*) type_filters;
     sdl_n_filters= 2;
+#ifdef OS_MACOS
+    // a catch-all filter makes SDL give the panel of macOS no types at all:
+    // a name typed without a suffix then got none, and the panel asked
+    // about replacing the file of that name rather than the one saved
+    // (#400); the panel takes other suffixes anyway (SDL allows them)
+    if (sdl_type == SDL_FILEDIALOG_SAVEFILE) sdl_n_filters= 1;
+#endif
   }
  
   // Create and set dialog properties
@@ -6872,9 +7327,17 @@ vue_chooser_widget_rep::perform_dialog (vue_window win) {
   // the folder (or file, for the save dialogs) the dialog starts at;
   // SDL_GetPrefPath was used here by mistake: it creates a preferences
   // folder named after its arguments under Application Support
+  // A save dialog takes the location for the file proposed: without a file,
+  // the directory was taken for one, and the dialogs of Linux proposed its
+  // name (the home: the name of the user, #400); a document of TeXmacs is
+  // proposed as untitled.tm there
   string location= directory;
-  if (N(file) > 0 && sdl_type == SDL_FILEDIALOG_SAVEFILE)
-    location= as_string (url_system (directory) * url_system (file));
+  string proposed= file;
+  if (N(proposed) == 0 && N(directory) > 0 &&
+      sdl_type == SDL_FILEDIALOG_SAVEFILE && file_type == "texmacs")
+    proposed= "untitled.tm";
+  if (N(proposed) > 0 && sdl_type == SDL_FILEDIALOG_SAVEFILE)
+    location= as_string (url_system (directory) * url_system (proposed));
   c_string tmp3 (location);
   if (N(location) > 0)
     SDL_SetStringProperty(props, SDL_PROP_FILE_DIALOG_LOCATION_STRING, tmp3);

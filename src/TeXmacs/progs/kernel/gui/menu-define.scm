@@ -213,6 +213,10 @@
   (require-format x '(division :%1 :*))
   `($division ,(cadr x) ,@(map gui-make (cddr x))))
 
+(define (gui-make-named x)
+  (require-format x '(named :%1 :*))
+  `($named ,(cadr x) ,@(map gui-make (cddr x))))
+
 (define (gui-make-class x)
   (require-format x '(class :%1 :*))
   `($class ,(cadr x) ,@(map gui-make (cddr x))))
@@ -463,6 +467,7 @@
   (vlist ,gui-make-vlist)
   (division ,gui-make-division)
   (class ,gui-make-class)
+  (named ,gui-make-named)
   (aligned ,gui-make-aligned)
   (item ,gui-make-item)
   (meti ,gui-make-meti)

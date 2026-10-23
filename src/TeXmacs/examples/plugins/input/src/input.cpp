@@ -20,7 +20,8 @@ using namespace std;
 int
 main () {
   cout << DATA_BEGIN << "verbatim:";
-  cout << DATA_BEGIN << "command:(session-use-math-input #t)" << DATA_END;
+  cout << DATA_BEGIN << "command:(if (not (session-math-input?)) "
+       << "(toggle-session-math-input))" << DATA_END;
   cout << "Convert mathematical input into plain text";
   cout << DATA_END;
   cout.flush ();

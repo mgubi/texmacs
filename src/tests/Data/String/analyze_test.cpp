@@ -139,6 +139,24 @@ test_as_hexadecimal () {
   CHECK_EQ (as_hexadecimal (0x1234, 6), string ("001234"));
 }
 
+static void
+test_tm_decode () {
+  CHECK_EQ (tm_decode ("a<less>b<gtr>c"), string ("a<b>c"));
+  // a character name and a <#hex> character are kept as written
+  CHECK_EQ (tm_decode ("<alpha>"), string ("<alpha>"));
+  CHECK_EQ (tm_decode ("x<alpha>y<#3B1>z"), string ("x<alpha>y<#3B1>z"));
+  // an unterminated < and a bare > are kept, with the rest of the string
+  CHECK_EQ (tm_decode ("a<b"), string ("a<b"));
+  CHECK_EQ (tm_decode ("a>b"), string ("a>b"));
+  CHECK_EQ (tm_decode ("a<b<alpha>c"), string ("a<b<alpha>c"));
+  CHECK_EQ (tm_decode ("<"), string ("<"));
+  CHECK_EQ (tm_decode (""), string (""));
+  // tm_decode undoes tm_encode
+  const char* samples[]= { "<x> < y >", "a<b", ">", "<<>>", "<less>", "" };
+  for (const char* y : samples)
+    CHECK_EQ (tm_decode (tm_encode (y)), string (y));
+}
+
 int
 main () {
   RUN (test_is_alpha);
@@ -155,5 +173,6 @@ main () {
   RUN (test_ends);
   RUN (test_read_word);
   RUN (test_as_hexadecimal);
+  RUN (test_tm_decode);
   return test_report ();
 }

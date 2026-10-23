@@ -145,7 +145,7 @@ edit_modify_rep::post_notify (path p) {
   tp= position_get (cur_pos);
   position_delete (cur_pos);
   cur_pos= nil_observer;
-  go_to_correct (tp);
+  go_to_after_change (tp);
   /*
   cout << "et= " << et << "\n";
   cout << "tp= " << tp << "\n\n";
@@ -286,7 +286,7 @@ edit_touch (editor_rep* ed, path p) {
 
 void
 edit_modify_rep::clear_undo_history () {
-  global_clear_history ();
+  arch->clear ();
 }
 
 double
@@ -310,13 +310,25 @@ edit_modify_rep::archive_state () {
 void
 edit_modify_rep::start_editing () {
   //cout << "Start editing" << LF << INDENT;
+  flush_cursor_hook ();
+  // a read-only document keeps what the program changed since the last
+  // event: only what is changed during the event is cancelled
+  if (buf->buf->read_only) arch->confirm ();
   set_author (this_author ());
 }
 
 void
 edit_modify_rep::end_editing () {
   //cout << UNINDENT << "End editing" << LF;
+  // what a key, a mouse action, a drop or a menu command changed in a
+  // read-only document is cancelled, once the command is done (its paths
+  // were valid while it ran); the moves of the cursor stay
+  if (buf->buf->read_only && arch->modifies ()) {
+    arch->cancel ();
+    set_message ("Read-only document", "edit");
+  }
   global_confirm ();
+  flush_cursor_hook ();
 }
 
 void
@@ -368,6 +380,7 @@ edit_modify_rep::undo_possibilities () {
 void
 edit_modify_rep::undo (bool redoable) {
   interrupt_shortcut ();
+  if (buf->buf->read_only) return;
   arch->forget_cursor ();
   if (inside_graphics () && !as_bool (eval ("graphics-undo-enabled"))) {
     eval ("(graphics-reset-context 'undo)"); return; }
@@ -376,6 +389,7 @@ edit_modify_rep::undo (bool redoable) {
   if (redoable) {
     path p= arch->undo ();
     if (!is_nil (p)) go_to (p);
+    call ("notify-undo-redo");
   }
   else arch->forget ();
   if (arch->conform_save ()) {
@@ -404,11 +418,13 @@ edit_modify_rep::redo_possibilities () {
 void
 edit_modify_rep::redo (int i) {
   interrupt_shortcut ();
+  if (buf->buf->read_only) return;
   arch->forget_cursor ();
   if (arch->redo_possibilities () == 0) {
     set_message ("No more redo information available", "redo"); return; }
   path p= arch->redo (i);
   if (!is_nil (p)) go_to (p);
+  call ("notify-undo-redo");
   if (arch->conform_save ()) {
     set_message ("Your document is back in its original state", "undo");
     beep (); }

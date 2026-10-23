@@ -17,6 +17,8 @@ class tm_frame_rep: virtual public server_rep {
 protected:
   bool full_screen;        // full screen mode
   bool full_screen_edit;   // full screen edit mode
+  bool saved_header;       // header visibility before full screen mode
+  bool saved_footer;       // footer visibility before full screen mode
   widget dialogue_win;     // dialogue window
   widget dialogue_wid;     // dialogue widget
 

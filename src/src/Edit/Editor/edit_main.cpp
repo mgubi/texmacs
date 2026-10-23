@@ -289,6 +289,11 @@ edit_main_rep::print_doc (url name, bool conform, int first, int last) {
   if (conform && (medium != "paper")) conform= false;
     // FIXME: better command for conform printing
 
+  // the hyperlinks are taken from the tables which the typesetting of the
+  // buffer fills (see box_rep::display_links), and a buffer which was just
+  // loaded (texmacs -c) has not been typeset yet
+  typeset_forced ();
+
   typeset_preamble ();
     // FIXME: when printing several files via aux buffers,
     // it seems that the style can be corrupted.  Why?

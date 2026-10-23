@@ -3,13 +3,22 @@
 #   * linux, windows: Qt 6, the jobs of ci.yml (the CI of wip_s7): each
 #     builds TeXmacs, runs the regression suites headless (.github/scripts)
 #     and keeps a runnable bundle as an artifact;
+#   * linux-qt5: that the Qt 5 build of Ubuntu 22.04 (GCC 11) compiles and
+#     starts, as users build it from source;
 #   * linux-vue, windows-vue: the Vue port (SDL3 and Clay, drawn by the
 #     GPU with OpenGL and ThorVG, or by MuPDF without OpenGL 3): the
 #     libraries the distributions lack (misc/vue/build-deps.sh, cached),
 #     TeXmacs, a runnable bundle as an artifact, and a check that it opens
 #     a document given on the command line and shows its colors
 #     (packages/macos/ci-colors.tm, png-has-red.py), under Xvfb on Linux
-#     (OpenGL of Mesa, on the CPU); the snapshots are artifacts too.
+#     (OpenGL of Mesa, on the CPU); the snapshots are artifacts too;
+#   * linux-appimage, appimage-check: AppImages of the Qt and the Vue builds,
+#     made on Ubuntu 22.04 (packages/appimage/build-appimage.sh) and run on
+#     Ubuntu 24.04 and Debian 12 without packages of development;
+#   * windows, windows-vue also make an installer each (Inno Setup,
+#     packages/windows/TeXmacs-Upsilon.iss, .github/scripts/windows-installer.sh),
+#     installed, run and uninstalled: beside the stock TeXmacs, it has its
+#     own folder and identity and writes no TEXMACS_PATH.
 # A state of upsilon_texmacs is built by moving upsilon_ci to it,
 #   git push -f origin upsilon_texmacs:upsilon_ci
 # NOTE: keep the jobs linux and windows as in ci.yml, which comes from wip_s7
@@ -79,6 +88,44 @@ jobs:
           path: src/texmacs-linux-x86_64.tar.gz
           retention-days: 14
 
+  # Qt 5, as users build it on Ubuntu 22.04 and the distributions of its age
+  # (GCC 11): only that it builds and starts (#389); nothing is published
+  linux-qt5:
+    name: Linux (Ubuntu 22.04, Qt 5, GCC)
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: src
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential pkg-config \
+            qtbase5-dev qtbase5-dev-tools libqt5svg5-dev libgl-dev \
+            libfreetype-dev libpng-dev zlib1g-dev libjpeg-dev \
+            libgnutls28-dev libsqlite3-dev ghostscript xvfb xauth
+
+      - name: Configure
+        run: ./configure --with-scheme=s7 --with-gnutls QMAKE=/usr/lib/qt5/bin/qmake CC=gcc CXX=g++
+
+      - name: Build
+        run: make -j"$(nproc)"
+
+      - name: TeXmacs starts
+        run: |
+          home=$(mktemp -d)
+          # (TeXmacs asks Qt for xcb, whatever QT_QPA_PLATFORM says)
+          TEXMACS_HOME_PATH="$home" timeout 300 xvfb-run -a \
+            TeXmacs/bin/texmacs.bin \
+            -x "(begin (string-save \"ok\" \"$home/ok\") (quit-TeXmacs))" \
+            > "$home/log.txt" 2>&1 || true
+          tail -20 "$home/log.txt"
+          [ -f "$home/ok" ] || { echo "error: TeXmacs did not run the command"; exit 1; }
+
   windows:
     name: Windows (MSYS2 MinGW-w64, Qt 6)
     runs-on: windows-latest
@@ -141,10 +188,16 @@ jobs:
           ls ../distr/TeXmacs-Windows/bin/platforms
           (cd ../distr && zip -qr "$GITHUB_WORKSPACE/texmacs-windows-x86_64.zip" TeXmacs-Windows)
 
+      # the installer (Inno Setup): made, installed, run and uninstalled
+      - name: Installer
+        run: ../.github/scripts/windows-installer.sh qt
+
       - uses: actions/upload-artifact@v4
         with:
           name: texmacs-windows-x86_64
-          path: texmacs-windows-x86_64.zip
+          path: |
+            texmacs-windows-x86_64.zip
+            texmacs-upsilon-qt-x86_64-setup.exe
           retention-days: 14
 
   linux-vue:
@@ -191,11 +244,14 @@ jobs:
           path: ~/vue-deps
           key: ${{ steps.deps-cache.outputs.cache-primary-key }}
 
+      # NOTE: GCC, as the job linux: configure would take clang, which
+      # accepts what GCC refuses (designated initializers out of the order
+      # of their fields, in the calls of Clay)
       - name: Configure
         run: |
           ./configure --with-gui=vue --with-scheme=s7 --with-sdl3 \
             --with-mupdf="$DEPS" --with-thorvg="$DEPS" --with-gnutls \
-            PKG_CONFIG_PATH="$DEPS/lib/pkgconfig"
+            PKG_CONFIG_PATH="$DEPS/lib/pkgconfig" CC=gcc CXX=g++
 
       # NOTE: -k, so that a run shows all the files which do not compile
       - name: Build
@@ -268,6 +324,156 @@ jobs:
           path: snapshots
           if-no-files-found: ignore
 
+  # AppImages of the Qt and the Vue builds, made on Ubuntu 22.04 (an
+  # AppImage runs where the glibc is as recent as the one it was built with:
+  # 2.35, Ubuntu 22.04, Debian 12, Fedora 36 and later), with
+  # packages/appimage/build-appimage.sh; appimage-check runs them where
+  # there are no packages of development
+  linux-appimage:
+    name: Linux AppImage (${{ matrix.gui }}, built on Ubuntu 22.04)
+    runs-on: ubuntu-24.04
+    container: ubuntu:22.04
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        gui: [qt, vue]
+    defaults:
+      run:
+        working-directory: src
+    env:
+      DEBIAN_FRONTEND: noninteractive
+      DEPS: /opt/vue-deps
+    steps:
+      # (the container has no git: checkout needs it for a clone)
+      - name: Tools of the container
+        working-directory: /
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends git ca-certificates curl file
+
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          apt-get install -y --no-install-recommends \
+            build-essential pkg-config python3 python3-venv \
+            libfreetype-dev libpng-dev zlib1g-dev libjpeg-dev libsqlite3-dev \
+            libgnutls28-dev libgl-dev
+          if [ "${{ matrix.gui }}" = qt ]; then
+            apt-get install -y --no-install-recommends \
+              qt6-base-dev qt6-base-dev-tools libqt6svg6-dev qt6-wayland
+          else
+            apt-get install -y --no-install-recommends cmake ninja-build \
+              libegl-dev libx11-dev libxext-dev libxrandr-dev \
+              libxcursor-dev libxi-dev libxss-dev libxfixes-dev libxtst-dev \
+              libxkbcommon-dev libdrm-dev libgbm-dev libgles-dev \
+              libwayland-dev wayland-protocols libdecor-0-dev
+          fi
+
+      - name: Cache of the libraries (Vue)
+        if: matrix.gui == 'vue'
+        id: deps-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: /opt/vue-deps
+          key: vue-deps-appimage-2204-${{ hashFiles('src/misc/vue/build-deps.sh', 'src/misc/thorvg/build-thorvg.sh') }}
+
+      - name: Libraries (SDL3, SDL3_ttf, MuPDF, ThorVG)
+        if: matrix.gui == 'vue' && steps.deps-cache.outputs.cache-hit != 'true'
+        run: misc/vue/build-deps.sh "$DEPS"
+
+      - uses: actions/cache/save@v4
+        if: matrix.gui == 'vue' && steps.deps-cache.outputs.cache-hit != 'true'
+        with:
+          path: /opt/vue-deps
+          key: ${{ steps.deps-cache.outputs.cache-primary-key }}
+
+      - name: Configure
+        run: |
+          if [ "${{ matrix.gui }}" = qt ]; then
+            ./configure --with-scheme=s7 --with-gnutls \
+              QMAKE=/usr/lib/qt6/bin/qmake CC=gcc CXX=g++
+          else
+            ./configure --with-gui=vue --with-scheme=s7 --with-sdl3 \
+              --with-mupdf="$DEPS" --with-thorvg="$DEPS" --with-gnutls \
+              PKG_CONFIG_PATH="$DEPS/lib/pkgconfig" CC=gcc CXX=g++
+          fi
+
+      - name: Build
+        run: make -j"$(nproc)"
+
+      - name: AppImage
+        run: |
+          export QMAKE=/usr/lib/qt6/bin/qmake
+          packages/appimage/build-appimage.sh ${{ matrix.gui }} \
+            texmacs-upsilon-${{ matrix.gui }}-x86_64.AppImage "$DEPS/lib"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: texmacs-upsilon-${{ matrix.gui }}-appimage
+          path: src/texmacs-upsilon-${{ matrix.gui }}-x86_64.AppImage
+          retention-days: 14
+
+  # the AppImages where a user runs them: the libraries of a desktop, no
+  # packages of development (no libGL.so, which ThorVG needed, #376); TeXmacs
+  # starts, runs a command and, with Vue, draws with OpenGL (Mesa, on the CPU)
+  appimage-check:
+    name: AppImage (${{ matrix.gui }}) on ${{ matrix.image }}
+    needs: linux-appimage
+    runs-on: ubuntu-24.04
+    container: ${{ matrix.image }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        gui: [qt, vue]
+        image: ['ubuntu:24.04', 'debian:12']
+    env:
+      DEBIAN_FRONTEND: noninteractive
+    steps:
+      - name: A desktop without packages of development
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            xvfb xauth libgl1-mesa-dri libglx-mesa0 libegl1 libegl-mesa0 \
+            libgl1 libopengl0 libharfbuzz0b \
+            libfontconfig1 libdbus-1-3 libx11-6 libx11-xcb1 libxext6 \
+            libxrandr2 libxcursor1 libxi6 libxss1 libxtst6 libxfixes3 \
+            libxkbcommon0 libxkbcommon-x11-0 libxcb-cursor0 libxcb-icccm4 \
+            libxcb-image0 libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 \
+            libxcb-shape0 libxcb-xinerama0 libxcb-xkb1 libxcb-xfixes0 \
+            libwayland-client0 libwayland-egl1 libwayland-cursor0
+          ! ls /usr/lib/x86_64-linux-gnu/libGL.so 2> /dev/null
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: texmacs-upsilon-${{ matrix.gui }}-appimage
+
+      - name: TeXmacs starts and runs a command
+        env:
+          APPIMAGE_EXTRACT_AND_RUN: 1
+        run: |
+          app="$PWD/texmacs-upsilon-${{ matrix.gui }}-x86_64.AppImage"
+          chmod +x "$app"
+          home=$(mktemp -d)
+          # (all the libraries which the system must give, at once)
+          (cd "$home" && "$app" --appimage-extract > /dev/null &&
+           find squashfs-root -type f \( -name '*.so*' -o -path '*/bin/*' \) \
+             -exec ldd {} + 2> /dev/null | grep 'not found' | sort -u) || true
+          HOME="$home" timeout 300 xvfb-run -a -s "-screen 0 1600x1200x24" \
+            "$app" -x "(begin (string-save \"ok\" \"$home/ok\") (quit-TeXmacs))" \
+            > "$home/log.txt" 2>&1 || true
+          tail -30 "$home/log.txt"
+          [ -f "$home/ok" ] || { echo "error: TeXmacs did not run the command"; exit 1; }
+          if [ "${{ matrix.gui }}" = vue ]; then
+            grep "GPU" "$home/log.txt" || true
+            ! grep -q "no GL canvas\|drawing with MuPDF" "$home/log.txt" ||
+              { echo "error: no OpenGL, TeXmacs draws with MuPDF"; exit 1; }
+            grep -q "GPU: .*Mesa" "$home/log.txt" ||
+              { echo "error: TeXmacs does not draw with OpenGL"; exit 1; }
+          fi
+
   windows-vue:
     name: Windows (MSYS2 MinGW-w64, Vue, GPU)
     runs-on: windows-latest
@@ -323,8 +529,8 @@ jobs:
           path: ${{ runner.temp }}\vue-deps
           key: ${{ steps.deps-cache.outputs.cache-primary-key }}
 
-      # NOTE: clang, as on Linux and macOS: gcc does not take the designated
-      # initializers of Clay in C++ (out of the order of the fields)
+      # NOTE: clang (MinGW GCC builds the Vue port too since the calls of
+      # Clay give their fields in order, 6c494fbbaf; not tried here)
       - name: Configure
         run: |
           ./configure --with-gui=vue --with-scheme=s7 --with-sdl3 \
@@ -339,6 +545,10 @@ jobs:
           make WINDOWS_BUNDLE
           ls ../distr/TeXmacs-Windows/bin
           (cd ../distr && zip -qr "$(cygpath -u "$GITHUB_WORKSPACE")/texmacs-vue-windows-x86_64.zip" TeXmacs-Windows)
+
+      # the installer (Inno Setup): made, installed, run and uninstalled
+      - name: Installer
+        run: ../.github/scripts/windows-installer.sh vue
 
       # the bundle (its DLLs); the runners have no OpenGL 3 (MuPDF draws)
       - name: Smoke test (TeXmacs shows a document)
@@ -403,7 +613,10 @@ jobs:
         if: always()
         with:
           name: texmacs-vue-windows-x86_64
-          path: texmacs-vue-windows-x86_64.zip
+          path: |
+            texmacs-vue-windows-x86_64.zip
+            texmacs-upsilon-vue-x86_64-setup.exe
+          if-no-files-found: warn
           retention-days: 14
 
       - uses: actions/upload-artifact@v4
@@ -418,7 +631,7 @@ jobs:
     # upsilon-latest (made by upsilon-macos.yml, which writes its notes): each
     # file replaces the one of the former build, with a label naming the
     # commit; the files of macOS are not touched
-    needs: [linux, windows, linux-vue, windows-vue]
+    needs: [linux, windows, linux-vue, windows-vue, appimage-check]
     if: always() && github.ref == 'refs/heads/upsilon_ci'
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -445,6 +658,13 @@ jobs:
         with:
           name: texmacs-vue-windows-x86_64
           path: dist
+      # (the AppImages once they ran on all the systems of appimage-check)
+      - uses: actions/download-artifact@v4
+        if: needs.appimage-check.result == 'success'
+        with:
+          pattern: texmacs-upsilon-*-appimage
+          merge-multiple: true
+          path: dist
 
       - name: The files of Linux and Windows in upsilon-latest
         env:
@@ -461,6 +681,10 @@ jobs:
               texmacs-vue-linux-*)   l="Linux, Vue, x86_64" ;;
               texmacs-windows-*)     l="Windows, Qt 6, x86_64" ;;
               texmacs-vue-windows-*) l="Windows, Vue, x86_64" ;;
+              texmacs-upsilon-qt-*.AppImage)  l="Linux AppImage, Qt 6, x86_64" ;;
+              texmacs-upsilon-qt-*-setup.exe)  l="Windows installer, Qt 6, x86_64" ;;
+              texmacs-upsilon-vue-*-setup.exe) l="Windows installer, Vue, x86_64" ;;
+              texmacs-upsilon-vue-*.AppImage) l="Linux AppImage, Vue, x86_64" ;;
               *) continue ;;
             esac
             files+=("$f#$l ($built)")

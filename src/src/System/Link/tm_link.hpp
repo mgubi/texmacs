@@ -85,8 +85,8 @@ ABSTRACT_NULL_CODE(tm_link);
 inline bool tm_link::operator == (tm_link l) { return rep == l.rep; }
 inline bool tm_link::operator != (tm_link l) { return rep != l.rep; }
 
-tm_link make_cmdline_link (string name);
-tm_link make_request_link (string name);
+tm_link make_cmdline_link (string name, string session= "default");
+tm_link make_request_link (string name, string session= "default");
 tm_link make_pipe_link (string cmd);
 bool    pipe_program_found (string cmd); // (not on Windows)
 tm_link make_dynamic_link (string lib, string symb, string init, string ses);
@@ -97,6 +97,7 @@ tm_link find_socket_link (int fd);
 
 void close_all_pipes ();
 void process_all_pipes ();
+void reap_pipe_children ();
 // the processing of the messages of a kind of links which is not part of
 // all builds (the language servers, see src/docs/code-features.md): it registers
 // itself when it is used, the server calls it at each turn of its loop

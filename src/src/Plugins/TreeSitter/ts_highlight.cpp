@@ -211,7 +211,11 @@ treesit_language_rep::highlight (tree t) {
   if (is_document (t)) region= t;
   else {
     path ip= obtain_ip (t);
-    if (!is_nil (ip) && ip_attached (ip)) {
+    // (a text typeset apart, as a hover of a language server in a balloon,
+    // has a path of its own, which the edited documents do not have: the
+    // lookup warned at each line, #399; see in_edit_tree in impl_language)
+    if (!is_nil (ip) && ip_attached (ip) &&
+        has_subtree (the_et, reverse (ip->next))) {
       tree parent= subtree (the_et, reverse (ip->next));
       int i= ip->item;
       if (is_document (parent) && i >= 0 && i < N(parent) &&

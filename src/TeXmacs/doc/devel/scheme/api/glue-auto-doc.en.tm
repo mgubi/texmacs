@@ -179,6 +179,14 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(gui-set-next-window-without-focus)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|gui_set_next_window_without_focus> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
     <scm|(gui-test-snapshot <scm-arg|string>)>
 <explain-synopsis|no synopsis>
   <|explain>
@@ -232,6 +240,78 @@ source code.
   <|explain>
     Calls the <c++> function <cpp|gui_test_click_later> which returns
     <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(gui-test-port)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|gui_test_port> which returns
+    <scm|string>.
+  </explain>
+
+  <\explain>
+    <scm|(gui-test-raw <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|gui_test_raw> which returns
+    <scm|int>.
+  </explain>
+
+  <\explain>
+    <scm|(gui-test-busy?)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|gui_test_busy> which returns
+    <scm|bool>.
+  </explain>
+
+  <\explain>
+    <scm|(gui-test-texts)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|gui_test_texts> which returns
+    <scm|array_string>.
+  </explain>
+
+  <\explain>
+    <scm|(gui-test-windows)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|gui_test_windows> which returns
+    <scm|array_string>.
+  </explain>
+
+  <\explain>
+    <scm|(gui-test-set-pump <scm-arg|bool>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|gui_test_pump> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(gui-test-eval-later <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|gui_test_eval_later> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(gui-test-file-dialog)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|gui_test_file_dialog> which returns
+    <scm|array_string>.
+  </explain>
+
+  <\explain>
+    <scm|(gui-test-file-dialog-do <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|gui_test_file_dialog_do> which returns
+    <scm|int>.
   </explain>
 
   <\explain>
@@ -4395,6 +4475,14 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(cpp-ai-set-prices <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|ai_set_prices> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
     <scm|(cpp-ai-chat <scm-arg|string> <scm-arg|string> <scm-arg|string>)>
 <explain-synopsis|no synopsis>
   <|explain>
@@ -4947,6 +5035,14 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(url-declare-out-of-date <scm-arg|url>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|declare_out_of_date> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
     <scm|(url-temp)>
 <explain-synopsis|no synopsis>
   <|explain>
@@ -5135,6 +5231,14 @@ source code.
 <explain-synopsis|no synopsis>
   <|explain>
     Calls the <c++> function <cpp|picture_cache_reset> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(remote-files-refresh)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|remote_files_refresh> which returns
     <scm|void>.
   </explain>
 
@@ -5447,6 +5551,14 @@ source code.
 <explain-synopsis|no synopsis>
   <|explain>
     Calls the <c++> function <cpp|gnutls_random_int> which returns
+    <scm|int>.
+  </explain>
+
+  <\explain>
+    <scm|(secure-random-number <scm-arg|uint>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|secure_random_int> which returns
     <scm|int>.
   </explain>
 
@@ -6219,6 +6331,22 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(buffer-get-style <scm-arg|url>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|get_buffer_style> which returns
+    <scm|tree>.
+  </explain>
+
+  <\explain>
+    <scm|(buffer-set-style <scm-arg|url> <scm-arg|content>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|set_buffer_style> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
     <scm|(buffer-set-master <scm-arg|url> <scm-arg|url>)>
 <explain-synopsis|no synopsis>
   <|explain>
@@ -6296,6 +6424,22 @@ source code.
   <|explain>
     Calls the <c++> function <cpp|pretend_buffer_saved> which returns
     <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(buffer-set-read-only <scm-arg|url> <scm-arg|bool>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|set_buffer_read_only> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(buffer-read-only? <scm-arg|url>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|is_buffer_read_only> which returns
+    <scm|bool>.
   </explain>
 
   <\explain>
@@ -6920,6 +7064,14 @@ source code.
   <|explain>
     Calls the <c++> function <cpp|bib_text_length> which returns
     <scm|int>.
+  </explain>
+
+  <\explain>
+    <scm|(bib-field-pages <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|bib_field_pages> which returns
+    <scm|tree>.
   </explain>
 
   <\explain>

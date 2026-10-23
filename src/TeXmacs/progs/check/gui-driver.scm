@@ -1,0 +1,469 @@
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; MODULE      : gui-driver.scm
+;; DESCRIPTION : scripted tests of the graphical interface
+;; COPYRIGHT   : (C) 2026  The TeXmacs Upsilon developers
+;;
+;; This software falls under the GNU general public license version 3 or later.
+;; It comes WITHOUT ANY WARRANTY WHATSOEVER. For details, see the file LICENSE
+;; in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
+;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; A test of the interface is a list of steps, which the port runs one at a
+;; time from its event loop: gui-test-run asks it (gui-test-set-pump) to
+;; call gui-test-pump at each turn, which runs the next step when no event
+;; of the port is waiting (gui-test-busy?) and the last wait is over. A
+;; step is made by one of the gt- procedures below; the checks count their
+;; failures as those of check-lib, and with gt-exit TeXmacs ends with the
+;; status 1 when one failed. The line language of the scripts is in
+;; gui-script.scm; docs/gui-scripting.md has the whole of it.
+;;
+;;   (gui-test-run
+;;     (list (gt-wait 12000)
+;;           (gt-raw "window #2")
+;;           (gt-activate "equation*")
+;;           (gt-activate "Inline formula")
+;;           (gt-idle)
+;;           (gt-check "inline" (lambda () (tree-is? (cursor-tree) :up 'math)))
+;;           (gt-exit)))
+;;
+;; The steps of a port which has no hooks (gui-test-port is "") do nothing.
+
+(texmacs-module (check gui-driver)
+  (:use (check check-lib)))
+
+;; A step is a pair (echo . thunk): echo, a string or #f, is written to the
+;; log before the step runs; the thunk returns
+;;   'next      done, the next step comes at the next turn of the loop
+;;   'continue  done, the next step may follow in the same turn
+;;   'retry     not yet: the step runs again at the next turn
+(define gt-steps '())
+(define gt-running? #f)
+(define gt-next-time 0)          ; no step before this time (gt-wait)
+(define gt-retrying #f)          ; the time at which the retried step began
+(define gt-quiet 0)              ; the turns in a row without waiting events
+(define gt-busy-time 0)          ; the last time the port was busy
+(define gt-busy-since #f)        ; since when it is busy without a break
+(define gt-busy-limit 20000)     ; then the steps go on anyway (ms)
+(define gt-exit? #f)             ; exit at the end, with the status
+(define gt-on-end #f)
+
+(tm-define (gt-log . l)
+  (:synopsis "Write @l to the log, as a line of the script")
+  (display* (gui-test-port) " script: ")
+  (apply display* l)
+  (display "\n")
+  (force-output))
+
+(tm-define (gt-step echo thunk)
+  (:synopsis "The step which writes @echo to the log, then runs @thunk")
+  (cons echo thunk))
+
+(tm-define (gui-test-run steps . opt-on-end)
+  (:synopsis "Run the steps @steps from the event loop of the port")
+  (set! gt-steps steps)
+  (set! gt-records '())
+  (set! gt-exit? #f)
+  (set! gt-busy-since #f)
+  (set! gt-on-end (and (nnull? opt-on-end) (car opt-on-end)))
+  (set! gt-running? #t)
+  (set! gt-next-time 0)
+  (set! gt-retrying #f)
+  (set! gt-quiet 0)
+  (gui-test-set-pump #t))
+
+(define (gt-run-step step)
+  (when (and (not gt-retrying) (car step))
+    (gt-log (car step)))
+  (catch #t
+    (cdr step)
+    (lambda (key . args)
+      (check-report #f (or (car step) "step")
+                    (string-append "error " (object->string (cons key args))))
+      'next)))
+
+(define (gt-finish)
+  (set! gt-running? #f)
+  (gui-test-set-pump #f)
+  (gt-log "done")
+  (when gt-on-end (gt-on-end))
+  (when gt-exit?
+    (with n (check-end)
+      (exit (if (> n 0) 1 0)))))
+
+(tm-define (gui-test-pump)
+  (:synopsis "Run the next step, if it is time (the port calls it)")
+  (cond ((not gt-running?) (noop))
+        ((and (gui-test-busy?) (gt-still-busy?))
+         (set! gt-quiet 0)
+         (set! gt-busy-time (texmacs-time)))
+        ((< (texmacs-time) gt-next-time)
+         (set! gt-busy-since #f)
+         (set! gt-quiet (+ gt-quiet 1)))
+        (else
+          (set! gt-busy-since #f)
+          (set! gt-quiet (+ gt-quiet 1))
+          (let loop ()
+            (if (null? gt-steps) (gt-finish)
+                (with r (gt-run-step (car gt-steps))
+                  (if (== r 'retry)
+                      (when (not gt-retrying) (set! gt-retrying (texmacs-time)))
+                      (begin
+                        (set! gt-steps (cdr gt-steps))
+                        (set! gt-retrying #f)
+                        (when (== r 'continue) (loop))))))))))
+
+(define (gt-still-busy?)
+  ;; the port is busy: no step now, unless it has been for too long (a
+  ;; command which keeps coming back, an animation without end), which is
+  ;; a failure, and the steps go on
+  (when (not gt-busy-since) (set! gt-busy-since (texmacs-time)))
+  (if (< (- (texmacs-time) gt-busy-since) gt-busy-limit) #t
+      (begin
+        (check-report #f "busy" "the port stayed busy for 20 s")
+        (set! gt-busy-since #f)
+        (set! gt-busy-limit 1000000000) ; (said once)
+        #f)))
+
+(define (gt-retried-for)
+  ;; how long the step being retried has been tried, in ms
+  (if gt-retrying (- (texmacs-time) gt-retrying) 0))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; The steps
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(tm-define (gt-wait ms . opt-echo)
+  (:synopsis "Wait @ms milliseconds")
+  (gt-step (if (nnull? opt-echo) (car opt-echo)
+               (string-append "wait " (number->string ms)))
+           (lambda ()
+             (set! gt-next-time (+ (texmacs-time) ms))
+             'next)))
+
+(tm-define (gt-raw line)
+  (:synopsis "The command @line of the port (click, key, window...)")
+  (gt-step line
+           (lambda ()
+             (with r (gui-test-raw line)
+               (when (== r 2)
+                 (check-report #f line "unknown command of the port"))
+               (if (== r 1) 'continue 'next)))))
+
+(tm-define (gt-eval-later cmd . opt-echo)
+  (:synopsis "Run the Scheme command @cmd (a string) at the next turn")
+  (gt-step (if (nnull? opt-echo) (car opt-echo)
+               (string-append "scheme " cmd))
+           (lambda ()
+             (gui-test-eval-later cmd)
+             'next)))
+
+(tm-define (gt-eval thunk)
+  (:synopsis "Run @thunk now")
+  (gt-step #f (lambda () (thunk) 'next)))
+
+(tm-define (gt-check what thunk)
+  (:synopsis "Check that @thunk returns true")
+  (gt-step (string-append "check " what)
+           (lambda ()
+             (check-predicate what thunk (lambda (x) x) "true")
+             'next)))
+
+(tm-define (gt-idle . opt)
+  (:synopsis "Wait until the port has had nothing to do for a while")
+  ;; for 200 ms since the step began and since the port was last busy (Qt
+  ;; on macOS flashes a chosen menu item before running it), and five turns
+  ;; of the loop; at most opt ms (10 s by default)
+  (with limit (if (nnull? opt) (car opt) 10000)
+    (gt-step "idle"
+             (lambda ()
+               (cond ((and (>= gt-quiet 5)
+                           (>= (gt-retried-for) 200)
+                           (>= (- (texmacs-time) gt-busy-time) 200))
+                      'next)
+                     ((> (gt-retried-for) limit)
+                      (check-report #f "idle" "the port stayed busy")
+                      'next)
+                     (else 'retry))))))
+
+;; The texts and icons of the window of the script (gui-test-texts), each
+;; (x y w h path text): the path is where the layout put it, a list such as
+;; ("menubar" "Format" "Font") (the bar, then the labels of the buttons
+;; whose menus it is in); an icon is "icon:<name of its file>".
+(define (gt-text-entry s)
+  ;; "x\ty\tw\th\tpath\ttext" -> (x y w h path text)
+  (with l (string-tokenize-by-char s #\tab)
+    (and (>= (length l) 6)
+         (append (map string->number (sublist l 0 4))
+                 (list (if (== (list-ref l 4) "") '()
+                           (string-decompose (list-ref l 4) " > "))
+                       (apply string-append
+                              (list-intersperse (list-tail l 5) "\t")))))))
+
+(define (gt-entries)
+  (list-filter (map gt-text-entry (gui-test-texts)) identity))
+
+(define (gt-same? name text)
+  ;; a name of a script for a text of the interface, in English or in the
+  ;; language of the interface; the dots of an item which opens a dialog
+  ;; may be left out ("Font" for "Font...")
+  (or (== text name)
+      (== text (string-append name "..."))
+      (and (not (string-starts? name "icon:"))
+           (with tr (translate name)
+             (or (== text tr) (== text (string-append tr "...")))))))
+
+(define (gt-starts? name text)
+  (or (string-starts? text name)
+      (and (not (string-starts? name "icon:"))
+           (string-starts? text (translate name)))))
+
+(define (gt-in-path? names path)
+  ;; the names, in this order, among the components of the path
+  (cond ((null? names) #t)
+        ((null? path) #f)
+        ((gt-same? (car names) (car path)) (gt-in-path? (cdr names) (cdr path)))
+        (else (gt-in-path? names (cdr path)))))
+
+(tm-define (gt-find-text selector)
+  (:synopsis "The box (x y w h) of the text named by @selector, or #f")
+  ;; "Format > Font > Bold": the text Bold, in the path of which come Format
+  ;; and Font (the bars are menubar, mainbar, modebar, focusbar, userbar,
+  ;; footer, prompt, lefttools, sidetools, bottomtools, extratools); an
+  ;; icon is icon:<name>; #name is what a (named "name" ...) of the menus
+;; holds (in the path, or as the last name, the text or icon in
+;; it). The text equal to the last name, else one which
+  ;; starts with it; the last one drawn, the topmost (a menu is drawn over
+  ;; the window)
+  (let* ((names (string-decompose selector " > "))
+         (label (cAr names))
+         (above (cDr names))
+         (l (list-filter (gt-entries)
+                         (lambda (e) (gt-in-path? above (list-ref e 4)))))
+         (same (list-filter l (lambda (e) (gt-same? label (list-ref e 5)))))
+         ;; a text which starts with the name, only once the exact one had
+         ;; time to come (it may be on its way), never an icon
+         (starts (if (or (string-starts? label "icon:")
+                         (< (gt-retried-for) 1000))
+                     '()
+                     (list-filter l (lambda (e)
+                                      (gt-starts? label (list-ref e 5))))))
+         ;; #name, a (named "name" ...) of the menus: what it holds
+         (named (list-filter l (lambda (e) (in? label (list-ref e 4)))))
+         (found (cond ((string-starts? label "#") named)
+                      ((nnull? same) same)
+                      (else starts))))
+    (and (nnull? found) (sublist (cAr found) 0 4))))
+
+(define (gt-texts-summary)
+  ;; the texts of the window, for the log of a failure
+  (with l (gt-entries)
+    (if (null? l) "none"
+        (apply string-append
+               (list-intersperse
+                (map (lambda (e)
+                       (object->string
+                        (apply string-append
+                               (list-intersperse
+                                (append (list-ref e 4) (list (list-ref e 5)))
+                                " > "))))
+                     l)
+                " ")))))
+
+(tm-define (gt-activate label . opt)
+  (:synopsis "Click the text @label of the window of the script")
+  ;; when it is drawn, within opt ms (3 s by default)
+  (with limit (if (nnull? opt) (car opt) 3000)
+    (gt-step (string-append "activate " label)
+             (lambda ()
+               (with box (gt-find-text label)
+                 (cond ((and box (== (caddr box) 0) (== (cadddr box) 0))
+                        ;; an item without a box, of a native menu (Cocoa):
+                        ;; the port chooses it, by its place in the list
+                        (gui-test-raw (string-append "choose "
+                                                     (number->string (car box))))
+                        'next)
+                       (box
+                        (with (x y w h) box
+                          (gui-test-raw
+                           (string-append "click "
+                                          (number->string (+ x (quotient w 2)))
+                                          " "
+                                          (number->string (+ y (quotient h 2))))))
+                        'next)
+                       ((> (gt-retried-for) limit)
+                        (check-report #f (string-append "activate " label)
+                                      (string-append
+                                       "no such text in the window, which has "
+                                       (gt-texts-summary)))
+                        'next)
+                       (else 'retry)))))))
+
+(tm-define (gt-see selector . opt)
+  (:synopsis "Wait until the text or icon named by @selector is drawn")
+  ;; within opt ms (3 s by default), else a failure
+  (with limit (if (nnull? opt) (car opt) 3000)
+    (gt-step (string-append "see " selector)
+             (lambda ()
+               (cond ((gt-find-text selector) 'next)
+                     ((> (gt-retried-for) limit)
+                      (check-report #f (string-append "see " selector)
+                                    (string-append
+                                     "no such text in the window, which has "
+                                     (gt-texts-summary)))
+                      'next)
+                     (else 'retry))))))
+
+(tm-define (gt-window title . opt)
+  (:synopsis "Wait until a window whose title has @title is shown, choose it")
+  ;; within opt ms (5 s by default), else a failure; "main" is the editor
+  (with limit (if (nnull? opt) (car opt) 5000)
+    (gt-step (string-append "window " title)
+             (lambda ()
+               (cond ((or (== title "main") (gt-window? title))
+                      (gui-test-raw (string-append "window " title))
+                      'continue)
+                     ((> (gt-retried-for) limit)
+                      (check-report #f (string-append "window " title)
+                                    "no such window")
+                      (gui-test-raw (string-append "window " title))
+                      'continue)
+                     (else 'retry))))))
+
+;; The file dialog of the system (to open or save a file), where the port
+;; reaches it (macOS): what it shows (gui-test-file-dialog), each (kind
+;; text), the kind title, label, field (the name), button, disabled (a
+;; button), popup, or alert-... for those of the alert over it (to replace
+;; a file); and what a test does in it (gui-test-file-dialog-do). A test
+;; opens it with gt-eval-later, as a menu would ("(choose-file ...)").
+(define (gt-file-dialog-entries)
+  (map (lambda (s)
+         (with l (string-tokenize-by-char s #\tab)
+           (list (car l)
+                 (apply string-append (list-intersperse (cdr l) "\t")))))
+       (gui-test-file-dialog)))
+
+(tm-define (gt-file-dialog-shown?)
+  (:synopsis "Is a file dialog of the system shown?")
+  (nnull? (gui-test-file-dialog)))
+
+(tm-define (gt-file-dialog-has? text . opt-kind)
+  (:synopsis "Does the file dialog show a text which has @text?")
+  ;; of the kind opt-kind ("alert-label"...), if given
+  (list-or (map (lambda (e)
+                  (and (or (null? opt-kind) (== (car e) (car opt-kind)))
+                       (string-contains? (cadr e) text)))
+                (gt-file-dialog-entries))))
+
+(define (gt-file-dialog-summary)
+  (with l (gt-file-dialog-entries)
+    (if (null? l) "none"
+        (apply string-append
+               (list-intersperse
+                (map (lambda (e) (object->string (string-append (car e) " "
+                                                                (cadr e))))
+                     l)
+                " ")))))
+
+(tm-define (gt-file-dialogs)
+  (:synopsis "The steps which follow need the file dialogs of the system")
+  ;; elsewhere (a port or a system without the hooks) the test stops there
+  (gt-step #f
+           (lambda ()
+             (when (!= (gui-test-file-dialog-do "supported") 0)
+               (gt-log "skipped: no file dialogs of the system here")
+               (when (list-find (cdr gt-steps)
+                                (lambda (s) (eq? (cdr s) gt-exit-thunk)))
+                 (set! gt-exit? #t))
+               (set! gt-steps (list (car gt-steps))))
+             'continue)))
+
+(tm-define (gt-file-dialog line . opt)
+  (:synopsis "Do @line in the file dialog of the system")
+  ;; "folder <path>", "name <text>", "type <text>", "press <title>"; once
+  ;; the dialog is shown and the button enabled, within opt ms (5 s by
+  ;; default), else a failure
+  (with limit (if (nnull? opt) (car opt) 5000)
+    (gt-step (string-append "file dialog: " line)
+             (lambda ()
+               (with r (gui-test-file-dialog-do line)
+                 (cond ((== r 0) 'next)
+                       ((and (== r 1) (<= (gt-retried-for) limit)) 'retry)
+                       (else
+                        (check-report #f (string-append "file dialog: " line)
+                                      (string-append
+                                       (if (== r 1) "not possible yet"
+                                           "impossible")
+                                       "; the dialog has "
+                                       (gt-file-dialog-summary)))
+                        'next)))))))
+
+(tm-define (gt-file-dialog-see text . opt)
+  (:synopsis "Wait until the file dialog shows a text which has @text")
+  ;; within opt ms (3 s by default), else a failure
+  (with limit (if (nnull? opt) (car opt) 3000)
+    (gt-step (string-append "file dialog: see " text)
+             (lambda ()
+               (cond ((gt-file-dialog-has? text) 'next)
+                     ((> (gt-retried-for) limit)
+                      (check-report #f (string-append "file dialog: see " text)
+                                    (string-append "not there; the dialog has "
+                                                   (gt-file-dialog-summary)))
+                      'next)
+                     (else 'retry))))))
+
+(tm-define (gt-file-dialog-closed . opt)
+  (:synopsis "Wait until no file dialog of the system is shown")
+  ;; within opt ms (3 s by default), else a failure
+  (with limit (if (nnull? opt) (car opt) 3000)
+    (gt-step "file dialog: closed"
+             (lambda ()
+               (cond ((not (gt-file-dialog-shown?)) 'next)
+                     ((> (gt-retried-for) limit)
+                      (check-report #f "file dialog: closed"
+                                    (string-append "still shown, with "
+                                                   (gt-file-dialog-summary)))
+                      'next)
+                     (else 'retry))))))
+
+(tm-define (gt-document-has? s)
+  (:synopsis "Does the document of the current buffer have the text @s?")
+  (string-contains? (object->string (tree->stree (buffer-tree))) s))
+
+(tm-define (gt-window? title)
+  (:synopsis "Is a window whose title has @title shown?")
+  (list-or (map (lambda (t) (string-contains? t title)) (gui-test-windows))))
+
+;; what the callbacks of a test record, to be checked at the end
+(define gt-records '())
+
+(tm-define (gt-record . l)
+  (:synopsis "Record the strings of @l, written together, and log them")
+  (with s (apply string-append l)
+    (set! gt-records (append gt-records (list s)))
+    (display* "got: " s "\n")))
+
+(tm-define (gt-recorded)
+  (:synopsis "What the callbacks recorded, in order")
+  gt-records)
+
+(tm-define (gt-port name)
+  (:synopsis "The steps which follow are for the port @name only")
+  (gt-step #f
+           (lambda ()
+             (when (!= (gui-test-port) name)
+               (gt-log "skipped: for the port " name)
+               ;; the rest goes, but an exit asked for after it
+               (when (list-find (cdr gt-steps)
+                                (lambda (s) (eq? (cdr s) gt-exit-thunk)))
+                 (set! gt-exit? #t))
+               (set! gt-steps (list (car gt-steps))))
+             'continue)))
+
+(define (gt-exit-thunk) (set! gt-exit? #t) 'continue)
+
+(tm-define (gt-exit)
+  (:synopsis "At the end, quit TeXmacs with the status 1 if a check failed")
+  (gt-step #f gt-exit-thunk))

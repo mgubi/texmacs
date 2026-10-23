@@ -285,11 +285,28 @@
              (when answ (save-buffer-as-check-other new-name name opts)))))
         (else (save-buffer-as-check-other new-name name opts))))
 
+(define (save-name-with-suffix new-name name)
+  ;; a document of TeXmacs saved under a name without a suffix is given .tm:
+  ;; it was saved as plain text, the format which a name without a suffix
+  ;; has (#400); a source file keeps the name it is given (a Makefile)
+  (let ((u (if (url? new-name) new-name (system->url new-name))))
+    (if (and (== (url-suffix u) "") (== (url-format name) "texmacs")
+             (not (url-directory? u)))
+        (url-glue u ".tm")
+        new-name)))
+
+(define (save-as-check-suffixed new-name name opts)
+  ;; the file dialog asked about replacing the file it gave (:overwrite),
+  ;; not the one with the suffix added: that one is asked about here
+  (with u (save-name-with-suffix new-name name)
+    (save-buffer-as-check-permissions
+     u name (if (== u new-name) opts (list-difference opts (list :overwrite))))))
+
 (tm-define (save-buffer-as-main new-name . args)
   ;;(display* "save-buffer-as-main " new-name "\n")
   (if (or (null? args) (not (url? (car args))))
-      (save-buffer-as-check-permissions new-name (current-buffer) args)
-      (save-buffer-as-check-permissions new-name (car args) (cdr args))))
+      (save-as-check-suffixed new-name (current-buffer) args)
+      (save-as-check-suffixed new-name (car args) (cdr args))))
 
 (tm-define (save-buffer-as new-name . args)
   (:argument new-name texmacs-file "Save as")
@@ -485,6 +502,18 @@
 ;; Loading buffers
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(tm-define (encrypted-buffer-body? b)
+  (:synopsis "Is @b the body of a document encrypted with a passphrase?")
+  ;; the body is (document (gpg-passphrase-encrypted-buffer enc)), see
+  ;; tree-export-encrypted and encrypted-buffer? in security/gpg/gpg-edit.scm
+  ;; (a lazy module, not loaded here). Only the first child is tested: a
+  ;; search of the whole document took seconds on long documents, and its
+  ;; recursion overflowed the Guile stack (#418).
+  (and (tree? b)
+       (== (tree-label b) 'document)
+       (> (tree-arity b) 0)
+       (== (tree-label (tree-ref b 0)) 'gpg-passphrase-encrypted-buffer)))
+
 (define (load-buffer-open name opts)
   ;;(display* "load-buffer-open " name ", " opts "\n")
   (cond ((in? :background opts) (noop))
@@ -493,8 +522,7 @@
         (else
           (switch-to-buffer name)))
   (buffer-notify-recent name)
-  (when (nnull? (select (buffer-get name)
-                        '(:* gpg-passphrase-encrypted-buffer)))
+  (when (encrypted-buffer-body? (buffer-get-body name))
     (tm-gpg-dialogue-passphrase-decrypt-buffer name))
   (and-with master (and (url-rooted-tmfs? name) (tmfs-master name))
     (when (!= master name)

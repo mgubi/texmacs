@@ -124,10 +124,11 @@ Module['preRun'].push(function () {
     if (gpu !== '0') console.warn ('TeXmacs: no WebGL2, drawing with MuPDF');
     ENV['TEXMACS_VUE_GPU'] = '0';
   }
-  // ?bars=top: the main and mode icon bars above the document, rather than
-  // in a column at its left (TEXMACS_VUE_BARS, see in_side_bar in
-  // vue_widget.cpp)
-  if (tmAddress.get ('bars') === 'top') ENV['TEXMACS_VUE_BARS'] = 'top';
+  // ?bars=top or ?bars=right: the main and mode icon bars above the
+  // document, or in a column at its right, rather than at its left
+  // (TEXMACS_VUE_BARS, see in_side_bar in vue_widget.cpp)
+  if (/^(top|left|right)$/.test (tmAddress.get ('bars') || ''))
+    ENV['TEXMACS_VUE_BARS'] = tmAddress.get ('bars');
   // ?slug=1: the glyphs drawn from their outlines (vue_gpu.cpp, Slug)
   if (tmAddress.get ('slug') === '1') ENV['TEXMACS_VUE_SLUG'] = '1';
   // ?glyphs=freetype|texmacs|mupdf: the glyphs of the atlas, whatever the
@@ -340,6 +341,9 @@ var tmHome = (function () {
         busy = false;
         var docs = paths.filter (function (p) { return !inPrefs (p); });
         if (channel && docs.length > 0) channel.postMessage ({ type: 'wrote', paths: docs });
+        // (the first file saved asks the browser to keep the files: files.js)
+        if (docs.length > 0 && typeof tmFiles !== 'undefined' && tmFiles.wrote)
+          try { tmFiles.wrote (docs); } catch (e) {}
         if (again) { again = false; flush (); }
         if (done) done ();
       };

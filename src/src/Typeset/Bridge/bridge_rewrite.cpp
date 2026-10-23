@@ -18,6 +18,8 @@
 class bridge_rewrite_rep: public bridge_rep {
 protected:
   bridge body;
+  tree   body_src;  // the rewritten tree of the body, before its ip was given
+  path   body_ip;   // and the ip of the bridge then
 
 public:
   bridge_rewrite_rep (typesetter ttt, tree st, path ip);
@@ -35,6 +37,17 @@ bridge_rewrite_rep::bridge_rewrite_rep (typesetter ttt, tree st, path ip):
 
 void
 bridge_rewrite_rep::initialize (tree body_t) {
+  // the same rewritten tree as before (an included document, from the cache
+  // of the inclusions) at the same place: the body is kept, and its bridges
+  // decide by their inputs whether they are typeset again. It was made anew
+  // each time (attach_right copies a detached tree), and no bridge of an
+  // included file was used again. (A bridge whose path changes keeps its
+  // path, shifted in place; without the inputs, the body is made again.)
+  if (!is_nil (body) && typeset_inputs_mode () != 0 &&
+      strong_equal (body_src, body_t) && strong_equal (body_ip, ip))
+    return;
+  body_src= body_t;
+  body_ip = ip;
   if (is_nil (body)) body= make_bridge (ttt, attach_right (body_t, ip));
   else replace_bridge (body, attach_right (body_t, ip));
 }
@@ -79,9 +92,13 @@ bridge_rewrite_rep::my_typeset (int desired_status) {
   if (is_func (st, VAR_INCLUDE)) {
     url save_name= env->cur_file_name;
     url file_name= url_unix (env->exec_string (st[0]));
-    env->cur_file_name= relative (env->base_file_name, file_name);
+    url incl_file= relative (env->base_file_name, file_name);
+    env->cur_file_name= incl_file;
     env->secure= is_secure (env->cur_file_name);
-    body->typeset (desired_status);
+    {
+      inclusion_guard guard (incl_file);
+      body->typeset (desired_status);
+    }
     env->cur_file_name= save_name;
     env->secure= is_secure (env->cur_file_name);
   }

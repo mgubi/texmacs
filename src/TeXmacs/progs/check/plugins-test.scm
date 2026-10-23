@@ -125,6 +125,12 @@
   (:launch "sh -c \"read x; printf '\\002verbatim:cut'\"")
   (:serializer ,raw-serialize))
 
+;; ignores SIGTERM: stopping it does not wait until it is killed (it waits
+;; with the argument 97, by which the test finds its process)
+(plugin-configure tmtestterm
+  (:launch "sh -c \"trap '' INT TERM; exec sleep 97\"")
+  (:serializer ,raw-serialize))
+
 ;; two variants, the session name chooses the variant
 (plugin-configure tmtestvariants
   (:launch "v1" "cat")
@@ -148,6 +154,26 @@
   (:cmdline ,(lambda (name chat cmd) (string-append "echo " cmd))
             ,(lambda (name chat res) (tm->tree (string-append "res=" res))))
   (:session "Cmdline test"))
+
+;; a command line plugin which records the session and the input it gets
+(define chat-seen '())
+
+(plugin-configure tmtestchat
+  (:cmdline ,(lambda (name chat cmd)
+               (set! chat-seen (list chat cmd))
+               "trap '' INT; echo ok")
+            ,(lambda (name chat res) (tm->tree (string-append chat "=" res))))
+  (:serializer ,(lambda (lan t) (string-append (texmacs->code t) "\n")))
+  (:session "Chat test"))
+
+;; a request plugin which records the same, and makes no request
+(plugin-configure tmtestrequest
+  (:request ,(lambda (name chat cmd)
+               (set! chat-seen (list chat cmd))
+               "")
+            ,(lambda (name chat res) (tm->tree res)))
+  (:serializer ,(lambda (lan t) (string-append (texmacs->code t) "\n")))
+  (:session "Request test"))
 
 (plugin-reconfigure-set! saved-reconfigure-flag)
 
@@ -385,7 +411,29 @@
           "res=out")
   ;; the other plugins have no command line
   (check= (connection-cmdline "tmtestecho" "default" "x") "")
-  (check= (tree->stree (connection-result "tmtestecho" "default" "x")) ""))
+  (check= (tree->stree (connection-result "tmtestecho" "default" "x")) "")
+  ;; the plugin gets the name of the session and the lines of the input,
+  ;; and the name of the session again with the output of the command.
+  ;; Only the name is checked in the result: the output of the command is
+  ;; read in the event loop (the socket notifiers, or with Qt pipes the
+  ;; links listened to), which does not run here, so that the result may
+  ;; come without it.
+  (set! chat-seen '())
+  (set! notified '())
+  (check= (start* "tmtestchat" "plugins-test-chat") "cmdline")
+  (connection-write "tmtestchat" "plugins-test-chat" '(document "a b" "c"))
+  (check= chat-seen '("plugins-test-chat" "a b\nc"))
+  (check-true (poll "tmtestchat" "plugins-test-chat"
+                    (lambda () (nnull? (notified-on "output")))))
+  (check-true (contains? (notified-on "output") "\"plugins-test-chat="))
+  (check-false (contains? (notified-on "output") "\"default="))
+  (check= (start* "tmtestchat" "plugins-test-other") "cmdline")
+  (connection-write "tmtestchat" "plugins-test-other" "d")
+  (check= chat-seen '("plugins-test-other" "d"))
+  (check-true (connection-request? "tmtestrequest"))
+  (check= (start* "tmtestrequest" "plugins-test-request") "request")
+  (connection-write "tmtestrequest" "plugins-test-request" "e")
+  (check= chat-seen '("plugins-test-request" "e\n")))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Serialization
@@ -1029,6 +1077,14 @@
       (set! python-command saved)
       r)))
 
+(define (commands-run thunk)
+  ;; the commands which @thunk runs with eval-system (none is run)
+  (let ((saved eval-system) (cmds '()))
+    (set! eval-system (lambda (cmd . opt) (set! cmds (cons cmd cmds)) ""))
+    (check-run thunk)
+    (set! eval-system saved)
+    (reverse cmds)))
+
 ;; The availability of plugins rests on looking for programs in the path,
 ;; and the plugins which are not sessions run external commands.
 (define (test-external)
@@ -1053,7 +1109,143 @@
              (list-filter (python-requirements)
                           (lambda (r) (eval r (current-module))))))
           '())
+  ;; nor does the jupyter plugin run its script to list the kernels: the
+  ;; command would be the script alone, which Windows fails to launch at
+  ;; each start of a plugin
+  (when (defined? 'plugin->jupyter)
+    (check= (without-python
+             (lambda () (commands-run (lambda () (plugin->jupyter "python")))))
+            '()))
   )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; The processes and the pipes of the plugins
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; Once a plugin has ended, TeXmacs has reaped its process and closed its
+;; ends of the three pipes: when the plugin exits by itself, and after each
+;; command of a command line plugin (which is one process per command). The
+;; descriptors are those open in TeXmacs itself (/dev/fd), and the processes
+;; which are not reaped are the zombies among the children of TeXmacs.
+;; (A stopped plugin is not checked: Qt pipes release its process and its
+;; pipes in the event loop, which does not run here.)
+
+(define (open-descriptors)
+  (length (url-read-directory (system->url "/dev/fd") "*")))
+
+(define (zombies)
+  (string->number
+   (var-eval-system
+    (string-append "ps -axo ppid=,stat= | "
+                   "awk -v p=$PPID '$1 == p && $2 ~ /^Z/ {n++} "
+                   "END {print n+0}'"))))
+
+(define (sleepers secs)
+  ;; the number of the processes "sleep @secs"
+  (string->number
+   (var-eval-system
+    (string-append "ps -axo command= | grep -c '^sleep " secs "$'"))))
+
+(define (term-pid)
+  ;; the process of tmtestterm, a child of TeXmacs, or #f (with Qt pipes,
+  ;; a grandchild: the command is run by sh -c, which dash does not replace)
+  (with s (var-eval-system
+           (string-append "ps -axo pid=,ppid=,command= | "
+                          "awk -v p=$PPID '{ up[$1]= $2 } "
+                          "$3 == \"sleep\" && $4 == \"97\" { s[$1]= $2 } "
+                          "END { for (k in s) "
+                          "if (s[k] == p || up[s[k]] == p) print k }'"))
+    (and (!= s "") s)))
+
+(define (cmdline-run ses cmd)
+  ;; run one command of the command line plugin until its process has ended
+  (when (nin? (list "tmtestcmdline" ses) started)
+    (set! started (cons (list "tmtestcmdline" ses) started)))
+  (connection-write-string "tmtestcmdline" ses cmd)
+  (wait-until (lambda ()
+                (connection-interrupt "tmtestcmdline" ses)
+                (== (connection-status "tmtestcmdline" ses) 0))
+              5000))
+
+(define (has-return? t)
+  ;; whether a string of the tree @t in scheme format has a carriage return
+  (cond ((string? t) (in? #\return (string->list t)))
+        ((pair? t) (or (has-return? (car t)) (has-return? (cdr t))))
+        (else #f)))
+
+;; Windows: the command is a line of the command interpreter (cmd /c, see
+;; cmdline_link.cpp), whose ends of lines are those of Unix in the output;
+;; an interrupt ends the command and all it started (its job)
+(define (test-windows-cmdline)
+  (check-group "processes: command lines (Windows)")
+  (check= (start* "tmtestcmdline" "plugins-test-win") "cmdline")
+  ;; (connection-eval reads the link, which takes the output of its
+  ;; command there)
+  (with r (eval* "tmtestcmdline" "plugins-test-win" "x y")
+    (check-true (contains? r "res=x y"))
+    (check-false (has-return? r)))
+  (check-true (cmdline-run "plugins-test-win" "z & ping -n 60 127.0.0.1"))
+  (for (i (.. 1 6))
+    (check-true (cmdline-run "plugins-test-win" "c"))))
+
+(define (test-processes)
+  (check-group "processes: plugins which exit")
+  ;; (the first session opens what is opened once)
+  (check= (start* "tmtestonce" "plugins-test-once0") "ok")
+  (check= (eval* "tmtestonce" "plugins-test-once0" "x\n") '(document "bye"))
+  (check-true (poll "tmtestonce" "plugins-test-once0"
+                    (lambda ()
+                      (== (connection-status "tmtestonce" "plugins-test-once0")
+                          0))))
+  (let ((fds (open-descriptors)))
+    (for (i (.. 1 6))
+      (with ses (string-append "plugins-test-once" (number->string i))
+        (check= (start* "tmtestonce" ses) "ok")
+        (check= (eval* "tmtestonce" ses "x\n") '(document "bye"))
+        (check-true (poll "tmtestonce" ses
+                          (lambda ()
+                            (== (connection-status "tmtestonce" ses) 0))))))
+    (check= (open-descriptors) fds)
+    (check= (zombies) 0))
+
+  (check-group "processes: command lines")
+  (check= (connection-start "tmtestcmdline" "plugins-test-cmd") "cmdline")
+  ;; connection-eval reads the link, which takes the output of its command
+  ;; there (with Qt pipes, it waited for ever: only the event loop read it)
+  (with r (eval* "tmtestcmdline" "plugins-test-cmd" "x y")
+    (check-true (contains? r "res=x y")))
+  (check-true (cmdline-run "plugins-test-cmd" "c0"))
+  (let ((fds (open-descriptors)))
+    (for (i (.. 1 6))
+      (check-true (cmdline-run "plugins-test-cmd" "c")))
+    (check= (open-descriptors) fds)
+    (check= (zombies) 0))
+  ;; an interrupt reaches all that the command started (its process group):
+  ;; here a sleep in the background, which ignores SIGINT, as well as the
+  ;; one in the foreground
+  (check= (sleepers "617") 0)
+  (check-true (cmdline-run "plugins-test-cmd"
+                           "z; sleep 617 > /dev/null & sleep 617"))
+  (check= (sleepers "617") 0)
+
+  (check-group "processes: a plugin which ignores SIGTERM")
+  (check= (start* "tmtestterm" "plugins-test-term") "ok")
+  (let ((pid #f))
+    (wait-until (lambda () (set! pid (term-pid)) pid) 5000)
+    (check-true pid)
+    (with start (texmacs-time)
+      (connection-stop "tmtestterm" "plugins-test-term")
+      ;; the interface is not blocked until the process is killed (2 s)
+      (check-true (< (- (texmacs-time) start) 1000)))
+    (check= (connection-status "tmtestterm" "plugins-test-term") 0)
+    ;; it is killed after 2 s, and reaped, by the event loop in TeXmacs;
+    ;; here (no event loop), by the next start or stop of a plugin
+    (pause "2.2")
+    (check= (start* "tmtestecho" "plugins-test-term2") "ok")
+    (connection-stop "tmtestecho" "plugins-test-term2")
+    ;; (pid-alive? counts a zombie as ended)
+    (when pid
+      (check-true (wait-until (lambda () (not (pid-alive? pid))) 3000)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The suite
@@ -1134,15 +1326,19 @@
       (when (url-exists? mark) (system-remove mark))
       (check= (start* "tmtestwrapper" "plugins-test-wrapper") "ok")
       (pause "0.5")  ; (the program runs, its trap is set)
-      (let ((start (texmacs-time)))
-        (connection-stop "tmtestwrapper" "plugins-test-wrapper")
-        ;; the program cleaned up before connection-stop returned; when
-        ;; not, the time says why: the whole wait of connection-stop (1 or
-        ;; 2 s), it was killed on a slow machine; less, it was not waited for
-        (check= (if (url-exists? mark) "cleaned"
+      (let* ((start (texmacs-time))
+             (dummy (connection-stop "tmtestwrapper" "plugins-test-wrapper"))
+             (stopped (- (texmacs-time) start)))
+        ;; the program cleans up before it is killed (2 s after the stop):
+        ;; connection-stop only waits for it 50 ms, the rest is in the
+        ;; background; when not cleaned, the times say why: 2 s, it was
+        ;; killed on a slow machine
+        (check= (if (wait-until (lambda () (url-exists? mark)) 1500)
+                    "cleaned"
                     (string-append "not cleaned, connection-stop returned after "
+                                   (number->string stopped) " ms, "
                                    (number->string (- (texmacs-time) start))
-                                   " ms"))
+                                   " ms ago"))
                 "cleaned")))
     ;; a command starting with a reserved word of the shell
     (check= (start* "tmtestshellword" "plugins-test-word") "ok")
@@ -1188,6 +1384,13 @@
   (if (url-exists-in-path? "sh")
       (run-group test-pipes)
       (skip "pipes" "sh is not in the path"))
+  ;; (Windows: no /dev/fd, and no ps)
+  (if (and (not (os-mingw?)) (url-exists-in-path? "sh")
+           (url-exists? (system->url "/dev/fd")))
+      (run-group test-processes)
+      (skip "processes" "no sh or no /dev/fd"))
+  (if (os-mingw?)
+      (run-group test-windows-cmdline))
   (run-group test-scheme-session)
   (run-group test-external)
   (check-end))

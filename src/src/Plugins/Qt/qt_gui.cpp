@@ -9,6 +9,7 @@
  * in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
  ******************************************************************************/
 
+#include "gui_test.hpp"
 #include <locale.h>
 
 #include "convert.hpp"
@@ -125,13 +126,19 @@ tm_sleep () {
 ******************************************************************************/
 
 void
-qt_flush_deferred_deletes () {
+qt_forget_deferred_deletes () {
   // (an exit of a script, (exit), from the event loop: the widgets which
-  // were to be deleted later, as the prompt of an interactive command, are
-  // deleted now, before the static objects of Qt go; else Qt deletes them
-  // while it ends its threads, after those, and crashes)
+  // were to be deleted later, as the prompt of an interactive command or a
+  // closed window, are forgotten, not deleted; else Qt deletes them while
+  // it ends its threads and crashes. A script given by -x runs before the
+  // event loop of Qt starts, which deletes them only in a nested loop, so
+  // they can wait until the exit. Deleting them here is not safe either:
+  // the thread-local objects of Qt are gone before any exit handler is
+  // called, and so are the static objects made after this handler was
+  // registered, as the list of the active scrollers of QScroller, made by
+  // the first one deleted. The quit of TeXmacs, _exit, deletes nothing)
   if (QCoreApplication::instance () != NULL)
-    QCoreApplication::sendPostedEvents (NULL, QEvent::DeferredDelete);
+    QCoreApplication::removePostedEvents (NULL, QEvent::DeferredDelete);
 }
 
 qt_gui_rep::qt_gui_rep (int &argc, char **argv):
@@ -217,6 +224,10 @@ needing_update (false)
     retina_icons= get_user_preference ("retina-icons") == "on"? 2: 1;
   if (has_user_preference ("retina-scale"))
     retina_scale= as_double (get_user_preference ("retina-scale"));
+  // the style sheet of the theme was applied when the application was
+  // created (QTMApplication::load), when retina_scale was not yet known:
+  // apply it again, with its sizes scaled accordingly
+  if (!headless_mode && tm_style_sheet != "") init_style_sheet (qApp);
 #endif
 }
 
@@ -628,6 +639,7 @@ qt_gui_rep::event_loop () {
     app = QApplication::instance ();
   update();
     //need_update();
+  gui_test_start (); // TEXMACS_TEST_SCRIPT=<file>: a scripted test
   app->exec();
 }
 
@@ -1194,6 +1206,14 @@ beep () {
   QApplication::beep();
 }
 
+void
+image_gc (string name) {
+    // Garbage collect images of a given name; the Qt port keeps no image
+    // cache of its own (qt_pic_cache lives as long as the session), so
+    // there is nothing to collect
+  (void) name;
+}
+
 bool
 check_event (int type) {
     // Check whether an event of one of the above types has occurred;
@@ -1284,6 +1304,19 @@ command_queue::exec_pending () {
     }
   } else
     wait = false;
+}
+
+bool
+command_queue::has_due (time_t now) {
+  for (int i= 0; i < N(start_times); i++)
+    if (now - start_times[i] >= 0) return true;
+  return false;
+}
+
+bool
+qt_gui_rep::test_busy () {
+  return !waiting_events.is_empty () || needing_update ||
+         delayed_commands.has_due (texmacs_time ());
 }
 
 void

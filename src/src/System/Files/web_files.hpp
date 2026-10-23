@@ -17,6 +17,7 @@
 #include "scheme.hpp"
 
 void web_cache_invalidate (url u);
+void web_cache_refresh ();
 
 url get_from_web (url u);
 url get_from_server (url u);

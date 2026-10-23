@@ -14,7 +14,6 @@
 
 
 #include "scheme.hpp" // interface to texmacs
-//#include "../Tiny/tinytmscm_tm.hpp" // interface to TinyScheme
 #if defined(USE_S7)
 #include "../S7/s7_tm.hpp" // interface to S7
 #elif defined(USE_FEMTOLISP)

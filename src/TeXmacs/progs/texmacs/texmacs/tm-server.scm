@@ -265,7 +265,7 @@
 (validate-enum-preference "updater:interval" '("0" "24" "168" "720"))
 (validate-enum-preference "gui theme" '("default" "light" "dark" ""))
 (validate-enum-preference "icon set" '("classical" "monochrome" "neo-classical" "lucide"))
-(validate-enum-preference "icon bars" '("top" "left"))
+(validate-enum-preference "icon bars" '("top" "left" "right"))
 (validate-enum-preference "window tabs" '("top" "left"))
 (validate-enum-preference "gui density" '("compact" "normal" "large"))
 (validate-enum-preference "gui:responsive tab mode" '("top" "side" "mobile" "grid"))
@@ -307,11 +307,15 @@
 (tm-define (buffers-modified?)
   (list-or (map buffer-modified? (buffer-list))))
 
+(tm-define (buffer-close-question buf)
+  ;; the question when closing the modified buffer @buf
+  "The document has not been saved. Really close it?")
+
 (tm-define (safely-kill-buffer)
   (cond ((buffer-embedded? (current-buffer))
          (alt-windows-delete (alt-window-search (current-buffer))))
         ((buffer-modified? (current-buffer))
-         (user-confirm "The document has not been saved. Really close it?" #f  
+         (user-confirm (buffer-close-question (current-buffer)) #f
            (lambda (answ)
              (when answ (buffer-close (current-buffer))))))
         (else (buffer-close (current-buffer)))))
@@ -338,12 +342,12 @@
         ((nnull? opt-name)
          (if (buffer-modified? (window->buffer (car opt-name)))
              (user-confirm
-                 "The document has not been saved. Really close it?" #f
+                 (buffer-close-question (window->buffer (car opt-name))) #f
                (lambda (answ)
                  (when answ (do-kill-window* (car opt-name)))))
              (do-kill-window* (car opt-name))))
         ((buffer-modified? (current-buffer))
-         (user-confirm "The document has not been saved. Really close it?" #f
+         (user-confirm (buffer-close-question (current-buffer)) #f
            (lambda (answ)
              (when answ (do-kill-window)))))
         (else (do-kill-window))))

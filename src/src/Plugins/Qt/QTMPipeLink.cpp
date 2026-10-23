@@ -13,7 +13,9 @@
 #include "qt_utilities.hpp"
 #include "qt_gui.hpp"
 #include "QTMPipeLink.hpp"
+#include "tm_timer.hpp"
 #include <QByteArray>
+#include <QList>
 
 #ifdef OS_MINGW
 #include <windows.h>
@@ -176,7 +178,39 @@ group_alive (pid_t pg) {
 #endif
   return ::killpg (pg, 0) == 0 || errno == EPERM;
 }
+
+// the stopped programs which have not ended yet (see killProcess)
+static QList<QTMPipeLink*> ending_links;
 #endif
+
+void
+QTMPipeLink::finishKill () {
+#if !defined (OS_MINGW) && !defined (OS_ANDROID)
+  ending_links.removeAll (this);
+  if (kill_at == 0) return;
+  kill_at= 0;
+  if (group_alive ((pid_t) ending_pg)) ::killpg ((pid_t) ending_pg, SIGKILL);
+  waitForFinished (1000);
+  if (state () != QProcess::NotRunning) {
+    kill ();
+    waitForFinished (1000);
+  }
+#endif
+}
+
+void
+reap_ending_pipe_links (bool all) {
+#if !defined (OS_MINGW) && !defined (OS_ANDROID)
+  if (ending_links.isEmpty ()) return;
+  QList<QTMPipeLink*> l= ending_links;
+  time_t now= texmacs_time ();
+  for (QTMPipeLink* p: l)
+    if (all || now >= p->kill_at || !group_alive ((pid_t) p->ending_pg))
+      p->finishKill ();
+#else
+  (void) all;
+#endif
+}
 
 void
 QTMPipeLink::killProcess (int msecs) {
@@ -189,10 +223,14 @@ QTMPipeLink::killProcess (int msecs) {
   terminate ();
   if (! waitForFinished (msecs)) kill ();
 #else
-  // Ask the process group of the program to terminate and wait for all of
-  // it (up to 2 s, or msecs), as the pipes without Qt do: a wrapper script
+  // Ask the process group of the program to terminate and give all of it
+  // up to 2 s (or msecs), as the pipes without Qt do: a wrapper script
   // often runs the program as a child of its own, which still cleans up
-  // when the wrapper is gone; then kill what is left
+  // when the wrapper is gone; then kill what is left. A stop (msecs 0)
+  // only waits for the first 50 ms: a program which takes longer (or
+  // ignores SIGTERM) is killed later by reap_ending_pipe_links, so that
+  // the interface is not blocked meanwhile
+  if (kill_at != 0) { finishKill (); return; }  // (stopped before)
   int limit= (msecs > 0? msecs: 2000);
   qint64 pid= processId ();
   if (pid > 0 && ::killpg ((pid_t) pid, SIGTERM) == 0) {
@@ -200,9 +238,16 @@ QTMPipeLink::killProcess (int msecs) {
     // the program has finished, it closes the pipes, and what is left of
     // the group then dies of SIGPIPE when it writes (as a shell reporting
     // that its child was terminated) instead of cleaning up
-    for (int waited= 0; waited < limit; waited += 10) {
+    int wait= (msecs > 0? limit: 50);
+    for (int waited= 0; waited < wait; waited += 10) {
       if (!group_alive ((pid_t) pid)) break;
       ::usleep (10000);
+    }
+    if (msecs == 0 && group_alive ((pid_t) pid)) {
+      ending_pg= pid;
+      kill_at  = texmacs_time () + limit;
+      ending_links << this;
+      return;
     }
     if (group_alive ((pid_t) pid)) ::killpg ((pid_t) pid, SIGKILL);
     waitForFinished (1000);

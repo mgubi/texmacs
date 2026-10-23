@@ -26,6 +26,15 @@ void gui_set_next_window_as_popup () {
   g_next_window_as_popup = true;
 }
 
+// Global flag: the next qt_window_widget_rep is shown without being
+// activated (the window of the error messages, which opens by itself on a
+// warning while one types in a document). Reset after each use.
+static bool g_next_window_without_focus = false;
+
+void gui_set_next_window_without_focus () {
+  g_next_window_without_focus = true;
+}
+
 #include "message.hpp"
 #include "analyze.hpp"
 #include "window.hpp"
@@ -77,6 +86,10 @@ qt_window_widget_rep::qt_window_widget_rep (QWidget* _wid, string name,
   if (g_next_window_as_popup) {
     qwid->setProperty ("tmWindowMode", QString ("popup"));
     g_next_window_as_popup = false;
+  }
+  if (g_next_window_without_focus) {
+    qwid->setAttribute (Qt::WA_ShowWithoutActivating);
+    g_next_window_without_focus = false;
   }
   
   QPointer<QTMMainTab> mainTab = qobject_cast<QTMMainTab *>(qwid);
@@ -405,7 +418,10 @@ qt_popup_widget_rep::tooltip_window_widget (string s) {
     qwid->setWindowTitle (to_qstring (s));
   }
   qwid->setWindowModality (Qt::NonModal);
-  qwid->setWindowFlags (Qt::ToolTip);
+  // the pointer goes through to the window under the balloon: else the
+  // editor did not see it go, and the balloon stayed, over the words which
+  // the pointer was then on (#399)
+  qwid->setWindowFlags (Qt::ToolTip | Qt::WindowTransparentForInput);
   return this;
 }
 

@@ -275,6 +275,56 @@
 (define (gpg-passphrase-options)
   (if (gpg-loopback?) (list "--pinentry-mode" "loopback") '()))
 
+;; Once a secret key was unlocked, gpg-agent keeps its passphrase in its
+;; cache (default-cache-ttl, 10 minutes by default), and in loopback mode a
+;; decryption then succeeds whatever passphrase is given: a wrong passphrase
+;; was accepted after the right one (wallet-correct-passphrase?). Before and
+;; after a decryption with a passphrase, the cached passphrases of the
+;; secret keys of the GnuPG home are cleared (CLEAR_PASSPHRASE of the agent,
+;; GnuPG 2.1 and later, the cache being keyed by the keygrips): the
+;; passphrase given is checked each time, and the key is not left unlocked.
+;; Only the agent of that home is asked (it is TeXmacs' own home, not the
+;; user's ~/.gnupg), and only for its entries: its configuration and the
+;; other entries of its cache are kept. --no-autostart: an agent which does
+;; not run has nothing in its cache.
+(define (gpg-connect-agent-executable)
+  (let* ((exe (gpg-get-executable))
+         (dir (url-head (url-resolve-in-path exe)))
+         (next (url-append dir "gpg-connect-agent")))
+    (cond ((url-exists? next) (url->system next))
+          ((url-exists-in-path? "gpg-connect-agent") "gpg-connect-agent")
+          (else #f))))
+
+(define (gpg-home-option homedir)
+  (url->system (if (url-none? homedir) (gpg-homedir) homedir)))
+
+(define (gpg-secret-keygrips homedir)
+  (let* ((cmd (append (gpg-executable-default homedir)
+                      (list "--with-colons" "--with-keygrip"
+                            "--list-secret-keys")))
+         (ret (evaluate-system cmd '() '() '(1 2))))
+    (if (!= (car ret) "0") '()
+        (with rows (map gpg-decompose-key-string
+                        (string-decompose (cadr ret) "\n"))
+          (map (lambda (row) (list-ref row 9))
+               (list-filter rows (lambda (row)
+                                   (and (>= (length row) 10)
+                                        (== (car row) "grp")
+                                        (!= (list-ref row 9) "")))))))))
+
+(tm-define (gpg-forget-passphrases homedir)
+  (:synopsis "Clear the passphrases which gpg-agent keeps for @homedir")
+  (and (gpg-loopback?)
+       (and-with cga (gpg-connect-agent-executable)
+         (for (g (gpg-secret-keygrips homedir))
+           (evaluate-system (list cga "--homedir" (gpg-home-option homedir)
+                                  "--no-autostart"
+                                  (string-append
+                                   "CLEAR_PASSPHRASE --mode=normal " g)
+                                  "/bye")
+                            '() '() '(1 2)))
+         #t)))
+
 (define (gpg-executable-default homedir)
   (if (url-none? homedir)
       (list (gpg-get-executable) "--homedir" (url->system (gpg-homedir))
@@ -512,11 +562,20 @@
               (list "--decrypt" "--passphrase-fd" "$%1" "--armor")
               (list "--decrypt" "--passphrase-fd" "$$1" "--armor"))))
 
+(define (gpg-decrypt-checked dir data passphrase)
+  ;; (the passphrase checked, not the cache of the agent: see above)
+  (gpg-forget-passphrases dir)
+  (let* ((cmd (gpg-executable-decrypt dir))
+         (ret (evaluate-system cmd '(0 -1) (list data passphrase) '(1 2))))
+    (gpg-forget-passphrases dir)
+    (cons cmd ret)))
+
 (tm-define (gpg-decrypt data passphrase . homedir)
   (:synopsis "GnuPG decrypt armored string @data with passphrase @passphrase")
   (let* ((dir (if (null? homedir) (url-none) (car homedir)))
-         (cmd (gpg-executable-decrypt dir))
-         (ret (evaluate-system cmd '(0 -1) (list data passphrase) '(1 2))))
+         (r (gpg-decrypt-checked dir data passphrase))
+         (cmd (car r))
+         (ret (cdr r)))
     (if (!= (car ret) "0")
         (gpg-error cmd (cadr ret) (caddr ret))
         (cadr ret))))
@@ -528,8 +587,7 @@
 (tm-define (gpg-decryptable? data passphrase . homedir)
   (:synopsis "Tells if @data can be decrypted with passphrase @passphrase")
   (let* ((dir (if (null? homedir) (url-none) (car homedir)))
-         (cmd (gpg-executable-decrypt dir))
-         (ret (evaluate-system cmd '(0 -1) (list data passphrase) '(1 2))))
+         (ret (cdr (gpg-decrypt-checked dir data passphrase))))
     (== (car ret) "0")))
 
 (tm-define (gpg-correct-passphrase? fingerprint passphrase . homedir)

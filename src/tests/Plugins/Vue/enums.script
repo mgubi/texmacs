@@ -36,3 +36,6 @@ wait 500
 wheel 60 100 0 -3
 wait 700
 snapshot e5
+# the output, which run.sh checks
+expect enum: 13pt
+expect enum: 12pt

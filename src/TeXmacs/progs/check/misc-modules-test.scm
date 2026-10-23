@@ -38,7 +38,8 @@
 ;;     edu-markup.scm;
 ;;   - tools: comments (comment-edit.scm), poster blocks and themes
 ;;     (poster-edit.scm, theme-edit.scm), the end of a spell check
-;;     (spell-edit.scm) and the serialization for AI requests (ai-batch.scm).
+;;     (spell-edit.scm), the serialization for AI requests (ai-batch.scm)
+;;     and the file of the examples of the handwriting recognizer.
 ;;     There is no word counting or statistics tool in progs/tools.
 ;;
 ;; Without a window the initial environment of a buffer is not updated
@@ -160,6 +161,56 @@
         (when (and (pair? r) (== (car r) 'error))
           (check-report #f "the group" (object->string r)))))))
 
+;; A position of the cursor history whose buffer was closed is forgotten,
+;; not read
+(define (cursor-history-drain)
+  ;; the history of this window starts empty, whatever earlier groups did
+  (with-buffer-doc '(document "drain") '("generic")
+    (lambda ()
+      (cursor-history-add (cursor-path))
+      (let loop ((i 0))
+        (when (and (< i 1000) (cursor-has-history?))
+          (cursor-history-backward)
+          (loop (+ i 1)))))))
+
+(define (test-cursor-history)
+  (check-group "cursor history")
+  (cursor-history-drain)
+  ;; going forward over an entry of a closed buffer
+  (with-buffer-doc '(document "five" "six") '("generic")
+    (lambda ()
+      (cursor-history-add (cursor-path))
+      (go-end)
+      (cursor-history-add (cursor-path))
+      (cursor-history-backward)))
+  (with-buffer-doc '(document "seven" "eight") '("generic")
+    (lambda ()
+      (with p (cursor-path)
+        (check-true (cursor-has-future?))
+        (check= (check-run (lambda () (cursor-history-forward) 'done)) 'done)
+        (check= (cursor-path) p))))
+  (cursor-history-drain)
+  ;; adding a position after a buffer with an entry was closed
+  (with-buffer-doc '(document "one" "two") '("generic")
+    (lambda ()
+      (go-end)
+      (cursor-history-add (cursor-path))))
+  (with-buffer-doc '(document "three" "four") '("generic")
+    (lambda ()
+      (with start (cursor-path)
+        (cursor-history-add start)
+        (check-true (cursor-has-history?))
+        (go-end)
+        (with end (cursor-path)
+          (cursor-history-add end)
+          (cursor-history-backward)
+          (check= (cursor-path) start)
+          (cursor-history-backward)
+          (check= (cursor-path) start)
+          (check-false (cursor-has-history?))
+          (cursor-history-forward)
+          (check= (cursor-path) end))))))
+
 (define (run-group thunk)
   ;; an error in a group counts as one failure
   (with r (check-run thunk)
@@ -268,6 +319,44 @@
              (help-file-title
               (url-concretize "$TEXMACS_PATH/doc/about/about.en.tm")))
             '(concat "About GNU " (TeXmacs) "-" (TeXmacs-version)))))
+
+;; The answers of url-exists-in-help? and the lists of files of the
+;; documentation search are kept for the session, and made again by
+;; help-caches-update (Tools -> Update -> Help): a page is added to the
+;; documentation of the (scratch) home, then removed.
+(define (test-help-refresh)
+  (check-group "help caches: kept for the session, updated on demand")
+  (let* ((home-doc (url-append (string->url "$TEXMACS_HOME_PATH") "doc"))
+         (dir (url-append home-doc "check-help-refresh"))
+         (page (url-append dir "new-page.en.tm"))
+         (name "check-help-refresh/new-page.en.tm")
+         (files (priv '(doc docgrep) 'docgrep-files))
+         (listed? (lambda ()
+                    (in? (url->system page)
+                         (files "$TEXMACS_DOC_PATH" "*.en.tm"))))
+         (clean (lambda ()
+                  (when (url-exists? page) (system-remove page))
+                  (when (url-exists? dir) (system-rmdir dir)))))
+    (clean)
+    (when (not (url-exists? home-doc)) (system-mkdir home-doc))
+    (help-caches-update)
+    (check-false (url-exists-in-help? name))
+    (check-false (listed?))
+    ;; a new folder with a new page: unseen until the update
+    (system-mkdir dir)
+    (string-save "<TeXmacs|2.1>\n\n<style|tmdoc>\n\n<body|x>\n" page)
+    (check-false (url-exists-in-help? name))
+    (check-false (listed?))
+    (help-caches-update)
+    (check-true (url-exists-in-help? name))
+    (check-true (listed?))
+    ;; the page is removed: still known until the update
+    (system-remove page)
+    (check-true (url-exists-in-help? name))
+    (help-caches-update)
+    (check-false (url-exists-in-help? name))
+    (check-false (listed?))
+    (clean)))
 
 ;; Every .tm file of the manual parses to a document with a TeXmacs version
 ;; and a body.
@@ -901,28 +990,6 @@
 
 ;; A position of the cursor history whose buffer was closed is forgotten,
 ;; not read
-(define (test-cursor-history)
-  (check-group "cursor history")
-  (with-buffer-doc '(document "one" "two") '("generic")
-    (lambda ()
-      (go-end)
-      (cursor-history-add (cursor-path))))
-  (with-buffer-doc '(document "three" "four") '("generic")
-    (lambda ()
-      (with start (cursor-path)
-        (cursor-history-add start)
-        (check-true (cursor-has-history?))
-        (go-end)
-        (with end (cursor-path)
-          (cursor-history-add end)
-          (cursor-history-backward)
-          (check= (cursor-path) start)
-          (cursor-history-backward)
-          (check= (cursor-path) start)
-          (check-false (cursor-has-history?))
-          (cursor-history-forward)
-          (check= (cursor-path) end))))))
-
 (define (test-font-design-page)
   (check-group "font design: page")
   (with-buffer-doc '(document "x") '("generic")
@@ -2387,7 +2454,11 @@
       (let* ((m (resolve-module '(part part-shared)))
              (invalidate (eval 'mirror-invalidate m))
              (black-list (eval 'mirror-black-list m))
+             ;; copies left by earlier suites (the synchronization never
+             ;; runs headless) are set aside, so that the list starts empty
+             (left (map car (ahash-table->list black-list)))
              (scheduled 0))
+        (for (uid left) (ahash-remove! black-list uid))
         (with-global exec-delayed-pause
             (lambda (c) (set! scheduled (+ scheduled 1)))
           (check= (catch #t (lambda () (invalidate (bt 0 2)) "ok")
@@ -2400,7 +2471,8 @@
         (check-true (ahash-ref black-list "mt-v"))
         (check= scheduled 1)
         (ahash-remove! black-list "mt-u")
-        (ahash-remove! black-list "mt-v")))))
+        (ahash-remove! black-list "mt-v")
+        (for (uid left) (ahash-set! black-list uid #t))))))
 
 (define (test-comments)
   (check-group "comments")
@@ -2613,6 +2685,21 @@
   (check= (ai-serialize "english" '(with "mode" "math" (frac "a" "b")))
           "$\\frac{a}{b}$"))
 
+;; The examples of the handwriting recognizer are saved in the home of
+;; TeXmacs (TEXMACS_HOME_PATH), which need not be ~/.TeXmacs. A home which
+;; already has learned glyphs is left alone.
+(define (test-handwriting)
+  (check-group "handwriting")
+  (with f (string->url "$TEXMACS_HOME_PATH/system/glyphs.scm")
+    (when (not (url-exists? f))
+      (set! last-glyph '(((0.0 0.0) (1.0 1.0)) ((0.0 1.0) (1.0 0.0))))
+      (learn-glyph "x")
+      (set! last-glyph '())
+      (check-true (url-exists? f))
+      (check= (load-object f)
+              '(("x" (((0.0 0.0) (1.0 1.0)) ((0.0 1.0) (1.0 0.0))))))
+      (system-remove f))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The suite
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -2623,7 +2710,8 @@
   (clear-misc-dir)
   (system-mkdir (system->url misc-dir))
   (for-each run-group
-            (list test-help-files test-doc-parse test-tmdoc-expand
+            (list test-help-files test-help-refresh test-doc-parse
+                  test-tmdoc-expand
                   test-tmdoc-books
                   test-tmdoc-rewrite test-doc-search test-tmdoc-edit
                   test-font-database test-font-design test-cursor-history
@@ -2637,6 +2725,6 @@
                   test-spelling
                   test-edu-contexts test-edu-macros test-edu-modes test-mc
                   test-mirrors test-comments test-posters-themes test-spell-edit
-                  test-ai-serialize))
+                  test-ai-serialize test-handwriting))
   (clear-misc-dir)
   (check-end))

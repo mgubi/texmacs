@@ -47,7 +47,8 @@
 (lsp-server-set! "javascript" '("typescript-language-server --stdio"))
 (lsp-server-set! "java" '("jdtls"))
 (lsp-server-set! "scala" '("metals"))
-(lsp-server-set! "julia" '("julia-language-server"))
+(lsp-server-set! "julia" '("jetls serve" "fatou lsp"
+                           "julia --startup-file=no --history-file=no -e \"using LanguageServer; runserver()\""))
 (lsp-server-set! "json" '("vscode-json-language-server --stdio"))
 ;; (no texlab for latex: a .tex file is converted to a document, which is
 ;; not its source, and a server would get the text of that document)

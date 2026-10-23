@@ -1,0 +1,14 @@
+# needs console.scm: the messages fill their window, at every size, and
+# scroll the long lines inside it (no scroll bar of the window itself).
+# ("window messages", not the full title: run.sh takes "Error message" in
+# its log for a crash)
+wait 9000
+window messages
+snapshot c0
+resize 700 500
+wait 1500
+snapshot c1
+resize 400 250
+wait 1500
+snapshot c2
+wait 400

@@ -98,8 +98,8 @@
       (with (server-name server-port server-pseudo) server-con
         (remove-active-connection server server-name server-port server-pseudo)
         (set! remote-client-list (client-active-servers))
-        (client-stop server)
-        (client-remove server)))
+        ;; (client-stop calls client-remove)
+        (client-stop server)))
     (client-open-error (or msg "Your account has been deleted"))))
 
 (tm-call-back (local-eval cmd)
@@ -117,6 +117,7 @@
 ;;   client-started      when it was opened (texmacs-time, ms)
 ;;   client-heard        when the server was last heard (any message)
 ;;   client-ping-sent    when the ping which is not answered yet was sent
+;;   client-beat         when the heartbeat last ran
 ;;   client-latency      how long the last ping took (ms)
 ;;   client-silent       the user was told that the server does not answer
 ;;   client-stop-reason  why we close the connection ourselves
@@ -126,6 +127,7 @@
 (define client-started (make-ahash-table))
 (define client-heard (make-ahash-table))
 (define client-ping-sent (make-ahash-table))
+(define client-beat (make-ahash-table))
 (define client-latency (make-ahash-table))
 (define client-silent (make-ahash-table))
 (define client-stop-reason (make-ahash-table))
@@ -150,33 +152,59 @@
 ;; only, which the servers of the other versions of TeXmacs
 ;; (cloud.texmacs.org) do not answer.
 (define (client-unreachable-hint)
+  ;; (translated, as the sentences it ends: see client-sentence)
   (if (defined? 'web-javascript)
-      (string-append ". From a browser the server has to accept WebSocket"
-                     " connections, at the port after its own: a server run"
-                     " by TeXmacs Upsilon does, the servers of other versions of"
-                     " TeXmacs do not (they need a bridge on your machine,"
-                     " see the help page)")
-      " (is a TeXmacs server running there, and reachable?)"))
+      (translate
+        (string-append ". From a browser the server has to accept WebSocket"
+                       " connections, at the port after its own: a server run"
+                       " by TeXmacs Upsilon does, the servers of other"
+                       " versions of TeXmacs do not (they need a bridge on"
+                       " your machine, see the help page)"))
+      (translate " (is a TeXmacs server running there, and reachable?)")))
 
 (define (client-forget-state server)
-  (for (t (list client-started client-heard client-ping-sent client-latency
+  (for (t (list client-started client-heard client-ping-sent client-beat
+                client-latency
                 client-silent client-stop-reason client-looking
                 client-token))
     (ahash-remove! t server)))
 
-(define (account-name server-name port pseudo)
-  (string-append pseudo "@" server-name (if (== port "6561") "" ":") 
-                 (if (== port "6561") "" port)))
+(tm-define (account->string server-name port pseudo)
+  (:synopsis "The account @pseudo on @server-name, @port, as the user reads it")
+  (if (== server-name "")
+      (account->string "localhost" port pseudo)
+      (with x (string-append pseudo "@" server-name)
+        (if (== port "6561") x
+            (string-append x ":" port)))))
+
+(tm-define (client-sentence fmt . args)
+  (:synopsis "The sentence @fmt translated, with %1, %2... replaced by @args")
+  ;; (the sentences of the connections are in the dictionaries this way,
+  ;; with the names and the numbers apart)
+  (translate (cons* 'replace fmt args)))
 
 ;; What tells the user of an event of a connection. event is one of
 ;;   :connecting :connected :logged-out :silent :back :lost :failed
 ;; and msg a sentence for it. A procedure, which a test (or another
 ;; interface) may replace; this one writes in the footer, and opens a
 ;; dialog for what the user has to know even when looking elsewhere.
+(define-preferences
+  ("client heartbeat" "on" (lambda (var val) (noop)))
+  ("client lost window" "on" (lambda (var val) (noop)))
+  ("client user cursors" "on" (lambda (var val) (noop))))
+
+(define client-lost-window-time #f) ;; when the window was opened last
+
 (tm-define client-notify-hook
   (lambda (event msg)
     (set-message msg "remote server")
-    (when (and (in? event (list :lost)) (not (headless?)))
+    ;; a lost connection also opens a window (the footer may not be looked
+    ;; at), once for connections lost together: not one for each server
+    (when (and (== event :lost) (not (headless?))
+               (get-boolean-preference "client lost window")
+               (or (not client-lost-window-time)
+                   (> (- (texmacs-time) client-lost-window-time) 30000)))
+      (set! client-lost-window-time (texmacs-time))
       (client-open-error msg))))
 
 (tm-define (client-notify event msg)
@@ -194,8 +222,8 @@
   (when (ahash-ref client-silent server)
     (ahash-remove! client-silent server)
     (and-with name (client-find-server-name server)
-      (client-notify :back (string-append "the server " name
-                                          " answers again")))))
+      (client-notify :back (client-sentence "the server %1 answers again"
+                                            name)))))
 
 (tm-define (client-connection-state server)
   (:synopsis "The state of a connection: :connected, :silent or :closed")
@@ -212,19 +240,20 @@
   (let* ((name (or (client-find-server-name server) "server"))
          (pseudo (client-find-server-pseudo server))
          (state (client-connection-state server))
-         (heard (ahash-ref client-heard server))
+         (since (or (ahash-ref client-ping-sent server)
+                    (ahash-ref client-heard server)))
          (ms (ahash-ref client-latency server)))
-    (cond ((== state :closed) (string-append "Not connected to " name))
+    (cond ((== state :closed) (client-sentence "Not connected to %1" name))
           ((== state :silent)
-           (string-append "No answer from " name " for "
-                          (number->string
-                            (quotient (- (texmacs-time) (or heard 0)) 1000))
-                          " s"))
-          (else
-            (string-append "Connected to " name
-                           (if pseudo (string-append " as " pseudo) "")
-                           (if ms (string-append " (" (number->string ms)
-                                                 " ms)") ""))))))
+           (client-sentence "No answer from %1 for %2 s" name
+                            (number->string
+                              (quotient (- (texmacs-time) (or since 0))
+                                        1000))))
+          ((and pseudo ms)
+           (client-sentence "Connected to %1 as %2 (%3 ms)" name pseudo
+                            (number->string ms)))
+          (pseudo (client-sentence "Connected to %1 as %2" name pseudo))
+          (else (client-sentence "Connected to %1" name)))))
 
 (tm-define (client-lost-connections)
   (:synopsis "The connections which were lost: (server-name port pseudo reason)")
@@ -247,11 +276,12 @@
                               client-lost))
       (client-notify
         :lost
-        (string-append "Connection with " (account-name server-name port pseudo)
-                       " lost: " reason
-                       ". Its remote files, chat rooms and live documents"
-                       " are no longer synchronized; log in again"
-                       " to continue.")))))
+        (client-sentence
+          (string-append "Connection with %1 lost: %2. Its remote files, chat"
+                         " rooms and live documents are no longer"
+                         " synchronized; log in again to continue.")
+          (account->string server-name port pseudo)
+          (translate reason))))))
 
 (define (client-fail-pending server reason)
   ;; whoever waits for an answer of server gets reason as an error
@@ -272,25 +302,32 @@
 
 (tm-define (client-heartbeat server)
   (:synopsis "Ask the server for a sign of life, and see whether it gave any")
-  ;; any message of the server is a sign of life, the answer to a ping too
-  ;; (an older server answers that it does not know the command)
+  ;; the server is silent when a ping waits for its answer: any message of
+  ;; the server is a sign of life, but when none is expected (the ping was
+  ;; answered) a long silence is no sign of trouble. A heartbeat which runs
+  ;; late (the computer slept, or TeXmacs was busy) gives the ping which
+  ;; waits a new chance: its answer may be there, not read yet.
   (let* ((now (texmacs-time))
-         (heard (or (ahash-ref client-heard server)
-                    (ahash-ref client-started server) now))
-         (quiet (- now heard))
+         (beat (ahash-ref client-beat server))
+         (late? (and beat (> (- now beat) (* 2 client-ping-interval))))
          (name (or (client-find-server-name server) "server"))
          (give-up (* 1000 (max 30 (or (client-get-connection-timeout) 100)))))
-    (cond ((> quiet give-up)
-           (client-close server
-                         (string-append "no answer for "
-                                        (number->string (quotient quiet 1000))
-                                        " s")))
-          ((> quiet client-silent-after)
-           (when (not (ahash-ref client-silent server))
-             (ahash-set! client-silent server #t)
-             (client-notify :silent (string-append
-                                      "the server " name
-                                      " does not answer; still trying")))))
+    (ahash-set! client-beat server now)
+    (when (and late? (ahash-ref client-ping-sent server))
+      (ahash-set! client-ping-sent server now))
+    (with waiting (- now (or (ahash-ref client-ping-sent server) now))
+      (cond ((> waiting give-up)
+             (client-close server
+                           (client-sentence "no answer for %1 s"
+                                            (number->string
+                                              (quotient waiting 1000)))))
+            ((> waiting client-silent-after)
+             (when (not (ahash-ref client-silent server))
+               (ahash-set! client-silent server #t)
+               (client-notify :silent
+                              (client-sentence
+                                "the server %1 does not answer; still trying"
+                                name))))))
     (when (and (ahash-ref client-server-active? server)
                (not (ahash-ref client-ping-sent server)))
       (ahash-set! client-ping-sent server now)
@@ -303,7 +340,13 @@
         (client-remote-eval server '(remote-ping) answered answered)))))
 
 (define (client-watch server)
-  ;; the heartbeat of a connection which is logged in
+  ;; the heartbeat of a connection which is logged in (a ping every
+  ;; client-ping-interval ms; a stock server answers it with an error,
+  ;; which is a sign of life too), unless the user does not want it
+  (when (get-boolean-preference "client heartbeat")
+    (client-watch* server)))
+
+(define (client-watch* server)
   (with token (client-new-token server)
     (delayed
       (:while (and (== (ahash-ref client-token server) token)
@@ -324,8 +367,9 @@
                  (not (ahash-ref client-heard server)))
         (client-close server
                       (string-append
-                        "no answer from " what " within "
-                        (number->string (quotient ms 1000)) " s"
+                        (client-sentence "no answer from %1 within %2 s"
+                                         what
+                                         (number->string (quotient ms 1000)))
                         ;; a page of a browser has WebSockets only, which
                         ;; the servers of the other versions of TeXmacs
                         ;; (cloud.texmacs.org) do not answer
@@ -383,7 +427,10 @@
 
 (tm-define (client-remove server)
   ;; the connection with server is over: closed on our side (a logout,
-  ;; client-stop), by the server or by the network. Whoever waits for an
+  ;; client-stop), by the server or by the network. It may be called more
+  ;; than once for a connection (client-stop, then the socket which
+  ;; closes): what it does is forgotten the first time, and then it does
+  ;; nothing. Whoever waits for an
   ;; answer of the server is told so; and a connection which was logged in
   ;; and not closed by a logout was lost, which the user is told.
   ;; (a connection which could not be made ends too, maybe before it was
@@ -773,5 +820,5 @@
 		 (client-stop server)
                  (client-notify
                    :logged-out
-                   (string-append "logged out from " server-name)))
+                   (client-sentence "logged out from %1" server-name)))
 	(client-remote-eval* server `(remote-logout) cb)))))

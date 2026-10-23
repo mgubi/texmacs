@@ -227,11 +227,22 @@ tt_font_find_sub (string name) {
   // writer real glyph indices instead of character codes.
   // (the font path is indexed once, see tt_index_find)
   u= tt_locate (name * ".otf");
-  if (!is_none (u)) return u;
-  u= tt_locate (name * ".ttf");
-  if (!is_none (u)) return u;
-  u= tt_locate (name * ".ttc");
-  if (!is_none (u)) return u;
+  if (is_none (u)) u= tt_locate (name * ".ttf");
+  if (is_none (u)) u= tt_locate (name * ".ttc");
+  if (!is_none (u)) {
+    // Except for a font of TeX, which has a TFM of its name (cmsy10,
+    // msam10...): TeXmacs asks for its glyphs by their codes in the TFM,
+    // which its Type 1 file has. An sfnt file of the same name elsewhere,
+    // as the BaKoMa fonts of LyX in /usr/share/fonts on Linux (fonts-lyx,
+    // which matplotlib needs), puts them at other codes, and the symbols
+    // came out as boxes (#407). The families of the paragraph above have
+    // no TFM of their name.
+    if (exists_in_tex (name * ".tfm")) {
+      url p= tt_locate (name * ".pfb");
+      if (!is_none (p)) return p;
+    }
+    return u;
+  }
   u= tt_locate (name * ".pfb");
   if (!is_none (u)) return u;
   u= tt_locate (name * ".dfont");
@@ -245,8 +256,9 @@ tt_font_find (string name) {
   // and is shared by every installation, so a cache written when Type 1
   // came first still named the .pfb file of a family whose .otf TeXmacs
   // now wants; the font then had no OpenType feature and no MATH table.
-  // Change the prefix whenever tt_font_find_sub changes its order.
-  string s= "sfnt:" * name;
+  // Change the prefix whenever tt_font_find_sub changes its order ("sfnt:"
+  // gave the fonts of TeX their TrueType files of LyX, #407).
+  string s= "sfnt-tfm:" * name;
   if (is_cached ("font_cache.scm", s)) {
     string r= cache_get ("font_cache.scm", s) -> label;
     if (r == "") return url_none ();

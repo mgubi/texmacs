@@ -36,6 +36,17 @@ if [ ! -x "$PREFIX/venv/bin/meson" ] &&
 fi
 [ -d "$PREFIX/src" ] ||
   git clone -q --depth 1 --branch "$THORVG_VERSION" https://github.com/thorvg/thorvg.git "$PREFIX/src"
+# The GL engine opens libGL.so, .so.4 or .so.3: the name of the library for
+# programs which link with it is libGL.so.1, and libGL.so is only there with
+# the packages of development (libgl-dev). Without them ThorVG had no canvas,
+# and TeXmacs drew with MuPDF: on Linux the main window was never drawn and
+# the dialogs were slow and malformed (#376). libGL.so.1 is tried too.
+GLSRC="$PREFIX/src/src/renderer/gpu_engine/gl/tvgGl.cpp"
+if [ -f "$GLSRC" ] && ! grep -q '"libGL.so.1"' "$GLSRC"; then
+  sed -i.orig 's|^\( *\)if (!_libGL) _libGL = dlopen("libGL.so.3", RTLD_LAZY);|&\
+\1if (!_libGL) _libGL = dlopen("libGL.so.1", RTLD_LAZY);|' "$GLSRC"
+  grep -q '"libGL.so.1"' "$GLSRC" || { echo "build-thorvg.sh: tvgGl.cpp not patched" >&2; exit 1; }
+fi
 
 ENGINES=gl
 [ "$TARGET" = wasm ] && ENGINES=${THORVG_ENGINES:-gl,wg}

@@ -291,7 +291,36 @@ get_buffer_tree (url name) {
   tm_buffer buf= concrete_buffer (name);
   if (is_nil (buf)) return "";
   tree body= subtree (the_et, buf->rp);
-  return attach_data (body, buf->data, true);
+  if (N(buf->vws) == 0) return attach_data (body, buf->data, true);
+  // the editor keeps its own copies of the style and initial environment
+  tm_view vw= concrete_view (get_recent_view (name));
+  if (vw == NULL) return attach_data (body, buf->data, true);
+  new_data data;
+  data->project= buf->data->project;
+  vw->ed->get_data (data);
+  return attach_data (body, data, true);
+}
+
+tree
+get_buffer_style (url name) {
+  // the style of the buffer, in its most recent view (each editor keeps a
+  // copy of its own)
+  tm_buffer buf= concrete_buffer (name);
+  if (is_nil (buf)) return "";
+  if (N(buf->vws) == 0) return copy (buf->data->style);
+  tm_view vw= concrete_view (get_recent_view (name));
+  if (vw == NULL) return copy (buf->data->style);
+  return copy (vw->ed->get_style ());
+}
+
+void
+set_buffer_style (url name, tree style) {
+  // the style of the buffer, in its data and in all its views
+  tm_buffer buf= concrete_buffer (name);
+  if (is_nil (buf)) return;
+  buf->data->style= copy (style);
+  for (int i=0; i<N(buf->vws); i++)
+    buf->vws[i]->ed->change_style (style);
 }
 
 void
@@ -373,6 +402,23 @@ buffer_modified (url name) {
   tm_buffer buf= concrete_buffer (name);
   if (is_nil (buf)) return false;
   return buf->needs_to_be_saved ();
+}
+
+// A read-only buffer can be read, searched, selected and copied, but what
+// one does in its editor does not change it: the changes made by a key, a
+// mouse action, a drop or a menu command are cancelled at the end of the
+// event (edit_modify_rep::end_editing), and there is no undo. The program
+// still changes it (the messages of the console, debug-widgets.scm)
+void
+set_buffer_read_only (url name, bool flag) {
+  tm_buffer buf= concrete_buffer (name);
+  if (!is_nil (buf)) buf->buf->read_only= flag;
+}
+
+bool
+is_buffer_read_only (url name) {
+  tm_buffer buf= concrete_buffer (name);
+  return !is_nil (buf) && buf->buf->read_only;
 }
 
 bool
@@ -562,6 +608,7 @@ export_tree (tree doc, url u, string fm) {
 
 bool
 buffer_export (url name, url dest, string fm) {
+  if (is_nil (concrete_buffer (name))) return true;
   tm_view vw= concrete_view (get_recent_view (name));
   ASSERT (vw != NULL, "view expected");
 
@@ -625,6 +672,7 @@ buffer_save (url name) {
   if (fm == "generic") fm= "verbatim";
   bool r= buffer_export (name, name, fm);
   if (!r) {
+    reset_inclusion (name);
     pretend_buffer_saved (name);
     array<url> ws = buffer_to_windows (name);
     for (int i=0; i<N(ws); i++)
@@ -638,6 +686,7 @@ buffer_save (url name) {
 ******************************************************************************/
 
 static hashmap<string,tree> document_inclusions ("");
+static hashmap<string,int> inclusions_busy (0);
 
 void
 reset_inclusions () {
@@ -659,4 +708,22 @@ load_inclusion (url name) {
   tree doc= extract_document (import_tree (name, "generic"));
   if (!is_func (doc, _ERROR)) document_inclusions (name_s)= doc;
   return doc;
+}
+
+bool
+inclusion_busy (url name) {
+  // Is the inclusion of name currently being processed (cycle detection)?
+  return inclusions_busy [as_string (name)] > 0;
+}
+
+void
+inclusion_enter (url name) {
+  inclusions_busy (as_string (name)) ++;
+}
+
+void
+inclusion_leave (url name) {
+  string name_s= as_string (name);
+  if (inclusions_busy [name_s] <= 1) inclusions_busy->reset (name_s);
+  else inclusions_busy (name_s) --;
 }

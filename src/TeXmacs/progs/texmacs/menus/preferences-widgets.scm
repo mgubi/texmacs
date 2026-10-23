@@ -121,7 +121,8 @@
 
 (define-preference-names-and-validate "icon bars"
   ("top" "Above the document")
-  ("left" "At the left of the document"))
+  ("left" "At the left of the document")
+  ("right" "At the right of the document"))
 
 (define-preference-names-and-validate "window tabs"
   ("left" "In a column at the left")
@@ -203,7 +204,8 @@
     (assuming (or (vue-gui?) (ns-gui?))
       (item (text "Main and mode icon bars:")
         (enum (set-pretty-preference "icon bars" answer)
-              '("Above the document" "At the left of the document")
+              '("Above the document" "At the left of the document"
+                "At the right of the document")
               (get-pretty-preference "icon bars")
               "18em")))
     (assuming (defined? 'web-javascript)

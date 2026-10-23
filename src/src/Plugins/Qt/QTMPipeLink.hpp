@@ -42,6 +42,11 @@ public:
   void feedBuf (ProcessChannel);
   bool listenChannel (ProcessChannel, int msecs);
   void killProcess (int msecs);
+  // a stopped program which has not ended yet: its process group is
+  // killed at kill_at (texmacs_time), see reap_ending_pipe_links
+  time_t kill_at= 0;
+  qint64 ending_pg= 0;
+  void finishKill ();
 
 #if !defined (OS_MINGW) && !defined (OS_ANDROID) && QT_VERSION < 0x060000
 protected:
@@ -49,6 +54,9 @@ protected:
   void setupChildProcess () override;
 #endif
 };
+
+// kills the stopped programs whose time is up (all of them with true)
+void reap_ending_pipe_links (bool all);
 
 #endif // QTM_PIPE_LINK
 

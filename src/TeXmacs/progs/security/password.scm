@@ -23,31 +23,12 @@
 (define symbols-charset "!@#$%^&*()_+-=[]{}|;:,.?")
 (define all-charset (string-append lower-charset upper-charset digits-charset symbols-charset))
 
-(define (urandom-number n)
-  ;; Uniform random integer in [0..n-1] from /dev/urandom, or #f
-  (and (url-exists? "/dev/urandom")
-       (catch #t
-         (lambda ()
-           (call-with-input-file "/dev/urandom"
-             (lambda (p)
-               ;; Read raw bytes: Guile 1.8 and S7 ports are byte ports,
-               ;; Guile 2+ ports decode text unless set to latin-1
-               (when (defined? 'set-port-encoding!)
-                 (set-port-encoding! p "ISO-8859-1"))
-               (let* ((m 4294967296)
-                      (limit (- m (modulo m n)))
-                      (b (lambda ()
-                           (with c (char->integer (read-char p))
-                             (if (< c 256) c (error "not a byte"))))))
-                 (let loop ()
-                   (let ((x (+ (b) (* 256 (+ (b) (* 256 (+ (b) (* 256 (b)))))))))
-                     (if (< x limit) (modulo x n) (loop))))))))
-         (lambda args #f))))
-
+;; A uniform integer in [0, n) from a cryptographic source: GnuTLS, else
+;; the system (rand_s on Windows, /dev/urandom elsewhere, #66); the random
+;; of Scheme only on a system which has none of them.
 (define (rnd n)
-  (if (supports-gnutls?)
-      (gnutls-random-number n)
-      (or (urandom-number n) (random n))))
+  (with r (secure-random-number n)
+    (if (>= r 0) r (random n))))
 
 (define (string-shuffle! s)
   (let ((n (string-length s)))

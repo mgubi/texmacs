@@ -247,7 +247,14 @@ table_rep::format_table (tree fm) {
     format_item (fm[i]);
 
   if (var->contains (TABLE_WIDTH)) {
-    width= env->as_length (env->exec (var[TABLE_WIDTH]));
+    // The width is kept executed: a width in par is taken again from the
+    // paragraph where the table is placed (lazy_table_rep::produce), which
+    // runs later, when the environment of the table (local variables,
+    // macro arguments) is no longer there; a width given by a value, as
+    // <value|figure-width> in the figures, is then known to be in par too.
+    tree w= env->exec (var[TABLE_WIDTH]);
+    var (TABLE_WIDTH)= w;
+    width= env->as_length (w);
     if (var->contains (TABLE_HMODE))
       hmode= as_string (env->exec (var[TABLE_HMODE]));
     else hmode= "exact";
@@ -392,6 +399,14 @@ table_rep::handle_decorations () {
   nr_cols= new_cols;
   i0     = off_i[i0] + ex_i1[i0];
   j0     = off_j[j0] + ex_j1[j0];
+
+  /*** the column widths are for the new number of columns ***/
+  if (mw != NULL) tm_delete_array (mw);
+  if (lw != NULL) tm_delete_array (lw);
+  if (rw != NULL) tm_delete_array (rw);
+  mw= tm_new_array<SI> (nr_cols);
+  lw= tm_new_array<SI> (nr_cols);
+  rw= tm_new_array<SI> (nr_cols);
 }
 
 void
@@ -726,6 +741,14 @@ table_rep::compute_heights (SI* mh, SI* bh, SI* th, SI xh) {
       if ((!is_nil (C)) && (C->row_span!=1)) {
         SI cmh, cbh, cth;
         C->compute_height (cmh, cbh, cth, xh);
+        if (cbh != 0 || cth != 0) {
+          // baseline aligned with the first row: the part above the
+          // baseline must fit into the first row, the rest below it
+          th[i]= max (th[i], cth);
+          mh[i]= max (mh[i], bh[i] + th[i]);
+          SI below= sum (mh+i, C->row_span) - (mh[i] - bh[i]);
+          if (cmh - cth > below) mh[i+C->row_span-1] += cmh - cth - below;
+        }
         SI tot= sum (mh+i, C->row_span);
         if (cmh > tot) mh[i] += cmh - tot;
       }
@@ -1005,10 +1028,7 @@ lazy_table_rep::produce (lazy_type request, format fm) {
   if (request == LAZY_VSTREAM) {
     if (fm->type == FORMAT_VSTREAM) {
       format_vstream fs= (format_vstream) fm;
-      // (the width as table_rep::format_table reads it, executed: a width
-      // given by a value, <value|figure-width>, is also taken again from
-      // the width of the paragraph where the table is placed)
-      string s= as_string (T->env->exec (T->var[TABLE_WIDTH]));
+      string s= as_string (T->var[TABLE_WIDTH]);  // executed by format_table
       if (ends (s, "par"))
         T->width= max ((SI) (as_double (s (0, N(s)-3)) * fs->width), 1);
     }

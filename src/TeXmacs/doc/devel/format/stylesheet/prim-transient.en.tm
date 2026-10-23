@@ -163,7 +163,8 @@
     created. After entering the name of the symbol, or the ASCII-code of the
     symbol and pressing return, the <markup|symbol> tag is replaced by the
     corresponding symbol (usually a string enclosed in
-    <verbatim|\<less\>\<gtr\>>).
+    <verbatim|\<less\>\<gtr\>>). A code above 255 is the Unicode code
+    point of the symbol.
 
     When pressing <key|\\>, a <markup|hybrid> tag is created. After entering
     a string and pressing return, it is determined whether the string

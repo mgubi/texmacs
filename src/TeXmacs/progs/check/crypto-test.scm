@@ -242,6 +242,28 @@
           (check-false (== s1 s2))
           (check-false (== (generate-salt) (generate-salt)))))))
 
+;; secure-random-number n: uniform in [0, n) with or without GnuTLS (from
+;; the system without it, rand_s on Windows and /dev/urandom elsewhere, so
+;; -1 only on a system with neither); the same checks as above.
+(define (secure-draws n limit)
+  (map (lambda (i) (secure-random-number limit)) (iota n)))
+
+(define (test-secure-random)
+  (check-group "secure random numbers")
+  (check= (secure-random-number 0) 0)
+  (check= (list-remove-duplicates (secure-draws 50 1)) '(0))
+  (for (limit '(2 3 10 1000 1000000 2147483647))
+    (check-true (list-and (map (lambda (x) (and (>= x 0) (< x limit)))
+                               (secure-draws 200 limit)))))
+  (check= (sort (list-remove-duplicates (secure-draws 200 2)) <) '(0 1))
+  (check-true (> (length (list-remove-duplicates (secure-draws 100 1000000)))
+                 90))
+  (let* ((l (secure-draws 6000 6))
+         (counts (map (lambda (k) (length (filter (cut == <> k) l)))
+                      (iota 6))))
+    (check-true (list-and (map (lambda (c) (and (> c 800) (< c 1200)))
+                               counts)))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Generated passwords
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -272,14 +294,11 @@
                       l)))
     (check-true (list-and (map server-strong-password? l)))
     (check= (length (list-remove-duplicates l)) 30))
-  (check= (string-length (generate-password 4)) 4)
-  ;; FIXME (#66, item 10): the characters come from the ordinary random
-  ;; without GnuTLS (security/password.scm:26) and are always shuffled with
-  ;; it (:33). *random-state* is seeded only when server-base.scm is loaded
-  ;; (with the time in seconds), so that without GnuTLS (generate-password
-  ;; 16) gives the same password in every new session ("%YUN}-t4.h*[PXmT"
-  ;; on macOS); generate-password should use a cryptographic source or fail.
-  )
+  ;; the characters and their shuffle come from secure-random-number (see
+  ;; test-secure-random), not from the random of Scheme, which was seeded
+  ;; with the time in seconds and gave the same password in every new
+  ;; session without GnuTLS (#66, item 10)
+  (check= (string-length (generate-password 4)) 4))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Server passwords
@@ -433,6 +452,17 @@
                 (stree->tree '(document (TeXmacs "2.1")
                                 (body (document "a"))))))
   (check-false (encrypted-buffer? (stree->tree '(document (TeXmacs "2.1")))))
+  ;; the same test on the body, made by load-buffer-open (texmacs/texmacs/
+  ;; tm-files.scm), which triggers the dialogue of the passphrase
+  (with enc '(gpg-passphrase-encrypted-buffer "m")
+    (check-true (encrypted-buffer-body? (stree->tree `(document ,enc))))
+    (check-true (encrypted-buffer-body? (stree->tree `(document ,enc "a"))))
+    (check-false (encrypted-buffer-body? (stree->tree `(document "a" ,enc))))
+    (check-false (encrypted-buffer-body?
+                  (stree->tree `(document (with "a" "b" ,enc))))))
+  (check-false (encrypted-buffer-body? (stree->tree '(document))))
+  (check-false (encrypted-buffer-body? (stree->tree '(document "a"))))
+  (check-false (encrypted-buffer-body? (stree->tree "a")))
   ;; FIXME (#66, item 5): tm-gpg-dialogue-passphrase-decrypt, the decryption
   ;; of a passphrase encrypted block, calls gpg-ask-ask-standalone-passphrase
   ;; (security/gpg/gpg-edit.scm:362), which is not defined: it raises
@@ -474,6 +504,45 @@
     (check-false (gpg-get-buffer-passphrase (url-autosave w "#")))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Temporary files are not trusted
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; The scripts of a document under $TEXMACS_HOME_PATH may call any function,
+;; except when the document is in system/tmp (downloads, documents extracted
+;; from PDF files...) or system/cache. New documents (texts/scratch) stay
+;; trusted.
+(tm-define (crypto-test-tmp-script) "done")
+
+(define (test-untrusted-tmp)
+  (check-group "untrusted temporary files")
+  (let* ((old (current-buffer))
+         (f (tmp "untrusted.tm"))
+         (run (lambda ()
+                (tree->stree
+                 (texmacs-exec '(extern "crypto-test-tmp-script"))))))
+    (check-false (secure? '(crypto-test-tmp-script)))
+    ;; a new document
+    (with u (new-buffer)
+      (switch-to-buffer* u)
+      (update-forced)
+      (check= (run) "done")
+      (buffer-pretend-saved u)
+      (buffer-close u))
+    ;; a document in system/tmp
+    (string-save (string-append "<TeXmacs|2.1>\n\n<style|generic>\n\n"
+                                "<\\body>\n  x\n</body>\n")
+                 f)
+    (load-buffer f)
+    (switch-to-buffer* f)
+    (update-forced)
+    (check= (current-buffer) f)
+    (check= (run) '(error "insecure script"))
+    (buffer-pretend-saved f)
+    (buffer-close f)
+    (url-remove f)
+    (when (buffer-exists? old) (switch-to-buffer old))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Untrusted documents
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -494,6 +563,40 @@
   ;; '(gpg-set-default-key-fingerprint "F")) and (secure?
   ;; '(tm-gpg-collect-public-keys-from-buffer)) are #t.
   )
+
+;; The scripts of a document whose name is in the directories of TeXmacs
+;; (TEXMACS_SECURE_PATH) are trusted: they may call any function. The trust
+;; is the one of the current name of the buffer: it is lost when the
+;; document gets a name outside these directories (Save as), and found
+;; again with a name inside them. No file is written.
+(tm-define (crypto-test-script) "done")
+
+(define (test-trust)
+  (check-group "trust of renamed documents")
+  (let* ((old (current-buffer))
+         (u (new-buffer))
+         ;; the home directory is trusted, but not its system/tmp, where
+         ;; tmp puts the files of this suite (is_secure, url.cpp). (A name
+         ;; of the system such as "/tm-crypto-test-untrusted/doc.tm" is
+         ;; relative on Windows, and renaming a buffer which has a view to
+         ;; a relative name overflows the stack there.)
+         (out (tmp "untrusted/doc.tm"))
+         (in (url-append (url-concretize "$TEXMACS_HOME_PATH")
+                         "crypto-test-trusted/doc.tm"))
+         (run (lambda ()
+                (tree->stree (texmacs-exec '(extern "crypto-test-script"))))))
+    (check-false (secure? '(crypto-test-script)))
+    (update-forced)
+    (check= (run) "done")
+    (buffer-rename u out)
+    (update-forced)
+    (check= (run) '(error "insecure script"))
+    (buffer-rename out in)
+    (update-forced)
+    (check= (run) "done")
+    (buffer-pretend-saved in)
+    (buffer-close in)
+    (when (buffer-exists? old) (switch-to-buffer old))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Without GnuPG
@@ -739,6 +842,7 @@
       (check-true (contains? s "gpg-passphrase-encrypted-buffer")))
     (with t (tree-import u "texmacs")
       (check-true (encrypted-buffer? t))
+      (check-true (encrypted-buffer-body? (tmfile-get t 'body)))
       (with enc (tree->string (tree-ref (tmfile-get t 'body) 0 0))
         (check-false (gpg-passphrase-decrypt enc "wrong-pass"))
         (with dec (gpg-passphrase-decrypt enc "doc-pass")
@@ -755,6 +859,51 @@
   (let ((home (url->system (url-concretize "$TEXMACS_HOME_PATH")))
         (user (url->system (url-concretize "~/.TeXmacs_Upsilon"))))
     (!= home user)))
+
+;; The passphrase of a secret key, as the wallet checks it
+;; (wallet-correct-passphrase?, gpg-wallet.scm) and opens it (gpg-decrypt):
+;; in a GnuPG home whose gpg-agent keeps the passphrases in its cache, as by
+;; default (no gpg-agent.conf), a wrong passphrase is refused also after the
+;; right one was given (once a key is unlocked, the agent would decrypt
+;; whatever passphrase is given, if its cache were not cleared:
+;; gpg-forget-passphrases)
+(define (gpg-short-home name)
+  ;; in the temporary directory of TeXmacs when its name is short enough
+  ;; for the sockets of gpg-agent, else in /tmp
+  (with u (url-append (url-temp-dir) name)
+    (if (< (string-length (url->system u)) gpg-socket-max) u (gpg-tmp name))))
+
+(define (test-gpg-key-passphrase)
+  (check-group "gpg passphrase of a key")
+  (let ((dir (gpg-short-home "gnupg-pw")))
+    (dynamic-wind
+      (lambda ()
+        (when (not (url-exists? dir)) (system-mkdir dir))
+        (when (not (or (os-mingw?) (os-win32?)))
+          (system-1 "chmod 700" dir)))
+      (lambda ()
+        (with r (gpg-run "--homedir" (url->system dir) "--batch" "--no-tty"
+                         "--pinentry-mode" "loopback" "--passphrase" "pw-one"
+                         "--quick-gen-key"
+                         "TeXmacs Test <texmacs-test@example.invalid>"
+                         "default" "default" "never")
+          (if (!= (car r) "0")
+              (skip "gpg passphrase of a key" (caddr r))
+              (let* ((fpr (car (gpg-secret-key-fingerprints dir)))
+                     (enc (gpg-encrypt secret-text (list fpr) dir)))
+                (check-true (string? enc))
+                (check-false (gpg-correct-passphrase? fpr "pw-two" dir))
+                (check-true (gpg-correct-passphrase? fpr "pw-one" dir))
+                ;; the key was unlocked: still refused
+                (check-false (gpg-correct-passphrase? fpr "pw-two" dir))
+                (check-false (gpg-decryptable? enc "pw-two" dir))
+                (check-true (gpg-decryptable? enc "pw-one" dir))
+                (check-false (gpg-decryptable? enc "" dir))
+                (check= (gpg-decrypt enc "pw-one" dir) secret-text)
+                (check-false (gpg-correct-passphrase? fpr "pw-two" dir))))))
+      (lambda ()
+        (gpg-kill-agent dir)
+        (system-rmdir-recursive dir)))))
 
 (define (test-gpg)
   (with ok (gpg-available)
@@ -780,6 +929,8 @@
                                (lambda () (test-gpg-keys dir other fpr)))
                       (guarded "gpg passphrase"
                                (lambda () (test-gpg-passphrase dir)))
+                      (guarded "gpg passphrase of a key"
+                               test-gpg-key-passphrase)
                       (cond
                         ((not (scratch-home?))
                          (skip "GnuPG in documents"
@@ -822,11 +973,14 @@
       (guarded "base64" test-base64)
       (guarded "tree-hash" test-tree-hash)
       (guarded "random numbers" test-random)
+      (guarded "secure random numbers" test-secure-random)
       (guarded "generate-password" test-generate-password)
       (guarded "server passwords" test-server-passwords)
       (guarded "format" test-format)
+      (guarded "untrusted temporary files" test-untrusted-tmp)
       (guarded "document passphrases" test-buffer-passphrases)
       (guarded "secure gpg functions" test-secure)
+      (guarded "trust of renamed documents" test-trust)
       (guarded "gpg" test-gpg))
     (lambda ()
       (system-rmdir-recursive crypto-dir)))

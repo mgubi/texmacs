@@ -14,6 +14,7 @@
 #include "sys_utils.hpp"
 #include "analyze.hpp"
 #include "hashmap.hpp"
+#include "iterator.hpp"
 #include "scheme.hpp"
 
 #ifdef QTTEXMACS
@@ -33,6 +34,7 @@
 static int web_nr=0;
 static array<tree> web_cache (MAX_CACHED);
 static hashmap<tree,tree> web_cache_resolve ("");
+static hashmap<tree,bool> web_cache_stale (false);
 
 /******************************************************************************
 * The web from a page of the browser (the Emscripten build)
@@ -330,10 +332,19 @@ get_cache (url name) {
 static url
 set_cache (url name, url tmp) {
   web_cache_resolve->reset (web_cache [web_nr]);
+  web_cache_stale->reset (web_cache [web_nr]);
   web_cache [web_nr]= name->t;
   web_cache_resolve (name->t)= tmp->t;
   web_nr= (web_nr+1) % MAX_CACHED;
   return tmp;
+}
+
+void
+web_cache_refresh () {
+  // the files in the cache are downloaded again when they are next needed;
+  // a file which cannot be downloaded keeps the copy of before
+  iterator<tree> it= iterate (web_cache_resolve);
+  while (it->busy ()) web_cache_stale (it->next ())= true;
 }
 
 void
@@ -342,6 +353,7 @@ web_cache_invalidate (url name) {
     if (web_cache[i] == name->t) {
       web_cache[i]= tree ("");
       web_cache_resolve->reset (name->t);
+      web_cache_stale->reset (name->t);
     }
 }
 
@@ -375,8 +387,11 @@ get_from_web (url name) {
     url u= url_root ("https") * (url ("www.doi.org") * name[2]);
     return get_from_web (u);
   }
-  url res= get_cache (name);
-  if (!is_none (res)) return res;
+  url old= get_cache (name);
+  if (!is_none (old)) {
+    if (!web_cache_stale[name->t]) return old;
+    web_cache_stale->reset (name->t);
+  }
 
 #ifdef __EMSCRIPTEN__
   if (web_http_available ()) {
@@ -386,17 +401,22 @@ get_from_web (url name) {
     static hashmap<string,int> failed (0);
     string key= as_string (name);
     int now= (int) (texmacs_time () / 1000);
-    if (failed->contains (key) && now - failed[key] < 10) return url_none ();
+    // (a copy of before, if any, is kept when it cannot be downloaded again)
+    if (failed->contains (key) && now - failed[key] < 10) return old;
     int id= web_request (key, array<string> (), "", false, true);
     int status; string bytes;
     web_answer (id, status, bytes);
     if (status < 200 || status >= 300 || N(bytes) == 0) {
       failed (key)= now;
-      return url_none ();
+      return old;
     }
     failed->reset (key);
     url tmp= url_temp ();
-    if (save_string (tmp, bytes, false)) return url_none ();
+    if (save_string (tmp, bytes, false)) return old;
+    if (!is_none (old)) {
+      web_cache_resolve (name->t)= tmp->t;
+      return tmp;
+    }
     return set_cache (name, tmp);
   }
 #endif
@@ -411,35 +431,54 @@ get_from_web (url name) {
   qt_download_file (name_s, tmp_s);
 #else
   string tool= fetch_tool ();
-  if (tool == "") return url_none ();
+  if (tool == "") return old;
   
   url tmp= url_temp ();
   string tmp_s= escape_sh (concretize (tmp));
   string cmd= "";
   
+  // give up when nothing is received for a while, as qt_download_file does;
+  // a page of error (404...) is not a copy of the file
+  string s= get_preference ("http request timeout");
+  string timeout= "10";
+  if (is_int (s) && as_int (s) > 0) timeout= s;
+
   if (tool == "wget") {
     cmd= "wget --header='User-Agent: TeXmacs-" TEXMACS_VERSION "' -q";
-    cmd << " --tries=1";
+    cmd << " --tries=1 --timeout=" << timeout;
     cmd << " -O " << tmp_s << " " << escape_sh (web_encode (as_string (name)));
   }
   
   if (tool == "curl") {
     cmd= "curl --user-agent TeXmacs-" TEXMACS_VERSION;
     cmd << curl_proxy_option (as_string (name));
+    cmd << " --fail --silent --connect-timeout " << timeout;
+    cmd << " --speed-limit 1 --speed-time " << timeout;
     cmd << " " << escape_sh (web_encode (as_string (name)));
     cmd << " --output " << tmp_s;
   }
 
   //cout << cmd << LF;
-  system (cmd);
+  if (system (cmd) != 0) {
+    // a transfer which failed or was given up (timeout) may have left a
+    // part of the file: it is not a copy of the file
+    remove (tmp);
+    return old;
+  }
   //cout << "got " << name << " as " << tmp << LF;
 #endif // QTTEXMACS, Qt >= 6.0
 
   if (file_size (tmp) <= 0) {
+    // not downloaded (offline...): the copy of before, if any
     remove (tmp);
-    return url_none ();
+    return old;
   }
-  else return set_cache (name, tmp);
+  if (!is_none (old)) {
+    // downloaded again: the new copy replaces the old one in the cache
+    web_cache_resolve (name->t)= tmp->t;
+    return tmp;
+  }
+  return set_cache (name, tmp);
 }
 
 /******************************************************************************

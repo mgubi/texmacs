@@ -32,3 +32,6 @@ release 200 700
 wait 500
 snapshot t5-ink
 wait 300
+# the output, which run.sh checks
+expect choice: Second
+expect enum: Beta

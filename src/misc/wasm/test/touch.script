@@ -11,7 +11,9 @@
 #      nothing ("selection":false); the view goes on after the finger is
 #      lifted ("glided":true);
 #   4. a swipe down brings it back up ("back":true);
-#   5. a finger which rests, then moves, selects ("selection":true).
+#   5. a finger which rests, then moves, selects ("selection":true);
+#   6. a finger put down on the thumb of the scroll bar drags it: the
+#      document goes down ("thumb":true; it panned the view up instead).
 wait 15000
 eval (async()=>{for(let i=0;i<120&&!(typeof _malloc=='function'&&typeof _vue_web_scheme_eval=='function');i++)await new Promise(r=>setTimeout(r,1000));await new Promise(r=>setTimeout(r,3000));return 'ready'})()
 eval window.tmS=(c)=>{const n=lengthBytesUTF8(c)+1,p=_malloc(n);stringToUTF8(c,p,n);const r=UTF8ToString(_vue_web_scheme_eval(p));_free(p);return r}; window.cv=()=>document.querySelector('#canvas').getBoundingClientRect(); window.ptr=(type,x,y,buttons)=>{const r=cv();document.querySelector('#canvas').dispatchEvent(new PointerEvent(type,{pointerType:'touch',pointerId:7,isPrimary:true,clientX:r.left+x,clientY:r.top+y,button:type=='pointermove'?-1:0,buttons:buttons,bubbles:true,cancelable:true,composed:true}))}; window.pause=(ms)=>new Promise(r=>setTimeout(r,ms)); window.tap=async(x,y)=>{ptr('pointerdown',x,y,1);await pause(90);ptr('pointerup',x,y,0);ptr('pointerleave',x,y,0)}; window.drag=async(x,y,dx,dy,steps,rest)=>{ptr('pointerdown',x,y,1);await pause(rest);for(let i=1;i<=steps;i++){await pause(16);ptr('pointermove',x+dx*i/steps,y+dy*i/steps,1)}if(rest)await pause(100);ptr('pointerup',x+dx,y+dy,0);ptr('pointerleave',x+dx,y+dy,0)}; 'ok'
@@ -19,3 +21,4 @@ eval (async()=>{const n=+tmS('(number->string (length (buffer-list)))');await ta
 eval (async()=>{tmS('(begin (load-buffer (string->url "$TEXMACS_PATH/doc/about/welcome/texmacs-vue.en.tm")) "")');await pause(5000);const y0=+tmS('(number->string (get-scroll-y))');await drag(560,600,0,-350,18,0);await pause(80);const y1=+tmS('(number->string (get-scroll-y))');await pause(2500);const y2=+tmS('(number->string (get-scroll-y))');window.y0=y0;return JSON.stringify({scrolled:y1<y0,glided:y2<y1,selection:tmS('(if (selection-active-any?) "yes" "no")')=='yes'})})()
 eval (async()=>{await drag(560,250,0,500,6,0);await pause(3000);return JSON.stringify({back:+tmS('(number->string (get-scroll-y))')>=window.y0})})()
 eval (async()=>{await drag(260,400,250,40,10,600);await pause(1500);return JSON.stringify({selection:tmS('(if (selection-active-any?) "yes" "no")')=='yes'})})()
+eval (async()=>{tmS('(begin (load-buffer (string->url "$TEXMACS_PATH/doc/about/welcome/texmacs-vue.en.tm")) "")');await pause(3000);const r=cv();const x=1273-r.left,y=72-r.top;const y0=+tmS('(number->string (get-scroll-y))');await drag(x,y,0,300,15,0);await pause(800);return JSON.stringify({thumb:+tmS('(number->string (get-scroll-y))')<y0-1000})})()

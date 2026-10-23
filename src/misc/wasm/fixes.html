@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TeXmacs Fixes</title>
+<meta name="description" content="TeXmacs Fixes: the stock GNU TeXmacs with bug fixes which are not yet in its releases, for macOS, Linux and Windows.">
+<!-- The packages are the files of the pre-release fixes-latest of the
+     repository (put there by .github/workflows/fixes.yml of wip_fixes),
+     listed from the public API of GitHub, as index.html does for TeXmacs
+     Upsilon (its style and its script, with other files) -->
+<link rel="icon" href="favicon.ico" sizes="16x16 32x32 48x48">
+<style>
+  :root {
+    --bg: #f6f6f4; --card: #ffffff; --text: #1d1d1f; --muted: #5d5d63;
+    --line: #dcdcd8; --accent: #0b5cad; --accent-bg: #e8f0fa; --warn: #8a5a00;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #18181a; --card: #222225; --text: #ececee; --muted: #a2a2aa;
+      --line: #38383d; --accent: #7db4ff; --accent-bg: #1f2c3d; --warn: #e0b060;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #18181a; --card: #222225; --text: #ececee; --muted: #a2a2aa;
+    --line: #38383d; --accent: #7db4ff; --accent-bg: #1f2c3d; --warn: #e0b060;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 16px/1.5 -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif; }
+  main { max-width: 860px; margin: 0 auto; padding: 32px 16px 48px; }
+  header { display: flex; align-items: center; gap: 16px; margin-bottom: 8px; }
+  header img { width: 56px; height: 56px; }
+  h1 { font-size: 28px; line-height: 1.2; margin: 0; }
+  h2 { font-size: 20px; margin: 32px 0 12px; }
+  p { margin: 8px 0; }
+  a { color: var(--accent); }
+  .lead { color: var(--muted); }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+          padding: 14px 16px; margin: 10px 0; display: flex; gap: 16px;
+          align-items: center; justify-content: space-between; flex-wrap: wrap; }
+  .card .what { flex: 1 1 320px; min-width: 0; }
+  .card .name { font-weight: 600; }
+  .card .desc { color: var(--muted); font-size: 14px; margin-top: 2px; }
+  .card .meta { color: var(--muted); font-size: 13px; margin-top: 4px; overflow-wrap: anywhere; }
+  .button { display: inline-block; padding: 8px 14px; border-radius: 8px; white-space: nowrap;
+            background: var(--accent-bg); color: var(--accent); text-decoration: none; font-weight: 600; }
+  .button:hover { text-decoration: underline; }
+  .missing { color: var(--muted); font-size: 14px; white-space: nowrap; }
+  .note { border-left: 3px solid var(--warn); padding: 4px 12px; color: var(--muted); font-size: 14px; }
+  code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 14px; overflow-wrap: anywhere; }
+  h3 { font-size: 16px; margin: 20px 0 4px; }
+  ul, ol { margin: 6px 0; padding-left: 22px; }
+  li { margin: 4px 0; }
+  .toc { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0 0; }
+  .toc a { padding: 4px 12px; border: 1px solid var(--line); border-radius: 999px;
+           background: var(--card); text-decoration: none; font-size: 14px; }
+  .toc a:hover { text-decoration: underline; }
+  section { border-top: 1px solid var(--line); margin-top: 40px; }
+  section > h2 { margin-top: 24px; }
+  pre { background: var(--card); border: 1px solid var(--line); border-radius: 8px;
+        padding: 10px 12px; overflow-x: auto; }
+  pre code { overflow-wrap: normal; }
+  footer { margin-top: 40px; color: var(--muted); font-size: 14px; }
+  .links { display: flex; gap: 10px; flex-wrap: wrap; margin: 18px 0 0; }
+  .button.primary { background: var(--accent); color: var(--card); }
+  .hero { margin: 24px 0 8px; }
+  .hero img { display: block; width: 100%; height: auto; border-radius: 10px;
+              border: 1px solid var(--line); box-shadow: 0 6px 24px rgba(0,0,0,.12); }
+  .hero figcaption { color: var(--muted); font-size: 14px; margin-top: 8px; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <img src="texmacs-64.png" alt="" width="56" height="56">
+    <h1>TeXmacs Fixes</h1>
+  </header>
+  <p class="lead">TeXmacs Fixes is the stock
+  <a href="https://texmacs.org">GNU TeXmacs</a> (its development version,
+  the SVN trunk) with bug fixes which are not yet in its releases: crashes,
+  conversions to and from LaTeX, BibTeX, Windows paths, the Scheme bridge,
+  editing modes and more. It adds nothing else: no new interface, no new
+  features, the Guile 1.8 and the Qt 6 interface of the official TeXmacs.
+  It is the conservative version, for those who want the fixes now;
+  <a href="./">TeXmacs Upsilon</a> is the bleeding-edge one.</p>
+  <p class="lead">Each fix is a pull request of the branch
+  <a href="https://github.com/mgubi/texmacs/tree/wip_fixes"><code>wip_fixes</code></a>,
+  made to be proposed to the official TeXmacs:
+  <a href="https://github.com/mgubi/texmacs/pulls?q=is%3Apr+is%3Amerged+base%3Awip_fixes">the
+  fixes in it</a>. The builds below are made by the continuous integration
+  of the repository from a state of that branch: they are tested, but they
+  are not releases. Problems go to the
+  <a href="https://github.com/mgubi/texmacs/issues">issues of the
+  repository</a>, not to the official TeXmacs.</p>
+
+  <div id="lists"><p class="lead">Loading the list of the files&hellip;</p></div>
+
+  <p class="note">TeXmacs Fixes installs beside the stock TeXmacs and
+  TeXmacs Upsilon, under its own name, and shares the preferences and the
+  files of the user of the stock TeXmacs (<code>~/.TeXmacs</code>, on
+  Windows <code>%APPDATA%\TeXmacs</code>): your styles, packages and plugins
+  are there for both. They should not run at the same time, as each one
+  writes the preferences it has when it quits.</p>
+
+  <footer>
+    All the files are those of the pre-release
+    <a href="https://github.com/mgubi/texmacs/releases/tag/fixes-latest">fixes-latest</a>,
+    whose label names the commit each one was built from.
+  </footer>
+</main>
+<script>
+(function () {
+  var RELEASE = 'https://github.com/mgubi/texmacs/releases/tag/fixes-latest';
+  var API = 'https://api.github.com/repos/mgubi/texmacs/releases/tags/fixes-latest';
+  // the platforms, and the files of each one (by the start and end of the
+  // name, as the workflows make them)
+  var GROUPS = [
+    { title: 'macOS', note: 'For macOS 13 or later. Signed ad hoc and not notarized: macOS refuses to open the ' +
+        'application the first time. Open it from its context menu (Open), or allow it in System Settings &gt; ' +
+        'Privacy &amp; Security, or run <code>xattr -dr com.apple.quarantine "/Applications/TeXmacs Fixes.app"</code>. ' +
+        'It installs beside the stock TeXmacs as <code>TeXmacs Fixes.app</code>; .tm files keep opening with the ' +
+        'stock TeXmacs when it is there (Open With chooses).',
+      kinds: [
+        { test: /-macos-arm64\.dmg$/, name: 'Apple silicon', desc: 'Qt 6, for the Macs with an M1 or later.' },
+        { test: /-macos-x86_64\.dmg$/, name: 'Intel', desc: 'Qt 6, for the Macs with an Intel processor.' } ] },
+    { title: 'Linux', note: 'For x86_64. The AppImage is one file, with its libraries, for most distributions ' +
+        '(Ubuntu 22.04, Debian 12, Fedora 36 or later): make it executable and run it, ' +
+        '<code>chmod +x texmacs-fixes-x86_64.AppImage; ./texmacs-fixes-x86_64.AppImage</code>. ' +
+        'Its menu entry, icon and command (texmacs-fixes) are its own.',
+      kinds: [
+        { test: /^texmacs-fixes-.*\.AppImage$/, name: 'AppImage', desc: 'Qt 6, in one file.' } ] },
+    { title: 'Windows', note: 'For x86_64. The installer puts TeXmacs Fixes in its own folder, with its entries in ' +
+        'the Start menu and an uninstaller, beside the stock TeXmacs, which it leaves alone (opening .tm files with ' +
+        'TeXmacs Fixes is an option of the installer); no administrator rights are needed. The archive: unpack, and ' +
+        'run <code>TeXmacs-Windows\\bin\\texmacs.exe</code>.',
+      kinds: [
+        { test: /^texmacs-fixes-.*-setup\.exe$/, name: 'Installer', desc: 'Qt 6.' },
+        { test: /^texmacs-fixes-windows-/, name: 'Zip', desc: 'Qt 6, nothing to install.' } ] } ];
+
+  function el (tag, cls, html) {
+    var e = document.createElement (tag);
+    if (cls) e.className = cls;
+    if (html !== undefined) e.innerHTML = html;
+    return e;
+  }
+  function text (s) {
+    return String (s).replace (/[&<>"]/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' } [c]; });
+  }
+  function size (n) {
+    return n >= 1048576 ? (n / 1048576).toFixed (0) + ' MB' : Math.max (1, Math.round (n / 1024)) + ' kB';
+  }
+  function day (iso) { return iso ? iso.slice (0, 10) : ''; }
+
+  function card (kind, asset) {
+    var c = el ('div', 'card');
+    var w = el ('div', 'what');
+    w.appendChild (el ('div', 'name', text (kind.name)));
+    w.appendChild (el ('div', 'desc', text (kind.desc)));
+    if (asset) {
+      var meta = text (asset.name) + ' &middot; ' + size (asset.size);
+      // the label: the platform and the commit, "(commit abc, 2026-10-18)"
+      var m = /\(([^)]*)\)\s*$/.exec (asset.label || '');
+      meta += ' &middot; ' + (m ? text (m[1]) : 'updated ' + day (asset.updated_at));
+      w.appendChild (el ('div', 'meta', meta));
+    }
+    c.appendChild (w);
+    if (asset) {
+      var a = el ('a', 'button', 'Download');
+      a.href = asset.browser_download_url;
+      c.appendChild (a);
+    }
+    else c.appendChild (el ('span', 'missing', 'not built yet'));
+    return c;
+  }
+
+  function show (assets) {
+    var box = document.getElementById ('lists');
+    box.innerHTML = '';
+    var used = {};
+    GROUPS.forEach (function (g) {
+      box.appendChild (el ('h2', '', text (g.title)));
+      g.kinds.forEach (function (k) {
+        var found = null;
+        assets.forEach (function (a) { if (!found && k.test.test (a.name)) found = a; });
+        if (found) used[found.name] = true;
+        box.appendChild (card (k, found));
+      });
+      box.appendChild (el ('p', 'note', g.note));
+    });
+    var others = assets.filter (function (a) { return !used[a.name]; });
+    if (others.length) {
+      box.appendChild (el ('h2', '', 'Other files'));
+      others.forEach (function (a) {
+        box.appendChild (card ({ name: a.name, desc: a.label || '' }, a));
+      });
+    }
+  }
+
+  function failed () {
+    document.getElementById ('lists').innerHTML =
+      '<h2>Desktop</h2><p>The list of the files could not be loaded. They are on the page of the ' +
+      '<a href="' + RELEASE + '">pre-release fixes-latest</a>.</p>';
+  }
+
+  fetch (API, { headers: { 'Accept': 'application/vnd.github+json' } })
+    .then (function (r) { if (!r.ok) throw new Error (r.status); return r.json (); })
+    .then (function (rel) { show (rel.assets || []); })
+    .catch (failed);
+}) ();
+</script>
+</body>
+</html>

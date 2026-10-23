@@ -126,6 +126,7 @@
   (fcolorbox "xcolor")
   (colorbox "xcolor")
   (textcolor "xcolor")
+  (sout ("normalem" "ulem"))
 
   (euro "eurosym")
 

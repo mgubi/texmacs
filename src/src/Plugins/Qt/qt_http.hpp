@@ -19,7 +19,7 @@
 
 #include <QNetworkReply>
 
-tree qt_http_from_json (string s, int mode= 0);
+tree qt_http_from_json (string s);
 
 // post raw data
 int qt_http_post (string& ret, string url, array<string> headers_attr,

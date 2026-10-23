@@ -95,11 +95,15 @@
   repository at each change: they are tested, but they are not releases.
   Problems go to the <a href="#report">issues of the repository</a>, not to
   the official TeXmacs.</p>
+  <p class="lead">Only the bug fixes, on the stock TeXmacs, without the
+  rest: <a href="fixes.html">TeXmacs Fixes</a>, the conservative
+  version.</p>
   <div class="links">
     <a class="button primary" href="texmacs.html">Open in the browser</a>
     <a class="button" href="#downloads">Download</a>
     <a class="button" href="features.html">Features</a>
     <a class="button" href="changes.html">Recent changes</a>
+    <a class="button" href="thanks.html">Thanks</a>
   </div>
   <figure class="hero">
     <a href="features.html"><img src="screenshots/opentype-math-fonts.webp" width="1600" height="1025"
@@ -327,7 +331,7 @@ make</code></pre>
       (the same tab can open it by itself on errors).</li>
       <li>On macOS and Linux, starting TeXmacs from a terminal shows its
       messages there, and the last ones before a crash: on macOS
-      <code>/Applications/TeXmacs.app/Contents/MacOS/TeXmacs</code>, on Linux
+      <code>"/Applications/TeXmacs Upsilon.app/Contents/MacOS/TeXmacs"</code> (or <code>TeXmacs Upsilon Vue.app</code>), on Linux
       the command given above.</li>
       <li>After a crash on macOS, the window of macOS about it has a button
       <em>Report&hellip;</em>: copy the text of the report into the
@@ -357,19 +361,31 @@ make</code></pre>
     { title: 'macOS', note: 'For Apple silicon and Intel, macOS 13 or later (Qt 6: Apple silicon only). ' +
         'Signed ad hoc and not notarized: macOS refuses to open the application the first time. ' +
         'Open it from its context menu (Open), or allow it in System Settings &gt; Privacy &amp; Security, ' +
-        'or run <code>xattr -dr com.apple.quarantine /Applications/TeXmacs.app</code>.',
+        'or run <code>xattr -dr com.apple.quarantine "/Applications/TeXmacs Upsilon.app"</code> ' +
+        '(<code>TeXmacs Upsilon Vue.app</code>, <code>TeXmacs Upsilon Qt.app</code>). ' +
+        'Each one installs beside the stock TeXmacs and the others, with preferences of its own.',
       kinds: [
         { test: /-cocoa-universal\.dmg$/, name: 'Cocoa (native interface)', desc: 'The menus, bars and dialogs of macOS; documents drawn by the GPU.' },
         { test: /-vue-universal\.dmg$/, name: 'Vue', desc: 'The interface drawn by TeXmacs itself, by the GPU; the same as in the browser.' },
         { test: /^texmacs-qt-macos-/, name: 'Qt 6', desc: 'The interface of the official TeXmacs releases. Apple silicon.' } ] },
-    { title: 'Linux', note: 'For x86_64, built on Ubuntu 24.04. Unpack, and run, in the folder of the archive, ' +
-        '<code>TEXMACS_PATH=$PWD/TeXmacs TeXmacs/bin/texmacs</code>. The Qt build uses the Qt 6 of the system ' +
-        '(on Ubuntu: <code>sudo apt install libqt6svg6 qt6-qpa-plugins</code>); the Vue build brings its libraries.',
+    { title: 'Linux', note: 'For x86_64. The AppImages are one file each, with their libraries, for most ' +
+        'distributions (Ubuntu 22.04, Debian 12, Fedora 36 or later): make it executable and run it, ' +
+        '<code>chmod +x texmacs-upsilon-vue-x86_64.AppImage; ./texmacs-upsilon-vue-x86_64.AppImage</code>. ' +
+        'The archives are built on Ubuntu 24.04: unpack, and run, in the folder of the archive, ' +
+        '<code>TEXMACS_PATH=$PWD/TeXmacs TeXmacs/bin/texmacs</code>; the Qt one uses the Qt 6 of the system ' +
+        '(on Ubuntu: <code>sudo apt install libqt6svg6 qt6-qpa-plugins</code>).',
       kinds: [
+        { test: /^texmacs-upsilon-qt-.*\.AppImage$/, name: 'Qt 6, AppImage', desc: 'The interface of the official TeXmacs releases, in one file.' },
+        { test: /^texmacs-upsilon-vue-.*\.AppImage$/, name: 'Vue, AppImage', desc: 'The interface drawn by TeXmacs itself (SDL3, OpenGL), in one file.' },
         { test: /^texmacs-linux-/, name: 'Qt 6', desc: 'The interface of the official TeXmacs releases.' },
         { test: /^texmacs-vue-linux-/, name: 'Vue', desc: 'The interface drawn by TeXmacs itself (SDL3, OpenGL).' } ] },
-    { title: 'Windows', note: 'For x86_64: unpack, and run <code>TeXmacs-Windows\\bin\\texmacs.exe</code>.',
+    { title: 'Windows', note: 'For x86_64. The installers put TeXmacs Upsilon in its own folder, with its entries in ' +
+        'the Start menu and an uninstaller, beside the stock TeXmacs, which they leave alone (opening .tm files with ' +
+        'Upsilon is an option of the installer); no administrator rights are needed. The archives: unpack, and run ' +
+        '<code>TeXmacs-Windows\\bin\\texmacs.exe</code>.',
       kinds: [
+        { test: /^texmacs-upsilon-qt-.*-setup\.exe$/, name: 'Qt 6, installer', desc: 'The interface of the official TeXmacs releases.' },
+        { test: /^texmacs-upsilon-vue-.*-setup\.exe$/, name: 'Vue, installer', desc: 'The interface drawn by TeXmacs itself (SDL3, OpenGL).' },
         { test: /^texmacs-windows-/, name: 'Qt 6', desc: 'The interface of the official TeXmacs releases.' },
         { test: /^texmacs-vue-windows-/, name: 'Vue', desc: 'The interface drawn by TeXmacs itself (SDL3, OpenGL).' } ] } ];
 

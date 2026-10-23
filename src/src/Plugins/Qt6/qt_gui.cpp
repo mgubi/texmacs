@@ -9,6 +9,7 @@
  * in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
  ******************************************************************************/
 
+#include "gui_test.hpp"
 #include <locale.h>
 
 #include "convert.hpp"
@@ -207,6 +208,10 @@ needing_update (false)
     retina_icons= get_user_preference ("retina-icons") == "on"? 2: 1;
   if (has_user_preference ("retina-scale"))
     retina_scale= as_double (get_user_preference ("retina-scale"));
+  // the style sheet of the theme was applied when the application was
+  // created (QTMApplication::load), when retina_scale was not yet known:
+  // apply it again, with its sizes scaled accordingly
+  if (!headless_mode && tm_style_sheet != "") init_style_sheet (qApp);
 #endif
 }
 
@@ -612,6 +617,7 @@ qt_gui_rep::event_loop () {
     app = QApplication::instance ();
   update();
     //need_update();
+  gui_test_start (); // TEXMACS_TEST_SCRIPT=<file>: a scripted test
   app->exec();
 }
 
@@ -1187,6 +1193,14 @@ beep () {
   QApplication::beep();
 }
 
+void
+image_gc (string name) {
+    // Garbage collect images of a given name; the Qt port keeps no image
+    // cache of its own (qt_pic_cache lives as long as the session), so
+    // there is nothing to collect
+  (void) name;
+}
+
 bool
 check_event (int type) {
     // Check whether an event of one of the above types has occurred;
@@ -1277,6 +1291,19 @@ command_queue::exec_pending () {
     }
   } else
     wait = false;
+}
+
+bool
+command_queue::has_due (time_t now) {
+  for (int i= 0; i < N(start_times); i++)
+    if (now - start_times[i] >= 0) return true;
+  return false;
+}
+
+bool
+qt_gui_rep::test_busy () {
+  return !waiting_events.is_empty () || needing_update ||
+         delayed_commands.has_due (texmacs_time ());
 }
 
 void

@@ -10,6 +10,7 @@
 ******************************************************************************/
 
 #include "glue.hpp"
+#include "gui_test.hpp"
 
 // the glue type uint (see build-glue): the C library of macOS declares it,
 // that of the browser build does not (a typedef may be repeated in C++)
@@ -1301,6 +1302,7 @@ tmscm_to_list_tree (tmscm p) {
 #include "image_files.hpp"
 #include "web_files.hpp"
 #include "zip_files.hpp"
+#include "data_cache.hpp"
 #include "sys_utils.hpp"
 #include "client_server.hpp"
 #include "analyze.hpp"

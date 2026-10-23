@@ -162,6 +162,7 @@
 (define loop-queue '())
 (define loop-log '())
 (define loop-blocked '())
+(define loop-old-clients '()) ;; clients which do not know of cursors
 (define loop-active? #f)
 
 ;; NOTE: the messages are intercepted where they are sent, in client-send
@@ -208,6 +209,11 @@
                  (server-eval (list (loop-client-of fd) msg-id) cmd))
                 ((and (pair? cmd) (in? (car cmd) loop-blocked))
                  (noop))
+                ((and (pair? cmd) (== (car cmd) 'live-cursor)
+                      (in? fd loop-old-clients))
+                 ;; as a TeXmacs without the cursors of the others answers
+                 (client-error (list (loop-server-of fd) msg-id)
+                               "invalid command"))
                 (else
                   (client-eval (list (loop-server-of fd) msg-id) cmd)))))
       (loop (+ n 1)))))
@@ -346,6 +352,8 @@
 (define (test-connection-state)
   (check-group "state of the connections")
   (let* ((heard (priv '(client client-base) 'client-heard))
+         (ping-sent (priv '(client client-base) 'client-ping-sent))
+         (beat (priv '(client client-base) 'client-beat))
          (notify-heard (priv '(client client-base) 'client-notify-heard))
          (events (lambda () (reverse (map car notify-log)))))
     (set! notify-log '())
@@ -362,8 +370,25 @@
                                 "Connected to loophost as rt-alice ("))
     (check= (rcall 9101 '(remote-ping)) "pong")
     (check= (events) '())
-    ;; a server which says nothing for a while, and then again
-    (ahash-set! heard 9101 (- (texmacs-time) 40000))
+    ;; after a freeze of TeXmacs (the computer slept): the server was not
+    ;; heard for long, but no ping waited for an answer
+    (ahash-set! heard 9101 (- (texmacs-time) 200000))
+    (ahash-set! beat 9101 (- (texmacs-time) 200000))
+    (client-heartbeat 9101)
+    (check= (client-connection-state 9101) :connected)
+    (check-true (number? (ahash-ref ping-sent 9101)))
+    (loop-pump)
+    (check-false (ahash-ref ping-sent 9101))
+    ;; a ping sent just before the freeze: its answer may wait unread, and
+    ;; the heartbeat which runs late gives it a new chance
+    (ahash-set! ping-sent 9101 (- (texmacs-time) 200000))
+    (ahash-set! beat 9101 (- (texmacs-time) 200000))
+    (client-heartbeat 9101)
+    (check= (client-connection-state 9101) :connected)
+    (check-true (< (- (texmacs-time) (ahash-ref ping-sent 9101)) 10000))
+    (check= (events) '())
+    ;; a server which does not answer a ping for a while, and then again
+    (ahash-set! ping-sent 9101 (- (texmacs-time) 40000))
     (client-heartbeat 9101)
     (check= (client-connection-state 9101) :silent)
     (check-true (string-starts? (client-connection-status 9101)
@@ -371,6 +396,7 @@
     (client-heartbeat 9101)
     (check= (events) '(:silent))
     (notify-heard 9101)
+    (ahash-remove! ping-sent 9101)
     (check= (client-connection-state 9101) :connected)
     (check= (events) '(:silent :back))
     ;; a server which says nothing for too long: the connection is closed,
@@ -379,7 +405,7 @@
       (client-remote-eval 9102 '(remote-logged?)
                           (lambda (x) (set! r x))
                           (lambda (e) (set! r (list :error e))))
-      (ahash-set! heard 9102 (- (texmacs-time) 200000))
+      (ahash-set! ping-sent 9102 (- (texmacs-time) 200000))
       (check= (client-lost-connections) '())
       (client-heartbeat 9102)
       (check= r '(:error "no answer for 200 s"))
@@ -1357,14 +1383,30 @@
 
 (define (live-doc) (tm->stree (live-current-document lid)))
 
+;; The client side of the suite is one client: the tables of client-live,
+;; filled by live-cursor-watch when a live document is opened, have each
+;; document followed through one connection. Here, clid is followed
+;; through the connection of bob (9102), as if bob had opened it.
+
+(define (client-cursor server lid who pos)
+  ;; a position sent to the client by server, as the call back is called
+  (client-eval (list server -1) `(live-cursor ,lid ,who "rt-eve" "Eve E" ,pos))
+  (loop-pump))
+
 (define (test-live-cursors)
   (check-group "cursors of the users of a live document")
   (let* ((clid "tmfs://live/loophost/rt-cursors")
+         (lids (priv '(client client-live) 'live-cursor-lids))
+         (servers (priv '(client client-live) 'live-cursor-servers))
+         (cursors (priv '(client client-live) 'live-cursors))
+         (table (priv '(server server-live) 'live-cursor-table))
          (told (lambda (client)
                  (with l (list-filter (loop-received 'client client 'live-cursor)
                                       (lambda (c) (== (cadr c) clid)))
                    (and (nnull? l) (cddr (cAr l)))))))
     (set! loop-blocked '(live-modify))
+    (ahash-set! lids clid 9102)
+    (ahash-set! servers clid 9102)
     (ralice `(live-open ,clid))
     (rbob `(live-open ,clid))
     (check= (live-participants clid) '())
@@ -1384,13 +1426,103 @@
     (check= (ralice `(live-cursor ,clid #f)) #t)
     (check= (told 9002) '(9001 "rt-alice" "Alice A" #f))
     (check= (live-participants clid) '())
-    ;; not a position; not logged in; no such document
-    (check= (ralice `(live-cursor ,clid "x"))
-            '(:error "Error: read access denied"))
+    ;; not logged in; no such document
     (check= (ranon `(live-cursor ,clid (0 1)))
             '(:error "Error: read access denied"))
     (check= (ralice `(live-cursor "tmfs://live/loophost/rt-none" (0 1)))
             '(:error "Error: read access denied"))
+    ;; not a path which an editor accepts: (in Guile, 1.0 and 10^20 are
+    ;; integers), and nothing is relayed
+    (check-group "positions of cursors which are refused")
+    (for (pos (list "x" '(1.0) '(0 100000000000000000000) '(-1) '(a)
+                    (make-list 1001 0)))
+      (check= (ralice `(live-cursor ,clid ,pos))
+              '(:error "Error: invalid cursor position")))
+    (check= (told 9002) '(9001 "rt-alice" "Alice A" #f))
+    (check-true (live-cursor-position? '(0 999999999)))
+    (check-false (live-cursor-position? '(0 1000000000)))
+    ;; only from the clients which opened this very document: root did not
+    ;; open it, and a name with another server but the same last part is
+    ;; another document, for which no table is made
+    (check-group "cursors of the clients which opened the document only")
+    (let ((other "tmfs://live/elsewhere/rt-cursors"))
+      (check= (rroot `(live-cursor ,clid (0 1)))
+              '(:error "Error: live document not open"))
+      (check= (ralice `(live-cursor ,other (0 1)))
+              '(:error "Error: live document not open"))
+      (check-false (live-connected? other 9001))
+      (check-false (in? other (live-remote-connections 9001)))
+      (check-false (ahash-ref table (list clid 9003)))
+      (check-false (ahash-ref table (list other 9001)))
+      (check= (told 9002) '(9001 "rt-alice" "Alice A" #f)))
+    ;; a client which leaves leaves no cursor: its number is given again
+    (check-group "the cursor of a client which leaves")
+    (check= (rcarol `(live-cursor ,clid (0 2))) #t)
+    (check= (told 9002) '(9005 "rt-carol" "Carol C" (0 2)))
+    (ahash-set! table (list "tmfs://live/loophost/rt-gone" 9005)
+                (list "rt-carol" '(0)))
+    (server-remove 9005)
+    (loop-pump)
+    (with l (told 9002)
+      (check= (list (car l) (cAr l)) '(9005 #f)))
+    (check= (list-filter (map car (ahash-table->list table))
+                         (lambda (key) (== (cadr key) 9005)))
+            '())
+    (server-add 9005)
+    (server-login-uid "rt-carol" 9005 "rt-carol")
+    (check= (rcarol '(remote-logged?)) "yes")
+    ;; the client takes the cursors of a document from its server only,
+    ;; positions which are paths only, and a bounded number of them
+    (check-group "cursors which the client accepts")
+    (client-cursor 9102 clid 7001 '(0 1))
+    (check= (live-participants clid) '("Eve E"))
+    (client-cursor 9102 clid 7001 #f)
+    (check= (live-participants clid) '())
+    (client-cursor 9105 clid 7002 '(0 1))
+    (client-cursor 9102 "tmfs://live/loophost/rt-other" 7003 '(0 1))
+    (client-cursor 9102 clid 7004 '(1.0))
+    (client-cursor 9102 clid 7005 '(0 100000000000000000000))
+    (check= (live-participants clid) '())
+    (check= (ahash-size cursors) 0)
+    (for (i (.. 0 300))
+      (client-cursor 9102 clid (+ 8000 i) '(0 1)))
+    (check= (ahash-size cursors) 256)
+    (client-cursor 9102 clid 8000 '(0 2))
+    (check= (third (ahash-ref cursors (list clid 8000))) '(0 2))
+    (for (i (.. 0 300))
+      (client-cursor 9102 clid (+ 8000 i) #f))
+    (check= (ahash-size cursors) 0)
+    ;; the colours of the users of two servers are not shared
+    (with color (priv '(client client-live) 'live-cursor-color)
+      (check-false (== (color 9102 7001) (color 9105 7001))))
+    ;; a client which does not know of cursors (a stock TeXmacs) is told
+    ;; once, and refuses: it is not told again
+    (set! loop-old-clients '(9002))
+    (with n (lambda () (length (list-filter (loop-received 'client 9002 'live-cursor)
+                                            (lambda (c) (== (cadr c) clid)))))
+      (with before (n)
+        (check= (ralice `(live-cursor ,clid (0 4))) #t)
+        (check= (n) (+ before 1))
+        (check= (ralice `(live-cursor ,clid (0 5))) #t)
+        (check= (n) (+ before 1))))
+    (set! loop-old-clients '())
+    (ahash-remove! (priv '(server server-live) 'live-cursor-refused) 9002)
+    ;; a live document of which no view is left is no longer followed (the
+    ;; poll stops with the last one), and the others are told that we left
+    (with gone "tmfs://live/loophost/rt-cursors-gone"
+      (let ((sent (priv '(client client-live) 'live-cursor-sent))
+            (poll (priv '(client client-live) 'live-cursor-poll)))
+        (ahash-set! lids gone 9102)
+        (ahash-set! servers gone 9102)
+        (ahash-set! sent gone '(0 1))
+        (poll)
+        (loop-pump)
+        (check-false (ahash-ref lids gone))
+        (check-false (ahash-ref sent gone))
+        (check= (ahash-ref servers gone) 9102)
+        (ahash-remove! servers gone)))
+    (ahash-remove! lids clid)
+    (ahash-remove! servers clid)
     (set! loop-blocked '())))
 
 (define (test-live)

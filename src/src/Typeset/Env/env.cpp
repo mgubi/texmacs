@@ -38,9 +38,9 @@ edit_env_rep::edit_env_rep (drd_info& drd2,
   base_file_name (base_file_name2),
   cur_file_name (base_file_name2),
   secure (is_secure (base_file_name2)),
-  local_ref (local_ref2), global_ref (global_ref2),
-  local_aux (local_aux2), global_aux (global_aux2),
-  local_att (local_att2), global_att (global_att2),
+  local_ref (local_ref2), global_ref (&global_ref2),
+  local_aux (local_aux2), global_aux (&global_aux2),
+  local_att (local_att2), global_att (&global_att2),
   missing (UNINIT), redefined (), touched (false),
   read_unknown (false), rec_keys (NULL), rec_values (NULL),
   rec_key_set (NULL), rec_bindings (NULL), rec_merged (NULL), rec_held (NULL),
@@ -160,9 +160,9 @@ edit_env_rep::lookup_value (string name) {
   if (N(name) == 0) return tree (UNINIT);
   string key= name (1, N(name));
   if (name[0] == 'a')
-    return local_att->contains (key)? local_att [key]: global_att [key];
+    return local_att->contains (key)? local_att [key]: (*global_att) [key];
   int type= (name[0] == '1') ? 1 : 0;
-  tree value= local_ref->contains (key)? local_ref [key]: global_ref [key];
+  tree value= local_ref->contains (key)? local_ref [key]: (*global_ref) [key];
   if (is_func (value, TUPLE) && (N(value) >= 2)) value= value[type];
   else if (type == 1) value= tree (UNINIT);
   return value;
@@ -449,9 +449,9 @@ value_hash64 (tree t) {
 unsigned long long
 edit_env_rep::labels_stamp () {
   return mix64 (local_ref->stamp ()) ^
-         mix64 (global_ref->stamp () * 0x9E3779B97F4A7C15ULL + 1) ^
+         mix64 ((*global_ref)->stamp () * 0x9E3779B97F4A7C15ULL + 1) ^
          mix64 (local_att->stamp () * 0x9E3779B97F4A7C15ULL + 2) ^
-         mix64 (global_att->stamp () * 0x9E3779B97F4A7C15ULL + 3);
+         mix64 ((*global_att)->stamp () * 0x9E3779B97F4A7C15ULL + 3);
 }
 
 int
