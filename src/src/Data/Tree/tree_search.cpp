@@ -364,11 +364,14 @@ search_concat (range_set& sel, tree t, tree what, path p) {
   for (int pos=0; pos<N(t); ) {
     range_set ssel= copy (inside[pos]);
     if (N(ssel) != 0) {
+      // ssel is a list of (start, end) pairs; a leading (trailing) wildcard
+      // extends the hits to the start (end) of the formula. Then they
+      // overlap, and merge keeps the first one (#454)
       if (is_func (what[0], WILDCARD, 1))
-        for (int i=0; i+1<N(ssel); i++)
+        for (int i=0; i+1<N(ssel); i+=2)
           ssel[i]= (p * 0) * start (t[0]);
       if (is_func (what[N(what)-1], WILDCARD, 1))
-        for (int i=0; i+1<N(ssel); i++)
+        for (int i=0; i+1<N(ssel); i+=2)
           ssel[i+1]= (p * (N(t)-1)) * end (t[N(t)-1]);
       merge (sel, ssel);
       if (is_compound (t[pos])) {
