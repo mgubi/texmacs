@@ -512,6 +512,159 @@
             (check-fast t '(concat "y)" (wildcard "x") "z") '()))))
       '(search replace))))
 
+;; between two elements which are not wildcards, a string of the pattern
+;; matches a whole string of the formula, as one match: aa does not match
+;; aaaa (#480); a part with a wildcard matches when it covers the string
+(define (test-middle-strings)
+  (check-group "middle strings")
+  (check-both '(document (concat "c" (rsub "x") "aaaa" (rsub "y")))
+              '(concat (rsub "x") "aa" (rsub "y"))
+              '())
+  (check-both '(document (concat "c" (rsub "x") "aa" (rsub "y")))
+              '(concat (rsub "x") "aa" (rsub "y"))
+              '((0 1 0) (0 3 1)))
+  (check-both '(document (concat "c" (rsub "x") "AA" (rsub "y")))
+              '(concat (rsub "x") "aa" (rsub "y"))
+              '())
+  (with-preference "case-insensitive-match" "on"
+    (lambda ()
+      (check-both '(document (concat "c" (rsub "x") "AA" (rsub "y")))
+                  '(concat (rsub "x") "aa" (rsub "y"))
+                  '((0 1 0) (0 3 1)))))
+  (check-both '(document (concat "c" (rsub "x") "abaa" (rsub "y")))
+              '(concat (rsub "x") "a" (wildcard "w") "a" (rsub "y"))
+              '((0 1 0) (0 3 1)))
+  (check-both '(document (concat "c" (rsub "x") "abab" (rsub "y")))
+              '(concat (rsub "x") "a" (wildcard "w") "a" (rsub "y"))
+              '())
+  ;; in linear time: a test which tried every place of every string (a
+  ;; first version of #480) took seconds in a string of 60000 characters
+  (let* ((abc (apply string-append (map (lambda (i) "abc") (iota 20000))))
+         (doc `(document
+                 (concat (rsub "1") ,(string-append abc "x") (rsub "2"))))
+         (what '(concat (rsub "1") "a" (wildcard "x") "b" (wildcard "y") "c"
+                        (rsub "2"))))
+    (for-each
+      (lambda (mode)
+        (with-search-mode mode
+          (lambda ()
+            (with r (time-of (lambda () (hits doc what)))
+              (check= (cdr r) '())
+              (check-true (< (car r) 500))))))
+      '(search replace))))
+
+;; a pattern which starts with strings and wildcards: the match starts at
+;; the first place where the rest matches, as for a string (#481); before
+;; a tag, it ends at the end of the string
+(define (test-strings-and-wildcards-first)
+  (check-group "strings and wildcards first")
+  (check-both '(document (concat "aaa" (rsub "y")))
+              '(concat "a" (wildcard "x") "a" (rsub "y"))
+              '((0 0 0) (0 1 1)))
+  (check-both '(document (concat "aaaa" (rsub "y")))
+              '(concat "aa" (wildcard "x") "a" (rsub "y"))
+              '((0 0 0) (0 1 1)))
+  (check-both '(document (concat "xab" (rsub "y")))
+              '(concat "a" (wildcard "x") "b" (rsub "y"))
+              '((0 0 1) (0 1 1)))
+  (check-both '(document (concat "xaa" (rsub "y")))
+              '(concat "a" (wildcard "x") "b" (rsub "y"))
+              '())
+  ;; two strings in a row in a pattern (from Scheme, or left by an empty
+  ;; string between them) are one string
+  (check-both '(document (concat "aab" (rsub "1")))
+              '(concat "a" "b" (rsub "1"))
+              '((0 0 1) (0 1 1)))
+  (check-both '(document (concat "xaab" (rsub "1")))
+              '(concat "a" "" "b" (wildcard "x") (rsub "1"))
+              '((0 0 2) (0 1 1)))
+  ;; but not when the pattern selects a region: each of its children is
+  ;; matched with a child of its own. (In the first search of a session,
+  ;; this needs the patterns prepared after initialize_search, which makes
+  ;; the label select-region; this check, not the first search of the
+  ;; suite, does not test that.)
+  (check-both '(document (concat "x" (frac "1" "2") "a" (rsub "1") "b"))
+              '(concat (select-region "x") "a" "b")
+              '((0 0 0) (0 0 1)))
+  ;; a leading wildcard and strings before a tag: the string ends as the
+  ;; part does, and the match starts at the start of the formula (#489)
+  (check-both '(document (concat "bbb" (rsub "y")))
+              '(concat (wildcard "x") "bb" (rsub "y"))
+              '((0 0 0) (0 1 1)))
+  (check-both '(document (concat (rsub "z") "cbbb" (rsub "y")))
+              '(concat (wildcard "x") "bb" (rsub "y"))
+              '((0 0 0) (0 2 1)))
+  (check-both '(document (concat "xabb" (rsub "y")))
+              '(concat (wildcard "w") "a" (wildcard "v") "b" (rsub "y"))
+              '((0 0 0) (0 1 1)))
+  (check-both '(document (concat "bbx" (rsub "y")))
+              '(concat (wildcard "x") "bb" (rsub "y"))
+              '())
+  ;; before a wildcard: as the same text as one string, abxyacabxyc
+  (with-search-mode 'search
+    (lambda ()
+      (check= (hits '(document (concat "ab" (frac "x" "y") "acab"
+                                       (frac "x" "y") "c"))
+                    '(concat "a" (wildcard "x") "b" (wildcard "y") "c"))
+              '((0 0 0) (0 2 2) (0 2 2) (0 4 1))))))
+
+;; a match across the children which ends inside a string: the hits of
+;; the string after it, as in the same text as one string, xa12bababa
+;; (#482); with the replace matching, the own hits of a string cover all
+;; of it, and the match goes on to the last ba
+(define (test-hits-after-a-match)
+  (check-group "hits after a match")
+  (let ((doc '(document (concat "xa" (frac "1" "2") "bababa")))
+        (what '(concat "a" (wildcard "x") "ba")))
+    (with-search-mode 'search
+      (lambda ()
+        (check= (hits '(document "xa12bababa") what)
+                '((0 1) (0 6) (0 7) (0 10)))
+        (check= (hits doc what) '((0 0 1) (0 2 2) (0 2 3) (0 2 6)))))
+    (with-search-mode 'replace
+      (lambda ()
+        (check= (hits doc what) '((0 0 1) (0 2 6)))))))
+
+;; a string of 100000 characters and a pattern of a string and a wildcard,
+;; with partial matches: the starts were tried by a recursion per character,
+;; which overflowed the stack and crashed TeXmacs (#479)
+(define (test-long-strings)
+  (check-group "long strings")
+  (let ((doc `(document ,(string-append (make-string 100000 #\a) "bc"))))
+    (with-search-mode 'search
+      (lambda ()
+        (check= (hits doc '(concat "b" (wildcard "x")))
+                '((0 100000) (0 100002)))
+        (check= (hits doc '(concat "q" (wildcard "x"))) '()))))
+  ;; and in linear time: each start rescanned the string after it (10 s
+  ;; for a<wildcard>b in 100000 times a)
+  (let ((doc `(document ,(make-string 100000 #\a))))
+    (with-search-mode 'search
+      (lambda ()
+        (with r (time-of
+                  (lambda () (hits doc '(concat "a" (wildcard "x") "b"))))
+          (check= (cdr r) '())
+          (check-true (< (car r) 500)))))))
+
+;; formulas of 40000 children and more: the scan for the start of a match, and a
+;; wildcard which takes many children, went from one child to the next by
+;; a recursion, which overflowed the stack and crashed TeXmacs (#487)
+(define (repeated n l)
+  (append-map (lambda (k) l) (iota n)))
+
+(define (test-long-concats)
+  (check-group "long formulas")
+  (let ((ab `(concat ,@(repeated 20000 '("ab" (rsub "1")))))
+        (xz `(concat "x" ,@(repeated 20000 '((rsub "1") (rsub "2"))) "z")))
+    (check-both `(document ,ab) '(concat (rsub "1") "ab" (rsub "2")) '())
+    (check-both `(document ,(append ab '("ab" (rsub "2"))))
+                '(concat (rsub "1") "ab" (rsub "2"))
+                '((0 39999 0) (0 40001 1)))
+    (check-both `(document ,ab) '(concat (wildcard "x") (rsub "2")) '())
+    (check-both `(document ,xz) '(concat "x" (wildcard "y") "z")
+                '((0 0 0) (0 40001 1)))
+    (check-both `(document ,xz) '(concat "x" (wildcard "y") "q") '())))
+
 (tm-define (search-test-failures)
   (check-suite "search")
   (test-text)
@@ -525,5 +678,10 @@
   (test-overlapping-strings)
   (test-paragraphs)
   (test-limit-and-position)
+  (test-middle-strings)
+  (test-strings-and-wildcards-first)
+  (test-hits-after-a-match)
   (test-speed)
+  (test-long-strings)
+  (test-long-concats)
   (check-end))

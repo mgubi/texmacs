@@ -110,6 +110,17 @@ have the details, and the problems go to the
   each start of a plugin showed a warning and opened the window of the
   error messages
   ([#467](https://github.com/mgubi/texmacs/pull/467)).
+- Search: a pattern with a long string is found fast, and no longer
+  crashes; a string in the middle of a pattern must match a whole string
+  of the text; patterns which start with a string followed by wildcards
+  are found; the hits after a match inside a string are no longer missed
+  ([#483](https://github.com/mgubi/texmacs/pull/483),
+  [#484](https://github.com/mgubi/texmacs/pull/484),
+  [#485](https://github.com/mgubi/texmacs/pull/485),
+  [#486](https://github.com/mgubi/texmacs/pull/486)).
+- Search: a formula with very many children (12000 and more) no longer
+  crashes the search
+  ([#491](https://github.com/mgubi/texmacs/pull/491)).
 
 ## 22 October 2026
 
