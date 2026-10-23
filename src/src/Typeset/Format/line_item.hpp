@@ -47,6 +47,7 @@ public:
   int        op_type;   // operator type for mathematical symbols
   box        b;         // the box
   space      spc;       // separation space
+  SI         cor;       // the italic correction included in spc
   int        penalty;   // penalty for a linebreak after this line_item
   bool       limits;    // line items has limits
   language   lan;       // language for hyphenating strings
@@ -69,5 +70,7 @@ class line_item {
 CONCRETE_NULL_CODE(line_item);
 
 tm_ostream& operator << (tm_ostream& out, line_item item);
+bool lets_space_through (line_item item);
+array<SI> carried_spaces (array<line_item> a);
 
 #endif // defined LINE_ITEM_H
