@@ -135,24 +135,42 @@ match_cascaded (tree t, tree what) {
   return false;
 }
 
+static string
+case_fold (string s) {
+  // the strings compared, in lower case when the case does not matter
+  return case_insensitive_match_flag? locase_all (s): s;
+}
+
+static tree
+case_fold_pattern (tree what) {
+  // idem for the strings of a concat pattern
+  if (!case_insensitive_match_flag) return what;
+  tree w (L(what), N(what));
+  for (int i=0; i<N(what); i++)
+    w[i]= is_atomic (what[i])? tree (locase_all (what[i]->label)): what[i];
+  return w;
+}
+
 bool
 match (tree t, tree what) {
   if (blank_match_flag && what == "") return true;
   if (is_func (what, WILDCARD, 1)) return true;
   if (is_atomic (t)) {
+    string s= case_fold (t->label);
     if (is_concat (what)) {
       int start, end;
-      return match_atomic (t->label, what, 0, 0, start, end);
+      return match_atomic (s, case_fold_pattern (what), 0, 0, start, end);
     }
     if (!is_atomic (what)) return false;
+    string w= case_fold (what->label);
     if (partial_match_flag) {
       int pos= 0;
-      return tm_search_forwards (what->label, pos, t->label) != -1;
+      return tm_search_forwards (w, pos, s) != -1;
     }
     else if (initial_match_flag)
-      return starts (t->label, what->label);
+      return starts (s, w);
     else
-      return t->label == what->label;
+      return s == w;
   }
   else if (injective_match_flag) {
     if (L(t) != L(what)) return false;
@@ -298,11 +316,10 @@ search_concat (tree t, tree what, int pos, int i,
 
 void
 search_string (range_set& sel, string s, tree what, path p) {
-  string source= (case_insensitive_match_flag)? locase_all (s): s;
+  string source= case_fold (s);
 
   if (is_atomic (what)) {
-    string w= what->label;
-    if (case_insensitive_match_flag) w= locase_all (w);
+    string w= case_fold (what->label);
     if (N(w) == 0) {
       // an empty string is found in an empty string only, once (the loop
       // below would not move: #452)
@@ -318,12 +335,7 @@ search_string (range_set& sel, string s, tree what, path p) {
     }
   }
   else if (is_concat (what)) {
-    tree w= what;
-    if (case_insensitive_match_flag) {
-      w= tree (L(what), N(what));
-      for (int i=0; i<N(what); i++)
-        w[i]= is_atomic (what[i])? tree (locase_all (what[i]->label)): what[i];
-    }
+    tree w= case_fold_pattern (what);
     for (int pos=0; pos<N(s); ) {
       int start, end;
       if (match_atomic (source, w, pos, 0, start, end)) {
