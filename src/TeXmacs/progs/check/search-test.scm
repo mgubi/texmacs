@@ -579,7 +579,10 @@
               '(concat "a" "" "b" (wildcard "x") (rsub "1"))
               '((0 0 2) (0 1 1)))
   ;; but not when the pattern selects a region: each of its children is
-  ;; matched with a child of its own (also in the first search of a session)
+  ;; matched with a child of its own. (In the first search of a session,
+  ;; this needs the patterns prepared after initialize_search, which makes
+  ;; the label select-region; this check, not the first search of the
+  ;; suite, does not test that.)
   (check-both '(document (concat "x" (frac "1" "2") "a" (rsub "1") "b"))
               '(concat (select-region "x") "a" "b")
               '((0 0 0) (0 0 1)))
