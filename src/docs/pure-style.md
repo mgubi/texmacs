@@ -1006,3 +1006,17 @@ To look at the evaluation itself, run TeXmacs with a window, switch on
 Debug ▸ style and watch the terminal, or `(debug-set "style" #t)` in a `-x`
 script. Use a separate `TEXMACS_HOME_PATH` so the runs write no
 preferences.
+
+Beyond the manual, the two comparisons were run on a corpus of 994
+documents (Joris's papers and talks from texmacs.org, other public
+documents, a private set). Documents printed alike from the document and
+from its rewritten tree:
+
+| Run | `compare-editor.sh` | `compare.sh` (copy) |
+|---|---|---|
+| October 21 | 852 | 704 |
+| October 23, after the marker fixes and the merge of `upsilon_texmacs` | 945 | 754 |
+
+Of the 49 left with the editor: 18 of Joris's, 20 of baltakatei's book, 6
+private, 5 other. The copy harness gives more differences by construction
+(automatic labels, see *Typesetting the result*).
