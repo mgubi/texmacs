@@ -12,6 +12,14 @@ branch [`upsilon_texmacs`](https://github.com/mgubi/texmacs/commits/upsilon_texm
 have the details, and the problems go to the
 [issues of the repository](https://github.com/mgubi/texmacs/issues).
 
+## 23 October 2026
+
+- **AI sessions**: the field of the API key in the preferences of an AI
+  session says "saved" next to it once the key typed is saved (with
+  Return, or when leaving the field), or "removed" when it was emptied:
+  nothing showed it, and Return seemed to do nothing
+  ([#455](https://github.com/mgubi/texmacs/issues/455)).
+
 ## 22 October 2026
 
 - A subscript or superscript whose content comes from a macro argument
