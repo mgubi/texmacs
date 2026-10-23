@@ -2063,6 +2063,12 @@ ui_children (string type, blackbox data) {
   else if (type == "horizontal_list") a= open_box<vue_horizontal_list> (data).a;
   else if (type == "vertical_menu")   a= open_box<vue_vertical_menu> (data).a;
   else if (type == "horizontal_menu") a= open_box<vue_horizontal_menu> (data).a;
+  else if (type == "tile_menu")       a= open_box<vue_tile_menu> (data).a;
+  else if (type == "minibar_menu")    a= open_box<vue_minibar_menu> (data).a;
+  else if (type == "popup_widget")    a << open_box<vue_popup_widget> (data).w;
+  else if (type == "balloon_widget")  a << open_box<vue_balloon_widget> (data).w;
+  else if (type == "user_canvas_widget")
+    a << open_box<vue_user_canvas_widget> (data).wid;
   else if (type == "division_widget") a << open_box<vue_division_widget> (data).w;
   else if (type == "resize_widget")   a << open_box<vue_resize_widget> (data).w;
   else if (type == "extend_widget")   a << open_box<vue_extend_widget> (data).w;

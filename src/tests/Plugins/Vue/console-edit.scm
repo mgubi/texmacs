@@ -29,6 +29,12 @@
 (define (warn s)
   (debug-message "std-warning" (string-append s "\n")))
 
+(define (at-end? u)
+  ;; the cursor of the console at the end, the latest message (u need not
+  ;; be the current buffer)
+  (with-buffer u
+    (== (cursor-path) (path-end (root-tree) (tree->path (buffer-tree))))))
+
 (define buffers-before #f)
 
 (gui-test-run
@@ -41,6 +47,13 @@
        (gt-wait 3000)
        (gt-check "the console opened by itself, a buffer per tab"
                  (lambda () (== (length (console-buffers)) 2)))
+       (gt-check "it begins at the end, the latest messages"
+                 (lambda () (at-end? (all-buffer))))
+       (gt-eval (lambda () (warn "a message while it is not used")))
+       (gt-wait 500)
+       (gt-check "it follows the new messages"
+                 (lambda () (and (shows? "a message while it is not used")
+                                 (at-end? (all-buffer)))))
        (gt-window "messages")
        (gt-raw "focus")
        (gt-idle)
@@ -75,9 +88,21 @@
        (gt-raw "key M-z")
        (gt-idle)
        (gt-check "read only: the messages are unchanged"
-                 (lambda () (and (== (shown-messages) 13) (not (shows? "zzz")))))
+                 (lambda () (and (== (shown-messages) 14) (not (shows? "zzz")))))
        (gt-check "read only: nothing to save"
                  (lambda () (not (buffer-modified? (all-buffer)))))
+       ;; (a change made otherwise than by the keys or the mouse, as a
+       ;; command of the menu bar of the Mac, goes with the next message)
+       (gt-eval (lambda ()
+                  (with-buffer (all-buffer)
+                    (go-start)
+                    (insert "zzz by a command"))))
+       (gt-eval (lambda () (warn "after a command")))
+       (gt-wait 500)
+       (gt-check "read only: a change by a command is undone"
+                 (lambda () (and (not (shows? "zzz by a command"))
+                                 (shows? "after a command")
+                                 (not (buffer-modified? (all-buffer))))))
        (gt-eval (lambda ()
                   (for (i (.. 0 120))
                     (warn (string-append "message " (number->string i))))))

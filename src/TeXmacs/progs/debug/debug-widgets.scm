@@ -139,12 +139,14 @@
             (buffer-set-body u doc))
         (buffer-pretend-saved u)))))
 
-;; A change of the document cancels its selection: the selection of the
-;; console being used (the current buffer) is kept, its paths moved by the
-;; number k of messages removed before it
+;; A change of the document cancels its selection: the selection of a
+;; console is kept, its paths moved by the number k of messages removed
+;; before it (with-buffer: the console need not be the current buffer, as
+;; the one which opened by itself, without the focus)
 (define (console-selection-paths u d)
-  (and (== (current-buffer) u) (selection-active-any?)
-       (list (tree->path d) (selection-get-start) (selection-get-end))))
+  (with-buffer u
+    (and (selection-active-any?)
+         (list (tree->path d) (selection-get-start) (selection-get-end)))))
 
 (define (console-restore-selection sel k)
   (and-with sel sel
@@ -156,6 +158,9 @@
       (let* ((s (move (cadr sel))) (e (move (caddr sel))))
         (when (and s e) (selection-set s e))))))
 
+(define (console-restore-selection-in u sel k)
+  (when sel (with-buffer u (console-restore-selection sel k))))
+
 (define (console-update u)
   ;; add the new messages at the end and remove those which are gone
   (let* ((info (ahash-ref console-buffers (url->unix u)))
@@ -165,7 +170,10 @@
          (k (list-drop-common old new))
          (d (console-messages-tree u))
          (end? (console-at-end? u)))
-    (cond ((== old new) (noop))
+    ;; (a console changed otherwise than by the keys, the mouse or a drop,
+    ;; say by a command of the menu bar of the Mac, gets its messages back)
+    (cond ((buffer-modified? u) (console-reset u))
+          ((== old new) (noop))
           ((or (not k) (not d) (null? old)) (console-reset u))
           (else
             (let* ((added (list-tail new (- (length old) k)))
@@ -175,14 +183,17 @@
                 (tree-insert! d (tree-arity d) (map build-message added)))
               (ahash-set! console-shown (url->unix u) new)
               (buffer-pretend-saved u)
-              (console-restore-selection sel k))))
+              (console-restore-selection-in u sel k))))
     ;; a console whose cursor is at the end follows it, as a log
-    (when (and end? (== (current-buffer) u)) (go-end))))
+    (when end? (console-go-end u))))
 
 (define (console-at-end? u)
-  (and (== (current-buffer) u)
-       (not (selection-active-any?))
-       (== (cursor-path) (path-end (root-tree) (tree->path (buffer-tree))))))
+  (with-buffer u
+    (and (not (selection-active-any?))
+         (== (cursor-path) (path-end (root-tree) (tree->path (buffer-tree)))))))
+
+(define (console-go-end u)
+  (with-buffer u (go-end)))
 
 (define (console-buffer-list)
   (list-filter (map unix->url (ahash-set->list console-buffers))
@@ -303,7 +314,13 @@
     (top-window (console-widget kind) kind
                 (lambda x
                   (ahash-remove! console-active? kind)
-                  (forget-console kind)))))
+                  (forget-console kind)))
+    ;; the consoles begin at the end, the latest messages, and follow them
+    (delayed
+      (:idle 1)
+      (for (u (console-buffer-list))
+        (when (== (car (ahash-ref console-buffers (url->unix u))) kind)
+          (console-go-end u))))))
 
 (tm-define (open-debug-console)
   (open-console "Debugging console"))
