@@ -133,6 +133,10 @@
   ("texmacs" "Bitmaps of TeXmacs, as Qt")
   ("mupdf" "MuPDF, lighter"))
 
+(define-preference-names-and-validate "emoji font"
+  ("default" "Twemoji, the same everywhere")
+  ("system" "Those of the system"))
+
 (define-preference-names-and-validate "gpu glyph hinting"
   ("light" "Light")
   ("none" "None")
@@ -248,6 +252,14 @@
         (enum (set-pretty-preference "gpu glyph hinting" answer)
               '("Light" "None" "Full")
               (get-pretty-preference "gpu glyph hinting")
+              "18em")))
+    ;; the emoji font of smart_font.cpp (emoji_font_name), read when the
+    ;; fonts are made: the browser has no fonts of a system
+    (assuming (not (defined? 'web-javascript))
+      (item (text "Emoji (from the next start):")
+        (enum (set-pretty-preference "emoji font" answer)
+              '("Twemoji, the same everywhere" "Those of the system")
+              (get-pretty-preference "emoji font")
               "18em")))
     (assuming (or (qt5-gui?) (ns-gui?))
       (meti (hlist // (text "Use retina fonts"))

@@ -243,6 +243,17 @@ array<string> parse_gsub_tags (const char* buf, int n);
 // first), each as the ligature glyph followed by the other components
 typedef hashmap<unsigned int, array<array<unsigned int> > > ot_gsub_ligatures;
 ot_gsub_ligatures parse_gsub_ligatures (const char* buf, int n, string feature);
+// a table of a font file in memory (a TrueType collection gives its first
+// font), or "" when it has none
+string ot_find_table (const char* buf, int n, const char* tag);
+// the same, from the GSUB table itself
+ot_gsub_ligatures parse_gsub_ligatures_table (string gsub, string feature);
+// the glyphs of a sequence after the substitutions of the default features
+// of an AAT morx table (the fonts of Apple: non contextual, contextual and
+// ligature subtables), the deleted glyphs left out; nglyphs is the number
+// of glyphs of the font
+array<unsigned int> aat_morx_apply (string morx, array<unsigned int> glyphs,
+                                    int nglyphs);
 
 /******************************************************************************
  * OpenType GPOS: pair kerning

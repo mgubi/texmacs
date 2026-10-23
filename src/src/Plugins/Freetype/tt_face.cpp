@@ -62,6 +62,21 @@ tt_face_rep::tt_face_rep (string name): rep<tt_face> (name) {
     debug_fonts << "Can't load " << name << LF; 
     return;
   }
+  if (fsize > (64 << 20)) {
+    // a font too large to be kept in memory (Apple Color Emoji, 190 MB):
+    // FreeType reads it from the file, and the tables TeXmacs parses
+    // itself come from FreeType (gsub_ligatures)
+    texmacs_fclose (font_file);
+    c_string path (concretize (u));
+    if (ft_new_face (ft_library, path, 0, &ft_face)) {
+      debug_fonts << "Can't load font " << name << LF;
+      return;
+    }
+    ft_select_charmap (ft_face, ft_encoding_adobe_custom);
+    init_strike ();
+    bad_face= false;
+    return;
+  }
 
   buffer = (FT_Byte*) malloc (fsize);
   ssize_t readed = texmacs_fread ((char*)buffer, fsize, font_file);
@@ -81,6 +96,7 @@ tt_face_rep::tt_face_rep (string name): rep<tt_face> (name) {
     return; 
   }
   ft_select_charmap (ft_face, ft_encoding_adobe_custom);
+  init_strike ();
   bad_face= false;
   buffer_size= (int) fsize;
 
@@ -110,9 +126,83 @@ tt_face_rep::gsub_ligatures (string tag) {
     ot_gsub_ligatures m;
     if (buffer != nullptr)
       m= parse_gsub_ligatures ((const char*) buffer, buffer_size, tag);
+    else if (!bad_face && ft_load_sfnt_table != NULL) {
+      // the font is not in memory: its GSUB table from FreeType
+      FT_ULong len= 0;
+      FT_ULong gtag= FT_MAKE_TAG ('G', 'S', 'U', 'B');
+      if (!ft_load_sfnt_table (ft_face, gtag, 0, NULL, &len) && len > 0) {
+        string gsub ((int) len);
+        if (!ft_load_sfnt_table (ft_face, gtag, 0, (FT_Byte*) &gsub[0], &len))
+          m= parse_gsub_ligatures_table (gsub, tag);
+      }
+    }
     gsub_ligature_table (tag)= m;
   }
   return gsub_ligature_table (tag);
+}
+
+int
+tt_face_rep::morx_sequence (array<unsigned int> codes) {
+  if (bad_face) return -1;
+  if (!morx_ready) {
+    morx_ready= true;
+    if (buffer != nullptr)
+      morx_table= ot_find_table ((const char*) buffer, buffer_size, "morx");
+    else if (ft_load_sfnt_table != NULL) {
+      FT_ULong len= 0;
+      FT_ULong mtag= FT_MAKE_TAG ('m', 'o', 'r', 'x');
+      if (!ft_load_sfnt_table (ft_face, mtag, 0, NULL, &len) && len > 0) {
+        string m ((int) len);
+        if (!ft_load_sfnt_table (ft_face, mtag, 0, (FT_Byte*) &m[0], &len))
+          morx_table= m;
+      }
+    }
+  }
+  if (N(morx_table) == 0 || N(codes) < 2) return -1;
+  string key;
+  for (int k= 0; k < N(codes); k++) key << as_string ((int) codes[k]) << ",";
+  if (morx_sequences->contains (key)) return morx_sequences [key];
+  array<unsigned int> g;
+  for (int k= 0; k < N(codes); k++) {
+    unsigned int gi= ft_get_char_index (ft_face, codes[k]);
+    if (gi == 0) { morx_sequences (key)= -1; return -1; }
+    g << gi;
+  }
+  array<unsigned int> r= aat_morx_apply (morx_table, g, (int) ft_face->num_glyphs);
+  int res= (N(r) == 1)? (int) r[0]: -1;
+  morx_sequences (key)= res;
+  return res;
+}
+
+void
+tt_face_rep::init_strike () {
+  if (FT_IS_SCALABLE (ft_face) || ft_face->num_fixed_sizes <= 0 ||
+      ft_select_size == NULL) return;
+  for (int k= 0; k < ft_face->num_fixed_sizes; k++) {
+    int ppem= (int) ((ft_face->available_sizes[k].y_ppem + 32) >> 6);
+    if (ppem > strike_ppem) { strike= k; strike_ppem= ppem; }
+  }
+  color_bitmaps= (strike >= 0 && FT_HAS_COLOR (ft_face));
+}
+
+bool
+tt_face_rep::set_size (int size, int hdpi, int vdpi) {
+  if (bad_face) return true;
+  if (strike >= 0) return ft_select_size (ft_face, strike) != 0;
+  return ft_set_char_size (ft_face, 0, size<<6, hdpi, vdpi) != 0;
+}
+
+double
+tt_face_rep::strike_scale (int size, int dpi) {
+  if (strike_ppem <= 0) return 1.0;
+  return (size * dpi / 72.0) / strike_ppem;
+}
+
+bool
+tt_face_rep::is_color () {
+  array<int> layers, cols;
+  (void) color_layers (0, layers, cols); // reads the palette
+  return N(palette) > 0 || color_bitmaps;
 }
 
 array<string>
@@ -204,8 +294,7 @@ tt_font_metric_rep::tt_font_metric_rep (
   font_metric_rep (name), size (size2), hdpi (hdpi2), vdpi (vdpi2), fnm (NULL)
 {
   face= load_tt_face (family);
-  bad_font_metric= face->bad_face ||
-    ft_set_char_size (face->ft_face, 0, size<<6, hdpi, vdpi);
+  bad_font_metric= face->bad_face || face->set_size (size, hdpi, vdpi);
   if (bad_font_metric) return;
 
   error_metric->x1= error_metric->y1= 0;
@@ -222,8 +311,37 @@ tt_font_metric_rep::exists (int i) {
   return glyph_index != 0;
 }
 
+// The metrics of a glyph of a font of bitmaps: those of its fixed size,
+// scaled
+static metric_struct*
+strike_metric (tt_face face, FT_UInt glyph_index, int size, int dpi) {
+  if (face->set_size (size, dpi, dpi) ||
+      ft_load_glyph (face->ft_face, glyph_index, FT_LOAD_COLOR)) return NULL;
+  FT_Glyph_Metrics& gm= face->ft_face->glyph->metrics;
+  double s= face->strike_scale (size, dpi);
+  SI w = tt_si ((int) (gm.width * s)), h = tt_si ((int) (gm.height * s));
+  SI dx= tt_si ((int) (gm.horiBearingX * s));
+  SI dy= tt_si ((int) (gm.horiBearingY * s));
+  SI ll= tt_si ((int) (gm.horiAdvance * s));
+  metric_struct* M= tm_new<metric_struct> ();
+  M->x1= 0;  M->y1= dy - h; M->x2= ll;     M->y2= dy;
+  M->x3= dx; M->y3= dy - h; M->x4= dx + w; M->y4= dy;
+  return M;
+}
+
 metric&
 tt_font_metric_rep::get (int i) {
+  if (!face->bad_face && !fnm->contains(i) && face->strike >= 0) {
+    FT_UInt glyph_index= decode_index (face->ft_face, i);
+    metric_struct* M= strike_metric (face, glyph_index, size, vdpi);
+    if (M == NULL) return error_metric;
+    if (face->color_bitmaps && is_emoji_mark (i)) {
+      // what is left of a sequence takes no room (as below)
+      M->x2= M->x3= M->x4= 0;
+      M->y1= M->y2= M->y3= M->y4= 0;
+    }
+    fnm(i)= (pointer) M;
+  }
   if (!face->bad_face && !fnm->contains(i)) {
     ft_set_char_size (face->ft_face, 0, size<<6, hdpi, vdpi);
     FT_UInt glyph_index= decode_index (face->ft_face, i);
@@ -296,6 +414,7 @@ mul_fix (long a, long b) {
 SI
 tt_font_metric_rep::kerning (int left, int right) {
   if (face->bad_face) return 0;
+  if (face->strike >= 0) return 0;
   FT_UInt l= decode_index (face->ft_face, left);
   FT_UInt r= decode_index (face->ft_face, right);
   ft_set_char_size (face->ft_face, 0, size<<6, hdpi, vdpi);
@@ -333,8 +452,7 @@ tt_font_glyphs_rep::tt_font_glyphs_rep (
   hdpi (hdpi2), vdpi (vdpi2), fng (glyph ())
 {
   face= load_tt_face (family);
-  bad_font_glyphs= face->bad_face ||
-    ft_set_char_size (face->ft_face, 0, size<<6, hdpi, vdpi);
+  bad_font_glyphs= face->bad_face || face->set_size (size, hdpi, vdpi);
   if (bad_font_glyphs) return;
 }
 
@@ -357,12 +475,40 @@ tt_glyph_units_advance (font_glyphs fng, int i) {
 }
 
 bool
+tt_color_bitmap (font_glyphs fng, int i, string& bgra, int& w, int& h,
+                 int& left, int& top, int& adv) {
+  tt_font_glyphs_rep* g= dynamic_cast<tt_font_glyphs_rep*> (fng.operator-> ());
+  if (g == NULL || g->face->bad_face || !g->face->color_bitmaps) return false;
+  tt_face face= g->face;
+  if (face->set_size (g->size, g->hdpi, g->vdpi) ||
+      ft_load_glyph (face->ft_face, decode_index (face->ft_face, i),
+                     FT_LOAD_COLOR)) return false;
+  FT_GlyphSlot slot= face->ft_face->glyph;
+  FT_Bitmap& bm= slot->bitmap;
+  adv= (int) ((slot->metrics.horiAdvance + 32) >> 6);
+  if (bm.pixel_mode != FT_PIXEL_MODE_BGRA) return false;
+  w= (int) bm.width; h= (int) bm.rows;
+  left= slot->bitmap_left; top= slot->bitmap_top;
+  bgra= string (4 * w * h);
+  for (int y= 0; y < h; y++) {
+    unsigned char* row= bm.buffer + y * bm.pitch;
+    for (int k= 0; k < 4 * w; k++) bgra[4 * w * y + k]= (char) row[k];
+  }
+  return true;
+}
+
+double
+tt_color_bitmap_scale (font_glyphs fng) {
+  tt_font_glyphs_rep* g= dynamic_cast<tt_font_glyphs_rep*> (fng.operator-> ());
+  if (g == NULL || g->face->bad_face || !g->face->color_bitmaps) return 0.0;
+  return g->face->strike_scale (g->size, g->hdpi);
+}
+
+bool
 tt_color_font (font_glyphs fng) {
   tt_font_glyphs_rep* g= dynamic_cast<tt_font_glyphs_rep*> (fng.operator-> ());
   if (g == NULL || g->face->bad_face) return false;
-  array<int> layers, cols;
-  (void) g->face->color_layers (0, layers, cols); // reads the palette
-  return N(g->face->palette) > 0;
+  return g->face->is_color ();
 }
 
 bool
@@ -545,6 +691,34 @@ tt_font_glyphs_rep::color_glyph_union (glyph G, array<int> layers) {
 
 glyph&
 tt_font_glyphs_rep::get (int i) {
+  if (!face->bad_face && !fng->contains(i) && face->strike >= 0) {
+    // a font of bitmaps: in one color, where the bitmap of its fixed size
+    // covers more than half of a pixel of the size asked for (the
+    // renderers draw it in color, see unicode_font.cpp)
+    fng (i)= error_glyph;
+    string bgra;
+    int w, h, left, top, adv;
+    if (tt_color_bitmap (this, i, bgra, w, h, left, top, adv) && w > 0 && h > 0) {
+      double s= face->strike_scale (size, hdpi);
+      int W= max (1, (int) (w * s + 0.5)), H= max (1, (int) (h * s + 0.5));
+      glyph G (W, H, -((int) (left * s + 0.5)), (int) (top * s + 0.5));
+      for (int y= 0; y < H; y++)
+        for (int x= 0; x < W; x++) {
+          int sx= min (w - 1, (int) ((x + 0.5) / s));
+          int sy= min (h - 1, (int) ((y + 0.5) / s));
+          if (((unsigned char) bgra[4 * (sy * w + sx) + 3]) >= 128)
+            G->set_1 (x, y, 1);
+        }
+      G->index = decode_index (face->ft_face, i);
+      G->lwidth= (int) (adv * s + 0.5);
+      fng (i)= G;
+    }
+    else if (decode_index (face->ft_face, i) != 0) {
+      glyph B (1, 1, 0, 0);    // nothing to draw, but text in a PDF
+      B->index = decode_index (face->ft_face, i);
+      fng (i)= B;
+    }
+  }
   if (!face->bad_face && !fng->contains(i)) {
     ft_set_char_size (face->ft_face, 0, size<<6, hdpi, vdpi);
     FT_UInt glyph_index= decode_index (face->ft_face, i);

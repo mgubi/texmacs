@@ -181,6 +181,8 @@
   ("gpu glyphs" "freetype" noop)
   ("gpu glyph boldness" "0.22" noop)
   ("gpu glyph hinting" "light" noop)
+  ;; the emoji: the shipped Twemoji, or those of the system (smart_font.cpp)
+  ("emoji font" "default" noop)
   ("gui:responsive tab mode" (get-default-responsive-tab-mode) noop)
   ("interactive footer" "off" noop)
   ("typographic palette set" "Classical" noop)

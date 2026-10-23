@@ -18,6 +18,7 @@
 #include "iterator.hpp"
 #include "analyze.hpp" // contains
 #include "colors.hpp"
+#include "boot.hpp" // get_user_preference
 
 bool virtually_defined (string c, string name);
 font smart_font_bis (string f, string v, string s, string sh, int sz,
@@ -1297,7 +1298,7 @@ smart_font_rep::advance (string s, int& pos, string& r, int& nr) {
       if (next == -1) next= resolve (s (pos, end));
       next= emoji_before_selector (s, pos, end, next);
       if (count == 1 && nr != -1 && next == nr &&
-          sm->fn_spec[nr] != tuple ("shipped-emoji")) {
+          !is_tuple (sm->fn_spec[nr], "shipped-emoji")) {
         // (the emoji font draws the bases of keycaps only with the rest)
         if (N(fn) <= nr || is_nil (fn[nr])) initialize_font (nr);
         if (!fn[nr]->supports (s (start, end))) break;
@@ -1331,6 +1332,25 @@ is_italic_font (string master) {
 // look the same on every platform, and whose ligatures make one picture of
 // a sequence (a family, a flag, a skin tone)
 #define SHIPPED_EMOJI_FONT "TwemojiMozilla"
+
+// The emoji font: the shipped one (the preference "emoji font" at
+// "default"), the one of the system ("system": Apple Color Emoji, Segoe UI
+// Emoji, Noto Color Emoji), or a font by the name of its file; the shipped
+// one when the font asked for is not there. It is read when a font is
+// made: a change shows in the documents opened afterwards.
+static string
+emoji_font_name () {
+  string pref= get_user_preference ("emoji font", "default");
+  if (pref == "system") {
+    const char* names[]= { "Apple Color Emoji", "seguiemj",
+                           "NotoColorEmoji", "Noto Color Emoji" };
+    for (int i= 0; i < 4; i++)
+      if (tt_font_exists (names[i])) return names[i];
+  }
+  else if (pref != "default" && pref != "" && tt_font_exists (pref))
+    return pref;
+  return SHIPPED_EMOJI_FONT;
+}
 
 // The code point of c when it is one, -1 otherwise
 static int
@@ -1572,7 +1592,7 @@ smart_font_rep::resolve (string c, string fam, int attempt) {
 
 int
 smart_font_rep::emoji_font () {
-  if (!tt_font_exists (SHIPPED_EMOJI_FONT)) return -1;
+  if (!tt_font_exists (emoji_font_name ())) return -1;
   tree key= tuple ("shipped-emoji");
   int nr= sm->add_font (key, REWRITE_NONE);
   initialize_font (nr);
@@ -1585,8 +1605,17 @@ smart_font_rep::resolve_emoji (string c) {
   if (nr < 0) return -1;
   // the marks are not drawn on their own (supports says no to them): the
   // ligatures of the font take them with the emoji before them
-  if (!is_emoji_mark (single_code (c)) && !fn[nr]->supports (c)) return -1;
-  return sm->add_char (tuple ("shipped-emoji"), c);
+  if (is_emoji_mark (single_code (c)) || fn[nr]->supports (c))
+    return sm->add_char (tuple ("shipped-emoji"), c);
+  // an emoji which the font of the system has not (the regional indicators
+  // alone, a newer emoji): from the shipped font
+  if (emoji_font_name () == SHIPPED_EMOJI_FONT ||
+      !tt_font_exists (SHIPPED_EMOJI_FONT)) return -1;
+  tree key= tuple ("shipped-emoji", "shipped");
+  int snr= sm->add_font (key, REWRITE_NONE);
+  initialize_font (snr);
+  if (!fn[snr]->supports (c)) return -1;
+  return sm->add_char (key, c);
 }
 
 // A character followed by U+FE0F (the variation selector which asks for an
@@ -2166,7 +2195,8 @@ smart_font_rep::initialize_font (int nr) {
   else if (a[0] == "shipped-math")
     fn[nr]= adjust_subfont (unicode_font (SHIPPED_MATH_FONT, sz, dpi));
   else if (a[0] == "shipped-emoji")
-    fn[nr]= adjust_subfont (unicode_font (SHIPPED_EMOJI_FONT, sz, dpi));
+    fn[nr]= adjust_subfont (unicode_font (N(a) > 1? string (SHIPPED_EMOJI_FONT):
+                                          emoji_font_name (), sz, dpi));
   else {
     int  ndpi= adjusted_dpi (a[0], a[1], a[2], a[3], as_int (a[4]));
     font cfn = closest_font (a[0], a[1], a[2], a[3], sz, ndpi, as_int (a[4]));

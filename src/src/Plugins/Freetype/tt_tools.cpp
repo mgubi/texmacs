@@ -534,7 +534,7 @@ raw_tag (const char* buf, int i, const char* tag) {
 // string. The directory is read in the buffer of the file, so that only the
 // table itself is copied. A table which the file cuts short is returned as
 // far as it goes.
-static string
+string
 ot_find_table (const char* buf, int n, const char* tag) {
   if (buf == NULL || n < 12) return "";
   long long h= 0;
@@ -1122,8 +1122,12 @@ parse_gsub_ligature_subtable (ot_table& t, int type, long long off,
 
 ot_gsub_ligatures
 parse_gsub_ligatures (const char* buf, int n, string feature) {
+  return parse_gsub_ligatures_table (ot_find_table (buf, n, "GSUB"), feature);
+}
+
+ot_gsub_ligatures
+parse_gsub_ligatures_table (string gsub, string feature) {
   ot_gsub_ligatures m;
-  string gsub= ot_find_table (buf, n, "GSUB");
   if (N (gsub) < 10) return m;
   ot_table t (gsub);
   int feature_list= t.u16 (6);
@@ -1150,6 +1154,206 @@ parse_gsub_ligatures (const char* buf, int n, string feature) {
   }
   if (!t.ok) return ot_gsub_ligatures ();
   return m;
+}
+
+/******************************************************************************
+ * AAT morx: the substitutions of the fonts of Apple, which have no GSUB (the
+ * emoji of Apple Color Emoji join into one picture by its ligatures). The
+ * subtables of the default features of the chains, of three kinds: non
+ * contextual (type 4), contextual (type 1) and ligatures (type 2), each a
+ * state machine on the classes of the glyphs, as Apple and HarfBuzz read
+ * them; the rearrangements and the insertions (types 0 and 5) are left out
+ * (Apple Color Emoji has them for features which are off).
+ ******************************************************************************/
+
+static const unsigned int AAT_DELETED= 0xffff;
+
+// the value of a glyph in a lookup table (formats 0, 2, 4, 6, 8, 10), or -1
+static int
+aat_lookup (ot_table& t, long long off, unsigned int g, int nglyphs) {
+  int format= t.u16 (off);
+  if (format == 0) {
+    if ((int) g >= nglyphs) return -1;
+    return (int) t.u16 (off + 2 + 2 * (long long) g);
+  }
+  if (format == 2 || format == 4 || format == 6) {
+    // a binary search header, then the segments (or the single glyphs)
+    int unit= t.u16 (off + 2), n= t.u16 (off + 4);
+    if (unit < (format == 6? 4: 6)) return -1;
+    int lo= 0, hi= n - 1;
+    while (lo <= hi && t.ok) {
+      int mid= (lo + hi) / 2;
+      long long e= off + 12 + (long long) mid * unit;
+      unsigned int last= t.u16 (e);
+      unsigned int first= (format == 6)? last: t.u16 (e + 2);
+      if (last == 0xffff && first == 0xffff) { hi= mid - 1; continue; }
+      if (g > last) lo= mid + 1;
+      else if (g < first) hi= mid - 1;
+      else if (format == 6) return (int) t.u16 (e + 2);
+      else if (format == 2) return (int) t.u16 (e + 4);
+      else return (int) t.u16 (off + t.u16 (e + 4) + 2 * (long long) (g - first));
+    }
+    return -1;
+  }
+  if (format == 8) {
+    unsigned int first= t.u16 (off + 2), cnt= t.u16 (off + 4);
+    if (g < first || g >= first + cnt) return -1;
+    return (int) t.u16 (off + 6 + 2 * (long long) (g - first));
+  }
+  if (format == 10) {
+    int unit= t.u16 (off + 2);
+    unsigned int first= t.u16 (off + 4), cnt= t.u16 (off + 6);
+    if (g < first || g >= first + cnt) return -1;
+    long long e= off + 8 + (long long) (g - first) * unit;
+    if (unit == 1) return (int) (t.u16 (e) >> 8);
+    if (unit == 2) return (int) t.u16 (e);
+    if (unit == 4) return (int) t.u32 (e);
+    return -1;
+  }
+  return -1;
+}
+
+// the class of the glyph at i in a state table (0 the end of the text, 1 out
+// of the table, 2 a deleted glyph)
+static int
+aat_class (ot_table& t, long long cls, array<unsigned int>& g, int i,
+           int nglyphs) {
+  if (i >= N(g)) return 0;
+  if (g[i] == AAT_DELETED) return 2;
+  int c= aat_lookup (t, cls, g[i], nglyphs);
+  return (c < 0)? 1: c;
+}
+
+static void
+aat_noncontextual (ot_table& t, long long body, array<unsigned int>& g,
+                   int nglyphs) {
+  for (int i= 0; i < N(g); i++)
+    if (g[i] != AAT_DELETED) {
+      int r= aat_lookup (t, body, g[i], nglyphs);
+      if (r >= 0) g[i]= (unsigned int) r;
+    }
+}
+
+static void
+aat_contextual (ot_table& t, long long body, array<unsigned int>& g,
+                int nglyphs) {
+  unsigned int ncl= t.u32 (body);
+  long long cls= body + t.u32 (body + 4), sa= body + t.u32 (body + 8);
+  long long et = body + t.u32 (body + 12), st= body + t.u32 (body + 16);
+  int state= 0, mark= 0, i= 0, guard= 8 * N(g) + 64;
+  bool mark_set= false;
+  while (t.ok && guard-- > 0) {
+    int klass= aat_class (t, cls, g, i, nglyphs);
+    int e= t.u16 (sa + 2 * ((long long) state * ncl + klass));
+    long long en= et + 8 * (long long) e;
+    int new_state= t.u16 (en), flags= t.u16 (en + 2);
+    int mark_index= t.u16 (en + 4), cur_index= t.u16 (en + 6);
+    if (i < N(g) || mark_set) {
+      if (mark_index != 0xffff && mark < N(g) && g[mark] != AAT_DELETED) {
+        int r= aat_lookup (t, st + t.u32 (st + 4 * (long long) mark_index),
+                           g[mark], nglyphs);
+        if (r >= 0) g[mark]= (unsigned int) r;
+      }
+      int cur= min (i, N(g) - 1);
+      if (cur_index != 0xffff && cur >= 0 && g[cur] != AAT_DELETED) {
+        int r= aat_lookup (t, st + t.u32 (st + 4 * (long long) cur_index),
+                           g[cur], nglyphs);
+        if (r >= 0) g[cur]= (unsigned int) r;
+      }
+    }
+    if (flags & 0x8000) { mark_set= true; mark= i; }
+    state= new_state;
+    if (i >= N(g)) break;
+    if (!(flags & 0x4000)) i++;
+  }
+}
+
+static void
+aat_ligature (ot_table& t, long long body, array<unsigned int>& g,
+              int nglyphs) {
+  unsigned int ncl= t.u32 (body);
+  long long cls= body + t.u32 (body + 4), sa= body + t.u32 (body + 8);
+  long long et = body + t.u32 (body + 12), la= body + t.u32 (body + 16);
+  long long ct = body + t.u32 (body + 20), lt= body + t.u32 (body + 24);
+  array<int> stack;  // the positions of the components
+  int state= 0, i= 0, guard= 8 * N(g) + 64;
+  while (t.ok && guard-- > 0) {
+    int klass= aat_class (t, cls, g, i, nglyphs);
+    int e= t.u16 (sa + 2 * ((long long) state * ncl + klass));
+    long long en= et + 6 * (long long) e;
+    int new_state= t.u16 (en), flags= t.u16 (en + 2), act= t.u16 (en + 4);
+    if ((flags & 0x8000) && i < N(g)) {
+      if (N(stack) >= 32) {
+        for (int k= 1; k < N(stack); k++) stack[k-1]= stack[k];
+        stack->resize (N(stack) - 1);
+      }
+      stack << i;
+    }
+    if ((flags & 0x2000) && N(stack) > 0) {
+      long long a= la + 4 * (long long) act;
+      unsigned int lig_index= 0, action= 0;
+      int cursor= N(stack);
+      do {
+        if (cursor == 0) { stack= array<int> (); break; }
+        cursor--;
+        int pos= stack[cursor];
+        action= t.u32 (a); a += 4;
+        int offset= (int) (action & 0x3fffffff);
+        if (offset & 0x20000000) offset |= (int) 0xc0000000;
+        lig_index += t.u16 (ct + 2 * ((long long) g[pos] + offset));
+        if (action & 0xc0000000) {
+          // store or last: the ligature at the place of this component,
+          // which stays on the stack, and the components after it deleted
+          g[pos]= t.u16 (lt + 2 * (long long) lig_index);
+          for (int k= N(stack) - 1; k > cursor; k--) g[stack[k]]= AAT_DELETED;
+          stack->resize (cursor + 1);
+        }
+      }
+      while (!(action & 0x80000000) && t.ok);
+    }
+    state= new_state;
+    if (i >= N(g)) break;
+    if (!(flags & 0x4000)) i++;
+  }
+}
+
+array<unsigned int>
+aat_morx_apply (string morx, array<unsigned int> glyphs, int nglyphs) {
+  ot_table t (morx);
+  if (N(morx) < 8 || t.u16 (0) < 2) return glyphs;
+  array<unsigned int> g= copy (glyphs);
+  unsigned int nchains= t.u32 (4);
+  long long p= 8;
+  for (unsigned int c= 0; c < nchains && t.ok; c++) {
+    unsigned int flags= t.u32 (p), clen= t.u32 (p + 4);
+    unsigned int nfeat= t.u32 (p + 8), nsub= t.u32 (p + 12);
+    long long q= p + 16 + 12 * (long long) nfeat;
+    for (unsigned int s= 0; s < nsub && t.ok; s++) {
+      unsigned int len= t.u32 (q), cov= t.u32 (q + 4), sff= t.u32 (q + 8);
+      long long body= q + 12;
+      if ((sff & flags) != 0) {
+        bool reverse= (cov & 0x40000000) != 0;
+        if (reverse) for (int k= 0; k < N(g)/2; k++) {
+          unsigned int x= g[k]; g[k]= g[N(g)-1-k]; g[N(g)-1-k]= x; }
+        switch (cov & 0xff) {
+        case 1: aat_contextual (t, body, g, nglyphs); break;
+        case 2: aat_ligature (t, body, g, nglyphs); break;
+        case 4: aat_noncontextual (t, body, g, nglyphs); break;
+        default: break;
+        }
+        if (reverse) for (int k= 0; k < N(g)/2; k++) {
+          unsigned int x= g[k]; g[k]= g[N(g)-1-k]; g[N(g)-1-k]= x; }
+      }
+      if (len < 12) break;
+      q += len;
+    }
+    if (clen < 16) break;
+    p += clen;
+  }
+  if (!t.ok) return glyphs;
+  array<unsigned int> r;
+  for (int k= 0; k < N(g); k++) if (g[k] != AAT_DELETED) r << g[k];
+  return r;
 }
 
 ot_gsub_map

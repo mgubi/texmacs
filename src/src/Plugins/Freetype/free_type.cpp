@@ -50,6 +50,13 @@ FT_Error (*ft_get_kerning)    (FT_Face        face,
                                FT_UInt        kern_mode,
                                FT_Vector      *akerning);
 FT_Error (*ft_done_face)      (FT_Face        face);
+FT_Error (*ft_select_size)    (FT_Face        face,
+                               FT_Int         strike_index)= NULL;
+FT_Error (*ft_load_sfnt_table) (FT_Face       face,
+                                FT_ULong      tag,
+                                FT_Long       offset,
+                                FT_Byte*      buffer,
+                                FT_ULong*     length)= NULL;
 #ifdef FT_HAS_COLOR_LAYERS
 FT_Bool  (*ft_get_color_glyph_layer) (FT_Face           face,
                                       FT_UInt           base_glyph,
@@ -80,6 +87,8 @@ ft_initialize () {
   ft_render_glyph  = (glyph_renderer) ((void*) FT_Render_Glyph);
   ft_get_kerning   = FT_Get_Kerning;
   ft_done_face     = FT_Done_Face;
+  ft_select_size   = FT_Select_Size;
+  ft_load_sfnt_table= FT_Load_Sfnt_Table;
 #ifdef FT_HAS_COLOR_LAYERS
   ft_get_color_glyph_layer= FT_Get_Color_Glyph_Layer;
   ft_palette_data_get= FT_Palette_Data_Get;
@@ -119,6 +128,12 @@ ft_initialize () {
   (void) symbol_install ("/usr/lib/libfreetype.so", "FT_Done_Face"     ,
        (pointer&) ft_done_face);
   if (ft_done_face == NULL) return true;
+  // optional: without them no font of bitmaps, nor of the size of the
+  // emoji of Apple
+  (void) symbol_install ("/usr/lib/libfreetype.so", "FT_Select_Size",
+       (pointer&) ft_select_size);
+  (void) symbol_install ("/usr/lib/libfreetype.so", "FT_Load_Sfnt_Table",
+       (pointer&) ft_load_sfnt_table);
 #ifdef FT_HAS_COLOR_LAYERS
   // optional: without them the color fonts are drawn in one color
   (void) symbol_install ("/usr/lib/libfreetype.so", "FT_Get_Color_Glyph_Layer",

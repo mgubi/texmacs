@@ -18,6 +18,7 @@
 #include "analyze.hpp"
 #include "converter.hpp"
 #include "colors.hpp"
+#include "picture.hpp"
 
 #ifdef USE_FREETYPE
 
@@ -182,6 +183,8 @@ struct unicode_font_rep: font_rep {
   bool   color_font; // with glyphs in several colors (COLR)
   bool   draw_color_glyph (renderer ren, unsigned int uc, string c,
                            SI x, SI y);
+  bool   draw_color_bitmap (renderer ren, unsigned int uc, string c,
+                            SI x, SI y);
   int    emoji_marks_end (string s, int i);
   font   magnify (double zoomx, double zoomy);
   void   advance_glyph (string s, int& pos, bool ligf);
@@ -778,10 +781,23 @@ unicode_font_rep::read_unicode_char (string s, int& i) {
 // ligatures of its ccmp feature
 unsigned int
 unicode_font_rep::read_glyph (string s, int& i, bool ligf) {
+  int start= i;
   unsigned int uc= read_unicode_char (s, i);
   if (ligs > 0 && ligf && (uc == 'f' || uc == 's'))
     return ligature_replace (uc, s, i);
-  if (color_font && i < N(s)) return color_ligature (uc, s, i);
+  if (color_font && i < N(s)) {
+    unsigned int lig= color_ligature (uc, s, i);
+    if (lig != uc) return lig;
+    // the fonts of Apple have their ligatures in morx, not in GSUB: the
+    // whole sequence of emoji which starts here
+    int end= tm_grapheme_end (s, start);
+    if (end > i && !is_nil (ot_face)) {
+      array<unsigned int> codes;
+      for (int j= start; j < end; ) codes << read_unicode_char (s, j);
+      int g= ot_face->morx_sequence (codes);
+      if (g > 0) { i= end; return 0xc000000 + (unsigned int) g; }
+    }
+  }
   return uc;
 }
 
@@ -804,8 +820,13 @@ unicode_font_rep::color_ligature (unsigned int uc, string s, int& i) {
     int  j = i;
     bool ok= true;
     for (int c= 1; c < N(lig) && ok; c++) {
-      if (j >= N(s)) ok= false;
-      else ok= (glyph_index_of (face, read_unicode_char (s, j)) == lig[c]);
+      if (j >= N(s)) { ok= false; break; }
+      unsigned int u= read_unicode_char (s, j);
+      unsigned int gu= glyph_index_of (face, u);
+      // a variation selector which the ligature does not list (the keycaps
+      // of Noto, whose U+FE0F other lookups take away) is passed over
+      if (gu != lig[c] && u >= 0xfe00 && u <= 0xfe0f) { c--; continue; }
+      ok= (gu == lig[c]);
     }
     if (ok) { i= j; return 0xc000000 + lig[0]; }
   }
@@ -846,6 +867,9 @@ unicode_font_rep::supports (string c) {
   int i= 0;
   unsigned int uc= read_unicode_char (c, i);
   if (uc == 0 || !fnm->exists (uc)) return false;
+  // a character of a color font which draws nothing alone (a regional
+  // indicator of Apple, which only its flags draw) is still the font's
+  if (color_font && uc < 0xc000000 && uc >= 0x80) return true;
   if (uc >= 0x42 && uc <= 0x5a && !fnm->exists (0x41)) return false;
   if (uc >= 0x62 && uc <= 0x7a && !fnm->exists (0x61)) return false;
   metric_struct* m= fnm->get (uc);
@@ -928,6 +952,91 @@ is_emoji_mark (unsigned int c) {
          (c >= 0xe0020 && c <= 0xe007f);
 }
 
+// A glyph of a font of bitmaps in color (sbix, CBDT: the emoji of Apple,
+// Noto, Android) as a picture: the bitmap of the fixed size of the font,
+// averaged down to the pixels of the renderer (cached), and drawn as the
+// renderers draw pictures, each in its own way; a PDF keeps it as an image.
+// The text of a PDF as for the layers (draw_color_glyph): the picture
+// stands for c, and the characters are invisible glyphs of the shipped
+// emoji font, which a PDF can embed (a font of bitmaps cannot be: Apple
+// Color Emoji has 190 MB).
+
+#define SHIPPED_EMOJI_FONT "TwemojiMozilla"
+
+static hashmap<string,picture> color_bitmap_pictures;
+
+static picture
+color_bitmap_picture (string bgra, int w, int h, int pw, int ph) {
+  picture pic= raster_picture (pw, ph, 0, 0);
+  double sx= ((double) w) / pw, sy= ((double) h) / ph;
+  for (int Y= 0; Y < ph; Y++)
+    for (int X= 0; X < pw; X++) {
+      // the mean of the pixels of the bitmap under the pixel of the
+      // picture (premultiplied, then divided again)
+      int x1= (int) (X * sx), x2= max (x1 + 1, (int) ((X + 1) * sx));
+      int y1= (int) (Y * sy), y2= max (y1 + 1, (int) ((Y + 1) * sy));
+      x2= min (x2, w); y2= min (y2, h);
+      double b= 0, g= 0, r= 0, a= 0;
+      int n= 0;
+      for (int y= y1; y < y2; y++)
+        for (int x= x1; x < x2; x++) {
+          const char* p= &bgra[4 * (y * w + x)];
+          b += (unsigned char) p[0]; g += (unsigned char) p[1];
+          r += (unsigned char) p[2]; a += (unsigned char) p[3];
+          n++;
+        }
+      // (the rows of a picture go upwards, those of the bitmap downwards)
+      int PY= ph - 1 - Y;
+      if (n == 0 || a == 0) { pic->set_pixel (X, PY, rgb_color (0, 0, 0, 0)); continue; }
+      int A= (int) (a / n + 0.5);
+      int R= min (255, (int) (255.0 * r / a + 0.5));
+      int G= min (255, (int) (255.0 * g / a + 0.5));
+      int B= min (255, (int) (255.0 * b / a + 0.5));
+      pic->set_pixel (X, PY, rgb_color (R, G, B, A));
+    }
+  return pic;
+}
+
+bool
+unicode_font_rep::draw_color_bitmap (renderer ren, unsigned int uc, string c,
+                                     SI x, SI y) {
+  string bgra;
+  int w, h, left, top, adv;
+  if (!tt_color_bitmap (fng, uc, bgra, w, h, left, top, adv) ||
+      w <= 0 || h <= 0 || adv <= 0) return false;
+  // a pixel of the bitmap, in the units of the renderer, and in its pixels
+  SI W= ROUND (fnm->get (uc)->x2);
+  double k = ((double) W) / adv;
+  double px= k / max (ren->pixel, 1);
+  int pw= max (1, (int) (w * px + 0.5)), ph= max (1, (int) (h * px + 0.5));
+  string key= fng->res_name * "#" * as_string ((int) uc) * "@" *
+              as_string (pw) * "x" * as_string (ph);
+  if (!color_bitmap_pictures->contains (key))
+    color_bitmap_pictures (key)= color_bitmap_picture (bgra, w, h, pw, ph);
+  picture pic= color_bitmap_pictures [key];
+  // the characters, as invisible glyphs of the shipped emoji font
+  if (tt_font_exists (SHIPPED_EMOJI_FONT)) {
+    font_glyphs  tg= tt_font_glyphs (SHIPPED_EMOJI_FONT, size, hdpi, vdpi);
+    array<unsigned int> chars;
+    for (int i= 0; i < N(c); ) chars << read_unicode_char (c, i);
+    int n= N(chars);
+    // the advance of an emoji of the shipped font, which is one em
+    int em= tt_glyph_units_advance (tg, 0x1F600);
+    SI  E = (SI) (((double) size) * hdpi / 72.0 * PIXEL);
+    ren->begin_actual_text ("");
+    for (int j= 0; j < n && em > 0 && n > 0; j++) {
+      int a= tt_glyph_units_advance (tg, chars[j]);
+      double hscale= (a > 0)? (((double) W) / n) / (E * a / ((double) em)): 1.0;
+      ren->draw_invisible (chars[j], tg, x + (j * W) / n, y, hscale);
+    }
+    ren->end_actual_text ();
+  }
+  ren->begin_actual_text (c);
+  ren->draw_picture (pic, x + (SI) (left * k), y + (SI) ((top - h) * k));
+  ren->end_actual_text ();
+  return true;
+}
+
 // The end of the marks of emoji which follow i, which are not drawn (like
 // the U+FE0F of a heart in color): the characters of the emoji before them
 // in the text of a PDF
@@ -975,6 +1084,8 @@ unicode_font_rep::draw_fixed (renderer ren, string s, SI x, SI y) {
 bool
 unicode_font_rep::draw_color_glyph (renderer ren, unsigned int uc, string c,
                                     SI x, SI y) {
+  if (tt_color_bitmap_scale (fng) > 0.0)
+    return draw_color_bitmap (ren, uc, c, x, y);
   array<int> codes;
   array<color> colors;
   array<bool> text;

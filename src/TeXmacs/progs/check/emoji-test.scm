@@ -115,6 +115,33 @@
                      (* 2 (em)) (/ (em) 10))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; The emoji font of the system
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; With the preference "emoji font" at "system" (or at the name of a font),
+;; the emoji come from a font of the system: Apple Color Emoji, made of
+;; bitmaps (sbix) and joined by its AAT morx table, or Noto Color Emoji
+;; (bitmaps, CBDT, and GSUB). Its emoji need not be one em wide: the
+;; sequences are compared with one emoji of it. The group checks nothing
+;; with the shipped font (the default); run the suite with a home whose
+;; preferences say "system" to check it.
+
+(define (test-system-font)
+  (check-group "system font")
+  (when (!= (get-preference "emoji font") "default")
+    (let* ((one (width smile))
+           (same? (lambda (t) (near? (width t) one (/ one 20)))))
+      (check-true (> one 0))
+      (check-true (same? rocket))
+      (check-true (same? (string-append man zwj woman zwj girl)))
+      (check-true (same? "<#1F1EE><#1F1F9>"))
+      (check-true (same? (string-append "<#2764>" vs16)))
+      (check-true (near? (width "<#1F44D><#1F3FD>") (width "<#1F44D>")
+                         (/ one 20)))
+      (check-true (same? (string-append "#" vs16 "<#20E3>")))
+      (check-true (near? (width (string-append "x" vs16 "y")) (width "xy") 2)))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Deleting a sequence
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -190,8 +217,11 @@
 (tm-define (emoji-test-failures)
   (:synopsis "Run the tests of the emoji and return the failures")
   (check-suite "emoji")
-  (run-group test-single)
-  (run-group test-sequences)
-  (run-group test-marks)
+  ;; the widths of the shipped font, whose emoji are one em
+  (when (== (get-preference "emoji font") "default")
+    (run-group test-single)
+    (run-group test-sequences)
+    (run-group test-marks))
+  (run-group test-system-font)
   (run-group test-deletion)
   (check-end))

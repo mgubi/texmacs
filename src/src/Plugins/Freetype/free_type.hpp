@@ -19,6 +19,7 @@ bool ft_present ();
 #ifdef USE_FREETYPE
 #include <ft2build.h>
 #include FT_FREETYPE_H 
+#include FT_TRUETYPE_TABLES_H
 
 extern FT_Library ft_library;
 
@@ -51,6 +52,15 @@ extern FT_Error (*ft_get_kerning)    (FT_Face        face,
                                       FT_UInt        kern_mode,
                                       FT_Vector      *akerning);
 extern FT_Error (*ft_done_face)      (FT_Face        face);
+// the fixed sizes of the fonts made of bitmaps (the emoji in color), and a
+// table of a font read by FreeType (when the font is not in memory)
+extern FT_Error (*ft_select_size)    (FT_Face        face,
+                                      FT_Int         strike_index);
+extern FT_Error (*ft_load_sfnt_table) (FT_Face       face,
+                                       FT_ULong      tag,
+                                       FT_Long       offset,
+                                       FT_Byte*      buffer,
+                                       FT_ULong*     length);
 
 // the layers of a glyph of a color font (COLR version 0) and the colors of
 // its palette (CPAL): NULL when the FreeType of the system has no support

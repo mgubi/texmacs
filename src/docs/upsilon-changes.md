@@ -22,6 +22,13 @@ have the details, and the problems go to the
   flags, the skin tones, the keycaps, and a symbol followed by U+FE0F,
   like the red heart. The emoji fonts of the systems (Apple Color Emoji,
   Noto Color Emoji) are not used yet.
+- **Emoji of the system**: the preference "Emoji" (Edit > Preferences >
+  General) takes the emoji of the system instead of the shipped Twemoji,
+  from the next start: Apple Color Emoji on a Mac, Noto Color Emoji on
+  Linux, Segoe UI Emoji on Windows. They are drawn in color on the
+  screen and in the PDF (as pictures), the families, the flags, the skin
+  tones and the keycaps as one picture each, and they copy out of a PDF
+  as their characters. Desktop applications only.
 - **Editing emoji**: a sequence (a family, a flag, a skin tone, a keycap)
   is one character for the editor: the cursor keys step over it at once,
   and Delete and Backspace remove it whole; the cursor stopped invisibly

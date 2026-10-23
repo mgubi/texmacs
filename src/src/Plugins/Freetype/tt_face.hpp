@@ -39,6 +39,26 @@ struct tt_face_rep: rep<tt_face> {
   hashmap<string,ot_gsub_ligatures> gsub_ligature_table;
   // the ligatures of a GSUB feature (cached)
   ot_gsub_ligatures& gsub_ligatures (string tag);
+  // the fonts made of bitmaps (the emoji in color of Apple, of Noto, of
+  // Android) have sizes of their own only: the largest one is taken, and
+  // its glyphs are scaled to the size asked for
+  int          strike= -1;
+  int          strike_ppem= 0;
+  bool         color_bitmaps= false;
+  // the size of the glyphs (ft_set_char_size, or the largest fixed size of
+  // a font of bitmaps): true when it cannot be set
+  bool set_size (int size, int hdpi, int vdpi);
+  void init_strike ();
+  // how much a glyph of the fixed size is scaled to be of the size asked
+  double strike_scale (int size, int dpi);
+  // whether the glyphs may have colors (layers or bitmaps)
+  bool is_color ();
+  string       morx_table;
+  bool         morx_ready= false;
+  hashmap<string,int> morx_sequences= hashmap<string,int> (-1);
+  // the glyph which the morx table of the font (Apple) makes of the
+  // sequence of characters c, or -1 when it makes more than one glyph
+  int morx_sequence (array<unsigned int> codes);
   bool         colors_ready= false;
   array<color> palette;
   // the layers of a glyph of a color font (COLR version 0), from the
@@ -87,8 +107,18 @@ bool tt_glyph_outline (font_glyphs fng, int i, array<int>& cmds, array<double>& 
 // the color of the text: false when the glyph has no colors
 bool tt_color_layers (font_glyphs fng, int i, array<int>& codes,
                       array<color>& colors, array<bool>& text);
-// whether the glyphs of a FreeType font may have colors (COLR, CPAL)
+// whether the glyphs of a FreeType font may have colors (COLR and CPAL, or
+// bitmaps in color: sbix, CBDT)
 bool tt_color_font (font_glyphs fng);
+// the bitmap in color of the glyph of a character of a font of bitmaps, at
+// the fixed size of the font: its pixels (blue, green, red and alpha,
+// premultiplied, the rows from the top), its size, the place of its top
+// left corner from the origin (y upwards) and the advance, in its pixels
+bool tt_color_bitmap (font_glyphs fng, int i, string& bgra, int& w, int& h,
+                      int& left, int& top, int& adv);
+// how much the bitmaps of tt_color_bitmap are scaled for the glyphs of fng
+// (0 when it is not a font of bitmaps in color)
+double tt_color_bitmap_scale (font_glyphs fng);
 // the advance of the glyph of a character in the units of the font, as
 // the font has it (0 when unknown)
 int tt_glyph_units_advance (font_glyphs fng, int i);
