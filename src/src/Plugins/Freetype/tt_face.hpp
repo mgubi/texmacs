@@ -89,6 +89,9 @@ bool tt_color_layers (font_glyphs fng, int i, array<int>& codes,
                       array<color>& colors, array<bool>& text);
 // whether the glyphs of a FreeType font may have colors (COLR, CPAL)
 bool tt_color_font (font_glyphs fng);
+// the advance of the glyph of a character in the units of the font, as
+// the font has it (0 when unknown)
+int tt_glyph_units_advance (font_glyphs fng, int i);
 // the glyph of a character of a FreeType font in shades of grey, at shrinkf
 // times less than the resolution of get (see tt_face.cpp): false when the
 // font is not a FreeType font

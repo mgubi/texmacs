@@ -221,6 +221,10 @@ class mupdf_pdf_renderer_rep : public renderer_rep {
   void begin_page ();
   void end_page ();
   void end_text ();
+  void begin_actual_text (string s);
+  void end_actual_text ();
+  void draw_invisible (int c, font_glyphs fn, SI x, SI y, double hscale);
+  void fix_to_unicode (pdf_font_item& it);
   void select_fill (color c);
   void select_stroke (color c);
   void select_width (SI w);
@@ -828,7 +832,10 @@ mupdf_pdf_renderer_rep::get_font (font_glyphs fn, int ch) {
                                      PDF_SIMPLE_ENCODING_LATIN);
         for (int i=0; i<256; i++) it.gid << -1;
       }
-      else it.obj= pdf_add_cid_font (ctx, doc, it.font);
+      else {
+        it.obj= pdf_add_cid_font (ctx, doc, it.font);
+        fix_to_unicode (it);
+      }
       char cnm[32];
       snprintf (cnm, sizeof (cnm), "F%d", (int) (it.num));
       pdf_dict_puts (ctx, res_font, cnm, it.obj);
@@ -883,6 +890,38 @@ tm_font_size (string name) {
   double d= as_double (name (pos+1, end));
   if (d == 0) d= 72;
   return size * d / 72.0;
+}
+
+// The span is in the text object, as the glyphs it covers (draw does not
+// end the text object)
+void
+mupdf_pdf_renderer_rep::begin_actual_text (string s) {
+  if (contents == NULL) return;
+  if (!in_text) {
+    put ("BT\n"); in_text= true; cur_font= -1; text_x= text_y= 0;
+  }
+  c_string hex (utf8_to_pdf_hex_string (s));
+  app ("/Span << /ActualText %s >> BDC\n", (const char*) hex);
+}
+
+void
+mupdf_pdf_renderer_rep::end_actual_text () {
+  if (contents == NULL) return;
+  put ("EMC\n");
+}
+
+void
+mupdf_pdf_renderer_rep::draw_invisible (int c, font_glyphs fn, SI x, SI y,
+                                        double hscale) {
+  if (contents == NULL) return;
+  if (!in_text) {
+    put ("BT\n"); in_text= true; cur_font= -1; text_x= text_y= 0;
+  }
+  put ("3 Tr\n");
+  if (hscale != 1.0) app ("%g Tz\n", 100.0 * hscale);
+  draw (c, fn, x, y);
+  if (hscale != 1.0) put ("100 Tz\n");
+  put ("0 Tr\n");
 }
 
 void
@@ -978,6 +1017,69 @@ mupdf_pdf_renderer_rep::glyph_name (pdf_font_item& it, int key, int fallback,
   if (nm[0] == 0) return "";
   gid= g;
   return string (nm);
+}
+
+// The character map of a CID font (glyph to characters) as MuPDF writes it
+// gives the characters beyond U+FFFF as <1f600>, which no reader takes:
+// they are in UTF-16, two units (the emoji, the mathematical letters). The
+// map is written again then, from the cmap of the font, the first
+// character of a glyph taken.
+void
+mupdf_pdf_renderer_rep::fix_to_unicode (pdf_font_item& it) {
+  if (it.font == NULL || it.obj == NULL) return;
+  FT_Face face= (FT_Face) fz_font_ft_face (ctx, it.font);
+  if (face == NULL) return;
+  hashmap<int,int> uni (0);
+  array<int> gids;
+  bool beyond= false;
+  fz_ft_lock (ctx);
+  FT_UInt gid= 0;
+  FT_ULong ucs= FT_Get_First_Char (face, &gid);
+  while (gid > 0) {
+    if (gid < (FT_UInt) face->num_glyphs && gid <= 0xffff &&
+        !uni->contains ((int) gid)) {
+      uni ((int) gid)= (int) ucs;
+      gids << (int) gid;
+      if (ucs > 0xffff) beyond= true;
+    }
+    ucs= FT_Get_Next_Char (face, ucs, &gid);
+  }
+  fz_ft_unlock (ctx);
+  if (!beyond) return;
+  string cmap;
+  cmap << "/CIDInit /ProcSet findresource begin 12 dict begin begincmap\n"
+       << "/CIDSystemInfo << /Registry (Adobe) /Ordering (UCS) "
+       << "/Supplement 0 >> def\n"
+       << "/CMapName /Adobe-Identity-UCS def /CMapType 2 def\n"
+       << "1 begincodespacerange <0000> <FFFF> endcodespacerange\n";
+  for (int i= 0; i < N(gids); i += 100) {
+    int n= min (100, N(gids) - i);
+    cmap << as_string (n) << " beginbfchar\n";
+    for (int j= i; j < i + n; j++) {
+      int u= uni [gids[j]];
+      string dst;
+      if (u > 0xffff) {
+        int v= u - 0x10000;
+        dst= as_hexadecimal (0xd800 + (v >> 10), 4) *
+             as_hexadecimal (0xdc00 + (v & 0x3ff), 4);
+      }
+      else dst= as_hexadecimal (u, 4);
+      cmap << "<" << as_hexadecimal (gids[j], 4) << "> <" << dst << ">\n";
+    }
+    cmap << "endbfchar\n";
+  }
+  cmap << "endcmap CMapName currentdict /CMap defineresource pop end end\n";
+  fz_buffer* cb= fz_new_buffer_from_copied_data (ctx,
+                   (unsigned char*) &cmap[0], (size_t) N(cmap));
+  fz_try (ctx) {
+    pdf_dict_put_drop (ctx, it.obj, PDF_NAME(ToUnicode),
+                       pdf_add_stream (ctx, doc, cb, NULL, 0));
+  }
+  fz_always (ctx) fz_drop_buffer (ctx, cb);
+  fz_catch (ctx) {
+    convert_warning << "mupdf_pdf_renderer: no character map for "
+                    << it.path << LF;
+  }
 }
 
 // The letters of the glyph a font draws for key, when it is a ligature;

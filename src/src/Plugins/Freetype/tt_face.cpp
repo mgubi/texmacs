@@ -347,6 +347,15 @@ tt_font_glyphs_rep::tt_font_glyphs_rep (
 * glyph at 0)
 ******************************************************************************/
 
+int
+tt_glyph_units_advance (font_glyphs fng, int i) {
+  tt_font_glyphs_rep* g= dynamic_cast<tt_font_glyphs_rep*> (fng.operator-> ());
+  if (g == NULL || g->face->bad_face) return 0;
+  FT_Face face= g->face->ft_face;
+  if (ft_load_glyph (face, decode_index (face, i), FT_LOAD_NO_SCALE)) return 0;
+  return (int) face->glyph->metrics.horiAdvance;
+}
+
 bool
 tt_color_font (font_glyphs fng) {
   tt_font_glyphs_rep* g= dynamic_cast<tt_font_glyphs_rep*> (fng.operator-> ());
@@ -575,6 +584,16 @@ tt_font_glyphs_rep::get (int i) {
       // a glyph of a color font: in one color, the union of its layers (the
       // renderers draw the layers in their colors, see unicode_font.cpp)
       G= color_glyph_union (G, layers);
+    if (G->width * G->height == 0 && glyph_index != 0 &&
+        N(face->palette) > 0) {
+      // a character of a color font which draws nothing by itself (U+200D,
+      // U+FE0F, the base of a keycap): a blank glyph, which a PDF writes
+      // as the text of an emoji (unicode_font.cpp, draw_color_glyph)
+      glyph B (1, 1, 0, 0);
+      B->index = G->index;
+      B->lwidth= G->lwidth;
+      G= B;
+    }
     if (G->width * G->height == 0) G= error_glyph;
     fng(i)= G;
   }

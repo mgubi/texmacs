@@ -180,7 +180,9 @@ struct unicode_font_rep: font_rep {
   void   draw_fixed (renderer ren, string s, SI x, SI y, bool ligf);
   void   draw_fixed (renderer ren, string s, SI x, SI y);
   bool   color_font; // with glyphs in several colors (COLR)
-  bool   draw_color_glyph (renderer ren, unsigned int uc, SI x, SI y);
+  bool   draw_color_glyph (renderer ren, unsigned int uc, string c,
+                           SI x, SI y);
+  int    emoji_marks_end (string s, int i);
   font   magnify (double zoomx, double zoomy);
   void   advance_glyph (string s, int& pos, bool ligf);
   glyph  get_glyph (string s);
@@ -926,16 +928,32 @@ is_emoji_mark (unsigned int c) {
          (c >= 0xe0020 && c <= 0xe007f);
 }
 
+// The end of the marks of emoji which follow i, which are not drawn (like
+// the U+FE0F of a heart in color): the characters of the emoji before them
+// in the text of a PDF
+int
+unicode_font_rep::emoji_marks_end (string s, int i) {
+  while (i < N(s)) {
+    int j= i;
+    if (!is_emoji_mark (read_unicode_char (s, j))) break;
+    i= j;
+  }
+  return i;
+}
+
 void
 unicode_font_rep::draw_fixed (renderer ren, string s, SI x, SI y, bool ligf) {
   int i= 0, n= N(s);
   unsigned int uc= 0xffffffff;
   while (i<n) {
     unsigned int pc= uc;
+    int start= i;
     uc= read_glyph (s, i, ligf);
     if (pc != 0xffffffff) x += ROUND (fnm->kerning (pc, uc));
     if (!color_font) ren->draw (uc, fng, x, y);
-    else if (!draw_color_glyph (ren, uc, x, y) && !is_emoji_mark (uc))
+    else if (!draw_color_glyph (ren, uc, s (start, emoji_marks_end (s, i)),
+                                x, y) &&
+             !is_emoji_mark (uc))
       // (what is left of a sequence of emoji is not drawn: the font may
       // not even have it, and would draw the box of a missing glyph)
       ren->draw (uc, fng, x, y);
@@ -955,16 +973,41 @@ unicode_font_rep::draw_fixed (renderer ren, string s, SI x, SI y) {
 // ordinary glyph in its own color, so that every renderer draws it as it
 // draws text, and a PDF keeps it as vectors
 bool
-unicode_font_rep::draw_color_glyph (renderer ren, unsigned int uc,
+unicode_font_rep::draw_color_glyph (renderer ren, unsigned int uc, string c,
                                     SI x, SI y) {
   array<int> codes;
   array<color> colors;
   array<bool> text;
   if (!tt_color_layers (fng, uc, codes, colors, text)) return false;
+  // The text of a PDF, c (the characters of the emoji or of its sequence),
+  // for the two kinds of readers: those which take it from the character
+  // map of the font find it in invisible glyphs of the characters (Preview),
+  // those which take the ActualText of a span find it on the first layer,
+  // since they leave out the glyphs with no ink (MuPDF). Every other glyph
+  // is in a span which stands for nothing.
+  // The invisible glyphs follow each other over the width of the emoji,
+  // each narrowed to its share: one on top of the other, they would be
+  // words of their own for a reader (spaces in the middle of a sequence).
+  array<unsigned int> chars;
+  for (int i= 0; i < N(c); ) chars << read_unicode_char (c, i);
+  int n= N(chars);
+  int w= tt_glyph_units_advance (fng, uc);
+  SI  W= ROUND (fnm->get (uc)->x2);
+  ren->begin_actual_text ("");
+  for (int k= 0; k < n; k++) {
+    int a= tt_glyph_units_advance (fng, chars[k]);
+    double hscale= (a > 0 && w > 0)? (((double) w) / n) / a: 1.0;
+    ren->draw_invisible (chars[k], fng, x + (k * W) / n, y, hscale);
+  }
+  ren->end_actual_text ();
   pencil pen= ren->get_pencil ();
   int fr, fg, fb, fa;
   get_rgb_color (pen->get_color (), fr, fg, fb, fa);
   for (int k= 0; k < N(codes); k++) {
+    if (k <= 1) {
+      if (k == 1) ren->end_actual_text ();
+      ren->begin_actual_text (k == 0? c: string (""));
+    }
     if (text[k]) ren->set_pencil (pen);
     else {
       // the opacity of the text applies to the colors of the layers too
@@ -976,6 +1019,7 @@ unicode_font_rep::draw_color_glyph (renderer ren, unsigned int uc,
     ren->draw (codes[k], fng, x, y);
   }
   ren->set_pencil (pen);
+  ren->end_actual_text ();
   return true;
 }
 
