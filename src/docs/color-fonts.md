@@ -92,12 +92,39 @@ hooks.
 - **The cursor** can stand inside a sequence: the characters of a ligature
   are all at the left of its picture (`get_xpositions`), and a key moves
   over them one by one.
-- **Copy from a PDF**: the glyphs of the layers are in no character map
-  of the font, so that the text taken from the PDF (of the MuPDF writer as
-  of PDFHummus) has U+FFFD for each emoji; the first layer should carry the characters of
-  the emoji (or of its sequence), and the others none.
+- **Spaces around emoji in the text of a PDF**: MuPDF leaves out the
+  spaces between two emoji (a character it takes from an ActualText has
+  no advance, so that the next gap seems too wide for a space), Preview
+  the space before an emoji which follows a word. The characters
+  themselves come out right in both.
+- **Ghostscript** cannot read the text of the emoji: it ignores ActualText,
+  splits the two units of UTF-16 of a character beyond U+FFFF, and writes
+  the layers as their glyph numbers.
 - A choice of another emoji font (a preference): the font is
   `SHIPPED_EMOJI_FONT` in `smart_font.cpp`.
+
+## The text of a PDF
+
+The layers are glyphs of no character, shared by many emoji (the yellow
+disc of the faces), so that no character map of the font can say what
+they stand for. The readers take the text in one of two ways, and each
+finds it once (`draw_color_glyph` in `unicode_font.cpp`):
+
+- those which take the ActualText of the spans (MuPDF, and the readers
+  built on it) find the characters of the emoji (all of a sequence) on its
+  first layer, and nothing on the others; on the first layer, because they
+  leave out the glyphs with no ink;
+- those which take the character map of the font alone (Preview) find
+  them in invisible glyphs of the characters (text mode 3, the renderer
+  hook `draw_invisible`), which the character map gives; they are narrowed
+  (`Tz`) to follow each other over the width of the emoji, so that a
+  sequence is one word and not a word per character.
+
+MuPDF writes the characters beyond U+FFFF in the character map of a CID
+font as `<1f600>`, one unit, which no reader takes; the writer writes the
+map again, in UTF-16 (`fix_to_unicode` in `mupdf_pdf_renderer.cpp`). The
+mathematical letters of the OpenType fonts (U+1D400 and beyond) copy
+right since then too. PDFHummus writes them in UTF-16 itself.
 
 ## Checks
 
@@ -105,3 +132,8 @@ The suite `emoji` (`TeXmacs/progs/check/emoji-test.scm`) checks the widths:
 an emoji is one em (Twemoji draws every emoji in one em), a sequence is one
 emoji, what is left of a sequence takes no room; a character which no font
 has is written out as its code, several em wide.
+
+`src/Plugins/MuPDF/tests/pdf-compare.sh` exports `emoji.tm` with the MuPDF
+writer and checks that every emoji, and every sequence whole, comes out of
+it as its characters, with MuPDF and, on a Mac, with PDFKit
+(`pdfkit-text.swift`, which takes the text as Preview does).

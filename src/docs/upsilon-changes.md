@@ -22,6 +22,12 @@ have the details, and the problems go to the
   flags, the skin tones, the keycaps, and a symbol followed by U+FE0F,
   like the red heart. The emoji fonts of the systems (Apple Color Emoji,
   Noto Color Emoji) are not used yet.
+- **PDF**: the emoji copy out of an exported PDF as their characters, a
+  sequence whole (a family, a flag), in Preview as in the readers which
+  take the text from the ActualText: they came out as U+FFFD, or as
+  nothing. With the MuPDF writer (the browser, or the preference "native
+  pdf renderer"), the mathematical letters of the OpenType fonts copy
+  right too, which Preview dropped.
 - **Vue**: the balloons of a language server under the mouse no longer
   vanish as soon as they show on Linux under Wayland: a balloon was a
   window of its own, which the compositor placed where it liked and gave

@@ -304,6 +304,9 @@
   <paragraph|23 October 2026>
 
   <\itemize>
+    <item>The emoji copy out of an exported PDF as their characters, and so
+    do the mathematical letters of the OpenType fonts.
+
     <item>Emoji in color (\<#1F600\> \<#1F680\> \<#1F1EE\>\<#1F1F9\>), with a font
     which comes with <TeXmacs>, Twemoji Mozilla, also in formulas and in
     the PDF. A family, a flag, a skin tone or a keycap is one picture; it
