@@ -139,6 +139,9 @@ hooks.
   they do not list.
 - A character which the font of the system lacks comes from the shipped
   font (`resolve_emoji`).
+- Seen with Apple Color Emoji: the screens of Vue, Cocoa (GPU and Core
+  Graphics) and Qt, the PDF of MuPDF and of PDFHummus (copied in Preview);
+  with Noto Color Emoji: Vue and the PDF of MuPDF.
 
 ## The text of a PDF
 
