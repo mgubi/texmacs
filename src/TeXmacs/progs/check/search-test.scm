@@ -33,8 +33,8 @@
 ;;
 ;; Wildcards (std 1, std 2, std 3 in the widgets) are (wildcard "x"), ...;
 ;; at the start or at the end of a concat pattern, a wildcard extends the
-;; hit to the start or to the end of the formula (at the end, not always:
-;; #453; several hits inside one tag: #454).
+;; hit to the start or to the end of the formula (several hits inside one
+;; tag: #454).
 
 (texmacs-module (check search-test)
   (:use (check check-lib)))

@@ -548,6 +548,8 @@ without_empty_strings (tree what) {
     if (!is_concat (what) || w != "") r << w;
   }
   if (is_concat (what) && N(r) == 0) return "";
+  // a concat of one element is that element, as tree-simplify keeps it
+  if (is_concat (what) && N(r) == 1 && N(what) > 1) return r[0];
   return r;
 }
 
