@@ -59,9 +59,12 @@ hooks.
    (the color of the text where the palette says so, and the opacity of
    the text for all of them). Every renderer thus draws an emoji as it
    draws text, and a PDF keeps it as vectors. Seen so far: the screen of
-   Vue (as `TEXMACS_VUE_SNAPSHOT` saves it) and the PostScript export
-   (with its PDF through Ghostscript); the screens of Cocoa and Qt and the
-   PDF of PDFHummus are still to be looked at.
+   Vue (as `TEXMACS_VUE_SNAPSHOT` saves it), the PDF of the MuPDF writer
+   (`TEXMACS_PDF_MUPDF=1` or the preference `native pdf renderer`, and
+   always in the browser), where the font is embedded as a subset, and
+   the PostScript export (with its PDF through Ghostscript, where the
+   glyphs become Type 3 fonts); the screens of Cocoa and Qt and the PDF of
+   PDFHummus are still to be looked at.
 
 ## Not done yet
 
@@ -77,8 +80,10 @@ hooks.
 - **The PDF of PDFHummus** (the Qt builds) is not checked yet: the layers
   are written as text of the font, which should also keep them searchable
   through the first layer.
-- **Copy from a PDF**: every layer is text, so the emoji may come out once
-  per layer.
+- **Copy from a PDF**: the glyphs of the layers are in no character map
+  of the font, so that the text taken from the PDF of the MuPDF writer has
+  U+FFFD for each emoji; the first layer should carry the characters of
+  the emoji (or of its sequence), and the others none.
 - A choice of another emoji font (a preference): the font is
   `SHIPPED_EMOJI_FONT` in `smart_font.cpp`.
 
