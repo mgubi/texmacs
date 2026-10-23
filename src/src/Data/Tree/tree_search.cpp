@@ -205,6 +205,29 @@ only_wildcards (tree what, int i) {
   return true;
 }
 
+static int
+string_occurrence (string s, string w, path q, path cur, bool wildcard) {
+  // the start of the occurrence of w in the string s (at the path q) with
+  // which a match starts, not before cur: the first one when a wildcard
+  // follows (the match furthest to the left, as in the same text as one
+  // string), the one which ends at the end of s otherwise; -1 if none.
+  // The occurrences may overlap (aa in aaa), unlike those which
+  // search_string finds (#477)
+  s= case_fold (s);
+  w= case_fold (w);
+  if (N(w) == 0) return -1;
+  int from= 0;
+  if (!path_less_eq (cur, q * 0)) {
+    if (!(q <= cur)) return -1;
+    from= (cur / q)->item;
+  }
+  int at= tm_search_forwards (w, from, s);
+  if (at < 0 || wildcard) return at;
+  int last= N(s) - N(w);
+  while (at < last) tm_char_forwards (s, at);
+  return (at == last && test (s, last, w))? last: -1;
+}
+
 static bool
 search_concat_sub (tree t, tree what, int pos, int i,
                    path p, path cur, path& p1, path& p2,
@@ -236,6 +259,18 @@ search_concat_sub (tree t, tree what, int pos, int i,
       if (i == 0 && j == N(what)) continue;
       tree swhat= what (i, j);
       if (j == i+1) swhat= swhat[0];
+      if (i == 0 && is_atomic (swhat)) {
+        // a string starts the match: at the occurrence that the rest of the
+        // pattern needs (c1 holds at i == 0, c2 by this choice)
+        bool wildcard= is_func (what[j], WILDCARD, 1);
+        int at= string_occurrence (t[pos]->label, swhat->label, p * pos, cur,
+                                   wildcard);
+        if (at < 0) continue;
+        p1= (p * pos) * at;
+        if (search_concat (t, what, pos+1, j, p, cur, p1, p2, inside, failed))
+          return true;
+        continue;
+      }
       range_set sel;
       search (sel, t[pos], swhat, p * pos);
       if (N(sel) != 0) {
@@ -244,10 +279,10 @@ search_concat_sub (tree t, tree what, int pos, int i,
         if (j<N(what) && is_func (what[j], WILDCARD, 1)) c2= true;
         if (i == 0) {
           p1= sel[N(sel)-2];
-          // only wildcards follow, which take the rest of the formula: the
-          // hit starts at the first occurrence after cur, not the last
-          // (before a middle wildcard, the last gives the shortest match)
-          if (j < N(what) && only_wildcards (what, j))
+          // a wildcard follows: the hit starts at the first occurrence
+          // after cur, not the last (the match furthest to the left, as in
+          // the same text as one string)
+          if (j < N(what) && is_func (what[j], WILDCARD, 1))
             for (int h=0; h+1<N(sel); h+=2)
               if (path_less_eq (cur, sel[h])) { p1= sel[h]; break; }
         }

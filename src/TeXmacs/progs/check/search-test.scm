@@ -289,7 +289,8 @@
 
 ;; a hit inside a string, then one which starts later in the same string
 ;; and goes on in the next children: both (#461). When replacing, the
-;; strings of the pattern must match whole strings, so only the second.
+;; strings of the pattern must match whole strings, and one match goes from
+;; the first f( to the end, as in the same text as one string (#477).
 (define (test-hits-after-a-hit)
   (check-group "hits after a hit")
   (let ((doc '(document (concat "f(x)+f(" (frac "1" "2") ")")))
@@ -299,7 +300,7 @@
         (check= (hits doc what) '((0 0 0) (0 0 4) (0 0 5) (0 2 1)))))
     (with-search-mode 'replace
       (lambda ()
-        (check= (hits doc what) '((0 0 5) (0 2 1))))))
+        (check= (hits doc what) '((0 0 0) (0 2 1))))))
   (with-search-mode 'search
     (lambda ()
       (check= (hits '(document (concat "axb+a" (rsub "1") "b+axb"))
@@ -354,6 +355,49 @@
       (check= (hits '(document (concat "x" (rsub "c") "aba+b"))
                     '(concat "a" (wildcard "x") "b"))
               '((0 2 0) (0 2 5))))))
+
+;; the first string of a pattern may overlap itself in the string where
+;; the match starts: aa_x in aaa_x starts at the second a (#477)
+(define (test-overlapping-strings)
+  (check-group "overlapping strings")
+  (check-both '(document (concat "aaa" (rsub "x")))
+              '(concat "aa" (rsub "x"))
+              '((0 0 1) (0 1 1)))
+  (check-both '(document (concat "aa" (rsub "x")))
+              '(concat "aa" (rsub "x"))
+              '((0 0 0) (0 1 1)))
+  ;; a symbol is one character: at the end of the string it is not an a,
+  ;; and the occurrences of <alpha><alpha> overlap in three of them
+  (check-both '(document (concat "a<alpha>" (rsub "x")))
+              '(concat "a" (rsub "x"))
+              '())
+  (check-both '(document (concat "<alpha><alpha><alpha>" (rsub "x")))
+              '(concat "<alpha><alpha>" (rsub "x"))
+              '((0 0 7) (0 1 1)))
+  ;; before a wildcard, the first occurrence: the match furthest to the left,
+  ;; as in the same text as one string
+  (check-both '(document "aaaxyb") '(concat "aa" (wildcard "x") "b")
+              '((0 0) (0 6)))
+  (check-both '(document (concat "aaa" (frac "x" "y") "b"))
+              '(concat "aa" (wildcard "x") "b")
+              '((0 0 0) (0 2 1)))
+  ;; also when the pattern starts with strings and wildcards
+  (check-both '(document (concat "abab" (frac "x" "y") "c"))
+              '(concat "a" (wildcard "x") "b" (wildcard "y") "c")
+              '((0 0 0) (0 2 1)))
+  ;; when searching, as in the same text as one string
+  (with-search-mode 'search
+    (lambda ()
+      (check= (hits '(document "aaaaaxya") '(concat "aa" (wildcard "x") "a"))
+              '((0 0) (0 3) (0 3) (0 8)))
+      (check= (hits '(document (concat "aaaaa" (frac "x" "y") "a"))
+                    '(concat "aa" (wildcard "x") "a"))
+              '((0 0 0) (0 0 3) (0 0 3) (0 2 1)))))
+  (with-preference "case-insensitive-match" "on"
+    (lambda ()
+      (check-both '(document (concat "xAAA" (rsub "x")))
+                  '(concat "aa" (rsub "x"))
+                  '((0 0 2) (0 1 1))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Paragraphs, limits, positions
@@ -478,6 +522,7 @@
   (test-hits-after-a-hit)
   (test-wildcards-and-several-hits)
   (test-hits-of-a-string-after-a-tag)
+  (test-overlapping-strings)
   (test-paragraphs)
   (test-limit-and-position)
   (test-speed)

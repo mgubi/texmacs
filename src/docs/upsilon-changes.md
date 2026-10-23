@@ -55,13 +55,17 @@ have the details, and the problems go to the
   several hits in one tag or string, give one hit to the end, with no
   empty or inverted ones; a hit inside a string no longer hides a match
   which starts later in it; case-insensitive search also applies inside
-  the tags of a pattern; and a wildcard in the middle which fails late
-  is fast on long formulas
+  the tags of a pattern; a pattern which starts with a string that
+  overlaps itself (aa_x in aaa_x) is found, and before a wildcard the
+  match starts at the first occurrence, as for the same text in one
+  string; and a wildcard in the middle which fails late is fast on long
+  formulas
   ([#471](https://github.com/mgubi/texmacs/pull/471),
   [#472](https://github.com/mgubi/texmacs/pull/472),
   [#474](https://github.com/mgubi/texmacs/pull/474),
   [#475](https://github.com/mgubi/texmacs/pull/475),
-  [#476](https://github.com/mgubi/texmacs/pull/476)).
+  [#476](https://github.com/mgubi/texmacs/pull/476),
+  [#478](https://github.com/mgubi/texmacs/pull/478)).
 - **Jupyter**: without Python, no kernels are looked for: on Windows,
   each start of a plugin showed a warning and opened the window of the
   error messages
