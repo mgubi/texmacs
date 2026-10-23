@@ -150,8 +150,8 @@ edit_text_rep::remove_text_sub (bool forward) {
   // deleting text
   if (forward && is_atomic (t) && (last != rix)) {
     language lan= get_env_language ();
-    int end= last;
-    tm_char_forwards (t->label, end);
+    // an emoji sequence (a family, a flag) as a whole
+    int end= tm_grapheme_end (t->label, last);
     remove (p * last, end-last);
     correct (path_up (p));
     return;
@@ -159,8 +159,7 @@ edit_text_rep::remove_text_sub (bool forward) {
 
   if ((!forward) && is_atomic (t) && (last != 0)) {
     language lan= get_env_language ();
-    int start= last;
-    tm_char_backwards (t->label, start);
+    int start= tm_grapheme_start (t->label, last);
     remove (p * start, last-start);
     correct (path_up (p));
     return;
