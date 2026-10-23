@@ -216,9 +216,10 @@ search_concat_sub (tree t, tree what, int pos, int i,
         if (j<N(what) && is_func (what[j], WILDCARD, 1)) c2= true;
         if (i == 0) {
           p1= sel[N(sel)-2];
-          // a wildcard follows, which takes the rest of the formula: the
+          // only wildcards follow, which take the rest of the formula: the
           // hit starts at the first occurrence after cur, not the last
-          if (j < N(what) && is_func (what[j], WILDCARD, 1))
+          // (before a middle wildcard, the last gives the shortest match)
+          if (j < N(what) && only_wildcards (what, j))
             for (int h=0; h+1<N(sel); h+=2)
               if (path_less_eq (cur, sel[h])) { p1= sel[h]; break; }
         }
