@@ -31,6 +31,15 @@ have the details, and the problems go to the
 - **Vue**: closing a window closes the buffers of the editors inside it
   (texmacs-input, as in the macro editors), also inside popups, balloons
   and scrolled areas: they stayed among the buffers.
+- Searching for a formula is fast again in long formulas: a pattern was
+  tried again from every position of a formula, which took up to a
+  quarter of a second in a formula of 200 terms, at each keystroke, and
+  seconds in nested ones; now a few milliseconds
+  ([#451](https://github.com/mgubi/texmacs/pull/451)).
+- The layouts of tables and of the streams of a page are freed after use:
+  they were never freed, and the memory grew at each typesetting of a
+  document with tables
+  ([#442](https://github.com/mgubi/texmacs/pull/442)).
 
 ## 22 October 2026
 

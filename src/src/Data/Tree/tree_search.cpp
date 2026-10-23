@@ -177,7 +177,8 @@ match (tree t, tree what) {
 
 bool
 search_concat (tree t, tree what, int pos, int i,
-               path p, path cur, path& p1, path& p2) {
+               path p, path cur, path& p1, path& p2,
+               array<range_set>& inside) {
   //cout << "Search " << what << ", " << i
   //     << " in " << t << ", " << pos << "\n";
   if (pos >= N(t)) return false;
@@ -201,12 +202,13 @@ search_concat (tree t, tree what, int pos, int i,
           p1= (p * 0) * start (t[0]);
         if (c1 && c2 && (i > 0 || path_less_eq (cur, p1))) {
           if (j >= N(what)) return true;
-          if (search_concat (t, what, pos+1, j, p, cur, p1, p2)) return true;
+          if (search_concat (t, what, pos+1, j, p, cur, p1, p2, inside))
+            return true;
         }
       }
     }
     if (i == 0 || is_func (what[i], WILDCARD, 1))
-      return search_concat (t, what, pos+1, i, p, cur, p1, p2);
+      return search_concat (t, what, pos+1, i, p, cur, p1, p2, inside);
     return false;
   }
   else if (is_func (what[i], WILDCARD, 1)) {
@@ -215,14 +217,14 @@ search_concat (tree t, tree what, int pos, int i,
       if (!path_less_eq (cur, p1)) return false;
     }
     if (i+1 < N(what) && is_func (what[i+1], WILDCARD, 1))
-      return search_concat (t, what, pos, i+1, p, cur, p1, p2);
+      return search_concat (t, what, pos, i+1, p, cur, p1, p2, inside);
     if (i+1 >= N(what)) {
       p2= (p * (N(t)-1)) * end (t[N(t)-1]);
       return true;
     }
-    if (search_concat (t, what, pos, i+1, p, cur, p1, p2)) return true;
+    if (search_concat (t, what, pos, i+1, p, cur, p1, p2, inside)) return true;
     path dummy;
-    return search_concat (t, what, pos+1, i, p, cur, dummy, p2);
+    return search_concat (t, what, pos+1, i, p, cur, dummy, p2, inside);
   }
   else {
     range_set sel;
@@ -234,14 +236,13 @@ search_concat (tree t, tree what, int pos, int i,
       if (i == N(what)-1) p2= sel[1];
       if (c1 && c2 && (i > 0 || path_less_eq (cur, p1))) {
         if (i+1 >= N(what)) return true;
-        if (search_concat (t, what, pos+1, i+1, p, cur, p1, p2)) return true;
+        if (search_concat (t, what, pos+1, i+1, p, cur, p1, p2, inside))
+          return true;
       }
     }
     if (i == 0) {
-      range_set test;
-      search (test, t[pos], what, p * pos);
-      if (N(test) != 0) return false;
-      return search_concat (t, what, pos+1, i, p, cur, p1, p2);
+      if (N(inside[pos]) != 0) return false;
+      return search_concat (t, what, pos+1, i, p, cur, p1, p2, inside);
     }
     return false;
   }
@@ -297,9 +298,19 @@ search_compound (range_set& sel, tree t, tree what, path p) {
 
 void
 search_concat (range_set& sel, tree t, tree what, path p) {
+  // search_concat (t, what, pos, 0, ...) scans forwards from pos for the
+  // start of a match, until it reaches a compound child which contains a
+  // match (with a leading wildcard, until the end or until it fails on
+  // cur). When such a scan fails, the scans from the next positions fail
+  // too (cur only grows), up to that child: skip them, instead of scanning
+  // again (quadratic in the length of the concat, and worse for nested
+  // concats). The matches inside each child are searched only once.
+  array<range_set> inside (N(t));
+  for (int pos=0; pos<N(t); pos++)
+    search (inside[pos], t[pos], what, p * pos);
+  bool scan= true;
   for (int pos=0; pos<N(t); ) {
-    range_set ssel;
-    search (ssel, t[pos], what, p * pos);
+    range_set ssel= copy (inside[pos]);
     if (N(ssel) != 0) {
       if (is_func (what[0], WILDCARD, 1))
         for (int i=0; i+1<N(ssel); i++)
@@ -308,17 +319,22 @@ search_concat (range_set& sel, tree t, tree what, path p) {
         for (int i=0; i+1<N(ssel); i++)
           ssel[i+1]= (p * (N(t)-1)) * end (t[N(t)-1]);
       merge (sel, ssel);
+      if (is_compound (t[pos]) && !is_func (what[0], WILDCARD, 1)) scan= true;
       pos++;
       continue;
     }
+    if (!scan) { pos++; continue; }
     path p1, p2, cur= (p * 0) * start (t[0]);
     if (N(sel) != 0) cur= sel[N(sel)-1];
-    if (search_concat (t, what, pos, 0, p, cur, p1, p2)) {
+    if (search_concat (t, what, pos, 0, p, cur, p1, p2, inside)) {
       merge (sel, simple_range (p1, p2));
       int next= (p2 / p)->item;
       pos= max (pos+1, next);
     }
-    else pos++;
+    else {
+      scan= false;
+      pos++;
+    }
   }
 }
 
