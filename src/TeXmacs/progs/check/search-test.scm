@@ -262,6 +262,18 @@
   (check-both '(document (concat "a" (rsub "b") "c"))
               '(concat (wildcard "y") (wildcard "y") (rsub "b") "")
               '((0 0 0) (0 1 1)))
+  ;; a trailing wildcard after a string with several hits: from the
+  ;; first one (the last one was taken)
+  (check-both '(document (concat "x" (rsub "n") "bb"))
+              '(concat "b" (wildcard "y"))
+              '((0 2 0) (0 2 2)))
+  (check-both '(document (concat "x" (rsub "n") "bab"))
+              '(concat "b" (wildcard "y"))
+              '((0 2 0) (0 2 3)))
+  ;; an empty paragraph of a document pattern matches an empty paragraph
+  ;; (it never returned either)
+  (check-both '(document "" "abc") '(document "" "abc") '((0 0) (1 3)))
+  (check-both '(document "x" "abc") '(document "" "abc") '())
   ;; an empty pattern is found nowhere with the matching of Replace
   (with-search-mode 'replace
     (lambda () (check= (hits '(document "abc") "") '()))))

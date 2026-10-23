@@ -214,7 +214,14 @@ search_concat_sub (tree t, tree what, int pos, int i,
         bool c1= (i == 0 || sel[0] == (p * pos) * start (t[pos]));
         bool c2= (j == N(what) || sel[N(sel)-1] == (p * pos) * end (t[pos]));
         if (j<N(what) && is_func (what[j], WILDCARD, 1)) c2= true;
-        if (i == 0) p1= sel[N(sel)-2];
+        if (i == 0) {
+          p1= sel[N(sel)-2];
+          // a wildcard follows, which takes the rest of the formula: the
+          // hit starts at the first occurrence after cur, not the last
+          if (j < N(what) && is_func (what[j], WILDCARD, 1))
+            for (int h=0; h+1<N(sel); h+=2)
+              if (path_less_eq (cur, sel[h])) { p1= sel[h]; break; }
+        }
         if (j == N(what)) p2= sel[1];
         if (i == 0 && is_func (what[0], WILDCARD, 1))
           p1= (p * 0) * start (t[0]);
@@ -295,7 +302,12 @@ search_string (range_set& sel, string s, tree what, path p) {
   if (is_atomic (what)) {
     string w= what->label;
     if (case_insensitive_match_flag) w= locase_all (w);
-    if (N(w) == 0) return;  // (the loop below would not move: #452)
+    if (N(w) == 0) {
+      // an empty string is found in an empty string only, once (the loop
+      // below would not move: #452)
+      if (N(s) == 0) merge (sel, simple_range (p * 0, p * 0));
+      return;
+    }
     int pos= 0;
     while (pos < N(s)) {
       int next= tm_search_forwards (w, pos, source);
