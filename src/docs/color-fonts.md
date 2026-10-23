@@ -59,12 +59,14 @@ hooks.
    (the color of the text where the palette says so, and the opacity of
    the text for all of them). Every renderer thus draws an emoji as it
    draws text, and a PDF keeps it as vectors. Seen so far: the screen of
-   Vue (as `TEXMACS_VUE_SNAPSHOT` saves it), the PDF of the MuPDF writer
+   Vue (as `TEXMACS_VUE_SNAPSHOT` saves it), the screen of Cocoa (as
+   `TEXMACS_NS_SNAPSHOT` saves it), drawn by the GPU and by Core Graphics
+   (`TEXMACS_NS_GPU=0`) in the same colors, the PDF of the MuPDF writer
    (`TEXMACS_PDF_MUPDF=1` or the preference `native pdf renderer`, and
    always in the browser), where the font is embedded as a subset, and
    the PostScript export (with its PDF through Ghostscript, where the
-   glyphs become Type 3 fonts); the screens of Cocoa and Qt and the PDF of
-   PDFHummus are still to be looked at.
+   glyphs become Type 3 fonts); the screen of Qt and the PDF of PDFHummus
+   are still to be looked at.
 
 ## Not done yet
 
