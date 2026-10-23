@@ -495,7 +495,8 @@ search_concat (tree t, tree what, int pos, int i,
 ******************************************************************************/
 
 void
-search_string (range_set& sel, string s, tree what, path p) {
+search_string (range_set& sel, string s, tree what, path p, int from= 0) {
+  // the hits of what in s, from the offset from on
   string source= case_fold (s);
 
   if (is_atomic (what)) {
@@ -506,7 +507,7 @@ search_string (range_set& sel, string s, tree what, path p) {
       if (N(s) == 0) merge (sel, simple_range (p * 0, p * 0));
       return;
     }
-    int pos= 0;
+    int pos= from;
     while (pos < N(s)) {
       int next= tm_search_forwards (w, pos, source);
       if (next < 0 || next >= N(s)) break;
@@ -516,7 +517,7 @@ search_string (range_set& sel, string s, tree what, path p) {
   }
   else if (is_concat (what)) {
     tree w= case_fold_pattern (what);
-    for (int pos=0; pos<N(s); ) {
+    for (int pos=from; pos<N(s); ) {
       int start, end;
       if (match_atomic (source, w, pos, 0, start, end)) {
         merge (sel, simple_range (p * start, p * end));
@@ -556,6 +557,16 @@ search_concat (range_set& sel, tree t, tree what, path p) {
   bool scan= true;
   for (int pos=0; pos<N(t); ) {
     range_set ssel= copy (inside[pos]);
+    if (partial_match_flag && is_atomic (t[pos]) && N(sel) != 0 &&
+        (p * pos) <= sel[N(sel)-1]) {
+      // a match across the children ended inside this string: its own hits
+      // from there (inside[pos] comes from its start, where a hit across
+      // that end could hide the next one, #482). With the replace matching,
+      // the own hits of a string cover all of it
+      ssel= range_set ();
+      search_string (ssel, t[pos]->label, what, p * pos,
+                     (sel[N(sel)-1] / (p * pos))->item);
+    }
     if (N(ssel) != 0) {
       // would a failed scan have stopped here? (cur has not changed since
       // it failed: the hits merged in between start before cur)
