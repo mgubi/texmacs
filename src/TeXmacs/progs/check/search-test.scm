@@ -324,6 +324,37 @@
               '(concat "a" (wildcard "x"))
               '((0 0 0 0) (0 1 1))))
 
+;; a string with several hits of its own, after a tag: the hits of the
+;; string, as when it is alone; no empty or inverted ranges (#473). A
+;; trailing wildcard starts at the first hit of the string.
+(define (test-hits-of-a-string-after-a-tag)
+  (check-group "hits of a string after a tag")
+  (with-search-mode 'search
+    (lambda ()
+      (check= (hits '(document "aba+b") '(concat "a" (wildcard "x") "b"))
+              '((0 0) (0 2) (0 2) (0 5)))
+      (check= (hits '(document (concat "x" (rsub "c") "aba+b"))
+                    '(concat "a" (wildcard "x") "b"))
+              '((0 2 0) (0 2 2) (0 2 2) (0 2 5)))
+      (check= (hits '(document (concat "ab" (rsub "c") "ab+ab"))
+                    '(concat "a" (wildcard "x") "b"))
+              '((0 0 0) (0 0 2) (0 2 0) (0 2 2) (0 2 3) (0 2 5)))
+      (check= (hits '(document (concat "x" (rsub "c") "ba+a" (rsub "d")))
+                    '(concat "a" (wildcard "x")))
+              '((0 2 1) (0 3 1)))))
+  ;; the search goes on after such a string: a scan which stopped there
+  ;; starts again after it
+  (check-both '(document (concat "x" (rsub "c") "ab" (rsub "1") "a" (rsub "2")
+                                 "b"))
+              '(concat "a" (wildcard "x") "b")
+              '((0 2 0) (0 2 2) (0 4 0) (0 6 1)))
+  ;; when replacing, a string of the pattern must match a whole string
+  (with-search-mode 'replace
+    (lambda ()
+      (check= (hits '(document (concat "x" (rsub "c") "aba+b"))
+                    '(concat "a" (wildcard "x") "b"))
+              '((0 2 0) (0 2 5))))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Paragraphs, limits, positions
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -407,8 +438,11 @@
                             '(concat "d" (rsup "f"))
                             '(concat (wildcard "x") "q" (rsub "k"))))
             ;; a hit in each string which contains x: the whole formula.
-            ;; The scans are not started again after a hit inside a string
-            ;; (they took 2 s on the dense formula when they were)
+            ;; The skipping of failed scans starts again only after a
+            ;; child where such a scan stops; here the first hit, extended
+            ;; to the end of the formula by the trailing wildcard, leaves
+            ;; none (starting again after every hit took 2 s on the dense
+            ;; formula)
             (check-fast t '(concat "x" (wildcard "y"))
                         '((0 0 0) (0 3200 3)))
             (check-fast (dense-formula 3000) '(concat "x" (wildcard "y"))
@@ -443,6 +477,7 @@
   (test-formula-wildcards)
   (test-hits-after-a-hit)
   (test-wildcards-and-several-hits)
+  (test-hits-of-a-string-after-a-tag)
   (test-paragraphs)
   (test-limit-and-position)
   (test-speed)

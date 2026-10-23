@@ -219,11 +219,21 @@ search_concat_sub (tree t, tree what, int pos, int i,
   }
   if (pos >= N(t)) return false;
   if (is_atomic (t[pos])) {
+    if (i == 0 && N(inside[pos]) != 0 &&
+        path_less_eq (cur, inside[pos][N(inside[pos])-2]))
+      // this string has matches of its own after cur: the outer loop
+      // takes them (here, p1 and p2 below could come from different
+      // matches and give a wrong range, #473)
+      return false;
     int j, k= i;
     while (k<N(what) &&
            (is_atomic (what[k]) || is_func (what[k], WILDCARD, 1))) k++;
     for (j=k; j>i; j--) {
       if (is_func (what[j-1], WILDCARD, 1)) continue;
+      // the whole pattern inside this string: the matches of the string
+      // itself, which the outer loop takes (here p1 and p2 would come from
+      // different matches when there are several, #473)
+      if (i == 0 && j == N(what)) continue;
       tree swhat= what (i, j);
       if (j == i+1) swhat= swhat[0];
       range_set sel;
@@ -362,11 +372,12 @@ void
 search_concat (range_set& sel, tree t, tree what, path p) {
   // search_concat (t, what, pos, 0, ...) scans forwards from pos for the
   // start of a match, until it reaches a compound child which contains a
-  // match (with a leading wildcard, until the end or until it fails on
-  // cur). When such a scan fails, the scans from the next positions fail
-  // too (cur only grows), up to that child: skip them, instead of scanning
-  // again (quadratic in the length of the concat, and worse for nested
-  // concats). The matches inside each child are searched only once.
+  // match, or a string with matches after cur (with a leading wildcard,
+  // a compound child only when it fails on cur). When such a scan fails,
+  // the scans from the next positions fail too (cur only grows), up to
+  // that child: skip them, instead of scanning again (quadratic in the
+  // length of the concat, and worse for nested concats). The matches
+  // inside each child are searched only once.
   array<range_set> inside (N(t));
   for (int pos=0; pos<N(t); pos++)
     search (inside[pos], t[pos], what, p * pos);
@@ -376,6 +387,13 @@ search_concat (range_set& sel, tree t, tree what, path p) {
   for (int pos=0; pos<N(t); ) {
     range_set ssel= copy (inside[pos]);
     if (N(ssel) != 0) {
+      // would a failed scan have stopped here? (cur has not changed since
+      // it failed: the hits merged in between start before cur)
+      path cur= (p * 0) * start (t[0]);
+      if (N(sel) != 0) cur= sel[N(sel)-1];
+      bool stop= is_compound (t[pos])?
+        !is_func (what[0], WILDCARD, 1):
+        path_less_eq (cur, ssel[N(ssel)-2]);
       // ssel is a list of (start, end) pairs; a leading (trailing) wildcard
       // extends the hits to the start (end) of the formula. Then they
       // overlap, and merge keeps the first one (#454)
@@ -386,8 +404,8 @@ search_concat (range_set& sel, tree t, tree what, path p) {
         for (int i=0; i+1<N(ssel); i+=2)
           ssel[i+1]= (p * (N(t)-1)) * end (t[N(t)-1]);
       merge (sel, ssel);
+      if (stop) scan= true;
       if (is_compound (t[pos])) {
-        if (!is_func (what[0], WILDCARD, 1)) scan= true;
         pos++;
         continue;
       }
