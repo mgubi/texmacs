@@ -83,6 +83,19 @@ class environment {
 };
 ABSTRACT_NULL_CODE(environment);
 
+/******************************************************************************
+* The reads of an evaluation
+******************************************************************************/
+
+// While reads_depth > 0, the reads of the standard environment are
+// recorded with the values read (record_read, see reads_frame in
+// evaluate_main.hpp): an evaluation is found again by them in another
+// environment, after a change before it. recorded_value is the value as
+// recorded: the value of the variable, or the mark of its absence.
+extern int reads_depth;
+void record_read (int key, tree val);
+tree recorded_value (environment env, int key);
+
 void test_environments ();
 
 #endif // defined ENVIRONMENT_H

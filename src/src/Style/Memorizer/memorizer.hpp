@@ -87,7 +87,12 @@ protected:
   memorizer* a;
   int n;
 public:
-  inline compound_memorizer_rep (): memorizer_rep (), a (NULL), n (0) {}
+  array<int>  read_keys; // the variables which the computation read
+  array<tree> read_vals; // and their values (see find_by_reads)
+  bool read_overflow;    // too many reads, not recorded
+
+  inline compound_memorizer_rep ():
+    memorizer_rep (), a (NULL), n (0), read_overflow (false) {}
   inline ~compound_memorizer_rep () { if (n!=0) tm_delete_array (a); }
   void set_children (memorizer* a, int n);
   void get_children (memorizer*& a, int& n);

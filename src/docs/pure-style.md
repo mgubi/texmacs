@@ -878,12 +878,35 @@ Two consequences:
    a first evaluation, though most of that work does not read the counter.
    - *Done:* `auto-id` and `get-attachment` are left to the typesetter
      (above), which removed the last errors.
-   - *Left:* keys made of the inputs actually read (the environment input
-     hash of #333) instead of addresses would save most of the 56 %; it is
-     an optimisation, worth doing with step 4, when the cost of the
-     rewriter adds to the typesetter's. The side effects of `write`,
-     `set-binding` and counters in the branches kept by a residual condition
-     are not handled.
+   - *Done (October 23):* an evaluation is also found by the values which
+     it read (`find_by_reads`, `evaluate_main.cpp`). The reads of the
+     standard environment (`std_environment_rep::read` and `contains`) are
+     recorded on a stack, a frame for each computation which a memorizer
+     replaces (evaluate, rewrite, inactive); when it ends, they are reduced
+     to the reads of values of its input environment, each variable once (a
+     variable read first with another value was set by the computation
+     itself), kept by the memorizer and left on the stack as reads of the
+     computation around it. An evaluation which leaves the environment as it
+     is (no assignment) is indexed by its tree: when the memorizer of the
+     environment misses, the latest 16 evaluations of the same tree are
+     tried, and one whose variables have the same values (the same tree, or
+     the same string) gives its result. Past 256 reads a computation keeps
+     only the fact that it read too much, and is not indexed (recording
+     such reads cost more than it saved). Measured on Joris's papers, a
+     section inserted near the start: `effreal` 16851 evaluations before,
+     4123 after, `amx` 40831 and 14413; the CPU time of the rewriting of
+     `amx` goes from about 66 to 51 ms (macro expansion and interning do not
+     depend on the evaluations); typing in a paragraph is unchanged (1 ms).
+     What is still evaluated again reads the counter: the parts of the
+     section macros around the number (title, entry of the table of
+     contents). Checked: the rewritten trees of the 696 pages and of the
+     994 documents of the corpus, each also after a section inserted at
+     the start and removed, are those of the build without it (but for the
+     current date and the identifiers made from addresses, which change
+     from run to run). One of these runs ended in a crash of the garbage
+     collector of S7 while a buffer was switched to, not seen again in five
+     runs of the same documents. The side effects of `write`, `set-binding` and
+     counters in the branches kept by a residual condition are not handled.
 4. **The typesetter consumes the result.** Split the work instead of
    stacking two caches: the rewriter evaluates the macros and memorizes by
    what it reads; the typesetter's recording shrinks to what needs layout

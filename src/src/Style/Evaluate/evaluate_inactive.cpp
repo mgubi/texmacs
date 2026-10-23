@@ -501,10 +501,18 @@ rewrite_inactive (tree t, inactive_style sty) {
   if (is_memorized (mem)) {
     if (style_trace) cout << UNINDENT << "Memorized " << mem->get_tree () << LF;
     std_env= mem->get_environment ();
+    note_reads (mem);
     return mem->get_tree ();
   }
   memorize_start ();
-  tree r= rewrite_inactive_impl (t, sty);
+  environment env_in= std_env;
+  compound_memorizer_rep* rep= (compound_memorizer_rep*) mem.operator -> ();
+  tree r;
+  {
+    reads_frame reads;
+    r= rewrite_inactive_impl (t, sty);
+    reads.close (env_in, rep);
+  }
   mem->set_tree (r);
   mem->set_environment (std_env);
   memorize_end ();

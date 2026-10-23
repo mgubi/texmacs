@@ -49,9 +49,14 @@ public:
     pure (pure2), env (env2), next (next2), accel (accel2), args (args2) {}
 
   inline bool contains (int key) {
-    return accel->contains (key); }
+    if (reads_depth == 0) return accel->contains (key);
+    tree* ptr= accel->raw_read (key);
+    record_read (key, ptr == NULL? accel->read (key): *ptr);
+    return ptr != NULL; }
   inline tree read (int key) {
-    return accel->read (key); }
+    tree r= accel->read (key);
+    if (reads_depth > 0) record_read (key, r);
+    return r; }
   inline void write (int key, const tree& val) {
     env->write (key, val);
     accel->write (key, val); }
@@ -84,6 +89,16 @@ std_environment_rep::print (const string& prefix) {
 
 inline std_environment as_std_environment (const environment& env) {
     return std_environment ((std_environment_rep*) as_pointer (env)); }
+
+/******************************************************************************
+* The reads of an evaluation (see environment.hpp)
+******************************************************************************/
+
+tree
+recorded_value (environment env, int key) {
+  // (the value of an absent variable is the same tree, uninit)
+  return as_std_environment (env)->accel->read (key);
+}
 
 /******************************************************************************
 * Primitive environments

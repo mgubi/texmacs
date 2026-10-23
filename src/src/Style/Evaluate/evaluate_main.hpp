@@ -98,6 +98,20 @@ struct assigned_collector {
     residual_assigned= &names; }
   inline ~assigned_collector () { residual_assigned= outer; }
 };
+// the reads of a computation which a memorizer replaces (see find_by_reads
+// in evaluate_main.cpp): they are recorded from a reads_frame to its close,
+// which gives them to the memorizer; they are also reads of the
+// computations around it, as when the memorizer is found again (note_reads)
+struct reads_frame {
+  int depth;
+  reads_frame ();
+  ~reads_frame ();
+  void close (environment env_in, compound_memorizer_rep* rep);
+};
+void note_reads (compound_memorizer_rep* rep);
+inline void note_reads (memorizer& mem) {
+  note_reads ((compound_memorizer_rep*) mem.operator -> ()); }
+
 inline void note_assigned (string var) {
   if (residual_assigned != NULL)
     *residual_assigned= list<string> (var, *residual_assigned); }

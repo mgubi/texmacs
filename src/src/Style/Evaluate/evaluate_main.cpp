@@ -16,11 +16,13 @@
 #include "path.hpp"
 #include "analyze.hpp"
 #include "merge_sort.hpp"
+#include "iterator.hpp"
 
 environment std_env;
 static bool markup_mode= false; // see evaluate_markup
 static int evaluate_calls= 0; // evaluations of compound trees
 static int evaluate_hits= 0;  // of which found in a memorizer
+static int evaluate_hits_by_reads= 0; // of which by the values read
 
 /******************************************************************************
 * Memorizing evaluations
@@ -29,7 +31,11 @@ static int evaluate_hits= 0;  // of which found in a memorizer
 static tree no_tree (UNINIT);
 
 class memorizer;
+class evaluate_memorizer_rep;
+static void unindex (evaluate_memorizer_rep* rep);
+
 class evaluate_memorizer_rep: public compound_memorizer_rep {
+public:
   environment env_in;
   tree t_in;
   bool markup; // evaluated as markup or as a value (see evaluate_markup)
@@ -37,12 +43,13 @@ class evaluate_memorizer_rep: public compound_memorizer_rep {
   environment env_out;
   tree t_out;
 
-public:
   list<string> assigned; // the variables which the evaluation assigned
+  bool indexed;          // in reads_index
 
   inline evaluate_memorizer_rep (environment env, tree t, bool m, bool s):
     env_in (env), t_in (t), markup (m), scratch (s), env_out (),
-    t_out (no_tree) {}
+    t_out (no_tree), indexed (false) {}
+  inline ~evaluate_memorizer_rep () { if (indexed) unindex (this); }
   void print (tm_ostream& out) {
     out << "evaluate_memorizer (" << t_in << ")"; }
 
@@ -64,6 +71,222 @@ inline memorizer
 evaluate_memorizer (environment env, tree t, bool markup) {
   return (memorizer_rep*)
     tm_new<evaluate_memorizer_rep> (env, t, markup, scratch_depth > 0);
+}
+
+/******************************************************************************
+* Finding an evaluation by the values which it read
+******************************************************************************/
+
+// The memorizers are found by the address of the environment: after a
+// change of a variable (a counter, a section inserted), every evaluation
+// after it has another environment and is computed again, though most do
+// not read the variable. An evaluation which leaves the environment as it
+// is (no assignment) is therefore also found by its tree and by the
+// values of the variables which it read: when they are the same in the
+// new environment, its result is the same.
+
+static hashmap<pointer,array<pointer> > reads_index; // by the tree evaluated
+static int reads_index_empty= 0; // its keys without memorizers
+static const int reads_candidates= 16; // the latest ones are tried
+
+static inline bool
+same_value (tree v1, tree v2) {
+  return weak_equal (v1, v2) ||
+         (is_atomic (v1) && is_atomic (v2) && v1->label == v2->label);
+}
+
+static void
+index_by_reads (evaluate_memorizer_rep* rep) {
+  // (once, should a memorizer be computed twice)
+  if (rep->indexed) return;
+  pointer key= (pointer) rep->t_in.operator -> ();
+  // (a new array for a new tree: the default value of the hashmap is one
+  // array, which << would change for all of them)
+  if (!reads_index->contains (key)) reads_index (key)= array<pointer> ();
+  else if (N (reads_index [key]) == 0) reads_index_empty--;
+  reads_index (key) << (pointer) rep;
+  rep->indexed= true;
+}
+
+static void
+unindex (evaluate_memorizer_rep* rep) {
+  // (the key is kept: removing it and adding it again resizes the hashmap
+  // at each evaluation of the document; compact_reads_index removes them)
+  pointer key= (pointer) rep->t_in.operator -> ();
+  if (!reads_index->contains (key)) return;
+  array<pointer>& a= reads_index (key);
+  int i, n= N(a);
+  for (i=0; i<n; i++)
+    if (a[i] == (pointer) rep) {
+      for (; i+1<n; i++) a[i]= a[i+1];
+      a->resize (n-1);
+      if (n == 1) reads_index_empty++;
+      break;
+    }
+  rep->indexed= false;
+}
+
+static void
+compact_reads_index () {
+  if (reads_index_empty < 4096 || 2 * reads_index_empty < N (reads_index))
+    return;
+  hashmap<pointer,array<pointer> > h;
+  iterator<pointer> it= iterate (reads_index);
+  while (it->busy ()) {
+    pointer key= it->next ();
+    if (N (reads_index [key]) != 0) h (key)= reads_index [key];
+  }
+  reads_index= h;
+  reads_index_empty= 0;
+}
+
+static evaluate_memorizer_rep*
+find_by_reads (tree t, bool markup, bool scratch) {
+  pointer key= (pointer) t.operator -> ();
+  if (!reads_index->contains (key)) return NULL;
+  array<pointer> a= reads_index [key];
+  int i, j, n= N(a);
+  for (i= n-1; i >= 0 && i >= n - reads_candidates; i--) {
+    evaluate_memorizer_rep* rep= (evaluate_memorizer_rep*) a[i];
+    if (rep->markup != markup || rep->scratch != scratch) continue;
+    int m= N(rep->read_keys);
+    for (j=0; j<m; j++)
+      if (!same_value (recorded_value (std_env, rep->read_keys[j]),
+                       rep->read_vals[j])) break;
+    if (j == m) return rep;
+  }
+  return NULL;
+}
+
+/******************************************************************************
+* Recording the reads
+******************************************************************************/
+
+// The reads are on one stack, a frame for each computation being
+// recorded: when it ends, the reads of its frame are reduced to those of
+// values of its input environment, each variable once, which stay on the
+// stack as reads of the frame around it. Past MAX_READS reads in a frame,
+// only the fact that there were too many is kept (overflow), also for the
+// frames around it: such a computation is not found by its reads.
+
+#define MAX_READS 256
+int reads_depth= 0;              // the frames
+static int*  frame_start= NULL;
+static bool* frame_over= NULL;
+static int   frame_cap= 0;
+static int*  rd_keys= NULL;      // the stack of the reads
+static tree* rd_vals= NULL;
+static int   rd_n= 0, rd_cap= 0;
+static int*  stamp= NULL;        // for each variable, the last reduction
+static int   stamp_cap= 0, stamp_gen= 0;
+
+static void
+push_read (int key, tree val) {
+  if (rd_n == rd_cap) {
+    int cap= max (2 * rd_cap, 1024);
+    int*  keys= tm_new_array<int> (cap);
+    tree* vals= tm_new_array<tree> (cap);
+    for (int i=0; i<rd_n; i++) { keys[i]= rd_keys[i]; vals[i]= rd_vals[i]; }
+    if (rd_cap != 0) { tm_delete_array (rd_keys); tm_delete_array (rd_vals); }
+    rd_keys= keys; rd_vals= vals; rd_cap= cap;
+  }
+  rd_keys[rd_n]= key;
+  rd_vals[rd_n]= val;
+  rd_n++;
+}
+
+static void
+overflow_frame (int f) {
+  frame_over[f]= true;
+  rd_n= frame_start[f];
+}
+
+void
+record_read (int key, tree val) {
+  int f= reads_depth - 1;
+  if (frame_over[f]) return;
+  if (rd_n - frame_start[f] >= MAX_READS) overflow_frame (f);
+  else push_read (key, val);
+}
+
+void
+note_reads (compound_memorizer_rep* rep) {
+  // (the reads of a computation are reads of the computations around it)
+  if (reads_depth == 0) return;
+  int f= reads_depth - 1;
+  if (frame_over[f]) return;
+  int i, m= N(rep->read_keys);
+  if (rep->read_overflow || rd_n - frame_start[f] + m > MAX_READS)
+    overflow_frame (f);
+  else
+    for (i=0; i<m; i++) push_read (rep->read_keys[i], rep->read_vals[i]);
+}
+
+reads_frame::reads_frame () {
+  if (reads_depth == frame_cap) {
+    int cap= max (2 * frame_cap, 64);
+    int*  starts= tm_new_array<int> (cap);
+    bool* overs = tm_new_array<bool> (cap);
+    for (int i=0; i<reads_depth; i++) {
+      starts[i]= frame_start[i]; overs[i]= frame_over[i]; }
+    if (frame_cap != 0) {
+      tm_delete_array (frame_start); tm_delete_array (frame_over); }
+    frame_start= starts; frame_over= overs; frame_cap= cap;
+  }
+  frame_start[reads_depth]= rd_n;
+  frame_over [reads_depth]= false;
+  depth= ++reads_depth;
+}
+
+reads_frame::~reads_frame () {
+  if (reads_depth != depth) return;
+  // (not closed: an exception; the frame around it misses reads)
+  reads_depth--;
+  rd_n= frame_start[reads_depth];
+  if (reads_depth > 0) overflow_frame (reads_depth - 1);
+}
+
+void
+reads_frame::close (environment env_in, compound_memorizer_rep* rep) {
+  int f= reads_depth - 1, start= frame_start[f];
+  if (frame_over[f]) rep->read_overflow= true;
+  else {
+    int i, m= 0;
+    if (++stamp_gen == 0) {
+      for (i=0; i<stamp_cap; i++) stamp[i]= 0;
+      stamp_gen= 1;
+    }
+    for (i= start; i<rd_n; i++) {
+      int k= rd_keys[i];
+      if (k >= stamp_cap) {
+        int cap= max (2 * stamp_cap, k + 1024);
+        int* st= tm_new_array<int> (cap);
+        for (int j=0; j<cap; j++) st[j]= (j < stamp_cap? stamp[j]: 0);
+        if (stamp_cap != 0) tm_delete_array (stamp);
+        stamp= st; stamp_cap= cap;
+      }
+      if (stamp[k] == stamp_gen) continue;
+      stamp[k]= stamp_gen;
+      // (a variable read first with another value was set by the
+      // computation itself, a with or an assignment: not an input)
+      if (same_value (recorded_value (env_in, k), rd_vals[i])) {
+        rd_keys[start+m]= k;
+        rd_vals[start+m]= rd_vals[i];
+        m++;
+      }
+    }
+    array<int>  keys (m);
+    array<tree> vals (m);
+    for (i=0; i<m; i++) { keys[i]= rd_keys[start+i]; vals[i]= rd_vals[start+i]; }
+    rep->read_keys= keys;
+    rep->read_vals= vals;
+    rd_n= start + m;
+  }
+  reads_depth--;
+  if (reads_depth == 0) rd_n= 0;
+  else if (rep->read_overflow ||
+           rd_n - frame_start[reads_depth - 1] > MAX_READS)
+    overflow_frame (reads_depth - 1);
 }
 
 list<string>
@@ -841,23 +1064,44 @@ evaluate_in (tree t, bool markup) {
     // (the variables which it assigned, for a residual branch around it,
     // see evaluate_branches)
     note_assigned (((evaluate_memorizer_rep*) mem.operator -> ())->assigned);
+    note_reads (mem);
     if (style_trace) cout << UNINDENT << "Memorized "
          << "[" << as_hexadecimal ((pointer) mem->get_tree ().operator -> ())
          << ", " << as_hexadecimal ((pointer) std_env.operator -> ()) << "] "
          << mem->get_tree () << LF;
     return mem->get_tree ();
   }
+  evaluate_memorizer_rep* rep= (evaluate_memorizer_rep*) mem.operator -> ();
+  evaluate_memorizer_rep* old= find_by_reads (t, markup, scratch_depth > 0);
+  if (old != NULL) {
+    // (the same values read: the same result, the environment unchanged)
+    evaluate_hits++;
+    evaluate_hits_by_reads++;
+    rep->set_tree (old->get_tree ());
+    rep->set_environment (std_env);
+    rep->read_keys= old->read_keys;
+    rep->read_vals= old->read_vals;
+    index_by_reads (rep);
+    note_reads (rep);
+    if (style_trace) cout << UNINDENT << "Memorized by reads "
+         << "[" << as_hexadecimal ((pointer) rep->get_tree ().operator -> ())
+         << "] " << rep->get_tree () << LF;
+    return rep->get_tree ();
+  }
   memorize_start ();
   bool old_mode= markup_mode;
   markup_mode= markup;
+  environment env_in= std_env;
   list<string> assigned;
   tree r;
   {
     assigned_collector collect;
+    reads_frame reads;
     r= evaluate_impl (t);
     // (each name once: the counters of a long document are assigned in
     // every section, and the lists go up to the memorizers of the document)
     assigned= unique_names (collect.names);
+    reads.close (env_in, rep);
   }
   note_assigned (assigned);
   markup_mode= old_mode;
@@ -866,7 +1110,9 @@ evaluate_in (tree t, bool markup) {
   if (!weak_equal (r, t)) decorate_ip (t, r);
   mem->set_tree (r);
   mem->set_environment (std_env);
-  ((evaluate_memorizer_rep*) mem.operator -> ())->assigned= assigned;
+  rep->assigned= assigned;
+  if (weak_equal (std_env, env_in) && is_nil (assigned) && !rep->read_overflow)
+    index_by_reads (rep);
   memorize_end ();
   // (the trace gives the addresses of the tree and of the environment after
   // the evaluation, as those before it in "Evaluate")
@@ -894,7 +1140,8 @@ evaluate_result (tree t) {
 memorizer
 evaluate (environment env, tree t) {
   environment old_env= std_env;
-  evaluate_calls= evaluate_hits= 0;
+  evaluate_calls= evaluate_hits= evaluate_hits_by_reads= 0;
+  compact_reads_index ();
   memorize_initialize ();
   // (the state of an evaluation which an exception interrupted)
   residual_assigned= NULL;
@@ -908,8 +1155,10 @@ evaluate (environment env, tree t) {
 array<int>
 evaluate_statistics () {
   // of the last evaluation of a document: evaluations, memorized ones,
-  // size of the table of memorizers
+  // size of the table of memorizers, memorized ones found by the values
+  // which they read (see find_by_reads)
   array<int> r;
-  r << evaluate_calls << evaluate_hits << memorizer_table_size ();
+  r << evaluate_calls << evaluate_hits << memorizer_table_size ()
+    << evaluate_hits_by_reads;
   return r;
 }

@@ -432,6 +432,34 @@
              (check-true (< (* 2 (car s)) first))
              (check-true (>= (cadr s) 30)))))))))
 
+;; style-rewrite-statistics, fourth number: the evaluations found by the
+;; values which they read (find_by_reads), when the environment changed
+;; before them. After a section inserted, the paragraphs after it read no
+;; section number: they are found so, and the result is the one of the
+;; same document evaluated in another buffer.
+(define (test-memorization-by-reads)
+  (check-group "memorization by reads")
+  (let* ((par (lambda (i)
+                `(concat "Text " (em ,(number->string i)) " and "
+                         (math (concat "x" (rsub "1"))) ".")))
+         (parts (lambda (l)
+                  (append-map (lambda (i) (list `(section ,(number->string i))
+                                                (par i)))
+                              l)))
+         (body `(document ,@(parts (iota 10))))
+         (inserted `(document ,@(parts '(0)) (section "new")
+                              ,@(cddr (parts (iota 10)))))
+         (fresh (with-scratch-body inserted
+                  (lambda () (tree->stree (style-rewrite-buffer))))))
+    (with-scratch-body body
+      (lambda ()
+        (style-rewrite-buffer)
+        (tree-insert! (buffer-tree) 2 (list (stree->tree '(section "new"))))
+        (let* ((r (tree->stree (style-rewrite-buffer)))
+               (s (style-rewrite-statistics)))
+          (check-true (> (cadddr s) 0))
+          (check= r fresh))))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Pages of the manual
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -555,6 +583,7 @@
         (test-boundaries)
         (test-markup-and-values)
         (test-memorization)
+        (test-memorization-by-reads)
         (test-manual)
         (test-documentation)
         (test-typesetter-caches)))

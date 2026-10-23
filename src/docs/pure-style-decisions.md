@@ -380,3 +380,34 @@ welcome pages); the evaluations per keystroke (1660 to 93 on the
 conventions page, 1.4 to 0.5 ms); the keystroke as fast as without the
 flag; the first rewriting of the glue reference 58 ms instead of 51, with
 more memorizers (120000 instead of 68000).
+
+**3.3 After a real change of a variable: a second lookup by the values
+read.** A counter which changes (a section inserted) gives every evaluation
+after it a new environment; interning (3.2) cannot help, the value is new.
+Decision: the memorizers keep their key (the address of the environment),
+and an evaluation which leaves the environment as it is is also found by
+its tree and the values of the variables which it read
+(`find_by_reads`): the latest 16 evaluations of the tree are tried, and
+one whose variables have the same values in the new environment (the same
+tree, or the same string) gives its result. The reads are recorded on one
+stack, a frame per computation which a memorizer replaces (evaluate,
+rewrite, inactive), reduced at its end to the reads of values of its input
+environment and left on the stack for the computation around it; past 256
+reads a frame only keeps the fact (it is not indexed, nor the frames
+around it).
+*Alternatives:* replacing the keys by the values read (3.2): every lookup
+would compare values, also when the environment is the same object, the
+common case of a keystroke. Indexing the evaluations which assign too, by
+replaying their assignments on the new environment: not needed by the
+measures (what is evaluated again reads the counter), and the replay must
+reproduce the environment exactly. Recording in arrays per computation, as
+first written: as many evaluations saved, no time saved (allocations, and
+the reads copied up at each level).
+*Decided by:* a section inserted near the start of Joris's papers:
+`effreal` 16851 evaluations to 4123, `amx` 40831 to 14413, the CPU time of
+the rewriting of `amx` from about 66 to 51 ms; typing in a paragraph
+unchanged (1 ms); the rewritten trees of the manual and of the corpus, also
+after the insertion, identical to those of the build without it. On the
+way: a `hashmap` of arrays gives every new key the same default array, so
+an array must be assigned before `<<` (the first version mixed the
+evaluations of all trees).
