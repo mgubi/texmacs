@@ -574,6 +574,7 @@ private:
   tree exec_get_attachment (tree t);
   tree exec_auto_id (tree t);
   bool auto_label_tag (tree& tag, tree& root, path& where);
+  bool calls_with_arguments (tree body);
 
   tree exec_pattern (tree t);
 
@@ -832,14 +833,18 @@ public:
   // style rewriter kept in an expand-as: auto_label_tag finds the tag of
   // the call there, as when the typesetter expands the call itself; as
   // there, the level is empty for a macro without arguments, and the tag is
-  // then looked for further out)
+  // then looked for further out, unless its body calls a macro with
+  // arguments: the typesetter finds the tag through the arguments of that
+  // call, which lie in the body, and the rewritten tree no longer has the
+  // call (prologue, whose principal-section* took a new label each time)
   inline void macro_begin_call (path ip, tree name) {
     macro_arg= list<hashmap<string,tree> > (
       hashmap<string,tree> (UNINIT), macro_arg);
     hashmap<string,path> h (path (DECORATION));
     tree f= (is_atomic (name) && provides (name->label)?
              read (name->label): tree (UNINIT));
-    if ((is_func (f, MACRO) && N(f) > 1) || is_func (f, XMACRO))
+    if ((is_func (f, MACRO) && N(f) > 1) || is_func (f, XMACRO) ||
+        (is_func (f, MACRO, 1) && calls_with_arguments (f[0])))
       h ("\1call")= descend (ip, 0);
     macro_src= list<hashmap<string,path> > (h, macro_src); }
   inline void macro_end_call () {

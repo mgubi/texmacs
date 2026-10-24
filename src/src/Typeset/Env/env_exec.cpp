@@ -2271,6 +2271,24 @@ edit_env_rep::auto_label_tag (tree& tag, tree& root, path& where) {
   return false;
 }
 
+bool
+edit_env_rep::calls_with_arguments (tree t) {
+  // (whether the body of a macro calls a macro with arguments, see
+  // macro_begin_call)
+  if (is_atomic (t)) return false;
+  if (L(t) >= START_EXTENSIONS && N(t) > 0) {
+    string name= as_string (L(t));
+    if (provides (name)) {
+      tree f= read (name);
+      if ((is_func (f, MACRO) && N(f) > 1) || is_func (f, XMACRO))
+        return true;
+    }
+  }
+  for (int i=0; i<N(t); i++)
+    if (calls_with_arguments (t[i])) return true;
+  return false;
+}
+
 tree
 edit_env_rep::exec_auto_id (tree t) {
   static bool stable= (get_env ("TEXMACS_STABLE_LABELS") != "off");

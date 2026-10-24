@@ -364,7 +364,7 @@ boxes at the same places in both prints). Left:
   outside and the paddings), and `explain-body` widens `par-left` from
   `(value par-left)`: the rewriter computed it from the margins outside the
   ornament. In those bodies the margins are now left to the typesetter
-  (`evaluate_ornamented` binds them to references). Found by cutting the
+  (`evaluate_locals.cpp` binds them to references). Found by cutting the
   page down: the last block alone differed, then a `block-if` holding an
   `explain`, while each alone was identical.
 
@@ -979,6 +979,14 @@ also after a section inserted at the start and removed, must be the same
 
     tests/style/compare-reads.sh [document.tm...]
 
+and the table of the variables which the typesetter sets itself in a
+part of the tree (`evaluate_locals.cpp`, decision 1.13) against the
+sources of the typesetter: every place which sets a variable must be in
+the table or reviewed, and `-v` lists the macros of the styles which read
+each variable (under a second):
+
+    tests/style/typesetter-vars.py [-v]
+
 It is not listed in `check-master.scm`, since the rewriter exists only in
 the experimental build (elsewhere the suite fails at once, saying so). It
 runs headless through two commands of the experimental build
@@ -1028,15 +1036,22 @@ from its rewritten tree:
 | October 21 | 852 | 704 |
 | October 23, after the marker fixes and the merge of `upsilon_texmacs` | 945 | 754 |
 | October 24, with `find_by_reads`, the loops, inclusions and `active` (decisions 1.5, 1.11, 1.12) | 968 | 762 |
+| October 24, with the variables set by the typesetter (1.13), the errors of `arg` and `map-args`, the labels of `prologue` (2.8) | 979 | 770 |
 
-The 26 left with the editor, by cause (the text and the places of the
+(In the last run, four of Joris's talks printed nothing in the copy
+harness, under the load of four runs at once; run again alone, all four
+were the same.)
+
+The 15 left with the editor, by cause (the text and the places of the
 glyphs of the pages compared, `mutool draw -F stext`):
-- Shifts of a fraction of a point, the same text (13: 7 of baltakatei's
-  chapters, among them subscripts given as arguments, and 6 of Joris's
-  papers): most probably the markers of the arguments (decision 2.9), not
-  confirmed one by one.
-- `riemann`: spaces after some formulas; `zmatmult`: other error messages
-  in a `map` of the title. Not analysed.
+- Shifts of a fraction of a point, the same text (8: 7 of baltakatei's
+  chapters, among them subscripts given as arguments, and Joris's
+  `matryoshka`): most probably the markers of the arguments (decision
+  2.9), not confirmed one by one. Five of Joris's papers counted here
+  before were the variables of scripts (1.13).
+- `riemann`: the italic correction of a `wide` given as an argument
+  (decision 2.9, confirmed: written in place, the typesetter places it as
+  the rewriter does).
 - The current time printed (2, baltakatei's `c0` and `book`): not a
   difference of the rewriter.
 - `graeffe-cca`: a macro defined in a `hide-preamble` inside the abstract,
@@ -1050,9 +1065,6 @@ glyphs of the pages compared, `mutool draw -F stext`):
   headings only; not reproduced in a small document.
 - `9_3_href_and_anchor`: a `set-binding` with three arguments, whose flag
   the typesetter shows only on the document.
-- `kucomp`, `stoch-quant` (private): big delimiters of other sizes;
-  `dalg`, `diffalg`: lines or rules only; `phdthesis` (private): a page
-  number "?" in the table of contents. Not analysed.
 
 The copy harness gives more differences by construction (automatic
 labels, see *Typesetting the result*).

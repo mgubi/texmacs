@@ -20,11 +20,9 @@ layout, and the rule for both is the same: leave them to the typesetter.
 computation with its arguments evaluated): the size of boxes (`box-info`,
 `frame-direct`, `frame-inverse`), the lengths in units, the automatic
 labels and the label tables (`auto-id`, `get-binding`, `has-binding`,
-`get-attachment`), patterns, `hard-id`; and the margins (`par-left`,
-`par-right`) in the body of an ornament, a canvas or an art box, and in
-the cells of a table, which the typesetter sets itself there
-(`evaluate_ornamented`, `evaluate_table`: a cell whose lines are broken
-has margins at zero). A `tmlen` whose
+`get-attachment`), patterns, `hard-id`; and the variables which the
+typesetter sets itself in a part of the tree, where they have no value
+which the rewriter can know (1.13). A `tmlen` whose
 bounds are lengths in units is one too, in a computation on lengths.
 *Alternatives:* compute an approximation (lengths in absolute units, as the
 rewriter of 2007 did): wrong, the typesetter converts units at the scale at
@@ -108,7 +106,10 @@ as its tag in error, not as the rewriter's `undefined`), an `assign` to a
 name which is not one, the call of an undefined macro (the typesetter
 assigns nothing: the reset of a group of `std-counter`, whose
 `<merge|counter-|<arg|x>>` is in a macro without an argument `x`, made the
-rewriter assign `""`, and `<>` then showed "0").
+rewriter assign `""`, and `<>` then showed "0"), the errors of an index
+of `arg` which does not apply and of `map-args` on an argument which is
+not a tuple (the rewriter gave the argument, and an error of its own:
+an affiliation of `amsart` written without a tuple, Joris's `zmatmult`).
 What the rewriter computes in a loop (`for-each`: the counters which
 `reset-std-env` resets at a section) is given to the typesetter after the
 loop, as assignments of the values which the loop changed: of the
@@ -232,6 +233,47 @@ number of the sequence (auto-27 for auto-4), and the table of contents,
 made earlier, showed "?".
 *Decided by:* a paper of the corpus (a subsection in an `active`).
 
+**1.13 The variables which the typesetter sets itself.** The typesetter
+sets some variables itself in some children of a primitive: the row and
+the column of a cell, in its body and in its format, which it executes in
+each cell; the display style, the math level and the position in
+scripts, fractions, the index of a root, what is above or below; the
+colour of the links in the body of a locus, on the screen; the
+magnification in graphics; the margins in the body of an ornament, a
+canvas, an art box and a cell whose lines are broken; the nesting of
+brackets... A macro which reads one of them there must find what the
+typesetter finds. They are listed in one table,
+`evaluate_locals.cpp`: for each one, the primitive, its children, the
+value when the typesetter always gives the same one (`math-display`
+false in a script, `magnify` 1 in graphics: the rewriter still decides
+what depends on it), and otherwise a reference, left to the typesetter
+(1.1); and the functions of the typesetter which set it. The rewriter
+reads the table where it evaluates the children of a primitive
+(`evaluate_typesetter_child`, also for the values of a cell format).
+`tests/style/typesetter-vars.py` checks the table against the sources of
+the typesetter: every place where the typesetter sets a variable (the
+function and the variable) is in the table, or in the list of its
+exceptions with the reason why the rewriter is not concerned (inactive
+markup, headers, the source mode, the editor's environment...), and every
+entry of the table is still such a place. A new place in the typesetter
+thus fails the check before a style reads its variable.
+*Tried:* one special case in the rewriter per primitive, as each
+difference was found (ornaments and cells, then the cells' row, scripts,
+loci, graphics): each was found by a document of the corpus, or not at
+all (the colour of links does not show in print, where a link keeps the
+colour of the text). *Alternative:* the `locals` of the DRD, which give
+the environment of a child to the editor: they hold only the display
+style of scripts and the source mode, and serve another purpose.
+*Limit:* the table holds the children of primitives; a variable which the
+typesetter changes in sequence (`par-no-first`, consumed by the paragraph
+after `no-indent`) is not one, and no style reads it.
+*Decided by:* the stripes of the listings (`striped-table` tests the row of
+the cell: computed once, for no row, Joris's `dalg` and `diffalg` had
+none); the binomials in superscripts and fractions (`shrink-inline` reads
+the display style and the level: Joris's `zmatmult` and `kucomp` had them
+in the size of the line); the text of a link with an underline, black on
+the screen, found by reading the styles for these variables.
+
 ## 2. How the editor typesets the rewritten tree
 
 **2.1 Behind a flag, in the experimental build.** `TEXMACS_STYLE_TYPESET=1`;
@@ -333,6 +375,15 @@ print: the headers of the pages stay active); a part
 in source mode (the body of `show-preamble`, 1.5) is shown as the
 inactive bridges show it, by the concater and the lazy typesetting
 (`make_lazy`), outside the rules of the rewritten tree.
+The automatic labels are numbered after the tag which makes them
+(`auto_label_tag`): the innermost call with arguments, found through the
+places of its arguments. The level of the expand-as of a macro without
+arguments is empty, as the typesetter's, unless its body calls a macro
+with arguments (`macro_begin_call`): the typesetter finds the tag through
+the arguments of that call, which lie in the body of the first one, and the
+rewritten tree no longer has the call (`<prologue>`, whose
+`principal-section*` took another number at each pass: "?" in the table
+of contents of a thesis in the corpus).
 *Limit:* the source shown there is not laid out as by the bridges (the
 indentation of its lines; tm-forge's `resume-template`).
 *Decided by:* the editor's prints of the documentation pages
@@ -345,7 +396,10 @@ marker before and after the value of an argument (`typeset_argument`);
 the rewriter substitutes the value, and the markers are missing. They are
 invisible, except where they change a layout: a subscript given as an
 argument (`<rsub|<arg|const>>`, the partial derivatives of baltakatei's
-notes, 0.3pt) and a page of Joris's `galois`.
+notes, 0.3pt), a page of Joris's `galois`, and the italic correction of a
+`wide` given as an argument, which the markers hide (`<rsub|<arg|f>>` of
+`reff` in Joris's `riemann`, 0.7pt; written in place, without the
+argument, the typesetter places it as the rewriter does).
 *Tried:* the typesetter takes a tree of the document under a place derived
 in a macro body for an argument (`rewritten_place`): the trees which the
 rewriter rebuilds without their place (`with`, `tformat`, `table`, the

@@ -377,7 +377,8 @@
                (with "par-left" (plus "2cm" "1fn") "y")))))
 
 ;; What the rewriter gives the typesetter, which numbers itself what it
-;; expands (the call of an undefined macro, an inclusion).
+;; expands (the call of an undefined macro, an inclusion), and which sets
+;; variables itself (in cells, scripts, fractions, loci and graphics).
 (define (test-left-to-typesetter)
   (check-group "left to the typesetter")
   ;; the counters which a loop resets: their values after the loop
@@ -399,7 +400,42 @@
   (check= (with r (rewrite '(document (assign "s" (macro "x" (with "font-series" "bold" (arg "x"))))
                                       (active (s "y"))))
             (and (pair? r) (cAr r)))
-          '(expand-as "s" (with "font-series" "bold" "y"))))
+          '(expand-as "s" (with "font-series" "bold" "y")))
+  ;; the row and the column of a cell, which the typesetter sets in each
+  ;; cell, in its format and in its body (striped-table)
+  (check= (rewrite-last '(document
+                          (tformat (cwith "1" "-1" "1" "-1" "cell-background"
+                                          (if (equal (mod (value "cell-row-nr") "2") "0") "red" ""))
+                                   (table (row (cell (value "cell-col-nr")))))))
+          '(tformat (cwith "1" "-1" "1" "-1" "cell-background"
+                           (if (equal (mod (value "cell-row-nr") "2") "0") "red" ""))
+                    (table (row (cell (value "cell-col-nr"))))))
+  ;; the display style and the math level, which the typesetter sets in
+  ;; scripts and fractions (a binomial in a superscript): the display
+  ;; style to the value which it always gives, the level as a reference
+  (check= (rewrite-last '(document (with "math-display" "true" "math-level" "0"
+                                     (concat (rsup (value "math-display"))
+                                             (frac (value "math-level") "2")))))
+          '(with "math-display" "true" "math-level" "0"
+             (concat (rsup "false")
+                     (frac (value "math-level") "2"))))
+  ;; the colour, which the typesetter sets in the body of a locus, to the
+  ;; colour of the links on the screen (an underline in a link)
+  (check= (rewrite-last '(document (locus (id "a") (value "color"))))
+          '(locus (id "a") (value "color")))
+  ;; the magnification, which the typesetter multiplies by magnify in
+  ;; graphics (page-length in a figure)
+  (check= (rewrite-last '(document (with "magnify" "2" (graphics (value "magnification")))))
+          '(with "magnify" "2" (graphics (value "magnification"))))
+  ;; the errors of the typesetter for an index of an argument which does
+  ;; not apply and for map-args on an argument which is not a tuple (an
+  ;; affiliation of amsart.ts written without a tuple)
+  (check= (rewrite-last '(document (assign "f" (macro "x" (arg "x" "0")))
+                                   (f "abc")))
+          '(error "arg x"))
+  (check= (rewrite-last '(document (assign "g" (macro "x" (map-args "f" "concat" "x" "1")))
+                                   (g "abc")))
+          '(error "map arguments x")))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Memorization

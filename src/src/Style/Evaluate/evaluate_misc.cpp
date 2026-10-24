@@ -25,7 +25,13 @@ tree
 evaluate_formatting (tree t, string v) {
   int i, n= N(t);
   tree r (t, n-1);
-  for (i=0; i<n-1; i++) r[i]= evaluate (t[i]);
+  // (the values of a cell format are executed by the typesetter in each
+  // cell, with the variables which it sets there: evaluate_locals.cpp)
+  for (i=0; i<n-1; i++) {
+    bool local= begin_typesetter_locals (t, i);
+    r[i]= evaluate (t[i]);
+    if (local) end_with (std_env);
+  }
   tree oldv= std_env [v];
   tree newv= intern_tree (oldv * r);
   assoc_environment local (1);
@@ -42,20 +48,16 @@ evaluate_table (tree t) {
   // (the same empty format each time: a new one would be a new key for
   // begin_with, and a new environment inside the table)
   static tree empty_format (TFORMAT);
-  // (the typesetter typesets the cells whose lines are broken with margins
-  // of their own, par-left and par-right at zero (cell_rep::typeset): in
-  // the cells they are left to it, as references, as in the body of an
-  // ornament (evaluate_ornamented); a list in a cell of a box with negative
-  // margins was placed with the margins outside the table)
-  static tree left (VALUE, PAR_LEFT), right (VALUE, PAR_RIGHT);
-  assoc_environment local (3);
+  // (in the cells, the variables which the typesetter sets itself there,
+  // evaluate_locals.cpp: the margins of a cell whose lines are broken, at
+  // zero, which placed a list in a cell of a box with negative margins with
+  // the margins outside the table; the row and the column)
+  assoc_environment local (1);
   local->raw_write (0, CELL_FORMAT, empty_format);
-  local->raw_write (1, PAR_LEFT, left);
-  local->raw_write (2, PAR_RIGHT, right);
   begin_with (std_env, local);
   int i, n= N(t);
   tree r (t, n);
-  for (i=0; i<n; i++) r[i]= evaluate_part (t[i]);
+  for (i=0; i<n; i++) r[i]= evaluate_typesetter_child (t, i);
   end_with (std_env);
   return r;
 }

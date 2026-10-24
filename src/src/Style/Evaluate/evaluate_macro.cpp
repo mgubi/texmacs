@@ -287,17 +287,22 @@ evaluate_arg (tree t) {
   if (!local->contains (key)) return evaluate_error ("undefined", r);
   macro_up (std_env);
   r= local[key];
+  // (an index which does not apply gives the error of the typesetter
+  // (edit_env_rep::exec_arg), not the argument: author-affiliation of
+  // amsart.ts with an affiliation which is not a tuple)
+  bool err= false;
   if (N(t) > 1) {
     int i, n= N(t);
     for (i=1; i<n; i++) {
       tree u= evaluate (t[i]);
-      if (!is_int (u)) break;
+      if (!is_int (u)) { err= true; break; }
       int nr= as_int (u);
-      if ((!is_compound (r)) || (nr<0) || (nr>=N(r))) break;
+      if ((!is_compound (r)) || (nr<0) || (nr>=N(r))) { err= true; break; }
       r= r[nr];
     }
   }
-  r= evaluate (r);
+  if (err) r= evaluate_error ("arg " * t[0]->label);
+  else r= evaluate (r);
   macro_redown (std_env, local);
   return r;
 }
@@ -379,9 +384,10 @@ expand (tree t, assoc_environment env) {
 	  int i, n= N(t);
 	  for (i=1; i<n; i++) {
 	    tree u= evaluate (expand (t[i], env));
-	    if (!is_int (u)) break;
+	    if (!is_int (u)) return evaluate_error ("arg " * t[0]->label);
 	    int nr= as_int (u);
-	    if ((!is_compound (r)) || (nr<0) || (nr>=N(r))) break;
+	    if ((!is_compound (r)) || (nr<0) || (nr>=N(r)))
+	      return evaluate_error ("arg " * t[0]->label);
 	    r= r[nr];
 	  }
 	}
@@ -392,13 +398,13 @@ expand (tree t, assoc_environment env) {
     case MAP_ARGS:
       {
 	if (!(is_atomic (t[0]) && is_atomic (t[1]) && is_atomic (t[2])))
-	  return evaluate_error ("invalid map-args");
+	  return evaluate_error ("invalid map arguments");
 	int key= make_tree_label (t[2]->label);
 	if (!env->contains (key))
 	  return evaluate_error ("undefined", t[2]);
 	tree val= env [key];
 	if (is_atomic (val))
-	  return evaluate_error ("invalid-map-args");
+	  return evaluate_error ("map arguments " * t[2]->label);
 	
 	int start= 0, end= N(val);
 	if (N(t)>=4) start= as_int (evaluate (expand (t[3], env)));
