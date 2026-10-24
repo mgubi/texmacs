@@ -569,7 +569,7 @@
   (:argument name smart-file "File name")
   (:default  name (propose-name-buffer))
   (if (buffer->window name)
-      (noop) ;;(window-focus (buffer->window name))
+      (switch-to-window (buffer->window name))
       (apply load-buffer-main (cons name (cons :new-window opts)))))
 
 (tm-define (load-browse-buffer name)
@@ -678,7 +678,7 @@
   (when (not (url-none? u))
     (if (window-per-buffer?)
         (if (buffer->window u)
-            (noop) ;;(window-focus (buffer->window u))
+            (switch-to-window (buffer->window u))
             (open-buffer-in-window u (buffer-get u) ""))
         (load-buffer u))))
 
