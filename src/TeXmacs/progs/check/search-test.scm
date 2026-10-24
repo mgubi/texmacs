@@ -23,8 +23,10 @@
 ;; argument matches any argument, and a tag matches a tag whose arguments
 ;; contain those of the pattern. Edit > Replace sets it to "on": the
 ;; matching follows allow-blank-replace, ..., all off by default, and a
-;; string must match a whole string. Both allow cascaded matches (a pattern
-;; inside an argument). The checks set preferences in memory only, and
+;; string of the pattern must match a whole argument of a tag. In the text,
+;; both match the same way: a match may start and end inside a string, and
+;; a wildcard takes the shortest run, maybe empty (#495). Both allow
+;; cascaded matches (a pattern inside an argument). The checks set preferences in memory only, and
 ;; restore them: nothing is saved.
 ;;
 ;; The formulas are written as the editor keeps them: a concat never has
@@ -105,27 +107,15 @@
                   '((0 0 0) (0 0 1))))))))
 
 ;; a concat of strings and wildcards also matches inside one string: in
-;; the search widget, each occurrence; in the replace widget, the whole
-;; string only
+;; both widgets, each occurrence (the replace widget took the whole string
+;; only, #495)
 (define (test-text-wildcards)
   (check-group "text wildcards")
-  (let ((doc '(document "abc axc ac" (concat "ab" (em "x") "c")))
-        (what '(concat "a" (wildcard "x") "c")))
-    (with-search-mode 'search
-      (lambda ()
-        (check= (hits doc what)
-                '((0 0) (0 3) (0 4) (0 7) (0 8) (0 10) (1 0 0) (1 2 1)))))
-    (with-search-mode 'replace
-      (lambda ()
-        (check= (hits doc what) '((0 0) (0 10) (1 0 0) (1 2 1))))))
-  (with-search-mode 'search
-    (lambda ()
-      (check= (hits '(document "abc xbc") '(concat (wildcard "x") "bc"))
-              '((0 0) (0 3) (0 3) (0 7)))))
-  (with-search-mode 'replace
-    (lambda ()
-      (check= (hits '(document "abc xbc") '(concat (wildcard "x") "bc"))
-              '((0 0) (0 7)))))
+  (check-both '(document "abc axc ac" (concat "ab" (em "x") "c"))
+              '(concat "a" (wildcard "x") "c")
+              '((0 0) (0 3) (0 4) (0 7) (0 8) (0 10) (1 0 0) (1 2 1)))
+  (check-both '(document "abc xbc") '(concat (wildcard "x") "bc")
+              '((0 0) (0 3) (0 3) (0 7)))
   (check-both '(document "abc xbc") '(concat "a" (wildcard "x"))
               '((0 0) (0 7))))
 
@@ -221,17 +211,11 @@
   (check-both '(document (concat "A+B" (rsub "m") "+C"))
               '(concat "A+" (wildcard "y"))
               '((0 0 0) (0 2 2)))
-  ;; in the middle: any content; when searching, each f(...) and g(...);
-  ;; when replacing, a string of the pattern must end or start with the
-  ;; string it matches, so that ")" only matches the last ")"
-  (let ((doc '(document (concat "f(" (frac "1" "2") ")+g(" (rsub "n") ")")))
-        (what '(concat "(" (wildcard "x") ")")))
-    (with-search-mode 'search
-      (lambda ()
-        (check= (hits doc what) '((0 0 1) (0 2 1) (0 2 3) (0 4 1)))))
-    (with-search-mode 'replace
-      (lambda ()
-        (check= (hits doc what) '((0 0 1) (0 4 1))))))
+  ;; in the middle: any content, each f(...) and g(...) (when replacing,
+  ;; ")" only matched the last ")" before #495)
+  (check-both '(document (concat "f(" (frac "1" "2") ")+g(" (rsub "n") ")"))
+              '(concat "(" (wildcard "x") ")")
+              '((0 0 1) (0 2 1) (0 2 3) (0 4 1)))
   (check-both '(document (concat "f(" (frac "1" "2") ")+g(" (rsub "n") ")"))
               '(concat "f(" (wildcard "x") ")+g(")
               '((0 0 0) (0 2 4)))
@@ -288,19 +272,13 @@
     (lambda () (check= (hits '(document "abc") "") '()))))
 
 ;; a hit inside a string, then one which starts later in the same string
-;; and goes on in the next children: both (#461). When replacing, the
-;; strings of the pattern must match whole strings, and one match goes from
-;; the first f( to the end, as in the same text as one string (#477).
+;; and goes on in the next children: both (#461), also when replacing (one
+;; match went from the first f( to the end before #495).
 (define (test-hits-after-a-hit)
   (check-group "hits after a hit")
-  (let ((doc '(document (concat "f(x)+f(" (frac "1" "2") ")")))
-        (what '(concat "f(" (wildcard "x") ")")))
-    (with-search-mode 'search
-      (lambda ()
-        (check= (hits doc what) '((0 0 0) (0 0 4) (0 0 5) (0 2 1)))))
-    (with-search-mode 'replace
-      (lambda ()
-        (check= (hits doc what) '((0 0 0) (0 2 1))))))
+  (check-both '(document (concat "f(x)+f(" (frac "1" "2") ")"))
+              '(concat "f(" (wildcard "x") ")")
+              '((0 0 0) (0 0 4) (0 0 5) (0 2 1)))
   (with-search-mode 'search
     (lambda ()
       (check= (hits '(document (concat "axb+a" (rsub "1") "b+axb"))
@@ -349,12 +327,13 @@
                                  "b"))
               '(concat "a" (wildcard "x") "b")
               '((0 2 0) (0 2 2) (0 4 0) (0 6 1)))
-  ;; when replacing, a string of the pattern must match a whole string
+  ;; also when replacing (where a string of the pattern had to match a
+  ;; whole string before #495)
   (with-search-mode 'replace
     (lambda ()
       (check= (hits '(document (concat "x" (rsub "c") "aba+b"))
                     '(concat "a" (wildcard "x") "b"))
-              '((0 2 0) (0 2 5))))))
+              '((0 2 0) (0 2 2) (0 2 2) (0 2 5))))))
 
 ;; the first string of a pattern may overlap itself in the string where
 ;; the match starts: aa_x in aaa_x starts at the second a (#477)
@@ -610,20 +589,14 @@
 
 ;; a match across the children which ends inside a string: the hits of
 ;; the string after it, as in the same text as one string, xa12bababa
-;; (#482); with the replace matching, the own hits of a string cover all
-;; of it, and the match goes on to the last ba
+;; (#482), with both matchings (with the replace matching, the match went
+;; on to the last ba before #495)
 (define (test-hits-after-a-match)
   (check-group "hits after a match")
   (let ((doc '(document (concat "xa" (frac "1" "2") "bababa")))
         (what '(concat "a" (wildcard "x") "ba")))
-    (with-search-mode 'search
-      (lambda ()
-        (check= (hits '(document "xa12bababa") what)
-                '((0 1) (0 6) (0 7) (0 10)))
-        (check= (hits doc what) '((0 0 1) (0 2 2) (0 2 3) (0 2 6)))))
-    (with-search-mode 'replace
-      (lambda ()
-        (check= (hits doc what) '((0 0 1) (0 2 6)))))))
+    (check-both '(document "xa12bababa") what '((0 1) (0 6) (0 7) (0 10)))
+    (check-both doc what '((0 0 1) (0 2 2) (0 2 3) (0 2 6)))))
 
 ;; a string of 100000 characters and a pattern of a string and a wildcard,
 ;; with partial matches: the starts were tried by a recursion per character,
@@ -688,6 +661,50 @@
     (check-both `(document (concat "bbab" ,y "a" ,y))
                 `(concat (wildcard "z") "aa" (wildcard "y") "a" ,y) '())))
 
+;; in the text, Search and Replace match the same way: a match may start
+;; and end inside a string, and a wildcard takes the shortest run, maybe
+;; empty. With Replace, a pattern with a wildcard had to cover its whole
+;; string, except one which started with a string and a wildcard (#495).
+;; A string of the pattern still matches a whole argument of a tag when
+;; replacing
+(define (test-text-same-in-both)
+  (check-group "text, the same in both")
+  (let ((x '(rsub "x")) (y '(rsub "y")) (z '(rsub "z")))
+    (check-both `(document (concat ,x "bab")) `(concat ,x (wildcard "w") "b")
+                '((0 0 0) (0 1 1)))
+    (check-both `(document (concat ,x "bab" ,z "b"))
+                `(concat ,x (wildcard "w") "b")
+                '((0 0 0) (0 1 1)))
+    (check-both `(document (concat ,x "abab")) `(concat ,x (wildcard "w") "ab")
+                '((0 0 0) (0 1 2)))
+    (check-both `(document (concat "abab" ,x)) `(concat "b" (wildcard "w") ,x)
+                '((0 0 1) (0 1 1)))
+    (check-both `(document (concat "abab" ,x))
+                `(concat "b" (wildcard "w") "a" (wildcard "v") ,x)
+                '((0 0 1) (0 1 1)))
+    (check-both `(document (concat ,x ,y)) `(concat ,x (wildcard "w") ,y)
+                '((0 0 0) (0 1 1))))
+  (check-both '(document (concat "xabbx")) '(concat "a" (wildcard "w") "b")
+              '((0 0 1) (0 0 3)))
+  (check-both '(document (concat "bab")) '(concat (wildcard "w") "b")
+              '((0 0 0) (0 0 1)))
+  (check-both '(document (concat "xab")) '(concat "a" (wildcard "w") "b")
+              '((0 0 1) (0 0 3)))
+  (check-both '(document (concat "abab")) '(concat "a" (wildcard "w") "b")
+              '((0 0 0) (0 0 2) (0 0 2) (0 0 4)))
+  (check-both '(document (concat (frac "a" "c"))) '(frac "a" (wildcard "w"))
+              '((0 0 0) (0 0 1)))
+  (with-search-mode 'search
+    (lambda ()
+      (check= (hits '(document (concat (frac "ab" "c")))
+                    '(frac "a" (wildcard "w")))
+              '((0 0 0) (0 0 1)))))
+  (with-search-mode 'replace
+    (lambda ()
+      (check= (hits '(document (concat (frac "ab" "c")))
+                    '(frac "a" (wildcard "w")))
+              '()))))
+
 ;; formulas of 40000 children and more: the scan for the start of a match, and a
 ;; wildcard which takes many children, went from one child to the next by
 ;; a recursion, which overflowed the stack and crashed TeXmacs (#487)
@@ -727,4 +744,5 @@
   (test-long-strings)
   (test-long-concats)
   (test-parts-before-wildcards)
+  (test-text-same-in-both)
   (check-end))

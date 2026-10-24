@@ -557,6 +557,14 @@ search_string (range_set& sel, string s, tree what, path p, int from= 0) {
     }
   }
   else if (is_concat (what)) {
+    // in the text, the matching of Replace is the one of Search: a match
+    // may start and end inside a string, as for a string alone above. The
+    // partial and initial flags only concern the arguments of tags (match).
+    // With Replace, a pattern with a wildcard covered its whole string, but
+    // a pattern which starts with a string and a wildcard could start
+    // inside one (#495)
+    bool partial= partial_match_flag, initial= initial_match_flag;
+    partial_match_flag= initial_match_flag= true;
     tree w= case_fold_pattern (what);
     for (int pos=from; pos<N(s); ) {
       int start, end;
@@ -566,6 +574,8 @@ search_string (range_set& sel, string s, tree what, path p, int from= 0) {
       }
       else break;
     }
+    partial_match_flag= partial;
+    initial_match_flag= initial;
   }
 }
 
@@ -598,12 +608,12 @@ search_concat (range_set& sel, tree t, tree what, path p) {
   bool scan= true;
   for (int pos=0; pos<N(t); ) {
     range_set ssel= copy (inside[pos]);
-    if (partial_match_flag && is_atomic (t[pos]) && N(sel) != 0 &&
+    if (is_atomic (t[pos]) && N(sel) != 0 &&
         (p * pos) <= sel[N(sel)-1]) {
       // a match across the children ended inside this string: its own hits
       // from there (inside[pos] comes from its start, where a hit across
-      // that end could hide the next one, #482). With the replace matching,
-      // the own hits of a string cover all of it
+      // that end could hide the next one, #482), with both matchings since
+      // they are the same in the text (#495)
       ssel= range_set ();
       search_string (ssel, t[pos]->label, what, p * pos,
                      (sel[N(sel)-1] / (p * pos))->item);
