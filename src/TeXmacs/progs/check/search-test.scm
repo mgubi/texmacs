@@ -646,6 +646,48 @@
           (check= (cdr r) '())
           (check-true (< (car r) 500)))))))
 
+;; a part of the pattern after a tag (or a leading wildcard) and before a
+;; wildcard covers the start of its string (or any piece of it): the
+;; wildcard takes the rest. With the replace matching, it had to cover the
+;; whole string (#488)
+(define (test-parts-before-wildcards)
+  (check-group "parts before wildcards")
+  (let ((x '(rsub "x")) (y '(rsub "y")) (z '(rsub "z")) (q '(rsub "q")))
+    (check-both `(document (concat "c" ,x "abba" ,y))
+                `(concat ,x (wildcard "w") "bb" (wildcard "v") ,y)
+                '((0 1 0) (0 3 1)))
+    (check-both `(document (concat "c" ,x "babbbbbbabbaabbaaab" ,y))
+                `(concat ,x (wildcard "w") "bb" (wildcard "v") ,y)
+                '((0 1 0) (0 3 1)))
+    (check-both `(document (concat ,x "abba" ,q "c" ,y))
+                `(concat ,x (wildcard "w") "b" (wildcard "v") ,y)
+                '((0 0 0) (0 4 1)))
+    (check-both `(document (concat "a" ,y "aabbb" ,x ,z))
+                `(concat ,y (wildcard "w") "ab" (wildcard "v") ,x)
+                '((0 1 0) (0 3 1)))
+    (check-both `(document (concat "abb" ,z "bab" ,x ,x))
+                `(concat ,z (wildcard "w") "ba" (wildcard "v") ,x ,x)
+                '((0 1 0) (0 4 1)))
+    (check-both `(document (concat ,y "aabaa" ,z "bb" ,x "aaa"))
+                `(concat ,y "aa" (wildcard "w") "b" (wildcard "v") ,z)
+                '((0 0 0) (0 2 1)))
+    ;; a leading wildcard
+    (check-both `(document (concat "aabbab" ,y "a" ,y))
+                `(concat (wildcard "z") "aa" (wildcard "y") "a" ,y)
+                '((0 0 0) (0 3 1)))
+    (check-both `(document (concat "<alpha>AaaA" ,z " A" ,y))
+                `(concat (wildcard "z") "a" (wildcard "x") "A" ,y)
+                '((0 0 0) (0 3 1)))
+    ;; and no more than that
+    (check-both `(document (concat ,x "abab" ,y))
+                `(concat ,x (wildcard "w") "bb" (wildcard "v") ,y) '())
+    (check-both `(document (concat ,x "abba" ,y))
+                `(concat ,x "bb" (wildcard "v") ,y) '())
+    (check-both `(document (concat "aabbab" ,y "b" ,y))
+                `(concat (wildcard "z") "aa" (wildcard "y") "a" ,y) '())
+    (check-both `(document (concat "bbab" ,y "a" ,y))
+                `(concat (wildcard "z") "aa" (wildcard "y") "a" ,y) '())))
+
 ;; formulas of 40000 children and more: the scan for the start of a match, and a
 ;; wildcard which takes many children, went from one child to the next by
 ;; a recursion, which overflowed the stack and crashed TeXmacs (#487)
@@ -684,4 +726,5 @@
   (test-speed)
   (test-long-strings)
   (test-long-concats)
+  (test-parts-before-wildcards)
   (check-end))

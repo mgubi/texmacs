@@ -1251,6 +1251,71 @@
           (check-true (not (and (pair? r) (== (car r) 'error)))))
         (check= kbd-menu-test-closed '(quit))))))
 
+;; A document shown in several windows (#463): closing one of them leaves the
+;; document in the other, without asking about its changes; the document is
+;; closed with its last window. The closing of the buffer is delayed until
+;; TeXmacs is idle, which never happens headless: the delayed command is
+;; caught and run here. Loading the document goes to one of its windows
+;; (#464). (With S7 the replacements may not reach tm-server,
+;; as above; the checks after the delay are then left out.)
+(define (test-close-shared-window)
+  (check-group "closing one of several windows of a document")
+  (let* ((win (current-window))
+         (old (current-buffer))
+         (b (new-buffer))
+         (before (window-list))
+         (asked 0)
+         (cmds '())
+         (kill (lambda (w)
+                 (set! cmds '())
+                 (with-global user-confirm
+                     (lambda (prompt default cont) (set! asked (+ asked 1)))
+                   (with-global exec-delayed-pause
+                       (lambda (c) (set! cmds (rcons cmds c)))
+                     (safely-kill-window w)))
+                 (with-global idle-time (lambda () 1000000)
+                   (for (c cmds) (c)))
+                 (nnull? cmds))))
+    (switch-to-buffer old)
+    (for (i (.. 0 3))
+      (open-buffer-in-window b (buffer-get b) ""))
+    (with l (list-difference (window-list) before)
+      (check= (length l) 3)
+      (when (== (length l) 3)
+        ;; loading a document which is open goes to its window (#464);
+        ;; headless, the current window does not follow (no focus events),
+        ;; and with S7 the replacement does not reach tm-files
+        (with to #f
+          (with-global switch-to-window (lambda (w) (set! to w))
+            (load-buffer-in-new-window b))
+          (when (or to (string-starts? (scheme-dialect) "guile"))
+            (check-true (in? to l))))
+        ;; the other windows keep the document
+        (when (kill (caddr l))
+          (check-true (buffer-exists? b))
+          (check= (window->buffer (car l)) b))
+        ;; and nothing is asked about its changes
+        (when (buffer-exists? b)
+          (buffer-pretend-modified b)
+          (with delayed? (kill (cadr l))
+            (check= asked 0)
+            (check= (buffer->windows b) (list (car l)))
+            (when delayed?
+              (check-true (buffer-exists? b))))
+          ;; the last window asks, and is kept without an answer (not with
+          ;; S7, where the real question would be asked)
+          (when (string-starts? (scheme-dialect) "guile")
+            (kill (car l))
+            (check= asked 1)
+            (check= (buffer->windows b) (list (car l))))
+          ;; and closes it
+          (buffer-pretend-saved b)
+          (when (kill (car l))
+            (check-false (buffer-exists? b))))))
+    (switch-to-window win)
+    (when (buffer-exists? b) (buffer-close b))
+    (check= (current-buffer) old)))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Defining menus
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1371,6 +1436,7 @@
   (test-lazy-menus)
   (test-preferences)
   (test-close-window)
+  (test-close-shared-window)
   (check-group "menu items")
   ;; all the menus above, each time they were expanded
   (check-true (> menu-buttons 10000))

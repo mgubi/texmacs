@@ -417,6 +417,25 @@ search_concat_sub (tree t, tree what, int pos, int i,
           return true;
         continue;
       }
+      if (j < N(what) && is_func (what[j], WILDCARD, 1) &&
+          (i > 0 || is_func (what[0], WILDCARD, 1))) {
+        // a wildcard follows, after a tag or a leading wildcard: the part
+        // covers the start of the string (after a tag) or any piece of it
+        // (after a leading wildcard), and the wildcard takes the rest. With
+        // the replace matching, the hits of search_string cover the whole
+        // string, and <wildcard>bb missed abba (#488)
+        tree w (CONCAT);
+        if (is_atomic (swhat)) w << swhat; else w= copy (swhat);
+        w << what[j];
+        if (i == 0) {
+          p1= (p * 0) * start (t[0]);
+          if (!path_less_eq (cur, p1)) return false;
+        }
+        if (!matches_whole (t[pos]->label, w)) continue;
+        if (search_concat (t, what, pos+1, j, p, cur, p1, p2, inside, failed))
+          return true;
+        continue;
+      }
       range_set sel;
       search (sel, t[pos], swhat, p * pos);
       if (N(sel) != 0) {

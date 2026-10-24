@@ -29,6 +29,16 @@ have the details, and the problems go to the
   TeXmacs whenever they are not UTF-8, so labels, menus and messages in
   other languages can no longer be empty or stop the application
   ([#468](https://github.com/mgubi/texmacs/issues/468)).
+- Two windows on one document: closing one of them leaves the document
+  in the other, instead of emptying it, and asks about unsaved changes
+  only when the last window of the document is closed. *File → Load* of
+  a document which is already open brings its window forward instead of
+  doing nothing
+  ([#496](https://github.com/mgubi/texmacs/pull/496)).
+- Search: with the matching of Replace, a part of the pattern between a
+  tag (or a leading wildcard) and a wildcard no longer has to cover a
+  whole string (`_x *bb* _y` finds `_x abba _y`)
+  ([#493](https://github.com/mgubi/texmacs/pull/493)).
 
 ## 23 October 2026
 
