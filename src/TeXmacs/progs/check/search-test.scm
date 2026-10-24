@@ -706,10 +706,14 @@
   (check-both '(document "xab" (rsub "y"))
               '(document "ab" (select-region (rsub "y")))
               '((1 0) (1 1)))
-  ;; in the argument of a tag of the pattern, a whole string when replacing
+  ;; in the argument of a tag of the pattern, a whole string when
+  ;; replacing, also inside another tag
   (with-search-mode 'replace
     (lambda ()
       (check= (hits '(document (frac (concat "xa" (rsub "y")) "b"))
+                    '(frac (concat "a" (select-region (rsub "y"))) "b"))
+              '())
+      (check= (hits '(document (frac (strong (concat "xa" (rsub "y"))) "b"))
                     '(frac (concat "a" (select-region (rsub "y"))) "b"))
               '())))
   ;; the leftmost start in the first paragraph; a middle paragraph is
@@ -735,7 +739,11 @@
   ;; an empty part: the end (start) of a paragraph, or an empty paragraph
   (check-both '(document "xab" "def") '(document "ab" "") '((0 1) (1 0)))
   (check-both '(document "ab" "defx") '(document "" "def") '((0 2) (1 3)))
-  (check-both '(document "ab" (rsub "x") "z") '(document "a" "" "z") '())
+  (check-both '(document "a" (rsub "x") "z") '(document "a" "" "z") '())
+  ;; also in a document inside a tag of a paragraph
+  (check-both '(document "a" (theorem (document "b" "c")) "d")
+              '(document "" "")
+              '((0 1) (1 0) (1 0 0 1) (1 0 1 0) (1 1) (2 0)))
   (check-both '(document "a" "" "b") '(document "a" "" "b") '((0 0) (2 1)))
   (with-search-mode 'search
     (lambda ()

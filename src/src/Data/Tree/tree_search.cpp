@@ -665,8 +665,7 @@ search_concat (range_set& sel, tree t, tree what, path p) {
 static tree
 anchored (tree t, bool at_start, bool at_end) {
   // a paragraph t, or a part of the pattern, as a concat with an anchor at
-  // its start and/or at its end: a tag which no document contains (its
-  // string is not Cork)
+  // its start and/or at its end: a tag which documents do not use
   tree a (SEARCH_ANCHOR, "\1"), r (CONCAT);
   if (at_start) r << a;
   if (is_concat (t))
@@ -817,6 +816,15 @@ search_document (range_set& sel, tree t, tree what, path p) {
             range_set lsel;
             search_paragraph (lsel, t[j], what[cur], p * j, true, false);
             if (N(lsel) != 0) {
+              // first the hits inside this paragraph before the match (in
+              // a document inside a tag of it: an empty first part matches
+              // every paragraph)
+              range_set nsel, bsel;
+              search (nsel, t[i], what, p * i);
+              for (int h=0; h+1<N(nsel); h+=2)
+                if (path_less_eq (nsel[h+1], fsel[0]))
+                  bsel << nsel[h] << nsel[h+1];
+              merge (sel, bsel);
               merge (sel, simple_range (fsel[0], lsel[1]));
               found= true;
               i= j-1;
@@ -941,7 +949,7 @@ select_direct_sub (range_set& sel, tree t, tree what, path p) {
 void
 select_direct (range_set& sel, tree t, tree what, path p) {
   // the children of a tag other than a formula or a document are arguments,
-  // also the formulas inside them
+  // also the formulas inside them, at any depth
   bool arg= select_in_argument;
   if (L(t) == L(what) && !is_concat (t) && !is_document (t))
     select_in_argument= true;
@@ -951,13 +959,11 @@ select_direct (range_set& sel, tree t, tree what, path p) {
 
 void
 select_cascaded (range_set& sel, tree t, tree what, path p) {
-  // a pattern anywhere inside t: in its text
-  bool arg= select_in_argument;
-  select_in_argument= false;
+  // a pattern anywhere inside t: in the text, or inside an argument of a
+  // tag of the pattern, as match_cascaded inside an argument
   for (int i=0; i<N(t); i++)
     if (is_accessible_for_search (t, i))
       select (sel, t[i], what, p*i);
-  select_in_argument= arg;
 }
 
 void
