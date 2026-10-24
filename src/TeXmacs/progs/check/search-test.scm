@@ -15,9 +15,11 @@
 ;; tree-search-tree-at on detached trees. A result is the flat list of the
 ;; start and end paths of the hits, in the order of the document.
 ;;
-;; In the text, searching and replacing match the same way: a match may
-;; start and end inside a string, and a wildcard takes the shortest run,
-;; maybe empty (#495). They differ in the arguments of tags. Edit > Search
+;; In the text, searching and replacing match the same way (#495): a match
+;; may start and end inside a string, and a wildcard takes the shortest
+;; run, maybe empty, except a leading (trailing) wildcard, which extends the
+;; hit to the start (end) of the formula, or of the paragraph in a pattern
+;; of several paragraphs. They differ in the arguments of tags. Edit > Search
 ;; (toolbar or widget) sets the preference "search-and-replace" to "off":
 ;; the arguments then follow the preferences allow-blank-match,
 ;; allow-initial-match, allow-partial-match and allow-injective-match, all
@@ -263,10 +265,12 @@
   (check-both '(document (concat "x" (rsub "n") "bab"))
               '(concat "b" (wildcard "y"))
               '((0 2 0) (0 2 3)))
-  ;; an empty paragraph of a document pattern matches an empty paragraph
-  ;; (it never returned either)
+  ;; an empty first paragraph of a document pattern matches the end of a
+  ;; paragraph, as when the selection starts with a paragraph break (it
+  ;; never returned, and later only matched an empty paragraph)
   (check-both '(document "" "abc") '(document "" "abc") '((0 0) (1 3)))
-  (check-both '(document "x" "abc") '(document "" "abc") '())
+  (check-both '(document "x" "abc") '(document "" "abc") '((0 1) (1 3)))
+  (check-both '(document "x" "zabc") '(document "" "abc") '())
   ;; an empty pattern is found nowhere with the matching of Replace
   (with-search-mode 'replace
     (lambda () (check= (hits '(document "abc") "") '()))))
@@ -696,9 +700,43 @@
   (check-both '(document (concat "xa" (rsub "b")))
               '(concat "a" (select-region (rsub "b")))
               '((0 1 0) (0 1 1)))
-  (check-both '(document (concat "xay" (rsub "b") "c"))
+  (check-both '(document (concat "xa" (rsub "b") "cy"))
               '(concat "a" (select-region (rsub "b")) "c")
               '((0 1 0) (0 1 1)))
+  (check-both '(document "xab" (rsub "y"))
+              '(document "ab" (select-region (rsub "y")))
+              '((1 0) (1 1)))
+  ;; in the argument of a tag of the pattern, a whole string when replacing
+  (with-search-mode 'replace
+    (lambda ()
+      (check= (hits '(document (frac (concat "xa" (rsub "y")) "b"))
+                    '(frac (concat "a" (select-region (rsub "y"))) "b"))
+              '())))
+  ;; the leftmost start in the first paragraph; a middle paragraph is
+  ;; covered by one match, not by several hits
+  (check-both '(document "abab" "c")
+              '(document (concat "a" (wildcard "x") "b") "c")
+              '((0 0) (1 1)))
+  (check-both '(document "abab" "c")
+              '(document (concat (wildcard "x") "b") "c")
+              '((0 0) (1 1)))
+  (check-both '(document "ab" "abab" "ab") '(document "ab" "ab" "ab") '())
+  ;; a second match may start in the paragraph where the first one ended,
+  ;; after it; not with a leading wildcard, which reaches the start of the
+  ;; paragraph
+  (check-both '(document "ab" "aab" "a")
+              '(document (concat "a" (wildcard "x") "b") "a")
+              '((0 0) (1 1) (1 1) (2 1)))
+  (check-both '(document "abxab" "abxab" "abxab" "abxab" "abxab")
+              '(document (concat (wildcard "w") "b")
+                         (concat (wildcard "w") "x" (wildcard "w")) "ab")
+              '((0 0) (2 2)))
+  (check-both '(document "ab" "bbb" "a") '(document "ab" "b" "a") '())
+  ;; an empty part: the end (start) of a paragraph, or an empty paragraph
+  (check-both '(document "xab" "def") '(document "ab" "") '((0 1) (1 0)))
+  (check-both '(document "ab" "defx") '(document "" "def") '((0 2) (1 3)))
+  (check-both '(document "ab" (rsub "x") "z") '(document "a" "" "z") '())
+  (check-both '(document "a" "" "b") '(document "a" "" "b") '((0 0) (2 1)))
   (with-search-mode 'search
     (lambda ()
       (check= (hits '(document (concat (frac "ab" "c")))

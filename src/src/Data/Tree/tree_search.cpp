@@ -664,14 +664,15 @@ search_concat (range_set& sel, tree t, tree what, path p) {
 
 static tree
 anchored (tree t, bool at_start, bool at_end) {
-  // a paragraph t, or a part of the pattern, as a concat with an anchor (a
-  // tag which no document contains) at its start and/or at its end
-  tree r (CONCAT);
-  if (at_start) r << tree (SEARCH_ANCHOR);
+  // a paragraph t, or a part of the pattern, as a concat with an anchor at
+  // its start and/or at its end: a tag which no document contains (its
+  // string is not Cork)
+  tree a (SEARCH_ANCHOR, "\1"), r (CONCAT);
+  if (at_start) r << a;
   if (is_concat (t))
     for (int k=0; k<N(t); k++) r << t[k];
   else if (t != "") r << t;
-  if (at_end) r << tree (SEARCH_ANCHOR);
+  if (at_end) r << a;
   return r;
 }
 
@@ -695,11 +696,6 @@ search_anchored (range_set& sel, tree t, tree what, path p,
   // not reach the end of t (a*b in abxb: ab), so the ends are anchored in
   // both t and what, and the hit, which contains the anchors, is the match
   // (#495)
-  if (what == "") {
-    // an empty part matches an empty paragraph only, as in search_string
-    if (t == "") sel << (p * 0) << (p * 0);
-    return;
-  }
   range_set ssel;
   search (ssel, anchored (t, at_start, at_end),
           anchored (what, at_start, at_end), p);
@@ -712,19 +708,80 @@ static void
 search_paragraph (range_set& sel, tree t, tree what, path p,
                   bool at_start, bool at_end) {
   // the match of a part what of a pattern of several paragraphs in the
-  // paragraph t, which starts at its start and/or ends at its end. The
-  // hits of search may do (also through a wildcard which extends a hit
-  // into a tag of t); else the anchored search finds the match
-  range_set ssel;
-  search (ssel, t, what, p);
-  int n= N(ssel);
-  if (n != 0 &&
-      (!at_start || ssel[0] == p * start (t)) &&
-      (!at_end || ssel[n-1] == p * end (t))) {
-    sel << (at_start? ssel[0]: ssel[n-2]) << (at_end? ssel[n-1]: ssel[1]);
+  // paragraph t, which starts at its start and/or ends at its end: the
+  // first part (at_end), the middle ones (both) and the last one
+  // (at_start). The hits of search may do, also through a wildcard which
+  // extends a hit into a tag of t, which the anchored search does not see;
+  // else the anchored search finds the match
+  if (what == "") {
+    // an empty part: the empty end (start) of any paragraph, as when the
+    // selection ends (starts) with a paragraph break; in the middle, an
+    // empty paragraph. With both matchings (the blank flags only concern
+    // the arguments of tags)
+    if (!at_start) sel << (p * end (t)) << (p * end (t));
+    else if (!at_end) sel << (p * start (t)) << (p * start (t));
+    else if (t == "") sel << (p * 0) << (p * 0);
     return;
   }
-  search_anchored (sel, t, what, p, at_start, at_end);
+  range_set ssel, asel;
+  search (ssel, t, what, p);
+  int n= N(ssel);
+  if (at_start && at_end) {
+    // one match covers the paragraph, not several hits
+    if (n == 2 && ssel[0] == p * start (t) && ssel[1] == p * end (t))
+      sel << ssel[0] << ssel[1];
+    else search_anchored (sel, t, what, p, true, true);
+  }
+  else if (at_start) {
+    // the first hit is the shortest match from the start
+    if (n != 0 && ssel[0] == p * start (t)) sel << ssel[0] << ssel[1];
+    else search_anchored (sel, t, what, p, true, false);
+  }
+  else {
+    // the leftmost start: of the hit which ends the paragraph, or of the
+    // anchored match, which may start before it (a*b in abab)
+    search_anchored (asel, t, what, p, false, true);
+    if (n != 0 && ssel[n-1] == p * end (t) &&
+        (N(asel) == 0 || path_less_eq (ssel[n-2], asel[0])))
+      sel << ssel[n-2] << ssel[n-1];
+    else sel << asel;
+  }
+}
+
+static void
+search_paragraph_after (range_set& sel, tree t, tree what, path p, path q) {
+  // idem for the first part, which starts at q (where the previous match
+  // ended, inside t) or after it: in the rest of t, as a paragraph. A
+  // position inside a tag of t skips the rest of that tag
+  path r= q / p;
+  if (is_atomic (t)) {
+    int o= r->item;
+    range_set ssel;
+    search_paragraph (ssel, t->label (o, N(t->label)), what, p, false, true);
+    for (int k=0; k<N(ssel); k++)
+      sel << (p * ((ssel[k] / p)->item + o));
+    return;
+  }
+  if (!is_concat (t) || is_nil (r)) return;
+  int k= r->item, o= 0;
+  bool cut= is_atomic (t[k]) && !is_nil (r->next);
+  tree u (CONCAT);
+  if (cut) {
+    o= r->next->item;
+    if (o < N(t[k]->label)) u << tree (t[k]->label (o, N(t[k]->label)));
+    else { cut= false; k++; }
+  }
+  else k++;
+  for (int c= (cut? k+1: k); c<N(t); c++) u << t[c];
+  if (N(u) == 0) return;
+  range_set ssel;
+  search_paragraph (ssel, u, what, p, false, true);
+  for (int h=0; h<N(ssel); h++) {
+    path x= ssel[h] / p;
+    int c= x->item;
+    if (cut && c == 0) sel << (p * path (k, path (x->next->item + o)));
+    else sel << (p * path (c + k, x->next));
+  }
 }
 
 void
@@ -732,10 +789,26 @@ search_document (range_set& sel, tree t, tree what, path p) {
   // a pattern of several paragraphs: the first one ends a paragraph, the
   // middle ones cover theirs, and the last one starts its paragraph
   if (N(what) == 0) return;
+  if (N(what) == 1) {
+    // one paragraph: as this paragraph (what[1] was read)
+    search (sel, t, what[0], p);
+    return;
+  }
   for (int i=0; i<N(t); i++) {
     bool found= false;
     range_set fsel;
     search_paragraph (fsel, t[i], what[0], p * i, false, true);
+    bool lead= is_func (what[0], WILDCARD, 1) ||
+               (is_concat (what[0]) && N(what[0]) > 0 &&
+                is_func (what[0][0], WILDCARD, 1));
+    if (N(fsel) != 0 && N(sel) != 0 && (p * i) <= sel[N(sel)-1] &&
+        !path_less_eq (sel[N(sel)-1], fsel[0]) && !lead) {
+      // the previous match ended in this paragraph, after this start: a
+      // start after the end of that match (with a leading wildcard, the
+      // part starts at the start of the paragraph)
+      fsel= range_set ();
+      search_paragraph_after (fsel, t[i], what[0], p * i, sel[N(sel)-1]);
+    }
     if (N(fsel) != 0)
       if (N(sel) == 0 || path_less_eq (sel[N(sel)-1], fsel[0])) {
         int cur= 1;
@@ -823,12 +896,17 @@ contains_select_region (tree t) {
   }
 }
 
+static bool select_in_argument= false;
+
 static bool
 match_child (tree t, int i, tree what) {
-  // the child i of t matches what: in a formula, the strings are text and
-  // are matched as when searching, also when replacing; the partial and
+  // the child i of t matches what: in a formula or a document which is not
+  // in the argument of a tag of the pattern, the strings are text and are
+  // matched as when searching, also when replacing; the partial and
   // initial flags only concern the arguments of tags (#495)
-  if (!is_concat (t) || !is_atomic (t[i])) return match_cascaded (t[i], what);
+  if (!(is_concat (t) || is_document (t)) || select_in_argument ||
+      !is_atomic (t[i]))
+    return match_cascaded (t[i], what);
   bool partial= partial_match_flag, initial= initial_match_flag;
   partial_match_flag= initial_match_flag= true;
   bool r= match_cascaded (t[i], what);
@@ -837,8 +915,8 @@ match_child (tree t, int i, tree what) {
   return r;
 }
 
-void
-select_direct (range_set& sel, tree t, tree what, path p) {
+static void
+select_direct_sub (range_set& sel, tree t, tree what, path p) {
   if (L(t) != L(what)) return;
   int cur=0;
   for (int i=0; i<N(t); i++)
@@ -861,10 +939,25 @@ select_direct (range_set& sel, tree t, tree what, path p) {
 }
 
 void
+select_direct (range_set& sel, tree t, tree what, path p) {
+  // the children of a tag other than a formula or a document are arguments,
+  // also the formulas inside them
+  bool arg= select_in_argument;
+  if (L(t) == L(what) && !is_concat (t) && !is_document (t))
+    select_in_argument= true;
+  select_direct_sub (sel, t, what, p);
+  select_in_argument= arg;
+}
+
+void
 select_cascaded (range_set& sel, tree t, tree what, path p) {
+  // a pattern anywhere inside t: in its text
+  bool arg= select_in_argument;
+  select_in_argument= false;
   for (int i=0; i<N(t); i++)
     if (is_accessible_for_search (t, i))
-      select (sel, t[i], what, p*i);  
+      select (sel, t[i], what, p*i);
+  select_in_argument= arg;
 }
 
 void
