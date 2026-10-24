@@ -38,6 +38,13 @@
     (<hlink|PDF|../documents/tutorials/TeXmacs-customization/TeXmacs-customization.pdf>).
   </itemize>
 
+  The original versions of these tutorials (2003\U2005) are kept for
+  reference: the <hlink|quick start guide|../documents/tutorials/original-tutorials/TeXmacs-quick-start.pdf>,
+  <hlink|<TeXmacs> in 60 minutes|../documents/tutorials/original-tutorials/TeXmacs-in-60-minutes/tmtour.html>,
+  the <hlink|graphics tutorial|../documents/tutorials/original-tutorials/TeXmacs-graphics-tutorial.pdf>,
+  <hlink|using plug-ins to insert technical figures|../documents/tutorials/original-tutorials/TeXmacs-graphical-plugins.pdf>
+  and <hlink|customizing <TeXmacs>|../documents/tutorials/original-tutorials/TeXmacs-customization.pdf>.
+
   <tmdoc-copyright|1999--2026|Joris van der Hoeven>
 
   <tmweb-license>
