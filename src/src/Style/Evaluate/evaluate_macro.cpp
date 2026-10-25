@@ -212,8 +212,11 @@ evaluate_quote_value (tree t) {
 
 tree
 evaluate_drd_props (tree t) {
-  (void) t; return "";
-  // FIXME: not yet implemented
+  // (the typesetter sets the properties, with its arguments as they are,
+  // and shows its flag at the place of the document)
+  tree r= copy (t);
+  transfer_ip (t, r);
+  return r;
 }
 
 /******************************************************************************

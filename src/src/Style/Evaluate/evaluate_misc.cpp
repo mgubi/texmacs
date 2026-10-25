@@ -164,6 +164,8 @@ evaluate_set_binding (tree t) {
     r[1]= value;
     for (int i=2; i<N(t); i++) r[i]= evaluate (t[i]);
   }
+  // (with the place of the document: the typesetter shows its flag there)
+  transfer_ip (t, r);
   return r;
 }
 

@@ -435,7 +435,22 @@
           '(error "arg x"))
   (check= (rewrite-last '(document (assign "g" (macro "x" (map-args "f" "concat" "x" "1")))
                                    (g "abc")))
-          '(error "map arguments x")))
+          '(error "map arguments x"))
+  ;; a style-with of the document, which the typesetter does not typeset:
+  ;; it stays, and what it assigns does not count after it (a redefinition
+  ;; of chapter in a book); the one of the preamble is filtered, and its
+  ;; assignment counts
+  (check= (rewrite-last '(document (style-with "src-compact" "none" (assign "s" "X"))))
+          '(style-with "src-compact" "none" (assign "s" "X")))
+  (check= (rewrite-last '(document (style-with "src-compact" "none" (assign "s" "X"))
+                                   (provides "s")))
+          "false")
+  (check= (rewrite-last '(document (hide-preamble (document (style-with "src-compact" "none" (assign "B" (macro "[b]")))))
+                                   (B)))
+          "[b]")
+  ;; drd-props, which the typesetter executes, with its flag
+  (check= (rewrite-last '(document (drd-props "foo" "arity" "1")))
+          '(drd-props "foo" "arity" "1")))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Memorization

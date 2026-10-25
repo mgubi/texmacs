@@ -1037,12 +1037,13 @@ from its rewritten tree:
 | October 23, after the marker fixes and the merge of `upsilon_texmacs` | 945 | 754 |
 | October 24, with `find_by_reads`, the loops, inclusions and `active` (decisions 1.5, 1.11, 1.12) | 968 | 762 |
 | October 24, with the variables set by the typesetter (1.13), the errors of `arg` and `map-args`, the labels of `prologue` (2.8) | 979 | 770 |
+| October 25, with the flags of `set-binding` and `drd-props` (1.5), the `style-with` of the document (1.9), the source mode of `show-preamble` (2.8), and the hidden parts of a cell executed in order (a typesetter fix) | 983 | 771 |
 
-(In the last run, four of Joris's talks printed nothing in the copy
-harness, under the load of four runs at once; run again alone, all four
+(In the last run, five of Joris's talks printed nothing in the copy
+harness, under the load of four runs at once; run again alone, all five
 were the same.)
 
-The 15 left with the editor, by cause (the text and the places of the
+The 11 left with the editor, by cause (the text and the places of the
 glyphs of the pages compared, `mutool draw -F stext`):
 - Shifts of a fraction of a point, the same text (8: 7 of baltakatei's
   chapters, among them subscripts given as arguments, and Joris's
@@ -1054,17 +1055,23 @@ glyphs of the pages compared, `mutool draw -F stext`):
   the rewriter does).
 - The current time printed (2, baltakatei's `c0` and `book`): not a
   difference of the rewriter.
-- `graeffe-cca`: a macro defined in a `hide-preamble` inside the abstract,
-  which the typesetter does not see (`<FF>` shown in error) and the
-  rewriter does (the letter shown).
-- `resume-template`: the source shown by `show-preamble` around a
-  `style-only*` (its argument rendered as the name `body`); reproduced in
-  a small document, not fixed.
-- `book_qft`: a `chapter-prefix` assigned a concatenation which holds a
-  macro (a line break in the source) shows the macro in the rewritten
-  headings only; not reproduced in a small document.
-- `9_3_href_and_anchor`: a `set-binding` with three arguments, whose flag
-  the typesetter shows only on the document.
+
+Fixed in the last round:
+- `graeffe-cca`: a macro defined in a `hide-preamble` inside an abstract,
+  which tmarticle draws in a table cell with `cell-hyphen` `t`. There the
+  typesetter typeset a `hidden` only when breaking the cell into lines,
+  after the paragraphs which follow it had been typeset: its definitions
+  came too late (`<FF>` shown in error in the original). A fix of the
+  typesetter: the body of a `hidden` is typeset where it occurs, and
+  broken into lines when the width is known (`lazy_hidden_rep`), as the
+  paragraphs are.
+- `resume-template`: the body of a `style-only*` in `show-preamble` showed
+  `<arg|body>` (decision 2.8).
+- `book_qft`: a redefinition of `chapter` in a `style-with` of the
+  document, which the typesetter ignores (decision 1.9).
+- `9_3_href_and_anchor`: the flag of a `set-binding` written in the
+  document, lost because the rewriter did not keep its place (1.5); the
+  same for `drd-props`, which the rewriter dropped.
 
 The copy harness gives more differences by construction (automatic
 labels, see *Typesetting the result*).

@@ -927,7 +927,17 @@ evaluate_impl (tree t) {
     return evaluate_filter_style (t);
   case STYLE_WITH:
   case VAR_STYLE_WITH:
-    return evaluate_result (t[N(t)-1]);
+    {
+      // (the style packages and hide-preamble are filtered of it, see
+      // filter_style: here it is the document's, which the typesetter
+      // does not typeset, an unknown primitive (test_box), and which it
+      // executes as its last child in a value; what the last child assigns
+      // does not count after it: a redefinition of chapter in a book)
+      environment before= std_env;
+      tree r= evaluate_compound_children (t);
+      std_env= before;
+      return r;
+    }
   case STYLE_ONLY:
   case VAR_STYLE_ONLY:
   case ACTIVE:

@@ -109,7 +109,12 @@ assigns nothing: the reset of a group of `std-counter`, whose
 rewriter assign `""`, and `<>` then showed "0"), the errors of an index
 of `arg` which does not apply and of `map-args` on an argument which is
 not a tuple (the rewriter gave the argument, and an error of its own:
-an affiliation of `amsart` written without a tuple, Joris's `zmatmult`).
+an affiliation of `amsart` written without a tuple, Joris's `zmatmult`),
+`drd-props`, which the typesetter executes with its arguments as they are
+and flags at its place (the rewriter dropped it).
+`set-binding` and `drd-props` keep the place of the document, where the
+typesetter shows their flags (a binding written in the document lost
+its flag with `info-flag` `paper`: mogan's `9_3_href_and_anchor`).
 What the rewriter computes in a loop (`for-each`: the counters which
 `reset-std-env` resets at a section) is given to the typesetter after the
 loop, as assignments of the values which the loop changed: of the
@@ -197,9 +202,17 @@ follows.** The argument of `hard-id` is evaluated (it is the tree which
 the typesetter finds and hashes) from the environment before it, which is
 restored after: the typesetter does not execute it, and what it assigns
 does not count after it.
+The same holds for a `style-with` of the document: the style packages and
+`hide-preamble` are filtered of it (`filter_style`), so one which the
+rewriter meets was written in the document or in a macro which it
+defines; the typesetter does not typeset it (an unknown primitive, an
+empty test box) and executes it as its last child only in a value. It
+stays, evaluated from the environment before it, which is restored after.
 *Decided by:* the footnotes of baltakatei's appendices, whose number
 became the key of an index entry in their body (`the-label`, `Metre`
-instead of 3).
+instead of 3); for `style-with`, the redefinition of `chapter` in
+tm-forge's `book_qft`, which the typesetter ignores (its headings and
+table of contents were the rewriter's).
 
 **1.10 A splice which the typesetter computes.** When a part spliced by
 `unquote*` comes back as it is (an `extern` whose arguments hold
@@ -374,7 +387,13 @@ typesets it as usual (`env->rewritten_tree` off, on the screen and in
 print: the headers of the pages stay active); a part
 in source mode (the body of `show-preamble`, 1.5) is shown as the
 inactive bridges show it, by the concater and the lazy typesetting
-(`make_lazy`), outside the rules of the rewritten tree.
+(`make_lazy`), outside the rules of the rewritten tree. The body of the
+`with` which sets the source mode is made again in that mode when it was
+made outside it (`bridge_with`): in the document it is the argument of
+`show-preamble`, whose bridge is made when the argument is typeset; in the
+rewritten tree it is the body itself, whose paragraphs were active, so
+that the body of a `style-only*` showed `<arg|body>` (tm-forge's
+`resume-template`).
 The automatic labels are numbered after the tag which makes them
 (`auto_label_tag`): the innermost call with arguments, found through the
 places of its arguments. The level of the expand-as of a macro without
@@ -384,8 +403,6 @@ the arguments of that call, which lie in the body of the first one, and the
 rewritten tree no longer has the call (`<prologue>`, whose
 `principal-section*` took another number at each pass: "?" in the table
 of contents of a thesis in the corpus).
-*Limit:* the source shown there is not laid out as by the bridges (the
-indentation of its lines; tm-forge's `resume-template`).
 *Decided by:* the editor's prints of the documentation pages
 (`env-misc`, `env-font`, `font-selection`, `man-convert`) and of the
 corpus (the notes of baltakatei), once the prints typeset the rewritten

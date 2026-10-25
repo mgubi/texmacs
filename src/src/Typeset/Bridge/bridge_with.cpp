@@ -15,6 +15,7 @@ class bridge_with_rep: public bridge_rep {
 protected:
   int    last;
   bridge body;
+  bool   body_preamble; // whether the body was made in source mode
 
 public:
   bridge_with_rep (typesetter ttt, tree st, path ip);
@@ -40,6 +41,7 @@ bridge_with_rep::bridge_with_rep (typesetter ttt, tree st, path ip):
 void
 bridge_with_rep::initialize () {
   last= N(st)-1;
+  body_preamble= ttt->env->preamble;
   if (is_nil(body)) body= make_bridge (ttt, st[last], descend (ip, last));
   else replace_bridge (body, st[last], descend (ip, last));
 }
@@ -181,6 +183,13 @@ bridge_with_rep::my_typeset (int desired_status) {
 
   // for (i=0; i<k; i++) env->monitored_write_update (vars[i], newv[i]);
   for (i=0; i<k; i++) env->write_update (vars[i], newv[i]);
+  if (ttt->rewritten && env->preamble != body_preamble) {
+    // (a tree of the style rewriter: the body of show-preamble lies in the
+    // with which sets the source mode, where the document has the argument
+    // of the macro, whose bridge is made in that mode, see make_bridge)
+    body_preamble= env->preamble;
+    body= make_bridge (ttt, st[last], descend (ip, last));
+  }
   ttt->insert_marker (st, ip);
   body->typeset (desired_status);
   for (i=k-1; i>=0; i--) env->write_update (vars[i], oldv[i]);
