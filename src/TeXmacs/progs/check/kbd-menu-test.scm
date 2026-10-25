@@ -1316,6 +1316,57 @@
     (when (buffer-exists? b) (buffer-close b))
     (check= (current-buffer) old)))
 
+;; Clone window (#464): a second window on the document, at the cursor of
+;; the first one; the Windows list of the Go menu has one entry for each
+;; window of the document, numbered, as their titles. Headless, the current
+;; window follows window-focus only (no focus events).
+(define (balloon-labels x)
+  ;; the short names of the items (balloon short long) in a menu expansion
+  (cond ((and (pair? x) (== (car x) 'balloon) (pair? (cdr x)))
+         (list (cadr x)))
+        ((pair? x) (append (balloon-labels (car x)) (balloon-labels (cdr x))))
+        (else '())))
+
+(define (window-menu-has? label)
+  (in? `(verbatim ,label)
+       (balloon-labels (menu-expand '(link buffer-windows-menu)))))
+
+(define (test-clone-window)
+  (check-group "clone window")
+  (let* ((win (current-window))
+         (old (current-buffer))
+         (b (new-buffer))
+         (before (window-list)))
+    (switch-to-buffer old)
+    (open-buffer-in-window b (buffer-get b) "")
+    (with l (list-difference (window-list) before)
+      (check= (length l) 1)
+      (when (== (length l) 1)
+        (window-focus (car l))
+        (check= (current-buffer) b)
+        (buffer-set-body b '(document "one" "two three"))
+        (go-to (append (buffer-path) '(1 3)))
+        (with p (cursor-path)
+          (check= p (append (buffer-path) '(1 3)))
+          (clone-window)
+          (with ws (buffer->windows b)
+            (check= (length ws) 2)
+            (check= (current-window) (cadr ws))
+            (check= (cursor-path) p)
+            (let* ((t (buffer-get-title b))
+                   (name (if (== t "") (url->system (url-tail b)) t)))
+              (check-true (window-menu-has? (string-append name " (1)")))
+              (check-true (window-menu-has? (string-append name " (2)")))
+              (window-focus (car ws))
+              (kill-window (cadr ws))
+              (check= (buffer->windows b) (list (car ws)))
+              (check-true (window-menu-has? name))
+              (check-false (window-menu-has? (string-append name " (1)"))))
+            (kill-window (car ws))))))
+    (window-focus win)
+    (when (buffer-exists? b) (buffer-close b))
+    (check= (current-buffer) old)))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Defining menus
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1437,6 +1488,7 @@
   (test-preferences)
   (test-close-window)
   (test-close-shared-window)
+  (test-clone-window)
   (check-group "menu items")
   ;; all the menus above, each time they were expanded
   (check-true (> menu-buttons 10000))

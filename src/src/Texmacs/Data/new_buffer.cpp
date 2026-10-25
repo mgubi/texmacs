@@ -237,11 +237,9 @@ set_title_buffer (url name, string title) {
   array<url> vs= buffer_to_views (name);
   for (int i=0; i<N(vs); i++) {
     tm_window win= concrete_window (view_to_window (vs[i]));
-    if (win != NULL) {
-      win->set_window_name (title);
-      win->set_window_url (name);
-    }
+    if (win != NULL) win->set_window_url (name);
   }
+  update_window_names (name);
 }
 
 /******************************************************************************

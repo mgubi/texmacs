@@ -52,9 +52,32 @@
          (l3 (list-difference l2 (list (current-buffer)))))
     (buffer-list-menu (list-difference l1 l3))))
 
+(define (window-number win)
+  ;; the rank of @win among the windows of its buffer, from 1
+  (let loop ((l (buffer->windows (window->buffer win))) (i 1))
+    (cond ((null? l) 1)
+          ((== (car l) win) i)
+          (else (loop (cdr l) (+ i 1))))))
+
+(tm-menu (window-list-menu l)
+  ;; one entry per window: a buffer shown in several windows (clone-window)
+  ;; has one entry for each of them, numbered
+  (for (win l)
+    (let* ((name (window->buffer win))
+           (abbr (buffer-get-title name))
+           (abbr* (if (== abbr "") (url->system (url-tail name)) abbr))
+           (nr (if (<= (length (buffer->windows name)) 1) ""
+                   (string-append " (" (number->string (window-number win))
+                                  ")")))
+           (mod? (buffer-modified? name))
+           (short-name `(verbatim ,(string-append abbr* nr (if mod? " *" ""))))
+           (long-name `(verbatim ,(url->system name))))
+      ((check (balloon (eval short-name) (eval long-name)) "v"
+              (== (current-window) win))
+       (switch-to-window win)))))
+
 (tm-define (buffer-windows-menu)
-  (let* ((l1 (map window->buffer (window-list))))
-    (buffer-list-menu l1)))
+  (window-list-menu (window-list)))
 
 (tm-define (buffer-invisible-list n)
   (let* ((l1 (list-difference (buffer-menu-list n) (linked-file-list)))
@@ -163,8 +186,7 @@
     ("New document" (new-document))
     (if (not (support-functionality? "tab"))
       ("New window" (new-document*))))
-  ;;("Clone window" (clone-window))
-  )
+  ("Clone window" (clone-window)))
 
 (menu-bind load-menu
   ("Load" (open-document))
@@ -318,6 +340,7 @@
             (link export-as-image-menu))))
   ---
   (if (window-per-buffer?)
+      ("Clone window" (clone-window))
       ("Close window" (close-document)))
   (if (not (window-per-buffer?))
       ("Close document" (close-document)))
