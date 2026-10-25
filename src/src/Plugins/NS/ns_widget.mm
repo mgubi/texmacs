@@ -420,9 +420,12 @@ ns_window_widget_rep::query (slot s, int type_id) {
     }
     case SLOT_SIZE:
     {
+      // the size of the contents, the one set by SLOT_SIZE (a window cloned
+      // with the size of another one grew by its title bar)
       check_type_id<coord2> (type_id, s);
-      NSRect frame = [[wc window] frame];
-      return close_box<coord2> (from_nssize (frame.size));
+      NSWindow* win= [wc window];
+      NSSize sz= [win contentRectForFrameRect: [win frame]].size;
+      return close_box<coord2> (from_nssize (sz));
     }
     default:
       return ns_widget_rep::query (s, type_id);
