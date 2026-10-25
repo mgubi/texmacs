@@ -108,6 +108,9 @@ public:
   friend array<page_item>
   typeset_stack (edit_env env, tree t, path ip, SI width,
                  array<line_item> a, array<line_item> b, stack_border& sb);
+  friend array<page_item>
+  typeset_stack (edit_env env, array<line_item> a, path ip, SI width,
+                 stack_border& sb);
 };
 
 struct lazy_paragraph {

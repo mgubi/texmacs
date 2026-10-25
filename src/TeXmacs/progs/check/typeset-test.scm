@@ -695,7 +695,25 @@
                     3 4 0 0 0 0 2 3 0 0 0)
             (pos-of rect-x1 (in-cell (inner "0.5par")) 3 4 0 0 0 0 3 0 0 0))
     (check= (pos-of rect-x2 (in-cell '(mt "0.5par")) 3 4 0 0 0 0)
-            (pos-of rect-x2 (in-cell '(ml "0.5par")) 3 4 0 0 0 0))))
+            (pos-of rect-x2 (in-cell '(ml "0.5par")) 3 4 0 0 0 0)))
+  ;; what a hidden part assigns in a cell whose lines are broken (the
+  ;; abstract of tmarticle, a hide-preamble in it) holds for the paragraphs
+  ;; after it, as when the assignment is not hidden: the hidden part was
+  ;; typeset only when the cell was broken into lines, after them, and the
+  ;; macro was undefined there
+  (let* ((in-cell (lambda (x)
+                    `(document
+                       (tformat (cwith "1" "1" "1" "1" "cell-hyphen" "t")
+                                (table (row (cell (document ,x
+                                                            (concat "a" (ww))))))))))
+         (def '(assign "ww" (macro "wwwwwwwwww")))
+         (end-of (lambda (doc)
+                   (let ((x #f))
+                     (with-typeset-body doc
+                       (lambda () (set! x (rect-x2 (rect 0 1 0 0 0 1)))))
+                     x))))
+    (check= (end-of (in-cell `(hidden ,def)))
+            (end-of (in-cell def)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Line breaking

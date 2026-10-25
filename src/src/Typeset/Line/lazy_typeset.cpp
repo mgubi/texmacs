@@ -179,8 +179,17 @@ add_markers (edit_env env, lazy par, path ip) {
 * Hidden
 ******************************************************************************/
 
+array<line_item> typeset_concat_or_table (edit_env env, tree t, path ip);
+
 lazy_hidden_rep::lazy_hidden_rep (edit_env env2, tree t2, path ip2):
-  lazy_rep (LAZY_HIDDEN, ip2), env (env2), t (t2), ip (ip2) {}
+  lazy_rep (LAZY_HIDDEN, ip2), env (env2), t (t2), ip (ip2)
+{
+  // the body is executed here, in the order of the document, as the
+  // paragraphs (make_lazy_paragraph), and only broken into lines when the
+  // width is known: what it assigns (the definitions of a hide-preamble)
+  // holds for the paragraphs after it, as with the bridges (bridge_hidden)
+  items= typeset_concat_or_table (env, t, ip);
+}
 
 format
 lazy_hidden_rep::query (lazy_type request, format fm) {
@@ -196,8 +205,8 @@ lazy_hidden_rep::produce (lazy_type request, format fm) {
     format_vstream fvs= (format_vstream) fm; 
     stack_border temp_sb;
     array<page_item> temp_l=
-      typeset_stack (env, t, ip, fvs->width,
-                     fvs->before, fvs->after, temp_sb);
+      typeset_stack (env, join (join (fvs->before, items), fvs->after), ip,
+                     fvs->width, temp_sb);
     int i=0, n= N(temp_l);
     for (i=0; i<n; i++)
       if (temp_l[i]->type != PAGE_CONTROL_ITEM) {

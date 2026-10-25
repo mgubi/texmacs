@@ -60,6 +60,8 @@ array<page_item> typeset_stack (edit_env env, tree t, path ip, SI width,
 array<page_item> typeset_stack (edit_env env, tree t, path ip,
 				array<line_item> a, array<line_item> b,
 				stack_border& sb);
+array<page_item> typeset_stack (edit_env env, array<line_item> a, path ip,
+                                SI width, stack_border& sb);
 
 void merge_stack (array<page_item>& l, stack_border& sb,
 		  array<page_item> l2, stack_border sb2);
