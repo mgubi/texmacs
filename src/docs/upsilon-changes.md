@@ -12,6 +12,18 @@ branch [`upsilon_texmacs`](https://github.com/mgubi/texmacs/commits/upsilon_texm
 have the details, and the problems go to the
 [issues of the repository](https://github.com/mgubi/texmacs/issues).
 
+## 25 October 2026
+
+- **Clone window**: File → Clone window and View → Clone window open a
+  second window on the document, to see two parts of it side by side: it
+  starts at the cursor and the zoom of the first one, beside it when the
+  screen has room (else a little lower), and what is typed in one window
+  shows in the other. The windows of the document are numbered in their
+  titles, "a.tm (1)", "a.tm (2)", and Go → Windows has an entry for each of
+  them ([#464](https://github.com/mgubi/texmacs/issues/464)).
+- **Cocoa**: a window given the size of another one (a cloned window) was
+  taller by the height of the title bar.
+
 ## 24 October 2026
 
 - **Server log**: the line written at each login check gives the date of
