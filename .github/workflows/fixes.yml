@@ -179,10 +179,11 @@ jobs:
         run: make -j"$(sysctl -n hw.ncpu)"
 
       # the command line and the exit of TeXmacs after a script (a crash at
-      # the exit, #462), one TeXmacs process per case, in the source tree
+      # the exit, #462), one TeXmacs process per case, in the source tree;
+      # the first case sets up a fresh home, slower on the Intel runner
       - name: The startup checks
         env:
-          QT_QPA_PLATFORM: offscreen
+          TM_TEST_TIMEOUT: 300
         run: tests/startup/check.sh
 
       - name: Application

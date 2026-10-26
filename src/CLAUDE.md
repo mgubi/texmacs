@@ -42,7 +42,7 @@ All runners are run from `src/`, after building, and exit non-zero on failure.
 | `tests/scheme/check.sh <name>` | one suite of check-master (e.g. `latex`, `table`) | seconds |
 | `tests/scheme/check.sh path/foo-test.scm` | a suite file not yet registered | seconds |
 | `tests/scheme/check.sh integration` | the integration suites (server backup, cache...) | |
-| `tests/startup/check.sh` | the command line (`-x`, files, `-q`, `-headless`) and the exit after a script, one TeXmacs process per case; a crash at the exit fails (#462); run with `QT_QPA_PLATFORM=offscreen` | about 20 s |
+| `tests/startup/check.sh` | the command line (`-x`, files, `-q`, `-headless`) and the exit after a script, one TeXmacs process per case; a crash at the exit fails (#462); offscreen, `TM_TEST_TIMEOUT` per case (60 s) | 20 s, 50 s with a fresh home |
 | `make -C tests` | the C++ unit tests (QtTest), linked against `src/Objects` | minutes |
 | `tests/documents/check.sh [-u] [-p]` | typesets `tests/documents/samples/*.tm` to PDF and compares their text with `tests/documents/ref` (`-u` updates, `-p` also compares pixels) | about 1 min |
 | `tests/docs/check.sh [-b\|-f] [-l lan] [-u]` | the whole documentation: the Help books to PDF and every `TeXmacs/doc` file; problems are compared with `tests/docs/ref/summary.txt` | about 9 min |
