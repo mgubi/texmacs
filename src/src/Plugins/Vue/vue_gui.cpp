@@ -3573,8 +3573,9 @@ static const time_t vue_repaint_dt= 16;
 * (hasPreciseScrollingDeltas is lost on the way), only the deltas, in
 * "lines". A trackpad gives a tenth of the displacement of the fingers in
 * points, hence wheel_precise_step, and its deltas are fractional; a notch
-* is one whole unit (on X11 the units of a trackpad are those of a wheel,
-* see wheel_x11). Whole deltas are therefore ambiguous, and the first
+* is one whole unit (on Linux a unit of a trackpad is taken as a notch, as
+* in the Qt port, see wheel_units_are_notches). Whole deltas are therefore
+* ambiguous, and the first
 * event of a stream may be taken for a notch when it opens a fast swipe:
 * the next event settles it, by its fraction or by following within
 * wheel_burst_dt, and since a notch is travelled and not jumped the excess
@@ -3630,13 +3631,9 @@ wheel_notch_step_of (vue_window win) {
 #endif
 }
 
-// is the video driver of SDL the one of X11 (also under XWayland)? There
-// the smooth scrolling of XInput2 gives the deltas of a trackpad as of a
-// wheel, in units of the scroll increment of the device: a unit is about a
-// notch (under XWayland ten pixels of the fingers), not a tenth of the
-// fingers in points as on macOS or Wayland, and 10 points a unit made the
-// trackpad an order slower than in the Qt port (issue #459), which takes
-// such a unit as a notch (120ths of an angle)
+#if !defined(OS_MACOS) && !defined(__EMSCRIPTEN__) && !defined(_WIN32)
+// is the video driver of SDL the one of X11 (also under XWayland)? Its
+// timestamps need care (wheel_stamp_of_x)
 static bool
 wheel_x11 () {
   static int x11= -1;
@@ -3646,12 +3643,36 @@ wheel_x11 () {
   }
   return x11 == 1;
 }
+#endif
 
-// the distance of a unit of fractional deltas (a trackpad): as a notch on
-// X11, as the Qt port does there (see above)
+// is a unit of a trackpad a notch? On Linux SDL gives a trackpad in units of
+// ten pixels of the fingers, under X11 (XInput2, the scroll increment of
+// the device: XWayland and xf86-input-libinput) as under Wayland (the axis
+// divided by 10), and Qt takes such a unit as a notch (120ths of an angle),
+// which the Qt port scrolls: 10 points a unit, which follow the fingers,
+// made the trackpad of Vue 5 to 25 times slower than in the Qt port (issue
+// #459). Not on macOS, Windows or in a browser, where the units are a tenth
+// of the fingers in points and the page follows them
+static bool
+wheel_units_are_notches () {
+#if defined(OS_MACOS) || defined(__EMSCRIPTEN__) || defined(_WIN32)
+  return false;
+#else
+  static int notches= -1;
+  if (notches < 0) {
+    const char* d= SDL_GetCurrentVideoDriver ();
+    notches= (d != NULL && (strcmp (d, "x11") == 0 ||
+                            strcmp (d, "wayland") == 0)) ? 1 : 0;
+  }
+  return notches == 1;
+#endif
+}
+
+// the distance of a unit of fractional deltas (a trackpad): a notch where
+// the units are notches (see above)
 static double
 wheel_precise_step_of (vue_window win) {
-  if (wheel_x11 ()) return wheel_notch_step_of (win);
+  if (wheel_units_are_notches ()) return wheel_notch_step_of (win);
   return wheel_precise_step;
 }
 
@@ -3709,9 +3730,9 @@ wheel_glides (const vue_input_state& in) {
 #ifdef __EMSCRIPTEN__
   return false;
 #else
-  // nor on X11, where the units of a trackpad are notches (wheel_x11): the
-  // glide went on far, and the Qt port does not glide there either
-  if (wheel_x11 ()) return false;
+  // nor where the units of a trackpad are notches (Linux): the glide went
+  // on far, and the Qt port does not glide there either
+  if (wheel_units_are_notches ()) return false;
   return !wheel_system_momentum;
 #endif
 }
@@ -3763,20 +3784,47 @@ clay_wheel_flush (vue_window_rep* win) {
   in.clay_wheel_x= in.clay_wheel_y= 0;
 }
 
+// is a timestamp given by SDL a time of the X server in ms? SDL counts the
+// timestamps in ns from its start (SDL_GetTicksNS), but on X11 it gives
+// those of the smooth scrolling of XInput2 as the X server gave them, in ms
+// of its own clock (SDL_x11xinput2.c, SDL 3.4), while those of the wheel
+// buttons are of SDL. The X server (Xorg, XWayland) counts the ms of the
+// monotonic clock on 32 bits, so that a stamp of more bits is of SDL (which
+// has them after 4.3 s); a smaller one is taken for the clock it is nearer
+// to, and when it is near neither (a server on another machine) for one of
+// the server. Only on X11: the stamps of the other drivers are those of
+// SDL, even when the loop was held up for seconds
+static bool
+wheel_stamp_of_x (uint64_t stamp) {
+#if defined(OS_MACOS) || defined(__EMSCRIPTEN__) || defined(_WIN32)
+  (void) stamp;
+  return false;
+#else
+  if (stamp == 0 || (stamp >> 32) != 0 || !wheel_x11 ()) return false;
+  uint64_t now= SDL_GetTicksNS ();
+  uint64_t d_sdl= (stamp > now ? stamp - now : now - stamp) / 1000000; // ms
+  struct timespec ts;
+  clock_gettime (CLOCK_MONOTONIC, &ts);
+  uint32_t x_now= (uint32_t) ((uint64_t) ts.tv_sec * 1000 + ts.tv_nsec / 1000000);
+  uint32_t d= x_now - (uint32_t) stamp, e= (uint32_t) stamp - x_now; // mod 2^32
+  uint64_t d_x= (uint64_t) (d < e ? d : e);
+  if (d_x < d_sdl && d_x <= 1000) return true;
+  if (d_sdl <= 1000) return false;
+  return true;
+#endif
+}
+
 // the interval (ms) between a wheel event of stamp stamp and the previous
-// one. SDL counts the timestamps in ns from its start (SDL_GetTicksNS), but
-// on X11 it gives those of the smooth scrolling of XInput2 as the X server
-// gave them, in ms of its own clock (SDL_x11xinput2.c, SDL 3.4): divided by
-// 10^6 every interval was 0, no stream of events ever ended, and a wheel
-// turned after a trackpad stayed a trackpad, slow (issue #459). A stamp
-// more than a second away from the clock of SDL is taken for one of the X
-// server; a stream whose stamps change clock starts anew
+// one. Divided by 10^6, the intervals between the stamps of the X server
+// (wheel_stamp_of_x) were all 0: no stream of events ever ended, and a
+// wheel turned after a trackpad stayed a trackpad (issue #459). A stream
+// whose stamps change clock starts anew; two events of the same stamp (the
+// two axes of a motion, or the same ms of the X server) are of a stream
 static time_t
 wheel_interval (vue_input_state& in, uint64_t stamp) {
-  uint64_t now= SDL_GetTicksNS ();
-  bool ms= (stamp != 0 && (stamp > now || now - stamp > 1000000000ull));
+  bool ms= wheel_stamp_of_x (stamp);
   time_t dt;
-  if (in.wheel_stamp == 0 || ms != in.wheel_stamp_ms || stamp <= in.wheel_stamp)
+  if (in.wheel_stamp == 0 || ms != in.wheel_stamp_ms || stamp < in.wheel_stamp)
     dt= wheel_slow_dt;
   else if (ms) dt= (time_t) (stamp - in.wheel_stamp);
   else dt= (time_t) ((stamp - in.wheel_stamp) / 1000000);
@@ -5665,7 +5713,9 @@ wheel_zooms (vue_window win, double y) {
   // as in Qt, the editor gets the wheel when it captures it (graphics)
   if (as_bool (call ("wheel-capture?"))) return false;
   if (y == 0) return true; // a sideways wheel does not scroll either
-  double m= (y == floor (y)) ? 15.0 * fabs (y) : wheel_precise_step * fabs (y);
+  // (where a unit of a trackpad is a notch, its fractions zoom as a wheel)
+  double m= (y == floor (y) || wheel_units_are_notches ()) ? 15.0 * fabs (y)
+                                                          : wheel_precise_step * fabs (y);
   double f= pow (max (m, 1.0), 1.0 / 16.0);
   if (f <= 1.0) return true;
   string cmd= (y > 0 ? "(zoom-in " : "(zoom-out ") * as_string (f) * ")";
@@ -5945,9 +5995,10 @@ process_event (SDL_Event *event) {
     {
       update_mouse_state ();
       if (DEBUG_VUE_EVENTS)
-        SDL_Log ("Window %d got wheel event %f %f (queued for %d ms)",
+        SDL_Log ("Window %d got wheel event %f %f (stamp %llu%s)",
                  event->wheel.windowID, event->wheel.x, event->wheel.y,
-                 (int) ((SDL_GetTicksNS () - event->wheel.timestamp) / 1000000));
+                 (unsigned long long) event->wheel.timestamp,
+                 wheel_stamp_of_x (event->wheel.timestamp) ? " ms, X server" : " ns");
       win= get_window_from_ID (event->wheel.windowID);
       float wx= event->wheel.mouse_x, wy= event->wheel.mouse_y;
       win= under_tooltip (win, wx, wy);
