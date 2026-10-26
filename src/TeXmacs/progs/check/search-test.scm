@@ -257,6 +257,73 @@
                                            '() 100000)))
         (check= (length (cdr r)) 64000)
         (check-true (< (car r) 500))))
+    ;; a first part with a leading wildcard reaches the start of its
+    ;; paragraph: no second match starts where the first one ended, also
+    ;; without an empty region
+    (check-both '(document "a" "bxa" "bx")
+                '(document (concat (wildcard "w") (select-region "a"))
+                           (concat "b" (select-region "x")))
+                '((0 0) (0 1) (1 1) (1 2)))
+    (check-both '(document "a" "bxa" "bx")
+                '(document (concat (wildcard "w") (select-region "a"))
+                           (concat "b" (select-region "")))
+                '((0 0) (0 1) (1 1) (1 2)))
+    ;; the documents inside the paragraphs of a match are searched too
+    (check-both '(document (concat (strong (document "xa" "bc")) "ya") "bc")
+                '(document (select-region "a") (concat "b" (select-region "")))
+                '((0 0 0 0 1) (0 0 0 0 2) (0 0 0 1 1) (0 0 0 1 2)
+                  (0 1 1) (0 1 2) (1 1) (1 2)))
+    ;; and the limit of hits holds in the loop over the paragraphs
+    (with doc (stree->tree `(document ,@(map (lambda (i) "ab") (iota 400))))
+      (with r (tree-search-tree
+                doc '(document (concat "a" (select-region ""))
+                               (concat "a" (select-region "")))
+                '() 10)
+        (check-true (and (>= (length r) 10) (< (length r) 100)))))
+    ;; no region inside a tag which a hit of the formula already covers
+    (check-both '(document (concat "x" (rsup "ba") "a"))
+                '(concat (select-region "") (wildcard "w") "a")
+                '((0 0 0) (0 0 1)))
+    ;; a tag alone is a formula of one token
+    (check-both '(document (frac "1" "2"))
+                '(concat (select-region "") (wildcard "w"))
+                '((0 0) (0 1)))
+    ;; in tag arguments: a region which is the whole argument selects its
+    ;; content anywhere in the argument, with both (as (strong [a]) in the
+    ;; tag checks, the example of the manual); a document pattern matches
+    ;; the whole argument with Replace
+    (check-both '(document (frac "abc" "1"))
+                '(frac (select-region "b") "1")
+                '((0 0 1) (0 0 2)))
+    (with-search-mode 'replace
+      (lambda ()
+        (check= (hits '(document (strong (document "xay" "bz"))
+                                 (strong (document "ay" "b")))
+                      '(strong (document (concat "a" (select-region "y")) "b")))
+                '((1 0 0 1) (1 0 0 2)))
+        (check= (hits '(document (strong (document "xay" "bz"))
+                                 (strong (document "ay" "b")))
+                      '(strong (document (concat "a" (select-region "")) "b")))
+                '((1 0 0 1) (1 0 0 2)))))
+    ;; in linear time in nested formulas: a hit carried out of the tags took
+    ;; a search of each level from each level (2.7 s at depth 80)
+    (let* ((deep (lambda (self n)
+                   (if (= n 0) "ab"
+                       `(concat "x" (frac ,(self self (- n 1)) "ab") "ab"))))
+           (doc (stree->tree `(document ,(deep deep 200)))))
+      (for-each
+        (lambda (mode)
+          (with-search-mode mode
+            (lambda ()
+              (with r (time-of
+                        (lambda ()
+                          (tree-search-tree
+                            doc '(concat (wildcard "x") (select-region "b")
+                                         (wildcard "y"))
+                            '() 1000)))
+                (check= (length (cdr r)) 2)
+                (check-true (< (car r) 500))))))
+        '(search replace)))
     ;; a trailing wildcard after an empty region takes nothing (the match
     ;; is the shortest), so that a[]* gives a region per a and its next
     ;; character, while a[b]* gives one region, the wildcard taking the rest
