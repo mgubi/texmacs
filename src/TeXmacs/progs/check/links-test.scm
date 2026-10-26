@@ -1848,7 +1848,112 @@
     (check= (file-init "im.tm")
             '(("font-base-size" . "12") ("page-medium" . "paper")
               ("par-first" . "0fn")))
-    (buffer-close q)))
+    (buffer-close q)
+    ;; a master whose initial environment is not sorted (written by hand),
+    ;; saved by its buffer, which sorts it: it did not change on disk
+    (write-unsorted-master)
+    (load-buffer q)
+    (update-forced)
+    (load-buffer m)
+    (update-forced)
+    (buffer-pretend-modified m)
+    (buffer-save m)
+    (switch-to-buffer q)
+    (edit (tree-set (bt 0) "intro view"))
+    (check= (part-save-changed q) (list))
+    (buffer-pretend-saved q)
+    (buffer-close q)
+    (buffer-close m)
+    ;; ... also when the buffer of the master is saved by a new style in
+    ;; the view of an included file
+    (write-unsorted-master)
+    (with p (system->url (part-url m (tmp "ia.tm")))
+      (load-buffer q)
+      (update-forced)
+      (load-buffer m)
+      (update-forced)
+      (load-buffer p)
+      (update-forced)
+      (set-view-style p eu)
+      (save-buffer p)
+      (check= (file-style "im.tm") eu)
+      (switch-to-buffer q)
+      (edit (tree-set (bt 0) "intro view"))
+      (check= (part-save-changed q) (list))
+      (buffer-pretend-saved q)
+      (buffer-pretend-saved p)
+      (buffer-close p)
+      (buffer-close q)
+      (buffer-close m))
+    ;; the view of an included file keeps the entries of the file which
+    ;; the master has too, also when the file is open and saved itself
+    (write-master-init)
+    (write-doc "ia.tm" '("book") '(("par-first" "0fn")) '((chapter "A") "a"))
+    (with a (tmp "ia.tm")
+      (with p (system->url (part-url m a))
+        (load-buffer a)
+        (update-forced)
+        (set-view-style a eu)
+        (load-buffer p)
+        (update-forced)
+        (edit (init-env "font-base-size" "12"))
+        (check= (part-own-plan p) (list a 'buffer #f))
+        (save-buffer p)
+        (check= (part-save-message) "Saved ia.tm")
+        (check= (file-init "ia.tm")
+                '(("font-base-size" . "12") ("page-medium" . "paper")
+                  ("par-first" . "0fn")))
+        (check= (master-buffer-init a "par-first") "0fn")
+        (check-false (buffer-modified? a))
+        (buffer-close p)
+        (buffer-close a)
+        ;; ... and when it is not open
+        (write-doc "ia.tm" '("book") '(("par-first" "0fn"))
+                   '((chapter "A") "a"))
+        (load-buffer p)
+        (update-forced)
+        (edit (init-env "font-base-size" "12"))
+        (check= (part-own-plan p) (list a 'none #f))
+        (save-buffer p)
+        (check= (file-init "ia.tm")
+                '(("font-base-size" . "12") ("page-medium" . "paper")
+                  ("par-first" . "0fn")))
+        (buffer-close p)
+        ;; the view of an included file does not write what it inherited
+        ;; from the parts of the master when it was loaded, after the
+        ;; master changed them
+        (write-doc "ia.tm" '("book") '() '((chapter "A") "a"))
+        (with doc (tree->stree (tree-import m "texmacs"))
+          (tree-export
+           (stree->tree
+            (tmfile-assign doc 'auxiliary
+                           '(collection
+                             (associate "parts"
+                                        (document
+                                         (tuple "ia.tm" "chapter-nr" "1"))))))
+           m "texmacs"))
+        (load-buffer p)
+        (update-forced)
+        (write-master-init)
+        (edit (init-env "font-base-size" "12"))
+        (save-buffer p)
+        (check= (part-save-message) "Saved ia.tm")
+        (check= (file-init "ia.tm")
+                '(("font-base-size" . "12") ("page-medium" . "paper")))
+        (buffer-close p)))
+    (write-doc "ia.tm" '("book") '() '((chapter "A") "a"))))
+
+(define (write-unsorted-master)
+  ;; the master im.tm with an initial environment in no order
+  (tree-export
+   (stree->tree
+    '(document (TeXmacs "2.1") (style (tuple "book"))
+               (body (document "intro" (include "ia.tm")))
+               (initial (collection (associate "zz" "1")
+                                    (associate "page-medium" "paper")
+                                    (associate "par-first" "0fn")
+                                    (associate "aa" "2")))))
+   (tmp "im.tm") "texmacs"))
 
 ;; The part tmfs opens a file of a project as a document of its own: its
 ;; url names the master and the file, its body is shared with the file and
