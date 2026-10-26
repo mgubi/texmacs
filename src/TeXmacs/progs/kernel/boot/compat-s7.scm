@@ -41,6 +41,10 @@
 
 (define-public lazy-catch catch)
 
+;; last-pair is that of the reference implementation of SRFI-1:
+;;   Copyright (c) 1998, 1999 by Olin Shivers. You may do as you please with
+;;   this code as long as you do not remove this copyright notice or hold me
+;;   liable for its use.
 (define-public (last-pair lis)
 ;;  (check-arg pair? lis last-pair)
   (let lp ((lis lis))
@@ -312,6 +316,8 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; hashing (use S7 internal hash)
+;; (the interface and the default bound as in the reference implementation
+;; of SRFI-69, Copyright (c) 2005 Panu Kalliokoski, MIT license)
 
 (define *default-bound* (- (expt 2 29) 3))
 

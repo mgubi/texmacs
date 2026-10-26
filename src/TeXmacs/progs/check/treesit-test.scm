@@ -122,7 +122,8 @@
             '((0 1) (1 3) (3 4) (5 8) (8 9)))))
 
 (define corpus
-  ;; some of test/corpus/main.txt of tree-sitter-json
+  ;; some of test/corpus/main.txt of tree-sitter-json (Copyright (c) 2014
+  ;; Max Brunsfeld, MIT license: see misc/tree-sitter/json/LICENSE)
   '(("\n[\n  345,\n  10.1,\n  10,\n  -10,\n  null,\n  true,\n  false,\n  { \"stuff\": \"good\" }\n]\n"
      "(document (array (number) (number) (number) (number) (null) (true) (false) (object (pair (string (string_content)) (string (string_content))))))")
     ("\n[\n  \"\",\n  \"abc\",\n  \"def\\n\",\n  \"ghi\\t\",\n  \"jkl\\f\"\n]\n"

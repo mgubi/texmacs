@@ -4,6 +4,7 @@
 *              (OpenGL 3.3 core, 4.1 on macOS, WebGL2 in the browser), with
 *              ThorVG's GL engine for the vector shapes
 * COPYRIGHT  : (C) 2026  Massimiliano Gubinelli
+*              Slug shaders adapted from E. Lengyel, (C) 2017, MIT (see below)
 *******************************************************************************
 * This software falls under the GNU general public license version 3 or later.
 * It comes WITHOUT ANY WARRANTY WHATSOEVER. For details, see the file LICENSE
@@ -216,6 +217,14 @@ static const char* fragment_src= GLSL_HEADER
   "  else o_col= texture (u_atlas, v_uv).r * v_col;\n"
   "}\n";
 
+// The Slug shaders below are adapted from the reference shaders of Eric
+// Lengyel (https://github.com/EricLengyel/Slug, SlugPixelShader.hlsl), the
+// algorithm of "GPU-Centered Font Rendering Directly from Glyph Outlines"
+// (JCGT 6 (2), 2017); rewritten for TeXmacs, with its own layout of the
+// curves and the bands. Copyright (c) 2017 Eric Lengyel, MIT License (see
+// TeXmacs/misc/licenses/Slug-MIT.txt): "The above copyright notice and this
+// permission notice shall be included in all copies or substantial portions
+// of the Software."
 static const char* slug_vertex_src= GLSL_HEADER
   "layout(location=0) in vec3 i_org;\n"   // origin (pixels), pixels a em
   "layout(location=1) in vec4 i_box;\n"   // the box (em)

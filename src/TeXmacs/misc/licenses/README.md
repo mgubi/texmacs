@@ -19,6 +19,11 @@ the fonts have theirs in their own folders (`fonts/truetype/*`, see
 | the Unicode tables of tree-sitter (from ICU) | `src/Plugins/TreeSitter/tree-sitter/src/unicode`, `progs/treesit/ts-unicode.scm` | Unicode / ICU license | `tree-sitter-unicode-ICU.txt` |
 | XZ Embedded | `src/Plugins/TreeSitter/xz` | 0BSD | `xz-embedded-0BSD.txt` |
 | Clay (Nic Barker) | `src/Plugins/Vue`, the Vue builds | zlib | `clay-zlib.txt` |
+| the Slug shaders (Eric Lengyel), adapted | `src/Plugins/Vue/gpu_backend_*`, the Vue builds | MIT | `Slug-MIT.txt` |
+| puff (Mark Adler), the inflater, adapted | `src/System/Files/zip_files.cpp` | zlib | its notice in the file |
+| the Mersenne Twister (Makoto Matsumoto, Takuji Nishimura) | `femtolisp/llt`, the femtolisp builds | BSD 3-clause | `femtolisp-BSD-3-Clause.txt` |
+| fixes of the femtolisp of Julia | `src/Scheme/Femtolisp/patches` | BSD 3-clause | `femtolisp-BSD-3-Clause.txt` |
+| `last-pair` of SRFI-1 (Olin Shivers), the interface of `hash` of SRFI-69 (Panu Kalliokoski) | `progs/kernel/boot/compat-*.scm` | their notices, MIT | in the files |
 
 ## Libraries linked with TeXmacs
 
