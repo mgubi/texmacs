@@ -4099,6 +4099,78 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(compress-table-select <scm-arg|content>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|compress_table_select> which returns
+    <scm|tree>.
+  </explain>
+
+  <\explain>
+    <scm|(compress-table-new <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|compress_table_new> which returns
+    <scm|string>.
+  </explain>
+
+  <\explain>
+    <scm|(compress-table-open <scm-arg|content>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|compress_table_open> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(compress-table-free <scm-arg|content>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|compress_table_free> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(compress-table-size <scm-arg|content>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|compress_table_size> which returns
+    <scm|int>.
+  </explain>
+
+  <\explain>
+    <scm|(compress-table-keys)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|compress_table_keys> which returns
+    <scm|tree>.
+  </explain>
+
+  <\explain>
+    <scm|(cpp-ai-chat-key <scm-arg|string> <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|ai_chat_key> which returns
+    <scm|tree>.
+  </explain>
+
+  <\explain>
+    <scm|(cpp-ai-engine <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|ai_engine> which returns
+    <scm|string>.
+  </explain>
+
+  <\explain>
+    <scm|(cpp-ai-chat-close <scm-arg|string> <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|ai_chat_close> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
     <scm|(cpp-ai-command <scm-arg|string> <scm-arg|string> <scm-arg|string>)>
 <explain-synopsis|no synopsis>
   <|explain>

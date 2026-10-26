@@ -31,7 +31,8 @@
 ;;   - the source code formats of the plugins (cpp, julia, java, scala,
 ;;     json, csv, python, scilab, mathemagix, caas, scheme) and the registry
 ;;     of all the formats;
-;;   - the C++ parsers of Coq vernacular and JSON, and the compressed trees;
+;;   - the C++ parsers of Coq vernacular and JSON, the compressed trees and
+;;     their tables (freed after each request of AI or LanguageTool);
 ;;   - the serializations (tm, stm, tmml, stree) of the control characters
 ;;     and of a document of 2000 paragraphs, each in less than 2 s.
 ;;
@@ -42,7 +43,9 @@
 
 (texmacs-module (check convert-more-test)
   (:use (check check-lib)
-        (convert mathml tmmath)))
+        (convert mathml tmmath)
+        (tools spell spell-lantool)
+        (tools ai ai-translate)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Helpers
@@ -1084,6 +1087,212 @@
           '(document (concat "a " "b" " c")))
   (check= (st (decompress-tree (stree->tree '(compressed "x999999")))) ""))
 
+;; The tables of the codes (#438): each request of AI or LanguageTool has
+;; its own, freed once its answer is decompressed, and a chat has its own,
+;; freed when its session is closed; the default table is left alone.
+(define (compress-table-key-list)
+  (map tree->stree (tree-children (compress-table-keys))))
+
+(define (compress-tables-like prefix)
+  ;; the tables of compress-table-new with this prefix: <prefix>-<number>
+  (with n (+ (string-length prefix) 1)
+    (list-filter (compress-table-key-list)
+                 (lambda (s)
+                   (and (string? s) (string-starts? s (string-append prefix "-"))
+                        (> (string-length s) n)
+                        (string->number (substring s n (string-length s))))))))
+
+(define (no-ai-request? model)
+  ;; no check may reach the network, whatever the preferences: the AI tools
+  ;; are only called with a model of no engine (nothing is built or sent)
+  (== (cpp-ai-engine model) "unknown"))
+
+(define (compress-table-serial name)
+  ;; the number of a table of compress-table-new: <prefix>-<number>
+  (with pos (string-search-backwards "-" (string-length name) name)
+    (string->number (substring name (+ pos 1) (string-length name)))))
+
+(define (test-compress-tables)
+  (check-group "compression tables")
+  (let* ((t (stree->tree '(document (concat "it is " (em "b") " " (frac "x" "y")))))
+         (default (compress-table-size ""))
+         (t1 (compress-table-new "check"))
+         (t2 (compress-table-new "check"))
+         (h1 (with-compress-table t1 (lambda () (compress-html t 1))))
+         (h2 (with-compress-table t2 (lambda () (compress-html t 1)))))
+    ;; codes numbered from x0 in each table: the same HTML in both
+    (check-false (== t1 t2))
+    (check= h1 h2)
+    (check-true (>= (string-search-forwards "id=\"x0\"" 0 h1) 0))
+    (check= (compress-table-size t1) 2)
+    (check= (compress-table-size "") default)
+    ;; the round trip, in the table of the compression
+    (check= (st (with-compress-table t1 (lambda () (decompress-html h1 1))))
+            (st t))
+    ;; freed: the table is gone, and its codes lose their markup, not text
+    (compress-table-free t1)
+    (check= (compress-table-size t1) -1)
+    (check-false (in? t1 (compress-table-key-list)))
+    (check= (compress-table-size t2) 2)
+    (compress-table-free t2)
+    (check= (st (with-compress-table t1 (lambda () (decompress-html h1 1))))
+            '(document (concat "it is " "b" " " (concat "x" "y"))))
+    ;; and neither decompressing nor compressing makes it again
+    (check= (compress-table-size t1) -1)
+    (with-compress-table t1 (lambda () (compress-html t 1)))
+    (check= (compress-table-size t1) -1)
+    (check= (st (with-compress-table t1 (lambda () (decompress-html h1 1))))
+            '(document (concat "it is " "b" " " (concat "x" "y"))))
+    (check= (compress-tables-like "check") '())
+    ;; a callback decompresses in its table, which is freed afterwards
+    (with t3 (compress-table-new "check")
+      (let* ((h (with-compress-table t3 (lambda () (compress-html t 1))))
+             (r ((compress-table-callback t3
+                   (lambda (s) (st (decompress-html s 1)))) h)))
+        (check= r (st t))
+        (check= (compress-table-size t3) -1)))
+    ;; also when the callback fails
+    (with t4 (compress-table-new "check")
+      (catch #t
+        (lambda () ((compress-table-callback t4 (lambda () (error "fails")))))
+        (lambda args #f))
+      (check= (compress-table-size t4) -1))
+    ;; Correct (an engine without a command: no request is sent) makes one
+    ;; table, between the two tables made here, and frees it
+    (when (no-ai-request? "no-such-engine")
+      (let* ((before (compress-table-new "check"))
+             (r (cpp-ai-correct t "english" "no-such-engine"))
+             (after (compress-table-new "check")))
+        (check-true (tree? r))
+        (check= (- (compress-table-serial after) (compress-table-serial before))
+                2)
+        (compress-table-free before)
+        (compress-table-free after)))
+    (check= (compress-tables-like "ai") '())
+    ;; a chat keeps its table until its session is stopped; the keys of
+    ;; two sessions are not confused, even when their names joined by "-"
+    ;; are the same (the connections a-b, c and a, b-c)
+    (let* ((k1 (cpp-ai-chat-key "a-b" "c"))
+           (k2 (cpp-ai-chat-key "a" "b-c"))
+           (u (stree->tree '(document (concat "it is " (em "b")))))
+           (clipboard (compress-table-size "ai-clipboard")))
+      (check-false (== (tree->stree k1) (tree->stree k2)))
+      (compress-table-open k1)
+      (compress-table-open k2)
+      (with-compress-table k1 (lambda () (compress-html t 1)))
+      (with-compress-table k2 (lambda () (compress-html u 1)))
+      (check= (compress-table-size k1) 2)
+      (check= (compress-table-size k2) 1)
+      (connection-stop "a-b" "c")
+      (check= (compress-table-size k1) -1)
+      (check= (compress-table-size k2) 1)
+      (check= (compress-table-size "") default)
+      (check= (compress-table-size "ai-clipboard") clipboard)
+      (connection-stop "a" "b-c")
+      (check= (compress-table-size k2) -1))
+    ;; LanguageTool: a check (while no spell process runs, the text comes
+    ;; back as its own answer, without a request) and its corrections
+    (let* ((h #f) (out #f)
+           (return (lambda (html r)
+                     (set! h html)
+                     (let* ((pos (string-search-forwards "is " 0 html))
+                            (json (string-append
+                                   "{\"software\":{},\"matches\":[{"
+                                   "\"message\":\"A verb\","
+                                   "\"replacements\":[{\"value\":\"was\"}],"
+                                   "\"offset\":" (number->string pos) ","
+                                   "\"length\":2,\"rule\":{\"id\":\"A\"}}]}")))
+                       (set! out (st (decompress-html
+                                      (lantool-correct html json) 1)))))))
+      (check-false (process-running? 'spell))
+      (when (not (process-running? 'spell))
+        (lantool-process* t return)
+        (check= h h1)
+        (check= out '(document (concat "it " (spell-error "is" "A verb" "was")
+                                       " " (em "b") " " (frac "x" "y"))))
+        (check= (compress-tables-like "lantool") '())))
+    ;; the answer of a translation: an error of the engine (here the body
+    ;; of an HTTP error from Albert, as the Qt request now gives it) is no
+    ;; translation, which would replace the paragraph by nothing; with the
+    ;; errors of #273, it is an "Error: ..." which stops the process
+    (let* ((err "{\"detail\":\"Invalid authentication credentials\"}")
+           (ok (string-append "{\"choices\":[{\"message\":{\"content\":"
+                              "\"<body><p>Bonjour</p></body>\"}}]}")))
+      (check-false (ai-translation-answer? "" "albert"))
+      (check-false (ai-translation-answer? #f "albert"))
+      (check-true (or (not (ai-translation-answer? err "albert"))
+                      (string-starts? (cpp-ai-output err "albert") "Error:")))
+      (check-true (ai-translation-answer? ok "albert")))
+    ;; the callback of one paragraph of the translation process, given these
+    ;; answers directly (no request): the error and the empty answer leave
+    ;; the paragraph, the answer with text replaces it (with the markup of
+    ;; the codes of its table); the table is freed and the process goes on
+    (let* ((old (current-buffer))
+           (before (buffer-list))
+           (u (new-buffer))
+           (para '(concat "it is " (em "b")))
+           (body (string-append "<body><p>Bonjour <div id=\\\"x0\\\">b"
+                                "</div></p></body>"))
+           (answers
+            (list (list "{\"detail\":\"Invalid authentication credentials\"}"
+                        para)
+                  (list "" para)
+                  (list (string-append "{\"choices\":[{\"message\":"
+                                       "{\"content\":\"" body "\"}}]}")
+                        ;; (the answer is a document, put as it is in place
+                        ;; of the paragraph, as before)
+                        '(document (concat "Bonjour " (em "b"))))))
+           (end (make-process-end 'translate-check))
+           (serial process-serial))
+      (dynamic-wind
+        (lambda () (noop))
+        (lambda ()
+          (switch-to-buffer* u)
+          (for (a answers)
+            (buffer-set-body u (stree->tree `(document ,para)))
+            (let* ((t (tree-ref (buffer-tree) 0))
+                   (tp (tree->tree-pointer t))
+                   (st (tm->stree t))
+                   (table (compress-table-new "translate"))
+                   (went-on #f))
+              (with-compress-table table (lambda () (compress-tree t)))
+              ((ai-translate-callback serial tp st "albert"
+                                      (lambda () (set! went-on #t)) table)
+               (car a))
+              (check= (tm->stree (tree-ref (buffer-tree) 0)) (cadr a))
+              (check= (compress-table-size table) -1)
+              (check-true went-on))))
+        (lambda ()
+          (end)
+          (for (b (buffer-list))
+            (when (nin? b before) (buffer-close b)))
+          (when (buffer-exists? old) (switch-to-buffer old)))))
+    ;; the translation process, whose request cannot be launched (an engine
+    ;; without a command: cpp-ai-async-eval-command says so, and will not
+    ;; call back): the table of the paragraph is freed all the same
+    (let* ((m (get-preference "ai")))
+      (when (no-ai-request? m)
+        (let* ((old (current-buffer))
+               (before (buffer-list))
+               (u (new-buffer)))
+          (dynamic-wind
+            (lambda () (noop))
+            (lambda ()
+              (switch-to-buffer* u)
+              (buffer-set-body u (stree->tree
+                                  '(document (concat "it is " (em "b")))))
+              (go-start)
+              (ai-translate* "french")
+              (check-true (process-running? 'translate))
+              (check= (compress-tables-like "translate") '()))
+            (lambda ()
+              (ai-abort-translate)
+              (for (b (buffer-list))
+                (when (nin? b before) (buffer-close b)))
+              (when (buffer-exists? old) (switch-to-buffer old))))
+          (check-false (process-running? 'translate)))))
+    (check= (compress-table-size "") default)))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Serializations of special characters
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1265,7 +1474,7 @@
                   test-cork-bytes test-cork-unicode test-other-encodings
                   test-images test-image-formats test-code-formats
                   test-format-registry test-vernac test-json test-ai-answers
-                  test-compress
+                  test-compress test-compress-tables
                   test-serialize-special test-big-document test-pdf-export))
   (when (url-exists? (temp-dir)) (system-rmdir-recursive (temp-dir)))
   (check-end))

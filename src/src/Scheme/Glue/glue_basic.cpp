@@ -6914,6 +6914,123 @@ tmg_decompress_html (tmscm arg1, tmscm arg2) {
 }
 
 tmscm
+tmg_compress_table_select (tmscm arg1) {
+  TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "compress-table-select");
+
+  content in1= tmscm_to_content (arg1);
+
+  // TMSCM_DEFER_INTS;
+  tree out= compress_table_select (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return tree_to_tmscm (out);
+}
+
+tmscm
+tmg_compress_table_new (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "compress-table-new");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  string out= compress_table_new (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return string_to_tmscm (out);
+}
+
+tmscm
+tmg_compress_table_open (tmscm arg1) {
+  TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "compress-table-open");
+
+  content in1= tmscm_to_content (arg1);
+
+  // TMSCM_DEFER_INTS;
+  compress_table_open (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_compress_table_free (tmscm arg1) {
+  TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "compress-table-free");
+
+  content in1= tmscm_to_content (arg1);
+
+  // TMSCM_DEFER_INTS;
+  compress_table_free (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_compress_table_size (tmscm arg1) {
+  TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "compress-table-size");
+
+  content in1= tmscm_to_content (arg1);
+
+  // TMSCM_DEFER_INTS;
+  int out= compress_table_size (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return int_to_tmscm (out);
+}
+
+tmscm
+tmg_compress_table_keys () {
+  // TMSCM_DEFER_INTS;
+  tree out= compress_table_keys ();
+  // TMSCM_ALLOW_INTS;
+
+  return tree_to_tmscm (out);
+}
+
+tmscm
+tmg_cpp_ai_chat_key (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "cpp-ai-chat-key");
+  TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "cpp-ai-chat-key");
+
+  string in1= tmscm_to_string (arg1);
+  string in2= tmscm_to_string (arg2);
+
+  // TMSCM_DEFER_INTS;
+  tree out= ai_chat_key (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return tree_to_tmscm (out);
+}
+
+tmscm
+tmg_cpp_ai_engine (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "cpp-ai-engine");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  string out= ai_engine (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return string_to_tmscm (out);
+}
+
+tmscm
+tmg_cpp_ai_chat_close (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "cpp-ai-chat-close");
+  TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "cpp-ai-chat-close");
+
+  string in1= tmscm_to_string (arg1);
+  string in2= tmscm_to_string (arg2);
+
+  // TMSCM_DEFER_INTS;
+  ai_chat_close (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
 tmg_cpp_ai_command (tmscm arg1, tmscm arg2, tmscm arg3) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "cpp-ai-command");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "cpp-ai-command");
@@ -11911,6 +12028,15 @@ initialize_glue_basic () {
   tmscm_install_procedure ("compressed->html",  tmg_compressed_2html, 2, 0, 0);
   tmscm_install_procedure ("compress-html",  tmg_compress_html, 2, 0, 0);
   tmscm_install_procedure ("decompress-html",  tmg_decompress_html, 2, 0, 0);
+  tmscm_install_procedure ("compress-table-select",  tmg_compress_table_select, 1, 0, 0);
+  tmscm_install_procedure ("compress-table-new",  tmg_compress_table_new, 1, 0, 0);
+  tmscm_install_procedure ("compress-table-open",  tmg_compress_table_open, 1, 0, 0);
+  tmscm_install_procedure ("compress-table-free",  tmg_compress_table_free, 1, 0, 0);
+  tmscm_install_procedure ("compress-table-size",  tmg_compress_table_size, 1, 0, 0);
+  tmscm_install_procedure ("compress-table-keys",  tmg_compress_table_keys, 0, 0, 0);
+  tmscm_install_procedure ("cpp-ai-chat-key",  tmg_cpp_ai_chat_key, 2, 0, 0);
+  tmscm_install_procedure ("cpp-ai-engine",  tmg_cpp_ai_engine, 1, 0, 0);
+  tmscm_install_procedure ("cpp-ai-chat-close",  tmg_cpp_ai_chat_close, 2, 0, 0);
   tmscm_install_procedure ("cpp-ai-command",  tmg_cpp_ai_command, 3, 0, 0);
   tmscm_install_procedure ("cpp-ai-eval-command",  tmg_cpp_ai_eval_command, 1, 0, 0);
   tmscm_install_procedure ("cpp-ai-async-eval-command",  tmg_cpp_ai_async_eval_command, 2, 0, 0);
