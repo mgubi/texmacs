@@ -1769,7 +1769,86 @@
     (check-false (buffer-modified? m))
     (check-false (buffer-modified? q))
     (buffer-close q)
-    (buffer-close m)))
+    (buffer-close m)
+    ;; an entry removed in the view is removed from the file and from an
+    ;; open buffer without changes, which has what was written
+    (write-master-init)
+    (load-buffer m)
+    (load-buffer q)
+    (update-forced)
+    (edit (init-default "par-first"))
+    (edit (init-env "font-base-size" "12"))
+    (check= (part-own-plan q) (list m 'same #f))
+    (save-buffer q)
+    (check= (part-save-message) "Saved im.tm")
+    (check= (file-init "im.tm")
+            '(("font-base-size" . "12") ("page-medium" . "paper")))
+    (check= (master-buffer-init m "par-first") #f)
+    (check= (master-buffer-init m "font-base-size") "12")
+    (check-false (buffer-modified? m))
+    (buffer-close q)
+    (buffer-close m)
+    ;; ... also from the open buffer of an included file
+    (write-doc "ia.tm" '("book") '(("par-first" "1fn")) '((chapter "A") "a"))
+    (write-master-init)
+    (with a (tmp "ia.tm")
+      (with p (system->url (part-url m a))
+        (load-buffer a)
+        (load-buffer p)
+        (update-forced)
+        (edit (init-default "par-first"))
+        (edit (init-env "font-base-size" "12"))
+        (check= (part-own-plan p) (list a 'same #f))
+        (save-buffer p)
+        (check= (part-save-message) "Saved ia.tm")
+        (check= (file-init "ia.tm")
+                '(("font-base-size" . "12") ("page-medium" . "paper")))
+        (check= (master-buffer-init a "par-first") #f)
+        (check= (master-buffer-init a "font-base-size") "12")
+        (check-false (buffer-modified? a))
+        (buffer-close p)
+        (buffer-close a)))
+    (write-doc "ia.tm" '("book") '() '((chapter "A") "a"))
+    ;; the initial environment of the master changed on disk after the view
+    ;; was loaded: the save asks first
+    (write-master-init)
+    (load-buffer q)
+    (update-forced)
+    (with doc (tree->stree (tree-import m "texmacs"))
+      (tree-export
+       (stree->tree
+        (tmfile-assign doc 'initial
+                       '(collection (associate "page-medium" "paper")
+                                    (associate "par-first" "3fn")
+                                    (associate "font" "pagella"))))
+       m "texmacs"))
+    (edit (init-env "font-base-size" "12"))
+    (check= (part-save-changed q) (list m))
+    (buffer-pretend-saved q)
+    (buffer-close q)
+    ;; the master lost the extra initial environment of its parts after the
+    ;; view was loaded: the view does not write what it inherited then
+    (write-master-init)
+    (with doc (tree->stree (tree-import m "texmacs"))
+      (tree-export
+       (stree->tree
+        (tmfile-assign doc 'auxiliary
+                       '(collection
+                         (associate "parts"
+                                    (document
+                                     (tuple "im.tm" "chapter-nr" "0"))))))
+       m "texmacs"))
+    (load-buffer q)
+    (update-forced)
+    (write-master-init)
+    (edit (init-env "font-base-size" "12"))
+    (check= (part-save-changed q) (list))
+    (save-buffer q)
+    (check= (part-save-message) "Saved im.tm")
+    (check= (file-init "im.tm")
+            '(("font-base-size" . "12") ("page-medium" . "paper")
+              ("par-first" . "0fn")))
+    (buffer-close q)))
 
 ;; The part tmfs opens a file of a project as a document of its own: its
 ;; url names the master and the file, its body is shared with the file and
