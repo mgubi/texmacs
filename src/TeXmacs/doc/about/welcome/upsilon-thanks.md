@@ -33,7 +33,9 @@ named differently, open an issue or say so in your report.
   Qt 5 (#389), symbols drawn as squares (#407), the times of a book of 2000
   pages (#408), and the slow search of formulas (#450).
 - **medwatt**: Vue under Wayland and tiling window managers: the interface
-  font, pasting in the fields, scrolling, dialogs (#391), the size of SVG icons (#394).
+  font, pasting in the fields, scrolling, dialogs (#391), the size of SVG icons (#394);
+  the slow opening and editing of long documents with PDF figures in Qt
+  (#458, #457).
 - **mlalaude**: the preferences of the AI sessions, and a session asked a
   question without an API key (#398).
 - **amichail**: the icon bars at the right of the document (#404).
