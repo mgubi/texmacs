@@ -106,6 +106,8 @@ two ()" \
 # the toolbar it had before is deleted later, by the event loop of Qt, which
 # a script given by -x runs before. The deletion of that toolbar at the exit
 # crashed in QCompletionModel::filter (#462); the exit deletes nothing now.
+# The case also checks that the focus toolbar has a field with a completer:
+# the label of the bibliography item, with its proposal.
 cat > "$out/startup-refs.bib" <<'EOF'
 @article{knuth, author={Knuth, Donald E.}, title={The Art}, journal={J}, year=1968}
 EOF
@@ -122,6 +124,21 @@ cat > "$out/startup-bib.tm" <<'EOF'
 </body>
 EOF
 cat > "$out/startup-bib.scm" <<'EOF'
+;; the proposals of the input fields of the focus toolbar which get a
+;; completer (qt_input_text_widget_rep::as_qwidget): not a password, and
+;; proposals other than none or one empty string
+(define (completer-proposals x)
+  (cond ((and (pair? x) (== (car x) 'input) (>= (length x) 4))
+         (let ((type (caddr x))
+               (p (cadddr x)))
+           (cond ((== type "password") '())
+                 ((and (string? p) (!= p "")) (list p))
+                 ((and (list? p) (pair? p) (!= p '(""))) p)
+                 (else '()))))
+        ((pair? x) (append-map completer-proposals x))
+        (else '())))
+(define (focus-completers)
+  (completer-proposals (menu-expand '(link texmacs-focus-icons))))
 (let ((u (url-append (url-pwd) "startup-bib.tm"))
       (o (url-append (url-pwd) "startup-a.tm")))
   (load-buffer u)
@@ -138,6 +155,7 @@ cat > "$out/startup-bib.scm" <<'EOF'
   (update-forced)
   (switch-to-buffer* u)
   (update-forced)
+  (display* "CHECK completer " (focus-completers) "\n")
   (buffer-pretend-saved u)
   (buffer-close o)
   (buffer-close u))
@@ -145,6 +163,7 @@ EOF
 
 check "a script which leaves a focus toolbar with a completer exits (#462)" \
       "in bib-list
+completer (bib-knuth)
 quit ()" \
       -x "$atquit" -x '(load "startup-bib.scm")' -q
 

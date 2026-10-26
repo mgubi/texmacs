@@ -7,7 +7,8 @@
 #     (.github/fixes/build-appimage.sh), run on Ubuntu 24.04 and Debian 12
 #     without packages of development;
 #   * macos: an application for Apple silicon and one for Intel, in a disk
-#     image each (signed ad hoc, not notarized), started once;
+#     image each (signed ad hoc, not notarized), started once, after the
+#     startup checks (tests/startup/check.sh) of the build;
 #   * windows: an installer (Inno Setup, .github/fixes/TeXmacs-Fixes.iss),
 #     installed, run and uninstalled (.github/fixes/windows-installer.sh),
 #     and the bundle in a zip.
@@ -176,6 +177,13 @@ jobs:
 
       - name: Build
         run: make -j"$(sysctl -n hw.ncpu)"
+
+      # the command line and the exit of TeXmacs after a script (a crash at
+      # the exit, #462), one TeXmacs process per case, in the source tree
+      - name: The startup checks
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: tests/startup/check.sh
 
       - name: Application
         run: |
