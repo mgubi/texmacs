@@ -577,6 +577,22 @@ typedef unsigned long long nat;
 #endif
 #endif
 
+/* The registers of a thread at the time it leaves Guile mode (suspend in
+   threads.c), for the GC, which scans them as well as the stack: the only
+   reference to a new object may be in a callee-saved register. They are
+   never jumped back to. On Windows x64, __builtin_setjmp keeps only the
+   frame and stack pointers and the address to resume at, so that the GC
+   missed what was in the registers (an object allocated just before a GC,
+   such as the bucket vector of a new hash table, was freed while used: the
+   "void hashtable" errors of TeXmacs at startup); the setjmp of the C
+   library copies RBX, RBP, RDI, RSI, R12-R15 and XMM6-XMM15 into the buffer
+   (with no frame: nothing is unwound). */
+#if defined (__MINGW64__) && !defined (_M_ARM64)
+#  define SCM_I_SAVE_REGISTERS(JB) _setjmp ((JB), NULL)
+#else
+#  define SCM_I_SAVE_REGISTERS(JB) SCM_I_SETJMP (JB)
+#endif
+
 /* James Clark came up with this neat one instruction fix for
  * continuations on the SPARC.  It flushes the register windows so
  * that all the state of the process is contained in the stack.
