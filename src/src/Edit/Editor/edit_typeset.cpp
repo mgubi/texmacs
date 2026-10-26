@@ -1256,6 +1256,10 @@ edit_typeset_rep::typeset_forced () {
   //cout << "Typeset forced\n";
   SI x1, y1, x2, y2;
   typeset (x1, y1, x2, y2);
+  // the changes are typeset now, so that the next typesetting of the
+  // editor finds none: their part of the screen is repainted from here
+  SI px= get_pixel_size ();
+  invalidate (x1- 2*px, y1- 2*px, x2+ 2*px, y2+ 2*px);
 }
 
 void
