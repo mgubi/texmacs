@@ -63,6 +63,16 @@
   (with-preference "search-and-replace" (if (== mode 'search) "off" "on")
     thunk))
 
+(define (with-search-mode-value mode thunk)
+  ;; the value of thunk, with the matching of mode (set in memory only)
+  (let* ((which "search-and-replace")
+         (had? (cpp-has-preference? which))
+         (old (get-preference which)))
+    (cpp-set-preference which (if (== mode 'search) "off" "on"))
+    (with r (thunk)
+      (if had? (cpp-set-preference which old) (cpp-reset-preference which))
+      r)))
+
 (define (hits doc what)
   (tree-search-tree (stree->tree doc) what '() 1000))
 
@@ -855,6 +865,59 @@
               '(concat "a" (wildcard "w"))
               '((0 0 0 0) (0 1))))
 
+;; Search finds at least what Replace finds in tag arguments: an argument
+;; which is a tag alone is a formula of one child for both (Search missed
+;; it inside the tags of an argument, which the cascade of Replace sees)
+(define (search-replace-cases n)
+  ;; n formula patterns and arguments, from a fixed pseudo-random sequence
+  (let* ((seed 7)
+         (rnd (lambda (k)
+                (set! seed (modulo (+ (* seed 1103515245) 12345) 2147483648))
+                (modulo (quotient seed 65536) k)))
+         (pick (lambda (l) (list-ref l (rnd (length l)))))
+         (atom (lambda () (pick '("a" "b" "ab" "z"))))
+         (tag (lambda () (pick '((rsub "x") (strong "ab") (rsup "2")))))
+         (arg (lambda ()
+                (case (rnd 4)
+                  ((0) (tag))
+                  ((1) `(em ,(tag)))
+                  ((2) `(concat ,(atom) (sqrt ,(tag))))
+                  (else `(concat ,(atom) ,(tag))))))
+         (elem (lambda ()
+                 (case (rnd 3)
+                   ((0) '(wildcard "w"))
+                   ((1) (tag))
+                   (else (atom))))))
+    (map (lambda (i)
+           (let* ((l (list (elem) (elem)))
+                  (l2 (if (and (string? (car l)) (string? (cadr l)))
+                          (list (car l) (tag))
+                          l)))
+             (list `(document (frac ,(arg) "c"))
+                   `(frac (concat ,@l2) "c"))))
+         (iota n))))
+
+(define (test-search-contains-replace)
+  (check-group "search contains replace")
+  (with r (list-filter
+            (search-replace-cases 400)
+            (lambda (c)
+              (let* ((rh (with-search-mode-value 'replace
+                           (lambda () (hits (car c) (cadr c)))))
+                     (sh (with-search-mode-value 'search
+                           (lambda () (hits (car c) (cadr c))))))
+                (and (pair? rh) (null? sh)))))
+    (check= r '()))
+  (check-both '(document (frac (concat "z" (em (rsub "x"))) "c"))
+              '(frac (concat (wildcard "w") (rsub "x")) "c")
+              '((0 0) (0 1)))
+  (check-both '(document (frac (concat "1+" (sqrt (rsup "2"))) "c"))
+              '(frac (concat (wildcard "w") (rsup "2")) "c")
+              '((0 0) (0 1)))
+  (check-both '(document (frac (em (strong "ab")) "c"))
+              '(frac (concat (strong "ab") (wildcard "w")) "c")
+              '((0 0) (0 1))))
+
 ;; a formula pattern in a tag argument, in nested fractions: the search of
 ;; each argument looked again inside all the tags of the argument, at each
 ;; level (16 s for a continued fraction of depth 60, a few ms now)
@@ -864,6 +927,16 @@
 
 (define (test-speed-in-arguments)
   (check-group "speed in arguments")
+  ;; and of depth 200 (2.3 s before the arguments without a hit were
+  ;; remembered, 0.55 s on wip_fixes, about 20 ms now)
+  (with t (stree->tree `(document ,(continued-fraction 200)))
+    (for-each
+      (lambda (mode)
+        (with-search-mode mode
+          (lambda ()
+            (check-fast t '(frac (concat "a" (wildcard "w") (rsub "x")) "c")
+                        '()))))
+      '(search replace)))
   (let ((t (stree->tree `(document ,(continued-fraction 60))))
         (u (stree->tree `(document ,@(map (lambda (i) (continued-fraction 15))
                                           (iota 300))))))
@@ -923,5 +996,6 @@
   (test-formulas-in-arguments)
   (test-match-after-a-tag)
   (test-lone-tags)
+  (test-search-contains-replace)
   (test-speed-in-arguments)
   (check-end))

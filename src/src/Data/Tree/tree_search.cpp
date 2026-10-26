@@ -13,6 +13,8 @@
 #include "analyze.hpp"
 #include "boot.hpp"
 #include "drd_mode.hpp"
+#include <set>
+#include <utility>
 
 int  search_max_hits= 1000000;
 bool blank_match_flag= false;
@@ -163,6 +165,56 @@ match_atomic (string s, tree what, int pos, int i, int& start, int& end) {
 static void search_anchored (range_set& sel, tree t, tree what, path p,
                              bool at_start, bool at_end);
 
+// the arguments in which a formula pattern was not found when searching,
+// with all the trees inside them: the pattern is not found inside them
+// either, so that it is not searched again in each nested argument (in
+// nested fractions, a power of the depth). For one search only
+static std::set<std::pair<tree_rep*, tree_rep*> > no_formula;
+static array<tree> no_formula_keep;
+
+static void
+clear_no_formula () {
+  no_formula.clear ();
+  no_formula_keep= array<tree> ();
+}
+
+static void
+mark_no_formula (tree t, tree what) {
+  if (is_atomic (t)) return;
+  std::pair<tree_rep*, tree_rep*> key (inside (t), inside (what));
+  if (no_formula.count (key) != 0) return;
+  no_formula.insert (key);
+  no_formula_keep << t;
+  for (int i=0; i<N(t); i++) mark_no_formula (t[i], what);
+}
+
+static int
+lone_element (tree what) {
+  // the element of a formula pattern which is a tag between wildcards
+  // (*_x, _x*...), or -1
+  int k= -1;
+  for (int i=0; i<N(what); i++)
+    if (!is_func (what[i], WILDCARD, 1)) {
+      if (k >= 0 || is_atomic (what[i])) return -1;
+      k= i;
+    }
+  return k;
+}
+
+static bool
+lone_arguments (tree t, tree e) {
+  // is there, inside t, an argument which is a tag alone and matches e? It
+  // is a formula of one child, which a tag between wildcards matches; the
+  // search does not see it as a formula
+  for (int i=0; i<N(t); i++)
+    if (is_compound (t[i]) && is_accessible_for_search (t, i)) {
+      if (!is_concat (t) && !is_concat (t[i]) && match (t[i], e))
+        return true;
+      if (lone_arguments (t[i], e)) return true;
+    }
+  return false;
+}
+
 static bool
 match_formula (tree t, tree what) {
   // a formula what (a concat) in the argument of a tag of the pattern, and
@@ -175,9 +227,21 @@ match_formula (tree t, tree what) {
   tree u= t;
   if (!is_concat (t)) u= tree (CONCAT, t);
   range_set sel;
+  if (partial_match_flag && cascaded_match_flag) {
+    // anywhere inside t, also in the arguments of its tags which are a tag
+    // alone, which the cascade of Replace matches as formulas (#501)
+    if (no_formula.count (std::pair<tree_rep*, tree_rep*>
+                            (inside (t), inside (what))) != 0)
+      return false;
+    search (sel, u, what, path ());
+    if (N(sel) != 0) return true;
+    int k= lone_element (what);
+    if (k >= 0 && lone_arguments (t, what[k])) return true;
+    mark_no_formula (t, what);
+    return false;
+  }
   if (partial_match_flag) {
     search (sel, u, what, path ());
-    if (cascaded_match_flag) return N(sel) != 0;
     // without cascaded matches, in the formula itself, not inside its tags
     for (int i=0; i+1<N(sel); i+=2)
       if (N(sel[i]) <= 2 && N(sel[i+1]) <= 2) return true;
@@ -533,7 +597,7 @@ search_concat_sub (tree t, tree what, int pos, int i,
     // matches the tag itself (a hit inside it would not do: searching it
     // there cost a search of the tag at each place, #501)
     range_set sel;
-    if (i > 0 || i < N(what)-1) {
+    if (N(what) > 1) {
       if (match (t[pos], what[i]))
         sel << (p * pos) * start (t[pos]) << (p * pos) * end (t[pos]);
     }
@@ -1200,6 +1264,7 @@ without_empty_strings (tree what, bool join) {
 range_set
 search (tree t, tree what, path p, int limit) {
   search_max_hits= limit;
+  clear_no_formula ();
   initialize_search ();  // also the label select-region, needed just below
   what= without_empty_strings (what, !contains_select_region (what));
   range_set sel;
@@ -1208,12 +1273,14 @@ search (tree t, tree what, path p, int limit) {
   else search (sel, t, what, p);
   //cout << "Selected " << sel << "\n";
   search_max_hits= 1000000;
+  clear_no_formula ();
   return sel;
 }
 
 range_set
 search (tree t, tree what, path p, path pos, int limit) {
   search_max_hits= limit;
+  clear_no_formula ();
   initialize_search ();  // also the label select-region, needed just below
   what= without_empty_strings (what, !contains_select_region (what));
   range_set sel;
@@ -1222,6 +1289,7 @@ search (tree t, tree what, path p, path pos, int limit) {
   else search (sel, t, what, p, pos);
   //cout << "Selected " << sel << "\n";
   search_max_hits= 1000000;
+  clear_no_formula ();
   return sel;
 }
 
