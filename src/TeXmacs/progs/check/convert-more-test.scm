@@ -1089,9 +1089,17 @@
 ;; The tables of the codes (#438): each request of AI or LanguageTool has
 ;; its own, freed once its answer is decompressed, and a chat has its own,
 ;; freed when its session is closed; the default table is left alone.
+(define (compress-table-key-list)
+  (map tree->stree (tree-children (compress-table-keys))))
+
 (define (compress-tables-like prefix)
-  (list-filter (compress-table-names)
-               (lambda (s) (string-starts? s prefix))))
+  (list-filter (compress-table-key-list)
+               (lambda (s) (and (string? s) (string-starts? s prefix)))))
+
+(define (compress-table-serial name)
+  ;; the number of a table of compress-table-new: <prefix>-<number>
+  (with pos (string-search-backwards "-" (string-length name) name)
+    (string->number (substring name (+ pos 1) (string-length name)))))
 
 (define (test-compress-tables)
   (check-group "compression tables")
@@ -1113,12 +1121,17 @@
     ;; freed: the table is gone, and its codes lose their markup, not text
     (compress-table-free t1)
     (check= (compress-table-size t1) -1)
-    (check-false (in? t1 (compress-table-names)))
+    (check-false (in? t1 (compress-table-key-list)))
     (check= (compress-table-size t2) 2)
     (compress-table-free t2)
     (check= (st (with-compress-table t1 (lambda () (decompress-html h1 1))))
             '(document (concat "it is " "b" " " (concat "x" "y"))))
-    (compress-table-free t1)
+    ;; and neither decompressing nor compressing makes it again
+    (check= (compress-table-size t1) -1)
+    (with-compress-table t1 (lambda () (compress-html t 1)))
+    (check= (compress-table-size t1) -1)
+    (check= (st (with-compress-table t1 (lambda () (decompress-html h1 1))))
+            '(document (concat "it is " "b" " " (concat "x" "y"))))
     (check= (compress-tables-like "check") '())
     ;; a callback decompresses in its table, which is freed afterwards
     (with t3 (compress-table-new "check")
@@ -1133,16 +1146,38 @@
         (lambda () ((compress-table-callback t4 (lambda () (error "fails")))))
         (lambda args #f))
       (check= (compress-table-size t4) -1))
-    ;; Correct (an engine without a command: no request is sent)
-    (with r (cpp-ai-correct t "english" "no-such-engine")
-      (check-true (tree? r)))
+    ;; Correct (an engine without a command: no request is sent) makes one
+    ;; table, between the two tables made here, and frees it
+    (let* ((before (compress-table-new "check"))
+           (r (cpp-ai-correct t "english" "no-such-engine"))
+           (after (compress-table-new "check")))
+      (check-true (tree? r))
+      (check= (- (compress-table-serial after) (compress-table-serial before))
+              2)
+      (compress-table-free before)
+      (compress-table-free after))
     (check= (compress-tables-like "ai") '())
-    ;; a chat keeps its table until its session is closed
-    (with-compress-table "ai:no-such-engine-check-chat"
-      (lambda () (compress-html t 1)))
-    (check= (compress-table-size "ai:no-such-engine-check-chat") 2)
-    (connection-stop "no-such-engine" "check-chat")
-    (check= (compress-table-size "ai:no-such-engine-check-chat") -1)
+    ;; a chat keeps its table until its session is stopped; the keys of
+    ;; two sessions are not confused, even when their names joined by "-"
+    ;; are the same (the connections a-b, c and a, b-c)
+    (let* ((k1 (cpp-ai-chat-key "a-b" "c"))
+           (k2 (cpp-ai-chat-key "a" "b-c"))
+           (u (stree->tree '(document (concat "it is " (em "b")))))
+           (clipboard (compress-table-size "ai-clipboard")))
+      (check-false (== (tree->stree k1) (tree->stree k2)))
+      (compress-table-open k1)
+      (compress-table-open k2)
+      (with-compress-table k1 (lambda () (compress-html t 1)))
+      (with-compress-table k2 (lambda () (compress-html u 1)))
+      (check= (compress-table-size k1) 2)
+      (check= (compress-table-size k2) 1)
+      (connection-stop "a-b" "c")
+      (check= (compress-table-size k1) -1)
+      (check= (compress-table-size k2) 1)
+      (check= (compress-table-size "") default)
+      (check= (compress-table-size "ai-clipboard") clipboard)
+      (connection-stop "a" "b-c")
+      (check= (compress-table-size k2) -1))
     ;; LanguageTool: a check (while no spell process runs, the text comes
     ;; back as its own answer, without a request) and its corrections
     (let* ((h #f) (out #f)

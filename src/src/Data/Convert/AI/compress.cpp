@@ -25,10 +25,11 @@
 * A compressed node "xN" stands for markup kept in a table, until the answer
 * which refers to it has been decompressed.  The users of the compression
 * have tables of their own, which they free when they no longer need them:
-* - a chat (ai_correct and ai_translate with a chat name, see ai.cpp):
-*   "ai:<model>-<chat>", kept as long as the chat, since its answers may
-*   refer to the codes of its earlier requests, and freed by ai_chat_close
-*   when its session is closed;
+* - a chat (ai_correct and ai_translate with a chat name, see ai.cpp): the
+*   table of the key (tuple model chat), the name and session of its
+*   connection, kept as long as the chat, since its answers may refer to the
+*   codes of its earlier requests, and freed by ai_chat_close when its
+*   session is stopped;
 * - a request outside a chat (ai_correct and ai_translate without a chat
 *   name, one paragraph of the translation process, one check of
 *   LanguageTool): a table of its own (compress_table_new), freed once its
@@ -36,8 +37,13 @@
 * - AI copy and paste: "ai-clipboard", for a chat outside TeXmacs, which
 *   does not tell TeXmacs when it ends;
 * - any other caller: the default table "".
-* The codes are numbered from x0 in each table, so that compressing the
-* same tree in a new table gives the same HTML.
+* The keys are trees, as the keys of compressed_code: a string names a
+* table of the tools, a tuple the table of a chat, so that no two of them
+* are confused.  A table is made by compress_table_new or compress_table_open
+* (the default table when it is first used); a key which is not a table
+* (for instance a freed one) compresses into a scratch table, and
+* decompresses to text.  The codes are numbered from x0 in each table, so
+* that compressing the same tree in a new table gives the same HTML.
 ******************************************************************************/
 
 struct compress_table_rep {
@@ -45,21 +51,42 @@ struct compress_table_rep {
   hashmap<tree,string> compressed_code;
 };
 
-static hashmap<string,pointer> compress_tables (NULL);
-static string compress_current= "";
+static hashmap<tree,pointer> compress_tables (NULL);
+static tree compress_current= "";
 static int compress_table_serial= 0;
+
+// a table which is not there (freed, or never opened) is not made again:
+// its codes go to a scratch table, emptied at each compression and
+// decompression, so that they decompress to their text only
+static compress_table_rep compress_scratch;
 
 static compress_table_rep*
 the_table () {
-  if (!compress_tables->contains (compress_current))
-    compress_tables (compress_current)= (pointer) tm_new<compress_table_rep> ();
-  return (compress_table_rep*) compress_tables [compress_current];
+  if (compress_tables->contains (compress_current))
+    return (compress_table_rep*) compress_tables [compress_current];
+  if (compress_current == "") {
+    compress_table_open ("");
+    return (compress_table_rep*) compress_tables [compress_current];
+  }
+  return &compress_scratch;
 }
 
-string
-compress_table_select (string name) {
-  string prev= compress_current;
-  compress_current= name;
+static void
+compress_scratch_reset () {
+  compress_scratch.compressed= hashmap<string,tree> ();
+  compress_scratch.compressed_code= hashmap<tree,string> ();
+}
+
+void
+compress_table_open (tree key) {
+  if (!compress_tables->contains (key))
+    compress_tables (key)= (pointer) tm_new<compress_table_rep> ();
+}
+
+tree
+compress_table_select (tree key) {
+  tree prev= compress_current;
+  compress_current= key;
   return prev;
 }
 
@@ -69,39 +96,39 @@ compress_table_new (string prefix) {
   do {
     name= prefix * "-" * as_string (++compress_table_serial);
   } while (compress_tables->contains (name));
-  compress_tables (name)= (pointer) tm_new<compress_table_rep> ();
+  compress_table_open (name);
   return name;
 }
 
 void
-compress_table_free (string name) {
-  if (!compress_tables->contains (name)) return;
-  compress_table_rep* rep= (compress_table_rep*) compress_tables [name];
-  compress_tables->reset (name);
+compress_table_free (tree key) {
+  if (!compress_tables->contains (key)) return;
+  compress_table_rep* rep= (compress_table_rep*) compress_tables [key];
+  compress_tables->reset (key);
   tm_delete (rep);
 }
 
 int
-compress_table_size (string name) {
-  if (!compress_tables->contains (name)) return -1;
-  compress_table_rep* rep= (compress_table_rep*) compress_tables [name];
+compress_table_size (tree key) {
+  if (!compress_tables->contains (key)) return -1;
+  compress_table_rep* rep= (compress_table_rep*) compress_tables [key];
   return N(rep->compressed);
 }
 
-array<string>
-compress_table_names () {
-  array<string> r;
-  iterator<string> it= iterate (compress_tables);
+tree
+compress_table_keys () {
+  tree r (TUPLE);
+  iterator<tree> it= iterate (compress_tables);
   while (it->busy ()) r << it->next ();
   return r;
 }
 
-compress_scope::compress_scope (string name2, bool temp2):
-  name (name2), temp (temp2), prev (compress_table_select (name2)) {}
+compress_scope::compress_scope (tree key2, bool temp2):
+  key (key2), temp (temp2), prev (compress_table_select (key2)) {}
 
 compress_scope::~compress_scope () {
   compress_table_select (prev);
-  if (temp) compress_table_free (name);
+  if (temp) compress_table_free (key);
 }
 
 tree html_as_compressed (string s, int& pos, string close, int mode, path p);
@@ -173,6 +200,7 @@ compress_tree (tree t, int spc_mode, path p) {
 
 tree
 compress_tree (tree t) {
+  compress_scratch_reset ();
   //cout << "[decoded] " << t << LF;
   //cout << "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~" << LF;
   //tree r= compress_tree (t, 0, path ());
@@ -293,6 +321,7 @@ decompress_tree (tree t, int& spc_mode) {
 
 tree
 decompress_tree (tree t) {
+  compress_scratch_reset ();
   int spc_mode= 0;
   //cout << "[encoded] " << t << LF;
   //cout << "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~" << LF;
@@ -542,6 +571,7 @@ html_as_compressed (string s, int& pos, string close, int mode, path p) {
 
 tree
 decompress_html (string s, int mode) {
+  compress_scratch_reset ();
   int pos= 0;
   tree t= html_as_compressed (s, pos, mode, path ());
   //cout << "t= " << t << "\n";

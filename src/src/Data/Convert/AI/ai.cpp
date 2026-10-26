@@ -208,14 +208,23 @@ extract_svg (string s) {
 
 // By ID
 
-hashmap<string,string> ai_last_id ("");
+// A chat is that of the session of a connection (ai-cmdline, ai-request
+// and ai-result get the name and session of the connection as model and
+// chat): its key is the pair, as the per-session tables of plugin-eval.scm
+// (list lan ses), and not a string made of both, which may be ambiguous.
+tree
+ai_chat_key (string model, string chat) {
+  return tuple (model, chat);
+}
+
+hashmap<tree,string> ai_last_id ("");
 
 void
 ai_get_continuation (string& s, string model, string chat) {
   if (chat == "") return;
   //cout << "model= " << model << "\n";
   if (starts (model, "none")) {
-    string key= model * "-" * chat;
+    tree key= ai_chat_key (model, chat);
     if (ai_last_id->contains (key)) {
       string id= ai_last_id[key];
       s= "Please follow up on your last answer with ID " * id * ". " * s;
@@ -232,7 +241,7 @@ ai_set_continuation (string s, string model, string chat) {
     pos += 6;
     int end= search_forwards ("\"", pos, s);
     if (end < 0) return;
-    string key= model * "-" * chat;
+    tree key= ai_chat_key (model, chat);
     ai_last_id (key)= s (pos, end);
   }
 }
@@ -240,10 +249,10 @@ ai_set_continuation (string s, string model, string chat) {
 // For albert, by passing previous prompts and answers
 
 static const int ai_default_history_size= 3;
-static hashmap<string,string> ai_current_prompt ("");
+static hashmap<tree,string> ai_current_prompt ("");
 static list<string> null_string_list;
-static hashmap<string,list<string> > ai_last_prompts (null_string_list);
-static hashmap<string,list<string> > ai_last_answers (null_string_list);
+static hashmap<tree,list<string> > ai_last_prompts (null_string_list);
+static hashmap<tree,list<string> > ai_last_answers (null_string_list);
 
 static int
 ai_get_history_size () {
@@ -255,21 +264,21 @@ ai_get_history_size () {
 static void
 ai_set_current_prompt (string s, string model, string chat) {
   if (chat == "") return;
-  string key= model * "-" * chat;
+  tree key= ai_chat_key (model, chat);
   ai_current_prompt(key)= s;
 }
 
 static string
 ai_get_current_prompt (string model, string chat) {
   if (chat == "") return "";
-  string key= model * "-" * chat;
+  tree key= ai_chat_key (model, chat);
   return ai_current_prompt[key];
 }
 
 static void
 ai_set_last_prompt (string s, string model, string chat) {
   if (chat == "") return;
-  string key= model * "-" * chat;
+  tree key= ai_chat_key (model, chat);
   list<string> l (s, ai_last_prompts[key]);
   ai_last_prompts(key)= l;
   const int max_size= ai_get_history_size ();
@@ -280,7 +289,7 @@ ai_set_last_prompt (string s, string model, string chat) {
 static list<string>
 ai_get_last_prompts (string model, string chat) {
   if (chat == "") return null_string_list;
-  string key= model * "-" * chat;
+  tree key= ai_chat_key (model, chat);
   const int max_size= ai_get_history_size ();
   if (N(ai_last_prompts[key]) > max_size)
     ai_last_prompts[key]= head (ai_last_prompts[key], max_size);
@@ -290,7 +299,7 @@ ai_get_last_prompts (string model, string chat) {
 static void
 ai_set_last_answer (string s, string model, string chat) {
   if (chat == "") return;
-  string key= model * "-" * chat;
+  tree key= ai_chat_key (model, chat);
   list<string> l (s, ai_last_answers[key]);
   ai_last_answers(key)= l;
   const int max_size= ai_get_history_size ();
@@ -301,7 +310,7 @@ ai_set_last_answer (string s, string model, string chat) {
 static list<string>
 ai_get_last_answers (string model, string chat) {
   if (chat == "") return null_string_list;
-  string key= model * "-" * chat;
+  tree key= ai_chat_key (model, chat);
   const int max_size= ai_get_history_size ();
   if (N(ai_last_answers[key]) > max_size)
     ai_last_answers[key]= head (ai_last_answers[key], max_size);
@@ -365,6 +374,7 @@ ai_async_eval_command (tree t, object callback) {
     get_post_data (url, headers, data, t);
     return async_http_post_json (url, headers, data, callback);
   }
+  // (true: nothing was launched, and the callback will not be called)
   io_error << "ai_async_eval_command, wrong command: "
            << http_mask_request (t) << LF;
   return true;
@@ -803,16 +813,20 @@ ai_post (tree t, tree u) {
 // the table of the compressed markup (compress.cpp): that of the chat,
 // whose later answers may refer to its codes, until ai_chat_close; without
 // a chat, a new one, freed at the end of the request
-static string
+static tree
 ai_compress_table (string model, string chat) {
   if (chat == "") return compress_table_new ("ai");
-  return "ai:" * model * "-" * chat;
+  tree key= ai_chat_key (model, chat);
+  compress_table_open (key);
+  return key;
 }
 
 void
 ai_chat_close (string model, string chat) {
+  // (called by connection_stop for every connection, with its name and
+  // session: nothing to do for a session which has no table)
   if (chat == "") return;
-  compress_table_free (ai_compress_table (model, chat));
+  compress_table_free (ai_chat_key (model, chat));
 }
 
 tree

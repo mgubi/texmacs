@@ -137,20 +137,22 @@ bool compressed_contains_text (tree t);
 string compressed_to_html (tree t, int mode= 0);
 string compress_html (tree t, int mode= 0);
 tree decompress_html (string s, int mode= 0);
-string compress_table_select (string name);
+tree compress_table_select (tree key);
 string compress_table_new (string prefix);
-void compress_table_free (string name);
-int compress_table_size (string name);
-array<string> compress_table_names ();
+void compress_table_open (tree key);
+void compress_table_free (tree key);
+int compress_table_size (tree key);
+tree compress_table_keys ();
 struct compress_scope {
-  // the compression uses the table name until the end of the scope,
+  // the compression uses the table key until the end of the scope,
   // after which a temporary table is freed
-  string name; bool temp; string prev;
-  compress_scope (string name, bool temp);
+  tree key; bool temp; tree prev;
+  compress_scope (tree key, bool temp);
   compress_scope (const compress_scope&) = delete;
   compress_scope& operator= (const compress_scope&) = delete;
   ~compress_scope ();
 };
+tree ai_chat_key (string model, string chat);
 void ai_chat_close (string model, string chat);
 tree json_to_tree (string s, int mode= 0);
 string tree_to_json (tree t, int mode= 0);

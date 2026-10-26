@@ -61,7 +61,9 @@
           (else
             (with cmd (cpp-ai-command in model agent)
               ;;(display* "Eval] " cmd "\n")
-              (cpp-ai-async-eval-command cmd return))))))
+              ;; (true: nothing launched, and return will not be called)
+              (when (cpp-ai-async-eval-command cmd return)
+                (compress-table-free table)))))))
 
 (define (make-translate-process lan)
   (make-process (translate-process-one lan) 'translate))

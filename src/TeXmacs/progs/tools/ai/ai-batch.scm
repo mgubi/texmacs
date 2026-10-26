@@ -102,6 +102,7 @@
 
 (tm-define (ai-copy)
   (when (selection-active-any?)
+    (compress-table-open ai-clipboard-table)
     (with-compress-table ai-clipboard-table
       (lambda ()
         (clipboard-set "primary" (compress-html (selection-tree) 1))))))

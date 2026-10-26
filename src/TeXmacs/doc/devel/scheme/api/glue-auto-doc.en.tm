@@ -4099,11 +4099,11 @@ source code.
   </explain>
 
   <\explain>
-    <scm|(compress-table-select <scm-arg|string>)>
+    <scm|(compress-table-select <scm-arg|content>)>
 <explain-synopsis|no synopsis>
   <|explain>
     Calls the <c++> function <cpp|compress_table_select> which returns
-    <scm|string>.
+    <scm|tree>.
   </explain>
 
   <\explain>
@@ -4115,7 +4115,15 @@ source code.
   </explain>
 
   <\explain>
-    <scm|(compress-table-free <scm-arg|string>)>
+    <scm|(compress-table-open <scm-arg|content>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|compress_table_open> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(compress-table-free <scm-arg|content>)>
 <explain-synopsis|no synopsis>
   <|explain>
     Calls the <c++> function <cpp|compress_table_free> which returns
@@ -4123,7 +4131,7 @@ source code.
   </explain>
 
   <\explain>
-    <scm|(compress-table-size <scm-arg|string>)>
+    <scm|(compress-table-size <scm-arg|content>)>
 <explain-synopsis|no synopsis>
   <|explain>
     Calls the <c++> function <cpp|compress_table_size> which returns
@@ -4131,11 +4139,19 @@ source code.
   </explain>
 
   <\explain>
-    <scm|(compress-table-names)>
+    <scm|(compress-table-keys)>
 <explain-synopsis|no synopsis>
   <|explain>
-    Calls the <c++> function <cpp|compress_table_names> which returns
-    <scm|array_string>.
+    Calls the <c++> function <cpp|compress_table_keys> which returns
+    <scm|tree>.
+  </explain>
+
+  <\explain>
+    <scm|(cpp-ai-chat-key <scm-arg|string> <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|ai_chat_key> which returns
+    <scm|tree>.
   </explain>
 
   <\explain>

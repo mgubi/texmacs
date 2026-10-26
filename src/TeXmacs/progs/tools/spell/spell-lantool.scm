@@ -63,15 +63,17 @@
 
 ;; The codes of the compressed markup of one check, from the compression of
 ;; the text to the decompression of the corrections, in a table of its own,
-;; freed when return has been called.  The same text compressed again gives
-;; the same HTML in a new table, so lantool-cache still works.
+;; freed when return has been called (or when no request could be sent).
+;; The same text compressed again gives the same HTML in a new table, so
+;; lantool-cache still works.
 (tm-define (lantool-process* t return)
   (with table (compress-table-new "lantool")
     (with-compress-table table
       (lambda ()
-        (lantool-process-in t (compress-table-callback table return))))))
+        (lantool-process-in t table
+                            (compress-table-callback table return))))))
 
-(define (lantool-process-in t return)
+(define (lantool-process-in t table return)
   (let* ((html (compress-html t 1))
          (lan (tree-get-env t "language"))
          (r (ahash-ref lantool-cache (list lan html))))
@@ -90,9 +92,11 @@
 	    (set! args (append args
 			       (list "username" (lantool-username)
 				     "apiKey" (lantool-api-key)))))
-          (async-http-post-query (lantool-server)
-	    '("Content-Type" "application/x-www-form-urlencoded") args
-	    (lantool-return lan html return))))))
+          ;; (true: nothing sent, and return will not be called)
+          (when (async-http-post-query (lantool-server)
+                  '("Content-Type" "application/x-www-form-urlencoded") args
+                  (lantool-return lan html return))
+            (compress-table-free table))))))
 
 (tm-define (lantool-process-old t return)
   (spell-initiate)
