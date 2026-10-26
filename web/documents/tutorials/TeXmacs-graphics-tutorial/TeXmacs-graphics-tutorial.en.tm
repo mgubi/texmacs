@@ -693,6 +693,10 @@
   <\with|font-size|2>
     <space|2em><em|That's all folks!>
   </with>
+
+  <\with|par-mode|right>
+    \<copyright\> Henri Lesourd 2005
+  </with>
 </body>
 
 <\initial>
