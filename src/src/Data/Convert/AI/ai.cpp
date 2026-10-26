@@ -824,9 +824,16 @@ ai_compress_table (string model, string chat) {
 void
 ai_chat_close (string model, string chat) {
   // (called by connection_stop for every connection, with its name and
-  // session: nothing to do for a session which has no table)
+  // session: nothing to do for a session which has neither a table nor a
+  // history; a session started again begins a new chat, its entries being
+  // made again by the first request)
   if (chat == "") return;
-  compress_table_free (ai_chat_key (model, chat));
+  tree key= ai_chat_key (model, chat);
+  compress_table_free (key);
+  ai_last_id->reset (key);
+  ai_current_prompt->reset (key);
+  ai_last_prompts->reset (key);
+  ai_last_answers->reset (key);
 }
 
 tree

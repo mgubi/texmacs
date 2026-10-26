@@ -1198,6 +1198,31 @@
       (check= out '(document (concat "it " (spell-error "is" "A verb" "was")
                                      " " (em "b") " " (frac "x" "y"))))
       (check= (compress-tables-like "lantool") '()))
+    ;; the translation process, whose request cannot be launched (an engine
+    ;; without a command: cpp-ai-async-eval-command says so, and will not
+    ;; call back): the table of the paragraph is freed all the same
+    (let* ((m (get-preference "ai"))
+           (engines '("chatgpt" "gemini" "ollama" "open-mistral" "albert")))
+      (when (not (list-or (map (lambda (e) (string-starts? m e)) engines)))
+        (let* ((old (current-buffer))
+               (before (buffer-list))
+               (u (new-buffer)))
+          (dynamic-wind
+            (lambda () (noop))
+            (lambda ()
+              (switch-to-buffer* u)
+              (buffer-set-body u (stree->tree
+                                  '(document (concat "it is " (em "b")))))
+              (go-start)
+              (ai-translate* "french")
+              (check-true (process-running? 'translate))
+              (check= (compress-tables-like "translate") '()))
+            (lambda ()
+              (ai-abort-translate)
+              (for (b (buffer-list))
+                (when (nin? b before) (buffer-close b)))
+              (when (buffer-exists? old) (switch-to-buffer old))))
+          (check-false (process-running? 'translate)))))
     (check= (compress-table-size "") default)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
