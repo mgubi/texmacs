@@ -567,6 +567,21 @@
 ;; Saving
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(define (part-master-own-inits mt ft ori)
+  ;; the initial environment which the view of the master saves from its
+  ;; own @ft (#421): when it was loaded, the view got the entries @mt
+  ;; from the master on disk @ori (master-inits: its own entries,
+  ;; part-flag, the extra initial environment of the parts...). The
+  ;; entries of the master itself are kept, also when the view did not
+  ;; change them; the others only when the view set or changed them.
+  (let* ((own (or (collection->assoc (tmfile-extract ori 'initial)) (list)))
+         (inh (or (collection->assoc mt) (list)))
+         (l   (or (collection->assoc ft) (list))))
+    (assoc->collection
+     (list-filter l (lambda (x)
+                      (or (assoc (car x) own)
+                          (!= (assoc-ref inh (car x)) (cdr x))))))))
+
 (define (part-compress doc ori mas u m)
   (cond ((tm-atomic? doc) doc)
         ((tm-func? doc 'body 1)
@@ -576,6 +591,11 @@
            (cond (val `(,(tm-label doc) ,val))
                  ((tm-is? doc 'style) doc)
                  (else `(,(tm-label doc) ,(assoc->collection (list)))))))
+        ((and (tm-is? doc 'initial) (== u m))
+         ;; the view of the master: the delta against the master on disk,
+         ;; not against the view itself (which is always empty)
+         `(initial ,(part-master-own-inits (master-inits mas u m)
+                                           (tm-ref doc 0) ori)))
         ((tm-is? doc 'initial)
          (let* ((mt (master-inits mas u m))
                 (ft (tm-ref doc 0))
@@ -672,7 +692,7 @@
   (let* ((m (part-master name))
          (f (part-file name))
          (ori (tree-import f "texmacs"))
-         (mas (if (== m f) doc (tree-import m "texmacs")))
+         (mas (if (== m f) ori (tree-import m "texmacs")))
          (com (part-compress doc ori mas f m))
          (body (part-own-body (tmfile-extract doc 'body) f m))
          (style (tmfile-extract doc 'style))
@@ -728,8 +748,9 @@
             (else
              (when (in? action '(same sync))
                ;; an open buffer without changes of its own gets the body
-               ;; which was written
-               (part-own-body-set f b))
+               ;; and the initial environment which were written
+               (part-own-body-set f b)
+               (part-buffer-set-init f (part-view-init-changes f com ori)))
              (when master-style?
                ;; which an open buffer of the master gets too
                (when (buffer-exists? m)

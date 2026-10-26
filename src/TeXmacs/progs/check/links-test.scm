@@ -1670,6 +1670,107 @@
     (buffer-close q)
     (buffer-close m)))
 
+;; The initial environment of the view of the master (#421): the view
+;; saves the changes of its initial environment into the master, as the
+;; master buffer itself would, and writes nothing which it inherits from
+;; the master when it is loaded (part-flag, the extra initial environment
+;; of the parts). An open master gets what was written.
+(define (master-buffer-init u var)
+  (collection-ref (tm->stree (tmfile-extract (buffer-get u) 'initial)) var))
+
+(define (write-master-init)
+  (write-doc "im.tm" '("book") '(("par-first" "0fn"))
+             '("intro" (include "ia.tm"))))
+
+(define (test-part-master-init)
+  (check-group "part view of the master: initial environment")
+  (write-doc "ia.tm" '("book") '() '((chapter "A") "a"))
+  (write-master-init)
+  (let* ((m (tmp "im.tm"))
+         (q (system->url (part-url m m)))
+         (eu '(tuple "book" "number-europe")))
+    ;; a save without a change of the initial environment keeps it
+    (load-buffer q)
+    (update-forced)
+    (edit (tree-set (bt 0) "intro view"))
+    (save-buffer q)
+    (check= (part-save-message) "Saved im.tm")
+    (check= (file-body "im.tm") '(document "intro view" (include "ia.tm")))
+    (check= (file-init "im.tm")
+            '(("page-medium" . "paper") ("par-first" . "0fn")))
+    ;; a new entry and a changed entry are written into the master
+    (edit (init-env "font-base-size" "12"))
+    (edit (init-env "par-first" "2fn"))
+    (check-true (buffer-modified? q))
+    (save-buffer q)
+    (check= (part-save-message) "Saved im.tm")
+    (check= (file-init "im.tm")
+            '(("font-base-size" . "12") ("page-medium" . "paper")
+              ("par-first" . "2fn")))
+    (check-false (buffer-modified? q))
+    (buffer-close q)
+    ;; a master saved with its parts gives its view part-flag and the
+    ;; extra initial environment of the parts, which are not written
+    (write-master-init)
+    (with doc (tree->stree (tree-import m "texmacs"))
+      (tree-export
+       (stree->tree
+        (tmfile-assign doc 'auxiliary
+                       '(collection
+                         (associate "parts"
+                                    (document
+                                     (tuple "im.tm" "chapter-nr" "0")
+                                     (tuple "ia.tm" "chapter-nr" "1"))))))
+       m "texmacs"))
+    (load-buffer q)
+    (update-forced)
+    (edit (init-env "font-base-size" "11"))
+    (save-buffer q)
+    (check= (part-save-message) "Saved im.tm")
+    (check= (file-init "im.tm")
+            '(("font-base-size" . "11") ("page-medium" . "paper")
+              ("par-first" . "0fn")))
+    (buffer-close q)
+    ;; the master is open without changes: its file is written, and its
+    ;; buffer gets the initial environment written before it is marked
+    ;; saved
+    (write-master-init)
+    (load-buffer m)
+    (load-buffer q)
+    (update-forced)
+    (edit (init-env "font-base-size" "12"))
+    (check= (part-own-plan q) (list m 'same #f))
+    (save-buffer q)
+    (check= (part-save-message) "Saved im.tm")
+    (check= (file-init "im.tm")
+            '(("font-base-size" . "12") ("page-medium" . "paper")
+              ("par-first" . "0fn")))
+    (check= (master-buffer-init m "font-base-size") "12")
+    (check-false (buffer-modified? m))
+    (check-false (buffer-modified? q))
+    (buffer-close q)
+    (buffer-close m)
+    ;; the master is open with an unsaved change of its style: it is saved
+    ;; itself, with its style and the initial environment of the view
+    (write-master-init)
+    (load-buffer m)
+    (set-view-style m eu)
+    (load-buffer q)
+    (update-forced)
+    (edit (init-env "font-base-size" "12"))
+    (check= (part-own-plan q) (list m 'buffer #f))
+    (save-buffer q)
+    (check= (part-save-message) "Saved im.tm")
+    (check= (file-style "im.tm") eu)
+    (check= (file-init "im.tm")
+            '(("font-base-size" . "12") ("page-medium" . "paper")
+              ("par-first" . "0fn")))
+    (check= (master-buffer-init m "font-base-size") "12")
+    (check-false (buffer-modified? m))
+    (check-false (buffer-modified? q))
+    (buffer-close q)
+    (buffer-close m)))
+
 ;; The part tmfs opens a file of a project as a document of its own: its
 ;; url names the master and the file, its body is shared with the file and
 ;; its environment marks it as a part.
@@ -2209,6 +2310,7 @@
   (run-group test-part-label-jump)
   (run-group test-part-style)
   (run-group test-part-open-own-file)
+  (run-group test-part-master-init)
   (run-group test-part-view-menu)
   (run-group test-parts-tmfs)
   (run-group test-document-parts)
