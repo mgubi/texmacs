@@ -1008,6 +1008,7 @@ tokens_between (array<search_token>& toks, tree u, path q, path a, path b) {
 #define ELEM_TAG 2
 #define ELEM_START 3
 #define ELEM_END 4
+#define ELEM_ONE 5
 
 static void
 pattern_elements (array<int>& kind, array<tree>& elem, tree what) {
@@ -1027,12 +1028,25 @@ pattern_elements (array<int>& kind, array<tree>& elem, tree what) {
     kind << ELEM_WILDCARD; elem << what;
   }
   else if (is_func (what, SELECT_REGION, 1)) {
+    // an empty region in a formula: exactly one character or one tag (the
+    // maintainer's decision on #515; in a tag argument, it is the argument)
     kind << ELEM_START; elem << what;
-    if (is_empty (what[0])) { kind << ELEM_WILDCARD; elem << what; }
+    if (is_empty (what[0])) { kind << ELEM_ONE; elem << what; }
     else pattern_elements (kind, elem, what[0]);
     kind << ELEM_END; elem << what;
   }
   else { kind << ELEM_TAG; elem << what; }
+}
+
+static bool
+has_one (tree what) {
+  // does the formula pattern what have an empty region at its level?
+  array<int> kind;
+  array<tree> elem;
+  pattern_elements (kind, elem, what);
+  for (int k=0; k<N(kind); k++)
+    if (kind[k] == ELEM_ONE) return true;
+  return false;
 }
 
 static void select_direct (range_set& sel, tree t, tree what, path p);
@@ -1041,9 +1055,27 @@ struct region_matcher {
   array<search_token> toks;
   array<int> kind;
   array<tree> elem;
+  bool to_end;          // the match ends at the end of the tokens
   array<bool> failed;   // (element, token) from which no match exists
+  array<int> wfail;     // a wildcard fails from this token on
   array<path> mark;     // the position of each start or end of a region
+  array<int> at;        // the token of each start of a region
   array<range_set> in;  // the regions inside each tag of the pattern
+  int end;              // the token after the match
+
+  void init (tree what, bool to_end2) {
+    pattern_elements (kind, elem, what);
+    to_end= to_end2;
+    int nt= N(toks) + 1;
+    failed= array<bool> (N(kind) * nt + nt);
+    for (int k=0; k<N(failed); k++) failed[k]= false;
+    wfail= array<int> (N(kind));
+    for (int k=0; k<N(kind); k++) wfail[k]= nt;
+    mark= array<path> (N(kind));
+    at= array<int> (N(kind));
+    in= array<range_set> (N(kind));
+    end= 0;
+  }
 
   path position (int ti, bool before) {
     // the position between the tokens ti-1 and ti
@@ -1053,22 +1085,36 @@ struct region_matcher {
   }
 
   bool run (int ei, int ti) {
-    // the pattern from its element ei matches the tokens from ti to the
-    // end; a wildcard takes as few tokens as it can (lazy)
+    // the pattern from its element ei matches the tokens from ti on (to the
+    // end if to_end); a wildcard takes as few tokens as it can (lazy). A
+    // wildcard which fails from ti fails from any later token: it is not
+    // tried again, so that each wildcard scans the tokens once
     int nt= N(toks) + 1;
-    if (ei == N(kind)) return ti == N(toks);
+    if (ei == N(kind)) {
+      if (to_end && ti != N(toks)) return false;
+      end= ti;
+      return true;
+    }
     if (failed[ei * nt + ti]) return false;
     bool ok= false;
     switch (kind[ei]) {
     case ELEM_START:
-      if (run (ei+1, ti)) { mark[ei]= position (ti, true); ok= true; }
+      if (run (ei+1, ti)) {
+        mark[ei]= position (ti, true); at[ei]= ti; ok= true;
+      }
       break;
     case ELEM_END:
       if (run (ei+1, ti)) { mark[ei]= position (ti, false); ok= true; }
       break;
     case ELEM_WILDCARD:
+      if (ti >= wfail[ei]) break;
       for (int k=ti; k<=N(toks) && !ok; k++)
         if (run (ei+1, k)) ok= true;
+      if (!ok) wfail[ei]= ti;
+      break;
+    case ELEM_ONE:
+      ok= ti < N(toks) && toks[ti].kind != TOKEN_BOUNDARY &&
+          run (ei+1, ti+1);
       break;
     case ELEM_CHAR:
       ok= ti < N(toks) && toks[ti].kind == TOKEN_CHAR &&
@@ -1090,68 +1136,148 @@ struct region_matcher {
     if (!ok) failed[ei * nt + ti]= true;
     return ok;
   }
+
+  int first_region () {
+    // the token where the first region starts, after a match
+    for (int k=0; k<N(kind); k++)
+      if (kind[k] == ELEM_START) return at[k];
+    return N(toks);
+  }
+
+  void regions (range_set& sel) {
+    // the regions of the match
+    for (int k=0; k<N(kind); k++)
+      if (kind[k] == ELEM_START) {
+        int e= k+1, depth= 1;
+        while (e < N(kind)) {
+          if (kind[e] == ELEM_START) depth++;
+          if (kind[e] == ELEM_END && --depth == 0) break;
+          e++;
+        }
+        if (e >= N(kind)) continue;
+        path r1= mark[k], r2= mark[e];
+        if (path_less (r2, r1)) r2= r1;  // an empty region
+        sel << r1 << r2;
+      }
+      else if (kind[k] == ELEM_TAG && N(in[k]) != 0)
+        sel << in[k];
+  }
 };
 
 static void select_hits (range_set& sel, tree t, tree what, path p,
                          bool first);
 
 static bool
+select_inside_tags (range_set& sel, region_matcher& m, int upto, tree what) {
+  // the regions of the first hit inside the tags m.toks[0..upto[: a hit
+  // inside a tag, which a leading and a trailing wildcard carry to the start
+  // and the end of the formula (the hits after it are merged into it)
+  bool arg= select_in_argument;
+  select_in_argument= false;
+  bool r= false;
+  for (int k=0; k<upto && k<N(m.toks) && !r; k++)
+    if (m.toks[k].kind == TOKEN_TAG) {
+      range_set ssel;
+      select_hits (ssel, m.toks[k].t, what, m.toks[k].at, true);
+      if (N(ssel) != 0) { sel << ssel; r= true; }
+    }
+  select_in_argument= arg;
+  return r;
+}
+
+static bool
 select_in_hit (range_set& sel, tree u, path q, path a, path b, tree what) {
   // the regions of what in the hit of its text from a to b, in u at q
   region_matcher m;
   tokens_between (m.toks, u, q, a, b);
-  pattern_elements (m.kind, m.elem, what);
+  m.init (what, true);
   if (N(m.toks) == 0) {
     // an empty hit: the regions are empty, at its position, if the pattern
     // has nothing else than wildcards
-    path at= q * (is_nil (a)? start (u): a);
+    path pos= q * (is_nil (a)? start (u): a);
     for (int k=0; k<N(m.kind); k++)
       if (m.kind[k] != ELEM_START && m.kind[k] != ELEM_END &&
           m.kind[k] != ELEM_WILDCARD) return false;
     for (int k=0; k<N(m.kind); k++)
-      if (m.kind[k] == ELEM_START) sel << at << at;
+      if (m.kind[k] == ELEM_START) sel << pos << pos;
     return true;
   }
-  int nt= N(m.toks) + 1;
-  m.failed= array<bool> (N(m.kind) * nt + nt);
-  for (int k=0; k<N(m.failed); k++) m.failed[k]= false;
-  m.mark= array<path> (N(m.kind));
-  m.in= array<range_set> (N(m.kind));
-  if (!m.run (0, 0)) {
-    // a hit inside a tag, which a leading and a trailing wildcard carry to
-    // the start and the end of the formula: its regions are in the first
-    // hit inside the tags of the hit (the others are merged into it)
-    bool arg= select_in_argument;
-    select_in_argument= false;
-    for (int k=0; k<N(m.toks); k++)
-      if (m.toks[k].kind == TOKEN_TAG) {
-        range_set ssel;
-        select_hits (ssel, m.toks[k].t, what, m.toks[k].at, true);
-        if (N(ssel) != 0) {
-          sel << ssel;
-          select_in_argument= arg;
-          return true;
-        }
-      }
-    select_in_argument= arg;
-    return false;
-  }
-  for (int k=0; k<N(m.kind); k++)
-    if (m.kind[k] == ELEM_START) {
-      int e= k+1, depth= 1;
-      while (e < N(m.kind)) {
-        if (m.kind[e] == ELEM_START) depth++;
-        if (m.kind[e] == ELEM_END && --depth == 0) break;
-        e++;
-      }
-      if (e >= N(m.kind)) continue;
-      path r1= m.mark[k], r2= m.mark[e];
-      if (path_less (r2, r1)) r2= r1;  // an empty region
-      sel << r1 << r2;
-    }
-    else if (m.kind[k] == ELEM_TAG && N(m.in[k]) != 0)
-      sel << m.in[k];
+  bool carried= N(m.kind) > 0 && m.kind[0] == ELEM_WILDCARD &&
+                m.kind[N(m.kind)-1] == ELEM_WILDCARD;
+  if (!m.run (0, 0))
+    return carried && select_inside_tags (sel, m, N(m.toks), what);
+  // the leftmost region: a hit inside an earlier tag, carried to the ends
+  // of the formula, comes first
+  if (carried && select_inside_tags (sel, m, m.first_region (), what))
+    return true;
+  m.regions (sel);
   return true;
+}
+
+static void
+sort_ranges (range_set& sel) {
+  // the ranges of sel in the order of their starts (an insertion sort: the
+  // ranges come mostly in order)
+  for (int i=2; i+1<N(sel); i+=2)
+    for (int j=i; j>=2 && path_less (sel[j], sel[j-2]); j-=2) {
+      path x= sel[j], y= sel[j+1];
+      sel[j]= sel[j-2]; sel[j+1]= sel[j-1];
+      sel[j-2]= x; sel[j-1]= y;
+    }
+}
+
+static void
+select_tokens (range_set& sel, tree t, tree what, path p) {
+  // a formula pattern with an empty region, which takes exactly one token,
+  // which the search has no element for: the pattern is matched with the
+  // tokens of each formula and string, leftmost and lazy, and then inside
+  // the tags of the formula, as when searching. In a tag argument with
+  // Replace, it covers the whole argument (or its start), as any pattern,
+  // or is inside the tags of the argument (a cascaded match)
+  range_set r;
+  bool arg= select_in_argument && !partial_match_flag;
+  region_matcher m;
+  if (arg || is_atomic (t) || is_concat (t)) {
+    tokens_between (m.toks, t, p, path (), path ());
+    m.init (what, arg && !initial_match_flag);
+    if (arg) {
+      if (N(m.toks) != 0 && m.run (0, 0)) { m.regions (sel); return; }
+      if (!cascaded_match_flag) return;
+    }
+    else
+      for (int s=0; s<N(m.toks); ) {
+        if (m.run (0, s)) {
+          range_set ssel;
+          m.regions (ssel);
+          merge (r, ssel);
+          s= max (s+1, m.end);
+        }
+        else s++;
+      }
+  }
+  if (is_compound (t)) {
+    // inside the tags of the formula (or of t)
+    array<tree> c;
+    array<path> cp;
+    if (is_concat (t)) {
+      for (int k=0; k<N(t); k++)
+        if (is_compound (t[k]))
+          for (int i=0; i<N(t[k]); i++)
+            if (is_accessible_for_search (t[k], i)) {
+              c << t[k][i]; cp << p * path (k, i);
+            }
+    }
+    else
+      for (int i=0; i<N(t); i++)
+        if (is_accessible_for_search (t, i)) { c << t[i]; cp << p * i; }
+    for (int i=0; i<N(c); i++) {
+      range_set ssel;
+      select_tokens (ssel, c[i], what, cp[i]);
+      r << ssel;
+    }
+    sort_ranges (r);
+  }
+  merge (sel, r);
 }
 
 static path
@@ -1189,7 +1315,8 @@ select_hits (range_set& sel, tree t, tree what, path p, bool first) {
 
 static void
 select_text (range_set& sel, tree t, tree what, path p) {
-  select_hits (sel, t, what, p, false);
+  if (has_one (what)) select_tokens (sel, t, what, p);
+  else select_hits (sel, t, what, p, false);
 }
 
 static void

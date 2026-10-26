@@ -191,9 +191,31 @@
     (check-both `(document (concat "xab" ,y (rsub "z") "cz"))
                 `(concat "ab" (select-region (wildcard "w")) "c")
                 '((0 1 0) (0 2 1)))
+    ;; an empty region in a formula takes exactly one character or one tag,
+    ;; never nothing (the maintainer's decision); [*] takes any run
+    (check-both '(document "abc abxc") '(concat "ab" (select-region ""))
+                '((0 2) (0 3) (0 6) (0 7)))
+    (check-both '(document (concat "ab" (rsub "1") (rsub "2")))
+                '(concat "ab" (select-region ""))
+                '((0 1 0) (0 1 1)))
+    (check-both '(document "abc") '(concat "ab" (select-region "") "c") '())
+    (check-both '(document "abxc") '(concat "ab" (select-region "") "c")
+                '((0 2) (0 3)))
+    (check-both '(document "abcc ababxc") '(concat "ab" (select-region "") "c")
+                '((0 2) (0 3) (0 9) (0 10)))
     (check-both `(document (concat "xab" ,y (rsub "z") "cz"))
                 `(concat "ab" (select-region "") "c")
-                '((0 1 0) (0 2 1)))
+                '())
+    (check-both `(document (concat "xab" ,y "cz" (frac "abxc" "1")))
+                `(concat "ab" (select-region "") "c")
+                '((0 1 0) (0 1 1) (0 3 0 2) (0 3 0 3)))
+    ;; in a tag argument with Replace, the whole argument
+    (with-search-mode 'replace
+      (lambda ()
+        (check= (hits '(document (frac (concat "zab" (rsub "y")) "c")
+                                 (frac (concat "ab" (rsub "y")) "c"))
+                      '(frac (concat "ab" (select-region "")) "c"))
+                '((1 0 1 0) (1 0 1 1)))))
     ;; a region which starts in a string and ends after a tag
     (check-both `(document (concat "xab" ,y "cd"))
                 `(concat "a" (select-region (concat "b" ,y "c")) "d")
@@ -203,6 +225,57 @@
     (check-both `(document (concat ,y (frac "xaba" "a")))
                 '(concat (wildcard "w") (select-region "a") (wildcard "v"))
                 '((0 1 0 1) (0 1 0 2)))
+    ;; the leftmost region: a hit inside an earlier tag, which the
+    ;; wildcards carry to the ends of the formula, comes first
+    (check-both '(document (concat "b" (frac "xa" "1") "a"))
+                '(concat (wildcard "w") (select-region "a") (wildcard "v"))
+                '((0 1 0 1) (0 1 0 2)))
+    ;; several regions; regions at the start and at the end of the pattern
+    (check-both '(document "xaybz abcd")
+                '(concat (select-region "a") (wildcard "w")
+                         (select-region "b"))
+                '((0 1) (0 2) (0 3) (0 4) (0 6) (0 7) (0 7) (0 8)))
+    (check-both '(document "xabcd") '(concat (select-region "a") "bc")
+                '((0 1) (0 2)))
+    (check-both '(document "xabcd") '(concat "bc" (select-region "d"))
+                '((0 4) (0 5)))
+    ;; case-insensitive
+    (with-preference "case-insensitive-match" "on"
+      (lambda ()
+        (check-both '(document "xABcx") '(concat "a" (select-region "b") "c")
+                    '((0 2) (0 3)))))
+    ;; a region in a tag inside a formula of the pattern
+    (check-both '(document (concat "x" (strong "abc") "y" (strong "abc")))
+                '(concat "y" (strong (concat "a" (select-region "b") "c")))
+                '((0 3 0 1) (0 3 0 2)))
+    ;; a document pattern with the region in its first or middle paragraph
+    (check-both '(document "xab" "cd" "e")
+                '(document (concat "a" (select-region "b")) "cd")
+                '((0 2) (0 3)))
+    (check-both '(document "xab" "cd" "ef")
+                '(document "ab" (concat "c" (select-region "d")) "e")
+                '((1 1) (1 2)))
+    ;; in linear time: a wildcard before a region which fails tried the
+    ;; rest of the hit from each place (4 s for 64000 characters)
+    (let ((doc `(document (concat ,(make-string 64000 #\b) (frac "bxc" "1")))))
+      (for-each
+        (lambda (mode)
+          (with-search-mode mode
+            (lambda ()
+              (with r (time-of
+                        (lambda ()
+                          (hits doc '(concat (wildcard "u")
+                                             (select-region
+                                               (concat "b" (wildcard "w") "c"))
+                                             (wildcard "v")))))
+                (check= (cdr r) '((0 1 0 0) (0 1 0 3)))
+                (check-true (< (car r) 500)))
+              (with r (time-of
+                        (lambda ()
+                          (hits doc '(concat "b" (select-region "") "q"))))
+                (check= (cdr r) '())
+                (check-true (< (car r) 500))))))
+        '(search replace)))
     ;; in a tag of the pattern: the tag in its place in the text
     (check-both '(document (concat "q" (frac "1" "2") "b" (frac "3" "2") "c"))
                 '(concat (frac (select-region "") "2") "c")
