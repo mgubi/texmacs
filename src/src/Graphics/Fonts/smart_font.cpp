@@ -463,11 +463,17 @@ get_unicode_range (int code) {
   else if (code >= 0x380 && code <= 0x3ff) return "greek";
   else if (code >= 0x400 && code <= 0x4ff) return "cyrillic";
   else if (code >= 0x3000 && code <= 0x303f) return "cjk";
-  else if (code >= 0x4e00 && code <= 0x9fcc) return "cjk";
+  else if (code >= 0x3400 && code <= 0x4dbf) return "cjk"; // extension A
+  else if (code >= 0x4e00 && code <= 0x9fff) return "cjk";
+  else if (code >= 0xf900 && code <= 0xfaff) return "cjk"; // compatibility
   else if (code >= 0xff00 && code <= 0xffef) return "cjk";
+  else if (code >= 0x20000 && code <= 0x3134f) return "cjk"; // ext. B-G
   else if (code >= 0x3040 && code <= 0x309F) return "hiragana";
   else if (code >= 0x30a0 && code <= 0x30ff) return "katakana";
+  else if (code >= 0x31f0 && code <= 0x31ff) return "katakana";
   else if (code >= 0xac00 && code <= 0xd7af) return "hangul";
+  else if (code >= 0x1100 && code <= 0x11ff) return "hangul"; // jamo
+  else if (code >= 0x3130 && code <= 0x318f) return "hangul";
   else if (code >= 0x2000 && code <= 0x23ff) return "mathsymbols";
   else if (code >= 0x2900 && code <= 0x2e7f) return "mathextra";
   else if (code >= 0x1d400 && code <= 0x1d7ff) return "mathletters";

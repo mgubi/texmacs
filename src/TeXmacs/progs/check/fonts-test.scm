@@ -21,7 +21,7 @@
 ;; compared with the formulas set when that text font is the text font too.
 ;;
 ;; The CJK fonts and STIX Two are those of the system: their checks are made
-;; when TeXmacs knows a Japanese or a Korean font of the system, and when the
+;; when a font of the database has CJK characters (or Hangul), and when the
 ;; files of STIX Two are installed. STIX and TeX Gyre come with TeXmacs.
 
 (texmacs-module (check fonts-test)
@@ -52,6 +52,16 @@
   (let ((w (width t)) (e (em)))
     (and (> e 0) (<= (abs (- w e)) (* tol e)))))
 
+(define (feature-font? feat)
+  ;; whether a font of the database has the glyphs @feat ("CJK", "Hangul")
+  (list-or
+   (map (lambda (fam)
+          (list-or
+           (map (lambda (sty)
+                  (in? feat (font-database-characteristics fam sty)))
+                (font-database-styles fam))))
+        (font-database-families))))
+
 (define (in-buffer thunk)
   ;; @thunk in a new generic buffer, closed afterwards
   (let* ((old (current-buffer))
@@ -71,8 +81,8 @@
 
 (define (test-kana)
   (check-group "kana in the default font")
-  (if (== (default-japanese-font) "roman")
-      (display "  (no Japanese font on this system: skipped)\n")
+  (if (not (feature-font? "CJK"))
+      (display "  (no CJK font on this system: skipped)\n")
       (begin
         ;; hiragana (U+3040-309F) and katakana (U+30A0-30FF) were drawn as
         ;; their names, katakana having no range in get_unicode_range
@@ -82,11 +92,24 @@
         (check-true (em-wide? "<#30CA>" 0.1))
         (check-true (em-wide? '(with "language" "japanese" "<#30BF>") 0.1))
         (check-true (em-wide? '(with "font-series" "bold" "<#306F>") 0.1))
-        (check-true (< (width "<#3053><#30AB>") (* 2.2 (em)))))))
+        (check-true (< (width "<#3053><#30AB>") (* 2.2 (em))))
+        ;; katakana phonetic extensions (U+31F0-31FF)
+        (check-true (em-wide? "<#31F0>" 0.05)))))
+
+(define (test-ideographs)
+  (check-group "ideographs outside the basic block")
+  (if (not (feature-font? "CJK"))
+      (display "  (no CJK font on this system: skipped)\n")
+      (begin
+        ;; extension A (U+3400-4DBF) and the compatibility ideographs
+        ;; (U+F900-FAFF) were scaled by the x-heights as Latin fallbacks
+        (check-true (em-wide? "<#3400>" 0.05))
+        (check-true (em-wide? "<#4DB5>" 0.05))
+        (check-true (em-wide? "<#F900>" 0.05)))))
 
 (define (test-hangul)
   (check-group "hangul in the default font")
-  (if (== (default-korean-font) "roman")
+  (if (not (feature-font? "Hangul"))
       (display "  (no Korean font on this system: skipped)\n")
       (begin
         ;; the fallback font was scaled by the ratio of the x-heights of the
@@ -94,6 +117,9 @@
         (check-true (em-wide? "<#D55C>" 0.05))
         (check-true (em-wide? "<#AD6D>" 0.05))
         (check-true (em-wide? '(with "font" "pagella" "<#D55C>") 0.05))
+        ;; the jamo (U+1100-11FF) and the compatibility jamo (U+3130-318F)
+        (check-true (em-wide? "<#1100>" 0.05))
+        (check-true (em-wide? "<#3131>" 0.05))
         ;; the Latin letters are not concerned
         (check-true (< (width "x") (* 0.7 (em)))))))
 
@@ -171,6 +197,7 @@
   (in-buffer
    (lambda ()
      (test-kana)
+     (test-ideographs)
      (test-hangul)
      (test-stix-two)
      (test-math-fonts)))
