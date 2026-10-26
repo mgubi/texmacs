@@ -152,6 +152,10 @@
       <newblock>Publishing House, 19XX.<newblock>
     </bib-list>
   </bibliography>
+
+  <\with|par-mode|right>
+    \<copyright\> Nicolas Ratier 2005
+  </with>
 </body>
 
 <\initial>

@@ -403,6 +403,10 @@
       \;
     </input>
   </session>
+
+  <\with|par-mode|right>
+    \<copyright\> Nicolas Ratier
+  </with>
 </body>
 
 <initial|<\collection>
