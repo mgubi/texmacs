@@ -355,6 +355,22 @@
     (check-both '(document (concat "b" (frac "xa" "1") "a"))
                 '(concat (wildcard "w") (select-region "a") (wildcard "v"))
                 '((0 1 0 1) (0 1 0 2)))
+    ;; also when a wildcard at an end of the pattern is inside the region:
+    ;; it reaches the ends of the argument where the hit is
+    (let ((doc '(document (concat "b" (strong "xa") "c"))))
+      (check-both doc '(concat (select-region (concat (wildcard "w") "a"))
+                               (wildcard "v"))
+                  '((0 1 0 0) (0 1 0 2)))
+      (check-both doc '(concat (select-region (wildcard "w")) "a"
+                               (wildcard "v"))
+                  '((0 1 0 0) (0 1 0 1)))
+      (check-both doc '(concat (wildcard "w") "a"
+                               (select-region (wildcard "v")))
+                  '((0 1 0 2) (0 1 0 2))))
+    (check-both '(document (concat "x" (rsup "acb") "y"))
+                '(concat (wildcard "w")
+                         (select-region (concat "c" (wildcard "v"))))
+                '((0 1 0 1) (0 1 0 3)))
     ;; several regions; regions at the start and at the end of the pattern
     (check-both '(document "xaybz abcd")
                 '(concat (select-region "a") (wildcard "w")

@@ -1201,7 +1201,8 @@ select_inside_tags (range_set& sel, region_matcher& m, int upto, tree what) {
   // wildcards, which is not carried again: one search, not one per level
   // of nested tags (a power of the depth)
   tree core= without_outer_wildcards (what);
-  if (core == what || (is_concat (core) && N(core) == 0)) return false;
+  // (with its edge wildcards inside a region, [*a*], the pattern itself)
+  if (is_concat (core) && N(core) == 0) return false;
   tree w= without_empty_strings (without_regions (core), true);
   bool arg= select_in_argument;
   select_in_argument= false;
@@ -1244,8 +1245,15 @@ select_in_hit (range_set& sel, tree u, path q, path a, path b, tree what) {
       if (m.kind[k] == ELEM_START) sel << pos << pos;
     return true;
   }
-  bool carried= N(m.kind) > 0 && m.kind[0] == ELEM_WILDCARD &&
-                m.kind[N(m.kind)-1] == ELEM_WILDCARD;
+  // a leading and a trailing wildcard, also inside a region at an end of
+  // the pattern ([*a]*, *[c*])
+  int e1= 0, e2= N(m.kind) - 1;
+  while (e1 < N(m.kind) && (m.kind[e1] == ELEM_START || m.kind[e1] == ELEM_END))
+    e1++;
+  while (e2 >= 0 && (m.kind[e2] == ELEM_START || m.kind[e2] == ELEM_END))
+    e2--;
+  bool carried= e1 <= e2 && m.kind[e1] == ELEM_WILDCARD &&
+                m.kind[e2] == ELEM_WILDCARD;
   if (!m.run (0, 0))
     return carried && select_inside_tags (sel, m, N(m.toks), what);
   // the leftmost region: a hit inside an earlier tag, carried to the ends
