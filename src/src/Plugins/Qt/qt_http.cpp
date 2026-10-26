@@ -237,18 +237,14 @@ QTMHTTPHandler_callback::onFinished () {
   if (reply == NULL)
     call (callback, string (""));
   else {
-    if (reply->error() != QNetworkReply::NoError) {
+    // (also after an error: who waits for the answer is called, with what
+    // came, which says why for an error status)
+    if (reply->error() != QNetworkReply::NoError)
       io_error << "http_post from "
 	       << from_qstring_utf8 (reply->url ().host ()) << ": "
 	       << from_qstring_utf8 (reply->errorString ()) << LF;
-      // an empty answer, as without reply (and as curl, without Qt), so
-      // that the caller is told and may free what waits for the answer
-      call (callback, string (""));
-    }
-    else {
-      string buffer= from_qstring_utf8 (QString (reply->readAll ()));
-      call (callback, buffer);
-    }
+    string buffer= from_qstring_utf8 (QString (reply->readAll ()));
+    call (callback, buffer);
     reply->close ();
   }
   this->deleteLater ();
