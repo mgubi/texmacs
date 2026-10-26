@@ -18,6 +18,12 @@ have the details, and the problems go to the
   of each of its tabs, "(1)", "(2)", stays in sight when the name is too
   long for the column, and the folded column shows it after the initials
   ("N11", "N12").
+- A macro defined in a hidden part (`hide-preamble`) inside the abstract of
+  an article was shown in error in the paragraphs of the abstract which
+  follow it, and worked only after the abstract. The same in any table
+  cell whose lines are broken (`cell-hyphen` `t`): what a hidden part
+  assigns there now holds for the paragraphs after it
+  ([#503](https://github.com/mgubi/texmacs/pull/503)).
 
 ## 25 October 2026
 
