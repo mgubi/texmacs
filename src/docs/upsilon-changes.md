@@ -14,6 +14,13 @@ have the details, and the problems go to the
 
 ## 26 October 2026
 
+- **Maple** (desktop): the session no longer hangs at its start on macOS.
+  Without a license file in the Maple tree, the launcher dated a file
+  with a `touch` option which macOS lacks, and then could not build its
+  helpers, even when they were in the home; it now keeps those which are
+  there, and any failure (no `maple` command, a build which fails, with
+  what the compiler says) is shown in the session. Maple 2015 and later
+  are found in `/Library/Frameworks` (#517).
 - **Qt**: only the part of the document in the window is repainted after
   typesetting. Opening a long document with saved references, or a new
   paragraph at its start, used to repaint every page that moved, and so

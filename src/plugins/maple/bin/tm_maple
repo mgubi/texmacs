@@ -1,35 +1,58 @@
 #!/bin/sh
 ##set -x
 
+# A failure is shown in the session, as a block of the TeXmacs protocol on
+# the standard output, and on the standard error; without the block, the
+# session would wait for a banner which never comes.
+tm_maple_fail () {
+	echo "tm_maple: $1" 1>&2
+	printf '\002verbatim:%s\n\005' "$1"
+	exit 1
+}
+
 TEXMACS_HOME_PLUGINS_MAPLE_DIR="$TEXMACS_HOME_PATH/plugins/maple"
-if [ ! -d $TEXMACS_HOME_PLUGINS_MAPLE_DIR ]; then
-	mkdir $TEXMACS_HOME_PLUGINS_MAPLE_DIR
-fi
+mkdir -p "$TEXMACS_HOME_PLUGINS_MAPLE_DIR" "$TEXMACS_HOME_PATH/bin"
 TEXMACS_HOME_PLUGINS_MAPLE_CONF="$TEXMACS_HOME_PLUGINS_MAPLE_DIR/tm_maple.conf"
 
 TEXMACS_MAPLE_BIN=`which maple`
 TEXMACS_HOME_PLUGINS_MAPLE_DO_SYMLINK="no"
-if [ -r $TEXMACS_HOME_PLUGINS_MAPLE_CONF ]; then
-	. $TEXMACS_HOME_PLUGINS_MAPLE_CONF
+if [ -r "$TEXMACS_HOME_PLUGINS_MAPLE_CONF" ]; then
+	. "$TEXMACS_HOME_PLUGINS_MAPLE_CONF"
+fi
+if [ ! -x "$TEXMACS_MAPLE_BIN" ]; then
+	tm_maple_fail "cannot find the maple command (set TEXMACS_MAPLE_BIN in $TEXMACS_HOME_PLUGINS_MAPLE_CONF)"
 fi
 
-TEXMACS_MAPLE_DIR=`echo "printf(kernelopts(mapledir));" | $TEXMACS_MAPLE_BIN -q`
+TEXMACS_MAPLE_DIR=`echo "printf(kernelopts(mapledir));" | "$TEXMACS_MAPLE_BIN" -q`
+if [ -z "$TEXMACS_MAPLE_DIR" ]; then
+	tm_maple_fail "$TEXMACS_MAPLE_BIN did not answer kernelopts(mapledir)"
+fi
 export TEXMACS_MAPLE_BIN
 export TEXMACS_MAPLE_DIR
 
 if [ -d "$TEXMACS_MAPLE_DIR/extern" ]; then
 	TEXMACS_MAPLE_STAMP="$TEXMACS_MAPLE_DIR/license/version.txt"
-	if [ ! -f $TEXMACS_MAPLE_STAMP ]; then
+	if [ ! -f "$TEXMACS_MAPLE_STAMP" ]; then
 		TEXMACS_MAPLE_STAMP="$TEXMACS_MAPLE_DIR/license/license.dat"
-		if [ ! -f $TEXMACS_MAPLE_STAMP ]; then
+		if [ ! -f "$TEXMACS_MAPLE_STAMP" ]; then
+			# the stamp holds the version of the kernel, and is written
+			# again, hence newer than tm_maple_9, when the version changes;
+			# a new stamp is dated in the past, so that tm_maple_9 and
+			# tm_maple_9.sh, if they are there, are kept (touch -t is
+			# POSIX, touch -d is not in the touch of macOS)
 			TEXMACS_MAPLE_STAMP="$TEXMACS_HOME_PLUGINS_MAPLE_DIR/maple-stamp"
-			MAPLE_KERNEL_BUILD_DATE=`echo "printf(op(3,sscanf(kernelopts(version),\"%[^,],%[^,],%[^,]\")));" | $TEXMACS_MAPLE_BIN -q`
-			touch -d "$MAPLE_KERNEL_BUILD_DATE" $TEXMACS_MAPLE_STAMP
+			MAPLE_KERNEL_VERSION=`echo "printf(kernelopts(version));" | "$TEXMACS_MAPLE_BIN" -q`
+			if [ ! -f "$TEXMACS_MAPLE_STAMP" ]; then
+				echo "$MAPLE_KERNEL_VERSION" > "$TEXMACS_MAPLE_STAMP"
+				touch -t 200001010000 "$TEXMACS_MAPLE_STAMP"
+			elif [ "`cat "$TEXMACS_MAPLE_STAMP"`" != "$MAPLE_KERNEL_VERSION" ]; then
+				echo "$MAPLE_KERNEL_VERSION" > "$TEXMACS_MAPLE_STAMP"
+			fi
 		fi
 	fi
 	if [ ! -x "$TEXMACS_HOME_PATH/bin/tm_maple_9" -o "$TEXMACS_MAPLE_STAMP" -nt "$TEXMACS_HOME_PATH/bin/tm_maple_9" ] || \
 			[ ! -x "$TEXMACS_HOME_PATH/bin/tm_maple_9.sh" -o "$TEXMACS_MAPLE_STAMP" -nt "$TEXMACS_HOME_PATH/bin/tm_maple_9.sh" ]; then
-		MAPLE_SYS_BIN=`echo "printf(kernelopts(bindir));" | $TEXMACS_MAPLE_BIN -q`
+		MAPLE_SYS_BIN=`echo "printf(kernelopts(bindir));" | "$TEXMACS_MAPLE_BIN" -q`
 		MAPLE_LIBRARY_PATH=$MAPLE_SYS_BIN
 		if [ -d "$MAPLE_SYS_BIN/system" -a -x "$MAPLE_SYS_BIN/cppcheck" ]; then
 			if ! ( LD_LIBRARY_PATH=$MAPLE_SYS_BIN $MAPLE_SYS_BIN/cppcheck > /dev/null 2>&1 ; ) then
@@ -47,19 +70,20 @@ if [ -d "$TEXMACS_MAPLE_DIR/extern" ]; then
 		export MAPLE_CPPFLAGS
 		export MAPLE_LDFLAGS
 		export MAPLE_LIBADD
-		make -s -C $TEXMACS_PATH/plugins/maple -f Makefile.9 TEXMACS_HOME_PATH="$TEXMACS_HOME_PATH" TEXMACS_MAPLE_STAMP="$TEXMACS_MAPLE_STAMP"
+		# (what make and the compiler say goes into the message)
+		MAPLE_BUILD_LOG=`make -s -C "$TEXMACS_PATH/plugins/maple" -f Makefile.9 TEXMACS_HOME_PATH="$TEXMACS_HOME_PATH" TEXMACS_MAPLE_STAMP="$TEXMACS_MAPLE_STAMP" 2>&1`
 		if [ $? -ne 0 ]; then
-			echo "cannot build $TEXMACS_HOME_PATH/bin/tm_maple_9*" 1>&2
-			exit 1
+			tm_maple_fail "cannot build tm_maple_9 and tm_maple_9.sh in $TEXMACS_HOME_PATH/bin (tm_maple_9 needs a C compiler: on macOS, the Xcode Command Line Tools):
+$MAPLE_BUILD_LOG"
 		fi
-		if [ "$TEXMACS_HOME_PLUGINS_MAPLE_DO_SYMLINK" != "no" -a ! -f $TEXMACS_HOME_PATH/bin/tm_maple ]; then
-			{ cd $TEXMACS_HOME_PATH/bin && ln -s tm_maple_9.sh tm_maple ; }
+		if [ "$TEXMACS_HOME_PLUGINS_MAPLE_DO_SYMLINK" != "no" -a ! -f "$TEXMACS_HOME_PATH/bin/tm_maple" ]; then
+			{ cd "$TEXMACS_HOME_PATH/bin" && ln -s tm_maple_9.sh tm_maple ; }
 		fi
 	fi
 	exec "$TEXMACS_HOME_PATH/bin/tm_maple_9.sh"
 elif [ -f "$TEXMACS_MAPLE_DIR/mwshelp" ]; then
 	exec tm_maple_5
 else
-	echo "Maple version not yet supported" 1>&2
+	tm_maple_fail "this version of Maple is not supported (no $TEXMACS_MAPLE_DIR/extern)"
 fi
 exit 126
