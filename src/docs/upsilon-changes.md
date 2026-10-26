@@ -12,6 +12,13 @@ branch [`upsilon_texmacs`](https://github.com/mgubi/texmacs/commits/upsilon_texm
 have the details, and the problems go to the
 [issues of the repository](https://github.com/mgubi/texmacs/issues).
 
+## 26 October 2026
+
+- **Browser**: Clone window opens a second tab on the document; the number
+  of each of its tabs, "(1)", "(2)", stays in sight when the name is too
+  long for the column, and the folded column shows it after the initials
+  ("N11", "N12").
+
 ## 25 October 2026
 
 - **Clone window**: File → Clone window and View → Clone window open a

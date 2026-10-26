@@ -60,6 +60,9 @@ var tmFrame = (function () {
     #tm-frame .tm-tab:hover { background:#cacaca }
     #tm-frame .tm-tab.active { background:#f6f6f6; box-shadow:inset 0 0 0 1px #b4b4b4 }
     #tm-frame .tm-tab .tm-title { flex:1; overflow:hidden; white-space:nowrap; text-overflow:ellipsis }
+    /* the number of a window among those of its document, kept when the
+       name is cut */
+    #tm-frame .tm-tab .tm-num { flex:none; white-space:pre }
     #tm-frame .tm-tab .tm-close { flex:none; margin-left:4px; width:18px; height:18px;
       line-height:18px; text-align:center; border-radius:3px; color:#9a9a9a }
     /* the close box of every tab, lighter on the tabs which are not shown */
@@ -69,7 +72,8 @@ var tmFrame = (function () {
     #tm-frame .tm-tab .tm-dot { display:none; position:absolute; top:4px; right:4px; width:6px;
       height:6px; border-radius:3px; background:#5b7fa8 }
     #tm-frame.collapsed .tm-tab { justify-content:center; padding:0; margin:2px 6px; height:30px }
-    #tm-frame.collapsed .tm-tab .tm-title, #tm-frame.collapsed .tm-tab .tm-close { display:none }
+    #tm-frame.collapsed .tm-tab .tm-title, #tm-frame.collapsed .tm-tab .tm-num,
+    #tm-frame.collapsed .tm-tab .tm-close { display:none }
     #tm-frame.collapsed .tm-tab .tm-short { display:block }
     #tm-frame.collapsed .tm-tab.modified .tm-dot { display:block }
     #tm-frame .tm-new, #tm-frame .tm-fold { display:flex; align-items:center; flex:none; height:30px;
@@ -701,13 +705,26 @@ var tmFrame = (function () {
 
   // the short name of a window in the folded column: the initials of its
   // first two words ("Help - Welcome..." gives HW, "paper.tm" gives P), or
-  // its first initial and its number ("No name [2]" gives N2)
+  // its first initial and its number ("No name [2]" gives N2); a window of
+  // a document shown in several has their number ("paper.tm (2)" gives P2)
   function initials (title) {
     title = String (title);
+    var k = windowNumber (title);
+    if (k) {
+      title = title.slice (0, title.length - k.length);
+      return (initials (title).slice (0, 2) + k.slice (2, -1)).slice (0, 3);
+    }
     var words = title.replace (/\.[a-z0-9]+$/i, '').match (/[\p{L}\p{N}]+/gu) || ['?'];
     var n = /\[(\d+)\]\s*$/.exec (title);
     if (n) return (words[0].charAt (0).toUpperCase () + n[1]).slice (0, 3);
     return words.slice (0, 2).map (function (w) { return w.charAt (0).toUpperCase (); }).join ('');
+  }
+
+  // " (2)" at the end of the title of a window, when its document is shown
+  // in several windows (update_window_names, new_view.cpp), else null
+  function windowNumber (title) {
+    var m = / \(\d+\)$/.exec (title);
+    return m ? m[0] : null;
   }
 
   // In the folded column a tab under the mouse grows to the right, over the
@@ -798,7 +815,9 @@ var tmFrame = (function () {
       var tab = el ('div', 'tm-tab' + (t.active ? ' active' : '') + (t.modified ? ' modified' : ''));
       tab.dataset.id = t.id;
       var name = (t.modified ? '• ' : '') + t.title;
-      tab.appendChild (el ('span', 'tm-title', name));
+      var k = windowNumber (t.title);
+      tab.appendChild (el ('span', 'tm-title', k ? name.slice (0, name.length - k.length) : name));
+      if (k) tab.appendChild (el ('span', 'tm-num', k));
       tab.appendChild (el ('span', 'tm-short', initials (t.title)));
       tab.appendChild (el ('span', 'tm-dot'));
       // the name in a balloon when it does not fit in the open column; in

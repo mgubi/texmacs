@@ -301,6 +301,16 @@
 
   The additions to <TeXmacs> Upsilon, the newest first.
 
+  <paragraph|26 October 2026>
+
+  <\itemize>
+    <item><menu|View|Clone window> (also in <menu|File>) opens a second tab
+    on the document, to see two parts of it side by side: it starts at the
+    cursor, and what is typed in one tab shows in the other. The tabs of the
+    document are numbered, (1) and (2), and <menu|Go|Windows> has an entry
+    for each of them.
+  </itemize>
+
   <paragraph|23 October 2026>
 
   <\itemize>
