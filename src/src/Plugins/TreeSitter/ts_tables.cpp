@@ -20,7 +20,11 @@
    tree_sitter_tables_start reads the syntax grammar written by
    progs/treesit/ts-native.scm and builds the states; tree_sitter_tables_finish
    is given the token conflicts and the keywords, computed in Scheme, and
-   gives the final states. Results are texts for the Scheme reader. */
+   gives the final states. Results are texts for the Scheme reader.
+
+   Like the Scheme code, it ports the generator of tree-sitter 0.27
+   (https://github.com/tree-sitter/tree-sitter), Copyright (c) 2018 Max
+   Brunsfeld, under the MIT license: TeXmacs/misc/licenses/tree-sitter-MIT.txt. */
 
 #include "tree_sitter_glue.hpp"
 #include <algorithm>

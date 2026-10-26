@@ -8,6 +8,9 @@
 ;; It comes WITHOUT ANY WARRANTY WHATSOEVER. For details, see the file LICENSE
 ;; in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
 ;;
+;; The scanner of tree-sitter-bash: Copyright (c) 2017 Max Brunsfeld,
+;; under the MIT license: see $TEXMACS_PATH/misc/tree-sitter/bash/LICENSE.
+;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;; A port of src/scanner.c of tree-sitter-bash (MIT): heredocs, the words

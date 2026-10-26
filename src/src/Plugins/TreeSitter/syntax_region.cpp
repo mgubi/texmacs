@@ -1470,7 +1470,14 @@ syntax_region_node_info (tree root, int language, int row, int col) {
    .ignore and .zero of the query, with the properties indent.immediate,
    indent.start_at_same_line, indent.open_delimiter, indent.close_delimiter,
    indent.increment and indent.avoid_last_matching_next. Rows and columns
-   are those of the lines of the region (positions in the TeXmacs strings). */
+   are those of the lines of the region (positions in the TeXmacs strings).
+
+   indent.lua is part of https://github.com/nvim-treesitter/nvim-treesitter
+   (the queries of misc/tree-sitter/<grammar>/indents.scm are those of its
+   commit d3e4a28b63961ba972b0945d66c73b6eec969953), Copyright the
+   nvim-treesitter contributors, under the Apache License 2.0
+   (TeXmacs/misc/tree-sitter/nvim-treesitter-LICENSE). Changed for TeXmacs
+   in 2026: translated from Lua to C++, on the lines of a code region. */
 
 // (the positions and columns are those of the core, System/Language/
 // code_lines.cpp: a tab of a source file is the character <#9>, which goes

@@ -9,6 +9,10 @@
 ;; It comes WITHOUT ANY WARRANTY WHATSOEVER. For details, see the file LICENSE
 ;; in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
 ;;
+;; Ported from tree-sitter 0.27 (https://github.com/tree-sitter/tree-sitter),
+;; Copyright (c) 2018 Max Brunsfeld, under the MIT license: see
+;; $TEXMACS_PATH/misc/licenses/tree-sitter-MIT.txt.
+;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;; The tables of ts-language.scm written for ts_dynamic.c, which fills a

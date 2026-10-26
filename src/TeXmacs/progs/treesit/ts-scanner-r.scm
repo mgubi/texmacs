@@ -8,6 +8,9 @@
 ;; It comes WITHOUT ANY WARRANTY WHATSOEVER. For details, see the file LICENSE
 ;; in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
 ;;
+;; The scanner of tree-sitter-r: Copyright (c) 2025 tree-sitter-r authors,
+;; under the MIT license: see $TEXMACS_PATH/misc/tree-sitter/r/LICENSE.
+;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;; A port of src/scanner.c of tree-sitter-r (MIT): the newlines, which end

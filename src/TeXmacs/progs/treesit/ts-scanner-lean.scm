@@ -8,6 +8,9 @@
 ;; It comes WITHOUT ANY WARRANTY WHATSOEVER. For details, see the file LICENSE
 ;; in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
 ;;
+;; The scanner of tree-sitter-lean: Copyright (c) 2024 Julian Berman,
+;; under the MIT license: see $TEXMACS_PATH/misc/tree-sitter/lean/LICENSE.
+;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;; A port of src/scanner.c of Julian/tree-sitter-lean (MIT): dotted, quoted
