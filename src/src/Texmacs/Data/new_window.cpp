@@ -275,8 +275,29 @@ open_window (tree geom) {
 
 void
 clone_window () {
+  // a second window on the current buffer, at the cursor and zoom of this one
+  tm_view old_vw= concrete_view (get_current_view_safe ());
+  url name= get_current_buffer ();
   url win= new_window ();
-  window_set_view (win, get_passive_view (get_current_buffer ()), true);
+  url u= get_passive_view (name);
+  window_set_view (win, u, true);
+  tm_view new_vw= concrete_view (u);
+  if (old_vw == NULL || new_vw == NULL || new_vw->win == NULL) return;
+  if (old_vw->win != NULL) {
+    // beside the original window if the screen has room, else shifted, so
+    // that the new window does not hide the original one
+    widget ow= old_vw->win->win, nw= new_vw->win->win;
+    SI x, y, w, h, W, H, d= 30 * PIXEL;
+    get_position (ow, x, y);
+    get_size (ow, w, h);
+    gui_root_extents (W, H);
+    set_size (nw, w, h);
+    if (x + 2*w <= W) set_position (nw, x + w, y);
+    else if (x >= w) set_position (nw, x - w, y);
+    else set_position (nw, x + d, y - d);
+    new_vw->win->set_window_zoom_factor (old_vw->win->get_window_zoom_factor ());
+  }
+  new_vw->ed->go_to (old_vw->ed->the_path ());
 }
 
 void
