@@ -97,9 +97,14 @@ struct vue_input_state {
   double wheel_vx, wheel_vy;
   time_t wheel_time;
   time_t wheel_event_time;
-  uint64_t wheel_stamp;    // SDL timestamp of the last wheel event (ns): the
+  uint64_t wheel_stamp;    // SDL timestamp of the last wheel event (ns, or ms
+                           // of the X server, see wheel_stamp_ms): the
                            // events of a frame are handled together, so the
                            // clock does not tell them apart (see wheel_event)
+  bool   wheel_stamp_ms;   // that timestamp is a time of the X server, in ms
+                           // (see wheel_interval)
+  double wheel_capture_x;  // the deltas of mouse_data as an editor which
+  double wheel_capture_y;  // captures the wheel gets them (see push_wheel)
   bool   wheel_precise;    // the stream has fractional deltas (a trackpad)
   bool   wheel_touch;      // the stream is a finger dragged on a touch screen
   bool   wheel_ambiguous;  // the stream opened with whole deltas: a notch?
@@ -107,6 +112,8 @@ struct vue_input_state {
   // time of the last step of that travel, and the excess which an opening
   // notch would have scrolled if it turns out to come from a trackpad
   double wheel_pend_x, wheel_pend_y;
+  double wheel_pend_g;     // the part of that distance which an editor which
+                           // captures the wheel gets (see wheel_event)
   double wheel_over_x, wheel_over_y;
   time_t wheel_smooth_time;
   // the wheel for the Clay scroll containers, in units of Clay, applied
@@ -141,9 +148,11 @@ struct vue_input_state {
     : key_time (0), key_stamp (0), mouse_time (0), mouse_x (0), mouse_y (0),
       mouse_ticket (0), mouse_clicks (1),
       wheel_est_x (0), wheel_est_y (0), wheel_vx (0), wheel_vy (0),
-      wheel_time (0), wheel_event_time (0), wheel_stamp (0),
+      wheel_time (0), wheel_event_time (0), wheel_stamp (0), wheel_stamp_ms (false),
+      wheel_capture_x (0), wheel_capture_y (0),
       wheel_precise (false), wheel_touch (false),
       wheel_ambiguous (false), wheel_pend_x (0), wheel_pend_y (0),
+      wheel_pend_g (1.0),
       wheel_over_x (0), wheel_over_y (0), wheel_smooth_time (0),
       clay_wheel_x (0), clay_wheel_y (0), wheel_taken (false),
       current_popup (false), cancel_popup (false),
