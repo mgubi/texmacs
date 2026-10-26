@@ -27,9 +27,12 @@
 ;; argument, an empty argument matches any argument, and a tag matches a
 ;; tag whose arguments contain those of the pattern. Edit > Replace sets it
 ;; to "on": the arguments follow allow-blank-replace, ..., all off by
-;; default, and a string of the pattern must match a whole argument. Both
-;; allow cascaded matches (a pattern inside an argument). The checks set
-;; preferences in memory only, and restore them: nothing is saved.
+;; default, and a string of the pattern must match a whole argument. A
+;; formula in an argument of the pattern is text, as in a paragraph, and
+;; follows the same flags: anywhere in the argument, or the whole argument
+;; (#501). Both allow cascaded matches (a pattern inside an argument).
+;; The checks set preferences in memory only, and restore them: nothing is
+;; saved.
 ;;
 ;; The formulas are written as the editor keeps them: a concat never has
 ;; two strings in a row (tree-simplify merges them), so that a+b_i is
@@ -59,6 +62,19 @@
   ;; mode is 'search (Edit > Search) or 'replace (Edit > Replace)
   (with-preference "search-and-replace" (if (== mode 'search) "off" "on")
     thunk))
+
+(define (with-search-mode-value mode thunk)
+  ;; the value of thunk, with the matching of mode (set in memory only, and
+  ;; restored also when thunk fails)
+  (let* ((which "search-and-replace")
+         (had? (cpp-has-preference? which))
+         (old (get-preference which)))
+    (dynamic-wind
+      (lambda () (cpp-set-preference which (if (== mode 'search) "off" "on")))
+      thunk
+      (lambda ()
+        (if had? (cpp-set-preference which old)
+            (cpp-reset-preference which))))))
 
 (define (hits doc what)
   (tree-search-tree (stree->tree doc) what '() 1000))
@@ -756,6 +772,215 @@
                     '(frac "a" (wildcard "w")))
               '()))))
 
+;; a formula in the argument of a tag of the pattern is text, as in a
+;; paragraph: its parts are contiguous and a wildcard takes any run, maybe
+;; empty. It was matched child by child, so that a wildcard took exactly
+;; one child, and Search skipped the children between the parts (#501). As
+;; for a string argument, Search finds it anywhere in the argument, Replace
+;; only as the whole argument
+(define (test-formulas-in-arguments)
+  (check-group "formulas in arguments")
+  (let ((pat '(frac (concat "a" (wildcard "w") (rsub "x")) "c")))
+    ;; the wildcard takes nothing, two children, a part of a string
+    (check-both '(document (frac (concat "a" (rsub "x")) "c")) pat
+                '((0 0) (0 1)))
+    (with-search-mode 'replace
+      (lambda ()
+        (check= (hits '(document (frac (concat "a" (rsub "y") (rsub "z")
+                                               (rsub "x"))
+                                       "c"))
+                      pat)
+                '((0 0) (0 1)))))
+    (check-both '(document (frac (concat "ab" (rsub "x")) "c")) pat
+                '((0 0) (0 1))))
+  ;; a leading wildcard may be empty before an argument which is a tag
+  (check-both '(document (frac (rsub "x") "c"))
+              '(frac (concat (wildcard "w") (rsub "x")) "c")
+              '((0 0) (0 1)))
+  ;; with Replace, the whole argument: a formula pattern does not match one
+  ;; child of the formula of the argument (only inside its tags)
+  (with-search-mode 'replace
+    (lambda ()
+      (check= (hits '(document (concat (frac (concat (rsub "x") "a") "c")
+                                       (frac (rsub "x") "c")))
+                    '(frac (concat (wildcard "w") (rsub "x")) "c"))
+              '((0 1 0) (0 1 1)))))
+  ;; without a wildcard, the parts are adjacent, also when searching
+  (with-search-mode 'search
+    (lambda ()
+      (check= (hits '(document (frac (concat "a" (rsub "y") (rsub "x")) "c"))
+                    '(frac (concat "a" (rsub "x")) "c"))
+              '())
+      (check= (hits '(document (frac (concat "ab" (rsub "x")) "c"))
+                    '(frac (concat "a" (rsub "x")) "c"))
+              '()))))
+
+;; a match of several paragraphs may start in the paragraph where the
+;; previous one ended, also inside a tag of it, where a trailing wildcard
+;; carries it to the end of the paragraph: it was missed (#501)
+(define (test-match-after-a-tag)
+  (check-group "a match after a match in a tag")
+  (check-both '(document "xb" (concat (strong "bab") "x") "a")
+              '(document (concat "b" (wildcard "w"))
+                         (concat (wildcard "v") "a"))
+              '((0 1) (1 0 0 2) (1 0 0 2) (2 1))))
+
+;; a paragraph which is a tag alone is a formula of one child: a leading
+;; (trailing) wildcard carries a hit inside the tag to the start (end) of
+;; the paragraph, as when the tag is in a formula; it stopped at the end of
+;; the string inside the tag (#501, the maintainer's decision)
+(define (test-lone-tags)
+  (check-group "a tag alone in its paragraph")
+  (check-both '(document (strong "xab") "c")
+              '(document (concat "a" (wildcard "x")) "c")
+              '((0 0 1) (1 1)))
+  (check-both '(document (strong "xab") "c") '(concat "a" (wildcard "x"))
+              '((0 0 1) (0 1)))
+  (check-both '(document (strong "xab") "c") '(concat (wildcard "x") "a")
+              '((0 0) (0 0 2)))
+  (check-both '(document "xb" (strong "bab") "a")
+              '(document (concat "b" (wildcard "w"))
+                         (concat (wildcard "v") "a"))
+              '((0 1) (1 0 2) (1 0 2) (2 1)))
+  ;; but a wildcard never carries a hit out of a document, as in a theorem
+  ;; or an item: the hits stay in their paragraphs (the maintainer's
+  ;; decision; a formula with a theorem gave one hit which ran out of the
+  ;; theorem); inline tags such as section, strong and frac carry it
+  (let ((th '(theorem (document "xab" "yab"))))
+    (check-both `(document (concat "q" ,th)) '(concat "a" (wildcard "w"))
+                '((0 1 0 0 1) (0 1 0 0 3) (0 1 0 1 1) (0 1 0 1 3)))
+    (check-both `(document ,th) '(concat "a" (wildcard "w"))
+                '((0 0 0 1) (0 0 0 3) (0 0 1 1) (0 0 1 3)))
+    (check-both `(document ,th "c") '(document (concat "a" (wildcard "w")) "c")
+                '()))
+  (check-both '(document
+                 (concat "z" (itemize (document (concat (item) "xab")
+                                                (concat (item) "yab")))))
+              '(concat "a" (wildcard "w"))
+              '((0 1 0 0 1 1) (0 1 0 0 1 3) (0 1 0 1 1 1) (0 1 0 1 1 3)))
+  (check-both '(document
+                 (concat "z" (equation* (document (concat "xa" (rsub "y"))))))
+              '(concat "a" (wildcard "w"))
+              '((0 1 0 0 0 1) (0 1 0 0 1 1)))
+  (check-both '(document (section "xab") "c") '(concat "a" (wildcard "w"))
+              '((0 0 1) (0 1)))
+  (check-both '(document (frac (concat "a" (rsub "y")) "a+c"))
+              '(concat "a" (wildcard "w"))
+              '((0 0 0 0) (0 1))))
+
+;; Search finds at least what Replace finds in tag arguments: an argument
+;; which is a tag alone is a formula of one child for both (Search missed
+;; it inside the tags of an argument, which the cascade of Replace sees)
+(define (search-replace-cases n)
+  ;; n formula patterns and arguments, from a fixed pseudo-random sequence
+  (let* ((seed 7)
+         (rnd (lambda (k)
+                (set! seed (modulo (+ (* seed 1103515245) 12345) 2147483648))
+                (modulo (quotient seed 65536) k)))
+         (pick (lambda (l) (list-ref l (rnd (length l)))))
+         (atom (lambda () (pick '("a" "b" "ab" "z"))))
+         (tag (lambda () (pick '((rsub "x") (strong "ab") (rsup "2")))))
+         (arg (lambda ()
+                (case (rnd 4)
+                  ((0) (tag))
+                  ((1) `(em ,(tag)))
+                  ((2) `(concat ,(atom) (sqrt ,(tag))))
+                  (else `(concat ,(atom) ,(tag))))))
+         (elem (lambda ()
+                 (case (rnd 3)
+                   ((0) '(wildcard "w"))
+                   ((1) (tag))
+                   (else (atom))))))
+    (map (lambda (i)
+           (let* ((l (list (elem) (elem)))
+                  (l2 (if (and (string? (car l)) (string? (cadr l)))
+                          (list (car l) (tag))
+                          l)))
+             (list `(document (frac ,(arg) "c"))
+                   `(frac (concat ,@l2) "c"))))
+         (iota n))))
+
+(define (test-search-contains-replace)
+  (check-group "search contains replace")
+  (with r (list-filter
+            (search-replace-cases 400)
+            (lambda (c)
+              (let* ((rh (with-search-mode-value 'replace
+                           (lambda () (hits (car c) (cadr c)))))
+                     (sh (with-search-mode-value 'search
+                           (lambda () (hits (car c) (cadr c))))))
+                (and (pair? rh) (null? sh)))))
+    (check= r '()))
+  (check-both '(document (frac (concat "z" (em (rsub "x"))) "c"))
+              '(frac (concat (wildcard "w") (rsub "x")) "c")
+              '((0 0) (0 1)))
+  (check-both '(document (frac (concat "1+" (sqrt (rsup "2"))) "c"))
+              '(frac (concat (wildcard "w") (rsup "2")) "c")
+              '((0 0) (0 1)))
+  (check-both '(document (frac (em (strong "ab")) "c"))
+              '(frac (concat (strong "ab") (wildcard "w")) "c")
+              '((0 0) (0 1)))
+  ;; the arguments where the pattern was not found are remembered, but not
+  ;; the hidden ones, which may be shared with a visible argument (a
+  ;; document holds one tree several times, and the search does not go
+  ;; into the value of a with); and for each formula of the pattern
+  (let* ((s (stree->tree '(concat "z" (rsub "x"))))
+         (d (tree 'document
+                  (tree 'concat
+                        (tree 'frac
+                              (tree 'concat "q" (tree 'with "color" s "u"))
+                              "c")
+                        " " (tree 'frac s "c"))))
+         (d2 (tree 'document
+                   (tree 'concat (tree 'frac s "c") "+" (tree 'frac "q" s)))))
+    (for-each
+      (lambda (mode)
+        (with-search-mode mode
+          (lambda ()
+            (check= (tree-search-tree
+                      d '(frac (concat (wildcard "w") (rsub "x")) "c") '() 100)
+                    '((0 2 0) (0 2 1)))
+            (check= (tree-search-tree
+                      d2 '(frac (concat "q" (wildcard "w"))
+                                (concat (wildcard "v") (rsub "x")))
+                      '() 100)
+                    '((0 2 0) (0 2 1))))))
+      '(search replace))))
+
+;; a formula pattern in a tag argument, in nested fractions: the search of
+;; each argument looked again inside all the tags of the argument, at each
+;; level (16 s for a continued fraction of depth 60, a few ms now)
+(define (continued-fraction d)
+  (if (= d 0) "q"
+      `(frac (concat "1+" (frac "1" ,(continued-fraction (- d 1)))) "c")))
+
+(define (test-speed-in-arguments)
+  (check-group "speed in arguments")
+  ;; and of depth 200 (2.3 s before the arguments without a hit were
+  ;; remembered, 0.55 s on wip_fixes, about 20 ms now)
+  (with t (stree->tree `(document ,(continued-fraction 200)))
+    (for-each
+      (lambda (mode)
+        (with-search-mode mode
+          (lambda ()
+            (check-fast t '(frac (concat "a" (wildcard "w") (rsub "x")) "c")
+                        '()))))
+      '(search replace)))
+  (let ((t (stree->tree `(document ,(continued-fraction 60))))
+        (u (stree->tree `(document ,@(map (lambda (i) (continued-fraction 15))
+                                          (iota 300))))))
+    (for-each
+      (lambda (mode)
+        (with-search-mode mode
+          (lambda ()
+            (for-each
+              (lambda (what)
+                (check-fast t what '())
+                (check-fast u what '()))
+              '((frac (concat "a" (wildcard "w") (rsub "x")) "c")
+                (frac (concat "1+" (rsub "x")) "c"))))))
+      '(search replace))))
+
 ;; formulas of 40000 children and more: the scan for the start of a
 ;; match, and a wildcard which takes many children, went from one child to
 ;; the next by a recursion, which overflowed the stack and crashed TeXmacs
@@ -797,4 +1022,9 @@
   (test-long-concats)
   (test-parts-before-wildcards)
   (test-text-same-in-both)
+  (test-formulas-in-arguments)
+  (test-match-after-a-tag)
+  (test-lone-tags)
+  (test-search-contains-replace)
+  (test-speed-in-arguments)
   (check-end))
