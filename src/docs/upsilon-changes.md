@@ -24,6 +24,21 @@ have the details, and the problems go to the
   cell whose lines are broken (`cell-hyphen` `t`): what a hidden part
   assigns there now holds for the paragraphs after it
   ([#503](https://github.com/mgubi/texmacs/pull/503)).
+- **Licenses**: the packages bring the licenses of the software built into
+  TeXmacs or shipped with it (s7, femtolisp, tree-sitter, Clay, SDL3,
+  ThorVG, MuPDF and its libraries, GnuTLS, FreeType, Hunspell...), in
+  `TeXmacs/misc/licenses` with a README naming each component, where it
+  is used and where its sources are; the Linux and Windows bundles add
+  those of the libraries of the system they bring (`misc/licenses/system`).
+  The browser version serves them in `licenses/`, its help page names the
+  license of each component, and TikZJax and Asymptote-web come with their
+  licenses and the places of their sources. The ports of tree-sitter,
+  of its scanners and of the indentation of nvim-treesitter name their
+  authors and licenses; the fonts of Libertine and TeX Gyre got their
+  license files, and the notices of the fonts and the icons no longer
+  claim one license for all. Help → TeXmacs Upsilon thanks the authors of
+  these works, the emoji of Twemoji included. An unused grid layout of the
+  Vue interface, which came without a license, is gone.
 
 ## 25 October 2026
 
