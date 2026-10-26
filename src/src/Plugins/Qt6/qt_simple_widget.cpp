@@ -675,6 +675,12 @@ qt_simple_widget_rep::repaint_invalid_regions () {
   // repaint invalid rectangles
   {
     rectangles new_regions;
+    // only the part in the backing store is repainted: the rest is
+    // invalidated again when it is scrolled into view, and repainting the
+    // whole changed part of a long document would load all its pictures
+    QSize bsz= backingPixmap->size();
+    invalid_regions= invalid_regions &
+                     rectangles (rectangle (0, 0, bsz.width(), bsz.height()));
     if (!is_nil (invalid_regions)) {
       rectangle lub= least_upper_bound (invalid_regions);
       if (area (lub) < 1.2 * area (invalid_regions))
