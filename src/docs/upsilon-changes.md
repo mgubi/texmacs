@@ -14,6 +14,12 @@ have the details, and the problems go to the
 
 ## 26 October 2026
 
+- **Qt**: only the part of the document in the window is repainted after
+  typesetting. Opening a long document with saved references, or a new
+  paragraph at its start, used to repaint every page that moved, and so
+  converted every PDF image with Ghostscript: a document with 63 figures
+  opens in 4 s instead of 10, and Enter at its start repaints in under a
+  millisecond instead of 1.5 s (#458, #457).
 - Search and Replace find the same matches in the text: a match may start
   and end inside a word, and a wildcard takes the shortest text, possibly
   none; a string of the pattern still has to match a whole argument of a
