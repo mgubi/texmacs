@@ -189,6 +189,22 @@
   <hlink|list of thanks|upsilon-thanks.md>, which is also on
   <hlink|the site|https://mgubi.github.io/texmacs/thanks.html>.
 
+  <section|Software, fonts and art of others>
+
+  <TeXmacs> Upsilon includes the work of others, under their own licenses:
+  the <name|S7> Scheme of Bill Schottstaedt (0BSD), <name|tree-sitter> of
+  Max Brunsfeld and its grammars (MIT), the indentation queries of
+  <name|nvim-treesitter> (Apache 2.0), <name|Clay> of Nic Barker (zlib),
+  <name|SDL> (zlib), <name|ThorVG> (MIT), <name|MuPDF> of Artifex (AGPL 3),
+  <name|FreeType>, <name|GnuTLS> (LGPL), <name|Qt> (LGPL 3), the fonts of
+  <TeX> Live and of their designers (the SIL Open Font License, the GUST
+  Font License...), the <name|Lucide> icons (ISC) and the emoji of
+  <name|Twemoji>: Copyright 2019 Twitter, Inc and other contributors,
+  licensed under <hlink|CC-BY 4.0|https://creativecommons.org/licenses/by/4.0/>,
+  as the color font of Mozilla. The texts of the licenses are in
+  <hlink|misc/licenses|../../../misc/licenses/README.md> and in the
+  folders of the fonts (<verbatim|fonts/truetype>).
+
   <tmdoc-copyright|2026|Massimiliano Gubinelli>
 
   <tmdoc-license|Permission is granted to copy, distribute and/or modify this

@@ -40,3 +40,14 @@ named differently, open an issue or say so in your report.
 - **baudoly**: two windows on one document (#463, #464), the preferences
   with Inkscape installed (#465), dialogs with an accented title in Cocoa
   (#468), each with its cause found and a fix.
+
+## Software, fonts and art of others
+
+TeXmacs Upsilon is built with the work of others, whom we thank too: the
+s7 Scheme of Bill Schottstaedt, tree-sitter of Max Brunsfeld and its
+grammars, the queries of nvim-treesitter, Clay of Nic Barker, SDL, ThorVG,
+MuPDF of Artifex, FreeType, GnuTLS, Hunspell, Qt, TikZJax and
+Asymptote-web in the browser, the fonts of TeX Live and of their designers,
+the Lucide icons, and the emoji of Twemoji (Copyright 2019 Twitter, Inc and
+other contributors, CC-BY 4.0, as the color font of Mozilla). Their licenses
+are in `TeXmacs/misc/licenses` (README.md) and in the folders of the fonts.

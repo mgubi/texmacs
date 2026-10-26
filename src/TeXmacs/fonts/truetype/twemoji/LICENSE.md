@@ -22,6 +22,11 @@ The Emoji art in the twe-svg.zip archive comes from [Twemoji](https://twitter.gi
 and is used and redistributed under the CC-BY-4.0 [license terms](https://github.com/twitter/twemoji#license)
 offered by the Twemoji project.
 
+Twemoji graphics: Copyright 2019 Twitter, Inc and other contributors,
+licensed under CC-BY 4.0 (https://creativecommons.org/licenses/by/4.0/).
+Changes: Mozilla made the graphics into the color font TwemojiMozilla.ttf
+(twemoji-colr v0.7.0); TeXmacs ships that font unchanged.
+
 ### Creative Commons Attribution 4.0 International (CC BY 4.0)
 https://creativecommons.org/licenses/by/4.0/legalcode
 or for the human readable summary: https://creativecommons.org/licenses/by/4.0/
