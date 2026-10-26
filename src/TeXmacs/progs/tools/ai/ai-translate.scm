@@ -45,12 +45,15 @@
 
 (define ((translate-process-one dest-lan) serial tp st next)
   (let* ((t (tree-pointer->tree tp))
-         (t* (compress-tree t))
+         ;; the codes of this paragraph, freed once its answer is there
+         (table (compress-table-new "translate"))
+         (t* (with-compress-table table (lambda () (compress-tree t))))
          (in (compressed->html t* 1))
          (src-lan (tree-get-env t "language"))
          (model (get-preference "ai"))
          (agent (ai-translation-agent src-lan dest-lan))
-         (return (translate-processed-one serial tp st model next)))
+         (return (compress-table-callback table
+                   (translate-processed-one serial tp st model next))))
     (cond ((not (compressed-contains-text? t*))
            (return #f))
           ((not (process-running? 'translate))

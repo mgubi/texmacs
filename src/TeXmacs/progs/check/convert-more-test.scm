@@ -31,7 +31,8 @@
 ;;   - the source code formats of the plugins (cpp, julia, java, scala,
 ;;     json, csv, python, scilab, mathemagix, caas, scheme) and the registry
 ;;     of all the formats;
-;;   - the C++ parsers of Coq vernacular and JSON, and the compressed trees;
+;;   - the C++ parsers of Coq vernacular and JSON, the compressed trees and
+;;     their tables (freed after each request of AI or LanguageTool);
 ;;   - the serializations (tm, stm, tmml, stree) of the control characters
 ;;     and of a document of 2000 paragraphs, each in less than 2 s.
 ;;
@@ -42,7 +43,8 @@
 
 (texmacs-module (check convert-more-test)
   (:use (check check-lib)
-        (convert mathml tmmath)))
+        (convert mathml tmmath)
+        (tools spell spell-lantool)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Helpers
@@ -1084,6 +1086,85 @@
           '(document (concat "a " "b" " c")))
   (check= (st (decompress-tree (stree->tree '(compressed "x999999")))) ""))
 
+;; The tables of the codes (#438): each request of AI or LanguageTool has
+;; its own, freed once its answer is decompressed, and a chat has its own,
+;; freed when its session is closed; the default table is left alone.
+(define (compress-tables-like prefix)
+  (list-filter (compress-table-names)
+               (lambda (s) (string-starts? s prefix))))
+
+(define (test-compress-tables)
+  (check-group "compression tables")
+  (let* ((t (stree->tree '(document (concat "it is " (em "b") " " (frac "x" "y")))))
+         (default (compress-table-size ""))
+         (t1 (compress-table-new "check"))
+         (t2 (compress-table-new "check"))
+         (h1 (with-compress-table t1 (lambda () (compress-html t 1))))
+         (h2 (with-compress-table t2 (lambda () (compress-html t 1)))))
+    ;; codes numbered from x0 in each table: the same HTML in both
+    (check-false (== t1 t2))
+    (check= h1 h2)
+    (check-true (>= (string-search-forwards "id=\"x0\"" 0 h1) 0))
+    (check= (compress-table-size t1) 2)
+    (check= (compress-table-size "") default)
+    ;; the round trip, in the table of the compression
+    (check= (st (with-compress-table t1 (lambda () (decompress-html h1 1))))
+            (st t))
+    ;; freed: the table is gone, and its codes lose their markup, not text
+    (compress-table-free t1)
+    (check= (compress-table-size t1) -1)
+    (check-false (in? t1 (compress-table-names)))
+    (check= (compress-table-size t2) 2)
+    (compress-table-free t2)
+    (check= (st (with-compress-table t1 (lambda () (decompress-html h1 1))))
+            '(document (concat "it is " "b" " " (concat "x" "y"))))
+    (compress-table-free t1)
+    (check= (compress-tables-like "check") '())
+    ;; a callback decompresses in its table, which is freed afterwards
+    (with t3 (compress-table-new "check")
+      (let* ((h (with-compress-table t3 (lambda () (compress-html t 1))))
+             (r ((compress-table-callback t3
+                   (lambda (s) (st (decompress-html s 1)))) h)))
+        (check= r (st t))
+        (check= (compress-table-size t3) -1)))
+    ;; also when the callback fails
+    (with t4 (compress-table-new "check")
+      (catch #t
+        (lambda () ((compress-table-callback t4 (lambda () (error "fails")))))
+        (lambda args #f))
+      (check= (compress-table-size t4) -1))
+    ;; Correct (an engine without a command: no request is sent)
+    (with r (cpp-ai-correct t "english" "no-such-engine")
+      (check-true (tree? r)))
+    (check= (compress-tables-like "ai") '())
+    ;; a chat keeps its table until its session is closed
+    (with-compress-table "ai:no-such-engine-check-chat"
+      (lambda () (compress-html t 1)))
+    (check= (compress-table-size "ai:no-such-engine-check-chat") 2)
+    (connection-stop "no-such-engine" "check-chat")
+    (check= (compress-table-size "ai:no-such-engine-check-chat") -1)
+    ;; LanguageTool: a check (while no spell process runs, the text comes
+    ;; back as its own answer, without a request) and its corrections
+    (let* ((h #f) (out #f)
+           (return (lambda (html r)
+                     (set! h html)
+                     (let* ((pos (string-search-forwards "is " 0 html))
+                            (json (string-append
+                                   "{\"software\":{},\"matches\":[{"
+                                   "\"message\":\"A verb\","
+                                   "\"replacements\":[{\"value\":\"was\"}],"
+                                   "\"offset\":" (number->string pos) ","
+                                   "\"length\":2,\"rule\":{\"id\":\"A\"}}]}")))
+                       (set! out (st (decompress-html
+                                      (lantool-correct html json) 1)))))))
+      (check-false (process-running? 'spell))
+      (lantool-process* t return)
+      (check= h h1)
+      (check= out '(document (concat "it " (spell-error "is" "A verb" "was")
+                                     " " (em "b") " " (frac "x" "y"))))
+      (check= (compress-tables-like "lantool") '()))
+    (check= (compress-table-size "") default)))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Serializations of special characters
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1265,7 +1346,7 @@
                   test-cork-bytes test-cork-unicode test-other-encodings
                   test-images test-image-formats test-code-formats
                   test-format-registry test-vernac test-json test-ai-answers
-                  test-compress
+                  test-compress test-compress-tables
                   test-serialize-special test-big-document test-pdf-export))
   (when (url-exists? (temp-dir)) (system-rmdir-recursive (temp-dir)))
   (check-end))

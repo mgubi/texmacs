@@ -17,9 +17,92 @@
 #include "drd_std.hpp"
 #include "analyze.hpp"
 #include "path.hpp"
+#include "iterator.hpp"
 
-static hashmap<string,tree> compressed;
-static hashmap<tree,string> compressed_code;
+/******************************************************************************
+* The tables of the codes
+*******************************************************************************
+* A compressed node "xN" stands for markup kept in a table, until the answer
+* which refers to it has been decompressed.  The users of the compression
+* have tables of their own, which they free when they no longer need them:
+* - a chat (ai_correct and ai_translate with a chat name, see ai.cpp):
+*   "ai:<model>-<chat>", kept as long as the chat, since its answers may
+*   refer to the codes of its earlier requests, and freed by ai_chat_close
+*   when its session is closed;
+* - a request outside a chat (ai_correct and ai_translate without a chat
+*   name, one paragraph of the translation process, one check of
+*   LanguageTool): a table of its own (compress_table_new), freed once its
+*   answer has been decompressed;
+* - AI copy and paste: "ai-clipboard", for a chat outside TeXmacs, which
+*   does not tell TeXmacs when it ends;
+* - any other caller: the default table "".
+* The codes are numbered from x0 in each table, so that compressing the
+* same tree in a new table gives the same HTML.
+******************************************************************************/
+
+struct compress_table_rep {
+  hashmap<string,tree> compressed;
+  hashmap<tree,string> compressed_code;
+};
+
+static hashmap<string,pointer> compress_tables (NULL);
+static string compress_current= "";
+static int compress_table_serial= 0;
+
+static compress_table_rep*
+the_table () {
+  if (!compress_tables->contains (compress_current))
+    compress_tables (compress_current)= (pointer) tm_new<compress_table_rep> ();
+  return (compress_table_rep*) compress_tables [compress_current];
+}
+
+string
+compress_table_select (string name) {
+  string prev= compress_current;
+  compress_current= name;
+  return prev;
+}
+
+string
+compress_table_new (string prefix) {
+  string name;
+  do {
+    name= prefix * "-" * as_string (++compress_table_serial);
+  } while (compress_tables->contains (name));
+  compress_tables (name)= (pointer) tm_new<compress_table_rep> ();
+  return name;
+}
+
+void
+compress_table_free (string name) {
+  if (!compress_tables->contains (name)) return;
+  compress_table_rep* rep= (compress_table_rep*) compress_tables [name];
+  compress_tables->reset (name);
+  tm_delete (rep);
+}
+
+int
+compress_table_size (string name) {
+  if (!compress_tables->contains (name)) return -1;
+  compress_table_rep* rep= (compress_table_rep*) compress_tables [name];
+  return N(rep->compressed);
+}
+
+array<string>
+compress_table_names () {
+  array<string> r;
+  iterator<string> it= iterate (compress_tables);
+  while (it->busy ()) r << it->next ();
+  return r;
+}
+
+compress_scope::compress_scope (string name2, bool temp2):
+  name (name2), temp (temp2), prev (compress_table_select (name2)) {}
+
+compress_scope::~compress_scope () {
+  compress_table_select (prev);
+  if (temp) compress_table_free (name);
+}
 
 tree html_as_compressed (string s, int& pos, string close, int mode, path p);
 
@@ -69,6 +152,9 @@ compress_tree (tree t, int spc_mode, path p) {
 
   tree key= tuple (val, as_string (spc_mode));
   if (N(p) == 0 || p->item >= 0) key << as_string (p);
+  compress_table_rep* tab= the_table ();
+  hashmap<string,tree>& compressed= tab->compressed;
+  hashmap<tree,string>& compressed_code= tab->compressed_code;
   if (compressed_code->contains (key)) {
     //cout << key << " <- " << compressed_code[key] << "\n";
     r[0]= compressed_code[key];
@@ -176,6 +262,7 @@ decompress_tree (tree t, int& spc_mode) {
 
   if (is_compound (t, "compressed") && N(t) >= 1 && is_atomic (t[0])) {
     string code= t[0]->label;
+    hashmap<string,tree>& compressed= the_table ()->compressed;
     if (compressed->contains (code)) {
       tree key= copy (compressed[code]);
       tree val= key[0];
@@ -394,7 +481,7 @@ html_as_compressed (string s, int& pos, int mode, path p) {
     if (test (s, pos, "</a>")) pos += 4;
     else pos= old_pos;
     if (var != "id") return "";
-    tree key= compressed[val];
+    tree key= the_table ()->compressed[val];
     path new_p= p;
     if (N(key) >= 2) new_p= as_path (key[2]->label);
     if (!(p <= new_p) && !is_compound (key[0], "spell-error")) {
@@ -409,7 +496,7 @@ html_as_compressed (string s, int& pos, int mode, path p) {
     if (var != "id") return "";
     string cont= "<div id=\"cont-" * val * "\">";
     tree r= compound ("compressed", val);
-    tree key= compressed[val];
+    tree key= the_table ()->compressed[val];
     path new_p= p;
     if (N(key) >= 2) new_p= as_path (key[2]->label);
     if (!(p <= new_p) && !is_compound (key[0], "spell-error")) {

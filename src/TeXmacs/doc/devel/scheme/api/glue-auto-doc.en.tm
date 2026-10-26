@@ -4099,6 +4099,54 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(compress-table-select <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|compress_table_select> which returns
+    <scm|string>.
+  </explain>
+
+  <\explain>
+    <scm|(compress-table-new <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|compress_table_new> which returns
+    <scm|string>.
+  </explain>
+
+  <\explain>
+    <scm|(compress-table-free <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|compress_table_free> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(compress-table-size <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|compress_table_size> which returns
+    <scm|int>.
+  </explain>
+
+  <\explain>
+    <scm|(compress-table-names)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|compress_table_names> which returns
+    <scm|array_string>.
+  </explain>
+
+  <\explain>
+    <scm|(cpp-ai-chat-close <scm-arg|string> <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|ai_chat_close> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
     <scm|(cpp-ai-command <scm-arg|string> <scm-arg|string> <scm-arg|string>)>
 <explain-synopsis|no synopsis>
   <|explain>

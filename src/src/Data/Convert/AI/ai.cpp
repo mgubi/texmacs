@@ -800,8 +800,24 @@ ai_post (tree t, tree u) {
   return u;
 }
 
+// the table of the compressed markup (compress.cpp): that of the chat,
+// whose later answers may refer to its codes, until ai_chat_close; without
+// a chat, a new one, freed at the end of the request
+static string
+ai_compress_table (string model, string chat) {
+  if (chat == "") return compress_table_new ("ai");
+  return "ai:" * model * "-" * chat;
+}
+
+void
+ai_chat_close (string model, string chat) {
+  if (chat == "") return;
+  compress_table_free (ai_compress_table (model, chat));
+}
+
 tree
 ai_correct (tree t, string lan, string model, string chat) {
+  compress_scope scope (ai_compress_table (model, chat), chat == "");
   array<string> comments;
   string s= compress_html (t);
   //cout << "s= " << s << "\n";
@@ -840,6 +856,7 @@ ai_translate (string s, string from, string into, string model, string chat) {
 
 tree
 ai_translate (tree t, string from, string into, string model, string chat) {
+  compress_scope scope (ai_compress_table (model, chat), chat == "");
   string s= compress_html (t);
   //cout << "s= " << s << "\n";
   string r= ai_translate (s, from, into, model, chat);

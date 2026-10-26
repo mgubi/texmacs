@@ -61,7 +61,17 @@
     (ahash-set! lantool-cache (list lan html) r)
     (return html r)))
 
+;; The codes of the compressed markup of one check, from the compression of
+;; the text to the decompression of the corrections, in a table of its own,
+;; freed when return has been called.  The same text compressed again gives
+;; the same HTML in a new table, so lantool-cache still works.
 (tm-define (lantool-process* t return)
+  (with table (compress-table-new "lantool")
+    (with-compress-table table
+      (lambda ()
+        (lantool-process-in t (compress-table-callback table return))))))
+
+(define (lantool-process-in t return)
   (let* ((html (compress-html t 1))
          (lan (tree-get-env t "language"))
          (r (ahash-ref lantool-cache (list lan html))))
