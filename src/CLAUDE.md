@@ -62,7 +62,8 @@ Logs are in `tests/build/<runner>/`. Some references depend on the machine's fon
 ## Running TeXmacs headless
 - ALWAYS set `TEXMACS_HOME_PATH` to a scratch directory (the runners do, `TM_TEST_HOME` overrides theirs). Without it TeXmacs writes into the user's real `~/.TeXmacs` (settings, font database, caches). Never run `texmacs.bin` by hand without it, not even for a probe.
 - `texmacs.bin -x '<expr>' -q`: an error in `-x` keeps TeXmacs running, so wrap the expression in `(catch #t ... )` and `(exit ...)`/`quit`, and use a timeout. `use-modules` and `lazy-define` are not allowed in `-x`; `(load "file.scm")` is.
-- Without a window: nothing is typeset until `update-forced`; `delayed` and idle work never run; auxiliary data needs `generate-all-aux` (see `tests/documents/export.scm`); page numbers are `?` unless the page medium is paper; modifier key presses and box-based cursor moves do not work.
+- Without a window: nothing is typeset until `update-forced`; `delayed` and idle work never run; auxiliary data needs `generate-all-aux` (see `tests/documents/export.scm`); page numbers are `?` unless the page medium is paper; modifier key presses do not work (call the command instead, e.g. `(make-fraction)` for `math f`).
+- Box-based cursor moves (`kbd-right`, `kbd-down`... the arrow keys) do nothing while the editor has pending changes (`has_changed` in `go_right`, `edit_cursor.cpp`), and `update-forced` does not clear them: call `(update-forced) (apply-changes)` after each edit, then `(kbd-right)` etc. work (`key-press "right"` alone does not). The arity of macros defined in a document is only learned by `drd_update`, which runs in `update_menus`: call `(update-menus)` after loading or editing the preamble, or `\name` Return inserts the macro without fields.
 - One process gets slower over many loaded documents (leaked views, #61); restart it every few hundred documents.
 
 ## Known pitfalls
