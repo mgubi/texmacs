@@ -3659,7 +3659,8 @@ wheel_x11 () {
 // fingers in points and the page follows them; nor, for now, on Windows,
 // where SDL gives notches (WHEEL_DELTA) and the trackpad was not measured.
 // An editor which captures the wheel (graphics) still gets the fingers
-// (push_wheel), as the Qt port gives it the pixels of the event
+// (push_wheel), as the Qt port does on Wayland and macOS with the pixels
+// of the event (under X11 Qt gives no pixels for these increments)
 static bool
 wheel_units_are_notches () {
 #if defined(OS_MACOS) || defined(__EMSCRIPTEN__) || defined(_WIN32)
@@ -3748,8 +3749,9 @@ wheel_glides (const vue_input_state& in) {
 // (mouse_action) and to the Clay scroll container under the pointer; gx,
 // gy are the delta as an editor which captures the wheel (graphics) gets
 // it: the movement of the fingers where a unit of a trackpad scrolls a
-// notch (wheel_units_are_notches), as the Qt port gives it the pixels of
-// the event. It is added up apart, each delta at its scale, since a frame
+// notch (wheel_units_are_notches), as the Qt port does on Wayland and
+// macOS with the pixels of the event. It is added up apart, each delta at
+// its scale, since a frame
 // may have both the travel of a notch and a trackpad
 static void
 push_wheel (vue_window win, double dx, double dy, double gx, double gy) {
@@ -3878,6 +3880,10 @@ wheel_event (vue_window win, double x, double y, time_t now, uint64_t stamp) {
   if (fresh) {
     in.wheel_precise= false;
     in.wheel_over_x= in.wheel_over_y= 0;
+    // a notch which comes while the tail of a swipe is still travelling
+    // reaches a graphics in full, not at the scale of the swipe (the tail
+    // is then a few pixels)
+    in.wheel_pend_g= 1.0;
   }
   // fractional deltas are a trackpad; so is a second event which follows
   // the opening one too soon for a wheel to have turned twice (see above)
