@@ -191,6 +191,10 @@ bool
 match_cascaded (tree t, tree what) {
   if (is_concat (what) && is_compound (t)) {
     if (match_formula (t, what)) return true;
+    // with partial matches, match_formula searched inside all the tags of
+    // t already: the cascade would search them again at each level (in
+    // nested fractions, a power of the depth)
+    if (partial_match_flag && cascaded_match_flag) return false;
     if (is_concat (t)) {
       // a formula pattern inside the tags of the formula t, not as a part of
       // t (a child of t, or a run of children, is matched above)
@@ -524,8 +528,16 @@ search_concat_sub (tree t, tree what, int pos, int i,
     return SC_NEXT_KEEP;
   }
   else {
+    // a tag of the pattern and a tag of the formula: unless it is the whole
+    // pattern, the element covers the start or the end of the tag, so it
+    // matches the tag itself (a hit inside it would not do: searching it
+    // there cost a search of the tag at each place, #501)
     range_set sel;
-    search (sel, t[pos], what[i], p * pos);
+    if (i > 0 || i < N(what)-1) {
+      if (match (t[pos], what[i]))
+        sel << (p * pos) * start (t[pos]) << (p * pos) * end (t[pos]);
+    }
+    else search (sel, t[pos], what[i], p * pos);
     if (N(sel) != 0) {
       bool c1= (i == 0 || sel[0] == (p * pos) * start (t[pos]));
       bool c2= (i == N(what)-1 || sel[N(sel)-1] == (p * pos) * end (t[pos]));
@@ -943,9 +955,20 @@ search_document (range_set& sel, tree t, tree what, path p) {
   }
 }
 
+static bool
+is_anchored (tree t) {
+  // a pattern, or a paragraph, with an anchor at its start or at its end
+  return is_concat (t) && N(t) > 0 &&
+         (is_func (t[0], SEARCH_ANCHOR) || is_func (t[N(t)-1], SEARCH_ANCHOR));
+}
+
 void
 search (range_set& sel, tree t, tree what, path p) {
   if (N(sel) > search_max_hits) return;
+  // an anchored pattern is found only in the anchored paragraph, not inside
+  // its children, which have no anchor: do not search them (match_formula
+  // makes such a search at each tag, at each level of the cascade)
+  if (is_anchored (what) && !is_anchored (t)) return;
   if (is_atomic (t))
     search_string (sel, t->label, what, p);
   else if (is_func (t, CONCAT) && is_func (what, CONCAT))

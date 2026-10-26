@@ -30,8 +30,9 @@
 ;; default, and a string of the pattern must match a whole argument. A
 ;; formula in an argument of the pattern is text, as in a paragraph, and
 ;; follows the same flags: anywhere in the argument, or the whole argument
-;; (#501). Both allow cascaded matches (a pattern inside an argument). The checks set
-;; preferences in memory only, and restore them: nothing is saved.
+;; (#501). Both allow cascaded matches (a pattern inside an argument).
+;; The checks set preferences in memory only, and restore them: nothing is
+;; saved.
 ;;
 ;; The formulas are written as the editor keeps them: a concat never has
 ;; two strings in a row (tree-simplify merges them), so that a+b_i is
@@ -807,8 +808,33 @@
 (define (test-match-after-a-tag)
   (check-group "a match after a match in a tag")
   (check-both '(document "xb" (concat (strong "bab") "x") "a")
-              '(document (concat "b" (wildcard "w")) (concat (wildcard "v") "a"))
+              '(document (concat "b" (wildcard "w"))
+                         (concat (wildcard "v") "a"))
               '((0 1) (1 0 0 2) (1 0 0 2) (2 1))))
+
+;; a formula pattern in a tag argument, in nested fractions: the search of
+;; each argument looked again inside all the tags of the argument, at each
+;; level (16 s for a continued fraction of depth 60, a few ms now)
+(define (continued-fraction d)
+  (if (= d 0) "q"
+      `(frac (concat "1+" (frac "1" ,(continued-fraction (- d 1)))) "c")))
+
+(define (test-speed-in-arguments)
+  (check-group "speed in arguments")
+  (let ((t (stree->tree `(document ,(continued-fraction 60))))
+        (u (stree->tree `(document ,@(map (lambda (i) (continued-fraction 15))
+                                          (iota 300))))))
+    (for-each
+      (lambda (mode)
+        (with-search-mode mode
+          (lambda ()
+            (for-each
+              (lambda (what)
+                (check-fast t what '())
+                (check-fast u what '()))
+              '((frac (concat "a" (wildcard "w") (rsub "x")) "c")
+                (frac (concat "1+" (rsub "x")) "c"))))))
+      '(search replace))))
 
 ;; formulas of 40000 children and more: the scan for the start of a
 ;; match, and a wildcard which takes many children, went from one child to
@@ -853,4 +879,5 @@
   (test-text-same-in-both)
   (test-formulas-in-arguments)
   (test-match-after-a-tag)
+  (test-speed-in-arguments)
   (check-end))
