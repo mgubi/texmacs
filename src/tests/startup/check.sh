@@ -1,7 +1,7 @@
 #!/bin/sh
 # Check the order in which TeXmacs processes its command line: the commands
 # of -x and the files in their order, -q and the automatic quit of the
-# headless mode after them.
+# headless mode after them, and the exit of TeXmacs after a script.
 #
 # usage: tests/startup/check.sh
 #
@@ -12,7 +12,8 @@
 # case which takes longer than TM_TEST_TIMEOUT seconds (default 60) is
 # stopped and fails. The cases replace quit-TeXmacs by a function which
 # prints the names of the buffers before it exits, to see what was loaded
-# when TeXmacs quits.
+# when TeXmacs quits. A run which does not exit with status 0 (a crash at
+# the exit) prints the line "exit status <n>" after the expected ones.
 
 here=$(cd "$(dirname "$0")" && pwd)
 top=$(cd "$here/../.." && pwd)
@@ -48,8 +49,11 @@ failed=0
 check () {
   name=$1; expected=$2; shift 2
   total=$((total + 1))
-  got=$(cd "$out" && perl -e 'alarm shift; exec @ARGV' "$timeout" "$bin" "$@" \
-          2> "$out/$total.err" | grep -a '^CHECK ' | sed 's/^CHECK //')
+  (cd "$out" && perl -e 'alarm shift; exec @ARGV' "$timeout" "$bin" "$@" \
+     > "$out/$total.out" 2> "$out/$total.err")
+  code=$?
+  got=$(grep -a '^CHECK ' "$out/$total.out" | sed 's/^CHECK //')
+  [ $code -eq 0 ] || got=$(printf '%s\nexit status %s' "$got" "$code")
   if [ "$got" = "$expected" ]; then
     echo "  ok     $name"
   else
@@ -96,6 +100,53 @@ check "headless: -X does not quit" \
       "one ()
 two ()" \
       -headless -X -x "$(show one)" -x "(delayed (delayed $(show two) (exit 0)))"
+
+# A script which leaves a buffer shown again with its cursor in a generated
+# bibliography: its focus toolbar has an input field with a completer, and
+# the toolbar it had before is deleted later, by the event loop of Qt, which
+# a script given by -x runs before. The deletion of that toolbar at the exit
+# crashed in QCompletionModel::filter (#462); the exit deletes nothing now.
+cat > "$out/startup-refs.bib" <<'EOF'
+@article{knuth, author={Knuth, Donald E.}, title={The Art}, journal={J}, year=1968}
+EOF
+cat > "$out/startup-bib.tm" <<'EOF'
+<TeXmacs|2.1.4>
+
+<style|generic>
+
+<\body>
+  See <cite|knuth>.
+
+  <\bibliography|bib|tm-plain|startup-refs>
+  </bibliography>
+</body>
+EOF
+cat > "$out/startup-bib.scm" <<'EOF'
+(let ((u (url-append (url-pwd) "startup-bib.tm"))
+      (o (url-append (url-pwd) "startup-a.tm")))
+  (load-buffer u)
+  (switch-to-buffer* u)
+  (update-forced)
+  (generate-all-aux)
+  (update-forced)
+  (with l (select (buffer-tree) '(:* bib-list))
+    (when (pair? l) (tree-go-to (car l) 1 :start)))
+  (update-forced)
+  (display* "CHECK in " (if (tree-innermost 'bib-list) "bib-list" "?") "\n")
+  (load-buffer o)
+  (switch-to-buffer* o)
+  (update-forced)
+  (switch-to-buffer* u)
+  (update-forced)
+  (buffer-pretend-saved u)
+  (buffer-close o)
+  (buffer-close u))
+EOF
+
+check "a script which leaves a focus toolbar with a completer exits (#462)" \
+      "in bib-list
+quit ()" \
+      -x "$atquit" -x '(load "startup-bib.scm")' -q
 
 echo "Total: $total checks, $failed failed"
 exit $status
