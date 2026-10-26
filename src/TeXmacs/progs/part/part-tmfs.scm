@@ -197,8 +197,9 @@
     (if b (list (cdr b)) (list))))
 
 (define (part-init-vars . ls)
-  ;; the variables of the bindings @ls, each once, in order
-  (sort (list-remove-duplicates (append-map (cut map car <>) ls)) string<?))
+  ;; the variables of the bindings @ls, each once, in their order (those
+  ;; of the first, then the new ones of the next...)
+  (list-remove-duplicates (append-map (cut map car <>) ls)))
 
 (define (part-init-changed name v)
   ;; the variables which the part view @name, with the initial environment
@@ -220,23 +221,33 @@
                         (if (!= (part-init-value V k) (part-init-value B k))
                             (part-init-value V k)
                             (part-init-value D k))))
-                 (part-init-vars V B D)))))
+                 (part-init-vars D V B)))))
+
+(define (part-init-conflicts? name v d0 d)
+  ;; does a variable which the part view @name (with the initial
+  ;; environment @v) changed have, in the initial environment @d, a value
+  ;; which differs both from the one in @d0 (the file on disk when the view
+  ;; was loaded or last saved) and from the one of the view?
+  (let* ((V  (part-init-assoc v))
+         (D0 (part-init-assoc d0))
+         (D  (part-init-assoc d)))
+    (list-or
+     (map (lambda (k)
+            (and (!= (part-init-value D k) (part-init-value D0 k))
+                 (!= (part-init-value D k) (part-init-value V k))))
+          (part-init-changed name v)))))
 
 (define (part-own-changed-on-disk? name f v)
   ;; did the body of the own file @f of the part view @name change on disk
   ;; since the view loaded or saved it, or a variable of its initial
   ;; environment which the view (with the initial environment @v) changed?
   (let* ((disk (part-loaded-disk name f))
-         (init (part-init-assoc (part-loaded-init-disk name)))
          (now  (part-file-body-init f)))
     (and now
          (or (and disk (!= (car now) disk))
              (and (part-loaded-init-disk name)
-                  (with D (part-init-assoc (cdr now))
-                    (list-or
-                     (map (lambda (k)
-                            (!= (part-init-value D k) (part-init-value init k)))
-                          (part-init-changed name v)))))))))
+                  (part-init-conflicts? name v (part-loaded-init-disk name)
+                                        (cdr now)))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Loading
@@ -739,12 +750,26 @@
   (when (!= (tm->stree (buffer-get-body f)) (tm->stree body))
     (buffer-shared-set-body f body)))
 
+(define (part-own-init-action name f body v)
+  ;; part-own-action for the part view @name, whose initial environment is
+  ;; @v: an open buffer of @f with an unsaved change of a variable which
+  ;; the view changed too is a conflict, as one in the body
+  (with action (part-own-action f body)
+    (if (and (== action 'buffer)
+             (part-loaded-init-disk name)
+             (part-init-conflicts? name v (part-loaded-init-disk name)
+                                   (tmfile-extract (buffer-get f) 'initial)))
+        'conflict
+        action)))
+
 (tm-define (part-own-plan buf)
   ;; for the part view @buf: (file action changed-on-disk?) for its own
   ;; file
   (buffer-shared-flush)
   (with (name f body copies) (part-view-info buf)
-    (with action (part-own-action f (part-compress-body body f))
+    (with action (part-own-init-action
+                  name f (part-compress-body body f)
+                  (tmfile-extract (tm->stree (buffer-get buf)) 'initial))
       (list f action (part-changed-on-disk? name f action)))))
 
 (tmfs-save-handler (part name doc)
@@ -773,13 +798,15 @@
       ;; the view of the master: its file is written with the new style
       (set! com (tmfile-assign com 'style style)))
     (let* ((b (tmfile-extract com 'body))
-           (action (part-own-action f b)))
+           (action (part-own-init-action name f b
+                                         (tmfile-extract doc 'initial))))
       (cond ((== action 'conflict)
              ;; an open buffer of the file has unsaved changes of its own
-             ;; in the body, which the file would lose (and the buffer
-             ;; would overwrite the view): the file is not written, as an
-             ;; included file (the master does not get the style of the
-             ;; view either)
+             ;; in the body or in a variable of the initial environment
+             ;; which the view changed too, which the file would lose (and
+             ;; the buffer would overwrite the view): the file is not
+             ;; written, as an included file (the master does not get the
+             ;; style of the view either)
              (part-save-refuse f "it is open with other unsaved changes"))
             ((and (== action 'buffer)
                   (part-changed-on-disk? name f action)

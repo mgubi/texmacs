@@ -2104,8 +2104,9 @@
          (a (tmp "ia.tm"))
          (q (system->url (part-url m m)))
          (p (system->url (part-url m a))))
-    ;; S1: master view, the master already has font termes; the buffer
-    ;; changes it to pagella (unsaved); the view sets fbs and saves
+    ;; the view of the master, whose file has font termes; the open buffer
+    ;; sets pagella (unsaved), the view sets font-base-size and saves; the
+    ;; next saves keep pagella
     (write-doc "ia.tm" '("book") '() '((chapter "A") "a"))
     (write-doc "im.tm" '("book") '(("par-first" "0fn") ("font" "termes"))
                '("intro" (include "ia.tm")))
@@ -2117,21 +2118,21 @@
     (edit (init-env "font-base-size" "12"))
     (check= (part-own-plan q) (list m 'buffer #f))
     (save-buffer q)
-        (check= (assoc-ref (file-init "im.tm") "font") "pagella")
+    (check= (assoc-ref (file-init "im.tm") "font") "pagella")
     (switch-to-buffer q)
     (edit (tree-set (bt 0) "intro 2"))
     (check= (part-save-changed q) (list))
     (save-buffer q)
-        (check= (assoc-ref (file-init "im.tm") "font") "pagella")
+    (check= (assoc-ref (file-init "im.tm") "font") "pagella")
     (check= (master-buffer-init m "font") "pagella")
     (check-false (buffer-modified? m))
     (switch-to-buffer q)
     (edit (tree-set (bt 0) "intro 3"))
     (save-buffer q)
-        (check= (assoc-ref (file-init "im.tm") "font") "pagella")
+    (check= (assoc-ref (file-init "im.tm") "font") "pagella")
     (buffer-close q) (buffer-close m)
-    ;; S2: included file, the master has font termes, ia none; the buffer
-    ;; of ia sets pagella; three saves of the chapter view
+    ;; the view of an included file; the master has font termes, ia.tm none;
+    ;; the open buffer of ia.tm sets pagella; three saves of the view
     (write-doc "ia.tm" '("book") '() '((chapter "A") "a"))
     (write-doc "im.tm" '("book") '(("par-first" "0fn") ("font" "termes"))
                '("intro" (include "ia.tm")))
@@ -2143,21 +2144,21 @@
     (edit (init-env "font-base-size" "13"))
     (check= (part-own-plan p) (list a 'buffer #f))
     (save-buffer p)
-        (check= (assoc-ref (file-init "ia.tm") "font") "pagella")
+    (check= (assoc-ref (file-init "ia.tm") "font") "pagella")
     (switch-to-buffer p)
     (edit (init-env "par-indent" "1fn"))
     (check= (part-save-changed p) (list))
     (save-buffer p)
-        (check= (assoc-ref (file-init "ia.tm") "font") "pagella")
+    (check= (assoc-ref (file-init "ia.tm") "font") "pagella")
     (switch-to-buffer p)
     (edit (init-env "par-indent" "2fn"))
     (check= (part-save-changed p) (list))
     (save-buffer p)
-        (check= (assoc-ref (file-init "ia.tm") "font") "pagella")
+    (check= (assoc-ref (file-init "ia.tm") "font") "pagella")
     (check= (master-buffer-init a "font") "pagella")
     (check-false (buffer-modified? a))
     (buffer-close p) (buffer-close a)
-    ;; S3: P1b with three saves, the master without font
+    ;; the same, the master without font
     (write-doc "ia.tm" '("book") '() '((chapter "A") "a"))
     (write-doc "im.tm" '("book") '(("par-first" "0fn"))
                '("intro" (include "ia.tm")))
@@ -2176,7 +2177,8 @@
     (check= (assoc-ref (file-init "ia.tm") "font") "pagella")
     (check= (master-buffer-init a "font") "pagella")
     (check-false (buffer-modified? a))
-    ;; S4: the buffer saved by itself in between (question expected)
+    ;; the buffer saves a change of par-sep itself in between: no question
+    ;; (the view did not change par-sep), and the file keeps it
     (switch-to-buffer a)
     (edit (init-env "par-sep" "1fn"))
     (buffer-save a)
@@ -2191,7 +2193,7 @@
     (check= (master-buffer-init a "par-indent") "9fn")
     (check-false (buffer-modified? a))
     (buffer-close p) (buffer-close a)
-    ;; S5: a file without initial environment (P1b)
+    ;; an included file without an initial environment
     (tree-export (stree->tree '(document (TeXmacs "2.1") (style (tuple "book"))
                                          (body (document (chapter "A") "a"))))
                  a "texmacs")
@@ -2205,24 +2207,24 @@
     (edit (init-env "font-base-size" "13"))
     (check= (part-own-plan p) (list a 'buffer #f))
     (save-buffer p)
-        (switch-to-buffer p)
+    (switch-to-buffer p)
     (edit (tree-set (bt 0 0) "B"))
     (check= (part-save-changed p) (list))
     (save-buffer p)
-        (check= (assoc-ref (file-init "ia.tm") "font") "pagella")
+    (check= (assoc-ref (file-init "ia.tm") "font") "pagella")
     (check-false (buffer-modified? a))
     (check-false (buffer-modified? p))
-    ;; S6: revert of the view, then a save
+    ;; a revert of the view, then a save
     (switch-to-buffer p)
     (revert-buffer-revert)
     (update-forced)
     (edit (init-env "par-indent" "3fn"))
     (check= (part-save-changed p) (list))
     (save-buffer p)
-        (check= (assoc-ref (file-init "ia.tm") "font") "pagella")
+    (check= (assoc-ref (file-init "ia.tm") "font") "pagella")
     (buffer-close p) (buffer-close a)
-    ;; S7: master view, buffer adds font, view saves; view then sets the
-    ;; same key font itself -> view wins; then removes it
+    ;; the view of the master; the open buffer adds font and the view saves;
+    ;; then the view sets font itself, and wins; then it removes it
     (write-doc "ia.tm" '("book") '() '((chapter "A") "a"))
     (write-doc "im.tm" '("book") '(("par-first" "0fn"))
                '("intro" (include "ia.tm")))
@@ -2246,6 +2248,106 @@
     (check= (master-buffer-init m "font") #f)
     (check-false (buffer-modified? m))
     (buffer-close q) (buffer-close m)
+    ;; an unsaved change of the open buffer in a variable which the view
+    ;; changed too is a conflict, as one in the body: refused, and the
+    ;; view keeps its change, which a later save writes
+    (write-doc "ia.tm" '("book") '() '((chapter "A") "a"))
+    (load-buffer a) (update-forced)
+    (load-buffer p) (update-forced)
+    (switch-to-buffer a)
+    (edit (init-env "par-indent" "1fn"))
+    (switch-to-buffer p)
+    (edit (init-env "par-indent" "9fn"))
+    (check= (part-own-plan p) (list a 'conflict #f))
+    (save-buffer p)
+    (check= (part-save-message)
+            "Not saved: ia.tm (it is open with other unsaved changes)")
+    (check= (assoc-ref (file-init "ia.tm") "par-indent") #f)
+    (check= (master-buffer-init a "par-indent") "1fn")
+    (check-true (buffer-modified? a))
+    (check-true (buffer-modified? p))
+    (switch-to-buffer a)
+    (edit (init-default "par-indent"))
+    (switch-to-buffer p)
+    (check= (part-own-plan p) (list a 'buffer #f))
+    (save-buffer p)
+    (check= (part-save-message) "Saved ia.tm")
+    (check= (assoc-ref (file-init "ia.tm") "par-indent") "9fn")
+    (check= (master-buffer-init a "par-indent") "9fn")
+    (check-false (buffer-modified? a))
+    (buffer-close p) (buffer-close a)
+    ;; a file which could not be written: the view keeps its change, which
+    ;; the next save writes
+    (write-doc "ia.tm" '("book") '() '((chapter "A") "a"))
+    (load-buffer p) (update-forced)
+    (edit (init-env "par-indent" "7fn"))
+    (system (string-append "chmod a-w " (url->system a)))
+    (buffer-save p)
+    (system (string-append "chmod u+w " (url->system a)))
+    (check-true (in? (cons a "the file could not be written")
+                     part-save-refused))
+    (check= (assoc-ref (file-init "ia.tm") "par-indent") #f)
+    (switch-to-buffer p)
+    (edit (tree-set (bt 0 2 1) "a written"))
+    (save-buffer p)
+    (check= (part-save-message) "Saved ia.tm")
+    (check= (assoc-ref (file-init "ia.tm") "par-indent") "7fn")
+    (buffer-close p)
+    ;; the disk changed a variable to the value which the view gives it: no
+    ;; question
+    (write-master-init)
+    (load-buffer q) (update-forced)
+    (edit (init-env "par-indent" "4fn"))
+    (with doc (tree->stree (tree-import m "texmacs"))
+      (tree-export
+       (stree->tree
+        (tmfile-assign doc 'initial
+                       '(collection (associate "page-medium" "paper")
+                                    (associate "par-first" "0fn")
+                                    (associate "par-indent" "4fn"))))
+       m "texmacs"))
+    (check= (part-save-changed q) (list))
+    (buffer-pretend-saved q)
+    (buffer-close q)
+    ;; the order of the initial environment of the file is kept, new
+    ;; variables come last
+    (write-unsorted-master)
+    (load-buffer q) (update-forced)
+    (edit (init-env "font-base-size" "12"))
+    (save-buffer q)
+    (check= (map car (collection->assoc (file-part "im.tm" 'initial)))
+            '("zz" "page-medium" "par-first" "aa" "font-base-size"))
+    (buffer-close q)
+    ;; two masters which include the same file: each view of it keeps the
+    ;; variables which the other one saved
+    (write-master-init)
+    (write-doc "ia.tm" '("book") '() '((chapter "A") "a"))
+    (write-doc "im2.tm" '("book") '() '("other" (include "ia.tm")))
+    (with p2 (system->url (part-url (tmp "im2.tm") a))
+      (load-buffer p) (update-forced)
+      (load-buffer p2) (update-forced)
+      (switch-to-buffer p)
+      (edit (init-env "par-indent" "1fn"))
+      (save-buffer p)
+      (check= (part-save-message) "Saved ia.tm")
+      (switch-to-buffer p2)
+      (edit (init-env "par-sep" "2fn"))
+      (check= (part-save-changed p2) (list))
+      (save-buffer p2)
+      (check= (part-save-message) "Saved ia.tm")
+      (check= (file-init "ia.tm")
+              '(("page-medium" . "paper") ("par-indent" . "1fn")
+                ("par-sep" . "2fn")))
+      (switch-to-buffer p)
+      (edit (init-env "par-indent" "3fn"))
+      (check= (part-save-changed p) (list))
+      (save-buffer p)
+      (check= (file-init "ia.tm")
+              '(("page-medium" . "paper") ("par-indent" . "3fn")
+                ("par-sep" . "2fn")))
+      (buffer-close p2)
+      (buffer-close p))
+    (check= links-questions (list))
     (write-doc "ia.tm" '("book") '() '((chapter "A") "a"))))
 
 ;; The part tmfs opens a file of a project as a document of its own: its
@@ -2760,7 +2862,24 @@
 ;; The suite
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;; A question (user-confirm) is answered no and recorded, so that a save
+;; which asks unexpectedly fails a check instead of waiting for an answer
+;; which never comes without a window.
+(define links-questions (list))
+
+(define (links-confirm prompt default cont)
+  (set! links-questions (append links-questions (list prompt)))
+  (cont #f))
+
 (tm-define (links-test-failures)
+  (with old user-confirm
+    (set! user-confirm links-confirm)
+    (with r (catch #t links-test-run (lambda args (set! user-confirm old)
+                                       (apply throw args)))
+      (set! user-confirm old)
+      r)))
+
+(define (links-test-run)
   (check-suite "links")
   (make-dir)
   (run-group test-labels)
