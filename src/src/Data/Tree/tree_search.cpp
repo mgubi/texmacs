@@ -1349,6 +1349,25 @@ select_paragraphs (range_set& sel, tree t, tree what, path p) {
              << (is_nil (b)? c * path (k, end (d[k])): c * path (k, b));
         continue;
       }
+      if (has_one (what[m])) {
+        // an empty region takes one token, which the wildcard of the search
+        // did not: the part is matched with the tokens of its paragraph,
+        // from any start to the end in the first paragraph, from the start
+        // in the last one, the whole paragraph in the middle
+        region_matcher r;
+        tokens_between (r.toks, d[k], c * k, path (), path ());
+        r.init (what[m], m < N(what)-1);
+        ok= false;
+        if (N(r.toks) != 0) {
+          if (m == 0) {
+            for (int st=0; st<N(r.toks) && !ok; st++)
+              ok= r.run (0, st);
+          }
+          else ok= r.run (0, 0);
+        }
+        if (ok) r.regions (ssel);
+        continue;
+      }
       ok= select_in_hit (ssel, d[k], c * k, a, b, what[m]);
     }
     if (ok) merge (sel, ssel);

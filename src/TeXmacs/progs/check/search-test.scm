@@ -209,6 +209,31 @@
     (check-both `(document (concat "xab" ,y "cz" (frac "abxc" "1")))
                 `(concat "ab" (select-region "") "c")
                 '((0 1 0) (0 1 1) (0 3 0 2) (0 3 0 3)))
+    ;; in a pattern of several paragraphs, the part with the empty region
+    ;; is matched with the tokens of its paragraph (the search, with a
+    ;; wildcard there, gave other starts and ends)
+    (check-both '(document "aab" "c")
+                '(document (concat "a" (select-region "")) "c")
+                '((0 2) (0 3)))
+    (check-both '(document "xa" "cbd")
+                '(document "a" (concat "c" (select-region "")))
+                '((1 1) (1 2)))
+    (check-both '(document "xa" "cbd" "e")
+                '(document "a" (concat "c" (select-region "") "d") "e")
+                '((1 1) (1 2)))
+    (check-both '(document "xa" "cbxd" "e")
+                '(document "a" (concat "c" (select-region "") "d") "e")
+                '())
+    ;; a trailing wildcard after an empty region takes nothing (the match
+    ;; is the shortest), so that a[]* gives a region per a and its next
+    ;; character, while a[b]* gives one region, the wildcard taking the rest
+    ;; of the formula (#454)
+    (check-both '(document "abcabc")
+                '(concat "a" (select-region "") (wildcard "w"))
+                '((0 1) (0 2) (0 4) (0 5)))
+    (check-both '(document "abcabc")
+                '(concat "a" (select-region "b") (wildcard "w"))
+                '((0 1) (0 2)))
     ;; in a tag argument with Replace, the whole argument
     (with-search-mode 'replace
       (lambda ()
