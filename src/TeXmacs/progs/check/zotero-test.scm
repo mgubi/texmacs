@@ -2073,6 +2073,56 @@
 ;; Main
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; The Zotero entries of the Document menu
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (menu-labels m)
+  ;; the labels of the entries of the menu term m and of its submenus,
+  ;; after the conditions of the if's (the when's only grey entries)
+  (append-map
+    (lambda (p)
+      (cond ((not (pair? p)) '())
+            ((string? (car p)) (list (car p)))
+            ((and (in? (car p) '(-> =>)) (pair? (cdr p)))
+             (append (if (string? (cadr p)) (list (cadr p)) '())
+                     (menu-labels (cddr p))))
+            ((== (car p) 'if)
+             (if ((cadr p)) (menu-labels (cddr p)) '()))
+            ((== (car p) 'when) (menu-labels (cddr p)))
+            ((== (car p) 'link) (menu-labels ((eval (cadr p)))))
+            (else '())))
+    m))
+
+(define (with-complex-actions val thunk)
+  ;; the preference is only bound in memory, never saved
+  (let ((had? (cpp-has-preference? "complex actions"))
+        (old (get-preference "complex actions")))
+    (cpp-set-preference "complex actions" val)
+    (with r (check-run thunk)
+      (if had?
+          (cpp-set-preference "complex actions" old)
+          (cpp-reset-preference "complex actions"))
+      (when (and (pair? r) (== (car r) 'error))
+        (check-report #f "the group" (object->string r))))))
+
+(define zotero-menu-entries
+  '("Update from Zotero" "Update the citations" "Check against Zotero..."
+    "Zotero settings..."))
+
+(define (test-menus)
+  (check-group "menus")
+  ;; the Zotero entries are in Document > Bibliography with both settings
+  ;; of complex actions (#447)
+  (for (val '("menus" "popups"))
+    (with-complex-actions val
+      (lambda ()
+        (check= (get-preference "complex actions") val)
+        (with l (menu-labels (document-menu))
+          (check-true (in? "Bibliography" l))
+          (check= (list-filter zotero-menu-entries (lambda (x) (in? x l)))
+                  zotero-menu-entries))))))
+
 (tm-define (zotero-test-failures)
   (check-suite "zotero")
   ;; NOTE: Zotero is used, and the preferences of the user stay as they are
@@ -2111,4 +2161,5 @@
   (test-first-library)
   (test-async-wait)
   (test-unused)
+  (test-menus)
   (eval-system (string-append "rm -rf '" zotero-dir "'")))

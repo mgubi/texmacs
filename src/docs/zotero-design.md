@@ -355,6 +355,11 @@ in §3.5, and syncs them from then on.
 - *Zotero settings…* (server, libraries, export format, completion,
   Zotero in the search window, connection test).
 
+The submenu is `document-bibliography-menu` (`generic/document-menu.scm`),
+shared by the full Document menu and by the compressed one of "complex
+actions through popup windows" (the default), so that Zotero is there with
+both settings (#447).
+
 **In a citation:**
 - Tab completes (§3.3); the alternate key opens the search window.
 - It is the window of references of §3.3, in both modes (*Focus ->

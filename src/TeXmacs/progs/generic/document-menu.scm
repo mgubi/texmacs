@@ -824,6 +824,20 @@
 ;; The main Document menu
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;; The same in the full menu and in the compressed one (complex actions
+;; through popup windows), so that Zotero is there with both settings
+(menu-bind document-bibliography-menu
+  (when (buffer-has-biblio? (current-buffer))
+    ("Local entries" (open-biblio)))
+  ("Update from Zotero" (zotero-update-bibliography))
+  (when (supports-db?)
+    ("Synchronize with Zotero" (zotero-synchronize))
+    ("Import the citations into the database" (zotero-import-citations)))
+  ("Update the citations" (zotero-update-citations))
+  ("Check against Zotero..." (open-zotero-check))
+  ---
+  ("Zotero settings..." (open-zotero-settings)))
+
 (menu-bind full-document-menu
   (-> "Style" (link document-style-menu))
   (link document-style-extra-menu)
@@ -849,17 +863,7 @@
   (-> "Paragraph" (link document-paragraph-menu))
   (-> "Page" (link document-page-menu))
   (-> "Metadata" (link document-metadata-menu))
-  (-> "Bibliography"
-      (when (buffer-has-biblio? (current-buffer))
-	("Local entries" (open-biblio)))
-      ("Update from Zotero" (zotero-update-bibliography))
-      (when (supports-db?)
-        ("Synchronize with Zotero" (zotero-synchronize))
-        ("Import the citations into the database" (zotero-import-citations)))
-      ("Update the citations" (zotero-update-citations))
-      ("Check against Zotero..." (open-zotero-check))
-      ---
-      ("Zotero settings..." (open-zotero-settings)))
+  (-> "Bibliography" (link document-bibliography-menu))
   ---
   (-> "Magnification" (link document-magnification-menu))
   (-> "Colors" (link document-colors-menu))
@@ -891,8 +895,7 @@
   ("Paragraph" (open-document-paragraph-format))
   ("Page" (open-document-page-format))
   ("Metadata" (open-document-metadata))
-  (when (buffer-has-biblio? (current-buffer))
-    ("Bibliography" (open-biblio)))
+  (-> "Bibliography" (link document-bibliography-menu))
   ;;("Colors" (open-document-colors))
   ---
   (-> "Magnification" (link document-magnification-menu))
