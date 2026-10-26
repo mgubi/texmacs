@@ -548,14 +548,17 @@
   (check-both '(document (concat "xaab" (rsub "1")))
               '(concat "a" "" "b" (wildcard "x") (rsub "1"))
               '((0 0 2) (0 1 1)))
-  ;; but not when the pattern selects a region: each of its children is
-  ;; matched with a child of its own. (In the first search of a session,
-  ;; this needs the patterns prepared after initialize_search, which makes
-  ;; the label select-region; this check, not the first search of the
-  ;; suite, does not test that.)
-  (check-both '(document (concat "x" (frac "1" "2") "a" (rsub "1") "b"))
+  ;; also with a region: its text is xab, adjacent (each child of the
+  ;; pattern was matched with a child of its own, with gaps, #500). (In the
+  ;; first search of a session, this needs the patterns prepared after
+  ;; initialize_search, which makes the label select-region; this check,
+  ;; not the first search of the suite, does not test that.)
+  (check-both '(document (concat "xab" (rsub "1")))
               '(concat (select-region "x") "a" "b")
               '((0 0 0) (0 0 1)))
+  (check-both '(document (concat "x" (frac "1" "2") "a" (rsub "1") "b"))
+              '(concat (select-region "x") "a" "b")
+              '())
   ;; a leading wildcard and strings before a tag: the string ends as the
   ;; part does, and the match starts at the start of the formula (#489)
   (check-both '(document (concat "bbb" (rsub "y")))
@@ -756,6 +759,72 @@
                     '(frac "a" (wildcard "w")))
               '()))))
 
+;; a pattern with a region (std ? in the widgets) is matched as the same
+;; pattern with the content of the region, by the rules of any pattern, and
+;; the region of each match is selected. Its parts were matched child by
+;; child, with other children in between, and its paragraphs and strings
+;; by the rule of the arguments of tags (#500)
+(define (test-regions)
+  (check-group "regions")
+  (let ((y '(rsub "y")))
+    ;; the parts are adjacent
+    (check-both `(document (concat "abx" ,y "zc"))
+                `(concat "ab" (select-region ,y) "c")
+                '())
+    ;; in text, Search and Replace match the same way
+    (with-search-mode 'replace
+      (lambda ()
+        (check= (hits '(document (concat "xab" (rsub "d")) (rsub "c"))
+                      '(document (concat "ab" (rsub "d"))
+                                 (select-region (rsub "c"))))
+                '((1 0) (1 1)))))
+    ;; a string of the pattern does not match a string inside a tag
+    (with-search-mode 'search
+      (lambda ()
+        (check= (hits '(document (concat "y" (strong "xab") (rsub "c")))
+                      '(concat "ab" (select-region (rsub "c"))))
+                '())))
+    ;; a region inside a string, a region of several children
+    (check-both '(document "xabcx" (concat "zabc" ,y))
+                '(concat "a" (select-region "b") "c")
+                '((0 2) (0 3) (1 0 2) (1 0 3)))
+    (check-both `(document (concat "xab" ,y (rsub "z") "cz"))
+                `(concat "ab" (select-region (wildcard "w")) "c")
+                '((0 1 0) (0 2 1)))
+    (check-both `(document (concat "xab" ,y (rsub "z") "cz"))
+                `(concat "ab" (select-region "") "c")
+                '((0 1 0) (0 2 1)))
+    ;; a region which starts in a string and ends after a tag
+    (check-both `(document (concat "xab" ,y "cd"))
+                `(concat "a" (select-region (concat "b" ,y "c")) "d")
+                '((0 0 2) (0 2 1)))
+    ;; a hit inside a tag, carried to the ends of the formula by a leading
+    ;; and a trailing wildcard: the region of the first hit inside the tag
+    (check-both `(document (concat ,y (frac "xaba" "a")))
+                '(concat (wildcard "w") (select-region "a") (wildcard "v"))
+                '((0 1 0 1) (0 1 0 2)))
+    ;; in a tag of the pattern: the tag in its place in the text
+    (check-both '(document (concat "q" (frac "1" "2") "b" (frac "3" "2") "c"))
+                '(concat (frac (select-region "") "2") "c")
+                '((0 3 0 0) (0 3 0 1)))
+    ;; in an argument of a tag: as a string, anywhere with Search, the whole
+    ;; argument with Replace
+    (let ((pat '(frac (concat "a" (select-region "b")) "c")))
+      (with-search-mode 'search
+        (lambda ()
+          (check= (hits '(document (frac "xab" "c")) pat)
+                  '((0 0 2) (0 0 3)))))
+      (with-search-mode 'replace
+        (lambda ()
+          (check= (hits '(document (frac "xab" "c") (frac "ab" "c")) pat)
+                  '((1 0 1) (1 0 2))))))
+    ;; the arguments of a tag one by one with Replace, as for other patterns
+    (with-search-mode 'replace
+      (lambda ()
+        (check= (hits '(document (concat (tuple "a" "b" "c") (tuple "a" "b")))
+                      '(tuple (select-region "a") "b"))
+                '((0 1 0 0) (0 1 0 1)))))))
+
 ;; formulas of 40000 children and more: the scan for the start of a
 ;; match, and a wildcard which takes many children, went from one child to
 ;; the next by a recursion, which overflowed the stack and crashed TeXmacs
@@ -797,4 +866,5 @@
   (test-long-concats)
   (test-parts-before-wildcards)
   (test-text-same-in-both)
+  (test-regions)
   (check-end))

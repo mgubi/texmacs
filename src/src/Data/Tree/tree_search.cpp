@@ -906,26 +906,346 @@ contains_select_region (tree t) {
 
 static bool select_in_argument= false;
 
-static bool
-match_child (tree t, int i, tree what) {
-  // the child i of t matches what: in a formula or a document which is not
-  // in the argument of a tag of the pattern, the strings are text and are
-  // matched as when searching, also when replacing; the partial and
-  // initial flags only concern the arguments of tags (#495)
-  if (!(is_concat (t) || is_document (t)) || select_in_argument ||
-      !is_atomic (t[i]))
-    return match_cascaded (t[i], what);
-  bool partial= partial_match_flag, initial= initial_match_flag;
-  partial_match_flag= initial_match_flag= true;
-  bool r= match_cascaded (t[i], what);
-  partial_match_flag= partial;
-  initial_match_flag= initial;
+static tree without_empty_strings (tree what, bool join);
+
+static tree
+without_regions (tree what) {
+  // the pattern which a select-region pattern matches: each region is its
+  // content, spliced into a formula; an empty region, which selects a
+  // whole argument, matches any content, as a wildcard
+  if (is_atomic (what)) return what;
+  if (is_func (what, SELECT_REGION, 1)) {
+    if (is_empty (what[0])) return tree (WILDCARD, "");
+    return without_regions (what[0]);
+  }
+  tree r (L(what));
+  for (int i=0; i<N(what); i++) {
+    tree w= without_regions (what[i]);
+    if (is_concat (what) && is_concat (w))
+      for (int k=0; k<N(w); k++) r << w[k];
+    else r << w;
+  }
   return r;
+}
+
+// the text of a hit, as a sequence of tokens: the characters of its strings
+// and its tags, each with the positions before and after it. Where the hit
+// goes out of a tag (a leading or trailing wildcard carries it to the start
+// or end of the formula), a boundary, which only a wildcard can take
+#define TOKEN_CHAR 0
+#define TOKEN_TAG 1
+#define TOKEN_BOUNDARY 2
+
+struct search_token {
+  int kind;
+  tree t;  // the character, or the tag
+  path at;  // the tag
+  path before, after;
+};
+
+static void
+tokens_between (array<search_token>& toks, tree u, path q, path a, path b) {
+  // the tokens of u (at q) from a to b (relative to q; nil: from the start,
+  // to the end)
+  if (is_atomic (u)) {
+    string s= u->label;
+    int o= (is_nil (a)? 0: a->item), e= (is_nil (b)? N(s): b->item);
+    while (o < e) {
+      int o2= o;
+      tm_char_forwards (s, o2);
+      search_token tok;
+      tok.kind= TOKEN_CHAR;
+      tok.t= tree (case_fold (s (o, o2)));
+      tok.before= q * o;
+      tok.after= q * o2;
+      toks << tok;
+      o= o2;
+    }
+    return;
+  }
+  bool an= !is_nil (a) && !is_nil (a->next);
+  bool bn= !is_nil (b) && !is_nil (b->next);
+  if (is_concat (u)) {
+    int k1= (is_nil (a)? 0: a->item), k2= (is_nil (b)? N(u)-1: b->item);
+    for (int k=k1; k<=k2 && k<N(u); k++) {
+      path sa= (k == k1 && !is_nil (a))? a->next: path ();
+      path sb= (k == k2 && !is_nil (b))? b->next: path ();
+      if (is_atomic (u[k])) tokens_between (toks, u[k], q * k, sa, sb);
+      else {
+        if (sa == path (1) || sb == path (0)) continue;
+        tokens_between (toks, u[k], q * k, sa, sb);
+      }
+    }
+    return;
+  }
+  if (!an && !bn) {
+    if (a == path (1) || b == path (0)) return;
+    search_token tok;
+    tok.kind= TOKEN_TAG;
+    tok.t= u;
+    tok.at= q;
+    tok.before= q * 0;
+    tok.after= q * 1;
+    toks << tok;
+    return;
+  }
+  if (an && bn && a->item == b->item) {
+    tokens_between (toks, u[a->item], q * a->item, a->next, b->next);
+    return;
+  }
+  if (an) tokens_between (toks, u[a->item], q * a->item, a->next, path ());
+  search_token tok;
+  tok.kind= TOKEN_BOUNDARY;
+  tok.before= tok.after= (an? q * path (a->item, end (u[a->item])): q * 0);
+  toks << tok;
+  if (bn) tokens_between (toks, u[b->item], q * b->item, path (), b->next);
+}
+
+// the elements of a pattern, for the tokens: characters, wildcards, tags,
+// and the starts and ends of the regions
+#define ELEM_CHAR 0
+#define ELEM_WILDCARD 1
+#define ELEM_TAG 2
+#define ELEM_START 3
+#define ELEM_END 4
+
+static void
+pattern_elements (array<int>& kind, array<tree>& elem, tree what) {
+  if (is_concat (what)) {
+    for (int i=0; i<N(what); i++) pattern_elements (kind, elem, what[i]);
+  }
+  else if (is_atomic (what)) {
+    string s= case_fold (what->label);
+    for (int o=0; o<N(s); ) {
+      int o2= o;
+      tm_char_forwards (s, o2);
+      kind << ELEM_CHAR; elem << tree (s (o, o2));
+      o= o2;
+    }
+  }
+  else if (is_func (what, WILDCARD, 1)) {
+    kind << ELEM_WILDCARD; elem << what;
+  }
+  else if (is_func (what, SELECT_REGION, 1)) {
+    kind << ELEM_START; elem << what;
+    if (is_empty (what[0])) { kind << ELEM_WILDCARD; elem << what; }
+    else pattern_elements (kind, elem, what[0]);
+    kind << ELEM_END; elem << what;
+  }
+  else { kind << ELEM_TAG; elem << what; }
+}
+
+static void select_direct (range_set& sel, tree t, tree what, path p);
+
+struct region_matcher {
+  array<search_token> toks;
+  array<int> kind;
+  array<tree> elem;
+  array<bool> failed;   // (element, token) from which no match exists
+  array<path> mark;     // the position of each start or end of a region
+  array<range_set> in;  // the regions inside each tag of the pattern
+
+  path position (int ti, bool before) {
+    // the position between the tokens ti-1 and ti
+    if (before && ti < N(toks)) return toks[ti].before;
+    if (ti > 0) return toks[ti-1].after;
+    return toks[0].before;
+  }
+
+  bool run (int ei, int ti) {
+    // the pattern from its element ei matches the tokens from ti to the
+    // end; a wildcard takes as few tokens as it can (lazy)
+    int nt= N(toks) + 1;
+    if (ei == N(kind)) return ti == N(toks);
+    if (failed[ei * nt + ti]) return false;
+    bool ok= false;
+    switch (kind[ei]) {
+    case ELEM_START:
+      if (run (ei+1, ti)) { mark[ei]= position (ti, true); ok= true; }
+      break;
+    case ELEM_END:
+      if (run (ei+1, ti)) { mark[ei]= position (ti, false); ok= true; }
+      break;
+    case ELEM_WILDCARD:
+      for (int k=ti; k<=N(toks) && !ok; k++)
+        if (run (ei+1, k)) ok= true;
+      break;
+    case ELEM_CHAR:
+      ok= ti < N(toks) && toks[ti].kind == TOKEN_CHAR &&
+          toks[ti].t == elem[ei] && run (ei+1, ti+1);
+      break;
+    case ELEM_TAG:
+      if (ti < N(toks) && toks[ti].kind == TOKEN_TAG) {
+        tree t= toks[ti].t, w= elem[ei];
+        if (!contains_select_region (w))
+          ok= match (t, w) && run (ei+1, ti+1);
+        else if (L(t) == L(w)) {
+          range_set ssel;
+          select_direct (ssel, t, w, toks[ti].at);
+          if (N(ssel) != 0 && run (ei+1, ti+1)) { in[ei]= ssel; ok= true; }
+        }
+      }
+      break;
+    }
+    if (!ok) failed[ei * nt + ti]= true;
+    return ok;
+  }
+};
+
+static void select_hits (range_set& sel, tree t, tree what, path p,
+                         bool first);
+
+static bool
+select_in_hit (range_set& sel, tree u, path q, path a, path b, tree what) {
+  // the regions of what in the hit of its text from a to b, in u at q
+  region_matcher m;
+  tokens_between (m.toks, u, q, a, b);
+  pattern_elements (m.kind, m.elem, what);
+  if (N(m.toks) == 0) {
+    // an empty hit: the regions are empty, at its position, if the pattern
+    // has nothing else than wildcards
+    path at= q * (is_nil (a)? start (u): a);
+    for (int k=0; k<N(m.kind); k++)
+      if (m.kind[k] != ELEM_START && m.kind[k] != ELEM_END &&
+          m.kind[k] != ELEM_WILDCARD) return false;
+    for (int k=0; k<N(m.kind); k++)
+      if (m.kind[k] == ELEM_START) sel << at << at;
+    return true;
+  }
+  int nt= N(m.toks) + 1;
+  m.failed= array<bool> (N(m.kind) * nt + nt);
+  for (int k=0; k<N(m.failed); k++) m.failed[k]= false;
+  m.mark= array<path> (N(m.kind));
+  m.in= array<range_set> (N(m.kind));
+  if (!m.run (0, 0)) {
+    // a hit inside a tag, which a leading and a trailing wildcard carry to
+    // the start and the end of the formula: its regions are in the first
+    // hit inside the tags of the hit (the others are merged into it)
+    bool arg= select_in_argument;
+    select_in_argument= false;
+    for (int k=0; k<N(m.toks); k++)
+      if (m.toks[k].kind == TOKEN_TAG) {
+        range_set ssel;
+        select_hits (ssel, m.toks[k].t, what, m.toks[k].at, true);
+        if (N(ssel) != 0) {
+          sel << ssel;
+          select_in_argument= arg;
+          return true;
+        }
+      }
+    select_in_argument= arg;
+    return false;
+  }
+  for (int k=0; k<N(m.kind); k++)
+    if (m.kind[k] == ELEM_START) {
+      int e= k+1, depth= 1;
+      while (e < N(m.kind)) {
+        if (m.kind[e] == ELEM_START) depth++;
+        if (m.kind[e] == ELEM_END && --depth == 0) break;
+        e++;
+      }
+      if (e >= N(m.kind)) continue;
+      path r1= m.mark[k], r2= m.mark[e];
+      if (path_less (r2, r1)) r2= r1;  // an empty region
+      sel << r1 << r2;
+    }
+    else if (m.kind[k] == ELEM_TAG && N(m.in[k]) != 0)
+      sel << m.in[k];
+  return true;
+}
+
+static path
+hit_container (path h1, path h2) {
+  // the tree in which a hit lies: the common part of its ends, which both
+  // go on after it
+  path c= common (h1, h2);
+  while (N(c) >= min (N(h1), N(h2))) c= path_up (c);
+  return c;
+}
+
+static void
+select_hits (range_set& sel, tree t, tree what, path p, bool first) {
+  // a formula pattern with regions: its text, the regions being their
+  // content, is matched as any pattern (#495: in the text, a match may start
+  // and end inside a string, and wildcards take the shortest runs, the same
+  // when searching and replacing; in a tag argument, the flags say where).
+  // It was matched child by child, with gaps (#500). The regions are then
+  // found in each hit (in the first one only, if first)
+  tree w= without_empty_strings (without_regions (what), true);
+  range_set hits;
+  if (select_in_argument && !partial_match_flag)
+    search_anchored (hits, t, w, p, true, !initial_match_flag);
+  else search (hits, t, w, p);
+  for (int i=0; i+1<N(hits); i+=2) {
+    path c= hit_container (hits[i], hits[i+1]);
+    if (!(p <= c)) continue;
+    range_set ssel;
+    if (!select_in_hit (ssel, subtree (t, c / p), c, hits[i] / c,
+                        hits[i+1] / c, what)) continue;
+    merge (sel, ssel);
+    if (first) return;
+  }
+}
+
+static void
+select_text (range_set& sel, tree t, tree what, path p) {
+  select_hits (sel, t, what, p, false);
+}
+
+static void
+select_paragraphs (range_set& sel, tree t, tree what, path p) {
+  // idem for a document pattern: its paragraphs match as in a search, and
+  // the regions are found in the parts of the hit
+  if (N(what) == 1) {
+    select (sel, t, what[0], p);
+    return;
+  }
+  tree w= without_empty_strings (without_regions (what), true);
+  range_set hits;
+  search (hits, t, w, p);
+  for (int i=0; i+1<N(hits); i+=2) {
+    path h1= hits[i], h2= hits[i+1];
+    path c= hit_container (h1, h2);
+    if (!(p <= c)) continue;
+    tree d= subtree (t, c / p);
+    int k1= (h1 / c)->item, k2= (h2 / c)->item;
+    if (!is_document (d) || k2 - k1 + 1 != N(what)) continue;
+    range_set ssel;
+    bool ok= true;
+    for (int m=0; m<N(what) && ok; m++) {
+      if (!contains_select_region (what[m])) continue;
+      int k= k1 + m;
+      path a= (m == 0? (h1 / c)->next: path ());
+      path b= (m == N(what)-1? (h2 / c)->next: path ());
+      if (is_func (what[m], SELECT_REGION, 1)) {
+        ssel << (is_nil (a)? c * path (k, start (d[k])): c * path (k, a))
+             << (is_nil (b)? c * path (k, end (d[k])): c * path (k, b));
+        continue;
+      }
+      ok= select_in_hit (ssel, d[k], c * k, a, b, what[m]);
+    }
+    if (ok) merge (sel, ssel);
+  }
 }
 
 static void
 select_direct_sub (range_set& sel, tree t, tree what, path p) {
   if (L(t) != L(what)) return;
+  if (!injective_match_flag) {
+    // the arguments one by one, as match does
+    if (N(t) != N(what)) return;
+    range_set r;
+    for (int i=0; i<N(t); i++)
+      if (contains_select_region (what[i])) {
+        range_set ssel;
+        select (ssel, t[i], what[i], p * i);
+        if (N(ssel) == 0) return;
+        r << ssel;
+      }
+      else if (!match_cascaded (t[i], what[i])) return;
+    merge (sel, r);
+    return;
+  }
   int cur=0;
   for (int i=0; i<N(t); i++)
     if (contains_select_region (what[cur])) {
@@ -936,23 +1256,22 @@ select_direct_sub (range_set& sel, tree t, tree what, path p) {
       for (int i2=i+1; i2<N(t); i2++)
         if (cur2 >= N(what)) break;
         else if (contains_select_region (what[cur2])) return;
-        else if (match_child (t, i2, what[cur2])) cur2++;
+        else if (match_cascaded (t[i2], what[cur2])) cur2++;
       if (cur2 >= N(what)) merge (sel, ssel);
       continue;
     }
     else {
-      if (match_child (t, i, what[cur])) cur++;
+      if (match_cascaded (t[i], what[cur])) cur++;
       if (cur >= N(what)) return;
     }
 }
 
-void
+static void
 select_direct (range_set& sel, tree t, tree what, path p) {
-  // the children of a tag other than a formula or a document are arguments,
-  // also the formulas inside them, at any depth
+  // the children of a tag (formulas and documents are matched as text) are
+  // arguments, also the formulas inside them, at any depth
   bool arg= select_in_argument;
-  if (L(t) == L(what) && !is_concat (t) && !is_document (t))
-    select_in_argument= true;
+  select_in_argument= true;
   select_direct_sub (sel, t, what, p);
   select_in_argument= arg;
 }
@@ -974,6 +1293,8 @@ select (range_set& sel, tree t, tree what, path p) {
     else
       search (sel, t, what[0], p);
   }
+  else if (is_concat (what)) select_text (sel, t, what, p);
+  else if (is_document (what)) select_paragraphs (sel, t, what, p);
   else {
     range_set ssel;
     select_direct (ssel, t, what, p);
