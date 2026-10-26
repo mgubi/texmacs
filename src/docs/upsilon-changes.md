@@ -14,6 +14,12 @@ have the details, and the problems go to the
 
 ## 26 October 2026
 
+- Search and Replace find the same matches in the text: a match may start
+  and end inside a word, and a wildcard takes the shortest text, possibly
+  none; a string of the pattern still has to match a whole argument of a
+  tag when replacing. Patterns of several paragraphs are found when the
+  first part reaches the end of its paragraph, from the leftmost start; an
+  empty paragraph in a pattern stands for a paragraph break (#497).
 - **Browser**: Clone window opens a second tab on the document; the number
   of each of its tabs, "(1)", "(2)", stays in sight when the name is too
   long for the column, and the folded column shows it after the initials

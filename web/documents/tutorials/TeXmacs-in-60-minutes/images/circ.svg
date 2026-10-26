@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300" viewBox="-200 -150 400 300">
+  <defs><marker id="a" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="black"/></marker></defs>
+  <line x1="-180" y1="0" x2="180" y2="0" stroke="black" stroke-width="1.5" marker-end="url(#a)"/>
+  <line x1="0" y1="130" x2="0" y2="-140" stroke="black" stroke-width="1.5" marker-end="url(#a)"/>
+  <text x="185" y="5" font-family="serif" font-size="14">x</text>
+  <text x="8" y="-135" font-family="serif" font-size="14">y</text>
+  <circle cx="-90" cy="30" r="60" fill="none" stroke="black" stroke-width="1.5"/>
+  <circle cx="90" cy="-30" r="60" fill="none" stroke="black" stroke-width="1.5"/>
+  <g stroke="gray" stroke-dasharray="3,3"><line x1="-150" y1="-140" x2="-150" y2="130"/><line x1="-30" y1="-140" x2="-30" y2="130"/><line x1="30" y1="-140" x2="30" y2="130"/><line x1="150" y1="-140" x2="150" y2="130"/></g>
+</svg>
