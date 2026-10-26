@@ -3586,10 +3586,11 @@ static const time_t vue_repaint_dt= 16;
 * from fingers which are lifted. On macOS the system computes the momentum
 * itself and, with SDL_HINT_MAC_SCROLL_MOMENTUM, sends it as a stream of
 * wheel events after the fingers are lifted: the view follows the fingers
-* while they are down and the glide of the system after. Elsewhere the
-* speed of the fingers is estimated from the events and, when they stop
-* above wheel_launch_speed, the view goes on with that velocity, decaying
-* exponentially with the time constant wheel_tau.
+* while they are down and the glide of the system after. Elsewhere (but on
+* Linux, where the view stops with the fingers as in the Qt port, see
+* wheel_glides) the speed of the fingers is estimated from the events and,
+* when they stop above wheel_launch_speed, the view goes on with that
+* velocity, decaying exponentially with the time constant wheel_tau.
 ******************************************************************************/
 
 static const double wheel_tau= 350.0;          // ms: the glide of a trackpad
@@ -3658,7 +3659,7 @@ wheel_x11 () {
 // fingers in points and the page follows them; nor, for now, on Windows,
 // where SDL gives notches (WHEEL_DELTA) and the trackpad was not measured.
 // An editor which captures the wheel (graphics) still gets the fingers
-// (wheel_capture_f), as the Qt port gives it the pixels of the event
+// (push_wheel), as the Qt port gives it the pixels of the event
 static bool
 wheel_units_are_notches () {
 #if defined(OS_MACOS) || defined(__EMSCRIPTEN__) || defined(_WIN32)
@@ -3744,17 +3745,26 @@ wheel_glides (const vue_input_state& in) {
 }
 
 // deliver a wheel delta (device pixels) to the window: to the widgets
-// (mouse_action) and to the Clay scroll container under the pointer
+// (mouse_action) and to the Clay scroll container under the pointer; gx,
+// gy are the delta as an editor which captures the wheel (graphics) gets
+// it: the movement of the fingers where a unit of a trackpad scrolls a
+// notch (wheel_units_are_notches), as the Qt port gives it the pixels of
+// the event. It is added up apart, each delta at its scale, since a frame
+// may have both the travel of a notch and a trackpad
 static void
-push_wheel (vue_window win, double dx, double dy) {
+push_wheel (vue_window win, double dx, double dy, double gx, double gy) {
   vue_input_state& in= win->input;
   if (in.mouse_action == "wheel" && N(in.mouse_data) == 2) {
     in.mouse_data[0] += dx; // several deltas in the same frame add up
     in.mouse_data[1] += dy;
+    in.wheel_capture_x += gx;
+    in.wheel_capture_y += gy;
   }
   else {
     in.mouse_action= "wheel";
     in.mouse_data= array<double> (dx, dy);
+    in.wheel_capture_x= gx;
+    in.wheel_capture_y= gy;
   }
   with_window frame (win);
   Clay_SetPointerState ((Clay_Vector2) { (float) in.mouse_x, (float) in.mouse_y }, false);
@@ -3768,6 +3778,11 @@ push_wheel (vue_window win, double dx, double dy) {
   // sends several events per frame) reset their scrolling to the start
   in.clay_wheel_x += cx / 10;
   in.clay_wheel_y += cy / 10;
+}
+
+static void
+push_wheel (vue_window win, double dx, double dy) {
+  push_wheel (win, dx, dy, dx, dy);
 }
 
 // the wheel of the frame to the Clay scroll containers of the window, as
@@ -3797,10 +3812,13 @@ clay_wheel_flush (vue_window_rep* win) {
 // wheel comes that way too (Xorg, XWayland), without it as buttons, which
 // have the stamps of SDL. The X server (Xorg, XWayland) counts the ms of the
 // monotonic clock on 32 bits, so that a stamp of more bits is of SDL (which
-// has them after 4.3 s); a smaller one is taken for the clock it is nearer
-// to, and when it is near neither (a server on another machine) for one of
-// the server. Only on X11: the stamps of the other drivers are those of
-// SDL, even when the loop was held up for seconds
+// has them after 4.3 s); a smaller one is of the server when it is near its
+// clock (within a second: the loop may have been held up), and else of SDL
+// only when it is very near the clock of SDL (SDL stamps the X11 events it
+// reads when it reads them), so that a late stamp of the server is not taken
+// for one of SDL in its first seconds; a stamp near neither (a server on
+// another machine) is of the server. Only on X11: the stamps of the other
+// drivers are those of SDL, even when the loop was held up for seconds
 static bool
 wheel_stamp_of_x (uint64_t stamp) {
 #if defined(OS_MACOS) || defined(__EMSCRIPTEN__) || defined(_WIN32)
@@ -3815,8 +3833,8 @@ wheel_stamp_of_x (uint64_t stamp) {
   uint32_t x_now= (uint32_t) ((uint64_t) ts.tv_sec * 1000 + ts.tv_nsec / 1000000);
   uint32_t d= x_now - (uint32_t) stamp, e= (uint32_t) stamp - x_now; // mod 2^32
   uint64_t d_x= (uint64_t) (d < e ? d : e);
-  if (d_x < d_sdl && d_x <= 1000) return true;
-  if (d_sdl <= 1000) return false;
+  if (d_x <= 1000 && d_x <= d_sdl) return true;
+  if (d_sdl <= 50) return false;
   return true;
 #endif
 }
@@ -3825,14 +3843,17 @@ wheel_stamp_of_x (uint64_t stamp) {
 // one. Divided by 10^6, the intervals between the stamps of the X server
 // (wheel_stamp_of_x) were all 0: no stream of events ever ended, and a
 // wheel turned after a trackpad stayed a trackpad (issue #459). A stream
-// whose stamps change clock starts anew; two events of the same stamp of
-// the X server (the two axes of a motion, or the same ms) are of a stream
+// whose stamps change clock starts anew; two events of the same stamp are
+// of a stream on Linux (the two axes of a motion, the same ms of the X server
+// or of Wayland, whose stamps are in ms): a new stream there made the next
+// delta of a swipe a notch (which an editor capturing the wheel got whole);
+// elsewhere as before
 static time_t
 wheel_interval (vue_input_state& in, uint64_t stamp) {
   bool ms= wheel_stamp_of_x (stamp);
   time_t dt;
   if (in.wheel_stamp == 0 || ms != in.wheel_stamp_ms || stamp < in.wheel_stamp ||
-      (stamp == in.wheel_stamp && !ms))
+      (stamp == in.wheel_stamp && !ms && !wheel_units_are_notches ()))
     dt= wheel_slow_dt;
   else if (ms) dt= (time_t) (stamp - in.wheel_stamp);
   else dt= (time_t) ((stamp - in.wheel_stamp) / 1000000);
@@ -3843,7 +3864,8 @@ wheel_interval (vue_input_state& in, uint64_t stamp) {
 
 // a wheel event: scroll and update the estimated speed of the wheel
 // (x, y are the deltas as reported by SDL, in wheel units; stamp is the
-// timestamp SDL gave the event, in ns: the events queued during a frame
+// timestamp SDL gave the event, in ns, or in ms of the X server (see
+// wheel_stamp_of_x): the events queued during a frame
 // are all handled at the end of it, so the clock would report them as
 // simultaneous and the intervals below would all be zero)
 static void
@@ -3871,20 +3893,31 @@ wheel_event (vue_window win, double x, double y, time_t now, uint64_t stamp) {
     in.wheel_pend_x -= in.wheel_over_x;
     in.wheel_pend_y -= in.wheel_over_y;
     in.wheel_over_x= in.wheel_over_y= 0;
+    // where a unit of a trackpad is a notch the distance is right, but an
+    // editor which captures the wheel gets the rest of it as the fingers:
+    // only when this event follows closely (a swipe which opened with whole
+    // deltas), not after a notch of the wheel still travelling
+    if (wheel_units_are_notches () && !fresh && dt <= wheel_stream_dt)
+      in.wheel_pend_g= wheel_precise_step / wheel_notch_step_of (win);
   }
   double step= win->density * (in.wheel_precise ? wheel_precise_step_of (win)
                                                 : wheel_notch_step_of (win));
-  in.wheel_capture_f= in.wheel_precise ? wheel_precise_step / wheel_precise_step_of (win)
-                                       : 1.0;
   double dx= x * step, dy= y * step; // device pixels
   dt= max ((time_t) 8, min (dt, wheel_slow_dt));
   in.wheel_est_x= 0.5 * (in.wheel_est_x + dx / dt);
   in.wheel_est_y= 0.5 * (in.wheel_est_y + dy / dt);
   in.wheel_event_time= now;
-  if (in.wheel_precise) push_wheel (win, dx, dy); // follow the fingers
+  if (in.wheel_precise) { // follow the fingers
+    double cf= wheel_units_are_notches () ?
+                 win->density * wheel_precise_step / step : 1.0;
+    push_wheel (win, dx, dy, cf * dx, cf * dy);
+  }
   else {
     // a notch is travelled over the next frames, not jumped (see above)
-    if (in.wheel_pend_x == 0 && in.wheel_pend_y == 0) in.wheel_smooth_time= now;
+    if (in.wheel_pend_x == 0 && in.wheel_pend_y == 0) {
+      in.wheel_smooth_time= now;
+      in.wheel_pend_g= 1.0;
+    }
     in.wheel_pend_x += dx; in.wheel_pend_y += dy;
     double over= win->density * (wheel_notch_step - wheel_precise_step);
     in.wheel_over_x= in.wheel_ambiguous ? x * over : 0.0;
@@ -3904,7 +3937,6 @@ touch_scroll (vue_window win, double fx, double fy, uint64_t stamp) {
   time_t dt= wheel_interval (in, stamp);
   in.wheel_precise= true;
   in.wheel_touch= true;
-  in.wheel_capture_f= 1.0;
   in.wheel_ambiguous= false;
   in.wheel_pend_x= in.wheel_pend_y= 0;
   in.wheel_over_x= in.wheel_over_y= 0;
@@ -3966,7 +3998,8 @@ wheel_step () {
           if (fabs (in.wheel_pend_y) < 0.5) { dy += in.wheel_pend_y; in.wheel_pend_y= 0; }
         }
         in.wheel_smooth_time= now;
-        if (dx != 0 || dy != 0) push_wheel (win, dx, dy);
+        if (dx != 0 || dy != 0)
+          push_wheel (win, dx, dy, in.wheel_pend_g * dx, in.wheel_pend_g * dy);
       }
     }
     if (in.wheel_vx == 0 && in.wheel_vy == 0) {
