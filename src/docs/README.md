@@ -14,6 +14,7 @@ say otherwise; C++ is under `src/src/`, Scheme under `src/TeXmacs/progs/`.
 |---|---|
 | [TODO.md](TODO.md) | **Open work on `upsilon_texmacs`**: PRs waiting, bugs found and not fixed, offers not taken up |
 | [upsilon-screenshots.md](upsilon-screenshots.md) | TeXmacs Upsilon in pictures |
+| [gpl-compliance.md](gpl-compliance.md) | GPL compliance of the code written with Claude Code: the license audit of the fork (2026-10-26), what was fixed, what is open |
 
 ## Interfaces
 
