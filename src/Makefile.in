@@ -573,6 +573,7 @@ WINDOWS_BUNDLE: TEXMACS WINDOWS_PDB
 	$(CP) misc/admin/texmacs_updates_dsa_pub.pem $(WINDOWS_BUILD_DIR)/bin
 	if test -n "@GUILE_DATA_PATH@"; then find @GUILE_DATA_PATH@ -type d -name ice-9 -exec $(CP) {} $(WINDOWS_BUILD_DIR)/progs/ \; ; fi
 	if test -d "$(QT_PLUGINS_PATH)";then $(CP) -u $$(cygpath -u $(QT_PLUGINS_PATH)/*) $(WINDOWS_BUILD_BIN_DIR);fi
+	packages/collect-licenses.sh $(WINDOWS_BUILD_BIN_DIR) $(WINDOWS_BUILD_DIR)/misc/licenses/system
 
 WINDOWS_PACKAGE: WINDOWS_BUNDLE
 	$(MKDIR) $(WINDOWS_PACKAGE_DIR)
