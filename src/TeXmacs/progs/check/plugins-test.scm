@@ -1127,8 +1127,10 @@
 ;; command of a command line plugin (which is one process per command). The
 ;; descriptors are those open in TeXmacs itself (/dev/fd), and the processes
 ;; which are not reaped are the zombies among the children of TeXmacs.
-;; (A stopped plugin is not checked: Qt pipes release its process and its
-;; pipes in the event loop, which does not run here.)
+;; (The descriptors of a stopped plugin are not checked: Qt pipes release
+;; them in the event loop, which does not run here. Its process is reaped
+;; when it is stopped: with Qt pipes on Linux, it was reaped only in the
+;; event loop, and each stopped plugin stayed a zombie here.)
 
 (define (open-descriptors)
   (length (url-read-directory (system->url "/dev/fd") "*")))
@@ -1204,6 +1206,14 @@
                             (== (connection-status "tmtestonce" ses) 0))))))
     (check= (open-descriptors) fds)
     (check= (zombies) 0))
+
+  (check-group "processes: stopped plugins")
+  (for (i (.. 1 4))
+    (with ses (string-append "plugins-test-stopped" (number->string i))
+      (check= (start* "tmtestecho" ses) "ok")
+      (connection-stop "tmtestecho" ses)
+      (check= (connection-status "tmtestecho" ses) 0)))
+  (check= (zombies) 0)
 
   (check-group "processes: command lines")
   (check= (connection-start "tmtestcmdline" "plugins-test-cmd") "cmdline")

@@ -149,7 +149,14 @@ QTMPipeLink::killProcess (int msecs) {
   close ();
 #else
   terminate ();
-  if (! waitForFinished (msecs)) kill ();
+  if (! waitForFinished (msecs)) {
+    kill ();
+    // the process is reaped here: QProcess reaps it only when it notices
+    // its end, in the event loop or in a wait; without one (a script run
+    // with -x, the test suites) a stopped plugin stayed a zombie where
+    // QProcess is told of the end by a pidfd (Linux), not by SIGCHLD (macOS)
+    waitForFinished (1000);
+  }
 #endif
 }
 
