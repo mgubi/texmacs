@@ -8,6 +8,9 @@
 ;; It comes WITHOUT ANY WARRANTY WHATSOEVER. For details, see the file LICENSE
 ;; in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
 ;;
+;; The scanner of tree-sitter-yaml: Copyright (c) 2024 tree-sitter-grammars contributors,
+;; under the MIT license: see $TEXMACS_PATH/misc/tree-sitter/yaml/LICENSE.
+;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;; A port of src/scanner.c and src/schema.core.c of

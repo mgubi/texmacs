@@ -10,21 +10,23 @@
 ###############################################################################
 #
 # Writes, for each icon set (classical, monochrome, neo-classical):
-#   doc/icons/<set>.pdf           every icon with its name, on light and on
+#   docs/icons/<set>.pdf          every icon with its name, on light and on
 #                                 dark pages (vector: the SVG files as they are)
-#   doc/icons/<set>-toolbars.png  the main, text and focus toolbars, light and
+#   docs/icons/<set>-toolbars.png  the main, text and focus toolbars, light and
 #                                 dark, as pictured in the README
 #
 # Usage (from src/): misc/icons/make-sheets.py
-# Needs rsvg-convert.
+# Needs rsvg-convert. The text is in the DejaVu fonts of TeXmacs
+# (fonts/truetype/dejavu, free), which fontconfig is told about: the PDFs
+# embed them, and not fonts of the system that may not be shared.
 
-import os, re, subprocess, sys
+import os, re, shutil, subprocess, sys
 
 PIX= os.path.join ("TeXmacs", "misc", "pixmaps")
 SETS= [("classical", "Classical", PIX),
        ("monochrome", "Monochrome", os.path.join (PIX, "monochrome")),
        ("neoclassical", "Neo-classical", os.path.join (PIX, "neoclassical"))]
-OUT= os.path.join ("doc", "icons")
+OUT= os.path.join ("docs", "icons")
 THEMES= {"light": ("#F3F3F3", "#3A3A3C", "#8A8A8E"),
          "dark": ("#2B2D31", "#E6E6EA", "#9A9AA0")}
 
@@ -117,9 +119,9 @@ def sheets (key, title, d, tmp):
     for start in range (0, len (names), per):
       chunk= names[start:start + per]
       w, h= cols * cw + 60, rows * ch + 110
-      out= ['<text x="30" y="46" font-family="Helvetica, Arial" font-size="22" '
+      out= ['<text x="30" y="46" font-family="DejaVu Sans" font-size="22" '
             'font-weight="bold" fill="%s">TeXmacs icons: %s</text>' % (fg, title),
-            '<text x="30" y="72" font-family="Helvetica, Arial" font-size="13" fill="%s">'
+            '<text x="30" y="72" font-family="DejaVu Sans" font-size="13" fill="%s">'
             '%s theme, icons %d-%d of %d</text>'
             % (dim, theme.capitalize (), start + 1, start + len (chunk), len (names))]
       for i, n in enumerate (chunk):
@@ -127,13 +129,13 @@ def sheets (key, title, d, tmp):
         f= icon_file (d, theme, n)
         if f: out.append (nested (f, start + i + (0 if theme == "light" else 10000),
                                   x + (cw - size) / 2, y, size))
-        out.append ('<text x="%g" y="%g" text-anchor="middle" font-family="Menlo, monospace" '
+        out.append ('<text x="%g" y="%g" text-anchor="middle" font-family="DejaVu Sans Mono" '
                     'font-size="8" fill="%s">%s</text>' % (x + cw / 2, y + size + 16, dim, escape (n)))
       page= os.path.join (tmp, "%s-%s-%d.svg" % (key, theme, start))
       open (page, "w", encoding= "utf-8").write (document (w, h, bg, "".join (out)))
       pages.append (page)
   pdf= os.path.join (OUT, "%s.pdf" % key)
-  subprocess.run (["rsvg-convert", "-f", "pdf", "-o", pdf] + pages, check= True)
+  subprocess.run (["rsvg-convert", "-f", "pdf", "-o", pdf] + pages, check= True, env= FONT_ENV)
   return len (names)
 
 ###############################################################################
@@ -170,16 +172,29 @@ def toolbars (key, title, d, tmp):
   png= os.path.join (OUT, "%s-toolbars.png" % key)
   subprocess.run (["rsvg-convert", "-z", "2", "-o", png, svg], check= True)
 
+# a configuration of fontconfig with only the fonts of fonts/truetype/dejavu
+# (no fallback to the fonts of the system)
+def font_env (tmp):
+  conf= os.path.abspath (os.path.join (tmp, "fonts.conf"))
+  dejavu= os.path.abspath (os.path.join ("TeXmacs", "fonts", "truetype", "dejavu"))
+  open (conf, "w").write ('<?xml version="1.0"?>\n<!DOCTYPE fontconfig SYSTEM "fonts.dtd">\n'
+                          '<fontconfig><dir>%s</dir><cachedir>%s</cachedir></fontconfig>\n'
+                          % (dejavu, os.path.abspath (os.path.join (tmp, "fc-cache"))))
+  # (on macOS, Pango takes the fonts of Core Text unless told otherwise)
+  env= dict (os.environ); env["FONTCONFIG_FILE"]= conf; env["PANGOCAIRO_BACKEND"]= "fc"
+  return env
+
 def main ():
+  global FONT_ENV
   os.makedirs (OUT, exist_ok= True)
   tmp= os.path.join (OUT, ".tmp")
   os.makedirs (tmp, exist_ok= True)
+  FONT_ENV= font_env (tmp)
   for key, title, d in SETS:
     n= sheets (key, title, d, tmp)
     toolbars (key, title, d, tmp)
     print ("%s: %d icons" % (title, n))
-  for f in os.listdir (tmp): os.remove (os.path.join (tmp, f))
-  os.rmdir (tmp)
+  shutil.rmtree (tmp)
 
 if __name__ == "__main__":
   main ()

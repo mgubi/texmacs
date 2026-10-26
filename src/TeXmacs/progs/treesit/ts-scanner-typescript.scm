@@ -8,6 +8,9 @@
 ;; It comes WITHOUT ANY WARRANTY WHATSOEVER. For details, see the file LICENSE
 ;; in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
 ;;
+;; The scanner of tree-sitter-typescript: Copyright (c) 2017 Max Brunsfeld,
+;; under the MIT license: see $TEXMACS_PATH/misc/tree-sitter/typescript/LICENSE.
+;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;; A port of common/scanner.h of tree-sitter-typescript (MIT), the scanner

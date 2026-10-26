@@ -309,6 +309,11 @@
     cursor, and what is typed in one tab shows in the other. The tabs of the
     document are numbered, (1) and (2), and <menu|Go|Windows> has an entry
     for each of them.
+
+    <item>The licenses of the components are served with the page
+    (<verbatim|licenses/>), the section on this build names the license of
+    each, and TikZJax and Asymptote-web come with their licenses and the
+    places of their sources.
   </itemize>
 
   <paragraph|23 October 2026>

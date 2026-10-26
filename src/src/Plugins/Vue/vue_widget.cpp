@@ -62,7 +62,6 @@ extern bool menu_caching;
 #include <emscripten.h> // EM_ASM (the input area of the page)
 #endif
 #include "clay.h"
-#include "clay_grid.h"
 
 Clay_Sizing layoutExpand= {
   .width=  CLAY_SIZING_GROW(0),

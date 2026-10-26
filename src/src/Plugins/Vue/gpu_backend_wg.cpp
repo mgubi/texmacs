@@ -4,6 +4,7 @@
 *              ThorVG's WebGPU engine for the vector shapes: in the browser
 *              (Emscripten, Dawn's webgpu.h for it: emdawnwebgpu)
 * COPYRIGHT  : (C) 2026  Massimiliano Gubinelli
+*              Slug shaders adapted from E. Lengyel, (C) 2017, MIT (see below)
 *******************************************************************************
 * This software falls under the GNU general public license version 3 or later.
 * It comes WITHOUT ANY WARRANTY WHATSOEVER. For details, see the file LICENSE
@@ -95,6 +96,14 @@ static const char* quad_src=
   "  return a * i.col;\n"
   "}\n";
 
+// The Slug shaders below are adapted from the reference shaders of Eric
+// Lengyel (https://github.com/EricLengyel/Slug, SlugPixelShader.hlsl), the
+// algorithm of "GPU-Centered Font Rendering Directly from Glyph Outlines"
+// (JCGT 6 (2), 2017); rewritten for TeXmacs, with its own layout of the
+// curves and the bands. Copyright (c) 2017 Eric Lengyel, MIT License (see
+// TeXmacs/misc/licenses/Slug-MIT.txt): "The above copyright notice and this
+// permission notice shall be included in all copies or substantial portions
+// of the Software."
 static const char* slug_src=
   "struct U { size: vec2f, bold: f32, pad: f32 };\n"
   "@group(0) @binding(0) var<uniform> u: U;\n"

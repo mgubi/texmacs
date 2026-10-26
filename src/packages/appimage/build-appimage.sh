@@ -90,6 +90,9 @@ fi
 # older libstdc++ loaded first left TeXmacs without OpenGL
 rm -f "$APPDIR"/usr/lib/libstdc++.so* "$APPDIR"/usr/lib/libgcc_s.so*
 
+# the licenses of the libraries of the system which were brought
+packages/collect-licenses.sh "$APPDIR/usr/lib" "$APPDIR/usr/share/TeXmacs/misc/licenses/system"
+
 # what was brought, for the log of the build
 echo "== libraries of the AppImage:"
 ls "$APPDIR/usr/lib"

@@ -1,5 +1,6 @@
 src/grammar.json of https://github.com/tree-sitter/tree-sitter-json.git
 (commit 254c42a6476413b776221e03982ac8ae159eeb72), with its LICENSE.
+highlights.scm is queries/highlights.scm of the same commit.
 indents.scm is runtime/queries/json/indents.scm of https://github.com/nvim-treesitter/nvim-treesitter
 (commit d3e4a28b63961ba972b0945d66c73b6eec969953, Apache-2.0, see ../nvim-treesitter-LICENSE).
 tags.scm is ours.

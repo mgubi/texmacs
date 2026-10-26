@@ -8,6 +8,9 @@
 ;; It comes WITHOUT ANY WARRANTY WHATSOEVER. For details, see the file LICENSE
 ;; in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
 ;;
+;; From tree-sitter-haskell: Copyright (c) 2014 Max Brunsfeld,
+;; under the MIT license: see $TEXMACS_PATH/misc/tree-sitter/haskell/LICENSE.
+;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;; The bitmaps of src/unicode.h of tree-sitter-haskell (MIT) as inclusive

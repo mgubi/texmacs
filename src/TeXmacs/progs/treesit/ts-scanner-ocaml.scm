@@ -8,6 +8,9 @@
 ;; It comes WITHOUT ANY WARRANTY WHATSOEVER. For details, see the file LICENSE
 ;; in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
 ;;
+;; The scanner of tree-sitter-ocaml: Copyright (c) 2020 Max Brunsfeld and Pieter Goetschalckx,
+;; under the MIT license: see $TEXMACS_PATH/misc/tree-sitter/ocaml/LICENSE.
+;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;; A port of common/scanner.h of tree-sitter-ocaml (MIT): nested comments
