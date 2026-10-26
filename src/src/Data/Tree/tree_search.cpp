@@ -1175,7 +1175,7 @@ struct region_matcher {
 static void select_hits (range_set& sel, tree t, tree what, path p,
                          bool first);
 static bool select_in_hit (range_set& sel, tree u, path q, path a, path b,
-                           tree what);
+                           tree what, bool no_carry= false);
 static path hit_container (path h1, path h2);
 
 static tree
@@ -1192,18 +1192,40 @@ without_outer_wildcards (tree what) {
   return r;
 }
 
+static void
+edge_wildcards (tree what, bool& lead, bool& trail) {
+  // does the formula pattern what start (end) with a wildcard, maybe inside
+  // a region ([*a], [a*])?
+  array<int> kind;
+  array<tree> elem;
+  pattern_elements (kind, elem, what);
+  int e1= 0, e2= N(kind) - 1;
+  while (e1 < N(kind) && (kind[e1] == ELEM_START || kind[e1] == ELEM_END))
+    e1++;
+  while (e2 >= 0 && (kind[e2] == ELEM_START || kind[e2] == ELEM_END)) e2--;
+  lead= e1 <= e2 && kind[e1] == ELEM_WILDCARD;
+  trail= e1 <= e2 && kind[e2] == ELEM_WILDCARD;
+}
+
 static bool
 select_inside_tags (range_set& sel, region_matcher& m, int upto, tree what) {
   // the regions of the first hit inside the tags m.toks[0..upto[: a hit
   // inside a tag, which a leading and a trailing wildcard carry to the start
   // and the end of the formula (the hits after it are merged into it). The
   // first hit is the first occurrence of the pattern without its outer
-  // wildcards, which is not carried again: one search, not one per level
-  // of nested tags (a power of the depth)
+  // wildcards. When wildcards remain at its ends, inside a region ([*a*],
+  // [*a]), it is the first occurrence of the pattern without them, which
+  // they extend to the ends of the formula (or string) where it is: one
+  // search, not one per level of nested tags (a power of the depth), and
+  // the region stays inside one argument
   tree core= without_outer_wildcards (what);
-  // (with its edge wildcards inside a region, [*a*], the pattern itself)
   if (is_concat (core) && N(core) == 0) return false;
+  bool lead, trail;
+  edge_wildcards (core, lead, trail);
   tree w= without_empty_strings (without_regions (core), true);
+  if (lead || trail) w= without_outer_wildcards (w);
+  if (w == "" || (is_concat (w) && N(w) == 0) || is_func (w, WILDCARD, 1))
+    return false;
   bool arg= select_in_argument;
   select_in_argument= false;
   bool r= false;
@@ -1214,11 +1236,27 @@ select_inside_tags (range_set& sel, region_matcher& m, int upto, tree what) {
       range_set hits;
       search (hits, t, w, p);
       for (int i=0; i+1<N(hits) && !r; i+=2) {
+        // a hit inside the tag, not the tag itself
+        if (hits[i] == p * 0 && hits[i+1] == p * 1) continue;
         path c= hit_container (hits[i], hits[i+1]);
         if (!(p <= c)) continue;
+        tree u= subtree (t, c / p);
+        path a= hits[i] / c, b= hits[i+1] / c;
+        if (lead || trail) {
+          // the formula (or string) where the hit is
+          if (!is_concat (u) && N(c) > N(p)) {
+            path up= path_up (c);
+            tree pu= subtree (t, up / p);
+            if (is_concat (pu)) {
+              c= up; u= pu;
+              a= hits[i] / c; b= hits[i+1] / c;
+            }
+          }
+          if (lead) a= path ();
+          if (trail) b= path ();
+        }
         range_set ssel;
-        if (select_in_hit (ssel, subtree (t, c / p), c, hits[i] / c,
-                           hits[i+1] / c, core)) {
+        if (select_in_hit (ssel, u, c, a, b, core, lead || trail)) {
           sel << ssel;
           r= true;
         }
@@ -1229,8 +1267,10 @@ select_inside_tags (range_set& sel, region_matcher& m, int upto, tree what) {
 }
 
 static bool
-select_in_hit (range_set& sel, tree u, path q, path a, path b, tree what) {
-  // the regions of what in the hit of its text from a to b, in u at q
+select_in_hit (range_set& sel, tree u, path q, path a, path b, tree what,
+               bool no_carry) {
+  // the regions of what in the hit of its text from a to b, in u at q (not
+  // carried out of a tag of it if no_carry)
   region_matcher m;
   tokens_between (m.toks, u, q, a, b);
   m.init (what, true);
@@ -1252,7 +1292,7 @@ select_in_hit (range_set& sel, tree u, path q, path a, path b, tree what) {
     e1++;
   while (e2 >= 0 && (m.kind[e2] == ELEM_START || m.kind[e2] == ELEM_END))
     e2--;
-  bool carried= e1 <= e2 && m.kind[e1] == ELEM_WILDCARD &&
+  bool carried= !no_carry && e1 <= e2 && m.kind[e1] == ELEM_WILDCARD &&
                 m.kind[e2] == ELEM_WILDCARD;
   if (!m.run (0, 0))
     return carried && select_inside_tags (sel, m, N(m.toks), what);

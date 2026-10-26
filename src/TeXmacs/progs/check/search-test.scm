@@ -371,6 +371,45 @@
                 '(concat (wildcard "w")
                          (select-region (concat "c" (wildcard "v"))))
                 '((0 1 0 1) (0 1 0 3)))
+    ;; and with wildcards at both ends inside regions; the region stays in
+    ;; the argument where the hit is (it went from the start of the formula
+    ;; in strong to inside the rsup)
+    (with doc '(document (concat "b" (strong "xa") "c"))
+      (check-both doc '(concat (wildcard "u")
+                               (select-region (concat (wildcard "w") "a"
+                                                      (wildcard "v")))
+                               (wildcard "t"))
+                  '((0 1 0 0) (0 1 0 2)))
+      (check-both doc '(concat (select-region (wildcard "w")) "a"
+                               (select-region (wildcard "v")))
+                  '((0 1 0 0) (0 1 0 1) (0 1 0 2) (0 1 0 2))))
+    (check-both '(document (concat "b" (strong (concat "x" (rsup "za"))) "c"))
+                '(concat (select-region (concat (wildcard "w") "a"))
+                         (wildcard "v"))
+                '((0 1 0 1 0 0) (0 1 0 1 0 2)))
+    ;; a tag of the pattern does not match a tag of the formula inside it
+    (check-both '(document (concat "ab" (rsub "y") "cd"))
+                '(concat (wildcard "w") (rsub "y")
+                         (select-region (wildcard "v")))
+                '((0 2 0) (0 2 2)))
+    ;; in nested tags, in linear time: the region was looked for again at
+    ;; each level (2.2 s at depth 200, and up to 900 s for the first search
+    ;; of a session at depth 300)
+    (let* ((nest (lambda (self d)
+                   (if (= d 0) "xa"
+                       `(concat "b" (strong ,(self self (- d 1))) "c"))))
+           (doc (stree->tree `(document ,(nest nest 300)))))
+      (for-each
+        (lambda (what)
+          (with r (time-of (lambda () (tree-search-tree doc what '() 100)))
+            (check-true (pair? (cdr r)))
+            (check-true (< (car r) 500))))
+        (list '(concat (wildcard "u")
+                       (select-region (concat (wildcard "w") "a"
+                                              (wildcard "v")))
+                       (wildcard "t"))
+              '(concat (select-region (wildcard "w")) "a"
+                       (select-region (wildcard "v"))))))
     ;; several regions; regions at the start and at the end of the pattern
     (check-both '(document "xaybz abcd")
                 '(concat (select-region "a") (wildcard "w")
