@@ -544,6 +544,7 @@
 "compress-table-size"
 "compress-table-keys"
 "cpp-ai-chat-key"
+"cpp-ai-engine"
 "cpp-ai-chat-close"
 "cpp-ai-command"
 "cpp-ai-eval-command"

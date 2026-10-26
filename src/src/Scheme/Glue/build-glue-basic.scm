@@ -583,6 +583,7 @@
   (compress-table-size compress_table_size (int content))
   (compress-table-keys compress_table_keys (tree))
   (cpp-ai-chat-key ai_chat_key (tree string string))
+  (cpp-ai-engine ai_engine (string string))
   (cpp-ai-chat-close ai_chat_close (void string string))
   (cpp-ai-command ai_command (tree string string string))
   (cpp-ai-eval-command ai_eval_command (string tree))

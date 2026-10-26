@@ -43,9 +43,17 @@
   (tree-pointer-detach tp)
   (next))
 
-;; an empty answer (a failed request) leaves the paragraph as it is
-(define ((translate-nonempty fun) out)
-  (fun (and (!= out "") out)))
+;; an answer without text (a failed request, or the error of the engine,
+;; as {"detail": ...} for Albert, from which cpp-ai-output gets nothing)
+;; leaves the paragraph as it is, and the process goes on
+(tm-define (ai-translation-answer? out model)
+  (and (string? out) (!= out "")
+       (with out* (cpp-ai-output out model)
+         (and (string? out*) (!= out* "")
+              (!= (car (cpp-ai-get-body out*)) "")))))
+
+(define ((translate-answered model fun) out)
+  (fun (and (ai-translation-answer? out model) out)))
 
 (define ((translate-process-one dest-lan) serial tp st next)
   (let* ((t (tree-pointer->tree tp))
@@ -57,7 +65,7 @@
          (model (get-preference "ai"))
          (agent (ai-translation-agent src-lan dest-lan))
          (return (compress-table-callback table
-                   (translate-nonempty
+                   (translate-answered model
                      (translate-processed-one serial tp st model next)))))
     (cond ((not (compressed-contains-text? t*))
            (return #f))

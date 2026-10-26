@@ -7003,6 +7003,19 @@ tmg_cpp_ai_chat_key (tmscm arg1, tmscm arg2) {
 }
 
 tmscm
+tmg_cpp_ai_engine (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "cpp-ai-engine");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  string out= ai_engine (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return string_to_tmscm (out);
+}
+
+tmscm
 tmg_cpp_ai_chat_close (tmscm arg1, tmscm arg2) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "cpp-ai-chat-close");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "cpp-ai-chat-close");
@@ -12022,6 +12035,7 @@ initialize_glue_basic () {
   tmscm_install_procedure ("compress-table-size",  tmg_compress_table_size, 1, 0, 0);
   tmscm_install_procedure ("compress-table-keys",  tmg_compress_table_keys, 0, 0, 0);
   tmscm_install_procedure ("cpp-ai-chat-key",  tmg_cpp_ai_chat_key, 2, 0, 0);
+  tmscm_install_procedure ("cpp-ai-engine",  tmg_cpp_ai_engine, 1, 0, 0);
   tmscm_install_procedure ("cpp-ai-chat-close",  tmg_cpp_ai_chat_close, 2, 0, 0);
   tmscm_install_procedure ("cpp-ai-command",  tmg_cpp_ai_command, 3, 0, 0);
   tmscm_install_procedure ("cpp-ai-eval-command",  tmg_cpp_ai_eval_command, 1, 0, 0);

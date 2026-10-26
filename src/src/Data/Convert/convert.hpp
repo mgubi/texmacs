@@ -153,6 +153,7 @@ struct compress_scope {
   ~compress_scope ();
 };
 tree ai_chat_key (string model, string chat);
+string ai_engine (string model);
 void ai_chat_close (string model, string chat);
 tree json_to_tree (string s, int mode= 0);
 string tree_to_json (tree t, int mode= 0);

@@ -44,7 +44,8 @@
 (texmacs-module (check convert-more-test)
   (:use (check check-lib)
         (convert mathml tmmath)
-        (tools spell spell-lantool)))
+        (tools spell spell-lantool)
+        (tools ai ai-translate)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Helpers
@@ -1103,8 +1104,8 @@
 
 (define (no-ai-request? model)
   ;; no check may reach the network, whatever the preferences: the AI tools
-  ;; are only called with a model for which there is no command to send
-  (== (tree->stree (cpp-ai-command "x" model "")) ""))
+  ;; are only called with a model of no engine (nothing is built or sent)
+  (== (cpp-ai-engine model) "unknown"))
 
 (define (compress-table-serial name)
   ;; the number of a table of compress-table-new: <prefix>-<number>
@@ -1210,6 +1211,18 @@
         (check= out '(document (concat "it " (spell-error "is" "A verb" "was")
                                        " " (em "b") " " (frac "x" "y"))))
         (check= (compress-tables-like "lantool") '())))
+    ;; the answer of a translation: an error of the engine (here the body
+    ;; of an HTTP error from Albert, as the Qt request now gives it) is no
+    ;; translation, which would replace the paragraph by nothing; with the
+    ;; errors of #273, it is an "Error: ..." which stops the process
+    (let* ((err "{\"detail\":\"Invalid authentication credentials\"}")
+           (ok (string-append "{\"choices\":[{\"message\":{\"content\":"
+                              "\"<body><p>Bonjour</p></body>\"}}]}")))
+      (check-false (ai-translation-answer? "" "albert"))
+      (check-false (ai-translation-answer? #f "albert"))
+      (check-true (or (not (ai-translation-answer? err "albert"))
+                      (string-starts? (cpp-ai-output err "albert") "Error:")))
+      (check-true (ai-translation-answer? ok "albert")))
     ;; the translation process, whose request cannot be launched (an engine
     ;; without a command: cpp-ai-async-eval-command says so, and will not
     ;; call back): the table of the paragraph is freed all the same

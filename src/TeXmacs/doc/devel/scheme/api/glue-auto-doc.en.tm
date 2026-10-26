@@ -4155,6 +4155,14 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(cpp-ai-engine <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|ai_engine> which returns
+    <scm|string>.
+  </explain>
+
+  <\explain>
     <scm|(cpp-ai-chat-close <scm-arg|string> <scm-arg|string>)>
 <explain-synopsis|no synopsis>
   <|explain>

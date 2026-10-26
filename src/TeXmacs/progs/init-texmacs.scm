@@ -525,9 +525,9 @@
 (lazy-define (tools spell spell-lantool) lantool-server supports-lantool?
 	     lantool-check)
 (lazy-define (tools spell correct-widgets) update-correct-widget open-correct)
-(lazy-define (tools ai ai-compress) with-compress-table compress-table-callback)
 (use-modules (tools ai ai-batch))
 (lazy-define (tools ai ai-translate) ai-translate* ai-abort-translate)
+(lazy-define (tools ai ai-compress) with-compress-table compress-table-callback)
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
 ;(display* "memory: " (texmacs-memory) " bytes\n")
 
