@@ -683,6 +683,20 @@ search_compound (range_set& sel, tree t, tree what, path p) {
 static void search_after (range_set& sel, tree t, tree what, path p,
                           path q);
 
+static bool
+crosses_document (tree t, path p, path q) {
+  // is there a document between t (at p) and the position q inside it?
+  tree u= t;
+  path r= q / p;
+  while (!is_nil (r) && !is_nil (r->next) && is_compound (u) &&
+         r->item >= 0 && r->item < N(u)) {
+    u= u[r->item];
+    if (is_document (u)) return true;
+    r= r->next;
+  }
+  return false;
+}
+
 void
 search_concat (range_set& sel, tree t, tree what, path p, path from) {
   // search_concat (t, what, pos, 0, ...) scans forwards from pos for the
@@ -726,13 +740,18 @@ search_concat (range_set& sel, tree t, tree what, path p, path from) {
         path_less_eq (cur, ssel[N(ssel)-2]);
       // ssel is a list of (start, end) pairs; a leading (trailing) wildcard
       // extends the hits to the start (end) of the formula. Then they
-      // overlap, and merge keeps the first one (#454)
+      // overlap, and merge keeps the first one (#454). Not out of a
+      // document inside the child, as in a theorem or an item: the
+      // extension stops at the nearest enclosing document (the maintainer's
+      // decision on #501)
       if (is_func (what[0], WILDCARD, 1))
         for (int i=0; i+1<N(ssel); i+=2)
-          ssel[i]= (p * 0) * start (t[0]);
+          if (!crosses_document (t, p, ssel[i]))
+            ssel[i]= (p * 0) * start (t[0]);
       if (is_func (what[N(what)-1], WILDCARD, 1))
         for (int i=0; i+1<N(ssel); i+=2)
-          ssel[i+1]= (p * (N(t)-1)) * end (t[N(t)-1]);
+          if (!crosses_document (t, p, ssel[i+1]))
+            ssel[i+1]= (p * (N(t)-1)) * end (t[N(t)-1]);
       merge (sel, ssel);
       if (stop) scan= true;
       if (is_compound (t[pos])) {

@@ -828,7 +828,32 @@
   (check-both '(document "xb" (strong "bab") "a")
               '(document (concat "b" (wildcard "w"))
                          (concat (wildcard "v") "a"))
-              '((0 1) (1 0 2) (1 0 2) (2 1))))
+              '((0 1) (1 0 2) (1 0 2) (2 1)))
+  ;; but a wildcard never carries a hit out of a document, as in a theorem
+  ;; or an item: the hits stay in their paragraphs (the maintainer's
+  ;; decision; a formula with a theorem gave one hit which ran out of the
+  ;; theorem); inline tags such as section, strong and frac carry it
+  (let ((th '(theorem (document "xab" "yab"))))
+    (check-both `(document (concat "q" ,th)) '(concat "a" (wildcard "w"))
+                '((0 1 0 0 1) (0 1 0 0 3) (0 1 0 1 1) (0 1 0 1 3)))
+    (check-both `(document ,th) '(concat "a" (wildcard "w"))
+                '((0 0 0 1) (0 0 0 3) (0 0 1 1) (0 0 1 3)))
+    (check-both `(document ,th "c") '(document (concat "a" (wildcard "w")) "c")
+                '()))
+  (check-both '(document
+                 (concat "z" (itemize (document (concat (item) "xab")
+                                                (concat (item) "yab")))))
+              '(concat "a" (wildcard "w"))
+              '((0 1 0 0 1 1) (0 1 0 0 1 3) (0 1 0 1 1 1) (0 1 0 1 1 3)))
+  (check-both '(document
+                 (concat "z" (equation* (document (concat "xa" (rsub "y"))))))
+              '(concat "a" (wildcard "w"))
+              '((0 1 0 0 0 1) (0 1 0 0 1 1)))
+  (check-both '(document (section "xab") "c") '(concat "a" (wildcard "w"))
+              '((0 0 1) (0 1)))
+  (check-both '(document (frac (concat "a" (rsub "y")) "a+c"))
+              '(concat "a" (wildcard "w"))
+              '((0 0 0 0) (0 1))))
 
 ;; a formula pattern in a tag argument, in nested fractions: the search of
 ;; each argument looked again inside all the tags of the argument, at each
