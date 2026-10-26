@@ -224,6 +224,39 @@
     (check-both '(document "xa" "cbxd" "e")
                 '(document "a" (concat "c" (select-region "") "d") "e")
                 '())
+    ;; a candidate which fails does not hide a match which overlaps it; a
+    ;; leading empty region is one token, not a wildcard; a second match
+    ;; does not reuse the end of the first one
+    (check-both '(document "b" "cbd" "cb")
+                '(document (concat "b" (select-region "")) "cb")
+                '((1 2) (1 3)))
+    (check-both '(document "x" "bTa" "aTbcaab" "aa")
+                '(document (concat (select-region "") (wildcard "w") "a"
+                                   (wildcard "v"))
+                           "a")
+                '((1 0) (1 1) (2 1) (2 2)))
+    (check-both '(document "axb" "caab" "ca")
+                '(document (concat "a" (select-region "") "b") "ca")
+                '((0 1) (0 2)))
+    ;; a paragraph of the pattern which is only an empty region is a whole
+    ;; paragraph, never an empty one
+    (check-both '(document "xa" "") '(document "a" (select-region "")) '())
+    (check-both '(document "xa" "yz") '(document "a" (select-region ""))
+                '((1 0) (1 2)))
+    (check-both '(document "a" "yz" "b")
+                '(document "a" (select-region "") "b")
+                '((1 0) (1 2)))
+    ;; in linear time: the hits inside the tags were sorted with those of
+    ;; the formula one by one (3.6 s for 16000 terms)
+    (with doc (stree->tree
+                `(document (concat ,@(append-map (lambda (k)
+                                                   '("ab" (frac "ab" "1")))
+                                                 (iota 16000)))))
+      (with r (time-of (lambda ()
+                         (tree-search-tree doc '(concat "a" (select-region ""))
+                                           '() 100000)))
+        (check= (length (cdr r)) 64000)
+        (check-true (< (car r) 500))))
     ;; a trailing wildcard after an empty region takes nothing (the match
     ;; is the shortest), so that a[]* gives a region per a and its next
     ;; character, while a[b]* gives one region, the wildcard taking the rest
@@ -316,6 +349,13 @@
         (lambda ()
           (check= (hits '(document (frac "xab" "c") (frac "ab" "c")) pat)
                   '((1 0 1) (1 0 2))))))
+    ;; with Replace, a region formula in an argument is also found inside the
+    ;; tags of the argument (a cascaded match), as without a region
+    (with-search-mode 'replace
+      (lambda ()
+        (check= (hits '(document (frac (concat "q" (strong "ab")) "1"))
+                      '(frac (concat "a" (select-region "b")) "1"))
+                '((0 0 1 0 1) (0 0 1 0 2)))))
     ;; the arguments of a tag one by one with Replace, as for other patterns
     (with-search-mode 'replace
       (lambda ()

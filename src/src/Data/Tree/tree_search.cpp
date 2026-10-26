@@ -1214,16 +1214,33 @@ select_in_hit (range_set& sel, tree u, path q, path a, path b, tree what) {
   return true;
 }
 
-static void
-sort_ranges (range_set& sel) {
-  // the ranges of sel in the order of their starts (an insertion sort: the
-  // ranges come mostly in order)
-  for (int i=2; i+1<N(sel); i+=2)
-    for (int j=i; j>=2 && path_less (sel[j], sel[j-2]); j-=2) {
-      path x= sel[j], y= sel[j+1];
-      sel[j]= sel[j-2]; sel[j+1]= sel[j-1];
-      sel[j-2]= x; sel[j-1]= y;
+static range_set
+merge_sorted (range_set a, range_set b) {
+  // the ranges of a and b, each in the order of their starts, in that order
+  range_set r;
+  int i=0, j=0;
+  while (i+1 < N(a) || j+1 < N(b))
+    if (j+1 >= N(b) || (i+1 < N(a) && path_less_eq (a[i], b[j]))) {
+      r << a[i] << a[i+1]; i += 2;
     }
+    else { r << b[j] << b[j+1]; j += 2; }
+  return r;
+}
+
+static void
+inside_tags (array<tree>& c, array<path>& cp, tree t, path p) {
+  // the arguments of the tags of the formula t, or the children of t
+  if (is_concat (t)) {
+    for (int k=0; k<N(t); k++)
+      if (is_compound (t[k]))
+        for (int i=0; i<N(t[k]); i++)
+          if (is_accessible_for_search (t[k], i)) {
+            c << t[k][i]; cp << p * path (k, i);
+          }
+  }
+  else if (is_compound (t))
+    for (int i=0; i<N(t); i++)
+      if (is_accessible_for_search (t, i)) { c << t[i]; cp << p * i; }
 }
 
 static void
@@ -1245,7 +1262,7 @@ select_tokens (range_set& sel, tree t, tree what, path p) {
       if (!cascaded_match_flag) return;
     }
     else
-      for (int s=0; s<N(m.toks); ) {
+      for (int s=0; s<N(m.toks) && N(r) <= search_max_hits; ) {
         if (m.run (0, s)) {
           range_set ssel;
           m.regions (ssel);
@@ -1256,26 +1273,15 @@ select_tokens (range_set& sel, tree t, tree what, path p) {
       }
   }
   if (is_compound (t)) {
-    // inside the tags of the formula (or of t)
+    // inside the tags of the formula (or of t): in the order of the
+    // document, then merged with the hits of the formula itself
     array<tree> c;
     array<path> cp;
-    if (is_concat (t)) {
-      for (int k=0; k<N(t); k++)
-        if (is_compound (t[k]))
-          for (int i=0; i<N(t[k]); i++)
-            if (is_accessible_for_search (t[k], i)) {
-              c << t[k][i]; cp << p * path (k, i);
-            }
-    }
-    else
-      for (int i=0; i<N(t); i++)
-        if (is_accessible_for_search (t, i)) { c << t[i]; cp << p * i; }
-    for (int i=0; i<N(c); i++) {
-      range_set ssel;
-      select_tokens (ssel, c[i], what, cp[i]);
-      r << ssel;
-    }
-    sort_ranges (r);
+    inside_tags (c, cp, t, p);
+    range_set in;
+    for (int i=0; i<N(c) && N(in) <= search_max_hits; i++)
+      select_tokens (in, c[i], what, cp[i]);
+    r= merge_sorted (r, in);
   }
   merge (sel, r);
 }
@@ -1299,8 +1305,22 @@ select_hits (range_set& sel, tree t, tree what, path p, bool first) {
   // found in each hit (in the first one only, if first)
   tree w= without_empty_strings (without_regions (what), true);
   range_set hits;
-  if (select_in_argument && !partial_match_flag)
+  if (select_in_argument && !partial_match_flag) {
     search_anchored (hits, t, w, p, true, !initial_match_flag);
+    if (N(hits) == 0 && cascaded_match_flag) {
+      // inside the tags of the argument, as a cascaded match
+      array<tree> c;
+      array<path> cp;
+      inside_tags (c, cp, t, p);
+      for (int i=0; i<N(c); i++) {
+        range_set ssel;
+        select_hits (ssel, c[i], what, cp[i], first);
+        merge (sel, ssel);
+        if (first && N(sel) != 0) return;
+      }
+      return;
+    }
+  }
   else search (hits, t, w, p);
   for (int i=0; i+1<N(hits); i+=2) {
     path c= hit_container (hits[i], hits[i+1]);
@@ -1319,6 +1339,111 @@ select_text (range_set& sel, tree t, tree what, path p) {
   else select_hits (sel, t, what, p, false);
 }
 
+static bool
+is_whole_region (tree w) {
+  // a part of a document pattern which is an empty region: the whole
+  // paragraph, as an argument of a tag, but never an empty one
+  return is_func (w, SELECT_REGION, 1) && is_empty (w[0]);
+}
+
+static bool
+match_part (range_set& sel, range_set& rsel, tree u, path q, tree w, int m,
+            int n, path from) {
+  // the part w (number m of n) of a document pattern in the paragraph u at
+  // q: from the start of u (m > 0) or from from on (m == 0, nil: anywhere),
+  // to its end (m < n-1). The range of the match in sel, its regions in
+  // rsel
+  bool at_start= (m > 0), at_end= (m < n-1);
+  if (is_whole_region (w)) {
+    if (u == "" || (!is_nil (from) && !path_less_eq (from, q * start (u))))
+      return false;
+    sel << q * start (u) << q * end (u);
+    rsel << q * start (u) << q * end (u);
+    return true;
+  }
+  if (has_one (w)) {
+    // a part with an empty region, which takes one token: with the tokens
+    // of the paragraph, leftmost and lazy
+    region_matcher r;
+    tokens_between (r.toks, u, q, path (), path ());
+    if (N(r.toks) == 0) return false;
+    r.init (w, at_end);
+    // as in the search: a leading wildcard reaches the start of the
+    // paragraph (so a second match does not start after the end of a
+    // previous one there), a trailing one its end
+    int e1= 0, e2= N(r.kind) - 1;
+    while (e1 < N(r.kind) && r.kind[e1] == ELEM_START) e1++;
+    while (e2 >= 0 && r.kind[e2] == ELEM_END) e2--;
+    bool lead= e1 < N(r.kind) && r.kind[e1] == ELEM_WILDCARD;
+    bool trail= e2 >= 0 && r.kind[e2] == ELEM_WILDCARD;
+    if (m == 0 && lead && !is_nil (from) && !path_less_eq (from, q * start (u)))
+      return false;
+    int st= 0;
+    if (!is_nil (from))
+      while (st < N(r.toks) && !path_less_eq (from, r.toks[st].before)) st++;
+    bool ok= false;
+    if (at_start) ok= (st == 0) && r.run (0, 0);
+    else for (; st<N(r.toks) && !ok; st++) ok= r.run (0, st);
+    if (!ok) return false;
+    st= (at_start? 0: st-1);
+    sel << r.position (st, true)
+        << (trail? q * end (u): r.position (r.end, false));
+    r.regions (rsel);
+    return true;
+  }
+  tree x= without_empty_strings (without_regions (w), true);
+  range_set ssel;
+  if (m == 0 && !is_nil (from) && !path_less_eq (from, q * start (u)))
+    search_paragraph_after (ssel, u, x, q, from);
+  else search_paragraph (ssel, u, x, q, at_start, at_end);
+  if (N(ssel) < 2) return false;
+  if (contains_select_region (w)) {
+    if (is_func (w, SELECT_REGION, 1)) rsel << ssel[0] << ssel[1];
+    else if (!select_in_hit (rsel, u, q, ssel[0] / q, ssel[1] / q, w))
+      return false;
+  }
+  sel << ssel[0] << ssel[1];
+  return true;
+}
+
+static void
+select_paragraphs_one (range_set& sel, tree t, tree what, path p) {
+  // a document pattern with an empty region in one of its parts, which the
+  // search has no element for: the paragraphs of each document are matched
+  // part by part, so that a candidate which fails does not hide a match
+  // which overlaps it (the hits of the search with a wildcard in its place
+  // did, and made a leading empty region a leading wildcard)
+  if (is_atomic (t) || N(sel) > search_max_hits) return;
+  if (!is_document (t)) {
+    for (int i=0; i<N(t); i++)
+      if (is_accessible_for_search (t, i))
+        select_paragraphs_one (sel, t[i], what, p * i);
+    return;
+  }
+  int n= N(what), last= -1;
+  path from;
+  for (int i=0; i<N(t); i++) {
+    bool found= false;
+    if (i + n <= N(t)) {
+      range_set psel, rsel;
+      bool ok= true;
+      for (int m=0; m<n && ok; m++)
+        ok= match_part (psel, rsel, t[i+m], p * (i+m), what[m], m, n,
+                        (m == 0 && !is_nil (from) && (p * i) <= from)?
+                        from: path ());
+      if (ok) {
+        merge (sel, rsel);
+        from= psel[N(psel)-1];
+        found= true;
+        last= i + n - 1;
+        i += n - 2;  // the next match may start in the last paragraph
+      }
+    }
+    // the trees inside a paragraph, unless a match took it
+    if (!found && i != last) select_paragraphs_one (sel, t[i], what, p * i);
+  }
+}
+
 static void
 select_paragraphs (range_set& sel, tree t, tree what, path p) {
   // idem for a document pattern: its paragraphs match as in a search, and
@@ -1327,6 +1452,11 @@ select_paragraphs (range_set& sel, tree t, tree what, path p) {
     select (sel, t, what[0], p);
     return;
   }
+  for (int m=0; m<N(what); m++)
+    if (is_whole_region (what[m]) || has_one (what[m])) {
+      select_paragraphs_one (sel, t, what, p);
+      return;
+    }
   tree w= without_empty_strings (without_regions (what), true);
   range_set hits;
   search (hits, t, w, p);
@@ -1347,25 +1477,6 @@ select_paragraphs (range_set& sel, tree t, tree what, path p) {
       if (is_func (what[m], SELECT_REGION, 1)) {
         ssel << (is_nil (a)? c * path (k, start (d[k])): c * path (k, a))
              << (is_nil (b)? c * path (k, end (d[k])): c * path (k, b));
-        continue;
-      }
-      if (has_one (what[m])) {
-        // an empty region takes one token, which the wildcard of the search
-        // did not: the part is matched with the tokens of its paragraph,
-        // from any start to the end in the first paragraph, from the start
-        // in the last one, the whole paragraph in the middle
-        region_matcher r;
-        tokens_between (r.toks, d[k], c * k, path (), path ());
-        r.init (what[m], m < N(what)-1);
-        ok= false;
-        if (N(r.toks) != 0) {
-          if (m == 0) {
-            for (int st=0; st<N(r.toks) && !ok; st++)
-              ok= r.run (0, st);
-          }
-          else ok= r.run (0, 0);
-        }
-        if (ok) r.regions (ssel);
         continue;
       }
       ok= select_in_hit (ssel, d[k], c * k, a, b, what[m]);
