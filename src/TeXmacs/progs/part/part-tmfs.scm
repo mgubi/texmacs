@@ -752,13 +752,14 @@
 
 (define (part-own-init-action name f body v)
   ;; part-own-action for the part view @name, whose initial environment is
-  ;; @v: an open buffer of @f with an unsaved change of a variable which
-  ;; the view changed too is a conflict, as one in the body
+  ;; @v: an open buffer of @f with an unsaved change (against the file on
+  ;; disk now) of a variable which the view changed too is a conflict, as
+  ;; one in the body
   (with action (part-own-action f body)
     (if (and (== action 'buffer)
-             (part-loaded-init-disk name)
-             (part-init-conflicts? name v (part-loaded-init-disk name)
-                                   (tmfile-extract (buffer-get f) 'initial)))
+             (part-init-conflicts?
+              name v (with now (part-file-body-init f) (and now (cdr now)))
+              (tmfile-extract (buffer-get f) 'initial)))
         'conflict
         action)))
 

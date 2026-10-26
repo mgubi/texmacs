@@ -2276,6 +2276,28 @@
     (check= (master-buffer-init a "par-indent") "9fn")
     (check-false (buffer-modified? a))
     (buffer-close p) (buffer-close a)
+    ;; a change which the open buffer saved is no unsaved change: after the
+    ;; question about the file on disk, the view wins for its variable, and
+    ;; the file gets the unsaved change of the buffer in another one
+    (write-doc "ia.tm" '("book") '() '((chapter "A") "a"))
+    (load-buffer a) (update-forced)
+    (load-buffer p) (update-forced)
+    (switch-to-buffer a)
+    (edit (init-env "par-indent" "1fn"))
+    (buffer-save a)
+    (edit (init-env "par-sep" "3fn"))
+    (switch-to-buffer p)
+    (edit (init-env "par-indent" "9fn"))
+    (check= (part-save-changed p) (list a))
+    (check= (part-own-plan p) (list a 'buffer #f))
+    (buffer-save p)
+    (check= (part-save-message) "Saved ia.tm")
+    (check= (file-init "ia.tm")
+            '(("page-medium" . "paper") ("par-indent" . "9fn")
+              ("par-sep" . "3fn")))
+    (check= (master-buffer-init a "par-indent") "9fn")
+    (check-false (buffer-modified? a))
+    (buffer-close p) (buffer-close a)
     ;; a file which could not be written: the view keeps its change, which
     ;; the next save writes
     (write-doc "ia.tm" '("book") '() '((chapter "A") "a"))
@@ -2347,7 +2369,6 @@
                 ("par-sep" . "2fn")))
       (buffer-close p2)
       (buffer-close p))
-    (check= links-questions (list))
     (write-doc "ia.tm" '("book") '() '((chapter "A") "a"))))
 
 ;; The part tmfs opens a file of a project as a document of its own: its
@@ -2880,6 +2901,7 @@
       r)))
 
 (define (links-test-run)
+  (set! links-questions (list))
   (check-suite "links")
   (make-dir)
   (run-group test-labels)
@@ -2913,5 +2935,7 @@
   (run-group test-document-parts)
   (run-group test-document-parts-undo)
   (run-group test-linked-files)
+  ;; (no group asked a question, which links-confirm answers no)
+  (check= links-questions (list))
   (clear-dir)
   (check-end))
