@@ -1223,6 +1223,50 @@
       (check-true (or (not (ai-translation-answer? err "albert"))
                       (string-starts? (cpp-ai-output err "albert") "Error:")))
       (check-true (ai-translation-answer? ok "albert")))
+    ;; the callback of one paragraph of the translation process, given these
+    ;; answers directly (no request): the error and the empty answer leave
+    ;; the paragraph, the answer with text replaces it (with the markup of
+    ;; the codes of its table); the table is freed and the process goes on
+    (let* ((old (current-buffer))
+           (before (buffer-list))
+           (u (new-buffer))
+           (para '(concat "it is " (em "b")))
+           (body (string-append "<body><p>Bonjour <div id=\\\"x0\\\">b"
+                                "</div></p></body>"))
+           (answers
+            (list (list "{\"detail\":\"Invalid authentication credentials\"}"
+                        para)
+                  (list "" para)
+                  (list (string-append "{\"choices\":[{\"message\":"
+                                       "{\"content\":\"" body "\"}}]}")
+                        ;; (the answer is a document, put as it is in place
+                        ;; of the paragraph, as before)
+                        '(document (concat "Bonjour " (em "b"))))))
+           (end (make-process-end 'translate-check))
+           (serial process-serial))
+      (dynamic-wind
+        (lambda () (noop))
+        (lambda ()
+          (switch-to-buffer* u)
+          (for (a answers)
+            (buffer-set-body u (stree->tree `(document ,para)))
+            (let* ((t (tree-ref (buffer-tree) 0))
+                   (tp (tree->tree-pointer t))
+                   (st (tm->stree t))
+                   (table (compress-table-new "translate"))
+                   (went-on #f))
+              (with-compress-table table (lambda () (compress-tree t)))
+              ((ai-translate-callback serial tp st "albert"
+                                      (lambda () (set! went-on #t)) table)
+               (car a))
+              (check= (tm->stree (tree-ref (buffer-tree) 0)) (cadr a))
+              (check= (compress-table-size table) -1)
+              (check-true went-on))))
+        (lambda ()
+          (end)
+          (for (b (buffer-list))
+            (when (nin? b before) (buffer-close b)))
+          (when (buffer-exists? old) (switch-to-buffer old)))))
     ;; the translation process, whose request cannot be launched (an engine
     ;; without a command: cpp-ai-async-eval-command says so, and will not
     ;; call back): the table of the paragraph is freed all the same

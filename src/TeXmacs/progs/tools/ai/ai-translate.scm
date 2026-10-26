@@ -55,6 +55,13 @@
 (define ((translate-answered model fun) out)
   (fun (and (ai-translation-answer? out model) out)))
 
+(tm-define (ai-translate-callback serial tp st model next table)
+  (:synopsis "The function called with the answer for one paragraph")
+  ;; (decompressed with the codes of the paragraph's table, which is freed)
+  (compress-table-callback table
+    (translate-answered model
+      (translate-processed-one serial tp st model next))))
+
 (define ((translate-process-one dest-lan) serial tp st next)
   (let* ((t (tree-pointer->tree tp))
          ;; the codes of this paragraph, freed once its answer is there
@@ -64,9 +71,7 @@
          (src-lan (tree-get-env t "language"))
          (model (get-preference "ai"))
          (agent (ai-translation-agent src-lan dest-lan))
-         (return (compress-table-callback table
-                   (translate-answered model
-                     (translate-processed-one serial tp st model next)))))
+         (return (ai-translate-callback serial tp st model next table)))
     (cond ((not (compressed-contains-text? t*))
            (return #f))
           ((not (process-running? 'translate))
