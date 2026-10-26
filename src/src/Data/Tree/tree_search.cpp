@@ -160,9 +160,51 @@ match_atomic (string s, tree what, int pos, int i, int& start, int& end) {
 * Matching
 ******************************************************************************/
 
+static void search_anchored (range_set& sel, tree t, tree what, path p,
+                             bool at_start, bool at_end);
+
+static bool
+match_formula (tree t, tree what) {
+  // a formula what (a concat) in the argument of a tag of the pattern, and
+  // a tag argument t: the formula is text, matched as when searching (#495:
+  // a match may start and end inside a string, a wildcard takes the
+  // shortest run, possibly empty), not child by child (a wildcard took
+  // exactly one child, and Search skipped children, #501). As for a string
+  // argument, the flags say where: anywhere in t with partial matches, at
+  // its start with initial matches, else the whole argument
+  tree u= t;
+  if (!is_concat (t)) u= tree (CONCAT, t);
+  range_set sel;
+  if (partial_match_flag) {
+    search (sel, u, what, path ());
+    if (cascaded_match_flag) return N(sel) != 0;
+    // without cascaded matches, in the formula itself, not inside its tags
+    for (int i=0; i+1<N(sel); i+=2)
+      if (N(sel[i]) <= 2 && N(sel[i+1]) <= 2) return true;
+    return false;
+  }
+  search_anchored (sel, u, what, path (), true, !initial_match_flag);
+  return N(sel) != 0;
+}
+
 bool
 match_cascaded (tree t, tree what) {
-  if (match (t, what)) return true;
+  if (is_concat (what) && is_compound (t)) {
+    if (match_formula (t, what)) return true;
+    if (is_concat (t)) {
+      // a formula pattern inside the tags of the formula t, not as a part of
+      // t (a child of t, or a run of children, is matched above)
+      if (cascaded_match_flag)
+        for (int i=0; i<N(t); i++)
+          if (is_compound (t[i]))
+            for (int j=0; j<N(t[i]); j++)
+              if (is_accessible_for_search (t[i], j))
+                if (match_cascaded (t[i][j], what))
+                  return true;
+      return false;
+    }
+  }
+  else if (match (t, what)) return true;
   if (cascaded_match_flag && is_compound (t))
     for (int i=0; i<N(t); i++)
       if (is_accessible_for_search (t, i))
@@ -593,8 +635,11 @@ search_compound (range_set& sel, tree t, tree what, path p) {
       search (sel, t[i], what, p * i);
 }
 
+static void search_after (range_set& sel, tree t, tree what, path p,
+                          path q);
+
 void
-search_concat (range_set& sel, tree t, tree what, path p) {
+search_concat (range_set& sel, tree t, tree what, path p, path from) {
   // search_concat (t, what, pos, 0, ...) scans forwards from pos for the
   // start of a match, until it reaches a compound child which contains a
   // match, or a string with matches after cur (with a leading wildcard,
@@ -603,9 +648,14 @@ search_concat (range_set& sel, tree t, tree what, path p) {
   // that child: skip them, instead of scanning again (quadratic in the
   // length of the concat, and worse for nested concats). The matches
   // inside each child are searched only once.
+  // With a path from inside a compound child (search_after), the hits of
+  // that child are those which start at from or after it
   array<range_set> inside (N(t));
   for (int pos=0; pos<N(t); pos++)
-    search (inside[pos], t[pos], what, p * pos);
+    if (!is_nil (from) && is_compound (t[pos]) && (p * pos) <= from &&
+        !is_nil ((from / (p * pos))->next))
+      search_after (inside[pos], t[pos], what, p * pos, from);
+    else search (inside[pos], t[pos], what, p * pos);
   array<bool> failed (N(t) * N(what));
   for (int k=0; k<N(failed); k++) failed[k]= false;
   bool scan= true;
@@ -660,6 +710,41 @@ search_concat (range_set& sel, tree t, tree what, path p) {
       pos++;
     }
   }
+}
+
+void
+search_concat (range_set& sel, tree t, tree what, path p) {
+  search_concat (sel, t, what, p, path ());
+}
+
+static void
+search_after (range_set& sel, tree t, tree what, path p, path q) {
+  // the hits of what in t (at p) which start at q (inside t) or after it
+  if (path_less_eq (q, p * start (t))) {
+    search (sel, t, what, p);
+    return;
+  }
+  path r= q / p;
+  if (is_atomic (t)) {
+    search_string (sel, t->label, what, p, r->item);
+    return;
+  }
+  if (is_nil (r->next)) return;  // after t
+  if (is_concat (t) && is_concat (what)) {
+    // as for the hits after a match which ended at q: q is the end of a
+    // previous hit, which merge takes into account
+    range_set ssel;
+    ssel << q << q;
+    search_concat (ssel, t, what, p, q);
+    for (int i=2; i<N(ssel); i++) sel << ssel[i];
+    return;
+  }
+  int k= r->item;
+  if (k < 0 || k >= N(t)) return;
+  if (is_accessible_for_search (t, k)) search_after (sel, t[k], what, p * k, q);
+  for (int i=k+1; i<N(t); i++)
+    if (is_accessible_for_search (t, i))
+      search (sel, t[i], what, p * i);
 }
 
 static tree
@@ -764,23 +849,37 @@ search_paragraph_after (range_set& sel, tree t, tree what, path p, path q) {
   if (!is_concat (t) || is_nil (r)) return;
   int k= r->item, o= 0;
   bool cut= is_atomic (t[k]) && !is_nil (r->next);
+  // q inside a tag of t: the matches which start there are carried out of
+  // it by a trailing wildcard (they were missed, #501)
+  bool in_tag= is_compound (t[k]) && !is_nil (r->next) &&
+               !is_nil (r->next->next);
   tree u (CONCAT);
   if (cut) {
     o= r->next->item;
     if (o < N(t[k]->label)) u << tree (t[k]->label (o, N(t[k]->label)));
     else { cut= false; k++; }
   }
-  else k++;
+  else if (!(is_compound (t[k]) && r->next == path (0))) k++;
   for (int c= (cut? k+1: k); c<N(t); c++) u << t[c];
-  if (N(u) == 0) return;
-  range_set ssel;
-  search_paragraph (ssel, u, what, p, false, true);
+  range_set ssel, usel;
+  if (N(u) != 0) search_paragraph (ssel, u, what, p, false, true);
   for (int h=0; h<N(ssel); h++) {
     path x= ssel[h] / p;
     int c= x->item;
-    if (cut && c == 0) sel << (p * path (k, path (x->next->item + o)));
-    else sel << (p * path (c + k, x->next));
+    if (cut && c == 0) usel << (p * path (k, path (x->next->item + o)));
+    else usel << (p * path (c + k, x->next));
   }
+  if (in_tag) {
+    range_set hsel;
+    search_after (hsel, t, what, p, q);
+    int n= N(hsel);
+    if (n != 0 && hsel[n-1] == p * end (t) &&
+        (N(usel) == 0 || path_less_eq (hsel[n-2], usel[0]))) {
+      sel << hsel[n-2] << hsel[n-1];
+      return;
+    }
+  }
+  sel << usel;
 }
 
 void

@@ -27,8 +27,10 @@
 ;; argument, an empty argument matches any argument, and a tag matches a
 ;; tag whose arguments contain those of the pattern. Edit > Replace sets it
 ;; to "on": the arguments follow allow-blank-replace, ..., all off by
-;; default, and a string of the pattern must match a whole argument. Both
-;; allow cascaded matches (a pattern inside an argument). The checks set
+;; default, and a string of the pattern must match a whole argument. A
+;; formula in an argument of the pattern is text, as in a paragraph, and
+;; follows the same flags: anywhere in the argument, or the whole argument
+;; (#501). Both allow cascaded matches (a pattern inside an argument). The checks set
 ;; preferences in memory only, and restore them: nothing is saved.
 ;;
 ;; The formulas are written as the editor keeps them: a concat never has
@@ -756,6 +758,58 @@
                     '(frac "a" (wildcard "w")))
               '()))))
 
+;; a formula in the argument of a tag of the pattern is text, as in a
+;; paragraph: its parts are contiguous and a wildcard takes any run, maybe
+;; empty. It was matched child by child, so that a wildcard took exactly
+;; one child, and Search skipped the children between the parts (#501). As
+;; for a string argument, Search finds it anywhere in the argument, Replace
+;; only as the whole argument
+(define (test-formulas-in-arguments)
+  (check-group "formulas in arguments")
+  (let ((pat '(frac (concat "a" (wildcard "w") (rsub "x")) "c")))
+    ;; the wildcard takes nothing, two children, a part of a string
+    (check-both '(document (frac (concat "a" (rsub "x")) "c")) pat
+                '((0 0) (0 1)))
+    (with-search-mode 'replace
+      (lambda ()
+        (check= (hits '(document (frac (concat "a" (rsub "y") (rsub "z")
+                                               (rsub "x"))
+                                       "c"))
+                      pat)
+                '((0 0) (0 1)))))
+    (check-both '(document (frac (concat "ab" (rsub "x")) "c")) pat
+                '((0 0) (0 1))))
+  ;; a leading wildcard may be empty before an argument which is a tag
+  (check-both '(document (frac (rsub "x") "c"))
+              '(frac (concat (wildcard "w") (rsub "x")) "c")
+              '((0 0) (0 1)))
+  ;; with Replace, the whole argument: a formula pattern does not match one
+  ;; child of the formula of the argument (only inside its tags)
+  (with-search-mode 'replace
+    (lambda ()
+      (check= (hits '(document (concat (frac (concat (rsub "x") "a") "c")
+                                       (frac (rsub "x") "c")))
+                    '(frac (concat (wildcard "w") (rsub "x")) "c"))
+              '((0 1 0) (0 1 1)))))
+  ;; without a wildcard, the parts are adjacent, also when searching
+  (with-search-mode 'search
+    (lambda ()
+      (check= (hits '(document (frac (concat "a" (rsub "y") (rsub "x")) "c"))
+                    '(frac (concat "a" (rsub "x")) "c"))
+              '())
+      (check= (hits '(document (frac (concat "ab" (rsub "x")) "c"))
+                    '(frac (concat "a" (rsub "x")) "c"))
+              '()))))
+
+;; a match of several paragraphs may start in the paragraph where the
+;; previous one ended, also inside a tag of it, where a trailing wildcard
+;; carries it to the end of the paragraph: it was missed (#501)
+(define (test-match-after-a-tag)
+  (check-group "a match after a match in a tag")
+  (check-both '(document "xb" (concat (strong "bab") "x") "a")
+              '(document (concat "b" (wildcard "w")) (concat (wildcard "v") "a"))
+              '((0 1) (1 0 0 2) (1 0 0 2) (2 1))))
+
 ;; formulas of 40000 children and more: the scan for the start of a
 ;; match, and a wildcard which takes many children, went from one child to
 ;; the next by a recursion, which overflowed the stack and crashed TeXmacs
@@ -797,4 +851,6 @@
   (test-long-concats)
   (test-parts-before-wildcards)
   (test-text-same-in-both)
+  (test-formulas-in-arguments)
+  (test-match-after-a-tag)
   (check-end))
