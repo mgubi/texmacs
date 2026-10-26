@@ -1093,8 +1093,18 @@
   (map tree->stree (tree-children (compress-table-keys))))
 
 (define (compress-tables-like prefix)
-  (list-filter (compress-table-key-list)
-               (lambda (s) (and (string? s) (string-starts? s prefix)))))
+  ;; the tables of compress-table-new with this prefix: <prefix>-<number>
+  (with n (+ (string-length prefix) 1)
+    (list-filter (compress-table-key-list)
+                 (lambda (s)
+                   (and (string? s) (string-starts? s (string-append prefix "-"))
+                        (> (string-length s) n)
+                        (string->number (substring s n (string-length s))))))))
+
+(define (no-ai-request? model)
+  ;; no check may reach the network, whatever the preferences: the AI tools
+  ;; are only called with a model for which there is no command to send
+  (== (tree->stree (cpp-ai-command "x" model "")) ""))
 
 (define (compress-table-serial name)
   ;; the number of a table of compress-table-new: <prefix>-<number>
@@ -1148,14 +1158,15 @@
       (check= (compress-table-size t4) -1))
     ;; Correct (an engine without a command: no request is sent) makes one
     ;; table, between the two tables made here, and frees it
-    (let* ((before (compress-table-new "check"))
-           (r (cpp-ai-correct t "english" "no-such-engine"))
-           (after (compress-table-new "check")))
-      (check-true (tree? r))
-      (check= (- (compress-table-serial after) (compress-table-serial before))
-              2)
-      (compress-table-free before)
-      (compress-table-free after))
+    (when (no-ai-request? "no-such-engine")
+      (let* ((before (compress-table-new "check"))
+             (r (cpp-ai-correct t "english" "no-such-engine"))
+             (after (compress-table-new "check")))
+        (check-true (tree? r))
+        (check= (- (compress-table-serial after) (compress-table-serial before))
+                2)
+        (compress-table-free before)
+        (compress-table-free after)))
     (check= (compress-tables-like "ai") '())
     ;; a chat keeps its table until its session is stopped; the keys of
     ;; two sessions are not confused, even when their names joined by "-"
@@ -1193,17 +1204,17 @@
                        (set! out (st (decompress-html
                                       (lantool-correct html json) 1)))))))
       (check-false (process-running? 'spell))
-      (lantool-process* t return)
-      (check= h h1)
-      (check= out '(document (concat "it " (spell-error "is" "A verb" "was")
-                                     " " (em "b") " " (frac "x" "y"))))
-      (check= (compress-tables-like "lantool") '()))
+      (when (not (process-running? 'spell))
+        (lantool-process* t return)
+        (check= h h1)
+        (check= out '(document (concat "it " (spell-error "is" "A verb" "was")
+                                       " " (em "b") " " (frac "x" "y"))))
+        (check= (compress-tables-like "lantool") '())))
     ;; the translation process, whose request cannot be launched (an engine
     ;; without a command: cpp-ai-async-eval-command says so, and will not
     ;; call back): the table of the paragraph is freed all the same
-    (let* ((m (get-preference "ai"))
-           (engines '("chatgpt" "gemini" "ollama" "open-mistral" "albert")))
-      (when (not (list-or (map (lambda (e) (string-starts? m e)) engines)))
+    (let* ((m (get-preference "ai")))
+      (when (no-ai-request? m)
         (let* ((old (current-buffer))
                (before (buffer-list))
                (u (new-buffer)))

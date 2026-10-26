@@ -43,6 +43,10 @@
   (tree-pointer-detach tp)
   (next))
 
+;; an empty answer (a failed request) leaves the paragraph as it is
+(define ((translate-nonempty fun) out)
+  (fun (and (!= out "") out)))
+
 (define ((translate-process-one dest-lan) serial tp st next)
   (let* ((t (tree-pointer->tree tp))
          ;; the codes of this paragraph, freed once its answer is there
@@ -53,7 +57,8 @@
          (model (get-preference "ai"))
          (agent (ai-translation-agent src-lan dest-lan))
          (return (compress-table-callback table
-                   (translate-processed-one serial tp st model next))))
+                   (translate-nonempty
+                     (translate-processed-one serial tp st model next)))))
     (cond ((not (compressed-contains-text? t*))
            (return #f))
           ((not (process-running? 'translate))
