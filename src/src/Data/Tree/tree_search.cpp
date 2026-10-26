@@ -166,9 +166,9 @@ static void search_anchored (range_set& sel, tree t, tree what, path p,
                              bool at_start, bool at_end);
 
 // the arguments in which a formula pattern was not found when searching,
-// with all the trees inside them: the pattern is not found inside them
-// either, so that it is not searched again in each nested argument (in
-// nested fractions, a power of the depth). For one search only
+// with all the accessible trees inside them: the pattern is not found
+// inside them either, so that it is not searched again in each nested
+// argument (in nested fractions, a power of the depth). For one search only
 static std::set<std::pair<tree_rep*, tree_rep*> > no_formula;
 static array<tree> no_formula_keep;
 
@@ -185,7 +185,10 @@ mark_no_formula (tree t, tree what) {
   if (no_formula.count (key) != 0) return;
   no_formula.insert (key);
   no_formula_keep << t;
-  for (int i=0; i<N(t); i++) mark_no_formula (t[i], what);
+  // only the trees which the search went into: a hidden argument may be
+  // shared with a visible one elsewhere
+  for (int i=0; i<N(t); i++)
+    if (is_accessible_for_search (t, i)) mark_no_formula (t[i], what);
 }
 
 static int

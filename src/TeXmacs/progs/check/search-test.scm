@@ -64,14 +64,17 @@
     thunk))
 
 (define (with-search-mode-value mode thunk)
-  ;; the value of thunk, with the matching of mode (set in memory only)
+  ;; the value of thunk, with the matching of mode (set in memory only, and
+  ;; restored also when thunk fails)
   (let* ((which "search-and-replace")
          (had? (cpp-has-preference? which))
          (old (get-preference which)))
-    (cpp-set-preference which (if (== mode 'search) "off" "on"))
-    (with r (thunk)
-      (if had? (cpp-set-preference which old) (cpp-reset-preference which))
-      r)))
+    (dynamic-wind
+      (lambda () (cpp-set-preference which (if (== mode 'search) "off" "on")))
+      thunk
+      (lambda ()
+        (if had? (cpp-set-preference which old)
+            (cpp-reset-preference which))))))
 
 (define (hits doc what)
   (tree-search-tree (stree->tree doc) what '() 1000))
@@ -916,7 +919,33 @@
               '((0 0) (0 1)))
   (check-both '(document (frac (em (strong "ab")) "c"))
               '(frac (concat (strong "ab") (wildcard "w")) "c")
-              '((0 0) (0 1))))
+              '((0 0) (0 1)))
+  ;; the arguments where the pattern was not found are remembered, but not
+  ;; the hidden ones, which may be shared with a visible argument (a
+  ;; document holds one tree several times, and the search does not go
+  ;; into the value of a with); and for each formula of the pattern
+  (let* ((s (stree->tree '(concat "z" (rsub "x"))))
+         (d (tree 'document
+                  (tree 'concat
+                        (tree 'frac
+                              (tree 'concat "q" (tree 'with "color" s "u"))
+                              "c")
+                        " " (tree 'frac s "c"))))
+         (d2 (tree 'document
+                   (tree 'concat (tree 'frac s "c") "+" (tree 'frac "q" s)))))
+    (for-each
+      (lambda (mode)
+        (with-search-mode mode
+          (lambda ()
+            (check= (tree-search-tree
+                      d '(frac (concat (wildcard "w") (rsub "x")) "c") '() 100)
+                    '((0 2 0) (0 2 1)))
+            (check= (tree-search-tree
+                      d2 '(frac (concat "q" (wildcard "w"))
+                                (concat (wildcard "v") (rsub "x")))
+                      '() 100)
+                    '((0 2 0) (0 2 1))))))
+      '(search replace))))
 
 ;; a formula pattern in a tag argument, in nested fractions: the search of
 ;; each argument looked again inside all the tags of the argument, at each
