@@ -11,7 +11,7 @@ and not fixed, pull requests waiting, decisions to take.
 - GUI scripting: Investigate GUI scripting via Scheme or via a specific scripting language like the current implementation?
   (plan: [docs/plans/plan-gui-scripting.md](docs/plans/plan-gui-scripting.md))
 - keep track of contributors: code, bug reports, etc.. to Upsilon (and then to TeXmacs in the usual place)
-- (?) work on the style rewriter
+- (?) work on the style rewriter (ongoing in wip_pure_style)
 - have the possibility to choose a more modern and uncluttered UI: common operations in UI elements, others in menus or specific dialogs 
 - add history to forward and backward buttons (like in a browser)
   (plan: [docs/plans/plan-navigation-history.md](docs/plans/plan-navigation-history.md))
@@ -23,7 +23,10 @@ and not fixed, pull requests waiting, decisions to take.
 - support for formalization of mathematics via Lean/LSP
   (plan: [docs/plans/plan-lean-lsp.md](docs/plans/plan-lean-lsp.md))
 - support of MCP in the sessions (to be considered agents)
-
+- implement tags for commands reacheable from the UI and an interface (command palette) for the users to see and select commands according to tags and activate one command, this could be a modern replacement to toolbars, menu, etc... (to be designed better)
+- a well typeset and structured and indented table of contents in the UI with indication of labels for formulas if asked, e.g. on a left panel, or pulldown button. It will allow to navigate the paper better.
+- easy editing of slides, e.g. moving them around, switching, thumbnails (at the place of the table of contents) There is some packages in tm-forge, check. 
+- Android and iPad port? (we need better UI!)
 
 ## Done
 
