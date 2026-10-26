@@ -32,6 +32,7 @@
 #include "locale.hpp"
 #include "editor.hpp"
 #include "new_view.hpp"      // get_current_editor()
+#include <time.h>            // clock_gettime (wheel_stamp_of_x)
 #include "image_files.hpp"
 #include "boot.hpp"      // is_headless
 #include "tm_window.hpp"
@@ -3599,10 +3600,12 @@ static const double wheel_stop_speed= 0.02;    // device pixels per ms: a third
 static const time_t wheel_stream_dt= 30;       // ms: the events have stopped
 static const time_t wheel_slow_dt= 200;        // ms: the wheel is turned slowly
 static const time_t wheel_burst_dt= 16;        // ms: too soon for a second notch
-// SDL reports the deltas in "lines": a trackpad (precise deltas) gives a
-// tenth of the finger's displacement in points, so 10 points per unit make
-// the page follow the finger exactly, as a dragged scroll bar follows the
-// pointer; a notch of a mouse wheel is one unit and scrolls about six lines.
+// SDL reports the deltas in "lines": on macOS a trackpad (precise deltas)
+// gives a tenth of the finger's displacement in points, so 10 points per
+// unit make the page follow the finger exactly, as a dragged scroll bar
+// follows the pointer; a notch of a mouse wheel is one unit and scrolls
+// about six lines. On Linux a unit of a trackpad scrolls a notch instead
+// (wheel_units_are_notches)
 // In the browser SDL gives the displacement in pixels of the page (points)
 // divided by 100: with 10 points per unit the page moved a tenth of the
 // fingers, and felt viscous
@@ -3646,13 +3649,16 @@ wheel_x11 () {
 #endif
 
 // is a unit of a trackpad a notch? On Linux SDL gives a trackpad in units of
-// ten pixels of the fingers, under X11 (XInput2, the scroll increment of
-// the device: XWayland and xf86-input-libinput) as under Wayland (the axis
+// ten pixels of the fingers (fifteen with xf86-input-libinput), under X11
+// (XInput2, the scroll increment of the device) as under Wayland (the axis
 // divided by 10), and Qt takes such a unit as a notch (120ths of an angle),
 // which the Qt port scrolls: 10 points a unit, which follow the fingers,
 // made the trackpad of Vue 5 to 25 times slower than in the Qt port (issue
-// #459). Not on macOS, Windows or in a browser, where the units are a tenth
-// of the fingers in points and the page follows them
+// #459). Not on macOS or in a browser, where the units are a tenth of the
+// fingers in points and the page follows them; nor, for now, on Windows,
+// where SDL gives notches (WHEEL_DELTA) and the trackpad was not measured.
+// An editor which captures the wheel (graphics) still gets the fingers
+// (wheel_capture_f), as the Qt port gives it the pixels of the event
 static bool
 wheel_units_are_notches () {
 #if defined(OS_MACOS) || defined(__EMSCRIPTEN__) || defined(_WIN32)
@@ -3787,8 +3793,9 @@ clay_wheel_flush (vue_window_rep* win) {
 // is a timestamp given by SDL a time of the X server in ms? SDL counts the
 // timestamps in ns from its start (SDL_GetTicksNS), but on X11 it gives
 // those of the smooth scrolling of XInput2 as the X server gave them, in ms
-// of its own clock (SDL_x11xinput2.c, SDL 3.4), while those of the wheel
-// buttons are of SDL. The X server (Xorg, XWayland) counts the ms of the
+// of its own clock (SDL_x11xinput2.c, SDL 3.4); under XInput 2.1 a mouse
+// wheel comes that way too (Xorg, XWayland), without it as buttons, which
+// have the stamps of SDL. The X server (Xorg, XWayland) counts the ms of the
 // monotonic clock on 32 bits, so that a stamp of more bits is of SDL (which
 // has them after 4.3 s); a smaller one is taken for the clock it is nearer
 // to, and when it is near neither (a server on another machine) for one of
@@ -3818,13 +3825,14 @@ wheel_stamp_of_x (uint64_t stamp) {
 // one. Divided by 10^6, the intervals between the stamps of the X server
 // (wheel_stamp_of_x) were all 0: no stream of events ever ended, and a
 // wheel turned after a trackpad stayed a trackpad (issue #459). A stream
-// whose stamps change clock starts anew; two events of the same stamp (the
-// two axes of a motion, or the same ms of the X server) are of a stream
+// whose stamps change clock starts anew; two events of the same stamp of
+// the X server (the two axes of a motion, or the same ms) are of a stream
 static time_t
 wheel_interval (vue_input_state& in, uint64_t stamp) {
   bool ms= wheel_stamp_of_x (stamp);
   time_t dt;
-  if (in.wheel_stamp == 0 || ms != in.wheel_stamp_ms || stamp < in.wheel_stamp)
+  if (in.wheel_stamp == 0 || ms != in.wheel_stamp_ms || stamp < in.wheel_stamp ||
+      (stamp == in.wheel_stamp && !ms))
     dt= wheel_slow_dt;
   else if (ms) dt= (time_t) (stamp - in.wheel_stamp);
   else dt= (time_t) ((stamp - in.wheel_stamp) / 1000000);
@@ -3866,6 +3874,8 @@ wheel_event (vue_window win, double x, double y, time_t now, uint64_t stamp) {
   }
   double step= win->density * (in.wheel_precise ? wheel_precise_step_of (win)
                                                 : wheel_notch_step_of (win));
+  in.wheel_capture_f= in.wheel_precise ? wheel_precise_step / wheel_precise_step_of (win)
+                                       : 1.0;
   double dx= x * step, dy= y * step; // device pixels
   dt= max ((time_t) 8, min (dt, wheel_slow_dt));
   in.wheel_est_x= 0.5 * (in.wheel_est_x + dx / dt);
@@ -3894,6 +3904,7 @@ touch_scroll (vue_window win, double fx, double fy, uint64_t stamp) {
   time_t dt= wheel_interval (in, stamp);
   in.wheel_precise= true;
   in.wheel_touch= true;
+  in.wheel_capture_f= 1.0;
   in.wheel_ambiguous= false;
   in.wheel_pend_x= in.wheel_pend_y= 0;
   in.wheel_over_x= in.wheel_over_y= 0;

@@ -52,8 +52,9 @@ have the details, and the problems go to the
   these works, the emoji of Twemoji included. An unused grid layout of the
   Vue interface, which came without a license, is gone.
 - **Vue on Linux**: a trackpad scrolls as in the Qt port, a wheel notch for
-  each unit of the device (ten pixels of the fingers), under X11 and
-  Wayland alike, and no longer 5 to 25 times slower; and under X11 (also
+  each unit of the device (ten pixels of the fingers, fifteen on Xorg),
+  under X11 and Wayland alike, and no longer 5 to 25 times slower (a
+  graphics still follows the fingers); and under X11 (also
   XWayland) the mouse wheel no longer stays slow after the trackpad was
   used: SDL gives the times of the smooth scrolling in milliseconds of the
   X server, where it gives the others in nanoseconds, so that no stream of

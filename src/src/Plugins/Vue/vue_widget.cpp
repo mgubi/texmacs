@@ -7113,10 +7113,13 @@ vue_simple_widget_rep::do_layout () {
       // (mouse_data is in SI here, ren->pixel per device pixel). They were
       // in points, with the signs of the view: 256 times too small, and a
       // graphics barely moved
+      // (a trackpad on Linux scrolls a notch a unit, but the editor gets
+      // the movement of the fingers, wheel_capture_f in vue_gui.cpp)
       array<double> data;
       if (N(mouse_data) == 2) {
         double f= (double) ren->pixel * (win ? win->density : 1.0f);
-        data << (-mouse_data[0] / f) * PIXEL << (-mouse_data[1] / f) * PIXEL;
+        double c= win ? win->input.wheel_capture_f : 1.0;
+        data << (-c * mouse_data[0] / f) * PIXEL << (-c * mouse_data[1] / f) * PIXEL;
       }
       handle_mouse ("wheel", x, y, (int) mouse_state, mouse_time, data);
     }
