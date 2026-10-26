@@ -3573,7 +3573,8 @@ static const time_t vue_repaint_dt= 16;
 * (hasPreciseScrollingDeltas is lost on the way), only the deltas, in
 * "lines". A trackpad gives a tenth of the displacement of the fingers in
 * points, hence wheel_precise_step, and its deltas are fractional; a notch
-* is one whole unit. Whole deltas are therefore ambiguous, and the first
+* is one whole unit (on X11 the units of a trackpad are those of a wheel,
+* see wheel_x11). Whole deltas are therefore ambiguous, and the first
 * event of a stream may be taken for a notch when it opens a fast swipe:
 * the next event settles it, by its fraction or by following within
 * wheel_burst_dt, and since a notch is travelled and not jumped the excess
@@ -3627,6 +3628,31 @@ wheel_notch_step_of (vue_window win) {
   double view= max (100.0, ((double) h) / PIXEL - 120.0);
   return 3.0 * (floor (view / 16.0) + 1.0);
 #endif
+}
+
+// is the video driver of SDL the one of X11 (also under XWayland)? There
+// the smooth scrolling of XInput2 gives the deltas of a trackpad as of a
+// wheel, in units of the scroll increment of the device: a unit is about a
+// notch (under XWayland ten pixels of the fingers), not a tenth of the
+// fingers in points as on macOS or Wayland, and 10 points a unit made the
+// trackpad an order slower than in the Qt port (issue #459), which takes
+// such a unit as a notch (120ths of an angle)
+static bool
+wheel_x11 () {
+  static int x11= -1;
+  if (x11 < 0) {
+    const char* d= SDL_GetCurrentVideoDriver ();
+    x11= (d != NULL && strcmp (d, "x11") == 0) ? 1 : 0;
+  }
+  return x11 == 1;
+}
+
+// the distance of a unit of fractional deltas (a trackpad): as a notch on
+// X11, as the Qt port does there (see above)
+static double
+wheel_precise_step_of (vue_window win) {
+  if (wheel_x11 ()) return wheel_notch_step_of (win);
+  return wheel_precise_step;
 }
 
 // a whole number of eighths: the deltas of a wheel with fine steps (Wayland
@@ -3683,6 +3709,9 @@ wheel_glides (const vue_input_state& in) {
 #ifdef __EMSCRIPTEN__
   return false;
 #else
+  // nor on X11, where the units of a trackpad are notches (wheel_x11): the
+  // glide went on far, and the Qt port does not glide there either
+  if (wheel_x11 ()) return false;
   return !wheel_system_momentum;
 #endif
 }
@@ -3734,6 +3763,28 @@ clay_wheel_flush (vue_window_rep* win) {
   in.clay_wheel_x= in.clay_wheel_y= 0;
 }
 
+// the interval (ms) between a wheel event of stamp stamp and the previous
+// one. SDL counts the timestamps in ns from its start (SDL_GetTicksNS), but
+// on X11 it gives those of the smooth scrolling of XInput2 as the X server
+// gave them, in ms of its own clock (SDL_x11xinput2.c, SDL 3.4): divided by
+// 10^6 every interval was 0, no stream of events ever ended, and a wheel
+// turned after a trackpad stayed a trackpad, slow (issue #459). A stamp
+// more than a second away from the clock of SDL is taken for one of the X
+// server; a stream whose stamps change clock starts anew
+static time_t
+wheel_interval (vue_input_state& in, uint64_t stamp) {
+  uint64_t now= SDL_GetTicksNS ();
+  bool ms= (stamp != 0 && (stamp > now || now - stamp > 1000000000ull));
+  time_t dt;
+  if (in.wheel_stamp == 0 || ms != in.wheel_stamp_ms || stamp <= in.wheel_stamp)
+    dt= wheel_slow_dt;
+  else if (ms) dt= (time_t) (stamp - in.wheel_stamp);
+  else dt= (time_t) ((stamp - in.wheel_stamp) / 1000000);
+  in.wheel_stamp= stamp;
+  in.wheel_stamp_ms= ms;
+  return dt;
+}
+
 // a wheel event: scroll and update the estimated speed of the wheel
 // (x, y are the deltas as reported by SDL, in wheel units; stamp is the
 // timestamp SDL gave the event, in ns: the events queued during a frame
@@ -3743,9 +3794,7 @@ static void
 wheel_event (vue_window win, double x, double y, time_t now, uint64_t stamp) {
   vue_input_state& in= win->input;
   in.wheel_vx= in.wheel_vy= 0; // the user took over from a glide
-  time_t dt= (in.wheel_stamp == 0 || stamp <= in.wheel_stamp) ? wheel_slow_dt
-             : (time_t) ((stamp - in.wheel_stamp) / 1000000);
-  in.wheel_stamp= stamp;
+  time_t dt= wheel_interval (in, stamp);
   bool fresh= (dt >= wheel_slow_dt); // a new stream of events
   in.wheel_touch= false;
   if (fresh) {
@@ -3767,7 +3816,7 @@ wheel_event (vue_window win, double x, double y, time_t now, uint64_t stamp) {
     in.wheel_pend_y -= in.wheel_over_y;
     in.wheel_over_x= in.wheel_over_y= 0;
   }
-  double step= win->density * (in.wheel_precise ? wheel_precise_step
+  double step= win->density * (in.wheel_precise ? wheel_precise_step_of (win)
                                                 : wheel_notch_step_of (win));
   double dx= x * step, dy= y * step; // device pixels
   dt= max ((time_t) 8, min (dt, wheel_slow_dt));
@@ -3794,9 +3843,7 @@ static void
 touch_scroll (vue_window win, double fx, double fy, uint64_t stamp) {
   vue_input_state& in= win->input;
   in.wheel_vx= in.wheel_vy= 0;
-  time_t dt= (in.wheel_stamp == 0 || stamp <= in.wheel_stamp) ? wheel_slow_dt
-             : (time_t) ((stamp - in.wheel_stamp) / 1000000);
-  in.wheel_stamp= stamp;
+  time_t dt= wheel_interval (in, stamp);
   in.wheel_precise= true;
   in.wheel_touch= true;
   in.wheel_ambiguous= false;

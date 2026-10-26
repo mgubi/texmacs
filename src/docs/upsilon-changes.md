@@ -51,6 +51,13 @@ have the details, and the problems go to the
   claim one license for all. Help → TeXmacs Upsilon thanks the authors of
   these works, the emoji of Twemoji included. An unused grid layout of the
   Vue interface, which came without a license, is gone.
+- **Vue on Linux (X11, XWayland)**: a trackpad scrolls as in the Qt
+  port, one notch for each unit of the device, and no longer ten times
+  slower; and the mouse wheel no longer stays slow after the trackpad was
+  used. SDL gives the times of these events in milliseconds of the X
+  server where it gives the others in nanoseconds, so that no stream of
+  events ever ended
+  ([#459](https://github.com/mgubi/texmacs/issues/459)).
 
 ## 25 October 2026
 
