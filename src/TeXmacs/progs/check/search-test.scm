@@ -812,6 +812,24 @@
                          (concat (wildcard "v") "a"))
               '((0 1) (1 0 0 2) (1 0 0 2) (2 1))))
 
+;; a paragraph which is a tag alone is a formula of one child: a leading
+;; (trailing) wildcard carries a hit inside the tag to the start (end) of
+;; the paragraph, as when the tag is in a formula; it stopped at the end of
+;; the string inside the tag (#501, the maintainer's decision)
+(define (test-lone-tags)
+  (check-group "a tag alone in its paragraph")
+  (check-both '(document (strong "xab") "c")
+              '(document (concat "a" (wildcard "x")) "c")
+              '((0 0 1) (1 1)))
+  (check-both '(document (strong "xab") "c") '(concat "a" (wildcard "x"))
+              '((0 0 1) (0 1)))
+  (check-both '(document (strong "xab") "c") '(concat (wildcard "x") "a")
+              '((0 0) (0 0 2)))
+  (check-both '(document "xb" (strong "bab") "a")
+              '(document (concat "b" (wildcard "w"))
+                         (concat (wildcard "v") "a"))
+              '((0 1) (1 0 2) (1 0 2) (2 1))))
+
 ;; a formula pattern in a tag argument, in nested fractions: the search of
 ;; each argument looked again inside all the tags of the argument, at each
 ;; level (16 s for a continued fraction of depth 60, a few ms now)
@@ -879,5 +897,6 @@
   (test-text-same-in-both)
   (test-formulas-in-arguments)
   (test-match-after-a-tag)
+  (test-lone-tags)
   (test-speed-in-arguments)
   (check-end))

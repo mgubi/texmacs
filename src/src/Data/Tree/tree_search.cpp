@@ -636,6 +636,37 @@ search_string (range_set& sel, string s, tree what, path p, int from= 0) {
   }
 }
 
+static bool
+is_lone_tag (tree t, tree what) {
+  // a paragraph t which is a tag alone, and a formula pattern with a leading
+  // or a trailing wildcard: the paragraph is a formula of one child, so that
+  // the wildcard carries a hit inside the tag to the start or the end of the
+  // paragraph, as when the tag is in a formula (#501)
+  return is_compound (t) && !is_concat (t) && !is_document (t) &&
+         is_concat (what) && N(what) > 0 &&
+         (is_func (what[0], WILDCARD, 1) ||
+          is_func (what[N(what)-1], WILDCARD, 1));
+}
+
+static void
+unwrap (range_set& sel, range_set ssel, path p) {
+  // the paths in t at p of the paths ssel in the formula (concat t) at p
+  for (int i=0; i<N(ssel); i++) sel << (p * (ssel[i] / p)->next);
+}
+
+static void
+search_paragraph_tree (range_set& sel, tree t, tree what, path p) {
+  // the hits of what in the paragraph t
+  if (!is_lone_tag (t, what)) {
+    search (sel, t, what, p);
+    return;
+  }
+  range_set ssel, usel;
+  search (ssel, tree (CONCAT, t), what, p);
+  unwrap (usel, ssel, p);
+  merge (sel, usel);
+}
+
 void
 search_compound (range_set& sel, tree t, tree what, path p) {
   if (match (t, what)) {
@@ -643,8 +674,10 @@ search_compound (range_set& sel, tree t, tree what, path p) {
     return;
   }
   for (int i=0; i<N(t); i++)
-    if (is_accessible_for_search (t, i))
-      search (sel, t[i], what, p * i);
+    if (is_accessible_for_search (t, i)) {
+      if (is_document (t)) search_paragraph_tree (sel, t[i], what, p * i);
+      else search (sel, t[i], what, p * i);
+    }
 }
 
 static void search_after (range_set& sel, tree t, tree what, path p,
@@ -820,7 +853,7 @@ search_paragraph (range_set& sel, tree t, tree what, path p,
     return;
   }
   range_set ssel, asel;
-  search (ssel, t, what, p);
+  search_paragraph_tree (ssel, t, what, p);
   int n= N(ssel);
   if (at_start && at_end) {
     // one match covers the paragraph, not several hits
@@ -850,6 +883,12 @@ search_paragraph_after (range_set& sel, tree t, tree what, path p, path q) {
   // ended, inside t) or after it: in the rest of t, as a paragraph. A
   // position inside a tag of t skips the rest of that tag
   path r= q / p;
+  if (is_lone_tag (t, what)) {
+    range_set ssel;
+    search_paragraph_after (ssel, tree (CONCAT, t), what, p, p * path (0, r));
+    unwrap (sel, ssel, p);
+    return;
+  }
   if (is_atomic (t)) {
     int o= r->item;
     range_set ssel;
@@ -992,7 +1031,12 @@ search (range_set& sel, tree t, tree what, path p, path pos) {
       array<range_set> sub (N(t));
       if (pos->item >= 0 && pos->item < N(t))
         if (is_accessible_for_search (t, pos->item)) {
-          search (sub[pos->item], t[pos->item], what, p * pos->item, pos->next);
+          if (is_document (t) && is_lone_tag (t[pos->item], what))
+            search_paragraph_tree (sub[pos->item], t[pos->item], what,
+                                   p * pos->item);
+          else
+            search (sub[pos->item], t[pos->item], what, p * pos->item,
+                    pos->next);
           hits += N(sub[pos->item]);
         }
       for (int d=1; d<N(t); d++)
@@ -1001,7 +1045,9 @@ search (range_set& sel, tree t, tree what, path p, path pos) {
           int i= (e==0? pos->item + d: pos->item - d);
           if (i >= 0 && i < N(t))
             if (is_accessible_for_search (t, i)) {
-              search (sub[i], t[i], what, p * i);
+              if (is_document (t))
+                search_paragraph_tree (sub[i], t[i], what, p * i);
+              else search (sub[i], t[i], what, p * i);
               hits += N(sub[i]);
             }
         }
