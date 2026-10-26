@@ -1208,12 +1208,14 @@
     (check= (zombies) 0))
 
   (check-group "processes: stopped plugins")
-  (for (i (.. 1 4))
-    (with ses (string-append "plugins-test-stopped" (number->string i))
-      (check= (start* "tmtestecho" ses) "ok")
-      (connection-stop "tmtestecho" ses)
-      (check= (connection-status "tmtestecho" ses) 0)))
-  (check= (zombies) 0)
+  ;; (the zombies which these stops leave, whatever the groups before left)
+  (let ((before (zombies)))
+    (for (i (.. 1 4))
+      (with ses (string-append "plugins-test-stopped" (number->string i))
+        (check= (start* "tmtestecho" ses) "ok")
+        (connection-stop "tmtestecho" ses)
+        (check= (connection-status "tmtestecho" ses) 0)))
+    (check= (- (zombies) before) 0))
 
   (check-group "processes: command lines")
   (check= (connection-start "tmtestcmdline" "plugins-test-cmd") "cmdline")
@@ -1245,13 +1247,14 @@
       ;; the interface is not blocked until the process is killed (2 s)
       (check-true (< (- (texmacs-time) start) 1000)))
     (check= (connection-status "tmtestterm" "plugins-test-term") 0)
-    ;; it is killed after 2 s, and reaped, by the event loop in TeXmacs;
-    ;; here (no event loop), by the next start or stop of a plugin
+    ;; without Qt pipes (pipe_link.cpp), it is killed after 2 s, and
+    ;; reaped, by the event loop in TeXmacs; here (no event loop), by the
+    ;; next start or stop of a plugin. With Qt pipes, connection-stop kills
+    ;; it at once and reaps it (QTMPipeLink::killProcess)
     (pause "2.2")
     (check= (start* "tmtestecho" "plugins-test-term2") "ok")
     (connection-stop "tmtestecho" "plugins-test-term2")
-    ;; (pid-alive? counts a zombie as ended: with Qt pipes, the process is
-    ;; killed at once but reaped only in the event loop, see above)
+    ;; (pid-alive? counts a zombie as ended)
     (when pid
       (check-true (wait-until (lambda () (not (pid-alive? pid))) 3000)))))
 
