@@ -466,6 +466,7 @@ get_unicode_range (int code) {
   else if (code >= 0x4e00 && code <= 0x9fcc) return "cjk";
   else if (code >= 0xff00 && code <= 0xffef) return "cjk";
   else if (code >= 0x3040 && code <= 0x309F) return "hiragana";
+  else if (code >= 0x30a0 && code <= 0x30ff) return "katakana";
   else if (code >= 0xac00 && code <= 0xd7af) return "hangul";
   else if (code >= 0x2000 && code <= 0x23ff) return "mathsymbols";
   else if (code >= 0x2900 && code <= 0x2e7f) return "mathextra";
@@ -492,9 +493,10 @@ in_unicode_range (string c, string range) {
   int code= decode_from_utf8 (uc, pos);
   string got= get_unicode_range (code);
   if (range == got) return range != "";
-  if (range == "cjk" && (got == "hangul" || got == "hiragana")) return true;
+  if (range == "cjk" &&
+      (got == "hangul" || got == "hiragana" || got == "katakana")) return true;
     // There are actually two ranges (cjk/hangul) for Korean characters and
-    // two ranges (cjk/hiragana) for Japanese characters
+    // three ranges (cjk/hiragana/katakana) for Japanese characters
     // For example, on macOS, `sys-korean` is expanded to `cjk=Apple SD Gothic Neo,roman`,
     // assuming that `Apple SD Gothic Neo` is the default korean font on macOS
   if (range == "mathlarge" || range == "mathbigop")
@@ -1006,8 +1008,10 @@ smart_font_rep::resolve (string c, string fam, int attempt) {
   }
 
   if (N(c) == 1 && is_alpha (c[0]) && ends (fam, " Math") && shape == "italic")
-    if (starts (fam, "TeX Gyre ") || starts (fam, "Stix "))
+    if (starts (fam, "TeX Gyre ") || starts (fam, "Stix ")) {
       fam= fam (0, N(fam) - 5);
+      if (fam == "Stix Two") fam= "Stix Two Text";
+    }
   
   if (attempt == 1) {
     bool ok= true;
@@ -1099,6 +1103,23 @@ smart_font_rep::resolve (string c, string fam, int attempt) {
   if (attempt > 1) {
     string range= get_unicode_range (c);
     int a= attempt - 1;
+    if (range == "hiragana" || range == "katakana") {
+      // No font is described by its kana in the font database: kana are
+      // searched in the fonts with CJK characters, first in the Japanese
+      // font of the system, so that they do not come from a Chinese font
+      range= "cjk";
+      string jfam= default_japanese_font_name ();
+      if (a == 1 && jfam != "roman" && jfam != fam) {
+        string v= (variant == "rm"? range: variant * "-" * range);
+        font cfn= closest_font (jfam, v, series, rshape, sz, dpi, 1);
+        if (cfn->supports (c)) {
+          tree key= tuple (jfam, v, series, rshape, "1");
+          int nr= sm->add_font (key, REWRITE_NONE);
+          initialize_font (nr);
+          return sm->add_char (key, c);
+        }
+      }
+    }
     string v;
     if (range == "") v= variant;
     else if (variant == "rm") v= range;
@@ -1444,9 +1465,19 @@ get_ex (string family, string variant, string series, string shape,
   else return as_int (ex);
 }
 
+static bool
+is_cjk_variant (string var) {
+  // the variants of the fallback fonts for CJK characters (see resolve)
+  return var == "cjk" || var == "hangul" ||
+         ends (var, "-cjk") || ends (var, "-hangul");
+}
+
 int
 smart_font_rep::adjusted_dpi (string fam, string var, string ser, string sh,
                               int attempt) {
+  // CJK characters fill the em square whatever the x-height of the Latin
+  // letters of their font: matching x-heights would shrink them (#196)
+  if (is_cjk_variant (var)) return dpi;
   int ex1= get_ex (mfam, variant, series, rshape, 1);
   int ex2= get_ex (fam, var, ser, sh, attempt);
   double zoom= 1.0;
@@ -1821,7 +1852,16 @@ smart_font (string family, string variant, string series, string shape,
             string tfam, string tvar, string tser, string tsh,
             int sz, int dpi) {
   if (!new_fonts) return find_font (family, variant, series, shape, sz, dpi);
-  if (tfam == "roman") tfam= family;
+  if (tfam == "roman") {
+    tfam= family;
+    // math-stix and the math fonts of TeX Gyre are those of the text fonts
+    // stix, bonum..., which their hand-tuned code recognizes by the names
+    // stix-..., bonum-... (#196): as when these are the text fonts too
+    if (tfam == "math-stix" || tfam == "math-bonum" ||
+        tfam == "math-pagella" || tfam == "math-schola" ||
+        tfam == "math-termes")
+      tfam= tfam (5, N(tfam));
+  }
   if (variant != "mr") {
     if (variant == "ms") tvar= "ss";
     if (variant == "mt") tvar= "tt";
