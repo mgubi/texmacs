@@ -129,7 +129,16 @@ all: $(OUT)/texmacs.js
 # declared in shell.html
 WEB_ICONS := $(foreach n,16 32 48 64 128 192,$(OUT)/web/texmacs-vue-$(n).png) $(OUT)/web/favicon.ico
 
-web: $(OUT)/web/texmacs.html $(OUT)/web/texmacs-files.json $(WEB_ICONS) $(OUT)/web/index.html $(OUT)/web/downloads.html $(OUT)/web/features.html $(SCREENSHOTS) $(OUT)/web/changes.html $(OUT)/web/changes.md $(OUT)/web/thanks.html $(OUT)/web/thanks.md $(OUT)/web/fixes.html $(OUT)/web/texmacs-64.png tikzjax asymptote python r
+web: $(OUT)/web/texmacs.html $(OUT)/web/texmacs-files.json $(WEB_ICONS) $(OUT)/web/index.html $(OUT)/web/downloads.html $(OUT)/web/features.html $(SCREENSHOTS) $(OUT)/web/changes.html $(OUT)/web/changes.md $(OUT)/web/thanks.html $(OUT)/web/thanks.md $(OUT)/web/fixes.html $(OUT)/web/texmacs-64.png licenses tikzjax asymptote python r
+
+# the licenses of the components (TeXmacs/misc/licenses, also in the
+# packages of the page), as files of the site: out/web/licenses/
+licenses: $(OUT)/web/licenses/README.md
+
+$(OUT)/web/licenses/README.md: $(wildcard $(TM)/TeXmacs/misc/licenses/*) $(TM)/LICENSE
+	@mkdir -p $(OUT)/web/licenses
+	cp $(TM)/TeXmacs/misc/licenses/* $(OUT)/web/licenses/
+	cp $(TM)/LICENSE $(OUT)/web/licenses/GPL-3.0.txt
 
 # the TeX of the TikZ plugin (plugins/tikz, src/docs/wasm/tikzjax.md):
 # TikZJax, fetched by get-tikzjax.sh, without its fonts and the part of its
@@ -145,9 +154,12 @@ $(OUT)/web/tikzjax/tables.js: $(W)/tikzjax-tables.mjs $(TIKZJAX)/dist/run-tex.js
 $(TIKZJAX)/dist/run-tex.js:
 	sh $(W)/get-tikzjax.sh $(CURDIR)
 
-$(OUT)/web/tikzjax/tm-tikz.js: $(TM)/plugins/tikz/web/tm-tikz.js $(TIKZJAX)/dist/run-tex.js $(wildcard $(W)/tikzjax-extra/*.tex)
+$(OUT)/web/tikzjax/tm-tikz.js: $(TM)/plugins/tikz/web/tm-tikz.js $(TIKZJAX)/dist/run-tex.js $(wildcard $(W)/tikzjax-extra/*) $(W)/tikzjax-sources.md
 	@mkdir -p $(OUT)/web/tikzjax
 	cp $(TIKZJAX)/dist/run-tex.js $(TIKZJAX)/dist/tex.wasm.gz $(TIKZJAX)/dist/core.dump.gz $(TIKZJAX)/LICENSE $(OUT)/web/tikzjax/
+	# where their sources are, and the licenses of the libraries added
+	cp $(W)/tikzjax-sources.md $(OUT)/web/tikzjax/SOURCES.md
+	cp $(W)/tikzjax-extra/README.md $(OUT)/web/tikzjax/EXTRA.md
 	rm -rf $(OUT)/web/tikzjax/tex_files; cp -R $(TIKZJAX)/dist/tex_files $(OUT)/web/tikzjax/
 	# the libraries of pgfplots which TikZJax lacks (misc/wasm/tikzjax-extra)
 	for f in $(W)/tikzjax-extra/*.tex; do gzip -9 -n -c $$f > $(OUT)/web/tikzjax/tex_files/`basename $$f`.gz; done
@@ -171,9 +183,14 @@ $(OUT)/web/asymptote/version.js: $(ASYMPTOTE)/dist/asymptote.wasm
 	  $(ASYMPTOTE_VERSION) $(ASYMPTOTE:asymptote-web-%=%) > $@
 
 # Asymptote-web, with brotli copies of its large files for the servers
-$(OUT)/web/asymptote/asymptote.wasm: $(ASYMPTOTE)/dist/asymptote.wasm
+# and its licenses (the LGPL, with the GPL it adds to) and where its
+# sources are (the npm package has neither)
+$(OUT)/web/asymptote/asymptote.wasm: $(ASYMPTOTE)/dist/asymptote.wasm $(W)/asymptote-sources.md
 	@mkdir -p $(OUT)/web/asymptote
 	cd $(ASYMPTOTE)/dist && cp $(ASY_FILES) $(CURDIR)/$(OUT)/web/asymptote/
+	cp $(TM)/TeXmacs/misc/licenses/LGPL-3.0.txt $(OUT)/web/asymptote/LICENSE
+	cp $(TM)/LICENSE $(OUT)/web/asymptote/COPYING
+	cp $(W)/asymptote-sources.md $(OUT)/web/asymptote/SOURCES.md
 	-command -v brotli > /dev/null && cd $(OUT)/web/asymptote && \
 	  for f in asymptote.wasm asy.data asymptote.js; do brotli -f -q 9 -k $$f; done
 	touch $@
@@ -405,4 +422,4 @@ $(OBJECTS): $(FLAGS_FILE)
 clean:
 	rm -rf $(OBJ) $(OUT)
 
-.PHONY: all web node clean tikzjax asymptote python r plugins-sync femtolisp-cache
+.PHONY: all web node clean licenses tikzjax asymptote python r plugins-sync femtolisp-cache

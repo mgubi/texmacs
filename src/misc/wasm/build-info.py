@@ -123,6 +123,7 @@ def pinned (script):
 hunspell_version, hunspell_sha = pinned ('get-hunspell.sh')
 tikzjax_version, tikzjax_sha = pinned ('get-tikzjax.sh')
 asymptote_version, asymptote_sha = pinned ('get-asymptote.sh')
+asymptote_upstream = grep (os.path.join (src, 'misc', 'wasm', 'Makefile'), r'^ASYMPTOTE_VERSION\s*:=\s*(\S+)')
 pyodide_version = grep (os.path.join (src, 'plugins', 'python', 'web', 'tm-python.mjs'), r"PYODIDE_VERSION = '([^']*)'")
 webr_version = grep (os.path.join (src, 'plugins', 'r', 'web', 'tm-r.mjs'), r"WEBR_VERSION = '([^']*)'")
 
@@ -201,21 +202,25 @@ line ()
 line ('  They are compiled into ' + verb ('texmacs.wasm') + ' by ' + name ('Emscripten') + ' ' +
       tm (ems_version) + ' (the programs of the plug-ins are apart, see below):')
 line ()
-rows = [['Component', 'Version', 'What it does']]
-rows.append (['<TeXmacs>', tm (version), 'the editor and the typesetter'])
-rows.append ([name ('S7') + ' Scheme', tm (s7_version), 'the extension language, in place of ' + name ('Guile')])
-rows.append ([name ('MuPDF'), tm (mupdf_version), 'the pictures, PDF, the pixels without the GPU'])
-bundled = [(n, v, w) for n, v, w in (
-  ('FreeType', freetype, 'the glyphs of the fonts'), ('zlib', zlib, 'compression'),
-  ('libjpeg', libjpeg, 'JPEG pictures'), ('OpenJPEG', openjpeg, 'JPEG 2000 pictures'),
-  ('Little CMS', lcms, 'colour management'), ('jbig2dec', jbig2, 'JBIG2 pictures')) if v]
-for n, v, w in bundled: rows.append (['  ' + name (n), tm (v), w + ' (in ' + name ('MuPDF') + ')'])
-rows.append ([name ('SDL'), tm (sdl_version), 'the window, the events, the keyboard'])
+rows = [['Component', 'Version', 'What it does', 'License']]
+rows.append (['<TeXmacs>', tm (version), 'the editor and the typesetter', 'GPL 3 or later'])
+rows.append ([name ('S7') + ' Scheme', tm (s7_version), 'the extension language, in place of ' + name ('Guile'), '0BSD'])
+rows.append ([name ('MuPDF'), tm (mupdf_version), 'the pictures, PDF, the pixels without the GPU', 'AGPL 3 or later'])
+bundled = [(n, v, w, l) for n, v, w, l in (
+  ('FreeType', freetype, 'the glyphs of the fonts', 'FreeType License'), ('zlib', zlib, 'compression', 'zlib'),
+  ('libjpeg', libjpeg, 'JPEG pictures', 'IJG'), ('OpenJPEG', openjpeg, 'JPEG 2000 pictures', 'BSD 2-clause'),
+  ('Little CMS', lcms, 'colour management', 'MIT'), ('jbig2dec', jbig2, 'JBIG2 pictures', 'AGPL 3 or later')) if v]
+for n, v, w, l in bundled: rows.append (['  ' + name (n), tm (v), w + ' (in ' + name ('MuPDF') + ')', l])
+rows.append ([name ('SDL'), tm (sdl_version), 'the window, the events, the keyboard', 'zlib'])
 if thorvg_version:
-  rows.append ([name ('ThorVG'), tm (thorvg_version), 'the drawing with the GPU (WebGL2)'])
-rows.append ([name ('Clay'), tm (clay_version), 'the layout of the interface'])
-rows.append ([name ('Hunspell'), tm (hunspell_version), 'the spell checker'])
+  rows.append ([name ('ThorVG'), tm (thorvg_version), 'the drawing with the GPU (WebGL2)', 'MIT'])
+rows.append ([name ('Clay'), tm (clay_version), 'the layout of the interface', 'zlib'])
+rows.append ([name ('Hunspell'), tm (hunspell_version), 'the spell checker', 'MPL 1.1, GPL 2 or LGPL 2.1'])
 table (rows)
+line ('  The texts of the licenses are served with the page, in ' +
+      '<hlink|licenses/|https://mgubi.github.io/texmacs/licenses/README.md> ' +
+      '(in the sources, ' + verb ('TeXmacs/misc/licenses') + ').')
+line ()
 line ('  Their sources:')
 line ()
 src_items = [
@@ -275,10 +280,16 @@ items ([
   tm (pyodide_version) + '/full/>, loaded at the first input of a session (then kept by the browser).',
   name ('webR') + ': <hlink|webr.r-wasm.org/v' + tm (webr_version) + '|https://webr.r-wasm.org/v' + tm (webr_version) +
   '/>, loaded at the first input of a session (then kept by the browser).',
-  name ('TikZJax') + ': the package ' + verb ('@rod2ik/tikzjax') + ' of npm, ' + checksum ('sha256', tikzjax_sha) +
-  ', served with the page (' + verb ('tikzjax/') + ').',
-  name ('Asymptote-web') + ': the package ' + verb ('asymptote-web') + ' of npm, ' + checksum ('sha256', asymptote_sha) +
-  ', served with the page (' + verb ('asymptote/') + ').',
+  name ('TikZJax') + ' (GPL 3): the package ' + verb ('@rod2ik/tikzjax') + ' of npm, ' + checksum ('sha256', tikzjax_sha) +
+  ', served with the page (' + verb ('tikzjax/') + ', with its license and ' + verb ('SOURCES.md') + '); ' +
+  'its sources are the tag ' + verb ('v' + tikzjax_version) + ' of ' +
+  '<hlink|github.com/rod2ik/tikzjax|https://github.com/rod2ik/tikzjax>.',
+  name ('Asymptote-web') + ' (LGPL 3): the package ' + verb ('asymptote-web') + ' of npm, ' + checksum ('sha256', asymptote_sha) +
+  ', served with the page (' + verb ('asymptote/') + ', with its license and ' + verb ('SOURCES.md') + '); ' +
+  'its sources are those of ' +
+  '<hlink|github.com/Julieisbaka/Asymptote-web|https://github.com/Julieisbaka/Asymptote-web> ' +
+  '(the commit of the version, in ' + verb ('SOURCES.md') + ') and of ' + name ('Asymptote') + ' ' +
+  '<hlink|' + tm (asymptote_upstream) + '|https://sourceforge.net/projects/asymptote/files/' + tm (asymptote_upstream) + '/>.',
   'AI: the services chosen in the preferences, with your keys, through the network.'])
 line ('</body>')
 line ()
