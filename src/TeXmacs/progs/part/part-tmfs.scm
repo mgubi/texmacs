@@ -159,11 +159,14 @@
 
 (define part-loaded-init (make-ahash-table))
 
-(define (part-file-init u)
-  ;; the initial environment of the file @u on disk, or #f
+(define (part-file-body-init u)
+  ;; the body and the initial environment of the file @u on disk, as a
+  ;; pair, or #f
   (and (url-exists? u)
-       (with t (tmfile-extract (tree-import u "texmacs") 'initial)
-         (if t (tm->stree t) '(collection)))))
+       (let* ((doc (tree-import u "texmacs"))
+              (t (tmfile-extract doc 'initial)))
+         (cons (tmfile-extract doc 'body)
+               (if t (tm->stree t) '(collection))))))
 
 (define (part-remember-init name disk inh)
   ;; @disk: the initial environment of the own file of the part view
@@ -190,12 +193,12 @@
   ;; did the body or the initial environment of the own file @f of the
   ;; part view @name change on disk since the view loaded or saved it?
   (let* ((disk (part-loaded-disk name f))
-         (init (part-loaded-init-disk name)))
-    (or (and disk (!= (part-file-body f) disk))
-        (and (ahash-ref part-loaded-init name)
-             (url-exists? f)
-             (!= (part-init-set (part-file-init f))
-                 (part-init-set (or init '(collection))))))))
+         (init (part-loaded-init-disk name))
+         (now  (part-file-body-init f)))
+    (and now
+         (or (and disk (!= (car now) disk))
+             (and init
+                  (!= (part-init-set (cdr now)) (part-init-set init)))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Loading
@@ -635,8 +638,7 @@
 (define (part-loaded-own-init name ori)
   ;; the initial environment of the own file of the part view @name when
   ;; it was loaded or last saved (else the one of the file @ori)
-  (or (and (ahash-ref part-loaded-init name)
-           (part-loaded-init-disk name))
+  (or (part-loaded-init-disk name)
       (tmfile-extract ori 'initial)
       '(collection)))
 
@@ -744,6 +746,16 @@
               (buffer-set f (tmfile-assign doc 'initial init))
               (buffer-pretend-modified f)))))))
 
+(define (part-buffer-sync-init f com)
+  ;; give the open buffer @f, without changes of its own, exactly the
+  ;; initial environment written (in @com)
+  (let* ((new (part-init-entries (tmfile-extract com 'initial)))
+         (own (part-init-entries (tmfile-extract (buffer-get f) 'initial)))
+         (vars (map car new)))
+    (part-buffer-set-init f (list-filter new (lambda (x) (nin? x own)))
+                          (list-filter (map car own)
+                                       (lambda (v) (nin? v vars))))))
+
 (define (part-buffer-update-init f com ori name)
   ;; give the open buffer @f the changes of the initial environment which
   ;; the file gets from the view: the entries set or changed, and the
@@ -817,8 +829,9 @@
                  (begin
                    (when master-style?
                      (part-remember-style name style))
-                   (part-remember name f (or (part-file-body f) b) b)
-                   (part-remember-init name (part-file-init f) #f)
+                   (with now (part-file-body-init f)
+                     (part-remember name f (or (and now (car now)) b) b)
+                     (part-remember-init name (and now (cdr now)) #f))
                    (set! own-ok? #t)
                    (set! part-save-written (cons f part-save-written)))))
             ((tree-export (tm->tree com) f "texmacs")
@@ -829,7 +842,7 @@
                ;; an open buffer without changes of its own gets the body
                ;; and the initial environment which were written
                (part-own-body-set f b)
-               (part-buffer-update-init f com ori name))
+               (part-buffer-sync-init f com))
              (when master-style?
                ;; which an open buffer of the master gets too
                (when (buffer-exists? m)
@@ -839,7 +852,7 @@
              (when (!= action 'none)
                (buffer-pretend-saved f))
              (part-remember name f b b)
-             (part-remember-init name (part-file-init f) #f)
+             (part-remember-init name (tmfile-extract com 'initial) #f)
              (set! own-ok? #t)
              (set! part-save-written (cons f part-save-written)))))
     (part-save-copies name (part-copies body))
