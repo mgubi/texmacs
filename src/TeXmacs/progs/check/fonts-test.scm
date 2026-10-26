@@ -21,8 +21,9 @@
 ;; compared with the formulas set when that text font is the text font too.
 ;;
 ;; The CJK fonts and STIX Two are those of the system: their checks are made
-;; when a font of the database has CJK characters (or Hangul), and when the
-;; files of STIX Two are installed. STIX and TeX Gyre come with TeXmacs.
+;; for each character when one of the fonts of the database with CJK
+;; characters or Hangul draws it, and when the files of STIX Two are
+;; installed. STIX and TeX Gyre come with TeXmacs.
 
 (texmacs-module (check fonts-test)
   (:use (check check-lib)))
@@ -52,15 +53,40 @@
   (let ((w (width t)) (e (em)))
     (and (> e 0) (<= (abs (- w e)) (* tol e)))))
 
-(define (feature-font? feat)
-  ;; whether a font of the database has the glyphs @feat ("CJK", "Hangul")
-  (list-or
-   (map (lambda (fam)
-          (list-or
-           (map (lambda (sty)
-                  (in? feat (font-database-characteristics fam sty)))
-                (font-database-styles fam))))
-        (font-database-families))))
+(define cjk-families-cache #f)
+
+(define (cjk-families)
+  ;; the families of the database with CJK characters or Hangul
+  (when (not cjk-families-cache)
+    (set! cjk-families-cache
+          (list-filter
+           (font-database-families)
+           (lambda (fam)
+             (list-or
+              (map (lambda (sty)
+                     (with chs (font-database-characteristics fam sty)
+                       (or (in? "CJK" chs) (in? "Hangul" chs))))
+                   (font-database-styles fam)))))))
+  cjk-families-cache)
+
+(define (covered? c)
+  ;; whether a font of the system has the character @c: as the text font,
+  ;; one of the CJK fonts draws it, instead of its name in red
+  (let loop ((l (cjk-families)))
+    (cond ((null? l) #f)
+          ((< (width `(with "font" ,(car l) ,c)) (* 1.5 (em))) #t)
+          (else (loop (cdr l))))))
+
+(define (check-em c tol . opt-t)
+  ;; whether the full-width character @c (or the tree @opt-t holding it) is
+  ;; one em wide in the default font, when a font of the system has it
+  (with t (if (null? opt-t) c (car opt-t))
+    (if (covered? c)
+        (check-report (em-wide? t tol)
+                      (string-append "one em wide: " (object->string t))
+                      (string-append "width " (number->string (width t))
+                                     ", em " (number->string (em))))
+        (display* "  (no font has " c ": skipped)\n"))))
 
 (define (in-buffer thunk)
   ;; @thunk in a new generic buffer, closed afterwards
@@ -81,47 +107,41 @@
 
 (define (test-kana)
   (check-group "kana in the default font")
-  (if (not (feature-font? "CJK"))
-      (display "  (no CJK font on this system: skipped)\n")
-      (begin
-        ;; hiragana (U+3040-309F) and katakana (U+30A0-30FF) were drawn as
-        ;; their names, katakana having no range in get_unicode_range
-        (check-true (em-wide? "<#3053>" 0.1))
-        (check-true (em-wide? "<#3093>" 0.1))
-        (check-true (em-wide? "<#30AB>" 0.1))
-        (check-true (em-wide? "<#30CA>" 0.1))
-        (check-true (em-wide? '(with "language" "japanese" "<#30BF>") 0.1))
-        (check-true (em-wide? '(with "font-series" "bold" "<#306F>") 0.1))
-        (check-true (< (width "<#3053><#30AB>") (* 2.2 (em))))
-        ;; katakana phonetic extensions (U+31F0-31FF)
-        (check-true (em-wide? "<#31F0>" 0.05)))))
+  ;; hiragana (U+3040-309F) and katakana (U+30A0-30FF) were drawn as
+  ;; their names, katakana having no range in get_unicode_range
+  (check-em "<#3053>" 0.1)
+  (check-em "<#3093>" 0.1)
+  (check-em "<#30AB>" 0.1)
+  (check-em "<#30CA>" 0.1)
+  (check-em "<#30BF>" 0.1 '(with "language" "japanese" "<#30BF>"))
+  (check-em "<#306F>" 0.1 '(with "font-series" "bold" "<#306F>"))
+  (when (and (covered? "<#3053>") (covered? "<#30AB>"))
+    (check-true (< (width "<#3053><#30AB>") (* 2.2 (em)))))
+  ;; katakana phonetic extensions (U+31F0-31FF)
+  (check-em "<#31F0>" 0.05))
 
 (define (test-ideographs)
   (check-group "ideographs outside the basic block")
-  (if (not (feature-font? "CJK"))
-      (display "  (no CJK font on this system: skipped)\n")
-      (begin
-        ;; extension A (U+3400-4DBF) and the compatibility ideographs
-        ;; (U+F900-FAFF) were scaled by the x-heights as Latin fallbacks
-        (check-true (em-wide? "<#3400>" 0.05))
-        (check-true (em-wide? "<#4DB5>" 0.05))
-        (check-true (em-wide? "<#F900>" 0.05)))))
+  ;; extension A (U+3400-4DBF), the compatibility ideographs (U+F900-FAFF)
+  ;; and extension B (U+20000-2A6DF) were scaled by the x-heights as Latin
+  ;; fallbacks
+  (check-em "<#3400>" 0.05)
+  (check-em "<#4DB5>" 0.05)
+  (check-em "<#F900>" 0.05)
+  (check-em "<#20B9F>" 0.05))
 
 (define (test-hangul)
   (check-group "hangul in the default font")
-  (if (not (feature-font? "Hangul"))
-      (display "  (no Korean font on this system: skipped)\n")
-      (begin
-        ;; the fallback font was scaled by the ratio of the x-heights of the
-        ;; Latin letters, which made the syllables 20 to 30% smaller
-        (check-true (em-wide? "<#D55C>" 0.05))
-        (check-true (em-wide? "<#AD6D>" 0.05))
-        (check-true (em-wide? '(with "font" "pagella" "<#D55C>") 0.05))
-        ;; the jamo (U+1100-11FF) and the compatibility jamo (U+3130-318F)
-        (check-true (em-wide? "<#1100>" 0.05))
-        (check-true (em-wide? "<#3131>" 0.05))
-        ;; the Latin letters are not concerned
-        (check-true (< (width "x") (* 0.7 (em)))))))
+  ;; the fallback font was scaled by the ratio of the x-heights of the
+  ;; Latin letters, which made the syllables 20 to 30% smaller
+  (check-em "<#D55C>" 0.05)
+  (check-em "<#AD6D>" 0.05)
+  (check-em "<#D55C>" 0.05 '(with "font" "pagella" "<#D55C>"))
+  ;; the jamo (U+1100-11FF) and the compatibility jamo (U+3130-318F)
+  (check-em "<#1100>" 0.05)
+  (check-em "<#3131>" 0.05)
+  ;; the Latin letters are not concerned
+  (check-true (< (width "x") (* 0.7 (em)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; STIX Two in the font database (#196, item 7)
