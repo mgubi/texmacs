@@ -150,19 +150,6 @@
   (and (url-exists? u)
        (tmfile-extract (tree-import u "texmacs") 'body)))
 
-;; For each part view: the initial environment of its own file on disk
-;; when the view was loaded or last saved (a file whose initial
-;; environment changed on disk since is asked about), the entries which
-;; the view inherited from the master when it was loaded (master-inits),
-;; and the base: the entries of the file which the view itself had then
-;; (when the open buffer of the file was saved itself, the file may also
-;; have entries of the buffer, which the view never had). Saving a part
-;; view keeps the entries of the base which it did not remove, writes the
-;; inherited ones only when the view changed them (#421), and keeps the
-;; entries of the file which are not in the base.
-
-(define part-loaded-init (make-ahash-table))
-
 (define (part-file-body-init u)
   ;; the body and the initial environment of the file @u on disk, as a
   ;; pair, or #f
@@ -172,42 +159,84 @@
          (cons (tmfile-extract doc 'body)
                (if t (tm->stree t) '(collection))))))
 
-(define (part-remember-init name disk inh base)
-  ;; @disk: the initial environment of the own file of the part view
-  ;; @name on disk; @inh: what the view inherits (#f: keep the last one);
-  ;; @base: the entries of the file which the view has
-  (with old (ahash-ref part-loaded-init name)
-    (ahash-set! part-loaded-init name
-                (list (and disk (tm->stree disk))
-                      (if inh (tm->stree inh) (and old (cadr old)))
-                      (and base (tm->stree base))))))
+;; The initial environment of a part view is saved into its own file by a
+;; three-way rule (#421), for each variable k, from
+;;   B(k)  the value which the view had when it was loaded or last saved
+;;         (inherited from the master or not; none if it had none),
+;;   V(k)  the value which the view has now,
+;;   D(k)  the value which the file has now (on disk, or in its open
+;;         buffer when that buffer is saved itself):
+;; the file gets V(k) when V(k) differs from B(k) (the view changed it,
+;; none: the view removed it), and D(k) otherwise. The view never writes
+;; back a value which it did not change, and writes an inherited value
+;; only when it changed it. For each part view, part-loaded-init holds
+;; (B . the initial environment of the file on disk then); saving asks
+;; first when a variable which the view changed also changed on disk.
 
-(define (part-loaded-init-disk name)
+(define part-loaded-init (make-ahash-table))
+
+(define (part-remember-init name view disk)
+  ;; the initial environments @view of the part view @name and @disk of
+  ;; its own file, when the view is loaded or saved
+  (ahash-set! part-loaded-init name
+              (cons (and view (tm->stree view)) (and disk (tm->stree disk)))))
+
+(define (part-loaded-init-view name)
   (and-with p (ahash-ref part-loaded-init name) (car p)))
 
-(define (part-loaded-init-inherited name)
-  (and-with p (ahash-ref part-loaded-init name) (cadr p)))
+(define (part-loaded-init-disk name)
+  (and-with p (ahash-ref part-loaded-init name) (cdr p)))
 
-(define (part-loaded-init-base name)
-  (and-with p (ahash-ref part-loaded-init name) (caddr p)))
+(define (part-init-assoc c)
+  ;; the bindings of the initial environment @c (#f: none)
+  (or (and c (collection->assoc c)) (list)))
 
-(define (part-init-set c)
-  ;; the entries of the initial environment @c, in the order of their
-  ;; variables (a file saved by TeXmacs has them sorted, a file written
-  ;; otherwise may not)
-  (sort (or (collection->assoc c) (list))
-        (lambda (x y) (string<? (car x) (car y)))))
+(define (part-init-value l k)
+  ;; the value of @k in the bindings @l, as a list (empty: none)
+  (with b (assoc k l)
+    (if b (list (cdr b)) (list))))
 
-(define (part-own-changed-on-disk? name f)
-  ;; did the body or the initial environment of the own file @f of the
-  ;; part view @name change on disk since the view loaded or saved it?
+(define (part-init-vars . ls)
+  ;; the variables of the bindings @ls, each once, in order
+  (sort (list-remove-duplicates (append-map (cut map car <>) ls)) string<?))
+
+(define (part-init-changed name v)
+  ;; the variables which the part view @name, with the initial environment
+  ;; @v, changed since it was loaded or last saved
+  (let* ((V (part-init-assoc v))
+         (B (part-init-assoc (part-loaded-init-view name))))
+    (list-filter (part-init-vars V B)
+                 (lambda (k) (!= (part-init-value V k) (part-init-value B k))))))
+
+(define (part-save-inits name v b d)
+  ;; the initial environment which the file gets from the part view @name:
+  ;; the three-way rule, with V = @v, B = @b and D = @d
+  (let* ((V (part-init-assoc v))
+         (B (part-init-assoc b))
+         (D (part-init-assoc d)))
+    (assoc->collection
+     (append-map (lambda (k)
+                   (map (cut cons k <>)
+                        (if (!= (part-init-value V k) (part-init-value B k))
+                            (part-init-value V k)
+                            (part-init-value D k))))
+                 (part-init-vars V B D)))))
+
+(define (part-own-changed-on-disk? name f v)
+  ;; did the body of the own file @f of the part view @name change on disk
+  ;; since the view loaded or saved it, or a variable of its initial
+  ;; environment which the view (with the initial environment @v) changed?
   (let* ((disk (part-loaded-disk name f))
-         (init (part-loaded-init-disk name))
+         (init (part-init-assoc (part-loaded-init-disk name)))
          (now  (part-file-body-init f)))
     (and now
          (or (and disk (!= (car now) disk))
-             (and init
-                  (!= (part-init-set (cdr now)) (part-init-set init)))))))
+             (and (part-loaded-init-disk name)
+                  (with D (part-init-assoc (cdr now))
+                    (list-or
+                     (map (lambda (k)
+                            (!= (part-init-value D k) (part-init-value init k)))
+                          (part-init-changed name v)))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Loading
@@ -258,7 +287,7 @@
          (let* ((mt (master-inits mas u m))
                 (ft (tm-ref doc 0))
                 (t  (collection-append mt ft)))
-           (part-remember-init name ft mt ft)
+           (part-remember-init name t ft)
            `(initial ,t)))
         ((tm-is? doc 'document)
          (when (and (tmfile-extract doc 'body)
@@ -627,47 +656,11 @@
 ;; Saving
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define (part-own-inits mt ft own-init)
-  ;; the initial environment which a part view saves into its own file
-  ;; from its own @ft (#421): when it was loaded, the view got the entries
-  ;; @mt from the master (master-inits: the entries of the master,
-  ;; part-flag, the extra initial environment of the parts...) and the
-  ;; entries @own-init of its own file, which win. The entries of the
-  ;; file are kept, also when the view did not change them and when the
-  ;; master has the same; the others only when the view set or changed
-  ;; them.
-  (let* ((own (or (collection->assoc own-init) (list)))
-         (inh (or (collection->assoc mt) (list)))
-         (l   (or (collection->assoc ft) (list))))
-    (assoc->collection
-     (list-filter l (lambda (x)
-                      (or (assoc (car x) own)
-                          (!= (assoc-ref inh (car x)) (cdr x))))))))
-
-(define (part-loaded-own-init name ori)
-  ;; the entries of the own file of the part view @name which the view had
-  ;; when it was loaded or last saved (else those of the file @ori)
-  (or (part-loaded-init-base name)
-      (tmfile-extract ori 'initial)
-      '(collection)))
-
-(define (part-file-only-inits name t)
-  ;; the entries of the own file of the part view @name, when the view was
-  ;; loaded or last saved, which the view never had (in its base), and
-  ;; which the initial environment @t which it saves does not set: those
-  ;; which the open buffer of the file saved itself
-  (let* ((disk (or (collection->assoc (part-loaded-init-disk name)) (list)))
-         (base (or (collection->assoc (part-loaded-init-base name)) (list)))
-         (l    (or (collection->assoc t) (list))))
-    (list-filter disk (lambda (x) (not (or (assoc (car x) base)
-                                           (assoc (car x) l)))))))
-
-(define (part-init-restrict c ft)
-  ;; the entries of the initial environment @c whose variables the
-  ;; initial environment @ft sets
-  (let* ((a (or (collection->assoc c) (list)))
-         (l (or (collection->assoc ft) (list))))
-    (assoc->collection (list-filter a (lambda (x) (assoc (car x) l))))))
+(define (part-view-base name ori mas u m)
+  ;; B for the part view @name (as it was loaded, if it was not)
+  (or (part-loaded-init-view name)
+      (collection-append (master-inits mas u m)
+                         (or (tmfile-extract ori 'initial) '(collection)))))
 
 (define (part-compress doc ori mas u m name)
   (cond ((tm-atomic? doc) doc)
@@ -679,18 +672,10 @@
                  ((tm-is? doc 'style) doc)
                  (else `(,(tm-label doc) ,(assoc->collection (list)))))))
         ((tm-is? doc 'initial)
-         ;; the delta against what the view inherited from the master and
-         ;; got from its file when it was loaded (for the view of the
-         ;; master, not against the view itself, which is always empty)
-         (let* ((inh (or (part-loaded-init-inherited name)
-                         (master-inits mas u m)))
-                (own (part-loaded-own-init name ori))
-                (ft  (tm-ref doc 0))
-                (t   (part-own-inits inh ft own)))
-           ;; (and the entries which the file got from its open buffer)
-           `(initial ,(assoc->collection
-                       (append (collection->assoc t)
-                               (part-file-only-inits name t))))))
+         ;; (the three-way rule, with the file on disk)
+         `(initial ,(part-save-inits name (tm-ref doc 0)
+                                     (part-view-base name ori mas u m)
+                                     (tmfile-extract ori 'initial))))
         ((tm-is? doc 'document)
          (cons 'document
                (map (cut part-compress <> ori mas u m name)
@@ -729,71 +714,24 @@
         ((buffer-modified? f) 'buffer)
         (else 'same)))
 
-;; The initial environment of the own file: when the open buffer of the
-;; file is saved itself, it first gets the entries which the view changed
-;; (those which the file would get from the view and which it does not
-;; have on disk), the view winning as for the style.
+;; An open buffer of the own file gets exactly the initial environment
+;; written.
 
-(define (part-init-entries c)
-  ;; the (var val) of the collection @c
-  (if (not (and c (tm-func? c 'collection))) (list)
-      (map (lambda (a) (list (tm->string (tm-ref a 0)) (tm->stree (tm-ref a 1))))
-           (list-filter (tm-children c)
-                        (lambda (a) (and (tm-func? a 'associate 2)
-                                         (tm-atomic? (tm-ref a 0))))))))
-
-(define (part-view-init-changes f com ori)
-  ;; the entries of the initial environment which the file @f gets from
-  ;; the view (in @com), which it does not have on disk (in @ori), and
-  ;; which its open buffer does not have
-  (let* ((new (part-init-entries (tmfile-extract com 'initial)))
-         (old (part-init-entries (tmfile-extract ori 'initial)))
-         (own (part-init-entries (tmfile-extract (buffer-get f) 'initial))))
-    (list-filter new (lambda (x) (and (nin? x old) (nin? x own))))))
-
-(define (part-view-init-removed f com ori name)
-  ;; the variables of the initial environment which the view @name
-  ;; removed: those which the file @f had when the view was loaded or
-  ;; last saved, which it does not get from the view (in @com), and which
-  ;; its open buffer has
-  (let* ((new (map car (part-init-entries (tmfile-extract com 'initial))))
-         (old (map car (part-init-entries (part-loaded-own-init name ori))))
-         (own (map car (part-init-entries
-                        (tmfile-extract (buffer-get f) 'initial)))))
-    (list-filter old (lambda (x) (and (nin? x new) (in? x own))))))
-
-(define (part-buffer-set-init f l . opt)
-  ;; give the open buffer @f the entries @l of the initial environment,
-  ;; and remove the variables of the optional list from it
-  (let ((del (if (null? opt) (list) (car opt))))
-    (when (or (nnull? l) (nnull? del))
+(define (part-buffer-set-init f init)
+  ;; give the open buffer @f the initial environment @init
+  (let* ((new (part-init-assoc init))
+         (own (part-init-assoc (tmfile-extract (buffer-get f) 'initial)))
+         (set (list-filter new (lambda (x) (!= (part-init-value own (car x))
+                                               (list (cdr x))))))
+         (del (list-filter (map car own) (lambda (k) (not (assoc k new))))))
+    (when (or (nnull? set) (nnull? del))
       (if (nnull? (buffer->views f))
           (with-buffer f
-            (for (x l) (init-env-tree (car x) (cadr x)))
-            (for (x del) (init-default x)))
+            (for (x set) (init-env-tree (car x) (cdr x)))
+            (for (k del) (init-default k)))
           (with doc (tm->stree (buffer-get f))
-            (with init (or (tmfile-extract doc 'initial) '(collection))
-              (for (x l) (set! init (collection-set init (car x) (cadr x))))
-              (set! init (collection-exclude init del))
-              (buffer-set f (tmfile-assign doc 'initial init))
-              (buffer-pretend-modified f)))))))
-
-(define (part-buffer-sync-init f com)
-  ;; give the open buffer @f, without changes of its own, exactly the
-  ;; initial environment written (in @com)
-  (let* ((new (part-init-entries (tmfile-extract com 'initial)))
-         (own (part-init-entries (tmfile-extract (buffer-get f) 'initial)))
-         (vars (map car new)))
-    (part-buffer-set-init f (list-filter new (lambda (x) (nin? x own)))
-                          (list-filter (map car own)
-                                       (lambda (v) (nin? v vars))))))
-
-(define (part-buffer-update-init f com ori name)
-  ;; give the open buffer @f the changes of the initial environment which
-  ;; the file gets from the view: the entries set or changed, and the
-  ;; entries removed
-  (part-buffer-set-init f (part-view-init-changes f com ori)
-                        (part-view-init-removed f com ori name)))
+            (buffer-set f (tmfile-assign doc 'initial (tm->stree init)))
+            (buffer-pretend-modified f))))))
 
 (define (part-own-body-set f body)
   ;; give the open buffer of @f the body @body, unless it has it already
@@ -855,7 +793,10 @@
              (part-own-body-set f b)
              (when master-style?
                (part-set-buffer-style f style))
-             (part-buffer-update-init f com ori name)
+             (part-buffer-set-init
+              f (part-save-inits name (tmfile-extract doc 'initial)
+                                 (part-view-base name ori mas f m)
+                                 (tmfile-extract (buffer-get f) 'initial)))
              (if (buffer-save f)
                  (part-save-refuse f "the file could not be written")
                  (begin
@@ -863,10 +804,8 @@
                      (part-remember-style name style))
                    (with now (part-file-body-init f)
                      (part-remember name f (or (and now (car now)) b) b)
-                     (part-remember-init name (and now (cdr now)) #f
-                                         (part-init-restrict
-                                          (tmfile-extract com 'initial)
-                                          (tmfile-extract doc 'initial))))
+                     (part-remember-init name (tmfile-extract doc 'initial)
+                                         (and now (cdr now))))
                    (set! own-ok? #t)
                    (set! part-save-written (cons f part-save-written)))))
             ((tree-export (tm->tree com) f "texmacs")
@@ -877,7 +816,7 @@
                ;; an open buffer without changes of its own gets the body
                ;; and the initial environment which were written
                (part-own-body-set f b)
-               (part-buffer-sync-init f com))
+               (part-buffer-set-init f (tmfile-extract com 'initial)))
              (when master-style?
                ;; which an open buffer of the master gets too
                (when (buffer-exists? m)
@@ -887,10 +826,8 @@
              (when (!= action 'none)
                (buffer-pretend-saved f))
              (part-remember name f b b)
-             (part-remember-init name (tmfile-extract com 'initial) #f
-                                 (part-init-restrict
-                                  (tmfile-extract com 'initial)
-                                  (tmfile-extract doc 'initial)))
+             (part-remember-init name (tmfile-extract doc 'initial)
+                                 (tmfile-extract com 'initial))
              (set! own-ok? #t)
              (set! part-save-written (cons f part-save-written)))))
     (part-save-copies name (part-copies body))
@@ -962,7 +899,8 @@
                                    (part-save-plan buf))
                             caddr))))
     (part-urls-unique
-     (if (part-own-changed-on-disk? name f)
+     (if (part-own-changed-on-disk?
+          name f (tmfile-extract (tm->stree (buffer-get buf)) 'initial))
          (cons f changed)
          changed))))
 
