@@ -499,6 +499,15 @@
         ((string-starts? s "b-") (tmtex-modified-token 'tmmathbf s 2))
         ((and (not (tmtex-math-mode?)) (logic-ref latex-text-symbols% s))
          (list '!group (list (logic-ref latex-text-symbols% s))))
+        ((and (string-starts? s "emoji-")
+              (!= (string-convert (string-append "<" s ">") "Cork" "UTF-8")
+                  (string-append "<" s ">")))
+         ;; an emoji by its name (<emoji-grinning-face>): its characters,
+         ;; as for an emoji written as its code points
+         (let* ((us (string-convert (string-append "<" s ">") "Cork" "UTF-8"))
+                (cv (if tmtex-use-catcodes? (string-convert us "UTF-8" "LaTeX")
+                        us)))
+           (list '!widechar (string->symbol cv))))
         ((and (string-starts? s "#") (not tmtex-use-catcodes?))
          (let* ((qs (string-append "<" s ">"))
                 (cv (string-convert qs "Cork" "UTF-8")))

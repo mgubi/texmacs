@@ -206,6 +206,106 @@
                                        "<#20E3>")))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; The names of the emoji
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; The emoji have names in the universal encoding, those of the LaTeX
+;; package emoji: <emoji-grinning-face> for U+1F600, one name for a whole
+;; sequence (TeXmacs/langs/encoding/emoji-names.scm, made from the
+;; emoji-test.txt of Unicode). A text in UTF-8 gets the names of its
+;; fully-qualified emoji (utf8->cork); a name is typeset as its code points,
+;; which stay valid (the documents written before the names).
+
+(define (named s) (utf8->cork (cork->utf8 s)))
+
+(define (test-name-conversions)
+  (check-group "names: conversions")
+  (check= (named smile) "<emoji-grinning-face>")
+  (check= (named (string-append man zwj woman zwj girl))
+          "<emoji-family-man-woman-girl>")
+  (check= (named (string-append "<#2764>" vs16)) "<emoji-red-heart>")
+  (check= (named "<#1F1EE><#1F1F9>") "<emoji-flag-italy>")
+  (check= (named "<#1F3F4><#E0067><#E0062><#E0065><#E006E><#E0067><#E007F>")
+          "<emoji-flag-england>")
+  (check= (named "<#1F44D><#1F3FD>") "<emoji-thumbs-up-medium-skin-tone>")
+  (check= (named "<#1F3FD>") "<emoji-medium-skin-tone>")
+  (check= (named (string-append "1" vs16 "<#20E3>")) "<emoji-keycap-1>")
+  (check= (named (string-append "#" vs16 "<#20E3>")) "<emoji-keycap-hash>")
+  ;; in a text, and what is not a fully-qualified emoji
+  (check= (named (string-append "a" smile "b")) "a<emoji-grinning-face>b")
+  (check= (named "a12#*") "a12#*")
+  (check= (named "<#2764>") "<#2764>")
+  (check= (named (string-append "1" vs16)) (string-append "1" vs16))
+  (check= (named (string-append smile zwj rocket))
+          "<emoji-grinning-face><#200D><emoji-rocket>")
+  (check= (named "<alpha>") "<alpha>")
+  ;; back to UTF-8: the same characters
+  (check= (cork->utf8 "<emoji-family-man-woman-girl>")
+          (cork->utf8 (string-append man zwj woman zwj girl)))
+  (check= (cork->utf8 "<emoji-keycap-1>")
+          (cork->utf8 (string-append "1" vs16 "<#20E3>")))
+  (check= (cork->utf8 "<emoji-no-such-emoji>") "<emoji-no-such-emoji>")
+  ;; the name of an emoji, by its name or by its code points
+  (check= (emoji-name smile) "<emoji-grinning-face>")
+  (check= (emoji-name "<emoji-rocket>") "<emoji-rocket>")
+  (check= (emoji-name "<#1F1EE><#1F1F9>") "<emoji-flag-italy>")
+  (check= (emoji-name "<#2764>") "")
+  (check= (emoji-name "a") "")
+  (check= (emoji-name (string-append smile rocket)) "")
+  ;; the character before a position: a sequence whole
+  (with s (string-append "a" man zwj woman zwj girl)
+    (check= (string-grapheme-start s (string-length s)) 1)))
+
+(define (same-width? s t)
+  (near? (width s) (width t) 2))
+
+(define (test-name-widths)
+  (check-group "names: typesetting")
+  ;; a name is typeset as its code points, in every font of emoji
+  (check-true (same-width? "<emoji-grinning-face>" smile))
+  (check-true (same-width? "<emoji-family-man-woman-girl>"
+                           (string-append man zwj woman zwj girl)))
+  (check-true (same-width? "<emoji-flag-italy>" "<#1F1EE><#1F1F9>"))
+  (check-true (same-width? "<emoji-thumbs-up-medium-skin-tone>"
+                           "<#1F44D><#1F3FD>"))
+  (check-true (same-width? "<emoji-keycap-1>" (string-append "1" vs16 "<#20E3>")))
+  (check-true (same-width? "<emoji-red-heart>" (string-append "<#2764>" vs16)))
+  (check-true (same-width? "a<emoji-grinning-face><emoji-rocket>b"
+                           (string-append "a" smile rocket "b")))
+  (check-true (same-width? `(with "font-series" "bold" "<emoji-grinning-face>")
+                           `(with "font-series" "bold" ,smile)))
+  (check-true (same-width? `(with "mode" "math" "<emoji-grinning-face>")
+                           `(with "mode" "math" ,smile)))
+  ;; one em in the shipped font
+  (when (== (get-preference "emoji font") "default")
+    (check-true (one-em? "<emoji-grinning-face>"))
+    (check-true (one-em? "<emoji-family-man-woman-girl>"))))
+
+(define (test-name-editing)
+  (check-group "names: editing")
+  ;; a name is one character: Backspace removes it whole
+  (with s "a<emoji-family-man-woman-girl>"
+    (check= (after-key (string-append s "b") (string-length s) kbd-backspace)
+            '(document "ab"))))
+
+(define (test-name-export)
+  (check-group "names: export and import")
+  (let ((ex (lambda (s fmt) (convert `(document ,s) "texmacs-stree" fmt))))
+    ;; the characters of the emoji, as for the code points
+    (check= (ex "a<emoji-grinning-face>b" "latex-snippet")
+            (ex (string-append "a" smile "b") "latex-snippet"))
+    (check= (ex "a<emoji-family-man-woman-girl>b" "latex-snippet")
+            (ex (string-append "a" man zwj woman zwj girl "b") "latex-snippet"))
+    (check= (ex "a<emoji-grinning-face>b" "html-snippet")
+            (ex (string-append "a" smile "b") "html-snippet")))
+  ;; \emoji of the LaTeX package emoji
+  (check= (convert "\\emoji{grinning-face}" "latex-snippet" "texmacs-stree")
+          "<emoji-grinning-face>")
+  (check= (convert "\\emoji{flag-congo---kinshasa}" "latex-snippet"
+                   "texmacs-stree")
+          "<emoji-flag-congo---kinshasa>"))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; All tests
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -224,4 +324,8 @@
     (run-group test-marks))
   (run-group test-system-font)
   (run-group test-deletion)
+  (run-group test-name-conversions)
+  (run-group test-name-widths)
+  (run-group test-name-editing)
+  (run-group test-name-export)
   (check-end))

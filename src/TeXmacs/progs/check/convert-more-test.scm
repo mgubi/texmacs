@@ -466,7 +466,10 @@
   (check= (tm->xml-cdata "x<foo>y") '(!concat "x" (tm-sym "foo") "y"))
   ;; <#3B1> is written as a symbol, since alpha comes back as <alpha>
   (check= (tm->xml-cdata "<#3B1>") '(tm-sym "#3B1"))
-  (check= (tm->xml-cdata "<#1F600>") (u8 #x1F600))
+  ;; and so is <#1F600>, which comes back by its name: the name is written
+  ;; as the character
+  (check= (tm->xml-cdata "<#1F600>") '(tm-sym "#1F600"))
+  (check= (tm->xml-cdata "<emoji-grinning-face>") (u8 #x1F600))
   (check= (xml-unspace "  a   b  " #t #t) "a b")
   (check= (xml-unspace "  a   b  " #f #f) " a b ")
   (check= (xml-unspace "  a \n\t b  " #t #f) "a b ")
@@ -480,7 +483,8 @@
   (check= (export '(with "my_var" "1" "y") "tmml-snippet")
           "<with my_95_var=\"1\">y</with>")
   (check= (export "<#3B1><#1F600><foo>" "tmml-snippet")
-          (string-append "<tm-sym>#3B1</tm-sym>" (u8 #x1F600) "<tm-sym>foo</tm-sym>"))
+          "<tm-sym>#3B1</tm-sym><tm-sym>#1F600</tm-sym><tm-sym>foo</tm-sym>")
+  (check= (export "<emoji-grinning-face>" "tmml-snippet") (u8 #x1F600))
   (check= (export (cork #x10 #x11 #x15 #x16 #x1c) "tmml-snippet")
           (u8 #x201C #x201D #x2013 #x2014 #xFB01))
   (let ((doc (tmfile `(document (foo-bar "x") (my_tag "y") (a.b "z")
@@ -651,7 +655,8 @@
   (check= (utf8->cork (u8 #x416 #x44F #x430)) "<#416><#44F><#430>")
   (check= (cork->utf8 "<#416><#44F><#430>") (u8 #x416 #x44F #x430))
   (check= (utf8->cork (u8 #x10D3)) "<#10D3>")
-  (check= (utf8->cork (u8 #x1F600)) "<#1F600>")
+  ;; an emoji comes by its name, as alpha does (emoji-test.scm)
+  (check= (utf8->cork (u8 #x1F600)) "<emoji-grinning-face>")
   (check= (utf8->cork (u8 #x4E2D #x6587)) "<#4E2D><#6587>")
   (check= (cork->utf8 "<#3B1><#10D3><#1F600>") (u8 #x3B1 #x10D3 #x1F600))
   (check= (cork->utf8 "<#3b1>") (u8 #x3B1))

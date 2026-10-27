@@ -270,13 +270,9 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define (footer-char-start s i)
-  ;; the start of the character which ends at i: a symbol <...> or a byte
-  (if (and (> i 0) (== (string-ref s (- i 1)) #\>))
-      (let loop ((j (- i 1)))
-        (cond ((< j 0) (- i 1))
-              ((== (string-ref s j) #\<) j)
-              (else (loop (- j 1)))))
-      (max 0 (- i 1))))
+  ;; the start of the character which ends at i: a symbol <...> or a byte,
+  ;; an emoji sequence whole (a family, a flag, a skin tone, a keycap)
+  (if (<= i 0) 0 (string-grapheme-start s i)))
 
 (tm-define (footer-char-info)
   ;; as edit_interface_rep::compute_text_footer: the character before the
@@ -288,6 +284,11 @@
                (i (min (cAr p) (string-length s)))
                (c (substring s (footer-char-start s i) i)))
           (cond ((== c "") "start")
+                ((!= (emoji-name c) "")
+                 ;; an emoji with its name (also one in code points)
+                 (with e (emoji-name c)
+                   (string-append c " (" (substring e 1 (- (string-length e) 1))
+                                  ")")))
                 ((== c " ") (if (in-math?) "apply" "space"))
                 ((== c "<#9>") "tab")   ; (a tab of a source file)
                 ((and (string-starts? c "<") (not (string-starts? c "<#"))

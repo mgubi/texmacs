@@ -301,6 +301,15 @@
 
   The additions to <TeXmacs> Upsilon, the newest first.
 
+  <paragraph|27 October 2026>
+
+  <\itemize>
+    <item>The emoji have names, those of the LaTeX package <verbatim|emoji>
+    (<verbatim|grinning-face>, <verbatim|flag-italy>): the footer shows the
+    emoji before the cursor in color, a family or a flag whole, with its
+    name, where it showed a square.
+  </itemize>
+
   <paragraph|26 October 2026>
 
   <\itemize>

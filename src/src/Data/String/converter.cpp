@@ -112,6 +112,14 @@ converter_rep::load () {
     hashtree_from_dictionary (dic,"symbol-unicode-oneway", BIT2BIT, UTF8, false);
     hashtree_from_dictionary (dic,"symbol-unicode-fallback", BIT2BIT, UTF8, false);
     hashtree_from_dictionary (dic,"symbol-unicode-math", BIT2BIT, UTF8, false);
+    hashtree_from_dictionary (dic,"emoji-names", BIT2BIT, UTF8, false);
+    ht = dic;
+  }
+  else if (from=="UTF-8" && to=="Emoji") {
+    // the names of the emoji (<emoji-grinning-face>), by their sequences
+    // in UTF-8, for utf8_to_cork
+    hashtree<char,string> dic;
+    hashtree_from_dictionary (dic,"emoji-names", UTF8, BIT2BIT, true);
     ht = dic;
   }
   else if (from=="UTF-8" && to=="Cork") {
@@ -208,6 +216,7 @@ converter_rep::load () {
     hashtree_from_dictionary (dic,"symbol-unicode-fallback", BIT2BIT, UTF8, false);
     hashtree_from_dictionary (dic,"symbol-unicode-math", BIT2BIT, UTF8, false);
     hashtree_from_dictionary (dic,"cork-to-real-ascii", BIT2BIT, BIT2BIT, false);
+    hashtree_from_dictionary (dic,"emoji-names", BIT2BIT, UTF8, false);
     ht = dic;
   }
   else if (from=="SourceCode" && to=="Cork") {
@@ -322,13 +331,116 @@ convert_utf8_to_LaTeX (string input) {
   return output;
 }
 
+/******************************************************************************
+* The names of the emoji
+******************************************************************************/
+
+// The emoji of Unicode have names in the universal encoding, those of the
+// LaTeX package emoji: <emoji-grinning-face> for U+1F600, and one name for a
+// whole sequence, <emoji-family-man-woman-girl> for U+1F468 U+200D U+1F469
+// U+200D U+1F467 (TeXmacs/langs/encoding/emoji-names.scm, made from the
+// emoji-test.txt of Unicode by misc/emoji/make-emoji-names.py). A text in
+// UTF-8 gets the names of its fully-qualified emoji (utf8_to_cork); the
+// older form, a sequence of code points <#1F600>, stays valid.
+
+static bool
+match_emoji_name (converter conv, string s, int& i, string& name) {
+  // the longest emoji of the table whose UTF-8 sequence starts at i
+  hashtree<char,string> node= conv->ht;
+  int j= i, last= -1;
+  while (j < N(s) && node->contains (s[j])) {
+    node= node (s[j++]);
+    if (node->label != "") { last= j; name= node->label; }
+  }
+  if (last < 0) return false;
+  i= last;
+  return true;
+}
+
+static bool
+match_emoji_name (converter conv, converter cconv, string s, int& i,
+                  string& name) {
+  // as above, but a character which has a symbol of its own keeps it
+  // (U+2648 is <aries>, U+25FD <square>)
+  int j= i;
+  if (!match_emoji_name (conv, s, j, name)) return false;
+  int k= i;
+  decode_from_utf8 (s, k);
+  if (k == j && apply (cconv, s (i, j)) != s (i, j)) return false;
+  i= j;
+  return true;
+}
+
+bool
+is_emoji_name (string s) {
+  return starts (s, "<emoji-") && ends (s, ">") && cork_to_utf8 (s) != s;
+}
+
+string
+emoji_code_points (string s) {
+  // the code points of the emoji named s (<#1F600> for <emoji-grinning-face>,
+  // the characters below 128 as themselves); "" if s is no emoji
+  if (!is_emoji_name (s)) return "";
+  string u= cork_to_utf8 (s), r;
+  int i= 0, n= N(u);
+  while (i < n) {
+    unsigned int code= decode_from_utf8 (u, i);
+    if (code < 128) r << ((char) code);
+    else r << "<#" << as_hexadecimal (code) << ">";
+  }
+  return r;
+}
+
+string
+emoji_to_code_points (string s) {
+  // the emoji of s written as code points
+  if (search_forwards ("<emoji-", s) < 0) return s;
+  string r;
+  int i= 0, n= N(s);
+  while (i < n) {
+    if (s[i] == '<' && test (s, i, "<emoji-")) {
+      int j= i;
+      while (j < n && s[j] != '>') j++;
+      if (j < n) {
+        string c= emoji_code_points (s (i, j+1));
+        if (c != "") { r << c; i= j+1; continue; }
+      }
+    }
+    r << s[i++];
+  }
+  return r;
+}
+
+string
+emoji_name (string s) {
+  // the name of the emoji which s is, in code points (<#1F600> or the
+  // name itself); "" if s is not one emoji
+  if (is_emoji_name (s)) return s;
+  string u= cork_to_utf8 (s), name;
+  if (N(u) == 0) return "";
+  int i= 0;
+  converter conv= load_converter ("UTF-8", "Emoji");
+  if (match_emoji_name (conv, u, i, name) && i == N(u)) return name;
+  return "";
+}
+
+/******************************************************************************
+* Conversions between UTF-8 and the universal encoding
+******************************************************************************/
+
 string
 utf8_to_cork (string input) {
   converter conv= load_converter ("UTF-8", "Cork");
+  converter econv= load_converter ("UTF-8", "Emoji");
   int start, i, n= N(input);
   string output;
   for (i=0; i<n; ) {
     start= i;
+    string name;
+    if (match_emoji_name (econv, conv, input, i, name)) {
+      output << name;
+      continue;
+    }
     unsigned int code= decode_from_utf8 (input, i);
     string s= input (start, i);
     string r= apply (conv, s);
@@ -342,10 +454,16 @@ utf8_to_cork (string input) {
 string
 var_utf8_to_cork (string input) {
   converter conv= load_converter ("UTF-8", "Cork");
+  converter econv= load_converter ("UTF-8", "Emoji");
   int start, i, n= N(input);
   string output;
   for (i=0; i<n; ) {
     start= i;
+    string name;
+    if (match_emoji_name (econv, conv, input, i, name)) {
+      output << name;
+      continue;
+    }
     unsigned int code= decode_from_utf8 (input, i);
     string s= input (start, i);
     string r= apply (conv, s);

@@ -502,6 +502,7 @@
   (cork->sourcecode cork_to_sourcecode (string string))
   (utf8->cork utf8_to_cork (string string))
   (cork->utf8 cork_to_utf8 (string string))
+  (emoji-name emoji_name (string string))
   (utf8->t2a utf8_to_t2a (string string))
   (t2a->utf8 t2a_to_utf8 (string string))
   (utf8->html utf8_to_html (string string))
@@ -535,6 +536,7 @@
   (list->tmstring tm_recompose (string array_string))
   (string-next tm_char_next (int string int))
   (string-previous tm_char_previous (int string int))
+  (string-grapheme-start tm_grapheme_start (int string int))
   (tmstring-split tm_string_split (array_string string))
 
   (tmstring-translit uni_translit (string string))

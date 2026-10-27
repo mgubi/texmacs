@@ -80,6 +80,68 @@ hooks.
    `misc/wasm/browser-run.mjs`: the screen and the PDF of the page; its
    FreeType, the one of MuPDF, has the layers of COLR).
 
+## The names of the emoji
+
+An emoji has a name in the universal encoding of TeXmacs, as a Greek letter
+has (`<alpha>`): `<emoji-grinning-face>` for U+1F600, and one name for a
+whole sequence, `<emoji-family-man-woman-girl>` (U+1F468 U+200D U+1F469
+U+200D U+1F467), `<emoji-red-heart>` (U+2764 U+FE0F), `<emoji-flag-italy>`,
+`<emoji-flag-england>` (a flag of tags), `<emoji-keycap-1>`,
+`<emoji-thumbs-up-medium-skin-tone>`, and the components alone
+(`<emoji-medium-skin-tone>`, `<emoji-red-hair>`).
+
+- **The names** are those of the LaTeX package `emoji`
+  (`\emoji{grinning-face}`): the CLDR short names of Unicode, in small
+  letters, without accents and without `: , . ' ( ) & "`, with a hyphen for
+  a space, `hash` and `asterisk` for the keycaps of `#` and `*`. Of the
+  3507 emoji of the package (v0.2.2, Emoji 13.1), 3500 have the same name;
+  7 were renamed by CLDR since (`hugging-face` is
+  `smiling-face-with-open-hands`, `flag-turkey` is `flag-turkiye`...). The
+  shortcodes of GitHub or Slack (`:grinning:`) were not taken: each service
+  has its own list, and many emoji have none.
+- **The table**, `TeXmacs/langs/encoding/emoji-names.scm` (ASCII: the code
+  points as `#XXXX`), has the fully-qualified emoji of the file
+  `emoji-test.txt` of Unicode and its components: 3972 names for Emoji 18.0.
+  It is generated, not edited:
+  `python3 misc/emoji/make-emoji-names.py emoji-test.txt > TeXmacs/langs/encoding/emoji-names.scm`
+  (from <https://unicode.org/Public/emoji/latest/>), and
+  `--check <emoji-table.def>` lists the names which differ from those of the
+  LaTeX package.
+- **The conversions.** The table is in the converters from the universal
+  encoding to UTF-8 and to source code (`converter_rep::load`,
+  `Data/String/converter.cpp`), so that a name is written out as its
+  characters (HTML, Markdown, the clipboard, a source file). The other way,
+  `utf8_to_cork` takes the longest emoji of the table at each character
+  (`match_emoji_name`): a text in UTF-8 (typed, pasted, imported) gets the
+  names, as it gets `<alpha>`; a character which has a symbol of its own
+  keeps it (U+2648 is `<aries>`, U+25FD `<square>`), and what is not a
+  fully-qualified emoji stays in code points (U+2764 alone, a skin tone
+  after a face, a joiner between two emoji which make nothing together).
+  `cork_to_utf8 (utf8_to_cork (s))` is `s`. The documents written before,
+  with `<#1F600>`, are not converted: both forms are valid and look the
+  same. `emoji_name`, `emoji_code_points` and `emoji_to_code_points`
+  (`converter.hpp`; `emoji-name` in Scheme) go from one to the other.
+- **The typesetting.** `smart_font_rep::resolve` gives a name a font of its
+  own (`emoji-name`, the emoji font of its first code point) whose rewrite
+  (`REWRITE_EMOJI`) is the code points of the name: everything below works
+  on the code points as before (the ligatures, the layers, the text of a
+  PDF), and the name is one character for the editor.
+- **The footer** says which character is before the cursor: an emoji
+  sequence whole (`tm_grapheme_start`, in `compute_text_footer` and in
+  `footer-char-info` of the interactive footer), with its name, also for
+  an emoji in code points (`<#1F600> (emoji-grinning-face)`). Vue draws
+  the texts of its widgets with one font, which has no emoji (a square):
+  `layout_text_emoji` (`vue_gui.cpp`) draws the emoji of a text with the
+  emoji font (`get_emoji_font`, at the em of the font of the widgets). Qt
+  and Cocoa give the text to the system, which finds an emoji font; Cocoa
+  no longer escapes the symbols of the right footer (`tm_var_encode` made
+  `<alpha>` of a footer literal).
+- **LaTeX**: `\emoji{grinning-face}` is imported as `<emoji-grinning-face>`
+  (`latex_command_to_tree`, `fromtex.cpp`); a name is exported as its
+  characters, as the code points are (`tmtex-token-sub`). TMML writes
+  `<#1F600>` as a `<tm-sym>`, since it would come back by its name (so is
+  `<#3B1>`, which comes back as `<alpha>`), and a name as its character.
+
 ## Not done yet
 
 - **Segoe UI Emoji** (Windows, COLR) should be drawn as Twemoji is, but has
@@ -182,6 +244,14 @@ With the preference "emoji font" at "system" (or at a font), the group
 groups of the widths of Twemoji are left out; checked with Apple Color
 Emoji and Noto Color Emoji (`TEXMACS_FONT_PATH` to its folder, the
 preference at "NotoColorEmoji").
+
+The groups "names" check the conversions to and from the names, that a
+name is as wide as its code points (with every emoji font), that it is one
+character, and the import and export of LaTeX and HTML. The scripted test
+of Vue `tests/Plugins/Vue/footer-emoji.scm` (`run.sh footer-emoji 90`)
+checks the footer: the whole sequence as a text of its own (in the emoji
+font), then its name, in both footers, and that an emoji typed comes by its
+name.
 
 `src/Plugins/MuPDF/tests/pdf-compare.sh` exports `emoji.tm` with the MuPDF
 writer and checks that every emoji, and every sequence whole, comes out of

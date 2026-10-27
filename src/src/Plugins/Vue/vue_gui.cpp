@@ -1912,6 +1912,42 @@ layout_text_box (string s, int style, color c, font fn) {
 
 extern int context_style; // style flags added by the enclosing divisions
 
+// A text with emoji (the footer says which character is before the cursor):
+// the font of the widgets has none, and drew a square. The emoji, by their
+// names (<emoji-grinning-face>) or their code points, come from the emoji
+// font, at the size of the font of the widgets, and the rest from that font
+static bool
+layout_text_emoji (string s, int style, color c, font fn) {
+  if (search_forwards ("<emoji-", s) < 0 && search_forwards ("<#", s) < 0)
+    return false;
+  array<string> parts;
+  array<bool>   emoji;
+  int i= 0, start= 0, n= N(s);
+  while (i < n) {
+    int j= tm_grapheme_end (s, i);
+    if (j <= i) j= i + 1;
+    if (emoji_name (s (i, j)) != "") {
+      if (start < i) { parts << s (start, i); emoji << false; }
+      parts << emoji_to_code_points (s (i, j)); emoji << true;
+      start= j;
+    }
+    i= j;
+  }
+  if (N(parts) == 0) return false;
+  if (start < n) { parts << s (start, n); emoji << false; }
+  // the em of the emoji is that of the font of the widgets
+  int dpi= (int) ((72.0 * fn->wquad) / (10.0 * PIXEL) + 0.5);
+  font efn= get_emoji_font (10, max (dpi, 1));
+  if (is_nil (efn)) return false;
+  CLAY_AUTO_ID({
+    .layout= { .childAlignment= { .y= CLAY_ALIGN_Y_CENTER }}})
+  {
+    for (int k= 0; k < N(parts); k++)
+      layout_text_box (parts[k], style, c, emoji[k]? efn: fn);
+  }
+  return true;
+}
+
 void layout_text (string s, int style, color c) {
   style |= context_style;
   // grey and inert texts are greyed, whatever color was asked for
@@ -1928,10 +1964,14 @@ void layout_text (string s, int style, color c) {
         .sizing= { .width= CLAY_SIZING_GROW(0) },
         .childAlignment= { .x= CLAY_ALIGN_X_CENTER }}})
     {
-      layout_text_box (s, style, c, get_default_styled_font (style));
+      font fn= get_default_styled_font (style);
+      if (!layout_text_emoji (s, style, c, fn)) layout_text_box (s, style, c, fn);
     }
   }
-  else layout_text_box (s, style, c, get_default_styled_font (style));
+  else {
+    font fn= get_default_styled_font (style);
+    if (!layout_text_emoji (s, style, c, fn)) layout_text_box (s, style, c, fn);
+  }
 }
 
 // The font of the symbols which the font of the widgets does not have, at

@@ -211,6 +211,7 @@ callback output.
 | `footer-variants` | the menu of a displayed formula in the footer makes it inline while the cursor is in an inline formula inside it, and the cursor goes back there (`got: (math text math) ...`) |
 | `named` | `(named "name" ...)` in the menus: two buttons with the same label told apart by the names of their groups (`#second`, `#first > Same`); steps of the driver in its `.scm`, without a script |
 | `footer-activate` | `footer-variants` written as steps of the driver in its `.scm`, without a script: the menus are found by their texts (`gt-activate`), the result is checked (`gt-check`) and TeXmacs quits with the status |
+| `footer-emoji` | the footer says which emoji is before the cursor: a sequence (a family, a flag, a keycap) whole, as a text of its own drawn with the emoji font, then its name (`(emoji-family-man-woman-girl)`), in the footer of the editor and in the interactive footer; an emoji typed comes into the document by its name (`<emoji-rocket>`) |
 
 One more is not run this way. `sockets-tls` repeats the `sockets` exchange
 over TLS and is run by hand:

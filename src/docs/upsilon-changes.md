@@ -14,6 +14,17 @@ have the details, and the problems go to the
 
 ## 27 October 2026
 
+- **Names of the emoji**: the emoji have names in the universal encoding
+  of TeXmacs, those of the LaTeX package `emoji` (the short names of
+  Unicode): `<emoji-grinning-face>`, and one name for a whole sequence,
+  `<emoji-family-man-woman-girl>`, `<emoji-flag-italy>`,
+  `<emoji-keycap-1>`. An emoji typed, pasted or imported comes into the
+  document by its name, as a Greek letter does; the documents which have
+  emoji as code points (`<#1F600>`) look the same as before. The footer
+  shows the emoji before the cursor, a sequence whole, with its name, where
+  it showed a square (Vue, the browser) or the last character of the
+  sequence alone (Qt); `\emoji{grinning-face}` of LaTeX is imported as the
+  emoji (#533).
 - **Maple** (desktop): the helper of the plug-in builds with the compilers
   of Xcode 15 and later and of GCC 14, which rejected the types of its
   callbacks, and on macOS it finds the Maple library by itself, also when

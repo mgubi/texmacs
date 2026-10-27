@@ -47,6 +47,7 @@ RESOURCE(smart_map);
 #define REWRITE_IGNORE         11
 #define REWRITE_MATH_ITALIC    12
 #define REWRITE_CORK           13
+#define REWRITE_EMOJI          14
 
 static string substitute_math_italic (string s);
 
@@ -1265,6 +1266,8 @@ rewrite (string s, int kind) {
     return substitute_math_italic (s);
   case REWRITE_CORK:
     return utf8_to_cork (strict_cork_to_utf8 (s));
+  case REWRITE_EMOJI:
+    return emoji_to_code_points (s);
   default:
     return s;
   }
@@ -1306,7 +1309,8 @@ smart_font_rep::advance (string s, int& pos, string& r, int& nr) {
       if (next == -1) next= resolve (s (pos, end));
       next= emoji_before_selector (s, pos, end, next);
       if (count == 1 && nr != -1 && next == nr &&
-          !is_tuple (sm->fn_spec[nr], "shipped-emoji")) {
+          !is_tuple (sm->fn_spec[nr], "shipped-emoji") &&
+          !is_tuple (sm->fn_spec[nr], "emoji-name")) {
         // (the emoji font draws the bases of keycaps only with the rest)
         if (N(fn) <= nr || is_nil (fn[nr])) initialize_font (nr);
         if (!fn[nr]->supports (s (start, end))) break;
@@ -1358,6 +1362,15 @@ emoji_font_name () {
   else if (pref != "default" && pref != "" && tt_font_exists (pref))
     return pref;
   return SHIPPED_EMOJI_FONT;
+}
+
+// The emoji font, for the texts which are not typeset by a smart font (the
+// widgets of Vue): it draws code points, not the names of the emoji
+font
+get_emoji_font (int sz, int dpi) {
+  string name= emoji_font_name ();
+  if (!tt_font_exists (name)) return font ();
+  return unicode_font (name, sz, dpi);
 }
 
 // The code point of c when it is one, -1 otherwise
@@ -1960,6 +1973,24 @@ smart_font_rep::resolve (string c) {
     }
   }
 
+  // an emoji by its name (<emoji-grinning-face>, see emoji_code_points):
+  // its code points, in the font of its first one
+  if (starts (c, "<emoji-")) {
+    string u= emoji_code_points (c);
+    if (u != "") {
+      int end= 0;
+      tm_char_forwards (u, end);
+      int enr= (u[0] == '<'? resolve_emoji (u (0, end)): -1);
+      if (enr < 0) enr= emoji_font ();
+      if (enr >= 0) {
+        tree key= tuple ("emoji-name", as_string (enr));
+        int nr= sm->add_font (key, REWRITE_EMOJI);
+        initialize_font (nr);
+        return sm->add_char (key, c);
+      }
+    }
+  }
+
   // the emoji, from the emoji font which comes with TeXmacs, before any
   // other font (some text fonts have a few of them in black and white)
   if (starts (c, "<#")) {
@@ -2120,6 +2151,12 @@ smart_font_rep::initialize_font (int nr) {
     int cnr= as_int (a[1]);
     initialize_font (cnr);
     fn[nr]= fn[cnr];
+  }
+  else if (a[0] == "emoji-name") {
+    // the emoji font which draws the code points of the names
+    int enr= as_int (a[1]);
+    initialize_font (enr);
+    fn[nr]= fn[enr];
   }
   else if (a[0] == "greek")
     fn[nr]= adjust_subfont (get_greek_font (a[1], a[2], a[3], a[4]));

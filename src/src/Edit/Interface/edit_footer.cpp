@@ -11,6 +11,7 @@
 
 #include "edit_interface.hpp"
 #include "convert.hpp"
+#include "converter.hpp"
 #include "connect.hpp"
 #include "dictionary.hpp"
 
@@ -112,9 +113,13 @@ edit_interface_rep::compute_text_footer (tree st) {
   string r;
   language lan= get_env_language ();
   int end  = last_item (tp);
-  int start= end;
-  tm_char_backwards (st->label, start);
+  // the character before the cursor, an emoji sequence whole (a family, a
+  // flag, a skin tone, a keycap), not its last code point alone
+  int start= tm_grapheme_start (st->label, end);
   r= st->label (start, end);
+  // an emoji with its name (also an emoji written as its code points)
+  string e= emoji_name (r);
+  if (e != "") return verbatim (r * " (" * e (1, N(e)-1) * ")");
   if (r == "") r= "start";
   if (r == " ") r= "space";
   if (r == "<#9>") r= "tab";   // (a tab of a source file)

@@ -633,7 +633,9 @@ ns_tm_widget_rep::send (slot s, blackbox val) {
     {
       check_type<string> (val, s);
       string msg = open_box<string> (val);
-      [rightField setStringValue:to_nsstring_utf8 (tm_var_encode (msg))];
+      // (the footer is in the universal encoding: the symbol before the
+      // cursor, <alpha> or <emoji-grinning-face>, is shown as its character)
+      [rightField setStringValue:to_nsstring_utf8 (msg)];
       // the field takes the width of its text
       CGFloat need= max ((CGFloat) 100.0, [[rightField cell] cellSize].width + 4);
       if (footer_menus) {

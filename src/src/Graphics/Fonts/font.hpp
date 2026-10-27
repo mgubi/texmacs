@@ -299,6 +299,7 @@ font smart_font (string family, string variant, string series, string shape,
 font smart_font (string family, string variant, string series, string shape,
                  string tf, string tv, string tw, string ts, int sz, int dpi);
 font apply_effects (font fn, string effects);
+font get_emoji_font (int sz, int dpi);
 
 int  script (int sz, int level);
 
