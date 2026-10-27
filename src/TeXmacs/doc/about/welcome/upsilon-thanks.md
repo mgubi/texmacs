@@ -42,6 +42,9 @@ named differently, open an issue or say so in your report.
 - **baudoly**: two windows on one document (#463, #464), the preferences
   with Inkscape installed (#465), dialogs with an accented title in Cocoa
   (#468), each with its cause found and a fix.
+- **Tilda**: the Maple plug-in on macOS (#517), with the trace which showed
+  its cause, and a shortcut which printed leaving its keys on the screen
+  (#519).
 
 ## Software, fonts and art of others
 

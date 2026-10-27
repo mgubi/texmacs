@@ -12,15 +12,29 @@ branch [`upsilon_texmacs`](https://github.com/mgubi/texmacs/commits/upsilon_texm
 have the details, and the problems go to the
 [issues of the repository](https://github.com/mgubi/texmacs/issues).
 
+## 27 October 2026
+
+- **Maple** (desktop): the helper of the plug-in builds with the compilers
+  of Xcode 15 and later and of GCC 14, which rejected the types of its
+  callbacks, and on macOS it finds the Maple library by itself, also when
+  it is built from an Intel shell on Apple silicon. A failure of Maple to
+  start (a licence, for instance) is shown in the session, and the helper
+  stops when the session ends instead of using a processor in full;
+  `Maple.framework/Versions/Current` is searched first (#517).
+- **Printing**: a shortcut which prints, such as `M-e p` bound to
+  `print-to-file`, no longer leaves the "M-e" it showed while waiting for
+  the second key on the screen (#519).
+
 ## 26 October 2026
 
 - **Maple** (desktop): the session no longer hangs at its start on macOS.
-  Without a license file in the Maple tree, the launcher dated a file
-  with a `touch` option which macOS lacks, and then could not build its
-  helpers, even when they were in the home; it now keeps those which are
-  there, and any failure (no `maple` command, a build which fails, with
-  what the compiler says) is shown in the session. Maple 2015 and later
-  are found in `/Library/Frameworks` (#517).
+  The launcher handed the path of TeXmacs to `make` without quotes, and
+  the path of the application has spaces; without a license file in the
+  Maple tree, it also dated a file with a `touch` option which macOS
+  lacks. It now keeps the helpers which are in the home, and any failure
+  (no `maple` command, a build which fails, with what the compiler says)
+  is shown in the session. Maple 2015 and later are found in
+  `/Library/Frameworks` (#517).
 - **Qt**: only the part of the document in the window is repainted after
   typesetting. Opening a long document with saved references, or a new
   paragraph at its start, used to repaint every page that moved, and so
