@@ -42,6 +42,8 @@
   (default-look-and-feel default_look_and_feel (string))
   (default-chinese-font default_chinese_font_name (string))
   (default-japanese-font default_japanese_font_name (string))
+  (windows-cjk-font-candidates windows_cjk_font_candidates
+                               (array_string string))
   (default-korean-font default_korean_font_name (string))
   (get-retina-factor get_retina_factor (int))
   (get-retina-zoom get_retina_zoom (int))
