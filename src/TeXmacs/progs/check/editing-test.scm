@@ -169,6 +169,40 @@
     (when (buffer-exists? old) (switch-to-buffer old))
     (check= (current-buffer) old)))
 
+;; Deleting a view of a buffer removes it from the views of the buffer and
+;; leaves the others, which still show and edit the buffer. delete_view
+;; went on reading the views after removing one, one past the end of the
+;; shortened array when the view was not the last one (#547: new_view.cpp);
+;; the read is caught only under ASan (with NO_FAST_ALLOC).
+(define (test-delete-view)
+  (check-group "deleting a view")
+  (with-buffer-body '(document "a")
+    (lambda ()
+      (let* ((u (current-buffer))
+             (v0 (current-view-url))
+             (v1 (view-new u))
+             (v2 (view-new u)))
+        (check= (buffer->views u) (list v0 v1 v2))
+        ;; the window shows v1, so that the first view is not in a window
+        (window-set-view (current-window) v1 #t)
+        (check= (current-view-url) v1)
+        (check-true (url-none? (view->window-url v0)))
+        (view-delete v0)
+        (check= (buffer->views u) (list v1 v2))
+        (check-false (in? v0 (view-list)))
+        (check= (view->buffer v1) u)
+        (check= (view->buffer v2) u)
+        ;; both views edit the buffer
+        (edit (go-end) (insert "b"))
+        (check= (body) '(document "ab"))
+        (window-set-view (current-window) v2 #t)
+        (check= (current-view-url) v2)
+        (check= (current-buffer) u)
+        (check= (body) '(document "ab"))
+        (edit (go-end) (insert "c"))
+        (check= (tree->stree (buffer-get-body u)) '(document "abc"))
+        (check= (buffer->views u) (list v1 v2))))))
+
 ;; A tree pointer or a position which is collected while it is still
 ;; attached to a tree (a process whose callback was never called, a
 ;; position-new without position-delete after an error) is held by the
@@ -1150,6 +1184,7 @@
   (check-suite "editing")
   (system-mkdir (system->url editing-dir))
   (test-buffers)
+  (test-delete-view)
   (test-tree-pointers)
   (test-embedded)
   (test-load)

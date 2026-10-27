@@ -318,6 +318,7 @@ delete_view (url u) {
         if (j<i) a[j]= buf->vws[j];
         else a[j]= buf->vws[j+1];
       buf->vws= a;
+      break; // buf->vws is now shorter: do not read past its end
     }
   notify_delete_view (u);
   vw->ed->buf= NULL;
