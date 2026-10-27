@@ -37,9 +37,9 @@
                 (out* (cpp-ai-output out model))
                 (out** (cpp-ai-get-body out*))
                 (new-t (decompress-html (car out**) 1)))
+           ;; (a document when the engine put <p>: not nested, #526)
            (when (== st st*)
-             (tree-set! t new-t)
-             (tree-correct-upwards t)))))
+             (tree-replace-paragraph! t new-t)))))
   (tree-pointer-detach tp)
   (next))
 
@@ -79,9 +79,14 @@
           (else
             (with cmd (cpp-ai-command in model agent)
               ;;(display* "Eval] " cmd "\n")
-              ;; (true: nothing launched, and return will not be called)
+              ;; (true: nothing launched, and return will not be called:
+              ;; the translation stops, as the next requests would fail too,
+              ;; and return, called without an answer, frees the table and
+              ;; detaches the tree pointer of each paragraph)
               (when (cpp-ai-async-eval-command cmd return)
-                (compress-table-free table)))))))
+                (set-message "The request could not be sent" "Translate")
+                (process-deactivate 'translate)
+                (return #f)))))))
 
 (define (make-translate-process lan)
   (make-process (translate-process-one lan) 'translate))

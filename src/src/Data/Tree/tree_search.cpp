@@ -1128,6 +1128,12 @@ search (range_set& sel, tree t, tree what, path p, path pos) {
     search (sel, t, what, p);
   else {
     if (is_nil (pos)) search (sel, t, what, p);
+    else if (!(is_anchored (what) && !is_anchored (t)) &&
+             (match (t, what) || matches_between_wildcards (t, what)))
+      // the cursor is inside a tag which matches: that tag is a hit, as in
+      // search_compound, so that a search from the cursor selects the
+      // enclosing match, as it does in a text (#523)
+      merge (sel, simple_range (p * start (t), p * end (t)));
     else {
       int hits= 0;
       array<range_set> sub (N(t));

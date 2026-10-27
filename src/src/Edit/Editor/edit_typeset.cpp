@@ -76,8 +76,10 @@ edit_typeset_rep::set_data (new_data data) {
 void
 edit_typeset_rep::get_data (new_data& data) {
   data->style= get_style ();
-  data->init = get_init ();
-  data->fin  = get_fin ();
+  // copies: the editor changes its own maps in place (init_env), and the
+  // buffer's data must not follow the changes of one view (#528)
+  data->init = copy (get_init ());
+  data->fin  = copy (get_fin ());
   data->ref  = get_ref ();
   data->aux  = get_aux ();
   data->att  = get_att ();
@@ -1055,15 +1057,46 @@ edit_typeset_rep::get_init_all () {
   return (tree) init;
 }
 
+// The initial environment is a property of the buffer: a change made in
+// one view goes to the buffer's data, from which new views start, and to
+// the other views of the buffer, which are marked modified too (#528).
+// The variables of the window (is_view_init_variable: its size, zoom and
+// full screen mode) stay those of the view, and do not modify the buffer.
+
+static void
+init_buffer_views (tm_buffer buf, string var, tree by, bool reset) {
+  // the buffer's data and all its views get the value @by of @var, or lose
+  // @var when @reset; the view which made the change has it already, so
+  // that init_env_local and init_default_local do nothing in it. An editor
+  // whose view was deleted (delete_view) has no buffer.
+  if (buf == NULL) return;
+  if (reset) buf->data->init->reset (var);
+  else buf->data->init (var)= copy (by);
+  for (int i=0; i<N(buf->vws); i++)
+    if (reset) buf->vws[i]->ed->init_default_local (var);
+    else buf->vws[i]->ed->init_env_local (var, copy (by));
+}
+
 void
 edit_typeset_rep::init_env (string var, tree by) {
   if (init (var) == by) return;
   init (var)= by;
   if (var == "full-screen-mode") return;
-  if (var != PAGE_SCREEN_WIDTH &&
-      var != PAGE_SCREEN_HEIGHT &&
-      var != ZOOM_FACTOR)
-    require_save ();
+  if (is_view_init_variable (var)) {
+    notify_change (THE_ENVIRONMENT);
+    return;
+  }
+  require_save ();
+  notify_change (THE_ENVIRONMENT);
+  init_buffer_views (buf, var, by, false);
+}
+
+void
+edit_typeset_rep::init_env_local (string var, tree by) {
+  // the change of init_env in one view of the buffer (init_buffer_views)
+  if (init (var) == by) return;
+  init (var)= by;
+  require_save ();
   notify_change (THE_ENVIRONMENT);
 }
 
@@ -1086,8 +1119,18 @@ edit_typeset_rep::set_zoom (tree z) {
 void
 edit_typeset_rep::init_default (string var) {
   if (!init->contains (var)) return;
+  init_default_local (var);
+  if (is_view_init_variable (var)) return;
+  init_buffer_views (buf, var, tree (UNINIT), true);
+}
+
+void
+edit_typeset_rep::init_default_local (string var) {
+  // the change of init_default in one view of the buffer
+  if (!init->contains (var)) return;
   init->reset (var);
   set_pre (var, stydef->contains (var)? stydef[var]: tree (UNINIT));
+  if (!is_view_init_variable (var)) require_save ();
   notify_change (THE_ENVIRONMENT);
 }
 

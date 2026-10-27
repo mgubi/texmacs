@@ -92,11 +92,16 @@
 	    (set! args (append args
 			       (list "username" (lantool-username)
 				     "apiKey" (lantool-api-key)))))
-          ;; (true: nothing sent, and return will not be called)
+          ;; (true: nothing sent, and return will not be called: the check
+          ;; stops, as the next requests would fail too, and return, called
+          ;; without an answer, frees the table, and the process detaches
+          ;; its tree pointers)
           (when (async-http-post-query (lantool-server)
                   '("Content-Type" "application/x-www-form-urlencoded") args
                   (lantool-return lan html return))
-            (compress-table-free table))))))
+            (set-message "The request could not be sent" "Spell check")
+            (process-deactivate 'lantool)
+            (return html #f))))))
 
 (tm-define (lantool-process-old t return)
   (spell-initiate)
@@ -116,19 +121,19 @@
                 (new-t (decompress-html html* 1)))
            (when (and (== st st*)
                       (nnull? (tm-search new-t spell-context?)))
-             (tree-set! t new-t)
-             (tree-correct-upwards t)
-             (when (not (tree-innermost spell-context?))
-               (with l (tree-search t spell-context?)
-                 (when (nnull? l)
-                   (tree-go-to (car l) 0 :start)
-                   (delayed
-                     (:idle 200)
-		     (recenter-window)
-		     (if (get-boolean-preference
-			  "languagetool use widgets")
-			 (open-correct)			   
-			 (refresh-tooltips)))))))))
+             ;; (not nested, should the answer be a document: #526)
+             (with ts (tree-replace-paragraph! t new-t)
+               (when (not (tree-innermost spell-context?))
+                 (with l (append-map (cut tree-search <> spell-context?) ts)
+                   (when (nnull? l)
+                     (tree-go-to (car l) 0 :start)
+                     (delayed
+                       (:idle 200)
+		       (recenter-window)
+		       (if (get-boolean-preference
+			    "languagetool use widgets")
+			   (open-correct)			   
+			   (refresh-tooltips))))))))))
         (else (set-message "No running LanguageTool server" "Spell check")))
   (tree-pointer-detach tp)
   (next))

@@ -873,6 +873,77 @@
                                  1000)
             (tree-search-tree doc '(concat "a" (wildcard "x")) '() 1000))))
 
+;; from a position inside a tag which matches a tag pattern: that tag is a
+;; hit, as from a position outside it; only its children were searched, which
+;; cannot match a pattern with its label (#523). With the cursor inside a
+;; match, "next" selects that enclosing match, as in a text (the
+;; maintainer's decision)
+(define (positions-in t p)
+  ;; the cursor positions inside the tree t at p
+  (if (string? t)
+      (map (lambda (k) (rcons p k)) (iota (+ (string-length t) 1)))
+      (append (list (rcons p 0) (rcons p 1))
+              (append-map (lambda (i) (positions-in (list-ref t (+ i 1))
+                                                    (rcons p i)))
+                          (iota (- (length t) 1))))))
+
+(define (stree-at t p)
+  (if (null? p) t (stree-at (list-ref t (+ (car p) 1)) (cdr p))))
+
+(define (check-from-inside doc what at expected)
+  ;; the hits of what from each position inside the subtree of doc at the
+  ;; path at, in both modes, are the hits from the start
+  (for-each
+    (lambda (mode)
+      (with-search-mode mode
+        (lambda ()
+          (let* ((t (stree->tree doc))
+                 (all (tree-search-tree t what '() 1000))
+                 (sub (stree-at doc at))
+                 (bad (list-filter
+                        (positions-in sub at)
+                        (lambda (pos)
+                          (!= (tree-search-tree-at t what '() pos 1000)
+                              all)))))
+            (check= all expected)
+            (check= bad '())))))
+    '(search replace)))
+
+(define (test-position-inside-a-match)
+  (check-group "a position inside a match")
+  (check-from-inside '(document (frac (sqrt "a") "c"))
+                     '(frac (sqrt "a") "c") '(0)
+                     '((0 0) (0 1)))
+  (check-from-inside '(document (concat "x+" (frac (sqrt "a") "c") "+y"))
+                     '(frac (sqrt "a") "c") '(0 1)
+                     '((0 1 0) (0 1 1)))
+  (check-from-inside '(document (concat "x+" (frac (sqrt "a") "c") "+y"))
+                     '(sqrt "a") '(0 1 0)
+                     '((0 1 0 0) (0 1 0 1)))
+  ;; a wildcard in the pattern
+  (check-from-inside
+    '(document (frac (sqrt (concat "a" (rsub "y") (rsub "x"))) "c"))
+    '(frac (sqrt (concat "a" (wildcard "w") (rsub "x"))) "c") '(0)
+    '((0 0) (0 1)))
+  ;; a tag in a text
+  (check-from-inside '(document (concat "x " (strong "ab") " y"))
+                     '(strong "ab") '(0 1)
+                     '((0 1 0) (0 1 1)))
+  ;; wildcards around a tag, as an argument
+  (check-from-inside '(document (concat "z" (frac (strong "ab") "c")))
+                     '(frac (concat (wildcard "v") (strong "ab")
+                                    (wildcard "w"))
+                            "c")
+                     '(0 1)
+                     '((0 1 0) (0 1 1)))
+  ;; a paragraph which is the tag alone
+  (check-from-inside '(document "u" (strong "ab") "v")
+                     '(strong "ab") '(1)
+                     '((1 0) (1 1)))
+  (check-from-inside '(document "u" (frac "a" (sqrt "b")) "v")
+                     '(frac "a" (sqrt "b")) '(1)
+                     '((1 0) (1 1))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Speed: long formulas (#450)
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1700,6 +1771,7 @@
   (test-overlapping-strings)
   (test-paragraphs)
   (test-limit-and-position)
+  (test-position-inside-a-match)
   (test-middle-strings)
   (test-strings-and-wildcards-first)
   (test-hits-after-a-match)
