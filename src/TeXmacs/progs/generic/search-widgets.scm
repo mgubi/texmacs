@@ -496,7 +496,7 @@
                  (replace-hit-parts by* parts hit (tree->path (buffer-tree)))))
            #t))))
 
-(define (inside? p q i)
+(define (inside-argument? p q i)
   ;; is the position p inside the argument i of the tree at q?
   (and (> (length p) (+ (length q) 1))
        (list-starts? p (rcons q i))))
@@ -511,8 +511,8 @@
                        (let* ((r2 (if (and (nnull? q)
                                            (not (tree-is? u 'concat))
                                            (not (tree-is? u 'document))
-                                           (not (and (inside? p1 q (car l))
-                                                     (inside? p2 q (car l)))))
+                                           (not (and (inside-argument? p1 q (car l))
+                                                     (inside-argument? p2 q (car l)))))
                                       (cons q r) r)))
                          (if (or (null? (cdr l)) (>= (car l) (tree-arity u)))
                              r2
@@ -521,26 +521,37 @@
          (all (list-remove-duplicates (append (tags p1) (tags p2)))))
     (sort all (lambda (a b) (> (length a) (length b))))))
 
-(define (without-text? t)
-  ;; t has no text in the arguments which the cursor can reach
-  (if (tree-atomic? t) (== (tree->string t) "")
-      (list-and (map (lambda (i)
-                       (or (not (tree-accessible-child? t i))
-                           (without-text? (tree-ref t i))))
-                     (iota (tree-arity t))))))
+(define (removable? u crossed)
+  ;; can the tag u, which the hit crossed, be removed after the cut? Only if
+  ;; it has nothing left: its children are empty strings, attributes which
+  ;; the cursor cannot reach (the color of a with), or crossed tags which
+  ;; can be removed; an image, a label... is content. The parts of a table
+  ;; are never removed: their content is empty
+  (and (tree-compound? u)
+       (not (tree-in? u '(concat document table row cell subtable tformat)))
+       (list-and (map (lambda (i)
+                        (nothing-left? (tree-ref u i)
+                                       (tree-accessible-child? u i) crossed))
+                      (iota (tree-arity u))))))
+
+(define (nothing-left? c accessible? crossed)
+  (cond ((tree-atomic? c) (or (== (tree->string c) "") (not accessible?)))
+        ((tree-is? c 'concat)
+         (list-and (map (lambda (x) (nothing-left? x #t crossed))
+                        (tree-children c))))
+        (else (and (list-or (map (lambda (x) (tree-eq? x c)) crossed))
+                   (removable? c crossed)))))
 
 (define (remove-from-formula f i)
   ;; remove the child i of the formula f, which stays normalized: the
   ;; strings around it become one, and a formula of one child is that child
+  ;; (with editing operations, which keep the positions)
   (tree-remove f i 1)
   (when (and (> i 0) (< i (tree-arity f))
              (tree-atomic? (tree-ref f (- i 1))) (tree-atomic? (tree-ref f i)))
-    (with s (string-append (tree->string (tree-ref f (- i 1)))
-                           (tree->string (tree-ref f i)))
-      (tree-remove f i 1)
-      (tree-assign (tree-ref f (- i 1)) s)))
+    (tree-join f (- i 1)))
   (when (== (tree-arity f) 1)
-    (tree-assign f (tree-copy (tree-ref f 0)))))
+    (tree-remove-node f 0)))
 
 (define (replace-hit-parts by* parts hit p)
   ;; a hit which a wildcard carried out of a tag or into one: only its
@@ -562,12 +573,15 @@
           (clipboard-cut "dummy"))))
     (go-to (position-get (cAr ps)))
     (insert-go-to (tree-copy by*) (path-end by* '()))
-    (for (u tags)
-      (when (and u (tree->path u) (tree-compound? u) (without-text? u))
-        (with up (tree-up u)
-          (if (and up (tree-is? up 'concat))
-              (remove-from-formula up (tree-index u))
-              (tree-assign u "")))))
+    (with cur (position-new-path (cursor-path))
+      (for (u tags)
+        (when (and u (tree->path u) (removable? u tags))
+          (with up (tree-up u)
+            (if (and up (tree-is? up 'concat))
+                (remove-from-formula up (tree-index u))
+                (tree-assign u "")))))
+      (go-to (position-get cur))
+      (position-delete cur))
     (for (x ps) (position-delete x))))
 
 (define (replace-next by)

@@ -45,6 +45,7 @@
 
 (texmacs-module (check search-test)
   (:use (check check-lib)
+        (utils library cursor)
         (generic search-widgets)))
 
 (define (with-preference which val thunk)
@@ -1686,16 +1687,13 @@
 ;; Edit > Replace in a buffer (replace-next*, as Replace All calls it): the
 ;; hits from tree-search-tree, the pattern and the replacement in the
 ;; auxiliary buffers of the widget
-(define (replace-in-buffer doc what by)
-  ;; the body of a buffer holding doc after replacing all the hits of what
-  ;; by by, from its start (at most 10)
+(define (with-search-buffers doc what by thunk)
+  ;; the value of thunk in a buffer holding doc, with the auxiliary buffers
+  ;; of the widget holding the pattern what and the replacement by, and the
+  ;; hits of what selected; the buffers are closed afterwards
   (let* ((old (current-buffer))
          (before (buffer-list))
-         (u (new-buffer))
-         (next (eval 'replace-next* (resolve-module '(generic search-widgets))))
-         (hits (lambda ()
-                 (tree-search-tree (buffer-tree) (stree->tree what)
-                                   (tree->path (buffer-tree)) 100))))
+         (u (new-buffer)))
     (switch-to-buffer* u)
     (buffer-set-body u (stree->tree doc))
     (buffer-set (search-buffer) (stree->tree `(document (body (document ,what)))))
@@ -1704,24 +1702,59 @@
     (buffer-set-master (replace-buffer) u)
     (go-start)
     (set-alt-selection "search-reference" (list (cursor-path) (cursor-path)))
-    (with r (check-run
-              (lambda ()
-                (let loop ((i 0))
-                  (with h (hits)
-                    (when (and (< i 10) (nnull? h))
-                      (set-alt-selection "alternate" h)
-                      (when (next (stree->tree by))
-                        (set-alt-selection "search-reference"
-                                           (list (cursor-path) (cursor-path)))
-                        (loop (+ i 1))))))
-                (tm->stree (buffer-get-body u))))
+    (with r (check-run (lambda () (thunk u)))
       (for (b (buffer-list))
         (when (nin? b before) (buffer-close b)))
       (when (buffer-exists? old) (switch-to-buffer old))
       r)))
 
+(define (search-hits what)
+  (tree-search-tree (buffer-tree) (stree->tree what)
+                    (tree->path (buffer-tree)) 100))
+
+(define (replace-hits what by n)
+  ;; replace the hits of what by by, at most n times; the cursor after the
+  ;; last one
+  (with next (eval 'replace-next* (resolve-module '(generic search-widgets)))
+    (let loop ((i 0) (cur #f))
+      (with h (search-hits what)
+        (if (or (>= i n) (null? h)) cur
+            (begin
+              (set-alt-selection "alternate" h)
+              (if (not (next (stree->tree by))) cur
+                  (with c (cursor-path)
+                    (set-alt-selection "search-reference" (list c c))
+                    (loop (+ i 1) c)))))))))
+
+(define (replace-in-buffer doc what by)
+  ;; the body of a buffer holding doc after replacing all the hits of what
+  ;; by by, from its start (at most 10)
+  (with-search-buffers doc what by
+    (lambda (u)
+      (replace-hits what by 10)
+      (tm->stree (buffer-get-body u)))))
+
 (define (test-replace-in-buffers)
   (check-group "replace in buffers")
+  ;; the cursor stays after the replacement when a tag left without text
+  ;; is removed (it went to the start of the paragraph)
+  (with-search-mode 'replace
+    (lambda ()
+      (check= (with-search-buffers '(document (concat "q" (strong "a") "c"))
+                '(concat "a" (wildcard "w")) '(concat "<" (wildcard "w") ">")
+                (lambda (u)
+                  (with c (replace-hits '(concat "a" (wildcard "w"))
+                                        '(concat "<" (wildcard "w") ">") 1)
+                    (list (tm->stree (buffer-get-body u))
+                          (list-tail c (length (buffer-path)))))))
+              '((document "q<c>") (0 4)))))
+  ;; Enter in the fields of the widget (the next hit, Replace One) calls
+  ;; the inside? of the kernel in this module: a helper of the module hid
+  ;; it, and Enter failed (wrong number of arguments). Without a window the
+  ;; auxiliary buffers have no view, so that with-buffer does not enter
+  ;; them, and kbd-enter cannot be called there
+  (check= (eval '(inside? 'inactive) (resolve-module '(generic search-widgets)))
+          #f)
   (with-search-mode 'replace
     (lambda ()
       (for-each
@@ -1856,6 +1889,39 @@
            (document (concat "a" (wildcard "w")) (concat (wildcard "v") "d"))
            (concat "[" (wildcard "w") "|" (wildcard "v") "]")
            (document "x[b|c]y"))
+          ;; nor one with other content (an image, a label)
+          ((document (concat "c" (strong (concat "ba" (image "x.png" "1cm" "1cm"
+                                                            "" "")))
+                             "y"))
+           (concat (wildcard "w") "a")
+           (concat "<" (wildcard "w") ">")
+           (document (concat "<c" (strong "b") ">"
+                             (strong (image "x.png" "1cm" "1cm" "" "")) "y")))
+          ((document (concat (strong (concat (label "l1") "ab")) "c"))
+           (concat "a" (wildcard "w"))
+           (concat "<" (wildcard "w") ">")
+           (document (concat (strong (label "l1")) "<" (strong "b") "c>")))
+          ;; nor a part of a table, whose content is empty
+          ((document (concat (tabular (table (row (cell "ab") (cell "d"))))
+                             "c"))
+           (concat "a" (wildcard "w"))
+           (concat "<" (wildcard "w") ">")
+           (document (concat (tabular (table (row (cell "") (cell "d"))))
+                             "<bc>")))
+          ((document (concat "c" (tabular (table (row (cell "ba")
+                                                      (cell "d"))))))
+           (concat (wildcard "w") "a")
+           (concat "<" (wildcard "w") ">")
+           (document (concat "<cb>" (tabular (table (row (cell "")
+                                                         (cell "d")))))))
+          ((document (concat (tabular (table (row (cell "x"))
+                                             (row (cell "ab"))))
+                             "c"))
+           (concat "a" (wildcard "w"))
+           (concat "<" (wildcard "w") ">")
+           (document (concat (tabular (table (row (cell "x"))
+                                             (row (cell ""))))
+                             "<bc>")))
           ;; a with has no other argument with text: it is kept
           ((document (concat "q" (with "color" "red" "xab") "c"))
            (concat "a" (wildcard "w"))
