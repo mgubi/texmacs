@@ -1679,9 +1679,23 @@ select_hits (range_set& sel, tree t, tree what, path p, bool first) {
   }
 }
 
+static bool
+has_other_text (tree t, const search_token& tok) {
+  // has the tag which the boundary tok leaves or enters an argument with
+  // text which the hit does not cross?
+  tree u= subtree (t, tok.at);
+  for (int j=0; j<N(u); j++)
+    if (j != tok.out && j != tok.in && is_accessible_for_search (u, j))
+      return true;
+  return false;
+}
+
 static tree
-in_copy (tree t, path at, int i, tree x) {
-  // the tag of t at at, its argument i being x, the others as in t
+in_copy (tree t, path at, int i, tree x, bool flat) {
+  // the part x, inside the argument i of the tag of t at at, as a part of
+  // a run which goes out of that tag or into it: in a copy of the tag, its
+  // other arguments as in t, unless flat
+  if (flat) return x;
   tree r= copy (subtree (t, at));
   r[i]= simplify_correct (x);
   return r;
@@ -1690,13 +1704,21 @@ in_copy (tree t, path at, int i, tree x) {
 static tree
 tokens_tree (tree t, array<search_token> toks, int s, int e) {
   // the text of the tokens s to e of a hit in t. A part of a tag, where the
-  // hit goes out of it or into it (a boundary), is kept in a copy of that
-  // tag, with its other arguments as in t (the maintainer's decision);
-  // selection_compute across a boundary gave the tree which holds both
-  // sides, the whole paragraph (#520)
+  // hit goes out of it or into it (a boundary), is in a copy of that tag,
+  // or alone (see below); selection_compute across a boundary gave the
+  // tree which holds both sides, the whole paragraph (#520)
   tree acc (CONCAT);
   array<tree> saved;
   array<int> entered;
+  // the parts are alone (flat) if a tag which the run leaves or enters has
+  // other arguments with text: they stay in the document, so that a copy
+  // would repeat them (a fraction), and so are the parts in the tags inside
+  // it, whose structure would be lost (a table cell without its row). Else
+  // the parts are in copies of their tags (strong, a with)
+  bool flat= false;
+  for (int i=s; i<e; i++)
+    if (toks[i].kind == TOKEN_BOUNDARY && has_other_text (t, toks[i]))
+      flat= true;
   int i0= s;
   for (int i=s; i<=e; i++) {
     if (i < e && toks[i].kind != TOKEN_BOUNDARY) continue;
@@ -1709,7 +1731,7 @@ tokens_tree (tree t, array<search_token> toks, int s, int e) {
     if (toks[i].out >= 0) {
       tree in= simplify_correct (acc);
       acc= tree (CONCAT);
-      if (in != "") acc << in_copy (t, toks[i].at, toks[i].out, in);
+      if (in != "") acc << in_copy (t, toks[i].at, toks[i].out, in, flat);
     }
     if (toks[i].in >= 0) {
       saved << acc;
@@ -1721,7 +1743,7 @@ tokens_tree (tree t, array<search_token> toks, int s, int e) {
     tree in= simplify_correct (acc);
     acc= saved[k];
     const search_token& tok= toks[entered[k]];
-    if (in != "") acc << in_copy (t, tok.at, tok.in, in);
+    if (in != "") acc << in_copy (t, tok.at, tok.in, in, flat);
   }
   return simplify_correct (acc);
 }
