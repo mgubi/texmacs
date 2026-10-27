@@ -126,7 +126,7 @@
   tmcodeinline)
 
 (logic-group latex-texmacs-2%
-  tmcolor tmmarked tmemojichar
+  tmcolor tmmarked
   tmsummarizeddocumentation tmsummarizedgrouped tmsummarizedexplain
   tmsummarizedplain tmsummarizedtiny tmsummarizedraw tmsummarizedenv
   tmsummarizedstd tmsummarized
@@ -143,6 +143,7 @@
   addtocountergroup)
 
 (logic-group latex-texmacs-3%
+  tmemojichar
   tmsession tmfoldedio tmunfoldedio tmfoldediomath tmunfoldediomath
   tmlinenote subsubindex tmref glossaryentry natbib-triple
   renderfootnotestar)

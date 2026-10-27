@@ -541,7 +541,8 @@
   (if (tmtex-math-mode?) (list 'text e) (list '!group e)))
 
 (define (tmtex-emoji-chars name)
-  ;; \tmemojichar{characters}{U+... of its code points}
+  ;; \tmemojichar{characters}{U+... of its code points}{its first code
+  ;; point, in decimal, for \iffontchar}
   (let* ((us (string-convert name "Cork" "UTF-8"))
          (cv (if tmtex-use-catcodes? (string-convert us "UTF-8" "LaTeX") us))
          (cps (string-decompose
@@ -552,7 +553,10 @@
                    (list-intersperse (map (lambda (x) (string-append "U+" x))
                                           cps*) " "))))
     (tmtex-emoji-wrap (list 'tmemojichar (list '!widechar (string->symbol cv))
-                            u))))
+                            u (number->string
+                               (or (and (pair? cps*)
+                                        (string->number (car cps*) 16))
+                                   0))))))
 
 (define (tmtex-emoji name)
   ;; name: <emoji-...>, an emoji of ours
@@ -561,27 +565,50 @@
         (tmtex-emoji-wrap (list 'emoji ln))
         (tmtex-emoji-chars name))))
 
+(define (tmtex-emoji-text t)
+  ;; the text of the argument of an (emoji ...) tag (an older import made
+  ;; (concat "white" (rsub "c") ...) of white_check_mark)
+  (cond ((string? t) t)
+        ((func? t 'concat) (apply string-append (map tmtex-emoji-text (cdr t))))
+        ((func? t 'rsub 1) (string-append "_" (tmtex-emoji-text (cadr t))))
+        ((func? t 'rsup 1) (string-append "^" (tmtex-emoji-text (cadr t))))
+        ((and (pair? t) (pair? (cdr t)))
+         (apply string-append (map tmtex-emoji-text (cdr t))))
+        (else "")))
+
 (define (tmtex-emoji-tag s l)
   ;; (emoji "name"), a \emoji{name} of an import which had not that emoji:
   ;; the emoji if the name is one of the package, else the name as a
-  ;; shortcode (not \emoji, which the package would stop on)
-  (let* ((x (if (and (pair? l) (string? (car l))) (car l) ""))
-         (e (emoji-from-latex x)))
+  ;; shortcode, as text (not \emoji, which the package would stop on)
+  (let* ((x (if (pair? l) (tmtex-emoji-text (car l)) ""))
+         (e (emoji-from-latex (locase-all x))))
     (if (!= e "") (tmtex-emoji e)
-        (tmtex-emoji-wrap (list 'texttt (string-append ":" x ":"))))))
+        (tmtex-emoji-wrap
+         (list 'texttt (string-append ":" (tmtex-emoji-escape x) ":"))))))
+
+(define (tmtex-emoji-escape x)
+  ;; the characters of x which are special for TeX, written as characters
+  (apply string-append
+         (map (lambda (c)
+                (cond ((string-index "#$%&_{}" c) (string #\\ c))
+                      ((== c #\~) "\\textasciitilde{}")
+                      ((== c #\^) "\\textasciicircum{}")
+                      ((== c #\\) "\\textbackslash{}")
+                      ((< (char->integer c) 32) "")
+                      (else (string c))))
+              (string->list x))))
 
 (define (tmtex-emoji-clean s)
-  ;; the selectors after an emoji by its name, and the joiners between two
-  ;; (a sequence which is not one emoji of the table), are left out: the
-  ;; emoji has them, and pdfLaTeX would stop on them
+  ;; the selectors and the joiners after an emoji by its name (what is
+  ;; left of a sequence which is not one emoji of the table) are left out:
+  ;; the emoji has them, and pdfLaTeX would stop on them
   (let loop ((l (tmstring->list s)) (prev #f) (acc '()))
     (if (null? l) (apply string-append (reverse acc))
         (let* ((c (car l))
                (named? (lambda (x) (and x (string-starts? x "<emoji-")))))
           (cond ((and (in? c '("<#FE0F>" "<#FE0E>")) (named? prev))
                  (loop (cdr l) prev acc))
-                ((and (== c "<#200D>") (named? prev) (pair? (cdr l))
-                      (named? (cadr l)))
+                ((and (== c "<#200D>") (named? prev))
                  (loop (cdr l) prev acc))
                 (else (loop (cdr l) c (cons c acc))))))))
 

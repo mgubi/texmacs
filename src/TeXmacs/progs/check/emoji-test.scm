@@ -426,7 +426,7 @@
     ;; an emoji which the package has not: its characters in \tmemojichar,
     ;; with its code points for pdfLaTeX
     (with u (string-append "{\\tmemojichar{" (cork->utf8 "<#1FAE9>")
-                           "}{U+1FAE9}}")
+                           "}{U+1FAE9}{129769}}")
       (check= (ex "<emoji-face-with-bags-under-eyes>" "latex-snippet") u)
       (check= (ex "<#1FAE9>" "latex-snippet") u))
     ;; what is left of a sequence which is not one emoji: no selector after
@@ -445,6 +445,12 @@
             "{\\emoji{grinning-face-with-smiling-eyes}}")
     (check= (ex '(emoji "no-such-emoji") "latex-snippet")
             "{\\texttt{:no-such-emoji:}}")
+    ;; its characters which are special for TeX as characters
+    (check= (ex '(emoji "a#b_c&d") "latex-snippet")
+            "{\\texttt{:a\\#b\\_c\\&d:}}")
+    ;; a joiner after an emoji, before something else, is dropped too
+    (check= (ex (string-append "<emoji-rocket>" zwj "x") "latex-snippet")
+            "{\\emoji{rocket}}x")
     ;; the preamble loads the package (with LuaLaTeX; another engine shows
     ;; the names) only when a document has an emoji
     (let ((doc (lambda (s)
@@ -453,7 +459,7 @@
                           "texmacs-stree" "latex-document")))
           (has? (lambda (s what) (>= (string-search-forwards what 0 s) 0))))
       (with d (doc "a<emoji-grinning-face>b")
-        (check-true (has? d "\\ifLuaTeX"))
+        (check-true (has? d "\\ifluatex"))
         (check-true (has? d "\\usepackage{emoji}"))
         (check-true (has? d "\\DeclareRobustCommand{\\emoji}[1]{\\texttt{:\\detokenize{#1}:}}"))
         (check-false (has? d "tmemojichar"))
@@ -465,8 +471,8 @@
       ;; an emoji which the package has not: not the package, its own macro
       (with d (doc "a<emoji-face-with-bags-under-eyes>b")
         (check-false (has? d "\\usepackage{emoji}"))
-        (check-true (has? d "\\iftutex"))
-        (check-true (has? d "\\DeclareRobustCommand{\\tmemojichar}[2]{#1}")))
+        (check-true (has? d "\\ifxetex"))
+        (check-true (has? d "\\iffontchar\\font#3")))
       (check-false (has? (doc '(concat "a" (emoji "no-such-emoji")))
                          "\\usepackage{emoji}")))
     (check= (convert (ex "a<emoji-smiling-face-with-open-hands>b" "latex-snippet")
@@ -479,6 +485,12 @@
           "<emoji-grinning-face>")
   (check= (convert "\\emoji{smile}" "latex-snippet" "texmacs-stree")
           "<emoji-grinning-face-with-smiling-eyes>")
+  ;; a shortcode of GitHub (with _), and a name which is no emoji, as it
+  ;; was written
+  (check= (convert "\\emoji{white_check_mark}" "latex-snippet" "texmacs-stree")
+          "<emoji-check-mark-button>")
+  (check= (convert "\\emoji{foo_bar}" "latex-snippet" "texmacs-stree")
+          '(emoji "foo_bar"))
   (check= (convert "\\emoji{+1}" "latex-snippet" "texmacs-stree")
           "<emoji-thumbs-up>")
   (check= (convert "\\emoji{tada}" "latex-snippet" "texmacs-stree")

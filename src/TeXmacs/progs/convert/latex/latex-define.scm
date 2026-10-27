@@ -688,22 +688,38 @@
   ;; the emoji (\emoji{grinning-face}): the package emoji, in color, needs
   ;; LuaLaTeX; with another engine the name of the emoji is written as a
   ;; shortcode (:grinning-face:, literally), so that the document still
-  ;; compiles
+  ;; compiles; in the PDF bookmarks too (\tmemojibm keeps the hyphens of
+  ;; flag-congo---kinshasa from becoming a dash)
   (emoji
    (!append "\\usepackage{iftex}\n"
-            "\\ifLuaTeX\n"
+            "\\ifluatex\n"
             "  \\usepackage{emoji}\n"
             "\\else\n"
             "  \\DeclareRobustCommand{\\emoji}[1]{\\texttt{:\\detokenize{#1}:}}\n"
+            "  \\def\\tmemojibm#1{\\tmemojibmx#1-\\tmemojibmend}\n"
+            "  \\def\\tmemojibmx#1-#2\\tmemojibmend{#1%\n"
+            "    \\if\\relax\\detokenize{#2}\\relax\\else-{}\\tmemojibmx#2\\tmemojibmend\\fi}\n"
+            "  \\AtBeginDocument{\\ifdefined\\pdfstringdefDisableCommands\n"
+            "    \\pdfstringdefDisableCommands{\\def\\emoji#1{:\\tmemojibm{#1}:}}\\fi}\n"
             "\\fi\n"))
   ;; an emoji which the package has not: its characters with LuaLaTeX and
-  ;; XeLaTeX, its code points with pdfLaTeX (which stops on the characters)
+  ;; XeLaTeX when the font has them, else its code points (pdfLaTeX stops
+  ;; on the characters); in the PDF bookmarks, the characters or the code
+  ;; points as well
   (tmemojichar
    (!append "\\usepackage{iftex}\n"
-            "\\iftutex\n"
-            "  \\DeclareRobustCommand{\\tmemojichar}[2]{#1}\n"
+            "\\newif\\iftmunicodetex\n"
+            "\\ifluatex\\tmunicodetextrue\\else"
+            "\\ifxetex\\tmunicodetextrue\\fi\\fi\n"
+            "\\iftmunicodetex\n"
+            "  \\DeclareRobustCommand{\\tmemojichar}[3]{%\n"
+            "    \\iffontchar\\font#3\\relax #1\\else\\texttt{[#2]}\\fi}\n"
+            "  \\AtBeginDocument{\\ifdefined\\pdfstringdefDisableCommands\n"
+            "    \\pdfstringdefDisableCommands{\\def\\tmemojichar#1#2#3{#1}}\\fi}\n"
             "\\else\n"
-            "  \\DeclareRobustCommand{\\tmemojichar}[2]{\\texttt{[#2]}}\n"
+            "  \\DeclareRobustCommand{\\tmemojichar}[3]{\\texttt{[#2]}}\n"
+            "  \\AtBeginDocument{\\ifdefined\\pdfstringdefDisableCommands\n"
+            "    \\pdfstringdefDisableCommands{\\def\\tmemojichar#1#2#3{[#2]}}\\fi}\n"
             "\\fi\n"))
   (tmkeywords
    (!append (newcommand (tmkeywords)
