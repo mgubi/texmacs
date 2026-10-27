@@ -1142,6 +1142,34 @@
   ((make-process (canned-translate answer) 'translate-check))
   (end-editing))
 
+(define (translate-selection body from to answer)
+  ;; the body of a buffer holding @body, once its selection from @from to
+  ;; @to (paths in the body) is translated by @answer
+  (buffer-set-body (current-buffer) (stree->tree body))
+  (selection-set (append (buffer-path) from) (append (buffer-path) to))
+  (translate-step (lambda (in) answer))
+  (tm->stree (buffer-tree)))
+
+(define translate-pending #f)
+
+(define ((deferred-translate answer) serial tp st next)
+  ;; canned-translate, whose answer comes when translate-answer-now is
+  ;; called, as the answer of an engine comes after a while
+  (set! translate-pending
+        (lambda () ((canned-translate (lambda (in) answer))
+                    serial tp st next))))
+
+(define (translate-later answer)
+  (archive-state)
+  (start-editing)
+  ((make-process (deferred-translate answer) 'translate-check))
+  (end-editing))
+
+(define (translate-answer-now)
+  (with f translate-pending
+    (set! translate-pending #f)
+    (when f (f))))
+
 (define (translate-body body answer)
   ;; the body of a buffer holding @body, once translated
   (buffer-set-body (current-buffer) (stree->tree body))
@@ -1218,20 +1246,96 @@
                               ("three" "<p>Quatre</p><p>Cinq</p>"))))
                 '(document "one" "Deux" "Trois" "Quatre" "Cinq"))
         (check-false (process-running? 'translate-check))
+        ;; empty paragraphs are no answer: the text stays
+        (check= (translate-body `(document ,para "second")
+                                (answer-first "<p></p>"))
+                `(document ,para "second"))
+        (check= (translate-body `(document ,para "second")
+                                (answer-first "<p></p>\n<p></p>"))
+                `(document ,para "second"))
         ;; a selection inside a paragraph (make-process puts it in an
         ;; identity tag): one paragraph in <p> takes its place, several
-        ;; split the paragraph, as Tools > AI > Translate inserts them
-        (buffer-set-body u (stree->tree '(document "it is good" "second")))
-        (selection-set (append (buffer-path) '(0 3))
-                       (append (buffer-path) '(0 5)))
-        (translate-step (lambda (in) "<p>was</p>"))
-        (check= (tm->stree (buffer-tree)) '(document "it was good" "second"))
-        (buffer-set-body u (stree->tree '(document "it is good" "second")))
-        (selection-set (append (buffer-path) '(0 3))
-                       (append (buffer-path) '(0 5)))
-        (translate-step (lambda (in) "<p>was</p><p>and</p>"))
-        (check= (tm->stree (buffer-tree))
+        ;; split the paragraph, also when the engine kept the identity
+        ;; (<div id="x0">) around them
+        (check= (translate-selection '(document "it is good" "second")
+                                     '(0 3) '(0 5) "<p>was</p>")
+                '(document "it was good" "second"))
+        (check= (translate-selection '(document "it is good" "second")
+                                     '(0 3) '(0 5) "<p>was</p><p>and</p>")
                 '(document "it was" "and good" "second"))
+        (check= (translate-selection
+                 '(document "it is good" "second") '(0 3) '(0 5)
+                 "<div id=\"x0\"><p>was</p><p>and</p></div>")
+                '(document "it was" "and good" "second"))
+        (check= (translate-selection
+                 '(document (concat "it is " (em "b"))) '(0 0 3) '(0 0 5)
+                 "<p>was</p><p>and</p>")
+                '(document "it was" (concat "and " (em "b"))))
+        ;; in a theorem and in a cell with a document, the paragraph is
+        ;; split; inside em, math, a section title, a cell without a
+        ;; document, the paragraphs are joined (no text is lost)
+        (check= (translate-selection
+                 '(document (theorem (document "it is good")))
+                 '(0 0 0 3) '(0 0 0 5) "<p>was</p><p>and</p>")
+                '(document (theorem (document "it was" "and good"))))
+        (check= (translate-selection
+                 '(document (tabular (table (row (cell (document
+                                                        "it is good"))))))
+                 '(0 0 0 0 0 0 3) '(0 0 0 0 0 0 5) "<p>was</p><p>and</p>")
+                '(document (tabular (table (row (cell (document
+                                                       "it was"
+                                                       "and good")))))))
+        (check= (translate-selection
+                 '(document (tabular (table (row (cell "it is good")))))
+                 '(0 0 0 0 0 3) '(0 0 0 0 0 5) "<p>was</p><p>and</p>")
+                '(document (tabular (table (row (cell "it was and good"))))))
+        (check= (translate-selection
+                 '(document (tabular (table (row (cell "it is good")))))
+                 '(0 0 0 0 0 0) '(0 0 0 0 0 10) "<p>was</p><p>and</p>")
+                '(document (tabular (table (row (cell "was and"))))))
+        (check= (translate-selection
+                 '(document (em "is good") "second")
+                 '(0 0 0) '(0 0 2) "<p>was</p><p>and</p>")
+                '(document (em "was and good") "second"))
+        (check= (translate-selection
+                 '(document (math "xy+z") "second")
+                 '(0 0 0) '(0 0 2) "<p>a</p><p>b</p>")
+                '(document (math "a b+z") "second"))
+        (check= (translate-selection
+                 '(document (section "it is good") "second")
+                 '(0 0 3) '(0 0 5) "<p>was</p><p>and</p>")
+                '(document (section "it was and good") "second"))
+        (check-false (process-running? 'translate-check))
+        ;; an answer which comes later does not move the cursor of the user,
+        ;; who went on editing elsewhere (a selection is cancelled by any
+        ;; change of the buffer: post_notify, edit_modify.cpp)
+        (buffer-set-body u (stree->tree '(document "it is good" "other")))
+        (selection-set (append (buffer-path) '(0 3))
+                       (append (buffer-path) '(0 5)))
+        (translate-later "<p>was</p><p>and</p>")
+        (go-to (append (buffer-path) '(1 2)))
+        (translate-answer-now)
+        (check= (tm->stree (buffer-tree))
+                '(document "it was" "and good" "other"))
+        (check= (cursor-path) (append (buffer-path) '(2 2)))
+        (check-false (process-running? 'translate-check))
+        ;; an answer for a buffer which is no longer the current one
+        (buffer-set-body u (stree->tree '(document "it is good" "other")))
+        (selection-set (append (buffer-path) '(0 3))
+                       (append (buffer-path) '(0 5)))
+        (translate-later "<p>was</p><p>and</p>")
+        (let* ((v (new-buffer)))
+          (switch-to-buffer* v)
+          (buffer-set-body v (stree->tree '(document "elsewhere")))
+          (go-end)
+          (with c (cursor-path)
+            (translate-answer-now)
+            (check= (current-buffer) v)
+            (check= (tm->stree (buffer-get-body u))
+                    '(document "it was" "and good" "other"))
+            (check= (tm->stree (buffer-get-body v)) '(document "elsewhere"))
+            (check= (cursor-path) c))
+          (switch-to-buffer* u))
         (check-false (process-running? 'translate-check))
         ;; LanguageTool: an answer of a paragraph with corrections is a
         ;; concat with spell-error, also if it came back in <p>
