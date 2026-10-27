@@ -886,7 +886,14 @@ add_properties (array<string> v, tree props) {
 
 static array<string>
 apply_substitutions (array<string> v, int depth) {
-  if (N(v) <= 0 || depth > 10) return v;
+  if (N(v) <= 0) return v;
+  if (depth > 10) {
+    static bool warned= false;
+    if (!warned)
+      cout << "TeXmacs] warning, the font substitutions loop for " << v << "\n";
+    warned= true;
+    return v;
+  }
   tree t= font_database_substitutions (v[0]);
   for (int i=0; i<N(t); i++)
     if (match_properties (v, t[i][0])) {
