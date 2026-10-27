@@ -59,11 +59,20 @@ if [ -d "$TEXMACS_MAPLE_DIR/extern" ]; then
 				MAPLE_LIBRARY_PATH="$MAPLE_SYS_BIN/system:$MAPLE_LIBRARY_PATH"
 			fi
 		fi
-		MAPLE_CPPFLAGS="-I$TEXMACS_MAPLE_DIR/extern/include"
+		# (the callbacks of tm_maple_9.c take const char*, which maplec.h may
+		# not have: recent compilers make the mismatch an error)
+		MAPLE_CPPFLAGS="-I$TEXMACS_MAPLE_DIR/extern/include -Wno-incompatible-pointer-types -Wno-incompatible-function-pointer-types"
 		MAPLE_LDFLAGS="-L$MAPLE_LIBRARY_PATH"
 		MAPLE_LIBADD="-lmaplec"
+		# (with an rpath, tm_maple_9 finds libmaplec without DYLD_LIBRARY_PATH,
+		# which only Maple's own launcher sets; on Apple silicon it is built
+		# for arm64 also from an x86_64 shell, under Rosetta)
 		case "${MAPLE_SYS_BIN##*bin.}" in
 			IBM_INTEL_LINUX|X86_64_LINUX)
+				MAPLE_LDFLAGS="$MAPLE_LDFLAGS -Wl,-rpath,$MAPLE_LIBRARY_PATH" ;;
+			APPLE_ARM64_MACOS)
+				MAPLE_LDFLAGS="$MAPLE_LDFLAGS -arch arm64 -Wl,-rpath,$MAPLE_LIBRARY_PATH" ;;
+			*APPLE*|*MACOS*|*OSX*)
 				MAPLE_LDFLAGS="$MAPLE_LDFLAGS -Wl,-rpath,$MAPLE_LIBRARY_PATH" ;;
 			*) ;;
 		esac
