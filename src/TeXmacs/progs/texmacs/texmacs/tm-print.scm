@@ -267,25 +267,30 @@
   (:argument  last "Last page")
   (:proposals last  (list (number->string (get-page-count)) "")))
 
+(define (preview-shell-quote s)
+  ;; a file name as one word of /bin/sh (a home with a space)
+  (string-append "'" (string-replace s "'" "'\\''") "'"))
+
+(tm-define (preview-command-line s)
+  (:synopsis "The shell command which shows the file @s, or #f if none")
+  (cond ((!= preview-command "default")
+         (string-append preview-command " " s " &"))
+        ((or (os-mingw?) (os-win32?)) s)
+        ((os-macos?) (string-append "open " (preview-shell-quote s)))
+        ((url-exists-in-path? "xdg-open")
+         (string-append "xdg-open " (preview-shell-quote s)))
+        ((url-exists-in-path? "ggv") (string-append "ggv " s " &"))
+        ((url-exists-in-path? "ghostview") (string-append "ghostview " s " &"))
+        ((url-exists-in-path? "gv") (string-append "gv " s " &"))
+        (else #f)))
+
 (tm-define (preview-file u)
-  (with s (url-sys-concretize u)
+  (let* ((s (url-sys-concretize u))
+         (cmd (and (not (defined? 'web-open-pdf)) (preview-command-line s))))
     (cond ((defined? 'web-open-pdf)
            ;; in the browser: a tab of its own (misc/wasm/print.js)
            (web-open-pdf s (url->string (url-tail u))))
-          ((!= preview-command "default")
-           (shell (string-append preview-command " " s " &")))
-          ((or (os-mingw?) (os-win32?))
-           (shell s))
-          ((os-macos?)
-           (shell (string-append "open " s)))
-          ((url-exists-in-path? "xdg-open")
-           (shell (string-append "xdg-open " s)))
-          ((url-exists-in-path? "ggv")
-           (shell (string-append "ggv " s " &")))
-          ((url-exists-in-path? "ghostview")
-           (shell (string-append "ghostview " s " &")))
-          ((url-exists-in-path? "gv")
-           (shell (string-append "gv " s " &")))
+          (cmd (shell cmd))
           (else (set-message
                  "Error: ghostview does not seem to be installed on your system"
                  "preview")))))
@@ -307,10 +312,23 @@
                    ((or (os-macos?) (== (printer-file-format) "pdf"))
                     "$TEXMACS_HOME_PATH/system/tmp/preview.pdf")
                    (else "$TEXMACS_HOME_PATH/system/tmp/preview.ps"))
+    ;; the file of the last preview is removed first: a PDF which could not
+    ;; be made (Ghostscript not found, #546) is then reported, instead of
+    ;; showing the old one, or nothing at all
+    (when (url-exists? file) (system-remove file))
     (print-to-file file)
-    (if (defined? 'web-open-pdf)
-        (web-open-pdf (url-sys-concretize file) (web-print-name))
-        (preview-file file))))
+    (cond ((not (url-exists? file))
+           (set-message (string-append "Error: the preview "
+                                       (url->system (url-tail file))
+                                       " could not be made"
+                                       (if (or (== (printer-file-format) "pdf")
+                                               (url-exists-in-path? "gs"))
+                                           ""
+                                           " (Ghostscript was not found)"))
+                        "preview"))
+          ((defined? 'web-open-pdf)
+           (web-open-pdf (url-sys-concretize file) (web-print-name)))
+          (else (preview-file file)))))
 
 (tm-define (choose-file-and-print-page-selection start end)
   (:argument  start "First page")

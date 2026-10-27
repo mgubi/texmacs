@@ -167,5 +167,25 @@ completer (bib-knuth)
 quit ()" \
       -x "$atquit" -x '(load "startup-bib.scm")' -q
 
+# An application started from the Finder or the Dock has only the PATH of
+# launchd, without /usr/local/bin or /opt/homebrew/bin: TeXmacs adds the
+# PATH of a login shell, $SHELL -l, so that Ghostscript is found. The Vue
+# build did not, and File > Preview made no PDF (#546). The login shell
+# is a script which gives a PATH of its own.
+if [ "$(uname)" = Darwin ]; then
+  cat > "$out/login-shell" <<'EOF2'
+#!/bin/sh
+echo /tm-startup-login/bin
+EOF2
+  chmod +x "$out/login-shell"
+  inpath='(display* "CHECK login path " (if (string-contains? (getenv "PATH") "/tm-startup-login/bin") "yes" "no") "\n")'
+  old_shell=$SHELL old_path=$PATH
+  export SHELL="$out/login-shell" PATH=/usr/bin:/bin:/usr/sbin:/sbin
+  check "macOS: the PATH of a login shell is added (#546)" \
+        "login path yes" \
+        -headless -x "$inpath"
+  export SHELL="$old_shell" PATH="$old_path"
+fi
+
 echo "Total: $total checks, $failed failed"
 exit $status

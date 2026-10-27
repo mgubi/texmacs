@@ -183,10 +183,19 @@ TeXmacs_init_paths (int& argc, char** argv) {
   }
 #endif
 
-#if defined(AQUATEXMACS) || defined(Q_OS_MAC) || (defined(X11TEXMACS) && defined (MACOSX_EXTENSIONS))
+#if defined(AQUATEXMACS) || defined(Q_OS_MAC) || \
+    (defined(X11TEXMACS) && defined (MACOSX_EXTENSIONS)) || \
+    (defined(OS_MACOS) && (defined(VUETEXMACS) || defined(SDLTEXMACS)))
   // Mac bundle environment initialization
   // We set some environment variables when the executable
   // is in a .app bundle on MacOSX
+  // An application started from the Finder or the Dock only has the PATH
+  // of launchd (/usr/bin:/bin:/usr/sbin:/sbin), without /usr/local/bin,
+  // /opt/homebrew/bin or /Library/TeX/texbin: the PATH of a login shell is
+  // added, so that Ghostscript, LaTeX and the programs of the plugins are
+  // found. The Vue and SDL interfaces need it as much as Qt and Cocoa:
+  // without it, File > Preview of a Vue build, which goes through
+  // Ghostscript (no PDF renderer), made no PDF and showed nothing (#546).
   if (is_empty (current_texmacs_path))
     set_env ("TEXMACS_PATH", as_string(exedir * "../Resources/share/TeXmacs"));
   //cout << get_env("PATH") * ":" * as_string(url("$PWD") * argv[0]
@@ -194,7 +203,8 @@ TeXmacs_init_paths (int& argc, char** argv) {
   string shell= get_env ("SHELL");
   if (shell != "" && exists(shell)) {
     string shell_env = var_eval_system ("PATH='' $SHELL -l -c 'echo $PATH'");
-    set_env ("PATH", get_env("PATH") * ":" * shell_env * ":" *
+    if (shell_env != "") shell_env= shell_env * ":";
+    set_env ("PATH", get_env("PATH") * ":" * shell_env *
              as_string (exedir * "../Resources/share/TeXmacs/bin"));
   } else {
     set_env ("PATH", get_env("PATH") * ":" *
