@@ -39,6 +39,7 @@
 #include "new_window.hpp"   // buffer_to_windows (the tabs of the page)
 #ifdef OS_MACOS
 #include "MacOS/mac_utilities.h" // mac_beep
+#include "vue_mac.hpp"  // the document in the title bar (vue_mac.mm)
 #include <objc/runtime.h> // the NSWindow of a tool window, see set_on_top
 #include <objc/message.h>
 #endif
@@ -232,9 +233,19 @@ public:
 
   void   destroy_event ();
   void   update_title ();  // the name and the marker of unsaved changes
+  // what the title bar shows: the name, the marker and, on macOS, the file
+  // (also for the editor which fills the host, see promoted)
+  void   show_title (string name, bool edited, string file);
   void   set_name (string name);
   string get_name ();
   void   set_modified (bool flag);
+  void   set_file (string file);
+#ifdef OS_MACOS
+  // the represented file and edited flag given to the NSWindow
+  string shown_path;
+  int    shown_edited= -1; // unknown
+  void*  cocoa_window ();
+#endif
   void   set_visibility (bool flag);
   void   set_full_screen (bool flag);
   void   set_on_top (bool flag);
@@ -413,6 +424,11 @@ vue_sdl_base_window_rep::vue_sdl_base_window_rep (vue_widget _content, string _n
     the_name= name;
     mod_name= name;
     sdl_win= adopt;
+#ifdef OS_MACOS
+    // the proxy icon and the edited dot of the window it was are not ours
+    vue_mac_set_document (cocoa_window (), NULL, false);
+    shown_edited= 0;
+#endif
     nr_windows++;
     Window_to_window (sdl_win)= (void*) this;
     id= serial++;
@@ -727,15 +743,61 @@ vue_sdl_base_window_rep::set_size_limits (SI min_w, SI min_h, SI max_w, SI max_h
 // dropped the marker until the document was saved and changed again, and
 // setting the marker on a window whose name had never arrived turned the
 // whole title into " *".
+//
+// On macOS the marker is the dot of AppKit in the close button instead,
+// and the file of the document (SLOT_FILE) is the represented URL of the
+// NSWindow, which gives the title its proxy icon and its path menu
+// (Cmd-click), as setWindowFilePath does in the Qt port (vue_mac.mm)
 void
 vue_sdl_base_window_rep::update_title () {
-  string name= modified ? the_name * " *" : the_name;
-  if (DEBUG_VUE_WIDGETS) debug_widgets << "window title: " << name << LF;
-  if (mod_name == name) return;
-  mod_name= name;
-  // SDL takes UTF-8, the names of TeXmacs are in its own encoding
-  c_string s (cork_to_utf8 (name));
-  SDL_SetWindowTitle (sdl_win, s);
+  show_title (the_name, modified, the_file);
+}
+
+#ifdef OS_MACOS
+void*
+vue_sdl_base_window_rep::cocoa_window () {
+  return SDL_GetPointerProperty (SDL_GetWindowProperties (sdl_win),
+                                 SDL_PROP_WINDOW_COCOA_WINDOW_POINTER, NULL);
+}
+
+// the file which the title bar of macOS shows for the file of a document:
+// local files which exist only (not untitled documents, tmfs:// views,
+// help pages on the web or remote files), as the Cocoa port does
+static string
+represented_path (string file) {
+  if (file == "") return "";
+  url u= url_system (file);
+  if (!is_rooted (u, "default") || !is_regular (u)) return "";
+  return as_string (u);
+}
+#endif
+
+void
+vue_sdl_base_window_rep::show_title (string name, bool edited, string file) {
+#ifdef OS_MACOS
+  string title= name;
+#else
+  string title= edited ? name * " *" : name;
+  (void) file;
+#endif
+  if (DEBUG_VUE_WIDGETS) debug_widgets << "window title: " << title << LF;
+  if (mod_name != title) {
+    mod_name= title;
+    // SDL takes UTF-8, the names of TeXmacs are in its own encoding
+    c_string s (cork_to_utf8 (title));
+    SDL_SetWindowTitle (sdl_win, s);
+  }
+#ifdef OS_MACOS
+  string path= represented_path (file);
+  if (path == shown_path && (edited ? 1 : 0) == shown_edited) return;
+  shown_path= path;
+  shown_edited= edited ? 1 : 0;
+  void* ns= cocoa_window ();
+  c_string p (path);
+  vue_mac_set_document (ns, N(path) == 0 ? NULL : (const char*) p, edited);
+  if (DEBUG_VUE_WIDGETS)
+    debug_widgets << "window document: " << vue_mac_document_state (ns) << LF;
+#endif
 }
 
 void
@@ -751,6 +813,11 @@ vue_sdl_base_window_rep::get_name () {
 void
 vue_sdl_base_window_rep::set_modified (bool flag) {
   if (modified != flag) { modified= flag; update_title (); }
+}
+
+void
+vue_sdl_base_window_rep::set_file (string file) {
+  if (the_file != file) { the_file= file; update_title (); }
 }
 
 void
@@ -2128,6 +2195,7 @@ public:
   string get_name () { return the_name; }
   void   set_modified (bool flag) {
     if (modified != flag) { modified= flag; update_title (); } }
+  void   set_file (string f) { if (the_file != f) { the_file= f; update_title (); } }
   void   set_visibility (bool flag);
   void   set_full_screen (bool flag);
   void   set_on_top (bool flag);
@@ -2275,12 +2343,11 @@ vue_virtual_window_rep::update_title () {
     if (active_tab == this && the_host != NULL) {
       the_host->set_name (the_name);
       the_host->set_modified (modified);
+      the_host->set_file (the_file);
     }
   }
-  if (promoted && the_host != NULL) {
-    c_string s (cork_to_utf8 (mod_name));
-    SDL_SetWindowTitle (the_host->sdl_win, s);
-  }
+  if (promoted && the_host != NULL)
+    the_host->show_title (the_name, modified, the_file);
 }
 
 void
@@ -2753,6 +2820,7 @@ activate_tab (vue_virtual_window_rep* v) {
     if (the_host != NULL) {
       the_host->set_name (v->the_name);
       the_host->set_modified (v->modified);
+      the_host->set_file (v->the_file);
     }
   }
 }
