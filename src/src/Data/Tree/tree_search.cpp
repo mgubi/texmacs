@@ -1137,20 +1137,23 @@ search (range_set& sel, tree t, tree what, path p, path pos) {
     else {
       int hits= 0;
       array<range_set> sub (N(t));
-      if (pos->item >= 0 && pos->item < N(t))
-        if (is_accessible_for_search (t, pos->item)) {
-          if (is_document (t) && is_lone_tag (t[pos->item], what))
-            search_paragraph_tree (sub[pos->item], t[pos->item], what,
-                                   p * pos->item);
-          else
-            search (sub[pos->item], t[pos->item], what, p * pos->item,
-                    pos->next);
-          hits += N(sub[pos->item]);
-        }
+      // the cursor may be just before or after the tag (pos->item out of
+      // range, as in q*1 after a one-argument tag): start from the nearest
+      // child, then, which is searched whole (#548)
+      int c= max (0, min (N(t) - 1, pos->item));
+      if (N(t) > 0 && is_accessible_for_search (t, c)) {
+        if (is_document (t) && (c != pos->item || is_lone_tag (t[c], what)))
+          search_paragraph_tree (sub[c], t[c], what, p * c);
+        else if (c != pos->item)
+          search (sub[c], t[c], what, p * c);
+        else
+          search (sub[c], t[c], what, p * c, pos->next);
+        hits += N(sub[c]);
+      }
       for (int d=1; d<N(t); d++)
         for (int e=0; e<=1; e++) {
           if (hits > search_max_hits) break;
-          int i= (e==0? pos->item + d: pos->item - d);
+          int i= (e==0? c + d: c - d);
           if (i >= 0 && i < N(t))
             if (is_accessible_for_search (t, i)) {
               if (is_document (t))
