@@ -1112,6 +1112,165 @@
   (with pos (string-search-backwards "-" (string-length name) name)
     (string->number (substring name (+ pos 1) (string-length name)))))
 
+;; The answers of the translation process (ai-translate*), given by a canned
+;; engine (no request): an engine often wraps its answer in <p>, which
+;; gives a document; it is not nested in the document of the buffer, but
+;; its paragraphs take the place of the paragraph (#526).
+(define (choices-answer body)
+  ;; an answer of Albert (as cpp-ai-output reads it) with this body
+  (string-append "{\"choices\":[{\"message\":{\"content\":\"<body>"
+                 (string-replace body "\"" "\\\"") "</body>\"}}]}"))
+
+(define ((canned-translate answer) serial tp st next)
+  ;; translate-process-one (ai-translate.scm) with the engine replaced by
+  ;; @answer, a function of the HTML sent which gives the body answered
+  (let* ((t (tree-pointer->tree tp))
+         (table (compress-table-new "translate"))
+         (t* (with-compress-table table (lambda () (compress-tree t))))
+         (in (compressed->html t* 1))
+         (n (string-length in))
+         (text (if (and (string-starts? in "<body>") (string-ends? in "</body>"))
+                   (substring in 6 (- n 7)) in))
+         (return (ai-translate-callback serial tp st "albert" next table)))
+    (return (choices-answer (answer text)))))
+
+(define (translate-step answer)
+  ;; one translation process on the buffer, or its selection, as a user
+  ;; action (its changes are one step of the undo history)
+  (archive-state)
+  (start-editing)
+  ((make-process (canned-translate answer) 'translate-check))
+  (end-editing))
+
+(define (translate-body body answer)
+  ;; the body of a buffer holding @body, once translated
+  (buffer-set-body (current-buffer) (stree->tree body))
+  (translate-step answer)
+  (tm->stree (buffer-tree)))
+
+(define (answer-by l)
+  ;; the answer to the paragraph whose HTML is the car of an element of @l,
+  ;; the HTML itself to the others
+  (lambda (in)
+    (with a (assoc in l)
+      (if a (cadr a) in))))
+
+(define (answer-first body)
+  ;; @body for the paragraph of para (below), the HTML itself for the others
+  (lambda (in)
+    (if (string-starts? in "it is ") body in)))
+
+(define (test-translate-paragraphs)
+  (let* ((old (current-buffer))
+         (before (buffer-list))
+         (u (new-buffer))
+         (para '(concat "it is " (em "b"))))
+    (dynamic-wind
+      (lambda () (noop))
+      (lambda ()
+        (switch-to-buffer* u)
+        ;; one paragraph in <p>: the paragraph, with its markup
+        (check= (translate-body
+                 `(document ,para "second")
+                 (answer-first "<p>Bonjour <div id=\"x0\">b</div></p>"))
+                '(document (concat "Bonjour " (em "b")) "second"))
+        ;; two paragraphs: two paragraphs of the document
+        (check= (translate-body `(document ,para "second")
+                                (answer-first "<p>Un</p>\n<p>Deux</p>\n"))
+                '(document "Un" "Deux" "second"))
+        ;; without <p>, as before
+        (check= (translate-body
+                 `(document ,para "second")
+                 (answer-first "Bonjour <div id=\"x0\">b</div>"))
+                '(document (concat "Bonjour " (em "b")) "second"))
+        ;; no empty paragraph for a <p></p> at the end (as ai_post)
+        (check= (translate-body `(document ,para "second")
+                                (answer-first "<p>Un</p><p></p>"))
+                '(document "Un" "second"))
+        (check= (translate-body `(document ,para "second")
+                                (answer-first "<p>Un</p><p>Deux</p><p></p>"))
+                '(document "Un" "Deux" "second"))
+        ;; a theorem as a paragraph is left a theorem
+        (check= (translate-body
+                 '(document (theorem (document "a" "b")) "second")
+                 (answer-by
+                  '(("<div id=\"x0\"><p>a</p>\n<p>b</p></div>"
+                     "<div id=\"x0\"><p>un</p>\n<p>deux</p></div>"))))
+                '(document (theorem (document "un" "deux")) "second"))
+        ;; one undo gives back the paragraph
+        (buffer-set-body u (stree->tree `(document ,para "second")))
+        (archive-state) (start-editing) (end-editing) (clear-undo-history)
+        (translate-step (answer-first "<p>Un</p>\n<p>Deux</p>"))
+        (check= (tm->stree (buffer-tree)) '(document "Un" "Deux" "second"))
+        (archive-state) (start-editing) (undo 0) (end-editing)
+        (check= (tm->stree (buffer-tree)) `(document ,para "second"))
+        ;; the process goes on with the next paragraphs, the first being
+        ;; translated into two
+        (check= (translate-body
+                 '(document "one" "two" "three")
+                 (answer-by '(("one" "<p>Un</p><p>Deux</p>")
+                              ("two" "<p>Trois</p>")
+                              ("three" "Quatre"))))
+                '(document "Un" "Deux" "Trois" "Quatre"))
+        (check= (translate-body
+                 '(document "one" "two" "three")
+                 (answer-by '(("two" "<p>Deux</p><p>Trois</p>")
+                              ("three" "<p>Quatre</p><p>Cinq</p>"))))
+                '(document "one" "Deux" "Trois" "Quatre" "Cinq"))
+        (check-false (process-running? 'translate-check))
+        ;; a selection inside a paragraph (make-process puts it in an
+        ;; identity tag): one paragraph in <p> takes its place, several
+        ;; split the paragraph, as Tools > AI > Translate inserts them
+        (buffer-set-body u (stree->tree '(document "it is good" "second")))
+        (selection-set (append (buffer-path) '(0 3))
+                       (append (buffer-path) '(0 5)))
+        (translate-step (lambda (in) "<p>was</p>"))
+        (check= (tm->stree (buffer-tree)) '(document "it was good" "second"))
+        (buffer-set-body u (stree->tree '(document "it is good" "second")))
+        (selection-set (append (buffer-path) '(0 3))
+                       (append (buffer-path) '(0 5)))
+        (translate-step (lambda (in) "<p>was</p><p>and</p>"))
+        (check= (tm->stree (buffer-tree))
+                '(document "it was" "and good" "second"))
+        (check-false (process-running? 'translate-check))
+        ;; LanguageTool: an answer of a paragraph with corrections is a
+        ;; concat with spell-error, also if it came back in <p>
+        (for (wrap (list (lambda (h) h)
+                         (lambda (h) (string-append "<p>" h "</p>"))))
+          (buffer-set-body u (stree->tree `(document ,para "second")))
+          (let* ((t (tree-ref (buffer-tree) 0))
+                 (tp (tree->tree-pointer t))
+                 (st (tm->stree t))
+                 (table (compress-table-new "lantool"))
+                 (html (wrap (with-compress-table table
+                               (lambda () (compress-html t 1)))))
+                 (pos (string-search-forwards "is " 0 html))
+                 (json (string-append
+                        "{\"software\":{},\"matches\":[{"
+                        "\"message\":\"A verb\","
+                        "\"replacements\":[{\"value\":\"was\"}],"
+                        "\"offset\":" (number->string pos) ","
+                        "\"length\":2,\"rule\":{\"id\":\"A\"}}]}"))
+                 (end (make-process-end 'lantool-check))
+                 (serial process-serial)
+                 (went-on #f))
+            (with-compress-table table
+              (lambda ()
+                ((lantool-processed-one serial tp st
+                                        (lambda () (set! went-on #t)))
+                 html json)))
+            (compress-table-free table)
+            (end)
+            (check= (tm->stree (buffer-tree))
+                    `(document (concat "it " (spell-error "is" "A verb" "was")
+                                       " " (em "b"))
+                               "second"))
+            (check-true went-on))))
+      (lambda ()
+        (for (b (buffer-list))
+          (when (nin? b before) (buffer-close b)))
+        (when (buffer-exists? old) (switch-to-buffer old))))))
+
 (define (test-compress-tables)
   (check-group "compression tables")
   (let* ((t (stree->tree '(document (concat "it is " (em "b") " " (frac "x" "y")))))
@@ -1239,9 +1398,9 @@
                   (list "" para)
                   (list (string-append "{\"choices\":[{\"message\":"
                                        "{\"content\":\"" body "\"}}]}")
-                        ;; (the answer is a document, put as it is in place
-                        ;; of the paragraph, as before)
-                        '(document (concat "Bonjour " (em "b"))))))
+                        ;; (the answer is a document of one paragraph,
+                        ;; which takes the place of the paragraph: #526)
+                        '(concat "Bonjour " (em "b")))))
            (end (make-process-end 'translate-check))
            (serial process-serial))
       (dynamic-wind
@@ -1249,7 +1408,7 @@
         (lambda ()
           (switch-to-buffer* u)
           (for (a answers)
-            (buffer-set-body u (stree->tree `(document ,para)))
+            (buffer-set-body u (stree->tree `(document ,para "second")))
             (let* ((t (tree-ref (buffer-tree) 0))
                    (tp (tree->tree-pointer t))
                    (st (tm->stree t))
@@ -1260,6 +1419,7 @@
                                       (lambda () (set! went-on #t)) table)
                (car a))
               (check= (tm->stree (tree-ref (buffer-tree) 0)) (cadr a))
+              (check= (tree-arity (buffer-tree)) 2)
               (check= (compress-table-size table) -1)
               (check-true went-on))))
         (lambda ()
@@ -1267,6 +1427,8 @@
           (for (b (buffer-list))
             (when (nin? b before) (buffer-close b)))
           (when (buffer-exists? old) (switch-to-buffer old)))))
+    ;; the answers of the translation process in <p> (#526)
+    (test-translate-paragraphs)
     ;; the translation process, whose request cannot be launched (an engine
     ;; without a command: cpp-ai-async-eval-command says so, and will not
     ;; call back): the table of the paragraph is freed all the same

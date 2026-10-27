@@ -37,9 +37,9 @@
                 (out* (cpp-ai-output out model))
                 (out** (cpp-ai-get-body out*))
                 (new-t (decompress-html (car out**) 1)))
+           ;; (a document when the engine put <p>: not nested, #526)
            (when (== st st*)
-             (tree-set! t new-t)
-             (tree-correct-upwards t)))))
+             (tree-replace-paragraph! t new-t)))))
   (tree-pointer-detach tp)
   (next))
 
