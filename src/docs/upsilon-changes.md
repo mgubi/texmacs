@@ -14,6 +14,14 @@ have the details, and the problems go to the
 
 ## 27 October 2026
 
+- **Emoji in LaTeX**: the export writes the emoji as `\emoji{...}` of the
+  LaTeX package `emoji`, by its name there (also those of older documents,
+  in code points), and loads the package in the preamble when the
+  document has emoji: they come in color with LuaLaTeX, and as their
+  names (`:grinning-face:`) with pdfLaTeX and XeLaTeX, which the package
+  does not support, so that the document still compiles. An emoji newer
+  than the package is written as its characters, as before; the import
+  gives back the same emoji.
 - **Names of the emoji**: the emoji have names in the universal encoding
   of TeXmacs, those of the LaTeX package `emoji` (the short names of
   Unicode): `<emoji-grinning-face>`, and one name for a whole sequence,

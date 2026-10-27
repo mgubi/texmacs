@@ -122,6 +122,14 @@ converter_rep::load () {
     hashtree_from_dictionary (dic,"emoji-names", UTF8, BIT2BIT, true);
     ht = dic;
   }
+  else if (from=="Emoji" && to=="LaTeX-emoji") {
+    // the emoji of the LaTeX package emoji, by their names there, for the
+    // export of LaTeX (\emoji{hugging-face} for <emoji-smiling-face-with-
+    // open-hands>)
+    hashtree<char,string> dic;
+    hashtree_from_dictionary (dic,"emoji-latex-names", BIT2BIT, BIT2BIT, false);
+    ht = dic;
+  }
   else if (from=="LaTeX-emoji" && to=="Emoji") {
     // the other names of the LaTeX package emoji (\emoji{smile}, the old
     // names of CLDR): the names of TeXmacs, for the import of LaTeX
@@ -545,6 +553,16 @@ emoji_match (string s, int pos, string w) {
     if (!starts (cw, acc)) return -1;
   }
   return acc == cw? i: -1;
+}
+
+string
+emoji_latex_name (string s) {
+  // the name in the LaTeX package emoji of the emoji named s
+  // (<emoji-grinning-face>); "" if the package has not that emoji
+  string val;
+  converter conv= load_converter ("Emoji", "LaTeX-emoji");
+  if (dictionary_value (conv, s, val)) return val;
+  return "";
 }
 
 string

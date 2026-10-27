@@ -99,6 +99,7 @@ bool has_emoji (string s);
 string emoji_names (string s);
 int emoji_match (string s, int pos, string w);
 string emoji_from_latex (string name);
+string emoji_latex_name (string s);
 bool check_using_iconv (string input, string encoding);
 string convert_using_iconv (string input, string from, string to); 
 

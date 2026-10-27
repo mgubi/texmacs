@@ -685,6 +685,16 @@
     "  \\pdfstringdefDisableCommands{\\def\\tmmarked#1#2{#2}}\\fi\n"))
   (nonconverted
    (!append "\\newcommand{\\nonconverted}[1]{\\mbox{}}\n"))
+  ;; the emoji (\emoji{grinning-face}): the package emoji, in color, needs
+  ;; LuaLaTeX; with another engine the name of the emoji is written as a
+  ;; shortcode (:grinning-face:), so that the document still compiles
+  (emoji
+   (!append "\\usepackage{iftex}\n"
+            "\\ifLuaTeX\n"
+            "  \\usepackage{emoji}\n"
+            "\\else\n"
+            "  \\providecommand{\\emoji}[1]{\\textsf{:#1:}}\n"
+            "\\fi\n"))
   (tmkeywords
    (!append (newcommand (tmkeywords)
                         (!append (textbf (!translate "Keywords:")) " "))

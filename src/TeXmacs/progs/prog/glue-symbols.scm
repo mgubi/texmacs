@@ -474,6 +474,8 @@
 "utf8->cork"
 "cork->utf8"
 "emoji-name"
+"emoji-names"
+"emoji-latex-name"
 "utf8->t2a"
 "t2a->utf8"
 "utf8->html"

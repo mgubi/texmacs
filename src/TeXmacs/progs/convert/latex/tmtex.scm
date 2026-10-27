@@ -500,10 +500,17 @@
         ((and (not (tmtex-math-mode?)) (logic-ref latex-text-symbols% s))
          (list '!group (list (logic-ref latex-text-symbols% s))))
         ((and (string-starts? s "emoji-")
+              (!= (emoji-latex-name (string-append "<" s ">")) ""))
+         ;; an emoji which the LaTeX package emoji has: \emoji{name}, by its
+         ;; name there (the preamble loads the package with LuaLaTeX, see
+         ;; latex-texmacs-preamble); in a formula, in a box
+         (with e (list 'emoji (emoji-latex-name (string-append "<" s ">")))
+           (if (tmtex-math-mode?) (list 'mbox e) (list '!group e))))
+        ((and (string-starts? s "emoji-")
               (!= (string-convert (string-append "<" s ">") "Cork" "UTF-8")
                   (string-append "<" s ">")))
-         ;; an emoji by its name (<emoji-grinning-face>): its characters,
-         ;; as for an emoji written as its code points
+         ;; an emoji which the package has not (a newer one): its
+         ;; characters, as for an emoji written as its code points
          (let* ((us (string-convert (string-append "<" s ">") "Cork" "UTF-8"))
                 (cv (if tmtex-use-catcodes? (string-convert us "UTF-8" "LaTeX")
                         us)))
@@ -665,6 +672,9 @@
                     (tmtex-string-produce (cdr l)))))))
 
 (define (tmtex-string s)
+  ;; the emoji in code points of the documents written before their names
+  ;; (<#1F600>, <#1F468><#200D>...) are exported by their names
+  (when (string-index s #\<) (set! s (emoji-names s)))
   (if (> (string-length s) 1000)
     `(!concat ,@(map tmtex (tmstring-split s)))
     (let* ((l (string->list s))

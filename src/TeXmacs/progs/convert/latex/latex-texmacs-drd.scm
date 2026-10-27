@@ -117,7 +117,7 @@
   uhat uwidehat utilde uwidetilde
   uvec ubreve uinvbreve ucheck uring uacute ugrave
   underdot uddot udddot uddddot
-  widespacing nonconverted
+  widespacing nonconverted emoji
   groupcommoncounter
   ;; NOTE: for personal use from vdh style package
   gb gbt)
@@ -257,7 +257,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (logic-group latex-texmacs-preamble-command%
-  newmdenv tikzframe
+  newmdenv tikzframe emoji
   tmkeywords tmacm tmarxiv tmpacs tmmsc
   fmtext tdatetext tmisctext tsubtitletext
   thankshomepage thanksemail thanksdate thanksamisc thanksmisc thankssubtitle

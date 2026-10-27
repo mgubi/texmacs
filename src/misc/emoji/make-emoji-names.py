@@ -22,7 +22,9 @@
 #
 # it writes the other names of the package instead (its aliases, as
 # \emoji{smile}, \emoji{+1}, and its names which CLDR changed since), for
-# the import of LaTeX.
+# the import of LaTeX. And with --latex-names instead of --aliases, it
+# writes TeXmacs/langs/encoding/emoji-latex-names.scm, the emoji which the
+# package has, each with its name there, for the export to LaTeX.
 #
 # The file is ASCII: the sequences are written as #XXXX escapes.
 
@@ -141,10 +143,31 @@ def aliases (seen, version, path):
     for a in sorted (out): print ('("%s"\t"%s")' % (a, out[a]))
     sys.stderr.write ("%d other names\n" % len (out))
 
+def latex_names (seen, version, path):
+    # the names of the package for our emoji, for the export to LaTeX:
+    # the emoji which the package has, each by its name there
+    latex= read_latex (path)
+    by_codes= dict ((v, k) for k, v in seen.items ())
+    out= {}
+    for key, lname, _ in latex:
+        if key in by_codes and by_codes[key] not in out:
+            out[by_codes[key]]= lname
+    header ("The emoji of the LaTeX package emoji, by their names there",
+            version, ",\n;; and emoji-table.def of the package: the emoji which it has (the\n"
+            ";; others are exported as their characters), each with its name in\n"
+            ";; \\emoji{...}, which is ours but for the names CLDR changed since.")
+    for n in sorted (out): print ('("<emoji-%s>"\t"%s")' % (n, out[n]))
+    sys.stderr.write ("%d emoji of the package, %d by another name\n" %
+                      (len (out), len ([n for n in out if out[n] != n])))
+
 def main (argv):
     if len (argv) == 4 and argv[1] == "--aliases":
         version, seen, _= read_names (argv[2])
         aliases (seen, version, argv[3])
+        return
+    if len (argv) == 4 and argv[1] == "--latex-names":
+        version, seen, _= read_names (argv[2])
+        latex_names (seen, version, argv[3])
         return
     if len (argv) == 4 and argv[2] == "--check":
         version, seen, out= read_names (argv[1])

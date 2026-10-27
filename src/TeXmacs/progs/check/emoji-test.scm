@@ -400,11 +400,48 @@
 (define (test-name-export)
   (check-group "names: export and import")
   (let ((ex (lambda (s fmt) (convert `(document ,s) "texmacs-stree" fmt))))
-    ;; the characters of the emoji, as for the code points
+    ;; LaTeX: \emoji of the package emoji, by its name there, for an emoji
+    ;; by its name and for one in code points (an older document)
     (check= (ex "a<emoji-grinning-face>b" "latex-snippet")
-            (ex (string-append "a" smile "b") "latex-snippet"))
+            "a{\\emoji{grinning-face}}b")
+    (check= (ex (string-append "a" smile "b") "latex-snippet")
+            "a{\\emoji{grinning-face}}b")
     (check= (ex "a<emoji-family-man-woman-girl>b" "latex-snippet")
-            (ex (string-append "a" man zwj woman zwj girl "b") "latex-snippet"))
+            "a{\\emoji{family-man-woman-girl}}b")
+    (check= (ex (string-append "a" man zwj woman zwj girl "b") "latex-snippet")
+            "a{\\emoji{family-man-woman-girl}}b")
+    (check= (ex "<emoji-flag-congo---kinshasa>" "latex-snippet")
+            "{\\emoji{flag-congo---kinshasa}}")
+    ;; by the name of the package where CLDR changed it since
+    (check= (ex "<emoji-smiling-face-with-open-hands>" "latex-snippet")
+            "{\\emoji{hugging-face}}")
+    ;; in a formula, in a box
+    (check= (convert '(document (math "x<emoji-rocket>")) "texmacs-stree"
+                     "latex-snippet")
+            "$x\\mbox{\\emoji{rocket}}$")
+    ;; an emoji which the package has not: its characters, as before
+    (check= (ex "<emoji-face-with-bags-under-eyes>" "latex-snippet")
+            (cork->utf8 "<#1FAE9>"))
+    (check= (ex "<#1FAE9>" "latex-snippet") (cork->utf8 "<#1FAE9>"))
+    ;; the preamble loads the package (with LuaLaTeX; another engine shows
+    ;; the names) only when a document has an emoji
+    (let ((doc (lambda (s)
+                 (convert `(document (TeXmacs "2.1.5") (style "generic")
+                                     (body (document ,s)))
+                          "texmacs-stree" "latex-document")))
+          (has? (lambda (s what) (>= (string-search-forwards what 0 s) 0))))
+      (with d (doc "a<emoji-grinning-face>b")
+        (check-true (has? d "\\ifLuaTeX"))
+        (check-true (has? d "\\usepackage{emoji}"))
+        (check-true (has? d "\\providecommand{\\emoji}"))
+        ;; and the import gives the emoji back, by its name
+        (check= (convert d "latex-document" "texmacs-stree")
+                '(document (TeXmacs "2.1.5") (style (tuple "article" "std-latex"))
+                           (body (document "a<emoji-grinning-face>b")))))
+      (check-false (has? (doc "ab") "emoji")))
+    (check= (convert (ex "a<emoji-smiling-face-with-open-hands>b" "latex-snippet")
+                     "latex-snippet" "texmacs-stree")
+            "a<emoji-smiling-face-with-open-hands>b")
     (check= (ex "a<emoji-grinning-face>b" "html-snippet")
             (ex (string-append "a" smile "b") "html-snippet")))
   ;; \emoji of the LaTeX package emoji, by its names and its other ones
