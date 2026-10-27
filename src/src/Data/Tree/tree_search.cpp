@@ -1136,7 +1136,9 @@ struct region_matcher {
         else if (L(t) == L(w)) {
           range_set ssel;
           select_direct (ssel, t, w, toks[ti].at);
-          if (N(ssel) != 0 && run (ei+1, ti+1)) { in[ei]= ssel; ok= true; }
+          if (N(ssel) != 0 && run (ei+1, ti+1)) {
+            in[ei]= ssel; at[ei]= ti; ok= true;
+          }
         }
       }
       break;
@@ -1146,9 +1148,11 @@ struct region_matcher {
   }
 
   int first_region () {
-    // the token where the first region starts, after a match
+    // the token where the first region starts, after a match: a region of
+    // the pattern, or one inside a tag of the pattern ((strong [a]))
     for (int k=0; k<N(kind); k++)
-      if (kind[k] == ELEM_START) return at[k];
+      if (kind[k] == ELEM_START || (kind[k] == ELEM_TAG && N(in[k]) != 0))
+        return at[k];
     return N(toks);
   }
 
@@ -1272,7 +1276,10 @@ select_inside_tags (range_set& sel, region_matcher& m, int upto, tree what) {
               if (f.toks[x].kind == TOKEN_TAG && f.toks[x].at == at) ti= x;
             if (ti >= 0 && ti < f.first_region ()) continue;
           }
-          f.regions (sel);
+          // as in select_in_hit: a hit inside an earlier tag of this
+          // formula, which the wildcards carry, comes first
+          if (!select_inside_tags (sel, f, f.first_region (), what))
+            f.regions (sel);
           r= true;
         }
         break;  // the first occurrence only

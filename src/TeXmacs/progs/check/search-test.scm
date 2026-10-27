@@ -488,8 +488,10 @@
 ;; a region which the wildcards of a pattern carry out of a tag is the
 ;; region which the pattern gives in the argument when it is alone: the
 ;; regions in b (strong F) c are those in F, moved into the strong, for
-;; formulas F made from a fixed pseudo-random sequence. (A formula F which
-;; is a tag alone is a formula of one child with #512.)
+;; formulas F made from a fixed pseudo-random sequence. A formula F which
+;; is a tag alone is left out here: it is a formula of one child only with
+;; the rule of #512 for a tag alone in its paragraph, which this branch does
+;; not have (its merge with #512 was checked with them).
 (define (region-formulas n)
   (let* ((seed 11)
          (rnd (lambda (k)
@@ -537,7 +539,13 @@
                  (concat (select-region (concat ,w "a")) "x" ,v)
                  (concat ,u "x" (select-region (concat "a" ,v)))
                  (select-region (concat ,w "a" ,v))
-                 (concat ,u (select-region (concat ,w "ax" ,v)) ,t)))
+                 (concat ,u (select-region (concat ,w "ax" ,v)) ,t)
+                 ;; a wildcard inside the part of the pattern, a region after
+                 ;; a tag of the pattern
+                 (concat ,u "x" ,w (select-region "a") ,t)
+                 (concat ,u "y" ,w (select-region "a") "x" ,t)
+                 (concat ,u (strong (select-region "a")) ,w
+                         (select-region "x") ,t)))
          (fs (region-formulas 200)))
     ;; the region of the formula where the pattern matches, the outermost
     ;; one (not the deepest), and lazily (xyaaaaax gave all of it)
@@ -551,6 +559,19 @@
     (check-both '(document (concat "b" (strong "xyaaaaax") "c"))
                 (list-ref pats 0)
                 '((0 1 0 0) (0 1 0 3)))
+    ;; in the formula which matches, the leftmost region, which may be in a
+    ;; tag before it; a region inside a tag of the pattern counts
+    (check-both '(document (concat "b" (strong (concat "x" (rsup "xa") "a"))
+                                   "c"))
+                (list-ref pats 8)
+                '((0 1 0 1 0 1) (0 1 0 1 0 2)))
+    (check-both '(document (concat "b" (rsup (concat (strong "a")
+                                                     (rsup (concat (strong "a")
+                                                                   "x"))
+                                                     "x"))
+                                   "c"))
+                (list-ref pats 10)
+                '((0 1 0 0 0 0) (0 1 0 0 0 1) (0 1 0 2 0) (0 1 0 2 1)))
     (for-each
       (lambda (mode)
         (with-search-mode mode
