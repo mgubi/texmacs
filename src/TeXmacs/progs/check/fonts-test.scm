@@ -159,11 +159,16 @@
         (check-true (in? "Stix Two Math" fams))
         (check-true (in? "Stix Two Text" fams))
         (check-true (nnull? (font-database-styles "Stix Two Text")))
-        ;; the italic letters of the math font come from Stix Two Text, not
-        ;; from the closest font to a family "Stix Two" which does not exist
-        (check= (width '(with "math-font" "Stix Two Math" "mode" "math" "x"))
+        ;; the italic letters of the font come from Stix Two Text, not from
+        ;; the closest font to a family "Stix Two" which does not exist
+        (check= (width '(with "font" "Stix Two Math" "font-shape" "italic"
+                          "x"))
                 (width '(with "font" "Stix Two Text" "font-shape" "italic"
-                          "x"))))))
+                          "x")))
+        ;; in math mode, the letters of an OpenType math font come from its
+        ;; own mathematical italic alphabet (U+1D44E...)
+        (check= (width '(with "math-font" "Stix Two Math" "mode" "math" "x"))
+                (width '(with "font" "Stix Two Math" "<#1D465>"))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; STIX and TeX Gyre as math fonts of another text font (#196, items 3-5)
