@@ -117,6 +117,8 @@ public:
   tree     get_init_all ();
   void     init_env (string var, tree by);
   void     init_default (string var);
+  void     init_env_local (string var, tree by);
+  void     init_default_local (string var);
   void     set_zoom (tree z);
   void     init_style ();
   void     init_style (string style);

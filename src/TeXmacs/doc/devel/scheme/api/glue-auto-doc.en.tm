@@ -355,6 +355,14 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(windows-cjk-font-candidates <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|windows_cjk_font_candidates> which returns
+    <scm|array_string>.
+  </explain>
+
+  <\explain>
     <scm|(default-korean-font)>
 <explain-synopsis|no synopsis>
   <|explain>

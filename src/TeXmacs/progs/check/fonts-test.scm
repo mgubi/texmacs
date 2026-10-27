@@ -128,7 +128,18 @@
   (check-em "<#3400>" 0.05)
   (check-em "<#4DB5>" 0.05)
   (check-em "<#F900>" 0.05)
-  (check-em "<#20B9F>" 0.05))
+  (check-em "<#20B9F>" 0.05)
+  ;; the CJK fallback of the default font is substituted by SimSun (or
+  ;; FandolSong) when it is installed, as on Windows: the substitution lost
+  ;; the CJK characters asked for, so that the fonts tried after SimSun were
+  ;; Courier New and other fonts without CJK, and U+31F0 or U+F900, which
+  ;; SimSun lacks, were drawn as their names (apply_substitutions in
+  ;; font_select.cpp); the rules themselves are checked on any system by
+  ;; tests/Graphics/Fonts/font_test.cpp
+  (with v (logical-font-substitute '("roman" "cjk"))
+    (if (== (car v) "roman")
+        (display "  (no substitution of (roman cjk) is active: skipped)\n")
+        (check-true (in? "cjk" v)))))
 
 (define (test-hangul)
   (check-group "hangul in the default font")
@@ -142,6 +153,107 @@
   (check-em "<#3131>" 0.05)
   ;; the Latin letters are not concerned
   (check-true (< (width "x") (* 0.7 (em)))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; The CJK fonts of Windows in the shipped font database (#538)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; On the first start, the local database is the shipped one, keeping the
+;; entries whose files exist (font_database_filter in font_database.cpp).
+;; Entries with the Mac file names only (MS Gothic.ttf) were dropped on
+;; Windows, whose files are msgothic.ttc and others. These checks read the
+;; shipped files, so that they are made on any system.
+
+(define shipped-cache (list))
+
+(define (shipped-lines name)
+  ;; the lines of the file @name of TeXmacs/fonts
+  (or (assoc-ref shipped-cache name)
+      (with l (string-tokenize-by-char
+               (string-load (system->url (string-append "$TEXMACS_PATH/fonts/"
+                                                        name)))
+               #\newline)
+        (set! shipped-cache (cons (cons name l) shipped-cache))
+        l)))
+
+(define (shipped-key fam)
+  ;; the start of the entries of the family @fam
+  (string-append "((" (string-replace fam " " "\\ ") " "))
+
+(define (shipped-file? fam file)
+  ;; whether the shipped database gives the file @file to the family @fam:
+  ;; the name as Windows lists it (font_database_collect compares the names
+  ;; exactly), or without its suffix, @file.* in any case
+  (let* ((k (shipped-key fam))
+         (exact? (string-occurs? "." file))
+         (f (string-append "(" (if exact? file (locase-all file))
+                           (if exact? " " "."))))
+    (list-or (map (lambda (l) (and (string-starts? l k)
+                                   (string-occurs? f (if exact? l
+                                                         (locase-all l)))))
+                  (shipped-lines "font-database.scm")))))
+
+(define (shipped-characteristics? fam)
+  ;; whether the shipped characteristics describe the family @fam (for the
+  ;; fallback, which looks for fonts with CJK characters)
+  (with k (shipped-key fam)
+    (list-or (map (lambda (l) (string-starts? l k))
+                  (shipped-lines "font-characteristics.scm")))))
+
+(define (check-shipped fam file)
+  (check-report (shipped-file? fam file)
+                (string-append "shipped database: " fam " in " file)
+                "no entry")
+  (check-report (shipped-characteristics? fam)
+                (string-append "shipped characteristics: " fam)
+                "no entry"))
+
+(define (list-tail-from pred? l)
+  ;; the tail of @l which starts with the first element satisfying @pred?
+  (cond ((null? l) l)
+        ((pred? (car l)) l)
+        (else (list-tail-from pred? (cdr l)))))
+
+(define (test-windows-fonts)
+  (check-group "the CJK fonts of Windows in the shipped database")
+  ;; the CJK fonts of every Windows 10 or later
+  (for-each (lambda (p) (check-shipped (car p) (cadr p)))
+            '(("MS Gothic" "msgothic.ttc") ("MS PGothic" "msgothic.ttc")
+              ("Yu Gothic" "YuGothR.ttc") ("Yu Gothic UI" "YuGothM.ttc")
+              ("Gulim" "gulim.ttc") ("MingLiU" "mingliu.ttc")
+              ("PMingLiU" "mingliu.ttc") ("SimSun" "simsun.ttc")
+              ("Microsoft YaHei" "msyh.ttc") ("Microsoft JhengHei" "msjh.ttc")
+              ("Malgun Gothic" "malgun.ttf")))
+  ;; the Japanese fonts of Windows, by preference (default_japanese_font_name
+  ;; on Windows): each must be a family of the database, else the "Japanese
+  ;; font first" step of the fallback of kana finds no font
+  (with l (windows-cjk-font-candidates "japanese")
+    (check-true (>= (length l) 10))
+    (check= (and (pair? l) (cadr l)) "MS PMincho")
+    (let loop ((l l))
+      (when (and (pair? l) (pair? (cdr l)))
+        (check-shipped (cadr l) (car l))
+        (loop (cddr l)))))
+  ;; on Windows, the Japanese font is one of them (Yu Gothic and MS Gothic
+  ;; come with every Windows 10 or later) instead of roman
+  ;; and its Regular style survives the filter of the database with the file
+  ;; of the candidate as its first file (Yu Gothic Regular was YuGothM.ttc,
+  ;; the Medium weight, when both files were given to it)
+  (when (os-mingw?)
+    (let* ((l (windows-cjk-font-candidates "japanese"))
+           (fam (default-japanese-font))
+           (tail (list-tail-from (lambda (x) (== x fam)) l)))
+      (check-report (in? fam l) "the Japanese font of Windows" fam)
+      (when (and (pair? tail) (< (length tail) (length l)))
+        ;; the file of a candidate comes just before its family
+        (let* ((file (list-ref l (- (length l) (length tail) 1)))
+               (files (font-database-search fam "Regular")))
+          (check-report (and (pair? files)
+                             (string-starts? (locase-all (car files))
+                                             (string-append (locase-all file)
+                                                            ".")))
+                        (string-append "the Regular file of " fam)
+                        (object->string files)))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; STIX Two in the font database (#196, item 7)
@@ -224,6 +336,7 @@
      (test-kana)
      (test-ideographs)
      (test-hangul)
+     (test-windows-fonts)
      (test-stix-two)
      (test-math-fonts)))
   (check-end))

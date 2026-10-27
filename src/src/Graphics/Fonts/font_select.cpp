@@ -920,15 +920,33 @@ add_properties (array<string> v, tree props) {
   return r;
 }
 
-array<string>
-apply_substitutions (array<string> v) {
+static array<string>
+apply_substitutions (array<string> v, int depth) {
   if (N(v) <= 0) return v;
+  if (depth > 10) {
+    static bool warned= false;
+    if (!warned)
+      cout << "TeXmacs] warning, the font substitutions loop for " << v << "\n";
+    warned= true;
+    return v;
+  }
   tree t= font_database_substitutions (v[0]);
   for (int i=0; i<N(t); i++)
     if (match_properties (v, t[i][0])) {
-      v= remove_properties (v, t[i][0]);
-      v= add_properties (v, t[i][1]);
-      return apply_substitutions (v);
+      array<string> w= remove_properties (v, t[i][0]);
+      w= add_properties (w, t[i][1]);
+      // The glyphs asked for stay asked for: (roman cjk) becomes (SimSun cjk),
+      // not (SimSun). Without them, the fallback fonts after SimSun were the
+      // fonts closest to SimSun, Courier New and others without CJK, and the
+      // CJK characters which SimSun lacks were drawn as their names.
+      for (int j=1; j<N(v); j++)
+        if (is_glyphs (v[j]) && !contains (v[j], w)) w << v[j];
+      return apply_substitutions (w, depth + 1);
     }
   return v;
+}
+
+array<string>
+apply_substitutions (array<string> v) {
+  return apply_substitutions (v, 0);
 }

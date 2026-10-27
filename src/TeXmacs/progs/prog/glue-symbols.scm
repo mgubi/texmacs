@@ -69,6 +69,7 @@
 "default-look-and-feel"
 "default-chinese-font"
 "default-japanese-font"
+"windows-cjk-font-candidates"
 "default-korean-font"
 "get-retina-factor"
 "get-retina-zoom"

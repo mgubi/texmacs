@@ -232,6 +232,9 @@ struct font_rep: rep<font> {
 
 string default_chinese_font_name ();
 string default_japanese_font_name ();
+array<string> windows_cjk_font_candidates (string lang);
+string windows_cjk_font (string lang);
+extern int font_database_generation;
 string default_korean_font_name ();
 
 font error_font (font fn);

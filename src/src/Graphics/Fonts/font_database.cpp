@@ -78,6 +78,7 @@ struct font_less_eq_operator {
 ******************************************************************************/
 
 bool new_fonts= false;
+int  font_database_generation= 0; // changes when the database may have changed
 static bool fonts_loaded= false;
 static bool fonts_global_loaded= false;
 hashmap<tree,tree> font_table (UNINIT);
@@ -360,6 +361,7 @@ font_database_load () {
   font_database_load_substitutions (GLOBAL_SUBSTITUTIONS);
   if (renew) shipped_fonts_save_mark (N (font_table));
   fonts_loaded= true;
+  font_database_generation++;
 }
 
 void
@@ -375,6 +377,7 @@ font_database_global_load () {
 
 void
 font_database_save () {
+  font_database_generation++;
   font_database_save_database (LOCAL_DATABASE);
   font_database_save_features (LOCAL_FEATURES);
   font_database_save_characteristics (LOCAL_CHARACTERISTICS);
