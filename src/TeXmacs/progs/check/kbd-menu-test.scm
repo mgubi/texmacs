@@ -1364,6 +1364,69 @@
     (when (buffer-exists? b) (buffer-close b))
     (check= (current-buffer) old)))
 
+;; A change of the initial environment made in the clone is in the window
+;; it was cloned from, which saves it (#528): the file has it and the
+;; buffer is no longer modified.
+(define (initial-of doc)
+  ;; the initial environment of @doc (an stree) as an association list
+  (with init (list-find (cdr doc)
+                        (lambda (x) (and (pair? x) (== (car x) 'initial))))
+    (if (not init) '()
+        (map (lambda (x) (cons (cadr x) (caddr x))) (cdadr init)))))
+
+(define (test-clone-window-init)
+  (check-group "clone window: initial environment")
+  (let* ((win (current-window))
+         (old (current-buffer))
+         (dir (system->url (string-append (url->system (url-temp-dir))
+                                          "/kbd-menu-test")))
+         (f (url-append dir "clone-init.tm"))
+         (before (window-list)))
+    (system-mkdir dir)
+    (tree-export (stree->tree
+                  '(document (TeXmacs "2.1") (style (tuple "generic"))
+                             (body (document "one"))))
+                 f "texmacs")
+    (load-buffer f)
+    (switch-to-buffer old)
+    (open-buffer-in-window f (buffer-get f) "")
+    (with l (list-difference (window-list) before)
+      (check= (length l) 1)
+      (when (== (length l) 1)
+        (window-focus (car l))
+        (check= (current-buffer) f)
+        (clone-window)
+        (with ws (buffer->windows f)
+          (check= (length ws) 2)
+          (when (== (length ws) 2)
+            (check= (current-window) (cadr ws))
+            (edit-step (lambda () (init-env "par-indent" "4fn")))
+            (check= (get-init "par-indent") "4fn")
+            (check-true (buffer-modified? f))
+            (window-focus (car ws))
+            (check= (current-window) (car ws))
+            (check= (get-init "par-indent") "4fn")
+            (buffer-save f)
+            (check= (assoc-ref (initial-of (tree->stree
+                                            (tree-import f "texmacs")))
+                               "par-indent")
+                    "4fn")
+            (check-false (buffer-modified? f))
+            (window-focus (cadr ws))
+            (check= (get-init "par-indent") "4fn")
+            (window-focus (car ws))
+            (buffer-pretend-saved f)
+            (kill-window (cadr ws)))
+          (buffer-pretend-saved f)
+          (kill-window (car ws)))))
+    (window-focus win)
+    (when (buffer-exists? f)
+      (buffer-pretend-saved f)
+      (buffer-close f))
+    (when (url-exists? f) (system-remove f))
+    (when (url-exists? dir) (system-rmdir dir))
+    (check= (current-buffer) old)))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Defining menus
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1486,6 +1549,7 @@
   (test-close-window)
   (test-close-shared-window)
   (test-clone-window)
+  (test-clone-window-init)
   (check-group "menu items")
   ;; all the menus above, each time they were expanded
   (check-true (> menu-buttons 10000))

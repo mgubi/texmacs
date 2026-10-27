@@ -920,6 +920,119 @@
           (buffer-close g)
           (switch-to-buffer f))))))
 
+;; The initial environment belongs to the buffer (#528): a change made in
+;; one view of it (init-env, init-default) is in its other views, in
+;; buffer-get and in the saved file, and in a view made after it; the
+;; buffer stays modified until it is saved. The variables of the window
+;; (zoom-factor, page-screen-width) stay those of each view.
+(define (initial-value doc var)
+  ;; the value of @var in the initial environment of @doc (a document read
+  ;; from a file, as an stree), or #f
+  (with init (doc-part doc 'initial)
+    (and init (pair? (cdr init))
+         (with a (list-find (cdadr init)
+                            (lambda (x) (and (pair? x) (pair? (cdr x))
+                                             (== (cadr x) var))))
+           (and a (caddr a))))))
+
+(define (buffer-init-value u var)
+  (initial-value (tree->stree (buffer-get u)) var))
+
+(define (file-init-value u var)
+  (initial-value (tree->stree (tree-import u "texmacs")) var))
+
+(define (test-views-init)
+  (check-group "initial environment in the views of a buffer")
+  (let ((old (current-buffer))
+        (before (buffer-list))
+        (f (tmp-file* "views-init.tm")))
+    (tree-export (stree->tree
+                  '(document (TeXmacs "2.1") (style (tuple "generic"))
+                             (body (document "one"))
+                             (initial (collection
+                                       (associate "font-base-size" "12")))))
+                 f "texmacs")
+    (with r (check-run
+             (lambda ()
+               (load-buffer f)
+               (update-forced)
+               (let ((v1 (current-view-url))
+                     (z1 (get-init "zoom-factor"))
+                     (w1 (get-init "page-screen-width")))
+                 ;; switching to the buffer shown makes a second view, and
+                 ;; switching again goes back to the first one
+                 (switch-to-buffer f)
+                 (with v2 (current-view-url)
+                   (check= (length (buffer->views f)) 2)
+                   (check-false (== v1 v2))
+                   ;; the variables of the window stay in their view, and
+                   ;; do not modify the buffer
+                   (edit (init-env "zoom-factor" "1.7"))
+                   (edit (init-env "page-screen-width" "123tmpt"))
+                   (check= (get-init "zoom-factor") "1.7")
+                   (check-false (buffer-modified? f))
+                   (switch-to-buffer f)
+                   (check= (current-view-url) v1)
+                   (check= (get-init "zoom-factor") z1)
+                   (check= (get-init "page-screen-width") w1)
+                   ;; init-env in the first view reaches the second one
+                   (edit (init-env "par-indent" "4fn"))
+                   (check-true (buffer-modified? f))
+                   (switch-to-buffer f)
+                   (check= (current-view-url) v2)
+                   (check= (get-init "par-indent") "4fn")
+                   (check= (buffer-init-value f "par-indent") "4fn")
+                   (check-true (buffer-modified? f))
+                   ;; and init-default in the second view the first one
+                   (edit (init-default "font-base-size"))
+                   (check= (get-init "font-base-size") "10")
+                   (switch-to-buffer f)
+                   (check= (current-view-url) v1)
+                   (check= (get-init "font-base-size") "10")
+                   (check= (get-init "par-indent") "4fn")
+                   (check-false (buffer-init-value f "font-base-size"))
+                   (check= (buffer-init-value f "par-indent") "4fn")
+                   (check-true (buffer-modified? f))
+                   ;; a view made after the changes has them
+                   (with v3 (view-new f)
+                     (window-set-view (current-window) v3 #t)
+                     (check= (current-view-url) v3)
+                     (check= (get-init "par-indent") "4fn")
+                     (check= (get-init "font-base-size") "10"))
+                   ;; the file saved has them, and not the variables of
+                   ;; the window
+                   (check-true (buffer-modified? f))
+                   (buffer-save f)
+                   (check-false (buffer-modified? f))
+                   (check= (file-init-value f "par-indent") "4fn")
+                   (check-false (file-init-value f "font-base-size"))
+                   (check-false (file-init-value f "zoom-factor"))
+                   (check-false (file-init-value f "page-screen-width"))
+                   ;; a change made after the save, in another view, is
+                   ;; saved from this one
+                   (switch-to-buffer f)
+                   (edit (init-env "par-indent" "2fn"))
+                   (switch-to-buffer f)
+                   (check= (get-init "par-indent") "2fn")
+                   (check-true (buffer-modified? f))
+                   (buffer-save f)
+                   (check-false (buffer-modified? f))
+                   (check= (file-init-value f "par-indent") "2fn")
+                   ;; the source mode (preamble) is a setting of the document
+                   (edit (init-env "preamble" "true"))
+                   (switch-to-buffer f)
+                   (check= (get-init "preamble") "true")
+                   (edit (init-default "preamble"))
+                   (switch-to-buffer f)
+                   (check= (get-init "preamble") "false")))))
+      (when (and (pair? r) (== (car r) 'error))
+        (check-report #f "the group" (object->string r))))
+    (for (b (buffer-list))
+      (when (nin? b before)
+        (buffer-pretend-saved b)
+        (buffer-close b)))
+    (when (buffer-exists? old) (switch-to-buffer old))))
+
 (define (test-export)
   (check-group "export")
   (with-buffer-body saved-doc
@@ -995,6 +1108,7 @@
   (test-undo-markers)
   (test-cancel-closed)
   (test-save)
+  (test-views-init)
   (test-export)
   (test-copy-as-text)
   (remove-tmp-files)
