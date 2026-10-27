@@ -18,6 +18,7 @@ range_set search (tree t, tree what, path p, path pos, int limit);
 range_set previous_search_hit (range_set sel, path cur, bool strict);
 range_set next_search_hit (range_set sel, path cur, bool strict);
 range_set navigate_search_hit (path cur, bool fw, bool extreme, bool strict);
+array<tree> search_align (tree t, path p1, path p2, tree what);
 
 range_set spell_with_cache (string lan, tree t, path p, int limit= 1000000);
 range_set spell (string lan, tree t, path p, int limit= 1000000);

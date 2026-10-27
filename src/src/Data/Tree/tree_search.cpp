@@ -1330,6 +1330,7 @@ struct region_matcher {
   array<int> wfail;     // a wildcard fails from this token on
   array<path> mark;     // the position of each start or end of a region
   array<int> at;        // the token of each start of a region
+  array<int> from;      // the token of each element, in the match
   array<range_set> in;  // the regions inside each tag of the pattern
   int end;              // the token after the match
 
@@ -1343,6 +1344,7 @@ struct region_matcher {
     for (int k=0; k<N(kind); k++) wfail[k]= nt;
     mark= array<path> (N(kind));
     at= array<int> (N(kind));
+    from= array<int> (N(kind));
     in= array<range_set> (N(kind));
     end= 0;
   }
@@ -1405,7 +1407,8 @@ struct region_matcher {
       }
       break;
     }
-    if (!ok) failed[ei * nt + ti]= true;
+    if (ok) from[ei]= ti;
+    else failed[ei * nt + ti]= true;
     return ok;
   }
 
@@ -1664,6 +1667,58 @@ select_hits (range_set& sel, tree t, tree what, path p, bool first) {
     merge (sel, ssel);
     if (first) return;
   }
+}
+
+array<tree>
+search_align (tree t, path p1, path p2, tree what) {
+  // the run of the hit from p1 to p2 in t (nil: from its start, to its end)
+  // which each child of the formula pattern what takes, as the search
+  // matches it: lazily, anchored at both ends; a match may start and end
+  // inside a string (#495). With partial (initial) matches, if the whole
+  // hit does not match, the leftmost match in it (at its start), as in a
+  // tag argument. Replace takes the values of the wildcards from these runs
+  // (#520); they matched child by child, which loses a wildcard which takes
+  // several children, or a part of a string. Nil if what does not match
+  initialize_search ();
+  array<tree> r;
+  if (!is_concat (what) || N(what) == 0 || contains_select_region (what))
+    return r;
+  clear_no_formula ();
+  // the first element of each child of the pattern
+  array<int> first (N(what) + 1);
+  int ne= 0;
+  for (int i=0; i<N(what); i++) {
+    first[i]= ne;
+    array<int> kind;
+    array<tree> elem;
+    pattern_elements (kind, elem, what[i]);
+    ne += N(kind);
+  }
+  first[N(what)]= ne;
+  region_matcher m;
+  tokens_between (m.toks, t, path (), p1, p2);
+  m.init (what, true);
+  bool ok= m.run (0, 0);
+  if (!ok && (partial_match_flag || initial_match_flag)) {
+    region_matcher m2;
+    m2.toks= m.toks;
+    m2.init (what, false);
+    for (int s=0; s<=N(m2.toks) && !ok; s++) {
+      ok= m2.run (0, s);
+      if (!partial_match_flag) break;
+    }
+    if (ok) m= m2;
+  }
+  clear_no_formula ();
+  if (!ok || N(m.kind) != ne) return r;
+  for (int i=0; i<N(what); i++) {
+    int s= (first[i] < ne? m.from[first[i]]: m.end);
+    int e= (first[i+1] < ne? m.from[first[i+1]]: m.end);
+    if (e <= s) r << tree ("");
+    else r << simplify_correct (selection_compute (t, m.toks[s].before,
+                                                   m.toks[e-1].after));
+  }
+  return r;
 }
 
 static void

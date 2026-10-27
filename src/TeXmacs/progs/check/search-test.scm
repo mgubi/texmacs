@@ -44,7 +44,8 @@
 ;; hit.
 
 (texmacs-module (check search-test)
-  (:use (check check-lib)))
+  (:use (check check-lib)
+        (generic search-widgets)))
 
 (define (with-preference which val thunk)
   ;; run thunk with the preference set in memory only: nothing is saved
@@ -1460,6 +1461,125 @@
                 '((0 0 0) (0 40001 1)))
     (check-both `(document ,xz) '(concat "x" (wildcard "y") "q") '())))
 
+;; Replace: the values of the wildcards are the runs which they take in the
+;; match, as the search aligns the pattern with the text of the match
+;; (lazily, a part of a string, several children, nothing); a run of several
+;; children is spliced into the formula around the wildcard, and an empty
+;; one is "" (the maintainer's decisions). They were matched child by child:
+;; with another number of children the replacement kept (wildcard "w"), and
+;; a*_x on ab_y_x gave _y (#520)
+(define adjust-by (eval 'adjust-by (resolve-module '(generic search-widgets))))
+
+(define (replaced by what match . hit)
+  (tm->stree (apply adjust-by (cons* by what match hit))))
+
+(define (check-replaced by what match expected)
+  ;; match is a hit of what in Replace mode, and its replacement by by
+  (with-search-mode 'replace
+    (lambda ()
+      (check= (hits `(document ,match) what) '((0 0) (0 1)))
+      (check= (replaced by what match) expected))))
+
+(define (formula-ends match)
+  ;; the start and the end of the formula or string match, in a document
+  (if (string? match) (list '(0 0) (list 0 (string-length match)))
+      (let* ((n (- (length match) 2))
+             (last (list-ref match (+ n 1))))
+        (list '(0 0 0)
+              (list 0 n (if (string? last) (string-length last) 1))))))
+
+(define (check-replaced-text by what match expected)
+  ;; idem for a formula pattern, which matches all the formula match
+  (with-search-mode 'replace
+    (lambda ()
+      (check= (hits `(document ,match) what) (formula-ends match))
+      (check= (replaced by what match) expected))))
+
+(define (distinct-wildcards what)
+  ;; what (a fraction of a formula), the second wildcard named v: two
+  ;; wildcards with the same name take the value of the first
+  (let* ((l (cdadr what))
+         (k (list-find-index l (cut == <> '(wildcard "w"))))
+         (l2 (if k (append (list-head l (+ k 1))
+                           (map (lambda (x)
+                                  (if (== x '(wildcard "w")) '(wildcard "v") x))
+                                (list-tail l (+ k 1))))
+                 l)))
+    `(frac (concat ,@l2) ,(caddr what))))
+
+(define (test-replace-wildcards)
+  (check-group "replace wildcards")
+  (let ((what '(frac (concat "a" (wildcard "w") (rsub "x")) "c"))
+        (by '(frac (wildcard "w") "c")))
+    (for-each
+      (lambda (row)
+        (check-replaced by what `(frac ,(car row) "c") `(frac ,(cadr row) "c")))
+      '(((concat "a" (rsub "y") (rsub "z") (rsub "x"))
+         (concat (rsub "y") (rsub "z")))
+        ((concat "a" (rsub "x")) "")
+        ((concat "ab" (rsub "x")) "b")
+        ((concat "a" (rsub "y") (rsub "x")) (rsub "y"))
+        ((concat "ab" (rsub "y") (rsub "x")) (concat "b" (rsub "y"))))))
+  (let ((what '(concat "a" (wildcard "w") (rsub "x"))))
+    (for-each
+      (lambda (row)
+        (check-replaced-text '(wildcard "w") what (car row) (cadr row))
+        ;; spliced into the formula of the replacement, and simplified
+        (check-replaced-text '(concat "q" (wildcard "w") "r") what
+                             (car row) (caddr row)))
+      '(((concat "a" (rsub "y") (rsub "z") (rsub "x"))
+         (concat (rsub "y") (rsub "z"))
+         (concat "q" (rsub "y") (rsub "z") "r"))
+        ((concat "abc" (rsub "x")) "bc" "qbcr")
+        ((concat "ab" (rsub "y") (rsub "x"))
+         (concat "b" (rsub "y"))
+         (concat "qb" (rsub "y") "r")))))
+  ;; the case of the letters does not matter
+  (with-preference "case-insensitive-match" "on"
+    (lambda ()
+      (check-replaced-text '(concat "<" (wildcard "w") ">")
+                           '(concat "A" (wildcard "w") "C") "abc" "<b>")
+      (check-replaced-text '(wildcard "w")
+                           '(concat "A" (wildcard "w") (rsub "X"))
+                           '(concat "aBc" (rsub "x")) "Bc")))
+  ;; with allow-partial-replace, a formula anywhere in the argument: the
+  ;; leftmost one
+  (with-preference "allow-partial-replace" "on"
+    (lambda ()
+      (check-replaced '(frac (wildcard "w") "c")
+                      '(frac (concat "a" (wildcard "w") (rsub "x")) "c")
+                      '(frac (concat "zab" (rsub "x") "qa" (rsub "x")) "c")
+                      '(frac "b" "c"))))
+  ;; a hit which a wildcard carries out of a tag (a paragraph which is the
+  ;; tag alone, #501) is aligned by its paths in the document: its subtree
+  ;; does not show where it starts
+  (with-search-mode 'replace
+    (lambda ()
+      (let* ((doc (stree->tree '(document (strong "xab") "c")))
+             (what '(concat "a" (wildcard "w")))
+             (h (tree-search-tree doc what '() 100)))
+        (check= h '((0 0 1) (0 1)))
+        (check= (replaced '(concat "<" (wildcard "w") ">") what
+                          '(strong "ab") doc (car h) (cadr h))
+                "<b>"))))
+  ;; replacing the hits of a pattern by the pattern itself gives them back
+  ;; (the direct hits: a cascaded match is inside a tag of the argument,
+  ;; which the replacement does not keep)
+  (with-search-mode 'replace
+    (lambda ()
+      (with-preference "allow-cascaded-match" "off"
+        (lambda ()
+          (with bad
+              (list-filter
+                (search-replace-cases 400)
+                (lambda (c)
+                  (let* ((doc (car c)) (what (distinct-wildcards (cadr c))))
+                    (and (== (hits doc what) '((0 0) (0 1)))
+                         (!= (replaced what what (cadr doc))
+                             (tm->stree (tree-simplify
+                                          (stree->tree (cadr doc)))))))))
+            (check= bad '())))))))
+
 (tm-define (search-test-failures)
   (check-suite "search")
   (test-text)
@@ -1488,4 +1608,5 @@
   (test-lone-tags)
   (test-search-contains-replace)
   (test-speed-in-arguments)
+  (test-replace-wildcards)
   (check-end))

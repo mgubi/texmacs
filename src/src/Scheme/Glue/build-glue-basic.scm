@@ -257,6 +257,7 @@
   (tree-search-sections search_sections (array_tree tree))
   (tree-search-tree search (array_path content content path int))
   (tree-search-tree-at search (array_path content content path path int))
+  (tree-search-align search_align (array_tree content path path content))
   (tree-spell spell (array_path string content path int))
   (tree-spell* spell_with_cache (array_path string content path int))
   (tree-spell-at spell (array_path string content path path int))

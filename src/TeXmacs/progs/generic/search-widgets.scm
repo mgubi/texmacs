@@ -309,12 +309,30 @@
     (if (null? l) (list)
 	(get-wildcards-in-string-rec what l match 0))))
 
+(define (aligned-runs t p1 p2 what)
+  ;; the run of the hit from p1 to p2 in t (all of t if both are empty)
+  ;; which each child of the formula pattern what takes, as the search
+  ;; matches it (#520), or #f
+  (with runs (tree-search-align t p1 p2 what)
+    (and (nnull? runs) runs)))
+
+(define (get-wildcards-aligned what runs)
+  ;; the wildcards of the formula pattern what, whose children took runs
+  (append-map get-wildcards (tm-children what) runs))
+
 (define (get-wildcards-var what match)
   (cond ((tm-equal? what match) (list))
         ((tm-func? what 'wildcard 1)
          (list `(:wildcard ,(tm->stree (tm-ref what 0)) ,(tm->stree match))))
         ((tm-equal? what "")
          (list `(:empty ,(tm->stree match))))
+        ;; a formula pattern against a formula, a string or a tag: its
+        ;; children are aligned with the text of the match as the search
+        ;; does, a wildcard taking a part of a string, or several children
+        ;; (#520); they were matched child by child
+        ((and (tm-func? what 'concat) (not (tm-func? match 'document))
+              (aligned-runs match '() '() what))
+         => (lambda (runs) (get-wildcards-aligned what runs)))
 	((and (tm-atomic? match)
 	      (tm-func? what 'concat))
 	 (get-wildcards-in-string (tm-children what) (tm->string match)))
@@ -366,13 +384,25 @@
         (else (with r (replace-wildcards-list (tm-children by) wc)
                 (cons (cons (tm-label by) (car r)) (cdr r))))))
 
-(define (adjust-by by what match)
+(define (get-wildcards-of-hit what match hit)
+  ;; the wildcards of what in its match; hit is () or the tree in which the
+  ;; match was found and the paths of the match in it, by which a formula
+  ;; pattern is aligned: also a match which a wildcard carried out of a tag
+  ;; (#515, #520), which its subtree does not show
+  (with runs (and (tm-func? what 'concat) (nnull? hit)
+                  (aligned-runs (car hit) (cadr hit) (caddr hit) what))
+    (if runs (get-wildcards-aligned what runs) (get-wildcards what match))))
+
+(define (adjust-by by what match . hit)
+  ;; the replacement of match, a match of what, by by: its wildcards take
+  ;; the values of those of what; a value of several children is spliced
+  ;; into the formula around the wildcard (#520)
   (let* ((swhat (and (tm-atomic? what) (tm->string what)))
          (smatch (and (tm-atomic? match) (tm->string match)))
          (sby (and (tm-atomic? by) (tm->string by)))
          (lwhat (and (tm-compound? what) (tm->list what)))
          (lmatch (and (tm-compound? match) (tm->list match)))
-         (wc (get-wildcards what match)))
+         (wc (get-wildcards-of-hit what match hit)))
     (cond ((tm-equal? what match) by)
           ((and (tm-func? what 'concat)
                 (tm-func? match 'concat)
@@ -387,7 +417,17 @@
                  ((== (locase-first swhat) smatch) (locase-first sby))
                  ((== (upcase-first swhat) smatch) (upcase-first sby))
                  (else sby)))
-          (else (car (replace-wildcards by wc))))))
+          ((null? wc) by)
+          (else (tree-simplify (tm->tree (car (replace-wildcards by wc))))))))
+
+(define (search-hit sel)
+  ;; the buffer and the paths in it of the hit sel, for adjust-by
+  (let* ((t (buffer-tree))
+         (p (tree->path t)))
+    (if (and (list-starts? (car sel) p) (list-starts? (cadr sel) p))
+        (list t (list-tail (car sel) (length p))
+              (list-tail (cadr sel) (length p)))
+        (list))))
 
 (define (replace-next* by)
   ;;(display* "replace-next* " by "\n")
@@ -397,7 +437,9 @@
          (and-with sel (search-next sels cur #f)
            (go-to* (car sel))
            (selection-set-range-set sel)
-           (with by* (tm->tree (adjust-by by (search-tree) (selection-tree)))
+           (with by* (tm->tree (apply adjust-by
+                                      (cons* by (search-tree) (selection-tree)
+                                             (search-hit sel))))
              (clipboard-cut "dummy")
              (insert-go-to (tree-copy by*) (path-end by* '())))
            #t))))
