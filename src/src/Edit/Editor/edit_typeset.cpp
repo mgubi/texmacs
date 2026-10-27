@@ -1063,6 +1063,20 @@ edit_typeset_rep::get_init_all () {
 // The variables of the window (is_view_init_variable: its size, zoom and
 // full screen mode) stay those of the view, and do not modify the buffer.
 
+static void
+init_buffer_views (tm_buffer buf, string var, tree by, bool reset) {
+  // the buffer's data and all its views get the value @by of @var, or lose
+  // @var when @reset; the view which made the change has it already, so
+  // that init_env_local and init_default_local do nothing in it. An editor
+  // whose view was deleted (delete_view) has no buffer.
+  if (buf == NULL) return;
+  if (reset) buf->data->init->reset (var);
+  else buf->data->init (var)= copy (by);
+  for (int i=0; i<N(buf->vws); i++)
+    if (reset) buf->vws[i]->ed->init_default_local (var);
+    else buf->vws[i]->ed->init_env_local (var, copy (by));
+}
+
 void
 edit_typeset_rep::init_env (string var, tree by) {
   if (init (var) == by) return;
@@ -1074,16 +1088,12 @@ edit_typeset_rep::init_env (string var, tree by) {
   }
   require_save ();
   notify_change (THE_ENVIRONMENT);
-  buf->data->init (var)= copy (by);
-  for (int i=0; i<N(buf->vws); i++) {
-    editor_rep* ed= ((tm_view) buf->vws[i])->ed.operator-> ();
-    if (ed != (editor_rep*) this) ed->init_env_local (var, copy (by));
-  }
+  init_buffer_views (buf, var, by, false);
 }
 
 void
 edit_typeset_rep::init_env_local (string var, tree by) {
-  // the change of init_env in another view of the buffer
+  // the change of init_env in one view of the buffer (init_buffer_views)
   if (init (var) == by) return;
   init (var)= by;
   require_save ();
@@ -1111,16 +1121,12 @@ edit_typeset_rep::init_default (string var) {
   if (!init->contains (var)) return;
   init_default_local (var);
   if (is_view_init_variable (var)) return;
-  buf->data->init->reset (var);
-  for (int i=0; i<N(buf->vws); i++) {
-    editor_rep* ed= ((tm_view) buf->vws[i])->ed.operator-> ();
-    if (ed != (editor_rep*) this) ed->init_default_local (var);
-  }
+  init_buffer_views (buf, var, tree (UNINIT), true);
 }
 
 void
 edit_typeset_rep::init_default_local (string var) {
-  // the change of init_default in this view only
+  // the change of init_default in one view of the buffer
   if (!init->contains (var)) return;
   init->reset (var);
   set_pre (var, stydef->contains (var)? stydef[var]: tree (UNINIT));
