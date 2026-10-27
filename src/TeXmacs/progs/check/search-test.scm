@@ -1805,6 +1805,57 @@
            (concat "<" (wildcard "w") ">")
            (document (concat "<cb>" (tabular (table (row (cell "x")
                                                          (cell "d")))))))
+          ;; the tags around the outermost tag with other arguments with
+          ;; text are kept
+          ((document (concat "q" (strong (frac "xab" "d")) "c"))
+           (concat "a" (wildcard "w"))
+           (concat "<" (wildcard "w") ">")
+           (document (concat "q" (strong (frac "x" "d")) "<" (strong "b")
+                             "c>")))
+          ;; but not the parts of a table
+          ((document (concat (strong (tabular (table (row (cell "xab")
+                                                          (cell "d")))))
+                             "c"))
+           (concat "a" (wildcard "w"))
+           (concat "<" (wildcard "w") ">")
+           (document (concat (strong (tabular (table (row (cell "x")
+                                                          (cell "d")))))
+                             "<" (strong "b") "c>")))
+          ;; a tag which the replacement leaves without text is removed
+          ((document (concat "q" (strong "ab") "c"))
+           (concat "a" (wildcard "w"))
+           (concat "<" (wildcard "w") ">")
+           (document (concat "q<" (strong "b") "c>")))
+          ((document (concat "c" (strong "ba") "x"))
+           (concat (wildcard "w") "a")
+           (concat "<" (wildcard "w") ">")
+           (document (concat "<c" (strong "b") ">x")))
+          ((document (strong "ab") "c")
+           (concat "a" (wildcard "w"))
+           (concat "<" (wildcard "w") ">")
+           (document (concat "<" (strong "b") ">") "c"))
+          ((document (concat (strong (em "ab")) "c"))
+           (concat "a" (wildcard "w"))
+           (concat "<" (wildcard "w") ">")
+           (document (concat "<" (strong (em "b")) "c>")))
+          ;; a hit of several paragraphs is one selection, replaced in
+          ;; place (with wildcards too); it went after the document
+          ((document "xab" "cdy")
+           (document "b" "c")
+           "Q"
+           (document "xaQdy"))
+          ((document "xab" "m" "cdy")
+           (document "b" "m" "c")
+           "Q"
+           (document "xaQdy"))
+          ((document (theorem (document "xab" "cdy")))
+           (document "b" "c")
+           "Q"
+           (document (theorem (document "xaQdy"))))
+          ((document "xab" "cdy")
+           (document (concat "a" (wildcard "w")) (concat (wildcard "v") "d"))
+           (concat "[" (wildcard "w") "|" (wildcard "v") "]")
+           (document "x[b|c]y"))
           ;; a with has no other argument with text: it is kept
           ((document (concat "q" (with "color" "red" "xab") "c"))
            (concat "a" (wildcard "w"))

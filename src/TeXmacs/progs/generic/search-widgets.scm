@@ -480,35 +480,94 @@
          (and-with sel (search-next sels cur #f)
            (go-to* (car sel))
            (selection-set-range-set sel)
-           (let* ((hit (search-hit sel))
+           (let* ((what (search-tree))
+                  (hit (search-hit sel))
                   (by* (tm->tree (apply adjust-by
-                                        (cons* by (search-tree)
-                                               (selection-tree) hit))))
-                  (parts (if (null? hit) (list)
+                                        (cons* by what (selection-tree) hit))))
+                  ;; a hit carried out of a tag (or into it) by a wildcard
+                  ;; of a formula pattern; not one of several paragraphs
+                  (parts (if (or (null? hit) (tm-func? what 'document)) (list)
                              (tree-search-hit-parts (car hit) (cadr hit)
                                                     (caddr hit)))))
              (if (null? parts)
-                 (clipboard-cut "dummy")
-                 (cut-hit-parts parts (tree->path (buffer-tree))))
-             (insert-go-to (tree-copy by*) (path-end by* '())))
+                 (begin
+                   (clipboard-cut "dummy")
+                   (insert-go-to (tree-copy by*) (path-end by* '())))
+                 (replace-hit-parts by* parts hit (tree->path (buffer-tree)))))
            #t))))
 
-(define (cut-hit-parts parts p)
+(define (inside? p q i)
+  ;; is the position p inside the argument i of the tree at q?
+  (and (> (length p) (+ (length q) 1))
+       (list-starts? p (rcons q i))))
+
+(define (crossed-tags t p1 p2)
+  ;; the paths in t of the tags which the hit from p1 to p2 goes out of or
+  ;; into (not both of its ends inside the same argument), the innermost
+  ;; first
+  (let* ((tags (lambda (p)
+                 (let loop ((u t) (q (list)) (l p) (r (list)))
+                   (if (or (null? l) (tree-atomic? u)) r
+                       (let* ((r2 (if (and (nnull? q)
+                                           (not (tree-is? u 'concat))
+                                           (not (tree-is? u 'document))
+                                           (not (and (inside? p1 q (car l))
+                                                     (inside? p2 q (car l)))))
+                                      (cons q r) r)))
+                         (if (or (null? (cdr l)) (>= (car l) (tree-arity u)))
+                             r2
+                             (loop (tree-ref u (car l)) (rcons q (car l))
+                                   (cdr l) r2)))))))
+         (all (list-remove-duplicates (append (tags p1) (tags p2)))))
+    (sort all (lambda (a b) (> (length a) (length b))))))
+
+(define (without-text? t)
+  ;; t has no text in the arguments which the cursor can reach
+  (if (tree-atomic? t) (== (tree->string t) "")
+      (list-and (map (lambda (i)
+                       (or (not (tree-accessible-child? t i))
+                           (without-text? (tree-ref t i))))
+                     (iota (tree-arity t))))))
+
+(define (remove-from-formula f i)
+  ;; remove the child i of the formula f, which stays normalized: the
+  ;; strings around it become one, and a formula of one child is that child
+  (tree-remove f i 1)
+  (when (and (> i 0) (< i (tree-arity f))
+             (tree-atomic? (tree-ref f (- i 1))) (tree-atomic? (tree-ref f i)))
+    (with s (string-append (tree->string (tree-ref f (- i 1)))
+                           (tree->string (tree-ref f i)))
+      (tree-remove f i 1)
+      (tree-assign (tree-ref f (- i 1)) s)))
+  (when (== (tree-arity f) 1)
+    (tree-assign f (tree-copy (tree-ref f 0)))))
+
+(define (replace-hit-parts by* parts hit p)
   ;; a hit which a wildcard carried out of a tag or into one: only its
   ;; parts are removed, in the tag and outside (a selection would take the
-  ;; whole tag, and the replacement drops the rest of it), and the cursor
-  ;; goes after the tag which it leaves, or before the one which it enters
-  ;; (#520). The paths are followed through the changes
+  ;; whole tag, and the replacement drops the rest of it), by* goes after
+  ;; the tag which it leaves, or before the one which it enters, and a tag
+  ;; which is left without text is removed (#520). The paths and the tags
+  ;; are followed through the changes
   (let* ((ps (map (lambda (q) (position-new-path (append p q))) parts))
          (ranges (let loop ((l (cDr ps)))
                    (if (or (null? l) (null? (cdr l))) (list)
-                       (cons (list (car l) (cadr l)) (loop (cddr l)))))))
+                       (cons (list (car l) (cadr l)) (loop (cddr l))))))
+         (tags (map (lambda (q) (path->tree (append p q)))
+                    (crossed-tags (car hit) (cadr hit) (caddr hit)))))
     (for (r (reverse ranges))
       (let ((s (position-get (car r))) (e (position-get (cadr r))))
         (when (path-less? s e)
           (selection-set s e)
           (clipboard-cut "dummy"))))
     (go-to (position-get (cAr ps)))
+    (insert-go-to (tree-copy by*) (path-end by* '()))
+    (for (u tags)
+      (when (and u (tree->path u) (tree-compound? u) (without-text? u))
+        (with up (tree-up u)
+          (if (and up (tree-is? up 'concat))
+              (remove-from-formula up (tree-index u))
+              (tree-assign u "")))))
     (for (x ps) (position-delete x))))
 
 (define (replace-next by)

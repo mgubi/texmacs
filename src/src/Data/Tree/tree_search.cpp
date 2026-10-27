@@ -1690,6 +1690,33 @@ has_other_text (tree t, const search_token& tok) {
   return false;
 }
 
+static bool
+in_table (tree t, const search_token& tok) {
+  // is the tag which the boundary tok leaves or enters a part of a table,
+  // or a tag around one (tabular)?
+  tree u= subtree (t, tok.at);
+  if (is_table (u) || is_table_format (u)) return true;
+  int i= (tok.out >= 0? tok.out: tok.in);
+  return i >= 0 && i < N(u) && (is_table (u[i]) || is_table_format (u[i]));
+}
+
+static bool
+is_flat (tree t, array<search_token> toks, int s, int e, path at) {
+  // is the part inside the tag of t at at of a run (tokens s to e) alone,
+  // not in a copy of the tag? If the run leaves or enters this tag, or a
+  // tag around it, which has other arguments with text: they stay in the
+  // document, so that a copy would repeat them (a fraction), and the
+  // structure of the tags inside it would be lost (a table cell without its
+  // row). The tags around the outermost such tag are kept (a strong around
+  // a fraction), as those without other text (strong, a with), but not the
+  // parts of a table (a table of a string)
+  for (int i=s; i<e; i++)
+    if (toks[i].kind == TOKEN_BOUNDARY && toks[i].at <= at &&
+        (has_other_text (t, toks[i]) || in_table (t, toks[i])))
+      return true;
+  return false;
+}
+
 static tree
 in_copy (tree t, path at, int i, tree x, bool flat) {
   // the part x, inside the argument i of the tag of t at at, as a part of
@@ -1710,15 +1737,6 @@ tokens_tree (tree t, array<search_token> toks, int s, int e) {
   tree acc (CONCAT);
   array<tree> saved;
   array<int> entered;
-  // the parts are alone (flat) if a tag which the run leaves or enters has
-  // other arguments with text: they stay in the document, so that a copy
-  // would repeat them (a fraction), and so are the parts in the tags inside
-  // it, whose structure would be lost (a table cell without its row). Else
-  // the parts are in copies of their tags (strong, a with)
-  bool flat= false;
-  for (int i=s; i<e; i++)
-    if (toks[i].kind == TOKEN_BOUNDARY && has_other_text (t, toks[i]))
-      flat= true;
   int i0= s;
   for (int i=s; i<=e; i++) {
     if (i < e && toks[i].kind != TOKEN_BOUNDARY) continue;
@@ -1731,7 +1749,9 @@ tokens_tree (tree t, array<search_token> toks, int s, int e) {
     if (toks[i].out >= 0) {
       tree in= simplify_correct (acc);
       acc= tree (CONCAT);
-      if (in != "") acc << in_copy (t, toks[i].at, toks[i].out, in, flat);
+      if (in != "")
+        acc << in_copy (t, toks[i].at, toks[i].out, in,
+                        is_flat (t, toks, s, e, toks[i].at));
     }
     if (toks[i].in >= 0) {
       saved << acc;
@@ -1743,7 +1763,8 @@ tokens_tree (tree t, array<search_token> toks, int s, int e) {
     tree in= simplify_correct (acc);
     acc= saved[k];
     const search_token& tok= toks[entered[k]];
-    if (in != "") acc << in_copy (t, tok.at, tok.in, in, flat);
+    if (in != "")
+      acc << in_copy (t, tok.at, tok.in, in, is_flat (t, toks, s, e, tok.at));
   }
   return simplify_correct (acc);
 }
@@ -1754,15 +1775,18 @@ search_hit_parts (tree t, path p1, path p2) {
   // ranges of its parts in each tag, or outside, then the position at
   // which Replace inserts the replacement: after the outermost tag which
   // the hit leaves, else before the outermost one which it enters. Nil for
-  // another hit, which Replace replaces as a selection (#520)
+  // another hit, which Replace replaces as a selection (#520), also for a
+  // hit of several paragraphs: it goes out of a paragraph of a document,
+  // not out of a tag
   array<path> r;
   array<search_token> toks;
   tokens_between (toks, t, path (), p1, p2);
   int outer= -1;
   for (int i=0; i<N(toks); i++)
-    if (toks[i].kind == TOKEN_BOUNDARY &&
-        (outer < 0 || N(toks[i].at) < N(toks[outer].at)))
-      outer= i;
+    if (toks[i].kind == TOKEN_BOUNDARY) {
+      if (is_document (subtree (t, toks[i].at))) return r;
+      if (outer < 0 || N(toks[i].at) < N(toks[outer].at)) outer= i;
+    }
   if (outer < 0) return r;
   int i0= 0;
   for (int i=0; i<=N(toks); i++) {
