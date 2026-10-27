@@ -359,6 +359,7 @@ connection_interrupt (string name, string session) {
 void
 connection_stop (string name, string session) {
   // cout << "Stop " << name << ", " << session << "\n";
+  ai_chat_close (name, session); // the codes of its compressed markup
   connection con= connection (name * "-" * session);
   if (is_nil (con)) return;
   con->stop ();

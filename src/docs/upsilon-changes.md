@@ -24,6 +24,26 @@ have the details, and the problems go to the
 - **Printing**: a shortcut which prints, such as `M-e p` bound to
   `print-to-file`, no longer leaves the "M-e" it showed while waiting for
   the second key on the screen (#519).
+- **Part views**: saving the view of the master writes the changes of its
+  initial environment (Document → Font size, for instance) and keeps the
+  master's own entries, which were dropped at every save. Each variable is
+  merged from what the view loaded, what it has now and what the file has
+  on disk, so that a change made on disk or by the open buffer of the file
+  is no longer overwritten (#421).
+- **Search**: a formula inside a tag argument of the pattern and a pattern
+  with regions to select (`select-region`) are matched as text, by the
+  rules of the other patterns, the same way by Search and Replace; a match
+  which follows one ending inside a tag is found (#500, #501).
+- **Fonts**: kana and the other CJK blocks go to the CJK fallback, and the
+  Korean and Chinese fallbacks are no longer shrunk to the size of Latin
+  letters. With `math-stix` or a TeX Gyre math font and the default text
+  font, formulas are set in the real math font, with its big operators,
+  radicals and wide accents (#196).
+- **AI and LanguageTool**: the codes which stand for the markup sent to
+  the engines are freed after each request, or with their chat session,
+  instead of piling up for the whole session (#438).
+- **Linux, Qt**: a stopped session plug-in no longer stays a zombie process
+  until the next event (#525).
 
 ## 26 October 2026
 

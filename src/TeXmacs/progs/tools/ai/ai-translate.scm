@@ -50,14 +50,35 @@
   (tree-pointer-detach tp)
   (next))
 
+;; an answer without text (a failed request, or the error of the engine,
+;; as {"detail": ...} for Albert, from which cpp-ai-output gets nothing)
+;; leaves the paragraph as it is, and the process goes on
+(tm-define (ai-translation-answer? out model)
+  (and (string? out) (!= out "")
+       (with out* (cpp-ai-output out model)
+         (and (string? out*) (!= out* "")
+              (!= (car (cpp-ai-get-body out*)) "")))))
+
+(define ((translate-answered model fun) out)
+  (fun (and (ai-translation-answer? out model) out)))
+
+(tm-define (ai-translate-callback serial tp st model next table)
+  (:synopsis "The function called with the answer for one paragraph")
+  ;; (decompressed with the codes of the paragraph's table, which is freed)
+  (compress-table-callback table
+    (translate-answered model
+      (translate-processed-one serial tp st model next))))
+
 (define ((translate-process-one dest-lan) serial tp st next)
   (let* ((t (tree-pointer->tree tp))
-         (t* (compress-tree t))
+         ;; the codes of this paragraph, freed once its answer is there
+         (table (compress-table-new "translate"))
+         (t* (with-compress-table table (lambda () (compress-tree t))))
          (in (compressed->html t* 1))
          (src-lan (tree-get-env t "language"))
          (model (get-preference "ai"))
          (agent (ai-translation-agent src-lan dest-lan))
-         (return (translate-processed-one serial tp st model next)))
+         (return (ai-translate-callback serial tp st model next table)))
     (cond ((not (compressed-contains-text? t*))
            (return #f))
           ((not (process-running? 'translate))
@@ -65,7 +86,9 @@
           (else
             (with cmd (cpp-ai-command in model agent)
               ;;(display* "Eval] " cmd "\n")
-              (cpp-ai-async-eval-command cmd return))))))
+              ;; (true: nothing launched, and return will not be called)
+              (when (cpp-ai-async-eval-command cmd return)
+                (compress-table-free table)))))))
 
 (define (make-translate-process lan)
   (make-process (translate-process-one lan) 'translate))

@@ -59,6 +59,7 @@
         (check database-test)
         (check math-edit-test)
         (check table-test)
+        (check fonts-test)
         (check text-structure-test)
         (check graphics-edit-test)
         (check version-test)
@@ -175,6 +176,7 @@
     ("convert-more" convert-more-test-failures count)
     ("math-edit" math-edit-test-failures count)
     ("table" table-test-failures count)
+    ("fonts" fonts-test-failures count)
     ("text-structure" text-structure-test-failures count)
     ("graphics-edit" graphics-edit-test-failures count)
     ;; makes a throwaway git repository in the temporary directory

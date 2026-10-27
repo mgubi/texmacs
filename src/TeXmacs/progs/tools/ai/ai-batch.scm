@@ -310,9 +310,16 @@
 ;; Copy and paste while compressing non natural language text
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;; the codes of the chat outside TeXmacs, which may paste back the answer to
+;; any earlier copy: their table lasts as long as TeXmacs
+(define ai-clipboard-table "ai-clipboard")
+
 (tm-define (ai-copy)
   (when (selection-active-any?)
-    (clipboard-set "primary" (compress-html (selection-tree) 1))))
+    (compress-table-open ai-clipboard-table)
+    (with-compress-table ai-clipboard-table
+      (lambda ()
+        (clipboard-set "primary" (compress-html (selection-tree) 1))))))
 
 (tm-define (ai-cut)
   (when (selection-active-any?)
@@ -330,5 +337,6 @@
           (else t))))
 
 (tm-define (ai-paste)
-  (with t (decompress-html (clipboard-get* "extern") 1)
+  (with t (with-compress-table ai-clipboard-table
+            (lambda () (decompress-html (clipboard-get* "extern") 1)))
     (insert t)))
