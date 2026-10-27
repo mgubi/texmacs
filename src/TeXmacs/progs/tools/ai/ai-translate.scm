@@ -79,9 +79,14 @@
           (else
             (with cmd (cpp-ai-command in model agent)
               ;;(display* "Eval] " cmd "\n")
-              ;; (true: nothing launched, and return will not be called)
+              ;; (true: nothing launched, and return will not be called:
+              ;; the translation stops, as the next requests would fail too,
+              ;; and return, called without an answer, frees the table and
+              ;; detaches the tree pointer of each paragraph)
               (when (cpp-ai-async-eval-command cmd return)
-                (compress-table-free table)))))))
+                (set-message "The request could not be sent" "Translate")
+                (process-deactivate 'translate)
+                (return #f)))))))
 
 (define (make-translate-process lan)
   (make-process (translate-process-one lan) 'translate))

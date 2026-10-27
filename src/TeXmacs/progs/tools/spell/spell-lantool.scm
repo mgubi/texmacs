@@ -92,11 +92,16 @@
 	    (set! args (append args
 			       (list "username" (lantool-username)
 				     "apiKey" (lantool-api-key)))))
-          ;; (true: nothing sent, and return will not be called)
+          ;; (true: nothing sent, and return will not be called: the check
+          ;; stops, as the next requests would fail too, and return, called
+          ;; without an answer, frees the table, and the process detaches
+          ;; its tree pointers)
           (when (async-http-post-query (lantool-server)
                   '("Content-Type" "application/x-www-form-urlencoded") args
                   (lantool-return lan html return))
-            (compress-table-free table))))))
+            (set-message "The request could not be sent" "Spell check")
+            (process-deactivate 'lantool)
+            (return html #f))))))
 
 (tm-define (lantool-process-old t return)
   (spell-initiate)

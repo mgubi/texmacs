@@ -169,6 +169,63 @@
     (when (buffer-exists? old) (switch-to-buffer old))
     (check= (current-buffer) old)))
 
+;; A tree pointer or a position which is collected while it is still
+;; attached to a tree (a process whose callback was never called, a
+;; position-new without position-delete after an error) is held by the
+;; list of the observers of the tree alone; when the tree is detached, by
+;; replacing the body of its buffer or closing it, the observer moves to
+;; the closest tree, and it was freed while it did so (#537: set_tree of
+;; tree_pointer.cpp and tree_addendum.cpp, set_position of
+;; tree_position.cpp). A use of freed memory does not always crash: on the
+;; Guile/Qt build of macOS these checks aborted without the fix, but they
+;; are reliable only under ASan (with NO_FAST_ALLOC).
+(define (attach-forgotten-pointer)
+  ;; (in a function of its own, so that nothing on the stack keeps it)
+  (tree->tree-pointer (tree-ref (buffer-tree) 0))
+  #t)
+
+(define (attach-forgotten-position)
+  (position-new-path (append (buffer-path) '(0 0 1)))
+  #t)
+
+(define (forgotten-observers-collected)
+  (do ((i 0 (+ i 1))) ((= i 20000)) (make-vector 50 i))
+  (gc)
+  #t)
+
+(define (test-tree-pointers)
+  (check-group "tree pointers")
+  ;; replacing the body
+  (with-buffer-body '(document (concat "a " (em "b")) "c")
+    (lambda ()
+      (attach-forgotten-pointer)
+      (forgotten-observers-collected)
+      (buffer-set-body (current-buffer) (stree->tree '(document "d")))
+      (check= (tree->stree (buffer-tree)) '(document "d"))))
+  ;; closing the buffer (with-buffer-body closes it)
+  (with-buffer-body '(document (concat "e " (em "f")))
+    (lambda ()
+      (attach-forgotten-pointer)
+      (forgotten-observers-collected)
+      (check= (tree->stree (buffer-tree)) '(document (concat "e " (em "f"))))))
+  (forgotten-observers-collected)
+  ;; a position, the body replaced twice, then the buffer closed
+  (with-buffer-body '(document (concat "ab " (em "b")) "c")
+    (lambda ()
+      (attach-forgotten-position)
+      (forgotten-observers-collected)
+      (buffer-set-body (current-buffer) (stree->tree '(document "d")))
+      (forgotten-observers-collected)
+      (buffer-set-body (current-buffer) (stree->tree '(document "e" "f")))
+      (check= (tree->stree (buffer-tree)) '(document "e" "f"))))
+  (forgotten-observers-collected)
+  ;; a pointer which is detached is still fine
+  (with-buffer-body '(document "g" "h")
+    (lambda ()
+      (with tp (tree->tree-pointer (tree-ref (buffer-tree) 1))
+        (check= (tree->stree (tree-pointer->tree tp)) "h")
+        (tree-pointer-detach tp)))))
+
 ;; The buffer of an embedded TeXmacs widget (texmacs-input) is embedded in an
 ;; alternative window when the widget is made while that window is being
 ;; built, between alt-window-handle and alt-window-create, as the dialogues
@@ -1093,6 +1150,7 @@
   (check-suite "editing")
   (system-mkdir (system->url editing-dir))
   (test-buffers)
+  (test-tree-pointers)
   (test-embedded)
   (test-load)
   (test-insert)

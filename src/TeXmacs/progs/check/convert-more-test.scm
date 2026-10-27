@@ -1269,21 +1269,33 @@
           (when (buffer-exists? old) (switch-to-buffer old)))))
     ;; the translation process, whose request cannot be launched (an engine
     ;; without a command: cpp-ai-async-eval-command says so, and will not
-    ;; call back): the table of the paragraph is freed all the same
+    ;; call back): the process stops at the first paragraph, whose table is
+    ;; freed all the same, and the second one is not tried (one table only,
+    ;; between the two made here); both paragraphs are left as they were,
+    ;; and their tree pointers detached (one left attached, once collected,
+    ;; was used by buffer-close)
     (let* ((m (get-preference "ai")))
       (when (no-ai-request? m)
         (let* ((old (current-buffer))
                (before (buffer-list))
-               (u (new-buffer)))
+               (u (new-buffer))
+               (doc '(document (concat "it is " (em "b")) (concat "c " (em "d")))))
           (dynamic-wind
             (lambda () (noop))
             (lambda ()
               (switch-to-buffer* u)
-              (buffer-set-body u (stree->tree
-                                  '(document (concat "it is " (em "b")))))
+              (buffer-set-body u (stree->tree doc))
               (go-start)
-              (ai-translate* "french")
-              (check-true (process-running? 'translate))
+              (let* ((first (compress-table-new "check"))
+                     (dummy (ai-translate* "french"))
+                     (last (compress-table-new "check")))
+                (check= (- (compress-table-serial last)
+                           (compress-table-serial first))
+                        2)
+                (compress-table-free first)
+                (compress-table-free last))
+              (check-false (process-running? 'translate))
+              (check= (st (buffer-tree)) doc)
               (check= (compress-tables-like "translate") '()))
             (lambda ()
               (ai-abort-translate)
