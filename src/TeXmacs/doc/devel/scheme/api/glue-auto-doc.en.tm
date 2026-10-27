@@ -1843,6 +1843,14 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(tree-search-hit-parts <scm-arg|content> <scm-arg|path> <scm-arg|path>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|search_hit_parts> which returns
+    <scm|array_path>.
+  </explain>
+
+  <\explain>
     <scm|(tree-spell <scm-arg|string> <scm-arg|content> <scm-arg|path> <scm-arg|int>)>
 <explain-synopsis|no synopsis>
   <|explain>

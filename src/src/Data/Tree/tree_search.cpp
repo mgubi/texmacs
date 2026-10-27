@@ -1209,8 +1209,9 @@ without_regions (tree what) {
 struct search_token {
   int kind;
   tree t;  // the character, or the tag
-  path at;  // the tag
+  path at;  // the tag (also for a boundary)
   path before, after;
+  int out, in;  // a boundary: the argument it leaves, and enters, or -1
 };
 
 static void
@@ -1266,6 +1267,9 @@ tokens_between (array<search_token>& toks, tree u, path q, path a, path b) {
   if (an) tokens_between (toks, u[a->item], q * a->item, a->next, path ());
   search_token tok;
   tok.kind= TOKEN_BOUNDARY;
+  tok.at= q;
+  tok.out= (an? a->item: -1);
+  tok.in= (bn? b->item: -1);
   tok.before= tok.after= (an? q * path (a->item, end (u[a->item])): q * 0);
   toks << tok;
   if (bn) tokens_between (toks, u[b->item], q * b->item, path (), b->next);
@@ -1669,6 +1673,79 @@ select_hits (range_set& sel, tree t, tree what, path p, bool first) {
   }
 }
 
+static tree
+in_copy (tree t, path at, int i, tree x) {
+  // the tag of t at at, its argument i being x, the others as in t
+  tree r= copy (subtree (t, at));
+  r[i]= simplify_correct (x);
+  return r;
+}
+
+static tree
+tokens_tree (tree t, array<search_token> toks, int s, int e) {
+  // the text of the tokens s to e of a hit in t. A part of a tag, where the
+  // hit goes out of it or into it (a boundary), is kept in a copy of that
+  // tag, with its other arguments as in t (the maintainer's decision);
+  // selection_compute across a boundary gave the tree which holds both
+  // sides, the whole paragraph (#520)
+  tree acc (CONCAT);
+  array<tree> saved;
+  array<int> entered;
+  int i0= s;
+  for (int i=s; i<=e; i++) {
+    if (i < e && toks[i].kind != TOKEN_BOUNDARY) continue;
+    if (i0 < i)
+      acc << selection_compute (t, toks[i0].before, toks[i-1].after);
+    i0= i+1;
+    if (i == e) break;
+    // the tokens before a boundary which leaves a tag are inside it, those
+    // after one which enters a tag are inside it, up to the end of the hit
+    if (toks[i].out >= 0) {
+      tree in= simplify_correct (acc);
+      acc= tree (CONCAT);
+      if (in != "") acc << in_copy (t, toks[i].at, toks[i].out, in);
+    }
+    if (toks[i].in >= 0) {
+      saved << acc;
+      entered << i;
+      acc= tree (CONCAT);
+    }
+  }
+  for (int k=N(entered)-1; k>=0; k--) {
+    tree in= simplify_correct (acc);
+    acc= saved[k];
+    const search_token& tok= toks[entered[k]];
+    if (in != "") acc << in_copy (t, tok.at, tok.in, in);
+  }
+  return simplify_correct (acc);
+}
+
+array<path>
+search_hit_parts (tree t, path p1, path p2) {
+  // a hit from p1 to p2 in t which goes out of a tag or into one: the
+  // ranges of its parts in each tag, or outside, then the position at
+  // which Replace inserts the replacement: after the outermost tag which
+  // the hit leaves, else before the outermost one which it enters. Nil for
+  // another hit, which Replace replaces as a selection (#520)
+  array<path> r;
+  array<search_token> toks;
+  tokens_between (toks, t, path (), p1, p2);
+  int outer= -1;
+  for (int i=0; i<N(toks); i++)
+    if (toks[i].kind == TOKEN_BOUNDARY &&
+        (outer < 0 || N(toks[i].at) < N(toks[outer].at)))
+      outer= i;
+  if (outer < 0) return r;
+  int i0= 0;
+  for (int i=0; i<=N(toks); i++) {
+    if (i < N(toks) && toks[i].kind != TOKEN_BOUNDARY) continue;
+    if (i0 < i) r << toks[i0].before << toks[i-1].after;
+    i0= i+1;
+  }
+  r << toks[outer].at * (toks[outer].out >= 0? 1: 0);
+  return r;
+}
+
 array<tree>
 search_align (tree t, path p1, path p2, tree what) {
   // the run of the hit from p1 to p2 in t (nil: from its start, to its end)
@@ -1715,8 +1792,7 @@ search_align (tree t, path p1, path p2, tree what) {
     int s= (first[i] < ne? m.from[first[i]]: m.end);
     int e= (first[i+1] < ne? m.from[first[i+1]]: m.end);
     if (e <= s) r << tree ("");
-    else r << simplify_correct (selection_compute (t, m.toks[s].before,
-                                                   m.toks[e-1].after));
+    else r << tokens_tree (t, m.toks, s, e);
   }
   return r;
 }

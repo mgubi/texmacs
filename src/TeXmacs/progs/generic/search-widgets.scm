@@ -371,6 +371,38 @@
              (t (replace-wildcards-list (cdr l) (cdr h))))
         (cons (cons (car h) (car t)) (cdr t)))))
 
+(define (spliced-value v)
+  ;; the children which the value v of a wildcard gives in a formula
+  (cond ((tm-func? v 'concat) (tm-children v))
+        ((tm-equal? v "") (list))
+        (else (list v))))
+
+(define (replace-wildcards-concat l wc)
+  ;; the children l of a formula of the replacement, each marked #t if it
+  ;; comes from the value of a wildcard, which is spliced into the formula
+  (if (null? l) (cons l wc)
+      (let* ((c (car l))
+             (h (if (tm-func? c 'wildcard 1)
+                    (with v (find-wildcard wc (tm->stree (tm-ref c 0)))
+                      (cons (map (lambda (x) (cons #t x)) (spliced-value v))
+                            wc))
+                    (with r (replace-wildcards c wc)
+                      (cons (list (cons #f (car r))) (cdr r)))))
+             (t (replace-wildcards-concat (cdr l) (cdr h))))
+        (cons (append (car h) (car t)) (cdr t)))))
+
+(define (merge-inserted l)
+  ;; two strings in a row, one of them from a value, are one string: the
+  ;; parts of the replacement which the user wrote are kept as they are
+  (cond ((or (null? l) (null? (cdr l))) l)
+        ((and (tm-atomic? (cdar l)) (tm-atomic? (cdadr l))
+              (or (caar l) (caadr l)))
+         (merge-inserted
+           (cons (cons #t (string-append (tm->string (cdar l))
+                                         (tm->string (cdadr l))))
+                 (cddr l))))
+        (else (cons (car l) (merge-inserted (cdr l))))))
+
 (define (replace-wildcards by wc)
   ;;(display* "replace-wildcards " by " " wc "\n")
   (cond ((null? wc)
@@ -381,6 +413,17 @@
          (find-empty wc))
         ((tm-atomic? by)
          (cons by wc))
+        ((and (tm-func? by 'concat)
+              (nnull? (list-filter (tm-children by)
+                                   (lambda (c) (tm-func? c 'wildcard 1)))))
+         ;; a value of several children is spliced into the formula, and
+         ;; merged with the strings around it (#520)
+         (let* ((r (replace-wildcards-concat (tm-children by) wc))
+                (l (map cdr (merge-inserted (car r)))))
+           (cons (cond ((null? l) "")
+                       ((null? (cdr l)) (car l))
+                       (else (cons 'concat l)))
+                 (cdr r))))
         (else (with r (replace-wildcards-list (tm-children by) wc)
                 (cons (cons (tm-label by) (car r)) (cdr r))))))
 
@@ -401,8 +444,7 @@
          (smatch (and (tm-atomic? match) (tm->string match)))
          (sby (and (tm-atomic? by) (tm->string by)))
          (lwhat (and (tm-compound? what) (tm->list what)))
-         (lmatch (and (tm-compound? match) (tm->list match)))
-         (wc (get-wildcards-of-hit what match hit)))
+         (lmatch (and (tm-compound? match) (tm->list match))))
     (cond ((tm-equal? what match) by)
           ((and (tm-func? what 'concat)
                 (tm-func? match 'concat)
@@ -417,8 +459,9 @@
                  ((== (locase-first swhat) smatch) (locase-first sby))
                  ((== (upcase-first swhat) smatch) (upcase-first sby))
                  (else sby)))
-          ((null? wc) by)
-          (else (tree-simplify (tm->tree (car (replace-wildcards by wc))))))))
+          (else
+            (with wc (get-wildcards-of-hit what match hit)
+              (if (null? wc) by (car (replace-wildcards by wc))))))))
 
 (define (search-hit sel)
   ;; the buffer and the paths in it of the hit sel, for adjust-by
@@ -437,12 +480,36 @@
          (and-with sel (search-next sels cur #f)
            (go-to* (car sel))
            (selection-set-range-set sel)
-           (with by* (tm->tree (apply adjust-by
-                                      (cons* by (search-tree) (selection-tree)
-                                             (search-hit sel))))
-             (clipboard-cut "dummy")
+           (let* ((hit (search-hit sel))
+                  (by* (tm->tree (apply adjust-by
+                                        (cons* by (search-tree)
+                                               (selection-tree) hit))))
+                  (parts (if (null? hit) (list)
+                             (tree-search-hit-parts (car hit) (cadr hit)
+                                                    (caddr hit)))))
+             (if (null? parts)
+                 (clipboard-cut "dummy")
+                 (cut-hit-parts parts (tree->path (buffer-tree))))
              (insert-go-to (tree-copy by*) (path-end by* '())))
            #t))))
+
+(define (cut-hit-parts parts p)
+  ;; a hit which a wildcard carried out of a tag or into one: only its
+  ;; parts are removed, in the tag and outside (a selection would take the
+  ;; whole tag, and the replacement drops the rest of it), and the cursor
+  ;; goes after the tag which it leaves, or before the one which it enters
+  ;; (#520). The paths are followed through the changes
+  (let* ((ps (map (lambda (q) (position-new-path (append p q))) parts))
+         (ranges (let loop ((l (cDr ps)))
+                   (if (or (null? l) (null? (cdr l))) (list)
+                       (cons (list (car l) (cadr l)) (loop (cddr l)))))))
+    (for (r (reverse ranges))
+      (let ((s (position-get (car r))) (e (position-get (cadr r))))
+        (when (path-less? s e)
+          (selection-set s e)
+          (clipboard-cut "dummy"))))
+    (go-to (position-get (cAr ps)))
+    (for (x ps) (position-delete x))))
 
 (define (replace-next by)
   ;; TODO: replacing all occurrences of 'a' by 'axa' may result in

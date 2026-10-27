@@ -1550,18 +1550,41 @@
                       '(frac (concat "a" (wildcard "w") (rsub "x")) "c")
                       '(frac (concat "zab" (rsub "x") "qa" (rsub "x")) "c")
                       '(frac "b" "c"))))
-  ;; a hit which a wildcard carries out of a tag (a paragraph which is the
-  ;; tag alone, #501) is aligned by its paths in the document: its subtree
-  ;; does not show where it starts
+  ;; a hit which a wildcard carries out of a tag, or into one, is aligned
+  ;; by its paths in the document: its subtree does not show where it
+  ;; starts. The part of a run inside the tag is kept in a copy of the tag
+  ;; (the maintainer's decision); the run was the whole paragraph
   (with-search-mode 'replace
     (lambda ()
-      (let* ((doc (stree->tree '(document (strong "xab") "c")))
-             (what '(concat "a" (wildcard "w")))
-             (h (tree-search-tree doc what '() 100)))
-        (check= h '((0 0 1) (0 1)))
+      (for-each
+        (lambda (row)
+          (let* ((doc (stree->tree (car row)))
+                 (what (cadr row))
+                 (h (tree-search-tree doc what '() 100)))
+            (check= h (caddr row))
+            (check= (map tm->stree (tree-search-align doc (car h) (cadr h)
+                                                      what))
+                    (cadddr row))
+            (check= (tree-search-hit-parts doc (car h) (cadr h))
+                    (car (cddddr row)))))
+        '(((document (strong "xab") "c") (concat "a" (wildcard "w"))
+           ((0 0 1) (0 1)) ("a" (strong "b"))
+           ((0 0 1) (0 0 3) (0 1)))
+          ((document (concat (strong "xab") "c")) (concat "a" (wildcard "w"))
+           ((0 0 0 1) (0 1 1)) ("a" (concat (strong "b") "c"))
+           ((0 0 0 1) (0 0 0 3) (0 1 0) (0 1 1) (0 0 1)))
+          ((document (concat "c" (strong "bax"))) (concat (wildcard "w") "a")
+           ((0 0 0) (0 1 0 2)) ((concat "c" (strong "b")) "a")
+           ((0 0 0) (0 0 1) (0 1 0 0) (0 1 0 2) (0 1 0)))
+          ;; a hit inside a tag is not carried
+          ((document (concat "q" (strong "xacb")))
+           (concat "a" (wildcard "w") "b")
+           ((0 1 0 1) (0 1 0 4)) ("a" "c" "b") ())))
+      (let* ((doc (stree->tree '(document (concat (strong "xab") "c"))))
+             (what '(concat "a" (wildcard "w"))))
         (check= (replaced '(concat "<" (wildcard "w") ">") what
-                          '(strong "ab") doc (car h) (cadr h))
-                "<b>"))))
+                          '(concat (strong "xab") "c") doc '(0 0 0 1) '(0 1 1))
+                '(concat "<" (strong "b") "c>")))))
   ;; replacing the hits of a pattern by the pattern itself gives them back
   ;; (the direct hits: a cascaded match is inside a tag of the argument,
   ;; which the replacement does not keep)
@@ -1579,6 +1602,88 @@
                              (tm->stree (tree-simplify
                                           (stree->tree (cadr doc)))))))))
             (check= bad '())))))))
+
+;; Edit > Replace in a buffer (replace-next*, as Replace All calls it): the
+;; hits from tree-search-tree, the pattern and the replacement in the
+;; auxiliary buffers of the widget
+(define (replace-in-buffer doc what by)
+  ;; the body of a buffer holding doc after replacing all the hits of what
+  ;; by by, from its start (at most 10)
+  (let* ((old (current-buffer))
+         (before (buffer-list))
+         (u (new-buffer))
+         (next (eval 'replace-next* (resolve-module '(generic search-widgets))))
+         (hits (lambda ()
+                 (tree-search-tree (buffer-tree) (stree->tree what)
+                                   (tree->path (buffer-tree)) 100))))
+    (switch-to-buffer* u)
+    (buffer-set-body u (stree->tree doc))
+    (buffer-set (search-buffer) (stree->tree `(document (body (document ,what)))))
+    (buffer-set (replace-buffer) (stree->tree `(document (body (document ,by)))))
+    (buffer-set-master (search-buffer) u)
+    (buffer-set-master (replace-buffer) u)
+    (go-start)
+    (set-alt-selection "search-reference" (list (cursor-path) (cursor-path)))
+    (with r (check-run
+              (lambda ()
+                (let loop ((i 0))
+                  (with h (hits)
+                    (when (and (< i 10) (nnull? h))
+                      (set-alt-selection "alternate" h)
+                      (when (next (stree->tree by))
+                        (set-alt-selection "search-reference"
+                                           (list (cursor-path) (cursor-path)))
+                        (loop (+ i 1))))))
+                (tm->stree (buffer-get-body u))))
+      (for (b (buffer-list))
+        (when (nin? b before) (buffer-close b)))
+      (when (buffer-exists? old) (switch-to-buffer old))
+      r)))
+
+(define (test-replace-in-buffers)
+  (check-group "replace in buffers")
+  (with-search-mode 'replace
+    (lambda ()
+      (for-each
+        (lambda (row)
+          (check= (replace-in-buffer (car row) (cadr row) (caddr row))
+                  (cadddr row)))
+        '(((document (concat "a" (rsub "y") (rsub "z") (rsub "x") " end"))
+           (concat "a" (wildcard "w") (rsub "x"))
+           (concat "<" (wildcard "w") ">")
+           (document (concat "<" (rsub "y") (rsub "z") "> end")))
+          ((document (concat "s " (frac (concat "ab" (rsub "y") (rsub "x")) "c")
+                             " t"))
+           (frac (concat "a" (wildcard "w") (rsub "x")) "c")
+           (frac (wildcard "w") "d")
+           (document (concat "s " (frac (concat "b" (rsub "y")) "d") " t")))
+          ;; Replace All
+          ((document (concat "a" (rsub "1") "x a" (rsub "2") (rsub "3") "x"))
+           (concat "a" (wildcard "w") "x")
+           (concat "[" (wildcard "w") "]")
+           (document (concat "[" (rsub "1") "] [" (rsub "2") (rsub "3") "]")))
+          ;; only the parts of the replacement which come from a wildcard
+          ;; are spliced and merged: the rest is as the user wrote it
+          ((document "a1x")
+           (concat "a" (wildcard "w") "x")
+           (concat (quote "q") (wildcard "w"))
+           (document (concat (quote "q") "1")))
+          ;; a hit which a wildcard carries out of a tag, or into it: only
+          ;; the hit is replaced, the rest of the tag stays, and the
+          ;; replacement goes after the tag (before it); the whole paragraph
+          ;; was replaced, and Replace All then replaced it again and again
+          ((document (strong "xab") "c")
+           (concat "a" (wildcard "w"))
+           (concat "<" (wildcard "w") ">")
+           (document (concat (strong "x") "<" (strong "b") ">") "c"))
+          ((document (concat (strong "xab") "c"))
+           (concat "a" (wildcard "w"))
+           (concat "<" (wildcard "w") ">")
+           (document (concat (strong "x") "<" (strong "b") "c>")))
+          ((document (concat "c" (strong "bax")))
+           (concat (wildcard "w") "a")
+           (concat "<" (wildcard "w") ">")
+           (document (concat "<c" (strong "b") ">" (strong "x")))))))))
 
 (tm-define (search-test-failures)
   (check-suite "search")
@@ -1609,4 +1714,5 @@
   (test-search-contains-replace)
   (test-speed-in-arguments)
   (test-replace-wildcards)
+  (test-replace-in-buffers)
   (check-end))
