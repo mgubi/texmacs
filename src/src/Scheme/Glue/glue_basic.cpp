@@ -255,6 +255,19 @@ tmg_default_japanese_font () {
 }
 
 tmscm
+tmg_windows_cjk_font_candidates (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "windows-cjk-font-candidates");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  array_string out= windows_cjk_font_candidates (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return array_string_to_tmscm (out);
+}
+
+tmscm
 tmg_default_korean_font () {
   // TMSCM_DEFER_INTS;
   string out= default_korean_font_name ();
@@ -11543,6 +11556,7 @@ initialize_glue_basic () {
   tmscm_install_procedure ("default-look-and-feel",  tmg_default_look_and_feel, 0, 0, 0);
   tmscm_install_procedure ("default-chinese-font",  tmg_default_chinese_font, 0, 0, 0);
   tmscm_install_procedure ("default-japanese-font",  tmg_default_japanese_font, 0, 0, 0);
+  tmscm_install_procedure ("windows-cjk-font-candidates",  tmg_windows_cjk_font_candidates, 1, 0, 0);
   tmscm_install_procedure ("default-korean-font",  tmg_default_korean_font, 0, 0, 0);
   tmscm_install_procedure ("get-retina-factor",  tmg_get_retina_factor, 0, 0, 0);
   tmscm_install_procedure ("get-retina-zoom",  tmg_get_retina_zoom, 0, 0, 0);
