@@ -10,7 +10,7 @@ fi
 # TEXMACS_PATH ending with a slash gives (not under Cygwin, where // starts
 # the path of a network share)
 if [ "$1" != cygwin ]; then
-  TEXMACS_MAXIMA_PATH=`echo "$TEXMACS_MAXIMA_PATH" | sed 's|//*|/|g'`
+  TEXMACS_MAXIMA_PATH=`printf '%s\n' "$TEXMACS_MAXIMA_PATH" | sed 's|//*|/|g'`
 fi
 export TEXMACS_MAXIMA_PATH
 
