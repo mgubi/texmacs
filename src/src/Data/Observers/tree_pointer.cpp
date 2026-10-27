@@ -106,7 +106,7 @@ tree_pointer_rep::set_tree (tree t) {
     tree ref (ptr);
     remove_observer (ref->obs, self);
     ptr= t.rep;
-    insert_observer (t->obs, observer (this));
+    insert_observer (t->obs, self);
   }
   return true;
 }
@@ -177,7 +177,7 @@ tree_pointer_rep::notify_insert_node (tree& ref, int pos) {
     observer self (this);
     remove_observer (ref[pos]->obs, self);
     ptr= ref.rep;
-    insert_observer (ref->obs, observer (this));    
+    insert_observer (ref->obs, self);
   }
   //cout << "position -> " << obtain_position (observer (this)) << "\n";
 }
