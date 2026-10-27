@@ -44,6 +44,8 @@ have the details, and the problems go to the
   instead of piling up for the whole session (#438).
 - **Linux, Qt**: a stopped session plug-in no longer stays a zombie process
   until the next event (#525).
+- **Linux AppImage**: Maxima starts when it is built on GCL; the paths of
+  TeXmacs in the AppImage no longer contain "//", which GCL rejects (#511).
 
 ## 26 October 2026
 
