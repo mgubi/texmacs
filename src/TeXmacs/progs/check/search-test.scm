@@ -485,6 +485,89 @@
                       '(tuple (select-region "a") "b"))
                 '((0 1 0 0) (0 1 0 1)))))))
 
+;; a region which the wildcards of a pattern carry out of a tag is the
+;; region which the pattern gives in the argument when it is alone: the
+;; regions in b (strong F) c are those in F, moved into the strong, for
+;; formulas F made from a fixed pseudo-random sequence. (A formula F which
+;; is a tag alone is a formula of one child with #512.)
+(define (region-formulas n)
+  (let* ((seed 11)
+         (rnd (lambda (k)
+                (set! seed (modulo (+ (* seed 1103515245) 12345) 2147483648))
+                (modulo (quotient seed 65536) k)))
+         (str (lambda ()
+                (apply string-append
+                       (map (lambda (i) (list-ref '("a" "a" "x" "y") (rnd 4)))
+                            (iota (+ 1 (rnd 3)))))))
+         (formula
+           (lambda (self d)
+             (let loop ((k (+ 1 (rnd 4))) (l '()))
+               (if (= k 0)
+                   (let ((r (reverse l)))
+                     (if (null? (cdr r)) (car r) (cons 'concat r)))
+                   (let ((x (if (and (> d 0) (< (rnd 100) 45))
+                                (case (rnd 3)
+                                  ((0) `(rsup ,(self self (- d 1))))
+                                  ((1) `(strong ,(self self (- d 1))))
+                                  (else `(frac ,(self self (- d 1))
+                                               ,(self self (- d 1)))))
+                                (str))))
+                     (if (and (string? x) (pair? l) (string? (car l)))
+                         (loop (- k 1) (cons (string-append (car l) x) (cdr l)))
+                         (loop (- k 1) (cons x l)))))))))
+    (let loop ((i 0) (r '()))
+      (if (= i n) (reverse r)
+          (with f (formula formula (+ 1 (rnd 3)))
+            (if (or (string? f) (func? f 'concat))
+                (loop (+ i 1) (cons f r))
+                (loop i r)))))))
+
+(define (moved-into-strong l)
+  ;; the paths of a paragraph F as paths of F in b (strong F) c
+  (map (lambda (p) (cons 0 (cons 1 (cons 0 (cdr p))))) l))
+
+(define (test-regions-in-arguments)
+  (check-group "regions in arguments")
+  (let* ((w '(wildcard "w")) (v '(wildcard "v"))
+         (u '(wildcard "u")) (t '(wildcard "t"))
+         (pats `((concat ,u (select-region (concat ,w "a" ,v)) ,t)
+                 (concat (select-region (concat ,w "a")) ,v)
+                 (concat ,u (select-region (concat "a" ,v)))
+                 (concat (select-region ,w) "a" (select-region ,v))
+                 (concat (select-region (concat ,w "a")) "x" ,v)
+                 (concat ,u "x" (select-region (concat "a" ,v)))
+                 (select-region (concat ,w "a" ,v))
+                 (concat ,u (select-region (concat ,w "ax" ,v)) ,t)))
+         (fs (region-formulas 200)))
+    ;; the region of the formula where the pattern matches, the outermost
+    ;; one (not the deepest), and lazily (xyaaaaax gave all of it)
+    (check-both '(document (concat "b" (strong (concat "x" (rsup "ya") "az"))
+                                   "c"))
+                (list-ref pats 3)
+                '((0 1 0 0 0) (0 1 0 1 1) (0 1 0 2 1) (0 1 0 2 2)))
+    (check-both '(document (concat "b" (strong (concat (rsup "a") "a")) "c"))
+                (list-ref pats 0)
+                '((0 1 0 0 0) (0 1 0 1 1)))
+    (check-both '(document (concat "b" (strong "xyaaaaax") "c"))
+                (list-ref pats 0)
+                '((0 1 0 0) (0 1 0 3)))
+    (for-each
+      (lambda (mode)
+        (with-search-mode mode
+          (lambda ()
+            (for-each
+              (lambda (what)
+                (check= (list-filter
+                          fs
+                          (lambda (f)
+                            (!= (hits `(document (concat "b" (strong ,f) "c"))
+                                      what)
+                                (moved-into-strong
+                                  (hits `(document ,f) what)))))
+                        '()))
+              pats))))
+      '(search replace))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Formulas: concat patterns
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1111,6 +1194,7 @@
   (test-text-wildcards)
   (test-tags)
   (test-regions)
+  (test-regions-in-arguments)
   (test-formulas)
   (test-formula-wildcards)
   (test-hits-after-a-hit)

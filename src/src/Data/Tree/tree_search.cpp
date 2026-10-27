@@ -1193,37 +1193,47 @@ without_outer_wildcards (tree what) {
 }
 
 static void
-edge_wildcards (tree what, bool& lead, bool& trail) {
-  // does the formula pattern what start (end) with a wildcard, maybe inside
-  // a region ([*a], [a*])?
-  array<int> kind;
-  array<tree> elem;
-  pattern_elements (kind, elem, what);
-  int e1= 0, e2= N(kind) - 1;
-  while (e1 < N(kind) && (kind[e1] == ELEM_START || kind[e1] == ELEM_END))
-    e1++;
-  while (e2 >= 0 && (kind[e2] == ELEM_START || kind[e2] == ELEM_END)) e2--;
-  lead= e1 <= e2 && kind[e1] == ELEM_WILDCARD;
-  trail= e1 <= e2 && kind[e2] == ELEM_WILDCARD;
+enclosing_formulas (array<tree>& fs, array<path>& fp, tree u, path g, path h) {
+  // the formulas (or strings, or tags alone) of the argument u at g which
+  // hold the position h, from u inwards
+  if (is_document (u)) {
+    path r= h / g;
+    if (is_nil (r) || is_nil (r->next)) return;
+    int j= r->item;
+    if (j >= 0 && j < N(u)) enclosing_formulas (fs, fp, u[j], g * j, h);
+    return;
+  }
+  fs << u; fp << g;
+  if (is_atomic (u)) return;
+  path r= h / g;
+  if (is_nil (r) || is_nil (r->next)) return;
+  int k= r->item;
+  if (k < 0 || k >= N(u)) return;
+  if (is_concat (u)) {
+    tree c= u[k];
+    path r2= r->next;
+    if (is_atomic (c) || is_nil (r2->next)) return;
+    int j= r2->item;
+    if (j >= 0 && j < N(c))
+      enclosing_formulas (fs, fp, c[j], g * path (k, j), h);
+  }
+  else enclosing_formulas (fs, fp, u[k], g * k, h);
 }
 
 static bool
 select_inside_tags (range_set& sel, region_matcher& m, int upto, tree what) {
-  // the regions of the first hit inside the tags m.toks[0..upto[: a hit
-  // inside a tag, which a leading and a trailing wildcard carry to the start
-  // and the end of the formula (the hits after it are merged into it). The
-  // first hit is the first occurrence of the pattern without its outer
-  // wildcards. When wildcards remain at its ends, inside a region ([*a*],
-  // [*a]), it is the first occurrence of the pattern without them, which
-  // they extend to the ends of the formula (or string) where it is: one
-  // search, not one per level of nested tags (a power of the depth), and
-  // the region stays inside one argument
-  tree core= without_outer_wildcards (what);
-  if (is_concat (core) && N(core) == 0) return false;
-  bool lead, trail;
-  edge_wildcards (core, lead, trail);
-  tree w= without_empty_strings (without_regions (core), true);
-  if (lead || trail) w= without_outer_wildcards (w);
+  // the regions of a hit inside the tags m.toks[0..upto[, which a leading
+  // and a trailing wildcard carry to the start and the end of the formula:
+  // the regions which the pattern gives in the argument, as when it is
+  // alone. The first occurrence of the pattern without the wildcards at
+  // its ends (also those inside a region) is found by one search; then the
+  // formulas around it, from the argument inwards, are matched with the
+  // pattern (lazily, its wildcards taking the rest of the formula), and the
+  // first one which matches gives the regions, unless the occurrence is in
+  // a tag before its first region (the leftmost region). Not one search per
+  // level of nested tags (a power of the depth)
+  tree w= without_empty_strings (without_regions (what), true);
+  w= without_outer_wildcards (w);
   if (w == "" || (is_concat (w) && N(w) == 0) || is_func (w, WILDCARD, 1))
     return false;
   bool arg= select_in_argument;
@@ -1238,28 +1248,34 @@ select_inside_tags (range_set& sel, region_matcher& m, int upto, tree what) {
       for (int i=0; i+1<N(hits) && !r; i+=2) {
         // a hit inside the tag, not the tag itself
         if (hits[i] == p * 0 && hits[i+1] == p * 1) continue;
-        path c= hit_container (hits[i], hits[i+1]);
-        if (!(p <= c)) continue;
-        tree u= subtree (t, c / p);
-        path a= hits[i] / c, b= hits[i+1] / c;
-        if (lead || trail) {
-          // the formula (or string) where the hit is
-          if (!is_concat (u) && N(c) > N(p)) {
-            path up= path_up (c);
-            tree pu= subtree (t, up / p);
-            if (is_concat (pu)) {
-              c= up; u= pu;
-              a= hits[i] / c; b= hits[i+1] / c;
-            }
+        path h= hits[i];
+        path rh= h / p;
+        if (is_nil (rh) || is_nil (rh->next)) continue;
+        int j= rh->item;
+        if (j < 0 || j >= N(t) || !is_accessible_for_search (t, j)) continue;
+        array<tree> fs;
+        array<path> fp;
+        enclosing_formulas (fs, fp, t[j], p * j, h);
+        for (int l=0; l<N(fs) && !r; l++) {
+          region_matcher f;
+          tokens_between (f.toks, fs[l], fp[l], path (), path ());
+          if (N(f.toks) == 0) continue;
+          f.init (what, true);
+          if (!f.run (0, 0)) continue;
+          if (l+1 < N(fs)) {
+            // the occurrence in a tag of this formula before its first
+            // region: the region is inside that tag (the leftmost one)
+            // (the tag of the formula, or the tag alone)
+            path at= is_concat (fs[l])? head (fp[l+1], N(fp[l]) + 1): fp[l];
+            int ti= -1;
+            for (int x=0; x<N(f.toks); x++)
+              if (f.toks[x].kind == TOKEN_TAG && f.toks[x].at == at) ti= x;
+            if (ti >= 0 && ti < f.first_region ()) continue;
           }
-          if (lead) a= path ();
-          if (trail) b= path ();
-        }
-        range_set ssel;
-        if (select_in_hit (ssel, u, c, a, b, core, lead || trail)) {
-          sel << ssel;
+          f.regions (sel);
           r= true;
         }
+        break;  // the first occurrence only
       }
     }
   select_in_argument= arg;
@@ -1696,6 +1712,11 @@ select (range_set& sel, tree t, tree what, path p) {
   if (is_func (what, SELECT_REGION, 1)) {
     if (is_empty (what[0]))
       merge (sel, simple_range (p * start (t), p * end (t)));
+    else if (!select_in_argument)
+      // a region which is the whole pattern: as any pattern with regions, so
+      // that one carried out of a tag by its wildcards stays in the
+      // argument where it is, as when the argument is alone
+      select_hits (sel, t, what, p, false);
     else
       // the content of the region anywhere in t, also in a tag argument
       // with Replace: (strong [a]) selects the letters a inside strong text
