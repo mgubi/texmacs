@@ -581,7 +581,10 @@
   ;; the emoji if the name is one of the package, else the name as a
   ;; shortcode, as text (not \emoji, which the package would stop on)
   (let* ((x (if (pair? l) (tmtex-emoji-text (car l)) ""))
-         (e (emoji-from-latex (locase-all x))))
+         (e0 (emoji-from-latex (locase-all x)))
+         ;; (the shortcodes of GitHub have _ where the package has -)
+         (e (if (!= e0 "") e0
+                (emoji-from-latex (string-replace (locase-all x) "_" "-")))))
     (if (!= e "") (tmtex-emoji e)
         (tmtex-emoji-wrap
          (list 'texttt (string-append ":" (tmtex-emoji-escape x) ":"))))))

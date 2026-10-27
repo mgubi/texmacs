@@ -122,6 +122,16 @@ converter_rep::load () {
     hashtree_from_dictionary (dic,"emoji-names", UTF8, BIT2BIT, true);
     ht = dic;
   }
+  else if (from=="UTF-8" && to=="Emoji-loose") {
+    // the same, and the sequences which lack a variation selector (the
+    // woman running, U+1F3C3 U+200D U+2640, without its U+FE0F), by the
+    // name of the fully-qualified emoji: for emoji_names and emoji_name,
+    // not for utf8_to_cork, which keeps the characters as they are
+    hashtree<char,string> dic;
+    hashtree_from_dictionary (dic,"emoji-names", UTF8, BIT2BIT, true);
+    hashtree_from_dictionary (dic,"emoji-names-unqualified", UTF8, BIT2BIT, true);
+    ht = dic;
+  }
   else if (from=="Emoji" && to=="LaTeX-emoji") {
     // the emoji of the LaTeX package emoji, by their names there, for the
     // export of LaTeX (\emoji{hugging-face} for <emoji-smiling-face-with-
@@ -485,7 +495,7 @@ emoji_name (string s) {
   string u= cork_to_utf8 (s), name;
   if (N(u) == 0) return "";
   int i= 0;
-  converter conv = load_converter ("UTF-8", "Emoji");
+  converter conv = load_converter ("UTF-8", "Emoji-loose");
   converter cconv= load_converter ("UTF-8", "Cork");
   if (!match_emoji_name (conv, cconv, u, i, name)) return "";
   while (i < N(u)) {
@@ -521,7 +531,7 @@ emoji_names (string s) {
     i= j;
   }
   at << N(utf);
-  converter conv = load_converter ("UTF-8", "Emoji");
+  converter conv = load_converter ("UTF-8", "Emoji-loose");
   converter cconv= load_converter ("UTF-8", "Cork");
   string r;
   int k= 0;

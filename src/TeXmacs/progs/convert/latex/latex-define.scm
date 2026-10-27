@@ -692,7 +692,7 @@
   ;; flag-congo---kinshasa from becoming a dash)
   (emoji
    (!append "\\usepackage{iftex}\n"
-            "\\ifluatex\n"
+            "\\ifLuaTeX\n"
             "  \\usepackage{emoji}\n"
             "\\else\n"
             "  \\DeclareRobustCommand{\\emoji}[1]{\\texttt{:\\detokenize{#1}:}}\n"
@@ -709,8 +709,8 @@
   (tmemojichar
    (!append "\\usepackage{iftex}\n"
             "\\newif\\iftmunicodetex\n"
-            "\\ifluatex\\tmunicodetextrue\\else"
-            "\\ifxetex\\tmunicodetextrue\\fi\\fi\n"
+            "\\ifLuaTeX\\tmunicodetextrue\\else"
+            "\\ifXeTeX\\tmunicodetextrue\\fi\\fi\n"
             "\\iftmunicodetex\n"
             "  \\DeclareRobustCommand{\\tmemojichar}[3]{%\n"
             "    \\iffontchar\\font#3\\relax #1\\else\\texttt{[#2]}\\fi}\n"

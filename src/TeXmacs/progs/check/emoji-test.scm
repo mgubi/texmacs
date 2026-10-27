@@ -270,6 +270,11 @@
   (with s "<emoji-flag-italy><#1F1EB>"
     (check= (string-grapheme-start s (string-length s))
             (string-length "<emoji-flag-italy>")))
+  ;; a sequence without its variation selector is named as the
+  ;; fully-qualified one, but utf8->cork keeps its characters as they are
+  (check= (emoji-name "<#1F3C3><#200D><#2640>") "<emoji-woman-running>")
+  (with u (cork->utf8 "<#1F3C3><#200D><#2640>")
+    (check= (cork->utf8 (utf8->cork u)) u))
   ;; one symbol only is a name
   (check= (emoji-name "<emoji-rocket><alpha>") "")
   (check= (emoji-name "<emoji-no-such-emoji>") "")
@@ -355,6 +360,9 @@
           '((document "<emoji-flag-italy>") 18))
   (check= (after-inserts "" 0 (list "1" vs16 "<#20E3>"))
           '((document "<emoji-keycap-1>") 16))
+  ;; a sequence typed without its variation selector
+  (check= (after-inserts "" 0 (list "<#1F3C3>" zwj "<#2640>"))
+          '((document "<emoji-woman-running>") 21))
   ;; next to the code points of an older document
   (check= (after-inserts "x<#1F44D>" 9 (list "<#1F3FD>"))
           '((document "x<emoji-thumbs-up-medium-skin-tone>") 35))
@@ -448,6 +456,15 @@
     ;; its characters which are special for TeX as characters
     (check= (ex '(emoji "a#b_c&d") "latex-snippet")
             "{\\texttt{:a\\#b\\_c\\&d:}}")
+    ;; a sequence without its variation selector: the fully-qualified emoji
+    (check= (ex "<emoji-person-running><#200D><#2640>" "latex-snippet")
+            "{\\emoji{woman-running}}")
+    (check= (ex "<#1F3C3><#200D><#2640>" "latex-snippet")
+            "{\\emoji{woman-running}}")
+    ;; a tag of an older import, with _ read as subscripts
+    (check= (ex '(emoji (concat "white" (rsub "c") "heck" (rsub "m") "ark"))
+                "latex-snippet")
+            "{\\emoji{check-mark-button}}")
     ;; a joiner after an emoji, before something else, is dropped too
     (check= (ex (string-append "<emoji-rocket>" zwj "x") "latex-snippet")
             "{\\emoji{rocket}}x")
@@ -459,7 +476,7 @@
                           "texmacs-stree" "latex-document")))
           (has? (lambda (s what) (>= (string-search-forwards what 0 s) 0))))
       (with d (doc "a<emoji-grinning-face>b")
-        (check-true (has? d "\\ifluatex"))
+        (check-true (has? d "\\ifLuaTeX"))
         (check-true (has? d "\\usepackage{emoji}"))
         (check-true (has? d "\\DeclareRobustCommand{\\emoji}[1]{\\texttt{:\\detokenize{#1}:}}"))
         (check-false (has? d "tmemojichar"))
@@ -471,7 +488,7 @@
       ;; an emoji which the package has not: not the package, its own macro
       (with d (doc "a<emoji-face-with-bags-under-eyes>b")
         (check-false (has? d "\\usepackage{emoji}"))
-        (check-true (has? d "\\ifxetex"))
+        (check-true (has? d "\\ifXeTeX"))
         (check-true (has? d "\\iffontchar\\font#3")))
       (check-false (has? (doc '(concat "a" (emoji "no-such-emoji")))
                          "\\usepackage{emoji}")))

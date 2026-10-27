@@ -194,6 +194,14 @@ U+200D U+1F467), `<emoji-red-heart>` (U+2764 U+FE0F), `<emoji-flag-italy>`,
   that it scales in the scripts. What is left of a sequence which is not
   one emoji is dropped (the variation selectors and the joiners after an
   emoji: `<emoji-man><#200D><emoji-woman>` is `\emoji{man}\emoji{woman}`).
+  A sequence which lacks a variation selector (minimally-qualified or
+  unqualified in `emoji-test.txt`: U+1F3C3 U+200D U+2640, the woman running
+  without the U+FE0F after the sign) is named as the fully-qualified emoji
+  by `emoji_names` and `emoji_name` (the export, the editor after an
+  insertion, the footer), from `TeXmacs/langs/encoding/emoji-names-unqualified.scm`
+  (`make-emoji-names.py --unqualified`, 1065 sequences of several code
+  points; a character alone, U+2764, is not taken: it is the heart of the
+  text); `utf8_to_cork` keeps such a text as it is.
   An emoji which the package has not (a newer one) is written as
   `\tmemojichar{<characters>}{U+1FAE9}{129769}` (the last, its first code
   point, for `\iffontchar`). An `(emoji "name")` tag (an `\emoji` of an
@@ -207,7 +215,7 @@ U+200D U+1F467), `<emoji-red-heart>` (U+2764 U+FE0F), `<emoji-flag-italy>`,
 
   ```
   \usepackage{iftex}
-  \ifluatex
+  \ifLuaTeX
     \usepackage{emoji}
   \else
     \DeclareRobustCommand{\emoji}[1]{\texttt{:\detokenize{#1}:}}
@@ -215,8 +223,9 @@ U+200D U+1F467), `<emoji-red-heart>` (U+2764 U+FE0F), `<emoji-flag-italy>`,
   \fi
   ```
 
-  and for `\tmemojichar`: with LuaLaTeX and XeLaTeX (`\ifluatex`,
-  `\ifxetex`, which every iftex has) the characters if the current font
+  and for `\tmemojichar`: with LuaLaTeX and XeLaTeX (`\ifLuaTeX`,
+  `\ifXeTeX`, which every iftex has, the old v0.2 of TeX Live 2019 and
+  before too) the characters if the current font
   has them (`\iffontchar`), else `[U+1FAE9]`; with pdfLaTeX `[U+1FAE9]`;
   in the bookmarks, the characters or the code points. The package needs
   LuaLaTeX (it stops the other engines with an error), and the exporter
