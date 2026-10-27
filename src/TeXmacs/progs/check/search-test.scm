@@ -584,9 +584,9 @@
                   '((0 0 0 0) (0 0 0 1)))
       (check-both '(document (rsup (strong "a"))) p
                   '((0 0 0 0) (0 0 0 1)))
-      (check-both '(document (rsup (strong "a")))
+      (check-both '(document (concat "z" (rsup (strong "a")) "q"))
                   '(concat (wildcard "u") (strong "a") (wildcard "t"))
-                  '((0 0 0) (0 0 1))))
+                  '((0 0 0) (0 2 1))))
     ;; in linear time: each formula of the argument is matched once (the
     ;; leftmost region searched again at each level: 9.8 s at depth 300)
     (let* ((nest (lambda (self k)
