@@ -128,7 +128,18 @@
   (check-em "<#3400>" 0.05)
   (check-em "<#4DB5>" 0.05)
   (check-em "<#F900>" 0.05)
-  (check-em "<#20B9F>" 0.05))
+  (check-em "<#20B9F>" 0.05)
+  ;; the CJK fallback of the default font is substituted by SimSun (or
+  ;; FandolSong) when it is installed, as on Windows: the substitution lost
+  ;; the CJK characters asked for, so that the fonts tried after SimSun were
+  ;; Courier New and other fonts without CJK, and U+31F0 or U+F900, which
+  ;; SimSun lacks, were drawn as their names (apply_substitutions in
+  ;; font_select.cpp); the rules themselves are checked on any system by
+  ;; tests/Graphics/Fonts/font_test.cpp
+  (with v (logical-font-substitute '("roman" "cjk"))
+    (if (== (car v) "roman")
+        (display "  (no substitution of (roman cjk) is active: skipped)\n")
+        (check-true (in? "cjk" v)))))
 
 (define (test-hangul)
   (check-group "hangul in the default font")
