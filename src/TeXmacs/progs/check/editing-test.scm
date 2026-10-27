@@ -169,6 +169,53 @@
     (when (buffer-exists? old) (switch-to-buffer old))
     (check= (current-buffer) old)))
 
+;; A tree pointer which is collected while it is still attached to a tree
+;; (a process whose callback was never called) is held by the list of the
+;; observers of the tree alone; when the tree is detached, by closing its
+;; buffer or replacing its body, the pointer moves to the closest tree
+;; without being freed while it does so (it was: tree_pointer.cpp and
+;; tree_addendum.cpp, set_tree). A use of freed memory does not always
+;; crash: these checks fail reliably only under ASan or MallocScribble.
+(define (attach-forgotten-pointer)
+  ;; (in a function of its own, so that nothing on the stack keeps it)
+  (tree->tree-pointer (tree-ref (buffer-tree) 0))
+  #t)
+
+(define (forgotten-pointers-collected)
+  (do ((i 0 (+ i 1))) ((= i 20000)) (make-vector 50 i))
+  (gc)
+  #t)
+
+(define (test-tree-pointers)
+  (check-group "tree pointers")
+  (let* ((old (current-buffer))
+         (u (new-buffer)))
+    (switch-to-buffer* u)
+    ;; replacing the body
+    (buffer-set-body u (stree->tree '(document (concat "a " (em "b")) "c")))
+    (attach-forgotten-pointer)
+    (forgotten-pointers-collected)
+    (buffer-set-body u (stree->tree '(document "d")))
+    (check= (tree->stree (buffer-tree)) '(document "d"))
+    ;; closing the buffer
+    (buffer-set-body u (stree->tree '(document (concat "e " (em "f")))))
+    (attach-forgotten-pointer)
+    (forgotten-pointers-collected)
+    (buffer-close u)
+    (check-false (buffer-exists? u))
+    (forgotten-pointers-collected)
+    ;; a pointer which is detached is still fine
+    (let* ((v (new-buffer)))
+      (switch-to-buffer* v)
+      (buffer-set-body v (stree->tree '(document "g" "h")))
+      (with tp (tree->tree-pointer (tree-ref (buffer-tree) 1))
+        (check= (tree->stree (tree-pointer->tree tp)) "h")
+        (tree-pointer-detach tp))
+      (buffer-close v)
+      (check-false (buffer-exists? v)))
+    (when (buffer-exists? old) (switch-to-buffer old))
+    (check= (current-buffer) old)))
+
 ;; The buffer of an embedded TeXmacs widget (texmacs-input) is embedded in an
 ;; alternative window when the widget is made while that window is being
 ;; built, between alt-window-handle and alt-window-create, as the dialogues
@@ -980,6 +1027,7 @@
   (check-suite "editing")
   (system-mkdir (system->url editing-dir))
   (test-buffers)
+  (test-tree-pointers)
   (test-embedded)
   (test-load)
   (test-insert)

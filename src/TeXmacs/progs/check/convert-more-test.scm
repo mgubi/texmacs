@@ -1283,7 +1283,10 @@
                                   '(document (concat "it is " (em "b")))))
               (go-start)
               (ai-translate* "french")
-              (check-true (process-running? 'translate))
+              ;; (the paragraph is left and its tree pointer detached: one
+              ;; left attached, once collected, was used by buffer-close)
+              (check-false (process-running? 'translate))
+              (check= (st (buffer-tree)) '(document (concat "it is " (em "b"))))
               (check= (compress-tables-like "translate") '()))
             (lambda ()
               (ai-abort-translate)

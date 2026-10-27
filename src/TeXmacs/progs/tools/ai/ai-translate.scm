@@ -79,9 +79,11 @@
           (else
             (with cmd (cpp-ai-command in model agent)
               ;;(display* "Eval] " cmd "\n")
-              ;; (true: nothing launched, and return will not be called)
+              ;; (true: nothing launched, and return will not be called:
+              ;; called here, as for no answer, it frees the table, detaches
+              ;; the tree pointer and goes on with the next paragraph)
               (when (cpp-ai-async-eval-command cmd return)
-                (compress-table-free table)))))))
+                (return #f)))))))
 
 (define (make-translate-process lan)
   (make-process (translate-process-one lan) 'translate))
