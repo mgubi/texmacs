@@ -572,6 +572,32 @@
                                    "c"))
                 (list-ref pats 10)
                 '((0 1 0 0 0 0) (0 1 0 0 0 1) (0 1 0 2 0) (0 1 0 2 1)))
+    ;; a tag of the pattern alone in an argument: the wildcards take
+    ;; nothing (it was not found, with or without the region)
+    (let ((p '(concat (wildcard "u") (strong (select-region "a"))
+                      (wildcard "t"))))
+      (check-both '(document (concat "z" (rsup (strong "a")) "q")) p
+                  '((0 1 0 0 0) (0 1 0 0 1)))
+      (check-both '(document (concat "z" (rsup (strong "a")))) p
+                  '((0 1 0 0 0) (0 1 0 0 1)))
+      (check-both '(document (frac (strong "a") "y")) p
+                  '((0 0 0 0) (0 0 0 1)))
+      (check-both '(document (rsup (strong "a"))) p
+                  '((0 0 0 0) (0 0 0 1)))
+      (check-both '(document (rsup (strong "a")))
+                  '(concat (wildcard "u") (strong "a") (wildcard "t"))
+                  '((0 0 0) (0 0 1))))
+    ;; in linear time: each formula of the argument is matched once (the
+    ;; leftmost region searched again at each level: 9.8 s at depth 300)
+    (let* ((nest (lambda (self k)
+                   (if (= k 0) "xa"
+                       `(concat "x" (rsup ,(self self (- k 1))) "a"))))
+           (doc (stree->tree
+                  `(document (concat "b" (strong ,(nest nest 300)) "c")))))
+      (with r (time-of (lambda () (tree-search-tree doc (list-ref pats 8)
+                                                    '() 100)))
+        (check-true (pair? (cdr r)))
+        (check-true (< (car r) 500))))
     (for-each
       (lambda (mode)
         (with-search-mode mode

@@ -72,6 +72,22 @@ merge (range_set& sel, range_set ssel) {
 }
 
 static bool
+matches_between_wildcards (tree t, tree what) {
+  // a formula pattern of wildcards around one tag, and a tree which matches
+  // that tag: the wildcards take nothing (#495), so that *(strong a)*
+  // matches (strong a) alone, in a paragraph or an argument, as (strong a)
+  // does (and so does a pattern with regions made of it)
+  if (!is_concat (what) || is_atomic (t)) return false;
+  int k= -1;
+  for (int i=0; i<N(what); i++)
+    if (!is_func (what[i], WILDCARD, 1)) {
+      if (k >= 0 || is_atomic (what[i])) return false;
+      k= i;
+    }
+  return k >= 0 && match (t, what[k]);
+}
+
+static bool
 is_accessible_for_search (tree t, int i) {
   if (is_accessible_child (t, i)) return true;
   if (is_func (t, HIDDEN)) return true;
@@ -592,7 +608,7 @@ search_string (range_set& sel, string s, tree what, path p, int from= 0) {
 
 void
 search_compound (range_set& sel, tree t, tree what, path p) {
-  if (match (t, what)) {
+  if (match (t, what) || matches_between_wildcards (t, what)) {
     merge (sel, simple_range (p * start (t), p * end (t)));
     return;
   }
@@ -1182,46 +1198,37 @@ static bool select_in_hit (range_set& sel, tree u, path q, path a, path b,
                            tree what, bool no_carry= false);
 static path hit_container (path h1, path h2);
 
-static tree
-without_outer_wildcards (tree what) {
-  // a formula pattern without its leading and trailing wildcards
-  if (!is_concat (what)) return what;
-  int i= 0, j= N(what);
-  while (i < j && is_func (what[i], WILDCARD, 1)) i++;
-  while (j > i && is_func (what[j-1], WILDCARD, 1)) j--;
-  if (j - i == N(what)) return what;
-  tree r (CONCAT);
-  for (int k=i; k<j; k++) r << what[k];
-  if (N(r) == 1) return r[0];
-  return r;
-}
-
-static void
-enclosing_formulas (array<tree>& fs, array<path>& fp, tree u, path g, path h) {
-  // the formulas (or strings, or tags alone) of the argument u at g which
-  // hold the position h, from u inwards
+static bool
+select_in_formula (range_set& sel, tree u, path g, tree what) {
+  // the regions of what in the formula (or string, or tag alone) u at g,
+  // as when u is alone: what matches all of u, lazily, its outer wildcards
+  // taking the rest, unless a hit inside a tag of u before its first region
+  // comes first (the leftmost region); if it does not match, the first hit
+  // inside the tags of u. Each formula is matched once: linear, not a
+  // search at each level of nested tags
+  if (is_atomic (u) && N(u->label) == 0) return false;
   if (is_document (u)) {
-    path r= h / g;
-    if (is_nil (r) || is_nil (r->next)) return;
-    int j= r->item;
-    if (j >= 0 && j < N(u)) enclosing_formulas (fs, fp, u[j], g * j, h);
-    return;
+    for (int i=0; i<N(u); i++)
+      if (select_in_formula (sel, u[i], g * i, what)) return true;
+    return false;
   }
-  fs << u; fp << g;
-  if (is_atomic (u)) return;
-  path r= h / g;
-  if (is_nil (r) || is_nil (r->next)) return;
-  int k= r->item;
-  if (k < 0 || k >= N(u)) return;
-  if (is_concat (u)) {
-    tree c= u[k];
-    path r2= r->next;
-    if (is_atomic (c) || is_nil (r2->next)) return;
-    int j= r2->item;
-    if (j >= 0 && j < N(c))
-      enclosing_formulas (fs, fp, c[j], g * path (k, j), h);
-  }
-  else enclosing_formulas (fs, fp, u[k], g * k, h);
+  region_matcher f;
+  tokens_between (f.toks, u, g, path (), path ());
+  if (N(f.toks) == 0) return false;
+  f.init (what, true);
+  bool ok= f.run (0, 0);
+  int upto= ok? f.first_region (): N(f.toks);
+  for (int k=0; k<upto && k<N(f.toks); k++)
+    if (f.toks[k].kind == TOKEN_TAG) {
+      tree t= f.toks[k].t;
+      path p= f.toks[k].at;
+      for (int j=0; j<N(t); j++)
+        if (is_accessible_for_search (t, j))
+          if (select_in_formula (sel, t[j], p * j, what)) return true;
+    }
+  if (!ok) return false;
+  f.regions (sel);
+  return true;
 }
 
 static bool
@@ -1229,17 +1236,7 @@ select_inside_tags (range_set& sel, region_matcher& m, int upto, tree what) {
   // the regions of a hit inside the tags m.toks[0..upto[, which a leading
   // and a trailing wildcard carry to the start and the end of the formula:
   // the regions which the pattern gives in the argument, as when it is
-  // alone. The first occurrence of the pattern without the wildcards at
-  // its ends (also those inside a region) is found by one search; then the
-  // formulas around it, from the argument inwards, are matched with the
-  // pattern (lazily, its wildcards taking the rest of the formula), and the
-  // first one which matches gives the regions, unless the occurrence is in
-  // a tag before its first region (the leftmost region). Not one search per
-  // level of nested tags (a power of the depth)
-  tree w= without_empty_strings (without_regions (what), true);
-  w= without_outer_wildcards (w);
-  if (w == "" || (is_concat (w) && N(w) == 0) || is_func (w, WILDCARD, 1))
-    return false;
+  // alone (the first such hit)
   bool arg= select_in_argument;
   select_in_argument= false;
   bool r= false;
@@ -1247,43 +1244,9 @@ select_inside_tags (range_set& sel, region_matcher& m, int upto, tree what) {
     if (m.toks[k].kind == TOKEN_TAG) {
       tree t= m.toks[k].t;
       path p= m.toks[k].at;
-      range_set hits;
-      search (hits, t, w, p);
-      for (int i=0; i+1<N(hits) && !r; i+=2) {
-        // a hit inside the tag, not the tag itself
-        if (hits[i] == p * 0 && hits[i+1] == p * 1) continue;
-        path h= hits[i];
-        path rh= h / p;
-        if (is_nil (rh) || is_nil (rh->next)) continue;
-        int j= rh->item;
-        if (j < 0 || j >= N(t) || !is_accessible_for_search (t, j)) continue;
-        array<tree> fs;
-        array<path> fp;
-        enclosing_formulas (fs, fp, t[j], p * j, h);
-        for (int l=0; l<N(fs) && !r; l++) {
-          region_matcher f;
-          tokens_between (f.toks, fs[l], fp[l], path (), path ());
-          if (N(f.toks) == 0) continue;
-          f.init (what, true);
-          if (!f.run (0, 0)) continue;
-          if (l+1 < N(fs)) {
-            // the occurrence in a tag of this formula before its first
-            // region: the region is inside that tag (the leftmost one)
-            // (the tag of the formula, or the tag alone)
-            path at= is_concat (fs[l])? head (fp[l+1], N(fp[l]) + 1): fp[l];
-            int ti= -1;
-            for (int x=0; x<N(f.toks); x++)
-              if (f.toks[x].kind == TOKEN_TAG && f.toks[x].at == at) ti= x;
-            if (ti >= 0 && ti < f.first_region ()) continue;
-          }
-          // as in select_in_hit: a hit inside an earlier tag of this
-          // formula, which the wildcards carry, comes first
-          if (!select_inside_tags (sel, f, f.first_region (), what))
-            f.regions (sel);
-          r= true;
-        }
-        break;  // the first occurrence only
-      }
+      for (int j=0; j<N(t) && !r; j++)
+        if (is_accessible_for_search (t, j))
+          r= select_in_formula (sel, t[j], p * j, what);
     }
   select_in_argument= arg;
   return r;
