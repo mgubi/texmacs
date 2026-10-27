@@ -24,6 +24,7 @@
 #include <QMenu>
 #include <QAction>
 #include <QKeyEvent>
+#include <QInputMethodEvent>
 #include <QMainWindow>
 #include <QPixmap>
 #include <QToolButton>
@@ -806,6 +807,14 @@ gui_test_raw (string line) {
     post_key (win, a[1], N(a) > 2 ? a[2] : string (""));
   else if (cmd == "text" && N(a) > 1)
     post_text (win, rest);
+  else if (cmd == "commit" && N(a) > 1) {
+    // an input method commits a text (as Vue's script command does)
+    QWidget* w= key_target (win);
+    c_string _text (rest);
+    QInputMethodEvent ev;
+    ev.setCommitString (QString::fromUtf8 ((char*) _text));
+    QApplication::sendEvent (w, &ev);
+  }
   else if (cmd == "focus")
     // the keys of a script go to the focus widget of its window, which
     // needs not be active; an activation by the script would not last

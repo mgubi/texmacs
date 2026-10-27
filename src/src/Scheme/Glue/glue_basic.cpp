@@ -5944,6 +5944,19 @@ tmg_cork_2utf8 (tmscm arg1) {
 }
 
 tmscm
+tmg_emoji_name (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "emoji-name");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  string out= emoji_name (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return string_to_tmscm (out);
+}
+
+tmscm
 tmg_utf8_2t2a (tmscm arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "utf8->t2a");
 
@@ -6345,6 +6358,21 @@ tmg_string_previous (tmscm arg1, tmscm arg2) {
 
   // TMSCM_DEFER_INTS;
   int out= tm_char_previous (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return int_to_tmscm (out);
+}
+
+tmscm
+tmg_string_grapheme_start (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "string-grapheme-start");
+  TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "string-grapheme-start");
+
+  string in1= tmscm_to_string (arg1);
+  int in2= tmscm_to_int (arg2);
+
+  // TMSCM_DEFER_INTS;
+  int out= tm_grapheme_start (in1, in2);
   // TMSCM_ALLOW_INTS;
 
   return int_to_tmscm (out);
@@ -12742,6 +12770,7 @@ initialize_glue_basic () {
   tmscm_install_procedure ("cork->sourcecode",  tmg_cork_2sourcecode, 1, 0, 0);
   tmscm_install_procedure ("utf8->cork",  tmg_utf8_2cork, 1, 0, 0);
   tmscm_install_procedure ("cork->utf8",  tmg_cork_2utf8, 1, 0, 0);
+  tmscm_install_procedure ("emoji-name",  tmg_emoji_name, 1, 0, 0);
   tmscm_install_procedure ("utf8->t2a",  tmg_utf8_2t2a, 1, 0, 0);
   tmscm_install_procedure ("t2a->utf8",  tmg_t2a_2utf8, 1, 0, 0);
   tmscm_install_procedure ("utf8->html",  tmg_utf8_2html, 1, 0, 0);
@@ -12771,6 +12800,7 @@ initialize_glue_basic () {
   tmscm_install_procedure ("list->tmstring",  tmg_list_2tmstring, 1, 0, 0);
   tmscm_install_procedure ("string-next",  tmg_string_next, 2, 0, 0);
   tmscm_install_procedure ("string-previous",  tmg_string_previous, 2, 0, 0);
+  tmscm_install_procedure ("string-grapheme-start",  tmg_string_grapheme_start, 2, 0, 0);
   tmscm_install_procedure ("tmstring-split",  tmg_tmstring_split, 1, 0, 0);
   tmscm_install_procedure ("tmstring-translit",  tmg_tmstring_translit, 1, 0, 0);
   tmscm_install_procedure ("tmstring-locase-first",  tmg_tmstring_locase_first, 1, 0, 0);

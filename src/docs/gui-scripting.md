@@ -272,7 +272,7 @@ Backspace deletes, Tab goes to the next field, Return presses the default
 button, Escape cancels. A window without a title is named by its first
 label (an alert by its message, `Enter data`). Qt and Cocoa have
 `window main` (the editor), `window <part of the title>`, `move`, `press`, `release`, `click`, `key`, `text`, `focus`,
-`snapshot`, `resize`, `repaint` and `close`; Qt `wheel` and `clipboard`
+`snapshot`, `resize`, `repaint` and `close`; Qt `wheel`, `commit` (an input method commits the text, as one event) and `clipboard`
 too, Cocoa `choose`; `window #<id>` is Vue's only. `window main` is the
 first window with an editor on every port, the way to write a test which
 runs on all of them; a `window` which matches nothing lists the windows

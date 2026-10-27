@@ -3587,6 +3587,14 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(emoji-name <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|emoji_name> which returns
+    <scm|string>.
+  </explain>
+
+  <\explain>
     <scm|(utf8-\<gtr\>t2a <scm-arg|string>)>
 <explain-synopsis|no synopsis>
   <|explain>
@@ -3815,6 +3823,14 @@ source code.
 <explain-synopsis|no synopsis>
   <|explain>
     Calls the <c++> function <cpp|tm_char_previous> which returns
+    <scm|int>.
+  </explain>
+
+  <\explain>
+    <scm|(string-grapheme-start <scm-arg|string> <scm-arg|int>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|tm_grapheme_start> which returns
     <scm|int>.
   </explain>
 

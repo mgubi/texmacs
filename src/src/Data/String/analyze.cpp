@@ -643,15 +643,46 @@ tm_char_backwards (string s, int& pos) {
 * text for the typesetter (text_language.cpp) and one step of the cursor
 ******************************************************************************/
 
-// the code point of the character <#XXXX> at pos, and its end
+// the first code point of the emoji named at pos (<emoji-rocket>), and the
+// end of the name; -1 if there is no name of an emoji at pos
 static int
-code_at (string s, int pos, int& end) {
+named_code_at (string s, int pos, int& end) {
+  if (pos + 8 >= N(s) || s[pos] != '<' || s[pos+1] != 'e' ||
+      !test (s, pos, "<emoji-")) return -1;
+  int e= pos;
+  tm_char_forwards (s, e);
+  string u= cork_to_utf8 (s (pos, e));
+  if (u == s (pos, e) || N(u) == 0) return -1;
+  int i= 0;
+  int c= (int) decode_from_utf8 (u, i);
+  end= e;
+  return c;
+}
+
+// the code point of the character <#XXXX> at pos, and its end; an emoji by
+// its name counts as its first code point (and named says so), so that the
+// sequences are the same whether their emoji come by their names or by
+// their code points (<emoji-man><#200D><emoji-woman> is one family)
+static int
+code_at (string s, int pos, int& end, bool& named) {
+  named= false;
+  if (pos < N(s) && s[pos] == '<' && pos + 1 < N(s) && s[pos+1] == 'e') {
+    int c= named_code_at (s, pos, end);
+    named= (c >= 0);
+    return c;
+  }
   if (pos + 3 >= N(s) || s[pos] != '<' || s[pos+1] != '#') return -1;
   int i= pos + 2;
   while (i < N(s) && is_hex_digit (s[i])) i++;
   if (i == pos + 2 || i >= N(s) || s[i] != '>') return -1;
   end= i + 1;
   return from_hexadecimal (s (pos + 2, i));
+}
+
+static int
+code_at (string s, int pos, int& end) {
+  bool named;
+  return code_at (s, pos, end, named);
 }
 
 static bool
@@ -662,12 +693,16 @@ is_regional_indicator (int c) {
 static int
 emoji_sequence_end (string s, int pos, int end) {
   int e;
-  int c= code_at (s, pos, e);
-  if (c < 0x200) return end;
-  if (is_regional_indicator (c)) {
-    // a flag: two regional indicators
+  bool named;
+  int c= code_at (s, pos, e, named);
+  if (c < 0x200 && !(named && c >= 0)) return end;
+  if (named) end= e;
+  if (is_regional_indicator (c) && !named) {
+    // a flag: two regional indicators (not one and a flag by its name)
     int f;
-    if (is_regional_indicator (code_at (s, end, f))) return f;
+    bool fnamed;
+    if (is_regional_indicator (code_at (s, end, f, fnamed)) && !fnamed)
+      return f;
     return end;
   }
   while (end < N(s)) {
@@ -708,9 +743,19 @@ tm_grapheme_end (string s, int pos) {
   return emoji_sequence_end (s, pos, end);
 }
 
+static bool
+continues_emoji (int c) {
+  // a character which continues the sequence before it
+  return (c >= 0xfe00 && c <= 0xfe0f) || (c >= 0x1f3fb && c <= 0x1f3ff) ||
+         (c >= 0xe0020 && c <= 0xe007f) || c == 0x20e3 || c == 0x200d ||
+         is_regional_indicator (c);
+}
+
 // a position before which the characters may begin a sequence of emoji but
 // not continue one: the first character before pos which is not <#XXXX>
-// beyond U+1FF (a letter, a digit, an accent), or the start
+// beyond U+1FF (a letter, a digit, an accent), or which cannot continue a
+// sequence and does not follow a joiner (so that a long text of ideographs
+// is not gone through), or the start
 static int
 grapheme_safe_start (string s, int pos) {
   int p= pos;
@@ -718,7 +763,14 @@ grapheme_safe_start (string s, int pos) {
     int q= p, e;
     tm_char_backwards (s, q);
     p= q;
-    if (code_at (s, q, e) < 0x200) break;
+    int c= code_at (s, q, e);
+    if (c < 0x200) break;
+    if (!continues_emoji (c)) {
+      int r= q;
+      if (r == 0) break;
+      tm_char_backwards (s, r);
+      if (code_at (s, r, e) != 0x200d) break;
+    }
   }
   return p;
 }

@@ -90,6 +90,15 @@ string t2a_to_utf8 (string input);
 string cyrillic_subset_in_t2a_to_code_point (string input);
 string code_point_to_cyrillic_subset_in_t2a (string input);
 string cork_to_ascii (string input);
+bool is_emoji_name (string s);
+string emoji_code_points (string s);
+string emoji_to_code_points (string s);
+string emoji_to_code_points (string s, array<int>& at);
+string emoji_name (string s);
+bool has_emoji (string s);
+string emoji_names (string s);
+int emoji_match (string s, int pos, string w);
+string emoji_from_latex (string name);
 bool check_using_iconv (string input, string encoding);
 string convert_using_iconv (string input, string from, string to); 
 
