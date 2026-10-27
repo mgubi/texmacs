@@ -63,6 +63,22 @@ have the details, and the problems go to the
   until the next event (#525).
 - **Linux AppImage**: Maxima starts when it is built on GCL; the paths of
   TeXmacs in the AppImage no longer contain "//", which GCL rejects (#511).
+- **Search**: with the cursor inside a tag which matches the pattern (a
+  fraction, for instance), that tag is found; the search from the cursor
+  skipped it (#523).
+- **Views**: a change of the initial environment (Document → Font size,
+  a style variable) reaches all the views of the buffer, also the clones
+  and the part views, instead of being lost when another view saves (#528).
+- **AI**: a paragraph translated in the background is no longer put in as
+  a document nested in the document (#526).
+- **Crash**: closing a buffer after a translation or a LanguageTool check
+  which could not start no longer crashes TeXmacs (#537).
+- **Fonts**: with SimSun or FandolSong installed, as on every Windows, the
+  characters of the CJK fallback keep their width of one em (#196).
+- **Windows, fonts**: the Japanese, Chinese and Korean fonts of Windows
+  (MS Gothic, Yu Gothic, Meiryo, MingLiU, Gulim...) are known from the
+  first start, without a scan of the disk, and the Japanese font is
+  found also without the supplemental fonts (#538).
 
 ## 26 October 2026
 
