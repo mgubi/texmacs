@@ -185,31 +185,47 @@ U+200D U+1F467), `<emoji-red-heart>` (U+2764 U+FE0F), `<emoji-flag-italy>`,
   `emoji_from_latex`). The export writes an emoji which the package has
   as `\emoji{...}` by its name there, whether the document has it by its
   name or in code points (`tmtex-string` names the sequences first,
-  `emoji-names`; `tmtex-token-sub` looks the name up, `emoji-latex-name`,
-  in `TeXmacs/langs/encoding/emoji-latex-names.scm`, made by
-  `make-emoji-names.py --latex-names`: the 3521 emoji of the package, 7 of
-  them by their older names, `\emoji{hugging-face}` for
-  `<emoji-smiling-face-with-open-hands>`); in a formula in an `\mbox`. An
-  emoji which the package has not (a newer one) is exported as its
-  characters, as before. A document with `\emoji` gets in its preamble
-  (`latex-texmacs-preamble`, `latex-define.scm`):
+  `emoji-names`; `tmtex-emoji` looks the name up, `emoji-latex-name`, in
+  `TeXmacs/langs/encoding/emoji-latex-names.scm`, made by
+  `make-emoji-names.py --latex-names` from the `emoji-table.def` of the
+  package as TeX Live 2025 has it, v0.2.2: its 3521 emoji, 7 of them by
+  their older names, `\emoji{hugging-face}` for
+  `<emoji-smiling-face-with-open-hands>`); in a formula in a `\text`, so
+  that it scales in the scripts. What is left of a sequence which is not
+  one emoji is dropped (a variation selector after an emoji, a joiner
+  between two: `<emoji-man><#200D><emoji-woman>` is `\emoji{man}\emoji{woman}`).
+  An emoji which the package has not (a newer one) is written as
+  `\tmemojichar{<characters>}{U+1FAE9}`. An `(emoji "name")` tag (an
+  `\emoji` of an import which did not know the name) is the emoji when
+  the package knows the name, else `\texttt{:name:}`, never an `\emoji`
+  which the package would stop on. A document with these gets in its
+  preamble, and only then (`latex-texmacs-preamble`, `latex-define.scm`):
 
   ```
   \usepackage{iftex}
   \ifLuaTeX
     \usepackage{emoji}
   \else
-    \providecommand{\emoji}[1]{\textsf{:#1:}}
+    \DeclareRobustCommand{\emoji}[1]{\texttt{:\detokenize{#1}:}}
+  \fi
+  \usepackage{iftex}
+  \iftutex
+    \DeclareRobustCommand{\tmemojichar}[2]{#1}
+  \else
+    \DeclareRobustCommand{\tmemojichar}[2]{\texttt{[#2]}}
   \fi
   ```
 
-  The package needs LuaLaTeX (it stops the other engines with an error),
-  and the exporter does not know which engine the document will be
-  compiled with (it has no setting for it): LuaLaTeX draws the emoji in
-  color, pdfLaTeX and XeLaTeX write their names as shortcodes
-  (`:grinning-face:`) instead of failing; `\emoji{...}` comes back as the
-  same emoji on import. The characters of an emoji which the package has
-  not still stop pdfLaTeX, as they did. TMML writes
+  (the first for `\emoji`, the second for `\tmemojichar`). The package
+  needs LuaLaTeX (it stops the other engines with an error), and the
+  exporter does not know which engine the document will be compiled with
+  (it has no setting for it): LuaLaTeX draws the emoji in color, pdfLaTeX
+  and XeLaTeX write their names as shortcodes, literally
+  (`:flag-congo---kinshasa:`); an emoji newer than the package shows as
+  its characters with LuaLaTeX and XeLaTeX (if the font has them) and as
+  its code points with pdfLaTeX, which stops on the characters. Checked
+  with the three engines of TeX Live 2025. `\emoji{...}` comes back as the
+  same emoji on import. TMML writes
   `<#1F600>` as a `<tm-sym>`, since it would come back by its name (so is
   `<#3B1>`, which comes back as `<alpha>`), and a name as its character.
 

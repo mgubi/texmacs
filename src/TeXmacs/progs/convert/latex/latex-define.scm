@@ -687,13 +687,23 @@
    (!append "\\newcommand{\\nonconverted}[1]{\\mbox{}}\n"))
   ;; the emoji (\emoji{grinning-face}): the package emoji, in color, needs
   ;; LuaLaTeX; with another engine the name of the emoji is written as a
-  ;; shortcode (:grinning-face:), so that the document still compiles
+  ;; shortcode (:grinning-face:, literally), so that the document still
+  ;; compiles
   (emoji
    (!append "\\usepackage{iftex}\n"
             "\\ifLuaTeX\n"
             "  \\usepackage{emoji}\n"
             "\\else\n"
-            "  \\providecommand{\\emoji}[1]{\\textsf{:#1:}}\n"
+            "  \\DeclareRobustCommand{\\emoji}[1]{\\texttt{:\\detokenize{#1}:}}\n"
+            "\\fi\n"))
+  ;; an emoji which the package has not: its characters with LuaLaTeX and
+  ;; XeLaTeX, its code points with pdfLaTeX (which stops on the characters)
+  (tmemojichar
+   (!append "\\usepackage{iftex}\n"
+            "\\iftutex\n"
+            "  \\DeclareRobustCommand{\\tmemojichar}[2]{#1}\n"
+            "\\else\n"
+            "  \\DeclareRobustCommand{\\tmemojichar}[2]{\\texttt{[#2]}}\n"
             "\\fi\n"))
   (tmkeywords
    (!append (newcommand (tmkeywords)

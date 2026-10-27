@@ -126,7 +126,7 @@
   tmcodeinline)
 
 (logic-group latex-texmacs-2%
-  tmcolor tmmarked
+  tmcolor tmmarked tmemojichar
   tmsummarizeddocumentation tmsummarizedgrouped tmsummarizedexplain
   tmsummarizedplain tmsummarizedtiny tmsummarizedraw tmsummarizedenv
   tmsummarizedstd tmsummarized
@@ -257,7 +257,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (logic-group latex-texmacs-preamble-command%
-  newmdenv tikzframe emoji
+  newmdenv tikzframe emoji tmemojichar
   tmkeywords tmacm tmarxiv tmpacs tmmsc
   fmtext tdatetext tmisctext tsubtitletext
   thankshomepage thanksemail thanksdate thanksamisc thanksmisc thankssubtitle

@@ -19,9 +19,10 @@ have the details, and the problems go to the
   in code points), and loads the package in the preamble when the
   document has emoji: they come in color with LuaLaTeX, and as their
   names (`:grinning-face:`) with pdfLaTeX and XeLaTeX, which the package
-  does not support, so that the document still compiles. An emoji newer
-  than the package is written as its characters, as before; the import
-  gives back the same emoji.
+  does not support, so that the document still compiles with all three.
+  An emoji newer than the package shows as its characters with LuaLaTeX
+  and XeLaTeX and as its code points with pdfLaTeX; the import gives back
+  the same emoji.
 - **Names of the emoji**: the emoji have names in the universal encoding
   of TeXmacs, those of the LaTeX package `emoji` (the short names of
   Unicode): `<emoji-grinning-face>`, and one name for a whole sequence,

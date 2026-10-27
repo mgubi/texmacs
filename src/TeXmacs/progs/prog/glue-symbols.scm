@@ -476,6 +476,8 @@
 "emoji-name"
 "emoji-names"
 "emoji-latex-name"
+"emoji-from-latex"
+"emoji-to-code-points"
 "utf8->t2a"
 "t2a->utf8"
 "utf8->html"

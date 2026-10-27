@@ -415,14 +415,36 @@
     ;; by the name of the package where CLDR changed it since
     (check= (ex "<emoji-smiling-face-with-open-hands>" "latex-snippet")
             "{\\emoji{hugging-face}}")
-    ;; in a formula, in a box
+    ;; in a formula, in a \text (which scales in scripts)
     (check= (convert '(document (math "x<emoji-rocket>")) "texmacs-stree"
                      "latex-snippet")
-            "$x\\mbox{\\emoji{rocket}}$")
-    ;; an emoji which the package has not: its characters, as before
-    (check= (ex "<emoji-face-with-bags-under-eyes>" "latex-snippet")
-            (cork->utf8 "<#1FAE9>"))
-    (check= (ex "<#1FAE9>" "latex-snippet") (cork->utf8 "<#1FAE9>"))
+            "$x\\text{\\emoji{rocket}}$")
+    (check= (convert (convert '(document (math "x+<emoji-rocket>=y"))
+                              "texmacs-stree" "latex-snippet")
+                     "latex-snippet" "texmacs-stree")
+            '(math (concat "x+" (text "<emoji-rocket>") "=y")))
+    ;; an emoji which the package has not: its characters in \tmemojichar,
+    ;; with its code points for pdfLaTeX
+    (with u (string-append "{\\tmemojichar{" (cork->utf8 "<#1FAE9>")
+                           "}{U+1FAE9}}")
+      (check= (ex "<emoji-face-with-bags-under-eyes>" "latex-snippet") u)
+      (check= (ex "<#1FAE9>" "latex-snippet") u))
+    ;; what is left of a sequence which is not one emoji: no selector after
+    ;; an emoji, no joiner between two (pdfLaTeX would stop on them)
+    (check= (ex (string-append "<emoji-man>" zwj "<emoji-woman>") "latex-snippet")
+            "{\\emoji{man}}{\\emoji{woman}}")
+    (check= (ex (string-append man zwj woman) "latex-snippet")
+            "{\\emoji{man}}{\\emoji{woman}}")
+    (check= (ex (string-append "<emoji-rocket>" vs16) "latex-snippet")
+            "{\\emoji{rocket}}")
+    (check= (ex "<emoji-red-heart><#FE0E>" "latex-snippet")
+            "{\\emoji{red-heart}}")
+    ;; an emoji tag of an import which did not know the name: the emoji if
+    ;; the package knows it, else the name as a shortcode (not \emoji)
+    (check= (ex '(emoji "smile") "latex-snippet")
+            "{\\emoji{grinning-face-with-smiling-eyes}}")
+    (check= (ex '(emoji "no-such-emoji") "latex-snippet")
+            "{\\texttt{:no-such-emoji:}}")
     ;; the preamble loads the package (with LuaLaTeX; another engine shows
     ;; the names) only when a document has an emoji
     (let ((doc (lambda (s)
@@ -433,12 +455,20 @@
       (with d (doc "a<emoji-grinning-face>b")
         (check-true (has? d "\\ifLuaTeX"))
         (check-true (has? d "\\usepackage{emoji}"))
-        (check-true (has? d "\\providecommand{\\emoji}"))
+        (check-true (has? d "\\DeclareRobustCommand{\\emoji}[1]{\\texttt{:\\detokenize{#1}:}}"))
+        (check-false (has? d "tmemojichar"))
         ;; and the import gives the emoji back, by its name
         (check= (convert d "latex-document" "texmacs-stree")
                 '(document (TeXmacs "2.1.5") (style (tuple "article" "std-latex"))
                            (body (document "a<emoji-grinning-face>b")))))
-      (check-false (has? (doc "ab") "emoji")))
+      (check-false (has? (doc "ab") "emoji"))
+      ;; an emoji which the package has not: not the package, its own macro
+      (with d (doc "a<emoji-face-with-bags-under-eyes>b")
+        (check-false (has? d "\\usepackage{emoji}"))
+        (check-true (has? d "\\iftutex"))
+        (check-true (has? d "\\DeclareRobustCommand{\\tmemojichar}[2]{#1}")))
+      (check-false (has? (doc '(concat "a" (emoji "no-such-emoji")))
+                         "\\usepackage{emoji}")))
     (check= (convert (ex "a<emoji-smiling-face-with-open-hands>b" "latex-snippet")
                      "latex-snippet" "texmacs-stree")
             "a<emoji-smiling-face-with-open-hands>b")
