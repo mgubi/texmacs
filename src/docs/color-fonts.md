@@ -143,14 +143,23 @@ U+200D U+1F467), `<emoji-red-heart>` (U+2764 U+FE0F), `<emoji-flag-italy>`,
   `emoji_names`): the family typed so is stored as
   `<emoji-family-man-woman-girl>`, a skin tone typed after a hand as
   `<emoji-thumbs-up-medium-skin-tone>`, also when the hand is a code point
-  of an older document; nothing else of a document is renamed. Qt, Qt 6
+  of an older document. Only the text from the start of that emoji up to
+  the cursor is renamed, never what follows the cursor (a joiner typed
+  between two emoji leaves the second one as it was), and the cursor stays
+  right after what was typed; nothing else of a document is renamed. Qt, Qt 6
   and Qtwk now send what an input method commits one character of TeXmacs
   after the other (an emoji sequence by its name, whole).
 - **Search** finds an emoji by its name and by its code points, whatever
   form the text has: when the pattern has an emoji (`has_emoji`), the
-  strings are compared with their emoji in code points (`emoji_match`, in
-  `search_string` and `match` of `tree_search.cpp` and in `test_sub` of
-  `edit_search.cpp`).
+  pattern and each string are written with their emoji in code points once
+  (`emoji_to_code_points`, with the positions of the string, only for a
+  string which has names) and searched as text (`search_string` and
+  `match` of `tree_search.cpp`; `test_sub` of `edit_search.cpp` compares
+  with `emoji_match`). A hit is a whole emoji: `<emoji-man>` (or U+1F468)
+  is found alone, and neither inside `<emoji-family-man-woman-girl>` nor
+  inside the same family in code points (the ends of a hit must not be
+  inside a sequence, `tm_grapheme_inside`). On a text of 2 MB, the search
+  of an emoji by its name takes about as long as that of a word.
 - **The typesetting.** The emoji font draws the names as their code points
   (its rewrite is `REWRITE_EMOJI`, which leaves code points as they are),
   and `smart_font_rep::resolve` gives a name the font its first code point

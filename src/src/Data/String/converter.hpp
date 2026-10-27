@@ -93,6 +93,7 @@ string cork_to_ascii (string input);
 bool is_emoji_name (string s);
 string emoji_code_points (string s);
 string emoji_to_code_points (string s);
+string emoji_to_code_points (string s, array<int>& at);
 string emoji_name (string s);
 bool has_emoji (string s);
 string emoji_names (string s);

@@ -206,20 +206,21 @@ edit_text_rep::join_emoji () {
   // the emoji before the cursor by the name of its whole sequence: an
   // emoji typed one code point after the other (the people and the joiners
   // of a family one by one, a skin tone after a hand, the second regional
-  // indicator of a flag) or next to the code points of an older document
+  // indicator of a flag) or next to the code points of an older document.
+  // Only what is before the cursor is renamed (not what the insertion
+  // joins after it), and the cursor stays right after the insertion
   path p= path_up (tp);
   tree st= subtree (et, p);
   if (!is_atomic (st)) return;
   string s= st->label;
   int l= last_item (tp);
-  if (l <= 0 || l > N(s) || search_forwards ("<", s) < 0) return;
+  if (l <= 0 || l > N(s)) return;
   int a= tm_grapheme_start (s, l);
-  int b= max (l, tm_grapheme_end (s, a));
-  string g= s (a, b);
+  string g= s (a, l);
   if (!has_emoji (g)) return;
   string c= emoji_names (g);
   if (c == g) return;
-  remove (p * a, b - a);
+  remove (p * a, l - a);
   insert (p * a, c);
   go_to (p * (a + N(c)));
 }

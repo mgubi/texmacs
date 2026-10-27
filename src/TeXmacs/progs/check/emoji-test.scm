@@ -358,6 +358,15 @@
   ;; next to the code points of an older document
   (check= (after-inserts "x<#1F44D>" 9 (list "<#1F3FD>"))
           '((document "x<emoji-thumbs-up-medium-skin-tone>") 35))
+  ;; only what is before the cursor is renamed, and the cursor stays after
+  ;; what was typed: a joiner between two emoji, a regional indicator
+  ;; before a flag
+  (check= (after-inserts (string-append smile rocket "z")
+                         (string-length smile) (list zwj))
+          `((document ,(string-append "<emoji-grinning-face>" zwj rocket "z"))
+            28))
+  (check= (after-inserts "<emoji-flag-italy>" 0 (list "<#1F1EB>"))
+          '((document "<#1F1EB><emoji-flag-italy>") 8))
   ;; what makes no emoji stays as it is
   (check= (after-inserts "" 0 (list "<#1F600>" zwj "<#1F680>"))
           '((document "<emoji-grinning-face><#200D><emoji-rocket>") 42))
@@ -378,6 +387,13 @@
     (check= (length (search-hits doc "<emoji-family-man-woman-girl>")) 2)
     (check= (search-hits doc "<emoji-family-man-woman-girl>")
             (search-hits doc (string-append man zwj woman zwj girl))))
+  ;; an emoji alone is found as a whole emoji, not inside a sequence,
+  ;; whatever form the sequence has
+  (let ((doc `(document ,(string-append "x" man zwj woman zwj girl
+                                        "y<emoji-family-man-woman-girl>z"
+                                        "<emoji-man>"))))
+    (check= (length (search-hits doc "<emoji-man>")) 2)
+    (check= (search-hits doc man) (search-hits doc "<emoji-man>")))
   ;; the other texts are searched as before
   (check= (length (search-hits '(document "a<alpha>b") "<alpha>")) 2))
 

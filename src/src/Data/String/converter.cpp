@@ -440,6 +440,34 @@ emoji_to_code_points (string s) {
 }
 
 string
+emoji_to_code_points (string s, array<int>& at) {
+  // as above, and at[j] is the position in s of the position j of the
+  // result, -1 inside the code points of a name (N(at) is one more than
+  // the length of the result)
+  at= array<int> ();
+  string r;
+  int i= 0, n= N(s);
+  while (i < n) {
+    if (is_emoji_token (s, i)) {
+      int j= i;
+      tm_char_forwards (s, j);
+      string c= emoji_code_points (s (i, j));
+      if (c != "") {
+        at << i;
+        for (int k= 1; k < N(c); k++) at << -1;
+        r << c;
+        i= j;
+        continue;
+      }
+    }
+    at << i;
+    r << s[i++];
+  }
+  at << n;
+  return r;
+}
+
+string
 emoji_name (string s) {
   // the name of the emoji which s is, by its name, by its code points, or
   // partly by names (<emoji-man><#200D><emoji-woman>...); "" if s is not
@@ -507,6 +535,7 @@ emoji_match (string s, int pos, string w) {
   // the end of w at pos in s, the emoji of both compared in code points
   // (<emoji-grinning-face> matches <#1F600>); -1 if w is not there
   string cw= emoji_to_code_points (w), acc;
+  if (pos >= N(s) || (s[pos] != '<' && s[pos] != cw[0])) return -1;
   int i= pos;
   while (i < N(s) && N(acc) < N(cw)) {
     int j= i;

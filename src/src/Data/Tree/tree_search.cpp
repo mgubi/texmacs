@@ -696,16 +696,29 @@ search_string (range_set& sel, string s, tree what, path p, int from= 0) {
     }
     if (has_emoji (w)) {
       // an emoji is found by its name and by its code points (the
-      // documents written before the names have code points), the emoji
-      // of the pattern and of the text compared in code points
-      int pos= from;
-      while (pos < N(s)) {
-        int end= emoji_match (source, pos, w);
-        if (end > pos) {
-          merge (sel, simple_range (p * pos, p * end));
-          pos= end;
+      // documents written before the names have code points): the pattern
+      // and the text with their emoji in code points, and a hit is a whole
+      // emoji (an emoji alone is not found inside a sequence, whatever form
+      // the sequence has)
+      string cw= emoji_to_code_points (w);
+      bool named= search_forwards ("<emoji-", source) >= 0;
+      array<int> at;
+      string cs= named? emoji_to_code_points (source, at): source;
+      int pos= 0;
+      if (!named) pos= from;
+      else while (pos < N(cs) && (at[pos] < 0 || at[pos] < from)) pos++;
+      while (pos < N(cs)) {
+        int next= tm_search_forwards (cw, pos, cs);
+        if (next < 0 || next >= N(cs)) break;
+        int a= named? at[next]: next;
+        int b= named? at[next + N(cw)]: next + N(cw), st, en;
+        if (a >= 0 && b >= 0 &&
+            !tm_grapheme_inside (source, a, st, en) &&
+            !tm_grapheme_inside (source, b, st, en)) {
+          merge (sel, simple_range (p * a, p * b));
+          pos= next + N(cw);
         }
-        else tm_char_forwards (source, pos);
+        else tm_char_forwards (cs, next), pos= next;
       }
       return;
     }

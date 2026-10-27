@@ -698,9 +698,11 @@ emoji_sequence_end (string s, int pos, int end) {
   if (c < 0x200 && !(named && c >= 0)) return end;
   if (named) end= e;
   if (is_regional_indicator (c) && !named) {
-    // a flag: two regional indicators
+    // a flag: two regional indicators (not one and a flag by its name)
     int f;
-    if (is_regional_indicator (code_at (s, end, f))) return f;
+    bool fnamed;
+    if (is_regional_indicator (code_at (s, end, f, fnamed)) && !fnamed)
+      return f;
     return end;
   }
   while (end < N(s)) {
@@ -741,9 +743,19 @@ tm_grapheme_end (string s, int pos) {
   return emoji_sequence_end (s, pos, end);
 }
 
+static bool
+continues_emoji (int c) {
+  // a character which continues the sequence before it
+  return (c >= 0xfe00 && c <= 0xfe0f) || (c >= 0x1f3fb && c <= 0x1f3ff) ||
+         (c >= 0xe0020 && c <= 0xe007f) || c == 0x20e3 || c == 0x200d ||
+         is_regional_indicator (c);
+}
+
 // a position before which the characters may begin a sequence of emoji but
 // not continue one: the first character before pos which is not <#XXXX>
-// beyond U+1FF (a letter, a digit, an accent), or the start
+// beyond U+1FF (a letter, a digit, an accent), or which cannot continue a
+// sequence and does not follow a joiner (so that a long text of ideographs
+// is not gone through), or the start
 static int
 grapheme_safe_start (string s, int pos) {
   int p= pos;
@@ -751,7 +763,14 @@ grapheme_safe_start (string s, int pos) {
     int q= p, e;
     tm_char_backwards (s, q);
     p= q;
-    if (code_at (s, q, e) < 0x200) break;
+    int c= code_at (s, q, e);
+    if (c < 0x200) break;
+    if (!continues_emoji (c)) {
+      int r= q;
+      if (r == 0) break;
+      tm_char_backwards (s, r);
+      if (code_at (s, r, e) != 0x200d) break;
+    }
   }
   return p;
 }
