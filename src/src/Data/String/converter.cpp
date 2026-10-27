@@ -122,6 +122,13 @@ converter_rep::load () {
     hashtree_from_dictionary (dic,"emoji-names", UTF8, BIT2BIT, true);
     ht = dic;
   }
+  else if (from=="LaTeX-emoji" && to=="Emoji") {
+    // the other names of the LaTeX package emoji (\emoji{smile}, the old
+    // names of CLDR): the names of TeXmacs, for the import of LaTeX
+    hashtree<char,string> dic;
+    hashtree_from_dictionary (dic,"emoji-latex-aliases", BIT2BIT, BIT2BIT, false);
+    ht = dic;
+  }
   else if (from=="UTF-8" && to=="Cork") {
     hashtree<char,string> dic;
     hashtree_from_dictionary (dic,"corktounicode", UTF8, BIT2BIT, true);
@@ -139,6 +146,7 @@ converter_rep::load () {
     hashtree_from_dictionary (dic,"tmuniversaltounicode-extra", BIT2BIT, UTF8, false);
     hashtree_from_dictionary (dic,"symbol-unicode-oneway", BIT2BIT, UTF8, false);
     hashtree_from_dictionary (dic,"symbol-unicode-math", BIT2BIT, UTF8, false);
+    hashtree_from_dictionary (dic,"emoji-names", BIT2BIT, UTF8, false);
     ht = dic;
   }
   else if (from=="UTF-8" && to=="HTML") {
@@ -165,6 +173,7 @@ converter_rep::load () {
     hashtree_from_dictionary (dic,"symbol-unicode-fallback", BIT2BIT, UTF8, false);
     hashtree_from_dictionary (dic,"symbol-unicode-math", BIT2BIT, UTF8, false);
     hashtree_from_dictionary (dic,"t2atounicode", BIT2BIT, UTF8, false);
+    hashtree_from_dictionary (dic,"emoji-names", BIT2BIT, UTF8, false);
     ht = dic;
   }  
   else if (from=="UTF-8" && to=="T2A" ) {
@@ -371,9 +380,30 @@ match_emoji_name (converter conv, converter cconv, string s, int& i,
   return true;
 }
 
+static bool
+dictionary_value (converter conv, string key, string& val) {
+  // the value of the key in the dictionary of conv, the whole key
+  hashtree<char,string> node= conv->ht;
+  for (int i= 0; i < N(key); i++) {
+    if (!node->contains (key[i])) return false;
+    node= node (key[i]);
+  }
+  val= node->label;
+  return val != "";
+}
+
+static bool
+is_emoji_token (string s, int i) {
+  return s[i] == '<' && test (s, i, "<emoji-");
+}
+
 bool
 is_emoji_name (string s) {
-  return starts (s, "<emoji-") && ends (s, ">") && cork_to_utf8 (s) != s;
+  // s is one symbol, the name of an emoji
+  if (!starts (s, "<emoji-")) return false;
+  int end= 0;
+  tm_char_forwards (s, end);
+  return end == N(s) && ends (s, ">") && cork_to_utf8 (s) != s;
 }
 
 string
@@ -398,13 +428,11 @@ emoji_to_code_points (string s) {
   string r;
   int i= 0, n= N(s);
   while (i < n) {
-    if (s[i] == '<' && test (s, i, "<emoji-")) {
+    if (is_emoji_token (s, i)) {
       int j= i;
-      while (j < n && s[j] != '>') j++;
-      if (j < n) {
-        string c= emoji_code_points (s (i, j+1));
-        if (c != "") { r << c; i= j+1; continue; }
-      }
+      tm_char_forwards (s, j);
+      string c= emoji_code_points (s (i, j));
+      if (c != "") { r << c; i= j; continue; }
     }
     r << s[i++];
   }
@@ -413,14 +441,95 @@ emoji_to_code_points (string s) {
 
 string
 emoji_name (string s) {
-  // the name of the emoji which s is, in code points (<#1F600> or the
-  // name itself); "" if s is not one emoji
+  // the name of the emoji which s is, by its name, by its code points, or
+  // partly by names (<emoji-man><#200D><emoji-woman>...); "" if s is not
+  // one emoji, or a character with a symbol of its own (<aries>); a
+  // variation selector after the emoji is that of the emoji
   if (is_emoji_name (s)) return s;
   string u= cork_to_utf8 (s), name;
   if (N(u) == 0) return "";
   int i= 0;
-  converter conv= load_converter ("UTF-8", "Emoji");
-  if (match_emoji_name (conv, u, i, name) && i == N(u)) return name;
+  converter conv = load_converter ("UTF-8", "Emoji");
+  converter cconv= load_converter ("UTF-8", "Cork");
+  if (!match_emoji_name (conv, cconv, u, i, name)) return "";
+  while (i < N(u)) {
+    unsigned int code= decode_from_utf8 (u, i);
+    if (code != 0xfe0e && code != 0xfe0f) return "";
+  }
+  return name;
+}
+
+bool
+has_emoji (string s) {
+  // whether s has an emoji, by its name or by its code points
+  if (search_forwards ("<emoji-", s) >= 0) return true;
+  if (search_forwards ("<#", s) < 0) return false;
+  return search_forwards ("<emoji-", utf8_to_cork (cork_to_utf8 (s))) >= 0;
+}
+
+string
+emoji_names (string s) {
+  // s with the emoji in code points, or partly by names, written by the
+  // names of the whole sequences (<emoji-man><#200D><emoji-woman><#200D>
+  // <emoji-girl> is <emoji-family-man-woman-girl>); the rest as it is
+  if (!has_emoji (s)) return s;
+  string u= emoji_to_code_points (s), utf;
+  array<string> toks;
+  array<int> at;
+  for (int i= 0; i < N(u); ) {
+    int j= i;
+    tm_char_forwards (u, j);
+    at << N(utf);
+    toks << u (i, j);
+    utf << cork_to_utf8 (u (i, j));
+    i= j;
+  }
+  at << N(utf);
+  converter conv = load_converter ("UTF-8", "Emoji");
+  converter cconv= load_converter ("UTF-8", "Cork");
+  string r;
+  int k= 0;
+  while (k < N(toks)) {
+    int pos= at[k];
+    string name;
+    if (match_emoji_name (conv, cconv, utf, pos, name)) {
+      int l= k;
+      while (l < N(toks) && at[l] < pos) l++;
+      if (at[l] == pos) { r << name; k= l; continue; }
+    }
+    r << toks[k++];
+  }
+  return r;
+}
+
+int
+emoji_match (string s, int pos, string w) {
+  // the end of w at pos in s, the emoji of both compared in code points
+  // (<emoji-grinning-face> matches <#1F600>); -1 if w is not there
+  string cw= emoji_to_code_points (w), acc;
+  int i= pos;
+  while (i < N(s) && N(acc) < N(cw)) {
+    int j= i;
+    tm_char_forwards (s, j);
+    acc << emoji_to_code_points (s (i, j));
+    i= j;
+    if (!starts (cw, acc)) return -1;
+  }
+  return acc == cw? i: -1;
+}
+
+string
+emoji_from_latex (string name) {
+  // the emoji of \emoji{name} of the LaTeX package emoji: by its name,
+  // which is ours, or by one of its other names (smile, +1, tada, the old
+  // names of CLDR); "" if none
+  string s= "<emoji-" * name * ">", val;
+  if (is_emoji_name (s)) return s;
+  converter conv= load_converter ("LaTeX-emoji", "Emoji");
+  if (dictionary_value (conv, name, val)) {
+    s= "<emoji-" * val * ">";
+    if (is_emoji_name (s)) return s;
+  }
   return "";
 }
 

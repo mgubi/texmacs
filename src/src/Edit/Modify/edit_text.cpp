@@ -12,6 +12,7 @@
 #include "edit_text.hpp"
 #include "file.hpp"
 #include "analyze.hpp"
+#include "converter.hpp" // join_emoji
 #include "scheme.hpp"
 
 /******************************************************************************
@@ -201,11 +202,36 @@ edit_text_rep::prepare_for_insert () {
 }
 
 void
+edit_text_rep::join_emoji () {
+  // the emoji before the cursor by the name of its whole sequence: an
+  // emoji typed one code point after the other (the people and the joiners
+  // of a family one by one, a skin tone after a hand, the second regional
+  // indicator of a flag) or next to the code points of an older document
+  path p= path_up (tp);
+  tree st= subtree (et, p);
+  if (!is_atomic (st)) return;
+  string s= st->label;
+  int l= last_item (tp);
+  if (l <= 0 || l > N(s) || search_forwards ("<", s) < 0) return;
+  int a= tm_grapheme_start (s, l);
+  int b= max (l, tm_grapheme_end (s, a));
+  string g= s (a, b);
+  if (!has_emoji (g)) return;
+  string c= emoji_names (g);
+  if (c == g) return;
+  remove (p * a, b - a);
+  insert (p * a, c);
+  go_to (p * (a + N(c)));
+}
+
+void
 edit_text_rep::insert_tree (tree t, path p_in_t) {
   if (!as_bool (call ("like-emacs?"))) selection_cut ("none");
   if (is_atomic (t) && (p_in_t == end (t)) &&
-      is_atomic (subtree (et, path_up (tp))))
+      is_atomic (subtree (et, path_up (tp)))) {
     insert (tp, t);
+    join_emoji ();
+  }
   else if (is_document (t)) {
     if (subtree (et, path_up (tp)) == "" &&
         accepts_return (path_up (tp)) &&

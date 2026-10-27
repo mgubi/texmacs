@@ -347,14 +347,18 @@ QTMWidget::inputMethodEvent (QInputMethodEvent* event) {
       if (DEBUG_QT)
         debug_qt << "IM committing: " << commit_string.toUtf8().data() << LF;
       if (preediting || get_preference ("speech", "off") == "off")
-        for (int i = 0; i < commit_string.size(); ++i) {
-          // keep surrogate pairs (non-BMP characters) together
-          int n= (commit_string[i].isHighSurrogate () &&
-                  i + 1 < commit_string.size () &&
-                  commit_string[i+1].isLowSurrogate ())? 2: 1;
-          kbdEvent (0, Qt::NoModifier, commit_string.mid (i, n));
-          i += n - 1;
+      {
+        // one key per character of TeXmacs: an emoji sequence (a family,
+        // a flag, a skin tone) by its name, whole, not code point after
+        // code point, and a character beyond the BMP not cut in two
+        string cs= from_qstring (commit_string);
+        for (int i= 0; i < N(cs); ) {
+          int j= i;
+          tm_char_forwards (cs, j);
+          kbdEvent (0, Qt::NoModifier, to_qstring (cs (i, j)));
+          i= j;
         }
+      }
       else {
         string s= "speech:" * from_qstring (commit_string);
         kbdEvent (0, Qt::NoModifier, to_qstring (s));

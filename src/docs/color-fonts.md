@@ -93,12 +93,13 @@ U+200D U+1F467), `<emoji-red-heart>` (U+2764 U+FE0F), `<emoji-flag-italy>`,
 - **The names** are those of the LaTeX package `emoji`
   (`\emoji{grinning-face}`): the CLDR short names of Unicode, in small
   letters, without accents and without `: , . ' ( ) & "`, with a hyphen for
-  a space, `hash` and `asterisk` for the keycaps of `#` and `*`. Of the
-  3507 emoji of the package (v0.2.2, Emoji 13.1), 3500 have the same name;
-  7 were renamed by CLDR since (`hugging-face` is
-  `smiling-face-with-open-hands`, `flag-turkey` is `flag-turkiye`...). The
-  shortcodes of GitHub or Slack (`:grinning:`) were not taken: each service
-  has its own list, and many emoji have none.
+  a space, `hash` and `asterisk` for the keycaps of `#` and `*`. The 3521
+  entries of the package (v0.2.2, Emoji 13.1) are all fully-qualified
+  emoji of ours, and 3514 have the same name; 7 were renamed by CLDR since
+  (`hugging-face` is `smiling-face-with-open-hands`, `flag-turkey` is
+  `flag-turkiye`...). The shortcodes of GitHub or Slack (`:grinning:`) were
+  not taken as names: each service has its own list, and many emoji have
+  none; the import of LaTeX knows those of the package (below).
 - **The table**, `TeXmacs/langs/encoding/emoji-names.scm` (ASCII: the code
   points as `#XXXX`), has the fully-qualified emoji of the file
   `emoji-test.txt` of Unicode and its components: 3972 names for Emoji 18.0.
@@ -106,7 +107,11 @@ U+200D U+1F467), `<emoji-red-heart>` (U+2764 U+FE0F), `<emoji-flag-italy>`,
   `python3 misc/emoji/make-emoji-names.py emoji-test.txt > TeXmacs/langs/encoding/emoji-names.scm`
   (from <https://unicode.org/Public/emoji/latest/>), and
   `--check <emoji-table.def>` lists the names which differ from those of the
-  LaTeX package.
+  LaTeX package. `--aliases emoji-test.txt <emoji-table.def>` writes
+  `TeXmacs/langs/encoding/emoji-latex-aliases.scm`, the other names of the
+  package: its 879 aliases after the shortcodes of GitHub (`smile`, `tada`,
+  `+1`) and its 7 names which are not ours, 886 in all, each with the name
+  of TeXmacs it stands for.
 - **The conversions.** The table is in the converters from the universal
   encoding to UTF-8 and to source code (`converter_rep::load`,
   `Data/String/converter.cpp`), so that a name is written out as its
@@ -117,15 +122,44 @@ U+200D U+1F467), `<emoji-red-heart>` (U+2764 U+FE0F), `<emoji-flag-italy>`,
   keeps it (U+2648 is `<aries>`, U+25FD `<square>`), and what is not a
   fully-qualified emoji stays in code points (U+2764 alone, a skin tone
   after a face, a joiner between two emoji which make nothing together).
-  `cork_to_utf8 (utf8_to_cork (s))` is `s`. The documents written before,
-  with `<#1F600>`, are not converted: both forms are valid and look the
-  same. `emoji_name`, `emoji_code_points` and `emoji_to_code_points`
-  (`converter.hpp`; `emoji-name` in Scheme) go from one to the other.
-- **The typesetting.** `smart_font_rep::resolve` gives a name a font of its
-  own (`emoji-name`, the emoji font of its first code point) whose rewrite
-  (`REWRITE_EMOJI`) is the code points of the name: everything below works
-  on the code points as before (the ligatures, the layers, the text of a
-  PDF), and the name is one character for the editor.
+  `cork_to_utf8 (utf8_to_cork (s))` is `s`; the table is also in the
+  strict and the T2A conversions. The documents written before, with
+  `<#1F600>`, are not converted on load: both forms are valid and look the
+  same. `emoji_name`, `emoji_names`, `emoji_code_points` and
+  `emoji_to_code_points` (`converter.hpp`; `emoji-name` in Scheme) go from
+  one to the other; `is_emoji_name` is true of one symbol only.
+- **Sequences partly by names.** An input method may send a family code
+  point after code point (Qt split the text it commits so, before it was
+  converted): its people come by their names and its joiners as code
+  points, `<emoji-man><#200D><emoji-woman>...`. Everything which cuts the
+  text into characters takes a name as its code points: `code_at`
+  (`analyze.cpp`, behind `tm_grapheme_end` and `tm_grapheme_start`) takes a
+  name as its first code point, so that such a sequence, a name with a
+  skin tone or a selector after it, or names among the code points of an
+  older document, is one character for the typesetter and for the editor;
+  a flag by its name takes no regional indicator after it. And the editor
+  writes the emoji before the cursor by the name of its whole sequence
+  after each insertion (`join_emoji`, `edit_text.cpp`, with
+  `emoji_names`): the family typed so is stored as
+  `<emoji-family-man-woman-girl>`, a skin tone typed after a hand as
+  `<emoji-thumbs-up-medium-skin-tone>`, also when the hand is a code point
+  of an older document; nothing else of a document is renamed. Qt, Qt 6
+  and Qtwk now send what an input method commits one character of TeXmacs
+  after the other (an emoji sequence by its name, whole).
+- **Search** finds an emoji by its name and by its code points, whatever
+  form the text has: when the pattern has an emoji (`has_emoji`), the
+  strings are compared with their emoji in code points (`emoji_match`, in
+  `search_string` and `match` of `tree_search.cpp` and in `test_sub` of
+  `edit_search.cpp`).
+- **The typesetting.** The emoji font draws the names as their code points
+  (its rewrite is `REWRITE_EMOJI`, which leaves code points as they are),
+  and `smart_font_rep::resolve` gives a name the font its first code point
+  gets: the emoji font, so that a name and the code points around it make
+  one run and one ligature; or, when the emoji font has not that emoji (a
+  newer one, `<emoji-face-with-bags-under-eyes>`), the font which the
+  fallback finds for the code point, through a font of its own
+  (`emoji-name`) which gives it the code points. Everything below works on
+  the code points as before (the ligatures, the layers, the text of a PDF).
 - **The footer** says which character is before the cursor: an emoji
   sequence whole (`tm_grapheme_start`, in `compute_text_footer` and in
   `footer-char-info` of the interactive footer), with its name, also for
@@ -137,7 +171,9 @@ U+200D U+1F467), `<emoji-red-heart>` (U+2764 U+FE0F), `<emoji-flag-italy>`,
   no longer escapes the symbols of the right footer (`tm_var_encode` made
   `<alpha>` of a footer literal).
 - **LaTeX**: `\emoji{grinning-face}` is imported as `<emoji-grinning-face>`
-  (`latex_command_to_tree`, `fromtex.cpp`); a name is exported as its
+  (`latex_command_to_tree`, `fromtex.cpp`), and so are the other names of
+  the package (`\emoji{smile}`, `\emoji{+1}`, `\emoji{hugging-face}`, by
+  `emoji_from_latex`); a name is exported as its
   characters, as the code points are (`tmtex-token-sub`). TMML writes
   `<#1F600>` as a `<tm-sym>`, since it would come back by its name (so is
   `<#3B1>`, which comes back as `<alpha>`), and a name as its character.
@@ -246,12 +282,18 @@ Emoji and Noto Color Emoji (`TEXMACS_FONT_PATH` to its folder, the
 preference at "NotoColorEmoji").
 
 The groups "names" check the conversions to and from the names, that a
-name is as wide as its code points (with every emoji font), that it is one
-character, and the import and export of LaTeX and HTML. The scripted test
-of Vue `tests/Plugins/Vue/footer-emoji.scm` (`run.sh footer-emoji 90`)
-checks the footer: the whole sequence as a text of its own (in the emoji
-font), then its name, in both footers, and that an emoji typed comes by its
-name.
+name is as wide as its code points (with every emoji font, mixed with code
+points, without the emoji in the emoji font), that it is one character,
+that emoji inserted code point after code point are stored by the name of
+their sequence, the search across the two forms, and the import (with the
+other names of the package) and export of LaTeX and HTML. The scripted
+test of Vue `tests/Plugins/Vue/footer-emoji.scm` checks the footer: the
+whole sequence as a text of its own (in the emoji font), then its name,
+and that an emoji typed comes by its name, also a family typed code point
+after code point; it runs once for each footer:
+`TEXMACS_VUE_FOOTER=plain sh tests/Plugins/Vue/run.sh footer-emoji 90`, and
+`TEXMACS_VUE_FOOTER=interactive` (the variable stands for the preference
+"interactive footer", which a test must not set).
 
 `src/Plugins/MuPDF/tests/pdf-compare.sh` exports `emoji.tm` with the MuPDF
 writer and checks that every emoji, and every sequence whole, comes out of

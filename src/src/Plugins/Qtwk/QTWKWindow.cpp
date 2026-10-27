@@ -526,15 +526,16 @@ QTWKWindow::inputMethodEvent (QInputMethodEvent* event) {
     
     int key = 0;
 #if 1
-    for (int i = 0; i < commit_string.size(); ++i) {
-      // keep surrogate pairs (non-BMP characters) together, as in Qt
-      int n= (commit_string[i].isHighSurrogate () &&
-              i + 1 < commit_string.size () &&
-              commit_string[i+1].isLowSurrogate ())? 2: 1;
+    // one key per character of TeXmacs, an emoji sequence by its name,
+    // as in Qt
+    string cs= from_qstring (commit_string);
+    for (int i= 0; i < N(cs); ) {
+      int j= i;
+      tm_char_forwards (cs, j);
       QKeyEvent ev (QEvent::KeyPress, key, Qt::NoModifier,
-                    commit_string.mid (i, n));
+                    to_qstring (cs (i, j)));
       keyPressEvent (&ev);
-      i += n - 1;
+      i= j;
     }
 #else
     QKeyEvent ev (QEvent::KeyPress, key, Qt::NoModifier, commit_string);

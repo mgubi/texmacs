@@ -2065,9 +2065,10 @@ latex_command_to_tree (tree t) {
 
   if (is_tuple (t, "\\emoji", 1)) {
     // the emoji of the LaTeX package emoji (\emoji{grinning-face}): those
-    // of TeXmacs have the same names (<emoji-grinning-face>)
-    string name= "<emoji-" * locase_all (emoji_arg (t[1])) * ">";
-    if (is_emoji_name (name)) return name;
+    // of TeXmacs have the same names (<emoji-grinning-face>); its other
+    // names (\emoji{smile}, \emoji{+1}) come from emoji-latex-aliases.scm
+    string name= emoji_from_latex (locase_all (emoji_arg (t[1])));
+    if (name != "") return name;
   }
 
   if (is_tuple (t, "\\marginpar", 1))

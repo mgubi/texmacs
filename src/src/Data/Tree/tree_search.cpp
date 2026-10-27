@@ -11,6 +11,7 @@
 
 #include "tree_search.hpp"
 #include "analyze.hpp"
+#include "converter.hpp" // emoji_match
 #include "boot.hpp"
 #include "drd_mode.hpp"
 #include <set>
@@ -328,6 +329,12 @@ match (tree t, tree what) {
     }
     if (!is_atomic (what)) return false;
     string w= case_fold (what->label);
+    if (has_emoji (w)) {
+      // an emoji by its name or by its code points, in the pattern and in
+      // the text (the documents written before the names have code points)
+      s= emoji_to_code_points (s);
+      w= emoji_to_code_points (w);
+    }
     if (partial_match_flag) {
       int pos= 0;
       return tm_search_forwards (w, pos, s) != -1;
@@ -685,6 +692,21 @@ search_string (range_set& sel, string s, tree what, path p, int from= 0) {
       // an empty string is found in an empty string only, once (the loop
       // below would not move: #452)
       if (N(s) == 0) merge (sel, simple_range (p * 0, p * 0));
+      return;
+    }
+    if (has_emoji (w)) {
+      // an emoji is found by its name and by its code points (the
+      // documents written before the names have code points), the emoji
+      // of the pattern and of the text compared in code points
+      int pos= from;
+      while (pos < N(s)) {
+        int end= emoji_match (source, pos, w);
+        if (end > pos) {
+          merge (sel, simple_range (p * pos, p * end));
+          pos= end;
+        }
+        else tm_char_forwards (source, pos);
+      }
       return;
     }
     int pos= from;

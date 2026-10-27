@@ -5981,7 +5981,11 @@ vue_texmacs_widget_rep::send (slot s, blackbox val) {
       left_footer= check_open<string> (val, s);
       // the editor sends the left footer first (edit_interface_rep::
       // set_footer), having said what it shows
-      footer_menus= get_preference ("interactive footer") == "on" &&
+      // (TEXMACS_VUE_FOOTER=interactive|plain stands for the preference,
+      // for the tests, which must not set it)
+      footer_menus= (get_env ("TEXMACS_VUE_FOOTER") != ""?
+                     get_env ("TEXMACS_VUE_FOOTER") == "interactive":
+                     get_preference ("interactive footer") == "on") &&
                     as_bool (call ("footer-environment?"));
       break;
       

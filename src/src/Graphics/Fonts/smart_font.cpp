@@ -1633,8 +1633,11 @@ smart_font_rep::resolve (string c, string fam, int attempt) {
 int
 smart_font_rep::emoji_font () {
   if (!tt_font_exists (emoji_font_name ())) return -1;
+  // (its texts may have emoji by their names, which it draws as their code
+  // points: a family whose people come by their names and whose joiners
+  // come as code points is one ligature)
   tree key= tuple ("shipped-emoji");
-  int nr= sm->add_font (key, REWRITE_NONE);
+  int nr= sm->add_font (key, REWRITE_EMOJI);
   initialize_font (nr);
   return nr;
 }
@@ -1652,7 +1655,7 @@ smart_font_rep::resolve_emoji (string c) {
   if (emoji_font_name () == SHIPPED_EMOJI_FONT ||
       !tt_font_exists (SHIPPED_EMOJI_FONT)) return -1;
   tree key= tuple ("shipped-emoji", "shipped");
-  int snr= sm->add_font (key, REWRITE_NONE);
+  int snr= sm->add_font (key, REWRITE_EMOJI);
   initialize_font (snr);
   if (!fn[snr]->supports (c)) return -1;
   return sm->add_char (key, c);
@@ -1974,16 +1977,28 @@ smart_font_rep::resolve (string c) {
   }
 
   // an emoji by its name (<emoji-grinning-face>, see emoji_code_points):
-  // its code points, in the font of its first one
+  // in the font of its first code point, as that code point would be (the
+  // emoji font, which draws the names as their code points, so that a name
+  // and the code points around it make one run and one ligature), else in
+  // the font which the code point finds, through a font which draws the
+  // name as its code points
   if (starts (c, "<emoji-")) {
     string u= emoji_code_points (c);
     if (u != "") {
       int end= 0;
       tm_char_forwards (u, end);
-      int enr= (u[0] == '<'? resolve_emoji (u (0, end)): -1);
-      if (enr < 0) enr= emoji_font ();
-      if (enr >= 0) {
-        tree key= tuple ("emoji-name", as_string (enr));
+      string first= u (0, end);
+      int enr= -1;
+      if (N(first) == 1) enr= emoji_font ();   // a keycap
+      else if (is_emoji_presentation (single_code (first)) ||
+               N(u) > N(first)) enr= resolve_emoji (first);
+      if (enr >= 0 && is_tuple (sm->fn_spec[enr], "shipped-emoji"))
+        return sm->add_char (sm->fn_spec[enr], c);
+      int cnr= (N(first) == 1? -1: resolve (first));
+      if (cnr >= 0) {
+        if (sm->fn_rewr[cnr] == REWRITE_EMOJI)
+          return sm->add_char (sm->fn_spec[cnr], c);
+        tree key= tuple ("emoji-name", as_string (cnr));
         int nr= sm->add_font (key, REWRITE_EMOJI);
         initialize_font (nr);
         return sm->add_char (key, c);

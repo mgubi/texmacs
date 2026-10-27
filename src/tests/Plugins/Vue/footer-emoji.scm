@@ -3,12 +3,13 @@
 ;; font (the font of the widgets has none, and drew a square), and its name
 ;; (<emoji-grinning-face>, the universal encoding of the emoji). An emoji
 ;; typed comes into the document by its name. Both footers: the texts of the
-;; editor (edit_footer.cpp) and the interactive footer (footer-menu.scm).
+;; editor (edit_footer.cpp) and the interactive footer (footer-menu.scm),
+;; one run each, chosen by TEXMACS_VUE_FOOTER (which stands for the
+;; preference "interactive footer": a test does not set preferences).
 ;; No script: run it with
-;;   sh tests/Plugins/Vue/run.sh footer-emoji 90
-;; it quits by itself, with the status 1 if a check failed. The preference
-;; is set in the home of the run (run.sh makes a copy of the home for it and
-;; removes it afterwards).
+;;   TEXMACS_VUE_FOOTER=plain sh tests/Plugins/Vue/run.sh footer-emoji 90
+;;   TEXMACS_VUE_FOOTER=interactive sh tests/Plugins/Vue/run.sh footer-emoji 90
+;; it quits by itself, with the status 1 if a check failed.
 (use-modules (check gui-driver))
 
 (define (footer-texts)
@@ -43,9 +44,10 @@
    (check-char "a keycap" " 1<#FE0F><#20E3>" "1<#FE0F><#20E3>"
                "emoji-keycap-1")
    (check-char "a name" " <emoji-red-heart>" "<#2764><#FE0F>"
-               "emoji-red-heart")))
+               "emoji-red-heart")
+   (check-char "a name and a selector" " <emoji-rocket><#FE0F>"
+               "<#1F680><#FE0F>" "emoji-rocket")))
 
-(set-preference "interactive footer" "off")
 (gui-test-run
  (append
   (list (gt-wait 3000)
@@ -54,11 +56,21 @@
         ;; (the messages of the start take the footer for a while)
         (gt-wait 9000))
   (checks)
-  ;; an emoji typed: by its name in the document
+  ;; an emoji typed: by its name in the document; a family typed code
+  ;; point after code point (as an input method may send it) is one
+  ;; emoji, by the name of the family
   (list (gt-raw (string-append "text " (cork->utf8 "<#1F680>")))
         (gt-idle)
         (gt-check "typed by its name"
                   (lambda () (gt-document-has? "<emoji-rocket>")))
-        (gt-eval (lambda () (set-preference "interactive footer" "on"))))
-  (checks)
-  (list (gt-exit))))
+        (gt-raw (string-append "text " (cork->utf8 " <#1F468><#200D><#1F469><#200D><#1F467>")))
+        (gt-idle)
+        (gt-check "a family typed is one emoji"
+                  (lambda ()
+                    (gt-document-has? "<emoji-family-man-woman-girl>")))
+        (gt-wait 500)
+        (gt-check "the footer says so"
+                  (lambda ()
+                    (footer-says? "<#1F468><#200D><#1F469><#200D><#1F467>"
+                                  "emoji-family-man-woman-girl")))
+        (gt-exit))))

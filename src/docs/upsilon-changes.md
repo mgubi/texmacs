@@ -20,11 +20,17 @@ have the details, and the problems go to the
   `<emoji-family-man-woman-girl>`, `<emoji-flag-italy>`,
   `<emoji-keycap-1>`. An emoji typed, pasted or imported comes into the
   document by its name, as a Greek letter does; the documents which have
-  emoji as code points (`<#1F600>`) look the same as before. The footer
-  shows the emoji before the cursor, a sequence whole, with its name, where
-  it showed a square (Vue, the browser) or the last character of the
-  sequence alone (Qt); `\emoji{grinning-face}` of LaTeX is imported as the
-  emoji (#533).
+  emoji as code points (`<#1F600>`) look the same as before and are not
+  converted when they are loaded; search finds an emoji in either form,
+  and a family or a skin tone typed code point after code point is stored
+  by the name of the whole. The footer shows the emoji before the cursor,
+  a sequence whole, with its name, where it showed a square (Vue, the
+  browser) or the last character of the sequence alone (Qt);
+  `\emoji{grinning-face}` of LaTeX is imported as the emoji, also by the
+  other names of the package (`\emoji{smile}`, `\emoji{+1}`). Note: stock
+  TeXmacs and older Upsilon builds read `<emoji-...>` as an unknown symbol;
+  in TMML an emoji in code points is now written as a `<tm-sym>` (as
+  `<#3B1>` is), since it would come back by its name (#533).
 - **Maple** (desktop): the helper of the plug-in builds with the compilers
   of Xcode 15 and later and of GCC 14, which rejected the types of its
   callbacks, and on macOS it finds the Maple library by itself, also when

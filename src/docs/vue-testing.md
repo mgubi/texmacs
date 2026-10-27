@@ -75,7 +75,8 @@ need `-debug-events` on the command line.
 
 `TEXMACS_VUE_TAB_MODE=top|side|mobile|grid` stands for the preference
 "gui:responsive tab mode" (test `responsive-tabs`), so that no test has to
-set it.
+set it, and `TEXMACS_VUE_FOOTER=plain|interactive` for the preference
+"interactive footer" (test `footer-emoji`).
 
 `TEXMACS_VUE_THEME=light|dark` forces the theme of the interface. The
 `theme` and `icons` tests each render one window under whichever theme is
@@ -211,7 +212,7 @@ callback output.
 | `footer-variants` | the menu of a displayed formula in the footer makes it inline while the cursor is in an inline formula inside it, and the cursor goes back there (`got: (math text math) ...`) |
 | `named` | `(named "name" ...)` in the menus: two buttons with the same label told apart by the names of their groups (`#second`, `#first > Same`); steps of the driver in its `.scm`, without a script |
 | `footer-activate` | `footer-variants` written as steps of the driver in its `.scm`, without a script: the menus are found by their texts (`gt-activate`), the result is checked (`gt-check`) and TeXmacs quits with the status |
-| `footer-emoji` | the footer says which emoji is before the cursor: a sequence (a family, a flag, a keycap) whole, as a text of its own drawn with the emoji font, then its name (`(emoji-family-man-woman-girl)`), in the footer of the editor and in the interactive footer; an emoji typed comes into the document by its name (`<emoji-rocket>`) |
+| `footer-emoji` | the footer says which emoji is before the cursor: a sequence (a family, a flag, a keycap) whole, as a text of its own drawn with the emoji font, then its name (`(emoji-family-man-woman-girl)`); an emoji typed comes into the document by its name (`<emoji-rocket>`), a family typed code point after code point by the name of the family. Run it with `TEXMACS_VUE_FOOTER=plain` and with `TEXMACS_VUE_FOOTER=interactive` (the footer of the editor, the interactive footer) |
 
 One more is not run this way. `sockets-tls` repeats the `sockets` exchange
 over TLS and is run by hand:
