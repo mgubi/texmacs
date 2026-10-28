@@ -122,6 +122,24 @@ converter_rep::load () {
     hashtree_from_dictionary (dic,"emoji-names", UTF8, BIT2BIT, true);
     ht = dic;
   }
+  else if (from=="UTF-8" && to=="Emoji-loose") {
+    // the same, and the sequences which lack a variation selector (the
+    // woman running, U+1F3C3 U+200D U+2640, without its U+FE0F), by the
+    // name of the fully-qualified emoji: for emoji_names and emoji_name,
+    // not for utf8_to_cork, which keeps the characters as they are
+    hashtree<char,string> dic;
+    hashtree_from_dictionary (dic,"emoji-names", UTF8, BIT2BIT, true);
+    hashtree_from_dictionary (dic,"emoji-names-unqualified", UTF8, BIT2BIT, true);
+    ht = dic;
+  }
+  else if (from=="Emoji" && to=="LaTeX-emoji") {
+    // the emoji of the LaTeX package emoji, by their names there, for the
+    // export of LaTeX (\emoji{hugging-face} for <emoji-smiling-face-with-
+    // open-hands>)
+    hashtree<char,string> dic;
+    hashtree_from_dictionary (dic,"emoji-latex-names", BIT2BIT, BIT2BIT, false);
+    ht = dic;
+  }
   else if (from=="LaTeX-emoji" && to=="Emoji") {
     // the other names of the LaTeX package emoji (\emoji{smile}, the old
     // names of CLDR): the names of TeXmacs, for the import of LaTeX
@@ -397,6 +415,87 @@ is_emoji_token (string s, int i) {
   return s[i] == '<' && test (s, i, "<emoji-");
 }
 
+static bool
+match_loose_emoji_name (converter lconv, string s, int& i, string& name) {
+  // a sequence of several code points without its variation selectors
+  // (the woman running pasted as U+1F3C3 U+200D U+2640), by the name of the
+  // fully-qualified emoji, as the editor names it when it is typed; not a
+  // keycap (a digit followed by U+20E3 stays as it is, as when it is typed)
+  if (i >= N(s) || ((unsigned char) s[i]) < 128) return false;
+  int j= i, k= i;
+  if (!match_emoji_name (lconv, s, j, name)) return false;
+  decode_from_utf8 (s, k);
+  if (j <= k) return false;
+  i= j;
+  return true;
+}
+
+int
+emoji_component_code (string s) {
+  // the code point of a symbol of its own, <female>, <male>, <leftrightarrow>,
+  // which is in the blocks of the emoji and their sequences (the sign after
+  // the person running, U+2640, is <female> once converted): its code
+  // point, which sequences take as such; -1 for the other symbols
+  if (N(s) < 3 || s[0] != '<' || s[1] == '#' || !ends (s, ">") ||
+      starts (s, "<emoji-")) return -1;
+  string u= strict_cork_to_utf8 (s);
+  if (u == s || N(u) == 0) return -1;
+  int i= 0;
+  int c= (int) decode_from_utf8 (u, i);
+  if (i != N(u)) return -1;
+  if ((c >= 0x2000 && c <= 0x2bff) || c >= 0x1f000 ||
+      c == 0x3030 || c == 0x303d || c == 0x3297 || c == 0x3299) return c;
+  return -1;
+}
+
+static bool
+is_variation_selector (string tok) {
+  return tok == "<#FE0F>" || tok == "<#FE0E>" ||
+         tok == "<#fe0f>" || tok == "<#fe0e>";
+}
+
+string
+emoji_search_form (string s, array<int>& at) {
+  // the form in which the search compares the emoji: names as their code
+  // points, the symbols of the sequences (<female>) as their code points,
+  // no variation selectors (so that the forms typed, pasted and of older
+  // documents of an emoji are one); at[j] is the position in s of the
+  // position j of the result, -1 inside a name
+  at= array<int> ();
+  string r;
+  int i= 0, n= N(s);
+  while (i < n) {
+    int j= i;
+    tm_char_forwards (s, j);
+    string tok= s (i, j), c;
+    if (is_variation_selector (tok)) { i= j; continue; }
+    if (is_emoji_token (s, i)) c= emoji_code_points (tok);
+    if (c != "") {
+      // (without the selectors of the name)
+      c= replace (replace (c, "<#FE0F>", ""), "<#FE0E>", "");
+    }
+    else if (s[i] == '<' && i + 1 < n && s[i+1] == '#')
+      c= upcase_all (tok);                      // (a search without case)
+    else if (s[i] == '<') {
+      int code= emoji_component_code (tok);
+      if (code >= 0) c= "<#" * as_hexadecimal (code) * ">";
+    }
+    if (c == "") c= tok;
+    at << i;
+    for (int k= 1; k < N(c); k++) at << -1;
+    r << c;
+    i= j;
+  }
+  at << n;
+  return r;
+}
+
+string
+emoji_search_form (string s) {
+  array<int> at;
+  return emoji_search_form (s, at);
+}
+
 bool
 is_emoji_name (string s) {
   // s is one symbol, the name of an emoji
@@ -477,7 +576,7 @@ emoji_name (string s) {
   string u= cork_to_utf8 (s), name;
   if (N(u) == 0) return "";
   int i= 0;
-  converter conv = load_converter ("UTF-8", "Emoji");
+  converter conv = load_converter ("UTF-8", "Emoji-loose");
   converter cconv= load_converter ("UTF-8", "Cork");
   if (!match_emoji_name (conv, cconv, u, i, name)) return "";
   while (i < N(u)) {
@@ -501,6 +600,14 @@ emoji_names (string s) {
   // names of the whole sequences (<emoji-man><#200D><emoji-woman><#200D>
   // <emoji-girl> is <emoji-family-man-woman-girl>); the rest as it is
   if (!has_emoji (s)) return s;
+  return emoji_all_names (s);
+}
+
+string
+emoji_all_names (string s) {
+  // as emoji_names, also for the sequences which utf8_to_cork keeps as
+  // they are (a keycap without its selector, 1<#20E3>): for the export
+  if (search_forwards ("<", s) < 0) return s;
   string u= emoji_to_code_points (s), utf;
   array<string> toks;
   array<int> at;
@@ -513,7 +620,7 @@ emoji_names (string s) {
     i= j;
   }
   at << N(utf);
-  converter conv = load_converter ("UTF-8", "Emoji");
+  converter conv = load_converter ("UTF-8", "Emoji-loose");
   converter cconv= load_converter ("UTF-8", "Cork");
   string r;
   int k= 0;
@@ -534,17 +641,36 @@ int
 emoji_match (string s, int pos, string w) {
   // the end of w at pos in s, the emoji of both compared in code points
   // (<emoji-grinning-face> matches <#1F600>); -1 if w is not there
-  string cw= emoji_to_code_points (w), acc;
-  if (pos >= N(s) || (s[pos] != '<' && s[pos] != cw[0])) return -1;
+  string cw= emoji_search_form (w), acc;
+  if (pos >= N(s) || N(cw) == 0 || (s[pos] != '<' && s[pos] != cw[0]))
+    return -1;
   int i= pos;
   while (i < N(s) && N(acc) < N(cw)) {
     int j= i;
     tm_char_forwards (s, j);
-    acc << emoji_to_code_points (s (i, j));
+    acc << emoji_search_form (s (i, j));
     i= j;
     if (!starts (cw, acc)) return -1;
   }
-  return acc == cw? i: -1;
+  if (acc != cw) return -1;
+  // (and the selectors after it)
+  while (i < N(s)) {
+    int j= i;
+    tm_char_forwards (s, j);
+    if (!is_variation_selector (s (i, j))) break;
+    i= j;
+  }
+  return i;
+}
+
+string
+emoji_latex_name (string s) {
+  // the name in the LaTeX package emoji of the emoji named s
+  // (<emoji-grinning-face>); "" if the package has not that emoji
+  string val;
+  converter conv= load_converter ("Emoji", "LaTeX-emoji");
+  if (dictionary_value (conv, s, val)) return val;
+  return "";
 }
 
 string
@@ -570,15 +696,18 @@ string
 utf8_to_cork (string input) {
   converter conv= load_converter ("UTF-8", "Cork");
   converter econv= load_converter ("UTF-8", "Emoji");
+  converter lconv= load_converter ("UTF-8", "Emoji-loose");
   int start, i, n= N(input);
   string output;
   for (i=0; i<n; ) {
     start= i;
-    string name;
-    if (match_emoji_name (econv, conv, input, i, name)) {
-      output << name;
-      continue;
-    }
+    // the longest emoji, fully-qualified or a sequence without selectors
+    string name, lname;
+    int si= i, li= i;
+    bool sm= match_emoji_name (econv, conv, input, si, name);
+    bool lm= match_loose_emoji_name (lconv, input, li, lname);
+    if (lm && (!sm || li > si)) { output << lname; i= li; continue; }
+    if (sm) { output << name; i= si; continue; }
     unsigned int code= decode_from_utf8 (input, i);
     string s= input (start, i);
     string r= apply (conv, s);
@@ -593,15 +722,18 @@ string
 var_utf8_to_cork (string input) {
   converter conv= load_converter ("UTF-8", "Cork");
   converter econv= load_converter ("UTF-8", "Emoji");
+  converter lconv= load_converter ("UTF-8", "Emoji-loose");
   int start, i, n= N(input);
   string output;
   for (i=0; i<n; ) {
     start= i;
-    string name;
-    if (match_emoji_name (econv, conv, input, i, name)) {
-      output << name;
-      continue;
-    }
+    // the longest emoji, fully-qualified or a sequence without selectors
+    string name, lname;
+    int si= i, li= i;
+    bool sm= match_emoji_name (econv, conv, input, si, name);
+    bool lm= match_loose_emoji_name (lconv, input, li, lname);
+    if (lm && (!sm || li > si)) { output << lname; i= li; continue; }
+    if (sm) { output << name; i= si; continue; }
     unsigned int code= decode_from_utf8 (input, i);
     string s= input (start, i);
     string r= apply (conv, s);

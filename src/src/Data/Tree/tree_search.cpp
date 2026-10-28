@@ -332,8 +332,8 @@ match (tree t, tree what) {
     if (has_emoji (w)) {
       // an emoji by its name or by its code points, in the pattern and in
       // the text (the documents written before the names have code points)
-      s= emoji_to_code_points (s);
-      w= emoji_to_code_points (w);
+      s= emoji_search_form (s);
+      w= emoji_search_form (w);
     }
     if (partial_match_flag) {
       int pos= 0;
@@ -700,10 +700,10 @@ search_string (range_set& sel, string s, tree what, path p, int from= 0) {
       // and the text with their emoji in code points, and a hit is a whole
       // emoji (an emoji alone is not found inside a sequence, whatever form
       // the sequence has)
-      string cw= emoji_to_code_points (w);
-      bool named= search_forwards ("<emoji-", source) >= 0;
+      string cw= emoji_search_form (w);
+      bool named= search_forwards ("<", source) >= 0;
       array<int> at;
-      string cs= named? emoji_to_code_points (source, at): source;
+      string cs= named? emoji_search_form (source, at): source;
       int pos= 0;
       if (!named) pos= from;
       else while (pos < N(cs) && (at[pos] < 0 || at[pos] < from)) pos++;

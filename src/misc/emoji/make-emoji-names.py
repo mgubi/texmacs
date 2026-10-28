@@ -22,7 +22,12 @@
 #
 # it writes the other names of the package instead (its aliases, as
 # \emoji{smile}, \emoji{+1}, and its names which CLDR changed since), for
-# the import of LaTeX.
+# the import of LaTeX. And with --latex-names instead of --aliases, it
+# writes TeXmacs/langs/encoding/emoji-latex-names.scm, the emoji which the
+# package has, each with its name there, for the export to LaTeX. And
+# --unqualified emoji-test.txt writes emoji-names-unqualified.scm, the
+# sequences which lack a variation selector, with the names of the
+# fully-qualified emoji.
 #
 # The file is ASCII: the sequences are written as #XXXX escapes.
 
@@ -42,7 +47,7 @@ def tm_name (desc):
     s= re.sub (r'\s+', "-", s.strip ())
     return s
 
-def read_test (path):
+def read_test (path, wanted= ("fully-qualified", "component")):
     version= "?"
     entries= []
     for line in open (path, encoding= "utf-8"):
@@ -52,7 +57,7 @@ def read_test (path):
         codes, rest= line.split (";", 1)
         status, comment= rest.split ("#", 1)
         status= status.strip ()
-        if status not in ("fully-qualified", "component"): continue
+        if status not in wanted: continue
         m= re.match (r'\s*\S+\s+E\d+\.\d+\s+(.*)$', comment.rstrip ("\n"))
         if not m: raise SystemExit ("cannot read: " + line)
         entries.append ((codes.split (), m.group (1)))
@@ -141,10 +146,58 @@ def aliases (seen, version, path):
     for a in sorted (out): print ('("%s"\t"%s")' % (a, out[a]))
     sys.stderr.write ("%d other names\n" % len (out))
 
+def latex_names (seen, version, path):
+    # the names of the package for our emoji, for the export to LaTeX:
+    # the emoji which the package has, each by its name there
+    latex= read_latex (path)
+    by_codes= dict ((v, k) for k, v in seen.items ())
+    out= {}
+    for key, lname, _ in latex:
+        if key in by_codes and by_codes[key] not in out:
+            out[by_codes[key]]= lname
+    header ("The emoji of the LaTeX package emoji, by their names there",
+            version, ",\n;; and emoji-table.def of the package: the emoji which it has (the\n"
+            ";; others are exported as their characters), each with its name in\n"
+            ";; \\emoji{...}, which is ours but for the names CLDR changed since.")
+    for n in sorted (out): print ('("<emoji-%s>"\t"%s")' % (n, out[n]))
+    sys.stderr.write ("%d emoji of the package, %d by another name\n" %
+                      (len (out), len ([n for n in out if out[n] != n])))
+
+def unqualified (path):
+    # the sequences of several code points which lack a variation selector
+    # (minimally-qualified and unqualified: U+1F3C3 U+200D U+2640, the woman
+    # running without the U+FE0F after the sign), each with the name of the
+    # fully-qualified emoji; not the characters alone (U+2764 alone is the
+    # heart of the text, not the emoji)
+    version, seen, _= read_names (path)
+    _, entries= read_test (path, ("minimally-qualified", "unqualified"))
+    out= []
+    for codes, desc in entries:
+        if len (codes) < 2: continue
+        name= tm_name (desc)
+        if name not in seen:
+            raise SystemExit ("no fully-qualified emoji for " + desc)
+        value= "".join ("#" + c.upper () for c in codes)
+        out.append ('("<emoji-%s>"\t"%s")' % (name, value))
+    header ("The emoji of Unicode without their variation selectors", version,
+            ":\n;; the sequences of several code points which are minimally-qualified or\n"
+            ";; unqualified, each with the name of the fully-qualified emoji. For the\n"
+            ";; names of what is typed and exported (emoji_names), not for utf8_to_cork,\n"
+            ";; which keeps the characters as they are.")
+    for line in out: print (line)
+    sys.stderr.write ("%d sequences\n" % len (out))
+
 def main (argv):
+    if len (argv) == 3 and argv[1] == "--unqualified":
+        unqualified (argv[2])
+        return
     if len (argv) == 4 and argv[1] == "--aliases":
         version, seen, _= read_names (argv[2])
         aliases (seen, version, argv[3])
+        return
+    if len (argv) == 4 and argv[1] == "--latex-names":
+        version, seen, _= read_names (argv[2])
+        latex_names (seen, version, argv[3])
         return
     if len (argv) == 4 and argv[2] == "--check":
         version, seen, out= read_names (argv[1])

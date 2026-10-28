@@ -3603,6 +3603,38 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(emoji-names <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|emoji_all_names> which returns
+    <scm|string>.
+  </explain>
+
+  <\explain>
+    <scm|(emoji-latex-name <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|emoji_latex_name> which returns
+    <scm|string>.
+  </explain>
+
+  <\explain>
+    <scm|(emoji-from-latex <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|emoji_from_latex> which returns
+    <scm|string>.
+  </explain>
+
+  <\explain>
+    <scm|(emoji-to-code-points <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|emoji_to_code_points> which returns
+    <scm|string>.
+  </explain>
+
+  <\explain>
     <scm|(utf8-\<gtr\>t2a <scm-arg|string>)>
 <explain-synopsis|no synopsis>
   <|explain>

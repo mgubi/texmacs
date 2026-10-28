@@ -182,8 +182,69 @@ U+200D U+1F467), `<emoji-red-heart>` (U+2764 U+FE0F), `<emoji-flag-italy>`,
 - **LaTeX**: `\emoji{grinning-face}` is imported as `<emoji-grinning-face>`
   (`latex_command_to_tree`, `fromtex.cpp`), and so are the other names of
   the package (`\emoji{smile}`, `\emoji{+1}`, `\emoji{hugging-face}`, by
-  `emoji_from_latex`); a name is exported as its
-  characters, as the code points are (`tmtex-token-sub`). TMML writes
+  `emoji_from_latex`). The export writes an emoji which the package has
+  as `\emoji{...}` by its name there, whether the document has it by its
+  name or in code points (`tmtex-string` names the sequences first,
+  `emoji-names`; `tmtex-emoji` looks the name up, `emoji-latex-name`, in
+  `TeXmacs/langs/encoding/emoji-latex-names.scm`, made by
+  `make-emoji-names.py --latex-names` from the `emoji-table.def` of the
+  package as TeX Live 2025 has it, v0.2.2: its 3521 emoji, 7 of them by
+  their older names, `\emoji{hugging-face}` for
+  `<emoji-smiling-face-with-open-hands>`); in a formula in a `\text`, so
+  that it scales in the scripts. What is left of a sequence which is not
+  one emoji is dropped (the variation selectors and the joiners after an
+  emoji: `<emoji-man><#200D><emoji-woman>` is `\emoji{man}\emoji{woman}`).
+  A sequence which lacks a variation selector (minimally-qualified or
+  unqualified in `emoji-test.txt`: U+1F3C3 U+200D U+2640, the woman running
+  without the U+FE0F after the sign) is named as the fully-qualified emoji
+  by `emoji_names` and `emoji_name` (the export, the editor after an
+  insertion, the footer), from `TeXmacs/langs/encoding/emoji-names-unqualified.scm`
+  (`make-emoji-names.py --unqualified`, 1065 sequences of several code
+  points; a character alone, U+2764, is not taken: it is the heart of the
+  text). `utf8_to_cork` names such a sequence too (a text pasted), but not
+  a keycap without its selector (`2026<#20E3>` stays as it is typed or
+  pasted; the export, `emoji_all_names`, names it `\emoji{keycap-6}`).
+  A symbol of TeXmacs which is a character of the blocks of the emoji
+  (`<female>` and `<male>`, which `utf8_to_cork` makes of U+2640 and
+  U+2642, the sign a key gives) counts as its code point in a sequence
+  (`emoji_component_code`, used by `code_at` and by the search): a
+  person running, a joiner and `<female>` typed one after the other are
+  `<emoji-woman-running>`, and the sign alone stays `<female>`. The search
+  compares the emoji in one form (`emoji_search_form`: names and such
+  symbols as code points, without the variation selectors), so that the
+  emoji typed, pasted and of an older document are found as one.
+  An emoji which the package has not (a newer one) is written as
+  `\tmemojichar{<characters>}{U+1FAE9}{129769}` (the last, its first code
+  point, for `\iffontchar`). An `(emoji "name")` tag (an `\emoji` of an
+  import which did not know the name; the import reads the name as it is
+  written, `_` included, and takes the shortcodes of GitHub with `_` for
+  `-`, `\emoji{white_check_mark}`) is the emoji when the package knows the
+  name, else `\texttt{:name:}` with the characters special for TeX
+  escaped, never an `\emoji` which the package would stop on. A document
+  with these gets in its preamble, and only then (`latex-texmacs-preamble`,
+  `latex-define.scm`), for `\emoji`:
+
+  ```
+  \usepackage{iftex}
+  \ifLuaTeX
+    \usepackage{emoji}
+  \else
+    \DeclareRobustCommand{\emoji}[1]{\texttt{:\detokenize{#1}:}}
+    (and, for the PDF bookmarks, :name: with its hyphens kept)
+  \fi
+  ```
+
+  and for `\tmemojichar`: with LuaLaTeX and XeLaTeX (`\ifLuaTeX`,
+  `\ifXeTeX`, which every iftex has, the old v0.2 of TeX Live 2019 and
+  before too) the characters if the current font
+  has them (`\iffontchar`), else `[U+1FAE9]`; with pdfLaTeX `[U+1FAE9]`;
+  in the bookmarks, the characters or the code points. The package needs
+  LuaLaTeX (it stops the other engines with an error), and the exporter
+  does not know which engine the document will be compiled with (it has no
+  setting for it): LuaLaTeX draws the emoji in color, pdfLaTeX and XeLaTeX
+  write their names as shortcodes, literally (`:flag-congo---kinshasa:`,
+  also in the bookmarks). Checked with the three engines of TeX Live 2025.
+  `\emoji{...}` comes back as the same emoji on import. TMML writes
   `<#1F600>` as a `<tm-sym>`, since it would come back by its name (so is
   `<#3B1>`, which comes back as `<alpha>`), and a name as its character.
 

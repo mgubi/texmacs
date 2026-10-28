@@ -270,6 +270,19 @@
   (with s "<emoji-flag-italy><#1F1EB>"
     (check= (string-grapheme-start s (string-length s))
             (string-length "<emoji-flag-italy>")))
+  ;; a sequence without its variation selector is named as the
+  ;; fully-qualified one, also when it is pasted (utf8->cork), and also with
+  ;; the symbol <female> for its sign; the sign alone stays <female>, and a
+  ;; keycap without its selector stays as it is
+  (check= (emoji-name "<#1F3C3><#200D><#2640>") "<emoji-woman-running>")
+  (check= (emoji-name "<emoji-person-running><#200D><female>")
+          "<emoji-woman-running>")
+  (check= (utf8->cork (cork->utf8 "<#1F3C3><#200D><#2640>"))
+          "<emoji-woman-running>")
+  (check= (utf8->cork (cork->utf8 "<#2640>")) "<female>")
+  (check= (utf8->cork (cork->utf8 "1<#20E3>")) "1<#20E3>")
+  (with s "a<emoji-person-running><#200D><female>"
+    (check= (string-grapheme-start s (string-length s)) 1))
   ;; one symbol only is a name
   (check= (emoji-name "<emoji-rocket><alpha>") "")
   (check= (emoji-name "<emoji-no-such-emoji>") "")
@@ -355,6 +368,19 @@
           '((document "<emoji-flag-italy>") 18))
   (check= (after-inserts "" 0 (list "1" vs16 "<#20E3>"))
           '((document "<emoji-keycap-1>") 16))
+  ;; a sequence typed without its variation selector, its sign as the key
+  ;; gives it (<female>) or as a code point
+  (check= (after-inserts "" 0 (list "<#1F3C3>" zwj "<#2640>"))
+          '((document "<emoji-woman-running>") 21))
+  (check= (after-inserts "" 0 (list "<#1F3C3>" zwj "<female>"))
+          '((document "<emoji-woman-running>") 21))
+  (check= (after-inserts "" 0 (list "<emoji-person-running>" zwj "<female>"))
+          '((document "<emoji-woman-running>") 21))
+  (check= (after-inserts "x" 1 (list "<female>"))
+          '((document "x<female>") 9))
+  ;; a keycap typed without its selector stays as it was typed
+  (check= (after-inserts "2026" 4 (list "<#20E3>"))
+          '((document "2026<#20E3>") 11))
   ;; next to the code points of an older document
   (check= (after-inserts "x<#1F44D>" 9 (list "<#1F3FD>"))
           '((document "x<emoji-thumbs-up-medium-skin-tone>") 35))
@@ -394,17 +420,118 @@
                                         "<emoji-man>"))))
     (check= (length (search-hits doc "<emoji-man>")) 2)
     (check= (search-hits doc man) (search-hits doc "<emoji-man>")))
+  ;; the forms of an emoji typed, pasted and of an older document are
+  ;; found as one, with or without their selectors, their sign by its
+  ;; symbol or its code point
+  (let ((doc `(document ,(string-append
+                          "a<emoji-woman-running>b"
+                          "<emoji-person-running><#200D><female>c"
+                          "<#1F3C3><#200D><#2640><#FE0F>d"
+                          "<#1F3C3><#200D><#2640>e"))))
+    (check= (length (search-hits doc "<emoji-woman-running>")) 8)
+    (check= (search-hits doc "<#1F3C3><#200D><#2640>")
+            (search-hits doc "<emoji-woman-running>"))
+    (check= (search-hits doc "<emoji-person-running><#200D><female>")
+            (search-hits doc "<emoji-woman-running>")))
   ;; the other texts are searched as before
   (check= (length (search-hits '(document "a<alpha>b") "<alpha>")) 2))
 
 (define (test-name-export)
   (check-group "names: export and import")
   (let ((ex (lambda (s fmt) (convert `(document ,s) "texmacs-stree" fmt))))
-    ;; the characters of the emoji, as for the code points
+    ;; LaTeX: \emoji of the package emoji, by its name there, for an emoji
+    ;; by its name and for one in code points (an older document)
     (check= (ex "a<emoji-grinning-face>b" "latex-snippet")
-            (ex (string-append "a" smile "b") "latex-snippet"))
+            "a{\\emoji{grinning-face}}b")
+    (check= (ex (string-append "a" smile "b") "latex-snippet")
+            "a{\\emoji{grinning-face}}b")
     (check= (ex "a<emoji-family-man-woman-girl>b" "latex-snippet")
-            (ex (string-append "a" man zwj woman zwj girl "b") "latex-snippet"))
+            "a{\\emoji{family-man-woman-girl}}b")
+    (check= (ex (string-append "a" man zwj woman zwj girl "b") "latex-snippet")
+            "a{\\emoji{family-man-woman-girl}}b")
+    (check= (ex "<emoji-flag-congo---kinshasa>" "latex-snippet")
+            "{\\emoji{flag-congo---kinshasa}}")
+    ;; by the name of the package where CLDR changed it since
+    (check= (ex "<emoji-smiling-face-with-open-hands>" "latex-snippet")
+            "{\\emoji{hugging-face}}")
+    ;; in a formula, in a \text (which scales in scripts)
+    (check= (convert '(document (math "x<emoji-rocket>")) "texmacs-stree"
+                     "latex-snippet")
+            "$x\\text{\\emoji{rocket}}$")
+    (check= (convert (convert '(document (math "x+<emoji-rocket>=y"))
+                              "texmacs-stree" "latex-snippet")
+                     "latex-snippet" "texmacs-stree")
+            '(math (concat "x+" (text "<emoji-rocket>") "=y")))
+    ;; an emoji which the package has not: its characters in \tmemojichar,
+    ;; with its code points for pdfLaTeX
+    (with u (string-append "{\\tmemojichar{" (cork->utf8 "<#1FAE9>")
+                           "}{U+1FAE9}{129769}}")
+      (check= (ex "<emoji-face-with-bags-under-eyes>" "latex-snippet") u)
+      (check= (ex "<#1FAE9>" "latex-snippet") u))
+    ;; what is left of a sequence which is not one emoji: no selector after
+    ;; an emoji, no joiner between two (pdfLaTeX would stop on them)
+    (check= (ex (string-append "<emoji-man>" zwj "<emoji-woman>") "latex-snippet")
+            "{\\emoji{man}}{\\emoji{woman}}")
+    (check= (ex (string-append man zwj woman) "latex-snippet")
+            "{\\emoji{man}}{\\emoji{woman}}")
+    (check= (ex (string-append "<emoji-rocket>" vs16) "latex-snippet")
+            "{\\emoji{rocket}}")
+    (check= (ex "<emoji-red-heart><#FE0E>" "latex-snippet")
+            "{\\emoji{red-heart}}")
+    ;; an emoji tag of an import which did not know the name: the emoji if
+    ;; the package knows it, else the name as a shortcode (not \emoji)
+    (check= (ex '(emoji "smile") "latex-snippet")
+            "{\\emoji{grinning-face-with-smiling-eyes}}")
+    (check= (ex '(emoji "no-such-emoji") "latex-snippet")
+            "{\\texttt{:no-such-emoji:}}")
+    ;; its characters which are special for TeX as characters
+    (check= (ex '(emoji "a#b_c&d") "latex-snippet")
+            "{\\texttt{:a\\#b\\_c\\&d:}}")
+    ;; a sequence without its variation selector: the fully-qualified emoji
+    (check= (ex "<emoji-person-running><#200D><#2640>" "latex-snippet")
+            "{\\emoji{woman-running}}")
+    (check= (ex "<#1F3C3><#200D><#2640>" "latex-snippet")
+            "{\\emoji{woman-running}}")
+    ;; a keycap without its selector, which typing keeps as it is
+    (check= (ex "Number 1<#20E3> only" "latex-snippet")
+            "Number {\\emoji{keycap-1}} only")
+    ;; the sign of a sequence by its symbol (pasted, typed by a key)
+    (check= (ex "<emoji-person-running><#200D><female>" "latex-snippet")
+            "{\\emoji{woman-running}}")
+    ;; a tag of an older import, with _ read as subscripts
+    (check= (ex '(emoji (concat "white" (rsub "c") "heck" (rsub "m") "ark"))
+                "latex-snippet")
+            "{\\emoji{check-mark-button}}")
+    ;; a joiner after an emoji, before something else, is dropped too
+    (check= (ex (string-append "<emoji-rocket>" zwj "x") "latex-snippet")
+            "{\\emoji{rocket}}x")
+    ;; the preamble loads the package (with LuaLaTeX; another engine shows
+    ;; the names) only when a document has an emoji
+    (let ((doc (lambda (s)
+                 (convert `(document (TeXmacs "2.1.5") (style "generic")
+                                     (body (document ,s)))
+                          "texmacs-stree" "latex-document")))
+          (has? (lambda (s what) (>= (string-search-forwards what 0 s) 0))))
+      (with d (doc "a<emoji-grinning-face>b")
+        (check-true (has? d "\\ifLuaTeX"))
+        (check-true (has? d "\\usepackage{emoji}"))
+        (check-true (has? d "\\DeclareRobustCommand{\\emoji}[1]{\\texttt{:\\detokenize{#1}:}}"))
+        (check-false (has? d "tmemojichar"))
+        ;; and the import gives the emoji back, by its name
+        (check= (convert d "latex-document" "texmacs-stree")
+                '(document (TeXmacs "2.1.5") (style (tuple "article" "std-latex"))
+                           (body (document "a<emoji-grinning-face>b")))))
+      (check-false (has? (doc "ab") "emoji"))
+      ;; an emoji which the package has not: not the package, its own macro
+      (with d (doc "a<emoji-face-with-bags-under-eyes>b")
+        (check-false (has? d "\\usepackage{emoji}"))
+        (check-true (has? d "\\ifXeTeX"))
+        (check-true (has? d "\\iffontchar\\font#3")))
+      (check-false (has? (doc '(concat "a" (emoji "no-such-emoji")))
+                         "\\usepackage{emoji}")))
+    (check= (convert (ex "a<emoji-smiling-face-with-open-hands>b" "latex-snippet")
+                     "latex-snippet" "texmacs-stree")
+            "a<emoji-smiling-face-with-open-hands>b")
     (check= (ex "a<emoji-grinning-face>b" "html-snippet")
             (ex (string-append "a" smile "b") "html-snippet")))
   ;; \emoji of the LaTeX package emoji, by its names and its other ones
@@ -412,6 +539,12 @@
           "<emoji-grinning-face>")
   (check= (convert "\\emoji{smile}" "latex-snippet" "texmacs-stree")
           "<emoji-grinning-face-with-smiling-eyes>")
+  ;; a shortcode of GitHub (with _), and a name which is no emoji, as it
+  ;; was written
+  (check= (convert "\\emoji{white_check_mark}" "latex-snippet" "texmacs-stree")
+          "<emoji-check-mark-button>")
+  (check= (convert "\\emoji{foo_bar}" "latex-snippet" "texmacs-stree")
+          '(emoji "foo_bar"))
   (check= (convert "\\emoji{+1}" "latex-snippet" "texmacs-stree")
           "<emoji-thumbs-up>")
   (check= (convert "\\emoji{tada}" "latex-snippet" "texmacs-stree")

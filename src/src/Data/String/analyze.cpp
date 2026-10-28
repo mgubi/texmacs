@@ -669,6 +669,15 @@ code_at (string s, int pos, int& end, bool& named) {
   if (pos < N(s) && s[pos] == '<' && pos + 1 < N(s) && s[pos+1] == 'e') {
     int c= named_code_at (s, pos, end);
     named= (c >= 0);
+    if (named) return c;
+  }
+  if (pos + 1 < N(s) && s[pos] == '<' && s[pos+1] != '#') {
+    // a symbol of the sequences (<female>, the sign after the person
+    // running): its code point
+    int e= pos;
+    tm_char_forwards (s, e);
+    int c= emoji_component_code (s (pos, e));
+    if (c >= 0) end= e;
     return c;
   }
   if (pos + 3 >= N(s) || s[pos] != '<' || s[pos+1] != '#') return -1;
