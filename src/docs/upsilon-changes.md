@@ -14,6 +14,12 @@ have the details, and the problems go to the
 
 ## 28 October 2026
 
+- **Font design in the Cocoa build** (desktop, Cocoa): Font design, in
+  the menu of the font of the document (the "Roman" button of the focus
+  bar), no longer quits TeXmacs at once. The page of the fonts follows
+  the size of the window, and the Cocoa window did not answer when the
+  editor asked for its size; the same happened to any document whose
+  page type is "automatic" (#558).
 - **Title bar of the documents** (Vue, macOS): the window of a saved
   document has the icon of its file next to the title, which can be
   dragged to the Finder, a mail or a Terminal, and a Cmd-click on the title

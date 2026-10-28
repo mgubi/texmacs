@@ -45,6 +45,7 @@ named differently, open an issue or say so in your report.
 - **Tilda**: the Maple plug-in on macOS (#517), with the trace which showed
   its cause, and a shortcut which printed leaving its keys on the screen
   (#519).
+- **YiqiXu**: Font design, which quit the Cocoa build at once (#558).
 
 ## Software, fonts and art of others
 
