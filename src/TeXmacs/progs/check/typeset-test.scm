@@ -409,6 +409,112 @@
          (check= (nr "s2") "2")
          (check= (height) h))))))
 
+;; The pass which a removed label asks for types again what read the label,
+;; not the whole document.
+(define (test-removed-label-reuse)
+  (check-group "removed label, bridges used again")
+  (with-typeset-body
+   `(document (section (concat "A" (label "s1")))
+              (concat "See " (reference "s2") ".")
+              ,@(map (lambda (i) (string-append "Paragraph "
+                                                (number->string i) "."))
+                     (iota 60))
+              (section (concat "B" (label "s2")))
+              "Text.")
+   (lambda ()
+     (let* ((update (lambda ()
+                      (update-forced)
+                      (generate-all-aux)
+                      (update-current-buffer)
+                      (update-forced)))
+            (nr (lambda (l) (cadr (tree->stree (get-reference l))))))
+       (update)
+       (update)
+       (check= (nr "s2") "2")
+       (let ((p0 (typeset-pass-count)) (r0 (typeset-redone-count)))
+         (tree-set (tree-ref (buffer-tree) 62) '(section "B"))
+         (update)
+         (check= (tree->stree (get-reference "s2")) '(uninit))
+         ;; (65 paragraphs: the whole document, typeset again, is some 140
+         ;; bridges, and about half of them with the reuse; in the check
+         ;; modes, the bridges used again are typeset to be compared)
+         (when (nin? (getenv "TEXMACS_TYPESET_READS") '("off" "check"))
+           (check-true (< (- (typeset-redone-count) r0) 100))))))))
+
+;; A file holds the table of its references as it was saved: entries which no
+;; label of the body defines any more (old names of automatic labels, labels
+;; removed since) are cleaned by the first complete pass, and are no reason
+;; for another pass unless a reference to one of them was typeset (#408: a
+;; chapter of a book with some hundreds of them was typeset twice from
+;; scratch).
+(define (stale-file name body refs)
+  (tree-export
+   (stree->tree
+    `(document (TeXmacs "2.1")
+               (style (tuple "article"))
+               (body (document ,@body))
+               (references
+                (collection
+                 ,@(map (lambda (r) `(associate ,r (tuple "7" "3"))) refs)))))
+   (incl-file name) "texmacs"))
+
+(define (stale-typeset name)
+  ;; the passes and the bridges typeset again by the first typesetting of
+  ;; the file, and the references of the buffer afterwards
+  (let* ((p0 (typeset-pass-count))
+         (r0 (typeset-redone-count))
+         (u (incl-file name)))
+    (load-buffer u)
+    (switch-to-buffer* u)
+    (update-forced)
+    (list (- (typeset-pass-count) p0) (- (typeset-redone-count) r0)
+          (list-references))))
+
+(define (test-stale-references)
+  (check-group "stale references")
+  (let ((old (current-buffer))
+        (before (buffer-list))
+        (mismatches (typeset-check-mismatches))
+        (body '((section (concat "A" (label "s1")))
+                (concat "See " (reference "s1") ".")
+                "Text.")))
+    (incl-clear-dir)
+    (system-mkdir (system->url incl-dir))
+    (with r (check-run
+             (lambda ()
+               ;; no stale entry: the reference
+               (stale-file "clean.tm" body '())
+               (with c (stale-typeset "clean.tm")
+                 (check= (car c) 1)
+                 (check-true (in? "s1" (caddr c)))
+                 ;; entries which nothing reads: one pass, as without them,
+                 ;; and the table is cleaned
+                 (stale-file "stale.tm" body
+                             (list "old-1" "old-2" "auto-9" "s0"))
+                 (with s (stale-typeset "stale.tm")
+                   (check= (car s) 1)
+                   (check= (cadr s) (cadr c))
+                   (check= (caddr s) (caddr c))))
+               ;; a reference to an entry which is not a label of the body
+               ;; shows the old value in the first pass, and "?" in the
+               ;; next (#417)
+               (stale-file "read.tm"
+                           '((concat "See " (reference "old-1") ".")
+                             "Text.")
+                           (list "old-1" "old-2"))
+               (with s (stale-typeset "read.tm")
+                 (check= (car s) 2)
+                 (check-false (in? "old-1" (caddr s))))))
+      (when (and (pair? r) (== (car r) 'error))
+        (check-report #f "the group" (object->string r)))
+      (for (b (buffer-list))
+        (when (nin? b before)
+          (buffer-pretend-saved b)
+          (buffer-close b)))
+      (when (buffer-exists? old) (switch-to-buffer* old))
+      (incl-clear-dir)
+      (check= (typeset-check-mismatches) mismatches))))
+
 ;; The entries of the table of contents and of the index put a label where
 ;; they stand, auto-n. The number is that of the tag which makes the label
 ;; (Typeset/Env/env_exec.cpp, exec_auto_id): it follows the order of the
@@ -2139,6 +2245,8 @@
   (test-numbering)
   (test-renumbering)
   (test-removed-label)
+  (test-removed-label-reuse)
+  (test-stale-references)
   (test-automatic-labels)
   (test-labels-of-nested-tags)
   (test-reuse-below-bindings)
