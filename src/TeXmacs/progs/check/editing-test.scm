@@ -1011,6 +1011,36 @@
           (buffer-close g)
           (switch-to-buffer f))))))
 
+;; Save as tells the window of the buffer its new url (its file in the
+;; title bar, the proxy icon of macOS), also when the file keeps its name in
+;; another folder and the title of the buffer does not change: the url was
+;; only sent with a new title (set_title_buffer, new_buffer.cpp).
+(define (test-save-as-window)
+  (check-group "save as: the url of the window")
+  (with-buffer-body '(document "a")
+    (lambda ()
+      (let* ((sub (string-append editing-dir "/sub2"))
+             (f (tmp-file* "d.tm"))
+             (g (tmp-file* "sub2/d.tm"))
+             (h (tmp-file* "sub2/e.tm")))
+        (system-mkdir (system->url sub))
+        (edit (save-buffer-as f :overwrite))
+        (check= (current-buffer) f)
+        (check= (window->file (current-window)) f)
+        (with title (buffer-get-title f)
+          ;; the same file name in another folder: the same title
+          (edit (save-buffer-as g :overwrite))
+          (check= (current-buffer) g)
+          (check= (buffer-get-title g) title)
+          (check= (window->file (current-window)) g))
+        ;; another file name: another title
+        (edit (save-buffer-as h :overwrite))
+        (check= (current-buffer) h)
+        (check= (window->file (current-window)) h)
+        (for-each (lambda (u) (when (url-exists? u) (system-remove u)))
+                  (list g h))
+        (system-rmdir (system->url sub))))))
+
 ;; The initial environment belongs to the buffer (#528): a change made in
 ;; one view of it (init-env, init-default) is in its other views, in
 ;; buffer-get and in the saved file, and in a view made after it; the
@@ -1201,6 +1231,7 @@
   (test-undo-markers)
   (test-cancel-closed)
   (test-save)
+  (test-save-as-window)
   (test-views-init)
   (test-export)
   (test-copy-as-text)
