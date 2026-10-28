@@ -50,6 +50,7 @@ public:
   void   inclusions_gc (string which);
   void   typeset_update (path p);
   void   typeset_update_all ();
+  void   typeset_update_pictures ();
   bool   is_yes (string s);
   void   quit ();
   void   shell    (string s);

@@ -18,6 +18,7 @@
 #include "dictionary.hpp"
 #include "new_document.hpp"
 #include "merge_sort.hpp"
+#include "iterator.hpp"
 
 array<tm_buffer> bufs;
 
@@ -702,6 +703,35 @@ reset_inclusion (url name) {
   string name_s= as_string (name);
   document_inclusions -> reset (name_s);
   inclusions_version++;
+}
+
+// The inclusions are read again (Tools > Update > Inclusions, Update All):
+// the entries whose file has the same contents keep their tree (the
+// typesetter compares the included documents by pointer, see same_lookups
+// in Typeset/Bridge/bridge.cpp: the layout of an include is kept when its
+// file did not change), the others get the new tree, and a file which
+// cannot be read any more is dropped. Tells whether something changed.
+bool
+refresh_inclusions () {
+  bool changed= false;
+  array<string> names;
+  iterator<string> it= iterate (document_inclusions);
+  while (it->busy ()) names << it->next ();
+  for (int i=0; i<N(names); i++) {
+    string name_s= names[i];
+    tree old_doc= document_inclusions [name_s];
+    tree doc= extract_document (import_tree (url_system (name_s), "generic"));
+    if (is_func (doc, _ERROR)) {
+      document_inclusions -> reset (name_s);
+      changed= true;
+    }
+    else if (doc != old_doc) {
+      document_inclusions (name_s)= doc;
+      changed= true;
+    }
+  }
+  if (changed) inclusions_version++;
+  return changed;
 }
 
 tree

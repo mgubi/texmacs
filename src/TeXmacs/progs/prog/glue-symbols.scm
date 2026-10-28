@@ -28,6 +28,7 @@
 
 (tm-define (all-glued-symbols) '( 
 "typeset-check-mismatches"
+"typeset-redone-count"
 "texmacs-version-release"
 "version-before?"
 "updater-supported?"
@@ -909,6 +910,7 @@
 "inclusions-gc"
 "update-all-path"
 "update-all-buffers"
+"update-picture-buffers"
 "set-message"
 "set-message-temp"
 "recall-message"

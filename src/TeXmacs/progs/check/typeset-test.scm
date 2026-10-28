@@ -1230,11 +1230,11 @@
      (update-all-kept)
      (update-all-kept)
      (check= (labels-state) (labels-state-from-scratch (buffer-tree)))
-     ;; the environment which inclusions-gc changes is dealt with by the
-     ;; renumbering pass (the classic cache keeps it for the next typesetting)
+     ;; inclusions-gc changes no environment when no file changed (the
+     ;; classic cache types it all again, and keeps that for the next pass)
      (when (!= (getenv "TEXMACS_TYPESET_READS") "off")
        (inclusions-gc)
-       (check-true (notified-change? 8))
+       (check-false (notified-change? 8))
        (renumber-auto-labels)
        (check-false (notified-change? 8))
        (generate-all-aux)
@@ -2440,6 +2440,71 @@
     (buffer-pretend-saved m)
     (buffer-close m)))
 
+;; The clean-up steps of Update All keep the layout (#425): when no included
+;; file and no picture changed, the renumbering pass after inclusions-gc and
+;; picture-gc uses the bridges again; when an included file changed (on
+;; disk, or saved from its own buffer), only its include is typeset again;
+;; the result is the one of a typesetting from scratch.
+(define gc-changed 0)
+(define (incl-gc-keeps)
+  (incl-write "gc-a.tm"
+              (append '((section "Alpha") (concat "a" (index "alpha")))
+                      (map (lambda (i) (string-append "Text of alpha " (number->string i)))
+                           (iota 40))))
+  (incl-write "gc-b.tm"
+              (append '((section "Beta") (concat "b" (index "beta")))
+                      (map (lambda (i) (string-append "Text of beta " (number->string i)))
+                           (iota 40))))
+  (incl-write "gc-m.tm"
+              (append '((table-of-contents "toc" (document ""))
+                        (section "Intro"))
+                      (map (lambda (i) (string-append "Master text " (number->string i)))
+                           (iota 40))
+                      '((include "gc-a.tm") (section "Middle") (include "gc-b.tm")
+                        (the-index "idx" (document "")))))
+  (with m (incl-file "gc-m.tm")
+    (load-buffer m)
+    (switch-to-buffer* m)
+    (let* ((c0 (typeset-redone-count))
+           (dummy (update-forced))
+           (all (- (typeset-redone-count) c0)))
+      (update-all-kept)
+      (update-all-kept)
+      (with c1 (typeset-redone-count)
+        (update-all-kept)
+        (with n (- (typeset-redone-count) c1)
+          (check= (labels-state) (incl-labels-fresh))
+          ;; (the classic cache types it all again, and the check mode too)
+          (when (not (member (getenv "TEXMACS_TYPESET_READS") (list "off" "check")))
+            (check-true (< (* 2 n) all)))))
+      ;; an included file edited on disk: the master shows it, and what is
+      ;; typeset again is that include and what follows from the renumbering
+      (incl-write "gc-b.tm"
+                  (append '((section "Beta") (concat "b" (index "beta"))
+                            (section "Gamma") (concat "g" (index "gamma")))
+                          (map (lambda (i) (string-append "Text of beta " (number->string i)))
+                               (iota 40))))
+      (with c2 (typeset-redone-count)
+        (update-all-kept)
+        (set! gc-changed (- (typeset-redone-count) c2))
+        (update-all-kept)
+        (check-true (string-occurs? "Gamma" (incl-table 'table-of-contents)))
+        (check-true (string-occurs? "gamma" (incl-table 'the-index)))
+        (check= (labels-state) (incl-labels-fresh))
+        (when (not (member (getenv "TEXMACS_TYPESET_READS") (list "off" "check")))
+          (check-true (< gc-changed all))))
+      ;; and back
+      (incl-write "gc-b.tm"
+                  (append '((section "Beta") (concat "b" (index "beta")))
+                          (map (lambda (i) (string-append "Text of beta " (number->string i)))
+                               (iota 40))))
+      (update-all-kept)
+      (update-all-kept)
+      (check-false (string-occurs? "Gamma" (incl-table 'table-of-contents)))
+      (check= (labels-state) (incl-labels-fresh)))
+    (buffer-pretend-saved m)
+    (buffer-close m)))
+
 (define (test-included-files)
   (check-group "included files")
   (let ((old (current-buffer))
@@ -2449,7 +2514,7 @@
     (system-mkdir (system->url incl-dir))
     (incl-extern)
     (for (f (list incl-renumbering incl-renumbering-writes
-                  incl-saved-include))
+                  incl-saved-include incl-gc-keeps))
       (with r (check-run f)
         (when (and (pair? r) (== (car r) 'error))
           (check-report #f "the group" (object->string r)))))

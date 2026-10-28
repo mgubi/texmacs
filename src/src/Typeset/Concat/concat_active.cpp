@@ -437,16 +437,12 @@ concater_rep::typeset_image (tree t, path ip) {
   if (N(t) != 5) error_image ("parameters");
   tree image_tree= env->exec (t[0]);
   url image= url_none ();
+  bool file_image= false;
   if (is_atomic (image_tree)) {
     if (N (image_tree->label) == 0)
       error_image (tree (WITH, "color", "red", "no image"));
-    url im= cork_to_utf8( image_tree->label);
-    image= resolve (relative (env->base_file_name, im));
-    if (is_none (image) && suffix (im) == "")
-      image= resolve (relative (env->base_file_name, ::glue (im, ".eps")));
-    if (is_none (image) && suffix (im) == "")
-      image= resolve (relative (env->base_file_name, ::glue (im, ".pdf")));
-    if (is_none (image)) image= "$TEXMACS_PATH/misc/pixmaps/unknown.ps";
+    image= env->image_file (env->base_file_name, image_tree->label);
+    file_image= true;
   }
   else if (is_func (image_tree, TUPLE, 2) &&
 	     is_func (image_tree[0], RAW_DATA, 1) &&
@@ -459,6 +455,10 @@ concater_rep::typeset_image (tree t, path ip) {
   // determine the original size of the image
   int iw, ih;
   image_size (image, iw, ih);
+  // (the file and its size are inputs of the bridge: the layout is not
+  // kept when the pictures were loaded again and these changed)
+  if (file_image)
+    env->picture_lookup ('p', image_tree->label, image, iw, ih);
   double pt= ((double) env->dpi*PIXEL) / 72.0;
   SI w= (SI) (((double) iw) * pt);
   SI h= (SI) (((double) ih) * pt);

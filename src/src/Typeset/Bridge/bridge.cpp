@@ -863,6 +863,7 @@ bridge_rep::typeset_by_inputs (int desired_status) {
   bool was_zoom= in_zoom;
   tree was_zoom_at= in_zoom_at;
   if (edit_profile.on) edit_profile.redone++;
+  typeset_redone_total++;
   unsigned long long state= env->derived_state ();
   unsigned long long items= items_signature (ttt->a, ttt->b);
   array<box> item_boxes= items_boxes (ttt->a, ttt->b);

@@ -118,6 +118,8 @@ typesetter_rep::local_end (array<page_item>& prev_l, stack_border& prev_sb) {
 // see typesetter.hpp
 int typeset_check_mismatches= 0;
 int get_typeset_check_mismatches () { return typeset_check_mismatches; }
+int typeset_redone_total= 0;
+int get_typeset_redone_count () { return typeset_redone_total; }
 
 void
 typeset_cache_mismatch (string what) {

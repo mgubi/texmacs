@@ -27,6 +27,14 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(typeset-redone-count)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|get_typeset_redone_count> which returns
+    <scm|int>.
+  </explain>
+
+  <\explain>
     <scm|(texmacs-version-release <scm-arg|string>)>
 <explain-synopsis|no synopsis>
   <|explain>
@@ -7071,6 +7079,14 @@ source code.
 <explain-synopsis|no synopsis>
   <|explain>
     Calls the <c++> function <cpp|typeset_update_all> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(update-picture-buffers)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|typeset_update_pictures> which returns
     <scm|void>.
   </explain>
 

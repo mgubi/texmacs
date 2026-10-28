@@ -18,6 +18,7 @@
   "initialize_glue_basic"
 
   (typeset-check-mismatches get_typeset_check_mismatches (int))
+  (typeset-redone-count get_typeset_redone_count (int))
   (texmacs-version-release texmacs_version (string string))
   (version-before? version_inf (bool string string))
   (updater-supported? updater_supported (bool))
