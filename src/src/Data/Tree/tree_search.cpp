@@ -1748,13 +1748,20 @@ match_tokens (region_matcher& m, tree what, bool str, bool alone,
 
 static bool
 argument_match (tree t, path arg, tree what, path& q1, path& q2,
-                bool lazy) {
+                bool lazy, path from) {
   // the match of what in the argument arg of t, as when it is alone (its
-  // tokens relative to it: short paths in deep nestings); lazy: the
-  // leftmost one, else all of the argument first (a cascaded match)
+  // tokens relative to it: short paths in deep nestings), not before the
+  // position from (the start of the hit: the text before it, the output of
+  // an earlier replacement, is not in it); lazy: the leftmost one, else all
+  // of the argument first (a cascaded match)
   region_matcher m;
   tree u= subtree (t, arg);
-  tokens_between (m.toks, u, path (), path (), path ());
+  array<search_token> all;
+  tokens_between (all, u, path (), path (), path ());
+  bool cut= !is_nil (from) && arg <= from && arg != from;
+  path rel= (cut? from / arg: path ());
+  for (int k=0; k<N(all); k++)
+    if (!cut || !path_less (all[k].before, rel)) m.toks << all[k];
   int start;
   if (!match_tokens (m, what, is_atomic (u), true, start, lazy)) return false;
   path a= argument_start (t, arg);
@@ -1765,7 +1772,7 @@ argument_match (tree t, path arg, tree what, path& q1, path& q2,
 
 static bool
 first_argument_match (tree t, path at, tree what, path& q1, path& q2,
-                      path& arg, bool lazy) {
+                      path& arg, bool lazy, path from) {
   // the first accessible argument of the tag of t at at, or of the tags
   // inside them, in the order of the document, where what matches (as when
   // it is alone): each argument once, and no further than the first match
@@ -1774,18 +1781,18 @@ first_argument_match (tree t, path at, tree what, path& q1, path& q2,
   if (is_concat (u) || is_document (u)) {
     for (int k=0; k<N(u); k++)
       if (is_compound (u[k]) &&
-          first_argument_match (t, at * k, what, q1, q2, arg, lazy))
+          first_argument_match (t, at * k, what, q1, q2, arg, lazy, from))
         return true;
     return false;
   }
   for (int j=0; j<N(u); j++)
     if (is_accessible_for_search (u, j)) {
-      if (argument_match (t, at * j, what, q1, q2, lazy)) {
+      if (argument_match (t, at * j, what, q1, q2, lazy, from)) {
         arg= at * j;
         return true;
       }
       if (is_compound (u[j]) &&
-          first_argument_match (t, at * j, what, q1, q2, arg, lazy))
+          first_argument_match (t, at * j, what, q1, q2, arg, lazy, from))
         return true;
     }
   return false;
@@ -1825,12 +1832,12 @@ replace_range (tree t, path p1, path p2, tree what, path& q1, path& q2,
       if (m.toks[k].kind == TOKEN_BOUNDARY) return false;
     if (c1 >= N(m.toks)) return false;
     arg= argument_of (t, m.toks[c1].before);
-    return argument_match (t, arg, what, q1, q2, lazy);
+    return argument_match (t, arg, what, q1, q2, lazy, p1);
   }
   // inside a tag of the hit: the first argument where it matches
   for (int k=0; k<N(m.toks); k++)
     if (m.toks[k].kind == TOKEN_TAG &&
-        first_argument_match (t, m.toks[k].at, what, q1, q2, arg, lazy))
+        first_argument_match (t, m.toks[k].at, what, q1, q2, arg, lazy, p1))
       return true;
   return false;
 }
@@ -1851,6 +1858,16 @@ search_replace_range (tree t, path p1, path p2, tree what) {
   array<path> r;
   if (!is_position (t, p1) || !is_position (t, p2)) return r;
   if (!is_concat (what) || N(what) == 0 || contains_select_region (what)) {
+    // a string or a tag pattern: the hit must be a match of it (a range
+    // which is not one is never replaced)
+    if (!is_document (what) && !contains_select_region (what)) {
+      initialize_search ();
+      clear_no_formula ();
+      tree sel= simplify_correct (selection_compute (t, p1, p2));
+      bool ok= match (sel, what);
+      clear_no_formula ();
+      if (!ok) return r;
+    }
     r << p1 << p2;
     return r;
   }
@@ -1937,16 +1954,11 @@ uncut (tree u, path q, path h) {
   return h;
 }
 
-array<path>
-search_from (tree t, tree what, path p, path cur, int limit) {
-  // the first hits (at most limit) of what in the paragraph t at p from
-  // the position cur on, as the search finds them in the text which comes
-  // after cur, each one narrowed to the match which Replace replaces (see
-  // replace_range): the next match after a replacement (#520)
+static array<path>
+search_from_paragraph (tree t, tree what, path p, path q, int limit) {
+  // the first hits of what in the paragraph t at p after the position q in
+  // it (see search_from)
   array<path> r;
-  if (!(p <= cur)) return r;
-  path q= cur / p;
-  if (!is_position (t, q)) return r;
   tree d (DOCUMENT, cut_before (t, q));
   range_set sel= search (d, what, path (), limit);
   bool narrow= is_concat (what) && N(what) != 0 &&
@@ -1965,11 +1977,44 @@ search_from (tree t, tree what, path p, path cur, int limit) {
     if (is_nil (h1) || h1->item != 0 || is_nil (h2) || h2->item != 0)
       continue;
     // (a hit at the start of the text after cur starts at cur)
-    path r1= p * uncut (t, q, h1->next), r2= p * uncut (t, q, h2->next);
-    if (path_less (r1, cur)) r1= cur;
+    path r1= p * uncut (t, q, h1->next);
+    path r2= p * uncut (t, q, h2->next);
+    if (!is_nil (q) && path_less (r1, p * q)) r1= p * q;
     if (path_less (r2, r1)) r2= r1;
     r << r1 << r2;
   }
+  return r;
+}
+
+array<path>
+search_from (tree t, tree what, path p, path cur, int limit) {
+  // the first hits (at most limit) of what in t at p (a paragraph, or the
+  // document) from the position cur on, as the search finds them in the
+  // text which comes after cur, each one narrowed to the match which
+  // Replace replaces (see replace_range): the next match after a
+  // replacement (#520). In a document, the paragraph of cur and then the
+  // next ones, until there are hits (a pattern of several paragraphs: the
+  // document after cur at once)
+  array<path> r;
+  if (!(p <= cur)) return r;
+  path q= cur / p;
+  if (!is_position (t, q)) return r;
+  if (!is_document (t)) return search_from_paragraph (t, what, p, q, limit);
+  if (is_document (what)) {
+    tree d= cut_before (t, q);
+    range_set sel= search (d, what, path (), limit);
+    for (int i=0; i+1<N(sel) && i < 2*limit; i+=2) {
+      path r1= p * uncut (t, q, sel[i]), r2= p * uncut (t, q, sel[i+1]);
+      if (path_less (r1, cur)) r1= cur;
+      if (path_less (r2, r1)) r2= r1;
+      r << r1 << r2;
+    }
+    return r;
+  }
+  if (is_nil (q)) return r;
+  for (int k=q->item; k<N(t) && N(r) == 0; k++)
+    r= search_from_paragraph (t[k], what, p * k,
+                              (k == q->item? q->next: path ()), limit);
   return r;
 }
 

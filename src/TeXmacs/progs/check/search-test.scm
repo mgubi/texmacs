@@ -1842,6 +1842,23 @@
           ((document (concat "q" (strong "xbbb")))
            (concat (wildcard "w") "b") ""
            (document (concat "q" (strong ""))))
+          ;; nested documents (a footnote): only the matches are replaced,
+          ;; and Replace All ends (it used paths which an edit made stale)
+          ((document (concat "ab " (footnote (document "ab")) (strong "q")
+                             (em "zzzz") (strong "zzab")))
+           "ab" (frac "1" "2")
+           (document (concat (frac "1" "2") " " (footnote (document (frac "1" "2")))
+                             (strong "q") (em "zzzz")
+                             (strong (concat "zz" (frac "1" "2"))))))
+          ((document (concat "ab" (footnote (document "ab")) (strong "q")
+                             (strong "zzab") (em "qqqqqq")))
+           "ab" ""
+           (document (concat (footnote (document "")) (strong "q")
+                             (strong "zz") (em "qqqqqq"))))
+          ;; a leading wildcard does not take the text before the reference
+          ((document (concat "p" (strong "xb") "zb"))
+           (concat (wildcard "w") "b") (concat "<" (wildcard "w") ">")
+           (document (concat "p" (strong "<x>") "<z>")))
           ((document "a--b--c") "--" "-" (document "a-b-c"))
           ((document "a1xa2xa3x")
            (concat "a" (wildcard "w") "x") (concat "[" (wildcard "w") "]")
@@ -2081,91 +2098,161 @@
                   (document "[1] [2] a3x")))))))
 
 ;; Random documents, patterns and replacements (seeded, the same each time):
-;; Replace All and Replace one again and again agree, undo gives the
-;; document back, no hit means no change, and for a pattern without
-;; wildcards the result is that of replacing the occurrences in each string,
-;; from left to right, as on wip_fixes (#520)
+;; strings over a small alphabet, strong, em, math, with, sqrt, frac, rsub,
+;; theorems and footnotes (nested documents), table cells (with documents),
+;; several paragraphs; string, wildcard, tag, region and multi-paragraph
+;; patterns; case-insensitive, partial and initial modes. Replace All and
+;; Replace one again and again agree, undo gives the document back, no hit
+;; means no change, nothing runs away or takes too long, and for a string
+;; pattern the result is that of replacing the occurrences in each string,
+;; from left to right (#520)
 (define random-state 0)
+
+(define (set-random-seed! s) (set! random-state s))
 
 (define (random-next n)
   ;; a deterministic random number in 0..n-1 (a linear congruential one)
   (set! random-state (modulo (+ (* random-state 1103515245) 12345) 2147483648))
   (modulo (quotient random-state 65536) n))
 
-(define (set-random-seed! s) (set! random-state s))
-
 (define (random-pick l) (list-ref l (random-next (length l))))
 
+(define random-upper? #f)
+
 (define (random-string)
-  (apply string-append
-         (map (lambda (i) (random-pick '("a" "b" "x")))
-              (iota (random-next 6)))))
+  (list->string
+    (map (lambda (i) (random-pick (if random-upper? '(#\a #\b #\x #\A #\B)
+                                      '(#\a #\b #\x #\a #\b))))
+         (iota (random-next 5)))))
 
-(define (random-item depth)
-  (with k (if (> depth 1) 0 (random-next 6))
-    (cond ((< k 3) (random-string))
-          ((== k 3) `(strong ,(random-formula (+ depth 1))))
-          ((== k 4) `(frac ,(random-formula (+ depth 1))
-                           ,(random-formula (+ depth 1))))
-          (else `(tabular (table (row (cell ,(random-formula (+ depth 1)))
-                                      (cell ,(random-string)))))))))
+(define (random-item d)
+  (if (or (<= d 0) (< (random-next 10) 5)) (random-string)
+      (with x (lambda () (random-formula (- d 1)))
+        (case (random-next 11)
+          ((0) `(strong ,(x)))
+          ((1) `(math ,(x)))
+          ((2) `(with "color" "red" ,(x)))
+          ((3) `(sqrt ,(x)))
+          ((4) `(frac ,(x) ,(x)))
+          ((5) `(rsub ,(x)))
+          ((6) `(theorem (document ,(x) ,(x))))
+          ((7) `(tabular (table (row (cell ,(x)) (cell ,(x))))))
+          ((8) `(footnote ,(x)))
+          ((9) `(tabular (table (row (cell (document ,(x) ,(x)))))))
+          (else `(em ,(x)))))))
 
-(define (random-formula depth)
-  (tm->stree (tree-simplify
-               (stree->tree `(concat ,@(map (lambda (i) (random-item depth))
-                                            (iota (+ 1 (random-next 3)))))))))
+(define (random-formula d)
+  (with n (+ 1 (random-next 3))
+    (if (= n 1) (random-item d)
+        `(concat ,@(map (lambda (i) (random-item d)) (iota n))))))
 
 (define (random-case)
-  (let* ((doc `(document ,@(map (lambda (i) (random-formula 0))
-                                (iota (+ 1 (random-next 2))))))
-         (w '(wildcard "w"))
-         (k (random-next 8))
-         (what (cond ((< k 4) (random-pick '("a" "b" "ab" "ba" "aa" "xa")))
-                     ((== k 4) `(concat "a" ,w))
-                     ((== k 5) `(concat ,w "b"))
-                     ((== k 6) `(concat "a" ,w "b"))
-                     (else `(concat ,w "b" (wildcard "v")))))
-         (by (if (string? what)
-                 (random-pick '("" "X" "ab" "a" "aa" "ba"))
-                 (random-pick `("" "X" (concat "<" ,w ">") ,w)))))
-    (list doc what by)))
+  (set! random-upper? (< (random-next 10) 2))
+  (let* ((w '(wildcard "w")) (v '(wildcard "v"))
+         (doc (simplified `(document ,@(map (lambda (i) (random-formula 2))
+                                            (iota (+ 1 (random-next 3)))))))
+         (what (case (random-next 12)
+                 ((0 1 2) (random-pick '("a" "ab" "ba" "aa" "b" "abx")))
+                 ((3) `(concat "a" ,w))
+                 ((4) `(concat ,w "b"))
+                 ((5) `(concat "a" ,w "b"))
+                 ((6) `(concat ,w "a" ,v))
+                 ((7) `(frac ,w ,v))
+                 ((8) `(concat "a" (select-region "")))
+                 ((9) `(concat "a" (select-region ,w) "b"))
+                 ((10) `(document (concat ,w "a") (concat "b" ,v)))
+                 (else `(concat (strong ,w) "a"))))
+         (by (if (and (pair? what) (in? (car what) '(concat document frac))
+                      (not (and (== (car what) 'concat)
+                                (list-or (map (cut tm-func? <> 'select-region)
+                                              (cdr what))))))
+                 (random-pick (list "" "Z" `(concat "<" ,w ">") w `(concat ,w ,w)
+                                    "aa" `(frac ,w "1")
+                                    (if (== (car what) 'document)
+                                        `(document ,w ,v) `(concat ,w "a"))))
+                 (random-pick '("" "Z" "aa" "ab" "b" "xab"))))
+         (prefs (case (random-next 8)
+                  ((0) '("case-insensitive-match"))
+                  ((1) '("allow-partial-replace"))
+                  ((2) '("allow-initial-replace"))
+                  (else '()))))
+    (list doc what by prefs)))
 
 (define (replace-in-strings t what by)
   ;; the occurrences of the string what in the strings of t replaced by by,
-  ;; from left to right
+  ;; from left to right (not in the variable and the value of a with)
   (cond ((string? t)
          (let loop ((i 0) (acc ""))
            (with j (string-search-forwards what i t)
              (if (< j 0) (string-append acc (substring t i (string-length t)))
                  (loop (+ j (string-length what))
                        (string-append acc (substring t i j) by))))))
+        ((and (pair? t) (== (car t) 'with))
+         (append (list-head t (- (length t) 1))
+                 (list (replace-in-strings (cAr t) what by))))
         ((pair? t) (cons (car t) (map (cut replace-in-strings <> what by)
                                       (cdr t))))
         (else t)))
 
 (define (simplified t) (tm->stree (tree-simplify (stree->tree t))))
 
+(define (text-and-tags t)
+  ;; the strings and the tags of t in order, without its formulas and
+  ;; documents: the editor makes a paragraph of a block in a formula (a
+  ;; theorem) when the formula changes, which changes no text
+  (let loop ((l (let walk ((t t))
+                  (cond ((string? t) (if (== t "") (list) (list t)))
+                        ((and (pair? t) (in? (car t) '(concat document)))
+                         (append-map walk (cdr t)))
+                        ((pair? t) (cons (list (car t))
+                                         (append-map walk (cdr t))))
+                        (else (list))))))
+    (cond ((or (null? l) (null? (cdr l))) l)
+          ((and (string? (car l)) (string? (cadr l)))
+           (loop (cons (string-append (car l) (cadr l)) (cddr l))))
+          (else (cons (car l) (loop (cdr l)))))))
+
+(define (random-case-problems c)
+  ;; the checks which the random case c fails
+  (let* ((doc (car c)) (what (cadr c)) (by (caddr c)) (prefs (cadddr c))
+         (t0 (texmacs-time)))
+    (for (p prefs) (cpp-set-preference p "on"))
+    (with r
+        (catch #t
+          (lambda ()
+            (let* ((all (replace-all-in-buffer doc what by))
+                   (one (replace-one-repeatedly doc what by))
+                   (hits (tree-search-tree (stree->tree doc) (stree->tree what)
+                                           '() 1000))
+                   (expect (and (string? what) (string? by) (null? prefs)
+                                (not random-upper?)
+                                (simplified (replace-in-strings doc what by)))))
+              (append
+                (if (and (pair? all) (== (cadr all) doc)) '() '(undo))
+                (if (and (pair? one) (== (car one) 'runaway)) '(runaway) '())
+                (if (and (pair? all) (== (simplified (car all)) (simplified one)))
+                    '() '(all-differs-from-one))
+                (if (or (nnull? hits) (and (pair? all) (== (car all) doc)))
+                    '() '(change-without-hit))
+                (if (or (not expect)
+                        (and (pair? all) (== (text-and-tags (car all))
+                                             (text-and-tags expect))))
+                    '() '(string-replacement))
+                (if (> (- (texmacs-time) t0) 10000) '(too-slow) '()))))
+          (lambda args (list 'error args)))
+      (for (p prefs) (cpp-reset-preference p))
+      r)))
+
 (define (random-replace-failures n seed)
-  ;; the cases among n random ones which fail a check
+  ;; the cases among n random ones which fail a check, with the checks
   (set-random-seed! seed)
   (with-search-mode-value 'replace
     (lambda ()
-      (list-filter
-        (map (lambda (i) (random-case)) (iota n))
-        (lambda (c)
-          (let* ((doc (car c)) (what (cadr c)) (by (caddr c))
-                 (all (replace-all-in-buffer doc what by))
-                 (one (replace-one-repeatedly doc what by))
-                 (hits (tree-search-tree (stree->tree doc) (stree->tree what)
-                                         '() 1000)))
-            (not (and (pair? all)
-                      (== (simplified (car all)) (simplified one))
-                      (== (cadr all) (simplified doc))
-                      (or (nnull? hits) (== (simplified (car all))
-                                            (simplified doc)))
-                      (or (not (string? what))
-                          (== (simplified (car all))
-                              (simplified (replace-in-strings doc what by))))))))))))
+      (let loop ((i 0) (bad (list)))
+        (if (>= i n) (reverse bad)
+            (let* ((c (random-case))
+                   (p (random-case-problems c)))
+              (loop (+ i 1) (if (null? p) bad (cons (list c p) bad)))))))))
 
 (define (test-replace-random)
   (check-group "replace random")
