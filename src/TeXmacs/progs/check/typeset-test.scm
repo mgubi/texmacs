@@ -409,16 +409,18 @@
          (check= (nr "s2") "2")
          (check= (height) h))))))
 
-;; The pass which a removed label asks for types again what read the label,
-;; not the whole document.
-(define (test-removed-label-reuse)
-  (check-group "removed label, bridges used again")
+;; The pass which a removed label asks for is a complete one: a label which
+;; only disappears because of it (here dep, made when s2 is 2) is removed
+;; too, and the references to it show "?" (#408: a pass which uses bridges
+;; again does not clean the tables). (typeset-redone-count counts the
+;; bridges typeset again with the reuse by inputs: it stays 0 with
+;; TEXMACS_TYPESET_READS=off.)
+(define (test-removed-label-chain)
+  (check-group "removed label, chain")
   (with-typeset-body
-   `(document (section (concat "A" (label "s1")))
-              (concat "See " (reference "s2") ".")
-              ,@(map (lambda (i) (string-append "Paragraph "
-                                                (number->string i) "."))
-                     (iota 60))
+   '(document (section (concat "A" (label "s1")))
+              (concat "X" (if (equal (get-binding "s2") "2") (label "dep") ""))
+              (concat "See dep: " (reference "dep"))
               (section (concat "B" (label "s2")))
               "Text.")
    (lambda ()
@@ -426,20 +428,15 @@
                       (update-forced)
                       (generate-all-aux)
                       (update-current-buffer)
-                      (update-forced)))
-            (nr (lambda (l) (cadr (tree->stree (get-reference l))))))
+                      (update-forced))))
        (update)
        (update)
-       (check= (nr "s2") "2")
-       (let ((p0 (typeset-pass-count)) (r0 (typeset-redone-count)))
-         (tree-set (tree-ref (buffer-tree) 62) '(section "B"))
-         (update)
-         (check= (tree->stree (get-reference "s2")) '(uninit))
-         ;; (65 paragraphs: the whole document, typeset again, is some 140
-         ;; bridges, and about half of them with the reuse; in the check
-         ;; modes, the bridges used again are typeset to be compared)
-         (when (nin? (getenv "TEXMACS_TYPESET_READS") '("off" "check"))
-           (check-true (< (- (typeset-redone-count) r0) 100))))))))
+       (check-true (in? "dep" (list-references)))
+       (tree-set (tree-ref (buffer-tree) 3) '(section "B"))
+       (update)
+       (check-false (in? "s2" (list-references)))
+       (check-false (in? "dep" (list-references)))
+       (check= (tree->stree (get-reference "dep")) '(uninit))))))
 
 ;; A file holds the table of its references as it was saved: entries which no
 ;; label of the body defines any more (old names of automatic labels, labels
@@ -2245,7 +2242,7 @@
   (test-numbering)
   (test-renumbering)
   (test-removed-label)
-  (test-removed-label-reuse)
+  (test-removed-label-chain)
   (test-stale-references)
   (test-automatic-labels)
   (test-labels-of-nested-tags)

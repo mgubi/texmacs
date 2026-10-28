@@ -1237,17 +1237,6 @@ clean_unused (edit_env env) {
   return matter;
 }
 
-// The document is to be typeset again after a pass because of the entries
-// of the table of references which it removed. The bridges which read one
-// of them see it in their lookups (the table has a new stamp), and are
-// typeset again by the next pass, while the others are used again; without
-// the reuse by inputs, they are all made again.
-static void
-invalidate_after_removed (typesetter ttt) {
-  if (typeset_inputs_mode () == 0)
-    ::notify_assign (ttt, path(), ttt->br->st);
-}
-
 void
 edit_typeset_rep::typeset (SI& x1, SI& y1, SI& x2, SI& y2) {
   int missing_nr= INT_MAX;
@@ -1273,9 +1262,10 @@ edit_typeset_rep::typeset (SI& x1, SI& y1, SI& x2, SI& y2) {
     }
     missing_nr= N(env->missing);
     redefined_nr= N(env->redefined);
-    if (N(env->missing) == 0 && N(env->redefined) == 0)
-      invalidate_after_removed (ttt);
-    else ::notify_assign (ttt, path(), ttt->br->st);
+    // (a complete pass again: the next one must collect the references,
+    // the page numbers and the auxiliary tables, which a pass that uses
+    // bridges again does not)
+    ::notify_assign (ttt, path(), ttt->br->st);
   }
 }
 
@@ -1329,7 +1319,7 @@ edit_typeset_rep::typeset_renumber_labels () {
     // the references to a removed label are typeset again by the
     // typesetting which follows (see typeset above)
     if (clean_unused (env) != 0)
-      invalidate_after_removed (ttt);
+      ::notify_assign (ttt, path(), ttt->br->st);
   }
   return auto_labels_numbers (root) != before;
 }

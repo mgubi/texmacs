@@ -63,6 +63,8 @@ extern int typeset_passes_total;
 extern int typeset_redone_total;
 int get_typeset_passes ();
 int get_typeset_redone ();
+// (the one place where bridges typeset again are counted: for both counters)
+void typeset_count_redone (int n);
 int get_typeset_check_mismatches ();
 // the switch of the caches of the typesetter which are not described by
 // one of the variables above (block replay, chunks of lines, shoves, the

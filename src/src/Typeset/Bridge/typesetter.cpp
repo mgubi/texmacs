@@ -121,6 +121,11 @@ int typeset_passes_total= 0;
 int typeset_redone_total= 0;
 int get_typeset_passes () { return typeset_passes_total; }
 int get_typeset_redone () { return typeset_redone_total; }
+void
+typeset_count_redone (int n) {
+  typeset_redone_total += n;
+  if (edit_profile.on) edit_profile.redone += n;
+}
 
 void
 typeset_cache_mismatch (string what) {

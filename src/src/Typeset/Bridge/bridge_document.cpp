@@ -157,8 +157,7 @@ void
 bridge_block_rep::my_stack_start () {
   // (the block is not a paragraph which is typeset again: those are
   // counted when its paragraphs are)
-  typeset_redone_total--;
-  if (edit_profile.on) edit_profile.redone--;
+  typeset_count_redone (-1);
   // (what the block made is made again)
   ok= false;
   repl= page_item ();
