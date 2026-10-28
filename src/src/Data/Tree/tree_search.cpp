@@ -1736,18 +1736,19 @@ argument_of (tree t, path p) {
 
 static bool
 match_tokens (region_matcher& m, tree what, bool str, bool alone,
-              int& start) {
+              int& start, bool lazy= false) {
   // the pattern what with the tokens of m: all of them; else, with partial
   // (initial) matches, or if they are an argument alone, the leftmost match
   // (at the start): a leading wildcard starts at the start, a trailing one
   // takes the rest, as the search carries an outer wildcard to the end of
   // the formula; in a string (str), with partial and without initial
   // matches, the match ends at its end, as match_atomic. start: the token
-  // where it starts
+  // where it starts. lazy (alone): the leftmost match only, not all of the
+  // tokens first, as the search on them (a1xa2x with a*x: a1x)
   array<search_token> toks= m.toks;
   m.init (what, true);
   start= 0;
-  if (m.run (0, 0)) return true;
+  if (!(lazy && alone) && m.run (0, 0)) return true;
   if (!(alone || partial_match_flag || initial_match_flag) || N(m.kind) == 0)
     return false;
   bool to_end= m.kind[N(m.kind)-1] == ELEM_WILDCARD ||
@@ -1763,14 +1764,16 @@ match_tokens (region_matcher& m, tree what, bool str, bool alone,
 }
 
 static bool
-argument_match (tree t, path arg, tree what, path& q1, path& q2) {
+argument_match (tree t, path arg, tree what, path& q1, path& q2,
+                bool lazy) {
   // the match of what in the argument arg of t, as when it is alone (its
-  // tokens relative to it: short paths in deep nestings)
+  // tokens relative to it: short paths in deep nestings); lazy: the
+  // leftmost one, else all of the argument first (a cascaded match)
   region_matcher m;
   tree u= subtree (t, arg);
   tokens_between (m.toks, u, path (), path (), path ());
   int start;
-  if (!match_tokens (m, what, is_atomic (u), true, start)) return false;
+  if (!match_tokens (m, what, is_atomic (u), true, start, lazy)) return false;
   path a= argument_start (t, arg);
   q1= (N(m.toks) == 0? a: arg * m.position (start, true));
   q2= (N(m.toks) == 0? a: arg * m.position (m.end, false));
@@ -1796,7 +1799,8 @@ replace_range (tree t, path p1, path p2, tree what, path& q1, path& q2,
   q1= p1; q2= p2; arg= path (-1);
   bool str= is_atomic (t) && is_nil (p1) && is_nil (p2);
   int start;
-  if (match_tokens (m, what, str, from, start)) {
+  bool lazy= !is_nil (p1) || !is_nil (p2);
+  if (match_tokens (m, what, str, from, start, from)) {
     if (from && N(m.toks) != 0) {
       q1= m.position (start, true);
       q2= m.position (m.end, false);
@@ -1817,7 +1821,7 @@ replace_range (tree t, path p1, path p2, tree what, path& q1, path& q2,
     if (c1 >= N(m.toks)) return false;
     arg= argument_of (t, m.toks[c1].before);
     // (from p1 on: not a match before p1, inside a replacement)
-    return argument_match (t, arg, what, q1, q2) &&
+    return argument_match (t, arg, what, q1, q2, lazy) &&
            !(from && path_less (q1, p1));
   }
   // inside a tag of the hit: the first argument where it matches (and the
@@ -1830,7 +1834,7 @@ replace_range (tree t, path p1, path p2, tree what, path& q1, path& q2,
   path a1, a2;
   for (int c=0; c<N(args); c++) {
     if (found && arg <= args[c]) continue;
-    if (argument_match (t, args[c], what, a1, a2)) {
+    if (argument_match (t, args[c], what, a1, a2, lazy)) {
       if (!found) { q1= a1; q2= a2; }
       found= true;
       arg= args[c];

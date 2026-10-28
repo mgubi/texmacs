@@ -1834,6 +1834,18 @@
           ((document "a1x a2x")
            (concat "a" (wildcard "w") "x") (concat "a" (wildcard "w") "xa")
            (document "a1xa a2xa"))
+          ;; a replacement which ends with the first letter of the pattern
+          ;; next to the next hit: the leftmost match after it, not one
+          ;; which takes both
+          ((document "a1xa2xa3x") (concat "a" (wildcard "w") "x") "a"
+           (document "aaa"))
+          ((document "a1xa2xa3x") (concat "a" (wildcard "w") "x") "aa"
+           (document "aaaaaa"))
+          ((document "a1xa2xa3x") (concat "a" (wildcard "w") "x") "xa"
+           (document "xaxaxa"))
+          ((document (frac "a2xa3x" "c"))
+           (concat "a" (wildcard "w") "x") (concat "[" (wildcard "w") "]")
+           (document (frac "[2][3]" "c")))
           ;; only the parts of the replacement which come from a wildcard
           ;; are spliced and merged: the rest is as the user wrote it
           ((document "a1x")
