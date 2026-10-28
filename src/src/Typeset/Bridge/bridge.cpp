@@ -911,6 +911,7 @@ bridge_rep::typeset_by_inputs (int desired_status) {
     if (edit_profile.on) edit_profile.cached++;
     give_record ();
     env->write_bindings (out_bindings);
+    env->replay_missing (seen_keys, seen_values);
     env->monitored_patch_env (changes);
     return false;
   }

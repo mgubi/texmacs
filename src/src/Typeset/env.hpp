@@ -703,6 +703,17 @@ public:
   inline void write_aux (string key, tree value) {
     if (rec_bindings != NULL) (*rec_bindings) << tree (WRITE, key, value);
     store_aux (key, value); }
+  // A bridge used again in a complete pass tells the references which it
+  // found missing (exec_get_binding does, where it is typeset), so that the
+  // pass is repeated and the warnings stay as long as they are true
+  inline void replay_missing (array<string> keys, array<tree> values) {
+    if (!complete) return;
+    for (int i=0; i<N(keys); i++)
+      if ((keys[i][0] == '0' || keys[i][0] == '1') &&
+          values[i] == tree (UNINIT) && get_bool (WARN_MISSING)) {
+        string key= keys[i] (1, N(keys[i]));
+        missing (key)= tree (GET_BINDING, key);
+      } }
   inline void write_bindings (array<tree> l) {
     // (those of a bridge used again: the record above gets the same tuples,
     // which take the value stored when it is a new one, so that the next

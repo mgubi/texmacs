@@ -165,7 +165,7 @@ edit_env_rep::lookup_value (string name) {
   if (name[0] == 'p' || name[0] == 'q') return picture_value (name);
   if (name[0] == 'a')
     return local_att->contains (key)? local_att [key]: (*global_att) [key];
-  int type= (name[0] == '1') ? 1 : 0;
+  int type= (name[0] == '1' || name[0] == '3') ? 1 : 0;
   tree value;
   if (local_ref->contains (key)) {
     // (while the tables are those which were loaded: see clean_unused)

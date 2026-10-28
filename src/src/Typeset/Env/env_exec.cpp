@@ -2111,11 +2111,13 @@ edit_env_rep::exec_get_binding (tree t) {
   int type= (N(t) == 1? 0: as_int (exec_string (t[1])));
   if (type != 0 && type != 1) type= 0;
   tree value= lookup ((type == 1 ? "1" : "0") * key);
-  if (complete && value == tree (UNINIT))
-    if (get_bool (WARN_MISSING)) {
-      missing (key)= tree (GET_BINDING, key);
-      //typeset_warning << "Undefined reference " << key << LF;
-    }
+  // (warn-missing is read whenever the value is missing, also when the
+  // pass is not complete: the bridge is then not used again in a complete
+  // pass without telling the reference, see replay_missing)
+  if (value == tree (UNINIT) && get_bool (WARN_MISSING) && complete) {
+    missing (key)= tree (GET_BINDING, key);
+    //typeset_warning << "Undefined reference " << key << LF;
+  }
   //cout << t << ": " << key << " -> " << value << "\n";
   return value;
 }
@@ -2126,7 +2128,8 @@ edit_env_rep::exec_has_binding (tree t) {
   string key= exec_string (t[0]);
   int type= (N(t) == 1? 0: as_int (exec_string (t[1])));
   if (type != 0 && type != 1) type= 0;
-  tree value= lookup ((type == 1 ? "1" : "0") * key);
+  // ("2" and "3": not a reference which is to be told when missing)
+  tree value= lookup ((type == 1 ? "3" : "2") * key);
   if (value == tree (UNINIT)) return "false";
   else return "true";
 }
