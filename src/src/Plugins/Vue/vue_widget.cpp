@@ -5916,6 +5916,8 @@ class vue_texmacs_widget_rep : public vue_widget_rep {
   string win_title;
   bool win_title_set;
   bool win_modified, win_modified_set;
+  string win_file;  // the file of the document (SLOT_FILE), likewise
+  bool win_file_set;
 
 public:
   vue_texmacs_widget_rep (int _mask, command _quit);
@@ -5957,7 +5959,8 @@ visibility_index (slot s) {
 vue_texmacs_widget_rep::vue_texmacs_widget_rep (int _mask, command _quit)
   : vue_widget_rep ("vue_texmacs_widget_rep"), mask (_mask), quit (_quit),
     win (NULL), interactive_mode (false), footer_menus (false), footer_room (0),
-    win_title_set (false), win_modified (false), win_modified_set (false)
+    win_title_set (false), win_modified (false), win_modified_set (false),
+    win_file_set (false)
 {
   // decode mask
   visibility[0]= (mask & 1)   == 1;   // header
@@ -6055,7 +6058,18 @@ vue_texmacs_widget_rep::send (slot s, blackbox val) {
     case SLOT_MODIFIED:
       win_modified= check_open<bool> (val, s);
       win_modified_set= true;
-      if (win) { win->set_modified (win_modified); win_modified_set= false; }
+      if (win) {
+        win->set_modified (win_modified); win_modified_set= false;
+        if (!win_modified) win->saved ();
+      }
+      break;
+
+    case SLOT_FILE:
+      // the file of the document, which the title bar of macOS shows
+      // (proxy icon and path menu, see vue_sdl_base_window_rep::show_title)
+      win_file= check_open<string> (val, s);
+      win_file_set= true;
+      if (win) { win->set_file (win_file); win_file_set= false; }
       break;
 
     case SLOT_INTERACTIVE_MODE:
@@ -6434,6 +6448,7 @@ void vue_texmacs_widget_rep::do_layout () {
     if (win_modified_set) {
       win->set_modified (win_modified); win_modified_set= false;
     }
+    if (win_file_set) { win->set_file (win_file); win_file_set= false; }
   }
   // grow to the size of the window
   SI w= 300, h= 300;

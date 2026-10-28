@@ -706,7 +706,20 @@ ns_tm_widget_rep::query (slot s, int type_id) {
     if (!is_nil (main_widget)) return main_widget->query (s, type_id);
     return ns_view_widget_rep::query (s, type_id);
 
-        
+  case SLOT_SIZE:
+    {
+      // the size of the contents of the window, as the one of the main
+      // window in the Qt interface: the editor asks for it for a page which
+      // follows the window (page medium automatic, as the page of the
+      // fonts), and an empty answer aborted TeXmacs (#558)
+      check_type_id<coord2> (type_id, s);
+      NSWindow* win= [view window];
+      if (win)
+        return close_box<coord2>
+          (from_nssize ([win contentRectForFrameRect: [win frame]].size));
+      return close_box<coord2> (from_nssize ([view frame].size));
+    }
+
   case SLOT_USER_ICONS_VISIBILITY:
     check_type_id<bool> (type_id, s);
     return close_box<bool> (visibility[4]);

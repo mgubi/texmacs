@@ -167,5 +167,53 @@ completer (bib-knuth)
 quit ()" \
       -x "$atquit" -x '(load "startup-bib.scm")' -q
 
+# An application started from the Finder or the Dock has only the PATH of
+# launchd, without /usr/local/bin or /opt/homebrew/bin: TeXmacs adds the
+# PATH of a login shell, $SHELL -l, so that Ghostscript is found. The Vue
+# build did not, and File > Preview made no PDF (#546). The login shells
+# are scripts: one prints a banner and an error before its PATH (only the
+# PATH is taken), one prints a list separated by spaces (not taken), and
+# one hangs (stopped after 5 seconds, its PATH not taken).
+if [ "$(uname)" = Darwin ]; then
+  cat > "$out/login-shell" <<'EOF2'
+#!/bin/sh
+echo "Last login: today"
+echo "zsh: command not found: pyenv" >&2
+echo /tm-startup-login/bin:/tm-startup-login/sbin
+EOF2
+  cat > "$out/login-list" <<'EOF2'
+#!/bin/sh
+echo /tm-startup-login/bin /tm-startup-login/sbin
+EOF2
+  cat > "$out/login-hang" <<'EOF2'
+#!/bin/sh
+/bin/sleep 30
+echo /tm-startup-login/bin
+EOF2
+  chmod +x "$out/login-shell" "$out/login-list" "$out/login-hang"
+  inpath='(display* "CHECK login path " (cond ((string-contains? (getenv "PATH") ":/tm-startup-login/bin:/tm-startup-login/sbin:") "yes") ((string-contains? (getenv "PATH") "tm-startup-login") "garbled") ((string-contains? (getenv "PATH") "Last login") "banner") (else "no")) "\n")'
+  old_shell=$SHELL old_path=$PATH
+  export PATH=/usr/bin:/bin:/usr/sbin:/sbin
+  export SHELL="$out/login-shell"
+  check "macOS: the PATH of a login shell is added, without its messages (#546)" \
+        "login path yes" \
+        -headless -x "$inpath"
+  export SHELL="$out/login-list"
+  check "macOS: a PATH separated by spaces is not taken" \
+        "login path no" \
+        -headless -x "$inpath"
+  export SHELL="$out/login-hang"
+  start=$(date +%s)
+  check "macOS: a login shell which hangs is stopped" \
+        "login path no" \
+        -headless -x "$inpath"
+  took=$(( $(date +%s) - start ))
+  if [ $took -ge 20 ]; then
+    echo "  FAILED a login shell which hangs delays the start by ${took}s"
+    failed=$((failed + 1)); status=1
+  fi
+  export SHELL="$old_shell" PATH="$old_path"
+fi
+
 echo "Total: $total checks, $failed failed"
 exit $status

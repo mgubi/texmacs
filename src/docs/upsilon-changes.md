@@ -20,6 +20,38 @@ have the details, and the problems go to the
   window does: the buffers of the console (`tmfs://aux/console-...`) and
   of the other embedded editors stayed open, and its quit command ran
   afterwards on a window which no longer existed (#566).
+- **Font design in the Cocoa build** (desktop, Cocoa): Font design, in
+  the menu of the font of the document (the "Roman" button of the focus
+  bar), no longer quits TeXmacs at once. The page of the fonts follows
+  the size of the window, and the Cocoa window did not answer when the
+  editor asked for its size; the same happened to any document whose
+  page type is "automatic" (#558).
+- **Title bar of the documents** (Vue, macOS): the window of a saved
+  document has the icon of its file next to the title, which can be
+  dragged to the Finder, a mail or a Terminal, and a Cmd-click on the title
+  shows the folders of the file, to open one in the Finder; unsaved changes
+  are shown by the dot in the close button instead of a `*` after the
+  name, as in the other applications of macOS. Untitled documents, help
+  pages and remote files have no icon (#545).
+- **File > Preview on macOS** (desktop, Vue): the preview opens again
+  when TeXmacs is started from the Finder or the Dock. The Vue build makes
+  the PDF with Ghostscript, and such an application only had the PATH of
+  the system (no `/usr/local/bin`, `/opt/homebrew/bin` or
+  `/Library/TeX/texbin`): no PDF was made and nothing was shown. TeXmacs
+  now adds the PATH of a login shell, as the Qt and Cocoa builds already
+  did, which also finds LaTeX and the programs of the plug-ins; the PATH
+  is read more carefully (the messages of a login script are left out,
+  and a login shell which hangs is stopped after 5 seconds). A preview
+  which cannot be made is now reported in the footer, instead of showing
+  nothing or an older preview (#546).
+- **Presentation mode**: the informative flags are hidden only in the
+  window which is in full screen, no longer in the other windows of the
+  same document; entering and leaving it no longer marks the document
+  modified, and saving during a presentation keeps the informative flags
+  of the document instead of writing "none" (#549).
+- **Save as**: after a Save as to a file of the same name in another
+  folder, the window shows the new file (its path, and on macOS the icon
+  of the title bar), no longer the old one (#564).
 
 ## 27 October 2026
 

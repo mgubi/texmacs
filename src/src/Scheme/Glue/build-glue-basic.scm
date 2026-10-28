@@ -959,6 +959,7 @@
   (current-window get_current_window (url))
   (buffer->windows buffer_to_windows (array_url url))
   (window-to-buffer window_to_buffer (url url))
+  (window->file window_to_file (url url))
   (window-set-buffer window_set_buffer (void url url))
   (window-focus window_focus (void url))
   (switch-to-window switch_to_window (void url))
