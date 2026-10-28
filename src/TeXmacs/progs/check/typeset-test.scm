@@ -2505,6 +2505,70 @@
     (buffer-pretend-saved m)
     (buffer-close m)))
 
+;; More of Update All with the layout kept (#425): a nested include edited
+;; on disk, a missing include which appears, a picture whose size changes
+;; on disk before picture-gc.
+(define (incl-gc-eps name w h)
+  (string-save
+   (string-append "%!PS-Adobe-3.0 EPSF-3.0\n%%BoundingBox: 0 0 "
+                  (number->string w) " " (number->string h)
+                  "\n0 0 moveto " (number->string w) " 0 lineto "
+                  (number->string w) " " (number->string h)
+                  " lineto 0 " (number->string h)
+                  " lineto closepath fill\nshowpage\n")
+   (incl-file name)))
+
+(define (incl-gc-more)
+  (incl-gc-eps "gc-pic.eps" 100 50)
+  (incl-write "gc-n2.tm" '((section "Inner") (concat "i" (index "inner"))))
+  (incl-write "gc-n1.tm" '((section "Outer") (include "gc-n2.tm")))
+  (incl-write "gc-m2.tm"
+              '((table-of-contents "toc" (document ""))
+                (section "Top")
+                (include "gc-n1.tm")
+                (include "gc-late.tm")
+                (concat "pic " (image "gc-pic.eps" "" "" "" ""))
+                "End."
+                (the-index "idx" (document ""))))
+  (with m (incl-file "gc-m2.tm")
+    (load-buffer m)
+    (switch-to-buffer* m)
+    (update-forced)
+    (update-all-kept)
+    (update-all-kept)
+    (check= (labels-state) (incl-labels-fresh))
+    ;; the nested include edited on disk
+    (incl-write "gc-n2.tm" '((section "Inner") (concat "i" (index "inner"))
+                             (section "Deeper") (concat "d" (index "deeper"))))
+    (update-all-kept)
+    (check-true (string-occurs? "Deeper" (incl-table 'table-of-contents)))
+    (check-true (string-occurs? "deeper" (incl-table 'the-index)))
+    (check= (labels-state) (incl-labels-fresh))
+    ;; the missing include appears
+    (check-false (string-occurs? "Late" (incl-table 'table-of-contents)))
+    (incl-write "gc-late.tm" '((section "Late") (concat "l" (index "late"))))
+    (update-all-kept)
+    (check-true (string-occurs? "Late" (incl-table 'table-of-contents)))
+    (check-true (string-occurs? "late" (incl-table 'the-index)))
+    (check= (labels-state) (incl-labels-fresh))
+    ;; the picture gets bigger on disk, then picture-gc
+    (update-forced)
+    (let* ((n (tree-arity (buffer-tree)))
+           (r (rect (- n 3))))
+      (incl-gc-eps "gc-pic.eps" 200 150)
+      (picture-gc)
+      (update-forced)
+      (update-all-kept)
+      (check-true (> (- (rect-y2 (rect (- n 3))) (rect-y1 (rect (- n 3))))
+                     (- (rect-y2 r) (rect-y1 r))))
+      ;; (and nothing changes when the file does not)
+      (with r2 (rect (- n 3))
+        (picture-gc)
+        (update-forced)
+        (check= (rect (- n 3)) r2)))
+    (buffer-pretend-saved m)
+    (buffer-close m)))
+
 (define (test-included-files)
   (check-group "included files")
   (let ((old (current-buffer))
@@ -2514,7 +2578,7 @@
     (system-mkdir (system->url incl-dir))
     (incl-extern)
     (for (f (list incl-renumbering incl-renumbering-writes
-                  incl-saved-include incl-gc-keeps))
+                  incl-saved-include incl-gc-keeps incl-gc-more))
       (with r (check-run f)
         (when (and (pair? r) (== (car r) 'error))
           (check-report #f "the group" (object->string r)))))

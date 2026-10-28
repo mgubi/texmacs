@@ -28,6 +28,7 @@
 
 (tm-define (all-glued-symbols) '( 
 "typeset-check-mismatches"
+"typeset-pass-count"
 "typeset-redone-count"
 "texmacs-version-release"
 "version-before?"

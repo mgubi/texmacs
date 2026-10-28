@@ -58,9 +58,14 @@ extern edit_profile_data edit_profile;
 // when there are any
 extern int typeset_check_mismatches;
 int get_typeset_check_mismatches ();
-// the bridges typeset since the start (not used again), for the tests
+// passes of the typesetter and bridges typeset again (not used again) since
+// the start, counted also without TEXMACS_EDIT_PROFILE: tests check them
+extern int typeset_passes_total;
 extern int typeset_redone_total;
-int get_typeset_redone_count ();
+int get_typeset_passes ();
+int get_typeset_redone ();
+// (the one place where bridges typeset again are counted: for both counters)
+void typeset_count_redone (int n);
 // the switch of the caches of the typesetter which are not described by
 // one of the variables above (block replay, chunks of lines, shoves, the
 // prepared environment), TEXMACS_TYPESET_CACHES:
