@@ -2096,10 +2096,14 @@ vue_ui_rep::send (slot s, blackbox val) {
     //VUE_WIDGET(wrapped_widget, widget, w, command, quit);
     vue_wrapped_widget d= open_box<vue_wrapped_widget> (data);
     if (s == SLOT_DESTROY && !is_nil (d.quit)) {
-      // queue our quit command, once
-      cmd_list= list(d.quit, cmd_list);
+      // our quit command, once, at once as in Qt (qt_wrapped_widget_rep):
+      // the buffer of an embedded editor is closed by the time
+      // window_delete returns (it stayed among the buffers when queued,
+      // until the next pass of the event loop)
+      command quit= d.quit;
       d.quit= command ();
       data= close_box (d);
+      quit ();
     }
     d.w->send (s, val);
     return;
@@ -5414,6 +5418,7 @@ public:
   widget read (slot s, blackbox index);
   void write (slot s, blackbox index, widget w);
   void notify (slot s, blackbox new_val);
+  void close_request ();
   
   void do_layout ();
   bool post_layout ();
@@ -5532,20 +5537,15 @@ vue_plain_window_widget_rep::send (slot s, blackbox val) {
     case SLOT_DESTROY:
     {
       ASSERT (is_nil (val), "type mismatch");
-      // the quit command usually deletes the window, which sends us
-      // SLOT_DESTROY again: run it only once. The main TeXmacs window has
-      // no quit command of its own: the request goes to its contents (the
-      // texmacs widget, whose command kills the window or quits), as the
-      // X11 port does
-      if (!quit_sent) {
-        quit_sent= true;
-        if (!is_nil (quit)) cmd_list= list (quit, cmd_list);
-        else if (!is_nil (wid)) wid->send (s, val);
-      }
-      // the second time, the window is being deleted (window_delete): it
-      // goes on to the contents, as in Qt (the commands of their wrapped
-      // widgets close the buffers of their embedded editors)
-      else if (!is_nil (quit) && !contents_destroyed && !is_nil (wid)) {
+      // the window is being deleted (window_delete; the close button goes
+      // to close_request): SLOT_DESTROY goes on to the contents, once, as
+      // in Qt (the commands of their wrapped widgets close the buffers of
+      // their embedded editors). The quit command is not run, as in Qt: a
+      // window deleted by a program (alt-window-delete) without a close
+      // request queued it, and it never reached its contents, so that
+      // the buffers of its editors stayed open (#566), and the quit
+      // command then deleted the window again, which no longer existed
+      if (!contents_destroyed && !is_nil (wid)) {
         contents_destroyed= true;
         wid->send (s, val);
       }
@@ -5561,6 +5561,30 @@ vue_plain_window_widget_rep::send (slot s, blackbox val) {
     default:
       vue_widget_rep::send(s, val);
   }
+}
+
+void
+vue_plain_window_widget_rep::close_request () {
+  // the close button of the window (or the close of a script): the quit
+  // command, which usually deletes the window (window_delete, which sends
+  // SLOT_DESTROY), queued only once. The main TeXmacs window has no quit
+  // command of its own: the request goes to its contents (the texmacs
+  // widget, whose command kills the window or quits), as the X11 port does
+  if (quit_sent) return;
+  quit_sent= true;
+  if (!is_nil (quit)) cmd_list= list (quit, cmd_list);
+  else if (!is_nil (wid)) {
+    contents_destroyed= true;
+    wid->send (SLOT_DESTROY, blackbox ());
+  }
+}
+
+void
+vue_window_close_request (vue_widget content) {
+  vue_plain_window_widget_rep* ww=
+    dynamic_cast<vue_plain_window_widget_rep*> (content.rep);
+  if (ww != NULL) ww->close_request ();
+  else send_destroy (abstract (content));
 }
 
 blackbox

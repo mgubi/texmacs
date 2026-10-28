@@ -12,6 +12,15 @@ branch [`upsilon_texmacs`](https://github.com/mgubi/texmacs/commits/upsilon_texm
 have the details, and the problems go to the
 [issues of the repository](https://github.com/mgubi/texmacs/issues).
 
+## 28 October 2026
+
+- **Windows closed by a program (Vue)**: a window which a program closes
+  (a dialog closed by one of its buttons, a script, `alt-window-delete`)
+  closes the buffers of the editors it shows, as the close button of the
+  window does: the buffers of the console (`tmfs://aux/console-...`) and
+  of the other embedded editors stayed open, and its quit command ran
+  afterwards on a window which no longer existed (#566).
+
 ## 27 October 2026
 
 - **Emoji in LaTeX**: the export writes the emoji as `\emoji{...}` of the
