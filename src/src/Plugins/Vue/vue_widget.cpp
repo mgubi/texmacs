@@ -6034,7 +6034,10 @@ vue_texmacs_widget_rep::send (slot s, blackbox val) {
     case SLOT_MODIFIED:
       win_modified= check_open<bool> (val, s);
       win_modified_set= true;
-      if (win) { win->set_modified (win_modified); win_modified_set= false; }
+      if (win) {
+        win->set_modified (win_modified); win_modified_set= false;
+        if (!win_modified) win->saved ();
+      }
       break;
 
     case SLOT_FILE:

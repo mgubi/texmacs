@@ -24,18 +24,22 @@
 void
 vue_mac_set_document (void* ns_window, const char* path, bool edited) {
   if (ns_window == NULL) return;
-  NSWindow* win= (__bridge NSWindow*) ns_window;
-  if (![win isKindOfClass: [NSWindow class]]) return;
-  NSURL* u= nil;
-  if (path != NULL && path[0] != '\0') {
-    NSString* s= [NSString stringWithUTF8String: path];
-    if (s != nil) u= [NSURL fileURLWithPath: s];
+  // (CMake compiles this file without ARC: the objects made here go with
+  // the pool)
+  @autoreleasepool {
+    NSWindow* win= (__bridge NSWindow*) ns_window;
+    if (![win isKindOfClass: [NSWindow class]]) return;
+    NSURL* u= nil;
+    if (path != NULL && path[0] != '\0') {
+      NSString* s= [NSString stringWithUTF8String: path];
+      if (s != nil) u= [NSURL fileURLWithPath: s];
+    }
+    NSURL* old= [win representedURL];
+    if (!(u == old || (u != nil && old != nil && [u isEqual: old])))
+      [win setRepresentedURL: u];
+    if ([win isDocumentEdited] != (edited ? YES : NO))
+      [win setDocumentEdited: edited ? YES : NO];
   }
-  NSURL* old= [win representedURL];
-  if (!(u == old || (u != nil && old != nil && [u isEqual: old])))
-    [win setRepresentedURL: u];
-  if ([win isDocumentEdited] != (edited ? YES : NO))
-    [win setDocumentEdited: edited ? YES : NO];
 }
 
 const char*
@@ -45,10 +49,12 @@ vue_mac_document_state (void* ns_window) {
     snprintf (buf, sizeof (buf), "no NSWindow");
     return buf;
   }
-  NSWindow* win= (__bridge NSWindow*) ns_window;
-  NSURL* u= [win representedURL];
-  const char* p= (u != nil) ? [[u path] UTF8String] : "(nil)";
-  snprintf (buf, sizeof (buf), "representedURL=%s documentEdited=%s",
-            p != NULL ? p : "(nil)", [win isDocumentEdited] ? "yes" : "no");
+  @autoreleasepool {
+    NSWindow* win= (__bridge NSWindow*) ns_window;
+    NSURL* u= [win representedURL];
+    const char* p= (u != nil) ? [[u path] UTF8String] : "(nil)";
+    snprintf (buf, sizeof (buf), "representedURL=%s documentEdited=%s",
+              p != NULL ? p : "(nil)", [win isDocumentEdited] ? "yes" : "no");
+  }
   return buf;
 }

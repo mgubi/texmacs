@@ -240,10 +240,18 @@ public:
   string get_name ();
   void   set_modified (bool flag);
   void   set_file (string file);
+  // the name, the marker and the file at once (the document of a tab)
+  void   set_document (string name, bool flag, string file);
+  void   saved ();
 #ifdef OS_MACOS
   // the represented file and edited flag given to the NSWindow
   string shown_path;
   int    shown_edited= -1; // unknown
+  // the file is local but does not exist yet: Save as renames the buffer
+  // (SLOT_FILE) before it writes the file, and an unchanged document gets
+  // no new SLOT_MODIFIED either, so the file is looked for again when the
+  // document is saved (SLOT_MODIFIED false, see saved)
+  bool   file_pending= false;
   void*  cocoa_window ();
 #endif
   void   set_visibility (bool flag);
@@ -763,11 +771,15 @@ vue_sdl_base_window_rep::cocoa_window () {
 // the file which the title bar of macOS shows for the file of a document:
 // local files which exist only (not untitled documents, tmfs:// views,
 // help pages on the web or remote files), as the Cocoa port does
+// (and not the untitled documents, which autosave writes to the scratch
+// folder); pending: a local file which may exist later
 static string
-represented_path (string file) {
+represented_path (string file, bool& pending) {
+  pending= false;
   if (file == "") return "";
   url u= url_system (file);
-  if (!is_rooted (u, "default") || !is_regular (u)) return "";
+  if (!is_rooted (u, "default") || is_scratch (u)) return "";
+  if (!is_regular (u)) { pending= true; return ""; }
   return as_string (u);
 }
 #endif
@@ -788,7 +800,7 @@ vue_sdl_base_window_rep::show_title (string name, bool edited, string file) {
     SDL_SetWindowTitle (sdl_win, s);
   }
 #ifdef OS_MACOS
-  string path= represented_path (file);
+  string path= represented_path (file, file_pending);
   if (path == shown_path && (edited ? 1 : 0) == shown_edited) return;
   shown_path= path;
   shown_edited= edited ? 1 : 0;
@@ -818,6 +830,22 @@ vue_sdl_base_window_rep::set_modified (bool flag) {
 void
 vue_sdl_base_window_rep::set_file (string file) {
   if (the_file != file) { the_file= file; update_title (); }
+}
+
+void
+vue_sdl_base_window_rep::set_document (string name, bool flag, string file) {
+  if (the_name == name && modified == flag && the_file == file) return;
+  the_name= name; modified= flag; the_file= file;
+  update_title ();
+}
+
+// SLOT_MODIFIED false comes after each change of the document too: only a
+// file not found before is looked for (see file_pending)
+void
+vue_sdl_base_window_rep::saved () {
+#ifdef OS_MACOS
+  if (file_pending) update_title ();
+#endif
 }
 
 void
@@ -2196,6 +2224,7 @@ public:
   void   set_modified (bool flag) {
     if (modified != flag) { modified= flag; update_title (); } }
   void   set_file (string f) { if (the_file != f) { the_file= f; update_title (); } }
+  void   saved ();
   void   set_visibility (bool flag);
   void   set_full_screen (bool flag);
   void   set_on_top (bool flag);
@@ -2341,13 +2370,23 @@ vue_virtual_window_rep::update_title () {
     // the tabs of the page, and the title of the host for the active one
     frame_dirty= true;
     if (active_tab == this && the_host != NULL) {
-      the_host->set_name (the_name);
-      the_host->set_modified (modified);
-      the_host->set_file (the_file);
+      the_host->set_document (the_name, modified, the_file);
     }
   }
   if (promoted && the_host != NULL)
     the_host->show_title (the_name, modified, the_file);
+}
+
+// the document of the host is that of the active tab or of the editor
+// which fills it: it may have a file now
+void
+vue_virtual_window_rep::saved () {
+  if (the_host == NULL) return;
+#ifdef OS_MACOS
+  if (!the_host->file_pending) return;
+#endif
+  if (promoted) the_host->show_title (the_name, modified, the_file);
+  else if (tab && active_tab == this) the_host->saved ();
 }
 
 void
@@ -2818,9 +2857,7 @@ activate_tab (vue_virtual_window_rep* v) {
   if (v != NULL) {
     focus_virtual (v);
     if (the_host != NULL) {
-      the_host->set_name (v->the_name);
-      the_host->set_modified (v->modified);
-      the_host->set_file (v->the_file);
+      the_host->set_document (v->the_name, v->modified, v->the_file);
     }
   }
 }
