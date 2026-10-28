@@ -138,7 +138,7 @@ tm_window_rep::tm_window_rep (widget wid2, tree geom):
   wid (wid2), id (create_window_id ()),
   serial (tm_window_serial++),
   menu_current (object ()), menu_cache (widget ()),
-  text_ptr (NULL)
+  text_ptr (NULL), cur_url (url_none ())
 {
   zoomf= retina_zoom * get_server () -> get_default_zoom_factor ();
 }
@@ -162,7 +162,7 @@ tm_window_rep::tm_window_rep (tree doc, command quit):
   wid (win), id (url_none ()),
   serial (tm_window_serial++),
   menu_current (object ()), menu_cache (widget ()),
-  text_ptr (NULL)
+  text_ptr (NULL), cur_url (url_none ())
 {
   zoomf= retina_zoom * get_doc_zoom_factor (doc);
   if (zoomf < 0.0)
@@ -362,7 +362,10 @@ tm_window_rep::set_modified (bool flag) {
 
 void
 tm_window_rep::set_window_url (url u) {
-  if (!is_none (u)) set_file (wid, as_string (u));
+  if (!is_none (u)) {
+    cur_url= u;
+    set_file (wid, as_string (u));
+  }
 }
 
 void

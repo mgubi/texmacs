@@ -180,6 +180,14 @@ window_to_buffer (url win) {
 }
 
 url
+window_to_file (url win) {
+  // the url last sent to the window as its file (title bar, proxy icon)
+  tm_window w= concrete_window (win);
+  if (w == NULL) return url_none ();
+  return w->get_window_url ();
+}
+
+url
 window_to_view (url win) {
   array<url> vs= get_all_views ();
   for (int i=0; i<N(vs); i++)

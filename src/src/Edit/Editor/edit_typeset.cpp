@@ -298,6 +298,17 @@ edit_typeset_rep::typeset_style_use_cache (tree style) {
   use_modules (env->read (THE_MODULES));
 }
 
+// Presentation mode (toggle-full-screen-mode) hides the informative flags
+// in the view which is full screen only: its typesetting uses info-flag
+// none, while the document's own info-flag (in init, shared by the views
+// of the buffer and saved) is not changed (#549). full-screen-mode is a
+// variable of the view (is_view_init_variable).
+static bool
+hides_info_flags (hashmap<string,tree> init) {
+  return init->contains ("full-screen-mode") &&
+         init ["full-screen-mode"] == "true";
+}
+
 void
 edit_typeset_rep::typeset_preamble () {
   env->write_default_env ();
@@ -305,6 +316,7 @@ edit_typeset_rep::typeset_preamble () {
   env->update ();
   env->read_env (stydef);
   env->patch_env (init);
+  if (hides_info_flags (init)) env->write (INFO_FLAG, "none");
   env->update ();
   hashmap<string,tree> h (UNINIT);
   env->read_env (h);
@@ -645,6 +657,8 @@ edit_typeset_rep::get_init_value (string var) {
   }
   if (N(pre)==0) typeset_preamble ();
   tree t= pre [var];
+  // (the document's value, not the one of presentation mode)
+  if (var == INFO_FLAG && hides_info_flags (init)) t= stydef [var];
   if (var == BG_COLOR && is_func (t, _PATTERN)) t= env->exec (t);
   return is_func (t, BACKUP, 2)? t[0]: t;
 }
@@ -1142,7 +1156,6 @@ void
 edit_typeset_rep::init_env (string var, tree by) {
   if (init (var) == by) return;
   init (var)= by;
-  if (var == "full-screen-mode") return;
   if (is_view_init_variable (var)) {
     notify_change (THE_ENVIRONMENT);
     return;

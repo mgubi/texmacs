@@ -151,6 +151,16 @@ path_to_buffer (path p) {
   return url_none ();
 }
 
+static void
+set_window_urls (url name) {
+  // tell the windows of the views of the buffer its url
+  array<url> vs= buffer_to_views (name);
+  for (int i=0; i<N(vs); i++) {
+    tm_window win= concrete_window (view_to_window (vs[i]));
+    if (win != NULL) win->set_window_url (name);
+  }
+}
+
 void
 rename_buffer (url name, url new_name) {
   if (new_name == name || is_nil (concrete_buffer (name))) return;
@@ -167,7 +177,10 @@ rename_buffer (url name, url new_name) {
   notify_rename_after (new_name);
   tree doc= subtree (the_et, buf->rp);
   string title= propose_title (buf->buf->title, new_name, doc);
-  set_title_buffer (new_name, title);
+  // the windows need the new url even when the title stays the same
+  // (Save as to the same file name in another folder)
+  if (buf->buf->title == title) set_window_urls (new_name);
+  else set_title_buffer (new_name, title);
 }
 
 url
@@ -234,11 +247,7 @@ set_title_buffer (url name, string title) {
   if (is_nil (buf)) return;
   if (buf->buf->title == title) return;
   buf->buf->title= title;
-  array<url> vs= buffer_to_views (name);
-  for (int i=0; i<N(vs); i++) {
-    tm_window win= concrete_window (view_to_window (vs[i]));
-    if (win != NULL) win->set_window_url (name);
-  }
+  set_window_urls (name);
   update_window_names (name);
 }
 

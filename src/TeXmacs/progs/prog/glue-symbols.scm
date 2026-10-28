@@ -881,6 +881,7 @@
 "current-window"
 "buffer->windows"
 "window-to-buffer"
+"window->file"
 "window-set-buffer"
 "window-focus"
 "switch-to-window"

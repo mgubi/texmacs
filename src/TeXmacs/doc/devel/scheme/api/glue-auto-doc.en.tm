@@ -6851,6 +6851,14 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(window-\<gtr\>file <scm-arg|url>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|window_to_file> which returns
+    <scm|url>.
+  </explain>
+
+  <\explain>
     <scm|(window-set-buffer <scm-arg|url> <scm-arg|url>)>
 <explain-synopsis|no synopsis>
   <|explain>
