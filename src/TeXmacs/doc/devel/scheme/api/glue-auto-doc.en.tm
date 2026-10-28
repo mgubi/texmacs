@@ -171,6 +171,14 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(gui-set-next-window-without-focus)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|gui_set_next_window_without_focus> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
     <scm|(support-functionality? <scm-arg|string>)>
 <explain-synopsis|no synopsis>
   <|explain>
@@ -208,6 +216,14 @@ source code.
   <|explain>
     Calls the <c++> function <cpp|default_japanese_font_name> which returns
     <scm|string>.
+  </explain>
+
+  <\explain>
+    <scm|(windows-cjk-font-candidates <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|windows_cjk_font_candidates> which returns
+    <scm|array_string>.
   </explain>
 
   <\explain>
@@ -4091,6 +4107,78 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(compress-table-select <scm-arg|content>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|compress_table_select> which returns
+    <scm|tree>.
+  </explain>
+
+  <\explain>
+    <scm|(compress-table-new <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|compress_table_new> which returns
+    <scm|string>.
+  </explain>
+
+  <\explain>
+    <scm|(compress-table-open <scm-arg|content>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|compress_table_open> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(compress-table-free <scm-arg|content>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|compress_table_free> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(compress-table-size <scm-arg|content>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|compress_table_size> which returns
+    <scm|int>.
+  </explain>
+
+  <\explain>
+    <scm|(compress-table-keys)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|compress_table_keys> which returns
+    <scm|tree>.
+  </explain>
+
+  <\explain>
+    <scm|(cpp-ai-chat-key <scm-arg|string> <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|ai_chat_key> which returns
+    <scm|tree>.
+  </explain>
+
+  <\explain>
+    <scm|(cpp-ai-engine <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|ai_engine> which returns
+    <scm|string>.
+  </explain>
+
+  <\explain>
+    <scm|(cpp-ai-chat-close <scm-arg|string> <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|ai_chat_close> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
     <scm|(cpp-ai-command <scm-arg|string> <scm-arg|string> <scm-arg|string>)>
 <explain-synopsis|no synopsis>
   <|explain>
@@ -5971,6 +6059,22 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(buffer-set-read-only <scm-arg|url> <scm-arg|bool>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|set_buffer_read_only> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(buffer-read-only? <scm-arg|url>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|is_buffer_read_only> which returns
+    <scm|bool>.
+  </explain>
+
+  <\explain>
     <scm|(buffer-pretend-autosaved <scm-arg|url>)>
 <explain-synopsis|no synopsis>
   <|explain>
@@ -6247,6 +6351,14 @@ source code.
 <explain-synopsis|no synopsis>
   <|explain>
     Calls the <c++> function <cpp|window_to_buffer> which returns
+    <scm|url>.
+  </explain>
+
+  <\explain>
+    <scm|(window-\<gtr\>file <scm-arg|url>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|window_to_file> which returns
     <scm|url>.
   </explain>
 

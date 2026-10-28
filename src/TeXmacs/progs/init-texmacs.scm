@@ -527,6 +527,7 @@
 (lazy-define (tools spell correct-widgets) update-correct-widget open-correct)
 (use-modules (tools ai ai-batch))
 (lazy-define (tools ai ai-translate) ai-translate* ai-abort-translate)
+(lazy-define (tools ai ai-compress) with-compress-table compress-table-callback)
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
 ;(display* "memory: " (texmacs-memory) " bytes\n")
 

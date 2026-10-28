@@ -169,6 +169,97 @@
     (when (buffer-exists? old) (switch-to-buffer old))
     (check= (current-buffer) old)))
 
+;; Deleting a view of a buffer removes it from the views of the buffer and
+;; leaves the others, which still show and edit the buffer. delete_view
+;; went on reading the views after removing one, one past the end of the
+;; shortened array when the view was not the last one (#547: new_view.cpp);
+;; the read is caught only under ASan (with NO_FAST_ALLOC).
+(define (test-delete-view)
+  (check-group "deleting a view")
+  (with-buffer-body '(document "a")
+    (lambda ()
+      (let* ((u (current-buffer))
+             (v0 (current-view-url))
+             (v1 (view-new u))
+             (v2 (view-new u)))
+        (check= (buffer->views u) (list v0 v1 v2))
+        ;; the window shows v1, so that the first view is not in a window
+        (window-set-view (current-window) v1 #t)
+        (check= (current-view-url) v1)
+        (check-true (url-none? (view->window-url v0)))
+        (view-delete v0)
+        (check= (buffer->views u) (list v1 v2))
+        (check-false (in? v0 (view-list)))
+        (check= (view->buffer v1) u)
+        (check= (view->buffer v2) u)
+        ;; both views edit the buffer
+        (edit (go-end) (insert "b"))
+        (check= (body) '(document "ab"))
+        (window-set-view (current-window) v2 #t)
+        (check= (current-view-url) v2)
+        (check= (current-buffer) u)
+        (check= (body) '(document "ab"))
+        (edit (go-end) (insert "c"))
+        (check= (tree->stree (buffer-get-body u)) '(document "abc"))
+        (check= (buffer->views u) (list v1 v2))))))
+
+;; A tree pointer or a position which is collected while it is still
+;; attached to a tree (a process whose callback was never called, a
+;; position-new without position-delete after an error) is held by the
+;; list of the observers of the tree alone; when the tree is detached, by
+;; replacing the body of its buffer or closing it, the observer moves to
+;; the closest tree, and it was freed while it did so (#537: set_tree of
+;; tree_pointer.cpp and tree_addendum.cpp, set_position of
+;; tree_position.cpp). A use of freed memory does not always crash: on the
+;; Guile/Qt build of macOS these checks aborted without the fix, but they
+;; are reliable only under ASan (with NO_FAST_ALLOC).
+(define (attach-forgotten-pointer)
+  ;; (in a function of its own, so that nothing on the stack keeps it)
+  (tree->tree-pointer (tree-ref (buffer-tree) 0))
+  #t)
+
+(define (attach-forgotten-position)
+  (position-new-path (append (buffer-path) '(0 0 1)))
+  #t)
+
+(define (forgotten-observers-collected)
+  (do ((i 0 (+ i 1))) ((= i 20000)) (make-vector 50 i))
+  (gc)
+  #t)
+
+(define (test-tree-pointers)
+  (check-group "tree pointers")
+  ;; replacing the body
+  (with-buffer-body '(document (concat "a " (em "b")) "c")
+    (lambda ()
+      (attach-forgotten-pointer)
+      (forgotten-observers-collected)
+      (buffer-set-body (current-buffer) (stree->tree '(document "d")))
+      (check= (tree->stree (buffer-tree)) '(document "d"))))
+  ;; closing the buffer (with-buffer-body closes it)
+  (with-buffer-body '(document (concat "e " (em "f")))
+    (lambda ()
+      (attach-forgotten-pointer)
+      (forgotten-observers-collected)
+      (check= (tree->stree (buffer-tree)) '(document (concat "e " (em "f"))))))
+  (forgotten-observers-collected)
+  ;; a position, the body replaced twice, then the buffer closed
+  (with-buffer-body '(document (concat "ab " (em "b")) "c")
+    (lambda ()
+      (attach-forgotten-position)
+      (forgotten-observers-collected)
+      (buffer-set-body (current-buffer) (stree->tree '(document "d")))
+      (forgotten-observers-collected)
+      (buffer-set-body (current-buffer) (stree->tree '(document "e" "f")))
+      (check= (tree->stree (buffer-tree)) '(document "e" "f"))))
+  (forgotten-observers-collected)
+  ;; a pointer which is detached is still fine
+  (with-buffer-body '(document "g" "h")
+    (lambda ()
+      (with tp (tree->tree-pointer (tree-ref (buffer-tree) 1))
+        (check= (tree->stree (tree-pointer->tree tp)) "h")
+        (tree-pointer-detach tp)))))
+
 ;; The buffer of an embedded TeXmacs widget (texmacs-input) is embedded in an
 ;; alternative window when the widget is made while that window is being
 ;; built, between alt-window-handle and alt-window-create, as the dialogues
@@ -920,6 +1011,149 @@
           (buffer-close g)
           (switch-to-buffer f))))))
 
+;; Save as tells the window of the buffer its new url (its file in the
+;; title bar, the proxy icon of macOS), also when the file keeps its name in
+;; another folder and the title of the buffer does not change: the url was
+;; only sent with a new title (set_title_buffer, new_buffer.cpp).
+(define (test-save-as-window)
+  (check-group "save as: the url of the window")
+  (with-buffer-body '(document "a")
+    (lambda ()
+      (let* ((sub (string-append editing-dir "/sub2"))
+             (f (tmp-file* "d.tm"))
+             (g (tmp-file* "sub2/d.tm"))
+             (h (tmp-file* "sub2/e.tm")))
+        (system-mkdir (system->url sub))
+        (edit (save-buffer-as f :overwrite))
+        (check= (current-buffer) f)
+        (check= (window->file (current-window)) f)
+        (with title (buffer-get-title f)
+          ;; the same file name in another folder: the same title
+          (edit (save-buffer-as g :overwrite))
+          (check= (current-buffer) g)
+          (check= (buffer-get-title g) title)
+          (check= (window->file (current-window)) g))
+        ;; another file name: another title
+        (edit (save-buffer-as h :overwrite))
+        (check= (current-buffer) h)
+        (check= (window->file (current-window)) h)
+        (for-each (lambda (u) (when (url-exists? u) (system-remove u)))
+                  (list g h))
+        (system-rmdir (system->url sub))))))
+
+;; The initial environment belongs to the buffer (#528): a change made in
+;; one view of it (init-env, init-default) is in its other views, in
+;; buffer-get and in the saved file, and in a view made after it; the
+;; buffer stays modified until it is saved. The variables of the window
+;; (zoom-factor, page-screen-width) stay those of each view.
+(define (initial-value doc var)
+  ;; the value of @var in the initial environment of @doc (a document read
+  ;; from a file, as an stree), or #f
+  (with init (doc-part doc 'initial)
+    (and init (pair? (cdr init))
+         (with a (list-find (cdadr init)
+                            (lambda (x) (and (pair? x) (pair? (cdr x))
+                                             (== (cadr x) var))))
+           (and a (caddr a))))))
+
+(define (buffer-init-value u var)
+  (initial-value (tree->stree (buffer-get u)) var))
+
+(define (file-init-value u var)
+  (initial-value (tree->stree (tree-import u "texmacs")) var))
+
+(define (test-views-init)
+  (check-group "initial environment in the views of a buffer")
+  (let ((old (current-buffer))
+        (before (buffer-list))
+        (f (tmp-file* "views-init.tm")))
+    (tree-export (stree->tree
+                  '(document (TeXmacs "2.1") (style (tuple "generic"))
+                             (body (document "one"))
+                             (initial (collection
+                                       (associate "font-base-size" "12")))))
+                 f "texmacs")
+    (with r (check-run
+             (lambda ()
+               (load-buffer f)
+               (update-forced)
+               (let ((v1 (current-view-url))
+                     (z1 (get-init "zoom-factor"))
+                     (w1 (get-init "page-screen-width")))
+                 ;; switching to the buffer shown makes a second view, and
+                 ;; switching again goes back to the first one
+                 (switch-to-buffer f)
+                 (with v2 (current-view-url)
+                   (check= (length (buffer->views f)) 2)
+                   (check-false (== v1 v2))
+                   ;; the variables of the window stay in their view, and
+                   ;; do not modify the buffer
+                   (edit (init-env "zoom-factor" "1.7"))
+                   (edit (init-env "page-screen-width" "123tmpt"))
+                   (check= (get-init "zoom-factor") "1.7")
+                   (check-false (buffer-modified? f))
+                   (switch-to-buffer f)
+                   (check= (current-view-url) v1)
+                   (check= (get-init "zoom-factor") z1)
+                   (check= (get-init "page-screen-width") w1)
+                   ;; init-env in the first view reaches the second one
+                   (edit (init-env "par-indent" "4fn"))
+                   (check-true (buffer-modified? f))
+                   (switch-to-buffer f)
+                   (check= (current-view-url) v2)
+                   (check= (get-init "par-indent") "4fn")
+                   (check= (buffer-init-value f "par-indent") "4fn")
+                   (check-true (buffer-modified? f))
+                   ;; and init-default in the second view the first one
+                   (edit (init-default "font-base-size"))
+                   (check= (get-init "font-base-size") "10")
+                   (switch-to-buffer f)
+                   (check= (current-view-url) v1)
+                   (check= (get-init "font-base-size") "10")
+                   (check= (get-init "par-indent") "4fn")
+                   (check-false (buffer-init-value f "font-base-size"))
+                   (check= (buffer-init-value f "par-indent") "4fn")
+                   (check-true (buffer-modified? f))
+                   ;; a view made after the changes has them
+                   (with v3 (view-new f)
+                     (window-set-view (current-window) v3 #t)
+                     (check= (current-view-url) v3)
+                     (check= (get-init "par-indent") "4fn")
+                     (check= (get-init "font-base-size") "10"))
+                   ;; the file saved has them, and not the variables of
+                   ;; the window
+                   (check-true (buffer-modified? f))
+                   (buffer-save f)
+                   (check-false (buffer-modified? f))
+                   (check= (file-init-value f "par-indent") "4fn")
+                   (check-false (file-init-value f "font-base-size"))
+                   (check-false (file-init-value f "zoom-factor"))
+                   (check-false (file-init-value f "page-screen-width"))
+                   ;; a change made after the save, in another view, is
+                   ;; saved from this one
+                   (switch-to-buffer f)
+                   (edit (init-env "par-indent" "2fn"))
+                   (switch-to-buffer f)
+                   (check= (get-init "par-indent") "2fn")
+                   (check-true (buffer-modified? f))
+                   (buffer-save f)
+                   (check-false (buffer-modified? f))
+                   (check= (file-init-value f "par-indent") "2fn")
+                   ;; the source mode (preamble) is a setting of the document
+                   (edit (init-env "preamble" "true"))
+                   (switch-to-buffer f)
+                   (check= (get-init "preamble") "true")
+                   (edit (init-default "preamble"))
+                   (switch-to-buffer f)
+                   (check= (get-init "preamble") "false")))))
+      (when (and (pair? r) (== (car r) 'error))
+        (check-report #f "the group" (object->string r))))
+    (for (b (buffer-list))
+      (when (nin? b before)
+        (buffer-pretend-saved b)
+        (buffer-close b)))
+    (when (buffer-exists? old) (switch-to-buffer old))))
+
 (define (test-export)
   (check-group "export")
   (with-buffer-body saved-doc
@@ -980,6 +1214,8 @@
   (check-suite "editing")
   (system-mkdir (system->url editing-dir))
   (test-buffers)
+  (test-delete-view)
+  (test-tree-pointers)
   (test-embedded)
   (test-load)
   (test-insert)
@@ -995,6 +1231,8 @@
   (test-undo-markers)
   (test-cancel-closed)
   (test-save)
+  (test-save-as-window)
+  (test-views-init)
   (test-export)
   (test-copy-as-text)
   (remove-tmp-files)

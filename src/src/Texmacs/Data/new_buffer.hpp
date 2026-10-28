@@ -92,6 +92,8 @@ void set_last_save_buffer (url name, int t);
 bool is_aux_buffer (url name);
 double last_visited (url name);
 bool buffer_modified (url name);
+void set_buffer_read_only (url name, bool flag);
+bool is_buffer_read_only (url name);
 bool buffer_modified_since_autosave (url name);
 void pretend_buffer_modified (url name);
 void pretend_buffer_saved (url name);

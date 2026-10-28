@@ -125,6 +125,12 @@
   (:launch "sh -c \"read x; printf '\\002verbatim:cut'\"")
   (:serializer ,raw-serialize))
 
+;; ignores SIGTERM: stopping it does not wait until it is killed (it waits
+;; with the argument 97, by which the test finds its process)
+(plugin-configure tmtestterm
+  (:launch "sh -c \"trap '' INT TERM; exec sleep 97\"")
+  (:serializer ,raw-serialize))
+
 ;; two variants, the session name chooses the variant
 (plugin-configure tmtestvariants
   (:launch "v1" "cat")
@@ -1071,6 +1077,14 @@
       (set! python-command saved)
       r)))
 
+(define (commands-run thunk)
+  ;; the commands which @thunk runs with eval-system (none is run)
+  (let ((saved eval-system) (cmds '()))
+    (set! eval-system (lambda (cmd . opt) (set! cmds (cons cmd cmds)) ""))
+    (check-run thunk)
+    (set! eval-system saved)
+    (reverse cmds)))
+
 ;; The availability of plugins rests on looking for programs in the path,
 ;; and the plugins which are not sessions run external commands.
 (define (test-external)
@@ -1095,6 +1109,13 @@
              (list-filter (python-requirements)
                           (lambda (r) (eval r (current-module))))))
           '())
+  ;; nor does the jupyter plugin run its script to list the kernels: the
+  ;; command would be the script alone, which Windows fails to launch at
+  ;; each start of a plugin
+  (when (defined? 'plugin->jupyter)
+    (check= (without-python
+             (lambda () (commands-run (lambda () (plugin->jupyter "python")))))
+            '()))
   )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1106,8 +1127,10 @@
 ;; command of a command line plugin (which is one process per command). The
 ;; descriptors are those open in TeXmacs itself (/dev/fd), and the processes
 ;; which are not reaped are the zombies among the children of TeXmacs.
-;; (A stopped plugin is not checked: Qt pipes release its process and its
-;; pipes in the event loop, which does not run here.)
+;; (The descriptors of a stopped plugin are not checked: Qt pipes release
+;; them in the event loop, which does not run here. Its process is reaped
+;; when it is stopped: with Qt pipes on Linux, it was reaped only in the
+;; event loop, and each stopped plugin stayed a zombie here.)
 
 (define (open-descriptors)
   (length (url-read-directory (system->url "/dev/fd") "*")))
@@ -1124,6 +1147,14 @@
   (string->number
    (var-eval-system
     (string-append "ps -axo command= | grep -c '^sleep " secs "$'"))))
+
+(define (term-pid)
+  ;; the process of tmtestterm, a child of TeXmacs, or #f
+  (with s (var-eval-system
+           (string-append "ps -axo pid=,ppid=,command= | "
+                          "awk -v p=$PPID '$2 == p && $3 == \"sleep\" && "
+                          "$4 == \"97\" {print $1}'"))
+    (and (!= s "") s)))
 
 (define (cmdline-run ses cmd)
   ;; run one command of the command line plugin until its process has ended
@@ -1176,6 +1207,16 @@
     (check= (open-descriptors) fds)
     (check= (zombies) 0))
 
+  (check-group "processes: stopped plugins")
+  ;; (the zombies which these stops leave, whatever the groups before left)
+  (let ((before (zombies)))
+    (for (i (.. 1 4))
+      (with ses (string-append "plugins-test-stopped" (number->string i))
+        (check= (start* "tmtestecho" ses) "ok")
+        (connection-stop "tmtestecho" ses)
+        (check= (connection-status "tmtestecho" ses) 0)))
+    (check= (- (zombies) before) 0))
+
   (check-group "processes: command lines")
   (check= (connection-start "tmtestcmdline" "plugins-test-cmd") "cmdline")
   ;; connection-eval reads the link, which takes the output of its command
@@ -1194,7 +1235,28 @@
   (check= (sleepers "617") 0)
   (check-true (cmdline-run "plugins-test-cmd"
                            "z; sleep 617 > /dev/null & sleep 617"))
-  (check= (sleepers "617") 0))
+  (check= (sleepers "617") 0)
+
+  (check-group "processes: a plugin which ignores SIGTERM")
+  (check= (start* "tmtestterm" "plugins-test-term") "ok")
+  (let ((pid #f))
+    (wait-until (lambda () (set! pid (term-pid)) pid) 5000)
+    (check-true pid)
+    (with start (texmacs-time)
+      (connection-stop "tmtestterm" "plugins-test-term")
+      ;; the interface is not blocked until the process is killed (2 s)
+      (check-true (< (- (texmacs-time) start) 1000)))
+    (check= (connection-status "tmtestterm" "plugins-test-term") 0)
+    ;; without Qt pipes (pipe_link.cpp), it is killed after 2 s, and
+    ;; reaped, by the event loop in TeXmacs; here (no event loop), by the
+    ;; next start or stop of a plugin. With Qt pipes, connection-stop kills
+    ;; it at once and reaps it (QTMPipeLink::killProcess)
+    (pause "2.2")
+    (check= (start* "tmtestecho" "plugins-test-term2") "ok")
+    (connection-stop "tmtestecho" "plugins-test-term2")
+    ;; (pid-alive? counts a zombie as ended)
+    (when pid
+      (check-true (wait-until (lambda () (not (pid-alive? pid))) 3000)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The suite

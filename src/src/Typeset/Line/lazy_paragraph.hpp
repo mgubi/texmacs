@@ -39,6 +39,7 @@ protected:
   SI            cur_r;       // the current right offset of the last line unit
   space         cur_w;       // the current width of the line unit
   int           cur_start;   // index of the start of the line unit
+  SI            last_cor;    // the italic correction in the last of spcs
 
   string        mode;        // justified, left, center or right
   double        flexibility; // threshold for switching to ragged mode

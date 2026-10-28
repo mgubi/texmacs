@@ -658,7 +658,44 @@
        (check-true (> (rect-x1 ra) (rect-x1 rc)))
        ;; the rows go downwards
        (check-true (< (rect-y2 rb) (rect-y1 ra)))
-       (check-true (< (rect-y2 rw) (rect-y1 rc)))))))
+       (check-true (< (rect-y2 rw) (rect-y1 rc))))))
+  ;; a table whose width is in par takes it from the paragraph where it is
+  ;; laid out (a cell whose lines are broken, the body of a frame), also when
+  ;; the width is given by a value (<value|figure-width> of the figures),
+  ;; with the value where the table is, set locally or a macro argument:
+  ;; its cell aligned on the right ends at the same place
+  (let* ((inner (lambda (w)
+                  `(tformat (twith "table-width" ,w) (twith "table-hmode" "exact")
+                            (cwith "1" "1" "1" "1" "cell-halign" "r")
+                            (table (row (cell "a"))))))
+         (in-cell (lambda (x)
+                    `(document
+                       (assign "w" "1par")
+                       (assign "mt" (macro "x" ,(inner '(arg "x"))))
+                       (assign "ml" (macro "x" ,(inner "0.5par")))
+                       (tformat (twith "table-width" "1par")
+                                (twith "table-hmode" "exact")
+                                (cwith "1" "1" "1" "1" "cell-hyphen" "t")
+                                (cwith "1" "1" "1" "-1" "cell-hpart" "1")
+                                (table (row (cell (document ,x))
+                                            (cell "b")))))))
+         (in-frame (lambda (w)
+                     `(document (assign "w" "1par")
+                                (framed (document ,(inner w))))))
+         (pos-of (lambda (acc doc . p)
+                   (let ((x #f))
+                     (with-typeset-body doc
+                       (lambda () (set! x (acc (apply rect p)))))
+                     x))))
+    (check= (pos-of rect-x1 (in-cell (inner '(value "w"))) 3 4 0 0 0 0 3 0 0 0)
+            (pos-of rect-x1 (in-cell (inner "1par")) 3 4 0 0 0 0 3 0 0 0))
+    (check= (pos-of rect-x1 (in-frame '(value "w")) 1 0 0 3 0 0 0)
+            (pos-of rect-x1 (in-frame "1par") 1 0 0 3 0 0 0))
+    (check= (pos-of rect-x1 (in-cell `(with "w" "0.5par" ,(inner '(value "w"))))
+                    3 4 0 0 0 0 2 3 0 0 0)
+            (pos-of rect-x1 (in-cell (inner "0.5par")) 3 4 0 0 0 0 3 0 0 0))
+    (check= (pos-of rect-x2 (in-cell '(mt "0.5par")) 3 4 0 0 0 0)
+            (pos-of rect-x2 (in-cell '(ml "0.5par")) 3 4 0 0 0 0))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Line breaking
@@ -739,6 +776,67 @@
        (check-true (> (rect-x1 indented) (rect-x1 left)))
        (check-true (> (- (rect-y2 narrow) (rect-y1 narrow))
                       (* 3 (- (rect-y2 full) (rect-y1 full)))))))))
+
+;; Markers: the boundaries of a macro, of its arguments and of a with are
+;; places for the cursor (concater_rep::marker), which do not change the
+;; layout: markup given by a macro or inside a with is typeset as the same
+;; markup written out. A script after them takes the base which the markup
+;; written out gives it; their height does not count. The cursor at the
+;; start and at the end of a with is next to its content: the space after an
+;; operator goes after the markers which end a macro, inside a fraction as in
+;; a paragraph. At the end of a line, the space before markers does not
+;; count, also before those of the macros of a style; a table cell counts the
+;; spaces of its content as the lines of its paragraph do. The italic
+;; correction after an italic glyph stays inside the macro which ends with it.
+(define (test-markers)
+  (check-group "markers")
+  (let ((same (lambda (t1 t2)
+                (check= (box t1 "lbrtLBRT") (box t2 "lbrtLBRT"))))
+        (with-same-as (lambda (t) `(with "same-as" (macro "x" (arg "x")) ,t))))
+    (same '(concat "T" (with "color" "brown" (rsub "E")))
+          '(concat "T" (rsub "E")))
+    (same (math '(concat "T" (with "color" "brown" (rsub "E"))))
+          (math '(concat "T" (rsub "E"))))
+    (same (math (with-same-as '(concat (same-as "C") (rsub "N") "+1")))
+          (math '(concat "C" (rsub "N") "+1")))
+    (same (with-same-as '(tabular (table (row (cell (same-as (rsup "o")))))))
+          '(tabular (table (row (cell (rsup "o")))))))
+  (with-typeset-body
+   `(document
+     ,(math '(frac (concat "x+" (with "color" "red" "a") "+b") "c"))
+     ,(math '(concat "x+" (with "color" "red" "a") "+b")))
+   (lambda ()
+     (for (l '((0 2 0 1) (1 2 1)))
+       (let ((w (apply rect l))
+             (a (apply rect (append l '(2)))))
+         (check= (rect-x1 w) (rect-x1 a))
+         (check= (rect-x2 w) (rect-x2 a))))))
+  (with-typeset-body
+   '(document
+     (with "ff" (macro "a" (arg "a"))
+       (with "gg" (macro (with "mode" "math" (concat "x" (ff "+"))))
+         (with "par-mode" "right"
+           (document (gg)
+                     (with "mode" "math" (concat "x" (ff "+")))
+                     (with "mode" "math" "x+"))))))
+   (lambda ()
+     (with x1 (lambda (i) (rect-x1 (rect 0 2 2 2 i)))
+       (check= (x1 0) (x1 2))
+       (check= (x1 1) (x1 2)))))
+  (with-typeset-body
+   (with content (math '(concat "x+" (with "color" "red" (concat))))
+     `(document
+       (tabular (tformat (cwith "1" "1" "1" "1" "cell-hyphen" "t")
+                         (table (row (cell (document ,content))))))
+       (tabular (table (row (cell ,content))))))
+   (lambda ()
+     (with w (lambda (r) (- (rect-x2 r) (rect-x1 r)))
+       (check= (w (rect 0)) (w (rect 1)))
+       (check= (w (rect 0 0 1 0 0 0 0)) (w (rect 1 0 0 0 0))))))
+  (with-typeset-body
+   '(document (concat (em "f") ")"))
+   (lambda ()
+     (check-true (> (rect-x2 (rect 0 0)) (rect-x2 (rect 0 0 0)))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Page breaking
@@ -2323,6 +2421,7 @@
   (test-page-breaks-kept)
   (test-tables)
   (test-paragraphs)
+  (test-markers)
   (test-pages)
   (test-pages-kept)
   (test-long-document-without-pages)

@@ -71,11 +71,14 @@ tree_addendum_rep::get_tree (tree& t) {
 bool
 tree_addendum_rep::set_tree (tree t) {
   if (ptr != t.rep) {
+    // (the list holds the only reference to an addendum: tree_addendum_new
+    // is always called with keep false, and nobody else keeps it)
+    observer self (this);
     tree ref (ptr);
-    remove_observer (ref->obs, observer (this));
+    remove_observer (ref->obs, self);
     if (keep) {
       ptr= t.rep;
-      insert_observer (t->obs, observer (this));
+      insert_observer (t->obs, self);
     }
     // FIXME: if !keep, then is it safe to not reinsert the observer?
   }
@@ -145,9 +148,10 @@ tree_addendum_rep::notify_insert_node (tree& ref, int pos) {
   //cout << "Notify insert node " << ref << ", " << pos << "\n";
   // NOTE: should we remove the 'false'? see also tree_pointer.cpp
   if (keep && false) {
-    remove_observer (ref[pos]->obs, observer (this));
+    observer self (this);
+    remove_observer (ref[pos]->obs, self);
     ptr= ref.rep;
-    insert_observer (ref->obs, observer (this));
+    insert_observer (ref->obs, self);
   }
   //cout << "position -> " << obtain_position (observer (this)) << "\n";
 }

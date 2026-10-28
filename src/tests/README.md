@@ -168,6 +168,14 @@ module macros). What needs a buffer, the cursor or the GUI is left out;
 checks which fail because of a bug in the sources are left out with a
 `FIXME` at their place.
 
+`search-test.scm` tests the search engine of Edit > Search and Edit >
+Replace (`src/Data/Tree/tree_search.cpp`) on detached trees: text, tags
+(the examples of the manual), formulas, wildcards, select-region, patterns
+of several paragraphs, the limit on the hits and the search from a
+position, case-insensitive matching, each for the two ways of matching of
+Edit > Search and Edit > Replace, and the time of a search in a long
+formula.
+
 Three more test the document level. `latex-test.scm` converts to and from
 LaTeX (special characters, accents, structure, formulas, tables, theorems,
 macros, whole documents) and checks round trips, including the ones which

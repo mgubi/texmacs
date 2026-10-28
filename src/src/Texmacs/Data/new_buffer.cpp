@@ -148,6 +148,16 @@ path_to_buffer (path p) {
   return url_none ();
 }
 
+static void
+set_window_urls (url name) {
+  // tell the windows of the views of the buffer its url
+  array<url> vs= buffer_to_views (name);
+  for (int i=0; i<N(vs); i++) {
+    tm_window win= concrete_window (view_to_window (vs[i]));
+    if (win != NULL) win->set_window_url (name);
+  }
+}
+
 void
 rename_buffer (url name, url new_name) {
   if (new_name == name || is_nil (concrete_buffer (name))) return;
@@ -163,7 +173,10 @@ rename_buffer (url name, url new_name) {
   notify_rename_after (new_name);
   tree doc= subtree (the_et, buf->rp);
   string title= propose_title (buf->buf->title, new_name, doc);
-  set_title_buffer (new_name, title);
+  // the windows need the new url even when the title stays the same
+  // (Save as to the same file name in another folder)
+  if (buf->buf->title == title) set_window_urls (new_name);
+  else set_title_buffer (new_name, title);
 }
 
 url
@@ -230,14 +243,8 @@ set_title_buffer (url name, string title) {
   if (is_nil (buf)) return;
   if (buf->buf->title == title) return;
   buf->buf->title= title;
-  array<url> vs= buffer_to_views (name);
-  for (int i=0; i<N(vs); i++) {
-    tm_window win= concrete_window (view_to_window (vs[i]));
-    if (win != NULL) {
-      win->set_window_name (title);
-      win->set_window_url (name);
-    }
-  }
+  set_window_urls (name);
+  update_window_names (name);
 }
 
 /******************************************************************************
@@ -398,6 +405,23 @@ buffer_modified (url name) {
   tm_buffer buf= concrete_buffer (name);
   if (is_nil (buf)) return false;
   return buf->needs_to_be_saved ();
+}
+
+// A read-only buffer can be read, searched, selected and copied, but what
+// one does in its editor does not change it: the changes made by a key, a
+// mouse action, a drop or a menu command are cancelled at the end of the
+// event (edit_modify_rep::end_editing), and there is no undo. The program
+// still changes it (the messages of the console, debug-widgets.scm)
+void
+set_buffer_read_only (url name, bool flag) {
+  tm_buffer buf= concrete_buffer (name);
+  if (!is_nil (buf)) buf->buf->read_only= flag;
+}
+
+bool
+is_buffer_read_only (url name) {
+  tm_buffer buf= concrete_buffer (name);
+  return !is_nil (buf) && buf->buf->read_only;
 }
 
 bool

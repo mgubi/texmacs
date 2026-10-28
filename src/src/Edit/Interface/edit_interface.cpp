@@ -1258,6 +1258,9 @@ edit_interface_rep::animate () {
 void
 edit_interface_rep::full_screen_mode (bool flag) {
   full_screen= flag;
+  // (now, not at the next apply_changes: the informative flags of this
+  // view are hidden in presentation mode, see typeset_preamble)
+  init_env ("full-screen-mode", string (full_screen? "true": "false"));
   send_invalidate_all (this);
 }
 

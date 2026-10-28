@@ -338,6 +338,8 @@ public:
   virtual tree     get_init_all () = 0;
   virtual void     init_env (string var, tree by) = 0;
   virtual void     init_default (string var) = 0;
+  virtual void     init_env_local (string var, tree by) = 0;
+  virtual void     init_default_local (string var) = 0;
   virtual void     set_zoom (tree z) = 0;
   virtual tree     get_ref (string key) = 0;
   virtual tree     get_aux (string key) = 0;

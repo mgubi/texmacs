@@ -197,6 +197,15 @@ tmg_gui_set_next_window_as_popup () {
 }
 
 tmscm
+tmg_gui_set_next_window_without_focus () {
+  // TMSCM_DEFER_INTS;
+  gui_set_next_window_without_focus ();
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
 tmg_support_functionalityP (tmscm arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "support-functionality?");
 
@@ -243,6 +252,19 @@ tmg_default_japanese_font () {
   // TMSCM_ALLOW_INTS;
 
   return string_to_tmscm (out);
+}
+
+tmscm
+tmg_windows_cjk_font_candidates (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "windows-cjk-font-candidates");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  array_string out= windows_cjk_font_candidates (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return array_string_to_tmscm (out);
 }
 
 tmscm
@@ -6905,6 +6927,123 @@ tmg_decompress_html (tmscm arg1, tmscm arg2) {
 }
 
 tmscm
+tmg_compress_table_select (tmscm arg1) {
+  TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "compress-table-select");
+
+  content in1= tmscm_to_content (arg1);
+
+  // TMSCM_DEFER_INTS;
+  tree out= compress_table_select (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return tree_to_tmscm (out);
+}
+
+tmscm
+tmg_compress_table_new (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "compress-table-new");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  string out= compress_table_new (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return string_to_tmscm (out);
+}
+
+tmscm
+tmg_compress_table_open (tmscm arg1) {
+  TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "compress-table-open");
+
+  content in1= tmscm_to_content (arg1);
+
+  // TMSCM_DEFER_INTS;
+  compress_table_open (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_compress_table_free (tmscm arg1) {
+  TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "compress-table-free");
+
+  content in1= tmscm_to_content (arg1);
+
+  // TMSCM_DEFER_INTS;
+  compress_table_free (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_compress_table_size (tmscm arg1) {
+  TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "compress-table-size");
+
+  content in1= tmscm_to_content (arg1);
+
+  // TMSCM_DEFER_INTS;
+  int out= compress_table_size (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return int_to_tmscm (out);
+}
+
+tmscm
+tmg_compress_table_keys () {
+  // TMSCM_DEFER_INTS;
+  tree out= compress_table_keys ();
+  // TMSCM_ALLOW_INTS;
+
+  return tree_to_tmscm (out);
+}
+
+tmscm
+tmg_cpp_ai_chat_key (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "cpp-ai-chat-key");
+  TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "cpp-ai-chat-key");
+
+  string in1= tmscm_to_string (arg1);
+  string in2= tmscm_to_string (arg2);
+
+  // TMSCM_DEFER_INTS;
+  tree out= ai_chat_key (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return tree_to_tmscm (out);
+}
+
+tmscm
+tmg_cpp_ai_engine (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "cpp-ai-engine");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  string out= ai_engine (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return string_to_tmscm (out);
+}
+
+tmscm
+tmg_cpp_ai_chat_close (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "cpp-ai-chat-close");
+  TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "cpp-ai-chat-close");
+
+  string in1= tmscm_to_string (arg1);
+  string in2= tmscm_to_string (arg2);
+
+  // TMSCM_DEFER_INTS;
+  ai_chat_close (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
 tmg_cpp_ai_command (tmscm arg1, tmscm arg2, tmscm arg3) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "cpp-ai-command");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "cpp-ai-command");
@@ -10232,6 +10371,34 @@ tmg_buffer_pretend_saved (tmscm arg1) {
 }
 
 tmscm
+tmg_buffer_set_read_only (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "buffer-set-read-only");
+  TMSCM_ASSERT_BOOL (arg2, TMSCM_ARG2, "buffer-set-read-only");
+
+  url in1= tmscm_to_url (arg1);
+  bool in2= tmscm_to_bool (arg2);
+
+  // TMSCM_DEFER_INTS;
+  set_buffer_read_only (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_buffer_read_onlyP (tmscm arg1) {
+  TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "buffer-read-only?");
+
+  url in1= tmscm_to_url (arg1);
+
+  // TMSCM_DEFER_INTS;
+  bool out= is_buffer_read_only (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return bool_to_tmscm (out);
+}
+
+tmscm
 tmg_buffer_pretend_autosaved (tmscm arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "buffer-pretend-autosaved");
 
@@ -10685,6 +10852,19 @@ tmg_window_to_buffer (tmscm arg1) {
 
   // TMSCM_DEFER_INTS;
   url out= window_to_buffer (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return url_to_tmscm (out);
+}
+
+tmscm
+tmg_window_2file (tmscm arg1) {
+  TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "window->file");
+
+  url in1= tmscm_to_url (arg1);
+
+  // TMSCM_DEFER_INTS;
+  url out= window_to_file (in1);
   // TMSCM_ALLOW_INTS;
 
   return url_to_tmscm (out);
@@ -11383,11 +11563,13 @@ initialize_glue_basic () {
   tmscm_install_procedure ("x-gui?",  tmg_x_guiP, 0, 0, 0);
   tmscm_install_procedure ("qt-gui?",  tmg_qt_guiP, 0, 0, 0);
   tmscm_install_procedure ("gui-set-next-window-as-popup",  tmg_gui_set_next_window_as_popup, 0, 0, 0);
+  tmscm_install_procedure ("gui-set-next-window-without-focus",  tmg_gui_set_next_window_without_focus, 0, 0, 0);
   tmscm_install_procedure ("support-functionality?",  tmg_support_functionalityP, 1, 0, 0);
   tmscm_install_procedure ("gui-version",  tmg_gui_version, 0, 0, 0);
   tmscm_install_procedure ("default-look-and-feel",  tmg_default_look_and_feel, 0, 0, 0);
   tmscm_install_procedure ("default-chinese-font",  tmg_default_chinese_font, 0, 0, 0);
   tmscm_install_procedure ("default-japanese-font",  tmg_default_japanese_font, 0, 0, 0);
+  tmscm_install_procedure ("windows-cjk-font-candidates",  tmg_windows_cjk_font_candidates, 1, 0, 0);
   tmscm_install_procedure ("default-korean-font",  tmg_default_korean_font, 0, 0, 0);
   tmscm_install_procedure ("get-retina-factor",  tmg_get_retina_factor, 0, 0, 0);
   tmscm_install_procedure ("get-retina-zoom",  tmg_get_retina_zoom, 0, 0, 0);
@@ -11873,6 +12055,15 @@ initialize_glue_basic () {
   tmscm_install_procedure ("compressed->html",  tmg_compressed_2html, 2, 0, 0);
   tmscm_install_procedure ("compress-html",  tmg_compress_html, 2, 0, 0);
   tmscm_install_procedure ("decompress-html",  tmg_decompress_html, 2, 0, 0);
+  tmscm_install_procedure ("compress-table-select",  tmg_compress_table_select, 1, 0, 0);
+  tmscm_install_procedure ("compress-table-new",  tmg_compress_table_new, 1, 0, 0);
+  tmscm_install_procedure ("compress-table-open",  tmg_compress_table_open, 1, 0, 0);
+  tmscm_install_procedure ("compress-table-free",  tmg_compress_table_free, 1, 0, 0);
+  tmscm_install_procedure ("compress-table-size",  tmg_compress_table_size, 1, 0, 0);
+  tmscm_install_procedure ("compress-table-keys",  tmg_compress_table_keys, 0, 0, 0);
+  tmscm_install_procedure ("cpp-ai-chat-key",  tmg_cpp_ai_chat_key, 2, 0, 0);
+  tmscm_install_procedure ("cpp-ai-engine",  tmg_cpp_ai_engine, 1, 0, 0);
+  tmscm_install_procedure ("cpp-ai-chat-close",  tmg_cpp_ai_chat_close, 2, 0, 0);
   tmscm_install_procedure ("cpp-ai-command",  tmg_cpp_ai_command, 3, 0, 0);
   tmscm_install_procedure ("cpp-ai-eval-command",  tmg_cpp_ai_eval_command, 1, 0, 0);
   tmscm_install_procedure ("cpp-ai-async-eval-command",  tmg_cpp_ai_async_eval_command, 2, 0, 0);
@@ -12108,6 +12299,8 @@ initialize_glue_basic () {
   tmscm_install_procedure ("buffer-modified-since-autosave?",  tmg_buffer_modified_since_autosaveP, 1, 0, 0);
   tmscm_install_procedure ("buffer-pretend-modified",  tmg_buffer_pretend_modified, 1, 0, 0);
   tmscm_install_procedure ("buffer-pretend-saved",  tmg_buffer_pretend_saved, 1, 0, 0);
+  tmscm_install_procedure ("buffer-set-read-only",  tmg_buffer_set_read_only, 2, 0, 0);
+  tmscm_install_procedure ("buffer-read-only?",  tmg_buffer_read_onlyP, 1, 0, 0);
   tmscm_install_procedure ("buffer-pretend-autosaved",  tmg_buffer_pretend_autosaved, 1, 0, 0);
   tmscm_install_procedure ("buffer-attach-notifier",  tmg_buffer_attach_notifier, 1, 0, 0);
   tmscm_install_procedure ("buffer-has-name?",  tmg_buffer_has_nameP, 1, 0, 0);
@@ -12143,6 +12336,7 @@ initialize_glue_basic () {
   tmscm_install_procedure ("current-window",  tmg_current_window, 0, 0, 0);
   tmscm_install_procedure ("buffer->windows",  tmg_buffer_2windows, 1, 0, 0);
   tmscm_install_procedure ("window-to-buffer",  tmg_window_to_buffer, 1, 0, 0);
+  tmscm_install_procedure ("window->file",  tmg_window_2file, 1, 0, 0);
   tmscm_install_procedure ("window-set-buffer",  tmg_window_set_buffer, 2, 0, 0);
   tmscm_install_procedure ("window-focus",  tmg_window_focus, 1, 0, 0);
   tmscm_install_procedure ("switch-to-window",  tmg_switch_to_window, 1, 0, 0);
