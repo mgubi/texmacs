@@ -314,7 +314,13 @@
   ;; which each child of the formula pattern what takes, as the search
   ;; matches it (#520), or #f
   (with runs (tree-search-align t p1 p2 what)
+    (when (null? runs)
+      (with why (tree-search-align-reason)
+        (when (!= why "") (set! replace-skip-reason why))))
     (and (nnull? runs) runs)))
+
+(define replace-skip-reason #f)   ;; why the last hit was left, if known
+(define replace-skip-message #f)  ;; the message of the last hit left
 
 (define (get-wildcards-aligned what runs)
   ;; the wildcards of the formula pattern what, whose children took runs
@@ -333,6 +339,10 @@
         ((and (tm-func? what 'concat) (not (tm-func? match 'document))
               (aligned-runs match '() '() what))
          => (lambda (runs) (get-wildcards-aligned what runs)))
+        ;; the pattern matches, but its values would lose text: none (the
+        ;; hit is left), not those of the rules below
+        ((and (tm-func? what 'concat) replace-skip-reason)
+         (list))
 	((and (tm-atomic? match)
 	      (tm-func? what 'concat))
 	 (get-wildcards-in-string (tm-children what) (tm->string match)))
@@ -434,7 +444,9 @@
   ;; (#515, #520), which its subtree does not show
   (with runs (and (tm-func? what 'concat) (nnull? hit)
                   (aligned-runs (car hit) (cadr hit) (caddr hit) what))
-    (if runs (get-wildcards-aligned what runs) (get-wildcards what match))))
+    (cond (runs (get-wildcards-aligned what runs))
+          ((and (tm-func? what 'concat) replace-skip-reason) (list))
+          (else (get-wildcards what match)))))
 
 (define (adjust-by by what match . hit)
   ;; the replacement of match, a match of what, by by: its wildcards take
@@ -466,15 +478,41 @@
            ;; with the match), so that the hit is not replaced: inserting
            ;; the (wildcard ...) tags, or nothing in their place, would lose
            ;; the text which they took (#520)
+           (set! replace-skip-reason #f)
            (let* ((wc (get-wildcards-of-hit what match hit))
-                  (known (map cadr (list-filter wc (cut tm-func? <> :wildcard 2)))))
-             (and (list-and (map (cut in? <> known)
-                                 (list-intersection (wildcard-names by)
-                                                    (wildcard-names what))))
-                  (car (replace-wildcards by wc)))))
+                  (known (map cadr (list-filter wc (cut tm-func? <> :wildcard 2))))
+                  ;; the wildcards whose values take the other content of
+                  ;; a tag of the hit, which the replacement must take once
+                  (carriers (if (or (null? hit) (not (tm-func? what 'concat)))
+                                (list)
+                                (map tm->stree
+                                     (tree-search-align-carriers
+                                       (car hit) (cadr hit) (caddr hit) what))))
+                  (uses (wildcard-uses by)))
+             (cond ((nlist-and (map (cut in? <> known)
+                                    (list-intersection (wildcard-names by)
+                                                       (wildcard-names what))))
+                    #f)
+                   ((nlist-and (map (lambda (c) (== (count-in c uses) 1))
+                                    carriers))
+                    (set! replace-skip-reason
+                          "the replacement would drop or repeat the other content of a tag")
+                    #f)
+                   (else (car (replace-wildcards by wc))))))
           (else
             (with wc (get-wildcards-of-hit what match hit)
               (if (null? wc) by (car (replace-wildcards by wc))))))))
+
+(define (nlist-and l) (not (list-and l)))
+
+(define (count-in x l)
+  (length (list-filter l (cut == <> x))))
+
+(define (wildcard-uses t)
+  ;; the names of the wildcards in t, once for each occurrence
+  (cond ((tm-func? t 'wildcard 1) (list (tm->stree (tm-ref t 0))))
+        ((tm-compound? t) (append-map wildcard-uses (tm-children t)))
+        (else (list))))
 
 (define (wildcard-names t)
   ;; the names of the wildcards in t
@@ -506,11 +544,16 @@
 
 (define replace-last #f)
 
+(define (replace-state cur)
+  ;; the place where Replace goes on, for this buffer and this pattern
+  (list (url->string (current-buffer)) (tm->stree (search-tree)) cur))
+
 (define (replace-from cur)
   ;; Replace goes on from cur, after its last replacement (or a hit which it
   ;; left): the next hit starts there, also when the replacement is inside
-  ;; a hit (a lone tag, whose replaced argument is inside it, #520)
-  (set! replace-last cur)
+  ;; a hit (a lone tag, whose replaced argument is inside it, #520). Only
+  ;; while the buffer, the pattern and the reference are the same
+  (set! replace-last (replace-state cur))
   (set-search-reference cur))
 
 (define (search-next-after sels cur)
@@ -524,7 +567,7 @@
   (let* ((sels (get-alt-selection "alternate"))
          (cur (get-search-reference #t)))
     (and (nnull? sels)
-         (and-with sel0 (if (== cur replace-last)
+         (and-with sel0 (if (== (replace-state cur) replace-last)
                             (search-next-after sels cur)
                             (search-next sels cur #f))
            (let* ((what (search-tree))
@@ -547,9 +590,12 @@
                       (selection-cancel)
                       (go-to (cadr sel0))
                       (replace-from (cursor-path))
-                      (set-message
-                        "the pattern could not be aligned with a match, which was left as it is"
-                        "Replace")
+                      (set! replace-skip-message
+                            (string-append
+                              "a match was left as it is: "
+                              (or replace-skip-reason
+                                  "the pattern could not be aligned with it")))
+                      (set-message replace-skip-message "Replace")
                       (!= (car sel0) (cadr sel0)))
                      ((null? parts)
                       (clipboard-cut "dummy")

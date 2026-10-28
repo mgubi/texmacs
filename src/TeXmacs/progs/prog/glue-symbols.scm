@@ -258,6 +258,8 @@
 "tree-search-hit-parts"
 "tree-search-inner-hit"
 "tree-search-replace-parts"
+"tree-search-align-carriers"
+"tree-search-align-reason"
 "tree-spell"
 "tree-spell*"
 "tree-spell-at"

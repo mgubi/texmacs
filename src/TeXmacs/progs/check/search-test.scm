@@ -1861,14 +1861,16 @@
            (concat "a" (wildcard "w") "x")
            (concat (quote "q") (wildcard "w"))
            (document (concat (quote "q") "1")))
-          ;; a hit which a wildcard carries out of a tag, or into it: only
-          ;; the hit is replaced, the rest of the tag stays, and the
-          ;; replacement goes after the tag (before it); the whole paragraph
-          ;; was replaced, and Replace All then replaced it again and again
+          ;; a hit which a wildcard carries out of a lone tag: replaced
+          ;; inside its argument, as when the tag is alone (a lone tag with
+          ;; text around it below: only the hit is replaced, the rest of the
+          ;; tag stays, and the replacement goes after the tag, or before
+          ;; it); the whole paragraph was replaced, and Replace All then
+          ;; replaced it again and again
           ((document (strong "xab") "c")
            (concat "a" (wildcard "w"))
            (concat "<" (wildcard "w") ">")
-           (document (concat (strong "x") "<" (strong "b") ">") "c"))
+           (document (strong "x<b>") "c"))
           ((document (concat (strong "xab") "c"))
            (concat "a" (wildcard "w"))
            (concat "<" (wildcard "w") ">")
@@ -1901,7 +1903,7 @@
           ((document (frac "xab" "d") "c")
            (concat "a" (wildcard "w"))
            (concat "<" (wildcard "w") ">")
-           (document (concat (frac "x" "d") "<b>") "c"))
+           (document (frac "x<b>" "d") "c"))
           ((document (concat "q" (frac (strong "xab") "d") "c"))
            (concat "a" (wildcard "w"))
            (concat "<" (wildcard "w") ">")
@@ -1946,7 +1948,7 @@
           ((document (strong "ab") "c")
            (concat "a" (wildcard "w"))
            (concat "<" (wildcard "w") ">")
-           (document (concat "<" (strong "b") ">") "c"))
+           (document (strong "<b>") "c"))
           ((document (concat (strong (em "ab")) "c"))
            (concat "a" (wildcard "w"))
            (concat "<" (wildcard "w") ">")
@@ -2100,10 +2102,13 @@
            (concat (wildcard "w") "b" (wildcard "v"))
            (concat "<" (wildcard "w") "|" (wildcard "v") ">")
            (document (folded "<xa|y>" "secret")))
+          ;; with text around it, both wildcards take a part of the
+          ;; folded: no result keeps its hidden body once, in the reading
+          ;; order, without an emptied argument: left as it is
           ((document (concat "p" (folded "xaby" "secret") "q"))
            (concat (wildcard "w") "b" (wildcard "v"))
            (concat "<" (wildcard "w") "|" (wildcard "v") ">")
-           (document (concat "<pxa|yq>" (folded "" "secret"))))
+           (document (concat "p" (folded "xaby" "secret") "q")))
           ((document (tabular (table (row (cell "xaby") (cell "d")))))
            (concat (wildcard "w") "a" (wildcard "v"))
            (concat "<" (wildcard "w") "|" (wildcard "v") ">")
@@ -2116,11 +2121,26 @@
            (concat (wildcard "w") "b" (wildcard "v"))
            (concat "<" (wildcard "w") "|" (wildcard "v") ">")
            (document (math (frac "<x|y>" "c"))))
-          ;; inside the formula of a lone math, around a fraction there
+          ;; inside the formula of a lone math, around a fraction there,
+          ;; whose numerator both wildcards would split: left
           ((document (math (concat "x+" (frac "aby" "c"))))
            (concat (wildcard "w") "b" (wildcard "v"))
            (concat "<" (wildcard "w") "|" (wildcard "v") ">")
-           (document (math (concat "<x+a|y>" (frac "" "c")))))
+           (document (math (concat "x+" (frac "aby" "c")))))
+          ((document (math (concat "x+" (frac "ab" "c"))))
+           (concat (wildcard "w") "b" (wildcard "v"))
+           (concat "<" (wildcard "w") "|" (wildcard "v") ">")
+           (document (math (concat "<x+" (frac "a" "c") "|>"))))
+          ;; a one-sided wildcard on a lone tag: inside, as on its argument
+          ;; alone
+          ((document (frac "xaby" "c"))
+           (concat "a" (wildcard "w"))
+           (concat "<" (wildcard "w") ">")
+           (document (frac "x<by>" "c")))
+          ((document (frac "xab" "c"))
+           (concat (wildcard "w") "b")
+           (concat "<" (wildcard "w") ">")
+           (document (frac "<xa>" "c")))
           ;; a hit inside a tag of the formula, carried to its ends
           ((document (concat "p" (strong "xaby") "c"))
            (concat (wildcard "w") "a" (wildcard "v"))
@@ -2131,10 +2151,31 @@
            (concat "<" (wildcard "w") "|" (wildcard "v") ">")
            (document (concat "<p" (strong (em "x")) "|" (strong (em "by"))
                              "c>")))
+          ;; text around a tag with other content: the tag goes, with
+          ;; that content, into the value of the one wildcard which takes a
+          ;; part of it (the reading order is kept, no argument is left
+          ;; empty); if both take a part, or the replacement drops or
+          ;; repeats that wildcard, the hit is left as it is
           ((document (concat "p" (frac "xaby" "c") "q"))
            (concat (wildcard "w") "b" (wildcard "v"))
            (concat "<" (wildcard "w") "|" (wildcard "v") ">")
-           (document (concat "<pxa|yq>" (frac "" "c"))))))))
+           (document (concat "p" (frac "xaby" "c") "q")))
+          ((document (concat "p" (frac "xab" "c") "q"))
+           (concat (wildcard "w") "b" (wildcard "v"))
+           (concat "<" (wildcard "w") "|" (wildcard "v") ">")
+           (document (concat "<p" (frac "xa" "c") "|q>")))
+          ((document (concat "p" (frac "xab" "c") "q"))
+           (concat (wildcard "w") "b" (wildcard "v"))
+           (concat "<" (wildcard "v") ">")
+           (document (concat "p" (frac "xab" "c") "q")))
+          ((document (concat "p" (frac "xab" "c") "q"))
+           (concat (wildcard "w") "b" (wildcard "v"))
+           (concat (wildcard "w") (wildcard "w") (wildcard "v"))
+           (document (concat "p" (frac "xab" "c") "q")))
+          ((document (concat (frac "xb" "c") (frac "yb" "d")))
+           (concat (wildcard "w") "b" (wildcard "v"))
+           (concat "<" (wildcard "w") "|" (wildcard "v") ">")
+           (document (concat "<" (frac "x" "c") "|" (frac "yb" "d") ">")))))))
     ;; partial and initial matches in a cascade: the value takes only a
     ;; part of the argument, which the replacement would lose: left as it
     ;; is; a match of all of it is replaced
@@ -2179,6 +2220,67 @@
                               (list-tail (cursor-path) (length p))
                               (tm->stree (buffer-get-body u)))))))
                 '(#t (0 3) (document "xyz a1b")))))
+    ;; a hit left as it is says why; Replace one replaces the hit which
+    ;; it then highlights
+    (with-search-mode 'replace
+      (lambda ()
+        (let* ((m (resolve-module '(generic search-widgets)))
+               (start (lambda ()
+                        (ahash-set! (eval 'search-filter-table m)
+                                    (current-buffer) (stree->tree '(attr)))
+                        ((eval 'perform-search* m))))
+               (rel (lambda (p)
+                      (with q (tree->path (buffer-tree))
+                        (if (list-starts? p q) (list-tail p (length q)) p))))
+               (sel (lambda ()
+                      (if (selection-active-any?)
+                          (list (rel (selection-get-start))
+                                (rel (selection-get-end)))
+                          'none))))
+          (check= (with-search-buffers
+                    '(document (concat "p" (frac "xaby" "c") "q"))
+                    '(concat (wildcard "w") "b" (wildcard "v"))
+                    '(concat "<" (wildcard "w") "|" (wildcard "v") ">")
+                    (lambda (u)
+                      (start)
+                      (replace-one)
+                      (eval 'replace-skip-message m)))
+                  "a match was left as it is: the wildcards would split a tag with other content")
+          (check= (with-search-buffers
+                    '(document (frac (frac "ab" "z") "c"))
+                    '(frac (concat "a" (wildcard "w")) "c")
+                    '(frac (wildcard "w") "d")
+                    (lambda (u)
+                      (start)
+                      (replace-one)
+                      (eval 'replace-skip-message m)))
+                  "a match was left as it is: the tag around the match has other content")
+          (check= (dynamic-wind
+                    (lambda () (cpp-set-preference "allow-partial-replace" "on"))
+                    (lambda ()
+                      (with-search-buffers
+                        '(document (frac (strong "zab") "c"))
+                        '(frac (concat "a" (wildcard "w")) "c")
+                        '(frac (wildcard "w") "d")
+                        (lambda (u)
+                          (start)
+                          (replace-one)
+                          (eval 'replace-skip-message m))))
+                    (lambda () (cpp-reset-preference "allow-partial-replace")))
+                  "a match was left as it is: the match takes only a part of the argument of a tag")
+          (check= (with-search-buffers
+                    '(document "a1x a2x a3x")
+                    '(concat "a" (wildcard "w") "x")
+                    '(concat "[" (wildcard "w") "]")
+                    (lambda (u)
+                      (start)
+                      (replace-one)
+                      (let* ((b1 (tm->stree (buffer-get-body u)))
+                             (s1 (sel)))
+                        (replace-one)
+                        (list b1 s1 (tm->stree (buffer-get-body u))))))
+                  '((document "[1] a2x a3x") ((0 4) (0 7))
+                    (document "[1] [2] a3x"))))))
     ;; the real Replace All, then undo in one step
     (with-search-mode 'replace
       (lambda ()

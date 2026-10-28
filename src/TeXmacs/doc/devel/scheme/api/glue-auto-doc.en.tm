@@ -1867,6 +1867,22 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(tree-search-align-carriers <scm-arg|content> <scm-arg|path> <scm-arg|path> <scm-arg|content>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|search_align_carriers> which returns
+    <scm|array_tree>.
+  </explain>
+
+  <\explain>
+    <scm|(tree-search-align-reason)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|search_align_reason> which returns
+    <scm|string>.
+  </explain>
+
+  <\explain>
     <scm|(tree-spell <scm-arg|string> <scm-arg|content> <scm-arg|path> <scm-arg|int>)>
 <explain-synopsis|no synopsis>
   <|explain>
