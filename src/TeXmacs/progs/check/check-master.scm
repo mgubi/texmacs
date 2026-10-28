@@ -68,6 +68,7 @@
         (check misc-modules-test)
         (check remote-test)
         (check web-files-test)
+        (check print-test)
         (check kbd-menu-test)
         (check structures-test)
         (check convert-more-test)
@@ -185,6 +186,8 @@
     ;; runs this TeXmacs as their merge driver
     ("git" git-test-failures count)
     ("misc-modules" misc-modules-test-failures count)
+    ;; prints the document for File > Preview (no viewer is started)
+    ("print" print-test-failures count)
     ;; loads the keyword tables of the program languages
     ("parse" parse-test-failures count)
     ("database" database-test-failures count)
