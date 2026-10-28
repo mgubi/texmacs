@@ -9355,6 +9355,14 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(update-current-buffer-keep)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|typeset_invalidate_keep> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
     <scm|(renumber-auto-labels)>
 <explain-synopsis|no synopsis>
   <|explain>

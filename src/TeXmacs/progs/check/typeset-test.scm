@@ -1142,6 +1142,17 @@
   (update-current-buffer)
   (update-forced))
 
+(define (update-all-kept)
+  ;; Document > Update > All as it is now: the layout is made from scratch
+  ;; first (inclusions-gc), the labels are numbered and the tables made
+  ;; from it, and the end only types again what the tables changed
+  ;; (update-current-buffer-keep: a complete pass, which uses the bridges)
+  (inclusions-gc)
+  (renumber-auto-labels)
+  (generate-all-aux)
+  (update-current-buffer-keep)
+  (update-forced))
+
 (define (labels-state-from-scratch body)
   (with-scratch-buffer
    (lambda (u)
@@ -1191,6 +1202,64 @@
      (update-all-labels)
      (with names (auto-names)
        (check= names (auto-range (length names))))
+     (check= (labels-state) (labels-state-from-scratch (buffer-tree))))))
+
+;; The update of everything keeps the layout of the renumbering pass
+;; (#408): inclusions-gc makes everything typeset from scratch, once, the
+;; renumbering pass is that typesetting, and the pass which follows the
+;; regeneration of the tables uses the bridges again (it is a complete pass,
+;; so that the page numbers of the references and the missing references are
+;; those of a typesetting from scratch). The result is the one of a buffer
+;; updated from scratch, whatever the order of the edits.
+(define (test-update-all-kept)
+  (check-group "update all keeps the layout")
+  (with-typeset-body
+   '(document (table-of-contents "toc" (document ""))
+              (assign "two" (macro "x" (concat (index (arg "x"))
+                                               (index (arg "x")))))
+              (assign "mywrite" (macro "x" (write "mine" (tuple (arg "x")))))
+              (section "A")
+              (concat "a" (two "first") (label "la"))
+              (concat "w" (mywrite "w1") (reference "lb") (pageref "lb"))
+              (section "B")
+              (concat "b" (index "second") (label "lb"))
+              (section "C")
+              (concat "c" (mywrite "w2") (reference "la"))
+              (the-index "idx" (document "")))
+   (lambda ()
+     (update-all-kept)
+     (update-all-kept)
+     (check= (labels-state) (labels-state-from-scratch (buffer-tree)))
+     ;; the environment which inclusions-gc changes is dealt with by the
+     ;; renumbering pass (the classic cache keeps it for the next typesetting)
+     (when (!= (getenv "TEXMACS_TYPESET_READS") "off")
+       (inclusions-gc)
+       (check-true (notified-change? 8))
+       (renumber-auto-labels)
+       (check-false (notified-change? 8))
+       (generate-all-aux)
+       (update-current-buffer-keep)
+       (update-forced)
+       (check= (labels-state) (labels-state-from-scratch (buffer-tree))))
+     ;; sections, an index entry, a write and a label before the others
+     (tree-insert (buffer-tree) 4 '((section "N")
+                                    (concat "n" (index "new") (label "ln")
+                                            (mywrite "w3"))))
+     (update-forced)
+     (tree-insert (buffer-tree) 2 '((section "M")))
+     (update-forced)
+     (update-all-kept)
+     (with names (auto-names)
+       (check= names (auto-range (length names))))
+     (check= (labels-state) (labels-state-from-scratch (buffer-tree)))
+     (check= (tree->stree (get-auxiliary "mine"))
+             '(document (tuple "w3") (tuple "w1") (tuple "w2")))
+     ;; a section and a label removed
+     (tree-remove (buffer-tree) 4 2)
+     (update-forced)
+     (update-all-kept)
+     (check= (labels-state) (labels-state-from-scratch (buffer-tree)))
+     (update-all-kept)
      (check= (labels-state) (labels-state-from-scratch (buffer-tree))))))
 
 ;; A binding which is the same as in the previous pass: below it, the
@@ -2244,6 +2313,13 @@
     (with names (auto-names)
       (check= names (auto-range (length names))))
     (check= (labels-state) (incl-labels-fresh))
+    ;; Update All with the layout kept, after a section was added to the
+    ;; master before the includes
+    (tree-insert (buffer-tree) 1 '((section "One")))
+    (update-forced)
+    (update-all-kept)
+    (update-all-kept)
+    (check= (labels-state) (incl-labels-fresh))
     (buffer-pretend-saved m)
     (buffer-close m)))
 
@@ -2430,6 +2506,7 @@
   (test-renumbering-labels)
   (test-label-names)
   (test-renumbering-against-scratch)
+  (test-update-all-kept)
   (test-bindings-against-scratch)
   (test-labels-of-parts)
   (test-loci-of-surround-parts)

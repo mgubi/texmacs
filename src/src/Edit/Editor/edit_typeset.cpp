@@ -1174,6 +1174,7 @@ edit_typeset_rep::typeset_sub (SI& x1, SI& y1, SI& x2, SI& y2) {
   handle_exceptions ();
 #endif
   bench_end ("typeset");
+  ttt->collect= false;
   //time_t t2= texmacs_time ();
   //if (t2 - t1 >= 10) cout << "typeset took " << t2-t1 << "ms\n";
   picture_cache_clean ();
@@ -1290,6 +1291,23 @@ edit_typeset_rep::typeset_invalidate_labels () {
   notify_change (THE_TREE);
 }
 
+// The next typesetting is a complete pass which uses the bridges again
+// (the auxiliary tables, the page numbers of the references and the
+// missing references are those of a typesetting from scratch, see
+// typesetter_rep::collect). For the end of Update All, which comes after
+// the layout was made from scratch (inclusions-gc) and the tables were
+// regenerated in the document: only what the edits changed is typeset
+// again. The classic cache typesets it all again.
+void
+edit_typeset_rep::typeset_invalidate_keep () {
+  if (typeset_inputs_mode () == 0) {
+    typeset_invalidate_all ();
+    return;
+  }
+  ttt->collect= true;
+  notify_change (THE_TREE);
+}
+
 // The automatic labels are numbered again, in the order of the document
 // (exec_auto_id in env_exec.cpp), which is to be done before the tables
 // of contents and the indexes are made again: these hold the names of
@@ -1301,6 +1319,11 @@ edit_typeset_rep::typeset_renumber_labels () {
   tree root= is_nil (rp) ? et : et[rp->item];
   array<int> before= auto_labels_numbers (root);
   if (!auto_labels_renumber (root)) return false;
+  // (a change of the environment which is waiting, such as the one of
+  // inclusions-gc, makes apply_changes typeset all again: it is done here,
+  // by the pass below, which is then not to be done twice)
+  bool pending= (typeset_inputs_mode () != 0 && has_changed (THE_ENVIRONMENT));
+  if (pending) typeset_invalidate_all ();
   for (int i=0; i<N(buf->vws); i++)
     ((tm_view) buf->vws[i])->ed->typeset_invalidate_labels ();
   // one pass, for the names: the references are not yet those of the
@@ -1317,6 +1340,13 @@ edit_typeset_rep::typeset_renumber_labels () {
     // typesetting which follows (see typeset above)
     if (clean_unused (env->local_ref, env->touched) != 0)
       ::notify_assign (ttt, path(), ttt->br->st);
+  }
+  if (pending) {
+    // what the pass made is on screen only after a repaint
+    notify_change (THE_TREE, THE_ENVIRONMENT);
+    SI px= get_pixel_size ();
+    invalidate (x1- 2*px, y1- 2*px, x2+ 2*px, y2+ 2*px);
+    invalidate_all ();
   }
   return auto_labels_numbers (root) != before;
 }

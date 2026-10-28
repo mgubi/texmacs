@@ -1194,6 +1194,7 @@
 "apply-changes"
 "update-path"
 "update-current-buffer"
+"update-current-buffer-keep"
 "renumber-auto-labels"
 "update-players"
 "generate-all-aux"

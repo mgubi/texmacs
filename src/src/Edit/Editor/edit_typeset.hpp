@@ -143,6 +143,7 @@ public:
   void     typeset_invalidate (path p);
   void     typeset_invalidate_all ();
   void     typeset_invalidate_labels ();
+  void     typeset_invalidate_keep ();
   bool     typeset_renumber_labels ();
   void     typeset_invalidate_players (path p, bool reattach);
   void     typeset_sub (SI& x1, SI& y1, SI& x2, SI& y2);
