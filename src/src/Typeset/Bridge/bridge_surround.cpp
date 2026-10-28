@@ -292,6 +292,7 @@ bridge_surround_rep::my_typeset (int desired_status) {
       add_inputs (env, parts_known, parts_vars, parts_vals);
       if (parts_zoom) env->zoom_read ()= true;
       env->write_bindings (parts_bindings);
+      env->replay_missing (parts_keys, parts_values);
     }
     env->monitored_patch_env (changes_before);
   }
