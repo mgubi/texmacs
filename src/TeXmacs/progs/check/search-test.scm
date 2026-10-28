@@ -1723,6 +1723,8 @@
   (tree-search-tree (buffer-tree) (stree->tree what)
                     (tree->path (buffer-tree)) 100))
 
+(define replace-hits-count 0)
+
 (define (replace-hits what by n)
   ;; replace the hits of what by by, at most n times; the cursor after the
   ;; last one
@@ -1734,16 +1736,21 @@
               (set-alt-selection "alternate" h)
               (if (not (next (stree->tree by))) cur
                   (with c (cursor-path)
+                    (set! replace-hits-count (+ i 1))
                     (set-alt-selection "search-reference" (list c c))
                     (loop (+ i 1) c)))))))))
 
 (define (replace-in-buffer doc what by)
   ;; the body of a buffer holding doc after replacing all the hits of what
-  ;; by by, from its start (at most 10)
+  ;; by by, from its start; a runaway (a replacement which is replaced
+  ;; again and again) is reported
   (with-search-buffers doc what by
     (lambda (u)
-      (replace-hits what by 10)
-      (tm->stree (buffer-get-body u)))))
+      (set! replace-hits-count 0)
+      (replace-hits what by 100)
+      (if (>= replace-hits-count 100)
+          (list 'runaway (tm->stree (buffer-get-body u)))
+          (tm->stree (buffer-get-body u))))))
 
 (define (replace-once-in-buffer doc what by)
   ;; the body of a buffer holding doc after replacing its first hit
@@ -2003,14 +2010,19 @@
                              "<" (with "color" "red" "b") "c>"))))))))
 
 ;; Replace aligns a pattern inside the tags of its match, as the search
-;; matches it there: a cascaded match (a formula pattern in a tag of the
-;; argument), a lone tag or a tag of the formula with a hit inside it which
-;; a leading and a trailing wildcard carry to the ends (#515). The tags
-;; around the runs are kept in copies; the other arguments of a tag with
-;; other text go into the first copy which a wildcard takes (Replace removes
-;; the whole tag), so that no text is lost or repeated. The alignment failed:
-;; the replacement kept the (wildcard ...) tags literally, and lost the text
-;; (#520)
+;; matches it there (#520). If the match is inside an argument of a tag of
+;; the hit and the hit has nothing else (a lone tag, a cascaded match), the
+;; replacement goes inside that argument, as when the tag is alone (the
+;; maintainer's decision: the regions found on b (strong F) c are those on F
+;; alone); the tag and its other arguments stay. If the outer wildcards take
+;; text around the tag, the hit enters the tag, as a carried hit: the part
+;; inside a tag with other content (also hidden) is alone and the tag stays
+;; with that content, a strong is kept in copies. In a cascaded match of a
+;; tag pattern, the whole hit is replaced: the values are in copies of the
+;; tags around them, unless these have other content or the match does not
+;; take all of their argument, which the replacement would lose: the hit is
+;; then left as it is. The alignment failed: the replacement kept the
+;; (wildcard ...) tags literally, and lost text
 (define (replace-all-in-buffer doc what by)
   ;; the real Replace All of the widget (perform-search*, replace-all) in a
   ;; buffer holding doc, then undo: the result and the body after undo
@@ -2041,24 +2053,74 @@
            (frac (concat "a" (wildcard "w")) "c")
            (frac (wildcard "w") "d")
            (document (frac (strong "b") "d")))
+          ((document (frac (strong "abz") "c"))
+           (frac (concat "a" (wildcard "w") "z") "c")
+           (frac (wildcard "w") "d")
+           (document (frac (strong "b") "d")))
+          ;; the inner fraction has other content, which the value would
+          ;; lose: left as it is
           ((document (frac (frac "ab" "z") "c"))
            (frac (concat "a" (wildcard "w")) "c")
            (frac (wildcard "w") "d")
-           (document (frac (frac "b" "z") "d")))
-          ;; a lone tag
+           (document (frac (frac "ab" "z") "c")))
+          ((document (frac (folded "ab" "hid") "c"))
+           (frac (concat "a" (wildcard "w")) "c")
+           (frac (wildcard "w") "d")
+           (document (frac (folded "ab" "hid") "c")))
+          ;; a lone tag: inside its argument
           ((document (frac "xab" "cdy"))
            (concat (wildcard "w") "b" (wildcard "v"))
            (concat "<" (wildcard "w") "|" (wildcard "v") ">")
-           (document (concat "<" (frac "xa" "cdy") "|>")))
+           (document (frac "<xa|>" "cdy")))
           ((document (frac "xaby" "cdy"))
            (concat (wildcard "w") "b" (wildcard "v"))
            (concat "<" (wildcard "w") "|" (wildcard "v") ">")
-           (document (concat "<" (frac "xa" "cdy") "|y>")))
+           (document (frac "<xa|y>" "cdy")))
+          ;; empty runs
+          ((document (frac "b" "c"))
+           (concat (wildcard "w") "b" (wildcard "v"))
+           (concat "<" (wildcard "w") "|" (wildcard "v") ">")
+           (document (frac "<|>" "c")))
+          ((document (tabular (table (row (cell "b") (cell "d")))))
+           (concat (wildcard "w") "b" (wildcard "v"))
+           (concat "<" (wildcard "w") "|" (wildcard "v") ">")
+           (document (tabular (table (row (cell "<|>") (cell "d"))))))
+          ;; a replacement which drops a wildcard, or repeats it, does not
+          ;; touch the other arguments
+          ((document (frac "xaby" "cdy"))
+           (concat (wildcard "w") "b" (wildcard "v"))
+           (concat "<" (wildcard "v") ">")
+           (document (frac "<y>" "cdy")))
+          ((document (frac "xaby" "cdy"))
+           (concat (wildcard "w") "b" (wildcard "v"))
+           (concat (wildcard "w") (wildcard "w"))
+           (document (frac "xaxa" "cdy")))
+          ;; hidden arguments stay once
+          ((document (folded "xaby" "secret"))
+           (concat (wildcard "w") "b" (wildcard "v"))
+           (concat "<" (wildcard "w") "|" (wildcard "v") ">")
+           (document (folded "<xa|y>" "secret")))
+          ((document (concat "p" (folded "xaby" "secret") "q"))
+           (concat (wildcard "w") "b" (wildcard "v"))
+           (concat "<" (wildcard "w") "|" (wildcard "v") ">")
+           (document (concat "<pxa|yq>" (folded "" "secret"))))
           ((document (tabular (table (row (cell "xaby") (cell "d")))))
            (concat (wildcard "w") "a" (wildcard "v"))
            (concat "<" (wildcard "w") "|" (wildcard "v") ">")
-           (document (concat "<" (tabular (table (row (cell "x") (cell "d"))))
-                             "|by>")))
+           (document (tabular (table (row (cell "<x|by>") (cell "d"))))))
+          ((document (strong (frac "xaby" "c")))
+           (concat (wildcard "w") "b" (wildcard "v"))
+           (concat "<" (wildcard "w") "|" (wildcard "v") ">")
+           (document (strong (frac "<xa|y>" "c"))))
+          ((document (math (frac "xby" "c")))
+           (concat (wildcard "w") "b" (wildcard "v"))
+           (concat "<" (wildcard "w") "|" (wildcard "v") ">")
+           (document (math (frac "<x|y>" "c"))))
+          ;; inside the formula of a lone math, around a fraction there
+          ((document (math (concat "x+" (frac "aby" "c"))))
+           (concat (wildcard "w") "b" (wildcard "v"))
+           (concat "<" (wildcard "w") "|" (wildcard "v") ">")
+           (document (math (concat "<x+a|y>" (frac "" "c")))))
           ;; a hit inside a tag of the formula, carried to its ends
           ((document (concat "p" (strong "xaby") "c"))
            (concat (wildcard "w") "a" (wildcard "v"))
@@ -2068,7 +2130,32 @@
            (concat (wildcard "w") "a" (wildcard "v"))
            (concat "<" (wildcard "w") "|" (wildcard "v") ">")
            (document (concat "<p" (strong (em "x")) "|" (strong (em "by"))
-                             "c>")))))))
+                             "c>")))
+          ((document (concat "p" (frac "xaby" "c") "q"))
+           (concat (wildcard "w") "b" (wildcard "v"))
+           (concat "<" (wildcard "w") "|" (wildcard "v") ">")
+           (document (concat "<pxa|yq>" (frac "" "c"))))))))
+    ;; partial and initial matches in a cascade: the value takes only a
+    ;; part of the argument, which the replacement would lose: left as it
+    ;; is; a match of all of it is replaced
+    (with-search-mode 'replace
+      (lambda ()
+        (with-preference "allow-partial-replace" "on"
+          (lambda ()
+            (check= (replace-in-buffer '(document (frac (strong "zab") "c"))
+                                       '(frac (concat "a" (wildcard "w")) "c")
+                                       '(frac (wildcard "w") "d"))
+                    '(document (frac (strong "zab") "c")))
+            (check= (replace-in-buffer '(document (frac "zxbyz" "c"))
+                                       '(concat "x" (wildcard "w") "y")
+                                       '(concat "<" (wildcard "w") ">"))
+                    '(document (frac "z<b>z" "c")))))
+        (with-preference "allow-initial-replace" "on"
+          (lambda ()
+            (check= (replace-in-buffer '(document (frac (strong "abz") "c"))
+                                       '(frac (concat "a" (wildcard "w")) "c")
+                                       '(frac (wildcard "w") "d"))
+                    '(document (frac (strong "bz") "d")))))))
     ;; a match which the pattern cannot be aligned with gives no
     ;; replacement (#f), and Replace leaves the hit as it is and goes on
     ;; after it, rather than inserting the wildcards, or nothing
@@ -2110,7 +2197,23 @@
             ((document (concat "p" (strong "xaby") "c"))
              (concat (wildcard "w") "a" (wildcard "v"))
              (concat "<" (wildcard "w") "|" (wildcard "v") ">")
-             (document (concat "<p" (strong "x") "|" (strong "by") "c>"))))))))
+             (document (concat "<p" (strong "x") "|" (strong "by") "c>")))
+            ;; Replace All goes on after each replacement, never inside it:
+            ;; the lone tag became a formula with b in it, which was the
+            ;; next hit, again and again
+            ((document (strong "xbybz"))
+             (concat (wildcard "w") "b" (wildcard "v"))
+             (concat "<" (wildcard "w") "|" (wildcard "v") ">")
+             (document (strong "<x|ybz>")))
+            ((document (frac "xbyb" "c") (frac "zbt" "d"))
+             (concat (wildcard "w") "b" (wildcard "v"))
+             (concat "<" (wildcard "w") "|" (wildcard "v") ">")
+             (document (frac "<x|yb>" "c") (frac "<z|t>" "d")))
+            ;; a hit which cannot be aligned is left, the next one replaced
+            ((document (frac (frac "ab" "z") "c") (frac "ab" "c"))
+             (frac (concat "a" (wildcard "w")) "c")
+             (frac (wildcard "w") "d")
+             (document (frac (frac "ab" "z") "c") (frac "b" "d"))))))))
 
 (tm-define (search-test-failures)
   (check-suite "search")

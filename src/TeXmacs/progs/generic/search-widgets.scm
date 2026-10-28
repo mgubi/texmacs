@@ -492,49 +492,90 @@
               (list-tail (cadr sel) (length p)))
         (list))))
 
+(define (inner-hit sel what)
+  ;; the part of the hit sel which Replace replaces, if the formula pattern
+  ;; what matches inside an argument of a tag of the hit, and nothing else
+  ;; (a lone tag, a cascaded match): the replacement goes inside that
+  ;; argument, as when the tag is alone (#520); else sel
+  (with hit (search-hit sel)
+    (if (or (null? hit) (not (tm-func? what 'concat))) sel
+        (with in (tree-search-inner-hit (car hit) (cadr hit) (caddr hit) what)
+          (if (null? in) sel
+              (with p (tree->path (car hit))
+                (list (append p (car in)) (append p (cadr in)))))))))
+
+(define replace-last #f)
+
+(define (replace-from cur)
+  ;; Replace goes on from cur, after its last replacement (or a hit which it
+  ;; left): the next hit starts there, also when the replacement is inside
+  ;; a hit (a lone tag, whose replaced argument is inside it, #520)
+  (set! replace-last cur)
+  (set-search-reference cur))
+
+(define (search-next-after sels cur)
+  ;; the first hit of sels which starts at cur or after it
+  (cond ((or (null? sels) (null? (cdr sels))) #f)
+        ((path-less? (car sels) cur) (search-next-after (cddr sels) cur))
+        (else (list (car sels) (cadr sels)))))
+
 (define (replace-next* by)
   ;;(display* "replace-next* " by "\n")
   (let* ((sels (get-alt-selection "alternate"))
          (cur (get-search-reference #t)))
     (and (nnull? sels)
-         (and-with sel (search-next sels cur #f)
-           (go-to* (car sel))
-           (selection-set-range-set sel)
+         (and-with sel0 (if (== cur replace-last)
+                            (search-next-after sels cur)
+                            (search-next sels cur #f))
            (let* ((what (search-tree))
-                  (hit (search-hit sel))
-                  (by* (apply adjust-by (cons* by what (selection-tree) hit)))
-                  ;; a hit carried out of a tag (or into it) by a wildcard
-                  ;; of a formula pattern; not one of several paragraphs
-                  (parts (if (or (not by*) (null? hit) (tm-func? what 'document))
-                             (list)
-                             (tree-search-hit-parts (car hit) (cadr hit)
-                                                    (caddr hit)))))
-             (cond ((not by*)
-                    ;; the values of the wildcards are not known: the hit is
-                    ;; left as it is, and Replace goes on after it (#520)
-                    (selection-cancel)
-                    (go-to (cadr sel))
-                    (set-search-reference (cadr sel))
-                    (!= (car sel) (cadr sel)))
-                   ((null? parts)
-                    (clipboard-cut "dummy")
-                    (with by* (tm->tree by*)
-                      (insert-go-to (tree-copy by*) (path-end by* '())))
-                    #t)
-                   (else
-                    (replace-hit-parts (tm->tree by*) parts hit
-                                       (tree->path (buffer-tree)))
-                    #t)))))))
+                  (sel (inner-hit sel0 what)))
+             (go-to* (car sel))
+             (selection-set-range-set sel)
+             (let* ((hit (search-hit sel))
+                    (by* (apply adjust-by (cons* by what (selection-tree) hit)))
+                    ;; a hit carried out of a tag (or into it) by a wildcard
+                    ;; of a formula pattern; not one of several paragraphs
+                    (parts (if (or (not by*) (null? hit)
+                                   (tm-func? what 'document))
+                               (list)
+                               (tree-search-replace-parts
+                                 (car hit) (cadr hit) (caddr hit) what))))
+               (cond ((not by*)
+                      ;; the values of the wildcards are not known: the hit
+                      ;; is left as it is, and Replace goes on after it
+                      ;; (#520)
+                      (selection-cancel)
+                      (go-to (cadr sel0))
+                      (replace-from (cursor-path))
+                      (set-message
+                        "the pattern could not be aligned with a match, which was left as it is"
+                        "Replace")
+                      (!= (car sel0) (cadr sel0)))
+                     ((null? parts)
+                      (clipboard-cut "dummy")
+                      (with by* (tm->tree by*)
+                        (insert-go-to (tree-copy by*) (path-end by* '())))
+                      ;; Replace goes on after the replacement, never inside
+                      ;; it (a lone tag became a formula, whose start was
+                      ;; before the cursor)
+                      (replace-from (cursor-path))
+                      #t)
+                     (else
+                      (replace-hit-parts (tm->tree by*) parts hit
+                                         (tree->path (buffer-tree)))
+                      (replace-from (cursor-path))
+                      #t))))))))
 
 (define (inside-argument? p q i)
   ;; is the position p inside the argument i of the tree at q?
   (and (> (length p) (+ (length q) 1))
        (list-starts? p (rcons q i))))
 
-(define (crossed-tags t p1 p2)
+(define (crossed-tags t p1 p2 . ends)
   ;; the paths in t of the tags which the hit from p1 to p2 goes out of or
   ;; into (not both of its ends inside the same argument), the innermost
-  ;; first
+  ;; first; also those on the way to the ends of its parts (a hit which its
+  ;; outer wildcards carry around a tag in which the pattern matches)
   (let* ((tags (lambda (p)
                  (let loop ((u t) (q (list)) (l p) (r (list)))
                    (if (or (null? l) (tree-atomic? u)) r
@@ -548,7 +589,9 @@
                              r2
                              (loop (tree-ref u (car l)) (rcons q (car l))
                                    (cdr l) r2)))))))
-         (all (list-remove-duplicates (append (tags p1) (tags p2)))))
+         (all (list-remove-duplicates
+                (append (tags p1) (tags p2)
+                        (append-map tags (if (null? ends) ends (car ends)))))))
     (sort all (lambda (a b) (> (length a) (length b))))))
 
 (define (removable? u crossed)
@@ -561,8 +604,15 @@
        (not (tree-in? u '(concat document table row cell subtable tformat)))
        (list-and (map (lambda (i)
                         (nothing-left? (tree-ref u i)
-                                       (tree-accessible-child? u i) crossed))
+                                       (content-child? u i) crossed))
                       (iota (tree-arity u))))))
+
+(define (content-child? u i)
+  ;; does the argument i of u hold content: one which the cursor reaches, or
+  ;; a hidden one (the body of a folded), not an attribute (of a with)?
+  (or (tree-accessible-child? u i)
+      (and (not (and (tree-is? u 'with) (< i (- (tree-arity u) 1))))
+           (in? (tree-child-type u i) '("regular" "adhoc" "unknown")))))
 
 (define (nothing-left? c accessible? crossed)
   (cond ((tree-atomic? c) (or (== (tree->string c) "") (not accessible?)))
@@ -656,7 +706,8 @@
                                   ranges)
                              identity))
          (tags (map (lambda (q) (path->tree (append p q)))
-                    (crossed-tags (car hit) (cadr hit) (caddr hit)))))
+                    (crossed-tags (car hit) (cadr hit) (caddr hit)
+                                  (cDr parts)))))
     (for (r (reverse ranges))
       (cut-range (car r) (cadr r)))
     (go-to (rcons (tree->path tag) (cAr ins)))

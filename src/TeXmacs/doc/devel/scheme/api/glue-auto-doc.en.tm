@@ -1851,6 +1851,22 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(tree-search-inner-hit <scm-arg|content> <scm-arg|path> <scm-arg|path> <scm-arg|content>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|search_inner_hit> which returns
+    <scm|array_path>.
+  </explain>
+
+  <\explain>
+    <scm|(tree-search-replace-parts <scm-arg|content> <scm-arg|path> <scm-arg|path> <scm-arg|content>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|search_replace_parts> which returns
+    <scm|array_path>.
+  </explain>
+
+  <\explain>
     <scm|(tree-spell <scm-arg|string> <scm-arg|content> <scm-arg|path> <scm-arg|int>)>
 <explain-synopsis|no synopsis>
   <|explain>

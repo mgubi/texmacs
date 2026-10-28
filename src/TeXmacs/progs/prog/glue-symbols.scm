@@ -256,6 +256,8 @@
 "tree-search-tree-at"
 "tree-search-align"
 "tree-search-hit-parts"
+"tree-search-inner-hit"
+"tree-search-replace-parts"
 "tree-spell"
 "tree-spell*"
 "tree-spell-at"
