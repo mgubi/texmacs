@@ -201,7 +201,18 @@ U+200D U+1F467), `<emoji-red-heart>` (U+2764 U+FE0F), `<emoji-flag-italy>`,
   insertion, the footer), from `TeXmacs/langs/encoding/emoji-names-unqualified.scm`
   (`make-emoji-names.py --unqualified`, 1065 sequences of several code
   points; a character alone, U+2764, is not taken: it is the heart of the
-  text); `utf8_to_cork` keeps such a text as it is.
+  text). `utf8_to_cork` names such a sequence too (a text pasted), but not
+  a keycap without its selector (`2026<#20E3>` stays as it is typed or
+  pasted; the export, `emoji_all_names`, names it `\emoji{keycap-6}`).
+  A symbol of TeXmacs which is a character of the blocks of the emoji
+  (`<female>` and `<male>`, which `utf8_to_cork` makes of U+2640 and
+  U+2642, the sign a key gives) counts as its code point in a sequence
+  (`emoji_component_code`, used by `code_at` and by the search): a
+  person running, a joiner and `<female>` typed one after the other are
+  `<emoji-woman-running>`, and the sign alone stays `<female>`. The search
+  compares the emoji in one form (`emoji_search_form`: names and such
+  symbols as code points, without the variation selectors), so that the
+  emoji typed, pasted and of an older document are found as one.
   An emoji which the package has not (a newer one) is written as
   `\tmemojichar{<characters>}{U+1FAE9}{129769}` (the last, its first code
   point, for `\iffontchar`). An `(emoji "name")` tag (an `\emoji` of an

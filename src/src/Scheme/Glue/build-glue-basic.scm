@@ -503,7 +503,7 @@
   (utf8->cork utf8_to_cork (string string))
   (cork->utf8 cork_to_utf8 (string string))
   (emoji-name emoji_name (string string))
-  (emoji-names emoji_names (string string))
+  (emoji-names emoji_all_names (string string))
   (emoji-latex-name emoji_latex_name (string string))
   (emoji-from-latex emoji_from_latex (string string))
   (emoji-to-code-points emoji_to_code_points (string string))

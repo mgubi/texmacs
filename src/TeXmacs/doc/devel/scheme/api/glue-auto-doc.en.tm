@@ -3598,7 +3598,7 @@ source code.
     <scm|(emoji-names <scm-arg|string>)>
 <explain-synopsis|no synopsis>
   <|explain>
-    Calls the <c++> function <cpp|emoji_names> which returns
+    Calls the <c++> function <cpp|emoji_all_names> which returns
     <scm|string>.
   </explain>
 

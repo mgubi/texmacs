@@ -271,10 +271,18 @@
     (check= (string-grapheme-start s (string-length s))
             (string-length "<emoji-flag-italy>")))
   ;; a sequence without its variation selector is named as the
-  ;; fully-qualified one, but utf8->cork keeps its characters as they are
+  ;; fully-qualified one, also when it is pasted (utf8->cork), and also with
+  ;; the symbol <female> for its sign; the sign alone stays <female>, and a
+  ;; keycap without its selector stays as it is
   (check= (emoji-name "<#1F3C3><#200D><#2640>") "<emoji-woman-running>")
-  (with u (cork->utf8 "<#1F3C3><#200D><#2640>")
-    (check= (cork->utf8 (utf8->cork u)) u))
+  (check= (emoji-name "<emoji-person-running><#200D><female>")
+          "<emoji-woman-running>")
+  (check= (utf8->cork (cork->utf8 "<#1F3C3><#200D><#2640>"))
+          "<emoji-woman-running>")
+  (check= (utf8->cork (cork->utf8 "<#2640>")) "<female>")
+  (check= (utf8->cork (cork->utf8 "1<#20E3>")) "1<#20E3>")
+  (with s "a<emoji-person-running><#200D><female>"
+    (check= (string-grapheme-start s (string-length s)) 1))
   ;; one symbol only is a name
   (check= (emoji-name "<emoji-rocket><alpha>") "")
   (check= (emoji-name "<emoji-no-such-emoji>") "")
@@ -360,9 +368,19 @@
           '((document "<emoji-flag-italy>") 18))
   (check= (after-inserts "" 0 (list "1" vs16 "<#20E3>"))
           '((document "<emoji-keycap-1>") 16))
-  ;; a sequence typed without its variation selector
+  ;; a sequence typed without its variation selector, its sign as the key
+  ;; gives it (<female>) or as a code point
   (check= (after-inserts "" 0 (list "<#1F3C3>" zwj "<#2640>"))
           '((document "<emoji-woman-running>") 21))
+  (check= (after-inserts "" 0 (list "<#1F3C3>" zwj "<female>"))
+          '((document "<emoji-woman-running>") 21))
+  (check= (after-inserts "" 0 (list "<emoji-person-running>" zwj "<female>"))
+          '((document "<emoji-woman-running>") 21))
+  (check= (after-inserts "x" 1 (list "<female>"))
+          '((document "x<female>") 9))
+  ;; a keycap typed without its selector stays as it was typed
+  (check= (after-inserts "2026" 4 (list "<#20E3>"))
+          '((document "2026<#20E3>") 11))
   ;; next to the code points of an older document
   (check= (after-inserts "x<#1F44D>" 9 (list "<#1F3FD>"))
           '((document "x<emoji-thumbs-up-medium-skin-tone>") 35))
@@ -402,6 +420,19 @@
                                         "<emoji-man>"))))
     (check= (length (search-hits doc "<emoji-man>")) 2)
     (check= (search-hits doc man) (search-hits doc "<emoji-man>")))
+  ;; the forms of an emoji typed, pasted and of an older document are
+  ;; found as one, with or without their selectors, their sign by its
+  ;; symbol or its code point
+  (let ((doc `(document ,(string-append
+                          "a<emoji-woman-running>b"
+                          "<emoji-person-running><#200D><female>c"
+                          "<#1F3C3><#200D><#2640><#FE0F>d"
+                          "<#1F3C3><#200D><#2640>e"))))
+    (check= (length (search-hits doc "<emoji-woman-running>")) 8)
+    (check= (search-hits doc "<#1F3C3><#200D><#2640>")
+            (search-hits doc "<emoji-woman-running>"))
+    (check= (search-hits doc "<emoji-person-running><#200D><female>")
+            (search-hits doc "<emoji-woman-running>")))
   ;; the other texts are searched as before
   (check= (length (search-hits '(document "a<alpha>b") "<alpha>")) 2))
 
@@ -460,6 +491,12 @@
     (check= (ex "<emoji-person-running><#200D><#2640>" "latex-snippet")
             "{\\emoji{woman-running}}")
     (check= (ex "<#1F3C3><#200D><#2640>" "latex-snippet")
+            "{\\emoji{woman-running}}")
+    ;; a keycap without its selector, which typing keeps as it is
+    (check= (ex "Number 1<#20E3> only" "latex-snippet")
+            "Number {\\emoji{keycap-1}} only")
+    ;; the sign of a sequence by its symbol (pasted, typed by a key)
+    (check= (ex "<emoji-person-running><#200D><female>" "latex-snippet")
             "{\\emoji{woman-running}}")
     ;; a tag of an older import, with _ read as subscripts
     (check= (ex '(emoji (concat "white" (rsub "c") "heck" (rsub "m") "ark"))

@@ -5963,7 +5963,7 @@ tmg_emoji_names (tmscm arg1) {
   string in1= tmscm_to_string (arg1);
 
   // TMSCM_DEFER_INTS;
-  string out= emoji_names (in1);
+  string out= emoji_all_names (in1);
   // TMSCM_ALLOW_INTS;
 
   return string_to_tmscm (out);
