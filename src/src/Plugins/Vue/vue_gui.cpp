@@ -656,7 +656,7 @@ vue_sdl_base_window_rep::destroy_event () {
   // the host which outlived its own window closes the windows it holds
   if (close_hosted_windows (this)) return;
   notify_window_destroy (orig_name);
-  send_destroy (abstract (content));
+  vue_window_close_request (content);
 }
 
 
@@ -2357,7 +2357,7 @@ vue_virtual_window_rep::~vue_virtual_window_rep () {
 void
 vue_virtual_window_rep::destroy_event () {
   notify_window_destroy (orig_name);
-  send_destroy (abstract (content));
+  vue_window_close_request (content);
 }
 
 // the name and the marker of unsaved changes, as vue_sdl_base_window_rep

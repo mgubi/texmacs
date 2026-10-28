@@ -302,6 +302,9 @@ extern string vue_test_label;        // the first text or icon laid out since
                                      // it was emptied (the label of a button)
 void   vue_test_note_label (string s);
 bool   vue_is_editor_window (vue_widget content); // window main
+// the close button of a window: its quit command (see
+// vue_plain_window_widget_rep::close_request)
+void   vue_window_close_request (vue_widget content);
 string vue_test_icon (void* ref);    // "<path>\ticon:<name>" of a picture
 void   vue_test_forget_icons ();
 struct with_test_context {

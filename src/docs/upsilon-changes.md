@@ -14,6 +14,12 @@ have the details, and the problems go to the
 
 ## 28 October 2026
 
+- **Windows closed by a program (Vue)**: a window which a program closes
+  (a dialog closed by one of its buttons, a script, `alt-window-delete`)
+  closes the buffers of the editors it shows, as the close button of the
+  window does: the buffers of the console (`tmfs://aux/console-...`) and
+  of the other embedded editors stayed open, and its quit command ran
+  afterwards on a window which no longer existed (#566).
 - **Font design in the Cocoa build** (desktop, Cocoa): Font design, in
   the menu of the font of the document (the "Roman" button of the focus
   bar), no longer quits TeXmacs at once. The page of the fonts follows
