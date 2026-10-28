@@ -14,6 +14,11 @@ have the details, and the problems go to the
 
 ## 28 October 2026
 
+- **Windows closed from their own editor (Vue)**: a window closed by a
+  key or a click in the editor it shows (C-Return in the editor of a
+  comment, an action of the document) no longer crashes TeXmacs. The
+  window is hidden at once and freed once its layout is done; its
+  buffers are still closed at once (#574).
 - **Windows closed by a program (Vue)**: a window which a program closes
   (a dialog closed by one of its buttons, a script, `alt-window-delete`)
   closes the buffers of the editors it shows, as the close button of the
