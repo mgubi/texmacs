@@ -1769,6 +1769,16 @@ tokens_tree (tree t, array<search_token> toks, int s, int e) {
   return simplify_correct (acc);
 }
 
+static bool
+is_position (tree t, path p) {
+  // is p a position in t (nil: anywhere)?
+  if (is_nil (p)) return true;
+  if (is_atomic (t)) return is_nil (p->next) && p->item >= 0 &&
+                            p->item <= N(t->label);
+  if (is_nil (p->next)) return p->item == 0 || p->item == 1;
+  return p->item >= 0 && p->item < N(t) && is_position (t[p->item], p->next);
+}
+
 array<path>
 search_hit_parts (tree t, path p1, path p2) {
   // a hit from p1 to p2 in t which goes out of a tag or into one: the
@@ -1779,6 +1789,8 @@ search_hit_parts (tree t, path p1, path p2) {
   // hit of several paragraphs: it goes out of a paragraph of a document,
   // not out of a tag
   array<path> r;
+  if (!is_position (t, p1) || !is_position (t, p2) || path_less (p2, p1))
+    return r;
   array<search_token> toks;
   tokens_between (toks, t, path (), p1, p2);
   int outer= -1;
@@ -1812,6 +1824,7 @@ search_align (tree t, path p1, path p2, tree what) {
   array<tree> r;
   if (!is_concat (what) || N(what) == 0 || contains_select_region (what))
     return r;
+  if (!is_position (t, p1) || !is_position (t, p2)) return r;
   clear_no_formula ();
   // the first element of each child of the pattern
   array<int> first (N(what) + 1);

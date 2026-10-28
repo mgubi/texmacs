@@ -542,47 +542,110 @@
         (else (and (list-or (map (lambda (x) (tree-eq? x c)) crossed))
                    (removable? c crossed)))))
 
-(define (remove-from-formula f i)
-  ;; remove the child i of the formula f, which stays normalized: the
-  ;; strings around it become one, and a formula of one child is that child
-  ;; (with editing operations, which keep the positions)
-  (tree-remove f i 1)
-  (when (and (> i 0) (< i (tree-arity f))
-             (tree-atomic? (tree-ref f (- i 1))) (tree-atomic? (tree-ref f i)))
-    (tree-join f (- i 1)))
-  (when (== (tree-arity f) 1)
-    (tree-remove-node f 0)))
+(define (normalize-formula f)
+  ;; the formula f without empty strings and without two strings in a row,
+  ;; a formula of one child being that child (with editing operations,
+  ;; which keep the positions)
+  (when (and f (tree->path f) (tree-is? f 'concat))
+    (let loop ((i 0))
+      (when (< i (tree-arity f))
+        (cond ((and (> (tree-arity f) 1) (tree-atomic? (tree-ref f i))
+                    (== (tree->string (tree-ref f i)) ""))
+               (tree-remove f i 1)
+               (loop i))
+              ((and (> i 0) (tree-atomic? (tree-ref f (- i 1)))
+                    (tree-atomic? (tree-ref f i)))
+               (tree-join f (- i 1))
+               (loop i))
+              (else (loop (+ i 1))))))
+    (cond ((== (tree-arity f) 1) (tree-remove-node f 0))
+          ((== (tree-arity f) 0) (tree-assign f "")))))
+
+(define (range-formula a b)
+  ;; the formula in which the text from a to b lies, or #f
+  (let* ((n (list-common-left a b))
+         (f (path->tree (list-head a n)))
+         (g (and f (> n 0) (tree-up f))))
+    (cond ((and f (tree-is? f 'concat)) f)
+          ((and g (tree-is? g 'concat)) g)
+          (else #f))))
+
+(define (cut-range a b)
+  ;; remove the text from a to b, in one string or in one formula, with
+  ;; editing operations (a selection is extended to the tags around it,
+  ;; and to the base of a script: it removed text outside the hit, #520).
+  ;; The strings which are left empty are removed afterwards
+  (let* ((n0 (list-common-left a b))
+         (t0 (path->tree (list-head a n0)))
+         ;; a whole tag, from before it to after it: in its formula
+         (n (if (and t0 (tree-compound? t0) (> n0 0)
+                     (== (length a) (+ n0 1)) (== (length b) (+ n0 1)))
+                (- n0 1) n0))
+         (q (list-head a n))
+         (f (path->tree q)))
+    (cond ((not f) (noop))
+          ((tree-atomic? f)
+           (when (and (== n (- (length a) 1)) (== n (- (length b) 1))
+                      (< (cAr a) (cAr b)))
+             (tree-remove f (cAr a) (- (cAr b) (cAr a)))))
+          ((and (tree-is? f 'concat) (> (length a) (+ n 1))
+                (> (length b) (+ n 1)))
+           (let* ((k1 (list-ref a n)) (ra (list-tail a (+ n 1)))
+                  (k2 (list-ref b n)) (rb (list-tail b (+ n 1)))
+                  (c1 (tree-ref f k1)) (c2 (tree-ref f k2))
+                  (s1? (and (tree-atomic? c1) (null? (cdr ra))))
+                  (s2? (and (tree-atomic? c2) (null? (cdr rb))))
+                  (lo (if (and (tree-compound? c1) (== ra '(0))) k1 (+ k1 1)))
+                  (hi (if (and (tree-compound? c2) (== rb '(1))) k2 (- k2 1))))
+             (when (< k1 k2)
+               (when (and s2? (> (car rb) 0)) (tree-remove c2 0 (car rb)))
+               (when (<= lo hi) (tree-remove f lo (+ (- hi lo) 1)))
+               (when (and s1? (< (car ra) (string-length (tree->string c1))))
+                 (tree-remove c1 (car ra)
+                              (- (string-length (tree->string c1)) (car ra)))))
+             (when (and (== k1 k2) (tree-compound? c1)
+                        (== ra '(0)) (== rb '(1)))
+               (tree-remove f k1 1))))
+          (else (noop)))))
 
 (define (replace-hit-parts by* parts hit p)
   ;; a hit which a wildcard carried out of a tag or into one: only its
   ;; parts are removed, in the tag and outside (a selection would take the
   ;; whole tag, and the replacement drops the rest of it), by* goes after
   ;; the tag which it leaves, or before the one which it enters, and a tag
-  ;; which is left without text is removed (#520). The paths and the tags
-  ;; are followed through the changes
-  (let* ((ps (map (lambda (q) (position-new-path (append p q))) parts))
-         (ranges (let loop ((l (cDr ps)))
+  ;; which is left without text is removed (#520). The parts are removed
+  ;; from the last one, so that the paths of the others stay valid, and the
+  ;; formulas are normalized at the end
+  (let* ((abs (map (lambda (q) (append p q)) parts))
+         (ins (cAr abs))
+         (tag (path->tree (cDr ins)))
+         (ranges (let loop ((l (cDr abs)))
                    (if (or (null? l) (null? (cdr l))) (list)
                        (cons (list (car l) (cadr l)) (loop (cddr l))))))
+         (forms (list-filter (map (lambda (r) (range-formula (car r) (cadr r)))
+                                  ranges)
+                             identity))
          (tags (map (lambda (q) (path->tree (append p q)))
                     (crossed-tags (car hit) (cadr hit) (caddr hit)))))
     (for (r (reverse ranges))
-      (let ((s (position-get (car r))) (e (position-get (cadr r))))
-        (when (path-less? s e)
-          (selection-set s e)
-          (clipboard-cut "dummy"))))
-    (go-to (position-get (cAr ps)))
+      (cut-range (car r) (cadr r)))
+    (go-to (rcons (tree->path tag) (cAr ins)))
     (insert-go-to (tree-copy by*) (path-end by* '()))
     (with cur (position-new-path (cursor-path))
       (for (u tags)
         (when (and u (tree->path u) (removable? u tags))
           (with up (tree-up u)
             (if (and up (tree-is? up 'concat))
-                (remove-from-formula up (tree-index u))
+                (begin
+                  (tree-remove up (tree-index u) 1)
+                  (set! forms (cons up forms)))
                 (tree-assign u "")))))
+      (for (f (sort (list-filter forms (lambda (f) (tree->path f)))
+                    (lambda (f g) (> (length (tree->path f))
+                                     (length (tree->path g))))))
+        (normalize-formula f))
       (go-to (position-get cur))
-      (position-delete cur))
-    (for (x ps) (position-delete x))))
+      (position-delete cur))))
 
 (define (replace-next by)
   ;; TODO: replacing all occurrences of 'a' by 'axa' may result in

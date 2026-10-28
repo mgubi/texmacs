@@ -1734,6 +1734,68 @@
       (replace-hits what by 10)
       (tm->stree (buffer-get-body u)))))
 
+(define (replace-once-in-buffer doc what by)
+  ;; the body of a buffer holding doc after replacing its first hit
+  (with-search-buffers doc what by
+    (lambda (u)
+      (replace-hits what by 1)
+      (tm->stree (buffer-get-body u)))))
+
+(define (test-replace-next-to-scripts)
+  (check-group "replace next to scripts")
+  ;; a script next to the tag which a carried hit leaves or enters: the
+  ;; parts of the hit were cut as selections, which the editor extends to
+  ;; the base of the script, so that text outside the hit was lost (the
+  ;; whole formula); they are cut with editing operations
+  (with-search-mode 'replace
+    (lambda ()
+      (for-each
+        (lambda (row)
+          (check= (replace-once-in-buffer (car row) (cadr row) (caddr row))
+                  (cadddr row)))
+        '(((document (concat (strong "xab") (rsub "q") "c"))
+           (concat "a" (wildcard "w")) (wildcard "w")
+           (document (concat (strong "x") (strong "b") (rsub "q") "c")))
+          ((document (concat "c" (lsub "q") (strong "bax")))
+           (concat (wildcard "w") "a") (wildcard "w")
+           (document (concat "c" (lsub "q") (strong "b") (strong "x"))))
+          ((document (math (concat (sqrt "x+ab") (rsup "2") "+c")))
+           (concat "a" (wildcard "w")) (concat "[a" (wildcard "w") "]")
+           (document (concat (math (sqrt "x+")) "[a"
+                             (math (concat (sqrt "b") (rsup "2") "+c")) "]")))
+          ((document (concat "xa" (tabular (table (row (cell (concat (strong "xc")
+                                                                     "aba"))
+                                                       (cell "keep"))))
+                             (rsub "q")))
+           (concat "ab" (wildcard "w")) (concat "[ab" (wildcard "w") "]")
+           (document (concat "xa" (tabular (table (row (cell (strong "xc"))
+                                                       (cell "keep"))))
+                             "[aba" (rsub "q") "]")))
+          ;; an empty replacement
+          ((document (concat (strong "xab") (rsub "q")))
+           (concat "a" (wildcard "w")) ""
+           (document (strong "x")))))))
+  ;; with allow-partial-replace, a hit from a script in a numerator out of
+  ;; the fraction: the numerator was emptied
+  (with-search-mode 'replace
+    (lambda ()
+      (with-preference "allow-partial-replace" "on"
+        (lambda ()
+          (check= (replace-once-in-buffer
+                    '(document (concat "b" (frac (concat (rsub "xaabbc")
+                                                         (rsub "xbx"))
+                                                 "ccx")))
+                    '(concat "ab" (wildcard "w"))
+                    '(concat "[ab" (wildcard "w") "]"))
+                  '(document (concat "b" (frac (rsub "xa") "ccx") "[abbc"
+                                     (rsub "xbx") "]")))))))
+  ;; the glue functions check their paths (a path outside the tree crashed)
+  (check= (tree-search-hit-parts (stree->tree '(document "ab")) '(7 3 0) '(9 1))
+          '())
+  (check= (tree-search-align (stree->tree '(document "ab")) '(0 7) '(0 9)
+                             '(concat "a" (wildcard "w")))
+          '()))
+
 (define (test-replace-in-buffers)
   (check-group "replace in buffers")
   ;; the cursor stays after the replacement when a tag left without text
@@ -1960,4 +2022,5 @@
   (test-speed-in-arguments)
   (test-replace-wildcards)
   (test-replace-in-buffers)
+  (test-replace-next-to-scripts)
   (check-end))
