@@ -459,9 +459,29 @@
                  ((== (locase-first swhat) smatch) (locase-first sby))
                  ((== (upcase-first swhat) smatch) (upcase-first sby))
                  (else sby)))
+          ((nnull? (list-intersection (wildcard-names by)
+                                      (wildcard-names what)))
+           ;; the replacement takes values of the wildcards of the pattern:
+           ;; #f if a value is not known (the pattern could not be aligned
+           ;; with the match), so that the hit is not replaced: inserting
+           ;; the (wildcard ...) tags, or nothing in their place, would lose
+           ;; the text which they took (#520)
+           (let* ((wc (get-wildcards-of-hit what match hit))
+                  (known (map cadr (list-filter wc (cut tm-func? <> :wildcard 2)))))
+             (and (list-and (map (cut in? <> known)
+                                 (list-intersection (wildcard-names by)
+                                                    (wildcard-names what))))
+                  (car (replace-wildcards by wc)))))
           (else
             (with wc (get-wildcards-of-hit what match hit)
               (if (null? wc) by (car (replace-wildcards by wc))))))))
+
+(define (wildcard-names t)
+  ;; the names of the wildcards in t
+  (cond ((tm-func? t 'wildcard 1) (list (tm->stree (tm-ref t 0))))
+        ((tm-compound? t) (list-remove-duplicates
+                            (append-map wildcard-names (tm-children t))))
+        (else (list))))
 
 (define (search-hit sel)
   ;; the buffer and the paths in it of the hit sel, for adjust-by
@@ -482,19 +502,29 @@
            (selection-set-range-set sel)
            (let* ((what (search-tree))
                   (hit (search-hit sel))
-                  (by* (tm->tree (apply adjust-by
-                                        (cons* by what (selection-tree) hit))))
+                  (by* (apply adjust-by (cons* by what (selection-tree) hit)))
                   ;; a hit carried out of a tag (or into it) by a wildcard
                   ;; of a formula pattern; not one of several paragraphs
-                  (parts (if (or (null? hit) (tm-func? what 'document)) (list)
+                  (parts (if (or (not by*) (null? hit) (tm-func? what 'document))
+                             (list)
                              (tree-search-hit-parts (car hit) (cadr hit)
                                                     (caddr hit)))))
-             (if (null? parts)
-                 (begin
-                   (clipboard-cut "dummy")
-                   (insert-go-to (tree-copy by*) (path-end by* '())))
-                 (replace-hit-parts by* parts hit (tree->path (buffer-tree)))))
-           #t))))
+             (cond ((not by*)
+                    ;; the values of the wildcards are not known: the hit is
+                    ;; left as it is, and Replace goes on after it (#520)
+                    (selection-cancel)
+                    (go-to (cadr sel))
+                    (set-search-reference (cadr sel))
+                    (!= (car sel) (cadr sel)))
+                   ((null? parts)
+                    (clipboard-cut "dummy")
+                    (with by* (tm->tree by*)
+                      (insert-go-to (tree-copy by*) (path-end by* '())))
+                    #t)
+                   (else
+                    (replace-hit-parts (tm->tree by*) parts hit
+                                       (tree->path (buffer-tree)))
+                    #t)))))))
 
 (define (inside-argument? p q i)
   ;; is the position p inside the argument i of the tree at q?

@@ -1728,12 +1728,32 @@ in_copy (tree t, path at, int i, tree x, bool flat) {
   return r;
 }
 
+static bool
+is_whole_flat (tree t, const search_token& tok, path whole,
+               array<path>* used, bool claim) {
+  // a boundary of a tag inside the tag at whole, which the hit contains
+  // entirely (the tag in which the pattern was aligned, as for a cascaded
+  // match): Replace removes all of it, so that a copy repeats nothing which
+  // stays in the document. The other arguments of a tag with other text go
+  // into the first copy which a wildcard takes, the later parts are alone:
+  // its text is neither lost nor repeated
+  if (!(has_other_text (t, tok) || in_table (t, tok))) return false;
+  if (!claim || used == NULL) return true;
+  for (int k=0; k<N(*used); k++)
+    if ((*used)[k] == tok.at) return true;
+  (*used) << tok.at;
+  return false;
+}
+
 static tree
-tokens_tree (tree t, array<search_token> toks, int s, int e) {
+tokens_tree (tree t, array<search_token> toks, int s, int e,
+             path whole= path (-1), array<path>* used= NULL,
+             bool claim= false) {
   // the text of the tokens s to e of a hit in t. A part of a tag, where the
   // hit goes out of it or into it (a boundary), is in a copy of that tag,
   // or alone (see below); selection_compute across a boundary gave the
-  // tree which holds both sides, the whole paragraph (#520)
+  // tree which holds both sides, the whole paragraph (#520). The tags at
+  // whole (or inside it) are all inside the hit (see is_whole_flat)
   tree acc (CONCAT);
   array<tree> saved;
   array<int> entered;
@@ -1749,9 +1769,12 @@ tokens_tree (tree t, array<search_token> toks, int s, int e) {
     if (toks[i].out >= 0) {
       tree in= simplify_correct (acc);
       acc= tree (CONCAT);
-      if (in != "")
-        acc << in_copy (t, toks[i].at, toks[i].out, in,
-                        is_flat (t, toks, s, e, toks[i].at));
+      if (in != "") {
+        bool flat= (whole <= toks[i].at)?
+          is_whole_flat (t, toks[i], whole, used, claim):
+          is_flat (t, toks, s, e, toks[i].at);
+        acc << in_copy (t, toks[i].at, toks[i].out, in, flat);
+      }
     }
     if (toks[i].in >= 0) {
       saved << acc;
@@ -1763,8 +1786,12 @@ tokens_tree (tree t, array<search_token> toks, int s, int e) {
     tree in= simplify_correct (acc);
     acc= saved[k];
     const search_token& tok= toks[entered[k]];
-    if (in != "")
-      acc << in_copy (t, tok.at, tok.in, in, is_flat (t, toks, s, e, tok.at));
+    if (in != "") {
+      bool flat= (whole <= tok.at)?
+        is_whole_flat (t, tok, whole, used, claim):
+        is_flat (t, toks, s, e, tok.at);
+      acc << in_copy (t, tok.at, tok.in, in, flat);
+    }
   }
   return simplify_correct (acc);
 }
@@ -1810,6 +1837,53 @@ search_hit_parts (tree t, path p1, path p2) {
   return r;
 }
 
+static void
+argument_candidates (array<path>& args, array<path>& roots, tree t, path at,
+                     path root) {
+  // the accessible arguments of the tag of t at at, and those of the tags
+  // inside them (in the order of the document), with the outermost tag
+  if (N(args) >= 256) return;
+  tree u= subtree (t, at);
+  if (is_atomic (u)) return;
+  if (is_concat (u) || is_document (u)) {
+    for (int k=0; k<N(u); k++)
+      if (is_compound (u[k]))
+        argument_candidates (args, roots, t, at * k, root);
+    return;
+  }
+  for (int j=0; j<N(u) && N(args) < 256; j++)
+    if (is_accessible_for_search (u, j)) {
+      args << at * j; roots << root;
+      if (is_compound (u[j])) argument_candidates (args, roots, t, at * j, root);
+    }
+}
+
+static path
+argument_start (tree t, path a) {
+  tree u= subtree (t, a);
+  if (is_atomic (u)) return a * 0;
+  if (is_concat (u) && N(u) > 0) return a * path (0, 0);
+  return a * 0;
+}
+
+static path
+argument_end (tree t, path a) {
+  tree u= subtree (t, a);
+  if (is_atomic (u)) return a * N(u->label);
+  if (is_concat (u) && N(u) > 0) {
+    tree l= u[N(u)-1];
+    return a * path (N(u)-1, is_atomic (l)? N(l->label): 1);
+  }
+  return a * 1;
+}
+
+static bool
+only_boundaries (array<search_token> toks) {
+  for (int i=0; i<N(toks); i++)
+    if (toks[i].kind != TOKEN_BOUNDARY) return false;
+  return true;
+}
+
 array<tree>
 search_align (tree t, path p1, path p2, tree what) {
   // the run of the hit from p1 to p2 in t (nil: from its start, to its end)
@@ -1841,23 +1915,74 @@ search_align (tree t, path p1, path p2, tree what) {
   tokens_between (m.toks, t, path (), p1, p2);
   m.init (what, true);
   bool ok= m.run (0, 0);
-  if (!ok && (partial_match_flag || initial_match_flag)) {
+  if (!ok && (partial_match_flag || initial_match_flag) && N(m.kind) != 0) {
+    // the leftmost match in the hit. A trailing wildcard takes the rest of
+    // it, as the search carries an outer wildcard to the end of the formula
+    // (and a leading one starts at its start: the match at the start comes
+    // first); in a string argument, without initial matches, the match ends
+    // at the end of the string, as match_atomic
+    bool str= is_atomic (t) && is_nil (p1) && is_nil (p2);
+    bool to_end= m.kind[N(m.kind)-1] == ELEM_WILDCARD ||
+                 (str && !initial_match_flag);
     region_matcher m2;
     m2.toks= m.toks;
-    m2.init (what, false);
+    m2.init (what, to_end);
     for (int s=0; s<=N(m2.toks) && !ok; s++) {
       ok= m2.run (0, s);
       if (!partial_match_flag) break;
     }
     if (ok) m= m2;
   }
+  // the start of the run of each child of the pattern
+  array<int> at (N(what) + 1);
+  path whole (-1);
+  if (ok && N(m.kind) == ne) {
+    for (int i=0; i<=N(what); i++)
+      at[i]= (first[i] < ne? m.from[first[i]]: m.end);
+    at[N(what)]= max (at[N(what)], m.end);
+  }
+  else if (!ok && N(m.kind) == ne && ne != 0) {
+    // the pattern inside an argument of a tag which the hit contains, as a
+    // cascaded match, or a hit inside a tag which a leading and a trailing
+    // wildcard carry to the ends of the formula (#515): the tokens before
+    // and after that argument go to the first and the last child, a
+    // wildcard if they hold text (#520)
+    array<path> args, roots;
+    for (int k=0; k<N(m.toks); k++)
+      if (m.toks[k].kind == TOKEN_TAG)
+        argument_candidates (args, roots, t, m.toks[k].at, m.toks[k].at);
+    bool lead= m.kind[0] == ELEM_WILDCARD;
+    bool trail= m.kind[ne-1] == ELEM_WILDCARD;
+    for (int c=0; c<N(args) && !ok; c++) {
+      path a= argument_start (t, args[c]), b= argument_end (t, args[c]);
+      array<search_token> before, after;
+      tokens_between (before, t, path (), p1, a);
+      tokens_between (after, t, path (), b, p2);
+      if (!lead && !only_boundaries (before)) continue;
+      if (!trail && !only_boundaries (after)) continue;
+      region_matcher mi;
+      tokens_between (mi.toks, t, path (), a, b);
+      mi.init (what, true);
+      if (!mi.run (0, 0)) continue;
+      ok= true;
+      int nb= N(before);
+      for (int i=0; i<=N(what); i++)
+        at[i]= nb + (first[i] < ne? mi.from[first[i]]: mi.end);
+      at[0]= 0;
+      m.toks= before;
+      m.toks << mi.toks << after;
+      at[N(what)]= N(m.toks);
+      whole= roots[c];
+    }
+  }
   clear_no_formula ();
-  if (!ok || N(m.kind) != ne) return r;
+  if (!ok) return r;
+  array<path> used;
   for (int i=0; i<N(what); i++) {
-    int s= (first[i] < ne? m.from[first[i]]: m.end);
-    int e= (first[i+1] < ne? m.from[first[i+1]]: m.end);
+    int s= at[i], e= at[i+1];
     if (e <= s) r << tree ("");
-    else r << tokens_tree (t, m.toks, s, e);
+    else r << tokens_tree (t, m.toks, s, e, whole, &used,
+                           is_func (what[i], WILDCARD, 1));
   }
   return r;
 }

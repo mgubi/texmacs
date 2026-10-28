@@ -1615,13 +1615,24 @@
                            '(concat "A" (wildcard "w") (rsub "X"))
                            '(concat "aBc" (rsub "x")) "Bc")))
   ;; with allow-partial-replace, a formula anywhere in the argument: the
-  ;; leftmost one
+  ;; leftmost one, as the search finds it (a_x ends at the first _x; the
+  ;; rest of the argument goes with the fraction, which Replace replaces as
+  ;; a whole). A trailing wildcard takes the rest of the argument, as the
+  ;; search carries it to the end of the formula, and in a string, without
+  ;; initial matches, the match ends at its end (match_atomic); the
+  ;; wildcard took nothing
   (with-preference "allow-partial-replace" "on"
     (lambda ()
-      (check-replaced '(frac (wildcard "w") "c")
-                      '(frac (concat "a" (wildcard "w") (rsub "x")) "c")
-                      '(frac (concat "zab" (rsub "x") "qa" (rsub "x")) "c")
-                      '(frac "b" "c"))))
+      (for-each
+        (lambda (row)
+          (check-replaced '(frac (wildcard "w") "c") (car row)
+                          `(frac ,(cadr row) "c") `(frac ,(caddr row) "c")))
+        '(((frac (concat "a" (wildcard "w") (rsub "x")) "c")
+           (concat "zab" (rsub "x") "qa" (rsub "x")) "b")
+          ((frac (concat "a" (wildcard "w")) "c") "zab" "b")
+          ((frac (concat "a" (wildcard "w")) "c")
+           (concat "za" (rsub "1") "b") (concat (rsub "1") "b"))
+          ((frac (concat "a" (wildcard "w") "x") "c") "zaxbax" "xba")))))
   ;; a hit which a wildcard carries out of a tag, or into one, is aligned
   ;; by its paths in the document: its subtree does not show where it
   ;; starts. The part of a run inside the tag is kept in a copy of the tag
@@ -1991,6 +2002,116 @@
            (document (concat "q" (with "color" "red" "x")
                              "<" (with "color" "red" "b") "c>"))))))))
 
+;; Replace aligns a pattern inside the tags of its match, as the search
+;; matches it there: a cascaded match (a formula pattern in a tag of the
+;; argument), a lone tag or a tag of the formula with a hit inside it which
+;; a leading and a trailing wildcard carry to the ends (#515). The tags
+;; around the runs are kept in copies; the other arguments of a tag with
+;; other text go into the first copy which a wildcard takes (Replace removes
+;; the whole tag), so that no text is lost or repeated. The alignment failed:
+;; the replacement kept the (wildcard ...) tags literally, and lost the text
+;; (#520)
+(define (replace-all-in-buffer doc what by)
+  ;; the real Replace All of the widget (perform-search*, replace-all) in a
+  ;; buffer holding doc, then undo: the result and the body after undo
+  (with-search-buffers doc what by
+    (lambda (u)
+      (let* ((m (resolve-module '(generic search-widgets)))
+             (table (eval 'search-filter-table m)))
+        ;; the hits are not filtered by the mode at the cursor (a buffer
+        ;; without a window is not typeset)
+        (ahash-set! table (current-buffer) (stree->tree '(attr)))
+        (clear-undo-history)
+        ((eval 'perform-search* m))
+        (replace-all)
+        (with res (tm->stree (buffer-get-body u))
+          (undo 0)
+          (list res (tm->stree (buffer-get-body u))))))))
+
+(define (test-replace-in-tags)
+  (check-group "replace aligned in tags")
+  (with-search-mode 'replace
+    (lambda ()
+      (for-each
+        (lambda (row)
+          (check= (replace-in-buffer (car row) (cadr row) (caddr row))
+                  (cadddr row)))
+        '(;; cascaded matches
+          ((document (frac (strong "ab") "c"))
+           (frac (concat "a" (wildcard "w")) "c")
+           (frac (wildcard "w") "d")
+           (document (frac (strong "b") "d")))
+          ((document (frac (frac "ab" "z") "c"))
+           (frac (concat "a" (wildcard "w")) "c")
+           (frac (wildcard "w") "d")
+           (document (frac (frac "b" "z") "d")))
+          ;; a lone tag
+          ((document (frac "xab" "cdy"))
+           (concat (wildcard "w") "b" (wildcard "v"))
+           (concat "<" (wildcard "w") "|" (wildcard "v") ">")
+           (document (concat "<" (frac "xa" "cdy") "|>")))
+          ((document (frac "xaby" "cdy"))
+           (concat (wildcard "w") "b" (wildcard "v"))
+           (concat "<" (wildcard "w") "|" (wildcard "v") ">")
+           (document (concat "<" (frac "xa" "cdy") "|y>")))
+          ((document (tabular (table (row (cell "xaby") (cell "d")))))
+           (concat (wildcard "w") "a" (wildcard "v"))
+           (concat "<" (wildcard "w") "|" (wildcard "v") ">")
+           (document (concat "<" (tabular (table (row (cell "x") (cell "d"))))
+                             "|by>")))
+          ;; a hit inside a tag of the formula, carried to its ends
+          ((document (concat "p" (strong "xaby") "c"))
+           (concat (wildcard "w") "a" (wildcard "v"))
+           (concat "<" (wildcard "w") "|" (wildcard "v") ">")
+           (document (concat "<p" (strong "x") "|" (strong "by") "c>")))
+          ((document (concat "p" (strong (em "xaby")) "c"))
+           (concat (wildcard "w") "a" (wildcard "v"))
+           (concat "<" (wildcard "w") "|" (wildcard "v") ">")
+           (document (concat "<p" (strong (em "x")) "|" (strong (em "by"))
+                             "c>")))))))
+    ;; a match which the pattern cannot be aligned with gives no
+    ;; replacement (#f), and Replace leaves the hit as it is and goes on
+    ;; after it, rather than inserting the wildcards, or nothing
+    (with-search-mode 'replace
+      (lambda ()
+        (check= (adjust-by '(concat "<" (wildcard "w") ">")
+                           '(concat "a" (wildcard "w") "b") "xyz")
+                #f)
+        (check= (adjust-by "Q" '(concat "a" (wildcard "w") "b") "xyz") "Q")
+        (check= (with-search-buffers '(document "xyz a1b")
+                  '(concat "a" (wildcard "w") "b")
+                  '(concat "<" (wildcard "w") ">")
+                  (lambda (u)
+                    (with next (eval 'replace-next*
+                                     (resolve-module '(generic search-widgets)))
+                      (let* ((p (tree->path (buffer-tree)))
+                             (h (list (append p '(0 0)) (append p '(0 3)))))
+                        ;; a hit of something else: no match of the pattern
+                        (set-alt-selection "alternate" h)
+                        (list (next (stree->tree '(concat "<" (wildcard "w") ">")))
+                              (list-tail (cursor-path) (length p))
+                              (tm->stree (buffer-get-body u)))))))
+                '(#t (0 3) (document "xyz a1b")))))
+    ;; the real Replace All, then undo in one step
+    (with-search-mode 'replace
+      (lambda ()
+        (for-each
+          (lambda (row)
+            (check= (replace-all-in-buffer (car row) (cadr row) (caddr row))
+                    (list (cadddr row) (car row))))
+          '(((document "a1x a22x a333x")
+             (concat "a" (wildcard "w") "x")
+             (concat "[" (wildcard "w") "]")
+             (document "[1] [22] [333]"))
+            ((document (concat (strong "xab") "c") "a1")
+             (concat "a" (wildcard "w"))
+             (concat "<" (wildcard "w") ">")
+             (document (concat (strong "x") "<" (strong "b") "c>") "<1>"))
+            ((document (concat "p" (strong "xaby") "c"))
+             (concat (wildcard "w") "a" (wildcard "v"))
+             (concat "<" (wildcard "w") "|" (wildcard "v") ">")
+             (document (concat "<p" (strong "x") "|" (strong "by") "c>"))))))))
+
 (tm-define (search-test-failures)
   (check-suite "search")
   (test-text)
@@ -2023,4 +2144,5 @@
   (test-replace-wildcards)
   (test-replace-in-buffers)
   (test-replace-next-to-scripts)
+  (test-replace-in-tags)
   (check-end))
