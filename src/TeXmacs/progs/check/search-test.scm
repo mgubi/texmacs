@@ -1645,7 +1645,7 @@
                  (what (cadr row))
                  (h (tree-search-tree doc what '() 100)))
             (check= h (caddr row))
-            (check= (tree-search-replace-range doc (car h) (cadr h) what)
+            (check= (tree-search-replace-range doc (car h) (cadr h) what #f)
                     (cadddr row))
             (check= (map tm->stree (tree-search-align doc (car h) (cadr h)
                                                       what))
@@ -1763,15 +1763,35 @@
 ;; the (wildcard ...) tags literally, lost text, and Replace All replaced its
 ;; own output again and again
 
+(define (replace-one-repeatedly doc what by)
+  ;; the real Replace one of the widget, again and again until nothing
+  ;; changes (at most 100 times: else a runaway)
+  (with-search-buffers doc what by
+    (lambda (u)
+      (let* ((m (resolve-module '(generic search-widgets)))
+             (state (lambda () (list (tm->stree (buffer-get-body u))
+                                     (get-alt-selection "search-reference")))))
+        (ahash-set! (eval 'search-filter-table m)
+                    (current-buffer) (stree->tree '(attr)))
+        ((eval 'perform-search* m))
+        (let loop ((i 0) (s (state)))
+          (replace-one)
+          (with s2 (state)
+            (cond ((== s2 s) (car s))
+                  ((>= i 100) (list 'runaway (car s2)))
+                  (else (loop (+ i 1) s2)))))))))
+
 (define (check-replace-rows rows)
   ;; each row: a document, the pattern, the replacement, the result; by
-  ;; replace-next* hit after hit, and by the real Replace All, whose undo
-  ;; gives the document back in one step
+  ;; replace-next* hit after hit, by the real Replace one again and again,
+  ;; and by the real Replace All, whose undo gives the document back in
+  ;; one step: they agree
   (for-each
     (lambda (row)
       (let* ((doc (car row)) (what (cadr row)) (by (caddr row))
              (res (cadddr row)))
         (check= (replace-in-buffer doc what by) res)
+        (check= (replace-one-repeatedly doc what by) res)
         (check= (replace-all-in-buffer doc what by)
                 (list res (tm->stree (tree-simplify (stree->tree doc)))))))
     rows))
@@ -1803,6 +1823,17 @@
            (concat "a" (wildcard "w") "x")
            (concat "[" (wildcard "w") "]")
            (document "[1] [22] [333]"))
+          ;; hits which touch, and a replacement which ends with the
+          ;; start of the next match
+          ((document "ababab") "ab" "X" (document "XXX"))
+          ((document "aaaaaa") "aa" "a" (document "aaa"))
+          ((document "a--b--c") "--" "-" (document "a-b-c"))
+          ((document "a1xa2xa3x")
+           (concat "a" (wildcard "w") "x") (concat "[" (wildcard "w") "]")
+           (document "[1][2][3]"))
+          ((document "a1x a2x")
+           (concat "a" (wildcard "w") "x") (concat "a" (wildcard "w") "xa")
+           (document "a1xa a2xa"))
           ;; only the parts of the replacement which come from a wildcard
           ;; are spliced and merged: the rest is as the user wrote it
           ((document "a1x")
@@ -1825,6 +1856,9 @@
           ((document (concat (strong "xab") "c"))
            (concat "a" (wildcard "w")) (concat "<" (wildcard "w") ">")
            (document (concat (strong "x<b>") "c")))
+          ((document (concat (strong "xab") "c" (strong "ad")))
+           (concat "a" (wildcard "w")) (concat "<" (wildcard "w") ">")
+           (document (concat (strong "x<b>") "c" (strong "<d>"))))
           ((document (concat "c" (strong "bax")))
            (concat (wildcard "w") "a") (concat "<" (wildcard "w") ">")
            (document (concat "c" (strong "<b>x"))))
@@ -1962,11 +1996,25 @@
                       '(frac (concat "a" (wildcard "w")) "c")
                       '(frac (wildcard "w") "d"))
                 '((document (frac (frac "ab" "z") "c"))
-                  "a match was left as it is: the values of its wildcards would lose text"))
+                  "a match was left as it is: its value inside a tag would lose the other content of that tag, or the rest of its argument"))
         (check= (adjust-by '(concat "<" (wildcard "w") ">")
                            '(concat "a" (wildcard "w") "b") "xyz")
                 #f)
         (check= (adjust-by "Q" '(concat "a" (wildcard "w") "b") "xyz") "Q")
+        ;; Replace All from a reference inside a hit replaces that hit
+        (check= (with-search-buffers
+                  '(document "a1x a22x a3x")
+                  '(concat "a" (wildcard "w") "x")
+                  '(concat "[" (wildcard "w") "]")
+                  (lambda (u)
+                    (with p (tree->path (buffer-tree))
+                      (set-alt-selection "search-reference"
+                                         (list (append p '(0 6))
+                                               (append p '(0 6))))
+                      (start)
+                      (replace-all)
+                      (tm->stree (buffer-get-body u)))))
+                '(document "a1x [22] [3]"))
         (check= (with-search-buffers
                   '(document "a1x a2x a3x")
                   '(concat "a" (wildcard "w") "x")

@@ -1779,7 +1779,7 @@ argument_match (tree t, path arg, tree what, path& q1, path& q2) {
 
 static bool
 replace_range (tree t, path p1, path p2, tree what, path& q1, path& q2,
-               path& arg, array<path>* all= NULL) {
+               path& arg, array<path>* all= NULL, bool from= false) {
   // the part of the hit from p1 to p2 in t (nil: all of t) which Replace
   // replaces. If the hit goes out of a tag or into it, or the pattern
   // matches inside a tag of the hit (a lone tag, a cascaded match), the
@@ -1787,17 +1787,22 @@ replace_range (tree t, path p1, path p2, tree what, path& q1, path& q2,
   // argument is alone (the maintainer's decision: the regions found on
   // b (strong F) c are those on F alone): the text around it stays (arg:
   // that argument; all: the matches in all the arguments of the hit in
-  // which it matches, in the order of the document). False if the literal
-  // part of the match crosses the border of a tag: no replacement keeps
-  // the text around it there
+  // which it matches, in the order of the document; from: the leftmost
+  // match from p1 on, the rest of a hit after a replacement in it). False
+  // if the literal part of the match crosses the border of a tag: no
+  // replacement keeps the text around it there
   region_matcher m;
   tokens_between (m.toks, t, path (), p1, p2);
   q1= p1; q2= p2; arg= path (-1);
   bool str= is_atomic (t) && is_nil (p1) && is_nil (p2);
   int start;
-  if (match_tokens (m, what, str, false, start)) {
+  if (match_tokens (m, what, str, from, start)) {
+    if (from && N(m.toks) != 0) {
+      q1= m.position (start, true);
+      q2= m.position (m.end, false);
+    }
     bool border= false;
-    for (int k=0; k<N(m.toks); k++)
+    for (int k=start; k<m.end; k++)
       if (m.toks[k].kind == TOKEN_BOUNDARY) border= true;
     if (!border) return true;
     // the literal part: from the first element which is not a wildcard to
@@ -1811,7 +1816,9 @@ replace_range (tree t, path p1, path p2, tree what, path& q1, path& q2,
       if (m.toks[k].kind == TOKEN_BOUNDARY) return false;
     if (c1 >= N(m.toks)) return false;
     arg= argument_of (t, m.toks[c1].before);
-    return argument_match (t, arg, what, q1, q2);
+    // (from p1 on: not a match before p1, inside a replacement)
+    return argument_match (t, arg, what, q1, q2) &&
+           !(from && path_less (q1, p1));
   }
   // inside a tag of the hit: the first argument where it matches (and the
   // next ones, outside it, if all)
@@ -1845,11 +1852,12 @@ with_argument (tree u, int i, tree x) {
 }
 
 array<path>
-search_replace_range (tree t, path p1, path p2, tree what) {
+search_replace_range (tree t, path p1, path p2, tree what, bool from) {
   // the parts of the hit from p1 to p2 in t which Replace replaces, in the
   // order of the document (see replace_range): the hit, the match inside
   // an argument, or those in the arguments of a lone tag (the cells of a
-  // table); nil if Replace leaves the hit (#520)
+  // table); with from, in the rest of a hit from p1, after a replacement
+  // in it (the leftmost match there); nil if Replace leaves the hit (#520)
   array<path> r;
   if (!is_position (t, p1) || !is_position (t, p2)) return r;
   if (!is_concat (what) || N(what) == 0 || contains_select_region (what)) {
@@ -1860,7 +1868,7 @@ search_replace_range (tree t, path p1, path p2, tree what) {
   clear_no_formula ();
   path q1, q2, arg;
   array<path> all;
-  bool ok= replace_range (t, p1, p2, what, q1, q2, arg, &all);
+  bool ok= replace_range (t, p1, p2, what, q1, q2, arg, &all, from);
   clear_no_formula ();
   if (ok && N(all) != 0) return all;
   if (ok) r << q1 << q2;

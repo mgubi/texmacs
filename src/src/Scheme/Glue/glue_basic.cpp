@@ -2902,19 +2902,21 @@ tmg_tree_search_align (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4) {
 }
 
 tmscm
-tmg_tree_search_replace_range (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4) {
+tmg_tree_search_replace_range (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4, tmscm arg5) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "tree-search-replace-range");
   TMSCM_ASSERT_PATH (arg2, TMSCM_ARG2, "tree-search-replace-range");
   TMSCM_ASSERT_PATH (arg3, TMSCM_ARG3, "tree-search-replace-range");
   TMSCM_ASSERT_CONTENT (arg4, TMSCM_ARG4, "tree-search-replace-range");
+  TMSCM_ASSERT_BOOL (arg5, TMSCM_ARG5, "tree-search-replace-range");
 
   content in1= tmscm_to_content (arg1);
   path in2= tmscm_to_path (arg2);
   path in3= tmscm_to_path (arg3);
   content in4= tmscm_to_content (arg4);
+  bool in5= tmscm_to_bool (arg5);
 
   // TMSCM_DEFER_INTS;
-  array_path out= search_replace_range (in1, in2, in3, in4);
+  array_path out= search_replace_range (in1, in2, in3, in4, in5);
   // TMSCM_ALLOW_INTS;
 
   return array_path_to_tmscm (out);
@@ -11784,7 +11786,7 @@ initialize_glue_basic () {
   tmscm_install_procedure ("tree-search-tree",  tmg_tree_search_tree, 4, 0, 0);
   tmscm_install_procedure ("tree-search-tree-at",  tmg_tree_search_tree_at, 5, 0, 0);
   tmscm_install_procedure ("tree-search-align",  tmg_tree_search_align, 4, 0, 0);
-  tmscm_install_procedure ("tree-search-replace-range",  tmg_tree_search_replace_range, 4, 0, 0);
+  tmscm_install_procedure ("tree-search-replace-range",  tmg_tree_search_replace_range, 5, 0, 0);
   tmscm_install_procedure ("tree-spell",  tmg_tree_spell, 4, 0, 0);
   tmscm_install_procedure ("tree-spell*",  tmg_tree_spell_dot, 4, 0, 0);
   tmscm_install_procedure ("tree-spell-at",  tmg_tree_spell_at, 5, 0, 0);
