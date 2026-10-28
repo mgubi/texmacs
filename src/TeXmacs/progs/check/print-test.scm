@@ -34,18 +34,32 @@
          (and (>= (string-length s) 5)
               (== (substring s 0 5) "%PDF-")))))
 
+(define (shell-word cmd prefix)
+  ;; the value which /bin/sh gives to the rest of cmd after prefix
+  (and (string-starts? cmd prefix)
+       (eval-system (string-append "printf %s "
+                                   (string-drop cmd (string-length prefix))))))
+
+(define preview-names
+  ;; a space, a quote, parentheses, and the ~ of iCloud Drive
+  (list "/tmp/x.pdf" "/a b/it's (1).pdf"
+        "/Users/x/Library/Mobile Documents/com~apple~CloudDocs/a.pdf"))
+
 (define (test-command-line)
   (check-group "preview command")
-  (cond ((or (os-mingw?) (os-win32?))
-         (check= (preview-command-line "C:\\a b\\x.pdf") "C:\\a b\\x.pdf"))
-        ((os-macos?)
-         (check= (preview-command-line "/tmp/x.pdf") "open '/tmp/x.pdf'")
-         ;; a file name with a space and a quote is one word of the shell
-         (check= (preview-command-line "/a b/it's.pdf")
-                 "open '/a b/it'\\''s.pdf'"))
-        ((url-exists-in-path? "xdg-open")
-         (check= (preview-command-line "/a b/x.pdf") "xdg-open '/a b/x.pdf'"))
-        (else (check-true #t))))
+  (with prefix (cond ((or (os-mingw?) (os-win32?)) #f)
+                     ((os-macos?) "open ")
+                     ((url-exists-in-path? "xdg-open") "xdg-open ")
+                     (else #f))
+    (if (not prefix)
+        (check-true #t)
+        ;; the file name, escaped by url-sys-concretize, comes back whole
+        ;; from the shell: it is not escaped a second time
+        (for-each
+         (lambda (name)
+           (with s (url-sys-concretize (system->url name))
+             (check= (shell-word (preview-command-line s) prefix) name)))
+         preview-names))))
 
 (define (with-recorded-preview thunk)
   ;; preview-file records the file it is given instead of showing it

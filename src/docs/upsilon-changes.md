@@ -20,10 +20,11 @@ have the details, and the problems go to the
   the system (no `/usr/local/bin`, `/opt/homebrew/bin` or
   `/Library/TeX/texbin`): no PDF was made and nothing was shown. TeXmacs
   now adds the PATH of a login shell, as the Qt and Cocoa builds already
-  did, which also finds LaTeX and the programs of the plug-ins. A preview
+  did, which also finds LaTeX and the programs of the plug-ins; the PATH
+  is read more carefully (the messages of a login script are left out,
+  and a login shell which hangs is stopped after 5 seconds). A preview
   which cannot be made is now reported in the footer, instead of showing
-  nothing or an older preview, and the file is passed to `open` and
-  `xdg-open` quoted (#546).
+  nothing or an older preview (#546).
 - **Names of the emoji**: the emoji have names in the universal encoding
   of TeXmacs, those of the LaTeX package `emoji` (the short names of
   Unicode): `<emoji-grinning-face>`, and one name for a whole sequence,

@@ -267,18 +267,16 @@
   (:argument  last "Last page")
   (:proposals last  (list (number->string (get-page-count)) "")))
 
-(define (preview-shell-quote s)
-  ;; a file name as one word of /bin/sh (a home with a space)
-  (string-append "'" (string-replace s "'" "'\\''") "'"))
-
 (tm-define (preview-command-line s)
   (:synopsis "The shell command which shows the file @s, or #f if none")
+  ;; s comes from url-sys-concretize, which already escapes it for the
+  ;; shell (escape_sh): it is passed as it is
   (cond ((!= preview-command "default")
          (string-append preview-command " " s " &"))
         ((or (os-mingw?) (os-win32?)) s)
-        ((os-macos?) (string-append "open " (preview-shell-quote s)))
+        ((os-macos?) (string-append "open " s))
         ((url-exists-in-path? "xdg-open")
-         (string-append "xdg-open " (preview-shell-quote s)))
+         (string-append "xdg-open " s))
         ((url-exists-in-path? "ggv") (string-append "ggv " s " &"))
         ((url-exists-in-path? "ghostview") (string-append "ghostview " s " &"))
         ((url-exists-in-path? "gv") (string-append "gv " s " &"))
@@ -318,14 +316,15 @@
     (when (url-exists? file) (system-remove file))
     (print-to-file file)
     (cond ((not (url-exists? file))
-           (set-message (string-append "Error: the preview "
-                                       (url->system (url-tail file))
-                                       " could not be made"
-                                       (if (or (== (printer-file-format) "pdf")
-                                               (url-exists-in-path? "gs"))
-                                           ""
-                                           " (Ghostscript was not found)"))
-                        "preview"))
+           (with name (url->system (url-tail file))
+             (set-message
+              (if (or (== (printer-file-format) "pdf")
+                      (url-exists-in-path? "gs"))
+                  `(concat "Error: the preview " (verbatim ,name)
+                           " could not be made")
+                  `(concat "Error: the preview " (verbatim ,name)
+                           " could not be made (Ghostscript was not found)"))
+              "preview")))
           ((defined? 'web-open-pdf)
            (web-open-pdf (url-sys-concretize file) (web-print-name)))
           (else (preview-file file)))))

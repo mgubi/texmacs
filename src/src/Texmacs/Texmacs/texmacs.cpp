@@ -140,6 +140,45 @@ void TeXmacs_init_font() {
 #endif
 }
 
+#if defined(AQUATEXMACS) || defined(Q_OS_MAC) || \
+    (defined(X11TEXMACS) && defined (MACOSX_EXTENSIONS)) || \
+    (defined(OS_MACOS) && (defined(VUETEXMACS) || defined(SDLTEXMACS)))
+static string
+macos_login_shell_path () {
+  // The PATH of a login shell of the user ($SHELL -l), or "". Only the
+  // last line of the output counts, so that the banners which a
+  // .zprofile may print come before it and are dropped; errors go to
+  // /dev/null, the shell reads no input, and the shell and what it started
+  // are killed after 5 seconds, so that a login script which hangs does
+  // not block the start of TeXmacs. printenv gives the PATH with colons
+  // also for shells, like fish, whose own PATH is a list.
+  string shell= get_env ("SHELL");
+  if (shell == "" || !exists (url_system (shell))) return "";
+  string login= "\"$SHELL\" -l -c '/usr/bin/printenv PATH'";
+  string cmd;
+  if (exists (url_system ("/usr/bin/perl")))
+    cmd= "PATH='' /usr/bin/perl -e '"
+         "$p= fork (); "
+         "if (!defined $p) { exit 1; } "
+         "if ($p == 0) { setpgrp (0, 0); exec @ARGV; exit 127; } "
+         "$SIG{ALRM}= sub { kill (\"KILL\", -$p); exit 1; }; "
+         "alarm 5; waitpid ($p, 0);' " * login;
+  else cmd= "PATH='' " * login;
+  string out= eval_system (cmd * " 2>/dev/null </dev/null");
+  array<string> lines= tokenize (out, "\n");
+  string r;
+  for (int i= N(lines)-1; i >= 0; i--) {
+    r= trim_spaces (replace (lines[i], "\r", ""));
+    if (r != "") break;
+  }
+  // a PATH: absolute directories, separated by colons (a list separated
+  // by spaces, or any other text, is not used)
+  if (!starts (r, "/")) return "";
+  if (occurs (" ", r) && !occurs (":", r)) return "";
+  return r;
+}
+#endif
+
 void
 TeXmacs_init_paths (int& argc, char** argv) {
   (void) argc; (void) argv;
@@ -200,16 +239,10 @@ TeXmacs_init_paths (int& argc, char** argv) {
     set_env ("TEXMACS_PATH", as_string(exedir * "../Resources/share/TeXmacs"));
   //cout << get_env("PATH") * ":" * as_string(url("$PWD") * argv[0]
   // * "../../Resources/share/TeXmacs/bin") << LF;
-  string shell= get_env ("SHELL");
-  if (shell != "" && exists(shell)) {
-    string shell_env = var_eval_system ("PATH='' $SHELL -l -c 'echo $PATH'");
-    if (shell_env != "") shell_env= shell_env * ":";
-    set_env ("PATH", get_env("PATH") * ":" * shell_env *
-             as_string (exedir * "../Resources/share/TeXmacs/bin"));
-  } else {
-    set_env ("PATH", get_env("PATH") * ":" *
-             as_string (exedir * "../Resources/share/TeXmacs/bin"));
-  }
+  string shell_env= macos_login_shell_path ();
+  if (shell_env != "") shell_env= shell_env * ":";
+  set_env ("PATH", get_env("PATH") * ":" * shell_env *
+           as_string (exedir * "../Resources/share/TeXmacs/bin"));
   // system("set");
 #endif
 
