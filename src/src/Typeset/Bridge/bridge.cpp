@@ -540,7 +540,7 @@ extern tree the_et;
 
 // the reads and the lookups of a bridge which was typeset or used again,
 // for the record of the bridge above it
-static void
+void
 add_reads (edit_env env, bool known, array<int> reads,
            array<string> keys, array<tree> values) {
   env_id_set* rec= env->read_recorder ();
@@ -678,8 +678,9 @@ same_page_items (array<page_item> l1, array<page_item> l2) {
 * of a document of the text (or a block of paragraphs, see
 * bridge_document.cpp), or the root; the bridges below a paragraph, and
 * those which come from the expansion of a macro (the paragraphs of its
-* body, but not those of its arguments), do not (bridge_record_next,
-* bridge_in_macro). A bridge which does not record is typeset again each
+* body, unless there are 16 or more; those of its arguments and of an
+* included file do record), do not (bridge_record_next, bridge_in_macro).
+* A bridge which does not record is typeset again each
 * time the bridge above is, as in the classic cache, and what it reads,
 * writes, looks up and binds goes to the record of the bridge above as if it
 * were typeset in it (typeset_unrecorded: it keeps no changes of the
@@ -844,8 +845,8 @@ typeset_record_mode () {
 // A bridge which does not record its inputs (a piece of a paragraph, say):
 // it is typeset again each time the bridge around it is, which is the
 // classic cache, and what it reads, writes and looks up goes to the record
-// of that bridge as if it were typeset in it. It keeps its changes of the
-// environment.
+// of that bridge as if it were typeset in it. It keeps no changes of the
+// environment (bridge_rep::exec_until redoes them).
 bool
 bridge_rep::typeset_unrecorded (int desired_status) {
   if (edit_profile.on) edit_profile.redone++;

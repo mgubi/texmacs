@@ -220,7 +220,7 @@ typesetter_rep::typeset () {
   {
     shove_pass pass (shoves);
     bridge_record_next= true;
-    bridge_in_macro= false;
+    bridge_macro_scope scope (false);
     br->typeset (PROCESSED+ WANTED_PARAGRAPH);
   }
   double t1= edit_profile.on ? edit_profile_now () : 0;

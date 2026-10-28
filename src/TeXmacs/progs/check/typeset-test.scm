@@ -1239,6 +1239,54 @@
 ;; The loci and links in the parts of a surround (the left part of a
 ;; footnote...) stay registered when its body is edited: the parts are
 ;; kept, and so is what they declared.
+;; The parts of a surround below a paragraph (which records no inputs of its
+;; own) read what the paragraph read before them: the inputs of the parts are
+;; those they read, also those which the paragraph had read already.
+(define (surround-parts-body lookup?)
+  (if lookup?
+      '(document
+        (set-binding "lab" "1cm")
+        (assign "sel" "1")
+        (with "w" (if (equal (value "sel") "1") (get-binding "lab") "1cm")
+              "sel" "0"
+          (surround (concat "L" (hspace (get-binding "lab")) "R") ""
+                    (document "body")))
+        "after")
+      '(document
+        (assign "y" "1cm")
+        (assign "sel" "1")
+        (with "w" (if (equal (value "sel") "1") (value "y") "1cm") "sel" "0"
+          (surround (concat "L" (hspace (value "y")) "R") ""
+                    (document "body")))
+        "after")))
+
+(define (surround-parts-x)
+  (car (tree-bounding-rectangle (tree-ref (buffer-tree) 2 4 2 0))))
+
+(define (surround-parts-scratch)
+  (let ((body (tree-copy (buffer-tree))))
+    (with-scratch-buffer
+     (lambda (u)
+       (buffer-set-body u body)
+       (update-current-buffer)
+       (update-forced) (update-forced)
+       (surround-parts-x)))))
+
+(define (test-surround-parts-inputs)
+  (check-group "inputs of the parts of a surround below a paragraph")
+  (for (lookup? '(#f #t))
+    (with-scratch-buffer
+     (lambda (u)
+       (buffer-set-body u (stree->tree (surround-parts-body lookup?)))
+       (update-current-buffer)
+       (update-forced) (update-forced)
+       (tree-set (tree-ref (buffer-tree) 1 1) "2")
+       (update-forced) (update-forced)
+       (tree-set (tree-ref (buffer-tree) 0 1) "5cm")
+       (update-forced) (update-forced)
+       (check= (surround-parts-x) (surround-parts-scratch))
+       (check= (typeset-check-mismatches) 0)))))
+
 (define (test-loci-of-surround-parts)
   (check-group "loci of surround parts")
   (with-typeset-body
@@ -1735,7 +1783,10 @@
   (let* ((ds (fz-documents (buffer-tree)))
          (d (fz-pick ds))
          (n (tree-arity d))
-         (pos (if (<= n 2) (min 1 n) (+ 1 (fz-rnd (- n 1))))))
+         ;; (the first two paragraphs of the root are the assignments which
+         ;; the edits of the cases 8 and 9 go through)
+         (lo (if (== (tree->path d) (tree->path (buffer-tree))) 2 1))
+         (pos (if (<= n (+ lo 1)) (min lo n) (+ lo (fz-rnd (- n lo))))))
     (case (fz-rnd 10)
       ((0 1) (tree-insert d pos (list (fz-leaf 1))))
       ((2) (when (> n 3) (tree-remove d pos 1)))
@@ -1753,7 +1804,7 @@
        (when (and (< pos n) (> n 3))
          (with s (tree->stree (tree-ref d pos))
            (tree-remove d pos 1)
-           (tree-insert d (+ 1 (fz-rnd (- n 2))) (list (stree->tree s))))))
+           (tree-insert d (+ lo (fz-rnd (- n lo 1))) (list (stree->tree s))))))
       ((8) ;; the name of the theorems moved
        (tree-set (tree-ref (buffer-tree) 0 1 1 2) (fz-pick '("0pt" "2ex" "4ex"))))
       (else ;; the value of the variable assigned at the start
@@ -2156,6 +2207,7 @@
   (test-bindings-against-scratch)
   (test-labels-of-parts)
   (test-loci-of-surround-parts)
+  (test-surround-parts-inputs)
   (test-bindings-written-again)
   (test-labels-after-undo)
   (test-labels-after-redo)

@@ -107,12 +107,19 @@ public:
 };
 
 // Which bridges record their inputs (see "What is typeset again" in
-// bridge.cpp): a bridge records them when the bridge above it is a block
-// of paragraphs or when it is the root, which is told to it by the flag
-// (the bridge which gets the flag clears it). The record may be
-// "all" (TEXMACS_TYPESET_RECORD=all: every bridge) or "blocks" (the default)
+// bridge.cpp): the next one typeset does when bridge_record_next is set (the
+// bridge which gets it clears it), and every one does with
+// TEXMACS_TYPESET_RECORD=all. bridge_in_macro tells that the bridges are
+// those of the body of a macro, whose paragraphs do not record (unless there
+// are many: bridge_document.cpp)
 extern bool bridge_record_next;
-extern bool bridge_in_macro; // typesetting the body of a macro, not an argument
+extern bool bridge_in_macro;
+struct bridge_macro_scope {
+  bool old;
+  inline bridge_macro_scope (bool in_macro): old (bridge_in_macro) {
+    bridge_in_macro= in_macro; }
+  inline ~bridge_macro_scope () { bridge_in_macro= old; }
+};
 int typeset_record_mode ();
 
 
@@ -122,6 +129,9 @@ bool same_page_items (array<page_item> l1, array<page_item> l2);
 // the inputs of a bridge below for the record of the bridge above it
 void add_inputs (edit_env env, bool known, array<int> vars,
                  unsigned long long vals);
+// the reads and lookups of a bridge below for the record of the bridge above
+void add_reads (edit_env env, bool known, array<int> reads,
+                array<string> keys, array<tree> values);
 // do the references and attachments looked up still have these values?
 // ('stamp': the labels_stamp of the tables when they last had them, or 0)
 bool same_lookups (edit_env env, array<string> keys, array<tree> values,
