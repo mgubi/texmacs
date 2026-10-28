@@ -1708,24 +1708,6 @@ argument_start (tree t, path a) {
   return a * 0;
 }
 
-static void
-argument_candidates (array<path>& args, tree t, path at) {
-  // the accessible arguments of the tag of t at at, and those of the tags
-  // inside them, in the order of the document (each once: linear)
-  tree u= subtree (t, at);
-  if (is_atomic (u)) return;
-  if (is_concat (u) || is_document (u)) {
-    for (int k=0; k<N(u); k++)
-      if (is_compound (u[k])) argument_candidates (args, t, at * k);
-    return;
-  }
-  for (int j=0; j<N(u); j++)
-    if (is_accessible_for_search (u, j)) {
-      args << at * j;
-      if (is_compound (u[j])) argument_candidates (args, t, at * j);
-    }
-}
-
 static path
 argument_of (tree t, path p) {
   // the argument (of a tag, or the root) in which the position p of t lies
@@ -1782,32 +1764,54 @@ argument_match (tree t, path arg, tree what, path& q1, path& q2,
 }
 
 static bool
+first_argument_match (tree t, path at, tree what, path& q1, path& q2,
+                      path& arg, bool lazy) {
+  // the first accessible argument of the tag of t at at, or of the tags
+  // inside them, in the order of the document, where what matches (as when
+  // it is alone): each argument once, and no further than the first match
+  tree u= subtree (t, at);
+  if (is_atomic (u)) return false;
+  if (is_concat (u) || is_document (u)) {
+    for (int k=0; k<N(u); k++)
+      if (is_compound (u[k]) &&
+          first_argument_match (t, at * k, what, q1, q2, arg, lazy))
+        return true;
+    return false;
+  }
+  for (int j=0; j<N(u); j++)
+    if (is_accessible_for_search (u, j)) {
+      if (argument_match (t, at * j, what, q1, q2, lazy)) {
+        arg= at * j;
+        return true;
+      }
+      if (is_compound (u[j]) &&
+          first_argument_match (t, at * j, what, q1, q2, arg, lazy))
+        return true;
+    }
+  return false;
+}
+
+static bool
 replace_range (tree t, path p1, path p2, tree what, path& q1, path& q2,
-               path& arg, array<path>* all= NULL, bool from= false) {
+               path& arg) {
   // the part of the hit from p1 to p2 in t (nil: all of t) which Replace
   // replaces. If the hit goes out of a tag or into it, or the pattern
   // matches inside a tag of the hit (a lone tag, a cascaded match), the
   // match inside the argument which holds its literal part, as when the
   // argument is alone (the maintainer's decision: the regions found on
-  // b (strong F) c are those on F alone): the text around it stays (arg:
-  // that argument; all: the matches in all the arguments of the hit in
-  // which it matches, in the order of the document; from: the leftmost
-  // match from p1 on, the rest of a hit after a replacement in it). False
-  // if the literal part of the match crosses the border of a tag: no
-  // replacement keeps the text around it there
+  // b (strong F) c are those on F alone), the leftmost one there; the text
+  // around it stays (arg: that argument). False if the literal part of the
+  // match crosses the border of a tag: no replacement keeps the text
+  // around it there
   region_matcher m;
   tokens_between (m.toks, t, path (), p1, p2);
   q1= p1; q2= p2; arg= path (-1);
   bool str= is_atomic (t) && is_nil (p1) && is_nil (p2);
-  int start;
   bool lazy= !is_nil (p1) || !is_nil (p2);
-  if (match_tokens (m, what, str, from, start, from)) {
-    if (from && N(m.toks) != 0) {
-      q1= m.position (start, true);
-      q2= m.position (m.end, false);
-    }
+  int start;
+  if (match_tokens (m, what, str, false, start)) {
     bool border= false;
-    for (int k=start; k<m.end; k++)
+    for (int k=0; k<N(m.toks); k++)
       if (m.toks[k].kind == TOKEN_BOUNDARY) border= true;
     if (!border) return true;
     // the literal part: from the first element which is not a wildcard to
@@ -1821,30 +1825,14 @@ replace_range (tree t, path p1, path p2, tree what, path& q1, path& q2,
       if (m.toks[k].kind == TOKEN_BOUNDARY) return false;
     if (c1 >= N(m.toks)) return false;
     arg= argument_of (t, m.toks[c1].before);
-    // (from p1 on: not a match before p1, inside a replacement)
-    return argument_match (t, arg, what, q1, q2, lazy) &&
-           !(from && path_less (q1, p1));
+    return argument_match (t, arg, what, q1, q2, lazy);
   }
-  // inside a tag of the hit: the first argument where it matches (and the
-  // next ones, outside it, if all)
-  array<path> args;
+  // inside a tag of the hit: the first argument where it matches
   for (int k=0; k<N(m.toks); k++)
-    if (m.toks[k].kind == TOKEN_TAG)
-      argument_candidates (args, t, m.toks[k].at);
-  bool found= false;
-  path a1, a2;
-  for (int c=0; c<N(args); c++) {
-    if (found && arg <= args[c]) continue;
-    if (argument_match (t, args[c], what, a1, a2, lazy)) {
-      if (!found) { q1= a1; q2= a2; }
-      found= true;
-      arg= args[c];
-      if (all == NULL) return true;
-      (*all) << a1 << a2;
-    }
-  }
-  if (found && all != NULL) arg= path (-1);
-  return found;
+    if (m.toks[k].kind == TOKEN_TAG &&
+        first_argument_match (t, m.toks[k].at, what, q1, q2, arg, lazy))
+      return true;
+  return false;
 }
 
 static tree
@@ -1857,12 +1845,9 @@ with_argument (tree u, int i, tree x) {
 }
 
 array<path>
-search_replace_range (tree t, path p1, path p2, tree what, bool from) {
-  // the parts of the hit from p1 to p2 in t which Replace replaces, in the
-  // order of the document (see replace_range): the hit, the match inside
-  // an argument, or those in the arguments of a lone tag (the cells of a
-  // table); with from, in the rest of a hit from p1, after a replacement
-  // in it (the leftmost match there); nil if Replace leaves the hit (#520)
+search_replace_range (tree t, path p1, path p2, tree what) {
+  // the part of the hit from p1 to p2 in t which Replace replaces (see
+  // replace_range), nil if Replace leaves the hit (#520)
   array<path> r;
   if (!is_position (t, p1) || !is_position (t, p2)) return r;
   if (!is_concat (what) || N(what) == 0 || contains_select_region (what)) {
@@ -1872,11 +1857,119 @@ search_replace_range (tree t, path p1, path p2, tree what, bool from) {
   initialize_search ();
   clear_no_formula ();
   path q1, q2, arg;
-  array<path> all;
-  bool ok= replace_range (t, p1, p2, what, q1, q2, arg, &all, from);
+  bool ok= replace_range (t, p1, p2, what, q1, q2, arg);
   clear_no_formula ();
-  if (ok && N(all) != 0) return all;
   if (ok) r << q1 << q2;
+  return r;
+}
+
+static tree
+cut_before (tree u, path q) {
+  // u without what comes before the position q in it: the text which a
+  // search from q sees (a tag which q is in keeps its arguments, those
+  // before the one of q empty)
+  if (is_nil (q)) return u;
+  if (is_atomic (u)) return u->label (q->item, N(u->label));
+  if (is_concat (u)) {
+    tree r (CONCAT);
+    int k= q->item;
+    if (k < N(u)) {
+      tree c= u[k];
+      if (is_atomic (c)) r << cut_before (c, q->next);
+      else if (q->next != path (1))
+        r << (q->next == path (0)? c: cut_before (c, q->next));
+    }
+    for (int i=k+1; i<N(u); i++) r << u[i];
+    tree s (CONCAT);
+    for (int i=0; i<N(r); i++)
+      if (r[i] != "") s << r[i];
+    if (N(s) == 0) return "";
+    if (N(s) == 1) return s[0];
+    return s;
+  }
+  if (q == path (0)) return u;
+  if (q == path (1)) return "";
+  tree r (L(u), N(u));
+  for (int i=0; i<N(u); i++)
+    r[i]= (i < q->item? tree (""):
+           i == q->item? cut_before (u[i], q->next): u[i]);
+  return r;
+}
+
+static path
+uncut (tree u, path q, path h) {
+  // the path in u of the path h in cut_before (u, q)
+  if (is_nil (q)) return h;
+  if (is_atomic (u)) return path (q->item + (is_nil (h)? 0: h->item));
+  if (is_concat (u)) {
+    // the children of the cut formula, with their indices in u, and
+    // whether they were cut
+    array<int> orig;
+    array<bool> cut;
+    int k= q->item;
+    if (k < N(u)) {
+      tree c= u[k];
+      tree x= c;
+      if (is_atomic (c)) x= cut_before (c, q->next);
+      if (is_atomic (c) || q->next != path (1)) {
+        if (x != "") {
+          orig << k;
+          cut << (is_atomic (c) || q->next != path (0));
+        }
+      }
+    }
+    for (int i=k+1; i<N(u); i++)
+      if (u[i] != "") { orig << i; cut << false; }
+    if (N(orig) == 0) return q;
+    if (N(orig) == 1) {
+      if (cut[0]) return path (orig[0], uncut (u[orig[0]], q->next, h));
+      return path (orig[0], h);
+    }
+    if (is_nil (h) || h->item >= N(orig)) return q;
+    int i= h->item;
+    if (cut[i]) return path (orig[i], uncut (u[orig[i]], q->next, h->next));
+    return path (orig[i], h->next);
+  }
+  if (q == path (0)) return h;
+  if (q == path (1)) return q;
+  if (!is_nil (h) && h->item == q->item)
+    return path (q->item, uncut (u[q->item], q->next, h->next));
+  return h;
+}
+
+array<path>
+search_from (tree t, tree what, path p, path cur, int limit) {
+  // the first hits (at most limit) of what in the paragraph t at p from
+  // the position cur on, as the search finds them in the text which comes
+  // after cur, each one narrowed to the match which Replace replaces (see
+  // replace_range): the next match after a replacement (#520)
+  array<path> r;
+  if (!(p <= cur)) return r;
+  path q= cur / p;
+  if (!is_position (t, q)) return r;
+  tree d (DOCUMENT, cut_before (t, q));
+  range_set sel= search (d, what, path (), limit);
+  bool narrow= is_concat (what) && N(what) != 0 &&
+               !contains_select_region (what);
+  if (narrow) initialize_search ();
+  for (int i=0; i+1<N(sel) && i < 2*limit; i+=2) {
+    path h1= sel[i], h2= sel[i+1];
+    if (narrow) {
+      // the match in the hit which Replace replaces (see replace_range),
+      // in the text after cur: a hit of a lone tag there is the tag
+      path q1, q2, arg;
+      clear_no_formula ();
+      if (replace_range (d, h1, h2, what, q1, q2, arg)) { h1= q1; h2= q2; }
+      clear_no_formula ();
+    }
+    if (is_nil (h1) || h1->item != 0 || is_nil (h2) || h2->item != 0)
+      continue;
+    // (a hit at the start of the text after cur starts at cur)
+    path r1= p * uncut (t, q, h1->next), r2= p * uncut (t, q, h2->next);
+    if (path_less (r1, cur)) r1= cur;
+    if (path_less (r2, r1)) r2= r1;
+    r << r1 << r2;
+  }
   return r;
 }
 

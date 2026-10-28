@@ -469,6 +469,12 @@
           ((not (list-and (map (cut in? <> known) need))) #f)
           (else (car (replace-wildcards by wc))))))
 
+;; Replace one replaces the current hit (the match in it, see replace-hit),
+;; and goes on from the end of the replacement: the next match is the first
+;; hit which the search finds in the text after it, in its paragraph, else
+;; the next hit of the document. Replace All is this, again and again, in
+;; one step of undo (#520)
+
 (define replace-last #f)
 (define replace-skip-message #f)
 
@@ -478,56 +484,43 @@
 
 (define (replace-from cur)
   ;; Replace goes on from cur, after its last replacement (or a hit which it
-  ;; left): the next hit starts there, also when the replacement is inside
-  ;; a hit (a lone tag), as long as the buffer, the pattern and the
-  ;; reference are the same
+  ;; left), as long as the buffer, the pattern and the reference are the
+  ;; same
   (set! replace-last (replace-state cur))
   (set-search-reference cur))
 
-(define (hit-ranges h what . from?)
-  ;; the parts of the hit h which Replace replaces, in the order of the
-  ;; document (see tree-search-replace-range), as paths in the buffer; with
-  ;; from?, those in the rest of a hit from (car h) on
-  (let* ((t (buffer-tree))
-         (p (tree->path t)))
-    (if (not (and (list-starts? (car h) p) (list-starts? (cadr h) p))) (list h)
-        (let loop ((l (tree-search-replace-range
-                        t (list-tail (car h) (length p))
-                        (list-tail (cadr h) (length p)) what
-                        (and (nnull? from?) (car from?)))))
-          (if (or (null? l) (null? (cdr l))) (list)
-              (cons (list (append p (car l)) (append p (cadr l)))
-                    (loop (cddr l))))))))
+(define (pairs l)
+  (if (or (null? l) (null? (cdr l))) (list)
+      (cons (list (car l) (cadr l)) (pairs (cddr l)))))
 
-(define (next-in-hit h cur what again? . upto)
-  ;; what Replace replaces next in the hit h, from cur: a hit after cur,
-  ;; else (or again?, after a replacement in it) the next part of a hit in
-  ;; which it replaced (the cells of a table), else the leftmost match from
-  ;; cur up to the end of h (or upto: the end of the next hit), as a search
-  ;; from there ("a1xa a2x" after replacing a1x by a1xa); #f if none
-  (cond ((and (not again?) (not (path-less? (car h) cur)))
-         (if (path-less? (car h) (cadr h))
-             (with rs (hit-ranges h what)
-               (if (null? rs) h (car rs)))
-             (and (== (car h) cur) h)))
-        ((not (path-less? cur (cadr h))) #f)
-        (else
-         (or (list-find (hit-ranges h what)
-                        (lambda (r) (not (path-less? (car r) cur))))
-             (with rs (hit-ranges (list cur (if (null? upto) (cadr h)
-                                                (car upto)))
-                                  what #t)
-               (and (nnull? rs) (car rs)))))))
+(define (paragraph-of p)
+  ;; the paragraph in which the position p lies: a child of the innermost
+  ;; document around it, and its path, or #f
+  (let loop ((k (- (length p) 1)))
+    (cond ((<= k 0) #f)
+          ((with u (path->tree (list-head p (- k 1)))
+             (and u (tree-is? u 'document)))
+           (list-head p k))
+          (else (loop (- k 1))))))
 
-(define (next-replacement sels cur what)
-  ;; what Replace replaces next in the hits sels, from cur
-  (cond ((or (null? sels) (null? (cdr sels))) #f)
-        ((null? (cddr sels))
-         (next-in-hit (list (car sels) (cadr sels)) cur what #f))
-        ((next-in-hit (list (car sels) (cadr sels)) cur what #f
-                      (cadddr sels))
-         => identity)
-        (else (next-replacement (cddr sels) cur what))))
+(define (next-hit sels cur what)
+  ;; the hit from which Replace goes on, from cur: the first one which the
+  ;; search finds in the text of its paragraph after cur, else the first hit
+  ;; of sels after that paragraph
+  (let* ((pp (paragraph-of cur))
+         (u (and pp (path->tree pp)))
+         (from (lambda (limit)
+                 (with l (tree-search-from u what pp cur limit)
+                   (with f (pairs (filter-search-results l))
+                     ;; the first hits only, unless the mode filters all
+                     (if (and (null? f) (>= (length l) (* 2 limit))
+                              (< limit 1000000))
+                         #f f)))))
+         (l (if u (or (from 8) (from 1000000)) (list))))
+    (if (nnull? l) (car l)
+        (list-find sels (lambda (h)
+                          (and (not (path-less? (car h) cur))
+                               (not (and pp (list-starts? (car h) pp)))))))))
 
 (define (replace-hit sel by what)
   ;; replace the hit sel of what by by: the part of it which Replace
@@ -539,7 +532,7 @@
          (r (if in?
                 (tree-search-replace-range t (list-tail (car sel) (length p))
                                            (list-tail (cadr sel) (length p))
-                                           what #f)
+                                           what)
                 (list)))
          (by* (cond ((not in?)
                      (selection-set-range-set sel)
@@ -568,25 +561,29 @@
           (set-message replace-skip-message "Replace")
           #f))))
 
+(define (replace-step sel by what)
+  ;; replace the hit sel, and go on from the end of the replacement; #f if
+  ;; nothing was done (an empty hit left as it is)
+  (go-to* (car sel))
+  (selection-set-range-set sel)
+  (with done? (replace-hit sel by what)
+    (replace-from (cursor-path))
+    (or done? (!= (car sel) (cadr sel)))))
+
 (define (replace-next* by)
   ;;(display* "replace-next* " by "\n")
   (let* ((sels (get-alt-selection "alternate"))
-         (cur (get-search-reference #t)))
+         (cur (get-search-reference #t))
+         (what (search-tree)))
     (and (nnull? sels)
          (and-with sel (if (== (replace-state cur) replace-last)
-                           (next-replacement sels cur (search-tree))
+                           (next-hit (pairs sels) cur what)
                            (search-next sels cur #f))
-           (go-to* (car sel))
-           (selection-set-range-set sel)
-           (with done? (replace-hit sel by (search-tree))
-             ;; Replace goes on after the replacement, never inside it
-             (replace-from (cursor-path))
-             (or done? (!= (car sel) (cadr sel))))))))
+           (replace-step sel by what)))))
 
 (define (replace-next by)
-  ;; Replace one: the next replacement, after which the search goes on from
-  ;; its end (replace-next* keeps the reference there; looking for the next
-  ;; hit after the cursor moved the reference to a hit in the replacement)
+  ;; Replace one, after which the search goes on from the end of the
+  ;; replacement
   (and (replace-next* by)
        (begin (perform-search*) #t)))
 
@@ -597,123 +594,53 @@
       (replace-next by)
       (end-editing))
     (perform-search*)
-    ;; the part which the next Replace replaces (a cell of a table), not
-    ;; the whole hit
+    ;; the match which the next Replace replaces, not the whole hit
     (with-buffer (master-buffer)
       (let* ((cur (get-search-reference #t))
-             (r (and (== (replace-state cur) replace-last)
-                     (next-replacement (get-alt-selection "alternate") cur
-                                       (search-tree)))))
-        (when r (selection-set-range-set r))))))
+             (what (search-tree))
+             (t (buffer-tree))
+             (p (tree->path t))
+             (h (and (== (replace-state cur) replace-last)
+                     (next-hit (pairs (get-alt-selection "alternate")) cur
+                               what)))
+             (r (and h (list-starts? (car h) p) (list-starts? (cadr h) p)
+                     (tree-search-replace-range
+                       t (list-tail (car h) (length p))
+                       (list-tail (cadr h) (length p)) what))))
+        (when (and r (nnull? r))
+          (selection-set-range-set
+            (list (append p (car r)) (append p (cadr r)))))))))
 
-(define (replace-rest cur bound by what)
-  ;; replace the matches from cur up to bound, the leftmost one after the
-  ;; other (the rest of an argument after a replacement in it); the new cur
-  (with rs (if (path-less? cur bound) (hit-ranges (list cur bound) what #t)
-               (list))
-    (if (null? rs) cur
-        (begin
-          (replace-hit (car rs) by what)
-          (with c (cursor-path)
-            (if (path-less? cur c) (replace-rest c bound by what) cur))))))
-
-(define (replace-in-hit h cur by what)
-  ;; replace in the hit h (positions) from cur, as Replace one after the
-  ;; other: its parts in the arguments of a lone tag (the cells of a table)
-  ;; found once and followed with positions (they were found again after
-  ;; each one: quadratic), each one with the rest of its argument; else the
-  ;; parts one after the other (see next-in-hit). The new cur
-  (let* ((sel (map position-get h))
-         (rs (if (and (not (path-less? (car sel) cur))
-                      (path-less? (car sel) (cadr sel)))
-                 (hit-ranges sel what) (list))))
-    (if (> (length rs) 1)
-        (with qs (map (lambda (r) (map position-new-path r)) rs)
-          (let loop ((l qs))
-            (when (nnull? l)
-              (replace-hit (map position-get (car l)) by what)
-              (with c (cursor-path)
-                (when (path-less? cur c) (set! cur c)))
-              (set! cur (replace-rest cur (if (nnull? (cdr l))
-                                              (position-get (caadr l))
-                                              (position-get (cadr h)))
-                                      by what))
-              (loop (cdr l))))
-          (for (q qs) (for (x q) (position-delete x)))
-          cur)
-        (let loop ((again? #f))
-          (with r (next-in-hit (map position-get h) cur what again?)
-            (if (not r) cur
-                (begin
-                  (replace-hit r by what)
-                  (with c (cursor-path)
-                    (if (path-less? cur c)
-                        (begin (set! cur c) (loop #t))
-                        cur)))))))))
-
-(define (paragraph-of p)
-  ;; the paragraph of the buffer in which the position p lies: a child of
-  ;; the innermost document around it
-  (let loop ((k (- (length p) 1)))
-    (cond ((<= k 0) #f)
-          ((with u (path->tree (list-head p (- k 1)))
-             (and u (tree-is? u 'document)))
-           (path->tree (list-head p k)))
-          (else (loop (- k 1))))))
+(define (has-document? t)
+  (or (tm-func? t 'document)
+      (and (tm-compound? t) (list-or (map has-document? (tm-children t))))))
 
 (define (replace-all-hits by)
-  ;; replace all the hits after the reference, found once, as Replace one
-  ;; after the other; they were found again after each replacement:
-  ;; quadratic. Their positions follow the changes: a replacement which
-  ;; ends where the next hit starts pushes its start after it. After the
-  ;; hits of a paragraph, it is searched again for matches which the search
-  ;; did not give as hits (the next ones in an argument which a hit enters,
-  ;; with a leading wildcard), so that Replace All is Replace one again and
-  ;; again
+  ;; Replace one again and again, from the reference: the hits of the
+  ;; document found once (they were found again after each replacement:
+  ;; quadratic), those of the paragraph of a replacement found again after
+  ;; it, in the text after it. Nothing is kept across the changes but the
+  ;; paths of the hits of the next paragraphs, which they do not change;
+  ;; with patterns or replacements of several paragraphs, which do, all the
+  ;; hits are found again after each replacement
   (let* ((what (search-tree))
-         (t (buffer-tree))
-         (cur (get-search-reference #t))
-         (hits-in (lambda (u)
-                    (with l (filter-search-results
-                              (tree-perform-search u what (tree->path u)
-                                                   100000000))
-                      (let loop ((l l))
-                        (if (or (null? l) (null? (cdr l))) (list)
-                            (cons (list (car l) (cadr l))
-                                  (loop (cddr l))))))))
-         (hits (list-filter (hits-in t)
-                            (lambda (h) (not (path-less? (cadr h) cur)))))
-         (ps (map (lambda (h) (map position-new-path h)) hits))
-         (pars (map (lambda (h) (paragraph-of (car h))) hits))
-         (para? (not (tm-func? what 'document)))
-         (done? #f)
-         (tail (lambda (u)
-                 ;; the paragraph u again, until nothing is replaced
-                 (let again ()
-                   (let* ((c0 cur)
-                          (l (list-filter (hits-in u)
-                                          (lambda (h)
-                                            (path-less? cur (cadr h))))))
-                     (for (h l)
-                       (with q (map position-new-path h)
-                         (set! cur (replace-in-hit q cur by what))
-                         (for (x q) (position-delete x))))
-                     (when (path-less? c0 cur) (again)))))))
-    (let loop ((ps ps) (pars pars))
-      (when (nnull? ps)
-        (let ((h (car ps)) (u (car pars)))
-          ;; a hit around the reference is replaced whole, as by Replace one
-          (when (and (not done?) (path-less? (position-get (car h)) cur))
-            (set! cur (position-get (car h))))
-          (set! cur (replace-in-hit h cur by what))
-          (set! done? #t)
-          (when (and para? u (tree->path u)
-                     (or (null? (cdr ps))
-                         (not (and (cadr pars) (tree-eq? (cadr pars) u)))))
-            (tail u))
-          (loop (cdr ps) (cdr pars)))))
-    (for (h ps) (for (x h) (position-delete x)))
-    (when done? (replace-from (cursor-path)))))
+         (all-hits (lambda ()
+                     (with t (buffer-tree)
+                       (filter-search-results
+                         (tree-perform-search t what (tree->path t)
+                                              100000000)))))
+         (sels (all-hits))
+         (hits (pairs sels))
+         (again? (or (has-document? what) (has-document? by))))
+    (let loop ((sel (search-next sels (get-search-reference #t) #f)) (n 0))
+      ;; (each step goes on after its replacement, or removes text; an empty
+      ;; hit found again at the same place ends it)
+      (when (and sel (< n (+ (* 10 (length hits)) 10000)))
+        (replace-step sel by what)
+        (when again? (set! hits (pairs (all-hits))))
+        (with next (next-hit hits (cursor-path) what)
+          (when (not (and next (== next sel) (== (car sel) (cadr sel))))
+            (loop next (+ n 1))))))))
 
 (tm-define (replace-all)
   (and-with by (by-tree)

@@ -1843,10 +1843,18 @@ source code.
   </explain>
 
   <\explain>
-    <scm|(tree-search-replace-range <scm-arg|content> <scm-arg|path> <scm-arg|path> <scm-arg|content> <scm-arg|bool>)>
+    <scm|(tree-search-replace-range <scm-arg|content> <scm-arg|path> <scm-arg|path> <scm-arg|content>)>
 <explain-synopsis|no synopsis>
   <|explain>
     Calls the <c++> function <cpp|search_replace_range> which returns
+    <scm|array_path>.
+  </explain>
+
+  <\explain>
+    <scm|(tree-search-from <scm-arg|content> <scm-arg|content> <scm-arg|path> <scm-arg|path> <scm-arg|int>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|search_from> which returns
     <scm|array_path>.
   </explain>
 

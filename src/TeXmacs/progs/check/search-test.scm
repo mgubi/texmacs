@@ -1645,7 +1645,7 @@
                  (what (cadr row))
                  (h (tree-search-tree doc what '() 100)))
             (check= h (caddr row))
-            (check= (tree-search-replace-range doc (car h) (cadr h) what #f)
+            (check= (tree-search-replace-range doc (car h) (cadr h) what)
                     (cadddr row))
             (check= (map tm->stree (tree-search-align doc (car h) (cadr h)
                                                       what))
@@ -1827,6 +1827,21 @@
           ;; start of the next match
           ((document "ababab") "ab" "X" (document "XXX"))
           ((document "aaaaaa") "aa" "a" (document "aaa"))
+          ;; a plain string: only its occurrences are replaced (the text
+          ;; from the cursor to the end of the hit was)
+          ((document "aabb") "ab" "a" (document "aab"))
+          ((document "aabb xy") "ab" "" (document "ab xy"))
+          ((document "thethee end") "the" "th" (document "ththe end"))
+          ((document "aabb ab xy") "ab" "a" (document "aab a xy"))
+          ;; matches removed one after the other (a crash), and replaced
+          ;; by text which ends with the pattern
+          ((document (frac "xbzbb" "c")) (concat (wildcard "w") "b") ""
+           (document (frac "" "c")))
+          ((document (frac "xbzb" "c")) (concat (wildcard "w") "b") "bb"
+           (document (frac "bbbb" "c")))
+          ((document (concat "q" (strong "xbbb")))
+           (concat (wildcard "w") "b") ""
+           (document (concat "q" (strong ""))))
           ((document "a--b--c") "--" "-" (document "a-b-c"))
           ((document "a1xa2xa3x")
            (concat "a" (wildcard "w") "x") (concat "[" (wildcard "w") "]")
@@ -2065,6 +2080,97 @@
                 '((document "[1] a2x a3x") ((0 4) (0 7))
                   (document "[1] [2] a3x")))))))
 
+;; Random documents, patterns and replacements (seeded, the same each time):
+;; Replace All and Replace one again and again agree, undo gives the
+;; document back, no hit means no change, and for a pattern without
+;; wildcards the result is that of replacing the occurrences in each string,
+;; from left to right, as on wip_fixes (#520)
+(define random-state 0)
+
+(define (random-next n)
+  ;; a deterministic random number in 0..n-1 (a linear congruential one)
+  (set! random-state (modulo (+ (* random-state 1103515245) 12345) 2147483648))
+  (modulo (quotient random-state 65536) n))
+
+(define (set-random-seed! s) (set! random-state s))
+
+(define (random-pick l) (list-ref l (random-next (length l))))
+
+(define (random-string)
+  (apply string-append
+         (map (lambda (i) (random-pick '("a" "b" "x")))
+              (iota (random-next 6)))))
+
+(define (random-item depth)
+  (with k (if (> depth 1) 0 (random-next 6))
+    (cond ((< k 3) (random-string))
+          ((== k 3) `(strong ,(random-formula (+ depth 1))))
+          ((== k 4) `(frac ,(random-formula (+ depth 1))
+                           ,(random-formula (+ depth 1))))
+          (else `(tabular (table (row (cell ,(random-formula (+ depth 1)))
+                                      (cell ,(random-string)))))))))
+
+(define (random-formula depth)
+  (tm->stree (tree-simplify
+               (stree->tree `(concat ,@(map (lambda (i) (random-item depth))
+                                            (iota (+ 1 (random-next 3)))))))))
+
+(define (random-case)
+  (let* ((doc `(document ,@(map (lambda (i) (random-formula 0))
+                                (iota (+ 1 (random-next 2))))))
+         (w '(wildcard "w"))
+         (k (random-next 8))
+         (what (cond ((< k 4) (random-pick '("a" "b" "ab" "ba" "aa" "xa")))
+                     ((== k 4) `(concat "a" ,w))
+                     ((== k 5) `(concat ,w "b"))
+                     ((== k 6) `(concat "a" ,w "b"))
+                     (else `(concat ,w "b" (wildcard "v")))))
+         (by (if (string? what)
+                 (random-pick '("" "X" "ab" "a" "aa" "ba"))
+                 (random-pick `("" "X" (concat "<" ,w ">") ,w)))))
+    (list doc what by)))
+
+(define (replace-in-strings t what by)
+  ;; the occurrences of the string what in the strings of t replaced by by,
+  ;; from left to right
+  (cond ((string? t)
+         (let loop ((i 0) (acc ""))
+           (with j (string-search-forwards what i t)
+             (if (< j 0) (string-append acc (substring t i (string-length t)))
+                 (loop (+ j (string-length what))
+                       (string-append acc (substring t i j) by))))))
+        ((pair? t) (cons (car t) (map (cut replace-in-strings <> what by)
+                                      (cdr t))))
+        (else t)))
+
+(define (simplified t) (tm->stree (tree-simplify (stree->tree t))))
+
+(define (random-replace-failures n seed)
+  ;; the cases among n random ones which fail a check
+  (set-random-seed! seed)
+  (with-search-mode-value 'replace
+    (lambda ()
+      (list-filter
+        (map (lambda (i) (random-case)) (iota n))
+        (lambda (c)
+          (let* ((doc (car c)) (what (cadr c)) (by (caddr c))
+                 (all (replace-all-in-buffer doc what by))
+                 (one (replace-one-repeatedly doc what by))
+                 (hits (tree-search-tree (stree->tree doc) (stree->tree what)
+                                         '() 1000)))
+            (not (and (pair? all)
+                      (== (simplified (car all)) (simplified one))
+                      (== (cadr all) (simplified doc))
+                      (or (nnull? hits) (== (simplified (car all))
+                                            (simplified doc)))
+                      (or (not (string? what))
+                          (== (simplified (car all))
+                              (simplified (replace-in-strings doc what by))))))))))))
+
+(define (test-replace-random)
+  (check-group "replace random")
+  (check= (random-replace-failures 200 543) '()))
+
 (tm-define (search-test-failures)
   (check-suite "search")
   (test-text)
@@ -2096,4 +2202,5 @@
   (test-speed-in-arguments)
   (test-replace-wildcards)
   (test-replace-in-buffers)
+  (test-replace-random)
   (check-end))
