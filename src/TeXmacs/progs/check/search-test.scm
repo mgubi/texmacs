@@ -1878,6 +1878,16 @@
                                              (theorem (document "<a><><>"
                                                                 "<>aa"))))
                              "<a><><><>")))
+          ;; the reference in a script argument with text after it: the
+          ;; script, which holds the reference, is not a part of the next
+          ;; match (the hit after it was left)
+          ((document (concat (rsub "xbbx") "b"))
+           (concat (wildcard "w") "b") (frac (wildcard "w") "1")
+           (document (concat (rsub (concat (frac "x" "1") (frac "" "1") "x"))
+                             (frac "" "1"))))
+          ((document (concat (rsub "bx") "b"))
+           (concat (wildcard "w") "b") (concat "<" (wildcard "w") ">")
+           (document (concat (rsub "<>x") "<>")))
           ;; a leading wildcard does not take the text before the reference
           ((document (concat "p" (strong "xb") "zb"))
            (concat (wildcard "w") "b") (concat "<" (wildcard "w") ">")
@@ -2243,8 +2253,11 @@
     (with r
         (catch #t
           (lambda ()
-            (let* ((all (replace-all-in-buffer doc what by))
+            (let* ((m (resolve-module '(generic search-widgets)))
+                   (no-skip (eval '(set! replace-skip-message #f) m))
+                   (all (replace-all-in-buffer doc what by))
                    (one (replace-one-repeatedly doc what by))
+                   (skip (eval 'replace-skip-message m))
                    (hits (tree-search-tree (stree->tree doc) (stree->tree what)
                                            '() 1000))
                    (expect (and (string? what) (string? by) (null? prefs)
@@ -2261,7 +2274,13 @@
                         (and (pair? all) (== (text-and-tags (car all))
                                              (text-and-tags expect))))
                     '() '(string-replacement))
-                (if (> (- (texmacs-time) t0) 10000) '(too-slow) '()))))
+                (if (> (- (texmacs-time) t0) 10000) '(too-slow) '())
+                ;; a hit of a string or formula pattern is never left: the
+                ;; search gives only hits which Replace can replace (a hit
+                ;; of a tag pattern whose values would lose text is left)
+                (if (and skip (or (string? what) (tm-func? what 'concat)
+                                  (tm-func? what 'document)))
+                    (list (list 'skip skip)) '()))))
           (lambda args (list 'error args)))
       (for (p prefs) (cpp-reset-preference p))
       r)))

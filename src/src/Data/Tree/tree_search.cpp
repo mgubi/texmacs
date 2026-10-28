@@ -1747,6 +1747,13 @@ match_tokens (region_matcher& m, tree what, bool str, bool alone,
 }
 
 static bool
+before_position (path x, path ref) {
+  // does the position or path x come before the position ref: before it
+  // in the tree, or around it (a tag which holds ref)?
+  return path_less (x, ref) || (x <= ref && x != ref);
+}
+
+static bool
 argument_match (tree t, path arg, tree what, path& q1, path& q2,
                 bool lazy, path from) {
   // the match of what in the argument arg of t, as when it is alone (its
@@ -1761,7 +1768,9 @@ argument_match (tree t, path arg, tree what, path& q1, path& q2,
   bool cut= !is_nil (from) && arg <= from && arg != from;
   path rel= (cut? from / arg: path ());
   for (int k=0; k<N(all); k++)
-    if (!cut || !path_less (all[k].before, rel)) m.toks << all[k];
+    if (!cut || !(before_position (all[k].before, rel) ||
+                  (all[k].kind == TOKEN_TAG && all[k].at <= rel)))
+      m.toks << all[k];
   int start;
   if (!match_tokens (m, what, is_atomic (u), true, start, lazy)) return false;
   path a= argument_start (t, arg);
@@ -1915,7 +1924,10 @@ cut_before (tree u, path q) {
 
 static path
 uncut (tree u, path q, path h) {
-  // the path in u of the path h in cut_before (u, q)
+  // the position in u of the position h in cut_before (u, q). The start of
+  // a cut tree (before a tag whose text before q was cut, or no position
+  // in a formula left with one child) is q itself: a position, never the
+  // path of a node, nor before a tag which holds q
   if (is_nil (q)) return h;
   if (is_atomic (u)) return path (q->item + (is_nil (h)? 0: h->item));
   if (is_concat (u)) {
@@ -1940,7 +1952,7 @@ uncut (tree u, path q, path h) {
     if (N(orig) == 0) return q;
     if (N(orig) == 1) {
       if (cut[0]) return path (orig[0], uncut (u[orig[0]], q->next, h));
-      return path (orig[0], h);
+      return is_nil (h)? q: path (orig[0], h);
     }
     if (is_nil (h) || h->item >= N(orig)) return q;
     int i= h->item;
@@ -1949,7 +1961,9 @@ uncut (tree u, path q, path h) {
   }
   if (q == path (0)) return h;
   if (q == path (1)) return q;
-  if (!is_nil (h) && h->item == q->item)
+  if (is_nil (h)) return q;
+  if (is_nil (h->next)) return (h->item == 0? q: h);
+  if (h->item == q->item)
     return path (q->item, uncut (u[q->item], q->next, h->next));
   return h;
 }
@@ -1983,7 +1997,7 @@ search_from_paragraph (tree t, tree what, path p, path q, int limit) {
     // before cur was cut, starts at cur: the text before the reference,
     // the output of an earlier replacement, is never in it)
     path c= p * q;
-    if (!is_nil (q) && (path_less (r1, c) || (r1 <= c && r1 != c))) r1= c;
+    if (!is_nil (q) && before_position (r1, c)) r1= c;
     if (path_less (r2, r1)) r2= r1;
     r << r1 << r2;
   }
@@ -2009,7 +2023,7 @@ search_from (tree t, tree what, path p, path cur, int limit) {
     range_set sel= search (d, what, path (), limit);
     for (int i=0; i+1<N(sel) && i < 2*limit; i+=2) {
       path r1= p * uncut (t, q, sel[i]), r2= p * uncut (t, q, sel[i+1]);
-      if (path_less (r1, cur) || (r1 <= cur && r1 != cur)) r1= cur;
+      if (before_position (r1, cur)) r1= cur;
       if (path_less (r2, r1)) r2= r1;
       r << r1 << r2;
     }
