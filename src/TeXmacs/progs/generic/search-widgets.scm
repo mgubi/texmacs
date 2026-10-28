@@ -309,22 +309,24 @@
     (if (null? l) (list)
 	(get-wildcards-in-string-rec what l match 0))))
 
-(define (aligned-runs t p1 p2 what)
-  ;; the run of the hit from p1 to p2 in t (all of t if both are empty)
-  ;; which each child of the formula pattern what takes, as the search
-  ;; matches it (#520), or #f
+;; The values of the wildcards are the runs which they take in the match, as
+;; the search aligns the pattern with its text (lazily: a part of a string,
+;; several children, or nothing); they were matched child by child (#520)
+
+(define (has-region? t)
+  (or (tm-func? t 'select-region)
+      (and (tm-compound? t) (list-or (map has-region? (tm-children t))))))
+
+(define (has-wildcard? t)
+  (or (tm-func? t 'wildcard 1)
+      (and (tm-compound? t) (list-or (map has-wildcard? (tm-children t))))))
+
+(define (get-wildcards-aligned what t p1 p2)
+  ;; the wildcards of the formula pattern what in the hit from p1 to p2 in
+  ;; t (all of t if both are empty), or #f if they are not known
   (with runs (tree-search-align t p1 p2 what)
-    (when (null? runs)
-      (with why (tree-search-align-reason)
-        (when (!= why "") (set! replace-skip-reason why))))
-    (and (nnull? runs) runs)))
-
-(define replace-skip-reason #f)   ;; why the last hit was left, if known
-(define replace-skip-message #f)  ;; the message of the last hit left
-
-(define (get-wildcards-aligned what runs)
-  ;; the wildcards of the formula pattern what, whose children took runs
-  (append-map get-wildcards (tm-children what) runs))
+    (and (nnull? runs)
+         (append-map get-wildcards (tm-children what) runs))))
 
 (define (get-wildcards-var what match)
   (cond ((tm-equal? what match) (list))
@@ -332,17 +334,9 @@
          (list `(:wildcard ,(tm->stree (tm-ref what 0)) ,(tm->stree match))))
         ((tm-equal? what "")
          (list `(:empty ,(tm->stree match))))
-        ;; a formula pattern against a formula, a string or a tag: its
-        ;; children are aligned with the text of the match as the search
-        ;; does, a wildcard taking a part of a string, or several children
-        ;; (#520); they were matched child by child
-        ((and (tm-func? what 'concat) (not (tm-func? match 'document))
-              (aligned-runs match '() '() what))
-         => (lambda (runs) (get-wildcards-aligned what runs)))
-        ;; the pattern matches, but its values would lose text: none (the
-        ;; hit is left), not those of the rules below
-        ((and (tm-func? what 'concat) replace-skip-reason)
-         (list))
+        ((and (tm-func? what 'concat) (not (has-region? what))
+              (not (tm-func? match 'document)) (has-wildcard? what))
+         (or (get-wildcards-aligned what match '() '()) (list)))
 	((and (tm-atomic? match)
 	      (tm-func? what 'concat))
 	 (get-wildcards-in-string (tm-children what) (tm->string match)))
@@ -381,21 +375,17 @@
              (t (replace-wildcards-list (cdr l) (cdr h))))
         (cons (cons (car h) (car t)) (cdr t)))))
 
-(define (spliced-value v)
-  ;; the children which the value v of a wildcard gives in a formula
-  (cond ((tm-func? v 'concat) (tm-children v))
-        ((tm-equal? v "") (list))
-        (else (list v))))
-
 (define (replace-wildcards-concat l wc)
   ;; the children l of a formula of the replacement, each marked #t if it
   ;; comes from the value of a wildcard, which is spliced into the formula
   (if (null? l) (cons l wc)
       (let* ((c (car l))
              (h (if (tm-func? c 'wildcard 1)
-                    (with v (find-wildcard wc (tm->stree (tm-ref c 0)))
-                      (cons (map (lambda (x) (cons #t x)) (spliced-value v))
-                            wc))
+                    (let* ((v (find-wildcard wc (tm->stree (tm-ref c 0))))
+                           (l (cond ((tm-func? v 'concat) (tm-children v))
+                                    ((tm-equal? v "") (list))
+                                    (else (list v)))))
+                      (cons (map (lambda (x) (cons #t x)) l) wc))
                     (with r (replace-wildcards c wc)
                       (cons (list (cons #f (car r))) (cdr r)))))
              (t (replace-wildcards-concat (cdr l) (cdr h))))
@@ -424,8 +414,7 @@
         ((tm-atomic? by)
          (cons by wc))
         ((and (tm-func? by 'concat)
-              (nnull? (list-filter (tm-children by)
-                                   (lambda (c) (tm-func? c 'wildcard 1)))))
+              (list-or (map (cut tm-func? <> 'wildcard 1) (tm-children by))))
          ;; a value of several children is spliced into the formula, and
          ;; merged with the strings around it (#520)
          (let* ((r (replace-wildcards-concat (tm-children by) wc))
@@ -437,26 +426,32 @@
         (else (with r (replace-wildcards-list (tm-children by) wc)
                 (cons (cons (tm-label by) (car r)) (cdr r))))))
 
-(define (get-wildcards-of-hit what match hit)
-  ;; the wildcards of what in its match; hit is () or the tree in which the
-  ;; match was found and the paths of the match in it, by which a formula
-  ;; pattern is aligned: also a match which a wildcard carried out of a tag
-  ;; (#515, #520), which its subtree does not show
-  (with runs (and (tm-func? what 'concat) (nnull? hit)
-                  (aligned-runs (car hit) (cadr hit) (caddr hit) what))
-    (cond (runs (get-wildcards-aligned what runs))
-          ((and (tm-func? what 'concat) replace-skip-reason) (list))
-          (else (get-wildcards what match)))))
+(define (wildcard-names t)
+  ;; the names of the wildcards in t
+  (cond ((tm-func? t 'wildcard 1) (list (tm->stree (tm-ref t 0))))
+        ((tm-compound? t) (list-remove-duplicates
+                            (append-map wildcard-names (tm-children t))))
+        (else (list))))
 
 (define (adjust-by by what match . hit)
   ;; the replacement of match, a match of what, by by: its wildcards take
-  ;; the values of those of what; a value of several children is spliced
-  ;; into the formula around the wildcard (#520)
+  ;; the values of those of what; hit is () or the tree in which the match
+  ;; is and the paths of the match in it, by which a formula pattern is
+  ;; aligned. #f if the values of the wildcards of what which by takes are
+  ;; not known: inserting the (wildcard ...) tags, or nothing in their place,
+  ;; would lose the text which they took (#520)
   (let* ((swhat (and (tm-atomic? what) (tm->string what)))
          (smatch (and (tm-atomic? match) (tm->string match)))
          (sby (and (tm-atomic? by) (tm->string by)))
          (lwhat (and (tm-compound? what) (tm->list what)))
-         (lmatch (and (tm-compound? match) (tm->list match))))
+         (lmatch (and (tm-compound? match) (tm->list match)))
+         (wc (or (and (nnull? hit) (tm-func? what 'concat)
+                      (not (has-region? what)) (has-wildcard? what)
+                      (get-wildcards-aligned what (car hit) (cadr hit)
+                                             (caddr hit)))
+                 (get-wildcards what match)))
+         (need (list-intersection (wildcard-names by) (wildcard-names what)))
+         (known (map cadr (list-filter wc (cut tm-func? <> :wildcard 2)))))
     (cond ((tm-equal? what match) by)
           ((and (tm-func? what 'concat)
                 (tm-func? match 'concat)
@@ -471,308 +466,105 @@
                  ((== (locase-first swhat) smatch) (locase-first sby))
                  ((== (upcase-first swhat) smatch) (upcase-first sby))
                  (else sby)))
-          ((nnull? (list-intersection (wildcard-names by)
-                                      (wildcard-names what)))
-           ;; the replacement takes values of the wildcards of the pattern:
-           ;; #f if a value is not known (the pattern could not be aligned
-           ;; with the match), so that the hit is not replaced: inserting
-           ;; the (wildcard ...) tags, or nothing in their place, would lose
-           ;; the text which they took (#520)
-           (set! replace-skip-reason #f)
-           (let* ((wc (get-wildcards-of-hit what match hit))
-                  (known (map cadr (list-filter wc (cut tm-func? <> :wildcard 2))))
-                  ;; the wildcards whose values take the other content of
-                  ;; a tag of the hit, which the replacement must take once
-                  (carriers (if (or (null? hit) (not (tm-func? what 'concat)))
-                                (list)
-                                (map tm->stree
-                                     (tree-search-align-carriers
-                                       (car hit) (cadr hit) (caddr hit) what))))
-                  (uses (wildcard-uses by)))
-             (cond ((nlist-and (map (cut in? <> known)
-                                    (list-intersection (wildcard-names by)
-                                                       (wildcard-names what))))
-                    #f)
-                   ((nlist-and (map (lambda (c) (== (count-in c uses) 1))
-                                    carriers))
-                    (set! replace-skip-reason
-                          "the replacement would drop or repeat the other content of a tag")
-                    #f)
-                   (else (car (replace-wildcards by wc))))))
-          (else
-            (with wc (get-wildcards-of-hit what match hit)
-              (if (null? wc) by (car (replace-wildcards by wc))))))))
-
-(define (nlist-and l) (not (list-and l)))
-
-(define (count-in x l)
-  (length (list-filter l (cut == <> x))))
-
-(define (wildcard-uses t)
-  ;; the names of the wildcards in t, once for each occurrence
-  (cond ((tm-func? t 'wildcard 1) (list (tm->stree (tm-ref t 0))))
-        ((tm-compound? t) (append-map wildcard-uses (tm-children t)))
-        (else (list))))
-
-(define (wildcard-names t)
-  ;; the names of the wildcards in t
-  (cond ((tm-func? t 'wildcard 1) (list (tm->stree (tm-ref t 0))))
-        ((tm-compound? t) (list-remove-duplicates
-                            (append-map wildcard-names (tm-children t))))
-        (else (list))))
-
-(define (search-hit sel)
-  ;; the buffer and the paths in it of the hit sel, for adjust-by
-  (let* ((t (buffer-tree))
-         (p (tree->path t)))
-    (if (and (list-starts? (car sel) p) (list-starts? (cadr sel) p))
-        (list t (list-tail (car sel) (length p))
-              (list-tail (cadr sel) (length p)))
-        (list))))
-
-(define (inner-hit sel what)
-  ;; the part of the hit sel which Replace replaces, if the formula pattern
-  ;; what matches inside an argument of a tag of the hit, and nothing else
-  ;; (a lone tag, a cascaded match): the replacement goes inside that
-  ;; argument, as when the tag is alone (#520); else sel
-  (with hit (search-hit sel)
-    (if (or (null? hit) (not (tm-func? what 'concat))) sel
-        (with in (tree-search-inner-hit (car hit) (cadr hit) (caddr hit) what)
-          (if (null? in) sel
-              (with p (tree->path (car hit))
-                (list (append p (car in)) (append p (cadr in)))))))))
+          ((not (list-and (map (cut in? <> known) need))) #f)
+          (else (car (replace-wildcards by wc))))))
 
 (define replace-last #f)
+(define replace-skip-message #f)
 
 (define (replace-state cur)
-  ;; the place where Replace goes on, for this buffer and this pattern
+  ;; the place where Replace goes on, with the buffer and the pattern
   (list (url->string (current-buffer)) (tm->stree (search-tree)) cur))
 
 (define (replace-from cur)
   ;; Replace goes on from cur, after its last replacement (or a hit which it
   ;; left): the next hit starts there, also when the replacement is inside
-  ;; a hit (a lone tag, whose replaced argument is inside it, #520). Only
-  ;; while the buffer, the pattern and the reference are the same
+  ;; a hit (a lone tag), as long as the buffer, the pattern and the
+  ;; reference are the same
   (set! replace-last (replace-state cur))
   (set-search-reference cur))
 
-(define (search-next-after sels cur)
-  ;; the first hit of sels which starts at cur or after it
-  (cond ((or (null? sels) (null? (cdr sels))) #f)
-        ((path-less? (car sels) cur) (search-next-after (cddr sels) cur))
-        (else (list (car sels) (cadr sels)))))
+(define (hit-ranges h what)
+  ;; the parts of the hit h which Replace replaces, in the order of the
+  ;; document (see tree-search-replace-range), as paths in the buffer
+  (let* ((t (buffer-tree))
+         (p (tree->path t)))
+    (if (not (and (list-starts? (car h) p) (list-starts? (cadr h) p))) (list h)
+        (let loop ((l (tree-search-replace-range
+                        t (list-tail (car h) (length p))
+                        (list-tail (cadr h) (length p)) what)))
+          (if (or (null? l) (null? (cdr l))) (list)
+              (cons (list (append p (car l)) (append p (cadr l)))
+                    (loop (cddr l))))))))
+
+(define (rest-of-hit sels cur what)
+  ;; the next part from cur of the hit of sels in which Replace replaced (a
+  ;; table, whose cells it replaces one after the other)
+  (let loop ((l sels))
+    (cond ((or (null? l) (null? (cdr l))) #f)
+          ((and (path-less? (car l) cur) (path-less? cur (cadr l)))
+           (list-find (hit-ranges (list (car l) (cadr l)) what)
+                      (lambda (r) (not (path-less? (car r) cur)))))
+          (else (loop (cddr l))))))
+
+(define (search-next-after sels cur what)
+  ;; the rest of the hit in which Replace replaced, else the first hit of
+  ;; sels which starts at cur or after it
+  (or (rest-of-hit sels cur what)
+      (let loop ((l sels))
+        (cond ((or (null? l) (null? (cdr l))) #f)
+              ((path-less? (car l) cur) (loop (cddr l)))
+              (else (list (car l) (cadr l)))))))
+
+(define (replace-hit sel by what)
+  ;; replace the hit sel of what by by: the part of it which Replace
+  ;; replaces (inside the argument of a tag which holds the match, see
+  ;; tree-search-replace-range), or leave it with a message; #f if left
+  (let* ((t (buffer-tree))
+         (p (tree->path t))
+         (in? (and (list-starts? (car sel) p) (list-starts? (cadr sel) p)))
+         (r (if in?
+                (tree-search-replace-range t (list-tail (car sel) (length p))
+                                           (list-tail (cadr sel) (length p))
+                                           what)
+                (list)))
+         (by* (cond ((not in?)
+                     (selection-set-range-set sel)
+                     (adjust-by by what (selection-tree)))
+                    ((null? r) #f)
+                    (else
+                     (selection-set-range-set
+                       (list (append p (car r)) (append p (cadr r))))
+                     (adjust-by by what (selection-tree) t (car r) (cadr r))))))
+    (if by*
+        (with by* (tm->tree by*)
+          (clipboard-cut "dummy")
+          (insert-go-to (tree-copy by*) (path-end by* '()))
+          #t)
+        (begin
+          (selection-cancel)
+          (go-to (cadr sel))
+          (set! replace-skip-message
+                (if (and in? (null? r))
+                    "a match was left as it is: it crosses the border of a tag"
+                    "a match was left as it is: the values of its wildcards would lose text"))
+          (set-message replace-skip-message "Replace")
+          #f))))
 
 (define (replace-next* by)
   ;;(display* "replace-next* " by "\n")
   (let* ((sels (get-alt-selection "alternate"))
          (cur (get-search-reference #t)))
     (and (nnull? sels)
-         (and-with sel0 (if (== (replace-state cur) replace-last)
-                            (search-next-after sels cur)
-                            (search-next sels cur #f))
-           (let* ((what (search-tree))
-                  (sel (inner-hit sel0 what)))
-             (go-to* (car sel))
-             (selection-set-range-set sel)
-             (let* ((hit (search-hit sel))
-                    (by* (apply adjust-by (cons* by what (selection-tree) hit)))
-                    ;; a hit carried out of a tag (or into it) by a wildcard
-                    ;; of a formula pattern; not one of several paragraphs
-                    (parts (if (or (not by*) (null? hit)
-                                   (tm-func? what 'document))
-                               (list)
-                               (tree-search-replace-parts
-                                 (car hit) (cadr hit) (caddr hit) what))))
-               (cond ((not by*)
-                      ;; the values of the wildcards are not known: the hit
-                      ;; is left as it is, and Replace goes on after it
-                      ;; (#520)
-                      (selection-cancel)
-                      (go-to (cadr sel0))
-                      (replace-from (cursor-path))
-                      (set! replace-skip-message
-                            (string-append
-                              "a match was left as it is: "
-                              (or replace-skip-reason
-                                  "the pattern could not be aligned with it")))
-                      (set-message replace-skip-message "Replace")
-                      (!= (car sel0) (cadr sel0)))
-                     ((null? parts)
-                      (clipboard-cut "dummy")
-                      (with by* (tm->tree by*)
-                        (insert-go-to (tree-copy by*) (path-end by* '())))
-                      ;; Replace goes on after the replacement, never inside
-                      ;; it (a lone tag became a formula, whose start was
-                      ;; before the cursor)
-                      (replace-from (cursor-path))
-                      #t)
-                     (else
-                      (replace-hit-parts (tm->tree by*) parts hit
-                                         (tree->path (buffer-tree)))
-                      (replace-from (cursor-path))
-                      #t))))))))
-
-(define (inside-argument? p q i)
-  ;; is the position p inside the argument i of the tree at q?
-  (and (> (length p) (+ (length q) 1))
-       (list-starts? p (rcons q i))))
-
-(define (crossed-tags t p1 p2 . ends)
-  ;; the paths in t of the tags which the hit from p1 to p2 goes out of or
-  ;; into (not both of its ends inside the same argument), the innermost
-  ;; first; also those on the way to the ends of its parts (a hit which its
-  ;; outer wildcards carry around a tag in which the pattern matches)
-  (let* ((tags (lambda (p)
-                 (let loop ((u t) (q (list)) (l p) (r (list)))
-                   (if (or (null? l) (tree-atomic? u)) r
-                       (let* ((r2 (if (and (nnull? q)
-                                           (not (tree-is? u 'concat))
-                                           (not (tree-is? u 'document))
-                                           (not (and (inside-argument? p1 q (car l))
-                                                     (inside-argument? p2 q (car l)))))
-                                      (cons q r) r)))
-                         (if (or (null? (cdr l)) (>= (car l) (tree-arity u)))
-                             r2
-                             (loop (tree-ref u (car l)) (rcons q (car l))
-                                   (cdr l) r2)))))))
-         (all (list-remove-duplicates
-                (append (tags p1) (tags p2)
-                        (append-map tags (if (null? ends) ends (car ends)))))))
-    (sort all (lambda (a b) (> (length a) (length b))))))
-
-(define (removable? u crossed)
-  ;; can the tag u, which the hit crossed, be removed after the cut? Only if
-  ;; it has nothing left: its children are empty strings, attributes which
-  ;; the cursor cannot reach (the color of a with), or crossed tags which
-  ;; can be removed; an image, a label... is content. The parts of a table
-  ;; are never removed: their content is empty
-  (and (tree-compound? u)
-       (not (tree-in? u '(concat document table row cell subtable tformat)))
-       (list-and (map (lambda (i)
-                        (nothing-left? (tree-ref u i)
-                                       (content-child? u i) crossed))
-                      (iota (tree-arity u))))))
-
-(define (content-child? u i)
-  ;; does the argument i of u hold content: one which the cursor reaches, or
-  ;; a hidden one (the body of a folded), not an attribute (of a with)?
-  (or (tree-accessible-child? u i)
-      (and (not (and (tree-is? u 'with) (< i (- (tree-arity u) 1))))
-           (in? (tree-child-type u i) '("regular" "adhoc" "unknown")))))
-
-(define (nothing-left? c accessible? crossed)
-  (cond ((tree-atomic? c) (or (== (tree->string c) "") (not accessible?)))
-        ((tree-is? c 'concat)
-         (list-and (map (lambda (x) (nothing-left? x #t crossed))
-                        (tree-children c))))
-        (else (and (list-or (map (lambda (x) (tree-eq? x c)) crossed))
-                   (removable? c crossed)))))
-
-(define (normalize-formula f)
-  ;; the formula f without empty strings and without two strings in a row,
-  ;; a formula of one child being that child (with editing operations,
-  ;; which keep the positions)
-  (when (and f (tree->path f) (tree-is? f 'concat))
-    (let loop ((i 0))
-      (when (< i (tree-arity f))
-        (cond ((and (> (tree-arity f) 1) (tree-atomic? (tree-ref f i))
-                    (== (tree->string (tree-ref f i)) ""))
-               (tree-remove f i 1)
-               (loop i))
-              ((and (> i 0) (tree-atomic? (tree-ref f (- i 1)))
-                    (tree-atomic? (tree-ref f i)))
-               (tree-join f (- i 1))
-               (loop i))
-              (else (loop (+ i 1))))))
-    (cond ((== (tree-arity f) 1) (tree-remove-node f 0))
-          ((== (tree-arity f) 0) (tree-assign f "")))))
-
-(define (range-formula a b)
-  ;; the formula in which the text from a to b lies, or #f
-  (let* ((n (list-common-left a b))
-         (f (path->tree (list-head a n)))
-         (g (and f (> n 0) (tree-up f))))
-    (cond ((and f (tree-is? f 'concat)) f)
-          ((and g (tree-is? g 'concat)) g)
-          (else #f))))
-
-(define (cut-range a b)
-  ;; remove the text from a to b, in one string or in one formula, with
-  ;; editing operations (a selection is extended to the tags around it,
-  ;; and to the base of a script: it removed text outside the hit, #520).
-  ;; The strings which are left empty are removed afterwards
-  (let* ((n0 (list-common-left a b))
-         (t0 (path->tree (list-head a n0)))
-         ;; a whole tag, from before it to after it: in its formula
-         (n (if (and t0 (tree-compound? t0) (> n0 0)
-                     (== (length a) (+ n0 1)) (== (length b) (+ n0 1)))
-                (- n0 1) n0))
-         (q (list-head a n))
-         (f (path->tree q)))
-    (cond ((not f) (noop))
-          ((tree-atomic? f)
-           (when (and (== n (- (length a) 1)) (== n (- (length b) 1))
-                      (< (cAr a) (cAr b)))
-             (tree-remove f (cAr a) (- (cAr b) (cAr a)))))
-          ((and (tree-is? f 'concat) (> (length a) (+ n 1))
-                (> (length b) (+ n 1)))
-           (let* ((k1 (list-ref a n)) (ra (list-tail a (+ n 1)))
-                  (k2 (list-ref b n)) (rb (list-tail b (+ n 1)))
-                  (c1 (tree-ref f k1)) (c2 (tree-ref f k2))
-                  (s1? (and (tree-atomic? c1) (null? (cdr ra))))
-                  (s2? (and (tree-atomic? c2) (null? (cdr rb))))
-                  (lo (if (and (tree-compound? c1) (== ra '(0))) k1 (+ k1 1)))
-                  (hi (if (and (tree-compound? c2) (== rb '(1))) k2 (- k2 1))))
-             (when (< k1 k2)
-               (when (and s2? (> (car rb) 0)) (tree-remove c2 0 (car rb)))
-               (when (<= lo hi) (tree-remove f lo (+ (- hi lo) 1)))
-               (when (and s1? (< (car ra) (string-length (tree->string c1))))
-                 (tree-remove c1 (car ra)
-                              (- (string-length (tree->string c1)) (car ra)))))
-             (when (and (== k1 k2) (tree-compound? c1)
-                        (== ra '(0)) (== rb '(1)))
-               (tree-remove f k1 1))))
-          (else (noop)))))
-
-(define (replace-hit-parts by* parts hit p)
-  ;; a hit which a wildcard carried out of a tag or into one: only its
-  ;; parts are removed, in the tag and outside (a selection would take the
-  ;; whole tag, and the replacement drops the rest of it), by* goes after
-  ;; the tag which it leaves, or before the one which it enters, and a tag
-  ;; which is left without text is removed (#520). The parts are removed
-  ;; from the last one, so that the paths of the others stay valid, and the
-  ;; formulas are normalized at the end
-  (let* ((abs (map (lambda (q) (append p q)) parts))
-         (ins (cAr abs))
-         (tag (path->tree (cDr ins)))
-         (ranges (let loop ((l (cDr abs)))
-                   (if (or (null? l) (null? (cdr l))) (list)
-                       (cons (list (car l) (cadr l)) (loop (cddr l))))))
-         (forms (list-filter (map (lambda (r) (range-formula (car r) (cadr r)))
-                                  ranges)
-                             identity))
-         (tags (map (lambda (q) (path->tree (append p q)))
-                    (crossed-tags (car hit) (cadr hit) (caddr hit)
-                                  (cDr parts)))))
-    (for (r (reverse ranges))
-      (cut-range (car r) (cadr r)))
-    (go-to (rcons (tree->path tag) (cAr ins)))
-    (insert-go-to (tree-copy by*) (path-end by* '()))
-    (with cur (position-new-path (cursor-path))
-      (for (u tags)
-        (when (and u (tree->path u) (removable? u tags))
-          (with up (tree-up u)
-            (if (and up (tree-is? up 'concat))
-                (begin
-                  (tree-remove up (tree-index u) 1)
-                  (set! forms (cons up forms)))
-                (tree-assign u "")))))
-      (for (f (sort (list-filter forms (lambda (f) (tree->path f)))
-                    (lambda (f g) (> (length (tree->path f))
-                                     (length (tree->path g))))))
-        (normalize-formula f))
-      (go-to (position-get cur))
-      (position-delete cur))))
+         (and-with sel (if (== (replace-state cur) replace-last)
+                           (search-next-after sels cur (search-tree))
+                           (search-next sels cur #f))
+           (go-to* (car sel))
+           (selection-set-range-set sel)
+           (with done? (replace-hit sel by (search-tree))
+             ;; Replace goes on after the replacement, never inside it
+             (replace-from (cursor-path))
+             (or done? (!= (car sel) (cadr sel))))))))
 
 (define (replace-next by)
   ;; TODO: replacing all occurrences of 'a' by 'axa' may result in
@@ -797,12 +589,42 @@
       (end-editing))
     (perform-search*)))
 
+(define (replace-all-hits by)
+  ;; replace all the hits after the reference, found once, from the last one
+  ;; to the first, so that each replacement leaves the hits before it as they
+  ;; are (they were found again after each replacement: quadratic); their
+  ;; positions follow the changes
+  (let* ((what (search-tree))
+         (t (buffer-tree))
+         (cur (get-search-reference #t))
+         (sels (filter-search-results
+                 (tree-perform-search t what (tree->path t) 100000000)))
+         (hits (let loop ((l sels))
+                 (cond ((or (null? l) (null? (cdr l))) (list))
+                       ((path-less? (cadr l) cur) (loop (cddr l)))
+                       (else (cons (list (car l) (cadr l)) (loop (cddr l)))))))
+         (ps (map (lambda (h) (map position-new-path h)) hits))
+         (last #f))
+    (for (h (reverse ps))
+      (with sel (map position-get h)
+        (when (not (path-less? (cadr sel) (car sel)))
+          ;; its parts (the cells of a table), from the last one too
+          (with rs (hit-ranges sel what)
+            (for (r (reverse (if (null? rs) (list sel) rs)))
+              (replace-hit r by what)
+              (when (not last)
+                (set! last (position-new-path (cursor-path)))))))))
+    (for (h ps) (for (x h) (position-delete x)))
+    (when last
+      (go-to (position-get last))
+      (position-delete last)
+      (replace-from (cursor-path)))))
+
 (tm-define (replace-all)
   (and-with by (by-tree)
     (with-buffer (master-buffer)
       (start-editing)
-      (while (replace-next by)
-        (perform-search*))
+      (replace-all-hits by)
       (end-editing))
     (perform-search*)))
 

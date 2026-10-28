@@ -1843,43 +1843,11 @@ source code.
   </explain>
 
   <\explain>
-    <scm|(tree-search-hit-parts <scm-arg|content> <scm-arg|path> <scm-arg|path>)>
+    <scm|(tree-search-replace-range <scm-arg|content> <scm-arg|path> <scm-arg|path> <scm-arg|content>)>
 <explain-synopsis|no synopsis>
   <|explain>
-    Calls the <c++> function <cpp|search_hit_parts> which returns
+    Calls the <c++> function <cpp|search_replace_range> which returns
     <scm|array_path>.
-  </explain>
-
-  <\explain>
-    <scm|(tree-search-inner-hit <scm-arg|content> <scm-arg|path> <scm-arg|path> <scm-arg|content>)>
-<explain-synopsis|no synopsis>
-  <|explain>
-    Calls the <c++> function <cpp|search_inner_hit> which returns
-    <scm|array_path>.
-  </explain>
-
-  <\explain>
-    <scm|(tree-search-replace-parts <scm-arg|content> <scm-arg|path> <scm-arg|path> <scm-arg|content>)>
-<explain-synopsis|no synopsis>
-  <|explain>
-    Calls the <c++> function <cpp|search_replace_parts> which returns
-    <scm|array_path>.
-  </explain>
-
-  <\explain>
-    <scm|(tree-search-align-carriers <scm-arg|content> <scm-arg|path> <scm-arg|path> <scm-arg|content>)>
-<explain-synopsis|no synopsis>
-  <|explain>
-    Calls the <c++> function <cpp|search_align_carriers> which returns
-    <scm|array_tree>.
-  </explain>
-
-  <\explain>
-    <scm|(tree-search-align-reason)>
-<explain-synopsis|no synopsis>
-  <|explain>
-    Calls the <c++> function <cpp|search_align_reason> which returns
-    <scm|string>.
   </explain>
 
   <\explain>
