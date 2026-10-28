@@ -342,6 +342,9 @@ public:
   hashmap<string,tree>         missing;     // missing refs
   array<tree>                  redefined;   // redefined labels
   hashmap<string,bool>         touched;     // touched refs
+  hashmap<string,bool>         read_refs;   // refs read since the tables
+                                            // were loaded (see clean_unused)
+  bool                         refs_settled;// tables cleaned by a pass since
   link_repository              link_env;    // current links
   array<array<int> >           size_cache;  // math font size cache
   array<rectangle>             white_zones; // text exclusion zones for curves

@@ -27,6 +27,22 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(typeset-pass-count)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|get_typeset_passes> which returns
+    <scm|int>.
+  </explain>
+
+  <\explain>
+    <scm|(typeset-redone-count)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|get_typeset_redone> which returns
+    <scm|int>.
+  </explain>
+
+  <\explain>
     <scm|(texmacs-version-release <scm-arg|string>)>
 <explain-synopsis|no synopsis>
   <|explain>
