@@ -749,6 +749,10 @@ elseif (APPLE)
     "${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/MacOS/*.m"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/MacOS/*.mm")
   list (REMOVE_ITEM TeXmacs_OS_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/Unix/unix_entrypoint.cpp")
+  # the title bar of the Vue windows (proxy icon, edited dot), macOS only
+  if (VUETEXMACS)
+    list (APPEND TeXmacs_OS_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/Vue/vue_mac.mm")
+  endif ()
 else ()
   file (GLOB TeXmacs_OS_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/Unix/*.cpp")
   list (REMOVE_ITEM TeXmacs_OS_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/Unix/unix_entrypoint.cpp")

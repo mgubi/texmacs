@@ -34,6 +34,13 @@ have the details, and the problems go to the
   and a login shell which hangs is stopped after 5 seconds). A preview
   which cannot be made is now reported in the footer, instead of showing
   nothing or an older preview (#546).
+- **Title bar of the documents** (Vue, macOS): the window of a saved
+  document has the icon of its file next to the title, which can be
+  dragged to the Finder, a mail or a Terminal, and a Cmd-click on the title
+  shows the folders of the file, to open one in the Finder; unsaved changes
+  are shown by the dot in the close button instead of a `*` after the
+  name, as in the other applications of macOS. Untitled documents, help
+  pages and remote files have no icon (#545).
 - **Names of the emoji**: the emoji have names in the universal encoding
   of TeXmacs, those of the LaTeX package `emoji` (the short names of
   Unicode): `<emoji-grinning-face>`, and one name for a whole sequence,

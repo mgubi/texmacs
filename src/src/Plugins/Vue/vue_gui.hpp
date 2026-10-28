@@ -171,6 +171,7 @@ public:
   string the_name;         // the name TeXmacs gave the window
   string mod_name;         // the title it shows (the name and the marker)
   bool   modified;         // has the document unsaved changes?
+  string the_file;         // the file of the document (SLOT_FILE), or ""
   string orig_name;
 
   vue_widget content;
@@ -237,6 +238,11 @@ public:
   virtual void   set_name (string name) = 0;
   virtual string get_name () = 0;
   virtual void   set_modified (bool flag) = 0;
+  // the file of the document, for the title bar of macOS (proxy icon)
+  virtual void   set_file (string file) { the_file= file; }
+  // the document was saved: its file may exist now (Save as), see
+  // vue_sdl_base_window_rep::file_pending
+  virtual void   saved () {}
   virtual void   set_visibility (bool flag) = 0;
   virtual void   set_full_screen (bool flag) = 0;
   // above the other windows of TeXmacs (a tool window)
