@@ -229,6 +229,8 @@ typesetter_rep::typeset () {
   double t0= edit_profile.on ? edit_profile_now () : 0;
   {
     shove_pass pass (shoves);
+    bridge_record_next= true;
+    bridge_macro_scope scope (false);
     br->typeset (PROCESSED+ WANTED_PARAGRAPH);
   }
   double t1= edit_profile.on ? edit_profile_now () : 0;
