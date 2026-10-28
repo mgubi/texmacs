@@ -1855,6 +1855,29 @@
            "ab" ""
            (document (concat (footnote (document "")) (strong "q")
                              (strong "zz") (em "qqqqqq"))))
+          ;; the next match after a replacement in a paragraph of a
+          ;; document inside a tag: the search after it saw the tag of the
+          ;; reference, whose text before it was cut, as the start of the
+          ;; hit, which took the earlier replacements (and was left)
+          ((document (concat (strong (concat (tabular (table (row (cell "b"))))
+                                             "x" (theorem (document "b" "baa"))))
+                             "ab"))
+           (concat (wildcard "w") "b") (concat "<" (wildcard "w") ">")
+           (document (concat (strong (concat (tabular (table (row (cell "<>"))))
+                                             "x" (theorem (document "<>" "<>aa"))))
+                             "<a>")))
+          ((document (concat (strong (concat (tabular (table (row (cell
+                                (document "aabaxaaa" "bbxxxxab")))))
+                                             "abx"
+                                             (theorem (document "abbb" "baa"))))
+                             "abbbb"))
+           (concat (wildcard "w") "b") (concat "<" (wildcard "w") ">")
+           (document (concat (strong (concat (tabular (table (row (cell
+                                (document "<aa>axaaa" "<><><xxxxa>")))))
+                                             "<a>x"
+                                             (theorem (document "<a><><>"
+                                                                "<>aa"))))
+                             "<a><><><>")))
           ;; a leading wildcard does not take the text before the reference
           ((document (concat "p" (strong "xb") "zb"))
            (concat (wildcard "w") "b") (concat "<" (wildcard "w") ">")

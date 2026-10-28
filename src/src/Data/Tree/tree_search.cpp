@@ -1979,7 +1979,11 @@ search_from_paragraph (tree t, tree what, path p, path q, int limit) {
     // (a hit at the start of the text after cur starts at cur)
     path r1= p * uncut (t, q, h1->next);
     path r2= p * uncut (t, q, h2->next);
-    if (!is_nil (q) && path_less (r1, p * q)) r1= p * q;
+    // (a hit which starts before cur, or at a tag around it whose text
+    // before cur was cut, starts at cur: the text before the reference,
+    // the output of an earlier replacement, is never in it)
+    path c= p * q;
+    if (!is_nil (q) && (path_less (r1, c) || (r1 <= c && r1 != c))) r1= c;
     if (path_less (r2, r1)) r2= r1;
     r << r1 << r2;
   }
@@ -2005,7 +2009,7 @@ search_from (tree t, tree what, path p, path cur, int limit) {
     range_set sel= search (d, what, path (), limit);
     for (int i=0; i+1<N(sel) && i < 2*limit; i+=2) {
       path r1= p * uncut (t, q, sel[i]), r2= p * uncut (t, q, sel[i+1]);
-      if (path_less (r1, cur)) r1= cur;
+      if (path_less (r1, cur) || (r1 <= cur && r1 != cur)) r1= cur;
       if (path_less (r2, r1)) r2= r1;
       r << r1 << r2;
     }

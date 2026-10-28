@@ -594,9 +594,12 @@
                      (tree-search-replace-range
                        t (list-tail (car h) (length p))
                        (list-tail (cadr h) (length p)) what))))
-        (when (and r (nnull? r))
-          (selection-set-range-set
-            (list (append p (car r)) (append p (cadr r)))))))))
+        (cond ((and r (nnull? r))
+               (selection-set-range-set
+                 (list (append p (car r)) (append p (cadr r)))))
+              ((== (replace-state cur) replace-last)
+               ;; nothing left to replace: no hit in the replacements
+               (selection-cancel)))))))
 
 (define (text-length t)
   (if (tree-atomic? t) (string-length (tree->string t))
