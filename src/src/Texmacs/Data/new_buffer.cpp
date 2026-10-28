@@ -686,7 +686,7 @@ static hashmap<string,int> inclusions_busy (0);
 // (changed with the cache: the typesetter looks the inclusions up again
 // then, see same_lookups in Typeset/Bridge/bridge.cpp)
 static unsigned long long inclusions_version= 1;
-// when and how the file of an entry was read (time of the file, its size,
+// when and how the file of an entry was read (time of the file, its identity,
 // and the time of the reading), so that a file which was not touched since
 // need not be read and parsed again (refresh_inclusions)
 static hashmap<string,tree> inclusion_stats ("");
@@ -695,7 +695,7 @@ static tree
 stat_tuple (url name) {
   int rd= (int) time (NULL);
   return tuple (as_string (last_modified (name, false)),
-                as_string (file_size (name)), as_string (rd));
+                file_identity (name), as_string (rd));
 }
 
 unsigned long long
@@ -733,13 +733,14 @@ refresh_inclusions () {
   for (int i=0; i<N(names); i++) {
     string name_s= names[i];
     tree old_doc= document_inclusions [name_s];
-    // (a file whose time and size are those of the reading, which is more
+    // (a file whose time, size, change time and inode are those of the reading, which is more
     // than two seconds later than the time of the file, is the same)
     url file= url_system (name_s);
     if (inclusion_stats->contains (name_s)) {
       tree st= inclusion_stats [name_s];
-      int mt= last_modified (file, false), sz= file_size (file);
-      if (as_int (st[0]) == mt && as_int (st[1]) == sz &&
+      int mt= last_modified (file, false);
+      string id= file_identity (file);
+      if (as_int (st[0]) == mt && N(id) > 0 && as_string (st[1]) == id &&
           as_int (st[2]) > mt + 2 && mt > 0)
         continue;
     }

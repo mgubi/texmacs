@@ -2748,6 +2748,47 @@
     (buffer-pretend-saved m)
     (buffer-close m)))
 
+;; The files which Update All reads again are skipped when they were not
+;; touched (#425): a file replaced with its old time and size is still read.
+(define (incl-sh . l)
+  (system (apply string-append l)))
+
+(define (incl-gc-times)
+  (incl-write "gc-t.tm" '((section "Alpha") (concat "a" (index "alpha"))))
+  (incl-write "gc-tm.tm"
+              '((table-of-contents "toc" (document ""))
+                (section "Top")
+                (include "gc-t.tm")
+                (the-index "idx" (document ""))))
+  (let ((t (url->system (incl-file "gc-t.tm")))
+        (r (url->system (incl-file "gc-t.ref"))))
+    (when (not (os-win32?))
+      ;; the file is old, and the master reads it
+      (incl-sh "touch -t 200001010000 '" t "'")
+      (with m (incl-file "gc-tm.tm")
+        (load-buffer m)
+        (switch-to-buffer* m)
+        (update-forced)
+        (update-all-kept)
+        (check-true (string-occurs? "Alpha" (incl-table 'table-of-contents)))
+        ;; nothing changed: the file is not read again, nothing is typeset
+        (let ((c (typeset-redone-count)))
+          (inclusions-gc)
+          (update-forced)
+          (when (not (member (getenv "TEXMACS_TYPESET_READS")
+                             (list "off" "check")))
+            (check= (typeset-redone-count) c)))
+        ;; replaced by a file of the same size and the same time
+        (incl-sh "cp -p '" t "' '" r "'")
+        (incl-write "gc-t.tm" '((section "Omega") (concat "a" (index "alpha"))))
+        (incl-sh "touch -r '" r "' '" t "'")
+        (update-all-kept)
+        (check-true (string-occurs? "Omega" (incl-table 'table-of-contents)))
+        (check-false (string-occurs? "Alpha" (incl-table 'table-of-contents)))
+        (check= (labels-state) (incl-labels-fresh))
+        (buffer-pretend-saved m)
+        (buffer-close m)))))
+
 (define (test-included-files)
   (check-group "included files")
   (let ((old (current-buffer))
@@ -2757,7 +2798,7 @@
     (system-mkdir (system->url incl-dir))
     (incl-extern)
     (for (f (list incl-renumbering incl-renumbering-writes
-                  incl-cite-first incl-saved-include incl-gc-keeps incl-gc-more))
+                  incl-cite-first incl-saved-include incl-gc-keeps incl-gc-more incl-gc-times))
       (with r (check-run f)
         (when (and (pair? r) (== (car r) 'error))
           (check-report #f "the group" (object->string r)))))
