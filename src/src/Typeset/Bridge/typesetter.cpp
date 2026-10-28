@@ -117,6 +117,15 @@ typesetter_rep::local_end (array<page_item>& prev_l, stack_border& prev_sb) {
 // see typesetter.hpp
 int typeset_check_mismatches= 0;
 int get_typeset_check_mismatches () { return typeset_check_mismatches; }
+int typeset_passes_total= 0;
+int typeset_redone_total= 0;
+int get_typeset_passes () { return typeset_passes_total; }
+int get_typeset_redone () { return typeset_redone_total; }
+void
+typeset_count_redone (int n) {
+  typeset_redone_total += n;
+  if (edit_profile.on) edit_profile.redone += n;
+}
 
 void
 typeset_cache_mismatch (string what) {
@@ -216,6 +225,7 @@ typesetter_rep::typeset () {
     env->redefined= array<tree> ();
     env->touched  = hashmap<string,bool> (false);
   }
+  typeset_passes_total++;
   double t0= edit_profile.on ? edit_profile_now () : 0;
   {
     shove_pass pass (shoves);
