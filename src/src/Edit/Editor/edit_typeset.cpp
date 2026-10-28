@@ -94,7 +94,13 @@ hashmap<string,tree> edit_typeset_rep::get_ref () { return buf->data->ref; }
 hashmap<string,tree> edit_typeset_rep::get_aux () { return buf->data->aux; }
 hashmap<string,tree> edit_typeset_rep::get_att () { return buf->data->att; }
 void edit_typeset_rep::set_fin (hashmap<string,tree> H) { fin= H; }
-void edit_typeset_rep::set_ref (hashmap<string,tree> H) { buf->data->ref= H; }
+void
+edit_typeset_rep::set_ref (hashmap<string,tree> H) {
+  buf->data->ref= H;
+  // (loaded tables: see clean_unused)
+  env->refs_settled= false;
+  env->read_refs= hashmap<string,bool> (false);
+}
 void edit_typeset_rep::set_aux (hashmap<string,tree> H) { buf->data->aux= H; }
 void edit_typeset_rep::set_att (hashmap<string,tree> H) { buf->data->att= H; }
 
@@ -1203,19 +1209,33 @@ report_redefined (array<tree> redefined) {
 }
 
 // Removes the references which the last complete pass did not define, and
-// tells how many were removed. A reference to one of them was typeset with
-// its old value during that pass (lookup_value reads local_ref first), and
-// was not reported as missing: one more pass gives it "?" (#417).
+// tells how many of them make one more pass necessary. A reference to one
+// of them was typeset with its old value during that pass (lookup_value
+// reads local_ref first), and was not reported as missing: one more pass
+// gives it "?" (#417).
+// The first time, the table is the one which was loaded with the file, and
+// holds entries which no label of the document defines any more (old
+// names, labels of other versions): they matter only if a reference to
+// them was typeset since (read_refs). Afterwards, an entry is there because
+// a pass defined it, and a bridge which was kept may have read it (#408).
 static int
-clean_unused (hashmap<string,tree>& refs, hashmap<string,bool> used) {
+clean_unused (edit_env env) {
+  hashmap<string,tree>& refs= env->local_ref;
+  bool settled= env->refs_settled;
   array<string> a;
+  int matter= 0;
   for (iterator<string> it= iterate (refs); it->busy(); ) {
     string key= it->next ();
-    if (!used->contains (key)) a << key;
+    if (!env->touched [key]) {
+      a << key;
+      if (settled || env->read_refs->contains (key)) matter++;
+    }
   }
   for (int i=0; i<N(a); i++)
     refs->reset (a[i]);
-  return N(a);
+  env->refs_settled= true;
+  env->read_refs= hashmap<string,bool> (false);
+  return matter;
 }
 
 void
@@ -1225,24 +1245,37 @@ edit_typeset_rep::typeset (SI& x1, SI& y1, SI& x2, SI& y2) {
   x1= MAX_SI; y1= MAX_SI; x2= MIN_SI; y2= MIN_SI;
   while (true) {
     SI sx1, sy1, sx2, sy2;
+    // (a pass which uses the bridges again, typeset_invalidate_keep: the
+    // bridges used again do not look up what they looked up before, so that
+    // the references which they found missing, and which this pass defines
+    // later in the document, are not told in env->missing: when the tables
+    // changed during the pass, one more pass looks them up again)
+    bool kept= ttt->collect;
+    unsigned long long stamp= env->labels_stamp ();
     typeset_sub (sx1, sy1, sx2, sy2);
     x1= min (x1, sx1); y1= min (y1, sy1);
     x2= max (x2, sx2); y2= max (y2, sy2);
     if (!env->complete) break;
     env->complete= false;
+    bool again= kept && env->labels_stamp () != stamp;
     // a removed label is treated like a redefined one: one more pass
     // (still bounded by the test below, which stops when the counts of
     // missing and redefined references no longer decrease)
-    int removed= clean_unused (env->local_ref, env->touched);
-    if (N(env->missing) == 0 && N(env->redefined) == 0 && removed == 0) break;
-    if ((N(env->missing) == missing_nr && N(env->redefined) == redefined_nr) ||
-        (N(env->missing) > missing_nr || N(env->redefined) > redefined_nr)) {
+    int removed= clean_unused (env);
+    if (N(env->missing) == 0 && N(env->redefined) == 0 && removed == 0 &&
+        !again) break;
+    if (!again &&
+        ((N(env->missing) == missing_nr && N(env->redefined) == redefined_nr) ||
+         (N(env->missing) > missing_nr || N(env->redefined) > redefined_nr))) {
       report_missing (env->missing);
       report_redefined (env->redefined);
       break;
     }
     missing_nr= N(env->missing);
     redefined_nr= N(env->redefined);
+    // (a complete pass again: the next one must collect the references,
+    // the page numbers and the auxiliary tables, which a pass that uses
+    // bridges again does not)
     ::notify_assign (ttt, path(), ttt->br->st);
   }
 }
@@ -1368,7 +1401,7 @@ edit_typeset_rep::typeset_renumber_labels () {
     env->complete= false;
     // the references to a removed label are typeset again by the
     // typesetting which follows (see typeset above)
-    if (clean_unused (env->local_ref, env->touched) != 0)
+    if (clean_unused (env) != 0)
       ::notify_assign (ttt, path(), ttt->br->st);
   }
   if (pending) {

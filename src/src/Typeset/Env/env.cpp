@@ -44,6 +44,7 @@ edit_env_rep::edit_env_rep (drd_info& drd2,
   local_aux (local_aux2), global_aux (&global_aux2),
   local_att (local_att2), global_att (&global_att2),
   missing (UNINIT), redefined (), touched (false),
+  read_refs (false), refs_settled (false),
   read_unknown (false), rec_keys (NULL), rec_values (NULL),
   rec_key_set (NULL), rec_bindings (NULL), rec_merged (NULL), rec_held (NULL),
   auto_buffer (""), typesetting (0), files_base (""), files_cur (""),
@@ -165,7 +166,13 @@ edit_env_rep::lookup_value (string name) {
   if (name[0] == 'a')
     return local_att->contains (key)? local_att [key]: (*global_att) [key];
   int type= (name[0] == '1') ? 1 : 0;
-  tree value= local_ref->contains (key)? local_ref [key]: (*global_ref) [key];
+  tree value;
+  if (local_ref->contains (key)) {
+    // (while the tables are those which were loaded: see clean_unused)
+    if (!refs_settled) read_refs (key)= true;
+    value= local_ref [key];
+  }
+  else value= (*global_ref) [key];
   if (is_func (value, TUPLE) && (N(value) >= 2)) value= value[type];
   else if (type == 1) value= tree (UNINIT);
   return value;

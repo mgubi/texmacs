@@ -409,6 +409,109 @@
          (check= (nr "s2") "2")
          (check= (height) h))))))
 
+;; The pass which a removed label asks for is a complete one: a label which
+;; only disappears because of it (here dep, made when s2 is 2) is removed
+;; too, and the references to it show "?" (#408: a pass which uses bridges
+;; again does not clean the tables). (typeset-redone-count counts the
+;; bridges typeset again with the reuse by inputs: it stays 0 with
+;; TEXMACS_TYPESET_READS=off.)
+(define (test-removed-label-chain)
+  (check-group "removed label, chain")
+  (with-typeset-body
+   '(document (section (concat "A" (label "s1")))
+              (concat "X" (if (equal (get-binding "s2") "2") (label "dep") ""))
+              (concat "See dep: " (reference "dep"))
+              (section (concat "B" (label "s2")))
+              "Text.")
+   (lambda ()
+     (let* ((update (lambda ()
+                      (update-forced)
+                      (generate-all-aux)
+                      (update-current-buffer)
+                      (update-forced))))
+       (update)
+       (update)
+       (check-true (in? "dep" (list-references)))
+       (tree-set (tree-ref (buffer-tree) 3) '(section "B"))
+       (update)
+       (check-false (in? "s2" (list-references)))
+       (check-false (in? "dep" (list-references)))
+       (check= (tree->stree (get-reference "dep")) '(uninit))))))
+
+;; A file holds the table of its references as it was saved: entries which no
+;; label of the body defines any more (old names of automatic labels, labels
+;; removed since) are cleaned by the first complete pass, and are no reason
+;; for another pass unless a reference to one of them was typeset (#408: a
+;; chapter of a book with some hundreds of them was typeset twice from
+;; scratch).
+(define (stale-file name body refs)
+  (tree-export
+   (stree->tree
+    `(document (TeXmacs "2.1")
+               (style (tuple "article"))
+               (body (document ,@body))
+               (references
+                (collection
+                 ,@(map (lambda (r) `(associate ,r (tuple "7" "3"))) refs)))))
+   (incl-file name) "texmacs"))
+
+(define (stale-typeset name)
+  ;; the passes and the bridges typeset again by the first typesetting of
+  ;; the file, and the references of the buffer afterwards
+  (let* ((p0 (typeset-pass-count))
+         (r0 (typeset-redone-count))
+         (u (incl-file name)))
+    (load-buffer u)
+    (switch-to-buffer* u)
+    (update-forced)
+    (list (- (typeset-pass-count) p0) (- (typeset-redone-count) r0)
+          (list-references))))
+
+(define (test-stale-references)
+  (check-group "stale references")
+  (let ((old (current-buffer))
+        (before (buffer-list))
+        (mismatches (typeset-check-mismatches))
+        (body '((section (concat "A" (label "s1")))
+                (concat "See " (reference "s1") ".")
+                "Text.")))
+    (incl-clear-dir)
+    (system-mkdir (system->url incl-dir))
+    (with r (check-run
+             (lambda ()
+               ;; no stale entry: the reference
+               (stale-file "clean.tm" body '())
+               (with c (stale-typeset "clean.tm")
+                 (check= (car c) 1)
+                 (check-true (in? "s1" (caddr c)))
+                 ;; entries which nothing reads: one pass, as without them,
+                 ;; and the table is cleaned
+                 (stale-file "stale.tm" body
+                             (list "old-1" "old-2" "auto-9" "s0"))
+                 (with s (stale-typeset "stale.tm")
+                   (check= (car s) 1)
+                   (check= (cadr s) (cadr c))
+                   (check= (caddr s) (caddr c))))
+               ;; a reference to an entry which is not a label of the body
+               ;; shows the old value in the first pass, and "?" in the
+               ;; next (#417)
+               (stale-file "read.tm"
+                           '((concat "See " (reference "old-1") ".")
+                             "Text.")
+                           (list "old-1" "old-2"))
+               (with s (stale-typeset "read.tm")
+                 (check= (car s) 2)
+                 (check-false (in? "old-1" (caddr s))))))
+      (when (and (pair? r) (== (car r) 'error))
+        (check-report #f "the group" (object->string r)))
+      (for (b (buffer-list))
+        (when (nin? b before)
+          (buffer-pretend-saved b)
+          (buffer-close b)))
+      (when (buffer-exists? old) (switch-to-buffer* old))
+      (incl-clear-dir)
+      (check= (typeset-check-mismatches) mismatches))))
+
 ;; The entries of the table of contents and of the index put a label where
 ;; they stand, auto-n. The number is that of the tag which makes the label
 ;; (Typeset/Env/env_exec.cpp, exec_auto_id): it follows the order of the
@@ -1398,6 +1501,57 @@
 ;; The loci and links in the parts of a surround (the left part of a
 ;; footnote...) stay registered when its body is edited: the parts are
 ;; kept, and so is what they declared.
+;; The parts of a surround below a paragraph (which records no inputs of its
+;; own) read what the paragraph read before them: the inputs of the parts are
+;; those they read, also those which the paragraph had read already.
+(define (surround-parts-body lookup?)
+  (if lookup?
+      '(document
+        (set-binding "lab" "1cm")
+        (assign "sel" "1")
+        (with "w" (if (equal (value "sel") "1") (get-binding "lab") "1cm")
+              "sel" "0"
+          (surround (concat "L" (hspace (get-binding "lab")) "R") ""
+                    (document "body")))
+        "after")
+      '(document
+        (assign "y" "1cm")
+        (assign "sel" "1")
+        (with "w" (if (equal (value "sel") "1") (value "y") "1cm") "sel" "0"
+          (surround (concat "L" (hspace (value "y")) "R") ""
+                    (document "body")))
+        "after")))
+
+(define (surround-parts-x)
+  (car (tree-bounding-rectangle (tree-ref (buffer-tree) 2 4 2 0))))
+
+(define (surround-parts-scratch)
+  (let ((body (tree-copy (buffer-tree))))
+    (with-scratch-buffer
+     (lambda (u)
+       (buffer-set-body u body)
+       (update-current-buffer)
+       (update-forced) (update-forced)
+       (surround-parts-x)))))
+
+(define (test-surround-parts-inputs)
+  (check-group "inputs of the parts of a surround below a paragraph")
+  ;; (not with the classic cache, TEXMACS_TYPESET_READS=off, whose old
+  ;; mistakes this finds)
+  (when (!= (getenv "TEXMACS_TYPESET_READS") "off")
+   (for (lookup? '(#f #t))
+    (with-scratch-buffer
+     (lambda (u)
+       (buffer-set-body u (stree->tree (surround-parts-body lookup?)))
+       (update-current-buffer)
+       (update-forced) (update-forced)
+       (tree-set (tree-ref (buffer-tree) 1 1) "2")
+       (update-forced) (update-forced)
+       (tree-set (tree-ref (buffer-tree) 0 1) "5cm")
+       (update-forced) (update-forced)
+       (check= (surround-parts-x) (surround-parts-scratch))
+       (check= (typeset-check-mismatches) 0))))))
+
 (define (test-loci-of-surround-parts)
   (check-group "loci of surround parts")
   (with-typeset-body
@@ -1894,7 +2048,10 @@
   (let* ((ds (fz-documents (buffer-tree)))
          (d (fz-pick ds))
          (n (tree-arity d))
-         (pos (if (<= n 2) (min 1 n) (+ 1 (fz-rnd (- n 1))))))
+         ;; (the first two paragraphs of the root are the assignments which
+         ;; the edits of the cases 8 and 9 go through)
+         (lo (if (== (tree->path d) (tree->path (buffer-tree))) 2 1))
+         (pos (if (<= n (+ lo 1)) (min lo n) (+ lo (fz-rnd (- n lo))))))
     (case (fz-rnd 10)
       ((0 1) (tree-insert d pos (list (fz-leaf 1))))
       ((2) (when (> n 3) (tree-remove d pos 1)))
@@ -1912,7 +2069,7 @@
        (when (and (< pos n) (> n 3))
          (with s (tree->stree (tree-ref d pos))
            (tree-remove d pos 1)
-           (tree-insert d (+ 1 (fz-rnd (- n 2))) (list (stree->tree s))))))
+           (tree-insert d (+ lo (fz-rnd (- n lo 1))) (list (stree->tree s))))))
       ((8) ;; the name of the theorems moved
        (tree-set (tree-ref (buffer-tree) 0 1 1 2) (fz-pick '("0pt" "2ex" "4ex"))))
       (else ;; the value of the variable assigned at the start
@@ -2394,6 +2551,28 @@
     (buffer-pretend-saved m)
     (buffer-close m)))
 
+(define (incl-cite-first)
+  ;; citations before a bibliography which the first Update All generates:
+  ;; the pass which uses the bridges again must give them their numbers
+  ;; (not "?") although the bridges of the citations are used again and
+  ;; look nothing up (#408)
+  (string-save incl-bib (incl-file "refs.bib"))
+  (incl-write "citefirst.tm"
+              '((section "S")
+                (concat "Cite " (cite "knuth") " and " (cite "lamport") ".")
+                (concat "Forward " (reference "later") ".")
+                (bibliography "bib" "tm-plain" "refs" (document ""))))
+  (with m (incl-file "citefirst.tm")
+    (load-buffer m)
+    (switch-to-buffer* m)
+    (update-forced)
+    (update-all-kept)
+    (go-start)
+    (with st (incl-state) (check= (car st) (cadr st)))
+    (check= (cadr (tree->stree (get-reference "bib-knuth"))) "1")
+    (buffer-pretend-saved m)
+    (buffer-close m)))
+
 (define (incl-saved-include)
   ;; an included file changed and saved from its own buffer, then one
   ;; Update All of the master: saving resets the inclusion (reset_inclusion
@@ -2578,7 +2757,7 @@
     (system-mkdir (system->url incl-dir))
     (incl-extern)
     (for (f (list incl-renumbering incl-renumbering-writes
-                  incl-saved-include incl-gc-keeps incl-gc-more))
+                  incl-cite-first incl-saved-include incl-gc-keeps incl-gc-more))
       (with r (check-run f)
         (when (and (pair? r) (== (car r) 'error))
           (check-report #f "the group" (object->string r)))))
@@ -2620,6 +2799,8 @@
   (test-numbering)
   (test-renumbering)
   (test-removed-label)
+  (test-removed-label-chain)
+  (test-stale-references)
   (test-automatic-labels)
   (test-labels-of-nested-tags)
   (test-reuse-below-bindings)
@@ -2639,6 +2820,7 @@
   (test-bindings-against-scratch)
   (test-labels-of-parts)
   (test-loci-of-surround-parts)
+  (test-surround-parts-inputs)
   (test-bindings-written-again)
   (test-labels-after-undo)
   (test-labels-after-redo)

@@ -57,6 +57,14 @@ extern edit_profile_data edit_profile;
 // TEXMACS_TYPESET_CACHES set to "check") since the start: a test fails
 // when there are any
 extern int typeset_check_mismatches;
+// passes of the typesetter and bridges typeset again (not used again) since
+// the start, counted also without TEXMACS_EDIT_PROFILE: tests check them
+extern int typeset_passes_total;
+extern int typeset_redone_total;
+int get_typeset_passes ();
+int get_typeset_redone ();
+// (the one place where bridges typeset again are counted: for both counters)
+void typeset_count_redone (int n);
 int get_typeset_check_mismatches ();
 // passes of the typesetter and bridges typeset again (not used again) since
 // the start, counted also without TEXMACS_EDIT_PROFILE: tests check them

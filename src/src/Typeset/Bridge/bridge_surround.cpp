@@ -49,12 +49,17 @@ public:
   bool my_typeset_will_be_complete ();
   void my_typeset (int desired_status);
   bool parts_again ();
+  // (while the parts are typeset under a record of their own)
+  array<string> nested_keys; array<tree> nested_values;
+  array<int> nested_vars; unsigned long long nested_vals;
+  bool nested_known, nested_zoom;
 };
 
 bridge_surround_rep::bridge_surround_rep (typesetter ttt, tree st, path ip):
   bridge_rep (ttt, st, ip), changes_before (UNINIT),
   parts_ok (false), parts_fp (0), parts_zoom (false), parts_zoom_at (""),
-  parts_stamp (0), parts_known (false)
+  parts_stamp (0), parts_known (false), nested_vals (0), nested_known (false),
+  nested_zoom (false)
 {
   initialize ();
 }
@@ -210,14 +215,57 @@ bridge_surround_rep::my_typeset (int desired_status) {
     cout << st[1] << "\n";
     cout << "-------------------------------------------------------------\n";
     */
-    a= typeset_concat (env, st[0], descend (ip, 0));
-    b= typeset_concat (env, st[1], descend (ip, 1));
+    // A surround which does not record (it is below a paragraph) types its
+    // parts under a record of its own, which it then gives to the record
+    // around: the slice of that record which they added would miss what
+    // the paragraph had read before.
+    bool nested= (inputs && in_unrecorded && keys != NULL);
+    if (nested) {
+      env_id_set nreads;
+      array<string> nkeys;
+      array<tree> nvalues;
+      array<int> nvars;
+      unsigned long long nvals= 0;
+      {
+        edit_env_rep::read_record record (env.operator-> (), &nreads,
+                                          &nkeys, &nvalues, &nvars, &nvals);
+        a= typeset_concat (env, st[0], descend (ip, 0));
+        b= typeset_concat (env, st[1], descend (ip, 1));
+        nested_known= record.complete () && N(nvars) <= 256 && N(nkeys) <= 64;
+        record.stop ();
+        nested_zoom= record.zoom;
+      }
+      nested_keys= nkeys; nested_values= nvalues;
+      nested_vars= nvars; nested_vals= nvals;
+      // (the inputs first, as give_record: the reads put the variables
+      // in the record, and a variable in it is not an input)
+      add_inputs (env, nested_known, nvars, nvals);
+      add_reads (env, nested_known && nreads.size () <= 256, nreads.ids,
+                 nkeys, nvalues);
+    }
+    else {
+      a= typeset_concat (env, st[0], descend (ip, 0));
+      b= typeset_concat (env, st[1], descend (ip, 1));
+    }
     env->local_update (ttt->old_patch, changes_before);
     env->local_end (prev_back);
     corrupted= false;
-    bool zoom= env->zoom_read ();
+    bool zoom= (nested? nested_zoom: env->zoom_read ());
     env->zoom_read ()= zoom0 || zoom;
-    if (inputs) {
+    if (nested) {
+      parts_zoom= zoom;
+      parts_zoom_at= zoom_at;
+      parts_ok= true;
+      parts_fp= fp;
+      parts_keys= nested_keys;
+      parts_values= nested_values;
+      parts_stamp= 0;
+      parts_known= nested_known;
+      parts_vars= nested_vars;
+      parts_vals= nested_vals;
+      parts_bindings= (bs == NULL? array<tree> (): range (*bs, b0, N(*bs)));
+    }
+    else if (inputs) {
       parts_zoom= zoom;
       parts_zoom_at= zoom_at;
       // (what the parts looked up: added to the record of the bridge)
