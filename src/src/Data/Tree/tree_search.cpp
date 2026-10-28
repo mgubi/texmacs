@@ -1741,8 +1741,9 @@ match_tokens (region_matcher& m, tree what, bool str, bool alone,
   // (initial) matches, or if they are an argument alone, the leftmost match
   // (at the start): a leading wildcard starts at the start, a trailing one
   // takes the rest, as the search carries an outer wildcard to the end of
-  // the formula; in a string (str), with partial and without initial
-  // matches, the match ends at its end, as match_atomic. start: the token
+  // the formula; in a string (str) argument of a tag pattern, with partial
+  // and without initial matches, the match ends at its end, as
+  // match_atomic. start: the token
   // where it starts. lazy (alone): the leftmost match only, not all of the
   // tokens first, as the search on them (a1xa2x with a*x: a1x)
   array<search_token> toks= m.toks;
@@ -1752,7 +1753,7 @@ match_tokens (region_matcher& m, tree what, bool str, bool alone,
   if (!(alone || partial_match_flag || initial_match_flag) || N(m.kind) == 0)
     return false;
   bool to_end= m.kind[N(m.kind)-1] == ELEM_WILDCARD ||
-               (str && partial_match_flag && !initial_match_flag);
+               (str && !alone && partial_match_flag && !initial_match_flag);
   region_matcher m2;
   m2.toks= toks;
   m2.init (what, to_end);

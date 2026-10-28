@@ -1843,6 +1843,22 @@
            (document "aaaaaa"))
           ((document "a1xa2xa3x") (concat "a" (wildcard "w") "x") "xa"
            (document "xaxaxa"))
+          ;; a leading wildcard, whose hit enters the tag: the next
+          ;; matches in the argument, which the search does not give as
+          ;; hits, are replaced too, as by Replace one again and again
+          ((document (frac "xabzb" "c"))
+           (concat (wildcard "w") "b") (concat "<" (wildcard "w") ">")
+           (document (frac "<xa><z>" "c")))
+          ((document (concat "q" (strong "xabzb")))
+           (concat (wildcard "w") "b") (concat "<" (wildcard "w") ">")
+           (document (concat "q" (strong "<xa><z>"))))
+          ((document (tabular (table (row (cell "xbyb") (cell "zb")))))
+           (concat (wildcard "w") "b") (concat "<" (wildcard "w") ">")
+           (document (tabular (table (row (cell "<x><y>") (cell "<z>"))))))
+          ((document (frac "a1xa2x" "c"))
+           (concat (wildcard "w") "a" (wildcard "v") "x")
+           (concat "[" (wildcard "w") "|" (wildcard "v") "]")
+           (document (frac "[|1][|2]" "c")))
           ((document (frac "a2xa3x" "c"))
            (concat "a" (wildcard "w") "x") (concat "[" (wildcard "w") "]")
            (document (frac "[2][3]" "c")))
@@ -1976,6 +1992,11 @@
             '(((document (frac (strong "zab") "c"))
                (frac (concat "a" (wildcard "w")) "c") (frac (wildcard "w") "d")
                (document (frac (strong "zab") "c")))
+              ;; the match in an argument as the search highlights it, not
+              ;; up to its end
+              ((document (frac "xabzb" "c"))
+               (concat (wildcard "w") "b") (concat "<" (wildcard "w") ">")
+               (document (frac "<xa><z>" "c")))
               ((document (frac "zxbyz" "c"))
                (concat "x" (wildcard "w") "y") (concat "<" (wildcard "w") ">")
                (document (frac "z<b>z" "c")))))))
