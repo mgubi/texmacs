@@ -219,7 +219,10 @@ bridge_compound_rep::my_typeset (int desired_status) {
     // /*IF_NON_CHILD_ENFORCING(st)*/ ttt->insert_marker (st, ip);
     if (!the_drd->is_child_enforcing (st))
       ttt->insert_marker (st, ip);
+    bool old_in_macro= bridge_in_macro;
+    bridge_in_macro= true;
     body->typeset (desired_status);
+    bridge_in_macro= old_in_macro;
     env->macro_arg= env->macro_arg->next;
     env->macro_src= env->macro_src->next;
   }

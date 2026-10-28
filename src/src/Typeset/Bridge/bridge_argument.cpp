@@ -178,7 +178,10 @@ bridge_argument_rep::my_typeset (int desired_status) {
   list<hashmap<string,path> > old_src= env->macro_src;
   if (!is_nil (env->macro_arg)) env->macro_arg= env->macro_arg->next;
   if (!is_nil (env->macro_src)) env->macro_src= env->macro_src->next;
+  bool old_in_macro= bridge_in_macro;
+  bridge_in_macro= false;
   body->typeset (desired_status);
+  bridge_in_macro= old_in_macro;
   env->macro_arg= old_var;
   env->macro_src= old_src;
 }

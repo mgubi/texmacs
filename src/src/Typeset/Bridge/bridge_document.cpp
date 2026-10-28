@@ -175,6 +175,7 @@ bridge_block_rep::my_typeset (int desired_status) {
   for (int k=0; k<N(brs); k++) {
     ttt->a= array<line_item> ();
     ttt->b= array<line_item> ();
+    bridge_record_next= !bridge_in_macro;
     brs[k]->typeset (PROCESSED + WANTED_PARAGRAPH);
   }
 }
@@ -410,6 +411,7 @@ bridge_document_rep::typeset_one (int i, int n, int desired_status,
   int wanted= (i==n-1? desired_status & WANTED_MASK: WANTED_PARAGRAPH);
   ttt->a= (i==0  ? a: array<line_item> ());
   ttt->b= (i==n-1? b: array<line_item> ());
+  bridge_record_next= !bridge_in_macro;
   brs[i]->typeset (PROCESSED+ wanted);
 }
 
@@ -446,6 +448,7 @@ bridge_document_rep::my_typeset (int desired_status) {
       br->set_paragraphs (range (brs, s, e));
       ttt->a= array<line_item> ();
       ttt->b= array<line_item> ();
+      bridge_record_next= !bridge_in_macro;
       blk->typeset (PROCESSED + WANTED_PARAGRAPH);
     }
   }

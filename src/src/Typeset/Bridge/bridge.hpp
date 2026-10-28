@@ -49,6 +49,7 @@ public:
                                     // again (0: not yet; see same_lookups)
   // what it was typeset from, when the inputs are used (see "What is
   // typeset again" in bridge.cpp)
+  bool                 in_unrecorded; // it records nothing (typeset_unrecorded)
   bool                 in_known; // all its inputs are known:
   array<int>           in_vars;  // the variables read before written
   unsigned long long   in_vals;  // a hash of their values (inputs_hash)
@@ -102,7 +103,17 @@ public:
   bool same_inputs ();
   void give_record ();
   bool typeset_by_inputs (int desired_status); // (made again?)
+  bool typeset_unrecorded (int desired_status);
 };
+
+// Which bridges record their inputs (see "What is typeset again" in
+// bridge.cpp): a bridge records them when the bridge above it is a block
+// of paragraphs or when it is the root, which is told to it by the flag
+// (the bridge which gets the flag clears it). The record may be
+// "all" (TEXMACS_TYPESET_RECORD=all: every bridge) or "blocks" (the default)
+extern bool bridge_record_next;
+extern bool bridge_in_macro; // typesetting the body of a macro, not an argument
+int typeset_record_mode ();
 
 
 // do two lists of page items make the same boxes (the check modes)?
