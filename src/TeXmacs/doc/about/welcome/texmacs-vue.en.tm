@@ -301,6 +301,14 @@
 
   The additions to <TeXmacs> Upsilon, the newest first.
 
+  <paragraph|28 October 2026>
+
+  <\itemize>
+    <item>A window closed by a key or a click in its own editor (<key|C-return>
+    in the editor of a comment) or by a key of another window no longer
+    crashes the page.
+  </itemize>
+
   <paragraph|27 October 2026>
 
   <\itemize>

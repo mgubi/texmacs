@@ -2832,8 +2832,12 @@ static bool
 close_hosted_windows (vue_window w) {
   if (!host_is_bare || !is_host (w)) return false;
   array<vue_virtual_window_rep*> vl= virtual_windows;
+  // (by the ids taken before: a window closed by the close of another one
+  // is freed; the ids are never reused)
+  array<int> vids;
+  for (int i= 0; i < N(vl); i++) vids << vl[i]->id;
   for (int i= N(vl) - 1; i >= 0; i--)
-    if (id_to_window->contains (vl[i]->id) && !vl[i]->popup)
+    if (id_to_window->contains (vids[i]) && !vl[i]->popup)
       vl[i]->destroy_event ();
   return true;
 }
@@ -5023,8 +5027,12 @@ void process_layout () {
   // the virtual windows (single-window mode); the array may change while
   // they are laid out
   array<vue_virtual_window_rep*> vl= virtual_windows;
+  array<int> vids;
+  for (int i= 0; i < N(vl); i++) vids << vl[i]->id;
   for (int i= 0; i < N(vl); i++) {
-    if (!id_to_window->contains (vl[i]->id)) continue;
+    // (by the id taken before: a window deleted meanwhile, during the
+    // layout of another one, is freed; the ids are never reused)
+    if (!id_to_window->contains (vids[i])) continue;
     if (vl[i]->tab && vl[i]->shown && vl[i] != active_tab) continue; // hidden tab
     vl[i]->process_layout ();
     delete_windows_later ();
