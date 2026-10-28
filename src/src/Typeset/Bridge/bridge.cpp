@@ -678,8 +678,9 @@ same_page_items (array<page_item> l1, array<page_item> l2) {
 * of a document of the text (or a block of paragraphs, see
 * bridge_document.cpp), or the root; the bridges below a paragraph, and
 * those which come from the expansion of a macro (the paragraphs of its
-* body, unless there are 16 or more; those of its arguments and of an
-* included file do record), do not (bridge_record_next, bridge_in_macro).
+* body, unless there are 16 or more or they are large (2000 characters),
+* and those grouped in blocks, which do record; those of its arguments and
+* of an included file record), do not (bridge_record_next, bridge_in_macro).
 * A bridge which does not record is typeset again each
 * time the bridge above is, as in the classic cache, and what it reads,
 * writes, looks up and binds goes to the record of the bridge above as if it

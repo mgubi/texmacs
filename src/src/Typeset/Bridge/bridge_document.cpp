@@ -223,6 +223,7 @@ protected:
   array<bridge> brs;
   bridge acc; // binary splitting acceleration for long documents
   hashmap<int,bridge> blocks; // by the number of their first paragraph
+  bool big_body;  // (while it is typeset, in the body of a macro)
   void typeset_one (int i, int n, int desired_status,
                     array<line_item>& a, array<line_item>& b);
 
@@ -243,7 +244,7 @@ public:
 };
 
 bridge_document_rep::bridge_document_rep (typesetter ttt, tree st, path ip):
-  bridge_rep (ttt, st, ip)
+  bridge_rep (ttt, st, ip), big_body (false)
 {
   initialize ();
 }
@@ -404,6 +405,17 @@ bridge_document_rep::my_typeset_will_be_complete () {
   else return acc->my_typeset_will_be_complete ();
 }
 
+// the size of a tree, counted up to a bound (the characters and the nodes)
+static int
+tree_size_upto (tree t, int bound) {
+  if (is_atomic (t)) return 1 + N(t->label);
+  int n= 1;
+  for (int i=0; i<N(t) && n<bound; i++) n += tree_size_upto (t[i], bound - n);
+  return n;
+}
+
+#define BIG_BODY 2000
+
 void
 bridge_document_rep::typeset_one (int i, int n, int desired_status,
                                   array<line_item>& a, array<line_item>& b) {
@@ -411,8 +423,9 @@ bridge_document_rep::typeset_one (int i, int n, int desired_status,
   int wanted= (i==n-1? desired_status & WANTED_MASK: WANTED_PARAGRAPH);
   ttt->a= (i==0  ? a: array<line_item> ());
   ttt->b= (i==n-1? b: array<line_item> ());
-  // (the paragraphs of the body of a macro record when there are many)
-  bridge_record_next= !bridge_in_macro || n >= 16;
+  // (the paragraphs of the body of a macro record when there are many or
+  // when they are large)
+  bridge_record_next= !bridge_in_macro || n >= 16 || big_body;
   brs[i]->typeset (PROCESSED+ wanted);
 }
 
@@ -423,6 +436,8 @@ bridge_document_rep::my_typeset (int desired_status) {
     int i, n= N(st);
     array<line_item> a= ttt->a;
     array<line_item> b= ttt->b;
+    big_body= (bridge_in_macro && n < 16 &&
+               tree_size_upto (st, BIG_BODY) >= BIG_BODY);
     hashmap<int,bridge> old_blocks= blocks;
     blocks= hashmap<int,bridge> ();
     // (the blocks are bridges used again when their inputs are the same:
