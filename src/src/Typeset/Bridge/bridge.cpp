@@ -850,7 +850,7 @@ typeset_record_mode () {
 // environment (bridge_rep::exec_until redoes them).
 bool
 bridge_rep::typeset_unrecorded (int desired_status) {
-  if (edit_profile.on) edit_profile.redone++;
+  typeset_count_redone (1);
   in_known= false;
   in_fp= 0;
   seen_keys= array<string> ();
