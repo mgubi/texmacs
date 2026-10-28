@@ -2394,6 +2394,28 @@
     (buffer-pretend-saved m)
     (buffer-close m)))
 
+(define (incl-cite-first)
+  ;; citations before a bibliography which the first Update All generates:
+  ;; the pass which uses the bridges again must give them their numbers
+  ;; (not "?") although the bridges of the citations are used again and
+  ;; look nothing up (#408)
+  (string-save incl-bib (incl-file "refs.bib"))
+  (incl-write "citefirst.tm"
+              '((section "S")
+                (concat "Cite " (cite "knuth") " and " (cite "lamport") ".")
+                (concat "Forward " (reference "later") ".")
+                (bibliography "bib" "tm-plain" "refs" (document ""))))
+  (with m (incl-file "citefirst.tm")
+    (load-buffer m)
+    (switch-to-buffer* m)
+    (update-forced)
+    (update-all-kept)
+    (go-start)
+    (with st (incl-state) (check= (car st) (cadr st)))
+    (check= (cadr (tree->stree (get-reference "bib-knuth"))) "1")
+    (buffer-pretend-saved m)
+    (buffer-close m)))
+
 (define (incl-saved-include)
   ;; an included file changed and saved from its own buffer, then one
   ;; Update All of the master: saving resets the inclusion (reset_inclusion
@@ -2449,7 +2471,7 @@
     (system-mkdir (system->url incl-dir))
     (incl-extern)
     (for (f (list incl-renumbering incl-renumbering-writes
-                  incl-saved-include))
+                  incl-cite-first incl-saved-include))
       (with r (check-run f)
         (when (and (pair? r) (== (car r) 'error))
           (check-report #f "the group" (object->string r)))))

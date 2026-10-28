@@ -1225,18 +1225,28 @@ edit_typeset_rep::typeset (SI& x1, SI& y1, SI& x2, SI& y2) {
   x1= MAX_SI; y1= MAX_SI; x2= MIN_SI; y2= MIN_SI;
   while (true) {
     SI sx1, sy1, sx2, sy2;
+    // (a pass which uses the bridges again, typeset_invalidate_keep: the
+    // bridges used again do not look up what they looked up before, so that
+    // the references which they found missing, and which this pass defines
+    // later in the document, are not told in env->missing: when the tables
+    // changed during the pass, one more pass looks them up again)
+    bool kept= ttt->collect;
+    unsigned long long stamp= env->labels_stamp ();
     typeset_sub (sx1, sy1, sx2, sy2);
     x1= min (x1, sx1); y1= min (y1, sy1);
     x2= max (x2, sx2); y2= max (y2, sy2);
     if (!env->complete) break;
     env->complete= false;
+    bool again= kept && env->labels_stamp () != stamp;
     // a removed label is treated like a redefined one: one more pass
     // (still bounded by the test below, which stops when the counts of
     // missing and redefined references no longer decrease)
     int removed= clean_unused (env->local_ref, env->touched);
-    if (N(env->missing) == 0 && N(env->redefined) == 0 && removed == 0) break;
-    if ((N(env->missing) == missing_nr && N(env->redefined) == redefined_nr) ||
-        (N(env->missing) > missing_nr || N(env->redefined) > redefined_nr)) {
+    if (N(env->missing) == 0 && N(env->redefined) == 0 && removed == 0 &&
+        !again) break;
+    if (!again &&
+        ((N(env->missing) == missing_nr && N(env->redefined) == redefined_nr) ||
+         (N(env->missing) > missing_nr || N(env->redefined) > redefined_nr))) {
       report_missing (env->missing);
       report_redefined (env->redefined);
       break;
