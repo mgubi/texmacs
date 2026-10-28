@@ -12,17 +12,15 @@ branch [`upsilon_texmacs`](https://github.com/mgubi/texmacs/commits/upsilon_texm
 have the details, and the problems go to the
 [issues of the repository](https://github.com/mgubi/texmacs/issues).
 
-## 27 October 2026
+## 28 October 2026
 
-- **Emoji in LaTeX**: the export writes the emoji as `\emoji{...}` of the
-  LaTeX package `emoji`, by its name there (also those of older documents,
-  in code points), and loads the package in the preamble when the
-  document has emoji: they come in color with LuaLaTeX, and as their
-  names (`:grinning-face:`) with pdfLaTeX and XeLaTeX, which the package
-  does not support, so that the document still compiles with all three.
-  An emoji newer than the package shows as its characters with LuaLaTeX
-  and XeLaTeX and as its code points with pdfLaTeX; the import gives back
-  the same emoji.
+- **Title bar of the documents** (Vue, macOS): the window of a saved
+  document has the icon of its file next to the title, which can be
+  dragged to the Finder, a mail or a Terminal, and a Cmd-click on the title
+  shows the folders of the file, to open one in the Finder; unsaved changes
+  are shown by the dot in the close button instead of a `*` after the
+  name, as in the other applications of macOS. Untitled documents, help
+  pages and remote files have no icon (#545).
 - **File > Preview on macOS** (desktop, Vue): the preview opens again
   when TeXmacs is started from the Finder or the Dock. The Vue build makes
   the PDF with Ghostscript, and such an application only had the PATH of
@@ -34,13 +32,26 @@ have the details, and the problems go to the
   and a login shell which hangs is stopped after 5 seconds). A preview
   which cannot be made is now reported in the footer, instead of showing
   nothing or an older preview (#546).
-- **Title bar of the documents** (Vue, macOS): the window of a saved
-  document has the icon of its file next to the title, which can be
-  dragged to the Finder, a mail or a Terminal, and a Cmd-click on the title
-  shows the folders of the file, to open one in the Finder; unsaved changes
-  are shown by the dot in the close button instead of a `*` after the
-  name, as in the other applications of macOS. Untitled documents, help
-  pages and remote files have no icon (#545).
+- **Presentation mode**: the informative flags are hidden only in the
+  window which is in full screen, no longer in the other windows of the
+  same document; entering and leaving it no longer marks the document
+  modified, and saving during a presentation keeps the informative flags
+  of the document instead of writing "none" (#549).
+- **Save as**: after a Save as to a file of the same name in another
+  folder, the window shows the new file (its path, and on macOS the icon
+  of the title bar), no longer the old one (#564).
+
+## 27 October 2026
+
+- **Emoji in LaTeX**: the export writes the emoji as `\emoji{...}` of the
+  LaTeX package `emoji`, by its name there (also those of older documents,
+  in code points), and loads the package in the preamble when the
+  document has emoji: they come in color with LuaLaTeX, and as their
+  names (`:grinning-face:`) with pdfLaTeX and XeLaTeX, which the package
+  does not support, so that the document still compiles with all three.
+  An emoji newer than the package shows as its characters with LuaLaTeX
+  and XeLaTeX and as its code points with pdfLaTeX; the import gives back
+  the same emoji.
 - **Names of the emoji**: the emoji have names in the universal encoding
   of TeXmacs, those of the LaTeX package `emoji` (the short names of
   Unicode): `<emoji-grinning-face>`, and one name for a whole sequence,
