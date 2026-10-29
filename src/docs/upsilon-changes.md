@@ -14,6 +14,13 @@ have the details, and the problems go to the
 
 ## 29 October 2026
 
+- **Plots of the sessions in the Cocoa build** (desktop, Cocoa): the
+  plots of gnuplot, Maxima and Sage, and any PostScript (`.ps`, `.eps`)
+  image, were blank, only their space reserved. macOS no longer draws
+  PostScript, and the application took the empty image which macOS
+  still gave for it; PostScript is now converted with Ghostscript, as
+  in the other builds, which requires Ghostscript (`gs`, e.g. from
+  Homebrew) (#582).
 - **Clicks and selections in long documents**: a click at the right of
   a line (after the square which ends a proof) or at the left of the
   lines no longer puts the cursor at the end or the start of the
