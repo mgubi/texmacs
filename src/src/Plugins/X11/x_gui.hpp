@@ -129,6 +129,9 @@ public:
 
   Atom XA_CLIPBOARD;
   Atom XA_TARGETS;
+  Atom XA_UTF8_STRING;
+  Atom XA_TEXT;
+  Atom XA_TEXT_PLAIN_UTF8;
 
 public:
   x_gui_rep (int& argc, char** argv);
@@ -169,6 +172,7 @@ public:
   void   deleted_window (Window win);
   void   focussed_window (Window win);
   bool   get_selection (string key, tree& t, string& s);
+  int    request_selection (Atom xsel, Atom target, string& s, Atom& type);
   bool   set_selection (string key, tree t, string s);
   void   clear_selection (string key);
 
@@ -192,5 +196,9 @@ public:
   friend class x_ps_font_rep;
   friend class x_tex_font_rep;
 };
+
+// the text of the selections: UTF-8 to Latin-1 and back (X11's STRING)
+string x_utf8_to_latin1 (string s);
+string x_latin1_to_utf8 (string s);
 
 #endif // defined X_GUI_H
