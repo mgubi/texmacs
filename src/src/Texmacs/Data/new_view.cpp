@@ -57,8 +57,11 @@ decode_url (string s) {
   int i= search_forwards ("/", 0, s);
   if (i < 0) return url_none ();
 #ifdef WINPATHS
+  // a relative name (encoded as "here/...") stays relative: rooting it
+  // gave another name than the one of the buffer, whose views could then
+  // no longer be found after a rename to a relative name (#432)
+  if (s (0, i) == "here") return url (s (i+1, N(s)));
   int j= 0;
-  if (s (0, i) == "here") j= i+1;
   if (s (0, i) == "default") j= i;
   if (j != 0) {
     if (s[j+1] == ':') return url (s (j, N(s)));
