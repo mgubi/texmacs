@@ -159,9 +159,10 @@ tree
 edit_env_rep::lookup_value (string name) {
   if (N(name) == 0) return tree (UNINIT);
   string key= name (1, N(name));
+  if (name[0] == 'i') return inclusion_value (key);
   if (name[0] == 'a')
     return local_att->contains (key)? local_att [key]: (*global_att) [key];
-  int type= (name[0] == '1') ? 1 : 0;
+  int type= (name[0] == '1' || name[0] == '3') ? 1 : 0;
   tree value;
   if (local_ref->contains (key)) {
     // (while the tables are those which were loaded: see clean_unused)
@@ -457,7 +458,8 @@ edit_env_rep::labels_stamp () {
   return mix64 (local_ref->stamp ()) ^
          mix64 ((*global_ref)->stamp () * 0x9E3779B97F4A7C15ULL + 1) ^
          mix64 (local_att->stamp () * 0x9E3779B97F4A7C15ULL + 2) ^
-         mix64 ((*global_att)->stamp () * 0x9E3779B97F4A7C15ULL + 3);
+         mix64 ((*global_att)->stamp () * 0x9E3779B97F4A7C15ULL + 3) ^
+         mix64 (inclusions_stamp () * 0x9E3779B97F4A7C15ULL + 4);
 }
 
 int

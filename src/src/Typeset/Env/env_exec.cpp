@@ -44,12 +44,19 @@ edit_env_rep::exec_string (tree t) {
 ******************************************************************************/
 
 static tree
-rewrite_include (url base_file_name, url file_rel) {
+rewrite_include (edit_env_rep* env, url base_file_name, url file_rel) {
   if (file_rel == base_file_name)
     return tree (_ERROR, "invalid self include");
   if (inclusion_busy (file_rel))
     return tree (_ERROR, "inclusion cycle");
-  return load_inclusion (file_rel);
+  // the included document, from the cache of the inclusions, is looked up
+  // as a reference is ("i" and the file, see lookup_value): it is an input
+  // of the bridge of the include (bridge_rewrite), which is typeset again
+  // when the file was saved or loaded again (another tree in the cache:
+  // reset_inclusion), also when nothing else changed
+  tree doc= load_inclusion (file_rel);
+  env->record_lookup ("i" * as_string (file_rel), doc);
+  return doc;
 }
 
 // Hack to transmit the current environment back to C++
@@ -122,7 +129,7 @@ edit_env_rep::rewrite (tree t) {
       url file_name= url_unix (exec_string (t[0]));
       url file_rel = relative (base_file_name, file_name);
       //cout << "file_name= " << as_tree (file_name) << LF;
-      return rewrite_include (base_file_name, file_rel);
+      return rewrite_include (this, base_file_name, file_rel);
     }
   case WITH_PACKAGE:
     {
@@ -179,7 +186,7 @@ edit_env_rep::exec_include (tree t) {
   if (N(t) == 0) return exec_rewrite (t);
   url file_name= url_unix (exec_string (t[0]));
   url file_rel = relative (base_file_name, file_name);
-  tree r= rewrite_include (base_file_name, file_rel);
+  tree r= rewrite_include (this, base_file_name, file_rel);
   inclusion_guard guard (file_rel);
   return exec (r);
 }
@@ -2103,12 +2110,15 @@ edit_env_rep::exec_get_binding (tree t) {
   string key= exec_string (t[0]);
   int type= (N(t) == 1? 0: as_int (exec_string (t[1])));
   if (type != 0 && type != 1) type= 0;
-  tree value= lookup ((type == 1 ? "1" : "0") * key);
-  if (complete && value == tree (UNINIT))
-    if (get_bool (WARN_MISSING)) {
-      missing (key)= tree (GET_BINDING, key);
-      //typeset_warning << "Undefined reference " << key << LF;
-    }
+  // (a lookup under warn-missing false, as tmdoc's if-ref, is looked up
+  // with the keys of has-binding: a bridge used again does not tell it as
+  // missing, see replay_missing)
+  bool warn= get_bool (WARN_MISSING);
+  tree value= lookup ((warn? (type == 1 ? "1" : "0"): (type == 1 ? "3" : "2")) * key);
+  if (value == tree (UNINIT) && warn && complete) {
+    missing (key)= tree (GET_BINDING, key);
+    //typeset_warning << "Undefined reference " << key << LF;
+  }
   //cout << t << ": " << key << " -> " << value << "\n";
   return value;
 }
@@ -2119,7 +2129,8 @@ edit_env_rep::exec_has_binding (tree t) {
   string key= exec_string (t[0]);
   int type= (N(t) == 1? 0: as_int (exec_string (t[1])));
   if (type != 0 && type != 1) type= 0;
-  tree value= lookup ((type == 1 ? "1" : "0") * key);
+  // ("2" and "3": not a reference which is to be told when missing)
+  tree value= lookup ((type == 1 ? "3" : "2") * key);
   if (value == tree (UNINIT)) return "false";
   else return "true";
 }
@@ -2159,7 +2170,11 @@ edit_env_rep::exec_has_binding (tree t) {
 * This is what a document gets when it is loaded, and again when it is
 * updated (typeset_renumber_labels in edit_typeset.cpp): the epoch of the
 * buffer changes, the numbers of another epoch are not used, and a
-* typesetting of the whole document numbers the labels again. Between two
+* typesetting of the whole document numbers the labels again. Each label
+* reads the variable auto-epoch, which the update changes: with the inputs
+* of the bridges (typeset_inputs_mode), the bridges which make labels are
+* typeset again, in the order of the document, and the others are used
+* again when the names of the labels did not change. Between two
 * updates the names of the labels already made stay. Outside of a
 * typesetting pass (a converter which expands the macros of a copy of the
 * document) the counter names the labels, which gives the same names in a
@@ -2280,6 +2295,10 @@ edit_env_rep::exec_auto_id (tree t) {
     if (fresh) { (void) exec (compound ("inc-auto")); return ""; }
     return exec (tree (VALUE, "auto-nr"));
   }
+  // (the epoch of the numbering, which changes when the labels are
+  // numbered again: the bridges which make labels read it, so that only
+  // they are typeset again then)
+  if (fresh) (void) provides ("auto-epoch");
   string last= "";
   if (provides ("auto-last")) last= as_string (read ("auto-last"));
   if (!fresh) {

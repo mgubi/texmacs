@@ -682,16 +682,26 @@ buffer_save (url name) {
 
 static hashmap<string,tree> document_inclusions ("");
 static hashmap<string,int> inclusions_busy (0);
+// (changed with the cache: the typesetter looks the inclusions up again
+// then, see same_lookups in Typeset/Bridge/bridge.cpp)
+static unsigned long long inclusions_version= 1;
+
+unsigned long long
+inclusions_stamp () {
+  return inclusions_version;
+}
 
 void
 reset_inclusions () {
   document_inclusions = hashmap<string,tree> ("");
+  inclusions_version++;
 }
 
 void
 reset_inclusion (url name) {
   string name_s= as_string (name);
   document_inclusions -> reset (name_s);
+  inclusions_version++;
 }
 
 tree
@@ -701,8 +711,18 @@ load_inclusion (url name) {
   if (document_inclusions->contains (name_s))
     return document_inclusions [name_s];
   tree doc= extract_document (import_tree (name, "generic"));
-  if (!is_func (doc, _ERROR)) document_inclusions (name_s)= doc;
+  if (!is_func (doc, _ERROR)) {
+    document_inclusions (name_s)= doc;
+    inclusions_version++;
+  }
   return doc;
+}
+
+tree
+inclusion_value (string name_s) {
+  if (document_inclusions->contains (name_s))
+    return document_inclusions [name_s];
+  return load_inclusion (url_system (name_s));
 }
 
 bool
