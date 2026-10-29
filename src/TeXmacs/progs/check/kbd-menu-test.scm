@@ -1366,22 +1366,36 @@
 
 ;; Clone window after a Save as (a rename of the buffer): the view of the
 ;; clone took the number, and so the url, of the view of the window, and
-;; TeXmacs aborted with "view attached to other window" (#560).
+;; TeXmacs aborted with "view attached to other window" (#560). The buffer
+;; is loaded from a file of its own, so that its only view is number 1
+;; (a new-buffer may reuse a name whose views already have high numbers).
 (define (test-clone-window-renamed)
   (check-group "clone window after a rename")
   (let* ((win (current-window))
          (old (current-buffer))
-         (b (new-buffer))
-         (f (system->url (string-append (url->system (url-temp-dir))
-                                        "/kbd-menu-test-renamed.tm")))
+         (dir (system->url (string-append (url->system (url-temp-dir))
+                                          "/kbd-menu-test")))
+         (src (url-append dir "clone-renamed-src.tm"))
+         (f (url-append dir "clone-renamed.tm"))
          (before (window-list)))
+    (system-mkdir dir)
+    (tree-export (stree->tree
+                  '(document (TeXmacs "2.1") (style (tuple "generic"))
+                             (body (document "one"))))
+                 src "texmacs")
+    (load-buffer src)
     (switch-to-buffer old)
-    (open-buffer-in-window b (buffer-get b) "")
+    (open-buffer-in-window src (buffer-get src) "")
     (with l (list-difference (window-list) before)
       (check= (length l) 1)
       (when (== (length l) 1)
         (window-focus (car l))
-        (buffer-rename b f)
+        (check= (current-buffer) src)
+        ;; the view of the window only: Clone window makes a new one
+        (for (v (buffer->views src))
+          (when (!= v (current-view-url)) (view-delete v)))
+        (check= (buffer->views src) (list (current-view-url)))
+        (buffer-rename src f)
         (check= (current-buffer) f)
         (clone-window)
         (with ws (buffer->windows f)
@@ -1390,13 +1404,18 @@
           (check= (length (list-remove-duplicates (buffer->views f))) 2)
           (for (w (reverse ws)) (kill-window w)))))
     (window-focus win)
-    (when (buffer-exists? f) (buffer-close f))
-    (when (buffer-exists? b) (buffer-close b))
+    (for (b (list f src))
+      (when (buffer-exists? b)
+        (buffer-pretend-saved b)
+        (buffer-close b)))
+    (when (url-exists? src) (system-remove src))
+    (when (url-exists? dir) (system-rmdir dir))
     (check= (current-buffer) old)))
 
-;; Deleting the only view of a window: the window shows a view of another
-;; buffer (a new one when no view is free), instead of staying empty
-;; (#559).
+;; Deleting the only view of a window, when no view is free anywhere: the
+;; window shows a new view of the most recent other buffer, instead of
+;; staying empty (#559). The free views of the other buffers are deleted
+;; first (switching to a buffer makes a new one).
 (define (test-delete-window-view)
   (check-group "deleting the view of a window")
   (let* ((win (current-window))
@@ -1410,12 +1429,18 @@
       (when (== (length l) 1)
         (window-focus (car l))
         (check= (buffer->views b) (list (current-view-url)))
-        (view-delete (current-view-url))
-        (check= (buffer->views b) '())
-        (with v (window->view (car l))
-          (check-false (url-none? v))
-          (check= (current-view-url) v)
-          (check-false (== (view->buffer v) b)))
+        (for (v (view-list))
+          (when (url-none? (view->window-url v)) (view-delete v)))
+        (let ((vs (view-list)))
+          (check-false (list-find vs (lambda (v)
+                                       (url-none? (view->window-url v)))))
+          (view-delete (current-view-url))
+          (check= (buffer->views b) '())
+          (with v (window->view (car l))
+            (check-false (url-none? v))
+            (check-false (in? v vs))
+            (check= (current-view-url) v)
+            (check-false (== (view->buffer v) b))))
         (kill-window (car l))))
     (window-focus win)
     (when (buffer-exists? b) (buffer-close b))

@@ -327,8 +327,10 @@ delete_view (url u) {
       if (vw->buf->vws[k] != vw && vw->buf->vws[k]->win == NULL)
         other= abstract_view (vw->buf->vws[k]);
     if (is_none (other)) other= get_recent_view (name, false, true, false, true);
-    if (is_none (other)) {
+    if (is_none (other) &&
+        concrete_window (abstract_window (vw->win)) != NULL) {
       // a new view of the most recent other buffer, as kill_buffer does
+      // (not for the window of an embedded editor, which has no url)
       url ob= view_to_buffer (get_recent_view (name, false, true, false, false));
       if (!is_none (ob)) other= get_passive_view (ob);
     }
