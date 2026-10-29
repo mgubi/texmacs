@@ -201,7 +201,44 @@
         (check= (body) '(document "ab"))
         (edit (go-end) (insert "c"))
         (check= (tree->stree (buffer-get-body u)) '(document "abc"))
-        (check= (buffer->views u) (list v1 v2))))))
+        (check= (buffer->views u) (list v1 v2))
+        ;; deleting the current view, which the window shows: the window
+        ;; shows another view of the buffer, which becomes the current one;
+        ;; before, both kept the deleted view (#559: delete_view of new_view.cpp)
+        (with win (current-window)
+          (view-delete v2)
+          (check= (buffer->views u) (list v1))
+          (check= (current-view-url) v1)
+          (check= (window->view win) v1)
+          (check= (view->window-url v1) win)
+          (check= (current-window) win))
+        (edit (go-end) (insert "d"))
+        (check= (body) '(document "abcd"))
+        ;; also with a view which was never in a window
+        (with v3 (view-new u)
+          (view-delete v1)
+          (check= (buffer->views u) (list v3))
+          (check= (current-view-url) v3)
+          (check= (window->view (current-window)) v3))
+        (edit (go-end) (insert "e"))
+        (check= (body) '(document "abcde")))))
+  ;; the views of a renamed buffer keep their numbers, and a new view does
+  ;; not take one of them (#560: two views had the same url, and Clone
+  ;; window after Save as aborted)
+  (with-buffer-body '(document "a")
+    (lambda ()
+      (let* ((u (current-buffer))
+             (v1 (view-new u))
+             (new-name (tmp-file "renamed-views.tm")))
+        (buffer-rename u new-name)
+        (let* ((vs (buffer->views new-name))
+               (v2 (view-new new-name))
+               (vs* (buffer->views new-name)))
+          (check= (length vs*) (+ (length vs) 1))
+          (check-false (in? v2 vs))
+          (check= (view->buffer v2) new-name)
+          (view-delete v2)
+          (check= (buffer->views new-name) vs))))))
 
 ;; A tree pointer or a position which is collected while it is still
 ;; attached to a tree (a process whose callback was never called, a
@@ -519,6 +556,23 @@
   (mouse "end-drag-left" x y 0)
   (mouse-update)
   (list (rel (selection-get-start)) (rel (selection-get-end))))
+
+;; A cursor path which goes below a string (go-to from a script with a wrong
+;; path) is refused when the changes are applied, with an error. The report
+;; of that error shifts the same path (cursor-path*), which went through the
+;; string and looped forever (#592: shift of tree_cursor.cpp did not check
+;; its path). apply-changes itself is not called here: its error is a C++
+;; exception, which only the event loop catches.
+(define (test-bad-cursor)
+  (check-group "a cursor path below a string")
+  (with-buffer-body '(document (tabular (table (row (cell "a") (cell "b")))))
+    (lambda ()
+      (go-to (at 0 0 0 1 0 0 0))
+      (update-forced)
+      (check= (rel (cursor-path*)) '(0 0 0 1 0 0 0))
+      (go-start)
+      (update-forced)
+      (check= (body) '(document (tabular (table (row (cell "a") (cell "b")))))))))
 
 (define (test-mouse-long)
   (check-group "mouse in a long document")
@@ -1291,6 +1345,7 @@
   (test-load)
   (test-insert)
   (test-cursor)
+  (test-bad-cursor)
   (test-mouse-long)
   (test-selection)
   (test-remove)

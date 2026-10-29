@@ -14,6 +14,17 @@ have the details, and the problems go to the
 
 ## 29 October 2026
 
+- **Views and windows**: deleting a view shown in a window, or the
+  current view, no longer leaves TeXmacs with a pointer to a deleted view
+  (crashes and hangs afterwards); the views of a renamed buffer get names
+  of their own, and Window > Clone window after File > Save as no longer
+  quits TeXmacs (#559, #560).
+- **A cursor path below a text** no longer makes TeXmacs hang when it
+  reports the error (#592).
+- **LaTeX import**: sources which end too early (a `\` or a command
+  without its argument at the end, a `$` at the end) are no longer read
+  past their end (#561).
+
 - **Clicks and selections in long documents**: a click at the right of
   a line (after the square which ends a proof) or at the left of the
   lines no longer puts the cursor at the end or the start of the
