@@ -21,6 +21,12 @@ have the details, and the problems go to the
   still gave for it; PostScript is now converted with Ghostscript, as
   in the other builds, which requires Ghostscript (`gs`, e.g. from
   Homebrew) (#582).
+- **The file dialogs of the system on Linux** (Vue, desktop): Open, Save
+  and the other file choosers show again the dialog of the desktop (its
+  portal, or zenity) rather than the file chooser of TeXmacs. SDL gave
+  zenity labels for the buttons which zenity 4 refuses ("Could not run
+  zenity: exit code 255"), and the SDL of the Linux packages was built
+  without D-Bus, hence without the desktop portal (#456).
 - **Clicks and selections in long documents**: a click at the right of
   a line (after the square which ends a proof) or at the left of the
   lines no longer puts the cursor at the end or the start of the
