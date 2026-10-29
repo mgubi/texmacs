@@ -542,6 +542,25 @@
       (update-forced)
       (check= (cadr (tree->stree (get-reference "b"))) "1")
       (check= (rebinding-state) (from-scratch rebinding-state))
+      (check= (typeset-check-mismatches) 0)))
+   ;; a label which only a running header makes (the pager's bindings are
+   ;; compared too), removed from it
+   (with-typeset-body
+    `(document (concat "see " (reference "h"))
+               (set-header (concat "Head" (label "h")))
+               ,@(map (lambda (i) (string-append "Paragraph " (number->string i)))
+                      (iota 5)))
+    (lambda ()
+      (init-env "page-medium" "paper")
+      (update-current-buffer)
+      (update-forced)
+      (update-forced)
+      (check-true (in? "h" (list-references)))
+      (tree-set (tree-ref (buffer-tree) 1) '(set-header "Head"))
+      (update-forced)
+      (check= (tree->stree (get-reference "h")) '(uninit))
+      (with w (lambda () (rect-width (rect 0 1)))
+        (check= (w) (from-scratch w)))
       (check= (typeset-check-mismatches) 0)))))
 
 ;; A file holds the table of its references as it was saved: entries which no
@@ -1644,10 +1663,9 @@
 
 (define (test-surround-parts-inputs)
   (check-group "inputs of the parts of a surround below a paragraph")
-  ;; (not with the classic cache, TEXMACS_TYPESET_READS=off, whose old
-  ;; mistakes this finds)
-  (when (!= (getenv "TEXMACS_TYPESET_READS") "off")
-   (for (lookup? '(#f #t))
+  ;; (also with the classic cache, TEXMACS_TYPESET_READS=off, which did
+  ;; not typeset again what read a binding whose value changed, #576)
+  (for (lookup? '(#f #t))
     (with-scratch-buffer
      (lambda (u)
        (buffer-set-body u (stree->tree (surround-parts-body lookup?)))
@@ -1658,7 +1676,109 @@
        (tree-set (tree-ref (buffer-tree) 0 1) "5cm")
        (update-forced) (update-forced)
        (check= (surround-parts-x) (from-scratch surround-parts-x))
-       (check= (typeset-check-mismatches) 0))))))
+       (check= (typeset-check-mismatches) 0)))))
+
+(define (passes-of thunk)
+  ;; the number of typesetting passes which @thunk makes
+  (with p0 (typeset-pass-count)
+    (thunk)
+    (- (typeset-pass-count) p0)))
+
+;; A paragraph which reads a binding is typeset again when an edit gives
+;; the binding another value, also with the classic cache
+;; (TEXMACS_TYPESET_READS=off), which does it by one complete pass (#576).
+;; A key which two bindings write (a label defined twice) is not a reason
+;; for it when the value is one which they wrote, nor are the missing
+;; references, and an edit which changes no binding makes one pass.
+(define (test-paragraph-reads-binding)
+  (check-group "a paragraph which reads a binding changed by an edit")
+  (with-scratch-buffer
+   (lambda (u)
+     (buffer-set-body u (stree->tree
+                         '(document (set-binding "lab" "1cm")
+                                    (concat "L" (hspace (get-binding "lab"))
+                                            "R" (reference "nowhere"))
+                                    "after")))
+     (update-current-buffer)
+     (update-forced) (update-forced)
+     (with x (lambda () (rect-x1 (rect 1 2)))
+       (check-true (<= (passes-of
+                        (lambda ()
+                          (tree-set (tree-ref (buffer-tree) 0 1) "5cm")
+                          (update-forced)))
+                       2))
+       (update-forced)
+       (check= (x) (from-scratch x))
+       (check= (passes-of
+                (lambda ()
+                  (tree-set (tree-ref (buffer-tree) 2) "after x")
+                  (update-forced)))
+               1))
+     (check= (typeset-check-mismatches) 0)))
+  (with-scratch-buffer
+   (lambda (u)
+     (buffer-set-body u (stree->tree
+                         '(document (theorem (document (concat "One"
+                                                               (label "dup"))))
+                                    (theorem (document (concat "Two"
+                                                               (label "dup"))))
+                                    (concat "see " (reference "dup"))
+                                    "after")))
+     (update-current-buffer)
+     (update-forced) (update-forced)
+     (check= (passes-of
+              (lambda ()
+                (for (v '("Onex" "Onexx" "Onexxx"))
+                  (tree-set (tree-ref (buffer-tree) 0 0 0 0) v)
+                  (update-forced))))
+             3)
+     (with x (lambda () (rect-x2 (rect 2)))
+       (check= (x) (from-scratch x)))
+     (check= (typeset-check-mismatches) 0)))
+  ;; the last of two set-binding of one key edited: its new value is not
+  ;; one which the two wrote (the values of the complete pass are copies,
+  ;; not the strings of the document)
+  (with-scratch-buffer
+   (lambda (u)
+     (buffer-set-body u (stree->tree
+                         '(document (set-binding "dup" "a")
+                                    (set-binding "dup" "WWWW")
+                                    (concat "see " (get-binding "dup") "after")
+                                    "filler")))
+     (update-current-buffer)
+     (update-forced) (update-forced)
+     (with x (lambda () (rect-x1 (rect 2 2)))
+       (tree-set (tree-ref (buffer-tree) 1 1) "WWWWWWWW")
+       (update-forced) (update-forced)
+       (check= (x) (from-scratch x))
+       (with s (tree-ref (buffer-tree) 1 1)
+         (go-to (append (tree->path s) (list (string-length (tree->string s)))))
+         (insert "WWWW"))
+       (update-forced) (update-forced)
+       (check= (x) (from-scratch x)))
+     (check= (typeset-check-mismatches) 0)))
+  ;; a label defined twice, one definition removed, the other one
+  ;; renumbered: its new value is not one which the two wrote
+  (with-scratch-buffer
+   (lambda (u)
+     (buffer-set-body u (stree->tree
+                         '(document (concat "see " (reference "dup") "after")
+                                    (theorem (document (concat "One"
+                                                               (label "dup"))))
+                                    (theorem (document (concat "Two"
+                                                               (label "dup"))))
+                                    "filler")))
+     (update-current-buffer)
+     (update-forced) (update-forced)
+     (tree-remove! (buffer-tree) 2 1)
+     (update-forced) (update-forced)
+     (tree-insert! (buffer-tree) 1
+                   (map (lambda (i) (stree->tree '(theorem (document "P"))))
+                        (.. 0 9)))
+     (update-forced) (update-forced)
+     (with x (lambda () (rect-x1 (rect 0 2)))
+       (check= (x) (from-scratch x)))
+     (check= (typeset-check-mismatches) 0))))
 
 (define (test-loci-of-surround-parts)
   (check-group "loci of surround parts")
@@ -2920,6 +3040,94 @@
         (buffer-pretend-saved m)
         (buffer-close m)))))
 
+;; A chapter opened through its master (Project menu: the master loaded, then
+;; the chapter, which names it as its project), and a theorem inserted and
+;; removed at its start: the numbers of the chapter change, those of the
+;; master are seen, and what is typeset again is the chapter, as when it is
+;; loaded alone, not the book (#408).
+(define (incl-book name project body)
+  (tree-export (stree->tree `(document (TeXmacs "2.1")
+                                       ,@(if project `((project ,project)) '())
+                                       (style (tuple "book"))
+                                       (body (document ,@body))))
+               (incl-file name) "texmacs"))
+
+(define (incl-chapter-edit)
+  ;; a theorem inserted after the title of the current chapter, then
+  ;; removed: the pieces typeset again by each, and the numbers of t1
+  (let* ((r0 (typeset-redone-count))
+         (dummy (begin (tree-insert! (buffer-tree) 1
+                                     (list (stree->tree '(theorem (document "New.")))))
+                       (update-forced)))
+         (ins (- (typeset-redone-count) r0))
+         (num (incl-num "t1"))
+         (r1 (typeset-redone-count)))
+    (tree-remove! (buffer-tree) 1 1)
+    (update-forced)
+    (list ins (- (typeset-redone-count) r1) num (incl-num "t1"))))
+
+(define (incl-through-master)
+  (incl-book "pc1.tm" "pm.tm"
+             (append '((chapter "One")
+                       (theorem (document (concat (label "t1") "First.")))
+                       (concat "See " (reference "t5") "."))
+                     (map (lambda (i) (string-append "Text of one " (number->string i)))
+                          (iota 10))))
+  (incl-book "pc2.tm" "pm.tm"
+             (cons '(chapter "Two")
+                   (apply append
+                          (map (lambda (i)
+                                 (with l (string-append "t" (number->string (+ i 2)))
+                                   (list `(theorem (document (concat (label ,l) "Claim.")))
+                                         '(concat "Back to " (reference "t1") ".")
+                                         (string-append "Text of two " (number->string i)))))
+                               (iota 30)))))
+  (incl-book "pm.tm" #f '((include "pc1.tm") (include "pc2.tm")))
+  (let ((m (incl-file "pm.tm"))
+        (c (incl-file "pc1.tm"))
+        (full 0))
+    (with r0 (typeset-redone-count)
+      (load-buffer m)
+      (switch-to-buffer* m)
+      (update-forced)
+      (set! full (- (typeset-redone-count) r0)))
+    (update-all-kept)
+    (update-all-kept)
+    (check= (incl-num "t5") "2.4")
+    (load-buffer c)
+    (switch-to-buffer* c)
+    (update-forced)
+    (update-forced)
+    ;; the numbers of the master, in the chapter
+    (check= (incl-num "t5") "2.4")
+    (check= (incl-num "t1") "1.1")
+    (with via (incl-chapter-edit)
+      (check= (cddr via) '("1.2" "1.1"))
+      (buffer-pretend-saved c)
+      (buffer-close c)
+      (buffer-pretend-saved m)
+      (buffer-close m)
+      ;; the chapter loaded alone
+      (load-buffer c)
+      (switch-to-buffer* c)
+      (update-forced)
+      (update-forced)
+      (with direct (incl-chapter-edit)
+        (check= (cddr direct) '("1.2" "1.1"))
+        ;; (the second chapter is ten times as big as the first; the
+        ;; classic cache counts no pieces typeset again)
+        (when (!= (getenv "TEXMACS_TYPESET_READS") "off")
+          (check-true (< (* 4 (car via)) full))
+          (check-true (< (* 4 (cadr via)) full))
+          (check-true (<= (car via) (+ (car direct) 10)))
+          (check-true (<= (cadr via) (+ (cadr direct) 10)))))
+      (buffer-pretend-saved c)
+      (buffer-close c)
+      ;; the chapter loaded alone has its master too, as a hidden buffer
+      (when (buffer-exists? m)
+        (buffer-pretend-saved m)
+        (buffer-close m)))))
+
 (define (test-included-files)
   (check-group "included files")
   (let ((old (current-buffer))
@@ -2930,7 +3138,7 @@
     (incl-extern)
     (for (f (list incl-renumbering incl-renumbering-writes
                   incl-cite-first incl-ifref incl-saved-include incl-gc-keeps
-                  incl-gc-more incl-gc-times))
+                  incl-gc-more incl-gc-times incl-through-master))
       (with r (check-run f)
         (when (and (pair? r) (== (car r) 'error))
           (check-report #f "the group" (object->string r)))))
@@ -2995,6 +3203,7 @@
   (test-labels-of-parts)
   (test-loci-of-surround-parts)
   (test-surround-parts-inputs)
+  (test-paragraph-reads-binding)
   (test-bindings-written-again)
   (test-labels-after-undo)
   (test-labels-after-redo)

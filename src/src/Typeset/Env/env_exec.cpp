@@ -2068,6 +2068,17 @@ edit_env_rep::write_binding (string key, tree value, string extra) {
   if (rec_bindings != NULL) (*rec_bindings) << tuple (key, stored, extra);
 }
 
+bool
+edit_env_rep::was_rewritten (string key, tree value) {
+  // whether one of the bindings of a key which the last complete pass
+  // wrote several times wrote this value
+  tree* vals= rewritten->find (key);
+  if (vals == NULL) return false;
+  for (int i=0; i<N(*vals); i++)
+    if ((*vals)[i] == value) return true;
+  return false;
+}
+
 tree
 edit_env_rep::store_binding (string key, tree value, string extra) {
   // (not written when it is there already: see labels_stamp; the binding
@@ -2091,14 +2102,34 @@ edit_env_rep::store_binding (string key, tree value, string extra) {
     local_ref (key)= now;
     stored= now[0];
   }
+  if (complete && touched [key]) {
+    // (the value there is the one which this pass wrote before)
+    if (!rewritten->contains (key))
+      rewritten (key)= tuple (is_tuple (old_value) && N(old_value) >= 1?
+                              old_value[0]: tree (UNINIT));
+    // (a copy: the value may be a tree of the document, which is edited)
+    rewritten (key) << copy (value);
+  }
   touched (key)= true;
-  if (complete && is_tuple (old_value) && N(old_value) >= 1) {
-    string old_s= tree_as_string (old_value[0]);
-    string new_s= tree_as_string (value);
-    if (new_s != old_s && !starts (key, "auto-")) {
-      redefined << tree (TUPLE, key, new_s);
-      //if (new_s == "") typeset_warning << "Redefined " << key << LF;
-      //else typeset_warning << "Redefined " << key << " as " << new_s << LF;
+  if (!same && is_tuple (old_value) && N(old_value) >= 1) {
+    if (!complete) {
+      // what read the old value and was not typeset again by this pass
+      // is typeset again by a complete pass (see typeset in
+      // edit_typeset.cpp); not for a key which several bindings write
+      // (a label defined twice) when the value is one which they wrote:
+      // each of them but the last one differs from the value in the
+      // table, which is the last one
+      if (old_value[0] != value && !was_rewritten (key, value))
+        rebound= true;
+    }
+    else {
+      string old_s= tree_as_string (old_value[0]);
+      string new_s= tree_as_string (value);
+      if (new_s != old_s && !starts (key, "auto-")) {
+        redefined << tree (TUPLE, key, new_s);
+        //if (new_s == "") typeset_warning << "Redefined " << key << LF;
+        //else typeset_warning << "Redefined " << key << " as " << new_s << LF;
+      }
     }
   }
   return stored;

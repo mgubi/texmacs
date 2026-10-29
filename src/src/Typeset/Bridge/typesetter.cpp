@@ -297,8 +297,10 @@ typesetter_rep::typeset () {
   // their bindings and the entries of the auxiliary tables again: collect)
   bool hides= hides_something (br->st);
   env->complete= (collect || br->my_typeset_will_be_complete ()) && !hides;
-  // (the bindings of the last pass, see drop_bindings)
-  bool track= !env->complete && !hides && typeset_inputs_mode () != 0;
+  // (the bindings of the last pass, see drop_bindings; a root which was
+  // never typeset has none, and all would look new)
+  bool track= !env->complete && !hides && typeset_inputs_mode () != 0 &&
+              br->version != 0;
   array<tree> before= (track? br->out_bindings: array<tree> ());
   array<tree> pages_before= pages_bindings;
 
@@ -308,7 +310,9 @@ typesetter_rep::typeset () {
     env->missing  = hashmap<string,tree> (UNINIT);
     env->redefined= array<tree> ();
     env->touched  = hashmap<string,bool> (false);
+    env->rewritten= hashmap<string,tree> (UNINIT);
   }
+  env->rebound= false;
   typeset_passes_total++;
   double t0= edit_profile.on ? edit_profile_now () : 0;
   {

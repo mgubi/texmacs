@@ -1238,17 +1238,73 @@ clean_unused (edit_env env) {
   return matter;
 }
 
-// The passes which follow an incomplete one whose bindings changed: one
-// is enough, unless the references typeset again change bindings in turn (a
-// label made only when another one has some value), which a few more passes
-// follow, as far as this bound
+/******************************************************************************
+* Passes
+*
+* edit_typeset_rep::typeset makes passes until the references are settled.
+* A pass is of one of three kinds:
+* - complete, from scratch: every bridge is made again (::notify_assign of
+*   the root); it makes the tables of the references and the auxiliary
+*   tables, and finds the pages of the labels;
+* - complete with the bridges used again (ttt->collect, #427, only with the
+*   inputs of the bridges): those used again write their bindings and their
+*   entries of the auxiliary tables again, those which looked up a
+*   reference whose entry changed are typeset again;
+* - incomplete: only what changed is typeset again (each edit), or a
+*   preamble is shown or parts are hidden.
+* Who cleans the table of the references (local_ref): clean_unused after a
+* complete pass, which removes what that pass did not define (#417), and
+* typesetter_rep::drop_bindings after an incomplete pass with the inputs of
+* the bridges, which removes what no bridge wrote any more (#571).
+* Who notices that a binding got another value, so that what read the old
+* one is typeset again: env->redefined after a complete pass (one more
+* complete pass); env->rebound after an incomplete pass of the classic
+* cache (one complete pass, #576); ttt->bindings_changed after an
+* incomplete pass with the inputs of the bridges (one more incomplete pass,
+* which typesets again what looked the binding up, #571, also for a binding
+* which was added or removed). The passes for changed bindings share one
+* limit, REBINDING_PASSES_MAX: one pass is enough, unless what it typesets
+* again changes bindings in turn (a label made only when another one has
+* some value; a binding which feeds on itself would go on forever).
+******************************************************************************/
+
 #define REBINDING_PASSES_MAX 4
+
+// After a pass which is not complete: whether it changed bindings which
+// were read before (see "Passes" above), and then the next pass is
+// prepared; nr counts these passes, complete tells that the classic cache
+// makes a complete one
+static bool
+another_pass_for_bindings (edit_env env, typesetter ttt,
+                           int& nr, bool& complete) {
+  complete= false;
+  if (nr >= REBINDING_PASSES_MAX) return false;
+  if (typeset_inputs_mode () != 0) {
+    // the incomplete pass which follows typesets again what looked up a
+    // binding which is not the same (the stamp of their lookups)
+    if (!ttt->bindings_changed) return false;
+    nr++;
+    return true;
+  }
+  // The classic cache (TEXMACS_TYPESET_READS=off) does not know what read
+  // a binding: when a pass which typeset only what changed gave another
+  // value to a binding (set-binding, a label renumbered), what read the
+  // old one (a reference, the part of a surround, #576) is typeset again
+  // by a complete pass, as for a redefined label after a complete pass,
+  // and only once (the whole limit)
+  if (!env->rebound) return false;
+  nr= REBINDING_PASSES_MAX;
+  complete= true;
+  ::notify_assign (ttt, path(), ttt->br->st);
+  return true;
+}
 
 void
 edit_typeset_rep::typeset (SI& x1, SI& y1, SI& x2, SI& y2) {
   int missing_nr= INT_MAX;
   int redefined_nr= INT_MAX;
   int rebinding_nr= 0;
+  bool rebound_pass= false;
   x1= MAX_SI; y1= MAX_SI; x2= MIN_SI; y2= MIN_SI;
   while (true) {
     SI sx1, sy1, sx2, sy2;
@@ -1256,11 +1312,11 @@ edit_typeset_rep::typeset (SI& x1, SI& y1, SI& x2, SI& y2) {
     x1= min (x1, sx1); y1= min (y1, sy1);
     x2= max (x2, sx2); y2= max (y2, sy2);
     if (!env->complete) {
-      // labels which an edit removed, added or changed (with the reuse by
-      // inputs): one more pass typesets again the references to them
-      // (typesetter_rep::drop_bindings)
-      if (ttt->bindings_changed && ++rebinding_nr <= REBINDING_PASSES_MAX)
+      bool complete;
+      if (another_pass_for_bindings (env, ttt, rebinding_nr, complete)) {
+        if (complete) rebound_pass= true;
         continue;
+      }
       break;
     }
     env->complete= false;
@@ -1269,6 +1325,12 @@ edit_typeset_rep::typeset (SI& x1, SI& y1, SI& x2, SI& y2) {
     // missing and redefined references no longer decrease)
     int removed= clean_unused (env);
     if (N(env->missing) == 0 && N(env->redefined) == 0 && removed == 0) break;
+    // (the complete pass made for a binding given another value: the
+    // missing references were missing before it, and are not a reason for
+    // one more pass, and they were not reported, as after any pass which
+    // is not complete)
+    if (rebound_pass && N(env->redefined) == 0 && removed == 0) break;
+    rebound_pass= false;
     if ((N(env->missing) == missing_nr && N(env->redefined) == redefined_nr) ||
         (N(env->missing) > missing_nr || N(env->redefined) > redefined_nr)) {
       report_missing (env->missing);

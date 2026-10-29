@@ -709,6 +709,10 @@ same_page_items (array<page_item> l1, array<page_item> l2) {
 * again when the bookkeeping of the changes of the environment, old_patch,
 * says that nothing changed before it) or "check" (a bridge which would be
 * used again is typeset again, and what it makes is compared).
+*
+* The kinds of passes, and which of them clean the table of the references
+* or typeset again what read a binding which changed: see "Passes" in
+* Edit/Editor/edit_typeset.cpp.
 ******************************************************************************/
 
 #define INPUTS_MAX 256
