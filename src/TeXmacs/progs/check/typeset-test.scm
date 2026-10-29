@@ -96,6 +96,7 @@
 (define (rect-x2 r) (caddr r))
 (define (rect-y2 r) (cadddr r))
 (define (rect-mid r) (/ (+ (rect-x1 r) (rect-x2 r)) 2))
+(define (rect-width r) (- (rect-x2 r) (rect-x1 r)))
 
 (define (env-at var . l)
   (tree->stree (get-env-tree-at var (apply at l))))
@@ -437,6 +438,130 @@
        (check-false (in? "s2" (list-references)))
        (check-false (in? "dep" (list-references)))
        (check= (tree->stree (get-reference "dep")) '(uninit))))))
+
+;; Labels removed, put back, added and renumbered by edits, with the reuse
+;; by inputs: the pass of an edit is not a complete one (unlike the updates
+;; of test-removed-label above, which make complete passes), and the
+;; references to these labels, also those before them, show after it what
+;; a typesetting from scratch shows (#571): "?" for a removed label, not
+;; its old number until Update All. One more pass typesets again what reads
+;; them, the other paragraphs are used again. (Not with the classic cache,
+;; TEXMACS_TYPESET_READS=off, which keeps the entry of a removed label until
+;; a complete typesetting.)
+(define (rebinding-state)
+  ;; the references of the paragraph "see ..." and their widths (not their
+  ;; pages, which only a complete pass finds: determine_page_references)
+  (list (map (lambda (l)
+               (with r (tree->stree (get-reference l))
+                 (if (and (pair? r) (pair? (cdr r))) (cadr r) r)))
+             '("a" "b" "c" "z"))
+        (map (lambda (i) (rect-width (rect 1 i))) '(1 3 5))))
+
+(define (rebinding-eq l)
+  `(equation (document (concat "x=y" (label ,l)))))
+
+(define (rebinding-costs thunk)
+  ;; the passes and the bridges typeset again by (@thunk) and a typesetting
+  (let ((p0 (typeset-pass-count))
+        (r0 (typeset-redone-count)))
+    (thunk)
+    (update-forced)
+    (list (- (typeset-pass-count) p0) (- (typeset-redone-count) r0))))
+
+(define (test-removed-label-by-edit)
+  (check-group "labels removed or added by an edit")
+  (when (!= (getenv "TEXMACS_TYPESET_READS") "off")
+   (with-typeset-body
+    `(document "start"
+               (concat "see " (reference "c") " and " (reference "b")
+                       " and " (reference "z"))
+               (equation (document "u=v"))
+               ,(rebinding-eq "a")
+               ,(rebinding-eq "c")
+               (section (concat "S" (label "b")))
+               ,@(map (lambda (i) (string-append "Paragraph " (number->string i)))
+                      (iota 20)))
+    (lambda ()
+      (update-current-buffer)
+      (update-forced)
+      (update-forced)
+      (check= (rebinding-state) (from-scratch rebinding-state))
+      ;; (the check mode typesets again every bridge which is used again)
+      (let* ((check? (== (getenv "TEXMACS_TYPESET_READS") "check"))
+             ;; a paragraph without labels removed: one pass
+             (plain (rebinding-costs
+                     (lambda () (tree-remove (buffer-tree) 7 1))))
+             ;; an equation without a label removed: the labels after it
+             ;; are renumbered, and one more pass typesets again the
+             ;; paragraph of the references, which is before them
+             (renumbered (rebinding-costs
+                          (lambda () (tree-remove (buffer-tree) 2 1))))
+             ;; an equation with a label removed: the same, its label goes
+             (removed (rebinding-costs
+                       (lambda () (tree-remove (buffer-tree) 2 1)))))
+        (check= (car plain) 1)
+        (check= (car renumbered) 2)
+        (check= (car removed) 2)
+        ;; (a few bridges more at most: those of the references)
+        (when (not check?)
+          (check-true (<= (cadr removed) (+ (cadr renumbered) 3)))))
+      (check= (tree->stree (get-reference "a")) '(uninit))
+      (check= (rebinding-state) (from-scratch rebinding-state))
+      ;; the last equation removed, then put back (as an undo does)
+      (tree-remove (buffer-tree) 2 1)
+      (update-forced)
+      (check= (rebinding-state) (from-scratch rebinding-state))
+      (tree-insert (buffer-tree) 2 (list (rebinding-eq "c")))
+      (update-forced)
+      (check= (cadr (tree->stree (get-reference "c"))) "1")
+      (check= (rebinding-state) (from-scratch rebinding-state))
+      ;; an equation inserted before it: renumbered
+      (tree-insert (buffer-tree) 2 (list (rebinding-eq "a")))
+      (update-forced)
+      (check= (cadr (tree->stree (get-reference "c"))) "2")
+      (check= (rebinding-state) (from-scratch rebinding-state))
+      ;; a new label, referred to before it
+      (tree-insert (buffer-tree) 5 (list (rebinding-eq "z")))
+      (update-forced)
+      (check= (cadr (tree->stree (get-reference "z"))) "3")
+      (check= (rebinding-state) (from-scratch rebinding-state))
+      ;; the label of a section removed from it, then put back
+      (tree-set (tree-ref (buffer-tree) 4) '(section "S"))
+      (update-forced)
+      (check= (tree->stree (get-reference "b")) '(uninit))
+      (check= (rebinding-state) (from-scratch rebinding-state))
+      (tree-set (tree-ref (buffer-tree) 4) '(section (concat "S" (label "b"))))
+      (update-forced)
+      (check= (cadr (tree->stree (get-reference "b"))) "1")
+      ;; a key bound twice: when one of the bindings is removed, the
+      ;; other one stays
+      (tree-insert (buffer-tree) 6 '((concat "T" (set-binding "b" "X"))))
+      (update-forced)
+      (check= (cadr (tree->stree (get-reference "b"))) "X")
+      (tree-remove (buffer-tree) 6 1)
+      (update-forced)
+      (check= (cadr (tree->stree (get-reference "b"))) "1")
+      (check= (rebinding-state) (from-scratch rebinding-state))
+      (check= (typeset-check-mismatches) 0)))
+   ;; a label which only a running header makes (the pager's bindings are
+   ;; compared too), removed from it
+   (with-typeset-body
+    `(document (concat "see " (reference "h"))
+               (set-header (concat "Head" (label "h")))
+               ,@(map (lambda (i) (string-append "Paragraph " (number->string i)))
+                      (iota 5)))
+    (lambda ()
+      (init-env "page-medium" "paper")
+      (update-current-buffer)
+      (update-forced)
+      (update-forced)
+      (check-true (in? "h" (list-references)))
+      (tree-set (tree-ref (buffer-tree) 1) '(set-header "Head"))
+      (update-forced)
+      (check= (tree->stree (get-reference "h")) '(uninit))
+      (with w (lambda () (rect-width (rect 0 1)))
+        (check= (w) (from-scratch w)))
+      (check= (typeset-check-mismatches) 0)))))
 
 ;; A file holds the table of its references as it was saved: entries which no
 ;; label of the body defines any more (old names of automatic labels, labels
@@ -2006,11 +2131,9 @@
                                (list (random-paragraph next)))
                   (set! next (+ next 1)))
                  ((and (== op 1) (> n 10))
-                  ;; a paragraph removed (not an equation: references to
-                  ;; it would keep their number until a complete pass)
-                  (with i (+ 2 (rng (- n 2)))
-                    (when (not (tree-is? (tree-ref t i) 'equation))
-                      (tree-remove t i 1))))
+                  ;; a paragraph removed (also an equation: the references
+                  ;; to it are undefined at once, #571)
+                  (tree-remove t (+ 2 (rng (- n 2))) 1))
                  ((== op 2)
                   ;; the unit of the length
                   (tree-set (tree-ref t 0 1 0)
@@ -3058,6 +3181,7 @@
   (test-renumbering)
   (test-removed-label)
   (test-removed-label-chain)
+  (test-removed-label-by-edit)
   (test-stale-references)
   (test-automatic-labels)
   (test-labels-of-nested-tags)
