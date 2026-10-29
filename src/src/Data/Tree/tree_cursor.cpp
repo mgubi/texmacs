@@ -251,6 +251,9 @@ closest_accessible_inside (tree t, path p, int dir) {
 bool
 is_shifted (tree t, path p, int dir= -1, bool flag= false) {
   if (dir == 0) return true;
+  // a path which is not in t, as in shift (#592, #599)
+  else if (is_nil (p) || (!is_atom (p) &&
+           (is_atomic (t) || p->item < 0 || p->item >= N(t)))) return false;
   else if (is_atom (p)) {
     if (flag) {
       if (dir < 0) return p->item != 0;
