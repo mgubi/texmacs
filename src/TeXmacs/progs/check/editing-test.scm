@@ -520,6 +520,23 @@
   (mouse-update)
   (list (rel (selection-get-start)) (rel (selection-get-end))))
 
+;; A cursor path which goes below a string (go-to from a script with a wrong
+;; path) is refused when the changes are applied, with an error. The report
+;; of that error shifts the same path (cursor-path*), which went through the
+;; string and looped forever (#592: shift of tree_cursor.cpp did not check
+;; its path). apply-changes itself is not called here: its error is a C++
+;; exception, which only the event loop catches.
+(define (test-bad-cursor)
+  (check-group "a cursor path below a string")
+  (with-buffer-body '(document (tabular (table (row (cell "a") (cell "b")))))
+    (lambda ()
+      (go-to (at 0 0 0 1 0 0 0))
+      (update-forced)
+      (check= (rel (cursor-path*)) '(0 0 0 1 0 0 0))
+      (go-start)
+      (update-forced)
+      (check= (body) '(document (tabular (table (row (cell "a") (cell "b")))))))))
+
 (define (test-mouse-long)
   (check-group "mouse in a long document")
   (with-buffer-body
@@ -1291,6 +1308,7 @@
   (test-load)
   (test-insert)
   (test-cursor)
+  (test-bad-cursor)
   (test-mouse-long)
   (test-selection)
   (test-remove)
