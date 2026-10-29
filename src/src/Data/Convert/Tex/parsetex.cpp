@@ -571,7 +571,7 @@ latex_parser::parse_backslash (string s, int& i, int change) {
   if ((i<n) && (s[i]=='*') && latex_type (s (start, i+1)) != "undefined") i++;
   string r= s (start, i);
   while ((i<n) && s[i] == ' ') i++;
-  if (s[i] == '\n') {lf= 'N'; i++;}
+  if ((i<n) && (s[i] == '\n')) {lf= 'N'; i++;}
   if ((r == "\\begin") || (r == "\\end")) {
     while ((i<n) && is_space (s[i])) i++;
     if ((i==n) || (s[i]!='{')) {
@@ -632,7 +632,7 @@ latex_parser::parse_symbol (string s, int& i) {
     end= i;
   }
   while ((i<N(s)) && s[i] == ' ') i++;
-  if (s[i] == '\n') {lf= 'N'; i++;}
+  if ((i<N(s)) && (s[i] == '\n')) {lf= 'N'; i++;}
   return tree (TUPLE, s(start, end));
 }
 
@@ -706,7 +706,10 @@ read_throught_env (string s, int &i, string cmd, bool end) {
   while (i < N(s) && count > 0 && count_aux >= 0) {
     if (s[i] == '\\' && test_env (s, i, env, false)) count++;
     if (s[i] == '\\' && test_env (s, i, env, true))  count--;
-    if (s[i] == '%' && (i == 0 || s[i-1] != '\\')) {while (s[i] != '\n') i++;}
+    if (s[i] == '%' && (i == 0 || s[i-1] != '\\')) {
+      while (i < N(s) && s[i] != '\n') i++;
+      if (i == N(s)) break;
+    }
     if (s[i] == '{') count_aux++;
     if (s[i] == '}') count_aux--;
     if (count > 0 && count_aux >=0) i++;
