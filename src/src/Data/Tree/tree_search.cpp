@@ -1315,6 +1315,22 @@ pattern_elements (array<int>& kind, array<tree>& elem, tree what) {
   else { kind << ELEM_TAG; elem << what; }
 }
 
+static void
+pattern_elements (array<int>& kind, array<tree>& elem, array<int>& child,
+                  tree what) {
+  // the elements of what, and the child of the formula what (0 for
+  // another pattern) to which each belongs
+  if (!is_concat (what)) {
+    pattern_elements (kind, elem, what);
+    while (N(child) < N(kind)) child << 0;
+    return;
+  }
+  for (int i=0; i<N(what); i++) {
+    pattern_elements (kind, elem, what[i]);
+    while (N(child) < N(kind)) child << i;
+  }
+}
+
 static bool
 has_one (tree what) {
   // does the formula pattern what have an empty region at its level?
@@ -1347,15 +1363,7 @@ struct region_matcher {
     kind= array<int> ();
     elem= array<tree> ();
     child= array<int> ();
-    if (is_concat (what))
-      for (int i=0; i<N(what); i++) {
-        pattern_elements (kind, elem, what[i]);
-        while (N(child) < N(kind)) child << i;
-      }
-    else {
-      pattern_elements (kind, elem, what);
-      while (N(child) < N(kind)) child << 0;
-    }
+    pattern_elements (kind, elem, child, what);
     to_end= to_end2;
     int nt= N(toks) + 1;
     failed= array<bool> (N(kind) * nt + nt);
@@ -2133,7 +2141,6 @@ search_from_paragraph (tree t, tree what, path p, path q, int limit,
     if (is_nil (h1) || h1->item != 0 || is_nil (h2) || h2->item != 0)
       continue;
     if (after_empty && !text_before (d, h1)) continue;
-    // (a hit at the start of the text after cur starts at cur)
     add_hit (r, p * uncut (t, q, h1->next, lv),
              p * uncut (t, q, h2->next, lv), is_nil (q)? path (): p * q);
   }
