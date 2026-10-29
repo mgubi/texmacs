@@ -274,55 +274,27 @@
            (set! by (tm-ref by 0)))
          by)))
 
-(define (get-positions-in-string-rec what match b)
-  ;; Return the list of positions of the strings in what,
-  ;; from position b in the string match.
-  (if (null? what) (list)
-      (with w (car what)
-	(with pos (string-search-forwards w b match)
-	  (if (< pos b) (list)
-	      (with pos1 (+ pos (string-length w))
-		(cons (list pos pos1)
-		      (get-positions-in-string-rec
-		       (cdr what) match pos1))))))))
-
-(define (get-positions-in-string what match)
-  ;; Return the list of positions of the strings
-  ;; in what in the string match.
-  (with l (get-positions-in-string-rec what match 0)
-    (if (!= (length l) (length what)) (list) l)))
-
-(define (get-wildcards-in-string-rec what l match b)
-  (if (null? what) (list)
-      (with w (car what)
-	(cond ((tm-func? w `wildcard 1)
-	       (if (null? l) `((:wildcard ,(tm->stree (tm-ref w 0))
-					  ,(string-tail match b)))
-		   (with pos (car l)
-		     (cons `(:wildcard ,(tm->stree (tm-ref w 0))
-				       ,(substring match b (first pos)))
-			   (get-wildcards-in-string-rec
-			    (cdr what) l match (first pos))))))
-	      ((tm-atomic? w)
-	       (if (null? l) (list)
-		   (with pos (car l)
-		     (get-wildcards-in-string-rec
-		      (cdr what) (cdr l) match (second pos)))))
-	      (else (list))))))
-
-(define (get-wildcards-in-string what match)
-  (with l (get-positions-in-string
-	   (map tm->string (list-filter what tm-atomic?)) match)
-    (if (null? l) (list)
-	(get-wildcards-in-string-rec what l match 0))))
-
 ;; The values of the wildcards are the runs which they take in the match, as
 ;; the search aligns the pattern with its text (lazily: a part of a string,
-;; several children, or nothing); they were matched child by child (#520)
+;; several children, or nothing; in the region of a pattern with one, as
+;; its content); they were matched child by child, and in a string by a
+;; case-sensitive search of its literal parts (#520)
 
 (define (has-region? t)
   (or (tm-func? t 'select-region)
       (and (tm-compound? t) (list-or (map has-region? (tm-children t))))))
+
+(define (regions t)
+  (cond ((tm-func? t 'select-region 1) (list t))
+        ((tm-compound? t) (append-map regions (tm-children t)))
+        (else (list))))
+
+(define (region-content what)
+  ;; the pattern which the hit of what matches: the content of its region,
+  ;; if it has one which is not empty, else #f
+  (with l (regions what)
+    (and (== (length l) 1) (not (tm-equal? (tm-ref (car l) 0) ""))
+         (tm-ref (car l) 0))))
 
 (define (has-wildcard? t)
   (or (tm-func? t 'wildcard 1)
@@ -347,14 +319,14 @@
          (list `(:wildcard ,(tm->stree (tm-ref what 0)) ,(tm->stree match))))
         ((tm-equal? what "")
          (list `(:empty ,(tm->stree match))))
-        ((and (tm-func? what 'concat) (not (has-region? what))
-              (not (tm-func? match 'document)) (has-wildcard? what))
+        ((has-region? what)
+         (with c (region-content what)
+           (if c (get-wildcards c match) (list))))
+        ((and (tm-func? what 'concat) (not (tm-func? match 'document))
+              (has-wildcard? what))
          (with r (replace-match (tm->tree match) what '() '())
            (if r (append-map get-wildcards (tm-children what) (cadddr r))
                (list))))
-	((and (tm-atomic? match)
-	      (tm-func? what 'concat))
-	 (get-wildcards-in-string (tm-children what) (tm->string match)))
         ((and (tm-compound? what) (tm-compound? match)
               (== (tm-label what) (tm-label match))
               (== (tm-arity what) (tm-arity match)))
@@ -481,10 +453,11 @@
                                        (car runs))
                            (get-wildcards what match)))
                    (need (list-intersection (wildcard-names by)
-                                            (wildcard-names what)))
-                   (known (map cadr (list-filter
-                                      wc (cut tm-func? <> :wildcard 2)))))
-              (and (list-and (map (cut in? <> known) need))
+                                            (wildcard-names what))))
+              (and (or (null? need)
+                       (with known (map cadr (list-filter
+                                               wc (cut tm-func? <> :wildcard 2)))
+                         (list-and (map (cut in? <> known) need))))
                    (car (replace-wildcards by wc))))))))
 
 ;; Replace one replaces the current hit (the match in it, see replace-hit),

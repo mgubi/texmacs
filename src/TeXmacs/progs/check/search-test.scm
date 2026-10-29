@@ -2395,6 +2395,36 @@
           ((document "aab") (concat (select-region (wildcard "w")) "a") "X"
            (document "XaXab")))))))
 
+;; The wildcards of a region pattern take their values in the region, as its
+;; content; the values were looked for by the literal parts around the
+;; region, which are outside it (and by a case-sensitive search), and the
+;; hit was left
+(define (test-replace-region-wildcards)
+  (check-group "replace region wildcards")
+  (with-search-mode 'replace
+    (lambda ()
+      (check-replace-rows
+        '(((document (concat "axyb a" (strong "x") "yb"))
+           (concat "a" (select-region (wildcard "w")) "b")
+           (concat "[" (wildcard "w") "]")
+           (document (concat "a[xy]b a[" (strong "x") "y]b")))
+          ((document "axyb")
+           (concat "a" (select-region (concat "x" (wildcard "w"))) "b")
+           (concat "<" (wildcard "w") ">")
+           (document "a<y>b"))
+          ;; a wildcard outside the region has no value: left
+          ((document "axyb")
+           (concat (wildcard "v") "a" (select-region (wildcard "w")) "b")
+           (concat (wildcard "v") (wildcard "w"))
+           (document "axyb"))))
+      (with-preference "case-insensitive-match" "on"
+        (lambda ()
+          (check-replace-rows
+            '(((document "AxyB aXYb")
+               (concat "a" (select-region (concat "x" (wildcard "w"))) "b")
+               (concat "<" (wildcard "w") ">")
+               (document "A<y>B a<Y>b")))))))))
+
 (define (test-replace-filters)
   (check-group "replace with a filter")
   ;; Replace goes on after the hits which the filter of the search rejects
@@ -2475,5 +2505,6 @@
   (test-replace-in-buffers)
   (test-replace-filters)
   (test-replace-empty-matches)
+  (test-replace-region-wildcards)
   (test-replace-random)
   (check-end))
