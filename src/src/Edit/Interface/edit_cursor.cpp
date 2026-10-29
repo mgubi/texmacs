@@ -420,8 +420,21 @@ edit_cursor_rep::adjust_cursor () {
   if (p == tp) cu= mv;
 }
 
+static path
+correct_outside (tree et, path rp, path p) {
+  // A path which is not in the tree (a go-to from a script with a wrong
+  // path: below a string, a negative or out of range index) would reach
+  // the editing functions, which assume their paths are in the tree, and
+  // crash them (#599). It is corrected to the closest cursor inside the
+  // tree, as super_correct corrects a path in the tree.
+  if (is_inside (et, p) || !(rp <= p)) return p;
+  tree st= subtree (et, rp);
+  return rp * super_correct (st, closest_inside (st, p / rp));
+}
+
 void
 edit_cursor_rep::go_to_here () {
+  tp= correct_outside (et, rp, tp);
   cu= eb->find_check_cursor (tp);
   if (!cu->valid || !valid_cursor (et, tp)) {
     tp= super_correct (et, tp);
@@ -446,8 +459,9 @@ edit_cursor_rep::go_to_here () {
 
 void
 edit_cursor_rep::go_to (path p) {
-  bool must_move= tp != p;
   if (rp <= p) {
+    p= correct_outside (et, rp, p);
+    bool must_move= tp != p;
     //if (tp != p) cout << "Go to " << p << "\n";
     tp= p;
     mv_status= DIRECT;
