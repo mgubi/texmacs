@@ -46,9 +46,9 @@ bridge nil_bridge;
 bridge_rep::bridge_rep (typesetter ttt2, tree st2, path ip2):
   ttt (ttt2), env (ttt->env), st (st2), ip (ip2),
   status (CORRUPTED), changes (UNINIT), reads (),
-  seen_stamp (0), in_known (false), in_vals (0), in_state (0), in_items (0),
-  in_fp (0), in_zoom (false), in_zoom_at (""), version (0), chunk_cache (NULL),
-  merged_version (-1)
+  seen_stamp (0), in_known (false), in_unrecorded (false), in_vals (0),
+  in_state (0), in_items (0), in_fp (0), in_zoom (false), in_zoom_at (""),
+  version (0), chunk_cache (NULL), merged_version (-1)
 {
   static int bridges_made= 0;
   serial= bridges_made++;
@@ -517,7 +517,9 @@ bridge_rep::exec_until (path p, bool skip_flag) {
 
   (void) skip_flag;
   // cout << "Exec until " << p << " in " << st << "\n";
-  if ((status & VALID_MASK) != PROCESSED) {
+  if ((status & VALID_MASK) != PROCESSED ||
+      (in_unrecorded && p == path (right_index (st)))) {
+    // (a bridge which records nothing does not keep its changes either)
     // cout << "  Re-execute until\n";
     env->exec_until (st, p);
   }
@@ -540,7 +542,7 @@ extern tree the_et;
 
 // the reads and the lookups of a bridge which was typeset or used again,
 // for the record of the bridge above it
-static void
+void
 add_reads (edit_env env, bool known, array<int> reads,
            array<string> keys, array<tree> values) {
   env_id_set* rec= env->read_recorder ();
@@ -577,10 +579,21 @@ shared_ids (array<int> a) {
   return a;
 }
 
-// do the references and attachments looked up still have the values found?
-// Not looked up again when the tables did not change since they last had
-// them (the stamp; in the check mode they are, and it is told if they do
-// not have them)
+// an included document ("i" and the file) is the same when the cache of
+// the inclusions has the same tree (a file saved or loaded again gives
+// another one), a file which is not there when it is still not there
+static inline bool
+same_lookup_value (string key, tree before, tree now) {
+  if (N(key) > 0 && key[0] == 'i')
+    return strong_equal (before, now) ||
+           (is_func (before, _ERROR) && before == now);
+  return before == now;
+}
+
+// do the references, attachments and included documents looked up still
+// have the values found? Not looked up again when the tables and the cache
+// of the inclusions did not change since they last had them (the stamp; in
+// the check mode they are, and it is told if they do not have them)
 bool
 same_lookups (edit_env env, array<string> keys, array<tree> values,
               unsigned long long& stamp) {
@@ -589,7 +602,8 @@ same_lookups (edit_env env, array<string> keys, array<tree> values,
   bool same_stamp= (stamp == now);
   if (same_stamp && typeset_inputs_mode () != 2) return true;
   for (int i=0; i<N(keys); i++)
-    if (env->lookup_value (keys[i]) != values[i]) {
+    if (!same_lookup_value (keys[i], values[i],
+                            env->lookup_value (keys[i]))) {
       if (same_stamp) {
         typeset_check_mismatches++;
         failed_error << "A reference changed while its tables did not: "
@@ -649,8 +663,9 @@ same_page_items (array<page_item> l1, array<page_item> l2) {
 * What a bridge makes is a function of its subtree and of what it was
 * typeset from: the variables which it read before it wrote them, with
 * their values, the state of the environment derived from the variables
-* (the font, the colour...: edit_env_rep::derived_state), the references
-* and attachments which it looked up, and the line items which the bridges
+* (the font, the colour...: edit_env_rep::derived_state), the references,
+* attachments and included documents which it looked up, and the line
+* items which the bridges
 * around it gave it (ttt->a and ttt->b). These are its inputs (the values
 * and the line items are kept as hashes of 64 bits, as the whole environment
 * below: inputs_hash, items_signature). A bridge
@@ -668,8 +683,29 @@ same_page_items (array<page_item> l1, array<page_item> l2) {
 * set-binding): a bridge used again writes again those it wrote, in the
 * same order (out_bindings), since the last binding of a key wins (the
 * running headers kept by the pager do the same, see make_part). The
-* auxiliary data (write) is only written by a complete typesetting, which
-* uses no bridge again, and the loci and links stay with the bridge.
+* entries of the auxiliary tables (<write|toc|...>: the table of contents,
+* the index, the bibliography) are recorded among them, as
+* <write|key|value> (edit_env_rep::write_aux), and a bridge used again
+* writes them again (write_bindings): a complete pass which uses bridges
+* again (the one of the renumbering of the labels: typesetter_rep::collect)
+* makes the whole tables. The loci and links stay with the bridge.
+*
+* Not every bridge keeps a record: recording, and giving it to the bridge
+* above, costs about as much as typesetting a small bridge (a quarter of a
+* complete typesetting when every bridge did it), and using such a bridge
+* again saves little. A bridge records its inputs when it is a paragraph
+* of a document of the text (or a block of paragraphs, see
+* bridge_document.cpp), or the root; the bridges below a paragraph, and
+* those which come from the expansion of a macro (the paragraphs of its
+* body, unless there are 16 or more or they are large (2000 characters),
+* and those grouped in blocks, which do record; those of its arguments and
+* of an included file record), do not (bridge_record_next, bridge_in_macro).
+* A bridge which does not record is typeset again each
+* time the bridge above is, as in the classic cache, and what it reads,
+* writes, looks up and binds goes to the record of the bridge above as if it
+* were typeset in it (typeset_unrecorded: it keeps no changes of the
+* environment either, which exec_until makes again when they are needed).
+* TEXMACS_TYPESET_RECORD=all makes every bridge record, as before.
 *
 * TEXMACS_TYPESET_READS may be "off" (the classic cache: a bridge is used
 * again when the bookkeeping of the changes of the environment, old_patch,
@@ -813,8 +849,55 @@ bridge_rep::give_record () {
   if (in_zoom) env->zoom_read ()= true;
 }
 
+bool bridge_record_next= true;
+bool bridge_in_macro= false;
+
+int
+typeset_record_mode () {
+  static int mode= -1;
+  if (mode < 0) {
+    string s= get_env ("TEXMACS_TYPESET_RECORD");
+    mode= (s == "all"? 1: 0);
+  }
+  return mode;
+}
+
+// A bridge which does not record its inputs (a piece of a paragraph, say):
+// it is typeset again each time the bridge around it is, which is the
+// classic cache, and what it reads, writes and looks up goes to the record
+// of that bridge as if it were typeset in it. It keeps no changes of the
+// environment (bridge_rep::exec_until redoes them).
+bool
+bridge_rep::typeset_unrecorded (int desired_status) {
+  typeset_count_redone (1);
+  in_known= false;
+  in_fp= 0;
+  seen_keys= array<string> ();
+  seen_values= array<tree> ();
+  reads= array<int> ();
+  in_item_boxes= array<box> ();
+  out_bindings= array<tree> ();
+  in_unrecorded= true;
+  changes= hashmap<string,tree> (UNINIT);
+  my_clean_links ();
+  link_repository old_link_env= env->link_env;
+  env->link_env= link_env;
+  my_stack_start ();
+  if (env->hl_lan != 0) env->lan->highlight (st);
+  my_typeset (desired_status);
+  my_stack_end ();
+  env->link_env= old_link_env;
+  status= desired_status;
+  version++;
+  return true;
+}
+
 bool
 bridge_rep::typeset_by_inputs (int desired_status) {
+  bool recorded= bridge_record_next || typeset_record_mode () == 1;
+  bridge_record_next= false;
+  if (!recorded) return typeset_unrecorded (desired_status);
+  in_unrecorded= false;
   bool same= (status == desired_status) && my_reusable () && same_inputs ();
   bool check= same && (typeset_inputs_mode () == 2 || my_check_cache ());
   array<SI> old_lines, old_border;
@@ -830,6 +913,7 @@ bridge_rep::typeset_by_inputs (int desired_status) {
     if (edit_profile.on) edit_profile.cached++;
     give_record ();
     env->write_bindings (out_bindings);
+    env->replay_missing (seen_keys, seen_values);
     env->monitored_patch_env (changes);
     return false;
   }
@@ -847,7 +931,7 @@ bridge_rep::typeset_by_inputs (int desired_status) {
   unsigned long long was_fp= in_fp;
   bool was_zoom= in_zoom;
   tree was_zoom_at= in_zoom_at;
-  if (edit_profile.on) edit_profile.redone++;
+  typeset_count_redone (1);
   unsigned long long state= env->derived_state ();
   unsigned long long items= items_signature (ttt->a, ttt->b);
   array<box> item_boxes= items_boxes (ttt->a, ttt->b);

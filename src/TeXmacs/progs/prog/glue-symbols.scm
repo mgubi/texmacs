@@ -28,6 +28,8 @@
 
 (tm-define (all-glued-symbols) '( 
 "typeset-check-mismatches"
+"typeset-pass-count"
+"typeset-redone-count"
 "texmacs-version-release"
 "version-before?"
 "updater-supported?"
@@ -975,6 +977,7 @@
 "inclusions-gc"
 "update-all-path"
 "update-all-buffers"
+"update-picture-buffers"
 "set-message"
 "set-message-temp"
 "recall-message"
@@ -1261,6 +1264,7 @@
 "apply-changes"
 "update-path"
 "update-current-buffer"
+"update-current-buffer-keep"
 "renumber-auto-labels"
 "update-players"
 "generate-all-aux"

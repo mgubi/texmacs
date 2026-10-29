@@ -309,13 +309,24 @@ set_imgbox_cache(tree t, int w, int h, int xmin, int ymin){
   img_box (t)= (imgbox) {w, h, xmin, ymin};
 }
 
+// (changes when sizes are dropped: the typesetter looks the pictures it
+// has up again then, see edit_env_rep::picture_value)
+static unsigned long long imgbox_version= 1;
+
+unsigned long long
+imgbox_stamp () {
+  return imgbox_version;
+}
+
 void
 clear_imgbox_cache(tree t){
+  if (img_box->contains (t)) imgbox_version++;
   img_box->reset (t);
 }
 
 void
 clearall_imgbox_cache() {
+  if (N(img_box) != 0) imgbox_version++;
   img_box = hashmap<tree,imgbox> ();
 }
 

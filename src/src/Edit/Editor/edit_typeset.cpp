@@ -94,7 +94,13 @@ hashmap<string,tree> edit_typeset_rep::get_ref () { return buf->data->ref; }
 hashmap<string,tree> edit_typeset_rep::get_aux () { return buf->data->aux; }
 hashmap<string,tree> edit_typeset_rep::get_att () { return buf->data->att; }
 void edit_typeset_rep::set_fin (hashmap<string,tree> H) { fin= H; }
-void edit_typeset_rep::set_ref (hashmap<string,tree> H) { buf->data->ref= H; }
+void
+edit_typeset_rep::set_ref (hashmap<string,tree> H) {
+  buf->data->ref= H;
+  // (loaded tables: see clean_unused)
+  env->refs_settled= false;
+  env->read_refs= hashmap<string,bool> (false);
+}
 void edit_typeset_rep::set_aux (hashmap<string,tree> H) { buf->data->aux= H; }
 void edit_typeset_rep::set_att (hashmap<string,tree> H) { buf->data->att= H; }
 
@@ -1235,6 +1241,7 @@ edit_typeset_rep::typeset_sub (SI& x1, SI& y1, SI& x2, SI& y2) {
   handle_exceptions ();
 #endif
   bench_end ("typeset");
+  ttt->collect= false;
   //time_t t2= texmacs_time ();
   //if (t2 - t1 >= 10) cout << "typeset took " << t2-t1 << "ms\n";
   picture_cache_clean ();
@@ -1263,19 +1270,33 @@ report_redefined (array<tree> redefined) {
 }
 
 // Removes the references which the last complete pass did not define, and
-// tells how many were removed. A reference to one of them was typeset with
-// its old value during that pass (lookup_value reads local_ref first), and
-// was not reported as missing: one more pass gives it "?" (#417).
+// tells how many of them make one more pass necessary. A reference to one
+// of them was typeset with its old value during that pass (lookup_value
+// reads local_ref first), and was not reported as missing: one more pass
+// gives it "?" (#417).
+// The first time, the table is the one which was loaded with the file, and
+// holds entries which no label of the document defines any more (old
+// names, labels of other versions): they matter only if a reference to
+// them was typeset since (read_refs). Afterwards, an entry is there because
+// a pass defined it, and a bridge which was kept may have read it (#408).
 static int
-clean_unused (hashmap<string,tree>& refs, hashmap<string,bool> used) {
+clean_unused (edit_env env) {
+  hashmap<string,tree>& refs= env->local_ref;
+  bool settled= env->refs_settled;
   array<string> a;
+  int matter= 0;
   for (iterator<string> it= iterate (refs); it->busy(); ) {
     string key= it->next ();
-    if (!used->contains (key)) a << key;
+    if (!env->touched [key]) {
+      a << key;
+      if (settled || env->read_refs->contains (key)) matter++;
+    }
   }
   for (int i=0; i<N(a); i++)
     refs->reset (a[i]);
-  return N(a);
+  env->refs_settled= true;
+  env->read_refs= hashmap<string,bool> (false);
+  return matter;
 }
 
 void
@@ -1293,7 +1314,7 @@ edit_typeset_rep::typeset (SI& x1, SI& y1, SI& x2, SI& y2) {
     // a removed label is treated like a redefined one: one more pass
     // (still bounded by the test below, which stops when the counts of
     // missing and redefined references no longer decrease)
-    int removed= clean_unused (env->local_ref, env->touched);
+    int removed= clean_unused (env);
     if (N(env->missing) == 0 && N(env->redefined) == 0 && removed == 0) break;
     if ((N(env->missing) == missing_nr && N(env->redefined) == redefined_nr) ||
         (N(env->missing) > missing_nr || N(env->redefined) > redefined_nr)) {
@@ -1303,7 +1324,15 @@ edit_typeset_rep::typeset (SI& x1, SI& y1, SI& x2, SI& y2) {
     }
     missing_nr= N(env->missing);
     redefined_nr= N(env->redefined);
-    ::notify_assign (ttt, path(), ttt->br->st);
+    // (a complete pass again: the next one must collect the references,
+    // the page numbers and the auxiliary tables, which a pass that uses
+    // bridges again does not.) With the inputs of the bridges and no
+    // removed label, it uses the bridges again (collect): those which
+    // looked up a reference whose table entry changed since are typeset
+    // again (the stamp of their lookups), the others are used again and
+    // tell the references they found missing (replay_missing)
+    if (typeset_inputs_mode () != 0 && removed == 0) ttt->collect= true;
+    else ::notify_assign (ttt, path(), ttt->br->st);
   }
 }
 
@@ -1335,6 +1364,69 @@ edit_typeset_rep::typeset_invalidate_all () {
   ::notify_assign (ttt, path(), subtree (et, rp));
 }
 
+// The labels are to be numbered again. With the inputs of the bridges,
+// only the bridges which make labels are typeset again (and those whose
+// environment changes in consequence): they read auto-epoch (exec_auto_id
+// in env_exec.cpp), which is changed. The classic cache typesets it all
+// again.
+void
+edit_typeset_rep::typeset_invalidate_labels () {
+  static int epoch= 0;
+  if (typeset_inputs_mode () == 0) {
+    typeset_invalidate_all ();
+    return;
+  }
+  set_pre ("auto-epoch", as_string (++epoch));
+  notify_change (THE_TREE);
+}
+
+// The next typesetting is a complete pass which uses the bridges again
+// (the auxiliary tables, the page numbers of the references and the
+// missing references are those of a typesetting from scratch, see
+// typesetter_rep::collect). For the end of Update All, which comes after
+// the layout was made from scratch (inclusions-gc) and the tables were
+// regenerated in the document: only what the edits changed is typeset
+// again. The classic cache typesets it all again.
+void
+edit_typeset_rep::typeset_invalidate_keep () {
+  if (typeset_inputs_mode () == 0) {
+    typeset_invalidate_all ();
+    return;
+  }
+  ttt->collect= true;
+  notify_change (THE_TREE);
+}
+
+// The files of some included documents changed (Update All, Tools > Update >
+// Inclusions: the cache of the inclusions holds other trees for them, see
+// refresh_inclusions). The include is an input of the bridge of the include
+// (rewrite_include in env_exec.cpp), so that the next typesetting types
+// again the includes of these files, and uses the layout of the rest. The
+// classic cache types it all again.
+void
+edit_typeset_rep::typeset_invalidate_inclusions () {
+  if (typeset_inputs_mode () == 0) {
+    typeset_invalidate_all ();
+    return;
+  }
+  notify_change (THE_TREE);
+}
+
+// The pictures were loaded again (Tools > Update > Pictures): what is on the
+// screen is drawn again from the files, and the images whose size changed
+// are typeset again, the others being used again (the size of an image is
+// an input of the bridge of the image, see typeset_image in
+// Concat/concat_active.cpp). The classic cache types it all again.
+void
+edit_typeset_rep::typeset_invalidate_pictures () {
+  if (typeset_inputs_mode () == 0) {
+    typeset_invalidate_all ();
+    return;
+  }
+  if (typeset_pictures_used ()) notify_change (THE_TREE);
+  invalidate_all ();
+}
+
 // The automatic labels are numbered again, in the order of the document
 // (exec_auto_id in env_exec.cpp), which is to be done before the tables
 // of contents and the indexes are made again: these hold the names of
@@ -1346,18 +1438,34 @@ edit_typeset_rep::typeset_renumber_labels () {
   tree root= is_nil (rp) ? et : et[rp->item];
   array<int> before= auto_labels_numbers (root);
   if (!auto_labels_renumber (root)) return false;
+  // (a change of the environment which is waiting, such as the one of
+  // inclusions-gc, makes apply_changes typeset all again: it is done here,
+  // by the pass below, which is then not to be done twice)
+  bool pending= (typeset_inputs_mode () != 0 && has_changed (THE_ENVIRONMENT));
+  if (pending) typeset_invalidate_all ();
   for (int i=0; i<N(buf->vws); i++)
-    ((tm_view) buf->vws[i])->ed->typeset_invalidate_all ();
+    ((tm_view) buf->vws[i])->ed->typeset_invalidate_labels ();
   // one pass, for the names: the references are not yet those of the
-  // tables to come, and the document is typeset again after them
+  // tables to come, and the document is typeset again after them. It is a
+  // complete pass, which makes the auxiliary tables (generate_aux uses
+  // them), also when the bridges which make no labels are used again
   SI x1, y1, x2, y2;
+  ttt->collect= (typeset_inputs_mode () != 0);
   typeset_sub (x1, y1, x2, y2);
+  ttt->collect= false;
   if (env->complete) {
     env->complete= false;
     // the references to a removed label are typeset again by the
     // typesetting which follows (see typeset above)
-    if (clean_unused (env->local_ref, env->touched) != 0)
+    if (clean_unused (env) != 0)
       ::notify_assign (ttt, path(), ttt->br->st);
+  }
+  if (pending) {
+    // what the pass made is on screen only after a repaint
+    notify_change (THE_TREE, THE_ENVIRONMENT);
+    SI px= get_pixel_size ();
+    invalidate (x1- 2*px, y1- 2*px, x2+ 2*px, y2+ 2*px);
+    invalidate_all ();
   }
   return auto_labels_numbers (root) != before;
 }

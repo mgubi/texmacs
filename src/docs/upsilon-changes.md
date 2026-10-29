@@ -12,6 +12,24 @@ branch [`upsilon_texmacs`](https://github.com/mgubi/texmacs/commits/upsilon_texm
 have the details, and the problems go to the
 [issues of the repository](https://github.com/mgubi/texmacs/issues).
 
+## 29 October 2026
+
+- **Faster Document > Update > All**: on a large document Update All
+  no longer typesets everything three or four times. The automatic labels
+  are numbered again by typesetting only what makes labels and table
+  entries; the clean-up of the included files and of the pictures keeps
+  the layout of what did not change (an included file changed on disk, or
+  a picture whose file or size changed, is still typeset again). On the
+  2000-page book of the report, an Update All takes about 2 seconds of
+  CPU instead of 25 to 33 (#408, #425).
+- **Opening documents with old references**: a document whose saved
+  table of references holds labels which it no longer defines is
+  typeset once when opened, not twice (half the time on the chapters of
+  the same book); a reference to such a label still shows "?" (#408).
+- **Typesetting from scratch** is about a quarter faster: only the
+  paragraphs record what they read for the reuse of the layout, not
+  every part of them; editing is also somewhat faster (#408).
+
 ## 28 October 2026
 
 - **Windows closed from their own editor**: a window closed by a key or

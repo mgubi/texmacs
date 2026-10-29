@@ -417,6 +417,25 @@ last_modified (url u, bool cache_flag) {
   return u_stat.st_mtime;
 }
 
+string
+file_identity (url u) {
+  if (is_rooted_web (u) || is_rooted_tmfs (u)) return "";
+  struct_stat u_stat;
+  if (get_attributes (u, &u_stat, true, false)) return "";
+  if (u_stat.st_ino == 0) return "";
+  return as_string ((int) u_stat.st_size) * ":" *
+         as_string ((int) u_stat.st_mtime) * ":" *
+         as_string ((int) u_stat.st_ctime) * ":" *
+#if defined(__APPLE__)
+         as_string ((int) u_stat.st_ctimespec.tv_nsec) * ":" *
+         as_string ((int) u_stat.st_mtimespec.tv_nsec) * ":" *
+#elif defined(__linux__)
+         as_string ((int) u_stat.st_ctim.tv_nsec) * ":" *
+         as_string ((int) u_stat.st_mtim.tv_nsec) * ":" *
+#endif
+         as_string ((double) u_stat.st_ino);
+}
+
 bool
 is_newer (url which, url than) {
   struct_stat which_stat;

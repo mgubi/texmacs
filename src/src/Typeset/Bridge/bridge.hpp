@@ -49,6 +49,7 @@ public:
                                     // again (0: not yet; see same_lookups)
   // what it was typeset from, when the inputs are used (see "What is
   // typeset again" in bridge.cpp)
+  bool                 in_unrecorded; // it records nothing (typeset_unrecorded)
   bool                 in_known; // all its inputs are known:
   array<int>           in_vars;  // the variables read before written
   unsigned long long   in_vals;  // a hash of their values (inputs_hash)
@@ -103,7 +104,24 @@ public:
   void give_record ();
   bool typeset_by_inputs (int desired_status); // (made again?)
   void fold_line (tree t, array<page_item>& items);
+  bool typeset_unrecorded (int desired_status);
 };
+
+// Which bridges record their inputs (see "What is typeset again" in
+// bridge.cpp): the next one typeset does when bridge_record_next is set (the
+// bridge which gets it clears it), and every one does with
+// TEXMACS_TYPESET_RECORD=all. bridge_in_macro tells that the bridges are
+// those of the body of a macro, whose paragraphs do not record (unless there
+// are many: bridge_document.cpp)
+extern bool bridge_record_next;
+extern bool bridge_in_macro;
+struct bridge_macro_scope {
+  bool old;
+  inline bridge_macro_scope (bool in_macro): old (bridge_in_macro) {
+    bridge_in_macro= in_macro; }
+  inline ~bridge_macro_scope () { bridge_in_macro= old; }
+};
+int typeset_record_mode ();
 
 
 // do two lists of page items make the same boxes (the check modes)?
@@ -112,6 +130,9 @@ bool same_page_items (array<page_item> l1, array<page_item> l2);
 // the inputs of a bridge below for the record of the bridge above it
 void add_inputs (edit_env env, bool known, array<int> vars,
                  unsigned long long vals);
+// the reads and lookups of a bridge below for the record of the bridge above
+void add_reads (edit_env env, bool known, array<int> reads,
+                array<string> keys, array<tree> values);
 // do the references and attachments looked up still have these values?
 // ('stamp': the labels_stamp of the tables when they last had them, or 0)
 bool same_lookups (edit_env env, array<string> keys, array<tree> values,

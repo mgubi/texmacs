@@ -503,6 +503,15 @@ tmg_update_all_buffers () {
 }
 
 tmscm
+tmg_update_picture_buffers () {
+  // TMSCM_DEFER_INTS;
+  get_server()->typeset_update_pictures ();
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
 tmg_set_message (tmscm arg1, tmscm arg2) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "set-message");
   TMSCM_ASSERT_CONTENT (arg2, TMSCM_ARG2, "set-message");
@@ -606,6 +615,7 @@ initialize_glue_server () {
   tmscm_install_procedure ("inclusions-gc",  tmg_inclusions_gc, 0, 0, 0);
   tmscm_install_procedure ("update-all-path",  tmg_update_all_path, 1, 0, 0);
   tmscm_install_procedure ("update-all-buffers",  tmg_update_all_buffers, 0, 0, 0);
+  tmscm_install_procedure ("update-picture-buffers",  tmg_update_picture_buffers, 0, 0, 0);
   tmscm_install_procedure ("set-message",  tmg_set_message, 2, 0, 0);
   tmscm_install_procedure ("set-message-temp",  tmg_set_message_temp, 3, 0, 0);
   tmscm_install_procedure ("recall-message",  tmg_recall_message, 0, 0, 0);
