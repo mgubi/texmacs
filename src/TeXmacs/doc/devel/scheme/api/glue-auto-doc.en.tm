@@ -1835,22 +1835,6 @@ source code.
   </explain>
 
   <\explain>
-    <scm|(tree-search-align <scm-arg|content> <scm-arg|path> <scm-arg|path> <scm-arg|content>)>
-<explain-synopsis|no synopsis>
-  <|explain>
-    Calls the <c++> function <cpp|search_align> which returns
-    <scm|array_tree>.
-  </explain>
-
-  <\explain>
-    <scm|(tree-search-replace-range <scm-arg|content> <scm-arg|path> <scm-arg|path> <scm-arg|content>)>
-<explain-synopsis|no synopsis>
-  <|explain>
-    Calls the <c++> function <cpp|search_replace_range> which returns
-    <scm|array_path>.
-  </explain>
-
-  <\explain>
     <scm|(tree-search-from <scm-arg|content> <scm-arg|content> <scm-arg|path> <scm-arg|path> <scm-arg|int>)>
 <explain-synopsis|no synopsis>
   <|explain>
@@ -1859,11 +1843,11 @@ source code.
   </explain>
 
   <\explain>
-    <scm|(tree-search-range-tree <scm-arg|content> <scm-arg|path> <scm-arg|path>)>
+    <scm|(tree-search-replace-match <scm-arg|content> <scm-arg|content> <scm-arg|path> <scm-arg|path>)>
 <explain-synopsis|no synopsis>
   <|explain>
-    Calls the <c++> function <cpp|search_range_tree> which returns
-    <scm|tree>.
+    Calls the <c++> function <cpp|search_replace_match> which returns
+    <scm|array_tree>.
   </explain>
 
   <\explain>
