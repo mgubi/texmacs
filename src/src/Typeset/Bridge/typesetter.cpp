@@ -28,6 +28,7 @@ typesetter_rep::typesetter_rep (edit_env& env2, tree et, path ip):
   x1= y1= x2= y2=0;
   kept_pages= tm_new<page_memo> ();
   collect= false;
+  dropped= false;
 }
 
 typesetter_rep::~typesetter_rep () {
@@ -193,6 +194,44 @@ typesetter_rep::determine_page_references (box b) {
   }
 }
 
+// A pass which is not complete does not clean the table of the references
+// (clean_unused in edit_typeset.cpp): with the reuse by inputs it types
+// again only the bridges which changed, but every bridge, typeset or used
+// again, writes its bindings (write_bindings), and the root holds all of
+// them (out_bindings). A key which the root wrote in the pass before and
+// which neither it nor the pager wrote in this one is that of a label
+// which an edit removed: its entry goes, and the pass which follows types
+// again what looked it up (same_lookups), as with the classic cache or
+// from scratch, where the references to it are undefined at once (#571).
+bool
+typesetter_rep::drop_bindings (array<tree> before, array<tree> pages) {
+  array<tree> now= br->out_bindings;
+  int i, n= N(before);
+  if (n == N(now)) {
+    for (i=0; i<n; i++)
+      if (before[i].operator-> () != now[i].operator-> () &&
+          before[i] != now[i]) break;
+    if (i == n) return false;
+  }
+  hashmap<string,bool> written (false);
+  for (int k=0; k<2; k++) {
+    array<tree> l= (k == 0? now: pages);
+    for (i=0; i<N(l); i++)
+      if (is_tuple (l[i]) && N(l[i]) >= 1 && is_atomic (l[i][0]))
+        written (l[i][0]->label)= true;
+  }
+  bool removed= false;
+  for (i=0; i<n; i++) {
+    tree t= before[i];
+    if (!is_tuple (t) || N(t) < 1 || !is_atomic (t[0])) continue;
+    string key= t[0]->label;
+    if (written->contains (key) || !env->local_ref->contains (key)) continue;
+    env->local_ref->reset (key);
+    removed= true;
+  }
+  return removed;
+}
+
 box
 typesetter_rep::typeset () {
   // (the tree of the buffer, for the automatic labels: see exec_auto_id)
@@ -220,6 +259,18 @@ typesetter_rep::typeset () {
     if (is_compound (st[i], "hide-part")) env->complete= false;
     if (!is_compound (st[i], "show-part")) break;
   }
+  // (the bindings of the last pass, see drop_bindings: not when a preamble
+  // or parts are hidden, whose labels stay)
+  bool track= false;
+  if (!env->complete && typeset_inputs_mode () != 0) {
+    track= !is_compound (st[0], "show-preamble");
+    for (int j= (is_compound (st[0], "hide-preamble")? 1: 0); j<n; j++) {
+      if (is_compound (st[j], "hide-part")) track= false;
+      if (!is_compound (st[j], "show-part")) break;
+    }
+  }
+  array<tree> before;
+  if (track) before= br->out_bindings;
 
   // Typeset
   if (env->complete) {
@@ -239,9 +290,16 @@ typesetter_rep::typeset () {
   double t1= edit_profile.on ? edit_profile_now () : 0;
   pager ppp= tm_new<pager_rep> (br->ip, env, l);
   ppp->memo= kept_pages;
-  box rb= ppp->make_pages ();
+  array<tree> pages;
+  box rb;
+  if (track) {
+    edit_env_rep::binding_record bindings (env.operator-> (), &pages);
+    rb= ppp->make_pages ();
+  }
+  else rb= ppp->make_pages ();
   if (env->complete && paper) determine_page_references (rb);
   tm_delete (ppp);
+  dropped= track && drop_bindings (before, pages);
   if (edit_profile.on) {
     edit_profile.bridges += t1 - t0;
     edit_profile.pages   += edit_profile_now () - t1;

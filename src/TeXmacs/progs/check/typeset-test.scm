@@ -438,6 +438,78 @@
        (check-false (in? "dep" (list-references)))
        (check= (tree->stree (get-reference "dep")) '(uninit))))))
 
+;; A numbered label removed by an edit, with the reuse by inputs: the pass
+;; of the edit is not a complete one, and the references to the label show
+;; "?" after it, as from scratch, not the old number until Update All
+;; (#571). The paragraphs which do not read the label are used again. (The
+;; classic cache, TEXMACS_TYPESET_READS=off, keeps the entry until a
+;; complete typesetting, as it always did: its bridges which are not typeset
+;; again do not write their bindings again, so it cannot tell.)
+(define (removed-ref-width)
+  ;; the width of the first reference of the paragraph "see ..." on top
+  (with r (rect 0 1) (- (rect-x2 r) (rect-x1 r))))
+
+(define (removed-ref-scratch)
+  (with body (tree-copy (buffer-tree))
+    (with-scratch-buffer
+     (lambda (u)
+       (buffer-set-body u body)
+       (update-forced)
+       (update-forced)
+       (list (tree->stree (get-reference "a")) (removed-ref-width))))))
+
+(define (test-removed-label-by-edit)
+  (check-group "label removed by an edit")
+  (when (!= (getenv "TEXMACS_TYPESET_READS") "off")
+    (test-removed-label-by-edit-inputs)))
+
+(define (test-removed-label-by-edit-inputs)
+  (with-typeset-body
+   `(document (equation (document (concat "x=y" (label "a"))))
+              (concat "see " (reference "a") " and " (reference "b"))
+              (section (concat "S" (label "b")))
+              ,@(map (lambda (i) (string-append "Paragraph " (number->string i)))
+                     (iota 20)))
+   (lambda ()
+     (update-current-buffer)
+     (update-forced)
+     (update-forced)
+     (check= (cadr (tree->stree (get-reference "a"))) "1")
+     ;; the equation removed: one typesetting, which types again a few
+     ;; bridges only
+     (let ((p0 (typeset-pass-count))
+           (r0 (typeset-redone-count)))
+       (tree-remove (buffer-tree) 0 1)
+       (update-forced)
+       (check-true (<= (- (typeset-pass-count) p0) 2))
+       ;; (the check mode types again every bridge which is used again)
+       (when (!= (getenv "TEXMACS_TYPESET_READS") "check")
+         (check-true (< (- (typeset-redone-count) r0) 10)))
+       (check= (tree->stree (get-reference "a")) '(uninit))
+       (check= (list (tree->stree (get-reference "a")) (removed-ref-width))
+               (removed-ref-scratch)))
+     ;; put back: the number again
+     (tree-insert (buffer-tree) 0
+                  '((equation (document (concat "x=y" (label "a"))))))
+     (update-forced)
+     (check= (cadr (tree->stree (get-reference "a"))) "1")
+     ;; the label of a section removed from it, then put back
+     (tree-set (tree-ref (buffer-tree) 2) '(section "S"))
+     (update-forced)
+     (check= (tree->stree (get-reference "b")) '(uninit))
+     (tree-set (tree-ref (buffer-tree) 2) '(section (concat "S" (label "b"))))
+     (update-forced)
+     (check= (cadr (tree->stree (get-reference "b"))) "1")
+     ;; a key bound twice: when one of the bindings is removed, the other
+     ;; one stays
+     (tree-insert (buffer-tree) 3 '((concat "T" (set-binding "b" "X"))))
+     (update-forced)
+     (check= (cadr (tree->stree (get-reference "b"))) "X")
+     (tree-remove (buffer-tree) 3 1)
+     (update-forced)
+     (check= (cadr (tree->stree (get-reference "b"))) "1")
+     (check= (typeset-check-mismatches) 0))))
+
 ;; A file holds the table of its references as it was saved: entries which no
 ;; label of the body defines any more (old names of automatic labels, labels
 ;; removed since) are cleaned by the first complete pass, and are no reason
@@ -1903,11 +1975,9 @@
                                (list (random-paragraph next)))
                   (set! next (+ next 1)))
                  ((and (== op 1) (> n 10))
-                  ;; a paragraph removed (not an equation: references to
-                  ;; it would keep their number until a complete pass)
-                  (with i (+ 2 (rng (- n 2)))
-                    (when (not (tree-is? (tree-ref t i) 'equation))
-                      (tree-remove t i 1))))
+                  ;; a paragraph removed (also an equation: the references
+                  ;; to it are undefined at once, #571)
+                  (tree-remove t (+ 2 (rng (- n 2))) 1))
                  ((== op 2)
                   ;; the unit of the length
                   (tree-set (tree-ref t 0 1 0)
@@ -2867,6 +2937,7 @@
   (test-renumbering)
   (test-removed-label)
   (test-removed-label-chain)
+  (test-removed-label-by-edit)
   (test-stale-references)
   (test-automatic-labels)
   (test-labels-of-nested-tags)

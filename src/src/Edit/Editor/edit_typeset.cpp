@@ -1242,13 +1242,20 @@ void
 edit_typeset_rep::typeset (SI& x1, SI& y1, SI& x2, SI& y2) {
   int missing_nr= INT_MAX;
   int redefined_nr= INT_MAX;
+  int dropped_nr= 0;
   x1= MAX_SI; y1= MAX_SI; x2= MIN_SI; y2= MIN_SI;
   while (true) {
     SI sx1, sy1, sx2, sy2;
     typeset_sub (sx1, sy1, sx2, sy2);
     x1= min (x1, sx1); y1= min (y1, sy1);
     x2= max (x2, sx2); y2= max (y2, sy2);
-    if (!env->complete) break;
+    if (!env->complete) {
+      // labels which an edit removed (with the reuse by inputs): one more
+      // pass types again the references to them (typesetter_rep::
+      // drop_bindings; a few, for labels which only the removed ones made)
+      if (ttt->dropped && ++dropped_nr <= 4) continue;
+      break;
+    }
     env->complete= false;
     // a removed label is treated like a redefined one: one more pass
     // (still bounded by the test below, which stops when the counts of

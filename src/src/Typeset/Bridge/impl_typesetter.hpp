@@ -33,6 +33,8 @@ public:
   bool paper;
   page_memo* kept_pages;   // the pages of the last pass (pager.hpp)
   bool collect;            // a complete pass with the bridges used again
+  bool dropped;            // the last pass removed bindings which no
+                           // bridge writes any more (drop_bindings)
 
   shove_memo shoves;        // memoized shoves
 
@@ -50,6 +52,7 @@ public:
   void local_end     (array<page_item>& l, stack_border& sb);
 
   void determine_page_references (box b);
+  bool drop_bindings (array<tree> before, array<tree> pages);
   box  typeset ();
   box  typeset (SI& x1, SI& y1, SI& x2, SI& y2);
 };
