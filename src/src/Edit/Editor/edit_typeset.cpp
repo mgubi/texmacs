@@ -1244,8 +1244,9 @@ clean_unused (edit_env env) {
 * edit_typeset_rep::typeset makes passes until the references are settled.
 * A pass is of one of three kinds:
 * - complete, from scratch: every bridge is made again (::notify_assign of
-*   the root); it makes the tables of the references and the auxiliary
-*   tables, and finds the pages of the labels;
+*   the root, or a new root: the first typesetting, a new view, a revert);
+*   it makes the tables of the references and the auxiliary tables, and
+*   finds the pages of the labels;
 * - complete with the bridges used again (ttt->collect, #427, only with the
 *   inputs of the bridges): those used again write their bindings and their
 *   entries of the auxiliary tables again, those which looked up a
@@ -1257,9 +1258,12 @@ clean_unused (edit_env env) {
 * typesetter_rep::drop_bindings after an incomplete pass with the inputs of
 * the bridges, which removes what no bridge wrote any more (#571).
 * Who notices that a binding got another value, so that what read the old
-* one is typeset again: env->redefined after a complete pass (one more
-* complete pass); env->rebound after an incomplete pass of the classic
-* cache (one complete pass, #576); ttt->bindings_changed after an
+* one is typeset again: env->redefined after a complete pass, or a label
+* removed by clean_unused (one more complete pass: with the inputs of the
+* bridges a collect pass for a redefined label, from scratch for a removed
+* one); env->rebound after an incomplete pass of the classic cache (one
+* pass from scratch, #576, complete unless a preamble is shown or parts
+* are hidden); ttt->bindings_changed after an
 * incomplete pass with the inputs of the bridges (one more incomplete pass,
 * which typesets again what looked the binding up, #571, also for a binding
 * which was added or removed). The passes for changed bindings share one
