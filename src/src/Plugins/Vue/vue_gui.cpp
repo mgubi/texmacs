@@ -8003,8 +8003,16 @@ vue_chooser_widget_rep::perform_dialog (vue_window win) {
   }
   SDL_SetBooleanProperty(props, SDL_PROP_FILE_DIALOG_MANY_BOOLEAN, false); // single file
   SDL_SetStringProperty(props, SDL_PROP_FILE_DIALOG_TITLE_STRING, caption);
+#if defined(OS_MACOS) || defined(_WIN32) || defined(__EMSCRIPTEN__)
   SDL_SetStringProperty(props, SDL_PROP_FILE_DIALOG_ACCEPT_STRING, sdl_type == SDL_FILEDIALOG_SAVEFILE ? "Save" : "Open");
   SDL_SetStringProperty(props, SDL_PROP_FILE_DIALOG_CANCEL_STRING, "Cancel");
+#else
+  // No labels for the buttons on Linux: SDL passes them to zenity as
+  // --ok-label and --cancel-label, which zenity 4 refuses for a file
+  // selection ("--ok-label is not supported for this dialog", exit code
+  // 255, #456), and no dialog came; the dialogs of the desktop portal and
+  // of zenity have these buttons anyway, in the language of the desktop
+#endif
   // the folder (or file, for the save dialogs) the dialog starts at;
   // SDL_GetPrefPath was used here by mistake: it creates a preferences
   // folder named after its arguments under Application Support

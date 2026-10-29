@@ -296,8 +296,20 @@ static NSImage*
 load_image (url u, int w, int h) {
   // The image of the file (+1 reference), converted when NSImage cannot
   // read it
+  // NOTE: macOS no longer renders PostScript (since macOS 14). NSImage
+  // refuses a PostScript file in an application linked with a recent SDK,
+  // but with an older SDK it returns an NSEPSImageRep of size zero which
+  // draws nothing: the plots of the sessions (gnuplot, Maxima, Sage) were
+  // blank (#582). PostScript therefore always goes through the converters
+  // (Ghostscript), as does any image which NSImage cannot size.
   NSString *fname = to_nsstring (concretize (u));
-  NSImage *pm = [[NSImage alloc] initWithContentsOfFile: fname];
+  string suf= locase_all (suffix (u));
+  bool ps= (suf == "ps" || suf == "eps");
+  NSImage *pm = ps? nil: [[NSImage alloc] initWithContentsOfFile: fname];
+  if (pm && ([pm size].width <= 0 || [pm size].height <= 0)) {
+    [pm release];
+    pm= nil;
+  }
   if (!pm) {
     url temp= url_temp (".png");
     image_to_png (u, temp, w, h);
