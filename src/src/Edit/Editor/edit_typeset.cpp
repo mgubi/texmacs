@@ -1242,19 +1242,40 @@ void
 edit_typeset_rep::typeset (SI& x1, SI& y1, SI& x2, SI& y2) {
   int missing_nr= INT_MAX;
   int redefined_nr= INT_MAX;
+  bool rebound_done= false, rebound_pass= false;
   x1= MAX_SI; y1= MAX_SI; x2= MIN_SI; y2= MIN_SI;
   while (true) {
     SI sx1, sy1, sx2, sy2;
     typeset_sub (sx1, sy1, sx2, sy2);
     x1= min (x1, sx1); y1= min (y1, sy1);
     x2= max (x2, sx2); y2= max (y2, sy2);
-    if (!env->complete) break;
+    if (!env->complete) {
+      // The classic cache (TEXMACS_TYPESET_READS=off) does not know what
+      // read a binding: when a pass which typeset only what changed gave
+      // another value to a binding (set-binding, a label renumbered), what
+      // read the old one (a reference, the part of a surround, #576) is
+      // typeset again by a complete pass, as for a redefined label after
+      // a complete pass. With the inputs of the bridges, those which read
+      // it are typeset again by the stamp of their lookups.
+      if (typeset_inputs_mode () == 0 && env->rebound && !rebound_done) {
+        rebound_done= rebound_pass= true;
+        ::notify_assign (ttt, path(), ttt->br->st);
+        continue;
+      }
+      break;
+    }
     env->complete= false;
     // a removed label is treated like a redefined one: one more pass
     // (still bounded by the test below, which stops when the counts of
     // missing and redefined references no longer decrease)
     int removed= clean_unused (env);
     if (N(env->missing) == 0 && N(env->redefined) == 0 && removed == 0) break;
+    // (the complete pass made for a binding given another value: the
+    // missing references were missing before it, and are not a reason for
+    // one more pass, and they were not reported, as after any pass which
+    // is not complete)
+    if (rebound_pass && N(env->redefined) == 0 && removed == 0) break;
+    rebound_pass= false;
     if ((N(env->missing) == missing_nr && N(env->redefined) == redefined_nr) ||
         (N(env->missing) > missing_nr || N(env->redefined) > redefined_nr)) {
       report_missing (env->missing);
