@@ -2573,6 +2573,31 @@
     (buffer-pretend-saved m)
     (buffer-close m)))
 
+(define (incl-ifref)
+  ;; a lookup of a missing label under warn-missing false (tmdoc's if-ref)
+  ;; is not told as missing: Update All makes its two passes, no more, also
+  ;; when the bridge is used again (#408)
+  (incl-write "ifref.tm"
+              '((section "S")
+                (concat "Test: "
+                        (with "warn-missing" "false"
+                              (if (unequal (get-binding "nolab") (uninit))
+                                  "yes" "no"))
+                        " end.")))
+  (with m (incl-file "ifref.tm")
+    (load-buffer m)
+    (switch-to-buffer* m)
+    (update-forced)
+    (update-all-kept)
+    (go-start)
+    (with p0 (typeset-pass-count)
+      (update-all-kept)
+      (update-all-kept)
+      (check= (- (typeset-pass-count) p0)
+              4))
+    (buffer-pretend-saved m)
+    (buffer-close m)))
+
 (define (incl-saved-include)
   ;; an included file changed and saved from its own buffer, then one
   ;; Update All of the master: saving resets the inclusion (reset_inclusion
@@ -2798,7 +2823,8 @@
     (system-mkdir (system->url incl-dir))
     (incl-extern)
     (for (f (list incl-renumbering incl-renumbering-writes
-                  incl-cite-first incl-saved-include incl-gc-keeps incl-gc-more incl-gc-times))
+                  incl-cite-first incl-ifref incl-saved-include incl-gc-keeps
+                  incl-gc-more incl-gc-times))
       (with r (check-run f)
         (when (and (pair? r) (== (car r) 'error))
           (check-report #f "the group" (object->string r)))))
