@@ -480,6 +480,39 @@
       (edit (go-right))
       (check= (cursor) '(0 3)))))
 
+;; A click (mouse-any, as the events of the window) at the left or at the
+;; right of a line of a long document. Outside paper mode, the paragraphs of
+;; a document of more than 512 paragraphs are merged by chunks (chunk_lines
+;; in Typeset/Bridge/bridge.cpp), whose group boxes have the path of the
+;; whole document: a click out of their extents put the cursor at the start
+;; or at the end of the document (#584, #585). The cursor position in pixels
+;; needs apply-changes (see the head of the file).
+(define (test-mouse-long)
+  (check-group "mouse in a long document")
+  (with-buffer-body
+      `(document ,@(map (lambda (i) (string-append "line " (number->string i)))
+                        (.. 0 600)))
+    (lambda ()
+      (define (point-at . p)
+        ;; the position on the screen of the cursor at @p
+        (edit (go-to (apply at p)))
+        (apply-changes)
+        (list (get-cursor-x) (get-cursor-y)))
+      (define (click x y)
+        (mouse-any "press-left" x y 1 0.0 '())
+        (mouse-any "release-left" x y 0 1.0 '())
+        (update-forced)
+        (apply-changes)
+        (cursor))
+      (edit (init-env "page-medium" "papyrus"))
+      (with (x y) (point-at 300 8)
+        (check= (click x y) '(300 8))
+        ;; at the right of the line: its end, not the end of the document
+        (check= (click (+ x 300000) y) '(300 8)))
+      (with (x y) (point-at 300 0)
+        ;; at its left: its start, not the start of the document
+        (check= (click (- x 20000) y) '(300 0))))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Selection and clipboard
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1220,6 +1253,7 @@
   (test-load)
   (test-insert)
   (test-cursor)
+  (test-mouse-long)
   (test-selection)
   (test-remove)
   (test-structure)
