@@ -220,7 +220,7 @@ jobs:
             libgl-dev libegl-dev libx11-dev libxext-dev libxrandr-dev \
             libxcursor-dev libxi-dev libxss-dev libxfixes-dev libxtst-dev \
             libxkbcommon-dev libdrm-dev libgbm-dev libgles-dev \
-            libwayland-dev wayland-protocols libdecor-0-dev \
+            libwayland-dev wayland-protocols libdecor-0-dev libdbus-1-dev \
             xvfb xauth libgl1-mesa-dri
 
       - name: Place of the libraries
@@ -368,7 +368,7 @@ jobs:
               libegl-dev libx11-dev libxext-dev libxrandr-dev \
               libxcursor-dev libxi-dev libxss-dev libxfixes-dev libxtst-dev \
               libxkbcommon-dev libdrm-dev libgbm-dev libgles-dev \
-              libwayland-dev wayland-protocols libdecor-0-dev
+              libwayland-dev wayland-protocols libdecor-0-dev libdbus-1-dev
           fi
 
       - name: Cache of the libraries (Vue)
