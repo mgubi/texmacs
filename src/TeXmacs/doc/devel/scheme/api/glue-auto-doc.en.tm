@@ -7091,6 +7091,14 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(update-picture-buffers)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|typeset_update_pictures> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
     <scm|(set-message <scm-arg|content> <scm-arg|content>)>
 <explain-synopsis|no synopsis>
   <|explain>

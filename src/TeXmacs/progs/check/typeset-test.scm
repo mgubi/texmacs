@@ -1333,11 +1333,11 @@
      (update-all-kept)
      (update-all-kept)
      (check= (labels-state) (labels-state-from-scratch (buffer-tree)))
-     ;; the environment which inclusions-gc changes is dealt with by the
-     ;; renumbering pass (the classic cache keeps it for the next typesetting)
+     ;; inclusions-gc changes no environment when no file changed (the
+     ;; classic cache types it all again, and keeps that for the next pass)
      (when (!= (getenv "TEXMACS_TYPESET_READS") "off")
        (inclusions-gc)
-       (check-true (notified-change? 8))
+       (check-false (notified-change? 8))
        (renumber-auto-labels)
        (check-false (notified-change? 8))
        (generate-all-aux)
@@ -2644,6 +2644,176 @@
     (buffer-pretend-saved m)
     (buffer-close m)))
 
+;; The clean-up steps of Update All keep the layout (#425): when no included
+;; file and no picture changed, the renumbering pass after inclusions-gc and
+;; picture-gc uses the bridges again; when an included file changed (on
+;; disk, or saved from its own buffer), only its include is typeset again;
+;; the result is the one of a typesetting from scratch.
+(define gc-changed 0)
+(define (incl-gc-keeps)
+  (incl-write "gc-a.tm"
+              (append '((section "Alpha") (concat "a" (index "alpha")))
+                      (map (lambda (i) (string-append "Text of alpha " (number->string i)))
+                           (iota 40))))
+  (incl-write "gc-b.tm"
+              (append '((section "Beta") (concat "b" (index "beta")))
+                      (map (lambda (i) (string-append "Text of beta " (number->string i)))
+                           (iota 40))))
+  (incl-write "gc-m.tm"
+              (append '((table-of-contents "toc" (document ""))
+                        (section "Intro"))
+                      (map (lambda (i) (string-append "Master text " (number->string i)))
+                           (iota 40))
+                      '((include "gc-a.tm") (section "Middle") (include "gc-b.tm")
+                        (the-index "idx" (document "")))))
+  (with m (incl-file "gc-m.tm")
+    (load-buffer m)
+    (switch-to-buffer* m)
+    (let* ((c0 (typeset-redone-count))
+           (dummy (update-forced))
+           (all (- (typeset-redone-count) c0)))
+      (update-all-kept)
+      (update-all-kept)
+      (with c1 (typeset-redone-count)
+        (update-all-kept)
+        (with n (- (typeset-redone-count) c1)
+          (check= (labels-state) (incl-labels-fresh))
+          ;; (the classic cache types it all again, and the check mode too)
+          (when (not (member (getenv "TEXMACS_TYPESET_READS") (list "off" "check")))
+            (check-true (< (* 2 n) all)))))
+      ;; an included file edited on disk: the master shows it, and what is
+      ;; typeset again is that include and what follows from the renumbering
+      (incl-write "gc-b.tm"
+                  (append '((section "Beta") (concat "b" (index "beta"))
+                            (section "Gamma") (concat "g" (index "gamma")))
+                          (map (lambda (i) (string-append "Text of beta " (number->string i)))
+                               (iota 40))))
+      (with c2 (typeset-redone-count)
+        (update-all-kept)
+        (set! gc-changed (- (typeset-redone-count) c2))
+        (update-all-kept)
+        (check-true (string-occurs? "Gamma" (incl-table 'table-of-contents)))
+        (check-true (string-occurs? "gamma" (incl-table 'the-index)))
+        (check= (labels-state) (incl-labels-fresh))
+        (when (not (member (getenv "TEXMACS_TYPESET_READS") (list "off" "check")))
+          (check-true (< gc-changed all))))
+      ;; and back
+      (incl-write "gc-b.tm"
+                  (append '((section "Beta") (concat "b" (index "beta")))
+                          (map (lambda (i) (string-append "Text of beta " (number->string i)))
+                               (iota 40))))
+      (update-all-kept)
+      (update-all-kept)
+      (check-false (string-occurs? "Gamma" (incl-table 'table-of-contents)))
+      (check= (labels-state) (incl-labels-fresh)))
+    (buffer-pretend-saved m)
+    (buffer-close m)))
+
+;; More of Update All with the layout kept (#425): a nested include edited
+;; on disk, a missing include which appears, a picture whose size changes
+;; on disk before picture-gc.
+(define (incl-gc-eps name w h)
+  (string-save
+   (string-append "%!PS-Adobe-3.0 EPSF-3.0\n%%BoundingBox: 0 0 "
+                  (number->string w) " " (number->string h)
+                  "\n0 0 moveto " (number->string w) " 0 lineto "
+                  (number->string w) " " (number->string h)
+                  " lineto 0 " (number->string h)
+                  " lineto closepath fill\nshowpage\n")
+   (incl-file name)))
+
+(define (incl-gc-more)
+  (incl-gc-eps "gc-pic.eps" 100 50)
+  (incl-write "gc-n2.tm" '((section "Inner") (concat "i" (index "inner"))))
+  (incl-write "gc-n1.tm" '((section "Outer") (include "gc-n2.tm")))
+  (incl-write "gc-m2.tm"
+              '((table-of-contents "toc" (document ""))
+                (section "Top")
+                (include "gc-n1.tm")
+                (include "gc-late.tm")
+                (concat "pic " (image "gc-pic.eps" "" "" "" ""))
+                "End."
+                (the-index "idx" (document ""))))
+  (with m (incl-file "gc-m2.tm")
+    (load-buffer m)
+    (switch-to-buffer* m)
+    (update-forced)
+    (update-all-kept)
+    (update-all-kept)
+    (check= (labels-state) (incl-labels-fresh))
+    ;; the nested include edited on disk
+    (incl-write "gc-n2.tm" '((section "Inner") (concat "i" (index "inner"))
+                             (section "Deeper") (concat "d" (index "deeper"))))
+    (update-all-kept)
+    (check-true (string-occurs? "Deeper" (incl-table 'table-of-contents)))
+    (check-true (string-occurs? "deeper" (incl-table 'the-index)))
+    (check= (labels-state) (incl-labels-fresh))
+    ;; the missing include appears
+    (check-false (string-occurs? "Late" (incl-table 'table-of-contents)))
+    (incl-write "gc-late.tm" '((section "Late") (concat "l" (index "late"))))
+    (update-all-kept)
+    (check-true (string-occurs? "Late" (incl-table 'table-of-contents)))
+    (check-true (string-occurs? "late" (incl-table 'the-index)))
+    (check= (labels-state) (incl-labels-fresh))
+    ;; the picture gets bigger on disk, then picture-gc
+    (update-forced)
+    (let* ((n (tree-arity (buffer-tree)))
+           (r (rect (- n 3))))
+      (incl-gc-eps "gc-pic.eps" 200 150)
+      (picture-gc)
+      (update-forced)
+      (update-all-kept)
+      (check-true (> (- (rect-y2 (rect (- n 3))) (rect-y1 (rect (- n 3))))
+                     (- (rect-y2 r) (rect-y1 r))))
+      ;; (and nothing changes when the file does not)
+      (with r2 (rect (- n 3))
+        (picture-gc)
+        (update-forced)
+        (check= (rect (- n 3)) r2)))
+    (buffer-pretend-saved m)
+    (buffer-close m)))
+
+;; The files which Update All reads again are skipped when they were not
+;; touched (#425): a file replaced with its old time and size is still read.
+(define (incl-sh . l)
+  (system (apply string-append l)))
+
+(define (incl-gc-times)
+  (incl-write "gc-t.tm" '((section "Alpha") (concat "a" (index "alpha"))))
+  (incl-write "gc-tm.tm"
+              '((table-of-contents "toc" (document ""))
+                (section "Top")
+                (include "gc-t.tm")
+                (the-index "idx" (document ""))))
+  (let ((t (url->system (incl-file "gc-t.tm")))
+        (r (url->system (incl-file "gc-t.ref"))))
+    (when (not (os-win32?))
+      ;; the file is old, and the master reads it
+      (incl-sh "touch -t 200001010000 '" t "'")
+      (with m (incl-file "gc-tm.tm")
+        (load-buffer m)
+        (switch-to-buffer* m)
+        (update-forced)
+        (update-all-kept)
+        (check-true (string-occurs? "Alpha" (incl-table 'table-of-contents)))
+        ;; nothing changed: the file is not read again, nothing is typeset
+        (let ((c (typeset-redone-count)))
+          (inclusions-gc)
+          (update-forced)
+          (when (not (member (getenv "TEXMACS_TYPESET_READS")
+                             (list "off" "check")))
+            (check= (typeset-redone-count) c)))
+        ;; replaced by a file of the same size and the same time
+        (incl-sh "cp -p '" t "' '" r "'")
+        (incl-write "gc-t.tm" '((section "Omega") (concat "a" (index "alpha"))))
+        (incl-sh "touch -r '" r "' '" t "'")
+        (update-all-kept)
+        (check-true (string-occurs? "Omega" (incl-table 'table-of-contents)))
+        (check-false (string-occurs? "Alpha" (incl-table 'table-of-contents)))
+        (check= (labels-state) (incl-labels-fresh))
+        (buffer-pretend-saved m)
+        (buffer-close m)))))
+
 (define (test-included-files)
   (check-group "included files")
   (let ((old (current-buffer))
@@ -2653,7 +2823,8 @@
     (system-mkdir (system->url incl-dir))
     (incl-extern)
     (for (f (list incl-renumbering incl-renumbering-writes
-                  incl-cite-first incl-ifref incl-saved-include))
+                  incl-cite-first incl-ifref incl-saved-include incl-gc-keeps
+                  incl-gc-more incl-gc-times))
       (with r (check-run f)
         (when (and (pair? r) (== (car r) 'error))
           (check-report #f "the group" (object->string r)))))

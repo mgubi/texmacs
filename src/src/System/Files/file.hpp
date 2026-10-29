@@ -34,6 +34,10 @@ bool is_symbolic_link (url name);
 bool is_newer (url which, url than);
 int  file_size (url u);
 int  last_modified (url u, bool cache_flag= true);
+// what identifies the file as it is now: size, times of the data and of
+// the metadata (a file replaced with the old time still has a new one) and
+// inode; "" when that is not known (no inode: the caller reads the file)
+string file_identity (url u);
 url  url_temp_dir ();
 url  url_temp (string suffix= "");
 url  url_numbered (url dir, string prefix, string postfix, int i=1);

@@ -18,6 +18,7 @@
 #include "dictionary.hpp"
 #include "new_document.hpp"
 #include "merge_sort.hpp"
+#include "iterator.hpp"
 
 array<tm_buffer> bufs;
 
@@ -685,6 +686,17 @@ static hashmap<string,int> inclusions_busy (0);
 // (changed with the cache: the typesetter looks the inclusions up again
 // then, see same_lookups in Typeset/Bridge/bridge.cpp)
 static unsigned long long inclusions_version= 1;
+// when and how the file of an entry was read (time of the file, its identity,
+// and the time of the reading), so that a file which was not touched since
+// need not be read and parsed again (refresh_inclusions)
+static hashmap<string,tree> inclusion_stats ("");
+
+static tree
+stat_tuple (url name) {
+  int rd= (int) time (NULL);
+  return tuple (as_string (last_modified (name, false)),
+                file_identity (name), as_string (rd));
+}
 
 unsigned long long
 inclusions_stamp () {
@@ -694,6 +706,7 @@ inclusions_stamp () {
 void
 reset_inclusions () {
   document_inclusions = hashmap<string,tree> ("");
+  inclusion_stats = hashmap<string,tree> ("");
   inclusions_version++;
 }
 
@@ -701,7 +714,52 @@ void
 reset_inclusion (url name) {
   string name_s= as_string (name);
   document_inclusions -> reset (name_s);
+  inclusion_stats -> reset (name_s);
   inclusions_version++;
+}
+
+// The inclusions are read again (Tools > Update > Inclusions, Update All):
+// the entries whose file has the same contents keep their tree (the
+// typesetter compares the included documents by pointer, see same_lookups
+// in Typeset/Bridge/bridge.cpp: the layout of an include is kept when its
+// file did not change), the others get the new tree, and a file which
+// cannot be read any more is dropped. Tells whether something changed.
+bool
+refresh_inclusions () {
+  bool changed= false;
+  array<string> names;
+  iterator<string> it= iterate (document_inclusions);
+  while (it->busy ()) names << it->next ();
+  for (int i=0; i<N(names); i++) {
+    string name_s= names[i];
+    tree old_doc= document_inclusions [name_s];
+    // (a file whose time, size, change time and inode are those of the reading, which is more
+    // than two seconds later than the time of the file, is the same)
+    url file= url_system (name_s);
+    if (inclusion_stats->contains (name_s)) {
+      tree st= inclusion_stats [name_s];
+      int mt= last_modified (file, false);
+      string id= file_identity (file);
+      if (as_int (st[0]) == mt && N(id) > 0 && as_string (st[1]) == id &&
+          as_int (st[2]) > mt + 2 && mt > 0)
+        continue;
+    }
+    tree doc= extract_document (import_tree (url_system (name_s), "generic"));
+    if (is_func (doc, _ERROR)) {
+      document_inclusions -> reset (name_s);
+      inclusion_stats -> reset (name_s);
+      changed= true;
+    }
+    else {
+      inclusion_stats (name_s)= stat_tuple (file);
+      if (doc != old_doc) {
+        document_inclusions (name_s)= doc;
+        changed= true;
+      }
+    }
+  }
+  if (changed) inclusions_version++;
+  return changed;
 }
 
 tree
@@ -713,6 +771,7 @@ load_inclusion (url name) {
   tree doc= extract_document (import_tree (name, "generic"));
   if (!is_func (doc, _ERROR)) {
     document_inclusions (name_s)= doc;
+    inclusion_stats (name_s)= stat_tuple (name);
     inclusions_version++;
   }
   return doc;

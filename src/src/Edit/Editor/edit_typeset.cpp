@@ -1336,6 +1336,36 @@ edit_typeset_rep::typeset_invalidate_keep () {
   notify_change (THE_TREE);
 }
 
+// The files of some included documents changed (Update All, Tools > Update >
+// Inclusions: the cache of the inclusions holds other trees for them, see
+// refresh_inclusions). The include is an input of the bridge of the include
+// (rewrite_include in env_exec.cpp), so that the next typesetting types
+// again the includes of these files, and uses the layout of the rest. The
+// classic cache types it all again.
+void
+edit_typeset_rep::typeset_invalidate_inclusions () {
+  if (typeset_inputs_mode () == 0) {
+    typeset_invalidate_all ();
+    return;
+  }
+  notify_change (THE_TREE);
+}
+
+// The pictures were loaded again (Tools > Update > Pictures): what is on the
+// screen is drawn again from the files, and the images whose size changed
+// are typeset again, the others being used again (the size of an image is
+// an input of the bridge of the image, see typeset_image in
+// Concat/concat_active.cpp). The classic cache types it all again.
+void
+edit_typeset_rep::typeset_invalidate_pictures () {
+  if (typeset_inputs_mode () == 0) {
+    typeset_invalidate_all ();
+    return;
+  }
+  if (typeset_pictures_used ()) notify_change (THE_TREE);
+  invalidate_all ();
+}
+
 // The automatic labels are numbered again, in the order of the document
 // (exec_auto_id in env_exec.cpp), which is to be done before the tables
 // of contents and the indexes are made again: these hold the names of

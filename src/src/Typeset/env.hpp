@@ -809,6 +809,16 @@ public:
   };
   tree lookup_value (string name);
   tree lookup (string name);
+  // The picture which an image or a pattern shows ("p" or "q", the base file
+  // and the name as written in the document: picture_key), and the size
+  // which the typesetting took from it, as a lookup (see rec_keys): the
+  // pictures loaded again (Tools > Update > Pictures) type again the images
+  // whose file or size changed, and nothing else
+  url  image_file (url base, string label);
+  url  pattern_file (url base, string label);
+  string picture_key (char kind, string label);
+  tree picture_value (string name);
+  tree picture_lookup (char kind, string label, url file, int w, int h);
   // a fingerprint of the values of the variables which are not plain
   unsigned long long derived_state ();
   // a copy of the table of the variables (not recorded as a read)
@@ -1011,6 +1021,9 @@ bool inclusion_busy (url u);
 void inclusion_enter (url u);
 void inclusion_leave (url u);
 void reset_inclusion (url u);
+bool refresh_inclusions ();
+// (whether the typesetting looked up a picture, see edit_env_rep::picture_value)
+bool typeset_pictures_used ();
 // the included document of a file, as the cache of the inclusions has it
 // (by the name of the file: as_string), and a number which changes when
 // the cache changes (the lookups of the inclusions, see same_lookups)

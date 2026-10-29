@@ -911,6 +911,7 @@
 "inclusions-gc"
 "update-all-path"
 "update-all-buffers"
+"update-picture-buffers"
 "set-message"
 "set-message-temp"
 "recall-message"

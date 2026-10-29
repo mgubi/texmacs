@@ -2383,11 +2383,15 @@ tree
 edit_env_rep::exec_pattern (tree t) {
   if (N(t)<1) return tree (_ERROR, "bad pattern");
   if (no_patterns && N(t) == 4 && is_atomic (t[3])) return exec (t[3]);
-  url im= url_system (exec_string (t[0]));
-  url image= resolve_pattern (relative (base_file_name, im));
-  if (is_none (image)) return "white";
+  string label= exec_string (t[0]);
+  url image= pattern_file (base_file_name, label);
+  if (is_none (image)) {
+    (void) picture_lookup ('q', label, image, 0, 0);
+    return "white";
+  }
   int imw_pt, imh_pt;
   image_size (image, imw_pt, imh_pt);
+  (void) picture_lookup ('q', label, image, imw_pt, imh_pt);
   double pt= ((double) dpi*PIXEL) / 72.0;
   SI imw= (SI) (((double) imw_pt) * pt);
   SI imh= (SI) (((double) imh_pt) * pt);
