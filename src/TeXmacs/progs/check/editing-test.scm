@@ -480,38 +480,76 @@
       (edit (go-right))
       (check= (cursor) '(0 3)))))
 
-;; A click (mouse-any, as the events of the window) at the left or at the
-;; right of a line of a long document. Outside paper mode, the paragraphs of
-;; a document of more than 512 paragraphs are merged by chunks (chunk_lines
-;; in Typeset/Bridge/bridge.cpp), whose group boxes have the path of the
-;; whole document: a click out of their extents put the cursor at the start
-;; or at the end of the document (#584, #585). The cursor position in pixels
-;; needs apply-changes (see the head of the file).
+;; Clicks and a drag (mouse-any, as the events of the window) at the left
+;; or at the right of the lines. Outside paper mode, the lines of a
+;; document are merged by chunks (chunk_lines in Typeset/Bridge/bridge.cpp)
+;; when it has 512 paragraphs or more, or when a line carries a footnote, a
+;; float or several columns; each chunk is a group box with the path of the
+;; whole document, and a point out of its extents put the cursor at the
+;; start or at the end of the document (#584, #585). The cursor position in
+;; pixels needs apply-changes (see the head of the file). The events need
+;; increasing times: mouse_any drops those older than the last one.
+(define mouse-time 1000.0)
+
+(define (mouse key x y mods)
+  (set! mouse-time (+ mouse-time 100.0))
+  (mouse-any key x y mods mouse-time '()))
+
+(define (mouse-point-at . p)
+  ;; the position on the screen of the cursor at @p
+  (edit (go-to (apply at p)))
+  (apply-changes)
+  (list (get-cursor-x) (get-cursor-y)))
+
+(define (mouse-update)
+  (update-forced)
+  (apply-changes))
+
+(define (mouse-click x y)
+  (mouse "press-left" x y 1)
+  (mouse "release-left" x y 0)
+  (mouse-update)
+  (cursor))
+
+(define (mouse-drag x0 y0 x y)
+  ;; the selection made by a drag from (@x0, @y0) to (@x, @y)
+  (mouse "press-left" x0 y0 1)
+  (mouse "start-drag-left" x0 y0 1)
+  (mouse "dragging-left" x y 1)
+  (mouse "end-drag-left" x y 0)
+  (mouse-update)
+  (list (rel (selection-get-start)) (rel (selection-get-end))))
+
 (define (test-mouse-long)
   (check-group "mouse in a long document")
   (with-buffer-body
       `(document ,@(map (lambda (i) (string-append "line " (number->string i)))
                         (.. 0 600)))
     (lambda ()
-      (define (point-at . p)
-        ;; the position on the screen of the cursor at @p
-        (edit (go-to (apply at p)))
-        (apply-changes)
-        (list (get-cursor-x) (get-cursor-y)))
-      (define (click x y)
-        (mouse-any "press-left" x y 1 0.0 '())
-        (mouse-any "release-left" x y 0 1.0 '())
-        (update-forced)
-        (apply-changes)
-        (cursor))
       (edit (init-env "page-medium" "papyrus"))
-      (with (x y) (point-at 300 8)
-        (check= (click x y) '(300 8))
+      (with (x y) (mouse-point-at 300 8)
+        (check= (mouse-click x y) '(300 8))
         ;; at the right of the line: its end, not the end of the document
-        (check= (click (+ x 300000) y) '(300 8)))
-      (with (x y) (point-at 300 0)
+        (check= (mouse-click (+ x 300000) y) '(300 8))
+        ;; a drag upwards to the left of line 290 (#585): from its start,
+        ;; not from the start of the document
+        (with (x1 y1) (mouse-point-at 290 0)
+          (check= (mouse-drag x y (- x1 20000) y1) '((290 0) (300 8)))))
+      (with (x y) (mouse-point-at 300 0)
         ;; at its left: its start, not the start of the document
-        (check= (click (- x 20000) y) '(300 0))))))
+        (check= (mouse-click (- x 20000) y) '(300 0)))))
+  ;; a footnote makes chunks in a short document too
+  (with-buffer-body
+      `(document ,@(map (lambda (i)
+                          (if (== i 5) '(concat "f" (footnote "a note"))
+                              (string-append "line " (number->string i))))
+                        (.. 0 40)))
+    (lambda ()
+      (edit (init-env "page-medium" "papyrus"))
+      (with (x y) (mouse-point-at 20 0)
+        (check= (mouse-click x y) '(20 0)))
+      (with (x y) (mouse-point-at 1 0)
+        (check= (mouse-click (+ x 150000) y) '(1 6))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Selection and clipboard
