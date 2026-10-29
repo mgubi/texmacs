@@ -373,7 +373,7 @@ latex_parser::parse (string s, int& i, string stop, int change) {
     }
     case '$': {
       i++;
-      if ((i<n) & (s[i]=='$')) {
+      if ((i<n) && (s[i]=='$')) {
         i++;
         t << tree (TUPLE, "\\begin-displaymath");
         command_type ("!mode")= "math";
@@ -615,6 +615,7 @@ sharp_to_arg (array<string> body, tree args, int arity) {
 tree
 latex_parser::parse_symbol (string s, int& i) {
   int start= i, end;
+  if (i >= N(s)) return "";
   if ((s[i] == '*') && (command_type ["!mode"] == "math")) {
     i++; return tree (TUPLE, "\\ast"); }
   if (s[i] == '<') { i++; return tree (TUPLE, "\\<less>"); }
@@ -827,7 +828,7 @@ latex_parser::parse_command (string s, int& i, string cmd, int change) {
   // cout << cmd << " [" << latex_type (cmd) << ", "
   // << command_type ["!mode"] << ", " << latex_arity (cmd) << "]" << LF;
   if (cmd == "\\gdef" || cmd == "\\xdef" || cmd == "\\edef") cmd= "\\def";
-  if (cmd == "\\def" && s[i] == '\\') delimdef = true;
+  if (cmd == "\\def" && i < N(s) && s[i] == '\\') delimdef = true;
   if (cmd == "\\newcommand") cmd= "\\def";
   if (cmd == "\\providecommand") cmd= "\\def";
   if (cmd == "\\renewcommand") cmd= "\\def";
@@ -866,12 +867,12 @@ latex_parser::parse_command (string s, int& i, string cmd, int change) {
   }
 
   if (cmd == "\\cmidrule") {
-    if (s[i] == '[') {
+    if (i < N(s) && s[i] == '[') {
       i++;
       parse (s, i, ']');
       skip_linespaces (s, ++i);
     }
-    if (s[i] == '(') {
+    if (i < N(s) && s[i] == '(') {
       i++;
       parse (s, i, ')');
       skip_linespaces (s, ++i);
@@ -884,14 +885,14 @@ latex_parser::parse_command (string s, int& i, string cmd, int change) {
   if (cmd == "\\multirow") {
     tree a= parse_argument (s, i);
     skip_linespaces (s, ++i);
-    if (s[i] == '[') {
+    if (i < N(s) && s[i] == '[') {
       i++;
       parse (s, i, ']');
       skip_linespaces (s, ++i);
     }
     tree b= parse_argument (s, i);
     skip_linespaces (s, ++i);
-    if (s[i] == '[') {
+    if (i < N(s) && s[i] == '[') {
       i++;
       parse (s, i, ']');
       skip_linespaces (s, ++i);
@@ -908,7 +909,7 @@ latex_parser::parse_command (string s, int& i, string cmd, int change) {
     skip_linespaces (s, ++i);
     tree c= parse_argument (s, i);
     skip_linespaces (s, ++i);
-    if (s[i] == '[') {
+    if (i < N(s) && s[i] == '[') {
       i++;
       tree d= parse (s, i, ']'); i++;
       return tree (TUPLE, cmd * "*", a, b, c, d);
@@ -935,12 +936,12 @@ latex_parser::parse_command (string s, int& i, string cmd, int change) {
     int start = i;
     string name, args= "";
     i++;
-    if (is_alpha (s[i])) {
+    if (i < N(s) && is_alpha (s[i])) {
       while (i < N(s) && ((!textm_class_flag && is_alpha (s[i])) ||
             (textm_class_flag && is_tex_alpha (s[i]))))
         i++;
     }
-    else
+    else if (i < N(s))
       start = i++;
     name = s(start, i);
     while (i < N(s) && s[i] != '{') {
@@ -1304,7 +1305,7 @@ latex_parser::parse_command (string s, int& i, string cmd, int change) {
 tree
 latex_parser::parse_argument (string s, int& i) {
   skip_spaces (s, i);
-  if (s[i] == '{') {
+  if (i < N(s) && s[i] == '{') {
     i++;
     return parse (s, i, "}");
   }
@@ -1451,14 +1452,14 @@ latex_parser::parse_length (string s, int& i, int e) {
 tree
 latex_parser::parse_length_name (string s, int& i) {
   skip_spaces (s, i);
-  if (s[i] == '{') {
+  if (i < N(s) && s[i] == '{') {
     i++;
     tree r= parse_length_name (s, i);
     skip_spaces (s, i);
-    if (s[i] == '}') i++;
+    if (i < N(s) && s[i] == '}') i++;
     return r;
   }
-  else if (s[i] == '\\') {
+  else if (i < N(s) && s[i] == '\\') {
     int start= i;
     i++;
     while (i<N(s) && is_tex_alpha (s[i])) i++;
@@ -1805,7 +1806,8 @@ latex_parser::parse (string s, int change) {
           i= cut + 1;
         }
       }
-      else if (s[i] != '\n' && !(s[i] == '\\' && test (s, i, "\\nextbib")))
+      else if (i >= n ||
+               (s[i] != '\n' && !(s[i] == '\\' && test (s, i, "\\nextbib"))))
         i--;
     }
     else if ((i == 0 || s[i-1] != '\\') && s[i] == '{')
