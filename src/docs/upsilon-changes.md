@@ -14,6 +14,12 @@ have the details, and the problems go to the
 
 ## 29 October 2026
 
+- **Japanese and Korean text**: the kanji of a Japanese text (and the
+  hanja of a Korean text) come from the Japanese (Korean) font of the
+  system, as the kana (Hangul) next to them, instead of the Chinese
+  fallback; with the fonts which the menus set for Japanese and Korean
+  documents, the CJK characters are no longer shrunk to 70-80% of their
+  size (#196).
 - **Clicks and selections in long documents**: a click at the right of
   a line (after the square which ends a proof) or at the left of the
   lines no longer puts the cursor at the end or the start of the
