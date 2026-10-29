@@ -443,6 +443,40 @@
                  (tip (and id (ref-preview id))))
         (show-tooltip id ref tip "auto" "auto" "default" 0.6)))))
 
+;; The label whose preview the keyboard shows. A tooltip of the keyboard is
+;; closed by the next key (keyboard-press in utils/misc/tooltip.scm) unless it
+;; is shown again; but in completion mode (Tab through the labels) the keys go
+;; to the overload of keyboard-press for complete-mode? (generic-edit.scm),
+;; which does not call the former ones: the preview of each label proposed
+;; then stayed on the screen under the next one (#583). The preview of
+;; another label is therefore closed here.
+(define keyboard-preview-id #f)
+
+(define (keyboard-preview-update)
+  ;; show the preview of the reference at the cursor, or close the previews
+  (let* ((id1 (and (in-inactive-reference?)
+                   (tm->string (cursor-tree))))
+         (tip1 (and id1 (ref-preview id1)))
+         (id2 (and id1 (not tip1)
+                   (number->label (cursor-tree))))
+         (tip2 (and id2 (ref-preview id2)))
+         (id (if tip1 id1 id2))
+         (tip (or tip1 tip2)))
+    (if tip
+        (begin
+          (when (and keyboard-preview-id (!= keyboard-preview-id id))
+            (close-tooltip keyboard-preview-id))
+          (set! keyboard-preview-id id)
+          (show-tooltip id (cursor-tree) tip
+                        "auto" "auto" "keyboard" 0.6)
+          (when (not tip1)
+            (set-message `(concat (verbatim ,id1) " <rightarrow> "
+                                  (verbatim ,id2)) "")))
+        (begin
+          (set! keyboard-preview-id #f)
+          (close-tooltips)
+          (set-message "" "")))))
+
 (tm-define (keyboard-press key time)
   (with before? (in-inactive-reference?)
     (former key time)
@@ -450,22 +484,5 @@
       (when (and (or before? after?) (in-preview-ref?))
         (delayed
           (:idle 100)
-          (let* ((id1 (and (in-inactive-reference?)
-                           (tm->string (cursor-tree))))
-                 (tip1 (and id1 (ref-preview id1)))
-                 (id2 (and id1 (not tip1)
-                           (number->label (cursor-tree))))
-                 (tip2 (and id2 (ref-preview id2)))
-                 (id (if tip1 id1 id2))
-                 (tip (or tip1 tip2)))
-            (if tip
-                (begin
-                  (show-tooltip id (cursor-tree) tip
-                                "auto" "auto" "keyboard" 0.6)
-                  (when (not tip1)
-                    (set-message `(concat (verbatim ,id1) " <rightarrow> "
-                                          (verbatim ,id2)) "")))
-                (begin
-                  (close-tooltips)
-                  (set-message "" "")))))))))
+          (keyboard-preview-update))))))
 

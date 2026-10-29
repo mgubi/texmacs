@@ -477,6 +477,85 @@
     (check-true (contains? r '(hlink "1" "#thm:one")))
     (check-true (contains? r '(hlink "2" "#lem:one")))))
 
+;; The preview of a reference with the style package preview-ref
+;; (ref-edit.scm): while the cursor is in an inactive reference, the
+;; tooltip of the keyboard shows the labelled text. Tab through the
+;; completions of the reference shows the preview of each label proposed;
+;; in completion mode the keys do not reach the keyboard handler of
+;; tooltip.scm, which closes the tooltips of the keyboard, and the preview
+;; of the label before stayed on the screen (#583). Without a window the
+;; tooltips cannot be shown: show-tooltip, close-tooltip and close-tooltips
+;; are replaced, for the group, by functions which note their calls.
+(define (ref-edit-private name)
+  (eval name (resolve-module '(link ref-edit))))
+
+(define (with-tooltip-calls thunk)
+  ;; run @thunk with the tooltip functions replaced; return the calls
+  (let* ((calls (list))
+         (note (lambda (x) (set! calls (append calls (list x)))))
+         (m (resolve-module '(link ref-edit)))
+         (show (eval 'show-tooltip m))
+         (close (eval 'close-tooltip m))
+         (close-all (eval 'close-tooltips m))
+         (set-all
+          (lambda (a b c)
+            (eval `(set! show-tooltip ,a) m)
+            (eval `(set! close-tooltip ,b) m)
+            (eval `(set! close-tooltips ,c) m))))
+    (set-all (lambda (id ref tip ha va type magf) (note (list 'show id type)))
+             (lambda (id) (note (list 'close id)))
+             (lambda () (note (list 'close-all))))
+    (catch #t thunk (lambda args (set-all show close close-all)
+                                 (apply throw args)))
+    (set-all show close close-all)
+    calls))
+
+(define (test-preview-ref)
+  (check-group "preview-ref: previews of the keyboard")
+  (write-doc "preview.tm" '("article" "preview-ref") '()
+             '((theorem (document (concat (label "topology-a") "First.")))
+               (theorem (document (concat (label "topology-b") "Second.")))
+               (concat "See " (inactive (reference "topology-a")) ".")))
+  (open "preview.tm")
+  (let* ((update (ref-edit-private 'keyboard-preview-update))
+         (inside? (ref-edit-private 'in-inactive-reference?))
+         (key (lambda ()
+                (tree-ref (car (tree-search (buffer-tree)
+                                            (lambda (t)
+                                              (tree-is? t 'reference))))
+                          0)))
+         (set-key (lambda (s)
+                    (edit (tree-assign (key) s))
+                    (tree-go-to (key) :end)
+                    (update-forced))))
+    (check-true (in-preview-ref?))
+    (tree-go-to (key) :end)
+    (check-true (inside?))
+    (check-true (tm-func? (ref-preview "topology-a") 'preview-balloon 1))
+    ;; the first label, then the second, as Tab proposes them: the preview
+    ;; of the first is closed when the second is shown
+    (check= (with-tooltip-calls update)
+            '((show "topology-a" "keyboard")))
+    (set-key "topology-b")
+    (check= (with-tooltip-calls update)
+            '((close "topology-a") (show "topology-b" "keyboard")))
+    ;; the same label again: the preview stays
+    (check= (with-tooltip-calls update)
+            '((show "topology-b" "keyboard")))
+    (set-key "topology-a")
+    (check= (with-tooltip-calls update)
+            '((close "topology-b") (show "topology-a" "keyboard")))
+    ;; a key which is no label: the previews are closed
+    (set-key "nothing")
+    (check= (with-tooltip-calls update) '((close-all)))
+    (set-key "topology-b")
+    (check= (with-tooltip-calls update)
+            '((show "topology-b" "keyboard")))
+    ;; out of the reference
+    (tree-go-to (buffer-tree) 0 :start)
+    (check-false (inside?))
+    (check= (with-tooltip-calls update) '((close-all)))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Numbering
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -2995,6 +3074,7 @@
   (run-group test-set-reference)
   (run-group test-ref-search)
   (run-group test-smart-refs)
+  (run-group test-preview-ref)
   (run-group test-book-numbering)
   (run-group test-toc)
   (run-group test-index)
