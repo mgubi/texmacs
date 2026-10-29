@@ -116,16 +116,23 @@
 (define search-serial 0)
 (define search-filter-out? #f)
 
-(define (tree-perform-search t what p limit)
+(define (with-search-access-mode thunk)
+  ;; thunk with the access mode of the search: in a source document, also
+  ;; the hidden content
   (let* ((source-mode 2)
          (old-mode (get-access-mode))
          (new-mode (if (== (get-init "mode") "src") source-mode old-mode)))
-    (set-access-mode new-mode)
-    (let* ((cp (cDr (cursor-path)))
-           (pos (if (list-starts? cp p) (list-tail cp (length p)) (list)))
-           (r (tree-search-tree-at t what p pos limit)))
-      (set-access-mode old-mode)
-      r)))
+    (dynamic-wind
+      (lambda () (set-access-mode new-mode))
+      thunk
+      (lambda () (set-access-mode old-mode)))))
+
+(define (tree-perform-search t what p limit)
+  (with-search-access-mode
+    (lambda ()
+      (let* ((cp (cDr (cursor-path)))
+             (pos (if (list-starts? cp p) (list-tail cp (length p)) (list))))
+        (tree-search-tree-at t what p pos limit)))))
 
 (define (go-to* p)
   (go-to p)
@@ -267,47 +274,44 @@
            (set! by (tm-ref by 0)))
          by)))
 
-(define (get-positions-in-string-rec what match b)
-  ;; Return the list of positions of the strings in what,
-  ;; from position b in the string match.
-  (if (null? what) (list)
-      (with w (car what)
-	(with pos (string-search-forwards w b match)
-	  (if (< pos b) (list)
-	      (with pos1 (+ pos (string-length w))
-		(cons (list pos pos1)
-		      (get-positions-in-string-rec
-		       (cdr what) match pos1))))))))
+;; The values of the wildcards are the runs which they take in the match, as
+;; the search aligns the pattern with its text (lazily: a part of a string,
+;; several children, or nothing; in the region of a pattern with one, as
+;; its content); they were matched child by child, and in a string by a
+;; case-sensitive search of its literal parts (#520)
 
-(define (get-positions-in-string what match)
-  ;; Return the list of positions of the strings
-  ;; in what in the string match.
-  (with l (get-positions-in-string-rec what match 0)
-    (if (!= (length l) (length what)) (list) l)))
+(define (has-region? t)
+  (or (tm-func? t 'select-region)
+      (and (tm-compound? t) (list-or (map has-region? (tm-children t))))))
 
-(define (get-wildcards-in-string-rec what l match b)
-  (if (null? what) (list)
-      (with w (car what)
-	(cond ((tm-func? w `wildcard 1)
-	       (if (null? l) `((:wildcard ,(tm->stree (tm-ref w 0))
-					  ,(string-tail match b)))
-		   (with pos (car l)
-		     (cons `(:wildcard ,(tm->stree (tm-ref w 0))
-				       ,(substring match b (first pos)))
-			   (get-wildcards-in-string-rec
-			    (cdr what) l match (first pos))))))
-	      ((tm-atomic? w)
-	       (if (null? l) (list)
-		   (with pos (car l)
-		     (get-wildcards-in-string-rec
-		      (cdr what) (cdr l) match (second pos)))))
-	      (else (list))))))
+(define (regions t)
+  (cond ((tm-func? t 'select-region 1) (list t))
+        ((tm-compound? t) (append-map regions (tm-children t)))
+        (else (list))))
 
-(define (get-wildcards-in-string what match)
-  (with l (get-positions-in-string
-	   (map tm->string (list-filter what tm-atomic?)) match)
-    (if (null? l) (list)
-	(get-wildcards-in-string-rec what l match 0))))
+(define (region-content what)
+  ;; the pattern which the hit of what matches: the content of its region,
+  ;; if it has one which is not empty, else #f
+  (with l (regions what)
+    (and (== (length l) 1) (not (tm-equal? (tm-ref (car l) 0) ""))
+         (tm-ref (car l) 0))))
+
+(define (has-wildcard? t)
+  (or (tm-func? t 'wildcard 1)
+      (and (tm-compound? t) (list-or (map has-wildcard? (tm-children t))))))
+
+(define (tuple->path x)
+  (map (lambda (c) (string->number (tree->string c))) (tree-children x)))
+
+(define (replace-match t what p1 p2)
+  ;; the match which Replace replaces in the hit from p1 to p2 in t (all of
+  ;; t if both are empty): its start, its end, the match, and the value of
+  ;; each child of a formula pattern, or #f (see tree-search-replace-match)
+  (with l (with-search-access-mode
+            (lambda () (tree-search-replace-match t what p1 p2)))
+    (and (nnull? l)
+         (list (tuple->path (car l)) (tuple->path (cadr l)) (caddr l)
+               (cdddr l)))))
 
 (define (get-wildcards-var what match)
   (cond ((tm-equal? what match) (list))
@@ -315,9 +319,14 @@
          (list `(:wildcard ,(tm->stree (tm-ref what 0)) ,(tm->stree match))))
         ((tm-equal? what "")
          (list `(:empty ,(tm->stree match))))
-	((and (tm-atomic? match)
-	      (tm-func? what 'concat))
-	 (get-wildcards-in-string (tm-children what) (tm->string match)))
+        ((has-region? what)
+         (with c (region-content what)
+           (if c (get-wildcards c match) (list))))
+        ((and (tm-func? what 'concat) (not (tm-func? match 'document))
+              (has-wildcard? what))
+         (with r (replace-match (tm->tree match) what '() '())
+           (if r (append-map get-wildcards (tm-children what) (cadddr r))
+               (list))))
         ((and (tm-compound? what) (tm-compound? match)
               (== (tm-label what) (tm-label match))
               (== (tm-arity what) (tm-arity match)))
@@ -353,6 +362,34 @@
              (t (replace-wildcards-list (cdr l) (cdr h))))
         (cons (cons (car h) (car t)) (cdr t)))))
 
+(define (replace-wildcards-concat l wc)
+  ;; the children l of a formula of the replacement, each marked #t if it
+  ;; comes from the value of a wildcard, which is spliced into the formula
+  (if (null? l) (cons l wc)
+      (let* ((c (car l))
+             (h (if (tm-func? c 'wildcard 1)
+                    (let* ((v (find-wildcard wc (tm->stree (tm-ref c 0))))
+                           (l (cond ((tm-func? v 'concat) (tm-children v))
+                                    ((tm-equal? v "") (list))
+                                    (else (list v)))))
+                      (cons (map (lambda (x) (cons #t x)) l) wc))
+                    (with r (replace-wildcards c wc)
+                      (cons (list (cons #f (car r))) (cdr r)))))
+             (t (replace-wildcards-concat (cdr l) (cdr h))))
+        (cons (append (car h) (car t)) (cdr t)))))
+
+(define (merge-inserted l)
+  ;; two strings in a row, one of them from a value, are one string: the
+  ;; parts of the replacement which the user wrote are kept as they are
+  (cond ((or (null? l) (null? (cdr l))) l)
+        ((and (tm-atomic? (cdar l)) (tm-atomic? (cdadr l))
+              (or (caar l) (caadr l)))
+         (merge-inserted
+           (cons (cons #t (string-append (tm->string (cdar l))
+                                         (tm->string (cdadr l))))
+                 (cddr l))))
+        (else (cons (car l) (merge-inserted (cdr l))))))
+
 (define (replace-wildcards by wc)
   ;;(display* "replace-wildcards " by " " wc "\n")
   (cond ((null? wc)
@@ -363,16 +400,41 @@
          (find-empty wc))
         ((tm-atomic? by)
          (cons by wc))
+        ((and (tm-func? by 'concat)
+              (list-or (map (cut tm-func? <> 'wildcard 1) (tm-children by))))
+         ;; a value of several children is spliced into the formula, and
+         ;; merged with the strings around it (#520)
+         (let* ((r (replace-wildcards-concat (tm-children by) wc))
+                (l (map cdr (merge-inserted (car r)))))
+           (cons (cond ((null? l) "")
+                       ((null? (cdr l)) (car l))
+                       (else (cons 'concat l)))
+                 (cdr r))))
         (else (with r (replace-wildcards-list (tm-children by) wc)
                 (cons (cons (tm-label by) (car r)) (cdr r))))))
 
+(define (wildcard-names t)
+  ;; the names of the wildcards in t
+  (cond ((tm-func? t 'wildcard 1) (list (tm->stree (tm-ref t 0))))
+        ((tm-compound? t) (list-remove-duplicates
+                            (append-map wildcard-names (tm-children t))))
+        (else (list))))
+
 (define (adjust-by by what match)
+  (adjust-by* by what match (list)))
+
+(define (adjust-by* by what match runs)
+  ;; the replacement of match, a match of what, by by: its wildcards take
+  ;; the values of those of what (runs, if not empty: the value of each
+  ;; child of a formula pattern, aligned with the match). #f if the values
+  ;; of the wildcards of what which by takes are not known: inserting the
+  ;; (wildcard ...) tags, or nothing in their place, would lose the text
+  ;; which they took (#520)
   (let* ((swhat (and (tm-atomic? what) (tm->string what)))
          (smatch (and (tm-atomic? match) (tm->string match)))
          (sby (and (tm-atomic? by) (tm->string by)))
          (lwhat (and (tm-compound? what) (tm->list what)))
-         (lmatch (and (tm-compound? match) (tm->list match)))
-         (wc (get-wildcards what match)))
+         (lmatch (and (tm-compound? match) (tm->list match))))
     (cond ((tm-equal? what match) by)
           ((and (tm-func? what 'concat)
                 (tm-func? match 'concat)
@@ -387,51 +449,188 @@
                  ((== (locase-first swhat) smatch) (locase-first sby))
                  ((== (upcase-first swhat) smatch) (upcase-first sby))
                  (else sby)))
-          (else (car (replace-wildcards by wc))))))
+          (else
+            (let* ((wc (if (and (tm-func? what 'concat) (nnull? runs))
+                           (append-map get-wildcards (tm-children what) runs)
+                           (get-wildcards what match)))
+                   (need (list-intersection (wildcard-names by)
+                                            (wildcard-names what))))
+              (and (or (null? need)
+                       (with known (map cadr (list-filter
+                                               wc (cut tm-func? <> :wildcard 2)))
+                         (list-and (map (cut in? <> known) need))))
+                   (car (replace-wildcards by wc))))))))
 
-(define (replace-next* by)
-  ;;(display* "replace-next* " by "\n")
-  (let* ((sels (get-alt-selection "alternate"))
-         (cur (get-search-reference #t)))
-    (and (nnull? sels)
-         (and-with sel (search-next sels cur #f)
-           (go-to* (car sel))
-           (selection-set-range-set sel)
-           (with by* (tm->tree (adjust-by by (search-tree) (selection-tree)))
-             (clipboard-cut "dummy")
-             (insert-go-to (tree-copy by*) (path-end by* '())))
-           #t))))
+;; Replace one replaces the current hit (the match in it, see replace-hit),
+;; and goes on from the end of the replacement: the next match is the first
+;; hit which the search finds in the text after it, in its paragraph, else
+;; the next hit of the document. Replace All is this, again and again, in
+;; one step of undo (#520)
 
-(define (replace-next by)
-  ;; TODO: replacing all occurrences of 'a' by 'axa' may result in
-  ;; a segmentation fault.  We may wish to protect against that
-  (with old-p (cursor-path)
-    (and (replace-next* by)
-         (with mid-p (cursor-path)
-           (perform-search*)
-           (with new-p (cursor-path)
-             (or (and (path-less? old-p new-p)
-                      ;; (path-less? mid-p new-p)
-                      ;; Commenting fixes bug #62534
-                      ;; Check also bug #59508
-                      )
-                 (search-next-match #t)))))))
+(define replace-last #f)    ;; the state where Replace goes on, and whether
+                            ;; its last match was empty
+(define replace-trace #f)   ;; for the tests, if a list: the document and the
+                            ;; range of each replacement (all of the
+                            ;; document at each step: only for small ones)
+(define replace-skip-message #f)
+
+(define (replace-state cur)
+  ;; the place where Replace goes on, with the buffer and the pattern
+  (list (url->string (current-buffer)) (tm->stree (search-tree)) cur))
+
+(define (replace-from cur empty?)
+  ;; Replace goes on from cur, after its last replacement (or a hit which it
+  ;; left; empty? if its match was empty), as long as the buffer, the
+  ;; pattern and the reference are the same
+  (set! replace-last (list (replace-state cur) empty?))
+  (set-search-reference cur))
+
+(define (replace-continues? cur)
+  (and replace-last (== (car replace-last) (replace-state cur))))
+
+(define (pairs l)
+  (if (or (null? l) (null? (cdr l))) (list)
+      (cons (list (car l) (cadr l)) (pairs (cddr l)))))
+
+(define (next-hit cur what)
+  ;; the hit from which Replace goes on, from cur: the first one which the
+  ;; search finds in the text of the document after cur, now (nothing found
+  ;; before a change is kept across it), which the filter of the search
+  ;; accepts: the search goes on after the hits which it rejects
+  (let* ((t (buffer-tree))
+         (p (tree->path t)))
+    (and (list-starts? cur p)
+         ;; (after an empty match, the next one starts at least one token
+         ;; later: Replace, which goes on after its replacement, ends)
+         (let loop ((from cur)
+                    (empty? (and (replace-continues? cur)
+                                 (cadr replace-last))))
+           (let* ((l (with-search-access-mode
+                       (lambda () (tree-search-from t what p from 1 empty?))))
+                  (f (pairs (filter-search-results l))))
+             (cond ((nnull? f) (car f))
+                   ((null? l) #f)
+                   ;; (no empty hit at from: tree-search-from leaves it out)
+                   ((path-less? from (cAr l)) (loop (cAr l) #f))
+                   (else #f)))))))
+
+(define (replace-current-range sel what)
+  ;; the match which Replace replaces in the hit sel of the buffer (see
+  ;; replace-match), its range in the buffer, or #f
+  (let* ((t (buffer-tree))
+         (p (tree->path t))
+         (n (length p)))
+    (and (list-starts? (car sel) p) (list-starts? (cadr sel) p)
+         (and-with r (replace-match t what (list-tail (car sel) n)
+                                    (list-tail (cadr sel) n))
+           (cons* (append p (car r)) (append p (cadr r)) (cddr r))))))
+
+(define (replace-hit sel by what)
+  ;; replace the hit sel of what by by: the match in it which Replace
+  ;; replaces (see replace-match), exactly (the selection of the editor
+  ;; moves the ends of a range next to a script over its base, which was
+  ;; lost), or leave it with a message: the range replaced, or #f if left
+  (let* ((rm (replace-current-range sel what))
+         (by* (and rm (adjust-by* by what (caddr rm) (cadddr rm)))))
+    (if by*
+        (let* ((a (car rm))
+               (b (cadr rm))
+               (by* (tm->tree by*)))
+          (when replace-trace
+            (let* ((t (buffer-tree))
+                   (n (length (tree->path t))))
+              (set! replace-trace (cons (list (tm->stree t) (list-tail a n)
+                                              (list-tail b n))
+                                        replace-trace))))
+          (go-to a)
+          ;; (an empty match: nothing to remove)
+          (when (path-less? a b) (clipboard-cut-between a b))
+          (insert-go-to (tree-copy by*) (path-end by* '()))
+          (list a b))
+        (begin
+          (go-to (cadr sel))
+          ;; (the message, also for the tests)
+          (set! replace-skip-message
+            (cond ((not rm) "Match left: not one, or it crosses a tag")
+                  ((not (tm-func? what 'concat))
+                   "Match left: it would lose the rest of a tag")
+                  (else "Match left: its wildcards have no values")))
+          (set-message replace-skip-message "Replace")
+          #f))))
+
+(define (current-hit cur what)
+  ;; the hit which Replace replaces from cur: after a replacement, the next
+  ;; one in the text after it (see next-hit), else the next hit of the search
+  (if (replace-continues? cur)
+      (next-hit cur what)
+      (search-next (get-alt-selection "alternate") cur #f)))
+
+(define (replace-step sel by what)
+  ;; replace the hit sel (or leave it), and go on from the end of the
+  ;; replacement; #t if replaced
+  (let* ((r (replace-hit sel by what))
+         (empty? (if r (== (car r) (cadr r)) (== (car sel) (cadr sel)))))
+    (replace-from (cursor-path) empty?)
+    (and r #t)))
+
+(define (with-editing thunk)
+  ;; thunk as one step of undo; if it fails, the document as it was before
+  ;; it, and the error raised again (in a read-only document, end-editing
+  ;; cancels what it changed: there are no read-only parts). cancel-editing
+  ;; is global_cancel: it cancels all that is pending since the last
+  ;; confirm, as the handlers of the keyboard and the mouse of the kernel do
+  ;; after an error (edit_keyboard.cpp, edit_mouse.cpp)
+  (start-editing)
+  (with r (catch #t thunk
+            (lambda args
+              (cancel-editing)
+              (end-editing)
+              (apply throw args)))
+    (end-editing)
+    r))
 
 (tm-define (replace-one)
   (and-with by (by-tree)
     (with-buffer (master-buffer)
-      (start-editing)
-      (replace-next by)
-      (end-editing))
-    (perform-search*)))
+      (with what (search-tree)
+        (and-with sel (current-hit (get-search-reference #t) what)
+          (with-editing
+            (lambda ()
+              (replace-step sel by what)
+              (go-to* (cursor-path)))))))
+    (perform-search*)
+    ;; the match which the next Replace replaces, not the whole hit (none:
+    ;; nothing left to replace)
+    (with-buffer (master-buffer)
+      (let* ((cur (get-search-reference #t))
+             (what (search-tree)))
+        (when (replace-continues? cur)
+          (with r (and-with h (current-hit cur what)
+                    (replace-current-range h what))
+            (if r (selection-set-range-set (list (car r) (cadr r)))
+                (selection-cancel))))))))
+
+(define (replace-all-hits by)
+  ;; Replace one again and again, from the reference: each step goes on in
+  ;; the text after its match, which a match which is not empty shortens,
+  ;; and after an empty one the next starts at least one character later
+  ;; (see next-hit), so it ends. The first hit from a search of the
+  ;; document now (the hits of the widget can be partial)
+  (let* ((what (search-tree))
+         (t (buffer-tree))
+         (sels (filter-search-results
+                 (tree-perform-search t what (tree->path t) 1000000))))
+    (let loop ((sel (search-next sels (get-search-reference #t) #f)))
+      (when sel
+        (replace-step sel by what)
+        (loop (next-hit (cursor-path) what))))
+    ;; (the place where it ended shown, if hidden)
+    (go-to* (cursor-path))))
 
 (tm-define (replace-all)
   (and-with by (by-tree)
     (with-buffer (master-buffer)
-      (start-editing)
-      (while (replace-next by)
-        (perform-search*))
-      (end-editing))
+      (with-editing (lambda () (replace-all-hits by))))
     (perform-search*)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

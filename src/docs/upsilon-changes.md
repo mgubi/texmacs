@@ -24,6 +24,16 @@ have the details, and the problems go to the
   (`TEXMACS_TYPESET_READS=off`): what reads a binding (`get-binding`,
   a reference, the parts of a surround) is typeset again when an edit
   gives it another value (#576).
+- **Replace with wildcards** (#520, #543): the text which a wildcard took
+  is kept by the replacement, also when the match has another number of
+  parts than the pattern, when its text lies in a tag argument, or in a
+  formula; Replace All gives the same as Replace pressed for each match,
+  in one undo step, and replaces each match once, left to right; Replace
+  takes only matches which Search shows, a wildcard never goes across
+  paragraphs, and a match is never extended over the base of a script;
+  a match which cannot be replaced without losing text is left, with a
+  message; after an error the document is left as it was; Replace goes
+  on after the parts which the mode or language filter leaves out.
 
 - **Dialogs at a fractional scaling** (desktop Vue builds, Wayland): with
   the display scaled by a fraction such as 150% or 167% (GNOME on
