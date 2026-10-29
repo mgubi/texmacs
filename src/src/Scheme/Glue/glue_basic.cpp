@@ -580,6 +580,30 @@ tmg_async_eval_system (tmscm arg1, tmscm arg2) {
 }
 
 tmscm
+tmg_async_eval_system_full (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "async-eval-system-full");
+  TMSCM_ASSERT_OBJECT (arg2, TMSCM_ARG2, "async-eval-system-full");
+
+  string in1= tmscm_to_string (arg1);
+  object in2= tmscm_to_object (arg2);
+
+  // TMSCM_DEFER_INTS;
+  bool out= async_eval_system_full (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return bool_to_tmscm (out);
+}
+
+tmscm
+tmg_async_eval_pending () {
+  // TMSCM_DEFER_INTS;
+  async_eval_pending ();
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
 tmg_http_post (tmscm arg1, tmscm arg2, tmscm arg3) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "http-post");
   TMSCM_ASSERT_ARRAY_STRING (arg2, TMSCM_ARG2, "http-post");
@@ -11658,6 +11682,8 @@ initialize_glue_basic () {
   tmscm_install_procedure ("var-eval-system",  tmg_var_eval_system, 1, 0, 0);
   tmscm_install_procedure ("evaluate-system",  tmg_evaluate_system, 4, 0, 0);
   tmscm_install_procedure ("async-eval-system",  tmg_async_eval_system, 2, 0, 0);
+  tmscm_install_procedure ("async-eval-system-full",  tmg_async_eval_system_full, 2, 0, 0);
+  tmscm_install_procedure ("async-eval-pending",  tmg_async_eval_pending, 0, 0, 0);
   tmscm_install_procedure ("http-post",  tmg_http_post, 3, 0, 0);
   tmscm_install_procedure ("http-post-query",  tmg_http_post_query, 3, 0, 0);
   tmscm_install_procedure ("async-http-post",  tmg_async_http_post, 4, 0, 0);

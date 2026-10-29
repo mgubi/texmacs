@@ -81,6 +81,8 @@
 "var-eval-system"
 "evaluate-system"
 "async-eval-system"
+"async-eval-system-full"
+"async-eval-pending"
 "http-post"
 "http-post-query"
 "async-http-post"

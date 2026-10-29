@@ -297,6 +297,64 @@
         (glue-check-equal "processes" "a long input"
                           (lambda () (cat long)) (list "0" long "")))))
 
+;; asynchronous commands: a thread reads the output of the command, and
+;; async-eval-pending (called by the main loop, here by the test) hands it
+;; over once the command is done. async-eval-system gives the output only;
+;; async-eval-system-full also gives the exit code and the errors, which
+;; used to be dropped (exit code always 0, errors to /dev/null, #437).
+;; (Unix only: on Windows, the command runs in cmd.exe and its errors are
+;; not read)
+(define (async-wait ok? msecs)
+  (let ((start (texmacs-time)))
+    (let loop ()
+      (async-eval-pending)
+      (cond ((ok?) #t)
+            ((> (- (texmacs-time) start) msecs) #f)
+            (else (system "sleep 0.02") (loop))))))
+
+(define (async-full cmd)
+  ;; (status output errors) of cmd, or #f if it did not end within 10 s
+  (let ((r #f))
+    (and (not (async-eval-system-full cmd (lambda (st out err)
+                                            (set! r (list st out err)))))
+         (async-wait (lambda () r) 10000)
+         r)))
+
+(define (test-glue-async)
+  (if (or (os-mingw?) (os-win32?))
+      (display "  Windows, skipped\n")
+      (let ((out #f))
+        (glue-check "async" "the output of async-eval-system"
+                    (and (not (async-eval-system "printf abc"
+                                                 (lambda (s) (set! out s))))
+                         (async-wait (lambda () out) 10000)
+                         (== out "abc"))
+                    (object->string out))
+        (glue-check-equal "async" "a command which succeeds"
+                          (lambda () (async-full "printf abc"))
+                          '(0 "abc" ""))
+        (glue-check-equal "async" "the exit code and the errors"
+                          (lambda ()
+                            (async-full "echo out; echo err >&2; exit 3"))
+                          '(3 "out\n" "err\n"))
+        (glue-check-equal "async" "a command which is not found"
+                          (lambda ()
+                            (car (async-full "no-such-command-437 2>/dev/null")))
+                          127)
+        (glue-check-equal "async" "a command stopped by a signal"
+                          (lambda () (car (async-full "kill -TERM $$")))
+                          (+ 128 15))
+        (with long (make-string 100000 #\a)
+          (glue-check-equal "async" "a long output and long errors"
+                            (lambda ()
+                              (async-full
+                                (string-append
+                                  "i=0; while [ $i -lt 1000 ]; do "
+                                  "printf " (make-string 100 #\a) "; "
+                                  "printf " (make-string 100 #\b) " >&2; "
+                                  "i=$((i+1)); done")))
+                            (list 0 long (make-string 100000 #\b)))))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The test suite
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -326,6 +384,8 @@
   (test-glue-paths-urls)
   (glue-group "processes")
   (test-glue-processes)
+  (glue-group "async")
+  (test-glue-async)
   (when (nnull? glue-redefined)
     (display* "  redefined in Scheme, not checked: "
               (object->string (reverse glue-redefined)) "\n"))

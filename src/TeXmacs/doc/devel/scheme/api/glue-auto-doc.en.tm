@@ -451,6 +451,22 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(async-eval-system-full <scm-arg|string> <scm-arg|object>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|async_eval_system_full> which returns
+    <scm|bool>.
+  </explain>
+
+  <\explain>
+    <scm|(async-eval-pending)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|async_eval_pending> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
     <scm|(http-post <scm-arg|string> <scm-arg|array_string> <scm-arg|string>)>
 <explain-synopsis|no synopsis>
   <|explain>

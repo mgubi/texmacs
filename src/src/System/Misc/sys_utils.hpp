@@ -55,6 +55,7 @@ array<string> evaluate_system (array<string> arg,
 
 class object;
 bool async_eval_system (string cmd, object call_back);
+bool async_eval_system_full (string cmd, object call_back);
 bool async_eval_system (string cmd, int& status, string& outbuf,
 			string& errbuf, bool& kill);
 void async_eval_pending ();
