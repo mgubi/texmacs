@@ -2333,6 +2333,31 @@
     (check= (typeset-fuzz 29 12 30 "papyrus") 0)
     (check= (typeset-check-mismatches) 0)))
 
+;; The page breaker sets to 0 the penalty of the last line before a change
+;; of the number of columns (breaker_prepare_items): on copies of the
+;; lines, not on those which the bridges keep, which the check mode compares
+;; with the lines typeset again (here the last line of the columns, which
+;; may not be broken from the equation which follows, #573)
+(define (test-lines-changed-by-breaker)
+  (check-group "lines changed by the page breaker")
+  (for (after '((equation (document "x=y"))
+                (equation* (document "x=y"))
+                (concat "plain")))
+    (with-scratch-buffer
+     (lambda (u)
+       (with m0 (typeset-check-mismatches)
+         (buffer-set-body u (stree->tree
+                             `(document (with "par-columns" "2"
+                                          (document "a" "b" "c"))
+                                        ,after)))
+         (init-env "page-medium" "paper")
+         (update-current-buffer)
+         (update-forced) (update-forced)
+         (update-forced) (update-forced)
+         (tree-insert (buffer-tree) 2 (list (stree->tree "d")))
+         (update-forced) (update-forced)
+         (check= (typeset-check-mismatches) m0))))))
+
 ;; A zoom typesets again only what reads the size of a pixel (px lengths,
 ;; the borders of ornaments, graphics: edit_env_rep::get_pixel), and uses the
 ;; rest again (edit_typeset_rep::set_zoom). After each zoom the places of the
@@ -3209,6 +3234,7 @@
   (test-labels-after-redo)
   (test-incremental-against-scratch)
   (test-random-documents)
+  (test-lines-changed-by-breaker)
   (test-block-replay)
   (test-references-after-removals)
   (test-assignments-in-blocks)
