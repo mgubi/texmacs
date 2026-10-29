@@ -578,7 +578,6 @@
   ;; replace the hit sel, and go on from the end of the replacement; #f if
   ;; nothing was done (an empty hit left as it is)
   (go-to* (car sel))
-  (selection-set-range-set sel)
   (with done? (replace-hit sel by what)
     (replace-from (cursor-path))
     (or done? (!= (car sel) (cadr sel)))))
