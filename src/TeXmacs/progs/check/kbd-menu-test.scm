@@ -1364,6 +1364,63 @@
     (when (buffer-exists? b) (buffer-close b))
     (check= (current-buffer) old)))
 
+;; Clone window after a Save as (a rename of the buffer): the view of the
+;; clone took the number, and so the url, of the view of the window, and
+;; TeXmacs aborted with "view attached to other window" (#560).
+(define (test-clone-window-renamed)
+  (check-group "clone window after a rename")
+  (let* ((win (current-window))
+         (old (current-buffer))
+         (b (new-buffer))
+         (f (system->url (string-append (url->system (url-temp-dir))
+                                        "/kbd-menu-test-renamed.tm")))
+         (before (window-list)))
+    (switch-to-buffer old)
+    (open-buffer-in-window b (buffer-get b) "")
+    (with l (list-difference (window-list) before)
+      (check= (length l) 1)
+      (when (== (length l) 1)
+        (window-focus (car l))
+        (buffer-rename b f)
+        (check= (current-buffer) f)
+        (clone-window)
+        (with ws (buffer->windows f)
+          (check= (length ws) 2)
+          (check= (length (buffer->views f)) 2)
+          (check= (length (list-remove-duplicates (buffer->views f))) 2)
+          (for (w (reverse ws)) (kill-window w)))))
+    (window-focus win)
+    (when (buffer-exists? f) (buffer-close f))
+    (when (buffer-exists? b) (buffer-close b))
+    (check= (current-buffer) old)))
+
+;; Deleting the only view of a window: the window shows a view of another
+;; buffer (a new one when no view is free), instead of staying empty
+;; (#559).
+(define (test-delete-window-view)
+  (check-group "deleting the view of a window")
+  (let* ((win (current-window))
+         (old (current-buffer))
+         (b (new-buffer))
+         (before (window-list)))
+    (switch-to-buffer old)
+    (open-buffer-in-window b (buffer-get b) "")
+    (with l (list-difference (window-list) before)
+      (check= (length l) 1)
+      (when (== (length l) 1)
+        (window-focus (car l))
+        (check= (buffer->views b) (list (current-view-url)))
+        (view-delete (current-view-url))
+        (check= (buffer->views b) '())
+        (with v (window->view (car l))
+          (check-false (url-none? v))
+          (check= (current-view-url) v)
+          (check-false (== (view->buffer v) b)))
+        (kill-window (car l))))
+    (window-focus win)
+    (when (buffer-exists? b) (buffer-close b))
+    (check= (current-buffer) old)))
+
 ;; A change of the initial environment made in the clone is in the window
 ;; it was cloned from, which saves it (#528): the file has it and the
 ;; buffer is no longer modified.
@@ -1666,6 +1723,8 @@
   (test-close-window)
   (test-close-shared-window)
   (test-clone-window)
+  (test-clone-window-renamed)
+  (test-delete-window-view)
   (test-clone-window-init)
   (test-full-screen-info-flag)
   (check-group "menu items")
