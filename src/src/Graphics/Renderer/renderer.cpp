@@ -136,6 +136,21 @@ renderer_rep::toc_entry (string kind, string title, SI x, SI y) {
 }
 
 void
+renderer_rep::begin_actual_text (string s) {
+  (void) s;
+}
+
+void
+renderer_rep::end_actual_text () {
+}
+
+void
+renderer_rep::draw_invisible (int c, font_glyphs fn, SI x, SI y,
+                              double hscale) {
+  (void) c; (void) fn; (void) x; (void) y; (void) hscale;
+}
+
+void
 renderer_rep::set_metadata (string kind, string val) {
   (void) kind; (void) val;
 }
