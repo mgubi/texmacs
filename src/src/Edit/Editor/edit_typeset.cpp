@@ -1238,11 +1238,17 @@ clean_unused (edit_env env) {
   return matter;
 }
 
+// The passes which follow an incomplete one whose bindings changed: one
+// is enough, unless the references typeset again change bindings in turn (a
+// label made only when another one has some value), which a few more passes
+// follow, as far as this bound
+#define REBINDING_PASSES_MAX 4
+
 void
 edit_typeset_rep::typeset (SI& x1, SI& y1, SI& x2, SI& y2) {
   int missing_nr= INT_MAX;
   int redefined_nr= INT_MAX;
-  int dropped_nr= 0;
+  int rebinding_nr= 0;
   x1= MAX_SI; y1= MAX_SI; x2= MIN_SI; y2= MIN_SI;
   while (true) {
     SI sx1, sy1, sx2, sy2;
@@ -1250,10 +1256,11 @@ edit_typeset_rep::typeset (SI& x1, SI& y1, SI& x2, SI& y2) {
     x1= min (x1, sx1); y1= min (y1, sy1);
     x2= max (x2, sx2); y2= max (y2, sy2);
     if (!env->complete) {
-      // labels which an edit removed (with the reuse by inputs): one more
-      // pass types again the references to them (typesetter_rep::
-      // drop_bindings; a few, for labels which only the removed ones made)
-      if (ttt->dropped && ++dropped_nr <= 4) continue;
+      // labels which an edit removed, added or changed (with the reuse by
+      // inputs): one more pass typesets again the references to them
+      // (typesetter_rep::drop_bindings)
+      if (ttt->bindings_changed && ++rebinding_nr <= REBINDING_PASSES_MAX)
+        continue;
       break;
     }
     env->complete= false;
