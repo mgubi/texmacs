@@ -29,15 +29,17 @@ named differently, open an issue or say so in your report.
   (#405).
 - **hammerfunctor**: the build with GCC 16 (#378), plug-ins and
   `get-environment-variable` (#379).
-- **Marc Mertens** (on the texmacs-users list): the builds with GCC and with
-  Qt 5 (#389), symbols drawn as squares (#407), the times of a book of 2000
-  pages (#408), and the slow search of formulas (#450).
+- **Marc Mertens** (lispmarc, on the texmacs-users list): the builds with
+  GCC and with Qt 5 (#389), symbols drawn as squares (#407), the times of a
+  book of 2000 pages (#408), the slow search of formulas (#450), the
+  previews of references left on the screen (#583), and clicks and
+  selections in long documents (#584, #585).
 - **medwatt**: Vue under Wayland and tiling window managers: the interface
   font, pasting in the fields, scrolling, dialogs (#391), the size of SVG icons (#394);
   the slow opening and editing of long documents with PDF figures in Qt
   (#458, #457).
 - **mlalaude**: the preferences of the AI sessions, and a session asked a
-  question without an API key (#398).
+  question without an API key (#398), Maxima in the AppImage (#511).
 - **amichail**: the icon bars at the right of the document (#404).
 - **baudoly**: two windows on one document (#463, #464), the preferences
   with Inkscape installed (#465), dialogs with an accented title in Cocoa
