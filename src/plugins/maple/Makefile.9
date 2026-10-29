@@ -27,7 +27,10 @@ $(TEXMACS_HOME_PATH)/bin/tm_maple_9.sh: $(TEXMACS_MAPLE_DIR)/bin/maple
 	sed \
 			-e 's%$${MAPLE}/$$MAPLE_SYS_BIN/cmaple%$(TEXMACS_HOME_PATH)/bin/tm_maple_9%' \
 			-e 's%$${MAPLE}/$$MAPLE_SYS_BIN/maplew%$(TEXMACS_HOME_PATH)/bin/tm_maple_9%' \
-		$< > $@ && chmod a+x $@
+		$< > $@.tmp
+	@grep -q '$(TEXMACS_HOME_PATH)/bin/tm_maple_9' $@.tmp || \
+	  { rm -f $@.tmp; echo "$<: no call of cmaple or maplew to replace by tm_maple_9" 1>&2; exit 1; }
+	chmod a+x $@.tmp && mv $@.tmp $@
 
 $(TEXMACS_HOME_PATH)/bin/tm_maple_9: src.9/tm_maple_9.c $(TEXMACS_MAPLE_STAMP)
 	$(CC) $(MAPLE_LDFLAGS) $(MAPLE_CPPFLAGS) $< -o $@ $(MAPLE_LIBADD)

@@ -88,6 +88,7 @@
 
 (tm-define (picture-gc)
   ;; the pictures are loaded again, and the remote ones downloaded again
+  ;; (the views are only typeset again where a picture changed)
   (remote-files-refresh)
   (picture-cache-reset)
-  (update-all-buffers))
+  (update-picture-buffers))

@@ -113,6 +113,8 @@ public:
   tree     get_init_all ();
   void     init_env (string var, tree by);
   void     init_default (string var);
+  void     init_env_local (string var, tree by);
+  void     init_default_local (string var);
   void     set_zoom (tree z);
   void     init_style ();
   void     init_style (string style);
@@ -140,6 +142,10 @@ public:
   void     typeset_exec_until (path p);
   void     typeset_invalidate (path p);
   void     typeset_invalidate_all ();
+  void     typeset_invalidate_labels ();
+  void     typeset_invalidate_keep ();
+  void     typeset_invalidate_inclusions ();
+  void     typeset_invalidate_pictures ();
   bool     typeset_renumber_labels ();
   void     typeset_invalidate_players (path p, bool reattach);
   void     typeset_sub (SI& x1, SI& y1, SI& x2, SI& y2);

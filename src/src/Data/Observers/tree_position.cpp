@@ -59,11 +59,14 @@ tree_position_rep::get_position (tree& t, int& index2) {
 
 bool
 tree_position_rep::set_position (tree t, int index2) {
+  // (the list may hold the last reference to this observer: a position
+  // of Scheme collected without position-delete)
+  observer self (this);
   tree ref (ptr);
-  detach_observer (ref, observer (this));
+  detach_observer (ref, self);
   ptr  = t.rep;
   index= index2;
-  attach_observer (t, observer (this));
+  attach_observer (t, self);
   return true;
 }
 

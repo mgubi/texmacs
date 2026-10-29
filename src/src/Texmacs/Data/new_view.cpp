@@ -318,6 +318,7 @@ delete_view (url u) {
         if (j<i) a[j]= buf->vws[j];
         else a[j]= buf->vws[j+1];
       buf->vws= a;
+      break; // buf->vws is now shorter: do not read past its end
     }
   notify_delete_view (u);
   vw->ed->buf= NULL;
@@ -343,6 +344,26 @@ notify_rename_after (url new_name) {
 ******************************************************************************/
 
 void
+update_window_names (url name) {
+  // the windows of a buffer shown in several windows (clone-window) are
+  // numbered in their titles, as in the Windows list of the Go menu
+  tm_buffer buf= concrete_buffer (name);
+  if (is_nil (buf)) return;
+  array<url> vs= buffer_to_views (name);
+  int n= 0, k= 0;
+  for (int i=0; i<N(vs); i++)
+    if (concrete_window (view_to_window (vs[i])) != NULL) n++;
+  for (int i=0; i<N(vs); i++) {
+    tm_window win= concrete_window (view_to_window (vs[i]));
+    if (win == NULL) continue;
+    string title= buf->buf->title;
+    // a new string: << would append to the title of the buffer itself
+    if (n > 1) title= title * " (" * as_string (++k) * ")";
+    win->set_window_name (title);
+  }
+}
+
+void
 attach_view (url win_u, url u) {
   tm_window win= concrete_window (win_u);
   tm_view   vw = concrete_view (u);
@@ -354,8 +375,8 @@ attach_view (url win_u, url u) {
   vw->ed->cvw= wid.rep;
   ASSERT (is_attached (wid), "widget should be attached");
   vw->ed->resume ();
-  win->set_window_name (vw->buf->buf->title);
   win->set_window_url (vw->buf->buf->name);
+  update_window_names (vw->buf->buf->name);
   notify_set_view (u);
   // cout << "View attached\n";
 }
@@ -374,6 +395,7 @@ detach_view (url u) {
   set_scrollable (wid, glue_widget ());
   win->set_window_name ("TeXmacs");
   win->set_window_url (url_none ());
+  update_window_names (vw->buf->buf->name);
   // cout << "View detached\n";
 }
 

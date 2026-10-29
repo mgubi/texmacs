@@ -42,6 +42,7 @@ All runners are run from `src/`, after building, and exit non-zero on failure.
 | `tests/scheme/check.sh <name>` | one suite of check-master (e.g. `latex`, `table`) | seconds |
 | `tests/scheme/check.sh path/foo-test.scm` | a suite file not yet registered | seconds |
 | `tests/scheme/check.sh integration` | the integration suites (server backup, cache...) | |
+| `tests/startup/check.sh` | the command line (`-x`, files, `-q`, `-headless`) and the exit after a script, one TeXmacs process per case; a crash at the exit fails (#462); offscreen, `TM_TEST_TIMEOUT` per case (60 s) | 20 s, 50 s with a fresh home |
 | `make -C tests` | the C++ unit tests (QtTest), linked against `src/Objects` | minutes |
 | `tests/documents/check.sh [-u] [-p]` | typesets `tests/documents/samples/*.tm` to PDF and compares their text with `tests/documents/ref` (`-u` updates, `-p` also compares pixels) | about 1 min |
 | `tests/docs/check.sh [-b\|-f] [-l lan] [-u]` | the whole documentation: the Help books to PDF and every `TeXmacs/doc` file; problems are compared with `tests/docs/ref/summary.txt` | about 9 min |
@@ -62,7 +63,8 @@ Logs are in `tests/build/<runner>/`. Some references depend on the machine's fon
 ## Running TeXmacs headless
 - ALWAYS set `TEXMACS_HOME_PATH` to a scratch directory (the runners do, `TM_TEST_HOME` overrides theirs). Without it TeXmacs writes into the user's real `~/.TeXmacs` (settings, font database, caches). Never run `texmacs.bin` by hand without it, not even for a probe.
 - `texmacs.bin -x '<expr>' -q`: an error in `-x` keeps TeXmacs running, so wrap the expression in `(catch #t ... )` and `(exit ...)`/`quit`, and use a timeout. `use-modules` and `lazy-define` are not allowed in `-x`; `(load "file.scm")` is.
-- Without a window: nothing is typeset until `update-forced`; `delayed` and idle work never run; auxiliary data needs `generate-all-aux` (see `tests/documents/export.scm`); page numbers are `?` unless the page medium is paper; modifier key presses and box-based cursor moves do not work.
+- Without a window: nothing is typeset until `update-forced`; `delayed` and idle work never run; auxiliary data needs `generate-all-aux` (see `tests/documents/export.scm`); page numbers are `?` unless the page medium is paper; modifier key presses do not work (call the command instead, e.g. `(make-fraction)` for `math f`).
+- Box-based cursor moves (`kbd-right`, `kbd-down`... the arrow keys) do nothing while the editor has pending changes (`has_changed` in `go_right`, `edit_cursor.cpp`), and `update-forced` does not clear them: call `(update-forced) (apply-changes)` after each edit, then `(kbd-right)` etc. work (`key-press "right"` alone does not). The arity of macros defined in a document is only learned by `drd_update`, which runs in `update_menus`: call `(update-menus)` after loading or editing the preamble, or `\name` Return inserts the macro without fields.
 - One process gets slower over many loaded documents (leaked views, #61); restart it every few hundred documents.
 
 ## Known pitfalls

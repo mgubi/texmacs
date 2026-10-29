@@ -37,6 +37,7 @@ CONCRETE(new_data);
 };
 CONCRETE_CODE(new_data);
 
+bool is_view_init_variable (string var);
 tree attach_data (tree body, new_data data, bool no_aux= false);
 tree detach_data (tree doc, new_data& data);
 

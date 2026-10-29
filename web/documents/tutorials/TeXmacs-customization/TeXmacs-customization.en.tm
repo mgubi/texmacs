@@ -574,6 +574,10 @@
   <\big-figure|<image|images/user-icons-greek.png|0.8par|||>>
     The menu of the first icon.
   </big-figure>
+
+  <\with|par-mode|right>
+    \<copyright\> Nicolas Ratier
+  </with>
 </body>
 
 <\initial>

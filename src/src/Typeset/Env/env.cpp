@@ -12,6 +12,8 @@
 #include "env.hpp"
 #include "iterator.hpp"
 #include "sys_utils.hpp" // get_env
+#include "image_files.hpp"
+#include "analyze.hpp"
 #include <unordered_map>
 extern hashmap<string,int> default_var_type;
 void initialize_default_var_type ();
@@ -41,7 +43,9 @@ edit_env_rep::edit_env_rep (drd_info& drd2,
   local_ref (local_ref2), global_ref (&global_ref2),
   local_aux (local_aux2), global_aux (&global_aux2),
   local_att (local_att2), global_att (&global_att2),
-  missing (UNINIT), redefined (), touched (false),
+  missing (UNINIT), redefined (), rebound (false), rewritten (UNINIT),
+  touched (false),
+  read_refs (false), refs_settled (false),
   read_unknown (false), rec_keys (NULL), rec_values (NULL),
   rec_key_set (NULL), rec_bindings (NULL), rec_merged (NULL), rec_held (NULL),
   auto_buffer (""), typesetting (0), files_base (""), files_cur (""),
@@ -158,12 +162,83 @@ tree
 edit_env_rep::lookup_value (string name) {
   if (N(name) == 0) return tree (UNINIT);
   string key= name (1, N(name));
+  if (name[0] == 'i') return inclusion_value (key);
+  if (name[0] == 'p' || name[0] == 'q') return picture_value (name);
   if (name[0] == 'a')
     return local_att->contains (key)? local_att [key]: (*global_att) [key];
-  int type= (name[0] == '1') ? 1 : 0;
-  tree value= local_ref->contains (key)? local_ref [key]: (*global_ref) [key];
+  int type= (name[0] == '1' || name[0] == '3') ? 1 : 0;
+  tree value;
+  if (local_ref->contains (key)) {
+    // (while the tables are those which were loaded: see clean_unused)
+    if (!refs_settled) read_refs (key)= true;
+    value= local_ref [key];
+  }
+  else value= (*global_ref) [key];
   if (is_func (value, TUPLE) && (N(value) >= 2)) value= value[type];
   else if (type == 1) value= tree (UNINIT);
+  return value;
+}
+
+/******************************************************************************
+* The pictures which images and patterns show
+******************************************************************************/
+
+static bool pictures_used= false;
+// (the base files and the names of the pictures looked up, by their keys)
+static hashmap<string,tree> picture_sources ("");
+
+bool
+typeset_pictures_used () {
+  return pictures_used;
+}
+
+url
+edit_env_rep::image_file (url base, string label) {
+  url im= cork_to_utf8 (label);
+  url image= resolve (relative (base, im));
+  if (is_none (image) && suffix (im) == "")
+    image= resolve (relative (base, ::glue (im, ".eps")));
+  if (is_none (image) && suffix (im) == "")
+    image= resolve (relative (base, ::glue (im, ".pdf")));
+  if (is_none (image)) image= "$TEXMACS_PATH/misc/pixmaps/unknown.ps";
+  return image;
+}
+
+url
+edit_env_rep::pattern_file (url base, string label) {
+  return resolve_pattern (relative (base, url_system (label)));
+}
+
+string
+edit_env_rep::picture_key (char kind, string label) {
+  string key= string (kind) * as_string (base_file_name) * "\n" * label;
+  if (!picture_sources->contains (key))
+    picture_sources (key)= tuple (base_file_name->t, label);
+  return key;
+}
+
+tree
+edit_env_rep::picture_value (string name) {
+  if (!picture_sources->contains (name)) return tree (UNINIT);
+  tree src= picture_sources [name];
+  url base= as_url (src[0]);
+  string label= as_string (src[1]);
+  url file= url_none ();
+  if (name[0] == 'p') file= image_file (base, label);
+  else file= pattern_file (base, label);
+  if (is_none (file)) return tuple ("");
+  int w= 0, h= 0;
+  image_size (file, w, h);
+  return tuple (as_string (file), as_string (w), as_string (h));
+}
+
+tree
+edit_env_rep::picture_lookup (char kind, string label, url file,
+                              int w, int h) {
+  pictures_used= true;
+  tree value= is_none (file)? tuple (""):
+              tuple (as_string (file), as_string (w), as_string (h));
+  record_lookup (picture_key (kind, label), value);
   return value;
 }
 
@@ -450,7 +525,9 @@ edit_env_rep::labels_stamp () {
   return mix64 (local_ref->stamp ()) ^
          mix64 ((*global_ref)->stamp () * 0x9E3779B97F4A7C15ULL + 1) ^
          mix64 (local_att->stamp () * 0x9E3779B97F4A7C15ULL + 2) ^
-         mix64 ((*global_att)->stamp () * 0x9E3779B97F4A7C15ULL + 3);
+         mix64 ((*global_att)->stamp () * 0x9E3779B97F4A7C15ULL + 3) ^
+         mix64 (inclusions_stamp () * 0x9E3779B97F4A7C15ULL + 4) ^
+         mix64 (imgbox_stamp () * 0x9E3779B97F4A7C15ULL + 5);
 }
 
 int

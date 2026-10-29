@@ -122,7 +122,9 @@
          (init-font "roman" "roman"))
         ((and (== val "roman") (!= opts (list "roman")))
          (init-font "roman" "roman"))
-        ((string-starts? val "Stix")
+        ;; the master of the old STIX, not of Stix Two Text, which has a
+        ;; profile of its own and its own math font
+        ((== val "Stix")
          (init-font "stix" "math-stix"))
         ((string-starts? val "TeX Gyre Bonum")
          (init-font "bonum" "math-bonum"))
@@ -583,6 +585,10 @@
   (system-wait "Updating current buffer, " "please wait")
   (update-current-buffer))
 
+(define (wait-update-current-buffer-keep)
+  (system-wait "Updating current buffer, " "please wait")
+  (update-current-buffer-keep))
+
 (tm-define (update-document what)
   (for (.. 0 doc-update-times)       
     (delayed    ; allow typesetting/magic to happen before next update
@@ -591,9 +597,13 @@
        ;; the automatic labels are first numbered in the order of the
        ;; document: the tables which are made hold their names (a
        ;; table made alone makes the others too when a name changed)
-       (cond ((== what "all") 
+       (cond ((== what "all")
+              ;; the layout is made from scratch first (the two gc), the
+              ;; labels are numbered and the tables made from that layout,
+              ;; and the end only types again what the tables changed
+              (inclusions-gc) (picture-gc)
               (renumber-auto-labels)
-              (generate-all-aux) (inclusions-gc) (picture-gc) (wait-update-current-buffer))
+              (generate-all-aux) (wait-update-current-buffer-keep))
              ((== what "bibliography")
               (renumber-auto-labels)
               (generate-all-aux) (wait-update-current-buffer))

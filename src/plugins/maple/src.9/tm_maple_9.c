@@ -161,7 +161,7 @@ main (int argc, char *argv[]) {
 
 	snprintf(tmmplinit,sizeof(tmmplinit), "%s/" TMMPL_PI_MAPLEINIT_RELPATH ,tm_path);
 	if (access(tmmplinit,R_OK)) {
-		printf("Fatal error, unable to read `%s`\n",tmmplinit);
+		printf("\2verbatim:Fatal error, unable to read `%s`\n\5",tmmplinit);
 		return( 1 );
 	}
 
@@ -169,7 +169,7 @@ main (int argc, char *argv[]) {
 
   /* initialize Maple */
   if( (kv=StartMaple(argc,argv,&cb,(void *)in,NULL,err)) == NULL) {
-    printf("Fatal error, %s\n",err);
+    printf("\2verbatim:Fatal error, %s\n\5",err);
     return( 1 );
   }
 
@@ -191,16 +191,18 @@ main (int argc, char *argv[]) {
     next_input ();
     printf("\5");
     fflush (stdout);
-    int i= 0;
+    int i= 0, c= 0;
     for (i=0; i<2047; i++) {
-      char c= getchar ();
-      if (c == '\n') break;
-      in[i]= c;
+      c= getchar ();
+      if (c == EOF || c == '\n') break;
+      in[i]= (char) c;
     }
     in[i]= '\0';
-    while (in[strlen(in)-1] == ';') in[strlen(in)-1]= '\0';
+    if (c == EOF && i == 0) break; /* TeXmacs closed the pipe */
+    while (i > 0 && in[i-1] == ';') in[--i]= '\0';
     if (strncmp (in, "quit", 4) == 0) break;
     printf("%c%s", DATA_BEGIN, "verbatim:");
+    if (i == 0) continue; /* an empty answer to an empty input */
     if (in[0] == '?')
       MapleHelp (kv, in+1, NULL, writeHelpChar, NULL, 80, NULL);
     else {

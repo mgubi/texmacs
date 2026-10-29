@@ -219,16 +219,19 @@ qt_http_from_json (string s) {
 
 void
 QTMHTTPHandler::onFinished () {
-  if (reply == NULL) call (callback, string (""));
-  if (reply->error() != QNetworkReply::NoError)
-    io_error << "http_post from "
-	     << from_qstring_utf8 (reply->url ().host ()) << ": "
-	     << from_qstring_utf8 (reply->errorString ()) << LF;
+  if (reply == NULL)
+    call (callback, string (""));
   else {
+    // (also after an error: who waits for the answer is called, with what
+    // came, which says why for an error status)
+    if (reply->error() != QNetworkReply::NoError)
+      io_error << "http_post from "
+	       << from_qstring_utf8 (reply->url ().host ()) << ": "
+	       << from_qstring_utf8 (reply->errorString ()) << LF;
     string buffer= from_qstring_utf8 (QString (reply->readAll ()));
     call (callback, buffer);
+    reply->close ();
   }
-  reply->close ();
   this->deleteLater ();
 }
 

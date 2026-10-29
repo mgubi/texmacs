@@ -392,7 +392,7 @@ suspend (void)
   t->top = SCM_STACK_PTR (&t);
   /* save registers. */
   SCM_FLUSH_REGISTER_WINDOWS;
-  SCM_I_SETJMP (t->regs);
+  SCM_I_SAVE_REGISTERS (t->regs);
   return t;
 }
 

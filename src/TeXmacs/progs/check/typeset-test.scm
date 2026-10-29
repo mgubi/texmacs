@@ -96,6 +96,7 @@
 (define (rect-x2 r) (caddr r))
 (define (rect-y2 r) (cadddr r))
 (define (rect-mid r) (/ (+ (rect-x1 r) (rect-x2 r)) 2))
+(define (rect-width r) (- (rect-x2 r) (rect-x1 r)))
 
 (define (env-at var . l)
   (tree->stree (get-env-tree-at var (apply at l))))
@@ -408,6 +409,233 @@
          (update)
          (check= (nr "s2") "2")
          (check= (height) h))))))
+
+;; The pass which a removed label asks for is a complete one: a label which
+;; only disappears because of it (here dep, made when s2 is 2) is removed
+;; too, and the references to it show "?" (#408: a pass which uses bridges
+;; again does not clean the tables). (typeset-redone-count counts the
+;; bridges typeset again with the reuse by inputs: it stays 0 with
+;; TEXMACS_TYPESET_READS=off.)
+(define (test-removed-label-chain)
+  (check-group "removed label, chain")
+  (with-typeset-body
+   '(document (section (concat "A" (label "s1")))
+              (concat "X" (if (equal (get-binding "s2") "2") (label "dep") ""))
+              (concat "See dep: " (reference "dep"))
+              (section (concat "B" (label "s2")))
+              "Text.")
+   (lambda ()
+     (let* ((update (lambda ()
+                      (update-forced)
+                      (generate-all-aux)
+                      (update-current-buffer)
+                      (update-forced))))
+       (update)
+       (update)
+       (check-true (in? "dep" (list-references)))
+       (tree-set (tree-ref (buffer-tree) 3) '(section "B"))
+       (update)
+       (check-false (in? "s2" (list-references)))
+       (check-false (in? "dep" (list-references)))
+       (check= (tree->stree (get-reference "dep")) '(uninit))))))
+
+;; Labels removed, put back, added and renumbered by edits, with the reuse
+;; by inputs: the pass of an edit is not a complete one (unlike the updates
+;; of test-removed-label above, which make complete passes), and the
+;; references to these labels, also those before them, show after it what
+;; a typesetting from scratch shows (#571): "?" for a removed label, not
+;; its old number until Update All. One more pass typesets again what reads
+;; them, the other paragraphs are used again. (Not with the classic cache,
+;; TEXMACS_TYPESET_READS=off, which keeps the entry of a removed label until
+;; a complete typesetting.)
+(define (rebinding-state)
+  ;; the references of the paragraph "see ..." and their widths (not their
+  ;; pages, which only a complete pass finds: determine_page_references)
+  (list (map (lambda (l)
+               (with r (tree->stree (get-reference l))
+                 (if (and (pair? r) (pair? (cdr r))) (cadr r) r)))
+             '("a" "b" "c" "z"))
+        (map (lambda (i) (rect-width (rect 1 i))) '(1 3 5))))
+
+(define (rebinding-eq l)
+  `(equation (document (concat "x=y" (label ,l)))))
+
+(define (rebinding-costs thunk)
+  ;; the passes and the bridges typeset again by (@thunk) and a typesetting
+  (let ((p0 (typeset-pass-count))
+        (r0 (typeset-redone-count)))
+    (thunk)
+    (update-forced)
+    (list (- (typeset-pass-count) p0) (- (typeset-redone-count) r0))))
+
+(define (test-removed-label-by-edit)
+  (check-group "labels removed or added by an edit")
+  (when (!= (getenv "TEXMACS_TYPESET_READS") "off")
+   (with-typeset-body
+    `(document "start"
+               (concat "see " (reference "c") " and " (reference "b")
+                       " and " (reference "z"))
+               (equation (document "u=v"))
+               ,(rebinding-eq "a")
+               ,(rebinding-eq "c")
+               (section (concat "S" (label "b")))
+               ,@(map (lambda (i) (string-append "Paragraph " (number->string i)))
+                      (iota 20)))
+    (lambda ()
+      (update-current-buffer)
+      (update-forced)
+      (update-forced)
+      (check= (rebinding-state) (from-scratch rebinding-state))
+      ;; (the check mode typesets again every bridge which is used again)
+      (let* ((check? (== (getenv "TEXMACS_TYPESET_READS") "check"))
+             ;; a paragraph without labels removed: one pass
+             (plain (rebinding-costs
+                     (lambda () (tree-remove (buffer-tree) 7 1))))
+             ;; an equation without a label removed: the labels after it
+             ;; are renumbered, and one more pass typesets again the
+             ;; paragraph of the references, which is before them
+             (renumbered (rebinding-costs
+                          (lambda () (tree-remove (buffer-tree) 2 1))))
+             ;; an equation with a label removed: the same, its label goes
+             (removed (rebinding-costs
+                       (lambda () (tree-remove (buffer-tree) 2 1)))))
+        (check= (car plain) 1)
+        (check= (car renumbered) 2)
+        (check= (car removed) 2)
+        ;; (a few bridges more at most: those of the references)
+        (when (not check?)
+          (check-true (<= (cadr removed) (+ (cadr renumbered) 3)))))
+      (check= (tree->stree (get-reference "a")) '(uninit))
+      (check= (rebinding-state) (from-scratch rebinding-state))
+      ;; the last equation removed, then put back (as an undo does)
+      (tree-remove (buffer-tree) 2 1)
+      (update-forced)
+      (check= (rebinding-state) (from-scratch rebinding-state))
+      (tree-insert (buffer-tree) 2 (list (rebinding-eq "c")))
+      (update-forced)
+      (check= (cadr (tree->stree (get-reference "c"))) "1")
+      (check= (rebinding-state) (from-scratch rebinding-state))
+      ;; an equation inserted before it: renumbered
+      (tree-insert (buffer-tree) 2 (list (rebinding-eq "a")))
+      (update-forced)
+      (check= (cadr (tree->stree (get-reference "c"))) "2")
+      (check= (rebinding-state) (from-scratch rebinding-state))
+      ;; a new label, referred to before it
+      (tree-insert (buffer-tree) 5 (list (rebinding-eq "z")))
+      (update-forced)
+      (check= (cadr (tree->stree (get-reference "z"))) "3")
+      (check= (rebinding-state) (from-scratch rebinding-state))
+      ;; the label of a section removed from it, then put back
+      (tree-set (tree-ref (buffer-tree) 4) '(section "S"))
+      (update-forced)
+      (check= (tree->stree (get-reference "b")) '(uninit))
+      (check= (rebinding-state) (from-scratch rebinding-state))
+      (tree-set (tree-ref (buffer-tree) 4) '(section (concat "S" (label "b"))))
+      (update-forced)
+      (check= (cadr (tree->stree (get-reference "b"))) "1")
+      ;; a key bound twice: when one of the bindings is removed, the
+      ;; other one stays
+      (tree-insert (buffer-tree) 6 '((concat "T" (set-binding "b" "X"))))
+      (update-forced)
+      (check= (cadr (tree->stree (get-reference "b"))) "X")
+      (tree-remove (buffer-tree) 6 1)
+      (update-forced)
+      (check= (cadr (tree->stree (get-reference "b"))) "1")
+      (check= (rebinding-state) (from-scratch rebinding-state))
+      (check= (typeset-check-mismatches) 0)))
+   ;; a label which only a running header makes (the pager's bindings are
+   ;; compared too), removed from it
+   (with-typeset-body
+    `(document (concat "see " (reference "h"))
+               (set-header (concat "Head" (label "h")))
+               ,@(map (lambda (i) (string-append "Paragraph " (number->string i)))
+                      (iota 5)))
+    (lambda ()
+      (init-env "page-medium" "paper")
+      (update-current-buffer)
+      (update-forced)
+      (update-forced)
+      (check-true (in? "h" (list-references)))
+      (tree-set (tree-ref (buffer-tree) 1) '(set-header "Head"))
+      (update-forced)
+      (check= (tree->stree (get-reference "h")) '(uninit))
+      (with w (lambda () (rect-width (rect 0 1)))
+        (check= (w) (from-scratch w)))
+      (check= (typeset-check-mismatches) 0)))))
+
+;; A file holds the table of its references as it was saved: entries which no
+;; label of the body defines any more (old names of automatic labels, labels
+;; removed since) are cleaned by the first complete pass, and are no reason
+;; for another pass unless a reference to one of them was typeset (#408: a
+;; chapter of a book with some hundreds of them was typeset twice from
+;; scratch).
+(define (stale-file name body refs)
+  (tree-export
+   (stree->tree
+    `(document (TeXmacs "2.1")
+               (style (tuple "article"))
+               (body (document ,@body))
+               (references
+                (collection
+                 ,@(map (lambda (r) `(associate ,r (tuple "7" "3"))) refs)))))
+   (incl-file name) "texmacs"))
+
+(define (stale-typeset name)
+  ;; the passes and the bridges typeset again by the first typesetting of
+  ;; the file, and the references of the buffer afterwards
+  (let* ((p0 (typeset-pass-count))
+         (r0 (typeset-redone-count))
+         (u (incl-file name)))
+    (load-buffer u)
+    (switch-to-buffer* u)
+    (update-forced)
+    (list (- (typeset-pass-count) p0) (- (typeset-redone-count) r0)
+          (list-references))))
+
+(define (test-stale-references)
+  (check-group "stale references")
+  (let ((old (current-buffer))
+        (before (buffer-list))
+        (mismatches (typeset-check-mismatches))
+        (body '((section (concat "A" (label "s1")))
+                (concat "See " (reference "s1") ".")
+                "Text.")))
+    (incl-clear-dir)
+    (system-mkdir (system->url incl-dir))
+    (with r (check-run
+             (lambda ()
+               ;; no stale entry: the reference
+               (stale-file "clean.tm" body '())
+               (with c (stale-typeset "clean.tm")
+                 (check= (car c) 1)
+                 (check-true (in? "s1" (caddr c)))
+                 ;; entries which nothing reads: one pass, as without them,
+                 ;; and the table is cleaned
+                 (stale-file "stale.tm" body
+                             (list "old-1" "old-2" "auto-9" "s0"))
+                 (with s (stale-typeset "stale.tm")
+                   (check= (car s) 1)
+                   (check= (cadr s) (cadr c))
+                   (check= (caddr s) (caddr c))))
+               ;; a reference to an entry which is not a label of the body
+               ;; shows the old value in the first pass, and "?" in the
+               ;; next (#417)
+               (stale-file "read.tm"
+                           '((concat "See " (reference "old-1") ".")
+                             "Text.")
+                           (list "old-1" "old-2"))
+               (with s (stale-typeset "read.tm")
+                 (check= (car s) 2)
+                 (check-false (in? "old-1" (caddr s))))))
+      (when (and (pair? r) (== (car r) 'error))
+        (check-report #f "the group" (object->string r)))
+      (for (b (buffer-list))
+        (when (nin? b before)
+          (buffer-pretend-saved b)
+          (buffer-close b)))
+      (when (buffer-exists? old) (switch-to-buffer* old))
+      (incl-clear-dir)
+      (check= (typeset-check-mismatches) mismatches))))
 
 ;; The entries of the table of contents and of the index put a label where
 ;; they stand, auto-n. The number is that of the tag which makes the label
@@ -1121,6 +1349,165 @@
      ;; and nothing to do the next time
      (check-false (renumber-auto-labels)))))
 
+;; When the labels are numbered again (Document > Update > All), only the
+;; bridges which make labels are typeset again, since they read the
+;; variable auto-epoch which the update changes (exec_auto_id in
+;; Typeset/Env/env_exec.cpp), and the others are used again (#408). The
+;; document is then the one of a typesetting from scratch: the same labels
+;; with the same values, the same auxiliary data, the same tables made from
+;; them in the document, the paragraphs at the same places.
+(define table-tags
+  '(table-of-contents the-index the-glossary list-of-figures bibliography))
+
+(define (labels-tables)
+  ;; the tables which generate-all-aux made in the document
+  (with t (buffer-tree)
+    (list-filter (map (lambda (i) (tree->stree (tree-ref t i)))
+                      (iota (tree-arity t)))
+                 (lambda (x) (and (pair? x) (in? (car x) table-tags))))))
+
+(define (labels-state)
+  (list (map (lambda (l) (list l (tree->stree (get-reference l))))
+             (auto-names))
+        (map (lambda (a) (list a (tree->stree (get-auxiliary a))))
+             (sort (list-auxiliaries) string<?))
+        (labels-tables)
+        ;; (the places from the first paragraph: the margins of a new
+        ;; buffer and of a loaded file may differ)
+        (let* ((l (map (lambda (i) (rect i)) (iota (tree-arity (buffer-tree)))))
+               (x (rect-x1 (car l))) (y (rect-y1 (car l))))
+          (map (lambda (r)
+                 (list (- (rect-x1 r) x) (- (rect-y1 r) y)
+                       (- (rect-x2 r) x) (- (rect-y2 r) y)))
+               l))))
+
+(define (update-all-labels)
+  ;; Document > Update > All, without the inclusions-gc
+  (renumber-auto-labels)
+  (generate-all-aux)
+  (update-current-buffer)
+  (update-forced))
+
+(define (update-all-kept)
+  ;; Document > Update > All as it is now: the layout is made from scratch
+  ;; first (inclusions-gc), the labels are numbered and the tables made
+  ;; from it, and the end only types again what the tables changed
+  ;; (update-current-buffer-keep: a complete pass, which uses the bridges)
+  (inclusions-gc)
+  (renumber-auto-labels)
+  (generate-all-aux)
+  (update-current-buffer-keep)
+  (update-forced))
+
+(define (labels-state-from-scratch body)
+  (with-scratch-buffer
+   (lambda (u)
+     (buffer-set-body u (tree-copy body))
+     (update-forced)
+     (update-all-labels)
+     (update-all-labels)
+     (labels-state))))
+
+(define (test-renumbering-against-scratch)
+  (check-group "labels numbered again, against scratch")
+  (with-typeset-body
+   '(document (table-of-contents "toc" (document ""))
+              (assign "two" (macro "x" (concat (index (arg "x"))
+                                               (index (arg "x")))))
+              (section "A")
+              (concat "a" (two "first"))
+              (section "B")
+              (concat "b" (index "second"))
+              (section "C")
+              "c"
+              (the-index "idx" (document "")))
+   (lambda ()
+     (update-all-labels)
+     (update-all-labels)
+     (check= (labels-state) (labels-state-from-scratch (buffer-tree)))
+     ;; sections and an index entry added before the others: their labels
+     ;; take new numbers, until the update
+     (tree-insert (buffer-tree) 4 '((section "N") (concat "n" (index "new"))))
+     (update-forced)
+     (tree-insert (buffer-tree) 2 '((section "M")))
+     (update-forced)
+     (check-true (renumber-auto-labels))
+     (generate-all-aux)
+     (update-current-buffer)
+     (update-forced)
+     (with names (auto-names)
+       (check= names (auto-range (length names))))
+     (check= (labels-state) (labels-state-from-scratch (buffer-tree)))
+     ;; nothing to do the next time
+     (check-false (renumber-auto-labels))
+     (update-forced)
+     (check= (labels-state) (labels-state-from-scratch (buffer-tree)))
+     ;; a section removed
+     (tree-remove (buffer-tree) 2 1)
+     (update-forced)
+     (update-all-labels)
+     (with names (auto-names)
+       (check= names (auto-range (length names))))
+     (check= (labels-state) (labels-state-from-scratch (buffer-tree))))))
+
+;; The update of everything keeps the layout of the renumbering pass
+;; (#408): inclusions-gc makes everything typeset from scratch, once, the
+;; renumbering pass is that typesetting, and the pass which follows the
+;; regeneration of the tables uses the bridges again (it is a complete pass,
+;; so that the page numbers of the references and the missing references are
+;; those of a typesetting from scratch). The result is the one of a buffer
+;; updated from scratch, whatever the order of the edits.
+(define (test-update-all-kept)
+  (check-group "update all keeps the layout")
+  (with-typeset-body
+   '(document (table-of-contents "toc" (document ""))
+              (assign "two" (macro "x" (concat (index (arg "x"))
+                                               (index (arg "x")))))
+              (assign "mywrite" (macro "x" (write "mine" (tuple (arg "x")))))
+              (section "A")
+              (concat "a" (two "first") (label "la"))
+              (concat "w" (mywrite "w1") (reference "lb") (pageref "lb"))
+              (section "B")
+              (concat "b" (index "second") (label "lb"))
+              (section "C")
+              (concat "c" (mywrite "w2") (reference "la"))
+              (the-index "idx" (document "")))
+   (lambda ()
+     (update-all-kept)
+     (update-all-kept)
+     (check= (labels-state) (labels-state-from-scratch (buffer-tree)))
+     ;; inclusions-gc changes no environment when no file changed (the
+     ;; classic cache types it all again, and keeps that for the next pass)
+     (when (!= (getenv "TEXMACS_TYPESET_READS") "off")
+       (inclusions-gc)
+       (check-false (notified-change? 8))
+       (renumber-auto-labels)
+       (check-false (notified-change? 8))
+       (generate-all-aux)
+       (update-current-buffer-keep)
+       (update-forced)
+       (check= (labels-state) (labels-state-from-scratch (buffer-tree))))
+     ;; sections, an index entry, a write and a label before the others
+     (tree-insert (buffer-tree) 4 '((section "N")
+                                    (concat "n" (index "new") (label "ln")
+                                            (mywrite "w3"))))
+     (update-forced)
+     (tree-insert (buffer-tree) 2 '((section "M")))
+     (update-forced)
+     (update-all-kept)
+     (with names (auto-names)
+       (check= names (auto-range (length names))))
+     (check= (labels-state) (labels-state-from-scratch (buffer-tree)))
+     (check= (tree->stree (get-auxiliary "mine"))
+             '(document (tuple "w3") (tuple "w1") (tuple "w2")))
+     ;; a section and a label removed
+     (tree-remove (buffer-tree) 4 2)
+     (update-forced)
+     (update-all-kept)
+     (check= (labels-state) (labels-state-from-scratch (buffer-tree)))
+     (update-all-kept)
+     (check= (labels-state) (labels-state-from-scratch (buffer-tree))))))
+
 ;; A binding which is the same as in the previous pass: below it, the
 ;; variable has the value of the previous pass, whatever it had outside;
 ;; a variable which a with binds and which was not there before is there
@@ -1257,6 +1644,160 @@
 ;; The loci and links in the parts of a surround (the left part of a
 ;; footnote...) stay registered when its body is edited: the parts are
 ;; kept, and so is what they declared.
+;; The parts of a surround below a paragraph (which records no inputs of its
+;; own) read what the paragraph read before them: the inputs of the parts are
+;; those they read, also those which the paragraph had read already.
+(define (surround-parts-body lookup?)
+  (if lookup?
+      '(document
+        (set-binding "lab" "1cm")
+        (assign "sel" "1")
+        (with "w" (if (equal (value "sel") "1") (get-binding "lab") "1cm")
+              "sel" "0"
+          (surround (concat "L" (hspace (get-binding "lab")) "R") ""
+                    (document "body")))
+        "after")
+      '(document
+        (assign "y" "1cm")
+        (assign "sel" "1")
+        (with "w" (if (equal (value "sel") "1") (value "y") "1cm") "sel" "0"
+          (surround (concat "L" (hspace (value "y")) "R") ""
+                    (document "body")))
+        "after")))
+
+(define (surround-parts-x)
+  (rect-x1 (rect 2 4 2 0)))
+
+(define (from-scratch measure)
+  ;; (@measure) in a new buffer holding a copy of the current document,
+  ;; typeset from scratch
+  (with body (tree-copy (buffer-tree))
+    (with-scratch-buffer
+     (lambda (u)
+       (buffer-set-body u body)
+       (update-current-buffer)
+       (update-forced) (update-forced)
+       (measure)))))
+
+(define (test-surround-parts-inputs)
+  (check-group "inputs of the parts of a surround below a paragraph")
+  ;; (also with the classic cache, TEXMACS_TYPESET_READS=off, which did
+  ;; not typeset again what read a binding whose value changed, #576)
+  (for (lookup? '(#f #t))
+    (with-scratch-buffer
+     (lambda (u)
+       (buffer-set-body u (stree->tree (surround-parts-body lookup?)))
+       (update-current-buffer)
+       (update-forced) (update-forced)
+       (tree-set (tree-ref (buffer-tree) 1 1) "2")
+       (update-forced) (update-forced)
+       (tree-set (tree-ref (buffer-tree) 0 1) "5cm")
+       (update-forced) (update-forced)
+       (check= (surround-parts-x) (from-scratch surround-parts-x))
+       (check= (typeset-check-mismatches) 0)))))
+
+(define (passes-of thunk)
+  ;; the number of typesetting passes which @thunk makes
+  (with p0 (typeset-pass-count)
+    (thunk)
+    (- (typeset-pass-count) p0)))
+
+;; A paragraph which reads a binding is typeset again when an edit gives
+;; the binding another value, also with the classic cache
+;; (TEXMACS_TYPESET_READS=off), which does it by one complete pass (#576).
+;; A key which two bindings write (a label defined twice) is not a reason
+;; for it when the value is one which they wrote, nor are the missing
+;; references, and an edit which changes no binding makes one pass.
+(define (test-paragraph-reads-binding)
+  (check-group "a paragraph which reads a binding changed by an edit")
+  (with-scratch-buffer
+   (lambda (u)
+     (buffer-set-body u (stree->tree
+                         '(document (set-binding "lab" "1cm")
+                                    (concat "L" (hspace (get-binding "lab"))
+                                            "R" (reference "nowhere"))
+                                    "after")))
+     (update-current-buffer)
+     (update-forced) (update-forced)
+     (with x (lambda () (rect-x1 (rect 1 2)))
+       (check-true (<= (passes-of
+                        (lambda ()
+                          (tree-set (tree-ref (buffer-tree) 0 1) "5cm")
+                          (update-forced)))
+                       2))
+       (update-forced)
+       (check= (x) (from-scratch x))
+       (check= (passes-of
+                (lambda ()
+                  (tree-set (tree-ref (buffer-tree) 2) "after x")
+                  (update-forced)))
+               1))
+     (check= (typeset-check-mismatches) 0)))
+  (with-scratch-buffer
+   (lambda (u)
+     (buffer-set-body u (stree->tree
+                         '(document (theorem (document (concat "One"
+                                                               (label "dup"))))
+                                    (theorem (document (concat "Two"
+                                                               (label "dup"))))
+                                    (concat "see " (reference "dup"))
+                                    "after")))
+     (update-current-buffer)
+     (update-forced) (update-forced)
+     (check= (passes-of
+              (lambda ()
+                (for (v '("Onex" "Onexx" "Onexxx"))
+                  (tree-set (tree-ref (buffer-tree) 0 0 0 0) v)
+                  (update-forced))))
+             3)
+     (with x (lambda () (rect-x2 (rect 2)))
+       (check= (x) (from-scratch x)))
+     (check= (typeset-check-mismatches) 0)))
+  ;; the last of two set-binding of one key edited: its new value is not
+  ;; one which the two wrote (the values of the complete pass are copies,
+  ;; not the strings of the document)
+  (with-scratch-buffer
+   (lambda (u)
+     (buffer-set-body u (stree->tree
+                         '(document (set-binding "dup" "a")
+                                    (set-binding "dup" "WWWW")
+                                    (concat "see " (get-binding "dup") "after")
+                                    "filler")))
+     (update-current-buffer)
+     (update-forced) (update-forced)
+     (with x (lambda () (rect-x1 (rect 2 2)))
+       (tree-set (tree-ref (buffer-tree) 1 1) "WWWWWWWW")
+       (update-forced) (update-forced)
+       (check= (x) (from-scratch x))
+       (with s (tree-ref (buffer-tree) 1 1)
+         (go-to (append (tree->path s) (list (string-length (tree->string s)))))
+         (insert "WWWW"))
+       (update-forced) (update-forced)
+       (check= (x) (from-scratch x)))
+     (check= (typeset-check-mismatches) 0)))
+  ;; a label defined twice, one definition removed, the other one
+  ;; renumbered: its new value is not one which the two wrote
+  (with-scratch-buffer
+   (lambda (u)
+     (buffer-set-body u (stree->tree
+                         '(document (concat "see " (reference "dup") "after")
+                                    (theorem (document (concat "One"
+                                                               (label "dup"))))
+                                    (theorem (document (concat "Two"
+                                                               (label "dup"))))
+                                    "filler")))
+     (update-current-buffer)
+     (update-forced) (update-forced)
+     (tree-remove! (buffer-tree) 2 1)
+     (update-forced) (update-forced)
+     (tree-insert! (buffer-tree) 1
+                   (map (lambda (i) (stree->tree '(theorem (document "P"))))
+                        (.. 0 9)))
+     (update-forced) (update-forced)
+     (with x (lambda () (rect-x1 (rect 0 2)))
+       (check= (x) (from-scratch x)))
+     (check= (typeset-check-mismatches) 0))))
+
 (define (test-loci-of-surround-parts)
   (check-group "loci of surround parts")
   (with-typeset-body
@@ -1608,11 +2149,9 @@
                                (list (random-paragraph next)))
                   (set! next (+ next 1)))
                  ((and (== op 1) (> n 10))
-                  ;; a paragraph removed (not an equation: references to
-                  ;; it would keep their number until a complete pass)
-                  (with i (+ 2 (rng (- n 2)))
-                    (when (not (tree-is? (tree-ref t i) 'equation))
-                      (tree-remove t i 1))))
+                  ;; a paragraph removed (also an equation: the references
+                  ;; to it are undefined at once, #571)
+                  (tree-remove t (+ 2 (rng (- n 2))) 1))
                  ((== op 2)
                   ;; the unit of the length
                   (tree-set (tree-ref t 0 1 0)
@@ -1753,7 +2292,10 @@
   (let* ((ds (fz-documents (buffer-tree)))
          (d (fz-pick ds))
          (n (tree-arity d))
-         (pos (if (<= n 2) (min 1 n) (+ 1 (fz-rnd (- n 1))))))
+         ;; (the first two paragraphs of the root are the assignments which
+         ;; the edits of the cases 8 and 9 go through)
+         (lo (if (== (tree->path d) (tree->path (buffer-tree))) 2 1))
+         (pos (if (<= n (+ lo 1)) (min lo n) (+ lo (fz-rnd (- n lo))))))
     (case (fz-rnd 10)
       ((0 1) (tree-insert d pos (list (fz-leaf 1))))
       ((2) (when (> n 3) (tree-remove d pos 1)))
@@ -1771,7 +2313,7 @@
        (when (and (< pos n) (> n 3))
          (with s (tree->stree (tree-ref d pos))
            (tree-remove d pos 1)
-           (tree-insert d (+ 1 (fz-rnd (- n 2))) (list (stree->tree s))))))
+           (tree-insert d (+ lo (fz-rnd (- n lo 1))) (list (stree->tree s))))))
       ((8) ;; the name of the theorems moved
        (tree-set (tree-ref (buffer-tree) 0 1 1 2) (fz-pick '("0pt" "2ex" "4ex"))))
       (else ;; the value of the variable assigned at the start
@@ -2111,6 +2653,499 @@
        (check= (map (lambda (i) (rect i)) (iota 3))
                (places-from-scratch (buffer-tree) 3))))))
 
+(define (incl-labels-fresh)
+  ;; the labels, tables and places of the current master, updated in a
+  ;; buffer of its own
+  (set! incl-fresh-count (+ incl-fresh-count 1))
+  (let* ((old (current-buffer))
+         (name (string-append "fresh-" (number->string incl-fresh-count)
+                              ".tm"))
+         (u (incl-file name)))
+    (incl-write name (cdr (tree->stree (buffer-tree))))
+    (dynamic-wind
+      (lambda () (noop))
+      (lambda ()
+        (load-buffer u)
+        (switch-to-buffer* u)
+        (update-forced)
+        (update-all-labels)
+        (update-all-labels)
+        (labels-state))
+      (lambda ()
+        (when (buffer-exists? u) (buffer-close u))
+        (switch-to-buffer* old)))))
+
+(define (incl-renumbering)
+  ;; the labels of the sections and of the index entries of the included
+  ;; files, numbered again in a master (#408): only the bridges which make
+  ;; labels are typeset again, and the includes are used again
+  (incl-write "four.tm"
+              '((section "Four")
+                (concat "a" (index "four"))
+                (section "Four again")))
+  (incl-write "five.tm"
+              '((section "Five")
+                (concat "b" (index "five"))))
+  (incl-write "labels.tm"
+              '((table-of-contents "toc" (document ""))
+                (include "four.tm")
+                (section "Between")
+                (include "five.tm")
+                (the-index "idx" (document ""))))
+  (with m (incl-file "labels.tm")
+    (load-buffer m)
+    (switch-to-buffer* m)
+    (update-forced)
+    (update-all-labels)
+    (update-all-labels)
+    (with names (auto-names)
+      (check= names (auto-range (length names)))
+      (check-true (>= (length names) 7)))
+    (check= (labels-state) (incl-labels-fresh))
+    ;; sections of the master before and between the includes
+    (tree-insert (buffer-tree) 1 '((section "Zero")))
+    (update-forced)
+    (tree-insert (buffer-tree) 4 '((concat "z" (index "zero"))))
+    (update-forced)
+    (check-true (renumber-auto-labels))
+    (generate-all-aux)
+    (update-current-buffer)
+    (update-forced)
+    (with names (auto-names)
+      (check= names (auto-range (length names))))
+    (check= (labels-state) (incl-labels-fresh))
+    ;; Update All with the layout kept, after a section was added to the
+    ;; master before the includes
+    (tree-insert (buffer-tree) 1 '((section "One")))
+    (update-forced)
+    (update-all-kept)
+    (update-all-kept)
+    (check= (labels-state) (incl-labels-fresh))
+    (buffer-pretend-saved m)
+    (buffer-close m)))
+
+(define incl-bib
+  (string-append
+   "@article{knuth, author={Knuth, Donald E.}, title={The Art}, journal={J}, year=1968}\n"
+   "@book{lamport, author={Lamport, Leslie}, title={LaTeX}, publisher={AW}, year=1986}\n"
+   "@misc{doe, author={Doe, J.}, title={Misc}, year=2000}\n"))
+
+(define (incl-table tag)
+  ;; the table @tag made in the document, as a string
+  (with l (list-filter (labels-tables) (lambda (x) (== (car x) tag)))
+    (if (null? l) "" (object->string (car l)))))
+
+(define (incl-state)
+  ;; the labels, tables and places of the current master, and those of a
+  ;; typesetting from scratch (the cursor at the start: a cursor in the
+  ;; bibliography shows its file in an input field of the focus toolbar,
+  ;; whose completer crashes TeXmacs when it exits without a window)
+  (go-start)
+  (list (labels-state) (incl-labels-fresh)))
+
+(define (incl-renumbering-writes)
+  ;; the entries of the tables written by paragraphs which make no label (a
+  ;; citation, a nocite, a write of the user): when the labels are numbered
+  ;; again, these paragraphs are used again and write their entries again
+  ;; (the <write|key|value> of their bindings, edit_env_rep::write_bindings
+  ;; in Typeset/env.hpp), so that the tables made from the renumbering pass
+  ;; hold them (#408)
+  (string-save incl-bib (incl-file "refs.bib"))
+  (incl-write "writes.tm"
+              '((table-of-contents "toc" (document ""))
+                (assign "myw" (macro "x" (write "mine" (tuple (arg "x")))))
+                (section "A")
+                (concat "a" (index "first"))
+                (concat "x" (cite "knuth"))
+                (concat "y" (nocite "lamport"))
+                (concat "w" (myw "w1"))
+                (section "B")
+                (concat "z" (cite "doe") (myw "w2"))
+                (the-index "idx" (document ""))
+                (bibliography "bib" "tm-plain" "refs" (document ""))))
+  (with m (incl-file "writes.tm")
+    (load-buffer m)
+    (switch-to-buffer* m)
+    (update-forced)
+    (update-all-labels)
+    (update-all-labels)
+    (with st (incl-state) (check= (car st) (cadr st)))
+    ;; a section and an index entry before the others: the labels are
+    ;; numbered again, the paragraphs which write without a label are used
+    ;; again
+    (tree-insert (buffer-tree) 2 '((section "Zero")))
+    (update-forced)
+    (tree-insert (buffer-tree) 4 '((concat "n" (index "new"))))
+    (update-forced)
+    (check-true (renumber-auto-labels))
+    (generate-all-aux)
+    (update-current-buffer)
+    (update-forced)
+    (with names (auto-names)
+      (check= names (auto-range (length names))))
+    ;; (the typesetting from scratch is updated as well, its bridges used
+    ;; again: the entries are checked by themselves)
+    (with bib (incl-table 'bibliography)
+      (check-true (string-occurs? "The art" bib))
+      (check-true (string-occurs? "LaTeX" bib))
+      (check-true (string-occurs? "Misc" bib)))
+    (check= (tree->stree (get-auxiliary "mine"))
+            '(document (tuple "w1") (tuple "w2")))
+    (with st (incl-state) (check= (car st) (cadr st)))
+    (buffer-pretend-saved m)
+    (buffer-close m)))
+
+(define (incl-cite-first)
+  ;; citations before a bibliography which the first Update All generates:
+  ;; the pass which uses the bridges again must give them their numbers
+  ;; (not "?") although the bridges of the citations are used again and
+  ;; look nothing up (#408)
+  (string-save incl-bib (incl-file "refs.bib"))
+  (incl-write "citefirst.tm"
+              '((section "S")
+                (concat "Cite " (cite "knuth") " and " (cite "lamport") ".")
+                (concat "Forward " (reference "later") ".")
+                (bibliography "bib" "tm-plain" "refs" (document ""))))
+  (with m (incl-file "citefirst.tm")
+    (load-buffer m)
+    (switch-to-buffer* m)
+    (update-forced)
+    (update-all-kept)
+    (go-start)
+    (with st (incl-state) (check= (car st) (cadr st)))
+    (check= (cadr (tree->stree (get-reference "bib-knuth"))) "1")
+    (buffer-pretend-saved m)
+    (buffer-close m)))
+
+(define (incl-ifref)
+  ;; a lookup of a missing label under warn-missing false (tmdoc's if-ref)
+  ;; is not told as missing: Update All makes its two passes, no more, also
+  ;; when the bridge is used again (#408)
+  (incl-write "ifref.tm"
+              '((section "S")
+                (concat "Test: "
+                        (with "warn-missing" "false"
+                              (if (unequal (get-binding "nolab") (uninit))
+                                  "yes" "no"))
+                        " end.")))
+  (with m (incl-file "ifref.tm")
+    (load-buffer m)
+    (switch-to-buffer* m)
+    (update-forced)
+    (update-all-kept)
+    (go-start)
+    (with p0 (typeset-pass-count)
+      (update-all-kept)
+      (update-all-kept)
+      (check= (- (typeset-pass-count) p0)
+              4))
+    (buffer-pretend-saved m)
+    (buffer-close m)))
+
+(define (incl-saved-include)
+  ;; an included file changed and saved from its own buffer, then one
+  ;; Update All of the master: saving resets the inclusion (reset_inclusion
+  ;; in Texmacs/Data/new_buffer.cpp), and the include is typeset again
+  ;; although nothing in the master changed and the old content of the file
+  ;; made no label (the included document is an input of the bridge of the
+  ;; include: rewrite_include in Typeset/Env/env_exec.cpp), so that its
+  ;; section, index entry and citation are in the tables (#408)
+  (string-save incl-bib (incl-file "refs.bib"))
+  (incl-write "plain.tm" '((concat "plain text " (cite "knuth"))))
+  (incl-write "saved.tm"
+              '((table-of-contents "toc" (document ""))
+                (section "First")
+                (include "plain.tm")
+                (the-index "idx" (document ""))
+                (bibliography "bib" "tm-plain" "refs" (document ""))))
+  (let ((m (incl-file "saved.tm"))
+        (p (incl-file "plain.tm")))
+    (load-buffer m)
+    (switch-to-buffer* m)
+    (update-forced)
+    (update-all-labels)
+    (update-all-labels)
+    (with st (incl-state) (check= (car st) (cadr st)))
+    (load-buffer p)
+    (switch-to-buffer* p)
+    (update-forced)
+    (with t (buffer-tree)
+      (tree-insert t (tree-arity t)
+                   '((section "Added")
+                     (concat "new " (index "added") (cite "lamport")))))
+    (update-forced)
+    (buffer-save p)
+    (switch-to-buffer* m)
+    (update-forced)
+    (update-all-labels)
+    (check-true (string-occurs? "Added" (incl-table 'table-of-contents)))
+    (check-true (string-occurs? "added" (incl-table 'the-index)))
+    (check-true (string-occurs? "LaTeX" (incl-table 'bibliography)))
+    (with names (auto-names)
+      (check= names (auto-range (length names))))
+    (with st (incl-state) (check= (car st) (cadr st)))
+    (buffer-close p)
+    (buffer-pretend-saved m)
+    (buffer-close m)))
+
+;; The clean-up steps of Update All keep the layout (#425): when no included
+;; file and no picture changed, the renumbering pass after inclusions-gc and
+;; picture-gc uses the bridges again; when an included file changed (on
+;; disk, or saved from its own buffer), only its include is typeset again;
+;; the result is the one of a typesetting from scratch.
+(define gc-changed 0)
+(define (incl-gc-keeps)
+  (incl-write "gc-a.tm"
+              (append '((section "Alpha") (concat "a" (index "alpha")))
+                      (map (lambda (i) (string-append "Text of alpha " (number->string i)))
+                           (iota 40))))
+  (incl-write "gc-b.tm"
+              (append '((section "Beta") (concat "b" (index "beta")))
+                      (map (lambda (i) (string-append "Text of beta " (number->string i)))
+                           (iota 40))))
+  (incl-write "gc-m.tm"
+              (append '((table-of-contents "toc" (document ""))
+                        (section "Intro"))
+                      (map (lambda (i) (string-append "Master text " (number->string i)))
+                           (iota 40))
+                      '((include "gc-a.tm") (section "Middle") (include "gc-b.tm")
+                        (the-index "idx" (document "")))))
+  (with m (incl-file "gc-m.tm")
+    (load-buffer m)
+    (switch-to-buffer* m)
+    (let* ((c0 (typeset-redone-count))
+           (dummy (update-forced))
+           (all (- (typeset-redone-count) c0)))
+      (update-all-kept)
+      (update-all-kept)
+      (with c1 (typeset-redone-count)
+        (update-all-kept)
+        (with n (- (typeset-redone-count) c1)
+          (check= (labels-state) (incl-labels-fresh))
+          ;; (the classic cache types it all again, and the check mode too)
+          (when (not (member (getenv "TEXMACS_TYPESET_READS") (list "off" "check")))
+            (check-true (< (* 2 n) all)))))
+      ;; an included file edited on disk: the master shows it, and what is
+      ;; typeset again is that include and what follows from the renumbering
+      (incl-write "gc-b.tm"
+                  (append '((section "Beta") (concat "b" (index "beta"))
+                            (section "Gamma") (concat "g" (index "gamma")))
+                          (map (lambda (i) (string-append "Text of beta " (number->string i)))
+                               (iota 40))))
+      (with c2 (typeset-redone-count)
+        (update-all-kept)
+        (set! gc-changed (- (typeset-redone-count) c2))
+        (update-all-kept)
+        (check-true (string-occurs? "Gamma" (incl-table 'table-of-contents)))
+        (check-true (string-occurs? "gamma" (incl-table 'the-index)))
+        (check= (labels-state) (incl-labels-fresh))
+        (when (not (member (getenv "TEXMACS_TYPESET_READS") (list "off" "check")))
+          (check-true (< gc-changed all))))
+      ;; and back
+      (incl-write "gc-b.tm"
+                  (append '((section "Beta") (concat "b" (index "beta")))
+                          (map (lambda (i) (string-append "Text of beta " (number->string i)))
+                               (iota 40))))
+      (update-all-kept)
+      (update-all-kept)
+      (check-false (string-occurs? "Gamma" (incl-table 'table-of-contents)))
+      (check= (labels-state) (incl-labels-fresh)))
+    (buffer-pretend-saved m)
+    (buffer-close m)))
+
+;; More of Update All with the layout kept (#425): a nested include edited
+;; on disk, a missing include which appears, a picture whose size changes
+;; on disk before picture-gc.
+(define (incl-gc-eps name w h)
+  (string-save
+   (string-append "%!PS-Adobe-3.0 EPSF-3.0\n%%BoundingBox: 0 0 "
+                  (number->string w) " " (number->string h)
+                  "\n0 0 moveto " (number->string w) " 0 lineto "
+                  (number->string w) " " (number->string h)
+                  " lineto 0 " (number->string h)
+                  " lineto closepath fill\nshowpage\n")
+   (incl-file name)))
+
+(define (incl-gc-more)
+  (incl-gc-eps "gc-pic.eps" 100 50)
+  (incl-write "gc-n2.tm" '((section "Inner") (concat "i" (index "inner"))))
+  (incl-write "gc-n1.tm" '((section "Outer") (include "gc-n2.tm")))
+  (incl-write "gc-m2.tm"
+              '((table-of-contents "toc" (document ""))
+                (section "Top")
+                (include "gc-n1.tm")
+                (include "gc-late.tm")
+                (concat "pic " (image "gc-pic.eps" "" "" "" ""))
+                "End."
+                (the-index "idx" (document ""))))
+  (with m (incl-file "gc-m2.tm")
+    (load-buffer m)
+    (switch-to-buffer* m)
+    (update-forced)
+    (update-all-kept)
+    (update-all-kept)
+    (check= (labels-state) (incl-labels-fresh))
+    ;; the nested include edited on disk
+    (incl-write "gc-n2.tm" '((section "Inner") (concat "i" (index "inner"))
+                             (section "Deeper") (concat "d" (index "deeper"))))
+    (update-all-kept)
+    (check-true (string-occurs? "Deeper" (incl-table 'table-of-contents)))
+    (check-true (string-occurs? "deeper" (incl-table 'the-index)))
+    (check= (labels-state) (incl-labels-fresh))
+    ;; the missing include appears
+    (check-false (string-occurs? "Late" (incl-table 'table-of-contents)))
+    (incl-write "gc-late.tm" '((section "Late") (concat "l" (index "late"))))
+    (update-all-kept)
+    (check-true (string-occurs? "Late" (incl-table 'table-of-contents)))
+    (check-true (string-occurs? "late" (incl-table 'the-index)))
+    (check= (labels-state) (incl-labels-fresh))
+    ;; the picture gets bigger on disk, then picture-gc
+    (update-forced)
+    (let* ((n (tree-arity (buffer-tree)))
+           (r (rect (- n 3))))
+      (incl-gc-eps "gc-pic.eps" 200 150)
+      (picture-gc)
+      (update-forced)
+      (update-all-kept)
+      (check-true (> (- (rect-y2 (rect (- n 3))) (rect-y1 (rect (- n 3))))
+                     (- (rect-y2 r) (rect-y1 r))))
+      ;; (and nothing changes when the file does not)
+      (with r2 (rect (- n 3))
+        (picture-gc)
+        (update-forced)
+        (check= (rect (- n 3)) r2)))
+    (buffer-pretend-saved m)
+    (buffer-close m)))
+
+;; The files which Update All reads again are skipped when they were not
+;; touched (#425): a file replaced with its old time and size is still read.
+(define (incl-sh . l)
+  (system (apply string-append l)))
+
+(define (incl-gc-times)
+  (incl-write "gc-t.tm" '((section "Alpha") (concat "a" (index "alpha"))))
+  (incl-write "gc-tm.tm"
+              '((table-of-contents "toc" (document ""))
+                (section "Top")
+                (include "gc-t.tm")
+                (the-index "idx" (document ""))))
+  (let ((t (url->system (incl-file "gc-t.tm")))
+        (r (url->system (incl-file "gc-t.ref"))))
+    (when (not (os-win32?))
+      ;; the file is old, and the master reads it
+      (incl-sh "touch -t 200001010000 '" t "'")
+      (with m (incl-file "gc-tm.tm")
+        (load-buffer m)
+        (switch-to-buffer* m)
+        (update-forced)
+        (update-all-kept)
+        (check-true (string-occurs? "Alpha" (incl-table 'table-of-contents)))
+        ;; nothing changed: the file is not read again, nothing is typeset
+        (let ((c (typeset-redone-count)))
+          (inclusions-gc)
+          (update-forced)
+          (when (not (member (getenv "TEXMACS_TYPESET_READS")
+                             (list "off" "check")))
+            (check= (typeset-redone-count) c)))
+        ;; replaced by a file of the same size and the same time
+        (incl-sh "cp -p '" t "' '" r "'")
+        (incl-write "gc-t.tm" '((section "Omega") (concat "a" (index "alpha"))))
+        (incl-sh "touch -r '" r "' '" t "'")
+        (update-all-kept)
+        (check-true (string-occurs? "Omega" (incl-table 'table-of-contents)))
+        (check-false (string-occurs? "Alpha" (incl-table 'table-of-contents)))
+        (check= (labels-state) (incl-labels-fresh))
+        (buffer-pretend-saved m)
+        (buffer-close m)))))
+
+;; A chapter opened through its master (Project menu: the master loaded, then
+;; the chapter, which names it as its project), and a theorem inserted and
+;; removed at its start: the numbers of the chapter change, those of the
+;; master are seen, and what is typeset again is the chapter, as when it is
+;; loaded alone, not the book (#408).
+(define (incl-book name project body)
+  (tree-export (stree->tree `(document (TeXmacs "2.1")
+                                       ,@(if project `((project ,project)) '())
+                                       (style (tuple "book"))
+                                       (body (document ,@body))))
+               (incl-file name) "texmacs"))
+
+(define (incl-chapter-edit)
+  ;; a theorem inserted after the title of the current chapter, then
+  ;; removed: the pieces typeset again by each, and the numbers of t1
+  (let* ((r0 (typeset-redone-count))
+         (dummy (begin (tree-insert! (buffer-tree) 1
+                                     (list (stree->tree '(theorem (document "New.")))))
+                       (update-forced)))
+         (ins (- (typeset-redone-count) r0))
+         (num (incl-num "t1"))
+         (r1 (typeset-redone-count)))
+    (tree-remove! (buffer-tree) 1 1)
+    (update-forced)
+    (list ins (- (typeset-redone-count) r1) num (incl-num "t1"))))
+
+(define (incl-through-master)
+  (incl-book "pc1.tm" "pm.tm"
+             (append '((chapter "One")
+                       (theorem (document (concat (label "t1") "First.")))
+                       (concat "See " (reference "t5") "."))
+                     (map (lambda (i) (string-append "Text of one " (number->string i)))
+                          (iota 10))))
+  (incl-book "pc2.tm" "pm.tm"
+             (cons '(chapter "Two")
+                   (apply append
+                          (map (lambda (i)
+                                 (with l (string-append "t" (number->string (+ i 2)))
+                                   (list `(theorem (document (concat (label ,l) "Claim.")))
+                                         '(concat "Back to " (reference "t1") ".")
+                                         (string-append "Text of two " (number->string i)))))
+                               (iota 30)))))
+  (incl-book "pm.tm" #f '((include "pc1.tm") (include "pc2.tm")))
+  (let ((m (incl-file "pm.tm"))
+        (c (incl-file "pc1.tm"))
+        (full 0))
+    (with r0 (typeset-redone-count)
+      (load-buffer m)
+      (switch-to-buffer* m)
+      (update-forced)
+      (set! full (- (typeset-redone-count) r0)))
+    (update-all-kept)
+    (update-all-kept)
+    (check= (incl-num "t5") "2.4")
+    (load-buffer c)
+    (switch-to-buffer* c)
+    (update-forced)
+    (update-forced)
+    ;; the numbers of the master, in the chapter
+    (check= (incl-num "t5") "2.4")
+    (check= (incl-num "t1") "1.1")
+    (with via (incl-chapter-edit)
+      (check= (cddr via) '("1.2" "1.1"))
+      (buffer-pretend-saved c)
+      (buffer-close c)
+      (buffer-pretend-saved m)
+      (buffer-close m)
+      ;; the chapter loaded alone
+      (load-buffer c)
+      (switch-to-buffer* c)
+      (update-forced)
+      (update-forced)
+      (with direct (incl-chapter-edit)
+        (check= (cddr direct) '("1.2" "1.1"))
+        ;; (the second chapter is ten times as big as the first; the
+        ;; classic cache counts no pieces typeset again)
+        (when (!= (getenv "TEXMACS_TYPESET_READS") "off")
+          (check-true (< (* 4 (car via)) full))
+          (check-true (< (* 4 (cadr via)) full))
+          (check-true (<= (car via) (+ (car direct) 10)))
+          (check-true (<= (cadr via) (+ (cadr direct) 10)))))
+      (buffer-pretend-saved c)
+      (buffer-close c)
+      ;; the chapter loaded alone has its master too, as a hidden buffer
+      (when (buffer-exists? m)
+        (buffer-pretend-saved m)
+        (buffer-close m)))))
+
 (define (test-included-files)
   (check-group "included files")
   (let ((old (current-buffer))
@@ -2119,6 +3154,12 @@
     (incl-clear-dir)
     (system-mkdir (system->url incl-dir))
     (incl-extern)
+    (for (f (list incl-renumbering incl-renumbering-writes
+                  incl-cite-first incl-ifref incl-saved-include incl-gc-keeps
+                  incl-gc-more incl-gc-times incl-through-master))
+      (with r (check-run f)
+        (when (and (pair? r) (== (car r) 'error))
+          (check-report #f "the group" (object->string r)))))
     (with r (check-run incl-groups)
       (when (and (pair? r) (== (car r) 'error))
         (check-report #f "the group" (object->string r)))
@@ -2157,6 +3198,9 @@
   (test-numbering)
   (test-renumbering)
   (test-removed-label)
+  (test-removed-label-chain)
+  (test-removed-label-by-edit)
+  (test-stale-references)
   (test-automatic-labels)
   (test-labels-of-nested-tags)
   (test-reuse-below-bindings)
@@ -2171,9 +3215,13 @@
   (test-derived-state)
   (test-renumbering-labels)
   (test-label-names)
+  (test-renumbering-against-scratch)
+  (test-update-all-kept)
   (test-bindings-against-scratch)
   (test-labels-of-parts)
   (test-loci-of-surround-parts)
+  (test-surround-parts-inputs)
+  (test-paragraph-reads-binding)
   (test-bindings-written-again)
   (test-labels-after-undo)
   (test-labels-after-redo)

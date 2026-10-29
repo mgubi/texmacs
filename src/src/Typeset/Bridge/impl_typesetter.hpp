@@ -32,6 +32,10 @@ public:
   hashmap<string,tree> old_patch;
   bool paper;
   page_memo* kept_pages;   // the pages of the last pass (pager.hpp)
+  bool collect;            // a complete pass with the bridges used again
+  bool bindings_changed;   // the last pass removed, added or changed
+                           // bindings: one more pass (drop_bindings)
+  array<tree> pages_bindings; // those which the pager wrote in it
 
   shove_memo shoves;        // memoized shoves
 
@@ -49,6 +53,7 @@ public:
   void local_end     (array<page_item>& l, stack_border& sb);
 
   void determine_page_references (box b);
+  bool drop_bindings (array<tree> before, array<tree> pages_before);
   box  typeset ();
   box  typeset (SI& x1, SI& y1, SI& x2, SI& y2);
 };
