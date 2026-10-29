@@ -155,6 +155,57 @@
   (check-true (< (width "x") (* 0.7 (em)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; The Han characters of a Japanese or Korean text (#196, items 1 and 2)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (ink t)
+  ;; the ink box of @t: it tells which font drew a glyph
+  (with r (tree->stree (texmacs-expand `(box-info ,t "LBRT")))
+    (if (and (pair? r) (== (car r) 'tuple))
+        (map string->number (cdr r))
+        r)))
+
+(define (check-language-font lan fam c)
+  ;; whether the Han character @c of a text in the language @lan comes from
+  ;; the font @fam of that language, as the kana or the Hangul next to it
+  (if (or (== fam "roman") (not (covered? c)))
+      (display* "  (no " lan " font for " c ": skipped)\n")
+      (check-report (== (ink `(with "language" ,lan ,c))
+                        (ink `(with "font" ,fam ,c)))
+                    (string-append c " in a " lan " text from " fam)
+                    (object->string (ink `(with "language" ,lan ,c))))))
+
+(define (test-language-han)
+  (check-group "the Han characters of a Japanese or Korean text")
+  ;; the kanji of a Japanese text came from the Chinese font of the
+  ;; fallback (Songti on macOS), next to kana from the Japanese font
+  (check-language-font "japanese" (default-japanese-font) "<#6F22>")
+  (check-language-font "japanese" (default-japanese-font) "<#9AA8>")
+  (check-language-font "korean" (default-korean-font) "<#97D3>")
+  ;; the language does not override a text font which has them
+  (when (covered? "<#6F22>")
+    (with fam (car (list-filter (cjk-families)
+                                (lambda (f)
+                                  (< (width `(with "font" ,f "<#6F22>"))
+                                     (* 1.5 (em))))))
+      (check= (ink `(with "font" ,fam "language" "japanese" "<#6F22>"))
+              (ink `(with "font" ,fam "<#6F22>")))))
+  ;; the fonts sys-japanese and sys-korean (cjk=<font>,roman, set by the
+  ;; menus for a Japanese or Korean document) scaled their CJK characters
+  ;; by the x-heights of the Latin letters, as Latin fallbacks: they are
+  ;; now as large as in the font itself
+  (for-each
+   (lambda (x)
+     (let ((sys (car x)) (fam (cadr x)) (c (caddr x)))
+       (when (and (!= fam "roman") (covered? c))
+         (check= (extents `(with "font" ,sys ,c))
+                 (extents `(with "font" ,fam ,c))))))
+   (list (list "sys-japanese" (default-japanese-font) "<#6F22>")
+         (list "sys-japanese" (default-japanese-font) "<#3053>")
+         (list "sys-korean" (default-korean-font) "<#D55C>")
+         (list "sys-korean" (default-korean-font) "<#97D3>"))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The CJK fonts of Windows in the shipped font database (#538)
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -331,6 +382,7 @@
      (test-kana)
      (test-ideographs)
      (test-hangul)
+     (test-language-han)
      (test-windows-fonts)
      (test-stix-two)
      (test-math-fonts)))
