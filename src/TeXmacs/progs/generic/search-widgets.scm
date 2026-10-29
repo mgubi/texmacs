@@ -502,7 +502,7 @@
            ;; replacement, ends)
            (let* ((empty? (== from replace-after-empty))
                   (l (with-search-access-mode
-                       (lambda () (tree-search-from t what p from 4 empty?))))
+                       (lambda () (tree-search-from t what p from 1 empty?))))
                   (f (pairs (filter-search-results l))))
              (cond ((nnull? f) (car f))
                    ((and (nnull? l) (path-less? from (cAr l))) (loop (cAr l)))

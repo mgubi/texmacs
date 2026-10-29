@@ -2129,10 +2129,12 @@ search_from_paragraph (tree t, tree what, path p, path q, int limit,
   array<path> r;
   array<cut_level> lv;
   tree d (DOCUMENT, cut_before (t, q, lv));
-  range_set sel= search (d, what, path (), limit);
+  // (after an empty match, the hits at the start are left out: at most an
+  // empty one and one which starts there)
+  range_set sel= search (d, what, path (), limit + (after_empty? 2: 0));
   bool narrow= is_concat (what) && N(what) != 0 &&
                !contains_select_region (what);
-  for (int i=0; i+1<N(sel) && i < 2*limit; i+=2) {
+  for (int i=0; i+1<N(sel) && N(r) < 2*limit; i+=2) {
     path h1= sel[i], h2= sel[i+1];
     if (narrow) {
       // the match in the hit which Replace replaces (see replace_range),
@@ -2174,8 +2176,8 @@ search_from (tree t, tree what, path p, path cur, int limit,
   if (is_document (what)) {
     array<cut_level> lv;
     tree d= cut_before (t, q, lv);
-    range_set sel= search (d, what, path (), limit);
-    for (int i=0; i+1<N(sel) && i < 2*limit; i+=2)
+    range_set sel= search (d, what, path (), limit + (after_empty? 2: 0));
+    for (int i=0; i+1<N(sel) && N(r) < 2*limit; i+=2)
       if (!after_empty || text_before (d, sel[i]))
         add_hit (r, p * uncut (t, q, sel[i], lv),
                p * uncut (t, q, sel[i+1], lv), cur);
