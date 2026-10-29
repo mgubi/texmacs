@@ -169,6 +169,36 @@
     (when (buffer-exists? old) (switch-to-buffer old))
     (check= (current-buffer) old)))
 
+;; A buffer which has a view can be renamed to a relative name, and to a
+;; name such as "/dir/doc.tm" (relative on Windows): its views still belong
+;; to it and edit it. On Windows, the name in the url of a view decoded a
+;; relative name as an absolute one, so that the views of the renamed
+;; buffer were lost and the rename overflowed the stack (#432: decode_url
+;; of new_view.cpp).
+(define (test-rename-relative)
+  (check-group "renaming to a relative name")
+  (for (name (list (url-append "tm-editing-test-relative" "doc.tm")
+                   (system->url "/tm-editing-test-relative/doc.tm")))
+    (with-buffer-body '(document "a")
+      (lambda ()
+        (let* ((u (current-buffer))
+               (n (length (buffer->views u))))
+          (check-true (> n 0))
+          (buffer-rename u name)
+          (check-true (buffer-exists? name))
+          (check= (current-buffer) name)
+          (check= (length (buffer->views name)) n)
+          (for (v (buffer->views name))
+            (check= (view->buffer v) name))
+          (edit (go-end) (insert "b"))
+          (check= (tree->stree (buffer-get-body name)) '(document "ab"))
+          (with v (view-new name)
+            (check= (view->buffer v) name)
+            (check= (length (buffer->views name)) (+ n 1))
+            (view-delete v))
+          (check= (length (buffer->views name)) n)
+          (buffer-pretend-saved name))))))
+
 ;; Deleting a view of a buffer removes it from the views of the buffer and
 ;; leaves the others, which still show and edit the buffer. delete_view
 ;; went on reading the views after removing one, one past the end of the
@@ -1285,6 +1315,7 @@
   (check-suite "editing")
   (system-mkdir (system->url editing-dir))
   (test-buffers)
+  (test-rename-relative)
   (test-delete-view)
   (test-tree-pointers)
   (test-embedded)
