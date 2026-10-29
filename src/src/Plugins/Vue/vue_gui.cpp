@@ -474,13 +474,25 @@ vue_logo_surface () {
 static int    loop_turns= 0;     // the turns of the loop (see retire_note_shown)
 static time_t last_pump_time= 0; // when SDL last read the events (loop_poll)
 
-#if !defined(__EMSCRIPTEN__) && !defined(__APPLE__) && !defined(_WIN32)
+// SDL shows the window w, taking the keyboard focus if activate (see
+// gui_set_next_window_without_focus)
+static void
+sdl_show_window (SDL_Window* w, bool activate) {
+  if (activate) { SDL_ShowWindow (w); return; }
+  SDL_SetHint (SDL_HINT_WINDOW_ACTIVATE_WHEN_SHOWN, "0");
+  SDL_ShowWindow (w);
+  SDL_ResetHint (SDL_HINT_WINDOW_ACTIVATE_WHEN_SHOWN);
+}
+
+#if !defined(__EMSCRIPTEN__) && !defined(OS_MACOS) && !defined(OS_MINGW)
 #include <dlfcn.h>
 
 struct retiring_window {
   SDL_Window* w;
   time_t until;  // not before (see above), nor before the events are read
   bool   destroy; // destroyed by SDL, else hidden
+  bool   reshow;  // shown again by SDL once hidden (see retire_defer_show)
+  bool   activate; // ... taking the keyboard focus
 };
 static array<retiring_window*> retiring; // windows off the screen, still alive
 static hashmap<SDL_Window*,int> shown_turn (-1); // when show_window showed it
@@ -499,11 +511,12 @@ retiring_remove (int i) {
 }
 
 // libdecor, which SDL loads where the compositor draws no decorations
+// (loaded at the start of the video, before the first window)
 static bool
 libdecor_loaded () {
-  static bool found= false;
-  if (!found) found= (dlopen ("libdecor-0.so.0", RTLD_NOW | RTLD_NOLOAD) != NULL);
-  return found;
+  static int found= -1;
+  if (found < 0) found= (dlopen ("libdecor-0.so.0", RTLD_NOW | RTLD_NOLOAD) != NULL) ? 1 : 0;
+  return found == 1;
 }
 
 // A null buffer committed to the surface of the SDL window w, which unmaps
@@ -546,13 +559,24 @@ retire_note_shown (SDL_Window* w) {
   shown_turn (w)= loop_turns;
 }
 
+// the SDL window w is destroyed
+static void
+retire_forget (SDL_Window* w) {
+  shown_turn->reset (w);
+}
+
 // Hides (destroy false) or destroys the SDL window w: at once, but for a
 // window decorated by libdecor on Wayland, which leaves the screen at once
 // and is hidden or destroyed by SDL a moment later (see above)
 static void
 retire_sdl_window (SDL_Window* w, bool destroy) {
   int i= retiring_index (w);
-  if (i >= 0) { if (destroy) retiring[i]->destroy= true; return; }
+  if (i >= 0) {
+    // (no longer to be shown again)
+    retiring[i]->reshow= false;
+    if (destroy) { retiring[i]->destroy= true; retire_forget (w); }
+    return;
+  }
   const char* driver= SDL_GetCurrentVideoDriver ();
   SDL_WindowFlags f= SDL_GetWindowFlags (w);
   int shown= shown_turn[w];
@@ -566,6 +590,8 @@ retire_sdl_window (SDL_Window* w, bool destroy) {
     r->w= w;
     r->until= texmacs_time () + 500;
     r->destroy= destroy;
+    r->reshow= false;
+    r->activate= true;
     retiring << r;
     return;
   }
@@ -573,15 +599,20 @@ retire_sdl_window (SDL_Window* w, bool destroy) {
   else SDL_HideWindow (w);
 }
 
-// The window w is shown again (or given to another window, see forget_host)
-// before SDL has hidden it: SDL hides it now, so that it is shown again
-// from the start
-static void
-unretire_sdl_window (SDL_Window* w) {
+// The window w is to be shown again (or was given to another window which
+// shows it, see forget_host) before SDL has hidden it: it is shown once
+// SDL has hidden it (see retire_windows), not before, since hiding it now
+// would destroy its decorations before the compositor has said that the
+// pointer left them (the crash of #376 again, after a click on the close
+// button of the host). Meanwhile it is not drawn (see sdl_window_shown).
+// Whether it was deferred so.
+static bool
+retire_defer_show (SDL_Window* w, bool activate) {
   int i= retiring_index (w);
-  if (i < 0) return;
-  retiring_remove (i);
-  SDL_HideWindow (w);
+  if (i < 0 || retiring[i]->destroy) return false;
+  retiring[i]->reshow= true;
+  retiring[i]->activate= activate;
+  return true;
 }
 
 static bool
@@ -599,10 +630,16 @@ retire_windows (bool all) {
     retiring_window* r= retiring[i];
     if (all || (now >= r->until && last_pump_time >= r->until)) {
       SDL_Window* w= r->w;
-      bool destroy= r->destroy;
+      bool destroy= r->destroy, reshow= r->reshow, activate= r->activate;
       retiring_remove (i);
-      if (destroy) SDL_DestroyWindow (w);
-      else SDL_HideWindow (w);
+      if (destroy) { retire_forget (w); SDL_DestroyWindow (w); }
+      else {
+        SDL_HideWindow (w);
+        if (reshow && !all) {
+          sdl_show_window (w, activate);
+          retire_note_shown (w);
+        }
+      }
     }
   }
 }
@@ -613,7 +650,8 @@ retire_sdl_window (SDL_Window* w, bool destroy) {
   else SDL_HideWindow (w);
 }
 static void retire_note_shown (SDL_Window* w) { (void) w; }
-static void unretire_sdl_window (SDL_Window* w) { (void) w; }
+static void retire_forget (SDL_Window* w) { (void) w; }
+static bool retire_defer_show (SDL_Window* w, bool a) { (void) w; (void) a; return false; }
 static bool is_retiring (SDL_Window* w) { (void) w; return false; }
 static void retire_windows (bool all) { (void) all; }
 #endif
@@ -671,11 +709,9 @@ vue_sdl_base_window_rep::vue_sdl_base_window_rep (vue_widget _content, string _n
     init_window_clay (this, win_w, win_h);
     update_density ();
     visible_requested= ready_to_show= true;
-    // (a window given up by the window which goes, which was leaving the
-    // screen, is hidden by SDL now and shown again by its new owner, see
-    // retire_sdl_window)
-    unretire_sdl_window (sdl_win);
-    shown= !(SDL_GetWindowFlags (sdl_win) & SDL_WINDOW_HIDDEN);
+    // (not shown while it is leaving the screen: it is shown again once SDL
+    // has hidden it, when its new owner asks for it, see retire_defer_show)
+    shown= sdl_window_shown (sdl_win);
     return;
   }
   // windows start hidden and are shown once laid out, see set_visibility
@@ -913,6 +949,7 @@ vue_sdl_base_window_rep::orphan () {
   if (sdl_win == NULL) return;
   Window_to_window->reset (sdl_win);
   vue_gpu_detach (sdl_win);
+  retire_forget (sdl_win);
   SDL_DestroyWindow (sdl_win);
   sdl_win= NULL;
   tooltip_parent= NULL;
@@ -1199,13 +1236,9 @@ gui_set_next_window_without_focus () {
 
 static void
 show_window (SDL_Window* sdl_win, bool activate) {
-  unretire_sdl_window (sdl_win); // (hidden a moment ago, see retire_sdl_window)
-  if (activate) SDL_ShowWindow (sdl_win);
-  else {
-    SDL_SetHint (SDL_HINT_WINDOW_ACTIVATE_WHEN_SHOWN, "0");
-    SDL_ShowWindow (sdl_win);
-    SDL_ResetHint (SDL_HINT_WINDOW_ACTIVATE_WHEN_SHOWN);
-  }
+  // (hidden a moment ago: shown once SDL has hidden it, see retire_defer_show)
+  if (retire_defer_show (sdl_win, activate)) return;
+  sdl_show_window (sdl_win, activate);
   retire_note_shown (sdl_win);
 }
 
@@ -1213,9 +1246,6 @@ void
 vue_sdl_base_window_rep::set_visibility (bool flag) {
   if (sdl_win == NULL) return; // (see orphan)
   visible_requested= flag;
-  // (hidden a moment ago: hidden by SDL now, before anything else is done
-  // to it, as the SDL_SyncWindow of set_size, see retire_sdl_window)
-  if (flag) unretire_sdl_window (sdl_win);
   if (!flag) {
     if (shown) retire_sdl_window (sdl_win, false);
     shown= false;
@@ -2462,6 +2492,10 @@ vue_single_window () {
 
 class vue_virtual_window_rep;
 static vue_sdl_base_window_rep* the_host= NULL;       // holds the others
+// the factor of the points of the display of the host (see points_factor),
+// which the sizes and the places of the windows it holds take
+static double host_points () {
+  return the_host != NULL ? the_host->size_points () : display_points; }
 static bool host_is_bare= false; // the host outlived its own window, see forget_host
 static array<vue_virtual_window_rep*> virtual_windows; // back to front
 static vue_virtual_window_rep* focused_virtual= NULL;  // gets the keys
@@ -2787,8 +2821,8 @@ vue_virtual_window_rep::resize_from (int e, float x0, float y0, float w0,
   float max_w= (e & 1) ? x0 + w0 - (hx + frame_w) : hx + hw - frame_w - x0;
   float max_h= (e & 4) ? y0 + h0 - (hy + title_bar_h + frame_w)
                        : hy + hh - frame_w - y0;
-  if (Max_w > 0) max_w= min (max_w, sdl_pointsf (Max_w));
-  if (Max_h > 0) max_h= min (max_h, sdl_pointsf (Max_h));
+  if (Max_w > 0) max_w= min (max_w, sdl_pointsf (Max_w, host_points ()));
+  if (Max_h > 0) max_h= min (max_h, sdl_pointsf (Max_h, host_points ()));
   float nw= w0, nh= h0;
   if (e & 1) nw= w0 - dx; else if (e & 2) nw= w0 + dx;
   if (e & 4) nh= h0 - dy; else if (e & 8) nh= h0 + dy;
@@ -2925,12 +2959,12 @@ vue_virtual_window_rep::set_size (SI sw, SI sh) {
 #endif
     return;
   }
-  float nw= max (1.0f, sdl_pointsf (sw));
-  float nh= max (1.0f, sdl_pointsf (sh));
-  if (Min_w > 0) nw= max (nw, sdl_pointsf (Min_w));
-  if (Min_h > 0) nh= max (nh, sdl_pointsf (Min_h));
-  if (Max_w > 0) nw= min (nw, sdl_pointsf (Max_w));
-  if (Max_h > 0) nh= min (nh, sdl_pointsf (Max_h));
+  float nw= max (1.0f, sdl_pointsf (sw, host_points ()));
+  float nh= max (1.0f, sdl_pointsf (sh, host_points ()));
+  if (Min_w > 0) nw= max (nw, sdl_pointsf (Min_w, host_points ()));
+  if (Min_h > 0) nh= max (nh, sdl_pointsf (Min_h, host_points ()));
+  if (Max_w > 0) nw= min (nw, sdl_pointsf (Max_w, host_points ()));
+  if (Max_h > 0) nh= min (nh, sdl_pointsf (Max_h, host_points ()));
   // a window which fills the host gets that size when it floats again
   if (fills ()) { saved_w= nw; saved_h= nh; return; }
   w= nw; h= nh;
@@ -2972,8 +3006,8 @@ vue_virtual_window_rep::set_size_limits (SI min_w, SI min_h, SI max_w, SI max_h)
 void
 vue_virtual_window_rep::get_size (SI& sw, SI& sh) {
   if (tab) fit_tab ();
-  sw= tm_length (w);
-  sh= tm_length (h);
+  sw= tm_length (w, host_points ());
+  sh= tm_length (h, host_points ());
 }
 
 void
@@ -2992,12 +3026,12 @@ vue_virtual_window_rep::set_position (SI sx, SI sy) {
   host_changed (); // or a pending move of the host would move it too
   placed= true;
   if (fills ()) {
-    saved_x= sdl_pointsf (sx);
-    saved_y= sdl_pointsf (-sy);
+    saved_x= sdl_pointsf (sx, host_points ());
+    saved_y= sdl_pointsf (-sy, host_points ());
     return;
   }
-  x= sdl_pointsf (sx);
-  y= sdl_pointsf (-sy);
+  x= sdl_pointsf (sx, host_points ());
+  y= sdl_pointsf (-sy, host_points ());
   clamp ();
 }
 
@@ -3005,8 +3039,8 @@ void
 vue_virtual_window_rep::get_position (SI& sx, SI& sy) {
   host_changed ();
   if (tab) fit_tab ();
-  sx= tm_length (x);
-  sy= tm_length (-y);
+  sx= tm_length (x, host_points ());
+  sy= tm_length (-y, host_points ());
 }
 
 void
