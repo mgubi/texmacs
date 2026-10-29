@@ -554,7 +554,35 @@
     ;; out of the reference
     (tree-go-to (buffer-tree) 0 :start)
     (check-false (inside?))
-    (check= (with-tooltip-calls update) '((close-all)))))
+    (check= (with-tooltip-calls update) '((close-all)))
+    ;; in completion mode, a key closes the tooltips of the keyboard (after
+    ;; 250ms, unless shown again), as in the other modes: a tooltip of the
+    ;; keyboard is put in the list of tooltip.scm, and the key must mark it
+    ;; to be unmapped (the delayed unmapping itself never runs here)
+    (set-key "topology")
+    (edit (keyboard-press "tab" (texmacs-time)))
+    (check-true (complete-mode?))
+    (check-true (with-keyboard-tooltip
+                 (lambda ()
+                   (edit (keyboard-press "tab" (texmacs-time)))
+                   (check-true (complete-mode?)))))
+    ;; out of completion mode, for the next groups
+    (edit (keyboard-press "escape" (texmacs-time)))
+    (check-false (complete-mode?))))
+
+(define (with-keyboard-tooltip thunk)
+  ;; run @thunk with a tooltip of the keyboard in the list of tooltip.scm;
+  ;; return whether it was marked to be unmapped. The list is restored after
+  (let* ((m (resolve-module '(utils misc tooltip)))
+         (old (eval 'tooltips m))
+         (settings (list 0 0 0 0 0 0 0 0 1.0 "keyboard"))
+         (reset (lambda () (eval `(set! tooltips ',old) m))))
+    (eval `(set! tooltips
+                 (cons (list "test-583" 0 ',settings #f) ',old)) m)
+    (catch #t thunk (lambda args (reset) (apply throw args)))
+    (with r (eval '(caddr (assoc-ref tooltips "test-583")) m)
+      (reset)
+      r)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Numbering

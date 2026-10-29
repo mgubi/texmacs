@@ -444,12 +444,13 @@
         (show-tooltip id ref tip "auto" "auto" "default" 0.6)))))
 
 ;; The label whose preview the keyboard shows. A tooltip of the keyboard is
-;; closed by the next key (keyboard-press in utils/misc/tooltip.scm) unless it
-;; is shown again; but in completion mode (Tab through the labels) the keys go
-;; to the overload of keyboard-press for complete-mode? (generic-edit.scm),
-;; which does not call the former ones: the preview of each label proposed
-;; then stayed on the screen under the next one (#583). The preview of
-;; another label is therefore closed here.
+;; closed 250ms after the next key (keyboard-tooltips-key-pressed in
+;; utils/misc/tooltip.scm, also called in completion mode) unless it is shown
+;; again. While Tab goes through the labels, the preview of the label before
+;; is closed here at once, so that the two do not overlap (#583). The
+;; variable may name a tooltip which was closed elsewhere, or one of the
+;; mouse (preview-reference uses the same ids): closing it again does
+;; nothing, or closes a preview of the same label.
 (define keyboard-preview-id #f)
 
 (define (keyboard-preview-update)
