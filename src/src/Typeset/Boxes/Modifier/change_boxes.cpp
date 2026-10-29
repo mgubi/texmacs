@@ -1057,8 +1057,14 @@ class group_box_rep: public change_box_rep {
 public:
   placed_box place;  // where the group was placed last
 public:
+  // (the group is transparent for the mouse, like the move box in it, as
+  // the chunk was before 30bf028248, a bare move_box with child_flag false:
+  // the group has the path of the whole bridge, so that a point out of its
+  // extents, at the right of a line shorter than the others of its chunk or
+  // at the left of the lines, gave the end or the start of the document,
+  // #584, #585)
   inline group_box_rep (path ip, box b):
-    change_box_rep (ip, true)
+    change_box_rep (ip, false)
   {
     insert (b, 0, 0);
     position ();

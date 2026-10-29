@@ -1221,6 +1221,8 @@
 
 (tm-define (keyboard-press key time)
   (:mode complete-mode?)
+  ;; the tooltips of the keyboard go as in the other modes (#583)
+  (keyboard-tooltips-key-pressed)
   (with cmd (key-press-command (string-append "complete " key))
     (cond (cmd (cmd))
           ((key-press-complete key) (noop))

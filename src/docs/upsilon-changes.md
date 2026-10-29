@@ -14,6 +14,19 @@ have the details, and the problems go to the
 
 ## 29 October 2026
 
+- **Clicks and selections in long documents**: a click at the right of
+  a line (after the square which ends a proof) or at the left of the
+  lines no longer puts the cursor at the end or the start of the
+  document, and a selection dragged there no longer becomes the whole
+  document. It happened in documents of 512 paragraphs or more, and in
+  any document with a footnote, a float or several columns, outside
+  paper mode (#584, #585).
+- **Previews of references and balloons while completing**: Tab through
+  the completions of a reference (`preview-ref` package) shows the
+  preview of the label proposed alone; the previews of the labels
+  before, and the balloons of the keyboard (focus balloons, comments of
+  versions), no longer stay on the screen (#583).
+
 - **References after an edit**: a reference to a label which an edit
   removes shows "?" at once, and its old number no longer stays until
   Document > Update; an undo, a label added after its references, or
