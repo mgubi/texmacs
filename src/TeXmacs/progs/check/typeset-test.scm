@@ -1523,16 +1523,18 @@
         "after")))
 
 (define (surround-parts-x)
-  (car (tree-bounding-rectangle (tree-ref (buffer-tree) 2 4 2 0))))
+  (rect-x1 (rect 2 4 2 0)))
 
-(define (surround-parts-scratch)
-  (let ((body (tree-copy (buffer-tree))))
+(define (from-scratch measure)
+  ;; (@measure) in a new buffer holding a copy of the current document,
+  ;; typeset from scratch
+  (with body (tree-copy (buffer-tree))
     (with-scratch-buffer
      (lambda (u)
        (buffer-set-body u body)
        (update-current-buffer)
        (update-forced) (update-forced)
-       (surround-parts-x)))))
+       (measure)))))
 
 (define (test-surround-parts-inputs)
   (check-group "inputs of the parts of a surround below a paragraph")
@@ -1548,30 +1550,64 @@
        (update-forced) (update-forced)
        (tree-set (tree-ref (buffer-tree) 0 1) "5cm")
        (update-forced) (update-forced)
-       (check= (surround-parts-x) (surround-parts-scratch))
-       (check= (typeset-check-mismatches) 0))))
-  ;; the same for a paragraph which reads the binding, without a surround
+       (check= (surround-parts-x) (from-scratch surround-parts-x))
+       (check= (typeset-check-mismatches) 0)))))
+
+(define (passes-of thunk)
+  ;; the number of typesetting passes which @thunk makes
+  (with p0 (typeset-pass-count)
+    (thunk)
+    (- (typeset-pass-count) p0)))
+
+;; A paragraph which reads a binding is typeset again when an edit gives
+;; the binding another value, also with the classic cache
+;; (TEXMACS_TYPESET_READS=off), which does it by one complete pass (#576).
+;; A key which two bindings write (a label defined twice) is not a reason
+;; for it, nor are the missing references, and an edit which changes no
+;; binding makes one pass.
+(define (test-paragraph-reads-binding)
+  (check-group "a paragraph which reads a binding changed by an edit")
   (with-scratch-buffer
    (lambda (u)
      (buffer-set-body u (stree->tree
                          '(document (set-binding "lab" "1cm")
                                     (concat "L" (hspace (get-binding "lab"))
-                                            "R")
+                                            "R" (reference "nowhere"))
                                     "after")))
      (update-current-buffer)
      (update-forced) (update-forced)
-     (tree-set (tree-ref (buffer-tree) 0 1) "5cm")
+     (with x (lambda () (rect-x1 (rect 1 2)))
+       (check-true (<= (passes-of
+                        (lambda ()
+                          (tree-set (tree-ref (buffer-tree) 0 1) "5cm")
+                          (update-forced)))
+                       2))
+       (update-forced)
+       (check= (x) (from-scratch x))
+       (check= (passes-of
+                (lambda ()
+                  (tree-set (tree-ref (buffer-tree) 2) "after x")
+                  (update-forced)))
+               1))
+     (check= (typeset-check-mismatches) 0)))
+  (with-scratch-buffer
+   (lambda (u)
+     (buffer-set-body u (stree->tree
+                         '(document (set-binding "dup" "aaa")
+                                    (set-binding "dup" "bbb")
+                                    (concat "see " (get-binding "dup"))
+                                    "after")))
+     (update-current-buffer)
      (update-forced) (update-forced)
-     (let* ((x (lambda () (car (tree-bounding-rectangle
-                                (tree-ref (buffer-tree) 1 2)))))
-            (now (x))
-            (body (tree-copy (buffer-tree))))
-       (check= now (with-scratch-buffer
-                    (lambda (v)
-                      (buffer-set-body v body)
-                      (update-current-buffer)
-                      (update-forced) (update-forced)
-                      (x))))))))
+     (check= (passes-of
+              (lambda ()
+                (for (v '("aaax" "aaaxx" "aaaxxx"))
+                  (tree-set (tree-ref (buffer-tree) 0 1) v)
+                  (update-forced))))
+             3)
+     (with x (lambda () (rect-x2 (rect 2)))
+       (check= (x) (from-scratch x)))
+     (check= (typeset-check-mismatches) 0))))
 
 (define (test-loci-of-surround-parts)
   (check-group "loci of surround parts")
@@ -2909,6 +2945,7 @@
   (test-labels-of-parts)
   (test-loci-of-surround-parts)
   (test-surround-parts-inputs)
+  (test-paragraph-reads-binding)
   (test-bindings-written-again)
   (test-labels-after-undo)
   (test-labels-after-redo)

@@ -2091,19 +2091,25 @@ edit_env_rep::store_binding (string key, tree value, string extra) {
     local_ref (key)= now;
     stored= now[0];
   }
+  if (complete && touched [key]) rewritten (key)= true;
   touched (key)= true;
-  // (a pass which is not complete: what read the old value, and was not
-  // typeset again by this pass, is not told: see typeset in edit_typeset)
-  if (!complete && !same && is_tuple (old_value) && N(old_value) >= 1 &&
-      old_value[0] != value)
-    rebound= true;
-  if (complete && is_tuple (old_value) && N(old_value) >= 1) {
-    string old_s= tree_as_string (old_value[0]);
-    string new_s= tree_as_string (value);
-    if (new_s != old_s && !starts (key, "auto-")) {
-      redefined << tree (TUPLE, key, new_s);
-      //if (new_s == "") typeset_warning << "Redefined " << key << LF;
-      //else typeset_warning << "Redefined " << key << " as " << new_s << LF;
+  if (!same && is_tuple (old_value) && N(old_value) >= 1) {
+    if (!complete) {
+      // what read the old value and was not typeset again by this pass
+      // is typeset again by a complete pass (see typeset in
+      // edit_typeset.cpp); not for a key which several bindings write
+      // (a label defined twice): each of them but the last one differs
+      // from the value in the table, which is the last one
+      if (!rewritten [key] && old_value[0] != value) rebound= true;
+    }
+    else {
+      string old_s= tree_as_string (old_value[0]);
+      string new_s= tree_as_string (value);
+      if (new_s != old_s && !starts (key, "auto-")) {
+        redefined << tree (TUPLE, key, new_s);
+        //if (new_s == "") typeset_warning << "Redefined " << key << LF;
+        //else typeset_warning << "Redefined " << key << " as " << new_s << LF;
+      }
     }
   }
   return stored;

@@ -227,7 +227,9 @@ typesetter_rep::typeset () {
     env->missing  = hashmap<string,tree> (UNINIT);
     env->redefined= array<tree> ();
     env->touched  = hashmap<string,bool> (false);
+    env->rewritten= hashmap<string,bool> (false);
   }
+  env->rebound= false;
   typeset_passes_total++;
   double t0= edit_profile.on ? edit_profile_now () : 0;
   {
