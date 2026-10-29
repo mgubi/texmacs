@@ -2814,6 +2814,94 @@
         (buffer-pretend-saved m)
         (buffer-close m)))))
 
+;; A chapter opened through its master (Project menu: the master loaded, then
+;; the chapter, which names it as its project), and a theorem inserted and
+;; removed at its start: the numbers of the chapter change, those of the
+;; master are seen, and what is typeset again is the chapter, as when it is
+;; loaded alone, not the book (#408).
+(define (incl-book name project body)
+  (tree-export (stree->tree `(document (TeXmacs "2.1")
+                                       ,@(if project `((project ,project)) '())
+                                       (style (tuple "book"))
+                                       (body (document ,@body))))
+               (incl-file name) "texmacs"))
+
+(define (incl-chapter-edit)
+  ;; a theorem inserted after the title of the current chapter, then
+  ;; removed: the pieces typeset again by each, and the numbers of t1
+  (let* ((r0 (typeset-redone-count))
+         (dummy (begin (tree-insert! (buffer-tree) 1
+                                     (list (stree->tree '(theorem (document "New.")))))
+                       (update-forced)))
+         (ins (- (typeset-redone-count) r0))
+         (num (incl-num "t1"))
+         (r1 (typeset-redone-count)))
+    (tree-remove! (buffer-tree) 1 1)
+    (update-forced)
+    (list ins (- (typeset-redone-count) r1) num (incl-num "t1"))))
+
+(define (incl-through-master)
+  (incl-book "pc1.tm" "pm.tm"
+             (append '((chapter "One")
+                       (theorem (document (concat (label "t1") "First.")))
+                       (concat "See " (reference "t5") "."))
+                     (map (lambda (i) (string-append "Text of one " (number->string i)))
+                          (iota 10))))
+  (incl-book "pc2.tm" "pm.tm"
+             (cons '(chapter "Two")
+                   (apply append
+                          (map (lambda (i)
+                                 (with l (string-append "t" (number->string (+ i 2)))
+                                   (list `(theorem (document (concat (label ,l) "Claim.")))
+                                         '(concat "Back to " (reference "t1") ".")
+                                         (string-append "Text of two " (number->string i)))))
+                               (iota 30)))))
+  (incl-book "pm.tm" #f '((include "pc1.tm") (include "pc2.tm")))
+  (let ((m (incl-file "pm.tm"))
+        (c (incl-file "pc1.tm"))
+        (full 0))
+    (with r0 (typeset-redone-count)
+      (load-buffer m)
+      (switch-to-buffer* m)
+      (update-forced)
+      (set! full (- (typeset-redone-count) r0)))
+    (update-all-kept)
+    (update-all-kept)
+    (check= (incl-num "t5") "2.4")
+    (load-buffer c)
+    (switch-to-buffer* c)
+    (update-forced)
+    (update-forced)
+    ;; the numbers of the master, in the chapter
+    (check= (incl-num "t5") "2.4")
+    (check= (incl-num "t1") "1.1")
+    (with via (incl-chapter-edit)
+      (check= (cddr via) '("1.2" "1.1"))
+      (buffer-pretend-saved c)
+      (buffer-close c)
+      (buffer-pretend-saved m)
+      (buffer-close m)
+      ;; the chapter loaded alone
+      (load-buffer c)
+      (switch-to-buffer* c)
+      (update-forced)
+      (update-forced)
+      (with direct (incl-chapter-edit)
+        (check= (cddr direct) '("1.2" "1.1"))
+        ;; (the second chapter is ten times as big as the first; the
+        ;; classic cache counts no pieces typeset again)
+        (when (!= (getenv "TEXMACS_TYPESET_READS") "off")
+          (check-true (< (* 4 (car via)) full))
+          (check-true (< (* 4 (cadr via)) full))
+          (check-true (<= (car via) (+ (car direct) 10)))
+          (check-true (<= (cadr via) (+ (cadr direct) 10)))))
+      (buffer-pretend-saved c)
+      (buffer-close c)
+      ;; the chapter loaded alone has its master too, as a hidden buffer
+      (when (buffer-exists? m)
+        (buffer-pretend-saved m)
+        (buffer-close m)))))
+
 (define (test-included-files)
   (check-group "included files")
   (let ((old (current-buffer))
@@ -2824,7 +2912,7 @@
     (incl-extern)
     (for (f (list incl-renumbering incl-renumbering-writes
                   incl-cite-first incl-ifref incl-saved-include incl-gc-keeps
-                  incl-gc-more incl-gc-times))
+                  incl-gc-more incl-gc-times incl-through-master))
       (with r (check-run f)
         (when (and (pair? r) (== (car r) 'error))
           (check-report #f "the group" (object->string r)))))
