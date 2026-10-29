@@ -305,6 +305,10 @@ bool   vue_is_editor_window (vue_widget content); // window main
 // the close button of a window: its quit command (see
 // vue_plain_window_widget_rep::close_request)
 void   vue_window_close_request (vue_widget content);
+// a window deleted while it is laid out (from an event of its own
+// widgets) is hidden now and deleted after its layout
+bool   vue_window_in_layout (vue_window_rep* w);
+void   vue_delete_window_later (vue_window_rep* w);
 string vue_test_icon (void* ref);    // "<path>\ticon:<name>" of a picture
 void   vue_test_forget_icons ();
 struct with_test_context {

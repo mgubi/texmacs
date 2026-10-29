@@ -7019,6 +7019,10 @@ vue_simple_widget_rep::handle_repaint (renderer win, SI x1, SI y1, SI x2, SI y2)
 
 void
 vue_simple_widget_rep::do_layout () {
+  // the editor may lose its view during its own event (a key which closes
+  // its window): it lives until the event is done, as the queued events of
+  // Qt hold their widget
+  widget keep_alive (this);
   layout_who= is_editor_widget () ? string ("editor") : string ("typeset box");
   win= current_window; // save the info
   // the zoom the editor starts with (the first one is not sent to the
@@ -8556,7 +8560,8 @@ void destroy_window_widget (widget w) {
   vue_plain_window_widget_rep *ww= dynamic_cast<vue_plain_window_widget_rep*> (vw.rep);
   vue_inputs_list_widget_rep *il= dynamic_cast<vue_inputs_list_widget_rep*> (vw.rep);
   if (ww) {
-    tm_delete (ww->win);
+    if (vue_window_in_layout (ww->win)) vue_delete_window_later (ww->win);
+    else tm_delete (ww->win);
     ww->win= NULL; // the widget may outlive its window (Scheme holds it)
   } else if (il) {
     // the dialog is shown in a window of its own

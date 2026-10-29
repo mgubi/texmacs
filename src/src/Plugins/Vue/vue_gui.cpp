@@ -958,8 +958,39 @@ vue_sdl_base_window_rep::set_visibility (bool flag) {
 // pixels, with the passes its contents ask for
 static void clay_wheel_flush (vue_window_rep* win);
 
+static array<vue_window_rep*> windows_in_layout;
+static array<vue_window_rep*> windows_to_delete;
+
+bool
+vue_window_in_layout (vue_window_rep* w) {
+  for (int i= 0; i < N(windows_in_layout); i++)
+    if (windows_in_layout[i] == w) return true;
+  return false;
+}
+
+void
+vue_delete_window_later (vue_window_rep* w) {
+  w->set_visibility (false);
+  windows_to_delete << w;
+}
+
+static void
+delete_windows_later () {
+  if (N(windows_in_layout) > 0) return;
+  array<vue_window_rep*> l= windows_to_delete;
+  windows_to_delete= array<vue_window_rep*> ();
+  for (int i= 0; i < N(l); i++) tm_delete (l[i]);
+}
+
+struct window_in_layout {
+  window_in_layout (vue_window_rep* w) { windows_in_layout << w; }
+  ~window_in_layout () {
+    windows_in_layout= range (windows_in_layout, 0, N(windows_in_layout)-1); }
+};
+
 static void
 layout_window_passes (vue_window_rep* w) {
+  window_in_layout in_layout (w);
   bool relayout= false;
   int passes= 0;
   do {
@@ -2801,8 +2832,12 @@ static bool
 close_hosted_windows (vue_window w) {
   if (!host_is_bare || !is_host (w)) return false;
   array<vue_virtual_window_rep*> vl= virtual_windows;
+  // (by the ids taken before: a window closed by the close of another one
+  // is freed; the ids are never reused)
+  array<int> vids;
+  for (int i= 0; i < N(vl); i++) vids << vl[i]->id;
   for (int i= N(vl) - 1; i >= 0; i--)
-    if (id_to_window->contains (vl[i]->id) && !vl[i]->popup)
+    if (id_to_window->contains (vids[i]) && !vl[i]->popup)
       vl[i]->destroy_event ();
   return true;
 }
@@ -4980,18 +5015,27 @@ void process_layout () {
   release_layout_widgets ();
   gui_needs_relayout= false; // widgets deleted while laying out are not drawn
   
+  array<SDL_Window*> sl;
   iterator<SDL_Window*> it= iterate (Window_to_window);
-  while (it->busy()) { // and then the other windows
-    vue_window_rep *win= (vue_window_rep*) Window_to_window [it->next()];
+  while (it->busy()) sl << it->next ();
+  for (int i= 0; i < N(sl); i++) {
+    if (!Window_to_window->contains (sl[i])) continue; // deleted meanwhile
+    vue_window_rep *win= (vue_window_rep*) Window_to_window [sl[i]];
     win->process_layout ();
+    delete_windows_later ();
   }
   // the virtual windows (single-window mode); the array may change while
   // they are laid out
   array<vue_virtual_window_rep*> vl= virtual_windows;
+  array<int> vids;
+  for (int i= 0; i < N(vl); i++) vids << vl[i]->id;
   for (int i= 0; i < N(vl); i++) {
-    if (!id_to_window->contains (vl[i]->id)) continue;
+    // (by the id taken before: a window deleted meanwhile, during the
+    // layout of another one, is freed; the ids are never reused)
+    if (!id_to_window->contains (vids[i])) continue;
     if (vl[i]->tab && vl[i]->shown && vl[i] != active_tab) continue; // hidden tab
     vl[i]->process_layout ();
+    delete_windows_later ();
   }
 }
 
