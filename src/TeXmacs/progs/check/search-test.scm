@@ -2424,16 +2424,17 @@
            (concat (select-region (wildcard "w")) "a") "X"
            (document "Xa"))))
       ;; after an empty match, a tag counts as a token, also without text:
-      ;; the hits after rules or empty labels were left out
+      ;; the hits after rules or empty labels were left out (each hit: the
+      ;; match, and the start of the whole hit, which the filter judges)
       (with from (lambda (doc what)
                    (tree-search-from (stree->tree doc) (stree->tree what)
                                      '() '(0 0 0) 1 #t))
         (check= (from '(document (concat (hrule) (hrule) (hrule) "a")) "a")
-                '((0 3 0) (0 3 1)))
+                '((0 3 0) (0 3 1) (0 3 0)))
         (check= (from '(document (concat (label "") (label "") (label "")
                                          (label "")))
                       '(label (wildcard "v")))
-                '((0 1 0) (0 1 1)))))))
+                '((0 1 0) (0 1 1) (0 1 0)))))))
 
 ;; A lone wildcard is a formula of it: one hit in each paragraph, never
 ;; across their borders (the maintainer's decision); it took all of the
@@ -2464,7 +2465,7 @@
         (check= (tree-search-from (stree->tree doc)
                                   (stree->tree '(strong (wildcard "w")))
                                   '() '(0 0) 1 #t)
-                '((0 1 0) (0 1 1)))))))
+                '((0 1 0) (0 1 1) (0 1 0)))))))
 
 ;; The wildcards of a region pattern take their values in the region, as its
 ;; content; the values were looked for by the literal parts around the
@@ -2583,6 +2584,116 @@
                           (string? (widget 'replace-skip-message)))))
                 '((document "xyz a1b") #t))))))
 
+;; Replace one, then Replace All: Replace All goes on after the replacement,
+;; as Replace one does; it took the hit which ends there, and replaced in
+;; the replacement (#596)
+(define (replace-one-then-all doc what by)
+  ;; the real Replace one then the real Replace All: the body after each
+  (with-search-buffers doc what by
+    (lambda (u)
+      (ahash-set! (widget 'search-filter-table)
+                  (current-buffer) (stree->tree '(attr)))
+      ((widget 'perform-search*))
+      (replace-one)
+      (with one (tm->stree (buffer-get-body u))
+        (replace-all)
+        (list one (tm->stree (buffer-get-body u)))))))
+
+(define (many-hits-document n c)
+  ;; n paragraphs of 25 hits of c
+  (let* ((para (apply string-append (repeated-list 25 (string-append c " ")))))
+    `(document ,@(repeated-list n para))))
+
+(define (repeated-list n x)
+  (let loop ((n n) (r (list)))
+    (if (<= n 0) r (loop (- n 1) (cons x r)))))
+
+(define (test-replace-followups)
+  (check-group "replace one then all, filters, many hits")
+  (with-search-mode 'replace
+    (lambda ()
+      (check= (replace-one-then-all '(document "foo foo foo") "foo" "barfoo")
+              '((document "barfoo foo foo") (document "barfoo barfoo barfoo")))
+      (check= (replace-one-then-all '(document "a a a") "a" "aa")
+              '((document "aa a a") (document "aa aa aa")))
+      (check= (replace-one-then-all '(document (concat "x" (math "x") "x"))
+                                    "x" "xx")
+              '((document (concat "xx" (math "x") "x"))
+                (document (concat "xx" (math "xx") "xx"))))
+      (check= (replace-one-then-all '(document "a1x a2x a3x")
+                                    '(concat "a" (wildcard "w") "x")
+                                    '(concat "a" (wildcard "w") "xa"))
+              '((document "a1xa a2x a3x") (document "a1xa a2xa a3xa")))
+      ;; the filter judges the start of the whole hit, as for the hits which
+      ;; the search shows, also for the hits after the first one: the match
+      ;; which Replace replaces in it may be in a formula, and only the
+      ;; first paragraph was replaced
+      (let* ((doc '(document (concat "p" (math "xab") "q")
+                             (concat "r" (math "yab") "s")))
+             (lone '(document (math "xab") (math "yab")))
+             (what '(concat (wildcard "w") "b" (wildcard "v")))
+             (by '(concat "<" (wildcard "w") "|" (wildcard "v") ">"))
+             (shown (lambda (doc)
+                      ;; the hits which the search shows
+                      (with-search-buffers doc what by
+                        (lambda (u)
+                          (ahash-set! (widget 'search-filter-table)
+                                      (current-buffer)
+                                      (stree->tree test-search-filter))
+                          ((widget 'perform-search*))
+                          (with q (tree->path (buffer-tree))
+                            (map (cut list-tail <> (length q))
+                                 (get-alt-selection "alternate"))))))))
+        (with-test-filter '(attr "mode" "text")
+          (lambda ()
+            (check= (shown doc) '((0 0 0) (0 2 1) (1 0 0) (1 2 1)))
+            (check= (shown lone) '((0 0) (0 1) (1 0) (1 1)))
+            (check= (shown '(document (concat "p" (math "xab") "q"
+                                              (math "yab") "s")))
+                    '((0 0 0) (0 4 1)))
+            (check-replace-rows
+              `((,doc ,what ,by
+                 (document (concat "p" (math "<xa|>") "q")
+                           (concat "r" (math "<ya|>") "s")))
+                (,lone ,what ,by
+                 (document (math "<xa|>") (math "<ya|>")))
+                ;; one hit, the paragraph, with two matches: after the
+                ;; replacement in the first formula, the rest of the hit is
+                ;; judged as the hit which the search shows (it was left)
+                ((document (concat "p" (math "xab") "q" (math "yab") "s"))
+                 ,what ,by
+                 (document (concat "p" (math "<xa|>") "q" (math "<ya|>")
+                                   "s")))
+                ((document (concat "p" (math "xabzb")))
+                 (concat (wildcard "w") "b") (concat "<" (wildcard "w") ">")
+                 (document (concat "p" (math "<xa><z>"))))
+                ((document (concat "q" (strong "xabzb")))
+                 (concat (wildcard "w") "b") (concat "<" (wildcard "w") ">")
+                 (document (concat "q" (strong "<xa><z>"))))))))
+        (with-test-filter '(attr "mode" "math")
+          (lambda ()
+            (check= (shown doc) '())
+            (check= (shown lone) '())
+            (check-replace-rows `((,doc ,what ,by ,doc) (,lone ,what ,by ,lone))))))
+      ;; 12,000 hits: the filter of the hits overflowed the stack of Guile
+      ;; (from about 10,000), and Replace All left the document as it was
+      (let* ((doc (many-hits-document 480 "a"))
+             (exp (many-hits-document 480 "b")))
+        (with-test-filter '(attr "mode" "text")
+          (lambda ()
+            (check= (with-search-buffers doc "a" "b"
+                      (lambda (u)
+                        (ahash-set! (widget 'search-filter-table)
+                                    (current-buffer)
+                                    (stree->tree test-search-filter))
+                        ;; (the hits which the search shows, all of them)
+                        ((widget '(lambda () (perform-search-sub 100000 #t))))
+                        (length (get-alt-selection "alternate"))))
+                    24000)
+            (with r (replace-all-in-buffer doc "a" "b")
+              (check= (car r) exp)
+              (check= (cadr r) doc))))))))
+
 (define (test-replace-random)
   (check-group "replace random")
   (let* ((t0 (texmacs-time))
@@ -2628,5 +2739,6 @@
   (test-replace-empty-matches)
   (test-lone-wildcard)
   (test-replace-region-wildcards)
+  (test-replace-followups)
   (test-replace-random)
   (check-end))

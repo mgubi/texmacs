@@ -223,22 +223,28 @@
         (edit (go-end) (insert "e"))
         (check= (body) '(document "abcde")))))
   ;; the views of a renamed buffer keep their numbers, and a new view does
-  ;; not take one of them (#560: two views had the same url, and Clone
-  ;; window after Save as aborted)
+  ;; not take one of them, nor the number of a view deleted after the
+  ;; rename (#560: two views had the same url, and Clone window after Save
+  ;; as aborted)
   (with-buffer-body '(document "a")
     (lambda ()
       (let* ((u (current-buffer))
-             (v1 (view-new u))
              (new-name (tmp-file "renamed-views.tm")))
+        (view-new u)
         (buffer-rename u new-name)
-        (let* ((vs (buffer->views new-name))
-               (v2 (view-new new-name))
-               (vs* (buffer->views new-name)))
-          (check= (length vs*) (+ (length vs) 1))
-          (check-false (in? v2 vs))
-          (check= (view->buffer v2) new-name)
-          (view-delete v2)
-          (check= (buffer->views new-name) vs))))))
+        (let ((gone (car (list-filter (buffer->views new-name)
+                                      (lambda (v)
+                                        (url-none? (view->window-url v)))))))
+          (view-delete gone)
+          (let* ((vs (buffer->views new-name))
+                 (v2 (view-new new-name))
+                 (vs* (buffer->views new-name)))
+            (check= (length vs*) (+ (length vs) 1))
+            (check-false (in? v2 vs))
+            (check-false (== v2 gone))
+            (check= (view->buffer v2) new-name)
+            (view-delete v2)
+            (check= (buffer->views new-name) vs)))))))
 
 ;; A tree pointer or a position which is collected while it is still
 ;; attached to a tree (a process whose callback was never called, a
@@ -557,22 +563,82 @@
   (mouse-update)
   (list (rel (selection-get-start)) (rel (selection-get-end))))
 
-;; A cursor path which goes below a string (go-to from a script with a wrong
-;; path) is refused when the changes are applied, with an error. The report
-;; of that error shifts the same path (cursor-path*), which went through the
-;; string and looped forever (#592: shift of tree_cursor.cpp did not check
-;; its path). apply-changes itself is not called here: its error is a C++
-;; exception, which only the event loop catches.
-(define (test-bad-cursor)
-  (check-group "a cursor path below a string")
-  (with-buffer-body '(document (tabular (table (row (cell "a") (cell "b")))))
+;; A cursor path which is not in the document (go-to from a script with a
+;; wrong path: below a string, a negative or out of range index, more
+;; children than a tag has) used to be kept as the cursor: the report of
+;; the error raised when the changes were applied shifted it and looped
+;; (#592), and the next insert crashed TeXmacs (#599). go-to now corrects
+;; such a path to the closest cursor inside the document. The insert is
+;; only done when the cursor is in the document, and the buffer is closed
+;; with a sane cursor, so that a regression fails these checks instead of
+;; crashing the whole suite.
+(define (path-in-stree? t p)
+  ;; whether @p is a cursor position inside the stree @t (as is_inside of
+  ;; tree_cursor.cpp, without the Cork characters)
+  (cond ((null? p) #f)
+        ((string? t)
+         (and (null? (cdr p)) (>= (car p) 0) (<= (car p) (string-length t))))
+        ((null? (cdr p)) (in? (car p) '(0 1)))
+        (else (and (>= (car p) 0) (< (car p) (length (cdr t)))
+                   (path-in-stree? (list-ref (cdr t) (car p)) (cdr p))))))
+
+(define (check-bad-go-to doc bad expected after)
+  ;; go to the path @bad of @doc, which is not in it: the cursor goes to
+  ;; @expected, and an insert there gives the body @after
+  (with-buffer-body doc
     (lambda ()
-      (go-to (at 0 0 0 1 0 0 0))
-      (update-forced)
-      (check= (rel (cursor-path*)) '(0 0 0 1 0 0 0))
-      (go-start)
-      (update-forced)
-      (check= (body) '(document (tabular (table (row (cell "a") (cell "b")))))))))
+      (edit (go-to (apply at bad)))
+      (check= (cursor) expected)
+      (check= (rel (cursor-path*)) expected)
+      (if (not (path-in-stree? (body) (cursor)))
+          (begin
+            (check-report #f "insert after (go-to bad path)"
+                          "the cursor is not in the document")
+            ;; closing the buffer with that cursor crashes as well
+            (edit (go-start)))
+          (begin
+            (edit (insert "X"))
+            (check= (body) after)
+            (check-true (path-in-stree? (body) (cursor))))))))
+
+(define (test-bad-cursor)
+  (check-group "a cursor path outside the document")
+  (let* ((table '(document (tabular (table (row (cell "a") (cell "b"))))))
+         (table-x (lambda (a b)
+                    `(document (tabular (table (row (cell ,a) (cell ,b))))))))
+    ;; below a string
+    (check-bad-go-to '(document "abc") '(0 0 0) '(0 0) '(document "Xabc"))
+    (check-bad-go-to '(document "abc") '(0 2 5 1) '(0 2) '(document "abXc"))
+    ;; below the string of a table cell (a bus error)
+    (check-bad-go-to table '(0 0 0 1 0 0 0) '(0 0 0 1 0 0)
+                     (table-x "a" "Xb"))
+    ;; a negative index
+    (check-bad-go-to table '(0 0 -1 0) '(0 0 0 0 0 0) (table-x "Xa" "b"))
+    (check-bad-go-to '(document "abc") '(0 -2) '(0 0) '(document "Xabc"))
+    ;; out of range: a paragraph, a position in a string
+    (check-bad-go-to '(document "abc") '(5 0) '(0 3) '(document "abcX"))
+    (check-bad-go-to '(document "abc") '(0 9) '(0 3) '(document "abcX"))
+    ;; more children than the tag has (a row of a one-row table)
+    (check-bad-go-to table '(0 0 7 0 0) '(0 0 0 1 0 1) (table-x "a" "bX"))
+    ;; the path of the buffer itself, the node of the document
+    (check-bad-go-to '(document "abc") '() '(0 0) '(document "Xabc")))
+  ;; the empty path is not in the buffer: go-to ignores it
+  (with-buffer-body '(document "abc")
+    (lambda ()
+      (edit (go-to (at 0 2)))
+      (edit (go-to '()))
+      (check= (cursor) '(0 2))
+      (edit (insert "X"))
+      (check= (body) '(document "abXc"))))
+  ;; a path in the document is kept
+  (with-buffer-body '(document "abc" (frac "x" "y"))
+    (lambda ()
+      (edit (go-to (at 0 2)))
+      (check= (cursor) '(0 2))
+      (edit (go-to (at 1 1 1)))
+      (check= (cursor) '(1 1 1))
+      (edit (insert "X"))
+      (check= (body) '(document "abc" (frac "x" "yX"))))))
 
 (define (test-mouse-long)
   (check-group "mouse in a long document")

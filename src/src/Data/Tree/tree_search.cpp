@@ -2133,16 +2133,48 @@ uncut (tree u, path q, path h, array<cut_level>& lv, int d= 0) {
 }
 
 static void
-add_hit (array<path>& r, path r1, path r2, path cur) {
+add_hit (array<path>& r, path r1, path r2, path w1, path cur) {
   // a hit which starts before cur, or at a tag around it whose text before
   // cur was cut, starts at cur: the text before the reference, the output
-  // of an earlier replacement, is never in it (no cur: the whole text)
+  // of an earlier replacement, is never in it (no cur: the whole text).
+  // w1: the start of the hit, of which r1 r2 is the match, for the filter
+  // of the search (see shown_start)
   if (!is_nil (cur) && before_position (r1, cur)) r1= cur;
   if (path_less (r2, r1)) r2= r1;
+  if (path_less (r1, w1)) w1= r1;
   // (a hit which is all before cur is none: an empty one at cur was left
   // out by search_in_cut)
   if (!is_nil (cur) && r1 == cur && r2 == cur) return;
-  r << r1 << r2;
+  r << r1 << r2 << w1;
+}
+
+static path
+shown_start (tree t, tree what, path p, path cur, path m1, path m2,
+              range_set& shown, bool& searched) {
+  // the start of the hit which the search shows now in t at p (a paragraph,
+  // or a document) and which holds the match m1 m2, for a hit after cur
+  // which starts at cur or before it: the continuation of a hit which goes
+  // on before cur, such as the rest of a hit after a replacement inside it,
+  // is judged by the filter of the search as that hit (#596). Else cur
+  bool para= !is_document (t);
+  if (!searched) {
+    shown= search (para? tree (DOCUMENT, t): t, what, path (), 1000000);
+    searched= true;
+  }
+  if (before_position (m1, cur)) m1= cur;
+  if (path_less (m2, m1)) m2= m1;
+  for (int i=0; i+1<N(shown); i+=2) {
+    path f1= shown[i], f2= shown[i+1];
+    if (para) {
+      if (is_nil (f1) || f1->item != 0 || is_nil (f2) || f2->item != 0)
+        continue;
+      f1= f1->next; f2= f2->next;
+    }
+    f1= p * f1; f2= p * f2;
+    if (path_less (m1, f1)) break;
+    if (path_less_eq (m2, f2)) return f1;
+  }
+  return cur;
 }
 
 static bool
@@ -2182,11 +2214,13 @@ search_in_cut (tree t, tree what, path p, path q, int limit,
   bool narrow= is_concat (what) && N(what) != 0 &&
                !contains_select_region (what);
   path cur= (is_nil (q)? path (): p * q);
+  range_set shown;
+  bool searched= false;
   for (int lim= limit; true; lim *= 2) {
     array<path> r;
     range_set sel= search (d, what, path (), lim);
-    for (int i=0; i+1<N(sel) && N(r) < 2*limit; i+=2) {
-      path h1= sel[i], h2= sel[i+1];
+    for (int i=0; i+1<N(sel) && N(r) < 3*limit; i+=2) {
+      path h1= sel[i], h2= sel[i+1], w1= sel[i];
       if (narrow) {
         // the match in the hit which Replace replaces (see replace_range),
         // in the text after cur: a hit of a lone tag there is the tag
@@ -2198,14 +2232,19 @@ search_in_cut (tree t, tree what, path p, path q, int limit,
         if (is_nil (h1) || h1->item != 0 || is_nil (h2) || h2->item != 0)
           continue;
         h1= h1->next; h2= h2->next;
+        w1= (is_nil (w1) || w1->item != 0? h1: w1->next);
       }
       if (!is_nil (q) && (after_empty || h1 == h2) && !token_before (c, h1))
         continue;
-      add_hit (r, p * uncut (t, q, h1, lv), p * uncut (t, q, h2, lv), cur);
+      path m1= p * uncut (t, q, h1, lv), m2= p * uncut (t, q, h2, lv);
+      path w= p * uncut (t, q, w1, lv);
+      if (!is_nil (cur) && (w == cur || before_position (w, cur)))
+        w= shown_start (t, what, p, cur, m1, m2, shown, searched);
+      add_hit (r, m1, m2, w, cur);
     }
     // (hits left out at the start: search further, unless the search gave
     // all of them, without reaching its limit)
-    if (N(r) >= 2*limit || N(sel) <= lim) return r;
+    if (N(r) >= 3*limit || N(sel) <= lim) return r;
   }
 }
 
@@ -2216,7 +2255,11 @@ search_from (tree t, tree what, path p, path cur, int limit,
   // document) from the position cur on, as the search finds them in the
   // text which comes after cur, each one narrowed to the match which
   // Replace replaces (see replace_range): the next match after a
-  // replacement (#520). In a document, the paragraph of cur and then the
+  // replacement (#520). Three paths for each hit: the start and the end of
+  // the match, and the start of the whole hit, which the filter of the
+  // search (mode, language) judges, as for the hits which it shows: for
+  // the rest of a hit which goes on before cur, the start of the hit which
+  // the search shows now (#596). In a document, the paragraph of cur and then the
   // next ones, until there are hits (a pattern of several paragraphs: the
   // document after cur at once). At cur, no empty match (one which ends
   // there, the previous match, is not followed by one), and after an empty

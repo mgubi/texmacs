@@ -14,6 +14,22 @@ have the details, and the problems go to the
 
 ## 29 October 2026
 
+- **Replace with wildcards, continued**: Replace All after a Replace no
+  longer replaces again inside the replacement just made; Replace All
+  works with more than 10,000 hits; in ordinary text, a hit which Search
+  shows across formulas is replaced whole, by Replace and by Replace All
+  alike (#596).
+- **Cursor positions from scripts**: a `go-to` to a position which is not
+  in the document (below a text, out of range, the document itself) puts
+  the cursor at the closest valid place, and the next key no longer
+  crashes TeXmacs (#599).
+- **LaTeX import of plain text**: a source which is only text, without
+  `\begin{document}`, no longer crashes TeXmacs, and a source of one
+  paragraph keeps its commands (`\emph{b}` gave `b`) (#608).
+- **Views**: the numbers of the views are never given again after a
+  rename, and a window whose only view is deleted shows a view of another
+  buffer instead of staying empty (#610).
+
 - **Views and windows**: deleting a view shown in a window, or the
   current view, no longer leaves TeXmacs with a pointer to a deleted view
   (crashes and hangs afterwards); the views of a renamed buffer get names
