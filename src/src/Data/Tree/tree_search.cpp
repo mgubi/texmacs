@@ -13,6 +13,7 @@
 #include "analyze.hpp"
 #include "boot.hpp"
 #include "drd_mode.hpp"
+#include "drd_std.hpp"
 #include <set>
 #include <utility>
 
@@ -1317,6 +1318,22 @@ pattern_elements (array<int>& kind, array<tree>& elem, tree what) {
   else { kind << ELEM_TAG; elem << what; }
 }
 
+static void
+pattern_elements (array<int>& kind, array<tree>& elem, array<int>& child,
+                  tree what) {
+  // the elements of what, and the child of the formula what (0 for
+  // another pattern) to which each belongs
+  if (!is_concat (what)) {
+    pattern_elements (kind, elem, what);
+    while (N(child) < N(kind)) child << 0;
+    return;
+  }
+  for (int i=0; i<N(what); i++) {
+    pattern_elements (kind, elem, what[i]);
+    while (N(child) < N(kind)) child << i;
+  }
+}
+
 static bool
 has_one (tree what) {
   // does the formula pattern what have an empty region at its level?
@@ -1339,11 +1356,17 @@ struct region_matcher {
   array<int> wfail;     // a wildcard fails from this token on
   array<path> mark;     // the position of each start or end of a region
   array<int> at;        // the token of each start of a region
+  array<int> from;      // the token of each element, in the match
+  array<int> child;     // the child of a formula pattern of each element
   array<range_set> in;  // the regions inside each tag of the pattern
   int end;              // the token after the match
 
   void init (tree what, bool to_end2) {
-    pattern_elements (kind, elem, what);
+    // (again on the same tokens: a new match, with the pattern what)
+    kind= array<int> ();
+    elem= array<tree> ();
+    child= array<int> ();
+    pattern_elements (kind, elem, child, what);
     to_end= to_end2;
     int nt= N(toks) + 1;
     failed= array<bool> (N(kind) * nt + nt);
@@ -1352,6 +1375,7 @@ struct region_matcher {
     for (int k=0; k<N(kind); k++) wfail[k]= nt;
     mark= array<path> (N(kind));
     at= array<int> (N(kind));
+    from= array<int> (N(kind));
     in= array<range_set> (N(kind));
     end= 0;
   }
@@ -1414,7 +1438,8 @@ struct region_matcher {
       }
       break;
     }
-    if (!ok) failed[ei * nt + ti]= true;
+    if (ok) from[ei]= ti;
+    else failed[ei * nt + ti]= true;
     return ok;
   }
 
@@ -1673,6 +1698,512 @@ select_hits (range_set& sel, tree t, tree what, path p, bool first) {
     merge (sel, ssel);
     if (first) return;
   }
+}
+
+/******************************************************************************
+* Aligning a pattern with a hit, for Replace (#520)
+******************************************************************************/
+
+static bool
+is_content_child (tree u, int j) {
+  // an argument of u which holds content: one which the search reaches, or
+  // a hidden one of regular content (the body of a folded), not attributes
+  // (the variable and the value of a with)
+  if (is_accessible_for_search (u, j)) return true;
+  if (u[j] == "" || (is_func (u, WITH) && j < N(u) - 1)) return false;
+  int type= the_drd->get_type_child (u, j);
+  return type == TYPE_REGULAR || type == TYPE_ADHOC || type == TYPE_UNKNOWN;
+}
+
+static bool
+is_position (tree t, path p) {
+  // is p a position in t (nil: anywhere)?
+  if (is_nil (p)) return true;
+  if (is_atomic (t)) return is_nil (p->next) && p->item >= 0 &&
+                            p->item <= N(t->label);
+  if (is_nil (p->next)) return p->item == 0 || p->item == 1;
+  return p->item >= 0 && p->item < N(t) && is_position (t[p->item], p->next);
+}
+
+static path
+argument_start (tree t, path a) {
+  tree u= subtree (t, a);
+  if (is_concat (u) && N(u) > 0) return a * path (0, 0);
+  return a * 0;
+}
+
+static path
+argument_of (tree t, path p) {
+  // the argument (of a tag, or the root) in which the position p of t lies
+  path q= path_up (p);
+  while (!is_nil (q) && is_concat (subtree (t, path_up (q)))) q= path_up (q);
+  return q;
+}
+
+static bool
+match_whole (region_matcher& m, tree what) {
+  // the pattern what with all the tokens of m
+  m.init (what, true);
+  return m.run (0, 0);
+}
+
+static bool
+match_leftmost (region_matcher& m, tree what, bool to_end, bool any_start,
+                int& start) {
+  // the leftmost match of what in the tokens of m, at their start only
+  // unless any_start: wildcards take as few tokens as they can, and a
+  // trailing one the rest of them if to_end; start: its first token
+  m.init (what, to_end);
+  for (start=0; start<=N(m.toks); start++) {
+    if (m.run (0, start)) return true;
+    if (!any_start) break;
+  }
+  return false;
+}
+
+static bool
+match_as_search (region_matcher& m, tree what, bool str, int& start) {
+  // the pattern what with the tokens m of a hit, as the search matches it:
+  // all of them, else, with partial (initial) matches, the leftmost match
+  // (at the start), whose trailing wildcard takes the rest, as the search
+  // carries an outer wildcard to the end of the formula; in a string (str)
+  // argument of a tag pattern, with partial and without initial matches,
+  // it ends at the end of the string, as match_atomic
+  start= 0;
+  if (match_whole (m, what)) return true;
+  if (!(partial_match_flag || initial_match_flag) || N(m.kind) == 0)
+    return false;
+  bool to_end= m.kind[N(m.kind)-1] == ELEM_WILDCARD ||
+               (str && partial_match_flag && !initial_match_flag);
+  return match_leftmost (m, what, to_end, partial_match_flag, start);
+}
+
+static bool
+match_alone (region_matcher& m, tree what, bool lazy, int& start) {
+  // the pattern what in the tokens m of an argument, as when it is alone:
+  // the leftmost match, a trailing wildcard taking the rest (if lazy: not
+  // all of the argument first, as the search on it: a1xa2x with a*x gives
+  // a1x; else all of it first, as a cascaded match in an argument)
+  start= 0;
+  if (!lazy && match_whole (m, what)) return true;
+  array<int> kind;
+  array<tree> elem;
+  pattern_elements (kind, elem, what);
+  if (N(kind) == 0) return false;
+  bool to_end= kind[N(kind)-1] == ELEM_WILDCARD;
+  return match_leftmost (m, what, to_end, true, start);
+}
+
+static bool
+before_position (path x, path ref) {
+  // does the position or path x come before the position ref: before it
+  // in the tree, or around it (a tag which holds ref)?
+  return path_less (x, ref) || (x <= ref && x != ref);
+}
+
+// the match which Replace replaces in a hit: its range, and its tokens
+// with the elements of the pattern aligned with them, for the values of the
+// wildcards (#520)
+struct replace_match {
+  path q1, q2;         // the range
+  region_matcher m;    // the tokens of the match, from the position base
+  path base;
+  int start;           // the first token of the match
+  bool in_arg;         // inside the argument arg (not the hit itself)
+  path arg;
+};
+
+static bool
+argument_match (tree t, path arg, tree what, bool lazy, path from,
+                replace_match& r) {
+  // the match of what in the argument arg of t, as when it is alone (its
+  // tokens relative to it: short paths in deep nestings), not before the
+  // position from (the start of the hit: the text before it, the output of
+  // an earlier replacement, is not in it)
+  tree u= subtree (t, arg);
+  array<search_token> all;
+  tokens_between (all, u, path (), path (), path ());
+  bool cut= !is_nil (from) && arg <= from && arg != from;
+  path rel= (cut? from / arg: path ());
+  region_matcher m;
+  // (the tokens not before the start of the hit: the same text as the cut
+  // after cur in search_from, from which next-hit takes the hit)
+  for (int k=0; k<N(all); k++)
+    if (!cut || !(before_position (all[k].before, rel) ||
+                  (all[k].kind == TOKEN_TAG && all[k].at <= rel)))
+      m.toks << all[k];
+  int start;
+  if (!match_alone (m, what, lazy, start)) return false;
+  path a= argument_start (t, arg);
+  r.q1= (N(m.toks) == 0? a: arg * m.position (start, true));
+  r.q2= (N(m.toks) == 0? a: arg * m.position (m.end, false));
+  r.m= m; r.base= arg; r.start= start; r.in_arg= true; r.arg= arg;
+  return true;
+}
+
+static bool
+first_argument_match (tree t, path at, tree what, bool lazy, path from,
+                      replace_match& r) {
+  // the first accessible argument of the tag of t at at, or of the tags
+  // inside them, in the order of the document, where what matches (as when
+  // it is alone): each argument once, and no further than the first match
+  tree u= subtree (t, at);
+  if (is_atomic (u)) return false;
+  if (is_concat (u) || is_document (u)) {
+    for (int k=0; k<N(u); k++)
+      if (is_compound (u[k]) &&
+          first_argument_match (t, at * k, what, lazy, from, r))
+        return true;
+    return false;
+  }
+  for (int j=0; j<N(u); j++)
+    if (is_accessible_for_search (u, j)) {
+      if (argument_match (t, at * j, what, lazy, from, r)) return true;
+      if (is_compound (u[j]) &&
+          first_argument_match (t, at * j, what, lazy, from, r))
+        return true;
+    }
+  return false;
+}
+
+static bool
+replace_range (tree t, path p1, path p2, tree what, replace_match& r) {
+  // the match which Replace replaces in the hit from p1 to p2 in t (nil:
+  // all of t). If the hit goes out of a tag or into it, or the pattern
+  // matches inside a tag of the hit (a lone tag, a cascaded match), the
+  // match inside the argument which holds its literal part, as when the
+  // argument is alone (the maintainer's decision: the regions found on
+  // b (strong F) c are those on F alone), the leftmost one there; the text
+  // around it stays. False if the literal part of the match crosses the
+  // border of a tag: no replacement keeps the text around it there
+  region_matcher m;
+  tokens_between (m.toks, t, path (), p1, p2);
+  r.q1= p1; r.q2= p2; r.base= path (); r.in_arg= false;
+  bool str= is_atomic (t) && is_nil (p1) && is_nil (p2);
+  // (the argument of a hit is searched as the search on it, the leftmost
+  // match; a whole tree, a cascaded match in an argument of a tag pattern,
+  // takes all of the argument first, as the search matched it)
+  bool lazy= !is_nil (p1) || !is_nil (p2);
+  if (match_as_search (m, what, str, r.start)) {
+    r.m= m;
+    bool border= false;
+    for (int k=0; k<N(m.toks); k++)
+      if (m.toks[k].kind == TOKEN_BOUNDARY) border= true;
+    if (!border) return true;
+    // the literal part: from the first element which is not a wildcard to
+    // the last one
+    int e1= 0, e2= N(m.kind) - 1;
+    while (e1 <= e2 && m.kind[e1] == ELEM_WILDCARD) e1++;
+    while (e2 >= e1 && m.kind[e2] == ELEM_WILDCARD) e2--;
+    if (e1 > e2) return false;
+    int c1= m.from[e1], c2= (e2+1 < N(m.kind)? m.from[e2+1]: m.end);
+    for (int k=c1; k<c2; k++)
+      if (m.toks[k].kind == TOKEN_BOUNDARY) return false;
+    if (c1 >= N(m.toks)) return false;
+    return argument_match (t, argument_of (t, m.toks[c1].before), what,
+                           lazy, p1, r);
+  }
+  // inside a tag of the hit: the first argument where it matches
+  for (int k=0; k<N(m.toks); k++)
+    if (m.toks[k].kind == TOKEN_TAG &&
+        first_argument_match (t, m.toks[k].at, what, lazy, p1, r))
+      return true;
+  return false;
+}
+
+struct search_scope {
+  // the flags of the search, and its cache of formulas, for one call
+  search_scope () { initialize_search (); clear_no_formula (); }
+  ~search_scope () { clear_no_formula (); }
+};
+
+static bool
+wildcard_runs (tree t, tree what, replace_match& r, bool whole,
+               array<tree>& runs) {
+  // the run of each child of the formula pattern what in the match r of t
+  // (a match may start and end inside a string, #495): Replace takes the
+  // values of the wildcards from them; they were matched child by child,
+  // which lost a wildcard which takes several children, or a part of a
+  // string (#520). If whole (the match is replaced as a whole: a cascaded
+  // match in an argument of a tag pattern) and it is inside an argument of
+  // a tag of t, the values are in the tags around that argument; false if
+  // the match does not take all of the argument, or these tags have other
+  // content, which would be lost
+  region_matcher& m= r.m;
+  array<path> tags;
+  if (whole && r.in_arg) {
+    array<search_token> before, after;
+    tokens_between (before, t, path (), path (), r.q1);
+    tokens_between (after, t, path (), r.q2, path ());
+    for (int k=0; k<N(before); k++)
+      if (before[k].kind != TOKEN_BOUNDARY) return false;
+    for (int k=0; k<N(after); k++)
+      if (after[k].kind != TOKEN_BOUNDARY) return false;
+    for (path q= r.arg; !is_nil (q); q= path_up (q)) {
+      tree u= subtree (t, path_up (q));
+      if (is_concat (u)) continue;
+      for (int j=0; j<N(u); j++)
+        if (j != last_item (q) && is_content_child (u, j)) return false;
+      tags << path_up (q);
+    }
+  }
+  // the first element of each child of the pattern, and the end
+  array<int> first (N(what) + 1);
+  for (int i=0, k=0; i<=N(what); i++) {
+    while (k < N(m.child) && m.child[k] < i) k++;
+    first[i]= k;
+  }
+  int ne= N(m.kind);
+  for (int i=0; i<N(what); i++) {
+    int s= (i == 0? r.start: first[i] < ne? m.from[first[i]]: m.end);
+    int e= (i == N(what)-1 || first[i+1] >= ne? m.end: m.from[first[i+1]]);
+    tree x= (e <= s? tree (""):
+             simplify_correct (selection_compute (t,
+                                 r.base * m.toks[s].before,
+                                 r.base * m.toks[e-1].after)));
+    if (is_func (what[i], WILDCARD, 1) && x != "")
+      for (int k=0; k<N(tags); k++) {
+        // (in a copy of the tag, which shares the other arguments)
+        tree u= subtree (t, tags[k]);
+        tree c (L(u), N(u));
+        for (int j=0; j<N(u); j++) c[j]= u[j];
+        c[(r.arg / tags[k])->item]= x;
+        x= c;
+      }
+    runs << x;
+  }
+  return true;
+}
+
+static tree
+path_as_tree (path p) {
+  tree r (TUPLE);
+  for (; !is_nil (p); p= p->next) r << as_string (p->item);
+  return r;
+}
+
+array<tree>
+search_replace_match (tree t, tree what, path p1, path p2) {
+  // the match which Replace replaces in the hit from p1 to p2 in t (nil:
+  // all of t, a match replaced as a whole): its start and its end (as
+  // tuples of the items of their paths), the match itself, exactly (the
+  // selection of the editor moves the ends of a range next to a script
+  // over its base), and the value of each child of a formula pattern (see
+  // wildcard_runs; none for another pattern); nil if Replace leaves the hit
+  array<tree> r;
+  if (is_func (what, WILDCARD, 1)) what= tree (CONCAT, what);  // (as search)
+  if (!is_position (t, p1) || !is_position (t, p2) || path_less (p2, p1))
+    return r;
+  search_scope scope;
+  replace_match rm;
+  array<tree> runs;
+  if (is_concat (what) && N(what) != 0 && !contains_select_region (what)) {
+    if (!replace_range (t, p1, p2, what, rm) ||
+        !wildcard_runs (t, what, rm, is_nil (p1) && is_nil (p2), runs))
+      return r;
+  }
+  else {
+    // a string or a tag pattern: the hit must be a match of it (a range
+    // which is not one is never replaced)
+    rm.q1= p1; rm.q2= p2;
+    if (!is_document (what) && !contains_select_region (what) &&
+        !match (simplify_correct (selection_compute (t, p1, p2)), what))
+      return r;
+  }
+  bool all= is_nil (rm.q1) && is_nil (rm.q2);
+  r << path_as_tree (rm.q1) << path_as_tree (rm.q2)
+    << (all? t: simplify_correct (selection_compute (t, rm.q1, rm.q2)));
+  r << runs;
+  return r;
+}
+
+// cut_before (u, q) records, for each formula on the way to q, the
+// indices in u of the children it keeps and which one of them was cut (-1
+// when none), so that uncut maps a position back by a lookup
+struct cut_level {
+  array<int> orig;
+  int cut;
+};
+
+static tree
+cut_before (tree u, path q, array<cut_level>& lv) {
+  // u without what comes before the position q in it: the text which a
+  // search from q sees (a tag which q is in keeps its arguments, those
+  // before the one of q empty). The cut copy is searched out of its
+  // context: a pattern which depends on the text before q (an emptied
+  // argument, a formula which loses its first children) can match it
+  // differently than the document (the hits are verified by the callers)
+  if (is_nil (q)) return u;
+  if (is_atomic (u)) return u->label (q->item, N(u->label));
+  if (is_concat (u)) {
+    int l= N(lv);
+    lv << cut_level ();
+    array<int> orig;
+    int cut= -1;
+    tree s (CONCAT);
+    int k= q->item;
+    if (k < N(u)) {
+      tree c= u[k], x= "";
+      bool whole= !is_atomic (c) && q->next == path (0);
+      if (whole) x= c;
+      else if (is_atomic (c) || q->next != path (1))
+        x= cut_before (c, q->next, lv);
+      if (x != "") { cut= (whole? -1: 0); orig << k; s << x; }
+    }
+    for (int i=k+1; i<N(u); i++)
+      if (u[i] != "") { orig << i; s << u[i]; }
+    lv[l].orig= orig; lv[l].cut= cut;
+    if (N(s) == 0) return "";
+    if (N(s) == 1) return s[0];
+    return s;
+  }
+  if (q == path (0)) return u;
+  if (q == path (1)) return "";
+  tree r (L(u), N(u));
+  for (int i=0; i<N(u); i++)
+    r[i]= (i < q->item? tree (""):
+           i == q->item? cut_before (u[i], q->next, lv): u[i]);
+  return r;
+}
+
+static path
+uncut (tree u, path q, path h, array<cut_level>& lv, int d= 0) {
+  // the position in u of the position h in cut_before (u, q, lv), whose
+  // formulas are lv[d], lv[d+1]... The start of a cut tree (before a tag
+  // whose text before q was cut, or no position in a formula left with one
+  // child) is q itself: a position, never the path of a node, nor before a
+  // tag which holds q
+  if (is_nil (q)) return h;
+  if (is_atomic (u)) return path (q->item + (is_nil (h)? 0: h->item));
+  if (is_concat (u)) {
+    array<int>& orig= lv[d].orig;
+    int n= N(orig), i= 0;
+    if (n == 0) return q;
+    if (n > 1) {
+      if (is_nil (h) || h->item >= n) return q;
+      i= h->item; h= h->next;
+    }
+    else if (lv[d].cut != 0 && is_nil (h)) return q;
+    if (lv[d].cut == i)
+      return path (orig[i], uncut (u[orig[i]], q->next, h, lv, d+1));
+    return path (orig[i], h);
+  }
+  if (q == path (0)) return h;
+  if (q == path (1)) return q;
+  if (is_nil (h)) return q;
+  if (is_nil (h->next)) return (h->item == 0? q: h);
+  if (h->item == q->item)
+    return path (q->item, uncut (u[q->item], q->next, h->next, lv, d));
+  return h;
+}
+
+static void
+add_hit (array<path>& r, path r1, path r2, path cur) {
+  // a hit which starts before cur, or at a tag around it whose text before
+  // cur was cut, starts at cur: the text before the reference, the output
+  // of an earlier replacement, is never in it (no cur: the whole text)
+  if (!is_nil (cur) && before_position (r1, cur)) r1= cur;
+  if (path_less (r2, r1)) r2= r1;
+  // (a hit which is all before cur is none: an empty one at cur was left
+  // out by search_in_cut)
+  if (!is_nil (cur) && r1 == cur && r2 == cur) return;
+  r << r1 << r2;
+}
+
+static bool
+has_tokens (tree u) {
+  // does u hold a character or a tag?
+  if (is_atomic (u)) return N(u->label) != 0;
+  if (!is_concat (u) && !is_document (u)) return true;
+  for (int i=0; i<N(u); i++)
+    if (has_tokens (u[i])) return true;
+  return false;
+}
+
+static bool
+token_before (tree u, path h) {
+  // is there a token of u (a character or a tag) before the position h?
+  if (is_nil (h)) return false;
+  if (is_atomic (u)) return h->item > 0;
+  if (is_nil (h->next)) return h->item == 1 && has_tokens (u);
+  bool flat= is_concat (u) || is_document (u);
+  for (int i=0; i<h->item && i<N(u); i++)
+    if ((flat || is_content_child (u, i)) && has_tokens (u[i])) return true;
+  return h->item < N(u) && token_before (u[h->item], h->next);
+}
+
+static array<path>
+search_in_cut (tree t, tree what, path p, path q, int limit,
+               bool after_empty) {
+  // the first hits of what in t at p (a paragraph, or a document for a
+  // pattern of several paragraphs) after the position q in it (see
+  // search_from). At q (not nil), no empty hit (after a match, which may
+  // end there), and no hit at all after an empty match (after_empty): the
+  // hits at the start, before any token, are left out
+  bool para= !is_document (t);
+  array<cut_level> lv;
+  tree c= cut_before (t, q, lv);
+  tree d= (para? tree (DOCUMENT, c): c);
+  bool narrow= is_concat (what) && N(what) != 0 &&
+               !contains_select_region (what);
+  path cur= (is_nil (q)? path (): p * q);
+  for (int lim= limit; true; lim *= 2) {
+    array<path> r;
+    range_set sel= search (d, what, path (), lim);
+    for (int i=0; i+1<N(sel) && N(r) < 2*limit; i+=2) {
+      path h1= sel[i], h2= sel[i+1];
+      if (narrow) {
+        // the match in the hit which Replace replaces (see replace_range),
+        // in the text after cur: a hit of a lone tag there is the tag
+        search_scope scope;
+        replace_match rm;
+        if (replace_range (d, h1, h2, what, rm)) { h1= rm.q1; h2= rm.q2; }
+      }
+      if (para) {
+        if (is_nil (h1) || h1->item != 0 || is_nil (h2) || h2->item != 0)
+          continue;
+        h1= h1->next; h2= h2->next;
+      }
+      if (!is_nil (q) && (after_empty || h1 == h2) && !token_before (c, h1))
+        continue;
+      add_hit (r, p * uncut (t, q, h1, lv), p * uncut (t, q, h2, lv), cur);
+    }
+    // (hits left out at the start: search further, unless the search gave
+    // all of them, without reaching its limit)
+    if (N(r) >= 2*limit || N(sel) <= lim) return r;
+  }
+}
+
+array<path>
+search_from (tree t, tree what, path p, path cur, int limit,
+             bool after_empty) {
+  // the first hits (at most limit) of what in t at p (a paragraph, or the
+  // document) from the position cur on, as the search finds them in the
+  // text which comes after cur, each one narrowed to the match which
+  // Replace replaces (see replace_range): the next match after a
+  // replacement (#520). In a document, the paragraph of cur and then the
+  // next ones, until there are hits (a pattern of several paragraphs: the
+  // document after cur at once). At cur, no empty match (one which ends
+  // there, the previous match, is not followed by one), and after an empty
+  // match at cur (after_empty), none at all: the next one starts at least
+  // one character or tag later, so that Replace, which goes on after its
+  // replacement, always ends. Each call searches the rest of the paragraph
+  // of cur again: Replace All costs O(n^2) in a paragraph of n hits, but
+  // the steps cost more (1000 hits in a paragraph of 5 kB: about 2 s, as
+  // 1000 hits in 1 MB of short paragraphs)
+  array<path> r;
+  if (is_func (what, WILDCARD, 1)) what= tree (CONCAT, what);  // (as search)
+  if (!(p <= cur)) return r;
+  path q= cur / p;
+  if (!is_position (t, q)) return r;
+  if (!is_document (t) || is_document (what))
+    return search_in_cut (t, what, p, q, limit, after_empty);
+  if (is_nil (q)) return r;
+  for (int k=q->item; k<N(t) && N(r) == 0; k++)
+    r= (k == q->item?
+        search_in_cut (t[k], what, p * k, q->next, limit, after_empty):
+        search_in_cut (t[k], what, p * k, path (), limit, false));
+  return r;
 }
 
 static void
@@ -1992,6 +2523,9 @@ search (tree t, tree what, path p, int limit) {
   clear_no_formula ();
   initialize_search ();  // also the label select-region, needed just below
   what= without_empty_strings (what, !contains_select_region (what));
+  // a lone wildcard is searched as a formula of it: in each paragraph,
+  // never across their borders (the maintainer's decision)
+  if (is_func (what, WILDCARD, 1)) what= tree (CONCAT, what);
   range_set sel;
   //cout << "Search " << what << ", " << contains_select_region (what) << "\n";
   if (contains_select_region (what)) select (sel, t, what, p);
@@ -2008,6 +2542,9 @@ search (tree t, tree what, path p, path pos, int limit) {
   clear_no_formula ();
   initialize_search ();  // also the label select-region, needed just below
   what= without_empty_strings (what, !contains_select_region (what));
+  // a lone wildcard is searched as a formula of it: in each paragraph,
+  // never across their borders (the maintainer's decision)
+  if (is_func (what, WILDCARD, 1)) what= tree (CONCAT, what);
   range_set sel;
   //cout << "Search " << what << ", " << contains_select_region (what) << "\n";
   if (contains_select_region (what)) select (sel, t, what, p);

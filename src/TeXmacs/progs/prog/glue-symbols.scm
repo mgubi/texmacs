@@ -257,6 +257,8 @@
 "tree-search-sections"
 "tree-search-tree"
 "tree-search-tree-at"
+"tree-search-from"
+"tree-search-replace-match"
 "tree-spell"
 "tree-spell*"
 "tree-spell-at"

@@ -1859,6 +1859,22 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(tree-search-from <scm-arg|content> <scm-arg|content> <scm-arg|path> <scm-arg|path> <scm-arg|int> <scm-arg|bool>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|search_from> which returns
+    <scm|array_path>.
+  </explain>
+
+  <\explain>
+    <scm|(tree-search-replace-match <scm-arg|content> <scm-arg|content> <scm-arg|path> <scm-arg|path>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|search_replace_match> which returns
+    <scm|array_tree>.
+  </explain>
+
+  <\explain>
     <scm|(tree-spell <scm-arg|string> <scm-arg|content> <scm-arg|path> <scm-arg|int>)>
 <explain-synopsis|no synopsis>
   <|explain>
