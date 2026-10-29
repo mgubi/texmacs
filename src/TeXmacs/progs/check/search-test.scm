@@ -2648,17 +2648,28 @@
           (lambda ()
             (check= (shown doc) '((0 0 0) (0 2 1) (1 0 0) (1 2 1)))
             (check= (shown lone) '((0 0) (0 1) (1 0) (1 1)))
+            (check= (shown '(document (concat "p" (math "xab") "q"
+                                              (math "yab") "s")))
+                    '((0 0 0) (0 4 1)))
             (check-replace-rows
               `((,doc ,what ,by
                  (document (concat "p" (math "<xa|>") "q")
                            (concat "r" (math "<ya|>") "s")))
                 (,lone ,what ,by
                  (document (math "<xa|>") (math "<ya|>")))
-                ;; (one hit: the paragraph, and its first match)
+                ;; one hit, the paragraph, with two matches: after the
+                ;; replacement in the first formula, the rest of the hit is
+                ;; judged as the hit which the search shows (it was left)
                 ((document (concat "p" (math "xab") "q" (math "yab") "s"))
                  ,what ,by
-                 (document (concat "p" (math "<xa|>") "q" (math "yab")
-                                   "s")))))))
+                 (document (concat "p" (math "<xa|>") "q" (math "<ya|>")
+                                   "s")))
+                ((document (concat "p" (math "xabzb")))
+                 (concat (wildcard "w") "b") (concat "<" (wildcard "w") ">")
+                 (document (concat "p" (math "<xa><z>"))))
+                ((document (concat "q" (strong "xabzb")))
+                 (concat (wildcard "w") "b") (concat "<" (wildcard "w") ">")
+                 (document (concat "q" (strong "<xa><z>"))))))))
         (with-test-filter '(attr "mode" "math")
           (lambda ()
             (check= (shown doc) '())
