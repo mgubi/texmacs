@@ -492,6 +492,8 @@ is_doc_data (tree t) {
 
 tree
 filter_preamble (tree t) {
+  // a source which is only text parses to a single string (#608)
+  if (!is_concat (t)) return t;
   int i, n=N(t);
   bool in_preamble= true;
   tree r (CONCAT);

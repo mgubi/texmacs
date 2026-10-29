@@ -759,6 +759,51 @@
   (check= (cadr (assoc 'style (cdr (ld "\\documentclass{amsart}\\begin{document}x\\end{document}"))))
           '(tuple "amsart")))
 
+;; a source which is only text, without \begin{document}, parses to a
+;; single string: it crashed in filter_preamble and finalize_sections (#608)
+(define plain-text-dir
+  (string-append (url->system (url-temp-dir)) "/latex-plain-text"))
+
+(define (remove-plain-text-dir)
+  (with d (system->url plain-text-dir)
+    (when (url-exists? d)
+      (for-each system-remove (url-read-directory d "*"))
+      (system-rmdir d))))
+
+(define (import-tex-file text)
+  ;; the body of the buffer of a .tex file holding @text, opened as File >
+  ;; Open does
+  (let ((u (system->url (string-append plain-text-dir "/plain.tex")))
+        (before (buffer-list)))
+    (remove-plain-text-dir)
+    (system-mkdir (system->url plain-text-dir))
+    (string-save text u)
+    (load-buffer u)
+    (with r (and (buffer-exists? u) (tree->stree (buffer-get-body u)))
+      (when (buffer-exists? u)
+        (buffer-pretend-saved u)
+        (buffer-close u))
+      (remove-plain-text-dir)
+      (list r (== (buffer-list) before)))))
+
+(define (test-import-plain-text)
+  (check-group "import: documents which are only text")
+  (check= (body-of (ld "a")) '(document "a"))
+  (check= (body-of (ld "ab")) '(document "ab"))
+  (check= (body-of (ld "a b")) '(document "a b"))
+  (check= (body-of (ld "a\n")) '(document "a"))
+  (check= (body-of (ld "a\n\nb")) '(document "a" "b"))
+  (check= (body-of (ld "\\documentclass{article}x")) '(document "x"))
+  (check= (cadr (assoc 'style (cdr (ld "\\documentclass{article}x"))))
+          '(tuple "article" "std-latex"))
+  ;; the only paragraph of a document stays one paragraph
+  (check= (body-of (ld "\\begin{document}a \\emph{b}\\end{document}"))
+          '(document (concat "a " (em "b"))))
+  (check= (body-of (ld "a \\emph{b}")) '(document (concat "a " (em "b"))))
+  ;; the same through the import of a .tex file
+  (check= (import-tex-file "Only some text.\n")
+          '((document "Only some text.") #t)))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Round trips
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1225,6 +1270,7 @@
   (test-import-unknown)
   (test-import-parse)
   (test-import-documents)
+  (test-import-plain-text)
   (test-source-tracking)
   (test-round-trips)
   (test-export-without-view)
