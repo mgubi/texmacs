@@ -452,6 +452,21 @@
   (check= (lt "\\vspace{1cm}") '(vspace "1cm"))
   (check= (lt "\\bigskip") '(vspace "2fn")))
 
+;; Sources which end in the middle of a construct: the parser looked at the
+;; byte after the end of the source (#561). A normal build reads a harmless
+;; byte there; only a build with ASan (--enable-sanitizers=address
+;; --disable-fastalloc) aborts, and only for strings whose length is a
+;; multiple of 4 below 24 or a power of two, as all of these are.
+(define (lt-returns? s)
+  (with r (lt s) (or (string? r) (pair? r))))
+
+(define (test-import-truncated)
+  (check-group "import: sources which end too early")
+  (for (s (list "abc\\" "a\n  " "$a$$" "abc\\quad" "\\def" "xyz\\def\\"
+                "\\setlength{\\" "\\setlength x" "\\cmidrule[ab" "\\cmidrule(ab"
+                "\\multirow{22" "x  \\multirow" " x \\category"))
+    (check-true (lt-returns? s))))
+
 (define (test-import-lists)
   (check-group "import: lists")
   (check= (lt "\\begin{itemize}\n\\item a\n\\item b\n\\end{itemize}")
@@ -1163,6 +1178,7 @@
   (test-import-special)
   (test-import-styles)
   (test-import-sections)
+  (test-import-truncated)
   (test-import-lists)
   (test-import-references)
   (test-import-math)
