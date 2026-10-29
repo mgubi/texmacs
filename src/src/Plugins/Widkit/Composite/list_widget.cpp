@@ -66,7 +66,7 @@ horizontal_list_rep::handle_get_size (get_size_event ev) {
   else {
     int i, ww=0, hh=0;
     for (i=0; i<N(a); i++) {
-      int www= w/N(a), hhh= h;
+      SI www= w/N(a), hhh= h;
       a[i] << get_size (www, hhh, ev->mode);
       ww= ww+ www;
       hh= max (hh, hhh);
@@ -176,7 +176,7 @@ vertical_list_rep::handle_get_size (get_size_event ev) {
   else {
     int i, ww=0, hh=0;
     for (i=0; i<N(a); i++) {
-      int www= w, hhh= h/N(a);
+      SI www= w, hhh= h/N(a);
       a[i] << get_size (www, hhh, ev->mode);
       ww= max (ww, www);
       hh= hh+ hhh;

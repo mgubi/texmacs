@@ -230,4 +230,22 @@ void
 client_listen_connections (int msecs) {
   io_error << "sockets are not implemented";
 }
+
+int
+legacy_client_start (string host, int port) {
+  (void) host; (void) port;
+  io_error << "sockets are not implemented";
+  return -1;
+}
+
+int
+tls_client_start (string host, int port, scheme_tree args) {
+  (void) host; (void) port; (void) args;
+  io_error << "sockets are not implemented";
+  return -1;
+}
+
+int
+client_protocol_version () { return 0; }
+
 #endif

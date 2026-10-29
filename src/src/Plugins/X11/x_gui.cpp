@@ -100,7 +100,7 @@ x_gui_rep::set_button_state (unsigned int state) {
 void
 x_gui_rep::emulate_leave_enter (widget old_widget, widget new_widget) {
   Window root, child;
-  SI root_x, root_y, x, y;
+  int root_x, root_y, x, y;
   unsigned int mask;
 
   XQueryPointer (dpy, get_Window (old_widget),

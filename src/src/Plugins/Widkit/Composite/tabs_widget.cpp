@@ -64,12 +64,12 @@ tabs_widget_rep::handle_get_size (get_size_event ev) {
 
   int i, l=N(a)-1, ww=0, hh=0;
   for (i=0; i<l; i++) {
-    int www= w, hhh= h;
+    SI www= w, hhh= h;
     a[i] << get_size (www, hhh, -1);
     ww= ww+ www + 2*PIXEL;
     hh= max (hh, hhh);
   }
-  int www= w, hhh= h - hh;
+  SI www= w, hhh= h - hh;
   a[l] << get_size (www, hhh, ev->mode);
   w= max (ww, www + 2*PIXEL); h= hh + hhh + 4*PIXEL;
 }
@@ -95,8 +95,8 @@ tabs_widget_rep::handle_position (position_event ev) {
   SI main_h= max_h + last_h;
   abs_round (main_w);
   abs_round (main_h);
-  xs= array<SI> (); xs << 0;
-  int cur_w= 0;
+  xs= array<SI> (); xs << ((SI) 0);
+  SI cur_w= 0;
   for (i=0; i<l; i++) {
     SI the_w= w, the_h= h;
     a[i] << get_size (the_w, the_h, -1);
