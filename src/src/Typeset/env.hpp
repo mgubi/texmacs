@@ -341,6 +341,9 @@ public:
   bool                         read_only;   // write-protected ?
   hashmap<string,tree>         missing;     // missing refs
   array<tree>                  redefined;   // redefined labels
+  bool                         rebound;     // a binding got another value
+                                            // in a pass which was not
+                                            // complete (see typeset)
   hashmap<string,bool>         touched;     // touched refs
   hashmap<string,bool>         read_refs;   // refs read since the tables
                                             // were loaded (see clean_unused)

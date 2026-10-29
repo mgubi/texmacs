@@ -2092,6 +2092,11 @@ edit_env_rep::store_binding (string key, tree value, string extra) {
     stored= now[0];
   }
   touched (key)= true;
+  // (a pass which is not complete: what read the old value, and was not
+  // typeset again by this pass, is not told: see typeset in edit_typeset)
+  if (!complete && !same && is_tuple (old_value) && N(old_value) >= 1 &&
+      old_value[0] != value)
+    rebound= true;
   if (complete && is_tuple (old_value) && N(old_value) >= 1) {
     string old_s= tree_as_string (old_value[0]);
     string new_s= tree_as_string (value);

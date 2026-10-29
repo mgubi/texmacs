@@ -1536,10 +1536,9 @@
 
 (define (test-surround-parts-inputs)
   (check-group "inputs of the parts of a surround below a paragraph")
-  ;; (not with the classic cache, TEXMACS_TYPESET_READS=off, whose old
-  ;; mistakes this finds)
-  (when (!= (getenv "TEXMACS_TYPESET_READS") "off")
-   (for (lookup? '(#f #t))
+  ;; (also with the classic cache, TEXMACS_TYPESET_READS=off, which did
+  ;; not typeset again what read a binding whose value changed, #576)
+  (for (lookup? '(#f #t))
     (with-scratch-buffer
      (lambda (u)
        (buffer-set-body u (stree->tree (surround-parts-body lookup?)))
@@ -1550,7 +1549,29 @@
        (tree-set (tree-ref (buffer-tree) 0 1) "5cm")
        (update-forced) (update-forced)
        (check= (surround-parts-x) (surround-parts-scratch))
-       (check= (typeset-check-mismatches) 0))))))
+       (check= (typeset-check-mismatches) 0))))
+  ;; the same for a paragraph which reads the binding, without a surround
+  (with-scratch-buffer
+   (lambda (u)
+     (buffer-set-body u (stree->tree
+                         '(document (set-binding "lab" "1cm")
+                                    (concat "L" (hspace (get-binding "lab"))
+                                            "R")
+                                    "after")))
+     (update-current-buffer)
+     (update-forced) (update-forced)
+     (tree-set (tree-ref (buffer-tree) 0 1) "5cm")
+     (update-forced) (update-forced)
+     (let* ((x (lambda () (car (tree-bounding-rectangle
+                                (tree-ref (buffer-tree) 1 2)))))
+            (now (x))
+            (body (tree-copy (buffer-tree))))
+       (check= now (with-scratch-buffer
+                    (lambda (v)
+                      (buffer-set-body v body)
+                      (update-current-buffer)
+                      (update-forced) (update-forced)
+                      (x))))))))
 
 (define (test-loci-of-surround-parts)
   (check-group "loci of surround parts")
