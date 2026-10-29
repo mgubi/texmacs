@@ -14,6 +14,19 @@ have the details, and the problems go to the
 
 ## 29 October 2026
 
+- **Dialogs at a fractional scaling** (desktop Vue builds): with the
+  display scaled by a fraction (GNOME on Wayland at 150% or 175%,
+  Windows at 125% or 150%...), a dialog sized to its contents (the
+  question of Ctrl+Q with unsaved documents) came out too small, its
+  text cut on the right and its buttons on the bottom, legible only once
+  resized (or too large at 125%). The windows now have the sizes and the
+  places of the Qt port at those scalings (#376).
+- **No crash after closing a dialog by a key on GNOME/Wayland** (desktop
+  Vue builds): Esc in the question of Ctrl+Q, with the pointer on the
+  title bar or the border of the question, could crash TeXmacs at the
+  next motion of the mouse, in the window decorations of GNOME (a bug of
+  libdecor up to 0.2.5, which TeXmacs now works around: a window leaves
+  the screen a moment before its decorations are destroyed) (#376).
 - **Faster Document > Update > All**: on a large document Update All
   no longer typesets everything three or four times. The automatic labels
   are numbered again by typesetting only what makes labels and table
