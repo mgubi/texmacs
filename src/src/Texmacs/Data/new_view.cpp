@@ -330,6 +330,13 @@ delete_view (url u) {
       if (vw->buf->vws[k] != vw && vw->buf->vws[k]->win == NULL)
         other= abstract_view (vw->buf->vws[k]);
     if (is_none (other)) other= get_recent_view (name, false, true, false, true);
+    if (is_none (other) &&
+        concrete_window (abstract_window (vw->win)) != NULL) {
+      // a new view of the most recent other buffer, as kill_buffer does
+      // (not for the window of an embedded editor, which has no url)
+      url ob= view_to_buffer (get_recent_view (name, false, true, false, false));
+      if (!is_none (ob)) other= get_passive_view (ob);
+    }
     if (is_none (other)) detach_view (u);
     else window_set_view (abstract_window (vw->win), other,
                           the_view == vw || the_view == NULL);
@@ -369,6 +376,13 @@ notify_rename_after (url new_name) {
   array<url> vs= buffer_to_views (new_name);
   for (int i=0; i<N(vs); i++)
     notify_set_view (vs[i]);
+  // the views keep their numbers: the numbers of the new name go on after
+  // them, also once these views are deleted
+  tm_buffer buf= concrete_buffer (new_name);
+  if (!is_nil (buf))
+    for (int i=0; i<N(buf->vws); i++)
+      if (buf->vws[i]->nr > view_number_table [new_name->t])
+        view_number_table (new_name->t)= buf->vws[i]->nr;
 }
 
 /******************************************************************************

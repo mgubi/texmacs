@@ -253,22 +253,28 @@
         (edit (go-end) (insert "e"))
         (check= (body) '(document "abcde")))))
   ;; the views of a renamed buffer keep their numbers, and a new view does
-  ;; not take one of them (#560: two views had the same url, and Clone
-  ;; window after Save as aborted)
+  ;; not take one of them, nor the number of a view deleted after the
+  ;; rename (#560: two views had the same url, and Clone window after Save
+  ;; as aborted)
   (with-buffer-body '(document "a")
     (lambda ()
       (let* ((u (current-buffer))
-             (v1 (view-new u))
              (new-name (tmp-file "renamed-views.tm")))
+        (view-new u)
         (buffer-rename u new-name)
-        (let* ((vs (buffer->views new-name))
-               (v2 (view-new new-name))
-               (vs* (buffer->views new-name)))
-          (check= (length vs*) (+ (length vs) 1))
-          (check-false (in? v2 vs))
-          (check= (view->buffer v2) new-name)
-          (view-delete v2)
-          (check= (buffer->views new-name) vs))))))
+        (let ((gone (car (list-filter (buffer->views new-name)
+                                      (lambda (v)
+                                        (url-none? (view->window-url v)))))))
+          (view-delete gone)
+          (let* ((vs (buffer->views new-name))
+                 (v2 (view-new new-name))
+                 (vs* (buffer->views new-name)))
+            (check= (length vs*) (+ (length vs) 1))
+            (check-false (in? v2 vs))
+            (check-false (== v2 gone))
+            (check= (view->buffer v2) new-name)
+            (view-delete v2)
+            (check= (buffer->views new-name) vs)))))))
 
 ;; A tree pointer or a position which is collected while it is still
 ;; attached to a tree (a process whose callback was never called, a
