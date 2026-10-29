@@ -2001,26 +2001,42 @@ search_replace_match (tree t, tree what, path p1, path p2) {
   return r;
 }
 
+// cut_before (u, q) records, for each formula on the way to q, the
+// indices in u of the children it keeps and which one of them was cut (-1
+// when none), so that uncut maps a position back by a lookup
+struct cut_level {
+  array<int> orig;
+  int cut;
+};
+
 static tree
-cut_before (tree u, path q) {
+cut_before (tree u, path q, array<cut_level>& lv) {
   // u without what comes before the position q in it: the text which a
   // search from q sees (a tag which q is in keeps its arguments, those
-  // before the one of q empty)
+  // before the one of q empty). The cut copy is searched out of its
+  // context: a pattern which depends on the text before q (an emptied
+  // argument, a formula which loses its first children) can match it
+  // differently than the document (the hits are verified by the callers)
   if (is_nil (q)) return u;
   if (is_atomic (u)) return u->label (q->item, N(u->label));
   if (is_concat (u)) {
-    tree r (CONCAT);
+    int l= N(lv);
+    lv << cut_level ();
+    array<int> orig;
+    int cut= -1;
+    tree s (CONCAT);
     int k= q->item;
     if (k < N(u)) {
-      tree c= u[k];
-      if (is_atomic (c)) r << cut_before (c, q->next);
-      else if (q->next != path (1))
-        r << (q->next == path (0)? c: cut_before (c, q->next));
+      tree c= u[k], x= "";
+      bool whole= !is_atomic (c) && q->next == path (0);
+      if (whole) x= c;
+      else if (is_atomic (c) || q->next != path (1))
+        x= cut_before (c, q->next, lv);
+      if (x != "") { cut= (whole? -1: 0); orig << k; s << x; }
     }
-    for (int i=k+1; i<N(u); i++) r << u[i];
-    tree s (CONCAT);
-    for (int i=0; i<N(r); i++)
-      if (r[i] != "") s << r[i];
+    for (int i=k+1; i<N(u); i++)
+      if (u[i] != "") { orig << i; s << u[i]; }
+    lv[l].orig= orig; lv[l].cut= cut;
     if (N(s) == 0) return "";
     if (N(s) == 1) return s[0];
     return s;
@@ -2030,54 +2046,49 @@ cut_before (tree u, path q) {
   tree r (L(u), N(u));
   for (int i=0; i<N(u); i++)
     r[i]= (i < q->item? tree (""):
-           i == q->item? cut_before (u[i], q->next): u[i]);
+           i == q->item? cut_before (u[i], q->next, lv): u[i]);
   return r;
 }
 
 static path
-uncut (tree u, path q, path h) {
-  // the position in u of the position h in cut_before (u, q). The start of
-  // a cut tree (before a tag whose text before q was cut, or no position
-  // in a formula left with one child) is q itself: a position, never the
-  // path of a node, nor before a tag which holds q
+uncut (tree u, path q, path h, array<cut_level>& lv, int d= 0) {
+  // the position in u of the position h in cut_before (u, q, lv), whose
+  // formulas are lv[d], lv[d+1]... The start of a cut tree (before a tag
+  // whose text before q was cut, or no position in a formula left with one
+  // child) is q itself: a position, never the path of a node, nor before a
+  // tag which holds q
   if (is_nil (q)) return h;
   if (is_atomic (u)) return path (q->item + (is_nil (h)? 0: h->item));
   if (is_concat (u)) {
-    // the children of the cut formula, with their indices in u, and
-    // whether they were cut
-    array<int> orig;
-    array<bool> cut;
-    int k= q->item;
-    if (k < N(u)) {
-      tree c= u[k];
-      tree x= c;
-      if (is_atomic (c)) x= cut_before (c, q->next);
-      if (is_atomic (c) || q->next != path (1)) {
-        if (x != "") {
-          orig << k;
-          cut << (is_atomic (c) || q->next != path (0));
-        }
-      }
+    array<int>& orig= lv[d].orig;
+    int n= N(orig), i= 0;
+    if (n == 0) return q;
+    if (n > 1) {
+      if (is_nil (h) || h->item >= n) return q;
+      i= h->item; h= h->next;
     }
-    for (int i=k+1; i<N(u); i++)
-      if (u[i] != "") { orig << i; cut << false; }
-    if (N(orig) == 0) return q;
-    if (N(orig) == 1) {
-      if (cut[0]) return path (orig[0], uncut (u[orig[0]], q->next, h));
-      return is_nil (h)? q: path (orig[0], h);
-    }
-    if (is_nil (h) || h->item >= N(orig)) return q;
-    int i= h->item;
-    if (cut[i]) return path (orig[i], uncut (u[orig[i]], q->next, h->next));
-    return path (orig[i], h->next);
+    else if (lv[d].cut != 0 && is_nil (h)) return q;
+    if (lv[d].cut == i)
+      return path (orig[i], uncut (u[orig[i]], q->next, h, lv, d+1));
+    return path (orig[i], h);
   }
   if (q == path (0)) return h;
   if (q == path (1)) return q;
   if (is_nil (h)) return q;
   if (is_nil (h->next)) return (h->item == 0? q: h);
   if (h->item == q->item)
-    return path (q->item, uncut (u[q->item], q->next, h->next));
+    return path (q->item, uncut (u[q->item], q->next, h->next, lv, d));
   return h;
+}
+
+static void
+add_hit (array<path>& r, path r1, path r2, path cur) {
+  // a hit which starts before cur, or at a tag around it whose text before
+  // cur was cut, starts at cur: the text before the reference, the output
+  // of an earlier replacement, is never in it (no cur: the whole text)
+  if (!is_nil (cur) && before_position (r1, cur)) r1= cur;
+  if (path_less (r2, r1)) r2= r1;
+  r << r1 << r2;
 }
 
 static array<path>
@@ -2085,7 +2096,8 @@ search_from_paragraph (tree t, tree what, path p, path q, int limit) {
   // the first hits of what in the paragraph t at p after the position q in
   // it (see search_from)
   array<path> r;
-  tree d (DOCUMENT, cut_before (t, q));
+  array<cut_level> lv;
+  tree d (DOCUMENT, cut_before (t, q, lv));
   range_set sel= search (d, what, path (), limit);
   bool narrow= is_concat (what) && N(what) != 0 &&
                !contains_select_region (what);
@@ -2101,15 +2113,8 @@ search_from_paragraph (tree t, tree what, path p, path q, int limit) {
     if (is_nil (h1) || h1->item != 0 || is_nil (h2) || h2->item != 0)
       continue;
     // (a hit at the start of the text after cur starts at cur)
-    path r1= p * uncut (t, q, h1->next);
-    path r2= p * uncut (t, q, h2->next);
-    // (a hit which starts before cur, or at a tag around it whose text
-    // before cur was cut, starts at cur: the text before the reference,
-    // the output of an earlier replacement, is never in it)
-    path c= p * q;
-    if (!is_nil (q) && before_position (r1, c)) r1= c;
-    if (path_less (r2, r1)) r2= r1;
-    r << r1 << r2;
+    add_hit (r, p * uncut (t, q, h1->next, lv),
+             p * uncut (t, q, h2->next, lv), is_nil (q)? path (): p * q);
   }
   return r;
 }
@@ -2129,14 +2134,12 @@ search_from (tree t, tree what, path p, path cur, int limit) {
   if (!is_position (t, q)) return r;
   if (!is_document (t)) return search_from_paragraph (t, what, p, q, limit);
   if (is_document (what)) {
-    tree d= cut_before (t, q);
+    array<cut_level> lv;
+    tree d= cut_before (t, q, lv);
     range_set sel= search (d, what, path (), limit);
-    for (int i=0; i+1<N(sel) && i < 2*limit; i+=2) {
-      path r1= p * uncut (t, q, sel[i]), r2= p * uncut (t, q, sel[i+1]);
-      if (before_position (r1, cur)) r1= cur;
-      if (path_less (r2, r1)) r2= r1;
-      r << r1 << r2;
-    }
+    for (int i=0; i+1<N(sel) && i < 2*limit; i+=2)
+      add_hit (r, p * uncut (t, q, sel[i], lv),
+               p * uncut (t, q, sel[i+1], lv), cur);
     return r;
   }
   if (is_nil (q)) return r;
