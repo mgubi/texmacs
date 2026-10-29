@@ -343,8 +343,9 @@ public:
   array<tree>                  redefined;   // redefined labels
   bool                         rebound;     // redefined, for passes which
                                             // are not complete
-  hashmap<string,bool>         rewritten;   // keys written more than once
-                                            // by the last complete pass
+  hashmap<string,tree>         rewritten;   // the values of the keys
+                                            // written more than once by
+                                            // the last complete pass
   hashmap<string,bool>         touched;     // touched refs
   hashmap<string,bool>         read_refs;   // refs read since the tables
                                             // were loaded (see clean_unused)
@@ -696,6 +697,7 @@ public:
     (*rec_merged) (a.operator-> ())= true; (*rec_held) << a; }
   void write_binding (string key, tree value, string extra);
   tree store_binding (string key, tree value, string extra);
+  bool was_rewritten (string key, tree value);
   // An entry of an auxiliary table (<write|toc|...>: the table of contents,
   // the index...), which a complete pass makes: it is recorded with the
   // bindings, as <write|key|value>, so that a bridge used again writes it

@@ -1563,8 +1563,8 @@
 ;; the binding another value, also with the classic cache
 ;; (TEXMACS_TYPESET_READS=off), which does it by one complete pass (#576).
 ;; A key which two bindings write (a label defined twice) is not a reason
-;; for it, nor are the missing references, and an edit which changes no
-;; binding makes one pass.
+;; for it when the value is one which they wrote, nor are the missing
+;; references, and an edit which changes no binding makes one pass.
 (define (test-paragraph-reads-binding)
   (check-group "a paragraph which reads a binding changed by an edit")
   (with-scratch-buffer
@@ -1593,19 +1593,43 @@
   (with-scratch-buffer
    (lambda (u)
      (buffer-set-body u (stree->tree
-                         '(document (set-binding "dup" "aaa")
-                                    (set-binding "dup" "bbb")
-                                    (concat "see " (get-binding "dup"))
+                         '(document (theorem (document (concat "One"
+                                                               (label "dup"))))
+                                    (theorem (document (concat "Two"
+                                                               (label "dup"))))
+                                    (concat "see " (reference "dup"))
                                     "after")))
      (update-current-buffer)
      (update-forced) (update-forced)
      (check= (passes-of
               (lambda ()
-                (for (v '("aaax" "aaaxx" "aaaxxx"))
-                  (tree-set (tree-ref (buffer-tree) 0 1) v)
+                (for (v '("Onex" "Onexx" "Onexxx"))
+                  (tree-set (tree-ref (buffer-tree) 0 0 0 0) v)
                   (update-forced))))
              3)
      (with x (lambda () (rect-x2 (rect 2)))
+       (check= (x) (from-scratch x)))
+     (check= (typeset-check-mismatches) 0)))
+  ;; a label defined twice, one definition removed, the other one
+  ;; renumbered: its new value is not one which the two wrote
+  (with-scratch-buffer
+   (lambda (u)
+     (buffer-set-body u (stree->tree
+                         '(document (concat "see " (reference "dup") "after")
+                                    (theorem (document (concat "One"
+                                                               (label "dup"))))
+                                    (theorem (document (concat "Two"
+                                                               (label "dup"))))
+                                    "filler")))
+     (update-current-buffer)
+     (update-forced) (update-forced)
+     (tree-remove! (buffer-tree) 2 1)
+     (update-forced) (update-forced)
+     (tree-insert! (buffer-tree) 1
+                   (map (lambda (i) (stree->tree '(theorem (document "P"))))
+                        (.. 0 9)))
+     (update-forced) (update-forced)
+     (with x (lambda () (rect-x1 (rect 0 2)))
        (check= (x) (from-scratch x)))
      (check= (typeset-check-mismatches) 0))))
 

@@ -1272,7 +1272,8 @@ edit_typeset_rep::typeset (SI& x1, SI& y1, SI& x2, SI& y2) {
     if (N(env->missing) == 0 && N(env->redefined) == 0 && removed == 0) break;
     // (the complete pass made for a binding given another value: the
     // missing references were missing before it, and are not a reason for
-    // one more pass)
+    // one more pass, and they were not reported, as after any pass which
+    // is not complete)
     if (rebound_pass && N(env->redefined) == 0 && removed == 0) break;
     rebound_pass= false;
     if ((N(env->missing) == missing_nr && N(env->redefined) == redefined_nr) ||
