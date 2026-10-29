@@ -79,6 +79,14 @@ jobs:
       - name: Run the regression suites
         run: ../.github/scripts/run-tests.sh TeXmacs/bin/texmacs.bin
 
+      # the command line and the exit of TeXmacs after a script (#462), one
+      # TeXmacs per case, under s7 (#562); fixes.yml runs them under Guile
+      - name: The startup checks
+        env:
+          TM_TEST_TIMEOUT: 300
+          TM_TEST_HOME: ${{ runner.temp }}/startup-home
+        run: tests/startup/check.sh
+
       - name: Package
         run: tar -czf texmacs-linux-x86_64.tar.gz TeXmacs
 
