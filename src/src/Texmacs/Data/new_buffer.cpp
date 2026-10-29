@@ -19,6 +19,7 @@
 #include "new_document.hpp"
 #include "merge_sort.hpp"
 #include "iterator.hpp"
+#include <time.h>
 
 array<tm_buffer> bufs;
 
