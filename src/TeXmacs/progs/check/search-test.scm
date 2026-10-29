@@ -2435,6 +2435,37 @@
                       '(label (wildcard "v")))
                 '((0 1 0) (0 1 1)))))))
 
+;; A lone wildcard is a formula of it: one hit in each paragraph, never
+;; across their borders (the maintainer's decision); it took all of the
+;; document, and Replace put a document inside a paragraph
+(define (test-lone-wildcard)
+  (check-group "lone wildcard")
+  (with-search-mode 'replace
+    (lambda ()
+      (for (w '((wildcard "w") (concat (wildcard "w"))))
+        (check= (hits '(document "ab" "cd") w) '((0 0) (0 2) (1 0) (1 2)))
+        (check= (hits '(document "ab" (theorem (document "x" "y")) "cd") w)
+                '((0 0) (0 2) (1 0 0 0) (1 0 0 1) (1 0 1 0) (1 0 1 1)
+                  (2 0) (2 2))))
+      (check-replace-rows
+        (append-map
+          (lambda (w)
+            `(((document "ab" "cd") ,w (concat "<" (wildcard "w") ">")
+               (document "<ab>" "<cd>"))
+              ((document "ab" "cd" "ef") ,w (concat "<" (wildcard "w") ">")
+               (document "<ab>" "<cd>" "<ef>"))
+              ((document "ab" (theorem (document "x" "y")) "cd") ,w
+               (concat "<" (wildcard "w") ">")
+               (document "<ab>" (theorem (document "<x>" "<y>")) "<cd>"))))
+          '((wildcard "w") (concat (wildcard "w")))))
+      ;; after an empty match, the hit at the start of the text after it is
+      ;; left out, and the search goes on for the next one
+      (with doc '(document (concat (strong "x") (strong "y") (strong "z")))
+        (check= (tree-search-from (stree->tree doc)
+                                  (stree->tree '(strong (wildcard "w")))
+                                  '() '(0 0) 1 #t)
+                '((0 1 0) (0 1 1)))))))
+
 ;; The wildcards of a region pattern take their values in the region, as its
 ;; content; the values were looked for by the literal parts around the
 ;; region, which are outside it (and by a case-sensitive search), and the
@@ -2595,6 +2626,7 @@
   (test-replace-filters)
   (test-replace-failures)
   (test-replace-empty-matches)
+  (test-lone-wildcard)
   (test-replace-region-wildcards)
   (test-replace-random)
   (check-end))

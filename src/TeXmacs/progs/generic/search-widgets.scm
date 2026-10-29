@@ -568,7 +568,6 @@
 (define (replace-step sel by what)
   ;; replace the hit sel (or leave it), and go on from the end of the
   ;; replacement; #t if replaced
-  (go-to (car sel))
   (let* ((r (replace-hit sel by what))
          (empty? (if r (== (car r) (cadr r)) (== (car sel) (cadr sel)))))
     (replace-from (cursor-path) empty?)
@@ -577,7 +576,10 @@
 (define (with-editing thunk)
   ;; thunk as one step of undo; if it fails, the document as it was before
   ;; it, and the error raised again (in a read-only document, end-editing
-  ;; cancels what it changed: there are no read-only parts)
+  ;; cancels what it changed: there are no read-only parts). cancel-editing
+  ;; is global_cancel: it cancels all that is pending since the last
+  ;; confirm, as the handlers of the keyboard and the mouse of the kernel do
+  ;; after an error (edit_keyboard.cpp, edit_mouse.cpp)
   (start-editing)
   (with r (catch #t thunk
             (lambda args

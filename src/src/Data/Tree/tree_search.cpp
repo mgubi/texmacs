@@ -1749,12 +1749,11 @@ match_whole (region_matcher& m, tree what) {
 
 static bool
 match_leftmost (region_matcher& m, tree what, bool to_end, bool any_start,
-                int& start, bool ready= false) {
+                int& start) {
   // the leftmost match of what in the tokens of m, at their start only
   // unless any_start: wildcards take as few tokens as they can, and a
   // trailing one the rest of them if to_end; start: its first token
-  // (ready: m was just initialized for it)
-  if (!ready || m.to_end != to_end) m.init (what, to_end);
+  m.init (what, to_end);
   for (start=0; start<=N(m.toks); start++) {
     if (m.run (0, start)) return true;
     if (!any_start) break;
@@ -1787,10 +1786,12 @@ match_alone (region_matcher& m, tree what, bool lazy, int& start) {
   // a1x; else all of it first, as a cascaded match in an argument)
   start= 0;
   if (!lazy && match_whole (m, what)) return true;
-  m.init (what, true);
-  if (N(m.kind) == 0) return false;
-  bool to_end= m.kind[N(m.kind)-1] == ELEM_WILDCARD;
-  return match_leftmost (m, what, to_end, true, start, true);
+  array<int> kind;
+  array<tree> elem;
+  pattern_elements (kind, elem, what);
+  if (N(kind) == 0) return false;
+  bool to_end= kind[N(kind)-1] == ELEM_WILDCARD;
+  return match_leftmost (m, what, to_end, true, start);
 }
 
 static bool
@@ -1990,6 +1991,7 @@ search_replace_match (tree t, tree what, path p1, path p2) {
   // over its base), and the value of each child of a formula pattern (see
   // wildcard_runs; none for another pattern); nil if Replace leaves the hit
   array<tree> r;
+  if (is_func (what, WILDCARD, 1)) what= tree (CONCAT, what);  // (as search)
   if (!is_position (t, p1) || !is_position (t, p2) || path_less (p2, p1))
     return r;
   search_scope scope;
@@ -2102,6 +2104,9 @@ add_hit (array<path>& r, path r1, path r2, path cur) {
   // of an earlier replacement, is never in it (no cur: the whole text)
   if (!is_nil (cur) && before_position (r1, cur)) r1= cur;
   if (path_less (r2, r1)) r2= r1;
+  // (a hit which is all before cur is none: an empty one at cur was left
+  // out by search_in_cut)
+  if (!is_nil (cur) && r1 == cur && r2 == cur) return;
   r << r1 << r2;
 }
 
@@ -2128,8 +2133,8 @@ token_before (tree u, path h) {
 }
 
 static array<path>
-search_after (tree t, tree what, path p, path q, int limit,
-              bool after_empty) {
+search_in_cut (tree t, tree what, path p, path q, int limit,
+               bool after_empty) {
   // the first hits of what in t at p (a paragraph, or a document for a
   // pattern of several paragraphs) after the position q in it (see
   // search_from). At q (not nil), no empty hit (after a match, which may
@@ -2163,8 +2168,9 @@ search_after (tree t, tree what, path p, path q, int limit,
         continue;
       add_hit (r, p * uncut (t, q, h1, lv), p * uncut (t, q, h2, lv), cur);
     }
-    // (hits left out at the start: search further)
-    if (N(r) >= 2*limit || N(sel) < 2*lim) return r;
+    // (hits left out at the start: search further, unless the search gave
+    // all of them, without reaching its limit)
+    if (N(r) >= 2*limit || N(sel) <= lim) return r;
   }
 }
 
@@ -2186,16 +2192,17 @@ search_from (tree t, tree what, path p, path cur, int limit,
   // the steps cost more (1000 hits in a paragraph of 5 kB: about 2 s, as
   // 1000 hits in 1 MB of short paragraphs)
   array<path> r;
+  if (is_func (what, WILDCARD, 1)) what= tree (CONCAT, what);  // (as search)
   if (!(p <= cur)) return r;
   path q= cur / p;
   if (!is_position (t, q)) return r;
   if (!is_document (t) || is_document (what))
-    return search_after (t, what, p, q, limit, after_empty);
+    return search_in_cut (t, what, p, q, limit, after_empty);
   if (is_nil (q)) return r;
   for (int k=q->item; k<N(t) && N(r) == 0; k++)
     r= (k == q->item?
-        search_after (t[k], what, p * k, q->next, limit, after_empty):
-        search_after (t[k], what, p * k, path (), limit, false));
+        search_in_cut (t[k], what, p * k, q->next, limit, after_empty):
+        search_in_cut (t[k], what, p * k, path (), limit, false));
   return r;
 }
 
@@ -2516,6 +2523,9 @@ search (tree t, tree what, path p, int limit) {
   clear_no_formula ();
   initialize_search ();  // also the label select-region, needed just below
   what= without_empty_strings (what, !contains_select_region (what));
+  // a lone wildcard is searched as a formula of it: in each paragraph,
+  // never across their borders (the maintainer's decision)
+  if (is_func (what, WILDCARD, 1)) what= tree (CONCAT, what);
   range_set sel;
   //cout << "Search " << what << ", " << contains_select_region (what) << "\n";
   if (contains_select_region (what)) select (sel, t, what, p);
@@ -2532,6 +2542,9 @@ search (tree t, tree what, path p, path pos, int limit) {
   clear_no_formula ();
   initialize_search ();  // also the label select-region, needed just below
   what= without_empty_strings (what, !contains_select_region (what));
+  // a lone wildcard is searched as a formula of it: in each paragraph,
+  // never across their borders (the maintainer's decision)
+  if (is_func (what, WILDCARD, 1)) what= tree (CONCAT, what);
   range_set sel;
   //cout << "Search " << what << ", " << contains_select_region (what) << "\n";
   if (contains_select_region (what)) select (sel, t, what, p);
