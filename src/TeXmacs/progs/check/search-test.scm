@@ -2122,7 +2122,7 @@
                       '(frac (concat "a" (wildcard "w")) "c")
                       '(frac (wildcard "w") "d"))
                 '((document (frac (frac "ab" "z") "c"))
-                  "a match was left as it is: its value inside a tag would lose the other content of that tag"))
+                  "Match left: it would lose the rest of a tag"))
         (check= (adjust-by '(concat "<" (wildcard "w") ">")
                            '(concat "a" (wildcard "w") "b") "xyz")
                 #f)

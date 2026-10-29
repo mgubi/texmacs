@@ -542,13 +542,12 @@
           (list a b))
         (begin
           (go-to (cadr sel))
+          ;; (the message, also for the tests)
           (set! replace-skip-message
-                (cond ((not rm)
-                       "a match was left as it is: it is not one, or its literal part crosses the border of a tag")
-                      ((not (tm-func? what 'concat))
-                       "a match was left as it is: its value inside a tag would lose the other content of that tag")
-                      (else
-                       "a match was left as it is: the values of its wildcards are not known")))
+            (cond ((not rm) "Match left: not one, or it crosses a tag")
+                  ((not (tm-func? what 'concat))
+                   "Match left: it would lose the rest of a tag")
+                  (else "Match left: its wildcards have no values")))
           (set-message replace-skip-message "Replace")
           #f))))
 
