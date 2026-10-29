@@ -48,6 +48,10 @@
         (utils library cursor)
         (generic search-widgets)))
 
+;; the private bindings of the widget, which the tests of Replace use
+(define widgets (resolve-module '(generic search-widgets)))
+(define (widget x) (eval x widgets))
+
 (define (with-preference which val thunk)
   ;; run thunk with the preference set in memory only: nothing is saved
   (let* ((had? (cpp-has-preference? which))
@@ -65,18 +69,22 @@
   (with-preference "search-and-replace" (if (== mode 'search) "off" "on")
     thunk))
 
-(define (with-search-mode-value mode thunk)
-  ;; the value of thunk, with the matching of mode (set in memory only, and
+(define (with-preference-value which val thunk)
+  ;; the value of thunk, with the preference set (in memory only, and
   ;; restored also when thunk fails)
-  (let* ((which "search-and-replace")
-         (had? (cpp-has-preference? which))
+  (let* ((had? (cpp-has-preference? which))
          (old (get-preference which)))
     (dynamic-wind
-      (lambda () (cpp-set-preference which (if (== mode 'search) "off" "on")))
+      (lambda () (cpp-set-preference which val))
       thunk
       (lambda ()
         (if had? (cpp-set-preference which old)
             (cpp-reset-preference which))))))
+
+(define (with-search-mode-value mode thunk)
+  ;; the value of thunk, with the matching of mode
+  (with-preference-value "search-and-replace"
+    (if (== mode 'search) "off" "on") thunk))
 
 (define (hits doc what)
   (tree-search-tree (stree->tree doc) what '() 1000))
@@ -1540,7 +1548,7 @@
 ;; one is "" (the maintainer's decisions). They were matched child by child:
 ;; with another number of children the replacement kept (wildcard "w"), and
 ;; a*_x on ab_y_x gave _y (#520)
-(define adjust-by (eval 'adjust-by (resolve-module '(generic search-widgets))))
+(define adjust-by (widget 'adjust-by))
 
 (define (replaced by what match . hit)
   (tm->stree (apply adjust-by (cons* by what match hit))))
@@ -1676,9 +1684,8 @@
                                           (stree->tree (cadr doc)))))))))
             (check= bad '())))))))
 
-;; Edit > Replace in a buffer (replace-next*, as Replace All calls it): the
-;; hits from tree-search-tree, the pattern and the replacement in the
-;; auxiliary buffers of the widget
+;; Edit > Replace in a buffer: the pattern and the replacement in the
+;; auxiliary buffers of the widget, driven by its Replace one and Replace All
 (define (with-search-buffers doc what by thunk)
   ;; the value of thunk in a buffer holding doc, with the auxiliary buffers
   ;; of the widget holding the pattern what and the replacement by, and the
@@ -1700,39 +1707,6 @@
       (when (buffer-exists? old) (switch-to-buffer old))
       r)))
 
-(define (search-hits what)
-  (tree-search-tree (buffer-tree) (stree->tree what)
-                    (tree->path (buffer-tree)) 100))
-
-(define replace-hits-count 0)
-
-(define (replace-hits what by n)
-  ;; replace the hits of what by by, at most n times; the cursor after the
-  ;; last one
-  (with next (eval 'replace-next* (resolve-module '(generic search-widgets)))
-    (let loop ((i 0) (cur #f))
-      (with h (search-hits what)
-        (if (or (>= i n) (null? h)) cur
-            (begin
-              (set-alt-selection "alternate" h)
-              (if (not (next (stree->tree by))) cur
-                  (with c (cursor-path)
-                    (set! replace-hits-count (+ i 1))
-                    (set-alt-selection "search-reference" (list c c))
-                    (loop (+ i 1) c)))))))))
-
-(define (replace-in-buffer doc what by)
-  ;; the body of a buffer holding doc after replacing all the hits of what
-  ;; by by, from its start; a runaway (a replacement which is replaced
-  ;; again and again) is reported
-  (with-search-buffers doc what by
-    (lambda (u)
-      (set! replace-hits-count 0)
-      (replace-hits what by 100)
-      (if (>= replace-hits-count 100)
-          (list 'runaway (tm->stree (buffer-get-body u)))
-          (tm->stree (buffer-get-body u))))))
-
 (define test-search-filter '(attr))
 (define test-source-mode? #f)
 
@@ -1741,44 +1715,41 @@
   ;; buffer holding doc, then undo: the result and the body after undo
   (with-search-buffers doc what by
     (lambda (u)
-      (let* ((m (resolve-module '(generic search-widgets)))
-             (table (eval 'search-filter-table m)))
+      (let* ((table (widget 'search-filter-table)))
         ;; the hits are not filtered by the mode at the cursor (a buffer
         ;; without a window is not typeset), unless a test sets a filter
         (ahash-set! table (current-buffer) (stree->tree test-search-filter))
         (when test-source-mode? (init-env "mode" "src"))
         (clear-undo-history)
-        ((eval 'perform-search* m))
+        ((widget 'perform-search*))
         (replace-all)
         (with res (tm->stree (buffer-get-body u))
           (undo 0)
           (list res (tm->stree (buffer-get-body u))))))))
 
-;; Edit > Replace and Replace All on documents (#520). The match is replaced
-;; in the argument of the tag which holds the literal part of the pattern,
-;; as when the argument is alone (the maintainer's decision: the regions
-;; found on b (strong F) c are those on F alone), the text around it stays:
-;; a lone tag, a hit which a wildcard carries out of a tag or into it, a
-;; cascaded match. A cascaded match of a tag pattern is replaced as a whole:
-;; the values are in copies of the tags around the argument, unless these
-;; have other content, or the match takes only a part of the argument, which
-;; the replacement would lose: the hit is left as it is, with a message, as
-;; when its literal part crosses the border of a tag. The replacement kept
-;; the (wildcard ...) tags literally, lost text, and Replace All replaced its
-;; own output again and again
+;; Edit > Replace and Replace All on documents (#520): the rule. Replace
+;; replaces the match in the argument of the tag which holds the literal
+;; part of the pattern, as when the argument is alone (the maintainer's
+;; decision: the regions found on b (strong F) c are those on F alone), and
+;; keeps the text around it: a lone tag, a hit which a wildcard carries out
+;; of a tag or into it, a cascaded match. A cascaded match of a tag pattern
+;; is replaced as a whole, its values in copies of the tags around the
+;; argument. Replace leaves a hit, with a message, when the replacement would
+;; lose text: the literal part crosses the border of a tag, those tags have
+;; other content, or the match takes only a part of the argument. It goes
+;; on in the text after its replacement, never in it
 
 (define (replace-one-repeatedly doc what by)
   ;; the real Replace one of the widget, again and again until nothing
   ;; changes (at most 100 times: else a runaway)
   (with-search-buffers doc what by
     (lambda (u)
-      (let* ((m (resolve-module '(generic search-widgets)))
-             (state (lambda () (list (tm->stree (buffer-get-body u))
+      (let* ((state (lambda () (list (tm->stree (buffer-get-body u))
                                      (get-alt-selection "search-reference")))))
-        (ahash-set! (eval 'search-filter-table m)
+        (ahash-set! (widget 'search-filter-table)
                     (current-buffer) (stree->tree test-search-filter))
         (when test-source-mode? (init-env "mode" "src"))
-        ((eval 'perform-search* m))
+        ((widget 'perform-search*))
         (let loop ((i 0) (s (state)))
           (replace-one)
           (with s2 (state)
@@ -1788,9 +1759,8 @@
 
 (define (check-replace-rows rows)
   ;; each row: a document, the pattern, the replacement, the result; by
-  ;; replace-next* hit after hit, by the real Replace one again and again,
-  ;; and by the real Replace All, whose undo gives the document back in
-  ;; one step: they agree
+  ;; the real Replace one again and again, and by the real Replace All,
+  ;; whose undo gives the document back in one step: they agree
   (for-each
     (lambda (row)
       (let* ((doc (car row)) (what (cadr row)) (by (caddr row))
@@ -1805,7 +1775,7 @@
   ;; Enter in the fields of the widget (the next hit, Replace One) calls
   ;; the inside? of the kernel in this module: a helper of the module hid
   ;; it, and Enter failed (wrong number of arguments)
-  (check= (eval '(inside? 'inactive) (resolve-module '(generic search-widgets)))
+  (check= (widget '(inside? 'inactive))
           #f)
   (with-search-mode 'replace
     (lambda ()
@@ -2103,11 +2073,10 @@
   ;; then highlights
   (with-search-mode 'replace
     (lambda ()
-      (let* ((m (resolve-module '(generic search-widgets)))
-             (start (lambda ()
-                      (ahash-set! (eval 'search-filter-table m)
+      (let* ((start (lambda ()
+                      (ahash-set! (widget 'search-filter-table)
                                   (current-buffer) (stree->tree '(attr)))
-                      ((eval 'perform-search* m))))
+                      ((widget 'perform-search*))))
              (rel (lambda (p)
                     (with q (tree->path (buffer-tree))
                       (if (list-starts? p q) (list-tail p (length q)) p))))
@@ -2117,7 +2086,7 @@
                          (start)
                          (replace-one)
                          (list (tm->stree (buffer-get-body u))
-                               (eval 'replace-skip-message m)))))))
+                               (widget 'replace-skip-message)))))))
         (check= (skip '(document (frac (frac "ab" "z") "c"))
                       '(frac (concat "a" (wildcard "w")) "c")
                       '(frac (wildcard "w") "d"))
@@ -2323,22 +2292,28 @@
           (and (subsequence? outside (chars-and-tags next (lambda (x y) #t)))
                (loop (cdr l)))))))
 
+(define (with-preferences-on l thunk)
+  ;; the value of thunk with the preferences l on (in memory only, and
+  ;; restored also when thunk fails)
+  (if (null? l) (thunk)
+      (with-preference-value (car l) "on"
+        (lambda () (with-preferences-on (cdr l) thunk)))))
+
 (define (random-case-problems c)
-  ;; the checks which the random case c fails
-  (let* ((doc (car c)) (what (cadr c)) (by (caddr c)) (prefs (cadddr c))
-         (t0 (texmacs-time)))
-    (for (p prefs) (cpp-set-preference p "on"))
-    (with r
+  ;; the checks which the random case c fails (a case which does not end
+  ;; is caught by the time limit of the suite)
+  (let* ((doc (car c)) (what (cadr c)) (by (caddr c)) (prefs (cadddr c)))
+    (with-preferences-on prefs
+      (lambda ()
         (catch #t
           (lambda ()
-            (let* ((m (resolve-module '(generic search-widgets)))
-                   (no-skip (eval '(set! replace-skip-message #f) m))
+            (let* ((no-skip (widget '(set! replace-skip-message #f)))
                    (all (replace-all-in-buffer doc what by))
-                   (no-trace (eval '(set! replace-trace (list)) m))
+                   (no-trace (widget '(set! replace-trace (list))))
                    (one (replace-one-repeatedly doc what by))
-                   (trace (eval 'replace-trace m))
-                   (no-trace2 (eval '(set! replace-trace #f) m))
-                   (skip (eval 'replace-skip-message m))
+                   (trace (widget 'replace-trace))
+                   (no-trace2 (widget '(set! replace-trace #f)))
+                   (skip (widget 'replace-skip-message))
                    (hits (tree-search-tree (stree->tree doc) (stree->tree what)
                                            '() 1000))
                    (expect (and (string? what) (string? by) (null? prefs)
@@ -2355,7 +2330,6 @@
                         (and (pair? all) (== (text-and-tags (car all))
                                              (text-and-tags expect))))
                     '() '(string-replacement))
-                (if (> (- (texmacs-time) t0) 10000) '(too-slow) '())
                 ;; nothing outside the range of each replacement changed
                 (if (or (not (pair? one)) (== (car one) 'runaway)
                         (kept-outside? trace one))
@@ -2366,9 +2340,7 @@
                 (if (and skip (or (string? what) (tm-func? what 'concat)
                                   (tm-func? what 'document)))
                     (list (list 'skip skip)) '()))))
-          (lambda args (list 'error args)))
-      (for (p prefs) (cpp-reset-preference p))
-      r)))
+          (lambda args (list 'error args)))))))
 
 (define (random-replace-failures n seed)
   ;; the cases among n random ones which fail a check, with the checks
@@ -2452,25 +2424,29 @@
       (set! test-source-mode? #f)
       ;; a hit which is not a match is left with a message (an error, after
       ;; which the editing did not end), and Replace goes on
-      (let* ((m (resolve-module '(generic search-widgets))))
+      (begin
         (check= (with-search-buffers '(document "xyz a1b")
                   '(concat "a" (wildcard "w") "b") '(concat "<" (wildcard "w") ">")
                   (lambda (u)
-                    (ahash-set! (eval 'search-filter-table m)
+                    (ahash-set! (widget 'search-filter-table)
                                 (current-buffer) (stree->tree '(attr)))
-                    (eval '(set! replace-skip-message #f) m)
+                    (widget '(set! replace-skip-message #f))
                     (with p (tree->path (buffer-tree))
                       (set-alt-selection "alternate"
                                          (list (append p '(0 0))
                                                (append p '(0 3)))))
                     (replace-one)
                     (list (tm->stree (buffer-get-body u))
-                          (string? (eval 'replace-skip-message m)))))
+                          (string? (widget 'replace-skip-message)))))
                 '((document "xyz a1b") #t))))))
 
 (define (test-replace-random)
   (check-group "replace random")
-  (check= (random-replace-failures 200 543) '()))
+  (let* ((t0 (texmacs-time))
+         (bad (random-replace-failures 200 543)))
+    (display* "    replace random: 200 cases in " (- (texmacs-time) t0)
+              " ms\n")
+    (check= bad '())))
 
 (tm-define (search-test-failures)
   (check-suite "search")

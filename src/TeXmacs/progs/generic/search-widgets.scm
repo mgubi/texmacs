@@ -467,8 +467,9 @@
 ;; one step of undo (#520)
 
 (define replace-last #f)
-(define replace-trace #f)   ;; for the tests: the document and the range of
-                            ;; each replacement, if a list
+(define replace-trace #f)   ;; for the tests, if a list: the document and the
+                            ;; range of each replacement (all of the
+                            ;; document at each step: only for small ones)
 (define replace-skip-message #f)
 (define replace-after-empty #f) ;; the cursor after an empty match
 
