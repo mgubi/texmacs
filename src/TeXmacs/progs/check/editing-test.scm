@@ -201,7 +201,44 @@
         (check= (body) '(document "ab"))
         (edit (go-end) (insert "c"))
         (check= (tree->stree (buffer-get-body u)) '(document "abc"))
-        (check= (buffer->views u) (list v1 v2))))))
+        (check= (buffer->views u) (list v1 v2))
+        ;; deleting the current view, which the window shows: the window
+        ;; shows another view of the buffer, which becomes the current one;
+        ;; before, both kept the deleted view (#559: delete_view of new_view.cpp)
+        (with win (current-window)
+          (view-delete v2)
+          (check= (buffer->views u) (list v1))
+          (check= (current-view-url) v1)
+          (check= (window->view win) v1)
+          (check= (view->window-url v1) win)
+          (check= (current-window) win))
+        (edit (go-end) (insert "d"))
+        (check= (body) '(document "abcd"))
+        ;; also with a view which was never in a window
+        (with v3 (view-new u)
+          (view-delete v1)
+          (check= (buffer->views u) (list v3))
+          (check= (current-view-url) v3)
+          (check= (window->view (current-window)) v3))
+        (edit (go-end) (insert "e"))
+        (check= (body) '(document "abcde")))))
+  ;; the views of a renamed buffer keep their numbers, and a new view does
+  ;; not take one of them (#560: two views had the same url, and Clone
+  ;; window after Save as aborted)
+  (with-buffer-body '(document "a")
+    (lambda ()
+      (let* ((u (current-buffer))
+             (v1 (view-new u))
+             (new-name (tmp-file "renamed-views.tm")))
+        (buffer-rename u new-name)
+        (let* ((vs (buffer->views new-name))
+               (v2 (view-new new-name))
+               (vs* (buffer->views new-name)))
+          (check= (length vs*) (+ (length vs) 1))
+          (check-false (in? v2 vs))
+          (check= (view->buffer v2) new-name)
+          (view-delete v2)
+          (check= (buffer->views new-name) vs))))))
 
 ;; A tree pointer or a position which is collected while it is still
 ;; attached to a tree (a process whose callback was never called, a
