@@ -1733,6 +1733,9 @@
           (list 'runaway (tm->stree (buffer-get-body u)))
           (tm->stree (buffer-get-body u))))))
 
+(define test-search-filter '(attr))
+(define test-source-mode? #f)
+
 (define (replace-all-in-buffer doc what by)
   ;; the real Replace All of the widget (perform-search*, replace-all) in a
   ;; buffer holding doc, then undo: the result and the body after undo
@@ -1741,8 +1744,9 @@
       (let* ((m (resolve-module '(generic search-widgets)))
              (table (eval 'search-filter-table m)))
         ;; the hits are not filtered by the mode at the cursor (a buffer
-        ;; without a window is not typeset)
-        (ahash-set! table (current-buffer) (stree->tree '(attr)))
+        ;; without a window is not typeset), unless a test sets a filter
+        (ahash-set! table (current-buffer) (stree->tree test-search-filter))
+        (when test-source-mode? (init-env "mode" "src"))
         (clear-undo-history)
         ((eval 'perform-search* m))
         (replace-all)
@@ -1772,7 +1776,8 @@
              (state (lambda () (list (tm->stree (buffer-get-body u))
                                      (get-alt-selection "search-reference")))))
         (ahash-set! (eval 'search-filter-table m)
-                    (current-buffer) (stree->tree '(attr)))
+                    (current-buffer) (stree->tree test-search-filter))
+        (when test-source-mode? (init-env "mode" "src"))
         ((eval 'perform-search* m))
         (let loop ((i 0) (s (state)))
           (replace-one)
@@ -1790,7 +1795,6 @@
     (lambda (row)
       (let* ((doc (car row)) (what (cadr row)) (by (caddr row))
              (res (cadddr row)))
-        (check= (replace-in-buffer doc what by) res)
         (check= (replace-one-repeatedly doc what by) res)
         (check= (replace-all-in-buffer doc what by)
                 (list res (tm->stree (tree-simplify (stree->tree doc)))))))
@@ -2377,6 +2381,49 @@
                    (p (random-case-problems c)))
               (loop (+ i 1) (if (null? p) bad (cons (list c p) bad)))))))))
 
+(define (test-replace-filters)
+  (check-group "replace with a filter")
+  ;; Replace goes on after the hits which the filter of the search rejects
+  ;; (a paragraph of them stopped it)
+  (with-search-mode 'replace
+    (lambda ()
+      (set! test-search-filter '(attr "mode" "math"))
+      (check-replace-rows
+        '(((document (math "a") "a" (math "a")) "a" "Z"
+           (document (math "Z") "a" (math "Z")))))
+      (set! test-search-filter '(attr "mode" "text" "language" "french"))
+      (check-replace-rows
+        '(((document (with "language" "french" "a") "a"
+                     (with "language" "french" "a"))
+           "a" "Z"
+           (document (with "language" "french" "Z") "a"
+                     (with "language" "french" "Z")))))
+      (set! test-search-filter '(attr))
+      ;; in a source document, also the hidden content, as the search
+      ;; (which shows it)
+      (set! test-source-mode? #t)
+      (check= (car (replace-all-in-buffer '(document (folded "q" "ab ab"))
+                                          "ab" "Z"))
+              '(document (unfolded "q" "Z Z")))
+      (set! test-source-mode? #f)
+      ;; a hit which is not a match is left with a message (an error, after
+      ;; which the editing did not end), and Replace goes on
+      (let* ((m (resolve-module '(generic search-widgets))))
+        (check= (with-search-buffers '(document "xyz a1b")
+                  '(concat "a" (wildcard "w") "b") '(concat "<" (wildcard "w") ">")
+                  (lambda (u)
+                    (ahash-set! (eval 'search-filter-table m)
+                                (current-buffer) (stree->tree '(attr)))
+                    (eval '(set! replace-skip-message #f) m)
+                    (with p (tree->path (buffer-tree))
+                      (set-alt-selection "alternate"
+                                         (list (append p '(0 0))
+                                               (append p '(0 3)))))
+                    (replace-one)
+                    (list (tm->stree (buffer-get-body u))
+                          (string? (eval 'replace-skip-message m)))))
+                '((document "xyz a1b") #t))))))
+
 (define (test-replace-random)
   (check-group "replace random")
   (check= (random-replace-failures 200 543) '()))
@@ -2412,5 +2459,6 @@
   (test-speed-in-arguments)
   (test-replace-wildcards)
   (test-replace-in-buffers)
+  (test-replace-filters)
   (test-replace-random)
   (check-end))

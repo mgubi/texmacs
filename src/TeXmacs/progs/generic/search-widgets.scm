@@ -116,16 +116,23 @@
 (define search-serial 0)
 (define search-filter-out? #f)
 
-(define (tree-perform-search t what p limit)
+(define (with-search-access-mode thunk)
+  ;; thunk with the access mode of the search: in a source document, also
+  ;; the hidden content
   (let* ((source-mode 2)
          (old-mode (get-access-mode))
          (new-mode (if (== (get-init "mode") "src") source-mode old-mode)))
-    (set-access-mode new-mode)
-    (let* ((cp (cDr (cursor-path)))
-           (pos (if (list-starts? cp p) (list-tail cp (length p)) (list)))
-           (r (tree-search-tree-at t what p pos limit)))
-      (set-access-mode old-mode)
-      r)))
+    (dynamic-wind
+      (lambda () (set-access-mode new-mode))
+      thunk
+      (lambda () (set-access-mode old-mode)))))
+
+(define (tree-perform-search t what p limit)
+  (with-search-access-mode
+    (lambda ()
+      (let* ((cp (cDr (cursor-path)))
+             (pos (if (list-starts? cp p) (list-tail cp (length p)) (list))))
+        (tree-search-tree-at t what p pos limit)))))
 
 (define (go-to* p)
   (go-to p)
@@ -498,19 +505,18 @@
 (define (next-hit cur what)
   ;; the hit from which Replace goes on, from cur: the first one which the
   ;; search finds in the text of the document after cur, now (nothing found
-  ;; before a change is kept across it)
+  ;; before a change is kept across it), which the filter of the search
+  ;; accepts: the search goes on after the hits which it rejects
   (let* ((t (buffer-tree))
-         (p (tree->path t))
-         (from (lambda (limit)
-                 (with l (tree-search-from t what p cur limit)
-                   (with f (pairs (filter-search-results l))
-                     ;; the first hits only, unless the mode filters all
-                     (if (and (null? f) (>= (length l) (* 2 limit))
-                              (< limit 1000000))
-                         #f f))))))
+         (p (tree->path t)))
     (and (list-starts? cur p)
-         (with l (or (from 1) (from 8) (from 1000000))
-           (and (nnull? l) (car l))))))
+         (let loop ((from cur))
+           (let* ((l (with-search-access-mode
+                       (lambda () (tree-search-from t what p from 4))))
+                  (f (pairs (filter-search-results l))))
+             (cond ((nnull? f) (car f))
+                   ((and (nnull? l) (path-less? from (cAr l))) (loop (cAr l)))
+                   (else #f)))))))
 
 (define (replace-hit sel by what)
   ;; replace the hit sel of what by by: the part of it which Replace
@@ -520,23 +526,28 @@
          (p (tree->path t))
          (in? (and (list-starts? (car sel) p) (list-starts? (cadr sel) p)))
          (r (if in?
-                (tree-search-replace-range t (list-tail (car sel) (length p))
-                                           (list-tail (cadr sel) (length p))
-                                           what)
+                (with-search-access-mode
+                  (lambda ()
+                    (tree-search-replace-range
+                      t (list-tail (car sel) (length p))
+                      (list-tail (cadr sel) (length p)) what)))
                 (list)))
          ;; the range, and the match in it, exactly: the selection of the
          ;; editor (selection-tree, clipboard-cut) moves the ends of a range
          ;; next to a script over its base, which was then lost
-         (a (if in? (append p (car r)) (car sel)))
-         (b (if in? (append p (cadr r)) (cadr sel)))
+         (a (if (nnull? r) (append p (car r)) (car sel)))
+         (b (if (nnull? r) (append p (cadr r)) (cadr sel)))
          (by* (cond ((not in?)
                      (selection-set-range-set sel)
                      (adjust-by by what (selection-tree)))
                     ((null? r) #f)
                     (else
                      (selection-set-range-set (list a b))
-                     (adjust-by by what (tree-search-range-tree t (car r) (cadr r))
-                                t (car r) (cadr r))))))
+                     (with-search-access-mode
+                       (lambda ()
+                         (adjust-by by what
+                                    (tree-search-range-tree t (car r) (cadr r))
+                                    t (car r) (cadr r))))))))
     (if by*
         (with by* (tm->tree by*)
           (when replace-trace
@@ -592,12 +603,14 @@
   (and (replace-next* by)
        (begin (perform-search*) #t)))
 
+(define (with-editing thunk)
+  ;; thunk as one step of undo, also when it fails
+  (dynamic-wind start-editing thunk end-editing))
+
 (tm-define (replace-one)
   (and-with by (by-tree)
     (with-buffer (master-buffer)
-      (start-editing)
-      (replace-next by)
-      (end-editing))
+      (with-editing (lambda () (replace-next by))))
     (perform-search*)
     ;; the match which the next Replace replaces, not the whole hit
     (with-buffer (master-buffer)
@@ -647,9 +660,7 @@
 (tm-define (replace-all)
   (and-with by (by-tree)
     (with-buffer (master-buffer)
-      (start-editing)
-      (replace-all-hits by)
-      (end-editing))
+      (with-editing (lambda () (replace-all-hits by))))
     (perform-search*)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
