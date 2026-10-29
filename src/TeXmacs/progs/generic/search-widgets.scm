@@ -503,7 +503,8 @@
          ;; (after an empty match, the next one starts at least one token
          ;; later: Replace, which goes on after its replacement, ends)
          (let loop ((from cur)
-                    (empty? (and (replace-continues? cur) (cadr replace-last))))
+                    (empty? (and (replace-continues? cur)
+                                 (cadr replace-last))))
            (let* ((l (with-search-access-mode
                        (lambda () (tree-search-from t what p from 1 empty?))))
                   (f (pairs (filter-search-results l))))
