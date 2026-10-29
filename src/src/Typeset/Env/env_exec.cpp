@@ -2107,7 +2107,8 @@ edit_env_rep::store_binding (string key, tree value, string extra) {
     if (!rewritten->contains (key))
       rewritten (key)= tuple (is_tuple (old_value) && N(old_value) >= 1?
                               old_value[0]: tree (UNINIT));
-    rewritten (key) << value;
+    // (a copy: the value may be a tree of the document, which is edited)
+    rewritten (key) << copy (value);
   }
   touched (key)= true;
   if (!same && is_tuple (old_value) && N(old_value) >= 1) {

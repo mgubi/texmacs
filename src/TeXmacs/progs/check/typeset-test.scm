@@ -1610,6 +1610,28 @@
      (with x (lambda () (rect-x2 (rect 2)))
        (check= (x) (from-scratch x)))
      (check= (typeset-check-mismatches) 0)))
+  ;; the last of two set-binding of one key edited: its new value is not
+  ;; one which the two wrote (the values of the complete pass are copies,
+  ;; not the strings of the document)
+  (with-scratch-buffer
+   (lambda (u)
+     (buffer-set-body u (stree->tree
+                         '(document (set-binding "dup" "a")
+                                    (set-binding "dup" "WWWW")
+                                    (concat "see " (get-binding "dup") "after")
+                                    "filler")))
+     (update-current-buffer)
+     (update-forced) (update-forced)
+     (with x (lambda () (rect-x1 (rect 2 2)))
+       (tree-set (tree-ref (buffer-tree) 1 1) "WWWWWWWW")
+       (update-forced) (update-forced)
+       (check= (x) (from-scratch x))
+       (with s (tree-ref (buffer-tree) 1 1)
+         (go-to (append (tree->path s) (list (string-length (tree->string s)))))
+         (insert "WWWW"))
+       (update-forced) (update-forced)
+       (check= (x) (from-scratch x)))
+     (check= (typeset-check-mismatches) 0)))
   ;; a label defined twice, one definition removed, the other one
   ;; renumbered: its new value is not one which the two wrote
   (with-scratch-buffer
