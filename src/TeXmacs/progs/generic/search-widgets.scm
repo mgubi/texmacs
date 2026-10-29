@@ -576,7 +576,8 @@
       (replace-step sel by what))))
 
 (define (with-editing thunk)
-  ;; thunk as one step of undo, also when it fails
+  ;; thunk as one step of undo, also when it fails (in a read-only document,
+  ;; end-editing cancels what it changed: there are no read-only parts)
   (dynamic-wind start-editing thunk end-editing))
 
 (tm-define (replace-one)

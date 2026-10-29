@@ -2151,7 +2151,10 @@ search_from (tree t, tree what, path p, path cur, int limit,
   // next ones, until there are hits (a pattern of several paragraphs: the
   // document after cur at once). After an empty match at cur (after_empty)
   // the next one starts at least one character later, so that Replace,
-  // which goes on after its replacement, always ends
+  // which goes on after its replacement, always ends. Each call searches
+  // the rest of the paragraph of cur again: Replace All costs O(n^2) in a
+  // paragraph of n hits, but the steps cost more (1000 hits in a paragraph
+  // of 5 kB: about 2 s, as 1000 hits in 1 MB of short paragraphs)
   array<path> r;
   if (!(p <= cur)) return r;
   path q= cur / p;
