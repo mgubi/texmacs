@@ -14,6 +14,17 @@ have the details, and the problems go to the
 
 ## 29 October 2026
 
+- **References after an edit**: a reference to a label which an edit
+  removes shows "?" at once, and its old number no longer stays until
+  Document > Update; an undo, a label added after its references, or
+  equations numbered again by an insertion also update the references
+  placed before them; the same for a label made only in a running header
+  (#571).
+- **Bindings changed by an edit with the classic cache**
+  (`TEXMACS_TYPESET_READS=off`): what reads a binding (`get-binding`,
+  a reference, the parts of a surround) is typeset again when an edit
+  gives it another value (#576).
+
 - **Dialogs at a fractional scaling** (desktop Vue builds, Wayland): with
   the display scaled by a fraction such as 150% or 167% (GNOME on
   Wayland), a dialog sized to its contents (the question of Ctrl+Q with
