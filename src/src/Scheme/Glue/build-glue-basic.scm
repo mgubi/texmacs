@@ -73,6 +73,8 @@
   (evaluate-system evaluate_system
     (array_string array_string array_int array_string array_int))
   (async-eval-system async_eval_system (bool string object))
+  (async-eval-system-full async_eval_system_full (bool string object))
+  (async-eval-pending async_eval_pending (void))
   (http-post http_post (string string array_string string))
   (http-post-query http_post_query (string string array_string array_string))
   (async-http-post async_http_post (bool string array_string string object))
