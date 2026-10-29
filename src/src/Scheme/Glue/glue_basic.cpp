@@ -21,6 +21,24 @@ tmg_typeset_check_mismatches () {
 }
 
 tmscm
+tmg_typeset_pass_count () {
+  // TMSCM_DEFER_INTS;
+  int out= get_typeset_passes ();
+  // TMSCM_ALLOW_INTS;
+
+  return int_to_tmscm (out);
+}
+
+tmscm
+tmg_typeset_redone_count () {
+  // TMSCM_DEFER_INTS;
+  int out= get_typeset_redone ();
+  // TMSCM_ALLOW_INTS;
+
+  return int_to_tmscm (out);
+}
+
+tmscm
 tmg_texmacs_version_release (tmscm arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "texmacs-version-release");
 
@@ -252,6 +270,19 @@ tmg_default_japanese_font () {
   // TMSCM_ALLOW_INTS;
 
   return string_to_tmscm (out);
+}
+
+tmscm
+tmg_windows_cjk_font_candidates (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "windows-cjk-font-candidates");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  array_string out= windows_cjk_font_candidates (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return array_string_to_tmscm (out);
 }
 
 tmscm
@@ -10887,6 +10918,19 @@ tmg_window_to_buffer (tmscm arg1) {
 }
 
 tmscm
+tmg_window_2file (tmscm arg1) {
+  TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "window->file");
+
+  url in1= tmscm_to_url (arg1);
+
+  // TMSCM_DEFER_INTS;
+  url out= window_to_file (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return url_to_tmscm (out);
+}
+
+tmscm
 tmg_window_set_buffer (tmscm arg1, tmscm arg2) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "window-set-buffer");
   TMSCM_ASSERT_URL (arg2, TMSCM_ARG2, "window-set-buffer");
@@ -11561,6 +11605,8 @@ tmg_array_url_append (tmscm arg1, tmscm arg2) {
 void
 initialize_glue_basic () {
   tmscm_install_procedure ("typeset-check-mismatches",  tmg_typeset_check_mismatches, 0, 0, 0);
+  tmscm_install_procedure ("typeset-pass-count",  tmg_typeset_pass_count, 0, 0, 0);
+  tmscm_install_procedure ("typeset-redone-count",  tmg_typeset_redone_count, 0, 0, 0);
   tmscm_install_procedure ("texmacs-version-release",  tmg_texmacs_version_release, 1, 0, 0);
   tmscm_install_procedure ("version-before?",  tmg_version_beforeP, 2, 0, 0);
   tmscm_install_procedure ("updater-supported?",  tmg_updater_supportedP, 0, 0, 0);
@@ -11585,6 +11631,7 @@ initialize_glue_basic () {
   tmscm_install_procedure ("default-look-and-feel",  tmg_default_look_and_feel, 0, 0, 0);
   tmscm_install_procedure ("default-chinese-font",  tmg_default_chinese_font, 0, 0, 0);
   tmscm_install_procedure ("default-japanese-font",  tmg_default_japanese_font, 0, 0, 0);
+  tmscm_install_procedure ("windows-cjk-font-candidates",  tmg_windows_cjk_font_candidates, 1, 0, 0);
   tmscm_install_procedure ("default-korean-font",  tmg_default_korean_font, 0, 0, 0);
   tmscm_install_procedure ("get-retina-factor",  tmg_get_retina_factor, 0, 0, 0);
   tmscm_install_procedure ("get-retina-zoom",  tmg_get_retina_zoom, 0, 0, 0);
@@ -12353,6 +12400,7 @@ initialize_glue_basic () {
   tmscm_install_procedure ("current-window",  tmg_current_window, 0, 0, 0);
   tmscm_install_procedure ("buffer->windows",  tmg_buffer_2windows, 1, 0, 0);
   tmscm_install_procedure ("window-to-buffer",  tmg_window_to_buffer, 1, 0, 0);
+  tmscm_install_procedure ("window->file",  tmg_window_2file, 1, 0, 0);
   tmscm_install_procedure ("window-set-buffer",  tmg_window_set_buffer, 2, 0, 0);
   tmscm_install_procedure ("window-focus",  tmg_window_focus, 1, 0, 0);
   tmscm_install_procedure ("switch-to-window",  tmg_switch_to_window, 1, 0, 0);

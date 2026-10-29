@@ -1427,6 +1427,123 @@
     (when (url-exists? dir) (system-rmdir dir))
     (check= (current-buffer) old)))
 
+;; Presentation mode in one of two windows of a buffer (#549): the
+;; informative flags are hidden in that window only, by the typesetter
+;; (get-env), while info-flag, the document's setting, is not changed: the
+;; other window keeps it, the buffer is not modified, the saved file has it.
+;; The delayed fit-to-screen of toggle-full-screen-mode is dropped (with one
+;; window left, change-zoom-factor would write the zoom preference).
+
+(define (refresh-view)
+  ;; as the event loop would: a change of the environment is typeset again
+  (apply-changes)
+  (update-forced))
+
+(define (toggle-presentation)
+  (with-global exec-delayed-pause (lambda (c) (noop))
+    (toggle-full-screen-mode))
+  (refresh-view))
+
+(define (test-full-screen-info-flag)
+  (check-group "presentation mode: informative flags of one window")
+  (let* ((win (current-window))
+         (old (current-buffer))
+         (dir (system->url (string-append (url->system (url-temp-dir))
+                                          "/kbd-menu-test")))
+         (f (url-append dir "full-screen-flags.tm"))
+         (before (window-list))
+         (saved-info (lambda ()
+                       (assoc-ref (initial-of (tree->stree
+                                               (tree-import f "texmacs")))
+                                  "info-flag"))))
+    (system-mkdir dir)
+    (tree-export (stree->tree
+                  '(document (TeXmacs "2.1") (style (tuple "generic"))
+                             (body (document "one"))
+                             (initial (collection
+                                       (associate "info-flag" "detailed")))))
+                 f "texmacs")
+    (load-buffer f)
+    (switch-to-buffer old)
+    (open-buffer-in-window f (buffer-get f) "")
+    (with l (list-difference (window-list) before)
+      (check= (length l) 1)
+      (when (== (length l) 1)
+        (window-focus (car l))
+        (check= (current-buffer) f)
+        (clone-window)
+        (with ws (buffer->windows f)
+          (check= (length ws) 2)
+          (when (== (length ws) 2)
+            (window-focus (car ws))
+            (check= (get-init "info-flag") "detailed")
+            (check-false (full-screen?))
+            (catch #t
+              (lambda ()
+                (toggle-presentation)
+                (check-true (full-screen?))
+                ;; the full screen window: flags hidden, setting unchanged
+                (check= (get-env "info-flag") "none")
+                (check= (get-init "info-flag") "detailed")
+                (check-true (init-has? "info-flag"))
+                (check-false (buffer-modified? f))
+                ;; the other window keeps the flags
+                (window-focus (cadr ws))
+                (refresh-view)
+                (check= (get-init "info-flag") "detailed")
+                (check= (get-env "info-flag") "detailed")
+                (window-focus (car ws))
+                (refresh-view)
+                ;; a save during the presentation keeps the setting
+                (edit-step (lambda () (insert "x")))
+                (check-true (buffer-modified? f))
+                (buffer-save f)
+                (check= (saved-info) "detailed")
+                (check-false (buffer-modified? f))
+                (toggle-presentation)
+                (check-false (full-screen?))
+                (check= (get-env "info-flag") "detailed")
+                (check= (get-init "info-flag") "detailed")
+                (check-false (buffer-modified? f))
+                ;; the default setting (no info-flag in the document)
+                (edit-step (lambda () (init-default "info-flag")))
+                (refresh-view)
+                (buffer-save f)
+                (with dflt (get-env "info-flag")
+                  (check= dflt (get-init "info-flag"))
+                  (check-true (!= dflt "none"))
+                  (toggle-presentation)
+                  (check= (get-env "info-flag") "none")
+                  (check= (get-init "info-flag") dflt)
+                  (check-false (init-has? "info-flag"))
+                  (check-false (buffer-modified? f))
+                  (window-focus (cadr ws))
+                  (refresh-view)
+                  (check= (get-env "info-flag") dflt)
+                  (check-false (init-has? "info-flag"))
+                  (window-focus (car ws))
+                  (refresh-view)
+                  (toggle-presentation)
+                  (check= (get-env "info-flag") dflt)
+                  (check-false (init-has? "info-flag"))
+                  (check-false (buffer-modified? f))
+                  (check= (saved-info) #f)))
+              (lambda args
+                (check-true (begin (display* "error: " args "\n") #f))))
+            (window-focus (car ws))
+            (when (full-screen?) (toggle-presentation))
+            (buffer-pretend-saved f)
+            (kill-window (cadr ws)))
+          (buffer-pretend-saved f)
+          (kill-window (car ws)))))
+    (window-focus win)
+    (when (buffer-exists? f)
+      (buffer-pretend-saved f)
+      (buffer-close f))
+    (when (url-exists? f) (system-remove f))
+    (when (url-exists? dir) (system-rmdir dir))
+    (check= (current-buffer) old)))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Defining menus
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1550,6 +1667,7 @@
   (test-close-shared-window)
   (test-clone-window)
   (test-clone-window-init)
+  (test-full-screen-info-flag)
   (check-group "menu items")
   ;; all the menus above, each time they were expanded
   (check-true (> menu-buttons 10000))

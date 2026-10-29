@@ -27,6 +27,7 @@ typesetter_rep::typesetter_rep (edit_env& env2, tree et, path ip):
   br= make_bridge (this, et, ip);
   x1= y1= x2= y2=0;
   kept_pages= tm_new<page_memo> ();
+  collect= false;
 }
 
 typesetter_rep::~typesetter_rep () {
@@ -117,6 +118,15 @@ typesetter_rep::local_end (array<page_item>& prev_l, stack_border& prev_sb) {
 // see typesetter.hpp
 int typeset_check_mismatches= 0;
 int get_typeset_check_mismatches () { return typeset_check_mismatches; }
+int typeset_passes_total= 0;
+int typeset_redone_total= 0;
+int get_typeset_passes () { return typeset_passes_total; }
+int get_typeset_redone () { return typeset_redone_total; }
+void
+typeset_count_redone (int n) {
+  typeset_redone_total += n;
+  if (edit_profile.on) edit_profile.redone += n;
+}
 
 void
 typeset_cache_mismatch (string what) {
@@ -198,8 +208,10 @@ typesetter_rep::typeset () {
   b        = array<line_item> ();
   paper    = (env->get_string (PAGE_MEDIUM) == "paper");
 
-  // Test whether we are doing a complete typesetting
-  env->complete= br->my_typeset_will_be_complete ();
+  // Test whether we are doing a complete typesetting (or a pass which
+  // makes the tables again from the bridges, those used again writing
+  // their bindings and the entries of the auxiliary tables again: collect)
+  env->complete= collect || br->my_typeset_will_be_complete ();
   tree st= br->st;
   int i= 0, n= N(st);
   if (is_compound (st[0], "show-preamble")) { i++; env->complete= false; }
@@ -216,9 +228,12 @@ typesetter_rep::typeset () {
     env->redefined= array<tree> ();
     env->touched  = hashmap<string,bool> (false);
   }
+  typeset_passes_total++;
   double t0= edit_profile.on ? edit_profile_now () : 0;
   {
     shove_pass pass (shoves);
+    bridge_record_next= true;
+    bridge_macro_scope scope (false);
     br->typeset (PROCESSED+ WANTED_PARAGRAPH);
   }
   double t1= edit_profile.on ? edit_profile_now () : 0;

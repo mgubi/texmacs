@@ -1540,6 +1540,38 @@
     (check-both `(document ,xz) '(concat "x" (wildcard "y") "z")
                 '((0 0 0) (0 40001 1)))
     (check-both `(document ,xz) '(concat "x" (wildcard "y") "q") '())))
+;; With the cursor just after a tag with one argument (the path ends with 1,
+;; out of the range of its children), the children of the tag were never
+;; searched, and tree-search-tree-at missed the hits inside it (#548)
+(define (check-from-anywhere doc what expected)
+  ;; the hits of what from every cursor position in doc, in both modes, are
+  ;; the hits from the start
+  (check-from-inside doc what '() expected))
+
+(define (test-position-after-a-one-argument-tag)
+  (check-group "a position after a one-argument tag")
+  (check-from-anywhere
+    '(document (theorem (document "a" (frac "x" "y") "b")))
+    '(frac "x" "y") '((0 0 1 0) (0 0 1 1)))
+  (check-from-anywhere
+    '(document (theorem (document "a" (frac "x" "y") "b")) "c")
+    '(frac "x" "y") '((0 0 1 0) (0 0 1 1)))
+  (check-from-anywhere
+    '(document "a" (theorem (document "b d")) "c")
+    "d" '((1 0 0 2) (1 0 0 3)))
+  (check-from-anywhere
+    '(document (tabular (table (row (cell "a") (cell (frac "x" "y")))
+                               (row (cell "b") (cell "c")))))
+    '(frac "x" "y") '((0 0 0 1 0 0) (0 0 0 1 0 1)))
+  (check-from-anywhere
+    '(document (tabular (table (row (cell "a") (cell "b d")))))
+    "d" '((0 0 0 1 0 2) (0 0 0 1 0 3)))
+  (check-from-anywhere
+    '(document (concat "a " (strong "x b") " c"))
+    "b" '((0 1 0 2) (0 1 0 3)))
+  (check-from-anywhere
+    '(document (concat "a " (strong (concat "x" (frac "x" "y"))) " c"))
+    '(frac "x" "y") '((0 1 0 1 0) (0 1 0 1 1))))
 
 ;; Replace: the values of the wildcards are the runs which they take in the
 ;; match, as the search aligns the pattern with the text of the match
@@ -2464,6 +2496,7 @@
   (test-paragraphs)
   (test-limit-and-position)
   (test-position-inside-a-match)
+  (test-position-after-a-one-argument-tag)
   (test-middle-strings)
   (test-strings-and-wildcards-first)
   (test-hits-after-a-match)

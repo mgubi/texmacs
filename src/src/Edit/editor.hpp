@@ -357,6 +357,10 @@ public:
   virtual void     typeset_forced () = 0;
   virtual void     typeset_invalidate (path p) = 0;
   virtual void     typeset_invalidate_all () = 0;
+  virtual void     typeset_invalidate_labels () = 0;
+  virtual void     typeset_invalidate_keep () = 0;
+  virtual void     typeset_invalidate_inclusions () = 0;
+  virtual void     typeset_invalidate_pictures () = 0;
   virtual bool     typeset_renumber_labels () = 0;
   virtual void     typeset_invalidate_players (path p, bool reattach) = 0;
 

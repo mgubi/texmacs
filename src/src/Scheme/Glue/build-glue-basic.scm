@@ -18,6 +18,8 @@
   "initialize_glue_basic"
 
   (typeset-check-mismatches get_typeset_check_mismatches (int))
+  (typeset-pass-count get_typeset_passes (int))
+  (typeset-redone-count get_typeset_redone (int))
   (texmacs-version-release texmacs_version (string string))
   (version-before? version_inf (bool string string))
   (updater-supported? updater_supported (bool))
@@ -42,6 +44,8 @@
   (default-look-and-feel default_look_and_feel (string))
   (default-chinese-font default_chinese_font_name (string))
   (default-japanese-font default_japanese_font_name (string))
+  (windows-cjk-font-candidates windows_cjk_font_candidates
+                               (array_string string))
   (default-korean-font default_korean_font_name (string))
   (get-retina-factor get_retina_factor (int))
   (get-retina-zoom get_retina_zoom (int))
@@ -893,6 +897,7 @@
   (current-window get_current_window (url))
   (buffer->windows buffer_to_windows (array_url url))
   (window-to-buffer window_to_buffer (url url))
+  (window->file window_to_file (url url))
   (window-set-buffer window_set_buffer (void url url))
   (window-focus window_focus (void url))
   (switch-to-window switch_to_window (void url))

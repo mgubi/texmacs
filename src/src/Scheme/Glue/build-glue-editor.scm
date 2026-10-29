@@ -331,6 +331,7 @@
   (apply-changes apply_pending_changes (void))
   (update-path typeset_invalidate (void path))
   (update-current-buffer typeset_invalidate_all (void))
+  (update-current-buffer-keep typeset_invalidate_keep (void))
   (renumber-auto-labels typeset_renumber_labels (bool))
   (update-players typeset_invalidate_players (void path bool))
   (generate-all-aux generate_aux (void))

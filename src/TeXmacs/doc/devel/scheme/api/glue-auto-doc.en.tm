@@ -27,6 +27,22 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(typeset-pass-count)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|get_typeset_passes> which returns
+    <scm|int>.
+  </explain>
+
+  <\explain>
+    <scm|(typeset-redone-count)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|get_typeset_redone> which returns
+    <scm|int>.
+  </explain>
+
+  <\explain>
     <scm|(texmacs-version-release <scm-arg|string>)>
 <explain-synopsis|no synopsis>
   <|explain>
@@ -216,6 +232,14 @@ source code.
   <|explain>
     Calls the <c++> function <cpp|default_japanese_font_name> which returns
     <scm|string>.
+  </explain>
+
+  <\explain>
+    <scm|(windows-cjk-font-candidates <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|windows_cjk_font_candidates> which returns
+    <scm|array_string>.
   </explain>
 
   <\explain>
@@ -6363,6 +6387,14 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(window-\<gtr\>file <scm-arg|url>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|window_to_file> which returns
+    <scm|url>.
+  </explain>
+
+  <\explain>
     <scm|(window-set-buffer <scm-arg|url> <scm-arg|url>)>
 <explain-synopsis|no synopsis>
   <|explain>
@@ -7071,6 +7103,14 @@ source code.
 <explain-synopsis|no synopsis>
   <|explain>
     Calls the <c++> function <cpp|typeset_update_all> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(update-picture-buffers)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|typeset_update_pictures> which returns
     <scm|void>.
   </explain>
 
@@ -9351,6 +9391,14 @@ source code.
 <explain-synopsis|no synopsis>
   <|explain>
     Calls the <c++> function <cpp|typeset_invalidate_all> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(update-current-buffer-keep)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|typeset_invalidate_keep> which returns
     <scm|void>.
   </explain>
 

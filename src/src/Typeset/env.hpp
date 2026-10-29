@@ -342,6 +342,9 @@ public:
   hashmap<string,tree>         missing;     // missing refs
   array<tree>                  redefined;   // redefined labels
   hashmap<string,bool>         touched;     // touched refs
+  hashmap<string,bool>         read_refs;   // refs read since the tables
+                                            // were loaded (see clean_unused)
+  bool                         refs_settled;// tables cleaned by a pass since
   link_repository              link_env;    // current links
   array<array<int> >           size_cache;  // math font size cache
   array<rectangle>             white_zones; // text exclusion zones for curves
@@ -662,8 +665,8 @@ public:
   inline void read_other () { if (env.rec != NULL) env.all= true; }
   // The references and the attachments which are looked up are recorded
   // too, with the values found: a name ("0" or "1" for the two parts of
-  // a binding, "a" for an attachment, then the key) and a value, which
-  // lookup_value finds again
+  // a binding, "a" for an attachment, "i" for an included document, then
+  // the key or the file) and a value, which lookup_value finds again
   array<string>* rec_keys;
   array<tree>*   rec_values;
   hashmap<string,bool>* rec_key_set; // (the keys of rec_keys, once each)
@@ -689,6 +692,28 @@ public:
     (*rec_merged) (a.operator-> ())= true; (*rec_held) << a; }
   void write_binding (string key, tree value, string extra);
   tree store_binding (string key, tree value, string extra);
+  // An entry of an auxiliary table (<write|toc|...>: the table of contents,
+  // the index...), which a complete pass makes: it is recorded with the
+  // bindings, as <write|key|value>, so that a bridge used again writes it
+  // again, and a complete pass need not typeset all again
+  inline void store_aux (string key, tree value) {
+    if (!complete) return;
+    if (!local_aux->contains (key)) local_aux (key)= tree (DOCUMENT);
+    local_aux (key) << value; }
+  inline void write_aux (string key, tree value) {
+    if (rec_bindings != NULL) (*rec_bindings) << tree (WRITE, key, value);
+    store_aux (key, value); }
+  // A bridge used again in a complete pass tells the references which it
+  // found missing (exec_get_binding does, where it is typeset), so that the
+  // pass is repeated and the warnings stay as long as they are true
+  inline void replay_missing (array<string> keys, array<tree> values) {
+    if (!complete) return;
+    for (int i=0; i<N(keys); i++)
+      if ((keys[i][0] == '0' || keys[i][0] == '1') &&
+          values[i] == tree (UNINIT) && get_bool (WARN_MISSING)) {
+        string key= keys[i] (1, N(keys[i]));
+        missing (key)= tree (GET_BINDING, key);
+      } }
   inline void write_bindings (array<tree> l) {
     // (those of a bridge used again: the record above gets the same tuples,
     // which take the value stored when it is a new one, so that the next
@@ -696,6 +721,7 @@ public:
     if (rec_bindings != NULL) (*rec_bindings) << l;
     for (int i=0; i<N(l); i++) {
       tree t= l[i];
+      if (is_func (t, WRITE, 2)) { store_aux (t[0]->label, t[1]); continue; }
       tree stored= store_binding (t[0]->label, t[1], t[2]->label);
       if (stored.operator-> () != t[1].operator-> ()) t[1]= stored; } }
   // a record of the bindings written for the time of one typesetting,
@@ -783,6 +809,16 @@ public:
   };
   tree lookup_value (string name);
   tree lookup (string name);
+  // The picture which an image or a pattern shows ("p" or "q", the base file
+  // and the name as written in the document: picture_key), and the size
+  // which the typesetting took from it, as a lookup (see rec_keys): the
+  // pictures loaded again (Tools > Update > Pictures) type again the images
+  // whose file or size changed, and nothing else
+  url  image_file (url base, string label);
+  url  pattern_file (url base, string label);
+  string picture_key (char kind, string label);
+  tree picture_value (string name);
+  tree picture_lookup (char kind, string label, url file, int w, int h);
   // a fingerprint of the values of the variables which are not plain
   unsigned long long derived_state ();
   // a copy of the table of the variables (not recorded as a read)
@@ -985,6 +1021,14 @@ bool inclusion_busy (url u);
 void inclusion_enter (url u);
 void inclusion_leave (url u);
 void reset_inclusion (url u);
+bool refresh_inclusions ();
+// (whether the typesetting looked up a picture, see edit_env_rep::picture_value)
+bool typeset_pictures_used ();
+// the included document of a file, as the cache of the inclusions has it
+// (by the name of the file: as_string), and a number which changes when
+// the cache changes (the lookups of the inclusions, see same_lookups)
+tree inclusion_value (string name);
+unsigned long long inclusions_stamp ();
 struct inclusion_guard {
   // Marks u as being included during the guard's lifetime (exception-safe)
   url u;
