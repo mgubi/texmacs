@@ -613,7 +613,17 @@
     (check-bad-go-to '(document "abc") '(5 0) '(0 3) '(document "abcX"))
     (check-bad-go-to '(document "abc") '(0 9) '(0 3) '(document "abcX"))
     ;; more children than the tag has (a row of a one-row table)
-    (check-bad-go-to table '(0 0 7 0 0) '(0 0 0 1 0 1) (table-x "a" "bX")))
+    (check-bad-go-to table '(0 0 7 0 0) '(0 0 0 1 0 1) (table-x "a" "bX"))
+    ;; the path of the buffer itself, the node of the document
+    (check-bad-go-to '(document "abc") '() '(0 0) '(document "Xabc")))
+  ;; the empty path is not in the buffer: go-to ignores it
+  (with-buffer-body '(document "abc")
+    (lambda ()
+      (edit (go-to (at 0 2)))
+      (edit (go-to '()))
+      (check= (cursor) '(0 2))
+      (edit (insert "X"))
+      (check= (body) '(document "abXc"))))
   ;; a path in the document is kept
   (with-buffer-body '(document "abc" (frac "x" "y"))
     (lambda ()

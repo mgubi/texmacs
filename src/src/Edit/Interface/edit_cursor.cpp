@@ -427,8 +427,11 @@ correct_outside (tree et, path rp, path p) {
   // the editing functions, which assume their paths are in the tree, and
   // crash them (#599). It is corrected to the closest cursor inside the
   // tree, as super_correct corrects a path in the tree.
-  if (is_inside (et, p) || !(rp <= p)) return p;
+  // The test is made in the buffer: in the root tree, the path of the
+  // buffer itself (go-to (buffer-path)) would count as inside.
+  if (!(rp <= p)) return p;
   tree st= subtree (et, rp);
+  if (is_inside (st, p / rp)) return p;
   return rp * super_correct (st, closest_inside (st, p / rp));
 }
 
